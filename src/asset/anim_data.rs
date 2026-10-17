@@ -43,7 +43,7 @@ impl<T> Track<T> {
 
     /// The track's last key time, or `0.0` when empty — used to derive the clip's
     /// overall duration.
-    pub fn end_time(&self) -> f32 {
+    fn end_time(&self) -> f32 {
         self.times.last().copied().unwrap_or(0.0)
     }
 }

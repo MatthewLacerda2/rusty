@@ -47,35 +47,29 @@ pub mod snapshot;
 pub mod world_cache;
 
 pub use camera::{
-    apply_lens, camera_for_entity, game_camera_from_scene, sync_lens_from_scene, Camera,
-    ScreenPoint,
+    camera_for_entity, game_camera_from_scene, sync_lens_from_scene, Camera, ScreenPoint,
 };
 pub use collision_matrix::CollisionMatrix;
 pub use fog::{FogMode, FogSettings};
 pub use identity::SceneId;
 pub use io::{
-    build_default_scene, bundled, is_scene_path, load_from_file, read_scene_file, save_lighting,
-    save_to_file, seed_default_scene, seed_default_scripts, seed_workspace, LightingSave,
-    DEFAULT_SCENE_PATH, DEFAULT_SCRIPTS_DEST_DIR, SCENE_EXTENSION,
+    build_default_scene, bundled, load_from_file, read_scene_file, save_lighting, save_to_file,
+    seed_default_scene, seed_default_scripts, seed_workspace, LightingSave, DEFAULT_SCENE_PATH,
+    DEFAULT_SCRIPTS_DEST_DIR,
 };
 pub use layers::{layer_in_mask, LayerRegistry, LAYER_COUNT};
-pub use lighting::io::{
-    apply_lighting, extract_lighting, load_lighting_sidecar, save_lighting_sidecar, sidecar_path,
-    LightingData,
-};
+pub use lighting::io::{sidecar_path, LightingData};
 pub use lighting::probe::{Probe, ProbeGrid, ProbeVolume};
-pub use lighting::probe_fill::{analytic_fill, AnalyticEnv};
+pub use lighting::probe_fill::analytic_fill;
 pub use lighting::reflection_probe::{ReflectionProbe, ReflectionProbeSet};
-pub use lighting::sh::{Sh9, SH_COEFFS};
-pub use prefab::apply::{apply_instance_field_to_source, apply_instance_to_source};
+pub use lighting::sh::Sh9;
 pub use prefab::link::{
-    list_instance_overrides, record_instance_overrides, reimport_all_linked_instances,
-    reimport_instance, revert_instance_overrides,
+    list_instance_overrides, record_instance_overrides, reimport_instance,
+    revert_instance_overrides,
 };
 pub use prefab::{
-    extract_prefab, instantiate_prefab, instantiate_prefab_linked, is_prefab_path,
-    load_and_instantiate, load_and_instantiate_linked, read_prefab_file, save_prefab,
-    write_prefab_file, PrefabData, PREFAB_EXTENSION,
+    extract_prefab, instantiate_prefab, is_prefab_path, load_and_instantiate,
+    load_and_instantiate_linked, read_prefab_file, save_prefab, PrefabData, PREFAB_EXTENSION,
 };
 pub use scene::{
     AnimatorComponent, AudioSourceComponent, CameraComponent, ClearFlags, ColliderComponent,

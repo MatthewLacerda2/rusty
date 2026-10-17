@@ -17,7 +17,7 @@ impl Renderer {
     /// Whether the surface can turn vsync OFF — i.e. advertises `Immediate`. `Fifo`
     /// (vsync on) is mandated by wgpu on every backend, so vsync can always be
     /// turned back on; only the off direction is gated.
-    pub fn supports_no_vsync(&self) -> bool {
+    fn supports_no_vsync(&self) -> bool {
         self.present_modes.contains(&wgpu::PresentMode::Immediate)
     }
 

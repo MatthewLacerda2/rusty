@@ -58,7 +58,7 @@ mod sizes;
 
 pub use lookup::{driven_by_group, rect_in, rect_of};
 pub use rect::UiRect;
-pub use sizes::{element_sizes, Sizes};
+pub use sizes::Sizes;
 
 /// Every UI element's computed rect, in draw order (a resource; see the module docs).
 #[derive(Clone, Debug, Default, PartialEq)]

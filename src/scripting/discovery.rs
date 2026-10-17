@@ -45,7 +45,7 @@ pub fn monobehaviour_scripts(dir: &str) -> Vec<String> {
 
 /// True if `code`, evaluated as a chunk, returns a table with at least one
 /// lifecycle method. A fresh `Lua` per call keeps detection side-effect-free.
-pub fn exposes_lifecycle(code: &str) -> bool {
+fn exposes_lifecycle(code: &str) -> bool {
     let lua = Lua::new();
     let Ok(table) = lua.load(code).eval::<Table>() else {
         return false;

@@ -48,7 +48,7 @@ pub fn locate(named: Option<PathBuf>) -> PathBuf {
 
 /// A shipped game's project: `project/` beside the executable, or in the macOS
 /// bundle's `Resources/`, when it holds an `assets/` folder.
-pub fn packaged_project() -> Option<PathBuf> {
+fn packaged_project() -> Option<PathBuf> {
     find_packaged_project(&exe_dir()?)
 }
 

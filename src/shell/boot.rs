@@ -123,7 +123,7 @@ pub fn load_game(scene_path: &str) -> GameWorld {
 
 /// Open the real audio device and inject it into the `AudioMaestro` (#212). A box
 /// with no audio device keeps the no-op backend, logging instead of failing.
-pub fn init_audio(game: &GameWorld) {
+fn init_audio(game: &GameWorld) {
     match crate::audio::KiraBackend::open() {
         Some(backend) => game
             .resources
@@ -139,7 +139,7 @@ pub fn init_audio(game: &GameWorld) {
 
 /// Load the physical→logical key remap (#88) from the persistent store. A missing
 /// binding blob means the identity mapping.
-pub fn load_keymap(game: &GameWorld) -> Keymap {
+fn load_keymap(game: &GameWorld) -> Keymap {
     let storage = game.resources.storage.borrow();
     match storage.get(KEYBINDINGS_NAMESPACE, KEYBINDINGS_KEY) {
         Some(blob) => Keymap::from_json(&blob),

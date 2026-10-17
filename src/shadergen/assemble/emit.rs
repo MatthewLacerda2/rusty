@@ -129,7 +129,7 @@ fn literal(p: &Param, value: Option<&ParamValue>) -> String {
 
 /// Format an `f32` so it is always a valid WGSL float literal (has a decimal
 /// point) and is deterministic across platforms.
-pub fn fmt_f32(v: f32) -> String {
+fn fmt_f32(v: f32) -> String {
     let s = format!("{v:?}");
     if s.contains('.') || s.contains('e') || s.contains("inf") || s.contains("nan") {
         s

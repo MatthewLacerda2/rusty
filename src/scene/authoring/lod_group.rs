@@ -22,13 +22,6 @@ pub fn set_size(g: &mut LodGroupComponent, size: f32) {
     }
 }
 
-/// Replace every level, then order the thresholds: each clamped into `0..=1` and to
-/// at most its finer neighbour's.
-pub fn set_levels(g: &mut LodGroupComponent, levels: Vec<LodLevel>) {
-    g.levels = levels;
-    normalize(g);
-}
-
 /// Set level `level`'s screen height, clamped between its neighbours' so the order
 /// holds. Out of range: no-op.
 pub fn set_level_height(g: &mut LodGroupComponent, level: usize, height: f32) {
@@ -70,20 +63,6 @@ pub fn remove_level(g: &mut LodGroupComponent, level: usize) {
     }
 }
 
-/// Clamp every threshold into `0..=1` and to at most its finer neighbour's, so the
-/// levels read finest-first; a non-finite threshold becomes its neighbour's.
-fn normalize(g: &mut LodGroupComponent) {
-    let mut ceiling = 1.0f32;
-    for level in &mut g.levels {
-        let h = match level.screen_height.is_finite() {
-            true => level.screen_height,
-            false => ceiling,
-        };
-        level.screen_height = h.clamp(0.0, ceiling);
-        ceiling = level.screen_height;
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -96,22 +75,11 @@ mod tests {
     }
 
     #[test]
-    fn set_levels_orders_and_clamps_the_thresholds() {
-        let mut g = LodGroupComponent::default();
-        let levels = vec![level(1.5, &[1]), level(0.2, &[2]), level(0.4, &[3])];
-        set_levels(&mut g, levels);
-        let heights: Vec<f32> = g.levels.iter().map(|l| l.screen_height).collect();
-        assert_eq!(heights, vec![1.0, 0.2, 0.2]);
-        assert_eq!(g.levels[2].renderers, vec![3]);
-    }
-
-    #[test]
     fn level_height_stays_between_its_neighbours() {
-        let mut g = LodGroupComponent::default();
-        set_levels(
-            &mut g,
-            vec![level(0.6, &[]), level(0.3, &[]), level(0.1, &[])],
-        );
+        let mut g = LodGroupComponent {
+            levels: vec![level(0.6, &[]), level(0.3, &[]), level(0.1, &[])],
+            ..Default::default()
+        };
         set_level_height(&mut g, 1, 0.9);
         assert_eq!(g.levels[1].screen_height, 0.6);
         set_level_height(&mut g, 1, 0.0);

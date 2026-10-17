@@ -74,13 +74,3 @@ pub fn capture_world_into(
     let scene = world.scene().borrow();
     capture_into(host, &scene, &world.camera().borrow(), path, width, height)
 }
-
-/// One-shot [`capture_world_into`].
-pub fn capture_world(
-    world: &GameWorld,
-    path: impl AsRef<Path>,
-    width: u32,
-    height: u32,
-) -> Result<bool, String> {
-    capture_world_into(&mut CaptureHost::new(), world, path, width, height)
-}

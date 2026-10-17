@@ -35,7 +35,6 @@ mod resources;
 mod scene_load;
 mod schedule;
 mod stage;
-mod system;
 mod trails;
 mod ui;
 mod world;
@@ -46,7 +45,6 @@ pub use registry::{build, App};
 pub use resources::Resources;
 pub use schedule::Schedule;
 pub use stage::Stage;
-pub use system::System;
 pub use world::World;
 
 #[cfg(test)]

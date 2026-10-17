@@ -1,6 +1,6 @@
-//! Shared-cell plumbing for [`ScriptManager`]: the `set_*_cell` injectors the app and
-//! platform layer use to hand the runtime the very cells they hold, and the `*_cell`
-//! accessors they read back through. Split from `manager` so the runtime's own
+//! Shared-cell plumbing for [`ScriptManager`]: the `set_*` injectors `Resources` uses
+//! to hand the runtime the very cells it holds, and the `*_cell` accessors the app and
+//! platform layer read and write through. Split from `manager` so the runtime's own
 //! lifecycle stays readable; every cell here is one an `api::` namespace borrows.
 
 use std::cell::RefCell;
@@ -22,12 +22,6 @@ impl ScriptManager {
     /// play-mode systems must agree on one device/log).
     pub fn set_audio_cell(&mut self, audio: Rc<RefCell<AudioMaestro>>) {
         self.audio = audio;
-    }
-
-    /// Handle to the shared audio maestro, so the platform layer can inject the real
-    /// `KiraBackend` and read the introspection log.
-    pub fn audio_cell(&self) -> Rc<RefCell<AudioMaestro>> {
-        Rc::clone(&self.audio)
     }
 
     /// Inject the shared UI screen-size cell (#417). `Resources` calls this so the
@@ -54,14 +48,6 @@ impl ScriptManager {
         Rc::clone(&self.is_playing)
     }
 
-    /// Inject the shared scene-path cell — the `Scene.Save()` write-back target.
-    /// The platform layer keeps this in sync with `EditorUi.current_scene_path`,
-    /// and the headless session sets it from the loaded boot scene, so a scripted
-    /// save writes back to the same file the editor would.
-    pub fn set_scene_path_cell(&mut self, scene_path: Rc<RefCell<Option<String>>>) {
-        self.scene_path = scene_path;
-    }
-
     /// Handle to the shared scene-path cell, so the platform layer can read/sync
     /// the current scene file with the editor's `current_scene_path`.
     pub fn scene_path_cell(&self) -> Rc<RefCell<Option<String>>> {
@@ -74,24 +60,10 @@ impl ScriptManager {
         self.storage = storage;
     }
 
-    /// Inject the shared quality-preset cell. The platform layer keeps this cell
-    /// in sync with the renderer's tier, so `Graphics.SetQuality` from a script
-    /// reaches `renderer.set_quality` (which guards the bloom-buffer realloc).
-    pub fn set_quality_cell(&mut self, quality: Rc<RefCell<QualityPreset>>) {
-        self.quality = quality;
-    }
-
     /// Handle to the shared quality-preset cell, so the platform layer can read a
     /// script-driven tier change and apply it to the renderer.
     pub fn quality_cell(&self) -> Rc<RefCell<QualityPreset>> {
         Rc::clone(&self.quality)
-    }
-
-    /// Inject the shared video-settings cell. The platform layer keeps this in sync
-    /// with the live surface/window, so `Video.*` writes from a script reach the
-    /// wgpu surface (resolution / present mode) and the winit window (fullscreen).
-    pub fn set_video_cell(&mut self, video: Rc<RefCell<VideoSettings>>) {
-        self.video = video;
     }
 
     /// Handle to the shared video-settings cell, so the platform layer can read a

@@ -18,7 +18,7 @@ pub struct LodSet {
 }
 
 /// Split `name` into its base and level when it ends in `_LOD<n>`.
-pub fn lod_suffix(name: &str) -> Option<(&str, u32)> {
+fn lod_suffix(name: &str) -> Option<(&str, u32)> {
     let at = name.rfind('_')?;
     let (base, tail) = (&name[..at], &name[at + 1..]);
     let tag = tail.get(..3).filter(|t| t.eq_ignore_ascii_case("lod"));

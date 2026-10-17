@@ -26,7 +26,7 @@ use crate::scene::{LightComponent, LightType, Scene};
 /// The bundled preview mesh (#352): a hardcoded `.obj`, never a project asset — it
 /// lives in the engine's own content (`engine/`, found from any project), never in
 /// the project's `assets/` the Content Browser scans, so it is never browsable.
-pub fn suzanne_path() -> String {
+fn suzanne_path() -> String {
     crate::core::project::engine_path("models/suzanne.obj")
 }
 

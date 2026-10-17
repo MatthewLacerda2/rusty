@@ -27,7 +27,7 @@ pub const FLY_SPEED_RANGE: (f32, f32) = (0.5, 200.0);
 /// Shift multiplies the fly speed by this.
 pub const FAST_MULTIPLIER: f32 = 3.0;
 /// Degrees of turn per point (or raw mouse count) of pointer motion.
-pub const DEGREES_PER_POINT: f32 = 0.25;
+const DEGREES_PER_POINT: f32 = 0.25;
 /// Fraction of the pivot distance one scroll step (one notch, 50 points) zooms.
 pub const ZOOM_PER_STEP: f32 = 0.15;
 /// Points of scroll that make one step, egui's line height times the notch lines.

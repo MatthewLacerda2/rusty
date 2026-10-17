@@ -11,9 +11,9 @@ use super::OffMeshLinkData;
 /// Unity's default `avoidancePriority`: the middle of the 0–99 range.
 pub const DEFAULT_AVOIDANCE_PRIORITY: u8 = 50;
 /// Unity's default `angularSpeed`, degrees/second.
-pub const DEFAULT_ANGULAR_SPEED: f32 = 120.0;
+const DEFAULT_ANGULAR_SPEED: f32 = 120.0;
 /// The default yaw-rate ramp, degrees/second²: 0 → 120°/s in 1/6 s.
-pub const DEFAULT_ANGULAR_ACCELERATION: f32 = 720.0;
+const DEFAULT_ANGULAR_ACCELERATION: f32 = 720.0;
 /// The highest (least important) avoidance priority, as in Unity.
 pub const MAX_AVOIDANCE_PRIORITY: u8 = 99;
 
@@ -129,9 +129,6 @@ pub struct NavMeshAgentComponent {
     /// The link the agent is on now, if any (Unity's `isOnOffMeshLink`).
     #[serde(skip)]
     pub off_mesh_link: Option<OffMeshLinkData>,
-    /// How far (world units) auto-traversal has carried the agent along that link.
-    #[serde(skip)]
-    pub link_progress: f32,
     /// The signed yaw rate the agent is turning at, degrees/second (+ is
     /// counter-clockwise seen from above); zero when it isn't turning.
     #[serde(skip)]
@@ -196,7 +193,6 @@ impl Default for NavMeshAgentComponent {
             path_status: NavPathStatus::Invalid,
             path_links: Vec::new(),
             off_mesh_link: None,
-            link_progress: 0.0,
             angular_velocity: 0.0,
         }
     }

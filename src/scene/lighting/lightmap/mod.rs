@@ -36,10 +36,7 @@ mod trace;
 
 pub use atlas::{pack, LightmapAtlas, MAX_PAGE};
 pub use bake::{bake, bake_with_progress, BakeSettings, Lightmap};
-pub use encode::{
-    decode_direction, decode_rgbm, encode_direction, encode_directions, encode_rgbm, encode_texels,
-    RGBM_RANGE,
-};
+pub use encode::{encode_directions, encode_texels};
 pub use input::{BakeLight, BakeMesh, BakeScene, LightShape};
 pub use probe_direct::baked_direct_sh;
 pub use progress::BakeProgress;

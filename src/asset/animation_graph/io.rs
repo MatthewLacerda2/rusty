@@ -7,16 +7,7 @@
 
 use std::path::Path;
 
-use super::{AnimationGraph, GraphError, GRAPH_EXTENSION};
-
-/// True if `path` looks like a graph asset (`guard.animgraph`). Case-insensitive,
-/// mirroring [`is_model_path`](crate::asset::is_model_path).
-pub fn is_graph_path(path: &str) -> bool {
-    Path::new(path)
-        .extension()
-        .and_then(|e| e.to_str())
-        .is_some_and(|e| e.eq_ignore_ascii_case(GRAPH_EXTENSION))
-}
+use super::{AnimationGraph, GraphError};
 
 /// Load and validate the graph at `path`. This is what rehydrates the
 /// `AnimatorComponent`'s path reference on scene load (#316) — a graph that loads

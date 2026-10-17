@@ -7,7 +7,6 @@
 
 use super::super::image_buf::{Image, Rgba};
 use super::generators::count;
-use super::math::luminance;
 
 /// Resample `img` under an affine domain transform: translate, rotate (turns) about
 /// the domain center, then scale; a `scale > 1` packs more repeats into the canvas.
@@ -114,11 +113,4 @@ pub fn separate_rgb(mut img: Image, channel: u8) -> Image {
         [v, v, v, 1.0]
     });
     img
-}
-
-/// Treat an RGB pixel as a height by its luminance — used when a height-consuming op
-/// is fed a color image rather than a grayscale one.
-#[inline]
-pub fn height_of(p: Rgba) -> f32 {
-    luminance(p)
 }

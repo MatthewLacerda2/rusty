@@ -16,7 +16,7 @@ use super::{AnimatorComponent, AnimatorParameter, LayerState};
 impl AnimatorParameter {
     /// The live value a declared parameter starts from when a graph binds: its
     /// declared default; a `Trigger` declares none — it always starts clear.
-    pub fn from_declaration(decl: &ParameterDeclaration) -> Self {
+    fn from_declaration(decl: &ParameterDeclaration) -> Self {
         match decl {
             ParameterDeclaration::Bool(v) => AnimatorParameter::Bool(*v),
             ParameterDeclaration::Float(v) => AnimatorParameter::Float(*v),

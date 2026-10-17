@@ -34,7 +34,7 @@ pub fn decibels(gain: f32) -> Decibels {
 }
 
 /// One group's track and the handles that retune it.
-pub struct GroupTrack {
+struct GroupTrack {
     pub track: TrackHandle,
     low_pass: FilterHandle,
     high_pass: FilterHandle,
