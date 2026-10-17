@@ -189,7 +189,8 @@ blockers: ## Prose-only "Blocked by #N" GitHub never recorded. ARGS=--fix record
 # gets skipped under load (#913). Removes every worktree under .claude/worktrees/
 # whose PR merged or closed, target/ first; never one with uncommitted changes,
 # unpushed commits or a lock, which it names. Prints the rest's target/ sizes and
-# free disk before and after. ARGS=--dry-run lists without deleting.
+# free disk before and after; a linked worktree outside .claude/worktrees/ is
+# named OUTSIDE, never touched (#982). ARGS=--dry-run lists without deleting.
 reclaim: ## Remove merged worktrees (and their target/), report disk. ARGS=--dry-run lists only
 	@python3 .github/scripts/reclaim.py $(ARGS)
 
