@@ -1,7 +1,7 @@
 //! src/asset/convert/glb/ — the glTF 2.0 a converter writes (#1024).
 //!
 //! A converter that reads its source itself (FBX through `ufbx`) fills a
-//! [`Document`] and [`write`] turns it into one binary glTF: geometry, base-colour
+//! [`Document`] and [`write()`] turns it into one binary glTF: geometry, base-colour
 //! materials, the node hierarchy and skins. Only what the engine's glTF importer
 //! reads back is here, so the round trip `source → Document → .glb → ImportedAsset`
 //! loses nothing the engine uses. Output is byte-for-byte deterministic: the same
