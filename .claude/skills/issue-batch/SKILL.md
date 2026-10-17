@@ -46,21 +46,28 @@ run) **skips that pull request and the watch carries on** with the rest (#751),
 printing `queue: HANDED BACK #N: …` as it happens; a fix pushed to the branch
 re-queues it. It exits on the machine failing, its deadline, or when nothing is
 left, with status 1 if anything was handed back and 3 if the machine or GitHub
-failed. **Run the watch as a background command writing to a log, and put a
-`Monitor` on `tail -F <log> | grep --line-buffered 'HANDED BACK'`**, never the
-watch itself under the `Monitor`: a `Monitor` dies at 30 minutes and kills its
-command, and the watch runs 70 (MatthewLacerda2/scorsese#845). Only one watch runs
+failed. **Start it under its supervisor: `make queue-daemon ARGS="--no-check --since
+<batch start>"`** (#908), from a worktree of its own under `.claude/worktrees/`. The
+supervisor detaches (a background command dies at two hours), logs to
+`.git/merge-queue/queue.log`, moves its worktree to `origin/main` before each
+watch, and starts the watch again by itself on every planned exit: its deadline
+and a hand-back at once, "nothing left" after ten minutes, the queue's own code
+changing on `main` (#967) at once, the machine or GitHub failing with a backoff,
+five times in a row at most. `make queue-stop` stops both between pull requests;
+never `pkill`. **Put a `Monitor` on `tail -F .git/merge-queue/queue.log | grep
+--line-buffered -E 'HANDED BACK|supervisor:.*stopped'`**, never the watch itself
+under the `Monitor`: a `Monitor` dies at 30 minutes and kills its command
+(MatthewLacerda2/scorsese#845). Only one watch runs
 at a time: a second refuses to start, naming the first's PID, with status 4
-(#928, a lock on `.git/merge-queue.lock`). Without the `Monitor` the watch's exit still
-wakes you. The watch also prints a
+(#928, a lock on `.git/merge-queue.lock`); a second supervisor likewise. The watch also prints a
 line per pull-request transition (`watch: #N opened as a draft`, `turned
 ready`, `back to draft`, `closed`, `queued`, `unqueued`; #909), so that one log (widen
 the `grep` to `watch:` lines when you want them) is the orchestrator's whole view: no
 separate pull-request poller; `--since <batch start>` keeps those lines to the
-batch's own pull requests (#928). Start it with `--for 70` (#697; `ci-merge` has why 70, and when to
-trade it for a longer per-PR `--deadline`; the watch refuses a pair past two hours). The watch ends itself first, between
-pull requests, with `watch ended: deadline reached …` — relaunch it
-as it was, nothing to read: its last line is always `watch: resume: <command>`, the exact command to run. It never resolves a conflict: a hand-back naming paths goes back to the
+batch's own pull requests (#928). Run bare, as `make queue ARGS="--watch --no-check --for 70"`
+in the background, the watch needs `--for` (#697; `ci-merge` has why 70; it refuses a pair
+with `--deadline` past two hours) and relaunching by hand on each exit: its last line is
+always `watch: resume: <command>`, the exact command to run. It never resolves a conflict: a hand-back naming paths goes back to the
 branch's author. `make queue PRS="a b c"` still takes named pull requests in the
 order given (a hand-back there skips the entry and the rest carry on), and
 `ARGS=--dry-run` shows what either would do and writes nothing.
@@ -287,13 +294,11 @@ This is the shape that ran the 2026-09-30 batch (≈40 pull requests merged in o
 day). Each role does what only it can do.
 
 **The orchestrator (this session, local)** writes no feature code. It picks work,
-briefs cloud coders, reviews and merges. It **starts `make queue
-ARGS="--watch --no-check --for 70 --since <batch start>"` in the background** (from a worktree under
-`.claude/worktrees/`), relaunches it unchanged (its `watch: resume:` line) each time it exits on its
-deadline (`watch ended: deadline reached`, #697: the first overnight watch was
-killed at the two-hour background cap mid-CI-wait), and is otherwise woken only
-by a `HANDED BACK` line (a `Monitor` tailing the watch's log, see above) or when
-the watch exits — never a
+briefs cloud coders, reviews and merges. It **starts `make queue-daemon
+ARGS="--no-check --since <batch start>"`** once (from a worktree under
+`.claude/worktrees/`; #908), which relaunches the watch on its own across every planned
+exit, and is otherwise woken only
+by a `HANDED BACK` line or the supervisor stopping (a `Monitor` tailing its log, see above) — never a
 per-PR polling loop or a chain of `make queue PRS=N` runs (#664: the 2026-09-30
 batch spent about 69 queue invocations and dozens of hand-built watchers on
 that, and one chain was cancelled by mistake). Its loop per pull request:
@@ -331,7 +336,8 @@ that, and one chain was cancelled by mistake). Its loop per pull request:
    a CI round instead of a three-minute check, and each still handed back unmerged.
    **The watch exits at once when no pull request is open at all**, which is the
    state right after a wave of coders launches and before their first drafts
-   exist. Start it once a draft is up (or poll for the first ready one yourself).
+   exist; the supervisor (#908) starts it again ten minutes later, so start
+   `make queue-daemon` whenever you like.
    The watch's own transition lines (#909) are the whole of watching the
    coders: no second `gh pr list` poller, no per-PR `until` loops.
 3. A hand-back is the queue's whole report, and the watch keeps going without
@@ -439,8 +445,10 @@ they hold for any repo running this workflow.
   every ready PR, and the order lives on GitHub, not in a list.
 - **Never stop the watch by pattern.** Other repos on this machine run the same
   command line (`merge-queue.py --watch`): on 2026-10-05 a `pkill -f` meant for
-  rusty's watch killed scorsese's too. Find rusty's by its working directory
-  (`lsof -a -p <pid> -d cwd` = the queue worktree) and kill that PID.
+  rusty's watch killed scorsese's too. `make queue-stop` (#908) asks rusty's watch
+  and supervisor to stop between pull requests; when a kill is unavoidable, find
+  rusty's by its working directory (`lsof -a -p <pid> -d cwd` = the queue worktree)
+  and kill that PID.
 - **Watch each PR's head commit, not only its draft/ready state.** A rebased PR
   stays *ready* the whole time, so a watcher keyed on state never sees the push.
   The queue's watch keys on the head for exactly this reason; your own reading

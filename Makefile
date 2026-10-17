@@ -23,7 +23,7 @@ SELF_CHECKS := target-dir inventory
 
 .DEFAULT_GOAL := help
 .NOTPARALLEL:
-.PHONY: help setup compile-cache check gates pre-commit $(SELF_CHECKS) $(GATES) mergeable queue blockers reclaim mutants-remote editor-capture bench
+.PHONY: help setup compile-cache check gates pre-commit $(SELF_CHECKS) $(GATES) mergeable queue queue-daemon queue-stop blockers reclaim mutants-remote editor-capture bench
 
 help: ## List the verbs
 	@grep -E '^[a-z-]+:.*## ' $(firstword $(MAKEFILE_LIST)) | \
@@ -178,6 +178,17 @@ mergeable: ## Did CI really run on this PR's head? make mergeable PR=524
 queue: ## Rebase, wait for CI, squash-merge each in turn. make queue PRS="524 526", or ARGS=--watch
 	@test -n "$(PRS)$(filter --watch,$(ARGS))" || { echo "queue: which pull requests? e.g. make queue PRS=\"524 526\", or make queue ARGS=--watch" >&2; exit 1; }
 	@python3 .github/scripts/merge-queue.py $(PRS) $(ARGS)
+
+# The watch exits on its deadline, on "nothing left", when its own code changes
+# on main, and when GitHub is down; each used to be a relaunch by hand (#908).
+# The supervisor runs detached (a background command dies at two hours), moves
+# its checkout to origin/main before each watch, and decides whether and when to
+# start it again. Run it from a worktree of its own. ARGS pass to the watch.
+queue-daemon: ## Keep the merge-queue watch running, detached; log in .git/merge-queue/queue.log
+	@python3 .github/scripts/queue-daemon.py --detach $(ARGS)
+
+queue-stop: ## Ask the watch and its supervisor to stop, between pull requests
+	@python3 .github/scripts/queue-daemon.py --stop
 
 # "Blocked by #N" written in an issue body but never recorded as a GitHub
 # relationship is invisible to everything that plans from the graph (#624).

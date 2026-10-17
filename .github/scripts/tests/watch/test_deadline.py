@@ -76,6 +76,17 @@ class Deadline(unittest.TestCase):
         self.assertTrue(why.startswith(ending.DEADLINE))
 
 
+class StopFile(unittest.TestCase):
+    def test_a_requested_stop_ends_between_takes_with_its_own_status(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            world = SlowWorld(tmp, [[pr(1)]], {1: outcomes.MERGED}, 0)
+            world.stop = True
+            _, why, status = loop.run(world.fx, fakes.opts())
+        self.assertEqual((world.taken, status), ([], ending.STOPPED_STATUS))
+        self.assertTrue(why.startswith(ending.STOP))
+        self.assertEqual(ending.status([3], True, True, True), ending.STOPPED_STATUS)
+
+
 class Arguments(unittest.TestCase):
     def test_for_needs_watch(self):
         self.assertEqual(cli.parse(["--watch", "--for", "70"]).for_minutes, 70)
