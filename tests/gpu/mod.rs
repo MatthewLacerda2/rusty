@@ -26,6 +26,8 @@ mod linear_data_maps_screenshot;
 mod material_maps_screenshot;
 mod metal_reflection_screenshot;
 mod normal_emissive_maps_screenshot;
+mod panorama_pole_screenshot;
+mod panorama_sky_screenshot;
 mod particle;
 mod postfx;
 mod preview_api;

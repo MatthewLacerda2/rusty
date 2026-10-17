@@ -24,7 +24,8 @@ pub struct PostPasses {
 /// 6-arg clippy threshold.
 pub struct PostFxContext<'a> {
     pub depth_view: &'a wgpu::TextureView,
-    pub skybox_view: &'a wgpu::TextureView,
+    /// The skybox panorama and its own (wrapping) sampler, for SSR's sky fallback.
+    pub skybox: (&'a wgpu::TextureView, &'a wgpu::Sampler),
     pub output: &'a wgpu::TextureView,
     /// The renderer's GPU pass timer (#835): the chain's passes are `post_fx`.
     pub(crate) timer: &'a GpuTimer,
