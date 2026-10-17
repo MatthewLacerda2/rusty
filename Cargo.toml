@@ -72,7 +72,8 @@ editor = ["dep:egui", "dep:egui-wgpu", "dep:egui-winit", "dep:egui-phosphor"]
 # The crate's lint policy lives here, not in command-line flags, so a plain
 # `cargo clippy`, rust-analyzer and CI all read the same rules (#485). The
 # threshold is `too-many-lines-threshold` in clippy.toml. CI adds `-D warnings`;
-# the sim modules' `#![deny(clippy::unwrap_used)]` stays module-scoped (#195).
+# the sim modules' `#![deny(clippy::unwrap_used)]` stays module-scoped (#195), one per
+# sim row of the layer table, held there by `make rules` (`unwrap-deny`, #962).
 [lints.clippy]
 too_many_lines = "deny"
 # Exceptions are inline, with a written reason (#961): `#[expect(lint, reason = "…")]`,

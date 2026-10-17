@@ -5,7 +5,7 @@ too-many-arguments-threshold = 6
 cognitive-complexity-threshold = 20
 type-complexity-threshold = 250
 
-# `clippy::unwrap_used` is denied in the deterministic sim modules (#195) to keep
+# `clippy::unwrap_used` is denied in every sim module (#195, #962) to keep
 # the headless harness panic-free; test code may unwrap freely. This config lets
 # the ban apply to production paths only, without a per-test `#[allow]`.
 allow-unwrap-in-tests = true
