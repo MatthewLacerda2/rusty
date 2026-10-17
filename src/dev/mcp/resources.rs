@@ -27,9 +27,14 @@ pub fn resources_list() -> Value {
 /// is a JSON-RPC protocol error `(code, message)` for an unknown URI, or an internal
 /// error when the checkout's `docs/api/` can't be read.
 pub fn resources_read(params: &Value) -> Result<Value, (i64, String)> {
+    read_from(params, &crate::scripting::api_doc::api_doc_dir())
+}
+
+/// [`resources_read`] with the reference assembled from `doc_dir`.
+fn read_from(params: &Value, doc_dir: &std::path::Path) -> Result<Value, (i64, String)> {
     let uri = params.get("uri").and_then(Value::as_str).unwrap_or("");
     if uri == SCRIPTING_API_URI {
-        let text = crate::scripting::api_doc::api_reference().map_err(|e| (-32603, e))?;
+        let text = crate::scripting::api_doc::assemble(doc_dir).map_err(|e| (-32603, e))?;
         Ok(json!({
             "contents": [{
                 "uri": SCRIPTING_API_URI,
@@ -68,5 +73,14 @@ mod tests {
         let (code, msg) = resources_read(&params).expect_err("unknown uri");
         assert_eq!(code, -32602);
         assert!(msg.contains("nope.md"));
+    }
+
+    #[test]
+    fn an_unreadable_doc_is_an_internal_error() {
+        let params = json!({ "uri": SCRIPTING_API_URI });
+        let absent = std::path::Path::new("/nonexistent/rusty/docs/api");
+        let (code, msg) = read_from(&params, absent).expect_err("no index.md");
+        assert_eq!(code, -32603);
+        assert!(msg.contains("index.md"), "{msg}");
     }
 }
