@@ -227,13 +227,8 @@ fn interaction_groups_encode_layer_bit_and_filter() {
 #[test]
 fn is_kinematic_only_for_non_static_bodies_without_a_dynamic_rigidbody() {
     let dynamic = RigidBodyComponent {
-        active: true,
-        is_kinematic: false,
-        mass: 1.0,
-        velocity: Vec3::ZERO,
-        angular_velocity: Vec3::ZERO,
-        use_gravity: true,
         collision_detection: crate::components::CollisionDetection::Discrete,
+        ..crate::scene::authoring::default_rigidbody()
     };
     let kinematic = |s, rb| matches!(classify(s, rb), BodyClass::Kinematic);
     assert!(!kinematic(true, None), "static is not kinematic");
@@ -260,10 +255,7 @@ fn collider_inputs_respects_the_active_flag() {
         Some(ColliderComponent {
             active: false,
             shape: ColliderShape::Box { size: Vec3::ONE },
-            is_trigger: false,
-            material: Default::default(),
-            aabb_min: Vec3::ZERO,
-            aabb_max: Vec3::ZERO,
+            ..crate::scene::authoring::default_collider()
         }),
     );
     assert!(

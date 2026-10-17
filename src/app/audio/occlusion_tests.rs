@@ -24,14 +24,10 @@ fn walled() -> (GameWorld, u32) {
     scene.world.set_static(wall, true);
     scene.world.transform_mut(wall).unwrap().position = Vec3::new(0.0, 0.0, 5.0);
     let collider = ColliderComponent {
-        active: true,
         shape: ColliderShape::Box {
             size: Vec3::new(20.0, 10.0, 1.0),
         },
-        is_trigger: false,
-        material: Default::default(),
-        aabb_min: Vec3::ZERO,
-        aabb_max: Vec3::ZERO,
+        ..crate::scene::authoring::default_collider()
     };
     scene.world.set_collider(wall, Some(collider));
     let speaker = scene.add_entity("Speaker".to_string());

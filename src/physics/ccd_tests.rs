@@ -39,14 +39,10 @@ fn add_wall(scene: &mut Scene, moving: bool) {
     scene.world.set_collider(
         wall,
         Some(ColliderComponent {
-            active: true,
             shape: ColliderShape::Box {
                 size: Vec3::new(0.2, 4.0, 4.0),
             },
-            is_trigger: false,
-            material: Default::default(),
-            aabb_min: Vec3::ZERO,
-            aabb_max: Vec3::ZERO,
+            ..crate::scene::authoring::default_collider()
         }),
     );
 }
@@ -64,26 +60,19 @@ fn wall_and_projectile(mode: CollisionDetection, moving: bool) -> (Scene, Physic
     scene.world.set_collider(
         sphere,
         Some(ColliderComponent {
-            active: true,
             shape: ColliderShape::Sphere { radius: 0.25 },
-            is_trigger: false,
-            material: Default::default(),
-            aabb_min: Vec3::ZERO,
-            aabb_max: Vec3::ZERO,
+            ..crate::scene::authoring::default_collider()
         }),
     );
     scene.world.set_rigidbody(
         sphere,
         Some(RigidBodyComponent {
-            active: true,
-            is_kinematic: false,
-            mass: 1.0,
             // 300 m/s along +x ⇒ 5 m per tick; gravity off so motion stays on the
             // x axis and the test reads a single coordinate.
             velocity: Vec3::new(300.0, 0.0, 0.0),
-            angular_velocity: Vec3::ZERO,
             use_gravity: false,
             collision_detection: mode,
+            ..crate::scene::authoring::default_rigidbody()
         }),
     );
 

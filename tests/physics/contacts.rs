@@ -5,18 +5,15 @@
 //! must surface as a collision pair and never as a trigger pair.
 
 use glam::Vec3;
-use rusty::components::{ColliderComponent, ColliderShape, CollisionDetection, RigidBodyComponent};
+use rusty::components::{ColliderComponent, ColliderShape};
 use rusty::physics::PhysicsWorld;
 use rusty::scene::Scene;
 
 fn box_collider(size: Vec3, is_trigger: bool) -> ColliderComponent {
     ColliderComponent {
-        active: true,
         shape: ColliderShape::Box { size },
         is_trigger,
-        material: Default::default(),
-        aabb_min: Vec3::ZERO,
-        aabb_max: Vec3::ZERO,
+        ..rusty::scene::authoring::default_collider()
     }
 }
 
@@ -33,18 +30,9 @@ fn static_floor_contact_is_a_collision_not_a_trigger() {
     scene
         .world
         .set_collider(ball, Some(box_collider(Vec3::ONE, false)));
-    scene.world.set_rigidbody(
-        ball,
-        Some(RigidBodyComponent {
-            active: true,
-            is_kinematic: false,
-            mass: 1.0,
-            velocity: Vec3::ZERO,
-            angular_velocity: Vec3::ZERO,
-            use_gravity: true,
-            collision_detection: CollisionDetection::Discrete,
-        }),
-    );
+    scene
+        .world
+        .set_rigidbody(ball, Some(rusty::scene::authoring::default_rigidbody()));
     let want = (floor.min(ball), floor.max(ball));
 
     let mut physics = PhysicsWorld::from_scene(&scene);

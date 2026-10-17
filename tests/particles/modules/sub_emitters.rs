@@ -72,14 +72,10 @@ fn collision_fires_at_the_hit_point_once() {
     scene.world.set_static(wall, true);
     scene.world.transform_mut(wall).unwrap().position = Vec3::new(3.0, 0.0, 0.0);
     let collider = ColliderComponent {
-        active: true,
         shape: ColliderShape::Box {
             size: Vec3::new(1.0, 4.0, 4.0),
         },
-        is_trigger: false,
-        material: Default::default(),
-        aabb_min: Vec3::ZERO,
-        aabb_max: Vec3::ZERO,
+        ..rusty::scene::authoring::default_collider()
     };
     scene.world.set_collider(wall, Some(collider));
     scene.update_entity_collider(wall);

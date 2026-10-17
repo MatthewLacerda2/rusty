@@ -25,12 +25,8 @@ fn saved_floor(name: &str) -> (Scene, String) {
         size: Vec3::new(10.0, 4.0, 10.0),
     };
     let collider = ColliderComponent {
-        active: true,
         shape,
-        is_trigger: false,
-        material: Default::default(),
-        aabb_min: Vec3::ZERO,
-        aabb_max: Vec3::ZERO,
+        ..crate::scene::authoring::default_collider()
     };
     scene.world.set_collider(floor, Some(collider));
     scene.update_entity_collider(floor);
