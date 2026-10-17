@@ -63,7 +63,7 @@ mod tests {
     /// sibling `.md` file, then appends the unlinked `.md` files, each exactly once.
     #[test]
     fn assemble_keeps_linked_then_unlinked_namespace_files_once() {
-        let dir = std::env::temp_dir().join(format!("rusty_api_doc_{}", std::process::id()));
+        let dir = crate::test_temp::dir().join("api_doc");
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(dir.join("sub")).unwrap();
         let index = "# Index\n[z](z.md) [a](a.md) [b](sub/b.md) [n](notes.txt) [m](missing.md)\n";
