@@ -13,7 +13,7 @@
 
 use std::path::Path;
 
-use mlua::{Lua, Table, Value};
+use mlua::{Table, Value};
 
 use super::callbacks::LIFECYCLE_CALLBACKS;
 
@@ -46,7 +46,7 @@ pub fn monobehaviour_scripts(dir: &str) -> Vec<String> {
 /// True if `code`, evaluated as a chunk, returns a table with at least one
 /// lifecycle method. A fresh `Lua` per call keeps detection side-effect-free.
 pub fn exposes_lifecycle(code: &str) -> bool {
-    let lua = Lua::new();
+    let lua = super::sandbox::inspection_vm();
     let Ok(table) = lua.load(code).eval::<Table>() else {
         return false;
     };

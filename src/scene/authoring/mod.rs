@@ -41,6 +41,7 @@ pub mod reverb_zone;
 pub mod ribbon;
 pub mod rigidbody;
 mod sanitize;
+pub mod script;
 pub mod selectable;
 pub mod shape;
 pub mod text;
@@ -65,6 +66,7 @@ pub use crate::scene::authoring::defaults::{
     default_material, default_nav_agent, default_rigidbody, default_visual_correction,
     material_asset_from_import,
 };
+pub use crate::scene::authoring::script::add_script;
 
 /// The primitive set the hierarchy toolbar's "Create" dropdown offers — meshes
 /// and lights. A `None` primitive (or an unrecognised name) creates a bare entity

@@ -22,6 +22,8 @@ local Slider = {
     },
 }
 
+local RangeAxis = require("ui.range_axis")
+
 local self_id, fill, area, handle
 local vertical, reversed = false, false
 
@@ -44,25 +46,16 @@ local function place()
     local lo, hi = 0, n
     if reversed then lo, hi = n, 1 end
     if fill then
-        if vertical then
-            RectTransform.SetAnchorMin(fill, 0, lo)
-            RectTransform.SetAnchorMax(fill, 1, hi)
-        else
-            RectTransform.SetAnchorMin(fill, lo, 0)
-            RectTransform.SetAnchorMax(fill, hi, 1)
-        end
+        RangeAxis.span(fill, vertical, lo, hi)
         RectTransform.SetSizeDelta(fill, 0, 0)
     end
     if handle then
         local w, h = RectTransform.GetSizeDelta(handle)
         local thick = math.max(w, h)
+        RangeAxis.span(handle, vertical, n, n)
         if vertical then
-            RectTransform.SetAnchorMin(handle, 0, n)
-            RectTransform.SetAnchorMax(handle, 1, n)
             RectTransform.SetSizeDelta(handle, 0, thick)
         else
-            RectTransform.SetAnchorMin(handle, n, 0)
-            RectTransform.SetAnchorMax(handle, n, 1)
             RectTransform.SetSizeDelta(handle, thick, 0)
         end
         RectTransform.SetAnchoredPosition(handle, 0, 0)
@@ -80,19 +73,10 @@ end
 function Slider.set_value(v) set(v, true) end
 function Slider.set_value_without_notify(v) set(v, false) end
 
--- Set the value from the pointer on the canvas (reference units, so it works on
--- a world canvas too).
+-- Set the value from the pointer along the slide area.
 local function from_pointer(event)
-    local r = UI.GetRect(area or self_id)
-    local p = event.canvas_position
-    if not r or not p then return end
-    local t
-    if vertical then
-        t = r.height > 0 and (p.y - r.y) / r.height or 0
-    else
-        t = r.width > 0 and (p.x - r.x) / r.width or 0
-    end
-    t = math.max(0, math.min(1, t))
+    local t = RangeAxis.track(area or self_id, event, vertical)
+    if not t then return end
     if reversed then t = 1 - t end
     Slider.set_value(Slider.min + t * (Slider.max - Slider.min))
 end
@@ -102,9 +86,7 @@ function Slider.Awake(id)
     fill = Scene.FindChild(id, "Fill Area/Fill")
     area = Scene.FindChild(id, "Handle Slide Area")
     handle = area and Scene.FindChild(area, "Handle")
-    local d = Slider.direction
-    vertical = d == "BottomToTop" or d == "TopToBottom"
-    reversed = d == "RightToLeft" or d == "TopToBottom"
+    vertical, reversed = RangeAxis.parse(Slider.direction)
     Slider.value = clamp(Slider.value)
     place()
 end
@@ -119,14 +101,9 @@ end
 
 -- Arrows along the axis step the value; across it they navigate.
 function Slider.OnMove(id, event)
-    local along = vertical and event.y or event.x
-    if along == 0 then
-        local to = UI.FindSelectable(id, event.direction)
-        if to then UI.SetSelected(to) end
-        return
-    end
+    local along = RangeAxis.move(id, event, vertical, reversed)
+    if along == 0 then return end
     local step = Slider.whole_numbers and 1 or (Slider.max - Slider.min) * 0.1
-    if reversed then along = -along end
     Slider.set_value(Slider.value + along * step)
 end
 
