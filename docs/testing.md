@@ -145,7 +145,9 @@ Where they actually run is not uniform, and it is worth knowing before you rely 
 | `build-test-cross` (macos) | real Metal GPU | run, against real VRAM |
 | `build-test-windows` (`windows.yml`, a signal, #741) | **WARP** (software) | run, against **system RAM** |
 
-**CI requires an adapter.** Those jobs set `RUSTY_REQUIRE_GPU=1`, which turns one
+**CI requires an adapter.** Every workflow job that runs the suite (nextest,
+`cargo test` other than `--doc`, `llvm-cov`, `mutants`) sets `RUSTY_REQUIRE_GPU=1`, and
+`make scripts` fails a job that does not (#978). The variable turns one
 canary test (`render::test_gpu::tests::gpu_adapter_present_when_required`) from a skip into
 a failure when no adapter is found — so a runner image that loses its driver goes red
 instead of quietly skipping every GPU test. The dev capture layer answers to the same
@@ -189,8 +191,10 @@ unbounded parallel renderers exhausted memory and failed *unrelated* tests with 
   with an explanation: something built a second headless renderer while still holding
   the first.
 
-Keep the two numbers equal. If a new GPU test makes CI run out of memory, **lower both
-to 1** before weakening the test.
+Keep the two numbers equal; `make scripts` fails when they differ, and holds the
+nextest settings above (no retries, `fail-fast = false`, the timeouts) in place
+(`.github/scripts/tests/test_gpu_config.py`, #978). If a new GPU test makes CI run out
+of memory, **lower both to 1** before weakening the test.
 
 **The GPU naming rule.** A test group selects tests by name, so the name says whether
 a test renders:
@@ -460,8 +464,9 @@ reached.
 the crate rebuild, not the test run, so nextest's scheduling buys little there — while
 process-per-test adds a process spawn per test per mutant, and `fail-fast = false`
 (right for the gate's summary) would make every *caught* mutant run the whole suite
-instead of stopping at its first failing binary. The mutation jobs also have no GPU
-driver, so the `gpu` group has nothing to bound. Revisit with
+instead of stopping at its first failing binary. The mutation jobs do render: they
+install lavapipe and set `RUSTY_REQUIRE_GPU=1` (#785), and under `cargo test` the
+in-process `MAX_CONCURRENT_HEADLESS` budget, not the nextest `gpu` group, bounds them. Revisit with
 `cargo mutants --test-tool nextest` plus a dedicated fail-fast profile if mutant
 test time ever dominates.
 
