@@ -416,6 +416,9 @@ only its adapter (Lua → zimmer document, file writes, patch-path resolution).
   platform layer is exempt.
   Scripts run inside the sim too: the gameplay Lua VM has no `os`/`io`, and
   `math.random` routes to the seeded `Random` resource (`core::random`, #443).
+  `require` / `dofile` / `loadfile` read against the project; a file outside it
+  is allowed but warns once in the console, since it is an input the seed
+  doesn't cover (#1062).
 - **Provider calls are authoring, never gameplay.** A paid, networked call (a
   vendor generating audio, say) lives behind `src/dev/providers/` only (#383): `dev`
   builds only, refused during Play (the determinism guard scans for clocks, not

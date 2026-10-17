@@ -150,7 +150,7 @@ impl ScriptManager {
     pub fn set_workspace_root(&mut self, root: impl Into<PathBuf>) {
         self.workspace = root.into();
         if let Some(lua) = &self.lua {
-            super::sandbox::point_require(lua, &self.workspace).ok();
+            super::sandbox::install_file_access(lua, &self.workspace, &self.console).ok();
         }
     }
 
@@ -176,7 +176,7 @@ impl ScriptManager {
         // Deterministic sandbox (#443): no `os`/`io`, `math.random` over the
         // seeded RNG — which restarts from its default seed with every fresh VM.
         let lua = super::sandbox::new_sim_vm()?;
-        super::sandbox::point_require(&lua, &self.workspace)?;
+        super::sandbox::install_file_access(&lua, &self.workspace, &self.console)?;
         *self.random.borrow_mut() = Random::default();
         *self.event_system.borrow_mut() = EventSystem::default();
 

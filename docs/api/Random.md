@@ -29,5 +29,18 @@ Gameplay scripts (and the console REPL, which evaluates in the same VM) get Lua
   `math.random(0)` → any integer. `math.randomseed(x)` is `Random.SetSeed(x)`
   (`0` when called with no argument — never a random seed).
 
+- **`require`, `dofile` and `loadfile` read against the project, not the
+  process's working directory.** `require("ui.range_axis")` looks in, in order:
+  `package.preload`; the project's `assets/scripts/` (`ui/range_axis.lua`, then
+  `ui/range_axis/init.lua`); the engine's bundled scripts (`engine/scripts/`, so the
+  widget kit's helpers load even where the project holds no copy); then Lua's own
+  `package.path`, which a script may extend. A relative `dofile` / `loadfile` path
+  is taken from the project root. Native (C) modules are off.
+- **Reading a file outside the project is allowed, and warns.** The first
+  `require` / `dofile` / `loadfile` of each file outside the project logs a console
+  warning: the game now depends on a file that may not exist on another machine,
+  and that file is an input the seed doesn't cover, so a replay is only as
+  reproducible as the file is unchanged.
+
 Everything else (`string`, `table`, `math`, `utf8`, `coroutine`, `package`) is
 Lua's own.
