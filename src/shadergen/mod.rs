@@ -41,6 +41,10 @@
 //! - [`textures`] — the extra texture slots a surface block may sample (#400): a
 //!   material-named pattern such as a baked noise map.
 
+// Panic-free sim (#195, #962): bare `.unwrap()` is denied in every sim module (use `?`
+// or a documented `.expect(...)`); test code is exempt via clippy.toml. See docs/linting.md.
+#![deny(clippy::unwrap_used)]
+
 pub mod assemble;
 pub mod bake;
 pub mod blocks;

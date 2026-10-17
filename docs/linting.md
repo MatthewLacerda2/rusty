@@ -21,7 +21,7 @@ agent can read exactly what failed.
 | Module layering | `tools/lint -- --layers` | every `crate::<module>` import and every external crate a module names matches the declared table (`tools/lint/src/layers/table.rs`): nothing undeclared, nothing stale, no cycle, no sim → platform edge (#724, #938) |
 | Sim determinism | clippy `disallowed_methods`/`disallowed_types` + `tools/lint -- --determinism` | **hard gate**: clock reads, OS/unseeded RNG and `std`'s randomly seeded hash maps are banned crate-wide in `clippy.toml`; only a platform row's `mod.rs` may opt out, and the ban list must stay whole (#757, #764) |
 | Dependency direction | `tools/lint -- --direction` | the table's sim modules never reference `crate::render`, `crate::editor`, `wgpu` or `egui` — the arrow is render/editor → sim (#494) |
-| Sim panic-freedom | clippy `unwrap_used` | **hard gate**: `#![deny(clippy::unwrap_used)]` in `app`/`scripting`/`physics`/`navigation`/`ui`; bare `.unwrap()` banned in production (test code exempt via `allow-unwrap-in-tests`) |
+| Sim panic-freedom | clippy `unwrap_used` + `tools/lint -- --rules` (`unwrap-deny`) | **hard gate**: every sim row of the layer table carries `#![deny(clippy::unwrap_used)]` at its `mod.rs`, and no sim file lifts it; bare `.unwrap()` banned in production (test code exempt via `allow-unwrap-in-tests`) (#195, #962) |
 | Component completeness | `tools/lint -- --components` | every first-class component has all 4 axes (field, Add Component entry, inspector card, API namespace), or a written waiver (`WAIVERS`) |
 | Editor↔shared-op parity | `tools/lint -- --parity` | every first-class component's inspector card routes its mutations through a shared `scene::authoring` op (never direct field writes through the #344 accessor guard) |
 | Rust API reference | rustdoc | **hard gate**: `RUSTDOCFLAGS="-D warnings" cargo doc --no-deps` (both feature sets) — no broken intra-doc links, no public docs linking private items; name a private item as plain `code`, not a link |
@@ -71,7 +71,8 @@ Crate-wide lint levels go in `Cargo.toml`'s `[lints]` table, never in command-li
 flags: a plain `cargo clippy`, rust-analyzer and CI then all read the same policy,
 so nothing is green locally and red in CI. CI adds only `-D warnings`. Thresholds
 stay in `clippy.toml`. Module-scoped rules stay module-scoped — the sim modules'
-`#![deny(clippy::unwrap_used)]` below is deliberately not crate-wide. `tools/lint`
+`#![deny(clippy::unwrap_used)]` below is deliberately not crate-wide (the
+`unwrap-deny` rule derives its scope from the layer table). `tools/lint`
 is held to the same policy (#935): `make clippy` and CI clippy it with `-D warnings`,
 and its own `[lints]` carries the nothing-temporary denies.
 
@@ -133,6 +134,11 @@ or baseline.
   new file beside it is the one a push silently drops
   (MatthewLacerda2/scorsese#872). It takes **no allow**: anchor the pattern
   (`/out/`, not `out/`) or move the file. A failed `git` call is a finding too.
+- **`unwrap-deny`** — the unwrap ban covers exactly the layer table's sim rows
+  (#962). Each sim row's `src/<module>/mod.rs` must carry
+  `#![deny(clippy::unwrap_used)]`, and no file under a sim module may `allow`,
+  `expect` or `warn` `clippy::unwrap_used` (or the `clippy::restriction` group).
+  A new sim row is covered the day it is added. Platform files are not scanned.
 - **The ≲10-files-per-directory signal** prints after the findings: every scanned
   directory holding more than ten `.rs` files (`mod.rs` aside), most crowded first.
   CLAUDE.md says "aim for", so it never fails the gate; it tells you where to
@@ -323,30 +329,31 @@ rg 'allow\(clippy::too_many_lines\)' src
 If a function grows past 50 lines, split it — **do not** silence the lint with a
 new `#[allow]`.
 
-The core sim modules (`app`, `scripting`, `physics`, `navigation`, `ui`)
-carry a module-level `#![deny(clippy::unwrap_used)]`, so a bare `.unwrap()` in
+Every sim module (the layer table's `sim` rows) carries a module-level
+`#![deny(clippy::unwrap_used)]` at its `mod.rs`, held there by the rules gate's
+`unwrap-deny` (#962), so a bare `.unwrap()` in
 their **production** code is a hard clippy error (caught by the same `-D warnings`
 gate, both feature sets, `make gates` + CI). This is the **survivability**
 sibling of the determinism guard's **reproducibility**: a `.unwrap()` that panics
 mid-frame kills an unattended/overnight play-test just as surely as a wall-clock
-read breaks replay — same rationale (#195). The determinism guard has since widened
-past these five (#723); extending the unwrap ban to the wider set is a separate
-burn-down, not yet measured.
+read breaks replay — same rationale (#195). The ban began in five modules (`app`, `scripting`,
+`physics`, `navigation`, `ui`) and widened to every sim row in #962, once the 10
+unwraps it found (all in `scene`'s default scene and material authoring) handled
+their missing case.
 
 The rule is deliberately narrow:
 - **`unwrap`, not `expect`.** `.expect("clear invariant")` is the sanctioned escape
   hatch — it documents *why* the value must be present at the call site. Use `?`
   where a `Result` should propagate, `.expect(...)` where the invariant is real and
   local; reach for the bare `.unwrap()` nowhere in the sim core.
-- **Sim core only.** The platform layer (the table's non-sim rows) is exempt —
+- **Sim only.** The platform layer (the table's non-sim rows) is exempt —
   e.g. `render/gpu/shaders.rs` panicking at boot on a bad shader is fail-fast-at-startup,
   not a mid-sim hazard. The determinism guard's exemption is the same platform layer.
 - **Tests exempt.** `clippy.toml`'s `allow-unwrap-in-tests = true` lets test code
   unwrap freely, so no per-test `#[allow]` noise.
 
-There is no baseline/burn-down: the sim core landed already clean (its few unwraps
-were all in `#[cfg(test)]`), so the lint went straight to `deny` with no grandfathered
-sites. Keep it that way — fix the call site, don't add an `#[allow]`.
+There is no baseline/burn-down: each widening fixed every site first, so the lint
+went straight to `deny` with no grandfathered sites. Keep it that way — fix the call site, don't add an `#[allow]`.
 
 ## Clippy: CI vs local
 Clippy lints the whole crate (it can't be scoped to changed files), which is too
