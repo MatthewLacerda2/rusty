@@ -147,29 +147,13 @@ fn register_look<'scope>(
         Ok(())
     });
     put(t, "SetTextureMode", f)?;
-    let f =
-        scope.create_function(move |_, id: u32| Ok(which.read(scene, id, |s| blend_name(s.blend))));
+    let f = scope.create_function(move |_, id: u32| Ok(which.read(scene, id, |s| s.blend.name())));
     put(t, "GetBlend", f)?;
     let f = scope.create_function(move |_, (id, name): (u32, String)| {
-        if let Some(blend) = parse_blend(&name) {
+        if let Some(blend) = ParticleBlend::parse(&name) {
             which.write(scene, id, |s| ops::set_blend(s, blend));
         }
         Ok(())
     });
     put(t, "SetBlend", f)
-}
-
-fn blend_name(blend: ParticleBlend) -> &'static str {
-    match blend {
-        ParticleBlend::Alpha => "Alpha",
-        ParticleBlend::Additive => "Additive",
-    }
-}
-
-fn parse_blend(name: &str) -> Option<ParticleBlend> {
-    match name.to_lowercase().as_str() {
-        "alpha" => Some(ParticleBlend::Alpha),
-        "additive" => Some(ParticleBlend::Additive),
-        _ => None,
-    }
 }
