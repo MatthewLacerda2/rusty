@@ -446,11 +446,19 @@ only its adapter (Lua → zimmer document, file writes, patch-path resolution).
   memory figure into a doc as the number to plan by; write "check the machine"
   (`df -h`, free memory). A figure quoted as evidence of a past incident, dated, is
   history, not a limit.
-- **Asset sources are glTF/OBJ, never `.blend`.** Authored 3D content comes from
-  Blender's native glTF 2.0 export (or `glTF`/`glb`/`obj`/`fbx` from elsewhere). The
-  engine reads those interchange formats directly and **never parses `.blend` nor
-  shells out to Blender** — the import path must not drift toward a Blender
-  dependency. glTF 2.0 is first-class; `.obj` is static-mesh only.
+- **One format inside, glTF; everything else is converted at import.** The engine's
+  loaders read glTF 2.0 (first-class) and `.obj` (static meshes only). Other sources are
+  turned into a cached glTF when imported, the way Unity read only FBX and had Blender
+  export one from a `.blend`; the source stays in the project, the cache is re-made when
+  it changes, and nothing past the importer learns another format (operator,
+  2026-10-17):
+  - `.fbx` is converted inside the engine with the `ufbx` crate (#1024);
+  - `.blend` is converted by **Blender**, run headless (#1072).
+  **Blender 5 or later is a requirement**, with the Blender MCP set up: rusty assumes it
+  is installed, and when it isn't, the import says so and asks for it — no fallback
+  parser and no promise of support without it. Running Blender is **authoring only**
+  (editor, MCP, dev tools): a shipped game reads the cached glTF and never runs Blender,
+  and the sim only ever sees glTF. The engine never parses `.blend` itself.
 
 ## Commit gate (programmatic — no AI needed)
 `make gates` runs everything CI blocks on, fastest-failing first; run it before
