@@ -11,7 +11,7 @@
 
 // `PostParams` lives in `common.wgsl` so authored postfx effects (#397) can bind it
 // too (binding 0) — they read the game time from it (#398).
-#import common::{PostParams}
+#import common::{PostParams, equirect_uv}
 
 @group(0) @binding(0) var<uniform> params: PostParams;
 @group(0) @binding(1) var t_color: texture_2d<f32>;
@@ -19,6 +19,9 @@
 @group(0) @binding(3) var t_bloom: texture_2d<f32>;
 @group(0) @binding(4) var t_depth: texture_depth_2d;
 @group(0) @binding(5) var t_skybox: texture_2d<f32>;
+// The panorama's own sampler (wrapping), not `s_color`'s clamp: the SSR fallback's
+// seam at φ = ±π must wrap as the skybox pass's does (#995).
+@group(0) @binding(6) var s_skybox: sampler;
 
 struct VsOut {
     @builtin(position) pos: vec4<f32>,
@@ -122,16 +125,11 @@ fn screen_space_reflection(uv: vec2<f32>, world_pos: vec3<f32>, n: vec3<f32>) ->
             return textureSampleLevel(t_color, s_color, suv, 0.0).rgb;
         }
     }
-    return cubemap_reflection(r);
+    return sky_reflection(r);
 }
 
-fn cubemap_reflection(r: vec3<f32>) -> vec3<f32> {
-    let pi = 3.14159265359;
-    let phi = atan2(r.z, r.x);
-    let theta = acos(clamp(r.y, -1.0, 1.0));
-    let u = (phi + pi) / (2.0 * pi);
-    let vv = theta / pi;
-    return textureSample(t_skybox, s_color, vec2<f32>(u, vv)).rgb;
+fn sky_reflection(r: vec3<f32>) -> vec3<f32> {
+    return textureSample(t_skybox, s_skybox, equirect_uv(r)).rgb;
 }
 
 // Camera motion blur: blur along the screen-space velocity of the pixel between

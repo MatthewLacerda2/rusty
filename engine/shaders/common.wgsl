@@ -396,6 +396,20 @@ fn sky_fog(fog: Fog, color: vec3<f32>, dir: vec3<f32>, eye: vec3<f32>) -> vec3<f
     return mix(color, fog.color, f * horizon);
 }
 
+// --- The panorama lookup (#995) -----------------------------------------------
+const PI: f32 = 3.14159265359;
+
+// Where direction `dir` lands on an equirectangular panorama: longitude to u (the
+// seam at φ = ±π, along -x), polar angle from +y to v. ONE function, three callers
+// (the skybox pass, the forward pass's reflection and post-FX's SSR fallback), so
+// what a surface reflects is the sky on screen. `y` is clamped: a normalised vector
+// can round past 1, and `acos` of that is NaN.
+fn equirect_uv(dir: vec3<f32>) -> vec2<f32> {
+    let phi = atan2(dir.z, dir.x);
+    let theta = acos(clamp(dir.y, -1.0, 1.0));
+    return vec2<f32>((phi + PI) / (2.0 * PI), theta / PI);
+}
+
 // --- The procedural sky (#256) ------------------------------------------------
 // The colour of the procedural sky along `dir`, before fog: a ground -> horizon ->
 // sky gradient tinted from `sky_color` (the scene's ambient colour) plus a cheap,
