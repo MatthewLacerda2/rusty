@@ -92,3 +92,9 @@ fn a_missing_source_keeps_its_cache_and_without_one_is_an_error() {
     refresh(&COPY, &dir.join("gone.src"), &out).unwrap();
     assert_eq!(std::fs::read_to_string(&out).unwrap(), "shipped");
 }
+
+#[test]
+fn the_cache_is_a_folder_of_the_projects_generated_assets() {
+    let generated = crate::core::project::GENERATED_DIR;
+    assert_eq!(super::IMPORT_CACHE_DIR, format!("{generated}/imported"));
+}

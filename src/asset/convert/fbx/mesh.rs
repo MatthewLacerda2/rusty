@@ -15,6 +15,12 @@ const MAX_INFLUENCES: usize = 4;
 /// Corners with the same bits are one vertex: position, normal, UV, joints, weights.
 type VertexKey = [u32; 16];
 
+/// A corner's position, normal and UV.
+type Corner = ([f32; 3], [f32; 3], [f32; 2]);
+
+/// A vertex's four (joint slot, weight) influences.
+type Influence = ([u16; 4], [f32; 4]);
+
 /// `mesh` as a glTF mesh named `name`. `materials` maps an FBX material's element
 /// id to its glTF index; `nodes` maps a node's element id to its glTF index.
 pub fn mesh(
@@ -45,7 +51,7 @@ fn primitive(
     mesh: &ufbx::Mesh,
     part: &ufbx::MeshPart,
     basis: Basis,
-    influences: Option<&[([u16; 4], [f32; 4])]>,
+    influences: Option<&[Influence]>,
     material: Option<usize>,
 ) -> glb::Primitive {
     let mut out = glb::Primitive {
@@ -79,8 +85,8 @@ fn corner_vertex(
     mesh: &ufbx::Mesh,
     basis: Basis,
     corner: usize,
-    skin: Option<([u16; 4], [f32; 4])>,
-) -> (VertexKey, ([f32; 3], [f32; 3], [f32; 2])) {
+    skin: Option<Influence>,
+) -> (VertexKey, Corner) {
     let position = basis.vector(mesh.vertex_position[corner]);
     let normal = if mesh.vertex_normal.exists {
         basis.vector(mesh.vertex_normal[corner])
@@ -106,11 +112,7 @@ fn corner_vertex(
     (key, (position, normal, uv))
 }
 
-fn push_vertex(
-    out: &mut glb::Primitive,
-    (position, normal, uv): ([f32; 3], [f32; 3], [f32; 2]),
-    skin: Option<([u16; 4], [f32; 4])>,
-) {
+fn push_vertex(out: &mut glb::Primitive, (position, normal, uv): Corner, skin: Option<Influence>) {
     out.positions.push(position);
     out.normals.push(normal);
     out.uvs.push(uv);
@@ -144,7 +146,7 @@ fn bone_index<'a>(cluster: &ufbx::SkinCluster, nodes: &'a Map<u32, usize>) -> Op
 /// Per mesh vertex, its four strongest influences as (joint slot, weight), the
 /// weights summing to one; `None` for an unskinned mesh. Joint slots count only
 /// the clusters [`skin`] keeps, so the two agree.
-fn influences(mesh: &ufbx::Mesh, nodes: &Map<u32, usize>) -> Option<Vec<([u16; 4], [f32; 4])>> {
+fn influences(mesh: &ufbx::Mesh, nodes: &Map<u32, usize>) -> Option<Vec<Influence>> {
     let deformer = mesh.skin_deformers.first()?;
     let mut slots = Vec::with_capacity(deformer.clusters.len());
     let mut next = 0u16;
@@ -172,7 +174,7 @@ fn influences(mesh: &ufbx::Mesh, nodes: &Map<u32, usize>) -> Option<Vec<([u16; 4
 
 /// The first [`MAX_INFLUENCES`] of `sorted` (strongest first), normalised; an
 /// unweighted vertex follows joint 0 fully.
-fn strongest(sorted: &[(u16, f32)]) -> ([u16; 4], [f32; 4]) {
+fn strongest(sorted: &[(u16, f32)]) -> Influence {
     let kept = &sorted[..sorted.len().min(MAX_INFLUENCES)];
     let total: f32 = kept.iter().map(|w| w.1).sum();
     if total <= 0.0 {

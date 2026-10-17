@@ -78,7 +78,7 @@ fn container(mut json: Vec<u8>, mut bin: Vec<u8>) -> Vec<u8> {
 }
 
 fn pad(bytes: &mut Vec<u8>, with: u8) {
-    while bytes.len() % 4 != 0 {
+    while !bytes.len().is_multiple_of(4) {
         bytes.push(with);
     }
 }
