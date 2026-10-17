@@ -4,13 +4,9 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use glam::Vec3;
-use rusty::app::GameWorld;
 use rusty::components::{ParticleBlend, TrailComponent};
-use rusty::core::input::InputState;
-use rusty::navigation::NavigationGraph;
 use rusty::scene::authoring::{add_component, ComponentKind};
 use rusty::scene::Scene;
-use rusty::scripting::ConsoleLogs;
 
 use super::{eval, round_trip, with_api};
 
@@ -67,14 +63,7 @@ fn record(frames: u32) -> Vec<Vec3> {
         ..Default::default()
     };
     scene.world.set_trail(id, Some(trail));
-    let nav = NavigationGraph::new(-20.0, 20.0, -20.0, 20.0, 1.0);
-    let mut game = GameWorld::new(
-        Rc::new(RefCell::new(scene)),
-        Rc::new(RefCell::new(InputState::new())),
-        Rc::new(RefCell::new(nav)),
-        Rc::new(RefCell::new(ConsoleLogs::new())),
-    );
-    game.set_playing(true);
+    let mut game = crate::play::playing(Rc::new(RefCell::new(scene)), 20.0);
     for frame in 0..frames {
         let x = frame as f32 * 3.0 / 60.0;
         let scene = game.scene().borrow_mut();

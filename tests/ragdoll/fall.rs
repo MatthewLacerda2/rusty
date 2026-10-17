@@ -5,11 +5,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use glam::Vec3;
-use rusty::app::GameWorld;
-use rusty::core::input::InputState;
-use rusty::navigation::NavigationGraph;
-use rusty::scene::{Scene, ScriptComponent};
-use rusty::scripting::ConsoleLogs;
+use rusty::scene::Scene;
 
 use super::{hitbox_at, ragdolled, rig};
 
@@ -30,25 +26,15 @@ end }";
 /// the second tick; return the scene and the rig.
 fn shot(impulse: f32, ticks: usize, tag: &str) -> (Rc<RefCell<Scene>>, u32) {
     let (mut scene, rig) = ragdolled();
-    let path = crate::temp::dir().join(format!("rusty_466_{tag}.lua"));
-    std::fs::write(&path, SHOOTER.replace("{J}", &impulse.to_string())).unwrap();
-    *scene.world.scripts_mut(rig).unwrap() = vec![ScriptComponent {
-        path: path.to_string_lossy().replace('\\', "/"),
-        ..Default::default()
-    }];
-    let scene = Rc::new(RefCell::new(scene));
-    let mut gw = GameWorld::new(
-        scene.clone(),
-        Rc::new(RefCell::new(InputState::new())),
-        Rc::new(RefCell::new(NavigationGraph::new(
-            -5.0, 5.0, -5.0, 5.0, 1.0,
-        ))),
-        Rc::new(RefCell::new(ConsoleLogs::new())),
+    crate::play::attach_script(
+        &mut scene,
+        rig,
+        &format!("rusty_466_{tag}.lua"),
+        &SHOOTER.replace("{J}", &impulse.to_string()),
     );
-    gw.set_playing(true);
-    for _ in 0..ticks {
-        gw.tick(1.0 / 60.0);
-    }
+    let scene = Rc::new(RefCell::new(scene));
+    let mut gw = crate::play::playing(scene.clone(), 5.0);
+    crate::play::run(&mut gw, ticks);
     (scene, rig)
 }
 

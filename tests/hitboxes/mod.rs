@@ -9,13 +9,9 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use glam::{Quat, Vec3};
-use rusty::app::GameWorld;
 use rusty::components::CharacterControllerComponent;
-use rusty::core::input::InputState;
-use rusty::navigation::NavigationGraph;
 use rusty::physics::{self, PhysicsWorld};
-use rusty::scene::{Scene, ScriptComponent};
-use rusty::scripting::ConsoleLogs;
+use rusty::scene::Scene;
 
 /// The bone a +Z ray at height `y`, offset `x` from the rig, strikes.
 fn bone_hit(scene: &Scene, physics: &PhysicsWorld, x: f32, y: f32) -> Option<(u32, u32)> {
@@ -74,24 +70,11 @@ fn a_shot_in_update_hits_the_arm_where_the_animation_put_it() {
     let mut scene = Scene::new();
     let rig = rig::character(&mut scene, Vec3::ZERO, true);
     scene.add_entity("Sink".to_string());
-    let path = crate::temp::dir().join("rusty_464_shooter.lua");
-    std::fs::write(&path, SHOOTER).unwrap();
-    *scene.world.scripts_mut(rig).unwrap() = vec![ScriptComponent {
-        path: path.to_string_lossy().replace('\\', "/"),
-        ..Default::default()
-    }];
+    crate::play::attach_script(&mut scene, rig, "rusty_464_shooter.lua", SHOOTER);
     let scene = Rc::new(RefCell::new(scene));
-    let nav = NavigationGraph::new(-5.0, 5.0, -5.0, 5.0, 1.0);
-    let mut gw = GameWorld::new(
-        scene.clone(),
-        Rc::new(RefCell::new(InputState::new())),
-        Rc::new(RefCell::new(nav)),
-        Rc::new(RefCell::new(ConsoleLogs::new())),
-    );
-    gw.set_playing(true);
-    for _ in 0..40 {
-        gw.tick(1.0 / 60.0); // the arm moves 0.1 a tick, twice its hitbox radius
-    }
+    let mut gw = crate::play::playing(scene.clone(), 5.0);
+    // The arm moves 0.1 a tick, twice its hitbox radius.
+    crate::play::run(&mut gw, 40);
     let s = scene.borrow();
     let tally = s
         .world

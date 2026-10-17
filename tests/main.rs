@@ -16,6 +16,7 @@
 
 mod layout;
 mod lua;
+mod play;
 mod temp;
 
 // ── Both feature sets ────────────────────────────────────────────────────────────
