@@ -50,20 +50,10 @@ pub fn extract_prefab(scene: &Scene, root_id: u32) -> Option<PrefabData> {
     })
 }
 
-/// Depth-first subtree ids starting at `root_id` (root first), following the live
-/// `children` lists. Used so extract order is deterministic and parent precedes
-/// child.
+/// Depth-first subtree ids starting at `root_id` (root first, children in declared
+/// order), so extract order is deterministic and parent precedes child.
 fn collect_subtree(scene: &Scene, root_id: u32) -> Vec<u32> {
-    let mut order = Vec::new();
-    let mut stack = vec![root_id];
-    while let Some(id) = stack.pop() {
-        order.push(id);
-        // Push children reversed so they come out in declared order.
-        for child in scene.world.children(id).into_iter().rev() {
-            stack.push(child);
-        }
-    }
-    order
+    scene.world.self_and_descendants(root_id).collect()
 }
 
 /// Rewrite one entity's identity into the local id space: its own `id`, its

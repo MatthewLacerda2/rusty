@@ -60,7 +60,7 @@ pub fn draw_node(
         // Branch: a real collapsible node. egui's body indent draws the guide line.
         let id = ui.make_persistent_id(("hierarchy_node", entity_id));
         // A skeleton is ~65 bones (#453): its subtrees start collapsed.
-        let default_open = scene.bone_owner(entity_id).is_none();
+        let default_open = !scene.is_bone(entity_id);
         CollapsingState::load_with_default_open(ui.ctx(), id, default_open)
             .show_header(ui, row)
             .body(|ui| {
@@ -142,7 +142,7 @@ const KINDS: &[(Has, &str, Tint)] = &[
 
 /// The row's glyph and its colour. Skeleton bones read as bones whatever they carry.
 fn node_glyph(scene: &Scene, id: u32, t: Theme) -> (&'static str, egui::Color32) {
-    let (glyph, tint) = if scene.bone_owner(id).is_some() {
+    let (glyph, tint) = if scene.is_bone(id) {
         (icon::BONE, Tint::Muted)
     } else {
         KINDS

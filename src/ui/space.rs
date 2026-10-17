@@ -109,7 +109,7 @@ pub fn canvas_space(
     match (canvas.render_mode, &view.camera) {
         (CanvasRenderMode::WorldSpace, _) => {
             let units = Mat4::from_scale(Vec3::splat(1.0 / canvas.pixels_per_unit.max(1e-3)));
-            CanvasSpace::World(world_matrix(world, id) * units * centre)
+            CanvasSpace::World(world.compute_world_matrix(id) * units * centre)
         }
         (CanvasRenderMode::ScreenSpaceCamera, Some(cam)) => {
             let d = canvas.plane_distance.max(0.01);
@@ -184,21 +184,6 @@ pub fn rect_screen_bounds(
         let p = canvas_to_screen(space, rect.scale_factor, c, view)?;
         Some((lo.min(p), hi.max(p)))
     })
-}
-
-/// An entity's world matrix, walking its parent chain (bounded by the entity count,
-/// so a malformed cycle cannot hang it).
-pub fn world_matrix(world: &World, id: u32) -> Mat4 {
-    let mut m = Mat4::IDENTITY;
-    let mut cur = Some(id);
-    for _ in 0..=world.len() {
-        let Some(c) = cur else { break };
-        if let Some(t) = world.transform(c) {
-            m = t.to_matrix() * m;
-        }
-        cur = world.parent_id(c);
-    }
-    m
 }
 
 #[cfg(test)]

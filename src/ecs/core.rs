@@ -93,14 +93,25 @@ impl World {
 
     /// `id`'s parent, grandparent, … up to the root — every hierarchy walk upward
     /// goes through here (#939). At most [`World::len`] steps, so a malformed parent
-    /// cycle ends the walk instead of hanging it.
+    /// cycle ends the walk instead of hanging it; a parent id no longer in the world
+    /// ends it too, as if `id`'s chain stopped there (#991).
     pub fn ancestors(&self, id: u32) -> impl Iterator<Item = u32> + '_ {
-        std::iter::successors(self.parent_id(id), |&p| self.parent_id(p)).take(self.len())
+        let live_parent = |id: u32| self.parent_id(id).filter(|&p| self.contains(p));
+        std::iter::successors(live_parent(id), move |&p| live_parent(p)).take(self.len())
     }
 
     /// `id`, then [`World::ancestors`].
     pub fn self_and_ancestors(&self, id: u32) -> impl Iterator<Item = u32> + '_ {
         std::iter::once(id).chain(self.ancestors(id))
+    }
+
+    /// `id`'s world matrix: its local Transform under every ancestor's — the one
+    /// live world-matrix walk (#991), bounded as [`World::ancestors`] is. Identity for
+    /// a dead id.
+    pub fn compute_world_matrix(&self, id: u32) -> glam::Mat4 {
+        self.self_and_ancestors(id)
+            .filter_map(|c| self.transform(c).map(|t| t.to_matrix()))
+            .fold(glam::Mat4::IDENTITY, |below, local| local * below)
     }
 
     /// Write the raw parent link. Hierarchy INVARIANTS (cycle checks, the

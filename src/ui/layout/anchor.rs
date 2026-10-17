@@ -22,7 +22,6 @@ use glam::{Vec2, Vec3};
 
 use crate::components::WorldAnchor;
 use crate::ecs::World;
-use crate::ui::space::world_matrix;
 use crate::ui::UiView;
 
 /// Where a marker goes this pass.
@@ -47,7 +46,7 @@ pub(super) fn place(
     let cam = view.camera.as_ref()?;
     let point = match anchor.target {
         Some(t) if world.transform(t).is_none() => return Some(Placement::Hidden),
-        Some(t) => world_matrix(world, t).transform_point3(Vec3::ZERO) + anchor.offset,
+        Some(t) => world.compute_world_matrix(t).transform_point3(Vec3::ZERO) + anchor.offset,
         None => anchor.offset,
     };
     let sp = cam.world_to_screen(point, view.screen);

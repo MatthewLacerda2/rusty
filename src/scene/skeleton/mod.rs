@@ -55,14 +55,24 @@ pub fn saved_next_id(scene: &Scene) -> u32 {
 }
 
 impl Scene {
-    /// Every bone entity of every skinned mesh in the scene.
+    /// Every bone entity of every skinned mesh in the scene: the ids
+    /// [`Scene::is_bone`] holds for, as one set for a caller that asks about many.
     pub fn bone_ids(&self) -> BTreeSet<u32> {
         self.world
             .ids_with_mesh()
             .into_iter()
-            .filter_map(|id| self.world.mesh(id).map(|m| m.skeleton.bones.clone()))
-            .flatten()
+            .filter_map(|id| self.world.mesh(id).map(|m| (id, m.skeleton.bones.clone())))
+            .flat_map(|(owner, bones)| {
+                let under_owner = move |&b: &u32| self.world.ancestors(b).any(|a| a == owner);
+                bones.into_iter().filter(under_owner)
+            })
             .collect()
+    }
+
+    /// Whether `id` is a bone: listed by the skeleton of a skinned entity above it.
+    /// The one "is a bone" test (#991); [`Scene::bone_ids`] is its set form.
+    pub fn is_bone(&self, id: u32) -> bool {
+        self.bone_owner(id).is_some()
     }
 
     /// The skinned entity whose skeleton `id` is a bone of, found by walking up
@@ -78,12 +88,14 @@ impl Scene {
     /// Despawn `owner`'s bones and everything under them — a skinned entity's
     /// skeleton goes with it.
     pub(crate) fn despawn_skeleton(&mut self, owner: u32) {
-        let mut stack = match self.world.mesh(owner) {
-            Some(mesh) => mesh.skeleton.bones.clone(),
-            None => return,
+        let Some(bones) = self.world.mesh(owner).map(|m| m.skeleton.bones.clone()) else {
+            return;
         };
-        while let Some(id) = stack.pop() {
-            stack.extend(self.world.children(id));
+        let doomed: Vec<u32> = bones
+            .into_iter()
+            .flat_map(|b| self.world.self_and_descendants(b))
+            .collect();
+        for id in doomed {
             self.world.despawn(id);
         }
     }

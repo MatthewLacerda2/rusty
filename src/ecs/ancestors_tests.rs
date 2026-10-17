@@ -28,3 +28,23 @@ fn a_parent_cycle_ends_the_walk() {
     w.set_parent_id(b, Some(a));
     assert_eq!(w.ancestors(a).count(), w.len());
 }
+
+#[test]
+fn a_dangling_parent_ends_the_walk() {
+    let mut w = World::new();
+    let gone = w.spawn("gone".into());
+    let leaf = w.spawn("leaf".into());
+    w.set_parent_id(leaf, Some(gone));
+    w.despawn(gone);
+    assert_eq!(w.ancestors(leaf).count(), 0);
+}
+
+#[test]
+fn the_world_matrix_walk_survives_a_parent_cycle() {
+    let mut w = World::new();
+    let a = w.spawn("a".into());
+    let b = w.spawn("b".into());
+    w.set_parent_id(a, Some(b));
+    w.set_parent_id(b, Some(a));
+    assert!(w.compute_world_matrix(a).is_finite());
+}

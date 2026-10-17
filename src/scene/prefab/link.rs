@@ -20,36 +20,11 @@
 use std::collections::BTreeMap;
 
 use crate::components::Entity;
+use crate::scene::prefab::instance::instance_members;
 use crate::scene::prefab::overrides::{apply_overrides, diff_entity};
 use crate::scene::prefab::read_prefab_file;
 use crate::scene::serialize::rehydrate_entity_mesh;
 use crate::scene::{instantiate_prefab, PrefabData, Scene};
-
-/// The entity ids of the instance rooted at `root_id`: the root plus every
-/// descendant that shares the root's `prefab_link.source`. Returns `None` if `root_id`
-/// is not a linked instance root.
-fn instance_entity_ids(scene: &Scene, root_id: u32) -> Option<Vec<u32>> {
-    let source = scene.world.prefab_link(root_id)?.source.clone();
-    let mut ids = Vec::new();
-    let mut stack = vec![root_id];
-    while let Some(id) = stack.pop() {
-        let same_source = scene
-            .world
-            .prefab_link(id)
-            .is_some_and(|l| l.source == source);
-        if !same_source {
-            // A bone (#453) carries no link, but the instance's own entities may
-            // hang from it.
-            if scene.bone_owner(id).is_some() {
-                stack.extend(scene.world.children(id));
-            }
-            continue;
-        }
-        ids.push(id);
-        stack.extend(scene.world.children(id));
-    }
-    Some(ids)
-}
 
 /// Build the fresh source baselines for one instance, keyed by source `local_id`.
 /// Instantiates the source into a SCRATCH scene that already shares `scene`'s
@@ -228,7 +203,7 @@ fn rebuild_entity(scene: &mut Scene, id: u32, baselines: &BTreeMap<u32, Entity>,
 
 /// The instance ids, erroring if `root_id` is not a linked instance root.
 fn require_instance(scene: &Scene, root_id: u32) -> Result<Vec<u32>, String> {
-    instance_entity_ids(scene, root_id)
+    instance_members(scene, root_id)
         .ok_or_else(|| format!("entity {root_id} is not a linked prefab instance"))
 }
 

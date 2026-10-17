@@ -17,6 +17,7 @@ use egui_phosphor::regular as icon;
 
 use crate::editor::inspector::components::card::component_card;
 use crate::editor::theme;
+use crate::scene::prefab::instance;
 use crate::scene::{authoring, Scene};
 
 /// A prefab-override edit the card requested this frame, dispatched by the caller once
@@ -188,30 +189,11 @@ fn field_label(path: &str) -> String {
     trimmed.replace('/', " / ")
 }
 
-/// The instance root for `selected_id`: walk up the parent chain to the topmost entity
-/// that shares the selected entity's prefab source (`local_id == 0` anchors it).
-/// Returns `selected_id` itself when it is not a linked instance, so callers can pass
-/// the result unconditionally.
+/// The instance root for `selected_id` (`scene::prefab::instance::instance_root`, the
+/// rule every prefab verb shares). Returns `selected_id` itself when it is not a linked
+/// instance, so callers can pass the result unconditionally.
 pub fn instance_root(scene: &Scene, selected_id: u32) -> u32 {
-    let Some(source) = scene
-        .world
-        .prefab_link(selected_id)
-        .map(|l| l.source.clone())
-    else {
-        return selected_id;
-    };
-    let linked = |p: u32| {
-        scene
-            .world
-            .prefab_link(p)
-            .is_some_and(|l| l.source == source)
-    };
-    scene
-        .world
-        .ancestors(selected_id)
-        .take_while(|&p| linked(p))
-        .last()
-        .unwrap_or(selected_id)
+    instance::instance_root(scene, selected_id).unwrap_or(selected_id)
 }
 
 /// Apply a [`PrefabAction`] against the live scene, routing through the shared

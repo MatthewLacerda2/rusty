@@ -13,11 +13,11 @@
 //! before the camera stack, after the sim tick has settled every transform — so a transform
 //! a script wrote earlier in the tick is observed by the frame's rendering. A read whose id
 //! is missing from the store (an entity spawned since the last refresh, or an edit-mode
-//! caller that never refreshes) transparently falls back to the live recursive walk, so a
+//! caller that never refreshes) transparently falls back to the live walk, so a
 //! cache miss is never stale-wrong — only uncached.
 //!
 //! **Why the collider refresh stays live.** [`Scene::update_entity_collider`] deliberately
-//! keeps the recursive walk rather than reading this cache: it is called mid-tick by
+//! keeps the live walk rather than reading this cache: it is called mid-tick by
 //! scattered writers (script `Transform.Set*`, the editor inspector/gizmo, the physics
 //! write-back), each needing the parent's transform *as just written this tick*, which a
 //! once-per-frame cache refreshed at render time cannot provide without per-write
@@ -114,23 +114,13 @@ impl WorldMatrixCache {
 }
 
 impl Scene {
-    /// Resolve an entity's world transform by walking its parent chain live. This is the
-    /// O(depth) recursive computation that [`Scene::refresh_world_matrices`] wraps; it
-    /// survives as the cache-fill primitive and as the accessor for one-off edit-mode
-    /// callers (picking, inspector, the snapshot API) that read outside a refreshed frame
-    /// and must see the current transforms, not a frame-old cache.
+    /// Resolve an entity's world transform by walking its parent chain live
+    /// ([`World::compute_world_matrix`](crate::ecs::World::compute_world_matrix), the one
+    /// bounded walk). It is the accessor for one-off edit-mode callers (picking, inspector,
+    /// the snapshot API) that read outside a refreshed frame and must see the current
+    /// transforms, not a frame-old cache.
     pub fn compute_world_matrix(&self, entity_id: u32) -> Mat4 {
-        if let Some(transform) = self.world.transform(entity_id) {
-            let local_mat = transform.to_matrix();
-            drop(transform);
-            if let Some(parent_id) = self.world.parent_id(entity_id) {
-                self.compute_world_matrix(parent_id) * local_mat
-            } else {
-                local_mat
-            }
-        } else {
-            Mat4::IDENTITY
-        }
+        self.world.compute_world_matrix(entity_id)
     }
 
     /// Fill the per-frame world-matrix store O(N) in hierarchy order (#331). Memoizes each
@@ -140,31 +130,38 @@ impl Scene {
     pub fn refresh_world_matrices(&self) {
         let mut store = self.world_cache.inner.borrow_mut();
         store.begin(self.world.epoch());
+        let mut chain = Vec::new();
         for &id in self.world.ids() {
-            self.fill_world_matrix(id, &mut store);
+            self.fill_world_matrix(id, &mut store, &mut chain);
         }
     }
 
-    /// Memoized world-matrix fill for one entity: returns the value already filled this
-    /// pass if present, else resolves the parent (recursively, sharing the same store) and
-    /// stores the product.
-    fn fill_world_matrix(&self, id: u32, store: &mut Store) -> Mat4 {
-        if let Some(cached) = store.get(id) {
-            return cached;
+    /// Memoized world-matrix fill for one entity: climb [`World::self_and_ancestors`]
+    /// (bounded, so a parent cycle cannot overflow the stack, #991) to the nearest entity
+    /// already filled this pass, then fill back down, storing each product. `chain` is
+    /// scratch space reused across the whole refresh.
+    ///
+    /// [`World::self_and_ancestors`]: crate::ecs::World::self_and_ancestors
+    fn fill_world_matrix(&self, id: u32, store: &mut Store, chain: &mut Vec<u32>) {
+        chain.clear();
+        let mut world = Mat4::IDENTITY;
+        for c in self.world.self_and_ancestors(id) {
+            if let Some(cached) = store.get(c) {
+                world = cached;
+                break;
+            }
+            chain.push(c);
         }
-        let Some((local, parent)) = self.world.local_and_parent(id) else {
-            return Mat4::IDENTITY;
-        };
-        let world = match parent {
-            Some(parent_id) => self.fill_world_matrix(parent_id, store) * local,
-            None => local,
-        };
-        store.put(id, world);
-        world
+        for &c in chain.iter().rev() {
+            if let Some(local) = self.world.transform(c).map(|t| t.to_matrix()) {
+                world *= local;
+                store.put(c, world);
+            }
+        }
     }
 
     /// An entity's world matrix as of the last [`Scene::refresh_world_matrices`] (#331).
-    /// Falls back to the live recursive walk on a cache miss, so the value is always
+    /// Falls back to the live walk on a cache miss, so the value is always
     /// correct — see the module's freshness contract.
     pub fn world_matrix(&self, entity_id: u32) -> Mat4 {
         self.world_cache
@@ -173,7 +170,7 @@ impl Scene {
     }
 
     /// Refresh one entity's collider world-AABB from its parent's *live* world matrix and
-    /// its own local transform. Uses the recursive walk, not the per-frame cache, so a
+    /// its own local transform. Uses the live walk, not the per-frame cache, so a
     /// mid-tick writer (a script's `Transform.Set*`, the editor, the physics write-back)
     /// sees the parent transform as just written this tick — see the module note on why the
     /// collider path stays live.
@@ -205,6 +202,9 @@ impl Scene {
     }
 }
 
+#[cfg(test)]
+#[path = "world_cache_guard_tests.rs"]
+mod world_cache_guard_tests;
 #[cfg(test)]
 #[path = "world_cache_tests.rs"]
 mod world_cache_tests;
