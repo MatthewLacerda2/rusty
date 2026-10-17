@@ -77,7 +77,7 @@ pub fn ensure_material_key(scene: &mut Scene, id: u32) -> Option<String> {
             }),
         );
     }
-    let key = scene.world.material(id).unwrap().material.clone();
+    let key = scene.world.material(id)?.material.clone();
     scene.materials.entry(key.clone()).or_default();
     Some(key)
 }

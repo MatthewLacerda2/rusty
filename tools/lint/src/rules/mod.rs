@@ -10,6 +10,7 @@ mod ignored;
 mod markers;
 mod prefix;
 mod skip;
+mod unwrap;
 
 pub use finding::Finding;
 use std::collections::BTreeMap;
@@ -39,10 +40,13 @@ pub fn run() {
             .or_insert_with(|| fs::read_to_string(path).unwrap_or_default())
             .clone()
     };
+    let sim_dirs = crate::layers::sim_dirs();
+    findings.extend(unwrap::missing_roots(&files, &sim_dirs));
     for path in &files {
         let src = source(path);
         findings.extend(markers::check(path, &src));
         findings.extend(skip::check(path, &src));
+        findings.extend(unwrap::check(path, &src, &sim_dirs));
     }
     findings.retain(|f| !finding::allowed(&source(&f.path), f.line, f.rule));
     for path in &files {
@@ -117,3 +121,5 @@ mod markers_tests;
 mod prefix_tests;
 #[cfg(test)]
 mod skip_tests;
+#[cfg(test)]
+mod unwrap_tests;

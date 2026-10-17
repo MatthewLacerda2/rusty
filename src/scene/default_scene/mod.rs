@@ -94,13 +94,17 @@ fn solid(
     place(scene, id, pos, scale);
     scene.world.set_static(id, true);
     add_component(scene, id, ComponentKind::Collider);
-    collider::set_shape(&mut scene.world.collider_mut(id).unwrap(), shape);
+    if let Some(mut c) = scene.world.collider_mut(id) {
+        collider::set_shape(&mut c, shape);
+    }
     wear(scene, id, material);
     id
 }
 
 fn place(scene: &mut Scene, id: u32, pos: Vec3, scale: Vec3) {
-    let mut t = scene.world.transform_mut(id).unwrap();
+    let Some(mut t) = scene.world.transform_mut(id) else {
+        return;
+    };
     t.position = pos;
     t.scale = scale;
 }
@@ -114,7 +118,10 @@ fn wear(scene: &mut Scene, id: u32, key: &str) {
 }
 
 fn attach_script(scene: &mut Scene, id: u32, path: &str) {
-    scene.world.scripts_mut(id).unwrap().push(ScriptComponent {
+    let Some(mut scripts) = scene.world.scripts_mut(id) else {
+        return;
+    };
+    scripts.push(ScriptComponent {
         path: path.to_string(),
         is_loaded: false,
         ..Default::default()
@@ -124,7 +131,9 @@ fn attach_script(scene: &mut Scene, id: u32, path: &str) {
 /// A character capsule of `height` × `radius` before scale (#451).
 fn character(scene: &mut Scene, id: u32, height: f32, radius: f32) {
     add_component(scene, id, ComponentKind::CharacterController);
-    let mut c = scene.world.character_controller_mut(id).unwrap();
+    let Some(mut c) = scene.world.character_controller_mut(id) else {
+        return;
+    };
     cc::set_height(&mut c, height);
     cc::set_radius(&mut c, radius);
 }
@@ -161,14 +170,12 @@ fn add_enemy(scene: &mut Scene, bot_script: &str) {
     );
     character(scene, id, 1.0, 0.5);
     add_component(scene, id, ComponentKind::Animator);
-    {
-        let mut a = scene.world.animator_mut(id).unwrap();
+    if let Some(mut a) = scene.world.animator_mut(id) {
         animator::set_clip(&mut a, "Walk".to_string());
         animator::set_speed(&mut a, 3.0);
     }
     add_component(scene, id, ComponentKind::NavMeshAgent);
-    {
-        let mut a = scene.world.nav_agent_mut(id).unwrap();
+    if let Some(mut a) = scene.world.nav_agent_mut(id) {
         nav_agent::set_active(&mut a, true);
         nav_agent::set_radius(&mut a, 0.65);
         nav_agent::set_speed(&mut a, 3.5);
@@ -188,12 +195,13 @@ fn add_enemy(scene: &mut Scene, bot_script: &str) {
 fn add_sun(scene: &mut Scene) {
     let id = create_entity(scene, "Sun", Some(Primitive::DirectionalLight));
     scene.world.set_static(id, true);
-    {
-        let mut t = scene.world.transform_mut(id).unwrap();
+    if let Some(mut t) = scene.world.transform_mut(id) {
         t.position = Vec3::new(0.0, 12.0, 0.0);
         t.rotation = Quat::from_xyzw(-0.408_218, -0.234_57, -0.109_382, 0.875_426).normalize();
     }
-    let mut l = scene.world.light_mut(id).unwrap();
+    let Some(mut l) = scene.world.light_mut(id) else {
+        return;
+    };
     authoring::light::set_color(&mut l, Vec3::new(1.0, 0.95, 0.85));
     authoring::light::set_intensity(&mut l, 1.2);
 }

@@ -4,6 +4,10 @@
 //! headless harness drives, and a monotonic `frame_count`. The simulation advances
 //! it once per tick; Lua reads it through the `Time` namespace (Unity: `Time`).
 
+// Panic-free sim (#195, #962): bare `.unwrap()` is denied in every sim module (use `?`
+// or a documented `.expect(...)`); test code is exempt via clippy.toml. See docs/linting.md.
+#![deny(clippy::unwrap_used)]
+
 /// The canonical fixed timestep (60 Hz). Matches `dev::harness::FIXED_DT`; kept
 /// here too so non-dev builds have the value without pulling in the dev tree.
 pub const FIXED_DELTA_TIME: f32 = 1.0 / 60.0;

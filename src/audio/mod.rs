@@ -21,6 +21,10 @@
 //!
 //! kira is used for the output device only.
 
+// Panic-free sim (#195, #962): bare `.unwrap()` is denied in every sim module (use `?`
+// or a documented `.expect(...)`); test code is exempt via clippy.toml. See docs/linting.md.
+#![deny(clippy::unwrap_used)]
+
 pub mod backend;
 pub mod device;
 pub mod introspection;
