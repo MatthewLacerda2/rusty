@@ -31,11 +31,10 @@ use std::path::Path;
 pub use lua::register;
 pub use report::{Report, Samples, Summary};
 
-use self::clock::ClockProbe;
 use super::capture::RenderedFrame;
 use super::harness::Harness;
 use crate::core::frame_stats::FrameStats;
-use crate::render::GpuPass;
+use crate::render::{ClockProbe, GpuPass};
 
 /// The render counters a bench row reports, in order.
 const COUNTERS: [&str; 6] = [
@@ -53,9 +52,7 @@ const SYSTEMS: [&str; 4] = ["update_scripts", "tick_nav", "step_physics", "anima
 /// The clock probe runs right before and right after each frame's GPU work.
 pub fn measure(harness: &mut Harness, ticks: u32) -> Report {
     let mut samples = Samples::default();
-    let probe = harness
-        .renderer()
-        .and_then(|r| ClockProbe::new(&r.device, &r.queue));
+    let probe = harness.renderer().and_then(|r| ClockProbe::new(r));
     // The first dispatch pays for setting the pipeline up: not a reading.
     time_probe(probe.as_ref(), harness);
     for _ in 0..ticks {
@@ -76,7 +73,7 @@ pub fn measure(harness: &mut Harness, ticks: u32) -> Report {
 fn time_probe(probe: Option<&ClockProbe>, harness: &mut Harness) -> Option<f64> {
     let probe = probe?;
     let renderer = harness.renderer()?;
-    probe.time(&renderer.device, &renderer.queue)
+    probe.time(renderer)
 }
 
 /// One frame's row values: the sim's CPU time, what rendering it cost, its

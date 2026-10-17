@@ -31,10 +31,12 @@
 //! time (`gpu_ms`), and a heavy pass shows as heavy instead of smearing into the
 //! light ones queued behind it.
 
+mod clock;
 mod readback;
 
 use std::cell::{Cell, RefCell};
 
+pub use clock::ClockProbe;
 use readback::Ring;
 
 /// The render passes the timer reports, under the stable names the stats use.

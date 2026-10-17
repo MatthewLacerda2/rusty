@@ -43,7 +43,7 @@ pub use ibl::reflection_bake::DEFAULT_REFLECTION_RESOLUTION;
 pub use setup::headless::{gpu_required, OFFSCREEN_FORMAT, REQUIRE_GPU_ENV};
 pub use setup::SurfaceWindow;
 pub use stats::RenderCounters;
-pub use timing::{GpuPass, GpuTimes};
+pub use timing::{ClockProbe, GpuPass, GpuTimes};
 pub use view::{PixelSize, RenderView};
 
 // GPU uniform memory layouts live in `gpu/uniforms.rs` (split out to keep files under
