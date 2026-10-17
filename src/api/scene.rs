@@ -10,6 +10,8 @@
 //!   - `DestroyEntity(id)` — **really** removes the entity (the editor's Destroy).
 //!   - `AddComponent(id, kind)` / `RemoveComponent(id, kind)` — the Add Component
 //!     menu's set, with the inspector's default values.
+//!   - `AddScript(id, path)` — append a script behaviour, as the Add Component menu's
+//!     script list does (#998).
 //!   - `SetParent(id, parent)` / `ClearParent(id)` — parenting (`parent_id`).
 //!   - `Save([path])` — persist the live world (write-back to the current scene
 //!     path when no path is given).
@@ -126,7 +128,8 @@ fn register_destroy<'scope>(
     )
 }
 
-/// `AddComponent` / `RemoveComponent` over the Add Component menu's set.
+/// `AddComponent` / `RemoveComponent` over the Add Component menu's set, and
+/// `AddScript` for its script list.
 fn register_components<'scope>(
     scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
@@ -143,6 +146,25 @@ fn register_components<'scope>(
                 &mut scene.borrow_mut(),
                 id,
                 parsed,
+            ))
+        }),
+    )?;
+
+    put(
+        table,
+        "AddScript",
+        scope.create_function(|_, (id, path): (u32, String)| {
+            if !std::path::Path::new(&path).is_file() {
+                return Err(mlua::Error::RuntimeError(format!(
+                    "Scene.AddScript: no script file at '{path}'"
+                )));
+            }
+            let world = &mut scene.borrow_mut().world;
+            Ok(authoring::attach_script(
+                world,
+                id,
+                &path,
+                Default::default(),
             ))
         }),
     )?;

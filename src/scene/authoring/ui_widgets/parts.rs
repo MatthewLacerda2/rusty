@@ -8,8 +8,8 @@
 use glam::{Vec2, Vec4};
 
 use crate::components::{
-    ImageComponent, RectTransformComponent, ScriptComponent, ScriptFieldValue, SelectableComponent,
-    TextAlignment, TextComponent,
+    ImageComponent, RectTransformComponent, ScriptFieldValue, SelectableComponent, TextAlignment,
+    TextComponent,
 };
 use crate::scene::Scene;
 
@@ -109,16 +109,12 @@ pub fn script(scene: &mut Scene, id: u32, name: &str) {
 
 /// [`script`], with some of its fields set away from the schema defaults.
 pub fn script_with(scene: &mut Scene, id: u32, name: &str, values: &[(&str, ScriptFieldValue)]) {
-    if let Some(mut scripts) = scene.world.scripts_mut(id) {
-        scripts.push(ScriptComponent {
-            path: format!("{SCRIPT_DIR}/{name}.lua"),
-            values: values
-                .iter()
-                .map(|(k, v)| (k.to_string(), v.clone()))
-                .collect(),
-            ..Default::default()
-        });
-    }
+    let values = values
+        .iter()
+        .map(|(k, v)| (k.to_string(), v.clone()))
+        .collect();
+    let path = format!("{SCRIPT_DIR}/{name}.lua");
+    crate::scene::authoring::attach_script(&mut scene.world, id, &path, values);
 }
 
 /// A label filling its parent, inset by `inset`.

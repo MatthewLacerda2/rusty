@@ -138,7 +138,6 @@ fn revert_field_drops_one_override_and_keeps_the_rest() {
 
     // Revert only the X leaf: it returns to source (0.0), Y stays overridden (4.0).
     let action = PrefabAction::RevertField {
-        root,
         entity: root,
         path: "/transform/position/0".to_string(),
     };
@@ -156,7 +155,6 @@ fn revert_field_on_an_unknown_path_is_a_noop() {
     let before = list_instance_overrides(&scene, root).unwrap();
 
     let action = PrefabAction::RevertField {
-        root,
         entity: root,
         path: "/not/a/real/path".to_string(),
     };

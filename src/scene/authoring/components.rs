@@ -35,7 +35,8 @@ macro_rules! component_kinds {
 component_kinds! {
     /// The first-class components the inspector's "Add Component" menu can attach /
     /// detach. `Script` is excluded: a script attachment carries a path (it is "add
-    /// *which* script"), so it has its own API verb rather than a defaulted add.
+    /// *which* script"), so it has its own verb rather than a defaulted add
+    /// ([`attach_script`](super::attach_script), `Scene.AddScript`).
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
     pub enum ComponentKind {
         Light,
