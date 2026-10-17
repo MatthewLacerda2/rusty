@@ -25,6 +25,7 @@ agent can read exactly what failed.
 | Component completeness | `tools/lint -- --components` | every first-class component has all 4 axes (field, Add Component entry, inspector card, API namespace), or a written waiver (`WAIVERS`) |
 | Editor↔shared-op parity | `tools/lint -- --parity` | every first-class component's inspector card routes its mutations through a shared `scene::authoring` op (never direct field writes through the #344 accessor guard) |
 | Rust API reference | rustdoc | **hard gate**: `RUSTDOCFLAGS="-D warnings" cargo doc --no-deps` (both feature sets) — no broken intra-doc links, no public docs linking private items; name a private item as plain `code`, not a link |
+| Docs name what exists | `make docrefs` (`.github/scripts/docrefs.py`) | **hard gate**: every `src/`, `tests/`, `tools/`, `docs/` or `.github/` path in a tracked `*.md`'s inline code is tracked, every `` `make <verb>` `` is a target, and CLAUDE.md's namespaces each have a `docs/api/` page; placeholders pass, anything else takes `<!-- docrefs: allow <why> -->`. Runs on Markdown-only PRs too (#973) |
 
 ## The `*_tests.rs` sibling rule
 The tight test cap exists to discourage over-splitting a bundle of `#[test]`s. But a
@@ -36,10 +37,11 @@ from *two* places. To keep cohesion, a `<x>_tests.rs` **sibling** shares its sou
 (singular), `tests/`, and `fixtures/` forms keep the tight 150-line cap (#211).
 
 ## What the size gate scans
-The full scan (`make size`, CI's `lint` job) walks `src/`, `tests/`, `fuzz/` and
-`tools/` (`SCAN_ROOTS` in `tools/lint/src/size.rs`); until #535 it walked only `src/`,
+The full scan (`make size`, CI's `lint` job) walks `src/`, `tests/`, `fuzz/`,
+`tools/` and `.github/` (`SIZE_ROOTS` in `tools/lint/src/size/mod.rs`; `.github/` since #926); until #535 it walked only `src/`,
 so oversized integration-test files passed unseen, and until #541 it skipped `tools/`,
 so the lint crate itself could drift past the cap. Any `target/` directory (cargo
+<!-- docrefs: allow build output, never tracked -->
 build output, e.g. `tools/lint/target/` or `fuzz/target/`) is never descended into.
 The commit hook checks whatever `.rs` files are staged, wherever they live.
 

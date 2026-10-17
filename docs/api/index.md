@@ -10,7 +10,7 @@ boundary as three `f32`s (`x, y, z`) rather than a table. Getters that miss
 return a sensible default (zeros, or `(1,1,1)` for scale) instead of erroring.
 
 > **Maintenance:** this file is currently **hand-written** and must be kept in
-> sync with `src/scripting/mod.rs` and `src/scripting/bindings/`. A generator
+> sync with `src/scripting/mod.rs` and the bindings in `src/api/`. A generator
 > that emits it from self-describing bindings (with a CI drift check) is a tracked
 > follow-up — see the PR for issue #28.
 
@@ -167,7 +167,7 @@ interaction — press, drag, scroll, submit and cancel stop at it without firing
 Focus callbacks (`OnSelect` … `OnMove`) go to the focused entity itself. How
 hits are found and what a Selectable adds is in [`docs/ui.md`](../ui.md).
 
-**Deterministic dispatch order** (enforced in `src/scripting/lifecycle.rs`, so
+**Deterministic dispatch order** (enforced in `src/scripting/lifecycle/`, so
 headless replays stay byte-identical):
 
 - Init is two-phase, at play-enter and again at the head of every tick's

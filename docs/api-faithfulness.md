@@ -96,10 +96,10 @@ per-module unit tests (e.g. `api/light.rs`) are the pattern.
 The per-scene navmesh bake settings (#276). Each setter writes `scene.nav_settings`
 then re-bakes the shared graph, so the **bake** is the read-site — proven in
 `src/api/nav/settings_tests.rs` (set via binding → `nav_settings` reflects it → a
-re-bake reflects it) and, at the bake itself, in `src/navigation/bake_tests.rs`
+re-bake reflects it) and, at the bake itself, in `src/navigation/bake/tests/settings.rs`
 (`bake_sources_max_step_from_scene_settings`, `bake_reshapes_grid_from_grid_spacing`),
-`src/navigation/erosion_tests.rs` (radius), and `src/navigation/headroom/tests.rs`
-(height — `low_overhang_carves_cells_beneath`).
+`src/navigation/bake/tests/erosion.rs` (radius), and `src/navigation/bake/tests/headroom.rs`
+(height — `low_overhang_drops_the_floor_beneath_but_keeps_its_top`).
 
 | Setter | Status | Read-site |
 |---|---|---|
@@ -485,20 +485,20 @@ rejected patch, note or option). zimmer's own render tests live in scorsese.
 |---|---|---|
 | `SetInteractable` | ✅ | sim — `ui::events::is_interactable` (the `Disabled` state; press / drag / scroll / submit gating); round-trips (`tests/selectable_api.rs`) |
 | `SetTransition` / `SetTargetGraphic` / `SetColor` / `SetFadeDuration` / `SetSprite` | ✅ | sim — `EventSystem::apply_transitions` writes the target's runtime `state_tint` / `override_texture`; render — multiplied / preferred in `render::ui::mesh` and `render::ui::text::emit` (`src/ui/events/transition_tests.rs`); round-trips |
-| `SetNavigation` / `SetSelectOn` | ✅ | sim — `ui::events::focus` (arrow-key navigation; `src/ui/events/focus_tests.rs`); round-trips, references remapped through prefabs |
+| `SetNavigation` / `SetSelectOn` | ✅ | sim — `ui::events::focus` (arrow-key navigation; `src/ui/events/focus/tests.rs`); round-trips, references remapped through prefabs |
 
 ### `LayoutGroup` — over `Entity.layout_group` (#421)
 
 | Setter | Status | Read-site |
 |---|---|---|
-| `SetKind` / `SetPadding` / `SetSpacing` / `SetChildAlignment` / `SetControlChildSize` / `SetChildForceExpand` | ✅ | sim — `ui::layout::group` places the children inside `UiLayout::compute` (`UI.GetRect`; `src/ui/layout/group_tests.rs`); round-trips (`tests/ui_layout_api.rs`) |
+| `SetKind` / `SetPadding` / `SetSpacing` / `SetChildAlignment` / `SetControlChildSize` / `SetChildForceExpand` | ✅ | sim — `ui::layout::group` places the children inside `UiLayout::compute` (`UI.GetRect`; `src/ui/layout/group_tests.rs`); round-trips (`tests/ui/layout_api/`) |
 | `SetCellSize` / `SetConstraint` / `SetConstraintCount` / `SetStartCorner` / `SetStartVertical` | ✅ | sim — `ui::layout::grid` (`src/ui/layout/grid_tests.rs`); round-trips |
 
 ### `LayoutElement` — over `Entity.layout_element` (#421)
 
 | Setter | Status | Read-site |
 |---|---|---|
-| `SetIgnoreLayout` / `SetMinSize` / `SetPreferredSize` / `SetFlexibleSize` | ✅ | sim — `ui::layout::sizes` (`layout_children`, `element_sizes`) read by the group pass (`src/ui/layout/group_tests.rs`); round-trips (`tests/ui_layout_api.rs`) |
+| `SetIgnoreLayout` / `SetMinSize` / `SetPreferredSize` / `SetFlexibleSize` | ✅ | sim — `ui::layout::sizes` (`layout_children`, `element_sizes`) read by the group pass (`src/ui/layout/group_tests.rs`); round-trips (`tests/ui/layout_api/`) |
 | `SetFit` | ✅ | sim — `ui::layout::fit` resizes the rect in `UiLayout::compute` (`src/ui/layout/fit_tests.rs`); round-trips |
 
 ### `UI` — the event system (#420)
