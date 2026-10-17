@@ -6,8 +6,9 @@ use std::path::Path;
 
 use egui_phosphor::regular as icon;
 
+use crate::asset::{IMAGE_EXTENSIONS, MODEL_EXTENSIONS};
 use crate::core::paths;
-use crate::editor::content_browser::{extension, file_name, ROOT};
+use crate::editor::content_browser::{file_name, ROOT};
 use crate::editor::theme::Theme;
 use crate::editor::EditorUi;
 use crate::scene::Scene;
@@ -49,11 +50,12 @@ pub fn draw(
 }
 
 /// Read the folder into `(path, is_dir)` pairs sorted folders-first, then
-/// alphabetically. Returns `None` if the directory can't be read.
+/// alphabetically. The import cache is left out: its source is the asset (#1024). Returns `None` if the directory can't be read.
 fn read_entries(dir: &str) -> Option<Vec<(String, bool)>> {
     let read = std::fs::read_dir(dir).ok()?;
     let mut entries: Vec<(String, bool)> = read
         .flatten()
+        .filter(|e| !crate::asset::convert::is_import_cache(&e.path()))
         .map(|e| {
             let p = e.path();
             (paths::to_slash(&p), p.is_dir())
@@ -134,7 +136,7 @@ fn collect_tiles(
         if !search.is_empty() && !name.to_lowercase().contains(search) {
             continue;
         }
-        let ext = extension(path);
+        let ext = paths::extension(path);
         let (glyph, color, kind) = match (*is_dir, ext.as_str()) {
             (true, _) => (
                 icon::FOLDER,
@@ -210,11 +212,11 @@ fn draw_tile(ui: &mut egui::Ui, t: Theme, tile: &Tile) -> egui::Response {
 
 fn type_glyph(ext: &str) -> &'static str {
     match ext {
-        "png" | "tga" | "jpg" | "jpeg" => icon::IMAGE,
+        e if IMAGE_EXTENSIONS.contains(&e) => icon::IMAGE,
         "wav" | "mp3" | "ogg" => icon::MUSIC_NOTES,
         "scene" => icon::FILM_SLATE,
         "prefab" => icon::PACKAGE,
-        "fbx" | "obj" | "gltf" | "glb" => icon::CUBE,
+        e if MODEL_EXTENSIONS.contains(&e) => icon::CUBE,
         "lua" => icon::FILE_CODE,
         _ => icon::FILE,
     }
@@ -231,7 +233,7 @@ fn truncate(name: &str) -> String {
 /// Select an asset (clears entity selection); loads script text for `.lua`.
 fn select_asset(editor: &mut EditorUi, path: String) {
     editor.selected_entity_id = None;
-    if extension(&path) == "lua" {
+    if paths::has_extension(&path, "lua") {
         if let Ok(content) = std::fs::read_to_string(&path) {
             editor.asset_script_content = content;
         }

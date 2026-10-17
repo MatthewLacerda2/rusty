@@ -65,6 +65,23 @@ pub fn to_slash(path: &Path) -> String {
     path.to_string_lossy().replace('\\', "/")
 }
 
+/// `path`'s extension, lowercased; empty when it has none (#994). The one place
+/// a file's kind is read from its name, so `.LUA` and `.lua` are the same file kind
+/// everywhere.
+pub fn extension(path: impl AsRef<Path>) -> String {
+    path.as_ref()
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase()
+}
+
+/// True when `path`'s extension is `ext` (given lowercase, without the dot),
+/// compared case-insensitively.
+pub fn has_extension(path: impl AsRef<Path>, ext: &str) -> bool {
+    extension(path) == ext
+}
+
 /// `path` without a verbatim prefix: `\\?\C:\x` → `C:\x`, `\\?\UNC\host\share`
 /// → `\\host\share`. Any other path, `/`-rooted ones included, comes back as is.
 pub fn strip_verbatim(path: &str) -> String {

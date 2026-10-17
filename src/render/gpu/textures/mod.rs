@@ -234,4 +234,6 @@ impl Renderer {
 }
 
 #[cfg(test)]
+mod formats_tests;
+#[cfg(test)]
 mod freshness_tests;

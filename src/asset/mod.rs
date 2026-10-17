@@ -1,7 +1,7 @@
 //! src/asset/ — the headless 3D-asset importer (issue #74).
 //!
-//! Turns an authored source file (glTF 2.0 `.gltf`/`.glb`, or Wavefront `.obj`)
-//! into addressable, scene-referenceable sub-meshes — WITHOUT ever inlining GPU
+//! Turns an authored source file (glTF 2.0 `.gltf`/`.glb`, Wavefront `.obj`, or an
+//! `.fbx` read through the glTF it is converted to, `convert`) into addressable, scene-referenceable sub-meshes — WITHOUT ever inlining GPU
 //! buffers into the scene document. Scenes store a path-based REFERENCE
 //! (`path::sub_object`); the geometry is re-imported on scene load, exactly like a
 //! primitive mesh is rebuilt from its `primitive_type`.
@@ -14,7 +14,7 @@
 //! Audio import (`audio`, #385) lives here too: MP3 is a source format, converted to
 //! WAV on arrival, and the one decoder every clip goes through.
 //!
-//! Purity: this module depends only on `glam` + the `gltf`/`tobj`/`serde`/`symphonia`
+//! Purity: this module depends only on `glam` + the `gltf`/`tobj`/`ufbx`/`serde`/`symphonia`
 //! crates — never wgpu/egui/mlua — so it stays a pure data transform. It lives outside the
 //! determinism-guarded sim trees (`app`/`scripting`/`physics`/`navigation`); a
 //! scene-load re-import is deterministic given the same file.
@@ -22,6 +22,7 @@
 pub mod anim_data;
 pub mod animation_graph;
 pub mod audio;
+pub mod convert;
 pub mod gltf;
 pub mod lightmap_uv;
 pub mod lod;
@@ -40,6 +41,7 @@ pub use manifest::{build_manifest, AssetEntry, AssetManifest, SubObjectEntry};
 pub use mesh_data::{ImportedAsset, JointTransform, MaterialData, MeshVertex, SkinData, SubMesh};
 pub use sidecar::{import_and_sync_sidecar, ImportSettings, MeshColliderKind};
 
+use crate::core::paths;
 use std::path::Path;
 
 /// The separator between a source path and a sub-object id in a scene reference:
@@ -73,18 +75,26 @@ impl std::fmt::Display for ImportError {
 
 impl std::error::Error for ImportError {}
 
+/// The source model formats [`import_file`] reads, lowercase (#983, #994). The one
+/// list: the editor's content grid, inspector and preview read it rather than
+/// spelling their own, so nothing offers a model the importer would reject. `fbx`
+/// is read through a cached glTF ([`convert`], #1024).
+pub const MODEL_EXTENSIONS: &[&str] = &["gltf", "glb", "obj", "fbx"];
+
+/// The image formats a texture is decoded from, lowercase (#994): what the
+/// renderer's `image` decoders are built with (`Cargo.toml`'s `image` features).
+pub const IMAGE_EXTENSIONS: &[&str] = &["png", "tga", "jpg", "jpeg"];
+
 /// True if `path` looks like a source 3D asset this importer can read
-/// (`.gltf`/`.glb`/`.obj`). Case-insensitive.
-pub fn is_model_path(path: &str) -> bool {
-    matches!(extension(path).as_str(), "gltf" | "glb" | "obj")
+/// ([`MODEL_EXTENSIONS`]). Case-insensitive.
+pub fn is_model_path(path: impl AsRef<Path>) -> bool {
+    MODEL_EXTENSIONS.contains(&paths::extension(path).as_str())
 }
 
-fn extension(path: &str) -> String {
-    Path::new(path)
-        .extension()
-        .and_then(|e| e.to_str())
-        .unwrap_or("")
-        .to_lowercase()
+/// True if `path` looks like a texture image ([`IMAGE_EXTENSIONS`]).
+/// Case-insensitive.
+pub fn is_image_path(path: impl AsRef<Path>) -> bool {
+    IMAGE_EXTENSIONS.contains(&paths::extension(path).as_str())
 }
 
 /// Import a whole source file into its addressable sub-meshes + materials,
@@ -111,14 +121,12 @@ pub fn import_file(path: &Path) -> Result<ImportedAsset, ImportError> {
 
 /// Parse a source file into sub-meshes + materials by its extension, as authored.
 fn parse_file(path: &Path) -> Result<ImportedAsset, ImportError> {
-    let ext = path
-        .extension()
-        .and_then(|e| e.to_str())
-        .unwrap_or("")
-        .to_lowercase();
-    match ext.as_str() {
+    match paths::extension(path).as_str() {
         "gltf" | "glb" => gltf::import::import(path),
         "obj" => obj_import::import(path),
+        _ if convert::converter_for(path).is_some() => {
+            gltf::import::import(&convert::cached_gltf(path)?)
+        }
         other => Err(ImportError::UnsupportedFormat(other.to_string())),
     }
 }
