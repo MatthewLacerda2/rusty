@@ -552,8 +552,8 @@ right away.
 
 **A human check is never a merge hold.** Some proof only a person can give: a real
 window, real speakers, taste. When a green pull request carries such a check, merge
-it anyway, and put the checklist in the PR description and an issue comment for
-the user to run later. If it turns out broken, that is a bug to file and fix, not
+it anyway: the checklist sits under the PR description's *For a human* heading,
+and `make checks` gathers it into the batch report for the user to run later. If it turns out broken, that is a bug to file and fix, not
 a reason the batch waited. The same goes for a judgement call the issue left open:
 take the default the issue, CLAUDE.md or Unity points to, write down what you
 chose and why, and keep going. The batch exists so the user does not have to be
@@ -621,6 +621,12 @@ checkout runs what was merged. Last, once nothing is compiling:
    connected keeps the old process until it reconnects; say so in the report.
 
 ## Reporting back
+
+**The report opens with `make checks SINCE=<the batch's start>`** (an ISO time,
+or an age like `12h`): every unticked *For a human* item from the PRs merged
+since then, grouped by PR, and the open issues labelled both `planning` and
+`human` (#929). Paste its Markdown as the report's first section; the user acts
+on it without opening a dozen PRs.
 
 The user is not reading the transcript of a batch. They take long — often hours,
 usually overnight — and the transcript is, if anything, notes for Claude itself.

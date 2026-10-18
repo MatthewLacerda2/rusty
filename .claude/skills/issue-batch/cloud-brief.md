@@ -107,8 +107,8 @@ a coder real time.
   (`gh api repos/...`, `gh workflow run`, `gh label create`), and so do the GitHub
   MCP tools; `gh pr` and `gh issue` subcommands that use GraphQL do not.
 - **The container cannot delete a branch** (neither `git push --delete` nor the
-  REST refs API is allowed). A throwaway branch you pushed goes in the PR's human
-  checklist for the operator to delete.
+  REST refs API is allowed). A throwaway branch you pushed goes under the PR's
+  *For a human* heading for the operator to delete.
 - **`git status --short --ignored` lists nothing you wrote** before readying: a
   `.gitignore` pattern silently kept a source file out of a commit once
   (MatthewLacerda2/scorsese#872).
@@ -152,6 +152,13 @@ Beyond what changed, why, the effect and the decisions:
 - **A `Gates` line:** what ran green, on which head commit, and what didn't run
   and why (no real GPU, a human check). After your own rebase it is re-run or
   marked stale; a rebase the merge queue pushes later dates it for you (#968).
+- **A `For a human` heading** for what only the operator can check (a real
+  window, speakers, a repository setting, a branch to delete), each one a
+  `- [ ]` item. The heading must *start* with "For a human": `make checks`
+  gathers every unticked item under such headings from a batch's merged PRs for
+  the batch report (#929), and finds nothing under any other name. When nothing
+  needs a human, leave the heading out or write a sentence under it, never
+  `- [ ] Nothing needs a human`, which would be listed as a check.
 - **A `Seam` section** when the PR creates something later branches build on:
   the types, functions, files and invariants a sibling should use. The
   orchestrator's next brief points at "PR #N, *Seam*" instead of re-describing

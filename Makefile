@@ -23,7 +23,7 @@ SELF_CHECKS := target-dir inventory
 
 .DEFAULT_GOAL := help
 .NOTPARALLEL:
-.PHONY: help setup compile-cache check gates pre-commit $(SELF_CHECKS) $(GATES) mergeable queue blockers reclaim mutants-remote editor-capture bench
+.PHONY: help setup compile-cache check gates pre-commit $(SELF_CHECKS) $(GATES) mergeable queue blockers checks reclaim mutants-remote editor-capture bench
 
 help: ## List the verbs
 	@grep -E '^[a-z-]+:.*## ' $(firstword $(MAKEFILE_LIST)) | \
@@ -193,6 +193,14 @@ blockers: ## Prose-only "Blocked by #N" GitHub never recorded. ARGS=--fix record
 .PHONY: board
 board: ## Stray branches, stale assignments, unlabelled issues. ARGS="--hours 48" sets the age
 	@python3 .github/scripts/board.py $(ARGS)
+
+# Human checks never hold a merge, so after a batch they are scattered across
+# its merged PRs (#929). Lists every unticked `- [ ]` under a "For a human"
+# heading in the PRs merged since SINCE, and the issues labelled both planning
+# and human, as Markdown for the batch report. A report, never a gate: exits 0.
+checks: ## Unticked human checks from PRs merged since then. make checks SINCE=12h or SINCE=2026-10-16
+	@test -n "$(SINCE)" || { echo "checks: since when? e.g. make checks SINCE=12h or SINCE=2026-10-16T18:00Z" >&2; exit 1; }
+	@python3 .github/scripts/human-checks.py '$(SINCE)'
 
 # Each worktree's target/ holds GBs, and removing it by hand per merged branch
 # gets skipped under load (#913). Removes every worktree under .claude/worktrees/
