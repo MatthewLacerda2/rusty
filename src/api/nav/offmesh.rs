@@ -15,7 +15,7 @@ use glam::Vec3;
 use mlua::{Lua, Table};
 
 use super::super::{put, Reg};
-use super::set_and_rebake;
+use super::settings::set_and_rebake;
 use crate::components::OffMeshLinkData;
 use crate::navigation::{complete_off_mesh_link, NavMeshSettings, NavigationGraph};
 use crate::scene::authoring::nav::agent as nav_ops;

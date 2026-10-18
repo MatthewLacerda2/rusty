@@ -1,4 +1,4 @@
-//! src/physics/collision_tests.rs — solid-contact events (#448): a sphere dropped
+//! src/physics/collision_events_tests.rs — solid-contact events (#448): a sphere dropped
 //! onto a floor enters, stays and exits exactly once, reports the contact point
 //! and normal a script expects, and replays identically.
 

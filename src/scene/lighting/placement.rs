@@ -162,5 +162,5 @@ pub fn plan_reflection_probes(scene: &Scene, region: f32, cap: u32) -> Vec<Refle
 }
 
 #[cfg(test)]
-#[path = "lighting_placement_tests.rs"]
-mod lighting_placement_tests;
+#[path = "placement_tests.rs"]
+mod placement_tests;

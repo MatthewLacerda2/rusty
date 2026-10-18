@@ -181,6 +181,10 @@ fn lua_err(e: impl std::fmt::Display) -> mlua::Error {
 }
 
 #[cfg(test)]
+#[path = "fixture.rs"]
+mod fixture;
+
+#[cfg(test)]
 #[path = "bake_tests.rs"]
 mod bake_tests;
 

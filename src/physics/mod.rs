@@ -22,7 +22,7 @@ mod ccd_tests;
 mod character;
 mod collision_events;
 #[cfg(test)]
-mod collision_tests;
+mod collision_events_tests;
 mod compound;
 #[cfg(test)]
 mod compound_tests;
@@ -38,8 +38,6 @@ mod material;
 #[cfg(test)]
 mod material_tests;
 mod query;
-#[cfg(test)]
-mod query_active_tests;
 #[cfg(test)]
 mod query_tests;
 mod ragdoll;

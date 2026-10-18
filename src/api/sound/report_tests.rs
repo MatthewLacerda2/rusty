@@ -3,7 +3,7 @@
 
 use mlua::{Lua, Table};
 
-use super::bake_tests::{lua_with_sound, tmp, IMPACT_PATCH};
+use super::fixture::{lua_with_sound, tmp, IMPACT_PATCH};
 use super::level_tests::write_wav;
 
 fn eval(lua: &Lua, code: &str) -> Table {

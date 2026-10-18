@@ -2,8 +2,9 @@
 //! far side dark, and a point light shadows along all six cube faces. Each check
 //! renders the scene with `cast_shadows` off as its control. Skips with no adapter.
 
-use glam::{Quat, Vec2, Vec3};
+use glam::{Vec2, Vec3};
 
+use super::gpu_fixture::{dark, lamp};
 use crate::render::{readback, RenderCounters, RenderView, Renderer, OFFSCREEN_FORMAT};
 use crate::scene::authoring::{create_entity, Primitive};
 use crate::scene::{Camera, Scene};
@@ -15,26 +16,6 @@ fn block(scene: &mut Scene, position: Vec3, scale: Vec3) {
     let id = create_entity(scene, "Block", Some(Primitive::Box));
     let mut t = scene.world.transform_mut(id).unwrap();
     (t.position, t.scale) = (position, scale);
-}
-
-/// A dark scene: no sky, sun or ambient.
-pub(super) fn dark() -> Scene {
-    let mut scene = Scene::new();
-    scene.skybox_path = String::new();
-    scene.ambient_intensity = 0.0;
-    scene
-}
-
-/// Add a `kind` light at `at`, pointing along `dir`, casting when `shadows`.
-pub(super) fn lamp(scene: &mut Scene, kind: Primitive, at: Vec3, dir: Vec3, shadows: bool) {
-    let id = create_entity(scene, "Lamp", Some(kind));
-    let mut t = scene.world.transform_mut(id).unwrap();
-    (t.position, t.rotation) = (at, Quat::from_rotation_arc(Vec3::NEG_Z, dir.normalize()));
-    drop(t);
-    let mut light = scene.world.light(id).unwrap().clone();
-    (light.range, light.intensity, light.outer_cone) = (10.0, 30.0, 60.0);
-    light.cast_shadows = shadows;
-    scene.world.set_light(id, Some(light));
 }
 
 /// A camera at `eye` looking at `target`.

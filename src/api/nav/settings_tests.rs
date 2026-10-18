@@ -10,7 +10,7 @@ use std::cell::RefCell;
 use glam::Vec3;
 use mlua::Lua;
 
-use super::register;
+use super::super::register;
 use crate::navigation::test_support::{add_box, add_floor, ground};
 use crate::navigation::{NavBounds, NavigationGraph};
 use crate::scene::Scene;
