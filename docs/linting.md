@@ -20,6 +20,7 @@ agent can read exactly what failed.
 | `tools/lint` stays std-only | `make test-lint` | its `Cargo.lock` names one package, itself (#935) |
 | Module layering | `tools/lint -- --layers` | every `crate::<module>` import and every external crate a module names matches the declared table (`tools/lint/src/layers/table.rs`): nothing undeclared, nothing stale, no cycle, no sim → platform edge (#724, #938) |
 | Sim determinism | clippy `disallowed_methods`/`disallowed_types` + `tools/lint -- --determinism` | **hard gate**: clock reads, OS/unseeded RNG and `std`'s randomly seeded hash maps are banned crate-wide in `clippy.toml`; only a platform row's `mod.rs` may opt out, and the ban list must stay whole (#757, #764) |
+| No shared process state | clippy `disallowed_methods` + `tools/lint -- --determinism` | **hard gate**: `std::env::{set_var, remove_var, set_current_dir}` are banned crate-wide in `clippy.toml`, tests included, since `cargo test` runs every in-crate test in one process; production opts out inline with a reason (`project::open`), and `--determinism` keeps the three on the list (#977) |
 | Dependency direction | `tools/lint -- --direction` | the table's sim modules never reference `crate::render`, `crate::editor`, `wgpu` or `egui` — the arrow is render/editor → sim (#494) |
 | Sim panic-freedom | clippy `unwrap_used` | **hard gate**: `#![deny(clippy::unwrap_used)]` in `app`/`scripting`/`physics`/`navigation`/`ui`; bare `.unwrap()` banned in production (test code exempt via `allow-unwrap-in-tests`) |
 | Component completeness | `tools/lint -- --components` | every first-class component has all 4 axes (field, Add Component entry, inspector card, API namespace), or a written waiver (`WAIVERS`) |
@@ -219,7 +220,11 @@ with a one-line reason. `make determinism` keeps that escape hatch honest: it fa
 that hold them (`clippy::style`, `clippy::all`), so a sim module can't quietly gain
 an `allow`; and it fails (`UNBANNED` / `UNDENIED`) when `clippy.toml` drops a banned
 item or `Cargo.toml` stops denying the lints. Which rows are platform comes from the
-layer table. Test code in a sim module is not exempt: a sim test has no reason to
+layer table. The same `disallowed-methods` list bans process-wide state
+(`std::env::{set_var, remove_var, set_current_dir}`, #977), which a sim module may
+own for one statement: that statement's `#[expect(clippy::disallowed_methods, …)]`
+sits under `// lint: allow(statement-opt-out) <why>` (`project::open`), and
+`--determinism` accepts it there and nowhere else. Test code in a sim module is not exempt: a sim test has no reason to
 read the clock either. The integration suite (`tests/`) is outside the gate's scan,
 like test code in the other guards; a test that times a bake allows the lints on
 its own module (`tests/navigation_layered/mod.rs`).

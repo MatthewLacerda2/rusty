@@ -60,3 +60,27 @@ fn a_dropped_ban_or_deny_is_reported() {
         .any(|s| s.starts_with("UNDENIED `disallowed_types")));
     assert!(!v.iter().any(|s| s.contains("`std::time::Instant::now`")));
 }
+
+#[test]
+fn a_reasoned_statement_opt_out_passes_and_a_bare_one_fails() {
+    let expect = "    #[expect(\n        clippy::disallowed_methods,\n        reason = \"r\"\n    )]\n    std::env::set_current_dir(root)?;\n";
+    let excused = format!("    // lint: allow(statement-opt-out) the cwd move\n{expect}");
+    assert!(opt_out_violations("src/core/project/mod.rs", &excused, &roots()).is_empty());
+    let bare = opt_out_violations("src/core/project/mod.rs", expect, &roots());
+    assert_eq!(bare.len(), 1, "{bare:?}");
+    let unreasoned = format!("    // lint: allow(statement-opt-out)\n{expect}");
+    assert_eq!(
+        opt_out_violations("src/core/project/mod.rs", &unreasoned, &roots()).len(),
+        1
+    );
+}
+
+#[test]
+fn the_ban_keeps_process_state_on_the_list() {
+    let clippy = include_str!("../../../clippy.toml").replace("std::env::set_var", "x");
+    let v = config_violations(&clippy, include_str!("../../../Cargo.toml"));
+    assert_eq!(
+        v,
+        vec!["UNBANNED `std::env::set_var` — clippy.toml no longer lists it"]
+    );
+}

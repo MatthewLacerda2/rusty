@@ -21,6 +21,12 @@ disallowed-methods = [
     { path = "std::time::Instant::elapsed", reason = "wall clock: sim code takes time from the `Time` resource (#757)" },
     { path = "std::time::SystemTime::now", reason = "wall clock: sim code takes time from the `Time` resource (#757)" },
     { path = "std::time::SystemTime::elapsed", reason = "wall clock: sim code takes time from the `Time` resource (#757)" },
+    # Process-wide state (#977): under `cargo test` every in-crate test shares one
+    # process, so a test that sets an env var or moves the working directory races
+    # every other. Pass the value as a parameter instead; production opts out inline.
+    { path = "std::env::set_var", reason = "process-wide state: pass the value as a parameter (docs/testing.md, #977)" },
+    { path = "std::env::remove_var", reason = "process-wide state: pass the value as a parameter (docs/testing.md, #977)" },
+    { path = "std::env::set_current_dir", reason = "process-wide state: resolve paths against a root instead (docs/testing.md, #977)" },
     { path = "getrandom::fill", reason = "OS entropy: sim code draws from the seeded `Random` resource (#757)" },
     { path = "getrandom::u32", reason = "OS entropy: sim code draws from the seeded `Random` resource (#757)" },
     { path = "getrandom::u64", reason = "OS entropy: sim code draws from the seeded `Random` resource (#757)" },

@@ -16,6 +16,11 @@
 //!   `layers/table.rs`) may name those lints, or allow the groups that hold them;
 //! - `clippy.toml` still lists every banned item, and `Cargo.toml` still denies them.
 //!
+//! The ban also covers process-wide state (`std::env::set_var`, `set_current_dir`,
+//! #977), which a sim module may own for one statement: `project::open` moves the
+//! working directory. That statement's opt-out carries
+//! `// lint: allow(statement-opt-out) <why>` (the rules gate's inline allow).
+//!
 //! Usage: `cargo run --manifest-path tools/lint/Cargo.toml -- --determinism`
 //! Exit code 1 on any violation; report mirrored to `.lint/report.txt`.
 
@@ -40,6 +45,10 @@ const BANNED: &[&str] = &[
     "std::collections::HashMap",
     "std::collections::HashSet",
     "std::hash::RandomState",
+    // Process-wide state (#977): banned crate-wide so no test races another on it.
+    "std::env::set_var",
+    "std::env::remove_var",
+    "std::env::set_current_dir",
 ];
 
 /// The `Cargo.toml` `[lints.clippy]` lines that turn the ban into an error.
@@ -55,6 +64,10 @@ const OPT_OUTS: &[&str] = &[
     "clippy::style",
     "clippy::all",
 ];
+
+/// The rule a `lint: allow(…)` names to excuse one statement's opt-out: one call
+/// the ban covers for another reason (`std::env::set_current_dir`, #977), never a clock.
+const STATEMENT_OPT_OUT: &str = "statement-opt-out";
 
 const REPORT: &str = ".lint/report.txt";
 
@@ -100,6 +113,9 @@ fn opt_out_violations(path: &str, content: &str, roots: &[String]) -> Vec<String
     let mut out = Vec::new();
     for (i, raw) in content.lines().enumerate() {
         let code = strip_comment(raw);
+        if crate::rules::allowed(content, i + 1, STATEMENT_OPT_OUT) {
+            continue;
+        }
         for name in OPT_OUTS.iter().filter(|n| names_lint(code, n)) {
             out.push(format!(
                 "OPT_OUT {path}:{} `{name}` — only a platform module's root may opt out of the clock ban",

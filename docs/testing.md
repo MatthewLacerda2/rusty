@@ -84,7 +84,10 @@ count and filled `target/` with near-identical binaries (#483). So `Cargo.toml` 
   `cargo test` runs the whole binary in one, and both must stay correct. Nothing in
   `tests/` may rely on having a process to itself: write scratch files under
   `temp::dir()`, which is unique to the process *and* the test (#709), and never
-  `set_var` / `set_current_dir`.
+  `set_var` / `remove_var` / `set_current_dir`. Clippy bans those three crate-wide
+  (`clippy.toml`'s `disallowed-methods`, #977): pass the value as a parameter
+  instead. Production code that really owns the process (`project::open` moving
+  the working directory) opts out inline with `#[expect(…, reason = "…")]`.
 - Filtering works by module path: `cargo nextest run -E 'binary(integration)' physics_`.
 
 ## Build and test share one dependency graph

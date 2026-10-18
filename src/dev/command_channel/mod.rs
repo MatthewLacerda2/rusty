@@ -60,8 +60,20 @@ impl CommandChannel {
     /// channel. On bind failure the error is logged to `console` and `None` is
     /// returned — the windowed app keeps running without a command channel.
     pub fn start(console: &RefCell<ConsoleLogs>) -> Option<Self> {
+        #[cfg(unix)]
+        let bind = |tx| transport::bind_and_listen(tx, transport::socket_path());
+        #[cfg(windows)]
+        let bind = transport::bind_and_listen;
+        Self::listen(console, bind)
+    }
+
+    /// [`start`](Self::start) over a given transport bind.
+    fn listen(
+        console: &RefCell<ConsoleLogs>,
+        bind: impl FnOnce(Sender<Command>) -> std::io::Result<transport::Bound>,
+    ) -> Option<Self> {
         let (tx, rx) = mpsc::channel::<Command>();
-        match transport::bind_and_listen(tx) {
+        match bind(tx) {
             Ok(bound) => {
                 console.borrow_mut().info(format!(
                     "[cmd] command channel listening on {}",
@@ -211,15 +223,16 @@ mod tests {
         // running engine or another test.
         let dir = std::env::temp_dir();
         let path = dir.join(format!("rusty-cmd-test-{}.sock", std::process::id()));
-        // SAFETY: single-threaded test setup; no other thread reads the env here.
-        unsafe { std::env::set_var("RUSTY_CMD_SOCK", &path) };
+        // The path goes to the bind directly: setting `RUSTY_CMD_SOCK` would leak
+        // into every other test in this process (#977).
 
         let console = RefCell::new(ConsoleLogs::new());
-        let channel = CommandChannel::start(&console).expect("bind the unix socket");
+        let channel =
+            CommandChannel::listen(&console, |tx| transport::bind_and_listen(tx, path.clone()))
+                .expect("bind the unix socket");
         assert!(path.exists(), "start() must create the socket file");
 
         drop(channel);
         assert!(!path.exists(), "drop must remove the socket file");
-        unsafe { std::env::remove_var("RUSTY_CMD_SOCK") };
     }
 }

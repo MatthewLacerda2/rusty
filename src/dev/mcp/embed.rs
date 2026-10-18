@@ -49,6 +49,11 @@ impl Embedded {
                 Ok(())
             }
             Err(err) => {
+                // lint: allow(statement-opt-out) the working-directory restore, not a clock read
+                #[expect(
+                    clippy::disallowed_methods,
+                    reason = "a failed switch restores the working directory `project::open` moved"
+                )]
                 std::env::set_current_dir(back).ok();
                 Err(err)
             }

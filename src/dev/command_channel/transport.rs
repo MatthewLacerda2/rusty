@@ -43,12 +43,16 @@ pub(super) fn socket_path() -> std::path::PathBuf {
     std::path::PathBuf::from("/tmp/rusty.sock")
 }
 
-/// Bind the unix socket (clearing any stale file first) and spawn the listener.
+/// Bind the unix socket at `path` (clearing any stale file first) and spawn the
+/// listener. The path is a parameter so a test binds its own without touching the
+/// process environment (#977).
 #[cfg(unix)]
-pub(super) fn bind_and_listen(tx: Sender<Command>) -> std::io::Result<Bound> {
+pub(super) fn bind_and_listen(
+    tx: Sender<Command>,
+    path: std::path::PathBuf,
+) -> std::io::Result<Bound> {
     use std::os::unix::net::UnixListener;
 
-    let path = socket_path();
     // A stale socket file from a prior run blocks the bind; remove it first.
     let _ = std::fs::remove_file(&path);
     let listener = UnixListener::bind(&path)?;

@@ -120,6 +120,11 @@ pub struct Opened {
 pub fn open(dir: &Path, access: Access) -> Result<Opened, String> {
     let (opened, mut lines) = prepare(dir, access)?;
     let root = &opened.root;
+    // lint: allow(statement-opt-out) the working-directory move, not a clock read
+    #[expect(
+        clippy::disallowed_methods,
+        reason = "opening a project makes it the working directory, once, at startup"
+    )]
     std::env::set_current_dir(root).map_err(|e| format!("{}: {e}", root.display()))?;
     lines.push(format!("Opened {}", root.display()));
     lines.extend(opened.engine.warning());
