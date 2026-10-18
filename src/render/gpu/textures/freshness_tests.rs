@@ -63,7 +63,7 @@ fn centre(renderer: &mut Renderer, scene: &Scene) -> [u8; 3] {
 
 /// A fresh per-test PNG path under the temp dir (the file itself is not created).
 fn temp_png(name: &str) -> String {
-    let dir = std::env::temp_dir().join(format!("rusty_689_{}", std::process::id()));
+    let dir = crate::test_temp::dir().join("rusty_689");
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join(format!("{name}.png"));
     std::fs::remove_file(&path).ok();

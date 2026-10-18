@@ -57,7 +57,7 @@ fn unix_paths_and_the_non_matches() {
 
 #[test]
 fn relativize_resolves_through_the_filesystem_and_leaves_the_rest() {
-    let root = std::env::temp_dir().join(format!("rusty_paths_{}", std::process::id()));
+    let root = crate::test_temp::dir().join("rusty_paths");
     std::fs::create_dir_all(root.join("project")).unwrap();
     let file = root.join("project").join("x.lua");
     std::fs::write(&file, "").unwrap();

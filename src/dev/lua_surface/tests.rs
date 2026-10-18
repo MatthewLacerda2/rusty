@@ -69,7 +69,7 @@ fn lightmap_bake_needs_a_saved_scene_and_counts_what_it_wrote() {
         s.eval("return Lighting.BakeLightmaps()").is_err(),
         "unsaved scene"
     );
-    let dir = std::env::temp_dir().join("rusty_lua_lightmaps");
+    let dir = crate::test_temp::dir().join("rusty_lua_lightmaps");
     let path = dir.join("level.scene").to_string_lossy().into_owned();
     *s.world().script_manager().scene_path_cell().borrow_mut() = Some(path);
     // Nothing static in an empty session: nothing to lightmap.

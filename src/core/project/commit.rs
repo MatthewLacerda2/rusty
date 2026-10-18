@@ -68,9 +68,9 @@ mod tests {
         );
     }
 
-    /// A fresh repository with one commit of `tracked.txt`, under the temp dir.
+    /// A fresh repository with one commit of `tracked.txt`, under the test's temp dir.
     fn scratch_repo(name: &str) -> std::path::PathBuf {
-        let dir = std::env::temp_dir().join(format!("rusty_{name}_{}", std::process::id()));
+        let dir = crate::test_temp::dir().join(name);
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         std::fs::write(dir.join("tracked.txt"), "one").unwrap();
