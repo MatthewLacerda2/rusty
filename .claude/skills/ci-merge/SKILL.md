@@ -316,7 +316,10 @@ briefs.
 After a rebase, re-check any claim the branch made **about the base it measured
 against** — the "Gates" paragraph in the description, a survivor count, a coverage
 number, a byte-identical-bake proof. A measurement taken against an older `main`
-is stale, and citing it is worse than not having run it.
+is stale, and citing it is worse than not having run it. **The queue dates the
+Gates line itself** (#968): each rebase it pushes appends (or replaces) one line
+in the description, `rebased by the queue onto <main>; local gates not re-run;
+CI judged <head>`, so a reader knows which commit the claim measured.
 
 ## The same-commit obligations
 
