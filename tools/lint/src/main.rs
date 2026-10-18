@@ -12,6 +12,7 @@
 //! Output: result to stdout and `.lint/report.txt`; exit code 1 on any violation.
 
 mod components;
+mod dead_pub;
 mod determinism;
 mod direction;
 mod layers;
@@ -63,6 +64,13 @@ fn main() {
     // mechanism (#934): `prefix-group`, `markers`, `skip`, `ignored`, and the ≲10-files signal.
     if args.iter().any(|a| a == "--rules") {
         rules::run();
+        return;
+    }
+
+    // `--dead-pub` prints the dead-pub signal (#1003): `pub` items nothing uses,
+    // and items only tests use. A report, never a gate.
+    if args.iter().any(|a| a == "--dead-pub") {
+        dead_pub::run();
         return;
     }
 

@@ -26,6 +26,7 @@ agent can read exactly what failed.
 | Component completeness | `tools/lint -- --components` | every first-class component has all 4 axes (field, Add Component entry, inspector card, API namespace), or a written waiver (`WAIVERS`) |
 | Editor↔shared-op parity | `tools/lint -- --parity` | every first-class component's inspector card routes its mutations through a shared `scene::authoring` op (never direct field writes through the #344 accessor guard) |
 | Rust API reference | rustdoc | **hard gate**: `RUSTDOCFLAGS="-D warnings" cargo doc --no-deps` (both feature sets) — no broken intra-doc links, no public docs linking private items; name a private item as plain `code`, not a link |
+| Dead `pub` items | `make dead-pub` (`tools/lint -- --dead-pub`) | **signal**, never a gate: `src/lib.rs` exports every module, so rustc's `dead_code` never fires on a `pub` item. On a copy under `target/dead-pub/` the modules go `pub(crate)` and every bin and the integration suite fold into the lib; the report lists items nothing uses, items only tests use (a test seam may be fine), and unused imports apart (#940, #1003) |
 
 ## The `*_tests.rs` sibling rule
 The tight test cap exists to discourage over-splitting a bundle of `#[test]`s. But a
