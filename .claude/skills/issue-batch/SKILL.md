@@ -111,7 +111,10 @@ before each rebase landed (mlua, then rapier, then #744's inspector rows), and e
 rebase was a full cold build. While a broad dependency branch is in flight or being
 rebased, name it the owner in every sibling's brief ("stay out of `Cargo.toml`"),
 and hold other lockfile-touching branches in draft until it merges. The next wave
-followed the rule, and the glam upgrade (#775) landed first time.
+followed the rule, and the glam upgrade (#775) landed first time. **The watch holds
+it too** (#969): of two open pull requests (drafts included) editing either file,
+the younger is not taken until the older merges or closes (`watch: LOCKFILE #a
+owns Cargo.lock; #b waits …`, once); Dependabot is exempt.
 
 ## Group the work before splitting it
 

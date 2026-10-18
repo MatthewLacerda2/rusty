@@ -101,6 +101,10 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
             if workflows and (pull.get("number"), pull.get("headRefOid")) not in told:
                 told.add((pull.get("number"), pull.get("headRefOid")))
                 fx.say(board.held_line(pull, workflows))
+        for waiter, owner in board.lock_waits(pulls, fx.bots).items():
+            if (waiter, owner) not in told:
+                told.add((waiter, owner))
+                fx.say(board.lock_line(waiter, owner))
         waiting = order.ready(pulls, memory, done, fx.bots)
         stale = fx.main_conflicts(waiting) if waiting else {}
         if stale:
