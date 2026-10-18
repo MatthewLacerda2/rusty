@@ -10,10 +10,19 @@
 //!   `Random` namespace, so the Lua habit keeps working but draws from the one
 //!   per-World stream instead of Lua 5.4's randomly seeded generator.
 //!
+//! - **`require`, `dofile` and `loadfile` read against the project** (#996,
+//!   #1062; [`files`]): `require` searches the project's scripts folder, then the
+//!   engine's bundled scripts, then `package.path`; a read outside the project is
+//!   allowed but warns once per file in the console. Native (C) modules are off.
+//!
 //! The console REPL evaluates against this same VM, so it gets the same
 //! stdlib — one surface, three callers.
 
 use mlua::{Lua, LuaOptions, StdLib};
+
+mod files;
+
+pub(super) use files::install as install_file_access;
 
 /// `math.random` / `math.randomseed` rewritten over `Random`. Looked up at call
 /// time, so a script caching `local random = math.random` still works: `Random`
@@ -50,4 +59,17 @@ pub(super) fn new_sim_vm() -> Result<Lua, String> {
         .exec()
         .map_err(|e| e.to_string())?;
     Ok(lua)
+}
+
+/// A throwaway VM for *reading* a script's returned table (its `fields` schema,
+/// its callbacks) without running it. `require` hands back an empty table, so a
+/// script that loads a helper module at its top level (#996) still evaluates
+/// here; nothing is read from disk.
+pub(super) fn inspection_vm() -> Lua {
+    let lua = Lua::new();
+    let stub = lua.create_function(|lua, _: mlua::MultiValue| lua.create_table());
+    if let Ok(stub) = stub {
+        lua.globals().set("require", stub).ok();
+    }
+    lua
 }

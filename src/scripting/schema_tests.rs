@@ -104,3 +104,15 @@ fn apply_without_schema_is_a_noop() {
     apply_field_values(&table, code, &BTreeMap::new()).unwrap();
     assert!(table.get::<mlua::Value>("anything").unwrap().is_nil());
 }
+
+#[test]
+fn a_script_requiring_a_helper_module_still_parses() {
+    // Slider and Scrollbar `require("ui.range_axis")` at their top level (#996);
+    // the schema read never loads the module, so it neither fails nor touches disk.
+    let code = r#"
+        local Axis = require("ui.does_not_exist")
+        return { fields = { speed = 2 }, Start = function() Axis.parse() end }
+    "#;
+    assert_eq!(parse_fields(code).len(), 1);
+    assert!(crate::scripting::discovery::exposes_lifecycle(code));
+}

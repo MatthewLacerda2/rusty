@@ -623,7 +623,12 @@ by editing its components or forks its behaviour by copying its script.
   with the prefabs, on every boot into `assets/scripts/ui/` and
   `assets/prefabs/ui/`. **Those two directories are engine-owned and rewritten**
   so they never go stale: to fork a widget, copy its script (or prefab) elsewhere
-  and point the entity at the copy.
+  and point the entity at the copy. Two of the scripts there are not widgets:
+  `dropdown_item.lua` is what a Dropdown attaches to its list items and blocker,
+  and `range_axis.lua` is a helper module Slider and Scrollbar load with
+  `require("ui.range_axis")` (`require` looks in the project's `assets/scripts/`
+  first, then the engine's bundled scripts; see `docs/api/Random.md`). A forked
+  Slider or Scrollbar keeps its `require`.
 - **Wiring one up.** A widget raises its events by calling function fields its
   owner sets — no event bus. The owner reaches the widget's script instance with
   `Scene.GetScript(id, name)` (Unity's `GetComponent<T>()`, `name` the file stem),
@@ -680,10 +685,13 @@ Each widget's inspector fields (its script's `fields` schema) and owner API:
   the menu makes such a column with two options.
 - **Slider** — `Fill Area/Fill` stretches from the start to the value;
   `Handle Slide Area/Handle` sits on it. A press anywhere sets the value; dragging
-  follows the pointer. The arrows along its axis step a tenth of the range (1 with
+  follows the pointer, clamped to the ends. Before the slider has a layout rect
+  (its first frame) a press does nothing. The arrows along its axis step a tenth of the range (1 with
   `whole_numbers`).
 - **Scrollbar** — `Sliding Area/Handle` spans `size` of the track at `value`.
   Drag the handle; press the track beside it to page one handle-length that way.
+  The pointer is read along the track exactly as a Slider reads it (clamped, and
+  nothing happens before there is a layout rect): both use `range_axis.lua`.
 - **Scroll View** — `Viewport` (a `RectMask`) over `Content`, which is pinned to
   the viewport's top-left and fits its height to its children (a vertical
   `LayoutGroup` + `LayoutElement` preferred-height fit) — so adding items is
@@ -702,7 +710,10 @@ Each widget's inspector fields (its script's `fields` schema) and owner API:
   `Blocker` — a click outside closes the list and reaches nothing underneath. The
   list has one `Item` per option (a Selectable, so it highlights; the chosen one
   carries a checkmark), navigable Up / Down; a click or Enter picks, Escape
-  closes, and focus returns to the dropdown.
+  closes, and focus returns to the dropdown. Clicks on the items and the blocker
+  are the event system's own `OnPointerClick` (through `dropdown_item.lua`), so
+  they follow its rules: press and release on the same item, and a press that
+  moves past the drag threshold scrolls the list instead of picking.
 - **Input Field** — a masked `Text Area` holding `Selection` (the highlight
   rects), `Placeholder` (shown while empty), `Text` and the `Caret`. Focusing it
   by keyboard selects everything; a click places the caret and a drag selects.

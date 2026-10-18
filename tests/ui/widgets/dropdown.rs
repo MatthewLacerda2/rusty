@@ -82,3 +82,38 @@ fn escape_and_an_outside_click_close_without_picking() {
         "set_options rebuilds the list"
     );
 }
+
+/// Press at `item`'s centre raised by `up`, move the pointer by `by`, release:
+/// a player's press and release, with the hand moving in between.
+fn press_move_release(ui: &mut Ui, item: u32, up: f32, by: (f32, f32)) {
+    let (x, y, w, h) = ui.rect(item);
+    let (cx, cy) = (x + w / 2.0, y + h / 2.0 + up);
+    ui.drag((cx, cy), (cx + by.0, cy + by.1), 1);
+}
+
+#[test]
+fn a_click_follows_the_event_systems_rules() {
+    // A (6, 6) wobble is under the 10-pixel drag threshold by distance, so it is
+    // still a click on the item (#996: the old Lua summed |dx| + |dy| and dropped it).
+    let (mut ui, d, _) = dropdown();
+    ui.click(d);
+    ui.tick(1);
+    let item = find(&ui, "Item 2: Option C");
+    press_move_release(&mut ui, item, 0.0, (6.0, 6.0));
+    assert!(!is_open(&ui, d), "{:?}", ui.errors());
+    assert_eq!(ui.log(), vec!["[w] 2 Option C"]);
+}
+
+#[test]
+fn sliding_from_one_item_onto_the_next_picks_neither() {
+    // Pressed 2 px above item 1's top edge (inside item 0), released 2 px below it:
+    // a click needs press and release on one entity (#996: the old Lua picked item 1).
+    let (mut ui, d, _) = dropdown();
+    ui.click(d);
+    ui.tick(1);
+    let next = find(&ui, "Item 1: Option B");
+    let (_, _, _, h) = ui.rect(next);
+    press_move_release(&mut ui, next, h / 2.0 + 2.0, (0.0, -4.0));
+    assert!(is_open(&ui, d), "the list stays open");
+    assert!(ui.log().is_empty(), "nothing picked: {:?}", ui.log());
+}
