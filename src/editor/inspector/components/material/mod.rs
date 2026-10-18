@@ -41,10 +41,10 @@ pub fn draw_material_card(
     let Some(key) = world.material(id).map(|m| m.material.clone()) else {
         return;
     };
-    if let Some(pending) = world.take_pending_material(id) {
-        materials.insert(key.clone(), pending);
-    }
-    materials.entry(key.clone()).or_default();
+    // The Add menu's staged default fills the key only when the library has nothing
+    // there: an existing asset is kept, the rule every attach path shares (#997).
+    let pending = world.take_pending_material(id).unwrap_or_default();
+    materials.entry(key.clone()).or_insert(pending);
 
     preview::draw_tab_strip(ui, &mut editor.preview_tab_active, editor.theme);
     if editor.preview_tab_active {

@@ -1,8 +1,57 @@
-//! The File menu's scene verbs: new, reset, load and save.
+//! The editor's scene-file verbs: the File menu's new / reset / load / save, and the
+//! one open and one save every other editor surface (the content grid's double-click,
+//! the scene asset's inspector buttons) goes through, so they never drift apart (#997).
+
+use std::path::Path;
 
 use crate::editor::EditorUi;
 use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;
+
+impl EditorUi {
+    /// Open the scene file at `path` — the editor face of `Scene.Load`, with its rules:
+    /// a path that is not a file is refused, and during play the swap is deferred to
+    /// the tick's tail. In edit mode the scene loads at once, becomes the current
+    /// scene file, and both selections clear so the inspector shows Scene Settings.
+    pub(crate) fn open_scene(
+        &mut self,
+        scene: &mut Scene,
+        console: &mut ConsoleLogs,
+        path: &str,
+        is_playing: bool,
+    ) {
+        if !Path::new(path).is_file() {
+            console.error(format!("Failed to load scene: no scene file at '{path}'"));
+            return;
+        }
+        if is_playing {
+            scene.request_load(path.to_string());
+            console.info(format!("Scene load queued: {path}"));
+            return;
+        }
+        match scene.load_from_file(path) {
+            Ok(_) => {
+                self.current_scene_path = Some(path.to_string());
+                self.selected_entity_id = None;
+                self.selected_asset_path = None;
+                self.is_dirty = true;
+                console.info(format!("Scene loaded from {path}"));
+            }
+            Err(err) => console.error(format!("Failed to load scene: {err}")),
+        }
+    }
+
+    /// Save the scene to `path`, which becomes the current scene file.
+    pub(crate) fn save_scene_to(&mut self, scene: &Scene, console: &mut ConsoleLogs, path: &str) {
+        match scene.save_to_file(path) {
+            Ok(_) => {
+                self.current_scene_path = Some(path.to_string());
+                console.info(format!("Scene saved to {path}"));
+            }
+            Err(err) => console.error(format!("Failed to save scene: {err}")),
+        }
+    }
+}
 
 /// Save writes back to the CURRENT scene path (set on load / double-click),
 /// falling back to the seeded default scene.
@@ -15,26 +64,17 @@ fn current_path(editor: &EditorUi) -> String {
 
 pub(super) fn save_scene(editor: &mut EditorUi, scene: &Scene, console: &mut ConsoleLogs) {
     let path = current_path(editor);
-    match scene.save_to_file(&path) {
-        Ok(_) => {
-            editor.current_scene_path = Some(path.clone());
-            console.info(format!("Scene saved to {}", path));
-        }
-        Err(err) => console.error(format!("Failed to save scene: {}", err)),
-    }
+    editor.save_scene_to(scene, console, &path);
 }
 
-pub(super) fn load_scene(editor: &mut EditorUi, scene: &mut Scene, console: &mut ConsoleLogs) {
+pub(super) fn load_scene(
+    editor: &mut EditorUi,
+    scene: &mut Scene,
+    console: &mut ConsoleLogs,
+    is_playing: bool,
+) {
     let path = current_path(editor);
-    match scene.load_from_file(&path) {
-        Ok(_) => {
-            editor.current_scene_path = Some(path.clone());
-            editor.selected_entity_id = None;
-            editor.is_dirty = true;
-            console.info(format!("Scene loaded from {}", path));
-        }
-        Err(err) => console.error(format!("Failed to load scene: {}", err)),
-    }
+    editor.open_scene(scene, console, &path, is_playing);
 }
 
 /// Start a fresh, empty scene — a blank slate (no entities, default ambient/sky/

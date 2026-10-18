@@ -125,7 +125,6 @@ fn move_towards_steps_by_step_then_snaps_at_target() {
 fn move_towards_holds_position_when_already_at_target() {
     let lua = Lua::new();
     let (scene, id) = scene_with_entity();
-
     lua.scope(|scope| {
         rusty::api::transform::register(&lua, scope, &scene).unwrap();
         lua.load(format!(
@@ -134,11 +133,17 @@ fn move_towards_holds_position_when_already_at_target() {
         ))
         .exec()
         .unwrap();
-        let (x, _, _): (f32, f32, f32) = lua
-            .load(format!("return Transform.GetPosition({id})"))
-            .eval()
+        let x = || -> f32 {
+            lua.load(format!("return Transform.GetPosition({id})"))
+                .eval()
+                .unwrap()
+        };
+        assert_eq!(x(), 7.0, "zero-distance move must not drift");
+        // A negative step backs away, like Unity's `Vector3.MoveTowards` (#997).
+        lua.load(format!("Transform.MoveTowards({id}, 10, 0, 0, -1)"))
+            .exec()
             .unwrap();
-        assert_eq!(x, 7.0, "zero-distance move must not drift");
+        assert_eq!(x(), 6.0);
         Ok(())
     })
     .unwrap();

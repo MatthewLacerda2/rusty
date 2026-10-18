@@ -140,8 +140,8 @@ fn draw_local_light(
     }
 }
 
-/// The light-type selector combo box. Switching to Spotlight seeds default cone
-/// angles when they are still zero so the spot is immediately visible. `light` is a
+/// The light-type selector combo box, offering every type under its one name. The
+/// shared `set_type` seeds a spot's cones when they are still zero. `light` is a
 /// snapshot of the current values; writes route through the shared ops.
 fn draw_light_type(
     ui: &mut egui::Ui,
@@ -152,45 +152,18 @@ fn draw_light_type(
 ) {
     ui.horizontal(|ui| {
         ui.label("Type:");
-        let current_type_name = match light.light_type {
-            LightType::Point => "Point",
-            LightType::Directional => "Directional",
-            LightType::Spotlight => "Spot",
-            LightType::Ambient => "Ambient",
-        };
         egui::ComboBox::from_id_salt("LightTypeSelector")
-            .selected_text(current_type_name)
+            .selected_text(light.light_type.name())
             .show_ui(ui, |ui| {
-                if ui
-                    .selectable_label(light.light_type == LightType::Point, "Point")
-                    .clicked()
-                {
-                    if let Some(mut l) = world.light_mut(id) {
-                        light_ops::set_type(&mut l, LightType::Point);
-                    }
-                    *is_dirty = true;
-                }
-                if ui
-                    .selectable_label(light.light_type == LightType::Directional, "Directional")
-                    .clicked()
-                {
-                    if let Some(mut l) = world.light_mut(id) {
-                        light_ops::set_type(&mut l, LightType::Directional);
-                    }
-                    *is_dirty = true;
-                }
-                if ui
-                    .selectable_label(light.light_type == LightType::Spotlight, "Spot")
-                    .clicked()
-                {
-                    if let Some(mut l) = world.light_mut(id) {
-                        light_ops::set_type(&mut l, LightType::Spotlight);
-                    }
-                    *is_dirty = true;
-                    if light.inner_cone == 0.0 && light.outer_cone == 0.0 {
+                for light_type in LightType::ALL {
+                    if ui
+                        .selectable_label(light.light_type == light_type, light_type.name())
+                        .clicked()
+                    {
                         if let Some(mut l) = world.light_mut(id) {
-                            light_ops::set_cones(&mut l, 30.0, 45.0);
+                            light_ops::set_type(&mut l, light_type);
                         }
+                        *is_dirty = true;
                     }
                 }
             });

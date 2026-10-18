@@ -23,6 +23,8 @@ mod shader_params;
 use std::collections::BTreeMap;
 use std::ops::RangeInclusive;
 
+pub use crate::components::material::entity_material_key;
+
 pub use maps::{bake_maps, rebake_maps, MAPS_DIR};
 pub use shader_params::{
     clear_entity_shader_param, entity_shader_param, entity_shader_param_with,
@@ -60,7 +62,9 @@ pub fn ensure_named(materials: &mut MaterialLibrary, name: &str) {
 }
 
 /// Resolve the library key for entity `id`'s material, creating a default material
-/// (under `entity_{id}_material`) and attaching the reference if it has none yet.
+/// (under [`entity_material_key`]) and attaching the reference if it has none yet.
+/// A library asset already under the key is kept, never overwritten: the rule every
+/// attach path shares (#997).
 /// Returns `None` only when the entity does not exist. This is the shared
 /// resolve-or-create the API's setters use before applying an op; the editor card
 /// already has a key in hand (it only edits an existing reference), so it does not
@@ -70,12 +74,9 @@ pub fn ensure_material_key(scene: &mut Scene, id: u32) -> Option<String> {
         return None;
     }
     if !scene.world.has_material(id) {
-        scene.world.set_material(
-            id,
-            Some(MaterialComponent {
-                material: format!("entity_{id}_material"),
-            }),
-        );
+        scene
+            .world
+            .set_material(id, Some(MaterialComponent::for_entity(id)));
     }
     let key = scene.world.material(id).unwrap().material.clone();
     scene.materials.entry(key.clone()).or_default();

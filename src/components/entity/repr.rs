@@ -186,9 +186,7 @@ fn migrate_material(
     match (material, texture) {
         (Some(m), _) => (Some(m), None),
         (None, Some(t)) => (
-            Some(MaterialComponent {
-                material: format!("entity_{id}_material"),
-            }),
+            Some(MaterialComponent::for_entity(id)),
             Some(MaterialAsset::from_legacy(&t)),
         ),
         (None, None) => (None, None),

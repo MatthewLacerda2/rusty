@@ -154,14 +154,13 @@ fn draw_tonemap(
     ui.horizontal(|ui| {
         ui.label("  Tonemap:");
         egui::ComboBox::from_id_salt("tonemap")
-            .selected_text(format!("{tonemap:?}"))
+            .selected_text(tonemap.name())
             .show_ui(ui, |ui| {
-                for (value, label) in [
-                    (Tonemap::Aces, "ACES"),
-                    (Tonemap::Reinhard, "Reinhard"),
-                    (Tonemap::None, "None"),
-                ] {
-                    if ui.selectable_value(&mut tonemap, value, label).changed() {
+                for value in Tonemap::ALL {
+                    if ui
+                        .selectable_value(&mut tonemap, value, value.name())
+                        .changed()
+                    {
                         if let Some(mut c) = world.visual_correction_mut(id) {
                             vc_ops::set_tonemap(&mut c, tonemap);
                         }
