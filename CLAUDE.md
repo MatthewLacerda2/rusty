@@ -35,6 +35,10 @@ not the engine calling third-party APIs: tooling that reaches an external servic
   use: `api/index.md`, then one file per namespace), `ui.md` (the in-game UI model), `providers.md` (bringing a provider key, and the budget). The Rust API reference is generated: `cargo doc --no-deps`.
 - **auxmd.md** *(gitignored)* — the operator's short-term scratchpad; read it if a
   session points you there.
+- **Nested CLAUDE.md files** carry one area's rules and load only when you read files
+  there: `.github/scripts/CLAUDE.md` (the merge and batch tooling), `tools/lint/CLAUDE.md`
+  (the lint tool) and `src/render/CLAUDE.md` (the renderer and `engine/shaders/`).
+  Project-wide rules stay in this file.
 
 **Two skills carry the working protocols** — `issue-batch` and `ci-merge` — so
 this file can hold the reasoning and they can hold the steps. Each
@@ -78,7 +82,8 @@ is wrong.
     gets that check on Claude's own say-so, and a new convention ships with its check.
     Every check has a case it must flag and a case it must pass, runs in `make gates` and
     CI, and takes exceptions **inline, with a written reason**, never as an unread list in
-    a config file. Where a check would misfire, the prose says so and why.
+    a config file. Where a check would misfire, the prose says so and why. How the lint
+  tool keeps this: `tools/lint/CLAUDE.md`.
 - **The gates (push back before you build).** An idea becomes an issue only when all
   three hold; if any fails, **push back instead of complying**:
   1. **Understanding.** Claude actually understands the idea — the user has a clear
@@ -244,6 +249,11 @@ the ones tooling or a past mistake depends on.
   defect is worth *recording* never is: **a bug is always filed**. If it questions a
   decision or exposes a foundational crack, tell the user; otherwise keep it brief and
   carry on. The strongest issues come out of doing the work.
+- **Once is a case; twice is an issue** (the operator, 2026-10-18). Something that
+  happens once is handled as a case. The second time, it is an issue: attack the root
+  of the problem so it never becomes a bottleneck again — fix the cause, build the tool
+  or add the check — and prefer what scales over a one-off fix. This is why a bug or a
+  stale doc is filed and fixed right away rather than worked around.
 - **Every issue Claude files unprompted carries the `agent` label.** It says only who
   decided to file it, and never stops work.
 - **The approval test.** A finding is filed with `planning`, and never folded in, when
@@ -470,8 +480,8 @@ readying a PR (`make help` lists the verbs, `make check` is the fast edit loop).
 Failures from `tools/lint` are written to `.lint/report.txt`. See **docs/linting.md**.
 - **The commit hook** (`.githooks/pre-commit`, activated once per clone by `make
   setup`) runs formatting and the size gate only, so it stays under a second.
-- Size gate: files ≤ 300 lines, test/fixture files ≤ 150 — every line of a `.rs`
-  file, the lines of code of a `.py` one (docstrings and comments free, #926). Style is rustfmt;
+- Size gate: files ≤ 300 lines, test/fixture files ≤ 150 (how a `.py` file is
+  counted: `.github/scripts/CLAUDE.md`). Style is rustfmt;
   **clippy is a hard gate** (`-D warnings`: default, `dev`, and the no-editor player
   build); the lint policy
   lives in `Cargo.toml`'s `[lints]`, not in flags.
