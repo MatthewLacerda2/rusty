@@ -12,8 +12,6 @@ use rusty::app::GameWorld;
 use rusty::components::{
     CanvasComponent, ImageComponent, RectTransformComponent, SelectableComponent,
 };
-use rusty::core::input::InputState;
-use rusty::navigation::NavigationGraph;
 use rusty::scene::{Scene, ScriptComponent};
 use rusty::scripting::ConsoleLogs;
 
@@ -59,13 +57,7 @@ fn session(tag: &str) -> (GameWorld, Rc<RefCell<ConsoleLogs>>, u32, u32) {
     s.world.set_image(label, Some(ImageComponent::default()));
     s.set_parent(label, Some(button)).expect("parent");
     let console = Rc::new(RefCell::new(ConsoleLogs::new()));
-    let nav = NavigationGraph::new(-1.0, 1.0, -1.0, 1.0, 1.0);
-    let mut game = GameWorld::new(
-        Rc::new(RefCell::new(s)),
-        Rc::new(RefCell::new(InputState::new())),
-        Rc::new(RefCell::new(nav)),
-        Rc::clone(&console),
-    );
+    let mut game = crate::play::world(Rc::new(RefCell::new(s)), 1.0, Rc::clone(&console));
     game.resources.screen.borrow_mut().set_game_view(1920, 1080);
     game.set_playing(true);
     game.tick(DT);
