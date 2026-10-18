@@ -32,7 +32,7 @@ Debug.Preview("assets/brick.png", "out/brick.png", { mesh = "cube", resolution =
 ```
 
 **Previewable kinds** — the same set the Inspector tab accepts, dispatched on the file
-extension: models (`gltf` / `glb` / `obj` / `fbx`, rendered as themselves), textures
+extension: models (`gltf` / `glb` / `obj`, rendered as themselves), textures
 (`png` / `tga` / `jpg` / `jpeg`, applied as the base-color map), and shaders (`wgsl`,
 which shades the stand-in mesh). Material assets have no on-disk file, so they have
 their own call, below.

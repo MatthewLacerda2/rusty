@@ -9,6 +9,7 @@ pub mod script;
 pub mod shader;
 
 use super::preview;
+use crate::asset::{IMAGE_EXTENSIONS, MODEL_EXTENSIONS};
 use crate::editor::EditorUi;
 use crate::navigation::NavigationGraph;
 use crate::scene::Scene;
@@ -23,11 +24,7 @@ pub fn draw_inspector(
     nav: &mut NavigationGraph,
     path: &str,
 ) {
-    let extension = std::path::Path::new(path)
-        .extension()
-        .and_then(|e| e.to_str())
-        .unwrap_or("")
-        .to_lowercase();
+    let extension = crate::core::paths::extension(path);
 
     // Model/texture/shader assets get a Preview tab (#352); everything else (audio,
     // scenes, prefabs, scripts) keeps its single Details view — there's no isolated
@@ -42,7 +39,7 @@ pub fn draw_inspector(
     }
 
     match extension.as_str() {
-        "png" | "tga" | "jpg" | "jpeg" => {
+        e if IMAGE_EXTENSIONS.contains(&e) => {
             image::draw(ui, editor, scene, path);
         }
         "wav" | "mp3" | "ogg" => {
@@ -54,7 +51,7 @@ pub fn draw_inspector(
         "prefab" => {
             prefab::draw(ui, editor, scene, path);
         }
-        "fbx" | "obj" | "gltf" | "glb" => {
+        e if MODEL_EXTENSIONS.contains(&e) => {
             model::draw(ui, editor, scene, path);
         }
         "lua" => {
