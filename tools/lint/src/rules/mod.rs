@@ -10,6 +10,7 @@ mod ignored;
 mod markers;
 mod prefix;
 mod skip;
+mod test_shape;
 
 pub use finding::{allowed, Finding};
 use std::collections::BTreeMap;
@@ -43,6 +44,7 @@ pub fn run() {
         let src = source(path);
         findings.extend(markers::check(path, &src));
         findings.extend(skip::check(path, &src));
+        findings.extend(test_shape::check(path, &src));
     }
     findings.retain(|f| !finding::allowed(&source(&f.path), f.line, f.rule));
     for path in &files {
@@ -117,3 +119,5 @@ mod markers_tests;
 mod prefix_tests;
 #[cfg(test)]
 mod skip_tests;
+#[cfg(test)]
+mod test_shape_tests;
