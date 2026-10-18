@@ -25,9 +25,11 @@ class World:
     def __init__(self, tmp: str, listings: list, verdicts: dict[int, str]):
         self.listings, self.verdicts, self.now, self.taken = listings, verdicts, 0.0, []
         self.clashes: set[frozenset[int]] = set()
+        self.code_moved: list[str] = []  # the queue's files changed on `main`
         self.stale: dict[int, list[str]] = {}  # conflicts with `main`, by pull request
         self.fx = argparse.Namespace(
             pulls=self.pulls, issue_labels=dict, clashes=lambda pulls: self.clashes,
+            stale_code=lambda: self.code_moved,
             main_conflicts=lambda pulls: {p["number"]: self.stale[p["number"]] for p in pulls if p["number"] in self.stale},
             turn=self.turn, head=lambda n: f"pushed{n}", attempts=lambda n, sha: "",
             clock=lambda: self.now, sleep=self.sleep, say=lambda *a: None,

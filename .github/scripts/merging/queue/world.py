@@ -8,7 +8,7 @@ import time
 from pathlib import Path
 
 from merging.queue import gitio, outcomes, pulls, stopping, taking
-from merging.watch import board, handbacks, mainline, order
+from merging.watch import board, freshness, handbacks, mainline, order
 
 
 def merge_tree_git(root: str, *args: str) -> tuple[int, str]:
@@ -21,8 +21,15 @@ def merge_tree_git(root: str, *args: str) -> tuple[int, str]:
     return done.returncode, done.stdout
 
 
+def git_at(*args: str, cwd: str) -> tuple[int, str]:
+    """[`watch.freshness`]'s `git`, run in `cwd`."""
+    return merge_tree_git(cwd, *args)
+
+
 def effects(repo: str, opts: argparse.Namespace) -> argparse.Namespace:
-    """What [`watch.loop.run`] does to the world, bound to this repository."""
+    """What [`watch.loop.run`] does to the world, bound to this repository.
+    Called once, at launch: that is when the running code's blobs are noted."""
+    code = freshness.launched(freshness.running(), git_at)
     common = gitio.git("rev-parse", "--git-common-dir", cwd=opts.root).stdout.strip() or ".git"
     return argparse.Namespace(
         pulls=lambda: pulls.quietly(
@@ -35,6 +42,7 @@ def effects(repo: str, opts: argparse.Namespace) -> argparse.Namespace:
         main_conflicts=functools.partial(
             mainline.conflicts, git=functools.partial(merge_tree_git, opts.root), known={}, bots=pulls.BOTS
         ),
+        stale_code=lambda: freshness.changed(code, functools.partial(merge_tree_git, opts.root)),
         turn=lambda number, tick: taking.unready(
             stopping.drain([number], lambda n: taking.take(repo, n, opts, tick=tick))[0]
         ),
