@@ -193,6 +193,19 @@ impl Scene {
         }
     }
 
+    /// Refresh the collider world-AABB of `id` and everything under it — what moves in
+    /// world space when `id` is re-parented with its local transform kept.
+    pub fn update_subtree_colliders(&mut self, id: u32) {
+        let ids: Vec<u32> = self
+            .world
+            .self_and_descendants(id)
+            .filter(|&d| self.world.collider(d).is_some())
+            .collect();
+        for id in ids {
+            self.update_entity_collider(id);
+        }
+    }
+
     /// Refresh every entity's collider world-AABB (editor/load batch operation).
     pub fn update_all_colliders(&mut self) {
         let ids = self.world.ids().to_vec();

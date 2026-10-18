@@ -100,6 +100,8 @@ mod proptest_harness;
 #[cfg(feature = "dev")]
 mod provider_keys;
 #[cfg(feature = "dev")]
+mod reparent_bounds;
+#[cfg(feature = "dev")]
 mod script_timers;
 #[cfg(feature = "dev")]
 mod structural_authoring;

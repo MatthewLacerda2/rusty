@@ -251,6 +251,8 @@ impl Scene {
         }
 
         self.world.set_parent_id(entity_id, parent_id);
+        // The local transform is kept, so the subtree moved in world space (#1067).
+        self.update_subtree_colliders(entity_id);
 
         Ok(())
     }
