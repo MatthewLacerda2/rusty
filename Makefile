@@ -185,6 +185,15 @@ queue: ## Rebase, wait for CI, squash-merge each in turn. make queue PRS="524 52
 blockers: ## Prose-only "Blocked by #N" GitHub never recorded. ARGS=--fix records them
 	@python3 .github/scripts/blockers.py $(ARGS)
 
+# The PR-on-first-commit rule exists so nothing goes stale unnoticed; this is
+# the noticing (#971). Lists branches ahead of main with no PR, merged branches
+# still standing, branch names off the convention, assignments older than a day
+# with no branch or PR, and open issues with no type label. A signal: it also
+# runs weekly (board.yml, into the run summary) and exits 1 on findings.
+.PHONY: board
+board: ## Stray branches, stale assignments, unlabelled issues. ARGS="--hours 48" sets the age
+	@python3 .github/scripts/board.py $(ARGS)
+
 # Each worktree's target/ holds GBs, and removing it by hand per merged branch
 # gets skipped under load (#913). Removes every worktree under .claude/worktrees/
 # whose PR merged or closed, target/ first; never one with uncommitted changes,
