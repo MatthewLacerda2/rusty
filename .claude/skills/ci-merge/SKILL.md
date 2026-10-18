@@ -8,7 +8,8 @@ description: Take a finished branch through to merged — the gates, CI, verifyi
 The steps, and the traps. `CLAUDE.md` carries why these exist; this is how.
 
 **The gate list is `make gates`.** The `Makefile`'s `GATES` list mirrors
-`.github/workflows/{ci,lint}.yml`; `make help` names each gate.
+`.github/workflows/{ci,lint}.yml`, and `make scripts` fails when a gate's command
+is missing from them (`test_gate_mirror.py`, #964); `make help` names each gate.
 
 ## Before marking a pull request ready
 
