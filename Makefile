@@ -99,6 +99,8 @@ inventory: ## The gate targets and the GATES list name the same set
 	fi
 
 # ---- the gates (each mirrors a CI step; .github/workflows/{ci,lint}.yml) ----
+# `make scripts` holds the mirror: test_gate_mirror.py fails when a command below
+# is missing from the workflows, or a clippy run adds more than `-D warnings` (#964).
 
 fmt: ## [gate] rustfmt, engine and tools/lint
 	cargo fmt --all --check
