@@ -308,6 +308,10 @@ that, and one chain was cancelled by mistake). Its loop per pull request:
    coder readies its own PR the moment its gates are green, and a green gate
    does not read code. Check the decisions against the issue, and note any
    human-only checks (a window, speakers) as a checklist; don't hold for them.
+   When the PR does work the engine does itself (engine mechanism, the API, a
+   stored format, determinism, CI or the merge path, a refactor), an
+   **independent review** comes first: invoke the `independent-review` skill,
+   and label only once its `Independent review` comment is on the PR.
    What the read turns up goes back to the coder unlabelled; removing the label
    pulls a PR out of line. Dependabot's cargo bumps arrive labelled; its GitHub
    Actions bumps never do (they are held anyway, #825).
