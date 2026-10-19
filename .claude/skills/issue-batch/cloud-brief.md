@@ -177,8 +177,9 @@ Beyond what changed, why, the effect and the decisions:
   you don't mean to close, even quoted or in backticks: the retro PR that added this
   rule closed #769 a second time by quoting it. The merge path now refuses a keyword that is not alone on
   its line (#966), so write `Closes #N` on a line of its own.
-- Commit messages end with
-  `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
+- Commit messages end with a `Co-Authored-By:` line naming the model you run
+  as, e.g. `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>` (a Sonnet
+  coder names Sonnet; the brief's `Model:` line says which, *Which model*).
 - Push often: a dead container takes its uncommitted work with it.
 - Green gates and a rebased branch → mark the PR **ready for review**, and end.
 - **Do NOT merge.**

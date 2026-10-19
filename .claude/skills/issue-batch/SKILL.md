@@ -222,8 +222,8 @@ minutes late, and the API refuses a time already past.
 Set two fields **on purpose**, never from the example body:
 
 - **The model.** The `schedule` skill's example body defaults to a smaller model,
-  so a routine copied from it runs the coder on that. Coding is judgement work
-  (*Model, as a hint*): name the strongest model.
+  so a routine copied from it runs the coder on that. Name the model the brief's
+  `Model:` line chose (*Which model*), never the example's.
 - **`allowed_tools`** must leave room for `ToolSearch` and the GitHub MCP tools
   the brief uses (`issue_read`, `create_pull_request`, `update_pull_request`,
   `add_issue_comment`, `actions_run_trigger`); a coder without them cannot read
@@ -396,6 +396,7 @@ Builds on: <what merged that it must build on, as "PR #N, Seam" where that
 PR wrote one; line numbers in issues go stale within hours>.
 Siblings in flight: <branch/issue → the files it edits; stay out of them>.
 Decisions: <anything already settled, or "none">.
+Model: <Opus or Sonnet, by *Which model*>.
 ```
 
 The routine prompt is then the same few lines for every coder:
@@ -526,11 +527,32 @@ read cold. Beyond that:
   between sibling agents, and a collision swaps one pull request's description
   for another's.
 
-## Model, as a hint
+## Which model
 
-Judgement work — design, implementation, triage — wants the strongest model. A
-rebase, a module-list conflict, an attribute moved between files does not. Most
-sessions on a branch are the second kind. The line is not crisp, so err upwards.
+The model follows the shape of the task, not the area of the code (operator,
+2026-10-19). **Sonnet when the issue already says exactly what to do and a gate
+proves it was done; Opus when the work has to decide something.** Cloud coders are
+paced by token spend, so the mechanical work goes to Sonnet and leaves the Opus
+budget for what needs it.
+
+- **Sonnet:** a rebase whose conflicts are mechanical (two rows added to one
+  table, a file that moved); a doc fix the docrefs check proves (#973); splitting
+  a file over the size cap or regrouping a directory into subfolders; a lint rule
+  whose issue already names the case it must flag and the case it must pass; the
+  editor's UI and egui panels, cards and inspectors (much text, little judgement,
+  and the editor never ships in a game).
+- **Opus:** everything else, and in particular: tests; read-only agents (research,
+  review, planning); the renderer and shaders, determinism, physics and
+  navigation; the merge-queue scripts; anything touching the five kinds, the API
+  surface or a stored format; a red `main`; a rebase whose conflict is in code
+  (a shader, a signature); writing issues and reviewing coders' diffs, which is
+  the orchestrator's work.
+
+When the line is not crisp, err upwards. **One issue, one agent, one model:** do
+not scout with one model and implement with another, because the second starts
+cold and pays again for everything the first read (the prompt cache is per
+model). The exception is work split into several independent pieces, where each
+piece is its own agent anyway and takes the model its own shape calls for.
 
 ## When to hand back to the user
 
