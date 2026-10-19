@@ -40,7 +40,8 @@ not the engine calling third-party APIs: tooling that reaches an external servic
   (the lint tool) and `src/render/CLAUDE.md` (the renderer and `engine/shaders/`).
   Project-wide rules stay in this file.
 
-**Two skills carry the working protocols** — `issue-batch` and `ci-merge` — so
+**Three skills carry the working protocols** — `issue-batch`, `ci-merge` and
+`independent-review` (an unbiased read of a PR before it queues) — so
 this file can hold the reasoning and they can hold the steps. Each
 one names its own scope and when to reach for it, so this file does not restate
 them; invoke them rather than reconstructing a procedure from memory, and name
