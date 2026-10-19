@@ -57,7 +57,6 @@ fn box_lightmap_uv(face: usize, uv: [f32; 2]) -> [f32; 2] {
 
 /// The 6 faces of a cube of half-extents `(w, h, d)`: each entry is the four corner
 /// positions (CCW) followed by the outward face normal.
-#[allow(clippy::type_complexity)]
 fn box_faces(w: f32, h: f32, d: f32) -> [(Vec3, Vec3, Vec3, Vec3, Vec3); 6] {
     [
         // Front face (+Z)

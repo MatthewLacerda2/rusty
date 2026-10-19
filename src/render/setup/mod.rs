@@ -131,8 +131,11 @@ impl Renderer {
     /// by the caller or at runtime.
     // A flat field-mapping constructor: no logic, just one line per `Renderer`
     // field, so the line/argument counts are inherent to the struct's width.
-    #[allow(clippy::too_many_arguments)]
-    #[allow(clippy::too_many_lines)]
+    #[expect(
+        clippy::too_many_arguments,
+        clippy::too_many_lines,
+        reason = "a flat one-line-per-field constructor: its length is the struct's width (docs/linting.md)"
+    )]
     fn assemble(
         device: wgpu::Device,
         queue: wgpu::Queue,

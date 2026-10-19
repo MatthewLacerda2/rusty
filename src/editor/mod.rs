@@ -1,7 +1,8 @@
-// Platform layer: the audio preview playhead and script-schema mtimes are wall-clock UI state.
-// Exempt from the sim's clock and RNG ban (#757); only the layer table's
-// platform rows may opt out (`make determinism`).
-#![allow(clippy::disallowed_methods, clippy::disallowed_types)]
+#![allow(
+    clippy::disallowed_methods,
+    clippy::disallowed_types,
+    reason = "platform layer, exempt from the sim's clock ban (#757): the audio preview playhead and script-schema mtimes are wall-clock UI state"
+)]
 
 use std::fs;
 
@@ -250,7 +251,7 @@ impl EditorUi {
 
     // The live engine state (scene, console, nav, play flag) plus the frame's HUD
     // metrics: distinct mutable borrows. Legacy signature, pending App/Resources.
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments, reason = "distinct mutable borrows")]
     pub fn draw(
         &mut self,
         ctx: &egui::Context,

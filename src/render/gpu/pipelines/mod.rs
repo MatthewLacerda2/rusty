@@ -34,7 +34,10 @@ pub(crate) struct ForwardPipelines {
 // wgpu pipeline construction legitimately threads several distinct GPU resources
 // (device, shader, format, four bind-group layouts); bundling them into a struct
 // would only add an indirection without clarifying intent.
-#[allow(clippy::too_many_arguments)]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "pipeline construction threads distinct GPU resources; a bundle struct adds only indirection"
+)]
 pub(crate) fn create_pipelines(
     device: &wgpu::Device,
     shader: &wgpu::ShaderModule,

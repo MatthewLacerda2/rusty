@@ -10,7 +10,8 @@ agent can read exactly what failed.
 | Style | rustfmt (`rustfmt.toml`) | `cargo fmt --check` |
 | Code smells | clippy (`clippy.toml`) | **hard gate**: `cargo clippy --all-targets -- -D warnings` (default, `--features dev`, and `--no-default-features` — the editor-free player build), plus `tools/lint` itself (#935) |
 | Merge helpers | `unittest` (`make scripts`) | **hard gate**: `.github/scripts/tests` pass — `make mergeable` is the only thing between a red PR and `main` while it has no required checks (#486, #491) |
-| Function ("endpoint") length | clippy `too_many_lines` | **hard gate**: `too-many-lines-threshold = 50` (`clippy.toml`), denied crate-wide in `Cargo.toml`'s `[lints]` |
+| Function ("endpoint") length | clippy `too_many_lines` + `tools/lint -- --determinism` | **hard gate**: `too-many-lines-threshold = 50` (`clippy.toml`), denied crate-wide in `Cargo.toml`'s `[lints]`; its one exception, `Renderer::assemble`, is locked (`ESCAPE`, #961) |
+| Lint exceptions carry a reason | clippy `allow_attributes` + `allow_attributes_without_reason` | **hard gate**: an exception is `#[expect(lint, reason = "…")]` (outer `#[allow]` is denied; a module-root `#![allow]` still needs its `reason`), and an expectation that no longer fires fails too (#961) |
 | File length | `tools/lint` | <= 300 lines: every line of a `.rs` file, the lines of code of a `.py` one (docstrings, comments and blank lines free, #926); nothing grandfathered |
 | Test / fixture file length | `tools/lint` | <= 150 lines (standalone `*_test.rs` / `tests/` / `fixtures/`, a `*_tests.rs` with no source beside it, and every `.py` under a `tests/` directory); a `<x>_tests.rs` **sibling** of `<x>.rs` (or of a `<x>/` module directory) shares the 300-line source cap |
 | Folder grouping | `tools/lint -- --rules` | **hard gate** (`prefix-group`): no three sibling `.rs` files share a first word (`nav_agent.rs`, `nav_obstacle.rs`, …); make it a subfolder and drop the prefix. Prints the ≲10-files-per-directory signal beside it, never failing on it (#934) |
@@ -23,7 +24,7 @@ agent can read exactly what failed.
 | Sim determinism | clippy `disallowed_methods`/`disallowed_types` + `tools/lint -- --determinism` | **hard gate**: clock reads, OS/unseeded RNG and `std`'s randomly seeded hash maps are banned crate-wide in `clippy.toml`; only a platform row's `mod.rs` may opt out, and the ban list must stay whole (#757, #764) |
 | No shared process state | clippy `disallowed_methods` + `tools/lint -- --determinism` | **hard gate**: `std::env::{set_var, remove_var, set_current_dir}` are banned crate-wide in `clippy.toml`, tests included, since `cargo test` runs every in-crate test in one process; production opts out inline with a reason (`project::open`), and `--determinism` keeps the three on the list (#977) |
 | Dependency direction | `tools/lint -- --direction` | the table's sim modules never reference `crate::render`, `crate::editor`, `wgpu` or `egui` — the arrow is render/editor → sim (#494) |
-| Sim panic-freedom | clippy `unwrap_used` | **hard gate**: `#![deny(clippy::unwrap_used)]` in `app`/`scripting`/`physics`/`navigation`/`ui`; bare `.unwrap()` banned in production (test code exempt via `allow-unwrap-in-tests`) |
+| Sim panic-freedom | clippy `unwrap_used` | **hard gate**: `#![deny(clippy::unwrap_used)]` in `app`/`scripting`/`physics`/`navigation`/`ui`; bare `.unwrap()` banned in production (test code exempt via `allow-unwrap-in-tests`, which `--determinism` keeps set); no `allow`/`expect` of `unwrap_used` anywhere (`ESCAPE`, #961) |
 | Component completeness | `tools/lint -- --components` | every first-class component has all 4 axes (field, Add Component entry, inspector card, API namespace), or a written waiver (`WAIVERS`) |
 | Editor↔shared-op parity | `tools/lint -- --parity` | every first-class component's inspector card routes its mutations through a shared `scene::authoring` op (never direct field writes through the #344 accessor guard) |
 | Rust API reference | rustdoc | **hard gate**: `RUSTDOCFLAGS="-D warnings" cargo doc --no-deps` (both feature sets) — no broken intra-doc links, no public docs linking private items; name a private item as plain `code`, not a link |
@@ -233,8 +234,8 @@ two, which is where a leaked order would show.
 
 The ban is crate-wide. The platform modules that need real time (`dev`, `editor`,
 `render`, `shell` today) opt out with
-`#![allow(clippy::disallowed_methods, clippy::disallowed_types)]` at their `mod.rs`,
-with a one-line reason. `make determinism` keeps that escape hatch honest: it fails
+`#![allow(clippy::disallowed_methods, clippy::disallowed_types, reason = "…")]` at
+their `mod.rs`. `make determinism` keeps that escape hatch honest: it fails
 (`OPT_OUT`) when any other file under `src/` names those lints or allows the groups
 that hold them (`clippy::style`, `clippy::all`), so a sim module can't quietly gain
 an `allow`; and it fails (`UNBANNED` / `UNDENIED`) when `clippy.toml` drops a banned
@@ -346,14 +347,12 @@ it through a shared op, never to grandfather.
 The 50-line per-function cap is a **hard clippy gate** (`too_many_lines = "deny"` in
 `Cargo.toml`'s `[lints.clippy]`, both feature sets) and is **on for the whole crate**
 — the legacy functions that predated it were split (#124). The one remaining
-`#[allow(clippy::too_many_lines)]` is `Renderer::assemble` in
-`src/render/setup/mod.rs`, a flat one-line-per-field constructor whose length is the
-struct's width. List any with:
-```
-rg 'allow\(clippy::too_many_lines\)' src
-```
-If a function grows past 50 lines, split it — **do not** silence the lint with a
-new `#[allow]`.
+exception is `Renderer::assemble` in `src/render/setup/mod.rs`
+(`#[expect(clippy::too_many_lines, reason = …)]`), a flat one-line-per-field
+constructor whose length is the struct's width. If a function grows past 50 lines,
+split it: `make determinism` fails (`ESCAPE`) on any other `allow`/`expect` of
+`too_many_lines`, and on any of `unwrap_used` (`ESCAPES` in
+`tools/lint/src/determinism/escapes.rs`, #961).
 
 The core sim modules (`app`, `scripting`, `physics`, `navigation`, `ui`)
 carry a module-level `#![deny(clippy::unwrap_used)]`, so a bare `.unwrap()` in
@@ -378,7 +377,8 @@ The rule is deliberately narrow:
 
 There is no baseline/burn-down: the sim core landed already clean (its few unwraps
 were all in `#[cfg(test)]`), so the lint went straight to `deny` with no grandfathered
-sites. Keep it that way — fix the call site, don't add an `#[allow]`.
+sites. Keep it that way — fix the call site; an `allow`/`expect` of `unwrap_used`
+fails `make determinism`.
 
 ## Clippy: CI vs local
 Clippy lints the whole crate (it can't be scoped to changed files), which is too

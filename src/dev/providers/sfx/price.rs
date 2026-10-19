@@ -21,7 +21,11 @@ pub const MILLS_PER_SECOND: u64 = 4;
 pub fn estimate_cents(seconds: f64) -> u64 {
     // Whole milliseconds first, so the arithmetic below is exact integers. The
     // brief's bounds (0.5 to 30) keep this small and positive.
-    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    #[expect(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "the brief's bounds (0.5 to 30 s) keep the product small and positive"
+    )]
     let millis = (seconds * 1000.0).ceil() as u64;
     (millis * MILLS_PER_SECOND).div_ceil(10_000)
 }

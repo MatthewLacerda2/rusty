@@ -126,7 +126,6 @@ impl PostFx {
         self.custom.resize(device, full_size.0, full_size.1);
     }
 
-    #[allow(clippy::type_complexity)]
     fn create_targets(
         device: &wgpu::Device,
         width: u32,

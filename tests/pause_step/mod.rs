@@ -38,13 +38,13 @@ fn drain_steps(h: &Harness) -> u32 {
 }
 
 /// Read an entity's world position. The `let` binding is load-bearing: it drops the
-/// transform guard before `scene` goes out of scope, so the borrow checker is
-/// satisfied (returning the field expression directly would outlive `scene`).
-#[allow(clippy::let_and_return)]
+/// transform guard before `scene` does, so the borrow checker is satisfied
+/// (returning the field expression directly would outlive `scene`).
 fn entity_pos(h: &Harness, id: u32) -> glam::Vec3 {
     let world = h.world.borrow();
     let scene = world.scene().borrow();
     let pos = scene.world.transform(id).unwrap().position;
+    drop(scene);
     pos
 }
 

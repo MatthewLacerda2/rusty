@@ -45,8 +45,8 @@ fn comments_and_longer_names_are_not_opt_outs() {
 
 #[test]
 fn the_shipped_config_bans_everything() {
-    let clippy = include_str!("../../../clippy.toml");
-    let cargo = include_str!("../../../Cargo.toml");
+    let clippy = include_str!("../../../../clippy.toml");
+    let cargo = include_str!("../../../../Cargo.toml");
     assert_eq!(config_violations(clippy, cargo), Vec::<String>::new());
 }
 
@@ -77,10 +77,29 @@ fn a_reasoned_statement_opt_out_passes_and_a_bare_one_fails() {
 
 #[test]
 fn the_ban_keeps_process_state_on_the_list() {
-    let clippy = include_str!("../../../clippy.toml").replace("std::env::set_var", "x");
-    let v = config_violations(&clippy, include_str!("../../../Cargo.toml"));
+    let clippy = include_str!("../../../../clippy.toml").replace("std::env::set_var", "x");
+    let v = config_violations(&clippy, include_str!("../../../../Cargo.toml"));
     assert_eq!(
         v,
         vec!["UNBANNED `std::env::set_var` — clippy.toml no longer lists it"]
     );
+}
+
+#[test]
+fn a_dropped_reason_deny_or_test_unwrap_setting_is_reported() {
+    let cargo = include_str!("../../../../Cargo.toml").replace("allow_attributes = \"deny\"", "");
+    let clippy =
+        include_str!("../../../../clippy.toml").replace("allow-unwrap-in-tests = true", "");
+    let v = config_violations(&clippy, &cargo);
+    assert!(
+        v.iter()
+            .any(|s| s.starts_with("UNDENIED `allow_attributes = ")),
+        "{v:?}"
+    );
+    assert!(
+        v.iter()
+            .any(|s| s.starts_with("UNSET `allow-unwrap-in-tests")),
+        "{v:?}"
+    );
+    assert_eq!(v.len(), 2, "{v:?}");
 }
