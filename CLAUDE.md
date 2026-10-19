@@ -152,7 +152,7 @@ is wrong.
   another in the merge queue pays a rebase per merge ahead of it, and only a colliding
   rebase is expensive. **Three kinds of agent, three limits:** **cloud coders ≈10**,
   paced by token spend and by how many diffs one orchestrator can read, not by
-  hardware; **local coders ≤2**, because the queue merges one PR per CI run and a third
+  hardware (so mechanical work runs on Sonnet; `issue-batch`, *Which model*); **local coders ≤2**, because the queue merges one PR per CI run and a third
   local coder finishes nothing sooner; **read-only agents** (research, review,
   planning) without limit, since they build nothing. Merging stays **one at a time**,
   whatever the count. **One worktree per branch** under
