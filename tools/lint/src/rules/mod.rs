@@ -11,10 +11,10 @@ mod ignored;
 mod markers;
 mod prefix;
 mod skip;
+mod temp_dir;
 mod test_code;
 mod test_shape;
 mod unwrap;
-mod temp_dir;
 
 pub use finding::{allowed, Finding};
 use std::collections::BTreeMap;
@@ -136,8 +136,8 @@ mod prefix_tests;
 #[cfg(test)]
 mod skip_tests;
 #[cfg(test)]
+mod temp_dir_tests;
+#[cfg(test)]
 mod test_shape_tests;
 #[cfg(test)]
 mod unwrap_tests;
-#[cfg(test)]
-mod temp_dir_tests;
