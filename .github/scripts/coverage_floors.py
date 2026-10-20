@@ -11,7 +11,9 @@ inline reason:
 
     api 85.00  # reason: the Sound.* adapter moved out of api (#1234)
 
-A raise, an unchanged floor and a new floor always pass. A removed floor can
+A reason answers for one drop: lowering a line again while keeping the reason
+it already had is still silent. A raise, an unchanged floor and a new floor
+always pass. A removed floor can
 carry no reason on its line, so it passes only when its module is gone from
 `src/` (`coverage-ignore.py` refuses a floor on a missing directory anyway).
 
@@ -34,14 +36,18 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 REASON = "# reason:"
 
 
-def parse(text: str) -> dict[str, tuple[float, str]]:
-    """Each floored module's `(floor, reason)`; the reason is "" when absent."""
+class GitError(RuntimeError):
+    """A `git` call failed (a shallow clone without the merge base, say)."""
+
+
+def parse(text: str) -> dict[str, tuple[float, str, str]]:
+    """Each module's `(floor, floor as written, reason)`; the reason is "" when absent."""
     floors = {}
     for line in text.splitlines():
         body, _, reason = line.partition(REASON)
         words = body.split("#", 1)[0].split()
         if len(words) >= 2:
-            floors[words[0]] = (float(words[1]), reason.strip())
+            floors[words[0]] = (float(words[1]), words[1], reason.strip())
     return floors
 
 
@@ -49,27 +55,28 @@ def findings(base: str, head: str, has_module: Callable[[str], bool]) -> list[st
     """Every floor `head` lowers from `base` without a reason, as a message."""
     old, new = parse(base), parse(head)
     out = []
-    for module, (floor, _) in old.items():
+    for module, (floor, written, old_reason) in old.items():
         if module not in new:
             if has_module(module):
                 out.append(
-                    f"{BASELINE}: the `{module}` floor ({floor:.2f}) was removed while "
+                    f"{BASELINE}: the `{module}` floor ({written}) was removed while "
                     f"src/{module}/ still exists; keep it, or lower it with `{REASON} <why>`"
                 )
             continue
-        now, reason = new[module]
-        if now < floor and not reason:
+        now, now_written, reason = new[module]
+        if now < floor and (not reason or reason == old_reason):
             out.append(
-                f"{BASELINE}: `{module}` floor dropped {floor:.2f} -> {now:.2f} without "
-                f"a reason; raise coverage instead, or end the line with `{REASON} <why>`"
+                f"{BASELINE}: `{module}` floor dropped {written} -> {now_written} without "
+                f"a new reason; raise coverage instead, or end the line with `{REASON} <why>`"
             )
     return out
 
 
 def git(*args: str, cwd: Path) -> str:
-    return subprocess.run(
-        ["git", *args], cwd=cwd, check=True, capture_output=True, text=True
-    ).stdout
+    done = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True)
+    if done.returncode != 0:
+        raise GitError(f"git {' '.join(args)}: {done.stderr.strip()}")
+    return done.stdout
 
 
 def against(base_ref: str, root: Path) -> list[str]:
@@ -82,7 +89,10 @@ def against(base_ref: str, root: Path) -> list[str]:
 
 def main() -> None:
     base_ref = sys.argv[1] if len(sys.argv) > 1 else "origin/main"
-    found = against(base_ref, REPO_ROOT)
+    try:
+        found = against(base_ref, REPO_ROOT)
+    except GitError as err:
+        sys.exit(f"coverage floors: {err}")
     print("\n".join(found) or f"coverage floors: none lowered silently against {base_ref}")
     sys.exit(1 if found else 0)
 

@@ -12,7 +12,7 @@ import os
 import subprocess
 import unittest
 
-from coverage_floors import REPO_ROOT, against, findings
+from coverage_floors import REPO_ROOT, GitError, against, findings
 
 BASE = "# floors\napp 95.00\napi 86.00\n"
 
@@ -36,6 +36,14 @@ class Rule(unittest.TestCase):
     def test_a_plain_comment_is_not_a_reason(self):
         self.assertEqual(len(check("app 95.00\napi 85.00  # lowered\n")), 1)
 
+    def test_a_drop_keeping_the_old_reason_is_flagged(self):
+        base = "api 85.00  # reason: X\n"
+        found = findings(base, "api 70.00  # reason: X\n", lambda m: True)
+        self.assertIn("`api` floor dropped 85.00 -> 70.00", found[0])
+
+    def test_the_floor_is_printed_as_written(self):
+        self.assertIn("86.00 -> 85.999", check("app 95.00\napi 85.999\n")[0])
+
     def test_a_raise_and_a_new_floor_pass(self):
         self.assertEqual(check("app 95.50\napi 86.00\nphysics 97.00\n"), [])
 
@@ -47,6 +55,10 @@ class Rule(unittest.TestCase):
 
 
 class ThisBranch(unittest.TestCase):
+    def test_a_failing_git_names_its_error(self):
+        with self.assertRaisesRegex(GitError, "no-such-ref-963"):
+            against("no-such-ref-963", REPO_ROOT)
+
     def test_no_floor_is_lowered_silently_against_main(self):
         known = subprocess.run(
             ["git", "rev-parse", "--verify", "--quiet", "origin/main"],
