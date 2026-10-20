@@ -7,7 +7,7 @@ use rusty::asset::anim_data::{AnimationClip, Interpolation, JointTrack, Track};
 use rusty::asset::animation_graph::{self, AnimationGraph};
 use rusty::asset::mesh_data::{JointTransform, SkinData};
 use rusty::components::{AnimatorComponent, MeshComponent};
-use rusty::scene::{DirtyFlag, Scene};
+use rusty::scene::Scene;
 
 use super::rig::play;
 
@@ -65,16 +65,11 @@ fn soldier() -> (Scene, u32) {
     scene.world.set_mesh(
         hero,
         Some(MeshComponent {
-            primitive_type: "Asset".to_string(),
             asset_ref: Some("soldier.glb::Body".to_string()),
-            vertices: Vec::new(),
-            indices: Vec::new(),
             bind_palette: vec![Mat4::IDENTITY; 2],
             skin: Some(skin),
             clips,
-            pose_palette: Vec::new(),
-            skeleton: Default::default(),
-            is_dirty: DirtyFlag::new(true),
+            ..MeshComponent::new("Asset", Vec::new(), Vec::new())
         }),
     );
     let mut anim = AnimatorComponent {

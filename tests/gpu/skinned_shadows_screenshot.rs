@@ -12,7 +12,7 @@ use glam::{Mat4, Quat, Vec3};
 use rusty::asset::SkinData;
 use rusty::dev::screenshot::capture;
 use rusty::scene::authoring::{create_entity, Primitive};
-use rusty::scene::{Camera, DirtyFlag, MeshComponent, Scene};
+use rusty::scene::{Camera, MeshComponent, Scene};
 
 const SHIFT: f32 = 10.0;
 
@@ -43,16 +43,10 @@ fn yard(pose: Mat4) -> Scene {
     scene.world.set_mesh(
         slab,
         Some(MeshComponent {
-            primitive_type: "Slab".to_string(),
-            asset_ref: None,
-            vertices,
-            indices,
             bind_palette: vec![Mat4::IDENTITY],
             skin: Some(skin),
-            clips: Vec::new(),
             pose_palette: vec![pose],
-            skeleton: Default::default(),
-            is_dirty: DirtyFlag::new(true),
+            ..MeshComponent::new("Slab", vertices, indices)
         }),
     );
     scene

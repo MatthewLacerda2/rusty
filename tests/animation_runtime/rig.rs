@@ -8,7 +8,7 @@ use glam::{Mat4, Vec3};
 use rusty::asset::anim_data::{AnimationClip, Interpolation, JointTrack, Track};
 use rusty::asset::mesh_data::{JointTransform, SkinData};
 use rusty::components::{AnimatorComponent, MeshComponent};
-use rusty::scene::{DirtyFlag, Scene, ScriptComponent};
+use rusty::scene::{Scene, ScriptComponent};
 
 /// A one-joint skin, `hand`, whose clip slides it +X over [0, 1] s — the smallest
 /// rig that produces a non-identity pose.
@@ -48,16 +48,11 @@ pub fn armed_scene(script: Option<&str>) -> (Scene, u32, u32, u32) {
     scene.world.set_mesh(
         hero,
         Some(MeshComponent {
-            primitive_type: "Asset".to_string(),
             asset_ref: Some("model.glb::Hero".to_string()),
-            vertices: Vec::new(),
-            indices: Vec::new(),
             bind_palette: vec![Mat4::IDENTITY],
             skin: Some(slide_skin()),
             clips: vec![slide_clip()],
-            pose_palette: Vec::new(),
-            skeleton: Default::default(),
-            is_dirty: DirtyFlag::new(true),
+            ..MeshComponent::new("Asset", Vec::new(), Vec::new())
         }),
     );
     let mut anim = AnimatorComponent::default();

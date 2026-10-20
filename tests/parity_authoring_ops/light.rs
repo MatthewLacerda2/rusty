@@ -14,14 +14,11 @@ fn entity_with_light(scene: &mut Scene, name: &str) -> u32 {
     scene.world.set_light(
         id,
         Some(LightComponent {
-            light_type: LightType::Point,
-            color: Vec3::ONE,
             intensity: 1.0,
             range: 5.0,
             inner_cone: 0.0,
             outer_cone: 0.0,
-            cast_shadows: false,
-            mode: Default::default(),
+            ..rusty::scene::authoring::default_light()
         }),
     );
     id

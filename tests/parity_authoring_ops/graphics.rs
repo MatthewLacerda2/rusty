@@ -4,7 +4,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use mlua::Lua;
-use rusty::components::{CameraComponent, ClearFlags, Tonemap, VisualCorrectionComponent};
+use rusty::components::{CameraComponent, Tonemap, VisualCorrectionComponent};
 use rusty::core::quality::QualityPreset;
 use rusty::scene::authoring::{camera as camera_ops, visual_correction as vc_ops};
 use rusty::scene::Scene;
@@ -16,39 +16,22 @@ fn scene_with_volume_and_cam() -> (Rc<RefCell<Scene>>, u32) {
     scene.world.set_visual_correction(
         id,
         Some(VisualCorrectionComponent {
-            active: true,
             bloom_active: false,
-            bloom_intensity: 1.0,
             bloom_threshold: 1.0,
-            exposure: 0.0,
-            contrast: 1.0,
-            saturation: 1.0,
             ssr_active: false,
             ssr_quality: "Low".to_string(),
             ssr_temporal_upsampling: false,
-            tonemap: Tonemap::Aces,
             gamma: 2.2,
-            shadows: Default::default(),
-            ssao: Default::default(),
-            custom_effects: Vec::new(),
-            post_params: Default::default(),
+            ..rusty::scene::authoring::default_visual_correction()
         }),
     );
     scene.world.set_camera(
         id,
         Some(CameraComponent {
-            active: true,
             fov: 60.0,
-            near: 0.1,
             far: 100.0,
-            culling_mask: u32::MAX,
-            render_order: 0,
-            clear_flags: ClearFlags::Skybox,
-            motion_blur_active: false,
             motion_blur_samples: 8,
-            fxaa_active: true,
-            projection: Default::default(),
-            target_texture: None,
+            ..CameraComponent::default()
         }),
     );
     (Rc::new(RefCell::new(scene)), id)

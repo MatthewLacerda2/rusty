@@ -6,10 +6,12 @@
 //! Exit code 1 on any finding; report mirrored to `.lint/report.txt`.
 
 mod finding;
+mod full_literal;
 mod ignored;
 mod markers;
 mod prefix;
 mod skip;
+mod test_code;
 mod test_shape;
 mod unwrap;
 
@@ -43,6 +45,12 @@ pub fn run() {
     };
     let sim_dirs = crate::layers::sim_dirs();
     findings.extend(unwrap::missing_roots(&files, &sim_dirs));
+    let texts: Vec<(String, String)> = files.iter().map(|p| (p.clone(), source(p))).collect();
+    let components =
+        full_literal::Components::load(texts.iter().map(|(p, s)| (p.as_str(), s.as_str())));
+    for (path, src) in &texts {
+        findings.extend(components.check(path, src));
+    }
     for path in &files {
         let src = source(path);
         findings.extend(markers::check(path, &src));
@@ -113,6 +121,8 @@ fn render(findings: &[Finding], crowded: &[(&str, usize)]) -> String {
     body
 }
 
+#[cfg(test)]
+mod full_literal_tests;
 #[cfg(test)]
 mod ignored_tests;
 #[cfg(test)]

@@ -22,13 +22,11 @@ fn light(kind: LightType, at: Vec3, range: f32) -> LocalLight {
     };
     let light = LightComponent {
         light_type: kind,
-        color: Vec3::ONE,
         intensity: 1.0,
         range,
         inner_cone: 20.0,
         outer_cone: 30.0,
-        cast_shadows: false,
-        mode: Default::default(),
+        ..crate::scene::authoring::default_light()
     };
     LocalLight::new(&transform, &light).expect("a local light")
 }

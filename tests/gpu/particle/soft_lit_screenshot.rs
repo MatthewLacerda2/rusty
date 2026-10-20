@@ -4,7 +4,7 @@
 
 use glam::Vec3;
 use rusty::components::ParticleRenderMode;
-use rusty::components::{LightComponent, LightType, MaterialAsset, ParticleRender};
+use rusty::components::{LightComponent, MaterialAsset, ParticleRender};
 use rusty::dev::capture::CaptureHost;
 
 use super::scene::{is_red, one, pixel, scene_with};
@@ -48,14 +48,10 @@ fn a_lit_particle_is_dark_unlit_and_brightens_by_a_light() {
     bright.world.set_light(
         lamp,
         Some(LightComponent {
-            light_type: LightType::Point,
-            color: Vec3::ONE,
             intensity: 20.0,
-            range: 10.0,
             inner_cone: 0.0,
             outer_cone: 0.0,
-            cast_shadows: false,
-            mode: Default::default(),
+            ..rusty::scene::authoring::default_light()
         }),
     );
     let (Some(u), Some(d), Some(b)) = (

@@ -95,20 +95,13 @@ fn play_animation_returns_whether_the_mesh_carries_the_clip() {
     scene.borrow_mut().world.set_mesh(
         id,
         Some(MeshComponent {
-            primitive_type: "Asset".to_string(),
-            asset_ref: None,
-            vertices: Vec::new(),
-            indices: Vec::new(),
-            bind_palette: Vec::new(),
-            skin: None,
             clips: vec![AnimationClip {
                 name: "Walk".to_string(),
                 tracks: Vec::new(),
                 duration: 1.0,
             }],
-            pose_palette: Vec::new(),
-            skeleton: Default::default(),
             is_dirty: Default::default(),
+            ..MeshComponent::new("Asset", Vec::new(), Vec::new())
         }),
     );
     assert_eq!(

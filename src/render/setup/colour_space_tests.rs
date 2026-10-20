@@ -6,7 +6,7 @@ use glam::Vec3;
 
 use crate::components::{MaterialAsset, MaterialComponent, Tonemap};
 use crate::render::{readback, RenderView, OFFSCREEN_FORMAT};
-use crate::scene::{Camera, DirtyFlag, MeshComponent, Scene, VisualCorrectionComponent};
+use crate::scene::{Camera, MeshComponent, Scene, VisualCorrectionComponent};
 
 /// What the window surface typically picks (`surface_config` takes the first sRGB
 /// format; BGRA is what Vulkan and Metal list first).
@@ -23,21 +23,9 @@ fn mid_grey_scene() -> Scene {
     scene.ambient_intensity = 0.0;
     let id = scene.add_entity("Grey".to_string());
     let (vertices, indices) = crate::components::mesh::primitives::generate_box(8.0, 8.0, 8.0);
-    scene.world.set_mesh(
-        id,
-        Some(MeshComponent {
-            primitive_type: "Box".to_string(),
-            asset_ref: None,
-            vertices,
-            indices,
-            bind_palette: Vec::new(),
-            skin: None,
-            clips: Vec::new(),
-            pose_palette: Vec::new(),
-            skeleton: Default::default(),
-            is_dirty: DirtyFlag::new(true),
-        }),
-    );
+    scene
+        .world
+        .set_mesh(id, Some(MeshComponent::new("Box", vertices, indices)));
     scene.world.set_material(
         id,
         Some(MaterialComponent {

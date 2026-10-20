@@ -7,7 +7,7 @@ use glam::{Quat, Vec3};
 use super::plan::{plan, AtlasPlan};
 use crate::components::{LightComponent, TransformComponent};
 use crate::render::clusters::{shadow_requests, ClusterGrid, LocalLight, MAX_VISIBLE_LIGHTS};
-use crate::scene::{Camera, LightType};
+use crate::scene::Camera;
 
 const ASPECT: f32 = 16.0 / 9.0;
 /// Lights past the camera budget: they lose its cut but, being intense, would
@@ -22,14 +22,13 @@ fn point(i: usize, color: Vec3, intensity: f32) -> LocalLight {
         ..Default::default()
     };
     let light = LightComponent {
-        light_type: LightType::Point,
         color,
         intensity,
         range: 4.0,
         inner_cone: 20.0,
         outer_cone: 30.0,
         cast_shadows: true,
-        mode: Default::default(),
+        ..crate::scene::authoring::default_light()
     };
     LocalLight::new(&transform, &light).expect("a local light")
 }

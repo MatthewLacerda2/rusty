@@ -11,11 +11,11 @@
 //!   `crate::render::test_gpu::headless_or_skip`, the one place that decides what
 //!   "no GPU here" means; a direct `Renderer::new_headless` drifts from it.
 //!
-//! Test code is everything under `tests/`, a `tests.rs` or `*_tests.rs` file, and a
-//! file's lines from its first `#[cfg(test)]` on (the inline `mod tests` shape).
-//! Comment lines never count, so a doc may name the calls.
+//! Test code is what `test_code.rs` says it is. Comment lines never count, so a doc
+//! may name the calls.
 
 use super::finding::Finding;
+use super::test_code;
 
 pub const INNER_CFG: &str = "test-inner-cfg";
 pub const USER_WORKSPACE: &str = "test-user-workspace";
@@ -24,19 +24,12 @@ pub const GPU_ENTRY: &str = "test-gpu-entry";
 /// The one file that may call `new_headless` from test code.
 const GPU_HELPER: &str = "src/render/test_gpu.rs";
 
-/// Is the whole of `path` test code?
-fn test_file(path: &str) -> bool {
-    let name = path.rsplit('/').next().unwrap_or(path);
-    path.starts_with("tests/") || name == "tests.rs" || name.ends_with("_tests.rs")
-}
-
 /// Every break of the three locks in `path` (under `src/` or `tests/`; other roots
 /// are not the engine's tests).
 pub fn check(path: &str, source: &str) -> Vec<Finding> {
-    if !(path.starts_with("src/") || path.starts_with("tests/")) {
+    let Some(first) = test_code::first_line(path, source) else {
         return Vec::new();
-    }
-    let mut in_test = test_file(path);
+    };
     let mut found = Vec::new();
     let mut flag = |line: usize, rule: &'static str, message: &str| {
         found.push(Finding {
@@ -46,12 +39,9 @@ pub fn check(path: &str, source: &str) -> Vec<Finding> {
             message: message.to_string(),
         });
     };
-    for (i, line) in source.lines().enumerate() {
+    for (i, line) in source.lines().enumerate().skip(first) {
         let code = line.trim_start();
-        if code.starts_with("#[cfg(test)]") {
-            in_test = true;
-        }
-        if !in_test || code.starts_with("//") {
+        if code.starts_with("//") {
             continue;
         }
         if path.starts_with("tests/") && code.starts_with("#![cfg(") {
