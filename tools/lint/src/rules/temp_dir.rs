@@ -15,8 +15,7 @@ use super::test_code;
 pub const RULE: &str = "test-temp-dir";
 const CALL: &str = "std::env::temp_dir()";
 
-/// Every `std::env::temp_dir()` call in the test code of `path` (under `src/` or
-/// `tests/`; other roots are not the engine's tests).
+/// Every `std::env::temp_dir()` call in the test code of `path`.
 pub fn check_file(path: &str, source: &str) -> Vec<Finding> {
     let Some(first) = test_code::first_line(path, source) else {
         return Vec::new();

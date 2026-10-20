@@ -24,8 +24,7 @@ pub const GPU_ENTRY: &str = "test-gpu-entry";
 /// The one file that may call `new_headless` from test code.
 const GPU_HELPER: &str = "src/render/test_gpu.rs";
 
-/// Every break of the three locks in `path` (under `src/` or `tests/`; other roots
-/// are not the engine's tests).
+/// Every break of the three locks in the test code of `path`.
 pub fn check(path: &str, source: &str) -> Vec<Finding> {
     let Some(first) = test_code::first_line(path, source) else {
         return Vec::new();

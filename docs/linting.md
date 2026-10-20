@@ -176,10 +176,12 @@ or baseline.
 - **`skip`** — an ignored test reads as passing to anyone who reads only the
   summary. `#[ignore]` and `#[cfg_attr(…, ignore)]` fail unless an allow says why:
   `// lint: allow(skip) a timing measurement, run by hand` right above it.
-- **Test code**, for every rule below that says it, is one classifier
+- **Test code**, for every rule in this list that says it, is one classifier
   (`rules/test_code.rs`, #1068): all of `tests/`, every `tests.rs` / `*_tests.rs`,
-  and a file's lines from its first `#[cfg(test)]` on, scanning only `src/` and
-  `tests/`.
+  and a file's lines from its first `#[cfg(test)]` or `#[cfg(all(…, test, …))]` on
+  (`test` anywhere among `all`'s arguments, the attribute wrapped or not), scanning
+  only `src/` and `tests/`. `any(test, …)` is not test-only, so it stays
+  production code. The layering lint and the clippy test exemption classify their own way.
 - **`test-inner-cfg`, `test-user-workspace`, `test-gpu-entry`** (#980) — three
   `docs/testing.md` locks on test code; comment lines never count. A `tests/` file never gates itself with an inner `#![cfg(…)]` (gate
   its `mod` line); test code never calls `in_user_workspace` or `scenario::run(`
@@ -203,8 +205,8 @@ or baseline.
   A new sim row is covered the day it is added. Platform files are not scanned.
 - **`test-temp-dir`** — a path under `std::env::temp_dir()` is shared by every test
   process, every worktree and (under `cargo test` and cargo-mutants) every test
-  thread, so a fixed or process-keyed name races. Test code under `src/` and
-  `tests/` calls `crate::test_temp::dir()` (in-crate) or `crate::temp::dir()`
+  thread, so a fixed or process-keyed name races. Test code (the *Test code* bullet)
+  calls `crate::test_temp::dir()` (in-crate) or `crate::temp::dir()`
   (integration) instead: both key on the process *and* the running test (#709,
   #999). Comment lines never count. The
   helper itself and Unix socket paths (which must stay short) carry an inline

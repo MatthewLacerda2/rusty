@@ -68,3 +68,28 @@ fn small_components_and_reasoned_exceptions_pass() {
     assert_eq!(lines("tests/a.rs", src), [2]);
     assert!(allowed(src, 2, RULE), "`rules::run` applies the allow");
 }
+
+#[test]
+fn cfg_all_test_is_test_code_and_any_test_is_not() {
+    let full = "ColliderComponent { shape, is_trigger, active }";
+    let gated = |attr: &str| format!("{attr}\nmod tests {{\n    fn t() {{ {full}; }}\n}}\n");
+    let all = gated("#[cfg(all(test, feature = \"dev\"))]");
+    assert_eq!(lines("src/physics/build.rs", &all), [3]);
+    let any = gated("#[cfg(any(test, feature = \"dev\"))]");
+    assert!(lines("src/physics/build.rs", &any).is_empty());
+}
+
+#[test]
+fn cfg_all_with_test_last_or_wrapped_is_test_code() {
+    let full = "ColliderComponent { shape, is_trigger, active }";
+    for attr in [
+        "#[cfg(all(feature = \"dev\", test))]",
+        "#[cfg(all(\n    feature = \"dev\",\n    test,\n))]",
+    ] {
+        let src = format!("{attr}\nmod tests {{\n    fn t() {{ {full}; }}\n}}\n");
+        let line = src.lines().count() - 1;
+        assert_eq!(lines("src/physics/build.rs", &src), [line], "{attr}");
+    }
+    let not = format!("#[cfg(all(feature = \"dev\", not(test)))]\nfn f() {{ {full}; }}\n");
+    assert!(lines("src/physics/build.rs", &not).is_empty());
+}
