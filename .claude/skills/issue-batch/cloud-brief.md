@@ -1,30 +1,26 @@
 # Cloud brief: the standing rules
 
 Every cloud coder the batch launches reads this file (#568). Its routine prompt
-carries only step 0 (which runs before this file is read), a pointer here, and the
-issue number; what is specific to the issue is a `Brief` comment on it (#910). When a lesson changes how cloud coders must work, change
-it **here**, once, not in the next prompt.
+carries only a pointer here and the issue number; what is specific to the issue
+is a `Brief` comment on it (#910). When a lesson changes how cloud coders must
+work, change it **here**, once, not in the next prompt.
 
-**Nobody can talk to you; the pull request is your only report.** Never send the operator a push notification: a hand-back or a decision goes in the PR description and an issue comment, where the orchestrator reads it and decides. Most "needs your call" questions are the orchestrator's to answer, and a phone alert at night is not how the batch works. Use the GitHub
+**Nobody can talk to you; the pull request is your only report.** Never send the operator a push notification: a hand-back or a decision goes in the PR description and an issue comment, where the orchestrator reads it and decides. Use the GitHub
 MCP tools (`issue_read`, `create_pull_request`, `update_pull_request`,
 `add_issue_comment`); load them with ToolSearch.
 
-**A finding is yours to deal with.** Fold it into this branch when it's in
-your way or small, or file an issue with the evidence (CLAUDE.md, *Issues,
-labels & priority*) and keep going. Either way it never goes unrecorded: the operator expects coders
-to file issues mid-batch. Every issue you file carries the **`agent`** label, and
-`planning` too when it fails CLAUDE.md's *approval test* (a stored format, a
-migration, or how an existing game behaves).
+**A finding is yours to deal with**: fold it in or file it, as CLAUDE.md's
+*Issues, labels & priority* says (the `agent` label; `planning` when it fails the
+approval test).
 
 **Need a sibling's tool for your own proof? Patch it locally, don't commit it.**
 If your PR's captures or measurements need something another in-flight issue is
 building (a CLI flag, a capture option), apply the smallest uncommitted patch to
-take them, and say so in the PR. On 2026-10-05 #831 committed its own copy of #848's
-`--select-asset`, and the second of the two to merge had a conflict.
+take them, and say so in the PR. A committed copy conflicts with the original.
 
 ## Check the issue's blockers yourself
 
-Before writing code, read the issue body for "Blocked by" and check each blocker's state on GitHub. The orchestrator checks GitHub's recorded relationships, and a blocker that exists only in prose slips past it. If a blocker is still open, stand down as the ~3-attempts rule says (comment on the issue, no branch) and say which issue should go first. (#399 on 2026-09-30.)
+Before writing code, read the issue body for "Blocked by" and check each blocker's state on GitHub; a blocker written only in prose slips past the orchestrator. If one is still open, stand down (comment on the issue, no branch) and say which issue should go first.
 
 ## Read first
 
@@ -42,13 +38,9 @@ orchestrator and the merge queue (#823). There is no check-in to schedule and
 nothing to wait for.
 
 - Run builds, tests and `make gates` in the **foreground**, with long timeouts,
-  split across calls as *The container* says (a call dies at ten minutes). A
-  session that starts a build in the background and ends its turn to wait is
-  never woken.
-- **Never schedule a `send_later` check-in.** Each one is a fresh cloud session
-  reading state the orchestrator already has, and on 2026-10-04 check-ins were
-  most of the late churn: green branches sat in draft waiting on them, and one
-  pushed to a branch the queue already held.
+  split across calls as *The container* says.
+- **Never schedule a `send_later` check-in**: it is a fresh session reading state
+  the orchestrator already has, and it pushes to branches the queue holds.
 
 ## Ready means finished
 
@@ -72,23 +64,17 @@ nothing to wait for.
 - **Once ready, the branch is the merge queue's. Never push to it again**, not
   to rebase and not to fix your own red CI: a red or conflicting ready PR comes
   back to the orchestrator as a hand-back, and it briefs a fix. Anything you
-  notice after readying goes in a comment on the issue. (#560 on 2026-09-30: a
-  test-only push landed mid-queue and the queue handed the PR back.)
+  notice after readying goes in a comment on the issue.
 
 ## The container
 
 Lessons from cloud coders' run logs (rusty's and scorsese's, #924). Each one cost
 a coder real time.
 
-- **A foreground tool call dies silently at ten minutes.** This was scorsese's
-  coders' single largest time sink (MatthewLacerda2/scorsese#781), and rusty's
-  `make gates` builds three feature sets plus the lavapipe GPU tests, so it bites
-  harder here. A cold `make gates` in a 4-core container took about 16 minutes
-  (2026-10-16): the quick gates ~25 s, `clippy` 4m25s (three feature sets),
-  `doc` 1m, `deny` 2 s, and **`make test` 10m21s on its own**: building the
-  default test binaries 5m15s, running them 56 s, building the `dev` ones 2m09s,
-  running them 1m52s. So split it, one call each, every one well under ten
-  minutes even cold:
+- **A tool call is moved to the background at ten minutes**, and you are woken
+  when it finishes (MatthewLacerda2/scorsese#1500). A cold `make gates` in the
+  container takes about 16, so split it anyway, one call each, so every result
+  comes back in the call that ran it:
   1. `make fmt size layers determinism direction components parity test-lint scripts`
      (seconds);
   2. `make clippy`;
@@ -110,11 +96,9 @@ a coder real time.
   REST refs API is allowed). A throwaway branch you pushed goes under the PR's
   *For a human* heading for the operator to delete.
 - **`git status --short --ignored` lists nothing you wrote** before readying: a
-  `.gitignore` pattern silently kept a source file out of a commit once
-  (MatthewLacerda2/scorsese#872).
+  `.gitignore` pattern can silently keep a source file out of a commit.
 - **Rebase once, last.** After a rebase over unrelated merges, `cargo check`, the
-  size gate and your own tests are enough; the whole gate list again is not
-  needed (MatthewLacerda2/scorsese#862).
+  size gate and your own tests are enough; the whole gate list again is not.
 - **Blessings come from the container's Mesa, not CI's.** A capture or snapshot
   blessed here may differ from what CI renders: bless nothing from a container
   without saying so in the PR.
@@ -132,12 +116,10 @@ a coder real time.
   draws (a panel, an inspector card, the theme), run `make editor-capture` on `main`
   and on the branch (`ARGS="--select <entity>"` to open its inspector) and show both
   in the PR description, the way `docs/testing.md` § Editor captures says. Never
-  leave a PNG on the branch that merges. (#731; #725 did it by hand.)
+  leave a PNG on the branch that merges.
 - `make gates` (foreground, split as *The container* says) before readying.
 - Never fall back to `cargo test`: CI runs nextest, and its per-test process
   isolation and the `gpu` test group are what the gate measures.
-- Rebase onto the latest `origin/main` before readying, once, last (*The
-  container*).
 - Don't run `cargo mutants` locally; ask for a scoped run (above).
 - **A refactor that claims no behaviour change proves it by comparison**:
   capture the output before (a scene dump, a bake, a capture, a test's printed
@@ -170,13 +152,10 @@ Beyond what changed, why, the effect and the decisions:
 - Open a **draft** PR on the first commit. Title carries `(#N)`. Body: what
   changed / why / effect / decisions, `Closes #N` (one line per issue), and it ends
   with `🤖 Generated with [Claude Code](https://claude.com/claude-code)`.
-- **A PR that leaves its issue open writes `Refs #N`, never `Closes #N`.** GitHub
-  closes on the keyword whatever the prose around it says: on 2026-10-04 PR #777
-  explained that #769 "stays open until one is chosen" and still closed it on
-  merge. The match ignores formatting, so never write the keyword next to a number
-  you don't mean to close, even quoted or in backticks: the retro PR that added this
-  rule closed #769 a second time by quoting it. The merge path now refuses a keyword that is not alone on
-  its line (#966), so write `Closes #N` on a line of its own.
+- **A PR that leaves its issue open writes `Refs #N`**, and never puts a closing
+  keyword next to a number it doesn't mean to close, even quoted or in backticks
+  (CLAUDE.md, *The closing-keyword trap*). The merge path refuses a keyword not
+  alone on its line (#966), so write `Closes #N` on a line of its own.
 - Commit messages end with a `Co-Authored-By:` line naming the model you run
   as, e.g. `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>` (a Sonnet
   coder names Sonnet; the brief's `Model:` line says which, *Which model*).

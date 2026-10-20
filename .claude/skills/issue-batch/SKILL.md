@@ -5,664 +5,213 @@ description: Run a set of issues from board to merged — how many branches at o
 
 # Working a batch of issues
 
-The user rarely has one issue. They write plenty of them and then ask for them in
-batches, leaving how many and in what order to you. This is how a set of them gets
-worked without the batch costing more than the work.
+The user writes many issues and asks for them in batches, leaving how many and in
+what order to you. CLAUDE.md already holds the rules a batch runs on (the limits
+per kind of agent, one worktree per branch, stage labels, branch names, draft on
+the first commit, ≈3 attempts then hand back); `ci-merge` holds the merge queue.
+This skill is how the orchestrator runs a batch on top of them.
 
-## Coding scales with separation; merging stays one at a time
+## What runs together: file collision, not count
 
-Coding parallelises. **Merging does not** — rusty is one compiled crate, so merges
-are serialized, and the queue is the bottleneck.
+Merging is serialized, so every branch behind another pays a rebase per merge
+ahead of it. Over separate files that is seconds of `git`; over shared code it is
+a session of conflict resolution. **Before starting a branch, ask whether it edits
+the same types as one in flight.** Spread across modules (physics, UI,
+navigation, audio, CI) at once; within one module, run one branch at a time.
 
-Every branch that is not first pays a rebase for each merge ahead of it. Over
-shared code that is **N(N−1)/2 colliding rebases**: two branches cost one, three
-cost three, four cost six. A rebase buys no correctness. Over separate files the
-same rebases are seconds of `git` each, so the count barely matters there.
+The files every feature appends to, where two branches at once is the case to
+avoid:
 
-So the number of branches in flight is set by **how separate their files are**
-(next section), then by the kind of agent writing them (CLAUDE.md, *Coding
-parallelises*):
+- `src/components/entity/mod.rs` (the live struct and its serde mirror) and
+  `src/components/entity/repr.rs`'s imports;
+- `src/scene/authoring/components.rs` (`ComponentKind`) and
+  `src/scene/authoring/dependency.rs` (`set_default`, `has_kind`, `clear_one`:
+  two component branches together push these past clippy's 50-line cap; split
+  by group, never trim);
+- `src/api/mod.rs`, `src/scripting/callbacks.rs`,
+  `src/editor/inspector/components/add/`;
+- `src/app/registry.rs`'s `build()`, where order *is* execution order, so a merge
+  that reorders it changes behaviour silently;
+- `docs/api/index.md`, `docs/api/Scene.md`'s component list,
+  `docs/api-faithfulness.md`;
+- `Cargo.toml` / `Cargo.lock`: one owner per wave. Name the owner in every
+  sibling's brief ("stay out of `Cargo.toml`"); the watch holds a second one
+  anyway (#969).
 
-- **Cloud coders ≈10.** Paced by token spend and by how many diffs one
-  orchestrator can read, not by hardware. The 2026-10-02 batch ran six to eight
-  over one serialized queue, limited by file collisions, GitHub runners and the
-  usage limit, not by this machine.
-- **Local coders ≤2.** The queue merges one PR per CI run, so a third local coder
-  finishes nothing sooner; it only competes for this machine's cores and disk.
-- **Read-only agents: no limit.** Research, review and planning build nothing.
+**Split by responsibility, not by parallelism.** Sub-issues that all touch the
+same type are one branch: a first-class component's four axes are one change the
+completeness gate won't accept in pieces. Sub-issues are for work separable *in
+the code*, not merely listable.
 
-The minimum shape is still **one in the merge queue, one being written**: nothing
-idles through a CI run.
+## Where a branch runs
 
-**The merge queue is `make queue ARGS=--watch`** (the `ci-merge` skill has the
-detail): started once, in the background, it takes each ready pull request the
-moment it carries the **`queue` label** (#925: the orchestrator's go-ahead,
-added after reading the diff), the one conflicting with the fewest others in line first, then
-by label priority (#753), and rebases, pushes, waits for CI
-on the new head, asks `make mergeable` and squash-merges, one at a time — so the
-session running the batch is not the one sitting through each run, nor the one
-noticing each label go on (#664). A **hand-back** (conflict, red, no
-run) **skips that pull request and the watch carries on** with the rest (#751),
-printing `queue: HANDED BACK #N: …` as it happens; a fix pushed to the branch
-re-queues it. It exits on the machine failing, its deadline, or when nothing is
-left, with status 1 if anything was handed back and 3 if the machine or GitHub
-failed. **Run the watch as a background command writing to a log, and put a
-`Monitor` on `tail -F <log> | grep --line-buffered 'HANDED BACK'`**, never the
-watch itself under the `Monitor`: a `Monitor` dies at 30 minutes and kills its
-command, and the watch runs 70 (MatthewLacerda2/scorsese#845). Only one watch runs
-at a time: a second refuses to start, naming the first's PID, with status 4
-(#928, a lock on `.git/merge-queue.lock`). Without the `Monitor` the watch's exit still
-wakes you. The watch also prints a
-line per pull-request transition (`watch: #N opened as a draft`, `turned
-ready`, `back to draft`, `closed`, `queued`, `unqueued`; #909), so that one log (widen
-the `grep` to `watch:` lines when you want them) is the orchestrator's whole view: no
-separate pull-request poller; `--since <batch start>` keeps those lines to the
-batch's own pull requests (#928). Start it with `--for 70` (#697; `ci-merge` has why 70, and when to
-trade it for a longer per-PR `--deadline`; the watch refuses a pair past two hours). The watch ends itself first, between
-pull requests, with `watch ended: deadline reached …` — relaunch it
-as it was, nothing to read: its last line is always `watch: resume: <command>`, the exact command to run. It never resolves a conflict: a hand-back naming paths goes back to the
-branch's author. `make queue PRS="a b c"` still takes named pull requests in the
-order given (a hand-back there skips the entry and the rest carry on), and
-`ARGS=--dry-run` shows what either would do and writes nothing.
+**Cloud by default** (#924). Lavapipe runs the GPU tests in the container (#826),
+so only the machine-bound work stays local: a real GPU (Metal, performance, driver
+races), the display, the speakers, the operator's files or keys, or a
+measurement. Once the local-only proof is in the PR, the rest of the branch can go
+to the cloud. Local builds: check `free -g` and `df -h` first, and give each heavy
+build half the cores (`CARGO_BUILD_JOBS`) when another may overlap it. Never run
+`cargo mutants` locally during a batch. A local coder gets the same `Brief` and
+`cloud-brief.md`, and puts its issue number in every scratch filename: siblings
+share the scratchpad.
 
-## The real limit is file collision, not count
+**Launching a cloud coder.** A one-off routine via `RemoteTrigger` (the `schedule`
+skill has the body shape):
 
-Two branches adding a variant to `ComponentKind` cost more than four branches in
-genuinely separate areas. A clean rebase is seconds of `git`; a colliding one is
-a whole session.
+- **Environment: `anthropic_cloud`**, never a `bridge` one (`archlinux:…` is this
+  machine). That choice is what makes it remote. Not the `Agent` tool's
+  `isolation: "remote"`, which fell back to a local worktree here (#504).
+- `run_once_at` computed, never typed: `date -u -d '+2 min' +%Y-%m-%dT%H:%M:00Z`
+  (`-v+2M` on macOS). The API refuses a time already past.
+- **The model** from the brief's `Model:` line (*Which model*), never the
+  example body's default.
+- **`allowed_tools`** includes `ToolSearch`; the GitHub MCP tools load through it
+  without being listed.
 
-**Before starting a second branch, ask: does it edit the same types as the
-first?** A branch in `src/navigation/`, one in `src/render/postfx/` and one in CI
-config barely touch each other. Two branches both adding a first-class component
-will collide every time.
-
-The files where everything collides are the ones every feature appends to:
-
-- `src/components/entity/mod.rs` — the `Option<…Component>` fields, twice over (the
-  live struct and its serde mirror).
-- `src/scene/authoring/components.rs` — the `ComponentKind` variant list (`ALL`
-  is generated from it, so keeping both sides' variants is the whole resolution).
-- `src/api/mod.rs` — the `pub mod` list, the namespace roll-call in the crate doc,
-  and the registration body.
-- `src/app/registry.rs`'s `build()` — where order *is* the per-frame execution
-  order, so a merge that reorders it changes behaviour silently.
-- `src/editor/inspector/components/add/` — the Add Component menu.
-- `src/scene/authoring/dependency.rs` — `set_default`, `has_kind`, `clear_one`:
-  dispatchers that gain one arm per component and cross clippy's 50-line cap when
-  two component branches land together (#699 + #703 on 2026-10-02). Split such a
-  dispatcher by group (UI kinds behind `set_default_ui`), never trim it line by line.
-- `src/components/entity/repr.rs` imports and `docs/api/Scene.md`'s component
-  list — both sides add one line at the same spot every time.
-- `docs/api/index.md` — the namespace list and the lifecycle callbacks, and a
-  hard gate parses it. The namespace tables are one file each since #569, so two
-  branches documenting different namespaces no longer collide.
-- `docs/api-faithfulness.md` — the setter catalog.
-- `src/scripting/callbacks.rs` — the one lifecycle-callback list.
-- `coverage-baseline.txt`, where two branches each *removing* lines is a
-  conflict nobody expects.
-
-Two branches landing in any of those at once is the case to avoid.
-
-**`Cargo.toml` and `Cargo.lock` get one owner per wave.** Every dependency change
-rewrites the lockfile, and a lockfile conflict always needs a compile to trust, so
-it goes back to a coder, never a quick hand-fix. On 2026-10-04 the graphics-stack
-upgrade (#333, PR #767) was handed back three times. A lockfile change merged just
-before each rebase landed (mlua, then rapier, then #744's inspector rows), and each
-rebase was a full cold build. While a broad dependency branch is in flight or being
-rebased, name it the owner in every sibling's brief ("stay out of `Cargo.toml`"),
-and hold other lockfile-touching branches in draft until it merges. The next wave
-followed the rule, and the glam upgrade (#775) landed first time. **The watch holds
-it too** (#969): of two open pull requests (drafts included) editing either file,
-the younger is not taken until the older merges or closes (`watch: LOCKFILE #a
-owns Cargo.lock; #b waits …`, once); Dependabot is exempt.
-
-## Group the work before splitting it
-
-**Split by responsibility, not by parallelism.** If a parent's sub-issues all
-touch the same type, they are **one branch**, not one each.
-
-Splitting an issue so several agents can run at once optimises the half that was
-never scarce, and manufactures collisions: a new first-class component's four
-axes — the `Entity` field, the Add Component entry, the inspector card, the API
-namespace and its doc row — are one coherent change that the completeness gate
-will not accept in pieces anyway. Four sub-issues there is four rebases, four CI
-cycles and one gate failing four times.
-
-Sub-issues are for work that is genuinely separable *in the code* — not for work
-that is merely listable.
-
-## Each branch gets its own worktree
-
-One checkout per branch under `.claude/worktrees/` (gitignored), never two
-branches taking turns in one. A shared checkout mixes another issue's edits into
-the gate run and thrashes `target/`.
-
-**Never set `CARGO_TARGET_DIR`.** Cargo keys artifacts by package, version,
-features and profile — never by source path — so worktrees pointed at one target
-directory overwrite each other's output and produce a false *green*: gates
-reported on code that was never compiled, which is exactly the claim a **ready**
-pull request makes. Cargo's default is already right, so the rule is to stop
-overriding it. `make target-dir` holds it: `make gates` refuses to run when cargo
-builds outside the worktree it runs in.
-
-**Cores and memory bound the builds now, not disk.** The limits, measured on the
-operator's 8-core / 15 GB machine on 2026-09-30 (#497 has the raw numbers; on a
-different machine, re-measure rather than trust them):
-
-- **Two local coders at most, and at most two heavy builds at once.** A heavy
-  build is a cold build of a fresh `target/` or a `make gates` run; an incremental
-  rebuild after an edit (seconds, about 1 GB) is not one. A third heavy build fits
-  in memory but buys nothing: one cold build already fills 8 cores, so two side by
-  side take exactly as long as the same two back to back. The second slot exists
-  so an agent is not queued behind another's build, not for throughput.
-- **Give each heavy build half the cores** (`CARGO_BUILD_JOBS=4` on 8 cores)
-  whenever another may overlap it. Two capped builds finished as fast as two
-  uncapped ones and peaked about 2 GB lower. A build alone runs uncapped.
-- **Check before a heavy build**, on the machine you are on, today: `free -g`
-  shows about 5 GB available (one build adds about 3 GB, the rest is margin), and
-  `df -h` about 10 GB free. A built worktree is ~2.5–4.5 GB, no longer 12–16.
-  Running out of disk still shows up as `No space left on device` at the link
-  step — the tell-tale ENOSPC.
-- **A local session that touches Rust also runs rust-analyzer** (the
-  `rust-analyzer-lsp` plugin, #488): about 4 GB resident once it has analysed the
-  crate (measured 2026-10-02: ~1 min to load, ~1 min to analyse). Count it against
-  the cap above: three such sessions are ~12 GB of language servers before anything
-  compiles, so on a 15 GB machine the practical limit is two local agents. Coding
-  goes to cloud sessions, which bring their own memory.
-
-`docs/testing.md` has the arithmetic.
-
-**Reclaim the moment a branch merges** — `rm -rf .claude/worktrees/<dir>/target`
-and remove the worktree. Disposal is what keeps disk from becoming the overnight
-failure.
-`make reclaim` does it for every merged or closed branch at once, refuses any
-worktree with uncommitted or unpushed work, and reports free disk; run it at each
-wave (`ARGS=--dry-run` to look first) (#913). It only reclaims worktrees under
-`.claude/worktrees/`; a linked worktree anywhere else prints as `OUTSIDE: <path>`
-with its `target/` size, for you to move or remove by hand (#982).
-
-## Cloud sessions are the default coders, not extra merges
-
-The build limits above are this machine's cores and memory, not the workflow's. A **cloud
-session** brings its own CPU, memory and disk, so it lifts the cap on how many
-branches can be *written* at once. It does nothing for merging — that queue is
-still one CI run at a time, here. **A branch is written in the cloud by default**
-(#924); local is the exception that needs a reason.
-
-**Where a branch runs:**
-
-- **Local:** the batch's own session; every merge; any branch that needs **the
-  machine**: a **real** GPU (Metal-specific behaviour, performance, driver races,
-  anything a software driver can't stand in for), the display, the speakers, the
-  operator's files or keys, or a measurement. At most two at a time.
-- **Cloud:** everything else. Ordinary render/screenshot/probe-bake tests run in a
-  cloud container on Mesa's lavapipe, which its SessionStart hook installs (#826),
-  exactly as Linux CI does (#489). The collision list above still decides which
-  cloud branches run together; cloud removes the build-slot limit, not the rebase
-  cost.
-
-**How many:** as many as there are branches in **genuinely separate files**, up to
-about ten cloud coders (scorsese runs the same way). Each one behind
-another still pays a rebase per merge ahead of it, and the queue drains about one
-pull request per 10–15 minutes (one CI run each, seen 2026-09-30), so five
-finishing together leave the last waiting about an hour. That wait is cheap when
-their files are separate and the coders have more to do; it is the collisions, not
-the count, that turn a queue into a session of conflict resolution. Merging stays
-one at a time however many are written.
-
-**Launching one — and proving it is one.** Not with the `Agent` tool's
-`isolation: "remote"`: in a local session that silently falls back to a local
-worktree (seen 2026-09-30). What works is a **one-off cloud routine** — the
-`RemoteTrigger` tool (the `schedule` skill has the body shape) with `run_once_at` a
-minute or two out, the repository as its source, and the short fixed prompt below
-(the brief itself is an issue comment, #910).
-Compute that time, never type it: `date -u -v+2M +%Y-%m-%dT%H:%M:00Z` on macOS
-(`date -u -d '+2 min' …` on Linux). On 2026-10-05 a hand-typed time fired 45
-minutes late, and the API refuses a time already past.
-Set two fields **on purpose**, never from the example body:
-
-- **The model.** The `schedule` skill's example body defaults to a smaller model,
-  so a routine copied from it runs the coder on that. Name the model the brief's
-  `Model:` line chose (*Which model*), never the example's.
-- **`allowed_tools`** must leave room for `ToolSearch` and the GitHub MCP tools
-  the brief uses (`issue_read`, `create_pull_request`, `update_pull_request`,
-  `add_issue_comment`, `actions_run_trigger`); a coder without them cannot read
-  its brief or report.
-
-Two traps decide whether it is really remote:
-
-- **Pick the `anthropic_cloud` environment, never a `bridge` one.** The environment
-  list includes a *bridge* to the operator's own machine (`archlinux:…`); a routine
-  on it runs **here**. This is the likely cause of past "cloud" sessions that ran
-  locally.
-- The brief's **first instruction**: run `echo "$CLAUDE_CODE_REMOTE"; pwd` (the
-  variable `.claude/hooks/session-start.sh` keys on). If it is not `true`, or the
-  path is the operator's home, **stop before touching anything** and report that
-  the session is local.
-
-Then check from here: `list_runs` / `get_run_log` on the routine show the session's
-first tool result (`CLAUDE_CODE_REMOTE=true`, a `/home/user/…` path), and no new
-worktree under `.claude/worktrees/` or local `cargo`/`rustc` process appeared for
-that branch. The cloud session has GitHub MCP tools (`create_pull_request`,
-`add_issue_comment`), so it can open and update its own pull request.
-
-**The pull request is the report.** A cloud session cannot message this one back.
-Brief it to open a draft on its first commit, push often (a dead container takes
-its uncommitted work with it), write decisions and hand-backs into the description
-and an issue comment, and mark the PR ready when its gates are green, then end.
-Its job stops there (#823): no check-in, no waiting on CI, no push to a ready
-branch. Watch the PR, not the agent.
-
-**Ready means finished.** The batch merges a ready PR the moment its gates are
-green, so a PR must never be readied just to make CI run. On 2026-09-30 #520's session
-readied its PR to get Windows CI on a temporary 200-round test loop, and it merged with
-the loop still in (#559 reverted it). For a proof run on a draft, dispatch the
-workflow on the branch instead (`windows.yml` for Windows, a non-gating signal since
-#741): `gh workflow run ci.yml --ref <branch>` runs
-the gates (`build-test`, `build-test-cross` on macOS, `deny`, `ci-gate`) and nothing else,
-without readying anything. Mutation and coverage are not in `ci.yml` any more (#750):
-a branch that adds mechanism asks for a scoped mutation run instead
-(`make mutants-remote SCOPE=diff`, or a `mutants-on-request.yml` dispatch).
-Never dispatch `mutants-sweep.yml` for a branch: that is the full sweep, five
-runners for most of a day taken from every other PR's gates (#705).
-
-**A cloud session is never woken by its own background work.** A routine session
-that starts a build in the background and ends its turn to wait sits idle forever —
-#485's first session did exactly that for an hour, gates half-run, PR still a draft.
-Brief every cloud session to run builds and gates in the **foreground** (long
-timeouts, split across calls), and never to wait on CI: it readies and ends, and
-the queue does the waiting. From here, a finished routine with its PR still a
-draft and no hand-back reason in the description is the stall's signature; the
-fix is a fresh routine briefed to finish the pushed branch.
-
-**The container's disk is finite too:** before #483 folded `tests/` into one binary,
-the dev-feature test pass filled it. (`cargo deny`'s proxy trap needs no brief
-line any more: the repo's `.cargo/config.toml` fetches with the system git, #572.)
-
-**What it costs,** so it is chosen on purpose: every cloud session cold-builds the
-whole dependency tree, with no local compile cache to help. Have it run the full
-gate list before readying — it has the room for both feature sets, which a crowded
-local machine may not.
-
-## Running a mixed batch: one orchestrator, cloud coders, a local slot
-
-This is the shape that ran the 2026-09-30 batch (≈40 pull requests merged in one
-day). Each role does what only it can do.
-
-**The orchestrator (this session, local)** writes no feature code. It picks work,
-briefs cloud coders, reviews and merges. It **starts `make queue
-ARGS="--watch --no-check --for 70 --since <batch start>"` in the background** (from a worktree under
-`.claude/worktrees/`), relaunches it unchanged (its `watch: resume:` line) each time it exits on its
-deadline (`watch ended: deadline reached`, #697: the first overnight watch was
-killed at the two-hour background cap mid-CI-wait) or, after updating that
-worktree to `origin/main`, on `relaunch:` (status 5: the queue's own code
-changed on `main`, #967), and is otherwise woken only
-by a `HANDED BACK` line (a `Monitor` tailing the watch's log, see above) or when
-the watch exits — never a
-per-PR polling loop or a chain of `make queue PRS=N` runs (#664: the 2026-09-30
-batch spent about 69 queue invocations and dozens of hand-built watchers on
-that, and one chain was cancelled by mistake). Its loop per pull request:
-
-1. **Read the description and the diff, then add the `queue` label** (#925).
-   The watch takes nothing without it, so this read never races the merge: a
-   coder readies its own PR the moment its gates are green, and a green gate
-   does not read code. Check the decisions against the issue, and note any
-   human-only checks (a window, speakers) as a checklist; don't hold for them.
-   When the PR does work the engine does itself (engine mechanism, the API, a
-   stored format, determinism, CI or the merge path, a refactor), an
-   **independent review** comes first: invoke the `independent-review` skill,
-   and label only once its `Independent review` comment is on the PR.
-   What the read turns up goes back to the coder unlabelled; removing the label
-   pulls a PR out of line. Dependabot's cargo bumps arrive labelled; its GitHub
-   Actions bumps never do (they are held anyway, #825).
-   If the coder dispatched a scoped mutation run, read its report when it
-   finishes (`ci-merge`, *Triaging a survivor*); launch a follow-up routine only
-   for survivors in code the branch wrote (#823).
-2. **The watch does** rebase → check → push → wait → merge; don't hand-roll
-   that loop. The queue rebases in a throwaway worktree, runs
-   `cargo check --locked --all-targets` with `dev` and `--no-default-features`
-   plus the size gate on the rebased tree **before** pushing (#571), and hands
-   the branch back — unpushed — on a conflict or a failed check. A clean
-   textual rebase still breaks when a merge ahead changed a signature: on #538,
-   #542 had removed a `Renderer::render` argument that #538's new tests still
-   passed, and CI caught it ten minutes later; a rebase of #563 onto #558 and
-   #564 pushed a file to 308/300 lines. It then waits for the runs on the
-   rebased head and merges only on `make mergeable`'s verdict, which reads a
-   cancelled run beside its still-running replacement as "wait", not red
-   (#562). The local check is a heavy build on a cold target, so it takes a
-   build slot like any other. Run it from a worktree under `.claude/worktrees/`,
-   never the scratchpad (a tmpfs a cold build fills, #580).
-   **`ARGS=--no-check` drops that build**: the rebase is pushed and CI is the
-   only judge. With every coder in the cloud, that makes the batch's whole local
-   footprint `git` plus `gh` (CLAUDE.md, *The lightest batch*), so use it whenever
-   the machine is shared or busy. What it gives up is catching a semantic break
-   before the push. That cost three breaks in the 126-PR batch of 2026-09-30, each
-   a CI round instead of a three-minute check, and each still handed back unmerged.
-   **The watch exits at once when no pull request is open at all**, which is the
-   state right after a wave of coders launches and before their first drafts
-   exist. Start it once a draft is up (or poll for the first ready one yourself).
-   The watch's own transition lines (#909) are the whole of watching the
-   coders: no second `gh pr list` poller, no per-PR `until` loops.
-3. A hand-back is the queue's whole report, and the watch keeps going without
-   it (#751): fix a conflict or a failed check on the branch (or brief its
-   coder to) while the other ready pull requests merge. The handed-back head is
-   passed over until it moves, so nobody re-takes an unfixed branch; once its
-   fix is pushed the running watch takes it again on its own (`make queue
-   PRS=N` takes it regardless). A one-line semantic
-   break (a field a merge ahead added) is quickest fixed here — but with
-   `--no-check` nothing compiles your resolution before CI does, so **grep every
-   use of anything either side moved or renamed, and check the 300-line file and
-   50-line function caps**, before pushing. On 2026-10-02 a hand-resolved #700
-   kept a variable #699 still used, and only a later CI round caught it. A
-   resolution that needs a compile to trust (a file split, a dispatcher over the
-   cap, two systems' order, a `Cargo.lock`) goes to a cloud routine instead: a
-   fresh one briefed to rebase or fix the pushed branch — a new `Brief` comment
-   on the issue naming the paths and what merged, pointing at the PR's
-   description (its *Seam* and decisions) for the design, with "force-push
-   authorised". Coders never push to a ready branch on their own (#823), so a
-   push the queue did not make is one you briefed.
-4. After merging: remove the worktree and its `target/`, re-read the board, and
-   start the next piece of work.
-
-**Cloud coders write the branches.** Pick an issue for the cloud when it needs no
-real GPU and **no in-flight branch works in the same module**. Run one branch per
-module at a time: tonight physics went #445 → #521 → #446 → #447, and UI went
-#417 → #418 → #419 → #420, each started when the previous one merged. Parallelism
-comes from spreading across modules (physics, UI, navigation, audio, scripting,
-CI) at once, not from stacking work in one.
-
-**The local slot takes what only this machine can do:** measurements that decide
-something (#487, #492, #497, #552 each put a before/after table in their pull
-request), fixes that need its real GPU (#518's driver race), and the
-orchestrator's own compile checks. Don't let the orchestrator compile while a
-local agent is timing builds; it skews the numbers. **Once the local-only proof is in
-the PR, the rest can go to the cloud.** On 2026-10-05 #834's Metal bench numbers were
-in PR #865 when disk ran short (8 GB in its worktree, 7.7 GB free). A cloud routine
-did the rebase, gates and ready, and the local worktree was deleted.
-
-**The brief is a comment on the issue, the prompt only points at it** (#910).
-`RemoteTrigger` echoes a prompt back about three times (create, then each read
-of the routine), so every line in it is paid for three times in the
-orchestrator's context: on 2026-10-05/06 the per-issue part alone came to
-roughly 4–5k tokens per launch, ~150k over the batch. So the issue-specific part
-goes on the issue as a comment whose first line is `Brief`, where it is also
-durable — a relaunch, a rebase routine or a later reader finds the decisions
-next to the issue body. The standing rules (foreground builds, ending at ready,
-the repo's rules, the PR's *Gates* and *Seam* sections, "do not merge") live in
-[`cloud-brief.md`](cloud-brief.md), versioned with this skill (#568); a change
-to them goes in that file, once. The comment:
+**The brief is a comment on the issue** (#910), first line `Brief`. The prompt is
+echoed back about three times by `RemoteTrigger`, so it stays a fixed pointer, and
+the comment is durable for a relaunch or a later reader. Standing rules for every
+coder live in [`cloud-brief.md`](cloud-brief.md); change them there, once.
 
 ```text
 Brief
 
 Branch: `N-short-slug`.
-Builds on: <what merged that it must build on, as "PR #N, Seam" where that
-PR wrote one; line numbers in issues go stale within hours>.
+Builds on: <what merged that it must build on, as "PR #N, Seam">.
 Siblings in flight: <branch/issue → the files it edits; stay out of them>.
 Decisions: <anything already settled, or "none">.
 Model: <Opus or Sonnet, by *Which model*>.
 ```
 
-The routine prompt is then the same few lines for every coder:
+Add to it when it applies: a shared file a merge left near the 300-line cap, the
+`Cargo.lock` owner. The routine prompt:
 
 ```text
-STEP 0 — before anything else, prove you are a cloud session. Run
-`echo "CLAUDE_CODE_REMOTE=$CLAUDE_CODE_REMOTE"; pwd; uname -a`. If it is not
-exactly `true`, or the path is under the operator's home, STOP: touch nothing,
-end with "LOCAL — aborted" and that output.
-
-Then read `.claude/skills/issue-batch/cloud-brief.md` and follow it.
+Read `.claude/skills/issue-batch/cloud-brief.md` and follow it.
 Issue(s): #N. Your brief is the newest comment on it that starts with `Brief`.
 ```
 
-A re-brief (a rebase request, a new sibling to avoid) is a new `Brief` comment
-and a fresh routine, never an edit to an old prompt. No helper script fills
-either: `RemoteTrigger` is a tool the orchestrator calls, not an API a script
-can reach, and five slots don't need one.
+A re-brief (a rebase, a fix, a new sibling) is a new `Brief` comment and a fresh
+routine, with "force-push authorised" when it works a pushed branch.
 
-### What the orchestrator keeps, and where
+**The pull request is the report.** A cloud coder cannot message back; it opens a
+draft, pushes often, readies when its gates are green and ends. Watch the PR, not
+the agent. A finished routine whose PR is still a draft with no reason in the
+description stalled; read its run log (`get_run_log`) and brief a fresh one to
+finish the pushed branch.
 
-Lessons scorsese's batches paid for (MatthewLacerda2/scorsese, 2026-10-02/03);
-they hold for any repo running this workflow.
+## The orchestrator's loop
 
-- **GitHub is the batch's state.** Open PRs, their draft/ready state and
-  comments, plus `RemoteTrigger list` for the routines, are enough to resume a
-  batch from nothing. The orchestrator's own notes (a routine table, which coder
-  holds which issue) are conveniences. Never keep anything **only** in `/tmp`:
-  the scratchpad lives there, and a reboot wipes it. A machine crash mid-batch
-  on scorsese took its queue list and routine table with it, and the batch
-  resumed from GitHub alone.
-- **Warn of a near-full file in the next brief.** When a merge leaves a file that
-  siblings share within a few lines of the 300-line cap, say so in the next
-  `Brief` of every sibling that touches it; two branches each adding a few lines
-  pass alone and fail together (#699/#703; MatthewLacerda2/scorsese#1046).
-- **Read the run log before calling a routine stalled.** `get_run_log` shows
-  what it is doing; idle with a pending background task is waiting, not stalled.
-- **A retro reads each cloud coder's run log**, not only its PR description: the
-  time sinks (a build killed at the ten-minute tool limit, a gate run three
-  times) show only there, and that is how scorsese found the lessons now in
-  `cloud-brief.md`, *The container*.
-- **Never wait on another process by `pgrep -f <text>`.** The waiting shell's
-  own command line contains the text, so it waits on itself forever (about 25
-  minutes lost on 2026-10-02). Wait on a PID you hold, or on the watch's own
-  exit. With one `make queue ARGS=--watch` there is nothing to chain: it takes
-  every ready PR, and the order lives on GitHub, not in a list.
-- **Never stop the watch by pattern.** Other repos on this machine run the same
-  command line (`merge-queue.py --watch`): on 2026-10-05 a `pkill -f` meant for
-  rusty's watch killed scorsese's too. Find rusty's by its working directory
-  (`lsof -a -p <pid> -d cwd` = the queue worktree) and kill that PID.
-- **Watch each PR's head commit, not only its draft/ready state.** A rebased PR
-  stays *ready* the whole time, so a watcher keyed on state never sees the push.
-  The queue's watch keys on the head for exactly this reason; your own reading
-  of a re-pushed PR still waits for the coder's PR comment ("rebased, gates
-  green"). If a push should *not* be retaken yet, remove its `queue` label
-  first: the watch takes only labelled PRs (#925).
+The orchestrator (this session, local) writes no feature code. It picks work,
+briefs coders, reads diffs and labels. GitHub is the batch's state: open PRs,
+their comments and `RemoteTrigger list` resume a batch from nothing, so nothing
+lives only in the scratchpad.
 
-## Starting
+**Start the watch once a draft exists** (it exits at once when no PR is open):
+`make queue ARGS="--watch --no-check --for 70 --since <batch start>"`, in the
+background from a worktree under `.claude/worktrees/`, writing to a log. Put a
+`Monitor` on `tail -F <log> | grep --line-buffered 'HANDED BACK'`, never on the
+watch itself (a `Monitor` dies at 30 minutes and takes its command with it). On a
+deadline exit, run its `watch: resume:` line; on `relaunch:` (status 5), update
+the worktree to `origin/main` first. The log's `watch:` lines are the whole view
+of the coders: no second poller. Wait on and stop the watch by its PID, never by
+pattern: `pgrep -f` matches its own shell, `pkill -f` kills scorsese's watch too.
+`ci-merge` has everything else about the queue.
 
-- Run `make blockers ARGS=--fix` once at the start of a batch: it records every
-  "Blocked by #N" an issue body states but GitHub never recorded (#624).
-- Read `make board` beside it (#971; it also runs weekly into `board.yml`'s run
-  summary): branches with commits and no PR, merged branches still standing,
-  off-convention names, assignments with no branch or PR, issues with no type
-  label. Close out what it names before the batch adds to it.
-- Assign the user the moment work begins — unassigned means fair game.
-- **Unassign** if it turns out the issue was never started.
-- Branch `{issue_number}-short-slug` off the latest `main`; an issue-less pull
-  request uses a readable slug.
-- Open a **draft** pull request on the first commit — that is the standing rule,
-  not something to be asked for. Draft is how work survives a session that ends
-  badly; the issue is the durable context, and a hand-back comment may never get
-  written.
+Per pull request:
 
-## Re-read the board after every merge
+1. **Read the description and the diff, then add the `queue` label** (#925).
+   Check its decisions against the issue. Engine mechanism, a stored format,
+   determinism, CI or the merge path, or a refactor gets the
+   `independent-review` skill first. What the read turns up goes back to the
+   coder unlabelled; removing the label pulls a PR out of line. File its
+   "follow-up" notes as issues now. If it dispatched a scoped mutation run, read
+   the report when it lands (`ci-merge`, *Triaging a survivor*).
+2. **A hand-back** skips that PR and the watch carries on. A one-line fix is
+   yours: under `--no-check` nothing compiles it before CI, so grep every use of
+   what either side moved and check the 300-line and 50-line caps first. A
+   resolution that needs a compile to trust (a split, a dispatcher, system
+   order, `Cargo.lock`) goes to a fresh routine.
+3. **After a merge:** `make reclaim` (removes merged worktrees, refuses unpushed
+   work), then re-read the board.
 
-A merge changes the graph. Whatever the merged issue blocked is fair game the
-moment it lands — so the decision is one merge wide, not one batch wide.
+## Starting, and re-reading the board
 
-**Re-read the whole board, not your list of it.** Coders file what they find
-(seven issues mid-batch on 2026-10-02, two of them red-main and a test race), and
-the operator files from other machines. A batch that only tracks the issues it
-started stops early and misreports what is left. That happened once on
-2026-10-02: the operator had to point out the board was not done. Count what is
-left from `gh issue list`, never from memory.
+At the start: `make blockers ARGS=--fix` (records prose-only blockers) and
+`make board` (stray branches, stale assignments, unlabelled issues); close out
+what it names. Unassign an issue that turns out never started.
 
-But re-reading is not a licence to start everything: **start the next one, and
-keep the second slot for whatever is furthest along.** The label order decides
-which one that is. An unblocked issue left unstarted is not wasted capacity; it is
-a rebase not yet paid for.
-
-**Dependabot pull requests** (`.github/dependabot.yml`, monthly, one grouped PR per
-ecosystem) have no issue, which is allowed for maintenance. A batch merges them like
-any other ready pull request, through the same serialized queue, at the **lowest
-priority** — after every labelled issue in flight. Dependabot rebases its own
-branch when `main` moves and cancels its own runs as it does, so a bot pull
-request often reads *not mergeable* between rebases; `make queue` never
-force-pushes one — it asks `@dependabot rebase` and waits for the new head. A
-GitHub Actions bump (it edits `.github/workflows/`) is the exception: the watch
-holds it with a `HELD` line, and it merges only after you dispatch the
-workflows it touches (`ci-merge` has the steps, #825).
-
-**A stage label is the only absolute stop.** `planning` and `human` mean *not
-yet*, and no amount of the issue looking ready overrides that. Everything else is
-startable the moment it exists, including an issue filed a minute ago. An issue
-filed mid-batch can outrank the work in flight: when a new label-priority leader
-appears, it is the one started next.
-
-## Briefing a subagent
-
-Point it at `CLAUDE.md` first, then the issue — issues here are written to be
-read cold. Beyond that:
-
-- Name the **base commit** and what has landed recently that it must respect.
-- Name the **siblings** and which files they are touching.
-- Tell it to invoke the **`ci-merge` skill** rather than restating that protocol.
-- For a **cloud** session: launched as a one-off routine on the `anthropic_cloud`
-  environment, the `CLAUDE_CODE_REMOTE` self-check comes first, and the pull request
-  is its only way to report (see above).
-- Tell it **not** to merge — merging is serialized and belongs to the session
-  running the batch.
-- Tell it not to start a heavy build while two siblings are already compiling,
-  to give it half the cores (`CARGO_BUILD_JOBS`) while one is,
-  and not to run `cargo mutants` locally at all during a batch: when the branch
-  adds mechanism, it asks for a scoped run on GitHub's runners instead
-  (`make mutants-remote SCOPE=diff`; nothing runs mutation per pull request, #750).
-- **Scratch filenames must carry the issue number.** The scratchpad is shared
-  between sibling agents, and a collision swaps one pull request's description
-  for another's.
+**After every merge, re-read the whole board**, not your list of it: coders and
+the operator file mid-batch, and what the merge unblocked is startable now. Count
+what is left from `gh issue list`, never from memory. A new label-priority leader
+is started next. Dependabot PRs merge through the same queue at the lowest
+priority (`ci-merge` has the Actions-bump hold).
 
 ## Which model
 
 The model follows the shape of the task, not the area of the code (operator,
 2026-10-19). **Sonnet when the issue already says exactly what to do and a gate
-proves it was done; Opus when the work has to decide something.** Cloud coders are
-paced by token spend, so the mechanical work goes to Sonnet and leaves the Opus
-budget for what needs it.
+proves it was done; Opus when the work has to decide something.**
 
-- **Sonnet:** a rebase whose conflicts are mechanical (two rows added to one
-  table, a file that moved); a doc fix the docrefs check proves (#973); splitting
-  a file over the size cap or regrouping a directory into subfolders; a lint rule
-  whose issue already names the case it must flag and the case it must pass; the
-  editor's UI and egui panels, cards and inspectors (much text, little judgement,
-  and the editor never ships in a game).
-- **Opus:** everything else, and in particular: tests; read-only agents (research,
-  review, planning); the renderer and shaders, determinism, physics and
-  navigation; the merge-queue scripts; anything touching the five kinds, the API
-  surface or a stored format; a red `main`; a rebase whose conflict is in code
-  (a shader, a signature); writing issues and reviewing coders' diffs, which is
-  the orchestrator's work.
+- **Sonnet:** a mechanical rebase (two rows in one table, a moved file); a doc
+  fix the docrefs check proves; splitting an oversized file or regrouping a
+  directory; a lint rule whose issue names the case to flag and the case to pass;
+  the editor's egui panels, cards and inspectors.
+- **Opus:** everything else, in particular tests; read-only agents; the renderer
+  and shaders, determinism, physics and navigation; the merge-queue scripts; the
+  five kinds, the API surface or a stored format; a red `main`; a conflict in
+  code; writing issues and reviewing diffs.
 
-When the line is not crisp, err upwards. **One issue, one agent, one model:** do
-not scout with one model and implement with another, because the second starts
-cold and pays again for everything the first read (the prompt cache is per
-model). The exception is work split into several independent pieces, where each
-piece is its own agent anyway and takes the model its own shape calls for.
+When the line is not crisp, err upwards. **One issue, one agent, one model**: a
+second model starts cold and pays again for everything the first read. Work split
+into independent pieces takes each piece's own model.
 
-## When to hand back to the user
+## Hand-backs and human checks
 
-- ≈3 attempts at the same failure.
-- A decision that is genuinely theirs: a change to the five kinds, a departure
-  from what the issue decided, anything a `planning` label would have carried.
-  A call the issue simply did not foresee is **not** one of these when Unity has
-  an answer: take Unity's (CLAUDE.md, *When in doubt, Unity's way*), name it in
-  the PR, and carry on.
-- **Save, ask, move on.** Push what exists (a dead session takes uncommitted work
-  with it), mark the pull request **draft**, write what is needed and why in the
-  description and an issue comment, then **take the next startable work**. The
-  branch stops, never the batch (operator, 2026-10-02: "the work is saved but the
-  progress doesn't stop"). Do not thrash on the stopped branch.
+**Save, ask, move on.** On ≈3 attempts or a decision that is genuinely the
+user's (the five kinds, a departure from the issue): push, mark the PR draft,
+write the reason in the description and an issue comment, and take the next
+startable work. The branch stops, never the batch. A call the issue did not
+foresee is not the user's when Unity has an answer.
 
-When working unattended, prefer leaving a comment on the issue and continuing
-over stalling the night on a question. Questions asked *while planning* are asked
-right away.
+**A human check is never a merge hold.** A real window, speakers, taste: the
+check goes under the PR's *For a human* heading and the PR merges when green;
+`make checks` gathers them for the report. If it turns out broken, that is a bug
+to file. The same for a judgement the issue left open: take the default, write it
+down, keep going.
 
-**A human check is never a merge hold.** Some proof only a person can give: a real
-window, real speakers, taste. When a green pull request carries such a check, merge
-it anyway: the checklist sits under the PR description's *For a human* heading,
-and `make checks` gathers it into the batch report for the user to run later. If it turns out broken, that is a bug to file and fix, not
-a reason the batch waited. The same goes for a judgement call the issue left open:
-take the default the issue, CLAUDE.md or Unity points to, write down what you
-chose and why, and keep going. The batch exists so the user does not have to be
-here. (On 2026-09-30, holding three PRs for a smoke test and an ear check stalled
-the queue for hours; every one was fine.)
+## Learning from the batch
 
-## Learn from the batch: every lesson ends as a change
+A batch finds the traps in the tooling faster than anything else, and a lesson
+that only reaches the chat is lost. Each one ends **fixed** (a PR removes the
+cause), **enforced** (a gate), **documented** (here, `ci-merge` or CLAUDE.md, for
+what the repo can't change) or **tracked** (an issue with the evidence). A lesson
+that blocks the running batch, or bites twice, is infrastructure: fix it now.
+Prefer fixing and enforcing to documenting; a line added here is a line every
+batch pays to read. A lesson goes in as the rule, not its story, and before
+adding one, take out what tooling or a better model has made unnecessary.
 
-A batch is trial by fire: it finds the traps, gaps and bugs in the tooling and in
-the engine faster than anything else. A lesson that only reaches the chat is lost,
-because the next session starts without it. So every lesson ends as exactly one of:
+At the end, before reporting: list every trap, surprise and hand-back (your
+notes, each PR's *Decisions*, the issues coders filed, their run logs), map each
+to one of the four, and add a *Context update* comment to the unstarted issues
+whose ground moved (never changing a `planning` issue's scope).
 
-- **fixed**: a pull request that removes the cause;
-- **enforced**: a lint, gate or test that makes it impossible to repeat;
-- **documented**: this skill, `ci-merge` or CLAUDE.md, for what the
-  repo can't change (a platform behaviour, a procedure);
-- **tracked**: an issue with the evidence (run ids, PR numbers, measurements) and a
-  proposed fix, never just the symptom.
+## Finishing and reporting
 
-**Mid-batch, fix what blocks or bites twice.** When a lesson costs the running batch
-time, such as a tooling bug that stalls the queue or a brief that makes every agent
-re-solve the same trap, fix it now. It is infrastructure, so it outranks whatever
-was next. A skill or doc edit is Markdown-only and merges without queuing. On
-2026-09-30, for example: #515 (red gates on cancelled runs), #555 (merges waiting
-on the mutation signal), and #519, #561 and #566 (skill fixes landed within the
-hour the lesson appeared).
+The batch is done when the main checkout runs what merged, once nothing is
+compiling:
 
-**Otherwise, file it and keep going.** The strongest issues come from doing the
-work. File an agent's "follow-up, not in this PR" notes and a PR's "decisions to
-check" the moment you read them, not at the end.
+1. `make reclaim` for what is left. Delete a local branch only when
+   `gh pr view N --json state` says `MERGED` (`git branch --merged` cannot see a
+   squash) or it has no commits beyond `main`; other unmerged work is the user's
+   to delete.
+2. `git pull --ff-only` on `main`.
+3. `cargo build --bin session-mcp --features dev` in the main checkout, so local
+   MCP clients drive the new engine (`docs/mcp.md`); a connected client keeps the
+   old process until it reconnects.
 
-**At the end, run a retro before reporting back:**
-
-1. List every trap, gap, surprise, workaround and hand-back from the batch: your
-   own notes, each PR's *Decisions* and *Not exercised* sections, the issues the
-   agents filed.
-2. Map each one to fixed, enforced, documented or tracked. Anything unmapped gets
-   an issue now.
-3. **Refresh the unstarted issues whose ground moved.** A batch invalidates line
-   references and assumptions fast, so add a short *Context update* comment to the
-   issues next in line: what merged that they build on, and what to rebase over.
-   Re-scope or close any that the batch made moot. Never touch a `planning`
-   issue's scope.
-4. Put the mapping in the report, so the user sees each lesson turned into a change
-   rather than only described.
-
-## Finishing a batch
-
-The batch is not done when the last branch merges — it is done when the main
-checkout runs what was merged. Last, once nothing is compiling:
-
-1. **Clean up what is finished.** `make queue`'s summary lists what it merged and
-   deliberately removes nothing. Remove the worktree and delete the local branch
-   of every pull request that is `MERGED` — ask `gh pr view N --json state`, never
-   its exit code, which is 0 for an open one too. `git branch --merged` cannot see
-   a squash merge, so it is not the test. A branch with **no commits beyond
-   `main`** (`git rev-list --count origin/main..BRANCH` is 0) goes too, once its
-   worktree has nothing uncommitted and no agent is still standing in it. Anything
-   else stays: unmerged work is only ever deleted by the user.
-2. **Bring the main checkout up to date** — `git pull --ff-only` on `main`.
-3. **Rebuild the MCP bridge, and launch nothing.** A local client is pointed at
-   `target/debug/session-mcp` (`docs/mcp.md`), so until
-   `cargo build --bin session-mcp --features dev` runs in the main checkout, every
-   session drives the old engine. Never beside a sibling's build. A client already
-   connected keeps the old process until it reconnects; say so in the report.
-
-## Reporting back
-
-**The report opens with `make checks SINCE=<the batch's start>`** (an ISO time,
-or an age like `12h`): every unticked *For a human* item from the PRs merged
-since then, grouped by PR, and the open issues labelled both `planning` and
-`human` (#929). Paste its Markdown as the report's first section; the user acts
-on it without opening a dozen PRs.
-
-The user is not reading the transcript of a batch. They take long — often hours,
-usually overnight — and the transcript is, if anything, notes for Claude itself.
-
-**When things go well, say what the result was.** When things did not go as one
-would expect, say what the surprise was. That does not necessarily mean things
-went badly: we write it down because the more we can predict, the better we
-improve.
-
-Two things still interrupt, because they are the ones the user would want to
-overrule and overruling is only possible while the batch is still running: **a
-change to the user's own files** outside the repo, and **a decision reversed** —
-where the issue said one thing and the branch did another.
+**The report opens with `make checks SINCE=<batch start>`**: the unticked human
+checks and the `planning`+`human` issues. Then the result, what surprised you
+(not only what went wrong), and the lessons mapped to their changes. Two things
+are raised even mid-batch, while they can still be overruled: a change to the
+user's files outside the repo, and a decision reversed from what the issue said.
