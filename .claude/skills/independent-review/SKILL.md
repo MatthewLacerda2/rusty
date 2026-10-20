@@ -71,17 +71,21 @@ And on demand: when the user asks for a PR to be reviewed, open or merged
 
 ### Level
 
-`code-review` takes an effort level. It follows what a miss would cost, not the
-size of the diff:
+`code-review` takes an effort level; rusty uses only **`medium`** and **`high`**
+(operator, 2026-10-19). **The reviewer picks it, not the dispatcher:** it reads
+`gh pr diff` first and sees what the PR really touches, where the dispatcher
+only knows what the brief meant it to touch. The rule it applies follows what a
+miss would cost, not the size of the diff:
 
-- **`high`**: a stored format (scene, prefab, save, asset cache), determinism,
-  the scripting sandbox (what a script may reach), or the merge path. A miss
-  there is a broken save, a desynced harness, an escape from the sandbox, or a
-  queue that merges the wrong thing for every PR behind it.
-- **`medium`**: every other trigger.
+- **`high`** when the diff touches a stored format (scene, prefab, save, asset
+  cache), determinism, the scripting sandbox (what a script may reach), or the
+  merge path. A miss there is a broken save, a desynced harness, an escape from
+  the sandbox, or a queue that merges the wrong thing for every PR behind it.
+- **`medium`** for everything else.
 
-Always name the level in the prompt: called without one, `code-review` reuses
-whatever level was typed last in the session.
+The rule goes into the prompt whole, and the reviewer names the level it chose
+and why at the top of its answer. Called without one, `code-review` reuses
+whatever level was typed last in the session, so a level is always passed.
 
 ### Prompt template
 
@@ -91,8 +95,11 @@ Review PR #<n> of MatthewLacerda2/rusty. It closes issue #<i>: read it with
 Read the root CLAUDE.md and any CLAUDE.md in a directory the PR touches first:
 they hold the conventions the code must follow.
 
-Run the `code-review` skill on PR #<n> (pass the PR number in its arguments)
-at `<level>`, without `--comment` and without `--fix`. Called without it, the
+First read `gh pr diff <n>` and pick the effort level: `high` if the diff
+touches a stored format (scene, prefab, save, asset cache), determinism, the
+scripting sandbox (what a script may reach) or the merge path; `medium`
+otherwise. Then run the `code-review` skill on PR #<n> (pass the PR number in
+its arguments) at that level, without `--comment` and without `--fix`. Called without it, the
 skill reviews the checkout's own local diff, which is not this PR: if what it
 reviewed is not `gh pr diff <n>`, discard its findings and review that diff
 yourself. The checkout is not on the PR's branch; read its files with
@@ -101,7 +108,8 @@ commits, pushes or comments, and no builds.
 
 Look especially for: <the steering lists for the PR's nature, pasted whole>.
 
-Answer with one entry per finding: path and symbol, the defect in one sentence,
+Start your answer with the level you chose and why, in one line. Then answer
+with one entry per finding: path and symbol, the defect in one sentence,
 a concrete failure scenario (inputs or state → wrong result or crash), and
 whether it must be fixed before merge. Verify each one against the code before
 reporting it. An empty list is a valid answer.
@@ -166,7 +174,7 @@ links the fix.
 - Pasting the `Brief` or a summary "to save it time"; it then reviews the
   summary, not the code.
 - Letting the reviewer push its own fixes. It reports; the coder fixes.
-- Leaving the level out of the prompt, or running every PR at `high`.
+- Picking the level for the reviewer, or leaving the rule out of the prompt.
 - Letting `code-review` run without the PR number: it then reviews the
   checkout's local diff, some other change entirely.
 - Labelling `queue` before the `Independent review` comment exists.
