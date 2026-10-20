@@ -6,7 +6,7 @@ use glam::{Vec2, Vec3, Vec4};
 use rusty::components::{
     CanvasComponent, ImageComponent, MaterialAsset, MaterialComponent, RectTransformComponent,
 };
-use rusty::scene::{DirtyFlag, MeshComponent, Scene};
+use rusty::scene::{MeshComponent, Scene};
 
 /// An empty scene with no ambient light.
 pub fn dark_scene() -> Scene {
@@ -21,18 +21,7 @@ pub fn emissive_box(scene: &mut Scene, name: &str, pos: Vec3, size: Vec3, emissi
     let (vertices, indices) =
         rusty::components::mesh::primitives::generate_box(size.x, size.y, size.z);
     scene.world.transform_mut(id).expect("transform").position = pos;
-    let mesh = MeshComponent {
-        primitive_type: "Box".to_string(),
-        asset_ref: None,
-        vertices,
-        indices,
-        bind_palette: Vec::new(),
-        skin: None,
-        clips: Vec::new(),
-        pose_palette: Vec::new(),
-        skeleton: Default::default(),
-        is_dirty: DirtyFlag::new(true),
-    };
+    let mesh = MeshComponent::new("Box", vertices, indices);
     scene.world.set_mesh(id, Some(mesh));
     let material = Some(MaterialComponent {
         material: name.to_string(),

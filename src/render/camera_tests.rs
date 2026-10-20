@@ -6,18 +6,13 @@ use glam::Vec3;
 
 fn cam_component(order: i32, mask: u32, flags: ClearFlags) -> CameraComponent {
     CameraComponent {
-        active: true,
         fov: 60.0,
         near: 0.2,
         far: 500.0,
         culling_mask: mask,
         render_order: order,
         clear_flags: flags,
-        motion_blur_active: false,
-        motion_blur_samples: 0,
-        fxaa_active: true,
-        projection: Default::default(),
-        target_texture: None,
+        ..CameraComponent::default()
     }
 }
 

@@ -97,6 +97,28 @@ pub struct MeshComponent {
 }
 
 impl MeshComponent {
+    /// A static mesh: `primitive_type` (see the field) over this geometry, with no
+    /// asset reference, skin or clips, and flagged dirty so the renderer uploads it.
+    /// Set the skinned and asset fields on top with `..MeshComponent::new(…)`.
+    pub fn new(
+        primitive_type: impl Into<String>,
+        vertices: Vec<Vertex>,
+        indices: Vec<u32>,
+    ) -> Self {
+        Self {
+            primitive_type: primitive_type.into(),
+            asset_ref: None,
+            vertices,
+            indices,
+            bind_palette: Vec::new(),
+            skin: None,
+            clips: Vec::new(),
+            pose_palette: Vec::new(),
+            skeleton: BoneBinding::default(),
+            is_dirty: DirtyFlag::new(true),
+        }
+    }
+
     /// The bone palette the renderer should upload: the live posed palette when an
     /// animation is driving the skeleton, otherwise the static bind pose.
     pub fn active_palette(&self) -> &[glam::Mat4] {

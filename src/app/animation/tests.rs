@@ -192,16 +192,11 @@ fn named_clip(name: &str, end: f32) -> AnimationClip {
 /// A mesh carrying two clips of different lengths (the geometry is irrelevant).
 fn two_clip_mesh() -> MeshComponent {
     MeshComponent {
-        primitive_type: "Asset".to_string(),
         asset_ref: Some("model.glb::Rig".to_string()),
-        vertices: Vec::new(),
-        indices: Vec::new(),
-        bind_palette: Vec::new(),
         skin: Some(chain_skin()),
         clips: vec![named_clip("Short", 0.75), named_clip("Long", 2.5)],
-        pose_palette: Vec::new(),
-        skeleton: Default::default(),
         is_dirty: Default::default(),
+        ..MeshComponent::new("Asset", Vec::new(), Vec::new())
     }
 }
 

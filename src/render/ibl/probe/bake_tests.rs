@@ -17,18 +17,7 @@ const RES: u32 = 32;
 
 fn box_mesh() -> MeshComponent {
     let (vertices, indices) = crate::components::mesh::primitives::generate_box(1.0, 1.0, 1.0);
-    MeshComponent {
-        primitive_type: "Box".to_string(),
-        asset_ref: None,
-        vertices,
-        indices,
-        bind_palette: Vec::new(),
-        skin: None,
-        clips: Vec::new(),
-        pose_palette: Vec::new(),
-        skeleton: Default::default(),
-        is_dirty: crate::scene::DirtyFlag::new(true),
-    }
+    MeshComponent::new("Box", vertices, indices)
 }
 
 /// A bright emissive static box at `pos`, scaled `scale`, glowing `emissive`.

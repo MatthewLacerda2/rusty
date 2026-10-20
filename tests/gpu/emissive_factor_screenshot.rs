@@ -14,29 +14,18 @@
 use crate::gpu::mean_brightness;
 use crate::temp::file as tmp;
 use glam::Vec3;
-use rusty::components::{MaterialAsset, MaterialComponent, Tonemap};
+use rusty::components::{MaterialAsset, MaterialComponent};
 use rusty::dev::screenshot::capture;
 use rusty::scene::Camera;
 use rusty::scene::{MeshComponent, Scene, VisualCorrectionComponent};
 
 fn vc(bloom: bool) -> VisualCorrectionComponent {
     VisualCorrectionComponent {
-        active: true,
         bloom_active: bloom,
-        bloom_intensity: 1.0,
         bloom_threshold: 0.6,
-        exposure: 0.0,
-        contrast: 1.0,
-        saturation: 1.0,
         ssr_active: false,
-        ssr_quality: "High".to_string(),
         ssr_temporal_upsampling: false,
-        tonemap: Tonemap::Aces,
-        gamma: 1.0,
-        shadows: Default::default(),
-        ssao: Default::default(),
-        custom_effects: Vec::new(),
-        post_params: Default::default(),
+        ..rusty::scene::authoring::default_visual_correction()
     }
 }
 
@@ -48,21 +37,9 @@ fn scene(emissive: [f32; 3], bloom: bool) -> Scene {
 
     let id = scene.add_entity("Box".to_string());
     let (vertices, indices) = rusty::components::mesh::primitives::generate_box(8.0, 8.0, 8.0);
-    scene.world.set_mesh(
-        id,
-        Some(MeshComponent {
-            primitive_type: "Box".to_string(),
-            asset_ref: None,
-            vertices,
-            indices,
-            bind_palette: Vec::new(),
-            skin: None,
-            clips: Vec::new(),
-            pose_palette: Vec::new(),
-            skeleton: Default::default(),
-            is_dirty: rusty::scene::DirtyFlag::new(true),
-        }),
-    );
+    scene
+        .world
+        .set_mesh(id, Some(MeshComponent::new("Box", vertices, indices)));
     scene.world.set_material(
         id,
         Some(MaterialComponent {

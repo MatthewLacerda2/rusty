@@ -11,7 +11,7 @@
 
 use crate::gpu::mean;
 use glam::{Quat, Vec3};
-use rusty::components::{LightComponent, LightMode, LightType};
+use rusty::components::{LightComponent, LightType};
 use rusty::dev::lightmap_bake::bake_scene_lightmaps;
 use rusty::dev::screenshot::capture;
 use rusty::scene::authoring::{primitive_mesh_component, Primitive};
@@ -54,13 +54,11 @@ fn scene(ambient: f32) -> Scene {
         spot,
         Some(LightComponent {
             light_type: LightType::Spotlight,
-            color: Vec3::ONE,
             intensity: 40.0,
             range: 20.0,
             inner_cone: 15.0,
             outer_cone: 20.0,
-            cast_shadows: false,
-            mode: LightMode::Mixed,
+            ..rusty::scene::authoring::default_light()
         }),
     );
     let mut t = scene.world.transform_mut(spot).unwrap();

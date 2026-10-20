@@ -5,7 +5,7 @@
 //! determinism contract holds.
 
 use proptest::prelude::*;
-use rusty::scene::{LightComponent, LightType, Scene};
+use rusty::scene::{LightComponent, Scene};
 
 /// One generated entity: a name, a position, and an optional Light component
 /// carrying a generated intensity. Kept small and finite (bounded coords/intensity)
@@ -56,15 +56,9 @@ proptest! {
                 scene.world.set_light(
                     id,
                     Some(LightComponent {
-                        light_type: LightType::Point,
-                        color: glam::Vec3::ONE,
-                        intensity,
-                        range: 10.0,
-                        inner_cone: 30.0,
-                        outer_cone: 45.0,
-                        cast_shadows: false,
-                        mode: Default::default(),
-                    }),
+intensity,
+..rusty::scene::authoring::default_light()
+}),
                 );
             }
         }

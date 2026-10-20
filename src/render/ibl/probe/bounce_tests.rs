@@ -57,18 +57,7 @@ fn pass_converged_thresholds_on_epsilon() {
 
 fn box_mesh() -> crate::scene::MeshComponent {
     let (vertices, indices) = crate::components::mesh::primitives::generate_box(1.0, 1.0, 1.0);
-    crate::scene::MeshComponent {
-        primitive_type: "Box".to_string(),
-        asset_ref: None,
-        vertices,
-        indices,
-        bind_palette: Vec::new(),
-        skin: None,
-        clips: Vec::new(),
-        pose_palette: Vec::new(),
-        skeleton: Default::default(),
-        is_dirty: crate::scene::DirtyFlag::new(true),
-    }
+    crate::scene::MeshComponent::new("Box", vertices, indices)
 }
 
 /// A static box at `pos` (scale `scale`) with the given base colour and emissive.

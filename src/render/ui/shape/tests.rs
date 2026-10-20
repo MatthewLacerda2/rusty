@@ -30,7 +30,7 @@ fn hud(entries: &[(Option<ShapeComponent>, Option<ImageComponent>)]) -> Vec<Canv
             pivot: Vec2::ZERO,
             anchored_position: Vec2::new(i as f32 * 120.0, 0.0),
             size_delta: Vec2::new(100.0, 50.0),
-            world_anchor: None,
+            ..RectTransformComponent::default()
         };
         scene.world.set_rect_transform(id, Some(rt));
         scene.world.set_shape(id, shape.clone());

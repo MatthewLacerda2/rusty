@@ -11,7 +11,7 @@ use glam::Vec3;
 use rusty::components::{MaterialAsset, MaterialComponent};
 use rusty::dev::screenshot::capture;
 use rusty::scene::authoring::defaults::default_visual_correction;
-use rusty::scene::{Camera, DirtyFlag, MeshComponent, Scene};
+use rusty::scene::{Camera, MeshComponent, Scene};
 
 /// A unit box scaled to `size` at `pos`, lit only by its own `emissive` term.
 /// Sized by its transform: box meshes are cached by primitive name, not by size.
@@ -21,18 +21,7 @@ fn emissive_box(scene: &mut Scene, name: &str, pos: Vec3, size: Vec3, emissive: 
     let mut t = scene.world.transform_mut(id).unwrap();
     (t.position, t.scale) = (pos, size);
     drop(t);
-    let mesh = MeshComponent {
-        primitive_type: "Box".to_string(),
-        asset_ref: None,
-        vertices,
-        indices,
-        bind_palette: Vec::new(),
-        skin: None,
-        clips: Vec::new(),
-        pose_palette: Vec::new(),
-        skeleton: Default::default(),
-        is_dirty: DirtyFlag::new(true),
-    };
+    let mesh = MeshComponent::new("Box", vertices, indices);
     scene.world.set_mesh(id, Some(mesh));
     let material = MaterialComponent {
         material: name.to_string(),

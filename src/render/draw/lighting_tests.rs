@@ -1,8 +1,6 @@
 //! Which lights the realtime path uploads, by mode (#809): a frame drops `Baked`
 //! lights, a bake capture drops `Realtime` ones.
 
-use glam::Vec3;
-
 use super::{apply_scene_lights, default_lighting_uniform};
 use crate::components::{LightComponent, LightMode, LightType};
 use crate::render::clusters::local_lights;
@@ -16,13 +14,11 @@ fn one_per_mode(light_type: LightType) -> Scene {
         let id = scene.add_entity(mode.name().to_string());
         let light = LightComponent {
             light_type: light_type.clone(),
-            color: Vec3::ONE,
             intensity: (k + 1) as f32,
-            range: 10.0,
             inner_cone: 20.0,
             outer_cone: 30.0,
-            cast_shadows: false,
             mode,
+            ..crate::scene::authoring::default_light()
         };
         scene.world.set_light(id, Some(light));
     }

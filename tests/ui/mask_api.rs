@@ -77,6 +77,7 @@ fn masks_and_backdrops_survive_save_and_load() {
         show_mask_graphic: false,
     };
     scene.world.set_mask(id, Some(mask.clone()));
+    // lint: allow(full-literal) every field off its default is what the round-trip checks
     let glass = BackdropFilterComponent {
         blur_radius: 30.0,
         tint: Vec4::new(0.1, 0.2, 0.3, 0.4),

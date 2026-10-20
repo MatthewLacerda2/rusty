@@ -33,7 +33,7 @@ pub fn element(scene: &mut Scene, parent: u32, rect: [f32; 4], color: Vec4) -> u
         pivot: Vec2::ZERO,
         anchored_position: Vec2::new(rect[0], rect[1]),
         size_delta: Vec2::new(rect[2], rect[3]),
-        world_anchor: None,
+        ..RectTransformComponent::default()
     };
     scene.world.set_rect_transform(id, Some(rt));
     let image = ImageComponent {

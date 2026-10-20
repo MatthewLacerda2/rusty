@@ -154,13 +154,11 @@ mod tests {
             id,
             Some(LightComponent {
                 light_type: LightType::Directional,
-                color: Vec3::ONE,
                 intensity: 5.0,
                 range: 0.0,
                 inner_cone: 0.0,
                 outer_cone: 0.0,
-                cast_shadows: false,
-                mode: Default::default(),
+                ..crate::scene::authoring::default_light()
             }),
         );
         scene.probes.add_probe(Vec3::ZERO);

@@ -55,21 +55,13 @@ pub fn set_material(c: &mut ColliderComponent, material: PhysicsMaterial) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::components::ColliderComponent;
+
     use crate::scene::Scene;
-    use glam::Vec3;
 
     fn scene_with_collider() -> (Scene, u32) {
         let mut scene = Scene::new();
         let id = scene.add_entity("Box".to_string());
-        let c = ColliderComponent {
-            active: true,
-            shape: ColliderShape::Box { size: Vec3::ONE },
-            is_trigger: false,
-            material: PhysicsMaterial::default(),
-            aabb_min: Vec3::ZERO,
-            aabb_max: Vec3::ZERO,
-        };
+        let c = crate::scene::authoring::default_collider();
         scene.world.set_collider(id, Some(c));
         (scene, id)
     }

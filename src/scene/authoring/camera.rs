@@ -148,18 +148,9 @@ mod tests {
         let mut scene = Scene::new();
         let id = scene.add_entity("Cam".to_string());
         let c = CameraComponent {
-            active: true,
             fov: 60.0,
-            near: 0.1,
             far: 1000.0,
-            culling_mask: u32::MAX,
-            render_order: 0,
-            clear_flags: ClearFlags::Skybox,
-            motion_blur_active: false,
-            motion_blur_samples: 0,
-            fxaa_active: true,
-            projection: Default::default(),
-            target_texture: None,
+            ..CameraComponent::default()
         };
         scene.world.set_camera(id, Some(c));
         (scene, id)

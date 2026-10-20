@@ -4,7 +4,7 @@
 
 use glam::Vec3;
 
-use crate::components::{LightComponent, LightMode, LightType, MaterialAsset};
+use crate::components::{LightComponent, LightMode, MaterialAsset};
 use crate::scene::authoring::{primitive_mesh_component, Primitive};
 use crate::scene::lighting::sh::Sh9;
 use crate::scene::{MaterialComponent, Scene};
@@ -43,14 +43,12 @@ fn floor_scene(mode: Option<LightMode>) -> Scene {
         let lamp = scene.add_entity("Lamp".into());
         scene.world.transform_mut(lamp).unwrap().position = Vec3::new(0.0, 3.0, 0.0);
         let light = LightComponent {
-            light_type: LightType::Point,
-            color: Vec3::ONE,
             intensity: 4.0,
             range: 20.0,
             inner_cone: 0.0,
             outer_cone: 0.0,
-            cast_shadows: false,
             mode,
+            ..crate::scene::authoring::default_light()
         };
         scene.world.set_light(lamp, Some(light));
     }

@@ -11,10 +11,10 @@
 
 use crate::temp::file as tmp;
 use glam::Vec3;
-use rusty::components::{CameraComponent, ClearFlags};
+use rusty::components::CameraComponent;
 use rusty::dev::screenshot::capture;
 use rusty::scene::Camera;
-use rusty::scene::{DirtyFlag, MeshComponent, Scene};
+use rusty::scene::{MeshComponent, Scene};
 
 /// A lit box plus a camera carrying the FXAA knob. No `VisualCorrection` volume at
 /// all, which is itself part of the point: FXAA is read off the camera, so it must
@@ -24,36 +24,16 @@ fn scene_with_fxaa(on: bool) -> Scene {
     scene.ambient_intensity = 1.0;
     let id = scene.add_entity("Box".to_string());
     let (vertices, indices) = rusty::components::mesh::primitives::generate_box(2.0, 2.0, 2.0);
-    scene.world.set_mesh(
-        id,
-        Some(MeshComponent {
-            primitive_type: "Box".to_string(),
-            asset_ref: None,
-            vertices,
-            indices,
-            bind_palette: Vec::new(),
-            skin: None,
-            clips: Vec::new(),
-            pose_palette: Vec::new(),
-            skeleton: Default::default(),
-            is_dirty: DirtyFlag::new(true),
-        }),
-    );
+    scene
+        .world
+        .set_mesh(id, Some(MeshComponent::new("Box", vertices, indices)));
     scene.world.set_camera(
         id,
         Some(CameraComponent {
-            active: true,
             fov: 60.0,
-            near: 0.1,
             far: 100.0,
-            culling_mask: u32::MAX,
-            render_order: 0,
-            clear_flags: ClearFlags::Skybox,
-            motion_blur_active: false,
-            motion_blur_samples: 0,
             fxaa_active: on,
-            projection: Default::default(),
-            target_texture: None,
+            ..CameraComponent::default()
         }),
     );
     scene
