@@ -9,6 +9,8 @@ is GitHub's failure, not the branch's, so [`waiting.wait_for`] re-runs those run
 (`gh run rerun --failed`, [`rerun_step`]) and keeps waiting inside the same
 `--deadline`; only a second cancellation hands back, as [`outcomes.RUNNERS`]. A red with
 any job `failure` besides a gate is the code's, and hands back at once as ever.
+A red whose jobs do not yet show the gate concluded is neither: it waits
+([`verdict.runners.unread`], #1109).
 """
 
 from __future__ import annotations
@@ -98,6 +100,13 @@ def progress(
     stalled = runners.outage(pull, runs, jobs)
     if stalled:
         return rerun_step(stalled, rerun or {}, sha[:7])
+    unread = runners.unread(pull, runs, jobs)
+    if unread:
+        workflow, run = unread[0]
+        return outcomes.WAIT, [
+            f"a `{workflow}` run for {sha[:7]} is listed failed, but {runlist.lag(run, jobs, workflow)}.",
+            "Whether the runners or the code reddened it is not known until the gate shows (#1109). Waiting.",
+        ]
     states = [
         decide.assess(pull, w, runlist.runs_for(runs, sha, w), jobs) for w in runlist.WORKFLOWS
     ]
