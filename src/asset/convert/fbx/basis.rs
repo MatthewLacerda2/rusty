@@ -7,7 +7,7 @@
 //! glTF exporter does: a point becomes `C·p`, a transform `C·M·C⁻¹`, and every
 //! world transform comes out in glTF's axes with the meshes upright in their own.
 
-use glam::{DMat3, DMat4, DVec3};
+use glam::{DMat3, DMat4, DQuat, DVec3};
 
 /// The rotation (or, for a left-handed file, reflection) taking file axes to
 /// glTF's.
@@ -43,6 +43,25 @@ impl Basis {
             .transform_vector3(DVec3::new(v.x, v.y, v.z))
             .as_vec3()
             .to_array()
+    }
+
+    /// A rotation in glTF's axes: `C·R·C⁻¹`, a proper rotation even when `C`
+    /// mirrors.
+    pub fn rotation(&self, q: ufbx::Quat) -> [f32; 4] {
+        let r = DMat3::from_quat(DQuat::from_xyzw(q.x, q.y, q.z, q.w));
+        let c = DMat3::from_mat4(self.c);
+        DQuat::from_mat3(&(c * r * c.transpose()))
+            .normalize()
+            .as_quat()
+            .to_array()
+    }
+
+    /// A scale in glTF's axes: the diagonal of `C·S·C⁻¹`, its components
+    /// permuted with their signs kept.
+    pub fn scale(&self, s: ufbx::Vec3) -> [f32; 3] {
+        let c = DMat3::from_mat4(self.c);
+        let m = c * DMat3::from_diagonal(DVec3::new(s.x, s.y, s.z)) * c.transpose();
+        [m.x_axis.x, m.y_axis.y, m.z_axis.z].map(|v| v as f32)
     }
 
     /// A transform in glTF's axes.
@@ -115,6 +134,29 @@ mod tests {
         ] {
             assert_eq!(Basis::new(&a).matrix(DMat4::IDENTITY), DMat4::IDENTITY);
         }
+    }
+
+    #[test]
+    fn z_up_keys_agree_with_the_conjugated_matrix() {
+        let basis = Basis::new(&axes(A::PositiveX, A::PositiveZ, A::NegativeY));
+        let q = DQuat::from_rotation_z(0.7) * DQuat::from_rotation_x(0.3);
+        let s = DVec3::new(1.0, 2.0, 3.0);
+        let fbx_q = ufbx::Quat {
+            x: q.x,
+            y: q.y,
+            z: q.z,
+            w: q.w,
+        };
+        let fbx_s = ufbx::Vec3 {
+            x: s.x,
+            y: s.y,
+            z: s.z,
+        };
+        let m = basis.matrix(DMat4::from_scale_rotation_translation(s, q, DVec3::ZERO));
+        let (scale, rotation, _) = m.to_scale_rotation_translation();
+        assert!(glam::Vec3::from(basis.scale(fbx_s)).abs_diff_eq(scale.as_vec3(), 1e-5));
+        let keyed = glam::Quat::from_array(basis.rotation(fbx_q));
+        assert!(keyed.dot(rotation.as_quat()).abs() > 1.0 - 1e-5);
     }
 
     #[test]

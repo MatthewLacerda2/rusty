@@ -2,7 +2,7 @@
 //!
 //! A converter that reads its source itself (FBX through `ufbx`) fills a
 //! [`Document`] and [`write()`] turns it into one binary glTF: geometry, base-colour
-//! materials, the node hierarchy and skins. Only what the engine's glTF importer
+//! materials, the node hierarchy, skins and animations. Only what the engine's glTF importer
 //! reads back is here, so the round trip `source → Document → .glb → ImportedAsset`
 //! loses nothing the engine uses. Output is byte-for-byte deterministic: the same
 //! document always writes the same file, so a versioned cache does not churn.
@@ -10,11 +10,14 @@
 //! A converter backed by another tool (Blender, #1072) writes its own glTF and
 //! never touches this module.
 
+mod anim;
+mod bin;
 mod write;
 
 pub use write::write;
 
-/// One glTF scene: a node forest plus the meshes, materials and skins it uses.
+/// One glTF scene: a node forest plus the meshes, materials, skins and animations
+/// it uses.
 /// Indices are positions in these vectors, exactly as glTF stores them.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Document {
@@ -24,6 +27,7 @@ pub struct Document {
     pub meshes: Vec<Mesh>,
     pub materials: Vec<Material>,
     pub skins: Vec<Skin>,
+    pub animations: Vec<Animation>,
 }
 
 /// A node: a local transform, its children and what it places.
@@ -110,6 +114,32 @@ impl Default for Material {
 pub struct Skin {
     pub joints: Vec<usize>,
     pub inverse_bind: Vec<[f32; 16]>,
+}
+
+/// One animation: named channels, each keying one path of one node, all sampled
+/// linearly (the engine's importer reads them back as one clip).
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Animation {
+    pub name: String,
+    pub channels: Vec<Channel>,
+}
+
+/// The keys of one node's translation, rotation or scale. `times` are seconds,
+/// ascending, as many as there are values.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Channel {
+    pub node: usize,
+    pub times: Vec<f32>,
+    pub keys: Keys,
+}
+
+/// A channel's values, by the path they animate.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Keys {
+    Translation(Vec<[f32; 3]>),
+    /// Unit quaternions, `[x, y, z, w]`.
+    Rotation(Vec<[f32; 4]>),
+    Scale(Vec<[f32; 3]>),
 }
 
 #[cfg(test)]

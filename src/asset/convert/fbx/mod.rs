@@ -4,9 +4,10 @@
 //! it converts the file's units to metres, bakes pivots and geometric transforms into the geometry, and fills a PBR view
 //! of every material whatever its shading model. This module turns the file's axes
 //! into glTF's (`basis`) and walks the result into a [`glb::Document`]: the node hierarchy, one glTF mesh per FBX mesh split
-//! into a primitive per material, base-colour materials, and skins. Animation
-//! stacks are not converted yet.
+//! into a primitive per material, base-colour materials, skins, and one
+//! animation per animation stack (`anim`).
 
+mod anim;
 mod basis;
 mod material;
 mod mesh;
@@ -25,20 +26,19 @@ pub fn convert(source: &Path, out: &Path) -> Result<(), ImportError> {
         space_conversion: ufbx::SpaceConversion::ModifyGeometry,
         geometry_transform_handling: ufbx::GeometryTransformHandling::ModifyGeometry,
         generate_missing_normals: true,
-        ignore_animation: true,
         ..Default::default()
     };
     let scene = ufbx::load_file(&source.to_string_lossy(), opts)
         .map_err(|e| ImportError::Parse(format!("{}: {e:?}", source.display())))?;
     let out_dir = out.parent().unwrap_or_else(|| Path::new(""));
-    let document = document(&scene, out_dir);
+    let document = document(&scene, out_dir)?;
     std::fs::write(out, glb::write(&document))
         .map_err(|e| ImportError::Parse(format!("writing {}: {e}", out.display())))
 }
 
 /// The glTF document for a loaded FBX scene. Texture URIs are made relative to
 /// `out_dir`, where the `.glb` is written.
-fn document(scene: &ufbx::Scene, out_dir: &Path) -> glb::Document {
+fn document(scene: &ufbx::Scene, out_dir: &Path) -> Result<glb::Document, ImportError> {
     let mut doc = glb::Document {
         materials: scene
             .materials
@@ -82,7 +82,8 @@ fn document(scene: &ufbx::Scene, out_dir: &Path) -> glb::Document {
             doc.nodes[index].skin = Some(doc.skins.len() - 1);
         }
     }
-    doc
+    doc.animations = anim::animations(scene, basis, &nodes)?;
+    Ok(doc)
 }
 
 /// Append `node` and its subtree, recording each FBX element id's glTF index.

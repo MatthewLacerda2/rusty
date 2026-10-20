@@ -1,23 +1,24 @@
 //! Serialise a [`Document`] as a binary glTF (`.glb`): one JSON chunk, one BIN
 //! chunk, every accessor tightly packed and 4-byte aligned (glTF 2.0 §4.4).
 
-use super::{Document, Material, Mesh, Node, Primitive, Skin};
+use super::bin::{pad, Bin};
+use super::{anim, Document, Material, Mesh, Node, Primitive, Skin};
 use serde_json::{json, Map, Value};
 
 const GLB_MAGIC: u32 = 0x4654_6C67; // "glTF"
 const CHUNK_JSON: u32 = 0x4E4F_534A;
 const CHUNK_BIN: u32 = 0x004E_4942;
-const FLOAT: u32 = 5126;
-const UNSIGNED_SHORT: u32 = 5123;
-const UNSIGNED_INT: u32 = 5125;
-const ARRAY_BUFFER: u32 = 34962;
-const ELEMENT_ARRAY_BUFFER: u32 = 34963;
 
 /// `doc` as the bytes of a `.glb` file.
 pub fn write(doc: &Document) -> Vec<u8> {
     let mut bin = Bin::default();
     let meshes: Vec<Value> = doc.meshes.iter().map(|m| mesh(m, &mut bin)).collect();
     let skins: Vec<Value> = doc.skins.iter().map(|s| skin(s, &mut bin)).collect();
+    let animations: Vec<Value> = doc
+        .animations
+        .iter()
+        .map(|a| anim::animation(a, &mut bin))
+        .collect();
     let mut images = Vec::new();
     let materials: Vec<Value> = doc
         .materials
@@ -35,6 +36,7 @@ pub fn write(doc: &Document) -> Vec<u8> {
     root.insert("nodes".into(), doc.nodes.iter().map(node).collect());
     insert_nonempty(&mut root, "meshes", meshes);
     insert_nonempty(&mut root, "skins", skins);
+    insert_nonempty(&mut root, "animations", animations);
     insert_nonempty(&mut root, "materials", materials);
     let textures: Vec<Value> = (0..images.len()).map(|i| json!({"source": i})).collect();
     insert_nonempty(&mut root, "textures", textures);
@@ -75,12 +77,6 @@ fn container(mut json: Vec<u8>, mut bin: Vec<u8>) -> Vec<u8> {
         out.extend_from_slice(&chunk);
     }
     out
-}
-
-fn pad(bytes: &mut Vec<u8>, with: u8) {
-    while !bytes.len().is_multiple_of(4) {
-        bytes.push(with);
-    }
 }
 
 fn node(node: &Node) -> Value {
@@ -139,7 +135,7 @@ fn primitive(p: &Primitive, bin: &mut Bin) -> Value {
 }
 
 fn skin(skin: &Skin, bin: &mut Bin) -> Value {
-    let matrices = bin.floats(&skin.inverse_bind, "MAT4", false);
+    let matrices = bin.data(&skin.inverse_bind, "MAT4");
     json!({"joints": skin.joints, "inverseBindMatrices": matrices})
 }
 
@@ -167,70 +163,4 @@ fn material(m: &Material, images: &mut Vec<String>) -> Value {
         out.insert("normalTexture".into(), texture(uri));
     }
     Value::Object(out)
-}
-
-/// The BIN chunk under construction, with the views and accessors into it.
-#[derive(Default)]
-struct Bin {
-    bytes: Vec<u8>,
-    views: Vec<Value>,
-    accessors: Vec<Value>,
-}
-
-impl Bin {
-    /// Append `data` as a new buffer view and return its accessor index.
-    fn push(&mut self, data: Vec<u8>, target: u32, accessor: Value) -> usize {
-        pad(&mut self.bytes, 0);
-        let mut view =
-            json!({"buffer": 0, "byteOffset": self.bytes.len(), "byteLength": data.len()});
-        if target != 0 {
-            view["target"] = json!(target);
-        }
-        self.bytes.extend_from_slice(&data);
-        let mut accessor = accessor;
-        accessor["bufferView"] = json!(self.views.len());
-        self.views.push(view);
-        self.accessors.push(accessor);
-        self.accessors.len() - 1
-    }
-
-    /// A float accessor of `N`-component elements; `bounds` adds the `min`/`max`
-    /// glTF requires on `POSITION`.
-    fn floats<const N: usize>(&mut self, items: &[[f32; N]], kind: &str, bounds: bool) -> usize {
-        let data = items
-            .iter()
-            .flatten()
-            .flat_map(|f| f.to_le_bytes())
-            .collect();
-        let mut accessor = json!({"componentType": FLOAT, "count": items.len(), "type": kind});
-        if bounds && !items.is_empty() {
-            let fold = |pick: fn(f32, f32) -> f32| {
-                (0..N)
-                    .map(|i| items.iter().map(|v| v[i]).reduce(pick).unwrap_or(0.0))
-                    .collect::<Vec<f32>>()
-            };
-            accessor["min"] = json!(fold(f32::min));
-            accessor["max"] = json!(fold(f32::max));
-        }
-        let target = if kind == "MAT4" { 0 } else { ARRAY_BUFFER };
-        self.push(data, target, accessor)
-    }
-
-    fn joints(&mut self, joints: &[[u16; 4]]) -> usize {
-        let data = joints
-            .iter()
-            .flatten()
-            .flat_map(|j| j.to_le_bytes())
-            .collect();
-        let accessor =
-            json!({"componentType": UNSIGNED_SHORT, "count": joints.len(), "type": "VEC4"});
-        self.push(data, ARRAY_BUFFER, accessor)
-    }
-
-    fn indices(&mut self, indices: &[u32]) -> usize {
-        let data = indices.iter().flat_map(|i| i.to_le_bytes()).collect();
-        let accessor =
-            json!({"componentType": UNSIGNED_INT, "count": indices.len(), "type": "SCALAR"});
-        self.push(data, ELEMENT_ARRAY_BUFFER, accessor)
-    }
 }
