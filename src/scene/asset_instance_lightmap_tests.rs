@@ -11,7 +11,7 @@ use crate::scene::Scene;
 
 /// A one-quad glTF (no `TEXCOORD_1`) in its own temp dir, with no sidecar yet.
 pub(crate) fn quad_model(dir: &str) -> String {
-    let dir = std::env::temp_dir().join(dir);
+    let dir = crate::test_temp::dir().join(dir);
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let (json, bin) = quad_mode_gltf(4, &[0, 1, 2, 0, 2, 3]);

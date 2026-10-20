@@ -119,6 +119,7 @@ mod tests {
 
     #[cfg(unix)]
     fn absent_address() -> String {
+        // lint: allow(test-temp-dir) a Unix socket path must stay short (sun_path is ~104 bytes)
         std::env::temp_dir()
             .join(format!("rusty-attach-absent-{}.sock", std::process::id()))
             .display()

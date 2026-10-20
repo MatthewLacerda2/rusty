@@ -58,6 +58,7 @@ pub(super) fn fake_engine() -> String {
     static NEXT: AtomicU32 = AtomicU32::new(0);
     let n = NEXT.fetch_add(1, Ordering::Relaxed);
     let path =
+        // lint: allow(test-temp-dir) a Unix socket path must stay short (sun_path is ~104 bytes)
         std::env::temp_dir().join(format!("rusty-attach-it-{}-{n}.sock", std::process::id()));
     let _ = std::fs::remove_file(&path);
     let listener = UnixListener::bind(&path).expect("bind fake engine");

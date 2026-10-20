@@ -5,7 +5,7 @@ use crate::asset::IMAGE_EXTENSIONS;
 
 #[test]
 fn every_listed_image_format_round_trips_through_the_decoder() {
-    let dir = std::env::temp_dir().join(format!("rusty_image_formats_{}", std::process::id()));
+    let dir = crate::test_temp::dir().join("image_formats");
     std::fs::create_dir_all(&dir).unwrap();
     let pixels = image::RgbImage::from_pixel(4, 4, image::Rgb([200, 40, 10]));
     for ext in IMAGE_EXTENSIONS {
