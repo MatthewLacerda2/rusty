@@ -52,8 +52,15 @@ pub fn is_import(message: &str) -> bool {
 }
 
 /// The report: dead even counting tests, used only by tests, and unused imports.
-pub fn render(with_tests: &BTreeSet<Warning>, without_tests: &BTreeSet<Warning>) -> String {
-    let dead = |w: &&Warning| !is_import(&w.message);
+/// `gated` says whether a finding's file is platform-gated (see [`super::platform`]):
+/// those are listed under their own heading, since the host build cannot see their use.
+pub fn render(
+    with_tests: &BTreeSet<Warning>,
+    without_tests: &BTreeSet<Warning>,
+    gated: &dyn Fn(&str) -> bool,
+) -> String {
+    let dead = |w: &&Warning| !is_import(&w.message) && !gated(&w.path);
+    let platform = |w: &&Warning| !is_import(&w.message) && gated(&w.path);
     let only_tests: BTreeSet<&Warning> = without_tests.difference(with_tests).collect();
     let mut out = String::from("dead-pub: a signal, never a gate (#1003)\n");
     let mut section = |title: &str, items: Vec<&Warning>| {
@@ -69,6 +76,14 @@ pub fn render(with_tests: &BTreeSet<Warning>, without_tests: &BTreeSet<Warning>)
     section(
         "Only tests use these (fine for a test seam; otherwise dead)",
         only_tests.iter().copied().filter(dead).collect(),
+    );
+    section(
+        "Platform-gated: check on that platform before narrowing (the host build cannot see its use)",
+        with_tests
+            .iter()
+            .chain(without_tests.difference(with_tests))
+            .filter(platform)
+            .collect(),
     );
     section(
         "Unused imports (a re-exported type a public fn returns may keep its name)",
