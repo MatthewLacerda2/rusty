@@ -40,6 +40,7 @@ use std::process::exit;
 
 mod axes;
 mod discover;
+mod kinds;
 mod waivers;
 
 use axes::{
@@ -60,7 +61,7 @@ const AXES: &[&str] = &["add_menu", "inspector", "api"];
 /// Entry point: discover every component and fail on any unwaived missing axis.
 pub fn run() {
     let components = discover();
-    let add_src = add_menu_src();
+    let add_src = kinds::with_kind_guards(&add_menu_src(), &read(kinds::HAS_KIND));
     let editor_blob = editor_blob();
     let api_stems = api_stems();
     let api_mod = read(API_MOD);
