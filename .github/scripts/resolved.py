@@ -13,12 +13,17 @@ paths reach CI without it:
 In the 2026-10-20 batch #1023 and #1052 went red on rustfmt after a keep-both
 resolution left `tools/lint/src/rules/mod.rs`'s `mod` lines out of order, a CI
 round-trip each. This runs from the `pre-push` hook (`.githooks/pre-push`) and as
-`make resolved`: it takes the files a branch changes against `origin/main` and
-runs rustfmt's check on each crate they touch. No build, so about a second.
+`make resolved`: both crates' rustfmt checks, exactly the pair `lint.yml` runs.
+No build: the same rustfmt the commit hook already pays per commit.
 
-It reads the working tree, as rustfmt does, so it checks a pushed tip only when
-that tip is `HEAD`; pushing some other branch is let through. The size gate stays
-in the commit hook and CI: in the merge queue's fresh worktree it would first
+It runs both every time rather than only for the crates a branch touches: an
+earlier cut diffed against `origin/main`'s merge base, and passed having checked
+nothing when there was none (a shallow clone) and missed a `rustfmt.toml` or
+edition change (#1101's independent review).
+
+It reads the working tree, as rustfmt does, so the hook checks a pushed tip only
+when that tip is `HEAD`; pushing some other branch is let through. The size gate
+stays in the commit hook and CI: in the merge queue's fresh worktree it would first
 compile `tools/lint`, which is not a second. Exit 1 names the command that fixes it.
 """
 
@@ -38,18 +43,6 @@ def git(*args: str, cwd: str | None = None) -> str:
     return done.stdout.strip() if done.returncode == 0 else ""
 
 
-def checks(paths: list[str]) -> list[list[str]]:
-    """The rustfmt checks the changed `paths` call for: one per crate they touch."""
-    lint = [p for p in paths if p.startswith("tools/lint/")]
-    engine = [p for p in paths if p.endswith(".rs") and not p.startswith("tools/lint/")]
-    wanted = []
-    if engine:
-        wanted.append(ROOT_FMT)
-    if any(p.endswith((".rs", "Cargo.toml")) for p in lint):
-        wanted.append(LINT_FMT)
-    return wanted
-
-
 def pushed_tips(hook_input: str) -> list[str]:
     """The local commits a `pre-push` hook's stdin says are being pushed (deletes dropped)."""
     tips = []
@@ -60,29 +53,16 @@ def pushed_tips(hook_input: str) -> list[str]:
     return tips
 
 
-def changed(tip: str, cwd: str | None = None) -> list[str] | None:
-    """Files `tip` changes against its merge base with `origin/main`; None without one."""
-    base = git("merge-base", tip, "origin/main", cwd=cwd)
-    if not base:
-        return None
-    names = git("diff", "--name-only", "--diff-filter=ACMR", base, tip, cwd=cwd)
-    return names.splitlines()
-
-
-def run(tips: list[str], cwd: str | None = None, quiet: bool = False) -> int:
-    """Check every tip that is `HEAD`; 1 when a check fails. `quiet` drops rustfmt's diff."""
+def pushes_head(tips: list[str], cwd: str | None = None) -> bool:
+    """Whether one of `tips` is `HEAD`, the only commit the working tree stands for."""
     head = git("rev-parse", "HEAD", cwd=cwd)
-    paths: set[str] = set()
-    for tip in tips:
-        if git("rev-parse", tip, cwd=cwd) != head:
-            continue
-        files = changed(tip, cwd)
-        if files is None:
-            print("resolved: no merge base with origin/main; nothing checked", file=sys.stderr)
-            continue
-        paths.update(files)
+    return any(git("rev-parse", tip, cwd=cwd) == head for tip in tips)
+
+
+def run(cwd: str | None = None, quiet: bool = False) -> int:
+    """Both crates' rustfmt checks; 1 when one fails. `quiet` drops rustfmt's diff."""
     failed = [
-        c for c in checks(sorted(paths))
+        c for c in (ROOT_FMT, LINT_FMT)
         if subprocess.run(c, cwd=cwd, capture_output=quiet).returncode != 0
     ]
     if failed and not quiet:
@@ -95,8 +75,8 @@ def run(tips: list[str], cwd: str | None = None, quiet: bool = False) -> int:
 
 def main() -> int:
     if sys.argv[1:] == ["--hook"]:
-        return run(pushed_tips(sys.stdin.read()))
-    return run(["HEAD"])
+        return run() if pushes_head(pushed_tips(sys.stdin.read())) else 0
+    return run()
 
 
 if __name__ == "__main__":

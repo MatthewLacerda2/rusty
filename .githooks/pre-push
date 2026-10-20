@@ -1,7 +1,8 @@
 #!/bin/sh
 # rusty's push hook (#1096). Activate once per clone with `make setup`.
 # `git rebase --continue` runs no pre-commit hook, so a conflict resolved by hand
-# is committed unchecked; this re-runs rustfmt over every crate the pushed branch
-# touches against origin/main (tools/lint included), with no build — about a second.
-# Git passes the pushed refs on stdin. `git push --no-verify` skips it; CI does not.
+# is committed unchecked; this runs rustfmt's check on both crates (tools/lint
+# included), as lint.yml does, with no build (the commit hook's own rustfmt cost).
+# Git passes the pushed refs on stdin; it checks only when one is HEAD.
+# `git push --no-verify` skips it; CI does not.
 exec python3 .github/scripts/resolved.py --hook

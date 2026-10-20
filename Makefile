@@ -3,7 +3,7 @@
 #   make gates       everything CI blocks on, fastest-failing first
 #   make check       the fast edit loop
 #   make pre-commit  what the commit hook runs (formatting + size gate, staged files)
-#   make resolved    what the push hook runs (formatting of every crate the branch touches)
+#   make resolved    the push hook's check (rustfmt on both crates, tools/lint included)
 #   make setup       once per clone: point git at the committed hooks in .githooks/,
 #                    and switch the compile cache on when sccache is installed
 #
@@ -76,7 +76,7 @@ pre-commit: ## What the commit hook runs: formatting + size gate on staged .rs, 
 		if [ -n "$$files" ]; then $(LINT) -- $$files; fi
 
 # `git rebase --continue` skips the commit hook; the push hook covers it (#1096).
-resolved: ## What the push hook runs: rustfmt on each crate this branch changes vs origin/main
+resolved: ## The push hook's check: rustfmt on the root crate and tools/lint, as lint.yml runs it
 	@python3 .github/scripts/resolved.py
 
 # ---- self-checks ----------------------------------------------------------

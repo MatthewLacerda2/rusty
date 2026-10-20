@@ -88,11 +88,14 @@ round, so the gate list cannot silently lose a gate.
   `.claude/hooks/session-start.sh`). `git commit --no-verify` skips it; CI doesn't.
   `make setup` also switches the worktrees' compile cache on when sccache is
   installed (`docs/testing.md`, *The compile cache*).
-- **Push hook:** `.githooks/pre-push` → `make resolved` (#1096): rustfmt over every
-  crate the pushed branch changes against `origin/main`, `tools/lint` included, with
-  no build. It exists because `git rebase --continue` runs no commit hook, so a
-  conflict resolved by hand would otherwise reach CI unformatted. It checks the
-  working tree, so only a pushed tip that is `HEAD`; `git push --no-verify` skips it.
+- **Push hook:** `.githooks/pre-push` → `.github/scripts/resolved.py --hook` (#1096):
+  `cargo fmt --all --check` and `tools/lint`'s rustfmt check, the pair `lint.yml`
+  runs, with no build (the commit hook's own rustfmt cost). It exists because
+  `git rebase --continue` runs no commit hook, so a conflict resolved by hand would
+  otherwise reach CI unformatted. rustfmt reads the working tree, so the hook checks
+  only when a pushed tip is `HEAD` and lets any other push through; `make resolved`
+  runs the same two checks on the working tree unconditionally.
+  `git push --no-verify` skips it.
 - **Before readying a PR:** `make gates`.
 - **CI:** `.github/workflows/{ci,lint}.yml` — the durable layer; survives `--no-verify`.
 
