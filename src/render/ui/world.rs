@@ -27,6 +27,7 @@ use super::pipeline::{self, UiPass};
 use crate::components::UiBlend;
 use crate::render::gpu::grow_buffer::GrowBuffer;
 use crate::render::gpu::layout_entries::dynamic_uniform_entry;
+use crate::render::gpu::pipelines::LazyPipeline;
 use crate::render::gpu::uniforms::FogUniform;
 use crate::render::timing::{GpuPass, GpuTimer};
 use crate::render::{RenderView, Renderer};
@@ -46,12 +47,13 @@ struct WorldUiUniform {
 /// The world pass's shared GPU state: its uniform layout and pipeline.
 pub(crate) struct WorldUiPipeline {
     pub(super) layout: wgpu::BindGroupLayout,
-    /// One per blend mode, in `UiBlend::ALL` order (#425).
-    pub(super) pipelines: Vec<wgpu::RenderPipeline>,
+    /// One per blend mode, in `UiBlend::ALL` order (#425), each built the first time
+    /// a world canvas draws with it (#985).
+    pipelines: Vec<LazyPipeline>,
 }
 
 impl WorldUiPipeline {
-    /// Build the pipelines, one per blend mode: into the HDR target, depth-tested
+    /// Prepare the pipelines, one per blend mode: into the HDR target, depth-tested
     /// (`LessEqual`) but never written, no culling (a canvas reads from both sides).
     /// `shared` is the overlay's groups (texture, batch); the placement is group 2.
     pub(crate) fn new(
@@ -72,10 +74,21 @@ impl WorldUiPipeline {
             bind_group_layouts: &[Some(shared[0]), Some(shared[1]), Some(&layout)],
             immediate_size: 0,
         });
-        let shader = ("World UI Pipeline", shader, &pipeline_layout);
-        let build = |mode| pipeline::build(device, shader, UiPass::World, mode);
-        let pipelines = UiBlend::ALL.into_iter().map(build).collect();
+        let lazy = |mode| {
+            let (shader, layout) = (shader.clone(), pipeline_layout.clone());
+            LazyPipeline::new(device, move |device| {
+                let shader = ("World UI Pipeline", &shader, &layout);
+                pipeline::build(device, shader, UiPass::World, mode)
+            })
+        };
+        let pipelines = UiBlend::ALL.into_iter().map(lazy).collect();
         Self { layout, pipelines }
+    }
+
+    /// The pipeline compositing with `mode`, built on its first draw.
+    pub(super) fn pipeline(&self, mode: UiBlend) -> Option<&wgpu::RenderPipeline> {
+        let lazy = self.pipelines.get(super::blend::index(mode))?;
+        Some(lazy.get())
     }
 }
 

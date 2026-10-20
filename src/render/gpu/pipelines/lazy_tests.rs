@@ -1,11 +1,12 @@
 //! The forward pass's optional pipelines wait for the first frame that draws them
 //! (#985): an opaque game frame builds none, the editor's overlays build the line
-//! pipeline, and a translucent solid builds the transparent one.
+//! pipeline, and a translucent solid builds the transparent one. Built by hand, every
+//! one of them is a valid pipeline, so a frame that first needs one never fails on it.
 
 use glam::Vec3;
 
 use crate::components::material::RenderMode;
-use crate::components::{MaterialAsset, MaterialComponent};
+use crate::components::{MaterialAsset, MaterialComponent, ParticleBlend};
 use crate::render::{RenderView, Renderer, OFFSCREEN_FORMAT};
 use crate::scene::{Camera, MeshComponent, Scene};
 
@@ -67,4 +68,19 @@ fn gpu_optional_forward_pipelines_build_on_first_draw() {
 
     draw(&mut renderer, &box_scene(RenderMode::Transparent), false);
     assert!(built(&renderer)[0], "a translucent solid draws transparent");
+}
+
+#[test]
+fn gpu_every_lazy_pipeline_builds() {
+    let Some(renderer) = crate::render::test_gpu::headless_or_skip(RES, RES) else {
+        return;
+    };
+    renderer.outline_pipeline.get();
+    renderer.line_pipeline.get();
+    renderer.transparent_pipeline.get();
+    for blend in [ParticleBlend::Alpha, ParticleBlend::Additive] {
+        renderer.particle_renderer.pipeline_for(blend);
+        renderer.ribbon_renderer.pipeline_for(blend);
+    }
+    assert_eq!(built(&renderer), [true; 3]);
 }

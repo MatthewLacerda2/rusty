@@ -4,6 +4,7 @@
 
 use crate::components::ParticleBlend;
 use crate::render::gpu::layout_entries::uniform_entry;
+use crate::render::gpu::pipelines::LazyPipeline;
 use crate::render::gpu::DEPTH_FORMAT;
 use crate::render::postfx::HDR_FORMAT;
 
@@ -43,71 +44,75 @@ impl Globals {
     }
 }
 
-/// The alpha and additive pipelines of one blended pass.
+/// The alpha and additive pipelines of one blended pass, each built the first time a
+/// frame draws with it (#985).
 pub(crate) struct BlendPipelines {
-    alpha: wgpu::RenderPipeline,
-    additive: wgpu::RenderPipeline,
+    alpha: LazyPipeline,
+    additive: LazyPipeline,
 }
 
 impl BlendPipelines {
-    /// Build both from `shader`'s `vs_main` and its `fs_alpha` / `fs_additive`,
+    /// Prepare both from `shader`'s `vs_main` and its `fs_alpha` / `fs_additive`,
     /// drawing `vertex` buffers into the HDR target. Both faces are drawn, and the
     /// scene depth is tested but never written: overlapping translucent sprites and
     /// strips must all blend, not z-fight, and the same depth can also be bound as a
     /// texture (soft particles).
     pub(crate) fn new(
         device: &wgpu::Device,
-        label: &str,
+        label: &'static str,
         (shader, layout): (&wgpu::ShaderModule, &wgpu::PipelineLayout),
-        vertex: wgpu::VertexBufferLayout<'_>,
+        vertex: wgpu::VertexBufferLayout<'static>,
     ) -> Self {
-        let pipeline = |blend, fragment_entry| {
-            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-                label: Some(label),
-                layout: Some(layout),
-                vertex: wgpu::VertexState {
-                    module: shader,
-                    entry_point: Some("vs_main"),
-                    compilation_options: Default::default(),
-                    buffers: &[Some(vertex.clone())],
-                },
-                fragment: Some(wgpu::FragmentState {
-                    module: shader,
-                    entry_point: Some(fragment_entry),
-                    compilation_options: Default::default(),
-                    targets: &[Some(wgpu::ColorTargetState {
-                        format: HDR_FORMAT,
-                        blend: Some(blend),
-                        write_mask: wgpu::ColorWrites::ALL,
-                    })],
-                }),
-                primitive: wgpu::PrimitiveState {
-                    topology: wgpu::PrimitiveTopology::TriangleList,
-                    cull_mode: None,
-                    ..Default::default()
-                },
-                depth_stencil: Some(wgpu::DepthStencilState {
-                    format: DEPTH_FORMAT,
-                    depth_write_enabled: Some(false),
-                    depth_compare: Some(wgpu::CompareFunction::LessEqual),
-                    stencil: wgpu::StencilState::default(),
-                    bias: wgpu::DepthBiasState::default(),
-                }),
-                multisample: wgpu::MultisampleState::default(),
-                multiview_mask: None,
-                cache: None,
+        let lazy = |blend, fragment_entry: &'static str| {
+            let (shader, layout, vertex) = (shader.clone(), layout.clone(), vertex.clone());
+            LazyPipeline::new(device, move |device| {
+                device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                    label: Some(label),
+                    layout: Some(&layout),
+                    vertex: wgpu::VertexState {
+                        module: &shader,
+                        entry_point: Some("vs_main"),
+                        compilation_options: Default::default(),
+                        buffers: &[Some(vertex.clone())],
+                    },
+                    fragment: Some(wgpu::FragmentState {
+                        module: &shader,
+                        entry_point: Some(fragment_entry),
+                        compilation_options: Default::default(),
+                        targets: &[Some(wgpu::ColorTargetState {
+                            format: HDR_FORMAT,
+                            blend: Some(blend),
+                            write_mask: wgpu::ColorWrites::ALL,
+                        })],
+                    }),
+                    primitive: wgpu::PrimitiveState {
+                        topology: wgpu::PrimitiveTopology::TriangleList,
+                        cull_mode: None,
+                        ..Default::default()
+                    },
+                    depth_stencil: Some(wgpu::DepthStencilState {
+                        format: DEPTH_FORMAT,
+                        depth_write_enabled: Some(false),
+                        depth_compare: Some(wgpu::CompareFunction::LessEqual),
+                        stencil: wgpu::StencilState::default(),
+                        bias: wgpu::DepthBiasState::default(),
+                    }),
+                    multisample: wgpu::MultisampleState::default(),
+                    multiview_mask: None,
+                    cache: None,
+                })
             })
         };
         Self {
-            alpha: pipeline(wgpu::BlendState::ALPHA_BLENDING, "fs_alpha"),
-            additive: pipeline(additive_blend(), "fs_additive"),
+            alpha: lazy(wgpu::BlendState::ALPHA_BLENDING, "fs_alpha"),
+            additive: lazy(additive_blend(), "fs_additive"),
         }
     }
 
     pub(crate) fn pipeline_for(&self, blend: ParticleBlend) -> &wgpu::RenderPipeline {
         match blend {
-            ParticleBlend::Alpha => &self.alpha,
-            ParticleBlend::Additive => &self.additive,
+            ParticleBlend::Alpha => self.alpha.get(),
+            ParticleBlend::Additive => self.additive.get(),
         }
     }
 }

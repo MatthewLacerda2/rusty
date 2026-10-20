@@ -63,7 +63,9 @@ pub(crate) fn create_pipelines(
     );
     let lazy = |layout: &wgpu::PipelineLayout, spec: PipelineSpec| {
         let (shader, layout) = (shader.clone(), layout.clone());
-        LazyPipeline::new(move |device| make_pipeline(device, &shader, format, &layout, &spec))
+        LazyPipeline::new(device, move |device| {
+            make_pipeline(device, &shader, format, &layout, &spec)
+        })
     };
     ForwardPipelines {
         forward: make_pipeline(device, shader, format, &render_layout, &forward_spec()),

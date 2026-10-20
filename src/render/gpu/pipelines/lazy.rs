@@ -9,29 +9,32 @@
 
 use std::sync::OnceLock;
 
-/// Builds the pipeline from the renderer's device, the first time it is asked for.
+/// Builds the pipeline, the first time it is asked for.
 type Build = Box<dyn Fn(&wgpu::Device) -> wgpu::RenderPipeline + Send + Sync>;
 
 /// A pipeline that is created the first time [`LazyPipeline::get`] runs, then kept.
 pub(crate) struct LazyPipeline {
     cell: OnceLock<wgpu::RenderPipeline>,
+    device: wgpu::Device,
     build: Build,
 }
 
 impl LazyPipeline {
-    /// A pipeline `build` creates on first use; nothing is compiled yet.
+    /// A pipeline `build` creates on `device` at first use; nothing is compiled yet.
     pub(crate) fn new(
+        device: &wgpu::Device,
         build: impl Fn(&wgpu::Device) -> wgpu::RenderPipeline + Send + Sync + 'static,
     ) -> Self {
         Self {
             cell: OnceLock::new(),
+            device: device.clone(),
             build: Box::new(build),
         }
     }
 
-    /// The pipeline, built on `device` if this is the first call.
-    pub(crate) fn get(&self, device: &wgpu::Device) -> &wgpu::RenderPipeline {
-        self.cell.get_or_init(|| (self.build)(device))
+    /// The pipeline, built if this is the first call.
+    pub(crate) fn get(&self) -> &wgpu::RenderPipeline {
+        self.cell.get_or_init(|| (self.build)(&self.device))
     }
 
     /// Whether the pipeline has been built yet.

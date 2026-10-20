@@ -71,7 +71,7 @@ impl Renderer {
         self.draw_batches(
             pass,
             items,
-            SolidPass::Transparent(self.transparent_pipeline.get(&self.device)),
+            SolidPass::Transparent(self.transparent_pipeline.get()),
         );
     }
 }
