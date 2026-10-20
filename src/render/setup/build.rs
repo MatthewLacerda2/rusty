@@ -46,9 +46,9 @@ pub(crate) struct ShadowSystem {
 /// the HDR offscreen target.
 pub(crate) struct ForwardPasses {
     pub render_pipeline: wgpu::RenderPipeline,
-    pub transparent_pipeline: wgpu::RenderPipeline,
-    pub line_pipeline: wgpu::RenderPipeline,
-    pub outline_pipeline: wgpu::RenderPipeline,
+    pub transparent_pipeline: pipelines::LazyPipeline,
+    pub line_pipeline: pipelines::LazyPipeline,
+    pub outline_pipeline: pipelines::LazyPipeline,
     pub prepass_pipeline: wgpu::RenderPipeline,
     pub skybox_renderer: skybox::SkyboxRenderer,
 }

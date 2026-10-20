@@ -43,13 +43,15 @@ fn gpu_auto_places_both_sets_on_empty_scene() {
     let scene_path = scene_path.to_str().unwrap();
 
     let mut scene = room_scene();
-    let report = bake_lighting(
-        &mut scene,
-        Some(scene_path),
-        None,
-        LightingBakeParams::default(),
-    )
-    .expect("placement + adapter-free bake never errors with a scene path");
+    // A coarse grid and one reflection region: the claim is that both sets get
+    // placed, which a few probes prove as well as the default grid (#985).
+    let coarse = LightingBakeParams {
+        probe_spacing: 10.0,
+        reflection_region: 20.0,
+        reflection_cap: 1,
+    };
+    let report = bake_lighting(&mut scene, Some(scene_path), None, coarse)
+        .expect("placement + adapter-free bake never errors with a scene path");
 
     assert!(report.auto_placed_light, "light probes auto-placed");
     assert!(

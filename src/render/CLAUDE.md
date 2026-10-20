@@ -34,6 +34,12 @@ Before building a layout or pipeline by hand, use what #939 extracted:
   the UI blur, the shadow-atlas blit).
 - `render::passes::blended`: the globals uniform and the alpha and additive pipelines
   into the HDR target that test depth without writing it (particles, ribbons).
+- `render::gpu::pipelines::LazyPipeline`: a pipeline a frame may not draw (an
+  editor overlay, a blend mode, a pass only some scenes use) is built on its first
+  draw, not with the renderer. On lavapipe each pipeline is an LLVM compile, and every
+  GPU test builds its own renderer (#985). A lazy pipeline must be listed in
+  `Renderer::lazy_pipelines` (`render::setup::warm`), so `warm_pipelines` builds it
+  when a windowed renderer starts: a game never compiles one mid-frame.
 
 ## GPU tests
 - **The name says it renders**: in-crate tests are named `gpu_*`, integration tests

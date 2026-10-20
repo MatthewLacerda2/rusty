@@ -268,7 +268,7 @@ impl super::UiRenderer {
         let standard = match (pass, mode.1) {
             (UiPass::Screen(format), true) => self.backdrops.get(&format),
             (UiPass::Screen(format), false) => self.pipelines.get(&(format, mode.0)),
-            (UiPass::World, _) => self.world.pipelines.get(super::blend::index(mode.0)),
+            (UiPass::World, _) => self.world.pipeline(mode.0),
         };
         let Some(pipeline) = standard else {
             return false;

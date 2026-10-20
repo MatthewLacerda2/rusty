@@ -50,6 +50,7 @@ use std::rc::Rc;
 
 use crate::components::UiBlend;
 use crate::render::gpu::bind_layouts;
+use crate::render::gpu::pipelines::LazyPipeline;
 use crate::render::gpu::shaders::ShaderRegistry;
 use crate::render::GpuTexture;
 
@@ -137,6 +138,11 @@ impl UiRenderer {
             world,
             shaders,
         }
+    }
+
+    /// The world-canvas pipelines, one per blend mode, built or not (#985).
+    pub(crate) fn lazy_pipelines(&self) -> impl Iterator<Item = &LazyPipeline> {
+        self.world.lazy()
     }
 
     /// Build the pipelines for `format` if absent, one per blend mode, plus the

@@ -22,6 +22,7 @@ use std::collections::HashMap;
 use wgpu::util::DeviceExt;
 
 use crate::components::particle::ParticleBlend;
+use crate::render::gpu::pipelines::LazyPipeline;
 use crate::render::gpu::shaders::ShaderRegistry;
 use crate::render::passes::blended::{BlendPipelines, Globals};
 use crate::render::MeshId;
@@ -100,5 +101,10 @@ impl ParticleRenderer {
 
     pub(crate) fn pipeline_for(&self, blend: ParticleBlend) -> &wgpu::RenderPipeline {
         self.pipelines.pipeline_for(blend)
+    }
+
+    /// Both blend pipelines, built or not (#985).
+    pub(crate) fn lazy_pipelines(&self) -> [&LazyPipeline; 2] {
+        self.pipelines.lazy()
     }
 }

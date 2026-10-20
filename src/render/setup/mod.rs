@@ -4,6 +4,7 @@ pub(crate) mod gpu_rule;
 pub(crate) mod headless;
 pub(crate) mod resize;
 pub(crate) mod textures;
+mod warm;
 
 use std::collections::HashMap;
 
@@ -79,20 +80,17 @@ impl Renderer {
         let present_modes = surface_caps.present_modes.clone();
         // No budget permit: there is exactly one windowed renderer and it is the
         // application itself, so it never queues behind the headless budget (#366).
-        Ok(Self::from_parts(
-            device,
-            queue,
-            Some(surface),
-            config,
-            present_modes,
-            None,
-        ))
+        let renderer = Self::from_parts(device, queue, Some(surface), config, present_modes, None);
+        // A game must not compile a pipeline mid-frame; only headless stays lazy (#985).
+        renderer.warm_pipelines(cfg!(feature = "editor"));
+        Ok(renderer)
     }
 
     /// Shared constructor body: builds all pipelines, layouts, buffers and bind
     /// groups from an already-created device/queue. Both the windowed (`new`) and
     /// the headless offscreen (`new_headless`) paths funnel through here, so they
-    /// produce a byte-identical renderer apart from the optional window surface.
+    /// produce a byte-identical renderer apart from the optional window surface;
+    /// only `new` then warms the pipelines built on first draw (#985).
     ///
     /// `gpu_permit` is the caller's slot in the headless budget (#366): `Some` from the
     /// headless path, `None` from the windowed one. It is merely *stored* here — it must

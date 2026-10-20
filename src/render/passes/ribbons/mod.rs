@@ -17,6 +17,7 @@ pub(crate) mod draw;
 pub(crate) mod strip;
 
 use crate::components::ParticleBlend;
+use crate::render::gpu::pipelines::LazyPipeline;
 use crate::render::gpu::shaders::ShaderRegistry;
 use crate::render::gpu::uniforms::FogUniform;
 use crate::render::passes::blended::{BlendPipelines, Globals};
@@ -77,5 +78,10 @@ impl RibbonRenderer {
 
     pub(crate) fn pipeline_for(&self, blend: ParticleBlend) -> &wgpu::RenderPipeline {
         self.pipelines.pipeline_for(blend)
+    }
+
+    /// Both blend pipelines, built or not (#985).
+    pub(crate) fn lazy_pipelines(&self) -> [&LazyPipeline; 2] {
+        self.pipelines.lazy()
     }
 }
