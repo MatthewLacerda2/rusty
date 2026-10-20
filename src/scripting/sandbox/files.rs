@@ -24,6 +24,7 @@ use std::rc::Rc;
 
 use mlua::{Function, IntoLuaMulti, Lua, MultiValue, Table, Value};
 
+use crate::core::paths::to_slash;
 use crate::core::project::SCRIPTS_DIR;
 use crate::scene::io::bundled;
 use crate::scripting::console::ConsoleLogs;
@@ -125,7 +126,7 @@ fn project_searcher(lua: &Lua, access: Rc<Access>) -> mlua::Result<Function> {
             if let Some(code) = access.read(&path, &format!("require(\"{name}\")")) {
                 return found(lua, &code, &path.to_string_lossy());
             }
-            tried.push(format!("no file '{}'", path.display()));
+            tried.push(format!("no file '{}'", to_slash(&path)));
         }
         tried.join("\n\t").into_lua_multi(lua)
     })
