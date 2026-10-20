@@ -97,7 +97,7 @@ jobs:
             echo '| Module | Floor | Current | Status |'
             echo '|---|---|---|---|'
             regressed=0
-            while read -r module floor; do
+            while read -r module floor _; do
               case "$module" in ''|\#*) continue ;; esac
               ignore=$(python3 .github/scripts/coverage-ignore.py "$module") || exit 1
               cur=$(cargo llvm-cov report --json --summary-only \
@@ -110,7 +110,8 @@ jobs:
             echo ''
             if [ "$regressed" = 1 ]; then
               echo '> A module dropped below its committed floor. Informational — add'
-              echo '> tests, or, if the drop is intended, lower it in `coverage-baseline.txt`.'
+              echo '> tests, or, if the drop is intended, lower it in `coverage-baseline.txt` with an'
+              echo '> inline `# reason: <why>` (make scripts fails a silent drop, #963).'
             else
               echo '> All floored modules at or above their committed floor.'
             fi
