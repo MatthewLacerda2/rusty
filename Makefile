@@ -3,6 +3,7 @@
 #   make gates       everything CI blocks on, fastest-failing first
 #   make check       the fast edit loop
 #   make pre-commit  what the commit hook runs (formatting + size gate, staged files)
+#   make resolved    the push hook's check (rustfmt on both crates, tools/lint included)
 #   make setup       once per clone: point git at the committed hooks in .githooks/,
 #                    and switch the compile cache on when sccache is installed
 #
@@ -23,7 +24,7 @@ SELF_CHECKS := target-dir inventory
 
 .DEFAULT_GOAL := help
 .NOTPARALLEL:
-.PHONY: help setup compile-cache check gates pre-commit $(SELF_CHECKS) $(GATES) mergeable queue queue-daemon queue-stop blockers checks reclaim mutants-remote dead-pub editor-capture bench
+.PHONY: help setup compile-cache check gates pre-commit resolved $(SELF_CHECKS) $(GATES) mergeable queue queue-daemon queue-stop blockers checks reclaim mutants-remote dead-pub editor-capture bench
 
 help: ## List the verbs
 	@grep -E '^[a-z-]+:.*## ' $(firstword $(MAKEFILE_LIST)) | \
@@ -31,7 +32,7 @@ help: ## List the verbs
 
 setup: ## Once per clone: the committed git hooks, and the compile cache if sccache is installed
 	git config core.hooksPath .githooks
-	@echo "setup: pre-commit hook active (formatting + size gate)"
+	@echo "setup: pre-commit (formatting + size gate) and pre-push (formatting) hooks active"
 	@$(MAKE) --no-print-directory compile-cache
 
 # The compile cache (#492). sccache stores each dependency compile under a hash of
@@ -66,10 +67,17 @@ gates: $(SELF_CHECKS) $(GATES) ## Everything CI blocks on, fastest-failing first
 check: target-dir fmt size ## Fast edit loop: formatting, size gate, dev-feature clippy
 	cargo clippy --all-targets --features dev
 
+# tools/lint is its own crate, out of `--all`'s reach: formatted only when staged (#1096).
 pre-commit: ## What the commit hook runs: formatting + size gate on staged .rs, .py, .lua and .wgsl files
 	@cargo fmt --all --check
+	@if git diff --cached --name-only --diff-filter=ACMR -- tools/lint | grep -q .; then \
+		cargo fmt --manifest-path tools/lint/Cargo.toml --check; fi
 	@files="$$(git diff --cached --name-only --diff-filter=ACMR -- '*.rs' '*.py' '*.lua' '*.wgsl')"; \
 		if [ -n "$$files" ]; then $(LINT) -- $$files; fi
+
+# `git rebase --continue` skips the commit hook; the push hook covers it (#1096).
+resolved: ## The push hook's check: rustfmt on the root crate and tools/lint, as lint.yml runs it
+	@python3 .github/scripts/resolved.py
 
 # ---- self-checks ----------------------------------------------------------
 

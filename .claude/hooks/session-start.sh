@@ -91,7 +91,8 @@ lint_tool() {
 }
 
 hooks() {
-    # The committed commit hook (formatting + size gate): `make setup` locally (#485).
+    # The committed hooks (#485, #1096): pre-commit (formatting + size gate) and
+    # pre-push (formatting); `make setup` locally.
     git config core.hooksPath .githooks && echo "core.hooksPath -> .githooks"
 }
 
