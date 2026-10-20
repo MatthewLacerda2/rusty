@@ -38,9 +38,7 @@ orchestrator and the merge queue (#823). There is no check-in to schedule and
 nothing to wait for.
 
 - Run builds, tests and `make gates` in the **foreground**, with long timeouts,
-  split across calls as *The container* says (a call dies at ten minutes). A
-  session that starts a build in the background and ends its turn to wait is
-  never woken.
+  split across calls as *The container* says.
 - **Never schedule a `send_later` check-in**: it is a fresh session reading state
   the orchestrator already has, and it pushes to branches the queue holds.
 
@@ -73,9 +71,10 @@ nothing to wait for.
 Lessons from cloud coders' run logs (rusty's and scorsese's, #924). Each one cost
 a coder real time.
 
-- **A foreground tool call dies silently at ten minutes**, and a cold
-  `make gates` in the container takes about 16 (`make test` alone over 10). So
-  split it, one call each, every one well under ten minutes even cold:
+- **A tool call is moved to the background at ten minutes**, and you are woken
+  when it finishes (MatthewLacerda2/scorsese#1500). A cold `make gates` in the
+  container takes about 16, so split it anyway, one call each, so every result
+  comes back in the call that ran it:
   1. `make fmt size layers determinism direction components parity test-lint scripts`
      (seconds);
   2. `make clippy`;

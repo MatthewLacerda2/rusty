@@ -65,9 +65,8 @@ skill has the body shape):
   (`-v+2M` on macOS). The API refuses a time already past.
 - **The model** from the brief's `Model:` line (*Which model*), never the
   example body's default.
-- **`allowed_tools`** leaves room for `ToolSearch` and the GitHub MCP tools
-  (`issue_read`, `create_pull_request`, `update_pull_request`,
-  `add_issue_comment`, `actions_run_trigger`).
+- **`allowed_tools`** includes `ToolSearch`; the GitHub MCP tools load through it
+  without being listed.
 
 **The brief is a comment on the issue** (#910), first line `Brief`. The prompt is
 echoed back about three times by `RemoteTrigger`, so it stays a fixed pointer, and
@@ -189,7 +188,8 @@ cause), **enforced** (a gate), **documented** (here, `ci-merge` or CLAUDE.md, fo
 what the repo can't change) or **tracked** (an issue with the evidence). A lesson
 that blocks the running batch, or bites twice, is infrastructure: fix it now.
 Prefer fixing and enforcing to documenting; a line added here is a line every
-batch pays to read.
+batch pays to read. A lesson goes in as the rule, not its story, and before
+adding one, take out what tooling or a better model has made unnecessary.
 
 At the end, before reporting: list every trap, surprise and hand-back (your
 notes, each PR's *Decisions*, the issues coders filed, their run logs), map each
