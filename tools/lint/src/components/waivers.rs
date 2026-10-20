@@ -41,7 +41,7 @@ pub(super) const WAIVERS: &[(&str, &str, &str)] = &[
     (
         "nav_agent",
         "api",
-        "Served by the `NavMeshAgent`/`Navigation` namespace in src/api/nav.rs \
+        "Served by the `NavMeshAgent`/`Navigation` namespace in src/api/nav/mod.rs \
          (the field is `nav_agent`, the namespace is the Unity name `NavMeshAgent`).",
     ),
     (
