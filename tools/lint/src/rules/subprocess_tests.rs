@@ -1,4 +1,4 @@
-use super::subprocess::{check, RULE};
+use super::{check, RULE};
 
 #[test]
 fn flags_an_engine_command() {
@@ -37,5 +37,5 @@ fn an_allow_with_a_reason_excuses_it() {
     let src =
         "// lint: allow(subprocess) asks git which commit this is\nuse std::process::Command;\n";
     let found = check("src/a.rs", src);
-    assert!(super::finding::allowed(src, found[0].line, RULE));
+    assert!(crate::rules::allowed(src, found[0].line, RULE));
 }

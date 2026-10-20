@@ -18,6 +18,7 @@
 //! `|---|` row) are not entries. A marker with no reason is a finding.
 
 use super::finding::Finding;
+use super::scan::Scan;
 use std::fs;
 use std::path::Path;
 
@@ -156,6 +157,15 @@ pub fn markdown(root: &Path) -> Vec<String> {
         .collect();
     md.sort();
     md
+}
+
+/// The rule over every scanned file and the Markdown under the working directory.
+pub fn run(scan: &Scan) -> Vec<Finding> {
+    let mut found = scan.each_file(check);
+    for path in markdown(Path::new(".")) {
+        found.extend(check(&path, &fs::read_to_string(&path).unwrap_or_default()));
+    }
+    found
 }
 
 #[cfg(test)]

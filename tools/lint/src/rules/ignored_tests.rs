@@ -1,4 +1,4 @@
-use super::ignored::{check, RULE};
+use super::{check, RULE};
 use std::fs;
 use std::path::PathBuf;
 use std::process::Command;

@@ -1,5 +1,5 @@
-use super::finding::allowed;
-use super::full_literal::{Components, RULE};
+use super::{Components, RULE};
+use crate::rules::allowed;
 
 const ENTITY: &str = "pub struct Entity {\n    pub id: u32,\n    pub transform: TransformComponent,\n    \
                       pub collider: Option<ColliderComponent>,\n    pub material: Option<MaterialComponent>,\n}\n";

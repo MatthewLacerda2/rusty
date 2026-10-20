@@ -1,4 +1,4 @@
-use super::skip::{check, RULE};
+use super::{check, RULE};
 
 #[test]
 fn flags_ignore_and_cfg_attr_ignore() {
@@ -26,5 +26,5 @@ fn an_allow_with_a_reason_excuses_the_skip() {
         1,
         "the rule reports; `rules::run` applies the allow"
     );
-    assert!(super::finding::allowed(src, found[0].line, RULE));
+    assert!(crate::rules::allowed(src, found[0].line, RULE));
 }

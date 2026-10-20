@@ -25,11 +25,13 @@ file is what a coder changing the tool must keep.
   nothing grandfathered (#926). A standing decision that is no single line's exception
   (a component axis waived for good) is a row with its rationale, like `WAIVERS` in
   `tools/lint/src/components/waivers.rs`.
-- **A new rule is a module, not a flag.** It goes in `tools/lint/src/rules/<rule>.rs`,
-  returns `Finding`s, and is one more call in `rules::run`: no new flag, gate, CI step
-  or baseline. Call it **before** the `findings.retain(…)` that applies the allows when
-  an inline allow may excuse it, **after** when nothing may: `ignored` runs there
-  because its fix is the `.gitignore` pattern, never an allow.
+- **A new rule is a module, not a flag.** It goes in `tools/lint/src/rules/<rule>.rs`
+  with `pub fn run(&Scan) -> Vec<Finding>`, mounts its own `<rule>_tests.rs` with
+  `#[path]`, and takes one line in `rules/mod.rs`'s sorted `mod` list and one row in
+  the sorted `RULES` table (#911), so parallel rule branches touch different lines:
+  no new flag, gate, CI step or baseline. Its row says `Allow::Inline` when an inline
+  allow may excuse it, `Allow::Never` when nothing may: `ignored` is the one, because
+  its fix is the `.gitignore` pattern.
 - **Signals print and never fail.** What CLAUDE.md only says to *aim* for (≲10 files
   per directory) prints under `signal (not a failure)` after the findings and leaves
   the exit code alone. It becomes a finding only with the decision that makes it a

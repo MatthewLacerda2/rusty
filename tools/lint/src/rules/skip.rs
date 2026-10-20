@@ -5,6 +5,7 @@
 //! reason: `// lint: allow(skip) <why>` on the line or right above it.
 
 use super::finding::Finding;
+use super::scan::Scan;
 
 pub const RULE: &str = "skip";
 
@@ -32,3 +33,12 @@ fn is_ignore(line: &str) -> bool {
             .any(|w| w == "ignore")
     })
 }
+
+/// The rule over every scanned file.
+pub fn run(scan: &Scan) -> Vec<Finding> {
+    scan.each_file(check)
+}
+
+#[cfg(test)]
+#[path = "skip_tests.rs"]
+mod tests;

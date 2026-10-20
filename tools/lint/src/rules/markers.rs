@@ -6,6 +6,7 @@
 //! is not.
 
 use super::finding::Finding;
+use super::scan::Scan;
 
 pub const RULE: &str = "markers";
 /// Spelled in halves so this file does not flag itself.
@@ -40,3 +41,12 @@ fn has_word(line: &str, word: &str) -> bool {
         !ident(line[..at].chars().next_back()) && !ident(line[at + word.len()..].chars().next())
     })
 }
+
+/// The rule over every scanned file.
+pub fn run(scan: &Scan) -> Vec<Finding> {
+    scan.each_file(check)
+}
+
+#[cfg(test)]
+#[path = "markers_tests.rs"]
+mod tests;

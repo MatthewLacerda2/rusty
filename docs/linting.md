@@ -159,8 +159,9 @@ inline comment, on the flagged line or in the comment/attribute lines right abov
 ```
 
 The reason is required; an allow without one is itself a finding (`[allow]`). A new
-rule is one more call in `tools/lint/src/rules/mod.rs`: no new flag, gate, CI step
-or baseline.
+rule is a module with its own `<rule>_tests.rs`, one line in the sorted `mod` list
+and one row in the sorted `RULES` table of `tools/lint/src/rules/mod.rs` (#911): no
+new flag, gate, CI step or baseline.
 
 - **`prefix-group`** — CLAUDE.md's "group by subfolder, not by filename prefix".
   Three or more sibling `.rs` files whose names start with the same word (up to the

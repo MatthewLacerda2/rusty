@@ -10,6 +10,7 @@
 //! Test code is what `test_code.rs` says it is. Comment lines never count, so a doc may name the call.
 
 use super::finding::Finding;
+use super::scan::Scan;
 use super::test_code;
 
 pub const RULE: &str = "test-temp-dir";
@@ -37,3 +38,12 @@ pub fn check_file(path: &str, source: &str) -> Vec<Finding> {
     }
     found
 }
+
+/// The rule over every scanned file.
+pub fn run(scan: &Scan) -> Vec<Finding> {
+    scan.each_file(check_file)
+}
+
+#[cfg(test)]
+#[path = "temp_dir_tests.rs"]
+mod tests;

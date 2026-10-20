@@ -1,6 +1,6 @@
 use super::{check, markdown, RULE};
 
-fn lines(found: &[super::Finding]) -> Vec<(usize, &str)> {
+fn lines(found: &[crate::rules::Finding]) -> Vec<(usize, &str)> {
     found.iter().map(|f| (f.line, f.rule)).collect()
 }
 
