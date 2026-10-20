@@ -88,7 +88,7 @@ fn flags_a_pub_fn_nothing_calls_and_passes_one_only_a_bin_calls() {
     let target = dir.join("target");
     let with = super::check(&tree, &target, &["--profile", "test"], &["dev"]).unwrap();
     let without = super::check(&tree, &target, &[], &["dev"]).unwrap();
-    let body = report::render(&with, &without);
+    let body = report::render(&with, &without, &|p| super::platform::is_gated(&tree, p));
     let _ = fs::remove_dir_all(&dir);
     let dead = body.split("Only tests").next().unwrap();
     assert!(dead.contains("`nobody`"), "{body}");
@@ -98,6 +98,52 @@ fn flags_a_pub_fn_nothing_calls_and_passes_one_only_a_bin_calls() {
             .nth(1)
             .unwrap()
             .contains("`the_tests`"),
+        "{body}"
+    );
+}
+
+#[test]
+fn platform_cfg_is_found_in_a_file_and_in_its_declaring_mod() {
+    use super::platform::{is_gated, mentions_platform};
+    assert!(mentions_platform(
+        "#[cfg(target_os = \"macos\")]\nfn f() {}"
+    ));
+    assert!(mentions_platform("#[cfg(not(windows))]\nfn f() {}"));
+    assert!(!mentions_platform("// cfg(unix)\nfn f() {}\n#[cfg(test)]"));
+    let dir = std::env::temp_dir().join(format!("lint_dead_pub_gated_{}", std::process::id()));
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(dir.join("src/s")).unwrap();
+    let put = |p: &str, b: &str| fs::write(dir.join(p), b).unwrap();
+    put(
+        "src/s/mod.rs",
+        "#[cfg(target_os = \"macos\")]\nmod mac;\nmod plain;\n",
+    );
+    put("src/s/mac.rs", "pub fn dock() {}\n");
+    put("src/s/plain.rs", "pub fn nothing() {}\n");
+    put("src/s/own.rs", "#[cfg(unix)]\npub fn u() {}\n");
+    let flagged = is_gated(&dir, "src/s/mac.rs") && is_gated(&dir, "src/s/own.rs");
+    let passed = !is_gated(&dir, "src/s/plain.rs");
+    let _ = fs::remove_dir_all(&dir);
+    assert!(flagged, "a platform-gated file must be flagged");
+    assert!(passed, "a plain file must pass");
+}
+
+#[test]
+fn a_gated_finding_gets_its_own_heading() {
+    let w = |path: &str| report::Warning {
+        path: path.into(),
+        line: 1,
+        message: "function `f` is never used".into(),
+    };
+    let set: std::collections::BTreeSet<_> = [w("src/mac.rs"), w("src/plain.rs")].into();
+    let body = report::render(&set, &set, &|p| p == "src/mac.rs");
+    let (before, gated) = body.split_once("Platform-gated").unwrap();
+    assert!(
+        before.contains("src/plain.rs") && !before.contains("src/mac.rs"),
+        "{body}"
+    );
+    assert!(
+        gated.contains("src/mac.rs") && !gated.contains("src/plain.rs"),
         "{body}"
     );
 }

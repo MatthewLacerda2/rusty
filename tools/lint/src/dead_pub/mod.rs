@@ -13,6 +13,7 @@
 //! Usage: `cargo run --manifest-path tools/lint/Cargo.toml -- --dead-pub` (`make dead-pub`)
 
 pub mod fold;
+pub mod platform;
 pub mod report;
 
 use std::fs;
@@ -32,7 +33,9 @@ pub fn run() {
     let result = prepare(&root, &tree, "rusty").and_then(|()| {
         let with_tests = check(&tree, &target, &["--profile", "test"], &["dev"])?;
         let without_tests = check(&tree, &target, &[], &["dev"])?;
-        Ok(report::render(&with_tests, &without_tests))
+        Ok(report::render(&with_tests, &without_tests, &|p| {
+            platform::is_gated(&tree, p)
+        }))
     });
     match result {
         Ok(body) => {
