@@ -5,7 +5,8 @@
 //! overrides **into the source `.prefab` document on disk**, so the asset itself changes
 //! and every *other* instance picks the edit up on its next load / reimport. Two forms:
 //! whole-object ([`apply_instance_to_source`]) and a single json-pointer leaf
-//! ([`apply_instance_field_to_source`]).
+//! ([`apply_instance_field_to_source`]). Its per-field opposite, dropping one override
+//! so the leaf tracks the source again, lives here too ([`revert_instance_field`]).
 //!
 //! It reuses the existing serde-value machinery rather than inventing a parallel
 //! serializer: [`apply_overrides`] is the same setter the live propagation uses (now
@@ -79,6 +80,26 @@ pub fn apply_instance_field_to_source(
     write_prefab_file(&prefab, &source)?;
     drop_override(scene, entity_id, path);
     reimport_instance(scene, root)
+}
+
+/// Revert ONE overridden field: drop the override at `path` from `entity_id`'s map,
+/// then reimport the instance so that leaf tracks the source again while every other
+/// override stays (Unity's `PrefabUtility.RevertPropertyOverride`). `entity_id` may be
+/// any instance entity (root or child). `Ok(false)` when there is no override at
+/// `path` (nothing changes); errors if `entity_id` is not a linked instance entity.
+/// The editor's per-field revert button and `Scene.RevertPrefabField` (#998).
+pub fn revert_instance_field(
+    scene: &mut Scene,
+    entity_id: u32,
+    path: &str,
+) -> Result<bool, String> {
+    let root = instance_root(scene, entity_id)?;
+    if !overrides_of(scene, entity_id).contains_key(path) {
+        return Ok(false);
+    }
+    drop_override(scene, entity_id, path);
+    reimport_instance(scene, root)?;
+    Ok(true)
 }
 
 /// Write `overrides` onto the source entity with `local_id` inside `prefab`, in place.

@@ -6,7 +6,8 @@
 //! them back into the source `.prefab`. Every button maps onto the SAME verbs the
 //! `Scene.*` API and console drive (`record_instance_overrides` /
 //! `revert_instance_overrides` / `reimport_instance` / `apply_instance_to_source` /
-//! `apply_instance_field_to_source`), so there is no second code path.
+//! `apply_instance_field_to_source` / `revert_instance_field`), so there is no second
+//! code path.
 //!
 //! The card is the deferred-action sort the rest of the inspector uses: it only reads
 //! the live entity (the override map lives on its `prefab_link`) and emits a
@@ -34,13 +35,10 @@ pub enum PrefabAction {
     /// Write every override back into the source `.prefab`, then clear them on the
     /// instance (`Scene.ApplyPrefabToSource`).
     ApplyToSource(u32),
-    /// Revert one overridden field: drop `path` from `entity`'s override map, then
-    /// reimport the instance rooted at `root` so that leaf tracks the source again.
-    RevertField {
-        root: u32,
-        entity: u32,
-        path: String,
-    },
+    /// Revert one overridden field so that leaf tracks the source again
+    /// (`Scene.RevertPrefabField`). Like its apply sibling, the verb resolves the
+    /// instance root from `entity`.
+    RevertField { entity: u32, path: String },
     /// Write one overridden field back into the source `.prefab`, then clear it on the
     /// instance (`Scene.ApplyPrefabFieldToSource`). The verb resolves the instance root
     /// from `entity` and reimports it afterwards, so no separate `root` is needed.
@@ -65,7 +63,7 @@ pub fn draw(
         ui.label(format!("Source: {source}"));
         ui.add_space(t.space_xs);
         action = draw_object_buttons(ui, root);
-        draw_overrides_list(ui, world, id, root, &mut action);
+        draw_overrides_list(ui, world, id, &mut action);
     });
     action
 }
@@ -122,7 +120,6 @@ fn draw_overrides_list(
     ui: &mut egui::Ui,
     world: &crate::ecs::World,
     id: u32,
-    root: u32,
     action: &mut Option<PrefabAction>,
 ) {
     let t = theme::from_ui(ui);
@@ -137,7 +134,7 @@ fn draw_overrides_list(
     }
     ui.label("Overridden fields:");
     for path in paths {
-        draw_override_row(ui, t.accent, id, root, &path, action);
+        draw_override_row(ui, t.accent, id, &path, action);
     }
 }
 
@@ -147,7 +144,6 @@ fn draw_override_row(
     ui: &mut egui::Ui,
     blue: egui::Color32,
     entity: u32,
-    root: u32,
     path: &str,
     action: &mut Option<PrefabAction>,
 ) {
@@ -170,7 +166,6 @@ fn draw_override_row(
             .clicked()
         {
             *action = Some(PrefabAction::RevertField {
-                root,
                 entity,
                 path: path.to_string(),
             });
@@ -197,10 +192,8 @@ pub fn instance_root(scene: &Scene, selected_id: u32) -> u32 {
 }
 
 /// Apply a [`PrefabAction`] against the live scene, routing through the shared
-/// `scene::authoring` prefab verbs (the same ones the `Scene.*` API calls). A
-/// per-field revert first drops the path from that entity's override map, then
-/// reimports so the now-un-overridden leaf re-tracks the source. Returns whether the
-/// scene changed (so the caller can mark the editor dirty).
+/// `scene::authoring` prefab verbs (the same ones the `Scene.*` API calls). Returns
+/// whether the scene changed (so the caller can mark the editor dirty).
 pub fn dispatch(scene: &mut Scene, action: PrefabAction) -> bool {
     match action {
         PrefabAction::Record(root) => authoring::record_instance_overrides(scene, root).is_ok(),
@@ -209,27 +202,13 @@ pub fn dispatch(scene: &mut Scene, action: PrefabAction) -> bool {
         PrefabAction::ApplyToSource(root) => {
             authoring::apply_instance_to_source(scene, root).is_ok()
         }
-        PrefabAction::RevertField { root, entity, path } => {
-            revert_field(scene, root, entity, &path)
+        PrefabAction::RevertField { entity, path } => {
+            authoring::revert_instance_field(scene, entity, &path).unwrap_or(false)
         }
         PrefabAction::ApplyFieldToSource { entity, path } => {
             authoring::apply_instance_field_to_source(scene, entity, &path).is_ok()
         }
     }
-}
-
-/// Drop one override `path` from `entity`'s map, then reimport the instance so that
-/// leaf returns to the source value while every other override is preserved.
-fn revert_field(scene: &mut Scene, root: u32, entity: u32, path: &str) -> bool {
-    let removed = scene
-        .world
-        .prefab_link_mut(entity)
-        .and_then(|mut l| l.overrides.remove(path))
-        .is_some();
-    if removed {
-        let _ = authoring::reimport_instance(scene, root);
-    }
-    removed
 }
 
 #[cfg(test)]

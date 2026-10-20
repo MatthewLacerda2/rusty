@@ -34,6 +34,7 @@ it behaves identically to the editor and uses the same default values.
 | `Scene.ReimportPrefab` | `(instanceRootId)` | — (re-baseline from source, re-apply overrides) |
 | `Scene.ApplyPrefabToSource` | `(instanceRootId)` | count of entities written back into the `.prefab` |
 | `Scene.ApplyPrefabFieldToSource` | `(entityId, jsonPointer)` | — (writes one leaf to the `.prefab`) |
+| `Scene.RevertPrefabField` | `(entityId, jsonPointer)` | `true` if an override was reverted, `false` if there was none at `jsonPointer` |
 | `Scene.ListPrefabOverrides` | `(instanceRootId)` | array of `"localId:json-pointer"` strings |
 
 **Hierarchy reads (#422).** `FindChild` walks one level per `/`-separated
@@ -250,6 +251,14 @@ Apply-to-source (the Unity "Apply → Prefab" direction):
   re-tracks the source (the instance's other overrides are untouched). `entityId` may be
   any instance entity — root or child; the verb resolves the instance root itself. Errors
   if the entity carries no override at `jsonPointer`.
+
+Its per-field opposite:
+
+- **`Scene.RevertPrefabField(entityId, jsonPointer)`** — Unity's *Revert* on one
+  property: drop just that override and reimport, so the leaf tracks the source again
+  (the instance's other overrides are untouched). `entityId` may be any instance
+  entity. Returns `false`, changing nothing, when there is no override at
+  `jsonPointer`. The prefab card's per-field revert button.
 
 The verbs error if `instanceRootId` (or, for the field form, `entityId`) is not a
 **linked** instance entity. **Scope (#216):** a flat instance of a flat prefab —

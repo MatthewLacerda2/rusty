@@ -38,7 +38,7 @@ use crate::scene::authoring::{
     self, add_component, animator, character_controller as cc, collider, create_entity,
     nav::agent as nav_agent, ComponentKind, Primitive,
 };
-use crate::scene::{ColliderShape, MaterialComponent, Scene, ScriptComponent};
+use crate::scene::{ColliderShape, MaterialComponent, Scene};
 
 pub use looks::{checker_recipe, shader_recipe, CHECKER_MAP, SHADER_NAME};
 pub use seed::{seed_default_assets, seed_default_assets_into};
@@ -118,14 +118,7 @@ fn wear(scene: &mut Scene, id: u32, key: &str) {
 }
 
 fn attach_script(scene: &mut Scene, id: u32, path: &str) {
-    let Some(mut scripts) = scene.world.scripts_mut(id) else {
-        return;
-    };
-    scripts.push(ScriptComponent {
-        path: path.to_string(),
-        is_loaded: false,
-        ..Default::default()
-    });
+    authoring::add_script(&mut scene.world, id, path, Default::default());
 }
 
 /// A character capsule of `height` × `radius` before scale (#451).
