@@ -42,7 +42,7 @@ mod macos {
 
     /// Set the Dock icon from PNG bytes. Off the main thread (never, in the editor)
     /// or on bytes AppKit can't read, the Dock keeps its default.
-    fn set_dock_icon(png: &[u8]) {
+    pub(super) fn set_dock_icon(png: &[u8]) {
         let Some(mtm) = MainThreadMarker::new() else {
             return;
         };
