@@ -22,6 +22,10 @@
 //!   snapshot  — edit-mode snapshot/restore around Play
 //!   runtime   — play-mode requests drained at the tick tail: destroys, scene loads
 
+// Panic-free sim (#195, #962): bare `.unwrap()` is denied in every sim module (use `?`
+// or a documented `.expect(...)`); test code is exempt via clippy.toml. See docs/linting.md.
+#![deny(clippy::unwrap_used)]
+
 pub mod asset_instance;
 pub mod authoring;
 pub mod camera;

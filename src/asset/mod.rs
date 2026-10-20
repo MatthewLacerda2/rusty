@@ -19,6 +19,10 @@
 //! determinism-guarded sim trees (`app`/`scripting`/`physics`/`navigation`); a
 //! scene-load re-import is deterministic given the same file.
 
+// Panic-free sim (#195, #962): bare `.unwrap()` is denied in every sim module (use `?`
+// or a documented `.expect(...)`); test code is exempt via clippy.toml. See docs/linting.md.
+#![deny(clippy::unwrap_used)]
+
 pub mod anim_data;
 pub mod animation_graph;
 pub mod audio;

@@ -46,7 +46,9 @@ fn ramp(scene: &mut Scene, name: &str, end: f32) {
         centre + size * 0.5,
         looks::FLOOR,
     );
-    scene.world.transform_mut(id).unwrap().rotation = tilt;
+    if let Some(mut t) = scene.world.transform_mut(id) {
+        t.rotation = tilt;
+    }
 }
 
 /// The pool's water: a translucent plane over the whole hole, no collider.

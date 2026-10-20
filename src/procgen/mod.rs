@@ -23,6 +23,10 @@
 //! - [`image_buf`] — the linear-RGBA buffer the runner works in (wrapping domain).
 //! - [`written`] — the log of PNGs written, so the renderer re-reads them (#689).
 
+// Panic-free sim (#195, #962): bare `.unwrap()` is denied in every sim module (use `?`
+// or a documented `.expect(...)`); test code is exempt via clippy.toml. See docs/linting.md.
+#![deny(clippy::unwrap_used)]
+
 pub mod bake;
 mod bake_set;
 pub mod hash;

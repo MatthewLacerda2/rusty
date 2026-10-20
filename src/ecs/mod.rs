@@ -13,6 +13,10 @@
 //! (`components::entity`) survives only as the on-disk document shape that
 //! `write_components`/`entity_document` decompose/recompose against.
 
+// Panic-free sim (#195, #962): bare `.unwrap()` is denied in every sim module (use `?`
+// or a documented `.expect(...)`); test code is exempt via clippy.toml. See docs/linting.md.
+#![deny(clippy::unwrap_used)]
+
 pub mod access;
 #[cfg(test)]
 mod ancestors_tests;
