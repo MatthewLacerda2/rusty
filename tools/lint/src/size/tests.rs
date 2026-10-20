@@ -193,3 +193,47 @@ fn the_rules_scan_still_reads_only_rust() {
     tmp.file("tools/x/a.py", "x = 1\n");
     assert_eq!(scan_dir(&tmp.0.join("tools")), vec![rust]);
 }
+
+#[test]
+fn a_shader_or_script_over_the_cap_in_code_fails_and_says_lines_of_code() {
+    // #1015: `shader.wgsl` and `input_field.lua` passed the cap unseen.
+    let tmp = Scratch::new("1015-over");
+    let shader = tmp.file("engine/shaders/s.wgsl", &"let a = 1;\n".repeat(301));
+    let script = tmp.file("engine/scripts/s.lua", &"x = 1\n".repeat(301));
+    for path in [shader, script] {
+        let line = check_file(&path).expect("301 lines of code must fail");
+        assert!(line.ends_with("301/300 (lines of code)"), "{line}");
+    }
+}
+
+#[test]
+fn shader_and_script_prose_does_not_count_against_the_cap() {
+    let tmp = Scratch::new("1015-prose");
+    let wgsl = format!(
+        "/*\n{}*/\n// {}\n",
+        "maths\n".repeat(400),
+        "why\n// ".repeat(400)
+    );
+    let shader = tmp.file("s.wgsl", &(wgsl + &"let a = 1;\n".repeat(300)));
+    assert_eq!(check_file(&shader), None);
+    let lua = format!(
+        "--[[\n{}]]\n-- {}\n",
+        "why\n".repeat(400),
+        "how\n-- ".repeat(400)
+    );
+    let script = tmp.file("s.lua", &(lua + &"x = 1\n".repeat(300)));
+    assert_eq!(check_file(&script), None);
+}
+
+#[test]
+fn the_full_scan_measures_the_engine_shaders_and_scripts() {
+    // #1015: `engine/` is a size root; its fonts and models are not measured.
+    assert!(SIZE_ROOTS.contains(&"engine"));
+    let tmp = Scratch::new("1015-scan");
+    let shader = tmp.file("engine/shaders/a.wgsl", "let a = 1;\n");
+    let script = tmp.file("engine/scripts/b.lua", "x = 1\n");
+    tmp.file("engine/models/m.obj", "v 0 0 0\n");
+    let mut found = measured_in(&tmp.0.join("engine"));
+    found.sort();
+    assert_eq!(found, vec![script, shader]);
+}

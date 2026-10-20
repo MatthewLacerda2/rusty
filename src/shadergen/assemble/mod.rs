@@ -138,8 +138,20 @@ fn assemble_surface(
     );
 
     let body = uv::splice(&base.replace(SURFACE_RETURN, &new_return), resolved, layout)?;
+    let (imports, body) = hoist_imports(&body);
     let depth = depth::entry_points(resolved, layout);
-    Ok(format!("{header}{additions}\n{body}{depth}"))
+    Ok(format!("{header}{imports}{additions}\n{body}{depth}"))
+}
+
+/// Split the base's `#import` lines from the rest. They lead the variant: naga_oil
+/// resolves an imported name only on lines after its `#import`, and the blocks'
+/// helpers, emitted above the base, read the forward bindings the base imports
+/// (`camera`, `entity`, …, #1015).
+fn hoist_imports(base: &str) -> (String, String) {
+    let (imports, rest): (Vec<&str>, Vec<&str>) = base
+        .split_inclusive('\n')
+        .partition(|line| line.starts_with("#import"));
+    (imports.concat(), rest.concat())
 }
 
 /// Assemble a self-contained postfx fullscreen module from the recipe.

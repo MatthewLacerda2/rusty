@@ -74,6 +74,7 @@ impl ShaderRegistry {
 #[cfg(test)]
 mod tests {
     use super::ShaderRegistry;
+    use crate::shadergen::compose;
     use crate::shadergen::validate::validate;
 
     const SHIPPED: [&str; 7] = [
@@ -121,7 +122,11 @@ mod tests {
 
         let dir = crate::test_temp::dir().join("rusty-722");
         std::fs::create_dir_all(&dir).unwrap();
-        std::fs::copy("engine/shaders/common.wgsl", dir.join("common.wgsl")).unwrap();
+        for module in compose::MODULES {
+            let to = dir.join(module);
+            std::fs::create_dir_all(to.parent().unwrap()).unwrap();
+            std::fs::copy(format!("engine/shaders/{module}"), to).unwrap();
+        }
         // Names a `common` struct that does not exist: naga rejects the unknown type.
         let bad = "#import common::{CameraUniforms}\n\
             @group(0) @binding(0) var<uniform> camera: NoSuchStruct;\n\
