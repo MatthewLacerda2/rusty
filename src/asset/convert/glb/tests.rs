@@ -1,6 +1,6 @@
 //! The GLB writer (#1024): what it writes parses as glTF and carries what it was given.
 
-use super::{write, Document, Material, Mesh, Node, Primitive, Skin};
+use super::{write, Animation, Channel, Document, Keys, Material, Mesh, Node, Primitive, Skin};
 
 fn triangle() -> Document {
     let mut root = Node::new("Tri");
@@ -32,6 +32,14 @@ fn triangle() -> Document {
         skins: vec![Skin {
             joints: vec![0],
             inverse_bind: vec![glam::Mat4::IDENTITY.to_cols_array()],
+        }],
+        animations: vec![Animation {
+            name: "Lift".into(),
+            channels: vec![Channel {
+                node: 0,
+                times: vec![0.0, 0.5],
+                keys: Keys::Translation(vec![[0.0; 3], [0.0, 1.0, 0.0]]),
+            }],
         }],
     }
 }
@@ -65,4 +73,23 @@ fn an_empty_document_is_still_a_valid_glb() {
     let glb = gltf::Gltf::from_slice(&write(&doc)).expect("valid glb");
     assert_eq!(glb.nodes().count(), 1);
     assert!(glb.blob.is_none());
+}
+
+#[test]
+fn an_animation_reads_back_as_a_linear_channel() {
+    let glb = gltf::Gltf::from_slice(&write(&triangle())).unwrap();
+    let animation = glb.animations().next().expect("one animation");
+    assert_eq!(animation.name(), Some("Lift"));
+    let channel = animation.channels().next().unwrap();
+    assert_eq!(
+        channel.target().property(),
+        gltf::animation::Property::Translation
+    );
+    let sampler = channel.sampler();
+    assert_eq!(
+        sampler.interpolation(),
+        gltf::animation::Interpolation::Linear
+    );
+    assert_eq!(sampler.input().max(), Some(serde_json::json!([0.5])));
+    assert!(sampler.input().view().unwrap().target().is_none());
 }

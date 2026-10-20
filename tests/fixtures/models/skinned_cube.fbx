@@ -2,6 +2,8 @@
 ; A one-metre cube skinned to one bone (#1024). Hand-written, so every number is
 ; deliberate: authored in centimetres with Z up, the way many FBX exporters write,
 ; so a correct import has to convert both (the bone sits 100 cm up = 1 m on +Y).
+; One animation stack, "Rise" (#1081): over one second the bone climbs from 100 cm
+; to 200 cm up Z, two linear keys, so the clip must end with it 2 m up +Y.
 FBXHeaderExtension:  {
 	FBXHeaderVersion: 1003
 	FBXVersion: 7400
@@ -100,6 +102,40 @@ Objects:  {
 			a: 1,0,0,0,0,1,0,0,0,0,1,0,0,0,100,1
 		}
 	}
+	AnimationStack: 6000, "AnimStack::Rise", "" {
+		Properties70:  {
+			P: "LocalStart", "KTime", "Time", "",0
+			P: "LocalStop", "KTime", "Time", "",46186158000
+		}
+	}
+	AnimationLayer: 6100, "AnimLayer::BaseLayer", "" {
+	}
+	AnimationCurveNode: 6200, "AnimCurveNode::T", "" {
+		Properties70:  {
+			P: "d|X", "Number", "", "A",0
+			P: "d|Y", "Number", "", "A",0
+			P: "d|Z", "Number", "", "A",100
+		}
+	}
+	AnimationCurve: 6300, "AnimCurve::", "" {
+		Default: 100
+		KeyVer: 4009
+		KeyTime: *2 {
+			a: 0,46186158000
+		}
+		KeyValueFloat: *2 {
+			a: 100,200
+		}
+		KeyAttrFlags: *1 {
+			a: 4
+		}
+		KeyAttrDataFloat: *4 {
+			a: 0,0,0,0
+		}
+		KeyAttrRefCount: *1 {
+			a: 2
+		}
+	}
 }
 Connections:  {
 	C: "OO",2000,0
@@ -110,4 +146,8 @@ Connections:  {
 	C: "OO",5000,1000
 	C: "OO",5100,5000
 	C: "OO",3000,5100
+	C: "OO",6100,6000
+	C: "OO",6200,6100
+	C: "OP",6200,3000, "Lcl Translation"
+	C: "OP",6300,6200, "d|Z"
 }

@@ -50,7 +50,8 @@ pub struct Converter {
 pub const CONVERTERS: &[Converter] = &[Converter {
     extension: "fbx",
     name: "ufbx",
-    version: 1,
+    // 2: animation stacks become glTF animations (#1081).
+    version: 2,
     convert: fbx::convert,
 }];
 
