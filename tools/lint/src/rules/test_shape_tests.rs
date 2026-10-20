@@ -52,3 +52,22 @@ fn cfg_all_test_is_test_code_and_any_test_is_not() {
     let any = all.replace("all(", "any(");
     assert!(rules("src/dev/a.rs", &any).is_empty());
 }
+
+#[test]
+fn cfg_all_with_test_last_or_wrapped_is_test_code() {
+    let call = "    fn t() { scenario::run(&p, &o); }\n";
+    for attr in [
+        "#[cfg(all(feature = \"dev\", test))]\n",
+        "#[cfg(all(\n    feature = \"dev\",\n    test,\n))]\n",
+    ] {
+        let src = format!("{attr}mod tests {{\n{call}}}\n");
+        let line = src.lines().count() - 1;
+        assert_eq!(
+            rules("src/dev/a.rs", &src),
+            [(line, USER_WORKSPACE)],
+            "{attr}"
+        );
+    }
+    let not = format!("#[cfg(all(feature = \"dev\", not(test)))]\nmod m {{\n{call}}}\n");
+    assert!(rules("src/dev/a.rs", &not).is_empty());
+}
