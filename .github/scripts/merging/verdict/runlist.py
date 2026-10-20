@@ -179,3 +179,25 @@ def failed_runs(runs: list[dict]) -> list[dict]:
 def unfinished(runs: list[dict]) -> list[dict]:
     """The runs that have not concluded. See [`failed_runs`]."""
     return [r for r in runs if r.get("status") != "completed"]
+
+
+def lagging(runs: list[dict], jobs: dict[int, list[dict]], workflow: str) -> list[dict]:
+    """The runs listed `completed` and not failed whose own jobs do not yet show
+    their gate concluded (#1095).
+
+    The runs listing and each run's jobs listing are separate reads, and either
+    can be behind the other (#592 watched the runs listing flicker). On
+    2026-10-20 PR #1063's `ci` run went `queued` while `ci-gate` waited for a
+    runner, and the next poll handed it back as "no gated job ran"; the run
+    finished green. A gate the jobs listing has not shown concluding, or not
+    shown at all, is a run still going, whatever the runs listing says: only a
+    concluded gate makes "nothing was built" an answer. A failed run is already
+    an answer and is not asked about.
+    """
+    gate = WORKFLOWS[workflow][0]
+
+    def gate_done(run: dict) -> bool:
+        return any(j.get("name") == gate and j.get("conclusion") is not None for j in jobs.get(run.get("id"), []))
+
+    settled = [r for r in runs if r.get("status") == "completed" and not failed_runs([r])]
+    return [r for r in settled if not gate_done(r)]

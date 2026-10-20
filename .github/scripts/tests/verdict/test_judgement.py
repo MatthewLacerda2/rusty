@@ -54,7 +54,8 @@ class Judgement(unittest.TestCase):
     def test_a_gated_job_without_its_gate_is_not_a_pass(self):
         ci, lint = both()
         jobs = {1: [job("build-test", "success")], 2: built("lint")}
-        self.assert_refused(verdict(ci, lint, jobs=jobs), "ran a gated job")
+        # A gate not yet listed is a run still going (#1095): refused, as wait.
+        self.assert_refused(verdict(ci, lint, jobs=jobs), "still going")
 
     def test_a_failed_run_is_refused_and_points_at_it(self):
         ok, lines = verdict(*both(conclusion="failure"))
