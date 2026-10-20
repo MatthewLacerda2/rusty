@@ -4,9 +4,13 @@
 use crate::render::gpu::mesh::vertex_layout;
 use crate::render::gpu::DEPTH_FORMAT;
 
+mod lazy;
 pub(crate) mod surface;
 
-/// Fixed-function knobs that distinguish the three forward-pass pipelines.
+pub(crate) use lazy::LazyPipeline;
+
+/// Fixed-function knobs that distinguish the forward-pass pipelines.
+#[derive(Clone, Copy)]
 struct PipelineSpec {
     label: &'static str,
     topology: wgpu::PrimitiveTopology,
@@ -16,21 +20,24 @@ struct PipelineSpec {
     depth_compare: wgpu::CompareFunction,
 }
 
-/// The forward-target pipelines, all sharing one shader + vertex layout.
+/// The forward-target pipelines, all sharing one shader + vertex layout. The ones a
+/// frame may not draw (translucents, debug lines, the selection outline) are built on
+/// first use (#985); the opaque pass and its prepass are built up front.
 pub(crate) struct ForwardPipelines {
     /// Opaque/cutout solids: REPLACE, depth write on.
     pub forward: wgpu::RenderPipeline,
     /// Alpha-blended translucent solids (#242): ALPHA_BLENDING, depth write off.
-    pub transparent: wgpu::RenderPipeline,
+    pub transparent: LazyPipeline,
     /// Line debug overlays.
-    pub line: wgpu::RenderPipeline,
+    pub line: LazyPipeline,
     /// Selection-silhouette inverted hull.
-    pub outline: wgpu::RenderPipeline,
+    pub outline: LazyPipeline,
     /// The SSAO depth prepass (#436): the forward vertex stage, no colour target.
     pub prepass: wgpu::RenderPipeline,
 }
 
-/// Builds the forward-lit, transparent, line debug, and outline pipelines.
+/// Builds the forward-lit and prepass pipelines, and the transparent, line debug and
+/// outline pipelines to be built on first use.
 // wgpu pipeline construction legitimately threads several distinct GPU resources
 // (device, shader, format, four bind-group layouts); bundling them into a struct
 // would only add an indirection without clarifying intent.
@@ -54,14 +61,15 @@ pub(crate) fn create_pipelines(
         material_layout,
         shadow_layout,
     );
-    let p = |layout: &wgpu::PipelineLayout, spec: &PipelineSpec| {
-        make_pipeline(device, shader, format, layout, spec)
+    let lazy = |layout: &wgpu::PipelineLayout, spec: PipelineSpec| {
+        let (shader, layout) = (shader.clone(), layout.clone());
+        LazyPipeline::new(move |device| make_pipeline(device, &shader, format, &layout, &spec))
     };
     ForwardPipelines {
-        forward: p(&render_layout, &forward_spec()),
-        transparent: p(&render_layout, &transparent_spec()),
-        line: p(&line_layout, &line_spec()),
-        outline: p(&render_layout, &outline_spec()),
+        forward: make_pipeline(device, shader, format, &render_layout, &forward_spec()),
+        transparent: lazy(&render_layout, transparent_spec()),
+        line: lazy(&line_layout, line_spec()),
+        outline: lazy(&render_layout, outline_spec()),
         prepass: make_prepass(device, shader, &render_layout, "fs_prepass"),
     }
 }
@@ -269,3 +277,6 @@ fn make_prepass(
 
 #[cfg(test)]
 mod scrolled_cut_tests;
+
+#[cfg(test)]
+mod lazy_tests;
