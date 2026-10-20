@@ -26,9 +26,9 @@ def ran_something(run: dict, jobs: dict[int, list[dict]], workflow: str) -> bool
     The question `conclusion == "success"` does not answer: a draft's run
     concludes success with every gated job skipped, gate green.
     """
-    gate, gated = runlist.WORKFLOWS[workflow]
+    gated = runlist.WORKFLOWS[workflow][1]
     ran = jobs.get(run.get("id"), [])
-    gate_ok = any(j.get("name") == gate and j.get("conclusion") == "success" for j in ran)
+    gate_ok = runlist.gate_conclusion(run, jobs, workflow) == "success"
     built = any(
         runlist.base(j.get("name", "")) in gated and j.get("conclusion") == "success" for j in ran
     )
@@ -75,9 +75,8 @@ def assess(
         ]
     lagging = runlist.lagging(kept, jobs, workflow)
     if lagging:
-        gate = runlist.WORKFLOWS[workflow][0]
         return RUNNING, [
-            f"a `{workflow}` run for {short} is listed completed, but its jobs show `{gate}` still going.",
+            f"a `{workflow}` run for {short} is listed completed, but {runlist.lag(lagging[0], jobs, workflow)}.",
             "The two listings are read apart and one can lag the other (#1095). Wait for the gate.",
         ]
 

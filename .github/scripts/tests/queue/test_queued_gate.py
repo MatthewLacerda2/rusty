@@ -45,7 +45,22 @@ class QueuedGate(unittest.TestCase):
         self.assertIn("still going", " ".join(lines))
 
     def test_a_completed_run_with_no_jobs_listed_yet_waits(self):
-        self.assertEqual(polled(run("ci"), [])[0], outcomes.WAIT)
+        state, lines = polled(run("ci"), [])
+        self.assertEqual(state, outcomes.WAIT)
+        self.assertIn("no `ci-gate` job is listed yet", " ".join(lines))
+
+    def test_jobs_a_whole_attempt_behind_the_run_wait(self):
+        # An outage cancels attempt 1 and it is re-run: the runs listing shows
+        # attempt 2 green while the jobs listing still shows attempt 1.
+        old = [{**j, "run_attempt": 1} for j in built("ci")]
+        old = [{**j, "conclusion": "cancelled"} if j["name"] == "ci-gate" else j for j in old]
+        state, lines = polled(run("ci", run_attempt=2), old)
+        self.assertEqual(state, outcomes.WAIT, lines)
+        self.assertIn("only for attempt 1, not the run's 2", " ".join(lines))
+
+    def test_jobs_caught_up_with_the_attempt_pass(self):
+        fresh = [{**j, "run_attempt": 2} for j in built("ci")]
+        self.assertEqual(polled(run("ci", run_attempt=2), fresh)[0], outcomes.GO)
 
     def test_mergeable_says_wait_for_it_too(self):
         state, _ = decide.assess({"headRefOid": run("ci")["head_sha"]}, "ci", [run("ci")], {1: gate_waiting()})
