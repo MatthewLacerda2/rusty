@@ -144,4 +144,49 @@ mod tests {
             assert!(normal.dot(outward) > 0.0, "inward face {a} {b} {c}");
         }
     }
+
+    /// Every shape `build_shape` makes tessellates: round ones finely enough to
+    /// reach their radius, a hull as convex, a trimesh as itself and not convex.
+    #[test]
+    fn every_built_shape_tessellates_within_its_extent() {
+        use crate::components::CapsuleAxis;
+        let round = [
+            ColliderShape::Sphere { radius: 1.0 },
+            ColliderShape::Cylinder {
+                radius: 1.0,
+                height: 2.0,
+            },
+            ColliderShape::Capsule {
+                radius: 1.0,
+                height: 4.0,
+                axis: CapsuleAxis::Y,
+            },
+        ];
+        for shape in round {
+            let built = build_shape(&shape, Vec3::ONE, None).expect("analytic shape");
+            let (v, tris, convex) = tessellate(built.shape()).expect("tessellates");
+            assert!(
+                convex && tris.len() >= 16,
+                "{shape:?}: {} triangles",
+                tris.len()
+            );
+            let reach = v.iter().map(|p| p.x.abs()).fold(0.0, f32::max);
+            assert!(
+                (reach - 1.0).abs() < 1e-4,
+                "{shape:?} reaches its radius: {reach}"
+            );
+        }
+        let tetra = vec![[0.0; 3], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
+        let faces = [0, 2, 1, 0, 1, 3, 0, 3, 2, 1, 2, 3];
+        for convex in [true, false] {
+            let shape = ColliderShape::Mesh {
+                convex,
+                local_min: Vec3::ZERO,
+                local_max: Vec3::ONE,
+            };
+            let built = build_shape(&shape, Vec3::ONE, Some((&tetra, &faces))).expect("mesh");
+            let (v, tris, is_convex) = tessellate(built.shape()).expect("tessellates");
+            assert_eq!((v.len(), tris.len(), is_convex), (4, 4, convex));
+        }
+    }
 }

@@ -9,6 +9,7 @@ mod collisions;
 mod console;
 mod coroutines;
 mod files;
+mod hook_errors;
 mod late_update;
 mod lifecycle;
 mod manager;
