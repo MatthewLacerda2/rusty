@@ -135,7 +135,8 @@ Per pull request:
    the report when it lands (`ci-merge`, *Triaging a survivor*).
 2. **A hand-back** skips that PR and the watch carries on. A one-line fix is
    yours: under `--no-check` nothing compiles it before CI, so grep every use of
-   what either side moved and check the 300-line and 50-line caps first. A
+   what either side moved and check the 300-line and 50-line caps first; the
+   `pre-push` hook (`make resolved`) catches a resolution rustfmt rejects. A
    resolution that needs a compile to trust (a split, a dispatcher, system
    order, `Cargo.lock`) goes to a fresh routine.
 3. **After a merge:** `make reclaim` (removes merged worktrees, refuses unpushed

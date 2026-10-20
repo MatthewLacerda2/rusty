@@ -35,7 +35,9 @@ only the `--features dev` run sees them.
 **The commit hook is not a substitute.** `.githooks/pre-commit` runs formatting
 and the size gate only — no clippy, rustdoc, tests or dev feature set — and only
 once `make setup` (or the cloud session-start hook) has pointed
-`core.hooksPath` at it. Assume nothing heavy was caught for you.
+`core.hooksPath` at it. `git rebase --continue` skips it; `.githooks/pre-push`
+(`make resolved`, #1096) re-runs the formatting half over the whole branch,
+`tools/lint` included, as the push leaves. Assume nothing heavy was caught for you.
 
 The full list is deliberately **not** run before every push. Checkpoint commits
 stay cheap.
@@ -308,7 +310,10 @@ those needs more than that: `app/registry.rs`'s `build()` is the **only** place
 per-frame system order is defined. Merging it by textual proximity silently
 reorders the schedule.
 
-Mechanical resolutions (a `mod` list, an import) are fine to do directly. Hand a
+Mechanical resolutions (a `mod` list, an import) are fine to do directly. The
+`pre-push` hook format-checks what the resolution touched before the force-push
+leaves (#1096); with hooks not set up, run `make resolved` first. It is rustfmt
+only: a lost `#[cfg(test)]` or a file pushed past its cap still waits for CI. Hand a
 rebase back to the branch's author when resolving it needs to know *why* the code
 is shaped as it is — a new variant that should join a documented grouping, two
 prose paragraphs that need ordering, a signature that has grown a parameter, a

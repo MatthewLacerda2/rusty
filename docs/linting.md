@@ -82,11 +82,17 @@ round, so the gate list cannot silently lose a gate.
 
 ## Where it runs
 - **Commit hook:** `.githooks/pre-commit` → `make pre-commit`: `cargo fmt --check`
-  and the size gate on the staged `.rs` files — nothing else, so it stays under a
+  (and `tools/lint`'s, when a staged file is under it) and the size gate on the staged
+  `.rs`, `.py`, `.lua` and `.wgsl` files — nothing else, so it stays under a
   second. Activate it once per clone with `make setup` (cloud sessions do it in
   `.claude/hooks/session-start.sh`). `git commit --no-verify` skips it; CI doesn't.
   `make setup` also switches the worktrees' compile cache on when sccache is
   installed (`docs/testing.md`, *The compile cache*).
+- **Push hook:** `.githooks/pre-push` → `make resolved` (#1096): rustfmt over every
+  crate the pushed branch changes against `origin/main`, `tools/lint` included, with
+  no build. It exists because `git rebase --continue` runs no commit hook, so a
+  conflict resolved by hand would otherwise reach CI unformatted. It checks the
+  working tree, so only a pushed tip that is `HEAD`; `git push --no-verify` skips it.
 - **Before readying a PR:** `make gates`.
 - **CI:** `.github/workflows/{ci,lint}.yml` — the durable layer; survives `--no-verify`.
 

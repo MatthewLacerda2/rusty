@@ -482,7 +482,9 @@ only its adapter (Lua → zimmer document, file writes, patch-path resolution).
 readying a PR (`make help` lists the verbs, `make check` is the fast edit loop).
 Failures from `tools/lint` are written to `.lint/report.txt`. See **docs/linting.md**.
 - **The commit hook** (`.githooks/pre-commit`, activated once per clone by `make
-  setup`) runs formatting and the size gate only, so it stays under a second.
+  setup`) runs formatting and the size gate only, so it stays under a second; the
+  push hook (`.githooks/pre-push`, `make resolved`) re-runs formatting over the whole
+  branch, `tools/lint` included, for the commits a `git rebase --continue` made.
 - Size gate: files ≤ 300 lines, test/fixture files ≤ 150 (how a `.py` file is
   counted: `.github/scripts/CLAUDE.md`). Style is rustfmt;
   **clippy is a hard gate** (`-D warnings`: default, `dev`, and the no-editor player
