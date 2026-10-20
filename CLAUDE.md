@@ -501,7 +501,8 @@ Failures from `tools/lint` are written to `.lint/report.txt`. See **docs/linting
   shared one is a false green.
 - **Nothing is grandfathered.** A file over its cap is split, not excused; no gate
   reads a baseline file (#926). An exception a check needs is written inline, with its
-  reason.
+  reason. The one committed list of numbers, `coverage-baseline.txt`'s floors, only
+  ratchets up: `make scripts` fails a floor lowered without an inline `# reason:` (#963).
 
 ## Overrides
 Any rule in this file may be overridden by the user's explicit say-so — in the current

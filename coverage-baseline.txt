@@ -2,13 +2,14 @@
 #
 # The weekly `coverage` workflow (coverage.yml, #750) measures each floored module and
 # flags — informationally, never blocking — any drop below its floor.
-# Format: `<module> <floor-percent>`, one per line; `#` lines are comments.
+# Format: `<module> <floor-percent> [# reason: <why>]`, one per line; `#` lines are comments.
 #
 # These are RECORDED floors a hair below the achieved coverage (measured both
 # feature sets accumulated, each module isolated from every other src/ dir):
 # app 95.03, scripting 96.63, physics 97.59, navigation 96.39, api 86.72.
 # Ratchet them UP as coverage improves; never lower one silently to hide a
-# regression.
+# regression. A lowered floor ends its line with `# reason: <why>`, or
+# `make scripts` fails it (.github/scripts/coverage_floors.py, #963).
 app 95.00
 scripting 96.00
 physics 97.00
