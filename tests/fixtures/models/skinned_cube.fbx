@@ -1,0 +1,113 @@
+; FBX 7.4.0 project file
+; A one-metre cube skinned to one bone (#1024). Hand-written, so every number is
+; deliberate: authored in centimetres with Z up, the way many FBX exporters write,
+; so a correct import has to convert both (the bone sits 100 cm up = 1 m on +Y).
+FBXHeaderExtension:  {
+	FBXHeaderVersion: 1003
+	FBXVersion: 7400
+	Creator: "rusty test fixture"
+}
+GlobalSettings:  {
+	Version: 1000
+	Properties70:  {
+		P: "UpAxis", "int", "Integer", "",2
+		P: "UpAxisSign", "int", "Integer", "",1
+		P: "FrontAxis", "int", "Integer", "",1
+		P: "FrontAxisSign", "int", "Integer", "",-1
+		P: "CoordAxis", "int", "Integer", "",0
+		P: "CoordAxisSign", "int", "Integer", "",1
+		P: "UnitScaleFactor", "double", "Number", "",1
+	}
+}
+Objects:  {
+	Geometry: 1000, "Geometry::Cube", "Mesh" {
+		Vertices: *24 {
+			a: -50,-50,-50,50,-50,-50,50,50,-50,-50,50,-50,-50,-50,50,50,-50,50,50,50,50,-50,50,50
+		}
+		PolygonVertexIndex: *24 {
+			a: 0,3,2,-2,4,5,6,-8,0,1,5,-5,2,3,7,-7,3,0,4,-8,1,2,6,-6
+		}
+		GeometryVersion: 124
+		LayerElementUV: 0 {
+			Version: 101
+			Name: "UVMap"
+			MappingInformationType: "ByPolygonVertex"
+			ReferenceInformationType: "IndexToDirect"
+			UV: *8 {
+				a: 0,0,1,0,1,1,0,1
+			}
+			UVIndex: *24 {
+				a: 0,1,2,3,0,1,2,3,0,1,2,3,0,1,2,3,0,1,2,3,0,1,2,3
+			}
+		}
+		LayerElementMaterial: 0 {
+			Version: 101
+			Name: ""
+			MappingInformationType: "AllSame"
+			ReferenceInformationType: "IndexToDirect"
+			Materials: *1 {
+				a: 0
+			}
+		}
+		Layer: 0 {
+			Version: 100
+			LayerElement:  {
+				Type: "LayerElementUV"
+				TypedIndex: 0
+			}
+			LayerElement:  {
+				Type: "LayerElementMaterial"
+				TypedIndex: 0
+			}
+		}
+	}
+	Model: 2000, "Model::Cube", "Mesh" {
+		Version: 232
+	}
+	Model: 3000, "Model::Bone", "LimbNode" {
+		Version: 232
+		Properties70:  {
+			P: "Lcl Translation", "Lcl Translation", "", "A",0,0,100
+		}
+	}
+	NodeAttribute: 3100, "NodeAttribute::Bone", "LimbNode" {
+		TypeFlags: "Skeleton"
+	}
+	Material: 4000, "Material::Red", "" {
+		Version: 102
+		ShadingModel: "lambert"
+		Properties70:  {
+			P: "DiffuseColor", "Color", "", "A",0.8,0.1,0.1
+			P: "DiffuseFactor", "Number", "", "A",1
+		}
+	}
+	Deformer: 5000, "Deformer::Skin", "Skin" {
+		Version: 101
+		Link_DeformAcuracy: 50
+	}
+	Deformer: 5100, "SubDeformer::Bone", "Cluster" {
+		Version: 100
+		Indexes: *8 {
+			a: 0,1,2,3,4,5,6,7
+		}
+		Weights: *8 {
+			a: 1,1,1,1,1,1,1,1
+		}
+		Transform: *16 {
+			a: 1,0,0,0,0,1,0,0,0,0,1,0,0,0,-100,1
+		}
+		TransformLink: *16 {
+			a: 1,0,0,0,0,1,0,0,0,0,1,0,0,0,100,1
+		}
+	}
+}
+Connections:  {
+	C: "OO",2000,0
+	C: "OO",3000,0
+	C: "OO",3100,3000
+	C: "OO",1000,2000
+	C: "OO",4000,2000
+	C: "OO",5000,1000
+	C: "OO",5100,5000
+	C: "OO",3000,5100
+}

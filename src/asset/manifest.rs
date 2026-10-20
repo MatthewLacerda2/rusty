@@ -132,7 +132,9 @@ fn collect_model_paths(dir: &Path, out: &mut Vec<String>) {
     };
     for entry in read.flatten() {
         let path = entry.path();
-        if path.is_dir() {
+        if super::convert::is_import_cache(&path) {
+            continue; // Converted copies: the source is the asset (#1024).
+        } else if path.is_dir() {
             collect_model_paths(&path, out);
         } else {
             let as_str = paths::to_slash(&path);

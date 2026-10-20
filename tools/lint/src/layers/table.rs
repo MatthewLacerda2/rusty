@@ -56,7 +56,7 @@ pub const LAYERS: &[Layer] = &[
     sim("time", &[]),
     // Decoding is the asset pipeline's: models, and clips through symphonia (#545);
     // only `audio` plays them.
-    sim("asset", &["core"]).uses(&["bevy_mikktspace", "gltf", "symphonia", "tobj"]),
+    sim("asset", &["core"]).uses(&["bevy_mikktspace", "gltf", "symphonia", "tobj", "ufbx"]),
     sim("procgen", &["core"]).uses(&["image"]),
     // Shader authoring; GPU-free composition lives here so `render` imports it (#722).
     sim("shadergen", &["core"]).uses(&["naga", "naga_oil"]),
