@@ -1,6 +1,8 @@
 //! The Canvas Group inspector card (#418): subtree alpha plus the interactable and
 //! blocks-raycasts flags. Every write routes through `scene::authoring::canvas_group`.
 
+use crate::editor::inspector::components::card::remove_component;
+use crate::scene::authoring::ComponentKind;
 use egui_phosphor::regular as icon;
 
 use crate::editor::inspector::components::card::component_card;
@@ -32,7 +34,7 @@ pub fn draw(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, is_dirty:
         }
     });
     if remove {
-        world.set_canvas_group(id, None);
+        remove_component(world, id, ComponentKind::CanvasGroup, is_dirty);
     }
     *is_dirty |= remove || changed;
 }

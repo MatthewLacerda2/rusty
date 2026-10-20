@@ -16,6 +16,8 @@ mod render;
 mod start;
 pub(in crate::editor::inspector::components) mod widgets;
 
+use crate::editor::inspector::components::card::remove_component;
+use crate::scene::authoring::ComponentKind;
 use egui_phosphor::regular as icon;
 use widgets::{clamped, combo, drag_u32};
 
@@ -70,8 +72,7 @@ pub fn draw(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, is_dirty:
         },
     );
     if remove {
-        cx.0.set_particles(id, None);
-        *is_dirty = true;
+        remove_component(cx.0, id, ComponentKind::Particles, is_dirty);
     } else if changed {
         *is_dirty = true;
     }

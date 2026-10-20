@@ -2,6 +2,8 @@
 //! feather, and the graphic clip's show-graphic toggle. Writes route through
 //! `scene::authoring::rect_mask`.
 
+use crate::editor::inspector::components::card::remove_component;
+use crate::scene::authoring::ComponentKind;
 use egui_phosphor::regular as icon;
 
 use super::vec4_row;
@@ -36,7 +38,7 @@ pub fn draw(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, is_dirty:
         }
     });
     if remove {
-        world.set_rect_mask(id, None);
+        remove_component(world, id, ComponentKind::RectMask, is_dirty);
     }
     *is_dirty |= remove || changed;
 }
@@ -56,7 +58,7 @@ pub fn draw_mask(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, is_d
         }
     });
     if remove {
-        world.set_mask(id, None);
+        remove_component(world, id, ComponentKind::Mask, is_dirty);
     }
     *is_dirty |= remove || changed;
 }

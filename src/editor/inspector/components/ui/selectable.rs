@@ -3,6 +3,8 @@
 //! targets. Widgets edit a snapshot; every write routes through
 //! `scene::authoring::selectable`.
 
+use crate::editor::inspector::components::card::remove_component;
+use crate::scene::authoring::ComponentKind;
 use egui_phosphor::regular as icon;
 
 use super::{combo, entity_row};
@@ -39,7 +41,7 @@ pub fn draw(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, is_dirty:
         }
     }
     if remove {
-        world.set_selectable(id, None);
+        remove_component(world, id, ComponentKind::Selectable, is_dirty);
     }
     *is_dirty |= remove || changed;
 }

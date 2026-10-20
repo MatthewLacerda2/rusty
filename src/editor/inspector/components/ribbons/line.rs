@@ -1,5 +1,7 @@
 //! src/editor/inspector/components/ribbons/line.rs — the Line card (#441).
 
+use crate::editor::inspector::components::card::remove_component;
+use crate::scene::authoring::ComponentKind;
 use egui_phosphor::regular as icon;
 
 use super::draw_style;
@@ -53,8 +55,7 @@ pub fn draw_line(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, dirt
         },
     );
     if remove {
-        world.set_line(id, None);
-        *dirty = true;
+        remove_component(world, id, ComponentKind::Line, dirty);
     }
 }
 

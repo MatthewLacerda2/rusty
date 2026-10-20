@@ -17,7 +17,6 @@ pub fn draw(
     selected_parent_name: &str,
     valid_parents: &[(u32, String)],
     pending_parent_change: &mut Option<Option<u32>>,
-    pending_nav_bake: &mut bool,
     is_dirty: &mut bool,
 ) {
     // Transform is mandatory: a foldout card with no remove button.
@@ -30,7 +29,6 @@ pub fn draw(
             selected_parent_name,
             valid_parents,
             pending_parent_change,
-            pending_nav_bake,
             is_dirty,
         );
     });
@@ -48,11 +46,8 @@ fn draw_body(
     selected_parent_name: &str,
     valid_parents: &[(u32, String)],
     pending_parent_change: &mut Option<Option<u32>>,
-    pending_nav_bake: &mut bool,
     is_dirty: &mut bool,
 ) {
-    let is_static = world.is_static(id);
-
     let Some(mut trans) = world.transform_mut(id) else {
         return;
     };
@@ -73,9 +68,6 @@ fn draw_body(
             }
         }
         *is_dirty = true;
-        if is_static {
-            *pending_nav_bake = true;
-        }
     }
 
     draw_parent_selector(

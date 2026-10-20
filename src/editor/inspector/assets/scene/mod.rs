@@ -49,9 +49,8 @@ pub fn draw(
 
 /// The per-scene Navmesh bake settings section (#276): edit agent radius, agent height,
 /// max slope, and max step (Unity's per-scene navmesh bake parameters), then re-bake the
-/// shared nav graph from the live scene so the edit takes effect — the SAME `nav.bake(scene)`
-/// path the entity inspector's collider/static toggles trigger via `pending_nav_bake`,
-/// no second re-bake mechanism. `agent_radius` is live (#277): the re-bake erodes the
+/// shared nav graph from the live scene so the edit takes effect at once (the editor's
+/// per-frame `nav.sync` would also see the changed settings and rebake in full, #992). `agent_radius` is live (#277): the re-bake erodes the
 /// walkable surface inward by the radius (clearance off walls, thin passages close).
 /// `agent_height` is live (#278): the re-bake drops spans whose open space is below the
 /// height (no pathing under a low overhang / through a crawlspace).

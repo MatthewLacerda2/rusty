@@ -3,6 +3,8 @@
 //! size) and the content fitter per axis. Widgets edit a snapshot; every write
 //! routes through `scene::authoring::layout_element`.
 
+use crate::editor::inspector::components::card::remove_component;
+use crate::scene::authoring::ComponentKind;
 use egui_phosphor::regular as icon;
 
 use super::combo;
@@ -54,7 +56,7 @@ pub fn draw(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, is_dirty:
         }
     }
     if remove {
-        world.set_layout_element(id, None);
+        remove_component(world, id, ComponentKind::LayoutElement, is_dirty);
     }
     *is_dirty |= remove || changed;
 }

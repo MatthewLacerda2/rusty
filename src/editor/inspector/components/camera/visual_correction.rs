@@ -7,6 +7,8 @@
 //! write through the shared `authoring::visual_correction::*` op (which the
 //! `Graphics.*` Lua surface calls too), never mutating the component directly.
 
+use crate::editor::inspector::components::card::remove_component;
+use crate::scene::authoring::ComponentKind;
 use egui_phosphor::regular as icon;
 
 use crate::editor::inspector::components::card::component_card;
@@ -49,8 +51,7 @@ pub fn draw_visual_correction(
         },
     );
     if remove {
-        world.set_visual_correction(id, None);
-        *is_dirty = true;
+        remove_component(world, id, ComponentKind::VisualCorrection, is_dirty);
     }
 }
 

@@ -3,6 +3,8 @@
 //! SDF effects (outline, shadow, glow) and the blend mode (#425). Widgets edit a snapshot; every write
 //! routes through `scene::authoring::text`.
 
+use crate::editor::inspector::components::card::remove_component;
+use crate::scene::authoring::ComponentKind;
 use egui_phosphor::regular as icon;
 
 use super::look::{blend_row, color_row, drag_row};
@@ -33,7 +35,7 @@ pub fn draw(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, is_dirty:
         }
     }
     if remove {
-        world.set_text(id, None);
+        remove_component(world, id, ComponentKind::Text, is_dirty);
     }
     *is_dirty |= remove || changed;
 }

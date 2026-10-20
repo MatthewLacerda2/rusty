@@ -6,7 +6,9 @@
 use egui::collapsing_header::CollapsingState;
 use egui_phosphor::regular as icon;
 
+use crate::ecs::World;
 use crate::editor::theme::{self, chrome};
+use crate::scene::authoring::{self, ComponentKind};
 
 /// Render a component foldout card. Pass `Some(&mut flag)` for a removable
 /// component (the X button sets the flag); pass `None` for mandatory ones
@@ -49,3 +51,16 @@ pub fn card_frame(t: &theme::Theme) -> egui::Frame {
         .corner_radius(6)
         .stroke(egui::Stroke::new(1.0, t.outline.linear_multiply(0.6)))
 }
+
+/// What a card's Remove button does once the card has drawn: the cascading verb
+/// behind `Scene.RemoveComponent` (#992), so the components that require `kind` (a
+/// Joint after its RigidBody, a Text after its RectTransform) go in the same frame,
+/// and the scene is marked unsaved.
+pub fn remove_component(world: &mut World, id: u32, kind: ComponentKind, is_dirty: &mut bool) {
+    authoring::remove_with_cascade(world, id, kind);
+    *is_dirty = true;
+}
+
+#[cfg(test)]
+#[path = "card_tests.rs"]
+mod tests;
