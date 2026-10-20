@@ -10,7 +10,8 @@ whose jobs do not yet show the gate concluded on the run's own attempt (the
 gate unconcluded, not listed, or listed only for an older attempt) has not said
 whose red it is: judging it then read an empty `bad` and handed an outage back
 as a code failure. So [`runner_red`] answers *not yet known* there, and the
-queue waits ([`unread`]), bounded by `--deadline` as any wait is.
+queue waits ([`unread`]) for a grace from the poll that first read it so
+([`queue.polling.lagging`]); past it, the run is judged as listed, red.
 """
 
 from __future__ import annotations

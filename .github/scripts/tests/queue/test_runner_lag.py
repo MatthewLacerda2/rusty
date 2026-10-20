@@ -14,13 +14,13 @@ import subprocess
 import unittest
 from unittest import mock
 
-from merging.queue import outcomes
+from merging.queue import outcomes, polling
 from merging.verdict import runners
 
-from tests.queue.fixtures import SPENT, asked
+from tests.queue.fixtures import READY, SPENT, asked
 from tests.queue.test_runner_outage import CHANGES_CANCELLED, CODE_RED, ci_cancelled, waited
 from tests.verdict import fixtures
-from tests.verdict.fixtures import built, job, run
+from tests.verdict.fixtures import CODE, built, job, run
 
 FAILED = run("ci", conclusion="failure")
 
@@ -62,10 +62,34 @@ class RunnerLag(unittest.TestCase):
         self.assertEqual(state, outcomes.STOP, lines)
         self.assertIn("concluded failure", lines[0])
 
-    def test_a_code_red_elsewhere_hands_back_without_waiting_on_the_lag(self):
-        runs = [FAILED, run("lint", conclusion="failure")]
-        lint_red = [job("changes", "success"), job("lint", "failure"), job("lint-gate", "failure")]
-        self.assertEqual(runners.unread(fixtures.READY, runs, {1: [], 2: lint_red}), [])
+    def test_a_code_red_elsewhere_hands_back_naming_the_code_red(self):
+        lint_url = "https://example.invalid/run/2"
+        runs = [FAILED, run("lint", conclusion="failure", html_url=lint_url)]
+        jobs = {1: [], 2: [job("changes", "success"), job("lint", "failure"), job("lint-gate", "failure")]}
+        self.assertEqual(runners.unread(fixtures.READY, runs, jobs), [])
+        state, lines = asked(*runs, jobs=jobs, waited=SPENT)
+        self.assertEqual(state, outcomes.STOP, lines)
+        self.assertIn("`lint` run", lines[0])
+        self.assertIn(lint_url, " ".join(lines))
+
+    def test_no_job_listed_within_the_grace_waits(self):
+        since = {(1, 1): SPENT}
+        state, lines = polling.progress(READY, [FAILED, run("lint")], {1: [], 2: built("lint")}, CODE, SPENT + 60, red_since=since)
+        self.assertEqual(state, outcomes.WAIT, lines)
+
+    def test_no_job_listed_past_the_grace_hands_back_failed_at_once(self):
+        # A run that failed before any job started never lists a gate (#1109's review).
+        since = {(1, 1): 0.0}
+        state, lines = polling.progress(READY, [FAILED, run("lint")], {1: [], 2: built("lint")}, CODE, polling.GATE_SHOWS_SECONDS, red_since=since)
+        self.assertEqual(state, outcomes.STOP, lines)
+        self.assertIn("`ci` run", lines[0])
+        self.assertIn("concluded failure", lines[0])
+        self.assertIn(FAILED["html_url"], " ".join(lines))
+
+    def test_the_first_poll_that_reads_the_lag_starts_its_grace(self):
+        since = {}
+        polling.progress(READY, [FAILED, run("lint")], {1: [], 2: built("lint")}, CODE, 42.0, red_since=since)
+        self.assertEqual(since, {(1, 1): 42.0})
 
     def test_an_outage_listed_for_the_current_attempt_is_still_re_run(self):
         # The lag catches up: the cancelled jobs show for the run's attempt, and
