@@ -5,9 +5,7 @@ use std::rc::Rc;
 use glam::Vec3;
 
 use crate::core::input::InputState;
-use crate::core::quality::QualityPreset;
 use crate::core::storage::Storage;
-use crate::core::video::VideoSettings;
 use crate::navigation::NavigationGraph;
 use crate::scene::Camera;
 use crate::scene::Scene;
@@ -63,32 +61,6 @@ fn set_storage_replaces_underlying_cell() {
     m.exec("Storage.Set('ns', 'k', 7)").unwrap();
     let val = storage.borrow().get("ns", "k");
     assert_eq!(val.and_then(|v| v.as_f64()), Some(7.0));
-}
-
-#[test]
-fn quality_cell_roundtrip() {
-    let mut m = make_manager();
-    let quality = Rc::new(RefCell::new(QualityPreset::High));
-    m.set_quality_cell(Rc::clone(&quality));
-    let out = m.quality_cell();
-    assert!(matches!(*out.borrow(), QualityPreset::High));
-    *quality.borrow_mut() = QualityPreset::Low;
-    assert!(matches!(*m.quality_cell().borrow(), QualityPreset::Low));
-}
-
-#[test]
-fn video_cell_roundtrip() {
-    let mut m = make_manager();
-    let video = Rc::new(RefCell::new(VideoSettings {
-        width: 1280,
-        height: 720,
-        vsync: false,
-        fullscreen: false,
-    }));
-    m.set_video_cell(Rc::clone(&video));
-    assert_eq!(m.video_cell().borrow().width, 1280);
-    video.borrow_mut().width = 1920;
-    assert_eq!(m.video_cell().borrow().width, 1920);
 }
 
 #[test]

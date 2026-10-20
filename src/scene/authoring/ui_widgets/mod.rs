@@ -27,7 +27,7 @@ use crate::scene::prefab::extract_prefab;
 use crate::scene::Scene;
 
 /// Where [`seed`] writes the widget prefabs, relative to the project root.
-pub const PREFAB_DIR: &str = "assets/prefabs/ui";
+const PREFAB_DIR: &str = "assets/prefabs/ui";
 
 /// Every entry of the Create ▸ UI menu, in menu order.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

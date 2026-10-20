@@ -26,7 +26,7 @@ mod sidecar;
 
 use std::path::{Path, PathBuf};
 
-pub use brief::{canonical, digest, digest_of, fingerprint, Brief};
+pub use brief::{canonical, digest, digest_of, Brief};
 #[cfg(test)]
 pub(crate) use sidecar::civil_date;
 pub use sidecar::{today, Sidecar};

@@ -173,6 +173,7 @@ impl ShadowRenderer {
 
     /// Whether some cascade's static bake is not `scene`'s: it holds another scene's
     /// statics, or nothing at all.
+    #[cfg(test)]
     pub fn needs_static_bake(&self, scene: SceneId) -> bool {
         let count = self.cascades.len().max(1);
         self.static_cache[..count]

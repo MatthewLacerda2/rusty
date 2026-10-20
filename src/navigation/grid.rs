@@ -157,6 +157,7 @@ impl NavigationGraph {
     }
 
     /// Whether a cell holds any walkable span.
+    #[cfg(test)]
     pub fn is_walkable(&self, gx: i32, gz: i32) -> bool {
         !self.span_range(gx, gz).is_empty()
     }

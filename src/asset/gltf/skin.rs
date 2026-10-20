@@ -18,7 +18,7 @@ use glam::{Mat4, Quat, Vec3};
 
 /// Global (model-space) transforms of every node, composed down the scene
 /// hierarchy from each root. glTF stores only local transforms.
-pub fn node_globals(document: &gltf::Document) -> Map<usize, Mat4> {
+fn node_globals(document: &gltf::Document) -> Map<usize, Mat4> {
     let mut globals = Map::default();
     for scene in document.scenes() {
         for node in scene.nodes() {

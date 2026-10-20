@@ -26,7 +26,7 @@ use scorsese_providers::voices::{
 use super::super::{resolve, Environment, Provider, Refusal, Secret};
 
 /// The most voices `/v2/voices` puts on one page.
-pub const PAGE_SIZE: u32 = 100;
+const PAGE_SIZE: u32 = 100;
 
 /// More pages than any account has (100,000 voices): past it, the vendor is
 /// repeating itself and the loop stops rather than spinning.

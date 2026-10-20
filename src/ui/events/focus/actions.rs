@@ -40,7 +40,7 @@ pub const REPEAT_DELAY: f32 = 0.5;
 pub const REPEAT_RATE: f32 = 0.1;
 /// How far a stick must lean to count as a Move (Unity's default button press
 /// point). Its axes already passed the pad's radial dead zone at the source.
-pub const STICK_PRESS: f32 = 0.5;
+const STICK_PRESS: f32 = 0.5;
 
 /// The keys whose press is a Move, direction-major in `select_on` order: each
 /// direction's arrow, then every pad slot's d-pad button.

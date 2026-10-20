@@ -16,7 +16,7 @@ use crate::scene::Camera;
 /// How fast a swayed canvas settles: the lag's exponential time constant, seconds.
 pub const SWAY_RECOVERY: f32 = 0.15;
 /// The most a canvas lags, degrees per axis — a whip-turn never flings the HUD away.
-pub const MAX_SWAY: f32 = 30.0;
+const MAX_SWAY: f32 = 30.0;
 
 /// Advance every `ScreenSpaceCamera` canvas's lag by one `dt`-second tick of `camera`.
 pub fn update_sway(world: &mut World, camera: &Camera, dt: f32) {

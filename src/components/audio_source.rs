@@ -78,13 +78,6 @@ impl Default for AudioSourceComponent {
     }
 }
 
-impl AudioSourceComponent {
-    /// Whether a clip path is set (an empty path is "no clip").
-    pub fn has_clip(&self) -> bool {
-        !self.clip.trim().is_empty()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -97,7 +90,7 @@ mod tests {
         assert!(!a.play_on_start);
         assert!(a.is_time_scaled);
         assert_eq!(a.spatial_blend, 0.0);
-        assert!(!a.has_clip());
+        assert!(a.clip.is_empty());
     }
 
     #[test]

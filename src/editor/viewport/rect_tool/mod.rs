@@ -36,7 +36,7 @@ use crate::ui::{CanvasSpace, UiLayout, UiPointer, UiRect};
 use geometry::Handle;
 
 /// How close (viewport points) the pointer must be to grab a handle.
-pub const HANDLE_RADIUS: f32 = 7.0;
+const HANDLE_RADIUS: f32 = 7.0;
 
 /// The Scene viewport image as the overlay sees it: its size in points and the
 /// pixels per point the offscreen target was sized with.

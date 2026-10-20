@@ -36,8 +36,8 @@ mod migrate;
 use std::path::{Path, PathBuf};
 
 pub use commit::{engine_commit, UNKNOWN_COMMIT};
-pub use file::{EngineCheck, ProjectFile, LEGACY_BUILD_SETTINGS, PROJECT_FILE};
-pub use locate::{engine_dir, engine_path, locate, packaged_project};
+pub use file::{EngineCheck, ProjectFile, PROJECT_FILE};
+pub use locate::{engine_dir, engine_path, locate};
 
 /// The project's content folder, relative to its root (Unity's `Assets/`).
 pub const ASSETS_DIR: &str = "assets";
@@ -49,7 +49,7 @@ pub const SAVED_DIR: &str = "saved";
 /// engine used before projects could live anywhere.
 pub const DEFAULT_PROJECT_DIR: &str = "project";
 /// The command-line flag every binary takes to name its project.
-pub const PROJECT_FLAG: &str = "--project";
+const PROJECT_FLAG: &str = "--project";
 
 /// Where a project keeps its Lua scripts, relative to the root.
 pub const SCRIPTS_DIR: &str = "assets/scripts";

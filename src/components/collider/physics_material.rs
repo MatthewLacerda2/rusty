@@ -61,7 +61,7 @@ pub struct PhysicsMaterial {
 impl PhysicsMaterial {
     /// rapier's own default friction. Kept (over Unity's `0.6`) so every scene
     /// authored before #447 simulates exactly as it did.
-    pub const DEFAULT_FRICTION: f32 = 0.5;
+    const DEFAULT_FRICTION: f32 = 0.5;
 
     /// A material with the given coefficients clamped into range (friction
     /// `>= 0`, bounciness `[0, 1]`) and the default `Average` combine modes.

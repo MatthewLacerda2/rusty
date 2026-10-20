@@ -21,11 +21,11 @@ use glam::Vec3;
 use serde::{Deserialize, Serialize};
 
 /// Number of L2 SH basis functions (3 bands: 1 + 3 + 5).
-pub const SH_COEFFS: usize = 9;
+const SH_COEFFS: usize = 9;
 
 /// Evaluate the 9 real spherical-harmonic basis functions for a unit direction.
 /// Constants are the standard normalized real-SH polynomials.
-pub fn sh_basis(dir: Vec3) -> [f32; SH_COEFFS] {
+fn sh_basis(dir: Vec3) -> [f32; SH_COEFFS] {
     let d = dir.normalize_or_zero();
     let (x, y, z) = (d.x, d.y, d.z);
     [

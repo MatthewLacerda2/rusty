@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 pub const LAYER_COUNT: usize = 32;
 
 /// The reserved name of layer 0, which is fixed.
-pub const DEFAULT_LAYER_NAME: &str = "Default";
+const DEFAULT_LAYER_NAME: &str = "Default";
 
 /// Whether `layer` is a member of the membership set `mask` (one bit per layer).
 /// Shared by the camera culling masks (#92) and the collision matrix (#91). A

@@ -181,8 +181,7 @@ pub use crate::scene::authoring::components::{add_component, remove_component, C
 // remove cascade, the inspector's per-frame reconcile, and scene load all reach the
 // one enforcement path through this shared authoring entry point.
 pub use crate::scene::authoring::dependency::{
-    add_with_requirements, enforce_requirements, reconcile_requirements, remove_with_cascade,
-    satisfy_requirements,
+    add_with_requirements, reconcile_requirements, remove_with_cascade,
 };
 
 // The prefab structural verbs live in `scene::prefab` (#215) and `scene::prefab_link`
@@ -195,19 +194,17 @@ pub use crate::scene::prefab::link::{
     list_instance_overrides, record_instance_overrides, reimport_instance,
     revert_instance_overrides,
 };
-pub use crate::scene::prefab::{extract_prefab, instantiate_prefab, instantiate_prefab_linked};
 
 // The asset-instantiate verb (#182) lives in `scene::asset_instance` (size-cap
 // split); re-exported here so the editor's model inspector and the `Scene.Instantiate`
 // asset branch both spawn imported sub-objects through this one shared entry point.
 pub use crate::scene::asset_instance::instantiate_asset;
-pub use crate::scene::lod_instance::{instantiate_lod_set, instantiate_model};
+pub use crate::scene::lod_instance::instantiate_model;
 
 // The per-field material-mutation ops (#287) live in `material`; the editor card and
 // the Lua `Material.*` API are siblings over them, so the field write + validation
 // (e.g. the alpha clamp) lives once. `ensure_material_key` is the shared resolve-or-
 // create the API uses; callers reach the ops via `authoring::material::*`.
-pub use crate::scene::authoring::material::ensure_material_key;
 
 #[cfg(test)]
 mod tests {

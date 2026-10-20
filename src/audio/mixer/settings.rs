@@ -12,7 +12,7 @@ pub const LOW_PASS_OFF: f32 = 22_000.0;
 /// A high-pass cutoff at or below this is "off" (Unity's default, 10 Hz).
 pub const HIGH_PASS_OFF: f32 = 10.0;
 /// The cutoff range a filter accepts, in Hz.
-pub const CUTOFF_RANGE: (f32, f32) = (HIGH_PASS_OFF, LOW_PASS_OFF);
+const CUTOFF_RANGE: (f32, f32) = (HIGH_PASS_OFF, LOW_PASS_OFF);
 
 /// A filter's cutoff (Hz) and resonance (`0..1`, `0` is a plain slope).
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]

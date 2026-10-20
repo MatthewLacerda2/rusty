@@ -40,7 +40,8 @@ pub struct Camera {
     scene_lens: bool,
 }
 
-pub use crate::components::camera::{DEFAULT_FAR, DEFAULT_FOV, DEFAULT_NEAR};
+pub use crate::components::camera::DEFAULT_FOV;
+use crate::components::camera::{DEFAULT_FAR, DEFAULT_NEAR};
 
 /// Pitch limit, in degrees, for every pitch a person or script sets: short of
 /// straight up/down, where the look-at basis degenerates and yaw stops meaning

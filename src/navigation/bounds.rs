@@ -10,8 +10,9 @@
 //!   [`BOUNDS_MARGIN`] plus the agent radius so the radius erosion's pull-back off the
 //!   world edge never eats the ground around the outermost geometry;
 //! * an **empty scene** (no static geometry) falls back to the historical ±20 box
-//!   ([`EMPTY_SCENE_HALF_EXTENT`]). With nothing to stand on it holds no spans
-//!   (#454): no geometry, no navmesh, as in Unity.
+//!   ([`EMPTY_SCENE_HALF_EXTENT`](crate::scene::nav_settings::EMPTY_SCENE_HALF_EXTENT)).
+//!   With nothing to stand on it holds no spans (#454): no geometry, no navmesh, as in
+//!   Unity.
 //!
 //! Resolved bounds snap outward to multiples of the grid spacing, so cell centres stay
 //! on the same world lattice whatever the geometry's extent (a moved crate never shifts
@@ -19,7 +20,7 @@
 //! for `navigation` holds.
 
 use super::NavigationGraph;
-pub use crate::scene::nav_settings::{NavBounds, EMPTY_SCENE_HALF_EXTENT};
+pub use crate::scene::nav_settings::NavBounds;
 use crate::scene::Scene;
 use glam::Vec3;
 

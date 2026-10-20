@@ -73,7 +73,7 @@ pub fn validate_layout(cube: &PrefilteredCubemap) -> bool {
 
 /// Mip count for a base edge length: a full chain down to 1×1 (`log2(size) + 1`), so the
 /// roughest mip is a single texel — the fully-diffuse limit of the lobe.
-pub fn mip_count(base_size: u32) -> u32 {
+fn mip_count(base_size: u32) -> u32 {
     32 - base_size.max(1).leading_zeros()
 }
 

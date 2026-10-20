@@ -10,7 +10,7 @@
 //! global skybox. Only LDR RGBA8 (UNORM / SRGB) is accepted, matching the bake's output
 //! format; anything else is treated as absent.
 //!
-//! The CPU-side parse ([`parse_ktx2_cubemap`]) is split out as a pure function over
+//! The CPU-side parse ([`parse_ktx2_cubemap_mips`]) is split out as a pure function over
 //! bytes so it is unit-testable without a GPU or a file on disk.
 
 use std::rc::Rc;
@@ -19,63 +19,20 @@ use ktx2::Format;
 
 use crate::render::Renderer;
 
-/// A decoded LDR cubemap on the CPU: a square edge length plus the six faces' RGBA8
-/// pixels in KTX2 face order (+X, -X, +Y, -Y, +Z, -Z), each `size * size * 4` bytes.
-pub struct CubemapData {
-    pub size: u32,
-    /// The six faces concatenated in face order — `6 * size * size * 4` bytes total,
-    /// exactly the layout a `depth_or_array_layers = 6` upload expects.
-    pub faces_rgba8: Vec<u8>,
-}
-
 /// A decoded LDR cubemap WITH its roughness mip chain (#245). `mips[0]` is the base level
 /// (`size`); each later mip halves the edge length. Every level is the six faces packed
-/// back-to-back, the same layout `CubemapData::faces_rgba8` uses. This is what the forward
+/// back-to-back in KTX2 face order (+X, -X, +Y, -Y, +Z, -Z). This is what the forward
 /// pass uploads so `textureSampleLevel` can pick a mip from a surface's roughness.
 pub struct CubemapMips {
     pub size: u32,
     pub mips: Vec<Vec<u8>>,
 }
 
-/// Parse a KTX2 byte blob into an LDR RGBA8 cubemap, or `None` when the bytes are not a
-/// usable LDR cubemap (bad/garbage data, non-cube, non-RGBA8, or a size mismatch). Pure
-/// and GPU-free so the loading path is testable headlessly.
-pub fn parse_ktx2_cubemap(bytes: &[u8]) -> Option<CubemapData> {
-    let reader = ktx2::Reader::new(bytes).ok()?;
-    let header = reader.header();
-
-    // Must be a square cubemap (6 faces, single array layer) in an RGBA8 LDR format.
-    if header.face_count != 6 || header.layer_count > 1 {
-        return None;
-    }
-    if !is_rgba8(header.format?) {
-        return None;
-    }
-    let size = header.pixel_width;
-    if size == 0 || header.pixel_height != size {
-        return None;
-    }
-
-    // Level 0 holds all six faces packed back-to-back; later mips (the prefilter chain,
-    // #245) are ignored for now — we sample the base level until roughness mips exist.
-    let level0 = reader.levels().next()?;
-    let face_bytes = (size as usize) * (size as usize) * 4;
-    let expected = face_bytes * 6;
-    if level0.len() < expected {
-        return None;
-    }
-
-    Some(CubemapData {
-        size,
-        faces_rgba8: level0[..expected].to_vec(),
-    })
-}
-
 /// Parse a KTX2 blob into an LDR RGBA8 cubemap WITH its full roughness mip chain (#245),
 /// or `None` when it is not a usable LDR cubemap. Level 0 is the base; each later level is
 /// expected to halve the edge length (the prefilter's layout). A level whose byte length
 /// is short for its expected size truncates the chain there rather than failing — the
-/// loader stays tolerant, matching `parse_ktx2_cubemap`'s graceful-absence contract.
+/// loader stays tolerant. Pure and GPU-free so the loading path is testable headlessly.
 pub fn parse_ktx2_cubemap_mips(bytes: &[u8]) -> Option<CubemapMips> {
     let reader = ktx2::Reader::new(bytes).ok()?;
     let header = reader.header();
@@ -119,19 +76,10 @@ pub struct CubemapTexture {
 }
 
 impl Renderer {
-    /// Load a reflection-probe cubemap from `path` into a GPU cube texture. Returns
-    /// `None` (caller falls back to the skybox) when the file is missing or is not a
-    /// usable LDR RGBA8 cubemap — the expected state until the bake exists (#245).
-    pub fn load_cubemap(&self, path: &str) -> Option<CubemapTexture> {
-        let bytes = std::fs::read(path).ok()?;
-        let data = parse_ktx2_cubemap(&bytes)?;
-        Some(self.upload_cubemap(path, &data))
-    }
-
     /// Load a reflection-probe cubemap WITH its roughness mip chain from `path` (#245),
     /// into a mipped cube texture the forward pass samples with `textureSampleLevel`.
     /// Returns `None` (caller falls back to the skybox) when the file is missing or is not
-    /// a usable LDR RGBA8 cubemap — the graceful-absence contract of `load_cubemap`.
+    /// a usable LDR RGBA8 cubemap — the expected state until the bake exists (#245).
     pub fn load_cubemap_mips(&self, path: &str) -> Option<CubemapTexture> {
         let bytes = std::fs::read(path).ok()?;
         let data = parse_ktx2_cubemap_mips(&bytes)?;
@@ -229,27 +177,6 @@ impl Renderer {
             sampler,
             size,
         }
-    }
-
-    /// Upload a decoded single-level cubemap into a 6-layer cube texture with a cube view
-    /// + sampler.
-    fn upload_cubemap(&self, label: &str, data: &CubemapData) -> CubemapTexture {
-        let texture = self.device.create_texture(&wgpu::TextureDescriptor {
-            label: Some(label),
-            size: wgpu::Extent3d {
-                width: data.size,
-                height: data.size,
-                depth_or_array_layers: 6,
-            },
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba8UnormSrgb,
-            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-            view_formats: &[],
-        });
-        self.write_cube_level(&texture, 0, data.size, &data.faces_rgba8);
-        self.finish_cube_texture(label, texture, data.size)
     }
 }
 

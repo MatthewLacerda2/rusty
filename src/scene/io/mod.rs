@@ -23,7 +23,7 @@ mod seed;
 use std::path::Path;
 
 pub use lighting_block::{save_lighting, LightingSave};
-pub use manifest::{SeedManifest, SeedOutcome, SEED_MANIFEST_PATH};
+pub use manifest::{SeedManifest, SeedOutcome};
 pub use seed::{
     build_default_scene, seed_default_scene, seed_default_scripts, seed_workspace,
     DEFAULT_SCENE_PATH, DEFAULT_SCRIPTS_DEST_DIR,
