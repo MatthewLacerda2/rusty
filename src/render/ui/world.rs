@@ -90,6 +90,11 @@ impl WorldUiPipeline {
         let lazy = self.pipelines.get(super::blend::index(mode))?;
         Some(lazy.get())
     }
+
+    /// Every blend mode's pipeline, built or not (#985).
+    pub(super) fn lazy(&self) -> impl Iterator<Item = &LazyPipeline> {
+        self.pipelines.iter()
+    }
 }
 
 /// A view's world-canvas uniforms: one aligned slot per canvas, rewritten per

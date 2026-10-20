@@ -1,12 +1,12 @@
 //! The forward pass's optional pipelines wait for the first frame that draws them
 //! (#985): an opaque game frame builds none, the editor's overlays build the line
-//! pipeline, and a translucent solid builds the transparent one. Built by hand, every
-//! one of them is a valid pipeline, so a frame that first needs one never fails on it.
+//! pipeline, and a translucent solid builds the transparent one. Warmed, as a windowed
+//! renderer does at startup, every one of them is a valid pipeline.
 
 use glam::Vec3;
 
 use crate::components::material::RenderMode;
-use crate::components::{MaterialAsset, MaterialComponent, ParticleBlend};
+use crate::components::{MaterialAsset, MaterialComponent, UiBlend};
 use crate::render::{RenderView, Renderer, OFFSCREEN_FORMAT};
 use crate::scene::{Camera, MeshComponent, Scene};
 
@@ -70,17 +70,27 @@ fn gpu_optional_forward_pipelines_build_on_first_draw() {
     assert!(built(&renderer)[0], "a translucent solid draws transparent");
 }
 
+/// What a windowed renderer does at startup: every lazy pipeline is built, world-UI
+/// blend modes no test draws included, so a game never compiles one mid-frame. A
+/// shipped game (no editor overlays) leaves only the line and outline lazy.
 #[test]
-fn gpu_every_lazy_pipeline_builds() {
+fn gpu_warm_pipelines_builds_every_lazy_pipeline() {
     let Some(renderer) = crate::render::test_gpu::headless_or_skip(RES, RES) else {
         return;
     };
-    renderer.outline_pipeline.get();
-    renderer.line_pipeline.get();
-    renderer.transparent_pipeline.get();
-    for blend in [ParticleBlend::Alpha, ParticleBlend::Additive] {
-        renderer.particle_renderer.pipeline_for(blend);
-        renderer.ribbon_renderer.pipeline_for(blend);
-    }
-    assert_eq!(built(&renderer), [true; 3]);
+    let every = renderer.lazy_pipelines(true);
+    // transparent + 2 particle + 2 ribbon + one world canvas per blend mode + 2 editor.
+    assert_eq!(every.len(), 1 + 2 + 2 + UiBlend::ALL.len() + 2);
+    assert!(every.iter().all(|p| !p.is_built()), "headless stays lazy");
+
+    renderer.warm_pipelines(false);
+    assert!(renderer.lazy_pipelines(false).iter().all(|p| p.is_built()));
+    assert_eq!(
+        built(&renderer),
+        [true, false, false],
+        "a game warms no overlays"
+    );
+
+    renderer.warm_pipelines(true);
+    assert!(renderer.lazy_pipelines(true).iter().all(|p| p.is_built()));
 }

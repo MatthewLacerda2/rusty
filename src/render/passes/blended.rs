@@ -115,6 +115,11 @@ impl BlendPipelines {
             ParticleBlend::Additive => self.additive.get(),
         }
     }
+
+    /// Both pipelines, built or not (#985).
+    pub(crate) fn lazy(&self) -> [&LazyPipeline; 2] {
+        [&self.alpha, &self.additive]
+    }
 }
 
 /// Additive blend (src + dst), keeping dst alpha. Sparks/fire brighten the HDR

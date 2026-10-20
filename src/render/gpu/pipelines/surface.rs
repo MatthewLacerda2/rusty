@@ -70,8 +70,8 @@ pub(crate) enum SolidPass<'a> {
     Prepass(&'a wgpu::RenderPipeline),
     /// Opaque solids; the standard pipeline is the view's (the preview may swap it).
     Opaque(&'a wgpu::RenderPipeline),
-    /// Alpha-blended solids.
-    Transparent(&'a wgpu::RenderPipeline),
+    /// Alpha-blended solids; the standard pipeline is built only if a batch uses it.
+    Transparent(&'a super::LazyPipeline),
 }
 
 /// What a slot's file looked like when it was last built: its path, mtime and length.
@@ -180,7 +180,7 @@ impl SurfaceShaders {
         match pass {
             SolidPass::Prepass(standard) => self.cut(id).map_or(standard, |c| &c.prepass),
             SolidPass::Opaque(standard) => variant.map_or(standard, |v| &v.forward),
-            SolidPass::Transparent(standard) => variant.map_or(standard, |v| &v.transparent),
+            SolidPass::Transparent(lazy) => variant.map_or_else(|| lazy.get(), |v| &v.transparent),
         }
     }
 
