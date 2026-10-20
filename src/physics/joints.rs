@@ -45,6 +45,8 @@ use crate::scene::Scene;
 mod impulse_pair_tests;
 #[cfg(test)]
 mod impulse_tests;
+#[cfg(test)]
+mod inert_tests;
 mod load;
 #[cfg(test)]
 mod load_tests;

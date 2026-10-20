@@ -116,3 +116,58 @@ fn a_script_requiring_a_helper_module_still_parses() {
     assert_eq!(parse_fields(code).len(), 1);
     assert!(crate::scripting::discovery::exposes_lifecycle(code));
 }
+
+#[test]
+fn type_aliases_parse_and_an_unknown_type_falls_back_to_the_default_s_kind() {
+    let code = r#"return { fields = {
+        b = { type = "bool", default = true },
+        t = { type = "text", default = "x" },
+        n = { type = "vector", default = 4 },
+        none = { type = "vector" },
+        spoken = { default = {} },
+    }}"#;
+    let fields = parse_fields(code);
+    assert_eq!(field(&fields, "b").default, ScriptFieldValue::Boolean(true));
+    assert_eq!(
+        field(&fields, "t").default,
+        ScriptFieldValue::Text("x".into())
+    );
+    assert_eq!(field(&fields, "n").default, ScriptFieldValue::Number(4.0));
+    // Nothing to infer from: a number, zeroed.
+    assert_eq!(
+        field(&fields, "none").default,
+        ScriptFieldValue::Number(0.0)
+    );
+    assert_eq!(field(&fields, "spoken").kind, FieldKind::Number);
+}
+
+#[test]
+fn a_default_of_the_wrong_kind_is_zeroed_for_the_declared_type() {
+    let code = r#"return { fields = {
+        n = { type = "number", default = "fast" },
+        on = { type = "boolean", default = 1 },
+        label = { type = "string", default = false },
+        whole = { type = "number", default = 7 },
+    }}"#;
+    let fields = parse_fields(code);
+    assert_eq!(field(&fields, "n").default, ScriptFieldValue::Number(0.0));
+    assert_eq!(
+        field(&fields, "on").default,
+        ScriptFieldValue::Boolean(false)
+    );
+    assert_eq!(
+        field(&fields, "label").default,
+        ScriptFieldValue::Text(String::new())
+    );
+    assert_eq!(
+        field(&fields, "whole").default,
+        ScriptFieldValue::Number(7.0)
+    );
+}
+
+#[test]
+fn a_bare_value_that_is_not_a_scalar_is_no_field() {
+    let code = r#"return { fields = { f = function() end, ok = 1 } }"#;
+    let names: Vec<_> = parse_fields(code).into_iter().map(|f| f.name).collect();
+    assert_eq!(names, vec!["ok"]);
+}
