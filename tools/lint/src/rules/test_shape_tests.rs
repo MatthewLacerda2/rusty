@@ -43,3 +43,12 @@ fn comments_and_other_roots_never_count() {
     let call = "#![cfg(x)]\nRenderer::new_headless(1, 1);\n";
     assert!(rules("tools/lint/src/a_tests.rs", call).is_empty());
 }
+
+#[test]
+fn cfg_all_test_is_test_code_and_any_test_is_not() {
+    let call = "    fn t() { scenario::run(&p, &o); }\n";
+    let all = format!("#[cfg(all(test, feature = \"dev\"))]\nmod tests {{\n{call}}}\n");
+    assert_eq!(rules("src/dev/a.rs", &all), [(3, USER_WORKSPACE)]);
+    let any = all.replace("all(", "any(");
+    assert!(rules("src/dev/a.rs", &any).is_empty());
+}

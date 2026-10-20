@@ -37,3 +37,17 @@ fn an_allow_with_a_reason_excuses_a_socket_path() {
     let found = check_file("tests/a.rs", &src);
     assert!(allowed(&src, found[0].line, RULE));
 }
+
+#[test]
+fn cfg_all_test_counts_and_any_test_does_not() {
+    let gated = |attr: &str| format!("{attr}\nmod tests {{\n{CALL}}}\n");
+    for attr in ["#[cfg(all(test, feature = \"dev\"))]", "#[cfg(all(test))]"] {
+        assert_eq!(check_file("src/a/b.rs", &gated(attr)).len(), 1, "{attr}");
+    }
+    for attr in [
+        "#[cfg(any(test, feature = \"dev\"))]",
+        "#[cfg(all(testing))]",
+    ] {
+        assert!(check_file("src/a/b.rs", &gated(attr)).is_empty(), "{attr}");
+    }
+}
