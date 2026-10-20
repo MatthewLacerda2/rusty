@@ -9,7 +9,8 @@
 
 ## Rules
 - Test and fixture files are capped at **150 lines** by the size gate
-  (`tools/lint`); keep them focused. Prefer small unit modules over one large
+  (`tools/lint`), except a `<x>_tests.rs` sibling of `<x>.rs` (or of a `<x>/`
+  module directory), which shares the 300-line source cap; keep them focused. Prefer small unit modules over one large
   test file.
 - The sim must stay deterministic (fixed timestep, seeded RNG, no wall-clock in the
   tick) so harness/scenario tests are reproducible.

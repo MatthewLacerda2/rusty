@@ -204,8 +204,8 @@ freely.
 **`docs/api/` is not one of those.** Two hard-gate tests parse it, so
 a Markdown-only edit to it can break `main` on its own. CI's `code` filter lists it
 explicitly (#525, #569), so a pull request touching it runs the drift tests like any code
-change, and it is serialized like code. Same for `docs/api-faithfulness.md`'s
-catalog if a branch is relying on it: treat it as code.
+change, and it is serialized like code. `docs/api-faithfulness.md` is not
+covered: nothing parses it, so a Markdown-only PR touching it merges freely.
 
 ## Verify the run happened on the head commit
 
