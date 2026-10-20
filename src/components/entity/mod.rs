@@ -56,6 +56,7 @@ pub struct PrefabLink {
     pub overrides: std::collections::BTreeMap<String, serde_json::Value>,
 }
 
+// Not sorted (#911): field order is the order a saved scene writes its keys in.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(from = "repr::EntityRepr")]
 pub struct Entity {

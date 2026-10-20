@@ -11,6 +11,7 @@ mod ignored;
 mod markers;
 mod prefix;
 mod skip;
+mod sorted;
 mod subprocess;
 mod temp_dir;
 mod test_code;
@@ -61,6 +62,10 @@ pub fn run() {
         findings.extend(unwrap::check(path, &src, &sim_dirs));
         findings.extend(temp_dir::check_file(path, &src));
         findings.extend(subprocess::check(path, &src));
+        findings.extend(sorted::check(path, &src));
+    }
+    for path in sorted::markdown(Path::new(".")) {
+        findings.extend(sorted::check(&path, &source(&path)));
     }
     findings.retain(|f| !finding::allowed(&source(&f.path), f.line, f.rule));
     for path in &files {

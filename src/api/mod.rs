@@ -18,6 +18,7 @@
 // or a documented `.expect(...)`); test code is exempt via clippy.toml. See docs/linting.md.
 #![deny(clippy::unwrap_used)]
 
+// sorted: one module per namespace; kept in order so parallel branches don't collide
 pub mod animator;
 pub mod application;
 pub mod assets;
@@ -161,9 +162,10 @@ fn register_navigation<'scope>(
     scope: &'scope mlua::Scope<'scope, '_>,
     ctx: &ApiScopedCtx<'scope>,
 ) -> Reg {
+    // sorted: each registrar makes its own global table
     nav::register(lua, scope, ctx.scene, ctx.nav)?;
-    nav_obstacle::register(lua, scope, ctx.scene)?;
     nav_modifier::register(lua, scope, ctx.scene)?;
+    nav_obstacle::register(lua, scope, ctx.scene)?;
     offmesh_link::register(lua, scope, ctx.scene, ctx.nav)
 }
 
@@ -176,61 +178,65 @@ pub fn register<'scope>(
     scope: &'scope mlua::Scope<'scope, '_>,
     ctx: &ApiScopedCtx<'scope>,
 ) -> Reg {
-    transform::register(lua, scope, ctx.scene)?;
+    // sorted: each registrar makes its own global table; the ones extending a table
+    // (`register_hitscan`, `register_scoped`, `register_events`, `register_writable`)
+    // sort after the one that made it
+    animator::register(lua, scope, ctx.scene, ctx.console)?;
+    application::register(lua, scope, ctx.application)?;
     // `Assets` mostly borrows no engine state (it walks the project asset root on
     // each call), so it stays a plain static registrar; only the import-setting
     // setter that re-imports the scene's meshes (#831) is scoped.
     assets::register(lua)?;
     assets::register_scoped(lua, scope, ctx.scene)?;
-    // `Texture` (#270) also borrows no engine state — it reads a recipe and writes a
-    // PNG file — so it likewise registers as a plain static namespace.
-    texture::register(lua)?;
-    // `Shader` (#272) likewise borrows no engine state — it reads a recipe, validates
-    // it through naga_oil, and writes a `.wgsl` file — a plain static namespace.
-    shader::register(lua)?;
-    // `Sound` (#357) is the same story for audio: it reads a patch and writes a
-    // `.wav`, so it too registers as a plain static namespace.
-    sound::register(lua)?;
-    material::register(lua, scope, ctx.scene)?;
-    animator::register(lua, scope, ctx.scene, ctx.console)?;
+    audio::register(lua, scope, ctx.scene, ctx.audio, ctx.time, ctx.camera)?;
+    camera::register(lua, scope, ctx)?;
+    canvas::register(lua, scope, ctx.scene, ctx.screen, ctx.video)?;
+    character_controller::register(lua, scope, ctx.scene, ctx.physics)?;
+    decals::register(lua, scope, ctx.scene)?;
+    graphics::register(lua, scope, ctx.scene, ctx.quality)?;
     input::register_readable(lua, scope, ctx.input)?;
-    scene::register(lua, scope, ctx.scene, ctx.scene_path, ctx.is_playing)?;
-    register_navigation(lua, scope, ctx)?;
+    input::register_writable(lua, scope, ctx.input)?;
+    joint::register(lua, scope, ctx.scene)?;
+    layers::register(lua, scope, ctx.scene)?;
+    light::register(lua, scope, ctx.scene)?;
+    lighting::register(lua)?;
+    line::register(lua, scope, ctx.scene)?;
+    lod_group::register(lua, scope, ctx.scene)?;
+    material::register(lua, scope, ctx.scene)?;
+    particle::register(lua, scope, ctx.scene)?;
     physics::register(lua, scope, ctx.scene)?;
     physics::register_hitscan(lua, scope, ctx.scene, ctx.physics)?;
-    joint::register(lua, scope, ctx.scene)?;
+    probe::register(lua, scope, ctx.scene)?;
     ragdoll::register(lua, scope, ctx.scene, ctx.physics)?;
-    character_controller::register(lua, scope, ctx.scene, ctx.physics)?;
-    lod_group::register(lua, scope, ctx.scene)?;
+    random::register(lua, scope, ctx.random)?;
+    rect_transform::register(lua, scope, ctx.scene, (ctx.screen, ctx.video))?;
+    reflection::register(lua, scope, ctx.scene)?;
+    register_navigation(lua, scope, ctx)?;
+    register_ui_components(lua, scope, ctx.scene)?;
+    reverb_zone::register(lua, scope, ctx.scene)?;
+    scene::register(lua, scope, ctx.scene, ctx.scene_path, ctx.is_playing)?;
+    selectable::register(lua, scope, ctx.scene, ctx.event_system)?;
+    // `Shader` (#272) borrows no engine state — it reads a recipe, validates it
+    // through naga_oil, and writes a `.wgsl` file — so it is a plain static namespace.
+    shader::register(lua)?;
+    shape::register(lua, scope, ctx.scene)?;
+    // `Sound` (#357) is `Shader`'s story for audio: it reads a patch and writes a
+    // `.wav`, so it too registers as a plain static namespace.
+    sound::register(lua)?;
+    storage::register(lua, scope, ctx.storage)?;
+    text::register(lua, scope, ctx.scene, ctx.screen, ctx.video)?;
+    // `Texture` (#270) borrows no engine state either — it reads a recipe and writes
+    // a PNG file — so it too registers as a plain static namespace.
+    texture::register(lua)?;
     time::register(lua, scope, ctx.time)?;
     timer::register(lua, scope, ctx.scene, ctx.timers, ctx.console)?;
-    tween::register(lua, scope, ctx.scene, ctx.timers)?;
-    random::register(lua, scope, ctx.random)?;
-    camera::register(lua, scope, ctx)?;
-    light::register(lua, scope, ctx.scene)?;
-    probe::register(lua, scope, ctx.scene)?;
-    reflection::register(lua, scope, ctx.scene)?;
-    lighting::register(lua)?;
-    particle::register(lua, scope, ctx.scene)?;
     trail::register(lua, scope, ctx.scene)?;
-    line::register(lua, scope, ctx.scene)?;
-    audio::register(lua, scope, ctx.scene, ctx.audio, ctx.time, ctx.camera)?;
-    reverb_zone::register(lua, scope, ctx.scene)?;
-    canvas::register(lua, scope, ctx.scene, ctx.screen, ctx.video)?;
-    rect_transform::register(lua, scope, ctx.scene, (ctx.screen, ctx.video))?;
+    transform::register(lua, scope, ctx.scene)?;
+    tween::register(lua, scope, ctx.scene, ctx.timers)?;
     ui::register(lua, scope, ctx.scene, (ctx.screen, ctx.video), ctx.camera)?;
     ui::register_events(lua, scope, ctx)?;
-    selectable::register(lua, scope, ctx.scene, ctx.event_system)?;
-    register_ui_components(lua, scope, ctx.scene)?;
-    text::register(lua, scope, ctx.scene, ctx.screen, ctx.video)?;
-    shape::register(lua, scope, ctx.scene)?;
-    decals::register(lua, scope, ctx.scene)?;
-    layers::register(lua, scope, ctx.scene)?;
-    graphics::register(lua, scope, ctx.scene, ctx.quality)?;
     video::register(lua, scope, ctx.video)?;
-    storage::register(lua, scope, ctx.storage)?;
-    input::register_writable(lua, scope, ctx.input)?;
-    application::register(lua, scope, ctx.application)?;
+
     // Last, so an extension can add verbs to a namespace registered above.
     for ext in EXTENSIONS.read().map_err(|e| e.to_string())?.iter() {
         ext(lua, scope, ctx)?;
@@ -261,13 +267,14 @@ fn register_ui_components<'scope>(
     scope: &'scope mlua::Scope<'scope, '_>,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
-    image::register(lua, scope, scene)?;
-    canvas_group::register(lua, scope, scene)?;
-    rect_mask::register(lua, scope, scene)?;
-    mask::register(lua, scope, scene)?;
+    // sorted: each registrar makes its own global table
     backdrop_filter::register(lua, scope, scene)?;
+    canvas_group::register(lua, scope, scene)?;
+    image::register(lua, scope, scene)?;
+    layout_element::register(lua, scope, scene)?;
     layout_group::register(lua, scope, scene)?;
-    layout_element::register(lua, scope, scene)
+    mask::register(lua, scope, scene)?;
+    rect_mask::register(lua, scope, scene)
 }
 
 /// Set a named entry on `table` from a built function value.
