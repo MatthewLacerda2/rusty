@@ -5,6 +5,8 @@
 //! marker pinned to a world point. The anchor-preset picker (#423) sits on top;
 //! an element its parent's layout group places is shown read-only, as in Unity.
 
+use crate::editor::inspector::components::card::remove_component;
+use crate::scene::authoring::ComponentKind;
 use egui_phosphor::regular as icon;
 
 use super::{anchor_presets, entity_row, vec2_row};
@@ -47,7 +49,7 @@ pub fn draw(
         },
     );
     if remove {
-        world.set_rect_transform(id, None);
+        remove_component(world, id, ComponentKind::RectTransform, is_dirty);
     }
     *is_dirty |= remove || changed;
 }

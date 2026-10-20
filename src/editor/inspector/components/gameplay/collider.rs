@@ -11,8 +11,9 @@ use egui_phosphor::regular as icon;
 use glam::Vec3;
 
 use crate::components::{CapsuleAxis, CombineMode, PhysicsMaterial};
-use crate::editor::inspector::components::card::component_card;
+use crate::editor::inspector::components::card::{component_card, remove_component};
 use crate::scene::authoring::collider as collider_ops;
+use crate::scene::authoring::ComponentKind;
 use crate::scene::ColliderShape;
 
 pub fn draw_collider(
@@ -20,7 +21,6 @@ pub fn draw_collider(
     world: &mut crate::ecs::World,
     id: u32,
     is_dirty: &mut bool,
-    pending_nav_bake: &mut bool,
 ) {
     let Some(collider) = world.collider(id).map(|c| c.clone()) else {
         return;
@@ -49,12 +49,13 @@ pub fn draw_collider(
             // The shape (variant + extents) is edited in a local clone, then routed
             // through the shared op as a whole when any widget changes it.
             let mut shape = collider.shape.clone();
-            let mut shape_changed = draw_shape_selector(ui, &mut shape, pending_nav_bake);
-            shape_changed |= draw_shape_fields(ui, &mut shape, pending_nav_bake);
+            let mut shape_changed = draw_shape_selector(ui, &mut shape);
+            shape_changed |= draw_shape_fields(ui, &mut shape);
             if shape_changed {
                 if let Some(mut c) = world.collider_mut(id) {
                     collider_ops::set_shape(&mut c, shape);
                 }
+                *is_dirty = true;
             }
             if let Some(material) = draw_material(ui, collider.material) {
                 if let Some(mut c) = world.collider_mut(id) {
@@ -65,19 +66,13 @@ pub fn draw_collider(
         },
     );
     if remove {
-        world.set_collider(id, None);
-        *is_dirty = true;
+        remove_component(world, id, ComponentKind::Collider, is_dirty);
     }
 }
 
-/// The Shape combo box; switching to a new shape resets it to sensible defaults
-/// and requests a nav rebake (the static geometry changed). Mutates the local
-/// `shape` clone; returns whether the shape changed.
-fn draw_shape_selector(
-    ui: &mut egui::Ui,
-    shape: &mut ColliderShape,
-    pending_nav_bake: &mut bool,
-) -> bool {
+/// The Shape combo box; switching to a new shape resets it to sensible defaults.
+/// Mutates the local `shape` clone; returns whether the shape changed.
+fn draw_shape_selector(ui: &mut egui::Ui, shape: &mut ColliderShape) -> bool {
     let mut shape_type = match shape {
         ColliderShape::Box { .. } => "Box",
         ColliderShape::Sphere { .. } => "Sphere",
@@ -108,7 +103,6 @@ fn draw_shape_selector(
             },
             _ => ColliderShape::Box { size: Vec3::ONE },
         };
-        *pending_nav_bake = true;
         return true;
     }
     false
@@ -116,11 +110,7 @@ fn draw_shape_selector(
 
 /// The shape-specific extent fields (or the baked-mesh hull toggle). Mutates the
 /// local `shape` clone; returns whether any extent changed.
-fn draw_shape_fields(
-    ui: &mut egui::Ui,
-    shape: &mut ColliderShape,
-    pending_nav_bake: &mut bool,
-) -> bool {
+fn draw_shape_fields(ui: &mut egui::Ui, shape: &mut ColliderShape) -> bool {
     match shape {
         ColliderShape::Box { size } => {
             ui.horizontal(|ui| {
@@ -149,11 +139,7 @@ fn draw_shape_fields(
             // Baked from the imported mesh (#77): no editable extents, but
             // the hull/trimesh choice can still be flipped here.
             ui.label("Baked from imported mesh");
-            if ui.checkbox(convex, "Convex hull").changed() {
-                *pending_nav_bake = true;
-                return true;
-            }
-            false
+            ui.checkbox(convex, "Convex hull").changed()
         }
     }
 }

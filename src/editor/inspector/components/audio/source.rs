@@ -6,6 +6,8 @@
 //! linear rolloff distances), and the mixer output group (#465). Pure authoring data — the card never touches the audio
 //! device; the `AudioMaestro` reads these when a voice starts.
 
+use crate::editor::inspector::components::card::remove_component;
+use crate::scene::authoring::ComponentKind;
 use egui_phosphor::regular as icon;
 
 use crate::audio::mixer::DEFAULT_GROUPS;
@@ -36,8 +38,7 @@ pub fn draw(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, is_dirty:
         },
     );
     if remove {
-        world.set_audio(id, None);
-        *is_dirty = true;
+        remove_component(world, id, ComponentKind::Audio, is_dirty);
     } else if changed {
         *is_dirty = true;
     }

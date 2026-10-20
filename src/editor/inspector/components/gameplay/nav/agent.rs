@@ -4,6 +4,8 @@
 //! A THIN client (#287): widgets read fields from a snapshot and route every write
 //! through `authoring::nav::agent`, the same ops the `NavMeshAgent.*` Lua setters call.
 
+use crate::editor::inspector::components::card::remove_component;
+use crate::scene::authoring::ComponentKind;
 use egui_phosphor::regular as icon;
 use glam::Vec3;
 
@@ -42,8 +44,7 @@ pub fn draw_nav_agent(
         ));
     });
     if remove {
-        world.set_nav_agent(id, None);
-        *is_dirty = true;
+        remove_component(world, id, ComponentKind::NavMeshAgent, is_dirty);
     }
 }
 

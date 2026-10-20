@@ -3,6 +3,8 @@
 //! size, constraint, start corner and axis. Widgets edit a snapshot; every write
 //! routes through `scene::authoring::layout_group`.
 
+use crate::editor::inspector::components::card::remove_component;
+use crate::scene::authoring::ComponentKind;
 use egui_phosphor::regular as icon;
 
 use super::{combo, vec2_row, vec4_row};
@@ -35,7 +37,7 @@ pub fn draw(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, is_dirty:
         }
     }
     if remove {
-        world.set_layout_group(id, None);
+        remove_component(world, id, ComponentKind::LayoutGroup, is_dirty);
     }
     *is_dirty |= remove || changed;
 }

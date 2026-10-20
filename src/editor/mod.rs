@@ -4,8 +4,6 @@
     reason = "platform layer, exempt from the sim's clock ban (#757): the audio preview playhead and script-schema mtimes are wall-clock UI state"
 )]
 
-use std::fs;
-
 pub mod bottom_panel;
 pub mod build_settings;
 mod content_browser;
@@ -21,7 +19,6 @@ pub mod project_picker;
 pub mod theme;
 pub mod viewport;
 
-use crate::core::paths;
 use crate::navigation::NavigationGraph;
 use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;
@@ -49,8 +46,6 @@ pub struct EditorUi {
     pub current_scene_path: Option<String>,
     pub current_dir: String,
     pub is_dirty: bool,
-    assets_scripts: Vec<String>,
-    assets_textures: Vec<String>,
 
     // Custom asset inspector properties
     pub asset_image_wrap: String,
@@ -147,8 +142,6 @@ impl EditorUi {
             current_scene_path: None,
             current_dir: crate::editor::content_browser::ROOT.to_string(),
             is_dirty: true,
-            assets_scripts: Vec::new(),
-            assets_textures: Vec::new(),
 
             asset_image_wrap: "Repeat".to_string(),
             asset_image_filter: "Linear".to_string(),
@@ -219,36 +212,6 @@ impl EditorUi {
         self.theme.apply(ctx);
     }
 
-    /// Read local assets folders to populate Asset Browser (legacy scan, kept for compatibility)
-    fn scan_assets(&mut self) {
-        self.assets_scripts.clear();
-        self.assets_textures.clear();
-
-        // Scan scripts
-        if let Ok(entries) = fs::read_dir("assets/scripts") {
-            for entry in entries.flatten() {
-                if let Some(path_str) = entry.path().to_str() {
-                    if paths::has_extension(path_str, "lua") {
-                        self.assets_scripts
-                            .push(paths::to_slash(std::path::Path::new(path_str)));
-                    }
-                }
-            }
-        }
-
-        // Scan textures
-        if let Ok(entries) = fs::read_dir("assets/textures") {
-            for entry in entries.flatten() {
-                if let Some(path_str) = entry.path().to_str() {
-                    if crate::asset::is_image_path(path_str) {
-                        self.assets_textures
-                            .push(paths::to_slash(std::path::Path::new(path_str)));
-                    }
-                }
-            }
-        }
-    }
-
     // The live engine state (scene, console, nav, play flag) plus the frame's HUD
     // metrics: distinct mutable borrows. Legacy signature, pending App/Resources.
     #[expect(clippy::too_many_arguments, reason = "distinct mutable borrows")]
@@ -264,7 +227,6 @@ impl EditorUi {
         viewport_texture: Option<egui::TextureId>,
     ) -> ViewportInteraction {
         self.apply_theme(ctx, *is_playing);
-        self.scan_assets();
         // Set by the Preview tab if it shows (#352); `None` skips its offscreen render.
         self.preview_request = None;
 
@@ -282,6 +244,10 @@ impl EditorUi {
             #[cfg(feature = "dev")]
             bottom_panel::draw_play_console(self, ctx, console);
         } else {
+            // One diffing navmesh sync per edit-mode frame catches every edit since
+            // the last one, whoever made it: a card, the gizmo, the console, MCP
+            // (#992). It rebakes only changed cells; play mode has `rebake_nav`.
+            nav.sync(scene);
             // 2. LEFT PANEL: Scene Hierarchy
             hierarchy::draw(self, ui, scene);
             // 3. RIGHT PANEL: Properties Inspector
@@ -296,3 +262,7 @@ impl EditorUi {
         viewport::draw(self, ui, viewport_texture, scene)
     }
 }
+
+#[cfg(test)]
+#[path = "nav_sync_tests.rs"]
+mod nav_sync_tests;

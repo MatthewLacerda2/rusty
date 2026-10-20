@@ -48,7 +48,7 @@ pub fn draw(
                 // Dispatch on the explicit inspector target (mutually exclusive).
                 match editor.inspector_target() {
                     InspectorTarget::Entity(selected_id) => {
-                        draw_entity_inspector(editor, ui, scene, nav, selected_id);
+                        draw_entity_inspector(editor, ui, scene, selected_id);
                     }
                     InspectorTarget::Asset(asset_path) => {
                         assets::draw_inspector(ui, editor, scene, console, nav, &asset_path);
@@ -79,7 +79,6 @@ fn draw_entity_inspector(
     editor: &mut EditorUi,
     ui: &mut egui::Ui,
     scene: &mut Scene,
-    nav: &mut NavigationGraph,
     selected_id: u32,
 ) {
     let mut pending = PendingEdits::default();
@@ -102,8 +101,7 @@ fn draw_entity_inspector(
             world,
             selected_id,
             &cx.layer_labels,
-            &mut pending.nav_bake,
-            &mut pending.layer_changed,
+            &mut editor.is_dirty,
         );
 
         // Linked-prefab override affordance, just under the header (a no-op for a plain
@@ -118,7 +116,6 @@ fn draw_entity_inspector(
             &cx.selected_parent_name,
             &cx.valid_parents,
             &mut pending.parent_change,
-            &mut pending.nav_bake,
             &mut editor.is_dirty,
         );
 
@@ -133,23 +130,18 @@ fn draw_entity_inspector(
         );
     }
 
-    pending.apply(editor, scene, nav, selected_id);
+    pending.apply(editor, scene, selected_id);
 }
 
 /// The Unity-style object header card: name + active/static toggles + layer combo.
 /// Widgets edit local snapshots and write back through the facade on change (#344).
-#[expect(
-    clippy::too_many_arguments,
-    reason = "(world, id) replaced the single &mut Entity handle"
-)]
 fn draw_object_header(
     ui: &mut egui::Ui,
     t: crate::editor::theme::Theme,
     world: &mut crate::ecs::World,
     id: u32,
     layer_labels: &[String],
-    pending_nav_bake: &mut bool,
-    layer_changed: &mut bool,
+    is_dirty: &mut bool,
 ) {
     components::card::card_frame(&t).show(ui, |ui| {
         ui.horizontal(|ui| {
@@ -160,12 +152,14 @@ fn draw_object_header(
                 .changed()
             {
                 world.set_name(id, name);
+                *is_dirty = true;
             }
         });
         ui.horizontal(|ui| {
             let mut active = world.is_active(id);
             if ui.checkbox(&mut active, "Active").changed() {
                 world.set_active(id, active);
+                *is_dirty = true;
             }
             let mut is_static = world.is_static(id);
             if ui
@@ -174,10 +168,10 @@ fn draw_object_header(
                 .changed()
             {
                 world.set_static(id, is_static);
-                *pending_nav_bake = true;
+                *is_dirty = true;
             }
         });
-        draw_layer_combo(ui, world, id, layer_labels, layer_changed);
+        draw_layer_combo(ui, world, id, layer_labels, is_dirty);
     });
     ui.add_space(t.space_xs);
 }
@@ -188,7 +182,7 @@ fn draw_layer_combo(
     world: &mut crate::ecs::World,
     id: u32,
     layer_labels: &[String],
-    layer_changed: &mut bool,
+    is_dirty: &mut bool,
 ) {
     ui.horizontal(|ui| {
         ui.label("Layer:");
@@ -203,7 +197,7 @@ fn draw_layer_combo(
                 for (i, label) in layer_labels.iter().enumerate() {
                     if ui.selectable_value(&mut layer, i as u8, label).clicked() {
                         world.set_layer(id, layer);
-                        *layer_changed = true;
+                        *is_dirty = true;
                     }
                 }
             });
@@ -233,9 +227,9 @@ fn draw_components(
 
     gameplay::draw_script(ui, world, id, &mut editor.is_dirty);
     gameplay::draw_animator(ui, world, id, &mut editor.is_dirty);
-    gameplay::draw_collider(ui, world, id, &mut editor.is_dirty, &mut pending.nav_bake);
+    gameplay::draw_collider(ui, world, id, &mut editor.is_dirty);
     gameplay::draw_bodies(ui, world, id, &mut editor.is_dirty);
-    gameplay::draw_navigation(ui, world, id, &mut editor.is_dirty, &mut pending.nav_bake);
+    gameplay::draw_navigation(ui, world, id, &mut editor.is_dirty);
 
     camera::draw_camera(ui, world, id, named_layers, &mut editor.is_dirty);
     camera::draw_visual_correction(ui, world, id, &mut editor.is_dirty);
@@ -248,5 +242,5 @@ fn draw_components(
     let view = editor.viewport_image_size;
     ui_cards::draw(ui, world, id, view, &mut editor.is_dirty);
 
-    add::draw(ui, world, id);
+    add::draw(ui, world, id, &mut editor.is_dirty);
 }

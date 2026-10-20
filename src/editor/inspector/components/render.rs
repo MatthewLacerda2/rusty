@@ -1,3 +1,5 @@
+use crate::editor::inspector::components::card::remove_component;
+use crate::scene::authoring::ComponentKind;
 use egui_phosphor::regular as icon;
 use glam::Vec3;
 
@@ -108,8 +110,7 @@ pub fn draw_light(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, is_
         }
     });
     if remove {
-        world.set_light(id, None);
-        *is_dirty = true;
+        remove_component(world, id, ComponentKind::Light, is_dirty);
     }
 }
 
