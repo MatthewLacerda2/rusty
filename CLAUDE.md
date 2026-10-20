@@ -172,8 +172,7 @@ is wrong.
   #826) goes there, which lifts the local build limit, never the one-at-a-time merge.
   A branch goes local only when it needs the machine: a real GPU (Metal, performance,
   driver races), the display, the speakers, the operator's files or keys, or a
-  measurement. The `issue-batch` skill says how to launch one and prove it really is
-  remote.
+  measurement. The `issue-batch` skill says how to launch one.
 - **The lightest batch keeps only the merge queue local.** With the coding in cloud
   sessions, `make queue ARGS=--no-check` skips the local compile check of each rebased
   head and lets CI judge it, so merging costs this machine `git` and GitHub calls, not a
