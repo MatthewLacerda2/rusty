@@ -166,10 +166,12 @@ or baseline.
 - **`skip`** — an ignored test reads as passing to anyone who reads only the
   summary. `#[ignore]` and `#[cfg_attr(…, ignore)]` fail unless an allow says why:
   `// lint: allow(skip) a timing measurement, run by hand` right above it.
+- **Test code**, for every rule below that says it, is one classifier
+  (`rules/test_code.rs`, #1068): all of `tests/`, every `tests.rs` / `*_tests.rs`,
+  and a file's lines from its first `#[cfg(test)]` on, scanning only `src/` and
+  `tests/`.
 - **`test-inner-cfg`, `test-user-workspace`, `test-gpu-entry`** (#980) — three
-  `docs/testing.md` locks on test code (all of `tests/`, every `tests.rs` /
-  `*_tests.rs`, and a file's lines from its first `#[cfg(test)]` on; comment lines
-  never count). A `tests/` file never gates itself with an inner `#![cfg(…)]` (gate
+  `docs/testing.md` locks on test code; comment lines never count. A `tests/` file never gates itself with an inner `#![cfg(…)]` (gate
   its `mod` line); test code never calls `in_user_workspace` or `scenario::run(`
   (use `scenario::run_isolated`); and test code reaches a GPU only through
   `render::test_gpu::headless_or_skip`, never `new_headless` directly
@@ -177,9 +179,7 @@ or baseline.
 - **`full-literal`** (#976) — a test builds a first-class component (a `…Component`
   type `Entity` names, with three or more fields) through a constructor or a
   `..rest`, never a struct expression naming every field: such a literal breaks the
-  day the component gains a field. Test code is `tests/`, `tests.rs` /
-  `*_tests.rs`, and a file's lines from its first `#[cfg(test)]` on
-  (`rules/test_code.rs`). When every field is the point, say so:
+  day the component gains a field. When every field is the point, say so:
   `// lint: allow(full-literal) <why>` (`rules/full_literal.rs`).
 - **`ignored`** — what you push must be what CI builds. A scanned `.rs` file that
   `git check-ignore --no-index` matches fails, tracked or not, because the next
@@ -196,8 +196,7 @@ or baseline.
   thread, so a fixed or process-keyed name races. Test code under `src/` and
   `tests/` calls `crate::test_temp::dir()` (in-crate) or `crate::temp::dir()`
   (integration) instead: both key on the process *and* the running test (#709,
-  #999). Test code is all of `tests/`, every `tests.rs` / `*_tests.rs`, and a
-  file's lines from its first `#[cfg(test)]` on; comment lines never count. The
+  #999). Comment lines never count. The
   helper itself and Unix socket paths (which must stay short) carry an inline
   allow. `tools/` is not scanned: the lint crate's own tests are not the engine's.
 - **The ≲10-files-per-directory signal** prints after the findings: every scanned
