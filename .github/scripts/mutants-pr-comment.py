@@ -76,8 +76,8 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--run-url", required=True)
     args = parser.parse_args(argv)
 
-    prs = json.loads(gh("pr", "list", "--repo", args.repo, "--head", args.branch,
-                        "--state", "open", "--json", "number"))
+    owner = args.repo.split("/")[0]
+    prs = json.loads(gh("api", f"repos/{args.repo}/pulls?state=open&head={owner}:{args.branch}"))
     if not prs:
         print(f"mutants-pr-comment: no open pull request from {args.branch}; nothing to post")
         return 0

@@ -63,6 +63,12 @@ branch refs/heads/4-elsewhere
 PRS = {"1-merged": "MERGED", "2-open": "OPEN", "3-dirty": "MERGED", "4-elsewhere": "MERGED"}
 
 
+def rest_pull(state: str, head: str) -> dict:
+    """A pull request as REST lists it, in GraphQL's `state` spelling."""
+    merged = "2026-10-01T00:00:00Z" if state == "MERGED" else None
+    return {"state": "open" if state == "OPEN" else "closed", "merged_at": merged, "head": {"sha": head}}
+
+
 class FakeMachine(reclaim.Machine):
     """Answers git/gh from the tables above and records what it would delete."""
 
@@ -75,8 +81,10 @@ class FakeMachine(reclaim.Machine):
         self.calls.append(argv)
         out, code = "", 0
         if argv[0] == "gh":
-            branch = argv[argv.index("--head") + 1]
-            out = json.dumps([{"state": PRS[branch], "headRefOid": "x"}] if branch in PRS else [])
+            branch = argv[2].split("head=o:")[1].split("&")[0]
+            out = json.dumps([rest_pull(PRS[branch], "x")] if branch in PRS else [])
+        elif argv[1:3] == ["remote", "get-url"]:
+            out = "https://github.com/o/r.git"
         elif "--git-common-dir" in argv:
             out = f"{MAIN}/.git"
         elif argv[3:5] == ["worktree", "list"]:

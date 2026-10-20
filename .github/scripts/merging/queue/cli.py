@@ -8,6 +8,8 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+import ghrest
+
 from merging.queue import checks, gitio, outcomes, stopping, taking, world
 from merging.verdict import github
 from merging.watch import ending, lock, loop
@@ -130,7 +132,7 @@ def start(opts: argparse.Namespace, argv: list[str]) -> int:
             outcomes.say(f"refusing to start: {refused[0]}", *refused[1:])
             return 1
     try:
-        repo = github.gh("repo", "view", "--json", "nameWithOwner")["nameWithOwner"]
+        repo = ghrest.slug()
     except github.Unreachable as down:
         outcomes.say(*stopping.unreachable(down))
         return ending.MACHINE_STATUS
