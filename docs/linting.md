@@ -37,6 +37,7 @@ agent can read exactly what failed.
 | Local gate = CI gate | `unittest` (`make scripts`, `test_gate_mirror.py`) | **hard gate**: every command a `GATES` recipe runs appears in a step of `ci.yml`/`lint.yml`, and every clippy run passes nothing after `--` but `-D warnings` (#964) |
 | One dependency graph | `make feature-split` (`.github/scripts/feature_split.py`) | **hard gate**: no dev-dependency turns on a feature the normal build lacks, so `cargo test` never rebuilds a shared crate (#552, #979; `docs/testing.md`) |
 | Dead `pub` items | `make dead-pub` (`tools/lint -- --dead-pub`) | **signal**, never a gate: `src/lib.rs` exports every module, so rustc's `dead_code` never fires on a `pub` item. On a copy under `target/dead-pub/` the modules go `pub(crate)` and every bin and the integration suite fold into the lib; the report lists items nothing uses, items only tests use (a test seam may be fine), and unused imports apart (#940, #1003) |
+| Docs name what exists | `make docrefs` (`.github/scripts/docrefs.py`) | **hard gate**: every `src/`, `tests/`, `tools/`, `docs/` or `.github/` path in a tracked `*.md`'s inline code is tracked, every `` `make <verb>` `` is a target, and CLAUDE.md's namespaces each have a `docs/api/` page; placeholders pass, anything else takes `<!-- docrefs: allow <why> -->`. Runs on Markdown-only PRs too (#973) |
 
 ## The `*_tests.rs` sibling rule
 The tight test cap exists to discourage over-splitting a bundle of `#[test]`s. But a
@@ -55,10 +56,11 @@ source's real sibling, give it a sibling (split the code it tests into `<x>.rs`)
 split it by responsibility.
 
 ## What the size gate scans
-The full scan (`make size`, CI's `lint` job) walks `src/`, `tests/`, `fuzz/` and
-`tools/` (`SCAN_ROOTS` in `tools/lint/src/size/mod.rs`); until #535 it walked only `src/`,
+The full scan (`make size`, CI's `lint` job) walks `src/`, `tests/`, `fuzz/`,
+`tools/` and `.github/` (`SIZE_ROOTS` in `tools/lint/src/size/mod.rs`; `.github/` since #926); until #535 it walked only `src/`,
 so oversized integration-test files passed unseen, and until #541 it skipped `tools/`,
 so the lint crate itself could drift past the cap. Any `target/` directory (cargo
+<!-- docrefs: allow build output, never tracked -->
 build output, e.g. `tools/lint/target/` or `fuzz/target/`) is never descended into.
 The commit hook checks whatever `.rs` files are staged, wherever they live.
 

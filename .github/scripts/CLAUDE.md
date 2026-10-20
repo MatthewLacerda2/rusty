@@ -21,7 +21,7 @@ coder *changing* it must know.
   403, and `gh pr view/list`, `gh issue list` and `gh repo view` with `--json` are
   GraphQL. New calls go through `gh api repos/{owner}/{repo}/…`, paging with an
   explicit `page=` (`--paginate` failed through the proxy too); `ghrest.py` does both.
-  `tests/test_rest_only.py` fails on a `gh pr|issue|repo …` call (#970); an exception
+  `.github/scripts/tests/test_rest_only.py` fails on a `gh pr|issue|repo …` call (#970); an exception
   goes on its line as `# graphql-ok: <reason>`.
 - **The incidents live in the docstrings.** A module's docstring names the incident
   behind each rule it keeps (an issue, a pull request, a dated scorsese run). Keep it

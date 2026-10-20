@@ -330,7 +330,7 @@ concrete type — that inventory lives in the rustdoc reference (`cargo doc --no
 and the script surface in `docs/api/`. Everything in the engine is one of
 five kinds of moving part (Unity analogs in parentheses):
 
-A **GameObject** is one entity (`Entity` in `components/entity/`): a mandatory
+A **GameObject** is one entity (`Entity` in `components/entity/mod.rs`): a mandatory
 `Transform` plus any mix of the optional first-class components below, and a place in
 the parent/child hierarchy. It can be **empty** — a Transform and nothing else, used as
 a grouping pivot or a spawn marker. Or it can be configured: instantiating a glTF
@@ -366,7 +366,7 @@ per-bone overrides and what hangs from a bone.
    clone-on-Play / restore-on-Stop snapshot makes edit-mode authoritative, mirroring
    Unity's play-mode behaviour.
 5. **The API surface** — one stable set of namespaces (`Transform`, `Input`, `Time`,
-   `Physics`, `Scene`, `Animator`, `Nav`, `Camera`, `Material`, `Application`, and
+   `Physics`, `Scene`, `Animator`, `Navigation`, `Camera`, `Material`, `Application`, and
    the dev-only `Debug`) shared by gameplay scripts, the console REPL, and bot-players.
    One surface, three callers — they never drift apart.
 

@@ -17,7 +17,7 @@ TEST := cargo nextest run --locked
 
 # The gates, in the order `make gates` runs them. `deny` sits last: its failures
 # are about dependencies (and it needs the network), so a code failure reports first.
-GATES := fmt size rules layers determinism direction components parity test-lint scripts feature-split clippy doc test deny
+GATES := fmt size rules layers determinism direction components parity test-lint scripts feature-split docrefs clippy doc test deny
 # Checks on the gate runner itself, run before any gate.
 SELF_CHECKS := target-dir inventory
 
@@ -134,6 +134,11 @@ test-lint: ## [gate] tools/lint's own tests
 # rebuild that crate and everything above it (#552). No build: `cargo tree` twice.
 feature-split: ## [gate] No dev-dependency turns on a feature the normal build lacks (docs/testing.md)
 	python3 .github/scripts/feature_split.py
+
+# A path, make verb or API namespace the docs name must exist (#973): agents drive
+# rusty by its docs, and a move that leaves a reference behind sends them searching.
+docrefs: ## [gate] Paths, make verbs and namespaces written in the docs exist
+	python3 .github/scripts/docrefs.py
 
 clippy: ## [gate] Clippy: default, dev, the no-editor player build, and tools/lint
 	cargo clippy --all-targets -- -D warnings

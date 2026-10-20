@@ -47,10 +47,14 @@ jobs:
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'pull_request' && github.event.pull_request.draft == false)
     steps:
+      # Unguarded (#973): the docrefs step below runs on Markdown-only PRs too.
       - uses: actions/checkout@v7
-        if: needs.changes.outputs.code != 'false'
         with:
           fetch-depth: 0
+      # Not guarded on `code` (#973): a Markdown-only PR is exactly where a stale
+      # path, make verb or namespace slips in. Stdlib Python, no build.
+      - name: Doc references (paths, make verbs and namespaces the docs name exist)
+        run: python3 .github/scripts/docrefs.py
       - name: Ensure rustfmt + clippy
         if: needs.changes.outputs.code != 'false'
         run: rustup component add rustfmt clippy
