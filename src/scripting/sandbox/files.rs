@@ -24,7 +24,7 @@ use std::rc::Rc;
 
 use mlua::{Function, IntoLuaMulti, Lua, MultiValue, Table, Value};
 
-use crate::core::paths::to_slash;
+use crate::core::paths::{self, to_slash};
 use crate::core::project::SCRIPTS_DIR;
 use crate::scene::io::bundled;
 use crate::scripting::console::ConsoleLogs;
@@ -52,6 +52,9 @@ impl Access {
     }
 
     /// Warn, once per file, when the existing file at `path` is outside the project.
+    /// `inside` compares std-canonical paths on both sides, so a non-UTF-8 path
+    /// can't lose its verbatim prefix on one side only; the printed path is
+    /// prefix-free and `/`-separated (#1106).
     fn check(&self, path: &Path, how: &str) {
         let real = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
         let root = if self.workspace.as_os_str().is_empty() {
@@ -64,10 +67,15 @@ impl Access {
             self.console.borrow_mut().warn(format!(
                 "[Lua] {how} read {}, outside the project: the game now depends on a file \
                  that may not exist on another machine, and the seed does not cover it",
-                real.display()
+                shown_path(&real)
             ));
         }
     }
+}
+
+/// `real` as the console prints it: no `\\?\` verbatim prefix, `/`-separated.
+fn shown_path(real: &Path) -> String {
+    to_slash(&paths::canonicalize(real).unwrap_or_else(|_| real.to_path_buf()))
 }
 
 /// Install the project-aware `require` searchers and the `dofile` / `loadfile`
@@ -108,12 +116,15 @@ fn install_searchers(lua: &Lua, access: &Rc<Access>) -> mlua::Result<()> {
 }
 
 /// `require`'s answer for a module found at `origin`: its chunk, and where it was.
-fn found(lua: &Lua, code: &str, origin: &str) -> mlua::Result<MultiValue> {
+/// Every searcher answers through here, so every chunk name and origin is
+/// `/`-separated, whatever the OS (#1106).
+fn found(lua: &Lua, code: &str, origin: &Path) -> mlua::Result<MultiValue> {
+    let origin = to_slash(origin);
     let chunk = lua
         .load(code)
         .set_name(format!("@{origin}"))
         .into_function()?;
-    (chunk, origin.to_string()).into_lua_multi(lua)
+    (chunk, origin).into_lua_multi(lua)
 }
 
 fn project_searcher(lua: &Lua, access: Rc<Access>) -> mlua::Result<Function> {
@@ -124,7 +135,7 @@ fn project_searcher(lua: &Lua, access: Rc<Access>) -> mlua::Result<Function> {
         for file in [format!("{rel}.lua"), format!("{rel}/init.lua")] {
             let path = dir.join(file);
             if let Some(code) = access.read(&path, &format!("require(\"{name}\")")) {
-                return found(lua, &code, &path.to_string_lossy());
+                return found(lua, &code, &path);
             }
             tried.push(format!("no file '{}'", to_slash(&path)));
         }
@@ -136,7 +147,7 @@ fn engine_searcher(lua: &Lua) -> mlua::Result<Function> {
     lua.create_function(|lua, name: String| {
         let rel = format!("{}.lua", name.replace('.', "/"));
         match bundled::script(&rel) {
-            Some(code) => found(lua, code, &format!("engine/scripts/{rel}")),
+            Some(code) => found(lua, code, Path::new(&format!("engine/scripts/{rel}"))),
             None => format!("no engine script 'engine/scripts/{rel}'").into_lua_multi(lua),
         }
     })
@@ -156,7 +167,7 @@ fn path_searcher(lua: &Lua, access: Rc<Access>) -> mlua::Result<Function> {
             Some((file, code))
         });
         match read {
-            Some((file, code)) => found(lua, &code, file),
+            Some((file, code)) => found(lua, &code, Path::new(file)),
             None => missing.unwrap_or_default().into_lua_multi(lua),
         }
     })
@@ -164,7 +175,8 @@ fn path_searcher(lua: &Lua, access: Rc<Access>) -> mlua::Result<Function> {
 
 /// Replace the global `name` (`dofile` / `loadfile`) with one that takes a relative
 /// path from the workspace root and warns on an outside file, then calls the stock
-/// function. No path (read stdin) is passed through untouched.
+/// function with the path in `opened_path`'s form, which names the chunk (#1106).
+/// No path (read stdin) is passed through untouched.
 fn wrap_file_reader(lua: &Lua, access: &Rc<Access>, name: &str) -> mlua::Result<()> {
     let key = format!("rusty.stock_{name}");
     let stock: Function = match lua.named_registry_value::<Option<Function>>(&key)? {
@@ -183,9 +195,20 @@ fn wrap_file_reader(lua: &Lua, access: &Rc<Access>, name: &str) -> mlua::Result<
             if path.is_file() {
                 access.check(&path, &how);
             }
-            args[0] = Value::String(lua.create_string(path.to_string_lossy().as_ref())?);
+            args[0] = Value::String(lua.create_string(opened_path(&path))?);
         }
         stock.call::<MultiValue>(args)
     })?;
     lua.globals().set(name, wrapper)
+}
+
+/// `path` as handed to the stock `dofile` / `loadfile`, which open it and name the
+/// chunk after it: `/`-separated where `\` is a separator (Windows opens either),
+/// untouched where `\` is a filename character, so the same file still opens.
+fn opened_path(path: &Path) -> String {
+    if std::path::MAIN_SEPARATOR == '\\' {
+        to_slash(path)
+    } else {
+        path.to_string_lossy().into_owned()
+    }
 }
