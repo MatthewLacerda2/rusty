@@ -1,9 +1,9 @@
 //! src/scene/authoring/script.rs — attaching a script component (#996).
 //!
 //! The one way a script lands on an entity, shared by the inspector's Add
-//! Component menu, the Project panel's drag-onto-entity, the widget builders and
-//! `Scene.AddScript`, so they can never disagree about what an attached script
-//! looks like.
+//! Component menu, the Project panel's drag-onto-entity, the widget builders, the
+//! default scene, the dev tools (stress bench, bot-player) and `Scene.AddScript`,
+//! so they can never disagree about what an attached script looks like.
 
 use std::collections::BTreeMap;
 

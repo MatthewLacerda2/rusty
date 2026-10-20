@@ -8,7 +8,7 @@
 use glam::{Quat, Vec3};
 
 use super::rig;
-use crate::components::{AnimatorComponent, MaterialComponent, ScriptComponent};
+use crate::components::{AnimatorComponent, MaterialComponent};
 use crate::core::curve::Range;
 use crate::scene::authoring::{
     self, add_component, character_controller as cc, create_entity, nav::agent as nav_agent,
@@ -210,9 +210,9 @@ fn attach(scene: &mut Scene, id: u32, path: &str) {
     if path.is_empty() {
         return;
     }
-    scene.world.scripts_mut(id).unwrap().push(ScriptComponent {
-        path: path.to_string(),
-        is_loaded: false,
-        ..Default::default()
-    });
+    let attached = authoring::add_script(&mut scene.world, id, path, Default::default());
+    assert!(
+        attached,
+        "stress entity {id} vanished before its script attached"
+    );
 }

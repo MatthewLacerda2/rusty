@@ -5,7 +5,8 @@
 //! overrides **into the source `.prefab` document on disk**, so the asset itself changes
 //! and every *other* instance picks the edit up on its next load / reimport. Two forms:
 //! whole-object ([`apply_instance_to_source`]) and a single json-pointer leaf
-//! ([`apply_instance_field_to_source`]).
+//! ([`apply_instance_field_to_source`]). Its per-field opposite, dropping one override
+//! so the leaf tracks the source again, lives here too ([`revert_instance_field`]).
 //!
 //! It reuses the existing serde-value machinery rather than inventing a parallel
 //! serializer: [`apply_overrides`] is the same setter the live propagation uses (now
@@ -79,6 +80,27 @@ pub fn apply_instance_field_to_source(
     write_prefab_file(&prefab, &source)?;
     drop_override(scene, entity_id, path);
     reimport_instance(scene, root)
+}
+
+/// Revert ONE overridden field: drop the override at `path` from `entity_id`'s map,
+/// then reimport the instance so that leaf tracks the source again while every other
+/// override stays (Unity's `PrefabUtility.RevertPropertyOverride`). `entity_id` may be
+/// any instance entity (root or child). `Ok(false)` when there is no override at
+/// `path`; errors if `entity_id` is not a linked instance entity or the source can't
+/// be read. Either way nothing changes: the source is read before the override goes.
+/// The editor's per-field revert button and `Scene.RevertPrefabField` (#998).
+pub fn revert_instance_field(
+    scene: &mut Scene,
+    entity_id: u32,
+    path: &str,
+) -> Result<bool, String> {
+    let root = instance_root(scene, entity_id)?;
+    read_prefab_file(&link_source(scene, root)?)?;
+    if !drop_override(scene, entity_id, path) {
+        return Ok(false);
+    }
+    reimport_instance(scene, root)?;
+    Ok(true)
 }
 
 /// Write `overrides` onto the source entity with `local_id` inside `prefab`, in place.
@@ -164,13 +186,18 @@ fn overrides_of(scene: &Scene, id: u32) -> BTreeMap<String, Value> {
         .unwrap_or_default()
 }
 
-/// Drop one override `path` from entity `id`'s link (a no-op if absent).
-fn drop_override(scene: &mut Scene, id: u32, path: &str) {
-    if let Some(mut link) = scene.world.prefab_link_mut(id) {
-        link.overrides.remove(path);
-    }
+/// Drop one override `path` from entity `id`'s link; whether there was one to drop.
+fn drop_override(scene: &mut Scene, id: u32, path: &str) -> bool {
+    scene
+        .world
+        .prefab_link_mut(id)
+        .is_some_and(|mut link| link.overrides.remove(path).is_some())
 }
 
 #[cfg(test)]
 #[path = "apply_tests.rs"]
 mod prefab_apply_tests;
+
+#[cfg(test)]
+#[path = "revert_field_tests.rs"]
+mod prefab_revert_field_tests;

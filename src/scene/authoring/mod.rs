@@ -190,7 +190,9 @@ pub use crate::scene::authoring::dependency::{
 // itself; re-exported here so editor and API reach extract / instantiate (unpacked
 // and linked) and the apply/revert/list verbs through this one shared authoring entry
 // point.
-pub use crate::scene::prefab::apply::{apply_instance_field_to_source, apply_instance_to_source};
+pub use crate::scene::prefab::apply::{
+    apply_instance_field_to_source, apply_instance_to_source, revert_instance_field,
+};
 pub use crate::scene::prefab::link::{
     list_instance_overrides, record_instance_overrides, reimport_instance,
     revert_instance_overrides,
