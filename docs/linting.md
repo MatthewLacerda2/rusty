@@ -195,13 +195,16 @@ new flag, gate, CI step or baseline.
   list whose order means nothing carries `// sorted: <why order is free>` (Markdown:
   `<!-- sorted: <why> -->`) on the line above it, and fails when an entry sorts
   before the one above it. The list ends at the first blank line or the first line
-  indented less than its first entry; an entry's key is its line from the first
-  word that is not a Rust keyword (`pub`, `crate`, `mod`, …), ignoring case, so
-  `pub(crate) mod a;` sorts as `a`. Deeper lines continue an entry; comment and
-  attribute lines and a Markdown table's header are skipped. Rust files and the
-  Markdown under `docs/`, `.claude/skills/` and the repo root are scanned. A list
+  indented less than its first entry; an entry's key is the rest of its line from
+  the first word that is not a Rust keyword (`pub`, `crate`, `mod`, …), compared
+  ignoring case, so `pub(crate) mod a;` sorts as `a;`. Deeper lines continue an
+  entry; comment and attribute lines and a Markdown table's header (right under the
+  marker) are skipped. A marker with no reason, one wrapped over two lines, or one
+  that governs no entries (a blank line under it, or a first entry indented deeper
+  than it) is itself a finding. Rust files and the tracked Markdown under `docs/`,
+  `.claude/skills/` and the repo root are scanned. A list
   whose order matters (`src/app/registry.rs`'s `build()`, the `Entity` fields,
-  `ComponentKind`) gets a comment saying why instead of a marker
+  `ComponentKind`, `docs/api/index.md`'s namespaces) gets a comment saying why instead of a marker
   (`rules/sorted.rs`).
 - **`full-literal`** (#976) — a test builds a first-class component (a `…Component`
   type `Entity` names, with three or more fields) through a constructor or a

@@ -44,16 +44,51 @@ fn passes_an_unmarked_list() {
 }
 
 #[test]
-fn finds_markdown_under_docs_and_at_the_root() {
+fn flags_a_marker_that_governs_no_entries() {
+    let blank = "// sorted: names only\n\nmod b;\nmod a;\n";
+    assert_eq!(lines(&check("src/x.rs", blank)), [(1, RULE)]);
+    let wrapped = "<!-- sorted: an index,\nwrapped -->\n- b\n- a\n";
+    assert_eq!(lines(&check("docs/x.md", wrapped)), [(1, RULE)]);
+    let deeper = "// sorted: names only\n    mod b;\nmod a;\n";
+    assert_eq!(lines(&check("src/x.rs", deeper)), [(1, RULE)]);
+}
+
+#[test]
+fn skips_a_table_header_only_right_under_the_marker() {
+    let md = "<!-- sorted: rows -->\n- b\n- a\n| Col | Note |\n|---|---|\n| d | x |\n";
+    assert_eq!(lines(&check("docs/x.md", md)), [(3, RULE)]);
+}
+
+#[test]
+fn finds_tracked_markdown_under_docs_and_at_the_root() {
     let root = std::env::temp_dir().join(format!("lint_sorted_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&root);
     std::fs::create_dir_all(root.join("docs/api")).expect("temp dir");
-    for f in ["README.md", "docs/api/A.md", "docs/a.txt", "src.md"] {
+    std::fs::create_dir_all(root.join("src")).expect("src");
+    let files = [
+        "README.md",
+        "docs/api/A.md",
+        "docs/a.txt",
+        "src.md",
+        "src/b.md",
+    ];
+    for f in files.iter().chain(&["notes.md"]) {
         std::fs::write(root.join(f), "").expect("write");
     }
-    std::fs::create_dir_all(root.join("src")).expect("src");
-    std::fs::write(root.join("src/b.md"), "").expect("write");
+    let git = |args: &[&str]| {
+        let ok = std::process::Command::new("git")
+            .args(args)
+            .current_dir(&root)
+            .status()
+            .expect("git");
+        assert!(ok.success());
+    };
+    git(&["init", "-q"]);
+    git(&[&["add", "--"][..], &files].concat());
     let found = markdown(&root);
     std::fs::remove_dir_all(&root).ok();
-    assert_eq!(found, ["README.md", "docs/api/A.md", "src.md"]);
+    assert_eq!(
+        found.expect("git"),
+        ["README.md", "docs/api/A.md", "src.md"]
+    );
 }

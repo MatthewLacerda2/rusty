@@ -18,7 +18,7 @@
 // or a documented `.expect(...)`); test code is exempt via clippy.toml. See docs/linting.md.
 #![deny(clippy::unwrap_used)]
 
-// sorted: one module per namespace; kept in order so parallel branches don't collide
+// sorted: namespace modules and their helpers; no module reads another's declaration order
 pub mod animator;
 pub mod application;
 pub mod assets;

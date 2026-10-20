@@ -10,17 +10,21 @@
 //! ```
 //!
 //! The list runs from the line after the marker to the first blank line, or the
-//! first line indented less than its first entry. An entry's key is the line from
-//! its first word that is not a Rust keyword (`pub`, `crate`, `mod`, …) on, compared
-//! ignoring case, so `pub(crate) mod a;` sorts as `a;` and `- [`A`](A.md)` as `A`.
-//! Lines deeper than the first entry continue the one above; comment and attribute
-//! lines, lines with no word, and a Markdown table's header (everything up to its
-//! `|---|` row) are not entries. A marker with no reason is a finding.
+//! first line indented less than its first entry. An entry's key is the rest of its
+//! line from the first word that is not a Rust keyword (`pub`, `crate`, `mod`, …),
+//! trailing space trimmed and compared ignoring case: `pub(crate) mod a;` sorts as
+//! `a;`, `- [`A`](A.md)` as ``A`](A.md)``. Lines deeper than the first entry
+//! continue the one above; comment and attribute lines, lines with no word, and a
+//! Markdown table's header (a `|` row and its `|---|` rule, right under the marker)
+//! are not entries. A marker is itself a finding when it gives no reason, does not
+//! fit on one line, or governs no entries: nothing under it, or a first entry
+//! indented deeper than the marker.
 
 use super::finding::Finding;
 use super::scan::Scan;
 use std::fs;
 use std::path::Path;
+use std::process::Command;
 
 pub const RULE: &str = "sorted";
 /// Words skipped before an entry's key starts.
@@ -40,11 +44,8 @@ pub fn check(path: &str, source: &str) -> Vec<Finding> {
     let mut found = Vec::new();
     for (at, line) in lines.iter().enumerate() {
         let Some(why) = reason(line) else { continue };
-        if why.is_empty() {
-            found.push(finding(
-                at,
-                "a `sorted` marker needs a reason after it".into(),
-            ));
+        if let Some(problem) = malformed(line, why, &lines, at) {
+            found.push(finding(at, problem.into()));
             continue;
         }
         let mut prev: Option<String> = None;
@@ -61,6 +62,27 @@ pub fn check(path: &str, source: &str) -> Vec<Finding> {
         }
     }
     found
+}
+
+/// What is wrong with the marker at `at`, which gives `why`, if anything.
+fn malformed(line: &str, why: &str, lines: &[&str], at: usize) -> Option<&'static str> {
+    if why.is_empty() {
+        return Some("a `sorted` marker needs a reason after it");
+    }
+    if line.trim_start().starts_with("<!--") && !line.trim_end().ends_with("-->") {
+        return Some("a `sorted` marker must fit on one line");
+    }
+    match entries(lines, at + 1).first() {
+        None => Some("this `sorted` marker governs no entries: start the list right under it"),
+        Some((i, _)) if indent(lines[*i]) > indent(line) => {
+            Some("this `sorted` list starts deeper than its marker; indent them alike")
+        }
+        Some(_) => None,
+    }
+}
+
+fn indent(line: &str) -> usize {
+    line.len() - line.trim_start().len()
 }
 
 /// The reason a marker line gives, `None` when `line` is no marker.
@@ -81,14 +103,16 @@ fn head(key: &str) -> &str {
 
 /// The `(line index, key)` of each entry in the list starting at `from`.
 fn entries(lines: &[&str], from: usize) -> Vec<(usize, String)> {
-    let indent = |l: &str| l.len() - l.trim_start().len();
     let block: Vec<(usize, &str)> = lines[from..]
         .iter()
         .enumerate()
         .map(|(i, l)| (from + i, *l))
         .take_while(|(_, l)| !l.trim().is_empty())
         .collect();
-    let header = block.iter().position(|(_, l)| is_table_rule(l));
+    let header = block
+        .iter()
+        .take_while(|(_, l)| l.trim_start().starts_with('|'))
+        .position(|(_, l)| is_table_rule(l));
     let block = &block[header.map_or(0, |h| h + 1)..];
     let Some(depth) = block.first().map(|(_, l)| indent(l)) else {
         return Vec::new();
@@ -129,41 +153,49 @@ fn key(line: &str) -> Option<String> {
     }
 }
 
-/// The Markdown files under [`MARKDOWN_ROOTS`] and at the top of `root`, relative to it.
-pub fn markdown(root: &Path) -> Vec<String> {
-    let mut out = Vec::new();
-    let mut dirs: Vec<_> = MARKDOWN_ROOTS.iter().map(|d| root.join(d)).collect();
-    let top = fs::read_dir(root).into_iter().flatten().flatten();
-    out.extend(top.map(|e| e.path()).filter(|p| p.is_file()));
-    while let Some(dir) = dirs.pop() {
-        for path in fs::read_dir(&dir)
-            .into_iter()
-            .flatten()
-            .flatten()
-            .map(|e| e.path())
-        {
-            if path.is_dir() {
-                dirs.push(path);
-            } else {
-                out.push(path);
-            }
-        }
+/// The tracked Markdown files under [`MARKDOWN_ROOTS`] and at the top of the repo at
+/// `root`, relative to it. Only tracked ones: a gitignored note (the operator's
+/// `auxmd.md`) never reaches CI, so it must not fail the gate locally either.
+pub fn markdown(root: &Path) -> Result<Vec<String>, String> {
+    let out = Command::new("git")
+        .arg("-C")
+        .arg(root)
+        .args(["ls-files", "-z", "--", "*.md"])
+        .output()
+        .map_err(|e| e.to_string())?;
+    if !out.status.success() {
+        return Err(String::from_utf8_lossy(&out.stderr).trim().to_string());
     }
-    let mut md: Vec<String> = out
-        .iter()
-        .filter(|p| p.extension().is_some_and(|e| e == "md"))
-        .filter_map(|p| p.strip_prefix(root).ok())
-        .map(|p| p.to_string_lossy().replace('\\', "/"))
+    let mut md: Vec<String> = String::from_utf8_lossy(&out.stdout)
+        .split('\0')
+        .filter(|p| !p.is_empty() && (!p.contains('/') || in_roots(p)))
+        .map(str::to_string)
         .collect();
     md.sort();
-    md
+    Ok(md)
+}
+
+fn in_roots(path: &str) -> bool {
+    MARKDOWN_ROOTS
+        .iter()
+        .any(|r| path.strip_prefix(r).is_some_and(|p| p.starts_with('/')))
 }
 
 /// The rule over every scanned file and the Markdown under the working directory.
 pub fn run(scan: &Scan) -> Vec<Finding> {
     let mut found = scan.each_file(check);
-    for path in markdown(Path::new(".")) {
-        found.extend(check(&path, &fs::read_to_string(&path).unwrap_or_default()));
+    match markdown(Path::new(".")) {
+        Ok(paths) => {
+            for path in paths {
+                found.extend(check(&path, &fs::read_to_string(&path).unwrap_or_default()));
+            }
+        }
+        Err(why) => found.push(Finding {
+            path: ".".into(),
+            line: 1,
+            rule: RULE,
+            message: format!("could not list the tracked Markdown: {why}"),
+        }),
     }
     found
 }
