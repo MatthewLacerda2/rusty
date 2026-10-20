@@ -28,8 +28,8 @@ CODE_RED = [job("changes", "success"), job("build-test", "failure"), job("deny",
 
 
 def lint(attempt=1, jobs=GATE_CANCELLED, **fields):
-    """`ci` green, `lint` on `attempt` with these jobs."""
-    return [run("ci"), run("lint", run_attempt=attempt, **fields)], {1: built("ci"), 2: jobs}
+    """`ci` green, `lint` on `attempt` with these jobs, listed for that attempt."""
+    return [run("ci"), run("lint", run_attempt=attempt, **fields)], {1: built("ci"), 2: [{**j, "run_attempt": attempt} for j in jobs]}
 
 
 def ci_cancelled(attempt=1, **fields):

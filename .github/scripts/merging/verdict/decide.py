@@ -26,9 +26,9 @@ def ran_something(run: dict, jobs: dict[int, list[dict]], workflow: str) -> bool
     The question `conclusion == "success"` does not answer: a draft's run
     concludes success with every gated job skipped, gate green.
     """
-    gate, gated = runlist.WORKFLOWS[workflow]
+    gated = runlist.WORKFLOWS[workflow][1]
     ran = jobs.get(run.get("id"), [])
-    gate_ok = any(j.get("name") == gate and j.get("conclusion") == "success" for j in ran)
+    gate_ok = runlist.gate_conclusion(run, jobs, workflow) == "success"
     built = any(
         runlist.base(j.get("name", "")) in gated and j.get("conclusion") == "success" for j in ran
     )
@@ -42,7 +42,9 @@ def assess(
 
     `runs` is every run of `workflow` on the head (see [`runlist.runs_for`]). Order is
     [`FAILED`] → [`RUNNING`] → [`ABSENT`] / [`UNBUILT`] → [`PASSED`]: a commit
-    carrying a red run and a live one is already answered.
+    carrying a red run and a live one is already answered. A run whose gate
+    has not concluded is [`RUNNING`] whatever the runs listing says of it
+    ([`runlist.lagging`], #1095): [`UNBUILT`] is judged only on a settled gate.
     """
     short = pull.get("headRefOid", "")[:7]
     if not runs:
@@ -70,6 +72,12 @@ def assess(
         return RUNNING, [
             f"a `{workflow}` run for {short} is {running[0].get('status')}.",
             "Wait for it. A run in flight has not passed yet.",
+        ]
+    lagging = runlist.lagging(kept, jobs, workflow)
+    if lagging:
+        return RUNNING, [
+            f"a `{workflow}` run for {short} is listed completed, but {runlist.lag(lagging[0], jobs, workflow)}.",
+            "The two listings are read apart and one can lag the other (#1095). Wait for the gate.",
         ]
 
     real = [r for r in kept if ran_something(r, jobs, workflow)]
