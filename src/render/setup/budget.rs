@@ -38,9 +38,17 @@ use std::time::Duration;
 /// be an instant self-deadlock.
 ///
 /// **If WARP runs out of memory again, lower this to 1 before anything else.** That
-/// fully serializes headless renderers and makes the suite's GPU memory deterministic;
-/// the cost is wall-clock on the GPU tests, which are a small minority of the suite.
-/// Raising it is the move that needs justification, not lowering it.
+/// fully serializes headless renderers and makes the suite's GPU memory deterministic.
+/// The cost is real: the GPU tests are under a tenth of the suite by count, but under
+/// nextest this cap (the `gpu` group's `max-threads`) makes them its critical path, so
+/// their time ÷ the cap *is* the suite's wall time (#985), and lowering it to 1
+/// stretches the run by as much as those tests then take one at a time.
+///
+/// Raising it is the move that needs justification, and was measured not to have one:
+/// on a 4-core lavapipe container, 4 instead of 2 won ~6%, within run-to-run noise,
+/// and 3 measured slower than either, because the whole suite is then near its core
+/// bound (#985). What does move the wall is a cheaper renderer per test: pipelines a
+/// frame may not draw are built on first use (`gpu::pipelines::LazyPipeline`).
 pub(crate) const MAX_CONCURRENT_HEADLESS: usize = 2;
 
 /// How long to wait for a permit before declaring the budget deadlocked.
