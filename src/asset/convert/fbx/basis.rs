@@ -136,9 +136,9 @@ mod tests {
         }
     }
 
-    #[test]
-    fn z_up_keys_agree_with_the_conjugated_matrix() {
-        let basis = Basis::new(&axes(A::PositiveX, A::PositiveZ, A::NegativeY));
+    /// `rotation` and `scale` of a key agree with conjugating its whole TRS
+    /// matrix, as `matrix` does for a rest transform.
+    fn keys_agree_with_the_conjugated_matrix(basis: Basis) {
         let q = DQuat::from_rotation_z(0.7) * DQuat::from_rotation_x(0.3);
         let s = DVec3::new(1.0, 2.0, 3.0);
         let fbx_q = ufbx::Quat {
@@ -157,6 +157,23 @@ mod tests {
         assert!(glam::Vec3::from(basis.scale(fbx_s)).abs_diff_eq(scale.as_vec3(), 1e-5));
         let keyed = glam::Quat::from_array(basis.rotation(fbx_q));
         assert!(keyed.dot(rotation.as_quat()).abs() > 1.0 - 1e-5);
+    }
+
+    #[test]
+    fn z_up_keys_agree_with_the_conjugated_matrix() {
+        keys_agree_with_the_conjugated_matrix(Basis::new(&axes(
+            A::PositiveX,
+            A::PositiveZ,
+            A::NegativeY,
+        )));
+    }
+
+    #[test]
+    fn mirrored_keys_agree_with_the_conjugated_matrix() {
+        // Left-handed, and Z-up, so the reflection and the permutation both apply.
+        let basis = Basis::new(&axes(A::PositiveX, A::PositiveZ, A::PositiveY));
+        assert!(basis.mirrored());
+        keys_agree_with_the_conjugated_matrix(basis);
     }
 
     #[test]

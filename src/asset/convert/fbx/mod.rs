@@ -82,7 +82,7 @@ fn document(scene: &ufbx::Scene, out_dir: &Path) -> Result<glb::Document, Import
             doc.nodes[index].skin = Some(doc.skins.len() - 1);
         }
     }
-    doc.animations = anim::animations(scene, basis, &nodes)?;
+    doc.animations = anim::animations(scene, basis, &nodes);
     Ok(doc)
 }
 
