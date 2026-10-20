@@ -296,7 +296,8 @@ zero violations (#494), and it is the groundwork the crate split (#495) needs.
 ## Component completeness (`--components`)
 A first-class component is only "done" when it appears on all four axes that
 deliberately live in non-dependent layers: a field on `Entity`, an Add Component
-entry (`inspector/components/add/`), an inspector card (some `inspector/components/*.rs`), and an API
+entry (`inspector/components/add/`: a `!world.has_<field>(id)` gate, or a
+`ComponentKind` row, resolved to its field through `authoring::has_kind`'s arms), an inspector card (some `inspector/components/*.rs`), and an API
 namespace (`src/api/<x>.rs` registered in `api/mod.rs` and documented in
 `docs/api/`, as the field or its Lua spelling: `layout_group` is `LayoutGroup`). The
 gate discovers components from `Entity`'s `Option<…Component>` fields — so a new one
