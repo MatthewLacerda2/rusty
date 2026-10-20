@@ -86,7 +86,8 @@ pub fn apply_instance_field_to_source(
 /// then reimport the instance so that leaf tracks the source again while every other
 /// override stays (Unity's `PrefabUtility.RevertPropertyOverride`). `entity_id` may be
 /// any instance entity (root or child). `Ok(false)` when there is no override at
-/// `path` (nothing changes); errors if `entity_id` is not a linked instance entity.
+/// `path`; errors if `entity_id` is not a linked instance entity or the source can't
+/// be read. Either way nothing changes: the source is read before the override goes.
 /// The editor's per-field revert button and `Scene.RevertPrefabField` (#998).
 pub fn revert_instance_field(
     scene: &mut Scene,
@@ -94,10 +95,10 @@ pub fn revert_instance_field(
     path: &str,
 ) -> Result<bool, String> {
     let root = instance_root(scene, entity_id)?;
-    if !overrides_of(scene, entity_id).contains_key(path) {
+    read_prefab_file(&link_source(scene, root)?)?;
+    if !drop_override(scene, entity_id, path) {
         return Ok(false);
     }
-    drop_override(scene, entity_id, path);
     reimport_instance(scene, root)?;
     Ok(true)
 }
@@ -185,13 +186,18 @@ fn overrides_of(scene: &Scene, id: u32) -> BTreeMap<String, Value> {
         .unwrap_or_default()
 }
 
-/// Drop one override `path` from entity `id`'s link (a no-op if absent).
-fn drop_override(scene: &mut Scene, id: u32, path: &str) {
-    if let Some(mut link) = scene.world.prefab_link_mut(id) {
-        link.overrides.remove(path);
-    }
+/// Drop one override `path` from entity `id`'s link; whether there was one to drop.
+fn drop_override(scene: &mut Scene, id: u32, path: &str) -> bool {
+    scene
+        .world
+        .prefab_link_mut(id)
+        .is_some_and(|mut link| link.overrides.remove(path).is_some())
 }
 
 #[cfg(test)]
 #[path = "apply_tests.rs"]
 mod prefab_apply_tests;
+
+#[cfg(test)]
+#[path = "revert_field_tests.rs"]
+mod prefab_revert_field_tests;

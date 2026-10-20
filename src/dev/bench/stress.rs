@@ -210,5 +210,9 @@ fn attach(scene: &mut Scene, id: u32, path: &str) {
     if path.is_empty() {
         return;
     }
-    authoring::add_script(&mut scene.world, id, path, Default::default());
+    let attached = authoring::add_script(&mut scene.world, id, path, Default::default());
+    assert!(
+        attached,
+        "stress entity {id} vanished before its script attached"
+    );
 }
