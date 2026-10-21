@@ -19,13 +19,13 @@ use crate::core::collections::Map;
 
 use rapier3d::prelude::*;
 
-use super::build::{body_state, gravity_scale, EntityBodyState};
-use super::collision_events::CollisionEvents;
 use super::compound::{world_to_local, BodyPlan};
 use super::convert::{from_pose, to_pose};
+use super::events::collision::CollisionEvents;
+use super::events::trigger::TriggerEvents;
 use super::joints::JointMap;
 use super::live::body_type;
-use super::trigger_events::TriggerEvents;
+use super::shape::build::{body_state, gravity_scale, EntityBodyState};
 use super::PhysicsEvents;
 use crate::scene::Scene;
 

@@ -9,14 +9,14 @@
 
 use rapier3d::prelude::*;
 
-use super::build::{
-    body_inputs, build_shape_for, ccd_enabled, collider_inputs, gravity_scale, interaction_groups,
-    BodyClass,
-};
 use super::character::upright_offset;
 use super::compound::{plan, relative_pose, world_pose, BodyPlan, WorldPose};
 use super::convert::to_pose;
 use super::material::apply_material;
+use super::shape::build::{
+    body_inputs, build_shape_for, ccd_enabled, collider_inputs, gravity_scale, interaction_groups,
+    BodyClass,
+};
 use super::world::PhysicsWorld;
 use crate::scene::Scene;
 

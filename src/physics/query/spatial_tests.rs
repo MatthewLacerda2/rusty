@@ -1,4 +1,4 @@
-//! src/physics/spatial_tests.rs — the single test home for `spatial.rs` (#311).
+//! src/physics/query/spatial_tests.rs — the single test home for `spatial.rs` (#311).
 //!
 //! Asserts the *answers* the area queries compute (who is inside, how far the
 //! swept sphere travels, where the closest point lands) against hand-computed
@@ -7,8 +7,8 @@
 
 use glam::Vec3;
 
-use super::PhysicsWorld;
 use crate::components::{ColliderComponent, ColliderShape};
+use crate::physics::PhysicsWorld;
 use crate::scene::Scene;
 
 /// A static unit-ish box entity at `pos` with the given half-size box collider.

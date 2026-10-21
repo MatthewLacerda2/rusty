@@ -1,4 +1,4 @@
-//! src/physics/mesh_shape.rs — a mesh collider's rapier shape (#77).
+//! src/physics/shape/mesh.rs — a mesh collider's rapier shape (#77).
 //!
 //! The one shape [`super::build::try_build_shape`] builds from geometry rather than
 //! dimensions, so the one that a mirrored world scale must reflect (#1124). This file
@@ -12,7 +12,7 @@ use rapier3d::prelude::*;
 
 /// Why a mesh collider was not built.
 #[derive(Debug, PartialEq)]
-pub(super) enum Skip {
+pub(in crate::physics) enum Skip {
     /// The entity has a Mesh collider but no Mesh component to take geometry from.
     NoMesh,
     /// Fewer vertices than a hull (4) or a trimesh (3) needs.
@@ -52,7 +52,7 @@ impl fmt::Display for Skip {
 /// a hull needs 4 vertices and some volume to span, a trimesh one triangle of
 /// non-zero area whose indices all point at a vertex (#1132, #1141). A hull reads no
 /// indices, so a stale one never drops it.
-pub(super) fn build_mesh_shape(
+pub(in crate::physics) fn build_mesh_shape(
     convex: bool,
     scale: Vec3,
     mesh: (&[[f32; 3]], &[u32]),

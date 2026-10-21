@@ -1,4 +1,4 @@
-//! src/physics/query.rs — ray queries over the rapier world.
+//! src/physics/query/mod.rs — ray queries over the rapier world.
 //!
 //! Split out of `world` so the step/sync pipeline and the read-only ray casts stay
 //! separately legible. The in-engine hitscan, the particles and the Lua
@@ -14,7 +14,20 @@
 use glam::Vec3;
 use rapier3d::prelude::*;
 
-use super::world::PhysicsWorld;
+use crate::physics::world::PhysicsWorld;
+
+#[cfg(test)]
+mod raycast_tests;
+pub(super) mod spatial;
+#[cfg(test)]
+mod spatial_tests;
+#[cfg(test)]
+mod tests;
+pub(super) mod through;
+#[cfg(test)]
+mod through_edge_tests;
+#[cfg(test)]
+mod through_tests;
 
 /// Whether `collider` takes part in queries: it is enabled (a deactivated
 /// compound part is not) and so is the body carrying it (a deactivated owner

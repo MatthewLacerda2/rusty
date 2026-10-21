@@ -8,8 +8,8 @@ use std::f32::consts::FRAC_PI_2;
 use glam::{Quat, Vec3};
 use rapier3d::prelude::Pose as RapierPose;
 
-use super::build::build_shape;
 use super::compound::world_pose;
+use super::shape::build::build_shape;
 use super::PhysicsWorld;
 use crate::components::{CapsuleAxis, ColliderComponent, ColliderShape};
 use crate::scene::{apply_scene_data, to_scene_data, Scene};

@@ -1,4 +1,4 @@
-//! src/physics/round_bounds_tests.rs — a collider's stored world AABB against
+//! src/physics/shape/round_bounds_tests.rs — a collider's stored world AABB against
 //! the rapier shape physics builds for it (#1140): both read one pose
 //! (`World::world_pose`) and one sizing rule (`ColliderShape::scaled`), so the
 //! box always holds the shape, parented and rotated or not.
@@ -9,8 +9,8 @@ use glam::{Quat, Vec3};
 use rapier3d::prelude::Pose as RapierPose;
 
 use super::build::build_shape;
-use super::compound::world_pose;
 use crate::components::{CapsuleAxis, ColliderComponent, ColliderShape};
+use crate::physics::compound::world_pose;
 use crate::scene::Scene;
 
 const SHAPES: [ColliderShape; 4] = [

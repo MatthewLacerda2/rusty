@@ -1,4 +1,4 @@
-//! src/physics/mirror_tests.rs — colliders under a mirrored parent (#1124).
+//! src/physics/shape/mirror_tests.rs — colliders under a mirrored parent (#1124).
 //!
 //! A negative world scale (see `MIRRORS` for where one lands) keeps every primitive
 //! at its drawn size, Unity-style, and turns a mesh collider's geometry without
@@ -8,8 +8,8 @@ use glam::{vec3, Vec3};
 
 use super::build::build_shape;
 use super::build_tests::mesh_shape;
-use super::PhysicsWorld;
 use crate::components::{CapsuleAxis, ColliderComponent, ColliderShape};
+use crate::physics::PhysicsWorld;
 use crate::scene::Scene;
 
 /// The mirrors under test: on X, a pure reflection and one with a stretch (where a

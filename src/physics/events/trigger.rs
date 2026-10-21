@@ -1,4 +1,4 @@
-//! src/physics/trigger_events.rs — the per-tick trigger events `PhysicsWorld::step`
+//! src/physics/events/trigger.rs — the per-tick trigger events `PhysicsWorld::step`
 //! surfaces: which overlap pairs began this tick, which persist, and which ended
 //! (#310). Edges are recovered by diffing this tick's sorted overlap set against
 //! the previous tick's — rapier's `Started`/`Stopped` events carry the same
@@ -11,9 +11,9 @@
 
 use rapier3d::prelude::*;
 
-use super::build::order_pair;
-use super::query::is_live;
-use super::world::PhysicsWorld;
+use crate::physics::query::is_live;
+use crate::physics::shape::build::order_pair;
+use crate::physics::world::PhysicsWorld;
 
 impl PhysicsWorld {
     /// The overlapping trigger pairs at the poses the step ended on, as sorted,
@@ -27,7 +27,7 @@ impl PhysicsWorld {
     /// query tree (refreshed at the end of every step) what it overlaps now,
     /// under the same layer groups and liveness rule (#521) as its pairs. A
     /// collider never pairs with its own body, so that body is excluded.
-    pub(super) fn overlap_pairs(&self) -> Vec<(u32, u32)> {
+    pub(in crate::physics) fn overlap_pairs(&self) -> Vec<(u32, u32)> {
         let live = |_: ColliderHandle, c: &Collider| is_live(&self.bodies, c);
         let mut pairs = Vec::new();
         for (handle, sensor) in self.colliders.iter() {

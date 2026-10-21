@@ -19,7 +19,7 @@
 
 use rapier3d::prelude::*;
 
-use super::build::{interaction_groups, EntityBodyState};
+use super::shape::build::{interaction_groups, EntityBodyState};
 use super::world::PhysicsWorld;
 use crate::scene::Scene;
 

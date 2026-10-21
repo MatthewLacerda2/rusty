@@ -1,4 +1,4 @@
-//! src/physics/spatial.rs — area-shaped queries over the rapier world (#311).
+//! src/physics/query/spatial.rs — area-shaped queries over the rapier world (#311).
 //!
 //! `query` holds the line-shaped ray casts; this file holds everything with a
 //! volume or a specific collider in mind: overlaps ("what colliders are inside
@@ -11,9 +11,9 @@ use glam::{Quat, Vec3};
 use rapier3d::parry::query::ShapeCastOptions;
 use rapier3d::prelude::*;
 
-use super::convert::to_pose;
-use super::query::{is_live, RayHit};
-use super::world::PhysicsWorld;
+use super::{is_live, RayHit};
+use crate::physics::convert::to_pose;
+use crate::physics::world::PhysicsWorld;
 
 impl PhysicsWorld {
     /// Entity ids whose colliders intersect the sphere at `center` — Unity's

@@ -1,4 +1,4 @@
-//! src/physics/query_tests.rs — the queries in `query.rs`.
+//! src/physics/query/tests.rs — the queries in `query/mod.rs`.
 //!
 //! The two segment-shaped queries: the wall ray a world canvas finds
 //! (`first_surface_ahead`, #429) and audio occlusion (`segment_blocked`, #467).
@@ -12,8 +12,8 @@
 
 use glam::Vec3;
 
-use super::PhysicsWorld;
 use crate::components::{ColliderComponent, ColliderShape, RigidBodyComponent};
+use crate::physics::PhysicsWorld;
 use crate::scene::Scene;
 
 /// A static unit-thick wall (or trigger) facing -x, its near face at `x - 0.5`.
@@ -227,7 +227,7 @@ fn the_character_sweep_walks_through_an_inactive_wall() {
         let mut world = PhysicsWorld::from_scene(&scene);
         scene.world.set_active(wall, wall_active);
         world.step(&mut scene, DT);
-        super::move_character(Some(&world), &mut scene, mover, Vec3::X * 4.0);
+        crate::physics::move_character(Some(&world), &mut scene, mover, Vec3::X * 4.0);
         let x = scene.world.transform(mover).unwrap().position.x;
         x
     };

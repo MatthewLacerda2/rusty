@@ -1,14 +1,15 @@
-//! src/physics/joints_tests.rs — `Joint` components in the rapier world (#449): a
+//! src/physics/joints/tests.rs — `Joint` components in the rapier world (#449): a
 //! fixed joint holds and welds, a hinge swings within its limits, a ball joint is
 //! a pendulum whose two swing limits stop it per axis (#675), a joint breaks past
 //! its force, and a run replays identically.
 
 use glam::{Quat, Vec2, Vec3};
 
-use super::{JointBreak, PhysicsWorld};
+use super::JointBreak;
 use crate::components::{
     ColliderComponent, ColliderShape, JointComponent, JointKind, RigidBodyComponent,
 };
+use crate::physics::PhysicsWorld;
 use crate::scene::Scene;
 
 const DT: f32 = 1.0 / 60.0;

@@ -1,4 +1,4 @@
-//! src/physics/through_edge_tests.rs — `raycast_through`'s edges (#892): a stray
+//! src/physics/query/through_edge_tests.rs — `raycast_through`'s edges (#892): a stray
 //! exit face after a crossing, the mesh walk's face cap, and a convex exit along
 //! the longest chord of a large and a small box.
 
