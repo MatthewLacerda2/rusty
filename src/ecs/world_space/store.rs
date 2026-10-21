@@ -17,10 +17,11 @@
 //! bumps the generation instead: every slot goes dirty in O(1).
 //!
 //! The downward walk follows `children`, which `Scene::set_parent` and rehydration keep
-//! in step with the parent links. Only a corrupt file can write a parent link its
-//! parent's `children` lacks; such a child reads its parent as of the last structural
-//! change, never NaN and never a hang (the walk stops at dirty entities, so a cycle in
-//! `children` ends it too).
+//! in step with the parent links. Only a raw `set_parent_id` (a corrupt file) can write
+//! a parent link its parent's `children` lacks; such a child reads its parent as of its
+//! own last move or the last generation bump, so a parent despawned under it can leave
+//! it stale, but never NaN and never a hang (the walk stops at dirty entities, so a
+//! cycle in `children` ends it too).
 //!
 //! **Determinism.** A matrix is a pure function of the local transforms up its chain,
 //! whatever order slots are cleaned in; stamps only gate the cache, never a result.

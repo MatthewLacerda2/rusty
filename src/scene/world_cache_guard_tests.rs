@@ -1,6 +1,8 @@
 //! The world-matrix walks on a malformed hierarchy (#991): a parent cycle (which
 //! only a raw `set_parent_id`, e.g. a corrupt scene file, can write) ends the walk,
-//! and a dangling parent reads as a root, whatever order the store fills in.
+//! and a dangling parent reads as a root, whatever order the store fills in. A raw link
+//! the parent's `children` lacks is the one case the store's downward walk cannot see
+//! (`ecs::world_space::store`).
 
 use glam::Vec3;
 
@@ -19,17 +21,16 @@ fn a_parent_cycle_neither_hangs_nor_overflows_the_store() {
 
 #[test]
 fn a_dangling_parent_reads_as_a_root() {
+    // A raw link to an id no longer in the world, as a corrupt file can write. (A
+    // despawn under a well-formed parent is `ecs::world_space::queue_tests`'.)
     let mut scene = Scene::new();
     let gone = scene.add_entity("gone".into());
     let leaf = scene.add_entity("leaf".into());
     scene.world.transform_mut(gone).unwrap().position = Vec3::X * 10.0;
     scene.world.transform_mut(leaf).unwrap().position = Vec3::Y;
-    scene.world.set_parent_id(leaf, Some(gone));
-    assert_eq!(
-        scene.world_matrix(leaf).w_axis.truncate(),
-        Vec3::new(10.0, 1.0, 0.0)
-    );
+    assert_eq!(scene.world_matrix(leaf).w_axis.truncate(), Vec3::Y);
     scene.world.despawn(gone);
+    scene.world.set_parent_id(leaf, Some(gone));
     let live = scene.compute_world_matrix(leaf).w_axis.truncate();
     let cached = scene.world_matrix(leaf).w_axis.truncate();
     assert_eq!(live, Vec3::Y);
