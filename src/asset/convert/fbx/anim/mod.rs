@@ -4,7 +4,8 @@
 //! resolves pivots, pre/post-rotations and Euler orders, and resamples the curves
 //! into per-node translation, rotation and scale keys in the same space as
 //! `Node::local_transform`. Here each key goes through the file's [`Basis`]
-//! exactly like a node's rest transform (`C·M·C⁻¹`, per component), each channel
+//! part by part, the same calls [`Basis::local`] makes for a node's rest
+//! transform, so a key and the rest pose it equals split alike (#1110); each channel
 //! is cut to its take's range (`range`), and each stack becomes one glTF
 //! animation.
 
@@ -116,5 +117,7 @@ fn arrays<T: Into<[f32; N]>, const N: usize>(values: Vec<T>) -> Vec<[f32; N]> {
     values.into_iter().map(Into::into).collect()
 }
 
+#[cfg(test)]
+mod mirrored;
 #[cfg(test)]
 mod tests;

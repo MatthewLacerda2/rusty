@@ -9,6 +9,15 @@
 
 use glam::{DMat3, DMat4, DQuat, DVec3};
 
+/// A local transform in glTF's axes, as [`Basis::local`] splits it.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Local {
+    pub translation: [f32; 3],
+    /// A unit quaternion, `[x, y, z, w]`.
+    pub rotation: [f32; 4],
+    pub scale: [f32; 3],
+}
+
 /// The rotation (or, for a left-handed file, reflection) taking file axes to
 /// glTF's.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -64,6 +73,22 @@ impl Basis {
         [m.x_axis.x, m.y_axis.y, m.z_axis.z].map(|v| v as f32)
     }
 
+    /// A local TRS transform in glTF's axes, part by part: translation, rotation
+    /// and scale through [`vector`](Self::vector), [`rotation`](Self::rotation)
+    /// and [`scale`](Self::scale), the very calls each animation key goes through.
+    /// It is the one decomposition a node's rest pose and its keys share (#1110):
+    /// splitting the conjugated matrix instead moves a negative scale's sign onto
+    /// whichever axis glam picks and turns the rotation 180° to match, so a rest
+    /// pose and a key 0 that mean the same transform would blend through a
+    /// flattened bone. As Unity's importer does, the scale keeps the file's signs.
+    pub fn local(&self, t: &ufbx::Transform) -> Local {
+        Local {
+            translation: self.vector(t.translation),
+            rotation: self.rotation(t.rotation),
+            scale: self.scale(t.scale),
+        }
+    }
+
     /// A transform in glTF's axes.
     pub fn matrix(&self, m: DMat4) -> DMat4 {
         self.c * m * self.c.transpose()
@@ -94,15 +119,6 @@ pub fn to_dmat4(m: &ufbx::Matrix) -> DMat4 {
         m.m00, m.m10, m.m20, 0.0, m.m01, m.m11, m.m21, 0.0, m.m02, m.m12, m.m22, 0.0, m.m03, m.m13,
         m.m23, 1.0,
     ])
-}
-
-/// A ufbx transform (TRS) as a glam matrix.
-pub fn trs(t: &ufbx::Transform) -> DMat4 {
-    DMat4::from_scale_rotation_translation(
-        DVec3::new(t.scale.x, t.scale.y, t.scale.z),
-        glam::DQuat::from_xyzw(t.rotation.x, t.rotation.y, t.rotation.z, t.rotation.w),
-        DVec3::new(t.translation.x, t.translation.y, t.translation.z),
-    )
 }
 
 #[cfg(test)]
@@ -136,8 +152,9 @@ mod tests {
         }
     }
 
-    /// `rotation` and `scale` of a key agree with conjugating its whole TRS
-    /// matrix, as `matrix` does for a rest transform.
+    /// `rotation` and `scale` of a key agree with splitting its whole conjugated
+    /// TRS matrix. Rest poses go through [`Basis::local`], not `matrix`: the two
+    /// splits agree only for positive scales (#1110), the case this checks.
     fn keys_agree_with_the_conjugated_matrix(basis: Basis) {
         let q = DQuat::from_rotation_z(0.7) * DQuat::from_rotation_x(0.3);
         let s = DVec3::new(1.0, 2.0, 3.0);
@@ -174,6 +191,52 @@ mod tests {
         let basis = Basis::new(&axes(A::PositiveX, A::PositiveZ, A::PositiveY));
         assert!(basis.mirrored());
         keys_agree_with_the_conjugated_matrix(basis);
+    }
+
+    /// A negative scale under a left-handed, Z-up basis: `local` keeps one
+    /// negative component, and its parts still compose to the conjugated matrix.
+    #[test]
+    fn local_keeps_a_negative_scale_under_a_mirrored_basis() {
+        let basis = Basis::new(&axes(A::PositiveX, A::PositiveZ, A::PositiveY));
+        assert!(basis.mirrored());
+        let (s, q, t) = (
+            DVec3::new(1.0, -1.0, 2.0),
+            DQuat::from_rotation_z(0.5),
+            DVec3::new(1.0, 2.0, 3.0),
+        );
+        let local = basis.local(&ufbx::Transform {
+            translation: ufbx::Vec3 {
+                x: t.x,
+                y: t.y,
+                z: t.z,
+            },
+            rotation: ufbx::Quat {
+                x: q.x,
+                y: q.y,
+                z: q.z,
+                w: q.w,
+            },
+            scale: ufbx::Vec3 {
+                x: s.x,
+                y: s.y,
+                z: s.z,
+            },
+        });
+        let scale = glam::Vec3::from(local.scale);
+        assert!(
+            scale.abs_diff_eq(glam::Vec3::new(1.0, 2.0, -1.0), 1e-6),
+            "{scale}"
+        );
+        let composed = glam::Mat4::from_scale_rotation_translation(
+            scale,
+            glam::Quat::from_array(local.rotation),
+            glam::Vec3::from(local.translation),
+        );
+        let conjugated = basis.matrix(DMat4::from_scale_rotation_translation(s, q, t));
+        assert!(
+            composed.abs_diff_eq(conjugated.as_mat4(), 1e-5),
+            "{composed}"
+        );
     }
 
     #[test]

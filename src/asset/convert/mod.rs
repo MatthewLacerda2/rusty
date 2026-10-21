@@ -51,7 +51,8 @@ pub const CONVERTERS: &[Converter] = &[Converter {
     extension: "fbx",
     name: "ufbx",
     // 2: animation stacks become glTF animations (#1081).
-    version: 2,
+    // 3: a rest pose splits like its keys, keeping a negative scale's signs (#1110).
+    version: 3,
     convert: fbx::convert,
 }];
 
