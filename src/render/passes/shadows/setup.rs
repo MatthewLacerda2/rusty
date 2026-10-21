@@ -7,6 +7,7 @@ use super::cascades::MAX_CASCADES;
 use super::ShadowRenderer;
 use crate::render::gpu::layout_entries::{dynamic_uniform_entry, storage_entry, uniform_entry};
 use crate::render::gpu::mesh::vertex_layout;
+use crate::render::gpu::pipelines::winding::front_face;
 use crate::render::gpu::pipelines::LazyPipeline;
 
 /// The two cascade depth arrays and their views.
@@ -251,11 +252,7 @@ pub(crate) fn depth_pipeline(
         }),
         primitive: wgpu::PrimitiveState {
             topology: wgpu::PrimitiveTopology::TriangleList,
-            front_face: if mirrored {
-                wgpu::FrontFace::Cw
-            } else {
-                wgpu::FrontFace::Ccw
-            },
+            front_face: front_face(mirrored),
             cull_mode: Some(wgpu::Face::Back),
             ..Default::default()
         },

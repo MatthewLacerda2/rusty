@@ -30,7 +30,9 @@ pub(crate) struct SolidResources {
 // uniform + any vertex buffer) plus their bind group; the joint array they bind is
 // the renderer's one shared identity matrix, so no per-overlay palette is allocated
 // (#210).
-pub(crate) type OutlineResource = (u32, MeshId, wgpu::Buffer, wgpu::BindGroup, u32);
+// The selection outline (#1142): the selected id, its mesh, the hull's uniform and
+// bind group, its index count, and whether its world matrix mirrors it.
+pub(crate) type OutlineResource = (u32, MeshId, wgpu::Buffer, wgpu::BindGroup, u32, bool);
 pub(crate) type GridResource = (wgpu::Buffer, wgpu::BindGroup);
 pub(crate) type AabbResource = (wgpu::Buffer, wgpu::Buffer, wgpu::BindGroup);
 pub(crate) type AxisResource = (usize, wgpu::Buffer, wgpu::BindGroup);

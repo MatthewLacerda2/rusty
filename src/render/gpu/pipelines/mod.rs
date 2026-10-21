@@ -6,6 +6,7 @@ use crate::render::gpu::DEPTH_FORMAT;
 
 mod lazy;
 pub(crate) mod surface;
+pub(crate) mod winding;
 
 pub(crate) use lazy::LazyPipeline;
 
@@ -15,6 +16,7 @@ struct PipelineSpec {
     label: &'static str,
     topology: wgpu::PrimitiveTopology,
     cull_mode: Option<wgpu::Face>,
+    front_face: wgpu::FrontFace,
     blend: wgpu::BlendState,
     depth_write_enabled: bool,
     depth_compare: wgpu::CompareFunction,
@@ -30,8 +32,9 @@ pub(crate) struct ForwardPipelines {
     pub transparent: LazyPipeline,
     /// Line debug overlays.
     pub line: LazyPipeline,
-    /// Selection-silhouette inverted hull.
+    /// Selection-silhouette inverted hull, and its twin for a mirrored selection.
     pub outline: LazyPipeline,
+    pub mirrored_outline: LazyPipeline,
     /// The SSAO depth prepass (#436): the forward vertex stage, no colour target.
     pub prepass: wgpu::RenderPipeline,
 }
@@ -71,7 +74,8 @@ pub(crate) fn create_pipelines(
         forward: make_pipeline(device, shader, format, &render_layout, &forward_spec()),
         transparent: lazy(&render_layout, transparent_spec()),
         line: lazy(&line_layout, line_spec()),
-        outline: lazy(&render_layout, outline_spec()),
+        outline: lazy(&render_layout, outline_spec(false)),
+        mirrored_outline: lazy(&render_layout, outline_spec(true)),
         prepass: make_prepass(device, shader, &render_layout, "fs_prepass"),
     }
 }
@@ -119,6 +123,7 @@ fn forward_spec() -> PipelineSpec {
         label: "Forward Lit Pipeline",
         topology: wgpu::PrimitiveTopology::TriangleList,
         cull_mode: None,
+        front_face: wgpu::FrontFace::Ccw,
         blend: wgpu::BlendState::REPLACE,
         depth_write_enabled: true,
         depth_compare: wgpu::CompareFunction::Less,
@@ -133,6 +138,7 @@ fn transparent_spec() -> PipelineSpec {
         label: "Transparent Pipeline",
         topology: wgpu::PrimitiveTopology::TriangleList,
         cull_mode: None,
+        front_face: wgpu::FrontFace::Ccw,
         blend: wgpu::BlendState::ALPHA_BLENDING,
         depth_write_enabled: false,
         depth_compare: wgpu::CompareFunction::Less,
@@ -145,6 +151,7 @@ fn line_spec() -> PipelineSpec {
         label: "Line Debug Pipeline",
         topology: wgpu::PrimitiveTopology::LineList,
         cull_mode: None,
+        front_face: wgpu::FrontFace::Ccw,
         blend: wgpu::BlendState::ALPHA_BLENDING,
         depth_write_enabled: false,
         depth_compare: wgpu::CompareFunction::LessEqual,
@@ -152,11 +159,18 @@ fn line_spec() -> PipelineSpec {
 }
 
 /// Selection silhouette (inverted hull): cull front faces so only back faces show.
-fn outline_spec() -> PipelineSpec {
+/// A `mirrored` selection's winding is reversed, so its twin takes clockwise
+/// triangles as front (#1142); otherwise its outer shell would cover the object.
+fn outline_spec(mirrored: bool) -> PipelineSpec {
     PipelineSpec {
-        label: "Outline Pipeline",
+        label: if mirrored {
+            "Mirrored Outline Pipeline"
+        } else {
+            "Outline Pipeline"
+        },
         topology: wgpu::PrimitiveTopology::TriangleList,
         cull_mode: Some(wgpu::Face::Front),
+        front_face: winding::front_face(mirrored),
         blend: wgpu::BlendState::REPLACE,
         depth_write_enabled: true,
         depth_compare: wgpu::CompareFunction::LessEqual,
@@ -222,7 +236,7 @@ fn make_pipeline(
         }),
         primitive: wgpu::PrimitiveState {
             topology: spec.topology,
-            front_face: wgpu::FrontFace::Ccw,
+            front_face: spec.front_face,
             cull_mode: spec.cull_mode,
             ..Default::default()
         },

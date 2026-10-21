@@ -147,10 +147,12 @@ fn draw_scale(ui: &mut egui::Ui, trans: &mut crate::components::TransformCompone
     .inner
 }
 
-/// A single scale drag field clamped to [0.01, 20]. Returns whether it changed.
+/// A single scale drag field: a drag is clamped to [0.01, 20], but a scale set
+/// elsewhere (a mirroring negative one, say) is shown as it is, not rewritten by
+/// selecting its entity (#1142). Returns whether it changed.
 fn drag_scale(ui: &mut egui::Ui, value: &mut f32) -> bool {
-    ui.add(egui::DragValue::new(value).speed(0.05).range(0.01..=20.0))
-        .changed()
+    let field = egui::DragValue::new(value).speed(0.05).range(0.01..=20.0);
+    ui.add(field.clamp_existing_to_range(false)).changed()
 }
 
 /// The integrated parent-selection combo box directly under Transform.

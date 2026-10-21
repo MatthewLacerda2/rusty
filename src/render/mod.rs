@@ -113,11 +113,12 @@ pub struct Renderer {
     // Pipelines
     render_pipeline: wgpu::RenderPipeline,
     /// Alpha-blended translucent solids (#242); depth write off, drawn back-to-front
-    /// in the transparent pass after opaque. Built on first use, like the two
+    /// in the transparent pass after opaque. Built on first use, like the three
     /// editor-only pipelines below (#985).
     transparent_pipeline: gpu::pipelines::LazyPipeline,
     line_pipeline: gpu::pipelines::LazyPipeline,
     outline_pipeline: gpu::pipelines::LazyPipeline,
+    mirrored_outline_pipeline: gpu::pipelines::LazyPipeline,
 
     // Bind Group Layouts
     pub camera_lighting_layout: wgpu::BindGroupLayout,

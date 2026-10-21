@@ -72,7 +72,7 @@ fn gpu_optional_forward_pipelines_build_on_first_draw() {
 
 /// What a windowed renderer does at startup: every lazy pipeline is built, world-UI
 /// blend modes no test draws included, so a game never compiles one mid-frame. A
-/// shipped game (no editor overlays) leaves only the line and outline lazy.
+/// shipped game (no editor overlays) leaves only the line and outline ones lazy.
 #[test]
 fn gpu_warm_pipelines_builds_every_lazy_pipeline() {
     let Some(renderer) = crate::render::test_gpu::headless_or_skip(RES, RES) else {
@@ -80,8 +80,8 @@ fn gpu_warm_pipelines_builds_every_lazy_pipeline() {
     };
     let every = renderer.lazy_pipelines(true);
     // transparent + 2 particle + 2 ribbon + one world canvas per blend mode
-    // + 2 mirrored shadow + 2 editor.
-    assert_eq!(every.len(), 1 + 2 + 2 + UiBlend::ALL.len() + 2 + 2);
+    // + 2 mirrored shadow + 3 editor (line, outline and its mirrored twin).
+    assert_eq!(every.len(), 1 + 2 + 2 + UiBlend::ALL.len() + 2 + 3);
     assert!(every.iter().all(|p| !p.is_built()), "headless stays lazy");
 
     renderer.warm_pipelines(false);

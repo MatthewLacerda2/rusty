@@ -205,3 +205,6 @@ pub(crate) fn active_material_map_paths(scene: &Scene) -> Vec<String> {
 #[cfg(test)]
 #[path = "instancing_tests.rs"]
 mod instancing_tests;
+
+#[cfg(test)]
+mod outline_tests;

@@ -30,6 +30,7 @@ use super::ShadowRenderer;
 use crate::render::gpu::draw_buffers::{push_palette, JointMatrix};
 use crate::render::gpu::material_cache::MaterialCache;
 use crate::render::gpu::pipelines::surface::SurfaceShaders;
+use crate::render::gpu::pipelines::winding::is_mirrored;
 use crate::render::lod::LodSelection;
 use crate::render::{Frustum, GpuMesh, MeshId};
 use crate::scene::Scene;
@@ -46,12 +47,6 @@ pub(super) struct CasterKey {
     pub mirrored: bool,
     pub clip: Option<Clip>,
     pub mesh: MeshId,
-}
-
-/// Whether `world` mirrors what it places: a negative determinant reverses a
-/// mesh's winding, so back-face culling would keep its far side (#1134).
-pub(super) fn is_mirrored(world: Mat4) -> bool {
-    world.determinant() < 0.0
 }
 
 /// One instanced depth draw: `instances` of `key`'s mesh, `num_indices` each.
