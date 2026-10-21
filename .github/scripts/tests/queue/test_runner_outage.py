@@ -33,7 +33,9 @@ def lint(attempt=1, jobs=GATE_CANCELLED, **fields):
 
 
 def ci_cancelled(attempt=1, **fields):
-    return [run("ci", conclusion="failure", run_attempt=attempt, **fields), run("lint")], {1: CHANGES_CANCELLED, 2: built("lint")}
+    """`ci` failed over a cancelled `changes` on `attempt`, its jobs listed for that attempt."""
+    ci_jobs = [{**j, "run_attempt": attempt} for j in CHANGES_CANCELLED]
+    return [run("ci", conclusion="failure", run_attempt=attempt, **fields), run("lint")], {1: ci_jobs, 2: built("lint")}
 
 
 RERUNNING = lint(2, [job("changes", "success"), job("lint", None)], status="in_progress", conclusion=None)
@@ -62,9 +64,10 @@ class RunnerRed(unittest.TestCase):
         mixed = [*CHANGES_CANCELLED[:-1], job("build-test-cross (macos-latest)", "failure"), job("ci-gate", "failure")]
         self.assertFalse(runners.runner_red(run("ci", conclusion="failure"), {1: mixed}, "ci"))
 
-    def test_a_run_with_no_jobs_is_the_runners_only_when_cancelled(self):
+    def test_a_run_with_no_jobs_is_the_runners_when_cancelled_and_unknown_when_failed(self):
+        # A failure with no jobs listed has not said whose red it is (#1109).
         self.assertTrue(runners.runner_red(run("ci", conclusion="cancelled"), {}, "ci"))
-        self.assertFalse(runners.runner_red(run("ci", conclusion="failure"), {}, "ci"))
+        self.assertIsNone(runners.runner_red(run("ci", conclusion="failure"), {}, "ci"))
 
     def test_one_code_red_beside_a_runner_red_is_no_outage(self):
         runs = [run("ci", conclusion="failure"), run("lint", conclusion="cancelled")]
