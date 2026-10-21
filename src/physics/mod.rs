@@ -27,6 +27,8 @@ mod compound;
 #[cfg(test)]
 mod compound_tests;
 mod convert;
+#[cfg(test)]
+mod degenerate_parent_tests;
 mod follow;
 mod joints;
 #[cfg(test)]
@@ -48,6 +50,8 @@ mod query_tests;
 mod ragdoll;
 #[cfg(test)]
 mod raycast_tests;
+#[cfg(test)]
+mod round_bounds_tests;
 mod spatial;
 #[cfg(test)]
 mod spatial_tests;

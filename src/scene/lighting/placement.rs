@@ -66,8 +66,10 @@ pub fn static_scene_aabb(scene: &Scene) -> Option<(Vec3, Vec3)> {
         if !collider.active {
             continue;
         }
-        let world_mat = scene.compute_world_matrix(id);
-        let (cmin, cmax) = collider.calculate_world_aabb(world_mat);
+        let Some(pose) = scene.world.world_pose(id) else {
+            continue;
+        };
+        let (cmin, cmax) = collider.calculate_world_aabb(pose);
         min = min.min(cmin);
         max = max.max(cmax);
         found = true;

@@ -9,6 +9,7 @@ use rapier3d::prelude::*;
 
 use crate::components::{
     CapsuleAxis, ColliderShape, CollisionDetection, PhysicsMaterial, RigidBodyComponent,
+    ScaledShape,
 };
 use crate::ecs::World;
 use crate::scene::Scene;
@@ -204,7 +205,8 @@ pub(super) fn build_shape_for(
 }
 
 /// Build a parry collider shape from the engine's `ColliderShape`, baking in the
-/// transform's (lossy, non-uniform) world scale the same way the legacy AABB did.
+/// transform's (lossy, non-uniform) world scale by [`ColliderShape::scaled`], the
+/// sizing rule the collider's world AABB reads too (#1140).
 /// A mirror (a negative axis: `scale.x` for a child, as glam splits its world matrix;
 /// any axis for an unparented entity, whose own scale arrives as-is) keeps a
 /// primitive's size, Unity-style: primitives size from `scale.abs()`, and only a
@@ -217,60 +219,27 @@ pub(super) fn try_build_shape(
     scale: Vec3,
     mesh: Option<(&[[f32; 3]], &[u32])>,
 ) -> Result<Collider, Skip> {
-    let abs = scale.abs();
-    let collider = match shape {
-        ColliderShape::Box { size } => {
-            let h = *size * abs * 0.5;
-            ColliderBuilder::cuboid(h.x.max(1e-4), h.y.max(1e-4), h.z.max(1e-4)).build()
-        }
-        ColliderShape::Sphere { radius } => {
-            let r = (*radius * abs.max_element()).max(1e-4);
-            ColliderBuilder::ball(r).build()
-        }
-        ColliderShape::Cylinder { radius, height } => {
-            // The larger cross axis, as a capsule's radius is (#1131).
-            let r = (*radius * abs.x.max(abs.z)).max(1e-4);
-            let half_h = (*height * abs.y * 0.5).max(1e-4);
-            ColliderBuilder::cylinder(half_h, r).build()
-        }
-        ColliderShape::Capsule {
+    let collider = match shape.scaled(scale) {
+        ScaledShape::Cuboid { half } => ColliderBuilder::cuboid(half.x, half.y, half.z),
+        ScaledShape::Ball { radius } => ColliderBuilder::ball(radius),
+        ScaledShape::Cylinder {
+            half_height,
             radius,
-            height,
+        } => ColliderBuilder::cylinder(half_height, radius),
+        ScaledShape::Capsule {
+            half_segment,
+            radius,
             axis,
-        } => capsule_builder(*radius, *height, *axis, abs).build(),
-        ColliderShape::Mesh { convex, .. } => {
-            return build_mesh_shape(*convex, scale, mesh.ok_or(Skip::NoMesh)?)
+        } => match axis {
+            CapsuleAxis::X => ColliderBuilder::capsule_x(half_segment, radius),
+            CapsuleAxis::Y => ColliderBuilder::capsule_y(half_segment, radius),
+            CapsuleAxis::Z => ColliderBuilder::capsule_z(half_segment, radius),
+        },
+        ScaledShape::Mesh { convex, .. } => {
+            return build_mesh_shape(convex, scale, mesh.ok_or(Skip::NoMesh)?)
         }
     };
-    Ok(collider)
-}
-
-/// A capsule's rapier builder with the world scale baked in, Unity-style: the
-/// full length scales with the axis' scale, the radius with the larger of the
-/// two cross-axis scales. rapier takes the half-length of the inner segment
-/// (caps excluded), so a full length under `2r` collapses to a sphere.
-fn capsule_builder(radius: f32, height: f32, axis: CapsuleAxis, scale: Vec3) -> ColliderBuilder {
-    let (half_segment, r) = capsule_dims(radius, height, axis, scale);
-    match axis {
-        CapsuleAxis::X => ColliderBuilder::capsule_x(half_segment, r),
-        CapsuleAxis::Y => ColliderBuilder::capsule_y(half_segment, r),
-        CapsuleAxis::Z => ColliderBuilder::capsule_z(half_segment, r),
-    }
-}
-
-/// A capsule's `(half_segment, radius)` with the world scale baked in, as
-/// [`capsule_builder`] builds it — shared with the CharacterController's sweep so
-/// the shape it moves is the shape others collide with. A mirrored axis keeps its
-/// size: the controller passes its signed world scale here directly.
-pub(super) fn capsule_dims(radius: f32, height: f32, axis: CapsuleAxis, scale: Vec3) -> (f32, f32) {
-    let s = scale.abs();
-    let (along, cross) = match axis {
-        CapsuleAxis::X => (s.x, s.y.max(s.z)),
-        CapsuleAxis::Y => (s.y, s.x.max(s.z)),
-        CapsuleAxis::Z => (s.z, s.x.max(s.y)),
-    };
-    let r = (radius * cross).max(1e-4);
-    (((height * along * 0.5) - r).max(0.0), r)
+    Ok(collider.build())
 }
 
 /// rapier collision + solver groups for a collider on `layer`: it is a member of

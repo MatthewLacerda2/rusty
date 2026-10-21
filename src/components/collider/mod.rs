@@ -1,13 +1,18 @@
 //! src/components/collider/mod.rs — Collider component
 //!
 //! box/sphere/cylinder/capsule/mesh shapes, the inline physics material
-//! (`physics_material`), and the cached world AABB. Unity: Collider.
+//! (`physics_material`), the shape under a world scale (`scaled`), and the
+//! cached world AABB. Unity: Collider.
 
 mod physics_material;
+mod scaled;
 
 pub use physics_material::{CombineMode, PhysicsMaterial};
+pub use scaled::{capsule_dims, round_radius, ScaledShape};
 
-use glam::{Mat4, Vec3};
+use glam::Vec3;
+
+use super::Pose;
 use serde::{Deserialize, Serialize};
 
 /// The local axis a capsule's length runs along (Unity: `CapsuleCollider.direction`).
@@ -113,56 +118,28 @@ impl ColliderComponent {
         }
     }
 
-    pub fn calculate_world_aabb(&self, world_mat: Mat4) -> (Vec3, Vec3) {
-        let local_corners = match &self.shape {
-            ColliderShape::Box { size } => box_corners(*size * -0.5, *size * 0.5),
-            ColliderShape::Sphere { radius } => {
-                let r = *radius;
-                vec![Vec3::new(-r, -r, -r), Vec3::new(r, r, r)]
-            }
-            ColliderShape::Cylinder { radius, height } => {
-                let r = *radius;
-                let h = *height * 0.5;
-                vec![Vec3::new(-r, -h, -r), Vec3::new(r, h, r)]
-            }
-            ColliderShape::Capsule {
-                radius,
-                height,
-                axis,
-            } => {
-                let half = capsule_local_half_extents(*radius, *height, *axis);
-                box_corners(-half, half)
-            }
-            ColliderShape::Mesh {
-                local_min,
-                local_max,
-                ..
-            } => box_corners(*local_min, *local_max),
-        };
-
+    /// The world AABB of the shape physics builds at `pose` (a world
+    /// [`Pose`], as `World::world_pose` gives it): the shape sized by
+    /// [`ColliderShape::scaled`], as `physics::build` sizes it, then turned and
+    /// moved by the pose. A sphere, cylinder or capsule stays round under
+    /// non-uniform scale, and a mesh's local box is carried through the pose's
+    /// signed scale (#1140).
+    pub fn calculate_world_aabb(&self, pose: Pose) -> (Vec3, Vec3) {
+        let (n, x) = self.shape.scaled(pose.scale).local_box();
         let mut min = Vec3::splat(f32::MAX);
         let mut max = Vec3::splat(f32::MIN);
-
-        for &corner in &local_corners {
-            let world_pos = world_mat.transform_point3(corner);
+        for corner in box_corners(n, x) {
+            let world_pos = pose.pos + pose.rot * corner;
             min = min.min(world_pos);
             max = max.max(world_pos);
         }
-
         (min, max)
     }
 }
 
-/// A capsule's local half-extents: `radius` across, and half its full length
-/// (never less than the caps' `radius`) along `axis`.
-fn capsule_local_half_extents(radius: f32, height: f32, axis: CapsuleAxis) -> Vec3 {
-    let along = (height * 0.5).max(radius);
-    Vec3::splat(radius) + axis.unit() * (along - radius)
-}
-
 /// The eight corners of the local box `min`..`max`.
-fn box_corners(n: Vec3, x: Vec3) -> Vec<Vec3> {
-    vec![
+fn box_corners(n: Vec3, x: Vec3) -> [Vec3; 8] {
+    [
         Vec3::new(n.x, n.y, n.z),
         Vec3::new(n.x, n.y, x.z),
         Vec3::new(n.x, x.y, n.z),
@@ -175,88 +152,4 @@ fn box_corners(n: Vec3, x: Vec3) -> Vec<Vec3> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn mesh_collider_world_aabb_follows_transform() {
-        let c = ColliderComponent::from_mesh_bounds(false, Vec3::splat(-1.0), Vec3::splat(1.0));
-        assert!(matches!(c.shape, ColliderShape::Mesh { convex: false, .. }));
-
-        // Translate +Y by 5 and scale x2: the local [-1,1] box maps to [-2,2]±offset.
-        let world = Mat4::from_scale_rotation_translation(
-            Vec3::splat(2.0),
-            glam::Quat::IDENTITY,
-            Vec3::new(0.0, 5.0, 0.0),
-        );
-        let (min, max) = c.calculate_world_aabb(world);
-        assert!((min - Vec3::new(-2.0, 3.0, -2.0)).length() < 1e-4);
-        assert!((max - Vec3::new(2.0, 7.0, 2.0)).length() < 1e-4);
-    }
-
-    fn capsule(radius: f32, height: f32, axis: CapsuleAxis) -> ColliderComponent {
-        ColliderComponent {
-            shape: ColliderShape::Capsule {
-                radius,
-                height,
-                axis,
-            },
-            ..ColliderComponent::from_mesh_bounds(false, Vec3::ZERO, Vec3::ZERO)
-        }
-    }
-
-    fn assert_vec(got: Vec3, want: Vec3) {
-        assert!((got - want).length() < 1e-4, "got {got}, want {want}");
-    }
-
-    #[test]
-    fn capsule_world_aabb_spans_full_height_along_its_axis() {
-        // Unity semantics: height 2 is the full end-to-end length, caps included.
-        let c = capsule(0.5, 2.0, CapsuleAxis::Y);
-        let (min, max) = c.calculate_world_aabb(Mat4::from_translation(Vec3::new(1.0, 3.0, 0.0)));
-        assert_vec(min, Vec3::new(0.5, 2.0, -0.5));
-        assert_vec(max, Vec3::new(1.5, 4.0, 0.5));
-
-        let (min, max) = capsule(0.25, 3.0, CapsuleAxis::X).calculate_world_aabb(Mat4::IDENTITY);
-        assert_vec(min, Vec3::new(-1.5, -0.25, -0.25));
-        assert_vec(max, Vec3::new(1.5, 0.25, 0.25));
-
-        let (min, max) = capsule(0.25, 3.0, CapsuleAxis::Z).calculate_world_aabb(Mat4::IDENTITY);
-        assert_vec(min, Vec3::new(-0.25, -0.25, -1.5));
-        assert_vec(max, Vec3::new(0.25, 0.25, 1.5));
-    }
-
-    #[test]
-    fn short_capsule_bounds_are_its_sphere() {
-        // height < 2r: the caps meet, the capsule is a sphere of radius r.
-        let (min, max) = capsule(1.0, 0.5, CapsuleAxis::Y).calculate_world_aabb(Mat4::IDENTITY);
-        assert_vec(min, Vec3::splat(-1.0));
-        assert_vec(max, Vec3::splat(1.0));
-    }
-
-    #[test]
-    fn rotated_capsule_bounds_follow_the_rotation() {
-        // A Y capsule turned 90° about Z lies along X.
-        let rot = Mat4::from_rotation_z(std::f32::consts::FRAC_PI_2);
-        let (min, max) = capsule(0.5, 4.0, CapsuleAxis::Y).calculate_world_aabb(rot);
-        assert_vec(min, Vec3::new(-2.0, -0.5, -0.5));
-        assert_vec(max, Vec3::new(2.0, 0.5, 0.5));
-    }
-
-    #[test]
-    fn capsule_axis_names_round_trip() {
-        for a in CapsuleAxis::ALL {
-            assert_eq!(CapsuleAxis::parse(a.as_str()), Some(a));
-        }
-        assert_eq!(CapsuleAxis::parse("y"), None);
-        assert_eq!(CapsuleAxis::default(), CapsuleAxis::Y);
-    }
-
-    #[test]
-    fn pre_447_collider_json_loads_with_default_material() {
-        let json = r#"{"active":true,"shape":{"Sphere":{"radius":1.0}},"is_trigger":false,
-            "aabb_min":[0,0,0],"aabb_max":[0,0,0]}"#;
-        let c: ColliderComponent = serde_json::from_str(json).unwrap();
-        assert_eq!(c.material, PhysicsMaterial::default());
-    }
-}
+mod tests;

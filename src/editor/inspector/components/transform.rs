@@ -1,6 +1,5 @@
 use crate::editor::widgets::DragRange;
 use egui_phosphor::regular as icon;
-use glam::Mat4;
 
 use crate::editor::inspector::components::card::component_card;
 use crate::scene::authoring::collider as collider_ops;
@@ -14,7 +13,6 @@ pub fn draw(
     ui: &mut egui::Ui,
     world: &mut crate::ecs::World,
     id: u32,
-    parent_mat: Option<Mat4>,
     selected_parent_name: &str,
     valid_parents: &[(u32, String)],
     pending_parent_change: &mut Option<Option<u32>>,
@@ -26,7 +24,6 @@ pub fn draw(
             ui,
             world,
             id,
-            parent_mat,
             selected_parent_name,
             valid_parents,
             pending_parent_change,
@@ -43,7 +40,6 @@ fn draw_body(
     ui: &mut egui::Ui,
     world: &mut crate::ecs::World,
     id: u32,
-    parent_mat: Option<Mat4>,
     selected_parent_name: &str,
     valid_parents: &[(u32, String)],
     pending_parent_change: &mut Option<Option<u32>>,
@@ -58,14 +54,9 @@ fn draw_body(
     drop(trans);
 
     if pos_changed || rot_changed || scl_changed {
-        let local = world.transform(id).map(|t| t.to_matrix());
-        if let Some(local) = local {
-            let wm = match parent_mat {
-                Some(p) => p * local,
-                None => local,
-            };
+        if let Some(pose) = world.world_pose(id) {
             if let Some(mut col) = world.collider_mut(id) {
-                collider_ops::refresh_aabb(&mut col, wm);
+                collider_ops::refresh_aabb(&mut col, pose);
             }
         }
         *is_dirty = true;

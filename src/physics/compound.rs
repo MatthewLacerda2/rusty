@@ -24,7 +24,7 @@ use std::collections::BTreeMap;
 
 use glam::{Quat, Vec3};
 
-use crate::components::transform::{local_rotation, world_rotation, world_scale};
+use crate::components::transform::local_rotation;
 use crate::scene::Scene;
 
 /// The body layout the scene implies: body-owner entity id → the collider
@@ -32,13 +32,9 @@ use crate::scene::Scene;
 /// comes first; the rest keep insertion order.
 pub(super) type BodyPlan = BTreeMap<u32, Vec<u32>>;
 
-/// A world-space pose: translation, rotation and (lossy) world scale.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub(super) struct WorldPose {
-    pub pos: Vec3,
-    pub rot: Quat,
-    pub scale: Vec3,
-}
+/// A world-space pose: translation, rotation and (lossy, signed) world scale.
+/// Named apart from rapier's own `Pose`, which the physics modules also import.
+pub(super) use crate::components::Pose as WorldPose;
 
 /// The entity whose rapier body carries `id`'s collider: `id` itself when it has
 /// a Rigidbody or a CharacterController, else its nearest such ancestor, else
@@ -72,29 +68,15 @@ pub(super) fn plan(scene: &Scene) -> BodyPlan {
     plan
 }
 
-/// `id`'s world pose from the live parent walk. A mirroring parent's reflection
-/// stays in `scale` and the rotation is seen through it
-/// ([`world_rotation`], #1119), so `rot` × `scale` is the entity's world matrix.
-/// A root entity reads its
-/// `Transform` verbatim, so the common unparented case is bit-identical to the
-/// local pose (no decompose round-trip noise).
+/// `id`'s world pose from the live parent walk ([`crate::ecs::World::world_pose`],
+/// the pose its collider's world AABB reads too, #1140). A mirroring parent's
+/// reflection stays in `scale` and the rotation is seen through it
+/// ([`crate::components::transform::world_rotation`], #1119), so `rot` × `scale`
+/// is the entity's world matrix. A root entity reads its `Transform` verbatim, so
+/// the common unparented case is bit-identical to the local pose (no decompose
+/// round-trip noise).
 pub(super) fn world_pose(scene: &Scene, id: u32) -> Option<WorldPose> {
-    let t = scene.world.transform(id)?;
-    let local = WorldPose {
-        pos: t.position,
-        rot: t.rotation,
-        scale: t.scale,
-    };
-    drop(t);
-    let Some(parent) = scene.world.parent_id(id) else {
-        return Some(local);
-    };
-    let parent_mat = scene.compute_world_matrix(parent);
-    Some(WorldPose {
-        pos: parent_mat.transform_point3(local.pos),
-        rot: world_rotation(parent_mat, local.rot),
-        scale: world_scale(parent_mat, local.scale),
-    })
+    scene.world.world_pose(id)
 }
 
 /// Convert a world pose into `id`'s local `Transform` position/rotation — the

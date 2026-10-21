@@ -12,9 +12,7 @@
 //!
 //! Pure.
 
-use glam::Mat4;
-
-use crate::components::{ColliderComponent, ColliderShape, PhysicsMaterial};
+use crate::components::{ColliderComponent, ColliderShape, PhysicsMaterial, Pose};
 
 /// Set the collider's `active` flag.
 pub fn set_active(c: &mut ColliderComponent, active: bool) {
@@ -26,10 +24,10 @@ pub fn set_trigger(c: &mut ColliderComponent, is_trigger: bool) {
     c.is_trigger = is_trigger;
 }
 
-/// Refresh the collider's cached world AABB for its entity's new `world` matrix —
+/// Refresh the collider's cached world AABB for its entity's new world `pose` —
 /// what the Transform card does after a move, so the cache never lags an edit.
-pub fn refresh_aabb(c: &mut ColliderComponent, world: Mat4) {
-    let (min, max) = c.calculate_world_aabb(world);
+pub fn refresh_aabb(c: &mut ColliderComponent, pose: Pose) {
+    let (min, max) = c.calculate_world_aabb(pose);
     c.aabb_min = min;
     c.aabb_max = max;
 }

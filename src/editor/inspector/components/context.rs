@@ -14,7 +14,6 @@ use crate::scene::{Scene, LAYER_COUNT};
 pub(crate) struct InspectorContext {
     pub layer_labels: Vec<String>,
     pub named_layers: Vec<(u8, String)>,
-    pub parent_mat: Option<glam::Mat4>,
     pub selected_parent_name: String,
     pub valid_parents: Vec<(u32, String)>,
     /// The root id of the linked-prefab instance the selection belongs to (the entity
@@ -39,7 +38,6 @@ pub(crate) fn gather_context(scene: &Scene, selected_id: u32) -> InspectorContex
         .collect();
 
     let current_parent_id = scene.world.parent_id(selected_id);
-    let parent_mat = current_parent_id.map(|p| scene.compute_world_matrix(p));
     let selected_parent_name = if let Some(p_id) = current_parent_id {
         scene
             .world
@@ -53,7 +51,6 @@ pub(crate) fn gather_context(scene: &Scene, selected_id: u32) -> InspectorContex
     InspectorContext {
         layer_labels,
         named_layers,
-        parent_mat,
         selected_parent_name,
         valid_parents: collect_valid_parents(scene, selected_id),
         prefab_root: prefab::instance_root(scene, selected_id),

@@ -43,7 +43,10 @@ pub use animator::{
 pub use audio_source::AudioSourceComponent;
 pub use camera::{CameraComponent, ClearFlags, Projection, RenderTarget, RENDER_TEXTURE_PREFIX};
 pub use character_controller::CharacterControllerComponent;
-pub use collider::{CapsuleAxis, ColliderComponent, ColliderShape, CombineMode, PhysicsMaterial};
+pub use collider::{
+    capsule_dims, CapsuleAxis, ColliderComponent, ColliderShape, CombineMode, PhysicsMaterial,
+    ScaledShape,
+};
 pub use entity::{Entity, PrefabLink};
 pub use joint::{JointComponent, JointKind};
 pub use light::{LightComponent, LightMode, LightType};
@@ -65,7 +68,7 @@ pub use ribbon::{LineComponent, RibbonStyle, TextureMode, TrailComponent};
 pub use rigidbody::{CollisionDetection, RigidBodyComponent};
 pub use script::{ScriptComponent, ScriptFieldValue};
 pub use texture::TextureComponent;
-pub use transform::TransformComponent;
+pub use transform::{Pose, TransformComponent};
 pub use ui::{
     BackdropFilterComponent, CanvasComponent, CanvasGroupComponent, CanvasRenderMode, CanvasSway,
     FillMethod, FillOrigin, ImageComponent, ImageType, LayoutAxisFit, LayoutConstraint,
