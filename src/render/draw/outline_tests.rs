@@ -6,12 +6,12 @@
 
 use glam::{Quat, Vec3};
 
-use super::overlays::outline_hull;
+use super::outline::outline_hull;
 use crate::render::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
 use crate::scene::authoring::{create_entity, Primitive};
 use crate::scene::{Camera, Scene};
 
-const RES: u32 = 64;
+pub(super) const RES: u32 = 64;
 
 /// A box parented under a moved, turned pivot, selected, mirrored along X when
 /// `mirrored`. Returns the scene and the box's world centre.
@@ -34,7 +34,7 @@ fn selected_child(mirrored: bool) -> (Scene, Vec3) {
 }
 
 /// The editor frame looking down -Z at `centre` from 3 units away, as RGBA8.
-fn frame(r: &mut Renderer, scene: &Scene, centre: Vec3) -> Vec<u8> {
+pub(super) fn frame(r: &mut Renderer, scene: &Scene, centre: Vec3) -> Vec<u8> {
     let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, RES, RES, 2);
     let out = view.color_target_view().unwrap();
     let cam = Camera::new(centre + Vec3::Z * 3.0, -90.0, 0.0);
@@ -49,7 +49,7 @@ fn is_outline(p: &[u8]) -> bool {
 }
 
 /// (outline pixel count, their centroid, whether the centre pixel is outline).
-fn outline_stats(px: &[u8]) -> (usize, [f32; 2], bool) {
+pub(super) fn outline_stats(px: &[u8]) -> (usize, [f32; 2], bool) {
     let hits: Vec<[f32; 2]> = px
         .chunks(4)
         .enumerate()

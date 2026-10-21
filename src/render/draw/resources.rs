@@ -5,6 +5,7 @@
 //! render pass.
 
 use super::batch::{BatchKey, DrawItem, FrameDraws};
+use super::outline::OutlineHull;
 use super::sort::{back_to_front, view_depth};
 use crate::components::MaterialAsset;
 use crate::render::gpu::draw_buffers::{group1, push_palette, FrameUpload, JointMatrix};
@@ -29,10 +30,8 @@ pub(crate) struct SolidResources {
 // The overlay resources keep only the buffers they own (the per-overlay entity
 // uniform + any vertex buffer) plus their bind group; the joint array they bind is
 // the renderer's one shared identity matrix, so no per-overlay palette is allocated
-// (#210).
-// The selection outline (#1142): the selected id, its mesh, the hull's uniform and
-// bind group, its index count, and whether its world matrix mirrors it.
-pub(crate) type OutlineResource = (u32, MeshId, wgpu::Buffer, wgpu::BindGroup, u32, bool);
+// (#210). The selection outline is the exception: a skinned hull binds its own pose
+// (#1160).
 pub(crate) type GridResource = (wgpu::Buffer, wgpu::BindGroup);
 pub(crate) type AabbResource = (wgpu::Buffer, wgpu::Buffer, wgpu::BindGroup);
 pub(crate) type AxisResource = (usize, wgpu::Buffer, wgpu::BindGroup);
@@ -45,7 +44,7 @@ pub(crate) type ProbeResource = (wgpu::Buffer, wgpu::Buffer, wgpu::BindGroup, u3
 /// and the per-camera loop pass a single value instead of four (#93).
 #[derive(Default)]
 pub(crate) struct Overlays {
-    pub outline: Option<OutlineResource>,
+    pub outline: Vec<OutlineHull>,
     pub grid: Option<GridResource>,
     pub aabb: Vec<AabbResource>,
     pub axis: Vec<AxisResource>,
@@ -55,19 +54,26 @@ pub(crate) struct Overlays {
 }
 
 impl Renderer {
-    /// The one shared identity joint buffer every overlay binds, so none of them
-    /// allocate a per-draw palette (#210).
+    /// The one shared identity joint buffer the overlays bind, so none of them
+    /// allocate a per-draw palette (#210). A skinned selection outline binds its own
+    /// pose instead (#1160).
     pub(crate) fn shared_bones_buffer(&self) -> &wgpu::Buffer {
         self.draw_buffers.default_bones()
     }
 
     /// Pre-create the editor overlay resources for a pass; all-empty in play mode.
-    pub(crate) fn precreate_overlays(&self, scene: &Scene, editor_mode: bool) -> Overlays {
+    /// `lod` is the camera's selection, the one its solids were drawn with.
+    pub(crate) fn precreate_overlays(
+        &self,
+        scene: &Scene,
+        lod: &LodSelection,
+        editor_mode: bool,
+    ) -> Overlays {
         if !editor_mode {
             return Overlays::default();
         }
         Overlays {
-            outline: self.precreate_outline(scene),
+            outline: self.precreate_outline(scene, lod),
             grid: self.precreate_grid(),
             aabb: self.precreate_aabb(scene),
             axis: self.precreate_axis_arrows(scene),

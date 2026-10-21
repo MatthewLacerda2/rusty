@@ -7,6 +7,7 @@ pub(crate) mod batch;
 mod camera;
 mod lighting;
 pub(crate) mod materials;
+mod outline;
 mod overlays;
 mod pass;
 mod probes;
@@ -208,3 +209,6 @@ mod instancing_tests;
 
 #[cfg(test)]
 mod outline_tests;
+
+#[cfg(test)]
+mod outline_follow_tests;
