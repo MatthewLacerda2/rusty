@@ -48,13 +48,10 @@ pub fn register<'scope>(
 
 const ZERO: Vec3 = Vec3::ZERO;
 
-/// The getters, each with what a missing entity reads as.
+/// The getters, each with what a missing entity reads as (the world ones read
+/// the API's own dead-id defaults, which are the same values).
 const READS: &[(&str, Read, Vec3)] = &[
-    (
-        "GetPosition",
-        |w, id| live(w, id).then(|| w.world_position(id)),
-        ZERO,
-    ),
+    ("GetPosition", |w, id| Some(w.world_position(id)), ZERO),
     (
         "GetLocalPosition",
         |w, id| Some(w.transform(id)?.position),
@@ -62,7 +59,7 @@ const READS: &[(&str, Read, Vec3)] = &[
     ),
     (
         "GetRotation",
-        |w, id| live(w, id).then(|| euler_degrees(w.world_rotation(id))),
+        |w, id| Some(euler_degrees(w.world_rotation(id))),
         ZERO,
     ),
     (
@@ -75,11 +72,7 @@ const READS: &[(&str, Read, Vec3)] = &[
         |w, id| Some(w.transform(id)?.scale),
         Vec3::ONE,
     ),
-    (
-        "GetLossyScale",
-        |w, id| live(w, id).then(|| w.lossy_scale(id)),
-        Vec3::ONE,
-    ),
+    ("GetLossyScale", |w, id| Some(w.lossy_scale(id)), Vec3::ONE),
 ];
 
 const WRITES: &[(&str, Write)] = &[
@@ -117,10 +110,6 @@ const MAPS: &[(&str, Map)] = &[
         w.inverse_transform_point(id, p)
     }),
 ];
-
-fn live(world: &World, id: u32) -> bool {
-    world.contains(id)
-}
 
 fn getter<'scope>(
     scope: &'scope mlua::Scope<'scope, '_>,

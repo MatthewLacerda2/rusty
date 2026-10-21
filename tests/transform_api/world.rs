@@ -30,7 +30,7 @@ pub(super) fn hierarchy() -> (RefCell<Scene>, u32, u32) {
 }
 
 /// Run `body` with `Transform` bound over `scene`; `get(lua)` evaluates a vector.
-fn with_lua(scene: &RefCell<Scene>, body: impl FnOnce(&dyn Fn(&str) -> Vec3)) {
+pub(super) fn with_lua(scene: &RefCell<Scene>, body: impl FnOnce(&dyn Fn(&str) -> Vec3)) {
     let lua = Lua::new();
     lua.scope(|scope| {
         rusty::api::transform::register(&lua, scope, scene).unwrap();
@@ -44,7 +44,7 @@ fn with_lua(scene: &RefCell<Scene>, body: impl FnOnce(&dyn Fn(&str) -> Vec3)) {
     .unwrap();
 }
 
-fn near(a: Vec3, b: Vec3) -> bool {
+pub(super) fn near(a: Vec3, b: Vec3) -> bool {
     a.abs_diff_eq(b, 1e-4)
 }
 
