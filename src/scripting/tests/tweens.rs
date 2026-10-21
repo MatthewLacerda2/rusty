@@ -50,7 +50,7 @@ fn time_scale_zero_pauses_a_scaled_tween_but_not_an_unscaled_one() {
     let (mut m, id) = rig("tween_unscaled", &counted(body));
     tick(&mut m, 5);
     assert_eq!(x(&m, id), "0");
-    assert_eq!(lane(&m, "GetScale", id), "3");
+    assert_eq!(lane(&m, "GetLocalScale", id), "3");
 }
 
 #[test]
@@ -84,7 +84,7 @@ fn a_sequence_runs_its_items_in_order() {
                   {id, 'Transform.scale', {5, 5, 5}, 1 / 60}, \
                 }";
     let (mut m, id) = rig("tween_seq", &counted(body));
-    let sx = |m: &ScriptManager| lane(m, "GetScale", id);
+    let sx = |m: &ScriptManager| lane(m, "GetLocalScale", id);
     tick(&mut m, 3);
     assert_eq!((x(&m, id), sx(&m)), ("2".into(), "1".into()));
     tick(&mut m, 1);

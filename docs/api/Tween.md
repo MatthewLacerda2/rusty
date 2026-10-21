@@ -20,8 +20,10 @@ missing or inactive entity, or on a component the entity lacks, is an error.
 params below) are animatable — a typo is an error listing them. A one-number property takes a number; the others take
 a table of exactly that many numbers:
 
-- `{x, y, z}`: `Transform.position`, `Transform.scale`, and `Transform.rotation`
-  (euler degrees, each angle interpolated on its own, like `Transform.SetRotation`)
+- `{x, y, z}`: `Transform.position` and `Transform.rotation` in **world** space, as
+  `Transform.SetPosition` / `Transform.SetRotation` write them (rotation in euler
+  degrees, each angle interpolated on its own), and `Transform.scale`, the **local**
+  scale `Transform.SetLocalScale` writes (Unity's split: no script writes a world scale)
 - `{x, y}`: `RectTransform.anchored_position`, `RectTransform.size_delta`,
   `RectTransform.pivot`, `RectTransform.anchor_min`, `RectTransform.anchor_max`
 - `{r, g, b, a}`: `Image.color`, `Text.color`

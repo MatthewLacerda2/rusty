@@ -57,16 +57,27 @@ impl TransformComponent {
     }
 
     pub fn euler_angles(&self) -> Vec3 {
-        let (yaw, pitch, roll) = self.rotation.to_euler(glam::EulerRot::YXZ);
-        Vec3::new(pitch.to_degrees(), yaw.to_degrees(), roll.to_degrees())
+        euler_degrees(self.rotation)
     }
 
     pub fn set_euler_angles(&mut self, euler_deg: Vec3) {
-        let yaw = euler_deg.y.to_radians();
-        let pitch = euler_deg.x.to_radians();
-        let roll = euler_deg.z.to_radians();
-        self.rotation = Quat::from_euler(glam::EulerRot::YXZ, yaw, pitch, roll);
+        self.rotation = from_euler_degrees(euler_deg);
     }
+}
+
+/// `rotation` as the editor and scripts show it: Euler degrees `(pitch, yaw, roll)`,
+/// applied yaw (Y), then pitch (X), then roll (Z).
+pub fn euler_degrees(rotation: Quat) -> Vec3 {
+    let (yaw, pitch, roll) = rotation.to_euler(glam::EulerRot::YXZ);
+    Vec3::new(pitch.to_degrees(), yaw.to_degrees(), roll.to_degrees())
+}
+
+/// The rotation [`euler_degrees`] reads back as `euler_deg`.
+pub fn from_euler_degrees(euler_deg: Vec3) -> Quat {
+    let yaw = euler_deg.y.to_radians();
+    let pitch = euler_deg.x.to_radians();
+    let roll = euler_deg.z.to_radians();
+    Quat::from_euler(glam::EulerRot::YXZ, yaw, pitch, roll)
 }
 
 /// A pose split the way physics poses a body: translation, a proper rotation,

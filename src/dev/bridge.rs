@@ -203,11 +203,10 @@ fn register_scene_transform(lua: &Lua, harness: &Shared) -> LuaResult<()> {
         lua.create_function(move |_, id: u32| {
             let w = world.borrow();
             let s = w.scene().borrow();
-            let p = s
-                .world
-                .transform(id)
-                .map(|t| t.position)
-                .unwrap_or(Vec3::ZERO);
+            let p = match s.world.contains(id) {
+                true => s.world.world_position(id),
+                false => Vec3::ZERO,
+            };
             Ok((p.x, p.y, p.z))
         })?,
     )?;

@@ -31,7 +31,7 @@ fn the_animator_poses_the_bone_and_the_skin_follows_it() {
 #[test]
 fn a_late_update_script_overrides_the_animator_before_skinning() {
     let script = "return { LateUpdate = function(id)\n\
-                  Transform.SetPosition(Animator.GetBone(id, 'hand'), 0, 3, 0)\nend }";
+                  Transform.SetLocalPosition(Animator.GetBone(id, 'hand'), 0, 3, 0)\nend }";
     let (scene, hero, _, _) = armed_scene(Some(script));
     let scene = play(scene, 10);
     let palette = scene
