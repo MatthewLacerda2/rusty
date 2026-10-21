@@ -120,7 +120,8 @@ pub fn local_rotation(parent_world: Mat4, world_rot: Quat) -> Quat {
 /// A child's signed world scale when it is not turned against its parent:
 /// `parent_world`'s split scale (its reflection on X, as glam decomposes it)
 /// times the child's own `scale`. Its signs are always the child's [`mirror`],
-/// turned or not; its magnitudes are [`Pose::under`]'s only for an unturned child.
+/// turned or not; its magnitudes are [`Pose::under`]'s for an unturned child or
+/// a parent scaled the same on every axis.
 pub fn world_scale(parent_world: Mat4, scale: Vec3) -> Vec3 {
     parent_world.to_scale_rotation_translation().0 * scale
 }
@@ -132,14 +133,25 @@ pub fn world_scale(parent_world: Mat4, scale: Vec3) -> Vec3 {
 /// when the parent reflects (glam's split carries a reflection on X, and
 /// [`world_rotation`] sees through it). They are the child's [`mirror`], an
 /// entity's own negative scale included (#1125). Then [`world_rotation`] times
-/// this scale is the world matrix whenever the hierarchy does not shear; an
-/// unturned child gets the parent's split scale times its own, bit for bit.
+/// this scale is the world matrix whenever the hierarchy does not shear.
+///
+/// Under a parent scaled the same on every axis, and for an unturned child, it
+/// is [`world_scale`] bit for bit: a turn cannot change a uniform scale, and
+/// reading it through the rotation's rounding would (a parent at 1000 would give
+/// 999.9999).
 fn lossy_scale(parent_world: Mat4, rotation: Quat, scale: Vec3) -> Vec3 {
-    let axes = glam::Mat3::from_mat4(parent_world) * glam::Mat3::from_quat(rotation);
+    let split = parent_world.to_scale_rotation_translation().0;
+    let size = split.abs();
+    if size.x == size.y && size.y == size.z {
+        return split * scale;
+    }
+    let parent = glam::Mat3::from_mat4(parent_world);
+    let turned = glam::Mat3::from_quat(rotation);
+    let along = |u: Vec3| (parent * u).length() / u.length();
     let lengths = Vec3::new(
-        axes.x_axis.length(),
-        axes.y_axis.length(),
-        axes.z_axis.length(),
+        along(turned.x_axis),
+        along(turned.y_axis),
+        along(turned.z_axis),
     );
     let flip = if parent_world.determinant() < 0.0 {
         -1.0
