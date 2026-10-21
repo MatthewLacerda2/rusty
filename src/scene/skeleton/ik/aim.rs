@@ -7,6 +7,7 @@
 use glam::{Quat, Vec3};
 
 use super::BonePose;
+use crate::components::transform::mirrored_direction;
 
 /// Re-aims per solve: each pass re-measures from where the last one left the
 /// tip, so the parallax of turning lower bones (the head swings sideways as the
@@ -19,10 +20,7 @@ const EPS: f32 = 1e-6;
 pub struct AimSettings<'a> {
     /// Each bone's share of the turn, parallel to the chain; empty = even.
     pub weights: &'a [f32],
-    /// The aim direction in the last bone's local space, as its world rotation
-    /// turns it: under a mirroring parent, the authored axis through
-    /// [`mirrored_direction`](crate::components::transform::mirrored_direction)
-    /// (#1125).
+    /// The aim direction in the last bone's local space.
     pub axis: Vec3,
     /// The most the aim may leave the animated aim, in radians.
     pub clamp: f32,
@@ -40,7 +38,9 @@ pub fn solve_aim(chain: &[BonePose], target: Vec3, s: AimSettings) -> Option<Vec
     }
     let shares = shares(s.weights, n)?;
     let mut poses = chain.to_vec();
-    let axis = s.axis.normalize();
+    // The tip's local axis as its world rotation turns it, through any mirror
+    // its world scale carries (#1125).
+    let axis = mirrored_direction(chain[n - 1].mirror, s.axis.normalize());
     let animated = (chain[n - 1].rot * axis).normalize();
     for _ in 0..PASSES {
         let to = target - poses[n - 1].pos;

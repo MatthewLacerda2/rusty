@@ -12,8 +12,10 @@
 //! about Y and swing 2 one about Z (Unity's `CharacterJoint`). Both bodies get that
 //! same world frame, so the pose the bodies are in when the joint is built is its
 //! rest pose, and the limits are measured from it (Unity's behaviour). Under a
-//! mirroring parent the axes are mirrored like the anchor, so the joint turns
-//! about the axis the entity's matrix draws (#1125). With
+//! mirror (a negative signed world scale, the entity's own or a parent's) the
+//! frame is seen through it as a rotation (`mirrored_frame_axes`, #1125): its X
+//! lies on the line the entity's matrix draws, and the joint moves as the mirror
+//! image of the unmirrored one, limits on the mirror-image side. With
 //! `auto_configure_connected_anchor` off, the connected side's origin moves to
 //! `connected_anchor` (the connected entity's local space, or world space with no
 //! connected body — which joins to one shared fixed "world" body).
@@ -40,7 +42,7 @@ use super::collision_events::VelocitySnapshot;
 use super::compound::{body_owner, world_pose};
 use super::convert::to_pose;
 use super::world::PhysicsWorld;
-use crate::components::transform::mirrored_direction;
+use crate::components::transform::{mirror, mirrored_frame_axes};
 use crate::components::{JointComponent, JointKind};
 use crate::scene::Scene;
 
@@ -158,11 +160,10 @@ impl PhysicsWorld {
         let j = &key.shape;
         let pose = world_pose(scene, id)?;
         let anchor = pose.pos + pose.rot * (pose.scale * j.anchor);
-        // The axes are local directions: seen through a mirroring parent like the
-        // anchor's scale, so the joint turns about the drawn axis (#1125).
-        let parent = scene.world.parent_world_matrix(id);
-        let local_axis = |v: Vec3| mirrored_direction(parent, v);
-        let rot = pose.rot * joint_basis(local_axis(j.axis), local_axis(j.swing_axis));
+        // The frame is seen through the mirror the pose's signed scale carries,
+        // as a rotation (#1125).
+        let (axis, swing) = mirrored_frame_axes(mirror(pose.scale), j.axis, j.swing_axis);
+        let rot = pose.rot * joint_basis(axis, swing);
         let connected = match (j.auto_configure_connected_anchor, j.connected_body) {
             (true, _) => anchor,
             (false, None) => j.connected_anchor,

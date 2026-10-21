@@ -1,13 +1,16 @@
 //! `world_rotation` / `local_rotation` (#1119): they agree with the rotation
 //! glam reads off the child's world matrix, mirrored parent or not, and each
-//! undoes the other; `mirrored_direction` turns a local direction onto the
-//! line the child's matrix draws (#1125).
+//! undoes the other; a local direction and a local frame seen through the
+//! mirror the child's signed scale carries land where its matrix draws them
+//! (#1125).
 
 use std::f32::consts::FRAC_PI_3;
 
 use glam::{Mat3, Mat4, Quat, Vec3};
 
-use super::{local_rotation, mirrored_direction, world_rotation};
+use super::{
+    local_rotation, mirror, mirrored_direction, mirrored_frame_axes, world_rotation, world_scale,
+};
 
 fn same(a: Quat, b: Quat) -> bool {
     a.dot(b).abs() > 1.0 - 1e-5
@@ -57,15 +60,76 @@ fn an_unmirrored_parent_is_the_plain_product() {
     );
 }
 
+/// Own scales with and without a reflection, on X and off it.
+const OWN: [Vec3; 3] = [
+    Vec3::ONE,
+    Vec3::new(1.0, 1.0, -1.0),
+    Vec3::new(-1.0, 1.0, 1.0),
+];
+
+/// A child's world matrix's linear part, and its world rotation and mirror.
+fn child(parent: Mat4, local: Quat, own: Vec3) -> (Mat3, Quat, Vec3) {
+    let world = parent * Mat4::from_scale_rotation_translation(own, local, Vec3::X);
+    let mirror = mirror(world_scale(parent, own));
+    (
+        Mat3::from_mat4(world),
+        world_rotation(parent, local),
+        mirror,
+    )
+}
+
+/// The rotation whose X is `x` and Y is `y` made perpendicular to it.
+fn basis(x: Vec3, y: Vec3) -> Mat3 {
+    let x = x.normalize();
+    let y = (y - x * y.dot(x)).normalize();
+    Mat3::from_cols(x, y, x.cross(y))
+}
+
 #[test]
 fn a_mirrored_direction_lands_on_the_drawn_world_direction() {
     let local = Quat::from_rotation_z(FRAC_PI_3) * Quat::from_rotation_x(0.2);
     let dir = Vec3::new(1.0, 1.0, 0.0).normalize();
     for parent in parents() {
-        let world = parent * Mat4::from_quat(local);
-        let drawn = world.transform_vector3(dir).normalize();
-        let ours = world_rotation(parent, local) * mirrored_direction(parent, dir);
-        assert!(ours.abs_diff_eq(drawn, 1e-5), "under {parent:?}");
+        for own in OWN {
+            let (world, rot, mirror) = child(parent, local, own);
+            let drawn = (world * dir).normalize();
+            let ours = rot * mirrored_direction(mirror, dir);
+            assert!(ours.abs_diff_eq(drawn, 1e-5), "{own} under {parent:?}");
+        }
     }
-    assert_eq!(mirrored_direction(parents()[0], dir), dir);
+    assert_eq!(mirrored_direction(Vec3::ONE, dir), dir);
+}
+
+/// A frame seen through the mirror turns the way the mirror image does: a twist
+/// about its X, drawn through the child's matrix, is the twist about the world
+/// frame's X, and that X lies on the drawn line in the mirror-image sense.
+#[test]
+fn a_mirrored_frame_twists_as_the_drawn_frame_does() {
+    let local = Quat::from_rotation_y(0.9) * Quat::from_rotation_x(-0.3);
+    let (x, y) = (Vec3::new(1.0, 0.5, 0.0), Vec3::new(0.0, 1.0, 1.0));
+    let twist = Mat3::from_rotation_x(0.6);
+    for parent in parents() {
+        for own in OWN {
+            let (world, rot, mirror) = child(parent, local, own);
+            let (mx, my) = mirrored_frame_axes(mirror, x, y);
+            let frame = Mat3::from_quat(rot) * basis(mx, my);
+            let b = basis(x, y);
+            let drawn = world * b * twist * b.inverse() * world.inverse();
+            let ours = frame * twist * frame.inverse();
+            assert!(ours.abs_diff_eq(drawn, 1e-5), "{own} under {parent:?}");
+            let reflects = world.determinant() < 0.0;
+            let sense = if reflects { -1.0 } else { 1.0 };
+            let line = (world * x).normalize() * sense;
+            assert!(
+                frame.x_axis.abs_diff_eq(line, 1e-5),
+                "{own} under {parent:?}"
+            );
+            assert_eq!(
+                mirrored_frame_axes(mirror, mx, my),
+                (x, y),
+                "its own inverse"
+            );
+        }
+    }
+    assert_eq!(mirrored_frame_axes(Vec3::ONE, x, y), (x, y));
 }

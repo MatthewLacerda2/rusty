@@ -11,6 +11,7 @@ fn spine() -> Vec<BonePose> {
         .map(|i| BonePose {
             pos: Vec3::Y * i as f32 * 0.3,
             rot: Quat::IDENTITY,
+            mirror: Vec3::ONE,
         })
         .collect()
 }
