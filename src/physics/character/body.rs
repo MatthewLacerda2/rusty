@@ -7,9 +7,9 @@ use rapier3d::prelude::*;
 
 use crate::components::{capsule_dims, CapsuleAxis, ColliderShape, PhysicsMaterial};
 use crate::ecs::World;
-use crate::physics::build::ColliderInputs;
 use crate::physics::compound::{relative_pose, world_pose};
 use crate::physics::convert::to_pose;
+use crate::physics::shape::build::ColliderInputs;
 use crate::physics::world::PhysicsWorld;
 use crate::scene::Scene;
 

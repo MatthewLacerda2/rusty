@@ -1,7 +1,7 @@
-//! src/physics/collision_events.rs — the per-tick solid-contact events
+//! src/physics/events/collision.rs — the per-tick solid-contact events
 //! `PhysicsWorld::step` surfaces for `OnCollisionEnter/Stay/Exit` (#448).
 //!
-//! The twin of `trigger_events`: the current tick's touching pairs come from
+//! The twin of `trigger`: the current tick's touching pairs come from
 //! rapier's contact graph (sensors never enter it — they live in the
 //! intersection graph), and the enter/exit edges are recovered by diffing the
 //! sorted pair keys against last tick's, exactly as the trigger edges are. Each
@@ -15,7 +15,7 @@ use crate::core::collections::Map;
 use glam::Vec3;
 use rapier3d::prelude::*;
 
-use super::world::PhysicsWorld;
+use crate::physics::world::PhysicsWorld;
 
 /// One contact as seen by the entity receiving the callback.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -52,7 +52,7 @@ impl CollisionPair {
     }
 
     /// The same pair keyed from `b`'s side.
-    pub(super) fn swapped(&self) -> Self {
+    pub(in crate::physics) fn swapped(&self) -> Self {
         let [_, (a, b, contact)] = self.sides();
         Self {
             a,
@@ -134,9 +134,9 @@ impl CollisionEvents {
 
 /// A body's velocity state before the solve: linear, angular, world centre of mass.
 #[derive(Clone, Copy)]
-pub(super) struct BodyVelocity {
-    pub(super) lin: Vec3,
-    pub(super) ang: Vec3,
+pub(in crate::physics) struct BodyVelocity {
+    pub(in crate::physics) lin: Vec3,
+    pub(in crate::physics) ang: Vec3,
     com: Vec3,
 }
 
@@ -147,12 +147,12 @@ impl BodyVelocity {
 }
 
 /// Pre-solve velocities of every moving body, read by the contact collector.
-pub(super) type VelocitySnapshot = Map<RigidBodyHandle, BodyVelocity>;
+pub(in crate::physics) type VelocitySnapshot = Map<RigidBodyHandle, BodyVelocity>;
 
 impl PhysicsWorld {
     /// Capture every non-fixed body's velocity before the pipeline solves the
     /// tick, so an impact reports its closing speed rather than the resolved one.
-    pub(super) fn snapshot_velocities(&self) -> VelocitySnapshot {
+    pub(in crate::physics) fn snapshot_velocities(&self) -> VelocitySnapshot {
         self.bodies
             .iter()
             .filter(|(_, b)| !b.is_fixed())
@@ -170,7 +170,10 @@ impl PhysicsWorld {
     /// This tick's touching solid pairs (see [`TOUCH_TOLERANCE`]), sorted by
     /// key, each with its strongest contact. A disabled collider or body generates no contacts, so the pairs
     /// follow the same liveness rule as the queries (#521).
-    pub(super) fn collect_contact_pairs(&self, pre: &VelocitySnapshot) -> Vec<CollisionPair> {
+    pub(in crate::physics) fn collect_contact_pairs(
+        &self,
+        pre: &VelocitySnapshot,
+    ) -> Vec<CollisionPair> {
         let body_owner: Map<RigidBodyHandle, u32> =
             self.id_to_body.iter().map(|(&id, &h)| (h, id)).collect();
         let owner_of = |c: ColliderHandle| {

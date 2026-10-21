@@ -1,4 +1,4 @@
-//! src/physics/through.rs — the penetration ray: where a ray enters *and leaves*
+//! src/physics/query/through.rs — the penetration ray: where a ray enters *and leaves*
 //! every solid it crosses (#830), the query wallbangs and over-penetration price
 //! their damage on.
 //!
@@ -13,8 +13,8 @@
 use glam::Vec3;
 use rapier3d::prelude::*;
 
-use super::query::RayHit;
-use super::world::PhysicsWorld;
+use super::RayHit;
+use crate::physics::world::PhysicsWorld;
 
 /// Past this many faces a mesh walk stops: a bound on one query's cost, far
 /// beyond any wall a bullet is meant to cross.
@@ -41,7 +41,7 @@ pub struct RayCrossing {
 
 /// One crossing of one shape, as distances along the ray and outward normals.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub(super) struct Span {
+pub(in crate::physics) struct Span {
     pub enter: f32,
     pub enter_normal: Vec3,
     pub exit: Option<(f32, Vec3)>,
@@ -65,7 +65,12 @@ impl Span {
 
 /// Every crossing of `shape` (placed at `pose`) by `ray` within `max_toi`,
 /// nearest first. `ray.dir` must be unit length.
-pub(super) fn spans(shape: &dyn Shape, pose: &Pose, ray: &Ray, max_toi: f32) -> Vec<Span> {
+pub(in crate::physics) fn spans(
+    shape: &dyn Shape,
+    pose: &Pose,
+    ray: &Ray,
+    max_toi: f32,
+) -> Vec<Span> {
     match shape.as_trimesh() {
         Some(mesh) => mesh_spans(mesh, pose, ray, max_toi),
         None => convex_span(shape, pose, ray, max_toi).into_iter().collect(),

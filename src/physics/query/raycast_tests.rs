@@ -1,4 +1,4 @@
-//! src/physics/raycast_tests.rs — ray hit info and the all-hits cast (#446).
+//! src/physics/query/raycast_tests.rs — ray hit info and the all-hits cast (#446).
 //!
 //! Asserts the *signed* point and normal each face reports, and the exact order
 //! `raycast_all` returns — so a flipped normal, a point off the surface, or an
@@ -6,9 +6,9 @@
 
 use glam::Vec3;
 
-use super::query::{sort_hits, RayHit};
-use super::PhysicsWorld;
+use super::{sort_hits, RayHit};
 use crate::components::{ColliderComponent, ColliderShape};
+use crate::physics::PhysicsWorld;
 use crate::scene::Scene;
 
 /// A static box entity centered at `pos` with a `size` box collider.

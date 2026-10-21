@@ -1,11 +1,11 @@
-//! src/physics/collision_events_tests.rs — solid-contact events (#448): a sphere dropped
+//! src/physics/events/collision_tests.rs — solid-contact events (#448): a sphere dropped
 //! onto a floor enters, stays and exits exactly once, reports the contact point
 //! and normal a script expects, and replays identically.
 
 use glam::Vec3;
 
-use super::{CollisionEvents, PhysicsWorld};
 use crate::components::{ColliderComponent, ColliderShape, RigidBodyComponent};
+use crate::physics::{CollisionEvents, PhysicsWorld};
 use crate::scene::Scene;
 
 const DT: f32 = 1.0 / 60.0;
@@ -120,15 +120,15 @@ fn contact_events_replay_identically() {
 }
 
 /// A pair keyed `(1, 2)` whose solver impulse this tick is `impulse`.
-fn pair(impulse: f32) -> super::CollisionPair {
-    let contact = super::Contact {
+fn pair(impulse: f32) -> crate::physics::CollisionPair {
+    let contact = crate::physics::Contact {
         point: Vec3::ZERO,
         normal: Vec3::Y,
         relative_velocity: Vec3::ZERO,
         impulse,
         other_body: 2,
     };
-    super::CollisionPair {
+    crate::physics::CollisionPair {
         a: 1,
         b: 2,
         contact,

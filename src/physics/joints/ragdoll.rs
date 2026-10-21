@@ -1,4 +1,4 @@
-//! src/physics/ragdoll.rs — what a ragdoll needs from the physics world (#466).
+//! src/physics/joints/ragdoll.rs — what a ragdoll needs from the physics world (#466).
 //!
 //! A ragdoll is ordinary components — a `Rigidbody` and a `Joint` on each bone,
 //! the bone's hitbox as its collider — so the step simulates it like any other
@@ -20,7 +20,7 @@
 
 use glam::Vec3;
 
-use super::world::PhysicsWorld;
+use crate::physics::world::PhysicsWorld;
 use crate::scene::Scene;
 
 impl PhysicsWorld {
