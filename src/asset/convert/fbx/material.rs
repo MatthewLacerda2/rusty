@@ -1,9 +1,9 @@
 //! An FBX material as a glTF metallic-roughness one.
 //!
 //! ufbx fills `pbr` for every shading model (a classic Phong/Lambert material
-//! included), so this reads only that view. Textures are kept when they are files
-//! on disk, as URIs relative to the written `.glb`; a texture embedded in the FBX
-//! is not extracted yet.
+//! included), so this reads only that view. Its textures come from `texture`: a
+//! file on disk is referenced where it lies, one embedded in the FBX is extracted
+//! beside the written `.glb` (#1082).
 
 use super::glb;
 use super::texture::Textures;

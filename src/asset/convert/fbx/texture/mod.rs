@@ -4,9 +4,12 @@
 //! the FBX (`ufbx::Texture::content`: Mixamo and many store packs embed them) is
 //! extracted into [`convert::textures_dir`] beside the `.glb`, the way Unity
 //! extracts them on import, and referenced there. File names are sanitised and kept
-//! distinct, and [`Textures::finish`] removes what an earlier conversion left.
+//! distinct, and [`Textures::finish`] removes what an earlier conversion left. Every
+//! URI is percent-encoded (`gltf::uri`): the folder is named after the source file,
+//! which may hold a `:` or a `%`.
 
 use super::super as convert;
+use crate::asset::gltf::uri;
 use crate::asset::{ImportError, IMAGE_EXTENSIONS};
 use crate::core::collections::Map;
 use crate::core::paths;
@@ -61,7 +64,7 @@ impl Textures {
             );
             return None;
         }
-        let (stem, ext) = file_name(texture);
+        let (stem, ext) = file_name(raw_name(texture), &texture.content);
         if !IMAGE_EXTENSIONS.contains(&ext.as_str()) {
             log::warn!(
                 "[Asset] FBX texture `{}` embeds a `.{ext}`, not an image format the importer reads; skipped",
@@ -74,7 +77,7 @@ impl Textures {
             Ok(()) => {
                 let dir = self.dir.file_name()?.to_string_lossy().into_owned();
                 self.written.push(name.clone());
-                Some(format!("{dir}/{name}"))
+                Some(uri::encode_path(&format!("{dir}/{name}")))
             }
             Err(e) => {
                 log::warn!("[Asset] FBX texture `{}`: {e}", texture.element.name);
@@ -108,35 +111,61 @@ impl Textures {
     }
 }
 
-/// The sanitised stem and lowercase extension of `texture`'s file name, else of
-/// its element name: only ASCII letters, digits, `-`, `_` and inner `.`, so no
-/// separator, `..` or URI escape survives.
-fn file_name(texture: &ufbx::Texture) -> (String, String) {
-    let raw = [&texture.relative_filename, &texture.filename]
+/// The name `texture`'s file goes by: its file name, else its element name.
+fn raw_name(texture: &ufbx::Texture) -> &str {
+    [&texture.relative_filename, &texture.filename]
         .into_iter()
         .map(|name| name.as_ref() as &str)
         .find(|name| !name.is_empty())
-        .unwrap_or(texture.element.name.as_ref());
+        .unwrap_or(texture.element.name.as_ref())
+}
+
+/// The sanitised stem and lowercase extension of the file `raw` names, holding
+/// `bytes`: only ASCII letters, digits, `-`, `_` and inner `.`, so no separator,
+/// `..` or URI escape survives. A name without an image extension whose bytes are
+/// a PNG or a JPEG gets that extension (`Material #25` → `Material__25.png`).
+fn file_name(raw: &str, bytes: &[u8]) -> (String, String) {
     // FBX paths are often Windows ones: split on both separators.
     let base = raw.rsplit(['/', '\\']).next().unwrap_or(raw);
     let (stem, ext) = base.rsplit_once('.').unwrap_or((base, ""));
-    let clean = |s: &str| -> String {
-        let s: String = s
-            .chars()
-            .map(|c| match c {
-                'a'..='z' | 'A'..='Z' | '0'..='9' | '-' | '_' | '.' => c,
-                _ => '_',
-            })
-            .collect();
-        s.trim_matches('.').to_string()
+    let ext = clean(ext).to_ascii_lowercase();
+    let (stem, ext) = match sniff(bytes) {
+        Some(sniffed) if !IMAGE_EXTENSIONS.contains(&ext.as_str()) => {
+            (clean(base), sniffed.to_string())
+        }
+        _ => (clean(stem), ext),
     };
-    let stem = clean(stem);
     let stem = if stem.is_empty() {
         "texture".to_string()
     } else {
         stem
     };
-    (stem, clean(ext).to_ascii_lowercase())
+    (stem, ext)
+}
+
+/// `s` with every character but ASCII letters, digits, `-`, `_` and `.` made `_`,
+/// and no leading or trailing `.`.
+fn clean(s: &str) -> String {
+    let s: String = s
+        .chars()
+        .map(|c| match c {
+            'a'..='z' | 'A'..='Z' | '0'..='9' | '-' | '_' | '.' => c,
+            _ => '_',
+        })
+        .collect();
+    s.trim_matches('.').to_string()
+}
+
+/// The extension `bytes`' magic number says they are, for the formats a name
+/// alone may not tell: PNG and JPEG.
+fn sniff(bytes: &[u8]) -> Option<&'static str> {
+    if bytes.starts_with(b"\x89PNG\r\n\x1a\n") {
+        Some("png")
+    } else if bytes.starts_with(&[0xFF, 0xD8, 0xFF]) {
+        Some("jpg")
+    } else {
+        None
+    }
 }
 
 /// `<stem>.<ext>`, or `<stem>.1.<ext>`, … when a name already `taken` matches it
@@ -153,7 +182,8 @@ fn unique(stem: &str, ext: &str, taken: &[String]) -> String {
         .unwrap_or(base)
 }
 
-/// `target` as a `/`-separated path from directory `from`, both resolved first.
+/// `target` as a `/`-separated, percent-encoded URI from directory `from`, both
+/// resolved first.
 pub fn relative_uri(from: &Path, target: &Path) -> Option<String> {
     let from = paths::canonicalize(from).ok()?;
     let target = paths::canonicalize(target).ok()?;
@@ -164,7 +194,9 @@ pub fn relative_uri(from: &Path, target: &Path) -> Option<String> {
     let down = target[shared..]
         .iter()
         .map(|c| c.as_os_str().to_string_lossy().into_owned());
-    Some(up.chain(down).collect::<Vec<_>>().join("/"))
+    Some(uri::encode_path(
+        &up.chain(down).collect::<Vec<_>>().join("/"),
+    ))
 }
 
 #[cfg(test)]

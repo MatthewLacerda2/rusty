@@ -5,7 +5,7 @@
 ; - "Red" has `skin.png`, a 1x1 red PNG.
 ; - "Blue" has `..\Skin.png` (a 1x1 blue PNG): a Windows path climbing out of its
 ;   folder whose name clashes with Red's but for case, so it must land as
-;   `skin.1.png`; and a normal map embedding a `.dds`, a format the importer
+;   `Skin.1.png`; and a normal map embedding a `.dds`, a format the importer
 ;   does not read, so it is skipped.
 FBXHeaderExtension:  {
 	FBXHeaderVersion: 1003

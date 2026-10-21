@@ -5,17 +5,26 @@ use crate::asset::gltf;
 use crate::asset::ImportedAsset;
 use std::path::{Path, PathBuf};
 
+mod formats;
+mod names;
+
 const PNG: &[u8] = b"\x89PNG";
 
-fn fixture() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/models/embedded_textures.fbx")
+fn fixture(name: &str) -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures/models")
+        .join(name)
 }
 
-/// The fixture converted into `dir`, then imported.
+/// The fixture `source` converted to `out`, then imported.
+fn convert_and_import(source: &Path, out: &Path) -> ImportedAsset {
+    convert(source, out).expect("the fixture converts");
+    gltf::import::import(out).expect("its glTF imports")
+}
+
+/// `embedded_textures.fbx` converted into `dir`, then imported.
 fn import(dir: &Path) -> ImportedAsset {
-    let out = dir.join("quad.fbx.glb");
-    convert(&fixture(), &out).expect("the fixture converts");
-    gltf::import::import(&out).expect("its glTF imports")
+    convert_and_import(&fixture("embedded_textures.fbx"), &dir.join("quad.fbx.glb"))
 }
 
 fn material<'a>(asset: &'a ImportedAsset, name: &str) -> &'a crate::asset::MaterialData {
@@ -71,11 +80,4 @@ fn a_reconversion_removes_files_it_no_longer_writes() {
         .collect();
     names.sort();
     assert_eq!(names, ["Skin.1.png", "skin.png"]);
-}
-
-#[test]
-fn names_are_sanitised_and_kept_apart_ignoring_case() {
-    let taken = vec!["skin.png".to_string()];
-    assert_eq!(super::unique("Skin", "png", &taken), "Skin.1.png");
-    assert_eq!(super::unique("other", "png", &taken), "other.png");
 }
