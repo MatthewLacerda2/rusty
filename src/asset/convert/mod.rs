@@ -19,14 +19,23 @@
 //! records the converter, its [`Converter::version`] and a digest of the source's
 //! bytes; any difference re-converts. Content, not timestamps: a fresh clone gives
 //! every file a new mtime, and a sim module reads no clock. Files a conversion
-//! writes for the glTF to reference (FBX's embedded textures, #1082) live in
-//! [`textures_dir`] and are re-made with it.
+//! writes for the glTF to reference (FBX's embedded textures, #1082) live in a
+//! `<cache>.glb.<digest>.textures/` folder beside it and are re-made with it.
+//!
+//! **How it is re-made.** A converter writes plain files into a fresh staging
+//! folder, and `stage` swaps the set into place, so a reader in another process
+//! finds the set whole when it opens the `.glb` (#1129). A lock on the source
+//! keeps two conversions of it from interleaving. Atomicity is this module's,
+//! never a converter's.
 //!
 //! **Adding a converter** is one row in [`CONVERTERS`]: an extension and a
-//! function that writes a glTF to the path it is given.
+//! function that writes a glTF where its [`Staging`] says.
 
 mod fbx;
 pub mod glb;
+mod stage;
+
+pub use stage::{textures_dirs, Staging};
 
 use super::ImportError;
 use crate::core::{hash, paths, project};
@@ -44,11 +53,11 @@ pub struct Converter {
     pub name: &'static str,
     /// Bump when the converter's output changes, so every cached file re-makes.
     pub version: u32,
-    /// Read `source`, write a glTF (binary or not) at `out`, each file through
-    /// [`write_atomic`]. Files the glTF references that the conversion makes (FBX's
-    /// embedded textures) go in [`textures_dir`]`(out)`, which it owns: a re-make
-    /// removes what it no longer writes there.
-    pub convert: fn(source: &Path, out: &Path) -> Result<(), ImportError>,
+    /// Read `source` and write plain files where `to` says: the glTF (binary or
+    /// not) at [`Staging::glb`], and the files it references that the conversion
+    /// makes (FBX's embedded textures) in [`Staging::textures`]. [`refresh`] swaps
+    /// them into place whole, and removes what an earlier conversion left.
+    pub convert: fn(source: &Path, to: &Staging) -> Result<(), ImportError>,
 }
 
 /// Every converted format.
@@ -58,7 +67,8 @@ pub const CONVERTERS: &[Converter] = &[Converter {
     // 2: animation stacks become glTF animations (#1081).
     // 3: a rest pose splits like its keys, keeping a negative scale's signs (#1110).
     // 4: embedded textures are extracted beside the `.glb` (#1082).
-    version: 4,
+    // 5: the textures folder is named by the conversion's digest (#1129).
+    version: 5,
     convert: fbx::convert,
 }];
 
@@ -85,23 +95,37 @@ pub fn cached_gltf(path: &Path) -> Result<PathBuf, ImportError> {
 
 /// Make `out` the conversion of `source`, unless its stamp says it already is. A
 /// missing source with a cache present keeps the cache (a game shipped without
-/// its sources).
+/// its sources). A failing converter leaves the old cache as it was; a swap that
+/// fails partway leaves the cache unstamped, so the next call converts again.
 pub fn refresh(converter: &Converter, source: &Path, out: &Path) -> Result<(), ImportError> {
-    let bytes = match std::fs::read(source) {
-        Ok(bytes) => bytes,
+    let parse = |e: std::io::Error| ImportError::Parse(format!("{}: {e}", source.display()));
+    let file = match std::fs::File::open(source) {
+        Ok(file) => file,
         Err(_) if out.is_file() => return Ok(()),
-        Err(e) => return Err(ImportError::Parse(format!("{}: {e}", source.display()))),
+        Err(e) => return Err(parse(e)),
     };
+    // A conversion of this source in another process (or thread) finishes first:
+    // an advisory lock, released when `file` drops. Where the filesystem has none,
+    // `stage` still keeps the set whole in most interleavings.
+    let _ = file.lock();
+    let bytes = std::fs::read(source).map_err(parse)?;
     let stamp = stamp(converter, &bytes);
-    let stamp_path = stamp_path(out);
-    if out.is_file() && std::fs::read_to_string(&stamp_path).is_ok_and(|s| s == stamp) {
+    if up_to_date(out, &stamp) {
         return Ok(());
     }
     if let Some(dir) = out.parent() {
         std::fs::create_dir_all(dir).map_err(|e| write_error(dir, &e))?;
     }
-    (converter.convert)(source, out)?;
-    std::fs::write(&stamp_path, stamp).map_err(|e| write_error(&stamp_path, &e))
+    match stage::convert(converter, source, out, &stamp) {
+        // Another process converted the same source meanwhile.
+        Err(_) if up_to_date(out, &stamp) => Ok(()),
+        result => result,
+    }
+}
+
+/// True when `out` exists and its stamp is `stamp`.
+fn up_to_date(out: &Path, stamp: &str) -> bool {
+    out.is_file() && std::fs::read_to_string(stamp_path(out)).is_ok_and(|s| s == stamp)
 }
 
 /// Where the project at `root` caches the source at `rel` (project-relative):
@@ -144,28 +168,6 @@ fn temp_path(path: &Path) -> PathBuf {
     std::env::temp_dir()
         .join("rusty-import")
         .join(format!("{digest:016x}-{name}.glb"))
-}
-
-/// Write `bytes` at `path` beside it and rename them into place, so a reader in
-/// another process never sees half a file. The partial file still ends in `path`'s
-/// extension: an exporter may insist on its own.
-pub fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), ImportError> {
-    let partial = match path.extension() {
-        Some(ext) => format!("{}.{PARTIAL}.{}", std::process::id(), ext.to_string_lossy()),
-        None => format!("{}.{PARTIAL}", std::process::id()),
-    };
-    let partial = path.with_extension(partial);
-    std::fs::write(&partial, bytes).map_err(|e| write_error(&partial, &e))?;
-    std::fs::rename(&partial, path).map_err(|e| write_error(path, &e))
-}
-
-/// What marks a file [`write_atomic`] has not renamed into place yet.
-pub const PARTIAL: &str = "partial";
-
-/// The folder of files a conversion writes for the glTF at `out` to reference:
-/// `<out>.textures/`.
-pub fn textures_dir(out: &Path) -> PathBuf {
-    with_suffix(out, ".textures")
 }
 
 fn stamp_path(out: &Path) -> PathBuf {

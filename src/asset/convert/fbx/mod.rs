@@ -14,21 +14,28 @@ mod material;
 mod mesh;
 mod texture;
 
-use super::glb;
+use super::{glb, Staging};
 use crate::asset::ImportError;
 use crate::core::collections::Map;
 use basis::Basis;
 use std::path::Path;
 use texture::Textures;
 
-/// Convert the FBX at `source` into a `.glb` at `out`, its embedded textures
+/// Convert the FBX at `source` into a `.glb` where `to` says, its embedded textures
 /// extracted beside it (`texture`).
-pub fn convert(source: &Path, out: &Path) -> Result<(), ImportError> {
+pub fn convert(source: &Path, to: &Staging) -> Result<(), ImportError> {
     let scene = load(source)?;
-    let mut textures = Textures::new(out);
-    let document = document(&scene, &mut textures)?;
-    textures.finish();
-    super::write_atomic(out, &glb::write(&document))
+    let document = document(&scene, &mut Textures::new(to))?;
+    std::fs::write(&to.glb, glb::write(&document))
+        .map_err(|e| ImportError::Parse(format!("writing {}: {e}", to.glb.display())))
+}
+
+/// The FBX at `source` converted to a cached `.glb` at `out` through
+/// `convert::refresh`, as an import would: the tests' way in.
+#[cfg(test)]
+fn convert_to(source: &Path, out: &Path) -> Result<(), ImportError> {
+    let converter = super::converter_for(source).expect("an FBX");
+    super::refresh(converter, source, out)
 }
 
 /// The FBX at `source`, read by ufbx in metres.

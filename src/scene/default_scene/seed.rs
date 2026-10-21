@@ -83,6 +83,7 @@ impl Staging {
     fn publish(&self, files: &[&str]) -> Result<(), String> {
         for f in files {
             let (from, to) = (self.0.join(f), self.1.join(f));
+            // lint: allow(atomic-write) publishes a file staged whole in this process's own folder
             std::fs::rename(&from, &to).map_err(|e| format!("{}: {e}", to.display()))?;
         }
         Ok(())

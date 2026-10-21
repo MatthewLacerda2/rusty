@@ -1,7 +1,7 @@
 //! Extracted texture names, and the URIs a source file's own name leads to (#1082).
 
 use super::super::{file_name, unique};
-use super::{convert_and_import, fixture, material, PNG};
+use super::{convert_and_import, fixture, material, textures, PNG};
 
 fn name(raw: &str) -> String {
     let (stem, ext) = file_name(raw, b"");
@@ -46,7 +46,10 @@ fn names_are_sanitised_and_kept_apart_ignoring_case() {
 
 #[test]
 fn a_source_name_a_uri_would_misread_still_finds_its_textures() {
-    for source in ["Soldier: v2.fbx", "bad%C0.fbx", "lit%20eral.fbx"] {
+    // A `:` can't be in a Windows file name (Windows isn't shipped yet), so only
+    // the other names run there.
+    let colon = (!cfg!(windows)).then_some("Soldier: v2.fbx");
+    for source in colon.into_iter().chain(["bad%C0.fbx", "lit%20eral.fbx"]) {
         let dir = crate::test_temp::dir();
         let copy = dir.join(source);
         std::fs::copy(fixture("embedded_textures.fbx"), &copy).unwrap();
@@ -56,7 +59,7 @@ fn a_source_name_a_uri_would_misread_still_finds_its_textures() {
             .base_color_map
             .clone()
             .expect(source);
-        let expected = dir.join(format!("{source}.glb.textures/skin.png"));
+        let expected = textures(&out).join("skin.png");
         assert_eq!(std::path::Path::new(&red), expected, "{source}");
         assert!(std::fs::read(&red).unwrap().starts_with(PNG), "{source}");
     }

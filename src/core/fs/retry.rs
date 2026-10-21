@@ -1,7 +1,7 @@
-//! src/asset/sidecar/retry.rs — ride out Windows' transient refusals on the
-//! sidecar's replace-and-read race (#520).
+//! src/core/fs/retry.rs — ride out Windows' transient refusals on a
+//! replace-and-read race (#520).
 //!
-//! The sidecar is saved by renaming a temp file over it. On Unix that rename
+//! An atomic write renames a temp file over its target. On Unix that rename
 //! replaces the destination even while other threads hold it open, and a reader
 //! opening it meanwhile just gets the old or the new file. On Windows both sides
 //! can be refused for a moment: the rename fails (access denied or a sharing
@@ -24,8 +24,8 @@ const ATTEMPTS: u32 = 20;
 /// Backoff grows linearly by this step (1 ms, 2 ms, …): ~190 ms worst case in total.
 const BACKOFF_STEP: Duration = Duration::from_millis(1);
 
-/// Run a sidecar file operation, retrying the transient Windows refusals.
-pub(super) fn retry_transient<T>(op: impl FnMut() -> io::Result<T>) -> io::Result<T> {
+/// Run a file operation, retrying the transient Windows refusals.
+pub fn retry_transient<T>(op: impl FnMut() -> io::Result<T>) -> io::Result<T> {
     retry(
         ATTEMPTS,
         BACKOFF_STEP,

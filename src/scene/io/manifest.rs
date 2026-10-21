@@ -22,8 +22,8 @@
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
 
+use crate::core::fs;
 use crate::core::hash::fnv1a64;
 
 /// The manifest's place, relative to the project root.
@@ -125,20 +125,13 @@ fn read_entries(path: &Path) -> BTreeMap<String, u64> {
         .collect()
 }
 
-/// Write `bytes` beside `dest` and rename it into place, so a reader in another
-/// process sees the whole file or the old one, never half of it.
+/// Write `bytes` at `dest` atomically ([`fs::write_atomic`]), creating its folder:
+/// a reader in another process sees the whole file or the old one, never half of it.
 fn write_atomic(dest: &Path, bytes: &[u8]) -> Result<(), String> {
-    static NEXT: AtomicU64 = AtomicU64::new(0);
     if let Some(parent) = dest.parent() {
         std::fs::create_dir_all(parent).map_err(|e| format!("{}: {e}", parent.display()))?;
     }
-    let n = NEXT.fetch_add(1, Ordering::Relaxed);
-    let staged = dest.with_extension(format!("seed-{}-{n}.tmp", std::process::id()));
-    std::fs::write(&staged, bytes).map_err(|e| format!("{}: {e}", staged.display()))?;
-    std::fs::rename(&staged, dest).map_err(|e| {
-        std::fs::remove_file(&staged).ok();
-        format!("{}: {e}", dest.display())
-    })
+    fs::write_atomic(dest, bytes).map_err(|e| format!("{}: {e}", dest.display()))
 }
 
 #[cfg(test)]

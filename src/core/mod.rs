@@ -8,6 +8,7 @@ pub mod collections;
 pub mod color;
 pub mod curve;
 pub mod frame_stats;
+pub mod fs;
 pub mod gamepad;
 pub mod hash;
 pub mod input;

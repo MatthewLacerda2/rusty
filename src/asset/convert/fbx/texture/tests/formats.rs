@@ -1,7 +1,7 @@
 //! Embedded textures the `gltf` crate can't decode, or whose names don't say their
 //! format, still import with their mesh (#1082).
 
-use super::{convert_and_import, fixture, material};
+use super::{convert_and_import, fixture, material, textures};
 use crate::asset::ImportedAsset;
 use std::path::Path;
 
@@ -14,7 +14,7 @@ fn import(dir: &Path) -> ImportedAsset {
 
 /// The bytes the map `uri` names, which must be `dir`'s extracted `file`.
 fn extracted(dir: &Path, uri: Option<String>, file: &str) -> Vec<u8> {
-    let path = dir.join("odd.fbx.glb.textures").join(file);
+    let path = textures(&dir.join("odd.fbx.glb")).join(file);
     assert_eq!(uri.as_deref().map(Path::new), Some(path.as_path()));
     std::fs::read(path).unwrap()
 }

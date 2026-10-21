@@ -61,14 +61,12 @@ pub fn refresh(root: &Path) -> Refresh {
 }
 
 /// Decode encoded audio `bytes` (a provider's MP3) and write it to `dest` as WAV,
-/// replacing whatever is there. The write goes through a temporary file and a
-/// rename, so a reader never sees half a WAV.
+/// replacing whatever is there. The write is atomic (`core::fs::write_atomic`), so
+/// a reader never sees half a WAV.
 pub fn import_mp3_bytes(bytes: Vec<u8>, dest: &Path) -> Result<(), String> {
     let audio = decode_bytes(bytes)?;
     let encoded = wav::encode(audio.channels, audio.sample_rate, &audio.samples);
-    let partial = dest.with_extension("wav.part");
-    std::fs::write(&partial, encoded).map_err(|e| e.to_string())?;
-    std::fs::rename(&partial, dest).map_err(|e| e.to_string())
+    crate::core::fs::write_atomic(dest, &encoded).map_err(|e| e.to_string())
 }
 
 /// Where a clip reference actually plays from: `foo.mp3` that has been converted

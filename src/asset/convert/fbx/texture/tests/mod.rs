@@ -1,6 +1,7 @@
 //! Embedded FBX textures extracted beside the cached `.glb` (#1082).
 
-use super::super::convert;
+use super::super::convert_to;
+use crate::asset::convert::textures_dirs;
 use crate::asset::gltf;
 use crate::asset::ImportedAsset;
 use std::path::{Path, PathBuf};
@@ -18,8 +19,14 @@ fn fixture(name: &str) -> PathBuf {
 
 /// The fixture `source` converted to `out`, then imported.
 fn convert_and_import(source: &Path, out: &Path) -> ImportedAsset {
-    convert(source, out).expect("the fixture converts");
+    convert_to(source, out).expect("the fixture converts");
     gltf::import::import(out).expect("its glTF imports")
+}
+
+/// The one textures folder beside the cached glTF at `out`.
+fn textures(out: &Path) -> PathBuf {
+    let [dir] = textures_dirs(out).try_into().expect("one textures folder");
+    dir
 }
 
 /// `embedded_textures.fbx` converted into `dir`, then imported.
@@ -39,7 +46,10 @@ fn an_embedded_texture_is_extracted_beside_the_glb() {
         .base_color_map
         .clone()
         .expect("a map");
-    assert_eq!(Path::new(&red), dir.join("quad.fbx.glb.textures/skin.png"));
+    assert_eq!(
+        Path::new(&red),
+        textures(&dir.join("quad.fbx.glb")).join("skin.png")
+    );
     assert!(std::fs::read(red).unwrap().starts_with(PNG));
 }
 
@@ -51,12 +61,9 @@ fn a_clashing_name_climbing_out_of_its_folder_lands_beside_the_first() {
         .base_color_map
         .clone()
         .expect("a map");
-    assert_eq!(
-        Path::new(&blue),
-        dir.join("quad.fbx.glb.textures/Skin.1.png")
-    );
-    let [red, blue] = ["skin.png", "Skin.1.png"]
-        .map(|n| std::fs::read(dir.join("quad.fbx.glb.textures").join(n)).unwrap());
+    let textures = textures(&dir.join("quad.fbx.glb"));
+    assert_eq!(Path::new(&blue), textures.join("Skin.1.png"));
+    let [red, blue] = ["skin.png", "Skin.1.png"].map(|n| std::fs::read(textures.join(n)).unwrap());
     assert!(blue.starts_with(PNG));
     assert_ne!(red, blue, "the second texture overwrote nothing");
 }
@@ -68,13 +75,14 @@ fn an_embedded_format_the_importer_cannot_read_is_skipped() {
 }
 
 #[test]
-fn a_reconversion_removes_files_it_no_longer_writes() {
+fn a_reconversion_replaces_an_older_converters_textures_folder() {
     let dir = crate::test_temp::dir();
-    let textures = dir.join("quad.fbx.glb.textures");
-    std::fs::create_dir_all(&textures).unwrap();
-    std::fs::write(textures.join("stale.png"), b"old").unwrap();
+    let stale = dir.join("quad.fbx.glb.textures");
+    std::fs::create_dir_all(&stale).unwrap();
+    std::fs::write(stale.join("stale.png"), b"old").unwrap();
     import(&dir);
-    let mut names: Vec<String> = std::fs::read_dir(&textures)
+    assert!(!stale.exists());
+    let mut names: Vec<String> = std::fs::read_dir(textures(&dir.join("quad.fbx.glb")))
         .unwrap()
         .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
         .collect();
