@@ -19,8 +19,9 @@ def wait_for(
     [`polling.sighted`] on `sha` is remembered across polls, so a run the listing
     drops is waited for rather than declared lost (#592). A red only the
     runners caused is re-run once ([`polling.rerun_step`]) on the same clock,
-    and a red whose gate has not shown is given a grace from the poll that
-    first read it ([`polling.lagging`], #1109).
+    and a red whose jobs do not yet show it over is given a grace from the
+    poll that first read it so ([`polling.lagging`], #1109, #1182), then
+    judged as its jobs are listed ([`polling.expiry`]).
     `tick()`, when given, runs once per poll: the watch reports its board
     there, so a pull request turning ready during a long run is heard of
     within a poll, not when the take ends (#928).
@@ -37,7 +38,7 @@ def wait_for(
             seen |= polling.sighted(pull, runs)
             state, lines = polling.progress(pull, runs, jobs, github.paths(pull), waited, seen, rerun, red_since)
             if state == outcomes.RERUN:
-                refused = rerun_failed(runners.outage(pull, runs, jobs), rerun)
+                refused = rerun_failed(runners.outage(pull, runs, jobs, polling.expiry(waited, red_since)), rerun)
                 if refused:
                     return outcomes.STOP, [f"{outcomes.RUNNERS}, and the re-run was refused: {refused}", *lines]
             elif state != outcomes.WAIT:

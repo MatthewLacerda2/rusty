@@ -65,9 +65,12 @@ class RunnerRed(unittest.TestCase):
         self.assertFalse(runners.runner_red(run("ci", conclusion="failure"), {1: mixed}, "ci"))
 
     def test_a_run_with_no_jobs_is_the_runners_when_cancelled_and_unknown_when_failed(self):
-        # A failure with no jobs listed has not said whose red it is (#1109).
-        self.assertTrue(runners.runner_red(run("ci", conclusion="cancelled"), {}, "ci"))
-        self.assertIsNone(runners.runner_red(run("ci", conclusion="failure"), {}, "ci"))
+        # No jobs listed has not said whose red it is (#1109, #1182); past the
+        # grace a cancelled run is the runners' and a failure stays unknown.
+        spent = lambda _run: True
+        self.assertIsNone(runners.runner_red(run("ci", conclusion="cancelled"), {}, "ci"))
+        self.assertTrue(runners.runner_red(run("ci", conclusion="cancelled"), {}, "ci", spent))
+        self.assertIsNone(runners.runner_red(run("ci", conclusion="failure"), {}, "ci", spent))
 
     def test_one_code_red_beside_a_runner_red_is_no_outage(self):
         runs = [run("ci", conclusion="failure"), run("lint", conclusion="cancelled")]

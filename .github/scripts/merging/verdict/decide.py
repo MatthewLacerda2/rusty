@@ -62,6 +62,8 @@ def assess(
             f"a `{workflow}` run for {short} concluded {run.get('conclusion')}.",
             f"See {run.get('html_url', 'the run')}.",
         ]
+        if not runlist.agrees(run, jobs, workflow):
+            lines.insert(1, f"Judged as listed, though {runlist.lag(run, jobs, workflow)} (#1182).")
         if len(kept) > 1:
             lines.append(
                 f"{len(kept)} `{workflow}` runs exist for this commit; a green one"
@@ -78,7 +80,7 @@ def assess(
     lagging = runlist.lagging(kept, jobs, workflow)
     if lagging:
         return RUNNING, [
-            f"a `{workflow}` run for {short} is listed completed, but {runlist.lag(lagging[0], jobs, workflow)}.",
+            f"a `{workflow}` run for {short} {runlist.listed(lagging[0])}, but {runlist.lag(lagging[0], jobs, workflow)}.",
             "The two listings are read apart and one can lag the other (#1095, #1182). Waiting for the jobs listing to catch up.",
         ]
 

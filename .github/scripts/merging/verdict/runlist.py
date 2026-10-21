@@ -32,7 +32,8 @@ still a run in flight; a finished run keeps GitHub's own conclusion — once its
 jobs show the gate concluded. A run listed `completed` whose jobs do not (the
 gate unconcluded, not listed, or listed only for an older attempt) is in flight,
 not final ([`lagging`], #1095): the two listings are separate reads. Every
-caller asks one question of the jobs, [`gate_conclusion`].
+reading of "the gate concluded" is [`gate_conclusion`]; whether the jobs agree
+the run is over is the stricter [`agrees`], below.
 
 ## A verdict needs every listing it reads to agree the run is over (#1182)
 
@@ -133,12 +134,21 @@ def by_gate(run: dict, jobs: dict[int, list[dict]], workflow: str) -> dict:
         return run
     concluded = gate_conclusion(run, jobs, workflow)
     if concluded not in (None, "skipped"):
-        return {**run, "status": "completed", "conclusion": concluded, BY_GATE: True}
+        return {**run, "status": "completed", "conclusion": concluded, BY_GATE: run.get("status")}
     return run
 
 
-# Marks a run [`by_gate`] settled rather than GitHub: [`agrees`] lets its signals run.
+# Marks a run [`by_gate`] settled rather than GitHub, holding the status the runs
+# listing gave it: [`agrees`] lets its signals run, and [`listed`] says what GitHub said.
 BY_GATE = "settled_by_gate"
+
+
+def listed(run: dict) -> str:
+    """How the runs listing shows `run`, in words: a run [`by_gate`] settled is
+    still listed going there, and its conclusion is only its gate's."""
+    if run.get(BY_GATE):
+        return f"is listed `{run[BY_GATE]}`, its gate concluded `{run.get('conclusion')}`"
+    return f"is listed `{run.get('status')}` `{run.get('conclusion')}`"
 
 
 def gate_jobs(run: dict, jobs: dict[int, list[dict]], workflow: str) -> list[dict]:
@@ -246,9 +256,9 @@ def agrees(run: dict, jobs: dict[int, list[dict]], workflow: str) -> bool:
     """Whether `run`'s jobs listing agrees it is over: its gate concluded on the
     run's own attempt and no job it waits for is still [`going`] (#1182).
 
-    The one predicate a verdict on a run listed `completed` reads its jobs
-    through: [`lagging`] for a pass or "nothing was built", and
-    `runners.runner_red` for whose red a failure is.
+    The one predicate a verdict on a settled run reads its jobs through:
+    [`lagging`] for a pass or "nothing was built", and `runners.runner_red`
+    for whose red any failed run is, until the queue's grace is spent.
     """
     return gate_conclusion(run, jobs, workflow) is not None and not going(run, jobs, workflow)
 
