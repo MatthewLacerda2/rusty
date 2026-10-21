@@ -82,13 +82,13 @@ pub struct Pose {
 
 impl Pose {
     /// This local pose under a parent whose world matrix is `parent_world`:
-    /// [`world_rotation`] and [`world_scale`], never a split of the product
+    /// [`world_rotation`] and `lossy_scale`, never a split of the product
     /// matrix, which loses a rotated child's scale axes.
     pub fn under(self, parent_world: Mat4) -> Self {
         Self {
             pos: parent_world.transform_point3(self.pos),
             rot: world_rotation(parent_world, self.rot),
-            scale: world_scale(parent_world, self.scale),
+            scale: lossy_scale(parent_world, self.rot, self.scale),
         }
     }
 }
@@ -117,15 +117,69 @@ pub fn local_rotation(parent_world: Mat4, world_rot: Quat) -> Quat {
     through_mirror(parent_world, parent_rot.inverse() * world_rot).normalize()
 }
 
-/// A child's signed world scale: `parent_world`'s (its reflection on X, as glam
-/// decomposes it) times the child's own `scale`. Its signs are the child's
-/// [`mirror`], an entity's own negative scale included (#1125).
+/// A child's signed world scale when it is not turned against its parent:
+/// `parent_world`'s split scale (its reflection on X, as glam decomposes it)
+/// times the child's own `scale`. Its signs are always the child's [`mirror`],
+/// turned or not; its magnitudes are [`Pose::under`]'s for an unturned child or
+/// a parent scaled the same on every axis.
 pub fn world_scale(parent_world: Mat4, scale: Vec3) -> Vec3 {
     parent_world.to_scale_rotation_translation().0 * scale
 }
 
+/// How far apart, relative to the largest, a parent's three scales may be, and how
+/// far from square its axes, and still read as uniform in [`lossy_scale`]: a few ulps.
+const UNIFORM: f32 = 4.0 * f32::EPSILON;
+
+/// Unity's `lossyScale` of a child with local `rotation` and `scale` under
+/// `parent_world`: the lengths of its world matrix's columns, so the parent's
+/// scale is read along the child's own axes, however it is turned (#1156). The
+/// signs are the mirror convention: the child's own, with X flipped once more
+/// when the parent reflects (glam's split carries a reflection on X, and
+/// [`world_rotation`] sees through it). They are the child's [`mirror`], an
+/// entity's own negative scale included (#1125). Then [`world_rotation`] times
+/// this scale is the world matrix whenever the hierarchy does not shear.
+///
+/// Under a conformal parent, one scaled the same on every axis with its axes still
+/// square (`M·Mᵀ = s²·I`, to within [`UNIFORM`], the rounding a matrix carries), it
+/// is [`world_scale`] exactly: a turn cannot change a uniform scale, and reading it
+/// through the rotation's rounding would (a parent at 1000 would give 999.9999).
+/// Equal axis lengths alone are not enough: a turned parent under a non-uniform
+/// grandparent can shear into three equal-length axes that are not square.
+fn lossy_scale(parent_world: Mat4, rotation: Quat, scale: Vec3) -> Vec3 {
+    let split = parent_world.to_scale_rotation_translation().0;
+    let parent = glam::Mat3::from_mat4(parent_world);
+    if conformal(parent, split.abs()) {
+        return split * scale;
+    }
+    let turned = glam::Mat3::from_quat(rotation);
+    let along = |u: Vec3| (parent * u).length() / u.length();
+    let lengths = Vec3::new(
+        along(turned.x_axis),
+        along(turned.y_axis),
+        along(turned.z_axis),
+    );
+    let flip = if parent_world.determinant() < 0.0 {
+        -1.0
+    } else {
+        1.0
+    };
+    Vec3::new(flip, 1.0, 1.0) * lengths * scale
+}
+
+/// Whether `m`, whose axis lengths are `size`, is a uniform scale times a rotation:
+/// equal lengths and square axes, both to within [`UNIFORM`].
+fn conformal(m: glam::Mat3, size: Vec3) -> bool {
+    let top = size.max_element();
+    let square = top * top;
+    let (x, y, z) = (m.x_axis, m.y_axis, m.z_axis);
+    top - size.min_element() <= UNIFORM * top
+        && [x.dot(y), x.dot(z), y.dot(z)]
+            .iter()
+            .all(|d| d.abs() <= UNIFORM * square)
+}
+
 /// The reflection a pose carries: the sign of each axis of its signed world
-/// scale ([`world_scale`]), `±1` each, all `+1` for no mirror. The pose's world
+/// scale ([`Pose::under`]), `±1` each, all `+1` for no mirror. The pose's world
 /// matrix is its [`world_rotation`] times `mirror` times the scale's magnitude.
 pub fn mirror(signed_scale: Vec3) -> Vec3 {
     Vec3::select(signed_scale.cmplt(Vec3::ZERO), -Vec3::ONE, Vec3::ONE)

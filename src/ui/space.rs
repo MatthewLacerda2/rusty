@@ -109,7 +109,7 @@ pub fn canvas_space(
     match (canvas.render_mode, &view.camera) {
         (CanvasRenderMode::WorldSpace, _) => {
             let units = Mat4::from_scale(Vec3::splat(1.0 / canvas.pixels_per_unit.max(1e-3)));
-            CanvasSpace::World(world.compute_world_matrix(id) * units * centre)
+            CanvasSpace::World(world.local_to_world(id) * units * centre)
         }
         (CanvasRenderMode::ScreenSpaceCamera, Some(cam)) => {
             let d = canvas.plane_distance.max(0.01);

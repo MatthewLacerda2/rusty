@@ -96,3 +96,27 @@ fn swap_carries_survivors_with_their_ids() {
     let fresh = s.add_entity("Spawned".to_string());
     assert!(fresh > speaker, "the allocator runs past every live id");
 }
+
+#[test]
+fn a_re_rooted_survivors_bounds_stand_where_it_is_now() {
+    // Under a holder 100 along X its box sat there; re-rooted by the load, it stands
+    // at its local pose, and both Physics.GetBounds and the nav bake must see it there.
+    let mut s = Scene::new();
+    let holder = s.add_entity("Holder".to_string());
+    let crate_ = s.add_entity("Crate".to_string());
+    s.world.transform_mut(holder).unwrap().position = glam::Vec3::X * 100.0;
+    s.set_parent(crate_, Some(holder)).unwrap();
+    s.world.set_static(crate_, true);
+    let collider = crate::scene::authoring::defaults::default_collider();
+    s.world.set_collider(crate_, Some(collider));
+    s.update_all_colliders();
+    s.dont_destroy_on_load(crate_);
+
+    let survivors = s.load_survivors();
+    s.swap_in(to_scene_data(&level()), NO_SIDECAR, &survivors)
+        .unwrap();
+    let (min, max) = s.world.collider_bounds(crate_).unwrap();
+    assert!((min + max).abs().max_element() < 1e-4, "{min} {max}");
+    let nav = crate::navigation::NavigationGraph::from_scene(&s).bounds();
+    assert!(nav.min_x <= min.x && nav.max_x < 50.0, "{nav:?}");
+}

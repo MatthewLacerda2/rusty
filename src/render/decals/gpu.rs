@@ -41,7 +41,7 @@ impl Renderer {
     /// Upload the scene's decals, once per frame: load any new maps into the atlas,
     /// then write every record, oldest first (the FIFO order they blend in). Each
     /// decal draws at its pose this frame (#639): an owned one follows its owner
-    /// through the world-matrix store, which must already be refreshed, and one
+    /// through its world matrix (`World::local_to_world`, never stale), and one
     /// whose owner is inactive or that has faded out is left out.
     pub(crate) fn upload_decals(&mut self, scene: &Scene) {
         let material = |d: &Decal| resolve(&scene.materials, d);

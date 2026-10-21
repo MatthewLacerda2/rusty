@@ -54,7 +54,6 @@ fn register_shape<'scope>(
             if let Some(mut c) = scene.world.collider_mut(id) {
                 collider_ops::set_shape(&mut c, shape);
             }
-            scene.update_entity_collider(id);
             Ok(())
         }),
     )

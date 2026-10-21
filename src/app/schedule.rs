@@ -91,6 +91,12 @@ impl Schedule {
                 None => (entry.run)(world, res),
             }
         }
+        // The stage's Transform writes queued their colliders' AABBs: store them once
+        // here, for the readers of the stored box. `World::collider_bounds` never
+        // depends on it, so a scene borrowed elsewhere just waits for the next stage.
+        if let Ok(mut scene) = world.scene.try_borrow_mut() {
+            scene.world.flush_bounds();
+        }
     }
 }
 

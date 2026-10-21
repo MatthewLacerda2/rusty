@@ -1,7 +1,7 @@
 //! src/api/transform.rs — `Transform` namespace.
 //!
-//! Get/Set position, rotation (euler), scale, and `MoveTowards`. Mutations route
-//! through `Scene::update_entity_collider` so a moved entity's collider tracks it.
+//! Get/Set position, rotation (euler), scale, and `MoveTowards`. A write moves the
+//! entity's subtree, colliders included (`ecs::world_space`, #1157).
 
 use std::cell::RefCell;
 
@@ -29,7 +29,7 @@ pub fn register<'scope>(
         .map_err(|e| e.to_string())
 }
 
-/// `GetPosition` / `SetPosition` (set re-syncs the entity's collider).
+/// `GetPosition` / `SetPosition`.
 fn register_position<'scope>(
     scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
@@ -56,13 +56,12 @@ fn register_position<'scope>(
             if let Some(mut t) = scene.world.transform_mut(id) {
                 t.position = Vec3::new(x, y, z);
             }
-            scene.update_entity_collider(id);
             Ok(())
         }),
     )
 }
 
-/// `GetRotation` / `SetRotation` over euler angles (set re-syncs the collider).
+/// `GetRotation` / `SetRotation` over euler angles.
 fn register_rotation<'scope>(
     scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
@@ -89,13 +88,12 @@ fn register_rotation<'scope>(
             if let Some(mut t) = scene.world.transform_mut(id) {
                 t.set_euler_angles(Vec3::new(x, y, z));
             }
-            scene.update_entity_collider(id);
             Ok(())
         }),
     )
 }
 
-/// `GetScale` / `SetScale` (set re-syncs the entity's collider).
+/// `GetScale` / `SetScale`.
 fn register_scale<'scope>(
     scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
@@ -122,7 +120,6 @@ fn register_scale<'scope>(
             if let Some(mut t) = scene.world.transform_mut(id) {
                 t.scale = Vec3::new(x, y, z);
             }
-            scene.update_entity_collider(id);
             Ok(())
         }),
     )
@@ -144,7 +141,6 @@ fn register_move_towards<'scope>(
             if let Some(mut t) = scene.world.transform_mut(id) {
                 t.position = t.position.move_towards(Vec3::new(tx, ty, tz), step);
             }
-            scene.update_entity_collider(id);
             Ok(())
         }),
     )

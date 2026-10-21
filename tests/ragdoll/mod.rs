@@ -6,6 +6,7 @@
 mod fall;
 mod ik;
 mod mirrored;
+mod own_mirror;
 mod rig;
 mod switch;
 

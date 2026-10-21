@@ -1,3 +1,5 @@
+#[cfg(test)]
+mod bounds_tests;
 mod changed;
 mod link;
 pub use link::complete_off_mesh_link;

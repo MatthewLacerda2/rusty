@@ -28,10 +28,9 @@ impl PendingEdits {
             }
         }
         if let Some(new_parent) = self.parent_change {
-            // A reparent moves the entity and its subtree in world space: refresh
-            // their collider bounds (#992), as a gizmo drag refreshes the one it moves.
+            // A reparent moves the subtree in world space; the write queues its
+            // collider bounds itself (#992, `ecs::world_space::bounds`).
             if scene.set_parent(id, new_parent).is_ok() {
-                scene.update_all_colliders();
                 editor.is_dirty = true;
             }
         }

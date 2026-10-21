@@ -103,8 +103,10 @@ fn stored_bounds_hold_a_turned_shape() {
 
 #[test]
 fn a_turned_child_reads_its_parents_scale_as_physics_does() {
-    // Parent (1,1,3), child turned 90° about Y: physics gives an X capsule radius
-    // 0.5·3 = 1.5 and length 6 along world Z. Splitting the product matrix said ±0.5.
+    // Parent (1,1,3), child turned 90° about Y: the child's X lies along world Z,
+    // which the parent stretches 3×, so the drawn capsule is 6·3 = 18 long along
+    // world Z with radius 0.5 (#1156). Reading the parent's scale in the child's
+    // own axes once said length 6 and radius 1.5.
     let mut scene = Scene::new();
     let parent = scene.add_entity("P".to_string());
     scene.world.transform_mut(parent).unwrap().scale = Vec3::new(1.0, 1.0, 3.0);
@@ -118,14 +120,14 @@ fn a_turned_child_reads_its_parents_scale_as_physics_does() {
     let ((min, max), _) = bounds(&scene, id);
     let centre = Vec3::new(4.0, -1.0, 6.0);
     assert!(
-        (max - centre - Vec3::new(1.5, 1.5, 3.0))
+        (max - centre - Vec3::new(0.5, 0.5, 9.0))
             .abs()
             .max_element()
             < 1e-4,
         "{max}"
     );
     assert!(
-        (min - centre + Vec3::new(1.5, 1.5, 3.0))
+        (min - centre + Vec3::new(0.5, 0.5, 9.0))
             .abs()
             .max_element()
             < 1e-4,

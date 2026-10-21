@@ -109,7 +109,6 @@ impl Scene {
                 aabb_max: Vec3::ZERO,
             }),
         );
-        self.update_entity_collider(id);
         id
     }
 

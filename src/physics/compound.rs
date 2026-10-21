@@ -11,10 +11,8 @@
 //! offset by its pose relative to the ancestor. With no such ancestor the entity is
 //! its own body, as before: static, or an implicit kinematic one.
 //!
-//! **Freshness.** Poses come from the live parent walk
-//! ([`Scene::compute_world_matrix`]), not the per-frame render cache: physics runs
-//! mid-tick, after scripts have written transforms the cache has not seen yet
-//! (see `scene/world_cache.rs`'s freshness contract).
+//! **Freshness.** Poses come from the ECS's world store (`ecs::world_space`), which a
+//! read cleans parents first, so a transform a script wrote this tick is seen.
 //!
 //! **Determinism.** The plan is a `BTreeMap` keyed by owner id, and each owner's
 //! colliders keep the ECS insertion order, so bodies and colliders are built — and
@@ -24,7 +22,6 @@ use std::collections::BTreeMap;
 
 use glam::{Quat, Vec3};
 
-use crate::components::transform::local_rotation;
 use crate::scene::Scene;
 
 /// The body layout the scene implies: body-owner entity id → the collider
@@ -68,8 +65,8 @@ pub(super) fn plan(scene: &Scene) -> BodyPlan {
     plan
 }
 
-/// `id`'s world pose from the live parent walk ([`crate::ecs::World::world_pose`],
-/// the pose its collider's world AABB reads too, #1140). A mirroring parent's
+/// `id`'s world pose ([`crate::ecs::World::world_pose`], the pose its collider's
+/// world AABB reads too, #1140). A mirroring parent's
 /// reflection stays in `scale` and the rotation is seen through it
 /// ([`crate::components::transform::world_rotation`], #1119), so `rot` × `scale`
 /// is the entity's world matrix. A root entity reads its `Transform` verbatim, so
@@ -81,14 +78,11 @@ pub(super) fn world_pose(scene: &Scene, id: u32) -> Option<WorldPose> {
 
 /// Convert a world pose into `id`'s local `Transform` position/rotation — the
 /// inverse of [`world_pose`], used to write a solved body back under its parent.
+/// Under a singular parent the position stays as it was (#1164).
 pub(super) fn world_to_local(scene: &Scene, id: u32, pos: Vec3, rot: Quat) -> (Vec3, Quat) {
-    let Some(parent) = scene.world.parent_id(id) else {
-        return (pos, rot);
-    };
-    let parent_mat = scene.compute_world_matrix(parent);
     (
-        parent_mat.inverse().transform_point3(pos),
-        local_rotation(parent_mat, rot),
+        scene.world.local_position_for(id, pos),
+        scene.world.local_rotation_for(id, rot),
     )
 }
 

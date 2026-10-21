@@ -72,10 +72,7 @@ pub(super) fn static_collider_ids(scene: &Scene) -> impl Iterator<Item = u32> + 
 
 /// World AABBs of the bake's static colliders.
 fn static_aabbs(scene: &Scene) -> impl Iterator<Item = (Vec3, Vec3)> + '_ {
-    static_collider_ids(scene).filter_map(move |id| {
-        let col = scene.world.collider(id)?;
-        Some((col.aabb_min, col.aabb_max))
-    })
+    static_collider_ids(scene).filter_map(move |id| scene.world.collider_bounds(id))
 }
 
 /// The XZ extent of the scene's static geometry, `None` when there is none.

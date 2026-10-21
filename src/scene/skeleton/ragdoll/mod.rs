@@ -71,7 +71,7 @@ impl Scene {
             .map(|&b| self.hitbox_of(b).map(|h| self.collider_volume(h)))
             .collect();
         let total: f32 = volumes.iter().flatten().sum::<f32>().max(f32::EPSILON);
-        let owner_rot = self.world_rotation(owner);
+        let owner_axes = self.front_and_side(owner);
         let mut made = Vec::new();
         for (slot, &bone) in bones.iter().enumerate() {
             let Some(volume) = volumes[slot] else {
@@ -95,9 +95,15 @@ impl Scene {
             }
             let joint = up.map(|p| {
                 let dir = self.bone_direction(&bones, &parents, slot);
-                let mut j = joint_from(preset_for(&names[slot]), dir, owner_rot);
+                let mut j = joint_from(preset_for(&names[slot]), dir, owner_axes);
                 j.connected_body = Some(bones[p]);
-                local_axes(&mut j, self.world_rotation(bone), self.mirror(bone));
+                let (rot, mirror) = self
+                    .world
+                    .world_pose(bone)
+                    .map_or((Quat::IDENTITY, Vec3::ONE), |pose| {
+                        (pose.rot, transform::mirror(pose.scale))
+                    });
+                local_axes(&mut j, rot, mirror);
                 j
             });
             self.world.set_joint(bone, joint);
@@ -140,7 +146,7 @@ impl Scene {
     /// The world direction bone `slot` points: toward the mean of its child
     /// bones, or on from its parent when it has none.
     fn bone_direction(&self, bones: &[u32], parents: &[Option<usize>], slot: usize) -> Vec3 {
-        let at = |s: usize| self.compute_world_matrix(bones[s]).w_axis.truncate();
+        let at = |s: usize| self.world.world_position(bones[s]);
         let children: Vec<Vec3> = (0..bones.len())
             .filter(|&c| parents[c] == Some(slot))
             .map(at)
@@ -153,29 +159,20 @@ impl Scene {
         dir.try_normalize().unwrap_or(Vec3::Y)
     }
 
-    /// `id`'s world rotation as its body gets it (`physics::compound`), so a
-    /// joint's local axes sit in the frame physics moves (#1119).
-    fn world_rotation(&self, id: u32) -> Quat {
-        self.world.transform(id).map_or(Quat::IDENTITY, |t| {
-            transform::world_rotation(self.world.parent_world_matrix(id), t.rotation)
-        })
-    }
-
-    /// The reflection `id`'s signed world scale carries (#1125).
-    fn mirror(&self, id: u32) -> Vec3 {
-        self.world.transform(id).map_or(Vec3::ONE, |t| {
-            let scale = transform::world_scale(self.world.parent_world_matrix(id), t.scale);
-            transform::mirror(scale)
-        })
+    /// `owner`'s front and side (its +Z and +X) as drawn, through its own mirror
+    /// (#1145).
+    fn front_and_side(&self, owner: u32) -> (Vec3, Vec3) {
+        let w = &self.world;
+        (
+            w.transform_direction(owner, Vec3::Z),
+            w.transform_direction(owner, Vec3::X),
+        )
     }
 
     /// A collider's volume at its world scale — what its share of the mass is
     /// weighed by.
     fn collider_volume(&self, id: u32) -> f32 {
-        let scale = self
-            .compute_world_matrix(id)
-            .to_scale_rotation_translation()
-            .0;
+        let scale = self.world.lossy_scale(id);
         let pi = std::f32::consts::PI;
         let local = match self.world.collider(id).map(|c| c.shape.clone()) {
             Some(ColliderShape::Box { size }) => size.x * size.y * size.z,
@@ -192,18 +189,14 @@ impl Scene {
 }
 
 /// A `Joint` in world terms from `p`: its axis is the one the bone (pointing
-/// `dir`) flexes about toward `p.bend` in the character's frame (`owner_rot`), its
-/// swing axis that bend direction.
-fn joint_from(p: JointPreset, dir: Vec3, owner_rot: Quat) -> JointComponent {
-    let bend = owner_rot
-        * match p.bend {
-            Bend::Forward => Vec3::Z,
-            Bend::Backward => -Vec3::Z,
-        };
-    let axis = dir
-        .cross(bend)
-        .try_normalize()
-        .unwrap_or(owner_rot * Vec3::X);
+/// `dir`) flexes about toward `p.bend` in the character's frame (`(front, side)`,
+/// its drawn +Z and +X), its swing axis that bend direction.
+fn joint_from(p: JointPreset, dir: Vec3, (front, side): (Vec3, Vec3)) -> JointComponent {
+    let bend = match p.bend {
+        Bend::Forward => front,
+        Bend::Backward => -front,
+    };
+    let axis = dir.cross(bend).try_normalize().unwrap_or(side);
     JointComponent {
         kind: p.kind,
         axis,

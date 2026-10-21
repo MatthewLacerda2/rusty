@@ -63,7 +63,7 @@ pub fn begin_drag(origin: Vec3, ray: Ray, pick_radius: f32) -> Option<GizmoDrag>
 
 /// Advance a drag for the current pick `ray`: translate `entity_id` along the grabbed
 /// axis by the change in the along-axis scalar, writing through the inspector's
-/// transform-mutation path (set position + refresh collider). Returns whether the
+/// transform-mutation path (the write queues the collider refresh). Returns whether the
 /// entity moved, so the caller can flag the scene dirty.
 pub fn drag(
     scene: &mut Scene,
@@ -87,8 +87,6 @@ pub fn drag(
     // along the world axis projected by the unchanged local basis, matching how the
     // inspector edits the same `position` field.
     transform.position += axis * delta;
-    drop(transform);
-    scene.update_entity_collider(entity_id);
     true
 }
 

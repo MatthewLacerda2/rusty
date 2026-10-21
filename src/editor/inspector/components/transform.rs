@@ -2,7 +2,6 @@ use crate::editor::widgets::DragRange;
 use egui_phosphor::regular as icon;
 
 use crate::editor::inspector::components::card::component_card;
-use crate::scene::authoring::collider as collider_ops;
 
 /// Transform editor with integrated parenting controls.
 #[expect(
@@ -53,12 +52,8 @@ fn draw_body(
     let scl_changed = draw_scale(ui, &mut trans);
     drop(trans);
 
+    // Dropping the guard moved the subtree, colliders included (#1157).
     if pos_changed || rot_changed || scl_changed {
-        if let Some(pose) = world.world_pose(id) {
-            if let Some(mut col) = world.collider_mut(id) {
-                collider_ops::refresh_aabb(&mut col, pose);
-            }
-        }
         *is_dirty = true;
     }
 

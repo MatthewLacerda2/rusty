@@ -161,10 +161,7 @@ impl Field {
             Self::Fov => write!(camera_mut, |c| camera::set_fov(c, v.x)),
             Self::Volume => write!(audio_mut, |c| audio::set_volume(c, v.x)),
         };
-        // A moved transform drags its collider along, as `Transform.Set*` does.
-        if written && matches!(self, Self::Position | Self::Rotation | Self::Scale) {
-            scene.update_entity_collider(id);
-        }
+        // A moved transform drags its subtree's colliders along (`ecs::world_space`).
         written
     }
 }

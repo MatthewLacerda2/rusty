@@ -19,6 +19,7 @@ mod point_queries;
 mod raycast;
 mod sandbox;
 mod spatial;
+mod subtree_bounds;
 mod through;
 mod timer_errors;
 mod timers;

@@ -17,7 +17,6 @@ use crate::scene::collision_matrix::CollisionMatrix;
 use crate::scene::identity::SceneId;
 use crate::scene::layers::LayerRegistry;
 use crate::scene::nav_settings::NavMeshSettings;
-use crate::scene::world_cache::WorldMatrixCache;
 
 // Re-export the component types so the many existing `scene::…Component` paths
 // resolve. The structs themselves live in `crate::components`.
@@ -120,12 +119,6 @@ pub struct Scene {
     /// it keeps running at time scale 0, so a paused menu still animates. Written by
     /// the tick; `0` outside Play. Never serialized.
     pub ui_time: f32,
-    /// Authoritative per-frame world-matrix store (#331): filled O(N) once per frame in
-    /// hierarchy order, then read by every render-frame consumer (the forward pass, both
-    /// shadow collects, and #330's frustum culling) instead of each walking the parent
-    /// chain itself. Not serialized — it is derived, per-frame runtime state. See
-    /// `world_cache.rs` for the fill algorithm and the freshness contract.
-    pub(crate) world_cache: WorldMatrixCache,
     /// Per-entity runtime shader-param overrides (#670). Runtime-only, never serialized.
     pub shader_overrides: crate::scene::shader_overrides::ShaderOverrides,
 }
@@ -154,7 +147,6 @@ impl Default for Scene {
             persistent: std::collections::BTreeSet::new(),
             shader_time: 0.0,
             ui_time: 0.0,
-            world_cache: WorldMatrixCache::default(),
             shader_overrides: Default::default(),
         }
     }
@@ -235,9 +227,14 @@ impl Scene {
             }
         }
 
-        // 2. Clear old parent's children list
+        // 2. Validate everything before touching a link, so a failed call changes
+        // nothing: a child dropped from its old parent's `children` while keeping its
+        // `parent_id` is a one-sided link the world store never dirties again.
         if !self.world.contains(entity_id) {
             return Err("Entity not found.".to_string());
+        }
+        if parent_id.is_some_and(|p| !self.world.contains(p)) {
+            return Err("Parent entity not found.".to_string());
         }
         if let Some(old_p) = self.world.parent_id(entity_id) {
             self.world.remove_child(old_p, entity_id);
@@ -245,14 +242,12 @@ impl Scene {
 
         // 3. Set new parent and update children list
         if let Some(new_p) = parent_id {
-            if !self.world.add_child(new_p, entity_id) {
-                return Err("Parent entity not found.".to_string());
-            }
+            self.world.add_child(new_p, entity_id);
         }
 
+        // The local transform is kept, so the subtree moves in world space (#1067):
+        // the parent write re-derives its world matrices and collider AABBs.
         self.world.set_parent_id(entity_id, parent_id);
-        // The local transform is kept, so the subtree moved in world space (#1067).
-        self.update_subtree_colliders(entity_id);
 
         Ok(())
     }

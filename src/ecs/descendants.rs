@@ -8,6 +8,7 @@
 
 use std::collections::BTreeSet;
 
+use super::bundle::Core;
 use super::world::World;
 
 /// A pre-order walk of a subtree, children in their declared order. Built by
@@ -38,6 +39,14 @@ impl<F: FnMut(u32) -> bool> Iterator for Descendants<'_, F> {
 }
 
 impl World {
+    /// Push `id`'s child ids onto `out`, allocating nothing once `out` is warm: the
+    /// world store's dirty walk, which bounds itself (`world_space::store`).
+    pub(in crate::ecs) fn push_children(&self, id: u32, out: &mut Vec<u32>) {
+        if let Some(core) = self.component::<Core>(id) {
+            out.extend_from_slice(&core.children);
+        }
+    }
+
     /// `id`, then every descendant, pre-order in declared child order; nothing for a
     /// dead id. See the module note for what a malformed hierarchy does.
     pub fn self_and_descendants(&self, id: u32) -> Descendants<'_, fn(u32) -> bool> {

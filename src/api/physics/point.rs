@@ -73,8 +73,9 @@ fn register_contains<'scope>(
 }
 
 /// `GetBounds` — `(found, min_x, min_y, min_z, max_x, max_y, max_z)`: the
-/// collider's cached world-space AABB, recomputed by the scene on transform
-/// edits, load, and each physics step. found=false ⇒ the entity has no
+/// collider's world-space AABB, never stale (`World::collider_bounds`): current
+/// the moment a Transform on it or above it moves, or the collider is set or
+/// reshaped. found=false ⇒ the entity has no
 /// collider component and the six extents are 0.
 fn register_bounds<'scope>(
     scope: &'scope mlua::Scope<'scope, '_>,
@@ -86,7 +87,7 @@ fn register_bounds<'scope>(
         "GetBounds",
         scope.create_function(|_, id: u32| {
             let scene = scene.borrow();
-            let bounds = scene.world.collider(id).map(|c| (c.aabb_min, c.aabb_max));
+            let bounds = scene.world.collider_bounds(id);
             Ok(match bounds {
                 Some((min, max)) => (true, min.x, min.y, min.z, max.x, max.y, max.z),
                 None => (false, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0),

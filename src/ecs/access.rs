@@ -25,8 +25,8 @@ use crate::components::ReverbZoneComponent;
 use crate::components::ShapeComponent;
 use crate::components::{
     AnimatorComponent, AudioSourceComponent, CameraComponent, CanvasComponent,
-    CanvasGroupComponent, ColliderComponent, ImageComponent, LayoutElementComponent,
-    LayoutGroupComponent, LightComponent, MaterialComponent, MeshComponent, NavMeshAgentComponent,
+    CanvasGroupComponent, ImageComponent, LayoutElementComponent, LayoutGroupComponent,
+    LightComponent, MaterialComponent, MeshComponent, NavMeshAgentComponent,
     ParticleEmitterComponent, PrefabLink, RectMaskComponent, RectTransformComponent,
     RigidBodyComponent, SelectableComponent, TextComponent, VisualCorrectionComponent,
 };
@@ -126,7 +126,6 @@ optional_component_accessors! {
     MaterialComponent => material, material_mut, has_material, set_material, take_material, ids_with_material;
     AnimatorComponent => animator, animator_mut, has_animator, set_animator, take_animator, ids_with_animator;
     LightComponent => light, light_mut, has_light, set_light, take_light, ids_with_light;
-    ColliderComponent => collider, collider_mut, has_collider, set_collider, take_collider, ids_with_collider;
     RigidBodyComponent => rigidbody, rigidbody_mut, has_rigidbody, set_rigidbody, take_rigidbody, ids_with_rigidbody;
     NavMeshAgentComponent => nav_agent, nav_agent_mut, has_nav_agent, set_nav_agent, take_nav_agent, ids_with_nav_agent;
     NavMeshObstacleComponent => nav_obstacle, nav_obstacle_mut, has_nav_obstacle, set_nav_obstacle, take_nav_obstacle, ids_with_nav_obstacle;

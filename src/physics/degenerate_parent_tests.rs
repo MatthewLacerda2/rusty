@@ -1,7 +1,9 @@
 //! src/physics/degenerate_parent_tests.rs — a collider under a zero-scaled
 //! ancestor (#1140). glam splits a zero axis into a NaN rotation; the pose
 //! physics and the stored AABB share must stay finite, and so must the scene
-//! that saves it (NaN serializes as `null`, which then fails to load).
+//! that saves it (NaN serializes as `null`, which then fails to load). A body's
+//! write-back under such a parent keeps the local position it cannot solve for
+//! (#1164).
 
 use std::f32::consts::FRAC_PI_2;
 
@@ -12,6 +14,7 @@ use super::compound::world_pose;
 use super::shape::build::build_shape;
 use super::PhysicsWorld;
 use crate::components::{CapsuleAxis, ColliderComponent, ColliderShape};
+use crate::scene::authoring::defaults::default_rigidbody;
 use crate::scene::{apply_scene_data, to_scene_data, Scene};
 
 /// A capsule child, turned 90° about Z, under a parent scaled by `parent_scale`
@@ -75,4 +78,20 @@ fn a_scene_with_a_zero_scaled_parent_saves_and_reloads() {
         let c = restored.world.collider(id).unwrap();
         assert!(c.aabb_min.is_finite() && c.aabb_max.is_finite());
     }
+}
+
+#[test]
+fn a_body_under_a_zero_scaled_group_stays_finite_through_a_step_and_a_reload() {
+    let mut scene = Scene::new();
+    let id = child_under(&mut scene, Vec3::new(0.0, 1.0, 1.0));
+    scene.world.set_rigidbody(id, Some(default_rigidbody()));
+    let mut physics = PhysicsWorld::from_scene(&scene);
+    physics.step(&mut scene, 1.0 / 60.0);
+    assert!(scene.world.transform(id).unwrap().position.is_finite());
+
+    let json = serde_json::to_string(&to_scene_data(&scene)).unwrap();
+    let data = serde_json::from_str(&json).expect("the saved scene loads");
+    let mut restored = Scene::new();
+    apply_scene_data(&mut restored, data);
+    assert!(restored.world.transform(id).unwrap().position.is_finite());
 }
