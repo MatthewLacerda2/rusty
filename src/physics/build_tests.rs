@@ -91,8 +91,10 @@ fn sphere_bakes_radius_times_max_scale() {
 }
 
 #[test]
-fn cylinder_bakes_radius_x_and_half_height_y() {
-    // r = radius * scale.x = 2*3 = 6; half_h = height * scale.y * 0.5 = 10*4*0.5 = 20.
+fn cylinder_bakes_the_larger_cross_axis_radius_and_half_height_y() {
+    // Like a capsule, the radius follows the larger of scale.x and scale.z, so a
+    // collider never sits inside its drawn surface (#1131). Here x wins:
+    // r = radius * max(3, 1) = 2*3 = 6; half_h = height * scale.y * 0.5 = 10*4*0.5 = 20.
     let c = build_shape(
         &ColliderShape::Cylinder {
             radius: 2.0,

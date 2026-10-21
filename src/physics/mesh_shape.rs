@@ -9,14 +9,21 @@ use rapier3d::prelude::*;
 /// Build a trimesh or convex-hull collider from rest-pose mesh geometry (#77),
 /// baking the signed world scale into each point. A mirror (odd number of negative
 /// axes) would turn every triangle inside out, so it swaps two indices of each
-/// (#1124). `None` if the geometry is too sparse to form a valid shape.
+/// (#1124). `None`, with a warning, if the geometry is too sparse to form a valid
+/// shape: a hull needs 4 vertices, a trimesh one triangle (#1132).
 pub(super) fn build_mesh_shape(
     convex: bool,
     scale: Vec3,
     mesh: (&[[f32; 3]], &[u32]),
 ) -> Option<Collider> {
     let (positions, indices) = mesh;
-    if positions.len() < 4 {
+    let min_points = if convex { 4 } else { 3 };
+    if positions.len() < min_points {
+        log::warn!(
+            "mesh collider skipped: {} vertices, a {} needs {min_points}",
+            positions.len(),
+            if convex { "convex hull" } else { "trimesh" }
+        );
         return None;
     }
     let points: Vec<Vector> = positions
@@ -26,7 +33,11 @@ pub(super) fn build_mesh_shape(
 
     if convex {
         // A convex hull is the cheaper, dynamic-body-friendly option.
-        ColliderBuilder::convex_hull(&points).map(|b| b.build())
+        let hull = ColliderBuilder::convex_hull(&points).map(|b| b.build());
+        if hull.is_none() {
+            log::warn!("mesh collider skipped: the points form no convex hull");
+        }
+        hull
     } else {
         // An exact triangle mesh — static geometry only, but a tight fit.
         // Counted, not multiplied: a product of tiny axes can underflow to -0.0.
@@ -42,9 +53,11 @@ pub(super) fn build_mesh_shape(
             })
             .collect();
         if triangles.is_empty() {
+            log::warn!("mesh collider skipped: a trimesh needs at least one triangle");
             return None;
         }
         ColliderBuilder::trimesh(points, triangles)
+            .map_err(|e| log::warn!("mesh collider skipped: {e}"))
             .ok()
             .map(|b| b.build())
     }
