@@ -32,7 +32,23 @@ still a run in flight; a finished run keeps GitHub's own conclusion — once its
 jobs show the gate concluded. A run listed `completed` whose jobs do not (the
 gate unconcluded, not listed, or listed only for an older attempt) is in flight,
 not final ([`lagging`], #1095): the two listings are separate reads. Every
-caller asks one question of the jobs, [`gate_conclusion`].
+reading of "the gate concluded" is [`gate_conclusion`]; whether the jobs agree
+the run is over is the stricter [`agrees`], below.
+
+## A verdict needs every listing it reads to agree the run is over (#1182)
+
+The gate concluding is not enough either. On 2026-10-21 PR #1174's `lint` run
+was listed `completed success` and its `lint-gate` job `success`, but the jobs
+listing still showed the `lint` job `in_progress`, conclusion `null`, minutes
+after every one of its steps had finished: `decide.ran_something` saw no gated
+job succeed and the queue handed a green pull request back as "no run ran a
+gated job". That was the third patch to one root (#1095 the gate, #1109
+`runner_red`), so the rule is now one predicate over every job, [`agrees`]: a
+run listed `completed` is in flight while any job of its attempt is not
+`completed`, whichever job it is. A run only [`by_gate`] settled is the one
+exception, for its signals alone: they may still run (#555), but a gate or
+gated job still listed going is lag there too. The bound is the queue's
+deadline, and the hand-back then says what is still listed going ([`lag`]).
 """
 
 from __future__ import annotations
@@ -102,7 +118,8 @@ def by_gate(run: dict, jobs: dict[int, list[dict]], workflow: str) -> dict:
     (CLAUDE.md, *Gates vs. signals*), so an unfinished run is read as settled — status and conclusion
     both the gate's — the moment the gate concludes, and a signal still running
     or red changes nothing. The gate `needs:` every gated job, so a concluded
-    gate means they concluded too.
+    gate means they concluded too, though the jobs listing may not show it
+    yet: [`going`] still waits on a gated job listed going (#1182).
 
     A run whose jobs belong to a newer attempt than the run says is read as
     that attempt, unfinished ([`latest`], #881). Otherwise only an
@@ -117,8 +134,21 @@ def by_gate(run: dict, jobs: dict[int, list[dict]], workflow: str) -> dict:
         return run
     concluded = gate_conclusion(run, jobs, workflow)
     if concluded not in (None, "skipped"):
-        return {**run, "status": "completed", "conclusion": concluded}
+        return {**run, "status": "completed", "conclusion": concluded, BY_GATE: run.get("status")}
     return run
+
+
+# Marks a run [`by_gate`] settled rather than GitHub, holding the status the runs
+# listing gave it: [`agrees`] lets its signals run, and [`listed`] says what GitHub said.
+BY_GATE = "settled_by_gate"
+
+
+def listed(run: dict) -> str:
+    """How the runs listing shows `run`, in words: a run [`by_gate`] settled is
+    still listed going there, and its conclusion is only its gate's."""
+    if run.get(BY_GATE):
+        return f"is listed `{run[BY_GATE]}`, its gate concluded `{run.get('conclusion')}`"
+    return f"is listed `{run.get('status')}` `{run.get('conclusion')}`"
 
 
 def gate_jobs(run: dict, jobs: dict[int, list[dict]], workflow: str) -> list[dict]:
@@ -170,13 +200,17 @@ def by_gates(runs: list[dict], jobs: dict[int, list[dict]], workflow: str) -> li
 
 def signals(run: dict, jobs: dict[int, list[dict]], workflow: str) -> list[str]:
     """The jobs of `run` still going that its gate does not wait for (#555)."""
-    gate, gated = WORKFLOWS[workflow]
-    waited = {gate, "changes", *gated}
     return [
         j.get("name", "")
         for j in jobs.get(run.get("id"), [])
-        if j.get("conclusion") is None and base(j.get("name", "")) not in waited
+        if j.get("conclusion") is None and base(j.get("name", "")) not in waited(workflow)
     ]
+
+
+def waited(workflow: str) -> set[str]:
+    """The jobs `workflow`'s gate waits for: itself, `changes` and its gated jobs."""
+    gate, gated = WORKFLOWS[workflow]
+    return {gate, "changes", *gated}
 
 
 def live(runs: list[dict]) -> list[dict]:
@@ -204,9 +238,34 @@ def unfinished(runs: list[dict]) -> list[dict]:
     return [r for r in runs if r.get("status") != "completed"]
 
 
+def going(run: dict, jobs: dict[int, list[dict]], workflow: str) -> list[dict]:
+    """The jobs of `run`'s own attempt the jobs listing does not show `completed`
+    (#1182), its signals left out when only [`by_gate`] settled it (#555).
+
+    A job is going while its `status` is not `completed` or its conclusion is
+    `null`: GitHub sets both together, and a listing caught between them is lag.
+    """
+    ran = [j for j in jobs.get(run.get("id"), []) if attempt(j) >= attempt(run)]
+    listed = [j for j in ran if j.get("status", "completed") != "completed" or j.get("conclusion") is None]
+    if not run.get(BY_GATE):
+        return listed
+    return [j for j in listed if base(j.get("name", "")) in waited(workflow)]
+
+
+def agrees(run: dict, jobs: dict[int, list[dict]], workflow: str) -> bool:
+    """Whether `run`'s jobs listing agrees it is over: its gate concluded on the
+    run's own attempt and no job it waits for is still [`going`] (#1182).
+
+    The one predicate a verdict on a settled run reads its jobs through:
+    [`lagging`] for a pass or "nothing was built", and `runners.runner_red`
+    for whose red any failed run is, until the queue's grace is spent.
+    """
+    return gate_conclusion(run, jobs, workflow) is not None and not going(run, jobs, workflow)
+
+
 def lagging(runs: list[dict], jobs: dict[int, list[dict]], workflow: str) -> list[dict]:
-    """The runs listed `completed` and not failed whose own jobs do not yet show
-    their gate concluded (#1095).
+    """The runs listed `completed` and not failed whose own jobs do not yet
+    [`agree`](agrees) they are over (#1095, #1182).
 
     The runs listing and each run's jobs listing are separate reads, and either
     can be behind the other (#592 watched the runs listing flicker). On
@@ -214,19 +273,23 @@ def lagging(runs: list[dict], jobs: dict[int, list[dict]], workflow: str) -> lis
     runner, and the next poll handed it back as "no gated job ran"; the run
     finished green. A gate the jobs listing has not shown concluding, or not
     shown at all, is a run still going, whatever the runs listing says: only a
-    concluded gate makes "nothing was built" an answer. A failed run is already
-    an answer and is not asked about.
+    concluded gate makes "nothing was built" an answer, and only once no job
+    is listed still going (#1174's `lint`). A failed run is already an answer
+    here, and `runners.runner_red` asks the same of it.
     """
     settled = [r for r in runs if r.get("status") == "completed" and not failed_runs([r])]
-    return [r for r in settled if gate_conclusion(r, jobs, workflow) is None]
+    return [r for r in settled if not agrees(r, jobs, workflow)]
 
 
 def lag(run: dict, jobs: dict[int, list[dict]], workflow: str) -> str:
-    """What the jobs listing shows of a [`lagging`] run's gate, in words."""
+    """What the jobs listing shows of a run that does not [`agree`](agrees) it is over, in words."""
     gate = WORKFLOWS[workflow][0]
     listed = gate_jobs(run, jobs, workflow)
     if not listed:
         return f"no `{gate}` job is listed yet"
     if all(attempt(j) < attempt(run) for j in listed):
         return f"its jobs show `{gate}` only for attempt {max(attempt(j) for j in listed)}, not the run's {attempt(run)}"
-    return f"its jobs show `{gate}` still going"
+    if gate_conclusion(run, jobs, workflow) is None:
+        return f"its jobs show `{gate}` still going"
+    names = ", ".join(f"`{j.get('name')}`" for j in going(run, jobs, workflow))
+    return f"its jobs still show {names} going after `{gate}` concluded"

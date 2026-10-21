@@ -9,13 +9,16 @@ is GitHub's failure, not the branch's, so [`waiting.wait_for`] re-runs those run
 (`gh run rerun --failed`, [`rerun_step`]) and keeps waiting inside the same
 `--deadline`; only a second cancellation hands back, as [`outcomes.RUNNERS`]. A red with
 any job `failure` besides a gate is the code's, and hands back at once as ever.
-A red whose jobs do not yet show the gate concluded is neither: it waits
+A red whose jobs do not yet show it over (the gate unconcluded, or any job
+still listed going, #1182) is neither: it waits
 ([`verdict.runners.unread`], #1109), but only for [`GATE_SHOWS_SECONDS`] from
-when this wait first read it so. A run that failed before any job started (an
+when this wait first read it so. Past the grace its jobs are judged as listed
+([`expiry`]): an outage whose listing still shows a job going is re-run, and a
+run whose gate never showed concluding hands back FAILED, with its URL and what
+its jobs listing still shows. A run that failed before any job started (an
 invalid workflow file, say) never lists a gate; waited on to the deadline it
 was handed back as "Nothing is red", when it is red and, before #1109, was
-handed back on the first poll. Past the grace it is judged as listed: FAILED,
-with its URL.
+handed back on the first poll.
 """
 
 from __future__ import annotations
@@ -29,7 +32,7 @@ from merging.verdict import absent, decide, runlist, runners
 # consistent; after this, the silence is the answer ([`verdict.absent.no_run`]).
 RUN_APPEARS_SECONDS = 300
 
-# How long a run listed failed whose jobs do not show its gate concluded is read
+# How long a run listed failed whose jobs do not show it over is read
 # as the jobs listing lagging (#1109), from the poll that first read it so: as
 # long as a run is given to appear, since both are the same eventual consistency.
 GATE_SHOWS_SECONDS = RUN_APPEARS_SECONDS
@@ -97,7 +100,7 @@ def progress(
     The verdict is [`verdict.decide.judge`]; this adds what a polling loop needs and
     a one-shot check does not: *not yet* against *no*. A red whose code is to
     blame stops at once, and names that run even when another workflow's red
-    is still unread. A red whose jobs do not yet show the gate concluded waits
+    is still unread. A red whose jobs do not yet show it over waits
     [`GATE_SHOWS_SECONDS`] from the poll that first read it so (`red_since`,
     kept by the caller per run attempt, as `rerun` is), then stops as listed;
     any other red stops at once. A run in flight waits.
@@ -112,22 +115,23 @@ def progress(
         return outcomes.STOP, ["the pull request is a draft.", "CI does not check drafts. Mark it ready before queueing it."]
 
     sha = pull.get("headRefOid", "")
-    stalled = runners.outage(pull, runs, jobs)
+    expired = expiry(waited, red_since)
+    stalled = runners.outage(pull, runs, jobs, expired)
     if stalled:
         return rerun_step(stalled, rerun or {}, sha[:7])
-    unread = [(w, r) for w, r in runners.unread(pull, runs, jobs) if lagging(r, waited, red_since)]
+    unread = [(w, r) for w, r in runners.unread(pull, runs, jobs, expired) if lagging(r, waited, red_since)]
     if unread:
         workflow, run = unread[0]
         return outcomes.WAIT, [
-            f"a `{workflow}` run for {sha[:7]} is listed failed, but {runlist.lag(run, jobs, workflow)}.",
-            "Whether the runners or the code reddened it is not known until the gate shows (#1109). Waiting.",
+            f"a `{workflow}` run for {sha[:7]} {runlist.listed(run)}, but {runlist.lag(run, jobs, workflow)}.",
+            "Whether the runners or the code reddened it is not known until its jobs show it over (#1109, #1182). Waiting.",
         ]
     states = [
         decide.assess(pull, w, runlist.runs_for(runs, sha, w), jobs) for w in runlist.WORKFLOWS
     ]
     failed = [(w, lines) for w, (state, lines) in zip(runlist.WORKFLOWS, states) if state == decide.FAILED]
     if failed:
-        code = {w for w, _, red in runners.judged(pull, runs, jobs) if red is False}
+        code = {w for w, _, red in runners.judged(pull, runs, jobs, expired) if red is False}
         return outcomes.STOP, min(failed, key=lambda f: f[0] not in code)[1]
     for state, lines in states:
         if state == decide.RUNNING:
@@ -153,3 +157,10 @@ def lagging(run: dict, waited: float, red_since: dict[tuple[int, int], float] | 
     `red_since` (#1109). Without `red_since`, every poll is the first."""
     first = (red_since if red_since is not None else {}).setdefault((run.get("id"), runlist.attempt(run)), waited)
     return waited - first < GATE_SHOWS_SECONDS
+
+
+def expiry(waited: float, red_since: dict[tuple[int, int], float] | None) -> runners.Expired:
+    """Whether a red run's grace for its jobs listing to catch up is spent
+    ([`lagging`]): past it, [`verdict.runners.runner_red`] judges the jobs as
+    listed, so a lagging outage is still re-run (#869, #1182)."""
+    return lambda run: not lagging(run, waited, red_since)
