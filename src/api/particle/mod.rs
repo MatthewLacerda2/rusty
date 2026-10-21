@@ -47,14 +47,17 @@ fn register_emission<'scope>(
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
-    // Emit `count` particles at the entity's position, right now. Returns the
+    // Emit `count` particles at the entity's world position, right now. Returns the
     // number actually spawned (the max-particle cap may swallow some).
     put(
         table,
         "Emit",
         scope.create_function(|_, (id, count): (u32, u32)| {
             let mut scene = scene.borrow_mut();
-            let origin = scene.world.transform(id).map(|t| t.position);
+            let origin = scene
+                .world
+                .contains(id)
+                .then(|| scene.world.world_position(id));
             let spawned = origin.and_then(|origin| {
                 scene
                     .world
@@ -72,7 +75,10 @@ fn register_emission<'scope>(
         "Burst",
         scope.create_function(|_, id: u32| {
             let mut scene = scene.borrow_mut();
-            let origin = scene.world.transform(id).map(|t| t.position);
+            let origin = scene
+                .world
+                .contains(id)
+                .then(|| scene.world.world_position(id));
             let spawned = origin.and_then(|origin| {
                 scene.world.particles_mut(id).map(|mut p| {
                     let burst = p.burst_count;

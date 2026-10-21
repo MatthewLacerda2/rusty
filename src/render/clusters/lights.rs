@@ -3,7 +3,7 @@
 
 use glam::Vec3;
 
-use crate::components::{LightComponent, TransformComponent};
+use crate::components::LightComponent;
 use crate::scene::{LightType, Scene};
 
 /// `LocalLight::kind` for a point light (no cone).
@@ -36,19 +36,20 @@ pub(crate) struct LocalLight {
 }
 
 impl LocalLight {
-    /// The light's record, or `None` for a type that is not a local light.
-    pub(crate) fn new(transform: &TransformComponent, light: &LightComponent) -> Option<Self> {
+    /// The light's record at world `position`, shining along world `forward`, or
+    /// `None` for a type that is not a local light.
+    pub(crate) fn new(position: Vec3, forward: Vec3, light: &LightComponent) -> Option<Self> {
         let kind = match light.light_type {
             LightType::Point => KIND_POINT,
             LightType::Spotlight => KIND_SPOT,
             LightType::Ambient | LightType::Directional => return None,
         };
         Some(Self {
-            position: transform.position.to_array(),
+            position: position.to_array(),
             range: light.range.max(0.0),
             color: light.color.to_array(),
             intensity: light.intensity,
-            direction: (transform.rotation * Vec3::NEG_Z).normalize().to_array(),
+            direction: forward.normalize().to_array(),
             kind,
             inner_cone: light.inner_cone.to_radians().cos(),
             outer_cone: light.outer_cone.to_radians().cos(),
@@ -85,8 +86,13 @@ pub(crate) fn local_lights(scene: &Scene, capture: bool) -> Vec<(LocalLight, boo
             if !light.mode.renders_live(capture) {
                 return None;
             }
-            let transform = scene.world.transform(id)?;
-            Some((LocalLight::new(&transform, &light)?, light.cast_shadows))
+            // World space: a light on a child (a flashlight in a hand) lights
+            // where it is drawn (#1196).
+            let (at, forward) = (
+                scene.world.world_position(id),
+                scene.world.transform_direction(id, Vec3::NEG_Z),
+            );
+            Some((LocalLight::new(at, forward, &light)?, light.cast_shadows))
         })
         .collect()
 }

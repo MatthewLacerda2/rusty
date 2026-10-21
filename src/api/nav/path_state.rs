@@ -12,13 +12,10 @@ use super::query::path_table;
 use crate::navigation::{remaining_corners, remaining_distance, reset_path, NavigationGraph};
 use crate::scene::Scene;
 
-/// The entity's position, or the origin when it has no transform.
+/// The entity's world position, where the agent steers from (the origin for a dead
+/// id).
 fn position(scene: &Scene, id: u32) -> Vec3 {
-    scene
-        .world
-        .transform(id)
-        .map(|t| t.position)
-        .unwrap_or(Vec3::ZERO)
+    scene.world.world_position(id)
 }
 
 /// The read-only path state.

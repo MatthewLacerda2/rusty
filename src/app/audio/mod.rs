@@ -63,7 +63,7 @@ fn occlude_voices(world: &mut World, res: &mut Resources) {
     let scene = world.scene.borrow();
     let lookup = |id| {
         let source = scene.world.audio(id)?.clone();
-        Some((source, scene.world.transform(id)?.position))
+        Some((source, scene.world.world_position(id)))
     };
     res.audio.borrow_mut().occlude(listener, dt, lookup);
 }
@@ -123,7 +123,7 @@ pub(super) fn start_sources(world: &World, res: &Resources, admit: impl Fn(u32) 
                 if !src.play_on_start {
                     return None;
                 }
-                let p = scene.world.transform(id)?.position;
+                let p = scene.world.world_position(id);
                 Some((id, src.clone(), [p.x, p.y, p.z]))
             })
             .collect()

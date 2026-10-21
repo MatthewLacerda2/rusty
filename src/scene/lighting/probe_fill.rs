@@ -43,8 +43,7 @@ impl AnalyticEnv {
             if light.light_type == LightType::Directional {
                 // The light shines along -Z of its transform; the sample
                 // direction *toward* the source is the negation.
-                let rotation = scene.world.transform(id).expect("mandatory").rotation;
-                let forward = rotation * Vec3::NEG_Z;
+                let forward = scene.world.transform_direction(id, Vec3::NEG_Z);
                 sun_dir = Some((-forward).normalize_or_zero());
                 sun_radiance = light.color * light.intensity;
                 break;

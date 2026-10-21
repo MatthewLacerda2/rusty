@@ -122,8 +122,11 @@ impl BakeScene {
                 continue;
             }
             let light = scene.world.light(id).expect("id came from ids_with_light");
-            let t = scene.world.transform(id).expect("mandatory Transform");
-            let forward = (t.rotation * Vec3::NEG_Z)
+            // World space: a light on a child bakes where it is drawn (#1196).
+            let position = scene.world.world_position(id);
+            let forward = scene
+                .world
+                .transform_direction(id, Vec3::NEG_Z)
                 .try_normalize()
                 .unwrap_or(Vec3::NEG_Y);
             let shape = match light.light_type {
@@ -133,11 +136,11 @@ impl BakeScene {
                 }
                 LightType::Directional => LightShape::Directional { direction: forward },
                 LightType::Point => LightShape::Point {
-                    position: t.position,
+                    position,
                     range: light.range,
                 },
                 LightType::Spotlight => LightShape::Spot {
-                    position: t.position,
+                    position,
                     direction: forward,
                     range: light.range,
                     cos_inner: light.inner_cone.to_radians().cos(),

@@ -67,7 +67,6 @@ pub(crate) fn apply_scene_lights(
             continue;
         }
         let light = scene.world.light(id).expect("id came from ids_with_light");
-        let transform = scene.world.transform(id).expect("mandatory Transform");
         match light.light_type {
             LightType::Ambient => {
                 lighting_uniform.ambient = AmbientLightUniform {
@@ -77,7 +76,7 @@ pub(crate) fn apply_scene_lights(
             }
             LightType::Directional if light.mode.renders_live(capture) => {
                 dirs.push(DirectionalLightUniform {
-                    direction: (transform.rotation * Vec3::NEG_Z).to_array(),
+                    direction: scene.world.transform_direction(id, Vec3::NEG_Z).to_array(),
                     _pad1: 0.0,
                     color: light.color.to_array(),
                     intensity: light.intensity,

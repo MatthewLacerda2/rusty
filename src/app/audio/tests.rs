@@ -51,6 +51,21 @@ fn play_on_start_sources_auto_start_on_entering_play() {
 }
 
 #[test]
+fn a_parented_source_starts_at_its_world_position() {
+    let mut world = world_with_audio(true);
+    {
+        let mut scene = world.scene().borrow_mut();
+        let pivot = scene.add_entity("Pivot".to_string());
+        scene.world.transform_mut(pivot).unwrap().position = glam::Vec3::new(0.0, 0.0, 7.0);
+        scene.set_parent(1, Some(pivot)).unwrap();
+    }
+    world.set_playing(true);
+    world.tick(1.0 / 60.0);
+    let audio = world.resources.audio.borrow();
+    assert_eq!(audio.events().last().unwrap().position, [0.0, 0.0, 7.0]);
+}
+
+#[test]
 fn sources_without_play_on_start_stay_silent() {
     let mut world = world_with_audio(false);
     world.set_playing(true);

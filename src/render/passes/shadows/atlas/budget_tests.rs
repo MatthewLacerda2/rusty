@@ -2,10 +2,10 @@
 //! drops is never shaded, so it never wins tiles, and never counts as dropped from
 //! the atlas either.
 
-use glam::{Quat, Vec3};
+use glam::Vec3;
 
 use super::plan::{plan, AtlasPlan};
-use crate::components::{LightComponent, TransformComponent};
+use crate::components::LightComponent;
 use crate::render::clusters::{shadow_requests, ClusterGrid, LocalLight, MAX_VISIBLE_LIGHTS};
 use crate::scene::Camera;
 
@@ -16,11 +16,7 @@ const ASPECT: f32 = 16.0 / 9.0;
 const OVER: usize = 16;
 
 fn point(i: usize, color: Vec3, intensity: f32) -> LocalLight {
-    let transform = TransformComponent {
-        position: Vec3::new((i % 10) as f32 - 4.5, (i / 10) as f32 * 0.5 - 2.0, -8.0),
-        rotation: Quat::IDENTITY,
-        ..Default::default()
-    };
+    let at = Vec3::new((i % 10) as f32 - 4.5, (i / 10) as f32 * 0.5 - 2.0, -8.0);
     let light = LightComponent {
         color,
         intensity,
@@ -30,7 +26,7 @@ fn point(i: usize, color: Vec3, intensity: f32) -> LocalLight {
         cast_shadows: true,
         ..crate::scene::authoring::default_light()
     };
-    LocalLight::new(&transform, &light).expect("a local light")
+    LocalLight::new(at, Vec3::NEG_Z, &light).expect("a local light")
 }
 
 /// `MAX_VISIBLE_LIGHTS` white lights that the camera keeps (light 0 asks for no

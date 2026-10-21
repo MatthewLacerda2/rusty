@@ -1,11 +1,11 @@
 //! The atlas plan (#468): only lights that cast and reach the view get tiles, the
 //! most important first, tiles never overlap, and what does not fit is counted.
 
-use glam::{Quat, Vec3, Vec4};
+use glam::{Vec3, Vec4};
 
 use super::plan::{plan, AtlasPlan, MAX_TILE, MIN_TILE};
 use super::ATLAS_SIZE;
-use crate::components::{LightComponent, TransformComponent};
+use crate::components::LightComponent;
 use crate::render::clusters::LocalLight;
 use crate::scene::{Camera, LightType};
 
@@ -15,11 +15,6 @@ fn camera() -> Camera {
 }
 
 fn light(kind: LightType, at: Vec3, intensity: f32) -> LocalLight {
-    let transform = TransformComponent {
-        position: at,
-        rotation: Quat::IDENTITY,
-        ..Default::default()
-    };
     let light = LightComponent {
         light_type: kind,
         intensity,
@@ -29,7 +24,7 @@ fn light(kind: LightType, at: Vec3, intensity: f32) -> LocalLight {
         cast_shadows: true,
         ..crate::scene::authoring::default_light()
     };
-    LocalLight::new(&transform, &light).expect("a local light")
+    LocalLight::new(at, Vec3::NEG_Z, &light).expect("a local light")
 }
 
 fn plan_for(lights: &[(LocalLight, bool)]) -> AtlasPlan {
