@@ -33,7 +33,7 @@ fn round_shape_aabb_contains_its_rapier_shape_under_non_uniform_scale() {
                 .unwrap()
                 .shape()
                 .compute_aabb(&Pose::from_parts(pos, rot));
-            let (wmin, wmax) = (Vec3::from(want.mins), Vec3::from(want.maxs));
+            let (wmin, wmax) = (want.mins, want.maxs);
             let tol = if rot == Quat::IDENTITY {
                 1e-4
             } else {
