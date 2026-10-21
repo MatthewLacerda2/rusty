@@ -188,7 +188,7 @@ pub(super) fn body_state(scene: &Scene, id: u32) -> Option<EntityBodyState> {
 ///
 /// Returns `None` for a mesh collider whose geometry is missing or degenerate
 /// (too few vertices for a hull, or no triangles for a trimesh); the caller skips
-/// the body entirely in that case. `mesh` carries the entity's live rest-pose
+/// the body entirely in that case, after a warning (#1132). `mesh` carries the entity's live rest-pose
 /// positions + triangle indices, supplied only for [`ColliderShape::Mesh`].
 pub(super) fn build_shape(
     shape: &ColliderShape,
@@ -206,7 +206,8 @@ pub(super) fn build_shape(
             ColliderBuilder::ball(r).build()
         }
         ColliderShape::Cylinder { radius, height } => {
-            let r = (*radius * abs.x).max(1e-4);
+            // The larger cross axis, as a capsule's radius is (#1131).
+            let r = (*radius * abs.x.max(abs.z)).max(1e-4);
             let half_h = (*height * abs.y * 0.5).max(1e-4);
             ColliderBuilder::cylinder(half_h, r).build()
         }
