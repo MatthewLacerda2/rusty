@@ -24,7 +24,7 @@ from __future__ import annotations
 import os
 import tempfile
 
-from merging.queue import gitio
+from merging.queue import gitio, refusal
 from merging.verdict import changes
 
 
@@ -122,12 +122,10 @@ def advance(
                 # A push that landed before its reply was lost is refused on the
                 # retry, its lease now stale against itself: GitHub already
                 # holds exactly this head, so it is pushed.
-                if pushed.returncode != 0 and gitio.remote_head(branch, work) != fresh:
-                    return None, [
-                        f"the force-push of {branch} was refused: {pushed.stderr.strip()}",
-                        "The lease held the head this queue started from, so"
-                        " something else has pushed since. Handed back.",
-                    ]
+                if pushed.returncode != 0:
+                    now = gitio.remote_head(branch, work)
+                    if now != fresh:
+                        return None, refusal.explain(branch, pushed.stderr, fresh, held=now == head)
             return fresh, []
         finally:
             gitio.git("worktree", "remove", "--force", work, cwd=root)
