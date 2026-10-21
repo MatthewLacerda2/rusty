@@ -7,6 +7,7 @@ use super::cascades::MAX_CASCADES;
 use super::ShadowRenderer;
 use crate::render::gpu::layout_entries::{dynamic_uniform_entry, storage_entry, uniform_entry};
 use crate::render::gpu::mesh::vertex_layout;
+use crate::render::gpu::pipelines::LazyPipeline;
 
 /// The two cascade depth arrays and their views.
 pub(super) struct DepthTextures {
@@ -115,23 +116,33 @@ impl ShadowRenderer {
     }
 
     /// The plain depth-only pipeline and the clipping one (#648), both from the
-    /// forward `shader`'s shadow stage; the clip pipeline's layout adds the forward
-    /// pass's group-2 material layout to the two shadow groups.
+    /// forward `shader`'s shadow stage, then their mirrored twins (#1134), built on
+    /// first draw; the clip pipelines' layout adds the forward pass's group-2
+    /// material layout to the two shadow groups.
     pub(super) fn create_pipelines(
         device: &wgpu::Device,
         [global, entity, material]: [&wgpu::BindGroupLayout; 3],
         shader: &wgpu::ShaderModule,
-    ) -> [wgpu::RenderPipeline; 2] {
+    ) -> ([wgpu::RenderPipeline; 2], [LazyPipeline; 2]) {
         let plain = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Shadow Pipeline Layout"),
             bind_group_layouts: &[Some(global), Some(entity)],
             immediate_size: 0,
         });
         let clip = clip_layout(device, [global, entity, material]);
-        [
-            depth_pipeline(device, shader, &plain, None),
-            depth_pipeline(device, shader, &clip, Some("fs_shadow")),
-        ]
+        let mirrored = |layout: &wgpu::PipelineLayout, fragment: Option<&'static str>| {
+            let (shader, layout) = (shader.clone(), layout.clone());
+            LazyPipeline::new(device, move |device| {
+                depth_pipeline(device, &shader, &layout, fragment, true)
+            })
+        };
+        (
+            [
+                depth_pipeline(device, shader, &plain, None, false),
+                depth_pipeline(device, shader, &clip, Some("fs_shadow"), false),
+            ],
+            [mirrored(&plain, None), mirrored(&clip, Some("fs_shadow"))],
+        )
     }
 }
 
@@ -207,16 +218,23 @@ pub(crate) fn clip_layout(
 /// base (#665), and a single-sided `Plane` casts nothing. Acne on the lit faces now
 /// stored is held off by the sloped bias here plus the receiver's normal offset and
 /// depth bias (`sample_cascade` / `sample_local_shadow`).
+///
+/// A `mirrored` pipeline draws casters whose world matrix has a negative determinant
+/// (#1134): mirroring reverses a mesh's winding, so it takes clockwise triangles as
+/// front and still stores the lit side.
 pub(crate) fn depth_pipeline(
     device: &wgpu::Device,
     shader: &wgpu::ShaderModule,
     layout: &wgpu::PipelineLayout,
     fragment: Option<&str>,
+    mirrored: bool,
 ) -> wgpu::RenderPipeline {
     device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-        label: Some(match fragment {
-            None => "Shadow Render Pipeline",
-            Some(_) => "Shadow Clip Pipeline",
+        label: Some(match (fragment, mirrored) {
+            (None, false) => "Shadow Render Pipeline",
+            (None, true) => "Shadow Mirrored Pipeline",
+            (Some(_), false) => "Shadow Clip Pipeline",
+            (Some(_), true) => "Shadow Mirrored Clip Pipeline",
         }),
         layout: Some(layout),
         vertex: wgpu::VertexState {
@@ -233,7 +251,11 @@ pub(crate) fn depth_pipeline(
         }),
         primitive: wgpu::PrimitiveState {
             topology: wgpu::PrimitiveTopology::TriangleList,
-            front_face: wgpu::FrontFace::Ccw,
+            front_face: if mirrored {
+                wgpu::FrontFace::Cw
+            } else {
+                wgpu::FrontFace::Ccw
+            },
             cull_mode: Some(wgpu::Face::Back),
             ..Default::default()
         },

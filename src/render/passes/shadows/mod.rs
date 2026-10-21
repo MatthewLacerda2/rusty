@@ -20,6 +20,7 @@ mod sweeps;
 mod uniform;
 
 use crate::render::gpu::pipelines::surface::SurfaceShaders;
+use crate::render::gpu::pipelines::LazyPipeline;
 use crate::render::CameraUniform;
 use crate::scene::SceneId;
 use atlas::ShadowAtlas;
@@ -51,6 +52,8 @@ pub struct ShadowRenderer {
     time_buffer: wgpu::Buffer,
     /// A Cutout material's caster, alpha-tested through its material group (#648).
     clip_pipeline: wgpu::RenderPipeline,
+    /// `pipeline` and `clip_pipeline` for mirrored casters, winding flipped (#1134).
+    mirrored: [LazyPipeline; 2],
     light_space_buffer: wgpu::Buffer,
     /// This frame's cascades, fitted to the camera by [`Self::update_cascades`].
     pub(crate) cascades: Vec<Cascade>,
@@ -115,7 +118,7 @@ impl ShadowRenderer {
         let (global_layout, global_bind_group, entity_layout) =
             Self::create_pass_layouts(device, [&light_space_buffer, &time_buffer]);
         let layouts = [&global_layout, &entity_layout, material_layout];
-        let [pipeline, clip_pipeline] = Self::create_pipelines(device, layouts, shader);
+        let ([pipeline, clip_pipeline], mirrored) = Self::create_pipelines(device, layouts, shader);
         let static_casters = CasterBuffer::new(device, &entity_layout);
         let dynamic_casters = CasterBuffer::new(device, &entity_layout);
         let atlas_layouts = [&global_layout, &entity_layout];
@@ -131,6 +134,7 @@ impl ShadowRenderer {
             pipeline,
             time_buffer,
             clip_pipeline,
+            mirrored,
             light_space_buffer,
             cascades: Vec::new(),
             static_cache: [None; MAX_CASCADES],
@@ -157,18 +161,31 @@ impl ShadowRenderer {
     }
 
     /// The pipeline a run of casters draws with: plain depth, the cutout clip, or a
-    /// surface variant's cut (the cutout clip if that variant failed to build).
+    /// surface variant's cut (the cutout clip if that variant failed to build) — the
+    /// winding-flipped one of each for a `mirrored` run (#1134).
     fn pipeline_for<'a>(
         &'a self,
         surfaces: &'a SurfaceShaders,
         clip: Option<Clip>,
+        mirrored: bool,
     ) -> &'a wgpu::RenderPipeline {
-        match clip {
-            None => &self.pipeline,
-            Some(c) => surfaces
+        let [plain, clipped] = &self.mirrored;
+        match (clip, mirrored) {
+            (None, false) => &self.pipeline,
+            (None, true) => plain.get(),
+            (Some(c), false) => surfaces
                 .cut(c.pipeline)
                 .map_or(&self.clip_pipeline, |cut| &cut.shadow),
+            (Some(c), true) => surfaces
+                .cut(c.pipeline)
+                .map_or_else(|| clipped.get(), |cut| &cut.mirrored_shadow),
         }
+    }
+
+    /// The pipelines built on first draw: the mirrored casters' (#1134, #985).
+    pub(crate) fn lazy_pipelines(&self) -> [&LazyPipeline; 2] {
+        let [plain, clipped] = &self.mirrored;
+        [plain, clipped]
     }
 
     /// Whether some cascade's static bake is not `scene`'s: it holds another scene's
@@ -219,3 +236,6 @@ mod cutout_tests;
 
 #[cfg(test)]
 pub(super) mod contact_tests;
+
+#[cfg(test)]
+mod mirror_tests;

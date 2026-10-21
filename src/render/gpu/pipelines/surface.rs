@@ -54,12 +54,13 @@ pub(crate) struct SurfacePipelines {
     pub cut: Option<CutPipelines>,
 }
 
-/// A cutting variant's depth-only pipelines (#648).
+/// A cutting variant's depth-only pipelines (#648); the shadow ones go through the
+/// shadow pass's clip layout, `mirrored_shadow` with the winding flipped (#1134).
 pub(crate) struct CutPipelines {
     /// The SSAO prepass, through the forward layout.
     pub prepass: wgpu::RenderPipeline,
-    /// The shadow cascades, through the shadow pass's clip layout.
     pub shadow: wgpu::RenderPipeline,
+    pub mirrored_shadow: wgpu::RenderPipeline,
 }
 
 /// Which solids pass a batch is drawn in, carrying that pass's standard pipeline, so

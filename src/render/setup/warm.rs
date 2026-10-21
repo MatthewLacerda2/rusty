@@ -9,9 +9,9 @@ use crate::render::gpu::pipelines::LazyPipeline;
 use crate::render::Renderer;
 
 impl Renderer {
-    /// Build every lazy pipeline now: the translucent, particle, ribbon and
-    /// world-canvas ones always, the debug-line and selection-outline ones only with
-    /// `editor_overlays` (a shipped game draws neither).
+    /// Build every lazy pipeline now: the translucent, particle, ribbon, world-canvas
+    /// and mirrored-shadow ones always, the debug-line and selection-outline ones only
+    /// with `editor_overlays` (a shipped game draws neither).
     pub(crate) fn warm_pipelines(&self, editor_overlays: bool) {
         for pipeline in self.lazy_pipelines(editor_overlays) {
             pipeline.get();
@@ -25,6 +25,7 @@ impl Renderer {
         all.extend(self.particle_renderer.lazy_pipelines());
         all.extend(self.ribbon_renderer.lazy_pipelines());
         all.extend(self.ui_renderer.lazy_pipelines());
+        all.extend(self.shadow_renderer.lazy_pipelines());
         if editor_overlays {
             all.extend([&self.line_pipeline, &self.outline_pipeline]);
         }
