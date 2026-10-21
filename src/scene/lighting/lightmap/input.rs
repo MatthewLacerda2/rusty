@@ -86,7 +86,7 @@ impl BakeScene {
             if mesh.is_skinned() || mesh.indices.is_empty() {
                 continue;
             }
-            let matrix = scene.world_matrix(id);
+            let matrix = scene.world.local_to_world(id);
             let normal_matrix = matrix.inverse().transpose();
             let (albedo, emissive) = surface(material, map_average);
             out.meshes.push(BakeMesh {

@@ -17,7 +17,7 @@ impl Renderer {
         if !scene.world.contains(selected_id) {
             return axis_arrow_resources;
         }
-        let world_matrix = scene.compute_world_matrix(selected_id);
+        let world_matrix = scene.world.local_to_world(selected_id);
         let world_pos = world_matrix.col(3).truncate();
         let arrow_model_matrix = Mat4::from_translation(world_pos);
 

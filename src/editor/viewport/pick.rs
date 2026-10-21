@@ -7,7 +7,7 @@
 //! selection overlay light up identically. Kept egui-free (pure glam) so the math is
 //! testable and the `wgpu`/`egui` layers stay decoupled.
 
-use glam::{Mat4, Vec3};
+use glam::Vec3;
 
 use crate::scene::Camera;
 use crate::scene::Scene;
@@ -57,7 +57,7 @@ pub fn pick_entity(scene: &Scene, ray: Ray) -> Option<(u32, f32)> {
             continue;
         }
         let mesh = scene.world.mesh(id).expect("id came from ids_with_mesh");
-        let world = scene.compute_world_matrix(id);
+        let world = scene.world.local_to_world(id);
         let Some((min, max)) = mesh.world_aabb(world) else {
             continue;
         };
@@ -87,17 +87,13 @@ fn ray_aabb(ray: Ray, min: Vec3, max: Vec3) -> Option<f32> {
     }
 }
 
-/// The world-space position of `entity_id` (its world matrix's translation), used to
+/// The world-space position of `entity_id`, used to
 /// anchor the move gizmo. `None` when the entity is gone.
 pub fn entity_world_position(scene: &Scene, entity_id: u32) -> Option<Vec3> {
     if !scene.world.contains(entity_id) {
         return None;
     }
-    Some(world_translation(scene.compute_world_matrix(entity_id)))
-}
-
-fn world_translation(m: Mat4) -> Vec3 {
-    m.col(3).truncate()
+    Some(scene.world.world_position(entity_id))
 }
 
 #[cfg(test)]

@@ -70,7 +70,7 @@ fn pushed(push: Vec3, frames: usize) -> (Scene, PhysicsWorld, Vec<(String, u32)>
 fn a_mirrored_limb_turns_the_way_its_body_does() {
     let (scene, world, hitboxes) = pushed(Vec3::new(0.8, 0.5, -1.5), 30);
     for (name, hitbox) in hitboxes {
-        let centre = scene.compute_world_matrix(hitbox).w_axis.truncate();
+        let centre = scene.world.world_position(hitbox);
         assert_eq!(
             world.collider_contains_point(hitbox, centre),
             Some(true),
@@ -81,7 +81,7 @@ fn a_mirrored_limb_turns_the_way_its_body_does() {
 
 #[test]
 fn the_first_physics_frame_keeps_a_mirrored_limbs_world_pose() {
-    let at = |s: &Scene, id: u32| s.compute_world_matrix(id).w_axis.truncate();
+    let at = |s: &Scene, id: u32| s.world.world_position(id);
     let (before, _, hitboxes) = pushed(Vec3::ZERO, 0);
     let (after, world, _) = pushed(Vec3::ZERO, 1);
     for (name, hitbox) in hitboxes {

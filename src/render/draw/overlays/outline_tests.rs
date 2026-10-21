@@ -29,7 +29,10 @@ fn selected_child(mirrored: bool) -> (Scene, Vec3) {
     (t.position, t.scale) = (Vec3::new(0.0, 0.0, 1.5), Vec3::new(sign, 1.0, 1.0));
     drop(t);
     scene.selected_entity_id = Some(child);
-    let centre = scene.world_matrix(child).transform_point3(Vec3::ZERO);
+    let centre = scene
+        .world
+        .local_to_world(child)
+        .transform_point3(Vec3::ZERO);
     (scene, centre)
 }
 

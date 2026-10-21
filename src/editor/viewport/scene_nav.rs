@@ -120,13 +120,13 @@ pub fn selection_bounds(scene: &Scene, id: u32) -> Option<(Vec3, f32)> {
         if !scene.world.is_active(next) {
             continue;
         }
-        if let Some((lo, hi)) = mesh.world_aabb(scene.compute_world_matrix(next)) {
+        if let Some((lo, hi)) = mesh.world_aabb(scene.world.local_to_world(next)) {
             bounds = Some(bounds.map_or((lo, hi), |(a, b)| (a.min(lo), b.max(hi))));
         }
     }
     Some(match bounds {
         Some((lo, hi)) => ((lo + hi) * 0.5, (hi - lo).length() * 0.5),
-        None => (scene.compute_world_matrix(id).col(3).truncate(), 1.0),
+        None => (scene.world.world_position(id), 1.0),
     })
 }
 

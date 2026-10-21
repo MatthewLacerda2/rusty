@@ -34,7 +34,7 @@ impl Scene {
         if bones.is_empty() || bones.len() != skin.inverse_bind.len() {
             return None;
         }
-        let owner_inverse = self.compute_world_matrix(owner).inverse();
+        let owner_inverse = self.world.local_to_world(owner).inverse();
         let mut in_mesh: Vec<Mat4> = Vec::with_capacity(bones.len());
         for (slot, &bone) in bones.iter().enumerate() {
             let (local, parent) = self.world.local_and_parent(bone)?;
@@ -42,7 +42,7 @@ impl Scene {
             let m = match (parent, parent_slot) {
                 (Some(p), _) if p == owner => local,
                 (Some(p), Some(ps)) if ps < slot && bones[ps] == p => in_mesh[ps] * local,
-                _ => owner_inverse * self.compute_world_matrix(bone),
+                _ => owner_inverse * self.world.local_to_world(bone),
             };
             in_mesh.push(m);
         }

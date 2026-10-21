@@ -196,7 +196,7 @@ fn register_snapshot<'scope>(
         "SnapshotEntity",
         scope.create_function(move |_, id: u32| {
             let scene = scene.borrow();
-            let world_matrix = scene.compute_world_matrix(id);
+            let world_matrix = scene.world.local_to_world(id);
             let value = if scene.world.contains(id) {
                 let view = UiView::with_camera(pixels(), camera.borrow().clone());
                 snapshot::entity_value(&scene, id, world_matrix, &view)

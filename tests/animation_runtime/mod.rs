@@ -21,7 +21,7 @@ fn the_animator_poses_the_bone_and_the_skin_follows_it() {
     let palette = s.world.mesh(hero).unwrap().pose_palette.clone();
     assert!((palette[0].w_axis.x - x).abs() < 1e-6);
     // The gun under the hand rides along.
-    let gun_at = s.compute_world_matrix(gun).w_axis.truncate();
+    let gun_at = s.world.world_position(gun);
     assert!(
         gun_at.abs_diff_eq(Vec3::new(x, 0.5, 0.0), 1e-5),
         "gun at {gun_at:?}"

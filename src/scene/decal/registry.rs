@@ -99,7 +99,7 @@ impl Scene {
             }
             // The live walk, not the per-frame store: a script may have moved the
             // owner earlier this tick.
-            let world = self.compute_world_matrix(entity);
+            let world = self.world.local_to_world(entity);
             // A zero-scale owner has no space to keep the box in: stamp it unowned.
             if world.determinant().abs() > f32::EPSILON {
                 let local = world.inverse() * decal.model_matrix();

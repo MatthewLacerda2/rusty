@@ -24,10 +24,9 @@
 mod preset;
 mod switch;
 
-use glam::{Quat, Vec3};
+use glam::Vec3;
 
 use super::HitboxOptions;
-use crate::components::transform;
 use crate::components::{ColliderShape, CollisionDetection, JointComponent, RigidBodyComponent};
 use crate::scene::Scene;
 use preset::{preset_for, Bend, JointPreset};
@@ -97,13 +96,11 @@ impl Scene {
                 let dir = self.bone_direction(&bones, &parents, slot);
                 let mut j = joint_from(preset_for(&names[slot]), dir, owner_axes);
                 j.connected_body = Some(bones[p]);
-                let (rot, mirror) = self
-                    .world
-                    .world_pose(bone)
-                    .map_or((Quat::IDENTITY, Vec3::ONE), |pose| {
-                        (pose.rot, transform::mirror(pose.scale))
-                    });
-                local_axes(&mut j, rot, mirror);
+                // The world axes, in the bone's local space: the exact inverse of how
+                // physics builds a joint's world frame, so it comes back on them (#1125).
+                (j.axis, j.swing_axis) =
+                    self.world
+                        .inverse_transform_frame(bone, j.axis, j.swing_axis);
                 j
             });
             self.world.set_joint(bone, joint);
@@ -215,15 +212,6 @@ fn joint_from(p: JointPreset, dir: Vec3, (front, side): (Vec3, Vec3)) -> JointCo
 /// reads `-a`.
 fn flex_limits((min, max): (f32, f32)) -> glam::Vec2 {
     glam::Vec2::new(-max, -min)
-}
-
-/// Turn a joint's world-space axes into `bone`'s local space (`bone_rot`, seen
-/// through the bone's `mirror`): the exact inverse of how physics builds a
-/// joint's world frame, so the frame comes back on the world axes (#1125).
-fn local_axes(j: &mut JointComponent, bone_rot: Quat, mirror: Vec3) {
-    let inv = bone_rot.inverse();
-    (j.axis, j.swing_axis) =
-        transform::mirrored_frame_axes(mirror, inv * j.axis, inv * j.swing_axis);
 }
 
 #[cfg(test)]

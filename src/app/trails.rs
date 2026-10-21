@@ -18,7 +18,7 @@ pub(super) fn tick_trails(world: &mut World, res: &mut Resources) {
         if !scene.world.is_active(id) {
             continue;
         }
-        let position = scene.compute_world_matrix(id).w_axis.truncate();
+        let position = scene.world.world_position(id);
         if let Some(mut trail) = scene.world.trail_mut(id) {
             trail.advance(position, dt);
         }

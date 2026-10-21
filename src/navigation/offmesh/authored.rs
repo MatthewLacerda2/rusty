@@ -33,7 +33,7 @@ pub fn authored_keys(scene: &Scene) -> Vec<(u32, AuthoredKey)> {
         .filter_map(|id| {
             let link = scene.world.offmesh_link(id)?.clone();
             link.active.then_some(())?;
-            let (start, end) = link.world_ends(scene.compute_world_matrix(id));
+            let (start, end) = link.world_ends(scene.world.local_to_world(id));
             let key = AuthoredKey {
                 start,
                 end,

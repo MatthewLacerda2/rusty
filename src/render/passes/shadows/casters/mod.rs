@@ -208,7 +208,7 @@ impl ShadowRenderer {
             let Some(gpu_mesh) = frame.gpu_meshes.get(&mesh_id) else {
                 continue;
             };
-            let world = scene.world_matrix(id);
+            let world = scene.world.local_to_world(id);
             // A skinned caster is bounded by its posed skeleton (#833); one whose pose
             // cannot be bounded is never culled — a wrongly-culled caster drops its shadow.
             let bounds = gpu_mesh.world_bounds(&mesh, world);

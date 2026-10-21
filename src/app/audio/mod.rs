@@ -48,7 +48,7 @@ fn resolve_reverb(world: &mut World, res: &mut Resources) {
         .iter()
         .filter_map(|&id| {
             let zone = scene.world.reverb_zone(id)?.clone();
-            Some((scene.world_matrix(id).w_axis.truncate(), zone))
+            Some((scene.world.world_position(id), zone))
         })
         .collect();
     let refs: Vec<_> = zones.iter().map(|(at, zone)| (*at, zone)).collect();

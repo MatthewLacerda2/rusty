@@ -60,7 +60,7 @@ pub fn play(scene: Scene, ticks: usize) -> GameWorld {
 
 pub fn bone_at(scene: &Scene, rig: u32, name: &str) -> Vec3 {
     let bone = scene.find_bone(rig, name).unwrap();
-    scene.compute_world_matrix(bone).w_axis.truncate()
+    scene.world.world_position(bone)
 }
 
 #[test]
