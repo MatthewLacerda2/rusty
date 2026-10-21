@@ -195,8 +195,8 @@ new flag, gate, CI step or baseline.
   count, a string that spans lines (a multi-line raw string) included; a `/* */`
   comment is read as code, so brackets in one can still move an item's end. A
   gated field or `let` whose generic type wraps over lines can end early, at a `,`
-  inside its `<…>`. Clippy's test exemption (`allow-unwrap-in-tests`) is rustc's
-  own and classifies its own way.
+  inside its `<…>`. Clippy's test exemption (`allow-unwrap-in-tests`, set in
+  `clippy.toml`) is Clippy's own and classifies its own way.
 - **`test-inner-cfg`, `test-user-workspace`, `test-gpu-entry`** (#980) — three
   `docs/testing.md` locks on test code; comment lines never count. A `tests/` file never gates itself with an inner `#![cfg(…)]` (gate
   its `mod` line); test code never calls `in_user_workspace` or `scenario::run(`
@@ -267,7 +267,9 @@ and direction guards, `CLAUDE.md` and these docs each kept.
   reference outside test code and reports `UNDECLARED_DEP` (code uses an edge the
   row lacks), `STALE_DEP` (the row lists an edge nothing uses), `CYCLE`, `SIM_LEAK`,
   and `UNDECLARED_MODULE` / `MISSING_MODULE`. Test code (`#[cfg(test)]` items and
-  test-only module files) is exempt, as in the other guards.
+  test-only module files) is exempt, by the same definition the rules that exempt test
+code use (*Test code*, below). The direction and determinism
+  guards are the two that scan test code: their arrow and clock ban hold in tests too.
 - **Known exceptions** go in `EXCEPTIONS`, each naming the open issue that removes
   it; the lint reports `STALE_EXCEPTION` once the edge is gone. The list is empty:
   #737 and #738 removed the two the lint landed with. A layer above the sim that adds
@@ -343,7 +345,11 @@ The sim runs headless with no GPU and no UI, so the dependency arrow points one 
 scans the table's sim modules and fails on any non-comment reference
 to `crate::render`, `crate::editor`, `wgpu` or `egui` (whole path segments only).
 The layering lint already covers the `crate::` half, transitively; this guard keeps
-the external crates, which the table does not model.
+the external crates, which the table does not model. Unlike the layering lint, it scans test code too
+(#1136): the arrow is the same everywhere, and a sim module's tests stay runnable
+without a GPU or a window only while they never reach for the renderer. (`wgpu` is
+a plain dependency of the one crate, so it is linked either way; what the guard keeps
+is the sim's tests independent of the display layer.)
 Plain data the renderer and the sim share lives sim-side: the mesh `Vertex` and the
 primitive builders in `components::mesh`, `Camera` and `Decal` in `scene`,
 `QualityPreset` in `core::quality`; the renderer keeps only the GPU half (e.g.

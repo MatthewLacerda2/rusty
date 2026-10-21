@@ -8,6 +8,10 @@
 //! catches the transitive leaks this one-hop guard cannot; this guard still owns the
 //! external crates (`wgpu`, `egui`) the table does not model.
 //!
+//! Unlike the layering lint and the rules that exempt test code, it scans test code
+//! too (#1136): the arrow is the same everywhere, and a sim module's tests stay
+//! runnable without a GPU or a window only while they never reach for the renderer.
+//!
 //! Usage: `cargo run --manifest-path tools/lint/Cargo.toml -- --direction`
 //! Exit code 1 on any violation; report mirrored to `.lint/report.txt`.
 
@@ -151,6 +155,24 @@ mod tests {
         assert!(banned_in("use crate::renderer_stats::X;").is_empty());
         assert!(banned_in("let my_wgpu_like = 1;").is_empty());
         assert!(banned_in("use crate::scene::render_order;").is_empty());
+    }
+
+    #[test]
+    fn test_code_in_a_sim_module_is_scanned_too() {
+        let path = std::env::temp_dir().join(format!("lint_direction_{}.rs", std::process::id()));
+        std::fs::write(
+            &path,
+            "fn live() {}\n#[cfg(test)]\nmod tests {\n    use crate::render::Camera;\n}\n",
+        )
+        .unwrap();
+        let mut violations = Vec::new();
+        scan_file(&path, &mut violations);
+        std::fs::remove_file(&path).ok();
+        assert_eq!(violations.len(), 1, "{violations:?}");
+        assert!(
+            violations[0].contains(":4 `crate::render`"),
+            "{violations:?}"
+        );
     }
 
     #[test]

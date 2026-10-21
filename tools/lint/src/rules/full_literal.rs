@@ -181,7 +181,7 @@ fn strip_comment(line: &str) -> &str {
 /// The rule over every scanned file, with `Entity`'s components read from the scan.
 pub fn run(scan: &Scan) -> Vec<Finding> {
     let components = Components::load(scan.files.iter().map(|p| (p.as_str(), scan.source(p))));
-    scan.each_file(|p, s| components.check(p, s, &scan.test_lines(p)))
+    scan.each_file(|p, s| components.check(p, s, scan.test_lines(p)))
 }
 
 #[cfg(test)]

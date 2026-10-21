@@ -5,9 +5,47 @@
 //! coarse line scan, like the direction guard.
 
 use super::extent::{item_end, strip_comment, Open};
-use super::gate::is_test_gate;
+use super::gate::{is_test_gate, test_only_files};
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
+
+/// The tree under `src`, read once and shared by the module list, the edge scan
+/// and the external-crate scan (#1136): every `.rs` file's text, and which files
+/// are test-only.
+pub struct Tree {
+    pub src: PathBuf,
+    sources: BTreeMap<PathBuf, String>,
+    test_only: BTreeSet<PathBuf>,
+}
+
+impl Tree {
+    pub fn read(src: &Path) -> Self {
+        let files = walk(src);
+        let sources: BTreeMap<PathBuf, String> = files
+            .iter()
+            .map(|f| (f.clone(), fs::read_to_string(f).unwrap_or_default()))
+            .collect();
+        let test_only = test_only_files(&files, |f| sources.get(f).map(String::as_str));
+        Self {
+            src: src.to_path_buf(),
+            sources,
+            test_only,
+        }
+    }
+
+    pub fn is_test_only(&self, path: &Path) -> bool {
+        self.test_only.contains(path)
+    }
+
+    /// Each file that is not test-only, with its text, in path order.
+    pub fn live_files(&self) -> impl Iterator<Item = (&Path, &str)> {
+        self.sources
+            .iter()
+            .filter(|(f, _)| !self.is_test_only(f))
+            .map(|(f, text)| (f.as_path(), text.as_str()))
+    }
+}
 
 /// One `crate::<module>` reference in non-test, non-comment code.
 pub struct Ref {
@@ -131,3 +169,7 @@ fn leading_ident(s: &str) -> Option<String> {
     let end = s.find(|c: char| !is_ident(c)).unwrap_or(s.len());
     (end > 0 && s[..end] != *"self").then(|| s[..end].to_string())
 }
+
+#[cfg(test)]
+#[path = "scan_tests.rs"]
+mod tests;
