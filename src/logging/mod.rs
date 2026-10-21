@@ -85,8 +85,10 @@ pub fn forward(console: &RefCell<ConsoleLogs>) -> Vec<String> {
 /// The records a drain takes: all of them. Under `cargo test` every test is a thread
 /// sharing this buffer, so a test takes only what its own thread logged, and one
 /// test's drain never steals another's warnings (nextest runs a process per test).
+/// Repeats left side by side once another thread's records are set aside count as
+/// one run.
 fn take_mine(pending: &mut Vec<Kept>) -> Vec<Kept> {
-    if cfg!(test) {
+    let taken = if cfg!(test) {
         let me = std::thread::current().id();
         let (mine, others) = std::mem::take(pending)
             .into_iter()
@@ -95,7 +97,17 @@ fn take_mine(pending: &mut Vec<Kept>) -> Vec<Kept> {
         mine
     } else {
         std::mem::take(pending)
+    };
+    let mut runs: Vec<Kept> = Vec::with_capacity(taken.len());
+    for kept in taken {
+        match runs.last_mut() {
+            Some(run) if run.level == kept.level && run.text == kept.text => {
+                run.times += kept.times;
+            }
+            _ => runs.push(kept),
+        }
     }
+    runs
 }
 
 /// `env_logger` for stderr, with a copy of engine warnings kept for [`forward`].
