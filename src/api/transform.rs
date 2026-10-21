@@ -164,12 +164,11 @@ fn register_move_towards<'scope>(
 ) -> Reg {
     let f = scope.create_function(|_, (id, tx, ty, tz, step): (u32, f32, f32, f32, f32)| {
         let world = &mut scene.borrow_mut().world;
-        if world.contains(id) {
-            let at = world
-                .world_position(id)
-                .move_towards(Vec3::new(tx, ty, tz), step);
-            world.set_world_position(id, at);
-        }
+        // A dead id reads the origin and the write is a no-op.
+        let at = world
+            .world_position(id)
+            .move_towards(Vec3::new(tx, ty, tz), step);
+        world.set_world_position(id, at);
         Ok(())
     });
     put(table, "MoveTowards", f)

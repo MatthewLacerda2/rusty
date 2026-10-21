@@ -1,7 +1,8 @@
 ## `Particles`
 
 Drive an entity's particle emitter (`ParticleEmitterComponent`). `Emit`/`Burst`
-spawn through the emitter's own seeded path, so scripted emission stays
+spawn at the entity's world position (a child's included) through the emitter's
+own seeded path, so scripted emission stays
 deterministic in a headless replay. `Emit`/`Burst` return the number of particles
 actually spawned (the `max_particles` cap may swallow some).
 

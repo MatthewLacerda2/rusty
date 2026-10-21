@@ -298,8 +298,12 @@ new flag, gate, CI step or baseline.
   and passes. Test code is not scanned (a test may decompose a result to check it),
   which is why the FBX basis tests and the synthetic hitbox rig need no allow; code
   that converts file data rather than the scene hierarchy carries an inline allow.
-  The Transform-read heuristic is lexical: a fold whose read sits more than five
-  lines below the walk slips past it (`rules/world_space.rs`).
+  The rule is lexical (`rules/world_space.rs`), and its limits are known. It
+  **misses** a parent walk not spelled `ancestors(`: `successors(..parent_id)`, a
+  `while let Some(p) = parent_id` loop, a chain of `local_and_parent(` calls, and a
+  fold whose Transform read sits more than five lines below its walk. It **falsely
+  flags** a membership or depth walk that happens to have an unrelated Transform
+  read within five lines; that line takes `// lint: allow(world-space) <why>`.
 - **The ≲10-files-per-directory signal** prints after the findings: every scanned
   directory holding more than ten `.rs` files (`mod.rs` aside), most crowded first.
   CLAUDE.md says "aim for", so it never fails the gate; it tells you where to

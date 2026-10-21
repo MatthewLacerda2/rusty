@@ -46,11 +46,8 @@ impl NavigationGraph {
             };
             // Steering is in world space: the agent's world position and facing,
             // written back through its parent (#1196).
-            let current_pos = scene
-                .world
-                .contains(id)
-                .then(|| scene.world.world_position(id));
-            if let (true, Some(position)) = (agent.active, current_pos) {
+            let position = scene.world.world_position(id);
+            if agent.active {
                 if agent.off_mesh_link.is_some() {
                     self.on_link(scene, id, agent, position, delta_time);
                     continue;

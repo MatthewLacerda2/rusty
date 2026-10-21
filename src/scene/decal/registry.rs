@@ -97,8 +97,8 @@ impl Scene {
             if !self.world.contains(entity) {
                 return None;
             }
-            // The live walk, not the per-frame store: a script may have moved the
-            // owner earlier this tick.
+            // The world store resolves a moved subtree on read, so a script's
+            // move of the owner earlier this tick is already in this matrix.
             let world = self.world.local_to_world(entity);
             // A zero-scale owner has no space to keep the box in: stamp it unowned.
             if world.determinant().abs() > f32::EPSILON {
