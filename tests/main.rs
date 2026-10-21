@@ -50,8 +50,7 @@ mod particles;
 mod physics;
 mod prefab_api;
 mod procgen;
-mod proptest_scene;
-mod proptest_world_space;
+mod proptest;
 mod ragdoll;
 mod reflection_probes;
 mod ribbons;
@@ -97,8 +96,6 @@ mod mcp_bridge;
 mod pause_step;
 #[cfg(feature = "dev")]
 mod player_controller;
-#[cfg(feature = "dev")]
-mod proptest_harness;
 #[cfg(feature = "dev")]
 mod provider_keys;
 #[cfg(feature = "dev")]

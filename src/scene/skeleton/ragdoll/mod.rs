@@ -71,11 +71,7 @@ impl Scene {
             .map(|&b| self.hitbox_of(b).map(|h| self.collider_volume(h)))
             .collect();
         let total: f32 = volumes.iter().flatten().sum::<f32>().max(f32::EPSILON);
-        // The character's front and side as drawn, through its own mirror (#1145).
-        let owner_axes = (
-            self.world.transform_direction(owner, Vec3::Z),
-            self.world.transform_direction(owner, Vec3::X),
-        );
+        let owner_axes = self.front_and_side(owner);
         let mut made = Vec::new();
         for (slot, &bone) in bones.iter().enumerate() {
             let Some(volume) = volumes[slot] else {
@@ -159,6 +155,16 @@ impl Scene {
             (true, None) => Vec3::Y,
         };
         dir.try_normalize().unwrap_or(Vec3::Y)
+    }
+
+    /// `owner`'s front and side (its +Z and +X) as drawn, through its own mirror
+    /// (#1145).
+    fn front_and_side(&self, owner: u32) -> (Vec3, Vec3) {
+        let w = &self.world;
+        (
+            w.transform_direction(owner, Vec3::Z),
+            w.transform_direction(owner, Vec3::X),
+        )
     }
 
     /// A collider's volume at its world scale — what its share of the mass is

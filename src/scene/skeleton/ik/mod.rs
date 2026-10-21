@@ -26,7 +26,7 @@ use crate::components::{IkChain, IkConstraint, IkTarget};
 use crate::scene::Scene;
 
 /// A bone's world position and rotation, and the reflection its world scale
-/// carries ([`mirror`]): its world matrix draws a local direction `d` along
+/// carries ([`World::world_mirror`](crate::ecs::World::world_mirror)): its world matrix draws a local direction `d` along
 /// `rot · mirror · d` (#1125).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct BonePose {
