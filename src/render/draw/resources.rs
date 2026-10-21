@@ -1,7 +1,7 @@
 //! Per-frame GPU resource pre-creation: the camera's solids (and mesh particles, #440)
 //! as instanced draws (#470), and the overlay resource-tuple type aliases. The
 //! material bind groups they share live in `materials`; editor overlays in
-//! `overlays`/`axis`/`probes`. Each block returns owned resources that outlive the
+//! `overlays` and its children. Each block returns owned resources that outlive the
 //! render pass.
 
 use super::batch::sort::{back_to_front, view_depth};

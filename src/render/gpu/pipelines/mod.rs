@@ -175,7 +175,9 @@ fn make_prepass(
 }
 
 #[cfg(test)]
+#[path = "tests/scrolled_cut_tests.rs"]
 mod scrolled_cut_tests;
 
 #[cfg(test)]
+#[path = "tests/lazy_tests.rs"]
 mod lazy_tests;

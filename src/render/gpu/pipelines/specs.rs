@@ -1,6 +1,6 @@
 //! The forward-pass pipelines' fixed-function knobs and the one function that turns
 //! a [`PipelineSpec`] into a pipeline. The layouts and entry points are shared, so
-//! each pipeline names only what it changes from [`PipelineSpec::default`].
+//! each pipeline names only what it changes from [`PipelineSpec::opaque`].
 
 use super::winding;
 use crate::render::gpu::mesh::vertex_layout;
@@ -20,10 +20,12 @@ pub(super) struct PipelineSpec {
     pub depth_compare: wgpu::CompareFunction,
 }
 
-impl Default for PipelineSpec {
-    fn default() -> Self {
+impl PipelineSpec {
+    /// The opaque forward pass under `label`; a spec names only what it changes. The
+    /// label has no default, so a spec that forgets one does not compile.
+    fn opaque(label: &'static str) -> Self {
         Self {
-            label: "",
+            label,
             topology: wgpu::PrimitiveTopology::TriangleList,
             cull_mode: None,
             front_face: wgpu::FrontFace::Ccw,
@@ -37,10 +39,7 @@ impl Default for PipelineSpec {
 /// Opaque/cutout forward pass: REPLACE, depth write on. No culling so primitives can
 /// render inside-out if needed.
 pub(super) fn forward_spec() -> PipelineSpec {
-    PipelineSpec {
-        label: "Forward Lit Pipeline",
-        ..Default::default()
-    }
+    PipelineSpec::opaque("Forward Lit Pipeline")
 }
 
 /// Transparent pass (#242): same shader/layout as the forward pass but alpha-blended
@@ -48,22 +47,20 @@ pub(super) fn forward_spec() -> PipelineSpec {
 /// surfaces all blend rather than z-cull each other. Drawn back-to-front after opaque.
 pub(super) fn transparent_spec() -> PipelineSpec {
     PipelineSpec {
-        label: "Transparent Pipeline",
         blend: wgpu::BlendState::ALPHA_BLENDING,
         depth_write_enabled: false,
-        ..Default::default()
+        ..PipelineSpec::opaque("Transparent Pipeline")
     }
 }
 
 /// Line debug overlays: don't write depth so they display over the grid.
 pub(super) fn line_spec() -> PipelineSpec {
     PipelineSpec {
-        label: "Line Debug Pipeline",
         topology: wgpu::PrimitiveTopology::LineList,
         blend: wgpu::BlendState::ALPHA_BLENDING,
         depth_write_enabled: false,
         depth_compare: wgpu::CompareFunction::LessEqual,
-        ..Default::default()
+        ..PipelineSpec::opaque("Line Debug Pipeline")
     }
 }
 
@@ -72,20 +69,19 @@ pub(super) fn line_spec() -> PipelineSpec {
 /// triangles as front (#1142); otherwise its outer shell would cover the object.
 pub(super) fn outline_spec(mirrored: bool) -> PipelineSpec {
     PipelineSpec {
-        label: if mirrored {
-            "Mirrored Outline Pipeline"
-        } else {
-            "Outline Pipeline"
-        },
         cull_mode: Some(wgpu::Face::Front),
         front_face: winding::front_face(mirrored),
         depth_compare: wgpu::CompareFunction::LessEqual,
-        ..Default::default()
+        ..PipelineSpec::opaque(if mirrored {
+            "Mirrored Outline Pipeline"
+        } else {
+            "Outline Pipeline"
+        })
     }
 }
 
-/// Create one forward-pass render pipeline from a [`PipelineSpec`]. All three
-/// passes share the same vertex layout, shader entry points, and depth format;
+/// Create one forward-pass render pipeline from a [`PipelineSpec`]. The five
+/// pipelines share the same vertex layout, shader entry points, and depth format;
 /// only the fixed-function knobs in the spec differ.
 pub(super) fn make_pipeline(
     device: &wgpu::Device,
