@@ -119,6 +119,9 @@ if [[ $state == red && -z $issue ]]; then
     echo 'failing jobs changes. A green run leaves a note but does not close this: green can be'
     echo 'vacuous (a docs-only merge skips the build steps; the nightly does not rebuild), so close'
     echo 'it from the PR that fixes it.'
+    echo ''
+    # The `Kind:` line every bug carries (#1173): this issue is its workflow's root.
+    echo 'Kind: root — one issue per red workflow; later red runs comment here'
   } >>"$body"
   write issue create -R "$REPO" --label "$LABEL" \
     --title "Red main: the \`$wf\` workflow is failing" --body-file "$body"

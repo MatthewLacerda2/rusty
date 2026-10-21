@@ -249,11 +249,22 @@ the ones tooling or a past mistake depends on.
   defect is worth *recording* never is: **a bug is always filed**. If it questions a
   decision or exposes a foundational crack, tell the user; otherwise keep it brief and
   carry on. The strongest issues come out of doing the work.
+  **Before filing a bug** (orchestrator, coder or reviewer): look for earlier cases of
+  its kind, open and closed, by symbol, module and wording; decide whether it is a
+  **case** (a discrete slip) or a **symptom** (a problem that will produce more), even
+  the first time. A symptom gets the **fix that scales** (a type, a lint rule, a shared
+  or property test, one API), and the instance becomes its sub-issue. An instance of an
+  open root issue is folded into it, never filed beside it. Every bug issue carries
+  one `Kind:` line: `Kind: #N` (root N, also its sub-issue parent), `Kind: case —
+  searched <terms>`, or `Kind: root`; `make board` lists the ones without it (#1173).
+  The steps: `issue-batch`, *Filing a bug*.
 - **Once is a case; twice is an issue** (the operator, 2026-10-18). Something that
   happens once is handled as a case. The second time, it is an issue: attack the root
   of the problem so it never becomes a bottleneck again — fix the cause, build the tool
   or add the check — and prefer what scales over a one-off fix. This is why a bug or a
-  stale doc is filed and fixed right away rather than worked around.
+  stale doc is filed and fixed right away rather than worked around. **A kind of bug
+  counts, not only the same bug:** the second case of a kind with no root issue
+  triggers one.
 - **Every issue Claude files unprompted carries the `agent` label.** It says only who
   decided to file it, and never stops work.
 - **The approval test.** A finding is filed with `planning`, and never folded in, when

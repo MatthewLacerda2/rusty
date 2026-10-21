@@ -161,6 +161,12 @@ code first, then:
    or filed as an issue when it lies outside the branch (*Filing what you notice
    is a duty*). No findings is said too. It is the record that the review
    happened.
+   **Before filing a pre-existing finding, class it** (`issue-batch`, *Filing a
+   bug*): look for earlier cases of its kind; a case is filed with `Kind: case —
+   searched <terms>`, a symptom gets the fix that scales as a root issue, with
+   the finding as its sub-issue. A finding of a kind that already has an open
+   root issue goes **on that issue**, as a comment or a sub-issue, never as an
+   issue beside it.
 3. When the fixes rework the logic substantially, one more reviewer reads the
    new diff. Otherwise one round is the review.
 4. Then the `queue` label. The review does not replace the gates or CI; it runs

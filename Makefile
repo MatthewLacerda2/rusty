@@ -219,10 +219,11 @@ blockers: ## Prose-only "Blocked by #N" GitHub never recorded. ARGS=--fix record
 # The PR-on-first-commit rule exists so nothing goes stale unnoticed; this is
 # the noticing (#971). Lists branches ahead of main with no PR, merged branches
 # still standing, branch names off the convention, assignments older than a day
-# with no branch or PR, and open issues with no type label. A signal: it also
+# with no branch or PR, open issues with no type label, and open bugs with no
+# `Kind:` line or one their sub-issue parent contradicts (#1173). A signal: it also
 # runs weekly (board.yml, into the run summary) and exits 1 on findings.
 .PHONY: board
-board: ## Stray branches, stale assignments, unlabelled issues. ARGS="--hours 48" sets the age
+board: ## Stray branches, stale assignments, unlabelled issues, bugs with no Kind. ARGS="--hours 48" sets the age
 	@python3 .github/scripts/board.py $(ARGS)
 
 # Human checks never hold a merge, so after a batch they are scattered across

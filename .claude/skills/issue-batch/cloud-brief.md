@@ -13,6 +13,13 @@ MCP tools (`issue_read`, `create_pull_request`, `update_pull_request`,
 *Issues, labels & priority* says (the `agent` label; `planning` when it fails the
 approval test).
 
+**A bug you file is classed first** (`issue-batch`, *Filing a bug*, #1173): look
+for earlier cases of its kind, open and closed (search answers 403 here, so page
+the REST issue list and grep it); class it a case or a symptom; for a symptom,
+file the fix that scales and make your finding its sub-issue; fold an instance of
+an open root issue into that issue as a comment. The issue carries one `Kind:`
+line: `Kind: #N`, `Kind: case — searched <terms>`, or `Kind: root`.
+
 **Need a sibling's tool for your own proof? Patch it locally, don't commit it.**
 If your PR's captures or measurements need something another in-flight issue is
 building (a CLI flag, a capture option), apply the smallest uncommitted patch to

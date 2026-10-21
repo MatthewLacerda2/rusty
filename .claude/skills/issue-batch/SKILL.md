@@ -156,14 +156,46 @@ Per pull request:
 ## Starting, and re-reading the board
 
 At the start: `make blockers ARGS=--fix` (records prose-only blockers) and
-`make board` (stray branches, stale assignments, unlabelled issues); close out
+`make board` (stray branches, stale assignments, unlabelled issues, bugs with
+no `Kind:` line); close out
 what it names. Unassign an issue that turns out never started.
 
 **After every merge, re-read the whole board**, not your list of it: coders and
 the operator file mid-batch, and what the merge unblocked is startable now. Count
 what is left from `gh issue list`, never from memory. A new label-priority leader
-is started next. Dependabot PRs merge through the same queue at the lowest
+is started next. **A root issue is picked over its instances**: a bug whose
+`Kind:` names an open root issue is not started on its own; the root's branch
+closes it. Dependabot PRs merge through the same queue at the lowest
 priority (`ci-merge` has the Actions-bump hold).
+
+## Filing a bug
+
+From 2026-10-19 to 21 the same kind of bug got about twelve separate patches,
+each one's review finding the next, before anyone filed the root fix (#1170).
+So whoever files a bug (orchestrator, coder or reviewer) first:
+
+1. **Looks for earlier cases** of its kind, open and closed, by symbol, module
+   and wording. `gh search issues` answers 403 in a cloud session; there, page
+   `gh api 'repos/{owner}/{repo}/issues?state=all&per_page=100&page=N'` and grep
+   titles and bodies.
+2. **Classes it: a case or a symptom**, even the first time. A case is a discrete
+   slip; a symptom is an underlying problem that will produce more.
+3. **For a symptom, files the fix that scales**: a type, a lint rule, a shared or
+   property test, one API. The instance becomes its sub-issue
+   (`POST repos/{owner}/{repo}/issues/{root}/sub_issues` with the instance's `id`),
+   never its own PR. An instance of an **open** root issue is folded into it: a
+   comment on the root, or a sub-issue of it, never a sibling issue.
+4. **The second case of a kind with no root issue triggers one.**
+
+Every bug issue carries one line, `Kind:`, exactly one of:
+
+- `Kind: #N`: an instance of root issue N, which is also its sub-issue parent;
+- `Kind: case — searched <terms>`: a discrete slip, with the search that found no
+  kin;
+- `Kind: root`: the root issue itself.
+
+`make board` lists an open `bug` issue (not `planning`) without the line, a `case`
+that names no search, and a `Kind: #N` whose sub-issue parent is not N.
 
 ## Which model
 
