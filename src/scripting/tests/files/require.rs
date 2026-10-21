@@ -1,6 +1,6 @@
 //! `require`: project, then engine, then `package.path`.
 
-use super::{dir, manager, out, warnings, write};
+use super::{backslash_dir, dir, manager, out, warnings, write};
 
 #[test]
 fn require_finds_project_modules_first_without_warning() {
@@ -74,4 +74,51 @@ fn native_modules_stay_off() {
     let (m, _) = manager(&dir("native"));
     assert_eq!(out(&m, "out = package.cpath"), "");
     assert_eq!(out(&m, "out = tostring(#package.searchers)"), "4");
+}
+
+/// A module that returns an error raised inside it, which its chunk name prefixes.
+pub(super) const SOURCE: &str = "local _, e = pcall(function() error('here') end) return e";
+
+#[test]
+fn a_project_module_is_named_with_slashes_only() {
+    let root = backslash_dir("slash_project");
+    write(&root.join("assets/scripts/ui/axis.lua"), SOURCE);
+    let (m, _) = manager(&root);
+    let named = out(&m, "local s, o = require('ui.axis'); out = s .. '|' .. o");
+    assert!(!named.contains('\\'), "{named}");
+    assert!(
+        named.contains("a/b/assets/scripts/ui/axis.lua:1: here|"),
+        "{named}"
+    );
+    assert!(named.ends_with("a/b/assets/scripts/ui/axis.lua"), "{named}");
+}
+
+#[test]
+fn a_package_path_module_is_named_with_slashes_only() {
+    let root = dir("slash_path_root");
+    let lib = backslash_dir("slash_path_lib");
+    write(&lib.join("shared.lua"), SOURCE);
+    let (m, _) = manager(&root);
+    let path = format!("{}/?.lua", lib.display());
+    m.exec(&format!("package.path = [[{path}]]"))
+        .expect("set path");
+    let named = out(&m, "local s, o = require('shared'); out = s .. '|' .. o");
+    assert!(!named.contains('\\'), "{named}");
+    assert!(named.contains("a/b/shared.lua:1: here|"), "{named}");
+    assert!(named.ends_with("a/b/shared.lua"), "{named}");
+}
+
+#[test]
+fn the_outside_warning_prints_a_slash_path_without_a_verbatim_prefix() {
+    let root = dir("slash_warn_root");
+    let lib = backslash_dir("slash_warn_lib");
+    write(&lib.join("shared.lua"), "return 1");
+    let (m, console) = manager(&root);
+    m.exec(&format!("package.path = [[{}/?.lua]]", lib.display()))
+        .expect("set path");
+    m.exec("require('shared')").expect("require");
+    let warned = warnings(&console);
+    let shown = warned[0].split(", outside").next().expect("path");
+    assert!(!shown.contains('\\'), "no `\\` and no `\\\\?\\`: {shown}");
+    assert!(shown.ends_with("a/b/shared.lua"), "{shown}");
 }
