@@ -78,20 +78,20 @@ class Issues(unittest.TestCase):
     def test_flags_a_missing_type_label_but_not_on_planning(self):
         self.assertIn("no type label: #7", self.check(Issue(7, "t", {"agent"})))
         self.assertEqual(self.check(Issue(7, "t", {"planning"})), "")
-        self.assertEqual(self.check(Issue(7, "t", {"bug"})), "")
+        self.assertEqual(self.check(Issue(7, "t", {"feature"})), "")
 
     def test_flags_an_old_assignment_with_no_branch_or_pr(self):
         self.assertIn("stale assignment: #7 t: assigned 48h ago",
-                      self.check(Issue(7, "t", {"bug"}, "", NOW - timedelta(hours=48))))
+                      self.check(Issue(7, "t", {"feature"}, "", NOW - timedelta(hours=48))))
 
     def test_passes_a_fresh_assignment_or_one_being_worked(self):
         old = NOW - timedelta(hours=48)
-        self.assertEqual(self.check(Issue(7, "t", {"bug"}, "", NOW - timedelta(hours=1))), "")
-        self.assertEqual(self.check(Issue(7, "t", {"bug"}, "", old), ["7-slug"]), "")
+        self.assertEqual(self.check(Issue(7, "t", {"feature"}, "", NOW - timedelta(hours=1))), "")
+        self.assertEqual(self.check(Issue(7, "t", {"feature"}, "", old), ["7-slug"]), "")
         pr = {"head": {"ref": "doc-fix"}, "title": "x", "body": "Closes #7"}
-        self.assertEqual(self.check(Issue(7, "t", {"bug"}, "", old), prs=[pr]), "")
+        self.assertEqual(self.check(Issue(7, "t", {"feature"}, "", old), prs=[pr]), "")
         pr["body"] = "Closes #70"
-        self.assertIn("stale", self.check(Issue(7, "t", {"bug"}, "", old), prs=[pr]))
+        self.assertIn("stale", self.check(Issue(7, "t", {"feature"}, "", old), prs=[pr]))
 
     def test_an_inline_keep_marker_exempts_an_issue(self):
         with contextlib.redirect_stderr(io.StringIO()):
@@ -107,7 +107,8 @@ class Main(unittest.TestCase):
                 "commits": [{"commit": {"committer": {"date": "2026-07-03T07:44:33Z"}}}]},
             "repos/o/r/pulls?state=all&head=o:claude%2Fkeen-cerf-f7fahe": [],
             "repos/o/r/issues?state=open": [
-                {"number": 3, "title": "t3", "labels": [{"name": "bug"}], "assignees": []},
+                {"number": 3, "title": "t3", "labels": [{"name": "bug"}], "assignees": [],
+                 "body": "Kind: #9", "parent_issue_url": "https://api.github.com/repos/o/r/issues/9"},
                 {"number": 4, "title": "pr", "labels": [], "pull_request": {}}],
             "repos/o/r/pulls?state=open": [],
         }

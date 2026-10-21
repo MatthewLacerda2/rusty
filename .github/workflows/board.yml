@@ -1,7 +1,8 @@
 name: board
 # The board audit, weekly (#971): branches with commits and no PR, merged
 # branches still standing, branch names off the convention, assignments with
-# no branch or PR, open issues with no type label. A signal, never a gate
+# no branch or PR, open issues with no type label, open bugs with no `Kind:`
+# line or one their sub-issue parent contradicts (#1173). A signal, never a gate
 # (CLAUDE.md, *Gates vs. signals*): it is about the board, and no merge waits
 # on it. The findings go to the run summary. The run goes red only when the
 # audit could not run (exit 2), never on a finding (exit 1), like coverage.yml.

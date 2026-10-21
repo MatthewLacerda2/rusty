@@ -16,10 +16,19 @@ ever. This is the noticing. It lists:
   with no branch `{issue}-…` and no open PR naming it, since an assignee means
   "in progress" (CLAUDE.md, *Assign yourself when you start*);
 - **no type label**: an open issue carrying none of the type labels the
-  priority order sorts by. `planning` issues are exempt: still being shaped.
+  priority order sorts by. `planning` issues are exempt: still being shaped;
+- **kind** (#1173): an open `bug` issue with no `Kind:` line, a `Kind: case`
+  that names no search, a `Kind: #N` whose sub-issue parent is not N, a `case` or
+  `root` that has a parent, more than one line, or an unknown form. The line is
+  read past list, quote, bold and backtick markup; a fenced block is an example,
+  not the issue's own line (#1174's review). About
+  twelve patches of one kind of bug landed before anyone filed its root fix
+  (#1170), because nothing made the filer look for earlier cases. `planning`
+  bugs are exempt, as above.
 
 What/Why headings are not checked: CLAUDE.md leaves how an issue reads to
-Claude (#922 retired the template).
+Claude (#922 retired the template). The one exception is the `Kind:` line on a
+bug issue (#1173), which the operator decided.
 
 A **signal**, not a gate: it is about the board, and no merge waits on it. It
 runs weekly (`.github/workflows/board.yml`, into the job summary) and as `make
@@ -46,6 +55,11 @@ PAGE = 100
 NAME = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
 TYPES = {"infrastructure", "architecture", "bug", "foundation", "feature", "documentation"}
 ISSUE_KEEP = re.compile(r"<!--\s*board:\s*keep,\s*(.+?)\s*-->")
+KIND = re.compile(r"^Kind:[ \t]*(.*)$")
+KIND_MARKUP = re.compile(r"^(?:[ \t]*(?:[-*>]|\d+\.)[ \t]+)*[ \t]*")  # list and quote markers
+FENCE = re.compile(r"^[ \t>]*(```|~~~)")
+KIND_ROOT = re.compile(r"#(\d+)\b")
+KIND_CASE = re.compile(r"case[ \t]*[—–-]+[ \t]*searched\b\W*\w")
 
 # Branches the board never flags, each with why. Empty is the goal.
 KEEP: dict[str, str] = {}
@@ -67,6 +81,7 @@ class Issue:
     labels: set[str]
     body: str = ""
     assigned_at: datetime | None = None  # the latest `assigned` event; None: unassigned
+    parent: int | None = None  # its sub-issue parent's number
 
 
 def fail(why: str) -> None:
@@ -111,6 +126,44 @@ def issue_findings(issues: list[Issue], branches: list[Branch], open_prs: list[d
             age = int((now - i.assigned_at).total_seconds() // 3600)
             found.append(f"stale assignment: #{i.number} {i.title}: assigned {age}h ago, "
                          f"no branch `{i.number}-…` and no open PR naming it")
+        if "bug" in i.labels and "planning" not in i.labels and (why := kind_problem(i)):
+            found.append(f"kind: #{i.number} {i.title}: {why}")
+    return found
+
+
+def kind_problem(i: Issue) -> str | None:
+    """What is wrong with a bug issue's `Kind:` line, or None (#1173)."""
+    lines = kind_lines(i.body or "")
+    if len(lines) != 1:
+        return "no `Kind:` line" if not lines else f"{len(lines)} `Kind:` lines"
+    kind = lines[0].strip()
+    if root := KIND_ROOT.match(kind):
+        if i.parent != int(root.group(1)):
+            return f"`Kind: #{root.group(1)}` but its sub-issue parent is " + \
+                (f"#{i.parent}" if i.parent else "none")
+        return None
+    if re.match(r"(?:root|case)\b", kind) and i.parent:
+        return f"`Kind: {kind.split()[0]}` but it is a sub-issue of #{i.parent}"
+    if re.match(r"root\b", kind):
+        return None
+    if kind.startswith("case"):
+        return None if KIND_CASE.match(kind) else "`Kind: case` names no search"
+    return f"`Kind: {kind}` is not `#N`, `case — searched <terms>` or `root`"
+
+
+def kind_lines(body: str) -> list[str]:
+    """The `Kind:` values in a body, past list, quote, bold and backtick markup;
+    lines inside fenced code blocks are examples, not the issue's own line."""
+    found, fenced = [], False
+    for line in body.splitlines():
+        if FENCE.match(line):
+            fenced = not fenced
+            continue
+        if fenced:
+            continue
+        bare = KIND_MARKUP.sub("", line).replace("**", "").replace("`", "")
+        if m := KIND.match(bare.strip()):
+            found.append(m.group(1))
     return found
 
 
@@ -170,6 +223,8 @@ def gather(gh: Gh, repo: str) -> tuple[list[Branch], list[Issue], list[dict]]:
             continue
         issue = Issue(raw["number"], raw["title"], {lb["name"] for lb in raw["labels"]},
                       raw.get("body") or "")
+        if parent := raw.get("parent_issue_url"):
+            issue.parent = int(parent.rsplit("/", 1)[1])
         if raw.get("assignees"):
             events = gh.pages(f"repos/{repo}/issues/{issue.number}/events")
             times = [stamp(e["created_at"]) for e in events if e["event"] == "assigned"]
