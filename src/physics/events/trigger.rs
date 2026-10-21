@@ -19,7 +19,7 @@ impl PhysicsWorld {
     /// The overlapping trigger pairs at the poses the step ended on, as sorted,
     /// deduped `(low, high)` entity ids — the current-tick set `TriggerEvents`
     /// diffs. Triggers are rapier sensors; solid contacts are
-    /// `collision_events`' business (#448).
+    /// `collision`'s business (#448).
     ///
     /// rapier's narrow phase runs at the *start* of a step, so its sensor pairs
     /// describe where things were before the step moved them: a body walking

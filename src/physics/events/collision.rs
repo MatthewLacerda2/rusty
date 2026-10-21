@@ -1,7 +1,7 @@
 //! src/physics/events/collision.rs — the per-tick solid-contact events
 //! `PhysicsWorld::step` surfaces for `OnCollisionEnter/Stay/Exit` (#448).
 //!
-//! The twin of `trigger_events`: the current tick's touching pairs come from
+//! The twin of `trigger`: the current tick's touching pairs come from
 //! rapier's contact graph (sensors never enter it — they live in the
 //! intersection graph), and the enter/exit edges are recovered by diffing the
 //! sorted pair keys against last tick's, exactly as the trigger edges are. Each
