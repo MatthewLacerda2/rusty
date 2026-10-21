@@ -171,7 +171,11 @@ Beyond what changed, why, the effect and the decisions:
   coder names Sonnet; the brief's `Model:` line says which, *Which model*).
 - Push often: a dead container takes its uncommitted work with it.
 - Green gates and a rebased branch → mark the PR **ready for review**, and end.
-- **Do NOT merge.**
+- **Do NOT merge, and do not review your own PR.** The independent review is the
+  orchestrator's (`independent-review`): it dispatches a reviewer that never saw
+  your reasoning, which one you spawn cannot be. A brief that says the PR "gets an
+  independent review" means the orchestrator will run one. PR #1184's coder ran its
+  own, and it had to be done again.
 - ≈3 attempts at the same failure, or a decision that is genuinely the user's:
   leave the PR as draft with the reason in its description, comment on the issue,
   and stop.
