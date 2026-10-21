@@ -1,5 +1,5 @@
-use super::finding::allowed;
-use super::prefix::{anchor, check_dir, groups, RULE};
+use super::{anchor, check_dir, groups, RULE};
+use crate::rules::allowed;
 use std::fs;
 
 #[test]

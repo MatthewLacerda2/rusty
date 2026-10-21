@@ -12,6 +12,7 @@
 //! [`Harness`](super::harness::Harness), the windowed shell) calls [`install_api`]
 //! first; it is idempotent, so the order and the count don't matter.
 
+// sorted: one module per dev namespace; kept in order so parallel branches don't collide
 mod bake;
 mod debug;
 mod generate;
@@ -31,18 +32,20 @@ pub fn install_api() {
     INSTALL.call_once(|| api::extend(register));
 }
 
-/// The [`api::Extension`] itself: `Debug`, then the bake verbs on the tables `api`
-/// already registered, then `Speech` (#386) with its voice verbs (#387), and `Sfx` (#388).
+/// The [`api::Extension`] itself: `Debug`, the bake verbs on the tables `api` already
+/// registered, `Sfx` (#388), and `Speech` (#386) with its voice verbs (#387).
 fn register<'scope>(
     lua: &Lua,
     scope: &'scope mlua::Scope<'scope, '_>,
     ctx: &ApiScopedCtx<'scope>,
 ) -> Reg {
-    debug::register(lua, scope, ctx)?;
+    // sorted: each registrar adds its own table or extends one `api` made; `voices`
+    // extends `Speech`, which `speech` sorts before
     bake::register(lua, scope, ctx)?;
+    debug::register(lua, scope, ctx)?;
     generate::register(lua, scope, ctx)?;
-    speech::register(lua, scope, ctx)?;
     sfx::register(lua, scope, ctx)?;
+    speech::register(lua, scope, ctx)?;
     voices::register(lua, scope, ctx)
 }
 

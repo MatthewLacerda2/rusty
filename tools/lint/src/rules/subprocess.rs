@@ -12,6 +12,7 @@
 //! too, and nothing else may name it.
 
 use super::finding::Finding;
+use super::scan::Scan;
 
 pub const RULE: &str = "subprocess";
 
@@ -45,3 +46,12 @@ fn has_word(code: &str, word: &str) -> bool {
         !ident(code[..at].chars().next_back()) && !ident(code[at + word.len()..].chars().next())
     })
 }
+
+/// The rule over every scanned file.
+pub fn run(scan: &Scan) -> Vec<Finding> {
+    scan.each_file(check)
+}
+
+#[cfg(test)]
+#[path = "subprocess_tests.rs"]
+mod tests;

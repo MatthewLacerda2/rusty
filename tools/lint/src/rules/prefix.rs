@@ -9,6 +9,7 @@
 //! The ≲10-files-per-directory aim beside it is a printed signal, never a failure.
 
 use super::finding::Finding;
+use super::scan::Scan;
 use std::collections::BTreeMap;
 use std::fs;
 
@@ -120,3 +121,15 @@ pub fn check_dir(dir: &str, files: &[&str]) -> Vec<Finding> {
         })
         .collect()
 }
+
+/// The rule over every scanned directory.
+pub fn run(scan: &Scan) -> Vec<Finding> {
+    let dirs = scan.dirs();
+    dirs.iter()
+        .flat_map(|(d, names)| check_dir(d, names))
+        .collect()
+}
+
+#[cfg(test)]
+#[path = "prefix_tests.rs"]
+mod tests;

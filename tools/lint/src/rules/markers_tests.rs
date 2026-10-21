@@ -1,4 +1,4 @@
-use super::markers::{check, RULE, WORDS};
+use super::{check, RULE, WORDS};
 
 #[test]
 fn flags_every_marker_word_standing_alone() {

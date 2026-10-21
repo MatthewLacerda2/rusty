@@ -1,4 +1,4 @@
-use super::test_shape::{check, GPU_ENTRY, INNER_CFG, USER_WORKSPACE};
+use super::{check, GPU_ENTRY, INNER_CFG, USER_WORKSPACE};
 
 fn rules(path: &str, src: &str) -> Vec<(usize, &'static str)> {
     check(path, src).iter().map(|f| (f.line, f.rule)).collect()

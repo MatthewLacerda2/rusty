@@ -1,75 +1,75 @@
 //! The rules gate (#934): every check that reports a [`Finding`] and honours the
-//! shared inline allow (`finding.rs`). A new rule is one more call in [`run`], not
-//! a new flag, gate or baseline.
+//! shared inline allow (`finding.rs`). A new rule is a module with its own
+//! `<rule>_tests.rs`, plus one line in the sorted `mod` list and one row in the
+//! sorted [`RULES`] (#911): not a new flag, gate or baseline.
 //!
 //! Usage: `cargo run --manifest-path tools/lint/Cargo.toml -- --rules`
 //! Exit code 1 on any finding; report mirrored to `.lint/report.txt`.
 
 mod finding;
+mod scan;
+mod test_code;
+
+// sorted: one module per rule, each a row of `RULES`
 mod full_literal;
 mod ignored;
 mod markers;
 mod prefix;
 mod skip;
+mod sorted;
 mod subprocess;
 mod temp_dir;
-mod test_code;
 mod test_shape;
 mod unwrap;
 
 pub use finding::{allowed, Finding};
+use scan::Scan;
 use std::collections::BTreeMap;
 use std::fs;
-use std::path::Path;
 use std::process::exit;
 
 const REPORT: &str = ".lint/report.txt";
 
+/// Whether an inline `lint: allow(<rule>) <why>` may excuse a rule's findings.
+#[derive(PartialEq)]
+enum Allow {
+    Inline,
+    /// `ignored`: its fix is the `.gitignore` pattern, never an allow.
+    Never,
+}
+
+/// A rule: every finding it has over the scan.
+type Rule = fn(&Scan) -> Vec<Finding>;
+
+/// Every rule. A new rule is one row, in its sorted place.
+const RULES: &[(Rule, Allow)] = &[
+    // sorted: rules are independent; allows apply to each rule's own findings
+    (full_literal::run, Allow::Inline),
+    (ignored::run, Allow::Never),
+    (markers::run, Allow::Inline),
+    (prefix::run, Allow::Inline),
+    (skip::run, Allow::Inline),
+    (sorted::run, Allow::Inline),
+    (subprocess::run, Allow::Inline),
+    (temp_dir::run, Allow::Inline),
+    (test_shape::run, Allow::Inline),
+    (unwrap::run, Allow::Inline),
+];
+
 /// Entry point: run every rule over [`crate::size::SCAN_ROOTS`].
 pub fn run() {
-    let files: Vec<String> = crate::size::SCAN_ROOTS
-        .iter()
-        .flat_map(|root| crate::size::scan_dir(Path::new(root)))
-        .map(|p| p.to_string_lossy().replace('\\', "/"))
-        .collect();
-    let dirs = by_dir(&files);
+    let scan = Scan::load();
+    let mut findings = Vec::new();
+    for (rule, allow) in RULES {
+        let mut found = rule(&scan);
+        if *allow == Allow::Inline {
+            found.retain(|f| !finding::allowed(scan.source(&f.path), f.line, f.rule));
+        }
+        findings.extend(found);
+    }
+    findings.extend(scan.each_file(finding::unexplained));
 
-    let mut findings: Vec<Finding> = dirs
-        .iter()
-        .flat_map(|(dir, names)| prefix::check_dir(dir, names))
-        .collect();
-    let mut sources: BTreeMap<String, String> = BTreeMap::new();
-    let mut source = |path: &str| -> String {
-        sources
-            .entry(path.to_string())
-            .or_insert_with(|| fs::read_to_string(path).unwrap_or_default())
-            .clone()
-    };
-    let sim_dirs = crate::layers::sim_dirs();
-    findings.extend(unwrap::missing_roots(&files, &sim_dirs));
-    let texts: Vec<(String, String)> = files.iter().map(|p| (p.clone(), source(p))).collect();
-    let components =
-        full_literal::Components::load(texts.iter().map(|(p, s)| (p.as_str(), s.as_str())));
-    for (path, src) in &texts {
-        findings.extend(components.check(path, src));
-    }
-    for path in &files {
-        let src = source(path);
-        findings.extend(markers::check(path, &src));
-        findings.extend(skip::check(path, &src));
-        findings.extend(test_shape::check(path, &src));
-        findings.extend(unwrap::check(path, &src, &sim_dirs));
-        findings.extend(temp_dir::check_file(path, &src));
-        findings.extend(subprocess::check(path, &src));
-    }
-    findings.retain(|f| !finding::allowed(&source(&f.path), f.line, f.rule));
-    for path in &files {
-        findings.extend(finding::unexplained(path, &source(path)));
-    }
-    // After the retain: an `ignored` file has no allow (the fix is the pattern).
-    findings.extend(ignored::check(".", &files));
-
-    let body = render(&findings, &crowded(&dirs));
+    let body = render(&findings, &crowded(&scan.dirs()));
     fs::create_dir_all(".lint").ok();
     fs::write(REPORT, &body).ok();
     if findings.is_empty() {
@@ -78,17 +78,6 @@ pub fn run() {
         eprint!("{body}");
         exit(1);
     }
-}
-
-/// File names grouped by their directory.
-fn by_dir(files: &[String]) -> BTreeMap<&str, Vec<&str>> {
-    let mut dirs: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
-    for f in files {
-        if let Some((dir, name)) = f.rsplit_once('/') {
-            dirs.entry(dir).or_default().push(name);
-        }
-    }
-    dirs
 }
 
 /// Directories past the ≲10-files aim, most crowded first. A signal, never a failure.
@@ -126,22 +115,4 @@ fn render(findings: &[Finding], crowded: &[(&str, usize)]) -> String {
 }
 
 #[cfg(test)]
-mod full_literal_tests;
-#[cfg(test)]
-mod ignored_tests;
-#[cfg(test)]
 mod lockfile_tests;
-#[cfg(test)]
-mod markers_tests;
-#[cfg(test)]
-mod prefix_tests;
-#[cfg(test)]
-mod skip_tests;
-#[cfg(test)]
-mod subprocess_tests;
-#[cfg(test)]
-mod temp_dir_tests;
-#[cfg(test)]
-mod test_shape_tests;
-#[cfg(test)]
-mod unwrap_tests;

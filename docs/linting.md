@@ -21,6 +21,7 @@ agent can read exactly what failed.
 | Skipped tests | `tools/lint -- --rules` (`skip`) | **hard gate**: `#[ignore]` / `#[cfg_attr(…, ignore)]` needs `// lint: allow(skip) <why>` (#935) |
 | Pushed = built | `tools/lint -- --rules` (`ignored`) | **hard gate**: no scanned `.rs` file may match a `.gitignore` pattern, tracked or not; no allow (#935) |
 | No subprocesses | `tools/lint -- --rules` (`subprocess`) | **hard gate**: no line of `src/` names `std::process::Command` — the engine never shells out (to Blender or anything else); a real need takes `// lint: allow(subprocess) <why>` (#975) |
+| Order-free lists stay sorted | `tools/lint -- --rules` (`sorted`) | **hard gate**: a list under a `// sorted: <why>` (or `<!-- sorted: <why> -->`) marker stays in order up to its first blank line, so two branches adding entries touch different lines (#911) |
 | Dependency locks | cargo-deny (`deny.toml`) | **hard gate**: every git dependency is pinned by `rev` (`required-git-spec`); `nalgebra` only through the physics stack and no `cgmath` — glam is the one math crate (#975) |
 | `tools/lint` stays std-only | `make test-lint` | its `Cargo.lock` names one package, itself (#935) |
 | Test temp dirs | `tools/lint -- --rules` | **hard gate** (`test-temp-dir`): test code writes under `crate::test_temp::dir()` / `crate::temp::dir()`, never a bare `std::env::temp_dir()` (#999) |
@@ -158,8 +159,9 @@ inline comment, on the flagged line or in the comment/attribute lines right abov
 ```
 
 The reason is required; an allow without one is itself a finding (`[allow]`). A new
-rule is one more call in `tools/lint/src/rules/mod.rs`: no new flag, gate, CI step
-or baseline.
+rule is a module with its own `<rule>_tests.rs`, one line in the sorted `mod` list
+and one row in the sorted `RULES` table of `tools/lint/src/rules/mod.rs` (#911): no
+new flag, gate, CI step or baseline.
 
 - **`prefix-group`** — CLAUDE.md's "group by subfolder, not by filename prefix".
   Three or more sibling `.rs` files whose names start with the same word (up to the
@@ -188,6 +190,22 @@ or baseline.
   (use `scenario::run_isolated`); and test code reaches a GPU only through
   `render::test_gpu::headless_or_skip`, never `new_headless` directly
   (`rules/test_shape.rs`).
+- **`sorted`** (#911) — two branches appending to the end of one list always
+  collide on its last line; entries inserted in order land on different lines. A
+  list whose order means nothing carries `// sorted: <why order is free>` (Markdown:
+  `<!-- sorted: <why> -->`) on the line above it, and fails when an entry sorts
+  before the one above it. The list ends at the first blank line or the first line
+  indented less than its first entry; an entry's key is the rest of its line from
+  the first word that is not a Rust keyword (`pub`, `crate`, `mod`, …), compared
+  ignoring case, so `pub(crate) mod a;` sorts as `a;`. Deeper lines continue an
+  entry; comment and attribute lines and a Markdown table's header (right under the
+  marker) are skipped. A marker with no reason, one wrapped over two lines, or one
+  that governs no entries (a blank line under it, or a first entry indented deeper
+  than it) is itself a finding. Rust files and the tracked Markdown under `docs/`,
+  `.claude/skills/` and the repo root are scanned. A list
+  whose order matters (`src/app/registry.rs`'s `build()`, the `Entity` fields,
+  `ComponentKind`, `docs/api/index.md`'s namespaces) gets a comment saying why instead of a marker
+  (`rules/sorted.rs`).
 - **`full-literal`** (#976) — a test builds a first-class component (a `…Component`
   type `Entity` names, with three or more fields) through a constructor or a
   `..rest`, never a struct expression naming every field: such a literal breaks the

@@ -6,6 +6,7 @@
 //! fix is always the pattern (anchor it) or the path.
 
 use super::finding::Finding;
+use super::scan::Scan;
 use std::io::Write;
 use std::process::{Command, Stdio};
 
@@ -60,3 +61,12 @@ fn ignored_paths(dir: &str, files: &[String]) -> Result<Vec<String>, String> {
         .map(String::from)
         .collect())
 }
+
+/// The rule over every scanned file, in the repo at the working directory.
+pub fn run(scan: &Scan) -> Vec<Finding> {
+    check(".", &scan.files)
+}
+
+#[cfg(test)]
+#[path = "ignored_tests.rs"]
+mod tests;

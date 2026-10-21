@@ -38,6 +38,10 @@ avoid:
   sibling's brief ("stay out of `Cargo.toml`"); the watch holds a second one
   anyway (#969).
 
+Where order means nothing, a list is kept sorted under a `// sorted: <why>` marker
+(the `sorted` rule, #911), so parallel entries land on different lines; reach for
+the marker when a new append-only list appears.
+
 **Split by responsibility, not by parallelism.** Sub-issues that all touch the
 same type are one branch: a first-class component's four axes are one change the
 completeness gate won't accept in pieces. Sub-issues are for work separable *in

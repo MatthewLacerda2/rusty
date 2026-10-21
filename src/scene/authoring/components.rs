@@ -32,6 +32,7 @@ macro_rules! component_kinds {
     };
 }
 
+// Not sorted (#911): declaration order is the Add Component menu's order.
 component_kinds! {
     /// The first-class components the inspector's "Add Component" menu can attach /
     /// detach. `Script` is excluded: a script attachment carries a path (it is "add

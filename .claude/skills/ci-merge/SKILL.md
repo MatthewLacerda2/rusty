@@ -296,11 +296,13 @@ description.
 
 ## Rebasing
 
-Expect conflicts wherever every feature appends: `Entity`'s `Option<…Component>`
-fields, `ComponentKind`'s variant list, `api/mod.rs`'s module
-list, `app/registry.rs`'s ordered `register` calls, the Add Component menu,
+Expect conflicts wherever every feature appends in an order that matters:
+`Entity`'s `Option<…Component>` fields, `ComponentKind`'s variant list,
+`app/registry.rs`'s ordered `register` calls, the Add Component menu,
 `docs/api/index.md`'s namespace list, `scripting/callbacks.rs`, and the burn-down
-baselines where both sides *removed* lines.
+baselines where both sides *removed* lines. Lists under a `sorted` marker (#911:
+`api/mod.rs`, the Lua surface, the lint rules) mostly merge clean; when two
+entries do meet, keep both, in order.
 
 `make queue` hands every one of these back rather than resolving it.
 

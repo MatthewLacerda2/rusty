@@ -263,6 +263,10 @@ headless replays stay byte-identical):
 
 One file per namespace, in reference order:
 
+<!-- Not sorted (#911): `scripting::api_doc::assemble` joins the pages in the order
+this list links them, and that assembled reference is what the dev MCP resource
+serves an agent. A new entry goes where it reads best. -->
+
 - [`Transform`](Transform.md)
 - [`Material`](Material.md)
 - [`Animator`](Animator.md)

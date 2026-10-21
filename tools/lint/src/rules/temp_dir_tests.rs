@@ -1,5 +1,5 @@
-use super::finding::allowed;
-use super::temp_dir::{check_file, RULE};
+use super::{check_file, RULE};
+use crate::rules::allowed;
 
 const CALL: &str = "    let d = std::env::temp_dir().join(\"x\");\n";
 

@@ -15,6 +15,7 @@
 //! may name the calls.
 
 use super::finding::Finding;
+use super::scan::Scan;
 use super::test_code;
 
 pub const INNER_CFG: &str = "test-inner-cfg";
@@ -68,3 +69,12 @@ pub fn check(path: &str, source: &str) -> Vec<Finding> {
     }
     found
 }
+
+/// The rule over every scanned file.
+pub fn run(scan: &Scan) -> Vec<Finding> {
+    scan.each_file(check)
+}
+
+#[cfg(test)]
+#[path = "test_shape_tests.rs"]
+mod tests;

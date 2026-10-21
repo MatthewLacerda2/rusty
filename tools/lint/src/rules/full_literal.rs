@@ -10,6 +10,7 @@
 //! `// lint: allow(full-literal) <why>`.
 
 use super::finding::Finding;
+use super::scan::Scan;
 use super::test_code;
 use std::collections::BTreeMap;
 
@@ -179,3 +180,13 @@ fn is_ident(c: char) -> bool {
 fn strip_comment(line: &str) -> &str {
     line.find("//").map_or(line, |i| &line[..i])
 }
+
+/// The rule over every scanned file, with `Entity`'s components read from the scan.
+pub fn run(scan: &Scan) -> Vec<Finding> {
+    let components = Components::load(scan.files.iter().map(|p| (p.as_str(), scan.source(p))));
+    scan.each_file(|p, s| components.check(p, s))
+}
+
+#[cfg(test)]
+#[path = "full_literal_tests.rs"]
+mod tests;

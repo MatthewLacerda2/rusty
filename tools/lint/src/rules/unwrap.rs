@@ -11,6 +11,7 @@
 //! Platform modules are out of scope. `.expect("why")` stays the sanctioned escape.
 
 use super::finding::Finding;
+use super::scan::Scan;
 
 pub const RULE: &str = "unwrap-deny";
 /// The attribute every sim root carries.
@@ -82,3 +83,14 @@ fn names_lint(code: &str, name: &str) -> bool {
 fn strip_comment(line: &str) -> &str {
     line.find("//").map_or(line, |i| &line[..i])
 }
+
+/// The rule over the layer table's sim rows and every scanned file.
+pub fn run(scan: &Scan) -> Vec<Finding> {
+    let mut found = missing_roots(&scan.files, &scan.sim_dirs);
+    found.extend(scan.each_file(|p, s| check(p, s, &scan.sim_dirs)));
+    found
+}
+
+#[cfg(test)]
+#[path = "unwrap_tests.rs"]
+mod tests;
