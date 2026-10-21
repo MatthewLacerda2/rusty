@@ -9,6 +9,15 @@
 
 use glam::{DMat3, DMat4, DQuat, DVec3};
 
+/// A local transform in glTF's axes, as [`Basis::local`] splits it.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Local {
+    pub translation: [f32; 3],
+    /// A unit quaternion, `[x, y, z, w]`.
+    pub rotation: [f32; 4],
+    pub scale: [f32; 3],
+}
+
 /// The rotation (or, for a left-handed file, reflection) taking file axes to
 /// glTF's.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -64,6 +73,22 @@ impl Basis {
         [m.x_axis.x, m.y_axis.y, m.z_axis.z].map(|v| v as f32)
     }
 
+    /// A local TRS transform in glTF's axes, part by part: translation, rotation
+    /// and scale through [`vector`](Self::vector), [`rotation`](Self::rotation)
+    /// and [`scale`](Self::scale), the very calls each animation key goes through.
+    /// It is the one decomposition a node's rest pose and its keys share (#1110):
+    /// splitting the conjugated matrix instead moves a negative scale's sign onto
+    /// whichever axis glam picks and turns the rotation 180° to match, so a rest
+    /// pose and a key 0 that mean the same transform would blend through a
+    /// flattened bone. As Unity's importer does, the scale keeps the file's signs.
+    pub fn local(&self, t: &ufbx::Transform) -> Local {
+        Local {
+            translation: self.vector(t.translation),
+            rotation: self.rotation(t.rotation),
+            scale: self.scale(t.scale),
+        }
+    }
+
     /// A transform in glTF's axes.
     pub fn matrix(&self, m: DMat4) -> DMat4 {
         self.c * m * self.c.transpose()
@@ -94,15 +119,6 @@ pub fn to_dmat4(m: &ufbx::Matrix) -> DMat4 {
         m.m00, m.m10, m.m20, 0.0, m.m01, m.m11, m.m21, 0.0, m.m02, m.m12, m.m22, 0.0, m.m03, m.m13,
         m.m23, 1.0,
     ])
-}
-
-/// A ufbx transform (TRS) as a glam matrix.
-pub fn trs(t: &ufbx::Transform) -> DMat4 {
-    DMat4::from_scale_rotation_translation(
-        DVec3::new(t.scale.x, t.scale.y, t.scale.z),
-        glam::DQuat::from_xyzw(t.rotation.x, t.rotation.y, t.rotation.z, t.rotation.w),
-        DVec3::new(t.translation.x, t.translation.y, t.translation.z),
-    )
 }
 
 #[cfg(test)]

@@ -20,6 +20,15 @@ use std::path::Path;
 
 /// Convert the FBX at `source` into a `.glb` at `out`.
 pub fn convert(source: &Path, out: &Path) -> Result<(), ImportError> {
+    let scene = load(source)?;
+    let out_dir = out.parent().unwrap_or_else(|| Path::new(""));
+    let document = document(&scene, out_dir)?;
+    std::fs::write(out, glb::write(&document))
+        .map_err(|e| ImportError::Parse(format!("writing {}: {e}", out.display())))
+}
+
+/// The FBX at `source`, read by ufbx in metres.
+fn load(source: &Path) -> Result<ufbx::SceneRoot, ImportError> {
     // Units are ufbx's to convert; axes are `basis`'s (see there for why).
     let opts = ufbx::LoadOpts {
         target_unit_meters: 1.0,
@@ -28,12 +37,8 @@ pub fn convert(source: &Path, out: &Path) -> Result<(), ImportError> {
         generate_missing_normals: true,
         ..Default::default()
     };
-    let scene = ufbx::load_file(&source.to_string_lossy(), opts)
-        .map_err(|e| ImportError::Parse(format!("{}: {e:?}", source.display())))?;
-    let out_dir = out.parent().unwrap_or_else(|| Path::new(""));
-    let document = document(&scene, out_dir)?;
-    std::fs::write(out, glb::write(&document))
-        .map_err(|e| ImportError::Parse(format!("writing {}: {e}", out.display())))
+    ufbx::load_file(&source.to_string_lossy(), opts)
+        .map_err(|e| ImportError::Parse(format!("{}: {e:?}", source.display())))
 }
 
 /// The glTF document for a loaded FBX scene. Texture URIs are made relative to
@@ -99,12 +104,12 @@ fn add_node(
     } else {
         node.element.name.to_string()
     };
-    let local = basis.matrix(basis::trs(&node.local_transform));
-    let (scale, rotation, translation) = local.to_scale_rotation_translation();
+    // Split as the animation keys are, so a clip blends with the rest pose.
+    let local = basis.local(&node.local_transform);
     let mut gltf_node = glb::Node::new(name);
-    gltf_node.translation = translation.as_vec3().to_array();
-    gltf_node.rotation = rotation.as_quat().normalize().to_array();
-    gltf_node.scale = scale.as_vec3().to_array();
+    gltf_node.translation = local.translation;
+    gltf_node.rotation = local.rotation;
+    gltf_node.scale = local.scale;
     out.push(gltf_node);
     ids.insert(node.element.element_id, index);
     let children: Vec<usize> = node

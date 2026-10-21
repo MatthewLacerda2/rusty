@@ -1,0 +1,78 @@
+; FBX 7.4.0 project file
+; One bone mirrored by scale (#1110). Hand-written, so every number is deliberate:
+; Z up, like skinned_cube.fbx, with Lcl Scaling (1,-1,1) and a 30° turn about Z,
+; so the change of basis permutes the negative scale onto another axis. One
+; stack, "Hold", keys only the translation; ufbx bakes the rotation and scale
+; keys at rest, so key 0 and the rest pose are the same transform.
+FBXHeaderExtension:  {
+	FBXHeaderVersion: 1003
+	FBXVersion: 7400
+	Creator: "rusty test fixture"
+}
+GlobalSettings:  {
+	Version: 1000
+	Properties70:  {
+		P: "UpAxis", "int", "Integer", "",2
+		P: "UpAxisSign", "int", "Integer", "",1
+		P: "FrontAxis", "int", "Integer", "",1
+		P: "FrontAxisSign", "int", "Integer", "",-1
+		P: "CoordAxis", "int", "Integer", "",0
+		P: "CoordAxisSign", "int", "Integer", "",1
+		P: "UnitScaleFactor", "double", "Number", "",1
+	}
+}
+Objects:  {
+	Model: 3000, "Model::Bone", "LimbNode" {
+		Version: 232
+		Properties70:  {
+			P: "Lcl Translation", "Lcl Translation", "", "A",0,0,100
+			P: "Lcl Rotation", "Lcl Rotation", "", "A",0,0,30
+			P: "Lcl Scaling", "Lcl Scaling", "", "A",1,-1,1
+		}
+	}
+	NodeAttribute: 3100, "NodeAttribute::Bone", "LimbNode" {
+		TypeFlags: "Skeleton"
+	}
+	AnimationStack: 6000, "AnimStack::Hold", "" {
+		Properties70:  {
+			P: "LocalStart", "KTime", "Time", "",0
+			P: "LocalStop", "KTime", "Time", "",46186158000
+		}
+	}
+	AnimationLayer: 6100, "AnimLayer::BaseLayer", "" {
+	}
+	AnimationCurveNode: 6200, "AnimCurveNode::T", "" {
+		Properties70:  {
+			P: "d|X", "Number", "", "A",0
+			P: "d|Y", "Number", "", "A",0
+			P: "d|Z", "Number", "", "A",100
+		}
+	}
+	AnimationCurve: 6300, "AnimCurve::", "" {
+		Default: 100
+		KeyVer: 4009
+		KeyTime: *2 {
+			a: 0,46186158000
+		}
+		KeyValueFloat: *2 {
+			a: 100,200
+		}
+		KeyAttrFlags: *1 {
+			a: 4
+		}
+		KeyAttrDataFloat: *4 {
+			a: 0,0,0,0
+		}
+		KeyAttrRefCount: *1 {
+			a: 2
+		}
+	}
+}
+Connections:  {
+	C: "OO",3000,0
+	C: "OO",3100,3000
+	C: "OO",6100,6000
+	C: "OO",6200,6100
+	C: "OP",6200,3000, "Lcl Translation"
+	C: "OP",6300,6200, "d|Z"
+}
