@@ -9,7 +9,8 @@ is GitHub's failure, not the branch's, so [`waiting.wait_for`] re-runs those run
 (`gh run rerun --failed`, [`rerun_step`]) and keeps waiting inside the same
 `--deadline`; only a second cancellation hands back, as [`outcomes.RUNNERS`]. A red with
 any job `failure` besides a gate is the code's, and hands back at once as ever.
-A red whose jobs do not yet show the gate concluded is neither: it waits
+A red whose jobs do not yet show it over (the gate unconcluded, or any job
+still listed going, #1182) is neither: it waits
 ([`verdict.runners.unread`], #1109), but only for [`GATE_SHOWS_SECONDS`] from
 when this wait first read it so. A run that failed before any job started (an
 invalid workflow file, say) never lists a gate; waited on to the deadline it
@@ -29,7 +30,7 @@ from merging.verdict import absent, decide, runlist, runners
 # consistent; after this, the silence is the answer ([`verdict.absent.no_run`]).
 RUN_APPEARS_SECONDS = 300
 
-# How long a run listed failed whose jobs do not show its gate concluded is read
+# How long a run listed failed whose jobs do not show it over is read
 # as the jobs listing lagging (#1109), from the poll that first read it so: as
 # long as a run is given to appear, since both are the same eventual consistency.
 GATE_SHOWS_SECONDS = RUN_APPEARS_SECONDS
@@ -97,7 +98,7 @@ def progress(
     The verdict is [`verdict.decide.judge`]; this adds what a polling loop needs and
     a one-shot check does not: *not yet* against *no*. A red whose code is to
     blame stops at once, and names that run even when another workflow's red
-    is still unread. A red whose jobs do not yet show the gate concluded waits
+    is still unread. A red whose jobs do not yet show it over waits
     [`GATE_SHOWS_SECONDS`] from the poll that first read it so (`red_since`,
     kept by the caller per run attempt, as `rerun` is), then stops as listed;
     any other red stops at once. A run in flight waits.
@@ -120,7 +121,7 @@ def progress(
         workflow, run = unread[0]
         return outcomes.WAIT, [
             f"a `{workflow}` run for {sha[:7]} is listed failed, but {runlist.lag(run, jobs, workflow)}.",
-            "Whether the runners or the code reddened it is not known until the gate shows (#1109). Waiting.",
+            "Whether the runners or the code reddened it is not known until its jobs show it over (#1109, #1182). Waiting.",
         ]
     states = [
         decide.assess(pull, w, runlist.runs_for(runs, sha, w), jobs) for w in runlist.WORKFLOWS

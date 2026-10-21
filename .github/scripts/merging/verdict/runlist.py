@@ -117,7 +117,8 @@ def by_gate(run: dict, jobs: dict[int, list[dict]], workflow: str) -> dict:
     (CLAUDE.md, *Gates vs. signals*), so an unfinished run is read as settled — status and conclusion
     both the gate's — the moment the gate concludes, and a signal still running
     or red changes nothing. The gate `needs:` every gated job, so a concluded
-    gate means they concluded too.
+    gate means they concluded too, though the jobs listing may not show it
+    yet: [`going`] still waits on a gated job listed going (#1182).
 
     A run whose jobs belong to a newer attempt than the run says is read as
     that attempt, unfinished ([`latest`], #881). Otherwise only an
@@ -189,13 +190,17 @@ def by_gates(runs: list[dict], jobs: dict[int, list[dict]], workflow: str) -> li
 
 def signals(run: dict, jobs: dict[int, list[dict]], workflow: str) -> list[str]:
     """The jobs of `run` still going that its gate does not wait for (#555)."""
-    gate, gated = WORKFLOWS[workflow]
-    waited = {gate, "changes", *gated}
     return [
         j.get("name", "")
         for j in jobs.get(run.get("id"), [])
-        if j.get("conclusion") is None and base(j.get("name", "")) not in waited
+        if j.get("conclusion") is None and base(j.get("name", "")) not in waited(workflow)
     ]
+
+
+def waited(workflow: str) -> set[str]:
+    """The jobs `workflow`'s gate waits for: itself, `changes` and its gated jobs."""
+    gate, gated = WORKFLOWS[workflow]
+    return {gate, "changes", *gated}
 
 
 def live(runs: list[dict]) -> list[dict]:
@@ -234,8 +239,7 @@ def going(run: dict, jobs: dict[int, list[dict]], workflow: str) -> list[dict]:
     listed = [j for j in ran if j.get("status", "completed") != "completed" or j.get("conclusion") is None]
     if not run.get(BY_GATE):
         return listed
-    gate, gated = WORKFLOWS[workflow]
-    return [j for j in listed if base(j.get("name", "")) in {gate, "changes", *gated}]
+    return [j for j in listed if base(j.get("name", "")) in waited(workflow)]
 
 
 def agrees(run: dict, jobs: dict[int, list[dict]], workflow: str) -> bool:

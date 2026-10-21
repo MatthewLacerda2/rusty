@@ -42,9 +42,11 @@ def assess(
 
     `runs` is every run of `workflow` on the head (see [`runlist.runs_for`]). Order is
     [`FAILED`] → [`RUNNING`] → [`ABSENT`] / [`UNBUILT`] → [`PASSED`]: a commit
-    carrying a red run and a live one is already answered. A run whose gate
-    has not concluded is [`RUNNING`] whatever the runs listing says of it
-    ([`runlist.lagging`], #1095): [`UNBUILT`] is judged only on a settled gate.
+    carrying a red run and a live one is already answered. A run whose jobs
+    do not [`runlist.agrees`] it is over (its gate unconcluded, #1095, or any
+    job it waits for still listed going, #1182) is [`RUNNING`] whatever the
+    runs listing says of it ([`runlist.lagging`]): [`UNBUILT`] is judged only
+    on a run every listing calls over.
     """
     short = pull.get("headRefOid", "")[:7]
     if not runs:
@@ -77,7 +79,7 @@ def assess(
     if lagging:
         return RUNNING, [
             f"a `{workflow}` run for {short} is listed completed, but {runlist.lag(lagging[0], jobs, workflow)}.",
-            "The two listings are read apart and one can lag the other (#1095). Wait for the gate.",
+            "The two listings are read apart and one can lag the other (#1095, #1182). Waiting for the jobs listing to catch up.",
         ]
 
     real = [r for r in kept if ran_something(r, jobs, workflow)]
