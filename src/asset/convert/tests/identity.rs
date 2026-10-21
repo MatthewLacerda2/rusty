@@ -41,9 +41,15 @@ fn sources_differing_only_by_the_assets_prefix_get_distinct_caches() {
     assert_ne!(with, cache_of(&root, &["props", "crate.fbx"]));
 }
 
-/// A path component: letters of either case, `\`, `.` and `_`, never `.` or `..`.
+/// A path component: letters of either case, `.` and `_`, and `\` where it is part
+/// of a name (Linux and macOS; a separator on Windows), never `.` or `..`.
 fn component() -> impl Strategy<Value = String> {
-    "[aAbB\\\\._]{1,3}".prop_filter("a name, not . or ..", |c| c != "." && c != "..")
+    let name = if cfg!(windows) {
+        "[aAbB._]{1,3}"
+    } else {
+        "[aAbB\\\\._]{1,3}"
+    };
+    name.prop_filter("a name, not . or ..", |c| c != "." && c != "..")
 }
 
 /// A project-relative source path, `assets/` first or not.
