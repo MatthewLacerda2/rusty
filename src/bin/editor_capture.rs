@@ -36,6 +36,7 @@ use rusty::shell::editor::capture_picker;
 mod sample_picker;
 
 fn main() {
+    rusty::logging::init();
     let mut args: Vec<String> = std::env::args().skip(1).collect();
     let project = rusty::core::project::take_flag(&mut args).unwrap_or_else(|e| fail(&e));
     let (out, scene, opts, page) = parse(&args).unwrap_or_else(|e| fail(&e));

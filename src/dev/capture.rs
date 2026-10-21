@@ -49,7 +49,7 @@ pub fn no_adapter(what: &str) -> Result<(), String> {
             "{REQUIRE_GPU_ENV}=1 but no GPU or software adapter was found — cannot {what}"
         ));
     }
-    log::warn!("no GPU/software adapter available — skipping {what}");
+    log::warn!("[Capture] no GPU/software adapter available — skipping {what}");
     Ok(())
 }
 

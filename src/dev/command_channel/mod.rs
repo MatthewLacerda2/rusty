@@ -104,7 +104,8 @@ impl CommandChannel {
     pub fn drain(&self, scripts: &ScriptManager, console: &RefCell<ConsoleLogs>) {
         while let Ok((line, reply_tx)) = self.rx.try_recv() {
             let outcome = console::evaluate_line(scripts, console, &line);
-            let _ = reply_tx.send(session::response_line(&outcome));
+            let warnings = crate::logging::forward(console);
+            let _ = reply_tx.send(session::response_line(&outcome, &warnings));
         }
     }
 }

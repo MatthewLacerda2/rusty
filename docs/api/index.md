@@ -49,6 +49,15 @@ on **stdout**, in lockstep:
 - success: `{"ok":true,"result":"<rendered value, or empty for a statement>"}`
 - failure: `{"ok":false,"error":"<message>"}`
 
+When the engine itself warned or errored since the previous response (an asset it
+skipped, a mesh collider it dropped), the response also carries them, oldest first,
+under an optional `"warnings"` key; the key is absent when there are none. A warning
+that repeated in a row is shown once with its count, `"… (×3)"`. The first response
+also carries what the boot raised. On a windowed engine (below) a reply carries what
+was raised while *its* line was evaluated; the rest shows in the window's console.
+
+- `{"ok":true,"result":"","warnings":["[Asset] texture 'rock.png' skipped: not found"]}`
+
 A line is evaluated as an expression first (so it echoes its value), then as a
 statement. **State persists for the life of the process**: globals set on one line
 are visible on the next, and any world mutation (a loaded scene, baked nav, an

@@ -30,7 +30,7 @@ impl OsClipboard {
         match arboard::Clipboard::new() {
             Ok(clipboard) => Some(Self::Arboard(clipboard)),
             Err(err) => {
-                log::warn!("clipboard unavailable: {err}");
+                log::warn!("[Input] clipboard unavailable: {err}");
                 None
             }
         }
@@ -64,7 +64,7 @@ impl ClipboardSource for OsClipboard {
             Self::Wayland(clipboard) => clipboard.store(text),
             Self::Arboard(clipboard) => {
                 if let Err(err) = clipboard.set_text(text) {
-                    log::warn!("clipboard write failed: {err}");
+                    log::warn!("[Input] clipboard write failed: {err}");
                 }
             }
         }

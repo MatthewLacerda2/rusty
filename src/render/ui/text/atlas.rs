@@ -80,7 +80,9 @@ impl GlyphAtlas {
         while self.cursor.1 + h > self.height {
             if self.height >= MAX_HEIGHT {
                 if !self.warned {
-                    log::warn!("UI glyph atlas full ({WIDTH}×{MAX_HEIGHT}); glyphs skipped");
+                    log::warn!(
+                        "[Render] UI glyph atlas full ({WIDTH}×{MAX_HEIGHT}); glyphs skipped"
+                    );
                     self.warned = true;
                 }
                 return None;

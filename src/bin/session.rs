@@ -24,6 +24,7 @@ use std::process::exit;
 use rusty::dev::session::{self, Session};
 
 fn main() {
+    rusty::logging::init();
     let args: Vec<String> = std::env::args().skip(1).collect();
 
     // `--project <dir>` chdirs first; then `--empty` starts blank, an explicit path

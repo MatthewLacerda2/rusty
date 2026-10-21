@@ -73,6 +73,15 @@ the open project's root.
 A tool whose Lua *fails* reports the error in-band (`isError: true` with the message
 as text), per MCP convention — the agent sees it and recovers, the server stays up.
 
+**Engine warnings come back in-band.** When the engine warned or errored while a
+call ran (an asset it skipped, a mesh collider it dropped), the `eval` or `snapshot`
+result carries a **second text block** after the answer, starting `engine warnings:`
+with one warning per line; the first block stays the answer, so a snapshot's JSON
+still parses. Headless, it holds everything raised since the previous call (the first
+call also gets what the boot raised); attached to a window, what was raised while
+that call's line was evaluated, the rest showing in the window's console. A warning
+that repeated in a row is shown once with its count, `… (×3)`.
+
 **Resources** (`resources/list`, `resources/read`):
 
 - `rusty://scripting-api.md` — the full Lua API reference (`docs/api/`, assembled into one

@@ -109,7 +109,7 @@ pub fn load(path: Option<&str>) -> FontHandle {
         Some(f) => Arc::new(f),
         None => {
             if let Some(p) = path {
-                log::warn!("font '{p}' did not load; using the default font");
+                log::warn!("[UI] font '{p}' did not load; using the default font");
             }
             Arc::clone(cache.entry(None).or_insert_with(|| Arc::new(bundled())))
         }

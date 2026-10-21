@@ -34,6 +34,10 @@ impl EvalBackend for Embedded {
     fn reopen(&self, root: &Path) -> Option<Result<(), String>> {
         Some(self.switch(root))
     }
+
+    fn take_warnings(&self) -> Vec<String> {
+        self.session.borrow().take_warnings()
+    }
 }
 
 impl Embedded {

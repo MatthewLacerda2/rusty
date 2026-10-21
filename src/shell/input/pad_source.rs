@@ -57,7 +57,7 @@ impl GilrsSource {
                 effects: HashMap::new(),
             }),
             Err(err) => {
-                log::warn!("gamepads unavailable: {err}");
+                log::warn!("[Input] gamepads unavailable: {err}");
                 None
             }
         }
@@ -133,7 +133,7 @@ impl PadSource for GilrsSource {
             Ok(effect) => {
                 self.effects.insert(device, effect);
             }
-            Err(err) => log::warn!("rumble failed on pad {device}: {err}"),
+            Err(err) => log::warn!("[Input] rumble failed on pad {device}: {err}"),
         }
     }
 }

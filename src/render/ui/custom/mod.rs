@@ -121,7 +121,7 @@ impl UiShaders {
             self.builds += 1;
             let source = source(name);
             let built = self.build(device, name, &source).map_err(|e| {
-                log::warn!("ui shader {name:?}: {e}; drawing with the standard UI shader");
+                log::warn!("[Render] ui shader {name:?}: {e}; drawing with the standard UI shader");
             });
             self.variants.insert(name.to_owned(), (source, built.ok()));
         }

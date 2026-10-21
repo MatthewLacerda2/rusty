@@ -19,6 +19,7 @@ use rusty::core::project::Access;
 use rusty::dev::scenario;
 
 fn main() {
+    rusty::logging::init();
     let mut args: Vec<String> = std::env::args().skip(1).collect();
     let project = rusty::core::project::take_flag(&mut args);
     let (Ok(project), [scenario_path, out_dir]) = (project, args.as_slice()) else {
