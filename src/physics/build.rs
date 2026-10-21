@@ -8,7 +8,8 @@ use glam::{Quat, Vec3};
 use rapier3d::prelude::*;
 
 use crate::components::{
-    CapsuleAxis, ColliderShape, CollisionDetection, PhysicsMaterial, RigidBodyComponent,
+    round_radius, CapsuleAxis, ColliderShape, CollisionDetection, PhysicsMaterial,
+    RigidBodyComponent,
 };
 use crate::ecs::World;
 use crate::scene::Scene;
@@ -228,8 +229,7 @@ pub(super) fn try_build_shape(
             ColliderBuilder::ball(r).build()
         }
         ColliderShape::Cylinder { radius, height } => {
-            // The larger cross axis, as a capsule's radius is (#1131).
-            let r = (*radius * abs.x.max(abs.z)).max(1e-4);
+            let r = round_radius(*radius, abs, CapsuleAxis::Y).max(1e-4);
             let half_h = (*height * abs.y * 0.5).max(1e-4);
             ColliderBuilder::cylinder(half_h, r).build()
         }
@@ -263,13 +263,8 @@ fn capsule_builder(radius: f32, height: f32, axis: CapsuleAxis, scale: Vec3) -> 
 /// the shape it moves is the shape others collide with. A mirrored axis keeps its
 /// size: the controller passes its signed world scale here directly.
 pub(super) fn capsule_dims(radius: f32, height: f32, axis: CapsuleAxis, scale: Vec3) -> (f32, f32) {
-    let s = scale.abs();
-    let (along, cross) = match axis {
-        CapsuleAxis::X => (s.x, s.y.max(s.z)),
-        CapsuleAxis::Y => (s.y, s.x.max(s.z)),
-        CapsuleAxis::Z => (s.z, s.x.max(s.y)),
-    };
-    let r = (radius * cross).max(1e-4);
+    let along = scale.abs().dot(axis.unit());
+    let r = round_radius(radius, scale, axis).max(1e-4);
     (((height * along * 0.5) - r).max(0.0), r)
 }
 

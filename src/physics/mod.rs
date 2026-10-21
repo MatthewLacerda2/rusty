@@ -48,6 +48,8 @@ mod query_tests;
 mod ragdoll;
 #[cfg(test)]
 mod raycast_tests;
+#[cfg(test)]
+mod round_bounds_tests;
 mod spatial;
 #[cfg(test)]
 mod spatial_tests;
