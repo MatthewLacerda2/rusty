@@ -37,12 +37,14 @@ pub(super) use buffer::CasterBuffer;
 use buffer::CasterData;
 use glam::Mat4;
 
-/// What a run of casters shares: its clip (`None` for plain depth), whether it is
-/// mirrored (drawn with the winding flipped, #1134), then its mesh.
+/// What a run of casters shares: whether it is mirrored (drawn with the winding
+/// flipped, #1134), its clip (`None` for plain depth), then its mesh. Field order is
+/// sort order: mirrored first, so one clip pipeline's plain and mirrored versions
+/// don't alternate per material.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(super) struct CasterKey {
-    pub clip: Option<Clip>,
     pub mirrored: bool,
+    pub clip: Option<Clip>,
     pub mesh: MeshId,
 }
 
@@ -67,8 +69,8 @@ impl CasterBatch {
 }
 
 /// Group `casters` into instanced runs of one key, returning the packed casters (in
-/// draw order) and the batches. Sorted by key — plain casters first, so the clipping
-/// pipelines bind last — and stable, so scene order holds within a run; depth writes
+/// draw order) and the batches. Sorted by key — unmirrored before mirrored, and
+/// within each plain casters first, so the clipping pipelines bind last — and stable, so scene order holds within a run; depth writes
 /// make the order between runs irrelevant. With `instancing` off, one draw per caster
 /// in scene order (the pre-#470 path, for comparison).
 pub(super) fn batch_casters(
@@ -222,8 +224,8 @@ impl ShadowRenderer {
             }
             casters.push(Candidate {
                 key: CasterKey {
-                    clip: clip.map(|c| c.clip),
                     mirrored: is_mirrored(world),
+                    clip: clip.map(|c| c.clip),
                     mesh: mesh_id,
                 },
                 num_indices: gpu_mesh.num_indices,

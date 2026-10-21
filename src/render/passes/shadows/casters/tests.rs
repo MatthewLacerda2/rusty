@@ -7,8 +7,8 @@ fn at(x: f32, bone_base: u32) -> CasterData {
 
 fn mesh(m: &str) -> CasterKey {
     CasterKey {
-        clip: None,
         mirrored: false,
+        clip: None,
         mesh: MeshId(m.to_string()),
     }
 }
@@ -96,4 +96,27 @@ fn a_mirrored_caster_draws_apart_from_unmirrored_copies() {
         .map(|b| (b.key.mirrored, b.counts()))
         .collect();
     assert_eq!(runs, [(false, (36, 1)), (true, (36, 2))]);
+}
+
+/// Mirroring sorts before the clip's material, so one clip pipeline's plain and
+/// mirrored versions each bind once, not once per material.
+#[test]
+fn mirrored_runs_sort_before_the_clip_material() {
+    let key = |mirrored, material| CasterKey {
+        mirrored,
+        clip: Some(Clip {
+            pipeline: 1,
+            material,
+        }),
+        ..mesh("Box")
+    };
+    let casters = [(true, 3), (false, 4), (true, 4), (false, 3)]
+        .map(|(m, mat)| (key(m, mat), 36, at(0.0, 0)))
+        .to_vec();
+    let (_, batches) = batch_casters(casters, true);
+    let order: Vec<_> = batches
+        .iter()
+        .map(|b| (b.key.mirrored, b.key.clip.unwrap().material))
+        .collect();
+    assert_eq!(order, [(false, 3), (false, 4), (true, 3), (true, 4)]);
 }
