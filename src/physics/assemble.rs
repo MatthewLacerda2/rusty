@@ -10,7 +10,7 @@
 use rapier3d::prelude::*;
 
 use super::build::{
-    body_inputs, build_shape, ccd_enabled, collider_inputs, gravity_scale, interaction_groups,
+    body_inputs, build_shape_for, ccd_enabled, collider_inputs, gravity_scale, interaction_groups,
     BodyClass,
 };
 use super::character::upright_offset;
@@ -123,7 +123,7 @@ impl PhysicsWorld {
             .mesh_geom
             .as_ref()
             .map(|(p, i)| (p.as_slice(), i.as_slice()));
-        let mut collider = build_shape(&inp.shape, pose.scale, mesh_ref)?;
+        let mut collider = build_shape_for(id, &inp.shape, pose.scale, mesh_ref)?;
         let (offset_pos, offset_rot) = relative_pose(owner_pose, &pose);
         let offset = if inp.upright {
             upright_offset(
