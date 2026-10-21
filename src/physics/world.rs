@@ -209,24 +209,21 @@ impl PhysicsWorld {
     /// converting each body's world pose into the owner's local `Transform`
     /// (#445). Static and kinematic bodies keep their transform: physics never
     /// moves the one, and the other is where its Transform sent it (no
-    /// world↔local round-trip drift). Every
-    /// attached collider's world AABB is refreshed, since moving an owner moves
-    /// its compound children too.
+    /// world↔local round-trip drift). The Transform write refreshes the world
+    /// AABB of every collider under the owner, compound children included.
     fn sync_from_rapier(&self, scene: &mut Scene) {
         for &owner in self.plan.keys() {
             self.write_back(scene, owner);
         }
     }
 
-    /// Write one owner's integrated pose and velocities back onto its entity and
-    /// refresh the world AABB of every collider its body carries.
+    /// Write one owner's integrated pose and velocities back onto its entity.
     pub(super) fn write_back(&self, scene: &mut Scene, owner: u32) {
-        let (Some(ids), Some(body)) = (
-            self.plan.get(&owner),
-            self.id_to_body
-                .get(&owner)
-                .and_then(|&h| self.bodies.get(h)),
-        ) else {
+        let body = self
+            .id_to_body
+            .get(&owner)
+            .and_then(|&h| self.bodies.get(h));
+        let Some(body) = body.filter(|_| self.plan.contains_key(&owner)) else {
             return;
         };
         // Only a dynamic body's pose is the solver's. A kinematic one ended the
@@ -245,9 +242,6 @@ impl PhysicsWorld {
                 rb.velocity = body.linvel();
                 rb.angular_velocity = body.angvel();
             }
-        }
-        for &id in ids {
-            scene.update_entity_collider(id);
         }
     }
 }

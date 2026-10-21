@@ -25,13 +25,13 @@ pub mod core;
 mod descendants;
 #[cfg(test)]
 mod descendants_tests;
-mod epoch;
 mod handles;
 #[cfg(test)]
 mod query_tests;
 pub mod world;
+mod world_space;
 
 pub use access::{CompMut, CompRef};
 pub use descendants::Descendants;
-pub use epoch::Epoch;
 pub use world::World;
+pub use world_space::TransformMut;

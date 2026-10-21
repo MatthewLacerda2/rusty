@@ -22,7 +22,6 @@ pub use two_bone::solve_two_bone;
 
 use glam::{Quat, Vec3};
 
-use crate::components::transform::{local_rotation, mirror, world_rotation, world_scale};
 use crate::components::{IkChain, IkConstraint, IkTarget};
 use crate::scene::Scene;
 
@@ -138,7 +137,7 @@ impl Scene {
             IkTarget::Entity(id) => self
                 .world
                 .contains(id)
-                .then(|| self.compute_world_matrix(id).w_axis.truncate()),
+                .then(|| self.world.world_position(id)),
         }
     }
 
@@ -150,28 +149,20 @@ impl Scene {
     }
 
     fn bone_pose(&self, bone: u32) -> BonePose {
-        let pos = self.compute_world_matrix(bone).w_axis.truncate();
-        let parent = self.world.parent_world_matrix(bone);
-        let (rot, mirror) = self
-            .world
-            .transform(bone)
-            .map_or((Quat::IDENTITY, Vec3::ONE), |t| {
-                (
-                    world_rotation(parent, t.rotation),
-                    mirror(world_scale(parent, t.scale)),
-                )
-            });
-        BonePose { pos, rot, mirror }
+        BonePose {
+            pos: self.world.world_position(bone),
+            rot: self.world.world_rotation(bone),
+            mirror: self.world.world_mirror(bone),
+        }
     }
 
-    /// Give `bone` the world rotation `rot`, as a local rotation under its
-    /// parent's current world pose (seen through the mirror when the parent
-    /// reflects, #1119); the `(bone, written, before)` record.
+    /// Give `bone` the world rotation `rot` under its parent's current world pose
+    /// (seen through the mirror when the parent reflects, #1119); the `(bone,
+    /// written, before)` record.
     fn set_world_rotation(&mut self, bone: u32, rot: Quat) -> Option<(u32, Quat, Quat)> {
-        let local = local_rotation(self.world.parent_world_matrix(bone), rot);
-        let mut t = self.world.transform_mut(bone)?;
-        let before = t.rotation;
-        t.rotation = local;
+        let before = self.world.transform(bone)?.rotation;
+        self.world.set_world_rotation(bone, rot);
+        let local = self.world.transform(bone)?.rotation;
         Some((bone, local, before))
     }
 }

@@ -34,7 +34,11 @@ mod material;
 mod material_tests;
 mod query;
 mod shape;
+#[cfg(test)]
+mod singular_parent_tests;
 mod world;
+#[cfg(test)]
+mod write_back_tests;
 
 pub use character::{can_stand, move_character, CharacterMove};
 pub use events::collision::{CollisionEvents, CollisionPair, Contact};

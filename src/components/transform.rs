@@ -82,13 +82,13 @@ pub struct Pose {
 
 impl Pose {
     /// This local pose under a parent whose world matrix is `parent_world`:
-    /// [`world_rotation`] and [`world_scale`], never a split of the product
+    /// [`world_rotation`] and [`lossy_scale`], never a split of the product
     /// matrix, which loses a rotated child's scale axes.
     pub fn under(self, parent_world: Mat4) -> Self {
         Self {
             pos: parent_world.transform_point3(self.pos),
             rot: world_rotation(parent_world, self.rot),
-            scale: world_scale(parent_world, self.scale),
+            scale: lossy_scale(parent_world, self.rot, self.scale),
         }
     }
 }
@@ -117,15 +117,40 @@ pub fn local_rotation(parent_world: Mat4, world_rot: Quat) -> Quat {
     through_mirror(parent_world, parent_rot.inverse() * world_rot).normalize()
 }
 
-/// A child's signed world scale: `parent_world`'s (its reflection on X, as glam
-/// decomposes it) times the child's own `scale`. Its signs are the child's
-/// [`mirror`], an entity's own negative scale included (#1125).
+/// A child's signed world scale when it is not turned against its parent:
+/// `parent_world`'s split scale (its reflection on X, as glam decomposes it)
+/// times the child's own `scale`. Its signs are always the child's [`mirror`],
+/// turned or not; its magnitudes are [`Pose::under`]'s only for an unturned child.
 pub fn world_scale(parent_world: Mat4, scale: Vec3) -> Vec3 {
     parent_world.to_scale_rotation_translation().0 * scale
 }
 
+/// Unity's `lossyScale` of a child with local `rotation` and `scale` under
+/// `parent_world`: the lengths of its world matrix's columns, so the parent's
+/// scale is read along the child's own axes, however it is turned (#1156). The
+/// signs are the mirror convention: the child's own, with X flipped once more
+/// when the parent reflects (glam's split carries a reflection on X, and
+/// [`world_rotation`] sees through it). They are the child's [`mirror`], an
+/// entity's own negative scale included (#1125). Then [`world_rotation`] times
+/// this scale is the world matrix whenever the hierarchy does not shear; an
+/// unturned child gets the parent's split scale times its own, bit for bit.
+fn lossy_scale(parent_world: Mat4, rotation: Quat, scale: Vec3) -> Vec3 {
+    let axes = glam::Mat3::from_mat4(parent_world) * glam::Mat3::from_quat(rotation);
+    let lengths = Vec3::new(
+        axes.x_axis.length(),
+        axes.y_axis.length(),
+        axes.z_axis.length(),
+    );
+    let flip = if parent_world.determinant() < 0.0 {
+        -1.0
+    } else {
+        1.0
+    };
+    Vec3::new(flip, 1.0, 1.0) * lengths * scale
+}
+
 /// The reflection a pose carries: the sign of each axis of its signed world
-/// scale ([`world_scale`]), `±1` each, all `+1` for no mirror. The pose's world
+/// scale ([`Pose::under`]), `±1` each, all `+1` for no mirror. The pose's world
 /// matrix is its [`world_rotation`] times `mirror` times the scale's magnitude.
 pub fn mirror(signed_scale: Vec3) -> Vec3 {
     Vec3::select(signed_scale.cmplt(Vec3::ZERO), -Vec3::ONE, Vec3::ONE)

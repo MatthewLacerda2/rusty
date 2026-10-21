@@ -46,7 +46,7 @@ pub(super) fn place(
     let cam = view.camera.as_ref()?;
     let point = match anchor.target {
         Some(t) if world.transform(t).is_none() => return Some(Placement::Hidden),
-        Some(t) => world.compute_world_matrix(t).transform_point3(Vec3::ZERO) + anchor.offset,
+        Some(t) => world.local_to_world(t).transform_point3(Vec3::ZERO) + anchor.offset,
         None => anchor.offset,
     };
     let sp = cam.world_to_screen(point, view.screen);

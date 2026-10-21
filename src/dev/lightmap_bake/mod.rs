@@ -83,7 +83,6 @@ pub const UNSAVED: &str = "save the scene before baking lightmaps";
 
 /// The static scene flattened for the bake: owned data, free of the ECS.
 pub fn gather_bake_input(scene: &mut Scene) -> BakeScene {
-    scene.refresh_world_matrices();
     BakeScene::gather(scene, &texture_average)
 }
 

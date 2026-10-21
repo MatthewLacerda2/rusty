@@ -46,5 +46,5 @@ fn the_world_matrix_walk_survives_a_parent_cycle() {
     let b = w.spawn("b".into());
     w.set_parent_id(a, Some(b));
     w.set_parent_id(b, Some(a));
-    assert!(w.compute_world_matrix(a).is_finite());
+    assert!(w.local_to_world(a).is_finite());
 }

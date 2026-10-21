@@ -51,6 +51,7 @@ mod physics;
 mod prefab_api;
 mod procgen;
 mod proptest_scene;
+mod proptest_world_space;
 mod ragdoll;
 mod reflection_probes;
 mod ribbons;

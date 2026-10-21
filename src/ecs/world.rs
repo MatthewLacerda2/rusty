@@ -26,8 +26,8 @@
 use crate::components::Entity;
 
 use super::bundle::{build_bundle, Core};
-use super::epoch::Epoch;
 use super::handles::Handles;
+use super::world_space::WorldStore;
 
 pub(in crate::ecs) use hecs::{Ref, RefMut};
 
@@ -42,8 +42,8 @@ pub struct World {
     /// Monotonic insertion-sequence allocator: each `place` stamps `Core::seq`
     /// from it so narrow queries can sort matches back into insertion order.
     next_seq: u64,
-    /// Redrawn whenever an id may stop naming the same entity (#727).
-    epoch: Epoch,
+    /// Every entity's world matrix, dirty-flagged (`ecs::world_space`).
+    pub(super) world_space: WorldStore,
 }
 
 impl Default for World {
@@ -60,7 +60,7 @@ impl World {
             order: Vec::new(),
             next_id: 1,
             next_seq: 0,
-            epoch: Epoch::fresh(),
+            world_space: WorldStore::default(),
         }
     }
 
@@ -103,13 +103,14 @@ impl World {
             self.next_id = entity.id + 1;
         }
         self.place(entity);
+        self.world_space.invalidate_all(); // an orphan may already name this id as parent
     }
 
     /// Despawn an entity by stable id.
     pub fn despawn(&mut self, id: u32) {
+        self.world_space.invalidate_all(); // whatever named it as parent now reads as a root
         if let Some(handle) = self.handles.remove(id) {
             let _ = self.inner.despawn(handle);
-            self.epoch = Epoch::fresh();
         }
         self.order.retain(|&e| e != id);
     }
@@ -121,7 +122,7 @@ impl World {
         self.order.clear();
         self.next_id = 1;
         self.next_seq = 0;
-        self.epoch = Epoch::fresh();
+        self.world_space.reset();
     }
 
     pub fn contains(&self, id: u32) -> bool {
@@ -141,12 +142,6 @@ impl World {
                 .and_then(|mut q| q.get().map(|(n, c)| *n == *name && c.active))
                 .unwrap_or(false)
         })
-    }
-
-    /// Changes on every despawn and `clear`: a cache keyed by id is only valid
-    /// while this matches the epoch it was filled at (see `ecs::epoch`).
-    pub fn epoch(&self) -> Epoch {
-        self.epoch
     }
 
     /// The stable ids in insertion order.
@@ -268,6 +263,7 @@ impl World {
         let handle = self.inner.spawn(builder.build());
         self.handles.insert(id, handle);
         self.order.push(id);
+        self.world_space.mark_dirty(id);
     }
 
     /// Decompose an `Entity` document and overwrite a LIVE entity's whole
@@ -291,6 +287,7 @@ impl World {
         let mut builder = build_bundle(entity, seq);
         let new_handle = self.inner.spawn(builder.build());
         self.handles.insert(id, new_handle);
+        self.world_space.invalidate_all(); // its transform and parent may both differ
         true
     }
 }

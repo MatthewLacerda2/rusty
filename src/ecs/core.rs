@@ -13,8 +13,7 @@
 //! from this module and `access.rs`.
 
 use crate::components::{
-    AnimatorComponent, Entity, MaterialAsset, MeshComponent, Pose, ScriptComponent,
-    TransformComponent,
+    AnimatorComponent, Entity, MaterialAsset, MeshComponent, ScriptComponent, TransformComponent,
 };
 
 use super::access::{CompMut, CompRef};
@@ -25,11 +24,6 @@ impl World {
     /// The mandatory Transform. `None` only when the entity does not exist.
     pub fn transform(&self, id: u32) -> Option<CompRef<'_, TransformComponent>> {
         self.component::<TransformComponent>(id).map(CompRef::new)
-    }
-
-    pub fn transform_mut(&mut self, id: u32) -> Option<CompMut<'_, TransformComponent>> {
-        self.component_mut::<TransformComponent>(id)
-            .map(CompMut::new)
     }
 
     /// The entity's script attachments (possibly empty; many per object is legal).
@@ -83,7 +77,7 @@ impl World {
     }
 
     /// The local Transform matrix and the parent, in one lookup — the hot read
-    /// of every hierarchy walk (the world-matrix cache, the skin palette build).
+    /// of every hierarchy walk (the skin palette build).
     pub fn local_and_parent(&self, id: u32) -> Option<(glam::Mat4, Option<u32>)> {
         self.with_pair::<TransformComponent, Core, _>(id, |t, c| (t.to_matrix(), c.parent_id))
     }
@@ -106,41 +100,20 @@ impl World {
         std::iter::once(id).chain(self.ancestors(id))
     }
 
-    /// `id`'s world matrix: its local Transform under every ancestor's — the one
-    /// live world-matrix walk (#991), bounded as [`World::ancestors`] is. Identity for
-    /// a dead id.
-    pub fn compute_world_matrix(&self, id: u32) -> glam::Mat4 {
-        self.self_and_ancestors(id)
-            .filter_map(|c| self.transform(c).map(|t| t.to_matrix()))
-            .fold(glam::Mat4::IDENTITY, |below, local| local * below)
-    }
-
-    /// `id`'s world [`Pose`]: its local Transform [`Pose::under`] its live parent's
-    /// world matrix, or the local pose as-is for a root. The pose physics builds a
-    /// body at and a collider's world AABB reads (#1140). `None` for a dead id.
-    pub fn world_pose(&self, id: u32) -> Option<Pose> {
-        let local = self.transform(id)?.pose();
-        Some(match self.ancestors(id).next() {
-            Some(parent) => local.under(self.compute_world_matrix(parent)),
-            None => local,
-        })
-    }
-
-    /// The world matrix `id`'s local Transform sits under: its live parent's, or
-    /// identity for a root (or a dead id).
-    pub fn parent_world_matrix(&self, id: u32) -> glam::Mat4 {
-        self.ancestors(id)
-            .next()
-            .map_or(glam::Mat4::IDENTITY, |p| self.compute_world_matrix(p))
-    }
-
     /// Write the raw parent link. Hierarchy INVARIANTS (cycle checks, the
     /// parent's `children` list) are `Scene::set_parent`'s job; this is the
     /// storage-level write it and scene rehydration route through.
+    /// The subtree moves in world space, so its world matrices go dirty and its
+    /// colliders' AABBs follow (`ecs::world_space`).
     pub fn set_parent_id(&mut self, id: u32, parent: Option<u32>) -> bool {
-        self.component_mut::<Core>(id)
+        let written = self
+            .component_mut::<Core>(id)
             .map(|mut c| c.parent_id = parent)
-            .is_some()
+            .is_some();
+        if written {
+            self.moved(id);
+        }
+        written
     }
 
     /// The entity's child ids (cloned; empty for a dead id).
