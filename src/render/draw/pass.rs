@@ -231,6 +231,7 @@ impl Renderer {
             _outline_ent_buf,
             outline_bind_group,
             num_indices,
+            mirrored,
         )) = outline_resources
         else {
             return;
@@ -240,7 +241,12 @@ impl Renderer {
         };
         // The outline is a flat unlit silhouette (`use_texture = 0`), so group(2) is
         // never sampled — bind the default material group to satisfy the layout.
-        render_pass.set_pipeline(self.outline_pipeline.get());
+        let pipeline = if *mirrored {
+            &self.mirrored_outline_pipeline
+        } else {
+            &self.outline_pipeline
+        };
+        render_pass.set_pipeline(pipeline.get());
         render_pass.set_vertex_buffer(0, gpu_mesh.vertex_buffer.slice(..));
         render_pass.set_index_buffer(gpu_mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
         render_pass.set_bind_group(1, outline_bind_group, &[0]);

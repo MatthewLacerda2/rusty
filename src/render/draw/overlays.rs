@@ -7,6 +7,7 @@ use wgpu::util::DeviceExt;
 
 use crate::components::mesh::Vertex;
 use crate::render::draw::resources::{AabbResource, AxisResource, GridResource, OutlineResource};
+use crate::render::gpu::pipelines::winding::is_mirrored;
 use crate::render::{EntityUniform, MeshId, Renderer};
 use crate::scene::Scene;
 
@@ -125,19 +126,8 @@ impl Renderer {
         }
         let gpu_mesh = self.gpu_meshes.get(&mesh_id)?;
 
-        let transform = scene
-            .world
-            .transform(selected_id)
-            .expect("mandatory Transform");
-        // Scale up the model matrix slightly for the outline hull
-        let outline_scale = 1.05;
-        let scaled_transform = Mat4::from_scale_rotation_translation(
-            transform.scale * outline_scale,
-            transform.rotation,
-            transform.position,
-        );
-
-        let outline_uniform = outline_uniform(scaled_transform);
+        let world = scene.world_matrix(selected_id);
+        let outline_uniform = outline_uniform(outline_hull(world));
 
         let outline_ent_buf = self
             .device
@@ -158,6 +148,7 @@ impl Renderer {
             outline_ent_buf,
             outline_bind_group,
             gpu_mesh.num_indices,
+            is_mirrored(world),
         ))
     }
 
@@ -200,6 +191,12 @@ impl Renderer {
             }
         }
     }
+}
+
+/// Where the outline hull sits: the selection's own world matrix (#1142), so a child
+/// follows its parents, scaled up slightly about its pivot.
+pub(super) fn outline_hull(world: Mat4) -> Mat4 {
+    world * Mat4::from_scale(Vec3::splat(1.05))
 }
 
 /// The fixed outline-hull uniform (orange tint, unlit) at `model` — split out of

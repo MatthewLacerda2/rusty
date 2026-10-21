@@ -184,6 +184,7 @@ impl Renderer {
             transparent_pipeline: forward.transparent_pipeline,
             line_pipeline: forward.line_pipeline,
             outline_pipeline: forward.outline_pipeline,
+            mirrored_outline_pipeline: forward.mirrored_outline_pipeline,
             prepass_pipeline: forward.prepass_pipeline,
             ssao,
             skybox_renderer: forward.skybox_renderer,

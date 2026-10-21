@@ -49,6 +49,7 @@ pub(crate) struct ForwardPasses {
     pub transparent_pipeline: pipelines::LazyPipeline,
     pub line_pipeline: pipelines::LazyPipeline,
     pub outline_pipeline: pipelines::LazyPipeline,
+    pub mirrored_outline_pipeline: pipelines::LazyPipeline,
     pub prepass_pipeline: wgpu::RenderPipeline,
     pub skybox_renderer: skybox::SkyboxRenderer,
 }
@@ -274,6 +275,7 @@ fn create_forward_passes(
         transparent_pipeline: pl.transparent,
         line_pipeline: pl.line,
         outline_pipeline: pl.outline,
+        mirrored_outline_pipeline: pl.mirrored_outline,
         prepass_pipeline: pl.prepass,
         skybox_renderer,
     }
