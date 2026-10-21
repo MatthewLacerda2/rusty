@@ -1,10 +1,14 @@
 //! The import cache (#1024): where a converted source is cached, and that it is
 //! re-made exactly when the source changes.
 
-use super::{cache_path, converter_for, is_import_cache, refresh, Converter, Staging};
+use super::{converter_for, is_import_cache, refresh, Converted, Converter, Staging};
 use crate::asset::ImportError;
 use std::path::Path;
 
+mod failures;
+mod identity;
+mod locking;
+mod skips;
 mod staging;
 
 /// A converter that copies its source, so a test can see which bytes it wrote.
@@ -15,23 +19,10 @@ const COPY: Converter = Converter {
     convert: copy,
 };
 
-fn copy(source: &Path, to: &Staging) -> Result<(), ImportError> {
+fn copy(source: &Path, to: &Staging) -> Result<Converted, ImportError> {
     std::fs::copy(source, &to.glb)
-        .map(drop)
+        .map(|_| Converted::default())
         .map_err(|e| ImportError::Parse(e.to_string()))
-}
-
-#[test]
-fn a_project_caches_beside_its_generated_assets_without_the_assets_prefix() {
-    let root = Path::new("/game");
-    assert_eq!(
-        cache_path(root, "assets/models/soldier.fbx"),
-        Path::new("/game/assets/generated/imported/models/soldier.fbx.glb")
-    );
-    assert_eq!(
-        cache_path(root, "props/crate.FBX"),
-        Path::new("/game/assets/generated/imported/props/crate.FBX.glb")
-    );
 }
 
 #[test]

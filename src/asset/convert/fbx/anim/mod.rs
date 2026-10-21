@@ -12,18 +12,19 @@
 mod range;
 
 use super::basis::Basis;
-use crate::asset::convert::glb;
+use crate::asset::convert::{glb, Skip};
 use crate::core::collections::Map;
 use glam::{Quat, Vec3};
 
 /// One glTF animation per stack in `scene`, keying the nodes `nodes` maps (FBX
 /// element id → glTF node index). A stack that keys none of them is dropped; one
-/// that fails to bake is skipped with a warning, as Unity imports the model and
-/// its other takes.
+/// that fails to bake is added to `skipped` (#1102), as Unity imports the model
+/// and its other takes.
 pub fn animations(
     scene: &ufbx::Scene,
     basis: Basis,
     nodes: &Map<u32, usize>,
+    skipped: &mut Vec<Skip>,
 ) -> Vec<glb::Animation> {
     let mut out = Vec::new();
     for (i, stack) in scene.anim_stacks.iter().enumerate() {
@@ -36,7 +37,10 @@ pub fn animations(
         let baked = match ufbx::bake_anim(scene, &stack.anim, ufbx::BakeOpts::default()) {
             Ok(baked) => baked,
             Err(e) => {
-                log::warn!("[Asset] skipping FBX animation {name:?}: baking failed ({e:?})");
+                skipped.push(Skip {
+                    what: format!("FBX animation {name:?}"),
+                    why: format!("baking failed ({e:?})"),
+                });
                 continue;
             }
         };

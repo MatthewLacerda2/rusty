@@ -2,7 +2,7 @@
 //! set whole when it opens the `.glb`, and a failure leaves the old one as it was.
 
 use super::super::stage::hook::{self, Step};
-use super::super::{refresh, textures_dirs, Converter, Staging};
+use super::super::{lock, refresh, textures_dirs, Converted, Converter, Staging};
 use crate::asset::ImportError;
 use std::path::Path;
 
@@ -17,14 +17,14 @@ const TEXTURED: Converter = Converter {
     convert: textured,
 };
 
-fn textured(source: &Path, to: &Staging) -> Result<(), ImportError> {
+fn textured(source: &Path, to: &Staging) -> Result<Converted, ImportError> {
     let text = std::fs::read_to_string(source).unwrap();
     // As `fbx::texture` does: only the textures folder, never a cleared parent.
     std::fs::create_dir(&to.textures).map_err(|e| ImportError::Parse(e.to_string()))?;
     std::fs::write(to.textures.join("t.png"), &text).unwrap();
     let folder = to.textures.file_name().unwrap().to_string_lossy();
     std::fs::write(&to.glb, format!("{text}\n{folder}")).unwrap();
-    Ok(())
+    Ok(Converted::default())
 }
 
 /// A converter that writes half a `.glb`, then fails.
@@ -33,7 +33,7 @@ const FAILING: Converter = Converter {
     ..TEXTURED
 };
 
-fn failing(_: &Path, to: &Staging) -> Result<(), ImportError> {
+fn failing(_: &Path, to: &Staging) -> Result<Converted, ImportError> {
     std::fs::write(&to.glb, "half").unwrap();
     Err(ImportError::Parse("broken".into()))
 }
@@ -105,5 +105,6 @@ fn a_lost_stamp_reconverts_over_its_own_textures_folder() {
 
     refresh(&TEXTURED, &source, &out).unwrap();
     assert_eq!(read_whole(&out), "one");
-    assert_eq!(names(&dir).len(), 4, "{:?}", names(&dir));
+    // The source, the `.glb`, its textures, its stamp and its lock.
+    assert_eq!(names(&dir).len(), 5, "{:?}", names(&dir));
 }
