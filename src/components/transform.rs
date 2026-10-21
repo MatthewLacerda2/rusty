@@ -83,11 +83,30 @@ pub fn local_rotation(parent_world: Mat4, world_rot: Quat) -> Quat {
     through_mirror(parent_world, parent_rot.inverse() * world_rot).normalize()
 }
 
+/// A direction written in a child's local space, as the child's
+/// [`world_rotation`] must turn it to land on the drawn world direction: `F·dir`
+/// under a mirroring parent, `dir` itself otherwise. The child's matrix draws a
+/// local `dir` along `R_w·F·dir` (the reflection lives in the scale), so a local
+/// aim axis or joint axis is mirrored once, here, before the world rotation
+/// turns it (#1125). An unmirrored parent returns `dir` bit for bit.
+pub fn mirrored_direction(parent_world: Mat4, dir: Vec3) -> Vec3 {
+    if mirrors(parent_world) {
+        Vec3::new(-dir.x, dir.y, dir.z)
+    } else {
+        dir
+    }
+}
+
+/// Whether `parent_world` reflects (a negative determinant).
+fn mirrors(parent_world: Mat4) -> bool {
+    parent_world.determinant() < 0.0
+}
+
 /// `rotation` seen through a mirroring parent's reflection, `F·R·F`: a rotation
 /// about the axis reflected as a pseudovector, `(x, y, z, w) → (x, −y, −z, w)`.
 /// Its own inverse, so one function serves both directions.
 fn through_mirror(parent_world: Mat4, rotation: Quat) -> Quat {
-    if parent_world.determinant() < 0.0 {
+    if mirrors(parent_world) {
         Quat::from_xyzw(rotation.x, -rotation.y, -rotation.z, rotation.w)
     } else {
         rotation

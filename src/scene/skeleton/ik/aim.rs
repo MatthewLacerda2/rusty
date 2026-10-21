@@ -19,7 +19,10 @@ const EPS: f32 = 1e-6;
 pub struct AimSettings<'a> {
     /// Each bone's share of the turn, parallel to the chain; empty = even.
     pub weights: &'a [f32],
-    /// The aim direction in the last bone's local space.
+    /// The aim direction in the last bone's local space, as its world rotation
+    /// turns it: under a mirroring parent, the authored axis through
+    /// [`mirrored_direction`](crate::components::transform::mirrored_direction)
+    /// (#1125).
     pub axis: Vec3,
     /// The most the aim may leave the animated aim, in radians.
     pub clamp: f32,

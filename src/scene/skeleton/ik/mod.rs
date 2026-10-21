@@ -22,7 +22,7 @@ pub use two_bone::solve_two_bone;
 
 use glam::{Quat, Vec3};
 
-use crate::components::transform::{local_rotation, world_rotation};
+use crate::components::transform::{local_rotation, mirrored_direction, world_rotation};
 use crate::components::{IkChain, IkConstraint, IkTarget};
 use crate::scene::Scene;
 
@@ -109,9 +109,12 @@ impl Scene {
                 clamp_degrees,
                 ..
             } => {
+                // The tip's local axis as its world rotation turns it, through
+                // a mirroring parent (#1125).
+                let tip = bones[bones.len() - 1];
                 let settings = AimSettings {
                     weights,
-                    axis: *axis,
+                    axis: mirrored_direction(self.world.parent_world_matrix(tip), *axis),
                     clamp: clamp_degrees.to_radians(),
                     weight: c.weight,
                 };

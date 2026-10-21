@@ -11,7 +11,9 @@
 //! `swing_axis` made perpendicular to it — so a Ball's swing 1 is a rotation
 //! about Y and swing 2 one about Z (Unity's `CharacterJoint`). Both bodies get that
 //! same world frame, so the pose the bodies are in when the joint is built is its
-//! rest pose, and the limits are measured from it (Unity's behaviour). With
+//! rest pose, and the limits are measured from it (Unity's behaviour). Under a
+//! mirroring parent the axes are mirrored like the anchor, so the joint turns
+//! about the axis the entity's matrix draws (#1125). With
 //! `auto_configure_connected_anchor` off, the connected side's origin moves to
 //! `connected_anchor` (the connected entity's local space, or world space with no
 //! connected body — which joins to one shared fixed "world" body).
@@ -38,6 +40,7 @@ use super::collision_events::VelocitySnapshot;
 use super::compound::{body_owner, world_pose};
 use super::convert::to_pose;
 use super::world::PhysicsWorld;
+use crate::components::transform::mirrored_direction;
 use crate::components::{JointComponent, JointKind};
 use crate::scene::Scene;
 
@@ -50,6 +53,8 @@ mod inert_tests;
 mod load;
 #[cfg(test)]
 mod load_tests;
+#[cfg(test)]
+mod mirrored_tests;
 
 /// One joint that broke this tick: the joint entity and what broke it.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -153,7 +158,11 @@ impl PhysicsWorld {
         let j = &key.shape;
         let pose = world_pose(scene, id)?;
         let anchor = pose.pos + pose.rot * (pose.scale * j.anchor);
-        let rot = pose.rot * joint_basis(j.axis, j.swing_axis);
+        // The axes are local directions: seen through a mirroring parent like the
+        // anchor's scale, so the joint turns about the drawn axis (#1125).
+        let parent = scene.world.parent_world_matrix(id);
+        let local_axis = |v: Vec3| mirrored_direction(parent, v);
+        let rot = pose.rot * joint_basis(local_axis(j.axis), local_axis(j.swing_axis));
         let connected = match (j.auto_configure_connected_anchor, j.connected_body) {
             (true, _) => anchor,
             (false, None) => j.connected_anchor,
