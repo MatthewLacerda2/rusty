@@ -1,19 +1,25 @@
 //! src/physics/mirror_tests.rs — colliders under a mirrored parent (#1124).
 //!
-//! A negative world scale (glam puts the reflection in `scale.x`) keeps every
-//! primitive at its drawn size, Unity-style, and turns a mesh collider's geometry
-//! without turning its triangles inside out. Asserts the exact distance a ray
-//! travels to each shape, so a collapsed axis or a halved radius is caught.
+//! A negative world scale (see `MIRRORS` for where one lands) keeps every primitive
+//! at its drawn size, Unity-style, and turns a mesh collider's geometry without
+//! turning its triangles inside out. Exact ray distances catch a collapsed axis.
 
-use glam::Vec3;
+use glam::{vec3, Vec3};
 
 use super::build::build_shape;
+use super::build_tests::mesh_shape;
 use super::PhysicsWorld;
 use crate::components::{CapsuleAxis, ColliderComponent, ColliderShape};
 use crate::scene::Scene;
 
-/// The mirrors under test: a pure reflection, and a reflection with a stretch.
-const MIRRORS: [f32; 2] = [-1.0, -2.0];
+/// The mirrors under test: on X, a pure reflection and one with a stretch (where a
+/// child's lands); on Y and Z, where only an unparented entity's own scale puts one.
+const MIRRORS: [Vec3; 4] = [
+    vec3(-1.0, 1.0, 1.0),
+    vec3(-2.0, 1.0, 1.0),
+    vec3(1.0, -1.0, 1.0),
+    vec3(1.0, 1.0, -2.0),
+];
 
 /// A static `shape` at local `pos` under `parent`.
 fn add_child(scene: &mut Scene, parent: u32, pos: Vec3, shape: ColliderShape) -> u32 {
@@ -40,8 +46,7 @@ fn hit_from_minus_x(world: &PhysicsWorld, id: u32, y: f32, z: f32) -> f32 {
 
 #[test]
 fn mirrored_primitives_keep_their_drawn_size() {
-    for sx in MIRRORS {
-        let (mirror, abs) = (Vec3::new(sx, 1.0, 1.0), Vec3::new(-sx, 1.0, 1.0));
+    for mirror in MIRRORS {
         let shapes = [
             ColliderShape::Box { size: Vec3::ONE },
             ColliderShape::Sphere { radius: 0.5 },
@@ -57,7 +62,7 @@ fn mirrored_primitives_keep_their_drawn_size() {
         ];
         for shape in shapes {
             let got = build_shape(&shape, mirror, None).unwrap();
-            let want = build_shape(&shape, abs, None).unwrap();
+            let want = build_shape(&shape, mirror.abs(), None).unwrap();
             let (g, w) = (
                 got.shape().compute_local_aabb(),
                 want.shape().compute_local_aabb(),
@@ -73,7 +78,7 @@ fn mirrored_primitives_keep_their_drawn_size() {
 
 #[test]
 fn a_ray_hits_mirrored_shapes_where_they_are_drawn() {
-    for sx in MIRRORS {
+    for sx in MIRRORS.map(|m| m.x).into_iter().filter(|&x| x < 0.0) {
         let mut scene = Scene::new();
         let parent = scene.add_entity("Mirror".to_string());
         scene.world.transform_mut(parent).unwrap().scale = Vec3::new(sx, 1.0, 1.0);
@@ -133,11 +138,7 @@ fn a_mirrored_trimesh_faces_out() {
         [-1.0, -1.0, 1.0],
     ];
     let i = [0, 1, 2, 0, 3, 1, 0, 2, 3, 1, 3, 2];
-    let shape = ColliderShape::Mesh {
-        convex: false,
-        local_min: Vec3::NEG_ONE,
-        local_max: Vec3::ONE,
-    };
+    let shape = mesh_shape(false);
     let mesh = Some((p.as_slice(), i.as_slice()));
     // Unscaled proves the fixture; two negative axes are a rotation, so the winding stays.
     for (x, y) in [(1.0, 1.0), (-1.0, 1.0), (-2.0, 1.0), (-1.0, -1.0)] {

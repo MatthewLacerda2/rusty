@@ -42,7 +42,7 @@ fn unit_cube() -> (Vec<[f32; 3]>, Vec<u32>) {
     (p, i)
 }
 
-fn mesh_shape(convex: bool) -> ColliderShape {
+pub(super) fn mesh_shape(convex: bool) -> ColliderShape {
     ColliderShape::Mesh {
         convex,
         local_min: Vec3::splat(-0.5),

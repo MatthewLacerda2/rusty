@@ -29,7 +29,8 @@ pub(super) fn build_mesh_shape(
         ColliderBuilder::convex_hull(&points).map(|b| b.build())
     } else {
         // An exact triangle mesh — static geometry only, but a tight fit.
-        let mirrored = scale.x * scale.y * scale.z < 0.0;
+        // Counted, not multiplied: a product of tiny axes can underflow to -0.0.
+        let mirrored = (scale.x < 0.0) ^ (scale.y < 0.0) ^ (scale.z < 0.0);
         let triangles: Vec<[u32; 3]> = indices
             .chunks_exact(3)
             .map(|c| {
