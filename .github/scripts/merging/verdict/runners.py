@@ -9,7 +9,9 @@ lag the other ([`runlist.lagging`], #1095). A run listed `completed/failure`
 whose jobs do not yet show the gate concluded on the run's own attempt (the
 gate unconcluded, not listed, or listed only for an older attempt) has not said
 whose red it is: judging it then read an empty `bad` and handed an outage back
-as a code failure. So [`runner_red`] answers *not yet known* there, and the
+as a code failure. A job other than the gate still listed going is the same
+lag (#1182): [`runner_red`] reads the jobs only once they [`runlist.agrees`]
+the run is over. So [`runner_red`] answers *not yet known* there, and the
 queue waits ([`unread`]) for a grace from the poll that first read it so
 ([`queue.polling.lagging`]); past it, the run is judged as listed, red.
 """
@@ -21,7 +23,7 @@ from merging.verdict import runlist
 
 def runner_red(run: dict, jobs: dict[int, list[dict]], workflow: str) -> bool | None:
     """Whether this failed run is red for GitHub's runners, not the code (#869);
-    `None` while a `failure`'s jobs do not show its gate concluded (#1109).
+    `None` while a `failure`'s jobs do not [`runlist.agrees`] it is over (#1109, #1182).
 
     On 2026-10-05 hosted runners stopped being acquired and every run in flight
     came back red with nothing compiled, in two shapes: the gate itself
@@ -30,7 +32,7 @@ def runner_red(run: dict, jobs: dict[int, list[dict]], workflow: str) -> bool | 
     the gate failed. A run cancelled with no job to show for it counts too.
     A job still going (a signal, [`runlist.by_gate`]) is not evidence either way.
     """
-    if run.get("conclusion") == "failure" and runlist.gate_conclusion(run, jobs, workflow) is None:
+    if run.get("conclusion") == "failure" and not runlist.agrees(run, jobs, workflow):
         return None
     gate = runlist.WORKFLOWS[workflow][0]
     bad = [
