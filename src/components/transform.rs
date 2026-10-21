@@ -57,16 +57,27 @@ impl TransformComponent {
     }
 
     pub fn euler_angles(&self) -> Vec3 {
-        let (yaw, pitch, roll) = self.rotation.to_euler(glam::EulerRot::YXZ);
-        Vec3::new(pitch.to_degrees(), yaw.to_degrees(), roll.to_degrees())
+        euler_degrees(self.rotation)
     }
 
     pub fn set_euler_angles(&mut self, euler_deg: Vec3) {
-        let yaw = euler_deg.y.to_radians();
-        let pitch = euler_deg.x.to_radians();
-        let roll = euler_deg.z.to_radians();
-        self.rotation = Quat::from_euler(glam::EulerRot::YXZ, yaw, pitch, roll);
+        self.rotation = from_euler_degrees(euler_deg);
     }
+}
+
+/// `rotation` as the editor and scripts show it: Euler degrees `(pitch, yaw, roll)`,
+/// applied yaw (Y), then pitch (X), then roll (Z).
+pub fn euler_degrees(rotation: Quat) -> Vec3 {
+    let (yaw, pitch, roll) = rotation.to_euler(glam::EulerRot::YXZ);
+    Vec3::new(pitch.to_degrees(), yaw.to_degrees(), roll.to_degrees())
+}
+
+/// The rotation [`euler_degrees`] reads back as `euler_deg`.
+pub fn from_euler_degrees(euler_deg: Vec3) -> Quat {
+    let yaw = euler_deg.y.to_radians();
+    let pitch = euler_deg.x.to_radians();
+    let roll = euler_deg.z.to_radians();
+    Quat::from_euler(glam::EulerRot::YXZ, yaw, pitch, roll)
 }
 
 /// A pose split the way physics poses a body: translation, a proper rotation,
@@ -82,7 +93,7 @@ pub struct Pose {
 
 impl Pose {
     /// This local pose under a parent whose world matrix is `parent_world`:
-    /// [`world_rotation`] and `lossy_scale`, never a split of the product
+    /// `world_rotation` and `lossy_scale`, never a split of the product
     /// matrix, which loses a rotated child's scale axes.
     pub fn under(self, parent_world: Mat4) -> Self {
         Self {
@@ -90,6 +101,16 @@ impl Pose {
             rot: world_rotation(parent_world, self.rot),
             scale: lossy_scale(parent_world, self.rot, self.scale),
         }
+    }
+
+    /// A frame in this pose's local space, by its X and Y axes (a joint's `axis`
+    /// and `swing_axis`), seen through the pose's mirror as a rotation
+    /// (`mirrored_frame_axes`) and not yet turned: `rot` turns it into world
+    /// space. A caller that builds a basis from the axes (with fallbacks for a
+    /// zero or parallel axis) builds it here and turns the result, so the
+    /// fallback turns with the pose (#1196).
+    pub fn mirror_frame(&self, x: Vec3, y: Vec3) -> (Vec3, Vec3) {
+        mirrored_frame_axes(mirror(self.scale), x, y)
     }
 }
 
@@ -103,7 +124,7 @@ impl Pose {
 /// bone. [`local_rotation`] is its exact inverse; an unmirrored parent gives the
 /// plain product, bit for bit. A degenerate parent (a zero scale axis)
 /// contributes no rotation (`parent_rotation`), so the result is never NaN.
-pub fn world_rotation(parent_world: Mat4, rotation: Quat) -> Quat {
+pub(crate) fn world_rotation(parent_world: Mat4, rotation: Quat) -> Quat {
     let parent_rot = parent_rotation(parent_world);
     (parent_rot * through_mirror(parent_world, rotation)).normalize()
 }
@@ -112,18 +133,9 @@ pub fn world_rotation(parent_world: Mat4, rotation: Quat) -> Quat {
 /// `parent_world`: the inverse of [`world_rotation`], so a world rotation read
 /// from a bone and written back leaves its local pose as it was, mirrored parent
 /// or not (#1119).
-pub fn local_rotation(parent_world: Mat4, world_rot: Quat) -> Quat {
+pub(crate) fn local_rotation(parent_world: Mat4, world_rot: Quat) -> Quat {
     let parent_rot = parent_rotation(parent_world);
     through_mirror(parent_world, parent_rot.inverse() * world_rot).normalize()
-}
-
-/// A child's signed world scale when it is not turned against its parent:
-/// `parent_world`'s split scale (its reflection on X, as glam decomposes it)
-/// times the child's own `scale`. Its signs are always the child's [`mirror`],
-/// turned or not; its magnitudes are [`Pose::under`]'s for an unturned child or
-/// a parent scaled the same on every axis.
-pub fn world_scale(parent_world: Mat4, scale: Vec3) -> Vec3 {
-    parent_world.to_scale_rotation_translation().0 * scale
 }
 
 /// How far apart, relative to the largest, a parent's three scales may be, and how
@@ -141,7 +153,7 @@ const UNIFORM: f32 = 4.0 * f32::EPSILON;
 ///
 /// Under a conformal parent, one scaled the same on every axis with its axes still
 /// square (`M·Mᵀ = s²·I`, to within [`UNIFORM`], the rounding a matrix carries), it
-/// is [`world_scale`] exactly: a turn cannot change a uniform scale, and reading it
+/// is the parent's split scale (glam's, its reflection on X) times `scale` exactly: a turn cannot change a uniform scale, and reading it
 /// through the rotation's rounding would (a parent at 1000 would give 999.9999).
 /// Equal axis lengths alone are not enough: a turned parent under a non-uniform
 /// grandparent can shear into three equal-length axes that are not square.
@@ -181,15 +193,16 @@ fn conformal(m: glam::Mat3, size: Vec3) -> bool {
 /// The reflection a pose carries: the sign of each axis of its signed world
 /// scale ([`Pose::under`]), `±1` each, all `+1` for no mirror. The pose's world
 /// matrix is its [`world_rotation`] times `mirror` times the scale's magnitude.
-pub fn mirror(signed_scale: Vec3) -> Vec3 {
+pub(crate) fn mirror(signed_scale: Vec3) -> Vec3 {
     Vec3::select(signed_scale.cmplt(Vec3::ZERO), -Vec3::ONE, Vec3::ONE)
 }
 
 /// A direction written in a pose's local space, as its world rotation must turn
 /// it to land on the drawn world direction: `mirror · dir`, since the pose's
 /// matrix draws a local `dir` along `R_w · mirror · dir` (#1125). An aim axis is
-/// one. No mirror returns `dir` bit for bit.
-pub fn mirrored_direction(mirror: Vec3, dir: Vec3) -> Vec3 {
+/// one. No mirror returns `dir` bit for bit. Besides `ecs::world_space`, the IK aim
+/// solver uses it: a pure function over `BonePose`s, which carry the mirror (#1128).
+pub(crate) fn mirrored_direction(mirror: Vec3, dir: Vec3) -> Vec3 {
     mirror * dir
 }
 
@@ -208,7 +221,7 @@ pub fn mirrored_direction(mirror: Vec3, dir: Vec3) -> Vec3 {
 /// limits are symmetric, `±swing_limit` and `±swing2_limit`, which are the only
 /// ones `physics::joints::joint_builder` sets. An asymmetric swing limit would
 /// need the swing signs flipped too.
-pub fn mirrored_frame_axes(mirror: Vec3, x: Vec3, y: Vec3) -> (Vec3, Vec3) {
+pub(crate) fn mirrored_frame_axes(mirror: Vec3, x: Vec3, y: Vec3) -> (Vec3, Vec3) {
     let sense = mirror.x * mirror.y * mirror.z;
     (sense * (mirror * x), mirror * y)
 }

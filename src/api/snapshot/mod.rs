@@ -66,7 +66,7 @@ pub fn world_value_with(
         .filter(|&&id| scene.world.contains(id))
         .filter(|id| include_bones || !bones.contains(id))
         .map(|&id| {
-            let world_matrix = scene.compute_world_matrix(id);
+            let world_matrix = scene.world.local_to_world(id);
             let mut value = entity_value(scene, id, world_matrix, &view);
             if bones.contains(&id) {
                 value["bone"] = json!(true);

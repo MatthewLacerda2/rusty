@@ -99,8 +99,7 @@ fn sun_direction(scene: &Scene, capture: bool) -> Vec3 {
         }
         let light = scene.world.light(id).expect("id came from ids_with_light");
         if light.light_type == LightType::Directional && light.mode.renders_live(capture) {
-            let transform = scene.world.transform(id).expect("mandatory Transform");
-            dir = (transform.rotation * Vec3::NEG_Z).normalize();
+            dir = scene.world.transform_direction(id, Vec3::NEG_Z).normalize();
         }
     }
     dir

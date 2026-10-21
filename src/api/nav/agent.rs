@@ -169,14 +169,7 @@ fn register_agent_queries<'scope>(
             let at_target = scene
                 .world
                 .nav_agent(id)
-                .map(|agent| {
-                    let current_pos = scene
-                        .world
-                        .transform(id)
-                        .map(|t| t.position)
-                        .unwrap_or(Vec3::ZERO);
-                    is_at_target(&agent, current_pos)
-                })
+                .map(|agent| is_at_target(&agent, scene.world.world_position(id)))
                 .unwrap_or(true);
             Ok(at_target)
         }),

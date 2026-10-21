@@ -30,7 +30,7 @@ pub fn ragdolled() -> (Scene, u32) {
 /// The world centre of `bone`'s hitbox.
 pub fn hitbox_at(scene: &Scene, bone: u32) -> Vec3 {
     let hitbox = scene.hitbox_of(bone).expect("a hitbox bone");
-    scene.compute_world_matrix(hitbox).w_axis.truncate()
+    scene.world.world_position(hitbox)
 }
 
 #[test]

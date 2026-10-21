@@ -114,11 +114,7 @@ fn stop_voices(world: &World, res: &Resources, ids: &[u32]) {
         .filter(|&id| audio.is_source_playing(id))
         .collect();
     for id in playing {
-        let p = scene
-            .world
-            .transform(id)
-            .map(|t| t.position)
-            .unwrap_or_default();
+        let p = scene.world.world_position(id);
         audio.stop_source(id, [p.x, p.y, p.z], tick, true);
     }
 }

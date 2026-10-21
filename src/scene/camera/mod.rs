@@ -186,7 +186,7 @@ pub fn game_camera_from_scene(base: &Camera, scene: &Scene) -> Camera {
 /// flags and projection. `base` supplies the rest. `None` without a camera.
 pub fn camera_for_entity(base: &Camera, scene: &Scene, id: u32) -> Option<Camera> {
     let c = scene.world.camera(id)?;
-    let world = scene.compute_world_matrix(id);
+    let world = scene.world.local_to_world(id);
     let (yaw, pitch) = yaw_pitch_from_matrix(world);
     let mut cam = base.clone();
     cam.position = world.col(3).truncate();

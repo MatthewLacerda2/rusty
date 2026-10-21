@@ -54,7 +54,7 @@ fn an_aim_axis_under_a_mirroring_parent_points_at_the_target() {
         let gw = play(scene, 5);
         let s = gw.scene().borrow();
         let head = s.find_bone(rig, "head").unwrap();
-        let drawn = s.compute_world_matrix(head).transform_vector3(axis);
+        let drawn = s.world.local_to_world(head).transform_vector3(axis);
         let want = target - bone_at(&s, rig, "head");
         let off = drawn.angle_between(want).to_degrees();
         assert!(off < 0.1, "axis {lua} aims {off}° off the target");
@@ -74,7 +74,7 @@ fn an_aim_tip_with_its_own_mirror_points_at_the_target() {
     let gw = play(scene, 5);
     let s = gw.scene().borrow();
     let head = s.find_bone(rig, "head").unwrap();
-    let drawn = s.compute_world_matrix(head).transform_vector3(Vec3::Z);
+    let drawn = s.world.local_to_world(head).transform_vector3(Vec3::Z);
     let want = target - bone_at(&s, rig, "head");
     let off = drawn.angle_between(want).to_degrees();
     assert!(off < 0.1, "aims {off}° off the target");

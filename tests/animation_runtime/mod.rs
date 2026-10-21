@@ -21,7 +21,7 @@ fn the_animator_poses_the_bone_and_the_skin_follows_it() {
     let palette = s.world.mesh(hero).unwrap().pose_palette.clone();
     assert!((palette[0].w_axis.x - x).abs() < 1e-6);
     // The gun under the hand rides along.
-    let gun_at = s.compute_world_matrix(gun).w_axis.truncate();
+    let gun_at = s.world.world_position(gun);
     assert!(
         gun_at.abs_diff_eq(Vec3::new(x, 0.5, 0.0), 1e-5),
         "gun at {gun_at:?}"
@@ -31,7 +31,7 @@ fn the_animator_poses_the_bone_and_the_skin_follows_it() {
 #[test]
 fn a_late_update_script_overrides_the_animator_before_skinning() {
     let script = "return { LateUpdate = function(id)\n\
-                  Transform.SetPosition(Animator.GetBone(id, 'hand'), 0, 3, 0)\nend }";
+                  Transform.SetLocalPosition(Animator.GetBone(id, 'hand'), 0, 3, 0)\nend }";
     let (scene, hero, _, _) = armed_scene(Some(script));
     let scene = play(scene, 10);
     let palette = scene

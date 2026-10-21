@@ -7,6 +7,7 @@ mod global;
 mod mixer;
 mod occlusion;
 mod oneshot;
+mod parented;
 mod reverb;
 mod voices;
 

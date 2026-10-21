@@ -18,7 +18,7 @@ fn nested_chain(scene: &mut Scene) -> (u32, u32, u32) {
 }
 
 fn world_translation(scene: &Scene, id: u32) -> Vec3 {
-    scene.world_matrix(id).w_axis.truncate()
+    scene.world.world_position(id)
 }
 
 #[test]
@@ -57,7 +57,7 @@ fn a_despawned_entity_is_never_answered_from_its_old_slot() {
     let (gp, p, c) = nested_chain(&mut scene);
     assert_eq!(world_translation(&scene, c), Vec3::new(7.0, 0.0, 0.0));
     scene.world.despawn(c);
-    assert_eq!(scene.world_matrix(c), glam::Mat4::IDENTITY);
+    assert_eq!(scene.world.local_to_world(c), glam::Mat4::IDENTITY);
     assert_eq!(world_translation(&scene, p), Vec3::new(3.0, 0.0, 0.0));
     assert_eq!(world_translation(&scene, gp), Vec3::new(1.0, 0.0, 0.0));
 }
@@ -105,10 +105,14 @@ fn the_store_matches_a_from_scratch_walk_across_churn() {
         if frame % 3 == 2 {
             let gone = live.remove((frame as usize * 5) % live.len());
             scene.world.despawn(gone);
-            assert_eq!(scene.world_matrix(gone), glam::Mat4::IDENTITY);
+            assert_eq!(scene.world.local_to_world(gone), glam::Mat4::IDENTITY);
         }
         for &id in scene.world.ids() {
-            assert_eq!(scene.world_matrix(id), from_scratch(&scene, id), "id {id}");
+            assert_eq!(
+                scene.world.local_to_world(id),
+                from_scratch(&scene, id),
+                "id {id}"
+            );
         }
     }
 }

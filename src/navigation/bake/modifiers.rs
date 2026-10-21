@@ -67,7 +67,7 @@ pub(super) fn modifier_keys(scene: &Scene) -> Vec<(u32, ModifierVolume)> {
         .filter_map(|id| {
             let m = scene.world.nav_modifier(id)?.clone();
             m.active.then_some(())?;
-            let pose = scene.compute_world_matrix(id);
+            let pose = scene.world.local_to_world(id);
             Some((
                 id,
                 ModifierVolume {

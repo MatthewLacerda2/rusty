@@ -16,9 +16,10 @@ use crate::scripting::ConsoleLogs;
 
 const DT: f32 = 1.0 / 60.0;
 
-/// A playing 3D source at z = 10, a 20 × 10 × 1 static wall at z = 5 between it
-/// and the camera at the origin. Returns the world and the wall's id.
-fn walled() -> (GameWorld, u32) {
+/// A playing 3D source at z = 10 (at local origin under a pivot there when
+/// `parented`), a 20 × 10 × 1 static wall at z = 5 between it and the camera at
+/// the origin. Returns the world and the wall's id.
+fn walled_with(parented: bool) -> (GameWorld, u32) {
     let mut scene = Scene::new();
     let wall = scene.add_entity("Wall".to_string());
     scene.world.set_static(wall, true);
@@ -31,7 +32,14 @@ fn walled() -> (GameWorld, u32) {
     };
     scene.world.set_collider(wall, Some(collider));
     let speaker = scene.add_entity("Speaker".to_string());
-    scene.world.transform_mut(speaker).unwrap().position = Vec3::new(0.0, 0.0, 10.0);
+    let placed = if parented {
+        let pivot = scene.add_entity("Pivot".to_string());
+        scene.set_parent(speaker, Some(pivot)).unwrap();
+        pivot
+    } else {
+        speaker
+    };
+    scene.world.transform_mut(placed).unwrap().position = Vec3::new(0.0, 0.0, 10.0);
     let source = AudioSourceComponent {
         clip: "loop.ogg".to_string(),
         looping: true,
@@ -49,6 +57,10 @@ fn walled() -> (GameWorld, u32) {
     world.resources.camera.borrow_mut().position = Vec3::ZERO;
     world.set_playing(true);
     (world, wall)
+}
+
+fn walled() -> (GameWorld, u32) {
+    walled_with(false)
 }
 
 /// Tick `frames` frames, returning the speaker's occlusion after each.
@@ -70,6 +82,13 @@ fn a_wall_occludes_and_removing_it_clears_after_smoothing() {
     let clearing = run(&mut world, 30);
     assert!(clearing[2] > 0.0, "smoothed, not snapped: {clearing:?}");
     assert_eq!(*clearing.last().unwrap(), 0.0, "{clearing:?}");
+}
+
+#[test]
+fn a_parented_source_is_occluded_at_its_world_position() {
+    let (mut world, _) = walled_with(true);
+    let walled_in = run(&mut world, 3);
+    assert_eq!(*walled_in.last().unwrap(), 1.0, "{walled_in:?}");
 }
 
 #[test]

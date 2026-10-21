@@ -2,12 +2,12 @@
 //! view, each cluster the ones that contribute most to it, and the cut is the same
 //! every time for the same input.
 
-use glam::{Quat, Vec3};
+use glam::Vec3;
 
 use super::bin::{bin_spheres, Binned, Budget};
 use super::grid::AabbCache;
 use super::*;
-use crate::components::{LightComponent, TransformComponent};
+use crate::components::LightComponent;
 use crate::scene::Camera;
 
 fn grid() -> ClusterGrid {
@@ -16,11 +16,6 @@ fn grid() -> ClusterGrid {
 
 /// A white point light at `at`.
 fn light(at: Vec3, range: f32, intensity: f32) -> LocalLight {
-    let transform = TransformComponent {
-        position: at,
-        rotation: Quat::IDENTITY,
-        ..Default::default()
-    };
     let light = LightComponent {
         intensity,
         range,
@@ -28,7 +23,7 @@ fn light(at: Vec3, range: f32, intensity: f32) -> LocalLight {
         outer_cone: 30.0,
         ..crate::scene::authoring::default_light()
     };
-    LocalLight::new(&transform, &light).expect("a local light")
+    LocalLight::new(at, Vec3::NEG_Z, &light).expect("a local light")
 }
 
 fn bin_lights(lights: &[LocalLight]) -> Binned {

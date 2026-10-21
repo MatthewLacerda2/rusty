@@ -43,10 +43,12 @@ impl ObstacleVolume {
 
     /// The upright capsule's world centre, radius and height (scaled).
     fn capsule(&self) -> (Vec3, f32, f32) {
-        let (scale, _, _) = self.pose.to_scale_rotation_translation();
+        // The pose's axis lengths: the stored pose may be a carve anchor, not a live
+        // entity, so it is read off the matrix rather than the world API.
+        let size = |axis: glam::Vec4| axis.truncate().length();
         let c = self.pose.transform_point3(self.center);
-        let r = self.radius * scale.x.abs().max(scale.z.abs());
-        (c, r, self.height * scale.y.abs())
+        let r = self.radius * size(self.pose.x_axis).max(size(self.pose.z_axis));
+        (c, r, self.height * size(self.pose.y_axis))
     }
 
     /// Points that follow the shape: a box's corners, a capsule's end centres. How
@@ -153,7 +155,7 @@ fn box_corners(v: &ObstacleVolume) -> [Vec3; 8] {
 /// obstacle seen for the first time has not moved, so it counts as stationary.
 pub fn tick_obstacles(scene: &mut Scene, dt: f32) {
     for id in scene.world.ids_with_nav_obstacle() {
-        let pose = scene.compute_world_matrix(id);
+        let pose = scene.world.local_to_world(id);
         let Some(mut o) = scene.world.nav_obstacle_mut(id) else {
             continue;
         };
@@ -192,7 +194,7 @@ pub(super) fn carving_volumes(scene: &Scene) -> Vec<(u32, ObstacleVolume)> {
             o.is_carving().then(|| {
                 let pose = o
                     .carve_pose
-                    .unwrap_or_else(|| scene.compute_world_matrix(id));
+                    .unwrap_or_else(|| scene.world.local_to_world(id));
                 (id, ObstacleVolume::of(&o, pose))
             })
         })
@@ -213,7 +215,7 @@ pub(super) fn avoidance_obstacles(scene: &Scene) -> Vec<AvoidanceAgent> {
             if !o.active || o.is_carving() {
                 return None;
             }
-            let pose = scene.compute_world_matrix(id);
+            let pose = scene.world.local_to_world(id);
             let (position, radius) = ObstacleVolume::of(&o, pose).avoidance_disc();
             let velocity = Vec2::new(o.velocity.x, o.velocity.z);
             Some(AvoidanceAgent {

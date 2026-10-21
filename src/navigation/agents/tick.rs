@@ -44,8 +44,10 @@ impl NavigationGraph {
             let Some(mut agent) = scene.world.take_nav_agent(id) else {
                 continue;
             };
-            let current_pos = scene.world.transform(id).map(|t| t.position);
-            if let (true, Some(position)) = (agent.active, current_pos) {
+            // Steering is in world space: the agent's world position and facing,
+            // written back through its parent (#1196).
+            let position = scene.world.world_position(id);
+            if agent.active {
                 if agent.off_mesh_link.is_some() {
                     self.on_link(scene, id, agent, position, delta_time);
                     continue;
@@ -60,9 +62,9 @@ impl NavigationGraph {
                 let steering = !agent.cached_path.is_empty() && !is_at_target(&agent, position);
                 let moved_with = agent.velocity;
                 let heading = self.steer_or_brake(&mut agent, position, steering, delta_time);
-                if let Some(mut t) = scene.world.transform_mut(id) {
-                    turn_toward(&mut agent, &mut t.rotation, heading, delta_time);
-                }
+                let mut facing = scene.world.world_rotation(id);
+                turn_toward(&mut agent, &mut facing, heading, delta_time);
+                scene.world.set_world_rotation(id, facing);
                 inputs.push(avoidance_input(&agent, position, moved_with, steering));
                 ticked.push(Ticked {
                     id,
@@ -153,8 +155,8 @@ impl NavigationGraph {
             .auto_traverse_off_mesh_link
             .then(|| auto_traverse(&mut agent, position, delta_time));
         scene.world.set_nav_agent(id, Some(agent));
-        if let (Some(p), Some(mut t)) = (moved, scene.world.transform_mut(id)) {
-            t.position = p;
+        if let Some(p) = moved {
+            scene.world.set_world_position(id, p);
         }
     }
 
@@ -165,9 +167,7 @@ impl NavigationGraph {
         };
         agent.velocity = velocity;
         let new_pos = self.slide(&mut agent, t.position, delta_time);
-        if let Some(mut tr) = scene.world.transform_mut(t.id) {
-            tr.position = new_pos;
-        }
+        scene.world.set_world_position(t.id, new_pos);
         scene.world.set_nav_agent(t.id, Some(agent));
     }
 

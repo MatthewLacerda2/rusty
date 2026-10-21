@@ -15,7 +15,6 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use glam::Vec3;
 use mlua::{Function, Lua, Result as LuaResult};
 
 use super::harness::{tick_unless_quit, Harness};
@@ -203,11 +202,7 @@ fn register_scene_transform(lua: &Lua, harness: &Shared) -> LuaResult<()> {
         lua.create_function(move |_, id: u32| {
             let w = world.borrow();
             let s = w.scene().borrow();
-            let p = s
-                .world
-                .transform(id)
-                .map(|t| t.position)
-                .unwrap_or(Vec3::ZERO);
+            let p = s.world.world_position(id);
             Ok((p.x, p.y, p.z))
         })?,
     )?;

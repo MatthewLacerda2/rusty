@@ -58,7 +58,8 @@ impl LodSelection {
             let Some(group) = scene.world.lod_group(id) else {
                 continue;
             };
-            let shown = pick(&group, scene.world_matrix(id)).and_then(|i| group.levels.get(i));
+            let shown =
+                pick(&group, scene.world.local_to_world(id)).and_then(|i| group.levels.get(i));
             let keep = |r: &u32| shown.is_some_and(|l| l.renderers.contains(r));
             hidden.extend(group.renderers().filter(|r| !keep(r)));
         }

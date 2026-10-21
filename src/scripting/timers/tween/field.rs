@@ -5,11 +5,15 @@
 //! animatable, so a typo is an error at `Tween.To`, never a silent no-op. Writes
 //! route through the same `scene::authoring` ops the inspector and the component
 //! namespaces use, so a tweened alpha is clamped exactly like a `SetAlpha`.
+//! `Transform.position` and `Transform.rotation` are world space, as
+//! `Transform.SetPosition` / `SetRotation` are; `Transform.scale` is the local scale,
+//! as `Transform.SetLocalScale` is (Unity's split, #1196).
 //!
 //! Every value travels as a `Vec4`; a property uses its first `arity` lanes.
 
 use glam::{Vec2, Vec3, Vec4};
 
+use crate::components::transform::{euler_degrees, from_euler_degrees};
 use crate::scene::authoring::{
     audio, camera, canvas_group, image, light, rect_transform as rect, text,
 };
@@ -103,8 +107,10 @@ impl Field {
         let v2 = |v: Vec2| v.extend(0.0).extend(0.0);
         let f = |v: f32| Vec4::new(v, 0.0, 0.0, 0.0);
         Some(match self {
-            Self::Position => v3(w.transform(id)?.position),
-            Self::Rotation => v3(w.transform(id)?.euler_angles()),
+            Self::Position => v3(w.contains(id).then(|| w.world_position(id))?),
+            Self::Rotation => v3(w
+                .contains(id)
+                .then(|| euler_degrees(w.world_rotation(id)))?),
             Self::Scale => v3(w.transform(id)?.scale),
             Self::AnchoredPosition => v2(w.rect_transform(id)?.anchored_position),
             Self::SizeDelta => v2(w.rect_transform(id)?.size_delta),
@@ -140,8 +146,8 @@ impl Field {
             };
         }
         let written = match self {
-            Self::Position => write!(transform_mut, |c| c.position = v.truncate()),
-            Self::Rotation => write!(transform_mut, |c| c.set_euler_angles(v.truncate())),
+            Self::Position => w.set_world_position(id, v.truncate()),
+            Self::Rotation => w.set_world_rotation(id, from_euler_degrees(v.truncate())),
             Self::Scale => write!(transform_mut, |c| c.scale = v.truncate()),
             Self::AnchoredPosition => {
                 write!(rect_transform_mut, |c| rect::set_anchored_position(c, xy))

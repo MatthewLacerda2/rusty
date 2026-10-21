@@ -53,7 +53,8 @@ fn run(ik: bool, enable: bool) -> Vec<Vec3> {
     ]
     .iter()
     .map(|b| {
-        s.compute_world_matrix(rig::bone(&s, id, b))
+        s.world
+            .local_to_world(rig::bone(&s, id, b))
             .w_axis
             .truncate()
     })

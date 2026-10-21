@@ -15,7 +15,7 @@ fn an_aim_chain_turns_to_its_clamp_and_stays_there() {
     let gw = play(scene, 60);
     let s = gw.scene().borrow();
     let head = s.find_bone(rig, "head").unwrap();
-    let (_, rot, _) = s.compute_world_matrix(head).to_scale_rotation_translation();
+    let (_, rot, _) = s.world.local_to_world(head).to_scale_rotation_translation();
     let aim = rot * Vec3::Z;
     let turned = aim.angle_between(Vec3::Z).to_degrees();
     // No clip keys these bones: without IK undoing its last write first, each

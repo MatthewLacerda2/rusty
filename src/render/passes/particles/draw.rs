@@ -227,7 +227,7 @@ fn collect_runs(scene: &Scene, culling_mask: u32, eye: Eye) -> Vec<EmitterRun> {
         if emitter.runtime.particles.is_empty() || emitter.render.mode == ParticleRenderMode::Mesh {
             continue;
         }
-        let origin = scene.world_matrix(id).w_axis.truncate();
+        let origin = scene.world.world_position(id);
         let light = emitter_light(scene, &emitter, origin);
         let (instances, depth) = emitter_instances(&emitter, light, eye);
         let run = EmitterRun {

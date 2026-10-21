@@ -1,12 +1,12 @@
 //! CPU light binning (#434): lights land in the clusters the shader will look up,
 //! lights out of view cost nothing, and the per-camera budget is reported.
 
-use glam::{Quat, Vec3};
+use glam::Vec3;
 
 use super::bin::Binned;
 use super::grid::AabbCache;
 use super::*;
-use crate::components::{LightComponent, Projection, TransformComponent};
+use crate::components::{LightComponent, Projection};
 use crate::scene::{Camera, LightType};
 
 /// A camera at the origin looking down -Z (yaw -90°), 16:9.
@@ -15,11 +15,6 @@ fn camera() -> Camera {
 }
 
 fn light(kind: LightType, at: Vec3, range: f32) -> LocalLight {
-    let transform = TransformComponent {
-        position: at,
-        rotation: Quat::IDENTITY,
-        ..Default::default()
-    };
     let light = LightComponent {
         light_type: kind,
         intensity: 1.0,
@@ -28,7 +23,7 @@ fn light(kind: LightType, at: Vec3, range: f32) -> LocalLight {
         outer_cone: 30.0,
         ..crate::scene::authoring::default_light()
     };
-    LocalLight::new(&transform, &light).expect("a local light")
+    LocalLight::new(at, Vec3::NEG_Z, &light).expect("a local light")
 }
 
 /// Bin `lights` for [`camera`] with a cold cache.

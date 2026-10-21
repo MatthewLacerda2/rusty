@@ -39,9 +39,8 @@ pub(super) fn tick_particles(world: &mut World, res: &mut Resources) {
             if !scene.world.contains(id) || !scene.world.is_active(id) {
                 continue;
             }
-            let Some(origin) = scene.world.transform(id).map(|t| t.position) else {
-                continue;
-            };
+            // World space, as `render::passes::particles::draw` reads it (#1196).
+            let origin = scene.world.world_position(id);
             scene
                 .world
                 .take_particles(id)

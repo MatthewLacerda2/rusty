@@ -15,7 +15,7 @@ for x = -10, 9 do
         n = n + 1
         local id = Scene.CreateEntity("Prop_" .. n, kinds[(n % 3) + 1])
         Transform.SetPosition(id, x * 1.5, 0.5, z * 1.5)
-        Transform.SetScale(id, 0.6, 0.6, 0.6)
+        Transform.SetLocalScale(id, 0.6, 0.6, 0.6)
     end
 end
 "#;

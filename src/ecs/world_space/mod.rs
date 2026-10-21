@@ -12,7 +12,8 @@
 //!   axes, signed by the mirror (#1123, #1128, #1156);
 //! - [`World::transform_point`], [`World::transform_direction`] (through the entity's
 //!   own mirror, #1145), [`World::transform_vector`] and
-//!   [`World::inverse_transform_point`];
+//!   [`World::inverse_transform_point`], and a frame's pair, [`World::transform_frame`]
+//!   and [`World::inverse_transform_frame`] (#1196);
 //! - [`World::set_world_position`] and [`World::set_world_rotation`], which under a
 //!   singular parent keep the local value they cannot solve for, as Unity does (#1164).
 //!
@@ -32,7 +33,9 @@ mod write;
 
 use glam::{Mat4, Quat, Vec3};
 
-use crate::components::transform::{local_rotation, mirror, mirrored_direction};
+use crate::components::transform::{
+    local_rotation, mirror, mirrored_direction, mirrored_frame_axes,
+};
 use crate::components::Pose;
 use crate::ecs::World;
 
@@ -113,6 +116,28 @@ impl World {
             return direction;
         };
         pose.rot * mirrored_direction(mirror(pose.scale), direction)
+    }
+
+    /// A frame in `id`'s local space, by its X and Y axes (a joint's `axis` and
+    /// `swing_axis`), in world space: turned, and seen through the entity's mirror as a
+    /// rotation, so the frame stays proper under a reflection (#1125). Unchanged for a
+    /// dead id.
+    pub fn transform_frame(&self, id: u32, x: Vec3, y: Vec3) -> (Vec3, Vec3) {
+        let Some(pose) = self.world_pose(id) else {
+            return (x, y);
+        };
+        let (x, y) = pose.mirror_frame(x, y);
+        (pose.rot * x, pose.rot * y)
+    }
+
+    /// A world frame in `id`'s local space: the exact inverse of
+    /// [`World::transform_frame`]. Unchanged for a dead id.
+    pub fn inverse_transform_frame(&self, id: u32, x: Vec3, y: Vec3) -> (Vec3, Vec3) {
+        let Some(pose) = self.world_pose(id) else {
+            return (x, y);
+        };
+        let inv = pose.rot.inverse();
+        mirrored_frame_axes(mirror(pose.scale), inv * x, inv * y)
     }
 
     /// A world point in `id`'s local space. `None` when `id`'s world matrix is singular

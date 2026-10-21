@@ -22,7 +22,7 @@ function Brain.Start(_)
 end
 function Brain.Update(_)
     local x = Transform.GetPosition(Brain.pivot)
-    local s = Transform.GetScale(Brain.pivot)
+    local s = Transform.GetLocalScale(Brain.pivot)
     local _, g = Image.GetColor(Brain.hud)
     print(string.format("[tween] %.9g %.9g %.9g %.9g", x, s, CanvasGroup.GetAlpha(Brain.hud), g))
 end

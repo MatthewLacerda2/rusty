@@ -41,10 +41,12 @@ per-module unit tests (e.g. `api/light.rs`) are the pattern.
 
 | Setter | Status | Read-site |
 |---|---|---|
-| `SetPosition` | ✅ | renderer (`draw_resources::solid_entity_uniform` model matrix) + sim (`compute_world_matrix`, collider re-sync); round-trips |
-| `SetRotation` | ✅ | same model-matrix read; collider re-sync on set |
-| `SetScale` | ✅ | same model-matrix read; collider re-sync on set |
-| `MoveTowards` | ✅ | writes `position`; same read-sites |
+| `SetPosition` | ✅ | world space: `World::set_world_position` solves the local position; renderer (`render::draw::resources` model matrix) + sim (`World::local_to_world`, collider re-sync); round-trips with `GetPosition` |
+| `SetLocalPosition` | ✅ | writes `position`; same read-sites |
+| `SetRotation` | ✅ | world space: `World::set_world_rotation`; same model-matrix read; collider re-sync on set |
+| `SetLocalRotation` | ✅ | writes `rotation`; same read-sites |
+| `SetLocalScale` | ✅ | writes `scale`; same model-matrix read; collider re-sync on set (`GetLossyScale` reads it back in world space) |
+| `MoveTowards` | ✅ | steps the world position through `World::set_world_position`; same read-sites |
 
 ### `Material` — over `Entity.texture` (`TextureComponent`)
 

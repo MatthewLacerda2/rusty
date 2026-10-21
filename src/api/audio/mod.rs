@@ -63,13 +63,12 @@ pub fn listener(camera: &RefCell<Camera>) -> Listener {
     Listener::new(cam.position, cam.right())
 }
 
-/// An entity's `AudioSource` and the position it is heard from — the one lookup
+/// An entity's `AudioSource` and the world position it is heard from — the one lookup
 /// behind both `Audio.GetSpatial` and the shell's per-frame mix (#412), so the two
 /// always resolve the same emitter. `None` when the entity has no `AudioSource`.
 pub fn emitter(scene: &Scene, id: u32) -> Option<(AudioSourceComponent, Vec3)> {
     let src = scene.world.audio(id)?;
-    let pos = scene.world.transform(id)?.position;
-    Some((src.clone(), pos))
+    Some((src.clone(), scene.world.world_position(id)))
 }
 
 /// The current play-mode frame, used as the deterministic event `tick`.
@@ -82,7 +81,7 @@ fn tick(time: &RefCell<Time>) -> u64 {
 fn source_clip_pos(scene: &RefCell<Scene>, id: u32) -> Option<(String, [f32; 3])> {
     let scene = scene.borrow();
     let src = scene.world.audio(id)?;
-    let p = scene.world.transform(id)?.position;
+    let p = scene.world.world_position(id);
     Some((src.clip.clone(), [p.x, p.y, p.z]))
 }
 

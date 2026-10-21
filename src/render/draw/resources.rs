@@ -176,7 +176,7 @@ impl Renderer {
             return false;
         };
         gpu_mesh
-            .world_bounds(&mesh, scene.world_matrix(id))
+            .world_bounds(&mesh, scene.world.local_to_world(id))
             .is_some_and(|(min, max)| !frustum.intersects_aabb(min, max))
     }
 
@@ -199,7 +199,7 @@ impl Renderer {
         let entry = scene.material_entry_of(id);
         let material = entry.map(|(_, asset)| asset);
         let transparent = material.is_some_and(MaterialAsset::is_transparent);
-        let model_matrix = scene.world_matrix(id);
+        let model_matrix = scene.world.local_to_world(id);
         let mut uniform = super::uniforms::solid_entity_uniform(scene, id, material);
         let instance = super::uniforms::solid_instance(
             scene,

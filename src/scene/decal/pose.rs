@@ -55,7 +55,7 @@ impl Scene {
             if !self.world.is_active(owner.entity) {
                 return None;
             }
-            pose.model = self.world_matrix(owner.entity) * owner.local;
+            pose.model = self.world.local_to_world(owner.entity) * owner.local;
         }
         (pose.opacity > 0.0).then_some(pose)
     }

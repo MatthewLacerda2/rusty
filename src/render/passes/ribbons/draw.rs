@@ -195,7 +195,7 @@ fn collect(scene: &Scene, camera: &Camera) -> Ribbons {
         let Some(line) = scene.world.line(id) else {
             continue;
         };
-        let points = line.world_positions(scene.world_matrix(id));
+        let points = line.world_positions(scene.world.local_to_world(id));
         draws.extend(out.push(&points, line.looping, &line.style, eye));
     }
     back_to_front(&mut draws);

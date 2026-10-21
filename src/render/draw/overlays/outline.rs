@@ -42,7 +42,7 @@ impl Renderer {
         let mesh = scene.world.mesh(id)?;
         let mesh_id = MeshId::from_mesh(&mesh);
         let num_indices = self.gpu_meshes.get(&mesh_id)?.num_indices;
-        let world = scene.world_matrix(id);
+        let world = scene.world.local_to_world(id);
         let mut joints = Vec::new();
         let mut uniform = outline_uniform(outline_hull(world));
         uniform.bone_base = push_palette(&mut joints, mesh.active_palette());

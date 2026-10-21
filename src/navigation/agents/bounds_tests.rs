@@ -39,3 +39,39 @@ fn an_agent_under_a_moved_parent_reports_its_bounds_where_it_stands() {
     assert!(centre.abs_diff_eq(stands, 1e-4), "{centre} vs {stands}");
     assert!(stands.x > 3.0 + 2.0, "it walked: {stands}");
 }
+
+/// An agent under a moved, yawed parent steers in world space (#1196): it walks to
+/// its world target, and faces the way it walks in the world.
+#[test]
+fn an_agent_under_a_turned_parent_walks_and_faces_in_world_space() {
+    let mut scene = Scene::new();
+    let parent = scene.add_entity("group".into());
+    {
+        let mut t = scene.world.transform_mut(parent).unwrap();
+        t.position = Vec3::new(3.0, 0.0, 4.0);
+        t.rotation = glam::Quat::from_rotation_y(std::f32::consts::FRAC_PI_2);
+    }
+    let agent = scene.add_entity("agent".into());
+    scene.set_parent(agent, Some(parent)).unwrap();
+    let target = Vec3::new(12.0, 0.0, 5.0);
+    scene.world.set_nav_agent(
+        agent,
+        Some(NavMeshAgentComponent {
+            active: true,
+            target,
+            radius: 0.5,
+            speed: 5.0,
+            acceleration: 10.0,
+            ..Default::default()
+        }),
+    );
+    let graph = NavigationGraph::new(0.0, 20.0, 0.0, 20.0, 1.0);
+    for _ in 0..120 {
+        graph.tick_nav_agents(&mut scene, 1.0 / 60.0);
+    }
+    let stands = scene.world.world_position(agent);
+    assert!(stands.distance(target) < 1.5, "reached it: {stands}");
+    // +Z is an agent's forward; it walked along world +X.
+    let facing = scene.world.transform_direction(agent, Vec3::Z);
+    assert!(facing.x > 0.9, "faces +X in the world: {facing}");
+}

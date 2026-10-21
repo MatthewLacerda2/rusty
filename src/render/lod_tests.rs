@@ -42,7 +42,7 @@ fn hidden(sel: &LodSelection) -> Vec<u32> {
 #[test]
 fn screen_height_is_size_over_the_visible_height() {
     let (scene, group) = scene_with_group(4.0);
-    let h = screen_height(2.0, &camera(), scene.world_matrix(group));
+    let h = screen_height(2.0, &camera(), scene.world.local_to_world(group));
     assert!((h - 0.25).abs() < 1e-5, "2 m at 4 m under a 90° fov: {h}");
 }
 

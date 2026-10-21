@@ -82,7 +82,7 @@ pub(super) fn collider_keys(scene: &Scene) -> Vec<(u32, ColliderKey)> {
     let mut out: Vec<_> = static_collider_ids(scene)
         .filter_map(|id| {
             let shape = scene.world.collider(id)?.shape.clone();
-            let pose = scene.compute_world_matrix(id);
+            let pose = scene.world.local_to_world(id);
             Some((id, ColliderKey { shape, pose }))
         })
         .collect();
