@@ -1,9 +1,11 @@
 ; FBX 7.4.0 project file
-; One bone mirrored by scale (#1110). Hand-written, so every number is deliberate:
-; Z up, like skinned_cube.fbx, with Lcl Scaling (1,-1,1) and a 30° turn about Z,
-; so the change of basis permutes the negative scale onto another axis. One
-; stack, "Hold", keys only the translation; ufbx bakes the rotation and scale
-; keys at rest, so key 0 and the rest pose are the same transform.
+; One bone mirrored by scale (#1110), a one-metre cube skinned to it so the
+; import yields a skin. Hand-written, so every number is deliberate: Z up, like
+; skinned_cube.fbx, with Lcl Scaling (1,-1,1) and a 30° turn about Z, so the
+; change of basis permutes the negative scale onto another axis. One stack,
+; "Turn": over one second the bone climbs from 100 to 200 cm and turns from 30°
+; to 90° about Z; ufbx bakes the scale keys at rest. So key 0 is the rest pose,
+; and the last key differs from it in everything but the scale.
 FBXHeaderExtension:  {
 	FBXHeaderVersion: 1003
 	FBXVersion: 7400
@@ -22,6 +24,18 @@ GlobalSettings:  {
 	}
 }
 Objects:  {
+	Geometry: 1000, "Geometry::Cube", "Mesh" {
+		Vertices: *24 {
+			a: -50,-50,-50,50,-50,-50,50,50,-50,-50,50,-50,-50,-50,50,50,-50,50,50,50,50,-50,50,50
+		}
+		PolygonVertexIndex: *24 {
+			a: 0,3,2,-2,4,5,6,-8,0,1,5,-5,2,3,7,-7,3,0,4,-8,1,2,6,-6
+		}
+		GeometryVersion: 124
+	}
+	Model: 2000, "Model::Cube", "Mesh" {
+		Version: 232
+	}
 	Model: 3000, "Model::Bone", "LimbNode" {
 		Version: 232
 		Properties70:  {
@@ -33,7 +47,26 @@ Objects:  {
 	NodeAttribute: 3100, "NodeAttribute::Bone", "LimbNode" {
 		TypeFlags: "Skeleton"
 	}
-	AnimationStack: 6000, "AnimStack::Hold", "" {
+	Deformer: 5000, "Deformer::Skin", "Skin" {
+		Version: 101
+		Link_DeformAcuracy: 50
+	}
+	Deformer: 5100, "SubDeformer::Bone", "Cluster" {
+		Version: 100
+		Indexes: *8 {
+			a: 0,1,2,3,4,5,6,7
+		}
+		Weights: *8 {
+			a: 1,1,1,1,1,1,1,1
+		}
+		Transform: *16 {
+			a: 0.8660254,0.5,0,0,0.5,-0.8660254,0,0,0,0,1,0,0,0,-100,1
+		}
+		TransformLink: *16 {
+			a: 0.8660254,0.5,0,0,0.5,-0.8660254,0,0,0,0,1,0,0,0,100,1
+		}
+	}
+	AnimationStack: 6000, "AnimStack::Turn", "" {
 		Properties70:  {
 			P: "LocalStart", "KTime", "Time", "",0
 			P: "LocalStop", "KTime", "Time", "",46186158000
@@ -67,12 +100,46 @@ Objects:  {
 			a: 2
 		}
 	}
+	AnimationCurveNode: 6400, "AnimCurveNode::R", "" {
+		Properties70:  {
+			P: "d|X", "Number", "", "A",0
+			P: "d|Y", "Number", "", "A",0
+			P: "d|Z", "Number", "", "A",30
+		}
+	}
+	AnimationCurve: 6500, "AnimCurve::", "" {
+		Default: 30
+		KeyVer: 4009
+		KeyTime: *2 {
+			a: 0,46186158000
+		}
+		KeyValueFloat: *2 {
+			a: 30,90
+		}
+		KeyAttrFlags: *1 {
+			a: 4
+		}
+		KeyAttrDataFloat: *4 {
+			a: 0,0,0,0
+		}
+		KeyAttrRefCount: *1 {
+			a: 2
+		}
+	}
 }
 Connections:  {
+	C: "OO",2000,0
 	C: "OO",3000,0
 	C: "OO",3100,3000
+	C: "OO",1000,2000
+	C: "OO",5000,1000
+	C: "OO",5100,5000
+	C: "OO",3000,5100
 	C: "OO",6100,6000
 	C: "OO",6200,6100
+	C: "OO",6400,6100
 	C: "OP",6200,3000, "Lcl Translation"
 	C: "OP",6300,6200, "d|Z"
+	C: "OP",6400,3000, "Lcl Rotation"
+	C: "OP",6500,6400, "d|Z"
 }

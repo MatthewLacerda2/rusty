@@ -1,74 +1,79 @@
-//! A bone mirrored by scale -1 (#1110): its rest pose and its clip's key 0 are
-//! the same transform, so they must split into the same parts, or blending
-//! them flattens the bone halfway.
+//! A bone mirrored by scale -1 (#1110), through the whole import: its rest pose
+//! and its clip's key 0 are the same transform, so they must split into the same
+//! parts, or blending the rest pose with the clip flattens the bone halfway.
 
-use crate::asset::convert::glb;
+use crate::app::animation::blend_poses;
+use crate::asset::mesh_data::{JointTransform, SkinData};
+use crate::asset::{anim_data::AnimationClip, gltf};
 use glam::{Quat, Vec3};
 use std::path::PathBuf;
 
-type Trs = (Vec3, Quat, Vec3);
-
-/// The fixture's bone as glTF stores it: its rest pose, and its key 0.
-fn rest_and_key_0() -> (Trs, Trs) {
+/// The fixture converted, written as a `.glb` and imported: the cube's skin and
+/// its one clip, as the animator receives them.
+fn import() -> (SkinData, AnimationClip) {
     let fixture =
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/models/mirrored_bone.fbx");
-    let scene = super::super::load(&fixture).expect("the fixture loads");
-    let doc = super::super::document(&scene, &crate::test_temp::dir()).expect("it converts");
-    let node = &doc.nodes[0];
-    let rest = (
-        Vec3::from(node.translation),
-        Quat::from_array(node.rotation),
-        Vec3::from(node.scale),
-    );
-    let (mut t, mut r, mut s) = (None, None, None);
-    for channel in &doc.animations[0].channels {
-        assert_eq!(channel.node, 0);
-        match &channel.keys {
-            glb::Keys::Translation(v) => t = Some(Vec3::from(v[0])),
-            glb::Keys::Rotation(v) => r = Some(Quat::from_array(v[0])),
-            glb::Keys::Scale(v) => s = Some(Vec3::from(v[0])),
-        }
+    let out = crate::test_temp::dir().join("mirrored_bone.fbx.glb");
+    super::super::convert(&fixture, &out).expect("the fixture converts");
+    let mut asset = gltf::import::import(&out).expect("its glTF imports");
+    let cube = asset.sub_meshes.remove(0);
+    let clip = cube.clips.into_iter().next().expect("the clip imports");
+    (cube.skin.expect("the cube is skinned"), clip)
+}
+
+/// The bone's first (`last = false`) or last key on every path. The paths are
+/// keyed at different rates, so "last" is each path's own.
+fn key(clip: &AnimationClip, last: bool) -> JointTransform {
+    let track = &clip.tracks[0];
+    let pick = |n: usize| if last { n - 1 } else { 0 };
+    JointTransform {
+        translation: track.translation.values[pick(track.translation.values.len())],
+        rotation: track.rotation.values[pick(track.rotation.values.len())],
+        scale: track.scale.values[pick(track.scale.values.len())],
     }
-    let key = (
-        t.unwrap(),
-        r.expect("a rotation key"),
-        s.expect("a scale key"),
-    );
-    (rest, key)
 }
 
-/// Translation, rotation and scale lerped, slerped and lerped, as the animator
-/// blends two poses.
-fn blend(a: Trs, b: Trs, w: f32) -> Trs {
-    (a.0.lerp(b.0, w), a.1.slerp(b.1, w), a.2.lerp(b.2, w))
-}
-
-fn assert_same(a: Trs, b: Trs) {
-    assert!(a.0.abs_diff_eq(b.0, 1e-4), "translation {} vs {}", a.0, b.0);
+fn assert_same(a: JointTransform, b: JointTransform) {
     assert!(
-        a.1.dot(b.1).abs() > 1.0 - 1e-5,
-        "rotation {} vs {}",
-        a.1,
-        b.1
+        a.translation.abs_diff_eq(b.translation, 1e-4),
+        "{a:?} vs {b:?}"
     );
-    assert!(a.2.abs_diff_eq(b.2, 1e-5), "scale {} vs {}", a.2, b.2);
+    assert!(
+        a.rotation.dot(b.rotation).abs() > 1.0 - 1e-5,
+        "{a:?} vs {b:?}"
+    );
+    assert!(a.scale.abs_diff_eq(b.scale, 1e-5), "{a:?} vs {b:?}");
 }
 
 #[test]
 fn the_rest_pose_and_key_0_decompose_identically() {
-    let (rest, key) = rest_and_key_0();
-    assert_same(rest, key);
+    let (skin, clip) = import();
+    assert_same(skin.local_bind[0], key(&clip, false));
     // Z up: the file's -1 on Y lands on glTF's Z, sign kept, as Unity keeps it.
+    let scale = skin.local_bind[0].scale;
     assert!(
-        key.2.abs_diff_eq(Vec3::new(1.0, 1.0, -1.0), 1e-5),
-        "{}",
-        key.2
+        scale.abs_diff_eq(Vec3::new(1.0, 1.0, -1.0), 1e-5),
+        "{scale}"
     );
 }
 
+/// A crossfade from a clip that leaves the bone at rest into this clip's last
+/// key, halfway, through the animator's own blend: the bone keeps its mirror
+/// and turns halfway, 60° about glTF's Y (the file's Z), instead of passing
+/// through a zero scale.
 #[test]
-fn blending_the_rest_pose_with_key_0_changes_nothing() {
-    let (rest, key) = rest_and_key_0();
-    assert_same(blend(rest, key, 0.5), rest);
-    assert_same(blend(rest, key, 0.5), key);
+fn blending_the_rest_pose_with_a_later_key_does_not_flip() {
+    let (skin, clip) = import();
+    let last = key(&clip, true);
+    let half = blend_poses(&skin.local_bind, &[last], 0.5)[0];
+    assert!(
+        half.scale.abs_diff_eq(Vec3::new(1.0, 1.0, -1.0), 1e-5),
+        "{half:?}"
+    );
+    let expected = Quat::from_rotation_y(60f32.to_radians());
+    assert!(half.rotation.dot(expected).abs() > 1.0 - 1e-5, "{half:?}");
+    assert!(
+        (half.translation - 1.5 * Vec3::Y).length() < 1e-4,
+        "{half:?}"
+    );
 }
