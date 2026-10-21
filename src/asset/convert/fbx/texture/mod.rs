@@ -7,8 +7,13 @@
 //! distinct; what an earlier conversion left is `convert::refresh`'s to remove. Every
 //! URI is percent-encoded (`gltf::uri`): the folder is named after the source file,
 //! which may hold a `:` or a `%`.
+//!
+//! A texture that is neither on disk nor embedded, or embeds a format the
+//! importer does not read, is a [`Skip`]; one that fails to extract, or lies on
+//! disk where no URI can reach it, fails the conversion (#1168).
 
-use super::super::Staging;
+use super::super::stage::hook::{self, Step};
+use super::super::{Skip, Staging};
 use crate::asset::gltf::uri;
 use crate::asset::{ImportError, IMAGE_EXTENSIONS};
 use crate::core::collections::Map;
@@ -24,70 +29,84 @@ pub struct Textures {
     by_id: Map<u32, Option<String>>,
     /// File names extracted into `dir` so far.
     written: Vec<String>,
+    /// What was left out on purpose, in the order it was met.
+    pub skipped: Vec<Skip>,
 }
 
 impl Textures {
     /// The textures of the `.glb` `to` stages.
     pub fn new(to: &Staging) -> Self {
         Self {
-            out_dir: to
-                .out
-                .parent()
-                .unwrap_or_else(|| Path::new(""))
-                .to_path_buf(),
+            // `.` for a bare file name, as `stage` reads it: a URI is relative to
+            // a folder that exists.
+            out_dir: match to.out.parent() {
+                Some(dir) if !dir.as_os_str().is_empty() => dir.to_path_buf(),
+                _ => PathBuf::from("."),
+            },
             dir: to.textures.clone(),
             by_id: Map::default(),
             written: Vec::new(),
+            skipped: Vec::new(),
         }
     }
 
-    /// The URI of `map`'s texture, extracting it on first use when it is embedded.
-    pub fn uri(&mut self, map: &ufbx::MaterialMap) -> Option<String> {
-        let texture = map.texture.as_ref()?;
+    /// The URI of `map`'s texture, extracting it on first use when it is embedded;
+    /// `None` when it has none or it was skipped.
+    pub fn uri(&mut self, map: &ufbx::MaterialMap) -> Result<Option<String>, ImportError> {
+        let Some(texture) = map.texture.as_ref() else {
+            return Ok(None);
+        };
         let id = texture.element.element_id;
         if let Some(uri) = self.by_id.get(&id) {
-            return uri.clone();
+            return Ok(uri.clone());
         }
-        let uri = self.resolve(texture);
+        let uri = self.resolve(texture)?;
         self.by_id.insert(id, uri.clone());
-        uri
+        Ok(uri)
     }
 
-    fn resolve(&mut self, texture: &ufbx::Texture) -> Option<String> {
+    fn resolve(&mut self, texture: &ufbx::Texture) -> Result<Option<String>, ImportError> {
         let on_disk = [&texture.filename, &texture.absolute_filename]
             .into_iter()
             .map(|name| PathBuf::from(name.as_ref() as &str))
             .find(|path| !path.as_os_str().is_empty() && path.is_file());
         if let Some(file) = on_disk {
-            return relative_uri(&self.out_dir, &file);
+            return relative_uri(&self.out_dir, &file).map(Some).ok_or_else(|| {
+                ImportError::Parse(format!(
+                    "FBX texture {}: cannot reference it",
+                    file.display()
+                ))
+            });
         }
         if texture.content.is_empty() {
-            log::warn!(
-                "[Asset] FBX texture `{}` is neither a file on disk nor embedded",
-                texture.element.name
-            );
-            return None;
+            return Ok(self.skip(texture, "neither a file on disk nor embedded".into()));
         }
         let (stem, ext) = file_name(raw_name(texture), &texture.content);
         if !IMAGE_EXTENSIONS.contains(&ext.as_str()) {
-            log::warn!(
-                "[Asset] FBX texture `{}` embeds a `.{ext}`, not an image format the importer reads; skipped",
-                texture.element.name
-            );
-            return None;
+            let why = format!("embeds a `.{ext}`, not an image format the importer reads");
+            return Ok(self.skip(texture, why));
         }
         let name = unique(&stem, &ext, &self.written);
-        match self.extract(&name, &texture.content) {
-            Ok(()) => {
-                let dir = self.dir.file_name()?.to_string_lossy().into_owned();
-                self.written.push(name.clone());
-                Some(uri::encode_path(&format!("{dir}/{name}")))
-            }
-            Err(e) => {
-                log::warn!("[Asset] FBX texture `{}`: {e}", texture.element.name);
-                None
-            }
-        }
+        self.extract(&name, &texture.content)?;
+        let Some(dir) = self.dir.file_name() else {
+            return Err(ImportError::Parse(format!(
+                "FBX texture `{}`: {} names no folder to reference",
+                texture.element.name,
+                self.dir.display()
+            )));
+        };
+        let uri = uri::encode_path(&format!("{}/{name}", dir.to_string_lossy()));
+        self.written.push(name);
+        Ok(Some(uri))
+    }
+
+    /// Record `texture` as left out, for `why`: no URI.
+    fn skip(&mut self, texture: &ufbx::Texture, why: String) -> Option<String> {
+        self.skipped.push(Skip {
+            what: format!("FBX texture `{}`", texture.element.name),
+            why,
+        });
+        None
     }
 
     /// Write one texture. Only the textures folder is created, never the staging
@@ -104,7 +123,8 @@ impl Textures {
             _ => {}
         }
         let path = self.dir.join(name);
-        std::fs::write(&path, bytes)
+        hook::io(Step::ExtractTexture)
+            .and_then(|()| std::fs::write(&path, bytes))
             .map_err(|e| ImportError::Parse(format!("writing {}: {e}", path.display())))
     }
 }

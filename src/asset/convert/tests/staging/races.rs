@@ -39,7 +39,8 @@ fn a_reader_between_the_swaps_steps_finds_a_whole_set() {
         ]
     );
     assert_eq!(textures_dirs(&out).len(), 1, "{:?}", names(&dir));
-    assert_eq!(names(&dir).len(), 4, "{:?}", names(&dir));
+    // The source, the `.glb`, its textures, its stamp and its lock.
+    assert_eq!(names(&dir).len(), 5, "{:?}", names(&dir));
 }
 
 #[test]
@@ -76,9 +77,9 @@ fn a_second_conversion_waits_for_the_first() {
 
 #[test]
 fn without_the_lock_an_interleaved_conversion_still_leaves_a_whole_set() {
-    // B converts "two" through another source path (so another lock) while A,
-    // converting "three", is at `step`. Between A's `.glb` rename and its stamp
-    // only the lock keeps B out (the test above).
+    // B converts "two" through another source path, as on a filesystem with no
+    // locks, while A, converting "three", is at `step`. Between A's `.glb` rename
+    // and its stamp only the lock keeps B out (the test above).
     for (step, stamped) in [
         (Step::Staged, true),
         (Step::TexturesIn, false),
@@ -90,7 +91,7 @@ fn without_the_lock_an_interleaved_conversion_still_leaves_a_whole_set() {
         std::fs::write(&source, "three").unwrap();
         hook::set(move |at| {
             if at == step {
-                refresh(&TEXTURED, &b_source, &b_out).unwrap();
+                lock::unavailable(|| refresh(&TEXTURED, &b_source, &b_out)).unwrap();
             }
         });
         let a = refresh(&TEXTURED, &source, &out);
@@ -110,10 +111,10 @@ const NO_GLB: Converter = Converter {
     ..TEXTURED
 };
 
-fn no_glb(_: &Path, to: &Staging) -> Result<(), ImportError> {
+fn no_glb(_: &Path, to: &Staging) -> Result<Converted, ImportError> {
     std::fs::create_dir(&to.textures).unwrap();
     std::fs::write(to.textures.join("t.png"), "orphan").unwrap();
-    Ok(())
+    Ok(Converted::default())
 }
 
 #[test]

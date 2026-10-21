@@ -12,6 +12,7 @@ mod test_code;
 
 // sorted: one module per rule, each a row of `RULES`
 mod atomic_write;
+mod converter_log;
 mod drag_range;
 mod full_literal;
 mod ignored;
@@ -48,6 +49,7 @@ type Rule = fn(&Scan) -> Vec<Finding>;
 const RULES: &[(Rule, Allow)] = &[
     // sorted: rules are independent; allows apply to each rule's own findings
     (atomic_write::run, Allow::Inline),
+    (converter_log::run, Allow::Inline),
     (drag_range::run, Allow::Inline),
     (full_literal::run, Allow::Inline),
     (ignored::run, Allow::Never),

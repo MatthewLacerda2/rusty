@@ -1,6 +1,6 @@
 //! Step 5 of the swap: what earlier conversions of one cache left beside it.
 
-use super::super::stamp_path;
+use super::super::{split_record, stamp_path};
 use super::{textures_name, STAGING, TEXTURES};
 use crate::core::fs;
 use std::path::{Path, PathBuf};
@@ -17,7 +17,8 @@ use std::path::{Path, PathBuf};
 /// conversion in place or fails that one import.
 pub(super) fn clear(dir: &Path, name: &str) {
     let stamp = stamp_path(&dir.join(name));
-    let current = || std::fs::read_to_string(&stamp).map(|s| textures_name(name, &s));
+    let current =
+        || std::fs::read_to_string(&stamp).map(|s| textures_name(name, split_record(&s).0));
     for old in textures_dirs(&dir.join(name)) {
         let stale = current().is_ok_and(|keep| old.file_name() != Some(keep.as_ref()));
         if stale {
@@ -61,7 +62,8 @@ fn is_textures_of(entry: &str, name: &str) -> bool {
     middle == "." || tag.is_some_and(|t| t.len() == 16 && t.bytes().all(|b| b.is_ascii_hexdigit()))
 }
 
-/// `out`'s folder (`.` for a bare file name) and file name.
+/// `out`'s folder (`.` for a bare file name) and file name: exact, since a
+/// project's source path is UTF-8 (`project_relative`).
 pub(super) fn split(out: &Path) -> (PathBuf, String) {
     let dir = match out.parent() {
         Some(dir) if !dir.as_os_str().is_empty() => dir.to_path_buf(),

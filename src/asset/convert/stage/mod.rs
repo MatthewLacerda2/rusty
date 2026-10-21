@@ -15,16 +15,17 @@
 //! 3. The old stamp is removed, then the `.glb` is renamed over the old one: the
 //!    one step a reader can observe. A crash between the two leaves an unstamped
 //!    cache, which re-converts, never a stale `.glb` called current.
-//! 4. The new stamp is written. After the `.glb`, never before: a new stamp beside
-//!    the old `.glb` would call it up to date.
+//! 4. The new stamp is written, with what the conversion skipped under it. After
+//!    the `.glb`, never before: a new stamp beside the old `.glb` would call it up
+//!    to date.
 //! 5. Textures folders the stamp **on disk** does not name, staging folders and
 //!    stamp temp files a crashed conversion left, are removed (`clear`).
 //!
 //! A failing converter stops before step 2: its staging folder is removed and the
 //! old cache is as it was.
 //!
-//! **Two conversions at once.** `refresh` holds an advisory lock on the source, so
-//! a second conversion of it waits for the first. Without one (a filesystem with
+//! **Two conversions at once.** `refresh` holds the cache's lock (`lock`), so a
+//! second conversion of it waits for the first. Without one (a filesystem with
 //! no locks), the set a reader opens stays whole as long as the second conversion
 //! does not land between another's steps 3 and 4: `clear` keeps the folder the
 //! stamp on disk names, and a converter whose staging folder was cleared fails
@@ -35,7 +36,7 @@ pub(in crate::asset::convert) mod hook;
 
 pub use clear::textures_dirs;
 
-use super::{stamp_path, write_error, Converter, ImportError};
+use super::{record, stamp_path, write_error, Converted, Converter, ImportError};
 use crate::core::{fs, hash};
 use hook::{at, Step};
 use std::path::{Path, PathBuf};
@@ -57,13 +58,13 @@ const STAGING: &str = "staging";
 const TEXTURES: &str = "textures";
 
 /// Run `converter` on `source` into a staging folder beside `out`, and swap the
-/// result in, stamped `stamp`.
+/// result in, stamped `stamp`: what the converter reported, once it is in place.
 pub(super) fn convert(
     converter: &Converter,
     source: &Path,
     out: &Path,
     stamp: &str,
-) -> Result<(), ImportError> {
+) -> Result<Converted, ImportError> {
     let (dir, name) = clear::split(out);
     let staging = fs::unique_sibling(&dir.join(format!(".{name}")), STAGING);
     std::fs::create_dir(&staging).map_err(|e| write_error(&staging, &e))?;
@@ -73,12 +74,13 @@ pub(super) fn convert(
         out: out.to_path_buf(),
     };
     at(Step::Staged);
-    let result = (converter.convert)(source, &to).and_then(|()| swap(&to, &dir, stamp));
+    let result = (converter.convert)(source, &to)
+        .and_then(|converted| swap(&to, &dir, &record(stamp, &converted)).map(|()| converted));
     let _ = std::fs::remove_dir_all(&staging);
-    result?;
+    let converted = result?;
     at(Step::Stamped);
     clear::clear(&dir, &name);
-    Ok(())
+    Ok(converted)
 }
 
 /// `<name>.<digest>.textures`: the folder of the conversion stamped `stamp`.
@@ -87,8 +89,9 @@ fn textures_name(name: &str, stamp: &str) -> String {
     format!("{name}.{tag:016x}.{TEXTURES}")
 }
 
-/// Steps 2 to 4: move the staged set into `dir`, the `.glb` last, then stamp it.
-fn swap(to: &Staging, dir: &Path, stamp: &str) -> Result<(), ImportError> {
+/// Steps 2 to 4: move the staged set into `dir`, the `.glb` last, then write its
+/// stamp file, `record`.
+fn swap(to: &Staging, dir: &Path, record: &str) -> Result<(), ImportError> {
     let moved = match (to.textures.is_dir(), to.textures.file_name()) {
         (true, Some(name)) => move_in(&to.textures, &dir.join(name))?,
         _ => None,
@@ -107,7 +110,7 @@ fn swap(to: &Staging, dir: &Path, stamp: &str) -> Result<(), ImportError> {
         return Err(write_error(&to.out, &e));
     }
     at(Step::GlbIn);
-    fs::write_atomic(&stamp_path, stamp.as_bytes()).map_err(|e| write_error(&stamp_path, &e))
+    fs::write_atomic(&stamp_path, record.as_bytes()).map_err(|e| write_error(&stamp_path, &e))
 }
 
 /// Move the folder `from` to `to`, returning `to` when it moved whole. When `to`

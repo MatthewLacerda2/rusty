@@ -7,6 +7,18 @@
 //! into a primitive per material, base-colour materials (embedded textures
 //! extracted beside the `.glb`, `texture`), skins, and one
 //! animation per animation stack (`anim`).
+//!
+//! A converter never logs or drops a `Result`: what it leaves out on purpose is a
+//! [`Skip`] in what it returns, and any failure fails the conversion (#1172).
+// A converter's (#1172): a `let _ =` or a discarded `.ok()` here would drop a
+// failure the cache must not be stamped over, and a print would bypass the one
+// warning path; the rest of the crate keeps `let _ =` for best-effort cleanup.
+#![deny(
+    clippy::let_underscore_must_use,
+    clippy::unused_result_ok,
+    clippy::print_stdout,
+    clippy::print_stderr
+)]
 
 mod anim;
 mod basis;
@@ -14,7 +26,8 @@ mod material;
 mod mesh;
 mod texture;
 
-use super::{glb, Staging};
+use super::stage::hook::{self, Step};
+use super::{glb, Converted, Skip, Staging};
 use crate::asset::ImportError;
 use crate::core::collections::Map;
 use basis::Basis;
@@ -22,12 +35,18 @@ use std::path::Path;
 use texture::Textures;
 
 /// Convert the FBX at `source` into a `.glb` where `to` says, its embedded textures
-/// extracted beside it (`texture`).
-pub fn convert(source: &Path, to: &Staging) -> Result<(), ImportError> {
+/// extracted beside it (`texture`): what it skipped, the textures first.
+pub fn convert(source: &Path, to: &Staging) -> Result<Converted, ImportError> {
     let scene = load(source)?;
-    let document = document(&scene, &mut Textures::new(to))?;
-    std::fs::write(&to.glb, glb::write(&document))
-        .map_err(|e| ImportError::Parse(format!("writing {}: {e}", to.glb.display())))
+    let mut textures = Textures::new(to);
+    let mut takes = Vec::new();
+    let document = document(&scene, &mut textures, &mut takes)?;
+    hook::io(Step::WriteGltf)
+        .and_then(|()| std::fs::write(&to.glb, glb::write(&document)))
+        .map_err(|e| ImportError::Parse(format!("writing {}: {e}", to.glb.display())))?;
+    let mut skipped = textures.skipped;
+    skipped.append(&mut takes);
+    Ok(Converted { skipped })
 }
 
 /// The FBX at `source` converted to a cached `.glb` at `out` through
@@ -48,19 +67,24 @@ fn load(source: &Path) -> Result<ufbx::SceneRoot, ImportError> {
         generate_missing_normals: true,
         ..Default::default()
     };
-    ufbx::load_file(&source.to_string_lossy(), opts)
-        .map_err(|e| ImportError::Parse(format!("{}: {e:?}", source.display())))
+    let failed = |e: String| ImportError::Parse(format!("{}: {e}", source.display()));
+    hook::io(Step::ReadSource).map_err(|e| failed(e.to_string()))?;
+    ufbx::load_file(&source.to_string_lossy(), opts).map_err(|e| failed(format!("{e:?}")))
 }
 
 /// The glTF document for a loaded FBX scene, its textures resolved through
-/// `textures`.
-fn document(scene: &ufbx::Scene, textures: &mut Textures) -> Result<glb::Document, ImportError> {
+/// `textures`, the takes that would not bake added to `skipped`.
+fn document(
+    scene: &ufbx::Scene,
+    textures: &mut Textures,
+    skipped: &mut Vec<Skip>,
+) -> Result<glb::Document, ImportError> {
     let mut doc = glb::Document {
         materials: scene
             .materials
             .iter()
             .map(|m| material::material(m, textures))
-            .collect(),
+            .collect::<Result<_, _>>()?,
         ..Default::default()
     };
     let materials: Map<u32, usize> = scene
@@ -98,7 +122,7 @@ fn document(scene: &ufbx::Scene, textures: &mut Textures) -> Result<glb::Documen
             doc.nodes[index].skin = Some(doc.skins.len() - 1);
         }
     }
-    doc.animations = anim::animations(scene, basis, &nodes);
+    doc.animations = anim::animations(scene, basis, &nodes, skipped);
     Ok(doc)
 }
 

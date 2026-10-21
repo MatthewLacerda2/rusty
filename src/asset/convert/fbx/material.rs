@@ -7,9 +7,13 @@
 
 use super::glb;
 use super::texture::Textures;
+use crate::asset::ImportError;
 
 /// `material` as a glTF material, its textures resolved through `textures`.
-pub fn material(material: &ufbx::Material, textures: &mut Textures) -> glb::Material {
+pub fn material(
+    material: &ufbx::Material,
+    textures: &mut Textures,
+) -> Result<glb::Material, ImportError> {
     let pbr = &material.pbr;
     let factor = |map: &ufbx::MaterialMap| value_or(map, 1.0);
     let rgb = |map: &ufbx::MaterialMap, scale: f32| {
@@ -22,15 +26,15 @@ pub fn material(material: &ufbx::Material, textures: &mut Textures) -> glb::Mate
     } else {
         [0.0; 3]
     };
-    glb::Material {
+    Ok(glb::Material {
         name: material.element.name.to_string(),
         base_color: [r, g, b, factor(&pbr.opacity)],
         metallic: value_or(&pbr.metalness, 0.0),
         roughness: value_or(&pbr.roughness, 0.5),
         emissive,
-        base_color_texture: textures.uri(&pbr.base_color),
-        normal_texture: textures.uri(&pbr.normal_map),
-    }
+        base_color_texture: textures.uri(&pbr.base_color)?,
+        normal_texture: textures.uri(&pbr.normal_map)?,
+    })
 }
 
 fn value_or(map: &ufbx::MaterialMap, default: f32) -> f32 {
