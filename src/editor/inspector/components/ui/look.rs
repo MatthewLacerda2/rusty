@@ -2,6 +2,7 @@
 //! mode picker and the gradient editor (kind, direction or centre/radius, 2–4
 //! stops). They edit a snapshot; the card writes it back through its ops.
 
+use crate::editor::widgets::DragRange;
 use glam::{Vec2, Vec4};
 
 use super::{combo, vec2_row};
@@ -68,7 +69,7 @@ fn draw_stops(ui: &mut egui::Ui, stops: &mut Vec<GradientStop>) -> bool {
         ui.horizontal(|ui| {
             ui.label(format!("  Stop {i}:"));
             changed |= ui
-                .add(egui::DragValue::new(&mut s.t).speed(0.01).range(0.0..=1.0))
+                .add(egui::DragValue::new(&mut s.t).speed(0.01).ranged(0.0..=1.0))
                 .changed();
             let mut c = s.color.to_array();
             changed |= ui.color_edit_button_rgba_unmultiplied(&mut c).changed();

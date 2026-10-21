@@ -6,6 +6,7 @@
 //! Hinge) are hidden, not cleared, so switching kinds back loses nothing.
 
 use crate::editor::inspector::components::card::remove_component;
+use crate::editor::widgets::DragRange;
 use crate::scene::authoring::ComponentKind;
 use egui_phosphor::regular as icon;
 
@@ -143,7 +144,7 @@ fn draw_limits(
     let changed = ui
         .horizontal(|ui| {
             ui.label("Limits (deg):");
-            let drag = |v| egui::DragValue::new(v).range(range.clone());
+            let drag = |v| egui::DragValue::new(v).ranged(range.clone());
             ui.add(drag(&mut min)).changed() | ui.add(drag(&mut max)).changed()
         })
         .inner;
@@ -169,7 +170,7 @@ fn draw_swing(
     let row = |ui: &mut egui::Ui, label: &str, v: &mut f32| {
         ui.horizontal(|ui| {
             ui.label(label);
-            let drag = egui::DragValue::new(v).range(0.0..=joint_ops::MAX_ANGLE);
+            let drag = egui::DragValue::new(v).ranged(0.0..=joint_ops::MAX_ANGLE);
             ui.add(drag).changed()
         })
         .inner
@@ -200,7 +201,7 @@ fn draw_breaking(
     let row = |ui: &mut egui::Ui, label: &str, v: &mut f32| {
         ui.horizontal(|ui| {
             ui.label(label);
-            let drag = egui::DragValue::new(v).speed(1.0).range(0.0..=f32::MAX);
+            let drag = egui::DragValue::new(v).speed(1.0).ranged(0.0..=f32::MAX);
             ui.add(drag).changed()
         })
         .inner

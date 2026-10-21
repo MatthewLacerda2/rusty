@@ -6,6 +6,7 @@
 //! `Navigation.SetAreaCost` / `DefineArea` call, then hand the new costs to the
 //! live graph. Costs are read at search time, so nothing is rebaked.
 
+use crate::editor::widgets::DragRange;
 use crate::navigation::{NavigationGraph, MIN_AREA_COST};
 use crate::scene::Scene;
 
@@ -20,7 +21,7 @@ pub fn draw(ui: &mut egui::Ui, scene: &mut Scene, nav: &mut NavigationGraph) {
         ui.horizontal(|ui| {
             ui.label(format!("{i}: {}", area.name));
             let drag = egui::DragValue::new(&mut cost).speed(0.1);
-            if ui.add(drag.range(MIN_AREA_COST..=1000.0)).changed() {
+            if ui.add(drag.ranged(MIN_AREA_COST..=1000.0)).changed() {
                 changed |= s.set_area_cost(&area.name, cost).is_some();
             }
         });

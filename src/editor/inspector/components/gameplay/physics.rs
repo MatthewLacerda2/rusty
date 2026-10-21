@@ -9,6 +9,7 @@
 //! bindings share one write.
 
 use crate::editor::inspector::components::card::remove_component;
+use crate::editor::widgets::DragRange;
 use crate::scene::authoring::ComponentKind;
 use egui_phosphor::regular as icon;
 use glam::Vec3;
@@ -51,7 +52,7 @@ fn draw_rb_mass(
         ui.label("Mass:");
         let drag = egui::DragValue::new(&mut mass)
             .speed(0.05)
-            .range(0.01..=1000.0);
+            .ranged(0.01..=1000.0);
         if ui.add(drag).changed() {
             if let Some(mut r) = world.rigidbody_mut(id) {
                 rigidbody_ops::set_mass(&mut r, mass);

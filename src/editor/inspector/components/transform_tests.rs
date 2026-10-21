@@ -33,7 +33,7 @@ fn drag_angle_shows_negative_zero_as_zero() {
 /// Selecting a mirrored entity used to clamp its scale to 0.01 in the Inspector.
 #[test]
 fn drag_scale_leaves_a_scale_it_shows_unchanged() {
-    for scale in [-1.5, 0.001, 1.0, 40.0] {
+    for scale in [-1.5, -40.0, 0.0, 0.001, 1.0, 40.0] {
         assert_eq!(shown_by(super::drag_scale, scale), scale);
     }
 }

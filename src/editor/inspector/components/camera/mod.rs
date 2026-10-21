@@ -3,6 +3,7 @@
 //! effects list in `custom_effects`), split apart to stay under the size cap. Both
 //! cards live on the same camera entity.
 
+use crate::editor::widgets::DragRange;
 use egui_phosphor::regular as icon;
 
 mod custom_effects;
@@ -112,7 +113,7 @@ fn draw_projection(
             .add(
                 egui::DragValue::new(&mut near)
                     .speed(0.01)
-                    .range(0.01..=10.0),
+                    .ranged(0.01..=10.0),
             )
             .changed()
         {
@@ -129,7 +130,7 @@ fn draw_projection(
             .add(
                 egui::DragValue::new(&mut far)
                     .speed(1.0)
-                    .range(1.0..=1000.0),
+                    .ranged(1.0..=1000.0),
             )
             .changed()
         {

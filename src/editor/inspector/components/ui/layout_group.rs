@@ -4,6 +4,7 @@
 //! routes through `scene::authoring::layout_group`.
 
 use crate::editor::inspector::components::card::remove_component;
+use crate::editor::widgets::DragRange;
 use crate::scene::authoring::ComponentKind;
 use egui_phosphor::regular as icon;
 
@@ -96,7 +97,7 @@ fn draw_grid(ui: &mut egui::Ui, g: &mut LayoutGroupComponent) -> bool {
     changed |= combo(ui, "Constraint", &mut g.constraint, &constraints, name);
     ui.horizontal(|ui| {
         ui.label("Constraint Count:");
-        let count = egui::DragValue::new(&mut g.constraint_count).range(1..=64);
+        let count = egui::DragValue::new(&mut g.constraint_count).ranged(1..=64);
         changed |= ui.add(count).changed();
     });
     let corners = CORNERS.map(|(c, _)| c);

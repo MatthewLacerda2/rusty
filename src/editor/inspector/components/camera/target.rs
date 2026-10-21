@@ -3,6 +3,7 @@
 //! functions use.
 
 use crate::components::{CameraComponent, Projection};
+use crate::editor::widgets::DragRange;
 use crate::scene::authoring::camera as camera_ops;
 
 /// Perspective / orthographic, and the orthographic half-height.
@@ -37,7 +38,7 @@ pub(super) fn draw_projection_mode(
             ui.label("Ortho Size:");
             let drag = egui::DragValue::new(&mut size)
                 .speed(0.1)
-                .range(0.01..=1000.0);
+                .ranged(0.01..=1000.0);
             if ui.add(drag).changed() {
                 next = Some(Projection::Orthographic { size });
             }
@@ -83,10 +84,10 @@ pub(super) fn draw_target(
         ui.label("Size:");
         let max = camera_ops::MAX_TARGET_SIZE;
         changed |= ui
-            .add(egui::DragValue::new(&mut w).range(1..=max))
+            .add(egui::DragValue::new(&mut w).ranged(1..=max))
             .changed();
         changed |= ui
-            .add(egui::DragValue::new(&mut h).range(1..=max))
+            .add(egui::DragValue::new(&mut h).ranged(1..=max))
             .changed();
     });
     if changed {
@@ -103,7 +104,7 @@ pub(super) fn draw_target(
     let mut every = t.update_every;
     ui.horizontal(|ui| {
         ui.label("Update Every N Frames:");
-        let drag = egui::DragValue::new(&mut every).range(1..=120);
+        let drag = egui::DragValue::new(&mut every).ranged(1..=120);
         if ui.add(drag).changed() {
             write(world, id, is_dirty, |c| {
                 camera_ops::set_target_update_every(c, every)

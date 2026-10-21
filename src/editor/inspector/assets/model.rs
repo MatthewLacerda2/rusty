@@ -1,3 +1,4 @@
+use crate::editor::widgets::DragRange;
 use crate::editor::EditorUi;
 use crate::scene::Scene;
 use egui_phosphor::regular as icon;
@@ -65,7 +66,7 @@ fn draw_import_settings(ui: &mut egui::Ui, editor: &mut EditorUi) {
         ui.add(
             egui::DragValue::new(&mut editor.asset_model_scale)
                 .speed(0.05)
-                .range(0.01..=100.0),
+                .ranged(0.01..=100.0),
         );
     });
 
@@ -106,7 +107,7 @@ fn draw_lightmap_uvs(ui: &mut egui::Ui, scene: &mut Scene, path: &str) {
         let mut knob = |ui: &mut egui::Ui, label: &str, value: &mut f32, max: f32| {
             ui.horizontal(|ui| {
                 ui.label(label);
-                let r = ui.add(egui::DragValue::new(value).speed(0.5).range(0.0..=max));
+                let r = ui.add(egui::DragValue::new(value).speed(0.5).ranged(0.0..=max));
                 commit |= r.drag_stopped() || (r.changed() && !r.dragged());
             });
         };

@@ -7,6 +7,7 @@
 //! (#992) rebakes only the volume's cells after an edit.
 
 use crate::editor::inspector::components::card::remove_component;
+use crate::editor::widgets::DragRange;
 use crate::scene::authoring::ComponentKind;
 use egui_phosphor::regular as icon;
 
@@ -58,7 +59,7 @@ pub fn draw_nav_modifier(
             .horizontal(|ui| {
                 ui.label("Area:");
                 let max = (MAX_AREAS - 1) as u8;
-                ui.add(egui::DragValue::new(&mut area).range(0..=max))
+                ui.add(egui::DragValue::new(&mut area).ranged(0..=max))
                     .changed()
             })
             .inner;
