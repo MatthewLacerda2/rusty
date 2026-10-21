@@ -129,9 +129,12 @@ pub fn boot_scene_from_args(args: &[String]) -> String {
 ///
 /// Each command yields exactly one JSON object on its own line, so an agent can
 /// read responses one-per-line in lockstep with the commands it sent:
-/// `{"ok":true,"result":"…"}` or `{"ok":false,"error":"…"}`. When the engine
-/// logged warnings or errors meanwhile, they ride along as `"warnings":[…]` (#1139);
-/// the key is absent otherwise.
+/// `{"ok":true,"result":"…"}` or `{"ok":false,"error":"…"}`. `warnings` are the
+/// engine warnings and errors the caller drained for this reply (#1139): the
+/// headless session passes everything raised since its previous reply, the windowed
+/// channel what was raised while *this line* was evaluated (the rest go to the
+/// window's console). They ride along as `"warnings":[…]`; the key is absent when
+/// there are none.
 ///
 /// Shared with the windowed command channel ([`super::command_channel`]) so the
 /// headless and windowed responses are byte-identical — the framing lives here once.

@@ -15,6 +15,7 @@
 //! window that closes and reopens is picked up transparently by the next call. A dial
 //! failure (no window running) is reported in-band as a tool error, never a crash.
 
+use std::cell::RefCell;
 use std::io;
 
 use serde_json::Value;
@@ -29,13 +30,18 @@ pub struct SocketClient {
     /// An explicit `--attach <addr>` override (a socket path on unix, a `host:port` on
     /// windows), or `None` to use the shared default address the listener binds.
     explicit: Option<String>,
+    /// The engine warnings the last reply carried, until [`EvalBackend::take_warnings`].
+    warnings: RefCell<Vec<String>>,
 }
 
 impl SocketClient {
     /// Build an attach backend. `explicit` is the `--attach <addr>` override; `None`
     /// uses the default address.
     pub fn new(explicit: Option<String>) -> Self {
-        Self { explicit }
+        Self {
+            explicit,
+            warnings: RefCell::default(),
+        }
     }
 
     /// The in-band message for "no engine reachable" — naming where we looked and how
@@ -56,22 +62,47 @@ impl EvalBackend for SocketClient {
         let mut client =
             Client::connect(self.explicit.as_deref()).map_err(|e| self.no_engine(&e))?;
         let framed = client.request(line).map_err(|e| self.no_engine(&e))?;
-        parse_framed(&framed)
+        let (outcome, warnings) = parse_framed(&framed);
+        *self.warnings.borrow_mut() = warnings;
+        outcome
+    }
+
+    /// What the window raised while the last line was evaluated; the window's own
+    /// console has those and everything else.
+    fn take_warnings(&self) -> Vec<String> {
+        std::mem::take(&mut *self.warnings.borrow_mut())
     }
 }
 
 /// Unwrap one framed reply line (`{"ok":true,"result":"…"}` /
 /// `{"ok":false,"error":"…"}`, the byte-identical framing from
-/// [`crate::dev::session::response_line`]) into the evaluator's `Result`. A reply that
-/// doesn't parse is itself an error (the engine should never send one — we never panic).
-fn parse_framed(framed: &str) -> Result<String, String> {
-    let value: Value = serde_json::from_str(framed)
-        .map_err(|e| format!("malformed reply from engine: {e}: {framed:?}"))?;
-    if value.get("ok").and_then(Value::as_bool).unwrap_or(false) {
+/// [`crate::dev::session::response_line`]) into the evaluator's `Result`, plus the
+/// engine warnings its optional `"warnings"` key carries. A reply that doesn't parse
+/// is itself an error (the engine should never send one — we never panic).
+fn parse_framed(framed: &str) -> (Result<String, String>, Vec<String>) {
+    let value: Value = match serde_json::from_str(framed) {
+        Ok(value) => value,
+        Err(e) => {
+            let error = format!("malformed reply from engine: {e}: {framed:?}");
+            return (Err(error), Vec::new());
+        }
+    };
+    let warnings = value
+        .get("warnings")
+        .and_then(Value::as_array)
+        .map(|list| {
+            list.iter()
+                .filter_map(Value::as_str)
+                .map(str::to_string)
+                .collect()
+        })
+        .unwrap_or_default();
+    let outcome = if value.get("ok").and_then(Value::as_bool).unwrap_or(false) {
         Ok(field(&value, "result"))
     } else {
         Err(field(&value, "error"))
-    }
+    };
+    (outcome, warnings)
 }
 
 /// Pull a string field from the framed reply, tolerating its absence.
@@ -89,23 +120,30 @@ mod tests {
 
     #[test]
     fn parse_framed_maps_ok_to_result() {
-        assert_eq!(
-            parse_framed(r#"{"ok":true,"result":"2"}"#),
-            Ok("2".to_string())
-        );
+        let (outcome, warnings) = parse_framed(r#"{"ok":true,"result":"2"}"#);
+        assert_eq!(outcome, Ok("2".to_string()));
+        assert!(warnings.is_empty());
     }
 
     #[test]
     fn parse_framed_maps_not_ok_to_error() {
         assert_eq!(
-            parse_framed(r#"{"ok":false,"error":"boom"}"#),
+            parse_framed(r#"{"ok":false,"error":"boom"}"#).0,
             Err("boom".to_string())
         );
     }
 
     #[test]
+    fn parse_framed_passes_the_engine_warnings_through() {
+        let reply = r#"{"ok":true,"result":"","warnings":["[Asset] skipped"]}"#;
+        let (outcome, warnings) = parse_framed(reply);
+        assert_eq!(outcome, Ok(String::new()));
+        assert_eq!(warnings, ["[Asset] skipped"]);
+    }
+
+    #[test]
     fn parse_framed_rejects_garbage() {
-        assert!(parse_framed("not json at all").is_err());
+        assert!(parse_framed("not json at all").0.is_err());
     }
 
     #[test]

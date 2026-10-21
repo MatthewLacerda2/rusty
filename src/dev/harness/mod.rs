@@ -222,6 +222,8 @@ impl Harness {
 
     /// Flush `results.json` + `console.log` into `out_dir`. Returns the results path.
     pub fn write_results(&self) -> std::io::Result<PathBuf> {
+        // Warnings raised outside a tick (loading the scene, say) join the log first.
+        crate::logging::forward(&self.console);
         std::fs::create_dir_all(&self.out_dir)?;
 
         let expects: Vec<Value> = self

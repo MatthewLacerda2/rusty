@@ -161,10 +161,11 @@ mod tests {
     fn engine_warnings_come_back_as_a_second_block() {
         crate::logging::init();
         let s = session();
-        log::warn!("[Test] a mesh collider was skipped");
+        log::warn!("[Test] mcp: a mesh collider was skipped");
         let result = tools_call(&s, &json!({ "name": "snapshot" })).expect("snapshot ok");
-        let warnings = result["content"][1]["text"].as_str().unwrap();
-        assert!(warnings.contains("[Test] a mesh collider was skipped"));
+        let warnings = result["content"][1]["text"].as_str().unwrap_or_default();
+        assert!(warnings.starts_with("engine warnings:\n"));
+        assert!(warnings.contains("[Test] mcp: a mesh collider was skipped"));
         let snap = result["content"][0]["text"].as_str().unwrap();
         assert!(
             serde_json::from_str::<Value>(snap).is_ok(),

@@ -1,29 +1,36 @@
 use std::cell::RefCell;
 
 use super::*;
-use crate::scripting::LogLevel;
+
+// Every assertion looks for its own tag with `contains`: under plain `cargo test`
+// other tests share the buffer (each drain takes only its own thread's records,
+// `take_mine`), and the console may hold their entries.
 
 fn console() -> RefCell<ConsoleLogs> {
     RefCell::new(ConsoleLogs::new())
 }
 
+fn has(console: &RefCell<ConsoleLogs>, text: &str, level: LogLevel) -> bool {
+    let entry = (text.to_string(), level);
+    console.borrow().messages.contains(&entry)
+}
+
 #[test]
 fn an_engine_warning_lands_in_the_console() {
     init();
-    log::warn!("[Test] a mesh collider was skipped");
-    log::error!("[Test] a texture did not load");
+    log::warn!("[Test] lands: a mesh collider was skipped");
+    log::error!("[Test] lands: a texture did not load");
 
     let console = console();
     let forwarded = forward(&console);
-    assert!(forwarded.contains(&"[Test] a mesh collider was skipped".to_string()));
-    let messages = &console.borrow().messages;
-    assert!(messages.contains(&(
-        "[Test] a mesh collider was skipped".to_string(),
-        LogLevel::Warning
-    )));
-    assert!(messages.contains(&("[Test] a texture did not load".to_string(), LogLevel::Error)));
+    let warning = "[Test] lands: a mesh collider was skipped";
+    assert!(forwarded.iter().any(|m| m == warning));
+    assert!(has(&console, warning, LogLevel::Warning));
+    let error = "[Test] lands: a texture did not load";
+    assert!(has(&console, error, LogLevel::Error));
+    let again = forward(&console);
     assert!(
-        forward(&console).is_empty(),
+        !again.iter().any(|m| m.contains("[Test] lands:")),
         "a drain takes each record once"
     );
 }
@@ -31,20 +38,36 @@ fn an_engine_warning_lands_in_the_console() {
 #[test]
 fn info_and_dependency_warnings_stay_out_of_the_console() {
     init();
-    log::info!("[Test] routine progress");
-    log::warn!(target: "wgpu_hal::vulkan", "[Dep] a driver quirk");
+    log::info!("[Test] out: routine progress");
+    log::warn!(target: "wgpu_hal::vulkan", "[Dep] out: a driver quirk");
 
     let forwarded = forward(&console());
-    assert!(!forwarded.iter().any(|m| m.contains("routine progress")));
-    assert!(!forwarded.iter().any(|m| m.contains("driver quirk")));
+    assert!(!forwarded
+        .iter()
+        .any(|m| m.contains("out: routine progress")));
+    assert!(!forwarded.iter().any(|m| m.contains("out: a driver quirk")));
+}
+
+#[test]
+fn a_warning_raised_every_frame_is_one_entry() {
+    init();
+    for _ in 0..250 {
+        log::warn!("[Test] collapse: per-frame warning");
+    }
+    let console = console();
+    let forwarded = forward(&console);
+    let shown = "[Test] collapse: per-frame warning (×250)";
+    assert!(forwarded.iter().any(|m| m == shown));
+    assert!(has(&console, shown, LogLevel::Warning));
 }
 
 #[test]
 fn the_buffer_keeps_only_the_newest_records() {
+    // A local buffer: the shared one may hold other tests' records.
+    let mut pending = Vec::new();
     for n in 0..CAPACITY + 5 {
-        keep(Level::Warn, format!("record {n}"));
+        keep(&mut pending, Level::Warn, format!("record {n}"));
     }
-    let forwarded = forward(&console());
-    assert_eq!(forwarded.len(), CAPACITY);
-    assert_eq!(forwarded[0], "record 5");
+    assert_eq!(pending.len(), CAPACITY);
+    assert_eq!(pending[0].text, "record 5");
 }

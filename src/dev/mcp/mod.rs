@@ -65,7 +65,8 @@ pub trait EvalBackend {
     }
 
     /// The engine warnings and errors logged since the last call (#1139). Attach
-    /// mode returns none: the window's own console shows them.
+    /// mode returns those its last reply carried: what the window raised while that
+    /// line was evaluated.
     fn take_warnings(&self) -> Vec<String> {
         Vec::new()
     }

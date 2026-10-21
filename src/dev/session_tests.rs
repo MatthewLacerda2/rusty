@@ -128,19 +128,19 @@ fn engine_warnings_ride_along_with_the_reply() {
     // #1139: a `log::warn!` from engine code reaches the agent driving the session.
     crate::logging::init();
     let s = session();
-    log::warn!("[Test] an asset was skipped");
+    log::warn!("[Test] session: an asset was skipped");
     let mut out = Vec::new();
     run(&s, b"1 + 1\n2 + 2\n" as &[u8], &mut out).expect("channel runs to EOF");
     let text = String::from_utf8(out).unwrap();
     let lines: Vec<&str> = text.lines().collect();
-    assert!(lines[0].contains("\"warnings\":[") && lines[0].contains("an asset was skipped"));
+    assert!(lines[0].contains("\"warnings\":[") && lines[0].contains("session: an asset"));
     assert!(
-        !lines[1].contains("warnings"),
+        !lines[1].contains("session: an asset"),
         "each warning is reported once"
     );
     let log = s.world().console().borrow();
     assert!(log
         .messages
         .iter()
-        .any(|(m, _)| m == "[Test] an asset was skipped"));
+        .any(|(m, _)| m == "[Test] session: an asset was skipped"));
 }
