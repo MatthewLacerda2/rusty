@@ -114,6 +114,14 @@ impl World {
             .fold(glam::Mat4::IDENTITY, |below, local| local * below)
     }
 
+    /// The world matrix `id`'s local Transform sits under: its live parent's, or
+    /// identity for a root (or a dead id).
+    pub fn parent_world_matrix(&self, id: u32) -> glam::Mat4 {
+        self.ancestors(id)
+            .next()
+            .map_or(glam::Mat4::IDENTITY, |p| self.compute_world_matrix(p))
+    }
+
     /// Write the raw parent link. Hierarchy INVARIANTS (cycle checks, the
     /// parent's `children` list) are `Scene::set_parent`'s job; this is the
     /// storage-level write it and scene rehydration route through.

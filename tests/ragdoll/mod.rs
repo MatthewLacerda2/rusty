@@ -5,6 +5,7 @@
 
 mod fall;
 mod ik;
+mod mirrored;
 mod rig;
 mod switch;
 

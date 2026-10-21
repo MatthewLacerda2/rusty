@@ -24,6 +24,7 @@ use std::collections::BTreeMap;
 
 use glam::{Quat, Vec3};
 
+use crate::components::transform::{local_rotation, world_rotation};
 use crate::scene::Scene;
 
 /// The body layout the scene implies: body-owner entity id → the collider
@@ -71,7 +72,10 @@ pub(super) fn plan(scene: &Scene) -> BodyPlan {
     plan
 }
 
-/// `id`'s world pose from the live parent walk. A root entity reads its
+/// `id`'s world pose from the live parent walk. A mirroring parent's reflection
+/// stays in `scale` and the rotation is seen through it
+/// ([`world_rotation`], #1119), so `rot` × `scale` is the entity's world matrix.
+/// A root entity reads its
 /// `Transform` verbatim, so the common unparented case is bit-identical to the
 /// local pose (no decompose round-trip noise).
 pub(super) fn world_pose(scene: &Scene, id: u32) -> Option<WorldPose> {
@@ -86,10 +90,10 @@ pub(super) fn world_pose(scene: &Scene, id: u32) -> Option<WorldPose> {
         return Some(local);
     };
     let parent_mat = scene.compute_world_matrix(parent);
-    let (parent_scale, parent_rot, _) = parent_mat.to_scale_rotation_translation();
+    let (parent_scale, _, _) = parent_mat.to_scale_rotation_translation();
     Some(WorldPose {
         pos: parent_mat.transform_point3(local.pos),
-        rot: (parent_rot * local.rot).normalize(),
+        rot: world_rotation(parent_mat, local.rot),
         scale: parent_scale * local.scale,
     })
 }
@@ -101,10 +105,9 @@ pub(super) fn world_to_local(scene: &Scene, id: u32, pos: Vec3, rot: Quat) -> (V
         return (pos, rot);
     };
     let parent_mat = scene.compute_world_matrix(parent);
-    let (_, parent_rot, _) = parent_mat.to_scale_rotation_translation();
     (
         parent_mat.inverse().transform_point3(pos),
-        (parent_rot.inverse() * rot).normalize(),
+        local_rotation(parent_mat, rot),
     )
 }
 

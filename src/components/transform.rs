@@ -59,3 +59,40 @@ impl TransformComponent {
         self.rotation = Quat::from_euler(glam::EulerRot::YXZ, yaw, pitch, roll);
     }
 }
+
+/// The world rotation of a child with local `rotation` under a parent whose world
+/// matrix is `parent_world`. A reflection stays in the scale, never in the
+/// rotation: glam's `to_scale_rotation_translation` carries a mirroring parent's
+/// reflection as a negative X scale, so the child's rotation is seen through that
+/// mirror, `R_parent · F·R·F` with `F` the X flip, not the plain product (#1119).
+/// Then this rotation times the parent's signed scale times the child's own
+/// scale is the child's world matrix, which is how physics poses a body and IK a
+/// bone. [`local_rotation`] is its exact inverse; an unmirrored parent gives the
+/// plain product, bit for bit.
+pub fn world_rotation(parent_world: Mat4, rotation: Quat) -> Quat {
+    let (_, parent_rot, _) = parent_world.to_scale_rotation_translation();
+    (parent_rot * through_mirror(parent_world, rotation)).normalize()
+}
+
+/// The local rotation that gives a child the world rotation `world_rot` under
+/// `parent_world`: the inverse of [`world_rotation`], so a world rotation read
+/// from a bone and written back leaves its local pose as it was, mirrored parent
+/// or not (#1119).
+pub fn local_rotation(parent_world: Mat4, world_rot: Quat) -> Quat {
+    let (_, parent_rot, _) = parent_world.to_scale_rotation_translation();
+    through_mirror(parent_world, parent_rot.inverse() * world_rot).normalize()
+}
+
+/// `rotation` seen through a mirroring parent's reflection, `F·R·F`: a rotation
+/// about the axis reflected as a pseudovector, `(x, y, z, w) → (x, −y, −z, w)`.
+/// Its own inverse, so one function serves both directions.
+fn through_mirror(parent_world: Mat4, rotation: Quat) -> Quat {
+    if parent_world.determinant() < 0.0 {
+        Quat::from_xyzw(rotation.x, -rotation.y, -rotation.z, rotation.w)
+    } else {
+        rotation
+    }
+}
+
+#[cfg(test)]
+mod tests;

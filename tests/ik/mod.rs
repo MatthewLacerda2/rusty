@@ -2,10 +2,12 @@
 //! five-bone rig (`pelvis → spine → {head, arm → finger}`): a script-set target
 //! is reached and skinned, the arm's hitbox follows the IK'd pose, an aim chain
 //! clamps without drifting, weight 0 is an exact no-op, a ragdolled bone is left
-//! to physics, and the whole path is deterministic.
+//! to physics, a mirrored rig reaches as well as a plain one (#1119), and the
+//! whole path is deterministic.
 
 mod aim;
 mod api;
+mod mirrored;
 
 use std::cell::RefCell;
 use std::rc::Rc;

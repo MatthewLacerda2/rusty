@@ -27,6 +27,7 @@ mod switch;
 use glam::{Quat, Vec3};
 
 use super::HitboxOptions;
+use crate::components::transform;
 use crate::components::{ColliderShape, CollisionDetection, JointComponent, RigidBodyComponent};
 use crate::scene::Scene;
 use preset::{preset_for, Bend, JointPreset};
@@ -152,10 +153,12 @@ impl Scene {
         dir.try_normalize().unwrap_or(Vec3::Y)
     }
 
+    /// `id`'s world rotation as its body gets it (`physics::compound`), so a
+    /// joint's local axes sit in the frame physics moves (#1119).
     fn world_rotation(&self, id: u32) -> Quat {
-        self.compute_world_matrix(id)
-            .to_scale_rotation_translation()
-            .1
+        self.world.transform(id).map_or(Quat::IDENTITY, |t| {
+            transform::world_rotation(self.world.parent_world_matrix(id), t.rotation)
+        })
     }
 
     /// A collider's volume at its world scale — what its share of the mass is

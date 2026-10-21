@@ -22,6 +22,7 @@ pub use two_bone::solve_two_bone;
 
 use glam::{Quat, Vec3};
 
+use crate::components::transform::{local_rotation, world_rotation};
 use crate::components::{IkChain, IkConstraint, IkTarget};
 use crate::scene::Scene;
 
@@ -145,21 +146,18 @@ impl Scene {
     }
 
     fn bone_pose(&self, bone: u32) -> BonePose {
-        let (_, rot, pos) = self
-            .compute_world_matrix(bone)
-            .to_scale_rotation_translation();
+        let pos = self.compute_world_matrix(bone).w_axis.truncate();
+        let rot = self.world.transform(bone).map_or(Quat::IDENTITY, |t| {
+            world_rotation(self.world.parent_world_matrix(bone), t.rotation)
+        });
         BonePose { pos, rot }
     }
 
     /// Give `bone` the world rotation `rot`, as a local rotation under its
-    /// parent's current world pose; the `(bone, written, before)` record.
+    /// parent's current world pose (seen through the mirror when the parent
+    /// reflects, #1119); the `(bone, written, before)` record.
     fn set_world_rotation(&mut self, bone: u32, rot: Quat) -> Option<(u32, Quat, Quat)> {
-        let parent_rot = self.world.parent_id(bone).map_or(Quat::IDENTITY, |p| {
-            self.compute_world_matrix(p)
-                .to_scale_rotation_translation()
-                .1
-        });
-        let local = (parent_rot.inverse() * rot).normalize();
+        let local = local_rotation(self.world.parent_world_matrix(bone), rot);
         let mut t = self.world.transform_mut(bone)?;
         let before = t.rotation;
         t.rotation = local;
