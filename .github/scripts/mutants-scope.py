@@ -7,7 +7,7 @@ and this is what the workflow asks to make sense of it. Two spellings:
 - **`diff`** — the Rust this branch changed against `origin/main`: "would
   anything notice if what I just wrote were wrong?"
 - **anything else** — one or more git pathspec globs, space-separated
-  (`src/physics/raycast.rs`, `'src/navigation/**'`). `**` crosses
+  (`src/physics/query/through.rs`, `'src/navigation/**'`). `**` crosses
   directories and `*` does not, git's own `:(glob)` rules.
 
 Both become one cargo-mutants argument, `--in-diff`: it keeps only mutants
