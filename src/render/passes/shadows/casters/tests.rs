@@ -8,6 +8,7 @@ fn at(x: f32, bone_base: u32) -> CasterData {
 fn mesh(m: &str) -> CasterKey {
     CasterKey {
         clip: None,
+        mirrored: false,
         mesh: MeshId(m.to_string()),
     }
 }
@@ -70,4 +71,29 @@ fn a_clipped_caster_draws_apart_from_plain_copies_of_its_mesh() {
 fn the_caster_layout_matches_the_shadow_stage() {
     // `struct Caster { model: mat4x4<f32>, bone_base, alpha_cutoff, use_texture, _pad0 }`.
     assert_eq!(std::mem::size_of::<CasterData>(), 80);
+}
+
+/// A mirrored caster (#1134) draws with the winding flipped, so it never shares a
+/// draw with an unmirrored copy of its mesh.
+#[test]
+fn a_mirrored_caster_draws_apart_from_unmirrored_copies() {
+    let flip = Mat4::from_scale(Vec3::new(-1.0, 1.0, 1.0));
+    assert!(is_mirrored(flip) && !is_mirrored(Mat4::IDENTITY));
+    let twice = Mat4::from_scale(Vec3::new(-1.0, -1.0, 1.0));
+    assert!(!is_mirrored(twice), "two flips are a turn");
+    let mirrored = CasterKey {
+        mirrored: true,
+        ..mesh("Box")
+    };
+    let casters = vec![
+        (mirrored.clone(), 36, at(0.0, 0)),
+        (mesh("Box"), 36, at(1.0, 0)),
+        (mirrored, 36, at(2.0, 0)),
+    ];
+    let (_, batches) = batch_casters(casters, true);
+    let runs: Vec<_> = batches
+        .iter()
+        .map(|b| (b.key.mirrored, b.counts()))
+        .collect();
+    assert_eq!(runs, [(false, (36, 1)), (true, (36, 2))]);
 }

@@ -94,7 +94,8 @@ pub(crate) fn surface_pipelines(
         transparent: make_pipeline(device, shader, format, layout, &transparent_spec()),
         cut: cut.then(|| surface::CutPipelines {
             prepass: make_prepass(device, shader, layout, CUT_PREPASS),
-            shadow: depth_pipeline(device, shader, shadow_layout, Some(CUT_SHADOW)),
+            shadow: depth_pipeline(device, shader, shadow_layout, Some(CUT_SHADOW), false),
+            mirrored_shadow: depth_pipeline(device, shader, shadow_layout, Some(CUT_SHADOW), true),
         }),
     }
 }
