@@ -85,7 +85,7 @@ pub enum ColliderShape {
     },
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ColliderComponent {
     pub active: bool,
     pub shape: ColliderShape,
@@ -94,8 +94,11 @@ pub struct ColliderComponent {
     /// saved before it, which load with the defaults.
     #[serde(default)]
     pub material: PhysicsMaterial,
-    // Cached world space bounds
+    /// The world-space bounds, derived from the shape and the entity's world pose
+    /// (`ecs::world_space::bounds`): never saved, and recomputed on every load.
+    #[serde(skip)]
     pub aabb_min: Vec3,
+    #[serde(skip)]
     pub aabb_max: Vec3,
 }
 

@@ -39,8 +39,7 @@ pub struct World {
     order: Vec<u32>,
     /// Monotonic stable-id allocator (mirrors the legacy `next_entity_id`).
     next_id: u32,
-    /// Monotonic insertion-sequence allocator: each `place` stamps `Core::seq`
-    /// from it so narrow queries can sort matches back into insertion order.
+    /// Insertion-sequence allocator: `place` stamps `Core::seq`, so narrow queries sort.
     next_seq: u64,
     /// Every entity's world matrix, dirty-flagged (`ecs::world_space`).
     pub(super) world_space: WorldStore,
@@ -114,7 +113,7 @@ impl World {
         for child in self.children(id) {
             self.moved(child);
         }
-        self.moved(id);
+        self.world_space.forget(id);
         if let Some(handle) = self.handles.remove(id) {
             let _ = self.inner.despawn(handle);
         }
@@ -270,7 +269,7 @@ impl World {
         let handle = self.inner.spawn(builder.build());
         self.handles.insert(id, handle);
         self.order.push(id);
-        self.world_space.moved(id);
+        self.moved(id); // a carried document (a re-rooted load survivor) brings a stale box
     }
 
     /// Decompose an `Entity` document and overwrite a LIVE entity's whole
@@ -294,6 +293,7 @@ impl World {
         let mut builder = build_bundle(entity, seq);
         let new_handle = self.inner.spawn(builder.build());
         self.handles.insert(id, new_handle);
+        self.moved(id);
         self.world_space.invalidate_all(); // its transform and parent may both differ
         true
     }

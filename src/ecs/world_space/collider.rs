@@ -3,15 +3,16 @@
 //! The other optional components get theirs from `access.rs`'s macro. A collider's
 //! world AABB depends on its shape, so the two ways to change one refresh it: attaching
 //! it ([`World::set_collider`]) and writing it through [`ColliderMut`], which lands the
-//! edit and refreshes the box when the guard drops, like `TransformMut`. Adding a
-//! collider in Play or reshaping it in the editor therefore never leaves a zero box.
+//! edit when the guard drops, like `TransformMut`: nothing when the value is unchanged,
+//! and a box refresh only when the shape changed. Adding a collider in Play or
+//! reshaping it in the editor therefore never leaves a zero box.
 
 use std::ops::{Deref, DerefMut};
 
 use crate::components::ColliderComponent;
 use crate::ecs::{CompRef, World};
 
-/// A collider being written; dropping it lands the edit and refreshes the AABB.
+/// A collider being written; see the module note for what dropping it does.
 pub struct ColliderMut<'w> {
     world: &'w mut World,
     id: u32,
@@ -33,8 +34,23 @@ impl DerefMut for ColliderMut<'_> {
 
 impl Drop for ColliderMut<'_> {
     fn drop(&mut self) {
-        if let Some(value) = self.value.take() {
-            self.world.set_collider(self.id, Some(value));
+        let Some(value) = self.value.take() else {
+            return;
+        };
+        let Some(stored) = self
+            .world
+            .collider(self.id)
+            .map(|c| ColliderComponent::clone(&c))
+        else {
+            return;
+        };
+        if stored == value {
+            return;
+        }
+        let reshaped = stored.shape != value.shape;
+        self.world.set_component(self.id, Some(value));
+        if reshaped {
+            self.world.refresh_collider_aabb(self.id);
         }
     }
 }

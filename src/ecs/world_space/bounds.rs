@@ -112,6 +112,9 @@ impl World {
     /// Refresh `id`'s stored collider AABB from its world pose now (a no-op without a
     /// collider). Setting or reshaping a collider does this itself.
     pub fn refresh_collider_aabb(&mut self, id: u32) {
+        if !self.has_collider(id) {
+            return;
+        }
         let Some(pose) = self.world_pose(id) else {
             return;
         };

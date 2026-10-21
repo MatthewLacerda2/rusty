@@ -128,10 +128,6 @@ scene.entities[].character_controller.step_offset: f32
 scene.entities[].character_controller: option
 scene.entities[].children: seq
 scene.entities[].children[]: u32
-scene.entities[].collider.aabb_max: tuple(3)
-scene.entities[].collider.aabb_max[]: f32
-scene.entities[].collider.aabb_min: tuple(3)
-scene.entities[].collider.aabb_min[]: f32
 scene.entities[].collider.active: bool
 scene.entities[].collider.is_trigger: bool
 scene.entities[].collider.material.bounce_combine: enum Average|Minimum|Multiply|Maximum

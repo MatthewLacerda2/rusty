@@ -227,9 +227,14 @@ impl Scene {
             }
         }
 
-        // 2. Clear old parent's children list
+        // 2. Validate everything before touching a link, so a failed call changes
+        // nothing: a child dropped from its old parent's `children` while keeping its
+        // `parent_id` is a one-sided link the world store never dirties again.
         if !self.world.contains(entity_id) {
             return Err("Entity not found.".to_string());
+        }
+        if parent_id.is_some_and(|p| !self.world.contains(p)) {
+            return Err("Parent entity not found.".to_string());
         }
         if let Some(old_p) = self.world.parent_id(entity_id) {
             self.world.remove_child(old_p, entity_id);
@@ -237,9 +242,7 @@ impl Scene {
 
         // 3. Set new parent and update children list
         if let Some(new_p) = parent_id {
-            if !self.world.add_child(new_p, entity_id) {
-                return Err("Parent entity not found.".to_string());
-            }
+            self.world.add_child(new_p, entity_id);
         }
 
         // The local transform is kept, so the subtree moves in world space (#1067):

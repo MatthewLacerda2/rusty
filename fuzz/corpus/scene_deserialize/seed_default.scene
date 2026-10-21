@@ -41,17 +41,7 @@
             ]
           }
         },
-        "is_trigger": false,
-        "aabb_min": [
-          -18.75,
-          -0.05,
-          -18.75
-        ],
-        "aabb_max": [
-          18.75,
-          0.05,
-          18.75
-        ]
+        "is_trigger": false
       },
       "rigidbody": null,
       "nav_agent": null,
@@ -113,17 +103,7 @@
             "height": 1.6
           }
         },
-        "is_trigger": false,
-        "aabb_min": [
-          -0.5,
-          0.7,
-          -6.5
-        ],
-        "aabb_max": [
-          0.5,
-          2.3,
-          -5.5
-        ]
+        "is_trigger": false
       },
       "rigidbody": {
         "active": true,
@@ -183,17 +163,7 @@
             ]
           }
         },
-        "is_trigger": false,
-        "aabb_min": [
-          2.5,
-          0.0,
-          0.0
-        ],
-        "aabb_max": [
-          3.5,
-          2.0,
-          4.0
-        ]
+        "is_trigger": false
       },
       "rigidbody": null,
       "nav_agent": null,
@@ -243,17 +213,7 @@
             ]
           }
         },
-        "is_trigger": false,
-        "aabb_min": [
-          -5.0,
-          0.0,
-          3.5
-        ],
-        "aabb_max": [
-          -1.0,
-          2.0,
-          4.5
-        ]
+        "is_trigger": false
       },
       "rigidbody": null,
       "nav_agent": null,
@@ -359,17 +319,7 @@
             ]
           }
         },
-        "is_trigger": false,
-        "aabb_min": [
-          7.35,
-          0.0,
-          7.35
-        ],
-        "aabb_max": [
-          8.65,
-          2.0,
-          8.65
-        ]
+        "is_trigger": false
       },
       "rigidbody": {
         "active": true,

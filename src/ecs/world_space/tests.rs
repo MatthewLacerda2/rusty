@@ -114,3 +114,24 @@ fn a_root_reads_its_local_pose_bit_for_bit() {
     assert_eq!(w.world_rotation(e), r);
     assert_eq!(w.lossy_scale(e), Vec3::ONE);
 }
+
+#[test]
+fn equal_axis_lengths_that_shear_are_not_read_as_a_uniform_scale() {
+    // A parent turned under a (2, 1, 1) grandparent so each of its axes has an x
+    // component of 1/√3: three axes √2 long, but not square.
+    let mut w = World::new();
+    let gp = w.spawn("grandparent".into());
+    w.transform_mut(gp).unwrap().scale = Vec3::new(2.0, 1.0, 1.0);
+    let p = child_of(&mut w, gp);
+    w.transform_mut(p).unwrap().rotation = Quat::from_rotation_arc(Vec3::ONE.normalize(), Vec3::X);
+    let c = child_of(&mut w, p);
+    w.transform_mut(c).unwrap().rotation = Quat::from_rotation_z(FRAC_PI_2 / 2.0);
+    let m = w.local_to_world(c);
+    let columns = Vec3::new(m.x_axis.length(), m.y_axis.length(), m.z_axis.length());
+    let lossy = w.lossy_scale(c);
+    assert!(
+        lossy.abs().abs_diff_eq(columns, EPS),
+        "{lossy} vs {columns}"
+    );
+    assert!((lossy.x - 3f32.sqrt()).abs() < EPS, "{lossy}");
+}

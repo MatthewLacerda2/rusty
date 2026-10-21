@@ -126,8 +126,8 @@ pub fn world_scale(parent_world: Mat4, scale: Vec3) -> Vec3 {
     parent_world.to_scale_rotation_translation().0 * scale
 }
 
-/// How far apart, relative to the largest, a parent's three scales may be and still
-/// read as uniform in [`lossy_scale`]: a few ulps.
+/// How far apart, relative to the largest, a parent's three scales may be, and how
+/// far from square its axes, and still read as uniform in [`lossy_scale`]: a few ulps.
 const UNIFORM: f32 = 4.0 * f32::EPSILON;
 
 /// Unity's `lossyScale` of a child with local `rotation` and `scale` under
@@ -139,17 +139,18 @@ const UNIFORM: f32 = 4.0 * f32::EPSILON;
 /// entity's own negative scale included (#1125). Then [`world_rotation`] times
 /// this scale is the world matrix whenever the hierarchy does not shear.
 ///
-/// Under a parent scaled the same on every axis (to within [`UNIFORM`], the
-/// rounding a scale read back from a matrix carries) it is [`world_scale`]
-/// exactly: a turn cannot change a uniform scale, and reading it through the
-/// rotation's rounding would (a parent at 1000 would give 999.9999).
+/// Under a conformal parent, one scaled the same on every axis with its axes still
+/// square (`M·Mᵀ = s²·I`, to within [`UNIFORM`], the rounding a matrix carries), it
+/// is [`world_scale`] exactly: a turn cannot change a uniform scale, and reading it
+/// through the rotation's rounding would (a parent at 1000 would give 999.9999).
+/// Equal axis lengths alone are not enough: a turned parent under a non-uniform
+/// grandparent can shear into three equal-length axes that are not square.
 fn lossy_scale(parent_world: Mat4, rotation: Quat, scale: Vec3) -> Vec3 {
     let split = parent_world.to_scale_rotation_translation().0;
-    let size = split.abs();
-    if size.max_element() - size.min_element() <= UNIFORM * size.max_element() {
+    let parent = glam::Mat3::from_mat4(parent_world);
+    if conformal(parent, split.abs()) {
         return split * scale;
     }
-    let parent = glam::Mat3::from_mat4(parent_world);
     let turned = glam::Mat3::from_quat(rotation);
     let along = |u: Vec3| (parent * u).length() / u.length();
     let lengths = Vec3::new(
@@ -163,6 +164,18 @@ fn lossy_scale(parent_world: Mat4, rotation: Quat, scale: Vec3) -> Vec3 {
         1.0
     };
     Vec3::new(flip, 1.0, 1.0) * lengths * scale
+}
+
+/// Whether `m`, whose axis lengths are `size`, is a uniform scale times a rotation:
+/// equal lengths and square axes, both to within [`UNIFORM`].
+fn conformal(m: glam::Mat3, size: Vec3) -> bool {
+    let top = size.max_element();
+    let square = top * top;
+    let (x, y, z) = (m.x_axis, m.y_axis, m.z_axis);
+    top - size.min_element() <= UNIFORM * top
+        && [x.dot(y), x.dot(z), y.dot(z)]
+            .iter()
+            .all(|d| d.abs() <= UNIFORM * square)
 }
 
 /// The reflection a pose carries: the sign of each axis of its signed world

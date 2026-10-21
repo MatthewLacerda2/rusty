@@ -97,11 +97,13 @@ impl Scene {
                 let dir = self.bone_direction(&bones, &parents, slot);
                 let mut j = joint_from(preset_for(&names[slot]), dir, owner_axes);
                 j.connected_body = Some(bones[p]);
-                local_axes(
-                    &mut j,
-                    self.world.world_rotation(bone),
-                    self.world.world_mirror(bone),
-                );
+                let (rot, mirror) = self
+                    .world
+                    .world_pose(bone)
+                    .map_or((Quat::IDENTITY, Vec3::ONE), |pose| {
+                        (pose.rot, transform::mirror(pose.scale))
+                    });
+                local_axes(&mut j, rot, mirror);
                 j
             });
             self.world.set_joint(bone, joint);

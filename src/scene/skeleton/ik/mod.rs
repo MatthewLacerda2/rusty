@@ -22,6 +22,7 @@ pub use two_bone::solve_two_bone;
 
 use glam::{Quat, Vec3};
 
+use crate::components::transform::mirror;
 use crate::components::{IkChain, IkConstraint, IkTarget};
 use crate::scene::Scene;
 
@@ -149,10 +150,17 @@ impl Scene {
     }
 
     fn bone_pose(&self, bone: u32) -> BonePose {
+        let Some(pose) = self.world.world_pose(bone) else {
+            return BonePose {
+                pos: Vec3::ZERO,
+                rot: Quat::IDENTITY,
+                mirror: Vec3::ONE,
+            };
+        };
         BonePose {
-            pos: self.world.world_position(bone),
-            rot: self.world.world_rotation(bone),
-            mirror: self.world.world_mirror(bone),
+            pos: pose.pos,
+            rot: pose.rot,
+            mirror: mirror(pose.scale),
         }
     }
 
@@ -160,9 +168,9 @@ impl Scene {
     /// (seen through the mirror when the parent reflects, #1119); the `(bone,
     /// written, before)` record.
     fn set_world_rotation(&mut self, bone: u32, rot: Quat) -> Option<(u32, Quat, Quat)> {
-        let before = self.world.transform(bone)?.rotation;
-        self.world.set_world_rotation(bone, rot);
-        let local = self.world.transform(bone)?.rotation;
+        let local = self.world.local_rotation_for(bone, rot);
+        let mut t = self.world.transform_mut(bone)?;
+        let before = std::mem::replace(&mut t.rotation, local);
         Some((bone, local, before))
     }
 }

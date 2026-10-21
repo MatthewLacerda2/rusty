@@ -7,8 +7,9 @@
 //!
 //! `SceneData` is the on-disk format: entity component values + scene settings,
 //! never baked GPU buffers. On load we rehydrate the non-serialized data —
-//! primitive meshes from `primitive_type`, and the collider world AABBs — so the
-//! file stays human-readable/diffable and small.
+//! primitive meshes from `primitive_type`, and the collider world AABBs (which
+//! `#[serde(skip)]` keeps out of the file) — so the file stays human-readable,
+//! diffable and small, and never holds a box gone stale.
 
 use std::collections::BTreeMap;
 

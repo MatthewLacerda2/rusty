@@ -1,8 +1,15 @@
 //! src/ecs/world_space/store.rs — the world-matrix store and its dirty flags (#1170).
 //!
-//! One slot per stable id: the entity's world matrix and the stamp of the fill it was
-//! computed in. A slot is **clean** when its stamp is the store's current `generation`;
-//! anything else (a fresh slot, one marked dirty, one from before a bump) is dirty.
+//! One slot per live entity a read has reached: its world matrix and the stamp of the
+//! fill it was computed in. A slot is **clean** when its stamp is the store's current
+//! `generation`; anything else (no slot yet, one marked dirty, one from before a bump)
+//! is dirty. A slot is made on the first read that cleans the entity, never on a spawn,
+//! and freed on a despawn for the next entity to reuse.
+//!
+//! **What it costs.** A 4-byte index entry per id since the last `clear` (ids are
+//! monotonic, so a dead id keeps its entry, as `Handles` keeps its 8 bytes), and a
+//! 72-byte slot per live entity a read has reached. A session spawning and despawning
+//! bullets grows by the index entry alone.
 //!
 //! **The invariant.** A dirty entity's descendants are all dirty, so a clean matrix was
 //! built from clean ancestors and is never stale. A write is O(1): it only queues the
@@ -16,9 +23,10 @@
 //! inserted under an id an orphan already names, a whole-entity overwrite, a `clear`)
 //! bumps the generation instead: every slot goes dirty in O(1).
 //!
-//! The downward walk follows `children`, which `Scene::set_parent` and rehydration keep
-//! in step with the parent links. Only a raw `set_parent_id` (a corrupt file) can write
-//! a parent link its parent's `children` lacks; such a child reads its parent as of its
+//! The downward walk follows `children`, which `Scene::set_parent` (which changes
+//! nothing when it fails) and rehydration keep in step with the parent links. Only a
+//! raw `set_parent_id` can write a parent link its parent's `children` lacks: a corrupt
+//! file, or engine code linking one side by hand; such a child reads its parent as of its
 //! own last move or the last generation bump, so a parent despawned under it can leave
 //! it stale, but never NaN and never a hang (the walk stops at dirty entities, so a
 //! cycle in `children` ends it too).
@@ -54,7 +62,11 @@ pub(in crate::ecs) struct WorldStore {
 }
 
 struct Slots {
+    /// Stable id -> its slot's index in `slots`, plus one; `0` for an id without one.
+    index: Vec<u32>,
     slots: Vec<Slot>,
+    /// Indices in `slots` a despawn freed, for the next new slot to reuse.
+    free: Vec<u32>,
     /// The stamp a clean slot carries. Never `0`, so `0` always reads as dirty.
     generation: u32,
     /// Entities written since the last read, whose subtrees are not yet marked dirty.
@@ -66,29 +78,61 @@ struct Slots {
 impl Default for WorldStore {
     fn default() -> Self {
         Self {
-            inner: RefCell::new(Slots {
-                slots: Vec::new(),
-                generation: 1,
-                pending: Vec::new(),
-                stack: Vec::new(),
-            }),
+            inner: RefCell::new(Slots::new()),
         }
     }
 }
 
 impl Slots {
-    fn clean(&self, id: u32) -> Option<Mat4> {
-        match self.slots.get(id as usize) {
-            Some(s) if s.stamp == self.generation => Some(s.world),
-            _ => None,
+    fn new() -> Self {
+        Self {
+            index: Vec::new(),
+            slots: Vec::new(),
+            free: Vec::new(),
+            generation: 1,
+            pending: Vec::new(),
+            stack: Vec::new(),
         }
     }
 
+    /// Drop every slot, keeping the tables' capacity.
+    fn forget_all(&mut self) {
+        self.index.clear();
+        self.slots.clear();
+        self.free.clear();
+        self.pending.clear();
+    }
+
+    fn find(&self, id: u32) -> Option<usize> {
+        let at = *self.index.get(id as usize)?;
+        (at != 0).then(|| at as usize - 1)
+    }
+
+    fn clean(&self, id: u32) -> Option<Mat4> {
+        let s = &self.slots[self.find(id)?];
+        (s.stamp == self.generation).then_some(s.world)
+    }
+
+    /// `id`'s slot, made (or a freed one reused) when it has none.
     fn slot(&mut self, id: u32) -> &mut Slot {
-        let at = id as usize;
-        if at >= self.slots.len() {
-            self.slots.resize(at + 1, EMPTY);
+        if let Some(at) = self.find(id) {
+            return &mut self.slots[at];
         }
+        let at = match self.free.pop() {
+            Some(at) => {
+                self.slots[at as usize] = EMPTY;
+                at as usize
+            }
+            None => {
+                self.slots.push(EMPTY);
+                self.slots.len() - 1
+            }
+        };
+        let entry = id as usize;
+        if entry >= self.index.len() {
+            self.index.resize(entry + 1, 0);
+        }
+        self.index[entry] = at as u32 + 1;
         &mut self.slots[at]
     }
 
@@ -101,8 +145,11 @@ impl Slots {
     /// Mark `id` dirty; `false` when it already was (its subtree is dirty too).
     fn dirty(&mut self, id: u32) -> bool {
         let generation = self.generation;
-        match self.slots.get_mut(id as usize) {
-            Some(s) if s.stamp == generation => {
+        let Some(at) = self.find(id) else {
+            return false;
+        };
+        match &mut self.slots[at] {
+            s if s.stamp == generation => {
                 s.stamp = 0;
                 true
             }
@@ -115,7 +162,9 @@ impl Slots {
         let mut pending = std::mem::take(&mut self.pending);
         let mut stack = std::mem::take(&mut self.stack);
         for &root in &pending {
-            self.slot(root).queued = false;
+            if let Some(at) = self.find(root) {
+                self.slots[at].queued = false;
+            }
             stack.push(root);
             while let Some(id) = stack.pop() {
                 if self.dirty(id) {
@@ -130,12 +179,25 @@ impl Slots {
 
 impl WorldStore {
     /// `id` moved in world space: queue its subtree to go dirty before the next read.
-    /// O(1), and nothing at all for an entity already queued.
+    /// O(1), and nothing at all for an entity already queued or without a slot: no
+    /// read has reached it since it was made, so no descendant was cleaned through it.
     pub(in crate::ecs) fn moved(&self, id: u32) {
         let mut store = self.inner.borrow_mut();
-        let slot = store.slot(id);
-        if !std::mem::replace(&mut slot.queued, true) {
+        let Some(at) = store.find(id) else {
+            return;
+        };
+        if !std::mem::replace(&mut store.slots[at].queued, true) {
             store.pending.push(id);
+        }
+    }
+
+    /// `id` was despawned: free its slot for the next entity. Its children must already
+    /// be queued ([`WorldStore::moved`]); they read it as gone from here on.
+    pub(in crate::ecs) fn forget(&self, id: u32) {
+        let mut store = self.inner.borrow_mut();
+        if let Some(at) = store.find(id) {
+            store.index[id as usize] = 0;
+            store.free.push(at as u32);
         }
     }
 
@@ -145,19 +207,14 @@ impl WorldStore {
         store.generation = store.generation.wrapping_add(1);
         if store.generation == 0 {
             // Wrapped: an old stamp could alias the new generation, so forget them all.
-            store.slots.clear();
-            store.pending.clear();
+            store.forget_all();
             store.generation = 1;
         }
     }
 
     /// Forget every slot (a `clear`, after which ids restart at 1).
     pub(in crate::ecs) fn reset(&self) {
-        let mut store = self.inner.borrow_mut();
-        store.slots.clear();
-        store.pending.clear();
-        drop(store);
-        self.invalidate_all();
+        *self.inner.borrow_mut() = Slots::new();
     }
 
     /// `id`'s world matrix, cleaning the dirty chain above it first. Identity for a dead

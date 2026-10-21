@@ -51,3 +51,21 @@ fn the_store_fills_parents_first_whatever_the_id_order() {
         Vec3::new(1.0, 0.0, 1.0)
     );
 }
+
+#[test]
+fn a_failed_re_parent_keeps_the_child_under_its_old_parent() {
+    // `pcall(Scene.SetParent, child, destroyedId)`: the call fails and changes nothing,
+    // so moving the old parent still moves the child.
+    let mut scene = Scene::new();
+    let parent = scene.add_entity("parent".into());
+    let child = scene.add_entity("child".into());
+    let gone = scene.add_entity("gone".into());
+    scene.set_parent(child, Some(parent)).unwrap();
+    scene.world.despawn(gone);
+    assert!(scene.set_parent(child, Some(gone)).is_err());
+    assert_eq!(scene.world.parent_id(child), Some(parent));
+    assert_eq!(scene.world.children(parent), vec![child]);
+    assert_eq!(scene.world_matrix(child).w_axis.truncate(), Vec3::ZERO);
+    scene.world.transform_mut(parent).unwrap().position = Vec3::X * 3.0;
+    assert_eq!(scene.world_matrix(child).w_axis.truncate(), Vec3::X * 3.0);
+}
