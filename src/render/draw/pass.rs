@@ -2,7 +2,7 @@
 //! render pass. The per-camera stacking loop + post-FX live in `draw`.
 
 use crate::render::draw::batch::DrawBatch;
-use crate::render::draw::outline::OutlineHull;
+use crate::render::draw::overlays::OutlineHull;
 use crate::render::draw::resources::Overlays;
 use crate::render::gpu::draw_buffers::DrawBuffers;
 use crate::render::gpu::global_group::GlobalGroup;

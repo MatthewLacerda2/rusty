@@ -4,7 +4,7 @@
 //! points as camera-facing strips into the HDR target, after the transparent
 //! solids and before the particles, so bloom and tonemap apply to an additive
 //! tracer. Ribbons are transparent effects: depth-tested against the scene but
-//! never writing depth, sorted back-to-front by the shared `draw::sort` key (the
+//! never writing depth, sorted back-to-front by the shared `draw::batch::sort` key (the
 //! one transparent solids and particle emitters use), unlit, fogged in the
 //! shader, and absent from the SSAO prepass and the shadow casters — a ribbon
 //! takes no AO and casts no shadow.

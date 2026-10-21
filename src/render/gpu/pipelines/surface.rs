@@ -280,21 +280,21 @@ impl SurfaceShaders {
 }
 
 #[cfg(test)]
-#[path = "surface_tests.rs"]
+#[path = "tests/surface_tests.rs"]
 mod surface_tests;
 
 #[cfg(test)]
-#[path = "params_tests.rs"]
+#[path = "tests/params_tests.rs"]
 mod params_tests;
 
 #[cfg(test)]
-#[path = "mask_tests.rs"]
+#[path = "tests/mask_tests.rs"]
 pub(crate) mod mask_tests;
 
 #[cfg(test)]
-#[path = "gameplay_blocks_tests.rs"]
+#[path = "tests/gameplay_blocks_tests.rs"]
 mod gameplay_blocks_tests;
 
 #[cfg(test)]
-#[path = "cut_depth_tests.rs"]
+#[path = "tests/cut_depth_tests.rs"]
 pub(crate) mod cut_depth_tests;

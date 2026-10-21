@@ -1,4 +1,4 @@
-//! src/render/draw/batch.rs — group one camera's solids into instanced draws (#470).
+//! Group one camera's solids into instanced draws (#470).
 //!
 //! Every visible solid becomes a [`DrawItem`]: its [`BatchKey`] (what must be equal for
 //! two entities to share one draw call) and its [`InstanceData`] (what may differ).
@@ -11,6 +11,8 @@
 //! correct, so only *consecutive* equal keys merge there — "where order allows".
 //! Pure CPU logic, no GPU state, so the grouping rules are unit-tested without an
 //! adapter.
+
+pub(crate) mod sort;
 
 use std::ops::Range;
 
@@ -116,5 +118,7 @@ impl FrameDraws {
 }
 
 #[cfg(test)]
-#[path = "batch_tests.rs"]
-mod batch_tests;
+mod tests;
+
+#[cfg(test)]
+mod instancing_tests;

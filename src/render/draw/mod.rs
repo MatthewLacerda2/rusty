@@ -2,17 +2,13 @@
 //! orchestration of pre-created resources into the scene render pass. Extracted
 //! from the original monolithic `Renderer::render` (behavior unchanged).
 
-mod axis;
 pub(crate) mod batch;
 mod camera;
 mod lighting;
 pub(crate) mod materials;
-mod outline;
 mod overlays;
 mod pass;
-mod probes;
 pub(crate) mod resources;
-pub(crate) mod sort;
 pub(crate) mod stack;
 pub(crate) mod uniforms;
 
@@ -202,13 +198,3 @@ pub(crate) fn active_material_map_paths(scene: &Scene) -> Vec<String> {
         .flatten()
         .collect()
 }
-
-#[cfg(test)]
-#[path = "instancing_tests.rs"]
-mod instancing_tests;
-
-#[cfg(test)]
-mod outline_tests;
-
-#[cfg(test)]
-mod outline_follow_tests;

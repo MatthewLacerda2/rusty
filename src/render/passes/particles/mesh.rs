@@ -13,8 +13,8 @@
 use glam::{Mat4, Quat, Vec3};
 
 use crate::components::{MaterialAsset, ParticleEmitterComponent, ParticleRenderMode};
+use crate::render::draw::batch::sort::view_depth;
 use crate::render::draw::batch::{BatchKey, DrawItem};
-use crate::render::draw::sort::view_depth;
 use crate::render::draw::uniforms::{material_uniform, probe_sh_at};
 use crate::render::{EntityUniform, InstanceData, MeshId, Renderer};
 use crate::scene::authoring::{primitive_mesh_component, Primitive};

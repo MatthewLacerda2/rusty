@@ -13,7 +13,7 @@ use wgpu::util::DeviceExt;
 use super::strip::{self, RibbonVertex};
 use super::RibbonGlobals;
 use crate::components::{ParticleBlend, RibbonStyle};
-use crate::render::draw::sort::{back_to_front, view_depth};
+use crate::render::draw::batch::sort::{back_to_front, view_depth};
 use crate::render::gpu::uniforms::FogUniform;
 use crate::render::passes::particles::ParticleDraws;
 use crate::render::timing::GpuPass;
