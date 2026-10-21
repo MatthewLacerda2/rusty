@@ -166,9 +166,10 @@ faithfulness claim is script↔engine **agreement**: every query routes through 
 same `PhysicsWorld` query pipeline the engine uses, proven by
 `src/physics/query/spatial_tests.rs` (the queries against hand-computed geometry) and
 `src/scripting/tests/spatial.rs` (the Lua bindings return those same answers,
-including the #91 layer-mask filter). `GetBounds` reads the collider's cached
-world AABB — the `calculate_world_aabb` value the scene recomputes on transform
-edits and each physics step.)
+including the #91 layer-mask filter). `GetBounds` reads the collider's world
+AABB through `World::collider_bounds` — the `calculate_world_aabb` value at the
+collider's current world pose, never stale after a transform edit or a collider
+change.)
 
 ### `Joint` — over `Entity.joint` (#449)
 
