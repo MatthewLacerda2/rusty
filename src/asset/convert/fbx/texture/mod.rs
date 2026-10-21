@@ -2,13 +2,13 @@
 //!
 //! A texture that is a file on disk is referenced where it lies. One embedded in
 //! the FBX (`ufbx::Texture::content`: Mixamo and many store packs embed them) is
-//! extracted into [`convert::textures_dir`] beside the `.glb`, the way Unity
-//! extracts them on import, and referenced there. File names are sanitised and kept
-//! distinct, and [`Textures::finish`] removes what an earlier conversion left. Every
+//! extracted into [`Staging::textures`] beside the `.glb`, the way Unity extracts
+//! them on import, and referenced there. File names are sanitised and kept
+//! distinct; what an earlier conversion left is `convert::refresh`'s to remove. Every
 //! URI is percent-encoded (`gltf::uri`): the folder is named after the source file,
 //! which may hold a `:` or a `%`.
 
-use super::super as convert;
+use super::super::Staging;
 use crate::asset::gltf::uri;
 use crate::asset::{ImportError, IMAGE_EXTENSIONS};
 use crate::core::collections::Map;
@@ -17,7 +17,7 @@ use std::path::{Component, Path, PathBuf};
 
 /// Every texture one conversion references, by FBX element id.
 pub struct Textures {
-    /// Where the `.glb` is written: URIs are relative to it.
+    /// Where the `.glb` will live: URIs are relative to it.
     out_dir: PathBuf,
     /// Where embedded textures are extracted.
     dir: PathBuf,
@@ -27,11 +27,15 @@ pub struct Textures {
 }
 
 impl Textures {
-    /// The textures of the `.glb` written at `out`.
-    pub fn new(out: &Path) -> Self {
+    /// The textures of the `.glb` `to` stages.
+    pub fn new(to: &Staging) -> Self {
         Self {
-            out_dir: out.parent().unwrap_or_else(|| Path::new("")).to_path_buf(),
-            dir: convert::textures_dir(out),
+            out_dir: to
+                .out
+                .parent()
+                .unwrap_or_else(|| Path::new(""))
+                .to_path_buf(),
+            dir: to.textures.clone(),
             by_id: Map::default(),
             written: Vec::new(),
         }
@@ -89,25 +93,9 @@ impl Textures {
     fn extract(&self, name: &str, bytes: &[u8]) -> Result<(), ImportError> {
         std::fs::create_dir_all(&self.dir)
             .map_err(|e| ImportError::Parse(format!("writing {}: {e}", self.dir.display())))?;
-        convert::write_atomic(&self.dir.join(name), bytes)
-    }
-
-    /// Remove what the textures folder holds that this conversion did not write
-    /// (another process's file not yet renamed into place aside), and the folder
-    /// itself when nothing is left in it.
-    pub fn finish(&self) {
-        let Ok(entries) = std::fs::read_dir(&self.dir) else {
-            return;
-        };
-        let partial = format!(".{}.", convert::PARTIAL);
-        for entry in entries.flatten() {
-            let name = entry.file_name().to_string_lossy().into_owned();
-            if !self.written.contains(&name) && !name.contains(&partial) {
-                let _ = std::fs::remove_file(entry.path());
-            }
-        }
-        // Fails, as it should, while anything is still in it.
-        let _ = std::fs::remove_dir(&self.dir);
+        let path = self.dir.join(name);
+        std::fs::write(&path, bytes)
+            .map_err(|e| ImportError::Parse(format!("writing {}: {e}", path.display())))
     }
 }
 

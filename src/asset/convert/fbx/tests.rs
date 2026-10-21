@@ -13,7 +13,7 @@ fn fixture() -> PathBuf {
 /// keep a conversion made by an older build of the converter), then imported.
 fn import() -> ImportedAsset {
     let out = crate::test_temp::dir().join("skinned_cube.fbx.glb");
-    super::convert(&fixture(), &out).expect("the fixture converts");
+    super::convert_to(&fixture(), &out).expect("the fixture converts");
     gltf::import::import(&out).expect("its glTF imports")
 }
 
@@ -93,8 +93,8 @@ fn converting_twice_writes_the_same_bytes() {
     let dir = crate::test_temp::dir().join("fbx_twice");
     std::fs::create_dir_all(&dir).unwrap();
     let [a, b] = ["a.glb", "b.glb"].map(|n| dir.join(n));
-    super::convert(&fixture(), &a).unwrap();
-    super::convert(&fixture(), &b).unwrap();
+    super::convert_to(&fixture(), &a).unwrap();
+    super::convert_to(&fixture(), &b).unwrap();
     assert_eq!(std::fs::read(a).unwrap(), std::fs::read(b).unwrap());
 }
 

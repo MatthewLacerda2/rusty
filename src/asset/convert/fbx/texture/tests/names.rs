@@ -1,7 +1,7 @@
 //! Extracted texture names, and the URIs a source file's own name leads to (#1082).
 
 use super::super::{file_name, unique};
-use super::{convert_and_import, fixture, material, PNG};
+use super::{convert_and_import, fixture, material, textures, PNG};
 
 fn name(raw: &str) -> String {
     let (stem, ext) = file_name(raw, b"");
@@ -56,7 +56,7 @@ fn a_source_name_a_uri_would_misread_still_finds_its_textures() {
             .base_color_map
             .clone()
             .expect(source);
-        let expected = dir.join(format!("{source}.glb.textures/skin.png"));
+        let expected = textures(&out).join("skin.png");
         assert_eq!(std::path::Path::new(&red), expected, "{source}");
         assert!(std::fs::read(&red).unwrap().starts_with(PNG), "{source}");
     }

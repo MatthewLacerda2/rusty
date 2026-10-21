@@ -1,9 +1,11 @@
 //! The import cache (#1024): where a converted source is cached, and that it is
 //! re-made exactly when the source changes.
 
-use super::{cache_path, converter_for, is_import_cache, refresh, Converter};
+use super::{cache_path, converter_for, is_import_cache, refresh, Converter, Staging};
 use crate::asset::ImportError;
 use std::path::Path;
+
+mod staging;
 
 /// A converter that copies its source, so a test can see which bytes it wrote.
 const COPY: Converter = Converter {
@@ -13,8 +15,8 @@ const COPY: Converter = Converter {
     convert: copy,
 };
 
-fn copy(source: &Path, out: &Path) -> Result<(), ImportError> {
-    std::fs::copy(source, out)
+fn copy(source: &Path, to: &Staging) -> Result<(), ImportError> {
+    std::fs::copy(source, &to.glb)
         .map(drop)
         .map_err(|e| ImportError::Parse(e.to_string()))
 }

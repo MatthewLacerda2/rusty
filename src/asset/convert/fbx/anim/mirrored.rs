@@ -14,7 +14,7 @@ fn import() -> (SkinData, AnimationClip) {
     let fixture =
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/models/mirrored_bone.fbx");
     let out = crate::test_temp::dir().join("mirrored_bone.fbx.glb");
-    super::super::convert(&fixture, &out).expect("the fixture converts");
+    super::super::convert_to(&fixture, &out).expect("the fixture converts");
     let mut asset = gltf::import::import(&out).expect("its glTF imports");
     let cube = asset.sub_meshes.remove(0);
     let clip = cube.clips.into_iter().next().expect("the clip imports");
