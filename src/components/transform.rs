@@ -102,7 +102,7 @@ impl Pose {
 /// scale is the child's world matrix, which is how physics poses a body and IK a
 /// bone. [`local_rotation`] is its exact inverse; an unmirrored parent gives the
 /// plain product, bit for bit. A degenerate parent (a zero scale axis)
-/// contributes no rotation ([`parent_rotation`]), so the result is never NaN.
+/// contributes no rotation (`parent_rotation`), so the result is never NaN.
 pub fn world_rotation(parent_world: Mat4, rotation: Quat) -> Quat {
     let parent_rot = parent_rotation(parent_world);
     (parent_rot * through_mirror(parent_world, rotation)).normalize()
