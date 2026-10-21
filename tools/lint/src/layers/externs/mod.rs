@@ -12,7 +12,7 @@ pub mod policy;
 mod tests;
 
 use super::graph::owner;
-use super::scan;
+use super::scan::Tree;
 use super::table::Layer;
 use std::collections::BTreeSet;
 use std::fs;
@@ -26,7 +26,7 @@ pub struct Use {
 }
 
 /// Check the crates under `src` against the table and `Cargo.toml`.
-pub fn violations(layers: &[Layer], manifest: &Path, src: &Path) -> Vec<String> {
+pub fn violations(layers: &[Layer], manifest: &Path, tree: &Tree) -> Vec<String> {
     let Ok(text) = fs::read_to_string(manifest) else {
         return vec![format!(
             "NO_MANIFEST {} — cannot read it",
@@ -34,21 +34,19 @@ pub fn violations(layers: &[Layer], manifest: &Path, src: &Path) -> Vec<String> 
         )];
     };
     let deps = cargo::dependencies(&text);
-    let uses = uses(src, &deps.iter().cloned().collect());
+    let uses = uses(tree, &deps.iter().cloned().collect());
     check::all(layers, &policy::POLICY, &deps, &uses)
 }
 
 /// Every external-crate reference in non-test module code under `src`.
-fn uses(src: &Path, crates: &BTreeSet<String>) -> Vec<Use> {
-    let files = scan::walk(src);
-    let test_only = super::gate::test_only_files(&files);
+fn uses(tree: &Tree, crates: &BTreeSet<String>) -> Vec<Use> {
     let mut out = Vec::new();
-    for file in files.iter().filter(|f| !test_only.contains(*f)) {
-        let (Some(module), Ok(content)) = (owner(src, file), fs::read_to_string(file)) else {
+    for (file, content) in tree.live_files() {
+        let Some(module) = owner(&tree.src, file) else {
             continue;
         };
         let norm = file.to_string_lossy().replace('\\', "/");
-        for r in find::crate_refs(&content, crates) {
+        for r in find::crate_refs(content, crates) {
             out.push(Use {
                 module: module.clone(),
                 krate: r.krate,

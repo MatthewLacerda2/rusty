@@ -37,7 +37,7 @@ pub fn check_file(path: &str, source: &str, test: &[bool]) -> Vec<Finding> {
 
 /// The rule over every scanned file.
 pub fn run(scan: &Scan) -> Vec<Finding> {
-    scan.each_file(|p, s| check_file(p, s, &scan.test_lines(p)))
+    scan.each_file(|p, s| check_file(p, s, scan.test_lines(p)))
 }
 
 #[cfg(test)]

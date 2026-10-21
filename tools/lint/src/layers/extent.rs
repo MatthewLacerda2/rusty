@@ -30,47 +30,82 @@ pub fn item_end(lines: &[&str], from: usize) -> usize {
 
 /// The first code line of the item at `lines[from]` past its attributes.
 fn head<'a>(lines: &[&'a str], from: usize) -> Option<&'a str> {
-    let (mut depth, mut open) = (0i32, Open::None);
-    for raw in &lines[from..] {
-        let in_attr = depth > 0 || open != Open::None;
-        let (code, delta) = brackets(raw, &mut open);
-        depth += delta;
-        if in_attr {
-            continue;
+    let mut at = from;
+    while at < lines.len() {
+        let item = attributes(&lines[at..]);
+        let code = strip_comment(item.code, &mut Open::None).trim();
+        if !code.is_empty() {
+            return Some(code);
         }
-        // An attribute and its item can share a line: `#[cfg(test)] use a::B;`.
-        let code = strip_attrs(code.trim());
-        if code.is_empty() {
-            continue;
-        }
-        return Some(code);
+        at += item.line + 1;
     }
     None
 }
 
-/// `code` past its leading complete `#[…]` attributes; empty when an attribute
-/// runs on past the line (its brackets carry `head` into the next lines).
-fn strip_attrs(code: &str) -> &str {
-    let mut rest = code;
-    while rest.starts_with("#[") {
-        let (mut depth, mut open) = (0i32, Open::None);
-        let mut end = None;
-        scan(rest, &mut open, |at, c| {
-            depth += match c {
-                '[' => 1,
-                ']' => -1,
-                _ => 0,
-            };
-            if c == ']' && depth == 0 && end.is_none() {
-                end = Some(at + 1);
-            }
-        });
-        let Some(end) = end else {
-            return "";
-        };
-        rest = rest[end..].trim_start();
+/// What [`attributes`] reads: the `#[…]` attributes leading an item, and where its
+/// own code starts.
+pub struct Attributes<'a> {
+    /// Each attribute from `#[` to its closing `]`, wrapped lines joined by a space.
+    pub attrs: Vec<String>,
+    /// The line (an index into the scanned lines) the item's code starts on.
+    pub line: usize,
+    /// That line's code past the attributes; a line with no attribute is all code.
+    pub code: &'a str,
+}
+
+/// The attributes opening `lines[0]` and the code past them: the one attribute
+/// reader the scans share (#1136). Brackets count outside comments and literals
+/// (`scan`), so `#[doc = "a (b"]` closes where it should, and an attribute may
+/// share its line with the next one or with its item (`#[cfg(test)] use a::B;`).
+/// One that never closes within a few lines is read as code.
+pub fn attributes<'a>(lines: &[&'a str]) -> Attributes<'a> {
+    let mut item = Attributes {
+        attrs: Vec::new(),
+        line: 0,
+        code: lines.first().map_or("", |l| l.trim_start()),
+    };
+    while let Some((attr, more, rest)) =
+        attribute(item.code, &lines[(item.line + 1).min(lines.len())..])
+    {
+        item.attrs.push(attr);
+        item.line += more;
+        item.code = rest;
+        if rest.is_empty() && item.line + 1 < lines.len() {
+            item.line += 1;
+            item.code = lines[item.line].trim_start();
+        }
     }
-    rest
+    item
+}
+
+/// The attribute opening `first` (then running on through `next`): its text, how
+/// many of `next` it takes, and its last line's code after it.
+fn attribute<'a>(first: &'a str, next: &[&'a str]) -> Option<(String, usize, &'a str)> {
+    if !first.starts_with("#[") {
+        return None;
+    }
+    let (mut depth, mut open, mut text) = (0i32, Open::None, String::new());
+    for (n, line) in std::iter::once(&first).chain(next).take(12).enumerate() {
+        let mut close = None;
+        let code_end = scan(line, &mut open, |at, c| match c {
+            _ if close.is_some() => {}
+            '{' | '(' | '[' => depth += 1,
+            '}' | ')' | ']' => {
+                depth -= 1;
+                if c == ']' && depth == 0 {
+                    close = Some(at + 1);
+                }
+            }
+            _ => {}
+        });
+        if let Some(at) = close {
+            text.push_str(line[..at].trim());
+            return Some((text, n, line[at..code_end.max(at)].trim()));
+        }
+        text.push_str(line[..code_end].trim());
+        text.push(' ');
+    }
+    None
 }
 
 /// Does `code` open an item (`pub(crate) unsafe fn`, `impl<T>`, `mod x`, …)

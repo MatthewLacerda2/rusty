@@ -7,48 +7,32 @@
 //! `all`'s arguments, nested `all` included), however rustfmt wraps it. `any(…)`
 //! and `not(…)` are never test-only: `any(test, x)` also compiles outside tests.
 
+use super::extent::attributes;
 use std::collections::BTreeSet;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
-/// Does the attribute opening `lines[0]` gate its item to test builds? An
+/// Does an attribute leading the item at `lines[0]` gate it to test builds? An
 /// attribute and its item may share the line: `#[cfg(test)] use a::B;`.
 pub fn is_test_gate(lines: &[&str]) -> bool {
-    attribute(lines).is_some_and(|(attr, _)| gates(&attr))
+    attributes(lines).attrs.iter().any(|attr| gates(attr))
 }
 
-/// Is the joined attribute `attr` a test gate?
+/// Is the attribute `attr` a test gate?
 fn gates(attr: &str) -> bool {
+    let attr: String = attr.chars().filter(|c| !c.is_whitespace()).collect();
     attr.strip_prefix("#[cfg(")
         .and_then(|rest| rest.strip_suffix(")]"))
         .is_some_and(test_only)
 }
 
-/// The `#[…]` attribute opening `lines[0]`, its wrapped lines joined and
-/// whitespace dropped, and how many lines it spans; `None` when `lines[0]` opens
-/// no attribute or it never closes within a few lines.
-fn attribute(lines: &[&str]) -> Option<(String, usize)> {
-    if !lines.first()?.trim_start().starts_with("#[") {
-        return None;
-    }
-    let (mut attr, mut depth) = (String::new(), 0);
-    for (n, line) in lines.iter().take(12).enumerate() {
-        for c in line.chars().filter(|c| !c.is_whitespace()) {
-            attr.push(c);
-            match c {
-                '[' | '(' => depth += 1,
-                ')' => depth -= 1,
-                ']' => {
-                    depth -= 1;
-                    if depth == 0 {
-                        return Some((attr, n + 1));
-                    }
-                }
-                _ => {}
-            }
-        }
-    }
-    None
+/// `#[path = "x.rs"]` → `x.rs`.
+fn path_of(attr: &str) -> Option<&str> {
+    let rest = attr
+        .strip_prefix("#[path")?
+        .trim_start()
+        .strip_prefix('=')?;
+    rest.trim_start().strip_prefix('"')?.split('"').next()
 }
 
 fn test_only(predicate: &str) -> bool {
@@ -80,19 +64,27 @@ fn test_only(predicate: &str) -> bool {
 
 /// The files among `files` that only compile under `cfg(test)`: declared by a
 /// test-gated `mod x;` (with or without `#[path]`), or declared (at any depth) by
-/// such a file.
-pub fn test_only_files(files: &[PathBuf]) -> BTreeSet<PathBuf> {
+/// such a file. `source` gives a file's text where the caller already read it; any
+/// other file is read here. Paths come back [`normalise`]d.
+pub fn test_only_files<'a>(
+    files: &[PathBuf],
+    source: impl Fn(&Path) -> Option<&'a str>,
+) -> BTreeSet<PathBuf> {
+    let mods = |file: &Path| match source(file) {
+        Some(text) => declared_mods(file, text),
+        None => declared_mods(file, &fs::read_to_string(file).unwrap_or_default()),
+    };
     let mut test_only = BTreeSet::new();
     let mut frontier: Vec<PathBuf> = Vec::new();
     for file in files {
-        for (child, gated) in declared_mods(file) {
+        for (child, gated) in mods(file) {
             if gated && test_only.insert(child.clone()) {
                 frontier.push(child);
             }
         }
     }
     while let Some(file) = frontier.pop() {
-        for (child, _) in declared_mods(&file) {
+        for (child, _) in mods(&file) {
             if test_only.insert(child.clone()) {
                 frontier.push(child);
             }
@@ -101,34 +93,21 @@ pub fn test_only_files(files: &[PathBuf]) -> BTreeSet<PathBuf> {
     test_only
 }
 
-/// The out-of-line modules `file` declares, each with whether its declaration is
-/// test-gated. Unresolvable declarations are skipped.
-fn declared_mods(file: &Path) -> Vec<(PathBuf, bool)> {
-    let Ok(content) = fs::read_to_string(file) else {
-        return Vec::new();
-    };
+/// The out-of-line modules `content` (the text of `file`) declares, each with
+/// whether its declaration is test-gated. Unresolvable declarations are skipped.
+fn declared_mods(file: &Path, content: &str) -> Vec<(PathBuf, bool)> {
     let lines: Vec<&str> = content.lines().collect();
-    let (mut gated, mut path_attr) = (false, None::<String>);
     let mut out = Vec::new();
     let mut i = 0;
     while i < lines.len() {
-        let line = lines[i].trim();
-        if let Some((attr, span)) = attribute(&lines[i..]) {
-            gated |= gates(&attr);
-            if let Some(p) = line.strip_prefix("#[path = \"") {
-                path_attr = p.split('"').next().map(str::to_string);
-            }
-            i += span;
-            continue;
-        }
-        if let Some(name) = outline_mod_name(line) {
-            if let Some(child) = resolve(file, name, path_attr.as_deref()) {
-                out.push((child, gated));
+        let item = attributes(&lines[i..]);
+        if let Some(name) = outline_mod_name(item.code.trim()) {
+            let path = item.attrs.iter().find_map(|a| path_of(a));
+            if let Some(child) = resolve(file, name, path) {
+                out.push((child, item.attrs.iter().any(|a| gates(a))));
             }
         }
-        gated = false;
-        path_attr = None;
-        i += 1;
+        i += item.line + 1;
     }
     out
 }
@@ -150,7 +129,7 @@ fn outline_mod_name(line: &str) -> Option<&str> {
 fn resolve(file: &Path, name: &str, path_attr: Option<&str>) -> Option<PathBuf> {
     let dir = file.parent()?;
     if let Some(p) = path_attr {
-        return Some(dir.join(p));
+        return Some(normalise(&dir.join(p)));
     }
     let stem = file.file_stem()?.to_str()?;
     let base = if matches!(stem, "mod" | "lib" | "main") {
@@ -164,6 +143,25 @@ fn resolve(file: &Path, name: &str, path_attr: Option<&str>) -> Option<PathBuf> 
     ]
     .into_iter()
     .find(|p| p.is_file())
+}
+
+/// `path` with its `.` segments dropped and each `..` folding the segment before
+/// it, so a `#[path = "./x.rs"]` names the same file the directory walk found
+/// (#1136). Lexical: symlinks are not followed.
+pub fn normalise(path: &Path) -> PathBuf {
+    let mut out = PathBuf::new();
+    for part in path.components() {
+        match part {
+            Component::CurDir => {}
+            Component::ParentDir
+                if matches!(out.components().next_back(), Some(Component::Normal(_))) =>
+            {
+                out.pop();
+            }
+            other => out.push(other),
+        }
+    }
+    out
 }
 
 #[cfg(test)]

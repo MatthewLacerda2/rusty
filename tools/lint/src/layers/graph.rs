@@ -1,6 +1,6 @@
 //! The measured module graph: who references whom, from the source.
 
-use super::scan::{self, Ref};
+use super::scan::{self, Ref, Tree};
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
@@ -14,15 +14,14 @@ pub struct Edge {
 
 /// The top-level modules under `src`: every directory but `bin`, plus any
 /// `src/<name>.rs` that is not a crate root.
-pub fn modules(src: &Path) -> Vec<String> {
-    let test_only = super::gate::test_only_files(&scan::walk(src));
-    let mut out: Vec<String> = fs::read_dir(src)
+pub fn modules(tree: &Tree) -> Vec<String> {
+    let mut out: Vec<String> = fs::read_dir(&tree.src)
         .into_iter()
         .flatten()
         .flatten()
         .filter_map(|e| {
             let path = e.path();
-            if test_only.contains(&path) {
+            if tree.is_test_only(&path) {
                 return None;
             }
             let name = path.file_stem()?.to_str()?.to_string();
@@ -40,19 +39,14 @@ pub fn modules(src: &Path) -> Vec<String> {
 }
 
 /// Every cross-module reference in non-test code under `src`.
-pub fn edges(src: &Path) -> Vec<Edge> {
-    let files = scan::walk(src);
-    let test_only = super::gate::test_only_files(&files);
+pub fn edges(tree: &Tree) -> Vec<Edge> {
     let mut out = Vec::new();
-    for file in files.iter().filter(|f| !test_only.contains(*f)) {
-        let Some(from) = owner(src, file) else {
-            continue;
-        };
-        let Ok(content) = fs::read_to_string(file) else {
+    for (file, content) in tree.live_files() {
+        let Some(from) = owner(&tree.src, file) else {
             continue;
         };
         let norm = file.to_string_lossy().replace('\\', "/");
-        for Ref { line, module } in scan::refs(&content) {
+        for Ref { line, module } in scan::refs(content) {
             if module != from {
                 out.push(Edge {
                     from: from.clone(),

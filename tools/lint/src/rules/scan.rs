@@ -11,8 +11,9 @@ pub struct Scan {
     /// Every `.rs` file under [`crate::size::SCAN_ROOTS`], `/`-separated.
     pub files: Vec<String>,
     sources: BTreeMap<String, String>,
-    /// The files only a test-gated `mod x;` declares (`layers::test_only_files`).
-    test_only: BTreeSet<String>,
+    /// For each file, whether each line is test code (`test_code.rs`), worked out
+    /// once for every rule that asks.
+    test_lines: BTreeMap<String, Vec<bool>>,
     /// The layer table's sim modules (`src/<module>`).
     pub sim_dirs: Vec<String>,
 }
@@ -23,18 +24,20 @@ impl Scan {
         Self::at(Path::new(""))
     }
 
-    /// [`Scan::load`] for the repository at `base`; paths stay relative to it.
+    /// [`Scan::load`] for the files of the repository at `base`; paths stay
+    /// relative to it. `sim_dirs` still comes from this build's layer table, not
+    /// from `base`: the table is code, compiled in.
     pub fn at(base: &Path) -> Self {
         let found: Vec<PathBuf> = crate::size::SCAN_ROOTS
             .iter()
             .flat_map(|root| crate::size::scan_dir(&base.join(root)))
             .collect();
-        let relative = |p: &PathBuf| {
+        let relative = |p: &Path| {
             let p = p.strip_prefix(base).unwrap_or(p);
             p.to_string_lossy().replace('\\', "/")
         };
-        let files: Vec<String> = found.iter().map(relative).collect();
-        let sources = files
+        let files: Vec<String> = found.iter().map(|p| relative(p)).collect();
+        let sources: BTreeMap<String, String> = files
             .iter()
             .map(|p| {
                 (
@@ -43,11 +46,23 @@ impl Scan {
                 )
             })
             .collect();
-        let test_only = crate::layers::test_only_files(&found);
+        let test_only: BTreeSet<String> = crate::layers::test_only_files(&found, |p| {
+            sources.get(&relative(p)).map(String::as_str)
+        })
+        .iter()
+        .map(|p| relative(p))
+        .collect();
+        let test_lines = sources
+            .iter()
+            .map(|(p, text)| {
+                let lines = test_code::test_lines(p, text, test_only.contains(p));
+                (p.clone(), lines)
+            })
+            .collect();
         Self {
             files,
             sources,
-            test_only: test_only.iter().map(relative).collect(),
+            test_lines,
             sim_dirs: crate::layers::sim_dirs(),
         }
     }
@@ -58,8 +73,8 @@ impl Scan {
     }
 
     /// For each line of a scanned file, whether it is test code (`test_code.rs`).
-    pub fn test_lines(&self, path: &str) -> Vec<bool> {
-        test_code::test_lines(path, self.source(path), self.test_only.contains(path))
+    pub fn test_lines(&self, path: &str) -> &[bool] {
+        self.test_lines.get(path).map_or(&[], Vec::as_slice)
     }
 
     /// `check` over every scanned file, findings in file order.
@@ -81,3 +96,7 @@ impl Scan {
         dirs
     }
 }
+
+#[cfg(test)]
+#[path = "scan_tests.rs"]
+mod tests;
