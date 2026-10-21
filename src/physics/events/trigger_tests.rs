@@ -4,8 +4,8 @@
 
 use glam::Vec3;
 
-use super::PhysicsWorld;
 use crate::components::{ColliderComponent, ColliderShape, RigidBodyComponent};
+use crate::physics::PhysicsWorld;
 use crate::scene::Scene;
 
 const DT: f32 = 1.0 / 60.0;

@@ -1,4 +1,4 @@
-//! src/physics/mesh_shape_tests.rs — which mesh colliders build, and which are skipped (#1132),
+//! src/physics/shape/mesh_tests.rs — which mesh colliders build, and which are skipped (#1132),
 //! and a cylinder's radius under a stretched Z (#1131).
 
 use glam::Vec3;
@@ -6,7 +6,7 @@ use rapier3d::prelude::*;
 
 use super::build::{build_shape, try_build_shape};
 use super::build_tests::mesh_shape;
-use super::mesh_shape::Skip;
+use super::mesh::Skip;
 use crate::components::ColliderShape;
 
 const TRIANGLE: [[f32; 3]; 3] = [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]];

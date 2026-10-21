@@ -120,7 +120,7 @@ impl ColliderComponent {
 
     /// The world AABB of the shape physics builds at `pose` (a world
     /// [`Pose`], as `World::world_pose` gives it): the shape sized by
-    /// [`ColliderShape::scaled`], as `physics::build` sizes it, then turned and
+    /// [`ColliderShape::scaled`], as `physics::shape::build` sizes it, then turned and
     /// moved by the pose. A sphere, cylinder or capsule stays round under
     /// non-uniform scale, and a mesh's local box is carried through the pose's
     /// signed scale (#1140).

@@ -5,7 +5,7 @@
 //! now go through rapier/parry's query pipeline
 //! (`PhysicsWorld::cast_ray` / `cast_ray_filtered`), so a script's cast and the
 //! engine's cast agree for the same ray. The old AABB approximation
-//! (`cast_ray_in_scene`) has been retired. The area-shaped queries (`spatial`:
+//! (`cast_ray_in_scene`) has been retired. The area-shaped queries (`query::spatial`:
 //! overlap, sphere-cast, closest-point, containment, #311) ride the same
 //! pipeline, so every spatial answer comes from the one live world.
 
@@ -14,65 +14,35 @@
 #![deny(clippy::unwrap_used)]
 
 mod assemble;
-mod build;
-#[cfg(test)]
-mod build_tests;
 #[cfg(test)]
 mod ccd_tests;
 mod character;
-mod collision_events;
-#[cfg(test)]
-mod collision_events_tests;
 mod compound;
 #[cfg(test)]
 mod compound_tests;
 mod convert;
 #[cfg(test)]
 mod degenerate_parent_tests;
+mod events;
 mod follow;
 mod joints;
-#[cfg(test)]
-mod joints_tests;
 mod live;
 #[cfg(test)]
 mod live_tests;
 mod material;
 #[cfg(test)]
 mod material_tests;
-mod mesh_shape;
-#[cfg(test)]
-mod mesh_shape_tests;
-#[cfg(test)]
-mod mirror_tests;
 mod query;
-#[cfg(test)]
-mod query_tests;
-mod ragdoll;
-#[cfg(test)]
-mod raycast_tests;
-#[cfg(test)]
-mod round_bounds_tests;
-mod spatial;
-#[cfg(test)]
-mod spatial_tests;
-mod through;
-#[cfg(test)]
-mod through_edge_tests;
-#[cfg(test)]
-mod through_tests;
-mod triangles;
-mod trigger_events;
-#[cfg(test)]
-mod trigger_tests;
+mod shape;
 mod world;
 
 pub use character::{can_stand, move_character, CharacterMove};
-pub use collision_events::{CollisionEvents, CollisionPair, Contact};
+pub use events::collision::{CollisionEvents, CollisionPair, Contact};
+pub use events::trigger::TriggerEvents;
 pub use joints::JointBreak;
+pub use query::through::RayCrossing;
 pub use query::RayHit;
-pub use through::RayCrossing;
-pub use triangles::{collider_world_triangles, ColliderTriangles};
-pub use trigger_events::TriggerEvents;
+pub use shape::triangles::{collider_world_triangles, ColliderTriangles};
 pub use world::PhysicsWorld;
 
 use crate::scene::Scene;

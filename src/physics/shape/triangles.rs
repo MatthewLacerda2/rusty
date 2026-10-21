@@ -1,4 +1,4 @@
-//! src/physics/triangles.rs — a collider's world-space triangles, for the navmesh bake.
+//! src/physics/shape/triangles.rs — a collider's world-space triangles, for the navmesh bake.
 //!
 //! The navmesh (#454) rasterises the geometry physics actually collides with, so it
 //! builds the same parry shape [`build_shape`] gives rapier (world scale baked in,
@@ -10,7 +10,7 @@ use glam::Vec3;
 use rapier3d::prelude::*;
 
 use super::build::{build_shape_for, collider_inputs};
-use super::compound::world_pose;
+use crate::physics::compound::world_pose;
 use crate::scene::Scene;
 
 /// Segments around a round shape's circumference.
@@ -81,7 +81,7 @@ fn tessellate(shape: &dyn Shape) -> Option<Tessellation> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::physics::build::build_shape;
+    use crate::physics::shape::build::build_shape;
     use crate::scene::{ColliderComponent, ColliderShape};
     use glam::Quat;
 

@@ -154,9 +154,9 @@ re-bake reflects it) and, at the bake itself, in `src/navigation/bake/tests/sett
 | `SetVelocity` | ✅ | sim — `physics/world.rs` integrates / writes back `velocity` |
 | `SetAngularVelocity` | ✅ | sim — `physics/world.rs` pushes `set_angvel` / writes back `angvel` |
 | `AddForce` | ✅ | sim — folds impulse into `velocity` (read above); skips kinematic |
-| `AddForceAtPosition` / `AddImpulseAtPosition` | ✅ | sim — `physics/ragdoll.rs::impulse_response` turns the push into `velocity` / `angular_velocity` (read above) from the body's mass properties (`src/physics/live_tests.rs`, `tests/ragdoll/fall.rs`) |
-| `SetKinematic` | ✅ | sim — `physics/build.rs::class_of`; a mid-play switch reaches rapier through `physics/live.rs::body_type` in `world.rs::apply_body_state` (`set_kinematic_mid_play_stops_and_restarts_a_falling_body`) |
-| `SetCollisionDetection` | ✅ | sim — `physics/build.rs::ccd_enabled` / `world.rs` `enable_ccd` (proven by `physics/ccd_tests.rs`: against a moving wall Discrete tunnels, Continuous stops; a static wall stops both since rapier 0.36, #754) |
+| `AddForceAtPosition` / `AddImpulseAtPosition` | ✅ | sim — `physics/joints/ragdoll.rs::impulse_response` turns the push into `velocity` / `angular_velocity` (read above) from the body's mass properties (`src/physics/live_tests.rs`, `tests/ragdoll/fall.rs`) |
+| `SetKinematic` | ✅ | sim — `physics/shape/build.rs::class_of`; a mid-play switch reaches rapier through `physics/live.rs::body_type` in `world.rs::apply_body_state` (`set_kinematic_mid_play_stops_and_restarts_a_falling_body`) |
+| `SetCollisionDetection` | ✅ | sim — `physics/shape/build.rs::ccd_enabled` / `world.rs` `enable_ccd` (proven by `physics/ccd_tests.rs`: against a moving wall Discrete tunnels, Continuous stops; a static wall stops both since rapier 0.36, #754) |
 
 (The #311 spatial query surface — `Raycast`'s siblings `SphereCast`,
 `OverlapSphere`/`OverlapBox`/`OverlapCapsule`, `CheckSphere`/`CheckBox`,
@@ -164,7 +164,7 @@ re-bake reflects it) and, at the bake itself, in `src/navigation/bake/tests/sett
 the live rapier world, not setters, so it doesn't add to the count. Its
 faithfulness claim is script↔engine **agreement**: every query routes through the
 same `PhysicsWorld` query pipeline the engine uses, proven by
-`src/physics/spatial_tests.rs` (the queries against hand-computed geometry) and
+`src/physics/query/spatial_tests.rs` (the queries against hand-computed geometry) and
 `src/scripting/tests/spatial.rs` (the Lua bindings return those same answers,
 including the #91 layer-mask filter). `GetBounds` reads the collider's cached
 world AABB — the `calculate_world_aabb` value the scene recomputes on transform
@@ -174,8 +174,8 @@ edits and each physics step.)
 
 | Setter | Status | Read-site |
 |---|---|---|
-| `SetKind` / `SetConnectedBody` / `SetAnchor` / `SetConnectedAnchor` / `SetAutoConfigureConnectedAnchor` / `SetAxis` / `SetSwingAxis` / `SetUseLimits` / `SetLimits` / `SetSwingLimit` / `SetSwing2Limit` / `SetEnableCollision` | ✅ | sim — `PhysicsWorld::resync_joints` builds the rapier joint from them, rebuilding on a change; swing 1 / swing 2 stop a Ball per axis (`src/physics/joints_tests.rs`); round-trips, the connected body remapped through prefabs (`tests/joint_api.rs`) |
-| `SetBreakForce` / `SetBreakTorque` | ✅ | sim — `PhysicsWorld::break_joints` reads them live after each step, torque taken about the anchor (`src/physics/joints_tests.rs`, `src/physics/joints/load_tests.rs`, #803); round-trips |
+| `SetKind` / `SetConnectedBody` / `SetAnchor` / `SetConnectedAnchor` / `SetAutoConfigureConnectedAnchor` / `SetAxis` / `SetSwingAxis` / `SetUseLimits` / `SetLimits` / `SetSwingLimit` / `SetSwing2Limit` / `SetEnableCollision` | ✅ | sim — `PhysicsWorld::resync_joints` builds the rapier joint from them, rebuilding on a change; swing 1 / swing 2 stop a Ball per axis (`src/physics/joints/tests.rs`); round-trips, the connected body remapped through prefabs (`tests/joint_api.rs`) |
+| `SetBreakForce` / `SetBreakTorque` | ✅ | sim — `PhysicsWorld::break_joints` reads them live after each step, torque taken about the anchor (`src/physics/joints/tests.rs`, `src/physics/joints/load_tests.rs`, #803); round-trips |
 
 ### `Ragdoll` — over the bones' `Entity.rigidbody` / `Entity.joint` (#466)
 
@@ -310,7 +310,7 @@ fields (incl. the spatial fields stored for #213) round-trip through `SceneData`
 
 | Setter | Status | Read-site |
 |---|---|---|
-| `SetLayer` | ✅ | renderer + sim — `draw_resources` culling mask (#92) and `physics/build.rs::interaction_groups` collision groups (#91); round-trips |
+| `SetLayer` | ✅ | renderer + sim — `draw_resources` culling mask (#92) and `physics/shape/build.rs::interaction_groups` collision groups (#91); round-trips |
 
 ### `Graphics` — over the active `VisualCorrectionComponent` / `CameraComponent` / `QualityPreset`
 

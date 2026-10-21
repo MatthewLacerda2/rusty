@@ -164,7 +164,7 @@ fn follow_bones(world: &mut World, res: &mut Resources) {
 }
 
 /// Override the Animator on every bone a dynamic body carries — a ragdoll's —
-/// with the pose this tick's step solved (#466, see `physics::ragdoll`).
+/// with the pose this tick's step solved (#466, see `physics::joints::ragdoll`).
 fn pose_ragdolls(world: &mut World, res: &mut Resources) {
     if let Some(physics) = res.physics.borrow().as_ref() {
         physics.pose_bones(&mut world.scene.borrow_mut());

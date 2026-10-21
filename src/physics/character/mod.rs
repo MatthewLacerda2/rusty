@@ -1,4 +1,4 @@
-//! src/physics/character.rs — the CharacterController's collide-and-slide (#451).
+//! src/physics/character/mod.rs — the CharacterController's collide-and-slide (#451).
 //!
 //! A CharacterController moves only when a script calls `Move` with a
 //! displacement. That move runs rapier's `KinematicCharacterController` over the

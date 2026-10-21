@@ -1,12 +1,12 @@
-//! src/physics/through_tests.rs — `raycast_through` (#830): enter/exit pairs for a
+//! src/physics/query/through_tests.rs — `raycast_through` (#830): enter/exit pairs for a
 //! box, a mesh crossed twice, a ray ending or starting inside, and triggers.
 
 use glam::Vec3;
 use rapier3d::prelude::*;
 
 use super::through::spans;
-use super::PhysicsWorld;
 use crate::components::{ColliderComponent, ColliderShape};
+use crate::physics::PhysicsWorld;
 use crate::scene::Scene;
 
 /// A static 2 m box entity centered at `pos`, a trigger when `trigger`.

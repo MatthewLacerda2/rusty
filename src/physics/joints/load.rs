@@ -32,7 +32,7 @@
 use glam::{Mat3, Quat, Vec3};
 use rapier3d::prelude::*;
 
-use crate::physics::collision_events::VelocitySnapshot;
+use crate::physics::events::collision::VelocitySnapshot;
 
 /// One solver row: its Jacobian per body, the torque about the anchor it applies
 /// to body 1 per unit impulse, and its impulse.

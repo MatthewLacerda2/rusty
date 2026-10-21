@@ -1,4 +1,4 @@
-//! src/physics/joints.rs — `Joint` components as rapier impulse joints (#449).
+//! src/physics/joints/mod.rs — `Joint` components as rapier impulse joints (#449).
 //!
 //! Each tick, before the step, [`PhysicsWorld::resync_joints`] matches the live
 //! joints to the scene: a joint is (re)built when it is new, when its shape
@@ -38,9 +38,9 @@ use std::collections::BTreeMap;
 use glam::{Mat3, Quat, Vec3};
 use rapier3d::prelude::*;
 
-use super::collision_events::VelocitySnapshot;
 use super::compound::{body_owner, world_pose};
 use super::convert::to_pose;
+use super::events::collision::VelocitySnapshot;
 use super::world::PhysicsWorld;
 use crate::components::transform::{mirror, mirrored_frame_axes};
 use crate::components::{JointComponent, JointKind};
@@ -58,6 +58,9 @@ mod load;
 mod load_tests;
 #[cfg(test)]
 mod mirrored_tests;
+pub(super) mod ragdoll;
+#[cfg(test)]
+mod tests;
 
 /// One joint that broke this tick: the joint entity and what broke it.
 #[derive(Debug, Clone, Copy, PartialEq)]

@@ -1,10 +1,10 @@
-//! src/physics/build_tests.rs — the single test home for `build.rs`.
+//! src/physics/shape/build_tests.rs — the single test home for `shape/build.rs`.
 //!
 //! All unit tests for body/collider construction live here, in one place, rather
-//! than split between an inline `#[cfg(test)] mod tests` in `build.rs` and this
-//! sibling. The lint counts `build.rs` and this sibling as one logical unit (see
-//! `tools/lint`), so there is no size-cap reason to test `build.rs` from two
-//! locations. These assert the *values* `build.rs` computes (baked extents, layer
+//! than split between an inline `#[cfg(test)] mod tests` in `shape/build.rs` and this
+//! sibling. The lint counts `shape/build.rs` and this sibling as one logical unit (see
+//! `tools/lint`), so there is no size-cap reason to test `shape/build.rs` from two
+//! locations. These assert the *values* `shape/build.rs` computes (baked extents, layer
 //! bits, body class) rather than just that a collider is produced, so
 //! arithmetic/comparison mutations are caught.
 
@@ -42,7 +42,7 @@ fn unit_cube() -> (Vec<[f32; 3]>, Vec<u32>) {
     (p, i)
 }
 
-pub(super) fn mesh_shape(convex: bool) -> ColliderShape {
+pub(in crate::physics) fn mesh_shape(convex: bool) -> ColliderShape {
     ColliderShape::Mesh {
         convex,
         local_min: Vec3::splat(-0.5),

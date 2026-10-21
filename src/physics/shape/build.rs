@@ -1,4 +1,4 @@
-//! src/physics/build.rs — body/collider construction helpers.
+//! src/physics/shape/build.rs — body/collider construction helpers.
 //!
 //! Pure mapping from the engine's component model to rapier builders, plus the
 //! body-class decision and the per-tick body-state snapshot. Kept out of
@@ -14,18 +14,18 @@ use crate::components::{
 use crate::ecs::World;
 use crate::scene::Scene;
 
-use super::compound::world_pose;
-use super::mesh_shape::{build_mesh_shape, Skip};
+use super::mesh::{build_mesh_shape, Skip};
+use crate::physics::compound::world_pose;
 
 /// Body class derived from the entity flags. Mirrors the legacy solver's encoding:
 /// static (fixed), kinematic (position-driven), or dynamic (gravity + solver).
-pub(super) enum BodyClass {
+pub(in crate::physics) enum BodyClass {
     Static,
     Kinematic,
     Dynamic,
 }
 
-pub(super) fn classify(is_static: bool, rb: Option<&RigidBodyComponent>) -> BodyClass {
+pub(in crate::physics) fn classify(is_static: bool, rb: Option<&RigidBodyComponent>) -> BodyClass {
     if is_static {
         BodyClass::Static
     } else if rb.is_none_or(|r| r.is_kinematic) {
@@ -37,7 +37,7 @@ pub(super) fn classify(is_static: bool, rb: Option<&RigidBodyComponent>) -> Body
 
 /// Owner `id`'s body class. A CharacterController's body is always kinematic
 /// (#451): it moves only where `CharacterController.Move` puts its Transform.
-pub(super) fn class_of(world: &World, id: u32) -> BodyClass {
+pub(in crate::physics) fn class_of(world: &World, id: u32) -> BodyClass {
     if world.has_character_controller(id) {
         return BodyClass::Kinematic;
     }
@@ -47,7 +47,7 @@ pub(super) fn class_of(world: &World, id: u32) -> BodyClass {
 /// rapier `gravity_scale` for a body's `use_gravity` flag: `1.0` keeps the body
 /// under world gravity, `0.0` exempts it (Unity: `Rigidbody.useGravity`). Only
 /// dynamic bodies integrate gravity, so it's a no-op on static/kinematic ones.
-pub(super) fn gravity_scale(use_gravity: bool) -> f32 {
+pub(in crate::physics) fn gravity_scale(use_gravity: bool) -> f32 {
     if use_gravity {
         1.0
     } else {
@@ -60,14 +60,14 @@ pub(super) fn gravity_scale(use_gravity: bool) -> f32 {
 /// stops it at the time of impact (anti-tunnelling), `Discrete` (default) tests
 /// overlap only at the tick's final pose. rapier already builds a `CCDSolver`
 /// into every step — this flag is the per-body switch that was dormant.
-pub(super) fn ccd_enabled(mode: CollisionDetection) -> bool {
+pub(in crate::physics) fn ccd_enabled(mode: CollisionDetection) -> bool {
     matches!(mode, CollisionDetection::Continuous)
 }
 
 /// The per-entity inputs needed to build one rapier collider, captured in a
 /// single borrow of the entity so `assemble` can release it before touching
 /// `self`. The pose is not here: it comes from the hierarchy (`compound`).
-pub(super) struct ColliderInputs {
+pub(in crate::physics) struct ColliderInputs {
     pub shape: ColliderShape,
     /// The shape's centre in the entity's local space, before scale: a
     /// CharacterController's `center`, zero for a Collider.
@@ -88,8 +88,8 @@ pub(super) struct ColliderInputs {
 /// on the same entity (#451). A mesh collider also captures the rest-pose
 /// geometry it rebuilds from. Reads through the #344 accessor facade — shared
 /// guards only.
-pub(super) fn collider_inputs(world: &World, id: u32) -> Option<ColliderInputs> {
-    if let Some(inputs) = super::character::character_collider_inputs(world, id) {
+pub(in crate::physics) fn collider_inputs(world: &World, id: u32) -> Option<ColliderInputs> {
+    if let Some(inputs) = crate::physics::character::character_collider_inputs(world, id) {
         return Some(inputs);
     }
     let collider = world.collider(id).filter(|c| c.active)?;
@@ -116,7 +116,7 @@ pub(super) fn collider_inputs(world: &World, id: u32) -> Option<ColliderInputs> 
 
 /// The inputs needed to build one rapier body, read off its owner entity (the
 /// entity with the Rigidbody, or the lone collider entity — see `compound`).
-pub(super) struct BodyInputs {
+pub(in crate::physics) struct BodyInputs {
     pub class: BodyClass,
     pub velocity: Vec3,
     /// Initial angular velocity (radians/sec per axis) seeded onto a dynamic body
@@ -130,7 +130,7 @@ pub(super) struct BodyInputs {
 }
 
 /// Snapshot the body-level inputs of owner `id`.
-pub(super) fn body_inputs(world: &World, id: u32) -> BodyInputs {
+pub(in crate::physics) fn body_inputs(world: &World, id: u32) -> BodyInputs {
     let rb = world.rigidbody(id);
     let rb = rb.as_deref();
     BodyInputs {
@@ -143,7 +143,7 @@ pub(super) fn body_inputs(world: &World, id: u32) -> BodyInputs {
 }
 
 /// The per-entity component state `sync_to_rapier` pushes into a body each tick.
-pub(super) struct EntityBodyState {
+pub(in crate::physics) struct EntityBodyState {
     /// World-space pose (#445): the owner's local `Transform` resolved through
     /// its parents.
     pub pos: Vec3,
@@ -160,7 +160,7 @@ pub(super) struct EntityBodyState {
 
 /// Snapshot an owner's world pose/velocity/body-class state for one tick
 /// (`None` when the entity is dead).
-pub(super) fn body_state(scene: &Scene, id: u32) -> Option<EntityBodyState> {
+pub(in crate::physics) fn body_state(scene: &Scene, id: u32) -> Option<EntityBodyState> {
     let pose = world_pose(scene, id)?;
     let world = &scene.world;
     let class = class_of(world, id);
@@ -183,7 +183,7 @@ pub(super) fn body_state(scene: &Scene, id: u32) -> Option<EntityBodyState> {
 
 /// [`try_build_shape`] without the reason.
 #[cfg(test)]
-pub(super) fn build_shape(
+pub(in crate::physics) fn build_shape(
     shape: &ColliderShape,
     scale: Vec3,
     mesh: Option<(&[[f32; 3]], &[u32])>,
@@ -193,7 +193,7 @@ pub(super) fn build_shape(
 
 /// [`try_build_shape`] for collider entity `id`: a skipped mesh collider is logged once,
 /// naming the entity and the reason (#1141).
-pub(super) fn build_shape_for(
+pub(in crate::physics) fn build_shape_for(
     id: u32,
     shape: &ColliderShape,
     scale: Vec3,
@@ -214,7 +214,7 @@ pub(super) fn build_shape_for(
 ///
 /// A mesh collider that cannot be built is a [`Skip`] saying why (#1132, #1141).
 /// `mesh` is the entity's rest-pose positions + indices, for [`ColliderShape::Mesh`].
-pub(super) fn try_build_shape(
+pub(in crate::physics) fn try_build_shape(
     shape: &ColliderShape,
     scale: Vec3,
     mesh: Option<(&[[f32; 3]], &[u32])>,
@@ -246,7 +246,7 @@ pub(super) fn try_build_shape(
 /// its own layer bit, and collides only with the layers `filter_mask` permits — the
 /// row the collision matrix (#91) provides for `layer`. A symmetric matrix makes the
 /// pairwise rapier test reduce to `can_collide(a, b)`.
-pub(super) fn interaction_groups(layer: u8, filter_mask: u32) -> InteractionGroups {
+pub(in crate::physics) fn interaction_groups(layer: u8, filter_mask: u32) -> InteractionGroups {
     let membership = if (layer as usize) < 32 {
         1u32 << layer
     } else {
@@ -260,7 +260,7 @@ pub(super) fn interaction_groups(layer: u8, filter_mask: u32) -> InteractionGrou
 }
 
 /// Canonical (low, high) ordering so trigger-pair dedup is stable.
-pub(super) fn order_pair(a: u32, b: u32) -> (u32, u32) {
+pub(in crate::physics) fn order_pair(a: u32, b: u32) -> (u32, u32) {
     if a <= b {
         (a, b)
     } else {
