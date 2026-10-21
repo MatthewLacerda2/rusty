@@ -27,9 +27,7 @@ const GPU_HELPER: &str = "src/render/test_gpu.rs";
 
 /// Every break of the three locks in the test code of `path`.
 pub fn check(path: &str, source: &str) -> Vec<Finding> {
-    let Some(first) = test_code::first_line(path, source) else {
-        return Vec::new();
-    };
+    let test = test_code::test_lines(path, source);
     let mut found = Vec::new();
     let mut flag = |line: usize, rule: &'static str, message: &str| {
         found.push(Finding {
@@ -39,7 +37,7 @@ pub fn check(path: &str, source: &str) -> Vec<Finding> {
             message: message.to_string(),
         });
     };
-    for (i, line) in source.lines().enumerate().skip(first) {
+    for (i, line) in source.lines().enumerate().filter(|(i, _)| test[*i]) {
         let code = line.trim_start();
         if code.starts_with("//") {
             continue;

@@ -93,3 +93,27 @@ fn cfg_all_with_test_last_or_wrapped_is_test_code() {
     let not = format!("#[cfg(all(feature = \"dev\", not(test)))]\nfn f() {{ {full}; }}\n");
     assert!(lines("src/physics/build.rs", &not).is_empty());
 }
+
+#[test]
+fn a_gated_item_is_test_code_and_the_lines_below_it_are_not() {
+    let full = "ColliderComponent { shape, is_trigger, active }";
+    let src = format!(
+        "#[cfg(test)]\nuse crate::x::Helper;\nfn f() -> ColliderComponent {{\n    {full}\n}}\n\
+         #[cfg(test)]\nfn helper(\n    a: u32,\n) {{\n    {full};\n}}\nfn g() {{ {full}; }}\n\
+         #[cfg(test)]\nmod tests {{\n    fn t() {{ {full}; }}\n}}\n"
+    );
+    assert_eq!(lines("src/physics/build.rs", &src), [10, 15]);
+}
+
+#[test]
+fn a_gated_fn_with_a_wrapped_signature_is_test_code_to_its_closing_brace() {
+    let full = "ColliderComponent { shape, is_trigger, active }";
+    let wheres =
+        format!("#[cfg(test)]\nfn f<T>(t: T)\nwhere\n    T: Clone,\n{{\n    {full};\n}}\n");
+    let returns =
+        format!("#[cfg(test)]\nfn f() -> Result<\n    A,\n    B,\n> {{\n    {full}\n}}\n");
+    let generics = format!("#[cfg(test)]\nfn f<\n    T: X,\n>(t: T) {{\n    {full};\n}}\n");
+    assert_eq!(lines("src/physics/build.rs", &wheres), [6]);
+    assert_eq!(lines("src/physics/build.rs", &returns), [6]);
+    assert_eq!(lines("src/physics/build.rs", &generics), [5]);
+}

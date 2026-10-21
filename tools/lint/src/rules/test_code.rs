@@ -1,9 +1,14 @@
 //! Which lines of a source file are test code: everything under `tests/`, a
-//! `tests.rs` or `*_tests.rs` file, and a file's lines from its first
-//! `#[cfg(test)]` or `#[cfg(all(…, test, …))]` on, however the attribute is wrapped
-//! (the inline `mod tests` shape). `any(test, …)` is not test-only (it also compiles
-//! outside tests), so it stays production code. Only `src/` and `tests/` hold the
-//! engine's tests; other roots never count.
+//! `tests.rs` or `*_tests.rs` file, and the item under each `#[cfg(test)]` or
+//! `#[cfg(all(…, test, …))]`, however the attribute is wrapped. A gated
+//! `mod tests { … }` or `fn` counts to its closing brace, a gated `use` to its `;`,
+//! a gated field or arm to its `,` (`layers::item_end`); the lines after the item
+//! are production code again (#1113). A gated `mod x;` counts as its own line only
+//! (#1120). `any(test, …)` is not test-only (it also compiles outside tests), so it
+//! stays production code. Only `src/` and `tests/` hold the engine's tests; other
+//! roots never count.
+
+use crate::layers::item_end;
 
 /// Is the whole of `path` test code?
 fn test_file(path: &str) -> bool {
@@ -11,17 +16,27 @@ fn test_file(path: &str) -> bool {
     path.starts_with("tests/") || name == "tests.rs" || name.ends_with("_tests.rs")
 }
 
-/// The 0-based index of the first test line of `source`, or `None` when the file
-/// holds no test code.
-pub fn first_line(path: &str, source: &str) -> Option<usize> {
+/// For each line of `source`, whether it is test code.
+pub fn test_lines(path: &str, source: &str) -> Vec<bool> {
+    let lines: Vec<&str> = source.lines().collect();
     if !(path.starts_with("src/") || path.starts_with("tests/")) {
-        return None;
+        return vec![false; lines.len()];
     }
     if test_file(path) {
-        return Some(0);
+        return vec![true; lines.len()];
     }
-    let lines: Vec<&str> = source.lines().collect();
-    (0..lines.len()).find(|&i| is_test_gate(&attribute(&lines[i..])))
+    let mut test = vec![false; lines.len()];
+    let mut i = 0;
+    while i < lines.len() {
+        if is_test_gate(&attribute(&lines[i..])) {
+            let end = item_end(&lines, i);
+            test[i..=end].fill(true);
+            i = end + 1;
+        } else {
+            i += 1;
+        }
+    }
+    test
 }
 
 /// The attribute starting at `lines[0]`, wrapped lines joined and spaces dropped,

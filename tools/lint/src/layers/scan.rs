@@ -5,6 +5,7 @@
 //! with every file it declares in turn. Not a parser — a coarse line scan, like the
 //! direction guard.
 
+use super::extent::{item_end, strip_comment, Open};
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -151,38 +152,24 @@ pub fn refs(content: &str) -> Vec<Ref> {
 }
 
 /// The lines of `content` that are live (non-test) code, numbered from 1, each with
-/// its `//` comment stripped. Shared with the external-crate scan.
+/// its `//` comment stripped (a string open across lines carried, so a `//` inside
+/// it is kept and one after it is cut). Shared with the external-crate scan.
 pub fn live_lines(content: &str) -> Vec<(usize, &str)> {
+    let lines: Vec<&str> = content.lines().collect();
     let mut out = Vec::new();
-    let mut skip_item = false;
-    let mut depth = 0i32;
-    for (i, raw) in content.lines().enumerate() {
-        let code = strip_comment(raw);
-        let trimmed = code.trim();
-        if !skip_item && is_test_cfg(trimmed) {
-            skip_item = true;
-        }
-        if skip_item {
-            depth += brace_delta(code);
-            if depth <= 0 && trimmed.ends_with([';', '}', ',']) {
-                skip_item = false;
-                depth = 0;
-            }
+    let (mut i, mut open) = (0, Open::None);
+    while i < lines.len() {
+        let inside = open != Open::None;
+        let code = strip_comment(lines[i], &mut open);
+        if !inside && is_test_cfg(code.trim()) {
+            i = item_end(&lines, i) + 1;
+            open = Open::None;
             continue;
         }
         out.push((i + 1, code));
+        i += 1;
     }
     out
-}
-
-fn brace_delta(code: &str) -> i32 {
-    code.chars()
-        .map(|c| match c {
-            '{' => 1,
-            '}' => -1,
-            _ => 0,
-        })
-        .sum()
 }
 
 /// Module names a line references. `group` carries an open `crate::{` across
@@ -240,11 +227,4 @@ fn leading_ident(s: &str) -> Option<String> {
     let s = s.trim_start();
     let end = s.find(|c: char| !is_ident(c)).unwrap_or(s.len());
     (end > 0 && s[..end] != *"self").then(|| s[..end].to_string())
-}
-
-fn strip_comment(line: &str) -> &str {
-    match line.find("//") {
-        Some(idx) => &line[..idx],
-        None => line,
-    }
 }
