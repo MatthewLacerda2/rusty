@@ -3,6 +3,7 @@
 //! colour gradients. The Trail and Line cards (#441) reuse them.
 
 use crate::core::curve::{ColorKey, Curve, Gradient, Key, Range};
+use crate::editor::widgets::DragRange;
 
 /// A labelled, clamped `f32` drag row. Returns whether the value changed.
 pub(in crate::editor::inspector::components) fn clamped(
@@ -13,7 +14,7 @@ pub(in crate::editor::inspector::components) fn clamped(
 ) -> bool {
     ui.horizontal(|ui| {
         ui.label(label);
-        ui.add(egui::DragValue::new(value).speed(0.05).range(range))
+        ui.add(egui::DragValue::new(value).speed(0.05).ranged(range))
             .changed()
     })
     .inner
@@ -28,7 +29,7 @@ pub(super) fn drag_u32(
 ) -> bool {
     ui.horizontal(|ui| {
         ui.label(label);
-        ui.add(egui::DragValue::new(value).speed(1.0).range(range))
+        ui.add(egui::DragValue::new(value).speed(1.0).ranged(range))
             .changed()
     })
     .inner
@@ -95,7 +96,7 @@ pub(super) fn range_row(
     let changed = ui
         .horizontal(|ui| {
             ui.label(label);
-            let drag = |v| egui::DragValue::new(v).speed(0.05).range(bounds.clone());
+            let drag = |v| egui::DragValue::new(v).speed(0.05).ranged(bounds.clone());
             let a = ui.add(drag(&mut min)).on_hover_text("min").changed();
             let b = ui.add(drag(&mut max)).on_hover_text("max").changed();
             a | b
@@ -135,7 +136,7 @@ fn key_rows(ui: &mut egui::Ui, keys: &mut Vec<Key>) -> bool {
             ui.label("t");
             let t = egui::DragValue::new(&mut key.t)
                 .speed(0.01)
-                .range(0.0..=1.0);
+                .ranged(0.0..=1.0);
             changed |= ui.add(t).changed();
             ui.label("value");
             changed |= ui
@@ -168,7 +169,7 @@ pub(in crate::editor::inspector::components) fn gradient_editor(
                 ui.label("t");
                 let t = egui::DragValue::new(&mut key.t)
                     .speed(0.01)
-                    .range(0.0..=1.0);
+                    .ranged(0.0..=1.0);
                 changed |= ui.add(t).changed();
                 changed |= ui.color_edit_button_rgb(&mut key.color).changed();
                 if ui.small_button("x").clicked() {

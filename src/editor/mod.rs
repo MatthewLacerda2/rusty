@@ -18,6 +18,7 @@ mod menu_create;
 pub mod project_picker;
 pub mod theme;
 pub mod viewport;
+pub mod widgets;
 
 use crate::navigation::NavigationGraph;
 use crate::scene::Scene;

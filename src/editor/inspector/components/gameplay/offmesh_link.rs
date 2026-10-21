@@ -7,6 +7,7 @@
 //! up (links only: no spans change).
 
 use crate::editor::inspector::components::card::remove_component;
+use crate::editor::widgets::DragRange;
 use crate::scene::authoring::ComponentKind;
 use egui_phosphor::regular as icon;
 
@@ -47,7 +48,7 @@ fn draw_cost_and_area(
         .horizontal(|ui| {
             ui.label("Area:");
             let max = (crate::navigation::MAX_AREAS - 1) as u8;
-            ui.add(egui::DragValue::new(&mut area).range(0..=max))
+            ui.add(egui::DragValue::new(&mut area).ranged(0..=max))
                 .changed()
         })
         .inner;

@@ -4,6 +4,7 @@
 //! `scene::authoring::selectable`.
 
 use crate::editor::inspector::components::card::remove_component;
+use crate::editor::widgets::DragRange;
 use crate::scene::authoring::ComponentKind;
 use egui_phosphor::regular as icon;
 
@@ -78,7 +79,7 @@ fn draw_transition(ui: &mut egui::Ui, edit: &mut SelectableComponent) -> bool {
                 .horizontal(|ui| {
                     ui.label("Fade Duration:");
                     let drag = egui::DragValue::new(&mut edit.fade_duration).speed(0.01);
-                    ui.add(drag.range(0.0..=f32::MAX).suffix(" s")).changed()
+                    ui.add(drag.ranged(0.0..=f32::MAX).suffix(" s")).changed()
                 })
                 .inner;
         }

@@ -5,6 +5,7 @@
 //! through `authoring::nav::agent`, the same ops the `NavMeshAgent.*` Lua setters call.
 
 use crate::editor::inspector::components::card::remove_component;
+use crate::editor::widgets::DragRange;
 use crate::scene::authoring::ComponentKind;
 use egui_phosphor::regular as icon;
 use glam::Vec3;
@@ -151,7 +152,7 @@ fn draw_agent_avoidance(
         ui.label("Avoidance Priority:");
         let max = crate::components::MAX_AVOIDANCE_PRIORITY;
         if ui
-            .add(egui::DragValue::new(&mut priority).range(0..=max))
+            .add(egui::DragValue::new(&mut priority).ranged(0..=max))
             .changed()
         {
             if let Some(mut a) = world.nav_agent_mut(id) {
@@ -188,7 +189,7 @@ fn clamped(
 ) -> bool {
     ui.horizontal(|ui| {
         ui.label(label);
-        ui.add(egui::DragValue::new(value).speed(0.05).range(range))
+        ui.add(egui::DragValue::new(value).speed(0.05).ranged(range))
             .changed()
     })
     .inner

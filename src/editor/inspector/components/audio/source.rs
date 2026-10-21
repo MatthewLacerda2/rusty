@@ -7,6 +7,7 @@
 //! device; the `AudioMaestro` reads these when a voice starts.
 
 use crate::editor::inspector::components::card::remove_component;
+use crate::editor::widgets::DragRange;
 use crate::scene::authoring::ComponentKind;
 use egui_phosphor::regular as icon;
 
@@ -202,7 +203,7 @@ fn clamped(
 ) -> bool {
     ui.horizontal(|ui| {
         ui.label(label);
-        ui.add(egui::DragValue::new(value).speed(0.01).range(range))
+        ui.add(egui::DragValue::new(value).speed(0.01).ranged(range))
             .changed()
     })
     .inner

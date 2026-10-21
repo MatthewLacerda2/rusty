@@ -12,6 +12,7 @@
 //! settings under the button (#810's directional mode among them) are the scene's,
 //! as `Lighting.SetSettings{…}` edits them.
 
+use crate::editor::widgets::DragRange;
 use std::time::Duration;
 
 use egui_phosphor::regular as icon;
@@ -70,21 +71,21 @@ fn draw_settings(ui: &mut egui::Ui, s: &mut BakeSettings) -> bool {
             ui.label(label);
         });
     };
-    let texels = egui::DragValue::new(&mut s.texels_per_unit).range(BakeSettings::TEXELS_PER_UNIT);
+    let texels = egui::DragValue::new(&mut s.texels_per_unit).ranged(BakeSettings::TEXELS_PER_UNIT);
     row(
         ui,
         texels.speed(0.1),
         "Texels per unit",
         "Lightmap resolution",
     );
-    let samples = egui::DragValue::new(&mut s.samples).range(BakeSettings::SAMPLES);
+    let samples = egui::DragValue::new(&mut s.samples).ranged(BakeSettings::SAMPLES);
     row(
         ui,
         samples,
         "Samples",
         "Paths traced per texel; more is smoother and slower",
     );
-    let bounces = egui::DragValue::new(&mut s.bounces).range(BakeSettings::BOUNCES);
+    let bounces = egui::DragValue::new(&mut s.bounces).ranged(BakeSettings::BOUNCES);
     row(
         ui,
         bounces,

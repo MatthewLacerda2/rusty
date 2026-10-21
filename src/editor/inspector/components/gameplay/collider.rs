@@ -7,6 +7,7 @@
 //! same ops the `Physics.*` Lua setters call, so the panel and the bindings share
 //! one write.
 
+use crate::editor::widgets::DragRange;
 use egui_phosphor::regular as icon;
 use glam::Vec3;
 
@@ -182,7 +183,7 @@ fn draw_material(ui: &mut egui::Ui, mut m: PhysicsMaterial) -> Option<PhysicsMat
                 .add(
                     egui::DragValue::new(&mut m.friction)
                         .speed(0.01)
-                        .range(0.0..=10.0),
+                        .ranged(0.0..=10.0),
                 )
                 .changed();
             ui.label("Bounciness:");
@@ -190,7 +191,7 @@ fn draw_material(ui: &mut egui::Ui, mut m: PhysicsMaterial) -> Option<PhysicsMat
                 .add(
                     egui::DragValue::new(&mut m.bounciness)
                         .speed(0.01)
-                        .range(0.0..=1.0),
+                        .ranged(0.0..=1.0),
                 )
                 .changed();
             c
@@ -217,6 +218,6 @@ fn combine_combo(ui: &mut egui::Ui, label: &str, mode: &mut CombineMode) -> bool
 /// A clamped collider-dimension drag field (shared between the shape variants).
 /// Returns whether the value changed.
 fn drag(ui: &mut egui::Ui, value: &mut f32) -> bool {
-    ui.add(egui::DragValue::new(value).speed(0.05).range(0.01..=100.0))
+    ui.add(egui::DragValue::new(value).speed(0.05).ranged(0.01..=100.0))
         .changed()
 }

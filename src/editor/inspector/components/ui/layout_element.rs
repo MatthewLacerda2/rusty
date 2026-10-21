@@ -4,6 +4,7 @@
 //! routes through `scene::authoring::layout_element`.
 
 use crate::editor::inspector::components::card::remove_component;
+use crate::editor::widgets::DragRange;
 use crate::scene::authoring::ComponentKind;
 use egui_phosphor::regular as icon;
 
@@ -68,7 +69,7 @@ fn optional(ui: &mut egui::Ui, label: &str, value: &mut Option<f32>) -> bool {
     let mut changed = ui.checkbox(&mut on, label).changed();
     if on {
         changed |= ui
-            .add(egui::DragValue::new(&mut v).range(0.0..=f32::MAX))
+            .add(egui::DragValue::new(&mut v).ranged(0.0..=f32::MAX))
             .changed();
     }
     *value = on.then_some(v);

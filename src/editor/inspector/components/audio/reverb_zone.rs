@@ -7,6 +7,7 @@
 //! in one place.
 
 use crate::editor::inspector::components::card::remove_component;
+use crate::editor::widgets::DragRange;
 use crate::scene::authoring::ComponentKind;
 use egui_phosphor::regular as icon;
 
@@ -29,7 +30,7 @@ fn drag_row(ui: &mut egui::Ui, label: &str, mut value: f32, range: (f32, f32)) -
         ui.label(label);
         let drag = egui::DragValue::new(&mut value)
             .speed(0.01)
-            .range(range.0..=range.1);
+            .ranged(range.0..=range.1);
         ui.add(drag).changed().then_some(value)
     })
     .inner

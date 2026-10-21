@@ -7,6 +7,7 @@
 //! to drop the level.
 
 use crate::editor::inspector::components::card::remove_component;
+use crate::editor::widgets::DragRange;
 use crate::scene::authoring::ComponentKind;
 use egui_phosphor::regular as icon;
 
@@ -38,7 +39,7 @@ pub fn draw_lod_group(ui: &mut egui::Ui, world: &mut World, id: u32, is_dirty: &
             let mut size = g.size;
             let drag = egui::DragValue::new(&mut size)
                 .speed(0.05)
-                .range(lod_ops::MIN_SIZE..=f32::MAX);
+                .ranged(lod_ops::MIN_SIZE..=f32::MAX);
             if ui
                 .horizontal(|ui| {
                     ui.label("Size (m):");
@@ -82,7 +83,7 @@ fn draw_level(
             let drag = egui::DragValue::new(&mut percent)
                 .speed(0.1)
                 .suffix(" %")
-                .range(0.0..=100.0);
+                .ranged(0.0..=100.0);
             let changed = ui.add(drag).changed();
             (changed, ui.small_button(icon::TRASH).clicked())
         })
