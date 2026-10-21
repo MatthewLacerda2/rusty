@@ -169,3 +169,7 @@ fn leading_ident(s: &str) -> Option<String> {
     let end = s.find(|c: char| !is_ident(c)).unwrap_or(s.len());
     (end > 0 && s[..end] != *"self").then(|| s[..end].to_string())
 }
+
+#[cfg(test)]
+#[path = "scan_tests.rs"]
+mod tests;

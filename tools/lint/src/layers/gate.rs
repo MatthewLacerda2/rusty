@@ -7,7 +7,7 @@
 //! `all`'s arguments, nested `all` included), however rustfmt wraps it. `any(…)`
 //! and `not(…)` are never test-only: `any(test, x)` also compiles outside tests.
 
-use super::extent::attributes;
+use super::extent::{attributes, strip_comment, Open};
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Component, Path, PathBuf};
@@ -94,20 +94,32 @@ pub fn test_only_files<'a>(
 }
 
 /// The out-of-line modules `content` (the text of `file`) declares, each with
-/// whether its declaration is test-gated. Unresolvable declarations are skipped.
+/// whether its declaration is test-gated. A gate or `#[path]` holds across the
+/// comment, doc-comment and blank lines before its item, as in `extent::head`.
+/// Unresolvable declarations are skipped.
 fn declared_mods(file: &Path, content: &str) -> Vec<(PathBuf, bool)> {
     let lines: Vec<&str> = content.lines().collect();
     let mut out = Vec::new();
-    let mut i = 0;
+    let (mut i, mut gated, mut path) = (0, false, None::<String>);
     while i < lines.len() {
         let item = attributes(&lines[i..]);
-        if let Some(name) = outline_mod_name(item.code.trim()) {
-            let path = item.attrs.iter().find_map(|a| path_of(a));
-            if let Some(child) = resolve(file, name, path) {
-                out.push((child, item.attrs.iter().any(|a| gates(a))));
-            }
-        }
         i += item.line + 1;
+        gated |= item.attrs.iter().any(|a| gates(a));
+        path = path.or_else(|| {
+            item.attrs
+                .iter()
+                .find_map(|a| path_of(a))
+                .map(str::to_owned)
+        });
+        let code = strip_comment(item.code, &mut Open::None).trim();
+        if code.is_empty() {
+            continue;
+        }
+        if let Some(child) = outline_mod_name(code).and_then(|n| resolve(file, n, path.as_deref()))
+        {
+            out.push((child, gated));
+        }
+        (gated, path) = (false, None);
     }
     out
 }

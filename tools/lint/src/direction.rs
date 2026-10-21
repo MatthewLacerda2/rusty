@@ -8,9 +8,9 @@
 //! catches the transitive leaks this one-hop guard cannot; this guard still owns the
 //! external crates (`wgpu`, `egui`) the table does not model.
 //!
-//! Unlike the layering lint and the rules, it scans test code too (#1136): a sim
-//! module's tests that name the renderer would link `wgpu` into the sim's test
-//! build, so the arrow holds there as well.
+//! Unlike the layering lint and the rules that exempt test code, it scans test code
+//! too (#1136): the arrow is the same everywhere, and a sim module's tests stay
+//! runnable without a GPU or a window only while they never reach for the renderer.
 //!
 //! Usage: `cargo run --manifest-path tools/lint/Cargo.toml -- --direction`
 //! Exit code 1 on any violation; report mirrored to `.lint/report.txt`.

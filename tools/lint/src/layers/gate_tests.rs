@@ -99,3 +99,25 @@ fn declarations_read_in_memory_with_quoted_brackets_shared_lines_and_dotted_path
         ["dotted.rs", "fixture.rs", "quoted.rs", "up.rs"].map(|n| src.join(n))
     );
 }
+
+#[test]
+fn a_gate_holds_across_comments_and_blank_lines_until_its_item() {
+    let root = std::env::temp_dir().join(format!("lint_gap_{}", std::process::id()));
+    let src = root.join("src");
+    std::fs::create_dir_all(src.join("sub")).unwrap();
+    for name in ["commented", "live", "sub/moved"] {
+        std::fs::write(src.join(format!("{name}.rs")), "").unwrap();
+    }
+    let lib = "#[cfg(test)]\n// why it is gated\n/// A doc.\n\nmod commented;\n\
+               #[cfg(test)]\nfn f() {}\n\nmod live;\n\
+               #[cfg(test)]\n#[path = \"sub/moved.rs\"]\n// a comment\nmod moved;\n";
+    let lib_path = src.join("lib.rs");
+    let found = test_only_files(std::slice::from_ref(&lib_path), |p| {
+        (p == lib_path).then_some(lib)
+    });
+    std::fs::remove_dir_all(&root).ok();
+    assert_eq!(
+        found.into_iter().collect::<Vec<_>>(),
+        ["commented.rs", "sub/moved.rs"].map(|n| src.join(n))
+    );
+}

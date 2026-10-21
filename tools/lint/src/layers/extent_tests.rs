@@ -144,3 +144,11 @@ fn a_string_open_across_lines_hides_its_brackets() {
     assert_eq!(brackets("}\"#) // }", &mut open), ("}\"#) ", -1));
     assert_eq!(open, Open::None);
 }
+
+#[test]
+fn an_attribute_wrapped_past_a_dozen_lines_still_ends_on_its_brackets() {
+    let derive = format!("#[derive(\n{})]", "    A,\n".repeat(13));
+    let src =
+        format!("#[cfg(test)]\n{derive}\nfn f<T>(t: T)\nwhere\n    T: Clone,\n{{\n}}\nfn g() {{}}");
+    assert_eq!(end(&src, 1), 21);
+}

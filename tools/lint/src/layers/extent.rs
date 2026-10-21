@@ -57,7 +57,8 @@ pub struct Attributes<'a> {
 /// reader the scans share (#1136). Brackets count outside comments and literals
 /// (`scan`), so `#[doc = "a (b"]` closes where it should, and an attribute may
 /// share its line with the next one or with its item (`#[cfg(test)] use a::B;`).
-/// One that never closes within a few lines is read as code.
+/// An attribute ends on bracket depth alone, however many lines it wraps (a long
+/// `#[derive(…)]`); one that never closes is read as code.
 pub fn attributes<'a>(lines: &[&'a str]) -> Attributes<'a> {
     let mut item = Attributes {
         attrs: Vec::new(),
@@ -85,7 +86,7 @@ fn attribute<'a>(first: &'a str, next: &[&'a str]) -> Option<(String, usize, &'a
         return None;
     }
     let (mut depth, mut open, mut text) = (0i32, Open::None, String::new());
-    for (n, line) in std::iter::once(&first).chain(next).take(12).enumerate() {
+    for (n, line) in std::iter::once(&first).chain(next).enumerate() {
         let mut close = None;
         let code_end = scan(line, &mut open, |at, c| match c {
             _ if close.is_some() => {}

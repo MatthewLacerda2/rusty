@@ -3,9 +3,9 @@
 //! sim module importing a platform one, directly or through another module. The
 //! [`externs`] half checks each module's external crates against its row (#938).
 //!
-//! Test code is exempt, as in the rules (`make rules`); the direction and
-//! determinism guards scan it, since the sim → display arrow and the clock ban hold
-//! in tests too. The table also feeds [`sim_dirs`], the one sim set the direction
+//! Test code is exempt, by the one definition in `gate` that the rules exempting
+//! test code (`make rules`) also read; the direction and determinism guards scan
+//! it, since the sim → display arrow and the clock ban hold in tests too. The table also feeds [`sim_dirs`], the one sim set the direction
 //! guard scans, and [`platform_roots`], the only files the determinism gate lets
 //! opt out of clippy's clock ban.
 //!
