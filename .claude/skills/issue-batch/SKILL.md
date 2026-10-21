@@ -95,8 +95,15 @@ Read `.claude/skills/issue-batch/cloud-brief.md` and follow it.
 Issue(s): #N. Your brief is the newest comment on it that starts with `Brief`.
 ```
 
-A re-brief (a rebase, a fix, a new sibling) is a new `Brief` comment and a fresh
-routine, with "force-push authorised" when it works a pushed branch.
+A re-brief (a rebase, a fix, a new sibling) is a new `Brief` comment, with
+"force-push authorised" when it works a pushed branch, and the PR turned back to
+draft. **The coder's own session often takes it:** a cloud coder stays subscribed
+to its PR, and a review comment or the turn to draft wakes it, sometimes
+seconds later. A fresh routine launched beside it works the same branch twice
+(2026-10-20: #1108, #1124). So check its session first (`RemoteTrigger
+list_runs` on its routine). If it is still `active`, wait about five minutes, and
+launch a fresh routine only if it hasn't woken (`last_event_at` unchanged) or
+has ended.
 
 **The pull request is the report.** A cloud coder cannot message back; it opens a
 draft, pushes often, readies when its gates are green and ends. Watch the PR, not

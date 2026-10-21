@@ -52,9 +52,12 @@ And on demand: when the user asks for a PR to be reviewed, open or merged
 
 - **A fresh local agent**: the `Agent` tool with `subagent_type:
   "general-purpose"`. **Never `"fork"`**: a fork inherits the orchestrator's
-  context, and with it the bias this skill exists to avoid. No `isolation` and
-  no model override: it runs on the current model, Opus (read-only agents stay
-  on Opus, `issue-batch`, *Which model*).
+  context, and with it the bias this skill exists to avoid. **`isolation:
+  "worktree"`**: `code-review` checks the PR out to read it, and in the shared
+  main checkout that moved other agents' branch and left `prNNNN` branches
+  behind (three times in the 2026-10-20 batch). No model override: it runs on
+  the current model, Opus (read-only agents stay on Opus, `issue-batch`,
+  *Which model*).
 - **Read-only, and no build.** It reads the PR, the repository and the issue,
   and runs read-only commands (`gh pr view`, `gh pr diff`, `gh issue view`,
   `git show`). It makes no edits, commits, pushes or comments, and it does not
@@ -102,9 +105,10 @@ otherwise. Then run the `code-review` skill on PR #<n> (pass the PR number in
 its arguments) at that level, without `--comment` and without `--fix`. Called without it, the
 skill reviews the checkout's own local diff, which is not this PR: if what it
 reviewed is not `gh pr diff <n>`, discard its findings and review that diff
-yourself. The checkout is not on the PR's branch; read its files with
-`gh pr diff <n>` and `git show <head>:<path>`. You are read-only: no edits,
-commits, pushes or comments, and no builds.
+yourself. You run in your own worktree: check out or fetch what you need
+there, never in the main checkout (the repository root), which
+other agents share. You are read-only: no edits, commits, pushes or comments,
+and no builds.
 
 Look especially for: <the steering lists for the PR's nature, pasted whole>.
 
