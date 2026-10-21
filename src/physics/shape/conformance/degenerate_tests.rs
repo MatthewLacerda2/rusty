@@ -44,8 +44,11 @@ fn a_zero_sized_primitive_still_builds() {
 
 type Geometry = (Vec<[f32; 3]>, Vec<u32>);
 
-/// A bad mesh, and what a hull and a trimesh built from it come to.
-fn bad_meshes() -> Vec<(&'static str, Option<Geometry>, [Result<(), Skip>; 2])> {
+/// A bad mesh: what it is, its geometry, and what a hull and a trimesh built
+/// from it come to.
+type BadMesh = (&'static str, Option<Geometry>, [Result<(), Skip>; 2]);
+
+fn bad_meshes() -> Vec<BadMesh> {
     let tri = vec![[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]];
     let few = |have, need| Err(Skip::TooFewVertices { have, need });
     vec![

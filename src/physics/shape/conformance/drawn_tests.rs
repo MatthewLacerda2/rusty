@@ -112,6 +112,7 @@ fn what_is_drawn_is_what_collides() {
 }
 
 #[test]
+// lint: allow(skip) a known bug, the Sphere primitive is drawn at radius 1; #1187 un-ignores it
 #[ignore = "#1187"]
 fn a_drawn_sphere_is_what_collides() {
     drawn(&KINDS[1]).iter().for_each(check_everywhere);
