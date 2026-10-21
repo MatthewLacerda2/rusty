@@ -5,6 +5,8 @@
 pub(super) mod build;
 #[cfg(test)]
 mod build_tests;
+#[cfg(test)]
+mod conformance;
 pub(super) mod mesh;
 #[cfg(test)]
 mod mesh_tests;
