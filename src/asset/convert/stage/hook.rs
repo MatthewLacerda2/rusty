@@ -14,9 +14,13 @@ pub enum Step {
     Stamped,
 }
 
+/// What a test runs at each step.
+#[cfg(test)]
+type Hook = Box<dyn FnMut(Step)>;
+
 #[cfg(test)]
 thread_local! {
-    static HOOK: std::cell::RefCell<Option<Box<dyn FnMut(Step)>>> =
+    static HOOK: std::cell::RefCell<Option<Hook>> =
         const { std::cell::RefCell::new(None) };
 }
 
