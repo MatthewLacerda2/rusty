@@ -46,27 +46,30 @@ fn a_reader_between_the_swaps_steps_finds_a_whole_set() {
 fn a_second_conversion_waits_for_the_first() {
     let (dir, source, out) = cached();
     std::fs::write(&source, "three").unwrap();
-    let (done, waited) = std::sync::mpsc::channel();
-    let mut b = None;
-    let (b_source, b_out) = (source.clone(), out.clone());
+    let b = Rc::new(std::cell::RefCell::new(None));
+    let (slot, b_source, b_out) = (b.clone(), source.clone(), out.clone());
     hook::set(move |step| {
         if step == Step::GlbIn {
             // B, another thread as another process would be, converts "two".
-            let (source, out, done) = (b_source.clone(), b_out.clone(), done.clone());
-            b = Some(std::thread::spawn(move || {
+            let (source, out) = (b_source.clone(), b_out.clone());
+            let (done, finished) = std::sync::mpsc::channel();
+            let handle = std::thread::spawn(move || {
                 std::fs::write(&source, "two").unwrap();
-                done.send(refresh(&TEXTURED, &source, &out)).unwrap();
-            }));
-            let early = waited.recv_timeout(std::time::Duration::from_millis(200));
-            assert!(early.is_err(), "B ran between A's steps: {early:?}");
+                let result = refresh(&TEXTURED, &source, &out);
+                let _ = done.send(());
+                result
+            });
+            let early = finished.recv_timeout(std::time::Duration::from_millis(200));
+            assert!(early.is_err(), "B ran between A's steps");
+            *slot.borrow_mut() = Some(handle);
         }
     });
     let a = refresh(&TEXTURED, &source, &out);
     hook::unset();
     a.unwrap();
     // B converted after A, reading what is on disk by then.
-    let b_result = waited.recv().unwrap();
-    b_result.unwrap();
+    let handle = b.borrow_mut().take().expect("B started");
+    handle.join().unwrap().unwrap();
     assert_eq!(read_whole(&out), "two");
     assert_eq!(textures_dirs(&out).len(), 1, "{:?}", names(&dir));
 }
