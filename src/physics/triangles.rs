@@ -9,9 +9,8 @@
 use glam::Vec3;
 use rapier3d::prelude::*;
 
-use super::build::collider_inputs;
+use super::build::{build_shape_for, collider_inputs};
 use super::compound::world_pose;
-use super::mesh_shape::build_shape_for;
 use crate::scene::Scene;
 
 /// Segments around a round shape's circumference.

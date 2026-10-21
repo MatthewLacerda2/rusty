@@ -14,6 +14,7 @@ use crate::ecs::World;
 use crate::scene::Scene;
 
 use super::compound::world_pose;
+use super::mesh_shape::{build_mesh_shape, Skip};
 
 /// Body class derived from the entity flags. Mirrors the legacy solver's encoding:
 /// static (fixed), kinematic (position-driven), or dynamic (gravity + solver).
@@ -179,6 +180,29 @@ pub(super) fn body_state(scene: &Scene, id: u32) -> Option<EntityBodyState> {
     })
 }
 
+/// [`try_build_shape`] without the reason.
+#[cfg(test)]
+pub(super) fn build_shape(
+    shape: &ColliderShape,
+    scale: Vec3,
+    mesh: Option<(&[[f32; 3]], &[u32])>,
+) -> Option<Collider> {
+    try_build_shape(shape, scale, mesh).ok()
+}
+
+/// [`try_build_shape`] for collider entity `id`: a skipped mesh collider is logged once,
+/// naming the entity and the reason (#1141).
+pub(super) fn build_shape_for(
+    id: u32,
+    shape: &ColliderShape,
+    scale: Vec3,
+    mesh: Option<(&[[f32; 3]], &[u32])>,
+) -> Option<Collider> {
+    try_build_shape(shape, scale, mesh)
+        .map_err(|skip| log::warn!("[Physics] entity {id}: mesh collider skipped: {skip}"))
+        .ok()
+}
+
 /// Build a parry collider shape from the engine's `ColliderShape`, baking in the
 /// transform's (lossy, non-uniform) world scale the same way the legacy AABB did.
 /// A mirror (a negative axis: `scale.x` for a child, as glam splits its world matrix;
@@ -186,15 +210,13 @@ pub(super) fn body_state(scene: &Scene, id: u32) -> Option<EntityBodyState> {
 /// primitive's size, Unity-style: primitives size from `scale.abs()`, and only a
 /// mesh gets the signed scale and is reflected (#1124).
 ///
-/// Returns `None` for a mesh collider whose geometry is missing or degenerate
-/// (too few vertices for a hull, or no triangles for a trimesh); the caller skips
-/// the body entirely in that case, after a warning (#1132). `mesh` carries the entity's live rest-pose
-/// positions + triangle indices, supplied only for [`ColliderShape::Mesh`].
-pub(super) fn build_shape(
+/// A mesh collider that cannot be built is a [`Skip`] saying why (#1132, #1141).
+/// `mesh` is the entity's rest-pose positions + indices, for [`ColliderShape::Mesh`].
+pub(super) fn try_build_shape(
     shape: &ColliderShape,
     scale: Vec3,
     mesh: Option<(&[[f32; 3]], &[u32])>,
-) -> Option<Collider> {
+) -> Result<Collider, Skip> {
     let abs = scale.abs();
     let collider = match shape {
         ColliderShape::Box { size } => {
@@ -217,10 +239,10 @@ pub(super) fn build_shape(
             axis,
         } => capsule_builder(*radius, *height, *axis, abs).build(),
         ColliderShape::Mesh { convex, .. } => {
-            return super::mesh_shape::build_mesh_shape(*convex, scale, mesh?)
+            return build_mesh_shape(*convex, scale, mesh.ok_or(Skip::NoMesh)?)
         }
     };
-    Some(collider)
+    Ok(collider)
 }
 
 /// A capsule's rapier builder with the world scale baked in, Unity-style: the

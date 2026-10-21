@@ -4,8 +4,9 @@
 use glam::Vec3;
 use rapier3d::prelude::*;
 
-use super::build::build_shape;
+use super::build::{build_shape, try_build_shape};
 use super::build_tests::mesh_shape;
+use super::mesh_shape::Skip;
 use crate::components::ColliderShape;
 
 const TRIANGLE: [[f32; 3]; 3] = [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]];
@@ -83,4 +84,41 @@ fn four_collinear_points_form_no_convex_hull() {
     ];
     let mesh = Some((line.as_slice(), [0u32, 1, 2].as_slice()));
     assert!(build_shape(&mesh_shape(true), Vec3::ONE, mesh).is_none());
+}
+
+#[test]
+fn a_small_tile_far_from_the_origin_still_builds() {
+    let tile = [[1500.0, 0.0, 0.0], [1501.0, 0.0, 0.0], [1500.0, 0.0, 1.0]];
+    let mesh = Some((tile.as_slice(), [0u32, 1, 2].as_slice()));
+    assert!(build_shape(&mesh_shape(false), Vec3::ONE, mesh).is_some());
+}
+
+#[test]
+fn a_convex_hull_ignores_a_stale_index() {
+    let tetra = [
+        [0.0, 0.0, 0.0],
+        [1.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0],
+        [0.0, 0.0, 1.0],
+    ];
+    let mesh = Some((tetra.as_slice(), [0u32, 1, 99].as_slice()));
+    assert!(build_shape(&mesh_shape(true), Vec3::ONE, mesh).is_some());
+}
+
+#[test]
+fn each_skip_names_its_reason() {
+    let shape = mesh_shape(false);
+    let skip = |idx: &[u32], mesh: bool| {
+        let m = mesh.then_some((TRIANGLE.as_slice(), idx));
+        try_build_shape(&shape, Vec3::ONE, m).err()
+    };
+    assert_eq!(skip(&[0, 1, 2], false), Some(Skip::NoMesh));
+    assert_eq!(
+        skip(&[0, 1, 3], true),
+        Some(Skip::IndexOutOfRange {
+            index: 3,
+            vertices: 3
+        })
+    );
+    assert_eq!(skip(&[0, 1], true), Some(Skip::NoTriangles));
 }
