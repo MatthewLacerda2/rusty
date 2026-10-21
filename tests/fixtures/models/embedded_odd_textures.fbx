@@ -1,0 +1,114 @@
+; FBX 7.4.0 project file
+; The quad of `embedded_textures.fbx`, its embedded textures in formats the
+; `gltf` crate does not decode or names that don't say the format (#1082):
+; - "Red" has `body_d.tga`, a 1x1 TGA, and a normal map with no file name at
+;   all, only its element name `Material #25`, holding a PNG: kept as
+;   `Material__25.png`.
+; - "Blue" has `skin.png` holding JPEG bytes.
+; Both must import with their mesh, each texture extracted.
+FBXHeaderExtension:  {
+	FBXHeaderVersion: 1003
+	FBXVersion: 7400
+	Creator: "rusty test fixture"
+}
+Objects:  {
+	Geometry: 1000, "Geometry::Quad", "Mesh" {
+		Vertices: *12 {
+			a: 0,0,0,1,0,0,1,1,0,0,1,0
+		}
+		PolygonVertexIndex: *6 {
+			a: 0,1,-3,0,2,-4
+		}
+		GeometryVersion: 124
+		LayerElementUV: 0 {
+			Version: 101
+			Name: "UVMap"
+			MappingInformationType: "ByPolygonVertex"
+			ReferenceInformationType: "IndexToDirect"
+			UV: *8 {
+				a: 0,0,1,0,1,1,0,1
+			}
+			UVIndex: *6 {
+				a: 0,1,2,0,2,3
+			}
+		}
+		LayerElementMaterial: 0 {
+			Version: 101
+			Name: ""
+			MappingInformationType: "ByPolygon"
+			ReferenceInformationType: "IndexToDirect"
+			Materials: *2 {
+				a: 0,1
+			}
+		}
+		Layer: 0 {
+			Version: 100
+			LayerElement:  {
+				Type: "LayerElementUV"
+				TypedIndex: 0
+			}
+			LayerElement:  {
+				Type: "LayerElementMaterial"
+				TypedIndex: 0
+			}
+		}
+	}
+	Model: 2000, "Model::Quad", "Mesh" {
+		Version: 232
+	}
+	Material: 3000, "Material::Red", "" {
+		Version: 102
+		ShadingModel: "lambert"
+	}
+	Material: 3100, "Material::Blue", "" {
+		Version: 102
+		ShadingModel: "lambert"
+	}
+	Video: 4000, "Video::Red", "Clip" {
+		Type: "Clip"
+		Filename: "/missing/body_d.tga"
+		RelativeFilename: "body_d.tga"
+		Content: , "AAACAAAAAAAAAAAAAQABABgAAAD/"
+	}
+	Texture: 4100, "Texture::Red", "" {
+		Type: "TextureVideoClip"
+		Version: 202
+		TextureName: "Texture::Red"
+		FileName: "/missing/body_d.tga"
+		RelativeFilename: "body_d.tga"
+	}
+	Video: 5000, "Video::Blue", "Clip" {
+		Type: "Clip"
+		Filename: "/missing/skin.png"
+		RelativeFilename: "skin.png"
+		Content: , "/9j/4AAQSkZJRgAAAAAAAAAAAAD/2Q=="
+	}
+	Texture: 5100, "Texture::Blue", "" {
+		Type: "TextureVideoClip"
+		Version: 202
+		TextureName: "Texture::Blue"
+		FileName: "/missing/skin.png"
+		RelativeFilename: "skin.png"
+	}
+	Video: 6000, "Video::Material #25", "Clip" {
+		Type: "Clip"
+		Content: , "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC"
+	}
+	Texture: 6100, "Texture::Material #25", "" {
+		Type: "TextureVideoClip"
+		Version: 202
+		TextureName: "Texture::Material #25"
+	}
+}
+Connections:  {
+	C: "OO",2000,0
+	C: "OO",1000,2000
+	C: "OO",3000,2000
+	C: "OO",3100,2000
+	C: "OO",4000,4100
+	C: "OP",4100,3000, "DiffuseColor"
+	C: "OO",5000,5100
+	C: "OP",5100,3100, "DiffuseColor"
+	C: "OO",6000,6100
+	C: "OP",6100,3000, "NormalMap"
+}

@@ -18,7 +18,9 @@
 //! **When it is re-made.** A `<cache>.glb.source` stamp beside each cached file
 //! records the converter, its [`Converter::version`] and a digest of the source's
 //! bytes; any difference re-converts. Content, not timestamps: a fresh clone gives
-//! every file a new mtime, and a sim module reads no clock.
+//! every file a new mtime, and a sim module reads no clock. Files a conversion
+//! writes for the glTF to reference (FBX's embedded textures, #1082) live in
+//! [`textures_dir`] and are re-made with it.
 //!
 //! **Adding a converter** is one row in [`CONVERTERS`]: an extension and a
 //! function that writes a glTF to the path it is given.
@@ -42,7 +44,10 @@ pub struct Converter {
     pub name: &'static str,
     /// Bump when the converter's output changes, so every cached file re-makes.
     pub version: u32,
-    /// Read `source`, write a glTF (binary or not) at `out`.
+    /// Read `source`, write a glTF (binary or not) at `out`, each file through
+    /// [`write_atomic`]. Files the glTF references that the conversion makes (FBX's
+    /// embedded textures) go in [`textures_dir`]`(out)`, which it owns: a re-make
+    /// removes what it no longer writes there.
     pub convert: fn(source: &Path, out: &Path) -> Result<(), ImportError>,
 }
 
@@ -52,7 +57,8 @@ pub const CONVERTERS: &[Converter] = &[Converter {
     name: "ufbx",
     // 2: animation stacks become glTF animations (#1081).
     // 3: a rest pose splits like its keys, keeping a negative scale's signs (#1110).
-    version: 3,
+    // 4: embedded textures are extracted beside the `.glb` (#1082).
+    version: 4,
     convert: fbx::convert,
 }];
 
@@ -94,12 +100,7 @@ pub fn refresh(converter: &Converter, source: &Path, out: &Path) -> Result<(), I
     if let Some(dir) = out.parent() {
         std::fs::create_dir_all(dir).map_err(|e| write_error(dir, &e))?;
     }
-    // Written beside `out` and renamed into place, so a reader in another process
-    // never sees half a file.
-    // Still ending in `.glb`: an exporter may insist on its extension.
-    let partial = out.with_extension(format!("{}.partial.glb", std::process::id()));
-    (converter.convert)(source, &partial)?;
-    std::fs::rename(&partial, out).map_err(|e| write_error(out, &e))?;
+    (converter.convert)(source, out)?;
     std::fs::write(&stamp_path, stamp).map_err(|e| write_error(&stamp_path, &e))
 }
 
@@ -145,9 +146,35 @@ fn temp_path(path: &Path) -> PathBuf {
         .join(format!("{digest:016x}-{name}.glb"))
 }
 
+/// Write `bytes` at `path` beside it and rename them into place, so a reader in
+/// another process never sees half a file. The partial file still ends in `path`'s
+/// extension: an exporter may insist on its own.
+pub fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), ImportError> {
+    let partial = match path.extension() {
+        Some(ext) => format!("{}.{PARTIAL}.{}", std::process::id(), ext.to_string_lossy()),
+        None => format!("{}.{PARTIAL}", std::process::id()),
+    };
+    let partial = path.with_extension(partial);
+    std::fs::write(&partial, bytes).map_err(|e| write_error(&partial, &e))?;
+    std::fs::rename(&partial, path).map_err(|e| write_error(path, &e))
+}
+
+/// What marks a file [`write_atomic`] has not renamed into place yet.
+pub const PARTIAL: &str = "partial";
+
+/// The folder of files a conversion writes for the glTF at `out` to reference:
+/// `<out>.textures/`.
+pub fn textures_dir(out: &Path) -> PathBuf {
+    with_suffix(out, ".textures")
+}
+
 fn stamp_path(out: &Path) -> PathBuf {
-    let mut name = out.as_os_str().to_owned();
-    name.push(".source");
+    with_suffix(out, ".source")
+}
+
+fn with_suffix(path: &Path, suffix: &str) -> PathBuf {
+    let mut name = path.as_os_str().to_owned();
+    name.push(suffix);
     PathBuf::from(name)
 }
 

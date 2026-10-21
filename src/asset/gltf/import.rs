@@ -13,20 +13,22 @@
 //! `TRIANGLE_STRIP`, `TRIANGLE_FAN`) becomes a plain triangle list, and
 //! non-surface modes (`POINTS`/`LINES`/`LINE_*`) are skipped with a warning.
 
-use super::{anim, skin};
+use super::{anim, skin, uri};
 use crate::asset::mesh_data::{ImportedAsset, MaterialData, MeshVertex, SkinData, SubMesh};
 use crate::asset::ImportError;
 use gltf::mesh::Mode;
 use std::path::Path;
 
 /// Import a `.gltf` or `.glb` file into addressable sub-meshes + materials.
-/// `gltf::import` transparently handles embedded vs. external buffers and `.glb`.
+/// Only the buffers are read: images are never decoded here (the renderer decodes
+/// a texture by its path), so one the `gltf` crate can't decode, a TGA say, never
+/// fails the model (#1082).
 pub fn import(path: &Path) -> Result<ImportedAsset, ImportError> {
-    let (document, buffers, _images) =
-        gltf::import(path).map_err(|e| ImportError::Parse(e.to_string()))?;
-
-    // External texture URIs resolve relative to the glTF file's own directory.
+    let parse = |e: gltf::Error| ImportError::Parse(e.to_string());
+    let gltf::Gltf { document, blob } = gltf::Gltf::open(path).map_err(parse)?;
+    // External texture and buffer URIs resolve relative to the glTF file's own directory.
     let base_dir = path.parent().unwrap_or_else(|| Path::new(""));
+    let buffers = gltf::import_buffers(&document, Some(base_dir), blob).map_err(parse)?;
     let materials = document
         .materials()
         .map(|m| material_data(m, base_dir))
@@ -91,11 +93,14 @@ fn material_data(material: gltf::Material, base_dir: &Path) -> MaterialData {
 /// directory. Only the EXTERNAL-URI case is handled: an embedded image
 /// (`Source::View`, a buffer view / data URI) returns `None` — extracting its pixels
 /// to disk is a documented follow-up, out of scope for #203. The URI is
-/// percent-decoded for the trivial `%20` (space) case; anything else is used as-is.
+/// percent-decoded (`uri`); one that doesn't decode is warned about and dropped.
 fn texture_path(texture: &gltf::Texture, base_dir: &Path) -> Option<String> {
     match texture.source().source() {
         gltf::image::Source::Uri { uri, .. } => {
-            let decoded = uri.replace("%20", " ");
+            let Some(decoded) = uri::decode(uri) else {
+                log::warn!("[Asset] glTF texture URI `{uri}` is not valid percent-encoding");
+                return None;
+            };
             Some(base_dir.join(decoded).to_string_lossy().into_owned())
         }
         // Embedded image: no on-disk path to reference (follow-up).

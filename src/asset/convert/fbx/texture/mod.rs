@@ -1,0 +1,203 @@
+//! An FBX texture as a URI the written `.glb` can reference (#1082).
+//!
+//! A texture that is a file on disk is referenced where it lies. One embedded in
+//! the FBX (`ufbx::Texture::content`: Mixamo and many store packs embed them) is
+//! extracted into [`convert::textures_dir`] beside the `.glb`, the way Unity
+//! extracts them on import, and referenced there. File names are sanitised and kept
+//! distinct, and [`Textures::finish`] removes what an earlier conversion left. Every
+//! URI is percent-encoded (`gltf::uri`): the folder is named after the source file,
+//! which may hold a `:` or a `%`.
+
+use super::super as convert;
+use crate::asset::gltf::uri;
+use crate::asset::{ImportError, IMAGE_EXTENSIONS};
+use crate::core::collections::Map;
+use crate::core::paths;
+use std::path::{Component, Path, PathBuf};
+
+/// Every texture one conversion references, by FBX element id.
+pub struct Textures {
+    /// Where the `.glb` is written: URIs are relative to it.
+    out_dir: PathBuf,
+    /// Where embedded textures are extracted.
+    dir: PathBuf,
+    by_id: Map<u32, Option<String>>,
+    /// File names extracted into `dir` so far.
+    written: Vec<String>,
+}
+
+impl Textures {
+    /// The textures of the `.glb` written at `out`.
+    pub fn new(out: &Path) -> Self {
+        Self {
+            out_dir: out.parent().unwrap_or_else(|| Path::new("")).to_path_buf(),
+            dir: convert::textures_dir(out),
+            by_id: Map::default(),
+            written: Vec::new(),
+        }
+    }
+
+    /// The URI of `map`'s texture, extracting it on first use when it is embedded.
+    pub fn uri(&mut self, map: &ufbx::MaterialMap) -> Option<String> {
+        let texture = map.texture.as_ref()?;
+        let id = texture.element.element_id;
+        if let Some(uri) = self.by_id.get(&id) {
+            return uri.clone();
+        }
+        let uri = self.resolve(texture);
+        self.by_id.insert(id, uri.clone());
+        uri
+    }
+
+    fn resolve(&mut self, texture: &ufbx::Texture) -> Option<String> {
+        let on_disk = [&texture.filename, &texture.absolute_filename]
+            .into_iter()
+            .map(|name| PathBuf::from(name.as_ref() as &str))
+            .find(|path| !path.as_os_str().is_empty() && path.is_file());
+        if let Some(file) = on_disk {
+            return relative_uri(&self.out_dir, &file);
+        }
+        if texture.content.is_empty() {
+            log::warn!(
+                "[Asset] FBX texture `{}` is neither a file on disk nor embedded",
+                texture.element.name
+            );
+            return None;
+        }
+        let (stem, ext) = file_name(raw_name(texture), &texture.content);
+        if !IMAGE_EXTENSIONS.contains(&ext.as_str()) {
+            log::warn!(
+                "[Asset] FBX texture `{}` embeds a `.{ext}`, not an image format the importer reads; skipped",
+                texture.element.name
+            );
+            return None;
+        }
+        let name = unique(&stem, &ext, &self.written);
+        match self.extract(&name, &texture.content) {
+            Ok(()) => {
+                let dir = self.dir.file_name()?.to_string_lossy().into_owned();
+                self.written.push(name.clone());
+                Some(uri::encode_path(&format!("{dir}/{name}")))
+            }
+            Err(e) => {
+                log::warn!("[Asset] FBX texture `{}`: {e}", texture.element.name);
+                None
+            }
+        }
+    }
+
+    fn extract(&self, name: &str, bytes: &[u8]) -> Result<(), ImportError> {
+        std::fs::create_dir_all(&self.dir)
+            .map_err(|e| ImportError::Parse(format!("writing {}: {e}", self.dir.display())))?;
+        convert::write_atomic(&self.dir.join(name), bytes)
+    }
+
+    /// Remove what the textures folder holds that this conversion did not write
+    /// (another process's file not yet renamed into place aside), and the folder
+    /// itself when nothing is left in it.
+    pub fn finish(&self) {
+        let Ok(entries) = std::fs::read_dir(&self.dir) else {
+            return;
+        };
+        let partial = format!(".{}.", convert::PARTIAL);
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            if !self.written.contains(&name) && !name.contains(&partial) {
+                let _ = std::fs::remove_file(entry.path());
+            }
+        }
+        // Fails, as it should, while anything is still in it.
+        let _ = std::fs::remove_dir(&self.dir);
+    }
+}
+
+/// The name `texture`'s file goes by: its file name, else its element name.
+fn raw_name(texture: &ufbx::Texture) -> &str {
+    [&texture.relative_filename, &texture.filename]
+        .into_iter()
+        .map(|name| name.as_ref() as &str)
+        .find(|name| !name.is_empty())
+        .unwrap_or(texture.element.name.as_ref())
+}
+
+/// The sanitised stem and lowercase extension of the file `raw` names, holding
+/// `bytes`: only ASCII letters, digits, `-`, `_` and inner `.`, so no separator,
+/// `..` or URI escape survives. A name without an image extension whose bytes are
+/// a PNG or a JPEG gets that extension (`Material #25` → `Material__25.png`).
+fn file_name(raw: &str, bytes: &[u8]) -> (String, String) {
+    // FBX paths are often Windows ones: split on both separators.
+    let base = raw.rsplit(['/', '\\']).next().unwrap_or(raw);
+    let (stem, ext) = base.rsplit_once('.').unwrap_or((base, ""));
+    let ext = clean(ext).to_ascii_lowercase();
+    let (stem, ext) = match sniff(bytes) {
+        Some(sniffed) if !IMAGE_EXTENSIONS.contains(&ext.as_str()) => {
+            (clean(base), sniffed.to_string())
+        }
+        _ => (clean(stem), ext),
+    };
+    let stem = if stem.is_empty() {
+        "texture".to_string()
+    } else {
+        stem
+    };
+    (stem, ext)
+}
+
+/// `s` with every character but ASCII letters, digits, `-`, `_` and `.` made `_`,
+/// and no leading or trailing `.`.
+fn clean(s: &str) -> String {
+    let s: String = s
+        .chars()
+        .map(|c| match c {
+            'a'..='z' | 'A'..='Z' | '0'..='9' | '-' | '_' | '.' => c,
+            _ => '_',
+        })
+        .collect();
+    s.trim_matches('.').to_string()
+}
+
+/// The extension `bytes`' magic number says they are, for the formats a name
+/// alone may not tell: PNG and JPEG.
+fn sniff(bytes: &[u8]) -> Option<&'static str> {
+    if bytes.starts_with(b"\x89PNG\r\n\x1a\n") {
+        Some("png")
+    } else if bytes.starts_with(&[0xFF, 0xD8, 0xFF]) {
+        Some("jpg")
+    } else {
+        None
+    }
+}
+
+/// `<stem>.<ext>`, or `<stem>.1.<ext>`, … when a name already `taken` matches it
+/// ignoring case (a macOS disk would make the two one file).
+fn unique(stem: &str, ext: &str, taken: &[String]) -> String {
+    let free = |name: &str| !taken.iter().any(|t| t.eq_ignore_ascii_case(name));
+    let base = format!("{stem}.{ext}");
+    if free(&base) {
+        return base;
+    }
+    (1..)
+        .map(|n| format!("{stem}.{n}.{ext}"))
+        .find(|name| free(name))
+        .unwrap_or(base)
+}
+
+/// `target` as a `/`-separated, percent-encoded URI from directory `from`, both
+/// resolved first.
+pub fn relative_uri(from: &Path, target: &Path) -> Option<String> {
+    let from = paths::canonicalize(from).ok()?;
+    let target = paths::canonicalize(target).ok()?;
+    let from: Vec<Component> = from.components().collect();
+    let target: Vec<Component> = target.components().collect();
+    let shared = from.iter().zip(&target).take_while(|(a, b)| a == b).count();
+    let up = std::iter::repeat_n("..".to_string(), from.len() - shared);
+    let down = target[shared..]
+        .iter()
+        .map(|c| c.as_os_str().to_string_lossy().into_owned());
+    Some(uri::encode_path(
+        &up.chain(down).collect::<Vec<_>>().join("/"),
+    ))
+}
+
+#[cfg(test)]
+mod tests;

@@ -4,6 +4,7 @@
 pub mod anim;
 pub mod import;
 pub mod skin;
+pub mod uri;
 
 #[cfg(test)]
 mod import_tests;
