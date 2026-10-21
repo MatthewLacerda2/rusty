@@ -30,12 +30,13 @@ pub enum ScaledShape {
         radius: f32,
         axis: CapsuleAxis,
     },
-    /// A mesh's local bounds times the signed scale: two opposite corners, not
-    /// necessarily min and max. The rapier shape is built from the vertices.
+    /// A mesh's local bounds times the signed scale: two opposite corners `a`
+    /// and `b`, unordered under a negative scale (not a min and a max). The
+    /// rapier shape is built from the vertices.
     Mesh {
         convex: bool,
-        min: Vec3,
-        max: Vec3,
+        a: Vec3,
+        b: Vec3,
     },
 }
 
@@ -55,7 +56,7 @@ impl ScaledShape {
                 radius,
                 axis,
             } => Vec3::splat(radius) + axis.unit() * half_segment,
-            Self::Mesh { min, max, .. } => return (min, max),
+            Self::Mesh { a, b, .. } => return (a, b),
         };
         (-half, half)
     }
@@ -94,8 +95,8 @@ impl ColliderShape {
                 local_max,
             } => ScaledShape::Mesh {
                 convex,
-                min: local_min * scale,
-                max: local_max * scale,
+                a: local_min * scale,
+                b: local_max * scale,
             },
         }
     }

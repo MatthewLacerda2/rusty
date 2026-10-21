@@ -101,9 +101,10 @@ impl Pose {
 /// Then this rotation times the parent's signed scale times the child's own
 /// scale is the child's world matrix, which is how physics poses a body and IK a
 /// bone. [`local_rotation`] is its exact inverse; an unmirrored parent gives the
-/// plain product, bit for bit.
+/// plain product, bit for bit. A degenerate parent (a zero scale axis)
+/// contributes no rotation ([`parent_rotation`]), so the result is never NaN.
 pub fn world_rotation(parent_world: Mat4, rotation: Quat) -> Quat {
-    let (_, parent_rot, _) = parent_world.to_scale_rotation_translation();
+    let parent_rot = parent_rotation(parent_world);
     (parent_rot * through_mirror(parent_world, rotation)).normalize()
 }
 
@@ -112,7 +113,7 @@ pub fn world_rotation(parent_world: Mat4, rotation: Quat) -> Quat {
 /// from a bone and written back leaves its local pose as it was, mirrored parent
 /// or not (#1119).
 pub fn local_rotation(parent_world: Mat4, world_rot: Quat) -> Quat {
-    let (_, parent_rot, _) = parent_world.to_scale_rotation_translation();
+    let parent_rot = parent_rotation(parent_world);
     through_mirror(parent_world, parent_rot.inverse() * world_rot).normalize()
 }
 
@@ -156,6 +157,18 @@ pub fn mirrored_direction(mirror: Vec3, dir: Vec3) -> Vec3 {
 pub fn mirrored_frame_axes(mirror: Vec3, x: Vec3, y: Vec3) -> (Vec3, Vec3) {
     let sense = mirror.x * mirror.y * mirror.z;
     (sense * (mirror * x), mirror * y)
+}
+
+/// The rotation glam splits out of `parent_world`, or identity when the matrix
+/// is degenerate: a zero scale axis has no direction, and glam divides by it,
+/// giving a NaN rotation that would poison every pose and AABB below it (#1140).
+fn parent_rotation(parent_world: Mat4) -> Quat {
+    let (_, rot, _) = parent_world.to_scale_rotation_translation();
+    if rot.is_finite() {
+        rot
+    } else {
+        Quat::IDENTITY
+    }
 }
 
 /// `rotation` seen through a mirroring parent's reflection, `F·R·F`: a rotation

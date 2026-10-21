@@ -112,7 +112,6 @@ fn draw_entity_inspector(
             ui,
             world,
             selected_id,
-            cx.parent_mat,
             &cx.selected_parent_name,
             &cx.valid_parents,
             &mut pending.parent_change,

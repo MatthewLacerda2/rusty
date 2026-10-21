@@ -27,6 +27,8 @@ mod compound;
 #[cfg(test)]
 mod compound_tests;
 mod convert;
+#[cfg(test)]
+mod degenerate_parent_tests;
 mod follow;
 mod joints;
 #[cfg(test)]

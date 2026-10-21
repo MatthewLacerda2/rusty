@@ -82,7 +82,7 @@ impl NavigationGraph {
                 self.integrate(scene, t, Vec3::new(v.x, 0.0, v.y), delta_time);
             }
             // Keep entity's collider bounds aligned with transform positioning
-            // (local matrix only — the legacy path never resolved the parent here).
+            // (the local pose only, parent not resolved here: #1153).
             let local = scene.world.transform(t.id).map(|t| t.pose());
             if let (Some(local), Some(mut col)) = (local, scene.world.collider_mut(t.id)) {
                 let (min, max) = col.calculate_world_aabb(local);
