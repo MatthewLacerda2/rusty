@@ -45,11 +45,11 @@ fn scene_format_matches_its_fingerprint() {
     let added: Vec<_> = new.difference(&old).map(|l| format!("  + {l}")).collect();
     panic!(
         "the scene file format changed:\n{}\n{}\n\n\
-         This changes what saved scenes and prefabs hold. Decide whether files already \
-         saved need a migration (a renamed or retyped field no longer loads as it was); \
-         then update {FINGERPRINT} with\n  \
+         This changes what saved scenes and prefabs hold. No migration is owed \
+         (CLAUDE.md, *No backward compatibility*): update the engine's fixtures and \
+         the default scene, then update {FINGERPRINT} with\n  \
          RUSTY_BLESS_SCENE_FORMAT=1 cargo nextest run -E 'test(scene_format)'\n\
-         and say in the PR which you chose.",
+         and say in the PR what changed.",
         removed.join("\n"),
         added.join("\n"),
     );

@@ -403,9 +403,10 @@ should: prefer `with=` or completing the example over `no-run`.
 file holds. A serde tracer walks `SceneData`'s read side (every field, every enum
 variant, legacy aliases included) into `tests/scene_format/scene.fingerprint`, one
 `path: kind` line per place a file can hold a value. A renamed, retyped, added or
-removed field or variant fails the test, which lists the changed lines and asks
-whether files already saved need a migration. Decide, say so in the PR, then
-re-bless by name: `RUSTY_BLESS_SCENE_FORMAT=1 cargo nextest run -E
+removed field or variant fails the test, which lists the changed lines. Files
+already saved need no migration (CLAUDE.md, *No backward compatibility*): update the
+engine's fixtures and the default scene, say what changed in the PR, then re-bless by
+name: `RUSTY_BLESS_SCENE_FORMAT=1 cargo nextest run -E
 'test(scene_format)'`. What serde hides from the tracer (a `#[serde(flatten)]`
 struct's own fields, a type that parses a whole `serde_json::Value`) is listed by
 hand in `hidden.rs`; an unlisted flatten struct fails the test by name.

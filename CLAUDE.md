@@ -257,12 +257,11 @@ the ones tooling or a past mistake depends on.
 - **Every issue Claude files unprompted carries the `agent` label.** It says only who
   decided to file it, and never stops work.
 - **The approval test.** A finding is filed with `planning`, and never folded in, when
-  it:
-  - changes a scene, prefab or save format, or another stored format;
-  - needs a migration; or
-  - changes how an existing game behaves.
+  it changes the engine's design (the five kinds, the one API surface, the
+  determinism rule) or a convention in this file. A stored format is not on the list:
+  it changes freely (*No backward compatibility*, below).
 - **Bug and doc fixes merge without waiting.** They are filed without `planning` and
-  merged like any other ready PR, even when the fix changes how an existing scene plays.
+  merged like any other ready PR, even when the fix changes how a scene plays.
   **Guard:** a change to the five kinds, the one API surface or the determinism rule
   never slips in under a `bug` label; it is a decision, and goes through the test above.
 - **Decisions are written down, not waited on.** An issue that needs a decision states
@@ -376,6 +375,14 @@ dependency pinned to a commit (#413; `deny.toml` requires a `rev` on every git d
 only its adapter (Lua → zimmer document, file writes, patch-path resolution).
 
 ## Conventions that matter
+- **No backward compatibility; everything is version 1** (the operator, 2026-10-20).
+  No game has been built on rusty yet, so nothing saved has to keep loading. A stored
+  format (scene, prefab, save, asset sidecar) changes freely, with no migration, no
+  compatibility shim, no legacy alias and no format-version bump. A PR that changes one
+  updates the engine's own fixtures and the default scene in the same change.
+  `Converter::version` is not a format version: it only tells the import cache to
+  re-make its files, and still bumps when a converter's output changes. When games
+  exist, the operator revisits this rule.
 - **Unity is the reference; rusty is a deliberate subset.** Use Unity Engine as the
   yardstick for what rusty *must* be capable of. Unity is exhaustive, so we implement
   only the subset a game actually needs — never feature-for-feature parity. The twist is

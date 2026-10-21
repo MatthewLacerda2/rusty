@@ -127,7 +127,8 @@ Paste every list whose trigger the PR hits.
 - **API surface**: `docs/api/` matches what the code does, not only what exists;
   errors a script can trigger reach the console instead of a panic; argument
   shapes match the namespace's siblings; the editor can do the same thing.
-- **Stored format / determinism**: old files still load; what is saved is
+- **Stored format / determinism**: no migration, legacy alias or compatibility
+  shim is added (CLAUDE.md, *No backward compatibility*); what is saved is
   references and values, never GPU or derived state; iteration order, clocks
   and RNG seeds in anything the sim reads; the same seed and inputs give the
   same frames.
