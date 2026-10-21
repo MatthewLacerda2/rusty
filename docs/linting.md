@@ -180,10 +180,13 @@ new flag, gate, CI step or baseline.
   `// lint: allow(skip) a timing measurement, run by hand` right above it.
 - **Test code**, for every rule in this list that says it, is one classifier
   (`rules/test_code.rs`, #1068): all of `tests/`, every `tests.rs` / `*_tests.rs`,
-  and a file's lines from its first `#[cfg(test)]` or `#[cfg(all(…, test, …))]` on
-  (`test` anywhere among `all`'s arguments, the attribute wrapped or not), scanning
-  only `src/` and `tests/`. `any(test, …)` is not test-only, so it stays
-  production code. The layering lint and the clippy test exemption classify their own way.
+  and the item under each `#[cfg(test)]` or `#[cfg(all(…, test, …))]` (`test`
+  anywhere among `all`'s arguments, the attribute wrapped or not), scanning only
+  `src/` and `tests/`. A gate covers its own item and no more (#1113): a
+  `mod tests { … }` to its closing brace, a `use` or `fn` to its end, the item's
+  extent found the way the layering lint finds it (`layers::item_end`); production
+  code below a gated `use` stays production code. `any(test, …)` is not test-only,
+  so it stays production code. The layering lint and the clippy test exemption classify their own way.
 - **`test-inner-cfg`, `test-user-workspace`, `test-gpu-entry`** (#980) — three
   `docs/testing.md` locks on test code; comment lines never count. A `tests/` file never gates itself with an inner `#![cfg(…)]` (gate
   its `mod` line); test code never calls `in_user_workspace` or `scenario::run(`

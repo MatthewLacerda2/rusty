@@ -18,11 +18,9 @@ const CALL: &str = "std::env::temp_dir()";
 
 /// Every `std::env::temp_dir()` call in the test code of `path`.
 pub fn check_file(path: &str, source: &str) -> Vec<Finding> {
-    let Some(first) = test_code::first_line(path, source) else {
-        return Vec::new();
-    };
+    let test = test_code::test_lines(path, source);
     let mut found = Vec::new();
-    for (i, line) in source.lines().enumerate().skip(first) {
+    for (i, line) in source.lines().enumerate().filter(|(i, _)| test[*i]) {
         let code = line.trim_start();
         if !code.starts_with("//") && line.contains(CALL) {
             found.push(Finding {

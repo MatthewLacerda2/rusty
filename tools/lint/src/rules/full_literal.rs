@@ -45,12 +45,10 @@ impl Components {
 
     /// Every full literal of a component in the test code of `path`.
     pub fn check(&self, path: &str, source: &str) -> Vec<Finding> {
-        let Some(first) = test_code::first_line(path, source) else {
-            return Vec::new();
-        };
+        let test = test_code::test_lines(path, source);
         let lines: Vec<&str> = source.lines().map(strip_comment).collect();
         let mut found = Vec::new();
-        for (i, line) in lines.iter().enumerate().skip(first) {
+        for (i, line) in lines.iter().enumerate().filter(|(i, _)| test[*i]) {
             for (name, fields) in &self.0 {
                 for at in literal_starts(line, name) {
                     let named = literal_fields(&lines[i..], &line[at..]);

@@ -93,3 +93,14 @@ fn cfg_all_with_test_last_or_wrapped_is_test_code() {
     let not = format!("#[cfg(all(feature = \"dev\", not(test)))]\nfn f() {{ {full}; }}\n");
     assert!(lines("src/physics/build.rs", &not).is_empty());
 }
+
+#[test]
+fn a_gated_item_is_test_code_and_the_lines_below_it_are_not() {
+    let full = "ColliderComponent { shape, is_trigger, active }";
+    let src = format!(
+        "#[cfg(test)]\nuse crate::x::Helper;\nfn f() -> ColliderComponent {{\n    {full}\n}}\n\
+         #[cfg(test)]\nfn helper(\n    a: u32,\n) {{\n    {full};\n}}\nfn g() {{ {full}; }}\n\
+         #[cfg(test)]\nmod tests {{\n    fn t() {{ {full}; }}\n}}\n"
+    );
+    assert_eq!(lines("src/physics/build.rs", &src), [10, 15]);
+}

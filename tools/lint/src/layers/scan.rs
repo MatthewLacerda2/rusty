@@ -153,33 +153,46 @@ pub fn refs(content: &str) -> Vec<Ref> {
 /// The lines of `content` that are live (non-test) code, numbered from 1, each with
 /// its `//` comment stripped. Shared with the external-crate scan.
 pub fn live_lines(content: &str) -> Vec<(usize, &str)> {
+    let lines: Vec<&str> = content.lines().collect();
     let mut out = Vec::new();
-    let mut skip_item = false;
-    let mut depth = 0i32;
-    for (i, raw) in content.lines().enumerate() {
-        let code = strip_comment(raw);
-        let trimmed = code.trim();
-        if !skip_item && is_test_cfg(trimmed) {
-            skip_item = true;
-        }
-        if skip_item {
-            depth += brace_delta(code);
-            if depth <= 0 && trimmed.ends_with([';', '}', ',']) {
-                skip_item = false;
-                depth = 0;
-            }
+    let mut i = 0;
+    while i < lines.len() {
+        let code = strip_comment(lines[i]);
+        if is_test_cfg(code.trim()) {
+            i = item_end(&lines, i) + 1;
             continue;
         }
         out.push((i + 1, code));
+        i += 1;
     }
     out
 }
 
-fn brace_delta(code: &str) -> i32 {
+/// The index of the last line of the item starting at `lines[from]` (its
+/// attributes included): where its brackets balance again on a line ending in `;`,
+/// `}` or `,`. A `mod x { … }` ends at its closing brace, a `use` at its `;`, a
+/// gated struct field at its `,`; the end of `lines` closes an item that never
+/// ends. Shared with the rules' test-code classifier (`rules/test_code.rs`).
+pub fn item_end(lines: &[&str], from: usize) -> usize {
+    let mut depth = 0i32;
+    for (i, raw) in lines.iter().enumerate().skip(from) {
+        let code = strip_comment(raw);
+        depth += bracket_delta(code);
+        if depth <= 0 && code.trim_end().ends_with([';', '}', ',']) {
+            return i;
+        }
+    }
+    lines.len().saturating_sub(1)
+}
+
+/// Opened minus closed brackets of every kind in `code`. String literals are not
+/// skipped: a raw string spans lines and holds quotes, so per-line string tracking
+/// misreads it, while the brackets inside one almost always balance.
+fn bracket_delta(code: &str) -> i32 {
     code.chars()
         .map(|c| match c {
-            '{' => 1,
-            '}' => -1,
+            '{' | '(' | '[' => 1,
+            '}' | ')' | ']' => -1,
             _ => 0,
         })
         .sum()

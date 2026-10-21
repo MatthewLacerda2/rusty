@@ -71,3 +71,10 @@ fn cfg_all_with_test_last_or_wrapped_is_test_code() {
     let not = format!("#[cfg(all(feature = \"dev\", not(test)))]\nmod m {{\n{call}}}\n");
     assert!(rules("src/dev/a.rs", &not).is_empty());
 }
+
+#[test]
+fn production_below_a_gated_use_is_not_test_code() {
+    let src = "#[cfg(test)]\nuse crate::x::Helper;\nfn cli() { scenario::run(&p, &o); }\n\
+               #[cfg(test)]\nmod tests {\n    fn t() { scenario::run(&p, &o); }\n}\n";
+    assert_eq!(rules("src/dev/scenario.rs", src), [(6, USER_WORKSPACE)]);
+}

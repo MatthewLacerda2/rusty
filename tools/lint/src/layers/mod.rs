@@ -18,6 +18,8 @@ mod table;
 #[cfg(test)]
 mod tests;
 
+/// One item's extent, shared with the rules' test-code classifier.
+pub use scan::item_end;
 use std::fs;
 use std::path::Path;
 use std::process::exit;
