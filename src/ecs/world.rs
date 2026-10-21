@@ -27,7 +27,7 @@ use crate::components::Entity;
 
 use super::bundle::{build_bundle, Core};
 use super::handles::Handles;
-use super::world_space::WorldStore;
+use super::world_space::{BoundsQueue, WorldStore};
 
 pub(in crate::ecs) use hecs::{Ref, RefMut};
 
@@ -44,6 +44,8 @@ pub struct World {
     next_seq: u64,
     /// Every entity's world matrix, dirty-flagged (`ecs::world_space`).
     pub(super) world_space: WorldStore,
+    /// The moved entities whose colliders' AABBs are due a refresh (`ecs::world_space`).
+    pub(super) bounds: BoundsQueue,
 }
 
 impl Default for World {
@@ -61,6 +63,7 @@ impl World {
             next_id: 1,
             next_seq: 0,
             world_space: WorldStore::default(),
+            bounds: BoundsQueue::default(),
         }
     }
 
@@ -106,9 +109,12 @@ impl World {
         self.world_space.invalidate_all(); // an orphan may already name this id as parent
     }
 
-    /// Despawn an entity by stable id.
+    /// Despawn an entity by stable id: its children then read as roots, it as identity.
     pub fn despawn(&mut self, id: u32) {
-        self.world_space.invalidate_all(); // whatever named it as parent now reads as a root
+        for child in self.children(id) {
+            self.moved(child);
+        }
+        self.moved(id);
         if let Some(handle) = self.handles.remove(id) {
             let _ = self.inner.despawn(handle);
         }
@@ -123,6 +129,7 @@ impl World {
         self.next_id = 1;
         self.next_seq = 0;
         self.world_space.reset();
+        self.bounds = BoundsQueue::default();
     }
 
     pub fn contains(&self, id: u32) -> bool {
@@ -263,7 +270,7 @@ impl World {
         let handle = self.inner.spawn(builder.build());
         self.handles.insert(id, handle);
         self.order.push(id);
-        self.world_space.mark_dirty(id);
+        self.world_space.moved(id);
     }
 
     /// Decompose an `Entity` document and overwrite a LIVE entity's whole

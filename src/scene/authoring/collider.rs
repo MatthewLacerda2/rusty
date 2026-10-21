@@ -8,11 +8,12 @@
 //! for both surfaces.
 //!
 //! Each op takes `&mut ColliderComponent`; the caller's accessor
-//! (`world.collider_mut(id)`) carries the no-op-when-absent semantics (#344).
+//! (`world.collider_mut(id)`) carries the no-op-when-absent semantics (#344), and
+//! refreshes the world AABB when the edit lands (`ecs::world_space::collider`).
 //!
 //! Pure.
 
-use crate::components::{ColliderComponent, ColliderShape, PhysicsMaterial, Pose};
+use crate::components::{ColliderComponent, ColliderShape, PhysicsMaterial};
 
 /// Set the collider's `active` flag.
 pub fn set_active(c: &mut ColliderComponent, active: bool) {
@@ -22,14 +23,6 @@ pub fn set_active(c: &mut ColliderComponent, active: bool) {
 /// Set the collider's `is_trigger` flag.
 pub fn set_trigger(c: &mut ColliderComponent, is_trigger: bool) {
     c.is_trigger = is_trigger;
-}
-
-/// Refresh the collider's cached world AABB for its entity's new world `pose` —
-/// what the Transform card does after a move, so the cache never lags an edit.
-pub fn refresh_aabb(c: &mut ColliderComponent, pose: Pose) {
-    let (min, max) = c.calculate_world_aabb(pose);
-    c.aabb_min = min;
-    c.aabb_max = max;
 }
 
 /// Replace the collider's shape (variant + extents). The card builds the new shape

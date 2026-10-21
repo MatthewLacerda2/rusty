@@ -34,4 +34,4 @@ mod world_space;
 pub use access::{CompMut, CompRef};
 pub use descendants::Descendants;
 pub use world::World;
-pub use world_space::TransformMut;
+pub use world_space::{ColliderMut, TransformMut};

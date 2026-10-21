@@ -82,7 +82,7 @@ fn warn_missing_uvs(static_meshes: usize, lightmaps: usize) {
 pub const UNSAVED: &str = "save the scene before baking lightmaps";
 
 /// The static scene flattened for the bake: owned data, free of the ECS.
-pub fn gather_bake_input(scene: &mut Scene) -> BakeScene {
+pub fn gather_bake_input(scene: &Scene) -> BakeScene {
     BakeScene::gather(scene, &texture_average)
 }
 

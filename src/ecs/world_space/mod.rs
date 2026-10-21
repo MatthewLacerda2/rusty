@@ -16,10 +16,15 @@
 //! - [`World::set_world_position`] and [`World::set_world_rotation`], which under a
 //!   singular parent keep the local value they cannot solve for, as Unity does (#1164).
 //!
-//! A write is a [`TransformMut`] landing (`write.rs`): its subtree goes dirty and every
-//! collider in it takes its world AABB from the new pose (#1157). Re-parenting, a
-//! despawn and a document insert invalidate what they re-point.
+//! A write is a [`TransformMut`] landing (`write.rs`), O(1): its subtree goes dirty before
+//! the next read, and its colliders' AABBs are due a refresh (`bounds.rs`), which
+//! [`World::collider_bounds`] never reads stale (#1157). Re-parenting and a despawn queue
+//! what they re-point the same way; a document insert invalidates every slot.
 
+mod bounds;
+mod collider;
+#[cfg(test)]
+mod queue_tests;
 mod store;
 #[cfg(test)]
 mod tests;
@@ -31,6 +36,8 @@ use crate::components::transform::{local_rotation, mirror, mirrored_direction};
 use crate::components::Pose;
 use crate::ecs::World;
 
+pub(in crate::ecs) use bounds::BoundsQueue;
+pub use collider::ColliderMut;
 pub(in crate::ecs) use store::WorldStore;
 pub use write::TransformMut;
 

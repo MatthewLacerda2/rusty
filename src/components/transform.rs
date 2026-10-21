@@ -126,6 +126,10 @@ pub fn world_scale(parent_world: Mat4, scale: Vec3) -> Vec3 {
     parent_world.to_scale_rotation_translation().0 * scale
 }
 
+/// How far apart, relative to the largest, a parent's three scales may be and still
+/// read as uniform in [`lossy_scale`]: a few ulps.
+const UNIFORM: f32 = 4.0 * f32::EPSILON;
+
 /// Unity's `lossyScale` of a child with local `rotation` and `scale` under
 /// `parent_world`: the lengths of its world matrix's columns, so the parent's
 /// scale is read along the child's own axes, however it is turned (#1156). The
@@ -135,14 +139,14 @@ pub fn world_scale(parent_world: Mat4, scale: Vec3) -> Vec3 {
 /// entity's own negative scale included (#1125). Then [`world_rotation`] times
 /// this scale is the world matrix whenever the hierarchy does not shear.
 ///
-/// Under a parent scaled the same on every axis, and for an unturned child, it
-/// is [`world_scale`] bit for bit: a turn cannot change a uniform scale, and
-/// reading it through the rotation's rounding would (a parent at 1000 would give
-/// 999.9999).
+/// Under a parent scaled the same on every axis (to within [`UNIFORM`], the
+/// rounding a scale read back from a matrix carries) it is [`world_scale`]
+/// exactly: a turn cannot change a uniform scale, and reading it through the
+/// rotation's rounding would (a parent at 1000 would give 999.9999).
 fn lossy_scale(parent_world: Mat4, rotation: Quat, scale: Vec3) -> Vec3 {
     let split = parent_world.to_scale_rotation_translation().0;
     let size = split.abs();
-    if size.x == size.y && size.y == size.z {
+    if size.max_element() - size.min_element() <= UNIFORM * size.max_element() {
         return split * scale;
     }
     let parent = glam::Mat3::from_mat4(parent_world);

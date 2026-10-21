@@ -20,12 +20,10 @@ fn with_box(w: &mut World, id: u32, size: Vec3) {
     let mut c = ColliderComponent::from_mesh_bounds(false, Vec3::ZERO, Vec3::ZERO);
     c.shape = ColliderShape::Box { size };
     w.set_collider(id, Some(c));
-    w.refresh_collider_aabb(id);
 }
 
 fn aabb(w: &World, id: u32) -> (Vec3, Vec3) {
-    let c = w.collider(id).unwrap();
-    (c.aabb_min, c.aabb_max)
+    w.collider_bounds(id).unwrap()
 }
 
 #[test]

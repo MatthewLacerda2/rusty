@@ -4,9 +4,9 @@
 //! lands back in the world when the guard drops. Landing is where a write takes effect
 //! in world space, once, for every writer (a script's `Transform.Set*`, a tween, the
 //! editor, the physics write-back, IK, the Animator): when the value changed, the
-//! entity's subtree goes dirty in the store and every collider in it gets its world
-//! AABB from the new pose (#1157). An unchanged value lands as a no-op, so a guard
-//! taken only to read costs nothing below it.
+//! entity is queued as moved ([`World::moved`]), O(1): its subtree's matrices go dirty
+//! before the next read and its colliders' AABBs are due a refresh (#1157). An
+//! unchanged value lands as a no-op, so a guard taken only to read costs nothing.
 
 use std::ops::{Deref, DerefMut};
 
@@ -40,9 +40,13 @@ impl Drop for TransformMut<'_> {
     }
 }
 
-/// Whether two transforms are the same bits (a NaN never is, so it always lands).
+/// Whether two transforms are the same bits, so a `-0.0` over a `0.0` still lands.
 fn same(a: &TransformComponent, b: &TransformComponent) -> bool {
-    a.position == b.position && a.rotation == b.rotation && a.scale == b.scale
+    let bits = |t: &TransformComponent| {
+        let (p, r, s) = (t.position, t.rotation, t.scale);
+        [p.x, p.y, p.z, r.x, r.y, r.z, r.w, s.x, s.y, s.z].map(f32::to_bits)
+    };
+    bits(a) == bits(b)
 }
 
 impl World {
@@ -66,34 +70,5 @@ impl World {
         *stored = value;
         drop(stored);
         self.moved(id);
-    }
-
-    /// `id`'s subtree moved in world space: every entity in it goes dirty, then every
-    /// collider in it reads its world AABB from its new pose.
-    pub(in crate::ecs) fn moved(&mut self, id: u32) {
-        let subtree: Vec<u32> = self.self_and_descendants(id).collect();
-        for &d in &subtree {
-            self.world_space.mark_dirty(d);
-        }
-        for d in subtree {
-            self.refresh_collider_aabb(d);
-        }
-    }
-
-    /// Refresh `id`'s collider world AABB from its world pose (a no-op without a
-    /// collider). The transform write does this for its whole subtree; call it after
-    /// changing a collider's shape.
-    pub fn refresh_collider_aabb(&mut self, id: u32) {
-        if !self.has_collider(id) {
-            return;
-        }
-        let Some(pose) = self.world_pose(id) else {
-            return;
-        };
-        if let Some(mut col) = self.collider_mut(id) {
-            let (min, max) = col.calculate_world_aabb(pose);
-            col.aabb_min = min;
-            col.aabb_max = max;
-        }
     }
 }

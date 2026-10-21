@@ -5,8 +5,9 @@
 //! disagree. They now live in `ecs::World`'s dirty-flagged store (`ecs::world_space`),
 //! which a read cleans parents first, so one answer serves the render frame, the sim
 //! mid-tick and edit mode alike. What stays is the scene's vocabulary for it and the
-//! collider-AABB refreshes a caller asks for by hand (after changing a shape, or after
-//! a load); a transform write refreshes its subtree's AABBs itself.
+//! collider-AABB refreshes a caller asks for by hand (after a load, which re-points
+//! parents wholesale). A transform write queues its subtree's AABBs, and setting or
+//! reshaping a collider refreshes its own (`ecs::world_space::bounds`).
 
 use glam::Mat4;
 
@@ -25,22 +26,18 @@ impl Scene {
         self.world.local_to_world(entity_id)
     }
 
-    /// Refresh one entity's collider world AABB from its world pose: what a changed
-    /// collider shape needs. A moved transform refreshes its own.
+    /// Bring one entity's stored collider AABB up to date, along with every one a
+    /// transform write has queued ([`World::flush_bounds`]).
+    ///
+    /// [`World::flush_bounds`]: crate::ecs::World::flush_bounds
     pub fn update_entity_collider(&mut self, id: u32) {
+        self.world.flush_bounds();
         self.world.refresh_collider_aabb(id);
-    }
-
-    /// Refresh the collider world-AABB of `id` and everything under it.
-    pub fn update_subtree_colliders(&mut self, id: u32) {
-        let ids: Vec<u32> = self.world.self_and_descendants(id).collect();
-        for id in ids {
-            self.world.refresh_collider_aabb(id);
-        }
     }
 
     /// Refresh every entity's collider world-AABB (editor/load batch operation).
     pub fn update_all_colliders(&mut self) {
+        self.world.flush_bounds();
         let ids = self.world.ids().to_vec();
         for id in ids {
             self.world.refresh_collider_aabb(id);

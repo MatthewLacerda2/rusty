@@ -132,9 +132,9 @@ exactly like `Raycast`. Unity analogues: `Physics.OverlapSphere` / `OverlapBox` 
   `found=false` ⇒ the entity has no live collider (edit mode, or no collider) and
   the query point echoes back.
 - **`ContainsPoint`** is `true` when the point is inside that entity's collider.
-- **`GetBounds`** surfaces the collider's world-space AABB, which the engine keeps
-  current on transform edits and each physics step — the one query that also works
-  in edit mode. `found=false` ⇒ the entity has no collider component.
+- **`GetBounds`** surfaces the collider's world-space AABB, current the moment a
+  Transform on it or above it moves, or the collider is added or reshaped — the one
+  query that also works in edit mode. `found=false` ⇒ the entity has no collider component.
 
 `AddForce` applies a **continuous force** (Unity's `ForceMode.Force`): the velocity
 change for one call is `F / mass · fixedDeltaTime`, so applying the same force each

@@ -58,7 +58,6 @@ fn build(nodes: &[Node]) -> (Scene, Vec<u32>) {
         (t.position, t.rotation, t.scale) = (n.pos, n.rot, n.scale);
         drop(t);
         scene.world.set_collider(id, Some(default_collider()));
-        scene.update_entity_collider(id);
         let parent = (i > 0).then(|| n.parent % (i + 1)).filter(|&p| p < i);
         let parent = parent.filter(|&p| depth[p] < 3);
         if let Some(p) = parent {
@@ -136,12 +135,16 @@ proptest! {
         scene.world.transform_mut(moved).unwrap().rotation *= Quat::from_rotation_y(turn);
         let mut fresh = Scene::new();
         apply_scene_data(&mut fresh, to_scene_data(&scene));
-        fresh.update_all_colliders();
-        for &id in &ids {
-            let (a, b) = (scene.world.collider(id).unwrap(), fresh.world.collider(id).unwrap());
-            let tol = 1e-4 * (1.0 + a.aabb_max.abs().max_element() + a.aabb_min.abs().max_element());
-            prop_assert!(a.aabb_min.abs_diff_eq(b.aabb_min, tol), "{id}: {} vs {}", a.aabb_min, b.aabb_min);
-            prop_assert!(a.aabb_max.abs_diff_eq(b.aabb_max, tol), "{id}: {} vs {}", a.aabb_max, b.aabb_max);
+        let read = |scene: &Scene| ids.iter().map(|&id| scene.world.collider_bounds(id).unwrap()).collect::<Vec<_>>();
+        let (before, want) = (read(&scene), read(&fresh));
+        scene.world.flush_bounds();
+        // Read mid-stage (worked out from the pose) and after the flush (stored).
+        for (got, when) in [(before, "read"), (read(&scene), "flushed")] {
+            for (&(a_min, a_max), &(b_min, b_max)) in got.iter().zip(&want) {
+                let tol = 1e-4 * (1.0 + a_max.abs().max_element() + a_min.abs().max_element());
+                prop_assert!(a_min.abs_diff_eq(b_min, tol), "{when}: {a_min} vs {b_min}");
+                prop_assert!(a_max.abs_diff_eq(b_max, tol), "{when}: {a_max} vs {b_max}");
+            }
         }
     }
 }

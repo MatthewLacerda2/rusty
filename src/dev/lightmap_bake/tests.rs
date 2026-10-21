@@ -144,8 +144,8 @@ fn an_unsaved_scene_cannot_bake() {
 
 #[test]
 fn the_bake_counts_static_meshes_left_without_a_lightmap_uv() {
-    let (mut scene, _, _) = scene();
-    let input = gather_bake_input(&mut scene);
+    let (scene, _, _) = scene();
+    let input = gather_bake_input(&scene);
     let maps = bake(&input, &quick());
     let report = missing_uv_report(input.meshes.len(), maps.len());
     assert_eq!(

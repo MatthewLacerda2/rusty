@@ -70,7 +70,11 @@ impl Renderer {
                 continue;
             }
 
-            let line_vertices = aabb_wireframe(col.aabb_min, col.aabb_max);
+            drop(col);
+            let Some((min, max)) = scene.world.collider_bounds(id) else {
+                continue;
+            };
+            let line_vertices = aabb_wireframe(min, max);
             let aabb_wire_buffer =
                 self.device
                     .create_buffer_init(&wgpu::util::BufferInitDescriptor {

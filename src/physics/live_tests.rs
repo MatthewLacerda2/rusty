@@ -1,11 +1,13 @@
 //! src/physics/live_tests.rs — mid-play edits reach the built bodies (#466): a
 //! Rigidbody's mass, a kinematic switch and a layer change, plus the velocity
-//! change an impulse at a point gives.
+//! change an impulse at a point gives; and the bodies' write-back reaches the
+//! colliders hanging under them (#1157).
 
 use glam::Vec3;
 
 use super::PhysicsWorld;
 use crate::components::{ColliderComponent, ColliderShape, RigidBodyComponent};
+use crate::scene::authoring::defaults::{default_collider, default_rigidbody};
 use crate::scene::Scene;
 
 const DT: f32 = 1.0 / 60.0;
@@ -109,5 +111,30 @@ fn a_layer_change_mid_play_decides_what_the_body_lands_on() {
     assert!(
         (fall(true) - 0.5).abs() < 0.05,
         "moved onto Default, it lands"
+    );
+}
+
+#[test]
+fn a_falling_body_drags_its_childs_bounds_down_with_it() {
+    let mut scene = Scene::new();
+    let body = scene.add_entity("body".into());
+    scene.world.transform_mut(body).unwrap().position = Vec3::new(0.0, 10.0, 0.0);
+    scene.world.set_rigidbody(body, Some(default_rigidbody()));
+    let child = scene.add_entity("child".into());
+    scene.set_parent(child, Some(body)).unwrap();
+    scene.world.transform_mut(child).unwrap().position = Vec3::X * 2.0;
+    for id in [body, child] {
+        scene.world.set_collider(id, Some(default_collider()));
+    }
+    let mut physics = PhysicsWorld::from_scene(&scene);
+    for _ in 0..10 {
+        physics.step(&mut scene, DT);
+    }
+    let fell = scene.world.world_position(child);
+    assert!(fell.y < 10.0, "it fell: {fell}");
+    let (min, max) = scene.world.collider_bounds(child).unwrap();
+    assert!(
+        ((min + max) * 0.5).abs_diff_eq(fell, 1e-4),
+        "{min} {max} vs {fell}"
     );
 }
