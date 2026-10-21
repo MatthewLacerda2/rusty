@@ -95,7 +95,8 @@ pub fn cached_gltf(path: &Path) -> Result<PathBuf, ImportError> {
 
 /// Make `out` the conversion of `source`, unless its stamp says it already is. A
 /// missing source with a cache present keeps the cache (a game shipped without
-/// its sources). A failed conversion leaves the old cache as it was.
+/// its sources). A failing converter leaves the old cache as it was; a swap that
+/// fails partway leaves the cache unstamped, so the next call converts again.
 pub fn refresh(converter: &Converter, source: &Path, out: &Path) -> Result<(), ImportError> {
     let parse = |e: std::io::Error| ImportError::Parse(format!("{}: {e}", source.display()));
     let file = match std::fs::File::open(source) {
