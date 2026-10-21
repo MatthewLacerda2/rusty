@@ -2,7 +2,8 @@
 //! render pass. The per-camera stacking loop + post-FX live in `draw`.
 
 use crate::render::draw::batch::DrawBatch;
-use crate::render::draw::resources::{OutlineResource, Overlays};
+use crate::render::draw::outline::OutlineHull;
+use crate::render::draw::resources::Overlays;
 use crate::render::gpu::draw_buffers::DrawBuffers;
 use crate::render::gpu::global_group::GlobalGroup;
 use crate::render::gpu::pipelines::surface::SolidPass;
@@ -223,34 +224,26 @@ impl Renderer {
     fn draw_outline<'a>(
         &'a self,
         render_pass: &mut wgpu::RenderPass<'a>,
-        outline_resources: &'a Option<OutlineResource>,
+        hulls: &'a [OutlineHull],
     ) {
-        let Some((
-            _selected_id,
-            outline_mesh_id,
-            _outline_ent_buf,
-            outline_bind_group,
-            num_indices,
-            mirrored,
-        )) = outline_resources
-        else {
-            return;
-        };
-        let Some(gpu_mesh) = self.gpu_meshes.get(outline_mesh_id) else {
-            return;
-        };
-        // The outline is a flat unlit silhouette (`use_texture = 0`), so group(2) is
-        // never sampled — bind the default material group to satisfy the layout.
-        let pipeline = if *mirrored {
-            &self.mirrored_outline_pipeline
-        } else {
-            &self.outline_pipeline
-        };
-        render_pass.set_pipeline(pipeline.get());
-        render_pass.set_vertex_buffer(0, gpu_mesh.vertex_buffer.slice(..));
-        render_pass.set_index_buffer(gpu_mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
-        render_pass.set_bind_group(1, outline_bind_group, &[0]);
-        render_pass.set_bind_group(2, &self.default_material_bind_group, &[]);
-        render_pass.draw_indexed(0..*num_indices, 0, 0..1);
+        for hull in hulls {
+            let Some(gpu_mesh) = self.gpu_meshes.get(&hull.mesh) else {
+                continue;
+            };
+            // The outline is a flat unlit silhouette (`use_texture = 0`), so group(2) is
+            // never sampled — bind the default material group to satisfy the layout.
+            let pipeline = if hull.mirrored {
+                &self.mirrored_outline_pipeline
+            } else {
+                &self.outline_pipeline
+            };
+            render_pass.set_pipeline(pipeline.get());
+            render_pass.set_vertex_buffer(0, gpu_mesh.vertex_buffer.slice(..));
+            render_pass
+                .set_index_buffer(gpu_mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
+            render_pass.set_bind_group(1, &hull.bind_group, &[0]);
+            render_pass.set_bind_group(2, &self.default_material_bind_group, &[]);
+            render_pass.draw_indexed(0..hull.num_indices, 0, 0..1);
+        }
     }
 }

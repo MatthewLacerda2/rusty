@@ -133,7 +133,7 @@ fn batch_solids(r: &mut Renderer, _: &mut RenderView, ctx: &mut CameraCtx) {
 }
 
 fn scene_pass(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
-    let overlays = r.precreate_overlays(ctx.scene, ctx.stack.editor_mode);
+    let overlays = r.precreate_overlays(ctx.scene, &ctx.lod, ctx.stack.editor_mode);
     let frame = ScenePassFrame {
         editor_mode: ctx.stack.editor_mode,
         clear: PassClear::for_pass(ctx.is_first, ctx.cam.clear_flags),

@@ -1,14 +1,13 @@
-//! Pre-creation of editor overlay resources: the selection outline, floor grid, and
-//! per-collider AABB wireframes. Extracted from `Renderer::render` (behavior
+//! Pre-creation of editor overlay resources: the floor grid and per-collider AABB
+//! wireframes (the selection outline lives in `outline`). Extracted from `Renderer::render` (behavior
 //! unchanged).
 
 use glam::{Mat4, Vec3};
 use wgpu::util::DeviceExt;
 
 use crate::components::mesh::Vertex;
-use crate::render::draw::resources::{AabbResource, AxisResource, GridResource, OutlineResource};
-use crate::render::gpu::pipelines::winding::is_mirrored;
-use crate::render::{EntityUniform, MeshId, Renderer};
+use crate::render::draw::resources::{AabbResource, AxisResource, GridResource};
+use crate::render::{EntityUniform, Renderer};
 use crate::scene::Scene;
 
 impl Renderer {
@@ -116,42 +115,6 @@ impl Renderer {
         (entity_buf, col_bind_group)
     }
 
-    pub(crate) fn precreate_outline(&self, scene: &Scene) -> Option<OutlineResource> {
-        // (uniform literal split into `outline_uniform` below for the 50-line fn cap)
-        let selected_id = scene.selected_entity_id?;
-        let mesh = scene.world.mesh(selected_id)?;
-        let mesh_id = MeshId::from_mesh(&mesh);
-        if !scene.world.is_active(selected_id) {
-            return None;
-        }
-        let gpu_mesh = self.gpu_meshes.get(&mesh_id)?;
-
-        let world = scene.world_matrix(selected_id);
-        let outline_uniform = outline_uniform(outline_hull(world));
-
-        let outline_ent_buf = self
-            .device
-            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("Outline Entity Uniform"),
-                contents: bytemuck::bytes_of(&outline_uniform),
-                usage: wgpu::BufferUsages::UNIFORM,
-            });
-        let outline_bind_group = self.entity_bind_group(
-            "Outline Bind Group",
-            &outline_ent_buf,
-            self.shared_bones_buffer(),
-        );
-
-        Some((
-            selected_id,
-            mesh_id,
-            outline_ent_buf,
-            outline_bind_group,
-            gpu_mesh.num_indices,
-            is_mirrored(world),
-        ))
-    }
-
     /// Draw the editor overlays (floor grid, collider AABBs, selected-entity axis
     /// arrows) into the scene pass. Editor-mode only; called from `record_scene_pass`.
     pub(crate) fn draw_editor_overlays<'a>(
@@ -190,34 +153,6 @@ impl Renderer {
                 render_pass.draw(0..self.axis_count, 0..1);
             }
         }
-    }
-}
-
-/// Where the outline hull sits: the selection's own world matrix (#1142), so a child
-/// follows its parents, scaled up slightly about its pivot.
-pub(super) fn outline_hull(world: Mat4) -> Mat4 {
-    world * Mat4::from_scale(Vec3::splat(1.05))
-}
-
-/// The fixed outline-hull uniform (orange tint, unlit) at `model` — split out of
-/// `precreate_outline` for the 50-line fn cap.
-fn outline_uniform(model: Mat4) -> EntityUniform {
-    EntityUniform {
-        model_matrix: model.to_cols_array(),
-        color_tint: [1.0, 0.5, 0.0, 1.0], // Vibrant glowing orange outline
-        use_texture: 0,
-        is_lit: 0,
-        metallic: 0.0,
-        roughness: 0.5,
-        use_metallic_map: 0,
-        use_roughness_map: 0,
-        use_normal_map: 0,
-        use_emissive_map: 0,
-        emissive: [0.0; 4],
-        use_cutout: 0,
-        alpha_cutoff: 0.0,
-        bone_base: 0,
-        receive_decals: 0,
     }
 }
 
