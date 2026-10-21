@@ -5,7 +5,6 @@
 //! did, and its hitbox drifted off its own collider.
 
 use glam::{Quat, Vec3};
-use rusty::components::transform;
 use rusty::physics::PhysicsWorld;
 use rusty::scene::skeleton::RagdollOptions;
 use rusty::scene::Scene;
@@ -92,15 +91,9 @@ fn the_first_physics_frame_keeps_a_mirrored_limbs_world_pose() {
     }
 }
 
-/// The world X axis physics builds `bone`'s joint frame on: its local axes seen
-/// through the bone's mirror, turned by its world rotation (`build_joint`).
-fn joint_world_x(scene: &Scene, bone: u32) -> Vec3 {
-    let parent = scene.world.parent_world_matrix(bone);
-    let t = scene.world.transform(bone).unwrap().clone();
-    let j = scene.world.joint(bone).unwrap().clone();
-    let mirror = transform::mirror(transform::world_scale(parent, t.scale));
-    let (axis, _) = transform::mirrored_frame_axes(mirror, j.axis, j.swing_axis);
-    (transform::world_rotation(parent, t.rotation) * axis).normalize()
+/// The world X axis of `bone`'s joint frame as physics built it.
+fn joint_world_x(world: &PhysicsWorld, bone: u32) -> Vec3 {
+    world.joint_world_frame(bone).unwrap() * Vec3::X
 }
 
 /// Each mirrored joint's world X is `dir × bend` on the mirrored bones (#1125):
@@ -111,14 +104,18 @@ fn joint_world_x(scene: &Scene, bone: u32) -> Vec3 {
 fn a_mirrored_ragdolls_joint_axes_are_the_mirror_image() {
     let (plain, plain_bones) = ragdolled(Vec3::ONE);
     let (mirrored, bones) = ragdolled(MIRROR);
+    let (plain_world, world) = (
+        PhysicsWorld::from_scene(&plain),
+        PhysicsWorld::from_scene(&mirrored),
+    );
     let mut joints = 0;
     for (&p, &m) in plain_bones.iter().zip(&bones) {
         if plain.world.joint(p).is_none() {
             continue;
         }
         joints += 1;
-        let want = -(joint_world_x(&plain, p) * MIRROR);
-        let got = joint_world_x(&mirrored, m);
+        let want = -(joint_world_x(&plain_world, p) * MIRROR);
+        let got = joint_world_x(&world, m);
         let name = mirrored
             .world
             .name(m)

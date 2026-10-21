@@ -24,7 +24,7 @@ use std::collections::BTreeMap;
 
 use glam::{Quat, Vec3};
 
-use crate::components::transform::{local_rotation, world_rotation};
+use crate::components::transform::{local_rotation, world_rotation, world_scale};
 use crate::scene::Scene;
 
 /// The body layout the scene implies: body-owner entity id → the collider
@@ -90,11 +90,10 @@ pub(super) fn world_pose(scene: &Scene, id: u32) -> Option<WorldPose> {
         return Some(local);
     };
     let parent_mat = scene.compute_world_matrix(parent);
-    let (parent_scale, _, _) = parent_mat.to_scale_rotation_translation();
     Some(WorldPose {
         pos: parent_mat.transform_point3(local.pos),
         rot: world_rotation(parent_mat, local.rot),
-        scale: parent_scale * local.scale,
+        scale: world_scale(parent_mat, local.scale),
     })
 }
 

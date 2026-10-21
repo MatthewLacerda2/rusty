@@ -13,7 +13,10 @@
 //!   shoulder can swing far forward yet little sideways (shoulders, hips, a
 //!   hanging lamp).
 //!
-//! `anchor`, `axis` and `swing_axis` are in this entity's local space. `connected_anchor` is in
+//! `anchor`, `axis` and `swing_axis` are in this entity's local space. Under a
+//! negative world scale (the entity's own or a parent's), the joint is the
+//! mirror image of the unmirrored one, twist and hinge limits acting on the
+//! mirror-image side (#1125). `connected_anchor` is in
 //! the connected body's local space — or world space with no connected body —
 //! and is ignored while `auto_configure_connected_anchor` is on, which puts it
 //! wherever `anchor` sits when the joint is built (Unity's default). The joint's

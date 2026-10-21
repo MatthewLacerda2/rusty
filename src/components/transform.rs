@@ -113,6 +113,13 @@ pub fn mirrored_direction(mirror: Vec3, dir: Vec3) -> Vec3 {
 /// rotation is a pseudovector), so a joint's limits act on the mirror-image
 /// side. Y is mirrored as a direction, and the frame they make stays a proper
 /// rotation. Its own inverse; no mirror returns both axes bit for bit.
+///
+/// Only the twist about X is the exact mirror image. Under a reflection, a turn
+/// about the frame's Y or Z comes out in the opposite sense to the mirror
+/// image's (the frame is `D·B·F`, not `−D·B`). That is harmless while swing
+/// limits are symmetric, `±swing_limit` and `±swing2_limit`, which are the only
+/// ones `physics::joints::joint_builder` sets. An asymmetric swing limit would
+/// need the swing signs flipped too.
 pub fn mirrored_frame_axes(mirror: Vec3, x: Vec3, y: Vec3) -> (Vec3, Vec3) {
     let sense = mirror.x * mirror.y * mirror.z;
     (sense * (mirror * x), mirror * y)

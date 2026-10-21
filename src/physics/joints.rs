@@ -46,6 +46,7 @@ use crate::components::transform::{mirror, mirrored_frame_axes};
 use crate::components::{JointComponent, JointKind};
 use crate::scene::Scene;
 
+mod frame;
 #[cfg(test)]
 mod impulse_pair_tests;
 #[cfg(test)]
