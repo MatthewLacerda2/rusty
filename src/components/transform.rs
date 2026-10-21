@@ -105,7 +105,7 @@ impl Pose {
 
     /// A frame in this pose's local space, by its X and Y axes (a joint's `axis`
     /// and `swing_axis`), seen through the pose's mirror as a rotation
-    /// ([`mirrored_frame_axes`]) and not yet turned: `rot` turns it into world
+    /// (`mirrored_frame_axes`) and not yet turned: `rot` turns it into world
     /// space. A caller that builds a basis from the axes (with fallbacks for a
     /// zero or parallel axis) builds it here and turns the result, so the
     /// fallback turns with the pose (#1196).
