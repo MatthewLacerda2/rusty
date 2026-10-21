@@ -29,11 +29,10 @@ pub(super) use body::{character_collider_inputs, upright_offset};
 use glam::Vec3;
 use rapier3d::prelude::*;
 
-use super::build::capsule_dims;
 use super::compound::{world_pose, world_to_local};
 use super::query::is_live;
 use super::world::PhysicsWorld;
-use crate::components::{CapsuleAxis, CharacterControllerComponent};
+use crate::components::{capsule_dims, CapsuleAxis, CharacterControllerComponent};
 use crate::scene::Scene;
 
 /// ended on the ground, and the ground's normal (`Vec3::Y` when airborne).

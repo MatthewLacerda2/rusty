@@ -13,7 +13,8 @@
 //! from this module and `access.rs`.
 
 use crate::components::{
-    AnimatorComponent, Entity, MaterialAsset, MeshComponent, ScriptComponent, TransformComponent,
+    AnimatorComponent, Entity, MaterialAsset, MeshComponent, Pose, ScriptComponent,
+    TransformComponent,
 };
 
 use super::access::{CompMut, CompRef};
@@ -112,6 +113,17 @@ impl World {
         self.self_and_ancestors(id)
             .filter_map(|c| self.transform(c).map(|t| t.to_matrix()))
             .fold(glam::Mat4::IDENTITY, |below, local| local * below)
+    }
+
+    /// `id`'s world [`Pose`]: its local Transform [`Pose::under`] its live parent's
+    /// world matrix, or the local pose as-is for a root. The pose physics builds a
+    /// body at and a collider's world AABB reads (#1140). `None` for a dead id.
+    pub fn world_pose(&self, id: u32) -> Option<Pose> {
+        let local = self.transform(id)?.pose();
+        Some(match self.ancestors(id).next() {
+            Some(parent) => local.under(self.compute_world_matrix(parent)),
+            None => local,
+        })
     }
 
     /// The world matrix `id`'s local Transform sits under: its live parent's, or

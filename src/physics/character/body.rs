@@ -5,9 +5,9 @@
 use glam::{Quat, Vec3};
 use rapier3d::prelude::*;
 
-use crate::components::{CapsuleAxis, ColliderShape, PhysicsMaterial};
+use crate::components::{capsule_dims, CapsuleAxis, ColliderShape, PhysicsMaterial};
 use crate::ecs::World;
-use crate::physics::build::{capsule_dims, ColliderInputs};
+use crate::physics::build::ColliderInputs;
 use crate::physics::compound::{relative_pose, world_pose};
 use crate::physics::convert::to_pose;
 use crate::physics::world::PhysicsWorld;

@@ -47,6 +47,15 @@ impl TransformComponent {
                 || self.rotation.abs_diff_eq(-other.rotation, eps))
     }
 
+    /// This transform as a [`Pose`], in its parent's space.
+    pub fn pose(&self) -> Pose {
+        Pose {
+            pos: self.position,
+            rot: self.rotation,
+            scale: self.scale,
+        }
+    }
+
     pub fn euler_angles(&self) -> Vec3 {
         let (yaw, pitch, roll) = self.rotation.to_euler(glam::EulerRot::YXZ);
         Vec3::new(pitch.to_degrees(), yaw.to_degrees(), roll.to_degrees())
@@ -57,6 +66,30 @@ impl TransformComponent {
         let pitch = euler_deg.x.to_radians();
         let roll = euler_deg.z.to_radians();
         self.rotation = Quat::from_euler(glam::EulerRot::YXZ, yaw, pitch, roll);
+    }
+}
+
+/// A pose split the way physics poses a body: translation, a proper rotation,
+/// and a signed (lossy) scale whose signs carry any mirror. A child's world
+/// pose is [`Pose::under`] its parent's world matrix, which is how a collider's
+/// world AABB and its rapier shape read the same rotation and scale (#1140).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Pose {
+    pub pos: Vec3,
+    pub rot: Quat,
+    pub scale: Vec3,
+}
+
+impl Pose {
+    /// This local pose under a parent whose world matrix is `parent_world`:
+    /// [`world_rotation`] and [`world_scale`], never a split of the product
+    /// matrix, which loses a rotated child's scale axes.
+    pub fn under(self, parent_world: Mat4) -> Self {
+        Self {
+            pos: parent_world.transform_point3(self.pos),
+            rot: world_rotation(parent_world, self.rot),
+            scale: world_scale(parent_world, self.scale),
+        }
     }
 }
 

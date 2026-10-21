@@ -83,7 +83,7 @@ impl NavigationGraph {
             }
             // Keep entity's collider bounds aligned with transform positioning
             // (local matrix only — the legacy path never resolved the parent here).
-            let local = scene.world.transform(t.id).map(|t| t.to_matrix());
+            let local = scene.world.transform(t.id).map(|t| t.pose());
             if let (Some(local), Some(mut col)) = (local, scene.world.collider_mut(t.id)) {
                 let (min, max) = col.calculate_world_aabb(local);
                 col.aabb_min = min;

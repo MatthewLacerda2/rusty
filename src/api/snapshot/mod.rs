@@ -191,10 +191,11 @@ fn bounds_value(scene: &Scene, id: u32, world_matrix: Mat4) -> Value {
         .mesh(id)
         .and_then(|m| m.world_aabb(world_matrix))
         .or_else(|| {
+            let pose = scene.world.world_pose(id)?;
             scene
                 .world
                 .collider(id)
-                .map(|c| c.calculate_world_aabb(world_matrix))
+                .map(|c| c.calculate_world_aabb(pose))
         });
     match aabb {
         Some((min, max)) => json!({ "min": vec3(min), "max": vec3(max) }),

@@ -175,19 +175,11 @@ impl Scene {
     /// sees the parent transform as just written this tick — see the module note on why the
     /// collider path stays live.
     pub fn update_entity_collider(&mut self, id: u32) {
-        let parent_mat = self
-            .world
-            .parent_id(id)
-            .map(|p| self.compute_world_matrix(p));
-        let Some(local) = self.world.transform(id).map(|t| t.to_matrix()) else {
+        let Some(pose) = self.world.world_pose(id) else {
             return;
         };
-        let world_matrix = match parent_mat {
-            Some(parent) => parent * local,
-            None => local,
-        };
         if let Some(mut col) = self.world.collider_mut(id) {
-            let (min, max) = col.calculate_world_aabb(world_matrix);
+            let (min, max) = col.calculate_world_aabb(pose);
             col.aabb_min = min;
             col.aabb_max = max;
         }

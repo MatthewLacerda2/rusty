@@ -58,14 +58,14 @@ fn draw_body(
     drop(trans);
 
     if pos_changed || rot_changed || scl_changed {
-        let local = world.transform(id).map(|t| t.to_matrix());
+        let local = world.transform(id).map(|t| t.pose());
         if let Some(local) = local {
-            let wm = match parent_mat {
-                Some(p) => p * local,
+            let pose = match parent_mat {
+                Some(p) => local.under(p),
                 None => local,
             };
             if let Some(mut col) = world.collider_mut(id) {
-                collider_ops::refresh_aabb(&mut col, wm);
+                collider_ops::refresh_aabb(&mut col, pose);
             }
         }
         *is_dirty = true;
