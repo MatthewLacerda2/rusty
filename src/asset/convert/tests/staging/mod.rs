@@ -1,9 +1,12 @@
-//! A conversion swapped into place whole (#1129): a reader of the cache sees the
-//! old set or the new one, and a failure leaves the old one as it was.
+//! A conversion swapped into place whole (#1129): a reader of the cache finds the
+//! set whole when it opens the `.glb`, and a failure leaves the old one as it was.
 
+use super::super::stage::hook::{self, Step};
 use super::super::{refresh, textures_dirs, Converter, Staging};
 use crate::asset::ImportError;
 use std::path::Path;
+
+mod races;
 
 /// A converter whose `.glb` references a texture it writes: the glTF is the
 /// source's text and its textures folder's name, the texture the same text.
@@ -15,12 +18,9 @@ const TEXTURED: Converter = Converter {
 };
 
 fn textured(source: &Path, to: &Staging) -> Result<(), ImportError> {
-    // As a reader in another process would, mid re-conversion: the old set is whole.
-    if to.out.is_file() {
-        read_whole(&to.out);
-    }
     let text = std::fs::read_to_string(source).unwrap();
-    std::fs::create_dir_all(&to.textures).unwrap();
+    // As `fbx::texture` does: only the textures folder, never a cleared parent.
+    std::fs::create_dir(&to.textures).map_err(|e| ImportError::Parse(e.to_string()))?;
     std::fs::write(to.textures.join("t.png"), &text).unwrap();
     let folder = to.textures.file_name().unwrap().to_string_lossy();
     std::fs::write(&to.glb, format!("{text}\n{folder}")).unwrap();
@@ -39,16 +39,13 @@ fn failing(_: &Path, to: &Staging) -> Result<(), ImportError> {
 }
 
 /// What the cached `.glb` at `out` says, after checking the texture it names is
-/// there and agrees with it.
+/// there and agrees with it: what a reader in another process opening it gets.
 fn read_whole(out: &Path) -> String {
     let glb = std::fs::read_to_string(out).unwrap();
     let (text, folder) = glb.split_once('\n').expect("a reference");
     let texture = out.parent().unwrap().join(folder).join("t.png");
-    assert_eq!(
-        std::fs::read_to_string(texture).unwrap(),
-        text,
-        "a torn set"
-    );
+    let found = std::fs::read_to_string(&texture);
+    assert_eq!(found.ok().as_deref(), Some(text), "a torn set: {texture:?}");
     text.to_string()
 }
 
@@ -60,27 +57,6 @@ fn names(dir: &Path) -> Vec<String> {
         .collect();
     names.sort();
     names
-}
-
-#[test]
-fn a_reader_during_a_reconversion_sees_the_old_set_whole() {
-    let dir = crate::test_temp::dir();
-    let (source, out) = (dir.join("a.src"), dir.join("cache/a.src.glb"));
-    std::fs::write(&source, "one").unwrap();
-    refresh(&TEXTURED, &source, &out).unwrap();
-    assert_eq!(read_whole(&out), "one");
-
-    std::fs::write(&source, "two").unwrap();
-    refresh(&TEXTURED, &source, &out).unwrap();
-    assert_eq!(read_whole(&out), "two");
-    // The old textures folder went once the new `.glb` was in; nothing staged is left.
-    assert_eq!(textures_dirs(&out).len(), 1);
-    assert_eq!(
-        names(&dir.join("cache")).len(),
-        3,
-        "{:?}",
-        names(&dir.join("cache"))
-    );
 }
 
 #[test]
@@ -106,12 +82,14 @@ fn a_reconversion_clears_what_a_crash_or_an_older_converter_left() {
     for leftover in leftovers {
         std::fs::create_dir_all(dir.join(leftover).join("junk")).unwrap();
     }
+    // A stamp write a crash cut short.
+    std::fs::write(dir.join("a.src.glb.source.999.3.tmp"), "half").unwrap();
     // Not this cache's: another source whose name starts like it.
     std::fs::create_dir_all(dir.join("a.src.glb.b.src.glb.textures")).unwrap();
 
     refresh(&TEXTURED, &source, &out).unwrap();
     let names = names(&dir);
-    for leftover in leftovers {
+    for leftover in [leftovers[0], leftovers[1], "a.src.glb.source.999.3.tmp"] {
         assert!(!names.iter().any(|n| n == leftover), "{leftover} left");
     }
     assert!(names.iter().any(|n| n == "a.src.glb.b.src.glb.textures"));

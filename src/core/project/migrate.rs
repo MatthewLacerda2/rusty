@@ -76,6 +76,7 @@ fn move_content(root: &Path) -> Result<Vec<String>, String> {
 }
 
 fn rename(from: &Path, to: &Path) -> Result<(), String> {
+    // lint: allow(atomic-write) moves a project's folders and files; it writes nothing
     std::fs::rename(from, to).map_err(|e| format!("{} → {}: {e}", from.display(), to.display()))
 }
 

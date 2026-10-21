@@ -24,8 +24,9 @@
 //!
 //! **How it is re-made.** A converter writes plain files into a fresh staging
 //! folder, and `stage` swaps the set into place, so a reader in another process
-//! sees the old set whole or the new one whole (#1129). Atomicity is this
-//! module's, never a converter's.
+//! finds the set whole when it opens the `.glb` (#1129). A lock on the source
+//! keeps two conversions of it from interleaving. Atomicity is this module's,
+//! never a converter's.
 //!
 //! **Adding a converter** is one row in [`CONVERTERS`]: an extension and a
 //! function that writes a glTF where its [`Staging`] says.
@@ -96,11 +97,17 @@ pub fn cached_gltf(path: &Path) -> Result<PathBuf, ImportError> {
 /// missing source with a cache present keeps the cache (a game shipped without
 /// its sources). A failed conversion leaves the old cache as it was.
 pub fn refresh(converter: &Converter, source: &Path, out: &Path) -> Result<(), ImportError> {
-    let bytes = match std::fs::read(source) {
-        Ok(bytes) => bytes,
+    let parse = |e: std::io::Error| ImportError::Parse(format!("{}: {e}", source.display()));
+    let file = match std::fs::File::open(source) {
+        Ok(file) => file,
         Err(_) if out.is_file() => return Ok(()),
-        Err(e) => return Err(ImportError::Parse(format!("{}: {e}", source.display()))),
+        Err(e) => return Err(parse(e)),
     };
+    // A conversion of this source in another process (or thread) finishes first:
+    // an advisory lock, released when `file` drops. Where the filesystem has none,
+    // `stage` still keeps the set whole in most interleavings.
+    let _ = file.lock();
+    let bytes = std::fs::read(source).map_err(parse)?;
     let stamp = stamp(converter, &bytes);
     if up_to_date(out, &stamp) {
         return Ok(());

@@ -46,7 +46,10 @@ fn names_are_sanitised_and_kept_apart_ignoring_case() {
 
 #[test]
 fn a_source_name_a_uri_would_misread_still_finds_its_textures() {
-    for source in ["Soldier: v2.fbx", "bad%C0.fbx", "lit%20eral.fbx"] {
+    // A `:` can't be in a Windows file name (Windows isn't shipped yet), so only
+    // the other names run there.
+    let colon = (!cfg!(windows)).then_some("Soldier: v2.fbx");
+    for source in colon.into_iter().chain(["bad%C0.fbx", "lit%20eral.fbx"]) {
         let dir = crate::test_temp::dir();
         let copy = dir.join(source);
         std::fs::copy(fixture("embedded_textures.fbx"), &copy).unwrap();

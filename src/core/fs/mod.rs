@@ -3,8 +3,9 @@
 //! A plain write truncates first, so a reader in another process (or thread) at
 //! that moment sees an empty or torn file. [`write_atomic`] writes beside the
 //! target and renames over it: a reader gets the whole old file or the whole new
-//! one. It is the one copy: the import sidecar, the import cache's stamp and the
-//! seed manifest all write through it.
+//! one. It is the one copy: the import sidecar, the import cache's stamp, the seed
+//! manifest, the authored UI widgets and imported audio all write through it, and
+//! the `atomic-write` rule (`make rules`) flags a `std::fs::rename` anywhere else.
 
 mod retry;
 
@@ -14,11 +15,15 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
+/// The suffix of [`write_atomic`]'s temp file, `<path>.<pid>.<n>.tmp`: what a
+/// crash leaves behind, for [`is_unique_sibling`] to spot.
+pub const TEMP_SUFFIX: &str = "tmp";
+
 /// Write `bytes` at `path` through a temp file beside it, renamed into place. The
 /// temp file is removed when the write or the rename fails, so a failure leaves no
 /// litter. The parent directory must exist.
 pub fn write_atomic(path: &Path, bytes: &[u8]) -> io::Result<()> {
-    let temp = unique_sibling(path, "tmp");
+    let temp = unique_sibling(path, TEMP_SUFFIX);
     // Windows refuses the rename for a moment while a reader holds the target.
     let result = std::fs::write(&temp, bytes)
         .and_then(|()| retry_transient(|| std::fs::rename(&temp, path)));

@@ -90,9 +90,19 @@ impl Textures {
         }
     }
 
+    /// Write one texture. Only the textures folder is created, never the staging
+    /// folder above it: a concurrent conversion that cleared that one must make
+    /// this conversion fail, not resurrect half of it.
     fn extract(&self, name: &str, bytes: &[u8]) -> Result<(), ImportError> {
-        std::fs::create_dir_all(&self.dir)
-            .map_err(|e| ImportError::Parse(format!("writing {}: {e}", self.dir.display())))?;
+        match std::fs::create_dir(&self.dir) {
+            Err(e) if e.kind() != std::io::ErrorKind::AlreadyExists => {
+                return Err(ImportError::Parse(format!(
+                    "writing {}: {e}",
+                    self.dir.display()
+                )))
+            }
+            _ => {}
+        }
         let path = self.dir.join(name);
         std::fs::write(&path, bytes)
             .map_err(|e| ImportError::Parse(format!("writing {}: {e}", path.display())))

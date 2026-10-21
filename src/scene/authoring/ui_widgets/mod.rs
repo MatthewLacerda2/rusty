@@ -170,10 +170,7 @@ fn write_if_changed(path: &Path, bytes: &[u8]) {
     if std::fs::read(path).is_ok_and(|old| old == bytes) {
         return;
     }
-    let tmp = path.with_extension(format!("tmp{}", std::process::id()));
-    if std::fs::write(&tmp, bytes).is_ok() && std::fs::rename(&tmp, path).is_err() {
-        std::fs::remove_file(&tmp).ok();
-    }
+    crate::core::fs::write_atomic(path, bytes).ok();
 }
 
 #[cfg(test)]
