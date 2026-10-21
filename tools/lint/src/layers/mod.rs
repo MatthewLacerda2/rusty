@@ -11,6 +11,7 @@
 //! Exit code 1 on any violation; report mirrored to `.lint/report.txt`.
 
 mod check;
+mod extent;
 mod externs;
 mod graph;
 mod scan;
@@ -19,7 +20,7 @@ mod table;
 mod tests;
 
 /// One item's extent, shared with the rules' test-code classifier.
-pub use scan::item_end;
+pub use extent::item_end;
 use std::fs;
 use std::path::Path;
 use std::process::exit;

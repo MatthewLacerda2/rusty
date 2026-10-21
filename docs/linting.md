@@ -183,10 +183,14 @@ new flag, gate, CI step or baseline.
   and the item under each `#[cfg(test)]` or `#[cfg(all(…, test, …))]` (`test`
   anywhere among `all`'s arguments, the attribute wrapped or not), scanning only
   `src/` and `tests/`. A gate covers its own item and no more (#1113): a
-  `mod tests { … }` to its closing brace, a `use` or `fn` to its end, the item's
-  extent found the way the layering lint finds it (`layers::item_end`); production
-  code below a gated `use` stays production code. `any(test, …)` is not test-only,
-  so it stays production code. The layering lint and the clippy test exemption classify their own way.
+  `mod tests { … }` or a `fn` to its closing brace, however its signature wraps, a
+  `use` to its `;`, a gated field, variant or arm to its `,` (or to the line before
+  its parent's `}`); production code below a gated `use` stays production code. A
+  gated `mod x;` covers only its own line (#1120). Brackets and `//` inside a
+  string or char literal don't count, a string that spans lines (a multi-line raw
+  string) included; a `/* */` comment is read as code, so brackets in one can
+  still move an item's end. `any(test, …)` is not test-only, so it stays production code. The
+  layering lint and the clippy test exemption classify their own way.
 - **`test-inner-cfg`, `test-user-workspace`, `test-gpu-entry`** (#980) — three
   `docs/testing.md` locks on test code; comment lines never count. A `tests/` file never gates itself with an inner `#![cfg(…)]` (gate
   its `mod` line); test code never calls `in_user_workspace` or `scenario::run(`

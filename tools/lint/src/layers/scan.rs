@@ -5,6 +5,7 @@
 //! with every file it declares in turn. Not a parser — a coarse line scan, like the
 //! direction guard.
 
+use super::extent::{item_end, strip_comment};
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -168,36 +169,6 @@ pub fn live_lines(content: &str) -> Vec<(usize, &str)> {
     out
 }
 
-/// The index of the last line of the item starting at `lines[from]` (its
-/// attributes included): where its brackets balance again on a line ending in `;`,
-/// `}` or `,`. A `mod x { … }` ends at its closing brace, a `use` at its `;`, a
-/// gated struct field at its `,`; the end of `lines` closes an item that never
-/// ends. Shared with the rules' test-code classifier (`rules/test_code.rs`).
-pub fn item_end(lines: &[&str], from: usize) -> usize {
-    let mut depth = 0i32;
-    for (i, raw) in lines.iter().enumerate().skip(from) {
-        let code = strip_comment(raw);
-        depth += bracket_delta(code);
-        if depth <= 0 && code.trim_end().ends_with([';', '}', ',']) {
-            return i;
-        }
-    }
-    lines.len().saturating_sub(1)
-}
-
-/// Opened minus closed brackets of every kind in `code`. String literals are not
-/// skipped: a raw string spans lines and holds quotes, so per-line string tracking
-/// misreads it, while the brackets inside one almost always balance.
-fn bracket_delta(code: &str) -> i32 {
-    code.chars()
-        .map(|c| match c {
-            '{' | '(' | '[' => 1,
-            '}' | ')' | ']' => -1,
-            _ => 0,
-        })
-        .sum()
-}
-
 /// Module names a line references. `group` carries an open `crate::{` across
 /// lines: `Some(depth)` while inside it, so a multi-line import still counts.
 fn crate_refs(code: &str, group: &mut Option<i32>) -> Vec<String> {
@@ -253,11 +224,4 @@ fn leading_ident(s: &str) -> Option<String> {
     let s = s.trim_start();
     let end = s.find(|c: char| !is_ident(c)).unwrap_or(s.len());
     (end > 0 && s[..end] != *"self").then(|| s[..end].to_string())
-}
-
-fn strip_comment(line: &str) -> &str {
-    match line.find("//") {
-        Some(idx) => &line[..idx],
-        None => line,
-    }
 }

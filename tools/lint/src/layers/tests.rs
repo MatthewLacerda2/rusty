@@ -35,6 +35,14 @@ fn skips_test_items() {
     assert!(!is_test_cfg("#[cfg(feature = \"testing\")]"));
 }
 
+#[test]
+fn a_gated_fn_with_a_wrapped_signature_is_skipped_to_its_closing_brace() {
+    let code =
+        "#[cfg(test)]\nfn f<T>(t: T) -> Result<\n    A,\n    B,\n>\nwhere\n    T: X,\n{\n    \
+                use crate::render::X;\n}\nuse crate::core::Y;";
+    assert_eq!(names(code), ["core"]);
+}
+
 fn edge(from: &str, to: &str) -> Edge {
     Edge {
         from: from.into(),

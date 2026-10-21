@@ -104,3 +104,16 @@ fn a_gated_item_is_test_code_and_the_lines_below_it_are_not() {
     );
     assert_eq!(lines("src/physics/build.rs", &src), [10, 15]);
 }
+
+#[test]
+fn a_gated_fn_with_a_wrapped_signature_is_test_code_to_its_closing_brace() {
+    let full = "ColliderComponent { shape, is_trigger, active }";
+    let wheres =
+        format!("#[cfg(test)]\nfn f<T>(t: T)\nwhere\n    T: Clone,\n{{\n    {full};\n}}\n");
+    let returns =
+        format!("#[cfg(test)]\nfn f() -> Result<\n    A,\n    B,\n> {{\n    {full}\n}}\n");
+    let generics = format!("#[cfg(test)]\nfn f<\n    T: X,\n>(t: T) {{\n    {full};\n}}\n");
+    assert_eq!(lines("src/physics/build.rs", &wheres), [6]);
+    assert_eq!(lines("src/physics/build.rs", &returns), [6]);
+    assert_eq!(lines("src/physics/build.rs", &generics), [5]);
+}

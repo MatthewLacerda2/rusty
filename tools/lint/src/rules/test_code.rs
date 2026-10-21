@@ -1,12 +1,12 @@
 //! Which lines of a source file are test code: everything under `tests/`, a
 //! `tests.rs` or `*_tests.rs` file, and the item under each `#[cfg(test)]` or
 //! `#[cfg(all(…, test, …))]`, however the attribute is wrapped. A gated
-//! `mod tests { … }` counts to its closing brace, a gated `use` or `fn` to its end;
-//! the lines after the item are production code again (#1113). A gated `mod x;`
-//! counts as its own line only: its file is test code by the `*_tests.rs` naming.
-//! `any(test, …)` is not test-only (it also compiles outside tests), so it stays
-//! production code. Only `src/` and `tests/` hold the engine's tests; other roots
-//! never count.
+//! `mod tests { … }` or `fn` counts to its closing brace, a gated `use` to its `;`,
+//! a gated field or arm to its `,` (`layers::item_end`); the lines after the item
+//! are production code again (#1113). A gated `mod x;` counts as its own line only
+//! (#1120). `any(test, …)` is not test-only (it also compiles outside tests), so it
+//! stays production code. Only `src/` and `tests/` hold the engine's tests; other
+//! roots never count.
 
 use crate::layers::item_end;
 
