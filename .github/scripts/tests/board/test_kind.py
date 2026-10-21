@@ -37,6 +37,26 @@ class Kind(unittest.TestCase):
         self.assertIn("is not `#N`", check("Kind: dunno"))
         self.assertIn("2 `Kind:` lines", check("Kind: root\nKind: root"))
 
+    def test_reads_the_line_past_markup(self):
+        for line in ("- Kind: root", "* Kind: root", "> Kind: root", "`Kind: root`",
+                     "**Kind:** root", "> - **Kind:** `#1170`"):
+            with self.subTest(line=line):
+                self.assertNotIn("no `Kind:` line", check(line, parent=1170 if "#" in line else None))
+        self.assertEqual(check("- Kind: #1170", parent=1170), "")
+
+    def test_ignores_a_line_in_a_fenced_block(self):
+        self.assertIn("no `Kind:` line", check("```\nKind: root\n```"))
+        self.assertEqual(check("~~~\nKind: dunno\n~~~\nKind: root"), "")
+
+    def test_a_case_says_searched_right_after_the_dash(self):
+        self.assertIn("names no search", check("Kind: case — not searched, outline"))
+        self.assertEqual(check("Kind: case - searched outline"), "")
+
+    def test_flags_a_case_or_root_with_a_parent(self):
+        self.assertIn("`Kind: case` but it is a sub-issue of #1170",
+                      check("Kind: case — searched outline", parent=1170))
+        self.assertIn("`Kind: root` but it is a sub-issue of #9", check("Kind: root", parent=9))
+
     def test_only_open_bugs_outside_planning_are_checked(self):
         self.assertEqual(check("", labels=("feature",)), "")
         self.assertEqual(check("", labels=("bug", "planning")), "")

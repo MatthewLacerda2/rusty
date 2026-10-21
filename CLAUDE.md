@@ -236,7 +236,9 @@ the ones tooling or a past mistake depends on.
   an assigned one is in progress.
 - **A stage label is the only absolute stop.** `planning` and `human` mean *not yet*,
   and no amount of the issue looking ready overrides them. Everything else is startable
-  the moment it exists, including an issue filed a minute ago, mid-batch or not. An idea
+  the moment it exists, including an issue filed a minute ago, mid-batch or not, except
+  a bug whose `Kind:` names an open root issue: that root's branch does it, not one of
+  its own (the operator, 2026-10-21). An idea
   still being shaped is what `planning` is for: the judgement lives in the label, so
   asking it again when work begins adds nothing.
 - **Issue-less PRs are allowed only** for documentation updates or bug fixes; everything
