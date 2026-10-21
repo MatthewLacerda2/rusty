@@ -10,24 +10,17 @@ queue as the machine's failure.
 
 from __future__ import annotations
 
-import subprocess
 import time
 import unittest
-from pathlib import Path
 from unittest import mock
 
-from merging.queue import gitio, outcomes, rebase, stopping
+from merging.queue import gitio, outcomes, stopping
 from merging.verdict import github
+from tests.queue.fixtures import FRESH, SHA, STALE, advancing, done
 
 
-SHA, FRESH = "a" * 40, "1" * 40
 SSL = "fatal: unable to access 'https://github.com/o/r/': SSL connection timeout"
-STALE = " ! [rejected]        b -> b (stale info)\nerror: failed to push some refs"
 LEASE = f"--force-with-lease=refs/heads/b:{SHA}"
-
-
-def done(code: int, stderr: str = "", stdout: str = "") -> subprocess.CompletedProcess:
-    return subprocess.CompletedProcess([], code, stdout, stderr)
 
 
 class Wording(unittest.TestCase):
@@ -71,25 +64,8 @@ class Pushing(unittest.TestCase):
     """[`rebase.advance`]'s push through a flaky network."""
 
     def advance(self, pushes, remote_head=FRESH):
-        calls, pushes = [], list(pushes)
-
-        def git(*args, cwd=None):
-            calls.append(args)
-            if args[0] == "rev-parse":
-                return done(0, stdout=FRESH + "\n")
-            if args[0] == "push":
-                return pushes.pop(0)
-            if args[0] == "ls-remote":
-                return done(0, stdout=f"{remote_head}\trefs/heads/b\n" if remote_head else "")
-            return done(0)
-
-        with mock.patch.object(gitio, "git", side_effect=git), \
-                mock.patch.object(rebase, "main_moved_by_docs", return_value=False), \
-                mock.patch.object(time, "sleep"):
-            try:
-                return rebase.advance("b", SHA, ".", push=True)
-            finally:
-                self.calls = calls
+        self.calls = []
+        return advancing(pushes, remote_head, self.calls)
 
     def pushes(self):
         return [c for c in self.calls if c[0] == "push"]

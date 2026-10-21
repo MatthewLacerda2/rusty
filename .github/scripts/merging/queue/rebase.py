@@ -24,7 +24,7 @@ from __future__ import annotations
 import os
 import tempfile
 
-from merging.queue import gitio
+from merging.queue import gitio, refusal
 from merging.verdict import changes
 
 
@@ -76,32 +76,6 @@ def on_tip(sha: str, root: str) -> bool:
     return gitio.git("merge-base", "--is-ancestor", "origin/main", sha, cwd=root).returncode == 0
 
 
-def refused(branch: str, stderr: str, hooked: bool) -> list[str]:
-    """Why a refused force-push of `branch` is handed back.
-
-    `hooked` is whether GitHub still holds the head the take began from. Then
-    the lease held, and what refused the push is `.githooks/pre-push`, which
-    runs on the queue's own pushes since #1101: misordered `mod` lines left by
-    the rebase, or `cargo` missing from the hook's PATH (a `FileNotFoundError`
-    before rustfmt runs). Before #1108 every refusal read as a lost lease, and
-    the orchestrator went looking for a foreign push that never happened.
-    """
-    if not hooked:
-        return [
-            f"the force-push of {branch} was refused: {stderr}",
-            "The lease held the head this queue started from, so"
-            " something else has pushed since. Handed back.",
-        ]
-    notes = [f"the pre-push hook refused the force-push of {branch}: {stderr}"]
-    if "FileNotFoundError" in stderr:
-        notes.append("The hook could not start a command; is `cargo` on its PATH?")
-    notes.append(
-        "GitHub still holds the head this queue started from, so the lease held."
-        " Reproduce it on the rebased branch with `make resolved`. Handed back."
-    )
-    return notes
-
-
 def advance(
     branch: str, head: str, root: str, push: bool, check=None
 ) -> tuple[str | None, list[str]]:
@@ -151,7 +125,7 @@ def advance(
                 if pushed.returncode != 0:
                     now = gitio.remote_head(branch, work)
                     if now != fresh:
-                        return None, refused(branch, pushed.stderr.strip(), hooked=now == head)
+                        return None, refusal.explain(branch, pushed.stderr, fresh, held=now == head)
             return fresh, []
         finally:
             gitio.git("worktree", "remove", "--force", work, cwd=root)
