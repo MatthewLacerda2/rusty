@@ -75,8 +75,9 @@ a coder real time.
   when it finishes (MatthewLacerda2/scorsese#1500). A cold `make gates` in the
   container takes about 16, so split it anyway, one call each, so every result
   comes back in the call that ran it:
-  1. `make fmt size layers determinism direction components parity test-lint scripts`
-     (seconds);
+  1. `make target-dir inventory fmt size rules layers determinism direction components parity test-lint scripts feature-split docrefs`
+     (seconds): every gate in the Makefile's `GATES` but the four below. A gate
+     left out here is never run before CI, as `docrefs` was for PR #1177;
   2. `make clippy`;
   3. `make doc deny`;
   4. `cargo nextest run --locked --no-run` (warms the default test build);
