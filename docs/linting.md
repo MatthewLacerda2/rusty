@@ -23,6 +23,7 @@ agent can read exactly what failed.
 | Ranged editor drags | `tools/lint -- --rules` (`drag-range`) | **hard gate**: a `DragValue` under `src/editor` bounds its range with `.ranged(..)` (`editor::widgets::DragRange`), never egui's `.range(..)`, which also rewrites an out-of-range value just by selecting the entity (#1158); a real need takes `// lint: allow(drag-range) <why>` |
 | One atomic write | `tools/lint -- --rules` (`atomic-write`) | **hard gate**: no line of `src/` outside `src/core/fs/` names `fs::rename` — a file a reader may open is written through `core::fs::write_atomic`; a rename that moves rather than writes takes `// lint: allow(atomic-write) <why>` (#1129) |
 | Converters report, never log | `tools/lint -- --rules` (`converter-log`) | **hard gate**: no code line of a converter under `src/asset/convert/` (every module, folder or single file, but the cache's own `mod`, `lock`, `record`, `stage` and `tests`) names `log::` or a bare logging macro — a converter returns what it skipped in `Converted` and fails on anything else, and `convert::refresh` alone warns; each converter's root carries `#![deny(clippy::let_underscore_must_use, clippy::unused_result_ok, clippy::print_stdout, clippy::print_stderr)]`, wrapped or not, so clippy refuses a dropped `Result` and a print there (#1172) |
+| One world space | `tools/lint -- --rules` (`world-space`) | **hard gate**: outside `ecs::world_space` and `components::transform`, no engine code line decomposes a matrix (`to_scale_rotation_translation`), names the retired `compute_world_matrix` / `world_matrix(` / `parent_world_matrix`, or folds a Transform over `ancestors(` — world space is read from `ecs::World`'s world API; test code is not scanned, and converting file data takes `// lint: allow(world-space) <why>` (#1196) |
 | No subprocesses | `tools/lint -- --rules` (`subprocess`) | **hard gate**: no line of `src/` names `std::process::Command` — the engine never shells out (to Blender or anything else); a real need takes `// lint: allow(subprocess) <why>` (#975) |
 | Tagged engine warnings | `tools/lint -- --rules` (`log-tag`) | **hard gate**: every engine warning or error in `src/` (`log::warn!` / `log::error!`, an imported bare `warn!` / `error!`, `log!` at `Level::Warn`/`Level::Error`) opens its message with its module, `[Asset] …`, since those records reach the console and the session/MCP replies (#1139); a message that is not a literal takes `// lint: allow(log-tag) <why>` |
 | Order-free lists stay sorted | `tools/lint -- --rules` (`sorted`) | **hard gate**: a list under a `// sorted: <why>` (or `<!-- sorted: <why> -->`) marker stays in order up to its first blank line, so two branches adding entries touch different lines (#911) |
@@ -284,6 +285,21 @@ new flag, gate, CI step or baseline.
   some eighty best-effort `let _ =` (a cleanup, a send to a closed channel). A
   future converter (`.blend`, #1072) is covered the day it is added
   (`rules/converter_log.rs`).
+- **`world-space`** (#1170, #1196) — fifteen bugs in two days came from systems
+  working out where an entity is in the world and getting a hierarchy case wrong: a
+  mirror, a zero scale, a turned child under a non-uniform parent. `ecs::World`'s
+  world API (`local_to_world`, `world_pose`, `lossy_scale`, `transform_frame`, …) is
+  the one answer, so a code line of `src/` outside `src/ecs/world_space/` and
+  `components::transform` fails when it decomposes a matrix
+  (`to_scale_rotation_translation`), names `compute_world_matrix`,
+  `parent_world_matrix` or a call `world_matrix(` (a variable of that name passes),
+  or has `ancestors(` with a Transform read (`.transform(`, `to_matrix(`, `.pose()`)
+  on it or the five lines after. A walk for membership or depth reads no Transform
+  and passes. Test code is not scanned (a test may decompose a result to check it),
+  which is why the FBX basis tests and the synthetic hitbox rig need no allow; code
+  that converts file data rather than the scene hierarchy carries an inline allow.
+  The Transform-read heuristic is lexical: a fold whose read sits more than five
+  lines below the walk slips past it (`rules/world_space.rs`).
 - **The ≲10-files-per-directory signal** prints after the findings: every scanned
   directory holding more than ten `.rs` files (`mod.rs` aside), most crowded first.
   CLAUDE.md says "aim for", so it never fails the gate; it tells you where to

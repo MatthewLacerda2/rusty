@@ -93,7 +93,7 @@ pub struct Pose {
 
 impl Pose {
     /// This local pose under a parent whose world matrix is `parent_world`:
-    /// [`world_rotation`] and `lossy_scale`, never a split of the product
+    /// `world_rotation` and `lossy_scale`, never a split of the product
     /// matrix, which loses a rotated child's scale axes.
     pub fn under(self, parent_world: Mat4) -> Self {
         Self {
