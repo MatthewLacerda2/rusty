@@ -126,7 +126,7 @@ impl World {
         let Some(pose) = self.world_pose(id) else {
             return (x, y);
         };
-        let (x, y) = mirrored_frame_axes(mirror(pose.scale), x, y);
+        let (x, y) = pose.mirror_frame(x, y);
         (pose.rot * x, pose.rot * y)
     }
 

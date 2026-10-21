@@ -8,9 +8,7 @@ use std::f32::consts::FRAC_PI_3;
 
 use glam::{Mat3, Mat4, Quat, Vec3};
 
-use super::{
-    local_rotation, mirror, mirrored_direction, mirrored_frame_axes, world_rotation, world_scale,
-};
+use super::{local_rotation, mirror, mirrored_direction, mirrored_frame_axes, world_rotation};
 
 fn same(a: Quat, b: Quat) -> bool {
     a.dot(b).abs() > 1.0 - 1e-5
@@ -70,7 +68,7 @@ const OWN: [Vec3; 3] = [
 /// A child's world matrix's linear part, and its world rotation and mirror.
 fn child(parent: Mat4, local: Quat, own: Vec3) -> (Mat3, Quat, Vec3) {
     let world = parent * Mat4::from_scale_rotation_translation(own, local, Vec3::X);
-    let mirror = mirror(world_scale(parent, own));
+    let mirror = mirror(parent.to_scale_rotation_translation().0 * own);
     (
         Mat3::from_mat4(world),
         world_rotation(parent, local),

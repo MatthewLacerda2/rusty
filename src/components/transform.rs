@@ -102,6 +102,16 @@ impl Pose {
             scale: lossy_scale(parent_world, self.rot, self.scale),
         }
     }
+
+    /// A frame in this pose's local space, by its X and Y axes (a joint's `axis`
+    /// and `swing_axis`), seen through the pose's mirror as a rotation
+    /// ([`mirrored_frame_axes`]) and not yet turned: `rot` turns it into world
+    /// space. A caller that builds a basis from the axes (with fallbacks for a
+    /// zero or parallel axis) builds it here and turns the result, so the
+    /// fallback turns with the pose (#1196).
+    pub fn mirror_frame(&self, x: Vec3, y: Vec3) -> (Vec3, Vec3) {
+        mirrored_frame_axes(mirror(self.scale), x, y)
+    }
 }
 
 /// The world rotation of a child with local `rotation` under a parent whose world
@@ -128,15 +138,6 @@ pub(crate) fn local_rotation(parent_world: Mat4, world_rot: Quat) -> Quat {
     through_mirror(parent_world, parent_rot.inverse() * world_rot).normalize()
 }
 
-/// A child's signed world scale when it is not turned against its parent:
-/// `parent_world`'s split scale (its reflection on X, as glam decomposes it)
-/// times the child's own `scale`. Its signs are always the child's [`mirror`],
-/// turned or not; its magnitudes are [`Pose::under`]'s for an unturned child or
-/// a parent scaled the same on every axis.
-pub(crate) fn world_scale(parent_world: Mat4, scale: Vec3) -> Vec3 {
-    parent_world.to_scale_rotation_translation().0 * scale
-}
-
 /// How far apart, relative to the largest, a parent's three scales may be, and how
 /// far from square its axes, and still read as uniform in [`lossy_scale`]: a few ulps.
 const UNIFORM: f32 = 4.0 * f32::EPSILON;
@@ -152,7 +153,7 @@ const UNIFORM: f32 = 4.0 * f32::EPSILON;
 ///
 /// Under a conformal parent, one scaled the same on every axis with its axes still
 /// square (`M·Mᵀ = s²·I`, to within [`UNIFORM`], the rounding a matrix carries), it
-/// is [`world_scale`] exactly: a turn cannot change a uniform scale, and reading it
+/// is the parent's split scale (glam's, its reflection on X) times `scale` exactly: a turn cannot change a uniform scale, and reading it
 /// through the rotation's rounding would (a parent at 1000 would give 999.9999).
 /// Equal axis lengths alone are not enough: a turned parent under a non-uniform
 /// grandparent can shear into three equal-length axes that are not square.
@@ -160,7 +161,7 @@ fn lossy_scale(parent_world: Mat4, rotation: Quat, scale: Vec3) -> Vec3 {
     let split = parent_world.to_scale_rotation_translation().0;
     let parent = glam::Mat3::from_mat4(parent_world);
     if conformal(parent, split.abs()) {
-        return world_scale(parent_world, scale);
+        return split * scale;
     }
     let turned = glam::Mat3::from_quat(rotation);
     let along = |u: Vec3| (parent * u).length() / u.length();
