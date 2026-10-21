@@ -9,8 +9,9 @@
 use glam::Vec3;
 use rapier3d::prelude::*;
 
-use super::build::{build_shape, collider_inputs};
+use super::build::collider_inputs;
 use super::compound::world_pose;
+use super::mesh_shape::build_shape_for;
 use crate::scene::Scene;
 
 /// Segments around a round shape's circumference.
@@ -37,7 +38,7 @@ pub fn collider_world_triangles(scene: &Scene, id: u32) -> Option<ColliderTriang
         .mesh_geom
         .as_ref()
         .map(|(p, i)| (p.as_slice(), i.as_slice()));
-    let collider = build_shape(&inp.shape, pose.scale, mesh)?;
+    let collider = build_shape_for(id, &inp.shape, pose.scale, mesh)?;
     let (points, triangles, convex) = tessellate(collider.shape())?;
     let vertices = points
         .into_iter()
@@ -81,6 +82,7 @@ fn tessellate(shape: &dyn Shape) -> Option<Tessellation> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::physics::build::build_shape;
     use crate::scene::{ColliderComponent, ColliderShape};
     use glam::Quat;
 

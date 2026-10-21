@@ -44,3 +44,43 @@ fn a_cylinder_ray_along_z_hits_the_stretched_radius() {
         .expect("the ray hits");
     assert!((t - 3.5).abs() < 1e-3, "hit at {t}");
 }
+
+#[test]
+fn an_index_past_the_vertices_is_skipped() {
+    let mesh = Some((TRIANGLE.as_slice(), [0u32, 1, 3].as_slice()));
+    assert!(build_shape(&mesh_shape(false), Vec3::ONE, mesh).is_none());
+}
+
+#[test]
+fn a_trimesh_of_collinear_points_is_skipped() {
+    let line = [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [2.0, 0.0, 0.0]];
+    let mesh = Some((line.as_slice(), [0u32, 1, 2].as_slice()));
+    assert!(build_shape(&mesh_shape(false), Vec3::ONE, mesh).is_none());
+}
+
+#[test]
+fn a_ramp_scaled_flat_is_skipped_but_one_good_triangle_keeps_the_mesh() {
+    let mesh = Some((TRIANGLE.as_slice(), [0u32, 1, 2].as_slice()));
+    assert!(build_shape(&mesh_shape(false), Vec3::new(1.0, 0.0, 1.0), mesh).is_none());
+    let quad = [
+        [0.0, 0.0, 0.0],
+        [1.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0],
+        [2.0, 0.0, 0.0],
+    ];
+    let mixed = Some((quad.as_slice(), [0u32, 1, 3, 0, 1, 2].as_slice()));
+    assert!(build_shape(&mesh_shape(false), Vec3::ONE, mixed).is_some());
+}
+
+/// Parry takes coplanar points as a flat hull; collinear ones are what it refuses.
+#[test]
+fn four_collinear_points_form_no_convex_hull() {
+    let line = [
+        [0.0, 0.0, 0.0],
+        [1.0, 0.0, 0.0],
+        [2.0, 0.0, 0.0],
+        [3.0, 0.0, 0.0],
+    ];
+    let mesh = Some((line.as_slice(), [0u32, 1, 2].as_slice()));
+    assert!(build_shape(&mesh_shape(true), Vec3::ONE, mesh).is_none());
+}
