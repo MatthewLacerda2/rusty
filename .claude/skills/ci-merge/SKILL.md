@@ -448,7 +448,7 @@ mechanism at all. That is one finding about the tests, not a list of survivors.
 
 **Establish equivalence by applying the mutation and running the suite** — never
 by reasoning about symmetry. Reasoning has been wrong repeatedly; measurement has
-not. Re-ask with a narrower scope (`make mutants-remote SCOPE=src/physics/raycast.rs`),
+not. Re-ask with a narrower scope (`make mutants-remote SCOPE=src/physics/query/through.rs`),
 or reproduce a survivor locally with the same shape the job uses:
 
     git diff origin/main > branch.diff

@@ -216,7 +216,7 @@ the ones tooling or a past mistake depends on.
   cold — no prior context — and run unattended, even overnight. So defining issues
   well outranks opening PRs.
 - **Point at code by symbol and path, never a bare line number.**
-  `physics::build::collider_inputs` survives the edits that land before the issue is
+  `physics::shape::build::collider_inputs` survives the edits that land before the issue is
   picked up; `src/main.rs:210` does not. On 2026-09-30 `src/main.rs` split into
   `src/shell/` mid-batch and nearly every brief had to warn its coder that the
   issue's line references were stale. A line number is fine as a hint *beside* a
