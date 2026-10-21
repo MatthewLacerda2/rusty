@@ -17,8 +17,9 @@
 //!
 //! ## stdout is JSON-RPC only
 //! Exactly one JSON-RPC message per line goes to `output`; nothing else. Engine logs
-//! already go to stderr (env_logger) or the in-memory `ConsoleLogs` (Lua `print` /
-//! `Debug.*`), never stdout — so the channel stays clean. Any diagnostics this layer
+//! already go to stderr (`crate::logging`) or the in-memory `ConsoleLogs` (Lua `print`
+//! / `Debug.*`), never stdout — so the channel stays clean. Engine warnings also come
+//! back in-band, as a second text block on the tool result (#1139). Any diagnostics this layer
 //! emits use `eprintln!` (stderr).
 //!
 //! ## Robustness
@@ -62,11 +63,21 @@ pub trait EvalBackend {
     fn reopen(&self, _root: &Path) -> Option<Result<(), String>> {
         None
     }
+
+    /// The engine warnings and errors logged since the last call (#1139). Attach
+    /// mode returns none: the window's own console shows them.
+    fn take_warnings(&self) -> Vec<String> {
+        Vec::new()
+    }
 }
 
 impl EvalBackend for Session {
     fn eval(&self, line: &str) -> Result<String, String> {
         Session::eval(self, line)
+    }
+
+    fn take_warnings(&self) -> Vec<String> {
+        Session::take_warnings(self)
     }
 }
 

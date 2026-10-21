@@ -149,7 +149,7 @@ impl EffectCache {
             }
             let pipeline = self.load(device, name);
             if let Err(e) = &pipeline {
-                log::warn!("post-FX effect `{name}` skipped: {e}");
+                log::warn!("[Render] post-FX effect `{name}` skipped: {e}");
             }
             self.pipelines.insert(name.clone(), pipeline.ok());
         }

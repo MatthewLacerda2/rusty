@@ -15,7 +15,7 @@
 use rusty::core::project::{self, Access};
 
 fn main() {
-    env_logger::init();
+    rusty::logging::init();
     let mut args: Vec<String> = std::env::args().skip(1).collect();
     match project::take_flag(&mut args) {
         Ok(Some(dir)) => {

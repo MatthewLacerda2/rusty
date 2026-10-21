@@ -217,7 +217,7 @@ impl SurfaceShaders {
         let built = built
             .map_err(|e| {
                 log::warn!(
-                    "surface shader {:?}: {e}; using the standard shader",
+                    "[Render] surface shader {:?}: {e}; using the standard shader",
                     slot.name
                 );
             })

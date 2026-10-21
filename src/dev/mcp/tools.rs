@@ -71,9 +71,12 @@ pub fn tools_call(backend: &dyn EvalBackend, params: &Value) -> Result<Value, (i
                 .get("line")
                 .and_then(Value::as_str)
                 .ok_or_else(|| (-32602, "eval requires a string `line` argument".to_string()))?;
-            Ok(eval_result(backend.eval(line)))
+            Ok(eval_result(backend.eval(line), &backend.take_warnings()))
         }
-        "snapshot" => Ok(eval_result(backend.eval("Debug.Snapshot()"))),
+        "snapshot" => Ok(eval_result(
+            backend.eval("Debug.Snapshot()"),
+            &backend.take_warnings(),
+        )),
         other => Err((-32602, format!("Unknown tool: {other}"))),
     }
 }
@@ -81,15 +84,18 @@ pub fn tools_call(backend: &dyn EvalBackend, params: &Value) -> Result<Value, (i
 /// Map one evaluator outcome to an MCP tool-result value. A Lua/eval error is *not*
 /// a protocol error: per MCP it is reported in-band with `isError: true` so the
 /// agent sees the message and can recover.
-fn eval_result(outcome: Result<String, String>) -> Value {
+fn eval_result(outcome: Result<String, String>, warnings: &[String]) -> Value {
     let (text, is_error) = match outcome {
         Ok(text) => (text, false),
         Err(err) => (err, true),
     };
-    json!({
-        "content": [{ "type": "text", "text": text }],
-        "isError": is_error,
-    })
+    let mut content = vec![json!({ "type": "text", "text": text })];
+    // A second block, so the result text itself (a snapshot's JSON) stays parseable.
+    if !warnings.is_empty() {
+        let text = format!("engine warnings:\n{}", warnings.join("\n"));
+        content.push(json!({ "type": "text", "text": text }));
+    }
+    json!({ "content": content, "isError": is_error })
 }
 
 #[cfg(test)]
@@ -149,6 +155,21 @@ mod tests {
         let snap: Value =
             serde_json::from_str(result["content"][0]["text"].as_str().unwrap()).unwrap();
         assert_eq!(snap["play_state"], "editor");
+    }
+
+    #[test]
+    fn engine_warnings_come_back_as_a_second_block() {
+        crate::logging::init();
+        let s = session();
+        log::warn!("[Test] a mesh collider was skipped");
+        let result = tools_call(&s, &json!({ "name": "snapshot" })).expect("snapshot ok");
+        let warnings = result["content"][1]["text"].as_str().unwrap();
+        assert!(warnings.contains("[Test] a mesh collider was skipped"));
+        let snap = result["content"][0]["text"].as_str().unwrap();
+        assert!(
+            serde_json::from_str::<Value>(snap).is_ok(),
+            "the snapshot stays JSON"
+        );
     }
 
     #[test]

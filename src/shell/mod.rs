@@ -225,6 +225,7 @@ fn run_frame<F: Frontend>(
         QuitAction::None => {}
     }
     drain_commands(shell, game);
+    crate::logging::forward(game.console());
 
     // Apply any video setting (resolution / vsync / fullscreen) a script wrote
     // this tick to the surface + window before drawing.

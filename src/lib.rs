@@ -16,6 +16,7 @@ pub mod core;
 pub mod ecs;
 #[cfg(feature = "editor")]
 pub mod editor;
+pub mod logging;
 pub mod navigation;
 pub mod physics;
 pub mod preview;

@@ -37,6 +37,7 @@ use rusty::dev::mcp::{self, attach::SocketClient, embed::Embedded, EvalBackend};
 use rusty::dev::session::{self, Session};
 
 fn main() {
+    rusty::logging::init();
     let args: Vec<String> = std::env::args().skip(1).collect();
 
     // Pick the backend: `--attach [<addr>]` forwards to a running window's socket;

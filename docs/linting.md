@@ -23,6 +23,7 @@ agent can read exactly what failed.
 | Ranged editor drags | `tools/lint -- --rules` (`drag-range`) | **hard gate**: a `DragValue` under `src/editor` bounds its range with `.ranged(..)` (`editor::widgets::DragRange`), never egui's `.range(..)`, which also rewrites an out-of-range value just by selecting the entity (#1158); a real need takes `// lint: allow(drag-range) <why>` |
 | One atomic write | `tools/lint -- --rules` (`atomic-write`) | **hard gate**: no line of `src/` outside `src/core/fs/` names `fs::rename` — a file a reader may open is written through `core::fs::write_atomic`; a rename that moves rather than writes takes `// lint: allow(atomic-write) <why>` (#1129) |
 | No subprocesses | `tools/lint -- --rules` (`subprocess`) | **hard gate**: no line of `src/` names `std::process::Command` — the engine never shells out (to Blender or anything else); a real need takes `// lint: allow(subprocess) <why>` (#975) |
+| Tagged engine warnings | `tools/lint -- --rules` (`log-tag`) | **hard gate**: every `log::warn!` / `log::error!` in `src/` opens its message with its module, `[Asset] …`, since those records reach the console and the session/MCP replies (#1139); a message that is not a literal takes `// lint: allow(log-tag) <why>` |
 | Order-free lists stay sorted | `tools/lint -- --rules` (`sorted`) | **hard gate**: a list under a `// sorted: <why>` (or `<!-- sorted: <why> -->`) marker stays in order up to its first blank line, so two branches adding entries touch different lines (#911) |
 | Dependency locks | cargo-deny (`deny.toml`) | **hard gate**: every git dependency is pinned by `rev` (`required-git-spec`); `nalgebra` only through the physics stack and no `cgmath` — glam is the one math crate (#975) |
 | `tools/lint` stays std-only | `make test-lint` | its `Cargo.lock` names one package, itself (#935) |
@@ -230,6 +231,12 @@ new flag, gate, CI step or baseline.
   new file beside it is the one a push silently drops
   (MatthewLacerda2/scorsese#872). It takes **no allow**: anchor the pattern
   (`/out/`, not `out/`) or move the file. A failed `git` call is a finding too.
+- **`log-tag`** (#1139) — engine warnings reach the console and the session and
+  MCP replies (`src/logging`), so a reader must see where each came from. A
+  `log::warn!(` or `log::error!(` in `src/` whose message literal (on that line or
+  the next, after an optional `target: "…",`) does not open with `[Module]`
+  (`[Asset] …`, `[Render] …`) fails. A message that is not a literal takes
+  `// lint: allow(log-tag) <why>` (`rules/log_tag.rs`).
 - **`unwrap-deny`** — the unwrap ban covers exactly the layer table's sim rows
   (#962). Each sim row's `src/<module>/mod.rs` must carry
   `#![deny(clippy::unwrap_used)]`, and no file under a sim module may `allow`,
@@ -297,7 +304,8 @@ What is not one row's lives in `tools/lint/src/layers/externs/policy.rs`:
 - **`common`** — the vocabulary any module may name unlisted: `glam`, `serde`,
   `serde_json`, `log`.
 - **`unscoped`** — dependencies no module names, each with why it is in
-  `Cargo.toml` (`env_logger`: the binaries; `getrandom`: a feature pin, #552).
+  `Cargo.toml` (`getrandom`: a feature pin, #552). `env_logger` left the list
+  when `src/logging` took it over (#1139).
 - **`confined`** — crates only some subtrees may name, finer than a module: the
   `egui` crates only under `src/editor` and `src/shell/editor` (the `editor`
   feature, #431), the provider crates only under `src/dev/providers` (#383).

@@ -40,7 +40,7 @@ pub(super) fn draw_custom_effects(
             .visual_correction_mut(id)
             .map(|mut c| vc_ops::set_custom_effects(&mut c, names));
         match result {
-            Some(Err(e)) => log::warn!("{e}"),
+            Some(Err(e)) => log::warn!("[Editor] {e}"),
             Some(Ok(())) => *is_dirty = true,
             None => {}
         }

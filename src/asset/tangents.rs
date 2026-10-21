@@ -42,7 +42,7 @@ pub fn generate_tangents(
         tangents: vec![None; positions.len()],
     };
     if let Err(e) = bevy_mikktspace::generate_tangents(&mut mesh) {
-        log::warn!("MikkTSpace tangent generation failed ({e}); using fallback tangents");
+        log::warn!("[Asset] MikkTSpace tangent generation failed ({e}); using fallback tangents");
     }
     mesh.tangents
         .into_iter()

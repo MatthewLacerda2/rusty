@@ -15,6 +15,7 @@ mod atomic_write;
 mod drag_range;
 mod full_literal;
 mod ignored;
+mod log_tag;
 mod markers;
 mod prefix;
 mod skip;
@@ -50,6 +51,7 @@ const RULES: &[(Rule, Allow)] = &[
     (drag_range::run, Allow::Inline),
     (full_literal::run, Allow::Inline),
     (ignored::run, Allow::Never),
+    (log_tag::run, Allow::Inline),
     (markers::run, Allow::Inline),
     (prefix::run, Allow::Inline),
     (skip::run, Allow::Inline),
