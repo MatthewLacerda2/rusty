@@ -25,6 +25,7 @@ mod subprocess;
 mod temp_dir;
 mod test_shape;
 mod unwrap;
+mod world_space;
 
 pub use finding::{allowed, Finding};
 use scan::Scan;
@@ -62,6 +63,7 @@ const RULES: &[(Rule, Allow)] = &[
     (temp_dir::run, Allow::Inline),
     (test_shape::run, Allow::Inline),
     (unwrap::run, Allow::Inline),
+    (world_space::run, Allow::Inline),
 ];
 
 /// Entry point: run every rule over [`crate::size::SCAN_ROOTS`].
