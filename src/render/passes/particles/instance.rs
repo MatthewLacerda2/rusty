@@ -5,7 +5,7 @@
 use glam::Vec3;
 
 use crate::components::{ParticleBlend, ParticleEmitterComponent, ParticleRenderMode};
-use crate::render::draw::sort::{back_to_front, view_depth};
+use crate::render::draw::batch::sort::{back_to_front, view_depth};
 use crate::render::gpu::uniforms::FogUniform;
 use crate::scene::Scene;
 

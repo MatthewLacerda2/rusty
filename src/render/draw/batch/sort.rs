@@ -1,4 +1,4 @@
-//! src/render/draw/sort.rs — the one back-to-front key every blended pass sorts by.
+//! The one back-to-front key every blended pass sorts by.
 //!
 //! Translucent solids (#242), particle emitters and the particles inside an
 //! alpha-blended emitter (#440) all order by view depth — the distance along the

@@ -19,8 +19,8 @@
 use glam::{Mat4, Vec3};
 use wgpu::util::DeviceExt;
 
+use super::aabb_wireframe;
 use crate::components::mesh::Vertex;
-use crate::render::draw::overlays::aabb_wireframe;
 use crate::render::draw::resources::ProbeResource;
 use crate::render::{EntityUniform, Renderer};
 use crate::scene::lighting::sh::Sh9;

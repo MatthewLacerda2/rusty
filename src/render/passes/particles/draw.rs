@@ -14,7 +14,7 @@ use wgpu::util::DeviceExt;
 use super::instance::{emitter_instances, emitter_light, Eye, ParticleGlobals, ParticleInstance};
 use crate::components::particle::ParticleBlend;
 use crate::components::ParticleRenderMode;
-use crate::render::draw::sort::back_to_front;
+use crate::render::draw::batch::sort::back_to_front;
 use crate::render::gpu::uniforms::FogUniform;
 use crate::render::timing::GpuPass;
 use crate::render::{GpuTexture, RenderView, Renderer};

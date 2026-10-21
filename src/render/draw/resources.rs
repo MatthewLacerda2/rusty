@@ -4,9 +4,9 @@
 //! `overlays`/`axis`/`probes`. Each block returns owned resources that outlive the
 //! render pass.
 
+use super::batch::sort::{back_to_front, view_depth};
 use super::batch::{BatchKey, DrawItem, FrameDraws};
-use super::outline::OutlineHull;
-use super::sort::{back_to_front, view_depth};
+use super::overlays::OutlineHull;
 use crate::components::MaterialAsset;
 use crate::render::gpu::draw_buffers::{group1, push_palette, FrameUpload, JointMatrix};
 use crate::render::lod::LodSelection;
