@@ -1,7 +1,11 @@
 use super::{check, GPU_ENTRY, INNER_CFG, USER_WORKSPACE};
+use crate::rules::test_code::test_lines;
 
 fn rules(path: &str, src: &str) -> Vec<(usize, &'static str)> {
-    check(path, src).iter().map(|f| (f.line, f.rule)).collect()
+    check(path, src, &test_lines(path, src, false))
+        .iter()
+        .map(|f| (f.line, f.rule))
+        .collect()
 }
 
 #[test]

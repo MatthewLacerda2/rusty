@@ -16,7 +16,6 @@
 
 use super::finding::Finding;
 use super::scan::Scan;
-use super::test_code;
 
 pub const INNER_CFG: &str = "test-inner-cfg";
 pub const USER_WORKSPACE: &str = "test-user-workspace";
@@ -25,9 +24,8 @@ pub const GPU_ENTRY: &str = "test-gpu-entry";
 /// The one file that may call `new_headless` from test code.
 const GPU_HELPER: &str = "src/render/test_gpu.rs";
 
-/// Every break of the three locks in the test code of `path`.
-pub fn check(path: &str, source: &str) -> Vec<Finding> {
-    let test = test_code::test_lines(path, source);
+/// Every break of the three locks in the test code of `path` (`test`, per line).
+pub fn check(path: &str, source: &str, test: &[bool]) -> Vec<Finding> {
     let mut found = Vec::new();
     let mut flag = |line: usize, rule: &'static str, message: &str| {
         found.push(Finding {
@@ -70,7 +68,7 @@ pub fn check(path: &str, source: &str) -> Vec<Finding> {
 
 /// The rule over every scanned file.
 pub fn run(scan: &Scan) -> Vec<Finding> {
-    scan.each_file(check)
+    scan.each_file(|p, s| check(p, s, &scan.test_lines(p)))
 }
 
 #[cfg(test)]

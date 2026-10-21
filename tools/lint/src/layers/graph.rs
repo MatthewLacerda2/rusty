@@ -15,7 +15,7 @@ pub struct Edge {
 /// The top-level modules under `src`: every directory but `bin`, plus any
 /// `src/<name>.rs` that is not a crate root.
 pub fn modules(src: &Path) -> Vec<String> {
-    let test_only = scan::test_only_files(&scan::walk(src));
+    let test_only = super::gate::test_only_files(&scan::walk(src));
     let mut out: Vec<String> = fs::read_dir(src)
         .into_iter()
         .flatten()
@@ -42,7 +42,7 @@ pub fn modules(src: &Path) -> Vec<String> {
 /// Every cross-module reference in non-test code under `src`.
 pub fn edges(src: &Path) -> Vec<Edge> {
     let files = scan::walk(src);
-    let test_only = scan::test_only_files(&files);
+    let test_only = super::gate::test_only_files(&files);
     let mut out = Vec::new();
     for file in files.iter().filter(|f| !test_only.contains(*f)) {
         let Some(from) = owner(src, file) else {

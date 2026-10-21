@@ -98,7 +98,7 @@ pub fn add_modifier(scene: &mut Scene, center: Vec3, size: Vec3, area: u8) -> u3
         center: Vec3::ZERO,
         size,
         area,
-        active: true,
+        ..Default::default()
     };
     scene.world.set_nav_modifier(id, Some(v));
     id

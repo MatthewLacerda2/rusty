@@ -11,14 +11,12 @@
 
 use super::finding::Finding;
 use super::scan::Scan;
-use super::test_code;
 
 pub const RULE: &str = "test-temp-dir";
 const CALL: &str = "std::env::temp_dir()";
 
-/// Every `std::env::temp_dir()` call in the test code of `path`.
-pub fn check_file(path: &str, source: &str) -> Vec<Finding> {
-    let test = test_code::test_lines(path, source);
+/// Every `std::env::temp_dir()` call in the test code of `path` (`test`, per line).
+pub fn check_file(path: &str, source: &str, test: &[bool]) -> Vec<Finding> {
     let mut found = Vec::new();
     for (i, line) in source.lines().enumerate().filter(|(i, _)| test[*i]) {
         let code = line.trim_start();
@@ -39,7 +37,7 @@ pub fn check_file(path: &str, source: &str) -> Vec<Finding> {
 
 /// The rule over every scanned file.
 pub fn run(scan: &Scan) -> Vec<Finding> {
-    scan.each_file(check_file)
+    scan.each_file(|p, s| check_file(p, s, &scan.test_lines(p)))
 }
 
 #[cfg(test)]

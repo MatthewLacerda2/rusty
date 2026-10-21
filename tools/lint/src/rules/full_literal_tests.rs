@@ -1,5 +1,5 @@
 use super::{Components, RULE};
-use crate::rules::allowed;
+use crate::rules::{allowed, scan::Scan, test_code::test_lines, Finding};
 
 const ENTITY: &str = "pub struct Entity {\n    pub id: u32,\n    pub transform: TransformComponent,\n    \
                       pub collider: Option<ColliderComponent>,\n    pub material: Option<MaterialComponent>,\n}\n";
@@ -14,12 +14,12 @@ fn components() -> Components {
     ])
 }
 
+fn check(path: &str, src: &str) -> Vec<Finding> {
+    components().check(path, src, &test_lines(path, src, false))
+}
+
 fn lines(path: &str, src: &str) -> Vec<usize> {
-    components()
-        .check(path, src)
-        .iter()
-        .map(|f| f.line)
-        .collect()
+    check(path, src).iter().map(|f| f.line).collect()
 }
 
 #[test]
@@ -29,7 +29,7 @@ fn a_literal_naming_every_field_is_flagged() {
                is_trigger: false,\n    active,\n};\n\
                let d = Some(rusty::components::ColliderComponent { shape, is_trigger: true, active: true });\n";
     assert_eq!(lines("tests/physics/gravity.rs", src), [1, 6]);
-    let f = &components().check("tests/a.rs", src)[0];
+    let f = &check("tests/a.rs", src)[0];
     assert_eq!(f.rule, RULE);
     assert!(f.message.contains("all 3 fields"), "{}", f.message);
 }
@@ -116,4 +116,32 @@ fn a_gated_fn_with_a_wrapped_signature_is_test_code_to_its_closing_brace() {
     assert_eq!(lines("src/physics/build.rs", &wheres), [6]);
     assert_eq!(lines("src/physics/build.rs", &returns), [6]);
     assert_eq!(lines("src/physics/build.rs", &generics), [5]);
+}
+
+#[test]
+fn a_file_only_a_gated_mod_declares_is_test_code() {
+    let root = std::env::temp_dir().join(format!("lint_full_literal_{}", std::process::id()));
+    let ui = root.join("src/ui");
+    std::fs::create_dir_all(&ui).unwrap();
+    let file = |path: &str, text: &str| std::fs::write(root.join(path), text).unwrap();
+    file(
+        "src/ui/fixture.rs",
+        "fn f() {\n    ColliderComponent { shape, is_trigger, active };\n}\n",
+    );
+    std::fs::create_dir_all(root.join("src/components/entity")).unwrap();
+    file("src/components/entity/mod.rs", ENTITY);
+    file("src/components/collider.rs", COLLIDER);
+    let found = |decl: &str| {
+        file("src/ui/mod.rs", decl);
+        let found = super::run(&Scan::at(&root));
+        found
+            .iter()
+            .map(|f| (f.path.clone(), f.line))
+            .collect::<Vec<_>>()
+    };
+    let gated = found("#[cfg(test)]\nmod fixture;\n");
+    let plain = found("mod fixture;\n");
+    std::fs::remove_dir_all(&root).ok();
+    assert_eq!(gated, [("src/ui/fixture.rs".to_string(), 2)]);
+    assert!(plain.is_empty(), "{plain:?}");
 }

@@ -41,7 +41,7 @@ pub fn violations(layers: &[Layer], manifest: &Path, src: &Path) -> Vec<String> 
 /// Every external-crate reference in non-test module code under `src`.
 fn uses(src: &Path, crates: &BTreeSet<String>) -> Vec<Use> {
     let files = scan::walk(src);
-    let test_only = scan::test_only_files(&files);
+    let test_only = super::gate::test_only_files(&files);
     let mut out = Vec::new();
     for file in files.iter().filter(|f| !test_only.contains(*f)) {
         let (Some(module), Ok(content)) = (owner(src, file), fs::read_to_string(file)) else {

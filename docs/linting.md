@@ -178,20 +178,24 @@ new flag, gate, CI step or baseline.
 - **`skip`** — an ignored test reads as passing to anyone who reads only the
   summary. `#[ignore]` and `#[cfg_attr(…, ignore)]` fail unless an allow says why:
   `// lint: allow(skip) a timing measurement, run by hand` right above it.
-- **Test code**, for every rule in this list that says it, is one classifier
-  (`rules/test_code.rs`, #1068): all of `tests/`, every `tests.rs` / `*_tests.rs`,
-  and the item under each `#[cfg(test)]` or `#[cfg(all(…, test, …))]` (`test`
-  anywhere among `all`'s arguments, the attribute wrapped or not), scanning only
-  `src/` and `tests/`. A gate covers its own item and no more (#1113): a
-  `mod tests { … }` or a `fn` to its closing brace, however its signature wraps, a
-  `use` to its `;`, a gated field, variant or arm to its `,` (or to the line before
-  its parent's `}`); production code below a gated `use` stays production code. A
-  gated `mod x;` covers only its own line (#1120). Brackets and `//` inside a
-  string or char literal don't count, a string that spans lines (a multi-line raw
-  string) included; a `/* */` comment is read as code, so brackets in one can
-  still move an item's end. A gated field or `let` whose generic type wraps over
-  lines can end early, at a `,` inside its `<…>`. `any(test, …)` is not test-only, so it stays production code. The
-  layering lint and the clippy test exemption classify their own way.
+- **Test code**, for every rule in this list that says it and for the layering
+  lint, is one definition (`rules/test_code.rs` over `layers/gate.rs`, #1068,
+  #1122): all of `tests/`, every `tests.rs` / `*_tests.rs`, every file only a
+  test-gated `mod x;` declares (with or without `#[path]`, and every file it declares
+  in turn, #1120), and the item under each `#[cfg(test)]` or
+  `#[cfg(all(…, test, …))]` (`test` anywhere among `all`'s arguments, the attribute
+  wrapped or not). The rules scan only `src/` and `tests/` for it. `any(test, …)`
+  is not test-only (it also compiles outside tests), so it stays production code,
+  and its imports are checked against the layer table. A gate covers its own item
+  and no more (#1113): a `mod tests { … }` or a `fn` to its closing brace, however
+  its signature wraps, a `use` to its `;`, a gated field, variant or arm to its `,`
+  (or to the line before its parent's `}`); production code below a gated `use`
+  stays production code. Brackets and `//` inside a string or char literal don't
+  count, a string that spans lines (a multi-line raw string) included; a `/* */`
+  comment is read as code, so brackets in one can still move an item's end. A
+  gated field or `let` whose generic type wraps over lines can end early, at a `,`
+  inside its `<…>`. Clippy's test exemption (`allow-unwrap-in-tests`) is rustc's
+  own and classifies its own way.
 - **`test-inner-cfg`, `test-user-workspace`, `test-gpu-entry`** (#980) — three
   `docs/testing.md` locks on test code; comment lines never count. A `tests/` file never gates itself with an inner `#![cfg(…)]` (gate
   its `mod` line); test code never calls `in_user_workspace` or `scenario::run(`

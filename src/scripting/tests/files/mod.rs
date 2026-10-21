@@ -17,9 +17,9 @@ use crate::scripting::console::{ConsoleLogs, LogLevel};
 use crate::scripting::manager::ScriptManager;
 use crate::time::Time;
 
-/// A fresh, empty directory under the temp dir, unique to this test and process.
+/// A fresh, empty directory under the test's own temp dir.
 pub(super) fn dir(name: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("rusty_files_{name}_{}", std::process::id()));
+    let dir = crate::test_temp::dir().join(name);
     std::fs::remove_dir_all(&dir).ok();
     std::fs::create_dir_all(&dir).expect("temp dir");
     dir

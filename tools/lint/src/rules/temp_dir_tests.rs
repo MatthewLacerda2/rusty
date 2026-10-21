@@ -1,5 +1,9 @@
-use super::{check_file, RULE};
-use crate::rules::allowed;
+use super::RULE;
+use crate::rules::{allowed, test_code::test_lines, Finding};
+
+fn check_file(path: &str, src: &str) -> Vec<Finding> {
+    super::check_file(path, src, &test_lines(path, src, false))
+}
 
 const CALL: &str = "    let d = std::env::temp_dir().join(\"x\");\n";
 

@@ -110,16 +110,10 @@ pub(super) fn rig(scene: &mut Scene) -> u32 {
     scene.world.set_mesh(
         id,
         Some(MeshComponent {
-            primitive_type: "Asset".to_string(),
-            asset_ref: None,
-            vertices: vertices(),
-            indices: Vec::new(),
             bind_palette: skin.bind_palette(),
             skin: Some(skin),
-            clips: Vec::new(),
-            pose_palette: Vec::new(),
-            skeleton: Default::default(),
             is_dirty: Default::default(),
+            ..MeshComponent::new("Asset", vertices(), Vec::new())
         }),
     );
     scene.sync_skeleton(id);

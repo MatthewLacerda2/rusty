@@ -35,7 +35,7 @@ pub fn panel(scene: &mut Scene, parent: u32, min: Vec2, size: Vec2) -> u32 {
         pivot: Vec2::ZERO,
         anchored_position: min,
         size_delta: size,
-        world_anchor: None,
+        ..Default::default()
     };
     scene.world.set_rect_transform(id, Some(rt));
     scene.world.set_image(id, Some(ImageComponent::default()));
