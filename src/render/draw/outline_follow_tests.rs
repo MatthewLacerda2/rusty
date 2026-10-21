@@ -41,29 +41,31 @@ fn posed_sphere(pose: Vec3) -> Scene {
     scene
 }
 
-/// An empty group at the origin over a LOD0 box at -X and a LOD1 box at +X. LOD0's
-/// threshold is never reached, so the camera always shows LOD1. Returns the scene
-/// and (group, LOD0, LOD1).
-fn lod_switched() -> (Scene, [u32; 3]) {
+/// An empty group at the origin over a LOD0 box at -X and a LOD1 of two boxes at +X,
+/// a body and a hat above it. LOD0's threshold is never reached, so the camera always
+/// shows LOD1. Returns the scene and (group, LOD0, LOD1 body, LOD1 hat).
+fn lod_switched() -> (Scene, [u32; 4]) {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
     let group = scene.add_entity("Prop".to_string());
-    let mut child = |name, x| {
+    let mut child = |name, position, s| {
         let id = create_entity(&mut scene, name, Some(Primitive::Box));
         scene.set_parent(id, Some(group)).unwrap();
         let mut t = scene.world.transform_mut(id).unwrap();
-        (t.position, t.scale) = (Vec3::new(x, 0.0, 0.0), Vec3::splat(0.8));
+        (t.position, t.scale) = (position, Vec3::splat(s));
         id
     };
-    let (lod0, lod1) = (child("Prop_LOD0", -0.55), child("Prop_LOD1", 0.55));
-    let level = |screen_height, r| LodLevel {
+    let lod0 = child("Prop_LOD0", Vec3::X * -0.55, 0.8);
+    let body = child("Prop_LOD1", Vec3::X * 0.55, 0.8);
+    let hat = child("Prop_LOD1_Hat", Vec3::new(0.55, 0.6, 0.0), 0.3);
+    let level = |screen_height, renderers| LodLevel {
         screen_height,
-        renderers: vec![r],
+        renderers,
     };
-    let levels = vec![level(10.0, lod0), level(0.0, lod1)];
+    let levels = vec![level(10.0, vec![lod0]), level(0.0, vec![body, hat])];
     let lod = LodGroupComponent { levels, size: 1.0 };
     scene.world.set_lod_group(group, Some(lod));
-    (scene, [group, lod0, lod1])
+    (scene, [group, lod0, body, hat])
 }
 
 /// The outline's horizontal centroid, in pixels right of the frame's centre.
@@ -87,7 +89,7 @@ fn gpu_the_outline_follows_a_skinned_pose_and_the_shown_lod() {
     assert!(rest.abs() < 4.0, "an unposed skin rings its bind pose");
 
     // LOD1 (+X) shows; selecting the group or the hidden LOD0 rings LOD1.
-    let (mut scene, [group, lod0, _]) = lod_switched();
+    let (mut scene, [group, lod0, ..]) = lod_switched();
     for (tag, selected) in [("group", group), ("hidden LOD0", lod0)] {
         scene.selected_entity_id = Some(selected);
         let right = centroid_right(&mut r, &scene, tag);
@@ -100,13 +102,17 @@ fn gpu_the_outline_follows_a_skinned_pose_and_the_shown_lod() {
 
 #[test]
 fn a_lod_selection_outlines_the_level_the_camera_shows() {
-    let (scene, [group, lod0, lod1]) = lod_switched();
+    let (scene, [group, lod0, body, hat]) = lod_switched();
     let cam = Camera::new(Vec3::Z * 3.0, -90.0, 0.0);
     let lod = LodSelection::for_camera(&scene, &cam);
-    assert_eq!(outline_targets(&scene, group, &lod), vec![lod1]);
-    assert_eq!(outline_targets(&scene, lod0, &lod), vec![lod1]);
-    assert_eq!(outline_targets(&scene, lod1, &lod), vec![lod1]);
+    // The root and a hidden renderer stand for the whole shown level.
+    assert_eq!(outline_targets(&scene, group, &lod), vec![body, hat]);
+    assert_eq!(outline_targets(&scene, lod0, &lod), vec![body, hat]);
+    // A shown renderer outlines itself alone, as Unity does.
+    assert_eq!(outline_targets(&scene, body, &lod), vec![body]);
+    assert_eq!(outline_targets(&scene, hat, &lod), vec![hat]);
     // The finest selection (what the static bake draws) shows LOD0 instead.
     let finest = LodSelection::finest(&scene);
-    assert_eq!(outline_targets(&scene, lod1, &finest), vec![lod0]);
+    assert_eq!(outline_targets(&scene, hat, &finest), vec![lod0]);
+    assert_eq!(outline_targets(&scene, lod0, &finest), vec![lod0]);
 }

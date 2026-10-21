@@ -59,7 +59,7 @@ impl Renderer {
             bytemuck::bytes_of(&uniform),
             wgpu::BufferUsages::UNIFORM,
         );
-        // A non-skinned hull binds the shared identity joint, as every overlay does.
+        // A non-skinned hull binds the shared identity joint; a skinned one its pose.
         let bones = (!joints.is_empty()).then(|| {
             init(
                 "Outline Bones",
@@ -77,16 +77,19 @@ impl Renderer {
     }
 }
 
-/// The entities whose hulls outline `selected`. A LOD group, or one of its renderers,
-/// stands for the level `lod` shows (#1160): selecting LOD0 while LOD2 draws rings
-/// LOD2, and a culled group rings nothing. A group's own mesh rings with its level.
-/// Anything else is outlined alone. Only active, shown meshes ring.
+/// The entities whose hulls outline `selected`. A LOD group's root, or a renderer the
+/// current level hides, stands for the level `lod` shows (#1160): selecting LOD0 while
+/// LOD2 draws rings LOD2, and a culled group rings nothing. A group's own mesh rings
+/// with its level. A shown renderer, like anything else, is outlined alone, as Unity
+/// does: selecting Hat in a `[Body, Hat]` level rings Hat. Only active, shown meshes
+/// ring.
 pub(super) fn outline_targets(scene: &Scene, selected: u32, lod: &LodSelection) -> Vec<u32> {
     if !scene.world.is_active(selected) {
         return Vec::new();
     }
     let mut ids = vec![selected];
-    if let Some(group_id) = owning_group(scene, selected) {
+    let stands_for_level = |&g: &u32| g == selected || lod.hides(selected);
+    if let Some(group_id) = owning_group(scene, selected).filter(stands_for_level) {
         let group = scene
             .world
             .lod_group(group_id)

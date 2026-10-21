@@ -211,5 +211,4 @@ mod instancing_tests;
 mod outline_tests;
 
 #[cfg(test)]
-#[path = "outline_follow_tests.rs"]
 mod outline_follow_tests;

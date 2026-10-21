@@ -54,8 +54,9 @@ pub(crate) struct Overlays {
 }
 
 impl Renderer {
-    /// The one shared identity joint buffer every overlay binds, so none of them
-    /// allocate a per-draw palette (#210).
+    /// The one shared identity joint buffer the overlays bind, so none of them
+    /// allocate a per-draw palette (#210). A skinned selection outline binds its own
+    /// pose instead (#1160).
     pub(crate) fn shared_bones_buffer(&self) -> &wgpu::Buffer {
         self.draw_buffers.default_bones()
     }
