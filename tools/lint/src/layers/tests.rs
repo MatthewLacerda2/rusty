@@ -1,6 +1,6 @@
 use super::check;
 use super::graph::Edge;
-use super::scan::{is_test_cfg, refs};
+use super::scan::refs;
 use super::table::{Exception, Layer, EXCEPTIONS, LAYERS};
 
 fn names(code: &str) -> Vec<String> {
@@ -30,9 +30,14 @@ fn skips_test_items() {
         names("#[cfg(test)] use crate::render::X;\nuse crate::ui::Z;"),
         ["ui"]
     );
-    assert!(is_test_cfg("#[cfg(all(test, feature = \"dev\"))]"));
-    assert!(!is_test_cfg("#[cfg(not(test))]"));
-    assert!(!is_test_cfg("#[cfg(feature = \"testing\")]"));
+}
+
+#[test]
+fn an_any_test_import_is_checked_and_a_wrapped_all_test_one_is_skipped() {
+    let any = "#[cfg(any(test, feature = \"x\"))]\nuse crate::render::X;";
+    assert_eq!(names(any), ["render"]);
+    let all = "#[cfg(all(\n    feature = \"dev\",\n    test\n))]\nuse crate::render::X;\nuse crate::ui::Z;";
+    assert_eq!(names(all), ["ui"]);
 }
 
 #[test]

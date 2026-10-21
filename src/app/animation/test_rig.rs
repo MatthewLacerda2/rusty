@@ -29,16 +29,10 @@ pub fn mesh(clips: Vec<AnimationClip>) -> MeshComponent {
         names: ["hips", "spine", "leg", "head"].map(String::from).to_vec(),
     };
     MeshComponent {
-        primitive_type: "Asset".to_string(),
-        asset_ref: None,
-        vertices: Vec::new(),
-        indices: Vec::new(),
-        bind_palette: Vec::new(),
         skin: Some(skin),
         clips,
-        pose_palette: Vec::new(),
-        skeleton: Default::default(),
         is_dirty: Default::default(),
+        ..MeshComponent::new("Asset", Vec::new(), Vec::new())
     }
 }
 

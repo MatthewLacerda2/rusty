@@ -11,7 +11,6 @@
 
 use super::finding::Finding;
 use super::scan::Scan;
-use super::test_code;
 use std::collections::BTreeMap;
 
 pub const RULE: &str = "full-literal";
@@ -43,9 +42,9 @@ impl Components {
         Components(map)
     }
 
-    /// Every full literal of a component in the test code of `path`.
-    pub fn check(&self, path: &str, source: &str) -> Vec<Finding> {
-        let test = test_code::test_lines(path, source);
+    /// Every full literal of a component in the test code of `path` (`test`, per
+    /// line).
+    pub fn check(&self, path: &str, source: &str, test: &[bool]) -> Vec<Finding> {
         let lines: Vec<&str> = source.lines().map(strip_comment).collect();
         let mut found = Vec::new();
         for (i, line) in lines.iter().enumerate().filter(|(i, _)| test[*i]) {
@@ -182,7 +181,7 @@ fn strip_comment(line: &str) -> &str {
 /// The rule over every scanned file, with `Entity`'s components read from the scan.
 pub fn run(scan: &Scan) -> Vec<Finding> {
     let components = Components::load(scan.files.iter().map(|p| (p.as_str(), scan.source(p))));
-    scan.each_file(|p, s| components.check(p, s))
+    scan.each_file(|p, s| components.check(p, s, &scan.test_lines(p)))
 }
 
 #[cfg(test)]

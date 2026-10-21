@@ -14,6 +14,7 @@ use std::path::PathBuf;
 /// test's name (libtest names each test's thread after it), so a helper shared by
 /// several tests can keep a fixed file name and still never collide.
 pub(crate) fn dir() -> PathBuf {
+    // lint: allow(test-temp-dir) the per-test helper itself, the one place that keys the path
     let dir = std::env::temp_dir()
         .join("rusty-tests")
         .join(std::process::id().to_string())

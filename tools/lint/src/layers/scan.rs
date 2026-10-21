@@ -1,12 +1,11 @@
 //! Source scan for the layering lint: which top-level modules each file names.
 //!
-//! Test code is exempt (#724): an inline `#[cfg(test)]` item is skipped, and a file
-//! declared as `#[cfg(test)] mod x;` (with or without `#[path]`) is dropped together
-//! with every file it declares in turn. Not a parser — a coarse line scan, like the
-//! direction guard.
+//! Test code is exempt (#724), as `gate` defines it: a test-gated item is
+//! skipped here, and the graph drops the test-only files whole. Not a parser — a
+//! coarse line scan, like the direction guard.
 
 use super::extent::{item_end, strip_comment, Open};
-use std::collections::BTreeSet;
+use super::gate::is_test_gate;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -38,102 +37,6 @@ fn walk_into(dir: &Path, out: &mut Vec<PathBuf>) {
     }
 }
 
-/// The files under `src` that only compile under `cfg(test)`: declared by a
-/// test-gated `mod x;`, or declared (at any depth) by such a file.
-pub fn test_only_files(files: &[PathBuf]) -> BTreeSet<PathBuf> {
-    let mut test_only = BTreeSet::new();
-    let mut frontier: Vec<PathBuf> = Vec::new();
-    for file in files {
-        for (child, gated) in declared_mods(file) {
-            if gated && test_only.insert(child.clone()) {
-                frontier.push(child);
-            }
-        }
-    }
-    while let Some(file) = frontier.pop() {
-        for (child, _) in declared_mods(&file) {
-            if test_only.insert(child.clone()) {
-                frontier.push(child);
-            }
-        }
-    }
-    test_only
-}
-
-/// The out-of-line modules `file` declares, each with whether its declaration is
-/// test-gated. Unresolvable declarations are skipped.
-fn declared_mods(file: &Path) -> Vec<(PathBuf, bool)> {
-    let Ok(content) = fs::read_to_string(file) else {
-        return Vec::new();
-    };
-    let (mut gated, mut path_attr) = (false, None::<String>);
-    let mut out = Vec::new();
-    for raw in content.lines() {
-        let line = raw.trim();
-        if line.starts_with("#[") {
-            gated |= is_test_cfg(line);
-            if let Some(p) = line.strip_prefix("#[path = \"") {
-                path_attr = p.split('"').next().map(str::to_string);
-            }
-            continue;
-        }
-        if let Some(name) = outline_mod_name(line) {
-            if let Some(child) = resolve(file, name, path_attr.as_deref()) {
-                out.push((child, gated));
-            }
-        }
-        gated = false;
-        path_attr = None;
-    }
-    out
-}
-
-/// `mod x;` / `pub(crate) mod x;` → `x`; anything else → `None`.
-fn outline_mod_name(line: &str) -> Option<&str> {
-    let rest = line.strip_suffix(';')?;
-    let at = rest.find("mod ")?;
-    let head = &rest[..at];
-    if !(head.is_empty() || head.trim_end().starts_with("pub")) {
-        return None;
-    }
-    let name = rest[at + 4..].trim();
-    name.chars()
-        .all(|c| c.is_alphanumeric() || c == '_')
-        .then_some(name)
-}
-
-fn resolve(file: &Path, name: &str, path_attr: Option<&str>) -> Option<PathBuf> {
-    let dir = file.parent()?;
-    if let Some(p) = path_attr {
-        return Some(dir.join(p));
-    }
-    let stem = file.file_stem()?.to_str()?;
-    let base = if matches!(stem, "mod" | "lib" | "main") {
-        dir.to_path_buf()
-    } else {
-        dir.join(stem)
-    };
-    [
-        base.join(format!("{name}.rs")),
-        base.join(name).join("mod.rs"),
-    ]
-    .into_iter()
-    .find(|p| p.is_file())
-}
-
-/// `#[cfg(test)]`, `#[cfg(all(test, …))]` — but not `#[cfg(not(test))]`.
-pub fn is_test_cfg(attr: &str) -> bool {
-    attr.starts_with("#[cfg(") && has_word(attr, "test") && !attr.contains("not(test)")
-}
-
-fn has_word(s: &str, word: &str) -> bool {
-    s.match_indices(word).any(|(at, _)| {
-        let before = s[..at].chars().next_back();
-        let after = s[at + word.len()..].chars().next();
-        !before.is_some_and(is_ident) && !after.is_some_and(is_ident)
-    })
-}
-
 pub fn is_ident(c: char) -> bool {
     c.is_alphanumeric() || c == '_'
 }
@@ -161,7 +64,7 @@ pub fn live_lines(content: &str) -> Vec<(usize, &str)> {
     while i < lines.len() {
         let inside = open != Open::None;
         let code = strip_comment(lines[i], &mut open);
-        if !inside && is_test_cfg(code.trim()) {
+        if !inside && is_test_gate(&lines[i..]) {
             i = item_end(&lines, i) + 1;
             open = Open::None;
             continue;

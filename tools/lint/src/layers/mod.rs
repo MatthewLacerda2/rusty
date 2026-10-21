@@ -13,14 +13,17 @@
 mod check;
 mod extent;
 mod externs;
+mod gate;
 mod graph;
 mod scan;
 mod table;
 #[cfg(test)]
 mod tests;
 
-/// One item's extent, shared with the rules' test-code classifier.
+/// One item's extent and what test code is, shared with the rules' test-code
+/// classifier.
 pub use extent::item_end;
+pub use gate::{is_test_gate, test_only_files};
 use std::fs;
 use std::path::Path;
 use std::process::exit;

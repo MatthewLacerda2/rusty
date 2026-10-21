@@ -60,7 +60,7 @@ pub(super) fn element(scene: &mut Scene, parent: u32, r: [f32; 4], color: Option
         pivot: Vec2::ZERO,
         anchored_position: Vec2::new(r[0], r[1]),
         size_delta: Vec2::new(r[2], r[3]),
-        world_anchor: None,
+        ..Default::default()
     };
     scene.world.set_rect_transform(id, Some(rt));
     let image = color.map(|color| ImageComponent {
