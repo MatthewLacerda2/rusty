@@ -6,11 +6,11 @@
 //! skipped in `Converted` and fails on anything else, and `convert::refresh`
 //! alone warns. Under `src/asset/convert/`, every module but [`NOT_CONVERTERS`]
 //! is a converter's, a folder or a single file, and a code line there that names
-//! `log::`, a bare logging macro or a print is a finding, as is one that throws a
-//! result away with `_ = …` or `.ok();`. Its root (`<name>/mod.rs` or `<name>.rs`)
-//! must also carry [`DENY`], so `let _ =` cannot drop a `Result` there. A
-//! `drop(result)` gets past both. A real need says why with
-//! `// lint: allow(converter-log) <why>`.
+//! `log::` or a bare logging macro is a finding. Its root (`<name>/mod.rs` or
+//! `<name>.rs`) must also carry [`DENY`], however rustfmt wraps it: clippy, not
+//! this scan, then refuses `let _ =` on a `Result`, a discarded `.ok()` and a
+//! print there. A `drop(result)` or `_ = expr;` gets past both. A real need says
+//! why with `// lint: allow(converter-log) <why>`.
 
 use super::finding::Finding;
 use super::scan::Scan;
@@ -22,25 +22,17 @@ const ROOT: &str = "src/asset/convert/";
 /// its stamp record, which report, the swap, and the cache's tests. A new module
 /// of the cache's own goes here.
 const NOT_CONVERTERS: &[&str] = &["lock", "mod", "record", "stage", "tests"];
-/// What a converter's root module carries.
-pub const DENY: &str = "#![deny(clippy::let_underscore_must_use)]";
+/// What a converter's root module carries: every lint it names, in one inner
+/// `deny`, wrapped or not.
+pub const DENY: &str = "#![deny(clippy::let_underscore_must_use, clippy::unused_result_ok, \
+                        clippy::print_stdout, clippy::print_stderr)]";
 /// What a converter must not call.
 const LOGGING: &[&str] = &[
-    "log::",
-    "log!",
-    "warn!",
-    "error!",
-    "info!",
-    "debug!",
-    "trace!",
-    "print!",
-    "println!",
-    "eprint!",
-    "eprintln!",
+    "log::", "log!", "warn!", "error!", "info!", "debug!", "trace!",
 ];
 
-/// Every logging or discarding line of a converter's source, and a converter
-/// root without [`DENY`].
+/// Every logging line of a converter's source, and a converter root without
+/// [`DENY`].
 pub fn check(path: &str, source: &str) -> Vec<Finding> {
     let Some(name) = converter(path) else {
         return Vec::new();
@@ -60,15 +52,10 @@ pub fn check(path: &str, source: &str) -> Vec<Finding> {
                 i + 1,
                 "a converter never logs: return the skip in `Converted`, or fail",
             ));
-        } else if discards(code) {
-            found.push(finding(
-                i + 1,
-                "a converter never discards a result: return it with `?`, or a skip",
-            ));
         }
     }
     let root = path == format!("{ROOT}{name}/mod.rs") || path == format!("{ROOT}{name}.rs");
-    if root && !source.lines().any(|l| l.trim() == DENY) {
+    if root && !denies(source) {
         found.push(finding(
             1,
             &format!("a converter's root carries `{DENY}` (a cache module: `NOT_CONVERTERS`)"),
@@ -99,15 +86,38 @@ fn logs(code: &str) -> bool {
     })
 }
 
-/// Does `code` throw a result away: `_ = expr;`, or a statement ending `.ok();`
-/// whose value nothing binds?
-fn discards(code: &str) -> bool {
-    let code = code.trim();
-    let binds = code.starts_with("let ") || code.contains(" = ");
-    let assigns = code
-        .strip_prefix("_ =")
-        .is_some_and(|r| !r.starts_with('>'));
-    assigns || code.ends_with(".ok();") && !binds
+/// Does `source` carry an inner `#![deny(…)]` naming every lint [`DENY`] names?
+/// Read across the lines rustfmt wraps it over, comments stripped.
+fn denies(source: &str) -> bool {
+    let wanted = lints(DENY).unwrap_or_default();
+    let mut open = Open::None;
+    let mut attr: Option<String> = None;
+    for line in source.lines() {
+        let code = strip_comment(line, &mut open).trim();
+        let text = match attr.take() {
+            Some(text) => text + code,
+            None if code.starts_with("#![deny(") => code.to_string(),
+            None => continue,
+        };
+        match lints(&text) {
+            Some(named) if wanted.iter().all(|l| named.contains(l)) => return true,
+            Some(_) => {}
+            None => attr = Some(text),
+        }
+    }
+    false
+}
+
+/// The lints a whole `#![deny(…)]` names; `None` while it is not closed yet.
+fn lints(attr: &str) -> Option<Vec<&str>> {
+    let inner = attr.strip_prefix("#![deny(")?.strip_suffix(")]")?;
+    Some(
+        inner
+            .split(',')
+            .map(str::trim)
+            .filter(|l| !l.is_empty())
+            .collect(),
+    )
 }
 
 /// The rule over every scanned file.

@@ -21,7 +21,9 @@ fn a_project_caches_beside_its_generated_assets_under_the_whole_source_path() {
 /// The cache of the project-relative `parts`, in a project at `root`.
 fn cache_of(root: &Path, parts: &[impl AsRef<str>]) -> std::path::PathBuf {
     let parts: Vec<&str> = parts.iter().map(AsRef::as_ref).collect();
-    let rel = project_relative(root, Path::new(&parts.join("/"))).expect("in the project");
+    let rel = project_relative(root, Path::new(&parts.join("/")))
+        .unwrap()
+        .expect("in the project");
     cache_path(root, &rel)
 }
 
@@ -69,24 +71,21 @@ proptest! {
 #[test]
 fn project_relative_keeps_a_backslash_and_drops_a_leading_dot() {
     let root = project();
-    let rel = |p: &str| project_relative(&root, Path::new(p));
+    let rel = |p: &str| project_relative(&root, Path::new(p)).unwrap();
     assert_eq!(rel(r"a\b.fbx").as_deref(), Some(Path::new(r"a\b.fbx")));
     assert_eq!(rel("./a/b.fbx").as_deref(), Some(Path::new("a/b.fbx")));
     assert_eq!(rel("../a.fbx"), None);
     assert_ne!(cache_of(&root, &["A.fbx"]), cache_of(&root, &["a.fbx"]));
 }
 
-/// Two names that are not UTF-8 and differ only in an invalid byte stay two
-/// caches: the key is built from raw components, never lossy strings.
+/// A name that is not UTF-8 is refused, so every name the cache derives from
+/// it is exact.
 #[cfg(unix)]
 #[test]
-fn non_utf8_names_keep_distinct_caches() {
+fn a_non_utf8_source_path_is_refused() {
     use std::ffi::OsStr;
     use std::os::unix::ffi::OsStrExt;
     let root = project();
-    let cache = |name: &[u8]| {
-        let rel = project_relative(&root, Path::new(OsStr::from_bytes(name))).unwrap();
-        cache_path(&root, &rel)
-    };
-    assert_ne!(cache(b"a\xff.fbx"), cache(b"a\xfe.fbx"));
+    let name = Path::new(OsStr::from_bytes(b"props/a\xff.fbx"));
+    assert!(project_relative(&root, name).is_err());
 }

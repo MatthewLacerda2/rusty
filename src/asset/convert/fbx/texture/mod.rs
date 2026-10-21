@@ -37,11 +37,12 @@ impl Textures {
     /// The textures of the `.glb` `to` stages.
     pub fn new(to: &Staging) -> Self {
         Self {
-            out_dir: to
-                .out
-                .parent()
-                .unwrap_or_else(|| Path::new(""))
-                .to_path_buf(),
+            // `.` for a bare file name, as `stage` reads it: a URI is relative to
+            // a folder that exists.
+            out_dir: match to.out.parent() {
+                Some(dir) if !dir.as_os_str().is_empty() => dir.to_path_buf(),
+                _ => PathBuf::from("."),
+            },
             dir: to.textures.clone(),
             by_id: Map::default(),
             written: Vec::new(),
@@ -87,12 +88,16 @@ impl Textures {
         }
         let name = unique(&stem, &ext, &self.written);
         self.extract(&name, &texture.content)?;
-        let dir = self
-            .dir
-            .file_name()
-            .map(|d| d.to_string_lossy().into_owned());
-        self.written.push(name.clone());
-        Ok(dir.map(|dir| uri::encode_path(&format!("{dir}/{name}"))))
+        let Some(dir) = self.dir.file_name() else {
+            return Err(ImportError::Parse(format!(
+                "FBX texture `{}`: {} names no folder to reference",
+                texture.element.name,
+                self.dir.display()
+            )));
+        };
+        let uri = uri::encode_path(&format!("{}/{name}", dir.to_string_lossy()));
+        self.written.push(name);
+        Ok(Some(uri))
     }
 
     /// Record `texture` as left out, for `why`: no URI.

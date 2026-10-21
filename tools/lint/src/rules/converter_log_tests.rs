@@ -12,10 +12,7 @@ fn flags_a_converter_logging_a_failed_extract() {
     let src = "Err(e) => {\n    log::warn!(\"[Asset] FBX texture: {e}\");\n    None\n}\n";
     let found: Vec<_> = check(FBX, src).iter().map(|f| (f.line, f.rule)).collect();
     assert_eq!(found, [(2, RULE)]);
-    for call in ["warn!(\"x\");", "eprintln!(\"x\");", "print!(\"x\");"] {
-        assert_eq!(lines(FBX, call), [1], "{call}");
-    }
-    for call in ["eprint!(\"x\");", "log!(Level::Warn, \"x\");"] {
+    for call in ["warn!(\"x\");", "log!(Level::Warn, \"x\");"] {
         assert_eq!(lines(FBX, call), [1], "{call}");
     }
     // A future converter's folder is a converter's too.
@@ -41,11 +38,21 @@ fn a_slash_slash_in_a_string_hides_nothing() {
 }
 
 #[test]
-fn flags_a_discarded_result() {
-    assert_eq!(lines(FBX, "    _ = std::fs::remove_file(p);\n"), [1]);
-    assert_eq!(lines(FBX, "    std::fs::remove_file(p).ok();\n"), [1]);
-    let kept = "let found = map.get(k).ok();\nlet _x = 1;\n    _ => {}\n";
-    assert!(check(FBX, kept).is_empty());
+fn a_deny_missing_a_lint_is_flagged() {
+    let root = "src/asset/convert/glb/mod.rs";
+    let old = "#![deny(clippy::let_underscore_must_use)]\nmod bin;\n";
+    assert_eq!(lines(root, old), [1]);
+    let unclosed = "#![deny(\n    clippy::let_underscore_must_use,\nmod bin;\n";
+    assert_eq!(lines(root, unclosed), [1]);
+}
+
+#[test]
+fn a_wrapped_or_commented_deny_passes() {
+    let root = "src/asset/convert/glb/mod.rs";
+    let wrapped = "#![deny(\n    clippy::let_underscore_must_use,\n    clippy::unused_result_ok,\n    \
+                   clippy::print_stdout, // stdout belongs to the shell\n    clippy::print_stderr\n)]\n";
+    assert!(check(root, wrapped).is_empty());
+    assert!(check(root, &format!("{DENY} // why\nmod bin;\n")).is_empty());
 }
 
 #[test]
@@ -54,7 +61,7 @@ fn passes_the_same_skip_returned_and_code_outside_a_converter() {
     assert!(check(FBX, src).is_empty());
     assert!(check(FBX, "let dialog::warn = catalog::x;\n").is_empty());
     assert!(check(FBX, "catalog!(x);\n").is_empty());
-    let warn = "log::warn!(\"[Asset] {skip}\");\n_ = x;\n";
+    let warn = "log::warn!(\"[Asset] {skip}\");\n";
     for path in [
         "src/asset/convert/mod.rs",
         "src/asset/convert/lock.rs",

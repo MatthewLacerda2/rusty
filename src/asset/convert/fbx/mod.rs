@@ -10,9 +10,15 @@
 //!
 //! A converter never logs or drops a `Result`: what it leaves out on purpose is a
 //! [`Skip`] in what it returns, and any failure fails the conversion (#1172).
-// A `let _ =` here would drop a failure the cache must not be stamped over; the
-// rest of the crate keeps `let _ =` for best-effort cleanup, so not crate-wide.
-#![deny(clippy::let_underscore_must_use)]
+// A converter's (#1172): a `let _ =` or a discarded `.ok()` here would drop a
+// failure the cache must not be stamped over, and a print would bypass the one
+// warning path; the rest of the crate keeps `let _ =` for best-effort cleanup.
+#![deny(
+    clippy::let_underscore_must_use,
+    clippy::unused_result_ok,
+    clippy::print_stdout,
+    clippy::print_stderr
+)]
 
 mod anim;
 mod basis;

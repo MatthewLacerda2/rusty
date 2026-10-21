@@ -123,7 +123,7 @@ pub fn cached_gltf(path: &Path) -> Result<PathBuf, ImportError> {
     let converter = converter_for(path)
         .ok_or_else(|| ImportError::UnsupportedFormat(paths::extension(path)))?;
     let root = Path::new(".");
-    let out = match project_relative(root, path) {
+    let out = match project_relative(root, path)? {
         Some(rel) => cache_path(root, &rel),
         None => temp_path(path),
     };
@@ -201,13 +201,36 @@ pub fn is_import_cache(path: &Path) -> bool {
 }
 
 /// `path` relative to `root`, when `root` is a project and `path` lies in it.
-/// Rebuilt from its raw components, never from lossy strings or by rewriting `\`:
-/// two non-UTF-8 names stay two, and on Linux and macOS a `\` is part of a file
-/// name, so `a\b.fbx` is not `a/b.fbx`.
-fn project_relative(root: &Path, path: &Path) -> Option<PathBuf> {
+/// Rebuilt from its components, never by rewriting `\`: on Linux and macOS a `\`
+/// is part of a file name, so `a\b.fbx` is not `a/b.fbx`. A name that is not
+/// UTF-8 is refused, so every name the cache derives from it (`stage`'s siblings)
+/// is exact.
+fn project_relative(root: &Path, path: &Path) -> Result<Option<PathBuf>, ImportError> {
     if !root.join(project::PROJECT_FILE).is_file() {
-        return None;
+        return Ok(None);
     }
+    let Some(rel) = relative_to_cwd(path) else {
+        return Ok(None);
+    };
+    let mut parts = PathBuf::new();
+    for component in rel.components() {
+        match component {
+            Component::Normal(part) if part.to_str().is_none() => {
+                return Err(ImportError::Parse(format!(
+                    "{}: a source path must be UTF-8",
+                    path.display()
+                )))
+            }
+            Component::Normal(part) => parts.push(part),
+            Component::CurDir => {}
+            _ => return Ok(None),
+        }
+    }
+    Ok((!parts.as_os_str().is_empty()).then_some(parts))
+}
+
+/// `path` relative to the working directory, if it lies in it.
+fn relative_to_cwd(path: &Path) -> Option<PathBuf> {
     let rel = if path.is_relative() {
         path.to_path_buf()
     } else {
@@ -224,15 +247,7 @@ fn project_relative(root: &Path, path: &Path) -> Option<PathBuf> {
             }
         }
     };
-    let mut parts = PathBuf::new();
-    for component in rel.components() {
-        match component {
-            Component::Normal(part) => parts.push(part),
-            Component::CurDir => {}
-            _ => return None,
-        }
-    }
-    (!parts.as_os_str().is_empty()).then_some(parts)
+    Some(rel)
 }
 
 /// Outside a project: a file in the temp folder named by the source's absolute

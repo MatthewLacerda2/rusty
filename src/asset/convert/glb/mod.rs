@@ -9,9 +9,15 @@
 //!
 //! A converter backed by another tool (Blender, #1072) writes its own glTF and
 //! never touches this module.
-// A converter's: a `let _ =` here would drop a failure the cache must not be
-// stamped over (#1172); the rest of the crate keeps it for best-effort cleanup.
-#![deny(clippy::let_underscore_must_use)]
+// A converter's (#1172): a `let _ =` or a discarded `.ok()` here would drop a
+// failure the cache must not be stamped over, and a print would bypass the one
+// warning path; the rest of the crate keeps `let _ =` for best-effort cleanup.
+#![deny(
+    clippy::let_underscore_must_use,
+    clippy::unused_result_ok,
+    clippy::print_stdout,
+    clippy::print_stderr
+)]
 
 mod anim;
 mod bin;
