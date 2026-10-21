@@ -34,28 +34,51 @@ fn head<'a>(lines: &[&'a str], from: usize) -> Option<&'a str> {
     for raw in &lines[from..] {
         let in_attr = depth > 0 || open != Open::None;
         let (code, delta) = brackets(raw, &mut open);
-        let code = code.trim();
         depth += delta;
-        if in_attr || code.is_empty() || code.starts_with("#[") {
+        if in_attr {
             continue;
         }
         // An attribute and its item can share a line: `#[cfg(test)] use a::B;`.
+        let code = strip_attrs(code.trim());
+        if code.is_empty() {
+            continue;
+        }
         return Some(code);
     }
     None
 }
 
+/// `code` past its leading complete `#[…]` attributes; empty when an attribute
+/// runs on past the line (its brackets carry `head` into the next lines).
+fn strip_attrs(code: &str) -> &str {
+    let mut rest = code;
+    while rest.starts_with("#[") {
+        let (mut depth, mut open) = (0i32, Open::None);
+        let mut end = None;
+        scan(rest, &mut open, |at, c| {
+            depth += match c {
+                '[' => 1,
+                ']' => -1,
+                _ => 0,
+            };
+            if c == ']' && depth == 0 && end.is_none() {
+                end = Some(at + 1);
+            }
+        });
+        let Some(end) = end else {
+            return "";
+        };
+        rest = rest[end..].trim_start();
+    }
+    rest
+}
+
 /// Does `code` open an item (`pub(crate) unsafe fn`, `impl<T>`, `mod x`, …)
-/// rather than a field, variant, arm or statement? An attribute on the same line
-/// is skipped first.
+/// rather than a field, variant, arm or statement? `union` and `macro_rules` are
+/// item heads only before an item (`union X {`, `macro_rules! x`): a field may be
+/// named `union`.
 fn is_item_head(code: &str) -> bool {
     let mut rest = code;
-    while let Some(attr) = rest.strip_prefix("#[") {
-        let Some(end) = attr.find(']') else {
-            return false;
-        };
-        rest = attr[end + 1..].trim_start();
-    }
     loop {
         let word = rest.split(|c: char| !super::scan::is_ident(c)).next();
         let word = word.unwrap_or("");
@@ -66,7 +89,9 @@ fn is_item_head(code: &str) -> bool {
             }
             "pub" | "unsafe" | "async" | "default" => {}
             "fn" | "impl" | "mod" | "struct" | "enum" | "trait" | "use" | "const" | "static"
-            | "type" | "union" | "extern" | "macro_rules" => return true,
+            | "type" | "extern" => return true,
+            "union" => return rest.starts_with(super::scan::is_ident),
+            "macro_rules" => return rest.starts_with('!'),
             _ => return false,
         }
     }
@@ -74,7 +99,7 @@ fn is_item_head(code: &str) -> bool {
 
 /// A string literal still open at the end of a line.
 #[derive(Clone, Copy, PartialEq, Debug)]
-enum Open {
+pub enum Open {
     None,
     /// `"…`, closed by an unescaped `"`.
     Escaped,
@@ -87,7 +112,7 @@ enum Open {
 /// ends.
 fn brackets<'a>(line: &'a str, open: &mut Open) -> (&'a str, i32) {
     let mut delta = 0;
-    let end = scan(line, open, |c| match c {
+    let end = scan(line, open, |_, c| match c {
         '{' | '(' | '[' => delta += 1,
         '}' | ')' | ']' => delta -= 1,
         _ => {}
@@ -95,15 +120,16 @@ fn brackets<'a>(line: &'a str, open: &mut Open) -> (&'a str, i32) {
     (&line[..end], delta)
 }
 
-/// `line` without its `//` comment; a `//` inside a string literal is kept.
-pub fn strip_comment(line: &str) -> &str {
-    &line[..scan(line, &mut Open::None, |_| {})]
+/// `line` without its `//` comment, starting inside `open` and leaving it as the
+/// line ends; a `//` inside a string literal is kept.
+pub fn strip_comment<'a>(line: &'a str, open: &mut Open) -> &'a str {
+    &line[..scan(line, open, |_, _| {})]
 }
 
-/// Walks `line` from inside `open`, calling `f` on each char outside string and
-/// char literals, and returns where its code ends: the first `//` outside a
+/// Walks `line` from inside `open`, calling `f` with each char (and its byte
+/// offset) outside string and char literals, and returns where its code ends: the first `//` outside a
 /// literal, or the line's end. A string still open at the end is left in `open`.
-fn scan(line: &str, open: &mut Open, mut f: impl FnMut(char)) -> usize {
+fn scan(line: &str, open: &mut Open, mut f: impl FnMut(usize, char)) -> usize {
     let bytes = line.as_bytes();
     let mut i = 0;
     if *open != Open::None {
@@ -119,7 +145,7 @@ fn scan(line: &str, open: &mut Open, mut f: impl FnMut(char)) -> usize {
         }
         let literal = match bytes[i] {
             b'"' => Some((i + 1, Open::Escaped)),
-            b'r' if !ident_before(line, i) => raw_start(line, i + 1),
+            b'r' if !ident_before(line, i) || raw_prefix(line, i) => raw_start(line, i + 1),
             b'\'' => {
                 if let Some(next) = char_end(line, i + 1) {
                     i = next;
@@ -140,7 +166,7 @@ fn scan(line: &str, open: &mut Open, mut f: impl FnMut(char)) -> usize {
             continue;
         }
         let c = rest.chars().next().unwrap_or(' ');
-        f(c);
+        f(i, c);
         i += c.len_utf8();
     }
     bytes.len()
@@ -151,6 +177,11 @@ fn ident_before(line: &str, at: usize) -> bool {
         .chars()
         .next_back()
         .is_some_and(super::scan::is_ident)
+}
+
+/// Is the `r` at `at` the second letter of a `br"…"` or `cr"…"` raw string?
+fn raw_prefix(line: &str, at: usize) -> bool {
+    at >= 1 && matches!(line.as_bytes()[at - 1], b'b' | b'c') && !ident_before(line, at - 1)
 }
 
 /// After an `r` at `from - 1`: where a raw string's body starts, and its kind.

@@ -1,4 +1,4 @@
-use super::{brackets, item_end, strip_comment, Open};
+use super::{brackets, head, is_item_head, item_end, strip_comment, Open};
 
 fn bracket_delta(code: &str) -> i32 {
     brackets(code, &mut Open::None).1
@@ -22,6 +22,37 @@ fn a_gated_fn_ends_at_its_body_whatever_its_signature_wraps() {
     assert_eq!(end(wrapped_generics, 1), 6);
     let wrapped_impl = "#[cfg(test)]\npub(crate) impl<T> X for Y<T>\nwhere\n    T: A,\n{\n}\n";
     assert_eq!(end(wrapped_impl, 1), 6);
+}
+
+#[test]
+fn an_attribute_sharing_its_items_line_is_stripped_from_the_head() {
+    let lines = ["#[cfg(test)] #[allow(x)] use crate::x::{", "    A,", "};"];
+    assert_eq!(head(&lines, 0), Some("use crate::x::{"));
+    let lines = ["#[cfg(all(", "    test,", "))]", "fn f() {}"];
+    assert_eq!(head(&lines, 0), Some("fn f() {}"));
+    let wrapped_where = "#[cfg(test)] fn f<T>(t: T)\nwhere\n    T: Clone,\n{\n    t;\n}\nfn g() {}";
+    assert_eq!(end(wrapped_where, 1), 6);
+    let one_line_mod = "#[cfg(test)] mod tests {\n    fn t() {}\n}\nx";
+    assert_eq!(
+        head(&one_line_mod.lines().collect::<Vec<_>>(), 0),
+        Some("mod tests {")
+    );
+    assert_eq!(end(one_line_mod, 1), 3);
+}
+
+#[test]
+fn union_and_macro_rules_head_an_item_only_before_one() {
+    assert!(is_item_head("pub union X {"));
+    assert!(is_item_head("macro_rules! x {"));
+    assert!(!is_item_head("union: u8,"));
+    assert!(!is_item_head("macro_rules: Vec<u8>,"));
+    assert_eq!(
+        end(
+            "struct S {\n    #[cfg(test)]\n    union: Vec<(\n        u8,\n    )>,\n    b: u8,\n}",
+            2
+        ),
+        5
+    );
 }
 
 #[test]
@@ -78,13 +109,20 @@ fn brackets_and_slashes_inside_literals_do_not_count() {
     assert_eq!(bracket_delta(r#"let s = "]";"#), 0);
     assert_eq!(bracket_delta(r#"let s = "a\"(";"#), 0);
     assert_eq!(bracket_delta(r##"let s = r#"("#;"##), 0);
+    assert_eq!(bracket_delta(r##"let s = br#"a"(b"#;"##), 0);
+    let mut open = Open::None;
+    assert_eq!(brackets(r#"f(cr"\")"#, &mut open).1, 0);
+    assert_eq!(open, Open::None);
     assert_eq!(bracket_delta("fn f<'a>(x: &'a u8) {"), 1);
     assert_eq!(bracket_delta(r"Some('\'')"), 0);
     assert_eq!(
-        strip_comment(r#"let u = "rusty://x"; // (note"#),
+        strip_comment(r#"let u = "rusty://x"; // (note"#, &mut Open::None),
         r#"let u = "rusty://x"; "#
     );
-    assert_eq!(strip_comment("let x = 1; // crate::render"), "let x = 1; ");
+    assert_eq!(
+        strip_comment("let x = 1; // crate::render", &mut Open::None),
+        "let x = 1; "
+    );
 }
 
 #[test]

@@ -189,7 +189,8 @@ new flag, gate, CI step or baseline.
   gated `mod x;` covers only its own line (#1120). Brackets and `//` inside a
   string or char literal don't count, a string that spans lines (a multi-line raw
   string) included; a `/* */` comment is read as code, so brackets in one can
-  still move an item's end. `any(test, …)` is not test-only, so it stays production code. The
+  still move an item's end. A gated field or `let` whose generic type wraps over
+  lines can end early, at a `,` inside its `<…>`. `any(test, …)` is not test-only, so it stays production code. The
   layering lint and the clippy test exemption classify their own way.
 - **`test-inner-cfg`, `test-user-workspace`, `test-gpu-entry`** (#980) — three
   `docs/testing.md` locks on test code; comment lines never count. A `tests/` file never gates itself with an inner `#![cfg(…)]` (gate

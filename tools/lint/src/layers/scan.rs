@@ -5,7 +5,7 @@
 //! with every file it declares in turn. Not a parser — a coarse line scan, like the
 //! direction guard.
 
-use super::extent::{item_end, strip_comment};
+use super::extent::{item_end, strip_comment, Open};
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -152,15 +152,18 @@ pub fn refs(content: &str) -> Vec<Ref> {
 }
 
 /// The lines of `content` that are live (non-test) code, numbered from 1, each with
-/// its `//` comment stripped. Shared with the external-crate scan.
+/// its `//` comment stripped (a string open across lines carried, so a `//` inside
+/// it is kept and one after it is cut). Shared with the external-crate scan.
 pub fn live_lines(content: &str) -> Vec<(usize, &str)> {
     let lines: Vec<&str> = content.lines().collect();
     let mut out = Vec::new();
-    let mut i = 0;
+    let (mut i, mut open) = (0, Open::None);
     while i < lines.len() {
-        let code = strip_comment(lines[i]);
-        if is_test_cfg(code.trim()) {
+        let inside = open != Open::None;
+        let code = strip_comment(lines[i], &mut open);
+        if !inside && is_test_cfg(code.trim()) {
             i = item_end(&lines, i) + 1;
+            open = Open::None;
             continue;
         }
         out.push((i + 1, code));
