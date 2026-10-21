@@ -152,11 +152,11 @@ pub fn refresh(converter: &Converter, source: &Path, out: &Path) -> Result<(), I
     let _lock = lock::hold(out);
     let skipped = match current(out, &stamp) {
         Some(skipped) => skipped,
-        None => stage::convert(converter, source, out, &stamp)?
-            .skipped
-            .iter()
-            .map(Skip::line)
-            .collect(),
+        None => match stage::convert(converter, source, out, &stamp) {
+            Ok(converted) => converted.skipped.iter().map(Skip::line).collect(),
+            // Without a lock, another process converted the same source meanwhile.
+            Err(e) => current(out, &stamp).ok_or(e)?,
+        },
     };
     report(source, &skipped);
     Ok(())
