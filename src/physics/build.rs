@@ -2,8 +2,7 @@
 //!
 //! Pure mapping from the engine's component model to rapier builders, plus the
 //! body-class decision and the per-tick body-state snapshot. Kept out of
-//! `world.rs` so that file stays focused on the step/sync lifecycle (and under
-//! the size cap).
+//! `world.rs` so that file stays focused on the step/sync lifecycle.
 
 use glam::{Quat, Vec3};
 use rapier3d::prelude::*;
@@ -182,6 +181,8 @@ pub(super) fn body_state(scene: &Scene, id: u32) -> Option<EntityBodyState> {
 
 /// Build a parry collider shape from the engine's `ColliderShape`, baking in the
 /// transform's (lossy, non-uniform) world scale the same way the legacy AABB did.
+/// A mirror (a negative axis; glam puts it in `scale.x`) keeps a primitive's size,
+/// Unity-style: sizes come from `scale.abs()`, and only a mesh is reflected (#1124).
 ///
 /// Returns `None` for a mesh collider whose geometry is missing or degenerate
 /// (too few vertices for a hull, or no triangles for a trimesh); the caller skips
@@ -194,16 +195,16 @@ pub(super) fn build_shape(
 ) -> Option<Collider> {
     let collider = match shape {
         ColliderShape::Box { size } => {
-            let h = *size * scale * 0.5;
+            let h = *size * scale.abs() * 0.5;
             ColliderBuilder::cuboid(h.x.max(1e-4), h.y.max(1e-4), h.z.max(1e-4)).build()
         }
         ColliderShape::Sphere { radius } => {
-            let r = (*radius * scale.max_element()).max(1e-4);
+            let r = (*radius * scale.abs().max_element()).max(1e-4);
             ColliderBuilder::ball(r).build()
         }
         ColliderShape::Cylinder { radius, height } => {
-            let r = (*radius * scale.x).max(1e-4);
-            let half_h = (*height * scale.y * 0.5).max(1e-4);
+            let r = (*radius * scale.x.abs()).max(1e-4);
+            let half_h = (*height * scale.y.abs() * 0.5).max(1e-4);
             ColliderBuilder::cylinder(half_h, r).build()
         }
         ColliderShape::Capsule {
@@ -211,7 +212,9 @@ pub(super) fn build_shape(
             height,
             axis,
         } => capsule_builder(*radius, *height, *axis, scale).build(),
-        ColliderShape::Mesh { convex, .. } => return build_mesh_shape(*convex, scale, mesh?),
+        ColliderShape::Mesh { convex, .. } => {
+            return super::mesh_shape::build_mesh_shape(*convex, scale, mesh?)
+        }
     };
     Some(collider)
 }
@@ -231,46 +234,16 @@ fn capsule_builder(radius: f32, height: f32, axis: CapsuleAxis, scale: Vec3) -> 
 
 /// A capsule's `(half_segment, radius)` with the world scale baked in, as
 /// [`capsule_builder`] builds it — shared with the CharacterController's sweep so
-/// the shape it moves is the shape others collide with.
+/// the shape it moves is the shape others collide with. A mirrored axis keeps its size.
 pub(super) fn capsule_dims(radius: f32, height: f32, axis: CapsuleAxis, scale: Vec3) -> (f32, f32) {
+    let s = scale.abs();
     let (along, cross) = match axis {
-        CapsuleAxis::X => (scale.x, scale.y.max(scale.z)),
-        CapsuleAxis::Y => (scale.y, scale.x.max(scale.z)),
-        CapsuleAxis::Z => (scale.z, scale.x.max(scale.y)),
+        CapsuleAxis::X => (s.x, s.y.max(s.z)),
+        CapsuleAxis::Y => (s.y, s.x.max(s.z)),
+        CapsuleAxis::Z => (s.z, s.x.max(s.y)),
     };
     let r = (radius * cross).max(1e-4);
     (((height * along * 0.5) - r).max(0.0), r)
-}
-
-/// Build a trimesh or convex-hull collider from rest-pose mesh geometry (#77),
-/// baking the world scale into each point. `None` if the geometry is too sparse to
-/// form a valid shape.
-fn build_mesh_shape(convex: bool, scale: Vec3, mesh: (&[[f32; 3]], &[u32])) -> Option<Collider> {
-    let (positions, indices) = mesh;
-    if positions.len() < 4 {
-        return None;
-    }
-    let points: Vec<Vector> = positions
-        .iter()
-        .map(|p| Vector::new(p[0] * scale.x, p[1] * scale.y, p[2] * scale.z))
-        .collect();
-
-    if convex {
-        // A convex hull is the cheaper, dynamic-body-friendly option.
-        ColliderBuilder::convex_hull(&points).map(|b| b.build())
-    } else {
-        // An exact triangle mesh — static geometry only, but a tight fit.
-        let triangles: Vec<[u32; 3]> = indices
-            .chunks_exact(3)
-            .map(|c| [c[0], c[1], c[2]])
-            .collect();
-        if triangles.is_empty() {
-            return None;
-        }
-        ColliderBuilder::trimesh(points, triangles)
-            .ok()
-            .map(|b| b.build())
-    }
 }
 
 /// rapier collision + solver groups for a collider on `layer`: it is a member of

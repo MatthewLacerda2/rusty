@@ -37,6 +37,9 @@ mod live_tests;
 mod material;
 #[cfg(test)]
 mod material_tests;
+mod mesh_shape;
+#[cfg(test)]
+mod mirror_tests;
 mod query;
 #[cfg(test)]
 mod query_tests;
