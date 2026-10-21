@@ -4,27 +4,31 @@
 //! it converts the file's units to metres, bakes pivots and geometric transforms into the geometry, and fills a PBR view
 //! of every material whatever its shading model. This module turns the file's axes
 //! into glTF's (`basis`) and walks the result into a [`glb::Document`]: the node hierarchy, one glTF mesh per FBX mesh split
-//! into a primitive per material, base-colour materials, skins, and one
+//! into a primitive per material, base-colour materials (embedded textures
+//! extracted beside the `.glb`, `texture`), skins, and one
 //! animation per animation stack (`anim`).
 
 mod anim;
 mod basis;
 mod material;
 mod mesh;
+mod texture;
 
 use super::glb;
 use crate::asset::ImportError;
 use crate::core::collections::Map;
 use basis::Basis;
 use std::path::Path;
+use texture::Textures;
 
-/// Convert the FBX at `source` into a `.glb` at `out`.
+/// Convert the FBX at `source` into a `.glb` at `out`, its embedded textures
+/// extracted beside it (`texture`).
 pub fn convert(source: &Path, out: &Path) -> Result<(), ImportError> {
     let scene = load(source)?;
-    let out_dir = out.parent().unwrap_or_else(|| Path::new(""));
-    let document = document(&scene, out_dir)?;
-    std::fs::write(out, glb::write(&document))
-        .map_err(|e| ImportError::Parse(format!("writing {}: {e}", out.display())))
+    let mut textures = Textures::new(out);
+    let document = document(&scene, &mut textures)?;
+    textures.finish();
+    super::write_atomic(out, &glb::write(&document))
 }
 
 /// The FBX at `source`, read by ufbx in metres.
@@ -41,14 +45,14 @@ fn load(source: &Path) -> Result<ufbx::SceneRoot, ImportError> {
         .map_err(|e| ImportError::Parse(format!("{}: {e:?}", source.display())))
 }
 
-/// The glTF document for a loaded FBX scene. Texture URIs are made relative to
-/// `out_dir`, where the `.glb` is written.
-fn document(scene: &ufbx::Scene, out_dir: &Path) -> Result<glb::Document, ImportError> {
+/// The glTF document for a loaded FBX scene, its textures resolved through
+/// `textures`.
+fn document(scene: &ufbx::Scene, textures: &mut Textures) -> Result<glb::Document, ImportError> {
     let mut doc = glb::Document {
         materials: scene
             .materials
             .iter()
-            .map(|m| material::material(m, out_dir))
+            .map(|m| material::material(m, textures))
             .collect(),
         ..Default::default()
     };

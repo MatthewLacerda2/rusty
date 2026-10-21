@@ -6,11 +6,10 @@
 //! is not extracted yet.
 
 use super::glb;
-use crate::core::paths;
-use std::path::{Component, Path, PathBuf};
+use super::texture::Textures;
 
-/// `material` as a glTF material; `out_dir` is where the `.glb` is written.
-pub fn material(material: &ufbx::Material, out_dir: &Path) -> glb::Material {
+/// `material` as a glTF material, its textures resolved through `textures`.
+pub fn material(material: &ufbx::Material, textures: &mut Textures) -> glb::Material {
     let pbr = &material.pbr;
     let factor = |map: &ufbx::MaterialMap| value_or(map, 1.0);
     let rgb = |map: &ufbx::MaterialMap, scale: f32| {
@@ -29,8 +28,8 @@ pub fn material(material: &ufbx::Material, out_dir: &Path) -> glb::Material {
         metallic: value_or(&pbr.metalness, 0.0),
         roughness: value_or(&pbr.roughness, 0.5),
         emissive,
-        base_color_texture: texture_uri(&pbr.base_color, out_dir),
-        normal_texture: texture_uri(&pbr.normal_map, out_dir),
+        base_color_texture: textures.uri(&pbr.base_color),
+        normal_texture: textures.uri(&pbr.normal_map),
     }
 }
 
@@ -40,36 +39,4 @@ fn value_or(map: &ufbx::MaterialMap, default: f32) -> f32 {
     } else {
         default
     }
-}
-
-/// The URI, relative to `out_dir`, of the file `map`'s texture names, if that
-/// file exists.
-fn texture_uri(map: &ufbx::MaterialMap, out_dir: &Path) -> Option<String> {
-    let texture = map.texture.as_ref()?;
-    let file = [&texture.filename, &texture.absolute_filename]
-        .into_iter()
-        .map(|name| PathBuf::from(name.as_ref() as &str))
-        .find(|path| !path.as_os_str().is_empty() && path.is_file());
-    let Some(file) = file else {
-        log::warn!(
-            "[Asset] FBX texture `{}` is not a file on disk (embedded textures are not extracted yet)",
-            texture.element.name
-        );
-        return None;
-    };
-    relative_uri(out_dir, &file)
-}
-
-/// `target` as a `/`-separated path from directory `from`, both resolved first.
-pub fn relative_uri(from: &Path, target: &Path) -> Option<String> {
-    let from = paths::canonicalize(from).ok()?;
-    let target = paths::canonicalize(target).ok()?;
-    let from: Vec<Component> = from.components().collect();
-    let target: Vec<Component> = target.components().collect();
-    let shared = from.iter().zip(&target).take_while(|(a, b)| a == b).count();
-    let up = std::iter::repeat_n("..".to_string(), from.len() - shared);
-    let down = target[shared..]
-        .iter()
-        .map(|c| c.as_os_str().to_string_lossy().into_owned());
-    Some(up.chain(down).collect::<Vec<_>>().join("/"))
 }
