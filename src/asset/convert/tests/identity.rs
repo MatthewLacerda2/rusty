@@ -9,11 +9,11 @@ use std::path::Path;
 fn a_project_caches_beside_its_generated_assets_under_the_whole_source_path() {
     let root = Path::new("/game");
     assert_eq!(
-        cache_path(root, "assets/models/soldier.fbx"),
+        cache_path(root, Path::new("assets/models/soldier.fbx")),
         Path::new("/game/assets/generated/imported/assets/models/soldier.fbx.glb")
     );
     assert_eq!(
-        cache_path(root, "props/crate.FBX"),
+        cache_path(root, Path::new("props/crate.FBX")),
         Path::new("/game/assets/generated/imported/props/crate.FBX.glb")
     );
 }
@@ -70,8 +70,23 @@ proptest! {
 fn project_relative_keeps_a_backslash_and_drops_a_leading_dot() {
     let root = project();
     let rel = |p: &str| project_relative(&root, Path::new(p));
-    assert_eq!(rel(r"a\b.fbx").as_deref(), Some(r"a\b.fbx"));
-    assert_eq!(rel("./a/b.fbx").as_deref(), Some("a/b.fbx"));
+    assert_eq!(rel(r"a\b.fbx").as_deref(), Some(Path::new(r"a\b.fbx")));
+    assert_eq!(rel("./a/b.fbx").as_deref(), Some(Path::new("a/b.fbx")));
     assert_eq!(rel("../a.fbx"), None);
     assert_ne!(cache_of(&root, &["A.fbx"]), cache_of(&root, &["a.fbx"]));
+}
+
+/// Two names that are not UTF-8 and differ only in an invalid byte stay two
+/// caches: the key is built from raw components, never lossy strings.
+#[cfg(unix)]
+#[test]
+fn non_utf8_names_keep_distinct_caches() {
+    use std::ffi::OsStr;
+    use std::os::unix::ffi::OsStrExt;
+    let root = project();
+    let cache = |name: &[u8]| {
+        let rel = project_relative(&root, Path::new(OsStr::from_bytes(name))).unwrap();
+        cache_path(&root, &rel)
+    };
+    assert_ne!(cache(b"a\xff.fbx"), cache(b"a\xfe.fbx"));
 }

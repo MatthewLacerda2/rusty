@@ -1,7 +1,7 @@
 //! The cache's lock (#1166): on a `<cache>.lock` file, not the source, and taken
 //! only to convert.
 
-use super::super::{lock, refresh};
+use super::super::{lock, record, refresh};
 use super::COPY;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{channel, Receiver};
@@ -49,4 +49,25 @@ fn a_source_replaced_by_rename_still_waits_for_the_lock() {
     drop(held);
     assert_eq!(finished.recv_timeout(Duration::from_secs(10)), Ok(true));
     assert_eq!(std::fs::read_to_string(&out).unwrap(), "two");
+}
+
+#[test]
+fn a_save_while_waiting_for_the_lock_is_what_gets_stamped() {
+    let (source, out) = cached();
+    let held = lock::hold(&out).expect("this filesystem locks");
+    std::fs::write(&source, "two").unwrap();
+    let finished = refresh_elsewhere(&source, &out);
+    // The waiter read "two" before blocking; the exporter saves again meanwhile.
+    let early = finished.recv_timeout(Duration::from_millis(200));
+    assert!(early.is_err(), "converted while the lock was held");
+    std::fs::write(&source, "three").unwrap();
+    drop(held);
+    assert_eq!(finished.recv_timeout(Duration::from_secs(10)), Ok(true));
+    assert_eq!(std::fs::read_to_string(&out).unwrap(), "three");
+    let stamp = record::stamp(&COPY, b"three");
+    assert_eq!(
+        record::current(&out, &stamp),
+        Some(Vec::new()),
+        "stamped as what it holds"
+    );
 }

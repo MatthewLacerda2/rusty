@@ -22,7 +22,7 @@ agent can read exactly what failed.
 | Pushed = built | `tools/lint -- --rules` (`ignored`) | **hard gate**: no scanned `.rs` file may match a `.gitignore` pattern, tracked or not; no allow (#935) |
 | Ranged editor drags | `tools/lint -- --rules` (`drag-range`) | **hard gate**: a `DragValue` under `src/editor` bounds its range with `.ranged(..)` (`editor::widgets::DragRange`), never egui's `.range(..)`, which also rewrites an out-of-range value just by selecting the entity (#1158); a real need takes `// lint: allow(drag-range) <why>` |
 | One atomic write | `tools/lint -- --rules` (`atomic-write`) | **hard gate**: no line of `src/` outside `src/core/fs/` names `fs::rename` — a file a reader may open is written through `core::fs::write_atomic`; a rename that moves rather than writes takes `// lint: allow(atomic-write) <why>` (#1129) |
-| Converters report, never log | `tools/lint -- --rules` (`converter-log`) | **hard gate**: no code line under a converter's folder of `src/asset/convert/` (every folder but `stage` and `tests`) names `log::`, a bare logging macro or a print — a converter returns what it skipped in `Converted` and fails on anything else, and `convert::refresh` alone warns; each converter folder's `mod.rs` carries `#![deny(clippy::let_underscore_must_use)]` (#1172) |
+| Converters report, never log | `tools/lint -- --rules` (`converter-log`) | **hard gate**: no code line of a converter under `src/asset/convert/` (every module, folder or single file, but the cache's own `mod`, `lock`, `record`, `stage` and `tests`) names `log::`, a bare logging macro or a print, or throws a result away with `_ = …` or `.ok();` — a converter returns what it skipped in `Converted` and fails on anything else, and `convert::refresh` alone warns; each converter's root carries `#![deny(clippy::let_underscore_must_use)]` (#1172) |
 | No subprocesses | `tools/lint -- --rules` (`subprocess`) | **hard gate**: no line of `src/` names `std::process::Command` — the engine never shells out (to Blender or anything else); a real need takes `// lint: allow(subprocess) <why>` (#975) |
 | Tagged engine warnings | `tools/lint -- --rules` (`log-tag`) | **hard gate**: every engine warning or error in `src/` (`log::warn!` / `log::error!`, an imported bare `warn!` / `error!`, `log!` at `Level::Warn`/`Level::Error`) opens its message with its module, `[Asset] …`, since those records reach the console and the session/MCP replies (#1139); a message that is not a literal takes `// lint: allow(log-tag) <why>` |
 | Order-free lists stay sorted | `tools/lint -- --rules` (`sorted`) | **hard gate**: a list under a `// sorted: <why>` (or `<!-- sorted: <why> -->`) marker stays in order up to its first blank line, so two branches adding entries touch different lines (#911) |
@@ -266,16 +266,23 @@ new flag, gate, CI step or baseline.
 - **`converter-log`** (#1172) — a converter that logs a failure and carries on
   returns `Ok`, and the import cache stamps a `.glb` missing a part as current
   (#1168); one that logs a skip is heard once, then never again from the cache. So
-  under `src/asset/convert/<folder>/`, every folder but `stage` (the swap) and
-  `tests` is a converter's, and a code line there naming `log::`, a bare `warn!` /
-  `error!` / `info!` / `debug!` / `trace!` or a `println!` / `eprintln!` fails: the
-  converter returns the skip in `Converted`, and `refresh` warns of it, on the
-  conversion and again on every load from the cache. Each converter folder's
-  `mod.rs` must also carry `#![deny(clippy::let_underscore_must_use)]`, so a
-  `let _ =` cannot drop a `Result` there; that lint is per folder, not in
-  `Cargo.toml`, because the rest of the crate has some eighty best-effort
-  `let _ =` (a cleanup, a send to a closed channel). A future converter's folder
-  (`.blend`, #1072) is covered the day it is added (`rules/converter_log.rs`).
+  every module under `src/asset/convert/` but `mod`, `lock`, `record` (the
+  cache, its lock and its stamp record, which report), `stage` (the swap) and
+  `tests` is a converter's (a new module of the cache's own joins that list), a folder
+  (`fbx/`) or a single file (`blend.rs`), and a code line there naming `log::`, a
+  bare `log!` / `warn!` / `error!` / `info!` / `debug!` / `trace!` or a `print!` /
+  `println!` / `eprint!` / `eprintln!` fails: the converter returns the skip in
+  `Converted`, and `refresh` warns of it on the conversion and once per process
+  from the cache. A `//` inside a string literal (`"file://…"`) does not hide the
+  rest of the line. A line that throws a result away, `_ = expr;` or a statement
+  ending `.ok();` whose value nothing binds, fails too, and each converter's root
+  (`<name>/mod.rs` or `<name>.rs`) must carry
+  `#![deny(clippy::let_underscore_must_use)]`, so `let _ =` cannot drop a
+  `Result` there. A `drop(result)` gets past both. The clippy lint is per
+  converter, not in `Cargo.toml`, because the rest of the crate has some eighty
+  best-effort `let _ =` (a cleanup, a send to a closed channel). A future
+  converter (`.blend`, #1072) is covered the day it is added
+  (`rules/converter_log.rs`).
 - **The ≲10-files-per-directory signal** prints after the findings: every scanned
   directory holding more than ten `.rs` files (`mod.rs` aside), most crowded first.
   CLAUDE.md says "aim for", so it never fails the gate; it tells you where to

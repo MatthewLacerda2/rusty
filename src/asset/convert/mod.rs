@@ -34,8 +34,9 @@
 //! skipped on purpose (an unsupported texture format, a take that would not
 //! bake) in [`Converted`], and fails on anything else, so a cache missing a part
 //! by accident is never stamped current (#1168). [`refresh`] warns of each skip,
-//! and stores them under the stamp so a cached load warns again, as Unity shows
-//! a model's import warnings on every reimport.
+//! and stores them under the stamp so a cached load in a fresh process warns
+//! again, once (`record`), as Unity shows a model's import warnings on every
+//! reimport.
 //!
 //! **Adding a converter** is one row in [`CONVERTERS`]: an extension and a
 //! function that writes a glTF where its [`Staging`] says.
@@ -43,12 +44,14 @@
 mod fbx;
 pub mod glb;
 mod lock;
+mod record;
 mod stage;
 
 pub use stage::{textures_dirs, Staging};
 
 use super::ImportError;
 use crate::core::{hash, paths, project};
+use record::{record, split_record, stamp_path};
 use std::path::{Component, Path, PathBuf};
 
 /// Where an open project keeps converted sources, relative to its root: a folder
@@ -89,7 +92,7 @@ pub struct Skip {
 
 impl Skip {
     /// The skip as one line: what is warned of, and stored under the stamp.
-    fn line(&self) -> String {
+    pub(super) fn line(&self) -> String {
         format!("skipped {}: {}", self.what, self.why).replace(['\n', '\r'], " ")
     }
 }
@@ -132,16 +135,10 @@ pub fn cached_gltf(path: &Path) -> Result<PathBuf, ImportError> {
 /// missing source with a cache present keeps the cache (a game shipped without
 /// its sources). A failing converter leaves the old cache as it was; a swap that
 /// fails partway leaves the cache unstamped, so the next call converts again.
-/// What the conversion skipped is warned of, whether it ran now or earlier.
+/// What the conversion skipped is warned of as it runs, and once per process
+/// from the cache (`record`), the source present or not.
 pub fn refresh(converter: &Converter, source: &Path, out: &Path) -> Result<(), ImportError> {
-    let bytes = match std::fs::read(source) {
-        Ok(bytes) => bytes,
-        Err(_) if out.is_file() => return Ok(()),
-        Err(e) => return Err(ImportError::Parse(format!("{}: {e}", source.display()))),
-    };
-    let stamp = stamp(converter, &bytes);
-    if let Some(skipped) = current(out, &stamp) {
-        report(source, &skipped);
+    if stale(converter, source, out)?.is_none() {
         return Ok(());
     }
     if let Some(dir) = out.parent() {
@@ -150,54 +147,51 @@ pub fn refresh(converter: &Converter, source: &Path, out: &Path) -> Result<(), I
     // Held until this returns: a conversion of the same cache in another
     // process (or thread) waits, then finds this one's result current.
     let _lock = lock::hold(out);
-    let skipped = match current(out, &stamp) {
-        Some(skipped) => skipped,
-        None => match stage::convert(converter, source, out, &stamp) {
-            Ok(converted) => converted.skipped.iter().map(Skip::line).collect(),
-            // Without a lock, another process converted the same source meanwhile.
-            Err(e) => current(out, &stamp).ok_or(e)?,
-        },
+    // Stamped again under the lock: what waited may have been converted
+    // meanwhile, or the source saved, and the stamp names what the converter reads.
+    let Some(stamp) = stale(converter, source, out)? else {
+        return Ok(());
     };
-    report(source, &skipped);
+    match stage::convert(converter, source, out, &stamp) {
+        Ok(converted) => {
+            let skipped: Vec<String> = converted.skipped.iter().map(Skip::line).collect();
+            record::report(source, out, &stamp, &skipped);
+        }
+        // Without a lock, another process converted the same source meanwhile.
+        Err(e) => {
+            let skipped = record::current(out, &stamp).ok_or(e)?;
+            record::replay(source, out, &stamp, &skipped);
+        }
+    }
     Ok(())
 }
 
-/// Warn of each part of `source` its conversion left out.
-fn report(source: &Path, skipped: &[String]) {
-    for skip in skipped {
-        log::warn!("[Asset] {}: {skip}", source.display());
-    }
+/// The stamp `source` converts to, when the cache at `out` is not its conversion
+/// yet; `None`, its skips replayed, when it is, or stands in for a missing source.
+fn stale(converter: &Converter, source: &Path, out: &Path) -> Result<Option<String>, ImportError> {
+    let bytes = match std::fs::read(source) {
+        Ok(bytes) => bytes,
+        Err(_) if out.is_file() => {
+            if let Some((stamp, skipped)) = record::stored(out) {
+                record::replay(source, out, &stamp, &skipped);
+            }
+            return Ok(None);
+        }
+        Err(e) => return Err(ImportError::Parse(format!("{}: {e}", source.display()))),
+    };
+    let stamp = record::stamp(converter, &bytes);
+    let Some(skipped) = record::current(out, &stamp) else {
+        return Ok(Some(stamp));
+    };
+    record::replay(source, out, &stamp, &skipped);
+    Ok(None)
 }
 
-/// What the conversion cached at `out` skipped, when `out` exists and is stamped
-/// `stamp`; `None` when it must be converted.
-fn current(out: &Path, stamp: &str) -> Option<Vec<String>> {
-    let record = std::fs::read_to_string(stamp_path(out)).ok()?;
-    let (found, skipped) = split_record(&record);
-    (out.is_file() && found == stamp).then(|| skipped.lines().map(str::to_string).collect())
-}
-
-/// What a stamp file holds: the stamp, then one line per skip.
-fn record(stamp: &str, converted: &Converted) -> String {
-    let mut record = stamp.to_string();
-    for skip in &converted.skipped {
-        record.push_str(&skip.line());
-        record.push('\n');
-    }
-    record
-}
-
-/// A stamp file's stamp (its first line, newline included) and the skips after it.
-fn split_record(record: &str) -> (&str, &str) {
-    let end = record.find('\n').map_or(record.len(), |i| i + 1);
-    record.split_at(end)
-}
-
-/// Where the project at `root` caches the source at `rel` (project-relative,
-/// `/`-separated): the whole of `rel` under [`IMPORT_CACHE_DIR`], plus `.glb`.
-/// Nothing is stripped, so distinct sources never share a cache (#1167).
-pub fn cache_path(root: &Path, rel: &str) -> PathBuf {
-    root.join(IMPORT_CACHE_DIR).join(format!("{rel}.glb"))
+/// Where the project at `root` caches the source at `rel` (project-relative): the
+/// whole of `rel` under [`IMPORT_CACHE_DIR`], plus `.glb`. Nothing is stripped or
+/// re-encoded, so distinct sources never share a cache (#1167).
+pub fn cache_path(root: &Path, rel: &Path) -> PathBuf {
+    with_suffix(&root.join(IMPORT_CACHE_DIR).join(rel), ".glb")
 }
 
 /// True when `path` is inside an import cache: what the manifest and the content
@@ -206,10 +200,11 @@ pub fn is_import_cache(path: &Path) -> bool {
     paths::to_slash(path).contains(IMPORT_CACHE_DIR)
 }
 
-/// `path` relative to `root`, its components joined by `/`, when `root` is a
-/// project and `path` lies in it. Joined by component, never by rewriting `\`:
-/// on Linux and macOS a `\` is part of a file name, and `a\b.fbx` is not `a/b.fbx`.
-fn project_relative(root: &Path, path: &Path) -> Option<String> {
+/// `path` relative to `root`, when `root` is a project and `path` lies in it.
+/// Rebuilt from its raw components, never from lossy strings or by rewriting `\`:
+/// two non-UTF-8 names stay two, and on Linux and macOS a `\` is part of a file
+/// name, so `a\b.fbx` is not `a/b.fbx`.
+fn project_relative(root: &Path, path: &Path) -> Option<PathBuf> {
     if !root.join(project::PROJECT_FILE).is_file() {
         return None;
     }
@@ -229,15 +224,15 @@ fn project_relative(root: &Path, path: &Path) -> Option<String> {
             }
         }
     };
-    let mut parts = Vec::new();
+    let mut parts = PathBuf::new();
     for component in rel.components() {
         match component {
-            Component::Normal(part) => parts.push(part.to_string_lossy()),
+            Component::Normal(part) => parts.push(part),
             Component::CurDir => {}
             _ => return None,
         }
     }
-    (!parts.is_empty()).then(|| parts.join("/"))
+    (!parts.as_os_str().is_empty()).then_some(parts)
 }
 
 /// Outside a project: a file in the temp folder named by the source's absolute
@@ -253,20 +248,10 @@ fn temp_path(path: &Path) -> PathBuf {
         .join(format!("{digest:016x}-{name}.glb"))
 }
 
-fn stamp_path(out: &Path) -> PathBuf {
-    with_suffix(out, ".source")
-}
-
 fn with_suffix(path: &Path, suffix: &str) -> PathBuf {
     let mut name = path.as_os_str().to_owned();
     name.push(suffix);
     PathBuf::from(name)
-}
-
-/// What the stamp records: the converter, its version and the source's digest.
-fn stamp(converter: &Converter, source: &[u8]) -> String {
-    let digest = hash::fnv1a64(source);
-    format!("{} {} {digest:016x}\n", converter.name, converter.version)
 }
 
 fn write_error(path: &Path, e: &std::io::Error) -> ImportError {

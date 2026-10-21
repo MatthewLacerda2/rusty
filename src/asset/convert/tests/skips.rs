@@ -1,7 +1,8 @@
 //! What a conversion leaves out on purpose (#1172): reported by `refresh`, never
-//! the converter, stored under the stamp, and reported again from the cache.
+//! the converter, stored under the stamp, and replayed from the cache once per
+//! process.
 
-use super::super::{refresh, Converted, Converter, Skip, Staging};
+use super::super::{record, refresh, Converted, Converter, Skip, Staging};
 use crate::asset::ImportError;
 use crate::logging;
 use crate::scripting::ConsoleLogs;
@@ -35,13 +36,14 @@ fn warnings_of(source: &Path) -> usize {
     forwarded.iter().filter(|m| m.starts_with(&line)).count()
 }
 
-#[test]
-fn a_skip_is_warned_of_on_conversion_and_again_from_the_cache() {
+/// `source` converted into `out` (warning once, stored under the stamp), with the
+/// cache then marked so a hit is visible.
+fn converted(name: &str) -> (std::path::PathBuf, std::path::PathBuf) {
     logging::init();
-    let dir = crate::test_temp::dir();
+    let dir = crate::test_temp::dir().join(name);
+    std::fs::create_dir_all(&dir).unwrap();
     let (source, out) = (dir.join("a.src"), dir.join("a.src.glb"));
     std::fs::write(&source, "one").unwrap();
-
     refresh(&SKIPPING, &source, &out).unwrap();
     assert_eq!(warnings_of(&source), 1, "warned as it converts");
     let record = std::fs::read_to_string(dir.join("a.src.glb.source")).unwrap();
@@ -50,13 +52,32 @@ fn a_skip_is_warned_of_on_conversion_and_again_from_the_cache() {
         2,
         "the stamp, then one line per skip"
     );
-
     std::fs::write(&out, "kept").unwrap();
+    (source, out)
+}
+
+#[test]
+fn a_cache_hit_replays_its_skips_once_per_process() {
+    let (source, out) = converted("skips_replay");
     refresh(&SKIPPING, &source, &out).unwrap();
     assert_eq!(
         std::fs::read_to_string(&out).unwrap(),
         "kept",
         "a cache hit"
     );
-    assert_eq!(warnings_of(&source), 1, "warned again from the cache");
+    assert_eq!(warnings_of(&source), 0, "this process already warned");
+
+    record::forget(&out); // a fresh process
+    refresh(&SKIPPING, &source, &out).unwrap();
+    refresh(&SKIPPING, &source, &out).unwrap();
+    assert_eq!(warnings_of(&source), 1, "two hits warn once");
+}
+
+#[test]
+fn a_cache_standing_in_for_a_missing_source_replays_its_skips() {
+    let (source, out) = converted("skips_shipped");
+    std::fs::remove_file(&source).unwrap();
+    record::forget(&out);
+    refresh(&SKIPPING, &source, &out).unwrap();
+    assert_eq!(warnings_of(&source), 1);
 }

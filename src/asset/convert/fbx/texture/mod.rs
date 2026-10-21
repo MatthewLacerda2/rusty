@@ -9,8 +9,8 @@
 //! which may hold a `:` or a `%`.
 //!
 //! A texture that is neither on disk nor embedded, or embeds a format the
-//! importer does not read, is a [`Skip`]; one that fails to extract fails the
-//! conversion (#1168).
+//! importer does not read, is a [`Skip`]; one that fails to extract, or lies on
+//! disk where no URI can reach it, fails the conversion (#1168).
 
 use super::super::stage::hook::{self, Step};
 use super::super::{Skip, Staging};
@@ -70,7 +70,12 @@ impl Textures {
             .map(|name| PathBuf::from(name.as_ref() as &str))
             .find(|path| !path.as_os_str().is_empty() && path.is_file());
         if let Some(file) = on_disk {
-            return Ok(relative_uri(&self.out_dir, &file));
+            return relative_uri(&self.out_dir, &file).map(Some).ok_or_else(|| {
+                ImportError::Parse(format!(
+                    "FBX texture {}: cannot reference it",
+                    file.display()
+                ))
+            });
         }
         if texture.content.is_empty() {
             return Ok(self.skip(texture, "neither a file on disk nor embedded".into()));
