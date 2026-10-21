@@ -7,6 +7,7 @@
 use glam::{Quat, Vec3};
 
 use super::BonePose;
+use crate::components::transform::mirrored_direction;
 
 /// Re-aims per solve: each pass re-measures from where the last one left the
 /// tip, so the parallax of turning lower bones (the head swings sideways as the
@@ -37,7 +38,9 @@ pub fn solve_aim(chain: &[BonePose], target: Vec3, s: AimSettings) -> Option<Vec
     }
     let shares = shares(s.weights, n)?;
     let mut poses = chain.to_vec();
-    let axis = s.axis.normalize();
+    // The tip's local axis as its world rotation turns it, through any mirror
+    // its world scale carries (#1125).
+    let axis = mirrored_direction(chain[n - 1].mirror, s.axis.normalize());
     let animated = (chain[n - 1].rot * axis).normalize();
     for _ in 0..PASSES {
         let to = target - poses[n - 1].pos;

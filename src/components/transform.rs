@@ -83,6 +83,48 @@ pub fn local_rotation(parent_world: Mat4, world_rot: Quat) -> Quat {
     through_mirror(parent_world, parent_rot.inverse() * world_rot).normalize()
 }
 
+/// A child's signed world scale: `parent_world`'s (its reflection on X, as glam
+/// decomposes it) times the child's own `scale`. Its signs are the child's
+/// [`mirror`], an entity's own negative scale included (#1125).
+pub fn world_scale(parent_world: Mat4, scale: Vec3) -> Vec3 {
+    parent_world.to_scale_rotation_translation().0 * scale
+}
+
+/// The reflection a pose carries: the sign of each axis of its signed world
+/// scale ([`world_scale`]), `±1` each, all `+1` for no mirror. The pose's world
+/// matrix is its [`world_rotation`] times `mirror` times the scale's magnitude.
+pub fn mirror(signed_scale: Vec3) -> Vec3 {
+    Vec3::select(signed_scale.cmplt(Vec3::ZERO), -Vec3::ONE, Vec3::ONE)
+}
+
+/// A direction written in a pose's local space, as its world rotation must turn
+/// it to land on the drawn world direction: `mirror · dir`, since the pose's
+/// matrix draws a local `dir` along `R_w · mirror · dir` (#1125). An aim axis is
+/// one. No mirror returns `dir` bit for bit.
+pub fn mirrored_direction(mirror: Vec3, dir: Vec3) -> Vec3 {
+    mirror * dir
+}
+
+/// A frame written in a pose's local space by its X and Y axes (a joint's `axis`
+/// and `swing_axis`), as its world rotation must turn it: the frame seen through
+/// the mirror as a rotation, the way [`world_rotation`] sees a child's (#1125).
+/// Its X stays on the drawn line, but in the mirror image's sense: a turn about
+/// `a` mirrors to a turn about `−mirror·a` when the mirror reflects (an axis of
+/// rotation is a pseudovector), so a joint's limits act on the mirror-image
+/// side. Y is mirrored as a direction, and the frame they make stays a proper
+/// rotation. Its own inverse; no mirror returns both axes bit for bit.
+///
+/// Only the twist about X is the exact mirror image. Under a reflection, a turn
+/// about the frame's Y or Z comes out in the opposite sense to the mirror
+/// image's (the frame is `D·B·F`, not `−D·B`). That is harmless while swing
+/// limits are symmetric, `±swing_limit` and `±swing2_limit`, which are the only
+/// ones `physics::joints::joint_builder` sets. An asymmetric swing limit would
+/// need the swing signs flipped too.
+pub fn mirrored_frame_axes(mirror: Vec3, x: Vec3, y: Vec3) -> (Vec3, Vec3) {
+    let sense = mirror.x * mirror.y * mirror.z;
+    (sense * (mirror * x), mirror * y)
+}
+
 /// `rotation` seen through a mirroring parent's reflection, `F·R·F`: a rotation
 /// about the axis reflected as a pseudovector, `(x, y, z, w) → (x, −y, −z, w)`.
 /// Its own inverse, so one function serves both directions.

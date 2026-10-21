@@ -97,7 +97,7 @@ impl Scene {
                 let dir = self.bone_direction(&bones, &parents, slot);
                 let mut j = joint_from(preset_for(&names[slot]), dir, owner_rot);
                 j.connected_body = Some(bones[p]);
-                local_axes(&mut j, self.world_rotation(bone));
+                local_axes(&mut j, self.world_rotation(bone), self.mirror(bone));
                 j
             });
             self.world.set_joint(bone, joint);
@@ -161,6 +161,14 @@ impl Scene {
         })
     }
 
+    /// The reflection `id`'s signed world scale carries (#1125).
+    fn mirror(&self, id: u32) -> Vec3 {
+        self.world.transform(id).map_or(Vec3::ONE, |t| {
+            let scale = transform::world_scale(self.world.parent_world_matrix(id), t.scale);
+            transform::mirror(scale)
+        })
+    }
+
     /// A collider's volume at its world scale — what its share of the mass is
     /// weighed by.
     fn collider_volume(&self, id: u32) -> f32 {
@@ -216,11 +224,13 @@ fn flex_limits((min, max): (f32, f32)) -> glam::Vec2 {
     glam::Vec2::new(-max, -min)
 }
 
-/// Turn a joint's world-space axes into `bone`'s local space (`bone_rot`).
-fn local_axes(j: &mut JointComponent, bone_rot: Quat) {
+/// Turn a joint's world-space axes into `bone`'s local space (`bone_rot`, seen
+/// through the bone's `mirror`): the exact inverse of how physics builds a
+/// joint's world frame, so the frame comes back on the world axes (#1125).
+fn local_axes(j: &mut JointComponent, bone_rot: Quat, mirror: Vec3) {
     let inv = bone_rot.inverse();
-    j.axis = inv * j.axis;
-    j.swing_axis = inv * j.swing_axis;
+    (j.axis, j.swing_axis) =
+        transform::mirrored_frame_axes(mirror, inv * j.axis, inv * j.swing_axis);
 }
 
 #[cfg(test)]

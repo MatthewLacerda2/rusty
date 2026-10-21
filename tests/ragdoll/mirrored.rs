@@ -15,13 +15,11 @@ use super::rig;
 const MIRROR: Vec3 = Vec3::new(-1.0, 1.0, 1.0);
 
 /// The rig with a bent arm and leg (a bone with no rotation looks the same in
-/// the mirror), mirrored, ragdolled with gravity off; its left forearm
-/// and shin pushed along `push`, stepped for `frames`. The scene, its physics and
-/// every ragdoll bone's (name, hitbox).
-fn pushed(push: Vec3, frames: usize) -> (Scene, PhysicsWorld, Vec<(String, u32)>) {
+/// the mirror), scaled `scale`, ragdolled: the scene and its ragdoll bones.
+fn ragdolled(scale: Vec3) -> (Scene, Vec<u32>) {
     let mut scene = Scene::new();
     let rig = rig::character(&mut scene, Vec3::ZERO, false);
-    scene.world.transform_mut(rig).unwrap().scale = MIRROR;
+    scene.world.transform_mut(rig).unwrap().scale = scale;
     for (name, rot) in [
         ("LeftArm", Quat::from_rotation_z(-0.4)),
         ("LeftForeArm", Quat::from_rotation_y(0.5)),
@@ -36,7 +34,15 @@ fn pushed(push: Vec3, frames: usize) -> (Scene, PhysicsWorld, Vec<(String, u32)>
     let made = scene
         .build_ragdoll(rig, &RagdollOptions::default())
         .unwrap();
-    let bones: Vec<u32> = made.into_iter().map(|(_, bone)| bone).collect();
+    (scene, made.into_iter().map(|(_, bone)| bone).collect())
+}
+
+/// [`ragdolled`] mirrored, with gravity off; its left forearm and shin pushed
+/// along `push`, stepped for `frames`. The scene, its physics and every ragdoll
+/// bone's (name, hitbox).
+fn pushed(push: Vec3, frames: usize) -> (Scene, PhysicsWorld, Vec<(String, u32)>) {
+    let (mut scene, bones) = ragdolled(MIRROR);
+    let rig = scene.find_entity_by_name("Rig").unwrap();
     for &bone in &bones {
         let mut rb = scene.world.rigidbody_mut(bone).unwrap();
         rb.is_kinematic = false;
@@ -83,4 +89,39 @@ fn the_first_physics_frame_keeps_a_mirrored_limbs_world_pose() {
         assert!(now.abs_diff_eq(was, 1e-4), "{name} moved: {was} → {now}");
         assert_eq!(world.collider_contains_point(hitbox, now), Some(true));
     }
+}
+
+/// The world X axis of `bone`'s joint frame as physics built it.
+fn joint_world_x(world: &PhysicsWorld, bone: u32) -> Vec3 {
+    world.joint_world_frame(bone).unwrap() * Vec3::X
+}
+
+/// Each mirrored joint's world X is `dir × bend` on the mirrored bones (#1125):
+/// the bone direction reflects and the bend (forward, +Z) doesn't, so it is the
+/// unmirrored joint's X seen as a pseudovector, `−F·x`. Before the fix, the axes
+/// came back reflected and every knee flexed about the wrong sense.
+#[test]
+fn a_mirrored_ragdolls_joint_axes_are_the_mirror_image() {
+    let (plain, plain_bones) = ragdolled(Vec3::ONE);
+    let (mirrored, bones) = ragdolled(MIRROR);
+    let (plain_world, world) = (
+        PhysicsWorld::from_scene(&plain),
+        PhysicsWorld::from_scene(&mirrored),
+    );
+    let mut joints = 0;
+    for (&p, &m) in plain_bones.iter().zip(&bones) {
+        if plain.world.joint(p).is_none() {
+            continue;
+        }
+        joints += 1;
+        let want = -(joint_world_x(&plain_world, p) * MIRROR);
+        let got = joint_world_x(&world, m);
+        let name = mirrored
+            .world
+            .name(m)
+            .map(|n| n.clone())
+            .unwrap_or_default();
+        assert!(got.abs_diff_eq(want, 1e-4), "{name}: X {got}, want {want}");
+    }
+    assert!(joints > 5, "every limb is jointed: {joints}");
 }

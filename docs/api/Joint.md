@@ -17,6 +17,9 @@ when there is none:
 
 The **anchor** (the pivot), the **axis** and the **swing axis** are in the
 entity's local space; only the swing axis's part perpendicular to the axis counts.
+Under a negative world scale (the entity's own or a parent's), the joint is the
+mirror image of the unmirrored one: its axis lies where the entity's matrix draws
+it, and twist and hinge limits act on the mirror-image side.
 The **connected anchor** is in the connected entity's local space — world space with no
 connected body — and is used only with auto-configure off; auto-configure (the
 default) puts it wherever the anchor sits. **The pose the bodies are in when the

@@ -22,15 +22,19 @@ pub use two_bone::solve_two_bone;
 
 use glam::{Quat, Vec3};
 
-use crate::components::transform::{local_rotation, world_rotation};
+use crate::components::transform::{local_rotation, mirror, world_rotation, world_scale};
 use crate::components::{IkChain, IkConstraint, IkTarget};
 use crate::scene::Scene;
 
-/// A bone's world position and rotation.
+/// A bone's world position and rotation, and the reflection its world scale
+/// carries ([`mirror`]): its world matrix draws a local direction `d` along
+/// `rot · mirror · d` (#1125).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct BonePose {
     pub pos: Vec3,
     pub rot: Quat,
+    /// `±1` per axis; all `+1` for a bone nothing mirrors.
+    pub mirror: Vec3,
 }
 
 impl Scene {
@@ -147,10 +151,17 @@ impl Scene {
 
     fn bone_pose(&self, bone: u32) -> BonePose {
         let pos = self.compute_world_matrix(bone).w_axis.truncate();
-        let rot = self.world.transform(bone).map_or(Quat::IDENTITY, |t| {
-            world_rotation(self.world.parent_world_matrix(bone), t.rotation)
-        });
-        BonePose { pos, rot }
+        let parent = self.world.parent_world_matrix(bone);
+        let (rot, mirror) = self
+            .world
+            .transform(bone)
+            .map_or((Quat::IDENTITY, Vec3::ONE), |t| {
+                (
+                    world_rotation(parent, t.rotation),
+                    mirror(world_scale(parent, t.scale)),
+                )
+            });
+        BonePose { pos, rot, mirror }
     }
 
     /// Give `bone` the world rotation `rot`, as a local rotation under its

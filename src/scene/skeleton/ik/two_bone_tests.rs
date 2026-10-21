@@ -11,10 +11,12 @@ fn arm() -> (BonePose, BonePose, Vec3) {
     let shoulder = BonePose {
         pos: Vec3::ZERO,
         rot: Quat::IDENTITY,
+        mirror: Vec3::ONE,
     };
     let elbow = BonePose {
         pos: Vec3::new(1.0, 0.0, -0.1),
         rot: Quat::IDENTITY,
+        mirror: Vec3::ONE,
     };
     (shoulder, elbow, Vec3::new(2.0, 0.0, 0.0))
 }
