@@ -151,6 +151,7 @@ fn write_page(
     image
         .save(&path)
         .map_err(|e| format!("write {}: {e}", path.display()))?;
+    crate::core::fs::written::note_written(&path.to_string_lossy());
     // The scene document stores `/` paths on every OS, like its other assets (#819).
     Ok(crate::core::paths::to_slash(&path))
 }

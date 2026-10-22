@@ -1,11 +1,12 @@
-//! The texture cache follows the file (#689): a PNG re-baked at a drawn path shows
-//! its new texels on the next frame, and a map drawn before it existed is picked up
-//! once it appears — baked by the engine, or written by anything else.
+//! The texture cache follows the file (#689, #1207): a PNG re-baked at a drawn path
+//! shows its new texels on the next frame, and a map drawn before it existed is
+//! picked up once it appears — baked by the engine, or written by anything else.
 
 use glam::Vec3;
 
 use super::freshness::MISS_RETRY_FRAMES;
 use crate::components::{MaterialAsset, MaterialComponent, Tonemap};
+use crate::core::fs::written::contract::{follows_rebakes, Bake};
 use crate::procgen::{bake::bake_to_png, Image, Slot};
 use crate::render::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
 use crate::scene::{Camera, MeshComponent, Scene};
@@ -65,6 +66,9 @@ fn bake(path: &str, rgb: [f32; 3]) {
     bake_to_png(&img, Slot::Emissive, path).unwrap();
 }
 
+const RED: [f32; 3] = [1.0, 0.0, 0.0];
+const GREEN: [f32; 3] = [0.0, 1.0, 0.0];
+
 fn is_red(p: [u8; 3]) -> bool {
     p[0] > 200 && p[1] < 40 && p[2] < 40
 }
@@ -73,38 +77,26 @@ fn is_green(p: [u8; 3]) -> bool {
     p[1] > 200 && p[0] < 40 && p[2] < 40
 }
 
+/// The shared cache contract (#1207): a map drawn before it was baked is picked up
+/// once baked, and a re-bake at the drawn path shows its new texels.
 #[test]
-fn gpu_a_texture_rebaked_at_a_drawn_path_shows_its_new_texels() {
+fn gpu_a_texture_follows_its_bakes() {
     let Some(mut renderer) = crate::render::test_gpu::headless_or_skip(16, 16) else {
         return;
     };
     let path = temp_png("rebake");
-    bake(&path, [1.0, 0.0, 0.0]);
     let scene = emissive_scene(&path);
-    let first = centre(&mut renderer, &scene);
-    assert!(is_red(first), "the first bake draws red, got {first:?}");
-    bake(&path, [0.0, 1.0, 0.0]);
-    let second = centre(&mut renderer, &scene);
-    assert!(
-        is_green(second),
-        "the re-bake must replace the upload, got {second:?}"
-    );
-}
-
-#[test]
-fn gpu_a_map_drawn_before_it_was_baked_is_picked_up_once_baked() {
-    let Some(mut renderer) = crate::render::test_gpu::headless_or_skip(16, 16) else {
-        return;
-    };
-    let path = temp_png("late_bake");
-    let scene = emissive_scene(&path);
-    let missing = centre(&mut renderer, &scene);
-    assert!(!is_green(missing), "no file yet, so no green: {missing:?}");
-    bake(&path, [0.0, 1.0, 0.0]);
-    let baked = centre(&mut renderer, &scene);
-    assert!(
-        is_green(baked),
-        "the bake must reach the next frame, got {baked:?}"
+    follows_rebakes(
+        &path,
+        |p, which| bake(p, if which == Bake::A { RED } else { GREEN }),
+        |_| centre(&mut renderer, &scene),
+        |&px, which| {
+            if which == Bake::A {
+                is_red(px)
+            } else {
+                is_green(px)
+            }
+        },
     );
 }
 

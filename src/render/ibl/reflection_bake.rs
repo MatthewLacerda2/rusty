@@ -68,7 +68,7 @@ impl Renderer {
         for (i, position) in positions.into_iter().enumerate() {
             let bytes = self.bake_reflection(scene, position, resolution);
             let path = out_dir.join(format!("reflection_probe_{i}.ktx2"));
-            std::fs::write(&path, &bytes).map_err(|e| {
+            crate::core::fs::written::write(&path, &bytes).map_err(|e| {
                 format!("Failed to write reflection cubemap {}: {e}", path.display())
             })?;
             let path_str = path.to_string_lossy().into_owned();

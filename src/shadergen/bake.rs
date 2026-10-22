@@ -74,6 +74,7 @@ pub fn bake_recipe(
     let sidecar = sidecar_path(std::path::Path::new(&path));
     std::fs::write(sidecar, json).map_err(|e| BakeError::Write(e.to_string()))?;
     std::fs::write(&path, &module).map_err(|e| BakeError::Write(e.to_string()))?;
+    crate::core::fs::written::note_written(&path);
     GENERATION.fetch_add(1, Ordering::Relaxed);
     Ok(path)
 }

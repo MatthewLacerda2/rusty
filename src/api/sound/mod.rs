@@ -167,7 +167,8 @@ fn write_bake(lua: &Lua, bake: Bake, path: &str) -> Baked {
     if let Some(dir) = std::path::Path::new(path).parent() {
         std::fs::create_dir_all(dir).map_err(lua_err)?;
     }
-    std::fs::write(path, &bake.wav).map_err(lua_err)?;
+    // Noted, so a clip cache that already played this path decodes the new file (#1208).
+    crate::core::fs::written::write(std::path::Path::new(path), &bake.wav).map_err(lua_err)?;
     Ok((
         path.to_string(),
         report_table(lua, &bake.profile, &bake.tracks)?,
@@ -187,6 +188,10 @@ mod fixture;
 #[cfg(test)]
 #[path = "bake_tests.rs"]
 mod bake_tests;
+
+#[cfg(test)]
+#[path = "rebake_tests.rs"]
+mod rebake_tests;
 
 #[cfg(test)]
 #[path = "level_tests.rs"]

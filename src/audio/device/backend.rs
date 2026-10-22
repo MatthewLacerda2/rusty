@@ -12,7 +12,8 @@
 //! total for the speaker mode (#546). The maestro hands over a [`VoiceMix`] per
 //! voice each frame (#412) through the voice's shared [`VoiceControl`], and a
 //! [`GroupMix`] per group whenever the mixer moves. Decoding is path-cached
-//! ([`ClipCache`]), so the hundredth footstep costs no disk or decode.
+//! ([`ClipCache`]), so the hundredth footstep costs no disk or decode until the
+//! engine re-writes its file.
 //!
 //! Generic over kira's `Backend` so tests render the whole graph headlessly
 //! (`capture.rs`); the shell uses kira's cpal backend.

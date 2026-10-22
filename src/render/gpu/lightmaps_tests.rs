@@ -54,3 +54,34 @@ fn gpu_lightmaps_rebind_on_colour_pages_and_match_direction_shapes() {
         "no lightmap of its own"
     );
 }
+
+/// The shared cache contract (#1207): a page list that failed before its page was
+/// baked binds once it is, and a re-bake at the same path binds the new page.
+#[test]
+fn gpu_lightmaps_follow_bakes_at_one_path() {
+    use crate::core::fs::written::{
+        self,
+        contract::{follows_rebakes, Bake},
+    };
+    let Some(renderer) = headless_or_skip(4, 4) else {
+        return;
+    };
+    let (device, queue) = (&renderer.device, &renderer.queue);
+    let mut maps = Lightmaps::new(device);
+    let edge = |bake| if bake == Bake::A { 2 } else { 4 };
+    let path = crate::test_temp::dir().join("rebaked.png");
+    follows_rebakes(
+        &path.to_string_lossy(),
+        |p, bake| {
+            image::RgbaImage::new(edge(bake), edge(bake))
+                .save(p)
+                .unwrap();
+            written::note_written(p);
+        },
+        |p| {
+            maps.bind(device, queue, &[p.to_string()], &[]);
+            maps.bound_edge()
+        },
+        |loaded, bake| *loaded == Some(edge(bake)),
+    );
+}
