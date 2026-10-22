@@ -59,6 +59,7 @@ impl RecentProjects {
             std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
         }
         let text = serde_json::to_string_pretty(self).unwrap_or_default();
+        // lint: allow(asset-write) project settings, not read by a path-keyed cache
         std::fs::write(path, text + "\n").map_err(|e| format!("{}: {e}", path.display()))
     }
 
@@ -105,6 +106,7 @@ pub fn record(root: &Path, now: u64) -> Result<(), String> {
     let path = default_path().ok_or("no home directory to keep the recent projects in")?;
     let mut list = RecentProjects::load(&path);
     list.touch(root, now);
+    // lint: allow(asset-write) project settings, not read by a path-keyed cache
     list.save(&path)
 }
 

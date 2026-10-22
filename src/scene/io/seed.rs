@@ -79,6 +79,7 @@ pub fn seed_workspace(root: &Path, samples: Option<&Path>) {
     ));
     for (to, bytes) in files {
         let parent = to.parent().unwrap_or(root);
+        // lint: allow(asset-write) a scene, prefab or lighting document, read whole on load
         let written = std::fs::create_dir_all(parent).and_then(|()| std::fs::write(&to, bytes));
         if let Err(e) = written {
             eprintln!("[Seed] seeding {} failed: {e}", to.display());

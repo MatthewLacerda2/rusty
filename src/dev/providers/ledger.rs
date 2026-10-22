@@ -63,6 +63,7 @@ impl Ledger {
             std::fs::create_dir_all(dir).map_err(|e| fail(&e))?;
         }
         let json = serde_json::to_string_pretty(self).map_err(|e| fail(&e))?;
+        // lint: allow(asset-write) the provider ledger, not read by a path-keyed cache
         std::fs::write(path, json + "\n").map_err(|e| fail(&e))
     }
 

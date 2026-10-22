@@ -25,5 +25,6 @@ pub fn load(path: &Path) -> Result<AnimationGraph, GraphError> {
 pub fn save(path: &Path, graph: &AnimationGraph) -> Result<(), GraphError> {
     graph.validate()?;
     let json = serde_json::to_string_pretty(graph).map_err(|e| GraphError::Parse(e.to_string()))?;
+    // lint: allow(asset-write) an animation graph document, read whole on load
     std::fs::write(path, json).map_err(|e| GraphError::Io(e.to_string()))
 }

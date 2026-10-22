@@ -169,6 +169,7 @@ impl ProjectPicker {
     fn remove_recent(&mut self, dir: &Path) {
         self.recent.remove(dir);
         if let Some(path) = &self.recent_path {
+            // lint: allow(asset-write) the recent-projects list, not an asset
             if let Err(err) = self.recent.save(path) {
                 self.error = Some(format!("Could not update the recent projects: {err}"));
             }

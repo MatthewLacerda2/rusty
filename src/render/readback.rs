@@ -133,6 +133,7 @@ pub fn write_png(
     let buffer = image::RgbaImage::from_raw(width, height, pixels.to_vec())
         .ok_or_else(|| "readback pixel buffer size mismatch".to_string())?;
     buffer
+        // lint: allow(asset-write) a screenshot capture, not read by a path-keyed cache
         .save(path)
         .map_err(|e| format!("failed to write PNG {}: {e}", path.display()))
 }

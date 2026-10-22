@@ -81,6 +81,7 @@ impl Permit {
     /// vendor has answered. A call that failed before spending is not recorded.
     pub fn record(mut self, path: &Path) -> Result<Ledger, Refusal> {
         self.ledger.record(self.estimate_cents);
+        // lint: allow(asset-write) the provider ledger, not read by a path-keyed cache
         self.ledger.save(path)?;
         Ok(self.ledger)
     }

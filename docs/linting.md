@@ -21,6 +21,7 @@ agent can read exactly what failed.
 | Skipped tests | `tools/lint -- --rules` (`skip`) | **hard gate**: `#[ignore]` / `#[cfg_attr(…, ignore)]` needs `// lint: allow(skip) <why>` (#935) |
 | Pushed = built | `tools/lint -- --rules` (`ignored`) | **hard gate**: no scanned `.rs` file may match a `.gitignore` pattern, tracked or not; no allow (#935) |
 | Ranged editor drags | `tools/lint -- --rules` (`drag-range`) | **hard gate**: a `DragValue` under `src/editor` bounds its range with `.ranged(..)` (`editor::widgets::DragRange`), never egui's `.range(..)`, which also rewrites an out-of-range value just by selecting the entity (#1158); a real need takes `// lint: allow(drag-range) <why>` |
+| Asset writes tell the caches | `tools/lint -- --rules` (`asset-write`) | **hard gate**: a non-test line of `src/` outside `src/core/fs/` that calls `fs::write(`, `File::create(` or `.save(<arg>)` has a `note_written` later in its function, or `// lint: allow(asset-write) <why>` (a file no path-keyed cache reads) (#1220) |
 | One atomic write | `tools/lint -- --rules` (`atomic-write`) | **hard gate**: no line of `src/` outside `src/core/fs/` names `fs::rename` — a file a reader may open is written through `core::fs::write_atomic`; a rename that moves rather than writes takes `// lint: allow(atomic-write) <why>` (#1129) |
 | Converters report, never log | `tools/lint -- --rules` (`converter-log`) | **hard gate**: no code line of a converter under `src/asset/convert/` (every module, folder or single file, but the cache's own `mod`, `lock`, `record`, `stage` and `tests`) names `log::` or a bare logging macro — a converter returns what it skipped in `Converted` and fails on anything else, and `convert::refresh` alone warns; each converter's root carries `#![deny(clippy::let_underscore_must_use, clippy::unused_result_ok, clippy::print_stdout, clippy::print_stderr)]`, wrapped or not, so clippy refuses a dropped `Result` and a print there (#1172) |
 | One world space | `tools/lint -- --rules` (`world-space`) | **hard gate**: outside `ecs::world_space` and `components::transform`, no engine code line decomposes a matrix (`to_scale_rotation_translation`), names the retired `compute_world_matrix` / `world_matrix(` / `parent_world_matrix`, or folds a Transform over `ancestors(` — world space is read from `ecs::World`'s world API; test code is not scanned, and converting file data takes `// lint: allow(world-space) <why>` (#1196) |
@@ -261,6 +262,14 @@ new flag, gate, CI step or baseline.
   #999). Comment lines never count. The
   helper itself and Unix socket paths (which must stay short) carry an inline
   allow. `tools/` is not scanned: the lint crate's own tests are not the engine's.
+- **`asset-write`** (#1220) — a file a path-keyed cache reads is written through
+  `core::fs::written::write`, or its writer calls `note_written` after (#1207).
+  A non-test line of `src/` outside `src/core/fs/` calling `fs::write(`,
+  `File::create(` or `.save(<arg>)` is a finding unless `note_written` follows in
+  the same function. A write nothing caches by path (scene, prefab, project,
+  settings, ledger, harness, bench) takes `// lint: allow(asset-write) <why>`. A
+  text heuristic: `.save(path)` also matches a project type's own saver, so its
+  callers carry the allow too (`rules/asset_write.rs`).
 - **`atomic-write`** (#1129) — a file another process (or thread) may read is
   written through `core::fs::write_atomic`: a temp name unique to the process and
   the call, renamed into place, the temp removed on any failure. Hand-rolled copies

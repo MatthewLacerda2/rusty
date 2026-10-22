@@ -68,6 +68,7 @@ pub fn save_lighting_sidecar(scene: &Scene, scene_path: &str) -> Result<(), Stri
     let data = extract_lighting(scene);
     let json = serde_json::to_string_pretty(&data)
         .map_err(|e| format!("Failed to serialize lighting sidecar: {}", e))?;
+    // lint: allow(asset-write) a scene, prefab or lighting document, read whole on load
     std::fs::write(&path, json).map_err(|e| format!("Failed to write lighting sidecar: {}", e))
 }
 

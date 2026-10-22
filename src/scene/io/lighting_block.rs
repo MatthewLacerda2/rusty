@@ -39,6 +39,7 @@ pub fn save_lighting(scene: &Scene, path: &str) -> Result<LightingSave, String> 
     }
     copy_lighting(scene, &mut data);
     let json = serde_json::to_string_pretty(&data).map_err(|e| e.to_string())?;
+    // lint: allow(asset-write) a scene, prefab or lighting document, read whole on load
     std::fs::write(path, json).map_err(|e| format!("Failed to write scene file: {e}"))?;
     crate::scene::lighting::io::save_lighting_sidecar(scene, path)?;
     Ok(LightingSave::Written)

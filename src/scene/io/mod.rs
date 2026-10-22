@@ -48,6 +48,7 @@ pub fn is_scene_path(path: &str) -> bool {
 /// buffers). Single active scene: this is the only persisted document.
 pub fn save_to_file(scene: &Scene, path: &str) -> Result<(), String> {
     let json = scene_json(scene)?;
+    // lint: allow(asset-write) a scene, prefab or lighting document, read whole on load
     std::fs::write(path, json).map_err(|e| format!("Failed to write scene file: {}", e))?;
     // Heavy baked SH lives beside the scene in `<scene>.lighting.json`, not inline in
     // the human-diffable scene doc (#240). Written only when probes are baked.

@@ -85,6 +85,7 @@ pub fn create_skeleton(dir: &Path) -> Result<(), String> {
     for ignored in [CACHE_DIR, SAVED_DIR] {
         let path = dir.join(ignored).join(".gitignore");
         if !path.exists() {
+            // lint: allow(asset-write) project settings, not read by a path-keyed cache
             std::fs::write(&path, "*\n").map_err(|e| format!("{}: {e}", path.display()))?;
         }
     }
