@@ -13,7 +13,9 @@ import gate_mirror
 
 MAKEFILE = """\
 LINT := cargo run --quiet --manifest-path tools/lint/Cargo.toml
-GATES := size clippy doc deny
+QUICK_GATES := size
+HEAVY_GATES := clippy doc deny
+GATES := $(QUICK_GATES) $(HEAVY_GATES)
 
 size: ## [gate] size
 \t$(LINT)
@@ -61,6 +63,12 @@ class Today(unittest.TestCase):
         self.assertIn("deny", gates)
         self.assertEqual(gate_mirror.missing(gates, ci), [])
 
+    def test_gates_are_exactly_quick_and_heavy_joined(self):
+        text = (gate_mirror.ROOT / "Makefile").read_text()
+        self.assertTrue(gate_mirror.gates_are_the_two_lists(text))
+        self.assertFalse(gate_mirror.gates_are_the_two_lists(
+            text.replace("GATES := $(QUICK_GATES) $(HEAVY_GATES)", "GATES := fmt $(HEAVY_GATES)")))
+
     def test_clippy_adds_only_deny_warnings(self):
         gates, ci = gate_mirror.load()
         local = [c for cmds in gates.values() for c in cmds]
@@ -87,7 +95,7 @@ class Mirror(unittest.TestCase):
         self.assertEqual([g for g, _ in gaps(workflow=workflow)], ["clippy"])
 
     def test_flags_a_gate_with_no_recipe(self):
-        makefile = MAKEFILE.replace("GATES := size", "GATES := ghost size")
+        makefile = MAKEFILE.replace("QUICK_GATES := size", "QUICK_GATES := ghost size")
         self.assertEqual(gaps(makefile=makefile), [("ghost", "<no command>")])
 
 

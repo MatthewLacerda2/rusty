@@ -76,6 +76,7 @@ The commit hook checks whatever `.rs`, `.py`, `.lua` and `.wgsl` files are stage
 ## Run it
 ```
 make gates     # everything CI blocks on, fastest-failing first
+make quick-gates  # the seconds-long gates and self-checks (all but clippy, doc, test, deny)
 make check     # the fast edit loop: formatting, size gate, dev-feature clippy
 make help      # every verb, and each gate on its own (make size, make clippy, …)
 ```
@@ -84,7 +85,10 @@ builds and refuses to run when that is outside the worktree: a target dir shared
 between worktrees lets one branch's artifacts stand in for another's, so a green
 run would not prove *this* branch compiled. **`inventory`** fails when a Makefile
 target documented `## [gate]` is missing from the `GATES` list, or the other way
-round, so the gate list cannot silently lose a gate.
+round, so the gate list cannot silently lose a gate. `GATES` is `QUICK_GATES` plus
+`HEAVY_GATES` (clippy, doc, test, deny), defined as exactly that and held by
+`make scripts`; a cold run passes a cloud tool call's limit, so cloud coders run
+`make quick-gates` and then each heavy gate (#1179).
 
 ## Where it runs
 - **Commit hook:** `.githooks/pre-commit` → `make pre-commit`: `cargo fmt --check`

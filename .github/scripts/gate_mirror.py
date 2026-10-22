@@ -53,11 +53,16 @@ def makefile_gates(text: str) -> dict[str, list[str]]:
             target = None
     expand = lambda cmd: re.sub(r"\$\((\w+)\)", lambda m: variables.get(m[1], m[0]), cmd)
     gates = {}
-    for gate in variables["GATES"].split():
+    for gate in expand(variables["GATES"]).split():
         commands = [expand(c.lstrip("@")) for c in recipes.get(gate, [])]
         # `command -v tool || { …install hint… }`: a local presence check; CI installs the tool.
         gates[gate] = [c for c in commands if not c.startswith("command -v ")]
     return gates
+
+
+def gates_are_the_two_lists(text: str) -> bool:
+    """`GATES` is defined as exactly `$(QUICK_GATES) $(HEAVY_GATES)` (#1179)."""
+    return re.search(r"^GATES := \$\(QUICK_GATES\) \$\(HEAVY_GATES\)$", text, flags=re.M) is not None
 
 
 def workflow_commands(text: str) -> list[str]:

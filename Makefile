@@ -16,15 +16,21 @@ LINT := cargo run --quiet --manifest-path tools/lint/Cargo.toml
 # nextest does not run doctests, so the `test` gate runs `cargo test --doc` beside it.
 TEST := cargo nextest run --locked
 
-# The gates, in the order `make gates` runs them. `deny` sits last: its failures
-# are about dependencies (and it needs the network), so a code failure reports first.
-GATES := fmt size rules layers determinism direction components parity test-lint scripts feature-split docrefs clippy doc test deny
+# The gates, in the order `make gates` runs them. The quick ones take seconds; the
+# heavy ones compile, so a cold run passes a cloud tool call's ten-minute limit and
+# is split (`make quick-gates`, then each heavy gate; cloud-brief.md, *The container*).
+# `deny` sits last: its failures are about dependencies (and it needs the network),
+# so a code failure reports first. GATES is exactly the two lists joined —
+# `make scripts` (test_gate_mirror.py) fails when it is anything else.
+QUICK_GATES := fmt size rules layers determinism direction components parity test-lint scripts feature-split docrefs
+HEAVY_GATES := clippy doc test deny
+GATES := $(QUICK_GATES) $(HEAVY_GATES)
 # Checks on the gate runner itself, run before any gate.
 SELF_CHECKS := target-dir inventory
 
 .DEFAULT_GOAL := help
 .NOTPARALLEL:
-.PHONY: help setup compile-cache check gates pre-commit resolved $(SELF_CHECKS) $(GATES) mergeable queue queue-daemon queue-stop blockers checks reclaim mutants-remote dead-pub editor-capture bench
+.PHONY: help setup compile-cache check gates quick-gates pre-commit resolved $(SELF_CHECKS) $(GATES) mergeable queue queue-daemon queue-stop blockers checks reclaim mutants-remote dead-pub editor-capture bench
 
 help: ## List the verbs
 	@grep -E '^[a-z-]+:.*## ' $(firstword $(MAKEFILE_LIST)) | \
@@ -63,6 +69,9 @@ compile-cache: ## Switch the worktrees' compile cache on (needs sccache); rerun 
 
 gates: $(SELF_CHECKS) $(GATES) ## Everything CI blocks on, fastest-failing first
 	@echo "gates: all green"
+
+quick-gates: $(SELF_CHECKS) $(QUICK_GATES) ## The seconds-long gates and self-checks (all but clippy, doc, test, deny)
+	@echo "quick-gates: all green"
 
 check: target-dir fmt size ## Fast edit loop: formatting, size gate, dev-feature clippy
 	cargo clippy --all-targets --features dev
