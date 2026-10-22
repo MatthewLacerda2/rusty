@@ -11,6 +11,8 @@ name: cargo-test
 # is the finding. Never on pull requests (the batch brief for #981); dispatch it
 # on a branch to measure that branch: `gh workflow run cargo-test.yml --ref <branch>`.
 #
+# A second job rides the same schedule: `make dead-pub` (#1205), below.
+#
 # `schedule:` fires only from the default branch, and GitHub disables it after
 # 60 days without repository activity; check the Actions tab if a week passes
 # with no run.
@@ -75,4 +77,47 @@ jobs:
                 echo "- \`$fs\`: green ($(grep -c '^test result: ok' "$log") binaries)"
               fi
             done
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+  # `make dead-pub` (#1003), the same weekly backstop (#1205): `pub` items nothing
+  # uses, and items only tests use, printed into the job summary. Its findings
+  # never fail it; it goes red only when no report came out (the folded copy did
+  # not compile), which is the signal itself breaking: it did for weeks, unseen,
+  # when an integration test first named `CARGO_BIN_EXE_*`. That red files
+  # through `main-health` like the job above.
+  dead-pub:
+    runs-on: ubuntu-24.04
+    # A cold check of the copied crate plus tools/lint; ~3 min warm in a container.
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+      - name: Toolchain (from rust-toolchain.toml)
+        run: rustup show
+      - name: Cache cargo registry + target
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: dead-pub
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: System libs for winit/wgpu builds
+        run: sudo apt-get update && sudo apt-get install -y pkg-config libxkbcommon-dev libwayland-dev libudev-dev libasound2-dev
+      - name: make dead-pub
+        run: make dead-pub 2>&1 | tee dead-pub.log
+        shell: bash -o pipefail {0}
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo '### Dead `pub` items on `main` (weekly signal, #1003)'
+            echo ''
+            if [ -s .lint/dead-pub.txt ]; then
+              echo '```'
+              cat .lint/dead-pub.txt
+              echo '```'
+            else
+              echo '**No report**: the signal itself broke. The cause, from the log:'
+              echo ''
+              echo '```'
+              grep -E 'error|no report' dead-pub.log | head -n 20 || true
+              echo '```'
+            fi
           } | tee -a "$GITHUB_STEP_SUMMARY"

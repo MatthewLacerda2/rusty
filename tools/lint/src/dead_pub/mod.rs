@@ -8,7 +8,9 @@
 //! `--features dev`: with `--profile test` (dead even counting tests) and without
 //! (the difference is what only tests use). Both share this worktree's `target/`,
 //! so only the copied crate itself compiles. Code behind `not(feature = "dev")` is
-//! not seen. The recipe and what it found first are #940's.
+//! not seen. The recipe and what it found first are #940's. It runs weekly on
+//! `main` (`cargo-test.yml`'s `dead-pub` job), so a fold that stops compiling
+//! goes red there instead of silently (#1205).
 //!
 //! Usage: `cargo run --manifest-path tools/lint/Cargo.toml -- --dead-pub` (`make dead-pub`)
 
@@ -82,6 +84,14 @@ pub fn check(
     features: &[&str],
 ) -> io::Result<std::collections::BTreeSet<report::Warning>> {
     let mut cargo = Command::new("cargo");
+    // Folded into the lib, an integration test's `env!("CARGO_BIN_EXE_<bin>")`
+    // is not defined: cargo sets it only for an integration test target. rustc
+    // reads `env!` from its environment, and the folded binary never runs, so
+    // any value will do (#1205).
+    for bin in fold::bins(&fs::read_to_string(tree.join("Cargo.toml"))?) {
+        let exe = target.join("dead-pub/never-run").join(&bin.name);
+        cargo.env(format!("CARGO_BIN_EXE_{}", bin.name), exe);
+    }
     cargo
         .current_dir(tree)
         .args(["check", "--lib", "--message-format", "short"]);

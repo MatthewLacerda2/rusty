@@ -272,7 +272,8 @@ mutants-remote: ## Mutation on GitHub's runners, scoped. make mutants-remote SCO
 # dead_code over a copy of the tree (under target/dead-pub/) with the lib's modules
 # crate-private and every bin and the integration suite folded in. A signal, never a
 # gate: it prints the report (and .lint/dead-pub.txt) and exits 0. About a minute
-# warm; the first run checks the copied crate's dependencies once.
+# warm; the first run checks the copied crate's dependencies once. Weekly on `main`
+# in cargo-test.yml's `dead-pub` job, red only when no report came out (#1205).
 dead-pub: ## Signal: pub items nothing uses, and items only tests use (tools/lint --dead-pub)
 	$(LINT) -- --dead-pub
 
