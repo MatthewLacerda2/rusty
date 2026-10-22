@@ -18,10 +18,11 @@ use crate::code::{strip_comment, Open};
 
 pub const RULE: &str = "converter-log";
 const ROOT: &str = "src/asset/convert/";
-/// Modules under [`ROOT`] that are not converters: the cache itself, its lock and
-/// its stamp record, which report, the swap, and the cache's tests. A new module
+/// Modules under [`ROOT`] that are not converters: the cache itself, the files a
+/// conversion depends on, its lock and its stamp record, which report, the swap,
+/// and the cache's tests. A new module
 /// of the cache's own goes here.
-const NOT_CONVERTERS: &[&str] = &["lock", "mod", "record", "stage", "tests"];
+const NOT_CONVERTERS: &[&str] = &["depends", "lock", "mod", "record", "stage", "tests"];
 /// What a converter's root module carries: every lint it names, in one inner
 /// `deny`, wrapped or not.
 pub const DENY: &str = "#![deny(clippy::let_underscore_must_use, clippy::unused_result_ok, \

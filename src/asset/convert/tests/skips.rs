@@ -82,3 +82,35 @@ fn a_cache_standing_in_for_a_missing_source_replays_its_skips() {
     refresh(&SKIPPING, &source, &out).unwrap();
     assert_eq!(warnings_of(&source), 1);
 }
+
+#[test]
+fn a_reconversion_elsewhere_for_a_changed_file_warns_of_its_new_skips() {
+    use super::super::Dependency;
+    use super::depends::{texture_of, LOOKING};
+    logging::init();
+    let dir = crate::test_temp::dir().join("skips_elsewhere");
+    std::fs::create_dir_all(&dir).unwrap();
+    let (source, out) = (dir.join("a.src"), dir.join("a.src.glb"));
+    std::fs::write(&source, "one").unwrap();
+    std::fs::write(texture_of(&source), "+red").unwrap();
+    refresh(&LOOKING, &source, &out).unwrap(); // nothing skipped, warned of
+    logging::forward(&RefCell::new(ConsoleLogs::new()));
+
+    // Another process converts again once the texture is gone: same stamp.
+    std::fs::remove_file(texture_of(&source)).unwrap();
+    let converted = Converted {
+        skipped: vec![Skip {
+            what: "texture".into(),
+            why: "missing".into(),
+        }],
+        depends_on: vec![Dependency::look(&texture_of(&source)).unwrap()],
+    };
+    let stamp = record::stamp(&LOOKING, b"one");
+    let stamp_file = record::record(&stamp, &converted);
+    std::fs::write(super::super::stamp_path(&out), stamp_file).unwrap();
+
+    refresh(&LOOKING, &source, &out).unwrap();
+    let line = format!("[Asset] {}: skipped texture: missing", source.display());
+    let forwarded = logging::forward(&RefCell::new(ConsoleLogs::new()));
+    assert_eq!(forwarded.iter().filter(|m| m.starts_with(&line)).count(), 1);
+}

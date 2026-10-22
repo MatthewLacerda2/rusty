@@ -9,6 +9,7 @@ mod depends;
 mod failures;
 mod identity;
 mod locking;
+mod looks;
 mod skips;
 mod staging;
 mod unlocked;

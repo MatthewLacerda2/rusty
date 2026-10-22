@@ -43,13 +43,14 @@
 //! **Adding a converter** is one row in [`CONVERTERS`]: an extension and a
 //! function that writes a glTF where its [`Staging`] says.
 
+mod depends;
 mod fbx;
 pub mod glb;
 mod lock;
 mod record;
 mod stage;
 
-pub use record::Dependency;
+pub use depends::{Dependency, Seen};
 pub use stage::{textures_dirs, Staging};
 
 use super::ImportError;
@@ -74,6 +75,11 @@ pub struct Converter {
     /// makes (FBX's embedded textures) in [`Staging::textures`]. [`refresh`] swaps
     /// them into place whole, and removes what an earlier conversion left. Any
     /// failure is an `Err`; only what is left out on purpose goes in [`Converted`].
+    ///
+    /// A conversion re-made only because a file it looked at changed reuses the
+    /// textures folder (its name digests the stamp, not the files), so a written
+    /// file's name must hold the same bytes whatever is found on disk: name every
+    /// file the source embeds before looking at the disk (`fbx::texture`, #1189).
     pub convert: fn(source: &Path, to: &Staging) -> Result<Converted, ImportError>,
 }
 
@@ -162,13 +168,12 @@ pub fn refresh(converter: &Converter, source: &Path, out: &Path) -> Result<(), I
     };
     match stage::convert(converter, source, out, &stamp) {
         Ok(converted) => {
-            let skipped: Vec<String> = converted.skipped.iter().map(Skip::line).collect();
-            record::report(source, out, &stamp, &skipped);
+            record::report(source, out, &record::Stored::written(&stamp, &converted));
         }
         // Without a lock, another process converted the same source meanwhile.
         Err(e) => {
-            let skipped = record::current(out, &stamp).ok_or(e)?;
-            record::replay(source, out, &stamp, &skipped);
+            let stored = record::current(out, &stamp).ok_or(e)?;
+            record::replay(source, out, &stored);
         }
     }
     Ok(())
@@ -180,18 +185,18 @@ fn stale(converter: &Converter, source: &Path, out: &Path) -> Result<Option<Stri
     let bytes = match std::fs::read(source) {
         Ok(bytes) => bytes,
         Err(_) if out.is_file() => {
-            if let Some((stamp, skipped)) = record::stored(out) {
-                record::replay(source, out, &stamp, &skipped);
+            if let Some(stored) = record::stored(out) {
+                record::replay(source, out, &stored);
             }
             return Ok(None);
         }
         Err(e) => return Err(ImportError::Parse(format!("{}: {e}", source.display()))),
     };
     let stamp = record::stamp(converter, &bytes);
-    let Some(skipped) = record::current(out, &stamp) else {
+    let Some(stored) = record::current(out, &stamp) else {
         return Ok(Some(stamp));
     };
-    record::replay(source, out, &stamp, &skipped);
+    record::replay(source, out, &stored);
     Ok(None)
 }
 

@@ -2,24 +2,24 @@
 //! current only while each reads as it did, so one appearing, changing or
 //! vanishing re-converts.
 
-use super::super::{refresh, Converted, Converter, Dependency, Skip, Staging};
+use super::super::{depends, refresh, Converted, Converter, Dependency, Skip, Staging};
 use crate::asset::ImportError;
 use std::path::{Path, PathBuf};
 
 /// A converter that copies its source and appends the texture beside it
 /// (`<source>.tex`), or skips it when it is missing.
-const LOOKING: Converter = Converter {
+pub(super) const LOOKING: Converter = Converter {
     convert: looking,
     ..super::COPY
 };
 
-fn texture_of(source: &Path) -> PathBuf {
+pub(super) fn texture_of(source: &Path) -> PathBuf {
     source.with_extension("tex")
 }
 
 fn looking(source: &Path, to: &Staging) -> Result<Converted, ImportError> {
     let texture = texture_of(source);
-    let looked = Dependency::look(&texture);
+    let looked = Dependency::look(&texture)?;
     let read = |path: &Path| std::fs::read(path).map_err(|e| ImportError::Parse(e.to_string()));
     let mut glb = read(source)?;
     let mut skipped = Vec::new();
@@ -90,4 +90,32 @@ fn a_missing_source_keeps_its_cache_whatever_its_files_read() {
     std::fs::remove_file(&source).unwrap();
     std::fs::remove_file(texture_of(&source)).unwrap();
     assert_eq!(refreshed(&source, &out), ("one+red".into(), false));
+}
+
+#[test]
+fn an_unchanged_texture_is_read_once_per_process_however_often_it_is_checked() {
+    let dir = crate::test_temp::dir().join("depends_once");
+    std::fs::create_dir_all(&dir).unwrap();
+    let (source, out) = (dir.join("a.src"), dir.join("a.src.glb"));
+    std::fs::write(&source, "one").unwrap();
+    std::fs::write(texture_of(&source), "+red").unwrap();
+    for _ in 0..200 {
+        refresh(&LOOKING, &source, &out).unwrap();
+    }
+    assert_eq!(depends::reads(&texture_of(&source)), 1);
+}
+
+#[test]
+fn a_depends_line_that_does_not_parse_reconverts() {
+    let dir = crate::test_temp::dir().join("depends_unparsed");
+    std::fs::create_dir_all(&dir).unwrap();
+    let (source, out) = (dir.join("a.src"), dir.join("a.src.glb"));
+    std::fs::write(&source, "one").unwrap();
+    refresh(&LOOKING, &source, &out).unwrap();
+    let stamp = super::super::stamp_path(&out);
+    let record = std::fs::read_to_string(&stamp).unwrap();
+    let record = record.replace("depends absent", "depends nonsense");
+    std::fs::write(&stamp, record).unwrap();
+    std::fs::write(&out, "kept").unwrap();
+    assert_eq!(refreshed(&source, &out).0, "one", "stale, not a skip");
 }

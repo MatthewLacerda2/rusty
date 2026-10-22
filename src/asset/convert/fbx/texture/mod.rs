@@ -14,12 +14,12 @@
 //! is used instead, so a name in the textures folder holds the same bytes
 //! whatever is on disk (`stage::move_in` relies on it).
 //!
-//! A texture that is neither on disk nor embedded, or embeds a format the
-//! importer does not read, is a [`Skip`]; one that fails to extract, or lies on
+//! A texture that is neither on disk nor embedded, is on disk but cannot be
+//! read, or embeds a format the importer does not read, is a [`Skip`]; one that fails to extract, or lies on
 //! disk where no URI can reach it, fails the conversion (#1168).
 
 use super::super::stage::hook::{self, Step};
-use super::super::{Dependency, Skip, Staging};
+use super::super::{Dependency, Seen, Skip, Staging};
 use crate::asset::gltf::uri;
 use crate::asset::{ImportError, IMAGE_EXTENSIONS};
 use crate::core::collections::Map;
@@ -84,21 +84,25 @@ impl Textures {
                 self.written.extend(name.clone());
                 (name, ext)
             });
-        if let Some(file) = self.on_disk(texture) {
-            return relative_uri(&self.out_dir, &file).map(Some).ok_or_else(|| {
-                ImportError::Parse(format!(
-                    "FBX texture {}: cannot reference it",
-                    file.display()
-                ))
-            });
-        }
-        let name = match embedded {
-            None => return Ok(self.skip(texture, "neither a file on disk nor embedded".into())),
-            Some((None, ext)) => {
+        let unreadable = match self.on_disk(texture)? {
+            Disk::Found(file) => return self.reference(&file).map(Some),
+            Disk::Unreadable(file) => Some(file),
+            Disk::Absent => None,
+        };
+        let name = match (embedded, unreadable) {
+            (Some((Some(name), _)), _) => name,
+            (Some((None, ext)), _) => {
                 let why = format!("embeds a `.{ext}`, not an image format the importer reads");
                 return Ok(self.skip(texture, why));
             }
-            Some((Some(name), _)) => name,
+            (None, Some(file)) => {
+                let why = format!("{} is on disk but cannot be read", file.display());
+                return Ok(self.skip(texture, why));
+            }
+            (None, None) => {
+                let why = "neither a file on disk nor embedded".into();
+                return Ok(self.skip(texture, why));
+            }
         };
         self.extract(&name, &texture.content)?;
         let Some(dir) = self.dir.file_name() else {
@@ -114,23 +118,37 @@ impl Textures {
         ))))
     }
 
-    /// The first file on disk `texture` names that is there, each one looked at
-    /// recorded in [`Textures::looked_at`].
-    fn on_disk(&mut self, texture: &ufbx::Texture) -> Option<PathBuf> {
+    /// The URI of `file`, a texture on disk, from the `.glb`'s folder.
+    fn reference(&self, file: &Path) -> Result<String, ImportError> {
+        relative_uri(&self.out_dir, file).ok_or_else(|| {
+            ImportError::Parse(format!(
+                "FBX texture {}: cannot reference it",
+                file.display()
+            ))
+        })
+    }
+
+    /// The first file on disk `texture` names that can be read, else the first
+    /// that is there but cannot; each one looked at is recorded in
+    /// [`Textures::looked_at`].
+    fn on_disk(&mut self, texture: &ufbx::Texture) -> Result<Disk, ImportError> {
+        let mut disk = Disk::Absent;
         for name in [&texture.filename, &texture.absolute_filename] {
             let path = PathBuf::from(name.as_ref() as &str);
             if path.as_os_str().is_empty() {
                 continue;
             }
             // Read, not only stat'd: what was found is what the stamp records.
-            let looked = Dependency::look(&path);
-            let found = looked.found();
+            let looked = Dependency::look(&path)?;
+            let seen = looked.seen();
             self.looked_at.push(looked);
-            if found {
-                return Some(path);
+            match seen {
+                Seen::Read(_) => return Ok(Disk::Found(path)),
+                Seen::Unreadable if matches!(disk, Disk::Absent) => disk = Disk::Unreadable(path),
+                _ => {}
             }
         }
-        None
+        Ok(disk)
     }
 
     /// Record `texture` as left out, for `why`: no URI.
@@ -161,6 +179,13 @@ impl Textures {
             .and_then(|()| std::fs::write(&path, bytes))
             .map_err(|e| ImportError::Parse(format!("writing {}: {e}", path.display())))
     }
+}
+
+/// What looking on disk for a texture found.
+enum Disk {
+    Found(PathBuf),
+    Unreadable(PathBuf),
+    Absent,
 }
 
 /// The name `texture`'s file goes by: its file name, else its element name.
