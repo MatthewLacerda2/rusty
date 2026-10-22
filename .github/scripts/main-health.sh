@@ -45,16 +45,32 @@ shard_had_findings() {
 # infrastructural. The nightly `windows` signal is the exception on purpose: a
 # red Windows build is the finding, and this issue is where it lands (#741).
 # The weekly `cargo-test` signal (#981) is the same: its red is the finding.
+# GitHub's jobs API lags the run's own conclusion: a job of a run that concluded
+# `success` can still read `conclusion: null` a few seconds later, and filing
+# that as `unfinished` raised three false reds (#1181, #1183, #1200). So re-read
+# while any job is unconcluded; only one still null after the last read counts.
+# The interval and attempts are env vars so the test keeps the wait out of its clock.
+read_jobs() {
+  gh api --paginate "repos/$REPO/actions/runs/$RUN_ID/jobs?filter=latest&per_page=100" \
+    --jq '.jobs[] | [.name, (.conclusion // "unfinished")] | @tsv' | sort
+}
+job_lines=$(read_jobs)
+for ((attempt = 1; attempt < ${JOBS_RETRY_ATTEMPTS:-12}; attempt++)); do
+  [[ $job_lines == *$'\tunfinished'* ]] || break
+  sleep "${JOBS_RETRY_INTERVAL:-10}"
+  job_lines=$(read_jobs)
+done
+
 failed=()
 while IFS=$'\t' read -r name concl; do
+  [[ -z $name ]] && continue
   case "$concl" in success | skipped | neutral) continue ;; esac
   if [[ $name =~ ^mutants\ \(([0-9]+)\)$ ]] && shard_had_findings "${BASH_REMATCH[1]}"; then
     echo "skip: $name ($concl) — mutation findings, surfaced by mutants-report"
     continue
   fi
   failed+=("$name ($concl)")
-done < <(gh api --paginate "repos/$REPO/actions/runs/$RUN_ID/jobs?filter=latest&per_page=100" \
-  --jq '.jobs[] | [.name, (.conclusion // "unfinished")] | @tsv' | sort)
+done <<<"$job_lines"
 
 # A run with no jobs at all never started (e.g. an invalid workflow file).
 if [[ ${#failed[@]} -eq 0 && $run_concl != success && $run_concl != skipped ]] \
