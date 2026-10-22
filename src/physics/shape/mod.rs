@@ -8,6 +8,8 @@ pub(super) mod build;
 mod build_tests;
 #[cfg(test)]
 mod conformance;
+#[cfg(test)]
+pub(super) mod fixture;
 pub(super) mod hull;
 #[cfg(test)]
 mod hull_tests;

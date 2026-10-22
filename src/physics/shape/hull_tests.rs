@@ -8,13 +8,13 @@
 
 use glam::Vec3;
 
+use super::fixture;
 use super::hull::beyond_faces;
 use super::mesh::build_mesh_shape;
-use crate::physics::query::convex_fixture;
 
 /// The off-centre Cylinder's points.
 fn off_centre_cylinder() -> Vec<[f32; 3]> {
-    let (vertices, _) = convex_fixture::off_centre_cylinder();
+    let (vertices, _) = fixture::off_centre_cylinder();
     vertices.iter().map(|v| v.position).collect()
 }
 

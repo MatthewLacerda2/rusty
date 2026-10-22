@@ -7,7 +7,7 @@
 
 use glam::Vec3;
 
-use super::convex_fixture::turned_hull;
+use super::convex_fixture::{flat_hull, turned_hull};
 use crate::physics::PhysicsWorld;
 
 #[test]
@@ -37,5 +37,23 @@ fn a_point_off_a_turned_hull_still_projects_onto_it() {
         let gap = (closest - out).length();
         assert!(gap <= 10.01 && gap > 1.0, "{out}: projected {gap} away");
         assert_eq!(world.collider_contains_point(id, out), Some(false));
+    }
+}
+
+#[test]
+fn a_flat_hull_holds_only_its_outline() {
+    // A flat hull's two face planes hold its whole plane: it is answered by parry.
+    let (scene, id) = flat_hull();
+    let world = PhysicsWorld::from_scene(&scene);
+    for (out, edge) in [
+        (Vec3::new(500.0, 0.0, 500.0), Vec3::new(7.5, 0.0, 7.5)),
+        (Vec3::new(10.0, 0.0, 1.0), Vec3::new(7.5, 0.0, 1.0)),
+    ] {
+        assert_eq!(world.collider_contains_point(id, out), Some(false), "{out}");
+        let closest = world.closest_point_on(id, out).expect("a live collider");
+        assert!(
+            (closest - edge).length() < 0.01,
+            "{out}: projected to {closest}"
+        );
     }
 }

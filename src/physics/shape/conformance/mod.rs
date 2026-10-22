@@ -16,8 +16,8 @@ use poses::{turns, world_poses, SCALES};
 
 use glam::Vec3;
 
+use super::fixture::off_centre_cylinder;
 use crate::components::{CapsuleAxis, ColliderShape};
-use crate::scene::authoring::{primitive_geometry, Primitive};
 
 /// One shape to test, with the rest-pose geometry a mesh collider builds from.
 pub(super) struct Sample {
@@ -93,15 +93,10 @@ pub(super) fn all_samples() -> Vec<Sample> {
     KINDS.iter().flat_map(samples).collect()
 }
 
-/// A mesh collider over the Cylinder primitive moved off its origin, so its
-/// local box is not centred.
+/// A mesh collider over [`off_centre_cylinder`], so its local box is not centred.
 fn off_centre_mesh(convex: bool) -> Sample {
-    let (vertices, indices) = primitive_geometry(Primitive::Cylinder).expect("a mesh");
-    let offset = Vec3::new(0.3, 0.2, -0.1);
-    let points: Vec<Vec3> = vertices
-        .iter()
-        .map(|v| Vec3::from(v.position) + offset)
-        .collect();
+    let (vertices, indices) = off_centre_cylinder();
+    let points: Vec<Vec3> = vertices.iter().map(|v| Vec3::from(v.position)).collect();
     let (local_min, local_max) = points.iter().fold((Vec3::MAX, Vec3::MIN), |(lo, hi), &p| {
         (lo.min(p), hi.max(p))
     });

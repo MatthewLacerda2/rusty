@@ -150,9 +150,10 @@ impl PhysicsWorld {
     }
 }
 
-/// [`hull::holds`] for a convex mesh collider; `None` for any other shape. parry's
-/// point projection can misreport a point on a hull's corner as far outside it.
+/// [`hull::holds`] for a convex mesh collider with volume; `None` for any other
+/// shape, a flat hull included. parry's point projection can misreport a point on
+/// a hull's corner as far outside it.
 fn hull_holds(collider: &Collider, point: Vec3) -> Option<bool> {
-    let hull = collider.shape().as_convex_polyhedron()?;
+    let hull = (collider.shape().as_convex_polyhedron()).filter(|h| hull::has_volume(h))?;
     Some(hull::holds(hull, collider.position(), point))
 }
