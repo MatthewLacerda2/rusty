@@ -73,6 +73,7 @@ fn sub_mesh_from_model(index: usize, model: tobj::Model) -> SubMesh {
                 mesh.positions[v * 3 + 1],
                 mesh.positions[v * 3 + 2],
             ];
+            // Without `vn` lines the flat path below fills it in (#1217).
             let normal = if has_normals {
                 [
                     mesh.normals[v * 3],
@@ -80,7 +81,7 @@ fn sub_mesh_from_model(index: usize, model: tobj::Model) -> SubMesh {
                     mesh.normals[v * 3 + 2],
                 ]
             } else {
-                [0.0, 1.0, 0.0]
+                [0.0; 3]
             };
             // OBJ V runs bottom-up; flip to match the engine's top-down UVs.
             let tex_coords = if has_uvs {
@@ -93,12 +94,19 @@ fn sub_mesh_from_model(index: usize, model: tobj::Model) -> SubMesh {
         .collect();
 
     // `.obj` carries no tangents; generate them so normal maps work (#207).
-    let vertices = with_generated_tangents(vertices, &mesh.indices);
+    let (vertices, indices) = if has_normals {
+        (
+            with_generated_tangents(vertices, &mesh.indices),
+            mesh.indices,
+        )
+    } else {
+        super::flat_normals::flat_shaded(&vertices, &mesh.indices)
+    };
 
     SubMesh {
         id,
         vertices,
-        indices: mesh.indices,
+        indices,
         material: mesh.material_id,
         // `.obj` is static-mesh only: no skin/anim, ever.
         skin: None,

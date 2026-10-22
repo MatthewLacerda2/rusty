@@ -108,3 +108,11 @@ fn a_texture_uri_climbs_out_of_the_cache_folder() {
         super::texture::relative_uri(&dir.join("cache/models"), &dir.join("textures/skin.png"));
     assert_eq!(uri.as_deref(), Some("../../textures/skin.png"));
 }
+
+#[test]
+fn a_cube_without_normals_is_shaded_flat() {
+    // The fixture has no `LayerElementNormal`; each face gets its own (#1217).
+    let asset = import();
+    crate::asset::flat_normals_tests::assert_flat(&asset.sub_meshes[0]);
+    assert_eq!(asset.sub_meshes[0].vertices.len(), 24);
+}
