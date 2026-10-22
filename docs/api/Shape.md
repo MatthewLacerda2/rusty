@@ -47,4 +47,4 @@ Shape.SetGradient(id, {
 ```
 
 Omitted keys take their defaults; fewer than two stops clears the gradient, extra
-stops past four are dropped. `GetGradient` returns the table in this shape.
+stops past four are dropped. `kind` is read in any case (`"radial"`, `"RADIAL"`). `GetGradient` returns the table in this shape.

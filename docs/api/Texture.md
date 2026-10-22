@@ -7,6 +7,7 @@ op-runner → bake) the material/shader legs build on.
 
 A recipe is authored as a Lua **table** whose shape mirrors the on-disk JSON document
 one-to-one, so the same DAG describes a Lua-built recipe and one loaded from a file.
+An `op` tag and an enum param (`kind`, `mode`, …) are read in any case (`"NOISE"`).
 Output maps are **seamless by construction** (the procedural domain wraps, and every
 periodic param is a whole count of repeats per tile — see *Tiling* below),
 **resolution-independent** (`resolution` only chooses how finely the pattern is

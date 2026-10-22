@@ -30,7 +30,7 @@
 
 use mlua::Value;
 
-use crate::api::lua_json::recipe_json;
+use crate::api::lua_json::{decode, recipe_json};
 use crate::components::MaterialAsset;
 use crate::procgen::TextureRecipe;
 
@@ -59,7 +59,7 @@ pub struct Validated {
 /// defined or baked. An absent `maps` is none.
 fn maps_recipe(value: Option<serde_json::Value>) -> Result<Option<TextureRecipe>, String> {
     value
-        .map(serde_json::from_value)
+        .map(decode::<TextureRecipe>)
         .transpose()
         .map_err(|e| format!("maps is a texture recipe (see Texture.BakeSet): {e}"))
 }
@@ -99,7 +99,7 @@ fn asset_from_json_value(
         maps = maps_recipe(obj.remove("maps"))?;
     }
     refuse_unknown_keys(&value)?;
-    let mut asset: MaterialAsset = serde_json::from_value(value).map_err(|e| e.to_string())?;
+    let mut asset: MaterialAsset = decode(value)?;
     asset.maps_recipe = maps;
     asset.decal = asset.decal.clamped();
     Ok((asset, validated))

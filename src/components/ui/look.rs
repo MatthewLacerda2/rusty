@@ -38,17 +38,14 @@ impl UiBlend {
     ];
 }
 
-/// How a gradient sweeps across the rect. Besides `"Linear"`/`"Radial"`, the exact
-/// lower-case spellings `"linear"`/`"radial"` parse too (serde aliases); no other
-/// casing does.
+/// How a gradient sweeps across the rect. Scripts may write the name in any case
+/// (`api::lua_json::decode`, #1216); a stored file holds `"Linear"`/`"Radial"`.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum GradientKind {
     /// Along a direction at `angle` degrees, corner to corner.
     #[default]
-    #[serde(alias = "linear")]
     Linear,
     /// Outward from `center`, reaching the last stop at `radius`.
-    #[serde(alias = "radial")]
     Radial,
 }
 

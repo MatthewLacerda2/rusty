@@ -27,6 +27,8 @@ use serde_json::Value as Json;
 use zimmer::survey::{Register, SongSurvey, Survey};
 use zimmer::{Patch, Song};
 
+use crate::api::lua_json::decode;
+
 pub use lua::survey;
 
 /// One one-shot patch, as its document states it — the patch half of a
@@ -100,12 +102,10 @@ impl SetSurvey {
         resolve: &dyn zimmer::PatchResolver,
     ) -> Result<(), String> {
         if json.get("tracks").is_some() {
-            let song: Song =
-                serde_json::from_value(json).map_err(|e| format!("invalid song: {e}"))?;
+            let song: Song = decode(json).map_err(|e| format!("invalid song: {e}"))?;
             self.songs.songs.push(SongSurvey::of(name, &song, resolve));
         } else {
-            let patch: Patch =
-                serde_json::from_value(json).map_err(|e| format!("invalid patch: {e}"))?;
+            let patch: Patch = decode(json).map_err(|e| format!("invalid patch: {e}"))?;
             self.patches.push(PatchSurvey::of(name.to_owned(), &patch));
         }
         Ok(())
