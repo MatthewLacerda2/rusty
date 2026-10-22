@@ -24,9 +24,11 @@ use std::rc::Rc;
 use glam::Vec2;
 
 use super::cache::{CanvasPlace, UiViewCache};
-use super::effects::{color_pass, GroupKey};
+use super::effects::GroupKey;
 use super::mesh::build_canvas_meshes;
 use super::pipeline::UiPass;
+use crate::render::gpu::fullscreen::color_pass;
+use crate::render::timing::GpuPass;
 use crate::render::{RenderView, Renderer};
 use crate::scene::{Camera, Scene};
 use crate::ui::{CanvasSpace, UiLayout, UiView};
@@ -127,7 +129,7 @@ impl Renderer {
         {
             let mut pass = color_pass(
                 &mut encoder,
-                ("UI Pass", &self.gpu_timer),
+                ("UI Pass", &self.gpu_timer, GpuPass::Ui),
                 target,
                 wgpu::LoadOp::Load,
             );

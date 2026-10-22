@@ -165,7 +165,7 @@ fn effects(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
 /// The editor's selection outline (#1175), over everything this camera drew. Only
 /// an editor camera marked any solid for it (`batch_solids`).
 fn outline(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
-    r.draw_outline(view, &ctx.solids.draws);
+    r.draw_outline(view, &ctx.solids, ctx.view_proj);
 }
 
 fn count(r: &mut Renderer, _: &mut RenderView, ctx: &mut CameraCtx) {

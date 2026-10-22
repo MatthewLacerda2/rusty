@@ -1,20 +1,42 @@
-//! Recording one camera's selection outline: the mask, then the edge pass over the
-//! HDR target, in one encoder of its own, after the camera's solids and effects.
+//! Recording one camera's selection outline: the mask, the row dilation and the
+//! ring over the HDR target, in one encoder of its own, after the camera's solids
+//! and effects. The last two are scissored to the selection's bounds on screen.
+
+use glam::Mat4;
 
 use super::{EdgeUniform, SelectionMask, OUTLINE_COLOR, OUTLINE_PX};
 use crate::render::draw::batch::FrameDraws;
+use crate::render::draw::resources::SolidResources;
 use crate::render::gpu::draw_buffers::DrawBuffers;
+use crate::render::gpu::fullscreen::color_pass;
+use crate::render::gpu::pipelines::LazyPipeline;
+use crate::render::timing::GpuPass;
 use crate::render::{RenderView, Renderer};
 
 impl Renderer {
-    /// Ring the solids `draws` marked for the outline in `view` (see the module doc).
-    /// A no-op when nothing is outlined. `draws` must be this camera's, still
-    /// uploaded: the mask binds their uniform slots and instances.
-    pub(crate) fn draw_outline(&mut self, view: &mut RenderView, draws: &FrameDraws) {
-        if draws.outline.is_empty() {
+    /// Ring the solids `solids` marked for the outline in `view`, seen through
+    /// `view_proj` (see the module doc). A no-op when nothing is outlined or the
+    /// selection is off screen. `solids` must be this camera's, still uploaded: the
+    /// mask binds their uniform slots and instances.
+    pub(crate) fn draw_outline(
+        &mut self,
+        view: &mut RenderView,
+        solids: &SolidResources,
+        view_proj: Mat4,
+    ) {
+        let Some(bounds) = solids.outline_bounds else {
+            return;
+        };
+        if solids.draws.outline.is_empty() {
             return;
         }
         let size = view.size();
+        let radius = OUTLINE_PX * view.pixel_scale();
+        let pad = radius.ceil() as u32 + 1;
+        let Some([x, y, w, h]) = bounds.screen_rect(view_proj, (size.width, size.height), pad)
+        else {
+            return;
+        };
         if !view
             .selection_mask
             .as_ref()
@@ -26,7 +48,7 @@ impl Renderer {
         let mask = view.selection_mask.as_ref().expect("allocated above");
         let params = EdgeUniform {
             color: OUTLINE_COLOR,
-            radius: OUTLINE_PX * view.pixel_scale(),
+            radius,
             _pad: [0.0; 3],
         };
         self.queue
@@ -36,13 +58,15 @@ impl Renderer {
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("Selection Outline Encoder"),
             });
-        self.record_mask(&mut encoder, &mask.view, draws);
-        let hdr = &view.post_fx.scene_hdr.view;
-        let mut pass = colour_pass(&mut encoder, "Selection Edge Pass", hdr, wgpu::LoadOp::Load);
-        pass.set_pipeline(self.outline.edge.get());
-        pass.set_bind_group(0, &mask.edge_group, &[]);
-        pass.draw(0..3, 0..1);
-        drop(pass);
+        self.record_mask(&mut encoder, &mask.mask, &solids.draws);
+        let rect = [x, y, w, h];
+        // Unwritten row distances read as "no mask pixel near".
+        let rows = (&mask.rows, wgpu::LoadOp::Clear(wgpu::Color::WHITE));
+        let dilate = (&self.outline.dilate, &mask.dilate_group);
+        self.scissored(&mut encoder, "Selection Dilate Pass", rows, dilate, rect);
+        let hdr = (&view.post_fx.scene_hdr.view, wgpu::LoadOp::Load);
+        let edge = (&self.outline.edge, &mask.edge_group);
+        self.scissored(&mut encoder, "Selection Edge Pass", hdr, edge, rect);
         self.queue.submit(std::iter::once(encoder.finish()));
     }
 
@@ -55,7 +79,8 @@ impl Renderer {
         draws: &FrameDraws,
     ) {
         let clear = wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT);
-        let mut pass = colour_pass(encoder, "Selection Mask Pass", mask, clear);
+        let timed = ("Selection Mask Pass", &self.gpu_timer, GpuPass::Outline);
+        let mut pass = color_pass(encoder, timed, mask, clear);
         pass.set_pipeline(self.outline.mask.get());
         pass.set_bind_group(0, &self.global_bind_group, &[]);
         // Group 3 is in the forward layout; the mask reads nothing from it.
@@ -72,29 +97,22 @@ impl Renderer {
             pass.draw_indexed(0..draw.num_indices, 0, draw.instance..draw.instance + 1);
         }
     }
-}
 
-/// Begin a one-target colour pass into `target`, with no depth attachment.
-fn colour_pass<'e>(
-    encoder: &'e mut wgpu::CommandEncoder,
-    label: &str,
-    target: &wgpu::TextureView,
-    load: wgpu::LoadOp<wgpu::Color>,
-) -> wgpu::RenderPass<'e> {
-    encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-        label: Some(label),
-        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-            view: target,
-            depth_slice: None,
-            resolve_target: None,
-            ops: wgpu::Operations {
-                load,
-                store: wgpu::StoreOp::Store,
-            },
-        })],
-        depth_stencil_attachment: None,
-        timestamp_writes: None,
-        occlusion_query_set: None,
-        multiview_mask: None,
-    })
+    /// One fullscreen outline pass: `pipeline` with `group` into `target`, timed as
+    /// the outline and scissored to `rect` (`[x, y, width, height]`).
+    fn scissored(
+        &self,
+        encoder: &mut wgpu::CommandEncoder,
+        label: &str,
+        (target, load): (&wgpu::TextureView, wgpu::LoadOp<wgpu::Color>),
+        (pipeline, group): (&LazyPipeline, &wgpu::BindGroup),
+        [x, y, w, h]: [u32; 4],
+    ) {
+        let timed = (label, &self.gpu_timer, GpuPass::Outline);
+        let mut pass = color_pass(encoder, timed, target, load);
+        pass.set_scissor_rect(x, y, w, h);
+        pass.set_pipeline(pipeline.get());
+        pass.set_bind_group(0, group, &[]);
+        pass.draw(0..3, 0..1);
+    }
 }

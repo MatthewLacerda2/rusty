@@ -1,7 +1,7 @@
 //! Which way round a placed mesh's triangles face (#1134, #1142). A world matrix
 //! with a negative determinant mirrors what it places and reverses its winding, so
 //! a pipeline that culls by facing needs a twin that takes clockwise triangles as
-//! front. The shadow casters and the selection outline both pick theirs here.
+//! front. The shadow casters pick theirs here.
 
 use glam::Mat4;
 

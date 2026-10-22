@@ -1,5 +1,6 @@
-//! The renderer-wide half of the selection outline: its mask and edge pipelines,
-//! built on first use (#985), and the edge pass's bind-group layout. The mask target
+//! The renderer-wide half of the selection outline: its mask, dilation and edge
+//! pipelines, built on first use (#985), and the bind-group layout the last two
+//! share. The mask target
 //! is per view ([`super::SelectionMask`]).
 
 use super::{EdgeUniform, MASK_FORMAT};
@@ -10,13 +11,16 @@ use crate::render::gpu::pipelines::LazyPipeline;
 use crate::render::gpu::shaders::ShaderRegistry;
 use crate::render::postfx::HDR_FORMAT;
 
-/// The selection outline's two pipelines and the edge pass's layout.
+/// The selection outline's three pipelines and the layout of the last two.
 pub(crate) struct OutlinePasses {
     /// The outlined draws into the mask, through the forward pipeline layout.
     pub(crate) mask: LazyPipeline,
-    /// The fullscreen ring over the HDR target, alpha-blended.
+    /// Each pixel's distance to the mask along its row (`fs_dilate_x`).
+    pub(crate) dilate: LazyPipeline,
+    /// The ring over the HDR target, alpha-blended (`fs_edge`).
     pub(crate) edge: LazyPipeline,
-    /// The edge pass's group 0: its [`EdgeUniform`] and the mask.
+    /// The dilation's and edge's group 0: the [`EdgeUniform`], the texture the pass
+    /// reads along its axis, and the mask.
     pub(super) edge_layout: wgpu::BindGroupLayout,
 }
 
@@ -35,6 +39,7 @@ impl OutlinePasses {
             entries: &[
                 uniform_entry(0, wgpu::ShaderStages::FRAGMENT),
                 texture_entry(1, wgpu::TextureViewDimension::D2),
+                texture_entry(2, wgpu::TextureViewDimension::D2),
             ],
         });
         let edge_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -46,39 +51,48 @@ impl OutlinePasses {
         let mask = LazyPipeline::new(device, move |device| {
             mask_pipeline(device, &mask_shader, &forward_layout)
         });
-        let edge = LazyPipeline::new(device, move |device| {
-            let target = wgpu::ColorTargetState {
-                format: HDR_FORMAT,
-                blend: Some(wgpu::BlendState::ALPHA_BLENDING),
-                write_mask: wgpu::ColorWrites::ALL,
-            };
-            Fullscreen {
-                label: "Selection Edge Pipeline",
-                shader: &edge_shader,
-                layout: &edge_pipeline_layout,
-                vs: "vs_fullscreen",
-                fs: "fs_edge",
-            }
-            .colour(device, &[Some(target)])
-        });
+        let fullscreen = |fs: &'static str, format, blend| {
+            let (shader, layout) = (edge_shader.clone(), edge_pipeline_layout.clone());
+            LazyPipeline::new(device, move |device| {
+                let target = wgpu::ColorTargetState {
+                    format,
+                    blend,
+                    write_mask: wgpu::ColorWrites::ALL,
+                };
+                let label = format!("Selection Outline {fs}");
+                Fullscreen {
+                    label: &label,
+                    shader: &shader,
+                    layout: &layout,
+                    vs: "vs_fullscreen",
+                    fs,
+                }
+                .colour(device, &[Some(target)])
+            })
+        };
+        let dilate = fullscreen("fs_dilate_x", MASK_FORMAT, None);
+        let blend = Some(wgpu::BlendState::ALPHA_BLENDING);
+        let edge = fullscreen("fs_edge", HDR_FORMAT, blend);
         Self {
             mask,
+            dilate,
             edge,
             edge_layout,
         }
     }
 
-    /// Both pipelines, for `Renderer::lazy_pipelines`.
-    pub(crate) fn lazy_pipelines(&self) -> [&LazyPipeline; 2] {
-        [&self.mask, &self.edge]
+    /// All three pipelines, for `Renderer::lazy_pipelines`.
+    pub(crate) fn lazy_pipelines(&self) -> [&LazyPipeline; 3] {
+        [&self.mask, &self.dilate, &self.edge]
     }
 
-    /// The edge pass's bind group over `uniform` and the `mask` view.
+    /// A dilation or edge bind group: `uniform`, the `source` the pass reads along
+    /// its axis, and the `mask`.
     pub(super) fn edge_group(
         &self,
         device: &wgpu::Device,
         uniform: &wgpu::Buffer,
-        mask: &wgpu::TextureView,
+        [source, mask]: [&wgpu::TextureView; 2],
     ) -> wgpu::BindGroup {
         device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Selection Edge Bind Group"),
@@ -90,6 +104,10 @@ impl OutlinePasses {
                 },
                 wgpu::BindGroupEntry {
                     binding: 1,
+                    resource: wgpu::BindingResource::TextureView(source),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
                     resource: wgpu::BindingResource::TextureView(mask),
                 },
             ],

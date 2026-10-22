@@ -80,8 +80,8 @@ fn gpu_warm_pipelines_builds_every_lazy_pipeline() {
     };
     let every = renderer.lazy_pipelines(true);
     // transparent + 2 particle + 2 ribbon + one world canvas per blend mode
-    // + 2 mirrored shadow + 3 editor (line, the outline's mask and edge).
-    assert_eq!(every.len(), 1 + 2 + 2 + UiBlend::ALL.len() + 2 + 3);
+    // + 2 mirrored shadow + 4 editor (line, the outline's mask, dilation and edge).
+    assert_eq!(every.len(), 1 + 2 + 2 + UiBlend::ALL.len() + 2 + 4);
     assert!(every.iter().all(|p| !p.is_built()), "headless stays lazy");
 
     renderer.warm_pipelines(false);

@@ -58,6 +58,8 @@ pub enum GpuPass {
     Ribbons,
     /// Particle systems.
     Particles,
+    /// The editor's selection outline: its mask, dilation and ring (#1175).
+    Outline,
     /// The post-FX chain: bloom, composite, authored effects, FXAA.
     PostFx,
     /// World and screen UI, its masks and backdrop blur.
@@ -66,13 +68,14 @@ pub enum GpuPass {
 
 impl GpuPass {
     /// Every pass, in frame order.
-    pub const ALL: [GpuPass; 8] = [
+    pub const ALL: [GpuPass; 9] = [
         GpuPass::Shadows,
         GpuPass::Ssao,
         GpuPass::Forward,
         GpuPass::Transparent,
         GpuPass::Ribbons,
         GpuPass::Particles,
+        GpuPass::Outline,
         GpuPass::PostFx,
         GpuPass::Ui,
     ];
@@ -86,6 +89,7 @@ impl GpuPass {
             GpuPass::Transparent => "transparent",
             GpuPass::Ribbons => "ribbons",
             GpuPass::Particles => "particles",
+            GpuPass::Outline => "outline",
             GpuPass::PostFx => "post_fx",
             GpuPass::Ui => "ui",
         }

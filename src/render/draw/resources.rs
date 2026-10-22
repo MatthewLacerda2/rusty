@@ -9,7 +9,7 @@ use super::batch::{BatchKey, DrawItem, FrameDraws};
 use crate::components::MaterialAsset;
 use crate::render::gpu::draw_buffers::{group1, push_palette, FrameUpload, JointMatrix};
 use crate::render::lod::LodSelection;
-use crate::render::passes::outline::outlined;
+use crate::render::passes::outline::{outlined, OutlineBounds};
 use crate::render::{Frustum, MeshId, Renderer};
 use crate::scene::Scene;
 
@@ -26,6 +26,9 @@ pub(crate) struct SolidResources {
     pub lod_hidden: u32,
     /// Mesh particles among the instances (#440) — counted as particles, not entities.
     pub mesh_particles: u32,
+    /// Where the solids the selection outline rings sit in world space (#1175);
+    /// `None` when it rings none.
+    pub outline_bounds: Option<OutlineBounds>,
 }
 // The overlay resources keep only the buffers they own (the per-overlay entity
 // uniform + any vertex buffer) plus their bind group; the joint array they bind is
@@ -130,11 +133,13 @@ impl Renderer {
             }
         }
         let mesh_particles = self.push_mesh_particles(scene, cam, (&mut opaque, &mut transparent));
+        let outline_bounds = self.outline_bounds(scene, &ringed);
         SolidResources {
             draws: self.upload_solids(opaque, transparent, &joints),
             culled,
             lod_hidden,
             mesh_particles,
+            outline_bounds,
         }
     }
 

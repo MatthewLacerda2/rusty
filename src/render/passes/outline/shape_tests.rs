@@ -1,7 +1,8 @@
 //! The ring is a fixed width around whatever the selection covers on screen
 //! (#1175): a box stretched (10,1,1), a primitive level's usual wall, rings as wide
 //! along its long sides as its short ones, and a glass box rings its silhouette
-//! instead of filling it. Skips with no adapter.
+//! instead of filling it. A resized view rebuilds its mask at the new size. Skips
+//! with no adapter.
 
 use glam::Vec3;
 
@@ -9,8 +10,9 @@ use super::tests::{frame_from, is_outline, outline_stats, RES};
 use super::OUTLINE_PX;
 use crate::components::material::RenderMode;
 use crate::components::{MaterialAsset, MaterialComponent};
+use crate::render::{readback, RenderView, OFFSCREEN_FORMAT};
 use crate::scene::authoring::{create_entity, Primitive};
-use crate::scene::Scene;
+use crate::scene::{Camera, Scene};
 
 /// A unit box at the origin, scaled by `scale`, selected.
 fn selected_box(scale: Vec3) -> Scene {
@@ -71,4 +73,31 @@ fn gpu_a_glass_box_rings_its_silhouette() {
     eprintln!("[outline, glass] {count} px");
     assert!(count > 20, "the glass box shows an outline");
     assert!(!filled, "the outline rings the glass, not fills it");
+}
+
+#[test]
+fn gpu_a_resized_view_rebuilds_its_mask_and_still_rings() {
+    let Some(mut r) = crate::render::test_gpu::headless_or_skip(RES, RES) else {
+        return;
+    };
+    let scene = selected_box(Vec3::ONE);
+    let cam = Camera::new(Vec3::Z * 3.0, -90.0, 0.0);
+    let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, RES, RES, 2);
+    for (w, h) in [(RES, RES), (RES / 2, RES * 3 / 4)] {
+        view.resize(&r.device, w, h, 2);
+        let out = view.color_target_view().unwrap();
+        r.render(&mut view, &scene, &cam, &out, true);
+        let mask = view
+            .selection_mask
+            .as_ref()
+            .expect("an outlined frame has a mask");
+        assert!(mask.matches(w, h), "the mask is rebuilt at {w}x{h}");
+        let px =
+            readback::read_texture_rgba8(&r.device, &r.queue, view.color_target().unwrap(), w, h);
+        let ring = px.chunks(4).filter(|p| is_outline(p)).count();
+        assert!(
+            ring > 20,
+            "{w}x{h}: the selection shows an outline ({ring} px)"
+        );
+    }
 }

@@ -11,11 +11,16 @@
 //!    forward pass's own `vertex_to_world`. The world matrix and mirroring (#1142),
 //!    the skinned pose and LOD level (#1160) and anything else the forward vertex
 //!    stage reads are the forward pass's by construction. The fragment honours the
-//!    material's cutout (`use_cutout`, `alpha_cutoff`); a surface shader's own cut
-//!    blocks (`dissolve`, #648) are not run, so a dissolving solid rings whole.
-//! 3. The **edge** pass (`outline/edge.wgsl`), one fullscreen triangle over the HDR
-//!    target before post-FX, colours each pixel outside the mask that has a mask
-//!    pixel within [`OUTLINE_PX`] (times the view's pixel scale). There is no pivot
+//!    material's cutout (`use_cutout`, `alpha_cutoff`) at the mesh's own UVs, as the
+//!    depth prepass and shadow clips do; a surface shader's blocks are not run, so
+//!    its cut blocks (`dissolve`, #648) and UV blocks (`uv_scroll`) are not followed:
+//!    a dissolving solid rings whole, a scrolled cutout rings its unscrolled texels.
+//! 3. Two fullscreen passes (`outline/edge.wgsl`), scissored to the selection's
+//!    bounds on screen ([`OutlineBounds`]), colour each pixel outside the mask that
+//!    has a mask pixel within [`OUTLINE_PX`] (times the view's pixel scale): a row
+//!    dilation, then a column walk that draws the ring over the HDR target before
+//!    post-FX. Separable, so a pixel loads about 2·(2r+1) texels, not (2r+1)². All
+//!    three passes are timed as the GPU timer's `outline`. There is no pivot
 //!    and no hull, so a pose far from its entity's origin rings evenly (#1165) and a
 //!    stretched box rings as wide along its long sides as its short ones; a
 //!    transparent solid rings its silhouette like any other.
@@ -23,11 +28,13 @@
 //! Editor-only: a camera outside editor mode (Play, a render texture) marks nothing
 //! and runs neither pass.
 
+mod bounds;
 mod run;
 mod select;
 mod setup;
 mod targets;
 
+pub(crate) use bounds::OutlineBounds;
 pub(crate) use select::outlined;
 pub(crate) use setup::OutlinePasses;
 pub(crate) use targets::SelectionMask;
@@ -53,6 +60,8 @@ struct EdgeUniform {
     _pad: [f32; 3],
 }
 
+#[cfg(test)]
+mod bounds_tests;
 #[cfg(test)]
 mod draw_tests;
 #[cfg(test)]

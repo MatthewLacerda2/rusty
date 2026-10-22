@@ -126,6 +126,7 @@ each kind's passes summed, under names that never change so two reports diff:
 | `transparent` | translucent solids |
 | `ribbons` | trails and lines |
 | `particles` | particle systems |
+| `outline` | the editor's selection outline: its mask, dilation and ring (editor only) |
 | `post_fx` | bloom, the composite, authored effects, FXAA |
 | `ui` | world and screen UI, Mask textures and the backdrop blur |
 

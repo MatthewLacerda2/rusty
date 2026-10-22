@@ -1,8 +1,7 @@
-//! The selection outline is a silhouette around where the selection is drawn
-//! (#1142): it follows the entity's world matrix, so a child of a moved, turned
-//! parent is outlined in place, and a mirrored selection draws through the
-//! clockwise twin, so its outer shell never covers the object. Skips with no
-//! adapter.
+//! The selection outline is a ring around where the selection is drawn (#1142): it
+//! follows the entity's world matrix, so a child of a moved, turned parent is
+//! outlined in place, and a mirrored selection is ringed the same as a plain one
+//! (the mask culls no faces), never filled. Skips with no adapter.
 
 use glam::{Quat, Vec3};
 
