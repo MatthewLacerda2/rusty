@@ -17,6 +17,7 @@ use glam::Vec3;
 use serde::{Deserialize, Serialize};
 
 use crate::components::{Entity, MaterialAsset};
+use crate::scene::authoring::material::fold_pending;
 use crate::scene::collision_matrix::CollisionMatrix;
 use crate::scene::layers::LayerRegistry;
 use crate::scene::lighting::lightmap::LightmapSet;
@@ -135,12 +136,13 @@ pub fn apply_scene_data(scene: &mut Scene, mut data: SceneData) {
 
     // Start from the document's library, then fold in any material an entity still
     // has staged (an Add-menu default restored from a snapshot before the inspector
-    // folded it in). Done before spawning so each entity's reference resolves.
+    // folded it in); an authored asset already under the key is kept (#997). Done
+    // before spawning so each entity's reference resolves.
     scene.materials = data.materials;
     for entity in &mut data.entities {
         if let Some(pending) = entity.pending_material.take() {
             if let Some(reference) = &entity.material {
-                scene.materials.insert(reference.material.clone(), pending);
+                fold_pending(&mut scene.materials, &reference.material, pending);
             }
         }
     }
