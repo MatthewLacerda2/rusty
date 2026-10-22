@@ -39,15 +39,9 @@ shard_had_findings() {
   [[ $rc == 2 || $rc == 3 ]]
 }
 
-# Every other non-success job files. The weekly signal jobs never fail on a
-# finding — `coverage` flags a floor drop without exiting non-zero, and
-# `mutants-report` only summarises — so their failure is always
-# infrastructural. The nightly `windows` signal is the exception on purpose: a
-# red Windows build is the finding, and this issue is where it lands (#741).
-# The weekly `cargo-test` signal (#981) is the same: its red is the finding.
 # GitHub's jobs API lags the run's own conclusion: a job of a run that concluded
 # `success` can still read `conclusion: null` a few seconds later, and filing
-# that as `unfinished` raised three false reds (#1181, #1183, #1200). So re-read
+# that as `unfinished` raised three false reds (#1181, #1183; fixed in #1200). So re-read
 # while any job is unconcluded; only one still null after the last read counts.
 # The interval and attempts are env vars so the test keeps the wait out of its clock.
 read_jobs() {
@@ -57,10 +51,18 @@ read_jobs() {
 job_lines=$(read_jobs)
 for ((attempt = 1; attempt < ${JOBS_RETRY_ATTEMPTS:-12}; attempt++)); do
   [[ $job_lines == *$'\tunfinished'* ]] || break
+  prev=$job_lines
   sleep "${JOBS_RETRY_INTERVAL:-10}"
-  job_lines=$(read_jobs)
+  # A failed re-read (a 502) keeps the previous one rather than aborting under set -e.
+  job_lines=$(read_jobs) || job_lines=$prev
 done
 
+# Every other non-success job files. The weekly signal jobs never fail on a
+# finding — `coverage` flags a floor drop without exiting non-zero, and
+# `mutants-report` only summarises — so their failure is always
+# infrastructural. The nightly `windows` signal is the exception on purpose: a
+# red Windows build is the finding, and this issue is where it lands (#741).
+# The weekly `cargo-test` signal (#981) is the same: its red is the finding.
 failed=()
 while IFS=$'\t' read -r name concl; do
   [[ -z $name ]] && continue

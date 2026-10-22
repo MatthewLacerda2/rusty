@@ -7,6 +7,7 @@ script runs with `DRY_RUN=true`, so an issue it would file is printed, not made.
 
 import json
 import os
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -34,6 +35,7 @@ def jobs(*conclusions):
     return json.dumps({"jobs": [{"name": f"job{i}", "conclusion": c} for i, c in enumerate(conclusions)]})
 
 
+@unittest.skipUnless(shutil.which("jq"), "the stubbed gh filters with jq")
 class JobRace(unittest.TestCase):
     def run_health(self, *reads):
         with tempfile.TemporaryDirectory() as tmp:
