@@ -1,6 +1,7 @@
 //! Recording one camera's selection outline: the mask, the row dilation and the
-//! ring over the HDR target, in one encoder of its own, after the camera's solids
-//! and effects. The last two are scissored to the selection's bounds on screen.
+//! ring over the post-FX output (#1224), in one encoder of its own, after post-FX
+//! and before the editor's handles. The last two are scissored to the selection's
+//! bounds on screen.
 
 use glam::Mat4;
 
@@ -15,14 +16,16 @@ use crate::render::{RenderView, Renderer};
 
 impl Renderer {
     /// Ring the solids `solids` marked for the outline in `view`, seen through
-    /// `view_proj` (see the module doc). A no-op when nothing is outlined or the
-    /// selection is off screen. `solids` must be this camera's, still uploaded: the
-    /// mask binds their uniform slots and instances.
+    /// `view_proj`, onto `output`, the view's finished post-FX image (see the module
+    /// doc). A no-op when nothing is outlined or the selection is off screen.
+    /// `solids` must be this camera's, still uploaded: the mask binds their uniform
+    /// slots and instances.
     pub(crate) fn draw_outline(
         &mut self,
         view: &mut RenderView,
         solids: &SolidResources,
         view_proj: Mat4,
+        output: &wgpu::TextureView,
     ) {
         let Some(bounds) = solids.outline_bounds else {
             return;
@@ -64,9 +67,9 @@ impl Renderer {
         let rows = (&mask.rows, wgpu::LoadOp::Clear(wgpu::Color::WHITE));
         let dilate = (&self.outline.dilate, &mask.dilate_group);
         self.scissored(&mut encoder, "Selection Dilate Pass", rows, dilate, rect);
-        let hdr = (&view.post_fx.scene_hdr.view, wgpu::LoadOp::Load);
+        let finished = (output, wgpu::LoadOp::Load);
         let edge = (&self.outline.edge, &mask.edge_group);
-        self.scissored(&mut encoder, "Selection Edge Pass", hdr, edge, rect);
+        self.scissored(&mut encoder, "Selection Edge Pass", finished, edge, rect);
         self.queue.submit(std::iter::once(encoder.finish()));
     }
 

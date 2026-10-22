@@ -2,7 +2,6 @@
 //! render pass. The per-camera stacking loop + post-FX live in `draw`.
 
 use crate::render::draw::batch::DrawBatch;
-use crate::render::draw::resources::Overlays;
 use crate::render::gpu::draw_buffers::DrawBuffers;
 use crate::render::gpu::global_group::GlobalGroup;
 use crate::render::gpu::pipelines::surface::SolidPass;
@@ -49,7 +48,6 @@ impl PassClear {
 
 /// Per-camera inputs threaded into the scene pass.
 pub(crate) struct ScenePassFrame {
-    pub editor_mode: bool,
     pub clear: PassClear,
     /// This camera's SSAO (#436), recorded ahead of the scene pass; `None` when off.
     pub ssao: Option<SsaoFrame>,
@@ -61,7 +59,6 @@ impl Renderer {
         view: &mut RenderView,
         frame: ScenePassFrame,
         solid_batches: &[DrawBatch],
-        overlays: &Overlays,
     ) {
         let mut encoder = self
             .device
@@ -76,24 +73,22 @@ impl Renderer {
         if let Some(ssao) = &frame.ssao {
             self.record_ssao(view, &mut encoder, ssao, solid_batches);
         }
-        // B. Main scene + overlay pass.
-        self.record_scene_pass(view, &mut encoder, &frame, solid_batches, overlays);
+        // B. Main scene pass. The editor's gizmos draw after post-FX (`draw_handles`).
+        self.record_scene_pass(view, &mut encoder, &frame, solid_batches);
 
         // 6. Submit the scene pass (it filled the HDR target + depth). Particles +
         // post-FX run from the per-camera loop in `draw`.
         self.queue.submit(std::iter::once(encoder.finish()));
     }
 
-    /// Record the main scene pass (solids, skybox, overlays) into `encoder`.
+    /// Record the main scene pass (solids, skybox) into `encoder`.
     fn record_scene_pass(
         &self,
         view: &RenderView,
         encoder: &mut wgpu::CommandEncoder,
         frame: &ScenePassFrame,
         solid_batches: &[DrawBatch],
-        overlays: &Overlays,
     ) {
-        let editor_mode = frame.editor_mode;
         let clear = frame.clear;
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             multiview_mask: None,
@@ -146,16 +141,6 @@ impl Renderer {
                     .skybox_renderer
                     .draw_gradient(&mut render_pass, &self.global_bind_group),
             }
-        }
-
-        // 5. Render debug overlay tools
-        if editor_mode {
-            render_pass.set_pipeline(self.line_pipeline.get());
-            let o = overlays;
-            self.draw_editor_overlays(&mut render_pass, &o.grid, &o.aabb, &o.axis);
-            // Light- & reflection-probe gizmos (#284): same line pipeline, same
-            // editor-only gate. Visualization only — never drawn in a game render.
-            self.draw_probe_overlays(&mut render_pass, &o.probes);
         }
     }
 

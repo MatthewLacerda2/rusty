@@ -1,8 +1,9 @@
 //! Pre-creation of editor overlay resources: the floor grid and per-collider AABB
-//! wireframes (the selection outline is its own pass, `passes::outline`). Extracted from `Renderer::render` (behavior
-//! unchanged).
+//! wireframes (the selection outline is its own pass, `passes::outline`), and the
+//! pass that draws them over the finished image ([`handles`], #1224).
 
 mod axis;
+mod handles;
 mod probes;
 
 use glam::{Mat4, Vec3};
@@ -123,7 +124,7 @@ impl Renderer {
     }
 
     /// Draw the editor overlays (floor grid, collider AABBs, selected-entity axis
-    /// arrows) into the scene pass. Editor-mode only; called from `record_scene_pass`.
+    /// arrows) into the handles pass. Editor-mode only; called from `draw_handles`.
     pub(crate) fn draw_editor_overlays<'a>(
         &'a self,
         render_pass: &mut wgpu::RenderPass<'a>,

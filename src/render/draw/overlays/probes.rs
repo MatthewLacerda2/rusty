@@ -77,7 +77,7 @@ impl Renderer {
         (vertex_buffer, entity_buf, bind_group, verts.len() as u32)
     }
 
-    /// Draw the probe gizmos into the scene pass. Caller has already bound the
+    /// Draw the probe gizmos into the handles pass. Caller has already bound the
     /// `line_pipeline`, group 0 (camera/lighting) and group 3 (shadow); this binds each
     /// probe's group-1 uniform + group-2 default material (line draws never sample it).
     pub(crate) fn draw_probe_overlays<'a>(

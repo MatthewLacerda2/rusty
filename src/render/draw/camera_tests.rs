@@ -23,9 +23,10 @@ fn stages_run_in_the_frames_order() {
             "transparent",
             "world_ui",
             "effects",
-            "outline",
             "count",
             "post_fx",
+            "outline",
+            "handles",
         ]
     );
 }
@@ -40,12 +41,13 @@ fn every_stage_reads_only_what_an_earlier_stage_wrote() {
     assert!(position("solids") < position("scene"));
     assert!(position("solids") < position("transparent"));
     assert!(position("world_ui") < position("effects"));
-    // The selection outline rings over everything the camera drew, from its solids.
-    assert!(position("effects") < position("outline"));
     // The counters read the solids and the effects' draw counts.
     assert!(position("effects") < position("count"));
-    // Post-FX composites everything this camera drew.
-    assert_eq!(position("post_fx"), CAMERA_PASSES.len() - 1);
+    // Post-FX composites everything this camera drew into the scene (#1224): Unity's
+    // order puts the outline after it, then the handles over the outline, last.
+    assert!(position("effects") < position("post_fx"));
+    assert_eq!(position("outline"), position("post_fx") + 1);
+    assert_eq!(position("handles"), CAMERA_PASSES.len() - 1);
 }
 
 #[test]

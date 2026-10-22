@@ -50,7 +50,7 @@ pub enum GpuPass {
     Shadows,
     /// The SSAO depth prepass, occlusion and blur.
     Ssao,
-    /// The opaque scene pass: solids, skybox, editor overlays.
+    /// The opaque scene pass: solids, skybox.
     Forward,
     /// Translucent solids.
     Transparent,
@@ -58,10 +58,11 @@ pub enum GpuPass {
     Ribbons,
     /// Particle systems.
     Particles,
-    /// The editor's selection outline: its mask, dilation and ring (#1175).
-    Outline,
     /// The post-FX chain: bloom, composite, authored effects, FXAA.
     PostFx,
+    /// The editor's selection outline (its mask, dilation and ring, #1175) and the
+    /// gizmos drawn over it, both after post-FX (#1224).
+    Outline,
     /// World and screen UI, its masks and backdrop blur.
     Ui,
 }
@@ -75,8 +76,8 @@ impl GpuPass {
         GpuPass::Transparent,
         GpuPass::Ribbons,
         GpuPass::Particles,
-        GpuPass::Outline,
         GpuPass::PostFx,
+        GpuPass::Outline,
         GpuPass::Ui,
     ];
 
