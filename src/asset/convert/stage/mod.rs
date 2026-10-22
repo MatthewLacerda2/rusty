@@ -115,8 +115,10 @@ fn swap(to: &Staging, dir: &Path, record: &str) -> Result<(), ImportError> {
 
 /// Move the folder `from` to `to`, returning `to` when it moved whole. When `to`
 /// is already a folder, it holds the same conversion's output (same digest), kept
-/// when its stamp was lost, so its files are replaced one by one: nothing a reader
-/// relies on changes. Any other failure is reported as it is.
+/// when its stamp was lost or a file the conversion looked at changed (#1189): a
+/// file name there holds the same bytes whatever was found on disk (`fbx::texture`
+/// reserves every embedded texture's name), so its files are replaced one by one
+/// and nothing a reader relies on changes. Any other failure is reported as it is.
 fn move_in(from: &Path, to: &Path) -> Result<Option<PathBuf>, ImportError> {
     if !to.is_dir() {
         // lint: allow(atomic-write) step 2 of the swap: a staged folder moves in whole

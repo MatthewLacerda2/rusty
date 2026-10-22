@@ -23,6 +23,7 @@ fn skipping(source: &Path, to: &Staging) -> Result<Converted, ImportError> {
     };
     Ok(Converted {
         skipped: vec![skip],
+        ..Converted::default()
     })
 }
 

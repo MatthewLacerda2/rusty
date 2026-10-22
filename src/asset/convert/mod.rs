@@ -17,10 +17,12 @@
 //! source path, so two sources never share one (#1167).
 //!
 //! **When it is re-made.** A `<cache>.glb.source` stamp beside each cached file
-//! records the converter, its [`Converter::version`] and a digest of the source's
-//! bytes; any difference re-converts. Content, not timestamps: a fresh clone gives
-//! every file a new mtime, and a sim module reads no clock. Files a conversion
-//! writes for the glTF to reference (FBX's embedded textures, #1082) live in a
+//! records the converter, its [`Converter::version`], a digest of the source's
+//! bytes, and every external file the conversion looked at (an FBX's on-disk
+//! texture), with a digest or as absent (#1189); any difference re-converts.
+//! Content, not timestamps: a fresh clone gives every file a new mtime, and a
+//! sim module reads no clock. Files a conversion writes for the glTF to
+//! reference (FBX's embedded textures, #1082) live in a
 //! `<cache>.glb.<digest>.textures/` folder beside it and are re-made with it.
 //!
 //! **How it is re-made.** A converter writes plain files into a fresh staging
@@ -47,6 +49,7 @@ mod lock;
 mod record;
 mod stage;
 
+pub use record::Dependency;
 pub use stage::{textures_dirs, Staging};
 
 use super::ImportError;
@@ -79,6 +82,9 @@ pub struct Converter {
 pub struct Converted {
     /// What it left out on purpose, each with its reason.
     pub skipped: Vec<Skip>,
+    /// Every file beside the source it looked at, found or not: the cache
+    /// re-converts when one reads differently (`record`, #1189).
+    pub depends_on: Vec<Dependency>,
 }
 
 /// One part of a source a conversion left out on purpose.
@@ -106,7 +112,9 @@ pub const CONVERTERS: &[Converter] = &[Converter {
     // 4: embedded textures are extracted beside the `.glb` (#1082).
     // 5: the textures folder is named by the conversion's digest (#1129).
     // 6: a texture that fails to extract fails the conversion (#1168).
-    version: 6,
+    // 7: an embedded texture's name is reserved even when a file on disk is
+    //    used instead, and the files looked at are recorded (#1189).
+    version: 7,
     convert: fbx::convert,
 }];
 

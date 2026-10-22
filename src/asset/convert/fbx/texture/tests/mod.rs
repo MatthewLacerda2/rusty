@@ -6,6 +6,7 @@ use crate::asset::gltf;
 use crate::asset::ImportedAsset;
 use std::path::{Path, PathBuf};
 
+mod depends;
 mod formats;
 mod names;
 mod skips;

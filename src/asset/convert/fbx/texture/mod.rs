@@ -8,12 +8,18 @@
 //! URI is percent-encoded (`gltf::uri`): the folder is named after the source file,
 //! which may hold a `:` or a `%`.
 //!
+//! Every file on disk a texture is looked for at is reported as a [`Dependency`],
+//! found or not, so the cache re-converts when one appears, vanishes or changes
+//! (#1189). An embedded texture's file name is reserved even when a file on disk
+//! is used instead, so a name in the textures folder holds the same bytes
+//! whatever is on disk (`stage::move_in` relies on it).
+//!
 //! A texture that is neither on disk nor embedded, or embeds a format the
 //! importer does not read, is a [`Skip`]; one that fails to extract, or lies on
 //! disk where no URI can reach it, fails the conversion (#1168).
 
 use super::super::stage::hook::{self, Step};
-use super::super::{Skip, Staging};
+use super::super::{Dependency, Skip, Staging};
 use crate::asset::gltf::uri;
 use crate::asset::{ImportError, IMAGE_EXTENSIONS};
 use crate::core::collections::Map;
@@ -27,10 +33,12 @@ pub struct Textures {
     /// Where embedded textures are extracted.
     dir: PathBuf,
     by_id: Map<u32, Option<String>>,
-    /// File names extracted into `dir` so far.
+    /// File names reserved in `dir` so far, extracted or not.
     written: Vec<String>,
     /// What was left out on purpose, in the order it was met.
     pub skipped: Vec<Skip>,
+    /// Every file on disk looked at, in the order it was looked at.
+    pub looked_at: Vec<Dependency>,
 }
 
 impl Textures {
@@ -47,6 +55,7 @@ impl Textures {
             by_id: Map::default(),
             written: Vec::new(),
             skipped: Vec::new(),
+            looked_at: Vec::new(),
         }
     }
 
@@ -66,11 +75,16 @@ impl Textures {
     }
 
     fn resolve(&mut self, texture: &ufbx::Texture) -> Result<Option<String>, ImportError> {
-        let on_disk = [&texture.filename, &texture.absolute_filename]
-            .into_iter()
-            .map(|name| PathBuf::from(name.as_ref() as &str))
-            .find(|path| !path.as_os_str().is_empty() && path.is_file());
-        if let Some(file) = on_disk {
+        // Reserved before the disk is looked at, so names never shift with it.
+        let embedded = (!texture.content.is_empty())
+            .then(|| file_name(raw_name(texture), &texture.content))
+            .map(|(stem, ext)| {
+                let readable = IMAGE_EXTENSIONS.contains(&ext.as_str());
+                let name = readable.then(|| unique(&stem, &ext, &self.written));
+                self.written.extend(name.clone());
+                (name, ext)
+            });
+        if let Some(file) = self.on_disk(texture) {
             return relative_uri(&self.out_dir, &file).map(Some).ok_or_else(|| {
                 ImportError::Parse(format!(
                     "FBX texture {}: cannot reference it",
@@ -78,15 +92,14 @@ impl Textures {
                 ))
             });
         }
-        if texture.content.is_empty() {
-            return Ok(self.skip(texture, "neither a file on disk nor embedded".into()));
-        }
-        let (stem, ext) = file_name(raw_name(texture), &texture.content);
-        if !IMAGE_EXTENSIONS.contains(&ext.as_str()) {
-            let why = format!("embeds a `.{ext}`, not an image format the importer reads");
-            return Ok(self.skip(texture, why));
-        }
-        let name = unique(&stem, &ext, &self.written);
+        let name = match embedded {
+            None => return Ok(self.skip(texture, "neither a file on disk nor embedded".into())),
+            Some((None, ext)) => {
+                let why = format!("embeds a `.{ext}`, not an image format the importer reads");
+                return Ok(self.skip(texture, why));
+            }
+            Some((Some(name), _)) => name,
+        };
         self.extract(&name, &texture.content)?;
         let Some(dir) = self.dir.file_name() else {
             return Err(ImportError::Parse(format!(
@@ -95,9 +108,29 @@ impl Textures {
                 self.dir.display()
             )));
         };
-        let uri = uri::encode_path(&format!("{}/{name}", dir.to_string_lossy()));
-        self.written.push(name);
-        Ok(Some(uri))
+        Ok(Some(uri::encode_path(&format!(
+            "{}/{name}",
+            dir.to_string_lossy()
+        ))))
+    }
+
+    /// The first file on disk `texture` names that is there, each one looked at
+    /// recorded in [`Textures::looked_at`].
+    fn on_disk(&mut self, texture: &ufbx::Texture) -> Option<PathBuf> {
+        for name in [&texture.filename, &texture.absolute_filename] {
+            let path = PathBuf::from(name.as_ref() as &str);
+            if path.as_os_str().is_empty() {
+                continue;
+            }
+            // Read, not only stat'd: what was found is what the stamp records.
+            let looked = Dependency::look(&path);
+            let found = looked.found();
+            self.looked_at.push(looked);
+            if found {
+                return Some(path);
+            }
+        }
+        None
     }
 
     /// Record `texture` as left out, for `why`: no URI.
