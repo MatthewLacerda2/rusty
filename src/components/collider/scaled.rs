@@ -107,10 +107,17 @@ impl ColliderShape {
 /// [`round_radius`]. rapier takes the half-length of the inner segment, so a
 /// full length under `2r` collapses to a sphere. Shared with the
 /// CharacterController's sweep, whose capsule is not a [`ColliderShape`].
+///
+/// One departure from Unity (#1191): the inner segment never gets shorter than
+/// the unscaled one stretched along the axis. When the scale across the axis
+/// outgrows the scale along it, Unity's rule shrinks the segment to make room
+/// for the wider caps and the drawn tube pokes out of the collider; this keeps
+/// what is drawn inside what collides.
 pub fn capsule_dims(radius: f32, height: f32, axis: CapsuleAxis, scale: Vec3) -> (f32, f32) {
     let along = scale.abs().dot(axis.unit());
     let r = round_radius(radius, scale, axis).max(MIN_SIZE);
-    (((height * along * 0.5) - r).max(0.0), r)
+    let drawn_segment = (height * 0.5 - radius).max(0.0) * along;
+    ((height * along * 0.5 - r).max(drawn_segment), r)
 }
 
 /// A round cross-section's radius under `scale`: `radius` times the larger of

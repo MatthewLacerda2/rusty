@@ -115,9 +115,11 @@ fn stretched_cylinder_and_capsule_bounds_stay_round() {
     let (min, max) = cylinder(0.5, 2.0).calculate_world_aabb(s);
     assert_vec(min, Vec3::new(-1.5, -1.0, -1.5));
     assert_vec(max, Vec3::new(1.5, 1.0, 1.5));
+    // The capsule's segment keeps its drawn half-length 1.5 (#1191), so its
+    // wider caps stick out past the drawn ±2.
     let (min, max) = capsule(0.5, 4.0, CapsuleAxis::Y).calculate_world_aabb(s);
-    assert_vec(min, Vec3::new(-1.5, -2.0, -1.5));
-    assert_vec(max, Vec3::new(1.5, 2.0, 1.5));
+    assert_vec(min, Vec3::new(-1.5, -3.0, -1.5));
+    assert_vec(max, Vec3::new(1.5, 3.0, 1.5));
 }
 
 #[test]

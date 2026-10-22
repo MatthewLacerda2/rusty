@@ -221,7 +221,11 @@ cylinder capped by two hemispheres. As in Unity, `height` is the **full**
 end-to-end length, caps included, so a `radius = 0.5, height = 2` capsule stands
 2 m tall and rests with its centre 1 m above the floor; a height under
 `2 * radius` is a sphere. World scale bakes in Unity's way — the length scales
-with the axis' scale, the radius with the larger of the other two. Every extent
+with the axis' scale, the radius with the larger of the other two — with one
+difference: the straight middle never gets shorter than the unscaled one
+stretched along the axis. Unity shrinks it when the sideways scale outgrows the
+lengthwise one, and the drawn Capsule then pokes out of its collider; here the
+collider always covers what is drawn. Every extent
 must be `> 0`. The shape is read when the body is built (entering Play, or a
 hierarchy change); `SetColliderShape` refreshes the bounds (`GetBounds`)
 immediately.

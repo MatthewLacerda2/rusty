@@ -52,7 +52,7 @@ impl Clone for DirtyFlag {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MeshComponent {
     /// How this mesh's geometry is rehydrated on load. `"Box"`/`"Sphere"`/
-    /// `"Plane"`/`"Cylinder"` rebuild a primitive; `"Asset"` re-imports an
+    /// `"Plane"`/`"Cylinder"`/`"Capsule"` rebuild a primitive; `"Asset"` re-imports an
     /// authored source file (see `asset_ref`). GPU buffers are never persisted.
     pub primitive_type: String,
     /// Path-based reference into an imported source file, `path::sub_object`

@@ -9,7 +9,7 @@ use rapier3d::prelude::{Pose as RapierPose, Shape};
 
 use super::bounds_tests::tolerance;
 use super::{samples, turns, world_poses, KINDS, SCALES};
-use crate::components::{ColliderShape, Pose};
+use crate::components::{CapsuleAxis, ColliderShape, Pose};
 use crate::physics::shape::build::build_shape;
 use crate::physics::shape::hull::{beyond_faces, has_volume};
 use crate::scene::authoring::{primitive_geometry, Primitive};
@@ -38,8 +38,14 @@ fn drawn(kind: &ColliderShape) -> Vec<Drawn> {
                 height: 1.0,
             },
         ),
-        // The engine has no Capsule primitive to draw one with.
-        ColliderShape::Capsule { .. } => vec![],
+        ColliderShape::Capsule { .. } => primitive(
+            Primitive::Capsule,
+            ColliderShape::Capsule {
+                radius: 0.5,
+                height: 2.0,
+                axis: CapsuleAxis::Y,
+            },
+        ),
         // A mesh collider is drawn as the mesh it is built from.
         ColliderShape::Mesh { .. } => samples(kind)
             .into_iter()

@@ -2,7 +2,7 @@
 //!
 //! The single, discoverable home for creating objects, mirroring Unity's
 //! `GameObject` menu: **Create Empty**, **3D Object ▸** (Cube / Sphere / Plane /
-//! Cylinder), **UI ▸** (Canvas, Panel, Image, Text and the widget kit, #422 — via
+//! Cylinder / Capsule), **UI ▸** (Canvas, Panel, Image, Text and the widget kit, #422 — via
 //! `ui_widgets::create_ui`, the path `UI.Create` takes) and **Light ▸**
 //! (Directional / Point / Spot). Object creation used to
 //! live in the Hierarchy toolbar (#255); it moved here so the Hierarchy does one
@@ -37,6 +37,7 @@ pub fn game_object_menu(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Sc
                 ("Sphere", icon::CIRCLE, Primitive::Sphere),
                 ("Plane", icon::RECTANGLE, Primitive::Plane),
                 ("Cylinder", icon::CYLINDER, Primitive::Cylinder),
+                ("Capsule", icon::PILL, Primitive::Capsule),
             ] {
                 if ui.button(format!("{glyph}  {label}")).clicked() {
                     spawn(editor, scene, label, Some(primitive));

@@ -78,6 +78,7 @@ pub enum Primitive {
     Sphere,
     Plane,
     Cylinder,
+    Capsule,
     PointLight,
     DirectionalLight,
     SpotLight,
@@ -92,6 +93,7 @@ impl Primitive {
             "sphere" => Some(Self::Sphere),
             "plane" => Some(Self::Plane),
             "cylinder" => Some(Self::Cylinder),
+            "capsule" => Some(Self::Capsule),
             "pointlight" => Some(Self::PointLight),
             "directionallight" => Some(Self::DirectionalLight),
             "spotlight" => Some(Self::SpotLight),
@@ -100,7 +102,7 @@ impl Primitive {
     }
 }
 
-/// The geometry for a primitive mesh (`Box`/`Sphere`/`Plane`/`Cylinder`). This is
+/// The geometry for a primitive mesh (`Box`/`Sphere`/`Plane`/`Cylinder`/`Capsule`). This is
 /// the single source of truth for primitive shapes, reused by serialization's
 /// `rehydrate_one` so a created primitive and a loaded one are byte-identical.
 /// Returns `None` for the light primitives, which carry no mesh.
@@ -115,6 +117,8 @@ pub fn primitive_geometry(primitive: Primitive) -> Option<(Vec<Vertex>, Vec<u32>
             0.5,
             12,
         )),
+        // Unity's Capsule: radius 0.5, full height 2, along Y.
+        Primitive::Capsule => Some(primitives::generate_capsule(0.5, 2.0, 16, 8)),
         Primitive::PointLight | Primitive::DirectionalLight | Primitive::SpotLight => None,
     }
 }
@@ -127,6 +131,7 @@ fn primitive_mesh_name(primitive: Primitive) -> Option<&'static str> {
         Primitive::Sphere => Some("Sphere"),
         Primitive::Plane => Some("Plane"),
         Primitive::Cylinder => Some("Cylinder"),
+        Primitive::Capsule => Some("Capsule"),
         _ => None,
     }
 }
@@ -238,6 +243,7 @@ mod tests {
     fn primitive_parse_is_case_insensitive() {
         assert_eq!(Primitive::parse("BOX"), Some(Primitive::Box));
         assert_eq!(Primitive::parse("spotlight"), Some(Primitive::SpotLight));
+        assert_eq!(Primitive::parse("Capsule"), Some(Primitive::Capsule));
         assert_eq!(Primitive::parse("nope"), None);
     }
 }
