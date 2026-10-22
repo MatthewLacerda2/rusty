@@ -143,15 +143,10 @@ pub(crate) fn prepare(dir: &Path, access: Access) -> Result<(Opened, Vec<String>
     std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     let root =
         crate::core::paths::canonicalize(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
-    let mut lines = Vec::new();
     create_skeleton(&root)?;
-    let engine = match access {
-        Access::Edit => {
-            let (engine, recorded) = file::record(&root)?;
-            lines.extend(recorded);
-            engine
-        }
-        Access::Run => file::inspect(&root)?,
+    let (engine, lines) = match access {
+        Access::Edit => file::record(&root)?,
+        Access::Run => (file::inspect(&root)?, Vec::new()),
     };
     Ok((Opened { root, engine }, lines))
 }

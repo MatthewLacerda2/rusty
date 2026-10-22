@@ -89,3 +89,20 @@ fn snapshot_restore_discards_mutations() {
     snap.restore(&mut scene);
     assert_eq!(scene.world.transform(id).unwrap().position, Vec3::ZERO);
 }
+
+#[test]
+fn corpus_seed_scene_loads_in_the_current_format() {
+    // The fuzz corpus's full-document seed must stay a valid scene in today's format:
+    // it loads, and re-serializing it gives back the same document, so a field the
+    // format no longer has (silently ignored on load) can't linger in the seed.
+    let path = "fuzz/corpus/scene_deserialize/seed_default.scene";
+    let text = std::fs::read_to_string(path).unwrap();
+    let data: rusty::scene::SceneData =
+        serde_json::from_str(&text).unwrap_or_else(|e| panic!("{path}: {e}"));
+    // Through text, so an f32 compares as the decimal the file holds.
+    let saved: serde_json::Value =
+        serde_json::from_str(&serde_json::to_string(&data).unwrap()).unwrap();
+    let file: serde_json::Value = serde_json::from_str(&text).unwrap();
+    assert_eq!(saved, file, "{path} is stale");
+    rusty::scene::apply_scene_data(&mut Scene::new(), data);
+}

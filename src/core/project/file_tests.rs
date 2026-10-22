@@ -2,6 +2,7 @@
 //! the check a frontend shows.
 
 use super::*;
+use crate::core::application::{WindowMode, DEFAULT_STARTUP_SCENE};
 
 fn fresh(name: &str) -> std::path::PathBuf {
     let dir = crate::test_temp::dir().join("project_file").join(name);
@@ -49,9 +50,23 @@ fn an_empty_record_is_no_record() {
 fn a_partial_file_keeps_the_defaults() {
     let file = ProjectFile::from_json(r#"{ "build": { "product_name": "Neon" } }"#).unwrap();
     assert_eq!(file.build.product_name, "Neon");
+    assert_eq!(file.build.startup_scene, DEFAULT_STARTUP_SCENE);
+    assert_eq!(file.build.window_mode, WindowMode::Windowed);
     assert_eq!(file.engine_commit, engine_commit());
-    assert_eq!(ProjectFile::from_json(&file.to_json()).unwrap(), file);
     assert!(ProjectFile::from_json("{ not json").is_err());
+}
+
+#[test]
+fn every_build_field_roundtrips() {
+    let file = ProjectFile {
+        build: BuildSettings {
+            startup_scene: "assets/scenes/menu.scene".into(),
+            product_name: "Neon".into(),
+            window_mode: WindowMode::Fullscreen,
+        },
+        ..ProjectFile::default()
+    };
+    assert_eq!(ProjectFile::from_json(&file.to_json()).unwrap(), file);
 }
 
 #[test]

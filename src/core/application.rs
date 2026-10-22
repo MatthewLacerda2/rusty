@@ -20,8 +20,8 @@
 //! harness and tests stay reproducible. Unlike `Storage`, a setter on a *bound*
 //! instance writes the file straight away: build settings are authoring-time project
 //! config, edited rarely and deliberately, never from inside `FixedUpdate`. The player
-//! reads the file without binding it ([`Application::load`]), so a shipped game can
-//! never rewrite its own build settings.
+//! reads the settings through [`ProjectFile::load`] into an unbound instance, so a
+//! shipped game can never rewrite its own build settings.
 
 use std::path::{Path, PathBuf};
 
@@ -89,19 +89,6 @@ impl Default for BuildSettings {
 }
 
 impl BuildSettings {
-    /// Parse settings from the file's JSON text. Malformed JSON is an error; missing
-    /// fields fall back to the defaults.
-    pub fn from_json(text: &str) -> Result<Self, String> {
-        serde_json::from_str(text).map_err(|e| format!("Failed to parse build settings: {e}"))
-    }
-
-    /// The settings as the pretty JSON the tracked file holds (with a trailing newline).
-    pub fn to_json(&self) -> String {
-        let mut text = serde_json::to_string_pretty(self).unwrap_or_default();
-        text.push('\n');
-        text
-    }
-
     /// Read the settings from the project file at `path`. A missing file yields the
     /// defaults; an unreadable or malformed one is an error.
     pub fn read(path: &Path) -> Result<Self, String> {
@@ -123,13 +110,6 @@ impl Application {
     /// Default settings, bound to no file — the harness and tests.
     pub fn new() -> Self {
         Self::default()
-    }
-
-    /// Read the project file at `path` without binding it: setters change the in-memory
-    /// settings only, so a shipped game never rewrites its build settings.
-    pub fn load(&mut self, path: impl AsRef<Path>) -> Result<(), String> {
-        self.build = BuildSettings::read(path.as_ref())?;
-        Ok(())
     }
 
     /// Read the project file at `path` and bind it (the editor), so every setter writes

@@ -198,7 +198,6 @@ scene.entities[].joint.kind: enum Fixed|Hinge|Ball
 scene.entities[].joint.limits: tuple(2)
 scene.entities[].joint.limits[]: f32
 scene.entities[].joint.swing2_limit: f32
-scene.entities[].joint.swing2_limit: option
 scene.entities[].joint.swing_axis: tuple(3)
 scene.entities[].joint.swing_axis[]: f32
 scene.entities[].joint.swing_limit: f32
@@ -301,7 +300,6 @@ scene.entities[].mesh.skeleton.bodies{}.joint.kind: enum Fixed|Hinge|Ball
 scene.entities[].mesh.skeleton.bodies{}.joint.limits: tuple(2)
 scene.entities[].mesh.skeleton.bodies{}.joint.limits[]: f32
 scene.entities[].mesh.skeleton.bodies{}.joint.swing2_limit: f32
-scene.entities[].mesh.skeleton.bodies{}.joint.swing2_limit: option
 scene.entities[].mesh.skeleton.bodies{}.joint.swing_axis: tuple(3)
 scene.entities[].mesh.skeleton.bodies{}.joint.swing_axis[]: f32
 scene.entities[].mesh.skeleton.bodies{}.joint.swing_limit: f32

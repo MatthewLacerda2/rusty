@@ -48,7 +48,7 @@ per-module unit tests (e.g. `api/light.rs`) are the pattern.
 | `SetLocalScale` | ✅ | writes `scale`; same model-matrix read; collider re-sync on set (`GetLossyScale` reads it back in world space) |
 | `MoveTowards` | ✅ | steps the world position through `World::set_world_position`; same read-sites |
 
-### `Material` — over `Entity.texture` (`TextureComponent`)
+### `Material` — over `Entity.material` (`MaterialAsset`)
 
 | Setter | Status | Read-site |
 |---|---|---|

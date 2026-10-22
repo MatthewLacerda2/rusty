@@ -94,7 +94,7 @@ every surface (editor Add menu, this API, and scene load):
   `Scene.RemoveComponent(id, "Camera")` also removes the entity's `VisualCorrection`.
 - **Loading** a scene validates the same rule: a hand-edited document with a
   dependent but no requirement gets the requirement auto-added (with a console
-  warning), so old scenes keep loading.
+  warning), so the loaded scene always satisfies the rule.
 
 The declared dependencies are **`VisualCorrection` requires `Camera`** (a
 color/bloom/SSR correction stack is inert without a camera to correct) and

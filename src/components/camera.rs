@@ -6,7 +6,7 @@
 use serde::{Deserialize, Serialize};
 
 /// A fresh camera renders every layer (Unity's default Culling Mask = Everything).
-/// Pre-#92 scenes have no `culling_mask`, so they load with this all-on value.
+/// A scene file that leaves out `culling_mask` loads with this all-on value.
 fn default_culling_mask() -> u32 {
     u32::MAX
 }

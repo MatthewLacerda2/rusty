@@ -56,7 +56,7 @@ pub struct AudioSourceComponent {
     pub occlusion_enabled: bool,
 }
 
-/// Occlusion is on unless a source opts out (also for scenes saved before #467).
+/// Occlusion is on unless a source opts out.
 fn occlusion_default() -> bool {
     true
 }
