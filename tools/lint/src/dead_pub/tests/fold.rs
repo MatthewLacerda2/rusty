@@ -30,7 +30,7 @@ fn lib_goes_crate_private_and_folds_its_callers() {
 #[test]
 fn a_caller_names_the_lib_as_crate_and_keeps_its_line_numbers() {
     let src = "#![cfg_attr(\n  x, y\n)]\nuse fixture::a;\nmod m;\nuse crate::m::f;\nfn main() {}\n";
-    let out = fold::caller(src, "__bin_p", "fixture");
+    let out = fold::caller(src, "__bin_p", "fixture", true);
     assert_eq!(
         out,
         "\n\n\nuse crate::a;\nmod m;\nuse crate::__bin_p::m::f;\npub fn main() {}\n"
@@ -40,9 +40,27 @@ fn a_caller_names_the_lib_as_crate_and_keeps_its_line_numbers() {
 #[test]
 fn an_inner_attribute_inside_a_macro_body_survives_the_fold() {
     let src = "//! doc\n#![allow(x)]\n/* c */\nproptest! {\n    #![proptest_config(config())]\n}\n";
-    let out = fold::caller(src, "__itests", "fixture");
+    let out = fold::caller(src, "__itests", "fixture", true);
     assert_eq!(
         out,
         "//! doc\n\n/* c */\nproptest! {\n    #![proptest_config(config())]\n}\n"
+    );
+}
+
+#[test]
+fn a_root_counts_brackets_outside_string_literals() {
+    let src = "#![doc = \"see [x\"]\nuse crate::a;\n";
+    assert_eq!(
+        fold::caller(src, "m", "fixture", true),
+        "\nuse crate::m::a;\n"
+    );
+}
+
+#[test]
+fn a_submodule_keeps_its_inner_attributes() {
+    let src = "#![cfg(target_os = \"macos\")]\nuse crate::a;\n";
+    assert_eq!(
+        fold::caller(src, "m", "fixture", false),
+        "#![cfg(target_os = \"macos\")]\nuse crate::m::a;\n"
     );
 }
