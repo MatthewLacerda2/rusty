@@ -42,6 +42,8 @@ fn sphere(shader: &str, mode: RenderMode) -> Scene {
     scene.skybox_path = String::new();
     create_entity(&mut scene, "Sun", Some(Primitive::DirectionalLight));
     let id = create_entity(&mut scene, "Ball", Some(Primitive::Sphere));
+    // Diameter 2: the thresholds below were set on that size.
+    scene.world.transform_mut(id).unwrap().scale = Vec3::splat(2.0);
     let key = mat_ops::ensure_material_key(&mut scene, id).unwrap();
     mat_ops::set_shader(&mut scene.materials, &key, shader.to_string());
     mat_ops::set_render_mode(&mut scene.materials, &key, mode);

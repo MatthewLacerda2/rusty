@@ -107,7 +107,7 @@ impl Primitive {
 pub fn primitive_geometry(primitive: Primitive) -> Option<(Vec<Vertex>, Vec<u32>)> {
     match primitive {
         Primitive::Box => Some(primitives::generate_box(1.0, 1.0, 1.0)),
-        Primitive::Sphere => Some(primitives::generate_sphere(1.0, 16, 16)),
+        Primitive::Sphere => Some(primitives::generate_sphere(0.5, 16, 16)),
         Primitive::Plane => Some(primitives::generate_plane(15.0, 15.0)),
         Primitive::Cylinder => Some(primitives::generate_cylinder(
             Vec3::new(0.0, -0.5, 0.0),

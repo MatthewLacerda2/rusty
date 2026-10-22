@@ -53,7 +53,10 @@ impl Drop for Flash {
 /// A lit white sphere at `x` whose own material names `shader`; returns its id.
 pub(super) fn sphere(scene: &mut Scene, x: f32, shader: &str) -> u32 {
     let id = create_entity(scene, "Ball", Some(Primitive::Sphere));
-    scene.world.transform_mut(id).unwrap().position = Vec3::new(x, 0.0, 0.0);
+    if let Some(mut t) = scene.world.transform_mut(id) {
+        // Diameter 2: the thresholds below were set on that size.
+        (t.position, t.scale) = (Vec3::new(x, 0.0, 0.0), Vec3::splat(2.0));
+    }
     let key = mat_ops::ensure_material_key(scene, id).unwrap();
     mat_ops::set_shader(&mut scene.materials, &key, shader.to_string());
     id

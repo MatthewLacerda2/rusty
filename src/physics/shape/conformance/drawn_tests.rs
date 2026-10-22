@@ -98,22 +98,10 @@ fn check_everywhere(drawn: &Drawn) {
     }
 }
 
-/// The Sphere primitive is drawn at radius 1 (#1187): checked on its own below.
-fn is_sphere(drawn: &Drawn) -> bool {
-    matches!(drawn.0, ColliderShape::Sphere { .. })
-}
-
 #[test]
 fn what_is_drawn_is_what_collides() {
-    let all: Vec<Drawn> = KINDS.iter().flat_map(drawn).collect();
-    all.iter()
-        .filter(|d| !is_sphere(d))
-        .for_each(check_everywhere);
-}
-
-#[test]
-// lint: allow(skip) a known bug, the Sphere primitive is drawn at radius 1; #1187 un-ignores it
-#[ignore = "#1187"]
-fn a_drawn_sphere_is_what_collides() {
-    drawn(&KINDS[1]).iter().for_each(check_everywhere);
+    KINDS
+        .iter()
+        .flat_map(drawn)
+        .for_each(|d| check_everywhere(&d));
 }
