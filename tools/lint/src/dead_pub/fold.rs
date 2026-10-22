@@ -7,6 +7,8 @@
 //! `#[cfg(test)] __itests`. Their sources then name the lib as `crate::` and their
 //! own root as `crate::<module>::`.
 
+use crate::code::code_lines;
+
 /// One `[[bin]]` target of `Cargo.toml`.
 #[derive(Debug, PartialEq, Eq)]
 pub struct Bin {
@@ -92,14 +94,19 @@ pub fn lib(source: &str, bins: &[Bin], tests_root: Option<&str>) -> String {
 
 /// One source file of a folded caller, now the lib's module `module`: its own
 /// root is `crate::<module>::`, the lib (`lib_name::`) is `crate::`, `main` is
-/// callable, and its inner attributes (only a crate root may carry some) are
-/// blanked, keeping every line number.
+/// callable, and the inner attributes at its head (only a crate root may carry
+/// some) are blanked, keeping every line number. One inside a macro body, such
+/// as `proptest!`'s `#![proptest_config(..)]`, is the macro's input and stays
+/// (#1205).
 pub fn caller(source: &str, module: &str, lib_name: &str) -> String {
     let mut out = String::new();
     let mut depth = 0i32;
-    for line in source.lines() {
-        if depth > 0 || line.trim_start().starts_with("#![") {
-            depth += line.matches('[').count() as i32 - line.matches(']').count() as i32;
+    let mut head = true;
+    for (line, code) in source.lines().zip(code_lines(source)) {
+        let attribute = depth > 0 || code.trim_start().starts_with("#![");
+        head &= attribute || code.trim().is_empty();
+        if head && attribute {
+            depth += code.matches('[').count() as i32 - code.matches(']').count() as i32;
             out.push('\n');
             continue;
         }

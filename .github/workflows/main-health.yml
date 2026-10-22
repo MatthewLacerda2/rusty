@@ -10,7 +10,8 @@ name: main-health
 # and the nightly `windows` signal (#741), which files when it fails to run or
 # goes red, since a red Windows build *is* its finding and nothing else
 # reports it; likewise the weekly `cargo-test` signal (#981), where a red run
-# is a test that leans on nextest's process-per-test. Not `docs`: its only failure today is the Pages deploy (Pages is not
+# is a test that leans on nextest's process-per-test, and its `dead-pub` job's red
+# is that signal producing no report (#1205). Not `docs`: its only failure today is the Pages deploy (Pages is not
 # enabled — #509, a human task), which would re-file on every merge, and the
 # rustdoc build it runs is already proven by lint.yml's rustdoc gate. Once #509 lands, adding
 # `docs` here and to WATCHED in the script is the whole change.

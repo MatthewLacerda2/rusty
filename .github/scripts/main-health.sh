@@ -63,6 +63,8 @@ done
 # infrastructural. The nightly `windows` signal is the exception on purpose: a
 # red Windows build is the finding, and this issue is where it lands (#741).
 # The weekly `cargo-test` signal (#981) is the same: its red is the finding.
+# Its `dead-pub` job (#1205) goes red only when that signal made no report,
+# which is the breakage to file.
 failed=()
 while IFS=$'\t' read -r name concl; do
   [[ -z $name ]] && continue

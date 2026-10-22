@@ -1,47 +1,13 @@
-use super::fold::{self, Bin};
+mod fold;
+
 use super::report;
 use std::fs;
 use std::path::PathBuf;
 
-const CARGO: &str = "[package]\nname = \"fixture\"\nversion = \"0.1.0\"\nedition = \"2021\"\n\n\
+pub(super) const CARGO: &str =
+    "[package]\nname = \"fixture\"\nversion = \"0.1.0\"\nedition = \"2021\"\n\n\
 [workspace]\n\n[features]\ndev = []\n\n[[bin]]\nname = \"play-x\"\npath = \"src/bin/play.rs\"\n\
 required-features = [\"dev\"]\n";
-
-#[test]
-fn reads_bins_and_their_features() {
-    let bins = fold::bins(CARGO);
-    let play = Bin {
-        name: "play-x".into(),
-        path: "src/bin/play.rs".into(),
-        features: vec!["dev".into()],
-    };
-    assert_eq!(bins, [play]);
-    assert_eq!(bins[0].module(), "__bin_play_x");
-}
-
-#[test]
-fn lib_goes_crate_private_and_folds_its_callers() {
-    let lib = fold::lib(
-        "pub mod a;\n#[cfg(test)]\nmod t;\n",
-        &fold::bins(CARGO),
-        Some("tests/main.rs"),
-    );
-    assert!(lib.starts_with("pub(crate) mod a;\n#[cfg(test)]\nmod t;\n"));
-    assert!(lib.contains(
-        "#[cfg(all(feature = \"dev\"))]\n#[path = \"bin/play.rs\"]\npub mod __bin_play_x;\n"
-    ));
-    assert!(lib.ends_with("#[cfg(test)]\n#[path = \"../tests/main.rs\"]\nmod __itests;\n"));
-}
-
-#[test]
-fn a_caller_names_the_lib_as_crate_and_keeps_its_line_numbers() {
-    let src = "#![cfg_attr(\n  x, y\n)]\nuse fixture::a;\nmod m;\nuse crate::m::f;\nfn main() {}\n";
-    let out = fold::caller(src, "__bin_p", "fixture");
-    assert_eq!(
-        out,
-        "\n\n\nuse crate::a;\nmod m;\nuse crate::__bin_p::m::f;\npub fn main() {}\n"
-    );
-}
 
 #[test]
 fn parses_only_unused_items_and_notices_errors() {
@@ -55,6 +21,8 @@ fn parses_only_unused_items_and_notices_errors() {
 }
 
 /// A crate on disk: the must-flag and must-pass cases, through real `cargo check`.
+/// Its integration test names `env!("CARGO_BIN_EXE_<bin>")`, which only an
+/// integration test target defines, so the folded copy must supply it (#1205).
 fn fixture() -> PathBuf {
     let dir = std::env::temp_dir().join(format!("lint_dead_pub_{}", std::process::id()));
     let _ = fs::remove_dir_all(&dir);
@@ -75,7 +43,7 @@ fn fixture() -> PathBuf {
     );
     file(
         "tests/main.rs",
-        "#[test]\nfn t() {\n    fixture::a::the_tests();\n}\n",
+        "#[test]\nfn t() {\n    fixture::a::the_tests();\n    let _ = env!(\"CARGO_BIN_EXE_play-x\");\n}\n",
     );
     dir
 }
