@@ -17,6 +17,10 @@ use rapier3d::prelude::*;
 use crate::physics::world::PhysicsWorld;
 
 #[cfg(test)]
+pub(super) mod convex_fixture;
+#[cfg(test)]
+mod convex_tests;
+#[cfg(test)]
 mod raycast_tests;
 pub(super) mod spatial;
 #[cfg(test)]

@@ -42,6 +42,11 @@ pub(super) fn spatial_runtime() -> (ScriptManager, u32, u32) {
     let mut raw = Scene::new();
     let a = add_box(&mut raw, "A", Vec3::ZERO, 0);
     let b = add_box(&mut raw, "B", Vec3::new(0.0, 0.0, 10.0), 3);
+    (runtime_over(raw), a, b)
+}
+
+/// A booted script runtime over `raw`, with the live physics world built from it.
+pub(super) fn runtime_over(raw: Scene) -> ScriptManager {
     let scene = Rc::new(RefCell::new(raw));
     let input = Rc::new(RefCell::new(InputState::new()));
     let nav = Rc::new(RefCell::new(NavigationGraph::new(
@@ -55,7 +60,7 @@ pub(super) fn spatial_runtime() -> (ScriptManager, u32, u32) {
         &scene.borrow(),
     ))));
     m.init_runtime(&physics).expect("runtime inits");
-    (m, a, b)
+    m
 }
 
 #[test]
