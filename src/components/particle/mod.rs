@@ -21,14 +21,12 @@
 //!
 //! [`Random`]: crate::core::random::Random
 
-mod legacy;
 mod render;
 mod runtime;
 mod shape;
 mod spawn;
 mod sub_emitter;
 
-pub use legacy::LegacyEmitter;
 pub use render::{Flipbook, ParticleRender, ParticleRenderMode};
 pub use runtime::{EmitterRuntime, Particle, SubEmitEvent};
 pub use shape::{EmitFrom, EmitShape};
@@ -89,8 +87,8 @@ pub enum CollisionResponse {
 }
 
 /// Authoring component: a particle emitter attached to an entity. Emits at the
-/// entity's transform position. All fields below serde-persist; every field added
-/// by #439 has a default that reproduces the pre-#439 look, so old scenes load.
+/// entity's transform position. All fields below serde-persist; the defaulted ones
+/// (from #439) default to a plain emitter — a constant size, an alpha fade.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ParticleEmitterComponent {
     pub active: bool,
@@ -128,8 +126,7 @@ pub struct ParticleEmitterComponent {
     /// Constant acceleration (e.g. `(0, -9.81, 0)` for gravity).
     pub gravity: Vec3,
 
-    /// Size at birth (world units). Loads the legacy `size_start` key.
-    #[serde(alias = "size_start")]
+    /// Size at birth (world units).
     pub size: Range,
     /// Starting sprite rotation in degrees.
     #[serde(default = "zero_range")]

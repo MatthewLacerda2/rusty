@@ -139,8 +139,7 @@ control is yours. A project looks like Unity's and Unreal's:
 
 Every path the project stores — a scene's scripts and meshes, the startup scene —
 is relative to the project root (`assets/scripts/bot.lua`), so the folder can move
-or be cloned anywhere. A project made before this layout (the old `./project`
-folder, paths starting `project/`) is migrated once, the first time it is opened.
+or be cloned anywhere.
 
 `project.rusty` is the project's one engine-owned file, like Unreal's `.uproject`
 or Unity's `ProjectVersion.txt`. It records the **engine commit** the project was
@@ -151,8 +150,8 @@ the agent sessions (`session`, `session-mcp`) record the running commit, so a
 broken scene after an engine update reads as version skew, not as a bug in the
 game. The player, `play` and `editor-capture` only check, never write. A dirty
 build (`<commit>-dirty`) counts as its commit, and a build made without git
-(`unknown`) can't be compared, so neither warns. A project from before this file
-gets it on its first edit-open, its old `build_settings.json` folded in.
+(`unknown`) can't be compared, so neither warns. A project without the file
+gets it on its first edit-open.
 
 The engine's own content (shaders, the bundled scripts) is not part of a project:
 it ships with the engine (`engine/`), and the scripts and starter materials are

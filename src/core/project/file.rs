@@ -12,8 +12,7 @@
 //!   [`open`](super::open) compares it with the running build ([`EngineCheck`]) and,
 //!   when it may write, records the running one (Unity rewrites its version file the
 //!   same way).
-//! * **`build`** — the [`BuildSettings`], which lived in `build_settings.json` before
-//!   this file. Opening a project that still has that file folds it in and deletes it.
+//! * **`build`** — the [`BuildSettings`].
 
 use std::path::Path;
 
@@ -24,8 +23,6 @@ use crate::core::application::BuildSettings;
 
 /// The project file, at the project root.
 pub const PROJECT_FILE: &str = "project.rusty";
-/// Where the build settings lived before [`PROJECT_FILE`] absorbed them.
-pub const LEGACY_BUILD_SETTINGS: &str = "build_settings.json";
 const DIRTY: &str = "-dirty";
 
 /// What `project.rusty` holds. Every field is `#[serde(default)]`, so a partial file
@@ -71,25 +68,10 @@ impl ProjectFile {
         Self::from_json(&text).map(Some)
     }
 
-    /// What the project at `root` holds, without writing anything: its file, else a
-    /// pre-#853 project's `build_settings.json` folded in, else the defaults.
+    /// What the project at `root` holds, without writing anything: its file, else
+    /// the defaults.
     pub fn load(root: &Path) -> Result<Self, String> {
-        if let Some(file) = Self::read(&root.join(PROJECT_FILE))? {
-            return Ok(file);
-        }
-        let legacy = root.join(LEGACY_BUILD_SETTINGS);
-        if !legacy.exists() {
-            return Ok(Self::default());
-        }
-        let text = std::fs::read_to_string(&legacy)
-            .map_err(|e| format!("Failed to read {}: {e}", legacy.display()))?;
-        let build = BuildSettings::from_json(&text)?;
-        // A pre-#853 project recorded no engine: say so, rather than claim this one.
-        let engine_commit = String::new();
-        Ok(Self {
-            engine_commit,
-            build,
-        })
+        Ok(Self::read(&root.join(PROJECT_FILE))?.unwrap_or_default())
     }
 
     /// Write the file to `path`, unless it already holds exactly this — a project
@@ -164,8 +146,7 @@ fn short(commit: &str) -> String {
 }
 
 /// Bring the project file at `root` up to date when the project is opened for
-/// editing: create it if missing (folding a legacy `build_settings.json` in and
-/// deleting it), and record the running engine. Returns the check made against what
+/// editing: create it if missing, and record the running engine. Returns the check made against what
 /// the file held before, and one line per change.
 pub(super) fn record(root: &Path) -> Result<(EngineCheck, Vec<String>), String> {
     let path = root.join(PROJECT_FILE);
@@ -180,14 +161,6 @@ pub(super) fn record(root: &Path) -> Result<(EngineCheck, Vec<String>), String> 
     file.write(&path)?;
     if !existed {
         lines.push(format!("created {PROJECT_FILE}"));
-        let legacy = root.join(LEGACY_BUILD_SETTINGS);
-        if legacy.exists() {
-            std::fs::remove_file(&legacy)
-                .map_err(|e| format!("Failed to remove {}: {e}", legacy.display()))?;
-            lines.push(format!(
-                "folded {LEGACY_BUILD_SETTINGS} into {PROJECT_FILE}"
-            ));
-        }
     }
     Ok((check, lines))
 }

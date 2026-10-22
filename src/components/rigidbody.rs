@@ -1,7 +1,7 @@
 //! src/components/rigidbody.rs — Rigidbody component
 //!
 //! mass/velocity/gravity/kinematic. Unity: Rigidbody. Moved verbatim from the
-//! legacy `core/scene.rs`.
+//! former `core/scene.rs`.
 
 use glam::Vec3;
 use serde::{Deserialize, Serialize};
@@ -52,7 +52,7 @@ pub struct RigidBodyComponent {
     /// Angular velocity in radians/sec per axis (Unity: `Rigidbody.angularVelocity`).
     /// rapier integrates the body's rotation from this every tick; the engine
     /// writes it back so scripts can read the spin, and pushes it so scripts can
-    /// inject an initial one. `#[serde(default)]` keeps pre-#319 scenes loading.
+    /// inject an initial one.
     #[serde(default)]
     pub angular_velocity: Vec3,
     pub use_gravity: bool,

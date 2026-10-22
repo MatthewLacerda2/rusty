@@ -1,9 +1,9 @@
-//! Tests for the per-scene navmesh settings: defaults, back-compat and the saved shape.
+//! Tests for the per-scene navmesh settings: defaults, sparse files and the saved shape.
 
 use super::*;
 
 /// The struct `Default` and every field's serde default must equal the historical
-/// bake constants, so an older scene missing the block bakes exactly as before.
+/// bake constants, so a scene missing the block bakes with the engine defaults.
 #[test]
 fn defaults_equal_bake_constants() {
     let d = NavMeshSettings::default();
@@ -26,20 +26,10 @@ fn the_area_table_is_not_a_bake_input() {
     assert!(!a.bakes_like(&NavMeshSettings::default()));
 }
 
-/// A JSON object missing every field deserializes to the defaults (back-compat).
+/// A JSON object missing every field deserializes to the defaults.
 #[test]
 fn empty_json_object_fills_defaults() {
     let s: NavMeshSettings = serde_json::from_str("{}").expect("empty object loads");
-    assert_eq!(s, NavMeshSettings::default());
-}
-
-/// A pre-#278 scene that carries the other knobs but omits `agent_height` still loads,
-/// filling the new field with its serde default (back-compat for the height addition).
-#[test]
-fn legacy_json_without_agent_height_uses_default() {
-    let json = r#"{"agent_radius":0.5,"max_slope":1.0,"max_step":0.5,"grid_spacing":1.0}"#;
-    let s: NavMeshSettings = serde_json::from_str(json).expect("legacy object loads");
-    assert_eq!(s.agent_height, DEFAULT_AGENT_HEIGHT);
     assert_eq!(s, NavMeshSettings::default());
 }
 

@@ -10,7 +10,7 @@
 //! `Player == 2` / `Enemy == 5` fragility.
 //!
 //! `spawn(name)` always attaches a Transform (via `Entity::new`): Transform is
-//! the one mandatory component. Iteration is in insertion order so the legacy
+//! the one mandatory component. Iteration is in insertion order so the former
 //! `Vec<Entity>` semantics (physics pair ordering, render order) are preserved.
 //!
 //! The generic `component`/`component_mut`/`set_component`/`take_component`/
@@ -35,9 +35,9 @@ pub struct World {
     inner: hecs::World,
     /// Stable engine id -> hecs handle (generational), a dense table (#696).
     handles: Handles,
-    /// Insertion order of stable ids — preserves legacy `Vec<Entity>` ordering.
+    /// Insertion order of stable ids — preserves the former `Vec<Entity>` ordering.
     order: Vec<u32>,
-    /// Monotonic stable-id allocator (mirrors the legacy `next_entity_id`).
+    /// Monotonic stable-id allocator (mirrors the former `next_entity_id`).
     next_id: u32,
     /// Insertion-sequence allocator: `place` stamps `Core::seq`, so narrow queries sort.
     next_seq: u64,
@@ -66,7 +66,7 @@ impl World {
         }
     }
 
-    /// The next stable id that `spawn` would hand out (legacy `next_entity_id`).
+    /// The next stable id that `spawn` would hand out (the former `next_entity_id`).
     pub fn next_id(&self) -> u32 {
         self.next_id
     }
@@ -136,7 +136,7 @@ impl World {
     }
 
     /// Find the first *active* entity with this name, returning its stable id.
-    /// Matches the legacy `Scene::find_entity_by_name` semantics.
+    /// Matches the former `Scene::find_entity_by_name` semantics.
     pub fn find_by_name(&self, name: &str) -> Option<u32> {
         self.order.iter().copied().find(|&id| {
             let Some(handle) = self.handles.get(id) else {

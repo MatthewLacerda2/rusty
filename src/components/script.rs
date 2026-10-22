@@ -1,7 +1,7 @@
 //! src/components/script.rs — Script component
 //!
 //! script path + load state. Unity: MonoBehaviour reference. Moved verbatim from
-//! the legacy `core/scene.rs`.
+//! the former `core/scene.rs`.
 
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;

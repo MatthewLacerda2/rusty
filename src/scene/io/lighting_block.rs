@@ -9,8 +9,8 @@
 //!
 //! The file is re-read as a typed `SceneData`, so it is written back in the layout
 //! [`save_to_file`](super::save_to_file) uses. That is only safe when the document
-//! survives the round trip unchanged (a legacy scene that loading migrates would
-//! not), so the round trip is checked first; when it fails nothing is written and
+//! survives the round trip unchanged (a hand-edited one, with unknown keys or
+//! out-of-range values loading drops or fixes, would not), so the round trip is checked first; when it fails nothing is written and
 //! the caller is told to save the whole scene instead.
 
 use serde_json::Value;
@@ -24,8 +24,8 @@ use crate::scene::Scene;
 pub enum LightingSave {
     /// The scene file now carries the lighting; nothing else in it changed.
     Written,
-    /// The file could not be rewritten field by field (it is a legacy or hand-edited
-    /// document loading would migrate); save the whole scene to keep the lighting.
+    /// The file could not be rewritten field by field (it is a hand-edited document
+    /// loading would change); save the whole scene to keep the lighting.
     NeedsSceneSave,
 }
 

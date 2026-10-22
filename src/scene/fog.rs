@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 /// How fog thickens with distance from the camera.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum FogMode {
-    /// No fog — the default, so older scenes look exactly as they did.
+    /// No fog — the default.
     #[default]
     Off,
     /// Ramps from none at `start` to full at `end`.

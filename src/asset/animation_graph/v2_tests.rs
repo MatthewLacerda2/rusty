@@ -1,5 +1,5 @@
 //! The v2 document (#457): blend-tree nodes and layers parse, round-trip and
-//! validate; a pre-#457 graph is a graph with no extra layers, unchanged on save.
+//! validate; a single-layer graph is a graph with no extra layers, unchanged on save.
 
 use super::tests::sample_graph;
 use super::*;

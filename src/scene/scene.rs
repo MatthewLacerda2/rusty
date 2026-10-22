@@ -25,8 +25,8 @@ pub use crate::components::{
     ColliderShape, CollisionDetection, CollisionResponse, DirtyFlag, EmitMode, Entity,
     LightComponent, LightMode, LightType, MaterialAsset, MaterialComponent, MeshComponent,
     NavMeshAgentComponent, Particle, ParticleBlend, ParticleEmitterComponent, RenderMode,
-    RigidBodyComponent, ScriptComponent, ScriptFieldValue, TextureComponent, Tonemap,
-    TransformComponent, VisualCorrectionComponent,
+    RigidBodyComponent, ScriptComponent, ScriptFieldValue, Tonemap, TransformComponent,
+    VisualCorrectionComponent,
 };
 
 fn default_skybox_path() -> String {
@@ -65,7 +65,7 @@ pub struct Scene {
     /// Per-scene navmesh bake tunables (#276): Unity's per-scene navmesh bake
     /// settings (agent radius, max slope, max step, grid spacing). The nav bake
     /// reads these off the active scene; serialized with the scene like the ambient
-    /// scalars, with serde defaults so older scenes load with the historical values.
+    /// scalars, with serde defaults equal to the historical bake constants.
     pub nav_settings: NavMeshSettings,
     /// Scene fog (#437): distance + height fog the renderer applies to every
     /// world-space pass. Serialized with the scene; off by default.

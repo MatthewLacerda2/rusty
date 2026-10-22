@@ -1,7 +1,7 @@
 //! src/components/transform.rs — Transform component (mandatory).
 //!
 //! Every entity has exactly one Transform (position/rotation/scale). Unity:
-//! Transform. Moved verbatim from the legacy `core/scene.rs`.
+//! Transform. Moved verbatim from the former `core/scene.rs`.
 
 use glam::{Mat4, Quat, Vec3};
 use serde::{Deserialize, Serialize};

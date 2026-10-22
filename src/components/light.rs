@@ -1,6 +1,6 @@
 //! src/components/light.rs — Light component
 //!
-//! ambient/directional/point/spot. Unity: Light. Moved verbatim from the legacy
+//! ambient/directional/point/spot. Unity: Light. Moved verbatim from the former
 //! `core/scene.rs`; the per-light [`LightMode`] (#438) is Unity's Light Mode.
 
 use glam::Vec3;
@@ -34,12 +34,8 @@ impl LightType {
         }
     }
 
-    /// Parse a type name, case-insensitively; `None` for an unknown one. The
-    /// pre-#997 API name `"Spotlight"` still parses, so older scripts keep working.
+    /// Parse a type name, case-insensitively; `None` for an unknown one.
     pub fn parse(name: &str) -> Option<LightType> {
-        if name.eq_ignore_ascii_case("spotlight") {
-            return Some(LightType::Spotlight);
-        }
         Self::ALL
             .into_iter()
             .find(|t| t.name().eq_ignore_ascii_case(name))
@@ -122,8 +118,7 @@ pub struct LightComponent {
     /// cascades.
     #[serde(default)]
     pub cast_shadows: bool,
-    /// Realtime / Mixed / Baked (#438). `#[serde(default)]` so pre-#438 scenes load
-    /// every light as `Mixed`, which renders exactly as they did.
+    /// Realtime / Mixed / Baked (#438); `Mixed` when the file names none.
     #[serde(default)]
     pub mode: LightMode,
 }
@@ -145,12 +140,16 @@ mod tests {
     }
 
     #[test]
-    fn type_names_round_trip_and_spotlight_still_parses() {
+    fn type_names_round_trip_and_only_unitys_names_parse() {
         for t in LightType::ALL {
             assert_eq!(LightType::parse(&t.name().to_lowercase()), Some(t));
         }
         assert_eq!(LightType::Spotlight.name(), "Spot", "Unity's name (#997)");
-        assert_eq!(LightType::parse("Spotlight"), Some(LightType::Spotlight));
+        assert_eq!(
+            LightType::parse("Spotlight"),
+            None,
+            "the pre-#997 name is gone"
+        );
         assert_eq!(LightType::parse("Area"), None);
     }
 

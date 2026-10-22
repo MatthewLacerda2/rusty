@@ -18,29 +18,6 @@ fn default_startup_scene_is_the_seeded_scene() {
 }
 
 #[test]
-fn partial_file_keeps_defaults_for_missing_fields() {
-    let b = BuildSettings::from_json(r#"{ "product_name": "Neon" }"#).unwrap();
-    assert_eq!(b.product_name, "Neon");
-    assert_eq!(b.startup_scene, DEFAULT_STARTUP_SCENE);
-    assert_eq!(b.window_mode, WindowMode::Windowed);
-}
-
-#[test]
-fn malformed_file_is_an_error() {
-    assert!(BuildSettings::from_json("{ not json").is_err());
-}
-
-#[test]
-fn json_roundtrips() {
-    let b = BuildSettings {
-        startup_scene: "assets/scenes/menu.scene".into(),
-        product_name: "Neon".into(),
-        window_mode: WindowMode::Fullscreen,
-    };
-    assert_eq!(BuildSettings::from_json(&b.to_json()).unwrap(), b);
-}
-
-#[test]
 fn missing_file_reads_as_defaults() {
     let path = temp_path("absent");
     assert_eq!(
@@ -69,21 +46,6 @@ fn bound_instance_writes_through_on_every_setter() {
     app.open(&path).unwrap();
     app.update(|b| b.product_name = "Neon".into()).unwrap();
     assert_eq!(BuildSettings::read(&path).unwrap().product_name, "Neon");
-    let _ = std::fs::remove_file(&path);
-}
-
-#[test]
-fn loaded_instance_never_writes_the_file() {
-    let path = temp_path("loaded");
-    std::fs::write(&path, ProjectFile::default().to_json()).unwrap();
-    let mut app = Application::new();
-    app.load(&path).unwrap();
-    app.update(|b| b.product_name = "Changed".into()).unwrap();
-    assert_eq!(app.build().product_name, "Changed");
-    assert_eq!(
-        BuildSettings::read(&path).unwrap().product_name,
-        DEFAULT_PRODUCT_NAME
-    );
     let _ = std::fs::remove_file(&path);
 }
 

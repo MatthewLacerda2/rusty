@@ -20,8 +20,7 @@ pub struct CollisionMatrix {
 }
 
 impl Default for CollisionMatrix {
-    /// Everything collides with everything (Unity's default matrix), so pre-#91
-    /// scenes keep their current "all pairs collide" behaviour.
+    /// Everything collides with everything (Unity's default matrix).
     fn default() -> Self {
         Self {
             rows: [u32::MAX; LAYER_COUNT],

@@ -198,7 +198,6 @@ scene.entities[].joint.kind: enum Fixed|Hinge|Ball
 scene.entities[].joint.limits: tuple(2)
 scene.entities[].joint.limits[]: f32
 scene.entities[].joint.swing2_limit: f32
-scene.entities[].joint.swing2_limit: option
 scene.entities[].joint.swing_axis: tuple(3)
 scene.entities[].joint.swing_axis[]: f32
 scene.entities[].joint.swing_limit: f32
@@ -301,7 +300,6 @@ scene.entities[].mesh.skeleton.bodies{}.joint.kind: enum Fixed|Hinge|Ball
 scene.entities[].mesh.skeleton.bodies{}.joint.limits: tuple(2)
 scene.entities[].mesh.skeleton.bodies{}.joint.limits[]: f32
 scene.entities[].mesh.skeleton.bodies{}.joint.swing2_limit: f32
-scene.entities[].mesh.skeleton.bodies{}.joint.swing2_limit: option
 scene.entities[].mesh.skeleton.bodies{}.joint.swing_axis: tuple(3)
 scene.entities[].mesh.skeleton.bodies{}.joint.swing_axis[]: f32
 scene.entities[].mesh.skeleton.bodies{}.joint.swing_limit: f32
@@ -431,12 +429,9 @@ scene.entities[].particles.shape<Cone>.radius: f32
 scene.entities[].particles.shape<Hemisphere>.radius: f32
 scene.entities[].particles.shape<Sphere>.radius: f32
 scene.entities[].particles.size: any
-scene.entities[].particles.size_end: f32
-scene.entities[].particles.size_end: option
 scene.entities[].particles.size_over_life.keys: seq
 scene.entities[].particles.size_over_life.keys[].t: f32
 scene.entities[].particles.size_over_life.keys[].value: f32
-scene.entities[].particles.size_start: alias
 scene.entities[].particles.speed: any
 scene.entities[].particles.spread: f32
 scene.entities[].particles.sub_emitters.birth: option
@@ -497,15 +492,6 @@ scene.entities[].rigidbody.use_gravity: bool
 scene.entities[].rigidbody.velocity: tuple(3)
 scene.entities[].rigidbody.velocity[]: f32
 scene.entities[].rigidbody: option
-scene.entities[].script.is_loaded: bool
-scene.entities[].script.path: string
-scene.entities[].script.values: map
-scene.entities[].script.values{key}: string
-scene.entities[].script.values{}: enum number|boolean|text
-scene.entities[].script.values{}<boolean>: bool
-scene.entities[].script.values{}<number>: f64
-scene.entities[].script.values{}<text>: string
-scene.entities[].script: option
 scene.entities[].scripts: seq
 scene.entities[].scripts[].is_loaded: bool
 scene.entities[].scripts[].path: string
@@ -612,17 +598,6 @@ scene.entities[].text.shadow_offset[]: f32
 scene.entities[].text.text: string
 scene.entities[].text.wrap: bool
 scene.entities[].text: option
-scene.entities[].texture.color: tuple(3)
-scene.entities[].texture.color[]: f32
-scene.entities[].texture.is_dirty: bool
-scene.entities[].texture.metallic: f32
-scene.entities[].texture.metallic_map: option
-scene.entities[].texture.metallic_map: string
-scene.entities[].texture.path: string
-scene.entities[].texture.roughness: f32
-scene.entities[].texture.roughness_map: option
-scene.entities[].texture.roughness_map: string
-scene.entities[].texture: option
 scene.entities[].trail.emitting: bool
 scene.entities[].trail.min_vertex_distance: f32
 scene.entities[].trail.style.blend: enum Alpha|Additive
@@ -655,10 +630,7 @@ scene.entities[].visual_correction.contrast: f32
 scene.entities[].visual_correction.custom_effects: seq
 scene.entities[].visual_correction.custom_effects[]: string
 scene.entities[].visual_correction.display_gamma: f32
-scene.entities[].visual_correction.display_gamma: option
 scene.entities[].visual_correction.exposure: f32
-scene.entities[].visual_correction.gamma: f32
-scene.entities[].visual_correction.gamma: option
 scene.entities[].visual_correction.post_params: map
 scene.entities[].visual_correction.post_params{key}: string
 scene.entities[].visual_correction.post_params{}: seq

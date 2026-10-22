@@ -31,8 +31,8 @@ path. The two individual verbs stay for a script that wants only one of them.
   lightmap pages, the probes' baked SH (`<scene>.lighting.json`), and the scene file's
   lighting fields (probe layout, reflection probes, lightmap set, settings). Only those
   fields of the file are rewritten: unsaved edits elsewhere in the scene **stay unsaved**,
-  in the editor and on disk. A scene file loading would rewrite (a legacy or hand-edited
-  one) is left untouched instead: `saved` is `false`, the editor marks the scene dirty,
+  in the editor and on disk. A scene file loading would rewrite (a hand-edited one,
+  say) is left untouched instead: `saved` is `false`, the editor marks the scene dirty,
   and saving the scene keeps the lighting. A lightmapped mesh that exists only in the
   unsaved edits keeps its lightmap once the scene is saved; until then the file names it
   but has no such entity, and the entry is ignored.

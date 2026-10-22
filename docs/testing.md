@@ -401,7 +401,7 @@ should: prefer `with=` or completing the example over `no-run`.
 ## Scene-format fingerprint
 `tests/scene_format/` (#941, both feature sets) pins what a `.scene` or `.prefab`
 file holds. A serde tracer walks `SceneData`'s read side (every field, every enum
-variant, legacy aliases included) into `tests/scene_format/scene.fingerprint`, one
+variant, serde aliases included) into `tests/scene_format/scene.fingerprint`, one
 `path: kind` line per place a file can hold a value. A renamed, retyped, added or
 removed field or variant fails the test, which lists the changed lines. Files
 already saved need no migration (CLAUDE.md, *No backward compatibility*): update the

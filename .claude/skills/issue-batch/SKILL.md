@@ -22,8 +22,8 @@ navigation, audio, CI) at once; within one module, run one branch at a time.
 The files every feature appends to, where two branches at once is the case to
 avoid:
 
-- `src/components/entity/mod.rs` (the live struct and its serde mirror) and
-  `src/components/entity/repr.rs`'s imports;
+- `src/components/entity/mod.rs` (the document struct, its imports and
+  `Entity::new`);
 - `src/scene/authoring/components.rs` (`ComponentKind`) and
   `src/scene/authoring/dependency.rs` (`set_default`, `has_kind`, `clear_one`:
   two component branches together push these past clippy's 50-line cap; split

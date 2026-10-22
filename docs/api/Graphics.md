@@ -16,7 +16,7 @@ Getters return a neutral default when no active volume/camera exists.
 | `Graphics.GetContrast` / `SetContrast` | `()` / `(value)` | `number` |
 | `Graphics.GetSaturation` / `SetSaturation` | `()` / `(value)` | `number` |
 | `Graphics.GetGamma` / `SetGamma` | `()` / `(value)` | `number` (display-gamma tweak, **neutral `1.0`**, clamped ≥ 0.01) |
-| `Graphics.GetTonemap` / `SetTonemap` | `()` / `(name)` | `"None"` / `"Reinhard"` / `"ACES"` (Unity's name; names are case-insensitive, so the pre-#997 `"Aces"` still works) |
+| `Graphics.GetTonemap` / `SetTonemap` | `()` / `(name)` | `"None"` / `"Reinhard"` / `"ACES"` (Unity's name; names are case-insensitive) |
 | `Graphics.GetSsrActive` / `SetSsrActive` | `()` / `(bool)` | `bool` |
 | `Graphics.GetSsrQuality` / `SetSsrQuality` | `()` / `(name)` | `string` |
 | `Graphics.GetMotionBlurActive` / `SetMotionBlurActive` | `()` / `(bool)` | `bool` |
@@ -41,9 +41,7 @@ Getters return a neutral default when no active volume/camera exists.
 **Gamma** is a display-gamma *tweak*, not the output encode: the render target
 (window, Game view, and headless screenshot alike) is sRGB and encodes linear →
 display in hardware, exactly once (#415). `1.0` leaves the image untouched; `> 1`
-lifts the midtones, `< 1` darkens them. Scenes saved before #415 stored the
-encode itself (`gamma: 2.2` meant "normal"); they load as `gamma / 2.2`, so an old
-2.2 becomes 1.0 and looks the same.
+lifts the midtones, `< 1` darkens them.
 
 **Sun shadows** are cascaded (#435): the camera's view, out to the **shadow
 distance**, is split into `1`–`4` slices, each with its own shadow map fitted to it

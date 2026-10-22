@@ -2,8 +2,8 @@
 //!
 //! A game lives in a **project folder** anywhere on disk, in its own repo — Unity's
 //! model, where the Hub or `-projectPath` opens a folder and the editor's working
-//! directory *is* that folder. rusty does the same: [`open`] creates the skeleton,
-//! carries a legacy `./project` forward, and makes the project root the process's
+//! directory *is* that folder. rusty does the same: [`open`] creates the skeleton
+//! and makes the project root the process's
 //! working directory. Every path a project stores (scene asset refs, script paths,
 //! build settings) is relative to that root, `/`-separated, so it names the same file
 //! on every machine and the engine code that reads it stays a plain relative read.
@@ -31,7 +31,6 @@ pub mod bench;
 mod commit;
 mod file;
 mod locate;
-mod migrate;
 
 use std::path::{Path, PathBuf};
 
@@ -95,8 +94,8 @@ pub fn create_skeleton(dir: &Path) -> Result<(), String> {
 /// How a binary opens its project: whether it may bring `project.rusty` up to date.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Access {
-    /// The editor and the agent sessions: create a missing `project.rusty` (folding a
-    /// legacy `build_settings.json` in) and record the running engine's commit.
+    /// The editor and the agent sessions: create a missing `project.rusty` and record
+    /// the running engine's commit.
     Edit,
     /// The player, scenario runs and captures: check the engine, write nothing. A
     /// shipped game never rewrites its project, and a run over the tracked fixture
@@ -114,7 +113,7 @@ pub struct Opened {
     pub engine: EngineCheck,
 }
 
-/// Open the project at `dir`: create its skeleton, migrate a legacy layout, check
+/// Open the project at `dir`: create its skeleton, check
 /// (and with [`Access::Edit`] record) the engine in `project.rusty`, and make it the
 /// working directory. Call it once, at startup, before anything reads a project path
 /// — and resolve any other relative path the command line named first
@@ -144,15 +143,10 @@ pub(crate) fn prepare(dir: &Path, access: Access) -> Result<(Opened, Vec<String>
     std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     let root =
         crate::core::paths::canonicalize(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
-    let mut lines = migrate::legacy_layout(&root)?;
     create_skeleton(&root)?;
-    let engine = match access {
-        Access::Edit => {
-            let (engine, recorded) = file::record(&root)?;
-            lines.extend(recorded);
-            engine
-        }
-        Access::Run => file::inspect(&root)?,
+    let (engine, lines) = match access {
+        Access::Edit => file::record(&root)?,
+        Access::Run => (file::inspect(&root)?, Vec::new()),
     };
     Ok((Opened { root, engine }, lines))
 }
@@ -163,8 +157,8 @@ pub fn inspect(dir: &Path) -> Result<EngineCheck, String> {
     file::inspect(dir)
 }
 
-/// Whether `dir` already holds a project: its [`PROJECT_FILE`], or (from before the
-/// file existed) an `assets/` folder. A picker opens only these, so a stray folder
+/// Whether `dir` already holds a project: its [`PROJECT_FILE`], or an `assets/`
+/// folder (a project only ever opened to run has no file). A picker opens only these, so a stray folder
 /// is never filled with a skeleton by accident.
 pub fn is_project(dir: &Path) -> bool {
     dir.join(PROJECT_FILE).is_file() || dir.join(ASSETS_DIR).is_dir()
@@ -209,7 +203,3 @@ pub fn open_from_args(args: &mut Vec<String>, access: Access) -> Opened {
 #[cfg(test)]
 #[path = "tests.rs"]
 mod tests;
-
-#[cfg(test)]
-#[path = "migrate_tests.rs"]
-mod migrate_tests;

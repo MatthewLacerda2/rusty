@@ -50,7 +50,7 @@ fn dispatch_fires_enter_stay_exit_in_order() {
 
 #[test]
 fn missing_edge_callbacks_are_optional() {
-    // A script defining only the legacy OnTrigger keeps working untouched.
+    // A script defining only the stay-edge OnTrigger keeps working untouched.
     let (mut m, id) = manager_with_entity();
     m.init_runtime(&Rc::new(RefCell::new(None))).unwrap();
     let path = write_script(

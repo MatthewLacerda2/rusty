@@ -5,6 +5,7 @@
       "name": "Floor_Plane",
       "active": true,
       "is_static": true,
+      "layer": 0,
       "transform": {
         "position": [
           0.0,
@@ -26,8 +27,8 @@
       "mesh": {
         "primitive_type": "Plane"
       },
-      "texture": null,
-      "script": null,
+      "material": null,
+      "scripts": [],
       "animator": null,
       "light": null,
       "collider": {
@@ -41,12 +42,42 @@
             ]
           }
         },
-        "is_trigger": false
+        "is_trigger": false,
+        "material": {
+          "friction": 0.5,
+          "bounciness": 0.0,
+          "friction_combine": "Average",
+          "bounce_combine": "Average"
+        }
       },
       "rigidbody": null,
       "nav_agent": null,
+      "nav_obstacle": null,
+      "offmesh_link": null,
+      "nav_modifier": null,
       "camera": null,
       "visual_correction": null,
+      "particles": null,
+      "audio": null,
+      "reverb_zone": null,
+      "canvas": null,
+      "rect_transform": null,
+      "image": null,
+      "canvas_group": null,
+      "rect_mask": null,
+      "mask": null,
+      "backdrop_filter": null,
+      "text": null,
+      "selectable": null,
+      "layout_group": null,
+      "layout_element": null,
+      "joint": null,
+      "character_controller": null,
+      "lod_group": null,
+      "trail": null,
+      "line": null,
+      "shape": null,
+      "prefab_link": null,
       "parent_id": null,
       "children": []
     },
@@ -55,6 +86,7 @@
       "name": "Player",
       "active": true,
       "is_static": false,
+      "layer": 0,
       "transform": {
         "position": [
           0.0,
@@ -76,23 +108,15 @@
       "mesh": {
         "primitive_type": "Cylinder"
       },
-      "texture": {
-        "path": "",
-        "is_dirty": false,
-        "metallic": 0.0,
-        "roughness": 0.5,
-        "metallic_map": null,
-        "roughness_map": null,
-        "color": [
-          0.3,
-          0.6,
-          1.0
-        ]
+      "material": {
+        "material": "entity_2_material"
       },
-      "script": {
-        "path": "assets/scripts/player_controller.lua",
-        "is_loaded": false
-      },
+      "scripts": [
+        {
+          "path": "assets/scripts/player_controller.lua",
+          "is_loaded": false
+        }
+      ],
       "animator": null,
       "light": null,
       "collider": {
@@ -103,7 +127,13 @@
             "height": 1.6
           }
         },
-        "is_trigger": false
+        "is_trigger": false,
+        "material": {
+          "friction": 0.5,
+          "bounciness": 0.0,
+          "friction_combine": "Average",
+          "bounce_combine": "Average"
+        }
       },
       "rigidbody": {
         "active": true,
@@ -114,11 +144,41 @@
           0.0,
           0.0
         ],
-        "use_gravity": false
+        "angular_velocity": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "use_gravity": false,
+        "collision_detection": "Discrete"
       },
       "nav_agent": null,
+      "nav_obstacle": null,
+      "offmesh_link": null,
+      "nav_modifier": null,
       "camera": null,
       "visual_correction": null,
+      "particles": null,
+      "audio": null,
+      "reverb_zone": null,
+      "canvas": null,
+      "rect_transform": null,
+      "image": null,
+      "canvas_group": null,
+      "rect_mask": null,
+      "mask": null,
+      "backdrop_filter": null,
+      "text": null,
+      "selectable": null,
+      "layout_group": null,
+      "layout_element": null,
+      "joint": null,
+      "character_controller": null,
+      "lod_group": null,
+      "trail": null,
+      "line": null,
+      "shape": null,
+      "prefab_link": null,
       "parent_id": null,
       "children": []
     },
@@ -127,6 +187,7 @@
       "name": "Obstacle_Wall_Left",
       "active": true,
       "is_static": true,
+      "layer": 0,
       "transform": {
         "position": [
           3.0,
@@ -148,8 +209,8 @@
       "mesh": {
         "primitive_type": "Box"
       },
-      "texture": null,
-      "script": null,
+      "material": null,
+      "scripts": [],
       "animator": null,
       "light": null,
       "collider": {
@@ -163,12 +224,42 @@
             ]
           }
         },
-        "is_trigger": false
+        "is_trigger": false,
+        "material": {
+          "friction": 0.5,
+          "bounciness": 0.0,
+          "friction_combine": "Average",
+          "bounce_combine": "Average"
+        }
       },
       "rigidbody": null,
       "nav_agent": null,
+      "nav_obstacle": null,
+      "offmesh_link": null,
+      "nav_modifier": null,
       "camera": null,
       "visual_correction": null,
+      "particles": null,
+      "audio": null,
+      "reverb_zone": null,
+      "canvas": null,
+      "rect_transform": null,
+      "image": null,
+      "canvas_group": null,
+      "rect_mask": null,
+      "mask": null,
+      "backdrop_filter": null,
+      "text": null,
+      "selectable": null,
+      "layout_group": null,
+      "layout_element": null,
+      "joint": null,
+      "character_controller": null,
+      "lod_group": null,
+      "trail": null,
+      "line": null,
+      "shape": null,
+      "prefab_link": null,
       "parent_id": null,
       "children": []
     },
@@ -177,6 +268,7 @@
       "name": "Obstacle_Wall_Right",
       "active": true,
       "is_static": true,
+      "layer": 0,
       "transform": {
         "position": [
           -3.0,
@@ -198,8 +290,8 @@
       "mesh": {
         "primitive_type": "Box"
       },
-      "texture": null,
-      "script": null,
+      "material": null,
+      "scripts": [],
       "animator": null,
       "light": null,
       "collider": {
@@ -213,12 +305,42 @@
             ]
           }
         },
-        "is_trigger": false
+        "is_trigger": false,
+        "material": {
+          "friction": 0.5,
+          "bounciness": 0.0,
+          "friction_combine": "Average",
+          "bounce_combine": "Average"
+        }
       },
       "rigidbody": null,
       "nav_agent": null,
+      "nav_obstacle": null,
+      "offmesh_link": null,
+      "nav_modifier": null,
       "camera": null,
       "visual_correction": null,
+      "particles": null,
+      "audio": null,
+      "reverb_zone": null,
+      "canvas": null,
+      "rect_transform": null,
+      "image": null,
+      "canvas_group": null,
+      "rect_mask": null,
+      "mask": null,
+      "backdrop_filter": null,
+      "text": null,
+      "selectable": null,
+      "layout_group": null,
+      "layout_element": null,
+      "joint": null,
+      "character_controller": null,
+      "lod_group": null,
+      "trail": null,
+      "line": null,
+      "shape": null,
+      "prefab_link": null,
       "parent_id": null,
       "children": []
     },
@@ -227,6 +349,7 @@
       "name": "Sun",
       "active": true,
       "is_static": true,
+      "layer": 0,
       "transform": {
         "position": [
           0.0,
@@ -246,8 +369,8 @@
         ]
       },
       "mesh": null,
-      "texture": null,
-      "script": null,
+      "material": null,
+      "scripts": [],
       "animator": null,
       "light": {
         "light_type": "Directional",
@@ -259,13 +382,39 @@
         "intensity": 1.2,
         "range": 0.0,
         "inner_cone": 0.0,
-        "outer_cone": 0.0
+        "outer_cone": 0.0,
+        "cast_shadows": false,
+        "mode": "Mixed"
       },
       "collider": null,
       "rigidbody": null,
       "nav_agent": null,
+      "nav_obstacle": null,
+      "offmesh_link": null,
+      "nav_modifier": null,
       "camera": null,
       "visual_correction": null,
+      "particles": null,
+      "audio": null,
+      "reverb_zone": null,
+      "canvas": null,
+      "rect_transform": null,
+      "image": null,
+      "canvas_group": null,
+      "rect_mask": null,
+      "mask": null,
+      "backdrop_filter": null,
+      "text": null,
+      "selectable": null,
+      "layout_group": null,
+      "layout_element": null,
+      "joint": null,
+      "character_controller": null,
+      "lod_group": null,
+      "trail": null,
+      "line": null,
+      "shape": null,
+      "prefab_link": null,
       "parent_id": null,
       "children": []
     },
@@ -274,6 +423,7 @@
       "name": "Enemy_1",
       "active": true,
       "is_static": false,
+      "layer": 0,
       "transform": {
         "position": [
           8.0,
@@ -295,14 +445,20 @@
       "mesh": {
         "primitive_type": "Box"
       },
-      "texture": null,
-      "script": {
-        "path": "assets/scripts/bot.lua",
-        "is_loaded": false
-      },
+      "material": null,
+      "scripts": [
+        {
+          "path": "assets/scripts/bot.lua",
+          "is_loaded": false
+        }
+      ],
       "animator": {
         "current_clip": "Walk",
         "time": 0.0,
+        "loop_clip": false,
+        "previous_time": 0.0,
+        "crossfade_elapsed": 0.0,
+        "crossfade_duration": 0.0,
         "speed": 3.0,
         "is_playing": true,
         "freeze": false
@@ -319,7 +475,13 @@
             ]
           }
         },
-        "is_trigger": false
+        "is_trigger": false,
+        "material": {
+          "friction": 0.5,
+          "bounciness": 0.0,
+          "friction_combine": "Average",
+          "bounce_combine": "Average"
+        }
       },
       "rigidbody": {
         "active": true,
@@ -330,11 +492,41 @@
           0.0,
           0.0
         ],
-        "use_gravity": false
+        "angular_velocity": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "use_gravity": false,
+        "collision_detection": "Discrete"
       },
       "nav_agent": null,
+      "nav_obstacle": null,
+      "offmesh_link": null,
+      "nav_modifier": null,
       "camera": null,
       "visual_correction": null,
+      "particles": null,
+      "audio": null,
+      "reverb_zone": null,
+      "canvas": null,
+      "rect_transform": null,
+      "image": null,
+      "canvas_group": null,
+      "rect_mask": null,
+      "mask": null,
+      "backdrop_filter": null,
+      "text": null,
+      "selectable": null,
+      "layout_group": null,
+      "layout_element": null,
+      "joint": null,
+      "character_controller": null,
+      "lod_group": null,
+      "trail": null,
+      "line": null,
+      "shape": null,
+      "prefab_link": null,
       "parent_id": null,
       "children": []
     }
@@ -347,5 +539,144 @@
     0.1,
     0.22
   ],
-  "ambient_intensity": 0.35
+  "ambient_intensity": 0.35,
+  "nav_settings": {
+    "agent_radius": 0.5,
+    "agent_height": 2.0,
+    "max_slope": 1.0,
+    "max_step": 0.5,
+    "grid_spacing": 1.0,
+    "bounds": null,
+    "drop_height": 0.0,
+    "jump_distance": 0.0,
+    "jump_height": 0.0,
+    "link_spacing": 2.0,
+    "areas": [
+      {
+        "name": "Walkable",
+        "cost": 1.0
+      },
+      {
+        "name": "NotWalkable",
+        "cost": 1.0
+      }
+    ]
+  },
+  "fog": {
+    "mode": "Off",
+    "color": [
+      0.6,
+      0.65,
+      0.7
+    ],
+    "density": 0.02,
+    "start": 10.0,
+    "end": 100.0,
+    "height_falloff": 0.0,
+    "base_height": 0.0
+  },
+  "layers": {
+    "names": [
+      "Default",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      ""
+    ]
+  },
+  "collision_matrix": {
+    "rows": [
+      4294967295,
+      4294967295,
+      4294967295,
+      4294967295,
+      4294967295,
+      4294967295,
+      4294967295,
+      4294967295,
+      4294967295,
+      4294967295,
+      4294967295,
+      4294967295,
+      4294967295,
+      4294967295,
+      4294967295,
+      4294967295,
+      4294967295,
+      4294967295,
+      4294967295,
+      4294967295,
+      4294967295,
+      4294967295,
+      4294967295,
+      4294967295,
+      4294967295,
+      4294967295,
+      4294967295,
+      4294967295,
+      4294967295,
+      4294967295,
+      4294967295,
+      4294967295
+    ]
+  },
+  "materials": {
+    "entity_2_material": {
+      "base_color": [
+        0.3,
+        0.6,
+        1.0
+      ],
+      "base_color_map": null,
+      "metallic": 0.0,
+      "metallic_map": null,
+      "roughness": 0.5,
+      "roughness_map": null,
+      "normal_map": null,
+      "emissive": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "emissive_map": null,
+      "render_mode": "Opaque",
+      "alpha": 1.0,
+      "alpha_cutoff": 0.5,
+      "shader": null
+    }
+  },
+  "probes": {
+    "probes": [],
+    "grid": null
+  },
+  "reflection_probes": {
+    "probes": []
+  }
 }

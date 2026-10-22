@@ -82,5 +82,4 @@ fn scene_format_flatten_list_is_complete() {
     let playback = serde_json::to_value(trace::trace::<Playback>("x").1).unwrap();
     check::<AnimatorComponent>("AnimatorComponent", playback.clone());
     check::<rusty::components::LayerState>("LayerState", playback);
-    // `LegacyEmitter` is read-only: its one own field, `size_end`, is never written.
 }

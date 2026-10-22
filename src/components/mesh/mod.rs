@@ -1,7 +1,7 @@
 //! src/components/mesh/ — Mesh component, its vertex layout and the built-in
 //! primitive geometry (`vertex`, `primitives`).
 //!
-//! primitive/imported vertex+index data. Moved verbatim from the legacy
+//! primitive/imported vertex+index data. Moved verbatim from the former
 //! `core/scene.rs`, except the GPU dirty flag is now a `DirtyFlag` newtype: hecs
 //! requires every stored component to be `Send + Sync`, and a bare
 //! `std::cell::Cell` is `!Sync`. `DirtyFlag` keeps the original interior-mutable

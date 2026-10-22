@@ -1,12 +1,12 @@
 //! src/components/camera.rs — Camera component
 //!
 //! fov/near/far/motion-blur, plus the camera-stack knobs (`render_order`,
-//! `clear_flags`). Unity: Camera. Moved verbatim from the legacy `core/scene.rs`.
+//! `clear_flags`). Unity: Camera. Moved verbatim from the former `core/scene.rs`.
 
 use serde::{Deserialize, Serialize};
 
 /// A fresh camera renders every layer (Unity's default Culling Mask = Everything).
-/// Pre-#92 scenes have no `culling_mask`, so they load with this all-on value.
+/// A scene file that leaves out `culling_mask` loads with this all-on value.
 fn default_culling_mask() -> u32 {
     u32::MAX
 }
@@ -27,14 +27,13 @@ pub enum ClearFlags {
     DepthOnly,
 }
 
-/// Pre-#93 scenes have no `clear_flags`; they load as a world/base camera.
+/// A camera whose file names no `clear_flags` loads as a world/base camera.
 fn default_clear_flags() -> ClearFlags {
     ClearFlags::Skybox
 }
 
-/// Pre-#360 scenes have no `fxaa_active`, so they load with anti-aliasing **on** —
-/// which is the point of a default-on effect: existing scenes gain it rather than
-/// having to opt in. FXAA costs a fraction of a millisecond, so the off-switch is for
+/// A camera whose file names no `fxaa_active` loads with anti-aliasing **on** — a
+/// default-on effect, so a scene gains it rather than having to opt in. FXAA costs a fraction of a millisecond, so the off-switch is for
 /// the rare shot that wants raw edges, not a posture scenes must opt out of.
 fn default_fxaa_active() -> bool {
     true

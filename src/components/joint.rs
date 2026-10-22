@@ -63,7 +63,8 @@ impl JointKind {
 
 /// A joint between this entity's Rigidbody and another's. See the module docs.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(from = "JointFile")]
+// Every field defaults, so a hand-written scene can name only what it sets.
+#[serde(default)]
 pub struct JointComponent {
     pub kind: JointKind,
     /// The entity whose body this one is joined to; `None` joins it to the world.
@@ -87,7 +88,7 @@ pub struct JointComponent {
     /// Ball: how far (degrees) the body may swing about `swing_axis` (swing 1).
     pub swing_limit: f32,
     /// Ball: how far (degrees) the body may swing about `axis × swing_axis`
-    /// (swing 2). A scene saved without it gets `swing_limit`: a round cone.
+    /// (swing 2).
     pub swing2_limit: f32,
     /// Force (newtons) past which the joint breaks; `0` never breaks.
     pub break_force: f32,
@@ -130,70 +131,6 @@ impl JointComponent {
     }
 }
 
-/// How a `JointComponent` is read from a scene: every field optional, and a
-/// missing `swing2_limit` (scenes from before #675) copies `swing_limit`.
-#[derive(Deserialize)]
-#[serde(default)]
-struct JointFile {
-    kind: JointKind,
-    connected_body: Option<u32>,
-    anchor: Vec3,
-    connected_anchor: Vec3,
-    auto_configure_connected_anchor: bool,
-    axis: Vec3,
-    swing_axis: Vec3,
-    use_limits: bool,
-    limits: Vec2,
-    swing_limit: f32,
-    swing2_limit: Option<f32>,
-    break_force: f32,
-    break_torque: f32,
-    enable_collision: bool,
-}
-
-impl Default for JointFile {
-    fn default() -> Self {
-        let d = JointComponent::default();
-        Self {
-            kind: d.kind,
-            connected_body: d.connected_body,
-            anchor: d.anchor,
-            connected_anchor: d.connected_anchor,
-            auto_configure_connected_anchor: d.auto_configure_connected_anchor,
-            axis: d.axis,
-            swing_axis: d.swing_axis,
-            use_limits: d.use_limits,
-            limits: d.limits,
-            swing_limit: d.swing_limit,
-            swing2_limit: None,
-            break_force: d.break_force,
-            break_torque: d.break_torque,
-            enable_collision: d.enable_collision,
-        }
-    }
-}
-
-impl From<JointFile> for JointComponent {
-    fn from(f: JointFile) -> Self {
-        Self {
-            kind: f.kind,
-            connected_body: f.connected_body,
-            anchor: f.anchor,
-            connected_anchor: f.connected_anchor,
-            auto_configure_connected_anchor: f.auto_configure_connected_anchor,
-            axis: f.axis,
-            swing_axis: f.swing_axis,
-            use_limits: f.use_limits,
-            limits: f.limits,
-            swing_limit: f.swing_limit,
-            swing2_limit: f.swing2_limit.unwrap_or(f.swing_limit),
-            break_force: f.break_force,
-            break_torque: f.break_torque,
-            enable_collision: f.enable_collision,
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -219,14 +156,18 @@ mod tests {
     }
 
     #[test]
-    fn a_scene_without_swing2_keeps_a_round_cone() {
-        let old: JointComponent =
+    fn a_sparse_joint_fills_the_defaults_and_round_trips() {
+        let sparse: JointComponent =
             serde_json::from_str(r#"{"kind":"Ball","swing_limit":30.0}"#).unwrap();
-        assert_eq!((old.swing_limit, old.swing2_limit), (30.0, 30.0));
-        assert_eq!(old.swing_axis, Vec3::Y);
+        let d = JointComponent::default();
+        assert_eq!(
+            (sparse.swing_limit, sparse.swing2_limit),
+            (30.0, d.swing2_limit)
+        );
+        assert_eq!(sparse.swing_axis, Vec3::Y);
         let new = JointComponent {
             swing2_limit: 70.0,
-            ..old
+            ..sparse
         };
         let json = serde_json::to_string(&new).unwrap();
         assert_eq!(serde_json::from_str::<JointComponent>(&json).unwrap(), new);

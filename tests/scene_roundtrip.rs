@@ -81,43 +81,6 @@ fn save_load_preserves_collision_matrix() {
 }
 
 #[test]
-fn legacy_single_script_scene_loads_into_scripts_vec() {
-    // Build + save a scene with one script, then rewrite the on-disk JSON to the
-    // pre-#83 singular `"script": {…}` shape and prove it deserializes into the
-    // new `scripts` vec (serde back-compat for old saves).
-    let mut scene = Scene::new();
-    let id = scene.add_entity("Bot".to_string());
-    scene
-        .world
-        .scripts_mut(id)
-        .unwrap()
-        .push(rusty::scene::ScriptComponent {
-            path: "assets/scripts/bot.lua".to_string(),
-            is_loaded: false,
-            ..Default::default()
-        });
-    let path = tmp("rusty_legacy_script.scene");
-    scene.save_to_file(&path).unwrap();
-
-    // Downgrade the saved file to the legacy singular key via the JSON tree, so
-    // the rewrite is independent of the pretty-printer's exact formatting.
-    let json = std::fs::read_to_string(&path).unwrap();
-    let mut doc: serde_json::Value = serde_json::from_str(&json).unwrap();
-    let ent = &mut doc["entities"][0];
-    let one = ent["scripts"][0].clone();
-    let obj = ent.as_object_mut().unwrap();
-    obj.remove("scripts");
-    obj.insert("script".to_string(), one);
-    std::fs::write(&path, serde_json::to_string_pretty(&doc).unwrap()).unwrap();
-
-    let mut loaded = Scene::new();
-    loaded.load_from_file(&path).unwrap();
-    let scripts = loaded.world.scripts(id).unwrap();
-    assert_eq!(scripts.len(), 1);
-    assert_eq!(scripts[0].path, "assets/scripts/bot.lua");
-}
-
-#[test]
 fn snapshot_restore_discards_mutations() {
     let mut scene = Scene::new();
     let id = scene.add_entity("Player".to_string());
@@ -125,4 +88,21 @@ fn snapshot_restore_discards_mutations() {
     scene.world.transform_mut(id).unwrap().position = Vec3::splat(9.0);
     snap.restore(&mut scene);
     assert_eq!(scene.world.transform(id).unwrap().position, Vec3::ZERO);
+}
+
+#[test]
+fn corpus_seed_scene_loads_in_the_current_format() {
+    // The fuzz corpus's full-document seed must stay a valid scene in today's format:
+    // it loads, and re-serializing it gives back the same document, so a field the
+    // format no longer has (silently ignored on load) can't linger in the seed.
+    let path = "fuzz/corpus/scene_deserialize/seed_default.scene";
+    let text = std::fs::read_to_string(path).unwrap();
+    let data: rusty::scene::SceneData =
+        serde_json::from_str(&text).unwrap_or_else(|e| panic!("{path}: {e}"));
+    // Through text, so an f32 compares as the decimal the file holds.
+    let saved: serde_json::Value =
+        serde_json::from_str(&serde_json::to_string(&data).unwrap()).unwrap();
+    let file: serde_json::Value = serde_json::from_str(&text).unwrap();
+    assert_eq!(saved, file, "{path} is stale");
+    rusty::scene::apply_scene_data(&mut Scene::new(), data);
 }

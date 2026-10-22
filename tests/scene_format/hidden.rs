@@ -8,7 +8,6 @@
 use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet};
 
-use rusty::components::particle::ParticleEmitterComponent;
 use rusty::components::Playback;
 use serde::de::Error as _;
 use serde::de::{DeserializeSeed, IntoDeserializer, MapAccess, Visitor};
@@ -35,7 +34,6 @@ pub fn registry(name: &str) -> Option<(&'static [&'static str], Inner)> {
             inner::<Playback>,
         ),
         "LayerState" => (&["name", "weight"], inner::<Playback>),
-        "LegacyEmitter" => (&["size_end"], inner::<ParticleEmitterComponent>),
         _ => return None,
     })
 }

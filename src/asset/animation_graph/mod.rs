@@ -167,7 +167,7 @@ impl StateMachine {
 }
 
 /// The whole graph, as one serde document: the shared parameter declarations,
-/// the base layer's machine (flattened to the top level, so a pre-#457
+/// the base layer's machine (flattened to the top level, so a
 /// single-layer graph is exactly a graph with no extra layers), and the extra
 /// layers in composition order. `parameters` is a `BTreeMap` so the JSON stays
 /// name-sorted and diffable.
