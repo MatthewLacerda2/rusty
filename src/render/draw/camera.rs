@@ -37,6 +37,7 @@ pub(crate) const CAMERA_PASSES: &[(&str, CameraPass)] = &[
     ("transparent", transparent),
     ("world_ui", world_ui),
     ("effects", effects),
+    ("outline", outline),
     ("count", count),
     ("post_fx", post_fx),
 ];
@@ -129,11 +130,12 @@ fn bin_clusters(r: &mut Renderer, _: &mut RenderView, ctx: &mut CameraCtx) {
 /// This camera's solids (the culling mask differs per camera) as instanced draws
 /// (#470), split opaque/cutout vs transparent (#242).
 fn batch_solids(r: &mut Renderer, _: &mut RenderView, ctx: &mut CameraCtx) {
-    ctx.solids = r.precreate_solid_resources(ctx.scene, ctx.cam, &ctx.frustum, &ctx.lod);
+    let outline = ctx.stack.editor_mode;
+    ctx.solids = r.precreate_solid_resources(ctx.scene, ctx.cam, &ctx.frustum, &ctx.lod, outline);
 }
 
 fn scene_pass(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
-    let overlays = r.precreate_overlays(ctx.scene, &ctx.lod, ctx.stack.editor_mode);
+    let overlays = r.precreate_overlays(ctx.scene, ctx.stack.editor_mode);
     let frame = ScenePassFrame {
         editor_mode: ctx.stack.editor_mode,
         clear: PassClear::for_pass(ctx.is_first, ctx.cam.clear_flags),
@@ -158,6 +160,12 @@ fn world_ui(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
 /// with the solids.
 fn effects(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
     ctx.effects = r.draw_effects(view, ctx.scene, ctx.cam);
+}
+
+/// The editor's selection outline (#1175), over everything this camera drew. Only
+/// an editor camera marked any solid for it (`batch_solids`).
+fn outline(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
+    r.draw_outline(view, &ctx.solids, ctx.view_proj);
 }
 
 fn count(r: &mut Renderer, _: &mut RenderView, ctx: &mut CameraCtx) {

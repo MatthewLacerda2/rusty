@@ -2,7 +2,6 @@
 //! a [`PipelineSpec`] into a pipeline. The layouts and entry points are shared, so
 //! each pipeline names only what it changes from [`PipelineSpec::opaque`].
 
-use super::winding;
 use crate::render::gpu::mesh::vertex_layout;
 use crate::render::gpu::DEPTH_FORMAT;
 
@@ -61,22 +60,6 @@ pub(super) fn line_spec() -> PipelineSpec {
         depth_write_enabled: false,
         depth_compare: wgpu::CompareFunction::LessEqual,
         ..PipelineSpec::opaque("Line Debug Pipeline")
-    }
-}
-
-/// Selection silhouette (inverted hull): cull front faces so only back faces show.
-/// A `mirrored` selection's winding is reversed, so its twin takes clockwise
-/// triangles as front (#1142); otherwise its outer shell would cover the object.
-pub(super) fn outline_spec(mirrored: bool) -> PipelineSpec {
-    PipelineSpec {
-        cull_mode: Some(wgpu::Face::Front),
-        front_face: winding::front_face(mirrored),
-        depth_compare: wgpu::CompareFunction::LessEqual,
-        ..PipelineSpec::opaque(if mirrored {
-            "Mirrored Outline Pipeline"
-        } else {
-            "Outline Pipeline"
-        })
     }
 }
 

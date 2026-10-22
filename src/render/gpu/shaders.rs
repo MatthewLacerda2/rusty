@@ -77,8 +77,10 @@ mod tests {
     use crate::shadergen::compose;
     use crate::shadergen::validate::validate;
 
-    const SHIPPED: [&str; 7] = [
+    const SHIPPED: [&str; 9] = [
         "shader.wgsl",
+        "outline/mask.wgsl",
+        "outline/edge.wgsl",
         "skybox.wgsl",
         "sky_gradient.wgsl",
         "particles.wgsl",

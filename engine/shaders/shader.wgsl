@@ -1,7 +1,7 @@
 #import common::{DecalSurface, NO_SHADOW, PI, VertexInput, apply_fog, blend_joints, cluster_index, local_light_radiance, local_shadow_tile, sample_local_shadow}
 // Every forward binding but `shadow` (the cascades, read only by `calculate_shadow`;
 // `fs_main` names its result `shadow`), so a surface variant's blocks can read any.
-#import forward::bindings::{bones, camera, cluster_lights, cluster_ranges, decals, entity, instances, lighting, local_lights, s_decal, s_diffuse, s_lightmaps, s_refl_cube, s_shadow, s_skybox, shadow_tiles, t_ao, t_decal_color, t_decal_data, t_diffuse, t_emissive, t_lightmap_dirs, t_lightmaps, t_metallic, t_normal, t_refl_cube, t_roughness, t_shadow, t_shadow_atlas, t_skybox}
+#import forward::bindings::{bones, camera, cluster_lights, cluster_ranges, decals, entity, instances, lighting, local_lights, s_decal, s_diffuse, s_lightmaps, s_refl_cube, s_shadow, s_skybox, shadow_tiles, t_ao, t_decal_color, t_decal_data, t_diffuse, t_emissive, t_lightmap_dirs, t_lightmaps, t_metallic, t_normal, t_refl_cube, t_roughness, t_shadow, t_shadow_atlas, t_skybox, vertex_to_world}
 #import forward::lighting::{FresnelSchlick, LIGHTMAP_RGBM_RANGE, ambient_occlusion, calculate_pbr, calculate_shadow, decode_lightmap_direction, environment_reflection, eval_sh, fold_decals, lightmap_direction_rebalance}
 
 // The forward pass (and its SSAO prepass and shadow-cascade entry points). Its
@@ -24,27 +24,13 @@ struct VertexOutput {
 @vertex
 fn vs_main(model: VertexInput, @builtin(instance_index) instance: u32) -> VertexOutput {
     var out: VertexOutput;
-    // The draw's transform (identity for instanced solids) over the instance's own.
-    let model_matrix = entity.model_matrix * instances[instance].model_matrix;
-
-    // Bone skinning transform: the draw's run of `bones` (#455), blended per vertex.
-    let joints = model.joint_indices + vec4<u32>(entity.bone_base);
-    let bone_transform = blend_joints(
-        bones[joints.x], bones[joints.y], bones[joints.z], bones[joints.w],
-        model.joint_weights,
-    );
-
-    let local_pos = bone_transform * vec4<f32>(model.position, 1.0);
-    let world_pos = model_matrix * local_pos;
-    
-    // Normal transform
-    let local_normal = bone_transform * vec4<f32>(model.normal, 0.0);
-    let world_normal = normalize((model_matrix * local_normal).xyz);
-
-    // Tangent rides the same skin + model transform as the normal; its `w`
-    // (handedness) passes through untouched.
-    let local_tangent = bone_transform * vec4<f32>(model.tangent.xyz, 0.0);
-    let world_tangent = normalize((model_matrix * local_tangent).xyz);
+    // Skin, then the draw's and the instance's transforms (`vertex_to_world`).
+    let to_world = vertex_to_world(model, instance);
+    let world_pos = to_world * vec4<f32>(model.position, 1.0);
+    let world_normal = normalize((to_world * vec4<f32>(model.normal, 0.0)).xyz);
+    // Tangent rides the same transform as the normal; its `w` (handedness) passes
+    // through untouched.
+    let world_tangent = normalize((to_world * vec4<f32>(model.tangent.xyz, 0.0)).xyz);
 
     out.world_position = world_pos.xyz;
     out.world_normal = world_normal;

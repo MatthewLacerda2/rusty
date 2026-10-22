@@ -2,7 +2,6 @@
 //! render pass. The per-camera stacking loop + post-FX live in `draw`.
 
 use crate::render::draw::batch::DrawBatch;
-use crate::render::draw::overlays::OutlineHull;
 use crate::render::draw::resources::Overlays;
 use crate::render::gpu::draw_buffers::DrawBuffers;
 use crate::render::gpu::global_group::GlobalGroup;
@@ -85,7 +84,7 @@ impl Renderer {
         self.queue.submit(std::iter::once(encoder.finish()));
     }
 
-    /// Record the main scene pass (solids, outline, skybox, overlays) into `encoder`.
+    /// Record the main scene pass (solids, skybox, overlays) into `encoder`.
     fn record_scene_pass(
         &self,
         view: &RenderView,
@@ -128,11 +127,8 @@ impl Renderer {
         let forward = view.forward_pipeline(&self.render_pipeline);
         render_pass.set_bind_group(0, &self.global_bind_group, &[]);
         render_pass.set_bind_group(3, self.scene_group3(view, frame.ssao.is_some()), &[]);
-        // Solid entities (each batch binds its shader's pipeline), then the outline.
+        // Solid entities (each batch binds its shader's pipeline).
         self.draw_batches(&mut render_pass, solid_batches, SolidPass::Opaque(forward));
-        if editor_mode {
-            self.draw_outline(&mut render_pass, &overlays.outline);
-        }
 
         // Render Skybox last (optimization). Only a Skybox camera paints it — a
         // DepthOnly/SolidColor overlay must not overwrite the world below it. With a
@@ -218,32 +214,6 @@ impl Renderer {
             render_pass.set_bind_group(1, self.draw_buffers.bind_group(), &offsets);
             render_pass.set_bind_group(2, self.materials.group(batch.key.material), &[]);
             render_pass.draw_indexed(0..batch.num_indices, 0, batch.instances.clone());
-        }
-    }
-
-    fn draw_outline<'a>(
-        &'a self,
-        render_pass: &mut wgpu::RenderPass<'a>,
-        hulls: &'a [OutlineHull],
-    ) {
-        for hull in hulls {
-            let Some(gpu_mesh) = self.gpu_meshes.get(&hull.mesh) else {
-                continue;
-            };
-            // The outline is a flat unlit silhouette (`use_texture = 0`), so group(2) is
-            // never sampled — bind the default material group to satisfy the layout.
-            let pipeline = if hull.mirrored {
-                &self.mirrored_outline_pipeline
-            } else {
-                &self.outline_pipeline
-            };
-            render_pass.set_pipeline(pipeline.get());
-            render_pass.set_vertex_buffer(0, gpu_mesh.vertex_buffer.slice(..));
-            render_pass
-                .set_index_buffer(gpu_mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
-            render_pass.set_bind_group(1, &hull.bind_group, &[0]);
-            render_pass.set_bind_group(2, &self.default_material_bind_group, &[]);
-            render_pass.draw_indexed(0..hull.num_indices, 0, 0..1);
         }
     }
 }

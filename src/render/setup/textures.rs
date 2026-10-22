@@ -62,8 +62,8 @@ pub(crate) fn create_textures(device: &wgpu::Device, queue: &wgpu::Queue) -> Tex
 /// A group(2) material bind group with all five texture slots (albedo, metallic,
 /// roughness, normal, emissive) pointing at the default texture (one shared sampler)
 /// and every extra shader texture slot at white (#400).
-/// Bound by passes that need group(2) but never sample the maps (outline, editor
-/// grid) (#202, #207).
+/// Bound by passes that need group(2) but never sample the maps (the editor grid
+/// and gizmos) (#202, #207).
 fn create_default_material_bind_group(
     device: &wgpu::Device,
     material_layout: &wgpu::BindGroupLayout,

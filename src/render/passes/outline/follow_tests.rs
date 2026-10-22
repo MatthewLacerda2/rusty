@@ -4,8 +4,8 @@
 
 use glam::{Mat4, Vec3};
 
-use super::outline::outline_targets;
-use super::outline_tests::{frame, outline_stats, RES};
+use super::select::outline_targets;
+use super::tests::{frame, outline_stats, RES};
 use crate::asset::{JointTransform, SkinData};
 use crate::components::mesh::primitives::generate_sphere;
 use crate::components::{LodGroupComponent, LodLevel, MeshComponent};
@@ -15,7 +15,7 @@ use crate::scene::{Camera, Scene};
 
 /// A one-joint skinned sphere (radius 0.8) whose pose moves it by `pose`, selected
 /// at the origin.
-fn posed_sphere(pose: Vec3) -> Scene {
+pub(super) fn posed_sphere(pose: Vec3) -> Scene {
     let (vertices, indices) = generate_sphere(0.8, 12, 16);
     let skin = SkinData {
         inverse_bind: vec![Mat4::IDENTITY],
@@ -44,7 +44,7 @@ fn posed_sphere(pose: Vec3) -> Scene {
 /// An empty group at the origin over a LOD0 box at -X and a LOD1 of two boxes at +X,
 /// a body and a hat above it. LOD0's threshold is never reached, so the camera always
 /// shows LOD1. Returns the scene and (group, LOD0, LOD1 body, LOD1 hat).
-fn lod_switched() -> (Scene, [u32; 4]) {
+pub(super) fn lod_switched() -> (Scene, [u32; 4]) {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
     let group = scene.add_entity("Prop".to_string());

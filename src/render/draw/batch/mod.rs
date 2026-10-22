@@ -9,6 +9,8 @@
 //! Opaque items are sorted by key first, so every copy of a prop lands in one run.
 //! Transparent items are not: their back-to-front order is what makes blending
 //! correct, so only *consecutive* equal keys merge there — "where order allows".
+//! The selection outline (#1175) is recorded here too: an item marked `outline` gets
+//! an [`OutlineDraw`] naming the very instance and uniform slot it was packed into.
 //! Pure CPU logic, no GPU state, so the grouping rules are unit-tested without an
 //! adapter.
 
@@ -46,6 +48,34 @@ pub(crate) struct DrawItem {
     pub key: BatchKey,
     pub num_indices: u32,
     pub instance: InstanceData,
+    /// Whether the selection outline rings this solid (#1175): it is then drawn a
+    /// second time, from this same draw, into the selection mask.
+    pub outline: bool,
+}
+
+/// The selection outline's draw of one solid (#1175): the forward draw's own mesh,
+/// material group, uniform slot (its per-draw uniform and bone palette) and instance
+/// (its world matrix), so the outline re-derives nothing the forward pass decided.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct OutlineDraw {
+    pub mesh: MeshId,
+    pub material: usize,
+    pub num_indices: u32,
+    pub uniform_slot: u32,
+    pub instance: u32,
+}
+
+impl OutlineDraw {
+    /// The outline of `instance`, packed into `batch`.
+    fn of(batch: &DrawBatch, instance: u32) -> Self {
+        Self {
+            mesh: batch.key.mesh.clone(),
+            material: batch.key.material,
+            num_indices: batch.num_indices,
+            uniform_slot: batch.uniform_slot,
+            instance,
+        }
+    }
 }
 
 /// One draw call: `instances` of `key`'s mesh, reading the per-draw uniform in slot
@@ -58,12 +88,14 @@ pub(crate) struct DrawBatch {
 }
 
 /// One camera's solids as instanced draws: the packed instance array, then the opaque
-/// and transparent batches that index into it.
+/// and transparent batches that index into it, and the outline draws of the solids
+/// marked for it.
 #[derive(Default)]
 pub(crate) struct FrameDraws {
     pub instances: Vec<InstanceData>,
     pub opaque: Vec<DrawBatch>,
     pub transparent: Vec<DrawBatch>,
+    pub outline: Vec<OutlineDraw>,
 }
 
 impl FrameDraws {
@@ -92,7 +124,6 @@ impl FrameDraws {
         let mut batches: Vec<DrawBatch> = Vec::new();
         for item in items {
             let index = self.instances.len() as u32;
-            self.instances.push(item.instance);
             match batches.last_mut() {
                 Some(run) if merge && run.key == item.key => run.instances.end = index + 1,
                 _ => batches.push(DrawBatch {
@@ -102,6 +133,11 @@ impl FrameDraws {
                     instances: index..index + 1,
                 }),
             }
+            if item.outline {
+                let run = batches.last().expect("the item joined or opened a run");
+                self.outline.push(OutlineDraw::of(run, index));
+            }
+            self.instances.push(item.instance);
         }
         batches
     }
@@ -122,3 +158,6 @@ mod tests;
 
 #[cfg(test)]
 mod instancing_tests;
+
+#[cfg(test)]
+mod outline_tests;

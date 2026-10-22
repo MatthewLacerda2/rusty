@@ -21,9 +21,9 @@
 use std::collections::HashMap;
 
 use super::backdrop::blur_level;
-use crate::render::gpu::fullscreen::Fullscreen;
+use crate::render::gpu::fullscreen::{color_pass, Fullscreen};
 use crate::render::postfx::PostFxContext;
-use crate::render::timing::GpuTimer;
+use crate::render::timing::{GpuPass, GpuTimer};
 use crate::render::{RenderView, Renderer};
 use crate::ui::CanvasSpace;
 
@@ -261,7 +261,7 @@ fn fullscreen(
     target: &wgpu::TextureView,
 ) {
     let clear = wgpu::LoadOp::Clear(wgpu::Color::BLACK);
-    let mut pass = super::color_pass(encoder, ("UI Blur Pass", timer), target, clear);
+    let mut pass = color_pass(encoder, ("UI Blur Pass", timer, GpuPass::Ui), target, clear);
     pass.set_pipeline(pipeline);
     pass.set_bind_group(0, group, &[]);
     pass.draw(0..3, 0..1);

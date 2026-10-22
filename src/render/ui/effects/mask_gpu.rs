@@ -14,8 +14,9 @@
 
 use std::collections::HashMap;
 
-use super::color_pass;
 use super::GroupKey;
+use crate::render::gpu::fullscreen::color_pass;
+use crate::render::timing::GpuPass;
 use crate::render::{RenderView, Renderer};
 
 /// The coverage textures' format: one 8-bit channel.
@@ -142,7 +143,7 @@ impl Renderer {
                 let clear = wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT);
                 let mut pass = color_pass(
                     &mut encoder,
-                    ("UI Mask Pass", &self.gpu_timer),
+                    ("UI Mask Pass", &self.gpu_timer, GpuPass::Ui),
                     target,
                     clear,
                 );
