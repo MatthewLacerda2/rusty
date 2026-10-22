@@ -40,7 +40,7 @@ impl MeshColliderKind {
 
 /// Per-file import settings + a cached sub-object listing. Settings here are the
 /// only authoritative thing in the sidecar; the sub-object map is a convenience
-/// cache. `#[serde(default)]` throughout so older/hand-written sidecars still load.
+/// cache. `#[serde(default)]` throughout so a sparse, hand-written sidecar loads.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ImportSettings {
     /// Uniform scale applied at instantiation time (authoring-unit fix-up).

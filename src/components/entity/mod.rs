@@ -5,12 +5,10 @@
 //! GameObject assembles into/out of for serialization, prefab diffing, and
 //! the editor/inspector's "view the whole GameObject" ergonomics. `transform`
 //! is the one mandatory field (Transform is never optional); every other
-//! component is `Option<…>`. Originally moved verbatim from the legacy
+//! component is `Option<…>`. Originally moved verbatim from the former
 //! `core/scene.rs`.
 
 use serde::{Deserialize, Serialize};
-
-mod repr;
 
 use super::ShapeComponent;
 use super::{
@@ -58,16 +56,14 @@ pub struct PrefabLink {
 
 // Not sorted (#911): field order is the order a saved scene writes its keys in.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(from = "repr::EntityRepr")]
 pub struct Entity {
     pub id: u32,
     pub name: String,
     pub active: bool,
     pub is_static: bool,
     /// Index into the project's shared Layers registry (Unity's per-object layer).
-    /// Defaults to 0 (`"Default"`); `#[serde(default)]` so pre-#90 scenes load.
-    /// Groundwork for the collision matrix (#91) and camera culling masks (#92) —
-    /// it carries no behaviour on its own yet.
+    /// Defaults to 0 (`"Default"`). Groundwork for the collision matrix (#91) and
+    /// camera culling masks (#92) — it carries no behaviour on its own yet.
     #[serde(default)]
     pub layer: u8,
     pub transform: TransformComponent,
@@ -75,15 +71,15 @@ pub struct Entity {
     /// Reference to a library material by name (the first-class component). The
     /// material DATA is a shared asset in `Scene.materials`; this only points at it.
     pub material: Option<MaterialComponent>,
-    /// Transient migration carrier: a legacy inline material lifted out of an old
-    /// scene by `From<EntityRepr>`, to be inserted into the scene's material library
-    /// by `apply_scene_data` (which is where the library is reachable). Never
-    /// serialized; always `None` on a freshly-built/loaded runtime entity.
+    /// Transient staging slot: a default library material the editor's Add menu
+    /// attached at the World level (which holds no library), to be inserted into the
+    /// scene's material library once one is reachable (the inspector, or
+    /// `apply_scene_data` when a snapshot is restored). Never serialized; always
+    /// `None` on a loaded entity.
     #[serde(skip)]
     pub pending_material: Option<MaterialAsset>,
-    /// An entity can carry MANY scripts, each its own MonoBehaviour-equivalent
-    /// Lua lifecycle table (#83). `#[serde(default)]` plus the legacy `script`
-    /// field in `EntityRepr` keep pre-#83 single-`script` scenes loadable.
+    /// An entity can carry MANY scripts, each its own MonoBehaviour-equivalent Lua
+    /// lifecycle table (#83).
     #[serde(default)]
     pub scripts: Vec<ScriptComponent>,
     pub animator: Option<AnimatorComponent>,
@@ -91,92 +87,78 @@ pub struct Entity {
     pub collider: Option<ColliderComponent>,
     pub rigidbody: Option<RigidBodyComponent>,
     pub nav_agent: Option<NavMeshAgentComponent>,
-    /// Carves the navmesh or is avoided by agents (#456). `#[serde(default)]` for
-    /// pre-#456 scenes.
+    /// Carves the navmesh or is avoided by agents (#456).
     #[serde(default)]
     pub nav_obstacle: Option<NavMeshObstacleComponent>,
-    /// An authored off-mesh link (#462). `#[serde(default)]` for pre-#462 scenes.
+    /// An authored off-mesh link (#462).
     #[serde(default)]
     pub offmesh_link: Option<OffMeshLinkComponent>,
-    /// A navigation-area modifier volume (#460). `#[serde(default)]` for pre-#460 scenes.
+    /// A navigation-area modifier volume (#460).
     #[serde(default)]
     pub nav_modifier: Option<NavMeshModifierVolumeComponent>,
     pub camera: Option<CameraComponent>,
     pub visual_correction: Option<VisualCorrectionComponent>,
     #[serde(default)]
     pub particles: Option<ParticleEmitterComponent>,
-    /// Per-entity 2D audio emitter (#212). `#[serde(default)]` so pre-#212 scenes
-    /// load with no audio source.
+    /// Per-entity 2D audio emitter (#212).
     #[serde(default)]
     pub audio: Option<AudioSourceComponent>,
-    /// Listener-position reverb volume (#469). `#[serde(default)]` for pre-#469
-    /// scenes.
+    /// Listener-position reverb volume (#469).
     #[serde(default)]
     pub reverb_zone: Option<ReverbZoneComponent>,
-    /// UI root (#417). `#[serde(default)]` so pre-#417 scenes load with no canvas.
+    /// UI root (#417).
     #[serde(default)]
     pub canvas: Option<CanvasComponent>,
     /// 2D placement inside the parent rect (#417), beside the mandatory Transform.
-    /// `#[serde(default)]` so pre-#417 scenes load without one.
     #[serde(default)]
     pub rect_transform: Option<RectTransformComponent>,
-    /// UI graphic (#418). `#[serde(default)]` so pre-#418 scenes load without one.
+    /// UI graphic (#418).
     #[serde(default)]
     pub image: Option<ImageComponent>,
-    /// UI subtree alpha + interaction flags (#418). `#[serde(default)]` for pre-#418
-    /// scenes.
+    /// UI subtree alpha + interaction flags (#418).
     #[serde(default)]
     pub canvas_group: Option<CanvasGroupComponent>,
-    /// Clips the UI subtree to this rect (#418). `#[serde(default)]` for pre-#418
-    /// scenes.
+    /// Clips the UI subtree to this rect (#418).
     #[serde(default)]
     pub rect_mask: Option<RectMaskComponent>,
-    /// Clips the UI subtree to this entity's graphic (#428). `#[serde(default)]` for
-    /// pre-#428 scenes.
+    /// Clips the UI subtree to this entity's graphic (#428).
     #[serde(default)]
     pub mask: Option<MaskComponent>,
-    /// Frosted glass behind this UI graphic (#426). `#[serde(default)]` for pre-#426
-    /// scenes.
+    /// Frosted glass behind this UI graphic (#426).
     #[serde(default)]
     pub backdrop_filter: Option<BackdropFilterComponent>,
-    /// UI text label (#419). `#[serde(default)]` for pre-#419 scenes.
+    /// UI text label (#419).
     #[serde(default)]
     pub text: Option<TextComponent>,
-    /// Interactive UI element (#420). `#[serde(default)]` for pre-#420 scenes.
+    /// Interactive UI element (#420).
     #[serde(default)]
     pub selectable: Option<SelectableComponent>,
-    /// Arranges the UI children in a row, column or grid (#421). `#[serde(default)]`
-    /// for pre-#421 scenes.
+    /// Arranges the UI children in a row, column or grid (#421).
     #[serde(default)]
     pub layout_group: Option<LayoutGroupComponent>,
-    /// Layout sizes and content fitting for a UI element (#421). `#[serde(default)]`
-    /// for pre-#421 scenes.
+    /// Layout sizes and content fitting for a UI element (#421).
     #[serde(default)]
     pub layout_element: Option<LayoutElementComponent>,
     #[serde(default)]
     pub joint: Option<JointComponent>,
-    /// Collide-and-slide capsule mover (#451). `#[serde(default)]` for pre-#451
-    /// scenes.
+    /// Collide-and-slide capsule mover (#451).
     #[serde(default)]
     pub character_controller: Option<CharacterControllerComponent>,
-    /// Level-of-detail group over renderer entities (#472). `#[serde(default)]` for
-    /// pre-#472 scenes.
+    /// Level-of-detail group over renderer entities (#472).
     #[serde(default)]
     pub lod_group: Option<LodGroupComponent>,
-    /// Ribbon along the entity's recent path (#441). `#[serde(default)]` for
-    /// pre-#441 scenes.
+    /// Ribbon along the entity's recent path (#441).
     #[serde(default)]
     pub trail: Option<TrailComponent>,
-    /// Ribbon through authored points (#441). `#[serde(default)]` for pre-#441
-    /// scenes.
+    /// Ribbon through authored points (#441).
     #[serde(default)]
     pub line: Option<LineComponent>,
-    /// Texture-free SDF UI graphic (#425). `#[serde(default)]` for pre-#425 scenes.
+    /// Texture-free SDF UI graphic (#425).
     #[serde(default)]
     pub shape: Option<ShapeComponent>,
     /// Live link back to the source `.prefab` for a *linked* prefab instance (#216).
     /// `None` on a plain entity or a v1 unpacked copy. Carried on every entity of an
-    /// instance. `#[serde(default)]` so pre-#216 scenes load with no link.
+    /// instance.
     #[serde(default)]
     pub prefab_link: Option<PrefabLink>,
     pub parent_id: Option<u32>,

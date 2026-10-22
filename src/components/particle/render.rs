@@ -1,9 +1,8 @@
 //! src/components/particle/render.rs — how an emitter's particles are drawn (#440).
 //!
 //! The render settings are pure authoring data on the emitter; the particle pass
-//! (`render::passes::particles`) reads them. Every default reproduces the pre-#440
-//! look — an unlit, hard-edged, camera-facing sprite with one frame — so scenes
-//! saved before this file load unchanged.
+//! (`render::passes::particles`) reads them. Every default is the plain look — an
+//! unlit, hard-edged, camera-facing sprite with one frame.
 
 use glam::Vec3;
 use serde::{Deserialize, Serialize};
@@ -98,8 +97,8 @@ impl Flipbook {
     }
 }
 
-/// An emitter's render settings. Serde-defaulted as a block, so a pre-#440 scene
-/// loads the default (billboard, unlit, hard, one frame).
+/// An emitter's render settings. Serde-defaulted as a block, so an emitter that
+/// omits it loads the default (billboard, unlit, hard, one frame).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct ParticleRender {

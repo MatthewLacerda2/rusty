@@ -38,7 +38,8 @@ impl UiBlend {
     ];
 }
 
-/// How a gradient sweeps across the rect.
+/// How a gradient sweeps across the rect. The lower-case spellings parse too, as
+/// every UI name does from Lua (`docs/api/Shape.md`).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum GradientKind {
     /// Along a direction at `angle` degrees, corner to corner.

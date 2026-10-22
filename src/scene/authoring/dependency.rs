@@ -273,7 +273,7 @@ pub fn reconcile_requirements(world: &mut World, id: u32) -> bool {
 
 /// Validate entity `id`'s declared requirements after a load, auto-adding any that are
 /// missing (same rule as add). Returns `(dependent, requirement)` pairs for what it
-/// added so the caller can warn — old/hand-edited scenes keep loading instead of
+/// added so the caller can warn — hand-edited scenes keep loading instead of
 /// silently violating a dependency.
 pub fn enforce_requirements(world: &mut World, id: u32) -> Vec<(ComponentKind, ComponentKind)> {
     let mut added = Vec::new();

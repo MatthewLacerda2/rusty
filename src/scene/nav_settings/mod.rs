@@ -5,8 +5,8 @@
 //! `FogSettings`: the arrow is navigation → scene, never the reverse (#721). The bake
 //! (`navigation`) reads them off the active `Scene` (`Scene::nav_settings`) and takes
 //! its defaults from the constants here, so they take effect on every re-bake. The
-//! serde defaults equal those constants, so a pre-#276 scene that omits the block
-//! bakes exactly as it did before.
+//! serde defaults equal those constants, so a scene that omits the block bakes with
+//! the engine defaults.
 //!
 //! Submodules: `area` (the area table's rows and limits, #460) and `bounds` (the
 //! authored XZ nav volume, #452). `navigation` re-exports all of it under its old
@@ -49,8 +49,8 @@ pub const DEFAULT_AGENT_HEIGHT: f32 = 2.0;
 ///
 /// Serialized on the `Scene` document and editable from the scene inspector + the
 /// `Navigation` script API. The `Default` here is the engine's source of truth for
-/// the bake tunables: every field's default equals the historical constant, so an
-/// older scene missing the block (back-compat) bakes byte-identically to before.
+/// the bake tunables: every field's default equals the historical constant, so a
+/// scene missing the block bakes with exactly those constants.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct NavMeshSettings {
     /// Agent radius (world units). Consumed by the bake (#277): the walkable surface is

@@ -31,7 +31,6 @@ pub mod reverb_zone;
 pub mod ribbon;
 pub mod rigidbody;
 pub mod script;
-pub mod texture;
 pub mod transform;
 pub mod ui;
 pub mod visual_correction;
@@ -67,7 +66,6 @@ pub use reverb_zone::{ReverbParams, ReverbPreset, ReverbZoneComponent};
 pub use ribbon::{LineComponent, RibbonStyle, TextureMode, TrailComponent};
 pub use rigidbody::{CollisionDetection, RigidBodyComponent};
 pub use script::{ScriptComponent, ScriptFieldValue};
-pub use texture::TextureComponent;
 pub use transform::{Pose, TransformComponent};
 pub use ui::{
     BackdropFilterComponent, CanvasComponent, CanvasGroupComponent, CanvasRenderMode, CanvasSway,

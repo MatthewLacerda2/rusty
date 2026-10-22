@@ -27,7 +27,7 @@ use crate::components::Entity;
 /// Top-level entity keys that must never be diffed/overridden: identity + structure
 /// the propagation already owns (ids/parenting are remapped per instance), the
 /// rehydrated-on-load mesh geometry (stored only as a reference; re-derived, so it
-/// would otherwise show as a giant spurious diff), the migration carrier, and the
+/// would otherwise show as a giant spurious diff), the staged-material slot, and the
 /// link itself (an instance's link is set by the stamper, not copied from source).
 const STRIPPED_KEYS: &[&str] = &[
     "id",

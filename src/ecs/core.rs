@@ -135,13 +135,13 @@ impl World {
             .is_some()
     }
 
-    /// Take the transient legacy-material migration carrier, if one is staged.
+    /// Take the material staged for the scene's library, if one is staged.
     pub fn take_pending_material(&mut self, id: u32) -> Option<MaterialAsset> {
         self.take_component::<MaterialAsset>(id)
     }
 
-    /// Stage a legacy-material migration carrier (the Add-menu's deferred
-    /// library insert; folded into the scene's material library elsewhere).
+    /// Stage a material for the scene's library (the Add-menu's deferred library
+    /// insert; folded into the scene's material library elsewhere).
     pub fn stage_pending_material(&mut self, id: u32, asset: MaterialAsset) -> bool {
         self.set_component(id, Some(asset))
     }

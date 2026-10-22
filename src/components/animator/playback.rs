@@ -3,8 +3,8 @@
 //! What one state machine is playing: its motion (a clip, or the blend tree of a
 //! graph node), the playhead, an outgoing motion while a crossfade blends, and the
 //! active graph node. The base layer's lives flattened at the top of
-//! [`AnimatorComponent`](super::AnimatorComponent) (so pre-#457 scenes load
-//! unchanged); every extra layer has its own in a [`LayerState`](super::LayerState).
+//! [`AnimatorComponent`](super::AnimatorComponent) (a one-layer animator
+//! reads as it always has); every extra layer has its own in a [`LayerState`](super::LayerState).
 //!
 //! A clip's playhead is in clip seconds. A blend tree's is **normalized** (0..1 is
 //! one cycle), because its children have different lengths and are sampled at the

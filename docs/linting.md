@@ -267,7 +267,7 @@ new flag, gate, CI step or baseline.
   drifted (a fixed `.part` name, a pid-only one, litter on failure), so a line of
   `src/` outside `src/core/fs/` whose code names `fs::rename` fails. A rename that
   moves rather than writes (the import cache's staging swap, the seed's staged
-  files, a project migration) carries an inline allow. Comment text never counts;
+  files) carries an inline allow. Comment text never counts;
   `tests/` and `tools/` are not scanned (`rules/atomic_write.rs`).
 - **`converter-log`** (#1172) — a converter that logs a failure and carries on
   returns `Ok`, and the import cache stamps a `.glb` missing a part as current

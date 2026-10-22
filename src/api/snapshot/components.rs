@@ -27,8 +27,8 @@ pub(crate) fn mesh_value(m: &MeshComponent) -> Value {
 }
 
 /// Material (PBR) params + texture references, read from the resolved library
-/// `MaterialAsset`. The albedo map is surfaced under the legacy `"texture"` key
-/// (empty string when unset, preserving the prior shape). `render_mode`/`alpha`/
+/// `MaterialAsset`. The albedo map is surfaced under the `"texture"` key (empty
+/// string when unset). `render_mode`/`alpha`/
 /// `alpha_cutoff` expose the transparency story (#242) so a script can read back what
 /// `Material.SetRenderMode`/`SetAlpha`/`SetAlphaCutoff` wrote; `shader` is the
 /// authored surface shader's name (#396), `null` for the standard one;

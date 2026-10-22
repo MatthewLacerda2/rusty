@@ -94,7 +94,7 @@ impl LayerRegistry {
     }
 
     /// Coerce a freshly-deserialized registry back to exactly [`LAYER_COUNT`]
-    /// slots with a fixed `"Default"` at index 0, so a hand-edited or legacy file
+    /// slots with a fixed `"Default"` at index 0, so a hand-edited file
     /// can never leave the registry malformed.
     pub fn normalize(&mut self) {
         self.names.resize(LAYER_COUNT, String::new());

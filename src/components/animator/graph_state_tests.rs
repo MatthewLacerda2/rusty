@@ -119,8 +119,8 @@ fn graph_fields_round_trip_through_serde() {
 
 #[test]
 fn default_graph_fields_stay_out_of_the_serialized_form() {
-    // The defaults (enabled, no node, 1× speed) are skipped, so pre-#316 scenes
-    // and post-#316 scenes serialize identically for a graph-less animator...
+    // The defaults (enabled, no node, 1× speed) are skipped, so a graph-less
+    // animator serializes without any graph fields...
     let json = serde_json::to_string(&AnimatorComponent::default()).unwrap();
     for key in ["graph", "current_node", "node_speed", "graph_enabled"] {
         assert!(!json.contains(key), "default `{key}` must not serialize");

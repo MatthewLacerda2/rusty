@@ -29,8 +29,8 @@ impl Tonemap {
         }
     }
 
-    /// Parse an operator name, case-insensitively (so the pre-#997 `"Aces"` still
-    /// parses); `None` for an unknown one.
+    /// Parse an operator name, case-insensitively, as every name setter does; `None`
+    /// for an unknown one.
     pub fn parse(name: &str) -> Option<Tonemap> {
         Self::ALL
             .into_iter()

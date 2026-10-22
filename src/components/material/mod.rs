@@ -6,10 +6,6 @@
 //! reference — `MaterialComponent { material: <library key> }` — which IS a
 //! first-class component (an engine-provided per-entity type), while the data it
 //! points at is the shared asset.
-//!
-//! `TextureComponent` (legacy, in `texture.rs`) is kept solely for back-compat
-//! deserialization of pre-#201 scenes that stored the material inline per entity;
-//! `MaterialAsset::from_legacy` migrates one across.
 
 mod decal;
 
@@ -17,7 +13,6 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
-use super::TextureComponent;
 use crate::procgen::TextureRecipe;
 pub use decal::DecalBlend;
 
@@ -92,8 +87,7 @@ pub struct MaterialAsset {
     pub emissive: [f32; 3],
     #[serde(default)]
     pub emissive_map: Option<String>,
-    /// Compositing mode (#242). `#[serde(default)]` => `Opaque`, so pre-#242 scenes
-    /// load unchanged.
+    /// Compositing mode (#242); `Opaque` when absent.
     #[serde(default)]
     pub render_mode: RenderMode,
     /// Base-color alpha in `[0, 1]`. Only read when `render_mode == Transparent`
@@ -108,7 +102,6 @@ pub struct MaterialAsset {
     /// The authored surface shader this material renders with (#396): a module name
     /// resolved as `<name>.wgsl` in `assets/shaders` (where `Shader.Bake`
     /// writes), then `engine/shaders`. `None` is the standard forward shader.
-    /// `#[serde(default)]`, so pre-#396 scenes load unchanged.
     #[serde(default)]
     pub shader: Option<String>,
     /// The shader's runtime param values (#399), by canonical name
@@ -167,22 +160,6 @@ impl Default for MaterialAsset {
 }
 
 impl MaterialAsset {
-    /// Migrate a legacy inline `TextureComponent` into a `MaterialAsset`. An empty
-    /// albedo path maps to `None`; normal/emissive default (the legacy type had
-    /// neither). Drops the legacy `is_dirty` flag (write-only, never read). Legacy
-    /// materials were always opaque, so the transparency fields take their defaults.
-    pub fn from_legacy(t: &TextureComponent) -> Self {
-        Self {
-            base_color: t.color,
-            base_color_map: (!t.path.is_empty()).then(|| t.path.clone()),
-            metallic: t.metallic,
-            metallic_map: t.metallic_map.clone(),
-            roughness: t.roughness,
-            roughness_map: t.roughness_map.clone(),
-            ..Self::default()
-        }
-    }
-
     /// Whether this material is drawn in the alpha-blended transparent pass (#242)
     /// rather than the opaque solids pass. `Opaque`/`Cutout` both ride the solids
     /// pass; only `Transparent` defers to the sorted pass.
@@ -254,11 +231,11 @@ mod tests {
     }
 
     #[test]
-    fn pre_242_material_without_transparency_fields_loads_opaque() {
-        // A material JSON predating #242 (no render_mode/alpha/alpha_cutoff) must load
-        // via `#[serde(default)]` as a fully-opaque material, unchanged.
+    fn a_material_without_transparency_fields_loads_opaque() {
+        // A hand-written material that names no render_mode/alpha/alpha_cutoff loads
+        // through `#[serde(default)]` as a fully-opaque material.
         let json = r#"{ "base_color": [0.5, 0.5, 0.5], "metallic": 0.0, "roughness": 0.5 }"#;
-        let m: MaterialAsset = serde_json::from_str(json).expect("legacy material parses");
+        let m: MaterialAsset = serde_json::from_str(json).expect("a sparse material parses");
         assert_eq!(m.render_mode, RenderMode::Opaque);
         assert_eq!(m.alpha, 1.0);
         assert_eq!(m.alpha_cutoff, 0.5);

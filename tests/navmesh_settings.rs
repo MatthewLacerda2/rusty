@@ -1,8 +1,8 @@
 //! Per-scene navmesh bake settings (#276).
 //!
 //! Locks in (a) the fresh-scene defaults equal the historical bake constants, (b) a
-//! pre-#276 save file that omits the `nav_settings` block rehydrates with those defaults
-//! (back-compat), and (c) authored settings survive a save→load round-trip.
+//! minimal scene file that omits the `nav_settings` block rehydrates with those
+//! defaults, and (c) authored settings survive a save→load round-trip.
 
 use crate::temp::path as tmp;
 use rusty::navigation::{default_areas, NavArea, NavBounds, NavMeshSettings};
@@ -21,16 +21,16 @@ fn fresh_scene_uses_default_nav_settings() {
 }
 
 #[test]
-fn legacy_scene_without_nav_settings_loads_with_defaults() {
-    // A pre-#276 document that omits the nav_settings block entirely. serde fills it
-    // from the engine's defaults, matching a freshly created scene (back-compat).
-    let legacy = r#"{
+fn a_scene_without_nav_settings_loads_with_defaults() {
+    // A minimal document that omits the nav_settings block entirely. serde fills it
+    // from the engine's defaults, matching a freshly created scene.
+    let minimal = r#"{
         "entities": [],
         "next_entity_id": 1,
         "selected_entity_id": null
     }"#;
-    let path = tmp("rusty_legacy_nav_settings.scene");
-    std::fs::write(&path, legacy).unwrap();
+    let path = tmp("rusty_minimal_nav_settings.scene");
+    std::fs::write(&path, minimal).unwrap();
 
     let mut loaded = Scene::new();
     loaded.load_from_file(&path).unwrap();

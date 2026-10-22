@@ -1,9 +1,8 @@
-//! The project seam (#829): the `--project` flag, the lookups, the skeleton and the
-//! one-time legacy migration. `open` itself moves the working directory, so it is
-//! exercised by the binaries, not here.
+//! The project seam (#829): the `--project` flag, the lookups and the skeleton.
+//! `open` itself moves the working directory, so it is exercised by the binaries,
+//! not here.
 
 use super::locate::{find_engine_dir, find_packaged_project};
-use super::migrate::{legacy_layout, rewrite};
 use super::*;
 
 fn fresh(name: &str) -> PathBuf {
@@ -77,66 +76,4 @@ fn the_skeleton_is_created_and_its_derived_folders_ignore_themselves() {
     let ignore = std::fs::read_to_string(root.join(CACHE_DIR).join(".gitignore")).unwrap();
     assert_eq!(ignore, "*\n");
     assert!(!root.join(".gitignore").exists(), "the root is the user's");
-}
-
-#[test]
-fn legacy_paths_become_project_relative() {
-    let scene = r#"{"path": "project/assets/scripts/bot.lua", "s": "project/scenes/a.scene"}"#;
-    assert_eq!(
-        rewrite(scene).unwrap(),
-        r#"{"path": "assets/scripts/bot.lua", "s": "assets/scenes/a.scene"}"#
-    );
-    assert_eq!(
-        rewrite("00ff project/scenarios/x.lua\n").unwrap(),
-        "00ff scenarios/x.lua\n"
-    );
-    assert_eq!(
-        rewrite("Scene.Instantiate('project/prefabs/E.prefab')").unwrap(),
-        "Scene.Instantiate('assets/prefabs/E.prefab')"
-    );
-    assert_eq!(rewrite("-- see myproject/notes and \"assets/x\""), None);
-}
-
-#[test]
-fn a_legacy_project_is_moved_and_rewritten_once() {
-    let root = fresh("legacy");
-    let write = |rel: &str, text: &str| {
-        let path = root.join(rel);
-        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
-        std::fs::write(path, text).unwrap();
-    };
-    write(
-        "build_settings.json",
-        r#"{"startup_scene": "project/scenes/default.scene"}"#,
-    );
-    write(
-        "scenes/default.scene",
-        r#"{"path": "project/assets/scripts/bot.lua"}"#,
-    );
-    write("assets/scripts/bot.lua", "return {}");
-    write(".seeded", "00ff project/assets/scripts/bot.lua\n");
-    write("storage.json", "{}");
-    create_skeleton(&root).unwrap();
-
-    let lines = legacy_layout(&root).unwrap();
-    assert!(
-        lines.iter().any(|l| l.contains("moved scenes/")),
-        "{lines:?}"
-    );
-    let read = |rel: &str| std::fs::read_to_string(root.join(rel)).unwrap();
-    assert_eq!(
-        read("build_settings.json"),
-        r#"{"startup_scene": "assets/scenes/default.scene"}"#
-    );
-    assert_eq!(
-        read("assets/scenes/default.scene"),
-        r#"{"path": "assets/scripts/bot.lua"}"#
-    );
-    assert_eq!(read(".seeded"), "00ff assets/scripts/bot.lua\n");
-    assert!(root.join("saved/storage.json").is_file());
-    assert!(!root.join("scenes").exists());
-    assert!(
-        legacy_layout(&root).unwrap().is_empty(),
-        "a second open changes nothing"
-    );
 }

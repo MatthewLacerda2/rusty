@@ -2,7 +2,7 @@
 //!
 //! The out-of-the-box ambient is brightened/coloured (blue-ish sky, darker ground,
 //! higher intensity) so differently-oriented faces read without baked probes. These
-//! lock in (a) the fresh-scene defaults and (b) that a pre-#256 save file omitting
+//! lock in (a) the fresh-scene defaults and (b) that a minimal scene file omitting
 //! the ambient fields rehydrates with the SAME defaults — i.e. one source of truth.
 
 use crate::temp::path as tmp;
@@ -26,16 +26,16 @@ fn fresh_scene_uses_brightened_ambient_defaults() {
 }
 
 #[test]
-fn legacy_scene_without_ambient_loads_with_defaults() {
-    // A pre-#256 document that omits the ambient fields entirely. serde fills them
+fn a_scene_without_ambient_loads_with_defaults() {
+    // A minimal document that omits the ambient fields entirely. serde fills them
     // from the engine's single source of truth, matching a freshly created scene.
-    let legacy = r#"{
+    let minimal = r#"{
         "entities": [],
         "next_entity_id": 1,
         "selected_entity_id": null
     }"#;
-    let path = tmp("rusty_legacy_ambient.scene");
-    std::fs::write(&path, legacy).unwrap();
+    let path = tmp("rusty_minimal_ambient.scene");
+    std::fs::write(&path, minimal).unwrap();
 
     let mut loaded = Scene::new();
     loaded.load_from_file(&path).unwrap();

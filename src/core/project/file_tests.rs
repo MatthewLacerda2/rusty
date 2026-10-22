@@ -1,4 +1,4 @@
-//! `project.rusty` (#853): folding the legacy settings in, recording the engine, and
+//! `project.rusty` (#853): recording the engine, and
 //! the check a frontend shows.
 
 use super::*;
@@ -52,36 +52,6 @@ fn a_partial_file_keeps_the_defaults() {
     assert_eq!(file.engine_commit, engine_commit());
     assert_eq!(ProjectFile::from_json(&file.to_json()).unwrap(), file);
     assert!(ProjectFile::from_json("{ not json").is_err());
-}
-
-#[test]
-fn opening_folds_the_legacy_settings_in_once() {
-    let root = fresh("fold");
-    let legacy = root.join(LEGACY_BUILD_SETTINGS);
-    std::fs::write(&legacy, r#"{ "product_name": "Neon" }"#).unwrap();
-
-    assert_eq!(
-        inspect(&root).unwrap().recorded,
-        None,
-        "pre-#853: no engine"
-    );
-    assert!(!root.join(PROJECT_FILE).exists(), "a run writes nothing");
-    assert_eq!(ProjectFile::load(&root).unwrap().build.product_name, "Neon");
-
-    let (engine, lines) = record(&root).unwrap();
-    assert_eq!(engine.recorded, None);
-    assert!(lines.iter().any(|l| l.contains("folded")), "{lines:?}");
-    assert!(!legacy.exists());
-    let file = ProjectFile::read(&root.join(PROJECT_FILE))
-        .unwrap()
-        .unwrap();
-    assert_eq!(file.build.product_name, "Neon");
-    assert_eq!(file.engine_commit, engine_commit());
-
-    let (again, lines) = record(&root).unwrap();
-    assert!(lines.is_empty(), "{lines:?}");
-    assert_eq!(again.recorded.as_deref(), Some(engine_commit()));
-    assert!(again.matches());
 }
 
 #[test]

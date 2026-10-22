@@ -2,8 +2,7 @@
 //!
 //! Sampled from a caller-supplied unit value (`u ∈ [0, 1)`) so the range never
 //! owns randomness — the caller's seeded stream does. Serialized compactly: a
-//! constant range is a bare number (or RGBA array), so pre-#439 scenes whose
-//! fields were plain `f32` / `[f32; 4]` load unchanged.
+//! constant range is a bare number (or RGBA array), the way it is written.
 
 use serde::{Deserialize, Serialize};
 
@@ -121,12 +120,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn ranges_sample_and_load_legacy_scalars() {
+    fn ranges_sample_and_constants_are_bare_scalars() {
         let r = Range::new(2.0, 4.0);
         assert_eq!(r.sample(0.5), 3.0);
-        let legacy: Range = serde_json::from_str("1.5").unwrap();
-        assert_eq!(legacy, Range::constant(1.5));
-        assert_eq!(serde_json::to_string(&legacy).unwrap(), "1.5");
+        let constant: Range = serde_json::from_str("1.5").unwrap();
+        assert_eq!(constant, Range::constant(1.5));
+        assert_eq!(serde_json::to_string(&constant).unwrap(), "1.5");
         let span: Range = serde_json::from_str(&serde_json::to_string(&r).unwrap()).unwrap();
         assert_eq!(span, r);
         let c: ColorRange = serde_json::from_str("[1.0,0.5,0.0,1.0]").unwrap();
