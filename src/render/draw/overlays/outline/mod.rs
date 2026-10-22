@@ -95,3 +95,10 @@ fn owning_group(scene: &Scene, id: u32) -> Option<u32> {
                 .is_some_and(|l| l.renderers().any(|r| r == id))
     })
 }
+
+#[cfg(test)]
+mod draw_tests;
+#[cfg(test)]
+mod follow_tests;
+#[cfg(test)]
+mod tests;

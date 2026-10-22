@@ -75,7 +75,7 @@ impl Renderer {
         let n_bytes: &[u8] = bytemuck::cast_slice(&outline_normals);
 
         // Re-use resident buffers when the new data still fits (the dirty-path
-        // case: same geometry re-uploaded). Both buffers carry COPY_DST so they
+        // case: same geometry re-uploaded). Every buffer carries COPY_DST so it
         // can be written without reallocation.
         if let Some(existing) = self.gpu_meshes.get_mut(&id) {
             if existing.vertex_buffer.size() >= v_bytes.len() as u64
@@ -93,29 +93,17 @@ impl Renderer {
             }
         }
 
-        let vertex_buffer = self
-            .device
-            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some(&format!("Mesh Vertices ({})", id.0)),
-                contents: v_bytes,
-                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-            });
-
-        let index_buffer = self
-            .device
-            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some(&format!("Mesh Indices ({})", id.0)),
-                contents: i_bytes,
-                usage: wgpu::BufferUsages::INDEX | wgpu::BufferUsages::COPY_DST,
-            });
-
-        let outline_normals = self
-            .device
-            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some(&format!("Mesh Outline Normals ({})", id.0)),
-                contents: n_bytes,
-                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-            });
+        let buffer = |kind: &str, contents: &[u8], usage: wgpu::BufferUsages| {
+            self.device
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some(&format!("Mesh {kind} ({})", id.0)),
+                    contents,
+                    usage: usage | wgpu::BufferUsages::COPY_DST,
+                })
+        };
+        let vertex_buffer = buffer("Vertices", v_bytes, wgpu::BufferUsages::VERTEX);
+        let index_buffer = buffer("Indices", i_bytes, wgpu::BufferUsages::INDEX);
+        let outline_normals = buffer("Outline Normals", n_bytes, wgpu::BufferUsages::VERTEX);
 
         self.gpu_meshes.insert(
             id,

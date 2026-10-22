@@ -6,8 +6,8 @@
 
 use glam::{Mat4, Vec3};
 
-use super::outline_follow_tests::{lod_switched, posed_sphere};
-use super::outline_tests::{frame, outline_stats, selected_child, RES};
+use super::follow_tests::{lod_switched, posed_sphere};
+use super::tests::{frame, outline_stats, selected_child, RES};
 use crate::render::draw::batch::FrameDraws;
 use crate::render::gpu::pipelines::winding::is_mirrored;
 use crate::render::lod::LodSelection;

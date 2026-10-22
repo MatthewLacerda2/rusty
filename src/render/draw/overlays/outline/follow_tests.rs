@@ -4,8 +4,8 @@
 
 use glam::{Mat4, Vec3};
 
-use super::outline::outline_targets;
-use super::outline_tests::{frame, outline_stats, RES};
+use super::outline_targets;
+use super::tests::{frame, outline_stats, RES};
 use crate::asset::{JointTransform, SkinData};
 use crate::components::mesh::primitives::generate_sphere;
 use crate::components::{LodGroupComponent, LodLevel, MeshComponent};
