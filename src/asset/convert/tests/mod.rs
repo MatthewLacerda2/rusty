@@ -10,6 +10,7 @@ mod identity;
 mod locking;
 mod skips;
 mod staging;
+mod unlocked;
 
 /// A converter that copies its source, so a test can see which bytes it wrote.
 const COPY: Converter = Converter {
