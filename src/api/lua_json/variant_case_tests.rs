@@ -89,7 +89,6 @@ fn other_errors_are_untouched() {
 #[test]
 fn a_name_two_variants_share_ignoring_case_stays_an_error() {
     #[derive(Debug, Deserialize)]
-    #[allow(non_camel_case_types, dead_code)]
     enum Twin {
         Up,
         UP,

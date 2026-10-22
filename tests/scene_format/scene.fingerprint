@@ -162,7 +162,7 @@ scene.entities[].image.fill_origin: enum Left|Right|Bottom|Top
 scene.entities[].image.gradient.angle: f32
 scene.entities[].image.gradient.center: tuple(2)
 scene.entities[].image.gradient.center[]: f32
-scene.entities[].image.gradient.kind: enum Linear|linear|Radial|radial
+scene.entities[].image.gradient.kind: enum Linear|Radial
 scene.entities[].image.gradient.radius: f32
 scene.entities[].image.gradient.stops: seq
 scene.entities[].image.gradient.stops[].color: tuple(4)
@@ -535,7 +535,7 @@ scene.entities[].shape.glow.size: f32
 scene.entities[].shape.gradient.angle: f32
 scene.entities[].shape.gradient.center: tuple(2)
 scene.entities[].shape.gradient.center[]: f32
-scene.entities[].shape.gradient.kind: enum Linear|linear|Radial|radial
+scene.entities[].shape.gradient.kind: enum Linear|Radial
 scene.entities[].shape.gradient.radius: f32
 scene.entities[].shape.gradient.stops: seq
 scene.entities[].shape.gradient.stops[].color: tuple(4)
