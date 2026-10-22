@@ -7,6 +7,8 @@ pub(super) mod build;
 mod build_tests;
 #[cfg(test)]
 mod conformance;
+#[cfg(test)]
+mod hull_tests;
 pub(super) mod mesh;
 #[cfg(test)]
 mod mesh_tests;
