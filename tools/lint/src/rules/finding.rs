@@ -39,6 +39,7 @@ impl fmt::Display for Finding {
 
 /// An allow comment on `line`: the rule it names, and its reason (maybe empty).
 fn parse_allow(line: &str) -> Option<(&str, &str)> {
+    // comment-cut: this reads the comment itself, never the code before it
     let comment = &line[line.find("//")?..];
     let rest = &comment[comment.find(MARKER)? + MARKER.len()..];
     let close = rest.find(')')?;

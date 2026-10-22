@@ -16,6 +16,7 @@
 
 use super::finding::Finding;
 use super::scan::Scan;
+use crate::code::code_lines;
 
 pub const INNER_CFG: &str = "test-inner-cfg";
 pub const USER_WORKSPACE: &str = "test-user-workspace";
@@ -35,11 +36,12 @@ pub fn check(path: &str, source: &str, test: &[bool]) -> Vec<Finding> {
             message: message.to_string(),
         });
     };
-    for (i, line) in source.lines().enumerate().filter(|(i, _)| test[*i]) {
+    for (i, line) in code_lines(source)
+        .iter()
+        .enumerate()
+        .filter(|(i, _)| test[*i])
+    {
         let code = line.trim_start();
-        if code.starts_with("//") {
-            continue;
-        }
         if path.starts_with("tests/") && code.starts_with("#![cfg(") {
             flag(
                 i + 1,

@@ -12,6 +12,7 @@
 
 use super::finding::Finding;
 use super::scan::Scan;
+use crate::code::code_lines;
 
 pub const RULE: &str = "log-tag";
 
@@ -27,7 +28,7 @@ pub fn check(path: &str, source: &str) -> Vec<Finding> {
         return Vec::new();
     }
     let bare = source.contains("use log::");
-    let lines: Vec<&str> = source.lines().map(code).collect();
+    let lines = code_lines(source);
     let mut found = Vec::new();
     for (i, line) in lines.iter().enumerate() {
         for (name, at) in calls(line, bare) {
@@ -44,11 +45,6 @@ pub fn check(path: &str, source: &str) -> Vec<Finding> {
         }
     }
     found
-}
-
-/// A line without its `//` comment.
-fn code(line: &str) -> &str {
-    line.split("//").next().unwrap_or_default()
 }
 
 /// Each logging call on `line`: the macro's name and where its arguments start.

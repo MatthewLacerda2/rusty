@@ -7,7 +7,8 @@
 //! `all`'s arguments, nested `all` included), however rustfmt wraps it. `any(…)`
 //! and `not(…)` are never test-only: `any(test, x)` also compiles outside tests.
 
-use super::extent::{attributes, strip_comment, Open};
+use super::extent::attributes;
+use crate::code::{strip_comment, Open};
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Component, Path, PathBuf};
@@ -111,7 +112,8 @@ fn declared_mods(file: &Path, content: &str) -> Vec<(PathBuf, bool)> {
                 .find_map(|a| path_of(a))
                 .map(str::to_owned)
         });
-        let code = strip_comment(item.code, &mut Open::None).trim();
+        let code = strip_comment(item.code, &mut Open::None);
+        let code = code.trim();
         if code.is_empty() {
             continue;
         }

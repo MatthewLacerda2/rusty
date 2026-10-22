@@ -30,6 +30,7 @@
 
 mod escapes;
 
+use crate::code::code_lines;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::exit;
@@ -140,8 +141,7 @@ fn opt_out_violations(path: &str, content: &str, roots: &[String]) -> Vec<String
         return Vec::new();
     }
     let mut out = Vec::new();
-    for (i, raw) in content.lines().enumerate() {
-        let code = strip_comment(raw);
+    for (i, code) in code_lines(content).iter().enumerate() {
         if crate::rules::allowed(content, i + 1, STATEMENT_OPT_OUT) {
             continue;
         }
@@ -180,15 +180,6 @@ fn walk(dir: &Path, out: &mut Vec<PathBuf>) {
         } else if path.extension().is_some_and(|e| e == "rs") {
             out.push(path);
         }
-    }
-}
-
-/// Drop a trailing `//` line comment so prose about the lints doesn't trip the
-/// gate. Not string-literal aware — adequate for a coarse source scan.
-fn strip_comment(line: &str) -> &str {
-    match line.find("//") {
-        Some(idx) => &line[..idx],
-        None => line,
     }
 }
 

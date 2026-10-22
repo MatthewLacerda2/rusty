@@ -15,6 +15,7 @@
 //! Usage: `cargo run --manifest-path tools/lint/Cargo.toml -- --direction`
 //! Exit code 1 on any violation; report mirrored to `.lint/report.txt`.
 
+use crate::code::{code_lines, is_ident};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::exit;
@@ -69,8 +70,8 @@ fn scan_file(path: &Path, violations: &mut Vec<String>) {
         return;
     };
     let norm = path.to_string_lossy().replace('\\', "/");
-    for (i, raw) in content.lines().enumerate() {
-        for needle in banned_in(strip_comment(raw)) {
+    for (i, code) in code_lines(&content).iter().enumerate() {
+        for needle in banned_in(code) {
             violations.push(format!(
                 "WRONG_DIRECTION {}:{} `{}` — sim modules must not depend on render/editor/wgpu/egui",
                 norm,
@@ -95,19 +96,6 @@ fn banned_in(code: &str) -> Vec<&'static str> {
             })
         })
         .collect()
-}
-
-fn is_ident(c: char) -> bool {
-    c.is_alphanumeric() || c == '_'
-}
-
-/// Drop a trailing `//` line comment so doc prose ("never wgpu/egui") doesn't trip
-/// the guard. Not string-literal aware — adequate for a coarse source scan.
-fn strip_comment(line: &str) -> &str {
-    match line.find("//") {
-        Some(idx) => &line[..idx],
-        None => line,
-    }
 }
 
 fn report(violations: &[String]) {
@@ -135,6 +123,7 @@ fn report(violations: &[String]) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::code::{strip_comment, Open};
 
     #[test]
     fn flags_render_editor_and_gpu_ui_crates() {
@@ -177,7 +166,11 @@ mod tests {
 
     #[test]
     fn comments_are_ignored() {
-        assert!(banned_in(strip_comment("//! never wgpu/egui")).is_empty());
-        assert!(banned_in(strip_comment("let x = 1; // crate::render::Camera")).is_empty());
+        assert!(banned_in(&strip_comment("//! never wgpu/egui", &mut Open::None)).is_empty());
+        assert!(banned_in(&strip_comment(
+            "let x = 1; // crate::render::Camera",
+            &mut Open::None
+        ))
+        .is_empty());
     }
 }

@@ -25,8 +25,6 @@ mod tests;
 /// One item's extent and what test code is, shared with the rules' test-code
 /// classifier.
 pub use extent::item_end;
-/// A line's code without its `//` comment, string-aware, for the rules too.
-pub use extent::{strip_comment, Open};
 pub use gate::{is_test_gate, test_only_files};
 use std::fs;
 use std::path::Path;

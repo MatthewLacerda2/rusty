@@ -17,6 +17,7 @@
 
 use super::finding::Finding;
 use super::scan::Scan;
+use crate::code::code_lines;
 
 pub const RULE: &str = "world-space";
 
@@ -38,10 +39,8 @@ pub fn check(path: &str, source: &str, test: &[bool]) -> Vec<Finding> {
     if !path.starts_with("src/") || OWNERS.iter().any(|o| path.starts_with(o)) {
         return Vec::new();
     }
-    let code: Vec<&str> = source
-        .lines()
-        .map(|l| l.split("//").next().unwrap_or_default())
-        .collect();
+    let code = code_lines(source);
+    let code: Vec<&str> = code.iter().map(|c| c.as_ref()).collect();
     let is_test = |i: usize| test.get(i).copied().unwrap_or(false);
     (0..code.len())
         .filter(|&i| !is_test(i))

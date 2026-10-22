@@ -12,6 +12,7 @@
 
 use super::finding::Finding;
 use super::scan::Scan;
+use crate::code::code_lines;
 
 pub const RULE: &str = "unwrap-deny";
 /// The attribute every sim root carries.
@@ -30,10 +31,11 @@ pub fn check(path: &str, source: &str, sim_dirs: &[String]) -> Vec<Finding> {
         rule: RULE,
         message,
     };
-    let code: Vec<(usize, &str)> = source
-        .lines()
+    let stripped = code_lines(source);
+    let code: Vec<(usize, &str)> = stripped
+        .iter()
         .enumerate()
-        .map(|(i, l)| (i + 1, strip_comment(l).trim()))
+        .map(|(i, l)| (i + 1, l.trim()))
         .collect();
     let mut out = Vec::new();
     if path == format!("{dir}/mod.rs") && !code.iter().any(|(_, l)| *l == DENY) {
@@ -77,11 +79,6 @@ fn names_lint(code: &str, name: &str) -> bool {
         let next = code[at + name.len()..].chars().next();
         !next.is_some_and(|c| c.is_alphanumeric() || c == '_')
     })
-}
-
-/// Drop a trailing `//` comment, so prose about the lint is not a finding.
-fn strip_comment(line: &str) -> &str {
-    line.find("//").map_or(line, |i| &line[..i])
 }
 
 /// The rule over the layer table's sim rows and every scanned file.

@@ -14,7 +14,7 @@
 
 use super::finding::Finding;
 use super::scan::Scan;
-use crate::layers::{strip_comment, Open};
+use crate::code::{strip_comment, Open};
 
 pub const RULE: &str = "converter-log";
 const ROOT: &str = "src/asset/convert/";
@@ -47,7 +47,7 @@ pub fn check(path: &str, source: &str) -> Vec<Finding> {
     let mut found = Vec::new();
     for (i, line) in source.lines().enumerate() {
         let code = strip_comment(line, &mut open);
-        if logs(code) {
+        if logs(&code) {
             found.push(finding(
                 i + 1,
                 "a converter never logs: return the skip in `Converted`, or fail",
@@ -93,7 +93,8 @@ fn denies(source: &str) -> bool {
     let mut open = Open::None;
     let mut attr: Option<String> = None;
     for line in source.lines() {
-        let code = strip_comment(line, &mut open).trim();
+        let code = strip_comment(line, &mut open);
+        let code = code.trim();
         let text = match attr.take() {
             Some(text) => text + code,
             None if code.starts_with("#![deny(") => code.to_string(),

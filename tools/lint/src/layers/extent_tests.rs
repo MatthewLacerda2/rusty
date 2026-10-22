@@ -1,4 +1,5 @@
-use super::{brackets, head, is_item_head, item_end, strip_comment, Open};
+use super::{brackets, head, is_item_head, item_end};
+use crate::code::Open;
 
 fn bracket_delta(code: &str) -> i32 {
     brackets(code, &mut Open::None).1
@@ -27,15 +28,15 @@ fn a_gated_fn_ends_at_its_body_whatever_its_signature_wraps() {
 #[test]
 fn an_attribute_sharing_its_items_line_is_stripped_from_the_head() {
     let lines = ["#[cfg(test)] #[allow(x)] use crate::x::{", "    A,", "};"];
-    assert_eq!(head(&lines, 0), Some("use crate::x::{"));
+    assert_eq!(head(&lines, 0), Some("use crate::x::{".to_string()));
     let lines = ["#[cfg(all(", "    test,", "))]", "fn f() {}"];
-    assert_eq!(head(&lines, 0), Some("fn f() {}"));
+    assert_eq!(head(&lines, 0), Some("fn f() {}".to_string()));
     let wrapped_where = "#[cfg(test)] fn f<T>(t: T)\nwhere\n    T: Clone,\n{\n    t;\n}\nfn g() {}";
     assert_eq!(end(wrapped_where, 1), 6);
     let one_line_mod = "#[cfg(test)] mod tests {\n    fn t() {}\n}\nx";
     assert_eq!(
         head(&one_line_mod.lines().collect::<Vec<_>>(), 0),
-        Some("mod tests {")
+        Some("mod tests {".to_string())
     );
     assert_eq!(end(one_line_mod, 1), 3);
 }
@@ -115,14 +116,6 @@ fn brackets_and_slashes_inside_literals_do_not_count() {
     assert_eq!(open, Open::None);
     assert_eq!(bracket_delta("fn f<'a>(x: &'a u8) {"), 1);
     assert_eq!(bracket_delta(r"Some('\'')"), 0);
-    assert_eq!(
-        strip_comment(r#"let u = "rusty://x"; // (note"#, &mut Open::None),
-        r#"let u = "rusty://x"; "#
-    );
-    assert_eq!(
-        strip_comment("let x = 1; // crate::render", &mut Open::None),
-        "let x = 1; "
-    );
 }
 
 #[test]
@@ -139,9 +132,9 @@ fn a_string_open_across_lines_hides_its_brackets() {
                let t = \"(\n    \";\n}\nfn g() {}";
     assert_eq!(end(src, 1), 8);
     let mut open = Open::None;
-    assert_eq!(brackets("x(r#\"{", &mut open), ("x(r#\"{", 1));
+    assert_eq!(brackets("x(r#\"{", &mut open), ("x(r#\"{".into(), 1));
     assert_eq!(open, Open::Raw(1));
-    assert_eq!(brackets("}\"#) // }", &mut open), ("}\"#) ", -1));
+    assert_eq!(brackets("}\"#) // }", &mut open), ("}\"#) ".into(), -1));
     assert_eq!(open, Open::None);
 }
 
@@ -151,4 +144,20 @@ fn an_attribute_wrapped_past_a_dozen_lines_still_ends_on_its_brackets() {
     let src =
         format!("#[cfg(test)]\n{derive}\nfn f<T>(t: T)\nwhere\n    T: Clone,\n{{\n}}\nfn g() {{}}");
     assert_eq!(end(&src, 1), 21);
+}
+
+#[test]
+fn a_block_comment_left_open_does_not_hold_an_item_open() {
+    let src = "#[cfg(test)]\nfn t() {}\n/* a note\nfn live() {}\n*/\nfn g() {}";
+    assert_eq!(end(src, 1), 2);
+    let tail = "#[cfg(test)]\nfn t() {} /* trailing\nfn live() {}";
+    assert_eq!(end(tail, 1), 2);
+}
+
+#[test]
+fn an_attribute_drops_its_block_comments() {
+    let lines = ["#[cfg(/* why */ test)] fn f() {}"];
+    let item = super::attributes(&lines);
+    assert_eq!(item.attrs, ["#[cfg(  test)]"]);
+    assert_eq!(item.code, "fn f() {}");
 }

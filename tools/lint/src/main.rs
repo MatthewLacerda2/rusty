@@ -11,6 +11,7 @@
 //!
 //! Output: result to stdout and `.lint/report.txt`; exit code 1 on any violation.
 
+mod code;
 mod components;
 mod dead_pub;
 mod determinism;
