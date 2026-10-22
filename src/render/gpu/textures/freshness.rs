@@ -77,11 +77,14 @@ impl Renderer {
     pub(crate) fn invalidate_textures(&mut self, paths: &[String]) {
         let stale = Stale::new(paths.to_vec());
         let is_stale = |key: &str| stale.matches(key);
-        // A cubemap loaded from a re-written file (#1207); an empty
-        // bound path makes the next frame rebind the reflection cube.
+        // A cubemap loaded from a re-written file (#1207). The bound cube goes
+        // too, so a camera that next picks no probe stops sampling the old one,
+        // and an empty bound path makes the next frame rebind.
         self.cubemaps.retain(|key, _| !is_stale(key));
         if is_stale(&self.reflection_cube_path) {
             self.reflection_cube_path.clear();
+            self.reflection_cube = None;
+            self.global_bind_group_dirty = true;
         }
         // The decal atlas keeps its own copy of each map (#638).
         self.decals.atlas.forget(is_stale);

@@ -112,3 +112,30 @@ fn gpu_a_cubemap_rebaked_at_a_cached_path_reloads() {
         |loaded, bake| *loaded == Some(size(bake)),
     );
 }
+
+/// Re-baking the bound probe's cubemap unbinds it at once, so a camera that next
+/// picks no probe does not keep sampling the old cube.
+#[test]
+fn gpu_rebaking_the_bound_cubemap_unbinds_it() {
+    let Some(mut renderer) = crate::render::test_gpu::headless_or_skip(4, 4) else {
+        return;
+    };
+    let path = crate::test_temp::dir().join("bound.ktx2");
+    let write = |size| {
+        let bytes = build_cubemap_ktx2(size, R8G8B8A8_SRGB, 6);
+        crate::core::fs::written::write(&path, &bytes).unwrap();
+    };
+    write(2);
+    let key = path.to_string_lossy().into_owned();
+    renderer.reflection_cube = renderer.cached_cubemap(&key);
+    renderer.reflection_cube_path = key;
+    renderer.global_bind_group_dirty = false;
+    write(4);
+    renderer.refresh_textures();
+    assert!(
+        renderer.reflection_cube.is_none(),
+        "the old cube stays bound"
+    );
+    assert!(renderer.reflection_cube_path.is_empty());
+    assert!(renderer.global_bind_group_dirty, "group 0 must rebind");
+}

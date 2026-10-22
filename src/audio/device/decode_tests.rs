@@ -23,6 +23,37 @@ fn a_missing_file_decodes_to_none_and_is_retried() {
     assert_eq!(cache.get_or_decode(path).unwrap().frames(), 1);
 }
 
+/// A clip that failed is not re-read on every play: only a changed file (or a
+/// note in the write log) retries it.
+#[test]
+fn a_failed_clip_is_retried_only_once_its_file_changes() {
+    let mut cache = ClipCache::new();
+    let path = crate::test_temp::dir().join("corrupt.wav");
+    let valid = wav_bytes(1, 8_000, &[16_384]);
+    std::fs::write(&path, vec![0; valid.len()]).unwrap();
+    let key = path.to_str().unwrap();
+    assert!(cache.get_or_decode(key).is_none());
+    // Fixed outside the log at the same length: the retry has nothing to see.
+    std::fs::write(&path, &valid).unwrap();
+    assert!(cache.get_or_decode(key).is_none(), "no re-decode per play");
+    written::note_written(key);
+    assert_eq!(cache.get_or_decode(key).unwrap().frames(), 1);
+}
+
+/// A key naming an MP3 that an import replaced plays the WAV, and follows that
+/// WAV's re-writes.
+#[test]
+fn a_converted_mp3_key_follows_its_wav() {
+    let mut cache = ClipCache::new();
+    let dir = crate::test_temp::dir();
+    let (mp3, wav) = (dir.join("step.mp3"), dir.join("step.wav"));
+    written::write(&wav, &wav_bytes(1, 8_000, &[1; 2])).unwrap();
+    let key = mp3.to_str().unwrap();
+    assert_eq!(cache.get_or_decode(key).unwrap().frames(), 2);
+    written::write(&wav, &wav_bytes(1, 8_000, &[1; 5])).unwrap();
+    assert_eq!(cache.get_or_decode(key).unwrap().frames(), 5);
+}
+
 #[test]
 fn a_cached_clip_is_decoded_once_and_shared() {
     let mut cache = ClipCache::new();

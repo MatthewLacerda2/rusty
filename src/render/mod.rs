@@ -187,7 +187,8 @@ pub struct Renderer {
     /// with different probes render in one frame; without this, each flip re-read the
     /// KTX2 from disk and re-uploaded every mip, i.e. a full disk load per frame. A
     /// cached `None` remembers an unreadable file so it is not retried on every flip
-    /// either (the same shape as the audio `ClipCache`).
+    /// either; an engine write to the path (a reflection bake) drops the entry,
+    /// cached `None` included (`refresh_textures`, #1207).
     cubemaps: HashMap<String, Option<Rc<cubemap::CubemapTexture>>>,
     /// A 1×1×6 black cube bound at binding 4 when no probe cube is active, so the bind
     /// group always satisfies the layout (the shader ignores it via `refl_has_cubemap`).

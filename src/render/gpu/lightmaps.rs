@@ -7,9 +7,11 @@
 //! `Rgba8Unorm`: the shader decodes RGBM itself. An array is built once per distinct
 //! page list and cached, so two scenes alternating in one frame cost a lookup, not a
 //! reload. A rebake writes changed pages under new names (their file name hashes the
-//! texels), so the cache never serves a stale page. A page that fails to load, or
+//! texels), so the cache rarely meets a stale page; when the engine does re-write
+//! one (or writes one a page list failed on), the write log (`core::fs::written`,
+//! #1207) drops every array holding it and rebinds. A page that fails to load, or
 //! pages of different sizes, leave the scene unlit by lightmaps (probe / ambient
-//! fallback) rather than half-bound.
+//! fallback) rather than half-bound, until the engine writes one of its pages.
 //!
 //! A directional bake (#810) adds its direction pages as a second array at binding 16,
 //! read through the same sampler with the same page index and UV. They are bound only
@@ -18,6 +20,8 @@
 
 use std::collections::HashMap;
 use std::rc::Rc;
+
+use crate::core::fs::written::{written_since, Stale};
 
 /// One uploaded page array.
 pub(crate) struct LightmapArray {
@@ -38,6 +42,8 @@ pub(crate) struct Lightmaps {
     cache: HashMap<Vec<String>, Option<Rc<LightmapArray>>>,
     /// A 1×1×1 black array, bound when the scene has no lightmaps.
     fallback: LightmapArray,
+    /// The newest write generation already applied to `cache`.
+    seen: u64,
 }
 
 impl Lightmaps {
@@ -51,6 +57,7 @@ impl Lightmaps {
             directions: None,
             cache: HashMap::new(),
             fallback,
+            seen: written_since(u64::MAX).0,
         }
     }
 
@@ -64,7 +71,8 @@ impl Lightmaps {
         pages: &[String],
         directions: &[String],
     ) -> bool {
-        if self.bound.0 == pages && self.bound.1 == directions {
+        let rewritten = self.drop_rewritten();
+        if !rewritten && self.bound.0 == pages && self.bound.1 == directions {
             return false;
         }
         self.bound = (pages.to_vec(), directions.to_vec());
@@ -74,6 +82,21 @@ impl Lightmaps {
             .array(device, queue, directions)
             .filter(|d| Some(d.shape) == shape);
         true
+    }
+
+    /// Forget every array (a failed one included) holding a page the engine wrote
+    /// since the last bind. Returns whether a bound list was among them, so the
+    /// caller rebinds even though the lists are unchanged.
+    fn drop_rewritten(&mut self) -> bool {
+        let (seen, paths) = written_since(self.seen);
+        self.seen = seen;
+        let stale = Stale::new(paths);
+        if stale.is_empty() {
+            return false;
+        }
+        let touches = |list: &[String]| list.iter().any(|p| stale.matches(p));
+        self.cache.retain(|list, _| !touches(list));
+        touches(&self.bound.0) || touches(&self.bound.1)
     }
 
     /// The (cached) array of `pages`; `None` for no pages or one that won't load.
@@ -95,6 +118,12 @@ impl Lightmaps {
     /// Whether a lightmap array is bound: when not, instances must not read it.
     pub(crate) fn resident(&self) -> bool {
         self.current.is_some()
+    }
+
+    /// The bound colour array's page edge, if one is bound.
+    #[cfg(test)]
+    pub(crate) fn bound_edge(&self) -> Option<u32> {
+        self.current.as_ref().map(|a| a.shape.0)
     }
 
     /// Whether direction pages are bound beside it (#810).

@@ -26,7 +26,8 @@ use std::sync::Mutex;
 static WRITES: Mutex<(u64, BTreeMap<String, u64>)> = Mutex::new((0, BTreeMap::new()));
 
 /// Write `bytes` at `path` atomically ([`super::write_atomic`]) and note the write.
-/// The parent directory must exist.
+/// The parent directory must exist. The rename replaces the path itself: a symlink
+/// there becomes a regular file, and the file it pointed at is left as it was.
 pub fn write(path: &Path, bytes: &[u8]) -> io::Result<()> {
     super::write_atomic(path, bytes)?;
     note_written(&path.to_string_lossy());
