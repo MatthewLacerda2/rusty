@@ -39,17 +39,28 @@ pub fn code_lines(source: &str) -> Vec<Cow<'_, str>> {
 /// `line`) that is code outside string and char literals.
 pub fn code_of<'a>(line: &'a str, open: &mut Open, f: impl FnMut(usize, char)) -> Cow<'a, str> {
     let (end, cuts) = scan(line, open, f);
-    if cuts.is_empty() {
+    cut(line, end, &cuts)
+}
+
+/// `line[..end]` with the block comments in `cuts` (from [`scan`]) each replaced by
+/// a space; a comment starting at or past `end` is not in it.
+pub fn cut<'a>(line: &'a str, end: usize, cuts: &[(usize, usize)]) -> Cow<'a, str> {
+    let mut cuts = cuts.iter().filter(|c| c.0 < end).peekable();
+    if cuts.peek().is_none() {
         return Cow::Borrowed(&line[..end]);
     }
     let (mut out, mut at) = (String::new(), 0);
-    for (from, to) in cuts {
+    for &(from, to) in cuts {
         out.push_str(&line[at..from]);
         out.push(' ');
-        at = to;
+        at = to.min(end);
     }
     out.push_str(&line[at..end]);
     Cow::Owned(out)
+}
+
+pub fn is_ident(c: char) -> bool {
+    c.is_alphanumeric() || c == '_'
 }
 
 /// Walks `line` from inside `open`, calling `f` with each char (and its byte
@@ -147,10 +158,6 @@ fn block_end(line: &str, from: usize, mut depth: usize) -> Result<usize, usize> 
         }
     }
     Err(depth)
-}
-
-fn is_ident(c: char) -> bool {
-    c.is_alphanumeric() || c == '_'
 }
 
 fn ident_before(line: &str, at: usize) -> bool {

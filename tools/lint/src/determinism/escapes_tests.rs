@@ -37,3 +37,11 @@ fn the_engine_tree_has_only_the_sanctioned_escape() {
     let src = include_str!("../../../../src/render/setup/mod.rs");
     assert!(violations(ASSEMBLE, src).is_empty());
 }
+
+#[test]
+fn a_bracket_inside_a_string_does_not_hold_an_attribute_open() {
+    let code = "#[doc = \"[\"]\n#[expect(clippy::too_many_lines, reason = \"x\")]\nfn f() {}\n";
+    let v = violations("src/app/mod.rs", code);
+    assert_eq!(v.len(), 1, "{v:?}");
+    assert!(v[0].contains("src/app/mod.rs:2 "), "{v:?}");
+}

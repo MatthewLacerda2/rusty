@@ -7,7 +7,7 @@
 //! and the sim's `unwrap_used` ban has none (docs/linting.md). This scan finds every
 //! `allow`/`expect` attribute that names one of them and reports any beyond
 //! [`ESCAPES`], so a second exception is a failed gate rather than a quiet line.
-use crate::code::code_lines;
+use crate::code::{code_of, Open};
 
 /// The lints whose escapes are locked.
 const LOCKED: &[&str] = &["clippy::too_many_lines", "clippy::unwrap_used"];
@@ -50,7 +50,14 @@ pub fn violations(path: &str, content: &str) -> Vec<String> {
 fn attributes(content: &str) -> Vec<(usize, String)> {
     let mut out = Vec::new();
     let mut open: Option<(usize, String, i32)> = None;
-    for (i, code) in code_lines(content).iter().enumerate() {
+    let mut literal = Open::None;
+    for (i, raw) in content.lines().enumerate() {
+        let mut brackets = 0i32;
+        let code = code_of(raw, &mut literal, |_, c| match c {
+            '[' => brackets += 1,
+            ']' => brackets -= 1,
+            _ => {}
+        });
         let (start, mut text, mut depth) = match open.take() {
             Some(o) => o,
             None => {
@@ -61,8 +68,8 @@ fn attributes(content: &str) -> Vec<(usize, String)> {
                 (i + 1, String::new(), 0)
             }
         };
-        text.push_str(code);
-        depth += code.matches('[').count() as i32 - code.matches(']').count() as i32;
+        text.push_str(&code);
+        depth += brackets;
         if depth > 0 {
             open = Some((start, text, depth));
         } else {

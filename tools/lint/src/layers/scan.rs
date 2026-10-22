@@ -77,9 +77,7 @@ fn walk_into(dir: &Path, out: &mut Vec<PathBuf>) {
     }
 }
 
-pub fn is_ident(c: char) -> bool {
-    c.is_alphanumeric() || c == '_'
-}
+pub use crate::code::is_ident;
 
 /// The `crate::<module>` references in `content`, minus comments and inline
 /// `#[cfg(test)]` items. `crate::{a, b::C}` yields both `a` and `b`.
@@ -95,8 +93,8 @@ pub fn refs(content: &str) -> Vec<Ref> {
 }
 
 /// The lines of `content` that are live (non-test) code, numbered from 1, each with
-/// its `//` comment stripped (a string open across lines carried, so a `//` inside
-/// it is kept and one after it is cut). Shared with the external-crate scan.
+/// read through `crate::code::strip_comment` (comments cut, a string or block
+/// comment open across lines carried). Shared with the external-crate scan.
 pub fn live_lines(content: &str) -> Vec<(usize, Cow<'_, str>)> {
     let lines: Vec<&str> = content.lines().collect();
     let mut out = Vec::new();

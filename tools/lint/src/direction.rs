@@ -15,7 +15,7 @@
 //! Usage: `cargo run --manifest-path tools/lint/Cargo.toml -- --direction`
 //! Exit code 1 on any violation; report mirrored to `.lint/report.txt`.
 
-use crate::code::code_lines;
+use crate::code::{code_lines, is_ident};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::exit;
@@ -96,10 +96,6 @@ fn banned_in(code: &str) -> Vec<&'static str> {
             })
         })
         .collect()
-}
-
-fn is_ident(c: char) -> bool {
-    c.is_alphanumeric() || c == '_'
 }
 
 fn report(violations: &[String]) {

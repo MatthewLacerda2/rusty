@@ -2,6 +2,7 @@
 //! so an item used only under `cfg(target_os = "macos")` reads as dead there, and
 //! narrowing it breaks the other platform's build.
 
+use crate::code::code_lines;
 use std::path::Path;
 
 const MARKERS: &[&str] = &[
@@ -17,10 +18,8 @@ const MARKERS: &[&str] = &[
 
 /// Whether `source` names a platform cfg anywhere.
 pub fn mentions_platform(source: &str) -> bool {
-    source
-        .lines()
-        .map(str::trim_start)
-        .filter(|l| !l.starts_with("//"))
+    code_lines(source)
+        .iter()
         .any(|l| MARKERS.iter().any(|m| l.contains(m)))
 }
 

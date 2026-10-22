@@ -145,3 +145,19 @@ fn an_attribute_wrapped_past_a_dozen_lines_still_ends_on_its_brackets() {
         format!("#[cfg(test)]\n{derive}\nfn f<T>(t: T)\nwhere\n    T: Clone,\n{{\n}}\nfn g() {{}}");
     assert_eq!(end(&src, 1), 21);
 }
+
+#[test]
+fn a_block_comment_left_open_does_not_hold_an_item_open() {
+    let src = "#[cfg(test)]\nfn t() {}\n/* a note\nfn live() {}\n*/\nfn g() {}";
+    assert_eq!(end(src, 1), 2);
+    let tail = "#[cfg(test)]\nfn t() {} /* trailing\nfn live() {}";
+    assert_eq!(end(tail, 1), 2);
+}
+
+#[test]
+fn an_attribute_drops_its_block_comments() {
+    let lines = ["#[cfg(/* why */ test)] fn f() {}"];
+    let item = super::attributes(&lines);
+    assert_eq!(item.attrs, ["#[cfg(  test)]"]);
+    assert_eq!(item.code, "fn f() {}");
+}

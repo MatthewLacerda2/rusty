@@ -7,6 +7,7 @@
 //! the item are production code again (#1113). Only `src/` and `tests/` hold the
 //! engine's tests; other roots never count.
 
+use crate::code::code_lines;
 use crate::layers::{is_test_gate, item_end};
 
 /// Is the whole of `path` test code by its name?
@@ -18,7 +19,8 @@ fn test_file(path: &str) -> bool {
 /// For each line of `source`, whether it is test code. `declared_test_only` says
 /// a test-gated `mod x;` declares the file, which makes all of it test code.
 pub fn test_lines(path: &str, source: &str, declared_test_only: bool) -> Vec<bool> {
-    let lines: Vec<&str> = source.lines().collect();
+    let stripped = code_lines(source);
+    let lines: Vec<&str> = stripped.iter().map(|l| l.as_ref()).collect();
     if !(path.starts_with("src/") || path.starts_with("tests/")) {
         return vec![false; lines.len()];
     }

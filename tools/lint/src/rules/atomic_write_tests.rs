@@ -37,3 +37,10 @@ fn reads_code_past_a_string_slash_slash_and_a_block_comment() {
     assert_eq!(check("src/a.rs", block).len(), 1);
     assert!(check("src/a.rs", "/* std::fs::rename\n still */ x();\n").is_empty());
 }
+
+#[test]
+fn a_test_gate_inside_a_block_comment_gates_nothing() {
+    use crate::rules::test_code::test_lines;
+    let src = "/*\n#[cfg(test)]\nmod tests {}\n*/\nfn live() {}\n";
+    assert_eq!(test_lines("src/a.rs", src, false), [false; 5]);
+}

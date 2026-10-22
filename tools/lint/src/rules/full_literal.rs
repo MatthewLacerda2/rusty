@@ -11,7 +11,7 @@
 
 use super::finding::Finding;
 use super::scan::Scan;
-use crate::code::code_lines;
+use crate::code::{code_lines, is_ident};
 use std::collections::BTreeMap;
 
 pub const RULE: &str = "full-literal";
@@ -169,10 +169,6 @@ fn literal_fields(rest: &[&str], from: &str) -> Option<Vec<String>> {
         names.push(name.to_string());
     }
     Some(names)
-}
-
-fn is_ident(c: char) -> bool {
-    c.is_alphanumeric() || c == '_'
 }
 
 /// The rule over every scanned file, with `Entity`'s components read from the scan.

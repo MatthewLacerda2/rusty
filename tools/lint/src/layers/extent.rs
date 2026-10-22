@@ -3,7 +3,7 @@
 //! A line scan, not a parser: brackets are counted outside comments and string and
 //! char literals and `/* */` comments (see `crate::code`).
 
-use crate::code::{code_of, scan, strip_comment, Open};
+use crate::code::{code_of, cut, scan, strip_comment, Open};
 use std::borrow::Cow;
 
 /// The index of the last line of the item starting at `lines[from]` (its
@@ -23,7 +23,10 @@ pub fn item_end(lines: &[&str], from: usize) -> usize {
         if depth < 0 {
             return i.saturating_sub(1).max(from);
         }
-        if depth == 0 && open == Open::None && code.trim_end().ends_with(ends) {
+        if depth == 0
+            && matches!(open, Open::None | Open::Block(_))
+            && code.trim_end().ends_with(ends)
+        {
             return i;
         }
     }
@@ -90,7 +93,7 @@ fn attribute<'a>(first: &'a str, next: &[&'a str]) -> Option<(String, usize, &'a
     let (mut depth, mut open, mut text) = (0i32, Open::None, String::new());
     for (n, line) in std::iter::once(&first).chain(next).enumerate() {
         let mut close = None;
-        let code_end = scan(line, &mut open, |at, c| match c {
+        let (code_end, cuts) = scan(line, &mut open, |at, c| match c {
             _ if close.is_some() => {}
             '{' | '(' | '[' => depth += 1,
             '}' | ')' | ']' => {
@@ -100,13 +103,12 @@ fn attribute<'a>(first: &'a str, next: &[&'a str]) -> Option<(String, usize, &'a
                 }
             }
             _ => {}
-        })
-        .0;
+        });
         if let Some(at) = close {
-            text.push_str(line[..at].trim());
+            text.push_str(cut(line, at, &cuts).trim());
             return Some((text, n, line[at..code_end.max(at)].trim()));
         }
-        text.push_str(line[..code_end].trim());
+        text.push_str(cut(line, code_end, &cuts).trim());
         text.push(' ');
     }
     None
