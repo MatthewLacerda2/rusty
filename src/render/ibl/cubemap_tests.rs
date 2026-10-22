@@ -88,3 +88,27 @@ fn rejects_garbage() {
     assert!(parse_ktx2_cubemap_mips(b"not a ktx2 file at all").is_none());
     assert!(parse_ktx2_cubemap_mips(&[]).is_none());
 }
+
+/// A reflection cubemap re-baked at a path the cache already loaded (or failed to)
+/// is read again on the next frame (#1207).
+#[test]
+fn gpu_a_cubemap_rebaked_at_a_cached_path_reloads() {
+    use crate::core::fs::written::contract::{follows_rebakes, Bake};
+    let Some(mut renderer) = crate::render::test_gpu::headless_or_skip(4, 4) else {
+        return;
+    };
+    let size = |bake| if bake == Bake::A { 2 } else { 4 };
+    let path = crate::test_temp::dir().join("probe.ktx2");
+    follows_rebakes(
+        &path.to_string_lossy(),
+        |p, bake| {
+            let bytes = build_cubemap_ktx2(size(bake), R8G8B8A8_SRGB, 6);
+            crate::core::fs::written::write(std::path::Path::new(p), &bytes).unwrap();
+        },
+        |p| {
+            renderer.refresh_textures();
+            renderer.cached_cubemap(p).map(|cube| cube.size)
+        },
+        |loaded, bake| *loaded == Some(size(bake)),
+    );
+}

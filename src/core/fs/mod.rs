@@ -6,8 +6,11 @@
 //! one. It is the one copy: the import sidecar, the import cache's stamp, the seed
 //! manifest, the authored UI widgets and imported audio all write through it, and
 //! the `atomic-write` rule (`make rules`) flags a `std::fs::rename` anywhere else.
+//! [`written`] is the log of asset files the engine wrote, which path-keyed caches
+//! drain to drop what went stale (#1207).
 
 mod retry;
+pub mod written;
 
 pub use retry::retry_transient;
 

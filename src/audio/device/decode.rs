@@ -15,7 +15,8 @@
 //!
 //! [`ClipSound`]: super::voice::ClipSound
 
-use crate::core::collections::Map;
+use crate::core::collections::{Map, Set};
+use crate::core::fs::written;
 use std::sync::Arc;
 
 /// Decoded PCM for one clip: interleaved `f32` samples + format. Cheap to clone
@@ -67,38 +68,65 @@ impl CachedClip {
 }
 
 /// A path → decoded-PCM cache. One lives in the device backend; clips decode
-/// lazily on first play and are reused thereafter.
+/// lazily on first play and are reused thereafter, until the engine re-writes the
+/// file (a `Sound.*` re-bake to the same path, #1208): each lookup first drains
+/// [`written`]'s notes and drops what they name. A failed decode is not cached: the
+/// next play retries it, so a clip played before it was baked plays once it is.
 #[derive(Default)]
 pub struct ClipCache {
-    clips: Map<String, Option<CachedClip>>,
+    clips: Map<String, CachedClip>,
+    /// The newest write generation already applied to `clips`.
+    seen: u64,
+    /// Paths whose decode failed and was logged, so the warning is said once.
+    warned: Set<String>,
 }
 
 impl ClipCache {
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            seen: written::written_since(u64::MAX).0,
+            ..Self::default()
+        }
     }
 
-    /// Cache an already-decoded clip under `path` (in-memory audio, such as a bake
-    /// that never touched disk), so playing `path` plays it.
+    /// Cache an already-decoded clip under `path`, so playing `path` plays it: a
+    /// test's in-memory audio.
+    #[cfg(test)]
     pub fn insert(&mut self, path: &str, clip: CachedClip) {
-        self.clips.insert(path.to_string(), Some(clip));
+        self.clips.insert(path.to_string(), clip);
     }
 
-    /// Decode `path` to PCM, caching the result (including a cached *failure* as
-    /// `None`, so a missing/garbage file isn't retried every play). Returns the
-    /// cached clip, or `None` when the file can't be opened/decoded — logged once,
-    /// on the first attempt, so an unplayable clip is never silent *and* unexplained.
+    /// The clip at `path`, decoded on first request and cached. Returns `None` when
+    /// the file can't be opened/decoded — logged once per path, so an unplayable
+    /// clip is never silent *and* unexplained — and retried on the next request.
     pub fn get_or_decode(&mut self, path: &str) -> Option<CachedClip> {
-        if let Some(entry) = self.clips.get(path) {
-            return entry.clone();
+        self.drop_rewritten();
+        if let Some(clip) = self.clips.get(path) {
+            return Some(clip.clone());
         }
-        let decoded = decode_file(path);
-        if let Err(why) = &decoded {
-            log::warn!("[Audio] clip '{path}' did not decode ({why}); it will play silence");
+        match decode_file(path) {
+            Ok(clip) => {
+                self.warned.remove(path);
+                self.clips.insert(path.to_string(), clip.clone());
+                Some(clip)
+            }
+            Err(why) => {
+                if self.warned.insert(path.to_string()) {
+                    log::warn!("[Audio] clip '{path}' did not decode ({why}); it plays silence");
+                }
+                None
+            }
         }
-        let decoded = decoded.ok();
-        self.clips.insert(path.to_string(), decoded.clone());
-        decoded
+    }
+
+    /// Forget every clip whose file the engine wrote since the last lookup.
+    fn drop_rewritten(&mut self) {
+        let (seen, paths) = written::written_since(self.seen);
+        self.seen = seen;
+        let stale = written::Stale::new(paths);
+        if !stale.is_empty() {
+            self.clips.retain(|key, _| !stale.matches(key));
+        }
     }
 }
 

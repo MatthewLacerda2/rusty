@@ -12,12 +12,15 @@ fn peak(clip: &CachedClip, channel: usize) -> f32 {
 }
 
 #[test]
-fn missing_file_decodes_to_none_and_is_cached() {
+fn a_missing_file_decodes_to_none_and_is_retried() {
     let mut cache = ClipCache::new();
-    assert!(cache.get_or_decode("does/not/exist.ogg").is_none());
-    // Second call hits the cached `None` (no re-attempt); still `None`.
-    assert!(cache.get_or_decode("does/not/exist.ogg").is_none());
-    assert!(cache.clips.contains_key("does/not/exist.ogg"));
+    let path = crate::test_temp::dir().join("late.wav");
+    let path = path.to_str().unwrap();
+    assert!(cache.get_or_decode(path).is_none());
+    assert!(!cache.clips.contains_key(path), "a failure is not cached");
+    // Written outside the engine's log: only the retry can find it.
+    std::fs::write(path, wav_bytes(1, 8_000, &[16_384])).unwrap();
+    assert_eq!(cache.get_or_decode(path).unwrap().frames(), 1);
 }
 
 #[test]

@@ -5,11 +5,12 @@
 //! before anything draws:
 //!
 //! - **The engine re-wrote the file** (`Texture.Bake`, `BakeSet`, `Material.Rebake`
-//!   all go through one PNG writer, which notes the path in
-//!   [`crate::procgen::written`]). The renderer drains the notes and drops the
-//!   matching upload — colour and data views together, they are one `GpuTexture` —
-//!   plus every material bind group, which still holds the old upload. Unity
-//!   reimports on write; this is that.
+//!   all go through one PNG writer, and a reflection bake writes its cubemap, each
+//!   noting the path in [`crate::core::fs::written`], #1207). The renderer drains the
+//!   notes and drops the matching upload — colour and data views together, they are
+//!   one `GpuTexture` — plus every material bind group, which still holds the old
+//!   upload, and the matching reflection cubemap. Unity reimports on write; this is
+//!   that.
 //! - **The file was missing when first drawn.** A failed load is remembered as a
 //!   *miss*, not cached as the default under its path, and misses are re-checked
 //!   (`Path::exists`, one per missing path) every [`MISS_RETRY_FRAMES`] frames, so a
@@ -21,6 +22,7 @@
 use std::collections::HashSet;
 use std::path::Path;
 
+use crate::core::fs::written::{written_since, Stale};
 use crate::render::Renderer;
 
 /// How many frames apart missing texture paths are re-checked on disk.
@@ -39,7 +41,7 @@ pub(crate) struct TextureFreshness {
 impl TextureFreshness {
     pub(crate) fn new() -> Self {
         Self {
-            seen: crate::procgen::written::written_since(u64::MAX).0,
+            seen: written_since(u64::MAX).0,
             misses: HashSet::new(),
             frames: 0,
         }
@@ -50,7 +52,7 @@ impl Renderer {
     /// Drop every cached upload whose file was re-written or has appeared since the
     /// last frame. Called once per frame, before any texture is resolved.
     pub(crate) fn refresh_textures(&mut self) {
-        let (seen, mut stale) = crate::procgen::written::written_since(self.texture_freshness.seen);
+        let (seen, mut stale) = written_since(self.texture_freshness.seen);
         self.texture_freshness.seen = seen;
         let freshness = &mut self.texture_freshness;
         freshness.frames += 1;
@@ -73,10 +75,14 @@ impl Renderer {
     /// file again. A cached key naming the same file by another spelling (relative
     /// vs absolute) goes too.
     pub(crate) fn invalidate_textures(&mut self, paths: &[String]) {
-        let written: Vec<_> = paths.iter().filter_map(|p| canonical(p)).collect();
-        let is_stale = |key: &str| {
-            paths.iter().any(|p| p == key) || canonical(key).is_some_and(|c| written.contains(&c))
-        };
+        let stale = Stale::new(paths.to_vec());
+        let is_stale = |key: &str| stale.matches(key);
+        // A cubemap loaded from a re-written file (#1207); an empty
+        // bound path makes the next frame rebind the reflection cube.
+        self.cubemaps.retain(|key, _| !is_stale(key));
+        if is_stale(&self.reflection_cube_path) {
+            self.reflection_cube_path.clear();
+        }
         // The decal atlas keeps its own copy of each map (#638).
         self.decals.atlas.forget(is_stale);
         let before = self.gpu_textures.len();
@@ -94,9 +100,4 @@ impl Renderer {
             self.skybox_path.clear();
         }
     }
-}
-
-/// `path` resolved to an absolute, symlink-free form, if the file exists.
-fn canonical(path: &str) -> Option<std::path::PathBuf> {
-    std::fs::canonicalize(path).ok()
 }

@@ -98,7 +98,7 @@ pub fn store<B: Brief + ?Sized>(
     if let Some(dir) = file.parent() {
         std::fs::create_dir_all(dir)?;
     }
-    std::fs::write(&file, bytes)?;
+    crate::core::fs::written::write(&file, bytes)?;
     let sidecar = Sidecar {
         kind: brief.kind().to_owned(),
         brief: canonical(brief).map_err(std::io::Error::other)?,

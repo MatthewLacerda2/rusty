@@ -93,7 +93,8 @@ impl Renderer {
     /// probes rendering in one frame legitimately swap it every frame. Uncached, each
     /// swap re-read the KTX2 from disk and re-uploaded every mip — a full disk load
     /// per frame, per flip. The failure is cached too, so an unreadable path is not
-    /// retried on every flip either.
+    /// retried on every flip either. A path the engine (re)writes, such as a
+    /// reflection bake, is dropped from the cache by `refresh_textures` (#1207).
     pub fn cached_cubemap(&mut self, path: &str) -> Option<Rc<CubemapTexture>> {
         if let Some(hit) = self.cubemaps.get(path) {
             return hit.clone();
