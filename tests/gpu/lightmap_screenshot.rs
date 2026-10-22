@@ -45,7 +45,7 @@ fn scene(ambient: f32) -> Scene {
             Vec3::new(3.25, 2.0, 0.0),
             Vec3::new(0.5, 4.0, 8.0),
         ),
-        (Primitive::Sphere, Vec3::new(-3.0, 1.0, 0.0), Vec3::ONE),
+        (Primitive::Sphere, Vec3::new(-3.0, 0.5, 0.0), Vec3::ONE),
     ] {
         add(&mut scene, primitive, at, scale);
     }
