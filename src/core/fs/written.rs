@@ -11,9 +11,9 @@
 //! baked files.
 //!
 //! The rule that keeps it whole: **an engine write of a file some cache reads by
-//! path goes through [`write`] (or, for a writer with its own encoder, calls
+//! path goes through [`write()`] (or, for a writer with its own encoder, calls
 //! [`note_written`] right after)**, and **a cache treats a failed load as a miss it
-//! retries, never as a cached default**. [`contract::follows_rebakes`] is the test
+//! retries, never as a cached default**. `contract::follows_rebakes` is the test
 //! every cache runs.
 
 use std::collections::BTreeMap;
