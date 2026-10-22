@@ -11,6 +11,7 @@
 
 use super::finding::Finding;
 use super::scan::Scan;
+use crate::code::code_lines;
 use std::collections::BTreeMap;
 
 pub const RULE: &str = "full-literal";
@@ -45,7 +46,8 @@ impl Components {
     /// Every full literal of a component in the test code of `path` (`test`, per
     /// line).
     pub fn check(&self, path: &str, source: &str, test: &[bool]) -> Vec<Finding> {
-        let lines: Vec<&str> = source.lines().map(strip_comment).collect();
+        let stripped = code_lines(source);
+        let lines: Vec<&str> = stripped.iter().map(|l| l.as_ref()).collect();
         let mut found = Vec::new();
         for (i, line) in lines.iter().enumerate().filter(|(i, _)| test[*i]) {
             for (name, fields) in &self.0 {
@@ -86,9 +88,9 @@ fn component_types(entity: &str) -> Vec<String> {
 
 /// The named fields of `pub struct name { … }` in `source`, if it is defined there.
 fn struct_fields(source: &str, name: &str) -> Option<Vec<String>> {
-    let fields: Vec<String> = body(source, name)?
-        .lines()
-        .map(|l| strip_comment(l).trim())
+    let fields: Vec<String> = code_lines(&body(source, name)?)
+        .iter()
+        .map(|l| l.trim())
         .filter(|l| !l.starts_with('#'))
         .filter_map(|l| {
             let l = l
@@ -171,11 +173,6 @@ fn literal_fields(rest: &[&str], from: &str) -> Option<Vec<String>> {
 
 fn is_ident(c: char) -> bool {
     c.is_alphanumeric() || c == '_'
-}
-
-/// Drop a trailing `//` comment (not string-aware; a coarse source scan).
-fn strip_comment(line: &str) -> &str {
-    line.find("//").map_or(line, |i| &line[..i])
 }
 
 /// The rule over every scanned file, with `Entity`'s components read from the scan.

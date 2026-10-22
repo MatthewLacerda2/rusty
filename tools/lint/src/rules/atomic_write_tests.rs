@@ -28,3 +28,12 @@ fn an_allow_with_a_reason_excuses_it() {
     let found = check("src/a.rs", src);
     assert!(crate::rules::allowed(src, found[0].line, RULE));
 }
+
+#[test]
+fn reads_code_past_a_string_slash_slash_and_a_block_comment() {
+    let url = "let u = \"http://x\"; std::fs::rename(&a, &b)?;\n";
+    assert_eq!(check("src/a.rs", url).len(), 1);
+    let block = "/* moved */ std::fs::rename(&a, &b)?;\n";
+    assert_eq!(check("src/a.rs", block).len(), 1);
+    assert!(check("src/a.rs", "/* std::fs::rename\n still */ x();\n").is_empty());
+}

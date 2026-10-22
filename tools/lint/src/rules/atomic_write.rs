@@ -11,6 +11,7 @@
 
 use super::finding::Finding;
 use super::scan::Scan;
+use crate::code::code_lines;
 
 pub const RULE: &str = "atomic-write";
 const HOME: &str = "src/core/fs/";
@@ -20,13 +21,10 @@ pub fn check(path: &str, source: &str) -> Vec<Finding> {
     if !path.starts_with("src/") || path.starts_with(HOME) {
         return Vec::new();
     }
-    source
-        .lines()
+    code_lines(source)
+        .iter()
         .enumerate()
-        .filter(|(_, l)| {
-            let code = l.split("//").next().unwrap_or_default();
-            code.contains("fs::rename")
-        })
+        .filter(|(_, code)| code.contains("fs::rename"))
         .map(|(i, _)| Finding {
             path: path.to_string(),
             line: i + 1,

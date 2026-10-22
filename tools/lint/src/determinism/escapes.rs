@@ -7,6 +7,7 @@
 //! and the sim's `unwrap_used` ban has none (docs/linting.md). This scan finds every
 //! `allow`/`expect` attribute that names one of them and reports any beyond
 //! [`ESCAPES`], so a second exception is a failed gate rather than a quiet line.
+use crate::code::code_lines;
 
 /// The lints whose escapes are locked.
 const LOCKED: &[&str] = &["clippy::too_many_lines", "clippy::unwrap_used"];
@@ -49,8 +50,7 @@ pub fn violations(path: &str, content: &str) -> Vec<String> {
 fn attributes(content: &str) -> Vec<(usize, String)> {
     let mut out = Vec::new();
     let mut open: Option<(usize, String, i32)> = None;
-    for (i, raw) in content.lines().enumerate() {
-        let code = super::strip_comment(raw);
+    for (i, code) in code_lines(content).iter().enumerate() {
         let (start, mut text, mut depth) = match open.take() {
             Some(o) => o,
             None => {

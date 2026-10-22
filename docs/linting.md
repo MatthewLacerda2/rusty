@@ -201,7 +201,8 @@ new flag, gate, CI step or baseline.
   (or to the line before its parent's `}`); production code below a gated `use`
   stays production code. Brackets and `//` inside a string or char literal don't
   count, a string that spans lines (a multi-line raw string) included; a `/* */`
-  comment is read as code, so brackets in one can still move an item's end. A
+  comment (nested ones too) is dropped, so neither its brackets nor its `//` count.
+  Every text-scanning rule reads code through the one stripper, `tools/lint/src/code.rs` (#1199). A
   gated field or `let` whose generic type wraps over lines can end early, at a `,`
   inside its `<…>`. Clippy's test exemption (`allow-unwrap-in-tests`, set in
   `clippy.toml`) is Clippy's own and classifies its own way.

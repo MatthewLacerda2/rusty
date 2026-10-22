@@ -9,6 +9,7 @@
 
 use super::finding::Finding;
 use super::scan::Scan;
+use crate::code::code_lines;
 
 pub const RULE: &str = "drag-range";
 
@@ -17,10 +18,10 @@ pub fn check(path: &str, source: &str) -> Vec<Finding> {
     if !path.starts_with("src/editor/") || !source.contains("DragValue") {
         return Vec::new();
     }
-    source
-        .lines()
+    code_lines(source)
+        .iter()
         .enumerate()
-        .filter(|(_, l)| l.split("//").next().unwrap_or_default().contains(".range("))
+        .filter(|(_, code)| code.contains(".range("))
         .map(|(i, _)| Finding {
             path: path.to_string(),
             line: i + 1,

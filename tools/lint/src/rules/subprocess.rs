@@ -13,6 +13,7 @@
 
 use super::finding::Finding;
 use super::scan::Scan;
+use crate::code::code_lines;
 
 pub const RULE: &str = "subprocess";
 
@@ -21,13 +22,10 @@ pub fn check(path: &str, source: &str) -> Vec<Finding> {
     if !path.starts_with("src/") {
         return Vec::new();
     }
-    source
-        .lines()
+    code_lines(source)
+        .iter()
         .enumerate()
-        .filter(|(_, l)| {
-            let code = l.split("//").next().unwrap_or_default();
-            code.contains("process::") && has_word(code, "Command")
-        })
+        .filter(|(_, code)| code.contains("process::") && has_word(code.as_ref(), "Command"))
         .map(|(i, _)| Finding {
             path: path.to_string(),
             line: i + 1,

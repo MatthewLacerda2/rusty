@@ -4,8 +4,10 @@
 //! skipped here, and the graph drops the test-only files whole. Not a parser — a
 //! coarse line scan, like the direction guard.
 
-use super::extent::{item_end, strip_comment, Open};
+use super::extent::item_end;
 use super::gate::{is_test_gate, test_only_files};
+use crate::code::{strip_comment, Open};
+use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -85,7 +87,7 @@ pub fn refs(content: &str) -> Vec<Ref> {
     let mut out = Vec::new();
     let mut group: Option<i32> = None;
     for (line, code) in live_lines(content) {
-        for module in crate_refs(code, &mut group) {
+        for module in crate_refs(&code, &mut group) {
             out.push(Ref { line, module });
         }
     }
@@ -95,7 +97,7 @@ pub fn refs(content: &str) -> Vec<Ref> {
 /// The lines of `content` that are live (non-test) code, numbered from 1, each with
 /// its `//` comment stripped (a string open across lines carried, so a `//` inside
 /// it is kept and one after it is cut). Shared with the external-crate scan.
-pub fn live_lines(content: &str) -> Vec<(usize, &str)> {
+pub fn live_lines(content: &str) -> Vec<(usize, Cow<'_, str>)> {
     let lines: Vec<&str> = content.lines().collect();
     let mut out = Vec::new();
     let (mut i, mut open) = (0, Open::None);

@@ -6,6 +6,7 @@
 //! are not followed.
 
 use crate::layers::scan::{is_ident, live_lines};
+use std::borrow::Cow;
 use std::collections::BTreeSet;
 
 /// One external crate named at `line`.
@@ -38,7 +39,8 @@ pub fn crate_refs(content: &str, crates: &BTreeSet<String>) -> Vec<CrateRef> {
             });
         }
     }
-    for &(line, code) in lines.iter().filter(|(l, _)| !in_use.contains(l)) {
+    for (line, code) in lines.iter().filter(|(l, _)| !in_use.contains(l)) {
+        let line = *line;
         for name in path_heads(code).into_iter().filter(|n| counts(n)) {
             out.push(CrateRef { line, krate: name });
         }
@@ -63,10 +65,11 @@ fn mod_name(code: &str) -> Option<String> {
 /// the name it binds.
 type Paths = Vec<(Vec<String>, String)>;
 
-fn use_statements(lines: &[(usize, &str)]) -> Vec<(std::ops::Range<usize>, Paths)> {
+fn use_statements(lines: &[(usize, Cow<str>)]) -> Vec<(std::ops::Range<usize>, Paths)> {
     let mut out = Vec::new();
     let mut open: Option<(usize, String)> = None;
-    for &(line, code) in lines {
+    for (line, code) in lines {
+        let line = *line;
         if open.is_none() {
             open = use_tree_start(code).map(|tree| (line, tree.to_string()));
         } else if let Some(o) = open.as_mut() {
