@@ -75,6 +75,6 @@ impl OutlineBounds {
         let pad = pad as f32;
         let (x0, y0) = ((lo.x - pad).floor().max(0.0), (lo.y - pad).floor().max(0.0));
         let (x1, y1) = ((hi.x + pad).ceil().min(w), (hi.y + pad).ceil().min(h));
-        (x1 > x0 && y1 > y0).then(|| [x0 as u32, y0 as u32, (x1 - x0) as u32, (y1 - y0) as u32])
+        (x1 > x0 && y1 > y0).then_some([x0 as u32, y0 as u32, (x1 - x0) as u32, (y1 - y0) as u32])
     }
 }
