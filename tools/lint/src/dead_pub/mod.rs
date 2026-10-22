@@ -41,15 +41,25 @@ pub fn run() {
     });
     match result {
         Ok(body) => {
-            fs::create_dir_all(".lint").ok();
-            fs::write(REPORT, &body).ok();
             print!("{body}");
+            if let Err(e) = write_report(Path::new(REPORT), &body) {
+                eprintln!("dead-pub: no report: could not write {REPORT}: {e}");
+                exit(1);
+            }
         }
         Err(e) => {
             eprintln!("dead-pub: no report: {e}");
             exit(1);
         }
     }
+}
+
+/// `body` into `report`, its directory made first.
+fn write_report(report: &Path, body: &str) -> io::Result<()> {
+    if let Some(dir) = report.parent() {
+        fs::create_dir_all(dir)?;
+    }
+    fs::write(report, body)
 }
 
 /// Copy `root` to `tree` (a fresh copy) and fold its callers into its lib.
@@ -67,11 +77,12 @@ pub fn prepare(root: &Path, tree: &Path, lib_name: &str) -> io::Result<()> {
     fs::write(&lib, fold::lib(&fs::read_to_string(&lib)?, &bins, tests))?;
     for bin in &bins {
         let file = tree.join(&bin.path);
-        rewrite(&file, &bin.module(), lib_name)?;
-        rewrite_dir(&file.with_extension(""), &bin.module(), lib_name)?;
+        rewrite(&file, &bin.module(), lib_name, true)?;
+        rewrite_dir(&file.with_extension(""), &bin.module(), lib_name, None)?;
     }
     if tests.is_some() {
-        rewrite_dir(&tree.join("tests"), "__itests", lib_name)?;
+        let tests = tree.join("tests");
+        rewrite_dir(&tests, "__itests", lib_name, Some(&tests.join("main.rs")))?;
     }
     Ok(())
 }
@@ -130,22 +141,23 @@ fn copy(from: &Path, to: &Path) -> io::Result<()> {
     Ok(())
 }
 
-fn rewrite(file: &Path, module: &str, lib_name: &str) -> io::Result<()> {
+fn rewrite(file: &Path, module: &str, lib_name: &str, root: bool) -> io::Result<()> {
     let source = fs::read_to_string(file)?;
-    fs::write(file, fold::caller(&source, module, lib_name))
+    fs::write(file, fold::caller(&source, module, lib_name, root))
 }
 
-/// Every `.rs` under `dir` (when it exists) rewritten as part of `module`.
-fn rewrite_dir(dir: &Path, module: &str, lib_name: &str) -> io::Result<()> {
+/// Every `.rs` under `dir` (when it exists) rewritten as part of `module`; only
+/// `root` (if any) is the module's root file.
+fn rewrite_dir(dir: &Path, module: &str, lib_name: &str, root: Option<&Path>) -> io::Result<()> {
     if !dir.is_dir() {
         return Ok(());
     }
     for entry in fs::read_dir(dir)? {
         let path = entry?.path();
         if path.is_dir() {
-            rewrite_dir(&path, module, lib_name)?;
+            rewrite_dir(&path, module, lib_name, root)?;
         } else if path.extension().is_some_and(|e| e == "rs") {
-            rewrite(&path, module, lib_name)?;
+            rewrite(&path, module, lib_name, root == Some(path.as_path()))?;
         }
     }
     Ok(())

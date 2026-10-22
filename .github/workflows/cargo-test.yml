@@ -117,7 +117,7 @@ jobs:
               echo '**No report**: the signal itself broke. The cause, from the log:'
               echo ''
               echo '```'
-              grep -E 'error|no report' dead-pub.log | head -n 20 || true
+              grep -E ': error|^error|no report' dead-pub.log | head -n 20 || true
               echo '```'
             fi
           } | tee -a "$GITHUB_STEP_SUMMARY"

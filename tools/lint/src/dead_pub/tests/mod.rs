@@ -115,3 +115,16 @@ fn a_gated_finding_gets_its_own_heading() {
         "{body}"
     );
 }
+
+#[test]
+fn a_report_that_cannot_be_written_is_an_error() {
+    let dir = std::env::temp_dir().join(format!("lint_dead_pub_w_{}", std::process::id()));
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(&dir).unwrap();
+    fs::write(dir.join("file"), "").unwrap();
+    let blocked = super::write_report(&dir.join("file/dead-pub.txt"), "x");
+    let fine = super::write_report(&dir.join("new/dead-pub.txt"), "x");
+    let _ = fs::remove_dir_all(&dir);
+    assert!(blocked.is_err(), "a path under a file must fail");
+    assert!(fine.is_ok(), "a missing directory is made");
+}

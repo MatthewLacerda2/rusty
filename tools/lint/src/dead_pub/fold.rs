@@ -7,7 +7,7 @@
 //! `#[cfg(test)] __itests`. Their sources then name the lib as `crate::` and their
 //! own root as `crate::<module>::`.
 
-use crate::code::code_lines;
+use crate::code::{code_of, Open};
 
 /// One `[[bin]]` target of `Cargo.toml`.
 #[derive(Debug, PartialEq, Eq)]
@@ -94,19 +94,27 @@ pub fn lib(source: &str, bins: &[Bin], tests_root: Option<&str>) -> String {
 
 /// One source file of a folded caller, now the lib's module `module`: its own
 /// root is `crate::<module>::`, the lib (`lib_name::`) is `crate::`, `main` is
-/// callable, and the inner attributes at its head (only a crate root may carry
-/// some) are blanked, keeping every line number. One inside a macro body, such
-/// as `proptest!`'s `#![proptest_config(..)]`, is the macro's input and stays
-/// (#1205).
-pub fn caller(source: &str, module: &str, lib_name: &str) -> String {
+/// callable, and, in the caller's `root` file only (a bin, `tests/main.rs`), the
+/// inner attributes at its head are blanked, keeping every line number: only a
+/// module's root can't carry them, and a submodule's own (`#![cfg(..)]`) belong to
+/// it. One inside a macro body, such as `proptest!`'s `#![proptest_config(..)]`,
+/// is the macro's input and stays (#1205). Brackets are counted outside literals.
+pub fn caller(source: &str, module: &str, lib_name: &str, root: bool) -> String {
     let mut out = String::new();
     let mut depth = 0i32;
-    let mut head = true;
-    for (line, code) in source.lines().zip(code_lines(source)) {
+    let mut head = root;
+    let mut open = Open::None;
+    for line in source.lines() {
+        let mut brackets = 0i32;
+        let code = code_of(line, &mut open, |_, c| match c {
+            '[' => brackets += 1,
+            ']' => brackets -= 1,
+            _ => {}
+        });
         let attribute = depth > 0 || code.trim_start().starts_with("#![");
         head &= attribute || code.trim().is_empty();
         if head && attribute {
-            depth += code.matches('[').count() as i32 - code.matches(']').count() as i32;
+            depth += brackets;
             out.push('\n');
             continue;
         }
