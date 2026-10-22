@@ -44,3 +44,24 @@ fn a_test_gate_inside_a_block_comment_gates_nothing() {
     let src = "/*\n#[cfg(test)]\nmod tests {}\n*/\nfn live() {}\n";
     assert_eq!(test_lines("src/a.rs", src, false), [false; 5]);
 }
+
+#[test]
+fn flags_a_grouped_or_aliased_rename_import() {
+    let grouped = "use std::fs::{self, rename};\nrename(&tmp, path)?;\n";
+    let found: Vec<_> = check("src/a.rs", grouped).iter().map(|f| f.line).collect();
+    assert_eq!(found, [2]);
+    let aliased = "use std::fs::rename as mv;\nmv(&tmp, path)?;\n";
+    assert!(check("src/a.rs", aliased).iter().any(|f| f.line == 2));
+    let multi = "use std::fs::{\n    self,\n    rename as mv,\n};\nmv(a, b)?;\n";
+    assert!(check("src/a.rs", multi).iter().any(|f| f.line == 5));
+}
+
+#[test]
+fn passes_a_rename_that_is_not_std_fs() {
+    assert!(check("src/a.rs", "item.rename(\"x\");\n").is_empty());
+    let other = "use crate::names::rename;\nrename(a, b);\n";
+    assert!(check("src/a.rs", other).is_empty());
+    let method = "use std::fs::{self, rename};\nx.rename(a);\nfn rename(a: u8) {}\n";
+    assert!(check("src/a.rs", method).is_empty());
+    assert!(check("src/a.rs", "use std::fs::{self, read};\nrename(a, b);\n").is_empty());
+}
