@@ -153,19 +153,14 @@ fn capsule_axis_picks_the_length_and_cross_scales() {
         (h[0] - 2.0).abs() < 1e-4 && (h[1] - 0.5).abs() < 1e-4,
         "{h:?}"
     );
-    // Z: length 1 * 2 = 2, r = 0.25 * max(4, 1) = 1: Unity's caps would meet, but
-    // the segment keeps its drawn half (0.5 - 0.25) * 2 (#1191).
+    // Z: length 1 * 2 = 2, r = 0.25 * max(4, 1) = 1 ⇒ the caps meet: a sphere.
     let (r, half, h) = capsule(0.25, 1.0, CapsuleAxis::Z, scale);
-    assert!(
-        (r - 1.0).abs() < 1e-5 && (half - 0.5).abs() < 1e-5,
-        "{r} {half}"
-    );
-    assert!((h[2] - 1.5).abs() < 1e-4, "{h:?}");
-    // Y: length 3 * 1, r = 0.25 * max(4, 2) = 1 ⇒ Unity's half 1.5 - 1 is under
-    // the drawn (1.5 - 0.25) * 1.
+    assert!((r - 1.0).abs() < 1e-5 && half == 0.0, "{r} {half}");
+    assert!((h[2] - 1.0).abs() < 1e-4, "{h:?}");
+    // Y: length 3 * 1, r = 0.25 * max(4, 2) = 1 ⇒ segment half 1.5 - 1.
     let (r, half, _) = capsule(0.25, 3.0, CapsuleAxis::Y, scale);
     assert!(
-        (r - 1.0).abs() < 1e-5 && (half - 1.25).abs() < 1e-5,
+        (r - 1.0).abs() < 1e-5 && (half - 0.5).abs() < 1e-5,
         "{r} {half}"
     );
 }

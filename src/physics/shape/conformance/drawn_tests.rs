@@ -101,12 +101,28 @@ fn check(drawn: &Drawn, pose: Pose) {
     );
 }
 
+/// Whether `shape` can hold its drawn mesh at `scale`. Unity's capsule rule
+/// (length × the axial scale, radius × the larger cross scale) can't hold a
+/// capsule scaled wider than it is long: the caps grow into the tube and its rim
+/// pokes out, in Unity too. rusty keeps Unity's rule (#1191, PR #1227), so those
+/// scales are left out; every other scale, turn and parenting still runs.
+fn holds_at(shape: &ColliderShape, scale: Vec3) -> bool {
+    let ColliderShape::Capsule { axis, .. } = shape else {
+        return true;
+    };
+    let along = scale.abs().dot(axis.unit());
+    (scale.abs() - along * axis.unit()).max_element() <= along
+}
+
 /// `drawn` under every scale, turn and parenting.
 fn check_everywhere(drawn: &Drawn) {
     for scale in SCALES {
         for (turn, _) in turns() {
+            // A turned child sees its parent's scale on other axes: read the pose's.
             for pose in world_poses(scale, turn) {
-                check(drawn, pose);
+                if holds_at(&drawn.0, pose.scale) {
+                    check(drawn, pose);
+                }
             }
         }
     }
