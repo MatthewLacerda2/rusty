@@ -27,6 +27,10 @@ pub(crate) mod uniforms;
 mod mesh_id_tests;
 
 #[cfg(test)]
+#[path = "outline_normals_tests.rs"]
+mod outline_normals_tests;
+
+#[cfg(test)]
 #[path = "uniform_layout_tests.rs"]
 mod uniform_layout_tests;
 

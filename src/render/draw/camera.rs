@@ -71,6 +71,8 @@ pub(crate) struct CameraCtx<'a> {
 /// The per-stack values every camera's context reads.
 pub(crate) struct StackShared {
     pub aspect: f32,
+    /// The view's `[w, h, 1/w, 1/h]` in pixels (`CameraUniform::viewport`).
+    pub viewport: [f32; 4],
     pub base_view_proj: glam::Mat4,
     pub fog: FogUniform,
     pub ssao: Option<SsaoPlan>,
@@ -105,6 +107,7 @@ impl<'a> CameraCtx<'a> {
                 time: scene.shader_time,
                 fog: shared.fog,
                 clusters: clusters.uniform(),
+                viewport: shared.viewport,
             },
             clusters,
             solids: SolidResources::default(),
@@ -133,7 +136,7 @@ fn batch_solids(r: &mut Renderer, _: &mut RenderView, ctx: &mut CameraCtx) {
 }
 
 fn scene_pass(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
-    let overlays = r.precreate_overlays(ctx.scene, &ctx.lod, ctx.stack.editor_mode);
+    let overlays = r.precreate_overlays(ctx.scene, ctx.stack.editor_mode);
     let frame = ScenePassFrame {
         editor_mode: ctx.stack.editor_mode,
         clear: PassClear::for_pass(ctx.is_first, ctx.cam.clear_flags),
@@ -141,7 +144,7 @@ fn scene_pass(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
             .ssao
             .map(|plan| SsaoFrame::for_camera(plan, ctx.view_proj, ctx.cam)),
     };
-    r.execute_scene_pass(view, frame, &ctx.solids.draws.opaque, &overlays);
+    r.execute_scene_pass(view, frame, &ctx.solids.draws, &overlays);
 }
 
 /// Translucent solids (#242), back-to-front over the opaque ones.

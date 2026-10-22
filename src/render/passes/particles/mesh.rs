@@ -81,6 +81,7 @@ impl Renderer {
                         sh,
                         ..InstanceData::IDENTITY
                     },
+                    outline: false,
                 };
                 if glass {
                     transparent.push((item, view_depth(p.position, cam.position, cam.forward())));

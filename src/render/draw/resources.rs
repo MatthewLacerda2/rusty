@@ -6,7 +6,7 @@
 
 use super::batch::sort::{back_to_front, view_depth};
 use super::batch::{BatchKey, DrawItem, FrameDraws};
-use super::overlays::OutlineHull;
+use super::overlays::outlined;
 use crate::components::MaterialAsset;
 use crate::render::gpu::draw_buffers::{group1, push_palette, FrameUpload, JointMatrix};
 use crate::render::lod::LodSelection;
@@ -30,8 +30,8 @@ pub(crate) struct SolidResources {
 // The overlay resources keep only the buffers they own (the per-overlay entity
 // uniform + any vertex buffer) plus their bind group; the joint array they bind is
 // the renderer's one shared identity matrix, so no per-overlay palette is allocated
-// (#210). The selection outline is the exception: a skinned hull binds its own pose
-// (#1160).
+// (#210). The selection outline is not an overlay resource: it draws from the
+// solids' own draws (`FrameDraws::outline`, #1175).
 pub(crate) type GridResource = (wgpu::Buffer, wgpu::BindGroup);
 pub(crate) type AabbResource = (wgpu::Buffer, wgpu::Buffer, wgpu::BindGroup);
 pub(crate) type AxisResource = (usize, wgpu::Buffer, wgpu::BindGroup);
@@ -39,12 +39,11 @@ pub(crate) type AxisResource = (usize, wgpu::Buffer, wgpu::BindGroup);
 // overlay uniform it owns, its group-1 bind group, and the vertex count to draw.
 pub(crate) type ProbeResource = (wgpu::Buffer, wgpu::Buffer, wgpu::BindGroup, u32);
 
-/// The editor-only overlay resources for one scene pass (selection outline, grid,
-/// collider AABBs, axis arrows). Empty outside editor mode. Bundled so the scene pass
+/// The editor-only overlay resources for one scene pass (grid, collider AABBs, axis
+/// arrows, probe gizmos). Empty outside editor mode. Bundled so the scene pass
 /// and the per-camera loop pass a single value instead of four (#93).
 #[derive(Default)]
 pub(crate) struct Overlays {
-    pub outline: Vec<OutlineHull>,
     pub grid: Option<GridResource>,
     pub aabb: Vec<AabbResource>,
     pub axis: Vec<AxisResource>,
@@ -55,25 +54,17 @@ pub(crate) struct Overlays {
 
 impl Renderer {
     /// The one shared identity joint buffer the overlays bind, so none of them
-    /// allocate a per-draw palette (#210). A skinned selection outline binds its own
-    /// pose instead (#1160).
+    /// allocate a per-draw palette (#210).
     pub(crate) fn shared_bones_buffer(&self) -> &wgpu::Buffer {
         self.draw_buffers.default_bones()
     }
 
     /// Pre-create the editor overlay resources for a pass; all-empty in play mode.
-    /// `lod` is the camera's selection, the one its solids were drawn with.
-    pub(crate) fn precreate_overlays(
-        &self,
-        scene: &Scene,
-        lod: &LodSelection,
-        editor_mode: bool,
-    ) -> Overlays {
+    pub(crate) fn precreate_overlays(&self, scene: &Scene, editor_mode: bool) -> Overlays {
         if !editor_mode {
             return Overlays::default();
         }
         Overlays {
-            outline: self.precreate_outline(scene, lod),
             grid: self.precreate_grid(),
             aabb: self.precreate_aabb(scene),
             axis: self.precreate_axis_arrows(scene),
@@ -82,7 +73,8 @@ impl Renderer {
     }
 
     /// Collect this camera's visible solids (skipping the LOD levels `lod` hides), batch repeated mesh + material pairs into
-    /// instanced draws (#470), and upload the camera's packed draw data.
+    /// instanced draws (#470), and upload the camera's packed draw data. The solids
+    /// the selection outline rings are marked, so it draws from their draws (#1175).
     pub(crate) fn precreate_solid_resources(
         &mut self,
         scene: &Scene,
@@ -93,6 +85,7 @@ impl Renderer {
         let (cam_pos, cam_fwd) = (cam.position, cam.forward());
         let (mut opaque, mut transparent, mut joints) = (Vec::new(), Vec::new(), Vec::new());
         let (mut culled, mut lod_hidden) = (0, 0);
+        let outline = outlined(scene, lod);
         for id in scene.world.ids_with_mesh() {
             if !scene.world.is_active(id) {
                 continue;
@@ -118,11 +111,12 @@ impl Renderer {
                 culled += 1;
                 continue;
             }
-            let Some((item, world_pos, is_transparent)) =
+            let Some((mut item, world_pos, is_transparent)) =
                 self.solid_draw_item(scene, id, &mut joints)
             else {
                 continue;
             };
+            item.outline = outline.contains(&id);
             if is_transparent {
                 transparent.push((item, view_depth(world_pos, cam_pos, cam_fwd)));
             } else {
@@ -231,6 +225,7 @@ impl Renderer {
             key,
             num_indices,
             instance,
+            outline: false,
         };
         Some((item, model_matrix.w_axis.truncate(), transparent))
     }

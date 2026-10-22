@@ -14,8 +14,9 @@ pub(crate) use lazy::LazyPipeline;
 use specs::{forward_spec, line_spec, make_pipeline, outline_spec, transparent_spec, PipelineSpec};
 
 /// The forward-target pipelines, all sharing one shader + vertex layout. The ones a
-/// frame may not draw (translucents, debug lines, the selection outline) are built on
-/// first use (#985); the opaque pass and its prepass are built up front.
+/// frame may not draw (translucents, debug lines) are built on first use (#985); the
+/// opaque pass and its prepass are built up front. The selection outline has its own
+/// shader ([`outline_pipelines`]).
 pub(crate) struct ForwardPipelines {
     /// Opaque/cutout solids: REPLACE, depth write on.
     pub forward: wgpu::RenderPipeline,
@@ -23,15 +24,12 @@ pub(crate) struct ForwardPipelines {
     pub transparent: LazyPipeline,
     /// Line debug overlays.
     pub line: LazyPipeline,
-    /// Selection-silhouette inverted hull, and its twin for a mirrored selection.
-    pub outline: LazyPipeline,
-    pub mirrored_outline: LazyPipeline,
     /// The SSAO depth prepass (#436): the forward vertex stage, no colour target.
     pub prepass: wgpu::RenderPipeline,
 }
 
-/// Builds the forward-lit and prepass pipelines, and the transparent, line debug and
-/// outline pipelines to be built on first use.
+/// Builds the forward-lit and prepass pipelines, and the transparent and line debug
+/// pipelines to be built on first use.
 // wgpu pipeline construction legitimately threads several distinct GPU resources
 // (device, shader, format, four bind-group layouts); bundling them into a struct
 // would only add an indirection without clarifying intent.
@@ -65,10 +63,25 @@ pub(crate) fn create_pipelines(
         forward: make_pipeline(device, shader, format, &render_layout, &forward_spec()),
         transparent: lazy(&render_layout, transparent_spec()),
         line: lazy(&line_layout, line_spec()),
-        outline: lazy(&render_layout, outline_spec(false)),
-        mirrored_outline: lazy(&render_layout, outline_spec(true)),
         prepass: make_prepass(device, shader, &render_layout, "fs_prepass"),
     }
+}
+
+/// The selection outline's pipelines (#1175), plain and mirrored, built on first use
+/// from `outline.wgsl` through the forward pipeline `layout`: the outline binds the
+/// forward pass's own groups, so it draws a solid from the forward pass's draw.
+pub(crate) fn outline_pipelines(
+    device: &wgpu::Device,
+    shader: &wgpu::ShaderModule,
+    format: wgpu::TextureFormat,
+    layout: &wgpu::PipelineLayout,
+) -> [LazyPipeline; 2] {
+    [false, true].map(|mirrored| {
+        let (shader, layout) = (shader.clone(), layout.clone());
+        LazyPipeline::new(device, move |device| {
+            make_pipeline(device, &shader, format, &layout, &outline_spec(mirrored))
+        })
+    })
 }
 
 /// An authored surface variant's opaque + transparent pipelines (#396): the forward
@@ -95,19 +108,20 @@ pub(crate) fn surface_pipelines(
     }
 }
 
-/// The forward passes' pipeline layout — groups 0–3 — for a surface variant (#396).
+/// The forward passes' pipeline layout — groups 0–3 — for a surface variant (#396)
+/// and the selection outline (#1175).
 pub(crate) fn forward_layout(
     device: &wgpu::Device,
     layouts: [&wgpu::BindGroupLayout; 4],
 ) -> wgpu::PipelineLayout {
     device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-        label: Some("Surface Variant Pipeline Layout"),
+        label: Some("Forward Variant Pipeline Layout"),
         bind_group_layouts: &layouts.map(Some),
         immediate_size: 0,
     })
 }
 
-/// The forward/outline and line pipelines share the same four bind-group layouts
+/// The forward and line pipelines share the same four bind-group layouts
 /// but carry distinct labels, so build both pipeline layouts here.
 fn create_pipeline_layouts(
     device: &wgpu::Device,

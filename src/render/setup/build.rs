@@ -269,13 +269,23 @@ fn create_forward_passes(
         &textures.material_layout,
         shadow_layout,
     );
+    let outline_shader = registry.load(device, "outline.wgsl", "Selection Outline Shader");
+    let groups = [
+        camera_lighting_layout,
+        entity_bones_layout,
+        &textures.material_layout,
+        shadow_layout,
+    ];
+    let outline_layout = pipelines::forward_layout(device, groups);
+    let [outline, mirrored_outline] =
+        pipelines::outline_pipelines(device, &outline_shader, HDR_FORMAT, &outline_layout);
 
     ForwardPasses {
         render_pipeline: pl.forward,
         transparent_pipeline: pl.transparent,
         line_pipeline: pl.line,
-        outline_pipeline: pl.outline,
-        mirrored_outline_pipeline: pl.mirrored_outline,
+        outline_pipeline: outline,
+        mirrored_outline_pipeline: mirrored_outline,
         prepass_pipeline: pl.prepass,
         skybox_renderer,
     }

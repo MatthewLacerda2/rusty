@@ -5,7 +5,7 @@
 
 #define_import_path forward::bindings
 
-#import common::{CameraUniforms, Decal, LightingUniforms, LocalLight, ShadowTile}
+#import common::{CameraUniforms, Decal, LightingUniforms, LocalLight, ShadowTile, VertexInput, blend_joints}
 
 struct EntityUniforms {
     model_matrix: mat4x4<f32>,
@@ -117,6 +117,19 @@ var<storage, read> bones: array<mat4x4<f32>>;
 
 @group(1) @binding(2)
 var<storage, read> instances: array<InstanceData>;
+
+// Where `model`'s vertex goes in world space: its skin (the draw's run of `bones`,
+// #455) under the draw's transform (identity for instanced solids) over the
+// instance's own. The forward pass and the selection outline (#1175) both place a
+// vertex through this, so the outline cannot sit anywhere the solid does not.
+fn vertex_to_world(model: VertexInput, instance: u32) -> mat4x4<f32> {
+    let joints = model.joint_indices + vec4<u32>(entity.bone_base);
+    let bone_transform = blend_joints(
+        bones[joints.x], bones[joints.y], bones[joints.z], bones[joints.w],
+        model.joint_weights,
+    );
+    return entity.model_matrix * instances[instance].model_matrix * bone_transform;
+}
 
 @group(2) @binding(0)
 var t_diffuse: texture_2d<f32>;

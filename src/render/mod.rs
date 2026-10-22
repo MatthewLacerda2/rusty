@@ -67,6 +67,9 @@ pub struct GpuMesh {
     /// Per-joint bind-pose boxes, computed at the same upload: a skinned entity's
     /// animated bound is built from them and its palette each frame (#833).
     pub skin_bounds: SkinBounds,
+    /// The selection outline's smoothed normals (`gpu::mesh::outline_normals`,
+    /// #1175), computed at the same upload and bound only by the outline.
+    pub outline_normals: wgpu::Buffer,
 }
 
 /// Stable identity for a mesh's GPU geometry, derived from its *source*

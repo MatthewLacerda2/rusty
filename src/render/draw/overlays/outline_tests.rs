@@ -1,12 +1,11 @@
 //! The selection outline is a silhouette around where the selection is drawn
-//! (#1142): its hull follows the entity's world matrix, so a child of a moved,
-//! turned parent is outlined in place, and a mirrored selection draws through the
-//! clockwise twin, so its hull's outer shell never covers the object. Skips with
-//! no adapter.
+//! (#1142): it follows the entity's world matrix, so a child of a moved, turned
+//! parent is outlined in place, and a mirrored selection draws through the
+//! clockwise twin, so its outer shell never covers the object. Skips with no
+//! adapter.
 
 use glam::{Quat, Vec3};
 
-use super::outline::outline_hull;
 use crate::render::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
 use crate::scene::authoring::{create_entity, Primitive};
 use crate::scene::{Camera, Scene};
@@ -15,7 +14,7 @@ pub(super) const RES: u32 = 64;
 
 /// A box parented under a moved, turned pivot, selected, mirrored along X when
 /// `mirrored`. Returns the scene and the box's world centre.
-fn selected_child(mirrored: bool) -> (Scene, Vec3) {
+pub(super) fn selected_child(mirrored: bool) -> (Scene, Vec3) {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
     let pivot = create_entity(&mut scene, "Pivot", None);
@@ -89,20 +88,4 @@ fn gpu_a_mirrored_child_is_outlined_in_place_as_a_silhouette() {
             "the outline rings the box, {off} px off"
         );
     }
-}
-
-/// The hull is the selection's world matrix grown about its pivot: it keeps the
-/// world placement and mirroring, and only scales.
-#[test]
-fn the_outline_hull_is_the_world_matrix_scaled_about_its_pivot() {
-    let world = glam::Mat4::from_scale_rotation_translation(
-        Vec3::new(-1.0, 2.0, 1.0),
-        Quat::from_rotation_y(0.5),
-        Vec3::new(4.0, 1.0, -2.0),
-    );
-    let hull = outline_hull(world);
-    assert!(hull
-        .transform_point3(Vec3::ZERO)
-        .abs_diff_eq(Vec3::new(4.0, 1.0, -2.0), 1e-5));
-    assert!((hull.determinant() / world.determinant() - 1.05f32.powi(3)).abs() < 1e-4);
 }

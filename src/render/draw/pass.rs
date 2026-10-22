@@ -1,8 +1,7 @@
 //! Shadow depth passes, dynamic global bind-group update, and the main scene
 //! render pass. The per-camera stacking loop + post-FX live in `draw`.
 
-use crate::render::draw::batch::DrawBatch;
-use crate::render::draw::overlays::OutlineHull;
+use crate::render::draw::batch::{DrawBatch, FrameDraws};
 use crate::render::draw::resources::Overlays;
 use crate::render::gpu::draw_buffers::DrawBuffers;
 use crate::render::gpu::global_group::GlobalGroup;
@@ -61,7 +60,7 @@ impl Renderer {
         &mut self,
         view: &mut RenderView,
         frame: ScenePassFrame,
-        solid_batches: &[DrawBatch],
+        draws: &FrameDraws,
         overlays: &Overlays,
     ) {
         let mut encoder = self
@@ -75,23 +74,24 @@ impl Renderer {
         self.update_global_bind_group();
         // A. SSAO (#436): prepass, occlusion and blur, which the scene pass samples.
         if let Some(ssao) = &frame.ssao {
-            self.record_ssao(view, &mut encoder, ssao, solid_batches);
+            self.record_ssao(view, &mut encoder, ssao, &draws.opaque);
         }
         // B. Main scene + overlay pass.
-        self.record_scene_pass(view, &mut encoder, &frame, solid_batches, overlays);
+        self.record_scene_pass(view, &mut encoder, &frame, draws, overlays);
 
         // 6. Submit the scene pass (it filled the HDR target + depth). Particles +
         // post-FX run from the per-camera loop in `draw`.
         self.queue.submit(std::iter::once(encoder.finish()));
     }
 
-    /// Record the main scene pass (solids, outline, skybox, overlays) into `encoder`.
+    /// Record the main scene pass (opaque solids, outline, skybox, overlays) into
+    /// `encoder`.
     fn record_scene_pass(
         &self,
         view: &RenderView,
         encoder: &mut wgpu::CommandEncoder,
         frame: &ScenePassFrame,
-        solid_batches: &[DrawBatch],
+        draws: &FrameDraws,
         overlays: &Overlays,
     ) {
         let editor_mode = frame.editor_mode;
@@ -129,9 +129,9 @@ impl Renderer {
         render_pass.set_bind_group(0, &self.global_bind_group, &[]);
         render_pass.set_bind_group(3, self.scene_group3(view, frame.ssao.is_some()), &[]);
         // Solid entities (each batch binds its shader's pipeline), then the outline.
-        self.draw_batches(&mut render_pass, solid_batches, SolidPass::Opaque(forward));
+        self.draw_batches(&mut render_pass, &draws.opaque, SolidPass::Opaque(forward));
         if editor_mode {
-            self.draw_outline(&mut render_pass, &overlays.outline);
+            self.draw_outline(&mut render_pass, &draws.outline);
         }
 
         // Render Skybox last (optimization). Only a Skybox camera paints it — a
@@ -218,32 +218,6 @@ impl Renderer {
             render_pass.set_bind_group(1, self.draw_buffers.bind_group(), &offsets);
             render_pass.set_bind_group(2, self.materials.group(batch.key.material), &[]);
             render_pass.draw_indexed(0..batch.num_indices, 0, batch.instances.clone());
-        }
-    }
-
-    fn draw_outline<'a>(
-        &'a self,
-        render_pass: &mut wgpu::RenderPass<'a>,
-        hulls: &'a [OutlineHull],
-    ) {
-        for hull in hulls {
-            let Some(gpu_mesh) = self.gpu_meshes.get(&hull.mesh) else {
-                continue;
-            };
-            // The outline is a flat unlit silhouette (`use_texture = 0`), so group(2) is
-            // never sampled — bind the default material group to satisfy the layout.
-            let pipeline = if hull.mirrored {
-                &self.mirrored_outline_pipeline
-            } else {
-                &self.outline_pipeline
-            };
-            render_pass.set_pipeline(pipeline.get());
-            render_pass.set_vertex_buffer(0, gpu_mesh.vertex_buffer.slice(..));
-            render_pass
-                .set_index_buffer(gpu_mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
-            render_pass.set_bind_group(1, &hull.bind_group, &[0]);
-            render_pass.set_bind_group(2, &self.default_material_bind_group, &[]);
-            render_pass.draw_indexed(0..hull.num_indices, 0, 0..1);
         }
     }
 }

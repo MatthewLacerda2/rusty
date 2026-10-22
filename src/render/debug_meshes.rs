@@ -71,6 +71,8 @@ impl Renderer {
         // bounds stay correct.
         let local_aabb = local_aabb(vertices);
         let skin_bounds = SkinBounds::from_vertices(vertices);
+        let outline_normals = crate::render::gpu::mesh::outline_normals(vertices);
+        let n_bytes: &[u8] = bytemuck::cast_slice(&outline_normals);
 
         // Re-use resident buffers when the new data still fits (the dirty-path
         // case: same geometry re-uploaded). Both buffers carry COPY_DST so they
@@ -78,12 +80,15 @@ impl Renderer {
         if let Some(existing) = self.gpu_meshes.get_mut(&id) {
             if existing.vertex_buffer.size() >= v_bytes.len() as u64
                 && existing.index_buffer.size() >= i_bytes.len() as u64
+                && existing.outline_normals.size() >= n_bytes.len() as u64
             {
                 existing.num_indices = num_indices;
                 existing.local_aabb = local_aabb;
                 existing.skin_bounds = skin_bounds;
                 self.queue.write_buffer(&existing.vertex_buffer, 0, v_bytes);
                 self.queue.write_buffer(&existing.index_buffer, 0, i_bytes);
+                self.queue
+                    .write_buffer(&existing.outline_normals, 0, n_bytes);
                 return;
             }
         }
@@ -104,6 +109,14 @@ impl Renderer {
                 usage: wgpu::BufferUsages::INDEX | wgpu::BufferUsages::COPY_DST,
             });
 
+        let outline_normals = self
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some(&format!("Mesh Outline Normals ({})", id.0)),
+                contents: n_bytes,
+                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+            });
+
         self.gpu_meshes.insert(
             id,
             GpuMesh {
@@ -112,6 +125,7 @@ impl Renderer {
                 num_indices,
                 local_aabb,
                 skin_bounds,
+                outline_normals,
             },
         );
     }
