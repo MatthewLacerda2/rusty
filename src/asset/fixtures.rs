@@ -185,8 +185,7 @@ pub const SKINNED_GLTF: &str = r#"{
 pub fn quad_mode_gltf(mode: u32, indices: &[u16]) -> (String, Vec<u8>) {
     let mut bin = Vec::new();
     let corners: [f32; 12] = [0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, 0.0];
-    let normals = [0.0f32, 0.0, 1.0].repeat(4);
-    for c in corners.iter().chain(&normals) {
+    for c in corners.iter().chain(&[0.0, 0.0, 1.0].repeat(4)) {
         bin.extend_from_slice(&c.to_le_bytes());
     }
     for i in indices {
