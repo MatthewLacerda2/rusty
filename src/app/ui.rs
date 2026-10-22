@@ -24,7 +24,7 @@ use super::resources::Resources;
 use super::stage::Stage;
 use super::world::World;
 use crate::ui::events::{Frame, UiHook, WALL_RANGE, WALL_TOLERANCE};
-use crate::ui::{UiLayout, UiView};
+use crate::ui::UiLayout;
 
 /// Register the sway and layout passes: the first `LateUpdate` systems, after
 /// every `FixedUpdate` system of the tick.
@@ -34,16 +34,11 @@ pub(super) fn register(app: &mut App) {
         .add_system(Stage::LateUpdate, show_selectable_states);
 }
 
-/// The screen and the active camera the UI is computed against this tick.
-fn ui_view(res: &Resources) -> UiView {
-    UiView::with_camera(res.screen_pixels(), res.camera.borrow().clone())
-}
-
 /// Turn this tick's input into UI callbacks and fire them (#420). Reads last tick's
 /// settled layout — or computes one on the first tick of Play, before this
 /// session's first `LateUpdate` ran.
 pub(super) fn dispatch_ui_events(world: &mut World, res: &mut Resources) {
-    let view = ui_view(res);
+    let view = res.ui_view();
     if res.play_frame == 0 {
         res.ui_layout = UiLayout::compute_in(&world.scene.borrow().world, &view);
     }
@@ -91,7 +86,7 @@ fn sway_ui(world: &mut World, res: &mut Resources) {
 
 /// Recompute every canvas's layout for this tick.
 fn layout_ui(world: &mut World, res: &mut Resources) {
-    let view = ui_view(res);
+    let view = res.ui_view();
     let scene = world.scene.borrow();
     res.ui_layout = UiLayout::compute_in(&scene.world, &view);
 }

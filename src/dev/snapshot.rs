@@ -18,6 +18,6 @@ pub fn snapshot(world: &GameWorld) -> Value {
         &world.camera().borrow(),
         world.play_frame(),
         world.is_playing(),
-        world.resources.screen_pixels(),
+        &world.resources.ui_view(),
     )
 }

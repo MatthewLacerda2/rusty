@@ -181,6 +181,7 @@ impl EditorFrontend {
         let frame = OverlayFrame {
             size: glam::Vec2::new(size.x, size.y),
             pixels_per_point,
+            textures: ui.ui_textures.clone(),
         };
         let point = glam::Vec2::new(local.x, local.y);
 

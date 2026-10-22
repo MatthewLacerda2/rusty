@@ -243,6 +243,7 @@ impl Frontend for EditorFrontend {
         self.egui_ctx.begin_pass(raw_input);
 
         self.editor_ui.preview_texture_id = self.preview_texture_id;
+        sync_ui_textures(&mut self.editor_ui, game);
         let interaction = self.draw_dashboard(shell, game);
         paint::drain_repl(&mut self.editor_ui, game);
 
@@ -261,4 +262,11 @@ impl Frontend for EditorFrontend {
 
         self.paint(shell, target);
     }
+}
+
+/// Read the UI's texture sizes into the sim and mirror them into the editor, so
+/// the overlay and the inspector lay the UI out as the game does (#1221).
+pub(super) fn sync_ui_textures(ui: &mut EditorUi, game: &GameWorld) {
+    crate::shell::frame::refresh_ui_textures(game);
+    ui.ui_textures = game.resources.screen.borrow().textures().clone();
 }

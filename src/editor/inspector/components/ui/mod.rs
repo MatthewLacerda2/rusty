@@ -21,18 +21,20 @@ pub mod shape;
 pub mod text;
 
 /// Draw every UI card the entity carries, in the order Unity's inspector shows them.
-/// `view` is the viewport image's size in points (the UI lays out on its pixels).
+/// `view` is the viewport image's size in points (the UI lays out on its pixels)
+/// and the texture sizes it lays out with.
 pub fn draw(
     ui: &mut egui::Ui,
     world: &mut crate::ecs::World,
     id: u32,
-    view: egui::Vec2,
+    (view, textures): (egui::Vec2, &crate::ui::TextureSizes),
     is_dirty: &mut bool,
 ) {
     let px = view * ui.ctx().pixels_per_point();
     let screen = glam::Vec2::new(px.x, px.y).round();
+    let screen = crate::ui::UiView::screen(screen).with_textures(textures.clone());
     canvas::draw(ui, world, id, is_dirty);
-    rect_transform::draw(ui, world, id, screen, is_dirty);
+    rect_transform::draw(ui, world, id, &screen, is_dirty);
     canvas_group::draw(ui, world, id, is_dirty);
     rect_mask::draw(ui, world, id, is_dirty);
     rect_mask::draw_mask(ui, world, id, is_dirty);

@@ -27,8 +27,8 @@ pub(super) fn register<'scope>(
     video: &'scope RefCell<VideoSettings>,
 ) -> Reg {
     let rect_size = move |id: u32| {
-        let px = screen.borrow().pixels(&video.borrow());
-        layout::rect_of(&scene.borrow().world, id, px).map(|r| r.rect.1)
+        let view = screen.borrow().view(&video.borrow(), None);
+        layout::rect_in(&scene.borrow().world, id, &view).map(|r| r.rect.1)
     };
     put(
         table,

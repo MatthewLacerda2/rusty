@@ -16,6 +16,7 @@
 use glam::{Vec2, Vec4};
 
 use super::grid;
+use super::native::TextureSizes;
 use super::sizes::{element_sizes, layout_children, own_size, Sizes};
 use crate::components::{LayoutGroupComponent, LayoutKind};
 use crate::ecs::World;
@@ -23,10 +24,12 @@ use crate::ecs::World;
 /// A child's `(position from the leading edge, size)` along one axis.
 type Slot = (f32, f32);
 
-/// A row or column group being laid out: the world, the group and its layout
-/// children, and the size-query nesting depth.
+/// A row or column group being laid out: the world and the texture sizes its
+/// images measure by, the group and its layout children, and the size-query
+/// nesting depth.
 struct Linear<'a> {
     world: &'a World,
+    textures: &'a TextureSizes,
     g: &'a LayoutGroupComponent,
     children: &'a [u32],
     depth: u32,
@@ -35,7 +38,12 @@ struct Linear<'a> {
 /// Where the group on `id` puts each of its layout children inside `rect`
 /// (`(min, size)`, y-up): `(child, (min, size))` in hierarchy order. Empty when
 /// `id` has no group.
-pub(super) fn placements(world: &World, id: u32, rect: (Vec2, Vec2)) -> Vec<(u32, (Vec2, Vec2))> {
+pub(super) fn placements(
+    world: &World,
+    textures: &TextureSizes,
+    id: u32,
+    rect: (Vec2, Vec2),
+) -> Vec<(u32, (Vec2, Vec2))> {
     let Some(g) = world.layout_group(id) else {
         return Vec::new();
     };
@@ -45,6 +53,7 @@ pub(super) fn placements(world: &World, id: u32, rect: (Vec2, Vec2)) -> Vec<(u32
         LayoutKind::Grid => grid::place(&g, children.len(), size),
         LayoutKind::Horizontal | LayoutKind::Vertical => Linear {
             world,
+            textures,
             g: &g,
             children: &children,
             depth: 0,
@@ -64,6 +73,7 @@ pub(super) fn placements(world: &World, id: u32, rect: (Vec2, Vec2)) -> Vec<(u32
 /// The group's own layout sizes along `axis` (its width `width` for heights).
 pub(super) fn group_sizes(
     world: &World,
+    textures: &TextureSizes,
     id: u32,
     g: &LayoutGroupComponent,
     axis: usize,
@@ -76,6 +86,7 @@ pub(super) fn group_sizes(
     }
     let group = Linear {
         world,
+        textures,
         g,
         children: &children,
         depth,
@@ -109,13 +120,13 @@ impl Linear<'_> {
     /// when the group controls the axis, else its own fixed size; force-expand
     /// makes it at least flexible 1.
     fn entries(&self, axis: usize, widths: &[f32]) -> Vec<Sizes> {
-        let (world, g, depth) = (self.world, self.g, self.depth);
+        let (world, textures, g, depth) = (self.world, self.textures, self.g, self.depth);
         let entry = |(i, &c): (usize, &u32)| {
             let w = widths.get(i).copied().unwrap_or(0.0);
             let mut s = if g.controls(axis) {
-                element_sizes(world, c, axis, w, depth)
+                element_sizes(world, textures, c, axis, w, depth)
             } else {
-                Sizes::fixed(own_size(world, c, axis, w, depth))
+                Sizes::fixed(own_size(world, textures, c, axis, w, depth))
             };
             if g.force_expands(axis) {
                 s.flexible = s.flexible.max(1.0);

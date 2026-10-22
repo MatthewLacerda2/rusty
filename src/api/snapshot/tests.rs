@@ -5,6 +5,7 @@ use super::*;
 use crate::scene::authoring::{add_component, create_entity, ComponentKind, Primitive};
 use crate::scene::Camera;
 use crate::scene::Scene;
+use glam::Vec2;
 
 /// The UI screen size the fixtures are snapshotted on.
 const SCREEN: Vec2 = Vec2::new(1920.0, 1080.0);
@@ -13,16 +14,21 @@ fn cam() -> Camera {
     Camera::new(Vec3::new(1.0, 2.0, 3.0), 10.0, -5.0)
 }
 
+/// The UI view the fixtures are snapshotted through.
+fn view() -> UiView {
+    UiView::with_camera(SCREEN, cam())
+}
+
 #[test]
 fn world_envelope_reports_frame_camera_and_play_state() {
     let scene = Scene::new();
-    let v = world_value(&scene, &cam(), 42, true, SCREEN);
+    let v = world_value(&scene, &cam(), 42, true, &view());
     assert_eq!(v["frame"].as_u64(), Some(42));
     assert_eq!(v["play_state"].as_str(), Some("playing"));
     assert_eq!(v["camera"]["pos"][0].as_f64(), Some(1.0));
     assert!(v["entities"].as_array().unwrap().is_empty());
 
-    let editor = world_value(&scene, &cam(), 0, false, SCREEN);
+    let editor = world_value(&scene, &cam(), 0, false, &view());
     assert_eq!(editor["play_state"].as_str(), Some("editor"));
 }
 
@@ -35,7 +41,7 @@ fn entity_reports_transform_scale_and_component_inventory() {
         t.scale = Vec3::new(2.0, 3.0, 4.0);
     }
 
-    let v = world_value(&scene, &cam(), 0, false, SCREEN);
+    let v = world_value(&scene, &cam(), 0, false, &view());
     let ent = &v["entities"][0];
     assert_eq!(ent["name"].as_str(), Some("Crate"));
     assert_eq!(ent["transform"]["scale"].as_array().unwrap().len(), 3);
@@ -63,7 +69,7 @@ fn mesh_and_material_reflect_authored_values() {
         mat.base_color_map = Some("assets/textures/wood.png".to_string());
     }
 
-    let ent = &world_value(&scene, &cam(), 0, false, SCREEN)["entities"][0];
+    let ent = &world_value(&scene, &cam(), 0, false, &view())["entities"][0];
     assert_eq!(ent["mesh"]["primitive_type"].as_str(), Some("Box"));
     assert_eq!(ent["material"]["color"][0].as_f64(), Some(0.5));
     assert_eq!(
@@ -79,7 +85,7 @@ fn collider_yields_world_bounds() {
     add_component(&mut scene, id, ComponentKind::Collider);
     scene.update_entity_collider(id);
 
-    let ent = &world_value(&scene, &cam(), 0, false, SCREEN)["entities"][0];
+    let ent = &world_value(&scene, &cam(), 0, false, &view())["entities"][0];
     let bounds = &ent["bounds"];
     assert!(bounds.is_object(), "an entity with geometry exposes bounds");
     assert_eq!(bounds["min"].as_array().unwrap().len(), 3);
@@ -105,7 +111,7 @@ fn ui_elements_report_their_components_and_computed_rect() {
     let hud = create_entity(&mut scene, "Hud", None);
     add_component(&mut scene, hud, ComponentKind::RectTransform);
     scene.set_parent(hud, Some(root)).expect("parent exists");
-    let v = world_value(&scene, &cam(), 0, false, SCREEN);
+    let v = world_value(&scene, &cam(), 0, false, &view());
     let ent = &v["entities"][1];
     assert_eq!(ent["components"], json!(["RectTransform"]));
     assert_eq!(ent["rect_transform"]["size_delta"], json!([100.0, 100.0]));
@@ -124,7 +130,7 @@ fn nav_agent_reports_its_turning() {
     let mut scene = Scene::new();
     let id = create_entity(&mut scene, "Bot", None);
     add_component(&mut scene, id, ComponentKind::NavMeshAgent);
-    let ent = &world_value(&scene, &cam(), 0, false, SCREEN)["entities"][0];
+    let ent = &world_value(&scene, &cam(), 0, false, &view())["entities"][0];
     let agent = &ent["nav_agent"];
     assert_eq!(agent["update_rotation"].as_bool(), Some(true));
     assert_eq!(agent["angular_speed"].as_f64(), Some(120.0));

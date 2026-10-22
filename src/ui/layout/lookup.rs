@@ -31,7 +31,7 @@ pub fn rect_in(world: &World, id: u32, view: &UiView) -> Option<UiRect> {
     let (mut node, _) = root_node(world, root, view)?;
     let mut parent = root;
     for &link in chain.iter().rev() {
-        let placed = group::placements(world, parent, node.rect.rect)
+        let placed = group::placements(world, &view.textures, parent, node.rect.rect)
             .into_iter()
             .find_map(|(c, r)| (c == link).then_some(r));
         node = child_node(world, view, link, &node, placed)?;

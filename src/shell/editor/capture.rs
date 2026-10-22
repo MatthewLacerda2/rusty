@@ -21,9 +21,7 @@
 //!
 //! No adapter → `Ok(false)`, the same skip contract as every headless capture.
 
-use std::cell::RefCell;
-use std::path::Path;
-use std::rc::Rc;
+use std::{cell::RefCell, path::Path, rc::Rc};
 
 use crate::app::GameWorld;
 use crate::core::input::InputState;
@@ -200,6 +198,7 @@ fn draw_ui(
     texture_id: Option<egui::TextureId>,
 ) -> egui::Vec2 {
     let mut is_playing = playing;
+    super::sync_ui_textures(ui, game);
     let interaction = ui.draw(
         ctx,
         &mut game.world.scene.borrow_mut(),

@@ -12,6 +12,7 @@ use crate::scene::Scene;
 const FRAME: OverlayFrame = OverlayFrame {
     size: Vec2::new(960.0, 540.0),
     pixels_per_point: 2.0,
+    textures: crate::ui::TextureSizes::new(),
 };
 
 /// A canvas holding a centred 200×100 image. Returns (scene, canvas, image).

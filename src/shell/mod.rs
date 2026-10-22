@@ -203,6 +203,7 @@ fn run_frame<F: Frontend>(
     // Like raw mouse motion, pads keep reporting while the window is unfocused.
     let pads_live = shell.window_focused && frontend.game_has_input(game);
     pump_pads(shell, game, pads_live);
+    frame::refresh_ui_textures(game);
     let transition = frame::advance_sim(game, delta_time);
     if let Some(clipboard) = shell.clipboard.as_mut() {
         input::clipboard::apply_request(clipboard, &mut game.input().borrow_mut());

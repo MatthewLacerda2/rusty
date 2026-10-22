@@ -83,6 +83,7 @@ pub fn draw(
                 let frame = rect_tool::OverlayFrame {
                     size: glam::Vec2::new(response.rect.width(), response.rect.height()),
                     pixels_per_point: ui.ctx().pixels_per_point(),
+                    textures: editor.ui_textures.clone(),
                 };
                 let painter = ui.painter_at(response.rect);
                 let selected = editor.selected_entity_id;

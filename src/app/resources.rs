@@ -193,6 +193,14 @@ impl Resources {
         self.screen.borrow().pixels(&video)
     }
 
+    /// What the UI is computed against this tick: the screen, the textures'
+    /// native sizes and the active camera.
+    pub fn ui_view(&self) -> crate::ui::UiView {
+        let video = *self.script_manager.video_cell().borrow();
+        let camera = self.camera.borrow().clone();
+        self.screen.borrow().view(&video, Some(camera))
+    }
+
     /// Number of play-mode frames simulated since the last `enter_play`.
     pub fn play_frame(&self) -> u64 {
         self.play_frame

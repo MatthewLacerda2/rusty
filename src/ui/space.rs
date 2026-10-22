@@ -13,8 +13,9 @@
 //!   the view there, tilted about its centre and swung about the eye by the sway
 //!   lag (`ui::sway`). Without a camera it is the overlay.
 //!
-//! [`UiView`] is what the UI is computed against — the screen size (a sim input)
-//! and the camera looking through it — and makes the [`UiPointer`] a tick's input
+//! [`UiView`] is what the UI is computed against — the screen size and the
+//! textures' native sizes (sim inputs, `ScreenSize`) and the camera looking
+//! through it — and makes the [`UiPointer`] a tick's input
 //! hit-tests with: the screen point, and the camera ray through it (the screen
 //! centre while the cursor is locked, for "look at it and press E" terminals).
 
@@ -23,7 +24,7 @@ use glam::{Mat4, Quat, Vec2, Vec3};
 use crate::components::{CanvasComponent, CanvasRenderMode};
 use crate::ecs::World;
 use crate::scene::Camera;
-use crate::ui::UiRect;
+use crate::ui::{TextureSizes, UiRect};
 
 /// The screen and the camera the UI is laid out, drawn and hit-tested against.
 #[derive(Clone)]
@@ -32,6 +33,9 @@ pub struct UiView {
     pub screen: Vec2,
     /// The camera looking through it; `None` places no world UI and no marker.
     pub camera: Option<Camera>,
+    /// The native size of each texture an `Image` measures by (`layout::native`);
+    /// empty unless the caller hands the platform's table over.
+    pub textures: TextureSizes,
 }
 
 impl UiView {
@@ -40,6 +44,7 @@ impl UiView {
         Self {
             screen: screen.max(Vec2::ONE),
             camera: None,
+            textures: TextureSizes::default(),
         }
     }
 
@@ -48,7 +53,14 @@ impl UiView {
         Self {
             screen: screen.max(Vec2::ONE),
             camera: Some(camera),
+            textures: TextureSizes::default(),
         }
+    }
+
+    /// This view, with `textures` as the native sizes its Images measure by.
+    pub fn with_textures(mut self, textures: TextureSizes) -> Self {
+        self.textures = textures;
+        self
     }
 
     /// The pointer for a mouse at `mouse` (UI screen pixels), or a locked cursor

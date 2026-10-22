@@ -13,18 +13,19 @@ use super::{anchor_presets, entity_row, vec2_row};
 use crate::components::{RectTransformComponent, WorldAnchor};
 use crate::editor::inspector::components::card::component_card;
 use crate::scene::authoring::rect_transform as rect_ops;
-use crate::ui::layout::{driven_by_group, rect_of};
+use crate::ui::layout::{driven_by_group, rect_in};
+use crate::ui::UiView;
 
 type Setter = fn(&mut RectTransformComponent, glam::Vec2);
 
 /// RectTransform card. A THIN client (#287): widgets read a snapshot and route
 /// each write through a shared op; remove detaches the component. `screen` is the
-/// game view's pixel size, which a preset needs to keep the rect in place.
+/// game view the UI lays out on, which a preset needs to keep the rect in place.
 pub fn draw(
     ui: &mut egui::Ui,
     world: &mut crate::ecs::World,
     id: u32,
-    screen: glam::Vec2,
+    screen: &UiView,
     is_dirty: &mut bool,
 ) {
     let Some(r) = world.rect_transform(id).map(|r| r.clone()) else {
@@ -61,7 +62,7 @@ fn draw_placement(
     world: &mut crate::ecs::World,
     id: u32,
     r: &RectTransformComponent,
-    screen: glam::Vec2,
+    screen: &UiView,
 ) -> bool {
     let driven = driven_by_group(world, id);
     let rows: [(&str, glam::Vec2, f32, Setter); 5] = [
@@ -82,7 +83,7 @@ fn draw_placement(
     let mut changed = false;
     ui.add_enabled_ui(!driven, |ui| {
         if let Some(preset) = anchor_presets::picker(ui, r) {
-            let parent = world.parent_id(id).and_then(|p| rect_of(world, p, screen));
+            let parent = world.parent_id(id).and_then(|p| rect_in(world, p, screen));
             let size = parent.map_or(glam::Vec2::ZERO, |p| p.rect.1);
             if let Some(mut c) = world.rect_transform_mut(id) {
                 rect_ops::apply_anchor_preset(&mut c, preset, size);

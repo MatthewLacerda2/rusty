@@ -52,9 +52,18 @@ pub struct Expectation {
 /// Quit **ends a headless run** (#431): once requested, every further step is a no-op,
 /// so a scenario's remaining observations read the state the game quit in and
 /// `results.json` records `"quit": true`. Returns whether a tick ran.
+///
+/// Before the tick the harness reads the UI's texture sizes from the files, as the
+/// window does (#1221), so a headless layout matches the drawn one; a scenario
+/// that wants other sizes writes `resources.screen`'s table between steps.
 pub fn tick_unless_quit(world: &mut GameWorld) -> bool {
     if world.quit_requested() {
         return false;
+    }
+    {
+        let scene = world.scene().borrow();
+        let mut screen = world.resources.screen.borrow_mut();
+        crate::render::refresh_texture_sizes(&scene.world, screen.textures_mut());
     }
     world.tick(FIXED_DT);
     // Engine warnings join the console, so a scenario's `console.log` carries them.

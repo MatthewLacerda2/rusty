@@ -113,7 +113,7 @@ fn the_snapshot_leaves_bones_out_unless_asked() {
             &Camera::new(Vec3::ZERO, 0.0, 0.0),
             0,
             false,
-            Vec2::new(800.0, 600.0),
+            &crate::ui::UiView::screen(Vec2::new(800.0, 600.0)),
             bones,
         );
         v["entities"].as_array().unwrap().clone()

@@ -57,6 +57,7 @@ mod rect;
 mod sizes;
 
 pub use lookup::{driven_by_group, rect_in, rect_of};
+pub use native::TextureSizes;
 pub use rect::UiRect;
 pub use sizes::Sizes;
 
@@ -133,7 +134,7 @@ impl UiLayout {
     fn walk(&mut self, world: &World, view: &UiView, id: u32, node: Node) {
         self.index.insert(id, self.rects.len());
         self.rects.push((id, node.rect));
-        let placed: BTreeMap<u32, _> = group::placements(world, id, node.rect.rect)
+        let placed: BTreeMap<u32, _> = group::placements(world, &view.textures, id, node.rect.rect)
             .into_iter()
             .collect();
         for child in world.children(id) {
@@ -203,7 +204,7 @@ fn child_node(
     let rt = world.rect_transform(id)?;
     let own = || {
         let own = rt.layout_in(parent.rect.rect.0, parent.rect.rect.1);
-        fit::fit(world, id, &rt, own)
+        fit::fit(world, &view.textures, id, &rt, own)
     };
     let marker = rt
         .world_anchor

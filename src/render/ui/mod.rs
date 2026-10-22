@@ -90,6 +90,9 @@ pub struct UiRenderer {
     world: world::WorldUiPipeline,
     /// Custom ui shaders' pipelines (#427).
     shaders: custom::UiShaders,
+    /// The texture sizes this pass lays out with, refreshed each prepare
+    /// (`gpu::textures::sizes`, #1221).
+    texture_sizes: crate::ui::TextureSizes,
 }
 
 impl UiRenderer {
@@ -137,6 +140,7 @@ impl UiRenderer {
             fonts: HashMap::new(),
             world,
             shaders,
+            texture_sizes: crate::ui::TextureSizes::new(),
         }
     }
 

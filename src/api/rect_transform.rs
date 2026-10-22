@@ -20,7 +20,7 @@ use crate::components::RectTransformComponent;
 use crate::core::video::VideoSettings;
 use crate::scene::authoring::rect_transform::{self as rect_ops, AnchorPreset, AxisPreset};
 use crate::scene::Scene;
-use crate::ui::layout::rect_of;
+use crate::ui::layout::rect_in;
 use crate::ui::ScreenSize;
 
 type Getter = fn(&RectTransformComponent) -> Vec2;
@@ -113,10 +113,10 @@ fn register_preset<'scope>(
             set_pivot: pivot.unwrap_or(false),
             set_position: position.unwrap_or(false),
         };
-        let px = screen.borrow().pixels(&video.borrow());
+        let view = screen.borrow().view(&video.borrow(), None);
         let mut scene = scene.borrow_mut();
         let parent = scene.world.parent_id(id);
-        let parent = parent.and_then(|p| rect_of(&scene.world, p, px));
+        let parent = parent.and_then(|p| rect_in(&scene.world, p, &view));
         let size = parent.map_or(Vec2::ZERO, |p| p.rect.1);
         if let Some(mut r) = scene.world.rect_transform_mut(id) {
             rect_ops::apply_anchor_preset(&mut r, preset, size);

@@ -9,6 +9,7 @@
 
 use glam::Vec2;
 
+use super::native::TextureSizes;
 use super::sizes::element_sizes;
 use crate::components::{LayoutAxisFit, RectTransformComponent};
 use crate::ecs::World;
@@ -16,6 +17,7 @@ use crate::ecs::World;
 /// `rect` (`(min, size)`, laid out from `rt`) resized by `id`'s content fitter.
 pub(super) fn fit(
     world: &World,
+    textures: &TextureSizes,
     id: u32,
     rt: &RectTransformComponent,
     rect: (Vec2, Vec2),
@@ -26,7 +28,7 @@ pub(super) fn fit(
     let (min, mut size) = rect;
     let pivot = min + size * rt.pivot;
     for axis in 0..2 {
-        let sizes = || element_sizes(world, id, axis, size.x, 0);
+        let sizes = || element_sizes(world, textures, id, axis, size.x, 0);
         size[axis] = match le.fit(axis) {
             LayoutAxisFit::Unconstrained => continue,
             LayoutAxisFit::MinSize => sizes().min,

@@ -57,6 +57,14 @@ impl FrameClock {
     }
 }
 
+/// Read the texture sizes the UI lays out with into the sim's screen resource,
+/// before it ticks (#1221): the layout reads a table, never a file.
+pub fn refresh_ui_textures(game: &GameWorld) {
+    let scene = game.scene().borrow();
+    let mut screen = game.resources.screen.borrow_mut();
+    crate::render::refresh_texture_sizes(&scene.world, screen.textures_mut());
+}
+
 /// Advance the simulation for one rendered frame, honouring the "playing-but-stepped"
 /// mode (#283).
 ///

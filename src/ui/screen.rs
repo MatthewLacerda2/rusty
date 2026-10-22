@@ -5,17 +5,26 @@
 //! ⇒ same layout. The windowed platform writes the game view's pixel size here every
 //! frame; a headless run never writes it and falls back to the `VideoSettings`
 //! resolution, so the harness lays out exactly as a window of that size would.
+//!
+//! The textures' native sizes ride along (#1221): an `Image` measures by its
+//! texture's size, which the platform reads and writes here ([`TextureSizes`])
+//! before each tick, so the layout never reads a file.
 
 use glam::Vec2;
 
 use crate::core::video::VideoSettings;
+use crate::scene::Camera;
+use crate::ui::{TextureSizes, UiView};
 
 /// The UI's target surface size (a resource). See the module docs.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct ScreenSize {
     /// The game view's size in physical pixels, as the platform last reported it.
     /// `None` until a platform writes one (always, headless).
     game_view: Option<(u32, u32)>,
+    /// The native size of each texture the scene's Images use, as the platform
+    /// last read them.
+    textures: TextureSizes,
 }
 
 impl ScreenSize {
@@ -29,6 +38,27 @@ impl ScreenSize {
     pub fn pixels(&self, video: &VideoSettings) -> Vec2 {
         let (w, h) = self.game_view.unwrap_or_else(|| video.resolution());
         Vec2::new(w.max(1) as f32, h.max(1) as f32)
+    }
+
+    /// The textures' native sizes the layout measures Images by.
+    pub fn textures(&self) -> &TextureSizes {
+        &self.textures
+    }
+
+    /// The table, for the platform (or a harness) to fill.
+    pub fn textures_mut(&mut self) -> &mut TextureSizes {
+        &mut self.textures
+    }
+
+    /// The view the UI is computed against: this screen (sized against `video`)
+    /// and its texture sizes, through `camera` when there is one.
+    pub fn view(&self, video: &VideoSettings, camera: Option<Camera>) -> UiView {
+        let px = self.pixels(video);
+        let view = match camera {
+            Some(camera) => UiView::with_camera(px, camera),
+            None => UiView::screen(px),
+        };
+        view.with_textures(self.textures.clone())
     }
 }
 

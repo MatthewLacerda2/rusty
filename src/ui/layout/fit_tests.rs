@@ -4,12 +4,13 @@
 
 use glam::Vec2;
 
-use super::super::fixture::{assert_rect, preferred, Fixture};
+use super::super::fixture::{assert_rect, preferred, Fixture, HD};
 use crate::components::{
     ImageComponent, LayoutAxisFit, LayoutElementComponent, LayoutGroupComponent, LayoutKind,
     TextComponent,
 };
 use crate::ui::text::preferred_size;
+use crate::ui::{TextureSizes, UiLayout, UiView};
 
 fn fitter(h: LayoutAxisFit, v: LayoutAxisFit) -> LayoutElementComponent {
     LayoutElementComponent {
@@ -61,20 +62,26 @@ fn a_label_fits_its_unwrapped_string() {
 
 #[test]
 fn an_image_fits_its_native_texture_size() {
-    let path = crate::test_temp::dir().join("rusty_421_native_64x32.png");
-    image::RgbaImage::new(64, 32)
-        .save(&path)
-        .expect("write png");
     let mut f = panel(
         Vec2::ZERO,
         fitter(LayoutAxisFit::PreferredSize, LayoutAxisFit::PreferredSize),
     );
     let img = ImageComponent {
-        texture: Some(path.to_string_lossy().into_owned()),
+        texture: Some("icons/64x32.png".to_string()),
         ..ImageComponent::default()
     };
     f.scene.world.set_image(f.panel, Some(img));
-    assert_rect(f.rect(f.panel), [-32.0, -16.0], [64.0, 32.0]);
+    // The layout reads the platform's table, never the file (#1221): unknown
+    // until the table has it, then its size.
+    assert_rect(f.rect(f.panel), [0.0, 0.0], [0.0, 0.0]);
+    let mut sizes = TextureSizes::new();
+    sizes.set("icons/64x32.png", Vec2::new(64.0, 32.0));
+    let view = UiView::screen(HD).with_textures(sizes);
+    let r = UiLayout::compute_in(&f.scene.world, &view)
+        .get(f.panel)
+        .expect("laid out")
+        .rect;
+    assert_rect((r.0 - f.origin, r.1), [-32.0, -16.0], [64.0, 32.0]);
 }
 
 #[test]
