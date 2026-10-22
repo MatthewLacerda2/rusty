@@ -66,32 +66,49 @@ fn primitive(
         if basis.mirrored() {
             triangles.chunks_mut(3).for_each(|t| t.swap(1, 2));
         }
-        for &mut corner in triangles {
-            let corner = corner as usize;
-            let skin = influences.map(|v| v[mesh.vertex_indices[corner] as usize]);
-            let (key, vertex) = corner_vertex(mesh, basis, corner, skin);
-            let index = *seen.entry(key).or_insert_with(|| {
-                push_vertex(&mut out, vertex, skin);
-                out.positions.len() as u32 - 1
-            });
-            out.indices.push(index);
+        for triangle in triangles.chunks(3) {
+            let flat = flat_normal(mesh, basis, triangle);
+            for &corner in triangle {
+                let corner = corner as usize;
+                let skin = influences.map(|v| v[mesh.vertex_indices[corner] as usize]);
+                let (key, vertex) = corner_vertex(mesh, basis, corner, skin, flat);
+                let index = *seen.entry(key).or_insert_with(|| {
+                    push_vertex(&mut out, vertex, skin);
+                    out.positions.len() as u32 - 1
+                });
+                out.indices.push(index);
+            }
         }
     }
     out
 }
 
-/// What one corner contributes, and the key that merges it with its twins.
+/// The flat normal of one (already re-wound) triangle of corners, for a mesh with
+/// no normals (#1217). The loader's `generate_missing_normals` means ufbx normally
+/// fills them in first, so this is the backstop, not the usual path.
+fn flat_normal(mesh: &ufbx::Mesh, basis: Basis, triangle: &[u32]) -> [f32; 3] {
+    if mesh.vertex_normal.exists {
+        return [0.0; 3]; // Unused: the corners carry their own.
+    }
+    let [a, b, c] = [0, 1, 2].map(|k| basis.vector(mesh.vertex_position[triangle[k] as usize]));
+    crate::asset::flat_normals::face_normal(a, b, c)
+}
+
+/// What one corner contributes, and the key that merges it with its twins. `flat`
+/// is its triangle's normal, used when the mesh has none of its own; corners keyed
+/// on it merge only within one plane, so faces keep their own normal.
 fn corner_vertex(
     mesh: &ufbx::Mesh,
     basis: Basis,
     corner: usize,
     skin: Option<Influence>,
+    flat: [f32; 3],
 ) -> (VertexKey, Corner) {
     let position = basis.vector(mesh.vertex_position[corner]);
     let normal = if mesh.vertex_normal.exists {
         basis.vector(mesh.vertex_normal[corner])
     } else {
-        [0.0, 1.0, 0.0]
+        flat
     };
     // FBX puts the UV origin bottom-left, glTF top-left.
     let uv = if mesh.vertex_uv.exists {

@@ -178,12 +178,15 @@ pub const SKINNED_GLTF: &str = r#"{
 /// vertices, with the given topology `mode` and u16 index stream (empty = a
 /// non-indexed primitive) — the #317 primitive-mode fixtures. Keeping the vertex
 /// pool fixed lets a strip/fan import be compared triangle-for-triangle against
-/// the equivalent plain-`TRIANGLES` list. Returns the JSON plus the binary buffer
+/// the equivalent plain-`TRIANGLES` list. The corners carry `+Z` normals, so the
+/// import keeps the index stream as written (a normal-less primitive is unwelded
+/// for flat shading, #1217). Returns the JSON plus the binary buffer
 /// the caller writes as a sibling `quad.bin`.
 pub fn quad_mode_gltf(mode: u32, indices: &[u16]) -> (String, Vec<u8>) {
     let mut bin = Vec::new();
     let corners: [f32; 12] = [0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, 0.0];
-    for c in corners {
+    let normals = [0.0f32, 0.0, 1.0].repeat(4);
+    for c in corners.iter().chain(&normals) {
         bin.extend_from_slice(&c.to_le_bytes());
     }
     for i in indices {
@@ -195,15 +198,15 @@ pub fn quad_mode_gltf(mode: u32, indices: &[u16]) -> (String, Vec<u8>) {
         (String::new(), String::new(), String::new())
     } else {
         (
-            r#", "indices": 1"#.to_string(),
+            r#", "indices": 2"#.to_string(),
             format!(
                 r#",
-    {{ "bufferView": 1, "componentType": 5123, "count": {}, "type": "SCALAR" }}"#,
+    {{ "bufferView": 2, "componentType": 5123, "count": {}, "type": "SCALAR" }}"#,
                 indices.len()
             ),
             format!(
                 r#",
-    {{ "buffer": 0, "byteOffset": 48, "byteLength": {} }}"#,
+    {{ "buffer": 0, "byteOffset": 96, "byteLength": {} }}"#,
                 indices.len() * 2
             ),
         )
@@ -216,14 +219,16 @@ pub fn quad_mode_gltf(mode: u32, indices: &[u16]) -> (String, Vec<u8>) {
   "nodes": [ {{ "mesh": 0 }} ],
   "meshes": [
     {{ "name": "Quad",
-      "primitives": [ {{ "attributes": {{ "POSITION": 0 }}, "mode": {mode}{indices_key} }} ] }}
+      "primitives": [ {{ "attributes": {{ "POSITION": 0, "NORMAL": 1 }}, "mode": {mode}{indices_key} }} ] }}
   ],
   "accessors": [
     {{ "bufferView": 0, "componentType": 5126, "count": 4, "type": "VEC3",
-      "min": [0.0, 0.0, 0.0], "max": [1.0, 1.0, 0.0] }}{index_accessor}
+      "min": [0.0, 0.0, 0.0], "max": [1.0, 1.0, 0.0] }},
+    {{ "bufferView": 1, "componentType": 5126, "count": 4, "type": "VEC3" }}{index_accessor}
   ],
   "bufferViews": [
-    {{ "buffer": 0, "byteOffset": 0, "byteLength": 48 }}{index_view}
+    {{ "buffer": 0, "byteOffset": 0, "byteLength": 48 }},
+    {{ "buffer": 0, "byteOffset": 48, "byteLength": 48 }}{index_view}
   ],
   "buffers": [ {{ "byteLength": {}, "uri": "quad.bin" }} ]
 }}

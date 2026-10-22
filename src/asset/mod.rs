@@ -27,6 +27,7 @@ pub mod anim_data;
 pub mod animation_graph;
 pub mod audio;
 pub mod convert;
+pub mod flat_normals;
 pub mod gltf;
 pub mod lightmap_uv;
 pub mod lod;
@@ -178,6 +179,8 @@ pub fn import_sub_mesh(reference: &str) -> Result<SubMesh, ImportError> {
 pub(crate) mod fixtures;
 #[cfg(test)]
 pub(crate) mod fixtures_anim;
+#[cfg(test)]
+pub(crate) mod flat_normals_tests;
 #[cfg(test)]
 mod manifest_tests;
 #[cfg(test)]

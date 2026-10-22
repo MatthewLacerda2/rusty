@@ -163,10 +163,11 @@ fn append_primitive(
     };
     let positions: Vec<[f32; 3]> = positions.collect();
 
-    let normals: Vec<[f32; 3]> = reader
+    // A primitive without one normal per position gets flat normals (#1217).
+    let normals: Option<Vec<[f32; 3]>> = reader
         .read_normals()
-        .map(|n| n.collect())
-        .unwrap_or_else(|| vec![[0.0, 1.0, 0.0]; positions.len()]);
+        .map(|n| n.collect::<Vec<_>>())
+        .filter(|n| n.len() == positions.len());
 
     let uvs: Vec<[f32; 2]> = reader
         .read_tex_coords(0)
@@ -196,17 +197,20 @@ fn append_primitive(
         return; // Non-surface mode; `triangle_list` logged the skip.
     };
     // glTF `TANGENT` accessor when present, else generate from positions + UVs (#207).
-    let tangents: Vec<[f32; 4]> =
-        reader
+    // Without normals the flat path below makes its own.
+    let tangents: Vec<[f32; 4]> = match &normals {
+        Some(normals) => reader
             .read_tangents()
             .map(|t| t.collect())
             .unwrap_or_else(|| {
-                crate::asset::tangents::generate_tangents(&positions, &normals, &uvs, &local)
-            });
+                crate::asset::tangents::generate_tangents(&positions, normals, &uvs, &local)
+            }),
+        None => Vec::new(),
+    };
 
-    let base = vertices.len() as u32;
+    let mut own: Vec<MeshVertex> = Vec::with_capacity(positions.len());
     for (i, position) in positions.iter().enumerate() {
-        let normal = normals.get(i).copied().unwrap_or([0.0, 1.0, 0.0]);
+        let normal = normals.as_ref().map_or([0.0; 3], |n| n[i]);
         let uv = uvs.get(i).copied().unwrap_or([0.0, 0.0]);
         let mut vertex = MeshVertex::new(*position, normal, uv);
         vertex.tangent = tangents.get(i).copied().unwrap_or([1.0, 0.0, 0.0, 1.0]);
@@ -215,9 +219,15 @@ fn append_primitive(
             let ji = [j[0] as u32, j[1] as u32, j[2] as u32, j[3] as u32];
             vertex = vertex.with_skin(ji, *w);
         }
-        vertices.push(vertex);
+        own.push(vertex);
     }
+    let (own, local) = match normals {
+        Some(_) => (own, local),
+        None => crate::asset::flat_normals::flat_shaded(&own, &local),
+    };
 
+    let base = vertices.len() as u32;
+    vertices.extend(own);
     indices.extend(local.into_iter().map(|i| i + base));
 }
 
