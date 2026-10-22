@@ -9,4 +9,5 @@ pub(crate) mod ktx2_encode;
 pub(crate) mod probe;
 pub(crate) mod reflection_bake;
 pub(crate) mod reflection_prefilter;
+pub(crate) mod reflection_probes;
 pub(crate) mod skybox;

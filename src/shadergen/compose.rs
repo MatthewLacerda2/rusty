@@ -22,6 +22,7 @@ pub use naga::Module;
 /// module names itself with `#define_import_path` (#1015).
 pub const MODULES: &[&str] = &[
     "sky/noise.wgsl",
+    "lighting/reflection_probe.wgsl",
     "common.wgsl",
     "forward/bindings.wgsl",
     "forward/lighting.wgsl",

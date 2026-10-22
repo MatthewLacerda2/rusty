@@ -153,13 +153,8 @@ impl Renderer {
         }
         self.global_bind_group_dirty = false;
         let sky = self.sky_panorama();
-        // The active reflection probe's cube at binding 4, else the black fallback cube —
-        // the shader picks skybox vs cube via the `refl_has_cubemap` flag, so a fallback
-        // here is never sampled but keeps the bind group valid against the layout.
-        let cube = self
-            .reflection_cube
-            .as_deref()
-            .unwrap_or(&self.default_cube);
+        // The resident reflection probes' cube array at binding 4 (#1206).
+        let cube = &self.reflection_probes;
         self.global_bind_group = GlobalGroup {
             camera: &self.camera_buffer,
             lighting: &self.lighting_buffer,

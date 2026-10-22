@@ -42,7 +42,7 @@ fn select_nearest_containing_probe() {
     // Two overlapping boxes covering the origin; nearest capture point wins.
     set.add(Vec3::new(3.0, 0.0, 0.0), Vec3::splat(5.0)); // covers origin, dist 3
     set.add(Vec3::new(1.0, 0.0, 0.0), Vec3::splat(5.0)); // covers origin, dist 1 (nearer)
-    let idx = set.select_index(Vec3::ZERO);
+    let idx = set.select(Vec3::ZERO).map(|(i, _)| i);
     assert_eq!(idx, Some(1));
 }
 
@@ -51,7 +51,6 @@ fn select_none_outside_all_boxes() {
     let mut set = ReflectionProbeSet::new();
     set.add(Vec3::ZERO, Vec3::ONE);
     assert!(set.select(Vec3::new(100.0, 0.0, 0.0)).is_none());
-    assert!(set.select_index(Vec3::new(100.0, 0.0, 0.0)).is_none());
 }
 
 #[test]
@@ -89,6 +88,30 @@ fn parallax_degenerate_returns_normalized_dir() {
     let corrected = probe.parallax_correct(Vec3::ZERO, Vec3::new(0.0, 0.0, 2.0));
     assert!(corrected.is_finite());
     assert!((corrected.length() - 1.0).abs() < 1e-5);
+}
+
+#[test]
+fn parallax_skips_a_fragment_outside_the_box() {
+    // The renderer picks a probe per object, so a fragment of a large object can sit
+    // outside its probe's box: it keeps the plain direction, never a box projection.
+    let probe = ReflectionProbe::new(Vec3::ZERO, Vec3::ONE);
+    let raw = Vec3::new(1.0, 1.0, 0.0);
+    let out = probe.parallax_correct(Vec3::new(5.0, 0.0, 0.0), raw);
+    assert_eq!(out, raw.normalize());
+}
+
+#[test]
+fn parallax_on_a_box_face_with_an_axis_aligned_ray_stays_finite() {
+    // A fragment exactly on the floor reflecting straight up: two zero components and
+    // a zero distance to the floor plane, the `0 * inf = NaN` case of an unguarded
+    // `1 / dir`. The ray exits through the ceiling.
+    let probe = ReflectionProbe::new(Vec3::ZERO, Vec3::splat(2.0));
+    let floor = Vec3::new(1.0, -2.0, 0.0);
+    let out = probe.parallax_correct(floor, Vec3::Y);
+    assert!(out.is_finite(), "{out:?}");
+    assert!((out - Vec3::new(1.0, 2.0, 0.0).normalize()).length() < 1e-5);
+    // Leaving through the face it sits on: no forward hit, the plain direction.
+    assert_eq!(probe.parallax_correct(floor, Vec3::NEG_Y), Vec3::NEG_Y);
 }
 
 #[test]

@@ -204,13 +204,23 @@ impl Renderer {
         let transparent = material.is_some_and(MaterialAsset::is_transparent);
         let model_matrix = scene.world.local_to_world(id);
         let mut uniform = super::uniforms::solid_entity_uniform(scene, id, material);
-        let instance = super::uniforms::solid_instance(
+        let mut instance = super::uniforms::solid_instance(
             scene,
             id,
             model_matrix,
             self.capture_probe_bounce,
             &self.lightmaps,
         );
+        // Like Unity, the reflection probe is picked per object, at the centre of its
+        // world bounds (its origin when they are unknown), #1206.
+        let centre = self
+            .gpu_meshes
+            .get(&mesh_id)
+            .and_then(|gpu| gpu.world_bounds(&mesh, model_matrix))
+            .map_or(model_matrix.w_axis.truncate(), |(min, max)| {
+                (min + max) * 0.5
+            });
+        instance.reflection_probe = self.reflection_probes.slot_for(centre);
 
         // The active bone palette: the live animated pose when a clip plays (#80),
         // else the bind pose (#79). Primitives/static meshes leave it empty and bind

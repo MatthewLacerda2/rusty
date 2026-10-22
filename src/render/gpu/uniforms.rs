@@ -4,6 +4,8 @@
 //! `pub(crate)` so the render submodules that build and write these uniforms can name them
 //! and their fields, exactly as when they lived in `mod.rs` (behavior unchanged).
 
+use crate::render::ibl::reflection_probes::{ReflectionProbeUniform, MAX_REFLECTION_PROBES};
+
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub(crate) struct CameraUniform {
@@ -94,19 +96,14 @@ pub(crate) struct LightingUniform {
     pub ssr_active: f32,
     pub ssr_quality: f32,
     pub ssr_temporal_upsampling: f32,
-    // Active reflection probe (#244): `refl_active` 1.0 when a probe's box covers the
-    // camera; the shader box-projects against `[refl_box_min, refl_box_max]` around
-    // `refl_center`. `refl_has_cubemap` (#245) 1.0 when that probe has a baked cube at
-    // binding 4 — then the shader samples it (roughness->mip), else the skybox. Pads keep
-    // each `vec4` 16-byte aligned, matching the WGSL layout. `sky_textured` (#718) 1.0
-    // when a skybox panorama is bound, else the shader reflects the procedural sky.
-    pub refl_active: f32,
-    pub refl_has_cubemap: f32,
+    // `sky_textured` (#718) 1.0 when a skybox panorama is bound, else the shader
+    // reflects the procedural sky. The pad keeps the probe array 16-byte aligned.
     pub sky_textured: f32,
-    pub _refl_pad: f32,
-    pub refl_center: [f32; 4],
-    pub refl_box_min: [f32; 4],
-    pub refl_box_max: [f32; 4],
+    pub _sky_pad: [f32; 3],
+    // The resident reflection probes (#1206), by slot: a draw's instance names one
+    // (`InstanceData::reflection_probe`), and the shader box-projects against its box
+    // and samples its layer of the binding-4 cube array.
+    pub refl_probes: [ReflectionProbeUniform; MAX_REFLECTION_PROBES],
 }
 
 #[repr(C)]
@@ -183,7 +180,9 @@ pub(crate) struct InstanceData {
     // 1 when the lightmap's direction page is bound (#810): normal maps then
     // reshape the baked light.
     pub lightmap_directional: u32,
-    pub _pad: u32,
+    // The slot of the reflection probe this instance reflects, plus one; 0 for none
+    // (the sky). Picked per object at its world-bounds centre (#1206).
+    pub reflection_probe: u32,
     pub lightmap_st: [f32; 4],
     pub sh: [[f32; 4]; 9],
 }
@@ -196,7 +195,7 @@ impl InstanceData {
         use_sh: 0,
         lightmap_page: 0,
         lightmap_directional: 0,
-        _pad: 0,
+        reflection_probe: 0,
         lightmap_st: [0.0; 4],
         sh: [[0.0; 4]; 9],
     };

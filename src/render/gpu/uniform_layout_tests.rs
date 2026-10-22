@@ -8,6 +8,7 @@ use std::mem::{offset_of, size_of};
 use super::uniforms::{CameraUniform, LightingUniform};
 use crate::render::clusters::LocalLight;
 use crate::render::decals::GpuDecal;
+use crate::render::ibl::reflection_probes::ReflectionProbeUniform;
 use crate::render::passes::shadows::atlas::ShadowTile;
 use crate::shadergen::compose;
 
@@ -86,11 +87,21 @@ fn lighting_uniform_matches_wgsl_layout() {
             "ssr_temporal_upsampling",
             offset_of!(LightingUniform, ssr_temporal_upsampling),
         ),
-        ("refl_active", offset_of!(LightingUniform, refl_active)),
-        ("refl_center", offset_of!(LightingUniform, refl_center)),
-        ("refl_box_max", offset_of!(LightingUniform, refl_box_max)),
+        ("sky_textured", offset_of!(LightingUniform, sky_textured)),
+        ("refl_probes", offset_of!(LightingUniform, refl_probes)),
     ];
     assert_layout("LightingUniforms", &pairs, size_of::<LightingUniform>());
+    let probe = [
+        ("mip_base", offset_of!(ReflectionProbeUniform, mip_base)),
+        ("box_min", offset_of!(ReflectionProbeUniform, box_min)),
+        ("mip_count", offset_of!(ReflectionProbeUniform, mip_count)),
+        ("box_max", offset_of!(ReflectionProbeUniform, box_max)),
+    ];
+    assert_layout(
+        "ReflectionProbe",
+        &probe,
+        size_of::<ReflectionProbeUniform>(),
+    );
 }
 
 #[test]

@@ -113,10 +113,10 @@ fn gpu_a_cubemap_rebaked_at_a_cached_path_reloads() {
     );
 }
 
-/// Re-baking the bound probe's cubemap unbinds it at once, so a camera that next
-/// picks no probe does not keep sampling the old cube.
+/// Re-baking a resident probe's cubemap reaches the probe array on the next frame
+/// (#1207, #1206): its slot is forgotten, so the new cube is copied in.
 #[test]
-fn gpu_rebaking_the_bound_cubemap_unbinds_it() {
+fn gpu_rebaking_a_resident_cubemap_recopies_it() {
     let Some(mut renderer) = crate::render::test_gpu::headless_or_skip(4, 4) else {
         return;
     };
@@ -126,16 +126,23 @@ fn gpu_rebaking_the_bound_cubemap_unbinds_it() {
         crate::core::fs::written::write(&path, &bytes).unwrap();
     };
     write(2);
+    let mut scene = crate::scene::Scene::new();
+    let i = scene
+        .reflection_probes
+        .add(glam::Vec3::ZERO, glam::Vec3::ONE);
     let key = path.to_string_lossy().into_owned();
-    renderer.reflection_cube = renderer.cached_cubemap(&key);
-    renderer.reflection_cube_path = key;
+    scene.reflection_probes.set_cubemap(i, key);
+    renderer.update_reflection_probes(&scene, glam::Vec3::ZERO);
+    assert_eq!(renderer.reflection_probes.face(), 2);
+    assert_ne!(renderer.reflection_probes.slot_for(glam::Vec3::ZERO), 0);
     renderer.global_bind_group_dirty = false;
     write(4);
     renderer.refresh_textures();
-    assert!(
-        renderer.reflection_cube.is_none(),
-        "the old cube stays bound"
+    renderer.update_reflection_probes(&scene, glam::Vec3::ZERO);
+    assert_eq!(
+        renderer.reflection_probes.face(),
+        4,
+        "the old cube stays resident"
     );
-    assert!(renderer.reflection_cube_path.is_empty());
     assert!(renderer.global_bind_group_dirty, "group 0 must rebind");
 }

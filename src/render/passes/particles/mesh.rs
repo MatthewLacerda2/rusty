@@ -79,6 +79,8 @@ impl Renderer {
                         model_matrix: model.to_cols_array(),
                         use_sh,
                         sh,
+                        // Picked per particle like any object (#1206).
+                        reflection_probe: self.reflection_probes.slot_for(p.position),
                         ..InstanceData::IDENTITY
                     },
                     outline: false,

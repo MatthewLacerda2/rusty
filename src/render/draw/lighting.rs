@@ -6,6 +6,7 @@
 use glam::Vec3;
 
 use crate::render::gpu::uniforms::MAX_DIRECTIONAL_LIGHTS;
+use crate::render::ibl::reflection_probes::MAX_REFLECTION_PROBES;
 use crate::render::{AmbientLightUniform, DirectionalLightUniform, LightingUniform};
 use crate::scene::{LightType, Scene};
 
@@ -21,30 +22,9 @@ pub(crate) fn default_lighting_uniform(scene: &Scene) -> LightingUniform {
         ssr_active: 0.0,
         ssr_quality: 0.0,
         ssr_temporal_upsampling: 0.0,
-        refl_active: 0.0,
-        refl_has_cubemap: 0.0,
         sky_textured: 0.0,
-        _refl_pad: 0.0,
-        refl_center: [0.0; 4],
-        refl_box_min: [0.0; 4],
-        refl_box_max: [0.0; 4],
-    }
-}
-
-/// Select the active reflection probe for this frame and write its box + centre into
-/// the lighting uniform (#244). The probe whose box contains the camera and is nearest
-/// to it wins; with none, `refl_active` stays 0 and the shader keeps the plain skybox
-/// reflection. The selection mirrors `ReflectionProbeSet::select` (unit-tested there).
-pub(crate) fn apply_reflection_probe(
-    lighting_uniform: &mut LightingUniform,
-    scene: &Scene,
-    camera_pos: Vec3,
-) {
-    if let Some(probe) = scene.reflection_probes.select(camera_pos) {
-        lighting_uniform.refl_active = 1.0;
-        lighting_uniform.refl_center = probe.position.extend(0.0).to_array();
-        lighting_uniform.refl_box_min = probe.box_min.extend(0.0).to_array();
-        lighting_uniform.refl_box_max = probe.box_max.extend(0.0).to_array();
+        _sky_pad: [0.0; 3],
+        refl_probes: [Default::default(); MAX_REFLECTION_PROBES],
     }
 }
 
@@ -133,8 +113,8 @@ impl crate::render::Renderer {
     /// Write the frame's lighting uniform and stage its point and spot lights (#434;
     /// uploaded once the shadow atlas has placed them, #468), and start the frame
     /// counters (#433) with the light counts.
-    pub(super) fn upload_lighting(&mut self, scene: &Scene, camera_pos: Vec3) {
-        let lighting_uniform = self.build_lighting_uniform(scene, camera_pos);
+    pub(super) fn upload_lighting(&mut self, scene: &Scene) {
+        let lighting_uniform = self.build_lighting_uniform(scene);
         self.queue.write_buffer(
             &self.lighting_buffer,
             0,
@@ -147,19 +127,15 @@ impl crate::render::Renderer {
         self.begin_counters(scene);
     }
 
-    /// Builds the per-frame lighting uniform from the scene's lights and SSR settings.
-    /// `refl_has_cubemap` is set only when a baked cube is actually loaded for the active
-    /// probe (`self.reflection_cube`), so the shader never samples the black fallback cube;
-    /// likewise `sky_textured` only when a panorama is loaded (#718), else the shader
-    /// reflects the procedural sky the sky pass draws.
-    fn build_lighting_uniform(&self, scene: &Scene, camera_pos: Vec3) -> LightingUniform {
+    /// Builds the per-frame lighting uniform from the scene's lights and SSR settings,
+    /// and the resident reflection probes' boxes (#1206). `sky_textured` is set only
+    /// when a panorama is loaded (#718), else the shader reflects the procedural sky the
+    /// sky pass draws.
+    fn build_lighting_uniform(&self, scene: &Scene) -> LightingUniform {
         let mut lighting_uniform = default_lighting_uniform(scene);
         apply_scene_lights(&mut lighting_uniform, scene, self.static_capture);
         apply_ssr_settings(&mut lighting_uniform, scene);
-        apply_reflection_probe(&mut lighting_uniform, scene, camera_pos);
-        if self.reflection_cube.is_some() {
-            lighting_uniform.refl_has_cubemap = 1.0;
-        }
+        lighting_uniform.refl_probes = *self.reflection_probes.uniforms();
         if self.skybox_texture.is_some() {
             lighting_uniform.sky_textured = 1.0;
         }

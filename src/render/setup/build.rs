@@ -15,6 +15,7 @@ use crate::render::gpu::global_group::GlobalGroup;
 use crate::render::gpu::lightmaps::Lightmaps;
 use crate::render::gpu::pipelines;
 use crate::render::gpu::shaders::ShaderRegistry;
+use crate::render::ibl::reflection_probes::ProbeArray;
 use crate::render::passes::outline::OutlinePasses;
 use crate::render::postfx::HDR_FORMAT;
 use crate::render::setup::textures::{create_textures, Textures};
@@ -32,6 +33,8 @@ pub(crate) struct GlobalBindings {
     pub decals: DecalBuffers,
     /// The baked lightmap pages group 0 binds (#438).
     pub lightmaps: Lightmaps,
+    /// The reflection-probe cube array group 0 binds (#1206).
+    pub reflection_probes: ProbeArray,
 }
 
 /// Shadow renderer, its cascade uniform buffer, and the main-pass bind group that
@@ -189,10 +192,9 @@ fn create_global_bindings(
         mapped_at_creation: false,
     });
 
-    // A throwaway fallback cube satisfies binding 4 until the per-frame rebuild swaps in
-    // the active reflection probe's cubemap (or the renderer's own fallback). The shader
-    // ignores it (the `refl_has_cubemap` flag stays 0) and samples the 2D skybox instead.
-    let cube = crate::render::ibl::cubemap::fallback_cube(device);
+    // One black cube until a frame makes probes resident; no draw selects a slot of
+    // it, so the shader never samples it.
+    let reflection_probes = ProbeArray::new(device);
     let clusters = ClusterBuffers::new(device);
     let decals = DecalBuffers::new(device);
     let lightmaps = Lightmaps::new(device);
@@ -200,7 +202,7 @@ fn create_global_bindings(
         camera: &camera_buffer,
         lighting: &lighting_buffer,
         skybox: (&default_texture.view, &default_texture.sampler),
-        cube: (&cube.view, &cube.sampler),
+        cube: (&reflection_probes.view, &reflection_probes.sampler),
         clusters: &clusters,
         decals: &decals,
         lightmaps: lightmaps.binding(),
@@ -214,6 +216,7 @@ fn create_global_bindings(
         clusters,
         decals,
         lightmaps,
+        reflection_probes,
     }
 }
 

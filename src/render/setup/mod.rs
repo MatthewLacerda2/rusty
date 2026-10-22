@@ -157,7 +157,6 @@ impl Renderer {
         } = gpu;
         let draw_buffers =
             crate::render::gpu::draw_buffers::DrawBuffers::new(&device, &entity_bones_layout);
-        let default_cube = crate::render::ibl::cubemap::fallback_cube(&device);
         let gpu_timer = crate::render::timing::GpuTimer::new(&device, &queue);
         let surface_shaders = crate::render::gpu::pipelines::surface::SurfaceShaders::new(
             crate::render::gpu::pipelines::forward_layout(
@@ -225,10 +224,8 @@ impl Renderer {
             axis_count: 0,
             skybox_texture: None,
             skybox_path: "".to_string(),
-            reflection_cube: None,
-            reflection_cube_path: String::new(),
+            reflection_probes: global.reflection_probes,
             cubemaps: HashMap::new(),
-            default_cube,
             static_capture: false,
             capture_probe_bounce: false,
             frame_counters: Default::default(),
