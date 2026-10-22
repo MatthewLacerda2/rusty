@@ -12,6 +12,11 @@ A gate that runs locally but not in CI is a false green on every pull request, s
   (`clippy_extras`): the lint policy lives in `Cargo.toml`'s `[lints]`, and
   "CI adds only `-D warnings`" (`docs/linting.md`).
 
+- `GATES` is exactly `$(QUICK_GATES) $(HEAVY_GATES)` (`gates_are_the_two_lists`),
+  and the cloud brief's heavy steps name every `HEAVY_GATES` entry
+  (`brief_misses_heavy`): a hand-copied gate list had drifted and `docrefs` went
+  unrun before CI (#1179, PR #1177).
+
 The comparison is one way: CI may run more than `make gates` (the macOS build,
 the JUnit copies), never less. Stdlib only, a text parser for the narrow YAML
 the workflows use; no build.
@@ -62,7 +67,14 @@ def makefile_gates(text: str) -> dict[str, list[str]]:
 
 def gates_are_the_two_lists(text: str) -> bool:
     """`GATES` is defined as exactly `$(QUICK_GATES) $(HEAVY_GATES)` (#1179)."""
-    return re.search(r"^GATES := \$\(QUICK_GATES\) \$\(HEAVY_GATES\)$", text, flags=re.M) is not None
+    variables = dict(re.findall(r"^([A-Z_]+) := (.*)$", text, flags=re.M))
+    return variables.get("GATES", "").split() == ["$(QUICK_GATES)", "$(HEAVY_GATES)"]
+
+
+def brief_misses_heavy(makefile: str, brief: str) -> list[str]:
+    """`HEAVY_GATES` entries the brief's *The container* steps never mention (#1179)."""
+    heavy = dict(re.findall(r"^([A-Z_]+) := (.*)$", makefile, flags=re.M))["HEAVY_GATES"]
+    return [g for g in heavy.split() if not re.search(rf"`make [^`]*\b{g}\b|make {g}\b", brief)]
 
 
 def workflow_commands(text: str) -> list[str]:

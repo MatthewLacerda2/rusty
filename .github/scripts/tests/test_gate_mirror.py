@@ -69,6 +69,12 @@ class Today(unittest.TestCase):
         self.assertFalse(gate_mirror.gates_are_the_two_lists(
             text.replace("GATES := $(QUICK_GATES) $(HEAVY_GATES)", "GATES := fmt $(HEAVY_GATES)")))
 
+    def test_the_brief_names_every_heavy_gate(self):
+        text = (gate_mirror.ROOT / "Makefile").read_text()
+        brief = (gate_mirror.ROOT / ".claude/skills/issue-batch/cloud-brief.md").read_text()
+        self.assertEqual(gate_mirror.brief_misses_heavy(text, brief), [])
+        self.assertEqual(gate_mirror.brief_misses_heavy(text, brief.replace("make doc deny", "make deny")), ["doc"])
+
     def test_clippy_adds_only_deny_warnings(self):
         gates, ci = gate_mirror.load()
         local = [c for cmds in gates.values() for c in cmds]

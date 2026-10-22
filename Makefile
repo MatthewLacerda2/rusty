@@ -1,6 +1,7 @@
 # rusty's gates, runnable in one command (#485).
 #
 #   make gates       everything CI blocks on, fastest-failing first
+#   make quick-gates the seconds-long gates and self-checks (the cloud split, #1179)
 #   make check       the fast edit loop
 #   make pre-commit  what the commit hook runs (formatting + size gate, staged files)
 #   make resolved    the push hook's check (rustfmt on both crates, tools/lint included)
@@ -70,7 +71,7 @@ compile-cache: ## Switch the worktrees' compile cache on (needs sccache); rerun 
 gates: $(SELF_CHECKS) $(GATES) ## Everything CI blocks on, fastest-failing first
 	@echo "gates: all green"
 
-quick-gates: $(SELF_CHECKS) $(QUICK_GATES) ## The seconds-long gates and self-checks (all but clippy, doc, test, deny)
+quick-gates: $(SELF_CHECKS) $(QUICK_GATES) ## The seconds-long gates and self-checks (all but HEAVY_GATES)
 	@echo "quick-gates: all green"
 
 check: target-dir fmt size ## Fast edit loop: formatting, size gate, dev-feature clippy
