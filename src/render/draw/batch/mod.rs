@@ -18,9 +18,6 @@ pub(crate) mod sort;
 
 use std::ops::Range;
 
-use glam::Mat4;
-
-use crate::render::gpu::pipelines::winding::is_mirrored;
 use crate::render::{EntityUniform, InstanceData, MeshId};
 
 /// What two solids must share to be drawn by one instanced call.
@@ -52,35 +49,31 @@ pub(crate) struct DrawItem {
     pub num_indices: u32,
     pub instance: InstanceData,
     /// Whether the selection outline rings this solid (#1175): it is then drawn a
-    /// second time, from this same draw, by the outline pipeline.
+    /// second time, from this same draw, into the selection mask.
     pub outline: bool,
 }
 
 /// The selection outline's draw of one solid (#1175): the forward draw's own mesh,
-/// uniform slot (its per-draw uniform and bone palette) and instance (its world
-/// matrix), so the outline re-derives nothing the forward pass decided. `mirrored`
-/// picks the clockwise outline twin (#1142), read off the same matrices the vertex
-/// stage multiplies.
+/// material group, uniform slot (its per-draw uniform and bone palette) and instance
+/// (its world matrix), so the outline re-derives nothing the forward pass decided.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct OutlineDraw {
     pub mesh: MeshId,
+    pub material: usize,
     pub num_indices: u32,
     pub uniform_slot: u32,
     pub instance: u32,
-    pub mirrored: bool,
 }
 
 impl OutlineDraw {
-    /// The outline of `instance`, packed as `data` into `batch`.
-    fn of(batch: &DrawBatch, instance: u32, data: &InstanceData) -> Self {
-        let draw = Mat4::from_cols_array(&batch.key.uniform().model_matrix);
-        let world = draw * Mat4::from_cols_array(&data.model_matrix);
+    /// The outline of `instance`, packed into `batch`.
+    fn of(batch: &DrawBatch, instance: u32) -> Self {
         Self {
             mesh: batch.key.mesh.clone(),
+            material: batch.key.material,
             num_indices: batch.num_indices,
             uniform_slot: batch.uniform_slot,
             instance,
-            mirrored: is_mirrored(world),
         }
     }
 }
@@ -142,8 +135,7 @@ impl FrameDraws {
             }
             if item.outline {
                 let run = batches.last().expect("the item joined or opened a run");
-                self.outline
-                    .push(OutlineDraw::of(run, index, &item.instance));
+                self.outline.push(OutlineDraw::of(run, index));
             }
             self.instances.push(item.instance);
         }

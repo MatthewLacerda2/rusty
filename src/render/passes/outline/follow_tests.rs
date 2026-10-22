@@ -4,7 +4,7 @@
 
 use glam::{Mat4, Vec3};
 
-use super::outline_targets;
+use super::select::outline_targets;
 use super::tests::{frame, outline_stats, RES};
 use crate::asset::{JointTransform, SkinData};
 use crate::components::mesh::primitives::generate_sphere;

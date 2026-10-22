@@ -40,12 +40,12 @@ fn draw(renderer: &mut Renderer, scene: &Scene, editor_mode: bool) {
     renderer.render(&mut view, scene, &cam, &out, editor_mode);
 }
 
-/// Which of (transparent, line, outline) are built.
+/// Which of (transparent, line, outline mask) are built.
 fn built(renderer: &Renderer) -> [bool; 3] {
     [
         renderer.transparent_pipeline.is_built(),
         renderer.line_pipeline.is_built(),
-        renderer.outline_pipeline.is_built(),
+        renderer.outline.mask.is_built(),
     ]
 }
 
@@ -80,7 +80,7 @@ fn gpu_warm_pipelines_builds_every_lazy_pipeline() {
     };
     let every = renderer.lazy_pipelines(true);
     // transparent + 2 particle + 2 ribbon + one world canvas per blend mode
-    // + 2 mirrored shadow + 3 editor (line, outline and its mirrored twin).
+    // + 2 mirrored shadow + 3 editor (line, the outline's mask and edge).
     assert_eq!(every.len(), 1 + 2 + 2 + UiBlend::ALL.len() + 2 + 3);
     assert!(every.iter().all(|p| !p.is_built()), "headless stays lazy");
 

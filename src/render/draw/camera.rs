@@ -37,6 +37,7 @@ pub(crate) const CAMERA_PASSES: &[(&str, CameraPass)] = &[
     ("transparent", transparent),
     ("world_ui", world_ui),
     ("effects", effects),
+    ("outline", outline),
     ("count", count),
     ("post_fx", post_fx),
 ];
@@ -71,8 +72,6 @@ pub(crate) struct CameraCtx<'a> {
 /// The per-stack values every camera's context reads.
 pub(crate) struct StackShared {
     pub aspect: f32,
-    /// The view's `[w, h, 1/w, 1/h]` in pixels (`CameraUniform::viewport`).
-    pub viewport: [f32; 4],
     pub base_view_proj: glam::Mat4,
     pub fog: FogUniform,
     pub ssao: Option<SsaoPlan>,
@@ -107,7 +106,6 @@ impl<'a> CameraCtx<'a> {
                 time: scene.shader_time,
                 fog: shared.fog,
                 clusters: clusters.uniform(),
-                viewport: shared.viewport,
             },
             clusters,
             solids: SolidResources::default(),
@@ -132,7 +130,8 @@ fn bin_clusters(r: &mut Renderer, _: &mut RenderView, ctx: &mut CameraCtx) {
 /// This camera's solids (the culling mask differs per camera) as instanced draws
 /// (#470), split opaque/cutout vs transparent (#242).
 fn batch_solids(r: &mut Renderer, _: &mut RenderView, ctx: &mut CameraCtx) {
-    ctx.solids = r.precreate_solid_resources(ctx.scene, ctx.cam, &ctx.frustum, &ctx.lod);
+    let outline = ctx.stack.editor_mode;
+    ctx.solids = r.precreate_solid_resources(ctx.scene, ctx.cam, &ctx.frustum, &ctx.lod, outline);
 }
 
 fn scene_pass(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
@@ -144,7 +143,7 @@ fn scene_pass(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
             .ssao
             .map(|plan| SsaoFrame::for_camera(plan, ctx.view_proj, ctx.cam)),
     };
-    r.execute_scene_pass(view, frame, &ctx.solids.draws, &overlays);
+    r.execute_scene_pass(view, frame, &ctx.solids.draws.opaque, &overlays);
 }
 
 /// Translucent solids (#242), back-to-front over the opaque ones.
@@ -161,6 +160,12 @@ fn world_ui(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
 /// with the solids.
 fn effects(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
     ctx.effects = r.draw_effects(view, ctx.scene, ctx.cam);
+}
+
+/// The editor's selection outline (#1175), over everything this camera drew. Only
+/// an editor camera marked any solid for it (`batch_solids`).
+fn outline(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
+    r.draw_outline(view, &ctx.solids.draws);
 }
 
 fn count(r: &mut Renderer, _: &mut RenderView, ctx: &mut CameraCtx) {

@@ -71,39 +71,38 @@ impl Renderer {
         // bounds stay correct.
         let local_aabb = local_aabb(vertices);
         let skin_bounds = SkinBounds::from_vertices(vertices);
-        let outline_normals = crate::render::gpu::mesh::outline_normals(vertices);
-        let n_bytes: &[u8] = bytemuck::cast_slice(&outline_normals);
 
         // Re-use resident buffers when the new data still fits (the dirty-path
-        // case: same geometry re-uploaded). Every buffer carries COPY_DST so it
+        // case: same geometry re-uploaded). Both buffers carry COPY_DST so they
         // can be written without reallocation.
         if let Some(existing) = self.gpu_meshes.get_mut(&id) {
             if existing.vertex_buffer.size() >= v_bytes.len() as u64
                 && existing.index_buffer.size() >= i_bytes.len() as u64
-                && existing.outline_normals.size() >= n_bytes.len() as u64
             {
                 existing.num_indices = num_indices;
                 existing.local_aabb = local_aabb;
                 existing.skin_bounds = skin_bounds;
                 self.queue.write_buffer(&existing.vertex_buffer, 0, v_bytes);
                 self.queue.write_buffer(&existing.index_buffer, 0, i_bytes);
-                self.queue
-                    .write_buffer(&existing.outline_normals, 0, n_bytes);
                 return;
             }
         }
 
-        let buffer = |kind: &str, contents: &[u8], usage: wgpu::BufferUsages| {
-            self.device
-                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some(&format!("Mesh {kind} ({})", id.0)),
-                    contents,
-                    usage: usage | wgpu::BufferUsages::COPY_DST,
-                })
-        };
-        let vertex_buffer = buffer("Vertices", v_bytes, wgpu::BufferUsages::VERTEX);
-        let index_buffer = buffer("Indices", i_bytes, wgpu::BufferUsages::INDEX);
-        let outline_normals = buffer("Outline Normals", n_bytes, wgpu::BufferUsages::VERTEX);
+        let vertex_buffer = self
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some(&format!("Mesh Vertices ({})", id.0)),
+                contents: v_bytes,
+                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+            });
+
+        let index_buffer = self
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some(&format!("Mesh Indices ({})", id.0)),
+                contents: i_bytes,
+                usage: wgpu::BufferUsages::INDEX | wgpu::BufferUsages::COPY_DST,
+            });
 
         self.gpu_meshes.insert(
             id,
@@ -113,7 +112,6 @@ impl Renderer {
                 num_indices,
                 local_aabb,
                 skin_bounds,
-                outline_normals,
             },
         );
     }

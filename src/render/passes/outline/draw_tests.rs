@@ -1,15 +1,14 @@
 //! The outline draws from the forward pass's own draw (#1175): for a mirrored child
 //! under a moved parent, a posed skin and a LOD-switched group, each outline's mesh,
-//! uniform slot (its per-draw uniform and bone palette), instance (its world matrix)
-//! and winding twin are the forward draw's. And with no pivot to grow about, a pose
-//! far from its entity's origin is ringed evenly (#1165). Skips with no adapter.
+//! material, uniform slot (its per-draw uniform and bone palette) and instance (its
+//! world matrix) are the forward draw's. And with no pivot to grow about, a pose far
+//! from its entity's origin is ringed evenly (#1165). Skips with no adapter.
 
 use glam::{Mat4, Vec3};
 
 use super::follow_tests::{lod_switched, posed_sphere};
 use super::tests::{frame, outline_stats, selected_child, RES};
 use crate::render::draw::batch::FrameDraws;
-use crate::render::gpu::pipelines::winding::is_mirrored;
 use crate::render::lod::LodSelection;
 use crate::render::{Frustum, MeshId, Renderer};
 use crate::scene::{Camera, Scene};
@@ -20,7 +19,7 @@ fn forward_draws(r: &mut Renderer, scene: &Scene, centre: Vec3) -> FrameDraws {
     let cam = Camera::new(centre + Vec3::Z * 3.0, -90.0, 0.0);
     let frustum = Frustum::from_view_proj(cam.build_view_projection(1.0));
     let lod = LodSelection::for_camera(scene, &cam);
-    r.precreate_solid_resources(scene, &cam, &frustum, &lod)
+    r.precreate_solid_resources(scene, &cam, &frustum, &lod, true)
         .draws
 }
 
@@ -53,7 +52,7 @@ fn assert_outlines_forward(scene: &Scene, draws: &FrameDraws, ids: &[u32]) -> Ve
             );
             assert_eq!(outline.uniform_slot, forward.uniform_slot, "{id}: uniform");
             assert_eq!(outline.num_indices, forward.num_indices, "{id}: indices");
-            assert_eq!(outline.mirrored, is_mirrored(world), "{id}: winding twin");
+            assert_eq!(outline.material, forward.key.material, "{id}: material");
             forward.key.uniform().bone_base
         })
         .collect()

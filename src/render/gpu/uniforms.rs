@@ -14,9 +14,6 @@ pub(crate) struct CameraUniform {
     pub fog: FogUniform,
     /// This camera's light-cluster grid (#434): how a point finds its cluster.
     pub clusters: ClusterUniform,
-    /// The view's size in pixels and its reciprocal, `[w, h, 1/w, 1/h]`: what turns
-    /// a width in pixels into clip space (the selection outline, #1175).
-    pub viewport: [f32; 4],
 }
 
 /// How a world point finds its light cluster (#434), mirroring `Clusters` in

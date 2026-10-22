@@ -29,11 +29,8 @@ impl Renderer {
     /// camera runs the [`CAMERA_PASSES`] table in order.
     pub(crate) fn draw_stack(&mut self, view: &mut RenderView, scene: &Scene, pass: StackPass) {
         let aspect = view.aspect();
-        let size = view.size();
-        let (w, h) = (size.width.max(1) as f32, size.height.max(1) as f32);
         let shared = StackShared {
             aspect,
-            viewport: [w, h, 1.0 / w, 1.0 / h],
             // The base (first) camera drives the shared post-FX history / motion vectors.
             base_view_proj: pass.stack[0].build_view_projection(aspect),
             fog: FogUniform::from_settings(&scene.fog),

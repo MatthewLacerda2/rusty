@@ -6,10 +6,10 @@
 
 use super::batch::sort::{back_to_front, view_depth};
 use super::batch::{BatchKey, DrawItem, FrameDraws};
-use super::overlays::outlined;
 use crate::components::MaterialAsset;
 use crate::render::gpu::draw_buffers::{group1, push_palette, FrameUpload, JointMatrix};
 use crate::render::lod::LodSelection;
+use crate::render::passes::outline::outlined;
 use crate::render::{Frustum, MeshId, Renderer};
 use crate::scene::Scene;
 
@@ -30,8 +30,8 @@ pub(crate) struct SolidResources {
 // The overlay resources keep only the buffers they own (the per-overlay entity
 // uniform + any vertex buffer) plus their bind group; the joint array they bind is
 // the renderer's one shared identity matrix, so no per-overlay palette is allocated
-// (#210). The selection outline is not an overlay resource: it draws from the
-// solids' own draws (`FrameDraws::outline`, #1175).
+// (#210). The selection outline is not an overlay: it is its own pass over the
+// solids' own draws (`passes::outline`, #1175).
 pub(crate) type GridResource = (wgpu::Buffer, wgpu::BindGroup);
 pub(crate) type AabbResource = (wgpu::Buffer, wgpu::Buffer, wgpu::BindGroup);
 pub(crate) type AxisResource = (usize, wgpu::Buffer, wgpu::BindGroup);
@@ -73,19 +73,25 @@ impl Renderer {
     }
 
     /// Collect this camera's visible solids (skipping the LOD levels `lod` hides), batch repeated mesh + material pairs into
-    /// instanced draws (#470), and upload the camera's packed draw data. The solids
-    /// the selection outline rings are marked, so it draws from their draws (#1175).
+    /// instanced draws (#470), and upload the camera's packed draw data. With
+    /// `outline` (an editor camera), the solids the selection outline rings are
+    /// marked, so it draws from their draws (#1175).
     pub(crate) fn precreate_solid_resources(
         &mut self,
         scene: &Scene,
         cam: &crate::scene::Camera,
         frustum: &Frustum,
         lod: &LodSelection,
+        outline: bool,
     ) -> SolidResources {
         let (cam_pos, cam_fwd) = (cam.position, cam.forward());
         let (mut opaque, mut transparent, mut joints) = (Vec::new(), Vec::new(), Vec::new());
         let (mut culled, mut lod_hidden) = (0, 0);
-        let outline = outlined(scene, lod);
+        let ringed = if outline {
+            outlined(scene, lod)
+        } else {
+            Vec::new()
+        };
         for id in scene.world.ids_with_mesh() {
             if !scene.world.is_active(id) {
                 continue;
@@ -116,7 +122,7 @@ impl Renderer {
             else {
                 continue;
             };
-            item.outline = outline.contains(&id);
+            item.outline = ringed.contains(&id);
             if is_transparent {
                 transparent.push((item, view_depth(world_pos, cam_pos, cam_fwd)));
             } else {

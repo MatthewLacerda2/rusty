@@ -1,7 +1,7 @@
 //! Shadow depth passes, dynamic global bind-group update, and the main scene
 //! render pass. The per-camera stacking loop + post-FX live in `draw`.
 
-use crate::render::draw::batch::{DrawBatch, FrameDraws};
+use crate::render::draw::batch::DrawBatch;
 use crate::render::draw::resources::Overlays;
 use crate::render::gpu::draw_buffers::DrawBuffers;
 use crate::render::gpu::global_group::GlobalGroup;
@@ -60,7 +60,7 @@ impl Renderer {
         &mut self,
         view: &mut RenderView,
         frame: ScenePassFrame,
-        draws: &FrameDraws,
+        solid_batches: &[DrawBatch],
         overlays: &Overlays,
     ) {
         let mut encoder = self
@@ -74,24 +74,23 @@ impl Renderer {
         self.update_global_bind_group();
         // A. SSAO (#436): prepass, occlusion and blur, which the scene pass samples.
         if let Some(ssao) = &frame.ssao {
-            self.record_ssao(view, &mut encoder, ssao, &draws.opaque);
+            self.record_ssao(view, &mut encoder, ssao, solid_batches);
         }
         // B. Main scene + overlay pass.
-        self.record_scene_pass(view, &mut encoder, &frame, draws, overlays);
+        self.record_scene_pass(view, &mut encoder, &frame, solid_batches, overlays);
 
         // 6. Submit the scene pass (it filled the HDR target + depth). Particles +
         // post-FX run from the per-camera loop in `draw`.
         self.queue.submit(std::iter::once(encoder.finish()));
     }
 
-    /// Record the main scene pass (opaque solids, outline, skybox, overlays) into
-    /// `encoder`.
+    /// Record the main scene pass (solids, skybox, overlays) into `encoder`.
     fn record_scene_pass(
         &self,
         view: &RenderView,
         encoder: &mut wgpu::CommandEncoder,
         frame: &ScenePassFrame,
-        draws: &FrameDraws,
+        solid_batches: &[DrawBatch],
         overlays: &Overlays,
     ) {
         let editor_mode = frame.editor_mode;
@@ -128,11 +127,8 @@ impl Renderer {
         let forward = view.forward_pipeline(&self.render_pipeline);
         render_pass.set_bind_group(0, &self.global_bind_group, &[]);
         render_pass.set_bind_group(3, self.scene_group3(view, frame.ssao.is_some()), &[]);
-        // Solid entities (each batch binds its shader's pipeline), then the outline.
-        self.draw_batches(&mut render_pass, &draws.opaque, SolidPass::Opaque(forward));
-        if editor_mode {
-            self.draw_outline(&mut render_pass, &draws.outline);
-        }
+        // Solid entities (each batch binds its shader's pipeline).
+        self.draw_batches(&mut render_pass, solid_batches, SolidPass::Opaque(forward));
 
         // Render Skybox last (optimization). Only a Skybox camera paints it — a
         // DepthOnly/SolidColor overlay must not overwrite the world below it. With a

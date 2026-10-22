@@ -67,9 +67,6 @@ pub struct GpuMesh {
     /// Per-joint bind-pose boxes, computed at the same upload: a skinned entity's
     /// animated bound is built from them and its palette each frame (#833).
     pub skin_bounds: SkinBounds,
-    /// The selection outline's smoothed normals (`gpu::mesh::outline_normals`,
-    /// #1175), computed at the same upload and bound only by the outline.
-    pub outline_normals: wgpu::Buffer,
 }
 
 /// Stable identity for a mesh's GPU geometry, derived from its *source*
@@ -120,8 +117,8 @@ pub struct Renderer {
     /// editor-only pipelines below (#985).
     transparent_pipeline: gpu::pipelines::LazyPipeline,
     line_pipeline: gpu::pipelines::LazyPipeline,
-    outline_pipeline: gpu::pipelines::LazyPipeline,
-    mirrored_outline_pipeline: gpu::pipelines::LazyPipeline,
+    /// The editor's selection outline (#1175).
+    outline: passes::outline::OutlinePasses,
 
     // Bind Group Layouts
     pub camera_lighting_layout: wgpu::BindGroupLayout,
@@ -163,7 +160,7 @@ pub struct Renderer {
     /// What an extra shader texture slot samples with no texture of its own (#400).
     pub white_texture: Rc<GpuTexture>,
     /// A group(2) material bind group whose three texture slots all point at
-    /// `default_texture` — used by the outline and editor-grid passes, which never
+    /// `default_texture` — used by the editor-grid and gizmo passes, which never
     /// sample the maps (they render unlit / use the default checker) but still must
     /// supply a bind group matching the expanded `material_layout` (#202).
     pub default_material_bind_group: wgpu::BindGroup,

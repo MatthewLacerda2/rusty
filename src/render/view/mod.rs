@@ -71,6 +71,12 @@ pub struct RenderView {
     /// The render textures this view's scene draws (#430); see
     /// `crate::render::render_texture`.
     pub(crate) render_textures: crate::render::render_texture::RenderTextures,
+    /// Physical pixels per logical one on the display this view is shown on: what
+    /// keeps a width in pixels (the selection outline's) the same on a Retina display.
+    pixel_scale: f32,
+    /// The selection outline's mask (#1175), allocated the first frame this view
+    /// outlines; it checks its own size, so `resize` leaves it alone.
+    pub(crate) selection_mask: Option<crate::render::passes::outline::SelectionMask>,
 }
 
 impl RenderView {
@@ -146,6 +152,8 @@ impl RenderView {
             ui_output: None,
             ui: Default::default(),
             render_textures: Default::default(),
+            pixel_scale: 1.0,
+            selection_mask: None,
         }
     }
 
@@ -174,6 +182,17 @@ impl RenderView {
             let (target, ui_format) = create_color_target(device, self.format, width, height);
             (self.color_target, self.ui_format) = (Some(target), Some(ui_format));
         }
+    }
+
+    /// Set the display's physical pixels per logical one (the window's scale factor);
+    /// 1 until set. Widths drawn in pixels, like the selection outline's, scale by it.
+    pub fn set_pixel_scale(&mut self, scale: f32) {
+        self.pixel_scale = scale.max(1e-3);
+    }
+
+    /// The display's physical pixels per logical one ([`Self::set_pixel_scale`]).
+    pub fn pixel_scale(&self) -> f32 {
+        self.pixel_scale
     }
 
     /// This view's pixel size — drives the projection aspect and the target sizes.

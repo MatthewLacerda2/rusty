@@ -43,9 +43,6 @@ struct CameraUniforms {
     fog: Fog,
     // This camera's light-cluster grid (#434).
     clusters: Clusters,
-    // The view's size in pixels (xy) and its reciprocal (zw): what turns a width in
-    // pixels into clip space, as the selection outline does (#1175).
-    viewport: vec4<f32>,
 };
 
 // The post-process chain's uniform (group 0, binding 0 of every post pass, built-in

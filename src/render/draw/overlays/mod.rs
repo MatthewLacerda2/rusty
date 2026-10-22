@@ -1,13 +1,9 @@
 //! Pre-creation of editor overlay resources: the floor grid and per-collider AABB
-//! wireframes (the selection outline, drawn from the solids' own draws, lives in
-//! `outline`). Extracted from `Renderer::render` (behavior
+//! wireframes (the selection outline is its own pass, `passes::outline`). Extracted from `Renderer::render` (behavior
 //! unchanged).
 
 mod axis;
-mod outline;
 mod probes;
-
-pub(crate) use outline::outlined;
 
 use glam::{Mat4, Vec3};
 use wgpu::util::DeviceExt;

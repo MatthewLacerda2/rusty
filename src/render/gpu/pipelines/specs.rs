@@ -2,8 +2,7 @@
 //! a [`PipelineSpec`] into a pipeline. The layouts and entry points are shared, so
 //! each pipeline names only what it changes from [`PipelineSpec::opaque`].
 
-use super::winding;
-use crate::render::gpu::mesh::{outline_normal_layout, vertex_layout};
+use crate::render::gpu::mesh::vertex_layout;
 use crate::render::gpu::DEPTH_FORMAT;
 
 /// Fixed-function knobs that distinguish the forward-pass pipelines. The default is
@@ -18,8 +17,6 @@ pub(super) struct PipelineSpec {
     pub blend: wgpu::BlendState,
     pub depth_write_enabled: bool,
     pub depth_compare: wgpu::CompareFunction,
-    /// Whether the pipeline also reads the outline normals at vertex slot 1 (#1175).
-    pub outline_normals: bool,
 }
 
 impl PipelineSpec {
@@ -34,7 +31,6 @@ impl PipelineSpec {
             blend: wgpu::BlendState::REPLACE,
             depth_write_enabled: true,
             depth_compare: wgpu::CompareFunction::Less,
-            outline_normals: false,
         }
     }
 }
@@ -67,24 +63,6 @@ pub(super) fn line_spec() -> PipelineSpec {
     }
 }
 
-/// Selection silhouette (inverted hull): cull front faces so only back faces show.
-/// A `mirrored` selection's winding is reversed, so its twin takes clockwise
-/// triangles as front (#1142); otherwise its outer shell would cover the object.
-/// The hull grows along the outline normals (#1175).
-pub(super) fn outline_spec(mirrored: bool) -> PipelineSpec {
-    PipelineSpec {
-        cull_mode: Some(wgpu::Face::Front),
-        outline_normals: true,
-        front_face: winding::front_face(mirrored),
-        depth_compare: wgpu::CompareFunction::LessEqual,
-        ..PipelineSpec::opaque(if mirrored {
-            "Mirrored Outline Pipeline"
-        } else {
-            "Outline Pipeline"
-        })
-    }
-}
-
 /// Create one forward-pass render pipeline from a [`PipelineSpec`]. The five
 /// pipelines share the same vertex layout, shader entry points, and depth format;
 /// only the fixed-function knobs in the spec differ.
@@ -95,8 +73,6 @@ pub(super) fn make_pipeline(
     layout: &wgpu::PipelineLayout,
     spec: &PipelineSpec,
 ) -> wgpu::RenderPipeline {
-    let buffers = [Some(vertex_layout()), Some(outline_normal_layout())];
-    let buffers = &buffers[..if spec.outline_normals { 2 } else { 1 }];
     device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
         label: Some(spec.label),
         layout: Some(layout),
@@ -104,7 +80,7 @@ pub(super) fn make_pipeline(
             module: shader,
             entry_point: Some("vs_main"),
             compilation_options: Default::default(),
-            buffers,
+            buffers: &[Some(vertex_layout())],
         },
         fragment: Some(wgpu::FragmentState {
             module: shader,

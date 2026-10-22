@@ -15,6 +15,7 @@ use crate::render::gpu::global_group::GlobalGroup;
 use crate::render::gpu::lightmaps::Lightmaps;
 use crate::render::gpu::pipelines;
 use crate::render::gpu::shaders::ShaderRegistry;
+use crate::render::passes::outline::OutlinePasses;
 use crate::render::postfx::HDR_FORMAT;
 use crate::render::setup::textures::{create_textures, Textures};
 use crate::render::{ibl::skybox, passes::shadows, passes::ssao};
@@ -48,8 +49,8 @@ pub(crate) struct ForwardPasses {
     pub render_pipeline: wgpu::RenderPipeline,
     pub transparent_pipeline: pipelines::LazyPipeline,
     pub line_pipeline: pipelines::LazyPipeline,
-    pub outline_pipeline: pipelines::LazyPipeline,
-    pub mirrored_outline_pipeline: pipelines::LazyPipeline,
+    /// The selection outline's mask and edge pipelines (#1175).
+    pub outline: crate::render::passes::outline::OutlinePasses,
     pub prepass_pipeline: wgpu::RenderPipeline,
     pub skybox_renderer: skybox::SkyboxRenderer,
 }
@@ -269,23 +270,12 @@ fn create_forward_passes(
         &textures.material_layout,
         shadow_layout,
     );
-    let outline_shader = registry.load(device, "outline.wgsl", "Selection Outline Shader");
-    let groups = [
-        camera_lighting_layout,
-        entity_bones_layout,
-        &textures.material_layout,
-        shadow_layout,
-    ];
-    let outline_layout = pipelines::forward_layout(device, groups);
-    let [outline, mirrored_outline] =
-        pipelines::outline_pipelines(device, &outline_shader, HDR_FORMAT, &outline_layout);
 
     ForwardPasses {
         render_pipeline: pl.forward,
         transparent_pipeline: pl.transparent,
         line_pipeline: pl.line,
-        outline_pipeline: outline,
-        mirrored_outline_pipeline: mirrored_outline,
+        outline: OutlinePasses::new(device, registry, &pl.layout),
         prepass_pipeline: pl.prepass,
         skybox_renderer,
     }

@@ -90,6 +90,7 @@ impl EditorFrontend {
         let scene = game.scene().borrow();
         let scene_tab = interaction.tab == ViewportTab::Scene;
         view.ui.screen_in_editor = scene_tab && self.editor_ui.ui_overlay;
+        view.set_pixel_scale(pixels_per_point);
         let camera = viewport_camera(&self.editor_ui, game, &scene, interaction.tab);
         renderer.render(view, &scene, &camera, &target_view, scene_tab);
         rebind_egui_texture(

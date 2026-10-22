@@ -68,12 +68,10 @@ fn camera_uniform_matches_wgsl_layout() {
         ("time", offset_of!(CameraUniform, time)),
         ("fog", offset_of!(CameraUniform, fog)),
         ("clusters", offset_of!(CameraUniform, clusters)),
-        ("viewport", offset_of!(CameraUniform, viewport)),
     ];
     assert_layout("CameraUniforms", &pairs, size_of::<CameraUniform>());
-    // `time` rides in the vec3 pad (#398); the cluster block adds 48 bytes (#434),
-    // the viewport 16 (#1175).
-    assert_eq!(size_of::<CameraUniform>(), 192);
+    // `time` rides in the vec3 pad (#398); the cluster block adds 48 bytes (#434).
+    assert_eq!(size_of::<CameraUniform>(), 176);
 }
 
 #[test]

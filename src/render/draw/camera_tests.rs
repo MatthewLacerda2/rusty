@@ -23,6 +23,7 @@ fn stages_run_in_the_frames_order() {
             "transparent",
             "world_ui",
             "effects",
+            "outline",
             "count",
             "post_fx",
         ]
@@ -39,6 +40,8 @@ fn every_stage_reads_only_what_an_earlier_stage_wrote() {
     assert!(position("solids") < position("scene"));
     assert!(position("solids") < position("transparent"));
     assert!(position("world_ui") < position("effects"));
+    // The selection outline rings over everything the camera drew, from its solids.
+    assert!(position("effects") < position("outline"));
     // The counters read the solids and the effects' draw counts.
     assert!(position("effects") < position("count"));
     // Post-FX composites everything this camera drew.
