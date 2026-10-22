@@ -23,6 +23,7 @@ mod lua;
 
 use std::collections::BTreeMap;
 
+use serde::de::DeserializeOwned;
 use serde_json::Value as Json;
 use zimmer::survey::{Register, SongSurvey, Survey};
 use zimmer::{Patch, Song};
@@ -66,8 +67,27 @@ impl PatchSurvey {
     }
 }
 
-/// One entry of the set: where it came from, and its JSON document (or why not).
-pub type Document = (String, Result<Json, String>);
+/// One entry of the set: where it came from, its JSON document (or why not), and
+/// whether a script wrote it inline.
+pub type Document = (String, Result<Json, String>, Origin);
+
+/// Where a document came from, which says how its enum names are read: a script's
+/// inline document in any case, as every `Sound` verb reads it (#1216); a file in
+/// the canonical spelling only, as a song bake's `load_patch` reads the same file.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Origin {
+    File,
+    Inline,
+}
+
+impl Origin {
+    fn decode<T: DeserializeOwned>(self, json: Json) -> Result<T, String> {
+        match self {
+            Self::File => serde_json::from_value(json).map_err(|e| e.to_string()),
+            Self::Inline => decode(json),
+        }
+    }
+}
 
 /// The whole set, sorted into patches and songs, plus what could not be read.
 #[derive(Debug, Default)]
@@ -86,8 +106,8 @@ impl SetSurvey {
         resolve: &dyn zimmer::PatchResolver,
     ) -> Self {
         let mut set = Self::default();
-        for (name, json) in documents {
-            match json.and_then(|json| set.add(&name, json, resolve)) {
+        for (name, json, origin) in documents {
+            match json.and_then(|json| set.add(&name, json, origin, resolve)) {
                 Ok(()) => {}
                 Err(why) => set.skipped.push((name, why)),
             }
@@ -99,13 +119,18 @@ impl SetSurvey {
         &mut self,
         name: &str,
         json: Json,
+        origin: Origin,
         resolve: &dyn zimmer::PatchResolver,
     ) -> Result<(), String> {
         if json.get("tracks").is_some() {
-            let song: Song = decode(json).map_err(|e| format!("invalid song: {e}"))?;
+            let song: Song = origin
+                .decode(json)
+                .map_err(|e| format!("invalid song: {e}"))?;
             self.songs.songs.push(SongSurvey::of(name, &song, resolve));
         } else {
-            let patch: Patch = decode(json).map_err(|e| format!("invalid patch: {e}"))?;
+            let patch: Patch = origin
+                .decode(json)
+                .map_err(|e| format!("invalid patch: {e}"))?;
             self.patches.push(PatchSurvey::of(name.to_owned(), &patch));
         }
         Ok(())
@@ -197,3 +222,7 @@ pub struct SetRollup {
 #[cfg(test)]
 #[path = "tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "origin_tests.rs"]
+mod origin_tests;

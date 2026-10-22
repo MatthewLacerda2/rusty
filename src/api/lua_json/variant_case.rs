@@ -6,13 +6,16 @@
 //! for every type at once, without touching any of them — zimmer's patch and song
 //! enums included, which rusty cannot annotate:
 //!
-//! 1. decode as-is: a document spelled canonically costs one plain `from_value`;
+//! 1. decode as-is: a document spelled canonically costs one plain decode, read
+//!    from the `Value` in place;
 //! 2. on serde's `unknown variant` error, find the one variant the given name
-//!    matches ignoring case; none (or two) and the original error stands, so an
-//!    unknown name reads exactly as it always did;
+//!    matches ignoring case; none (or two) and that error stands, so an unknown
+//!    name reads exactly as it always did;
 //! 3. find *which* string in the document serde was decoding — the one that, swapped
-//!    for a probe, makes the error name the probe — rewrite that string alone to the
-//!    canonical name, and decode again.
+//!    for a probe, makes serde fail on the probe against the same variant list —
+//!    rewrite that string alone to the canonical name, and decode again;
+//! 4. the error returned is the one that remains, so a real mistake later in the
+//!    document is reported as itself, not as a miscased name already fixed.
 //!
 //! Only the failing string is rewritten, so a node id or a file name that happens to
 //! share the miscased name keeps its spelling, and a stored file written back from
@@ -27,21 +30,22 @@ use serde_json::Value;
 const PROBE: &str = "\u{1}rusty-variant-probe\u{1}";
 
 /// Decode `json` into `T`, reading every enum variant name case-insensitively.
-/// Errors are serde's, unchanged.
+/// An error is serde's for the document as it stands after the rewrites — plain
+/// serde's own when nothing was rewritten.
 pub fn decode<T: DeserializeOwned>(mut json: Value) -> Result<T, String> {
-    let mut first_error = None;
+    let mut rewrites_left = None;
     loop {
-        let error = match serde_json::from_value(json.clone()) {
+        let error = match T::deserialize(&json) {
             Ok(value) => return Ok(value),
             Err(e) => e.to_string(),
         };
-        let fixed = unknown_variant(&error)
-            .and_then(|(given, expected)| canonical(&given, &expected).map(|c| (given, c)))
-            .is_some_and(|(given, canon)| rewrite_failing::<T>(&mut json, &given, canon));
-        let first = first_error.get_or_insert(error);
-        if !fixed {
-            return Err(first.clone());
+        // Each rewrite leaves one string canonical for good, so a document never
+        // needs more rewrites than it has strings; the bound only guards that.
+        let left = rewrites_left.get_or_insert_with(|| string_paths(&json, |_| true).len());
+        if *left == 0 || !rewrite_failing::<T>(&mut json, &error) {
+            return Err(error);
         }
+        *left -= 1;
     }
 }
 
@@ -64,53 +68,61 @@ fn canonical<'a>(given: &str, expected: &[&'a str]) -> Option<&'a str> {
     (matches.next().is_none() && canon != given).then_some(canon)
 }
 
-/// Rewrite the string serde failed on — the one equal to `given` whose swap for
-/// [`PROBE`] makes the error name the probe — to `canon`. False when none does.
-fn rewrite_failing<T: DeserializeOwned>(json: &mut Value, given: &str, canon: &str) -> bool {
-    for index in 0..count_strings(json, given) {
-        let mut probed = json.clone();
-        replace_nth(&mut probed, given, index, PROBE);
-        let names_probe = serde_json::from_value::<T>(probed)
-            .err()
-            .and_then(|e| unknown_variant(&e.to_string()).map(|(name, _)| name == PROBE))
-            .unwrap_or(false);
+/// When `error` is an unknown variant that names one variant ignoring case, rewrite
+/// the string serde failed on to that variant: the string equal to the given name
+/// whose swap for [`PROBE`] makes serde fail on the probe, against the same list of
+/// variants. False when no string does.
+fn rewrite_failing<T: DeserializeOwned>(json: &mut Value, error: &str) -> bool {
+    let Some((given, expected)) = unknown_variant(error) else {
+        return false;
+    };
+    let Some(canon) = canonical(&given, &expected) else {
+        return false;
+    };
+    for path in string_paths(json, |s| s == given) {
+        set(json, &path, PROBE);
+        let names_probe = T::deserialize(&*json).err().is_some_and(|e| {
+            unknown_variant(&e.to_string()) == Some((PROBE.to_owned(), expected.clone()))
+        });
+        set(json, &path, if names_probe { canon } else { &given });
         if names_probe {
-            replace_nth(json, given, index, canon);
             return true;
         }
     }
     false
 }
 
-/// How many string values (not keys) equal `text`.
-fn count_strings(json: &Value, text: &str) -> usize {
-    match json {
-        Value::String(s) => usize::from(s == text),
-        Value::Array(items) => items.iter().map(|v| count_strings(v, text)).sum(),
-        Value::Object(map) => map.values().map(|v| count_strings(v, text)).sum(),
-        _ => 0,
-    }
-}
-
-/// Replace the `n`th string value equal to `text` (in [`count_strings`]'s order) with
-/// `with`; `n` counts down as the walk passes earlier matches.
-fn replace_nth(json: &mut Value, text: &str, n: usize, with: &str) {
-    fn walk(json: &mut Value, text: &str, n: &mut usize, with: &str) -> bool {
+/// The JSON pointer of every string value (not key) that `keep` accepts.
+fn string_paths(json: &Value, keep: impl Fn(&str) -> bool) -> Vec<String> {
+    fn walk(json: &Value, at: &mut String, keep: &dyn Fn(&str) -> bool, out: &mut Vec<String>) {
+        let mut child = |at: &mut String, key: &str, value: &Value| {
+            let len = at.len();
+            at.push('/');
+            at.push_str(&key.replace('~', "~0").replace('/', "~1"));
+            walk(value, at, keep, out);
+            at.truncate(len);
+        };
         match json {
-            Value::String(s) if s == text => {
-                if *n == 0 {
-                    *s = with.to_owned();
-                    return true;
+            Value::String(s) if keep(s) => out.push(at.clone()),
+            Value::Array(items) => {
+                for (i, v) in items.iter().enumerate() {
+                    child(at, &i.to_string(), v);
                 }
-                *n -= 1;
-                false
             }
-            Value::Array(items) => items.iter_mut().any(|v| walk(v, text, n, with)),
-            Value::Object(map) => map.values_mut().any(|v| walk(v, text, n, with)),
-            _ => false,
+            Value::Object(map) => map.iter().for_each(|(k, v)| child(at, k, v)),
+            _ => {}
         }
     }
-    walk(json, text, &mut { n }, with);
+    let mut out = Vec::new();
+    walk(json, &mut String::new(), &keep, &mut out);
+    out
+}
+
+/// Set the string at `path` (from [`string_paths`]) to `text`.
+fn set(json: &mut Value, path: &str, text: &str) {
+    if let Some(value) = json.pointer_mut(path) {
+        *value = Value::String(text.to_owned());
+    }
 }
 
 #[cfg(test)]

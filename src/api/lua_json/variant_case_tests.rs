@@ -64,26 +64,50 @@ fn only_the_failing_string_is_rewritten() {
 
 #[test]
 fn an_unknown_name_fails_exactly_as_plain_serde_does() {
-    for bad in [
-        json!({ "name": "g", "kind": "Conic" }),
-        json!({ "name": "g", "kind": "radial", "more": ["spiral"] }),
-        json!({ "name": "g", "kind": "Linear", "ops": [{ "op": "osc stack" }] }),
+    for (bad, fixed) in [
+        (json!({ "name": "g", "kind": "Conic" }), None),
+        (
+            json!({ "name": "g", "kind": "radial", "more": ["spiral"] }),
+            Some("Radial"),
+        ),
+        (
+            json!({ "name": "g", "kind": "Linear", "ops": [{ "op": "osc stack" }] }),
+            None,
+        ),
     ] {
-        let plain = serde_json::from_value::<Doc>(bad.clone()).unwrap_err();
-        let err = doc(bad).unwrap_err();
-        let first = plain.to_string();
-        assert!(err.contains("unknown variant"), "{err}");
-        if !first.contains("`radial`") {
-            assert_eq!(err, first);
+        let mut canonical = bad.clone();
+        if let Some(kind) = fixed {
+            canonical["kind"] = kind.into();
         }
+        let plain = serde_json::from_value::<Doc>(canonical).unwrap_err();
+        assert_eq!(doc(bad).unwrap_err(), plain.to_string());
+    }
+}
+
+#[test]
+fn a_mistake_after_a_miscased_name_is_reported_as_itself() {
+    // `more` and `ops` sort after `kind`, so serde meets the miscased name first.
+    for bad in [
+        json!({ "name": "g", "kind": "RADIAL", "more": ["spiral"] }),
+        json!({ "name": "g", "kind": "RADIAL", "ops": [{ "op": "osc_stack", "wave": 7 }] }),
+        json!({ "name": "g", "kind": "RADIAL", "more": "big" }),
+    ] {
+        let err = doc(bad.clone()).unwrap_err();
+        assert!(!err.contains("RADIAL"), "{bad}: {err}");
+        let mut canonical = bad;
+        canonical["kind"] = "Radial".into();
+        let plain = serde_json::from_value::<Doc>(canonical).unwrap_err();
+        assert_eq!(err, plain.to_string());
     }
 }
 
 #[test]
 fn other_errors_are_untouched() {
-    let bad = json!({ "name": 3, "kind": "radial" });
-    let plain = serde_json::from_value::<Doc>(bad.clone()).unwrap_err();
-    assert_eq!(doc(bad).unwrap_err(), plain.to_string());
+    let plain = serde_json::from_value::<Doc>(json!({ "name": 3, "kind": "Radial" })).unwrap_err();
+    for kind in ["Radial", "radial"] {
+        let err = doc(json!({ "name": 3, "kind": kind })).unwrap_err();
+        assert_eq!(err, plain.to_string(), "{kind}");
+    }
 }
 
 #[test]

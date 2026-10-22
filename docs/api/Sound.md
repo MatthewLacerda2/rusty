@@ -35,7 +35,7 @@ hash, never wall-clock or unseeded RNG). Output is always **stereo**, 16-bit PCM
 | `Sound.ToJson` | `(patch)` | the patch's canonical JSON string |
 
 `patch` is a table **or** its serialized JSON string (from `Sound.ToJson`, or a saved
-`.json`) — both forms decode alike, with the same errors. A name inside it (an enum value such as `kind` or `op`) is read in any case; a stored file holds the canonical spelling. `note` is either a **name** — a letter `A`–`G`, any accidentals (`#`/`s`
+`.json`) — both forms decode alike, with the same errors. Its enum values (`kind`, `wave`, `fx`) are read in any case; a patch or song file read by path (a song's named patch, `Sound.Survey`) must hold the canonical spelling, which `Sound.ToJson` writes. `note` is either a **name** — a letter `A`–`G`, any accidentals (`#`/`s`
 sharp, `b`/`f` flat), then the octave, e.g. `"C#4"`, `"Bb3"`, `"C-1"` — or a **MIDI
 number** (`60` is middle C, `69` is A4 = 440 Hz; fractions are legal microtones).
 Pitch is equal temperament: `f = 440 × 2^((midi − 69) / 12)`. A rejected patch, note

@@ -14,7 +14,7 @@ use mlua::{Lua, Table, Value};
 use serde_json::Value as Json;
 use zimmer::survey::{Register, SongSurvey, TrackSurvey};
 
-use super::{Document, PatchSurvey, SetRollup, SetSurvey, SourceRow};
+use super::{Document, Origin, PatchSurvey, SetRollup, SetSurvey, SourceRow};
 use crate::api::lua_json::recipe_json;
 
 /// Survey the documents `set` lists and build the report table.
@@ -47,12 +47,12 @@ fn document(position: usize, entry: &Value) -> Document {
     match entry {
         Value::String(s) => match s.to_str() {
             Ok(text) if text.trim_start().starts_with('{') => {
-                (format!("#{position}"), recipe_json(entry))
+                (format!("#{position}"), recipe_json(entry), Origin::Inline)
             }
-            Ok(path) => (path.to_owned(), read(&path)),
-            Err(e) => (format!("#{position}"), Err(e.to_string())),
+            Ok(path) => (path.to_owned(), read(&path), Origin::File),
+            Err(e) => (format!("#{position}"), Err(e.to_string()), Origin::Inline),
         },
-        other => (format!("#{position}"), recipe_json(other)),
+        other => (format!("#{position}"), recipe_json(other), Origin::Inline),
     }
 }
 
