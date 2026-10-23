@@ -152,7 +152,9 @@ fn late_update_scripts(_world: &mut World, res: &mut Resources) {
 /// `late_update_scripts` and before `advance_frame`, so a destroyed entity still
 /// took part in this whole tick (Unity's end-of-frame `Object.Destroy`).
 fn apply_destroys(_world: &mut World, res: &mut Resources) {
-    res.script_manager.apply_pending_destroys();
+    let removed = res.script_manager.apply_pending_destroys();
+    let tick = res.play_frame();
+    res.audio.borrow_mut().stop_sources(removed, tick);
 }
 
 /// Step the rapier world and dispatch the resulting trigger and collision

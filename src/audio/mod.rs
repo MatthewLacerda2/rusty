@@ -37,6 +37,7 @@ pub mod recording;
 pub mod reverb;
 pub mod spatial;
 pub mod speaker;
+mod stop;
 
 pub use backend::{AudioBackend, NullBackend, PlayParams, VoiceId, VoiceMix};
 pub use device::KiraBackend;

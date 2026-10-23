@@ -3,6 +3,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use crate::audio::AudioEventKind;
 use crate::components::AudioSourceComponent;
 use crate::core::input::InputState;
 use crate::navigation::NavigationGraph;
@@ -86,4 +87,36 @@ fn leaving_play_silences_voices() {
     world.set_playing(false);
     world.tick(1.0 / 60.0); // exit_play stops all voices
     assert!(!world.resources.audio.borrow().is_source_playing(1));
+}
+
+#[test]
+fn destroying_a_parent_silences_its_looping_child_source_at_once() {
+    let mut world = world_with_audio(false);
+    let (parent, child) = {
+        let mut scene = world.scene().borrow_mut();
+        let parent = scene.add_entity("Vehicle".to_string());
+        let child = scene.add_entity("Engine".to_string());
+        scene.set_parent(child, Some(parent)).unwrap();
+        let hum = AudioSourceComponent {
+            clip: "engine.ogg".to_string(),
+            play_on_start: true,
+            looping: true,
+            ..Default::default()
+        };
+        scene.world.set_audio(child, Some(hum));
+        (parent, child)
+    };
+    world.set_playing(true);
+    world.tick(1.0 / 60.0);
+    assert!(world.resources.audio.borrow().is_source_playing(child));
+
+    world.scene().borrow_mut().request_destroy(parent);
+    world.tick(1.0 / 60.0); // the tick's tail destroys the subtree
+    let audio = world.resources.audio.borrow();
+    assert!(
+        !audio.is_source_playing(child),
+        "the hum stops with its parent"
+    );
+    let stop = audio.events().last().expect("a Stop was logged");
+    assert_eq!((stop.kind, stop.entity), (AudioEventKind::Stop, child));
 }

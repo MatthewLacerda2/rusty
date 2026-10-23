@@ -106,17 +106,19 @@ pub(super) fn apply_scene_load(world: &mut World, res: &mut Resources) {
 /// source leaves with its scene unless it was marked `DontDestroyOnLoad`.
 fn stop_voices(world: &World, res: &Resources, ids: &[u32]) {
     let scene = world.scene.borrow();
+    let at = |&id: &u32| {
+        (
+            id,
+            scene
+                .world
+                .transform(id)
+                .map_or([0.0; 3], |t| t.position.to_array()),
+        )
+    };
     let tick = res.play_frame();
-    let mut audio = res.audio.borrow_mut();
-    let playing: Vec<u32> = ids
-        .iter()
-        .copied()
-        .filter(|&id| audio.is_source_playing(id))
-        .collect();
-    for id in playing {
-        let p = scene.world.world_position(id);
-        audio.stop_source(id, [p.x, p.y, p.z], tick, true);
-    }
+    res.audio
+        .borrow_mut()
+        .stop_sources(ids.iter().map(at), tick);
 }
 
 #[cfg(test)]

@@ -28,6 +28,12 @@ fn env_at(pos: Vec3, time_scale: f32, paused: bool) -> MixEnv {
     }
 }
 
+/// The lookup of a scene where the test voices' entities still exist: entity 1 is
+/// the time-scaled source, any other the unscaled one.
+fn alive(id: u32) -> Option<(AudioSourceComponent, Vec3)> {
+    Some((spatial(id == 1), Vec3::ZERO))
+}
+
 #[test]
 fn moving_the_listener_away_lowers_the_gain_handed_over() {
     let (backend, rec) = RecordingBackend::new();
@@ -80,7 +86,7 @@ fn time_scale_sets_the_rate_of_time_scaled_voices_only() {
     let mut m = AudioMaestro::with_backend(backend);
     m.play_source(1, &spatial(true), [0.0; 3], 0);
     m.play_source(2, &spatial(false), [0.0; 3], 0);
-    m.apply_mix(&env_at(Vec3::ZERO, 0.5, false), |_| None);
+    m.apply_mix(&env_at(Vec3::ZERO, 0.5, false), alive);
     assert_eq!(m.voice_mix(1).unwrap().speed, 0.5);
     assert_eq!(m.voice_mix(2).unwrap().speed, 1.0);
     let scaled = rec.borrow().plays[0].0;
@@ -96,10 +102,10 @@ fn zero_time_scale_or_pause_holds_only_time_scaled_voices_then_resumes() {
         env_at(Vec3::ZERO, 0.0, false),
         env_at(Vec3::ZERO, 1.0, true),
     ] {
-        m.apply_mix(&env, |_| None);
+        m.apply_mix(&env, alive);
         assert!(m.voice_mix(1).unwrap().paused, "{env:?}");
         assert!(!m.voice_mix(2).unwrap().paused, "{env:?}");
-        m.apply_mix(&env_at(Vec3::ZERO, 1.0, false), |_| None);
+        m.apply_mix(&env_at(Vec3::ZERO, 1.0, false), alive);
         assert!(!m.voice_mix(1).unwrap().paused, "resumes after {env:?}");
         assert!(m.is_source_playing(1), "paused, not stopped");
     }
@@ -110,7 +116,7 @@ fn an_unchanged_mix_is_not_resent() {
     let (backend, rec) = RecordingBackend::new();
     let mut m = AudioMaestro::with_backend(backend);
     m.play_source(1, &spatial(true), [0.0; 3], 0);
-    m.apply_mix(&MixEnv::default(), |_| None);
+    m.apply_mix(&MixEnv::default(), alive);
     assert!(rec.borrow().mixes.is_empty());
 }
 
@@ -139,4 +145,21 @@ fn play_at_is_spatialized_and_reaped_when_the_backend_finishes_it() {
     rec.borrow_mut().live.remove(&voice);
     m.apply_mix(&MixEnv::default(), |_| None);
     assert_eq!(m.live_oneshots(), 0);
+}
+
+#[test]
+fn a_voice_whose_entity_is_gone_is_stopped_at_the_next_mix() {
+    let (backend, rec) = RecordingBackend::new();
+    let mut m = AudioMaestro::with_backend(backend);
+    m.play_source(1, &spatial(true), [0.0; 3], 0);
+    m.play_source(2, &spatial(true), [0.0; 3], 0);
+    let gone = rec.borrow().plays[0].0;
+    m.apply_mix(&MixEnv::default(), |id| {
+        (id == 2).then(|| alive(id).unwrap())
+    });
+    assert!(!m.is_source_playing(1) && m.is_source_playing(2));
+    assert!(
+        !rec.borrow().live.contains(&gone),
+        "the backend voice is stopped"
+    );
 }
