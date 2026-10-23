@@ -73,7 +73,8 @@ pub const CONVERTERS: &[Converter] = &[
         // 8: an extracted texture's image is named by its identity, which a saved
         //    scene references (#1130).
         // 9: an extracted texture's extension follows its bytes, not its name (#1072).
-        version: 9,
+        // 10: a colour the file leaves out is glTF's default, white base colour (#1280).
+        version: 10,
         tool: None,
         convert: fbx::convert,
     },
