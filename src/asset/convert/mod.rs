@@ -27,9 +27,10 @@
 //!
 //! **How it is re-made.** A converter writes plain files into a fresh staging
 //! folder, and `stage` swaps the set into place, so a reader in another process
-//! finds the set whole when it opens the `.glb` (#1129). A `<cache>.lock` file
-//! keeps two conversions of one cache from interleaving; a cache already current
-//! is read without taking it (#1166). Atomicity is this module's, never a
+//! finds the set whole when it opens the `.glb` (#1129). A lock file in the
+//! project's machine-local `cache/`, never in `assets/` (`lock`, #1190), keeps two
+//! conversions of one cache from interleaving; a cache already current is read
+//! without taking it (#1166). Atomicity is this module's, never a
 //! converter's.
 //!
 //! **What a conversion left out.** A converter never logs: it returns what it
