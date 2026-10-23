@@ -64,7 +64,8 @@ fn gltf_reads_full_metallic_roughness_material() {
     assert_eq!(mat.emissive, [0.1, 0.2, 0.3]);
     // The external base-color URI resolved against the glTF dir, with `%20` decoded.
     let expected = dir
-        .join("tex/brick wall.png")
+        .join("tex")
+        .join("brick wall.png")
         .to_string_lossy()
         .into_owned();
     assert_eq!(mat.base_color_map, Some(expected.into()));
