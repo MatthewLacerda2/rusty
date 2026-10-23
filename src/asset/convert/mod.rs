@@ -52,7 +52,8 @@
 //! brings every source under the project's `assets/` up to date first, then it
 //! reads the cache as it stands, and a source changed meanwhile converts at the
 //! first edit frame after Stop. The standalone player refreshes and holds the
-//! same way.
+//! same way; an exported project (`dev::export`, #1267) ships the cache without
+//! its sources, so the player there converts nothing and never starts Blender.
 //!
 //! **What a scene saves** for an extracted texture is never its cache path but
 //! `model.fbx#tex/<identity>`, which [`texture_ref`] resolves (#1130).
@@ -75,7 +76,10 @@ pub mod texture_ref;
 
 pub use converter::{converter_for, Converted, Converter, Skip, CONVERTERS};
 pub use depends::{Dependency, Seen};
-pub use gate::{conversion_allowed, convert_held, mark_standalone, refresh_sources, PlayHold};
+pub use gate::{
+    conversion_allowed, convert_held, convertible_sources, mark_standalone, refresh_sources,
+    PlayHold,
+};
 pub use stage::{textures_dirs, Staging};
 
 use super::ImportError;

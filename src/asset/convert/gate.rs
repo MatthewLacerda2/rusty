@@ -5,9 +5,10 @@
 //! its earlier instances don't have. Unity's runtime loads never import either; it
 //! refreshes the asset database before Play instead. So `app::GameWorld` brings
 //! every converted source in the project up to date ([`refresh_sources`]) and then
-//! takes a [`PlayHold`] for as long as it plays, the standalone player too (no
-//! export step ships its caches yet, #1267). Conversion runs only while no hold is
-//! taken.
+//! takes a [`PlayHold`] for as long as it plays, the standalone player too: a
+//! project run from its folder may hold sources, while an exported one
+//! (`dev::export`, #1267) has none, so its refresh finds nothing to convert.
+//! Conversion runs only while no hold is taken.
 //!
 //! While it is off, [`cached_gltf`](super::cached_gltf) serves the cache as it
 //! stands, current or not, and holds back each source it found changed;
@@ -124,6 +125,18 @@ pub fn refresh_sources(root: &Path) -> usize {
     if !conversion_allowed() {
         return 0;
     }
+    let sources = convertible_sources(root);
+    for source in &sources {
+        if let Err(e) = cached_gltf(source) {
+            log::warn!("[Asset] {}: {e}", source.display());
+        }
+    }
+    sources.len()
+}
+
+/// Every source under `root` a converter reads, sorted: what a refresh brings up to
+/// date and an export (`dev::export`, #1267) converts and leaves behind.
+pub fn convertible_sources(root: &Path) -> Vec<PathBuf> {
     let mut sources = Vec::new();
     crate::asset::manifest::walk(root, &mut |path| {
         if converter_for(path).is_some() {
@@ -131,12 +144,7 @@ pub fn refresh_sources(root: &Path) -> usize {
         }
     });
     sources.sort();
-    for source in &sources {
-        if let Err(e) = cached_gltf(source) {
-            log::warn!("[Asset] {}: {e}", source.display());
-        }
-    }
-    sources.len()
+    sources
 }
 
 /// Convert every source held back while conversion was off, once it is on again.

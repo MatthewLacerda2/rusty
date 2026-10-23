@@ -24,6 +24,7 @@
 //!   lua_surface — `Debug.*` and the `*.Bake` verbs, installed onto the Lua surface (#737)
 //!   stats       — frame stats: the schedule timing probe + render counters (#433)
 //!   bench       — the stress scene and report behind `make bench` (#835)
+//!   export      — ship a project: runtime files and the import cache, no sources (#1267)
 //!   providers   — the boundary paid, networked calls live behind: key, budget, edit-mode only (#383)
 //!
 //! Status: harness + scenario runner implemented (issue #3); offscreen screenshot
@@ -41,6 +42,7 @@ pub mod bridge;
 pub mod capture;
 pub mod command_channel;
 pub mod console;
+pub mod export;
 pub mod generate_lighting;
 pub mod harness;
 pub mod lighting_bake;
