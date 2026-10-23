@@ -12,7 +12,9 @@ Each `subObject`'s `reference` is the canonical `path::sub_object` string and
 round-trips with `AssetRef` / `import_sub_mesh`, so it can be handed straight to the
 mesh-instantiation path to place exactly what the manifest names. Files that fail to
 import are skipped; a missing root yields an empty list. Output is deterministic
-(files sorted by path, sub-objects in source order).
+(files sorted by path, sub-objects in source order). During Play nothing is converted
+(#1253), so an `.fbx` is listed from its last import: the one made as Play began, or
+before a source changed during Play.
 
 | Function | Signature | Returns |
 |---|---|---|

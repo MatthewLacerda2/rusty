@@ -127,20 +127,31 @@ fn entry_for(path: &str) -> Option<AssetEntry> {
 /// Recursively gather model-file paths under `dir` (forward-slashed). Unreadable
 /// directories are silently skipped, mirroring the content browser's tolerance.
 fn collect_model_paths(dir: &Path, out: &mut Vec<String>) {
+    walk(dir, &mut |path| {
+        let as_str = paths::to_slash(path);
+        if is_model_path(&as_str) {
+            out.push(as_str);
+        }
+    });
+}
+
+/// Visit every file under `dir`, recursively, the import cache left out (the source
+/// is the asset, #1024). A symlinked folder is not followed, so a link back up the
+/// tree never loops; an unreadable folder is skipped. The one walk of a project's
+/// assets: the manifest's and Play's refresh (`convert::refresh_sources`, #1253).
+pub(crate) fn walk(dir: &Path, visit: &mut dyn FnMut(&Path)) {
     let Ok(read) = std::fs::read_dir(dir) else {
         return;
     };
     for entry in read.flatten() {
         let path = entry.path();
         if super::convert::is_import_cache(&path) {
-            continue; // Converted copies: the source is the asset (#1024).
-        } else if path.is_dir() {
-            collect_model_paths(&path, out);
-        } else {
-            let as_str = paths::to_slash(&path);
-            if is_model_path(&as_str) {
-                out.push(as_str);
-            }
+            continue;
+        }
+        match entry.file_type() {
+            Ok(kind) if kind.is_dir() => walk(&path, visit),
+            Ok(_) => visit(&path),
+            Err(_) => {}
         }
     }
 }

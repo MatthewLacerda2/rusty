@@ -8,9 +8,9 @@
 //! emitters (`render::passes::particles::mesh_cache`).
 //!
 //! It runs on the edit frame (`app::GameWorld::edit_frame`), every frame outside
-//! Play, stepped or frozen. A model can be written during Play (`Scene.Instantiate`
-//! converts a changed source, #1253); its note waits for the first edit frame after
-//! Stop, and by then the restored edit scene was read from disk after it
+//! Play, stepped or frozen. A model written during Play (an `.obj` or glTF writer;
+//! conversion itself waits for Stop, #1253) has its note wait for the first edit
+//! frame after Stop, and by then the restored edit scene was read from disk after it
 //! (`Scene::meshes_read_at`), so nothing is read twice.
 
 use crate::core::fs::written::{written_since, Stale};

@@ -13,7 +13,7 @@
 
 use super::depends::Dependency;
 use super::{Converted, Converter, Skip};
-use crate::core::{collections::Set, hash};
+use crate::core::collections::Set;
 use std::path::{Path, PathBuf};
 use std::sync::{LazyLock, Mutex, PoisonError};
 
@@ -23,8 +23,7 @@ use std::sync::{LazyLock, Mutex, PoisonError};
 static WARNED: LazyLock<Mutex<Set<(PathBuf, String)>>> = LazyLock::new(Mutex::default);
 
 /// What the stamp records: the converter, its version and the source's digest.
-pub(super) fn stamp(converter: &Converter, source: &[u8]) -> String {
-    let digest = hash::fnv1a64(source);
+pub(super) fn stamp(converter: &Converter, digest: u64) -> String {
     format!("{} {} {digest:016x}\n", converter.name, converter.version)
 }
 

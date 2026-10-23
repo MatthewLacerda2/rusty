@@ -38,10 +38,12 @@ impl World {
 impl super::GameWorld {
     /// The edit frame: what runs in place of the schedule on every frame outside
     /// Play, stepped or frozen (`shell::frame::advance_sim` calls it on a frozen one).
-    /// Every edit-mode follower hangs off it: a model the engine re-wrote reloads
-    /// into its entities (#1242), a bone the designer moved still skins (#453), and
-    /// the UI's texture sizes are read (#1241).
+    /// Every edit-mode follower hangs off it: a model Play found changed converts
+    /// now (#1253), a model the engine re-wrote reloads into its entities (#1242),
+    /// a bone the designer moved still skins (#453), and the UI's texture sizes are
+    /// read (#1241).
     pub fn edit_frame(&mut self) {
+        crate::asset::convert::convert_held();
         self.refresh_ui_textures();
         let mut scene = self.world.scene.borrow_mut();
         self.resources.model_writes.follow(&mut scene);

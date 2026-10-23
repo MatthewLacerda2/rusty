@@ -32,10 +32,25 @@ impl GameWorld {
     /// no edit snapshot is taken (there is no edit mode to return to) and Play is
     /// requested at once, so the next `tick` enters it and reports
     /// [`PlayTransition::Entered`](super::PlayTransition::Entered) like the editor's
-    /// Play button would.
+    /// Play button would. Entering it refreshes the project's converted models and
+    /// then holds conversion off, as the editor's Play does (#1253).
     pub fn boot_standalone(&mut self) {
+        crate::asset::convert::mark_standalone();
         self.resources.standalone = true;
         self.set_playing(true);
+    }
+
+    /// Bring the project's converted sources up to date and the scene's instances
+    /// with them, then refuse conversion for the session (#1253), as Unity refreshes
+    /// its assets before Play and its runtime loads never import. Runs before the
+    /// edit snapshot, so Stop restores the refreshed scene. The standalone player
+    /// does the same: nothing ships its caches yet (#1267).
+    pub(super) fn refresh_then_hold_imports(&mut self) {
+        use crate::asset::convert::{refresh_sources, PlayHold};
+        refresh_sources(&self.resources.sources_root);
+        let mut scene = self.world.scene.borrow_mut();
+        self.resources.model_writes.follow(&mut scene);
+        self.resources.play_hold = Some(PlayHold::take());
     }
 
     /// Whether the game called `Application.Quit()` and no host has consumed it yet.
@@ -262,3 +277,7 @@ mod standalone_tests;
 #[cfg(test)]
 #[path = "play_tests.rs"]
 mod play_tests;
+
+#[cfg(test)]
+#[path = "import_tests/mod.rs"]
+mod import_tests;

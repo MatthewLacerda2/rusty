@@ -8,11 +8,15 @@
 //! once per mesh entity on a scene load, a `Scene.Instantiate` and a prefab
 //! propagation, and an atlas may back every material of a model: hashing each
 //! texture on each check would read gigabytes per load. So this process remembers
-//! each path's digest with the file's length, and reads it again only when the
-//! length changes (a file appearing or vanishing included). A file the engine
-//! itself wrote is read again whatever its length: each look first drains the
-//! write log, `core::fs::written`, and forgets the paths it names (#1219). An
-//! outside tool's edit that keeps the length is seen by the next process.
+//! each path's digest with the file's length and modification time, and reads it
+//! again only when either changes (a file appearing or vanishing included). A file
+//! the engine itself wrote is read again whatever its metadata: each look first
+//! drains the write log, `core::fs::written`, and forgets the paths it names
+//! (#1219). Play's refresh looks at every source this way too ([`digest`], #1253),
+//! so an unchanged project costs one `stat` per source.
+//!
+//! The modification time is file metadata, not a clock read: it decides only
+//! whether to read the file again, never what the sim sees, which is the digest.
 //!
 //! Only a regular file is read: a texture path naming a folder, a FIFO or
 //! `/dev/zero` is absent, never read (which would hang or never end).
@@ -23,6 +27,7 @@ use crate::core::fs::written::written_since;
 use crate::core::{collections::Map, hash};
 use std::path::{Path, PathBuf};
 use std::sync::{LazyLock, Mutex, PoisonError};
+use std::time::Duration;
 
 /// One external file a conversion looked at, as it found it.
 #[derive(Clone, Debug, PartialEq)]
@@ -90,6 +95,7 @@ impl Noted {
 
 struct Look {
     len: u64,
+    modified: Option<Duration>,
     digest: u64,
     /// The file's canonical path, which a note by another spelling matches.
     canonical: Option<PathBuf>,
@@ -162,13 +168,26 @@ const DEPENDS: &str = "depends ";
 const ABSENT: &str = "absent";
 const UNREADABLE: &str = "unreadable";
 
+/// What the file at `path` holds now, by the same memo a dependency's look uses:
+/// a source's digest, read again only when its length or mtime changed.
+pub(super) fn digest(path: &Path) -> Seen {
+    seen(path)
+}
+
+/// When the file was last modified, as its metadata says: `None` where the
+/// platform keeps no such time. Compared for equality, never against a clock.
+fn modified(meta: &std::fs::Metadata) -> Option<Duration> {
+    let time = meta.modified().ok()?;
+    time.duration_since(std::time::UNIX_EPOCH).ok()
+}
+
 /// What `path` holds now, read only when this process has not read it at its
-/// current length.
+/// current length and modification time.
 fn seen(path: &Path) -> Seen {
-    let Some(len) = std::fs::metadata(path)
+    let Some((len, modified)) = std::fs::metadata(path)
         .ok()
         .filter(std::fs::Metadata::is_file)
-        .map(|meta| meta.len())
+        .map(|meta| (meta.len(), modified(&meta)))
     else {
         return Seen::Absent;
     };
@@ -176,7 +195,8 @@ fn seen(path: &Path) -> Seen {
     let (known, since) = {
         let mut looks = lock();
         looks.forget_written();
-        let known = looks.files.get(path).filter(|look| look.len == len);
+        let known =
+            (looks.files.get(path)).filter(|look| look.len == len && look.modified == modified);
         (known.map(|look| look.digest), looks.seen)
     };
     if let Some(digest) = known {
@@ -200,6 +220,7 @@ fn seen(path: &Path) -> Seen {
     let len = bytes.len() as u64;
     let look = Look {
         len,
+        modified,
         digest,
         canonical,
         reads,
