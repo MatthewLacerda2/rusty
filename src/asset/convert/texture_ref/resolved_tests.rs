@@ -88,12 +88,14 @@ fn a_glb_another_process_writes_is_picked_up_on_the_callers_beat() {
     let red = base_color_map(&path, "Red");
     let glb = cache_location(&path).unwrap();
     let aside = glb.with_extension("aside");
+    // lint: allow(atomic-write) moves the cache aside, as if never converted
     std::fs::rename(&glb, &aside).unwrap();
     assert_eq!(file(&red), None, "no cache to read");
 
     // The caller remembers its miss, and the `.glb` comes back outside the write log.
     let mut caller = Freshness::new();
     caller.miss(&red);
+    // lint: allow(atomic-write) the test plays another process writing the cache
     std::fs::rename(&aside, &glb).unwrap();
     let picked_up = (1..=MISS_RETRY_FRAMES).find(|_| caller.poll_with(exists).stale.contains(&red));
     assert!(picked_up.is_some(), "within one beat of the caller");
