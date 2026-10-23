@@ -5,11 +5,15 @@
 //! stamp and propagation. Split out of `serialize` (#453) to keep it under the size
 //! cap. GPU buffers are never stored on disk, only rebuilt here.
 
-use glam::Mat4;
+use std::collections::BTreeMap;
+
+use glam::{Mat4, Vec3};
 
 use crate::asset::{self, MeshVertex, SubMesh};
 use crate::components::mesh::Vertex;
-use crate::components::Entity;
+use crate::components::{ColliderShape, Entity};
+use crate::core::fs::written::Stale;
+use crate::ecs::World;
 use crate::scene::authoring::{primitive_geometry, Primitive};
 
 /// Convert one imported `MeshVertex` (pure data) into the renderer's `Vertex`,
@@ -120,26 +124,83 @@ pub fn rehydrate_entity_mesh(entity: &mut Entity) {
 /// touches them, and their rig is bound to live bones. Returns how many were rebuilt.
 pub fn reimport_model(scene: &mut crate::scene::Scene, path: &str) -> usize {
     let prefix = format!("{path}{}", asset::REF_SEPARATOR);
+    reimport_where(scene, |reference| reference.starts_with(&prefix))
+}
+
+/// Re-import every unskinned mesh in `scene` whose model file `stale` names: the
+/// engine re-wrote it (#1242), and Unity updates every instance of a re-imported
+/// model. Skinned meshes keep theirs, as in [`reimport_model`]. Each distinct file
+/// is matched against `stale` once. Returns how many were rebuilt.
+pub fn reimport_written(scene: &mut crate::scene::Scene, stale: &Stale) -> usize {
+    if stale.is_empty() {
+        return 0;
+    }
+    let mut named: BTreeMap<String, bool> = BTreeMap::new();
+    reimport_where(scene, |reference| {
+        let Some(file) = asset_ref_file(reference) else {
+            return false;
+        };
+        *named
+            .entry(file)
+            .or_insert_with_key(|file| stale.matches(file))
+    })
+}
+
+/// Re-import every mesh whose reference `names` accepts ([`reimport_entity_mesh`]).
+fn reimport_where(scene: &mut crate::scene::Scene, mut names: impl FnMut(&str) -> bool) -> usize {
     let mut rebuilt = 0;
     for id in scene.world.ids_with_mesh() {
-        let Some(mut mesh) = scene.world.mesh_mut(id) else {
-            continue;
-        };
-        let from_model = mesh
-            .asset_ref
-            .as_deref()
-            .is_some_and(|r| r.starts_with(&prefix));
-        if !from_model || mesh.skin.is_some() {
-            continue;
-        }
-        let fresh = rehydrate_asset_mesh(&mesh.asset_ref);
-        if fresh.skin.is_none() && !fresh.vertices.is_empty() {
-            (mesh.vertices, mesh.indices) = (fresh.vertices, fresh.indices);
-            mesh.is_dirty.set(true);
+        let named = scene
+            .world
+            .mesh(id)
+            .is_some_and(|mesh| mesh.asset_ref.as_deref().is_some_and(&mut names));
+        if named && reimport_entity_mesh(&mut scene.world, id) {
             rebuilt += 1;
         }
     }
     rebuilt
+}
+
+/// Re-import one entity's mesh geometry from its reference, and refit its mesh
+/// collider's box to it. Skinned meshes keep theirs: their rig is bound to live
+/// bones. A model that yields nothing (gone, or now skinned) keeps the old geometry.
+/// Returns whether the mesh was rebuilt.
+fn reimport_entity_mesh(world: &mut World, id: u32) -> bool {
+    let Some(mut mesh) = world.mesh_mut(id) else {
+        return false;
+    };
+    if mesh.skin.is_some() {
+        return false;
+    }
+    let reference = mesh.asset_ref.as_deref();
+    let Some(sub) = reference.and_then(|r| asset::import_sub_mesh(r).ok()) else {
+        return false;
+    };
+    let Some(bounds) = sub.bounds().filter(|_| sub.skin.is_none()) else {
+        return false;
+    };
+    mesh.vertices = sub.vertices.iter().map(vertex_from_imported).collect();
+    mesh.indices = sub.indices;
+    mesh.is_dirty.set(true);
+    drop(mesh);
+    refit_mesh_collider(world, id, bounds);
+    true
+}
+
+/// Size `id`'s mesh collider (if it has one) to `(min, max)`, as Unity's
+/// `MeshCollider` follows its shared mesh. The guard refreshes the world AABB.
+fn refit_mesh_collider(world: &mut World, id: u32, (min, max): (Vec3, Vec3)) {
+    let Some(mut collider) = world.collider_mut(id) else {
+        return;
+    };
+    if let ColliderShape::Mesh {
+        local_min,
+        local_max,
+        ..
+    } = &mut collider.shape
+    {
+        (*local_min, *local_max) = (min, max);
+    }
 }
 
 /// Build an `"Asset"` mesh component from a path-based reference, importing its

@@ -104,6 +104,8 @@ pub struct Resources {
     /// The schedule's observer (#433) — the dev layer's frame-stats timer. `None`
     /// unless installed via `GameWorld::set_probe`; it only watches the frame.
     pub(super) probe: Option<Box<dyn super::SystemProbe>>,
+    /// How far the edit scene's meshes follow the write log (#1242).
+    pub(super) model_writes: crate::scene::model_writes::ModelWrites,
 }
 
 impl Resources {
@@ -167,6 +169,7 @@ impl Resources {
             animation_graphs: GraphCache::default(),
             animation_events: Vec::new(),
             probe: None,
+            model_writes: Default::default(),
         }
     }
 

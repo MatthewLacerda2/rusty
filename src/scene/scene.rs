@@ -121,6 +121,9 @@ pub struct Scene {
     pub ui_time: f32,
     /// Per-entity runtime shader-param overrides (#670). Runtime-only, never serialized.
     pub shader_overrides: crate::scene::shader_overrides::ShaderOverrides,
+    /// The write-log generation (`core::fs::written`) when the meshes were last read
+    /// from a document: every note up to it is in them (#1242). Never serialized.
+    pub meshes_read_at: u64,
 }
 
 impl Default for Scene {
@@ -148,6 +151,7 @@ impl Default for Scene {
             shader_time: 0.0,
             ui_time: 0.0,
             shader_overrides: Default::default(),
+            meshes_read_at: 0,
         }
     }
 }

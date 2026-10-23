@@ -81,6 +81,11 @@ pub fn refresh_ui_textures(reader: &mut TextureSizeReader, game: &GameWorld) {
 /// Every tick, stepped or not, first refreshes the UI's texture sizes through
 /// `ui_textures`, as the harness's `tick_unless_quit` does; so does a frozen frame
 /// outside Play.
+///
+/// Every edit-mode follower (a re-written model reloading into its entities, a
+/// moved bone skinning) hangs off [`GameWorld::edit_frame`], which runs on every
+/// frame outside Play, stepped or frozen: a tick runs it in place of the schedule,
+/// and a frozen frame here calls it directly. Add a new one there, not here.
 pub fn advance_sim(
     game: &mut GameWorld,
     delta_time: f32,
@@ -107,12 +112,16 @@ pub fn advance_sim(
     // No step this frame: the sim is frozen, but a Play/Stop pressed while paused must
     // still take effect without advancing the clock or the schedule. Outside Play a
     // pause can outlive Stop (`Time::reset` keeps it), so the editor's UI still reads
-    // fresh texture sizes; in Play they stay tick-driven, as headless.
+    // fresh texture sizes and the edit frame still runs, on the scene the transition
+    // left; in Play both stay tick-driven, as headless.
     if !stepped {
         if !game.is_playing() {
             refresh_ui_textures(ui_textures, game);
         }
         transition = game.poll_transition();
+        if !game.is_playing() {
+            game.edit_frame();
+        }
     }
     transition
 }
@@ -175,6 +184,9 @@ pub fn acquire_frame(renderer: &mut Renderer) -> Option<wgpu::SurfaceTexture> {
     }
 }
 
+#[cfg(test)]
+#[path = "frame_edit_tests.rs"]
+mod frame_edit_tests;
 #[cfg(test)]
 #[path = "frame_tests.rs"]
 mod frame_tests;
