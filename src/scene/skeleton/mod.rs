@@ -23,6 +23,8 @@
 //!   skeleton to a re-imported rig in place, by bone name (#1252, #1265): a bone
 //!   the rig still names keeps its entity; what hung from a dropped one hangs on
 //!   by the same rule as a load.
+//! - [`Scene::despawn_bone`]: destroying one bone takes its subtree, and its
+//!   slots stay missing (skinned at the bind pose) until the skeleton is rebuilt.
 //! - `palette` builds each skinned mesh's posed palette from the bones.
 //! - `hitbox` fits per-bone hitbox colliders and names the bone a hit struck (#464).
 //! - `ragdoll` turns those hitboxes into jointed bodies and switches them between
@@ -73,11 +75,15 @@ impl Scene {
             .ids_with_mesh()
             .into_iter()
             .filter_map(|id| self.world.mesh(id).map(|m| (id, m.skeleton.bones.clone())))
-            .flat_map(|(owner, bones)| {
-                let under_owner = move |&b: &u32| self.world.ancestors(b).any(|a| a == owner);
-                bones.into_iter().filter(under_owner)
-            })
+            .flat_map(|(owner, bones)| bones.into_iter().filter(move |&b| self.is_under(b, owner)))
             .collect()
+    }
+
+    /// Whether `bone`, listed by `owner`'s skeleton, is still one of its bones:
+    /// live and under `owner`. A bone a script moved out from under it (under a
+    /// prop, say) is an ordinary entity now; a destroyed one is a missing slot.
+    pub(super) fn is_under(&self, bone: u32, owner: u32) -> bool {
+        self.world.ancestors(bone).any(|a| a == owner)
     }
 
     /// Whether `id` is a bone: listed by the skeleton of a skinned entity above it.
@@ -103,14 +109,29 @@ impl Scene {
         let Some(bones) = self.world.mesh(owner).map(|m| m.skeleton.bones.clone()) else {
             return;
         };
-        // Walk from the top bones only: the rest are their descendants.
-        let set: BTreeSet<u32> = bones.into_iter().collect();
-        let doomed: BTreeSet<u32> = set
+        let doomed = self.subtrees(bones.into_iter().collect());
+        self.despawn_batch(&doomed);
+    }
+
+    /// `bones` and everything under them, walked from the top ones only: the rest
+    /// are their descendants.
+    pub(super) fn subtrees(&self, bones: BTreeSet<u32>) -> BTreeSet<u32> {
+        bones
             .iter()
             .filter(|&&b| self.world.contains(b))
-            .filter(|&&b| !self.world.parent_id(b).is_some_and(|p| set.contains(&p)))
+            .filter(|&&b| !self.world.parent_id(b).is_some_and(|p| bones.contains(&p)))
             .flat_map(|&b| self.world.self_and_descendants(b))
-            .collect();
+            .collect()
+    }
+
+    /// Despawn bone `id` with everything under it, its descendant bones and what
+    /// hangs from them, in one batch: Unity destroys a GameObject's children with
+    /// it, and no bone of the rig is left a root posed as if it were a child
+    /// (#1273). Their slots in the owner's skeleton keep the dead ids, which mark
+    /// them **missing**: they skin at their bind pose (`palette`) until the
+    /// skeleton is rebuilt (a load, a prefab propagation, a re-import).
+    pub(crate) fn despawn_bone(&mut self, id: u32) {
+        let doomed: BTreeSet<u32> = self.world.self_and_descendants(id).collect();
         self.despawn_batch(&doomed);
     }
 
@@ -126,7 +147,13 @@ impl Scene {
 #[cfg(test)]
 mod bone_refs_tests;
 #[cfg(test)]
+mod connected_bone_tests;
+#[cfg(test)]
 mod despawn_refs_tests;
+#[cfg(test)]
+mod destroy_bone_tests;
+#[cfg(test)]
+mod drop_warn_tests;
 #[cfg(test)]
 mod fixture;
 #[cfg(test)]

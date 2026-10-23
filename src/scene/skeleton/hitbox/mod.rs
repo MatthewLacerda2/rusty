@@ -57,7 +57,8 @@ impl Scene {
         let layer = self.hitbox_layer(&opts.layer)?;
         let mut made = Vec::with_capacity(fits.len());
         for fit in &fits {
-            let Some(&bone) = bones.get(fit.slot) else {
+            // A destroyed bone's slot is missing (#1273): nothing to fit a hitbox to.
+            let Some(&bone) = bones.get(fit.slot).filter(|&&b| self.world.contains(b)) else {
                 continue;
             };
             made.push((names[fit.slot].clone(), self.place_hitbox(bone, fit, layer)));

@@ -225,7 +225,9 @@ else, and is an ordinary entity in every API — `Transform.*`, `Scene.SetParent
   transform. A hitbox `Physics.GenerateHitboxes` made for a removed bone is
   destroyed. A bone's `Rigidbody` and
   `Joint` (a ragdoll's, #466 — see [`Ragdoll`](Ragdoll.md)) are saved by bone
-  name too, the joint's connected bone included. Any other component added to a
+  name too, the joint's connected bone by its name and then its ancestors', so a
+  joint to a bone the model dropped holds to its nearest surviving ancestor, as
+  on a live re-import (#1277). Any other component added to a
   bone itself is not saved: put a hitbox `Collider` on a child of the bone —
   `Physics.GenerateHitboxes(id)` does exactly that for every bone (see
   `Physics`, *Per-bone hitboxes*, #464).
@@ -235,6 +237,8 @@ else, and is an ordinary entity in every API — `Transform.*`, `Scene.SetParent
   its id, its `active` flag, its layer, its components, its children and the
   editor's selection, and moves to its new rest pose (a bone you moved off the
   old rest pose stays where you put it, as an override does on a load). A bone
+  you moved out from under the skinned entity is no bone any more: it stays
+  where it is, and the rig gets a new bone of that name. A bone
   new to the rig is spawned at rest. A bone the rig dropped is destroyed: what
   hung from it, a joint or marker pointing at it, moves to its nearest ancestor
   bone, as on a load, with a warning, and its ragdoll body and any other
@@ -245,6 +249,13 @@ else, and is an ordinary entity in every API — `Transform.*`, `Scene.SetParent
   offset. A load cannot know the old rest pose, and a live re-import behaves
   exactly like a reload, so re-place the attachment by hand.
 - **Destroying** the skinned entity destroys its skeleton and what hangs from it.
+  Destroying **one bone** destroys its subtree with it, Unity's way (#1273): its
+  descendant bones and everything hanging from them. Their slots in the skeleton
+  are then **missing**: the mesh skins them at their bind pose, the Animator's
+  writes to them do nothing, and `Animator.GetBone` returns `nil` for them. They
+  stay missing until the skeleton is rebuilt from the model: a reload (bones are
+  never saved, so a saved scene gets them back), a prefab propagation or a
+  re-import.
 
 `Debug.Snapshot()` leaves bones out by default; `Debug.Snapshot({ bones = true })`
 includes them. The editor's Hierarchy shows a skeleton collapsed.

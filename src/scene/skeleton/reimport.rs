@@ -26,14 +26,17 @@ use crate::scene::Scene;
 pub struct Parked {
     /// Each live bone, in slot order: its id and its bone chain (its name first).
     bones: Vec<(u32, Vec<String>)>,
-    /// The bones off the old rig's rest pose, by name: kept as they are.
-    overrides: BTreeMap<String, TransformComponent>,
+    /// The bones off the old rig's rest pose, by id: a bone the new rig keeps
+    /// keeps its pose. Keyed by entity, not name, so two joints of one name each
+    /// keep their own (#1277); only a save keys them by name.
+    overrides: BTreeMap<u32, TransformComponent>,
 }
 
 impl Scene {
     /// Note `owner`'s bones against the rig they were built from, before it is
     /// replaced: each bone's name and chain, and which were moved off its rest
-    /// pose. Nothing is despawned. Empty for an entity with no skin.
+    /// pose. Nothing is despawned. Empty for an entity with no skin. A bone moved
+    /// out from under `owner` is no longer a bone, and is left where it is.
     pub(crate) fn take_skeleton(&self, owner: u32) -> Parked {
         let Some((skin, bones)) = self
             .world
@@ -44,14 +47,16 @@ impl Scene {
         };
         let mut parked = Parked::default();
         for (slot, bone) in bones.into_iter().enumerate() {
+            if !self.is_under(bone, owner) {
+                continue;
+            }
             let Some(transform) = self.world.transform(bone).map(|t| t.clone()) else {
                 continue;
             };
-            let chain = bone_chain(&skin, slot);
             if !transform.approx_eq(&rest_local(&skin, slot), OVERRIDE_EPS) {
-                parked.overrides.insert(chain[0].clone(), transform);
+                parked.overrides.insert(bone, transform);
             }
-            parked.bones.push((bone, chain));
+            parked.bones.push((bone, bone_chain(&skin, slot)));
         }
         parked
     }
@@ -70,33 +75,23 @@ impl Scene {
         for (id, chain) in old.iter().rev() {
             pool.entry(chain[0].as_str()).or_default().push(*id);
         }
-        let mut bones: Vec<u32> = Vec::new();
-        for (slot, skin) in skin
-            .iter()
-            .flat_map(|s| (0..s.local_bind.len()).map(move |i| (i, s)))
-        {
-            let parent = match skin.parents.get(slot).copied().flatten() {
-                Some(p) if p < slot => bones[p],
-                _ => owner,
-            };
-            let name = skin.name(slot);
-            let pose = overrides
-                .remove(&name)
-                .unwrap_or_else(|| rest_local(skin, slot));
-            let bone = match pool.get_mut(name.as_str()).and_then(Vec::pop) {
-                Some(bone) => {
-                    if self.world.parent_id(bone) != Some(parent) {
-                        let _ = self.set_parent(bone, Some(parent));
-                    }
-                    if let Some(mut t) = self.world.transform_mut(bone) {
-                        *t = pose;
-                    }
-                    bone
+        let bones = skin.map_or_else(Vec::new, |skin| {
+            self.walk_slots(owner, &skin, |scene, slot, parent| {
+                let name = skin.name(slot);
+                let rest = rest_local(&skin, slot);
+                let Some(bone) = pool.get_mut(name.as_str()).and_then(Vec::pop) else {
+                    return scene.spawn_bone(parent, name, rest);
+                };
+                if scene.world.parent_id(bone) != Some(parent) {
+                    let _ = scene.set_parent(bone, Some(parent));
                 }
-                None => self.spawn_bone(parent, name, pose),
-            };
-            bones.push(bone);
-        }
+                let pose = overrides.remove(&bone).unwrap_or(rest);
+                if let Some(mut t) = scene.world.transform_mut(bone) {
+                    *t = pose;
+                }
+                bone
+            })
+        });
         let left: BTreeSet<u32> = pool.into_values().flatten().collect();
         if let Some(mut mesh) = self.world.mesh_mut(owner) {
             mesh.skeleton.bones = bones;
@@ -110,22 +105,26 @@ impl Scene {
 
     /// Despawn `removed`, `owner`'s bones the new rig no longer has: what hung
     /// from them hangs on by bone name, the leaves naming them re-bind the same
-    /// way, and what was authored on them (`overrides` left unmatched included)
-    /// is warned about.
+    /// way, and what was authored on them (`overrides`, the removed bones' own) is
+    /// warned about. Nothing removed (a vertex-only re-import) costs nothing.
     fn drop_bones(
         &mut self,
         owner: u32,
         removed: &BTreeMap<u32, Vec<String>>,
-        overrides: BTreeMap<String, TransformComponent>,
+        overrides: BTreeMap<u32, TransformComponent>,
     ) {
-        for name in overrides.into_keys() {
-            log::warn!(
-                "[Asset] entity {owner}: the skeleton has no bone '{name}' any more; \
-                 its transform override was dropped."
-            );
+        if removed.is_empty() {
+            return;
         }
         let mut hung: Vec<Hung> = Vec::new();
         for (&bone, chain) in removed {
+            if overrides.contains_key(&bone) {
+                log::warn!(
+                    "[Asset] entity {owner}: the skeleton has no bone '{}' any more; \
+                     its transform override was dropped.",
+                    chain[0]
+                );
+            }
             self.warn_dropped_bone(owner, bone, &chain[0]);
             for child in self.world.children(bone) {
                 if !removed.contains_key(&child) && !self.is_bone(child) {
@@ -137,10 +136,7 @@ impl Scene {
             let _ = self.set_parent(*child, Some(owner));
         }
         let refs: Vec<BoneRef> = self.park_bone_refs(owner, removed);
-        let doomed: BTreeSet<u32> = removed
-            .keys()
-            .flat_map(|&b| self.world.self_and_descendants(b))
-            .collect();
+        let doomed = self.subtrees(removed.keys().copied().collect());
         self.despawn_batch(&doomed);
         self.attach_to_bones(hung);
         self.bind_bone_refs(refs);

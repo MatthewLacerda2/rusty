@@ -37,6 +37,12 @@ pub(super) fn hero(scene: &mut Scene, tag: &str) -> u32 {
 /// hangs under an `Armature` rotated 90° about X and scaled 0.5 — the offset a
 /// Blender export puts between the mesh and the skeleton.
 pub(super) fn armature_skin() -> SkinData {
+    chain_skin(&["hips", "spine", "head"])
+}
+
+/// A chain of joints named `names`, each 1 unit up its parent, the root under
+/// [`armature_skin`]'s `Armature`: a rig to re-import an armature rig to.
+pub(super) fn chain_skin(names: &[&str]) -> SkinData {
     let armature = Mat4::from_scale_rotation_translation(
         Vec3::splat(0.5),
         Quat::from_rotation_x(std::f32::consts::FRAC_PI_2),
@@ -46,8 +52,16 @@ pub(super) fn armature_skin() -> SkinData {
         translation: Vec3::Y,
         ..JointTransform::default()
     };
-    let local_bind = vec![JointTransform::default(), step, step];
-    let parents = vec![None, Some(0), Some(1)];
+    let local_bind: Vec<JointTransform> = (0..names.len())
+        .map(|s| {
+            if s == 0 {
+                JointTransform::default()
+            } else {
+                step
+            }
+        })
+        .collect();
+    let parents: Vec<Option<usize>> = (0..names.len()).map(|s| s.checked_sub(1)).collect();
     let mut bind_global: Vec<Mat4> = Vec::new();
     for (slot, local) in local_bind.iter().enumerate() {
         let parent = parents[slot].map_or(armature, |p: usize| bind_global[p]);
@@ -58,10 +72,26 @@ pub(super) fn armature_skin() -> SkinData {
         bind_global,
         local_bind,
         parents,
-        joint_nodes: vec![1, 2, 3],
+        joint_nodes: (1..=names.len()).collect(),
         mesh_inverse: Mat4::IDENTITY,
-        names: vec!["hips".into(), "spine".into(), "head".into()],
+        names: names.iter().map(|n| n.to_string()).collect(),
     }
+}
+
+/// Re-import `rig` to `skin` in place, as a re-written model does.
+pub(super) fn reimport_to(scene: &mut Scene, rig: u32, skin: SkinData) {
+    let parked = scene.take_skeleton(rig);
+    scene.world.mesh_mut(rig).unwrap().skin = Some(skin);
+    scene.restore_skeleton(rig, parked);
+}
+
+/// The engine warnings `f` logs on this thread.
+pub(super) fn warnings_of(f: impl FnOnce()) -> Vec<String> {
+    crate::logging::init();
+    let console = std::cell::RefCell::new(crate::scripting::ConsoleLogs::new());
+    crate::logging::forward(&console); // what earlier code on this thread logged
+    f();
+    crate::logging::forward(&console)
 }
 
 /// An entity carrying a skinned mesh of [`armature_skin`] (no file behind it).

@@ -103,8 +103,8 @@ impl SavedBones {
         {
             self.overrides.insert(name.clone(), doc.transform.clone());
         }
-        let bone_name = |id: u32| Some(skin.name(bones.iter().position(|&b| b == id)?));
-        if let Some(body) = bone_body(doc, bone_name) {
+        let chain_of = |id: u32| Some(bone_chain(skin, bones.iter().position(|&b| b == id)?));
+        if let Some(body) = bone_body(doc, chain_of) {
             self.bodies.insert(name.clone(), body);
         }
         if carries_components(doc) {
@@ -157,19 +157,22 @@ fn reparent_attachments(
 }
 
 /// A bone's `Rigidbody` and `Joint`, with a joint to another bone of the same
-/// skeleton (`bone_name` resolves it) saved by that bone's name, and one to another
+/// skeleton (`chain_of` resolves it) saved by that bone's chain, and one to another
 /// skeleton's bone by its `bone_refs`. A joint to any other entity keeps its id.
 /// `None` for a bone with neither.
-fn bone_body(doc: &Entity, bone_name: impl Fn(u32) -> Option<String>) -> Option<BoneBody> {
+fn bone_body(doc: &Entity, chain_of: impl Fn(u32) -> Option<Vec<String>>) -> Option<BoneBody> {
     if doc.rigidbody.is_none() && doc.joint.is_none() {
         return None;
     }
     let mut joint = doc.joint.clone();
-    let connected_bone = joint.as_mut().and_then(|j| {
-        let name = bone_name(j.connected_body?)?;
-        j.connected_body = None;
-        Some(name)
-    });
+    let connected_bone = joint
+        .as_mut()
+        .and_then(|j| {
+            let chain = chain_of(j.connected_body?)?;
+            j.connected_body = None;
+            Some(chain)
+        })
+        .unwrap_or_default();
     let bone_refs = doc
         .bone_refs
         .iter()

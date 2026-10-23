@@ -5,7 +5,7 @@ use std::collections::BTreeSet;
 
 use glam::Vec3;
 
-use super::fixture::{animated_model, armature_owner};
+use super::fixture::{animated_model, armature_owner, chain_skin, reimport_to, warnings_of};
 use super::HITBOX_NAME;
 use crate::asset::fixtures_anim::ANIMATED_GLTF;
 use crate::components::ColliderComponent;
@@ -226,18 +226,14 @@ fn a_bone_gone_with_its_ancestors_leaves_its_child_on_the_rig() {
     let pistol = hang_gun(&mut scene, rig, "hips");
 
     let old_bones = scene.world.mesh(rig).unwrap().skeleton.bones.clone();
-    let attachments = scene.take_skeleton(rig);
     // The new rig keeps only the root, renamed: `head`'s whole chain is gone.
-    let mut skin = scene.world.mesh(rig).unwrap().skin.clone().unwrap();
-    skin.names = vec!["pelvis".to_string()];
-    skin.local_bind.truncate(1);
-    skin.parents.truncate(1);
-    skin.bind_global.truncate(1);
-    skin.inverse_bind.truncate(1);
-    skin.joint_nodes.truncate(1);
-    scene.world.mesh_mut(rig).unwrap().skin = Some(skin);
-
-    scene.restore_skeleton(rig, attachments);
+    let warned = warnings_of(|| reimport_to(&mut scene, rig, chain_skin(&["pelvis"])));
+    let named = |b: &str| {
+        let bone = format!("from bone '{b}'");
+        warned.iter().filter(|w| w.contains(&bone)).count()
+    };
+    let counts = ["hips", "spine", "head"].map(named);
+    assert_eq!(counts, [1, 0, 2], "one warning per attachment: {warned:?}");
     assert_eq!(scene.world.parent_id(hat), Some(rig));
     assert_eq!(scene.world.parent_id(pistol), Some(rig));
     assert_eq!(scene.bone_ids().len(), 1, "the new rig's one bone");

@@ -290,8 +290,8 @@ scene.entities[].mesh.skeleton.bodies{}.bone_refs: map
 scene.entities[].mesh.skeleton.bodies{}.bone_refs{key}: string
 scene.entities[].mesh.skeleton.bodies{}.bone_refs{}: seq
 scene.entities[].mesh.skeleton.bodies{}.bone_refs{}[]: string
-scene.entities[].mesh.skeleton.bodies{}.connected_bone: option
-scene.entities[].mesh.skeleton.bodies{}.connected_bone: string
+scene.entities[].mesh.skeleton.bodies{}.connected_bone: seq
+scene.entities[].mesh.skeleton.bodies{}.connected_bone[]: string
 scene.entities[].mesh.skeleton.bodies{}.joint.anchor: tuple(3)
 scene.entities[].mesh.skeleton.bodies{}.joint.anchor[]: f32
 scene.entities[].mesh.skeleton.bodies{}.joint.auto_configure_connected_anchor: bool

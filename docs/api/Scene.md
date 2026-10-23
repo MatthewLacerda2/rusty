@@ -107,7 +107,8 @@ and **`Joint` requires `RigidBody`** (a joint constrains a body — Unity's `Joi
 **`Scene.Deactivate`** is Unity's deferred `Object.Destroy`: it sets `active =
 false` but leaves the entity in the scene. **`Scene.DestroyEntity`** is the
 editor's Destroy button: it actually removes the entity (and, for a skinned
-entity, its bones and what hangs from them).
+entity, its bones and what hangs from them; a bone takes its whole subtree, see
+[`Animator`](Animator.md), *Bones are GameObjects*).
 
 **Nothing keeps naming a destroyed entity** (#1264). Its children stay in the
 scene as roots, where they stood in the world (their local Transform becomes

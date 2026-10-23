@@ -179,7 +179,12 @@ impl Scene {
 
     /// Remove entity `id` with its skeleton. Its children stay, as roots at their
     /// world pose, and nothing keeps naming it (`World::despawn`, `despawn_one`).
+    /// A bone instead takes its whole subtree with it ([`Scene::despawn_bone`]).
     pub fn destroy_entity(&mut self, id: u32) {
+        if self.is_bone(id) {
+            self.despawn_bone(id); // Unity's way (#1273)
+            return;
+        }
         self.despawn_skeleton(id); // its bones, and what hangs from them (#453)
         self.despawn_one(id);
     }

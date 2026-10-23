@@ -38,7 +38,7 @@ fn a_saved_ragdoll_comes_back_on_the_same_bones() {
     assert_eq!(bodies.len(), 2);
     let saved_joint = bodies["Joint1"].joint.as_ref().unwrap();
     assert_eq!(saved_joint.connected_body, None, "no bone id is saved");
-    assert_eq!(bodies["Joint1"].connected_bone.as_deref(), Some("Joint0"));
+    assert_eq!(bodies["Joint1"].connected_bone, ["Joint0"]);
 
     let json = serde_json::to_string(&data).unwrap();
     let mut loaded = Scene::new();

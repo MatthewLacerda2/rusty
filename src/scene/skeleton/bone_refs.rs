@@ -98,8 +98,10 @@ impl Scene {
         else {
             return Vec::new();
         };
-        let live = |b: &u32| self.world.ancestors(*b).any(|a| a == owner);
-        let slots = bones.into_iter().enumerate().filter(|(_, b)| live(b));
+        let slots = bones
+            .into_iter()
+            .enumerate()
+            .filter(|(_, b)| self.is_under(*b, owner));
         slots.map(|(s, b)| (b, bone_chain(&skin, s))).collect()
     }
 
@@ -177,7 +179,7 @@ impl Scene {
 
     /// The first bone of `chain` `owner`'s skeleton has, or `owner` itself; warns
     /// unless it is the chain's own bone.
-    fn resolve_bone(&self, holder: u32, owner: u32, chain: &[String]) -> u32 {
+    pub(super) fn resolve_bone(&self, holder: u32, owner: u32, chain: &[String]) -> u32 {
         let found = chain
             .iter()
             .enumerate()
