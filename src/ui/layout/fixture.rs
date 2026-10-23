@@ -54,7 +54,10 @@ impl Fixture {
 
     /// `id`'s laid-out `(min, size)` relative to the panel's bottom-left.
     pub fn rect(&self, id: u32) -> (Vec2, Vec2) {
-        let layout = UiLayout::compute(&self.scene.world, HD);
+        let layout = UiLayout::compute_in(
+            &self.scene.world,
+            &crate::ui::UiView::screen(HD, Default::default()),
+        );
         let r = layout.get(id).expect("laid out").rect;
         (r.0 - self.origin, r.1)
     }

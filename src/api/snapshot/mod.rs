@@ -12,7 +12,7 @@
 //! harness (`dev::snapshot`) and the dev-only `Debug.Snapshot` binding both call
 //! it, and reads stay on the one API surface.
 
-use glam::{Mat4, Vec2, Vec3};
+use glam::{Mat4, Vec3};
 use serde_json::{json, Value};
 
 mod audio;
@@ -31,17 +31,18 @@ pub(crate) fn vec3(v: Vec3) -> Value {
     json!([v.x, v.y, v.z])
 }
 
-/// The whole-world snapshot: play-state envelope + camera + every entity. `screen`
-/// is the UI's screen size in pixels (for each UI element's computed `ui_rect`).
+/// The whole-world snapshot: play-state envelope + camera + every entity. `view` is
+/// what the UI is computed against (each UI element's `ui_rect`): the screen, the
+/// texture sizes and `camera`, through which markers are placed (#429).
 /// Skeleton bones (#453) are left out — see [`world_value_with`].
 pub fn world_value(
     scene: &Scene,
     camera: &Camera,
     frame: u64,
     playing: bool,
-    screen: Vec2,
+    view: &UiView,
 ) -> Value {
-    world_value_with(scene, camera, frame, playing, screen, false)
+    world_value_with(scene, camera, frame, playing, view, false)
 }
 
 /// [`world_value`], choosing whether skeleton bones are included (#453): a
@@ -52,11 +53,9 @@ pub fn world_value_with(
     camera: &Camera,
     frame: u64,
     playing: bool,
-    screen: Vec2,
+    view: &UiView,
     include_bones: bool,
 ) -> Value {
-    // Markers are placed through the camera, as the UI lays them out (#429).
-    let view = UiView::with_camera(screen, camera.clone());
     let bones = scene.bone_ids();
     // Collect ids first so the per-entity accessor borrows below don't overlap
     // any iterator-held guard.
@@ -67,7 +66,7 @@ pub fn world_value_with(
         .filter(|id| include_bones || !bones.contains(id))
         .map(|&id| {
             let world_matrix = scene.world.local_to_world(id);
-            let mut value = entity_value(scene, id, world_matrix, &view);
+            let mut value = entity_value(scene, id, world_matrix, view);
             if bones.contains(&id) {
                 value["bone"] = json!(true);
             }

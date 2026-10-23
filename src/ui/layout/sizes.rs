@@ -16,6 +16,7 @@
 use glam::Vec2;
 
 use super::group;
+use super::native::TextureSizes;
 use crate::components::{ImageType, LayoutAxisFit};
 use crate::ecs::World;
 use crate::ui::text::preferred_size;
@@ -53,11 +54,18 @@ impl Sizes {
 
 /// `id`'s layout sizes along `axis`; `width` is the width it will have (read for
 /// heights only). Content, then the `LayoutElement` overrides.
-pub fn element_sizes(world: &World, id: u32, axis: usize, width: f32, depth: u32) -> Sizes {
+pub fn element_sizes(
+    world: &World,
+    textures: &TextureSizes,
+    id: u32,
+    axis: usize,
+    width: f32,
+    depth: u32,
+) -> Sizes {
     if depth > MAX_DEPTH {
         return Sizes::default();
     }
-    let mut s = content_sizes(world, id, axis, width, depth);
+    let mut s = content_sizes(world, textures, id, axis, width, depth);
     if let Some(le) = world.layout_element(id) {
         let [min, preferred, flexible] = le.overrides(axis);
         s.min = min.unwrap_or(s.min);
@@ -69,16 +77,23 @@ pub fn element_sizes(world: &World, id: u32, axis: usize, width: f32, depth: u32
 }
 
 /// The sizes `id`'s content asks for: the largest of its group, text and image.
-fn content_sizes(world: &World, id: u32, axis: usize, width: f32, depth: u32) -> Sizes {
+fn content_sizes(
+    world: &World,
+    textures: &TextureSizes,
+    id: u32,
+    axis: usize,
+    width: f32,
+    depth: u32,
+) -> Sizes {
     let mut s = Sizes::default();
-    if let Some(g) = world.layout_group(id) {
-        s = s.max(group::group_sizes(world, id, &g, axis, width, depth + 1));
+    if let Some(group) = group::group_sizes(world, textures, id, axis, width, depth + 1) {
+        s = s.max(group);
     }
     if let Some(t) = world.text(id) {
         s.preferred = s.preferred.max(preferred_size(&t, width)[axis]);
     }
     if let Some(img) = world.image(id) {
-        s.preferred = s.preferred.max(image_preferred(&img)[axis]);
+        s.preferred = s.preferred.max(image_preferred(&img, textures)[axis]);
     }
     s
 }
@@ -86,7 +101,14 @@ fn content_sizes(world: &World, id: u32, axis: usize, width: f32, depth: u32) ->
 /// The size `id` keeps along `axis` when nothing controls it: its content fitter's
 /// pick, else its RectTransform's `size_delta` (Unity reads `sizeDelta`, which a
 /// fitter writes).
-pub(super) fn own_size(world: &World, id: u32, axis: usize, width: f32, depth: u32) -> f32 {
+pub(super) fn own_size(
+    world: &World,
+    textures: &TextureSizes,
+    id: u32,
+    axis: usize,
+    width: f32,
+    depth: u32,
+) -> f32 {
     let fit = world
         .layout_element(id)
         .map_or(LayoutAxisFit::Unconstrained, |le| le.fit(axis));
@@ -94,8 +116,10 @@ pub(super) fn own_size(world: &World, id: u32, axis: usize, width: f32, depth: u
         LayoutAxisFit::Unconstrained => world
             .rect_transform(id)
             .map_or(0.0, |rt| rt.size_delta[axis]),
-        LayoutAxisFit::MinSize => element_sizes(world, id, axis, width, depth).min,
-        LayoutAxisFit::PreferredSize => element_sizes(world, id, axis, width, depth).preferred,
+        LayoutAxisFit::MinSize => element_sizes(world, textures, id, axis, width, depth).min,
+        LayoutAxisFit::PreferredSize => {
+            element_sizes(world, textures, id, axis, width, depth).preferred
+        }
     }
 }
 
@@ -111,9 +135,9 @@ pub(super) fn layout_children(world: &World, id: u32) -> Vec<u32> {
 }
 
 /// An Image's preferred size (Unity's `Image.preferredWidth/Height`): the texture's
-/// native size, or for `Sliced` / `Tiled` the sum of its borders. Zero without a
-/// texture, or when the file cannot be read.
-fn image_preferred(img: &crate::components::ImageComponent) -> Vec2 {
+/// native size from the platform's table, or for `Sliced` / `Tiled` the sum of its
+/// borders. Zero without a texture, or while the table has no size for it.
+fn image_preferred(img: &crate::components::ImageComponent, textures: &TextureSizes) -> Vec2 {
     let Some(path) = img.texture.as_deref() else {
         return Vec2::ZERO;
     };
@@ -121,6 +145,6 @@ fn image_preferred(img: &crate::components::ImageComponent) -> Vec2 {
         ImageType::Sliced | ImageType::Tiled => {
             Vec2::new(img.border.x + img.border.z, img.border.y + img.border.w)
         }
-        ImageType::Simple | ImageType::Filled => super::native::texture_size(path),
+        ImageType::Simple | ImageType::Filled => textures.get(path).unwrap_or(Vec2::ZERO),
     }
 }

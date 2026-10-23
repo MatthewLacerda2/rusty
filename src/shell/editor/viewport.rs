@@ -92,6 +92,9 @@ impl EditorFrontend {
         view.ui.screen_in_editor = scene_tab && self.editor_ui.ui_overlay;
         view.set_pixel_scale(pixels_per_point);
         let camera = viewport_camera(&self.editor_ui, game, &scene, interaction.tab);
+        renderer.set_ui_textures(std::rc::Rc::clone(
+            game.resources.screen.borrow().textures(),
+        ));
         renderer.render(view, &scene, &camera, &target_view, scene_tab);
         rebind_egui_texture(
             &mut self.egui_renderer,
@@ -181,6 +184,7 @@ impl EditorFrontend {
         let frame = OverlayFrame {
             size: glam::Vec2::new(size.x, size.y),
             pixels_per_point,
+            textures: std::rc::Rc::clone(&ui.ui_textures),
         };
         let point = glam::Vec2::new(local.x, local.y);
 

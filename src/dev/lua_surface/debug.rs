@@ -13,7 +13,6 @@ use mlua::{Lua, Table};
 use crate::api::{put, snapshot, ApiScopedCtx, Reg};
 use crate::dev::preview::{capture_asset, capture_material, PreviewOptions};
 use crate::preview::PreviewMesh;
-use crate::ui::UiView;
 
 /// Register the `Debug` namespace onto `lua` (dev builds only).
 pub fn register<'scope>(
@@ -171,7 +170,11 @@ fn register_snapshot<'scope>(
     let time = ctx.time;
     let is_playing = ctx.is_playing;
     let (screen, video) = (ctx.screen, ctx.video);
-    let pixels = move || screen.borrow().pixels(&video.borrow());
+    let view = move || {
+        screen
+            .borrow()
+            .view(&video.borrow(), Some(camera.borrow().clone()))
+    };
     put(
         table,
         "Snapshot",
@@ -183,7 +186,7 @@ fn register_snapshot<'scope>(
                 &camera.borrow(),
                 time.borrow().frame_count,
                 *is_playing.borrow(),
-                pixels(),
+                &view(),
                 bones.unwrap_or(false),
             );
             Ok(serde_json::to_string_pretty(&value).unwrap_or_default())
@@ -198,8 +201,7 @@ fn register_snapshot<'scope>(
             let scene = scene.borrow();
             let world_matrix = scene.world.local_to_world(id);
             let value = if scene.world.contains(id) {
-                let view = UiView::with_camera(pixels(), camera.borrow().clone());
-                snapshot::entity_value(&scene, id, world_matrix, &view)
+                snapshot::entity_value(&scene, id, world_matrix, &view())
             } else {
                 serde_json::Value::Null
             };

@@ -164,7 +164,14 @@ fn rect_of_agrees_with_the_full_pass_under_a_group() {
         .set_layout_group(row, Some(group(LayoutKind::Horizontal)));
     let leaf = f.child(row, None, Vec2::ZERO);
     let _ = f.child(row, None, Vec2::ZERO);
-    let full = super::super::UiLayout::compute(&f.scene.world, super::super::fixture::HD);
-    let one = super::super::rect_of(&f.scene.world, leaf, super::super::fixture::HD);
+    let full = super::super::UiLayout::compute_in(
+        &f.scene.world,
+        &crate::ui::UiView::screen(super::super::fixture::HD, Default::default()),
+    );
+    let one = super::super::rect_in(
+        &f.scene.world,
+        leaf,
+        &crate::ui::UiView::screen(super::super::fixture::HD, Default::default()),
+    );
     assert_eq!(full.get(leaf).copied(), one);
 }

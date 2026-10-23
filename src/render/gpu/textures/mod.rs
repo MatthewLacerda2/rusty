@@ -1,5 +1,6 @@
 pub(crate) mod freshness;
 mod panorama;
+pub(crate) mod sizes;
 
 use std::rc::Rc;
 

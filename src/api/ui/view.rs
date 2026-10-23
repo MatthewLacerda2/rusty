@@ -1,7 +1,7 @@
 //! src/api/ui/view.rs — the screen + camera the `UI` verbs compute against (#429).
 //!
 //! The same [`UiView`] the per-tick systems build (`app::ui`): the sim's screen
-//! size and the active camera, so `UI.GetRect`, `UI.Raycast`, `UI.Click` and
+//! size and texture sizes and the active camera, so `UI.GetRect`, `UI.Raycast`, `UI.Click` and
 //! `UI.List` see markers and world canvases exactly where they draw and hit.
 
 use std::cell::RefCell;
@@ -20,8 +20,8 @@ pub(super) fn ui_view(
     video: &RefCell<VideoSettings>,
     camera: &RefCell<Camera>,
 ) -> UiView {
-    let px = screen.borrow().pixels(&video.borrow());
-    UiView::with_camera(px, camera.borrow().clone())
+    let camera = camera.borrow().clone();
+    screen.borrow().view(&video.borrow(), Some(camera))
 }
 
 /// The pointer at `mouse` (UI pixels; `None`: a locked cursor, the centre ray),

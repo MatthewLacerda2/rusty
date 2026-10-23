@@ -42,7 +42,10 @@ fn canvas() -> (Scene, u32) {
 }
 
 fn build(scene: &Scene) -> CanvasMesh {
-    let layout = UiLayout::compute(&scene.world, SCREEN);
+    let layout = UiLayout::compute_in(
+        &scene.world,
+        &crate::ui::UiView::screen(SCREEN, Default::default()),
+    );
     let mut atlases = FontAtlases::default();
     let tex = |_: &str| Some(Vec2::splat(8.0));
     let meshes = build_canvas_meshes(&scene.world, &layout, SCREEN, &tex, &mut atlases);

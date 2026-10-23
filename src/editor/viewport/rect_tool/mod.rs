@@ -25,6 +25,8 @@
 pub mod geometry;
 pub mod overlay;
 
+use std::rc::Rc;
+
 use glam::{Vec2, Vec3};
 
 use crate::components::RectTransformComponent;
@@ -32,18 +34,20 @@ use crate::ecs::World;
 use crate::scene::authoring::rect_transform as rect_ops;
 use crate::ui::events::raycast_pointer;
 use crate::ui::layout::driven_by_group;
-use crate::ui::{CanvasSpace, UiLayout, UiPointer, UiRect};
+use crate::ui::{CanvasSpace, TextureSizes, UiLayout, UiPointer, UiRect, UiView};
 use geometry::Handle;
 
 /// How close (viewport points) the pointer must be to grab a handle.
 const HANDLE_RADIUS: f32 = 7.0;
 
-/// The Scene viewport image as the overlay sees it: its size in points and the
-/// pixels per point the offscreen target was sized with.
-#[derive(Clone, Copy, Debug, PartialEq)]
+/// The Scene viewport image as the overlay sees it: its size in points, the
+/// pixels per point the offscreen target was sized with, and the texture sizes
+/// the UI lays out with (`EditorUi::ui_textures`).
+#[derive(Clone, Debug, PartialEq)]
 pub struct OverlayFrame {
     pub size: Vec2,
     pub pixels_per_point: f32,
+    pub textures: Rc<TextureSizes>,
 }
 
 impl OverlayFrame {
@@ -73,7 +77,8 @@ impl OverlayFrame {
 
     /// The overlay's layout of `world` (no camera: markers sit at their anchors).
     pub fn layout(&self, world: &World) -> UiLayout {
-        UiLayout::compute(world, self.screen())
+        let view = UiView::screen(self.screen(), Rc::clone(&self.textures));
+        UiLayout::compute_in(world, &view)
     }
 }
 

@@ -25,6 +25,17 @@ through it, so world and camera canvases are hit, listed and clicked too.
 | `UI.SetShaderParam` | `(id, name, value)` | — set a **runtime** param of the shader on every graphic of `id` that names one, e.g. `"dissolve.amount"`; `value` is a number or an array (one number broadcasts). Strict: an unknown or baked param, or a wrong count, errors listing the runtime params; so does calling it before `SetShader` |
 | `UI.GetShaderParam` | `(id, name)` | the value it draws with: the one set, else the baked default (a number, or an array for a vector param) |
 
+**An Image's native size arrives at the next tick** (#1221). A `Simple` or `Filled`
+Image fitted to its content (`LayoutElement` preferred size, a layout group) measures
+by its texture's size, which the engine reads from the file *before* each tick, like
+Unity's content-size fitting applied late. So within one chunk of script, an Image
+just created, or a texture just baked (`Texture.Bake`), still measures what the table
+held when the tick began: zero for a path it has never read, the old size after a
+re-bake. `GetRect`, `Raycast`, `Click` and `List` called in that same chunk see that
+size. To read the real size, step the sim first (`Harness.Step(1)` in a scenario, or
+the next frame in a script) and query after. An Image with an explicit size, or a
+`Sliced` / `Tiled` one, is unaffected.
+
 **Custom shaders** (`UI.SetShader` & co., #427) are Unity's `Graphic.material`: bake
 one with `Shader.Bake` and `pass = "ui"` (see [`Shader.md`](Shader.md#the-ui-pass)),
 name it on a graphic, and drive its runtime params the way

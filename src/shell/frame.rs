@@ -7,7 +7,7 @@
 use std::time::{Duration, Instant};
 
 use crate::app::{GameWorld, PlayTransition};
-use crate::render::Renderer;
+use crate::render::{Renderer, TextureSizeReader};
 use wgpu::CurrentSurfaceTexture;
 
 /// Wall-clock frame timing for the windowed loop: the raw delta handed to the sim and
@@ -57,6 +57,14 @@ impl FrameClock {
     }
 }
 
+/// Read the texture sizes the UI lays out with into the sim's screen resource
+/// (#1221): the layout reads a table, never a file. Runs before every tick, as the
+/// headless harness does.
+pub fn refresh_ui_textures(reader: &mut TextureSizeReader, game: &GameWorld) {
+    let scene = game.scene().borrow();
+    reader.refresh_screen(&scene.world, &mut game.resources.screen.borrow_mut());
+}
+
 /// Advance the simulation for one rendered frame, honouring the "playing-but-stepped"
 /// mode (#283).
 ///
@@ -69,9 +77,18 @@ impl FrameClock {
 ///   loop halts again. A paused frame with no pending steps runs no schedule at all,
 ///   but still processes a Play/Stop transition (so Stop restores the edit snapshot
 ///   even while paused). Rendering continues every frame regardless.
-pub fn advance_sim(game: &mut GameWorld, delta_time: f32) -> PlayTransition {
+///
+/// Every tick, stepped or not, first refreshes the UI's texture sizes through
+/// `ui_textures`, as the harness's `tick_unless_quit` does; so does a frozen frame
+/// outside Play.
+pub fn advance_sim(
+    game: &mut GameWorld,
+    delta_time: f32,
+    ui_textures: &mut TextureSizeReader,
+) -> PlayTransition {
     let paused = game.time().borrow().paused;
     if !paused {
+        refresh_ui_textures(ui_textures, game);
         return game.tick(delta_time);
     }
 
@@ -80,6 +97,7 @@ pub fn advance_sim(game: &mut GameWorld, delta_time: f32) -> PlayTransition {
     let mut transition = PlayTransition::None;
     let mut stepped = false;
     while game.time().borrow_mut().take_pending_step() {
+        refresh_ui_textures(ui_textures, game);
         let t = game.tick(crate::time::FIXED_DELTA_TIME);
         if t != PlayTransition::None {
             transition = t;
@@ -87,8 +105,13 @@ pub fn advance_sim(game: &mut GameWorld, delta_time: f32) -> PlayTransition {
         stepped = true;
     }
     // No step this frame: the sim is frozen, but a Play/Stop pressed while paused must
-    // still take effect without advancing the clock or the schedule.
+    // still take effect without advancing the clock or the schedule. Outside Play a
+    // pause can outlive Stop (`Time::reset` keeps it), so the editor's UI still reads
+    // fresh texture sizes; in Play they stay tick-driven, as headless.
     if !stepped {
+        if !game.is_playing() {
+            refresh_ui_textures(ui_textures, game);
+        }
         transition = game.poll_transition();
     }
     transition

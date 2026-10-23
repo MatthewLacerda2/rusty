@@ -5,7 +5,8 @@
 //! GPU-free, deterministic half of the UI that runs in the sim:
 //!
 //! - [`ScreenSize`] — the sim input the layout is a function of (the game view's
-//!   pixel size, or the video resolution when headless);
+//!   pixel size, or the video resolution when headless, and the native size of
+//!   each texture an Image measures by, [`TextureSizes`]);
 //! - [`layout`] — the pass that turns canvases and rect transforms into rectangles
 //!   in canvas reference units and screen pixels ([`UiLayout`], [`UiRect`]);
 //! - [`text`] — fonts, rich text, measuring, wrapping, overflow and auto-size for
@@ -33,7 +34,7 @@ pub mod sway;
 pub mod text;
 
 pub use events::EventSystem;
-pub use layout::{UiLayout, UiRect};
+pub use layout::{TextureSizes, UiLayout, UiRect};
 pub use screen::ScreenSize;
 pub use space::{CanvasSpace, UiPointer, UiView};
 pub use sway::SWAY_RECOVERY;

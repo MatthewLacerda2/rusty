@@ -61,6 +61,8 @@ impl Harness {
     pub fn render_frame(&mut self) -> Option<RenderedFrame> {
         let result = {
             let world = self.world.borrow();
+            let size = (DEFAULT_WIDTH, DEFAULT_HEIGHT);
+            crate::dev::screenshot::share_ui_textures(&mut self.capture, &world, size.0, size.1);
             let scene = world.scene().borrow();
             let camera = world.camera().borrow();
             self.capture

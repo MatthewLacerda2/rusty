@@ -65,6 +65,8 @@ impl Frontend for PlayerFrontend {
         let scene = game.scene().borrow();
         let camera = crate::scene::game_camera_from_scene(&game.camera().borrow(), &scene);
         // No debug overlays in a shipped game: editor mode off.
+        let textures = std::rc::Rc::clone(game.resources.screen.borrow().textures());
+        shell.renderer.set_ui_textures(textures);
         shell.renderer.render(view, &scene, &camera, target, false);
     }
 }

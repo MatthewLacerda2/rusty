@@ -34,7 +34,12 @@ fn a_world_canvas_is_centred_on_its_transform_in_metres() {
         t.rotation = Quat::from_rotation_y(std::f32::consts::FRAC_PI_2);
     }
     let c = canvas(CanvasRenderMode::WorldSpace);
-    let CanvasSpace::World(m) = canvas_space(&scene.world, id, &c, &UiView::screen(SCREEN)) else {
+    let CanvasSpace::World(m) = canvas_space(
+        &scene.world,
+        id,
+        &c,
+        &UiView::screen(SCREEN, Default::default()),
+    ) else {
         panic!("a world canvas lives in the world");
     };
     // 400×200 units at 100 units/m: 4×2 m, centred on the Transform.
@@ -52,7 +57,11 @@ fn the_camera_ray_hits_a_world_canvas_where_it_is_drawn() {
     let mut scene = Scene::new();
     let id = scene.add_entity("Sign".to_string());
     let c = canvas(CanvasRenderMode::WorldSpace);
-    let view = UiView::with_camera(SCREEN, camera(Vec3::new(0.5, 0.25, 5.0)));
+    let view = UiView::with_camera(
+        SCREEN,
+        camera(Vec3::new(0.5, 0.25, 5.0)),
+        Default::default(),
+    );
     let CanvasSpace::World(m) = canvas_space(&scene.world, id, &c, &view) else {
         panic!("world");
     };
@@ -77,7 +86,7 @@ fn a_camera_canvas_fills_the_view_at_zero_tilt() {
         plane_distance: 2.0,
         ..Default::default()
     };
-    let view = UiView::with_camera(SCREEN, camera(Vec3::ZERO));
+    let view = UiView::with_camera(SCREEN, camera(Vec3::ZERO), Default::default());
     let space = canvas_space(&scene.world, 0, &c, &view);
     let size = c.size(SCREEN);
     let scale = c.scale_factor(SCREEN);
@@ -94,7 +103,12 @@ fn a_camera_canvas_fills_the_view_at_zero_tilt() {
     ));
     // Without a camera it is the overlay.
     assert_eq!(
-        canvas_space(&scene.world, 0, &c, &UiView::screen(SCREEN)),
+        canvas_space(
+            &scene.world,
+            0,
+            &c,
+            &UiView::screen(SCREEN, Default::default())
+        ),
         CanvasSpace::Screen
     );
 }
@@ -107,7 +121,7 @@ fn tilt_leans_the_top_away() {
         tilt: Vec2::new(30.0, 0.0),
         ..Default::default()
     };
-    let view = UiView::with_camera(SCREEN, camera(Vec3::ZERO));
+    let view = UiView::with_camera(SCREEN, camera(Vec3::ZERO), Default::default());
     let CanvasSpace::World(m) = canvas_space(&scene.world, 0, &c, &view) else {
         panic!("world")
     };

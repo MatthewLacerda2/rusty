@@ -75,7 +75,7 @@ fn place_projects_the_target_through_the_camera() {
         t.position = Vec3::new(0.0, 0.0, -10.0);
     }
     let cam = Camera::new(Vec3::ZERO, -90.0, 0.0);
-    let view = UiView::with_camera(SIZE, cam);
+    let view = UiView::with_camera(SIZE, cam, Default::default());
     let a = WorldAnchor {
         target: Some(enemy),
         offset: Vec3::ZERO,
@@ -85,7 +85,13 @@ fn place_projects_the_target_through_the_camera() {
     assert!((p - SIZE * 0.5).length() < 0.5, "{p}");
     // No camera: the anchors place it.
     assert_eq!(
-        place(&scene.world, &a, &UiView::screen(SIZE), SIZE, 1.0),
+        place(
+            &scene.world,
+            &a,
+            &UiView::screen(SIZE, Default::default()),
+            SIZE,
+            1.0
+        ),
         None
     );
     // A destroyed target hides the marker.
@@ -121,7 +127,11 @@ fn the_layout_pins_markers_and_drops_hidden_ones_with_their_subtree() {
         .set_rect_transform(label, Some(RectTransformComponent::default()));
     scene.set_parent(label, Some(marker)).expect("parent");
     // Looking at the point: the 100×100 marker is centred on screen.
-    let ahead = UiView::with_camera(SIZE, Camera::new(Vec3::ZERO, -90.0, 0.0));
+    let ahead = UiView::with_camera(
+        SIZE,
+        Camera::new(Vec3::ZERO, -90.0, 0.0),
+        Default::default(),
+    );
     let layout = UiLayout::compute_in(&scene.world, &ahead);
     let r = layout.get(marker).expect("placed");
     assert!(
@@ -132,7 +142,7 @@ fn the_layout_pins_markers_and_drops_hidden_ones_with_their_subtree() {
     assert_eq!(rect_in(&scene.world, marker, &ahead), Some(*r));
     assert!(layout.get(label).is_some());
     // Turned away: hidden, and its child with it.
-    let away = UiView::with_camera(SIZE, Camera::new(Vec3::ZERO, 90.0, 0.0));
+    let away = UiView::with_camera(SIZE, Camera::new(Vec3::ZERO, 90.0, 0.0), Default::default());
     let layout = UiLayout::compute_in(&scene.world, &away);
     assert!(layout.get(marker).is_none() && layout.get(label).is_none());
     assert_eq!(rect_in(&scene.world, marker, &away), None);

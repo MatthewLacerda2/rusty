@@ -40,7 +40,10 @@ fn element(scene: &mut Scene, parent: u32, pos: Vec2, size: Vec2, texture: Optio
 }
 
 fn build(scene: &Scene) -> Vec<CanvasMesh> {
-    let layout = UiLayout::compute(&scene.world, SCREEN);
+    let layout = UiLayout::compute_in(
+        &scene.world,
+        &crate::ui::UiView::screen(SCREEN, Default::default()),
+    );
     let mut atlases = FontAtlases::default();
     build_canvas_meshes(
         &scene.world,

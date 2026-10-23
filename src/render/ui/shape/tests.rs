@@ -37,7 +37,10 @@ fn hud(entries: &[(Option<ShapeComponent>, Option<ImageComponent>)]) -> Vec<Canv
         scene.world.set_image(id, image.clone());
         scene.set_parent(id, Some(root)).expect("parent exists");
     }
-    let layout = UiLayout::compute(&scene.world, SCREEN);
+    let layout = UiLayout::compute_in(
+        &scene.world,
+        &crate::ui::UiView::screen(SCREEN, Default::default()),
+    );
     let mut atlases = FontAtlases::default();
     build_canvas_meshes(&scene.world, &layout, SCREEN, &|_| None, &mut atlases)
 }

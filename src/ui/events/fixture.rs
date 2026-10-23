@@ -96,8 +96,8 @@ impl Rig {
     pub fn tick(&mut self) -> Vec<Delivery> {
         self.input.begin_tick();
         let view = match self.camera.clone() {
-            Some(cam) => UiView::with_camera(SCREEN, cam),
-            None => UiView::screen(SCREEN),
+            Some(cam) => UiView::with_camera(SCREEN, cam, Default::default()),
+            None => UiView::screen(SCREEN, Default::default()),
         };
         let layout = UiLayout::compute_in(&self.scene.world, &view);
         let handlers = &self.handlers.0;

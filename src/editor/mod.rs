@@ -98,6 +98,10 @@ pub struct EditorUi {
     /// The scene image's last drawn size in egui points, recorded each frame so the
     /// front-end can size the offscreen render target to match the displayed rect.
     pub viewport_image_size: egui::Vec2,
+    /// The texture sizes the UI lays out with (#1221): the sim's own table
+    /// (`ScreenSize::textures`), handed over each frame by the shell, so the
+    /// overlay and the inspector measure Images as the game does.
+    pub ui_textures: std::rc::Rc<crate::ui::TextureSizes>,
     /// Live move-gizmo drag, if an axis handle is currently grabbed (#183).
     pub gizmo_drag: Option<viewport::gizmo::GizmoDrag>,
     /// The Scene tab's UI overlay: screen canvases drawn, the rect tool live (#423).
@@ -170,6 +174,7 @@ impl EditorUi {
             speaker_mode_request: None,
             viewport_tab: ViewportTab::Scene,
             viewport_image_size: egui::Vec2::ZERO,
+            ui_textures: Default::default(),
             gizmo_drag: None,
             ui_overlay: true,
             rect_drag: None,

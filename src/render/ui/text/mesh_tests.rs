@@ -33,7 +33,10 @@ fn a_label_is_one_font_batch_after_its_panel() {
     scene.world.set_text(label, Some(text));
     scene.set_parent(label, Some(root)).expect("parent exists");
 
-    let layout = UiLayout::compute(&scene.world, SCREEN);
+    let layout = UiLayout::compute_in(
+        &scene.world,
+        &crate::ui::UiView::screen(SCREEN, Default::default()),
+    );
     let mut atlases = FontAtlases::default();
     let meshes = build_canvas_meshes(&scene.world, &layout, SCREEN, &|_| None, &mut atlases);
     let batches = &meshes[0].batches;
