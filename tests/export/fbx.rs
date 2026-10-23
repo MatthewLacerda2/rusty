@@ -2,7 +2,9 @@
 
 use std::path::{Path, PathBuf};
 
-use super::{cache, entity, export, play, project, tree, with_extension, CACHE};
+use super::{
+    cache, entity, export, play, play_scenario, project, tree, with_extension, CACHE, SCENARIO,
+};
 
 /// The fixture quad, its `Quad` textured by the embedded `Red`.
 pub(super) const QUAD: &str = "embedded_textures.fbx";
@@ -84,6 +86,41 @@ fn the_export_plays_from_its_cache_and_converts_nothing() {
     );
     let red = extracted(&out.join(format!("{CACHE}/{SOURCE}.glb")), "Red");
     assert!(red.is_file(), "{} is exported", red.display());
+}
+
+/// [`START`], the quad scaled to a metre (it is 1 cm, the FBX default unit) and
+/// the camera half a metre in front of its face.
+const SHOW: &str = r#"local quad = Scene.Instantiate("assets/models/embedded_textures.fbx::Quad", "ExportedQuad")
+Transform.SetLocalScale(quad, 100, 100, 100)
+Camera.SetPosition(0.5, 0.5, 1.2)
+Camera.SetYaw(-90)
+Camera.SetPitch(0)"#;
+
+#[test]
+fn gpu_the_exported_quad_renders_red_from_its_cache() {
+    // Coloured only by its texture, the quad rendered black before the converter
+    // read a colour the file leaves out as white (#1280).
+    let game = project(&[QUAD], SHOW);
+    let out = crate::temp::dir().join("out");
+    assert!(export(&game, &out).status.success());
+    let png = crate::temp::dir().join("quad.png");
+    let shot = format!(
+        "{SCENARIO}Harness.Screenshot({:?})\n",
+        png.to_string_lossy()
+    );
+    let (_, results) = play_scenario(&out, &shot, &[]);
+    if !png.is_file() {
+        // Only a real skip may pass (#885).
+        assert!(!rusty::render::gpu_required(), "no shot: {results}");
+        eprintln!("no GPU adapter — skipping the pixels");
+        return;
+    }
+    let image = image::open(&png).unwrap().to_rgb8();
+    let red = image
+        .pixels()
+        .filter(|p| p[0] > 96 && p[1] < 32 && p[2] < 32);
+    let share = red.count() as f32 / image.pixels().len() as f32;
+    assert!(share > 0.25, "{share:.3} of the frame is the red quad");
 }
 
 /// The file the cached `.glb` at `glb` names for the texture `identity`: where

@@ -16,16 +16,19 @@ pub fn material(
 ) -> Result<glb::Material, ImportError> {
     let pbr = &material.pbr;
     let factor = |map: &ufbx::MaterialMap| value_or(map, 1.0);
-    let rgb = |map: &ufbx::MaterialMap, scale: f32| {
+    // A colour the file leaves out is glTF's default: white for the base, which a
+    // texture alone then shows as itself (#1280), and black for emission.
+    let rgb = |map: &ufbx::MaterialMap, default: f32, scale: f32| {
         let v = &map.value_vec4;
-        [v.x, v.y, v.z].map(|c| c as f32 * scale)
+        let c = if map.has_value {
+            [v.x, v.y, v.z]
+        } else {
+            [f64::from(default); 3]
+        };
+        c.map(|c| c as f32 * scale)
     };
-    let [r, g, b] = rgb(&pbr.base_color, factor(&pbr.base_factor));
-    let emissive = if pbr.emission_color.has_value {
-        rgb(&pbr.emission_color, factor(&pbr.emission_factor))
-    } else {
-        [0.0; 3]
-    };
+    let [r, g, b] = rgb(&pbr.base_color, 1.0, factor(&pbr.base_factor));
+    let emissive = rgb(&pbr.emission_color, 0.0, factor(&pbr.emission_factor));
     Ok(glb::Material {
         name: material.element.name.to_string(),
         base_color: [r, g, b, factor(&pbr.opacity)],

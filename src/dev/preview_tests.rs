@@ -83,3 +83,30 @@ fn gpu_capture_writes_a_square_png_at_the_requested_resolution() {
     assert_eq!((image.width(), image.height()), (64, 64));
     let _ = std::fs::remove_file(&out);
 }
+
+#[test]
+fn gpu_a_centimetre_fbx_quad_previews_as_its_red_texture() {
+    // `embedded_textures.fbx`: a 1 cm quad (the FBX default unit) with no colour of
+    // its own, only an embedded red texture. It used to preview as empty sky — a
+    // sub-pixel speck, and black besides (#1280).
+    let fixture =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/models/embedded_textures.fbx");
+    let dir = crate::test_temp::dir();
+    let fbx = dir.join("quad.fbx");
+    std::fs::copy(fixture, &fbx).unwrap();
+    let out = dir.join("quad.png");
+    let options = PreviewOptions {
+        resolution: 64,
+        ..PreviewOptions::default()
+    };
+    if !capture_asset(fbx.to_str().unwrap(), &out, options).expect("preview must not error") {
+        eprintln!("no GPU adapter — skipping the render half of this test");
+        return;
+    }
+    let image = image::open(&out).unwrap().to_rgb8();
+    let red = image
+        .pixels()
+        .filter(|p| p[0] > 96 && u16::from(p[1]) + u16::from(p[2]) < 64)
+        .count();
+    assert!(red > 64 * 64 / 10, "only {red} red pixels");
+}

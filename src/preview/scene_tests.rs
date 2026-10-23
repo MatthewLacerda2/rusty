@@ -29,6 +29,18 @@ f 1//1 2//1 3//1
 f 1//1 3//1 4//1
 ";
 
+/// The quad a hundredth of the size: a 2 cm square.
+const TINY_QUAD_OBJ: &str = "\
+o Quad
+v -0.01 0.0 -0.01
+v 0.01 0.0 -0.01
+v 0.01 0.0 0.01
+v -0.01 0.0 0.01
+vn 0.0 1.0 0.0
+f 1//1 2//1 3//1
+f 1//1 3//1 4//1
+";
+
 /// Two named objects that together span `x[8,12]` — neither sits at the union centre
 /// `(10, 0, 0)`, so a per-object recentring would pull them on top of each other.
 const TWO_PART_OBJ: &str = "\
@@ -141,7 +153,9 @@ fn an_off_origin_model_is_recentred_where_the_camera_looks() {
     // this by looking at the bundled Suzanne's preview).
     let path = write_obj("preview_scene_test_offset.obj", OFFSET_QUAD_OBJ);
     let scene = build_preview_scene(PreviewMesh::Sphere, &PreviewSubject::Model(path));
-    let expected = -Vec3::new(10.0, 5.0, 0.0); // the fixture's own bounds centre
+    // The fixture's own bounds centre, scaled with the subject to fit the frame.
+    let scale = fit_scale(Vec3::new(9.0, 5.0, -1.0), Vec3::new(11.0, 5.0, 1.0));
+    let expected = -Vec3::new(10.0, 5.0, 0.0) * scale;
     assert!(
         (mesh_position(&scene) - expected).length() < 1e-3,
         "expected the subject centred on the origin, got {:?}",
@@ -164,11 +178,35 @@ fn a_multi_part_model_shares_one_offset_so_its_layout_survives() {
         .map(|id| scene.world.transform(id).unwrap().position)
         .collect();
     assert_eq!(positions.len(), 2, "both sub-objects spawn");
+    let scale = fit_scale(Vec3::new(8.0, -1.0, -1.0), Vec3::new(12.0, 1.0, 1.0));
     assert!(
         positions
             .iter()
-            .all(|p| (*p - Vec3::new(-10.0, 0.0, 0.0)).length() < 1e-3),
+            .all(|p| (*p - Vec3::new(-10.0, 0.0, 0.0) * scale).length() < 1e-3),
         "both parts share the union offset, got {positions:?}"
+    );
+}
+
+#[test]
+fn a_centimetre_model_is_scaled_up_to_fill_the_frame() {
+    // An FBX in its default unit, the centimetre, imports a hundredth of a metre
+    // across: at the fixed camera distance it was a sub-pixel speck (#1280).
+    let path = write_obj("preview_scene_test_tiny.obj", TINY_QUAD_OBJ);
+    let scene = build_preview_scene(PreviewMesh::Sphere, &PreviewSubject::Model(path));
+    let id = scene.world.ids_with_mesh()[0];
+    let scale = scene.world.transform(id).unwrap().scale;
+    let radius = Vec3::new(0.02, 0.0, 0.02).length() * 0.5 * scale.x;
+    assert!((radius - FIT_RADIUS).abs() < 1e-4, "fitted radius {radius}");
+    assert_eq!(scale, Vec3::splat(scale.x), "the scale is uniform");
+}
+
+#[test]
+fn a_flat_or_empty_bounds_keeps_its_size() {
+    assert_eq!(fit_scale(Vec3::ONE, Vec3::ONE), 1.0);
+    let unit = fit_scale(Vec3::splat(-0.5), Vec3::splat(0.5));
+    assert!(
+        (unit - 1.0).abs() < 1e-5,
+        "a unit cube previews at its size"
     );
 }
 

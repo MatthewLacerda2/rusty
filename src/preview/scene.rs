@@ -180,15 +180,43 @@ fn spawn_suzanne(scene: &mut Scene) -> u32 {
     .unwrap_or_else(|_| authoring::create_entity(scene, "PreviewMesh", Some(Primitive::Sphere)))
 }
 
-/// Instantiate every sub-object of `path`, centred on the origin and carrying its own
+/// Instantiate every sub-object of `path`, fitted to the frame and carrying its own
 /// imported materials — mirrors `inspector/assets/model.rs`'s "Instantiate into Scene".
-/// All sub-objects share one offset, so a multi-part model keeps its internal layout.
+/// All sub-objects share one offset and one scale, so a multi-part model keeps its
+/// internal layout.
 fn spawn_model(scene: &mut Scene, path: &str) {
     let Ok(asset) = asset::import_and_sync_sidecar(Path::new(path)) else {
         return;
     };
-    let origin = -bounds_centre(&asset.sub_meshes);
-    authoring::instantiate_model(scene, path, &asset, origin);
+    let bounds = union_bounds(&asset.sub_meshes);
+    let scale = bounds.map_or(1.0, |(min, max)| fit_scale(min, max));
+    let origin = -bounds_centre(&asset.sub_meshes) * scale;
+    for id in authoring::instantiate_model(scene, path, &asset, origin) {
+        if let Some(mut transform) = scene.world.transform_mut(id) {
+            transform.scale *= scale;
+        }
+    }
+}
+
+/// The bounding radius a model is fitted to: a unit cube's, the size of the stock
+/// sphere and cube, so a model that size previews at its own size.
+const FIT_RADIUS: f32 = 0.866_025_4;
+
+/// The uniform scale that fits bounds `min..max` to [`FIT_RADIUS`] (#1280).
+///
+/// The camera sits at a fixed distance, so a model far from a metre across renders
+/// as a speck or overflows the frame: a 1 cm FBX quad (the file's default unit is
+/// the centimetre) was a sub-pixel dot. Unity's asset preview frames by bounds; this
+/// scales the subject instead of moving the camera, since a camera close enough
+/// for a centimetre would sit inside its near plane and the shot stays fixed.
+/// Flat in every axis (a point, or no geometry) keeps its size.
+fn fit_scale(min: Vec3, max: Vec3) -> f32 {
+    let radius = (max - min).length() * 0.5;
+    if radius > f32::EPSILON && radius.is_finite() {
+        FIT_RADIUS / radius
+    } else {
+        1.0
+    }
 }
 
 /// The centre of the union of `subs`' local bounds (`Vec3::ZERO` when they have no
@@ -201,17 +229,14 @@ fn spawn_model(scene: &mut Scene, path: &str) {
 /// had in the authoring tool. Spawning at `-centre` puts the subject where the camera
 /// is already looking, for the Inspector tab and `Debug.Preview` alike.
 fn bounds_centre(subs: &[asset::SubMesh]) -> Vec3 {
-    let mut bounds: Option<(Vec3, Vec3)> = None;
-    for sub in subs {
-        let Some((lo, hi)) = sub.bounds() else {
-            continue;
-        };
-        bounds = Some(match bounds {
-            Some((min, max)) => (min.min(lo), max.max(hi)),
-            None => (lo, hi),
-        });
-    }
-    bounds.map_or(Vec3::ZERO, |(min, max)| (min + max) * 0.5)
+    union_bounds(subs).map_or(Vec3::ZERO, |(min, max)| (min + max) * 0.5)
+}
+
+/// The union of `subs`' local bounds, `None` when none has geometry.
+fn union_bounds(subs: &[asset::SubMesh]) -> Option<(Vec3, Vec3)> {
+    subs.iter()
+        .filter_map(asset::SubMesh::bounds)
+        .reduce(|(a0, a1), (b0, b1)| (a0.min(b0), a1.max(b1)))
 }
 
 /// Insert `material` under a scene-local key and reference it from `id`. The
