@@ -121,7 +121,7 @@ Component menu offers.
 | `OnAnimationEvent` | `OnAnimationEvent(id, name)` | Once per animation event the entity's `Animator` crossed this tick (#459): an authored marker on the playing graph node or blend-tree child, or `"End"` when a non-looping clip or tree reaches its end. After the animation step (and ragdoll posing), before `LateUpdate`. Rules and order: [`Animator`](Animator.md), *Animation events*. |
 | `OnEnable` | `OnEnable(id)` | When the owning entity becomes `active`: on its **first** activation — between `Awake` and `Start`, so the first-tick order is `Awake → OnEnable → Start` — and again on every later inactive→active transition (e.g. a script's `Scene.SetActive(id, true)` re-enabling a pooled object). Detected by diffing the entity's `active` flag against the previous tick, so it fires **exactly once** per rising edge. |
 | `OnDisable` | `OnDisable(id)` | When the owning entity becomes inactive: once on each `active`→inactive transition (e.g. `Scene.Deactivate`), and once more — immediately **before** `OnDestroy` — when an *active* entity is destroyed. Fires **exactly once** per falling edge. While disabled, the entity receives no other gameplay callback (no `Update`/`LateUpdate`/`OnTrigger`/`OnCollision*`). |
-| `OnDestroy` | `OnDestroy(id)` | Once, when the entity is removed **during play** — by `Scene.DestroyEntity`, or because `Scene.Load` unloaded its scene (unless it was marked `Scene.DontDestroyOnLoad`) — after its `OnDisable` if it was active. The entity is still readable during the callback (removal happens just after). See the divergence note: **Stop does not fire `OnDestroy`.** |
+| `OnDestroy` | `OnDestroy(id)` | Once, when the entity is removed **during play** — by `Scene.DestroyEntity` on it or an ancestor, or because `Scene.Load` unloaded its scene (unless it was marked `Scene.DontDestroyOnLoad`) — after its `OnDisable` if it was active. The entity is still readable during the callback (removal happens just after). See the divergence note: **Stop does not fire `OnDestroy`.** |
 | `OnPointerEnter` | `OnPointerEnter(id, event)` | UI (#420): the pointer moved onto the entity or one of its descendants. Fires on every entity from the hit one up to the root that defines it, deepest first — moving from a button onto its own label does not re-enter the button. |
 | `OnPointerExit` | `OnPointerExit(id, event)` | UI: the pointer left the entity and all its descendants (deepest first). |
 | `OnPointerDown` | `OnPointerDown(id, event)` | UI: a mouse button went down over the entity. Bubbles — see below. |
@@ -210,8 +210,9 @@ headless replays stay byte-identical):
   so a first activation runs `Awake → OnEnable → Start`, all before that tick's
   `Update`. `OnDestroy` runs in a dedicated destroy phase at the **tail** of the
   tick (after `LateUpdate`), draining the ids `Scene.DestroyEntity` queued this
-  tick: all `OnDisable`s first, then all `OnDestroy`s, in ascending
-  `(entity id, script index)` order, before the entities are removed. Every
+  tick and everything under them (#1283): all `OnDisable`s first, then all
+  `OnDestroy`s, each pass children before parents (deepest first, then ascending
+  entity id) and an entity's scripts by index, before the entities are removed. Every
   edge fires exactly once, so replays stay byte-identical.
 - The scene-load phase follows the destroy phase, still at the tick's tail: a
   `Scene.Load` requested this tick unloads the outgoing scene — the same

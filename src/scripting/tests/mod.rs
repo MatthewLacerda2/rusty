@@ -8,6 +8,7 @@ mod collider;
 mod collisions;
 mod console;
 mod coroutines;
+mod destroy_subtree;
 mod files;
 mod hook_errors;
 mod late_update;

@@ -23,8 +23,8 @@
 //!   skeleton to a re-imported rig in place, by bone name (#1252, #1265): a bone
 //!   the rig still names keeps its entity; what hung from a dropped one hangs on
 //!   by the same rule as a load.
-//! - `Scene::despawn_bone`: destroying one bone takes its subtree, and its
-//!   slots stay missing (skinned at the bind pose) until the skeleton is rebuilt.
+//! - `Scene::destroy_entity` takes a bone's subtree as it takes any entity's,
+//!   and its slots stay missing (skinned at the bind pose) until the skeleton is rebuilt.
 //! - `palette` builds each skinned mesh's posed palette from the bones.
 //! - `hitbox` fits per-bone hitbox colliders and names the bone a hit struck (#464).
 //! - `ragdoll` turns those hitboxes into jointed bodies and switches them between
@@ -119,19 +119,6 @@ impl Scene {
         })
     }
 
-    /// Despawn `owner`'s bones and everything under them — a skinned entity's
-    /// skeleton goes with it — in one batch, dropping whatever pointed at them as
-    /// [`Scene::destroy_entity`] does. A bone a script moved out from under
-    /// `owner` is an ordinary entity now, and stays.
-    pub(crate) fn despawn_skeleton(&mut self, owner: u32) {
-        let bones: BTreeSet<u32> = self.live_bones(owner).collect();
-        if bones.is_empty() {
-            return; // a plain entity: no despawn pass to pay for
-        }
-        let doomed = self.subtrees(bones);
-        self.despawn_batch(&doomed);
-    }
-
     /// `bones` and everything under them, walked from the top ones only: the rest
     /// are their descendants.
     pub(super) fn subtrees(&self, bones: BTreeSet<u32>) -> BTreeSet<u32> {
@@ -141,19 +128,6 @@ impl Scene {
             .filter(|&&b| !self.world.parent_id(b).is_some_and(|p| bones.contains(&p)))
             .flat_map(|&b| self.world.self_and_descendants(b))
             .collect()
-    }
-
-    /// Despawn bone `id` with everything under it, its descendant bones and what
-    /// hangs from them, in one batch: Unity destroys a GameObject's children with
-    /// it, and no bone of the rig is left a root posed as if it were a child
-    /// (#1273). Their slots in the owner's skeleton become `None`, **missing**
-    /// (the despawn's reference-clearing pass, `MeshComponent`'s
-    /// `EntityRefs::forget`): they ride with their nearest surviving parent bone
-    /// (`palette`) until the skeleton is rebuilt (a load, a prefab propagation, a
-    /// re-import).
-    pub(crate) fn despawn_bone(&mut self, id: u32) {
-        let doomed: BTreeSet<u32> = self.world.self_and_descendants(id).collect();
-        self.despawn_batch(&doomed);
     }
 
     /// The bone of `owner`'s skeleton named `name` (the glTF joint name), present
@@ -189,7 +163,7 @@ mod destroy_bone_tests;
 #[cfg(test)]
 mod drop_warn_tests;
 #[cfg(test)]
-mod fixture;
+pub(crate) mod fixture;
 #[cfg(test)]
 mod missing_slot_tests;
 #[cfg(test)]

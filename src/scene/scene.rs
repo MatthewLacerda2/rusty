@@ -177,21 +177,20 @@ impl Scene {
         self.world.spawn(name)
     }
 
-    /// Remove entity `id` with its skeleton. Its children stay, as roots at their
-    /// world pose, and nothing keeps naming it (`World::despawn`, `despawn_one`).
-    /// A bone instead takes its whole subtree with it (`Scene::despawn_bone`).
+    /// Remove entity `id` and everything under it ([`Scene::destroy_set`]), as
+    /// Unity's `Object.Destroy` takes a GameObject's children (#1283). Nothing
+    /// keeps naming them ([`Scene::despawn_batch`]).
     pub fn destroy_entity(&mut self, id: u32) {
-        if self.is_bone(id) {
-            self.despawn_bone(id); // Unity's way (#1273)
-            return;
-        }
-        self.despawn_skeleton(id); // its bones, and what hangs from them (#453)
-        self.despawn_one(id);
+        let doomed = self.destroy_set(id);
+        self.despawn_batch(&doomed);
     }
 
-    /// Despawn `id` alone: [`Scene::despawn_batch`] of one.
-    pub(crate) fn despawn_one(&mut self, id: u32) {
-        self.despawn_batch(&BTreeSet::from([id]));
+    /// What destroying `id` removes: `id` and every descendant, so a skinned
+    /// entity's bones and what hangs from them, and a bone's subtree (#1273). The
+    /// one answer [`Scene::destroy_entity`] despawns and the script teardown
+    /// notifies, so the two cannot drift (#1283). Empty for a dead id.
+    pub fn destroy_set(&self, id: u32) -> BTreeSet<u32> {
+        self.world.self_and_descendants(id).collect()
     }
 
     /// Despawn every entity of `ids` together, then drop the scene's own references
