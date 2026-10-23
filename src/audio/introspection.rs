@@ -10,9 +10,10 @@
 //!     record they ever played.
 //!
 //! These are plain serde data (no audio-device types), so a test can assert on them
-//! with no sound card (`AudioMaestro::events`). No Lua, MCP or harness surface
-//! exposes them yet: `Debug.Snapshot` shows each entity's `AudioSource` component,
-//! not this log, so a fire-and-forget one-shot is invisible to an agent (#1247).
+//! with no sound card (`AudioMaestro::events`). The dev-only Lua reads
+//! `Debug.AudioEvents([since_tick])` and `Debug.AudioVoices()` hand both to an agent
+//! (`dev::lua_surface::debug::audio`, #1247): `Debug.Snapshot` shows each entity's
+//! `AudioSource` component, which a fire-and-forget one-shot never has.
 
 use serde::{Deserialize, Serialize};
 

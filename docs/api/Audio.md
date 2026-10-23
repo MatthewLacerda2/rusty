@@ -28,6 +28,8 @@ until the next refresh replaces it.
 voice; on the **headless harness the audio backend is a no-op**, so playback makes no
 sound but every action is still recorded in the maestro's introspection log (so a
 play-test can assert *what* played, *where*, and *by whom* — one-shots included).
+Dev builds read it back with `Debug.AudioEvents` and the live per-source roster with
+`Debug.AudioVoices` (see `Debug.md`).
 
 | Function | Signature | Returns |
 |---|---|---|

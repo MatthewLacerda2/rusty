@@ -14,6 +14,8 @@ because the namespace is absent.
 | `Debug.Preview` | `(asset_path, out_png [, opts])` | the written path, or `nil` if the machine has no GPU |
 | `Debug.PreviewMaterial` | `(name, out_png [, opts])` | the written path, or `nil` if the machine has no GPU |
 | `Debug.Stats` | `()` | a **table**: the frame stats — timings and counters (below) |
+| `Debug.AudioEvents` | `([since_tick])` | an **array** of the audio event log's entries, oldest first: those whose `tick` is at or after `since_tick` (default `0`, all) (below) |
+| `Debug.AudioVoices` | `()` | an **array**: one roster row per entity carrying an `AudioSource` (below) |
 
 ### The preview — eyes on an authored asset (#353)
 
@@ -149,6 +151,51 @@ only. Before any Play frame, `frames` is `0` and no metric is present.
 Scenarios get the same table as `Harness.Stats()` and can turn it into pass/fail with
 `Harness.AssertBudget{ draw_calls = 2000, fixed_update_ms = 4 }` — see *Performance
 budgets* in `docs/testing.md`.
+
+### The audio reads — what played, where, and by whom (#1247)
+
+`Debug.Snapshot` shows each entity's `AudioSource` *component*. An `Audio.PlayAt`
+one-shot leaves no component, so the snapshot never sees it; the audio maestro's
+**event log** does. Both reads work with no sound card: the headless backend makes
+no sound, but every action is logged all the same.
+
+`Debug.AudioEvents([since_tick])` returns the log's entries, oldest first, as plain
+tables:
+
+| Field | Meaning |
+|---|---|
+| `kind` | `"Play"` (an `AudioSource` started: `Audio.Play` or `play_on_start`), `"Stop"` (`Audio.Stop`) or `"PlayAt"` (a one-shot) |
+| `tick` | the frame it happened on (`Time.frameCount`), deterministic |
+| `clip` | the clip path (`""` for a `Stop`) |
+| `entity` | the source entity; for `PlayAt` the emitter passed, else `0` |
+| `position` | `{ x, y, z }`, where it played: the entity's world position, or `PlayAt`'s point |
+| `volume` | the per-source volume asked for, before the master (`0` for a `Stop`) |
+
+`since_tick` is **inclusive**: a reader that has seen tick `t` asks for `t + 1` next.
+The log is a ring of the **last 1024** entries and is **cleared on entering Play**;
+older entries are gone, so `since_tick` returns only what is still held: none of
+what rolled off, with no error.
+
+```lua
+Audio.PlayAt("sfx/shot.ogg", 1, 2, 3)
+local seen = 0
+for _, e in ipairs(Debug.AudioEvents(seen)) do
+  print(e.tick, e.kind, e.clip, e.position[1], e.position[2], e.position[3])
+  seen = e.tick + 1
+end
+```
+
+`Debug.AudioVoices()` is the live roster: one row per entity carrying an
+`AudioSource`, in creation order, whether it is playing or not, heard from the active
+camera (the listener). A one-shot has no row; read it from the log.
+
+| Field | Meaning |
+|---|---|
+| `entity` | the owning entity |
+| `clip` / `volume` / `looping` / `is_time_scaled` | the `AudioSource`'s own fields |
+| `playing` | whether the maestro has its voice live |
+| `spatial` | `{ gain, pan }` as `Audio.GetSpatial` resolves it: gain after rolloff, the 2D↔3D blend and the occlusion muffle; pan in `[-1, 1]` |
+| `occlusion` | the smoothed occlusion factor in `[0, 1]`, `0` when not playing |
 
 ### The snapshot — the structured scene-read (#180)
 

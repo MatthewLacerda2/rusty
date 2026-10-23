@@ -291,7 +291,8 @@ change.)
 
 The maestro carries a **no-op backend** on the headless harness, so the *sound* is a
 windowed-only side effect; the **introspection log + playing set** are the
-device-free read-sites a play-test asserts on (deterministic — voice ids are a
+device-free read-sites a play-test asserts on, read back by the dev-only
+`Debug.AudioEvents` / `Debug.AudioVoices` (#1247) (deterministic — voice ids are a
 monotone counter, the event tick is `Time.frameCount`). `AudioSource`'s authoring
 fields (incl. the spatial fields stored for #213) round-trip through `SceneData`.
 
