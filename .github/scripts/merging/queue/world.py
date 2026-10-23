@@ -63,7 +63,7 @@ def effects(repo: str, opts: argparse.Namespace) -> argparse.Namespace:
         bots=pulls.BOTS,
         merged=outcomes.MERGED,
         # A dry run previews every ready one; it hands nothing back for real.
-        ends={outcomes.GREEN, outcomes.DRY} | ({outcomes.HANDED_BACK} if opts.dry_run else set()),
+        ends={outcomes.GREEN, outcomes.DRY} | ({outcomes.HANDED_BACK, outcomes.RECLAIM} if opts.dry_run else set()),
         stops={outcomes.STOPPED},
         skips={outcomes.NOT_READY},
     )

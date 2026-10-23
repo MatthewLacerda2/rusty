@@ -22,7 +22,9 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
     (ended without a hand-back: green under `--no-merge`, previewed by a dry run)
     `stops` (the machine's failure, [`queue.stopping.Stopped`]) and `skips` (it
     turned draft or closed after the listing). Anything else is a hand-back: it is
-    remembered, announced ([`ending.handed_back`]) and passed over.
+    remembered, announced ([`ending.handed_back`]) and passed over until its head
+    moves; one ending [`outcomes.RECLAIM`] also until its body or labels change
+    ([`handbacks.reworded`], #1279).
     `stale_code()` names the queue's files that changed on `main` since launch
     ([`freshness.changed`]); asked before each take, a non-empty answer ends the
     watch ([`ending.relaunch`]) with the pull request untaken.
@@ -33,12 +35,14 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
     """
     results, done, failed, handed, told, landed = [], set(), 0, [], set(), set()
     memory, marks = handbacks.recall(fx.memory), handbacks.recall(fx.memory.with_name(handbacks.RUNS_MEMORY))
+    claims = handbacks.recall(fx.memory.with_name(handbacks.CLAIMS_MEMORY))
     line = aging.Line()
     shown = [None]  # the board as last reported; `None` until the first listing
 
     def save() -> None:
         handbacks.remember(fx.memory, memory)
         handbacks.remember(fx.memory.with_name(handbacks.RUNS_MEMORY), {n: m for n, m in marks.items() if n in memory})
+        handbacks.remember(fx.memory.with_name(handbacks.CLAIMS_MEMORY), {n: c for n, c in claims.items() if n in memory})
 
     def report(pulls: list[dict]) -> None:
         now = board.heads(board.recent(pulls, getattr(opts, "since", None)))
@@ -51,9 +55,10 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
         if pulls is not None:
             report(pulls)
 
-    def settle(number: int, result: tuple[int, str, str], head: str, ask: bool = True) -> str | None:
+    def settle(number: int, result: tuple[int, str, str], head: str, ask: bool = True, pull: dict | None = None) -> str | None:
         """Record how a pull request ended; why to exit, if the machine failed.
-        A hand-back remembers the head GitHub reports now when `ask`, else `head`."""
+        A hand-back remembers the head GitHub reports now when `ask`, else `head`;
+        an edit hand-back also what `pull`, as listed, claimed ([`handbacks.claim`])."""
         results.append(result)
         state = result[1]
         if state == fx.merged:
@@ -68,11 +73,15 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
         else:
             memory[number] = (fx.head(number) if ask else None) or head
             marks.pop(number, None)
+            claims.pop(number, None)
+            edit = state == outcomes.RECLAIM and pull is not None
+            if edit:
+                claims[number] = handbacks.claim(pull)
             mark = fx.attempts(number, memory[number])
             if mark is not None:
                 marks[number] = mark
             handed.append(number)
-            fx.say(ending.handed_back(number, result[2]))
+            fx.say(ending.handed_back(number, result[2], edit))
         return None
 
     last, moved = None, fx.clock()
@@ -98,6 +107,11 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
             memory.pop(number, None)
             marks.pop(number, None)
             fx.say(f"watch: #{number} has run again on its handed-back head; back in line.")
+        for number in handbacks.reworded(pulls, memory, claims):
+            memory.pop(number, None)
+            marks.pop(number, None)
+            claims.pop(number, None)
+            fx.say(f"watch: #{number}'s description or labels changed since its hand-back; back in line.")
         report(pulls)
         now = board.heads(pulls)
         if now != last:
@@ -148,7 +162,7 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
                 fx.say(said)
         fx.say(f"watch: taking #{number}.")
         line.took(number)
-        stop = settle(number, fx.turn(number, tick), chosen.get("headRefOid", ""))
+        stop = settle(number, fx.turn(number, tick), chosen.get("headRefOid", ""), pull=chosen)
         save()
         if stop:
             return results, stop, ending.status(handed, True)

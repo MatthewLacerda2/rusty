@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -12,6 +13,31 @@ MEMORY = "merge-queue/handed-back.json"
 # Beside it, the runs on each remembered head as [`attempts`] spells them, so a
 # re-run of the same head reads as movement (#869).
 RUNS_MEMORY = "handed-back-runs.json"
+
+
+# Beside it too, for a hand-back an edit fixes, what the description and labels
+# were ([`claim`]): a change re-admits it with no push (#1279).
+CLAIMS_MEMORY = "handed-back-claims.json"
+
+
+def claim(pull: dict) -> str:
+    """What a pull request claims, as one comparable string: its body and labels."""
+    labels = sorted(label.get("name", "") if isinstance(label, dict) else str(label) for label in pull.get("labels") or [])
+    said = json.dumps({"body": pull.get("body") or "", "labels": labels}, sort_keys=True)
+    return hashlib.sha256(said.encode()).hexdigest()[:16]
+
+
+def reworded(pulls: list[dict], memory: dict[int, str], claims: dict[int, str]) -> list[int]:
+    """The remembered edit hand-backs whose description or labels changed since (#1279).
+
+    Only an entry in `claims` is asked: a red run or a conflict waits for its
+    head. A pull request listed without a body is no news.
+    """
+    return [
+        pull["number"] for pull in pulls
+        if pull.get("number") in claims and memory.get(pull.get("number")) is not None
+        and "body" in pull and claims[pull["number"]] != claim(pull)
+    ]
 
 
 def forget_closed(memory: dict[int, str], pulls: list[dict]) -> dict[int, str]:

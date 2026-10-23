@@ -104,9 +104,16 @@ def relaunch(paths: list[str], results: list[tuple[int, str, str]], merged: str)
     )
 
 
-def handed_back(number: int, why: str) -> str:
-    """The line a hand-back prints as it happens, beginning [`HANDED_BACK_LINE`]."""
-    return f"{HANDED_BACK_LINE} #{number}: {why} Passed over until its head moves; the watch carries on."
+def handed_back(number: int, why: str, edit: bool = False) -> str:
+    """The line a hand-back prints as it happens, beginning [`HANDED_BACK_LINE`].
+    It says which fix it waits for: an `edit` of the description or labels
+    (#1279), or a push."""
+    if edit:
+        return (
+            f"{HANDED_BACK_LINE} #{number}: {why} Fix the description or labels; no push needed:"
+            " passed over until they change (or its head moves); the watch carries on."
+        )
+    return f"{HANDED_BACK_LINE} #{number}: {why} Push a fix: passed over until its head moves; the watch carries on."
 
 
 def over_budget(for_minutes: float | None, deadline: float) -> str | None:

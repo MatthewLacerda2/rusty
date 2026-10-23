@@ -8,7 +8,7 @@ import subprocess
 import time
 
 from merging.queue import checks, dependabot, gitio, landing, outcomes, pulls, rebase, stamping, waiting
-from merging.verdict import closing, decide, github, protocol
+from merging.verdict import carried, closing, decide, github, protocol
 
 
 def dry(repo: str, pull: dict, fresh: str, notes: list[str]) -> tuple[int, str, str]:
@@ -42,7 +42,8 @@ def take(repo: str, number: int, opts: argparse.Namespace, tick=None) -> tuple[i
     refused = protocol.refusal({**pull, "closes": closing.closed_by(repo, pull)})
     if refused:
         outcomes.say(f"#{number}: {refused[0]}", *refused[1:])
-        return number, outcomes.HANDED_BACK, refused[0]
+        # An image is deleted by a commit; everything else here is an edit (#1279).
+        return number, outcomes.HANDED_BACK if carried.images(pull) else outcomes.RECLAIM, refused[0]
 
     branch, head = pull["headRefName"], pull["headRefOid"]
     gitio.remote("fetch", "--quiet", "origin", "main", cwd=opts.root)

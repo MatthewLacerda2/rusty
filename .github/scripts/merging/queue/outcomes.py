@@ -19,6 +19,11 @@ RUNNERS = "runners unavailable"
 # report never claims a merge it did not make.
 MERGED, GREEN, DRY, HANDED_BACK = "merged", "green", "dry run", "handed back"
 
+# A hand-back for what the description or labels claim ([`verdict.protocol.refusal`]):
+# an edit fixes it, so the watch re-reads it when they change, not only when the
+# head moves (#1279: #1275's fixed description sat until the daemon restarted).
+RECLAIM = "handed back: description"
+
 # The machine failed, not the branch ([`stopping.Stopped`]); and what the stop left untouched.
 STOPPED, NOT_TAKEN = "stopped the queue", "not taken"
 
