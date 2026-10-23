@@ -70,15 +70,17 @@ fn every_build_field_roundtrips() {
 }
 
 #[test]
-fn a_new_project_gets_a_default_file() {
-    let root = fresh("new");
+fn a_new_project_gets_a_default_file_named_after_its_folder() {
+    let root = fresh("Horde");
     let (engine, lines) = record(&root).unwrap();
     assert!(engine.matches());
     assert_eq!(lines, vec![format!("created {PROJECT_FILE}")]);
     let file = ProjectFile::read(&root.join(PROJECT_FILE))
         .unwrap()
         .unwrap();
-    assert_eq!(file, ProjectFile::default());
+    let mut expected = ProjectFile::default();
+    expected.build.product_name = "Horde".to_string();
+    assert_eq!(file, expected);
 }
 
 #[test]
@@ -103,7 +105,12 @@ fn opening_for_edit_records_the_running_engine() {
         Some(A),
         "the check sees the old record"
     );
-    let now = ProjectFile::read(&path).unwrap().unwrap().engine_commit;
+    let now = ProjectFile::read(&path).unwrap().unwrap();
+    assert_eq!(
+        now.build, stale.build,
+        "an existing file keeps its product name"
+    );
+    let now = now.engine_commit;
     let expected = if engine_commit() == UNKNOWN_COMMIT {
         A
     } else {
