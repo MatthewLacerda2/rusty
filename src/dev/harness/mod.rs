@@ -57,8 +57,8 @@ pub struct Expectation {
 /// Before the tick `ui_textures` reads the UI's texture sizes from the files into
 /// the sim, as the window does before each of its ticks (#1221), so a headless
 /// layout matches the drawn one. No Lua binding writes the table: Rust code driving
-/// a harness may set sizes on `resources.screen.textures_mut()` between steps (only
-/// for paths the scene's Images use; see `render::TextureSizeReader`).
+/// a harness may set sizes on `resources.screen.borrow_mut().textures_mut()` between
+/// steps (only for paths the scene's Images use; see `render::TextureSizeReader`).
 pub fn tick_unless_quit(world: &mut GameWorld, ui_textures: &mut TextureSizeReader) -> bool {
     if world.quit_requested() {
         return false;

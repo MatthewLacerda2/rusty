@@ -83,5 +83,5 @@ fn the_ui_api_reads_the_shared_screen_cell() {
         .expect("runtime boots");
     let size = res.script_manager.eval("UI.GetScreenSize()").unwrap();
     assert_eq!(size, "640, 480");
-    assert_eq!(res.screen_pixels(), glam::Vec2::new(640.0, 480.0));
+    assert_eq!(res.ui_view().screen, glam::Vec2::new(640.0, 480.0));
 }

@@ -185,14 +185,6 @@ impl Resources {
         }
     }
 
-    /// The screen size in pixels the UI lays out on this tick: the platform's game
-    /// view, else the video resolution (headless).
-    pub fn screen_pixels(&self) -> glam::Vec2 {
-        let video = self.script_manager.video_cell();
-        let video = *video.borrow();
-        self.screen.borrow().pixels(&video)
-    }
-
     /// What the UI is computed against this tick: the screen, the textures'
     /// native sizes and the active camera.
     pub fn ui_view(&self) -> crate::ui::UiView {

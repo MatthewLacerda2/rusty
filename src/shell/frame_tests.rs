@@ -91,3 +91,50 @@ fn quit_closes_the_player_and_stops_play_in_the_editor() {
         assert_eq!(quit_action(host, false, true), None);
     }
 }
+
+#[test]
+fn paused_steps_lay_out_with_texture_sizes_read_before_each_step() {
+    use crate::components::{CanvasComponent, ImageComponent, LayoutAxisFit as Fit};
+    use crate::components::{LayoutElementComponent, RectTransformComponent};
+    let dir = crate::test_temp::dir().join("rusty_1221_frame");
+    std::fs::create_dir_all(&dir).expect("temp dir");
+    let path = dir.join("icon.png").to_string_lossy().into_owned();
+    std::fs::remove_file(&path).ok();
+    let mut game = playing_world();
+    let icon = {
+        let mut scene = game.scene().borrow_mut();
+        let root = scene.add_entity("Canvas".to_string());
+        scene
+            .world
+            .set_canvas(root, Some(CanvasComponent::default()));
+        let id = scene.add_entity("Icon".to_string());
+        let rt = RectTransformComponent::default();
+        scene.world.set_rect_transform(id, Some(rt));
+        let (horizontal_fit, vertical_fit) = (Fit::PreferredSize, Fit::PreferredSize);
+        let fit = LayoutElementComponent {
+            horizontal_fit,
+            vertical_fit,
+            ..Default::default()
+        };
+        scene.world.set_layout_element(id, Some(fit));
+        let texture = Some(path.clone());
+        let img = ImageComponent {
+            texture,
+            ..Default::default()
+        };
+        scene.world.set_image(id, Some(img));
+        scene.set_parent(id, Some(root)).expect("parent exists");
+        id
+    };
+    let mut reader = Default::default();
+    advance_sim(&mut game, 0.02, &mut reader); // enter Play: the file is missing
+    let size = |game: &GameWorld| game.resources.ui_layout.get(icon).map(|r| r.rect.1);
+    assert_eq!(size(&game), Some(glam::Vec2::ZERO));
+    game.time().borrow_mut().pause();
+    let image = crate::procgen::Image::new(8);
+    crate::procgen::bake::bake_to_png(&image, crate::procgen::Slot::BaseColor, &path).unwrap();
+    // Two steps in one frame: the size is read before the first, not once per frame.
+    game.time().borrow_mut().request_steps(2);
+    advance_sim(&mut game, 0.5, &mut reader);
+    assert_eq!(size(&game), Some(glam::Vec2::splat(8.0)));
+}
