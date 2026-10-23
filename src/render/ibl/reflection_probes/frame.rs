@@ -23,9 +23,7 @@ impl Renderer {
             if wanted.len() == MAX_REFLECTION_PROBES {
                 break;
             }
-            let path = &probes[i].cubemap_path;
-            let admits = |renderer: &mut Self, size| renderer.reflection_probes.admits(path, size);
-            if let Some(cube) = self.cached_cubemap_where(path, admits) {
+            if let Some(cube) = self.cached_cubemap(&probes[i].cubemap_path) {
                 wanted.push((i, cube));
             }
         }

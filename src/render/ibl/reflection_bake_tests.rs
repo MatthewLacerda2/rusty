@@ -145,8 +145,9 @@ fn gpu_bake_writes_file_and_sets_path() {
         "cubemap file should exist"
     );
 
-    // The written file loads back into a mipped cube on the GPU.
-    let cube = renderer.load_cubemap_mips(&path).expect("baked file loads");
+    // The written file loads back, through the path the frame uses, into a mipped
+    // cube the probe array admits.
+    let cube = renderer.cached_cubemap(&path).expect("baked file loads");
     assert_eq!(cube.size, RES);
 
     let _ = std::fs::remove_dir_all(&dir);

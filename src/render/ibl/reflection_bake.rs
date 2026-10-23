@@ -5,7 +5,8 @@
 //! (`capture_static_cubemap`, #243), GGX-prefilters it into a roughness mip chain
 //! (`reflection_prefilter`), encodes the result to KTX2 (`ktx2_encode`), writes that file
 //! next to the scene, and stores its path on the probe (the `cubemap_path` field from
-//! #244). The runtime then loads it (`load_cubemap`) and the forward pass reflects it.
+//! #244). Each frame loads it through the probe array's cubemap cache
+//! (`Renderer::cached_cubemap`), and the forward pass reflects it.
 //!
 //! Every cube is baked at [`DEFAULT_REFLECTION_RESOLUTION`], the face of the probe
 //! array the frame copies cubes into (#1238): a bake at any other size would write

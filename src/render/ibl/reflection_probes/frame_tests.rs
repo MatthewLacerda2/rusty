@@ -1,7 +1,9 @@
 //! Choosing the frame's resident probes (#1238): ranked by box, ties by scene index,
 //! cubes that don't fit passed over before the budget.
 
+use std::cell::RefCell;
 use std::panic::AssertUnwindSafe;
+use std::rc::Rc;
 
 use glam::Vec3;
 
@@ -9,6 +11,7 @@ use super::super::gpu_tests::{cube_file, probes_at, renderer};
 use super::ranked;
 use crate::render::ibl::reflection_probes::MAX_REFLECTION_PROBES;
 use crate::scene::Scene;
+use crate::scripting::ConsoleLogs;
 
 /// A probe whose box holds the camera ranks first, however far its capture point.
 #[test]
@@ -71,7 +74,8 @@ fn gpu_symmetric_probes_do_not_snap_with_the_camera() {
 }
 
 /// A larger hand-set cube is passed over: it neither takes a budget slot nor knocks
-/// out the baked-size probes, it is never uploaded, and a re-bake reads it again.
+/// out the baked-size probes, it is never uploaded, and it warns once per load: again
+/// only after a re-bake reads it again.
 #[test]
 fn gpu_a_larger_cube_is_passed_over_and_never_uploaded() {
     let Some(mut renderer) = renderer() else {
@@ -82,16 +86,25 @@ fn gpu_a_larger_cube_is_passed_over_and_never_uploaded() {
         cube_file("small_4.ktx2", 4, 5),
     );
     let scene = probes_at(&[(-2.0, &big), (2.0, &small)]);
-    renderer.update_reflection_probes(&scene, Vec3::ZERO);
+    crate::logging::init();
+    let console = RefCell::new(ConsoleLogs::new());
+    let warnings = |renderer: &mut crate::render::Renderer| {
+        renderer.update_reflection_probes(&scene, Vec3::ZERO);
+        let logged = crate::logging::forward(&console);
+        logged.iter().filter(|m| m.contains(big.as_str())).count()
+    };
+    assert_eq!(warnings(&mut renderer), 1, "the first frame warns");
+    assert_eq!(warnings(&mut renderer), 0, "the next frame does not");
     let probes = &renderer.reflection_probes;
     assert_eq!(probes.probe_for(Vec3::new(-2.0, 0.0, 0.0)), 0);
     assert_ne!(probes.probe_for(Vec3::new(2.0, 0.0, 0.0)), 0);
     let cached = renderer.cubemaps.get(&big);
     assert!(matches!(cached, Some(None)), "cached as absent, no texture");
     renderer.invalidate_textures(std::slice::from_ref(&big));
-    assert!(
-        !renderer.cubemaps.contains_key(&big),
-        "a re-bake reads it again"
+    assert_eq!(
+        warnings(&mut renderer),
+        1,
+        "a re-bake reads it and warns again"
     );
 }
 
@@ -104,7 +117,7 @@ fn gpu_update_refuses_a_cube_that_does_not_fit() {
         return;
     };
     let path = cube_file("unadmitted_256.ktx2", 256, 5);
-    let cube = renderer.cached_cubemap(&path).unwrap();
+    let cube = Rc::new(renderer.load_cubemap_mips(&path, |_| true).unwrap());
     let scene = probes_at(&[(0.0, &path)]);
     let wanted = [(&scene.reflection_probes.probes[0], cube)];
     let r = &mut renderer;

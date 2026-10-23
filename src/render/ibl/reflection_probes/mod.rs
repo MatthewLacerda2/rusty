@@ -12,8 +12,8 @@
 //!
 //! **Per-frame cost.** Ordering the scene's probes by the camera's distance to their
 //! boxes is O(P log P) over P probes, then each draw tests at most
-//! [`MAX_REFLECTION_PROBES`] boxes. GPU work happens only when the set of nearest cubes changes: one
-//! texture-to-texture copy per newly resident cube (about 0.5 MB at the bake's
+//! [`MAX_REFLECTION_PROBES`] boxes. GPU work happens only when the set of nearest
+//! cubes changes: one texture-to-texture copy per newly resident cube (about 0.5 MB at the bake's
 //! 128-texel face), or a rebuild of the array when it cannot hold them. A scene with
 //! no baked probe (the Inspector preview, rendered every frame beside the viewport)
 //! leaves the resident cubes alone, so the next scene finds them still in place.
@@ -128,10 +128,10 @@ impl ProbeArray {
     }
 
     /// Whether a `size`-texel cube at `path` fits the array: the bake's face halved a
-    /// whole number of times; any other cube is warned about. The frame asks once per
-    /// load of a path, before uploading it (#1245), so a cube that doesn't fit warns
-    /// once, and again after a re-bake re-reads it.
-    pub(super) fn admits(&self, path: &str, size: u32) -> bool {
+    /// whole number of times; any other cube is warned about. The cubemap cache asks
+    /// once per load of a path, before uploading it (#1245), so a cube that doesn't fit
+    /// warns once, and again after a re-bake re-reads it.
+    pub(in crate::render::ibl) fn admits(path: &str, size: u32) -> bool {
         if fits(DEFAULT_REFLECTION_RESOLUTION, size) {
             return true;
         }
@@ -143,17 +143,19 @@ impl ProbeArray {
         false
     }
 
-    /// Make `wanted` (each [admitted](Self::admits), which a debug build asserts, in
-    /// scene order, at most the budget) this frame's probes: copy the cubes that are not resident yet,
-    /// rebuilding the array when it cannot hold them. Returns true when the array
-    /// texture was replaced, so group 0 must rebind.
+    /// Make `wanted` (in scene order, at most the budget) this frame's probes: copy
+    /// the cubes that are not resident yet, rebuilding the array when it cannot hold
+    /// them. Returns true when the array texture was replaced, so group 0 must rebind.
+    /// Each cube must be [admitted](Self::admits): a debug build asserts it, and a
+    /// release build leaves out one that isn't, since a cube larger than the face would
+    /// give the array a mip count wgpu rejects (#1245).
     fn update(
         &mut self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         wanted: &[(&ReflectionProbe, Rc<CubemapTexture>)],
     ) -> bool {
-        let kept: Vec<_> = wanted.iter().map(|(p, c)| (*p, &**c)).collect();
+        let kept = admitted(wanted);
         if kept.is_empty() {
             // Nothing to shade: keep the resident cubes for the next scene.
             self.activate(&[], &[]);
@@ -209,10 +211,6 @@ impl ProbeArray {
     /// does not reallocate), else as many as the set needs.
     fn target_size(&self, kept: &[(&ReflectionProbe, &CubemapTexture)]) -> (u32, u32) {
         let face = DEFAULT_REFLECTION_RESOLUTION;
-        debug_assert!(
-            kept.iter().all(|(_, cube)| fits(face, cube.size)),
-            "every wanted cube was admitted"
-        );
         let mips = kept
             .iter()
             .map(|(_, cube)| (face / cube.size).trailing_zeros() + cube.texture.mip_level_count())
@@ -251,6 +249,22 @@ impl ProbeArray {
 /// number of times.
 fn fits(face: u32, size: u32) -> bool {
     face.is_multiple_of(size) && (face / size).is_power_of_two()
+}
+
+/// The cubes of `wanted` that fit the array. Each should, being admitted before it
+/// was uploaded: a debug build asserts it, a release build leaves out one that doesn't.
+fn admitted<'a>(
+    wanted: &'a [(&'a ReflectionProbe, Rc<CubemapTexture>)],
+) -> Vec<(&'a ReflectionProbe, &'a CubemapTexture)> {
+    let face = DEFAULT_REFLECTION_RESOLUTION;
+    debug_assert!(
+        wanted.iter().all(|(_, cube)| fits(face, cube.size)),
+        "every wanted cube was admitted"
+    );
+    (wanted.iter())
+        .filter(|(_, cube)| fits(face, cube.size))
+        .map(|(p, c)| (*p, &**c))
+        .collect()
 }
 
 /// One entry per distinct cube path in `kept`, in first-wanted order: the cubes that
