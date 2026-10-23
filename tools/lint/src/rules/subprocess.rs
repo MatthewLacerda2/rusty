@@ -1,7 +1,8 @@
 //! `subprocess`: the engine never starts another program (#975).
 //!
-//! CLAUDE.md: the engine "never parses `.blend` nor shells out to Blender", and a
-//! shipped game runs on what it carries. A line of `src/` that names
+//! A shipped game runs on what it carries, and the one program the engine starts
+//! is Blender, to convert a `.blend` while authoring (CLAUDE.md, *One format
+//! inside*; `asset::convert::blend`, #1072). A line of `src/` that names
 //! `std::process::Command` (`process::` and the word `Command` on one code line, so
 //! `use std::process::{Command, Stdio}` counts) is a finding; a legitimate use says
 //! why with `// lint: allow(subprocess) <why>`. `tests/` and `tools/` are not the
@@ -31,7 +32,7 @@ pub fn check(path: &str, source: &str) -> Vec<Finding> {
             line: i + 1,
             rule: RULE,
             message:
-                "the engine never starts another program (CLAUDE.md: no shelling out to Blender)"
+                "the engine starts no other program but Blender, while authoring (CLAUDE.md, *One format inside*)"
                     .to_string(),
         })
         .collect()

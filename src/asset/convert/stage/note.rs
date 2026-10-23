@@ -15,9 +15,10 @@
 //! it is re-imported.
 //!
 //! **A converter that does not write the files itself** (the `.blend` path
-//! through Blender, #1072, not built yet) still writes into the staging folder,
-//! so [`swapped_in`] notes its outputs the same way; one that wrote somewhere
-//! else would have to call `note_written` on each output once it returns.
+//! through Blender, #1072) has its program export into the staging folder and
+//! writes the `.glb` and textures from there, so [`swapped_in`] notes its outputs
+//! the same way; one that wrote somewhere else would have to call `note_written`
+//! on each output once it returns.
 
 use crate::core::fs::written::note_written;
 use std::path::Path;

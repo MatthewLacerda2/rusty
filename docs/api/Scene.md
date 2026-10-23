@@ -219,7 +219,7 @@ one name and never drift.
   engine default when the glTF names none), and syncs a mesh collider when the asset's
   `.meta` sidecar records one. Returns the new entity's id; errors (without spawning)
   when the reference is malformed, the file fails to import, or the sub-object is absent.
-  A converted source (`.fbx`) is never converted during Play: as Unity refreshes its
+  A converted source (`.fbx`, `.blend`) is never converted during Play: as Unity refreshes its
   assets before Play and its runtime loads never import, entering Play brings every
   converted source under `assets/` up to date (and every instance in the scene with
   it), and Play then reads that import. A source changed during Play keeps its last

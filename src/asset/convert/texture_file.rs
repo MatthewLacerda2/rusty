@@ -1,5 +1,12 @@
 //! The file names and URIs of the textures a conversion writes or references,
 //! shared by every converter that writes its own (`fbx::texture`, `blend::pack`).
+// A converter's (#1172): see `fbx`'s root for why.
+#![deny(
+    clippy::let_underscore_must_use,
+    clippy::unused_result_ok,
+    clippy::print_stdout,
+    clippy::print_stderr
+)]
 
 use crate::asset::gltf::uri;
 use crate::asset::IMAGE_EXTENSIONS;

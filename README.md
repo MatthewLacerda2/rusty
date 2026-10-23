@@ -42,16 +42,26 @@ wallbangs, grenades, and multi-floor maps with jump spots, drops and ladders. ru
 
 ## Assets
 
-Authored 3D assets come from **Blender** (its native glTF 2.0 export), or are
+Authored 3D assets are `.blend` files saved straight from **Blender**, or
 `glTF` / `glb` / `obj` / `fbx` files brought in, downloaded, or exported from
-anywhere else. An `.fbx` (binary or ASCII) is converted to glTF when it is imported,
-skins and animation stacks included, by the `ufbx` library inside the engine: the converted copy is cached under
-`assets/generated/imported/` and re-made when the source changes (outside Play, and
-for every source as Play starts; Play itself never converts), while scenes keep
-naming the `.fbx`. The engine reads those standard interchange formats directly — it
-**never parses `.blend` and never shells out to Blender** as a subprocess (the
-fragile Unity-style convenience that breaks the moment Blender isn't installed).
-glTF 2.0 is the first-class path; `.obj` covers static meshes. Levels of detail
+anywhere else. Inside, the engine reads one format, glTF 2.0 (`.obj` covers static
+meshes); everything else is converted to glTF when it is imported, the way Unity read
+only FBX and had Blender export one:
+
+- an `.fbx` (binary or ASCII), skins and animation stacks included, by the `ufbx`
+  library inside the engine;
+- a `.blend` by **Blender 5 or later**, which rusty requires: it runs Blender headless
+  with the export settings pinned in one script (+Y up, modifiers applied, animations
+  and skins on). Blender is found on `PATH`, then where it usually installs; set
+  `RUSTY_BLENDER` to its executable for any other install. Without it, a `.blend`
+  import fails saying so, and an unchanged `.blend` still loads its last import.
+  Images packed into the `.blend` are extracted; images on disk are used where they lie.
+
+The converted copy is cached under `assets/generated/imported/` and re-made when the
+source changes, or the Blender that made it does (outside Play, and for every source
+as Play starts; Play itself never converts), while scenes keep naming the source. A
+shipped game reads the cache and never runs Blender; the engine never parses a
+`.blend` itself. Levels of detail
 follow the Unity / Blender naming convention: objects named `Crate_LOD0`,
 `Crate_LOD1`, … import as one `Crate` carrying an `LODGroup` that shows one level at
 a time by on-screen size (see `docs/api/LODGroup.md`). A mesh's second UV map (glTF

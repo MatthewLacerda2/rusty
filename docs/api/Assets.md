@@ -2,7 +2,7 @@
 
 The project's importable assets — the "see what I can place" half of authoring.
 `Assets.Manifest()` (alias `Assets.List()`) walks the open project's `assets/` folder, imports
-every model file (`.gltf`/`.glb`/`.obj`/`.fbx`; an `.fbx` is read through the glTF it
+every model file (`.gltf`/`.glb`/`.obj`/`.fbx`/`.blend`; an `.fbx` or a `.blend` is read through the glTF it
 is converted to and cached in `assets/generated/imported/`, which the walk skips), and returns a structured catalogue of the
 addressable sub-objects inside each file plus their footprint (so the agent can lay
 things out without overlap) and material count. Unlike the rest of the surface,
@@ -13,7 +13,7 @@ round-trips with `AssetRef` / `import_sub_mesh`, so it can be handed straight to
 mesh-instantiation path to place exactly what the manifest names. Files that fail to
 import are skipped; a missing root yields an empty list. Output is deterministic
 (files sorted by path, sub-objects in source order). During Play nothing is converted
-(#1253), so an `.fbx` is listed from its last import: the one made as Play began, or
+(#1253), so an `.fbx` or a `.blend` is listed from its last import: the one made as Play began, or
 before a source changed during Play.
 
 | Function | Signature | Returns |

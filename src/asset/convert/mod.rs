@@ -18,8 +18,11 @@
 //!
 //! **When it is re-made.** A `<cache>.glb.source` stamp beside each cached file
 //! records the converter, its [`Converter::version`], a digest of the source's
-//! bytes, and every external file the conversion looked at (an FBX's on-disk
-//! texture), with a digest or as absent (#1189); any difference re-converts.
+//! bytes, the version of the program it runs ([`Converter::tool`]: Blender's, for a
+//! `.blend`), and every external file the conversion looked at (an FBX's on-disk
+//! texture, a `.blend`'s linked library), with a digest or as absent (#1189); any
+//! difference re-converts. With the program missing, a cache of the unchanged
+//! source stands, made by whichever version of it.
 //! Content, not timestamps: a fresh clone gives every file a new mtime. A source's
 //! digest is remembered by its length and mtime (`depends`), so a Play that looks
 //! at every source reads only the ones that changed. Files a conversion writes for the glTF to

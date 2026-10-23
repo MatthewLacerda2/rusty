@@ -127,9 +127,12 @@ fn major(version: &str) -> Option<u32> {
     version.split('.').next()?.parse().ok()
 }
 
-/// Versions already asked, by executable path, with its length and mtime.
-static ASKED: LazyLock<Mutex<Map<PathBuf, (u64, Option<Duration>, String)>>> =
-    LazyLock::new(Mutex::default);
+/// A version asked: the executable's length and mtime when it answered, and
+/// the answer.
+type Asked = (u64, Option<Duration>, String);
+
+/// Versions already asked, by executable path.
+static ASKED: LazyLock<Mutex<Map<PathBuf, Asked>>> = LazyLock::new(Mutex::default);
 
 /// The version the Blender at `path` reports, asked once per build of it.
 fn version(path: &Path) -> Result<String, ImportError> {
