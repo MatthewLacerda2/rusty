@@ -2,7 +2,7 @@
 //! to now, against the one stored beside the cache (`record`).
 
 use super::depends::{self, Seen};
-use super::{record, unreadable, Converter};
+use super::{record, served_from_cache, unreadable, Converter};
 use crate::asset::ImportError;
 use std::path::Path;
 
@@ -51,15 +51,14 @@ pub(super) fn stale(
     out: &Path,
     tool: Tool,
 ) -> Result<Option<String>, ImportError> {
-    let digest = match depends::digest(source) {
-        Seen::Read(digest) => digest,
-        _ if out.is_file() => {
-            if let Some(stored) = record::stored(out) {
-                record::replay(source, out, &stored);
-            }
-            return Ok(None);
+    let Seen::Read(digest) = depends::digest(source) else {
+        if !served_from_cache(false, out) {
+            return Err(unreadable(source));
         }
-        _ => return Err(unreadable(source)),
+        if let Some(stored) = record::stored(out) {
+            record::replay(source, out, &stored);
+        }
+        return Ok(None);
     };
     let version = match tool {
         Tool::Found(version) => Some(version),

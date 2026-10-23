@@ -244,7 +244,8 @@ jobs:
   # The `.blend` import through a real Blender (#1072). Its tests are `#[ignore]`d
   # in every other run, since rusty requires Blender but a runner has none; this
   # job installs one and runs exactly those (`--run-ignored only`), so the
-  # conversion is proven somewhere on every code change. The tarball is cached by
+  # conversion is proven somewhere on every code change; `dev` builds the `export`
+  # and `play` binaries the export's test drives (#1267). The tarball is cached by
   # version; `RUSTY_BLENDER` names it, as a non-standard install would.
   blender:
     needs: changes
@@ -291,7 +292,8 @@ jobs:
       - name: Test (the .blend import, through Blender)
         run: |
           export RUSTY_BLENDER="$HOME/blender/blender"
-          cargo nextest run --profile ci --locked --run-ignored only -E 'test(/convert::blend::/)'
+          cargo nextest run --profile ci --locked --features dev --run-ignored only \
+            -E 'test(/convert::blend::|^export::blend::/)'
 
   # The one gating job that also runs nightly — see the `schedule` trigger note.
   deny:

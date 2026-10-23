@@ -25,6 +25,14 @@ fn missing_asset_is_reported_by_path() {
 }
 
 #[test]
+fn a_converted_source_with_no_cache_is_missing_too() {
+    // An exported project previews a `.fbx` from its cache (#1267); with neither, the
+    // path is reported as it was.
+    let err = resolve_subject("assets/models/never-imported.fbx").expect_err("no file");
+    assert!(err.contains("no such asset"), "{err}");
+}
+
+#[test]
 fn resolves_each_previewable_kind() {
     assert!(matches!(
         resolve_subject(MODEL),

@@ -34,6 +34,13 @@ name = "play"
 path = "src/bin/play.rs"
 required-features = ["dev"]
 
+# Ship a project (#1267): refresh the import cache, copy the runtime files, leave the
+# convertible sources behind. Dev-only, since it may run Blender.
+[[bin]]
+name = "export"
+path = "src/bin/export.rs"
+required-features = ["dev"]
+
 # Long-lived headless EDIT-mode session + command channel (the keystone, #177).
 # Dev-only: an agent drives the full `api::` surface over stdin against a live world.
 [[bin]]

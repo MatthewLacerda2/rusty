@@ -156,9 +156,12 @@ pub fn capture_asset(
 /// which of the two things went wrong. Checking existence up front matters because
 /// [`preview::build_preview_scene`] is deliberately forgiving — a failed import leaves
 /// an empty scene, which would render a perfectly nice picture of empty sky and let a
-/// typo'd path pass for a working preview.
+/// typo'd path pass for a working preview. A converted source an export left behind
+/// (#1267) is there while its import cache is.
 fn resolve_subject(asset_path: &str) -> Result<PreviewSubject, String> {
-    if !Path::new(asset_path).is_file() {
+    if !Path::new(asset_path).is_file()
+        && !crate::asset::convert::cached_without_source(Path::new(asset_path))
+    {
         return Err(format!("no such asset: {asset_path}"));
     }
     preview::subject_for_path(asset_path).ok_or_else(|| {

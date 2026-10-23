@@ -44,7 +44,7 @@ impl GameWorld {
     /// with them, then refuse conversion for the session (#1253), as Unity refreshes
     /// its assets before Play and its runtime loads never import. Runs before the
     /// edit snapshot, so Stop restores the refreshed scene. The standalone player
-    /// does the same: nothing ships its caches yet (#1267).
+    /// does the same; on an exported project (#1267) there are no sources to refresh.
     pub(super) fn refresh_then_hold_imports(&mut self) {
         use crate::asset::convert::{refresh_sources, PlayHold};
         refresh_sources(&self.resources.sources_root);
