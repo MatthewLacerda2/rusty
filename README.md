@@ -49,7 +49,13 @@ meshes); everything else is converted to glTF when it is imported, the way Unity
 only FBX and had Blender export one:
 
 - an `.fbx` (binary or ASCII), skins and animation stacks included, by the `ufbx`
-  library inside the engine;
+  library inside the engine. A texture file beside it is used only when the engine
+  can load it (a PNG, JPEG or TGA whose bytes agree with its name); otherwise a
+  copy embedded in the FBX stands in, or the texture is left out with a warning
+  and the material keeps its colour. Colours follow Unity's (URP's) FBX import: a
+  diffuse or emissive colour under a texture is white, so the texture shows as
+  itself, and a Lambert or Phong colour without one is taken as is. As in Unity, a
+  skipped emission texture leaves its colour glowing;
 - a `.blend` by **Blender 5 or later**, which rusty requires: it runs Blender headless
   with the export settings pinned in one script (+Y up, modifiers applied, animations
   and skins on). Blender is found on `PATH`, then where it usually installs; set

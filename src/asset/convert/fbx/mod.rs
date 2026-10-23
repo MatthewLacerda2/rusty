@@ -61,6 +61,22 @@ fn convert_to(source: &Path, out: &Path) -> Result<(), ImportError> {
     super::refresh(converter, source, out)
 }
 
+/// The test fixture model `name`.
+#[cfg(test)]
+fn fixture(name: &str) -> std::path::PathBuf {
+    std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures/models")
+        .join(name)
+}
+
+/// The FBX at `source` converted fresh to `out` (the shared cache would keep a
+/// conversion made by an older build of the converter), then imported.
+#[cfg(test)]
+fn convert_and_import(source: &Path, out: &Path) -> crate::asset::ImportedAsset {
+    convert_to(source, out).expect("the fixture converts");
+    crate::asset::gltf::import::import(out).expect("its glTF imports")
+}
+
 /// The FBX at `source`, read by ufbx in metres.
 fn load(source: &Path) -> Result<ufbx::SceneRoot, ImportError> {
     // Units are ufbx's to convert; axes are `basis`'s (see there for why).

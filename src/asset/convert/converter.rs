@@ -77,7 +77,11 @@ pub const CONVERTERS: &[Converter] = &[
         // 9: an extracted texture's extension follows its bytes, not its name (#1072).
         // 10: a colour the file leaves out is glTF's default, white base colour (#1280).
         // 11: a base colour bound to a texture is white × its factor, as Unity's (#1287).
-        version: 11,
+        // 12: colours follow URP's FBX import, linearised; the emissive map is carried;
+        //     an on-disk texture the importer can't read is skipped (#1293).
+        // 13: those colour rules for classic shading only; an on-disk texture must
+        //     load, by extension and bytes (#1293, its review).
+        version: 13,
         tool: None,
         convert: fbx::convert,
     },

@@ -207,7 +207,7 @@ fn sub_object_row(
 /// Import the source file and instantiate each addressable sub-object as its own
 /// entity carrying a path-based `"Asset"` mesh reference (`path::sub_object`) — a
 /// `_LOD<n>` set as one LODGroup entity (#472). Routes through the shared
-/// `authoring::instantiate_model` / `instantiate_asset` verbs — the same path
+/// `authoring::instantiate_model` / `instantiate_imported` verbs — the same path
 /// `Scene.Instantiate` drives — so editor and API never drift. The
 /// geometry is re-imported on every scene load; no GPU buffers are persisted.
 fn instantiate(editor: &mut EditorUi, scene: &mut Scene, path: &str) {

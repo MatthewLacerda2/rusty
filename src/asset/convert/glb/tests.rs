@@ -31,7 +31,8 @@ fn triangle() -> Document {
         materials: vec![Material {
             name: "M".into(),
             base_color_texture: texture.clone(),
-            normal_texture: texture,
+            normal_texture: texture.clone(),
+            emissive_texture: texture,
             ..Material::default()
         }],
         skins: vec![Skin {
@@ -63,12 +64,13 @@ fn a_written_triangle_reads_back() {
 }
 
 #[test]
-fn one_texture_used_twice_is_one_image() {
+fn one_texture_used_thrice_is_one_image() {
     let glb = gltf::Gltf::from_slice(&write(&triangle())).unwrap();
     assert_eq!(glb.images().count(), 1);
     assert_eq!(glb.images().next().unwrap().name(), Some("Skin"));
     let material = glb.materials().next().unwrap();
     assert!(material.normal_texture().is_some());
+    assert!(material.emissive_texture().is_some());
 }
 
 #[test]

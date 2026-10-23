@@ -1,8 +1,7 @@
 //! Embedded FBX textures extracted beside the cached `.glb` (#1082).
 
-use super::super::convert_to;
+use super::super::{convert_and_import, fixture};
 use crate::asset::convert::textures_dirs;
-use crate::asset::gltf;
 use crate::asset::ImportedAsset;
 use crate::asset::MapRef;
 use std::path::{Path, PathBuf};
@@ -10,21 +9,10 @@ use std::path::{Path, PathBuf};
 mod depends;
 mod formats;
 mod names;
+mod on_disk;
 mod skips;
 
 const PNG: &[u8] = b"\x89PNG";
-
-fn fixture(name: &str) -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/fixtures/models")
-        .join(name)
-}
-
-/// The fixture `source` converted to `out`, then imported.
-fn convert_and_import(source: &Path, out: &Path) -> ImportedAsset {
-    convert_to(source, out).expect("the fixture converts");
-    gltf::import::import(out).expect("its glTF imports")
-}
 
 /// The one textures folder beside the cached glTF at `out`.
 fn textures(out: &Path) -> PathBuf {

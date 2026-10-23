@@ -17,17 +17,20 @@
 //! An extracted texture is named in the `.glb` by its [`identity`], which a saved
 //! scene references it by (#1130); one on disk is not, and stays a plain path.
 //!
-//! A texture that is neither on disk nor embedded, is on disk but cannot be
-//! read, or embeds a format the importer does not read, is a [`Skip`]; one that fails to extract, or lies on
-//! disk where no URI can reach it, fails the conversion (#1168).
+//! A texture that is neither on disk nor embedded, is on disk but cannot be read
+//! or loaded (not an image format the importer reads, bytes that disagree with
+//! its name, or empty: #1293), or embeds a format it doesn't read, is a [`Skip`]:
+//! the material then keeps its colour. A later file on disk, then an embedded
+//! copy, stands in for one that can't be loaded. One that fails to extract, or
+//! lies on disk where no URI can reach it, fails the conversion (#1168).
 
 mod identity;
 
-use super::super::texture_file::{self, file_name, relative_uri, unique};
+use super::super::texture_file::{self, file_name, relative_uri, sniff, unique};
 use super::super::{glb, Dependency, Seen, Skip, Staging};
 use crate::asset::gltf::uri;
-use crate::asset::{ImportError, IMAGE_EXTENSIONS};
-use crate::core::collections::Map;
+use crate::asset::{is_image_path, ImportError, IMAGE_EXTENSIONS};
+use crate::core::{collections::Map, paths};
 use std::path::{Path, PathBuf};
 
 /// Every texture one conversion references, by FBX element id.
@@ -94,24 +97,21 @@ impl Textures {
                 self.written.extend(name.clone());
                 (name, ext)
             });
-        let unreadable = match self.on_disk(texture)? {
+        let unusable = match self.on_disk(texture)? {
             Disk::Found(file) => {
                 let uri = self.reference(&file)?;
                 return Ok(Some(glb::Texture { uri, name: None }));
             }
-            Disk::Unreadable(file) => Some(file),
+            Disk::Unusable(why) => Some(why),
             Disk::Absent => None,
         };
-        let name = match (embedded, unreadable) {
+        let name = match (embedded, unusable) {
             (Some((Some(name), _)), _) => name,
             (Some((None, ext)), _) => {
                 let why = format!("embeds a `.{ext}`, not an image format the importer reads");
                 return Ok(self.skip(texture, why));
             }
-            (None, Some(file)) => {
-                let why = format!("{} is on disk but cannot be read", file.display());
-                return Ok(self.skip(texture, why));
-            }
+            (None, Some(why)) => return Ok(self.skip(texture, why)),
             (None, None) => {
                 let why = "neither a file on disk nor embedded".into();
                 return Ok(self.skip(texture, why));
@@ -141,8 +141,8 @@ impl Textures {
         })
     }
 
-    /// The first file on disk `texture` names that can be read, else the first
-    /// that is there but cannot; each one looked at is recorded in
+    /// The first file on disk `texture` names that the renderer can load, else why
+    /// the first one there cannot be; each one looked at is recorded in
     /// [`Textures::looked_at`].
     fn on_disk(&mut self, texture: &ufbx::Texture) -> Result<Disk, ImportError> {
         let mut disk = Disk::Absent;
@@ -152,14 +152,26 @@ impl Textures {
                 continue;
             }
             // Read, not only stat'd: what was found is what the stamp records.
-            let looked = Dependency::look(&path)?;
-            let seen = looked.seen();
+            let mut looked = Dependency::look(&path)?;
+            let why = match looked.seen() {
+                Seen::Read(_) => match usable(&path) {
+                    Usable::Yes => {
+                        self.looked_at.push(looked);
+                        return Ok(Disk::Found(path));
+                    }
+                    Usable::No(why) => Some(why),
+                    // A look cached by length and time can outlive the file's
+                    // permissions: the stamp records what opening it found.
+                    Usable::Unopened => {
+                        looked = Dependency::unopened(&path);
+                        Some(unreadable(&path))
+                    }
+                },
+                Seen::Unreadable => Some(unreadable(&path)),
+                Seen::Absent => None,
+            };
             self.looked_at.push(looked);
-            match seen {
-                Seen::Read(_) => return Ok(Disk::Found(path)),
-                Seen::Unreadable if matches!(disk, Disk::Absent) => disk = Disk::Unreadable(path),
-                _ => {}
-            }
+            disk.note(why);
         }
         Ok(disk)
     }
@@ -177,8 +189,54 @@ impl Textures {
 /// What looking on disk for a texture found.
 enum Disk {
     Found(PathBuf),
-    Unreadable(PathBuf),
+    /// A file is there, but the renderer can't load it: why.
+    Unusable(String),
     Absent,
+}
+
+impl Disk {
+    /// Keep the first reason a file there can't be used.
+    fn note(&mut self, why: Option<String>) {
+        if let (Disk::Absent, Some(why)) = (&self, why) {
+            *self = Disk::Unusable(why);
+        }
+    }
+}
+
+fn unreadable(file: &Path) -> String {
+    format!("{} is on disk but cannot be read", file.display())
+}
+
+/// Whether the renderer can load `file`, which was read.
+enum Usable {
+    Yes,
+    No(String),
+    Unopened,
+}
+
+/// The renderer picks its decoder by the name's extension (#1293), so `file`'s
+/// must be an image format it reads, and its bytes, when their magic number says
+/// what they are, must agree. An empty file is no image. A `.psd`, `.tif` or
+/// `.dds` beside an FBX is common in store packs.
+fn usable(file: &Path) -> Usable {
+    use std::io::Read;
+    let shown = file.display();
+    if !is_image_path(file) {
+        return Usable::No(format!("{shown} is not an image format the importer reads"));
+    }
+    let mut head = [0u8; 8];
+    let Ok(read) = std::fs::File::open(file).and_then(|mut f| f.read(&mut head)) else {
+        return Usable::Unopened;
+    };
+    let ext = paths::extension(file);
+    match sniff(&head[..read]) {
+        _ if read == 0 => Usable::No(format!("{shown} is empty")),
+        Some("jpg") if ext == "jpeg" => Usable::Yes,
+        Some(sniffed) if sniffed != ext => Usable::No(format!(
+            "{shown} holds `.{sniffed}` bytes under a `.{ext}` name"
+        )),
+        _ => Usable::Yes,
+    }
 }
 
 /// The name `texture`'s file goes by: its file name, else its element name.

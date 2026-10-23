@@ -238,8 +238,11 @@ fn the_bundled_suzanne_is_fitted_like_a_model() {
     let asset = asset::import_and_sync_sidecar(Path::new(&suzanne_path())).unwrap();
     let (min, max) = union_bounds(&asset.sub_meshes).unwrap();
     let id = scene.world.ids_with_mesh()[0];
-    let scale = scene.world.transform(id).unwrap().scale;
-    assert_eq!(scale, Vec3::splat(fit_scale(min, max)));
+    let transform = scene.world.transform(id).unwrap();
+    let scale = fit_scale(min, max);
+    assert_eq!(transform.scale, Vec3::splat(scale));
+    // Centred after scaling: its bounds' centre lands on the world origin (#1293).
+    assert_eq!(transform.position, -(min + max) * 0.5 * scale);
 }
 
 #[test]

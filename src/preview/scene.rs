@@ -159,7 +159,7 @@ fn spawn_preview_mesh(scene: &mut Scene, mesh: PreviewMesh) -> u32 {
 }
 
 /// Instantiate the embedded Suzanne `.obj` exactly like any other model asset — same
-/// `asset::import_and_sync_sidecar` + `authoring::instantiate_asset` path the model
+/// `asset::import_and_sync_sidecar` + `authoring::instantiate_imported` path the model
 /// inspector's "Instantiate into Scene" button uses (#352 leans on existing plumbing
 /// rather than a bespoke embedded-mesh loader) — then fitted like a model subject.
 fn spawn_suzanne(scene: &mut Scene) -> u32 {
@@ -171,9 +171,9 @@ fn spawn_suzanne(scene: &mut Scene) -> u32 {
     let Some(sub) = asset.sub_meshes.first() else {
         return fallback(scene);
     };
-    let reference = format!("{}{}{}", suzanne_path(), asset::REF_SEPARATOR, sub.id);
+    let path = suzanne_path();
     let ids = spawn_fitted(scene, &asset.sub_meshes, |scene, origin| {
-        authoring::instantiate_asset(scene, &reference, Some("PreviewMesh"), origin)
+        authoring::instantiate_imported(scene, &path, &asset, &sub.id, Some("PreviewMesh"), origin)
             .into_iter()
             .collect()
     });
@@ -218,8 +218,6 @@ fn spawn_fitted(
             transform.scale *= scale;
         }
     }
-    // The spawn refreshed the colliders at the file's size.
-    scene.update_all_colliders();
     ids
 }
 

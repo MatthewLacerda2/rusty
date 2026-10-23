@@ -4,7 +4,12 @@
 
 /// Inverse-sRGB transfer (IEC 61966-2-1) for one 8-bit channel, to linear `[0, 1]`.
 pub fn srgb_to_linear(b: u8) -> f32 {
-    let c = b as f32 / 255.0;
+    gamma_to_linear(b as f32 / 255.0)
+}
+
+/// Inverse-sRGB transfer for one channel, unclamped: an HDR value above 1 follows
+/// the curve's power segment, as Unity's `Mathf.GammaToLinearSpace` does.
+pub fn gamma_to_linear(c: f32) -> f32 {
     if c <= 0.040_45 {
         c / 12.92
     } else {
@@ -38,6 +43,12 @@ mod tests {
             let back = (linear_to_srgb(srgb_to_linear(b)) * 255.0 + 0.5) as u8;
             assert_eq!(back, b);
         }
+    }
+
+    #[test]
+    fn an_hdr_value_keeps_climbing_past_one() {
+        assert_eq!(gamma_to_linear(1.0), 1.0);
+        assert!(gamma_to_linear(2.0) > 4.0, "{}", gamma_to_linear(2.0));
     }
 
     #[test]
