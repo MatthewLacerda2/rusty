@@ -23,7 +23,7 @@
 //!   skeleton to a re-imported rig in place, by bone name (#1252, #1265): a bone
 //!   the rig still names keeps its entity; what hung from a dropped one hangs on
 //!   by the same rule as a load.
-//! - [`Scene::despawn_bone`]: destroying one bone takes its subtree, and its
+//! - `Scene::despawn_bone`: destroying one bone takes its subtree, and its
 //!   slots stay missing (skinned at the bind pose) until the skeleton is rebuilt.
 //! - `palette` builds each skinned mesh's posed palette from the bones.
 //! - `hitbox` fits per-bone hitbox colliders and names the bone a hit struck (#464).
