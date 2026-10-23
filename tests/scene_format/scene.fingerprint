@@ -193,6 +193,8 @@ scene.entities[].joint.connected_anchor: tuple(3)
 scene.entities[].joint.connected_anchor[]: f32
 scene.entities[].joint.connected_body: option
 scene.entities[].joint.connected_body: u32
+scene.entities[].joint.connected_bone: seq
+scene.entities[].joint.connected_bone[]: string
 scene.entities[].joint.enable_collision: bool
 scene.entities[].joint.kind: enum Fixed|Hinge|Ball
 scene.entities[].joint.limits: tuple(2)
@@ -295,6 +297,8 @@ scene.entities[].mesh.skeleton.bodies{}.joint.connected_anchor: tuple(3)
 scene.entities[].mesh.skeleton.bodies{}.joint.connected_anchor[]: f32
 scene.entities[].mesh.skeleton.bodies{}.joint.connected_body: option
 scene.entities[].mesh.skeleton.bodies{}.joint.connected_body: u32
+scene.entities[].mesh.skeleton.bodies{}.joint.connected_bone: seq
+scene.entities[].mesh.skeleton.bodies{}.joint.connected_bone[]: string
 scene.entities[].mesh.skeleton.bodies{}.joint.enable_collision: bool
 scene.entities[].mesh.skeleton.bodies{}.joint.kind: enum Fixed|Hinge|Ball
 scene.entities[].mesh.skeleton.bodies{}.joint.limits: tuple(2)

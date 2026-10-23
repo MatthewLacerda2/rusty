@@ -32,7 +32,8 @@ element's **pivot** there; its size still comes from its anchors and `SizeDelta`
 Off screen: behind the camera with `hide_when_behind` → hidden; with
 `clamp_to_screen_edge` → pinned to the padded screen edge toward the target
 (turned toward it with `rotate_toward_target`); otherwise at the raw projection.
-A destroyed target hides the marker. Markers only apply on `ScreenSpaceOverlay` /
+A destroyed target hides the marker: its target is cleared and the marker is
+deactivated (`Scene.SetActive` brings it back). Markers only apply on `ScreenSpaceOverlay` /
 `ScreenSpaceCamera` canvases, and need a camera (`UI.GetRect` and the per-tick
 layout use the active one). The option setters do nothing to a non-marker; saving
 a prefab keeps a target inside it and drops one outside.
