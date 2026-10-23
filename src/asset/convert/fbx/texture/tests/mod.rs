@@ -94,3 +94,11 @@ fn a_reconversion_replaces_an_older_converters_textures_folder() {
     names.sort();
     assert_eq!(names, ["Skin.1.png", "skin.png"]);
 }
+
+#[test]
+fn a_material_with_only_a_texture_has_a_white_base_colour() {
+    // The fixture's materials name no `DiffuseColor`: the texture alone colours
+    // them, so the factor it multiplies is glTF's white, not black (#1280).
+    let asset = import(&crate::test_temp::dir());
+    assert_eq!(material(&asset, "Red").base_color, [1.0; 4]);
+}
