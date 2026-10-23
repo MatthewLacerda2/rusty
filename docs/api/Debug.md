@@ -14,7 +14,7 @@ because the namespace is absent.
 | `Debug.Preview` | `(asset_path, out_png [, opts])` | the written path, or `nil` if the machine has no GPU |
 | `Debug.PreviewMaterial` | `(name, out_png [, opts])` | the written path, or `nil` if the machine has no GPU |
 | `Debug.Stats` | `()` | a **table**: the frame stats — timings and counters (below) |
-| `Debug.AudioEvents` | `([since_tick])` | an **array** of the audio event log's entries, oldest first: those whose `tick` is at or after `since_tick` (default `0`, all) (below) |
+| `Debug.AudioEvents` | `([after_seq])` | an **array** of the audio event log's entries whose `seq` is greater than `after_seq` (default `0`, all), oldest first, **and** the oldest `seq` the log still holds (below) |
 | `Debug.AudioVoices` | `()` | an **array**: one roster row per entity carrying an `AudioSource` (below) |
 
 ### The preview — eyes on an authored asset (#353)
@@ -159,29 +159,36 @@ one-shot leaves no component, so the snapshot never sees it; the audio maestro's
 **event log** does. Both reads work with no sound card: the headless backend makes
 no sound, but every action is logged all the same.
 
-`Debug.AudioEvents([since_tick])` returns the log's entries, oldest first, as plain
+`Debug.AudioEvents([after_seq])` returns the log's entries, oldest first, as plain
 tables:
 
 | Field | Meaning |
 |---|---|
+| `seq` | the event's sequence number: from `1`, one per logged event, never reused while the engine runs. The reader's cursor |
 | `kind` | `"Play"` (an `AudioSource` started: `Audio.Play` or `play_on_start`), `"Stop"` (`Audio.Stop`) or `"PlayAt"` (a one-shot) |
-| `tick` | the frame it happened on (`Time.frameCount`), deterministic |
-| `clip` | the clip path (`""` for a `Stop`) |
+| `tick` | the frame it happened on (`Time.frameCount`), deterministic. Every action in a frame shares it, so it is not a cursor |
+| `clip` | the clip path (always `""` for a `Stop`) |
 | `entity` | the source entity; for `PlayAt` the emitter passed, else `0` |
 | `position` | `{ x, y, z }`, where it played: the entity's world position, or `PlayAt`'s point |
 | `volume` | the per-source volume asked for, before the master (`0` for a `Stop`) |
 
-`since_tick` is **inclusive**: a reader that has seen tick `t` asks for `t + 1` next.
-The log is a ring of the **last 1024** entries and is **cleared on entering Play**;
-older entries are gone, so `since_tick` returns only what is still held: none of
-what rolled off, with no error.
+A reader keeps the last `seq` it saw and passes it back: an action logged later in
+the same frame as the poll still comes back next time. The log is a ring of the
+**last 1024** entries and is **cleared on entering Play**; `seq` keeps counting
+across the clear, so a cursor from an earlier run returns the new run's events,
+never a repeat. The **second return value** is the oldest `seq` still held (the
+next `seq` to be given when the log is empty): when it is greater than
+`after_seq + 1`, the events in between rolled off the ring or were cleared, and are
+gone.
 
 ```lua
 Audio.PlayAt("sfx/shot.ogg", 1, 2, 3)
 local seen = 0
-for _, e in ipairs(Debug.AudioEvents(seen)) do
-  print(e.tick, e.kind, e.clip, e.position[1], e.position[2], e.position[3])
-  seen = e.tick + 1
+local events, oldest = Debug.AudioEvents(seen)
+if oldest > seen + 1 then print("missed", oldest - seen - 1, "events") end
+for _, e in ipairs(events) do
+  print(e.seq, e.tick, e.kind, e.clip, e.position.x, e.position.y, e.position.z)
+  seen = e.seq
 end
 ```
 

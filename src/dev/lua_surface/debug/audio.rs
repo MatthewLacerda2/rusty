@@ -5,11 +5,13 @@
 //! row per `AudioSource` (`audio::introspection`, #212). `Debug.Snapshot` shows the
 //! `AudioSource` *components*, so a fire-and-forget `Audio.PlayAt` one-shot, which
 //! leaves none, is visible only here. Both reads hand the records to Lua through
-//! serde, so the tables carry exactly the Rust fields and cannot drift from them.
+//! serde (`lua_json::to_lua`), so the tables carry exactly the Rust fields and cannot
+//! drift from them.
 
-use mlua::{LuaSerdeExt, Table};
+use mlua::{Table, Value};
 
 use crate::api::audio::{emitter, listener};
+use crate::api::lua_json::to_lua;
 use crate::api::{put, ApiScopedCtx, Reg};
 
 /// Register both audio reads on the `Debug` table.
@@ -19,15 +21,15 @@ pub fn register<'scope>(
     ctx: &ApiScopedCtx<'scope>,
 ) -> Reg {
     let audio = ctx.audio;
-    // `since_tick` is inclusive: a reader passes the last tick it saw plus one.
+    // The cursor is the last `seq` a reader saw; the second return is the oldest
+    // `seq` still held, so a reader can tell when events rolled off past its cursor.
     put(
         table,
         "AudioEvents",
-        scope.create_function(move |lua, since_tick: Option<u64>| {
-            let since = since_tick.unwrap_or(0);
+        scope.create_function(move |lua, after_seq: Option<u64>| {
             let audio = audio.borrow();
-            let events: Vec<_> = audio.events().iter().filter(|e| e.tick >= since).collect();
-            lua.to_value(&events)
+            let (events, oldest) = audio.events_after(after_seq.unwrap_or(0));
+            Ok((to_lua(lua, events)?, oldest))
         }),
     )?;
 
@@ -35,7 +37,7 @@ pub fn register<'scope>(
     put(
         table,
         "AudioVoices",
-        scope.create_function(move |lua, ()| {
+        scope.create_function(move |lua, ()| -> mlua::Result<Value> {
             let scene = scene.borrow();
             let (audio, heard_by) = (audio.borrow(), listener(camera));
             let voices: Vec<_> = scene
@@ -47,7 +49,7 @@ pub fn register<'scope>(
                     Some(audio.voice_info(id, &source, at, &heard_by))
                 })
                 .collect();
-            lua.to_value(&voices)
+            to_lua(lua, &voices)
         }),
     )
 }
