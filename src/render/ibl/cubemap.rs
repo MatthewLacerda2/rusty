@@ -17,6 +17,7 @@ use std::rc::Rc;
 
 use ktx2::Format;
 
+use super::reflection_probes::ProbeArray;
 use crate::render::Renderer;
 
 /// A decoded LDR cubemap WITH its roughness mip chain (#245). `mips[0]` is the base level
@@ -78,16 +79,23 @@ pub struct CubemapTexture {
 impl Renderer {
     /// Load a reflection-probe cubemap WITH its roughness mip chain from `path` (#245),
     /// into a mipped cube texture the forward pass samples with `textureSampleLevel`.
-    /// Returns `None` (caller falls back to the skybox) when the file is missing or is not
-    /// a usable LDR RGBA8 cubemap — the expected state until the bake exists (#245).
-    pub fn load_cubemap_mips(&self, path: &str) -> Option<CubemapTexture> {
+    /// Returns `None` (caller falls back to the skybox) when the file is missing, is not
+    /// a usable LDR RGBA8 cubemap — the expected state until the bake exists (#245) — or
+    /// has a base size `accept` refuses, which is decoded but never uploaded (#1245).
+    pub fn load_cubemap_mips(
+        &self,
+        path: &str,
+        accept: impl FnOnce(u32) -> bool,
+    ) -> Option<CubemapTexture> {
         let bytes = std::fs::read(path).ok()?;
-        let data = parse_ktx2_cubemap_mips(&bytes)?;
+        let data = parse_ktx2_cubemap_mips(&bytes).filter(|data| accept(data.size))?;
         Some(self.upload_cubemap_mips(path, &data))
     }
 
-    /// [`load_cubemap_mips`](Self::load_cubemap_mips) behind a by-path content cache
-    /// (#355), returning a shared handle.
+    /// A reflection probe's cube, through a by-path content cache (#355): only a cube
+    /// the probe array [admits](ProbeArray::admits) is uploaded, so everything the
+    /// cache holds fits the array, whoever asks (#1245). A cube that doesn't fit warns
+    /// and is cached as absent, so it warns once per load of its path.
     ///
     /// Which cube is *bound* is per-scene state: two scenes with different reflection
     /// probes rendering in one frame legitimately swap it every frame. Uncached, each
@@ -95,11 +103,13 @@ impl Renderer {
     /// per frame, per flip. The failure is cached too, so an unreadable path is not
     /// retried on every flip either. A path the engine (re)writes, such as a
     /// reflection bake, is dropped from the cache by `refresh_textures` (#1207).
-    pub fn cached_cubemap(&mut self, path: &str) -> Option<Rc<CubemapTexture>> {
+    pub(crate) fn cached_cubemap(&mut self, path: &str) -> Option<Rc<CubemapTexture>> {
         if let Some(hit) = self.cubemaps.get(path) {
             return hit.clone();
         }
-        let loaded = self.load_cubemap_mips(path).map(Rc::new);
+        let loaded = self
+            .load_cubemap_mips(path, |size| ProbeArray::admits(path, size))
+            .map(Rc::new);
         self.cubemaps.insert(path.to_string(), loaded.clone());
         loaded
     }

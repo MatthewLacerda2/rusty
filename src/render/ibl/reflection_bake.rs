@@ -5,10 +5,15 @@
 //! (`capture_static_cubemap`, #243), GGX-prefilters it into a roughness mip chain
 //! (`reflection_prefilter`), encodes the result to KTX2 (`ktx2_encode`), writes that file
 //! next to the scene, and stores its path on the probe (the `cubemap_path` field from
-//! #244). The runtime then loads it (`load_cubemap`) and the forward pass reflects it.
+//! #244). Each frame loads it through the probe array's cubemap cache
+//! (`Renderer::cached_cubemap`), and the forward pass reflects it.
 //!
-//! Pure render layer: a function of (static scene, probe positions, resolution) plus the
-//! output directory — no wall-clock / RNG, so it is clean under the determinism guard
+//! Every cube is baked at [`DEFAULT_REFLECTION_RESOLUTION`], the face of the probe
+//! array the frame copies cubes into (#1238): a bake at any other size would write
+//! cubes the frame rejects, so there is no size to pass (#1245).
+//!
+//! Pure render layer: a function of (static scene, probe positions) plus the output
+//! directory — no wall-clock / RNG, so it is clean under the determinism guard
 //! like the capture and prefilter it stands on. File I/O is plain baked-asset output.
 
 use std::path::Path;
@@ -25,16 +30,11 @@ use crate::scene::Scene;
 pub const DEFAULT_REFLECTION_RESOLUTION: u32 = 128;
 
 impl Renderer {
-    /// Bake one reflection probe: capture the static scene from `position`, prefilter it
-    /// into a roughness mip chain, and return the encoded KTX2 bytes. `resolution` is the
-    /// per-face base edge length (clamped to the renderer's offscreen size by the capture).
-    pub fn bake_reflection(
-        &mut self,
-        scene: &Scene,
-        position: glam::Vec3,
-        resolution: u32,
-    ) -> Vec<u8> {
-        let capture = self.capture_static_cubemap(scene, position, resolution);
+    /// Bake one reflection probe: capture the static scene from `position` at
+    /// [`DEFAULT_REFLECTION_RESOLUTION`] per face, prefilter it into a roughness mip
+    /// chain, and return the encoded KTX2 bytes.
+    pub fn bake_reflection(&mut self, scene: &Scene, position: glam::Vec3) -> Vec<u8> {
+        let capture = self.capture_static_cubemap(scene, position, DEFAULT_REFLECTION_RESOLUTION);
         let prefiltered = prefilter(&capture);
         // The mip a fully-rough surface samples (CPU mirror of the shader's selection),
         // logged so a bake's roughness range is visible when debugging a probe.
@@ -53,12 +53,7 @@ impl Renderer {
     /// `out_dir` (named `reflection_probe_<i>.ktx2`) and pointing the probe's
     /// `cubemap_path` at it. Returns the number of probes baked, or an error if a file
     /// could not be written. With no probes it is a successful no-op (0 baked).
-    pub fn bake_reflections(
-        &mut self,
-        scene: &mut Scene,
-        out_dir: &Path,
-        resolution: u32,
-    ) -> Result<usize, String> {
+    pub fn bake_reflections(&mut self, scene: &mut Scene, out_dir: &Path) -> Result<usize, String> {
         let positions: Vec<glam::Vec3> = scene
             .reflection_probes
             .probes
@@ -66,7 +61,7 @@ impl Renderer {
             .map(|p| p.position)
             .collect();
         for (i, position) in positions.into_iter().enumerate() {
-            let bytes = self.bake_reflection(scene, position, resolution);
+            let bytes = self.bake_reflection(scene, position);
             let path = out_dir.join(format!("reflection_probe_{i}.ktx2"));
             crate::core::fs::written::write(&path, &bytes).map_err(|e| {
                 format!("Failed to write reflection cubemap {}: {e}", path.display())

@@ -190,8 +190,9 @@ impl ReflectionProbeSet {
     /// Pick the reflection probe that applies at `world_pos`, with its index: the
     /// NEAREST probe (by capture distance) whose box contains the point, the lower
     /// index in this set on a tie (the renderer keeps its resident set in scene order,
-    /// so that is the lower scene index there too, wherever the camera is, #1238). `None` when no probe's box covers the point — the caller then
-    /// falls back to the global skybox. The renderer calls it per draw, at the
+    /// so that is the lower scene index there too, wherever the camera is, #1238).
+    /// `None` when no probe's box covers the point — the caller then falls back to
+    /// the global skybox. The renderer calls it per draw, at the
     /// object's world-bounds centre (#1206).
     pub fn select(&self, world_pos: Vec3) -> Option<(usize, &ReflectionProbe)> {
         self.probes

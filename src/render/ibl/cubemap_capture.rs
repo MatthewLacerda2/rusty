@@ -82,9 +82,8 @@ impl Renderer {
     /// `resolution × resolution` LDR RGBA8 (#243). Reuses the forward lit pass with a
     /// 90° FOV per face; only `is_static` entities and the skybox are drawn.
     ///
-    /// `self` must be a renderer sized at least `resolution × resolution` (a headless
-    /// renderer built at that size — see [`Renderer::new_headless`]); faces are read
-    /// from the top-left `resolution²` region of its offscreen target.
+    /// The faces render into a target of their own, `resolution²`, whatever the
+    /// renderer's own size.
     pub fn capture_static_cubemap(
         &mut self,
         scene: &Scene,
