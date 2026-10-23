@@ -11,12 +11,11 @@ use rusty::scene::Scene;
 
 use super::{add_box, bake, level};
 
-/// Move `id` to `position`, keeping its collider bounds current.
+/// Move `id` to `position`; its collider bounds follow on their own.
 fn move_to(scene: &mut Scene, id: u32, position: Vec3) {
     if let Some(mut t) = scene.world.transform_mut(id) {
         t.position = position;
     }
-    scene.update_entity_collider(id);
 }
 
 /// A carving 1 × 2 × 4 obstacle at `at`, carving at once.

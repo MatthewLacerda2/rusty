@@ -32,7 +32,6 @@ fn add_box(scene: &mut Scene, name: &str, pos: Vec3, layer: u8) -> u32 {
             ..crate::scene::authoring::default_collider()
         }),
     );
-    scene.update_entity_collider(id);
     id
 }
 

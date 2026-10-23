@@ -6,8 +6,8 @@
 //! - **a Transform write** on it or anything above it. That only queues the written
 //!   entity ([`World::moved`], O(1)); [`World::flush_bounds`] later refreshes every
 //!   collider under the queued entities, each once however many of its ancestors were
-//!   written. The frame loop flushes after every stage, and so does every scene-level
-//!   refresh (`Scene::update_entity_collider`, `Scene::update_all_colliders`).
+//!   written. The frame loop flushes after every stage, and so does the scene-level
+//!   refresh (`Scene::update_all_colliders`).
 //!
 //! Between a write and the flush the stored box can lag, so a reader goes through
 //! [`World::collider_bounds`]: the stored box when nothing above the collider is

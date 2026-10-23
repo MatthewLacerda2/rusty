@@ -29,7 +29,6 @@ fn saved_floor(name: &str) -> (Scene, String) {
         ..crate::scene::authoring::default_collider()
     };
     scene.world.set_collider(floor, Some(collider));
-    scene.update_entity_collider(floor);
     let s = &mut scene.lighting_settings.lightmaps;
     (s.texels_per_unit, s.samples, s.bounces, s.max_resolution) = (2.0, 4, 1, 16);
     scene.save_to_file(&path).unwrap();

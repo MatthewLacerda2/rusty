@@ -33,7 +33,6 @@ pub fn add_rotated_box(scene: &mut Scene, center: Vec3, size: Vec3, rot: Quat) -
     let mut col = ColliderComponent::from_mesh_bounds(false, Vec3::ZERO, Vec3::ZERO);
     col.shape = ColliderShape::Box { size };
     scene.world.set_collider(id, Some(col));
-    scene.update_entity_collider(id);
     id
 }
 

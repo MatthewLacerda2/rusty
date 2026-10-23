@@ -28,7 +28,6 @@ fn room_scene() -> Scene {
             ..crate::scene::authoring::default_collider()
         }),
     );
-    scene.update_entity_collider(id);
     scene
 }
 
