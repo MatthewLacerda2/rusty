@@ -1,4 +1,4 @@
-//! src/api/lua_json.rs — rusty's settings for mlua's serde bridge (`LuaSerdeExt`).
+//! src/api/lua_json/mod.rs — rusty's settings for mlua's serde bridge (`LuaSerdeExt`).
 //!
 //! The conversion itself is mlua's (#755); this module only fixes the options every
 //! caller shares, so a recipe, a `Storage` value and a UI look all cross the Lua ↔
@@ -15,15 +15,21 @@
 //! accepts **either** form — a Lua table or the recipe's JSON string (#410) — so
 //! there is one verb per operation, not a table verb plus a `*Json` twin. Both go
 //! through `serde_json::Value`, so a bad key reads the same whichever form carried it.
+//! The decode is [`decode`]: serde's, except that an enum's variant names are read
+//! in any case, as every hand-written name setter reads them (#1216).
 
 use mlua::{Lua, LuaSerdeExt, Value};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
+mod variant_case;
+
+pub use variant_case::decode;
+
 /// Decode a recipe argument into `T`: a Lua **table** or a **JSON string** (the
-/// on-disk form). Both reach `T`'s serde derive through the same `from_value` call.
+/// on-disk form). Both reach `T`'s serde derive through the same [`decode`] call.
 pub fn recipe_from_lua<T: DeserializeOwned>(value: &Value) -> Result<T, String> {
-    serde_json::from_value(recipe_json(value)?).map_err(|e| e.to_string())
+    decode(recipe_json(value)?)
 }
 
 /// The recipe argument as a `serde_json::Value`, for a caller that must inspect
@@ -74,5 +80,7 @@ pub fn to_lua<T: Serialize + ?Sized>(lua: &Lua, value: &T) -> mlua::Result<Value
 }
 
 #[cfg(test)]
-#[path = "lua_json_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+mod enum_case_tests;

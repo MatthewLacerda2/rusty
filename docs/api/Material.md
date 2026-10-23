@@ -49,7 +49,7 @@ like any library material (no engine special-casing).
 | `Material.HasAsset` | `(name)` | `bool` |
 
 The **recipe** is a table (or that table's JSON string — both decode alike) whose shape mirrors the `MaterialAsset` document one-to-one
-(every field optional — omit one to take its default), bounded to exactly what the
+(every field optional — omit one to take its default; enum values are read in any case), bounded to exactly what the
 renderer samples:
 
 ```lua with=id

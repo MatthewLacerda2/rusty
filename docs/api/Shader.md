@@ -29,7 +29,7 @@ passes, bindings, or render features).
 | `Shader.Blocks` | `(pass)` | the curated blocks for `pass` (`"surface"` \| `"postfx"` \| `"ui"`): `{ {id, desc, params = { {name, default, arity, runtime} }, textures = {slot…}, stage }, … }` — `stage` is `"color"` or `"uv"` |
 
 `recipe` is a table **or** its serialized JSON string (from `Shader.ToJson`, or a
-saved `.json`) — both forms decode alike, with the same errors. `out_dir` defaults to `assets/shaders`. Use `Shader.Validate` to
+saved `.json`) — both forms decode alike, with the same errors. Its enum value `pass` is read in any case; a stored file holds the canonical spelling. `out_dir` defaults to `assets/shaders`. Use `Shader.Validate` to
 compose-check a recipe before committing to a bake, and `Shader.Blocks` to discover
 the catalog rather than guess block ids or params.
 
