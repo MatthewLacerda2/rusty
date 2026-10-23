@@ -56,15 +56,13 @@ pub fn evaluate_line(
     }
 }
 
-/// A single line of REPL input plus a small history, owned by whatever UI hosts
-/// the console (the editor's bottom panel). Kept separate from `ConsoleLogs` so
-/// the log buffer stays a pure sink with no UI state.
+/// The line of REPL input being typed, owned by whatever UI hosts the console (the
+/// editor's bottom panel). Kept separate from `ConsoleLogs` so the log buffer stays
+/// a pure sink with no UI state.
 #[derive(Default)]
 pub struct ReplInput {
     /// The text currently being edited in the input line.
     pub buffer: String,
-    /// Previously submitted lines, newest last, for up/down recall.
-    history: Vec<String>,
 }
 
 impl ReplInput {
@@ -72,19 +70,13 @@ impl ReplInput {
         Self::default()
     }
 
-    /// Take the current buffer, push it onto history, and clear the buffer.
-    /// Returns `None` if the buffer is blank.
+    /// Take the current buffer and clear it. Returns `None` if the buffer is blank.
     pub fn take_submit(&mut self) -> Option<String> {
         let line = std::mem::take(&mut self.buffer);
         if line.trim().is_empty() {
             return None;
         }
-        self.history.push(line.clone());
         Some(line)
-    }
-
-    pub fn history(&self) -> &[String] {
-        &self.history
     }
 }
 
@@ -210,7 +202,7 @@ mod tests {
     }
 
     #[test]
-    fn repl_input_take_submit_records_history() {
+    fn repl_input_take_submit_clears_the_line_and_skips_blanks() {
         let mut input = ReplInput::new();
         assert!(input.take_submit().is_none());
         input.buffer = "  ".to_string();
@@ -218,6 +210,5 @@ mod tests {
         input.buffer = "print(1)".to_string();
         assert_eq!(input.take_submit().as_deref(), Some("print(1)"));
         assert!(input.buffer.is_empty());
-        assert_eq!(input.history(), &["print(1)".to_string()]);
     }
 }
