@@ -95,18 +95,16 @@ Read `.claude/skills/issue-batch/cloud-brief.md` and follow it.
 Issue(s): #N. Your brief is the newest comment on it that starts with `Brief`.
 ```
 
-A re-brief (a rebase, a fix, a new sibling) is a new `Brief` comment, with
-"force-push authorised" when it works a pushed branch, the PR turned back to
-draft, **and a PR comment pointing at it** ("Re-brief: the newest `Brief` on
-#N"). The coder's session is subscribed to its **PR**, not its issue. In the
-2026-10-22 batch sessions woke on the draft flip, read only the PR, found no
-reason and stood down, which looked like "half never wake". `cloud-brief.md`
-now sends a woken session to the issue for a newer `Brief`. Check its session
-(`RemoteTrigger list_runs` on its routine) about four minutes later: a push or
-a `last_event_at` past the pointer means it took it. If not, or the session
-ended, `RemoteTrigger run` the coder's **own** routine (its prompt already
-points at the newest `Brief`). Never launch a second routine beside a session
-still working the branch (2026-10-20: #1108, #1124).
+A re-brief (a rebase, a fix, a new sibling) is a new `Brief` comment on the
+issue, with "force-push authorised" when it works a pushed branch, and the PR
+turned back to draft. **Then `RemoteTrigger run` the coder's own routine right
+away.** Its prompt already points at the newest `Brief`. Don't wait for the old
+session: it is subscribed to the PR, not the issue. In the 2026-10-22 batch,
+sessions woke on the draft flip, read only the PR, found no instruction and
+stood down, by design (`cloud-brief.md`: once ready, the branch is the
+queue's). That looked like "half never wake", and it is also why they never
+race the fresh session. So never put the re-brief on the PR: every session
+subscribed to it would act on it, and a PR re-briefed twice has two.
 
 **The pull request is the report.** A cloud coder cannot message back; it opens a
 draft, pushes often, readies when its gates are green and ends. Watch the PR, not

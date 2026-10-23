@@ -72,12 +72,6 @@ nothing to wait for.
   to rebase and not to fix your own red CI: a red or conflicting ready PR comes
   back to the orchestrator as a hand-back, and it briefs a fix. Anything you
   notice after readying goes in a comment on the issue.
-- **Woken after ready, read your issue, not only the PR.** A PR event (turned
-  back to draft, a review comment, a push) can wake your session. The
-  orchestrator's answer is a new `Brief` on the **issue**, with a pointer on
-  the PR. If the issue's newest `Brief` is newer than the one you worked from,
-  it is a re-brief: follow it (it says whether a force-push is authorised).
-  If there is none, do nothing.
 
 ## The container
 
