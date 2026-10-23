@@ -12,9 +12,21 @@ run on such a head is accepted here too, and a test pins that.
 from __future__ import annotations
 
 
-# Markdown that is code for merge purposes: tests parse it (CLAUDE.md). Path
-# prefixes: the scripting-API reference is one file per namespace (#569).
-CODE_DOCS = ("docs/api/",)
+# Markdown that is code for merge purposes: code or tests read it (CLAUDE.md).
+# Path prefixes: the scripting-API reference is one file per namespace (#569); a
+# prefix not ending in `/` is one file, the game guide `session-mcp` serves and the
+# game CLAUDE.md template the build embeds (#1313).
+CODE_DOCS = ("docs/api/", "docs/game-agent.md", "src/core/project/game_claude.md")
+
+
+def code_doc_example(prefix: str) -> str:
+    """A path under `prefix`: a namespace page in a folder, else the file itself."""
+    return f"{prefix}Transform.md" if prefix.endswith("/") else prefix
+
+
+def code_doc_filter(prefix: str) -> str:
+    """`prefix` as ci.yml's `code` filter writes it: a folder's glob, or the file."""
+    return f"{prefix}**" if prefix.endswith("/") else prefix
 
 # Where the doc-drift tests run: a `build-test` step whose name says it runs
 # the tests with the dev features (`Test (engine, dev features)` today). Matched

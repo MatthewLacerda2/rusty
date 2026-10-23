@@ -159,13 +159,15 @@ version control is yours:
   are filed as issues, not fixed from the game. It is the game's file, written once
   when absent and never touched again;
 - `.mcp.json`, which registers the `rusty` MCP (attach mode, the editor window) and
-  `rusty-headless` (embed mode) with Claude Code. It is engine-owned: a `dev` build
-  rewrites it on every edit-open, with this machine's absolute paths. A build without
-  `dev` never writes it.
+  `rusty-headless` (embed mode) with Claude Code, both running the checkout's built
+  `target/debug/session-mcp`. The engine owns only those two entries: a `dev` build
+  rewrites them on every edit-open, with this machine's absolute paths, and keeps any
+  other server the game registers. A build without `dev` never writes it.
 
 Both are written when a project is opened to edit (*New Project*, `bench_create`, the
-editor and the agent sessions), so an existing project gets them on its next
-edit-open. A project looks like Unity's and Unreal's:
+editor, the agent sessions and `make export`), so an existing project gets them on its
+next edit-open. A project inside the engine checkout (its own `project/`) gets
+neither, and a file that can't be written is a warning, never a failed open. A project looks like Unity's and Unreal's:
 
 ```text
 <project>/

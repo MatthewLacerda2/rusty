@@ -36,8 +36,10 @@ project.rusty    engine-owned: the engine commit and the build settings
 scenarios/       headless play-tests (optional)
 cache/  saved/   regenerable output and save data, ignored by git
 CLAUDE.md        the game's rules: yours
-.mcp.json        engine-owned: registers this MCP; rewritten when a dev editor opens
-                 the project, with this machine's absolute paths
+.mcp.json        registers this MCP: the engine owns its `rusty` and `rusty-headless`
+                 entries and rewrites them, with this machine's absolute paths,
+                 whenever a dev build opens the project to edit (the editor, New
+                 Project, an agent session, an export); other servers are yours
 ```
 
 Every path the game stores is **relative to the project root**, `/`-separated
@@ -52,14 +54,14 @@ Every path the game stores is **relative to the project root**, `/`-separated
 ## Play-testing headlessly
 
 A scenario is a Lua file under `scenarios/` that drives the game through the same
-API plus `Harness.*` (press keys, step ticks, assert), run with the `play` binary:
+API plus `Harness.*` (press keys, step ticks, assert), run with the `play` binary from the engine checkout:
 
 ```sh
-cargo run --manifest-path <engine>/Cargo.toml --bin play --features dev -- \
-    --project . scenarios/smoke.lua out/
+cd <engine> && cargo run --bin play --features dev -- \
+    --project <game> scenarios/smoke.lua <game>/out/
 ```
 
-It writes `out/results.json` and `out/console.log`. See `docs/testing.md` for
+It writes `results.json` and `console.log` into the output folder. See `docs/testing.md` for
 scenarios and captures, and `docs/ui.md` for the in-game UI.
 
 ## The MCP
@@ -71,10 +73,15 @@ The tools describe themselves; what they don't say:
 - when the engine warned during a call, the result carries a second text block
   starting `engine warnings:`. Read it: a skipped asset or a dropped collider shows
   up there first;
-- `.mcp.json` registers two servers. **Use one at a time:** `rusty` attaches to the
-  editor window the operator watches (open the editor on this project first);
+- `.mcp.json` registers two servers, each the checkout's built
+  `target/debug/session-mcp`. **Use one at a time**, and approve only the one this
+  session will use. `rusty` attaches to the editor window the operator watches; open
+  it first, from the checkout, with a `dev` build (a build without `dev` has no
+  command socket): `cd <engine> && cargo run --features dev -- --project <game>`.
   `rusty-headless` runs its own world with no window, for when none is open. Two
-  worlds saving the same scene overwrite each other.
+  worlds saving the same scene overwrite each other;
+- if a server fails to start, build it in the checkout:
+  `cd <engine> && cargo build --bin session-mcp --features dev`.
 
 More: `docs/mcp.md`.
 

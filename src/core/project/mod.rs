@@ -25,7 +25,8 @@
 //!
 //! `cache/` and `saved/` each hold a `.gitignore` of `*`, so they stay out of git
 //! with no root `.gitignore`: version control is the user's. An edit-open also
-//! writes the two agent files (`agent.rs`).
+//! writes the two agent files (`agent.rs`), unless the project is inside the engine
+//! checkout.
 //!
 //! The engine's own content (shaders, bundled scripts, the preview model) is not the
 //! project's: it is found by [`engine_dir`], wherever the project is.
@@ -177,7 +178,7 @@ pub(crate) fn prepare(dir: &Path, access: Access) -> Result<(Opened, Vec<String>
     let (engine, lines) = match access {
         Access::Edit => {
             let (engine, mut lines) = file::record(&root)?;
-            lines.extend(agent::write(&root, cfg!(feature = "dev"))?);
+            lines.extend(agent::write(&root, cfg!(feature = "dev")));
             (engine, lines)
         }
         Access::Run => (file::inspect(&root)?, Vec::new()),
@@ -241,3 +242,7 @@ mod tests;
 #[cfg(test)]
 #[path = "agent_tests.rs"]
 mod agent_tests;
+
+#[cfg(test)]
+#[path = "agent_mcp_tests.rs"]
+mod agent_mcp_tests;

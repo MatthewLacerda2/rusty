@@ -144,9 +144,11 @@ is wrong.
   it). So merging **cannot be parallelized**: rebase each PR onto the latest `main` →
   CI green on that rebased state → merge → repeat, one PR at a time. The only exception
   is a PR that touches **only** Markdown — CI is skipped for Markdown-only PRs, so they
-  needn't be serialized and can merge freely. **Except `docs/api/`:** the
-  API-doc drift tests parse it, and a Markdown-only PR skips exactly those tests — so a
-  PR touching it is serialized like code.
+  needn't be serialized and can merge freely. **Except the Markdown code reads:**
+  `docs/api/` (the API-doc drift tests parse it), `docs/game-agent.md` (served by
+  `session-mcp`) and `src/core/project/game_claude.md` (embedded by the build). A
+  Markdown-only PR skips exactly the tests that read them, so CI's `code` filter counts
+  them as code and a PR touching them is serialized like code.
 - **Coding parallelises; merging does not.** How many branches are written at once
   scales with **how separate their files are**: two branches appending to the same enum
   or registry cost more than five in separate modules, because every branch behind

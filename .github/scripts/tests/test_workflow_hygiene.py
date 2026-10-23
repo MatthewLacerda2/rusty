@@ -62,16 +62,16 @@ class Concurrency(unittest.TestCase):
 
 
 class DocsThatAreCode(unittest.TestCase):
-    """`docs/api/` is code in ci.yml's path filter, `mergeable`, and the queue."""
+    """`CODE_DOCS` are code in ci.yml's path filter, `mergeable`, and the queue."""
 
     def test_ci_path_filter_reincludes_exactly_the_code_docs(self):
         body = jobs("ci.yml")["changes"]
         reincluded = re.findall(r"^\s+- '([^'!][^']*)'$", body, flags=re.M)
-        self.assertEqual(sorted(reincluded), sorted(f"{p}**" for p in changes.CODE_DOCS))
+        self.assertEqual(sorted(reincluded), sorted(map(changes.code_doc_filter, changes.CODE_DOCS)))
 
     def test_mergeable_counts_them_as_code(self):
         for prefix in changes.CODE_DOCS:
-            path = f"{prefix}Transform.md"
+            path = changes.code_doc_example(prefix)
             with self.subTest(path=path):
                 self.assertFalse(changes.inert([path]))
                 self.assertTrue(changes.needs_drift_run([path]))
@@ -79,7 +79,7 @@ class DocsThatAreCode(unittest.TestCase):
     def test_the_queue_rebases_over_them(self):
         for prefix in changes.CODE_DOCS:
             with self.subTest(prefix=prefix):
-                self.assertFalse(rebase.docs_advance(f">abc\n{prefix}Transform.md\n"))
+                self.assertFalse(rebase.docs_advance(f">abc\n{changes.code_doc_example(prefix)}\n"))
         self.assertTrue(rebase.docs_advance(">abc\nREADME.md\n"))
 
 

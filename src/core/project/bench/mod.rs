@@ -74,8 +74,9 @@ impl Bench {
         Self::at(recent::default_path())
     }
 
-    /// *New Project*: make `name` under `parent` a project (its skeleton and
-    /// `project.rusty`, as opening it would) without opening it, and put it at the
+    /// *New Project*: make `name` under `parent` a project (its skeleton,
+    /// `project.rusty`, `CLAUDE.md` and in a `dev` build `.mcp.json`, as opening it
+    /// would) without opening it, and put it at the
     /// top of the list. Returns its root.
     pub fn create(&mut self, parent: &Path, name: &str, now: u64) -> Result<PathBuf, String> {
         let dir = new_project_dir(parent, name)?;

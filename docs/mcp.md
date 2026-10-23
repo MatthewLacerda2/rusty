@@ -130,12 +130,16 @@ The window must be built with `--features dev` for its socket to exist.
 
 A game project needs no registering: a `dev` build's edit-open writes the project's
 `.mcp.json` (README § Game projects), which Claude Code offers the first time it starts
-in the folder. It registers two servers, both run with `cargo run --manifest-path
-<checkout>/Cargo.toml --quiet --bin session-mcp --features dev -- …` so they work before
-`session-mcp` was ever built: `rusty` in attach mode (`--attach`, the editor window) and
-`rusty-headless` in embed mode (`--project <root>`). Use one at a time: two worlds saving
-the same scene overwrite each other. The paths are absolute, so the file names this
-machine's checkout and is rewritten by each edit-open.
+in the folder. It registers two servers, both the checkout's built
+`<checkout>/target/debug/session-mcp`: `rusty` in attach mode (`--attach`, the editor
+window) and `rusty-headless` in embed mode (`--project <root>`). They run the binary,
+not `cargo run`: from a game folder cargo would ignore the checkout's
+`rust-toolchain.toml` and `.cargo/config.toml` and cold-build the engine past Claude
+Code's server startup timeout, so build it once (`cargo build --bin session-mcp
+--features dev`). Use one at a time: two worlds saving the same scene overwrite each
+other. The engine owns only those two entries under `mcpServers`, keeping any other
+server and key in the file; the paths are absolute, so each edit-open rewrites them to
+this machine's checkout.
 
 To register it by hand instead, build a dev binary once, then point Claude Code at it:
 
