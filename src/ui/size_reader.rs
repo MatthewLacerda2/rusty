@@ -30,6 +30,7 @@ use std::rc::Rc;
 
 use glam::Vec2;
 
+use crate::asset::MapRef;
 use crate::components::{ImageComponent, ImageType, RENDER_TEXTURE_PREFIX};
 use crate::core::fs::freshness::Freshness;
 use crate::core::fs::written::Stale;
@@ -121,7 +122,11 @@ impl TextureSizeReader {
 /// The texture path `img` measures by, if it measures by one on disk.
 fn measured_path(img: &ImageComponent) -> Option<&str> {
     let by_texture = matches!(img.image_type, ImageType::Simple | ImageType::Filled);
-    let path = img.texture.as_deref().filter(|_| by_texture)?;
+    let path = img
+        .texture
+        .as_ref()
+        .map(MapRef::as_str)
+        .filter(|_| by_texture)?;
     (!path.starts_with(RENDER_TEXTURE_PREFIX)).then_some(path)
 }
 

@@ -16,6 +16,7 @@
 //! an id a script can remove it by. Ageing runs on the fixed sim tick
 //! ([`DecalSet::tick`]), never the wall clock; the registry is [`DecalSet`].
 
+use crate::asset::MapRef;
 use glam::camera::rh::view::look_to_mat4;
 use glam::{Mat4, Quat, Vec3};
 
@@ -38,7 +39,7 @@ pub struct DecalSpec {
     /// RGBA tint, multiplied into the decal's albedo (alpha scales its coverage).
     pub color: [f32; 4],
     /// Albedo texture path when no material names one; `None` stamps a solid square.
-    pub texture: Option<String>,
+    pub texture: Option<MapRef>,
     /// The decal material (#638): a library material whose maps and `decal` block
     /// say what the decal changes. `None` changes only the albedo, by `texture`.
     pub material: Option<String>,
@@ -85,7 +86,7 @@ pub struct Decal {
     /// RGBA tint multiplied into the sampled texel (alpha scales the blend).
     pub color: [f32; 4],
     /// Albedo texture path when no material names one, or `None` for a solid square.
-    pub texture: Option<String>,
+    pub texture: Option<MapRef>,
     /// The library material this decal stamps (#638), by name; see [`DecalSpec`].
     pub material: Option<String>,
     /// The entity it sticks to and its box in that entity's space, if any.

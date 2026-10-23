@@ -16,6 +16,7 @@
 //! flat tint and `blend` picks the compositing mode (#425, `look`). Authoring data, plus two
 //! runtime-only slots a `Selectable` drives (never serialized).
 
+use crate::asset::MapRef;
 use glam::Vec4;
 use serde::{Deserialize, Serialize};
 
@@ -66,7 +67,7 @@ pub struct ImageComponent {
     /// RGBA tint in display space, straight alpha, each channel in `[0, 1]`.
     pub color: Vec4,
     /// The texture's path; `None` draws a solid `color`.
-    pub texture: Option<String>,
+    pub texture: Option<MapRef>,
     /// How the texture maps onto the rect.
     pub image_type: ImageType,
     /// `Sliced` borders in texels — `x` left, `y` bottom, `z` right, `w` top.
@@ -97,7 +98,7 @@ pub struct ImageComponent {
     /// Runtime only, never saved: the sprite a `Selectable`'s `SpriteSwap` shows in
     /// place of `texture` (Unity's `Image.overrideSprite`, #420).
     #[serde(skip)]
-    pub override_texture: Option<String>,
+    pub override_texture: Option<MapRef>,
 }
 
 impl Default for ImageComponent {
@@ -125,6 +126,9 @@ impl Default for ImageComponent {
 impl ImageComponent {
     /// The texture this image draws: a `SpriteSwap` override, else its own.
     pub fn shown_texture(&self) -> Option<&str> {
-        self.override_texture.as_deref().or(self.texture.as_deref())
+        self.override_texture
+            .as_ref()
+            .or(self.texture.as_ref())
+            .map(MapRef::as_str)
     }
 }

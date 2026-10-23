@@ -56,7 +56,7 @@ fn spawn_honours_optional_size_texture_and_tint() {
         let d = &s.decals[0];
         assert_eq!(d.size.x, 2.0, "explicit stamp size");
         assert_eq!(d.size.z, 2.0, "depth tracks size when size > default depth");
-        assert_eq!(d.texture.as_deref(), Some("decals/scorch.png"));
+        assert_eq!(d.texture, Some("decals/scorch.png".into()));
         assert_eq!(d.color, [1.0, 0.0, 0.0, 0.5]);
         Ok(())
     })

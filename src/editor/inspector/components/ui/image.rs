@@ -9,6 +9,7 @@ use egui_phosphor::regular as icon;
 
 use super::look::{blend_row, gradient_editor};
 use super::{combo, vec4_row};
+use crate::asset::MapRef;
 use crate::components::{FillMethod, FillOrigin, ImageComponent, ImageType};
 use crate::editor::inspector::components::card::component_card;
 use crate::scene::authoring::image as image_ops;
@@ -61,14 +62,18 @@ fn draw_common(ui: &mut egui::Ui, edit: &mut ImageComponent) -> bool {
         })
         .inner;
     edit.color = glam::Vec4::from_array(color);
-    let mut path = edit.texture.clone().unwrap_or_default();
+    let mut path = edit
+        .texture
+        .as_ref()
+        .map(MapRef::to_string)
+        .unwrap_or_default();
     changed |= ui
         .horizontal(|ui| {
             ui.label("Texture:");
             ui.text_edit_singleline(&mut path).changed()
         })
         .inner;
-    edit.texture = Some(path);
+    edit.texture = Some(path.into());
     let types = [
         ImageType::Simple,
         ImageType::Sliced,
@@ -117,7 +122,7 @@ fn draw_fill(ui: &mut egui::Ui, edit: &mut ImageComponent) -> bool {
 /// the origin is fitted to the new method).
 fn write_back(i: &mut ImageComponent, edit: ImageComponent) {
     image_ops::set_color(i, edit.color);
-    image_ops::set_texture(i, edit.texture);
+    image_ops::set_texture(i, edit.texture.as_ref().map(MapRef::to_string));
     image_ops::set_image_type(i, edit.image_type);
     image_ops::set_border(i, edit.border);
     image_ops::set_fill_method(i, edit.fill_method);

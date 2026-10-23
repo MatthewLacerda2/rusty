@@ -17,6 +17,7 @@
 use glam::Vec4;
 
 use super::EventSystem;
+use crate::asset::MapRef;
 use crate::components::SelectableTransition;
 use crate::ecs::World;
 
@@ -50,7 +51,7 @@ impl EventSystem {
                 SelectableTransition::None => (Vec4::ONE, None),
             };
             let target = sel.target(id);
-            let sprite = sprite.map(str::to_string);
+            let sprite = sprite.map(MapRef::from);
             if let Some(mut image) = world.image_mut(target) {
                 image.state_tint = tint;
                 if image.override_texture != sprite {

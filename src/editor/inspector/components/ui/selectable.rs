@@ -9,6 +9,7 @@ use crate::scene::authoring::ComponentKind;
 use egui_phosphor::regular as icon;
 
 use super::{combo, entity_row};
+use crate::asset::MapRef;
 use crate::components::{
     NavigationMode, SelectableComponent, SelectableTransition, SelectionState,
 };
@@ -85,14 +86,14 @@ fn draw_transition(ui: &mut egui::Ui, edit: &mut SelectableComponent) -> bool {
         }
         SelectableTransition::SpriteSwap => {
             for (slot, s) in edit.sprites.iter_mut().zip(states).skip(1) {
-                let mut path = slot.clone().unwrap_or_default();
+                let mut path = slot.as_ref().map(MapRef::to_string).unwrap_or_default();
                 changed |= ui
                     .horizontal(|ui| {
                         ui.label(format!("{} Sprite:", s.name()));
                         ui.text_edit_singleline(&mut path).changed()
                     })
                     .inner;
-                *slot = Some(path).filter(|p| !p.is_empty());
+                *slot = Some(path).filter(|p| !p.is_empty()).map(MapRef::from);
             }
         }
         SelectableTransition::None => {}
@@ -129,7 +130,11 @@ fn write_back(s: &mut SelectableComponent, edit: &SelectableComponent) {
     ops::set_target_graphic(s, edit.target_graphic);
     for state in SelectionState::ALL {
         ops::set_color(s, state, edit.color(state));
-        ops::set_sprite(s, state, edit.sprites[state as usize].clone());
+        ops::set_sprite(
+            s,
+            state,
+            edit.sprites[state as usize].as_ref().map(MapRef::to_string),
+        );
     }
     ops::set_fade_duration(s, edit.fade_duration);
     ops::set_navigation(s, edit.navigation);

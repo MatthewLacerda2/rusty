@@ -6,6 +6,7 @@
 
 use super::mesh_data::{ImportedAsset, MaterialData, MeshVertex, SubMesh};
 use super::ImportError;
+use crate::asset::MapRef;
 use std::path::Path;
 
 /// Import a `.obj` (resolving its sibling `.mtl` if present) into addressable
@@ -32,7 +33,7 @@ pub fn import(path: &Path) -> Result<ImportedAsset, ImportError> {
             let base = m.diffuse.unwrap_or([1.0, 1.0, 1.0]);
             let base_color_map = m
                 .diffuse_texture
-                .map(|t| base_dir.join(t).to_string_lossy().into_owned());
+                .map(|t| MapRef::from(base_dir.join(t).to_string_lossy().into_owned()));
             MaterialData {
                 name: m.name,
                 base_color: [base[0], base[1], base[2], 1.0],

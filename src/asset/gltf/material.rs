@@ -4,6 +4,7 @@
 use super::uri;
 use crate::asset::convert::texture_ref;
 use crate::asset::mesh_data::MaterialData;
+use crate::asset::MapRef;
 use std::path::Path;
 
 /// Read one glTF material into the pure-data [`MaterialData`]: the metallic-roughness
@@ -23,16 +24,20 @@ pub(super) fn material_data(
         roughness: pbr.roughness_factor(),
         base_color_map: pbr
             .base_color_texture()
-            .and_then(|t| texture_path(&t.texture(), base_dir, source)),
+            .and_then(|t| texture_path(&t.texture(), base_dir, source))
+            .map(MapRef::from),
         metallic_roughness_map: pbr
             .metallic_roughness_texture()
-            .and_then(|t| texture_path(&t.texture(), base_dir, source)),
+            .and_then(|t| texture_path(&t.texture(), base_dir, source))
+            .map(MapRef::from),
         normal_map: material
             .normal_texture()
-            .and_then(|t| texture_path(&t.texture(), base_dir, source)),
+            .and_then(|t| texture_path(&t.texture(), base_dir, source))
+            .map(MapRef::from),
         emissive_map: material
             .emissive_texture()
-            .and_then(|t| texture_path(&t.texture(), base_dir, source)),
+            .and_then(|t| texture_path(&t.texture(), base_dir, source))
+            .map(MapRef::from),
         emissive: material.emissive_factor(),
     }
 }

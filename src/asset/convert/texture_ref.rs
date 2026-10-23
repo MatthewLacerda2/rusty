@@ -14,6 +14,10 @@
 //! `core::fs::written`, so a cache keyed by a reference drops it by its
 //! [`source`]. A map that is not a reference is the path it is.
 
+mod map_ref;
+
+pub use map_ref::MapRef;
+
 use super::{cache_location, converter_for, glb};
 use crate::asset::gltf::uri;
 use std::path::{Path, PathBuf};

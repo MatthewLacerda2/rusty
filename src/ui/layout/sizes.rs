@@ -17,6 +17,7 @@ use glam::Vec2;
 
 use super::group;
 use super::native::TextureSizes;
+use crate::asset::MapRef;
 use crate::components::{ImageType, LayoutAxisFit};
 use crate::ecs::World;
 use crate::ui::text::preferred_size;
@@ -138,7 +139,7 @@ pub(super) fn layout_children(world: &World, id: u32) -> Vec<u32> {
 /// native size from the platform's table, or for `Sliced` / `Tiled` the sum of its
 /// borders. Zero without a texture, or while the table has no size for it.
 fn image_preferred(img: &crate::components::ImageComponent, textures: &TextureSizes) -> Vec2 {
-    let Some(path) = img.texture.as_deref() else {
+    let Some(path) = img.texture.as_ref().map(MapRef::as_str) else {
         return Vec2::ZERO;
     };
     match img.image_type {

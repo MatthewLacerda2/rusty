@@ -69,7 +69,7 @@ fn scene(metallic: f32, metallic_map: Option<String>) -> Scene {
             base_color: [0.9, 0.9, 0.9],
             metallic,
             roughness: 1.0,
-            metallic_map,
+            metallic_map: metallic_map.map(Into::into),
             ..MaterialAsset::default()
         },
     );

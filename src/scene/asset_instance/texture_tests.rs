@@ -60,7 +60,11 @@ fn instanced(path: &str, node: &str) -> (Scene, String) {
 }
 
 fn base_color_map(scene: &Scene, key: &str) -> String {
-    scene.materials[key].base_color_map.clone().expect("a map")
+    scene.materials[key]
+        .base_color_map
+        .as_ref()
+        .expect("a map")
+        .to_string()
 }
 
 #[test]

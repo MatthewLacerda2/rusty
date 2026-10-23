@@ -59,7 +59,7 @@ fn a_frozen_frame_outside_play_reads_ui_texture_sizes() {
     let scene = Rc::new(RefCell::new(Scene::new()));
     let id = scene.borrow_mut().add_entity("Icon".to_string());
     let img = ImageComponent {
-        texture: Some(path.clone()),
+        texture: Some(path.clone().into()),
         ..Default::default()
     };
     scene.borrow_mut().world.set_image(id, Some(img));

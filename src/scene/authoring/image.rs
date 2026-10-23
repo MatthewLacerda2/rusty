@@ -12,6 +12,7 @@
 use glam::Vec4;
 
 use super::ui_look::sanitize_gradient;
+use crate::asset::MapRef;
 use crate::components::{FillMethod, FillOrigin, ImageComponent, ImageType, UiBlend, UiGradient};
 
 /// Set the RGBA tint (display space, straight alpha), each channel clamped to `[0, 1]`.
@@ -21,7 +22,7 @@ pub fn set_color(i: &mut ImageComponent, color: Vec4) {
 
 /// Set the texture path; `None` or an empty path draws a solid colour.
 pub fn set_texture(i: &mut ImageComponent, path: Option<String>) {
-    i.texture = path.filter(|p| !p.is_empty());
+    i.texture = path.filter(|p| !p.is_empty()).map(MapRef::from);
 }
 
 /// Set how the texture maps onto the rect.
@@ -164,7 +165,7 @@ mod tests {
         set_texture(&mut i, Some(String::new()));
         assert_eq!(i.texture, None);
         set_texture(&mut i, Some("ui/bar.png".into()));
-        assert_eq!(i.texture.as_deref(), Some("ui/bar.png"));
+        assert_eq!(i.texture, Some("ui/bar.png".into()));
     }
 
     #[test]

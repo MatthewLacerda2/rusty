@@ -31,7 +31,7 @@ fn element(scene: &mut Scene, parent: u32, pos: Vec2, size: Vec2, texture: Optio
     };
     scene.world.set_rect_transform(id, Some(rt));
     let image = ImageComponent {
-        texture: texture.map(str::to_string),
+        texture: texture.map(Into::into),
         ..Default::default()
     };
     scene.world.set_image(id, Some(image));

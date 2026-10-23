@@ -62,7 +62,7 @@ mod tests {
                 .get("mask")
                 .cloned()
         };
-        assert_eq!(mask(&scene).as_deref(), Some("n.png"));
+        assert_eq!(mask(&scene), Some("n.png".into()));
 
         run(
             &scene,

@@ -71,7 +71,7 @@ fn emissive_map_visibly_modulates_emission() {
     let mat = |map: &std::path::Path| MaterialAsset {
         base_color: [0.0, 0.0, 0.0],
         emissive: [1.0, 1.0, 1.0],
-        emissive_map: Some(map.to_string_lossy().into_owned()),
+        emissive_map: Some(map.to_string_lossy().into_owned().into()),
         ..MaterialAsset::default()
     };
 
@@ -100,7 +100,7 @@ fn normal_map_visibly_perturbs_shading() {
 
     let mat = |map: &std::path::Path| MaterialAsset {
         base_color: [0.9, 0.9, 0.9],
-        normal_map: Some(map.to_string_lossy().into_owned()),
+        normal_map: Some(map.to_string_lossy().into_owned().into()),
         ..MaterialAsset::default()
     };
 

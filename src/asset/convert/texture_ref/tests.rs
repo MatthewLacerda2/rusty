@@ -2,6 +2,7 @@
 
 use super::{file, reference, source};
 use crate::asset::import_file;
+use crate::asset::MapRef;
 use std::path::{Path, PathBuf};
 
 /// A copy of the embedded-textures fixture in a fresh folder, `text` edited by `edit`.
@@ -20,7 +21,8 @@ fn quad_at(path: &Path, edit: impl Fn(String) -> String) -> PathBuf {
 fn base_color_map(path: &Path, material: &str) -> String {
     let asset = import_file(path).expect("imports");
     let data = asset.materials.iter().find(|m| m.name == material);
-    data.and_then(|m| m.base_color_map.clone()).expect(material)
+    data.and_then(|m| m.base_color_map.as_ref().map(MapRef::to_string))
+        .expect(material)
 }
 
 #[test]

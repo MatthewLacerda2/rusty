@@ -53,7 +53,7 @@ fn sprite_swap_and_a_separate_target_graphic() {
     s.world.set_text(icon, Some(TextComponent::default()));
     let mut sel = s.world.selectable(btn).expect("sel").clone();
     sel.transition = SelectableTransition::SpriteSwap;
-    sel.sprites[4] = Some("off.png".to_string());
+    sel.sprites[4] = Some("off.png".into());
     sel.target_graphic = Some(icon);
     sel.interactable = false;
     s.world.set_selectable(btn, Some(sel));

@@ -33,6 +33,7 @@ pub use shader_params::{
 };
 
 use super::sanitize::unit;
+use crate::asset::MapRef;
 use crate::scene::{MaterialAsset, MaterialComponent, RenderMode, Scene};
 
 /// The range of the `[0, 1]` factors (metallic, roughness, alpha, alpha cutoff): the
@@ -101,7 +102,7 @@ pub fn set_base_color(materials: &mut MaterialLibrary, key: &str, rgb: [f32; 3])
 /// Set the base-color (albedo) map path; an empty path clears it to `None`.
 pub fn set_base_color_map(materials: &mut MaterialLibrary, key: &str, path: String) {
     if let Some(m) = materials.get_mut(key) {
-        m.base_color_map = (!path.is_empty()).then_some(path);
+        m.base_color_map = (!path.is_empty()).then(|| MapRef::from(path));
     }
 }
 
@@ -115,7 +116,7 @@ pub fn set_metallic(materials: &mut MaterialLibrary, key: &str, value: f32) {
 /// Set (or, with `None`, clear) the metallic map path.
 pub fn set_metallic_map(materials: &mut MaterialLibrary, key: &str, path: Option<String>) {
     if let Some(m) = materials.get_mut(key) {
-        m.metallic_map = path;
+        m.metallic_map = path.map(MapRef::from);
     }
 }
 
@@ -129,14 +130,14 @@ pub fn set_roughness(materials: &mut MaterialLibrary, key: &str, value: f32) {
 /// Set (or, with `None`, clear) the roughness map path.
 pub fn set_roughness_map(materials: &mut MaterialLibrary, key: &str, path: Option<String>) {
     if let Some(m) = materials.get_mut(key) {
-        m.roughness_map = path;
+        m.roughness_map = path.map(MapRef::from);
     }
 }
 
 /// Set (or, with `None`, clear) the normal map path.
 pub fn set_normal_map(materials: &mut MaterialLibrary, key: &str, path: Option<String>) {
     if let Some(m) = materials.get_mut(key) {
-        m.normal_map = path;
+        m.normal_map = path.map(MapRef::from);
     }
 }
 
@@ -150,7 +151,7 @@ pub fn set_emissive(materials: &mut MaterialLibrary, key: &str, rgb: [f32; 3]) {
 /// Set (or, with `None`, clear) the emissive map path.
 pub fn set_emissive_map(materials: &mut MaterialLibrary, key: &str, path: Option<String>) {
     if let Some(m) = materials.get_mut(key) {
-        m.emissive_map = path;
+        m.emissive_map = path.map(MapRef::from);
     }
 }
 
@@ -199,7 +200,7 @@ pub fn set_shader_texture(
     crate::shadergen::textures::slot(slot)?;
     if let Some(m) = materials.get_mut(key) {
         match path.filter(|p| !p.is_empty()) {
-            Some(p) => m.shader_textures.insert(slot.to_owned(), p),
+            Some(p) => m.shader_textures.insert(slot.to_owned(), p.into()),
             None => m.shader_textures.remove(slot),
         };
     }

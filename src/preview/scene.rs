@@ -102,7 +102,7 @@ pub fn build_preview_scene(mesh: PreviewMesh, subject: &PreviewSubject) -> Scene
         PreviewSubject::Texture(path) => {
             let id = spawn_preview_mesh(&mut scene, mesh);
             let material = MaterialAsset {
-                base_color_map: Some(path.clone()),
+                base_color_map: Some(path.as_str().into()),
                 ..MaterialAsset::default()
             };
             attach_material(&mut scene, id, material);

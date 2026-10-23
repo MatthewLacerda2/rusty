@@ -37,7 +37,7 @@ fn scene(effect: &str, fog: bool) -> Scene {
             ParticleBlend::Alpha
         },
         color: ColorRange::constant([1.0, 0.2, 0.2, 1.0]),
-        texture: white_sprite(),
+        texture: white_sprite().map(Into::into),
         ..Default::default()
     };
     emitter

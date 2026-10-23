@@ -10,6 +10,7 @@
 
 use std::rc::Rc;
 
+use crate::asset::MapRef;
 use crate::components::MaterialAsset;
 use crate::render::gpu::material_cache::{ParamOwner, MATERIAL_TEXTURES};
 use crate::render::{GpuTexture, Renderer};
@@ -180,7 +181,7 @@ pub(crate) fn material_texture_paths(
     ];
     let slots = textures::SLOTS
         .iter()
-        .map(|s| m.shader_textures.get(s.name).cloned());
-    let mut paths = maps.into_iter().cloned().chain(slots);
-    std::array::from_fn(|_| paths.next().flatten())
+        .map(|s| m.shader_textures.get(s.name));
+    let mut paths = maps.into_iter().map(Option::as_ref).chain(slots);
+    std::array::from_fn(|_| paths.next().flatten().map(MapRef::to_string))
 }

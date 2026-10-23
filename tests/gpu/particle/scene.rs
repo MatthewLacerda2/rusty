@@ -41,7 +41,7 @@ pub fn scene_with(render: ParticleRender, particles: Vec<Particle>) -> (Scene, u
     let mut scene = wall_scene(20.0, [0.0, 0.0, 0.0]);
     let id = scene.add_entity("Emitter".to_string());
     let mut emitter = ParticleEmitterComponent {
-        texture: Some(white_sprite()),
+        texture: Some(white_sprite().into()),
         render,
         ..Default::default()
     };

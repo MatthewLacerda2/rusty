@@ -98,7 +98,7 @@ fn a_mid_grey_metallic_map_reads_one_half() {
     };
     assert_same(
         "metallic",
-        mat(1.0, Some(map)),
+        mat(1.0, Some(map.into())),
         mat(0.5, None),
         mat(0.216, None),
     );
@@ -117,7 +117,7 @@ fn a_mid_grey_roughness_map_reads_one_half() {
     };
     assert_same(
         "roughness",
-        mat(1.0, Some(map)),
+        mat(1.0, Some(map.into())),
         mat(0.5, None),
         mat(0.216, None),
     );
@@ -132,5 +132,10 @@ fn a_flat_normal_map_leaves_the_normal_unperturbed() {
         normal_map,
         ..MaterialAsset::default()
     };
-    assert_same("normal", mat(Some(flat)), mat(None), mat(Some(bent)));
+    assert_same(
+        "normal",
+        mat(Some(flat.into())),
+        mat(None),
+        mat(Some(bent.into())),
+    );
 }

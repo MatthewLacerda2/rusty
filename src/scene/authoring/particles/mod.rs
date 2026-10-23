@@ -24,6 +24,7 @@ pub use render::*;
 
 use glam::Vec3;
 
+use crate::asset::MapRef;
 use crate::components::{
     CollisionResponse, EmitFrom, EmitMode, EmitShape, ParticleBlend, ParticleEmitterComponent,
     SubEmitTrigger,
@@ -67,7 +68,7 @@ pub fn set_blend(p: &mut ParticleEmitterComponent, blend: ParticleBlend) {
 
 /// Set (or, with an empty string, clear) the particle texture path.
 pub fn set_texture(p: &mut ParticleEmitterComponent, texture: String) {
-    p.texture = (!texture.is_empty()).then_some(texture);
+    p.texture = (!texture.is_empty()).then(|| MapRef::from(texture));
 }
 
 /// Set the per-particle lifetime range (seconds), each bound clamped to `≥ 0`.
@@ -204,7 +205,7 @@ mod tests {
             assert!(p.active);
             assert_eq!(p.rate, 0.0, "rate clamps to 0");
             assert_eq!(p.emit_mode, EmitMode::Burst);
-            assert_eq!(p.texture.as_deref(), Some("smoke.png"));
+            assert_eq!(p.texture, Some("smoke.png".into()));
             assert_eq!(p.color.min, [0.1, 0.2, 0.3, 0.4]);
             assert_eq!(p.size, Range::new(0.0, 2.0), "size clamps to 0");
             assert_eq!(p.seed, 42);

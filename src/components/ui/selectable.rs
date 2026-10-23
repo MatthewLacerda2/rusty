@@ -18,6 +18,7 @@
 //! remapped with the entity when a prefab is saved or stamped
 //! ([`SelectableComponent::remap_refs`]).
 
+use crate::asset::MapRef;
 use glam::Vec4;
 use serde::{Deserialize, Serialize};
 
@@ -102,7 +103,7 @@ pub struct SelectableComponent {
     pub fade_duration: f32,
     /// `SpriteSwap` textures per state, in [`SelectionState`] order; `None` (and the
     /// `Normal` slot, always) shows the Image's own texture.
-    pub sprites: [Option<String>; 5],
+    pub sprites: [Option<MapRef>; 5],
     /// How keyboard focus leaves it.
     pub navigation: NavigationMode,
     /// `Explicit` targets: up, down, left, right.
@@ -152,7 +153,7 @@ impl SelectableComponent {
     pub fn sprite(&self, state: SelectionState) -> Option<&str> {
         match state {
             SelectionState::Normal => None,
-            _ => self.sprites[state as usize].as_deref(),
+            _ => self.sprites[state as usize].as_ref().map(MapRef::as_str),
         }
     }
 
@@ -181,7 +182,7 @@ mod tests {
             assert_eq!(SelectionState::parse(&s.name().to_lowercase()), Some(s));
         }
         let sel = SelectableComponent {
-            sprites: std::array::from_fn(|i| Some(format!("s{i}.png"))),
+            sprites: std::array::from_fn(|i| Some(format!("s{i}.png").into())),
             ..Default::default()
         };
         assert_eq!(sel.sprite(SelectionState::Normal), None);

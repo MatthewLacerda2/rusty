@@ -12,6 +12,7 @@ use glam::Vec3;
 use wgpu::util::DeviceExt;
 
 use super::instance::{emitter_instances, emitter_light, Eye, ParticleGlobals, ParticleInstance};
+use crate::asset::MapRef;
 use crate::components::particle::ParticleBlend;
 use crate::components::ParticleRenderMode;
 use crate::render::draw::batch::sort::back_to_front;
@@ -232,7 +233,7 @@ fn collect_runs(scene: &Scene, culling_mask: u32, eye: Eye) -> Vec<EmitterRun> {
         let (instances, depth) = emitter_instances(&emitter, light, eye);
         let run = EmitterRun {
             blend: emitter.blend,
-            texture: emitter.texture.clone(),
+            texture: emitter.texture.as_ref().map(MapRef::to_string),
             instances,
         };
         runs.push((run, depth));

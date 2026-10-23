@@ -34,7 +34,7 @@ fn fitted_image(texture: &str) -> (Scene, u32) {
     };
     scene.world.set_layout_element(id, Some(fit));
     let img = ImageComponent {
-        texture: Some(texture.to_string()),
+        texture: Some(texture.into()),
         ..ImageComponent::default()
     };
     scene.world.set_image(id, Some(img));

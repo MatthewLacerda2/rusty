@@ -20,6 +20,7 @@ pub use trail::{TrailComponent, TrailPoint, TrailRuntime};
 
 use serde::{Deserialize, Serialize};
 
+use crate::asset::MapRef;
 use crate::components::ParticleBlend;
 use crate::core::curve::{Curve, Gradient};
 
@@ -62,7 +63,7 @@ pub struct RibbonStyle {
     pub color: Gradient,
     /// Optional texture path; the renderer's default white texture without one.
     #[serde(default)]
-    pub texture: Option<String>,
+    pub texture: Option<MapRef>,
     #[serde(default)]
     pub texture_mode: TextureMode,
     pub blend: ParticleBlend,

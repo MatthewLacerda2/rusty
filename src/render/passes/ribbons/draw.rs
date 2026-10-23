@@ -12,6 +12,7 @@ use wgpu::util::DeviceExt;
 
 use super::strip::{self, RibbonVertex};
 use super::RibbonGlobals;
+use crate::asset::MapRef;
 use crate::components::{ParticleBlend, RibbonStyle};
 use crate::render::draw::batch::sort::{back_to_front, view_depth};
 use crate::render::gpu::uniforms::FogUniform;
@@ -227,7 +228,7 @@ impl Ribbons {
         let centroid = points.iter().sum::<Vec3>() / points.len() as f32;
         let draw = RibbonDraw {
             blend: style.blend,
-            texture: style.texture.clone(),
+            texture: style.texture.as_ref().map(MapRef::to_string),
             first,
             count,
         };

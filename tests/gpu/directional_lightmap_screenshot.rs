@@ -44,7 +44,7 @@ fn scene(dir: &std::path::Path) -> Scene {
     let material = MaterialAsset {
         base_color: [1.0, 1.0, 1.0],
         roughness: 1.0,
-        normal_map: Some(map.to_string_lossy().into_owned()),
+        normal_map: Some(map.to_string_lossy().into_owned().into()),
         ..MaterialAsset::default()
     };
     scene.materials.insert("bumpy".to_string(), material);

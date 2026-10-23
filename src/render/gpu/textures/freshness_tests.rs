@@ -29,7 +29,7 @@ fn emissive_scene(map: &str) -> Scene {
     let asset = MaterialAsset {
         base_color: [0.0; 3],
         emissive: [1.0; 3],
-        emissive_map: Some(map.to_string()),
+        emissive_map: Some(map.into()),
         ..MaterialAsset::default()
     };
     scene.materials.insert("glow".to_string(), asset);

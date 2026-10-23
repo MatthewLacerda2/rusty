@@ -41,6 +41,7 @@ pub use anim_data::{AnimationClip, Interpolation, JointTrack, Track};
 pub use animation_graph::{
     AnimationGraph, Condition, GraphEdge, GraphError, GraphNode, NumericOp, ParameterDeclaration,
 };
+pub use convert::texture_ref::MapRef;
 pub use lightmap_uv::LightmapUvSettings;
 pub use manifest::{build_manifest, AssetEntry, AssetManifest, SubObjectEntry};
 pub use mesh_data::{ImportedAsset, JointTransform, MaterialData, MeshVertex, SkinData, SubMesh};

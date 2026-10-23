@@ -9,6 +9,7 @@ use glam::Vec3;
 
 use super::atlas::DecalAtlas;
 use super::record::{self, DecalMaps, GpuDecal, NO_LAYER};
+use crate::asset::MapRef;
 use crate::components::MaterialAsset;
 use crate::render::gpu::grow_buffer::GrowBuffer;
 use crate::render::Renderer;
@@ -53,7 +54,7 @@ impl Renderer {
         let paths: Vec<&str> = drawn
             .iter()
             .flat_map(|(_, _, maps)| maps.iter().flatten())
-            .map(String::as_str)
+            .map(MapRef::as_str)
             .collect();
         let misses = &mut self.texture_freshness;
         let d = &mut self.decals;
@@ -67,8 +68,8 @@ impl Renderer {
                     let Some(path) = path else {
                         return NO_LAYER;
                     };
-                    let layer = d.atlas.layer(&path);
-                    dropped += u32::from(layer == NO_LAYER && !misses.is_miss(&path));
+                    let layer = d.atlas.layer(path.as_str());
+                    dropped += u32::from(layer == NO_LAYER && !misses.is_miss(path.as_str()));
                     layer
                 });
                 record::record(decal, pose, material(decal), layers)

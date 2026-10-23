@@ -3,6 +3,7 @@
 
 use super::{convert_and_import, fixture, material, textures};
 use crate::asset::ImportedAsset;
+use crate::asset::MapRef;
 use std::path::Path;
 
 fn import(dir: &Path) -> ImportedAsset {
@@ -13,9 +14,9 @@ fn import(dir: &Path) -> ImportedAsset {
 }
 
 /// The bytes the map `uri` names, which must be `dir`'s extracted `file`.
-fn extracted(dir: &Path, uri: Option<String>, file: &str) -> Vec<u8> {
+fn extracted(dir: &Path, map: Option<MapRef>, file: &str) -> Vec<u8> {
     let path = textures(&dir.join("odd.fbx.glb")).join(file);
-    assert_eq!(uri.as_deref().map(Path::new), Some(path.as_path()));
+    assert_eq!(map.and_then(|m| m.file()), Some(path.clone()));
     std::fs::read(path).unwrap()
 }
 

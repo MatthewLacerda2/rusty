@@ -34,7 +34,7 @@ fn a_minimap_shows_its_render_texture_through_a_circular_soft_mask() {
     // A 96-unit circle frame at (16, 16), its edge fading over 8 texels; centre (64, 64).
     let frame = element(&mut scene, root, [16.0, 16.0, 96.0, 96.0], WHITE);
     let circle = ImageComponent {
-        texture: Some(soft_circle(96, 8.0)),
+        texture: Some(soft_circle(96, 8.0).into()),
         ..Default::default()
     };
     scene.world.set_image(frame, Some(circle));
@@ -98,7 +98,7 @@ fn nested_masks_multiply() {
     // right half of the canvas inside it.
     let outer = element(&mut scene, root, [16.0, 16.0, 96.0, 96.0], WHITE);
     let circle = ImageComponent {
-        texture: Some(soft_circle(96, 1.0)),
+        texture: Some(soft_circle(96, 1.0).into()),
         ..Default::default()
     };
     scene.world.set_image(outer, Some(circle));

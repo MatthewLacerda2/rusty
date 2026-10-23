@@ -4,6 +4,7 @@ use super::super::convert_to;
 use crate::asset::convert::textures_dirs;
 use crate::asset::gltf;
 use crate::asset::ImportedAsset;
+use crate::asset::MapRef;
 use std::path::{Path, PathBuf};
 
 mod depends;
@@ -46,10 +47,11 @@ fn an_embedded_texture_is_extracted_beside_the_glb() {
     let asset = import(&dir);
     let red = material(&asset, "Red")
         .base_color_map
-        .clone()
+        .as_ref()
+        .and_then(MapRef::file)
         .expect("a map");
     assert_eq!(
-        Path::new(&red),
+        red.as_path(),
         textures(&dir.join("quad.fbx.glb")).join("skin.png")
     );
     assert!(std::fs::read(red).unwrap().starts_with(PNG));
@@ -61,10 +63,11 @@ fn a_clashing_name_climbing_out_of_its_folder_lands_beside_the_first() {
     let asset = import(&dir);
     let blue = material(&asset, "Blue")
         .base_color_map
-        .clone()
+        .as_ref()
+        .and_then(MapRef::file)
         .expect("a map");
     let textures = textures(&dir.join("quad.fbx.glb"));
-    assert_eq!(Path::new(&blue), textures.join("Skin.1.png"));
+    assert_eq!(blue, textures.join("Skin.1.png"));
     let [red, blue] = ["skin.png", "Skin.1.png"].map(|n| std::fs::read(textures.join(n)).unwrap());
     assert!(blue.starts_with(PNG));
     assert_ne!(red, blue, "the second texture overwrote nothing");

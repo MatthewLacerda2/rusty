@@ -15,6 +15,7 @@ use std::collections::BTreeMap;
 use std::path::Path;
 
 use super::MaterialLibrary;
+use crate::asset::MapRef;
 use crate::procgen::{bake_set, Slot};
 use crate::scene::MaterialAsset;
 
@@ -84,7 +85,7 @@ fn fill_empty_maps(asset: &mut MaterialAsset, baked: &BTreeMap<String, String>) 
                 "emissive_map" => &mut asset.emissive_map,
                 _ => continue,
             };
-            target.get_or_insert_with(|| path.clone());
+            target.get_or_insert_with(|| MapRef::from(path.clone()));
         }
     }
 }

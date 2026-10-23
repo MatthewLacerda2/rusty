@@ -67,7 +67,7 @@ fn gltf_reads_full_metallic_roughness_material() {
         .join("tex/brick wall.png")
         .to_string_lossy()
         .into_owned();
-    assert_eq!(mat.base_color_map.as_deref(), Some(expected.as_str()));
+    assert_eq!(mat.base_color_map, Some(expected.into()));
     // The fixture declares no other textures.
     assert!(mat.metallic_roughness_map.is_none());
     assert!(mat.normal_map.is_none());

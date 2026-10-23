@@ -2,6 +2,7 @@
 //! and the mesh toggle — all GPU-free (`Scene` is plain data).
 
 use super::*;
+use crate::asset::MapRef;
 
 /// A minimal two-triangle `.obj` with one named object, for `spawn_model` tests.
 const QUAD_OBJ: &str = "\
@@ -103,7 +104,7 @@ fn texture_subject_sets_base_color_map() {
         .get("preview::material")
         .expect("material attached");
     assert_eq!(
-        material.base_color_map.as_deref(),
+        material.base_color_map.as_ref().map(MapRef::as_str),
         Some("assets/textures/rock.png")
     );
 }

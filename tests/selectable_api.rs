@@ -82,11 +82,11 @@ fn a_selectable_survives_save_and_load_but_the_runtime_tint_does_not() {
         target_graphic: Some(id),
         ..Default::default()
     };
-    sel.sprites[3] = Some("focus.png".to_string());
+    sel.sprites[3] = Some("focus.png".into());
     scene.world.set_selectable(id, Some(sel.clone()));
     let image = ImageComponent {
         state_tint: Vec4::splat(0.5),
-        override_texture: Some("focus.png".to_string()),
+        override_texture: Some("focus.png".into()),
         ..Default::default()
     };
     scene.world.set_image(id, Some(image));
