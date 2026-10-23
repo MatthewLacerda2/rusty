@@ -10,11 +10,14 @@
 //!     record they ever played.
 //!
 //! These are plain serde data (no audio-device types), so a test can assert on them
-//! with no sound card (`AudioMaestro::events`). No Lua, MCP or harness surface
-//! exposes them yet: `Debug.Snapshot` shows each entity's `AudioSource` component,
-//! not this log, so a fire-and-forget one-shot is invisible to an agent (#1247).
+//! with no sound card (`AudioMaestro::events`). The dev-only Lua reads
+//! `Debug.AudioEvents([after_seq])` and `Debug.AudioVoices()` hand both to an agent
+//! (`dev::lua_surface::debug::audio`, #1247): `Debug.Snapshot` shows each entity's
+//! `AudioSource` component, which a fire-and-forget one-shot never has.
 
 use serde::{Deserialize, Serialize};
+
+use super::AudioMaestro;
 
 /// The resolved spatial state of a source against the listener (#213): the per-source
 /// **gain** (pre-master, after distance rolloff + `spatial_blend`) and **pan** in
@@ -68,11 +71,16 @@ pub enum AudioEventKind {
 
 /// One logged audio action — the durable "what happened" record, especially for
 /// one-shots. `tick` is the play-mode frame the action occurred on (deterministic),
-/// so a scenario can assert ordering without any wall clock.
+/// so a scenario can assert ordering without any wall clock; `seq` orders the
+/// actions *within* a frame and is the reader's cursor (#1247).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct AudioEvent {
+    /// The log's sequence number: from 1, one per logged event, never reused while
+    /// the process lives (a clear on Play keeps counting). Set by
+    /// [`AudioEventLog::push`], which overwrites whatever the caller passed.
+    pub seq: u64,
     pub kind: AudioEventKind,
-    /// The clip path that played (empty for a `Stop` of a clip-less source).
+    /// The clip path that played; always `""` for a `Stop`.
     pub clip: String,
     /// The source entity id. For `PlayAt` this is the caller-supplied source (or
     /// `0` when none was given) — useful to attribute a one-shot to its emitter.
@@ -80,6 +88,9 @@ pub struct AudioEvent {
     /// World position the sound played at. For an entity source this is its
     /// transform position; for `PlayAt` it is the explicit point. (Stored for #213;
     /// 2D playback ignores it but the agent can still read where it happened.)
+    /// Serializes as a keyed `{ x, y, z }`, the shape the rest of the Lua surface
+    /// hands back for a point.
+    #[serde(with = "xyz")]
     pub position: [f32; 3],
     /// Effective volume the action requested (pre-master).
     pub volume: f32,
@@ -89,10 +100,18 @@ pub struct AudioEvent {
 
 /// A bounded ring buffer of [`AudioEvent`]s. Old entries fall off past the cap so an
 /// hour-long play-test can't grow the log without bound; the agent reads the tail.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct AudioEventLog {
     events: Vec<AudioEvent>,
     cap: usize,
+    /// The `seq` the next pushed event takes.
+    next_seq: u64,
+}
+
+impl Default for AudioEventLog {
+    fn default() -> Self {
+        Self::new(DEFAULT_EVENT_CAP)
+    }
 }
 
 /// Default ring capacity — generous enough that a typical scenario reads the whole
@@ -105,14 +124,18 @@ impl AudioEventLog {
         Self {
             events: Vec::new(),
             cap: cap.max(1),
+            next_seq: 1,
         }
     }
 
-    /// Append an event, evicting the oldest if the cap is reached (FIFO).
-    pub fn push(&mut self, event: AudioEvent) {
+    /// Append an event under the next `seq`, evicting the oldest if the cap is
+    /// reached (FIFO).
+    pub fn push(&mut self, mut event: AudioEvent) {
         if self.events.len() >= self.cap {
             self.events.remove(0);
         }
+        event.seq = self.next_seq;
+        self.next_seq += 1;
         self.events.push(event);
     }
 
@@ -121,7 +144,21 @@ impl AudioEventLog {
         &self.events
     }
 
-    /// Drop the whole log (e.g. on entering Play for a clean record).
+    /// The held events whose `seq` is greater than `after_seq`, oldest first.
+    pub fn after(&self, after_seq: u64) -> &[AudioEvent] {
+        let from = self.events.partition_point(|e| e.seq <= after_seq);
+        &self.events[from..]
+    }
+
+    /// The oldest `seq` still held, or the next one to be assigned when the log is
+    /// empty. A reader whose cursor is below `oldest_seq() - 1` missed the events in
+    /// between: they rolled off the ring or were cleared on Play.
+    pub fn oldest_seq(&self) -> u64 {
+        self.events.first().map_or(self.next_seq, |e| e.seq)
+    }
+
+    /// Drop the whole log (e.g. on entering Play for a clean record). `seq` keeps
+    /// counting, so a reader's cursor never matches an event of the new run twice.
     pub fn clear(&mut self) {
         self.events.clear();
     }
@@ -137,12 +174,54 @@ impl AudioEventLog {
     }
 }
 
+/// The maestro's reads of its event log.
+impl AudioMaestro {
+    /// The agent-facing event log (play / stop / one-shot), oldest first.
+    pub fn events(&self) -> &[AudioEvent] {
+        self.log.events()
+    }
+
+    /// The held events logged after `after_seq`, and the oldest `seq` still held
+    /// (see [`AudioEventLog::after`] and [`AudioEventLog::oldest_seq`]).
+    pub fn events_after(&self, after_seq: u64) -> (&[AudioEvent], u64) {
+        (self.log.after(after_seq), self.log.oldest_seq())
+    }
+
+    /// Clear the event log (e.g. on entering Play for a clean record).
+    pub fn clear_log(&mut self) {
+        self.log.clear();
+    }
+}
+
+/// `[x, y, z]` as a keyed `{ x, y, z }` map.
+mod xyz {
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    #[derive(Serialize, Deserialize)]
+    struct Xyz {
+        x: f32,
+        y: f32,
+        z: f32,
+    }
+
+    pub fn serialize<S: Serializer>(p: &[f32; 3], s: S) -> Result<S::Ok, S::Error> {
+        let [x, y, z] = *p;
+        Xyz { x, y, z }.serialize(s)
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<[f32; 3], D::Error> {
+        let Xyz { x, y, z } = Xyz::deserialize(d)?;
+        Ok([x, y, z])
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     fn ev(tick: u64) -> AudioEvent {
         AudioEvent {
+            seq: 0,
             kind: AudioEventKind::Play,
             clip: "a.ogg".to_string(),
             entity: 1,
@@ -179,5 +258,26 @@ mod tests {
         assert!(!log.is_empty());
         log.clear();
         assert!(log.is_empty());
+    }
+
+    #[test]
+    fn seq_counts_from_one_and_survives_a_clear() {
+        let mut log = AudioEventLog::new(8);
+        log.push(ev(1));
+        log.push(ev(1));
+        assert_eq!(log.after(0).len(), 2);
+        assert_eq!(log.after(1)[0].seq, 2);
+        log.clear();
+        assert_eq!(log.oldest_seq(), 3, "an empty log names the next seq");
+        log.push(ev(0));
+        assert_eq!(log.after(2)[0].seq, 3, "a new run keeps counting");
+    }
+
+    #[test]
+    fn oldest_seq_moves_past_what_rolled_off() {
+        let mut log = AudioEventLog::new(2);
+        (0..5).for_each(|t| log.push(ev(t)));
+        assert_eq!(log.oldest_seq(), 4);
+        assert_eq!(log.after(0).len(), 2, "only what is held comes back");
     }
 }

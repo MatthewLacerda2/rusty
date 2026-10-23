@@ -73,8 +73,9 @@ pub struct AudioMaestro {
     pub(super) occlusion: Occlusion,
     /// The listener's reverb, as the zones around it resolve (#469).
     pub(super) reverb: ReverbState,
-    /// The agent-facing log of play/stop/one-shot actions.
-    log: AudioEventLog,
+    /// The agent-facing log of play/stop/one-shot actions; read through the
+    /// accessors in `introspection`.
+    pub(super) log: AudioEventLog,
     /// Monotone id source for backend voices (deterministic — never a clock/RNG).
     next_voice: u64,
 }
@@ -194,6 +195,7 @@ impl AudioMaestro {
             );
         }
         self.log.push(AudioEvent {
+            seq: 0,
             kind: AudioEventKind::Play,
             clip: source.clip.clone(),
             entity: id,
@@ -212,6 +214,7 @@ impl AudioMaestro {
         }
         if log_stop {
             self.log.push(AudioEvent {
+                seq: 0,
                 kind: AudioEventKind::Stop,
                 clip: String::new(),
                 entity: id,
@@ -260,6 +263,7 @@ impl AudioMaestro {
             );
         }
         self.log.push(AudioEvent {
+            seq: 0,
             kind: AudioEventKind::PlayAt,
             clip: clip.to_string(),
             entity: source_entity,
@@ -276,16 +280,6 @@ impl AudioMaestro {
         self.entity_voices.clear();
         self.oneshots.clear();
         self.backend.stop_all();
-    }
-
-    /// The agent-facing event log (play / stop / one-shot), oldest first.
-    pub fn events(&self) -> &[AudioEvent] {
-        self.log.events()
-    }
-
-    /// Clear the event log (e.g. on entering Play for a clean record).
-    pub fn clear_log(&mut self) {
-        self.log.clear();
     }
 }
 

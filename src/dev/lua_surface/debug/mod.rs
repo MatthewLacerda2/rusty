@@ -1,12 +1,15 @@
-//! src/dev/lua_surface/debug.rs — `Debug` namespace (DEV-ONLY).
+//! src/dev/lua_surface/debug/ — `Debug` namespace (DEV-ONLY).
 //!
 //! `Debug.Log/Warn/Error`, the structured scene-read `Debug.Snapshot` /
 //! `Debug.SnapshotEntity` (#180), the headless `Debug.Preview` asset shot (#353) and its
-//! named-material twin `Debug.PreviewMaterial` (#404), and
-//! the frame stats `Debug.Stats` (#433) — the agent's observation channels:
-//! structured, visual, and performance. Registered
+//! named-material twin `Debug.PreviewMaterial` (#404),
+//! the frame stats `Debug.Stats` (#433), and the audio reads `Debug.AudioEvents` /
+//! `Debug.AudioVoices` (`audio.rs`, #1247) — the agent's observation channels:
+//! structured, visual, performance and aural. Registered
 //! only in dev builds — stripped from the shipped game, like Unity `Debug.*` under
 //! `[Conditional]`: it lives in `dev`, which installs it onto the surface (#737).
+
+mod audio;
 
 use mlua::{Lua, Table};
 
@@ -27,6 +30,7 @@ pub fn register<'scope>(
     register_preview(lua, &table)?;
     register_preview_material(scope, &table, ctx.scene)?;
     register_stats(scope, &table, ctx.stats)?;
+    audio::register(scope, &table, ctx)?;
 
     lua.globals().set("Debug", table).map_err(|e| e.to_string())
 }
