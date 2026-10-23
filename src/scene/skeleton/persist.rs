@@ -193,7 +193,7 @@ fn carries_components(doc: &Entity) -> bool {
 }
 
 /// Take the `parent_bone` marks out of a document about to be inserted, for
-/// [`Scene::hang_on_skeletons`] once the skeletons exist.
+/// [`Scene::hang_on_skeletons`](crate::scene::Scene::hang_on_skeletons) once the skeletons exist.
 pub fn take_bone_parents(entities: &mut [Entity]) -> Vec<Hung> {
     entities
         .iter_mut()
