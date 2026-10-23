@@ -3,6 +3,7 @@
 //! Animator ↔ physics switch, IK leaving a ragdoll alone (#461), and determinism. Saving is in-crate
 //! (`scene::skeleton::ragdoll::persist_tests`), over the glTF fixture.
 
+mod decapitated;
 mod fall;
 mod ik;
 mod mirrored;

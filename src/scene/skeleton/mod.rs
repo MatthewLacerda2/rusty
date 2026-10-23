@@ -23,6 +23,8 @@
 //!   skeleton to a re-imported rig in place, by bone name (#1252, #1265): a bone
 //!   the rig still names keeps its entity; what hung from a dropped one hangs on
 //!   by the same rule as a load.
+//! - `Scene::despawn_bone`: destroying one bone takes its subtree, and its
+//!   slots stay missing (skinned at the bind pose) until the skeleton is rebuilt.
 //! - `palette` builds each skinned mesh's posed palette from the bones.
 //! - `hitbox` fits per-bone hitbox colliders and names the bone a hit struck (#464).
 //! - `ragdoll` turns those hitboxes into jointed bodies and switches them between
@@ -72,12 +74,33 @@ impl Scene {
         self.world
             .ids_with_mesh()
             .into_iter()
-            .filter_map(|id| self.world.mesh(id).map(|m| (id, m.skeleton.bones.clone())))
-            .flat_map(|(owner, bones)| {
-                let under_owner = move |&b: &u32| self.world.ancestors(b).any(|a| a == owner);
-                bones.into_iter().filter(under_owner)
-            })
+            .flat_map(|owner| self.live_bones(owner))
             .collect()
+    }
+
+    /// `owner`'s bones that are still its bones, with their slots: present (not
+    /// missing) and under `owner` ([`Scene::is_under`]). The one walk every reader
+    /// that treats a slot as a bone of the skeleton goes through.
+    pub(super) fn live_slots(&self, owner: u32) -> Vec<(usize, u32)> {
+        let Some(mesh) = self.world.mesh(owner) else {
+            return Vec::new();
+        };
+        let slots = mesh.skeleton.bones.iter().enumerate();
+        let present = slots.filter_map(|(s, b)| Some((s, (*b)?)));
+        present.filter(|&(_, b)| self.is_under(b, owner)).collect()
+    }
+
+    /// [`Scene::live_slots`]' bones alone.
+    fn live_bones(&self, owner: u32) -> impl Iterator<Item = u32> {
+        self.live_slots(owner).into_iter().map(|(_, b)| b)
+    }
+
+    /// Whether `bone`, listed by `owner`'s skeleton, is still one of its bones:
+    /// live and under `owner`. A bone a script moved out from under it (under a
+    /// prop, say) is an ordinary entity to the scene (destroy, save, re-import),
+    /// though its slot still skins by it; a destroyed one is a missing slot.
+    pub(super) fn is_under(&self, bone: u32, owner: u32) -> bool {
+        self.world.ancestors(bone).any(|a| a == owner)
     }
 
     /// Whether `id` is a bone: listed by the skeleton of a skinned entity above it.
@@ -92,33 +115,65 @@ impl Scene {
         self.world.ancestors(id).find(|&c| {
             self.world
                 .mesh(c)
-                .is_some_and(|m| m.skeleton.bones.contains(&id))
+                .is_some_and(|m| m.skeleton.bones.contains(&Some(id)))
         })
     }
 
     /// Despawn `owner`'s bones and everything under them — a skinned entity's
     /// skeleton goes with it — in one batch, dropping whatever pointed at them as
-    /// [`Scene::destroy_entity`] does.
+    /// [`Scene::destroy_entity`] does. A bone a script moved out from under
+    /// `owner` is an ordinary entity now, and stays.
     pub(crate) fn despawn_skeleton(&mut self, owner: u32) {
-        let Some(bones) = self.world.mesh(owner).map(|m| m.skeleton.bones.clone()) else {
-            return;
-        };
-        // Walk from the top bones only: the rest are their descendants.
-        let set: BTreeSet<u32> = bones.into_iter().collect();
-        let doomed: BTreeSet<u32> = set
-            .iter()
-            .filter(|&&b| self.world.contains(b))
-            .filter(|&&b| !self.world.parent_id(b).is_some_and(|p| set.contains(&p)))
-            .flat_map(|&b| self.world.self_and_descendants(b))
-            .collect();
+        let bones: BTreeSet<u32> = self.live_bones(owner).collect();
+        if bones.is_empty() {
+            return; // a plain entity: no despawn pass to pay for
+        }
+        let doomed = self.subtrees(bones);
         self.despawn_batch(&doomed);
     }
 
-    /// The bone of `owner`'s skeleton named `name` (the glTF joint name).
+    /// `bones` and everything under them, walked from the top ones only: the rest
+    /// are their descendants.
+    pub(super) fn subtrees(&self, bones: BTreeSet<u32>) -> BTreeSet<u32> {
+        bones
+            .iter()
+            .filter(|&&b| self.world.contains(b))
+            .filter(|&&b| !self.world.parent_id(b).is_some_and(|p| bones.contains(&p)))
+            .flat_map(|&b| self.world.self_and_descendants(b))
+            .collect()
+    }
+
+    /// Despawn bone `id` with everything under it, its descendant bones and what
+    /// hangs from them, in one batch: Unity destroys a GameObject's children with
+    /// it, and no bone of the rig is left a root posed as if it were a child
+    /// (#1273). Their slots in the owner's skeleton become `None`, **missing**
+    /// (the despawn's reference-clearing pass, `MeshComponent`'s
+    /// `EntityRefs::forget`): they ride with their nearest surviving parent bone
+    /// (`palette`) until the skeleton is rebuilt (a load, a prefab propagation, a
+    /// re-import).
+    pub(crate) fn despawn_bone(&mut self, id: u32) {
+        let doomed: BTreeSet<u32> = self.world.self_and_descendants(id).collect();
+        self.despawn_batch(&doomed);
+    }
+
+    /// The bone of `owner`'s skeleton named `name` (the glTF joint name), present
+    /// in its slots, as Unity's `SkinnedMeshRenderer.bones` keeps a bone Transform
+    /// a script moved elsewhere: `Animator.GetBone` reads it.
     pub fn find_bone(&self, owner: u32, name: &str) -> Option<u32> {
         let bones = self.world.mesh(owner)?.skeleton.bones.clone();
         bones
             .into_iter()
+            .flatten()
+            .find(|&b| self.world.name(b).is_some_and(|n| *n == name))
+    }
+
+    /// [`Scene::find_bone`] among the bones still under `owner` only
+    /// ([`Scene::live_slots`]): where a stamp hangs an attachment or re-binds a
+    /// reference by name, never onto a bone a script moved away.
+    pub(super) fn live_bone(&self, owner: u32, name: &str) -> Option<u32> {
+        let slots = self.live_slots(owner).into_iter();
+        slots
+            .map(|(_, b)| b)
             .find(|&b| self.world.name(b).is_some_and(|n| *n == name))
     }
 }
@@ -126,9 +181,19 @@ impl Scene {
 #[cfg(test)]
 mod bone_refs_tests;
 #[cfg(test)]
+mod connected_bone_tests;
+#[cfg(test)]
 mod despawn_refs_tests;
 #[cfg(test)]
+mod destroy_bone_tests;
+#[cfg(test)]
+mod drop_warn_tests;
+#[cfg(test)]
 mod fixture;
+#[cfg(test)]
+mod missing_slot_tests;
+#[cfg(test)]
+mod moved_bone_tests;
 #[cfg(test)]
 mod persist_tests;
 #[cfg(test)]

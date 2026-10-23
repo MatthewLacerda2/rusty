@@ -21,7 +21,7 @@ fn hero(scene: &mut Scene, tag: &str) -> (u32, String) {
 }
 
 fn bones(scene: &Scene, owner: u32) -> Vec<u32> {
-    scene.world.mesh(owner).unwrap().skeleton.bones.clone()
+    scene.world.mesh(owner).unwrap().skeleton.ids()
 }
 
 #[test]

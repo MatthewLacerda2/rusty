@@ -38,7 +38,8 @@ use motion::MotionContext;
 /// The local transform `anim` gives each of `mesh`'s bones this tick, as
 /// `(bone entity, transform)` writes. A joint no layer's playing motion keys (or
 /// whose layers' masks leave it out) is not written, so a script or an override
-/// posing it keeps it (Unity leaves unanimated properties alone). Empty without a
+/// posing it keeps it (Unity leaves unanimated properties alone), and a missing
+/// (destroyed) bone has nothing to write to. Empty without a
 /// bound skeleton: a stopped animator leaves the bones where they are. `graph` is
 /// the animator's graph asset, when it has one — blend-tree nodes and layers
 /// resolve against it.
@@ -56,7 +57,7 @@ pub fn bone_writes(
     }
     pose.into_iter()
         .enumerate()
-        .filter_map(|(slot, local)| Some((bones[slot], bone_local(skin, slot, local?))))
+        .filter_map(|(slot, local)| Some((bones[slot]?, bone_local(skin, slot, local?))))
         .collect()
 }
 

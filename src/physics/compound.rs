@@ -38,11 +38,7 @@ pub(super) use crate::components::Pose as WorldPose;
 /// `id` (its own body). A CharacterController is a body of its own (#451), so
 /// hitboxes parented under a character ride its body.
 pub(super) fn body_owner(scene: &Scene, id: u32) -> u32 {
-    scene
-        .world
-        .self_and_ancestors(id)
-        .find(|&c| scene.world.has_rigidbody(c) || scene.world.has_character_controller(c))
-        .unwrap_or(id)
+    scene.world.body_carrier(id).unwrap_or(id)
 }
 
 /// Group every active collider — and every CharacterController's capsule — under

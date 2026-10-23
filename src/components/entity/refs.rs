@@ -19,8 +19,11 @@
 //! - `/prefab_link/overrides/<override path>`: an override leaf whose path is one of
 //!   the above holds an instance id too.
 //!
-//! Not walked: `MeshComponent`'s `skeleton.bones` (runtime-only, re-bound by name,
-//! and gone with its skinned entity), and the runtime-only `OffMeshLinkData::owner`
+//! Not walked: `MeshComponent`'s `skeleton.bones`, one `Option` per joint slot
+//! (runtime-only, never saved, re-bound by name on load). They join the clearing
+//! pass only: `MeshComponent` overrides [`EntityRefs::forget`] and
+//! [`EntityRefs::names_any`], so a despawn or a load that leaves a bone behind sets
+//! its slot to `None`, missing (#1273). Nor the runtime-only `OffMeshLinkData::owner`
 //! and `SubEmitEvent::target`, never saved and read through `World::contains`.
 //! A new component field that holds an entity id joins its component's
 //! `EntityRefs` impl; a new component holding one also joins the list.

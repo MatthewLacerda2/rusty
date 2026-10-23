@@ -67,7 +67,7 @@ impl Scene {
             None => return Vec::new(),
         };
         for (name, transform) in overrides {
-            match self.find_bone(owner, &name) {
+            match self.live_bone(owner, &name) {
                 Some(bone) => {
                     if let Some(mut t) = self.world.transform_mut(bone) {
                         *t = transform;
@@ -87,10 +87,11 @@ impl Scene {
     }
 
     /// Put a saved [`BoneBody`] back on `owner`'s bone `name`, its joint's
-    /// connected bone of the same skeleton resolved by name. One of another
-    /// skeleton is returned, to bind once that skeleton is built.
+    /// connected bone of the same skeleton resolved by its chain, as a live
+    /// re-import resolves it (#1277). One of another skeleton is returned, to bind
+    /// once that skeleton is built.
     fn restore_bone_body(&mut self, owner: u32, name: &str, body: BoneBody) -> Vec<BoneRef> {
-        let Some(bone) = self.find_bone(owner, name) else {
+        let Some(bone) = self.live_bone(owner, name) else {
             log::warn!(
                 "[Asset] entity {owner}: the skeleton has no bone '{name}' any more; \
                  its saved Rigidbody / Joint were dropped."
@@ -112,48 +113,90 @@ impl Scene {
             })
             .collect();
         let mut joint = body.joint;
-        if let (Some(j), Some(other)) = (joint.as_mut(), body.connected_bone) {
-            j.connected_body = self.find_bone(owner, &other);
-            if j.connected_body.is_none() {
-                log::warn!(
-                    "[Asset] entity {owner}: bone '{name}' was jointed to bone '{other}', \
-                     which the skeleton no longer has; the joint now holds it to the world."
-                );
-            }
+        let mut landed = None;
+        if let Some(j) = joint.as_mut().filter(|_| !body.connected_bone.is_empty()) {
+            let (to, moved) = self.resolve_chain(owner, &body.connected_bone);
+            j.connected_body = Some(to);
+            landed = moved.map(|what| (to, what));
         }
         self.world.set_rigidbody(bone, body.rigidbody);
         self.world.set_joint(bone, joint);
+        if let Some((to, what)) = landed {
+            let lost = body.connected_bone.first().map_or("", String::as_str);
+            log::warn!(
+                "[Asset] entity {owner}: bone '{name}''s joint was to bone '{lost}', which \
+                 the skeleton no longer has; it now joins {what}, {}.",
+                self.joint_effect(bone, to)
+            );
+        }
         refs
     }
 
-    /// Whether `bones` is a complete binding of `skin` to live entities.
-    fn binding_is_live(&self, skin: &SkinData, bones: &[u32]) -> bool {
-        bones.len() == skin.local_bind.len() && bones.iter().all(|&b| self.world.contains(b))
+    /// What a joint on `bone` connected to `to` does, by the body that carries
+    /// `to` (`World::body_carrier`, as the physics plan reads it): a joint with
+    /// no second body, or with the bone's own, is inert.
+    fn joint_effect(&self, bone: u32, to: u32) -> String {
+        let own = self.world.body_carrier(bone);
+        match self.world.body_carrier(to) {
+            Some(carrier) if Some(carrier) != own => {
+                format!("constraining it to entity {carrier}'s body")
+            }
+            _ => "so the joint is inert".to_string(),
+        }
+    }
+
+    /// Whether `bones` is a complete binding of `skin`: one slot per joint, each
+    /// a live entity or missing (a destroyed bone stays missing, #1273). A bone a
+    /// script re-parented elsewhere is still live and stays bound: the palette
+    /// skins it by its world matrix, as Unity does.
+    fn binding_is_live(&self, skin: &SkinData, bones: &[Option<u32>]) -> bool {
+        let live = |b: &u32| self.world.contains(*b);
+        bones.len() == skin.local_bind.len() && bones.iter().flatten().all(live)
     }
 
     /// Walk the joint slots in order (parents first), finding each bone by name
     /// under its parent (never one of `parked`) or spawning it at rest. Returns the
     /// slot → entity binding.
-    fn bind_bones(&mut self, owner: u32, skin: &SkinData, parked: &BTreeSet<u32>) -> Vec<u32> {
-        let mut bones: Vec<u32> = Vec::with_capacity(skin.local_bind.len());
+    fn bind_bones(
+        &mut self,
+        owner: u32,
+        skin: &SkinData,
+        parked: &BTreeSet<u32>,
+    ) -> Vec<Option<u32>> {
         let mut taken: BTreeSet<u32> = BTreeSet::new();
+        self.walk_slots(owner, skin, |scene, slot, parent| {
+            let name = skin.name(slot);
+            let existing = scene.world.children(parent).into_iter().find(|&c| {
+                !taken.contains(&c)
+                    && !parked.contains(&c)
+                    && scene.world.name(c).is_some_and(|n| *n == name)
+            });
+            let bone =
+                existing.unwrap_or_else(|| scene.spawn_bone(parent, name, rest_local(skin, slot)));
+            taken.insert(bone);
+            bone
+        })
+    }
+
+    /// Bind `skin`'s joint slots in order, parents first, each to the bone `pick`
+    /// gives it under its parent's bone (`owner` for a skeleton root, or for a
+    /// parent link that does not point to an earlier slot). Returns the slot →
+    /// entity binding: the one walk a bind and a re-import share.
+    pub(super) fn walk_slots(
+        &mut self,
+        owner: u32,
+        skin: &SkinData,
+        mut pick: impl FnMut(&mut Scene, usize, u32) -> u32,
+    ) -> Vec<Option<u32>> {
+        let mut bones: Vec<u32> = Vec::with_capacity(skin.local_bind.len());
         for slot in 0..skin.local_bind.len() {
             let parent = match skin.parents.get(slot).copied().flatten() {
                 Some(p) if p < slot => bones[p],
                 _ => owner,
             };
-            let name = skin.name(slot);
-            let existing = self.world.children(parent).into_iter().find(|&c| {
-                !taken.contains(&c)
-                    && !parked.contains(&c)
-                    && self.world.name(c).is_some_and(|n| *n == name)
-            });
-            let bone =
-                existing.unwrap_or_else(|| self.spawn_bone(parent, name, rest_local(skin, slot)));
-            taken.insert(bone);
-            bones.push(bone);
+            bones.push(pick(self, slot, parent));
         }
-        bones
+        bones.into_iter().map(Some).collect()
     }
 
     pub(super) fn spawn_bone(

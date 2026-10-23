@@ -16,7 +16,7 @@ fn names(scene: &Scene, ids: &[u32]) -> Vec<String> {
 fn instantiating_a_skinned_asset_spawns_its_skeleton_as_child_entities() {
     let mut scene = Scene::new();
     let hero = hero(&mut scene, "spawn");
-    let bones = scene.world.mesh(hero).unwrap().skeleton.bones.clone();
+    let bones = scene.world.mesh(hero).unwrap().skeleton.ids();
     assert_eq!(names(&scene, &bones), ["Joint0", "Joint1"]);
     // The joint hierarchy is the entity hierarchy, rooted under the skinned entity.
     assert_eq!(scene.world.parent_id(bones[0]), Some(hero));
@@ -62,7 +62,7 @@ fn sync_is_idempotent_and_rebinds_existing_bones_by_name() {
     let mut scene = Scene::new();
     let rig = armature_owner(&mut scene);
     scene.sync_skeleton(rig);
-    let bones = scene.world.mesh(rig).unwrap().skeleton.bones.clone();
+    let bones = scene.world.mesh(rig).unwrap().skeleton.ids();
     let count = scene.entity_count();
     scene.sync_skeletons();
     assert_eq!(
@@ -74,7 +74,7 @@ fn sync_is_idempotent_and_rebinds_existing_bones_by_name() {
     scene.world.mesh_mut(rig).unwrap().skeleton.bones.clear();
     scene.sync_skeletons();
     assert_eq!(scene.entity_count(), count);
-    assert_eq!(scene.world.mesh(rig).unwrap().skeleton.bones, bones);
+    assert_eq!(scene.world.mesh(rig).unwrap().skeleton.ids(), bones);
 }
 
 #[test]

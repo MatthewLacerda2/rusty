@@ -35,7 +35,7 @@ use preset::{preset_for, Bend, JointPreset};
 pub const RAGDOLL_LAYER: &str = "Ragdoll";
 
 /// A skeleton's bones, their parent slots and their names, in joint order.
-type Skeleton = (Vec<u32>, Vec<Option<usize>>, Vec<String>);
+type Skeleton = (Vec<Option<u32>>, Vec<Option<usize>>, Vec<String>);
 
 /// What [`Scene::build_ragdoll`] builds.
 #[derive(Clone, Debug, PartialEq)]
@@ -61,18 +61,21 @@ impl Scene {
     ) -> Result<Vec<(String, u32)>, String> {
         self.sync_skeleton(owner);
         let (bones, parents, names) = self.skeleton_of(owner)?;
-        if bones.iter().all(|&b| self.hitbox_of(b).is_none()) {
+        if bones.iter().flatten().all(|&b| self.hitbox_of(b).is_none()) {
             self.generate_hitboxes(owner, &HitboxOptions::default())?;
         }
         self.ragdoll_layer()?;
         let volumes: Vec<Option<f32>> = bones
             .iter()
-            .map(|&b| self.hitbox_of(b).map(|h| self.collider_volume(h)))
+            .map(|b| self.hitbox_of((*b)?).map(|h| self.collider_volume(h)))
             .collect();
         let total: f32 = volumes.iter().flatten().sum::<f32>().max(f32::EPSILON);
         let owner_axes = self.front_and_side(owner);
         let mut made = Vec::new();
         for (slot, &bone) in bones.iter().enumerate() {
+            let Some(bone) = bone else {
+                continue; // missing (#1273); its volume is `None`, so it is skipped over
+            };
             let Some(volume) = volumes[slot] else {
                 self.world.set_rigidbody(bone, None);
                 self.world.set_joint(bone, None);
@@ -95,7 +98,7 @@ impl Scene {
             let joint = up.map(|p| {
                 let dir = self.bone_direction(&bones, &parents, slot);
                 let mut j = joint_from(preset_for(&names[slot]), dir, owner_axes);
-                j.connected_body = Some(bones[p]);
+                j.connected_body = bones[p];
                 // The world axes, in the bone's local space: the exact inverse of how
                 // physics builds a joint's world frame, so it comes back on them (#1125).
                 (j.axis, j.swing_axis) =
@@ -115,7 +118,7 @@ impl Scene {
         let mut out = Vec::new();
         for e in self.world.self_and_descendants(id) {
             if let Some(mesh) = self.world.mesh(e) {
-                out.extend(mesh.skeleton.bones.iter().copied());
+                out.extend(mesh.skeleton.bones.iter().flatten().copied());
             }
         }
         out.retain(|&b| self.world.has_rigidbody(b));
@@ -141,17 +144,24 @@ impl Scene {
     }
 
     /// The world direction bone `slot` points: toward the mean of its child
-    /// bones, or on from its parent when it has none.
-    fn bone_direction(&self, bones: &[u32], parents: &[Option<usize>], slot: usize) -> Vec3 {
-        let at = |s: usize| self.world.world_position(bones[s]);
+    /// bones, or on from its parent when it has none. A missing (destroyed) child
+    /// is no direction to point in, and is skipped (#1273).
+    fn bone_direction(
+        &self,
+        bones: &[Option<u32>],
+        parents: &[Option<usize>],
+        slot: usize,
+    ) -> Vec3 {
+        let at = |s: usize| Some(self.world.world_position(bones[s]?));
         let children: Vec<Vec3> = (0..bones.len())
             .filter(|&c| parents[c] == Some(slot))
-            .map(at)
+            .filter_map(at)
             .collect();
-        let dir = match (children.is_empty(), parents[slot]) {
-            (false, _) => children.iter().sum::<Vec3>() / children.len() as f32 - at(slot),
-            (true, Some(p)) => at(slot) - at(p),
-            (true, None) => Vec3::Y,
+        let dir = match (children.is_empty(), parents[slot].and_then(at), at(slot)) {
+            (_, _, None) => Vec3::Y,
+            (false, _, Some(here)) => children.iter().sum::<Vec3>() / children.len() as f32 - here,
+            (true, Some(up), Some(here)) => here - up,
+            (true, None, Some(_)) => Vec3::Y,
         };
         dir.try_normalize().unwrap_or(Vec3::Y)
     }

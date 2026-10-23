@@ -46,12 +46,13 @@ pub fn strip_bones(entities: &mut Vec<Entity>) {
         let Some(skin) = &mesh.skin else {
             continue;
         };
+        let owner = entities[i].id;
         let mut saved = SavedBones::default();
-        let bones = &mesh.skeleton.bones;
-        for (slot, bone) in bones.iter().enumerate() {
-            if let Some(&b) = index.get(bone) {
-                saved.record(&entities[b], skin, bones, slot);
-            }
+        for (slot, bone) in mesh.skeleton.bones.iter().enumerate() {
+            let Some(bone) = bone.filter(|b| bone_of.contains_key(b)) else {
+                continue;
+            };
+            saved.record(&entities[index[&bone]], skin, (owner, &bone_of), slot);
         }
         if let Some(mesh) = &mut entities[i].mesh {
             mesh.skeleton.overrides = saved.overrides;
@@ -66,7 +67,9 @@ pub fn strip_bones(entities: &mut Vec<Entity>) {
 }
 
 /// Every bone document in `entities` (`index` finds them by id), with its skinned
-/// entity and bone chain.
+/// entity and bone chain. A slot's entity counts only while it is still under its
+/// skinned entity, as `Scene::is_under` holds live: one a script moved under a
+/// prop is saved as the ordinary entity it now is.
 fn index_bones(entities: &[Entity], index: &BTreeMap<u32, usize>) -> BoneIndex {
     let mut bone_of = BoneIndex::new();
     for entity in entities {
@@ -77,12 +80,28 @@ fn index_bones(entities: &[Entity], index: &BTreeMap<u32, usize>) -> BoneIndex {
             continue;
         };
         for (slot, bone) in mesh.skeleton.bones.iter().enumerate() {
-            if index.contains_key(bone) {
-                bone_of.insert(*bone, (entity.id, bone_chain(skin, slot)));
+            match bone {
+                Some(b) if doc_is_under(entities, index, *b, entity.id) => {
+                    bone_of.insert(*b, (entity.id, bone_chain(skin, slot)));
+                }
+                _ => {}
             }
         }
     }
     bone_of
+}
+
+/// Whether document `id` sits under document `owner`, walking `parent_id` up.
+fn doc_is_under(entities: &[Entity], index: &BTreeMap<u32, usize>, id: u32, owner: u32) -> bool {
+    let mut at = index.get(&id).and_then(|&i| entities[i].parent_id);
+    for _ in 0..entities.len() {
+        match at {
+            Some(p) if p == owner => return true,
+            Some(p) => at = index.get(&p).and_then(|&i| entities[i].parent_id),
+            None => return false,
+        }
+    }
+    false
 }
 
 /// What one skeleton saves of its bones, by bone name.
@@ -94,8 +113,17 @@ struct SavedBones {
 
 impl SavedBones {
     /// Record bone `slot`'s document: its transform when it is off the rest
-    /// pose, its physics, and a warning for any other component.
-    fn record(&mut self, doc: &Entity, skin: &SkinData, bones: &[u32], slot: usize) {
+    /// pose, its physics, and a warning for any other component. A joint is saved
+    /// by bone chain only to a bone `bone_of` lists for `owner`, still under it:
+    /// one to a bone a script moved away keeps that entity's id, as a live
+    /// re-import keeps the joint on it (#1277).
+    fn record(
+        &mut self,
+        doc: &Entity,
+        skin: &SkinData,
+        (owner, bone_of): (u32, &BoneIndex),
+        slot: usize,
+    ) {
         let name = skin.name(slot);
         if !doc
             .transform
@@ -103,8 +131,11 @@ impl SavedBones {
         {
             self.overrides.insert(name.clone(), doc.transform.clone());
         }
-        let bone_name = |id: u32| Some(skin.name(bones.iter().position(|&b| b == id)?));
-        if let Some(body) = bone_body(doc, bone_name) {
+        let chain_of = |id: u32| {
+            let (of, chain) = bone_of.get(&id)?;
+            (*of == owner).then(|| chain.clone())
+        };
+        if let Some(body) = bone_body(doc, chain_of) {
             self.bodies.insert(name.clone(), body);
         }
         if carries_components(doc) {
@@ -157,19 +188,22 @@ fn reparent_attachments(
 }
 
 /// A bone's `Rigidbody` and `Joint`, with a joint to another bone of the same
-/// skeleton (`bone_name` resolves it) saved by that bone's name, and one to another
+/// skeleton (`chain_of` resolves it) saved by that bone's chain, and one to another
 /// skeleton's bone by its `bone_refs`. A joint to any other entity keeps its id.
 /// `None` for a bone with neither.
-fn bone_body(doc: &Entity, bone_name: impl Fn(u32) -> Option<String>) -> Option<BoneBody> {
+fn bone_body(doc: &Entity, chain_of: impl Fn(u32) -> Option<Vec<String>>) -> Option<BoneBody> {
     if doc.rigidbody.is_none() && doc.joint.is_none() {
         return None;
     }
     let mut joint = doc.joint.clone();
-    let connected_bone = joint.as_mut().and_then(|j| {
-        let name = bone_name(j.connected_body?)?;
-        j.connected_body = None;
-        Some(name)
-    });
+    let connected_bone = joint
+        .as_mut()
+        .and_then(|j| {
+            let chain = chain_of(j.connected_body?)?;
+            j.connected_body = None;
+            Some(chain)
+        })
+        .unwrap_or_default();
     let bone_refs = doc
         .bone_refs
         .iter()

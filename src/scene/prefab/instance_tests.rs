@@ -28,7 +28,7 @@ fn character() -> (Scene, [u32; 5]) {
     scene.set_parent(hand, Some(rig)).unwrap();
     scene.set_parent(gun, Some(hand)).unwrap();
     scene.set_parent(other, Some(hand)).unwrap();
-    scene.world.mesh_mut(rig).unwrap().skeleton.bones = vec![hand];
+    scene.world.mesh_mut(rig).unwrap().skeleton.bones = vec![Some(hand)];
     for (local, id) in [root, rig, gun].into_iter().enumerate() {
         link(&mut scene, id, "hero.prefab", local as u32);
     }

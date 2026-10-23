@@ -22,9 +22,12 @@ use crate::components::{
 pub struct BoneBinding {
     /// The bone entity of each joint slot, in the skin's joint order — what the
     /// palette build reads. Runtime only: bones get fresh ids every load, and an
-    /// empty or stale list is re-bound by name (`Scene::sync_skeletons`).
+    /// empty or stale list is re-bound by name (`Scene::sync_skeletons`). A
+    /// destroyed bone's slot is `None`, **missing** (#1273): it skins at its bind
+    /// pose until the skeleton is rebuilt, and never holds a dead id a later
+    /// entity could be given.
     #[serde(skip)]
-    pub bones: Vec<u32>,
+    pub bones: Vec<Option<u32>>,
     /// Bone name → the local transform a designer gave it, applied when the
     /// skeleton is (re)built. Filled from the live bones on save and consumed on
     /// load, so the live value is empty and the bones themselves are authoritative.
@@ -41,19 +44,30 @@ impl BoneBinding {
     pub fn is_unmodified(&self) -> bool {
         self.overrides.is_empty() && self.bodies.is_empty()
     }
+
+    /// Every slot's bone, for a test of a whole skeleton: panics on a missing one.
+    #[cfg(test)]
+    pub fn ids(&self) -> Vec<u32> {
+        self.bones
+            .iter()
+            .map(|b| b.expect("no slot is missing"))
+            .collect()
+    }
 }
 
 /// A bone's saved `Rigidbody` and `Joint`. Bones get fresh ids on every load, so
 /// a joint to a bone of the same skeleton is saved as `connected_bone`, that bone's
-/// name, with its id field cleared; one to another skeleton's bone by `bone_refs`.
+/// chain (its name, then its ancestor bones', nearest first, like every bone
+/// reference, #1277), with its id field cleared; one to another skeleton's bone by
+/// `bone_refs`.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct BoneBody {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rigidbody: Option<RigidBodyComponent>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub joint: Option<JointComponent>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub connected_bone: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub connected_bone: Vec<String>,
     /// A joint to a bone of another skeleton (#1264): the joint names that skinned
     /// entity, and this the bone, as `Entity::bone_refs` does (keyed `/joint/…`).
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
@@ -95,12 +109,35 @@ impl EntityRefs for MeshComponent {
         }
     }
 
+    /// Also marks a bone slot naming a destroyed entity missing (#1273): the slots
+    /// join this one clearing pass (a despawn, a load leaving the entity behind),
+    /// so no path leaves a dead id a later entity could be given. They stay out of
+    /// [`EntityRefs::visit_refs`], the saved-id walk: they are never saved.
+    fn forget(&mut self, dead: &dyn Fn(u32) -> bool) {
+        self.visit_refs(&mut |_, r| {
+            if r.is_some_and(dead) {
+                *r = None;
+            }
+        });
+        for slot in &mut self.skeleton.bones {
+            if slot.is_some_and(dead) {
+                *slot = None;
+            }
+        }
+    }
+
+    fn names_any(&self, dead: &dyn Fn(u32) -> bool) -> bool {
+        let mut hit = self.skeleton.bones.iter().flatten().any(|&b| dead(b));
+        self.each_ref(&mut |_, r| hit |= dead(r));
+        hit
+    }
+
     #[cfg(test)]
     fn every_ref() -> Self {
         let body = BoneBody {
             rigidbody: None,
             joint: Some(JointComponent::default()),
-            connected_bone: None,
+            connected_bone: Vec::new(),
             bone_refs: BTreeMap::new(),
         };
         let mut mesh = Self::new("Box", Vec::new(), Vec::new());

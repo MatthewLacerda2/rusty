@@ -42,7 +42,7 @@ impl Scene {
             let found = chain
                 .iter()
                 .enumerate()
-                .find_map(|(at, bone)| Some((at, bone, self.find_bone(owner, bone)?)));
+                .find_map(|(at, bone)| Some((at, bone, self.live_bone(owner, bone)?)));
             if let Some((0, _, bone)) = found {
                 let _ = self.set_parent(child, Some(bone));
                 continue;

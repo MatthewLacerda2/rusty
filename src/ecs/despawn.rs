@@ -13,7 +13,9 @@
 //!   when its connected body is destroyed), a Selectable with no `target_graphic` tints itself, a lost
 //!   sub-emitter or LOD renderer draws nothing, a marker whose target is gone is
 //!   `target_lost` and hidden (its scripts keep running, so it can be given a target
-//!   again), and a prefab override naming it becomes `null`.
+//!   again), and a prefab override naming it becomes `null`;
+//! - a skinned mesh's bone slot naming it, which goes missing (`None`, #1273): the
+//!   slots are cleared in this pass, never saved, so they are not in the walk.
 //!
 //! The World walk below goes over the same component list the document walk does
 //! ([`with_ref_components`]), so the two cannot disagree. Scene-level references

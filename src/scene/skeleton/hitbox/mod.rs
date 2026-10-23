@@ -57,12 +57,14 @@ impl Scene {
         let layer = self.hitbox_layer(&opts.layer)?;
         let mut made = Vec::with_capacity(fits.len());
         for fit in &fits {
-            let Some(&bone) = bones.get(fit.slot) else {
+            // A destroyed bone's slot is missing (#1273): nothing to fit a hitbox to.
+            let Some(bone) = bones.get(fit.slot).copied().flatten() else {
                 continue;
             };
             made.push((names[fit.slot].clone(), self.place_hitbox(bone, fit, layer)));
         }
-        for (slot, &bone) in bones.iter().enumerate() {
+        for (slot, bone) in bones.iter().enumerate() {
+            let Some(bone) = *bone else { continue };
             if !fits.iter().any(|f| f.slot == slot) {
                 if let Some(stale) = self.hitbox_of(bone) {
                     self.destroy_entity(stale);

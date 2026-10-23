@@ -91,15 +91,10 @@ impl Scene {
 
     /// `owner`'s bones, each with its bone chain; empty without a skin.
     fn bones_with_chains(&self, owner: u32) -> Vec<(u32, Vec<String>)> {
-        let Some((skin, bones)) = self
-            .world
-            .mesh(owner)
-            .and_then(|m| Some((m.skin.clone()?, m.skeleton.bones.clone())))
-        else {
+        let Some(skin) = self.world.mesh(owner).and_then(|m| m.skin.clone()) else {
             return Vec::new();
         };
-        let live = |b: &u32| self.world.ancestors(*b).any(|a| a == owner);
-        let slots = bones.into_iter().enumerate().filter(|(_, b)| live(b));
+        let slots = self.live_slots(owner).into_iter();
         slots.map(|(s, b)| (b, bone_chain(&skin, s))).collect()
     }
 
@@ -177,21 +172,29 @@ impl Scene {
 
     /// The first bone of `chain` `owner`'s skeleton has, or `owner` itself; warns
     /// unless it is the chain's own bone.
-    fn resolve_bone(&self, holder: u32, owner: u32, chain: &[String]) -> u32 {
+    pub(super) fn resolve_bone(&self, holder: u32, owner: u32, chain: &[String]) -> u32 {
+        let (bone, landed) = self.resolve_chain(owner, chain);
+        if let Some(landed) = landed {
+            log::warn!(
+                "[Asset] entity {holder} referred to bone '{}', which the skeleton of \
+                 entity {owner} no longer has; it now refers to {landed}.",
+                chain.first().map_or("", String::as_str)
+            );
+        }
+        bone
+    }
+
+    /// [`Scene::resolve_bone`] without the warning: the bone, and what it landed
+    /// on ("bone 'spine'", "entity 4") when that is not the chain's own bone.
+    pub(super) fn resolve_chain(&self, owner: u32, chain: &[String]) -> (u32, Option<String>) {
         let found = chain
             .iter()
             .enumerate()
-            .find_map(|(at, name)| Some((at, name, self.find_bone(owner, name)?)));
-        let landed = match found {
-            Some((0, _, bone)) => return bone,
-            Some((_, name, _)) => format!("bone '{name}'"),
-            None => format!("entity {owner}"),
-        };
-        log::warn!(
-            "[Asset] entity {holder} referred to bone '{}', which the skeleton of entity \
-             {owner} no longer has; it now refers to {landed}.",
-            chain.first().map_or("", String::as_str)
-        );
-        found.map_or(owner, |(_, _, bone)| bone)
+            .find_map(|(at, name)| Some((at, name, self.live_bone(owner, name)?)));
+        match found {
+            Some((0, _, bone)) => (bone, None),
+            Some((_, name, bone)) => (bone, Some(format!("bone '{name}'"))),
+            None => (owner, Some(format!("entity {owner}"))),
+        }
     }
 }
