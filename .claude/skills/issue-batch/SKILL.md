@@ -88,7 +88,22 @@ Model: <Opus or Sonnet, by *Which model*>.
 ```
 
 Add to it when it applies: a shared file a merge left near the 300-line cap, the
-`Cargo.lock` owner. The routine prompt:
+`Cargo.lock` owner.
+
+**A `Decisions` line states facts, so check each one first.** In the 2026-10-22
+batch, four briefs carried a premise nobody had checked, and each cost a review
+round:
+- "Play never imports" assumed Unity's import-on-add, which rusty lacks;
+- "the player ships its caches" assumed an export step that didn't exist;
+- "leave transparent runs out" forgot the renderer still samples their lightmap;
+- "a path can't hold `::`" is false on Linux and macOS.
+
+So, before writing a brief:
+- before citing Unity, check that rusty has the machinery that makes Unity's way safe;
+- when a decision removes data or a capability, grep its consumers;
+- verify any claim about a platform or a tool in one command.
+
+The routine prompt:
 
 ```text
 Read `.claude/skills/issue-batch/cloud-brief.md` and follow it.
@@ -104,7 +119,10 @@ sessions woke on the draft flip, read only the PR, found no instruction and
 stood down, by design (`cloud-brief.md`: once ready, the branch is the
 queue's). That looked like "half never wake", and it is also why they never
 race the fresh session. So never put the re-brief on the PR: every session
-subscribed to it would act on it, and a PR re-briefed twice has two.
+subscribed to it would act on it, and a PR re-briefed twice has two. **Take the
+`queue` label off when you re-brief**, and put it back only after reading the
+fix. A re-briefed PR that keeps the label is merged as soon as its coder readies
+it, unread (#1255, 2026-10-23).
 
 **The pull request is the report.** A cloud coder cannot message back; it opens a
 draft, pushes often, readies when its gates are green and ends. Watch the PR, not

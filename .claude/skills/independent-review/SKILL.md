@@ -55,7 +55,10 @@ And on demand: when the user asks for a PR to be reviewed, open or merged
   context, and with it the bias this skill exists to avoid. **`isolation:
   "worktree"`**: `code-review` checks the PR out to read it, and in the shared
   main checkout that moved other agents' branch and left `prNNNN` branches
-  behind (three times in the 2026-10-20 batch). No model override: it runs on
+  behind (three times in the 2026-10-20 batch). Remove a reviewer's worktree
+  only after its report is in, by its own path, never by a pattern: a blanket
+  `agent-*` cleanup removed a running reviewer's checkout and lost its report
+  (2026-10-23). No model override: it runs on
   the current model, Opus (read-only agents stay on Opus, `issue-batch`,
   *Which model*).
 - **Read-only, and no build.** It reads the PR, the repository and the issue,
