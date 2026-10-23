@@ -167,7 +167,6 @@ impl World {
         let core = self.component::<Core>(id)?;
         let name = (*self.name(id)?).clone();
         let transform = (*self.transform(id)?).clone();
-        let scripts = (*self.scripts(id)?).clone();
         Some(Entity {
             id: core.id,
             name,
@@ -178,7 +177,7 @@ impl World {
             mesh: self.mesh(id).map(|c| (*c).clone()),
             material: self.material(id).map(|c| (*c).clone()),
             pending_material: self.component::<MaterialAsset>(id).map(|c| (*c).clone()),
-            scripts,
+            scripts: (*self.scripts(id)?).clone(),
             animator: self.animator(id).map(|c| (*c).clone()),
             light: self.light(id).map(|c| (*c).clone()),
             collider: self.collider(id).map(|c| (*c).clone()),
@@ -211,8 +210,7 @@ impl World {
             shape: self.shape(id).map(|c| (*c).clone()),
             prefab_link: self.prefab_link(id).map(|c| (*c).clone()),
             parent_id: core.parent_id,
-            // Document-only: filled by a save, consumed by a load (`scene::skeleton`).
-            parent_bone: Vec::new(),
+            parent_bone: Vec::new(), // document-only, as `bone_refs`: a save fills them
             bone_refs: BTreeMap::new(),
             children: core.children.clone(),
         })
