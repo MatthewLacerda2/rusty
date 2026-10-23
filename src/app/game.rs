@@ -19,8 +19,7 @@ use glam::Vec3;
 use crate::core::input::{CursorState, InputState};
 use crate::navigation::NavigationGraph;
 use crate::physics::PhysicsWorld;
-use crate::scene::Camera;
-use crate::scene::{Scene, SceneSnapshot};
+use crate::scene::{Camera, Scene, SceneSnapshot};
 use crate::scripting::{ConsoleLogs, ScriptManager};
 use crate::time::Time;
 
@@ -129,17 +128,17 @@ impl GameWorld {
             .init_runtime(&self.resources.physics)
     }
 
-    /// Whether the simulation is in play mode.
+    /// Whether the host asked for Play ([`set_playing`](Self::set_playing)); the
+    /// World enters it at the next tick's transition, when the scene's single
+    /// play state flips (`Scene::is_playing`, #1302).
     pub fn is_playing(&self) -> bool {
-        self.resources.is_playing
+        self.resources.play_requested
     }
 
-    /// Enter or leave play mode (the platform layer flips this on a button / ESC).
+    /// Ask to enter or leave Play, every host's one way in (the editor transport,
+    /// the player, the harness): the next tick's transition acts on it.
     pub fn set_playing(&mut self, playing: bool) {
-        self.resources.is_playing = playing;
-        // Mirror into the script runtime's shared cell so `Debug.Snapshot` reports
-        // the live play-state (the evaluator doesn't hold `Resources`).
-        *self.resources.script_manager.play_state_cell().borrow_mut() = playing;
+        self.resources.play_requested = playing;
     }
 
     /// Advance the simulation by `dt` seconds. Returns any play-state transition so
@@ -157,7 +156,7 @@ impl GameWorld {
             time.advance(dt);
             time.delta_time
         };
-        if self.resources.is_playing {
+        if self.world.scene.borrow().is_playing() {
             // Run the schedule's per-frame stages against (&mut World, &mut
             // Resources). The schedule is moved out of `Resources` for the call (its
             // systems take `&mut Resources`) and restored after, avoiding a
@@ -196,7 +195,9 @@ impl GameWorld {
     }
 
     fn handle_transition(&mut self) -> PlayTransition {
-        let transition = if self.resources.is_playing && !self.resources.was_playing {
+        let asked = self.resources.play_requested;
+        let playing = self.world.scene.borrow().is_playing();
+        if asked && !playing {
             // Before `Start`, so a script can override the locked+hidden default.
             self.resources
                 .input
@@ -204,7 +205,7 @@ impl GameWorld {
                 .reset_cursor(CursorState::PLAY);
             self.enter_play();
             PlayTransition::Entered
-        } else if !self.resources.is_playing && self.resources.was_playing {
+        } else if !asked && playing {
             self.resources
                 .input
                 .borrow_mut()
@@ -213,9 +214,7 @@ impl GameWorld {
             PlayTransition::Exited
         } else {
             PlayTransition::None
-        };
-        self.resources.was_playing = self.resources.is_playing;
-        transition
+        }
     }
 
     fn enter_play(&mut self) {
@@ -238,6 +237,7 @@ impl GameWorld {
             self.resources.edit_snapshot = Some(SceneSnapshot::capture(&self.world.scene.borrow()));
             self.capture_play_origin();
         }
+        self.world.scene.borrow_mut().set_playing(true); // the one play state (#1302)
         self.resources
             .console
             .borrow_mut()
@@ -279,7 +279,7 @@ impl GameWorld {
         // discard play-mode mixer changes (#465) as the scene's are below.
         self.resources.audio.borrow_mut().exit_play();
         self.resources.play_hold = None; // conversion on before the restore (#1253)
-                                         // Restore the edit scene captured on Play, discarding play-mode state.
+        self.world.scene.borrow_mut().set_playing(false); // before the restore (#1302)
         if let Some(snapshot) = self.resources.edit_snapshot.take() {
             snapshot.restore(&mut self.world.scene.borrow_mut());
             self.resources

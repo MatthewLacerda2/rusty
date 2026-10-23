@@ -82,7 +82,7 @@ pub(super) fn load_scene(
 /// rebuilds the *engine's default* (its ground, lights, etc.). The new scene is
 /// unsaved, so its path is cleared until the next Save.
 pub(super) fn new_scene(editor: &mut EditorUi, scene: &mut Scene, console: &mut ConsoleLogs) {
-    *scene = Scene::new();
+    scene.clear();
     editor.current_scene_path = None;
     editor.selected_entity_id = None;
     editor.selected_asset_path = None;

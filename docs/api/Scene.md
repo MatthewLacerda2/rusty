@@ -110,7 +110,11 @@ editor's Destroy button: it actually removes the entity **and its whole subtree*
 as Unity's `Object.Destroy` does (#1283): its children and theirs, so a skinned
 entity's bones and what hangs from them, and a bone's descendant bones (see
 [`Animator`](Animator.md), *Bones are GameObjects*). In Play every script on the
-subtree gets `OnDisable` (if active) then `OnDestroy`, children before parents.
+subtree gets `OnDisable` (if active) then `OnDestroy`, each pass children before
+parents. Unity documents no order here: the one public test (Unity 2017.4) saw
+`OnDisable` children first but `OnDestroy` parents first, so rusty's `OnDestroy`
+order is its own choice, kept the same as `OnDisable`'s (#1298). An engine destroy
+in Play (a stale hitbox `Physics.GenerateHitboxes` drops) is queued the same way.
 To keep a child, unparent it first: `Scene.SetParent(child, nil)`.
 
 **Nothing keeps naming a destroyed entity** (#1264). Every reference to it is dropped, live and in the next
@@ -149,7 +153,7 @@ scene — additive loading is not supported.
   old file until the swap.
 - **Unload lifecycle.** Every script of the outgoing scene gets `OnDisable` (if
   its entity was active) then `OnDestroy`, exactly as `Scene.DestroyEntity`
-  would. Its timers and coroutines stop, its sounds stop, and UI focus, hover
+  would, in the same order (children before parents). Its timers and coroutines stop, its sounds stop, and UI focus, hover
   and press state on it is dropped. Physics and the navmesh are rebuilt from the
   new scene. The new scene's scripts `Awake` / `OnEnable` / `Start` at the head
   of the next tick, before any `Update` — like spawned entities.

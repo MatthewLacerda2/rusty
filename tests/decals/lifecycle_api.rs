@@ -80,7 +80,7 @@ fn an_owned_decal_follows_its_entity_and_goes_when_it_is_destroyed() {
         "{}",
         at(&game)
     );
-    game.scene().borrow_mut().destroy_entity(crate_id);
+    game.scene().borrow_mut().destroy(crate_id);
     game.tick(DT);
     assert!(
         game.scene().borrow().decals.is_empty(),

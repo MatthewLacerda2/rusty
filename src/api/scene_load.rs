@@ -22,7 +22,6 @@ pub fn register<'scope>(
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
     scene_path: &'scope RefCell<Option<String>>,
-    is_playing: &'scope RefCell<bool>,
 ) -> Reg {
     put(
         table,
@@ -31,7 +30,7 @@ pub fn register<'scope>(
             if !Path::new(&path).is_file() {
                 return Err(runtime(format!("Scene.Load: no scene file at '{path}'")));
             }
-            if *is_playing.borrow() {
+            if scene.borrow().is_playing() {
                 scene.borrow_mut().request_load(path);
             } else {
                 scene
@@ -55,7 +54,7 @@ pub fn register<'scope>(
         table,
         "DontDestroyOnLoad",
         scope.create_function(move |_, id: u32| {
-            if !*is_playing.borrow() {
+            if !scene.borrow().is_playing() {
                 return Err(runtime(
                     "Scene.DontDestroyOnLoad only works during play".to_string(),
                 ));

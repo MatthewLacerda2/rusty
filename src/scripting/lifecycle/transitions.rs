@@ -7,10 +7,15 @@
 //!     *inactive* set (`disabled_keys`), the mirror of `mod.rs`'s `eligible_keys`.
 //!   - `OnDestroy` (preceded by `OnDisable` for still-active instances) on the
 //!     deferred-destroy drain: `Scene.DestroyEntity` queued ids this tick, and
-//!     `apply_pending_destroys` fires teardown, children before parents, then
-//!     removes the entities with their subtrees.
+//!     `apply_pending_destroys` fires teardown, then removes the entities with
+//!     their subtrees.
 //!   - The same teardown for a whole outgoing scene on `Scene.Load` (#432):
 //!     `unload_entities` fires it for every non-surviving entity.
+//!
+//! Both tear down in one order, [`teardown_order`]: children before parents
+//! (#1298). Unity documents no order; the one public test (Uninomicon, Unity
+//! 2017.4) saw `OnDisable` children first but `OnDestroy` parents first. With no
+//! current source to settle `OnDestroy`, both passes run children first.
 //!
 //! Both reuse the shared dispatch core (`dispatch_keys`, `call_hook`,
 //! `entity_active`) so they stay loops, not copies.
@@ -20,6 +25,17 @@ use std::collections::BTreeSet;
 
 use super::super::callbacks::{ON_DESTROY, ON_DISABLE};
 use super::super::manager::{ScriptInstance, ScriptManager};
+use crate::scene::{Despawn, Scene};
+
+/// The order a teardown visits `ids` (ascending): deepest first, then ascending
+/// id, so every child comes before its parent. The one order a destroy and an
+/// unload share (#1298).
+fn teardown_order(scene: &Scene, ids: &[u32]) -> Vec<u32> {
+    let mut order = ids.to_vec();
+    // Stable, so equal depths keep `ids`' ascending order.
+    order.sort_by_cached_key(|&id| Reverse(scene.world.ancestors(id).count()));
+    order
+}
 
 impl ScriptManager {
     /// The disable mirror of `eligible_keys`: ascending keys of instances passing
@@ -67,25 +83,27 @@ impl ScriptManager {
         let (doomed, order, removed) = {
             let scene = self.scene.borrow();
             let doomed: BTreeSet<u32> = ids.iter().flat_map(|&id| scene.destroy_set(id)).collect();
-            let mut order: Vec<u32> = doomed.iter().copied().collect();
-            // Children before parents, as Unity tears a hierarchy down.
-            order.sort_by_key(|&id| Reverse(scene.world.ancestors(id).count()));
+            let order = teardown_order(&scene, &doomed.iter().copied().collect::<Vec<_>>());
             // World space: a child's sound stops where it was heard, not at its local offset.
             let at = |id: u32| (id, scene.world.world_position(id).to_array());
             let removed = order.iter().map(|&id| at(id)).collect();
             (doomed, order, removed)
         };
         self.dispatch_teardown(&order);
-        self.scene.borrow_mut().despawn_batch(&doomed);
+        self.scene
+            .borrow_mut()
+            .despawn_batch(&doomed, Despawn::TornDown);
         self.forget_entities(&doomed.into_iter().collect::<Vec<_>>());
         removed
     }
 
-    /// A scene unload (#432): the same teardown as a destroy for every entity in
-    /// `ids` (ascending), and their instances, timers and coroutines forgotten — but
-    /// no per-entity removal, because the scene swap that follows replaces the World.
+    /// A scene unload (#432): the same teardown as a destroy, in the same order,
+    /// for every entity in `ids` (ascending), and their instances, timers and
+    /// coroutines forgotten — but no per-entity removal, because the scene swap that
+    /// follows replaces the World.
     pub fn unload_entities(&mut self, ids: &[u32]) {
-        self.dispatch_teardown(ids);
+        let order = teardown_order(&self.scene.borrow(), ids);
+        self.dispatch_teardown(&order);
         self.forget_entities(ids);
     }
 

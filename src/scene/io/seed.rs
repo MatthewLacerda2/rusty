@@ -25,7 +25,7 @@ pub const DEFAULT_SCRIPTS_DEST_DIR: &str = crate::core::project::SCRIPTS_DIR;
 /// the seeded file, which may be an older default or the user's edit.
 pub fn build_default_scene(scene: &mut Scene) -> String {
     default_scene::seed_default_assets();
-    *scene = Scene::new();
+    scene.clear();
     default_scene::build(scene, default_scene::BOT_SCRIPT);
     DEFAULT_SCENE_PATH.to_string()
 }

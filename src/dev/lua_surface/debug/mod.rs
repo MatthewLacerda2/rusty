@@ -172,7 +172,6 @@ fn register_snapshot<'scope>(
     let scene = ctx.scene;
     let camera = ctx.camera;
     let time = ctx.time;
-    let is_playing = ctx.is_playing;
     let (screen, video) = (ctx.screen, ctx.video);
     let view = move || {
         screen
@@ -189,7 +188,7 @@ fn register_snapshot<'scope>(
                 &scene.borrow(),
                 &camera.borrow(),
                 time.borrow().frame_count,
-                *is_playing.borrow(),
+                scene.borrow().is_playing(),
                 &view(),
                 bones.unwrap_or(false),
             );

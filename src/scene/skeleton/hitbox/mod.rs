@@ -33,7 +33,8 @@ impl Scene {
     /// Generate (or regenerate) `owner`'s per-bone hitboxes and return them as
     /// `(bone name, hitbox entity)` pairs, ascending by joint slot. A bone that
     /// already has a `Hitbox` child gets it refitted in place; one that no longer
-    /// qualifies loses it. `Err` when `owner` has no skinned mesh, or no layer is
+    /// qualifies loses it ([`Scene::destroy`]: queued in Play, so a script under it
+    /// is torn down, #1298). `Err` when `owner` has no skinned mesh, or no layer is
     /// free for the hitbox layer.
     pub fn generate_hitboxes(
         &mut self,
@@ -67,7 +68,7 @@ impl Scene {
             let Some(bone) = *bone else { continue };
             if !fits.iter().any(|f| f.slot == slot) {
                 if let Some(stale) = self.hitbox_of(bone) {
-                    self.destroy_entity(stale);
+                    self.destroy(stale);
                 }
             }
         }
@@ -75,12 +76,13 @@ impl Scene {
     }
 
     /// The generated hitbox under `bone`: its child named [`HITBOX_NAME`] that
-    /// carries a collider.
+    /// carries a collider. One queued for destruction is already gone to every
+    /// lookup (#1298), so a ragdoll or a regeneration in the same tick skips it.
     pub fn hitbox_of(&self, bone: u32) -> Option<u32> {
         self.world
             .children(bone)
             .into_iter()
-            .find(|&c| self.is_generated_hitbox(c))
+            .find(|&c| self.is_generated_hitbox(c) && !self.pending_destroy.contains(&c))
     }
 
     /// Whether `id` is a hitbox [`Scene::generate_hitboxes`] made: named
@@ -156,6 +158,8 @@ impl Scene {
 
 #[cfg(test)]
 mod persist_tests;
+#[cfg(test)]
+mod play_tests;
 #[cfg(test)]
 mod rig;
 #[cfg(test)]

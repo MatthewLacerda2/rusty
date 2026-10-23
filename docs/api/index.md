@@ -210,14 +210,15 @@ headless replays stay byte-identical):
   so a first activation runs `Awake → OnEnable → Start`, all before that tick's
   `Update`. `OnDestroy` runs in a dedicated destroy phase at the **tail** of the
   tick (after `LateUpdate`), draining the ids `Scene.DestroyEntity` queued this
-  tick and everything under them (#1283): all `OnDisable`s first, then all
+  tick — and those the engine queued, such as a hitbox `Physics.GenerateHitboxes`
+  dropped (#1298) — and everything under them (#1283): all `OnDisable`s first, then all
   `OnDestroy`s, each pass children before parents (deepest first, then ascending
   entity id) and an entity's scripts by index, before the entities are removed. Every
   edge fires exactly once, so replays stay byte-identical.
 - The scene-load phase follows the destroy phase, still at the tick's tail: a
   `Scene.Load` requested this tick unloads the outgoing scene — the same
-  teardown, all `OnDisable`s then all `OnDestroy`s in ascending
-  `(entity id, script index)` order, for every entity that does not survive —
+  teardown in the same order (children before parents, then ascending entity
+  id; an entity's scripts by index), for every entity that does not survive —
   and swaps the new scene in. Its scripts `Awake` / `OnEnable` / `Start` at
   the head of the next tick, like spawns.
 - The UI callbacks run in their own phase between the init phase and

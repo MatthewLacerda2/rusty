@@ -5,16 +5,31 @@
 //! re-entered to fire the entity's teardown callbacks. So the verb QUEUES the id
 //! here (like Unity's deferred `Object.Destroy`), and the script system drains
 //! the queue at the tick's destroy phase — firing `OnDisable`/`OnDestroy` before
-//! the real removal. The queue is a plain `Vec<u32>` field on `Scene`; these two
+//! the real removal. The queue is a plain `Vec<u32>` field on `Scene`; these
 //! verbs are its only writers/readers, split out here to keep `scene.rs` lean.
+//! Every engine destroy that may run in Play (`Scene.DestroyEntity`, a stale
+//! hitbox, an orphaned one) calls [`Scene::destroy`], which picks (#1298).
 
 use crate::scene::Scene;
 
 impl Scene {
+    /// Destroy `id` and its subtree the way the mode allows (#1298): in Play,
+    /// queue it ([`Scene::request_destroy`]) so its scripts are torn down; in
+    /// edit mode, where no script runs, remove it at once
+    /// ([`Scene::destroy_entity`]).
+    pub fn destroy(&mut self, id: u32) {
+        if self.playing {
+            self.request_destroy(id);
+        } else {
+            self.destroy_entity(id);
+        }
+    }
+
     /// Queue entity `id` for deferred destruction — the play-mode
     /// `Scene.DestroyEntity` path. The entity stays live until the script system
-    /// drains the queue at the tick's destroy phase (firing `OnDisable`/`OnDestroy`
-    /// before the real removal via [`Scene::destroy_entity`]).
+    /// drains the queue at the tick's destroy phase, which fires
+    /// `OnDisable`/`OnDestroy` across its subtree and then despawns it
+    /// (`ScriptManager::apply_pending_destroys`).
     pub fn request_destroy(&mut self, id: u32) {
         self.pending_destroy.push(id);
     }
@@ -46,5 +61,28 @@ mod tests {
             scene.take_pending_destroys().is_empty(),
             "queue is drained after a take"
         );
+    }
+
+    #[test]
+    fn destroy_queues_in_play_and_removes_at_once_in_edit_mode() {
+        let mut scene = Scene::new();
+        let edit = scene.add_entity("Edit".into());
+        scene.destroy(edit);
+        assert!(!scene.world.contains(edit), "edit mode: gone at once");
+        let play = scene.add_entity("Play".into());
+        scene.set_playing(true);
+        scene.destroy(play);
+        assert!(scene.world.contains(play), "Play: live until the drain");
+        assert_eq!(scene.take_pending_destroys(), vec![play]);
+    }
+
+    #[test]
+    #[cfg(debug_assertions)]
+    #[should_panic(expected = "skips script teardown")]
+    fn an_immediate_destroy_in_play_is_refused() {
+        let mut scene = Scene::new();
+        let id = scene.add_entity("Doomed".into());
+        scene.set_playing(true);
+        scene.destroy_entity(id);
     }
 }
