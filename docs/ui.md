@@ -117,7 +117,10 @@ ported faithfully:
   space). They come from its content — its own group (from *its* children), its `Text`
   (unwrapped width; height wrapped at the width it will get), its `Image` (the texture's
   native size, or for `Sliced` / `Tiled` the sum of its borders) — the largest of
-  several wins, and zeros when there is no content.
+  several wins, and zeros when there is no content. The native size is a sim input like
+  the screen size: the platform reads each texture file's header into a table before
+  every tick (the window, the editor and the headless harness alike) and follows the
+  engine's own re-bakes; a texture not on disk yet measures zero until it is.
 - **`LayoutElement`** overrides any of those six numbers (`None` keeps the content's),
   and `ignore_layout` takes the element out of its parent's group.
 - **Row / column placement** (Unity's `HorizontalOrVerticalLayoutGroup`). Along the main
