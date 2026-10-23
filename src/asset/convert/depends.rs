@@ -131,6 +131,14 @@ impl Dependency {
     }
 
     /// True when the file still reads as it did.
+    /// The same file, as it reads now.
+    pub(super) fn now(&self) -> Self {
+        Self {
+            path: self.path.clone(),
+            seen: seen(&self.path),
+        }
+    }
+
     pub(super) fn holds(&self) -> bool {
         seen(&self.path) == self.seen
     }

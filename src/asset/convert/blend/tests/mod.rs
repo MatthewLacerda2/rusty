@@ -7,10 +7,13 @@ use crate::asset::gltf::import::import_from;
 use crate::asset::{ImportedAsset, MapRef};
 use std::path::{Path, PathBuf};
 
+mod linked;
 #[cfg(unix)]
 mod locate;
+#[cfg(unix)]
+mod run;
 
-fn fixture(name: &str) -> PathBuf {
+pub(super) fn fixture(name: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("tests/fixtures/models")
         .join(name)
@@ -24,7 +27,7 @@ fn import(out: &Path) -> ImportedAsset {
     import_from(out, Some(&source.to_string_lossy())).expect("its glTF imports")
 }
 
-fn base_color_map(asset: &ImportedAsset, material: &str) -> String {
+pub(super) fn base_color_map(asset: &ImportedAsset, material: &str) -> String {
     let m = asset.materials.iter().find(|m| m.name == material);
     let map = m.and_then(|m| m.base_color_map.as_ref()).expect(material);
     map.as_str().to_string()
@@ -58,6 +61,8 @@ fn a_packed_image_is_extracted_flat_and_becomes_a_reference() {
         .collect();
     assert_eq!(files.len(), 1, "flat: one file, no subfolder");
     assert!(files[0].file_type().unwrap().is_file());
+    // Its name says `.jpg`, its bytes are a PNG: the bytes win.
+    assert_eq!(files[0].file_name(), "Checker.png");
     assert!(std::fs::read(files[0].path())
         .unwrap()
         .starts_with(b"\x89PNG"));
@@ -80,4 +85,15 @@ fn an_image_on_disk_stays_a_plain_path_and_is_a_dependency() {
         stamp.lines().next().unwrap().ends_with(&format!(" {tool}")),
         "{stamp}"
     );
+}
+
+#[test]
+// lint: allow(skip) needs Blender 5+; CI's `blender` job installs it and runs this
+#[ignore]
+fn an_unused_missing_image_is_neither_a_dependency_nor_a_skip() {
+    let out = crate::test_temp::dir().join("textured.blend.glb");
+    import(&out);
+    let stamp = std::fs::read_to_string(super::super::record::stamp_path(&out)).unwrap();
+    assert!(!stamp.contains("no_such_image"), "{stamp}");
+    assert!(!stamp.contains("skipped"), "{stamp}");
 }

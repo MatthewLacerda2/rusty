@@ -34,12 +34,13 @@ fn an_embedded_tga_imports_with_its_mesh() {
 }
 
 #[test]
-fn bytes_that_mismatch_their_name_import_with_their_mesh() {
+fn bytes_that_mismatch_their_name_are_named_by_their_bytes() {
     let dir = crate::test_temp::dir();
     let asset = import(&dir);
     assert!(!asset.sub_meshes.is_empty(), "the mesh survived");
+    // A JPEG embedded as `skin.png`: the renderer picks its decoder by extension.
     let blue = material(&asset, "Blue").base_color_map.clone();
-    assert!(extracted(&dir, blue, "skin.png").starts_with(&[0xFF, 0xD8, 0xFF]));
+    assert!(extracted(&dir, blue, "skin.jpg").starts_with(&[0xFF, 0xD8, 0xFF]));
 }
 
 #[test]

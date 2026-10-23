@@ -71,7 +71,8 @@ pub const CONVERTERS: &[Converter] = &[
         //    used instead, and the files looked at are recorded (#1189).
         // 8: an extracted texture's image is named by its identity, which a saved
         //    scene references (#1130).
-        version: 8,
+        // 9: an extracted texture's extension follows its bytes, not its name (#1072).
+        version: 9,
         tool: None,
         convert: fbx::convert,
     },

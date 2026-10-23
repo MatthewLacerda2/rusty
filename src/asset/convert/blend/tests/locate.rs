@@ -5,20 +5,29 @@ use super::super::Search;
 use std::path::{Path, PathBuf};
 
 /// A fake `blender` in `dir` that prints `output` when asked its version.
-fn fake(dir: &Path, output: &str) -> PathBuf {
+pub(super) fn fake(dir: &Path, output: &str) -> PathBuf {
+    script(dir, &format!("echo '{output}'"))
+}
+
+/// A fake `blender` in `dir` that runs the shell `body`. Written under another
+/// name, closed, then renamed into place: a process forked meanwhile by another
+/// test can't hold it open for writing ("text file busy").
+pub(super) fn script(dir: &Path, body: &str) -> PathBuf {
     use std::os::unix::fs::PermissionsExt;
     std::fs::create_dir_all(dir).unwrap();
-    let path = dir.join("blender");
-    std::fs::write(&path, format!("#!/bin/sh\necho '{output}'\n")).unwrap();
-    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
+    let (draft, path) = (dir.join("blender.draft"), dir.join("blender"));
+    std::fs::write(&draft, format!("#!/bin/sh\n{body}\n")).unwrap();
+    std::fs::set_permissions(&draft, std::fs::Permissions::from_mode(0o755)).unwrap();
+    std::fs::rename(&draft, &path).unwrap();
     path
 }
 
-fn search(explicit: Option<&Path>, path: Option<&Path>) -> Search {
+pub(super) fn search(explicit: Option<&Path>, path: Option<&Path>) -> Search {
     Search {
         explicit: explicit.map(Into::into),
         path: path.map(Into::into),
         places: Vec::new(),
+        timeout: None,
     }
 }
 

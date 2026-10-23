@@ -23,9 +23,7 @@
 
 mod identity;
 
-use super::super::stage;
-use super::super::stage::hook::{self, Step};
-use super::super::texture_file::{file_name, relative_uri, unique};
+use super::super::texture_file::{self, file_name, relative_uri, unique};
 use super::super::{glb, Dependency, Seen, Skip, Staging};
 use crate::asset::gltf::uri;
 use crate::asset::{ImportError, IMAGE_EXTENSIONS};
@@ -119,7 +117,7 @@ impl Textures {
                 return Ok(self.skip(texture, why));
             }
         };
-        self.extract(&name, &texture.content)?;
+        texture_file::write(&self.dir, &name, &texture.content)?;
         let Some(dir) = self.dir.file_name() else {
             return Err(ImportError::Parse(format!(
                 "FBX texture `{}`: {} names no folder to reference",
@@ -173,25 +171,6 @@ impl Textures {
             why,
         });
         None
-    }
-
-    /// Write one texture. Only the textures folder is created, never the staging
-    /// folder above it: a concurrent conversion that cleared that one must make
-    /// this conversion fail, not resurrect half of it.
-    fn extract(&self, name: &str, bytes: &[u8]) -> Result<(), ImportError> {
-        match std::fs::create_dir(&self.dir) {
-            Err(e) if e.kind() != std::io::ErrorKind::AlreadyExists => {
-                return Err(ImportError::Parse(format!(
-                    "writing {}: {e}",
-                    self.dir.display()
-                )))
-            }
-            _ => {}
-        }
-        let path = self.dir.join(name);
-        hook::io(Step::ExtractTexture)
-            .and_then(|()| stage::write(&path, bytes))
-            .map_err(|e| ImportError::Parse(format!("writing {}: {e}", path.display())))
     }
 }
 

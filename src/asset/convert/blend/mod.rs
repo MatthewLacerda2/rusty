@@ -71,7 +71,7 @@ fn convert_with(search: &Search, source: &Path, to: &Staging) -> Result<Converte
     hook::io(Step::ReadSource)
         .and_then(|()| std::fs::create_dir(&dir))
         .map_err(|e| ImportError::Parse(format!("writing {}: {e}", dir.display())))?;
-    run::export(&blender.path, source, &dir)?;
+    run::export(&blender.path, source, &dir, search.export_timeout()?)?;
     pack::pack(&dir, to)
 }
 

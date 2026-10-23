@@ -1,6 +1,9 @@
 # Makes textured.blend (#1072), the `.blend` fixture: a cube whose material samples
-# an image packed into the file ("Checker"), and a plane whose material samples
-# textured_bricks.png beside it ("Bricks", an image on disk). Run from this folder:
+# an image packed into the file ("Checker": PNG bytes under a `.jpg` name, as a
+# painted-over JPG packs), and a plane whose material samples
+# textured_bricks.png beside it ("Bricks", an image on disk). "Unused" names a
+# missing file and no material samples it: it is neither a dependency nor a skip.
+# Run from this folder:
 #   blender --background --factory-startup --python make_textured_blend.py
 import bpy
 import os
@@ -24,7 +27,7 @@ cube = bpy.context.active_object
 cube.name = "Cube"
 checker = bpy.data.images.new("Checker", 4, 4)
 checker.pixels = [1.0, 0.0, 0.0, 1.0] * 16
-checker.filepath_raw = "//Checker.png"
+checker.filepath_raw = "//Checker.jpg"
 checker.file_format = "PNG"
 checker.pack()
 cube.data.materials.append(material("Packed", checker))
@@ -36,6 +39,13 @@ bricks = bpy.data.images.load(os.path.join(here, "textured_bricks.png"))
 bricks.name = "Bricks"
 plane.data.materials.append(material("External", bricks))
 
+unused = bpy.data.images.new("Unused", 1, 1)
+unused.source = "FILE"
+unused.filepath = "//no_such_image.png"
+unused.use_fake_user = True
+
+# No `.blend1` backup beside a fixture saved over.
+bpy.context.preferences.filepaths.save_version = 0
 bpy.ops.wm.save_as_mainfile(
     filepath=os.path.join(here, "textured.blend"), relative_remap=True, compress=True
 )

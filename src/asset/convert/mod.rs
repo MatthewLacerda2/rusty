@@ -66,6 +66,7 @@ pub mod glb;
 mod lock;
 mod record;
 mod stage;
+mod stale;
 mod texture_file;
 pub mod texture_ref;
 
@@ -76,7 +77,8 @@ pub use stage::{textures_dirs, Staging};
 
 use super::ImportError;
 use crate::core::{hash, paths, project};
-use record::{record, split_record, stamp_path};
+use record::{record, stamp_path};
+use stale::{stale, Tool};
 use std::path::{Component, Path, PathBuf};
 
 /// Where an open project keeps converted sources, relative to its root: a folder
@@ -115,7 +117,10 @@ pub fn cache_location(path: &Path) -> Result<PathBuf, ImportError> {
 /// What the conversion skipped is warned of as it runs, and once per process
 /// from the cache (`record`), the source present or not.
 pub fn refresh(converter: &Converter, source: &Path, out: &Path) -> Result<(), ImportError> {
-    if stale(converter, source, out)?.is_none() {
+    // Asked once: the program's lookup and version serve both checks below.
+    let asked = converter.tool.map(|identify| identify());
+    let tool = Tool::of(asked.as_ref());
+    if stale(converter, source, out, tool)?.is_none() {
         return Ok(());
     }
     if let Some(dir) = out.parent() {
@@ -126,12 +131,14 @@ pub fn refresh(converter: &Converter, source: &Path, out: &Path) -> Result<(), I
     let _lock = lock::hold(out);
     // Stamped again under the lock: what waited may have been converted
     // meanwhile, or the source saved, and the stamp names what the converter reads.
-    let Some(stamp) = stale(converter, source, out)? else {
+    let Some(stamp) = stale(converter, source, out, tool)? else {
         return Ok(());
     };
-    match stage::convert(converter, source, out, &stamp) {
+    let tag = record::folder_tag(out, &stamp);
+    match stage::convert(converter, source, out, (&stamp, &tag)) {
         Ok(converted) => {
-            record::report(source, out, &record::Stored::written(&stamp, &converted));
+            let stored = record::Stored::written(&stamp, &tag, &converted);
+            record::report(source, out, &stored);
         }
         // Without a lock, another process converted the same source meanwhile.
         Err(e) => {
@@ -140,40 +147,6 @@ pub fn refresh(converter: &Converter, source: &Path, out: &Path) -> Result<(), I
         }
     }
     Ok(())
-}
-
-/// The stamp `source` converts to, when the cache at `out` is not its conversion
-/// yet; `None`, its skips replayed, when it is, or stands in for a missing source.
-fn stale(converter: &Converter, source: &Path, out: &Path) -> Result<Option<String>, ImportError> {
-    let digest = match depends::digest(source) {
-        Seen::Read(digest) => digest,
-        _ if out.is_file() => {
-            if let Some(stored) = record::stored(out) {
-                record::replay(source, out, &stored);
-            }
-            return Ok(None);
-        }
-        _ => return Err(unreadable(source)),
-    };
-    let stamp = match converter.tool.map(|identify| identify()) {
-        None => record::stamp(converter, digest, None),
-        Some(Ok(tool)) => record::stamp(converter, digest, Some(&tool)),
-        // No program to convert with: a cache of the unchanged source, made by
-        // any version of it, stands in; otherwise converting says what is missing.
-        Some(Err(_)) => {
-            let stamp = record::stamp(converter, digest, None);
-            let Some(stored) = record::current_by_any_tool(out, &stamp) else {
-                return Ok(Some(stamp));
-            };
-            record::replay(source, out, &stored);
-            return Ok(None);
-        }
-    };
-    let Some(stored) = record::current(out, &stamp) else {
-        return Ok(Some(stamp));
-    };
-    record::replay(source, out, &stored);
-    Ok(None)
 }
 
 /// Where the project at `root` caches the source at `rel` (project-relative): the

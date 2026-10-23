@@ -8,8 +8,11 @@
 //! it fakes instead of setting process-wide environment variables.
 //!
 //! Asking a version starts Blender, which takes most of a second, so the answer
-//! is remembered by the executable's path, length and modification time: a check
-//! of a current cache costs a few `stat`s, and an upgraded Blender is asked again.
+//! (a failure included: a broken `blender` on `PATH` is started once, not once
+//! per check) is remembered by the executable's path, length and modification
+//! time, and an upgraded Blender is asked again. The executable a search found
+//! is remembered too, while the search and that file stay the same: a check of a
+//! current cache costs two `stat`s, not one per `PATH` folder.
 
 use crate::asset::ImportError;
 use crate::core::collections::Map;
@@ -24,6 +27,17 @@ pub const RUSTY_BLENDER: &str = "RUSTY_BLENDER";
 /// The oldest Blender major version rusty converts with.
 pub const MIN_MAJOR: u32 = 5;
 
+/// The environment variable that sets how long an export may run, in seconds.
+pub const RUSTY_BLENDER_TIMEOUT: &str = "RUSTY_BLENDER_TIMEOUT";
+
+/// How long an export may run unless [`RUSTY_BLENDER_TIMEOUT`] says otherwise:
+/// long enough for a big scene, short enough that a hung Blender gives the
+/// editor and the cache's lock back.
+const EXPORT_TIMEOUT: Duration = Duration::from_secs(600);
+
+/// How long `blender --version` may take.
+pub(super) const VERSION_TIMEOUT: Duration = Duration::from_secs(10);
+
 /// Where rusty tells people to get Blender.
 const DOWNLOAD: &str = "https://www.blender.org/download/";
 
@@ -35,6 +49,7 @@ pub struct Blender {
 }
 
 /// Where to look for Blender.
+#[derive(Clone, PartialEq)]
 pub struct Search {
     /// [`RUSTY_BLENDER`]'s value, if set.
     pub explicit: Option<OsString>,
@@ -42,6 +57,8 @@ pub struct Search {
     pub path: Option<OsString>,
     /// The platform's usual install places, in order.
     pub places: Vec<PathBuf>,
+    /// [`RUSTY_BLENDER_TIMEOUT`]'s value, if set.
+    pub timeout: Option<OsString>,
 }
 
 impl Search {
@@ -52,7 +69,25 @@ impl Search {
             explicit: std::env::var_os(RUSTY_BLENDER).filter(|v| !v.is_empty()),
             path: std::env::var_os("PATH"),
             places: places(home.as_deref()),
+            timeout: std::env::var_os(RUSTY_BLENDER_TIMEOUT).filter(|v| !v.is_empty()),
         }
+    }
+
+    /// How long an export may run: [`RUSTY_BLENDER_TIMEOUT`]'s seconds, else ten
+    /// minutes.
+    pub fn export_timeout(&self) -> Result<Duration, ImportError> {
+        let Some(raw) = &self.timeout else {
+            return Ok(EXPORT_TIMEOUT);
+        };
+        let secs = raw.to_str().and_then(|s| s.trim().parse::<u64>().ok());
+        secs.filter(|s| *s > 0)
+            .map(Duration::from_secs)
+            .ok_or_else(|| {
+                ImportError::Parse(format!(
+                    "{RUSTY_BLENDER_TIMEOUT} is {}, not a whole number of seconds above 0",
+                    raw.to_string_lossy()
+                ))
+            })
     }
 
     /// The Blender this search finds, version checked.
@@ -68,7 +103,7 @@ impl Search {
                 }
                 path
             }
-            None => self.first_found().ok_or_else(|| {
+            None => self.remembered().ok_or_else(|| {
                 missing("no Blender was found on PATH or where it is usually installed")
             })?,
         };
@@ -78,6 +113,20 @@ impl Search {
             return Err(missing(&format!("{} is Blender {version}", path.display())));
         }
         Ok(Blender { path, version })
+    }
+
+    /// [`Search::first_found`], remembered while this search, and the file it
+    /// found, stay the same.
+    fn remembered(&self) -> Option<PathBuf> {
+        let lock = || FOUND.lock().unwrap_or_else(PoisonError::into_inner);
+        if let Some((search, found)) = lock().as_ref() {
+            if search == self && found.is_file() {
+                return Some(found.clone());
+            }
+        }
+        let found = self.first_found()?;
+        *lock() = Some((self.clone(), found.clone()));
+        Some(found)
     }
 
     fn first_found(&self) -> Option<PathBuf> {
@@ -129,10 +178,13 @@ fn major(version: &str) -> Option<u32> {
 
 /// A version asked: the executable's length and mtime when it answered, and
 /// the answer.
-type Asked = (u64, Option<Duration>, String);
+type Asked = (u64, Option<Duration>, Result<String, ImportError>);
 
 /// Versions already asked, by executable path.
 static ASKED: LazyLock<Mutex<Map<PathBuf, Asked>>> = LazyLock::new(Mutex::default);
+
+/// The last search made, and what it found.
+static FOUND: Mutex<Option<(Search, PathBuf)>> = Mutex::new(None);
 
 /// The version the Blender at `path` reports, asked once per build of it.
 fn version(path: &Path) -> Result<String, ImportError> {
@@ -144,12 +196,12 @@ fn version(path: &Path) -> Result<String, ImportError> {
     let lock = || ASKED.lock().unwrap_or_else(PoisonError::into_inner);
     if let Some((l, m, version)) = lock().get(path) {
         if (*l, *m) == (len, modified) {
-            return Ok(version.clone());
+            return version.clone();
         }
     }
-    let version = super::run::version(path)?;
+    let version = super::run::version(path);
     lock().insert(path.to_path_buf(), (len, modified, version.clone()));
-    Ok(version)
+    version
 }
 
 /// The version in `blender --version`'s output: the word after the first

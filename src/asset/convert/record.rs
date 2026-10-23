@@ -1,6 +1,7 @@
 //! A cache's stamp file (`<cache>.glb.source`): the stamp that says which
-//! conversion the cache is, then one line per external file it looked at (#1189),
-//! then one line per part it skipped (#1172), and the warnings those skips raise.
+//! conversion the cache is, the tag of its textures folder ([`folder_tag`]), then
+//! one line per external file it looked at (#1189), then one line per part it
+//! skipped (#1172), and the warnings those skips raise.
 //!
 //! The files looked at are [`Dependency`] lines (`depends`); the cache is current
 //! only while each still reads the same.
@@ -14,6 +15,7 @@
 use super::depends::Dependency;
 use super::{Converted, Converter, Skip};
 use crate::core::collections::Set;
+use crate::core::hash;
 use std::path::{Path, PathBuf};
 use std::sync::{LazyLock, Mutex, PoisonError};
 
@@ -41,11 +43,34 @@ pub(super) fn stamp_path(out: &Path) -> PathBuf {
     super::with_suffix(out, ".source")
 }
 
-/// What a stamp file holds: the stamp, then one line per look at a file (each
-/// once: a file looked at twice and found the same is one line), then one line
-/// per skip.
-pub(super) fn record(stamp: &str, converted: &Converted) -> String {
-    let mut record = stamp.to_string();
+/// What starts the line naming the conversion's textures folder by its tag.
+const TEXTURES: &str = "textures ";
+
+/// The tag of the textures folder a conversion stamped `stamp` writes beside the
+/// cache at `out`: a digest of the stamp and of how each file the cache's current
+/// conversion looked at reads now. A conversion made again only because one of
+/// those changed (a `.blend`'s linked library, whose packed images it extracts)
+/// gets a folder of its own, so it never rewrites a file the live `.glb` reads
+/// (#1072). Only a conversion whose stamp file was lost, or whose swap failed,
+/// meets its own folder again (`stage::move_in`).
+pub(super) fn folder_tag(out: &Path, stamp: &str) -> String {
+    let mut key = stamp.to_string();
+    for dependency in stored(out).iter().flat_map(|s| &s.depends_on) {
+        key.push_str(&dependency.now().line());
+    }
+    format!("{:016x}", hash::fnv1a64(key.as_bytes()))
+}
+
+/// The textures folder tag the stamp file `record` names.
+pub(super) fn tag_of(record: &str) -> Option<&str> {
+    record.lines().find_map(|line| line.strip_prefix(TEXTURES))
+}
+
+/// What a stamp file holds: the stamp, its textures folder's `tag`, then one line
+/// per look at a file (each once: a file looked at twice and found the same is
+/// one line), then one line per skip.
+pub(super) fn record(stamp: &str, tag: &str, converted: &Converted) -> String {
+    let mut record = format!("{stamp}{TEXTURES}{tag}\n");
     let mut lines = Set::default();
     for line in converted.depends_on.iter().map(Dependency::line) {
         if lines.insert(line.clone()) {
@@ -77,9 +102,9 @@ pub(super) struct Stored {
 
 impl Stored {
     /// What the conversion stamped `stamp` that reported `converted` writes.
-    pub(super) fn written(stamp: &str, converted: &Converted) -> Self {
+    pub(super) fn written(stamp: &str, tag: &str, converted: &Converted) -> Self {
         Self {
-            text: record(stamp, converted),
+            text: record(stamp, tag, converted),
             stamp: stamp.to_string(),
             depends_on: converted.depends_on.clone(),
             skipped: converted.skipped.iter().map(Skip::line).collect(),
@@ -92,7 +117,7 @@ pub(super) fn stored(out: &Path) -> Option<Stored> {
     let text = std::fs::read_to_string(stamp_path(out)).ok()?;
     let (stamp, rest) = split_record(&text);
     let (mut depends_on, mut skipped) = (Vec::new(), Vec::new());
-    for line in rest.lines() {
+    for line in rest.lines().filter(|l| !l.starts_with(TEXTURES)) {
         match Dependency::parse(line) {
             Some(dependency) => depends_on.push(dependency?),
             None => skipped.push(line.to_string()),

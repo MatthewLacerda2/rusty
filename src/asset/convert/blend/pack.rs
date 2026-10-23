@@ -5,19 +5,22 @@
 //! binary glTF (`glb::container`), and resolves each image:
 //!
 //! - one the conversion made (a packed or generated image, under the export
-//!   folder) is moved into [`Staging::textures`], flat, and keeps its name: the
-//!   importer references it as `model.blend#tex/<name>` (#1130);
+//!   folder) is moved into [`Staging::textures`], flat, named after the identity
+//!   the script gave it (its image's name, made unique), and the glTF image takes
+//!   that identity as its name: the importer references it as
+//!   `model.blend#tex/<identity>` (#1130);
 //! - one that is a file on disk is referenced where it lies, from the `.glb`'s
 //!   folder, and the importer reads it as the plain path it is.
 //!
-//! Every file the `.blend` named (a linked library, an image on disk) is looked at
+//! Every linked library, and every image on disk a material uses, is looked at
 //! and recorded, found or not, so the cache re-converts when one changes (#1189).
 
 use super::super::stage::hook::{self, Step};
-use super::super::texture_file::{file_name, relative_uri, unique};
-use super::super::{glb, stage, Converted, Dependency, Skip, Staging};
+use super::super::texture_file::{self, file_name, relative_uri, unique};
+use super::super::{glb, relative_to_cwd, stage, Converted, Dependency, Skip, Staging};
 use crate::asset::gltf::uri;
 use crate::asset::ImportError;
+use crate::core::collections::Map;
 use crate::core::paths;
 use serde::Deserialize;
 use serde_json::Value;
@@ -33,7 +36,16 @@ const REPORT: &str = "rusty.json";
 struct Report {
     libraries: Vec<PathBuf>,
     images: Vec<External>,
+    made: Vec<Made>,
     skipped: Vec<Skipped>,
+}
+
+/// An image the export script wrote into `made/`, by its file there, and the
+/// identity it gave it.
+#[derive(Deserialize)]
+struct Made {
+    file: String,
+    name: String,
 }
 
 /// An image the `.blend` names as a file on disk.
@@ -81,7 +93,8 @@ pub(super) fn pack(dir: &Path, to: &Staging) -> Result<Converted, ImportError> {
     let mut doc: Value = serde_json::from_slice(&read(&gltf_path)?)
         .map_err(|e| failed(&gltf_path, &e.to_string()))?;
     let bin = buffer(dir, &mut doc)?;
-    Images::new(dir, to).resolve(&mut doc)?;
+    let made = report.made.into_iter().map(|m| (m.file, m.name)).collect();
+    Images::new(dir, to, made).resolve(&mut doc)?;
     let json = serde_json::to_vec(&doc).map_err(|e| failed(&gltf_path, &e.to_string()))?;
     hook::io(Step::WriteGltf)
         .and_then(|()| stage::write(&to.glb, &glb::container(json, bin)))
@@ -113,12 +126,14 @@ struct Images<'a> {
     to: &'a Staging,
     /// The `.glb`'s final folder, which an image on disk is referenced from.
     out_dir: PathBuf,
+    /// Each made image's identity, by its file name in `made/`.
+    made: Map<String, String>,
     /// File names written into the textures folder so far.
     written: Vec<String>,
 }
 
 impl<'a> Images<'a> {
-    fn new(dir: &'a Path, to: &'a Staging) -> Self {
+    fn new(dir: &'a Path, to: &'a Staging, made: Map<String, String>) -> Self {
         let out_dir = match to.out.parent() {
             Some(d) if !d.as_os_str().is_empty() => d.to_path_buf(),
             _ => PathBuf::from("."),
@@ -127,6 +142,7 @@ impl<'a> Images<'a> {
             dir,
             to,
             out_dir,
+            made,
             written: Vec::new(),
         }
     }
@@ -144,7 +160,9 @@ impl<'a> Images<'a> {
                 .ok_or_else(|| failed(&self.dir.join(GLTF), &format!("a bad image URI `{old}`")))?;
             let file = paths::fold(&self.dir.join(decoded));
             let new = if file.starts_with(self.dir) {
-                self.extract(&file)?
+                let (uri, identity) = self.extract(&file)?;
+                image.insert("name".into(), Value::String(identity));
+                uri
             } else {
                 // Named still: the importer makes it a plain path, as it lies
                 // outside the cache (`gltf::material`).
@@ -156,41 +174,34 @@ impl<'a> Images<'a> {
         Ok(())
     }
 
-    /// Move `file`, an image the conversion made, into the textures folder: its URI
-    /// there. Only the textures folder is created, never the staging folder above
-    /// it (see `fbx::texture`'s `extract`).
-    fn extract(&mut self, file: &Path) -> Result<String, ImportError> {
+    /// Move `file`, an image the conversion made, into the textures folder: its
+    /// URI there, and its identity.
+    fn extract(&mut self, file: &Path) -> Result<(String, String), ImportError> {
         let bytes = read(file)?;
-        let raw = file
+        let made = file
             .file_name()
             .map_or_else(Default::default, |n| n.to_string_lossy());
-        let (stem, ext) = file_name(&raw, &bytes);
+        let identity =
+            self.made.get(made.as_ref()).cloned().ok_or_else(|| {
+                failed(file, "an image the export script made but gave no identity")
+            })?;
+        // The made file's extension is the format the script wrote; the bytes'
+        // own format still wins (`file_name`).
+        let ext = made.rsplit_once('.').map_or("", |(_, ext)| ext);
+        let (stem, ext) = file_name(&format!("{identity}.{ext}"), &bytes);
         let name = unique(&stem, &ext, &self.written);
         self.written.push(name.clone());
-        let dir = &self.to.textures;
-        match std::fs::create_dir(dir) {
-            Err(e) if e.kind() != std::io::ErrorKind::AlreadyExists => {
-                return Err(failed(dir, &e.to_string()))
-            }
-            _ => {}
-        }
-        let path = dir.join(&name);
-        hook::io(Step::ExtractTexture)
-            .and_then(|()| stage::write(&path, &bytes))
-            .map_err(|e| failed(&path, &e.to_string()))?;
-        let folder = dir
-            .file_name()
-            .map_or_else(Default::default, |n| n.to_string_lossy());
-        Ok(uri::encode_path(&format!("{folder}/{name}")))
+        texture_file::write(&self.to.textures, &name, &bytes)?;
+        let folder =
+            (self.to.textures.file_name()).map_or_else(Default::default, |n| n.to_string_lossy());
+        Ok((uri::encode_path(&format!("{folder}/{name}")), identity))
     }
 }
 
 /// `path` relative to the working directory when it lies in it, as a project's
 /// paths are written: a stamp that holds on every clone of the project.
 fn local(path: &Path) -> PathBuf {
-    let cwd = std::env::current_dir().ok();
-    let cwd = cwd.and_then(|c| paths::canonicalize(&c).ok());
-    match cwd.and_then(|c| path.strip_prefix(c).ok().map(Path::to_path_buf)) {
+    match relative_to_cwd(path) {
         Some(rel) if !rel.as_os_str().is_empty() => rel,
         _ => path.to_path_buf(),
     }
