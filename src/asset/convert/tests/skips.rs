@@ -105,7 +105,7 @@ fn a_reconversion_elsewhere_for_a_changed_file_warns_of_its_new_skips() {
         }],
         depends_on: vec![Dependency::look(&texture_of(&source)).unwrap()],
     };
-    let stamp = record::stamp(&LOOKING, b"one");
+    let stamp = record::stamp(&LOOKING, crate::core::hash::fnv1a64(b"one"));
     let stamp_file = record::record(&stamp, &converted);
     std::fs::write(super::super::stamp_path(&out), stamp_file).unwrap();
 

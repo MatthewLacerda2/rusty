@@ -1,24 +1,14 @@
 //! Play refreshes before it holds (#1253): entering Play brings every converted
 //! source under the project's `assets/` up to date, as Unity refreshes its assets
 //! before Play, so a model only a script spawns has an import to play from. And
-//! the hold Play takes ends with the world that took it.
+//! the scene's instances follow the refresh before the edit snapshot. And the
+//! hold Play takes ends with the world that took it.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
-use super::import_gate_tests::{stamp, world, QUAD};
+use super::{assets, indices, spawn, stamp, triangle, world, DT, QUAD};
 use crate::asset::convert::{cached_gltf, conversion_allowed};
 use crate::scene::ScriptComponent;
-
-const DT: f32 = 1.0 / 60.0;
-
-/// `<test>/assets/enemies/enemy.fbx`, a quad, never imported; returns the root.
-fn assets() -> (PathBuf, PathBuf) {
-    let root = crate::test_temp::dir().join("assets");
-    std::fs::create_dir_all(root.join("enemies")).unwrap();
-    let enemy = root.join("enemies/enemy.fbx");
-    std::fs::write(&enemy, QUAD).unwrap();
-    (root, enemy)
-}
 
 fn slashed(path: &Path) -> String {
     path.to_string_lossy().replace('\\', "/")
@@ -76,4 +66,23 @@ fn a_world_dropped_in_play_releases_its_hold() {
     other.tick(DT);
     cached_gltf(&enemy).unwrap();
     assert_ne!(stamp(&enemy), before, "another world converts");
+}
+
+#[test]
+fn an_instance_follows_a_source_rewritten_outside_before_play() {
+    let (root, enemy) = assets();
+    let mut gw = world();
+    gw.resources.sources_root = root;
+    let loaded = spawn(&gw, &enemy).unwrap();
+    std::fs::write(&enemy, triangle()).unwrap();
+
+    gw.set_playing(true);
+    gw.tick(DT);
+    assert_eq!(
+        indices(&gw, loaded),
+        3,
+        "the instance has the refreshed import"
+    );
+    let spawned = spawn(&gw, &enemy).unwrap();
+    assert_eq!(indices(&gw, spawned), 3, "and a Play spawn agrees with it");
 }

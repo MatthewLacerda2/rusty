@@ -15,9 +15,6 @@
 
 fn main() {
     rusty::logging::init();
-    // A shipped game reads its import caches and never converts (#1253), the
-    // startup scene's models included.
-    rusty::asset::convert::ship();
     let mut args: Vec<String> = std::env::args().skip(1).collect();
     rusty::core::project::open_from_args(&mut args, rusty::core::project::Access::Run);
     rusty::shell::player::launch();

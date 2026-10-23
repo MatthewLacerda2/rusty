@@ -20,8 +20,9 @@
 //! records the converter, its [`Converter::version`], a digest of the source's
 //! bytes, and every external file the conversion looked at (an FBX's on-disk
 //! texture), with a digest or as absent (#1189); any difference re-converts.
-//! Content, not timestamps: a fresh clone gives every file a new mtime, and a
-//! sim module reads no clock. Files a conversion writes for the glTF to
+//! Content, not timestamps: a fresh clone gives every file a new mtime. A source's
+//! digest is remembered by its length and mtime (`depends`), so a Play that looks
+//! at every source reads only the ones that changed. Files a conversion writes for the glTF to
 //! reference (FBX's embedded textures, #1082) live in a
 //! `<cache>.glb.<digest>.textures/` folder beside it and are re-made with it.
 //!
@@ -44,7 +45,8 @@
 //! **When it is not re-made.** Play never converts (`gate`, #1253): entering it
 //! brings every source under the project's `assets/` up to date first, then it
 //! reads the cache as it stands, and a source changed meanwhile converts at the
-//! first edit frame after Stop. The standalone player never converts at all.
+//! first edit frame after Stop. The standalone player refreshes and holds the
+//! same way.
 //!
 //! **What a scene saves** for an extracted texture is never its cache path but
 //! `model.fbx#tex/<identity>`, which [`texture_ref`] resolves (#1130).
@@ -64,7 +66,7 @@ pub mod texture_ref;
 
 pub use converter::{converter_for, Converted, Converter, Skip, CONVERTERS};
 pub use depends::{Dependency, Seen};
-pub use gate::{conversion_allowed, convert_held, refresh_sources, ship, PlayHold};
+pub use gate::{conversion_allowed, convert_held, mark_standalone, refresh_sources, PlayHold};
 pub use stage::{textures_dirs, Staging};
 
 use super::ImportError;
@@ -138,17 +140,17 @@ pub fn refresh(converter: &Converter, source: &Path, out: &Path) -> Result<(), I
 /// The stamp `source` converts to, when the cache at `out` is not its conversion
 /// yet; `None`, its skips replayed, when it is, or stands in for a missing source.
 fn stale(converter: &Converter, source: &Path, out: &Path) -> Result<Option<String>, ImportError> {
-    let bytes = match std::fs::read(source) {
-        Ok(bytes) => bytes,
-        Err(_) if out.is_file() => {
+    let digest = match depends::digest(source) {
+        Seen::Read(digest) => digest,
+        _ if out.is_file() => {
             if let Some(stored) = record::stored(out) {
                 record::replay(source, out, &stored);
             }
             return Ok(None);
         }
-        Err(e) => return Err(ImportError::Parse(format!("{}: {e}", source.display()))),
+        _ => return Err(unreadable(source)),
     };
-    let stamp = record::stamp(converter, &bytes);
+    let stamp = record::stamp(converter, digest);
     let Some(stored) = record::current(out, &stamp) else {
         return Ok(Some(stamp));
     };
@@ -236,6 +238,12 @@ fn with_suffix(path: &Path, suffix: &str) -> PathBuf {
     let mut name = path.as_os_str().to_owned();
     name.push(suffix);
     PathBuf::from(name)
+}
+
+/// Why the source at `path` could not be read, in the OS's words.
+fn unreadable(path: &Path) -> ImportError {
+    let why = std::fs::read(path).map_or_else(|e| e.to_string(), |_| "not a file".into());
+    ImportError::Parse(format!("{}: {why}", path.display()))
 }
 
 fn write_error(path: &Path, e: &std::io::Error) -> ImportError {

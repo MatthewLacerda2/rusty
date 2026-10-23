@@ -2,13 +2,14 @@
 //! from the cache as it stands and converted once conversion is back on, and a
 //! source never imported fails its load.
 
-use super::super::{cache_location, cached_gltf, conversion_allowed, convert_held};
-use super::super::{refresh_sources, PlayHold};
+use super::super::PlayHold;
+use super::super::{cached_gltf, conversion_allowed, convert_held};
 use crate::asset::import_file;
 use std::path::{Path, PathBuf};
 
 /// A quad (6 indices) under the object name `Quad`.
-const QUAD: &str = include_str!("../../../../tests/fixtures/models/embedded_textures.fbx");
+pub(super) const QUAD: &str =
+    include_str!("../../../../tests/fixtures/models/embedded_textures.fbx");
 
 /// One triangle (3 indices) under the same object name.
 fn triangle() -> String {
@@ -21,12 +22,12 @@ fn source(text: &str) -> PathBuf {
     path
 }
 
-fn indices(source: &Path) -> usize {
+pub(super) fn indices(source: &Path) -> usize {
     let asset = import_file(source).unwrap();
     asset.sub_mesh("Quad").unwrap().indices.len()
 }
 
-fn stamp(cache: &Path) -> String {
+pub(super) fn stamp(cache: &Path) -> String {
     let mut name = cache.as_os_str().to_owned();
     name.push(".source");
     std::fs::read_to_string(PathBuf::from(name)).unwrap()
@@ -91,32 +92,4 @@ fn conversion_is_refused_while_any_hold_lives() {
     assert!(!conversion_allowed(), "one world still plays");
     drop(second);
     assert!(conversion_allowed(), "none plays");
-}
-
-#[test]
-fn refreshing_converts_every_source_under_the_root_and_skips_a_broken_one() {
-    let root = crate::test_temp::dir().join("assets");
-    std::fs::create_dir_all(root.join("enemies")).unwrap();
-    let enemy = root.join("enemies/enemy.fbx");
-    std::fs::write(&enemy, QUAD).unwrap();
-    std::fs::write(root.join("broken.fbx"), "not an fbx").unwrap();
-    std::fs::write(root.join("notes.txt"), "not a model").unwrap();
-
-    let hold = PlayHold::take();
-    assert_eq!(refresh_sources(&root), 0, "nothing converts while held");
-    drop(hold);
-    assert!(!cache_location(&enemy).unwrap().is_file());
-
-    assert_eq!(refresh_sources(&root), 2, "both sources looked at");
-    let cache = cache_location(&enemy).unwrap();
-    let before = stamp(&cache);
-    let hold = PlayHold::take();
-    assert_eq!(indices(&enemy), 6, "served from the refresh in Play");
-    drop(hold);
-    refresh_sources(&root);
-    assert_eq!(
-        stamp(&cache),
-        before,
-        "a current source is not converted again"
-    );
 }

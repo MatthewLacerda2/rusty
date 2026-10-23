@@ -5,30 +5,32 @@
 //! its earlier instances don't have. Unity's runtime loads never import either; it
 //! refreshes the asset database before Play instead. So `app::GameWorld` brings
 //! every converted source in the project up to date ([`refresh_sources`]) and then
-//! takes a [`PlayHold`] for as long as it plays; the standalone player [`ship`]s,
-//! for good, since a shipped game reads its caches and nothing else. Conversion
-//! runs only while no hold is taken and nothing shipped.
+//! takes a [`PlayHold`] for as long as it plays, the standalone player too (no
+//! export step ships its caches yet, #1267). Conversion runs only while no hold is
+//! taken.
 //!
 //! While it is off, [`cached_gltf`](super::cached_gltf) serves the cache as it
 //! stands, current or not, and holds back each source it found changed;
 //! [`convert_held`] converts them once conversion is on again (the first edit
 //! frame after Stop), and the swap's note reloads every entity using the model
-//! (#1242). A source with no cache at all fails its load.
+//! (#1242). A source with no cache at all fails its load. A source whose
+//! conversion failed at the refresh but has an older cache plays from that one,
+//! warned of as changed.
 //!
 //! Process-wide, as the cache and its lock are (per thread under test). The play
 //! state lives in `app`, above this module, so `app` holds the switch and this
 //! module never reads it.
 
-use super::{cached_gltf, converter_for, is_import_cache, stale, Converter};
+use super::{cached_gltf, converter_for, stale, Converter};
 use crate::asset::ImportError;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
 /// Who refuses conversion, and the sources found changed while it was refused.
 struct Gate {
     /// Live [`PlayHold`]s: one per world in Play.
     plays: usize,
-    /// A shipped game: never converts, whatever plays.
-    shipped: bool,
+    /// A standalone game ([`mark_standalone`]): what its warnings say, nothing more.
+    standalone: bool,
     /// Sources found changed while refused, in the order found.
     held: Vec<PathBuf>,
     /// Sources with no cache already warned of while refused.
@@ -37,14 +39,24 @@ struct Gate {
 
 impl Gate {
     fn allowed(&self) -> bool {
-        self.plays == 0 && !self.shipped
+        self.plays == 0
+    }
+
+    /// What a held source plays from, in this run's words: a standalone game has no
+    /// Stop to wait for.
+    fn uses(&self) -> &'static str {
+        if self.standalone {
+            "the game uses the last import"
+        } else {
+            "Play uses the last import until Stop"
+        }
     }
 }
 
-/// On until a world plays or the game ships.
+/// On until a world plays.
 const ON: Gate = Gate {
     plays: 0,
-    shipped: false,
+    standalone: false,
     held: Vec::new(),
     missing: Vec::new(),
 };
@@ -93,10 +105,10 @@ impl Drop for PlayHold {
     }
 }
 
-/// Refuse conversion for the rest of the process: a shipped game (the standalone
-/// player) reads the caches it ships with.
-pub fn ship() {
-    with_gate(|gate| gate.shipped = true);
+/// Word warnings for a standalone game (the player), which has no edit mode to
+/// return to. Conversion is refused by its [`PlayHold`], as the editor's is.
+pub fn mark_standalone() {
+    with_gate(|gate| gate.standalone = true);
 }
 
 /// Whether a stale or missing cache is converted now.
@@ -113,7 +125,11 @@ pub fn refresh_sources(root: &Path) -> usize {
         return 0;
     }
     let mut sources = Vec::new();
-    collect_sources(root, &mut sources);
+    crate::asset::manifest::walk(root, &mut |path| {
+        if converter_for(path).is_some() {
+            sources.push(path.to_path_buf());
+        }
+    });
     sources.sort();
     for source in &sources {
         if let Err(e) = cached_gltf(source) {
@@ -121,22 +137,6 @@ pub fn refresh_sources(root: &Path) -> usize {
         }
     }
     sources.len()
-}
-
-/// Every file under `dir` a converter reads, the import cache left out.
-fn collect_sources(dir: &Path, out: &mut Vec<PathBuf>) {
-    let Ok(entries) = std::fs::read_dir(dir) else {
-        return;
-    };
-    for path in entries.flatten().map(|entry| entry.path()) {
-        if is_import_cache(&path) {
-            continue;
-        } else if path.is_dir() {
-            collect_sources(&path, out);
-        } else if converter_for(&path).is_some() {
-            out.push(path);
-        }
-    }
 }
 
 /// Convert every source held back while conversion was off, once it is on again.
@@ -168,16 +168,14 @@ pub(super) fn serve(converter: &Converter, source: &Path, out: &Path) -> Result<
     if !out.is_file() {
         return Err(not_imported(source));
     }
-    let (held, shipped) = with_gate(|gate| (gate.held.iter().any(|p| p == source), gate.shipped));
-    if held || stale(converter, source, out)?.is_none() {
+    let key = key(source);
+    if with_gate(|gate| gate.held.contains(&key)) || stale(converter, source, out)?.is_none() {
         return Ok(());
     }
-    with_gate(|gate| gate.held.push(source.to_path_buf()));
-    let uses = if shipped {
-        "the game uses the last import"
-    } else {
-        "Play uses the last import until Stop"
-    };
+    let uses = with_gate(|gate| {
+        gate.held.push(key);
+        gate.uses()
+    });
     log::warn!(
         "[Asset] {}: changed since its import; {uses}",
         source.display()
@@ -191,21 +189,33 @@ fn not_imported(source: &Path) -> ImportError {
     if !source.is_file() {
         return ImportError::Parse(format!("{}: file not found", source.display()));
     }
-    let first = with_gate(|gate| {
-        let first = !gate.missing.iter().any(|p| p == source);
+    let key = key(source);
+    let (first, standalone) = with_gate(|gate| {
+        let first = !gate.missing.contains(&key);
         if first {
-            gate.missing.push(source.to_path_buf());
+            gate.missing.push(key);
         }
-        first
+        (first, gate.standalone)
     });
+    let fix = if standalone {
+        "a running game does not import; open the project in the editor to import it"
+    } else {
+        "Play does not import; import it in edit mode first"
+    };
     if first {
-        log::warn!(
-            "[Asset] {}: not imported yet, and Play does not import; import it in edit mode first",
-            source.display()
-        );
+        log::warn!("[Asset] {}: not imported yet, and {fix}", source.display());
     }
     ImportError::Parse(format!(
-        "{}: no imported copy to play from; import it in edit mode first",
+        "{}: no imported copy to play from; {fix}",
         source.display()
     ))
+}
+
+/// The one spelling of `source` the held and missing lists compare: `./assets/x.fbx`
+/// and `assets/x.fbx` are one entry.
+pub(super) fn key(source: &Path) -> PathBuf {
+    source
+        .components()
+        .filter(|part| *part != Component::CurDir)
+        .collect()
 }

@@ -47,7 +47,7 @@ Authored 3D assets come from **Blender** (its native glTF 2.0 export), or are
 anywhere else. An `.fbx` (binary or ASCII) is converted to glTF when it is imported,
 skins and animation stacks included, by the `ufbx` library inside the engine: the converted copy is cached under
 `assets/generated/imported/` and re-made when the source changes (outside Play, and
-for every source as Play starts; Play and a shipped game never convert), while scenes keep
+for every source as Play starts; Play itself never converts), while scenes keep
 naming the `.fbx`. The engine reads those standard interchange formats directly — it
 **never parses `.blend` and never shells out to Blender** as a subprocess (the
 fragile Unity-style convenience that breaks the moment Blender isn't installed).

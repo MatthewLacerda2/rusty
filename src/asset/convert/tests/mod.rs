@@ -12,6 +12,7 @@ mod identity;
 mod locking;
 mod looks;
 mod notes;
+mod refresh;
 mod skips;
 mod staging;
 mod unlocked;
