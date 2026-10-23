@@ -80,12 +80,16 @@ watch keeps merging the rest** (#751): it prints one line,
 head is remembered (under the checkout's git directory) and passed over, by
 this watch and later ones, until it moves — pushing a fix is the whole of
 re-queueing it. **A new run attempt on that head counts as moving** (#869): `gh
-run rerun --failed ID` re-queues it, no push, no relaunch. **A hand-back an edit
-fixes waits for the edit, not a push** (#1279): one for what the description or
-labels claim (a missing `Closes #N`, a stray keyword, a `planning` issue, an
-issue-less code change) says "no push needed", and the watch takes it again once
-the pull request's body or labels change; one for red CI, a conflict or an image
-says "Push a fix" and waits for the head. A run is judged by its **latest attempt** (#881): when the runs listing still shows an older attempt than the run's jobs do, the jobs' attempt is the run, so a green re-run that landed before the verdict is not handed back. The watch **exits** on the machine failing (below), on its
+run rerun --failed ID` re-queues it, no push, no relaunch. **A hand-back no push
+fixes waits for what does** (#1279). One for what the description or labels
+claim (a missing `Closes #N`, a stray keyword, a wrong number, an issue-less code
+change) says "no push needed", and the watch takes it again once the pull
+request's body or labels change. One the issue refuses (it is labelled
+`planning`/`human`, has an open blocker, or is already closed) says "the issue
+blocks it": the watch asks about that issue each listing and takes the pull
+request again once it no longer refuses it (or the description changes). One for
+red CI, a conflict or an image says "push a fix, or re-run the failed jobs" and
+waits for the head to move or run again. A run is judged by its **latest attempt** (#881): when the runs listing still shows an older attempt than the run's jobs do, the jobs' attempt is the run, so a green re-run that landed before the verdict is not handed back. The watch **exits** on the machine failing (below), on its
 `--for` deadline, or when nothing is left (no open pull request, or only drafts,
 unlabelled and handed-back heads, none moved for `--idle` minutes, default 90). Its exit
 status says what to do: **0** nothing to read, **1** something was handed back

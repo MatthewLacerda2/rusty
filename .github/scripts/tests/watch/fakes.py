@@ -32,7 +32,7 @@ class World:
             pulls=self.pulls, issue_labels=dict, clashes=lambda pulls: self.clashes,
             stale_code=lambda: self.code_moved, stop_requested=lambda: self.stop,
             main_conflicts=lambda pulls: {p["number"]: self.stale[p["number"]] for p in pulls if p["number"] in self.stale},
-            turn=self.turn, head=lambda n: f"pushed{n}", attempts=lambda n, sha: "",
+            turn=self.turn, head=lambda n: f"pushed{n}", attempts=lambda n, sha: "", blocks=lambda issues: issues,
             clock=lambda: self.now, sleep=self.sleep, say=lambda *a: None,
             memory=Path(tmp, handbacks.MEMORY), bots=pulls.BOTS, merged=outcomes.MERGED,
             ends={outcomes.GREEN, outcomes.DRY}, stops={outcomes.STOPPED}, skips={outcomes.NOT_READY},

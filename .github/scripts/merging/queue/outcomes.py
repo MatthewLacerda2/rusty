@@ -19,10 +19,26 @@ RUNNERS = "runners unavailable"
 # report never claims a merge it did not make.
 MERGED, GREEN, DRY, HANDED_BACK = "merged", "green", "dry run", "handed back"
 
-# A hand-back for what the description or labels claim ([`verdict.protocol.refusal`]):
-# an edit fixes it, so the watch re-reads it when they change, not only when the
-# head moves (#1279: #1275's fixed description sat until the daemon restarted).
-RECLAIM = "handed back: description"
+# A hand-back no push fixes ([`verdict.protocol.refusal`], #1279: #1275's fixed
+# description sat until the daemon restarted). `AWAITS_EDIT`: what the description
+# or labels claim, re-read when they change; `AWAITS_ISSUE`: the issue it closes
+# is staged, blocked or closed, re-read when that issue no longer blocks it.
+AWAITS_EDIT, AWAITS_ISSUE = "handed back: description", "handed back: issue"
+AWAITING = (AWAITS_EDIT, AWAITS_ISSUE)
+
+
+class Awaiting(tuple):
+    """An `AWAITS_*` hand-back: the `(number, state, why)` every caller unpacks,
+    carrying what the pull request claimed as it was judged ([`watch.handbacks.claim`])
+    and the issues that refused it ([`verdict.closing.blocking`])."""
+
+    claim: str
+    issues: tuple[int, ...]
+
+    def __new__(cls, number: int, state: str, why: str, claim: str, issues=()):
+        made = super().__new__(cls, (number, state, why))
+        made.claim, made.issues = claim, tuple(issues)
+        return made
 
 # The machine failed, not the branch ([`stopping.Stopped`]); and what the stop left untouched.
 STOPPED, NOT_TAKEN = "stopped the queue", "not taken"

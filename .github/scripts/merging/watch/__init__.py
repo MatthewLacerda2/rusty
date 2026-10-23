@@ -21,7 +21,11 @@ the background is woken then. A hand-back is not one of those (#751):
   watch or a later one; `make queue PRS=N` ignores the memory. **A new run
   attempt on that head counts as moving** (#869): the runs on it are
   remembered too ([`handbacks.RUNS_MEMORY`], [`handbacks.rerun_heads`]), so `gh run rerun` after a
-  runner outage, or a flaky job re-run by hand, re-queues it without a push. The starter still
+  runner outage, or a flaky job re-run by hand, re-queues it without a push. **A hand-back no push fixes waits for what does**
+  (#1279, [`handbacks`]): one for the description or labels comes back when they
+  change ([`handbacks.CLAIMS_MEMORY`]), one the closed issue refuses when that
+  issue no longer does ([`handbacks.ISSUES_MEMORY`]); #1275 sat with a fixed
+  description until the daemon restarted. The starter still
   hears at once: each hand-back prints one line beginning [`ending.HANDED_BACK_LINE`]
   (a `Monitor` on the output can wake on it), and the exit status at the end
   says one happened ([`ending.status`]), as scorsese's does (scorsese#615, #690).

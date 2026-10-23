@@ -78,6 +78,23 @@ def open_pulls(repo: str) -> list[dict] | None:
     return shaped
 
 
+def issues_block(repo: str, numbers: tuple[int, ...]) -> list[int] | None:
+    """Which of `numbers` still refuse a merge ([`verdict.closing.blocking`]),
+    `None` when GitHub failed: what re-admits an `AWAITS_ISSUE` hand-back (#1279)."""
+    closes = {}
+    for n in numbers:
+        issue = quietly("api", f"repos/{repo}/issues/{n}")
+        if issue is None:
+            return None
+        if issue.get("state") == "open":
+            blockers = quietly("api", f"repos/{repo}/issues/{n}/dependencies/blocked_by?per_page=100")
+            if blockers is None:
+                return None
+            issue = {**issue, "blocked_by": blockers}
+        closes[n] = issue
+    return closing.blocking(closes)
+
+
 def head_of(repo: str, number: int) -> str | None:
     """The head commit of pull request `number`, `None` when GitHub failed."""
     return ((quietly("api", f"repos/{repo}/pulls/{number}") or {}).get("head") or {}).get("sha")

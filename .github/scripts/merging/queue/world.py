@@ -56,6 +56,7 @@ def effects(repo: str, opts: argparse.Namespace) -> argparse.Namespace:
         ),
         head=functools.partial(pulls.head_of, repo),
         attempts=lambda number, sha: pulls.head_runs(repo, sha),
+        blocks=functools.partial(pulls.issues_block, repo),
         clock=time.monotonic,
         sleep=time.sleep,
         say=outcomes.say,
@@ -63,7 +64,7 @@ def effects(repo: str, opts: argparse.Namespace) -> argparse.Namespace:
         bots=pulls.BOTS,
         merged=outcomes.MERGED,
         # A dry run previews every ready one; it hands nothing back for real.
-        ends={outcomes.GREEN, outcomes.DRY} | ({outcomes.HANDED_BACK, outcomes.RECLAIM} if opts.dry_run else set()),
+        ends={outcomes.GREEN, outcomes.DRY} | ({outcomes.HANDED_BACK, *outcomes.AWAITING} if opts.dry_run else set()),
         stops={outcomes.STOPPED},
         skips={outcomes.NOT_READY},
     )

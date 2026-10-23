@@ -78,12 +78,22 @@ def refusal(closes: dict[int, dict]) -> list[str]:
         lines.append(
             "`planning` and `human` mean do not start (CLAUDE.md, *Overrides*: never"
             " with `planning` on), and neither does an open blocker (*Dependencies*)."
-            " Only the operator removes the label or the block; queue it again once"
-            " they have."
+            " Only the operator removes the label or the block; the watch takes it"
+            " again once they have (#1279)."
         )
     if wrong:
         lines.append("Fix the number, or write `Refs #N` for an issue left open; editing the description needs no push.")
     return lines
+
+
+def blocking(closes: dict[int, dict]) -> list[int]:
+    """The issues among `closes` that refuse it whatever the description says:
+    labelled `planning`/`human`, blocked by an open issue, or already closed.
+    Only a change to the issue clears them (#1279), unlike a wrong number."""
+    return sorted(
+        number for number, issue in closes.items()
+        if issue.get("state") == "closed" or any(s in labels(issue) for s in STAGES) or open_blockers(issue)
+    )
 
 
 def open_blockers(issue: dict) -> list[int]:

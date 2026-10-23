@@ -9,6 +9,7 @@ import time
 
 from merging.queue import checks, dependabot, gitio, landing, outcomes, pulls, rebase, stamping, waiting
 from merging.verdict import carried, closing, decide, github, protocol
+from merging.watch import handbacks
 
 
 def dry(repo: str, pull: dict, fresh: str, notes: list[str]) -> tuple[int, str, str]:
@@ -39,11 +40,16 @@ def take(repo: str, number: int, opts: argparse.Namespace, tick=None) -> tuple[i
         return number, outcomes.HANDED_BACK, outcomes.A_DRAFT
     # Also before any push: what the pull request claims (#927), with the issues'
     # labels as they stand now, so a greenlight given since it was queued counts.
-    refused = protocol.refusal({**pull, "closes": closing.closed_by(repo, pull)})
+    closes = closing.closed_by(repo, pull)
+    refused = protocol.refusal({**pull, "closes": closes})
     if refused:
         outcomes.say(f"#{number}: {refused[0]}", *refused[1:])
-        # An image is deleted by a commit; everything else here is an edit (#1279).
-        return number, outcomes.HANDED_BACK if carried.images(pull) else outcomes.RECLAIM, refused[0]
+        # An image is deleted by a commit; the rest waits for an edit or an issue (#1279).
+        if carried.images(pull):
+            return number, outcomes.HANDED_BACK, refused[0]
+        blocking = closing.blocking(closes)
+        state = outcomes.AWAITS_ISSUE if blocking else outcomes.AWAITS_EDIT
+        return outcomes.Awaiting(number, state, refused[0], handbacks.claim(pull), blocking)
 
     branch, head = pull["headRefName"], pull["headRefOid"]
     gitio.remote("fetch", "--quiet", "origin", "main", cwd=opts.root)
