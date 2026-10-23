@@ -70,7 +70,7 @@ def desktop_entry(root: Path) -> str:
             f"Path={_desktop_string(str(root))}",
             f"Icon={APP_ID}",
             "Terminal=false",
-            "Categories=Development;Game;",
+            "Categories=Development;",
             "Keywords=game;engine;editor;",
             f"StartupWMClass={APP_ID}",
             "",
