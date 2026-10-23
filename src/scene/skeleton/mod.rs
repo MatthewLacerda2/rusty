@@ -17,6 +17,8 @@
 //! - [`take_bone_parents`] + [`Scene::attach_to_bones`] put those attachments back
 //!   under their bones on load. A bone that no longer exists is warned about, never
 //!   dropped silently.
+//! - `reimport`: `Scene::take_skeleton` + `Scene::restore_skeleton` rebuild a live
+//!   skeleton from a re-imported rig, keeping what was authored on it (#1252).
 //! - `palette` builds each skinned mesh's posed palette from the bones.
 //! - `hitbox` fits per-bone hitbox colliders and names the bone a hit struck (#464).
 //! - `ragdoll` turns those hitboxes into jointed bodies and switches them between
@@ -29,6 +31,7 @@ mod ik;
 mod palette;
 mod persist;
 mod ragdoll;
+mod reimport;
 mod sync;
 
 use std::collections::BTreeSet;
@@ -113,5 +116,7 @@ impl Scene {
 mod fixture;
 #[cfg(test)]
 mod persist_tests;
+#[cfg(test)]
+mod reimport_tests;
 #[cfg(test)]
 mod tests;
