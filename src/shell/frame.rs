@@ -164,5 +164,8 @@ pub fn acquire_frame(renderer: &mut Renderer) -> Option<wgpu::SurfaceTexture> {
 }
 
 #[cfg(test)]
+#[path = "frame_edit_tests.rs"]
+mod frame_edit_tests;
+#[cfg(test)]
 #[path = "frame_tests.rs"]
 mod frame_tests;

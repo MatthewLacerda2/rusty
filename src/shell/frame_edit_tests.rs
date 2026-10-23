@@ -7,8 +7,8 @@ use std::path::Path;
 use std::rc::Rc;
 
 use super::*;
-use crate::core::fs::written::write;
 use crate::components::ImageComponent;
+use crate::core::fs::written::write;
 use crate::core::input::InputState;
 use crate::navigation::NavigationGraph;
 use crate::scene::{asset_mesh_component, Scene};
