@@ -70,19 +70,20 @@ pub(super) fn placements(
         .collect()
 }
 
-/// The group's own layout sizes along `axis` (its width `width` for heights).
+/// The own layout sizes along `axis` (its width `width` for heights) of the group
+/// on `id`; `None` when `id` has no group.
 pub(super) fn group_sizes(
     world: &World,
     textures: &TextureSizes,
     id: u32,
-    g: &LayoutGroupComponent,
     axis: usize,
     width: f32,
     depth: u32,
-) -> Sizes {
+) -> Option<Sizes> {
+    let g = &world.layout_group(id)?;
     let children = layout_children(world, id);
     if g.kind == LayoutKind::Grid {
-        return grid::sizes(g, children.len(), axis, width);
+        return Some(grid::sizes(g, children.len(), axis, width));
     }
     let group = Linear {
         world,
@@ -96,7 +97,7 @@ pub(super) fn group_sizes(
     } else {
         Vec::new()
     };
-    totals(g, axis, &group.entries(axis, &widths))
+    Some(totals(g, axis, &group.entries(axis, &widths)))
 }
 
 impl Linear<'_> {

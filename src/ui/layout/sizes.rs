@@ -86,8 +86,7 @@ fn content_sizes(
     depth: u32,
 ) -> Sizes {
     let mut s = Sizes::default();
-    if let Some(g) = world.layout_group(id) {
-        let group = group::group_sizes(world, textures, id, &g, axis, width, depth + 1);
+    if let Some(group) = group::group_sizes(world, textures, id, axis, width, depth + 1) {
         s = s.max(group);
     }
     if let Some(t) = world.text(id) {
