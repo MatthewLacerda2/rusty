@@ -105,6 +105,6 @@ fn a_lost_stamp_reconverts_over_its_own_textures_folder() {
 
     refresh(&TEXTURED, &source, &out).unwrap();
     assert_eq!(read_whole(&out), "one");
-    // The source, the `.glb`, its textures, its stamp and its lock.
-    assert_eq!(names(&dir).len(), 5, "{:?}", names(&dir));
+    // The source, the `.glb`, its textures and its stamp: the lock is elsewhere.
+    assert_eq!(names(&dir).len(), 4, "{:?}", names(&dir));
 }

@@ -39,8 +39,8 @@ fn a_reader_between_the_swaps_steps_finds_a_whole_set() {
         ]
     );
     assert_eq!(textures_dirs(&out).len(), 1, "{:?}", names(&dir));
-    // The source, the `.glb`, its textures, its stamp and its lock.
-    assert_eq!(names(&dir).len(), 5, "{:?}", names(&dir));
+    // The source, the `.glb`, its textures and its stamp: the lock is elsewhere.
+    assert_eq!(names(&dir).len(), 4, "{:?}", names(&dir));
 }
 
 #[test]

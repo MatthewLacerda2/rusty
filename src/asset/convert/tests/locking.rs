@@ -1,8 +1,9 @@
-//! The cache's lock (#1166): on a `<cache>.lock` file, not the source, and taken
-//! only to convert.
+//! The cache's lock (#1166): on a lock file of its own, not the source, taken
+//! only to convert, and kept out of `assets/` (#1190).
 
-use super::super::{lock, record, refresh};
+use super::super::{cache_path, lock, record, refresh};
 use super::COPY;
+use crate::core::{paths, project};
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{channel, Receiver};
 use std::time::Duration;
@@ -70,4 +71,45 @@ fn a_save_while_waiting_for_the_lock_is_what_gets_stamped() {
         Some(Vec::new()),
         "stamped as what it holds"
     );
+}
+
+/// Every file under `dir`, at any depth.
+fn files_under(dir: &Path) -> Vec<PathBuf> {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return Vec::new();
+    };
+    let paths = entries.flatten().map(|entry| entry.path());
+    paths
+        .flat_map(|p| if p.is_dir() { files_under(&p) } else { vec![p] })
+        .collect()
+}
+
+#[test]
+fn a_projects_lock_lives_in_its_cache_folder_never_in_assets() {
+    let root = crate::test_temp::dir();
+    std::fs::write(root.join(project::PROJECT_FILE), "").unwrap();
+    std::fs::create_dir_all(root.join("assets/models")).unwrap();
+    let source = root.join("assets/models/a.src");
+    std::fs::write(&source, "one").unwrap();
+    let out = cache_path(&root, Path::new("assets/models/a.src"));
+    refresh(&COPY, &source, &out).unwrap();
+    std::fs::write(&source, "two").unwrap();
+    refresh(&COPY, &source, &out).unwrap();
+
+    let assets = files_under(&root.join(project::ASSETS_DIR));
+    let is_lock = |p: &PathBuf| p.extension().is_some_and(|e| e == "lock");
+    assert!(!assets.iter().any(is_lock), "{assets:?}");
+    // Canonical, as `lock::path` is: macOS's temp dir `/var` is a link to `/private/var`.
+    let locks = paths::canonicalize(&root.join(project::CACHE_DIR).join(lock::LOCKS_DIR));
+    let locks = files_under(&locks.unwrap());
+    assert_eq!(locks, vec![lock::path(&out).unwrap()], "one lock, reused");
+}
+
+#[test]
+fn two_spellings_of_one_cache_share_its_lock() {
+    let dir = crate::test_temp::dir();
+    std::fs::create_dir_all(dir.join("sub")).unwrap();
+    let plain = lock::path(&dir.join("a.src.glb")).unwrap();
+    assert_eq!(lock::path(&dir.join("sub/../a.src.glb")).unwrap(), plain);
+    assert_ne!(lock::path(&dir.join("b.src.glb")).unwrap(), plain);
 }
