@@ -84,8 +84,8 @@ impl std::error::Error for ImportError {}
 /// The source model formats [`import_file`] reads, lowercase (#983, #994). The one
 /// list: the editor's content grid, inspector and preview read it rather than
 /// spelling their own, so nothing offers a model the importer would reject. `fbx`
-/// is read through a cached glTF ([`convert`], #1024).
-pub const MODEL_EXTENSIONS: &[&str] = &["gltf", "glb", "obj", "fbx"];
+/// and `blend` are read through a cached glTF ([`convert`], #1024, #1072).
+pub const MODEL_EXTENSIONS: &[&str] = &["gltf", "glb", "obj", "fbx", "blend"];
 
 /// The image formats a texture is decoded from, lowercase (#994): what the
 /// renderer's `image` decoders are built with (`Cargo.toml`'s `image` features).

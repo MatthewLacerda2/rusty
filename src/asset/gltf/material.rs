@@ -5,6 +5,7 @@ use super::uri;
 use crate::asset::convert::texture_ref;
 use crate::asset::mesh_data::MaterialData;
 use crate::asset::MapRef;
+use crate::core::paths;
 use std::path::Path;
 
 /// Read one glTF material into the pure-data [`MaterialData`]: the metallic-roughness
@@ -43,22 +44,25 @@ pub(super) fn material_data(
 }
 
 /// Resolve a glTF texture's image to a file path, anchored at the glTF file's
-/// directory; a named image of the glTF a conversion of `source` wrote is the
-/// reference to it instead (`convert::texture_ref`). Only the EXTERNAL-URI case
-/// is handled: an embedded image (`Source::View`, a buffer view / data URI) returns `None` — extracting its pixels
-/// to disk is a documented follow-up, out of scope for #203. The URI is
+/// directory; a named image a conversion of `source` wrote, which lies in the
+/// cache's folder, is the reference to it instead (`convert::texture_ref`). One
+/// that lies elsewhere is a file on disk and stays the path it is, whatever the
+/// converter named it (#1072). Only the EXTERNAL-URI case is handled: an embedded
+/// image (`Source::View`, a buffer view / data URI) returns `None` — extracting
+/// its pixels to disk is a documented follow-up, out of scope for #203. The URI is
 /// percent-decoded and folded (`uri::file`); one that doesn't decode is warned
 /// about and dropped.
 fn texture_path(texture: &gltf::Texture, base_dir: &Path, source: Option<&str>) -> Option<String> {
     let image = texture.source();
-    if let (Some(source), Some(name)) = (source, image.name()) {
-        return Some(texture_ref::reference(source, name));
-    }
-    match image.source() {
-        gltf::image::Source::Uri { uri, .. } => {
-            Some(uri::file(base_dir, uri)?.to_string_lossy().into_owned())
-        }
+    let file = match image.source() {
+        gltf::image::Source::Uri { uri, .. } => uri::file(base_dir, uri)?,
         // Embedded image: no on-disk path to reference (follow-up).
-        gltf::image::Source::View { .. } => None,
+        gltf::image::Source::View { .. } => return None,
+    };
+    if let (Some(source), Some(name)) = (source, image.name()) {
+        if file.starts_with(paths::fold(base_dir)) {
+            return Some(texture_ref::reference(source, name));
+        }
     }
+    Some(file.to_string_lossy().into_owned())
 }

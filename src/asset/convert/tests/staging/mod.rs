@@ -14,6 +14,7 @@ const TEXTURED: Converter = Converter {
     extension: "src",
     name: "textured",
     version: 1,
+    tool: None,
     convert: textured,
 };
 

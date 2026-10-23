@@ -22,9 +22,19 @@ use std::sync::{LazyLock, Mutex, PoisonError};
 /// the stamp but may skip differently.
 static WARNED: LazyLock<Mutex<Set<(PathBuf, String)>>> = LazyLock::new(Mutex::default);
 
-/// What the stamp records: the converter, its version and the source's digest.
-pub(super) fn stamp(converter: &Converter, digest: u64) -> String {
-    format!("{} {} {digest:016x}\n", converter.name, converter.version)
+/// What the stamp records: the converter, its version, the source's digest, and
+/// the version of the program the converter runs (`blender 1 <digest> 5.0.1`).
+pub(super) fn stamp(converter: &Converter, digest: u64, tool: Option<&str>) -> String {
+    let base = format!("{} {} {digest:016x}", converter.name, converter.version);
+    match tool {
+        Some(tool) => format!("{base} {tool}\n"),
+        None => format!("{base}\n"),
+    }
+}
+
+/// `stamp` without the version of the program that made it.
+fn untooled(stamp: &str) -> Vec<&str> {
+    stamp.split_whitespace().take(3).collect()
 }
 
 pub(super) fn stamp_path(out: &Path) -> PathBuf {
@@ -103,6 +113,14 @@ pub(super) fn current(out: &Path, stamp: &str) -> Option<Stored> {
     let stored = stored(out)?;
     let holds = stored.stamp == stamp && stored.depends_on.iter().all(Dependency::holds);
     holds.then_some(stored)
+}
+
+/// [`current`], made by any version of the converter's program: what stands in
+/// while that program cannot be found.
+pub(super) fn current_by_any_tool(out: &Path, stamp: &str) -> Option<Stored> {
+    let stored = stored(out)?;
+    let same = untooled(&stored.stamp) == untooled(stamp);
+    (same && stored.depends_on.iter().all(Dependency::holds)).then_some(stored)
 }
 
 /// Warn of what the conversion of `source` that wrote `stored` skipped, as it ran.

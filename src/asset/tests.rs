@@ -213,15 +213,15 @@ fn missing_sub_object_errors() {
 #[test]
 fn unsupported_format_errors() {
     assert!(matches!(
-        import_file(std::path::Path::new("foo.blend")),
+        import_file(std::path::Path::new("foo.max")),
         Err(ImportError::UnsupportedFormat(_))
     ));
     assert!(is_model_path("a/b/c.GLB"));
     assert!(!is_model_path("a/b/c.png"));
     assert!(is_image_path("a/b/c.JPG") && !is_image_path("a/b/c.glb"));
     // Every listed model format reaches an importer (a missing file is a parse
-    // error, not an unsupported one); FBX has none and is not listed (#983).
-    for ext in MODEL_EXTENSIONS.iter().chain(&["fbx"]) {
+    // error, not an unsupported one); `.max` has none and is not listed (#983).
+    for ext in MODEL_EXTENSIONS.iter().chain(&["max"]) {
         let err = import_file(&std::path::Path::new("missing").with_extension(ext));
         let unsupported = matches!(err, Err(ImportError::UnsupportedFormat(_)));
         assert_eq!(unsupported, !MODEL_EXTENSIONS.contains(ext), "{ext}");

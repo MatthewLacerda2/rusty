@@ -12,6 +12,7 @@ const WITH_TEXTURE: Converter = Converter {
     extension: "src",
     name: "copy-with-texture",
     version: 1,
+    tool: None,
     convert: with_texture,
 };
 

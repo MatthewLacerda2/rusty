@@ -12,6 +12,7 @@ mod identity;
 mod locking;
 mod looks;
 mod notes;
+mod on_disk;
 mod refresh;
 mod skips;
 mod staging;
@@ -22,6 +23,7 @@ const COPY: Converter = Converter {
     extension: "src",
     name: "copy",
     version: 1,
+    tool: None,
     convert: copy,
 };
 

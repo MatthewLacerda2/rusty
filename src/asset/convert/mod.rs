@@ -54,6 +54,7 @@
 //! **Adding a converter** is one row in [`CONVERTERS`]: an extension and a
 //! function that writes a glTF where its [`Staging`] says.
 
+mod blend;
 mod converter;
 mod depends;
 mod fbx;
@@ -62,6 +63,7 @@ pub mod glb;
 mod lock;
 mod record;
 mod stage;
+mod texture_file;
 pub mod texture_ref;
 
 pub use converter::{converter_for, Converted, Converter, Skip, CONVERTERS};
@@ -150,7 +152,20 @@ fn stale(converter: &Converter, source: &Path, out: &Path) -> Result<Option<Stri
         }
         _ => return Err(unreadable(source)),
     };
-    let stamp = record::stamp(converter, digest);
+    let stamp = match converter.tool.map(|identify| identify()) {
+        None => record::stamp(converter, digest, None),
+        Some(Ok(tool)) => record::stamp(converter, digest, Some(&tool)),
+        // No program to convert with: a cache of the unchanged source, made by
+        // any version of it, stands in; otherwise converting says what is missing.
+        Some(Err(_)) => {
+            let stamp = record::stamp(converter, digest, None);
+            let Some(stored) = record::current_by_any_tool(out, &stamp) else {
+                return Ok(Some(stamp));
+            };
+            record::replay(source, out, &stored);
+            return Ok(None);
+        }
+    };
     let Some(stored) = record::current(out, &stamp) else {
         return Ok(Some(stamp));
     };
