@@ -297,9 +297,11 @@ card) fits one collider per bone of `id`'s skinned mesh and returns
   ancestor). Same skin, same hitboxes: regenerating refits the existing ones in
   place and removes those that no longer qualify. In Play that removal waits for
   the tick's destroy phase, as `Scene.DestroyEntity` does, so a script under a
-  dropped hitbox gets its `OnDisable`/`OnDestroy` (#1298); until then the
-  hitbox is already gone to the engine (a `Ragdoll.Build` in the same
-  tick builds no body for its bone), though its entity is still readable.
+  dropped hitbox gets its `OnDisable`/`OnDestroy` (#1298). Until then the
+  hitbox lookups skip it, as they skip one under a bone a `Scene.DestroyEntity`
+  queued (a `Ragdoll.Build` or `GenerateHitboxes` in the same tick sees no
+  hitbox for that bone), but its entity is still readable and physics queries
+  (`Raycast` and the rest) still hit its collider until the destroy phase.
 - **On a child of the bone.** Each hitbox is an ordinary entity named `Hitbox`
   under its bone, carrying a plain `Collider`, so it stays hand-tweakable
   (`SetColliderShape`, `Transform.*`). Bones are rebuilt from the model on load,

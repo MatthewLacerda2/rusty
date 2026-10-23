@@ -64,7 +64,17 @@ fn pause_keeps_play_state_unlike_stop() {
         "pause must keep play-mode state (mutation survived): x={x_after_pause}"
     );
     assert!(
-        h.world.borrow().is_playing(),
+        h.world.borrow().scene().borrow().is_playing(),
         "pause does not leave play mode (that's Stop)"
     );
+}
+
+#[test]
+fn harness_snapshot_reports_the_state_not_the_request() {
+    // The harness asks for Play at boot, but the World enters it on the first step:
+    // until then its snapshot says `editor`, as `Debug.Snapshot` does (#1304).
+    let h = Harness::new(crate::temp::dir().join("rusty_snapshot_state"), "");
+    assert_eq!(h.snapshot()["play_state"].as_str(), Some("editor"));
+    h.step(1);
+    assert_eq!(h.snapshot()["play_state"].as_str(), Some("playing"));
 }

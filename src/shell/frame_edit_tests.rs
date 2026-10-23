@@ -43,7 +43,7 @@ fn a_frozen_frame_outside_play_reloads_a_rewritten_model() {
     write(Path::new(&path), triangle.as_bytes()).unwrap();
 
     advance_sim(&mut game, 0.02);
-    assert!(!game.is_playing());
+    assert!(!game.scene().borrow().is_playing());
     let indices = scene.borrow().world.mesh(id).unwrap().indices.len();
     assert_eq!(
         indices, 3,

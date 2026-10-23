@@ -129,9 +129,9 @@ impl GameWorld {
     }
 
     /// Whether the host asked for Play ([`set_playing`](Self::set_playing)); the
-    /// World enters it at the next tick's transition, when the scene's single
-    /// play state flips (`Scene::is_playing`, #1302).
-    pub fn is_playing(&self) -> bool {
+    /// World enters it at the next tick's transition. Whether it *is* in Play is
+    /// the scene's single play state, `Scene::is_playing` (#1302, #1304).
+    pub fn play_requested(&self) -> bool {
         self.resources.play_requested
     }
 

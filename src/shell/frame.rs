@@ -98,7 +98,7 @@ pub fn advance_sim(game: &mut GameWorld, delta_time: f32) -> PlayTransition {
     // on the scene the transition left; in Play it stays tick-driven, as headless.
     if !stepped {
         transition = game.poll_transition();
-        if !game.is_playing() {
+        if !game.play_requested() {
             game.edit_frame();
         }
     }

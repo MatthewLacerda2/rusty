@@ -7,7 +7,10 @@ fn session() -> Session {
 #[test]
 fn stays_in_edit_mode_with_live_evaluator() {
     let s = session();
-    assert!(!s.world().is_playing(), "session must not force play mode");
+    assert!(
+        !s.world().play_requested(),
+        "session must not force play mode"
+    );
     assert!(
         s.world().script_manager().is_live(),
         "edit-mode evaluator must be live"

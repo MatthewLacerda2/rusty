@@ -211,7 +211,7 @@ fn run_frame<F: Frontend>(
     frontend.on_play_transition(game, transition);
     shell.cursor.sync(frontend.cursor(game), &shell.window);
 
-    match frame::quit_action(F::HOST, game.take_quit_request(), game.is_playing()) {
+    match frame::quit_action(F::HOST, game.take_quit_request(), game.play_requested()) {
         QuitAction::Exit => {
             elwt.exit();
             return;

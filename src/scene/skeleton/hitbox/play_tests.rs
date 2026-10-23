@@ -53,3 +53,34 @@ fn a_ragdoll_built_before_the_drain_skips_a_doomed_hitbox() {
         "no body on the doomed hitbox's bone"
     );
 }
+
+#[test]
+fn a_ragdoll_built_after_a_limb_is_queued_skips_the_whole_limb() {
+    let mut scene = Scene::new();
+    let owner = rig(&mut scene);
+    let fine = HitboxOptions {
+        min_size: 0.01,
+        ..HitboxOptions::default()
+    };
+    scene.generate_hitboxes(owner, &fine).unwrap();
+    let arm = scene.find_bone(owner, "arm").unwrap();
+    let finger = scene.find_bone(owner, "finger").unwrap();
+    assert!(scene.hitbox_of(finger).is_some(), "the finger has its own");
+    scene.set_playing(true);
+    scene.destroy(arm); // `Scene.DestroyEntity(arm)`: queued with its subtree
+    assert_eq!(scene.hitbox_of(finger), None, "doomed with its bone");
+    let opts = RagdollOptions::default();
+    let made = scene.build_ragdoll(owner, &opts).unwrap();
+    assert_eq!(made.len(), 3, "pelvis, spine and head only");
+    for limb in [arm, finger] {
+        assert!(!scene.world.has_rigidbody(limb), "no body on a doomed bone");
+    }
+    let total: f32 = made
+        .iter()
+        .map(|(_, bone)| scene.world.rigidbody(*bone).unwrap().mass)
+        .sum();
+    assert!(
+        (total - opts.mass).abs() < 1e-3,
+        "the survivors share it all"
+    );
+}

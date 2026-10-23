@@ -96,7 +96,10 @@ fn esc_reaches_the_game_and_play_keeps_running() {
     let mut release = CursorRelease::default();
     release.on_key(KeyCode::Escape, true, true);
     game.tick(0.016);
-    assert!(game.is_playing(), "Esc no longer stops Play");
+    assert!(
+        game.scene().borrow().is_playing(),
+        "Esc no longer stops Play"
+    );
     assert!(game.input().borrow().get_key_down("ESCAPE"));
     let requested = game.input().borrow().cursor();
     assert!(requested.locked, "the game's own request is untouched");

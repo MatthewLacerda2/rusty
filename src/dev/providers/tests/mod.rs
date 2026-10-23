@@ -87,7 +87,7 @@ fn a_call_during_play_is_refused() {
     game.set_playing(true);
     let ledger = scratch("play").join("provider_budget.json");
     let refusal = permit(
-        game.is_playing(),
+        game.play_requested(),
         Provider::ElevenLabs,
         1,
         &keyed(),
@@ -98,7 +98,7 @@ fn a_call_during_play_is_refused() {
 
     game.set_playing(false);
     assert!(permit(
-        game.is_playing(),
+        game.play_requested(),
         Provider::ElevenLabs,
         1,
         &keyed(),
