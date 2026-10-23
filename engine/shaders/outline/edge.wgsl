@@ -9,8 +9,9 @@
 //    row within `radius` (in whole pixels, stored as k/255; 255 for none) into a
 //    one-channel target cleared to "none".
 // 2. `fs_edge` walks its column: a row `dy` away whose row distance `dx` has
-//    dx² + dy² <= radius² is a mask pixel inside the disc. It draws over the HDR
-//    target, as Unity's selection outline draws over the scene.
+//    dx² + dy² <= radius² is a mask pixel inside the disc. It draws over the
+//    post-FX output (#1224), as Unity's selection outline draws over the finished
+//    scene: no tonemap, grade, bloom, SSR, motion blur or FXAA touches the ring.
 
 struct EdgeParams {
     color: vec4<f32>,

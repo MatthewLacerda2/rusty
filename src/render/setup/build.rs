@@ -85,8 +85,13 @@ pub(crate) struct GpuResources {
 impl GpuResources {
     /// Build every *shared* GPU resource from an already-created device/queue. The
     /// per-view targets (depth + post-FX chain) are no longer built here — each
-    /// [`crate::render::RenderView`] owns its own (#355).
-    pub(crate) fn build(device: &wgpu::Device, queue: &wgpu::Queue) -> Self {
+    /// [`crate::render::RenderView`] owns its own (#355). `output_format` is what
+    /// post-FX writes, which the editor's outline ring and gizmos draw over (#1224).
+    pub(crate) fn build(
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        output_format: wgpu::TextureFormat,
+    ) -> Self {
         let mut registry = ShaderRegistry::new(crate::shadergen::engine_shader_dir());
         let camera_lighting_layout = bind_layouts::create_camera_lighting_layout(device);
         let entity_bones_layout = bind_layouts::create_entity_bones_layout(device);
@@ -108,6 +113,7 @@ impl GpuResources {
                 &shadows.layout,
             ],
             &textures,
+            output_format,
             &mut registry,
         );
         let billboards = create_billboard_passes(
@@ -241,14 +247,16 @@ fn create_shadow_system(
     }
 }
 
-/// Build the forward-lit, line, outline and skybox passes that all draw into the HDR
-/// offscreen target, the solids through the forward `shader`.
+/// Build the forward-lit, line, outline and skybox passes, the solids through the
+/// forward `shader`. Solids and sky draw into the HDR offscreen target; the editor's
+/// outline ring and line gizmos into `output_format`, over post-FX (#1224).
 /// `layouts` are groups 0, 1 and 3: camera + lighting, entity + bones, shadows.
 fn create_forward_passes(
     device: &wgpu::Device,
     shader: &wgpu::ShaderModule,
     [camera_lighting_layout, entity_bones_layout, shadow_layout]: [&wgpu::BindGroupLayout; 3],
     textures: &Textures,
+    output_format: wgpu::TextureFormat,
     registry: &mut ShaderRegistry,
 ) -> ForwardPasses {
     // Skybox binds a single-texture `GpuTexture.bind_group` at its group(1), so it
@@ -264,7 +272,7 @@ fn create_forward_passes(
     let pl = pipelines::create_pipelines(
         device,
         shader,
-        HDR_FORMAT,
+        [HDR_FORMAT, output_format],
         camera_lighting_layout,
         entity_bones_layout,
         &textures.material_layout,
@@ -275,7 +283,7 @@ fn create_forward_passes(
         render_pipeline: pl.forward,
         transparent_pipeline: pl.transparent,
         line_pipeline: pl.line,
-        outline: OutlinePasses::new(device, registry, &pl.layout),
+        outline: OutlinePasses::new(device, registry, &pl.layout, output_format),
         prepass_pipeline: pl.prepass,
         skybox_renderer,
     }

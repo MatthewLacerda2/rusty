@@ -1,7 +1,9 @@
 //! The editor's selection outline (#1175): an orange ring a fixed number of pixels
 //! wide around exactly what the forward pass drew for the selection. It is drawn the
 //! way Unity draws it, in screen space and over everything: an occluded selection
-//! still shows its whole ring, so it can be found behind a wall.
+//! still shows its whole ring, so it can be found behind a wall. Unity's order
+//! holds (#1224): scene, post-FX, the outline, then the handles and gizmos
+//! (`draw::overlays`), then the UI.
 //!
 //! 1. The forward pass marks the solids the selection rings ([`outlined`]) and
 //!    records each one's draw as it batches them (`FrameDraws::outline`): the mesh,
@@ -18,8 +20,8 @@
 //! 3. Two fullscreen passes (`outline/edge.wgsl`), scissored to the selection's
 //!    bounds on screen ([`OutlineBounds`]), colour each pixel outside the mask that
 //!    has a mask pixel within [`OUTLINE_PX`] (times the view's pixel scale): a row
-//!    dilation, then a column walk that draws the ring over the HDR target before
-//!    post-FX. Separable, so a pixel loads about 2·(2r+1) texels, not (2r+1)². All
+//!    dilation, then a column walk that draws the ring over the post-FX output, so
+//!    no grade, bloom, SSR, motion blur or FXAA treats it as scene colour. Separable, so a pixel loads about 2·(2r+1) texels, not (2r+1)². All
 //!    three passes are timed as the GPU timer's `outline`. There is no pivot
 //!    and no hull, so a pose far from its entity's origin rings evenly (#1165) and a
 //!    stretched box rings as wide along its long sides as its short ones; a
@@ -66,6 +68,8 @@ mod bounds_tests;
 mod draw_tests;
 #[cfg(test)]
 mod follow_tests;
+#[cfg(test)]
+mod order_tests;
 #[cfg(test)]
 mod shape_tests;
 #[cfg(test)]

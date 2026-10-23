@@ -21,7 +21,8 @@ pub(crate) struct ForwardPipelines {
     pub forward: wgpu::RenderPipeline,
     /// Alpha-blended translucent solids (#242): ALPHA_BLENDING, depth write off.
     pub transparent: LazyPipeline,
-    /// Line debug overlays.
+    /// The editor's line gizmos (grid, collider boxes, axis arrows, probes), drawn
+    /// over the post-FX output (#1224), so built against the output format.
     pub line: LazyPipeline,
     /// The SSAO depth prepass (#436): the forward vertex stage, no colour target.
     pub prepass: wgpu::RenderPipeline,
@@ -29,8 +30,9 @@ pub(crate) struct ForwardPipelines {
     pub layout: wgpu::PipelineLayout,
 }
 
-/// Builds the forward-lit and prepass pipelines, and the transparent and line debug
-/// pipelines to be built on first use.
+/// Builds the forward-lit and prepass pipelines into `format` (the HDR target), and
+/// the transparent and line debug pipelines to be built on first use; the lines into
+/// `output_format`, the post-FX output they draw over (#1224).
 // wgpu pipeline construction legitimately threads several distinct GPU resources
 // (device, shader, format, four bind-group layouts); bundling them into a struct
 // would only add an indirection without clarifying intent.
@@ -41,7 +43,7 @@ pub(crate) struct ForwardPipelines {
 pub(crate) fn create_pipelines(
     device: &wgpu::Device,
     shader: &wgpu::ShaderModule,
-    format: wgpu::TextureFormat,
+    [format, output_format]: [wgpu::TextureFormat; 2],
     camera_lighting_layout: &wgpu::BindGroupLayout,
     entity_bones_layout: &wgpu::BindGroupLayout,
     material_layout: &wgpu::BindGroupLayout,
@@ -54,7 +56,7 @@ pub(crate) fn create_pipelines(
         material_layout,
         shadow_layout,
     );
-    let lazy = |layout: &wgpu::PipelineLayout, spec: PipelineSpec| {
+    let lazy = |layout: &wgpu::PipelineLayout, format, spec: PipelineSpec| {
         let (shader, layout) = (shader.clone(), layout.clone());
         LazyPipeline::new(device, move |device| {
             make_pipeline(device, &shader, format, &layout, &spec)
@@ -62,8 +64,8 @@ pub(crate) fn create_pipelines(
     };
     ForwardPipelines {
         forward: make_pipeline(device, shader, format, &render_layout, &forward_spec()),
-        transparent: lazy(&render_layout, transparent_spec()),
-        line: lazy(&line_layout, line_spec()),
+        transparent: lazy(&render_layout, format, transparent_spec()),
+        line: lazy(&line_layout, output_format, line_spec()),
         prepass: make_prepass(device, shader, &render_layout, "fs_prepass"),
         layout: render_layout,
     }

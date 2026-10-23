@@ -108,7 +108,7 @@ impl Renderer {
         // bindings, shadow system, forward/billboard passes), then assemble the
         // flat renderer from those groups and seed the editor gizmo meshes. Per-view
         // targets (depth + post-FX) belong to each `RenderView`, not the renderer (#355).
-        let gpu = GpuResources::build(&device, &queue);
+        let gpu = GpuResources::build(&device, &queue, config.format);
         let mut renderer = Self::assemble(
             device,
             queue,

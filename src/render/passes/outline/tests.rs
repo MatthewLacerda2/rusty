@@ -54,7 +54,8 @@ pub(super) fn is_outline(p: &[u8]) -> bool {
     p[0] > 180 && (60..200).contains(&p[1]) && p[2] < 80
 }
 
-/// (outline pixel count, their centroid, whether the centre pixel is outline).
+/// (outline pixel count, their centroid, whether the pixel at that centroid is
+/// outline: inside a ring it is the selection, never the ring).
 pub(super) fn outline_stats(px: &[u8]) -> (usize, [f32; 2], bool) {
     let hits: Vec<[f32; 2]> = px
         .chunks(4)
@@ -66,12 +67,10 @@ pub(super) fn outline_stats(px: &[u8]) -> (usize, [f32; 2], bool) {
     let sum = hits
         .iter()
         .fold([0.0; 2], |a, h| [a[0] + h[0], a[1] + h[1]]);
-    let mid = ((RES / 2) * RES + RES / 2) as usize * 4;
-    (
-        hits.len(),
-        sum.map(|s| s / n),
-        is_outline(&px[mid..mid + 4]),
-    )
+    let centroid = sum.map(|s| s / n);
+    let [x, y] = centroid.map(|c| (c.round() as u32).min(RES - 1));
+    let mid = (y * RES + x) as usize * 4;
+    (hits.len(), centroid, is_outline(&px[mid..mid + 4]))
 }
 
 #[test]

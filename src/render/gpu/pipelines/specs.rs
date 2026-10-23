@@ -17,6 +17,8 @@ pub(super) struct PipelineSpec {
     pub blend: wgpu::BlendState,
     pub depth_write_enabled: bool,
     pub depth_compare: wgpu::CompareFunction,
+    /// The fragment entry point: `fs_main`, or the gizmos' unfogged `fs_gizmo`.
+    pub fragment: &'static str,
 }
 
 impl PipelineSpec {
@@ -31,6 +33,7 @@ impl PipelineSpec {
             blend: wgpu::BlendState::REPLACE,
             depth_write_enabled: true,
             depth_compare: wgpu::CompareFunction::Less,
+            fragment: "fs_main",
         }
     }
 }
@@ -52,9 +55,12 @@ pub(super) fn transparent_spec() -> PipelineSpec {
     }
 }
 
-/// Line debug overlays: don't write depth so they display over the grid.
+/// The editor's line gizmos: don't write depth so they display over the grid. Drawn
+/// on the finished image after post-FX (#1224), so `fs_gizmo` writes the authored
+/// colour unfogged, as Unity draws its gizmos.
 pub(super) fn line_spec() -> PipelineSpec {
     PipelineSpec {
+        fragment: "fs_gizmo",
         topology: wgpu::PrimitiveTopology::LineList,
         blend: wgpu::BlendState::ALPHA_BLENDING,
         depth_write_enabled: false,
@@ -63,9 +69,9 @@ pub(super) fn line_spec() -> PipelineSpec {
     }
 }
 
-/// Create one forward-pass render pipeline from a [`PipelineSpec`]. The five
-/// pipelines share the same vertex layout, shader entry points, and depth format;
-/// only the fixed-function knobs in the spec differ.
+/// Create one forward-pass render pipeline from a [`PipelineSpec`]. The pipelines
+/// share the same vertex layout, vertex entry point and depth format; only the
+/// spec's fixed-function knobs and fragment entry point differ.
 pub(super) fn make_pipeline(
     device: &wgpu::Device,
     shader: &wgpu::ShaderModule,
@@ -84,7 +90,7 @@ pub(super) fn make_pipeline(
         },
         fragment: Some(wgpu::FragmentState {
             module: shader,
-            entry_point: Some("fs_main"),
+            entry_point: Some(spec.fragment),
             compilation_options: Default::default(),
             targets: &[Some(wgpu::ColorTargetState {
                 format,

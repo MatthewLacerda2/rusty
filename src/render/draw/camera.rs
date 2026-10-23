@@ -10,8 +10,10 @@
 //! [`CameraCtx`]; a new camera-uniform field is set once, in [`CameraCtx::new`].
 //! No trait objects and no registration at runtime: a static, ordered table.
 //!
-//! One stage is not every camera's: `post_fx` runs only on the stack's last camera
-//! (it composites the whole stack) and returns early on the others.
+//! Three stages are not every camera's: `post_fx` runs only on the stack's last
+//! camera (it composites the whole stack) and returns early on the others, and the
+//! editor's `outline` and `handles` follow it there, onto the finished image, in
+//! Unity's order: scene, post-FX, outline, handles, then the UI (#1224).
 
 use super::pass::{PassClear, ScenePassFrame};
 use super::resources::SolidResources;
@@ -37,9 +39,10 @@ pub(crate) const CAMERA_PASSES: &[(&str, CameraPass)] = &[
     ("transparent", transparent),
     ("world_ui", world_ui),
     ("effects", effects),
-    ("outline", outline),
     ("count", count),
     ("post_fx", post_fx),
+    ("outline", outline),
+    ("handles", handles),
 ];
 
 /// Everything one camera's stages share, built once per camera.
@@ -135,15 +138,13 @@ fn batch_solids(r: &mut Renderer, _: &mut RenderView, ctx: &mut CameraCtx) {
 }
 
 fn scene_pass(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
-    let overlays = r.precreate_overlays(ctx.scene, ctx.stack.editor_mode);
     let frame = ScenePassFrame {
-        editor_mode: ctx.stack.editor_mode,
         clear: PassClear::for_pass(ctx.is_first, ctx.cam.clear_flags),
         ssao: ctx
             .ssao
             .map(|plan| SsaoFrame::for_camera(plan, ctx.view_proj, ctx.cam)),
     };
-    r.execute_scene_pass(view, frame, &ctx.solids.draws.opaque, &overlays);
+    r.execute_scene_pass(view, frame, &ctx.solids.draws.opaque);
 }
 
 /// Translucent solids (#242), back-to-front over the opaque ones.
@@ -162,12 +163,6 @@ fn effects(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
     ctx.effects = r.draw_effects(view, ctx.scene, ctx.cam);
 }
 
-/// The editor's selection outline (#1175), over everything this camera drew. Only
-/// an editor camera marked any solid for it (`batch_solids`).
-fn outline(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
-    r.draw_outline(view, &ctx.solids, ctx.view_proj);
-}
-
 fn count(r: &mut Renderer, _: &mut RenderView, ctx: &mut CameraCtx) {
     r.count_camera(&ctx.solids, ctx.effects);
 }
@@ -176,6 +171,22 @@ fn count(r: &mut Renderer, _: &mut RenderView, ctx: &mut CameraCtx) {
 fn post_fx(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
     if ctx.is_last {
         r.run_post_fx(view, ctx);
+    }
+}
+
+/// The editor's selection outline (#1175), onto the finished post-FX image (#1224).
+/// Only an editor camera marked any solid for it (`batch_solids`).
+fn outline(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
+    if ctx.is_last {
+        r.draw_outline(view, &ctx.solids, ctx.view_proj, ctx.stack.output);
+    }
+}
+
+/// The editor's handles and gizmos (grid, collider boxes, axis arrows, probes) over
+/// the outline, depth-tested against this camera's scene (#1224).
+fn handles(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
+    if ctx.is_last && ctx.stack.editor_mode {
+        r.draw_handles(view, ctx.scene, ctx.stack.output);
     }
 }
 

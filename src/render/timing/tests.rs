@@ -48,8 +48,8 @@ fn pass_names_are_stable_and_unique() {
             "transparent",
             "ribbons",
             "particles",
-            "outline",
             "post_fx",
+            "outline",
             "ui"
         ]
     );

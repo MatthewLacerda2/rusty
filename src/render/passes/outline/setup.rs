@@ -9,7 +9,6 @@ use crate::render::gpu::layout_entries::{texture_entry, uniform_entry};
 use crate::render::gpu::mesh::vertex_layout;
 use crate::render::gpu::pipelines::LazyPipeline;
 use crate::render::gpu::shaders::ShaderRegistry;
-use crate::render::postfx::HDR_FORMAT;
 
 /// The selection outline's three pipelines and the layout of the last two.
 pub(crate) struct OutlinePasses {
@@ -17,7 +16,7 @@ pub(crate) struct OutlinePasses {
     pub(crate) mask: LazyPipeline,
     /// Each pixel's distance to the mask along its row (`fs_dilate_x`).
     pub(crate) dilate: LazyPipeline,
-    /// The ring over the HDR target, alpha-blended (`fs_edge`).
+    /// The ring over the post-FX output, alpha-blended (`fs_edge`).
     pub(crate) edge: LazyPipeline,
     /// The dilation's and edge's group 0: the [`EdgeUniform`], the texture the pass
     /// reads along its axis, and the mask.
@@ -26,11 +25,13 @@ pub(crate) struct OutlinePasses {
 
 impl OutlinePasses {
     /// The outline's pipelines, unbuilt. The mask binds the forward pass's own groups,
-    /// so it is built through the forward pipeline `forward_layout`.
+    /// so it is built through the forward pipeline `forward_layout`; the ring draws
+    /// into `output_format`, the post-FX output (#1224).
     pub(crate) fn new(
         device: &wgpu::Device,
         registry: &mut ShaderRegistry,
         forward_layout: &wgpu::PipelineLayout,
+        output_format: wgpu::TextureFormat,
     ) -> Self {
         let mask_shader = registry.load(device, "outline/mask.wgsl", "Selection Mask Shader");
         let edge_shader = registry.load(device, "outline/edge.wgsl", "Selection Edge Shader");
@@ -72,7 +73,7 @@ impl OutlinePasses {
         };
         let dilate = fullscreen("fs_dilate_x", MASK_FORMAT, None);
         let blend = Some(wgpu::BlendState::ALPHA_BLENDING);
-        let edge = fullscreen("fs_edge", HDR_FORMAT, blend);
+        let edge = fullscreen("fs_edge", output_format, blend);
         Self {
             mask,
             dilate,

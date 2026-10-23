@@ -2,8 +2,8 @@
 //! glance at the scene shows where light/reflection probes sit and what they captured,
 //! so you don't bake blind. Nothing here touches the bake, the SH/cubemap data, or the
 //! lit-scene shading; the gizmos draw through the SAME editor-overlay line path as the
-//! grid/AABB/axis overlays and ride the SAME editor-mode toggle (built in
-//! `precreate_overlays` only when `editor_mode`, never in a shipped game render).
+//! grid/AABB/axis overlays, in the handles pass an editor camera runs after post-FX
+//! (`overlays::handles`, #1224), never in a shipped game render.
 //!
 //! Two families, both line-list geometry on the `line_pipeline`:
 //!   * Light probes — a small 3-axis cross marker at each probe position, TINTED by the
@@ -77,7 +77,7 @@ impl Renderer {
         (vertex_buffer, entity_buf, bind_group, verts.len() as u32)
     }
 
-    /// Draw the probe gizmos into the scene pass. Caller has already bound the
+    /// Draw the probe gizmos into the handles pass. Caller has already bound the
     /// `line_pipeline`, group 0 (camera/lighting) and group 3 (shadow); this binds each
     /// probe's group-1 uniform + group-2 default material (line draws never sample it).
     pub(crate) fn draw_probe_overlays<'a>(

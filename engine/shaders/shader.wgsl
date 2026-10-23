@@ -130,6 +130,14 @@ fn fs_shadow(in: VertexOutput) {
     shadow_clip(in);
 }
 
+// The editor's line gizmos (grid, collider boxes, axis arrows, probes): drawn on the
+// finished image after post-FX (#1224), so the authored colour as is, unlit and
+// unfogged, as Unity draws its gizmos. Fog is a scene effect; a gizmo is not scene.
+@fragment
+fn fs_gizmo(in: VertexOutput) -> @location(0) vec4<f32> {
+    return entity.color_tint;
+}
+
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     var base_color: vec4<f32>;
@@ -147,7 +155,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         discard;
     }
 
-    // Unlit rendering (e.g. grids, path highlights, light gizmos). Still fogged: an
+    // Unlit rendering (e.g. path highlights, a light's own mesh). Still fogged: an
     // unlit sign down a smoky corridor fades like the wall it hangs on (#437).
     if (entity.is_lit == 0u) {
         return vec4<f32>(apply_fog(camera.fog, base_color.rgb, in.world_position, camera.camera_pos), base_color.a);

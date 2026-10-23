@@ -29,7 +29,19 @@ pub fn read_texture_rgba8(
     width: u32,
     height: u32,
 ) -> Vec<u8> {
-    let unpadded_bytes_per_row = width * 4;
+    read_texture_bytes(device, queue, texture, (width, height), 4)
+}
+
+/// [`read_texture_rgba8`] for any single-plane colour format of `texel_bytes` bytes
+/// per texel (8 for the HDR target's `Rgba16Float`): the raw texels, tightly packed.
+pub(crate) fn read_texture_bytes(
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    texture: &wgpu::Texture,
+    (width, height): (u32, u32),
+    texel_bytes: u32,
+) -> Vec<u8> {
+    let unpadded_bytes_per_row = width * texel_bytes;
     let align = wgpu::COPY_BYTES_PER_ROW_ALIGNMENT;
     let padded_bytes_per_row = unpadded_bytes_per_row.div_ceil(align) * align;
 
