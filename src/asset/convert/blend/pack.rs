@@ -10,16 +10,21 @@
 //!   that identity as its name: the importer references it as
 //!   `model.blend#tex/<identity>` (#1130);
 //! - one that is a file on disk is referenced where it lies, from the `.glb`'s
-//!   folder, and the importer reads it as the plain path it is.
+//!   folder, its name dropped, and the importer reads it as the plain path it is:
+//!   a name could only shadow a made image's identity.
+//!
+//! A made file whose bytes are not a format the importer reads (by their magic
+//! number, among [`IMAGE_EXTENSIONS`]) is never referenced: it is a [`Skip`], and the glTF
+//! loses the image and every texture and material slot that sampled it (`drop`).
 //!
 //! Every linked library, and every image on disk a material uses, is looked at
 //! and recorded, found or not, so the cache re-converts when one changes (#1189).
 
 use super::super::stage::hook::{self, Step};
-use super::super::texture_file::{self, file_name, relative_uri, unique};
+use super::super::texture_file::{self, file_name, relative_uri, sniff, unique};
 use super::super::{glb, relative_to_cwd, stage, Converted, Dependency, Skip, Staging};
 use crate::asset::gltf::uri;
-use crate::asset::ImportError;
+use crate::asset::{ImportError, IMAGE_EXTENSIONS};
 use crate::core::collections::Map;
 use crate::core::paths;
 use serde::Deserialize;
@@ -94,7 +99,10 @@ pub(super) fn pack(dir: &Path, to: &Staging) -> Result<Converted, ImportError> {
         .map_err(|e| failed(&gltf_path, &e.to_string()))?;
     let bin = buffer(dir, &mut doc)?;
     let made = report.made.into_iter().map(|m| (m.file, m.name)).collect();
-    Images::new(dir, to, made).resolve(&mut doc)?;
+    let mut images = Images::new(dir, to, made);
+    images.resolve(&mut doc)?;
+    super::drop::images(&mut doc, &images.dropped);
+    converted.skipped.append(&mut images.skipped);
     let json = serde_json::to_vec(&doc).map_err(|e| failed(&gltf_path, &e.to_string()))?;
     hook::io(Step::WriteGltf)
         .and_then(|()| stage::write(&to.glb, &glb::container(json, bin)))
@@ -130,6 +138,9 @@ struct Images<'a> {
     made: Map<String, String>,
     /// File names written into the textures folder so far.
     written: Vec<String>,
+    /// The glTF images left out, by index, and why.
+    dropped: Vec<usize>,
+    skipped: Vec<Skip>,
 }
 
 impl<'a> Images<'a> {
@@ -144,6 +155,8 @@ impl<'a> Images<'a> {
             out_dir,
             made,
             written: Vec::new(),
+            dropped: Vec::new(),
+            skipped: Vec::new(),
         }
     }
 
@@ -152,7 +165,10 @@ impl<'a> Images<'a> {
         let Some(images) = doc.get_mut("images").and_then(Value::as_array_mut) else {
             return Ok(());
         };
-        for image in images.iter_mut().filter_map(Value::as_object_mut) {
+        for (index, image) in images.iter_mut().enumerate() {
+            let Some(image) = image.as_object_mut() else {
+                continue;
+            };
             let Some(Value::String(old)) = image.get("uri") else {
                 continue;
             };
@@ -160,12 +176,14 @@ impl<'a> Images<'a> {
                 .ok_or_else(|| failed(&self.dir.join(GLTF), &format!("a bad image URI `{old}`")))?;
             let file = paths::fold(&self.dir.join(decoded));
             let new = if file.starts_with(self.dir) {
-                let (uri, identity) = self.extract(&file)?;
+                let Some((uri, identity)) = self.extract(&file)? else {
+                    self.dropped.push(index);
+                    continue;
+                };
                 image.insert("name".into(), Value::String(identity));
                 uri
             } else {
-                // Named still: the importer makes it a plain path, as it lies
-                // outside the cache (`gltf::material`).
+                image.remove("name");
                 relative_uri(&self.out_dir, &file)
                     .ok_or_else(|| failed(&file, "an image on disk the `.glb` cannot reference"))?
             };
@@ -175,8 +193,9 @@ impl<'a> Images<'a> {
     }
 
     /// Move `file`, an image the conversion made, into the textures folder: its
-    /// URI there, and its identity.
-    fn extract(&mut self, file: &Path) -> Result<(String, String), ImportError> {
+    /// URI there, and its identity. `None`, and a [`Skip`], when its bytes are not
+    /// an image the importer reads.
+    fn extract(&mut self, file: &Path) -> Result<Option<(String, String)>, ImportError> {
         let bytes = read(file)?;
         let made = file
             .file_name()
@@ -188,13 +207,24 @@ impl<'a> Images<'a> {
         // The made file's extension is the format the script wrote; the bytes'
         // own format still wins (`file_name`).
         let ext = made.rsplit_once('.').map_or("", |(_, ext)| ext);
+        // The script writes only PNG or JPEG; anything else is never referenced.
+        if !sniff(&bytes).is_some_and(|kind| IMAGE_EXTENSIONS.contains(&kind)) {
+            self.skipped.push(Skip {
+                what: format!("Blender image `{identity}`"),
+                why: "its bytes are not an image rusty reads (PNG, JPEG)".into(),
+            });
+            return Ok(None);
+        }
         let (stem, ext) = file_name(&format!("{identity}.{ext}"), &bytes);
         let name = unique(&stem, &ext, &self.written);
         self.written.push(name.clone());
         texture_file::write(&self.to.textures, &name, &bytes)?;
         let folder =
             (self.to.textures.file_name()).map_or_else(Default::default, |n| n.to_string_lossy());
-        Ok((uri::encode_path(&format!("{folder}/{name}")), identity))
+        Ok(Some((
+            uri::encode_path(&format!("{folder}/{name}")),
+            identity,
+        )))
     }
 }
 

@@ -59,7 +59,7 @@ fn clean(s: &str) -> String {
 
 /// The extension `bytes`' magic number says they are: PNG, JPEG or OpenEXR. A
 /// TGA has no magic number, so its name is trusted.
-fn sniff(bytes: &[u8]) -> Option<&'static str> {
+pub(super) fn sniff(bytes: &[u8]) -> Option<&'static str> {
     if bytes.starts_with(b"\x89PNG\r\n\x1a\n") {
         Some("png")
     } else if bytes.starts_with(&[0xFF, 0xD8, 0xFF]) {

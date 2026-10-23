@@ -120,9 +120,19 @@ pub fn cache_location(path: &Path) -> Result<PathBuf, ImportError> {
 /// What the conversion skipped is warned of as it runs, and once per process
 /// from the cache (`record`), the source present or not.
 pub fn refresh(converter: &Converter, source: &Path, out: &Path) -> Result<(), ImportError> {
-    // Asked once: the program's lookup and version serve both checks below.
-    let asked = converter.tool.map(|identify| identify());
-    let tool = Tool::of(asked.as_ref());
+    // Asked once: the program's lookup and version serve both checks below. A
+    // missing source is served from its cache, so its program is never asked: a
+    // player shipped without its `.blend` sources never starts Blender.
+    let present = source.is_file();
+    let asked = converter
+        .tool
+        .filter(|_| present)
+        .map(|identify| identify());
+    let tool = if present {
+        Tool::of(asked.as_ref())
+    } else {
+        Tool::unasked(converter)
+    };
     if stale(converter, source, out, tool)?.is_none() {
         return Ok(());
     }

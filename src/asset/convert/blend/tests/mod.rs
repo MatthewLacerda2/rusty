@@ -4,12 +4,16 @@
 
 use crate::asset::convert::{converter_for, refresh, textures_dirs};
 use crate::asset::gltf::import::import_from;
+use crate::asset::gltf::uri;
 use crate::asset::{ImportedAsset, MapRef};
 use std::path::{Path, PathBuf};
 
+mod drop;
+mod library_image;
 mod linked;
 #[cfg(unix)]
 mod locate;
+mod packed_formats;
 #[cfg(unix)]
 mod run;
 
@@ -25,6 +29,21 @@ fn import(out: &Path) -> ImportedAsset {
     let converter = converter_for(&source).expect("a .blend converts");
     refresh(converter, &source, out).expect("the fixture converts");
     import_from(out, Some(&source.to_string_lossy())).expect("its glTF imports")
+}
+
+/// The colour of the first pixel of the base colour map material `material` of
+/// the `.glb` at `out` samples, read from the file its glTF image names.
+pub(super) fn pixel(out: &Path, material: &str) -> [u8; 4] {
+    let doc = gltf::Gltf::open(out).expect("the cached .glb reads");
+    let m = doc.materials().find(|m| m.name() == Some(material));
+    let info = m.and_then(|m| m.pbr_metallic_roughness().base_color_texture());
+    let image = info.expect(material).texture().source();
+    let gltf::image::Source::Uri { uri, .. } = image.source() else {
+        panic!("{material}'s image is a file beside the .glb");
+    };
+    let file = out.parent().unwrap().join(uri::decode(uri).expect("a URI"));
+    let decoded = image::open(&file).unwrap_or_else(|e| panic!("{}: {e}", file.display()));
+    decoded.to_rgba8().get_pixel(0, 0).0
 }
 
 pub(super) fn base_color_map(asset: &ImportedAsset, material: &str) -> String {

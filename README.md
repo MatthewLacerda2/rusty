@@ -57,15 +57,18 @@ only FBX and had Blender export one:
   import fails saying so, and an unchanged `.blend` still loads its last import. An
   export that runs past ten minutes is stopped (`RUSTY_BLENDER_TIMEOUT` sets the limit
   in seconds). Images packed into the `.blend` are extracted and named after their
-  image (a namesake from a linked library takes `.1`); images on disk are used where
-  they lie.
+  image (a namesake from a linked library takes `.1`): a packed PNG or JPEG as its
+  bytes, any other (BMP, TGA, EXR, a generated image) as an 8-bit PNG of its pixels,
+  so a float image's colour is clamped to 0..1 (HDR maps are not imported). Images
+  on disk are used where they lie, a linked library's found beside that library.
 
 The converted copy is cached under `assets/generated/imported/` and re-made when the
 source changes, or the Blender that made it does (outside Play, and for every source
 as Play starts; Play itself never converts), while scenes keep naming the source. A
 running game never starts Blender, not even to ask its version: it reads the cache as
 it stands. Only the refresh before Play does, in the editor and, while a game still
-ships with its sources (until #1267's export), in the standalone player. The engine
+ships with its sources (until #1267's export), in the standalone player; a `.blend`
+missing from the project is served from its cache without asking Blender anything. The engine
 never parses a `.blend` itself. Levels of detail
 follow the Unity / Blender naming convention: objects named `Crate_LOD0`,
 `Crate_LOD1`, … import as one `Crate` carrying an `LODGroup` that shows one level at

@@ -26,22 +26,27 @@ const TAIL_LINES: usize = 12;
 /// How often a run is polled for its end.
 const POLL: Duration = Duration::from_millis(20);
 
+/// What the Blender at `path` answers when asked its version: `Ok` of the version
+/// its answer names (or why it names none), `Err` when it gave no answer at all,
+/// since it could not start or ran past its limit.
+pub(super) type Answer = Result<Result<String, ImportError>, ImportError>;
+
 /// The version the Blender at `path` reports.
-pub(super) fn version(path: &Path) -> Result<String, ImportError> {
+pub(super) fn version(path: &Path) -> Answer {
     version_within(path, VERSION_TIMEOUT)
 }
 
 /// [`version`], asked within `limit`.
-pub(super) fn version_within(path: &Path, limit: Duration) -> Result<String, ImportError> {
+pub(super) fn version_within(path: &Path, limit: Duration) -> Answer {
     let output = run(path, Command::new(path).arg("--version"), limit)
         .map_err(|e| e.error(&format!("{} --version", path.display()), ""))?;
     let text = String::from_utf8_lossy(&output.stdout);
-    super::locate::parse_version(&text).ok_or_else(|| {
+    Ok(super::locate::parse_version(&text).ok_or_else(|| {
         ImportError::Parse(format!(
             "{} --version reported no Blender version",
             path.display()
         ))
-    })
+    }))
 }
 
 /// Export `source` with the Blender at `blender` into the folder `dir`, within

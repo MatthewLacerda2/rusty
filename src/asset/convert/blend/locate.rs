@@ -8,11 +8,14 @@
 //! it fakes instead of setting process-wide environment variables.
 //!
 //! Asking a version starts Blender, which takes most of a second, so the answer
-//! (a failure included: a broken `blender` on `PATH` is started once, not once
+//! (a wrong one included: a broken `blender` on `PATH` is started once, not once
 //! per check) is remembered by the executable's path, length and modification
-//! time, and an upgraded Blender is asked again. The executable a search found
-//! is remembered too, while the search and that file stay the same: a check of a
-//! current cache costs two `stat`s, not one per `PATH` folder.
+//! time, and an upgraded Blender is asked again. No answer at all (it could not
+//! start, or ran past its limit, as a slow first launch may) is not remembered,
+//! and is asked again next time. The executable a search found is remembered too,
+//! while the search and that file stay the same and it was not refused: a check
+//! of a current cache costs two `stat`s, not one per `PATH` folder, and a newer
+//! Blender put earlier on `PATH` after a refusal is found without a restart.
 
 use crate::asset::ImportError;
 use crate::core::collections::Map;
@@ -107,12 +110,14 @@ impl Search {
                 missing("no Blender was found on PATH or where it is usually installed")
             })?,
         };
-        let version = version(&path)?;
-        let major = major(&version);
-        if major.is_none_or(|m| m < MIN_MAJOR) {
-            return Err(missing(&format!("{} is Blender {version}", path.display())));
+        let checked = version(&path).and_then(|version| match major(&version) {
+            Some(m) if m >= MIN_MAJOR => Ok(Blender { path, version }),
+            _ => Err(missing(&format!("{} is Blender {version}", path.display()))),
+        });
+        if checked.is_err() {
+            *FOUND.lock().unwrap_or_else(PoisonError::into_inner) = None;
         }
-        Ok(Blender { path, version })
+        checked
     }
 
     /// [`Search::first_found`], remembered while this search, and the file it
@@ -199,9 +204,9 @@ fn version(path: &Path) -> Result<String, ImportError> {
             return version.clone();
         }
     }
-    let version = super::run::version(path);
-    lock().insert(path.to_path_buf(), (len, modified, version.clone()));
-    version
+    let answer = super::run::version(path)?;
+    lock().insert(path.to_path_buf(), (len, modified, answer.clone()));
+    answer
 }
 
 /// The version in `blender --version`'s output: the word after the first

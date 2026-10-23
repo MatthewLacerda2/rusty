@@ -21,17 +21,19 @@
 //! **Textures.** Only the images a material uses are looked at. One packed into
 //! the `.blend` (or generated in it) is written into the textures folder beside
 //! the `.glb`, flat, under its identity: the image's name, unique within the
-//! export (the first keeps it; a linked library's namesake takes `.1`), its
-//! extension the format of its bytes. A scene names it
+//! export (the first keeps it; a linked library's namesake takes `.1`): a packed
+//! PNG or JPEG as its bytes, any other as an 8-bit PNG of its pixels (a float
+//! image's colour clamped; HDR maps are out of scope). A scene names it
 //! `model.blend#tex/<identity>` (#1130). An image that is a file on disk stays a
-//! plain path to that file. Each linked library, and each image on disk, is a
+//! plain path to that file, a linked library's resolved against that library. Each linked library, and each image on disk, is a
 //! dependency of the cache (#1189), and a changed one re-converts into a textures
 //! folder of its own (`record::folder_tag`).
 //!
 //! **Authoring only.** A running game never starts Blender, not even to ask its
 //! version: Play serves the cache as it stands (`gate::serve`). Only the refresh
 //! before Play (`gate::refresh_sources`) converts, in the editor and, while a game
-//! still ships with its sources (until #1267's export), in the standalone player.
+//! still ships with its sources (until #1267's export), in the standalone player;
+//! a source missing from the project is served from its cache, Blender unasked.
 //!
 //! A converter never logs or drops a `Result`: what it leaves out on purpose is a
 //! [`Skip`](super::Skip) in what it returns, and any failure fails the conversion
@@ -46,6 +48,7 @@
     clippy::print_stderr
 )]
 
+mod drop;
 mod locate;
 mod pack;
 mod run;

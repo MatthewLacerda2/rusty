@@ -37,7 +37,7 @@ fn a_version_within_its_limit_is_read() {
     let dir = crate::test_temp::dir();
     let blender = fake(&dir, "Blender 5.0.1");
     let version = version_within(&blender, Duration::from_secs(10)).expect("answered");
-    assert_eq!(version, "5.0.1");
+    assert_eq!(version.expect("a version"), "5.0.1");
 }
 
 #[test]
@@ -51,4 +51,19 @@ fn the_export_limit_is_ten_minutes_unless_set_in_seconds() {
         let why = search.export_timeout().expect_err(bad).to_string();
         assert!(why.contains("RUSTY_BLENDER_TIMEOUT"), "{why}");
     }
+}
+
+#[test]
+fn a_program_that_could_not_start_is_asked_again() {
+    use std::os::unix::fs::PermissionsExt;
+    let dir = crate::test_temp::dir();
+    let blender = fake(&dir, "Blender 5.0.1");
+    let mode = |m| std::fs::set_permissions(&blender, std::fs::Permissions::from_mode(m));
+    mode(0o644).unwrap();
+    let search = search(None, Some(&dir));
+    let why = search.find().expect_err("not executable").to_string();
+    assert!(why.contains("starting"), "{why}");
+    // The same length and mtime: only an answer not remembered is asked again.
+    mode(0o755).unwrap();
+    assert_eq!(search.find().expect("asked again").version, "5.0.1");
 }

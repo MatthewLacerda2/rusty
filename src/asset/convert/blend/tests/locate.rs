@@ -99,3 +99,19 @@ fn the_version_is_the_word_after_blender() {
     assert_eq!(parse_version(noisy).as_deref(), Some("5.2.0"));
     assert_eq!(parse_version("Blender Foundation\n"), None);
 }
+
+#[test]
+fn a_newer_blender_put_earlier_on_path_after_a_refusal_is_found() {
+    let dir = crate::test_temp::dir();
+    let (first, second) = (dir.join("first"), dir.join("second"));
+    std::fs::create_dir_all(&first).unwrap();
+    fake(&second, "Blender 4.2.3");
+    let path = std::env::join_paths([&first, &second]).unwrap();
+    let search = Search {
+        path: Some(path),
+        ..search(None, None)
+    };
+    assert!(search.find().is_err(), "4.2.3 is refused");
+    let newer = fake(&first, "Blender 5.1.0");
+    assert_eq!(search.find().expect("found").path, newer);
+}

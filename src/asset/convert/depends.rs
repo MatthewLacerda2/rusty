@@ -130,7 +130,6 @@ impl Dependency {
         matches!(self.seen, Seen::Read(_))
     }
 
-    /// True when the file still reads as it did.
     /// The same file, as it reads now.
     pub(super) fn now(&self) -> Self {
         Self {
@@ -139,6 +138,7 @@ impl Dependency {
         }
     }
 
+    /// True when the file still reads as it did.
     pub(super) fn holds(&self) -> bool {
         seen(&self.path) == self.seen
     }

@@ -237,9 +237,11 @@ on `PATH` or named by `RUSTY_BLENDER`:
 
     cargo nextest run --run-ignored only -E 'test(/convert::blend::/)'
 
-Finding Blender (not found, too old, the override, a version that fails or hangs)
+Finding Blender (not found, too old, the override, a version that fails, hangs or
+cannot start, a newer one put earlier on `PATH`)
 is tested in the ordinary suite with fake executables, and the cache's handling of
-a converter's program (its version in the stamp, none installed, Play never asking)
+a converter's program (its version in the stamp, none installed, Play and a missing
+source never asking)
 with a fake `Converter::tool`, so neither needs Blender. The `.blend` fixtures in
 `tests/fixtures/models/` are made by the `make_*_blend.py` scripts beside them:
 re-run one with Blender to change its fixture.

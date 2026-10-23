@@ -94,3 +94,13 @@ fn play_serves_a_cache_without_asking_the_program() {
     assert_eq!(ASKED.get(), 0);
     assert_eq!(read(&out), "kept");
 }
+
+#[test]
+fn a_missing_source_is_served_from_its_cache_without_asking_the_program() {
+    let (source, out) = converted();
+    std::fs::remove_file(&source).unwrap();
+    ASKED.set(0);
+    refresh(&TOOLED, &source, &out).expect("the cache stands");
+    assert_eq!(ASKED.get(), 0, "a player without sources never starts it");
+    assert_eq!(read(&out), "kept");
+}
