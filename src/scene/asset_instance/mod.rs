@@ -151,6 +151,8 @@ fn sync_collider(scene: &mut Scene, id: u32, path: &str, asset: &ImportedAsset, 
 }
 
 #[cfg(test)]
+mod multi_material_tests;
+#[cfg(test)]
 mod tests;
 #[cfg(test)]
 mod texture_tests;

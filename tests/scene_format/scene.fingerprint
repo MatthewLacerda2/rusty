@@ -279,7 +279,8 @@ scene.entities[].lod_group.size: f32
 scene.entities[].lod_group: option
 scene.entities[].mask.show_mask_graphic: bool
 scene.entities[].mask: option
-scene.entities[].material.material: string
+scene.entities[].material.materials: seq
+scene.entities[].material.materials[]: string
 scene.entities[].material: option
 scene.entities[].mesh.asset_ref: option
 scene.entities[].mesh.asset_ref: string
