@@ -234,7 +234,7 @@ impl Renderer {
                 pipeline,
                 mesh: mesh_id.clone(),
                 first_index: indices.start,
-                material: self.material_index(entry, pipeline, params.clone()),
+                material: self.material_index(entry, pipeline, params),
                 uniform: uniform.words(),
             };
             let item = DrawItem {

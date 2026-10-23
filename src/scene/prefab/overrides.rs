@@ -51,6 +51,11 @@ const STRIPPED_MESH_KEYS: &[&str] = &[
     "is_dirty",
 ];
 
+/// Lists overridden whole, as one leaf, rather than per element: an entity's material
+/// slots follow its mesh's runs (#1285), so an override may add or lengthen the list,
+/// which per-element leaves cannot (the apply never grows an array).
+const WHOLE_LISTS: &[&str] = &["/material/materials"];
+
 /// The serde JSON of `entity` with the volatile/identity keys masked out, so the
 /// diff sees only authored component data.
 fn maskable_json(entity: &Entity) -> Value {
@@ -69,7 +74,8 @@ fn maskable_json(entity: &Entity) -> Value {
 }
 
 /// Flatten a JSON value into `out` as RFC-6901 json-pointer leaves. Objects and
-/// arrays recurse (arrays index by position); every scalar — and `null` — is a leaf,
+/// arrays recurse (arrays index by position, but a [`WHOLE_LISTS`] list is one
+/// leaf); every scalar — and `null` — is a leaf,
 /// so a present↔absent component (`Some`↔`None`, i.e. object↔`null`) is captured.
 fn flatten(prefix: &str, value: &Value, out: &mut BTreeMap<String, Value>) {
     match value {
@@ -78,7 +84,7 @@ fn flatten(prefix: &str, value: &Value, out: &mut BTreeMap<String, Value>) {
                 flatten(&format!("{prefix}/{}", escape_token(k)), v, out);
             }
         }
-        Value::Array(items) if !items.is_empty() => {
+        Value::Array(items) if !items.is_empty() && !WHOLE_LISTS.contains(&prefix) => {
             for (i, v) in items.iter().enumerate() {
                 flatten(&format!("{prefix}/{i}"), v, out);
             }
@@ -278,3 +284,7 @@ fn unescape(token: &str) -> String {
 #[cfg(test)]
 #[path = "overrides_tests.rs"]
 mod prefab_overrides_tests;
+
+#[cfg(test)]
+#[path = "material_list_override_tests.rs"]
+mod material_list_override_tests;
