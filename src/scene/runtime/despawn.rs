@@ -12,7 +12,7 @@ use std::collections::BTreeSet;
 
 use crate::scene::Scene;
 
-/// Why a despawn may skip script teardown ([`Scene::despawn_batch`]).
+/// Why a despawn may skip script teardown (`Scene::despawn_batch`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Despawn {
     /// Outside Play, where no script runs. Refused in Play (debug builds).
