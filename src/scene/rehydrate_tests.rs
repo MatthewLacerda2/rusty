@@ -55,3 +55,10 @@ fn a_reimport_rebuilds_only_that_models_unskinned_meshes() {
         "and keeps the old geometry"
     );
 }
+
+#[test]
+fn a_reference_names_its_file_and_a_primitive_names_none() {
+    let file = super::asset_ref_file("models/casing.fbx::Casing");
+    assert_eq!(file.as_deref(), Some("models/casing.fbx"));
+    assert_eq!(super::asset_ref_file("Box"), None);
+}

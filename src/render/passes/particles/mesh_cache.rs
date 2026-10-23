@@ -15,10 +15,10 @@
 //!   cached answer: misses are dropped every `MISS_RETRY_FRAMES` frames, with the
 //!   texture cache's, so a model imported after the first draw is picked up.
 
-use crate::asset::AssetRef;
 use crate::components::ParticleEmitterComponent;
 use crate::core::fs::written::Stale;
 use crate::render::{MeshId, Renderer};
+use crate::scene::serialize::asset_ref_file;
 
 /// What one mesh-emitter spec resolved to.
 #[derive(Clone, Debug, PartialEq)]
@@ -29,11 +29,6 @@ pub(crate) enum CachedMesh {
     Missing,
     /// Its file was re-written: read again, replacing the resident upload.
     Stale,
-}
-
-/// The file a spec loads from: a model reference's path; `None` for a primitive.
-fn spec_file(spec: &str) -> Option<String> {
-    AssetRef::parse(spec).ok().map(|r| r.path)
 }
 
 impl Renderer {
@@ -76,7 +71,7 @@ impl Renderer {
     /// again.
     pub(crate) fn forget_particle_meshes(&mut self, stale: &Stale) {
         for (spec, cached) in &mut self.particle_renderer.meshes {
-            if spec_file(spec).is_some_and(|file| stale.matches(&file)) {
+            if asset_ref_file(spec).is_some_and(|file| stale.matches(&file)) {
                 *cached = CachedMesh::Stale;
             }
         }

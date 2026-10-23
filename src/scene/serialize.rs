@@ -25,7 +25,7 @@ use crate::scene::lighting::LightingSettings;
 use crate::scene::nav_settings::NavMeshSettings;
 use crate::scene::Scene;
 
-pub use super::rehydrate::{asset_mesh_component, rehydrate_entity_mesh};
+pub use super::rehydrate::{asset_mesh_component, asset_ref_file, rehydrate_entity_mesh};
 
 fn default_skybox_path() -> String {
     String::new()

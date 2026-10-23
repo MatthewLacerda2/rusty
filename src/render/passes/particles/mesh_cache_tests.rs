@@ -1,7 +1,6 @@
 //! A mesh emitter's model follows the file (#1219): re-imported at a drawn spec it
 //! draws the new mesh, and one that failed to load is picked up once it appears.
 
-use super::spec_file;
 use crate::components::{ParticleEmitterComponent, ParticleRender, ParticleRenderMode};
 use crate::core::fs::written::contract::{follows_rebakes, Bake};
 use crate::render::gpu::textures::freshness::MISS_RETRY_FRAMES;
@@ -12,13 +11,14 @@ const QUAD: &str = "o Model\nv 0 0 0\nv 1 0 0\nv 1 1 0\nv 0 1 0\nf 1 2 3\nf 1 3 
 const TRIANGLE: &str = "o Model\nv 0 0 0\nv 1 0 0\nv 1 1 0\nf 1 2 3\n";
 
 fn emitter(spec: &str) -> ParticleEmitterComponent {
-    let mut emitter = ParticleEmitterComponent::default();
-    emitter.render = ParticleRender {
-        mode: ParticleRenderMode::Mesh,
-        mesh: Some(spec.to_string()),
+    ParticleEmitterComponent {
+        render: ParticleRender {
+            mode: ParticleRenderMode::Mesh,
+            mesh: Some(spec.to_string()),
+            ..Default::default()
+        },
         ..Default::default()
-    };
-    emitter
+    }
 }
 
 fn indices(bake: Bake) -> u32 {
@@ -27,13 +27,6 @@ fn indices(bake: Bake) -> u32 {
     } else {
         3
     }
-}
-
-#[test]
-fn a_spec_names_its_model_file_and_a_primitive_names_none() {
-    let file = spec_file("models/casing.fbx::Casing");
-    assert_eq!(file.as_deref(), Some("models/casing.fbx"));
-    assert_eq!(spec_file("Box"), None);
 }
 
 /// The shared cache contract (#1207): drawn before the model exists (a miss),
