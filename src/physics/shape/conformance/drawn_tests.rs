@@ -11,6 +11,7 @@ use super::bounds_tests::tolerance;
 use super::{samples, turns, world_poses, KINDS, SCALES};
 use crate::components::{ColliderShape, Pose};
 use crate::physics::shape::build::build_shape;
+use crate::physics::shape::hull::{beyond_faces, has_volume};
 use crate::scene::authoring::{primitive_geometry, Primitive};
 
 /// A drawn mesh's positions, and the collider that should fit it.
@@ -51,8 +52,15 @@ fn drawn(kind: &ColliderShape) -> Vec<Drawn> {
 }
 
 /// How far `point` lies outside `shape` at `pose` (zero inside), and how far it
-/// is from its surface.
+/// is from its surface. A convex hull with volume is measured by its face planes:
+/// parry's projection can misreport a point on a hull's corner (#1211). Outside,
+/// the plane distance is only a lower bound on both (up to √3 times short near a
+/// corner); a point outside by more than the tolerance still fails the check.
 fn outside_and_off(shape: &dyn Shape, pose: &RapierPose, point: Vec3) -> (f32, f32) {
+    if let Some(hull) = shape.as_convex_polyhedron().filter(|h| has_volume(h)) {
+        let beyond = beyond_faces(hull, pose.inverse_transform_point(point));
+        return (beyond.max(0.0), beyond.abs());
+    }
     let solid = shape.project_point(pose, point, true);
     let outside = if solid.is_inside {
         0.0

@@ -13,6 +13,7 @@ use rapier3d::prelude::*;
 
 use super::{is_live, RayHit};
 use crate::physics::convert::to_pose;
+use crate::physics::shape::hull;
 use crate::physics::world::PhysicsWorld;
 
 impl PhysicsWorld {
@@ -116,9 +117,13 @@ impl PhysicsWorld {
 
     /// Nearest point on `id`'s live collider to `point`, solid — a point inside
     /// the collider is its own closest point (Unity `Collider.ClosestPoint`).
-    /// `None` when the entity has no collider in the live world.
+    /// `None` when the entity has no collider in the live world. A convex hull
+    /// answers an inside point by its face planes (#1211).
     pub fn closest_point_on(&self, id: u32, point: Vec3) -> Option<Vec3> {
         let collider = self.collider_of(id)?;
+        if hull_holds(collider, point) == Some(true) {
+            return Some(point);
+        }
         let projection = collider
             .shape()
             .project_point(collider.position(), point, true);
@@ -126,10 +131,14 @@ impl PhysicsWorld {
     }
 
     /// Whether `point` lies inside `id`'s live collider. `None` when the entity
-    /// has no collider in the live world.
+    /// has no collider in the live world. A convex hull answers by its face
+    /// planes (#1211).
     pub fn collider_contains_point(&self, id: u32, point: Vec3) -> Option<bool> {
         let collider = self.collider_of(id)?;
-        Some(collider.shape().contains_point(collider.position(), point))
+        Some(
+            hull_holds(collider, point)
+                .unwrap_or_else(|| collider.shape().contains_point(collider.position(), point)),
+        )
     }
 
     /// The live collider built for entity `id` (the entity that owns the
@@ -139,4 +148,12 @@ impl PhysicsWorld {
         let collider = self.colliders.get(*self.id_to_collider.get(&id)?)?;
         is_live(&self.bodies, collider).then_some(collider)
     }
+}
+
+/// [`hull::holds`] for a convex mesh collider with volume; `None` for any other
+/// shape, a flat hull included. parry's point projection can misreport a point on
+/// a hull's corner as far outside it.
+fn hull_holds(collider: &Collider, point: Vec3) -> Option<bool> {
+    let hull = (collider.shape().as_convex_polyhedron()).filter(|h| hull::has_volume(h))?;
+    Some(hull::holds(hull, collider.position(), point))
 }

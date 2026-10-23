@@ -1,22 +1,21 @@
 //! src/physics/shape/hull_tests.rs — a convex mesh collider's hull holds every point
 //! of its mesh at every scale (#1195).
 //!
-//! Measured against the hull's own face planes, not with `project_point`: parry's
-//! point projection can misreport a point on a convex polyhedron as far outside it,
-//! which is how #1195 took a sound hull for one missing a cap.
+//! Measured against the hull's own face planes ([`super::hull::beyond_faces`]), not
+//! with `project_point`: parry's point projection can misreport a point on a convex
+//! polyhedron as far outside it, which is how #1195 took a sound hull for one
+//! missing a cap (#1211).
 
 use glam::Vec3;
 
+use super::fixture;
+use super::hull::beyond_faces;
 use super::mesh::build_mesh_shape;
-use crate::scene::authoring::{primitive_geometry, Primitive};
 
-/// The conformance suite's off-centre Cylinder: rings of coplanar points, the
-/// classic quickhull degeneracy.
+/// The off-centre Cylinder's points.
 fn off_centre_cylinder() -> Vec<[f32; 3]> {
-    let (vertices, _) = primitive_geometry(Primitive::Cylinder).expect("a mesh");
-    let offset = Vec3::new(0.3, 0.2, -0.1);
-    let at = |v: [f32; 3]| (Vec3::from(v) + offset).to_array();
-    vertices.iter().map(|v| at(v.position)).collect()
+    let (vertices, _) = fixture::off_centre_cylinder();
+    vertices.iter().map(|v| v.position).collect()
 }
 
 /// How far the worst of `points`, scaled, lies beyond a face plane of the hull built
@@ -27,13 +26,10 @@ fn worst_outside(points: &[[f32; 3]], scale: Vec3) -> f32 {
         .shape()
         .as_convex_polyhedron()
         .expect("a convex polyhedron");
-    let corner = |first: u32| hull.points()[hull.vertices_adj_to_face()[first as usize] as usize];
-    let planes: Vec<(Vec3, Vec3)> = (hull.faces().iter())
-        .map(|f| (f.normal, corner(f.first_vertex_or_edge)))
-        .collect();
-    let beyond = |p: Vec3| planes.iter().map(move |&(n, on)| n.dot(p - on));
     let scaled = points.iter().map(|&p| Vec3::from(p) * scale);
-    scaled.flat_map(beyond).fold(f32::MIN, f32::max)
+    scaled
+        .map(|p| beyond_faces(hull, p))
+        .fold(f32::MIN, f32::max)
 }
 
 /// The slack a hull may leave: rounding at the size of the scaled shape.

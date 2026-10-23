@@ -1,12 +1,16 @@
 //! src/physics/shape/mod.rs — turning a `Collider` into a rapier shape: the
-//! builder (`build`), the triangle-mesh shape (`mesh`) and the world-space
-//! triangle read-back (`triangles`).
+//! builder (`build`), the triangle-mesh shape (`mesh`), a convex hull measured
+//! by its face planes (`hull`) and the world-space triangle read-back
+//! (`triangles`).
 
 pub(super) mod build;
 #[cfg(test)]
 mod build_tests;
 #[cfg(test)]
 mod conformance;
+#[cfg(test)]
+pub(super) mod fixture;
+pub(super) mod hull;
 #[cfg(test)]
 mod hull_tests;
 pub(super) mod mesh;

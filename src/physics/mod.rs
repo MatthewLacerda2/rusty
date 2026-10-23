@@ -40,6 +40,8 @@ pub use character::{can_stand, move_character, CharacterMove};
 pub use events::collision::{CollisionEvents, CollisionPair, Contact};
 pub use events::trigger::TriggerEvents;
 pub use joints::JointBreak;
+#[cfg(test)]
+pub(crate) use query::convex_fixture::turned_hull;
 pub use query::through::RayCrossing;
 pub use query::RayHit;
 pub use shape::triangles::{collider_world_triangles, ColliderTriangles};
