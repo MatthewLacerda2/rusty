@@ -173,5 +173,8 @@ fn material<'a>(m: &'a Material, images: &mut Vec<&'a Texture>) -> Value {
     if let Some(t) = &m.normal_texture {
         out.insert("normalTexture".into(), texture(t));
     }
+    if let Some(t) = &m.emissive_texture {
+        out.insert("emissiveTexture".into(), texture(t));
+    }
     Value::Object(out)
 }

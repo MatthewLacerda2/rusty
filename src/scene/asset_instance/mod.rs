@@ -8,7 +8,9 @@
 //! Both callers route through here so editor and API can never drift: the editor's
 //! model inspector ("Instantiate into Scene", one entity per sub-object) and the
 //! `Scene.Instantiate` asset branch (one entity by reference). The shared piece is
-//! [`instantiate_asset`]; the editor loops it over every sub-object of a file.
+//! [`instantiate_asset`], and [`instantiate_imported`] behind it for a caller that
+//! already holds the imported file: the editor spawns every sub-object of a file
+//! through it (`scene::lod_instance::instantiate_model`).
 //!
 //! Like every other mesh, an instanced asset stores only its REFERENCE on disk:
 //! [`asset_mesh_component`](crate::scene::asset_mesh_component) keeps the
@@ -48,29 +50,46 @@ pub fn instantiate_asset(
     let asset_ref = asset::AssetRef::parse(reference).map_err(|e| e.to_string())?;
     let asset = asset::import_and_sync_sidecar(std::path::Path::new(&asset_ref.path))
         .map_err(|e| e.to_string())?;
-    if asset.sub_mesh(&asset_ref.sub_object).is_none() {
+    let (path, sub) = (&asset_ref.path, &asset_ref.sub_object);
+    instantiate_imported(scene, path, &asset, sub, name, position)
+}
+
+/// [`instantiate_asset`] for a file its caller already imported: `asset` is the
+/// file at `path`, and `sub` one of its sub-objects (or a `_LOD<n>` set's base).
+/// A model spawned whole goes through here, so its file is imported once, not
+/// once more per sub-object.
+pub fn instantiate_imported(
+    scene: &mut Scene,
+    path: &str,
+    asset: &ImportedAsset,
+    sub: &str,
+    name: Option<&str>,
+    position: Vec3,
+) -> Result<u32, String> {
+    let reference = format!("{path}{}{sub}", asset::REF_SEPARATOR);
+    if asset.sub_mesh(sub).is_none() {
         // A `_LOD<n>` set's base name addresses the whole set (#472).
-        return match asset::lod::lod_set(&asset, &asset_ref.sub_object) {
-            Some(set) => instantiate_lod_set(scene, &asset_ref.path, &asset, &set, name, position),
+        return match asset::lod::lod_set(asset, sub) {
+            Some(set) => instantiate_lod_set(scene, path, asset, &set, name, position),
             None => Err(format!(
                 "asset reference '{reference}' has no such sub-object"
             )),
         };
     }
 
-    let label = name.unwrap_or(&asset_ref.sub_object);
+    let label = name.unwrap_or(sub);
     let id = scene.add_entity(label.to_string());
     if let Some(mut transform) = scene.world.transform_mut(id) {
         transform.position = position;
     }
     scene
         .world
-        .set_mesh(id, Some(crate::scene::asset_mesh_component(reference)));
+        .set_mesh(id, Some(crate::scene::asset_mesh_component(&reference)));
     // A skinned sub-object brings its skeleton as child bone entities (#453).
     scene.sync_skeleton(id);
 
-    apply_material(scene, id, &asset_ref.path, &asset, &asset_ref.sub_object);
-    if sync_collider(scene, id, &asset_ref.path, &asset, &asset_ref.sub_object) {
+    apply_material(scene, id, path, asset, sub);
+    if sync_collider(scene, id, path, asset, sub) {
         scene.update_all_colliders();
     }
     Ok(id)

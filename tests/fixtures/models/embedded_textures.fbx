@@ -1,7 +1,8 @@
 ; FBX 7.4.0 project file
 ; A quad of two triangles, one material each, whose textures are embedded (#1082).
 ; Hand-written: every texture's file is missing on disk, so only the embedded
-; bytes can supply it.
+; bytes can supply it. `Red`'s emissive colour is a placeholder under its texture,
+; `Blue`'s is a plain colour (#1293).
 ; - "Red" has `skin.png`, a 1x1 red PNG.
 ; - "Blue" has `..\Skin.png` (a 1x1 blue PNG): a Windows path climbing out of its
 ;   folder whose name clashes with Red's but for case, so it must land as
@@ -60,6 +61,10 @@ Objects:  {
 	Material: 3000, "Material::Red", "" {
 		Version: 102
 		ShadingModel: "lambert"
+		Properties70:  {
+			P: "EmissiveColor", "Color", "", "A",0.3,0.3,0.3
+			P: "EmissiveFactor", "Number", "", "A",2
+		}
 	}
 	Material: 3100, "Material::Blue", "" {
 		Version: 102
@@ -67,6 +72,8 @@ Objects:  {
 		Properties70:  {
 			P: "DiffuseColor", "Color", "", "A",0,0,0
 			P: "DiffuseFactor", "Number", "", "A",0.5
+			P: "EmissiveColor", "Color", "", "A",0.5,0,0
+			P: "EmissiveFactor", "Number", "", "A",1
 		}
 	}
 	Video: 4000, "Video::Red", "Clip" {
@@ -116,6 +123,7 @@ Connections:  {
 	C: "OO",3100,2000
 	C: "OO",4000,4100
 	C: "OP",4100,3000, "DiffuseColor"
+	C: "OP",4100,3000, "EmissiveColor"
 	C: "OO",5000,5100
 	C: "OP",5100,3100, "DiffuseColor"
 	C: "OO",6000,6100

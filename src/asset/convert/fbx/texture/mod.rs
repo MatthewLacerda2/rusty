@@ -17,9 +17,11 @@
 //! An extracted texture is named in the `.glb` by its [`identity`], which a saved
 //! scene references it by (#1130); one on disk is not, and stays a plain path.
 //!
-//! A texture that is neither on disk nor embedded, is on disk but cannot be
-//! read, or embeds a format the importer does not read, is a [`Skip`]; one that fails to extract, or lies on
-//! disk where no URI can reach it, fails the conversion (#1168).
+//! A texture that is neither on disk nor embedded, is on disk but cannot be read
+//! or is in a format the importer does not read (#1293), or embeds such a format,
+//! is a [`Skip`]: the material then keeps its colour. An embedded copy the importer
+//! reads is used when the file on disk is unusable. One that fails to extract, or
+//! lies on disk where no URI can reach it, fails the conversion (#1168).
 
 mod identity;
 
@@ -94,24 +96,29 @@ impl Textures {
                 self.written.extend(name.clone());
                 (name, ext)
             });
-        let unreadable = match self.on_disk(texture)? {
-            Disk::Found(file) => {
-                let uri = self.reference(&file)?;
-                return Ok(Some(glb::Texture { uri, name: None }));
+        let unusable = match self.on_disk(texture)? {
+            Disk::Found(file) => match format_on_disk(&file)? {
+                ext if IMAGE_EXTENSIONS.contains(&ext.as_str()) => {
+                    let uri = self.reference(&file)?;
+                    return Ok(Some(glb::Texture { uri, name: None }));
+                }
+                ext => Some(format!(
+                    "{} is a `.{ext}`, not an image format the importer reads",
+                    file.display()
+                )),
+            },
+            Disk::Unreadable(file) => {
+                Some(format!("{} is on disk but cannot be read", file.display()))
             }
-            Disk::Unreadable(file) => Some(file),
             Disk::Absent => None,
         };
-        let name = match (embedded, unreadable) {
+        let name = match (embedded, unusable) {
             (Some((Some(name), _)), _) => name,
             (Some((None, ext)), _) => {
                 let why = format!("embeds a `.{ext}`, not an image format the importer reads");
                 return Ok(self.skip(texture, why));
             }
-            (None, Some(file)) => {
-                let why = format!("{} is on disk but cannot be read", file.display());
-                return Ok(self.skip(texture, why));
-            }
+            (None, Some(why)) => return Ok(self.skip(texture, why)),
             (None, None) => {
                 let why = "neither a file on disk nor embedded".into();
                 return Ok(self.skip(texture, why));
@@ -179,6 +186,21 @@ enum Disk {
     Found(PathBuf),
     Unreadable(PathBuf),
     Absent,
+}
+
+/// The format of `file`, a texture on disk: what its first bytes say, else what
+/// its name says (`texture_file::file_name`). A `.psd`, `.tif` or `.dds` beside an
+/// FBX is common in store packs, and the renderer reads none of them (#1293).
+/// A file that was just read and now cannot be fails the conversion, as any
+/// texture failure does (#1168).
+fn format_on_disk(file: &Path) -> Result<String, ImportError> {
+    use std::io::Read;
+    // A short file leaves zeros, which no magic number matches: the name decides.
+    let mut head = [0u8; 8];
+    std::fs::File::open(file)
+        .and_then(|mut f| f.read(&mut head))
+        .map_err(|e| ImportError::Parse(format!("reading {}: {e}", file.display())))?;
+    Ok(file_name(&file.to_string_lossy(), &head).1)
 }
 
 /// The name `texture`'s file goes by: its file name, else its element name.

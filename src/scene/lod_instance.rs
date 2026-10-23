@@ -4,7 +4,7 @@
 //! (`asset::lod`) is one prop at several levels of detail. Instantiating it builds
 //! what Unity's importer builds: a parent entity named after the base carrying an
 //! `LODGroup`, one child per level's sub-object (each spawned through the shared
-//! [`instantiate_asset`] verb, so it gets its mesh, material and collider exactly as
+//! [`instantiate_imported`] verb, so it gets its mesh, material and collider exactly as
 //! a lone sub-object would), each level listing its children as renderers.
 //!
 //! Two entry points, one per caller shape: [`instantiate_lod_set`] behind
@@ -15,10 +15,10 @@
 use glam::Vec3;
 
 use crate::asset::lod::{lod_sets, LodSet};
-use crate::asset::{ImportedAsset, REF_SEPARATOR};
+use crate::asset::ImportedAsset;
 use crate::components::lod_group::default_thresholds;
 use crate::components::{LodGroupComponent, LodLevel};
-use crate::scene::authoring::instantiate_asset;
+use crate::scene::asset_instance::instantiate_imported;
 use crate::scene::authoring::lod_group::MIN_SIZE;
 use crate::scene::Scene;
 
@@ -42,8 +42,7 @@ pub fn instantiate_lod_set(
     for (subs, screen_height) in set.levels.iter().zip(heights) {
         let mut renderers = Vec::with_capacity(subs.len());
         for sub in subs {
-            let reference = format!("{path}{REF_SEPARATOR}{sub}");
-            let child = instantiate_asset(scene, &reference, Some(sub), Vec3::ZERO)?;
+            let child = instantiate_imported(scene, path, asset, sub, Some(sub), Vec3::ZERO)?;
             scene.set_parent(child, Some(group))?;
             renderers.push(child);
         }
@@ -83,10 +82,7 @@ pub fn instantiate_model(
                 spawned_sets[i] = true;
                 instantiate_lod_set(scene, path, asset, &sets[i], None, position)
             }
-            None => {
-                let reference = format!("{path}{REF_SEPARATOR}{}", sub.id);
-                instantiate_asset(scene, &reference, Some(&sub.id), position)
-            }
+            None => instantiate_imported(scene, path, asset, &sub.id, Some(&sub.id), position),
         };
         ids.extend(id.ok());
     }

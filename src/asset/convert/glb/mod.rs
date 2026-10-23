@@ -101,6 +101,7 @@ pub struct Material {
     pub emissive: [f32; 3],
     pub base_color_texture: Option<Texture>,
     pub normal_texture: Option<Texture>,
+    pub emissive_texture: Option<Texture>,
 }
 
 /// One texture a material samples: its image's URI, relative to the written
@@ -124,6 +125,7 @@ impl Default for Material {
             emissive: [0.0; 3],
             base_color_texture: None,
             normal_texture: None,
+            emissive_texture: None,
         }
     }
 }
