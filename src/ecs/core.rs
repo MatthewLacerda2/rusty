@@ -135,18 +135,6 @@ impl World {
             .is_some()
     }
 
-    /// Cut `id` out of the hierarchy as it is despawned: it leaves its parent's
-    /// `children`, so no dead id stays listed (or saved), and its own children,
-    /// which now read as roots, move in world space.
-    pub(super) fn detach(&mut self, id: u32) {
-        if let Some(parent) = self.parent_id(id) {
-            self.remove_child(parent, id);
-        }
-        for child in self.children(id) {
-            self.moved(child);
-        }
-    }
-
     /// Take the material staged for the scene's library, if one is staged.
     pub fn take_pending_material(&mut self, id: u32) -> Option<MaterialAsset> {
         self.take_component::<MaterialAsset>(id)

@@ -16,13 +16,15 @@ pub type Hung = (u32, Vec<String>);
 
 impl Scene {
     /// Build every skinned mesh's skeleton, then hang `pending` (parked under their
-    /// skinned entities) back on it: what a load or a prefab stamp ends with.
+    /// skinned entities) back on it and re-bind the joints tied to a bone by name
+    /// (`joints`): what a load or a prefab stamp ends with.
     pub fn hang_on_skeletons(&mut self, pending: Vec<Hung>) {
         let parked: Vec<u32> = pending.iter().map(|(id, _)| *id).collect();
         for owner in self.world.ids_with_mesh() {
             self.sync_skeleton_past(owner, &parked);
         }
         self.attach_to_bones(pending);
+        self.bind_bone_joints();
     }
 
     /// Re-parent each pending entity under the first bone its chain names that the

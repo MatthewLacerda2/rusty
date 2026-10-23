@@ -17,6 +17,8 @@
 //! - [`take_bone_parents`] + [`Scene::hang_on_skeletons`] put those attachments
 //!   back under their bones on load (`hang`). A bone that no longer exists hands
 //!   them to its nearest surviving ancestor, with a warning, never silently.
+//! - `joints`: a joint from outside the skeleton to a bone is saved and re-bound by
+//!   the bone's name the same way (#1264).
 //! - `reimport`: `Scene::take_skeleton` + `Scene::restore_skeleton` rebuild a live
 //!   skeleton from a re-imported rig, keeping what was authored on it (#1252), and
 //!   hang its attachments back by the same rule as a load.
@@ -30,6 +32,7 @@
 mod hang;
 mod hitbox;
 mod ik;
+mod joints;
 mod palette;
 mod persist;
 mod ragdoll;
@@ -103,11 +106,7 @@ impl Scene {
             .flat_map(|b| self.world.self_and_descendants(b))
             .collect();
         for id in doomed {
-            self.world.despawn(id);
-            self.shader_overrides.clear(id, None);
-            if self.selected_entity_id == Some(id) {
-                self.selected_entity_id = None;
-            }
+            self.despawn_one(id);
         }
     }
 
@@ -121,7 +120,11 @@ impl Scene {
 }
 
 #[cfg(test)]
+mod despawn_refs_tests;
+#[cfg(test)]
 mod fixture;
+#[cfg(test)]
+mod joints_tests;
 #[cfg(test)]
 mod persist_tests;
 #[cfg(test)]

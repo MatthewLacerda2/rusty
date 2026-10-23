@@ -177,13 +177,26 @@ impl Scene {
         self.world.spawn(name)
     }
 
+    /// Remove entity `id` with its skeleton. Its children stay, as roots at their
+    /// world pose, and nothing keeps naming it (`World::despawn`, `despawn_one`).
     pub fn destroy_entity(&mut self, id: u32) {
         self.despawn_skeleton(id); // its bones, and what hangs from them (#453)
+        self.despawn_one(id);
+    }
+
+    /// Despawn `id` alone, then drop the scene's own references to it (#1264): the
+    /// selection, `DontDestroyOnLoad`, a queued destroy, its lightmap entry and its
+    /// shader overrides. The World's references go in `World::despawn`. Every
+    /// despawn in the scene runs through here.
+    pub(crate) fn despawn_one(&mut self, id: u32) {
         self.world.despawn(id);
         self.shader_overrides.clear(id, None);
         if self.selected_entity_id == Some(id) {
             self.selected_entity_id = None;
         }
+        self.persistent.remove(&id);
+        self.pending_destroy.retain(|&e| e != id);
+        self.lightmaps.entries.retain(|e| e.entity != id);
     }
 
     pub fn find_entity_by_name(&self, name: &str) -> Option<u32> {

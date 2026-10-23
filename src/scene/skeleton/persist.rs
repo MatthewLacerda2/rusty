@@ -4,8 +4,9 @@
 //! transform differs from the model's rest pose (`BoneBinding::overrides`), and
 //! every entity parented under a bone, re-pointed at the skinned entity with the
 //! bone's name (then its ancestor bones') in `parent_bone`, and the `Rigidbody` /
-//! `Joint` a ragdoll put on a bone (`BoneBinding::bodies`, #466). All re-bind by
-//! name on load.
+//! `Joint` a ragdoll put on a bone (`BoneBinding::bodies`, #466); a joint from
+//! outside the skeleton to a bone keeps the bone by name too (`joints`, #1264).
+//! All re-bind by name on load.
 
 use std::collections::BTreeMap;
 
@@ -72,6 +73,7 @@ pub(super) fn strip(entities: &mut Vec<Entity>, why: Why) {
         return;
     }
     reparent_attachments(entities, &index, &bone_of);
+    super::joints::repoint_joints(entities, &bone_of);
     entities.retain(|e| !bone_of.contains_key(&e.id));
     for entity in entities.iter_mut() {
         entity.children.retain(|c| !bone_of.contains_key(c));
@@ -120,7 +122,7 @@ impl SavedBones {
 /// first: what an attachment saves, so a bone the model later drops hands it to
 /// the nearest one left. A parent link that does not point to an earlier slot ends
 /// the chain, as `bind_bones` treats such a joint as a root.
-fn bone_chain(skin: &SkinData, slot: usize) -> Vec<String> {
+pub(super) fn bone_chain(skin: &SkinData, slot: usize) -> Vec<String> {
     let mut chain = vec![skin.name(slot)];
     let mut at = slot;
     while let Some(p) = skin.parents.get(at).copied().flatten().filter(|&p| p < at) {

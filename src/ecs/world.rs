@@ -103,9 +103,10 @@ impl World {
         self.world_space.invalidate_all(); // an orphan may already name this id as parent
     }
 
-    /// Despawn an entity by stable id: cut out of the hierarchy (`detach`), it reads as identity.
+    /// Despawn an entity by stable id, every reference the World holds to it going
+    /// first (`ecs::despawn`). A dead id reads as identity.
     pub fn despawn(&mut self, id: u32) {
-        self.detach(id);
+        self.forget_references(id);
         self.world_space.forget(id);
         if let Some(handle) = self.handles.remove(id) {
             let _ = self.inner.despawn(handle);

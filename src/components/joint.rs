@@ -96,6 +96,14 @@ pub struct JointComponent {
     pub break_torque: f32,
     /// Whether the two joined bodies still collide with each other.
     pub enable_collision: bool,
+    /// Document-only (#1264): the bone `connected_body` names, then that bone's
+    /// ancestor bones, nearest first — the way `Entity::parent_bone` keeps a child
+    /// of a bone. Bones get fresh ids on every load and re-import, so a joint to a
+    /// bone is saved with `connected_body` naming the skinned entity and re-bound
+    /// by name once the skeleton is back (`scene::skeleton::joints`). Always empty
+    /// on a live joint.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub connected_bone: Vec<String>,
 }
 
 impl Default for JointComponent {
@@ -115,6 +123,7 @@ impl Default for JointComponent {
             break_force: 0.0,
             break_torque: 0.0,
             enable_collision: false,
+            connected_bone: Vec::new(),
         }
     }
 }

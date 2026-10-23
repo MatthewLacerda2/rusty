@@ -3,8 +3,9 @@
 //! When a skinned model is re-written, every entity built from it takes the new
 //! mesh and rig, and its bones are rebuilt from the new rig at its rest pose. What
 //! a designer authored on the old bones survives the way a save and load keeps it
-//! (`persist`): per-bone overrides and bone bodies by bone name, and every entity
-//! hung from a bone hung back by the same rule as a load (`hang`). A model
+//! (`persist`): per-bone overrides and bone bodies by bone name, every entity
+//! hung from a bone hung back by the same rule as a load (`hang`), and every joint
+//! tied to a bone re-bound by name (`joints`). A model
 //! re-written as static keeps no bones, so what was authored on them is dropped,
 //! with a warning.
 
@@ -18,7 +19,8 @@ impl Scene {
     /// Take `owner`'s skeleton down: its bone overrides and bodies go to the mesh's
     /// `BoneBinding` (which [`Scene::sync_skeleton`] applies), the entities hung
     /// from its bones are parked under `owner` and returned with their bone
-    /// chains, and the bones are despawned. Empty for an entity with no skin.
+    /// chains, joints tied to a bone are parked on `owner` by bone name
+    /// (`joints`), and the bones are despawned. Empty for an entity with no skin.
     pub(crate) fn take_skeleton(&mut self, owner: u32) -> Vec<Hung> {
         let Some(bones) = self
             .world
@@ -57,6 +59,7 @@ impl Scene {
         for (child, _) in &hung {
             let _ = self.set_parent(*child, Some(owner));
         }
+        self.park_bone_joints(owner);
         self.despawn_skeleton(owner);
         if let Some(mut mesh) = self.world.mesh_mut(owner) {
             mesh.skeleton.bones.clear();
@@ -72,6 +75,7 @@ impl Scene {
         let parked: Vec<u32> = hung.iter().map(|(id, _)| *id).collect();
         self.sync_skeleton_past(owner, &parked);
         let missing = self.attach_to_bones(hung);
+        self.bind_bone_joints();
         if let Some(mut mesh) = self.world.mesh_mut(owner).filter(|m| m.skin.is_none()) {
             mesh.skeleton.overrides.clear();
             let bodies: Vec<String> = std::mem::take(&mut mesh.skeleton.bodies)

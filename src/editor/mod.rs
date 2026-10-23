@@ -236,7 +236,13 @@ impl EditorUi {
         // Set by the Preview tab if it shows (#352); `None` skips its offscreen render.
         self.preview_request = None;
 
-        // Push editor selection to scene (editor UI is the authority)
+        // The editor picks the selection and pushes it to the scene; the World says
+        // what may stay selected. An entity despawned since the last frame (a
+        // script's `Scene.DestroyEntity`, a re-import's bones) leaves it (#1264).
+        // Ids are never reused within a scene, and a scene swap clears it.
+        self.selected_entity_id = self
+            .selected_entity_id
+            .filter(|&id| scene.world.contains(id));
         scene.selected_entity_id = self.selected_entity_id;
 
         let ui = &mut theme::chrome::root_ui(ctx);
@@ -272,3 +278,7 @@ impl EditorUi {
 #[cfg(test)]
 #[path = "nav_sync_tests.rs"]
 mod nav_sync_tests;
+
+#[cfg(test)]
+#[path = "selection_tests.rs"]
+mod selection_tests;
