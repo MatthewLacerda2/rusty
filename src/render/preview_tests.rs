@@ -40,9 +40,7 @@ fn sphere_scene() -> Scene {
         .insert("preview::material".to_string(), Default::default());
     scene.world.set_material(
         id,
-        Some(MaterialComponent {
-            material: "preview::material".to_string(),
-        }),
+        Some(MaterialComponent::new("preview::material".to_string())),
     );
     scene
 }

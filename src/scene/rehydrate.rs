@@ -39,6 +39,7 @@ fn vertex_from_imported(v: &MeshVertex) -> Vertex {
 struct RehydratedMesh {
     vertices: Vec<Vertex>,
     indices: Vec<u32>,
+    ranges: Vec<std::ops::Range<u32>>,
     bind_palette: Vec<Mat4>,
     skin: Option<crate::asset::SkinData>,
     clips: Vec<crate::asset::AnimationClip>,
@@ -65,6 +66,7 @@ impl RehydratedMesh {
         Self {
             vertices: sub.vertices.iter().map(vertex_from_imported).collect(),
             indices: sub.indices.clone(),
+            ranges: sub.ranges.iter().map(|r| r.indices.clone()).collect(),
             bind_palette,
             skin: sub.skin.clone(),
             clips: sub.clips.clone(),
@@ -116,6 +118,7 @@ pub fn rehydrate_entity_mesh(entity: &mut Entity) {
 fn install(mesh: &mut crate::scene::MeshComponent, rebuilt: RehydratedMesh) {
     mesh.vertices = rebuilt.vertices;
     mesh.indices = rebuilt.indices;
+    mesh.ranges = rebuilt.ranges;
     mesh.bind_palette = rebuilt.bind_palette;
     mesh.skin = rebuilt.skin;
     mesh.clips = rebuilt.clips;

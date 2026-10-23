@@ -70,7 +70,7 @@ fn starter_materials_resolve_as_library_references_round_trip() {
         let id = scene.add_entity(data.name.clone());
         scene
             .world
-            .set_material(id, Some(MaterialComponent { material: key }));
+            .set_material(id, Some(MaterialComponent::new(key)));
         ids.push((id, data.name.clone()));
     }
 
@@ -85,7 +85,7 @@ fn starter_materials_resolve_as_library_references_round_trip() {
             .find(|(n, ..)| n == name)
             .unwrap_or_else(|| panic!("unexpected starter material {name}"));
         assert_eq!(
-            loaded.world.material(*id).unwrap().material,
+            loaded.world.material(*id).unwrap().first(),
             format!("{STARTER}::{name}"),
             "{name} keeps its deterministic library key across save/load"
         );

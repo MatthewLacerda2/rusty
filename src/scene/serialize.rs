@@ -144,7 +144,7 @@ pub fn apply_scene_data(scene: &mut Scene, mut data: SceneData) {
     for entity in &mut data.entities {
         if let Some(pending) = entity.pending_material.take() {
             if let Some(reference) = &entity.material {
-                fold_pending(&mut scene.materials, &reference.material, pending);
+                fold_pending(&mut scene.materials, reference.first(), pending);
             }
         }
     }

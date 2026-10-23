@@ -159,8 +159,8 @@ pub(crate) fn active_material_map_paths(scene: &Scene) -> Vec<crate::asset::MapR
         .ids_with_material()
         .into_iter()
         .filter(|&id| scene.world.is_active(id))
-        .filter_map(|id| scene.material_asset_of(id).cloned())
-        .flat_map(|m| materials::material_texture_paths(Some(&m)))
+        .flat_map(|id| scene.material_assets_of(id))
+        .flat_map(|m| materials::material_texture_paths(Some(m)))
         .flatten()
         .collect()
 }

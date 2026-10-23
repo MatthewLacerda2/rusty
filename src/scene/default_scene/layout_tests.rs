@@ -45,8 +45,8 @@ fn the_water_is_seen_but_never_collides() {
     for name in ["Pool_Water", "Jacuzzi_Water"] {
         let id = scene.find_entity_by_name(name).unwrap();
         assert!(scene.world.collider(id).is_none(), "{name} has a collider");
-        let key = &scene.world.material(id).unwrap().material;
-        let water = &scene.materials[key];
+        let key = scene.world.material(id).unwrap().first().to_string();
+        let water = &scene.materials[&key];
         assert_eq!(water.render_mode, crate::scene::RenderMode::Transparent);
         assert!(water.alpha < 1.0);
     }

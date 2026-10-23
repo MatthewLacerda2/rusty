@@ -15,12 +15,9 @@ fn entity_referencing(
         scene.materials.insert(key.to_string(), mat);
     }
     let id = scene.add_entity(name.to_string());
-    scene.world.set_material(
-        id,
-        Some(MaterialComponent {
-            material: key.to_string(),
-        }),
-    );
+    scene
+        .world
+        .set_material(id, Some(MaterialComponent::new(key.to_string())));
     id
 }
 
@@ -88,5 +85,5 @@ fn material_and_reference_survive_scene_data_round_trip() {
     assert_eq!(resolved.base_color_map, Some("textures/wood.png".into()));
     assert_eq!(resolved.metallic, 0.8);
     assert_eq!(resolved.roughness, 0.2);
-    assert_eq!(loaded.world.material(id).unwrap().material, "wood");
+    assert_eq!(loaded.world.material(id).unwrap().first(), "wood");
 }

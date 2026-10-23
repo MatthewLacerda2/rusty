@@ -12,6 +12,7 @@
 use crate::asset::{AnimationClip, SkinData};
 use serde::{Deserialize, Serialize};
 use std::cell::Cell;
+use std::ops::Range;
 
 pub mod primitives;
 mod skeleton;
@@ -65,6 +66,12 @@ pub struct MeshComponent {
     pub vertices: Vec<Vertex>,
     #[serde(skip)]
     pub indices: Vec<u32>,
+    /// The sub-mesh runs of `indices` (#1285), in order: run `i` draws with the
+    /// entity's material `i` (`MaterialComponent::materials`). Empty means one run
+    /// over every index, as a primitive has. Rehydrated from the imported sub-mesh's
+    /// material ranges, never serialized (like `indices`).
+    #[serde(skip)]
+    pub ranges: Vec<Range<u32>>,
     /// The bind-pose bone palette for a skinned `"Asset"` mesh, indexed by joint
     /// (matching the vertices' `joint_indices`). Empty for static/primitive meshes.
     /// Like `vertices`, it is never persisted — it is rehydrated from the imported
@@ -110,6 +117,7 @@ impl MeshComponent {
             asset_ref: None,
             vertices,
             indices,
+            ranges: Vec::new(),
             bind_palette: Vec::new(),
             skin: None,
             clips: Vec::new(),
@@ -117,6 +125,16 @@ impl MeshComponent {
             skeleton: BoneBinding::default(),
             is_dirty: DirtyFlag::new(true),
         }
+    }
+
+    /// The index runs to draw, one per material slot: `ranges`, or the whole index
+    /// list as one run when it is empty.
+    pub fn index_ranges(&self) -> impl Iterator<Item = Range<u32>> + '_ {
+        let whole = self
+            .ranges
+            .is_empty()
+            .then_some(0..self.indices.len() as u32);
+        whole.into_iter().chain(self.ranges.iter().cloned())
     }
 
     /// The bone palette the renderer should upload: the live posed palette when an

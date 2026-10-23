@@ -19,6 +19,7 @@
 
 mod maps;
 mod shader_params;
+mod slots;
 
 use std::collections::BTreeMap;
 use std::ops::RangeInclusive;
@@ -31,6 +32,7 @@ pub use shader_params::{
     set_entity_shader_param, set_entity_shader_param_with, set_shader_param, shader_layout,
     shader_param,
 };
+pub use slots::{keys, set_slot, slot_count};
 
 use super::sanitize::unit;
 use crate::asset::MapRef;
@@ -70,7 +72,7 @@ pub fn fold_pending(materials: &mut MaterialLibrary, key: &str, pending: Materia
     materials.entry(key.to_string()).or_insert(pending);
 }
 
-/// Resolve the library key for entity `id`'s material, creating a default material
+/// Resolve the library key for entity `id`'s first material, creating a default material
 /// (under [`entity_material_key`]) and attaching the reference if it has none yet.
 /// A library asset already under the key is kept, never overwritten: the rule every
 /// attach path shares (#997).
@@ -87,7 +89,7 @@ pub fn ensure_material_key(scene: &mut Scene, id: u32) -> Option<String> {
             .world
             .set_material(id, Some(MaterialComponent::for_entity(id)));
     }
-    let key = scene.world.material(id)?.material.clone();
+    let key = scene.world.material(id)?.first().to_string();
     scene.materials.entry(key.clone()).or_default();
     Some(key)
 }

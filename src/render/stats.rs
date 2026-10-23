@@ -164,8 +164,8 @@ impl Renderer {
     pub(crate) fn count_camera(&mut self, solids: &SolidResources, particles: ParticleDraws) {
         let c = &mut self.frame_counters;
         let batches = solids.draws.batches();
-        c.add_draws(batches.map(|b| (b.num_indices, b.instances.len() as u32)));
-        c.visible_entities += solids.draws.instances.len() as u32 - solids.mesh_particles;
+        c.add_draws(batches.map(|b| (b.key.indices.len(), b.instances.len() as u32)));
+        c.visible_entities += solids.visible;
         c.culled_entities += solids.culled;
         c.lod_hidden_entities += solids.lod_hidden;
         c.draw_calls += particles.draw_calls;

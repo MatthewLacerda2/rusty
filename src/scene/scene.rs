@@ -216,21 +216,6 @@ impl Scene {
         self.world.find_by_name(name)
     }
 
-    /// Resolve an entity's referenced material from the library, if any. Returns
-    /// `None` when the entity has no `MaterialComponent` or it points at a missing
-    /// library key.
-    pub fn material_asset_of(&self, id: u32) -> Option<&MaterialAsset> {
-        self.material_entry_of(id).map(|(_, asset)| asset)
-    }
-
-    /// Entity `id`'s material with its library key (the renderer keys a material's
-    /// runtime shader params by it, #399).
-    pub fn material_entry_of(&self, id: u32) -> Option<(&str, &MaterialAsset)> {
-        let key = self.world.material(id)?.material.clone();
-        let (key, asset) = self.materials.get_key_value(&key)?;
-        Some((key.as_str(), asset))
-    }
-
     /// Stable ids in insertion order.
     pub fn entity_ids(&self) -> Vec<u32> {
         self.world.ids().to_vec()

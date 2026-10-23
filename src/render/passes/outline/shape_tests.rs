@@ -60,9 +60,7 @@ fn gpu_a_glass_box_rings_its_silhouette() {
     };
     let mut scene = selected_box(Vec3::ONE);
     let id = scene.selected_entity_id.unwrap();
-    let material = MaterialComponent {
-        material: "glass".to_string(),
-    };
+    let material = MaterialComponent::new("glass".to_string());
     scene.world.set_material(id, Some(material));
     let glass = MaterialAsset {
         render_mode: RenderMode::Transparent,

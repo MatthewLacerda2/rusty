@@ -88,12 +88,8 @@ fn entity_uses_the_named_asset_by_reference() {
     let id = {
         let mut sc = scene.borrow_mut();
         let id = sc.add_entity("Trophy".to_string());
-        sc.world.set_material(
-            id,
-            Some(MaterialComponent {
-                material: "gold".to_string(),
-            }),
-        );
+        sc.world
+            .set_material(id, Some(MaterialComponent::new("gold".to_string())));
         id
     };
 

@@ -259,7 +259,7 @@ fn attach_material(scene: &mut Scene, id: u32, material: MaterialAsset) {
     scene.materials.insert(key.clone(), material);
     scene
         .world
-        .set_material(id, Some(MaterialComponent { material: key }));
+        .set_material(id, Some(MaterialComponent::new(key)));
 }
 
 #[cfg(test)]

@@ -85,10 +85,11 @@ fn gpu_capture_writes_a_square_png_at_the_requested_resolution() {
 }
 
 #[test]
-fn gpu_a_centimetre_fbx_quad_previews_as_its_red_texture() {
-    // `embedded_textures.fbx`: a 1 cm quad (the FBX default unit) with no colour of
-    // its own, only an embedded red texture. It used to preview as empty sky — a
-    // sub-pixel speck, and black besides (#1280).
+fn gpu_a_centimetre_fbx_quad_previews_as_its_red_and_blue_textures() {
+    // `embedded_textures.fbx`: a 1 cm quad (the FBX default unit) whose triangles
+    // have no colour of their own, only an embedded red texture on one and a blue one
+    // on the other. It used to preview as empty sky — a sub-pixel speck, and black
+    // besides (#1280) — then all red, its second material dropped (#1285).
     let fixture =
         Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/models/embedded_textures.fbx");
     let dir = crate::test_temp::dir();
@@ -104,9 +105,17 @@ fn gpu_a_centimetre_fbx_quad_previews_as_its_red_texture() {
         return;
     }
     let image = image::open(&out).unwrap().to_rgb8();
-    let red = image
-        .pixels()
-        .filter(|p| p[0] > 96 && u16::from(p[1]) + u16::from(p[2]) < 64)
-        .count();
-    assert!(red > 64 * 64 / 10, "only {red} red pixels");
+    let count = |own: usize| {
+        let hue = |p: &&image::Rgb<u8>| {
+            let others: u16 = (0..3).filter(|&c| c != own).map(|c| u16::from(p[c])).sum();
+            p[own] > 96 && others < 64
+        };
+        image.pixels().filter(hue).count()
+    };
+    let (red, blue) = (count(0), count(2));
+    eprintln!("red={red} blue={blue}");
+    assert!(
+        red > 64 * 64 / 50 && blue > 64 * 64 / 50,
+        "red={red} blue={blue}"
+    );
 }

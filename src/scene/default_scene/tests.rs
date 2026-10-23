@@ -38,8 +38,8 @@ fn every_mesh_wears_a_defined_material() {
             .world
             .material(id)
             .expect("has a material")
-            .material
-            .clone();
+            .first()
+            .to_string();
         assert!(
             scene.materials.contains_key(&key),
             "{key} is in the library"

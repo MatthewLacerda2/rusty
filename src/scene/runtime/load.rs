@@ -72,7 +72,8 @@ impl Scene {
         let materials: BTreeMap<String, MaterialAsset> = carried
             .iter()
             .filter_map(|e| e.material.as_ref())
-            .filter_map(|m| Some((m.material.clone(), self.materials.get(&m.material)?.clone())))
+            .flat_map(|m| &m.materials)
+            .filter_map(|key| Some((key.clone(), self.materials.get(key)?.clone())))
             .collect();
 
         make_room(&mut data, survivors);

@@ -97,7 +97,7 @@ impl Renderer {
             let offsets = DrawBuffers::offsets(draw.uniform_slot);
             pass.set_bind_group(1, self.draw_buffers.bind_group(), &offsets);
             pass.set_bind_group(2, self.materials.group(draw.material), &[]);
-            pass.draw_indexed(0..draw.num_indices, 0, draw.instance..draw.instance + 1);
+            pass.draw_indexed(draw.indices.clone(), 0, draw.instance..draw.instance + 1);
         }
     }
 

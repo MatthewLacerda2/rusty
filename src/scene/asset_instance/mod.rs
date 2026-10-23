@@ -76,25 +76,42 @@ pub fn instantiate_asset(
     Ok(id)
 }
 
-/// Resolve the sub-mesh's imported material into the scene library and reference it
-/// from `id`; when the sub-mesh names no material, dress the entity with the engine
-/// default — a GameObject built from a glTF carries a Material by definition
+/// Resolve the sub-mesh's imported materials into the scene library and reference
+/// them from `id`, one per material run (#1285); a run that names no material takes
+/// the engine default. When no run names one, dress the entity with the engine
+/// default alone — a GameObject built from a glTF carries a Material by definition
 /// (CLAUDE.md), so it renders with a resolvable reference rather than none.
 fn apply_material(scene: &mut Scene, id: u32, path: &str, asset: &ImportedAsset, sub: &str) {
-    let key = asset
+    let runs: Vec<Option<usize>> = asset
         .sub_mesh(sub)
-        .and_then(|s| s.material)
-        .and_then(|idx| import_material(scene, path, asset, idx));
-    match key {
-        Some(key) => {
-            scene
-                .world
-                .set_material(id, Some(MaterialComponent { material: key }));
+        .map(|s| s.ranges.iter().map(|r| r.material).collect())
+        .unwrap_or_default();
+    // Each distinct material is converted once, however many runs draw with it.
+    let mut imported: Vec<(usize, Option<String>)> = Vec::new();
+    let mut key_of = |idx: usize| {
+        if let Some((_, key)) = imported.iter().find(|(i, _)| *i == idx) {
+            return key.clone();
         }
-        None => {
-            crate::scene::authoring::attach_default_material(scene, id);
-        }
+        let key = import_material(scene, path, asset, idx);
+        imported.push((idx, key.clone()));
+        key
+    };
+    let keys: Vec<Option<String>> = runs.iter().map(|run| run.and_then(&mut key_of)).collect();
+    // A run with no material, or none at all, draws with the entity's own default.
+    if keys.is_empty() || keys.iter().any(Option::is_none) {
+        crate::scene::authoring::attach_default_material(scene, id);
     }
+    if keys.iter().all(Option::is_none) {
+        return;
+    }
+    let fallback = crate::components::material::entity_material_key(id);
+    let materials = keys
+        .into_iter()
+        .map(|k| k.unwrap_or_else(|| fallback.clone()))
+        .collect();
+    scene
+        .world
+        .set_material(id, Some(MaterialComponent { materials }));
 }
 
 /// Convert sub-mesh material `idx` into a `MaterialAsset`, insert it under a
@@ -140,6 +157,8 @@ fn sync_collider(scene: &mut Scene, id: u32, path: &str, asset: &ImportedAsset, 
     )
 }
 
+#[cfg(test)]
+mod multi_material_tests;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]

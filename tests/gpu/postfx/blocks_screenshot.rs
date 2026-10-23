@@ -46,12 +46,9 @@ fn edge_scene(effects: &[&str]) -> Scene {
     // The box is 400 wide: centre it 200.5 right so its left edge is at x = 0.5.
     scene.world.transform_mut(white).unwrap().position = Vec3::new(200.5, 0.0, 3.0);
     scene.world.set_mesh(white, Some(mesh));
-    scene.world.set_material(
-        white,
-        Some(MaterialComponent {
-            material: "white".to_string(),
-        }),
-    );
+    scene
+        .world
+        .set_material(white, Some(MaterialComponent::new("white".to_string())));
     let asset = MaterialAsset {
         base_color: [0.0, 0.0, 0.0],
         emissive: [1.0, 1.0, 1.0],

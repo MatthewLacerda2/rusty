@@ -119,7 +119,7 @@ fn soldier(scene: &mut Scene, i: u32, script: &str) {
     let material = "enemy_red".to_string();
     scene
         .world
-        .set_material(id, Some(MaterialComponent { material }));
+        .set_material(id, Some(MaterialComponent::new(material)));
     let mut anim = AnimatorComponent::default();
     anim.play(rig::WALK.to_string());
     scene.world.set_animator(id, Some(anim));

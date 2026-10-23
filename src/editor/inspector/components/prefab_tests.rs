@@ -20,12 +20,9 @@ fn write_prefab(tag: &str) -> String {
     scene
         .materials
         .insert("Stone".into(), MaterialAsset::default());
-    scene.world.set_material(
-        root,
-        Some(MaterialComponent {
-            material: "Stone".into(),
-        }),
-    );
+    scene
+        .world
+        .set_material(root, Some(MaterialComponent::new("Stone")));
     let path = crate::test_temp::dir()
         .join(format!("rusty_263_{tag}.prefab"))
         .to_string_lossy()

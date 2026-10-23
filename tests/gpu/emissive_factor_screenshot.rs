@@ -40,12 +40,9 @@ fn scene(emissive: [f32; 3], bloom: bool) -> Scene {
     scene
         .world
         .set_mesh(id, Some(MeshComponent::new("Box", vertices, indices)));
-    scene.world.set_material(
-        id,
-        Some(MaterialComponent {
-            material: "mat".to_string(),
-        }),
-    );
+    scene
+        .world
+        .set_material(id, Some(MaterialComponent::new("mat".to_string())));
     scene.world.set_visual_correction(id, Some(vc(bloom)));
     scene.materials.insert(
         "mat".to_string(),

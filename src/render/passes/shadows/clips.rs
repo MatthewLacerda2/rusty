@@ -37,7 +37,7 @@ impl Clip {
 }
 
 /// How one caster's shadow is clipped.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct CasterClip {
     pub clip: Clip,
     /// The Cutout material's alpha cutoff, and whether it has an albedo map to test.
@@ -45,33 +45,42 @@ pub(crate) struct CasterClip {
 }
 
 impl Renderer {
-    /// Every active mesh entity whose shadow is clipped, by id — resolving each one's
-    /// surface pipeline and material group exactly as its forward draw does, so both
-    /// passes read one param buffer and mask.
-    pub(super) fn shadow_clips(&mut self, scene: &Scene) -> HashMap<u32, CasterClip> {
+    /// Every active mesh entity's clipped material slots, by `(id, slot)` (#1285) —
+    /// resolving each slot's surface pipeline and material group exactly as its
+    /// forward draw does, so both passes read one param buffer and mask.
+    pub(super) fn shadow_clips(&mut self, scene: &Scene) -> HashMap<(u32, usize), CasterClip> {
         let mut clips = HashMap::new();
         for id in scene.world.ids_with_mesh() {
             if !scene.world.is_active(id) {
                 continue;
             }
-            let Some(entry) = scene.material_entry_of(id) else {
-                continue;
-            };
-            let asset = entry.1;
-            let shader = asset.shader.as_deref();
-            let pipeline = self.surface_shaders.pipeline_id(&self.device, shader);
-            let cuts = self.surface_shaders.cut(pipeline).is_some();
-            let cutout = (asset.render_mode == RenderMode::Cutout)
-                .then(|| (asset.alpha_cutoff, asset.base_color_map.is_some()));
-            if !cuts && cutout.is_none() {
-                continue;
+            let slots = scene.world.material(id).map_or(0, |m| m.materials.len());
+            for slot in 0..slots {
+                if let Some(clip) = self.slot_clip(scene, id, slot) {
+                    clips.insert((id, slot), clip);
+                }
             }
-            let clip = Clip {
-                pipeline: if cuts { pipeline } else { STANDARD },
-                material: self.material_index(Some(entry), pipeline, entity_params(scene, id)),
-            };
-            clips.insert(id, CasterClip { clip, cutout });
         }
         clips
+    }
+
+    /// How material slot `slot` of entity `id` clips its shadow, or `None` when it
+    /// doesn't.
+    fn slot_clip(&mut self, scene: &Scene, id: u32, slot: usize) -> Option<CasterClip> {
+        let entry = scene.material_entry_at(id, slot)?;
+        let asset = entry.1;
+        let shader = asset.shader.as_deref();
+        let pipeline = self.surface_shaders.pipeline_id(&self.device, shader);
+        let cuts = self.surface_shaders.cut(pipeline).is_some();
+        let cutout = (asset.render_mode == RenderMode::Cutout)
+            .then(|| (asset.alpha_cutoff, asset.base_color_map.is_some()));
+        if !cuts && cutout.is_none() {
+            return None;
+        }
+        let clip = Clip {
+            pipeline: if cuts { pipeline } else { STANDARD },
+            material: self.material_index(Some(entry), pipeline, entity_params(scene, id, slot)),
+        };
+        Some(CasterClip { clip, cutout })
     }
 }

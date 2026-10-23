@@ -109,7 +109,9 @@
         "primitive_type": "Cylinder"
       },
       "material": {
-        "material": "entity_2_material"
+        "materials": [
+          "entity_2_material"
+        ]
       },
       "scripts": [
         {

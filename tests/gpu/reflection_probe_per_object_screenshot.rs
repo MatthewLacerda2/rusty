@@ -65,9 +65,7 @@ fn scene() -> Scene {
             transform.position = Vec3::new(x, 0.0, 0.0);
             transform.scale = Vec3::splat(2.0);
         }
-        let material = MaterialComponent {
-            material: "metal".to_string(),
-        };
+        let material = MaterialComponent::new("metal".to_string());
         scene.world.set_material(id, Some(material));
     }
     scene

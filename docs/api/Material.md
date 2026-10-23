@@ -3,7 +3,11 @@
 A *material* is a reusable **asset** — glTF 2.0 metallic-roughness data — stored
 once in the scene's per-World **material library**; an entity carries only a thin
 **reference** to one by name (its `MaterialComponent`). Many entities can share a
-single material, so editing it once updates all of them. These functions resolve
+single material, so editing it once updates all of them. A mesh with several
+materials (an imported model whose faces use more than one) has one material
+**slot** per material run, each referencing its own library material (see
+[*Material slots*](#material-slots) below); the setters below act on the **first**
+slot, Unity's `renderer.sharedMaterial`. These functions resolve
 the entity's referenced material in the library and mutate that shared asset;
 calling one on an entity that has no material yet **creates** a default library
 material and attaches the reference. `SetTexture` sets the albedo (`base_color`)
@@ -44,12 +48,55 @@ conversion wrote into the import cache is a reference (#1072).
 | `Material.GetAssetShaderParam` | `(asset, name)` → the asset's value: the one set, else the shader's baked default |
 | `Material.SetShaderTexture` | `(id, slot, path)` — point an extra texture slot of the material's surface shader (`"mask"`, see *Shader textures* below) at a texture path (a PNG or an `rt:<name>` render texture); `nil` or `""` clears it back to white; errors on an unknown slot |
 
+### Material slots
+
+An entity's `MaterialComponent` holds a **list** of library keys, one per material
+run of its mesh, in the mesh's order (Unity's `Renderer.sharedMaterials`, #1285).
+Importing a model splits each mesh into runs at every material boundary — a glTF
+mesh's primitives, an FBX mesh's per-polygon materials, an `.obj` object's `usemtl`
+groups — while the mesh stays one addressable sub-object (`model.fbx::Body`).
+Instancing it fills one slot per run with that run's imported material (the engine
+default for a run that names none). A primitive, or any one-material mesh, has one
+slot. As in Unity, the list and the runs need not match:
+
+- **fewer materials than runs:** a run past the end of the list is not drawn;
+- **more materials than runs:** each extra material draws the last run again, over
+  it (a second pass, as Unity does).
+
+| Function | Signature | Returns |
+|---|---|---|
+| `Material.Get` | `(id)` | the first slot's library key (Unity's `sharedMaterial`), or `nil` if the entity has no Material |
+| `Material.Set` | `(id, key)` | — points the first slot at library material `key`, attaching a Material if the entity has none |
+| `Material.GetAll` | `(id)` | an array of the library key of every slot, in run order (empty if the entity has no Material) |
+| `Material.SetAt` | `(id, index, key)` | — points slot `index` (0-based, Unity's `sharedMaterials[i]`) at library material `key`; the other slots are untouched |
+
+`index` is 0-based, like every index argument in rusty's API (`Probe`,
+`Reflection`, `Layers`, pads). `GetAll` returns a Lua array, which starts at 1, so a
+loop over it passes `i - 1`:
+
+```lua with=e:Material
+for i, key in ipairs(Material.GetAll(e)) do
+    Material.SetAt(e, i - 1, key)
+end
+```
+
+`Set` and `SetAt` raise an error, and change nothing, when `index` is past the
+entity's slots (one per run of its mesh, or its list's length when that is longer)
+or the library has no material `key`. Setting a slot past the end of the list grows
+it, every new slot up to `index` taking `key`. The slots save with the scene.
+
+```lua with=e:Material
+Material.DefineAsset("chrome", { metallic = 1.0, roughness = 0.1 })
+Material.Set(e, "chrome")
+print(Material.Get(e), #Material.GetAll(e))   -- chrome  1
+```
+
 ### Standalone material assets
 
 The setters above mutate the material an *entity* references. To author a reusable
 material as a **named asset** from scratch — decoupled from any entity, the way an
-imported glTF material is — define it directly into the library, then point any
-entity's `MaterialComponent` at the name. The asset round-trips through `SceneData`
+imported glTF material is — define it directly into the library, then point an
+entity's slot at the name (`Material.Set` / `Material.SetAt`). The asset round-trips through `SceneData`
 like any library material (no engine special-casing).
 
 | Function | Signature | Returns |
@@ -167,7 +214,8 @@ visible fallback.
 
 > **Imported materials.** Instantiating a glTF model populates the material library
 > from the file's authored metallic-roughness materials and points each sub-object's
-> entity at the matching library entry via its `MaterialComponent`. The library key
+> entity at the matching library entries via its `MaterialComponent`, one slot per
+> material run of its mesh (*Material slots*). The library key
 > is deterministic — `"<path>::<material-name>"` (or `"<path>::material_<index>"`
 > when the material is unnamed) — so sub-objects that share one glTF material share a
 > single library entry. glTF packs metallic + roughness in one texture; on import it
@@ -184,7 +232,7 @@ visible fallback.
 > conductor), `Plastic` (smooth coloured dielectric), and `Emissive` (a glowing
 > dielectric). Instantiating the file populates the library with keys
 > `assets/materials/starter.gltf::Matte` (and so on for `Metal` / `Plastic` /
-> `Emissive`); point any entity's `MaterialComponent` at one of those keys to reuse it,
+> `Emissive`); point any entity's slot at one of those keys (`Material.Set`) to reuse it,
 > or copy its factors as the starting point for your own. No external textures — the
 > factors stand alone, so the set stays tiny and license-clean.
 

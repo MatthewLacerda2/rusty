@@ -40,12 +40,12 @@ pub(crate) const MATERIAL_TEXTURES: usize = 5 + crate::shadergen::textures::SLOT
 /// texture slots (`mask`), in that order.
 pub(crate) type MapSignature = [String; MATERIAL_TEXTURES];
 
-/// Who owns a param buffer: a material (by library key), or one entity overriding
-/// its material's values (#670).
+/// Who owns a param buffer: a material (by library key), or one material slot of an
+/// entity overriding its material's values (#670, #1285).
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum ParamOwner {
     Material(String),
-    Entity(SceneId, u32),
+    Entity(SceneId, u32, usize),
 }
 
 /// A group's identity: its maps, and who owns its param buffer (if anyone).
@@ -102,7 +102,7 @@ impl MaterialCache {
     /// `overrides` (#670) — run before the frame resolves any index, so a freed slot
     /// is never one a batch of this frame points at.
     pub(crate) fn release_entities(&mut self, scene: SceneId, overrides: impl Fn(u32) -> bool) {
-        let stale = |o: &ParamOwner| matches!(o, ParamOwner::Entity(s, id) if *s == scene && !overrides(*id));
+        let stale = |o: &ParamOwner| matches!(o, ParamOwner::Entity(s, id, _) if *s == scene && !overrides(*id));
         self.params.retain(|owner, _| !stale(owner));
         let (groups, free) = (&mut self.groups, &mut self.free);
         self.index.retain(|(_, owner), i| {
@@ -161,6 +161,12 @@ impl MaterialCache {
     #[cfg(test)]
     pub(crate) fn len(&self) -> usize {
         self.groups.iter().flatten().count()
+    }
+
+    /// The values last written to `owner`'s param buffer.
+    #[cfg(test)]
+    pub(crate) fn params_of(&self, owner: &ParamOwner) -> Option<&PackedParams> {
+        self.params.get(owner).map(|(_, values)| values)
     }
 
     /// Param buffers alive now (materials' and entities').

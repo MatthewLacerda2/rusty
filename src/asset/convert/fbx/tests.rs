@@ -66,7 +66,7 @@ fn the_lambert_material_keeps_its_colour() {
     let [r, g, b, a] = red.base_color;
     assert!((r - 0.8).abs() < 1e-4 && (g - 0.1).abs() < 1e-4 && (b - 0.1).abs() < 1e-4);
     assert_eq!(a, 1.0);
-    assert_eq!(asset.sub_meshes[0].material, Some(0));
+    assert_eq!(asset.sub_meshes[0].first_material(), Some(0));
 }
 
 #[test]

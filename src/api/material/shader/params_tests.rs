@@ -64,7 +64,13 @@ pub(super) fn run(scene: &RefCell<Scene>, script: &str) -> Result<(), String> {
 fn set_stores_by_canonical_name_and_get_reads_it_back() {
     let shader = Baked::new("set");
     let (scene, id) = scene_with(&shader.0);
-    let key = scene.borrow().world.material(id).unwrap().material.clone();
+    let key = scene
+        .borrow()
+        .world
+        .material(id)
+        .unwrap()
+        .first()
+        .to_string();
     run(
         &scene,
         &format!(

@@ -28,6 +28,10 @@ pub(crate) struct BatchKey {
     pub pipeline: usize,
     /// The geometry (vertex + index buffers), by asset identity (#127).
     pub mesh: MeshId,
+    /// The drawn index run (#1285), whole: each material run of one mesh is a draw of
+    /// its own, and two entities whose runs of one mesh are joined differently never
+    /// share a draw.
+    pub indices: IndexRun,
     /// The group-2 material bind group (the resolved texture maps), by cache index.
     pub material: usize,
     /// The per-draw uniform's words (tint, PBR scalars, map and cutout flags, and the
@@ -46,7 +50,6 @@ impl BatchKey {
 /// One visible solid, ready to batch.
 pub(crate) struct DrawItem {
     pub key: BatchKey,
-    pub num_indices: u32,
     pub instance: InstanceData,
     /// Whether the selection outline rings this solid (#1175): it is then drawn a
     /// second time, from this same draw, into the selection mask.
@@ -60,7 +63,7 @@ pub(crate) struct DrawItem {
 pub(crate) struct OutlineDraw {
     pub mesh: MeshId,
     pub material: usize,
-    pub num_indices: u32,
+    pub indices: Range<u32>,
     pub uniform_slot: u32,
     pub instance: u32,
 }
@@ -71,7 +74,7 @@ impl OutlineDraw {
         Self {
             mesh: batch.key.mesh.clone(),
             material: batch.key.material,
-            num_indices: batch.num_indices,
+            indices: batch.key.indices.range(),
             uniform_slot: batch.uniform_slot,
             instance,
         }
@@ -82,7 +85,6 @@ impl OutlineDraw {
 /// `uniform_slot` of the frame's packed uniforms.
 pub(crate) struct DrawBatch {
     pub key: BatchKey,
-    pub num_indices: u32,
     pub uniform_slot: u32,
     pub instances: Range<u32>,
 }
@@ -128,7 +130,6 @@ impl FrameDraws {
                 Some(run) if merge && run.key == item.key => run.instances.end = index + 1,
                 _ => batches.push(DrawBatch {
                     key: item.key,
-                    num_indices: item.num_indices,
                     uniform_slot: slot_base + batches.len() as u32,
                     instances: index..index + 1,
                 }),
@@ -151,6 +152,64 @@ impl FrameDraws {
     pub(crate) fn batches(&self) -> impl Iterator<Item = &DrawBatch> {
         self.opaque.iter().chain(&self.transparent)
     }
+}
+
+/// A run of a mesh's index buffer, `start..end`, as a key field (#1285): `Range`
+/// is neither `Copy` nor `Ord`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub(crate) struct IndexRun {
+    pub start: u32,
+    pub end: u32,
+}
+
+impl IndexRun {
+    /// The run as the range `draw_indexed` takes.
+    pub(crate) fn range(self) -> Range<u32> {
+        self.start..self.end
+    }
+
+    /// How many indices the run draws.
+    pub(crate) fn len(self) -> u32 {
+        self.end - self.start
+    }
+}
+
+impl From<Range<u32>> for IndexRun {
+    fn from(r: Range<u32>) -> Self {
+        Self {
+            start: r.start,
+            end: r.end,
+        }
+    }
+}
+
+/// `runs` clipped to the `count` indices a GPU mesh holds, empty runs dropped
+/// (#1285). A mesh's runs always cover its own indices; the clip only matters when
+/// its CPU geometry changed ahead of the upload.
+pub(crate) fn clip_runs(runs: impl Iterator<Item = Range<u32>>, count: u32) -> Vec<Range<u32>> {
+    runs.map(|r| r.start.min(count)..r.end.min(count))
+        .filter(|r| !r.is_empty())
+        .collect()
+}
+
+/// Which material slot draws which of a mesh's index `runs` (#1285), Unity's way
+/// (`Renderer.sharedMaterials`): slot `i` draws run `i`; a slot past the last run
+/// draws the last run again, so an extra material layers over it; a run past the
+/// last slot is not drawn. `slots` is `None` for an entity without a Material, whose
+/// every run draws with the engine default.
+pub(crate) fn material_runs(
+    runs: Vec<Range<u32>>,
+    slots: Option<usize>,
+) -> Vec<(usize, Range<u32>)> {
+    let Some(slots) = slots else {
+        return runs.into_iter().enumerate().collect();
+    };
+    let Some(last) = runs.last() else {
+        return Vec::new();
+    };
+    (0..slots)
+        .map(|slot| (slot, runs.get(slot).unwrap_or(last).clone()))
+        .collect()
 }
 
 #[cfg(test)]
