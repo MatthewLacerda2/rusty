@@ -19,8 +19,7 @@ use glam::Vec3;
 use crate::core::input::{CursorState, InputState};
 use crate::navigation::NavigationGraph;
 use crate::physics::PhysicsWorld;
-use crate::scene::Camera;
-use crate::scene::{Scene, SceneSnapshot};
+use crate::scene::{Camera, Scene, SceneSnapshot};
 use crate::scripting::{ConsoleLogs, ScriptManager};
 use crate::time::Time;
 
@@ -238,6 +237,7 @@ impl GameWorld {
             self.resources.edit_snapshot = Some(SceneSnapshot::capture(&self.world.scene.borrow()));
             self.capture_play_origin();
         }
+        self.world.scene.borrow_mut().playing = true; // every destroy now queues (#1298)
         self.resources
             .console
             .borrow_mut()
@@ -279,7 +279,7 @@ impl GameWorld {
         // discard play-mode mixer changes (#465) as the scene's are below.
         self.resources.audio.borrow_mut().exit_play();
         self.resources.play_hold = None; // conversion on before the restore (#1253)
-                                         // Restore the edit scene captured on Play, discarding play-mode state.
+        self.world.scene.borrow_mut().playing = false; // the restore destroys at once (#1298)
         if let Some(snapshot) = self.resources.edit_snapshot.take() {
             snapshot.restore(&mut self.world.scene.borrow_mut());
             self.resources

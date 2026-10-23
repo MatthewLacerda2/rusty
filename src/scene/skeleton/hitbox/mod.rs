@@ -33,7 +33,8 @@ impl Scene {
     /// Generate (or regenerate) `owner`'s per-bone hitboxes and return them as
     /// `(bone name, hitbox entity)` pairs, ascending by joint slot. A bone that
     /// already has a `Hitbox` child gets it refitted in place; one that no longer
-    /// qualifies loses it. `Err` when `owner` has no skinned mesh, or no layer is
+    /// qualifies loses it ([`Scene::destroy`]: queued in Play, so a script under it
+    /// is torn down, #1298). `Err` when `owner` has no skinned mesh, or no layer is
     /// free for the hitbox layer.
     pub fn generate_hitboxes(
         &mut self,
@@ -67,7 +68,7 @@ impl Scene {
             let Some(bone) = *bone else { continue };
             if !fits.iter().any(|f| f.slot == slot) {
                 if let Some(stale) = self.hitbox_of(bone) {
-                    self.destroy_entity(stale);
+                    self.destroy(stale);
                 }
             }
         }
@@ -156,6 +157,8 @@ impl Scene {
 
 #[cfg(test)]
 mod persist_tests;
+#[cfg(test)]
+mod play_tests;
 #[cfg(test)]
 mod rig;
 #[cfg(test)]

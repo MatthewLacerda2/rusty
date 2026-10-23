@@ -23,7 +23,7 @@ const BUSY: &str = "_G.__log = _G.__log or ''\n\
 
 /// A started runtime whose `parent` carries `LOGGER`; `child` (made by `under`
 /// from the scene and the parent) carries `BUSY`. Returns the manager, parent, child.
-fn scripted(
+pub(super) fn scripted(
     name: &str,
     under: impl FnOnce(&mut crate::scene::Scene, u32) -> u32,
 ) -> (ScriptManager, u32, u32) {
@@ -45,7 +45,7 @@ fn scripted(
 }
 
 /// Request `id`'s destroy and drain it, as the Play schedule does.
-fn destroy(m: &mut ScriptManager, id: u32) {
+pub(super) fn destroy(m: &mut ScriptManager, id: u32) {
     m.scene.borrow_mut().request_destroy(id);
     m.apply_pending_destroys();
 }

@@ -216,8 +216,8 @@ headless replays stay byte-identical):
   edge fires exactly once, so replays stay byte-identical.
 - The scene-load phase follows the destroy phase, still at the tick's tail: a
   `Scene.Load` requested this tick unloads the outgoing scene — the same
-  teardown, all `OnDisable`s then all `OnDestroy`s in ascending
-  `(entity id, script index)` order, for every entity that does not survive —
+  teardown in the same order (children before parents, then ascending entity
+  id; an entity's scripts by index), for every entity that does not survive —
   and swaps the new scene in. Its scripts `Awake` / `OnEnable` / `Start` at
   the head of the next tick, like spawns.
 - The UI callbacks run in their own phase between the init phase and

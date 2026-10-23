@@ -48,10 +48,10 @@ impl Scene {
                 continue;
             }
             if self.is_generated_hitbox(child) {
-                self.destroy_entity(child);
+                self.destroy(child);
                 log::warn!(
                     "[Asset] the skeleton of entity {owner} no longer has bone '{name}'; \
-                     its generated hitbox (entity {child}) was removed."
+                     its generated hitbox (entity {child}) is removed."
                 );
                 continue;
             }

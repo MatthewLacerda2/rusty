@@ -106,6 +106,10 @@ pub struct Scene {
     /// Ids queued for deferred destruction by play-mode `Scene.DestroyEntity`
     /// (#323); drained in `runtime::destroy_queue`. Transient, never serialized.
     pub pending_destroy: Vec<u32>,
+    /// Whether this World is in Play (#1298): set on entering Play, cleared on
+    /// leaving it. While it holds, every destroy goes through the queue so its
+    /// scripts are torn down ([`Scene::destroy`]). Transient, never serialized.
+    pub playing: bool,
     /// The scene file a play-mode `Scene.Load` asked for (#432); swapped in at the
     /// tick's tail by the scene-load phase (`scene_load`). Transient, never serialized.
     pub pending_load: Option<String>,
@@ -146,6 +150,7 @@ impl Default for Scene {
             lightmaps: Default::default(),
             lighting_settings: Default::default(),
             pending_destroy: Vec::new(),
+            playing: false,
             pending_load: None,
             persistent: std::collections::BTreeSet::new(),
             shader_time: 0.0,
@@ -179,8 +184,14 @@ impl Scene {
 
     /// Remove entity `id` and everything under it ([`Scene::destroy_set`]), as
     /// Unity's `Object.Destroy` takes a GameObject's children (#1283). Nothing
-    /// keeps naming them (`Scene::despawn_batch`).
+    /// keeps naming them (`Scene::despawn_batch`). Edit mode only: in Play a
+    /// destroy must tear its scripts down first, so it goes through
+    /// [`Scene::destroy`] (#1298).
     pub fn destroy_entity(&mut self, id: u32) {
+        debug_assert!(
+            !self.playing,
+            "destroy_entity({id}) in Play skips script teardown; use Scene::destroy"
+        );
         let doomed = self.destroy_set(id);
         self.despawn_batch(&doomed);
     }

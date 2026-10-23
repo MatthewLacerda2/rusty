@@ -109,8 +109,9 @@ fn register_destroy<'scope>(
     // stays live until the script system's destroy phase, which fires its
     // `OnDisable`/`OnDestroy` before removing it — matching Unity's end-of-frame
     // `Object.Destroy`. In EDIT mode there is no script tick to drain the queue
-    // (and no scripts to notify), so removal is immediate, via `Scene::destroy_entity`
-    // (which also clears the selection if it was selected).
+    // (and no scripts to notify), so `Scene::destroy` removes it at once (and
+    // clears the selection if it was selected); it queues too should the scene
+    // already be in Play, so the two play flags can never skip a teardown (#1298).
     put(
         table,
         "DestroyEntity",
@@ -122,7 +123,7 @@ fn register_destroy<'scope>(
                     s.request_destroy(id);
                 }
             } else {
-                s.destroy_entity(id);
+                s.destroy(id);
             }
             Ok(existed)
         }),

@@ -92,7 +92,7 @@ per-module unit tests (e.g. `api/light.rs`) are the pattern.
 | `RecordPrefabOverrides` | ✅ | round-trip — records the instance↔source diff into `prefab_link.overrides`; observable via `ListPrefabOverrides` and re-applied by propagation |
 | `RevertPrefabOverrides` / `ReimportPrefab` | ✅ | rebuild each instance entity from a fresh source baseline (re-applying overrides on reimport); the resulting component values feed the same renderer/sim read-sites as any edited entity |
 | `ApplyPrefabToSource` / `ApplyPrefabFieldToSource` | ✅ | write the instance's overrides into the source `.prefab` on disk (reusing the override setter + the one `.prefab` writer), then clear them — other instances pick the edit up on reload/reimport (#268) |
-| `SetActive` | ✅ | sim + renderer — the same `active` flag `DestroyEntity` clears: the script lifecycle's `OnEnable`/`OnDisable` edge sweep, layout groups, UI hit-testing and drawing all read it; round-trips (`tests/ui/widgets/reads.rs`, #422) |
+| `SetActive` | ✅ | sim + renderer — the same `active` flag `Deactivate` clears: the script lifecycle's `OnEnable`/`OnDisable` edge sweep, layout groups, UI hit-testing and drawing all read it; round-trips (`tests/ui/widgets/reads.rs`, #422) |
 
 ### `Navigation` — over `Scene.nav_settings`
 
