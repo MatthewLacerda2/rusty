@@ -1,5 +1,5 @@
-//! A re-written skinned model rebuilds the rig and bones of the entities built from
-//! it (#1252), keeping the bone overrides and what hangs from a bone.
+//! A re-written skinned model re-binds the rig and bones of the entities built from
+//! it (#1252, #1265), keeping the bone overrides and what hangs from a bone.
 
 use std::collections::BTreeSet;
 
@@ -70,7 +70,7 @@ fn assert_dead_and_unlisted(scene: &Scene, old: &[u32]) {
 }
 
 #[test]
-fn a_changed_bind_pose_rebuilds_the_rig_and_keeps_what_was_authored() {
+fn a_changed_bind_pose_rebinds_the_rig_and_keeps_what_was_authored() {
     let mut scene = Scene::new();
     let (hero, path) = hero(&mut scene, "reimport_bind");
     let root = scene.find_bone(hero, "Joint0").unwrap();
@@ -94,8 +94,8 @@ fn a_changed_bind_pose_rebuilds_the_rig_and_keeps_what_was_authored() {
     assert!(mesh.is_dirty.get(), "re-uploaded");
     let bones = mesh.skeleton.bones.clone();
     drop(mesh);
-    assert_eq!(bones.len(), 2);
-    assert_eq!(scene.bone_ids().len(), 2, "the old bones are gone");
+    assert_eq!(bones, old_bones, "the bones are kept");
+    assert_eq!(scene.bone_ids().len(), 2, "and no bone was added");
     let tip = scene.world.transform(bones[1]).unwrap().position;
     assert!(
         tip.abs_diff_eq(2.0 * Vec3::Y, 1e-6),
@@ -109,7 +109,6 @@ fn a_changed_bind_pose_rebuilds_the_rig_and_keeps_what_was_authored() {
         "the gun hangs on"
     );
     assert_eq!(scene.world.transform(gun).unwrap().position, Vec3::Z);
-    assert_dead_and_unlisted(&scene, &old_bones);
 }
 
 #[test]
@@ -130,12 +129,16 @@ fn a_removed_bone_hands_what_hung_from_it_to_its_parent_bone() {
     assert_eq!(writes.follow(&mut scene), 1);
 
     let bones = scene.world.mesh(hero).unwrap().skeleton.bones.clone();
-    assert_eq!(bones.len(), 1, "the rig lost Joint1");
+    assert_eq!(
+        bones,
+        old_bones[..1],
+        "the rig lost Joint1, and kept Joint0"
+    );
     assert_eq!(scene.world.parent_id(gun), Some(bones[0]));
     assert_eq!(parent_name(&scene, gun), "Joint0");
     assert!(!scene.world.contains(hitbox), "a hitbox goes with its bone");
     assert_eq!(scene.selected_entity_id, None, "the selected bone is gone");
-    assert_dead_and_unlisted(&scene, &old_bones);
+    assert_dead_and_unlisted(&scene, &old_bones[1..]);
 }
 
 #[test]
@@ -214,7 +217,7 @@ fn destroying_a_child_takes_it_out_of_its_parents_children() {
 }
 
 #[test]
-fn a_bone_gone_with_its_ancestors_is_warned_about_and_leaves_its_child_on_the_rig() {
+fn a_bone_gone_with_its_ancestors_leaves_its_child_on_the_rig() {
     let mut scene = Scene::new();
     let rig = armature_owner(&mut scene);
     scene.sync_skeleton(rig);
@@ -222,9 +225,8 @@ fn a_bone_gone_with_its_ancestors_is_warned_about_and_leaves_its_child_on_the_ri
     hang_gun(&mut scene, rig, "head");
     let pistol = hang_gun(&mut scene, rig, "hips");
 
+    let old_bones = scene.world.mesh(rig).unwrap().skeleton.bones.clone();
     let attachments = scene.take_skeleton(rig);
-    assert_eq!(scene.bone_ids().len(), 0, "the bones came down");
-    assert_eq!(scene.world.parent_id(hat), Some(rig), "parked on the rig");
     // The new rig keeps only the root, renamed: `head`'s whole chain is gone.
     let mut skin = scene.world.mesh(rig).unwrap().skin.clone().unwrap();
     skin.names = vec!["pelvis".to_string()];
@@ -235,9 +237,9 @@ fn a_bone_gone_with_its_ancestors_is_warned_about_and_leaves_its_child_on_the_ri
     skin.joint_nodes.truncate(1);
     scene.world.mesh_mut(rig).unwrap().skin = Some(skin);
 
-    let missing = scene.restore_skeleton(rig, attachments);
-    assert_eq!(missing, ["hips", "head"], "each bone gone, once");
+    scene.restore_skeleton(rig, attachments);
     assert_eq!(scene.world.parent_id(hat), Some(rig));
     assert_eq!(scene.world.parent_id(pistol), Some(rig));
     assert_eq!(scene.bone_ids().len(), 1, "the new rig's one bone");
+    assert_dead_and_unlisted(&scene, &old_bones);
 }

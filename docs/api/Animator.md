@@ -230,12 +230,20 @@ else, and is an ordinary entity in every API — `Transform.*`, `Scene.SetParent
   `Physics.GenerateHitboxes(id)` does exactly that for every bone (see
   `Physics`, *Per-bone hitboxes*, #464).
 - **Re-importing the model** (its file re-written while the editor runs, #1252)
-  applies the same rules live, without a reload: the skeleton is rebuilt from the
-  new rig, so **every bone gets a new id**. Look bones up again with
-  `Animator.GetBone` rather than keeping an id across a re-import. Overrides,
-  attachments, ragdoll bodies and joints carry over by bone name, as on a load;
-  any other component on a bone is deleted, with a warning. A model re-written
-  without a skin drops its overrides and ragdoll bodies, with a warning.
+  re-binds the skeleton to the new rig **in place, by bone name**, as Unity
+  keeps a model's bone Transforms (#1265): a bone the new rig still names keeps
+  its id, its `active` flag, its layer, its components, its children and the
+  editor's selection, and moves to its new rest pose (a bone you moved off the
+  old rest pose stays where you put it, as an override does on a load). A bone
+  new to the rig is spawned at rest. A bone the rig dropped is destroyed: what
+  hung from it, a joint or marker pointing at it, moves to its nearest ancestor
+  bone, as on a load, with a warning, and its ragdoll body and any other
+  component on it are deleted, with a warning. A model re-written without a
+  skin drops every bone that way.
+  **Known limitation:** an attachment that falls back to an ancestor bone keeps
+  the local transform it had on the removed bone, so it jumps by that bone's
+  offset. A load cannot know the old rest pose, and a live re-import behaves
+  exactly like a reload, so re-place the attachment by hand.
 - **Destroying** the skinned entity destroys its skeleton and what hangs from it.
 
 `Debug.Snapshot()` leaves bones out by default; `Debug.Snapshot({ bones = true })`

@@ -19,9 +19,10 @@
 //!   them to its nearest surviving ancestor, with a warning, never silently.
 //! - `bone_refs`: any other id leaf naming a bone (a joint, a marker, an override)
 //!   is saved and re-bound by the bone's name the same way (#1264).
-//! - `reimport`: `Scene::take_skeleton` + `Scene::restore_skeleton` rebuild a live
-//!   skeleton from a re-imported rig, keeping what was authored on it (#1252), and
-//!   hang its attachments back by the same rule as a load.
+//! - `reimport`: `Scene::take_skeleton` + `Scene::restore_skeleton` re-bind a live
+//!   skeleton to a re-imported rig in place, by bone name (#1252, #1265): a bone
+//!   the rig still names keeps its entity; what hung from a dropped one hangs on
+//!   by the same rule as a load.
 //! - `palette` builds each skinned mesh's posed palette from the bones.
 //! - `hitbox` fits per-bone hitbox colliders and names the bone a hit struck (#464).
 //! - `ragdoll` turns those hitboxes into jointed bodies and switches them between
@@ -134,6 +135,8 @@ mod persist_tests;
 mod prefab_refs_tests;
 #[cfg(test)]
 mod ragdoll_refs_tests;
+#[cfg(test)]
+mod rebind_tests;
 #[cfg(test)]
 mod reimport_tests;
 #[cfg(test)]

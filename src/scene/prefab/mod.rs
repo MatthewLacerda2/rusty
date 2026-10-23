@@ -117,12 +117,9 @@ fn stamp_prefab(
         if entity.parent_id.is_none() {
             new_root = entity.id;
         }
-        if !entity.parent_bone.is_empty() {
-            bone_parents.push((entity.id, std::mem::take(&mut entity.parent_bone)));
-        }
-        bone_refs.extend(crate::scene::skeleton::take_bone_refs(
-            std::slice::from_mut(&mut entity),
-        ));
+        let one = std::slice::from_mut(&mut entity);
+        bone_parents.extend(crate::scene::skeleton::take_bone_parents(one));
+        bone_refs.extend(crate::scene::skeleton::take_bone_refs(one));
         scene.world.insert_entity(entity);
     }
     scene.hang_on_skeletons(bone_parents, bone_refs);

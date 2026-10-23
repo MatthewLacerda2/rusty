@@ -18,7 +18,7 @@ use crate::components::mesh::BoneBody;
 use crate::components::{Entity, TransformComponent};
 
 /// How far a bone may drift from its rest pose before it counts as an override.
-const OVERRIDE_EPS: f32 = 1.0e-5;
+pub(super) const OVERRIDE_EPS: f32 = 1.0e-5;
 
 /// Take every skeleton out of `entities` (a document about to be saved or
 /// extracted): record each skinned entity's bone overrides and bone bodies, move
@@ -27,21 +27,6 @@ const OVERRIDE_EPS: f32 = 1.0e-5;
 /// about: only its transform and physics are kept, so a component belongs on a
 /// child of the bone.
 pub fn strip_bones(entities: &mut Vec<Entity>) {
-    strip(entities, Why::Saved);
-}
-
-/// Why bones are being taken out of a document, for the warning about the
-/// components a bone carried.
-#[derive(Clone, Copy)]
-pub(super) enum Why {
-    /// A save or extract: the components are not written.
-    Saved,
-    /// A live re-import (#1252): the bones are despawned, and the components with them.
-    Reimported,
-}
-
-/// [`strip_bones`], warning about a bone's other components as `why` says.
-pub(super) fn strip(entities: &mut Vec<Entity>, why: Why) {
     let index: BTreeMap<u32, usize> = entities
         .iter()
         .enumerate()
@@ -65,7 +50,7 @@ pub(super) fn strip(entities: &mut Vec<Entity>, why: Why) {
         let bones = &mesh.skeleton.bones;
         for (slot, bone) in bones.iter().enumerate() {
             if let Some(&b) = index.get(bone) {
-                saved.record(&entities[b], skin, bones, slot, why);
+                saved.record(&entities[b], skin, bones, slot);
             }
         }
         if let Some(mesh) = &mut entities[i].mesh {
@@ -110,7 +95,7 @@ struct SavedBones {
 impl SavedBones {
     /// Record bone `slot`'s document: its transform when it is off the rest
     /// pose, its physics, and a warning for any other component.
-    fn record(&mut self, doc: &Entity, skin: &SkinData, bones: &[u32], slot: usize, why: Why) {
+    fn record(&mut self, doc: &Entity, skin: &SkinData, bones: &[u32], slot: usize) {
         let name = skin.name(slot);
         if !doc
             .transform
@@ -122,18 +107,11 @@ impl SavedBones {
         if let Some(body) = bone_body(doc, bone_name) {
             self.bodies.insert(name.clone(), body);
         }
-        if !carries_components(doc) {
-            return;
-        }
-        match why {
-            Why::Saved => log::warn!(
+        if carries_components(doc) {
+            log::warn!(
                 "[Scene] bone '{name}' carries components that are not saved (bones are \
                  rebuilt from the model); put them on a child of the bone instead."
-            ),
-            Why::Reimported => log::warn!(
-                "[Asset] bone '{name}' carried components; re-importing its model rebuilt \
-                 the bone and deleted them. Put them on a child of the bone instead."
-            ),
+            );
         }
     }
 }
@@ -209,7 +187,7 @@ fn bone_body(doc: &Entity, bone_name: impl Fn(u32) -> Option<String>) -> Option<
 /// Whether a bone's document holds anything beyond what every bone has (name,
 /// transform, hierarchy, flags, and the physics `bone_body` keeps) — a component
 /// or a script.
-fn carries_components(doc: &Entity) -> bool {
+pub(super) fn carries_components(doc: &Entity) -> bool {
     let mut bare = Entity::new(doc.id, doc.name.clone());
     bare.rigidbody = doc.rigidbody.clone();
     bare.joint = doc.joint.clone();
