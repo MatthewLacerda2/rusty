@@ -15,8 +15,11 @@ pub(super) fn quad(entity: u32, c: [Vec3; 4], albedo: Vec3) -> BakeMesh {
         normals: vec![n; 4],
         lightmap_uvs: vec![Vec2::ZERO, Vec2::X, Vec2::ONE, Vec2::Y],
         indices: vec![0, 1, 2, 0, 2, 3],
-        albedo,
-        emissive: Vec3::ZERO,
+        runs: vec![BakeRun {
+            end: 6,
+            albedo,
+            emissive: Vec3::ZERO,
+        }],
     }
 }
 

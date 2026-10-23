@@ -37,7 +37,7 @@ mod trace;
 pub use atlas::{pack, LightmapAtlas, MAX_PAGE};
 pub use bake::{bake, bake_with_progress, BakeSettings, Lightmap};
 pub use encode::{encode_directions, encode_texels};
-pub use input::{BakeLight, BakeMesh, BakeScene, LightShape};
+pub use input::{BakeLight, BakeMesh, BakeRun, BakeScene, LightShape};
 pub use probe_direct::baked_direct_sh;
 pub use progress::BakeProgress;
 pub use raster::{lightmap_size, MIN_RESOLUTION};
@@ -53,5 +53,7 @@ mod gather_tests;
 mod probe_direct_tests;
 #[cfg(test)]
 mod progress_tests;
+#[cfg(test)]
+mod run_tests;
 #[cfg(test)]
 mod tests;

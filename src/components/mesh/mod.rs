@@ -172,8 +172,28 @@ impl MeshComponent {
     }
 }
 
+/// Which material slot draws which of a mesh's index `runs` (#1285), Unity's way
+/// (`Renderer.sharedMaterials`): slot `i` draws run `i`; a slot past the last run
+/// draws the last run again, so an extra material layers over it; a run past the
+/// last slot is not drawn. `slots` is `None` for an entity without a Material, whose
+/// every run draws with the engine default. The renderer and the lightmap bake
+/// (#1290) both pair slots with runs through this one rule.
+pub fn material_runs(runs: Vec<Range<u32>>, slots: Option<usize>) -> Vec<(usize, Range<u32>)> {
+    let Some(slots) = slots else {
+        return runs.into_iter().enumerate().collect();
+    };
+    let Some(last) = runs.last() else {
+        return Vec::new();
+    };
+    (0..slots)
+        .map(|slot| (slot, runs.get(slot).unwrap_or(last).clone()))
+        .collect()
+}
+
 #[cfg(test)]
 mod box_lightmap_tests;
+#[cfg(test)]
+mod material_runs_tests;
 #[cfg(test)]
 #[path = "primitives_tests.rs"]
 mod primitives_tests;

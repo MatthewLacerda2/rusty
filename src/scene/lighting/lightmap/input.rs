@@ -2,10 +2,13 @@
 //! triangles, the lights that take part in the bake, and the sky. Gathered once from a
 //! [`Scene`]; the tracer never touches the ECS, so the bake is a pure function of this.
 
+use std::ops::Range;
+
 use glam::{Vec2, Vec3};
 
 use crate::asset::MapRef;
-use crate::components::{LightType, MaterialAsset};
+use crate::components::mesh::material_runs;
+use crate::components::{LightType, MaterialAsset, MeshComponent};
 use crate::scene::Scene;
 
 /// One static mesh in world space. Every one occludes and bounces light; the ones
@@ -18,11 +21,30 @@ pub struct BakeMesh {
     /// Unit world-space vertex normals.
     pub normals: Vec<Vec3>,
     pub lightmap_uvs: Vec<Vec2>,
+    /// The opaque runs' triangles only: a Transparent run, or one with no material
+    /// slot, is left out (#1290).
     pub indices: Vec<u32>,
+    /// How `indices` splits into material runs, in order (#1290).
+    pub runs: Vec<BakeRun>,
+}
+
+/// One material run of a [`BakeMesh`]: the indices up to `end` (from the previous
+/// run's `end`) and the surface its own material gives them.
+#[derive(Clone, Copy, Debug)]
+pub struct BakeRun {
+    pub end: u32,
     /// Diffuse reflectance: the material colour times its albedo map's average.
     pub albedo: Vec3,
     /// Emitted radiance, as the forward shader adds it.
     pub emissive: Vec3,
+}
+
+impl BakeMesh {
+    /// The run index `index` (into `indices`) belongs to; the last run past the end.
+    pub fn run_at(&self, index: u32) -> &BakeRun {
+        let k = self.runs.partition_point(|r| r.end <= index);
+        &self.runs[k.min(self.runs.len() - 1)]
+    }
 }
 
 /// Where a baked light sits and how it falls off — the forward shader's models.
@@ -67,8 +89,9 @@ pub struct BakeScene {
 }
 
 impl BakeScene {
-    /// Flatten `scene`: every active static, opaque mesh that is not a light gizmo, the
-    /// active `Mixed` / `Baked` lights, and the ambient sky. `map_average` turns a
+    /// Flatten `scene`: the opaque runs of every active static mesh that is not a light
+    /// gizmo, each with its own material (#1290), the active `Mixed` / `Baked` lights,
+    /// and the ambient sky. `map_average` turns a
     /// texture path into its average linear colour (`None` when it cannot be read).
     pub fn gather(scene: &Scene, map_average: &dyn Fn(&MapRef) -> Option<Vec3>) -> Self {
         let mut out = BakeScene {
@@ -79,17 +102,19 @@ impl BakeScene {
             let usable = scene.world.is_active(id)
                 && scene.world.is_static(id)
                 && !scene.world.has_light(id);
-            let material = scene.material_asset_of(id);
-            if !usable || material.is_some_and(MaterialAsset::is_transparent) {
+            if !usable {
                 continue;
             }
             let mesh = scene.world.mesh(id).expect("id came from ids_with_mesh");
-            if mesh.is_skinned() || mesh.indices.is_empty() {
+            if mesh.is_skinned() {
+                continue;
+            }
+            let (indices, runs) = opaque_runs(scene, id, &mesh, map_average);
+            if indices.is_empty() {
                 continue;
             }
             let matrix = scene.world.local_to_world(id);
             let normal_matrix = matrix.inverse().transpose();
-            let (albedo, emissive) = surface(material, map_average);
             out.meshes.push(BakeMesh {
                 entity: id,
                 positions: mesh
@@ -106,9 +131,8 @@ impl BakeScene {
                     })
                     .collect(),
                 lightmap_uvs: mesh.vertices.iter().map(|v| v.lightmap_uv.into()).collect(),
-                indices: mesh.indices.clone(),
-                albedo,
-                emissive,
+                indices,
+                runs,
             });
         }
         out.gather_lights(scene);
@@ -157,6 +181,55 @@ impl BakeScene {
             }
         }
     }
+}
+
+/// Entity `id`'s opaque index runs, each with its own material's surface, paired
+/// with its slots the way the renderer draws them
+/// ([`material_runs`](crate::components::mesh::material_runs)): a run with no slot
+/// is left out, as is a Transparent one, and an extra slot past the last run adds
+/// its emission to that run.
+fn opaque_runs(
+    scene: &Scene,
+    id: u32,
+    mesh: &MeshComponent,
+    map_average: &dyn Fn(&MapRef) -> Option<Vec3>,
+) -> (Vec<u32>, Vec<BakeRun>) {
+    let count = mesh.indices.len() as u32;
+    let ranges = mesh
+        .index_ranges()
+        .map(|r| r.start.min(count)..r.end.min(count))
+        .filter(|r| !r.is_empty())
+        .collect();
+    let slots = scene.world.material(id).map(|m| m.materials.len());
+    let (mut indices, mut runs) = (Vec::new(), Vec::<BakeRun>::new());
+    // The run the previous slot drew, and whether it was kept.
+    let mut previous: Option<(Range<u32>, bool)> = None;
+    for (slot, range) in material_runs(ranges, slots) {
+        let material = slots.and_then(|_| scene.material_entry_at(id, slot).map(|(_, m)| m));
+        let (albedo, emissive) = surface(material, map_average);
+        if let Some((last, kept)) = &previous {
+            if *last == range {
+                // An extra slot layers over the last run: only its emission bakes.
+                if let Some(run) = runs.last_mut().filter(|_| *kept) {
+                    run.emissive += emissive;
+                }
+                continue;
+            }
+        }
+        let kept = !material.is_some_and(MaterialAsset::is_transparent);
+        previous = Some((range.clone(), kept));
+        if !kept {
+            continue;
+        }
+        indices.extend_from_slice(&mesh.indices[range.start as usize..range.end as usize]);
+        let end = indices.len() as u32;
+        runs.push(BakeRun {
+            end,
+            albedo,
+            emissive,
+        });
+    }
+    (indices, runs)
 }
 
 /// A material's diffuse albedo and emitted radiance; white and black with none, the
