@@ -35,6 +35,7 @@ pub mod manifest;
 pub mod material_range;
 pub mod mesh_data;
 pub mod obj_import;
+pub mod reference;
 pub mod sidecar;
 pub mod tangents;
 
@@ -47,14 +48,11 @@ pub use lightmap_uv::LightmapUvSettings;
 pub use manifest::{build_manifest, AssetEntry, AssetManifest, SubObjectEntry};
 pub use material_range::MaterialRange;
 pub use mesh_data::{ImportedAsset, JointTransform, MaterialData, MeshVertex, SkinData, SubMesh};
+pub use reference::{AssetRef, REF_SEPARATOR};
 pub use sidecar::{import_and_sync_sidecar, ImportSettings, MeshColliderKind};
 
 use crate::core::paths;
 use std::path::Path;
-
-/// The separator between a source path and a sub-object id in a scene reference:
-/// `crates.glb::Barrel`.
-pub const REF_SEPARATOR: &str = "::";
 
 /// Anything that can go wrong importing a source file. Kept small and string-y:
 /// the importer is a leaf, and callers only ever surface these to a log/console.
@@ -64,7 +62,8 @@ pub enum ImportError {
     UnsupportedFormat(String),
     /// The underlying parser (gltf/tobj) rejected the file.
     Parse(String),
-    /// The reference string wasn't `path::sub_object`, or the sub-object is absent.
+    /// The reference string wasn't `path::sub_object` ([`AssetRef`]), or the
+    /// sub-object is absent: `'<reference>': <why>`.
     BadReference(String),
     /// Reading/writing the `.meta` sidecar failed.
     Sidecar(String),
@@ -140,33 +139,6 @@ fn parse_file(path: &Path) -> Result<ImportedAsset, ImportError> {
     }
 }
 
-/// A parsed scene reference: a source file path and the sub-object within it.
-/// This is the path-based identity an `"Asset"` mesh reference rehydrates from.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct AssetRef {
-    pub path: String,
-    pub sub_object: String,
-}
-
-impl AssetRef {
-    /// Build the canonical reference string `path::sub_object`.
-    pub fn to_string_ref(&self) -> String {
-        format!("{}{}{}", self.path, REF_SEPARATOR, self.sub_object)
-    }
-
-    /// Parse `path::sub_object`. The path may itself contain no `::` (paths don't),
-    /// so we split on the LAST separator to be safe.
-    pub fn parse(reference: &str) -> Result<AssetRef, ImportError> {
-        match reference.rsplit_once(REF_SEPARATOR) {
-            Some((path, sub)) if !path.is_empty() && !sub.is_empty() => Ok(AssetRef {
-                path: path.to_string(),
-                sub_object: sub.to_string(),
-            }),
-            _ => Err(ImportError::BadReference(reference.to_string())),
-        }
-    }
-}
-
 /// Re-import just the sub-mesh a reference points at. This is the hot path scene
 /// rehydration calls: parse the reference, import the file, pull out the one
 /// addressable sub-object.
@@ -176,7 +148,7 @@ pub fn import_sub_mesh(reference: &str) -> Result<SubMesh, ImportError> {
     asset
         .sub_mesh(&asset_ref.sub_object)
         .cloned()
-        .ok_or_else(|| ImportError::BadReference(reference.to_string()))
+        .ok_or_else(|| reference::bad(reference, "the file has no such sub-object"))
 }
 
 #[cfg(test)]
@@ -189,5 +161,7 @@ pub(crate) mod flat_normals_tests;
 mod manifest_tests;
 #[cfg(test)]
 mod multi_material_tests;
+#[cfg(test)]
+mod ref_tests;
 #[cfg(test)]
 mod tests;

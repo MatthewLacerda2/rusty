@@ -224,6 +224,13 @@ one name and never drift.
   engine default when the glTF names none), and syncs a mesh collider when the asset's
   `.meta` sidecar records one. Returns the new entity's id; errors (without spawning)
   when the reference is malformed, the file fails to import, or the sub-object is absent.
+  A reference splits on its **first** `::`: the sub-object name after it may itself
+  hold `::` (`hero.glb::Body::Mesh`, taken verbatim from the model), so the path before
+  it must end in a model extension and must not hold `::`. That is rusty's rule, not
+  the OS's (macOS and Linux allow `:` in names); a project folder whose own name holds
+  `::` is fine, because references are project-relative. A model under a folder such
+  as `assets/my::kit/` is refused with an error naming the path and the rule, never
+  spawned with a mesh that loads empty.
   A converted source (`.fbx`, `.blend`) is never converted during Play: as Unity refreshes its
   assets before Play and its runtime loads never import, entering Play brings every
   converted source under `assets/` up to date (and every instance in the scene with

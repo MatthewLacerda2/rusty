@@ -81,9 +81,28 @@ fn rehydrate_asset_mesh(asset_ref: &Option<String>) -> RehydratedMesh {
     match asset_ref {
         Some(reference) => match asset::import_sub_mesh(reference) {
             Ok(sub) => RehydratedMesh::from_sub_mesh(&sub),
-            Err(_) => RehydratedMesh::default(),
+            Err(e) => {
+                warn_once(reference, &e);
+                RehydratedMesh::default()
+            }
         },
         None => RehydratedMesh::default(),
+    }
+}
+
+thread_local! {
+    /// The references a failed rehydrate was already warned of: a scene reloads
+    /// often, and one warning per reference is enough (#1295).
+    static WARNED: std::cell::RefCell<std::collections::BTreeSet<String>> =
+        const { std::cell::RefCell::new(std::collections::BTreeSet::new()) };
+}
+
+/// Say why `reference`'s mesh comes back empty, once per reference, rather than
+/// leaving an invisible entity with no explanation.
+fn warn_once(reference: &str, error: &asset::ImportError) {
+    let first = WARNED.with(|warned| warned.borrow_mut().insert(reference.to_string()));
+    if first {
+        log::warn!("[Scene] mesh '{reference}' loads empty: {error}");
     }
 }
 
@@ -133,8 +152,11 @@ fn install(mesh: &mut crate::scene::MeshComponent, rebuilt: RehydratedMesh) {
 /// touches them, and re-binding their rig would touch their bones for nothing.
 /// Returns how many were rebuilt.
 pub fn reimport_model(scene: &mut Scene, path: &str) -> usize {
-    let prefix = format!("{path}{}", asset::REF_SEPARATOR);
-    reimport_where(scene, Rig::Keep, |reference| reference.starts_with(&prefix))
+    reimport_where(scene, Rig::Keep, |reference| {
+        reference
+            .split_once(asset::REF_SEPARATOR)
+            .is_some_and(|(file, _)| file == path)
+    })
 }
 
 /// Re-import every mesh in `scene` whose model file `stale` names: the engine
