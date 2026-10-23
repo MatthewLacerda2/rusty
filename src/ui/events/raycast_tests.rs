@@ -3,17 +3,15 @@
 
 use glam::{Quat, Vec2};
 
-use super::raycast;
+use super::raycast_pointer;
 use crate::components::{CanvasComponent, CanvasGroupComponent, MaskComponent, RectMaskComponent};
 use crate::ui::events::fixture::{panel, scene, SCREEN};
 use crate::ui::UiLayout;
 
 fn hit(scene: &crate::scene::Scene, x: f32, y: f32) -> Option<u32> {
-    let layout = UiLayout::compute_in(
-        &scene.world,
-        &crate::ui::UiView::screen(SCREEN, Default::default()),
-    );
-    raycast(&scene.world, &layout, Vec2::new(x, y))
+    let view = crate::ui::UiView::screen(SCREEN, Default::default());
+    let layout = UiLayout::compute_in(&scene.world, &view);
+    raycast_pointer(&scene.world, &layout, &view.pointer(Some(Vec2::new(x, y))))
 }
 
 #[test]

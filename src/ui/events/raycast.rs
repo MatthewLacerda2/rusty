@@ -28,14 +28,9 @@ use crate::ecs::World;
 use crate::ui::space::ray_to_canvas;
 use crate::ui::{CanvasSpace, UiLayout, UiPointer, UiRect};
 
-/// The top-most raycast target under `point` (UI screen pixels) on the screen
-/// canvases, if any.
-pub fn raycast(world: &World, layout: &UiLayout, point: Vec2) -> Option<u32> {
-    raycast_pointer(world, layout, &UiPointer::at(point))
-}
-
 /// The raycast target `pointer` hits: the screen canvases first, then the world
-/// canvases along its ray, nearest first (see the module docs).
+/// canvases along its ray, nearest first (see the module docs). The pointer comes
+/// from [`crate::ui::UiView::pointer`].
 pub fn raycast_pointer(world: &World, layout: &UiLayout, pointer: &UiPointer) -> Option<u32> {
     let rects: Vec<(u32, &UiRect)> = layout.iter().collect();
     let hit_in = |canvas: u32, p: Vec2| {

@@ -84,17 +84,6 @@ pub struct UiPointer {
     pub ray_limit: f32,
 }
 
-impl UiPointer {
-    /// A pointer on the screen only (no camera ray): overlay canvases.
-    pub fn at(screen: Vec2) -> Self {
-        Self {
-            screen: Some(screen),
-            ray: None,
-            ray_limit: f32::INFINITY,
-        }
-    }
-}
-
 /// Where one canvas's reference units end up.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub enum CanvasSpace {
