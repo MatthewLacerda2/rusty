@@ -2,7 +2,7 @@
 //!
 //! An entity names others by id in a handful of component fields. Every follower of
 //! those references goes through this walk, never a list of its own: a prefab save,
-//! stamp or propagation remapping them ([`Entity::remap_refs`]), a despawn clearing
+//! stamp or propagation remapping them ([`EntityRefs::remap_refs`]), a despawn clearing
 //! the ones that name the dead id (`ecs::World::forget_references`), a save keeping a
 //! bone by name (`scene::skeleton::bone_refs`), and the property test that checks no
 //! dead id survives (`scene::skeleton`'s `despawn_refs_tests`).
@@ -14,6 +14,8 @@
 //! - `/particles/sub_emitters/{birth,death,collision}`;
 //! - `/lod_group/levels/<n>/renderers/<m>`;
 //! - `/rect_transform/world_anchor/target`;
+//! - `/mesh/skeleton/bodies/<bone>/joint/connected_body`: a saved ragdoll joint, in a
+//!   document only (a load hands it to the bone, `scene::skeleton`'s `sync`);
 //! - `/prefab_link/overrides/<override path>`: an override leaf whose path is one of
 //!   the above holds an instance id too.
 //!
@@ -29,7 +31,8 @@ use serde_json::Value;
 
 use super::{Entity, PrefabLink};
 use crate::components::{
-    JointComponent, LodGroupComponent, RectTransformComponent, SelectableComponent, SubEmitters,
+    JointComponent, LodGroupComponent, MeshComponent, RectTransformComponent, SelectableComponent,
+    SubEmitters,
 };
 
 /// Visits one id slot: its JSON pointer and the slot. Setting it to `None` drops the
@@ -45,15 +48,28 @@ pub trait EntityRefs {
     /// Every id the component holds, read-only, with its pointer.
     fn each_ref(&self, visit: &mut dyn FnMut(&str, u32));
 
-    /// Rewrite every reference through `map` (one `map` drops is cleared).
+    /// Rewrite every reference through `map` (one `map` drops is cleared): how the
+    /// references follow their entities when a prefab is saved, stamped or
+    /// propagated, and when a load moves ids.
     fn remap_refs(&mut self, map: &dyn Fn(u32) -> Option<u32>) {
         self.visit_refs(&mut |_, r| *r = r.and_then(map));
     }
 
-    /// Whether any reference names `id`.
-    fn names(&self, id: u32) -> bool {
+    /// Clear every reference to an entity that was destroyed (`dead` says which): a
+    /// despawn, or a scene load that did not carry it. Unlike a remap dropping a
+    /// reference, the target is gone, which a component may record (a marker hides).
+    fn forget(&mut self, dead: &dyn Fn(u32) -> bool) {
+        self.visit_refs(&mut |_, r| {
+            if r.is_some_and(dead) {
+                *r = None;
+            }
+        });
+    }
+
+    /// Whether any reference names an entity `dead` holds for.
+    fn names_any(&self, dead: &dyn Fn(u32) -> bool) -> bool {
         let mut hit = false;
-        self.each_ref(&mut |_, r| hit |= r == id);
+        self.each_ref(&mut |_, r| hit |= dead(r));
         hit
     }
 
@@ -74,6 +90,7 @@ macro_rules! with_ref_components {
             joint: $crate::components::JointComponent,
             particles: $crate::components::ParticleEmitterComponent,
             lod_group: $crate::components::LodGroupComponent,
+            mesh: $crate::components::MeshComponent,
             rect_transform: $crate::components::RectTransformComponent,
             prefab_link: $crate::components::PrefabLink,
         }
@@ -83,29 +100,34 @@ pub(crate) use with_ref_components;
 
 macro_rules! entity_walk {
     ($($field:ident: $ty:ty,)*) => {
-        impl Entity {
-            /// Visit every id slot of every component, with its pointer under the
-            /// entity (see the module docs).
-            pub fn visit_refs(&mut self, visit: &mut RefVisit<'_>) {
+        /// An entity's id slots are its components', each pointer under the entity
+        /// (see the module docs).
+        impl EntityRefs for Entity {
+            fn visit_refs(&mut self, visit: &mut RefVisit<'_>) {
                 $(if let Some(c) = &mut self.$field {
                     let prefix = concat!("/", stringify!($field));
                     c.visit_refs(&mut |p, r| visit(&format!("{prefix}{p}"), r));
                 })*
             }
 
-            /// Every id the entity's components hold, with its pointer.
-            pub fn each_ref(&self, visit: &mut dyn FnMut(&str, u32)) {
+            fn each_ref(&self, visit: &mut dyn FnMut(&str, u32)) {
                 $(if let Some(c) = &self.$field {
                     let prefix = concat!("/", stringify!($field));
                     c.each_ref(&mut |p, r| visit(&format!("{prefix}{p}"), r));
                 })*
             }
 
+            fn forget(&mut self, dead: &dyn Fn(u32) -> bool) {
+                $(if let Some(c) = &mut self.$field {
+                    c.forget(dead);
+                })*
+            }
+
             /// An entity carrying every reference-holding component, each with
             /// [`EntityRefs::every_ref`].
             #[cfg(test)]
-            pub fn with_every_ref(id: u32) -> Self {
-                let mut e = Self::new(id, "Refs".into());
+            fn every_ref() -> Self {
+                let mut e = Self::new(0, "Refs".into());
                 $(e.$field = Some(<$ty as EntityRefs>::every_ref());)*
                 e
             }
@@ -115,13 +137,6 @@ macro_rules! entity_walk {
 with_ref_components!(entity_walk);
 
 impl Entity {
-    /// Rewrite every entity reference the components hold through `map`: how the
-    /// references follow the entity when a prefab is saved, stamped or propagated,
-    /// and when a load moves ids.
-    pub fn remap_refs(&mut self, map: &dyn Fn(u32) -> Option<u32>) {
-        self.visit_refs(&mut |_, r| *r = r.and_then(map));
-    }
-
     /// Whether `pointer` (a JSON pointer into the entity document, as prefab
     /// overrides key their leaves) names one of the component id leaves. Override
     /// leaves never nest, so `/prefab_link/…` is not one.
@@ -137,8 +152,17 @@ impl Entity {
             || pointer
                 .strip_prefix("/lod_group")
                 .is_some_and(LodGroupComponent::is_ref_pointer)
+            || pointer
+                .strip_prefix("/mesh")
+                .is_some_and(MeshComponent::is_ref_pointer)
             || under("/rect_transform", &RectTransformComponent::REF_POINTERS)
     }
+}
+
+/// Escape one JSON-pointer reference token (RFC 6901: `~` → `~0`, `/` → `~1`): the
+/// one escape every pointer builder uses (prefab overrides' too).
+pub fn escape_token(token: &str) -> String {
+    token.replace('~', "~0").replace('/', "~1")
 }
 
 /// An override leaf that holds an id: its path is a reference pointer and its value
@@ -155,7 +179,7 @@ fn override_slot(path: &str, value: &Value) -> Option<Option<u32>> {
 
 /// The pointer of override `path` under the link: `/overrides/<escaped path>`.
 fn override_pointer(path: &str) -> String {
-    format!("/overrides/{}", path.replace('~', "~0").replace('/', "~1"))
+    format!("/overrides/{}", escape_token(path))
 }
 
 /// Visit every id leaf of an override map (`PrefabLink::overrides`), keyed by

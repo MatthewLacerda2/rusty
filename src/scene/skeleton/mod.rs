@@ -96,22 +96,21 @@ impl Scene {
     }
 
     /// Despawn `owner`'s bones and everything under them — a skinned entity's
-    /// skeleton goes with it — dropping whatever pointed at them as
+    /// skeleton goes with it — in one batch, dropping whatever pointed at them as
     /// [`Scene::destroy_entity`] does.
     pub(crate) fn despawn_skeleton(&mut self, owner: u32) {
         let Some(bones) = self.world.mesh(owner).map(|m| m.skeleton.bones.clone()) else {
             return;
         };
-        let mut doomed: Vec<u32> = bones
-            .into_iter()
-            .flat_map(|b| self.world.self_and_descendants(b))
+        // Walk from the top bones only: the rest are their descendants.
+        let set: BTreeSet<u32> = bones.into_iter().collect();
+        let doomed: BTreeSet<u32> = set
+            .iter()
+            .filter(|&&b| self.world.contains(b))
+            .filter(|&&b| !self.world.parent_id(b).is_some_and(|p| set.contains(&p)))
+            .flat_map(|&b| self.world.self_and_descendants(b))
             .collect();
-        // A bone is a descendant of every bone above it: despawn each once.
-        let mut seen = BTreeSet::new();
-        doomed.retain(|&id| seen.insert(id));
-        for id in doomed {
-            self.despawn_one(id);
-        }
+        self.despawn_batch(&doomed);
     }
 
     /// The bone of `owner`'s skeleton named `name` (the glTF joint name).
@@ -133,6 +132,8 @@ mod fixture;
 mod persist_tests;
 #[cfg(test)]
 mod prefab_refs_tests;
+#[cfg(test)]
+mod ragdoll_refs_tests;
 #[cfg(test)]
 mod reimport_tests;
 #[cfg(test)]

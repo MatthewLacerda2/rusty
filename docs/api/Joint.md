@@ -30,8 +30,11 @@ jointed to another's) is saved by the bone's name, then its ancestors', and
 re-bound by name on load, on a prefab stamp or re-import, and when the model is
 re-imported; a bone the model no longer has hands the joint to its nearest
 ancestor bone still there, with a warning. A linked prefab instance keeps it the
-same way, and applying it to the source writes the bone by name. **When the
-connected body is destroyed** the joint holds to the world, as Unity's does.
+same way, and applying it to the source writes the bone by name. A ragdoll bone's
+joint saved in a prefab follows each stamp: jointed to another skeleton's bone or
+to a prop inside the prefab, each stamped copy joins its own copy of it. **When the
+connected body is destroyed** (or left behind by a scene load) the joint holds to
+the world, as Unity's does.
 **Both bodies need a collider**: a body without one does not
 exist in the physics world, and a joint missing a body does nothing. A deactivated
 joint entity's joint is removed until it is active again. `enable_collision` (off

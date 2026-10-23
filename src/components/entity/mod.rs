@@ -30,7 +30,7 @@ use super::{NavMeshModifierVolumeComponent, ReverbZoneComponent, TrailComponent}
 mod refs;
 
 pub(crate) use refs::with_ref_components;
-pub use refs::{visit_override_refs, EntityRefs, RefVisit};
+pub use refs::{escape_token, visit_override_refs, EntityRefs, RefVisit};
 
 /// The live link from an instance entity back to the `.prefab` it was stamped from
 /// (#216). Set on EVERY entity of a linked instance — not just the root — so that

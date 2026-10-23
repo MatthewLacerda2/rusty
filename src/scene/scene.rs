@@ -8,7 +8,7 @@
 //! (whose deps are restricted to hecs + components). This wrapper lives in the
 //! `scene` layer, which is allowed to depend on `crate::scene` and rendering.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use glam::Vec3;
 
@@ -184,19 +184,27 @@ impl Scene {
         self.despawn_one(id);
     }
 
-    /// Despawn `id` alone, then drop the scene's own references to it (#1264): the
-    /// selection, `DontDestroyOnLoad`, a queued destroy, its lightmap entry and its
-    /// shader overrides. The World's references go in `World::despawn`. Every
-    /// despawn in the scene runs through here.
+    /// Despawn `id` alone: [`Scene::despawn_batch`] of one.
     pub(crate) fn despawn_one(&mut self, id: u32) {
-        self.world.despawn(id);
-        self.shader_overrides.clear(id, None);
-        if self.selected_entity_id == Some(id) {
+        self.despawn_batch(&BTreeSet::from([id]));
+    }
+
+    /// Despawn every entity of `ids` together, then drop the scene's own references
+    /// to them (#1264): the selection, `DontDestroyOnLoad`, a queued destroy, their
+    /// lightmap entries and shader overrides. The World's references go in
+    /// `World::despawn_all`, one pass for the batch. Every despawn in the scene runs
+    /// through here.
+    pub(crate) fn despawn_batch(&mut self, ids: &BTreeSet<u32>) {
+        self.world.despawn_all(ids);
+        for &id in ids {
+            self.shader_overrides.clear(id, None);
+        }
+        if self.selected_entity_id.is_some_and(|s| ids.contains(&s)) {
             self.selected_entity_id = None;
         }
-        self.persistent.remove(&id);
-        self.pending_destroy.retain(|&e| e != id);
-        self.lightmaps.entries.retain(|e| e.entity != id);
+        self.persistent.retain(|id| !ids.contains(id));
+        self.pending_destroy.retain(|e| !ids.contains(e));
+        self.lightmaps.entries.retain(|e| !ids.contains(&e.entity));
     }
 
     pub fn find_entity_by_name(&self, name: &str) -> Option<u32> {

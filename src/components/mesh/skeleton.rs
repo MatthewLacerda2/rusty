@@ -13,7 +13,10 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::components::{JointComponent, RigidBodyComponent, TransformComponent};
+use super::MeshComponent;
+use crate::components::{
+    escape_token, EntityRefs, JointComponent, RefVisit, RigidBodyComponent, TransformComponent,
+};
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct BoneBinding {
@@ -55,4 +58,53 @@ pub struct BoneBody {
     /// entity, and this the bone, as `Entity::bone_refs` does (keyed `/joint/…`).
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub bone_refs: BTreeMap<String, Vec<String>>,
+}
+
+impl MeshComponent {
+    /// Whether `pointer`, under the mesh, is a saved bone joint's id leaf:
+    /// `/skeleton/bodies/<bone>/joint/connected_body`.
+    pub fn is_ref_pointer(pointer: &str) -> bool {
+        let parts: Vec<&str> = pointer.split('/').collect();
+        matches!(
+            parts.as_slice(),
+            ["", "skeleton", "bodies", _, "joint", "connected_body"]
+        )
+    }
+}
+
+/// A saved ragdoll joint names its connected body by id when that body is not a
+/// bone of the same skeleton (that one is `connected_bone`): a prop, or another
+/// skinned entity with the bone in `bone_refs`. It follows the walk (#1264) like any
+/// joint; the live bones' own joints are walked on the bones.
+impl EntityRefs for MeshComponent {
+    fn visit_refs(&mut self, visit: &mut RefVisit<'_>) {
+        for (name, body) in &mut self.skeleton.bodies {
+            if let Some(joint) = &mut body.joint {
+                let pointer = format!("/skeleton/bodies/{}/joint", escape_token(name));
+                joint.visit_refs(&mut |p, r| visit(&format!("{pointer}{p}"), r));
+            }
+        }
+    }
+
+    fn each_ref(&self, visit: &mut dyn FnMut(&str, u32)) {
+        for (name, body) in &self.skeleton.bodies {
+            if let Some(joint) = &body.joint {
+                let pointer = format!("/skeleton/bodies/{}/joint", escape_token(name));
+                joint.each_ref(&mut |p, r| visit(&format!("{pointer}{p}"), r));
+            }
+        }
+    }
+
+    #[cfg(test)]
+    fn every_ref() -> Self {
+        let body = BoneBody {
+            rigidbody: None,
+            joint: Some(JointComponent::default()),
+            connected_bone: None,
+            bone_refs: BTreeMap::new(),
+        };
+        let mut mesh = Self::new("Box", Vec::new(), Vec::new());
+        mesh.skeleton.bodies.insert("hand".into(), body);
+        mesh
+    }
 }

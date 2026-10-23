@@ -1,11 +1,10 @@
 //! A linked prefab instance keeps its references to a bone, and drops one to a
 //! destroyed entity, through a save and a load and an apply-to-source (#1264).
 
-use super::fixture::hero;
+use super::fixture::{connected, hero, reload};
 use crate::components::JointComponent;
 use crate::scene::prefab::apply::apply_instance_to_source;
 use crate::scene::prefab::instantiate_prefab_linked;
-use crate::scene::serialize::{apply_scene_data, to_scene_data, SceneData};
 use crate::scene::{read_prefab_file, record_instance_overrides, save_prefab, Scene};
 
 /// A linked instance of `Group { Hero (skinned), Rope jointed to Hero's Joint1 }`,
@@ -41,21 +40,9 @@ fn linked(tag: &str) -> (Scene, u32, u32, u32, String) {
     (scene, root, hero, rope, path)
 }
 
-fn reload(scene: &Scene) -> Scene {
-    let json = serde_json::to_string(&to_scene_data(scene)).unwrap();
-    let data: SceneData = serde_json::from_str(&json).unwrap();
-    let mut out = Scene::new();
-    apply_scene_data(&mut out, data);
-    out
-}
-
 fn override_of_in(scene: &Scene, rope: u32) -> serde_json::Value {
     let link = scene.world.prefab_link(rope).unwrap();
     link.overrides["/joint/connected_body"].clone()
-}
-
-fn connected(scene: &Scene, rope: u32) -> Option<u32> {
-    scene.world.joint(rope).unwrap().connected_body
 }
 
 #[test]

@@ -19,7 +19,7 @@
 
 use std::collections::BTreeMap;
 
-use crate::components::Entity;
+use crate::components::{Entity, EntityRefs};
 use crate::scene::prefab::instance::instance_members;
 use crate::scene::prefab::overrides::{apply_overrides, diff_entity};
 use crate::scene::prefab::read_prefab_file;
@@ -74,9 +74,10 @@ fn in_instance_space(
         .iter()
         .filter_map(|&id| Some((local_id_of(scene, id)?, id)))
         .collect();
-    for entity in baselines.values_mut() {
+    for (local, entity) in baselines.iter_mut() {
         entity.remap_refs(&|l| map.get(&l).copied());
-        scene.bind_doc_bone_refs(entity);
+        let holder = map.get(local).copied().unwrap_or(entity.id);
+        scene.bind_doc_bone_refs(entity, holder);
     }
     baselines
 }
@@ -238,6 +239,9 @@ fn link_source(scene: &Scene, root_id: u32) -> Result<String, String> {
 #[cfg(test)]
 #[path = "link_tests.rs"]
 mod prefab_link_tests;
+#[cfg(test)]
+#[path = "lod_override_tests.rs"]
+mod prefab_lod_override_tests;
 #[cfg(test)]
 #[path = "refs_tests.rs"]
 mod prefab_refs_tests;

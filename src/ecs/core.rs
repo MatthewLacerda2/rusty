@@ -12,6 +12,8 @@
 //! directly — that lives in `world.rs`'s generic column accessors, used only
 //! from this module and `access.rs`.
 
+use std::collections::BTreeMap;
+
 use crate::components::{
     AnimatorComponent, Entity, MaterialAsset, MeshComponent, ScriptComponent, TransformComponent,
 };
@@ -167,6 +169,8 @@ impl World {
         let transform = (*self.transform(id)?).clone();
         let scripts = (*self.scripts(id)?).clone();
         Some(Entity {
+            id: core.id,
+            name,
             active: core.active,
             is_static: core.is_static,
             layer: core.layer,
@@ -207,9 +211,10 @@ impl World {
             shape: self.shape(id).map(|c| (*c).clone()),
             prefab_link: self.prefab_link(id).map(|c| (*c).clone()),
             parent_id: core.parent_id,
+            // Document-only: filled by a save, consumed by a load (`scene::skeleton`).
+            parent_bone: Vec::new(),
+            bone_refs: BTreeMap::new(),
             children: core.children.clone(),
-            // The document-only fields (`parent_bone`, `bone_refs`) stay empty.
-            ..Entity::new(core.id, name)
         })
     }
 

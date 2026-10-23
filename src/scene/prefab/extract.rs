@@ -4,7 +4,7 @@
 use std::collections::BTreeMap;
 
 use super::PrefabData;
-use crate::components::Entity;
+use crate::components::{Entity, EntityRefs};
 use crate::scene::Scene;
 
 /// Walk `root_id` + its descendants, deep-clone their bundles, remap to local

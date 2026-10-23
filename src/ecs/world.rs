@@ -103,15 +103,15 @@ impl World {
         self.world_space.invalidate_all(); // an orphan may already name this id as parent
     }
 
-    /// Despawn an entity by stable id, every reference the World holds to it going
-    /// first (`ecs::despawn`). A dead id reads as identity.
-    pub fn despawn(&mut self, id: u32) {
-        self.forget_references(id);
-        self.world_space.forget(id);
-        if let Some(handle) = self.handles.remove(id) {
-            let _ = self.inner.despawn(handle);
+    /// Drop the rows of `ids`, whose references `World::despawn_all` cleared first.
+    pub(super) fn remove_rows(&mut self, ids: &std::collections::BTreeSet<u32>) {
+        for &id in ids {
+            self.world_space.forget(id);
+            if let Some(handle) = self.handles.remove(id) {
+                let _ = self.inner.despawn(handle);
+            }
         }
-        self.order.retain(|&e| e != id);
+        self.order.retain(|e| !ids.contains(e));
     }
 
     /// Remove all entities and reset the id allocator (used on scene load).

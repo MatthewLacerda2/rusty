@@ -3,34 +3,11 @@
 
 use glam::Vec3;
 
-use super::fixture::{armature_owner, hero};
+use super::fixture::{armature_owner, connected, hero, reload, rope_to};
 use crate::components::{JointComponent, RectTransformComponent};
 use crate::scene::authoring::rect_transform::set_world_anchor;
-use crate::scene::serialize::{apply_scene_data, to_scene_data, SceneData};
+use crate::scene::serialize::to_scene_data;
 use crate::scene::Scene;
-
-/// A `Rope` entity jointed to `owner`'s bone `bone`.
-fn rope_to(scene: &mut Scene, owner: u32, bone: &str) -> u32 {
-    let rope = scene.add_entity("Rope".to_string());
-    let joint = JointComponent {
-        connected_body: scene.find_bone(owner, bone),
-        ..JointComponent::default()
-    };
-    scene.world.set_joint(rope, Some(joint));
-    rope
-}
-
-fn connected(scene: &Scene, id: u32) -> Option<u32> {
-    scene.world.joint(id).unwrap().connected_body
-}
-
-fn reload(scene: &Scene) -> Scene {
-    let json = serde_json::to_string(&to_scene_data(scene)).unwrap();
-    let data: SceneData = serde_json::from_str(&json).unwrap();
-    let mut out = Scene::new();
-    apply_scene_data(&mut out, data);
-    out
-}
 
 #[test]
 fn a_joint_to_a_bone_is_saved_by_name_and_rebound_on_load() {

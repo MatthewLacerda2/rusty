@@ -27,7 +27,7 @@ use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
-use crate::components::{Entity, MaterialAsset};
+use crate::components::{Entity, EntityRefs, MaterialAsset};
 use crate::scene::serialize::rehydrate_entity_mesh;
 use crate::scene::Scene;
 

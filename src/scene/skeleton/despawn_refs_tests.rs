@@ -7,7 +7,7 @@
 use std::collections::BTreeSet;
 
 use super::fixture::hero;
-use crate::components::Entity;
+use crate::components::{Entity, EntityRefs};
 use crate::scene::lighting::lightmap::LightmapEntry;
 use crate::scene::serialize::to_scene_data;
 use crate::scene::Scene;
@@ -23,7 +23,8 @@ fn named(doc: &Entity) -> Vec<u32> {
 /// An entity carrying every reference-holding component, every slot naming
 /// `target`. Returns the components the walk visited (the pointers' first token).
 fn referrer(scene: &mut Scene, target: u32) -> BTreeSet<String> {
-    let mut doc = Entity::with_every_ref(scene.world.next_id());
+    let mut doc = Entity::every_ref();
+    doc.id = scene.world.next_id();
     let mut kinds = BTreeSet::new();
     doc.visit_refs(&mut |pointer, r| {
         kinds.insert(pointer.split('/').nth(1).unwrap_or_default().to_string());
@@ -67,7 +68,7 @@ fn the_walk_reaches_every_reference_holding_component() {
     let mut scene = Scene::new();
     let kinds = referrer(&mut scene, 0);
     // Every component the fixture carries, read off its saved form.
-    let doc = serde_json::to_value(Entity::with_every_ref(0)).unwrap();
+    let doc = serde_json::to_value(Entity::every_ref()).unwrap();
     let carried: BTreeSet<String> = doc
         .as_object()
         .unwrap()
@@ -77,7 +78,7 @@ fn the_walk_reaches_every_reference_holding_component() {
         .collect();
     assert_eq!(kinds, carried, "each listed component has a slot");
     let mut pointers = Vec::new();
-    Entity::with_every_ref(0).visit_refs(&mut |p, _| pointers.push(p.to_string()));
+    Entity::every_ref().visit_refs(&mut |p, _| pointers.push(p.to_string()));
     for p in pointers.iter().filter(|p| !p.starts_with("/prefab_link/")) {
         assert!(Entity::is_ref_pointer(p), "{p} is a reference pointer");
     }

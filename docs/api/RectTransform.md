@@ -34,8 +34,12 @@ Off screen: behind the camera with `hide_when_behind` → hidden; with
 (turned toward it with `rotate_toward_target`); otherwise at the raw projection.
 A destroyed target hides the marker: its target is cleared and the marker stays
 hidden (`target_lost`) while its entity and scripts stay active, until
-`SetWorldAnchor` pins it again. `target = nil` set by a script is still a fixed
-world point. A target that is a bone follows the bone by name through a save and a
+`SetWorldAnchor` gives it a target again; changing only its offset or options
+(`SetWorldAnchor(id, nil, …)` included, or an edit in the inspector, which shows
+"target lost") keeps it hidden. A target left behind by a scene load counts as
+destroyed. A target dropped any other way (a prefab save leaving it outside the
+subtree, `target = nil` set by a script) makes the marker a fixed world point
+instead. A target that is a bone follows the bone by name through a save and a
 re-import of its model. Markers only apply on `ScreenSpaceOverlay` /
 `ScreenSpaceCamera` canvases, and need a camera (`UI.GetRect` and the per-tick
 layout use the active one). The option setters do nothing to a non-marker; saving

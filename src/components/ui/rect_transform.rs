@@ -121,13 +121,21 @@ impl RectTransformComponent {
     pub const REF_POINTERS: [&'static str; 1] = ["/world_anchor/target"];
 }
 
-/// A marker whose target is dropped is marked `target_lost`, and hides.
+/// A marker whose target is destroyed is marked `target_lost`, and hides; one whose
+/// target is only dropped by a remap (a prefab leaving it out) becomes a world point.
 impl EntityRefs for RectTransformComponent {
     fn visit_refs(&mut self, visit: &mut RefVisit<'_>) {
         if let Some(a) = &mut self.world_anchor {
-            let had = a.target.is_some();
             visit(Self::REF_POINTERS[0], &mut a.target);
-            a.target_lost |= had && a.target.is_none();
+        }
+    }
+
+    fn forget(&mut self, dead: &dyn Fn(u32) -> bool) {
+        if let Some(a) = &mut self.world_anchor {
+            if a.target.is_some_and(dead) {
+                a.target = None;
+                a.target_lost = true;
+            }
         }
     }
 

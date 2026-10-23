@@ -49,11 +49,13 @@ pub fn set_size_delta(r: &mut RectTransformComponent, size_delta: Vec2) {
 
 /// Make the element a marker pinned to `target` (+ `offset`, metres), or to the
 /// fixed world point `offset` when `target` is `None`. An existing marker keeps its
-/// options, and one whose target was destroyed shows again.
+/// options; one whose target was destroyed stays hidden until it is given a target.
 pub fn set_world_anchor(r: &mut RectTransformComponent, target: Option<u32>, offset: Vec3) {
     let anchor = r.world_anchor.get_or_insert_with(WorldAnchor::default);
+    if anchor.target != target {
+        anchor.target_lost = false;
+    }
     anchor.target = target;
-    anchor.target_lost = false;
     anchor.offset = offset;
 }
 
@@ -126,5 +128,16 @@ mod tests {
         assert_eq!(a.edge_padding, 0.0);
         clear_world_anchor(&mut r);
         assert_eq!(r.world_anchor, None);
+    }
+
+    #[test]
+    fn a_lost_marker_stays_lost_until_it_gets_a_target() {
+        let mut r = RectTransformComponent::default();
+        set_world_anchor(&mut r, None, Vec3::Y);
+        r.world_anchor.as_mut().unwrap().target_lost = true;
+        set_world_anchor(&mut r, None, Vec3::X); // an inspector edit of the offset
+        assert!(r.world_anchor.as_ref().unwrap().target_lost);
+        set_world_anchor(&mut r, Some(7), Vec3::X);
+        assert!(!r.world_anchor.as_ref().unwrap().target_lost);
     }
 }

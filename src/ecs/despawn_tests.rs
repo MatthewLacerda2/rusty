@@ -53,9 +53,13 @@ fn a_marker_whose_target_is_despawned_hides() {
     assert!(w.is_active(marker), "its scripts keep running");
 
     let mut rect = w.rect_transform(marker).unwrap().clone();
-    crate::scene::authoring::rect_transform::set_world_anchor(&mut rect, None, glam::Vec3::ZERO);
+    crate::scene::authoring::rect_transform::set_world_anchor(
+        &mut rect,
+        Some(marker),
+        glam::Vec3::ZERO,
+    );
     assert!(
         !rect.world_anchor.unwrap().target_lost,
-        "pinning it again shows it"
+        "pinning it to a target again shows it"
     );
 }

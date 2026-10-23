@@ -19,7 +19,7 @@
 use std::collections::BTreeMap;
 
 use super::persist::bone_chain;
-use crate::components::Entity;
+use crate::components::{Entity, EntityRefs};
 use crate::scene::Scene;
 
 /// Bone id → its skinned entity and bone chain (the bone's name, then its
@@ -160,10 +160,10 @@ impl Scene {
     }
 
     /// Bind a document's `bone_refs` against this scene's live skeletons, clearing
-    /// them: a linked prefab's fresh baseline, in instance ids.
-    pub(crate) fn bind_doc_bone_refs(&self, doc: &mut Entity) {
+    /// them: a linked prefab's fresh baseline, in instance ids, for the live entity
+    /// `holder` (what a warning names).
+    pub(crate) fn bind_doc_bone_refs(&self, doc: &mut Entity, holder: u32) {
         let chains = std::mem::take(&mut doc.bone_refs);
-        let holder = doc.id;
         doc.visit_refs(&mut |pointer, r| {
             if let (Some(chain), Some(owner)) = (chains.get(pointer), *r) {
                 *r = Some(self.resolve_bone(holder, owner, chain));

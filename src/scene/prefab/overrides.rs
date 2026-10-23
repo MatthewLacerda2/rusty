@@ -22,7 +22,7 @@ use std::collections::BTreeMap;
 
 use serde_json::Value;
 
-use crate::components::Entity;
+use crate::components::{escape_token, Entity};
 
 /// Top-level entity keys that must never be diffed/overridden: identity + structure
 /// the propagation already owns (ids/parenting are remapped per instance), the
@@ -75,7 +75,7 @@ fn flatten(prefix: &str, value: &Value, out: &mut BTreeMap<String, Value>) {
     match value {
         Value::Object(map) if !map.is_empty() => {
             for (k, v) in map {
-                flatten(&format!("{prefix}/{}", escape(k)), v, out);
+                flatten(&format!("{prefix}/{}", escape_token(k)), v, out);
             }
         }
         Value::Array(items) if !items.is_empty() => {
@@ -88,11 +88,6 @@ fn flatten(prefix: &str, value: &Value, out: &mut BTreeMap<String, Value>) {
             out.insert(prefix.to_string(), leaf.clone());
         }
     }
-}
-
-/// Escape a json-pointer reference token (RFC 6901: `~` -> `~0`, `/` -> `~1`).
-fn escape(token: &str) -> String {
-    token.replace('~', "~0").replace('/', "~1")
 }
 
 /// The override map for `instance` against `baseline`: every flattened leaf whose
@@ -120,21 +115,55 @@ pub fn diff_entity(instance: &Entity, baseline: &Entity) -> BTreeMap<String, Val
     diff
 }
 
-/// Apply an override map onto `baseline` in place: set each path's leaf on the
-/// entity's JSON form, then deserialize back. Identity/structure/geometry keys are
-/// preserved from `baseline` because the diff never carries them. A path that no
-/// longer resolves (the source's shape changed underneath an override) is skipped,
-/// so a stale override can never corrupt the rebuilt entity.
+/// Apply an override map onto `baseline` in place, leaf by leaf: set each path's
+/// leaf on the entity's JSON form, then deserialize back. Identity/structure/geometry
+/// keys are preserved from `baseline` because the diff never carries them. A path
+/// that no longer resolves (the source's shape changed underneath an override) is
+/// skipped. A `null` written into an array element the element type can't hold (a
+/// destroyed LOD renderer's id, a shortened list) drops that element. A leaf that
+/// still doesn't fit is skipped with a warning naming it, and the entity keeps every
+/// other override: one stale leaf never costs the rest.
 pub fn apply_overrides(baseline: &mut Entity, overrides: &BTreeMap<String, Value>) {
     if overrides.is_empty() {
         return;
     }
-    let mut value = match serde_json::to_value(&*baseline) {
-        Ok(v) => v,
-        Err(_) => return,
+    let Ok(mut value) = serde_json::to_value(&*baseline) else {
+        return;
     };
-    for (path, leaf) in overrides {
-        set_pointer(&mut value, path, leaf.clone());
+    let (mut drops, plain): (Vec<_>, Vec<_>) = overrides
+        .iter()
+        .partition(|(path, leaf)| leaf.is_null() && in_array(&value, path));
+    let mut all = value.clone();
+    for (path, leaf) in &plain {
+        set_pointer(&mut all, path, (*leaf).clone());
+    }
+    if fits(&all) {
+        value = all;
+    } else {
+        for (path, leaf) in plain {
+            let mut trial = value.clone();
+            set_pointer(&mut trial, path, leaf.clone());
+            keep_if_fits(&mut value, trial, &baseline.name, path);
+        }
+    }
+    // Highest index first, so dropping one element never shifts a later drop's.
+    drops.sort_by_key(|(path, _)| std::cmp::Reverse(array_slot(path)));
+    for (path, _) in drops {
+        let mut trial = value.clone();
+        set_pointer(&mut trial, path, Value::Null);
+        if fits(&trial) {
+            value = trial;
+            continue;
+        }
+        let mut trial = value.clone();
+        if let Some((parent, Some(i))) = array_slot(path) {
+            if let Some(Value::Array(items)) = trial.pointer_mut(&parent) {
+                if i < items.len() {
+                    items.remove(i);
+                }
+            }
+        }
+        keep_if_fits(&mut value, trial, &baseline.name, path);
     }
     if let Ok(rebuilt) = serde_json::from_value::<Entity>(value) {
         let (id, parent_id, children) =
@@ -147,6 +176,37 @@ pub fn apply_overrides(baseline: &mut Entity, overrides: &BTreeMap<String, Value
         baseline.children = children;
         baseline.prefab_link = link;
     }
+}
+
+/// Whether `value` reads back as an entity.
+fn fits(value: &Value) -> bool {
+    serde_json::from_value::<Entity>(value.clone()).is_ok()
+}
+
+/// Take `trial` when it still reads back as an entity; otherwise warn that override
+/// `path` on entity `name` was skipped.
+fn keep_if_fits(value: &mut Value, trial: Value, name: &str, path: &str) {
+    if fits(&trial) {
+        *value = trial;
+    } else {
+        log::warn!(
+            "[Prefab] entity '{name}': override '{path}' no longer fits the prefab's \
+             source; it was skipped, and the entity's other overrides kept."
+        );
+    }
+}
+
+/// The parent pointer of `path` and its last token as an index.
+fn array_slot(path: &str) -> Option<(String, Option<usize>)> {
+    let (parent, last) = path.rsplit_once('/')?;
+    Some((parent.to_string(), last.parse().ok()))
+}
+
+/// Whether `path`'s leaf is an element of an array in `value`.
+fn in_array(value: &Value, path: &str) -> bool {
+    array_slot(path).is_some_and(|(parent, i)| {
+        i.is_some() && value.pointer(&parent).is_some_and(Value::is_array)
+    })
 }
 
 /// Set `value` at an RFC-6901 `pointer` to `leaf`, creating intermediate objects as
@@ -210,7 +270,7 @@ fn place(cursor: &mut Value, token: &str, leaf: Value) {
     }
 }
 
-/// Inverse of [`escape`] (RFC 6901: `~1` -> `/`, `~0` -> `~`, in that order).
+/// Inverse of [`escape_token`] (RFC 6901: `~1` -> `/`, `~0` -> `~`, in that order).
 fn unescape(token: &str) -> String {
     token.replace("~1", "/").replace("~0", "~")
 }
