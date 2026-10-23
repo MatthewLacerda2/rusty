@@ -1,5 +1,5 @@
 //! The reflection probes the forward pass shades with (#1206): the baked cubes of
-//! the probes nearest the camera, copied into one cube-array texture at group-0
+//! the probes whose boxes are nearest the camera (#1238), copied into one cube-array texture at group-0
 //! binding 4, and the probes themselves in `LightingUniforms.refl_probes`.
 //!
 //! Like Unity, a probe is picked per drawn object, not per camera or per pixel: the
@@ -9,7 +9,8 @@
 //! loaded cube are resident. A layer holds one cube *path*: probes that share a
 //! cube share its layer, each keeping its own box and centre.
 //!
-//! **Per-frame cost.** Ordering the scene's probes by distance to the camera is
+//! **Per-frame cost.** Ordering the scene's probes by the camera's distance to their
+//! boxes is
 //! O(P log P) over P probes, then each draw tests at most [`MAX_REFLECTION_PROBES`]
 //! boxes. GPU work happens only when the set of nearest cubes changes: one
 //! texture-to-texture copy per newly resident cube (about 0.5 MB at the bake's
@@ -17,10 +18,12 @@
 //! no baked probe (the Inspector preview, rendered every frame beside the viewport)
 //! leaves the resident cubes alone, so the next scene finds them still in place.
 //!
-//! Cubes of different sizes share the array when each is the array's face size
-//! halved some number of times: a smaller cube lands that many mips down, and its
-//! `mip_base` tells the shader where its chain starts. A cube of any other size is
-//! left out with a warning, and the objects it would cover reflect the sky.
+//! The array's face is the bake's [`DEFAULT_REFLECTION_RESOLUTION`], so every baked
+//! cube fits. A smaller cube shares it when it is that size halved some number of
+//! times: it lands that many mips down, and its `mip_base` tells the shader where its
+//! chain starts. A cube of any other size (a larger hand-set one included) is left out
+//! before the budget is counted, with a warning, and the objects it would cover
+//! reflect the sky (#1238).
 
 mod frame;
 mod gpu;
@@ -33,6 +36,7 @@ use glam::Vec3;
 use self::slots::SlotTable;
 pub(crate) use self::slots::MAX_REFLECTION_PROBES;
 use super::cubemap::CubemapTexture;
+use super::reflection_bake::DEFAULT_REFLECTION_RESOLUTION;
 use crate::scene::{ReflectionProbe, ReflectionProbeSet};
 
 /// One resident probe as the shader reads it: its capture point, its parallax box,
@@ -69,7 +73,8 @@ pub(crate) struct ProbeArray {
     /// This frame's resident probes in selection form; probe `i` is uniform `i`.
     active: ReflectionProbeSet,
     uniforms: [ReflectionProbeUniform; MAX_REFLECTION_PROBES],
-    /// Cube paths already warned about for not fitting the array.
+    /// Cube paths already warned about for not fitting the array; a re-bake
+    /// ([`Self::forget`]) clears its path, so a cube that still doesn't fit warns again.
     warned: Vec<String>,
     /// How many cubes were copied in, for tests that a frame did no GPU work.
     #[cfg(test)]
@@ -114,7 +119,7 @@ impl ProbeArray {
         &self.uniforms
     }
 
-    /// The array's face size: the largest resident cube's.
+    /// The array's face size: the bake's, once any probe has been resident.
     #[cfg(test)]
     pub(crate) fn face(&self) -> u32 {
         self.face
@@ -122,19 +127,38 @@ impl ProbeArray {
 
     /// Drop the slots of re-written cubemaps (#1207); the next frame copies them again.
     pub(crate) fn forget(&mut self, stale: impl Fn(&str) -> bool) {
-        self.table.forget(stale);
+        self.table.forget(&stale);
+        self.warned.retain(|path| !stale(path));
     }
 
-    /// Make `wanted` (nearest first, at most the budget) this frame's probes: copy the
-    /// cubes that are not resident yet, rebuilding the array when it cannot hold them.
-    /// Returns true when the array texture was replaced, so group 0 must rebind.
+    /// Whether a `size`-texel cube at `path` fits the array: the bake's face halved a
+    /// whole number of times. Each other cube is warned about once per bake.
+    pub(super) fn admits(&mut self, path: &str, size: u32) -> bool {
+        if fits(DEFAULT_REFLECTION_RESOLUTION, size) {
+            return true;
+        }
+        if !self.warned.iter().any(|p| p == path) {
+            log::warn!(
+                "[Reflection] cubemap {path} is {size} texels, not the bake's \
+                 {DEFAULT_REFLECTION_RESOLUTION} halved a whole number of times; its \
+                 objects reflect the sky"
+            );
+            self.warned.push(path.to_string());
+        }
+        false
+    }
+
+    /// Make `wanted` (each [admitted](Self::admits), in scene order, at most the
+    /// budget) this frame's probes: copy the cubes that are not resident yet,
+    /// rebuilding the array when it cannot hold them. Returns true when the array
+    /// texture was replaced, so group 0 must rebind.
     fn update(
         &mut self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         wanted: &[(&ReflectionProbe, Rc<CubemapTexture>)],
     ) -> bool {
-        let kept = self.fitting(wanted);
+        let kept: Vec<_> = wanted.iter().map(|(p, c)| (*p, &**c)).collect();
         if kept.is_empty() {
             // Nothing to shade: keep the resident cubes for the next scene.
             self.activate(&[], &[]);
@@ -185,50 +209,20 @@ impl ProbeArray {
         rebuilt
     }
 
-    /// The wanted probes whose cube fits an array sized to the largest of them (its
-    /// face halved a whole number of times); each other cube is warned about once.
-    fn fitting<'a>(
-        &mut self,
-        wanted: &'a [(&'a ReflectionProbe, Rc<CubemapTexture>)],
-    ) -> Vec<(&'a ReflectionProbe, &'a CubemapTexture)> {
-        let face = wanted.iter().map(|(_, c)| c.size).max().unwrap_or(1);
-        let mut kept = Vec::new();
-        for (probe, cube) in wanted {
-            if fits(face, cube.size) {
-                kept.push((*probe, &**cube));
-            } else if !self.warned.contains(&probe.cubemap_path) {
-                log::warn!(
-                    "[Reflection] cubemap {} is {} texels, not {face} halved a whole number \
-                     of times; its objects reflect the sky",
-                    probe.cubemap_path,
-                    cube.size
-                );
-                self.warned.push(probe.cubemap_path.clone());
-            }
-        }
-        kept
-    }
-
-    /// The face size and mip count to hold `kept`: the current array's when it can
-    /// hold every cube (so a scene with smaller cubes does not reallocate), else the
-    /// set's own.
+    /// The face size and mip count to hold `kept`: the bake's face, and the current
+    /// array's mips when they hold every cube's chain (so a scene with smaller cubes
+    /// does not reallocate), else as many as the set needs.
     fn target_size(&self, kept: &[(&ReflectionProbe, &CubemapTexture)]) -> (u32, u32) {
-        let needs = |face: u32| {
-            let mut mips = 0;
-            for (_, cube) in kept {
-                if !fits(face, cube.size) {
-                    return None;
-                }
-                let shift = (face / cube.size).trailing_zeros();
-                mips = mips.max(shift + cube.texture.mip_level_count());
-            }
-            Some(mips)
-        };
-        if needs(self.face).is_some_and(|mips| mips <= self.mips) {
-            return (self.face, self.mips);
+        let face = DEFAULT_REFLECTION_RESOLUTION;
+        let mips = kept
+            .iter()
+            .map(|(_, cube)| (face / cube.size).trailing_zeros() + cube.texture.mip_level_count())
+            .max()
+            .unwrap_or(1);
+        if self.face == face && mips <= self.mips {
+            return (face, self.mips);
         }
-        let face = kept.iter().map(|(_, c)| c.size).max().unwrap_or(1);
-        (face, needs(face).unwrap_or(1))
+        (face, mips)
     }
 
     /// Record `kept` as the frame's probes, probe `i` in layer `layers[i]`: the

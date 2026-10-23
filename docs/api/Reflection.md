@@ -11,12 +11,14 @@ infinitely-distant skybox; a fragment outside the box (a large object reaching p
 it) reflects the cubemap without the correction. An object no baked probe covers
 reflects the global skybox. There is no blending between two probes.
 
-Each frame keeps at most the **32 baked probes nearest the camera**; an object whose
-probe is further away reflects the skybox. Their cubemaps share one texture, so they
-must agree in size: the largest sets the size, and a cubemap that is not that size
-halved a whole number of times (the bake always writes 128 texels, so baked probes
-always fit) is dropped with a one-time console warning, and its objects reflect the
-skybox. Probes may share one cubemap file; each keeps its own box.
+Each frame keeps at most the **32 baked probes whose boxes are nearest the camera**
+(a box the camera stands in counts as distance zero, however far its capture point;
+ties go to the lower index); an object whose probe is further away reflects the
+skybox. Their cubemaps share one texture of the bake's size, 128 texels: a cubemap
+that is not 128 halved a whole number of times (a larger hand-set one included) is
+skipped before the 32 are counted, with a console warning (repeated after the next
+bake), and its objects reflect the skybox. Probes may share one cubemap file; each
+keeps its own box.
 
 Like light probes, reflection probes are a scene-level dataset (not a component),
 addressed by **index** (0-based, in placement order); the whole set — positions, boxes,

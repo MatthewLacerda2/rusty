@@ -8,7 +8,7 @@ use crate::render::Renderer;
 use crate::scene::Scene;
 
 /// A one-mip `size`² cube file named `name`, every texel `value`; returns its path.
-fn cube_file(name: &str, size: u32, value: u8) -> String {
+pub(super) fn cube_file(name: &str, size: u32, value: u8) -> String {
     let face = vec![value; (size * size * 4) as usize];
     let cube = PrefilteredCubemap {
         mips: vec![std::array::from_fn(|_| face.clone())],
@@ -20,7 +20,7 @@ fn cube_file(name: &str, size: u32, value: u8) -> String {
 }
 
 /// A scene with one probe per `(x, cube path)`, each a 2-unit box around `x`.
-fn probes_at(probes: &[(f32, &str)]) -> Scene {
+pub(super) fn probes_at(probes: &[(f32, &str)]) -> Scene {
     let mut scene = Scene::new();
     for (x, path) in probes {
         let set = &mut scene.reflection_probes;
@@ -30,7 +30,7 @@ fn probes_at(probes: &[(f32, &str)]) -> Scene {
     scene
 }
 
-fn renderer() -> Option<Renderer> {
+pub(super) fn renderer() -> Option<Renderer> {
     crate::render::test_gpu::headless_or_skip(4, 4)
 }
 
@@ -58,7 +58,7 @@ fn gpu_a_probe_less_scene_keeps_the_resident_cubes() {
     );
     renderer.update_reflection_probes(&viewport, Vec3::ZERO);
     assert_eq!(renderer.reflection_probes.copies, 2, "nothing copied again");
-    assert_eq!(renderer.reflection_probes.face(), 4);
+    assert_eq!(renderer.reflection_probes.face(), 128, "the bake's face");
     assert!(
         !renderer.global_bind_group_dirty,
         "the array was not rebuilt"
