@@ -38,6 +38,7 @@ mod lightmap_screenshot;
 mod linear_data_maps_screenshot;
 mod material_maps_screenshot;
 mod metal_reflection_screenshot;
+mod multi_material_screenshot;
 mod normal_emissive_maps_screenshot;
 mod panorama_pole_screenshot;
 mod panorama_sky_screenshot;

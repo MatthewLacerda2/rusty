@@ -188,4 +188,6 @@ pub(crate) mod flat_normals_tests;
 #[cfg(test)]
 mod manifest_tests;
 #[cfg(test)]
+mod multi_material_tests;
+#[cfg(test)]
 mod tests;

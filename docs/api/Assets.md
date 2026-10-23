@@ -37,7 +37,7 @@ Returned shape (Lua, 1-indexed arrays):
       {
         id = "Sedan",
         reference = "assets/models/crates.glb::Sedan",  -- round-trips with AssetRef
-        materialCount = 1,         -- 0 or 1 (a sub-mesh uses at most one material)
+        materialCount = 1,         -- distinct materials its runs use (0 when none)
         size = { x = 4.2, y = 1.5, z = 1.8 },            -- AABB extent (max - min)
         min  = { x = -2.1, y = 0.0, z = -0.9 },          -- absent if the mesh is empty
         max  = { x =  2.1, y = 1.5, z =  0.9 },
