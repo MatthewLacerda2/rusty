@@ -138,9 +138,15 @@ fn dispatch(backend: &dyn EvalBackend, id: &Value, method: &str, params: &Value)
     }
 }
 
+/// MCP's server instructions: a pointer to the two resources, never the guide itself
+/// (Claude Code truncates long instructions, #1313).
+const INSTRUCTIONS: &str = "rusty game engine. Before working on a game, read the \
+resource rusty://game-guide.md (the engine's rules for building a game), then \
+rusty://scripting-api.md (the Lua API that the eval tool runs) before writing Lua.";
+
 /// The `initialize` result: echo the client's protocol version (defaulting to the
-/// baseline `2024-11-05`), advertise the tools + resources capabilities, and
-/// identify the server.
+/// baseline `2024-11-05`), advertise the tools + resources capabilities, identify
+/// the server, and point at the resources to read first ([`INSTRUCTIONS`]).
 fn initialize(params: &Value) -> Value {
     let protocol_version = params
         .get("protocolVersion")
@@ -150,6 +156,7 @@ fn initialize(params: &Value) -> Value {
         "protocolVersion": protocol_version,
         "capabilities": { "tools": {}, "resources": {} },
         "serverInfo": { "name": "rusty-session", "version": "0.1.0" },
+        "instructions": INSTRUCTIONS,
     })
 }
 
@@ -173,6 +180,15 @@ mod tests {
         assert_eq!(resp["id"], json!(1));
         assert_eq!(resp["result"]["protocolVersion"], "2025-03-26");
         assert_eq!(resp["result"]["serverInfo"]["name"], "rusty-session");
+        let instructions = resp["result"]["instructions"].as_str().unwrap();
+        assert!(
+            instructions.contains(resources::GAME_GUIDE_URI),
+            "{instructions}"
+        );
+        assert!(
+            instructions.contains(resources::SCRIPTING_API_URI),
+            "{instructions}"
+        );
     }
 
     #[test]

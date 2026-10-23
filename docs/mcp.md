@@ -84,10 +84,20 @@ that repeated in a row is shown once with its count, `… (×3)`.
 
 **Resources** (`resources/list`, `resources/read`):
 
+- `rusty://game-guide.md` — the game guide, `docs/game-agent.md` (#1313): the engine's rules
+  for an agent building a game (the five kinds, determinism in scripts, the project layout,
+  headless scenarios, how to file an engine finding) and a short manual for this MCP. A game
+  project's `CLAUDE.md` points at it, so the engine's half of the instructions ships with the
+  engine and never goes stale in a game. Read from the checkout on each request.
 - `rusty://scripting-api.md` — the full Lua API reference (`docs/api/`, assembled into one
   document by `scripting::api_doc`), read from the engine checkout on each request so it is always
   the checkout's current doc (#931: an embedded doc rebuilt the crate on every doc edit). The agent
   reads it to learn the namespaces and functions available to `eval`.
+
+**Server instructions.** The `initialize` answer carries a short `instructions` string
+(MCP's server instructions) naming both resources and saying to read the game guide first.
+It is a pointer only: Claude Code truncates long instructions, so the guide is never
+inlined there.
 
 The transport is MCP stdio: newline-delimited JSON-RPC 2.0. **stdout carries only
 JSON-RPC** — engine logs go to stderr or the in-memory console, never stdout.
@@ -118,7 +128,20 @@ The window must be built with `--features dev` for its socket to exist.
 
 ## Registering it with Claude Code
 
-Build a dev binary once, then point Claude Code at it:
+A game project needs no registering: a `dev` build's edit-open writes the project's
+`.mcp.json` (README § Game projects), which Claude Code offers the first time it starts
+in the folder. It registers two servers, both the checkout's built
+`<checkout>/target/debug/session-mcp`: `rusty` in attach mode (`--attach`, the editor
+window) and `rusty-headless` in embed mode (`--project <root>`). They run the binary,
+not `cargo run`: from a game folder cargo would ignore the checkout's
+`rust-toolchain.toml` and `.cargo/config.toml` and cold-build the engine past Claude
+Code's server startup timeout, so build it once (`cargo build --bin session-mcp
+--features dev`). Use one at a time: two worlds saving the same scene overwrite each
+other. The engine owns only those two entries under `mcpServers`, keeping any other
+server and key in the file; the paths are absolute, so each edit-open rewrites them to
+this machine's checkout.
+
+To register it by hand instead, build a dev binary once, then point Claude Code at it:
 
 ```
 cargo build --bin session-mcp --features dev

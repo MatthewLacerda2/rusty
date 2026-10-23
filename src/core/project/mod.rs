@@ -19,14 +19,19 @@
 //!   .seeded              the seed manifest (#746)
 //!   cache/               anything the engine can regenerate (Unity's Library/)
 //!   saved/               the player's save data (Unreal's Saved/)
+//!   CLAUDE.md            the game's instructions for an agent (#1313)
+//!   .mcp.json            registers the engine's MCP with Claude Code
 //! ```
 //!
 //! `cache/` and `saved/` each hold a `.gitignore` of `*`, so they stay out of git
-//! without the engine writing anything at the root: version control is the user's.
+//! with no root `.gitignore`: version control is the user's. An edit-open also
+//! writes the two agent files (`agent.rs`), unless the project is inside the engine
+//! checkout.
 //!
 //! The engine's own content (shaders, bundled scripts, the preview model) is not the
 //! project's: it is found by [`engine_dir`], wherever the project is.
 
+mod agent;
 pub mod bench;
 mod commit;
 mod file;
@@ -35,6 +40,7 @@ mod locate;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
+pub use agent::{CLAUDE_FILE, MCP_FILE};
 pub use commit::{engine_commit, UNKNOWN_COMMIT};
 pub use file::{EngineCheck, ProjectFile, PROJECT_FILE};
 pub use locate::{engine_dir, engine_path, locate};
@@ -97,7 +103,7 @@ pub fn create_skeleton(dir: &Path) -> Result<(), String> {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Access {
     /// The editor and the agent sessions: create a missing `project.rusty` and record
-    /// the running engine's commit.
+    /// the running engine's commit, and write `CLAUDE.md` and `.mcp.json`.
     Edit,
     /// The player, scenario runs and captures: check the engine, write nothing. A
     /// shipped game never rewrites its project, and a run over the tracked fixture
@@ -170,7 +176,11 @@ pub(crate) fn prepare(dir: &Path, access: Access) -> Result<(Opened, Vec<String>
         crate::core::paths::canonicalize(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     create_skeleton(&root)?;
     let (engine, lines) = match access {
-        Access::Edit => file::record(&root)?,
+        Access::Edit => {
+            let (engine, mut lines) = file::record(&root)?;
+            lines.extend(agent::write(&root, cfg!(feature = "dev")));
+            (engine, lines)
+        }
         Access::Run => (file::inspect(&root)?, Vec::new()),
     };
     Ok((Opened { root, engine }, lines))
@@ -228,3 +238,11 @@ pub fn open_from_args(args: &mut Vec<String>, access: Access) -> Opened {
 #[cfg(test)]
 #[path = "tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "agent_tests.rs"]
+mod agent_tests;
+
+#[cfg(test)]
+#[path = "agent_mcp_tests.rs"]
+mod agent_mcp_tests;
