@@ -9,6 +9,7 @@ use std::path::{Path, PathBuf};
 mod depends;
 mod formats;
 mod names;
+mod on_disk;
 mod skips;
 
 const PNG: &[u8] = b"\x89PNG";

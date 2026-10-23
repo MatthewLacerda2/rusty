@@ -120,6 +120,16 @@ impl Dependency {
         })
     }
 
+    /// The file at `path`, which a look found but which would not open: unreadable,
+    /// whatever a look cached by its length and time says (#1293). A later check
+    /// that finds it readable re-converts.
+    pub(super) fn unopened(path: &Path) -> Self {
+        Self {
+            path: path.to_path_buf(),
+            seen: Seen::Unreadable,
+        }
+    }
+
     /// What the look found.
     pub fn seen(&self) -> Seen {
         self.seen

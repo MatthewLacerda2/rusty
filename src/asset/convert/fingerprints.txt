@@ -8,4 +8,5 @@ ufbx 12 embedded_odd_textures.fbx 656aebb529a9d759 -
 ufbx 12 embedded_textures.fbx 35e91332a29b57ab -
 ufbx 12 mirrored_bone.fbx aa97a82e286aae8c -
 ufbx 12 missing_texture.fbx e388bc8238d781ea -
+ufbx 12 physical_material.fbx 0898afa3a09b51c6 -
 ufbx 12 skinned_cube.fbx 2e37dc37d728d38c -

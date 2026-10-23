@@ -5,7 +5,8 @@
 //! file on disk is referenced where it lies, one embedded in the FBX is extracted
 //! beside the written `.glb` (#1082).
 //!
-//! Colours follow URP's FBX import (`FBXMaterialDescriptionPreprocessor.cs`, in
+//! A classic material's colours (Lambert, Phong, and what ufbx can't tell apart
+//! from them) follow URP's FBX import (`FBXMaterialDescriptionPreprocessor.cs`, in
 //! `com.unity.render-pipelines.universal/Editor/AssetPostProcessors`, #1293). Unity
 //! stores a material colour gamma-encoded and hands the shader its linear value,
 //! while a glTF factor is linear, so each colour here is what URP's shader sees:
@@ -16,7 +17,11 @@
 //!   `EmissiveFactor` only switches emission on (above zero) or off;
 //! - an unbound one is `EmissiveColor` × `EmissiveFactor`, linearised.
 //!
-//! A texture that isn't written leaves its colour as the unbound rule reads it.
+//! A texture that isn't written leaves its colour as the unbound rule reads it, so
+//! a skipped emission mask's placeholder colour glows: URP's import does the same
+//! when the texture is missing. Every other shading model (Arnold and OSL Standard
+//! Surface, 3ds Max Physical, OpenPBR, …) is colour × its weight, as Unity's own
+//! preprocessors for them apply the base weight.
 
 use super::glb;
 use super::texture::Textures;
@@ -41,21 +46,28 @@ pub fn material(
         }
     };
     let base_color_texture = textures.texture(&pbr.base_color)?;
-    // A colour bound to a texture is the exporter's placeholder, often grey or
-    // black, not a tint (#1287).
-    let [r, g, b] = if base_color_texture.is_some() {
-        [gamma_to_linear(factor(&pbr.base_factor)); 3]
-    } else {
-        rgb(&pbr.base_color, 1.0)
-    };
     let normal_texture = textures.texture(&pbr.normal_map)?;
     let emissive_texture = textures.texture(&pbr.emission_color)?;
-    let emission = factor(&pbr.emission_factor);
-    // A placeholder colour under an emissive mask would make the whole mesh glow.
-    let emissive = if emissive_texture.is_some() {
-        [if emission > 0.0 { 1.0 } else { 0.0 }; 3]
+    let (base, emission) = (factor(&pbr.base_factor), factor(&pbr.emission_factor));
+    let ([r, g, b], emissive) = if classic(material.shader_type) {
+        // A colour bound to a texture is the exporter's placeholder, often grey or
+        // black, not a tint (#1287); a placeholder under an emissive mask would
+        // make the whole mesh glow.
+        let base_color = match base_color_texture {
+            Some(_) => [gamma_to_linear(base); 3],
+            None => rgb(&pbr.base_color, 1.0),
+        };
+        let emissive = match emissive_texture {
+            Some(_) => [if emission > 0.0 { 1.0 } else { 0.0 }; 3],
+            None => rgb(&pbr.emission_color, 0.0).map(|c| gamma_to_linear(c * emission)),
+        };
+        (base_color, emissive)
     } else {
-        rgb(&pbr.emission_color, 0.0).map(|c| gamma_to_linear(c * emission))
+        let weighted = |map, default, weight| rgb(map, default).map(|c| c * weight);
+        (
+            weighted(&pbr.base_color, 1.0, base),
+            weighted(&pbr.emission_color, 0.0, emission),
+        )
     };
     Ok(glb::Material {
         name: material.element.name.to_string(),
@@ -67,6 +79,13 @@ pub fn material(
         normal_texture,
         emissive_texture,
     })
+}
+
+/// Whether URP's classic FBX rules read a material of `shader`: ufbx's
+/// Lambert and Phong, Blender's Phong export, and a material it can't place.
+fn classic(shader: ufbx::ShaderType) -> bool {
+    use ufbx::ShaderType::{BlenderPhong, FbxLambert, FbxPhong, Unknown};
+    matches!(shader, FbxLambert | FbxPhong | BlenderPhong | Unknown)
 }
 
 fn value_or(map: &ufbx::MaterialMap, default: f32) -> f32 {

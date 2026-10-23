@@ -45,3 +45,12 @@ fn a_colour_whose_texture_is_not_written_stays_without_its_factor() {
     assert_eq!(gone.base_color, [0.2, 0.4, 0.6, 1.0]);
     assert_eq!(gone.base_color_map, None);
 }
+
+#[test]
+fn a_physical_material_is_its_colour_times_its_weight() {
+    // Not classic shading: Unity's Physical and Arnold imports weight the base
+    // colour, so the classic rule (colour as is, factor dropped) must not apply.
+    let materials = materials("physical_material.fbx");
+    let [r, g, b, _] = material(&materials, "Physical").base_color;
+    assert_eq!([r, g, b], [0.4, 0.2, 0.8]);
+}
