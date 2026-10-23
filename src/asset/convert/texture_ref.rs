@@ -46,7 +46,7 @@ fn split(map: &str) -> Option<(&str, &str)> {
 /// The file the material map `map` names: a reference resolved through its
 /// source's import cache, any other map the path it is. `None` when a
 /// reference names no texture the cache holds. A source's textures are read
-/// once and kept until it is converted again ([`resolved`]).
+/// once and kept until it is converted again (`texture_ref::resolved`).
 pub fn file(map: &str) -> Option<PathBuf> {
     let Some((source, identity)) = split(map) else {
         return Some(PathBuf::from(map));
