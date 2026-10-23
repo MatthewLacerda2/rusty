@@ -12,9 +12,9 @@ use crate::components::{
     CanvasComponent, ImageComponent, ImageType, LayoutAxisFit, LayoutElementComponent,
     RectTransformComponent,
 };
+use crate::core::fs::freshness::MISS_RETRY_FRAMES;
 use crate::core::fs::written::contract::{follows_rebakes, Bake};
 use crate::procgen::{bake::bake_to_png, Image, Slot};
-use crate::render::gpu::textures::freshness::MISS_RETRY_FRAMES;
 use crate::scene::Scene;
 use crate::ui::{TextureSizes, UiLayout, UiView};
 
@@ -104,4 +104,31 @@ fn only_the_scenes_measured_images_are_kept() {
     scene.world.set_image(id, Some(img));
     tick(&scene, id, &mut state);
     assert_eq!(state.1.get(&path), None);
+}
+
+#[test]
+fn a_bare_tick_reads_the_sizes_and_an_idle_one_copies_nothing() {
+    use crate::{app::GameWorld, core::input::InputState, navigation::NavigationGraph};
+    use std::cell::RefCell;
+    let path = temp_png("ticked");
+    bake_to_png(&Image::new(4), Slot::BaseColor, &path).expect("bake");
+    let (scene, _) = fitted_image(&path);
+    let nav = NavigationGraph::new(-1.0, 1.0, -1.0, 1.0, 1.0);
+    let mut game = GameWorld::new(
+        Rc::new(RefCell::new(scene)),
+        Rc::new(RefCell::new(InputState::new())),
+        Rc::new(RefCell::new(nav)),
+        Rc::new(RefCell::new(crate::scripting::ConsoleLogs::new())),
+    );
+    // No refresh call beside the tick: the tick does it (#1241).
+    game.tick(crate::time::FIXED_DELTA_TIME);
+    // Held as the renderer and the editor hold it, so a write would copy it.
+    let held = Rc::clone(game.resources.screen.borrow().textures());
+    assert_eq!(held.get(&path), Some(Vec2::splat(4.0)));
+    game.tick(crate::time::FIXED_DELTA_TIME);
+    let now = Rc::clone(game.resources.screen.borrow().textures());
+    assert!(
+        Rc::ptr_eq(&held, &now),
+        "nothing changed: the table is not copied"
+    );
 }

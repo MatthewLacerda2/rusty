@@ -7,8 +7,8 @@
 //! resolution, so the harness lays out exactly as a window of that size would.
 //!
 //! The textures' native sizes ride along (#1221): an `Image` measures by its
-//! texture's size, which the platform reads and writes here ([`TextureSizes`])
-//! before every tick, so the layout never reads a file. One `Rc` is shared with
+//! texture's size, which the tick reads from the files and writes here
+//! ([`TextureSizes`]) before it steps, so the layout never reads a file. One `Rc` is shared with
 //! every view and the renderer; a write copies it only while one is held.
 
 use std::rc::Rc;
@@ -48,9 +48,10 @@ impl ScreenSize {
         &self.textures
     }
 
-    /// Replace the shared table (the platform, after a refresh).
-    pub fn set_textures(&mut self, textures: Rc<TextureSizes>) {
-        self.textures = textures;
+    /// The shared table's handle, for the tick's refresh to update in place
+    /// (`ui::TextureSizeReader`): it copies the table only when it changes it.
+    pub fn shared_textures_mut(&mut self) -> &mut Rc<TextureSizes> {
+        &mut self.textures
     }
 
     /// The table, for a test or a scenario to fill by hand. Copies it first only while

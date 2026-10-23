@@ -44,7 +44,7 @@ fn playing_speaker() -> (GameWorld, u32, Rc<RefCell<Recording>>) {
     let (backend, rec) = RecordingBackend::new();
     game.resources.audio.borrow_mut().set_backend(backend);
     game.boot_standalone();
-    advance_sim(&mut game, 0.02, &mut Default::default());
+    advance_sim(&mut game, 0.02);
     (game, id, rec)
 }
 

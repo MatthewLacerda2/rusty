@@ -7,7 +7,7 @@
 use std::time::{Duration, Instant};
 
 use crate::app::{GameWorld, PlayTransition};
-use crate::render::{Renderer, TextureSizeReader};
+use crate::render::Renderer;
 use wgpu::CurrentSurfaceTexture;
 
 /// Wall-clock frame timing for the windowed loop: the raw delta handed to the sim and
@@ -57,14 +57,6 @@ impl FrameClock {
     }
 }
 
-/// Read the texture sizes the UI lays out with into the sim's screen resource
-/// (#1221): the layout reads a table, never a file. Runs before every tick, as the
-/// headless harness does.
-pub fn refresh_ui_textures(reader: &mut TextureSizeReader, game: &GameWorld) {
-    let scene = game.scene().borrow();
-    reader.refresh_screen(&scene.world, &mut game.resources.screen.borrow_mut());
-}
-
 /// Advance the simulation for one rendered frame, honouring the "playing-but-stepped"
 /// mode (#283).
 ///
@@ -78,22 +70,14 @@ pub fn refresh_ui_textures(reader: &mut TextureSizeReader, game: &GameWorld) {
 ///   but still processes a Play/Stop transition (so Stop restores the edit snapshot
 ///   even while paused). Rendering continues every frame regardless.
 ///
-/// Every tick, stepped or not, first refreshes the UI's texture sizes through
-/// `ui_textures`, as the harness's `tick_unless_quit` does; so does a frozen frame
-/// outside Play.
-///
 /// Every edit-mode follower (a re-written model reloading into its entities, a
-/// moved bone skinning) hangs off [`GameWorld::edit_frame`], which runs on every
-/// frame outside Play, stepped or frozen: a tick runs it in place of the schedule,
-/// and a frozen frame here calls it directly. Add a new one there, not here.
-pub fn advance_sim(
-    game: &mut GameWorld,
-    delta_time: f32,
-    ui_textures: &mut TextureSizeReader,
-) -> PlayTransition {
+/// moved bone skinning, the UI's texture sizes) hangs off [`GameWorld::edit_frame`],
+/// which runs on every frame outside Play, stepped or frozen: a tick runs it in
+/// place of the schedule, and a frozen frame here calls it directly. Add a new one
+/// there, not here. In Play, a tick reads the UI's texture sizes itself.
+pub fn advance_sim(game: &mut GameWorld, delta_time: f32) -> PlayTransition {
     let paused = game.time().borrow().paused;
     if !paused {
-        refresh_ui_textures(ui_textures, game);
         return game.tick(delta_time);
     }
 
@@ -102,7 +86,6 @@ pub fn advance_sim(
     let mut transition = PlayTransition::None;
     let mut stepped = false;
     while game.time().borrow_mut().take_pending_step() {
-        refresh_ui_textures(ui_textures, game);
         let t = game.tick(crate::time::FIXED_DELTA_TIME);
         if t != PlayTransition::None {
             transition = t;
@@ -111,13 +94,9 @@ pub fn advance_sim(
     }
     // No step this frame: the sim is frozen, but a Play/Stop pressed while paused must
     // still take effect without advancing the clock or the schedule. Outside Play a
-    // pause can outlive Stop (`Time::reset` keeps it), so the editor's UI still reads
-    // fresh texture sizes and the edit frame still runs, on the scene the transition
-    // left; in Play both stay tick-driven, as headless.
+    // pause can outlive Stop (`Time::reset` keeps it), so the edit frame still runs,
+    // on the scene the transition left; in Play it stays tick-driven, as headless.
     if !stepped {
-        if !game.is_playing() {
-            refresh_ui_textures(ui_textures, game);
-        }
         transition = game.poll_transition();
         if !game.is_playing() {
             game.edit_frame();
@@ -184,9 +163,6 @@ pub fn acquire_frame(renderer: &mut Renderer) -> Option<wgpu::SurfaceTexture> {
     }
 }
 
-#[cfg(test)]
-#[path = "frame_edit_tests.rs"]
-mod frame_edit_tests;
 #[cfg(test)]
 #[path = "frame_tests.rs"]
 mod frame_tests;

@@ -215,7 +215,7 @@ impl Renderer {
             quality,
             gpu_meshes: HashMap::new(),
             gpu_textures: HashMap::new(),
-            texture_freshness: crate::render::gpu::textures::freshness::TextureFreshness::new(),
+            texture_freshness: crate::core::fs::freshness::Freshness::new(),
             grid_vertex_buffer: None,
             grid_count: 0,
             axis_x_buffer: None,

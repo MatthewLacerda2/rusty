@@ -20,16 +20,11 @@ use mlua::{Function, Lua, Result as LuaResult};
 use super::harness::{tick_unless_quit, Harness};
 use crate::app::GameWorld;
 use crate::core::input::InputState;
-use crate::render::TextureSizeReader;
 
 type Shared = Rc<RefCell<Harness>>;
 
 fn world_of(h: &Shared) -> Rc<RefCell<GameWorld>> {
     Rc::clone(&h.borrow().world)
-}
-
-fn sizes_of(h: &Shared) -> Rc<RefCell<TextureSizeReader>> {
-    Rc::clone(&h.borrow().ui_textures)
 }
 
 /// Register every scenario-facing table on `lua`'s globals.
@@ -51,13 +46,13 @@ fn register_harness(lua: &Lua, harness: &Shared) -> LuaResult<()> {
 
 /// Step / StepUntil — advance the headless world by fixed-dt ticks.
 fn register_harness_stepping(lua: &Lua, harness: &Shared, t: &mlua::Table) -> LuaResult<()> {
-    let (world, sizes) = (world_of(harness), sizes_of(harness));
+    let world = world_of(harness);
     t.set(
         "Step",
         lua.create_function(move |_, n: u32| {
             let mut w = world.borrow_mut();
             for _ in 0..n {
-                if !tick_unless_quit(&mut w, &mut sizes.borrow_mut()) {
+                if !tick_unless_quit(&mut w) {
                     break;
                 }
             }
@@ -65,13 +60,13 @@ fn register_harness_stepping(lua: &Lua, harness: &Shared, t: &mlua::Table) -> Lu
         })?,
     )?;
 
-    let (world, sizes) = (world_of(harness), sizes_of(harness));
+    let world = world_of(harness);
     t.set(
         "StepUntil",
         lua.create_function(move |_, (pred, max): (Function, u32)| {
             for _ in 0..max {
                 // A quit game ends the run: the predicate can no longer come true.
-                if !tick_unless_quit(&mut world.borrow_mut(), &mut sizes.borrow_mut()) {
+                if !tick_unless_quit(&mut world.borrow_mut()) {
                     return Ok(false);
                 }
                 if pred.call::<bool>(())? {

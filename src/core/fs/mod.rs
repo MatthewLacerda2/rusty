@@ -7,8 +7,10 @@
 //! manifest, the authored UI widgets and imported audio all write through it, and
 //! the `atomic-write` rule (`make rules`) flags a `std::fs::rename` anywhere else.
 //! [`written`] is the log of asset files the engine wrote, which path-keyed caches
-//! drain to drop what went stale (#1207).
+//! drain to drop what went stale (#1207), each through a [`freshness::Freshness`]
+//! that also keeps the files it could not read (#1241).
 
+pub mod freshness;
 mod retry;
 pub mod written;
 

@@ -29,7 +29,7 @@ use crate::scene::Camera;
 use crate::scene::{Scene, SceneSnapshot};
 use crate::scripting::{ConsoleLogs, ScriptManager};
 use crate::time::Time;
-use crate::ui::{EventSystem, ScreenSize, UiLayout};
+use crate::ui::{EventSystem, ScreenSize, TextureSizeReader, UiLayout};
 
 use super::animation::graph::GraphCache;
 use super::Schedule;
@@ -63,6 +63,8 @@ pub struct Resources {
     /// writes the game view's pixel size each frame; headless leaves it unset and
     /// the video resolution stands in. Shared with the `UI` namespace.
     pub screen: Rc<RefCell<ScreenSize>>,
+    /// Fills `screen`'s texture sizes from the files on every tick (#1241).
+    pub(super) ui_textures: RefCell<TextureSizeReader>,
     /// Every UI rect as of the end of the last tick (#417), in draw order —
     /// written by the `LateUpdate` layout system, read by the UI render pass
     /// (#418) and pointer dispatch (#420). Empty until the first Play tick.
@@ -154,6 +156,7 @@ impl Resources {
             script_manager,
             storage,
             screen,
+            ui_textures: RefCell::default(),
             ui_layout: UiLayout::default(),
             event_system,
             application,

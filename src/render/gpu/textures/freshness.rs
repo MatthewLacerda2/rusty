@@ -14,68 +14,38 @@
 //!   write; this is that.
 //! - **The file was missing when first drawn.** A failed load is remembered as a
 //!   *miss*, not cached as the default under its path, and misses are re-checked
-//!   (`Path::exists`, one per missing path) every [`MISS_RETRY_FRAMES`] frames, so a
+//!   (`Path::exists`, one per missing path) every `MISS_RETRY_FRAMES` frames, so a
 //!   map that appears later — baked, imported or copied in — is picked up. A mesh
 //!   emitter's model that was missing is retried on the same beat, once its
 //!   file has appeared.
 //!
+//! Both are kept by the shared [`Freshness`](crate::core::fs::freshness::Freshness)
+//! (#1241), which the UI's texture-size table uses too.
+//!
 //! A material map naming a texture an import extracted (`model.fbx#tex/Skin`,
-//! #1130) is dropped when its source is noted, which a re-conversion does.
+//! #1130) is dropped when its source is noted, which a re-conversion does, and a
+//! missing one is retried once the file it resolves to exists.
 //!
 //! A file changed on disk by an outside tool at a path that already loaded is not
 //! noticed: that would need the per-frame stat this module exists to avoid.
 
-use std::collections::HashSet;
-
 use crate::asset::convert::texture_ref;
-use crate::core::fs::written::{written_since, Stale};
+use crate::core::fs::written::Stale;
 use crate::render::Renderer;
-
-/// How many frames apart missing texture paths are re-checked on disk.
-pub(crate) const MISS_RETRY_FRAMES: u64 = 60;
-
-/// What the renderer knows about the cache's freshness.
-pub(crate) struct TextureFreshness {
-    /// The newest write generation already applied to the cache.
-    seen: u64,
-    /// Paths whose load failed: drawn with the default until the file appears.
-    pub(crate) misses: HashSet<String>,
-    /// Frames since misses were last re-checked.
-    frames: u64,
-}
-
-impl TextureFreshness {
-    pub(crate) fn new() -> Self {
-        Self {
-            seen: written_since(u64::MAX).0,
-            misses: HashSet::new(),
-            frames: 0,
-        }
-    }
-}
 
 impl Renderer {
     /// Drop every cached upload whose file was re-written or has appeared since the
     /// last frame. Called once per frame, before any texture is resolved.
     pub(crate) fn refresh_textures(&mut self) {
-        let (seen, mut stale) = written_since(self.texture_freshness.seen);
-        self.texture_freshness.seen = seen;
-        let freshness = &mut self.texture_freshness;
-        freshness.frames += 1;
-        if freshness.frames >= MISS_RETRY_FRAMES {
-            freshness.frames = 0;
-            stale.extend(
-                freshness
-                    .misses
-                    .iter()
-                    .filter(|p| texture_ref::file(p).is_some_and(|f| f.exists()))
-                    .cloned(),
-            );
+        let changes = self
+            .texture_freshness
+            .poll_with(|p| texture_ref::file(p).is_some_and(|f| f.exists()));
+        if changes.retried {
             // A mesh emitter's model whose file has appeared is tried again too.
             self.retry_particle_meshes();
         }
-        if !stale.is_empty() {
-            self.invalidate_textures(&stale);
+        if !changes.stale.is_empty() {
+            self.invalidate_textures(&changes.stale);
         }
     }
 
@@ -95,10 +65,8 @@ impl Renderer {
         self.decals.atlas.forget(is_stale);
         let before = self.gpu_textures.len();
         self.gpu_textures.retain(|key, _| !is_stale(key));
-        let misses_before = self.texture_freshness.misses.len();
-        self.texture_freshness.misses.retain(|key| !is_stale(key));
-        let dropped = self.gpu_textures.len() != before
-            || self.texture_freshness.misses.len() != misses_before;
+        let missed = self.texture_freshness.forget_misses_where(is_stale);
+        let dropped = self.gpu_textures.len() != before || missed;
         if !dropped {
             return;
         }

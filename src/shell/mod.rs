@@ -77,8 +77,6 @@ pub struct Shell {
     /// Whether the window has OS focus: raw mouse motion arrives even when it does
     /// not, and must not reach the game then.
     pub window_focused: bool,
-    /// Reads the UI's texture sizes into the sim before every tick (#1221).
-    pub ui_textures: crate::render::TextureSizeReader,
     /// Dev-only socket command channel (#282): an external process drives this
     /// running playtest through the same evaluator the console uses. `None` if the
     /// socket failed to bind — the window keeps running without it.
@@ -205,7 +203,7 @@ fn run_frame<F: Frontend>(
     // Like raw mouse motion, pads keep reporting while the window is unfocused.
     let pads_live = shell.window_focused && frontend.game_has_input(game);
     pump_pads(shell, game, pads_live);
-    let transition = frame::advance_sim(game, delta_time, &mut shell.ui_textures);
+    let transition = frame::advance_sim(game, delta_time);
     if let Some(clipboard) = shell.clipboard.as_mut() {
         input::clipboard::apply_request(clipboard, &mut game.input().borrow_mut());
     }

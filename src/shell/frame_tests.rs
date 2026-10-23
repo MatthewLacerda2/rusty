@@ -49,35 +49,35 @@ fn clock_never_goes_backwards() {
 #[test]
 fn live_advance_ticks_with_the_wall_clock_delta() {
     let mut game = playing_world();
-    assert!(advance_sim(&mut game, 0.02, &mut Default::default()) == PlayTransition::Entered);
-    advance_sim(&mut game, 0.02, &mut Default::default());
+    assert!(advance_sim(&mut game, 0.02) == PlayTransition::Entered);
+    advance_sim(&mut game, 0.02);
     assert_eq!(game.play_frame(), 2);
 }
 
 #[test]
 fn paused_advance_runs_only_the_queued_fixed_steps() {
     let mut game = playing_world();
-    advance_sim(&mut game, 0.02, &mut Default::default()); // enter Play
+    advance_sim(&mut game, 0.02); // enter Play
     let before = game.play_frame();
     game.time().borrow_mut().pause();
-    advance_sim(&mut game, 0.5, &mut Default::default());
+    advance_sim(&mut game, 0.5);
     assert_eq!(
         game.play_frame(),
         before,
         "a paused frame with no steps is frozen"
     );
     game.time().borrow_mut().request_steps(3);
-    advance_sim(&mut game, 0.5, &mut Default::default());
+    advance_sim(&mut game, 0.5);
     assert_eq!(game.play_frame(), before + 3);
 }
 
 #[test]
 fn paused_advance_still_processes_a_stop() {
     let mut game = playing_world();
-    advance_sim(&mut game, 0.02, &mut Default::default());
+    advance_sim(&mut game, 0.02);
     game.time().borrow_mut().pause();
     game.set_playing(false);
-    assert!(advance_sim(&mut game, 0.02, &mut Default::default()) == PlayTransition::Exited);
+    assert!(advance_sim(&mut game, 0.02) == PlayTransition::Exited);
 }
 
 #[test]
@@ -126,8 +126,7 @@ fn paused_steps_lay_out_with_texture_sizes_read_before_each_step() {
         scene.set_parent(id, Some(root)).expect("parent exists");
         id
     };
-    let mut reader = Default::default();
-    advance_sim(&mut game, 0.02, &mut reader); // enter Play: the file is missing
+    advance_sim(&mut game, 0.02); // enter Play: the file is missing
     let size = |game: &GameWorld| game.resources.ui_layout.get(icon).map(|r| r.rect.1);
     assert_eq!(size(&game), Some(glam::Vec2::ZERO));
     game.time().borrow_mut().pause();
@@ -135,6 +134,6 @@ fn paused_steps_lay_out_with_texture_sizes_read_before_each_step() {
     crate::procgen::bake::bake_to_png(&image, crate::procgen::Slot::BaseColor, &path).unwrap();
     // Two steps in one frame: the size is read before the first, not once per frame.
     game.time().borrow_mut().request_steps(2);
-    advance_sim(&mut game, 0.5, &mut reader);
+    advance_sim(&mut game, 0.5);
     assert_eq!(size(&game), Some(glam::Vec2::splat(8.0)));
 }

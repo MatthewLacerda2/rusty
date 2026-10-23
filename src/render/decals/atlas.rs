@@ -15,6 +15,7 @@ use std::collections::{HashMap, HashSet};
 use image::imageops::FilterType;
 
 use super::record::NO_LAYER;
+use crate::core::fs::freshness::Freshness;
 
 /// The side of one layer, in texels.
 pub(crate) const LAYER_SIZE: u32 = 512;
@@ -74,11 +75,11 @@ impl DecalAtlas {
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         paths: &[&str],
-        misses: &mut HashSet<String>,
+        misses: &mut Freshness,
     ) -> bool {
         let mut fresh: Vec<&str> = Vec::new();
         for &path in paths {
-            if !self.slots.contains_key(path) && !misses.contains(path) && !fresh.contains(&path) {
+            if !self.slots.contains_key(path) && !misses.is_miss(path) && !fresh.contains(&path) {
                 fresh.push(path);
             }
         }
@@ -108,7 +109,7 @@ impl DecalAtlas {
                     self.slots.insert(path.to_string(), layer);
                 }
                 None => {
-                    misses.insert(path.to_string());
+                    misses.miss(path);
                 }
             }
         }

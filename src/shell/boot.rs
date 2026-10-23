@@ -174,7 +174,6 @@ impl Shell {
             pads: super::input::pads::PadPump::default(),
             modifiers: winit::keyboard::ModifiersState::empty(),
             window_focused: true,
-            ui_textures: crate::render::TextureSizeReader::new(),
             // A bind failure logs to the game's console and leaves the channel `None`.
             #[cfg(feature = "dev")]
             cmd_channel: crate::dev::command_channel::CommandChannel::start(game.console()),

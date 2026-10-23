@@ -155,3 +155,14 @@ optional_component_accessors! {
     ShapeComponent => shape, shape_mut, has_shape, set_shape, take_shape, ids_with_shape;
     PrefabLink => prefab_link, prefab_link_mut, has_prefab_link, set_prefab_link, take_prefab_link, ids_with_prefab_link;
 }
+
+impl World {
+    /// Visit every Image, in no set order and without allocating: for a per-tick
+    /// scan whose answer does not depend on order (`ui::TextureSizeReader`, #1241).
+    /// Work whose order matters walks `ids_with_image`.
+    pub fn each_image(&self, mut visit: impl FnMut(&ImageComponent)) {
+        for (_, img) in self.inner.query::<&ImageComponent>().iter() {
+            visit(img);
+        }
+    }
+}
