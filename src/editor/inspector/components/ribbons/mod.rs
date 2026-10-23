@@ -13,6 +13,7 @@ pub use line::draw_line;
 pub use trail::draw_trail;
 
 use super::particles::widgets::{combo, curve_editor, gradient_editor};
+use crate::asset::MapRef;
 use crate::components::{ParticleBlend, RibbonStyle, TextureMode};
 use crate::core::curve::{Curve, Gradient};
 use crate::scene::authoring::ribbon as ribbon_ops;
@@ -49,7 +50,11 @@ fn draw_style(ui: &mut egui::Ui, s: &RibbonStyle) -> Option<StyleEdit> {
     if let Some(g) = gradient_editor(ui, "Color", &s.color) {
         edit = Some(StyleEdit::Color(g));
     }
-    let mut tex = s.texture.clone().unwrap_or_default();
+    let mut tex = s
+        .texture
+        .as_ref()
+        .map(MapRef::to_string)
+        .unwrap_or_default();
     ui.horizontal(|ui| {
         ui.label("Texture:");
         if ui.text_edit_singleline(&mut tex).changed() {

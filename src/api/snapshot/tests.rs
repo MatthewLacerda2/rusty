@@ -66,7 +66,7 @@ fn mesh_and_material_reflect_authored_values() {
     let key = scene.world.material(id).unwrap().material.clone();
     if let Some(mat) = scene.materials.get_mut(&key) {
         mat.base_color = [0.5, 0.25, 0.125];
-        mat.base_color_map = Some("assets/textures/wood.png".to_string());
+        mat.base_color_map = Some("assets/textures/wood.png".into());
     }
 
     let ent = &world_value(&scene, &cam(), 0, false, &view())["entities"][0];

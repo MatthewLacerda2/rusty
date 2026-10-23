@@ -24,6 +24,7 @@ use std::path::{Path, PathBuf};
 
 use glam::Vec3;
 
+use crate::asset::MapRef;
 use crate::scene::lighting::lightmap::{
     bake, encode_directions, encode_texels, pack, BakeScene, BakeSettings, Lightmap, LightmapEntry,
     LightmapSet,
@@ -178,8 +179,8 @@ fn clear_old_lightmaps(dir: &Path) -> Result<(), String> {
 
 /// A texture's average linear colour (its texels are sRGB), for the bake's albedo
 /// and emission. `None` when it cannot be read; the material colour then stands alone.
-fn texture_average(path: &str) -> Option<Vec3> {
-    let file = crate::asset::convert::texture_ref::file(path)?;
+fn texture_average(map: &MapRef) -> Option<Vec3> {
+    let file = map.file()?;
     let rgba = image::open(file).ok()?.to_rgba8();
     let count = (rgba.width() * rgba.height()).max(1) as f32;
     let to_linear = crate::core::color::srgb_to_linear;

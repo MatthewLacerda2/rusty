@@ -68,7 +68,7 @@ fn material_and_reference_survive_scene_data_round_trip() {
     let mut scene = Scene::new();
     let mat = MaterialAsset {
         base_color: [0.5, 0.25, 0.125],
-        base_color_map: Some("textures/wood.png".to_string()),
+        base_color_map: Some("textures/wood.png".into()),
         metallic: 0.8,
         roughness: 0.2,
         ..MaterialAsset::default()
@@ -85,10 +85,7 @@ fn material_and_reference_survive_scene_data_round_trip() {
         .material_asset_of(id)
         .expect("reference resolves post-load");
     assert_eq!(resolved.base_color, [0.5, 0.25, 0.125]);
-    assert_eq!(
-        resolved.base_color_map.as_deref(),
-        Some("textures/wood.png")
-    );
+    assert_eq!(resolved.base_color_map, Some("textures/wood.png".into()));
     assert_eq!(resolved.metallic, 0.8);
     assert_eq!(resolved.roughness, 0.2);
     assert_eq!(loaded.world.material(id).unwrap().material, "wood");

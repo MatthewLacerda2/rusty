@@ -16,6 +16,7 @@ use glam::Vec3;
 use mlua::{Lua, Variadic};
 
 use super::{put, Reg};
+use crate::asset::MapRef;
 use crate::scene::decal::DecalSpec;
 use crate::scene::Scene;
 
@@ -123,7 +124,7 @@ fn spec_from_positional(args: &[mlua::Value]) -> DecalSpec {
         depth: size.max(DEFAULT_DEPTH),
         rotation_deg: opt_num(args, 8).unwrap_or(0.0),
         color: [9, 10, 11, 12].map(|i| opt_num(args, i).unwrap_or(1.0)),
-        texture: opt_str(args, 7),
+        texture: opt_str(args, 7).map(MapRef::from),
         ..DecalSpec::default()
     }
 }
@@ -158,7 +159,7 @@ fn spec_from_opts(opts: &mlua::Table) -> mlua::Result<DecalSpec> {
             .unwrap_or(size.max(DEFAULT_DEPTH)),
         rotation_deg: opts.get::<Option<f32>>("rotation")?.unwrap_or(0.0),
         color,
-        texture: opts.get("texture")?,
+        texture: opts.get::<Option<String>>("texture")?.map(MapRef::from),
         material: opts.get("material")?,
         owner: opts.get("owner")?,
         lifetime: opts.get("lifetime")?,

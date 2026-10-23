@@ -10,6 +10,7 @@ use std::cell::RefCell;
 use mlua::Table;
 
 use super::{put, Reg};
+use crate::asset::MapRef;
 use crate::components::{ParticleBlend, RibbonStyle, TextureMode};
 use crate::core::curve::{Curve, Gradient};
 use crate::scene::authoring::ribbon as ops;
@@ -129,7 +130,9 @@ fn register_look<'scope>(
     which: Ribbon,
 ) -> Reg {
     let f = scope.create_function(move |_, id: u32| {
-        Ok(which.read(scene, id, |s| s.texture.clone()).flatten())
+        Ok(which
+            .read(scene, id, |s| s.texture.as_ref().map(MapRef::to_string))
+            .flatten())
     });
     put(t, "GetTexture", f)?;
     let f = scope.create_function(move |_, (id, path): (u32, Option<String>)| {

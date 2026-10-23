@@ -14,8 +14,13 @@
 //! `core::fs::written`, so a cache keyed by a reference drops it by its
 //! [`source`]. A map that is not a reference is the path it is.
 
-use super::{cache_location, converter_for, glb};
-use crate::asset::gltf::uri;
+mod map_ref;
+mod resolved;
+
+pub use map_ref::MapRef;
+
+use super::converter_for;
+use crate::core::fs::written::Stale;
 use std::path::{Path, PathBuf};
 
 /// What separates the source from the identity.
@@ -40,16 +45,28 @@ fn split(map: &str) -> Option<(&str, &str)> {
 
 /// The file the material map `map` names: a reference resolved through its
 /// source's import cache, any other map the path it is. `None` when a
-/// reference names no texture the cache holds.
+/// reference names no texture the cache holds. A source's textures are read
+/// once and kept until it is converted again (`texture_ref::resolved`).
 pub fn file(map: &str) -> Option<PathBuf> {
     let Some((source, identity)) = split(map) else {
         return Some(PathBuf::from(map));
     };
-    let glb = cache_location(Path::new(source)).ok()?;
-    // The folder the glTF importer anchors the same URI at.
-    let base_dir = glb.parent().unwrap_or_else(|| Path::new(""));
-    uri::file(base_dir, &glb::image_uri(&glb, identity)?)
+    resolved::file(source, identity)
 }
 
+/// Whether the file `map` names exists: what a cache keyed by maps re-checks a
+/// miss with (`Freshness::poll_with`).
+pub fn exists(map: &str) -> bool {
+    file(map).is_some_and(|f| f.exists())
+}
+
+/// Whether the map `map` names a file in `stale`: the file itself, or a texture
+/// extracted from a source that was converted again.
+pub fn is_written(stale: &Stale, map: &str) -> bool {
+    stale.matches(map) || source(map).is_some_and(|s| stale.matches(s))
+}
+
+#[cfg(test)]
+mod resolved_tests;
 #[cfg(test)]
 mod tests;

@@ -9,6 +9,7 @@
 //! Pure.
 
 use super::sanitize::{non_negative, unit};
+use crate::asset::MapRef;
 use crate::components::{ParticleBlend, RibbonStyle, TextureMode};
 use crate::core::curve::{Curve, Gradient};
 
@@ -40,7 +41,7 @@ pub fn set_color(s: &mut RibbonStyle, color: Gradient) {
 
 /// Set (or, with an empty string, clear) the texture path.
 pub fn set_texture(s: &mut RibbonStyle, texture: String) {
-    s.texture = (!texture.is_empty()).then_some(texture);
+    s.texture = (!texture.is_empty()).then(|| MapRef::from(texture));
 }
 
 /// Set how the texture maps along the length.
@@ -65,7 +66,7 @@ mod tests {
         set_color(&mut s, Gradient::linear([-1.0, 2.0, 0.5, 3.0], [0.0; 4]));
         assert_eq!(s.color.evaluate(0.0), [0.0, 2.0, 0.5, 1.0]);
         set_texture(&mut s, "beam.png".into());
-        assert_eq!(s.texture.as_deref(), Some("beam.png"));
+        assert_eq!(s.texture, Some("beam.png".into()));
         set_texture(&mut s, String::new());
         assert_eq!(s.texture, None);
         set_texture_mode(&mut s, TextureMode::Tile);

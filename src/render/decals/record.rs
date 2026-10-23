@@ -4,6 +4,7 @@
 
 use glam::Vec3;
 
+use crate::asset::MapRef;
 use crate::components::{DecalBlend, MaterialAsset};
 use crate::scene::decal::{Decal, DecalPose};
 
@@ -38,7 +39,7 @@ pub(crate) struct GpuDecal {
 }
 
 /// The maps one decal samples, by path: albedo, normal, metallic, roughness.
-pub(crate) type DecalMaps = [Option<String>; 4];
+pub(crate) type DecalMaps = [Option<MapRef>; 4];
 
 /// The maps `decal` samples: its material's when it names one, else its own
 /// albedo `texture`.

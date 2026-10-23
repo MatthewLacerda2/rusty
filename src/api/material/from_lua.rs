@@ -169,14 +169,14 @@ mod tests {
             .unwrap();
         let (asset, _) = asset_from_lua(&t).expect("recipe parses");
         assert_eq!(asset.base_color, [0.5, 0.25, 0.125]);
-        assert_eq!(asset.base_color_map.as_deref(), Some("albedo.png"));
+        assert_eq!(asset.base_color_map, Some("albedo.png".into()));
         assert_eq!(asset.metallic, 0.7);
         assert_eq!(asset.roughness, 0.2);
-        assert_eq!(asset.metallic_map.as_deref(), Some("mr.png"));
-        assert_eq!(asset.roughness_map.as_deref(), Some("mr.png"));
-        assert_eq!(asset.normal_map.as_deref(), Some("n.png"));
+        assert_eq!(asset.metallic_map, Some("mr.png".into()));
+        assert_eq!(asset.roughness_map, Some("mr.png".into()));
+        assert_eq!(asset.normal_map, Some("n.png".into()));
         assert_eq!(asset.emissive, [1.0, 0.0, 0.0]);
-        assert_eq!(asset.emissive_map.as_deref(), Some("e.png"));
+        assert_eq!(asset.emissive_map, Some("e.png".into()));
     }
 
     #[test]

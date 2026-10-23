@@ -67,7 +67,7 @@ fn an_image_fits_its_native_texture_size() {
         fitter(LayoutAxisFit::PreferredSize, LayoutAxisFit::PreferredSize),
     );
     let img = ImageComponent {
-        texture: Some("icons/64x32.png".to_string()),
+        texture: Some("icons/64x32.png".into()),
         ..ImageComponent::default()
     };
     f.scene.world.set_image(f.panel, Some(img));

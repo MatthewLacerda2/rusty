@@ -39,7 +39,7 @@ fn baked_texture_feeds_a_material_slot() {
     // The slot now references the baked file, and the file is a real PNG.
     let sc = scene.borrow();
     let mat = sc.material_asset_of(id).unwrap();
-    assert_eq!(mat.base_color_map.as_deref(), Some(path.as_str()));
+    assert_eq!(mat.base_color_map, Some(path.as_str().into()));
     let img = image::open(&path).expect("baked PNG decodes");
     assert_eq!(image::GenericImageView::dimensions(&img), (32, 32));
     std::fs::remove_file(path).ok();

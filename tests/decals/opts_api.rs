@@ -34,10 +34,10 @@ fn opts_name_the_material_and_every_positional_value() {
     .unwrap();
     let s = scene.borrow();
     let d = &s.decals[0];
-    assert_eq!(d.material.as_deref(), Some("blood"));
+    assert_eq!(d.material, Some("blood".into()));
     assert_eq!((d.size.x, d.size.z), (2.0, 0.25), "size and explicit depth");
     assert_eq!(d.color, [1.0, 0.0, 0.0, 0.5]);
-    assert_eq!(d.texture.as_deref(), Some("splat.png"));
+    assert_eq!(d.texture, Some("splat.png".into()));
 }
 
 #[test]

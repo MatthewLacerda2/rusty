@@ -15,6 +15,7 @@ use mlua::Lua;
 
 use super::ui_look::{BlendAccess, GradientAccess};
 use super::{put, Reg};
+use crate::asset::MapRef;
 use crate::components::ImageComponent;
 use crate::scene::authoring::image as image_ops;
 use crate::scene::Scene;
@@ -228,7 +229,10 @@ fn register_texture_and_amount<'scope>(
         "GetTexture",
         scope.create_function(|_, id: u32| {
             let scene = scene.borrow();
-            Ok(scene.world.image(id).and_then(|i| i.texture.clone()))
+            Ok(scene
+                .world
+                .image(id)
+                .and_then(|i| i.texture.as_ref().map(MapRef::to_string)))
         }),
     )?;
     put(

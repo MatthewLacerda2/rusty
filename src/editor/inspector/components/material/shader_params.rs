@@ -11,6 +11,7 @@
 
 use std::collections::BTreeMap;
 
+use crate::asset::MapRef;
 use crate::scene::authoring::material as mat_ops;
 use crate::scene::MaterialAsset;
 
@@ -57,7 +58,7 @@ pub(super) fn draw_shader_textures(
         let mut path = materials[key]
             .shader_textures
             .get(slot.name)
-            .cloned()
+            .map(MapRef::to_string)
             .unwrap_or_default();
         ui.horizontal(|ui| {
             ui.label(format!("{} texture:", slot.name));

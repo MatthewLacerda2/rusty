@@ -45,12 +45,12 @@ fn defined_asset_round_trips_through_scene_data() {
     let m = loaded.materials.get("brick").expect("asset survives load");
     assert_eq!(m.base_color, [0.5, 0.25, 0.125]);
     assert_eq!(m.roughness, 0.8);
-    assert_eq!(m.base_color_map.as_deref(), Some("brick_albedo.png"));
-    assert_eq!(m.metallic_map.as_deref(), Some("brick_mr.png"));
-    assert_eq!(m.roughness_map.as_deref(), Some("brick_mr.png"));
-    assert_eq!(m.normal_map.as_deref(), Some("brick_n.png"));
+    assert_eq!(m.base_color_map, Some("brick_albedo.png".into()));
+    assert_eq!(m.metallic_map, Some("brick_mr.png".into()));
+    assert_eq!(m.roughness_map, Some("brick_mr.png".into()));
+    assert_eq!(m.normal_map, Some("brick_n.png".into()));
     assert_eq!(m.emissive, [0.1, 0.0, 0.0]);
-    assert_eq!(m.emissive_map.as_deref(), Some("brick_e.png"));
+    assert_eq!(m.emissive_map, Some("brick_e.png".into()));
     assert_eq!(m.render_mode, RenderMode::Cutout);
     assert_eq!(m.alpha_cutoff, 0.4);
 }
@@ -120,6 +120,6 @@ fn packed_metallic_roughness_path_lands_in_both_map_slots() {
     );
     let scene = scene.borrow();
     let m = scene.materials.get("packed").unwrap();
-    assert_eq!(m.metallic_map.as_deref(), Some("tile_mr.png"));
-    assert_eq!(m.roughness_map.as_deref(), Some("tile_mr.png"));
+    assert_eq!(m.metallic_map, Some("tile_mr.png".into()));
+    assert_eq!(m.roughness_map, Some("tile_mr.png".into()));
 }

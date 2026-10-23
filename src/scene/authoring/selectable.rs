@@ -8,6 +8,7 @@
 
 use glam::Vec4;
 
+use crate::asset::MapRef;
 use crate::components::{
     NavigationMode, SelectableComponent, SelectableTransition, SelectionState,
 };
@@ -49,7 +50,7 @@ pub fn set_fade_duration(s: &mut SelectableComponent, seconds: f32) {
 /// of its own — it always shows the Image's texture — so setting it is a no-op.
 pub fn set_sprite(s: &mut SelectableComponent, state: SelectionState, sprite: Option<String>) {
     if state != SelectionState::Normal {
-        s.sprites[state as usize] = sprite.filter(|p| !p.is_empty());
+        s.sprites[state as usize] = sprite.filter(|p| !p.is_empty()).map(MapRef::from);
     }
 }
 
@@ -121,7 +122,7 @@ mod tests {
         set_sprite(&mut s, SelectionState::Normal, Some("n.png".into()));
         set_sprite(&mut s, SelectionState::Disabled, Some("d.png".into()));
         assert_eq!(s.sprites[0], None);
-        assert_eq!(s.sprites[4].as_deref(), Some("d.png"));
+        assert_eq!(s.sprites[4], Some("d.png".into()));
         set_select_on(
             &mut s,
             direction_index("right").expect("a direction"),

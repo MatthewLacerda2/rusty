@@ -2,6 +2,7 @@
 
 use super::super::{file_name, unique};
 use super::{convert_and_import, fixture, material, textures, PNG};
+use crate::asset::MapRef;
 
 fn name(raw: &str) -> String {
     let (stem, ext) = file_name(raw, b"");
@@ -57,10 +58,11 @@ fn a_source_name_a_uri_would_misread_still_finds_its_textures() {
         let asset = convert_and_import(&copy, &out);
         let red = material(&asset, "Red")
             .base_color_map
-            .clone()
+            .as_ref()
+            .and_then(MapRef::file)
             .expect(source);
         let expected = textures(&out).join("skin.png");
-        assert_eq!(std::path::Path::new(&red), expected, "{source}");
+        assert_eq!(red, expected, "{source}");
         assert!(std::fs::read(&red).unwrap().starts_with(PNG), "{source}");
     }
 }

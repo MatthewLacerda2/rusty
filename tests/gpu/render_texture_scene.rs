@@ -57,13 +57,13 @@ pub fn monitor_scene() -> Scene {
     let screen = MaterialAsset {
         base_color: [0.0, 0.0, 0.0],
         emissive: [1.0, 1.0, 1.0],
-        emissive_map: Some("rt:pip".to_string()),
+        emissive_map: Some("rt:pip".into()),
         ..Default::default()
     };
     scene.materials.insert("screen".to_string(), screen);
     // The red box also wears the texture: the camera samples what it draws.
     if let Some(red) = scene.materials.get_mut("red") {
-        red.base_color_map = Some("rt:pip".to_string());
+        red.base_color_map = Some("rt:pip".into());
     }
     scene
 }
@@ -110,7 +110,7 @@ fn add_pip_image(scene: &mut Scene) {
     scene.world.set_rect_transform(id, Some(rt));
     let image = ImageComponent {
         color: Vec4::ONE,
-        texture: Some("rt:pip".to_string()),
+        texture: Some("rt:pip".into()),
         ..Default::default()
     };
     scene.world.set_image(id, Some(image));

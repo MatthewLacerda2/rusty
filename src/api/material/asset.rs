@@ -182,9 +182,9 @@ mod tests {
         let m = scene.materials.get("brick").expect("asset defined");
         assert_eq!(m.base_color, [0.5, 0.25, 0.125]);
         assert_eq!(m.roughness, 0.8);
-        assert_eq!(m.metallic_map.as_deref(), Some("brick_mr.png"));
-        assert_eq!(m.roughness_map.as_deref(), Some("brick_mr.png"));
-        assert_eq!(m.normal_map.as_deref(), Some("brick_n.png"));
+        assert_eq!(m.metallic_map, Some("brick_mr.png".into()));
+        assert_eq!(m.roughness_map, Some("brick_mr.png".into()));
+        assert_eq!(m.normal_map, Some("brick_n.png".into()));
     }
 
     #[test]

@@ -117,7 +117,7 @@ fn paused_steps_lay_out_with_texture_sizes_read_before_each_step() {
             ..Default::default()
         };
         scene.world.set_layout_element(id, Some(fit));
-        let texture = Some(path.clone());
+        let texture = Some(path.as_str().into());
         let img = ImageComponent {
             texture,
             ..Default::default()

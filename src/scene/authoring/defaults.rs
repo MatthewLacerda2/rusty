@@ -205,10 +205,10 @@ mod tests {
             base_color: [0.8, 0.4, 0.2, 0.5],
             metallic: 0.25,
             roughness: 0.75,
-            base_color_map: Some("albedo.png".to_string()),
-            metallic_roughness_map: Some("mr.png".to_string()),
-            normal_map: Some("n.png".to_string()),
-            emissive_map: Some("e.png".to_string()),
+            base_color_map: Some("albedo.png".into()),
+            metallic_roughness_map: Some("mr.png".into()),
+            normal_map: Some("n.png".into()),
+            emissive_map: Some("e.png".into()),
             emissive: [0.1, 0.2, 0.3],
         };
         let mat = material_asset_from_import(&data);
@@ -217,12 +217,12 @@ mod tests {
         assert_eq!(mat.base_color, [0.8, 0.4, 0.2]);
         assert_eq!(mat.metallic, 0.25);
         assert_eq!(mat.roughness, 0.75);
-        assert_eq!(mat.base_color_map.as_deref(), Some("albedo.png"));
+        assert_eq!(mat.base_color_map, Some("albedo.png".into()));
         // The single glTF MR texture fans out to BOTH engine maps (#203).
-        assert_eq!(mat.metallic_map.as_deref(), Some("mr.png"));
-        assert_eq!(mat.roughness_map.as_deref(), Some("mr.png"));
-        assert_eq!(mat.normal_map.as_deref(), Some("n.png"));
+        assert_eq!(mat.metallic_map, Some("mr.png".into()));
+        assert_eq!(mat.roughness_map, Some("mr.png".into()));
+        assert_eq!(mat.normal_map, Some("n.png".into()));
         assert_eq!(mat.emissive, [0.1, 0.2, 0.3]);
-        assert_eq!(mat.emissive_map.as_deref(), Some("e.png"));
+        assert_eq!(mat.emissive_map, Some("e.png".into()));
     }
 }

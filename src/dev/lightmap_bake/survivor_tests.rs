@@ -22,7 +22,7 @@ fn texture_average_is_the_linear_mean_of_its_texels() {
     // 188 is past the sRGB toe (≈ 0.5029 linear), 10 is inside it (10/255/12.92).
     // Two rows (#894): a 2×1 image can't tell `w * h` texels from `w / h`.
     let path = png("albedo", &[[188, 10, 0, 255], [188, 10, 255, 255]], 2);
-    let average = texture_average(&path).expect("a readable PNG");
+    let average = texture_average(&path.as_str().into()).expect("a readable PNG");
     assert!((average.x - 0.502_886).abs() < 1e-4, "{average}");
     assert!((average.y - 0.003_035_3).abs() < 1e-6, "{average}");
     assert!((average.z - 0.5).abs() < 1e-6, "{average}");
@@ -30,7 +30,10 @@ fn texture_average_is_the_linear_mean_of_its_texels() {
 
 #[test]
 fn an_unreadable_texture_has_no_average() {
-    assert_eq!(texture_average("/nonexistent/rusty/albedo.png"), None);
+    assert_eq!(
+        texture_average(&"/nonexistent/rusty/albedo.png".into()),
+        None
+    );
 }
 
 #[test]

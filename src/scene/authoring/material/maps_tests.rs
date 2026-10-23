@@ -3,6 +3,7 @@
 use std::path::{Path, PathBuf};
 
 use super::*;
+use crate::asset::MapRef;
 use crate::procgen::recipe::{Node, OpKind};
 use crate::procgen::TextureRecipe;
 
@@ -39,8 +40,10 @@ fn png(dir: &Path, file: &str) -> String {
     format!("{}/{file}", dir.display())
 }
 
-fn width(path: &str) -> u32 {
-    image::image_dimensions(path).expect("baked PNG decodes").0
+fn width(map: &MapRef) -> u32 {
+    image::image_dimensions(map.file().unwrap())
+        .expect("baked PNG decodes")
+        .0
 }
 
 #[test]
@@ -48,11 +51,14 @@ fn bake_fills_each_slots_maps_and_a_packed_map_fills_both() {
     let dir = dir("maps_fill");
     let mut m = with_maps(recipe(8, &["albedo", "normal", "mr"]));
     bake_maps(&mut m, "panel", &dir).unwrap();
-    let mr = png(&dir, "panel_metallic_roughness.png");
-    assert_eq!(m.base_color_map, Some(png(&dir, "panel_base_color.png")));
-    assert_eq!(m.normal_map, Some(png(&dir, "panel_normal.png")));
-    assert_eq!(m.metallic_map.as_ref(), Some(&mr));
-    assert_eq!(m.roughness_map.as_ref(), Some(&mr));
+    let mr: MapRef = png(&dir, "panel_metallic_roughness.png").into();
+    assert_eq!(
+        m.base_color_map,
+        Some(png(&dir, "panel_base_color.png").into())
+    );
+    assert_eq!(m.normal_map, Some(png(&dir, "panel_normal.png").into()));
+    assert_eq!(m.metallic_map, Some(mr.clone()));
+    assert_eq!(m.roughness_map, Some(mr.clone()));
     assert_eq!(m.emissive_map, None, "no emissive output, no emissive map");
     assert_eq!(width(&mr), 8);
 }
@@ -63,8 +69,11 @@ fn a_hand_set_map_path_wins_over_the_bake() {
     let mut m = with_maps(recipe(8, &["base_color", "normal"]));
     m.normal_map = Some("hand_made_n.png".into());
     bake_maps(&mut m, "panel", &dir).unwrap();
-    assert_eq!(m.normal_map.as_deref(), Some("hand_made_n.png"));
-    assert_eq!(m.base_color_map, Some(png(&dir, "panel_base_color.png")));
+    assert_eq!(m.normal_map, Some("hand_made_n.png".into()));
+    assert_eq!(
+        m.base_color_map,
+        Some(png(&dir, "panel_base_color.png").into())
+    );
 }
 
 #[test]
@@ -90,7 +99,7 @@ fn rebake_at_a_new_resolution_rewrites_the_maps_and_keeps_it() {
     rebake_maps(&mut materials, "panel", Some(32), &dir).unwrap();
     let m = &materials["panel"];
     assert_eq!(m.maps_recipe.as_ref().unwrap().resolution, 32);
-    assert_eq!(width(m.base_color_map.as_deref().unwrap()), 32);
+    assert_eq!(width(m.base_color_map.as_ref().unwrap()), 32);
 }
 
 #[test]

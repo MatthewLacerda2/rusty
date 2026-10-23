@@ -53,9 +53,9 @@ fn define_asset_bakes_maps_and_fills_the_map_paths() {
     cleanup(&name);
     result.unwrap();
     let m = m.expect("asset defined");
-    assert_eq!(m.base_color_map, Some(path("base_color")));
-    assert_eq!(m.metallic_map, Some(path("metallic_roughness")));
-    assert_eq!(m.roughness_map, Some(path("metallic_roughness")));
+    assert_eq!(m.base_color_map, Some(path("base_color").into()));
+    assert_eq!(m.metallic_map, Some(path("metallic_roughness").into()));
+    assert_eq!(m.roughness_map, Some(path("metallic_roughness").into()));
     assert_eq!(m.metallic, 1.0, "factors still scale the maps");
     assert_eq!(m.maps_recipe.unwrap().seed, 3, "the recipe rides the asset");
 }

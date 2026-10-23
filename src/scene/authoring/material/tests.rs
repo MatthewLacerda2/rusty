@@ -48,7 +48,7 @@ fn map_ops_set_and_clear() {
     set_normal_map(&mut materials, "k", None);
     let m = &materials["k"];
     assert_eq!(m.base_color_map, None);
-    assert_eq!(m.metallic_map.as_deref(), Some("m.png"));
+    assert_eq!(m.metallic_map, Some("m.png".into()));
     assert_eq!(m.normal_map, None);
 }
 

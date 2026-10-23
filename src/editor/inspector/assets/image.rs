@@ -119,5 +119,5 @@ fn apply_albedo_to_entity(scene: &mut Scene, entity_id: u32, path: &str) {
         return;
     };
     let mat = scene.materials.entry(key).or_default();
-    mat.base_color_map = Some(path.to_string());
+    mat.base_color_map = Some(path.into());
 }

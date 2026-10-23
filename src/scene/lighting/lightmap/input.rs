@@ -4,6 +4,7 @@
 
 use glam::{Vec2, Vec3};
 
+use crate::asset::MapRef;
 use crate::components::{LightType, MaterialAsset};
 use crate::scene::Scene;
 
@@ -69,7 +70,7 @@ impl BakeScene {
     /// Flatten `scene`: every active static, opaque mesh that is not a light gizmo, the
     /// active `Mixed` / `Baked` lights, and the ambient sky. `map_average` turns a
     /// texture path into its average linear colour (`None` when it cannot be read).
-    pub fn gather(scene: &Scene, map_average: &dyn Fn(&str) -> Option<Vec3>) -> Self {
+    pub fn gather(scene: &Scene, map_average: &dyn Fn(&MapRef) -> Option<Vec3>) -> Self {
         let mut out = BakeScene {
             sky: scene.ambient_color * scene.ambient_intensity,
             ..Default::default()
@@ -162,12 +163,12 @@ impl BakeScene {
 /// forward shader's defaults.
 fn surface(
     material: Option<&MaterialAsset>,
-    map_average: &dyn Fn(&str) -> Option<Vec3>,
+    map_average: &dyn Fn(&MapRef) -> Option<Vec3>,
 ) -> (Vec3, Vec3) {
     let Some(m) = material else {
         return (Vec3::ONE, Vec3::ZERO);
     };
-    let average = |map: &Option<String>| map.as_deref().and_then(map_average).unwrap_or(Vec3::ONE);
+    let average = |map: &Option<MapRef>| map.as_ref().and_then(map_average).unwrap_or(Vec3::ONE);
     let albedo = Vec3::from(m.base_color) * average(&m.base_color_map);
     let emissive = Vec3::from(m.emissive) * average(&m.emissive_map);
     (albedo.clamp(Vec3::ZERO, Vec3::ONE), emissive)

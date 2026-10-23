@@ -89,7 +89,7 @@ fn add_bar_and_panel(scene: &mut Scene, root: u32) {
     };
     at(scene, root, [16.0, 16.0, 96.0, 16.0], Some(bar));
     let panel = ImageComponent {
-        texture: Some(frame_texture()),
+        texture: Some(frame_texture().into()),
         image_type: ImageType::Sliced,
         border: Vec4::splat(8.0),
         ..Default::default()

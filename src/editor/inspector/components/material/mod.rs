@@ -19,6 +19,7 @@ use std::collections::BTreeMap;
 
 use egui_phosphor::regular as icon;
 
+use crate::asset::MapRef;
 use crate::editor::inspector::components::card::component_card;
 use crate::editor::inspector::preview::{self, PreviewSubject};
 use crate::editor::EditorUi;
@@ -113,7 +114,11 @@ fn draw_material_factors(
     key: &str,
     is_dirty: &mut bool,
 ) {
-    let mut albedo = materials[key].base_color_map.clone().unwrap_or_default();
+    let mut albedo = materials[key]
+        .base_color_map
+        .as_ref()
+        .map(MapRef::to_string)
+        .unwrap_or_default();
     ui.horizontal(|ui| {
         ui.label("Albedo Map Path:");
         if ui.text_edit_singleline(&mut albedo).changed() {
@@ -224,7 +229,7 @@ enum MapKind {
 
 impl MapKind {
     /// Read this map's current path from the asset.
-    fn get(self, m: &MaterialAsset) -> &Option<String> {
+    fn get(self, m: &MaterialAsset) -> &Option<MapRef> {
         match self {
             MapKind::Metallic => &m.metallic_map,
             MapKind::Roughness => &m.roughness_map,
@@ -259,7 +264,7 @@ fn optional_map(
     if ui.checkbox(&mut enabled, label).changed() {
         kind.set(materials, key, enabled.then(String::new));
     }
-    if let Some(mut path) = kind.get(&materials[key]).clone() {
+    if let Some(mut path) = kind.get(&materials[key]).as_ref().map(MapRef::to_string) {
         ui.horizontal(|ui| {
             ui.label("  Path:");
             if ui.text_edit_singleline(&mut path).changed() {

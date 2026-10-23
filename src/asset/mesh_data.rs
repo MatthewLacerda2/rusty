@@ -6,6 +6,7 @@
 //! rehydrates a mesh, so the importer never depends on wgpu/egui/mlua.
 
 use super::anim_data::AnimationClip;
+use super::convert::texture_ref::MapRef;
 use glam::{Mat4, Quat, Vec3};
 
 /// One vertex of imported geometry: position, normal, the texture and lightmap UVs and the
@@ -174,14 +175,14 @@ pub struct MaterialData {
     /// glTF `roughnessFactor` (default 1.0 per the glTF spec).
     pub roughness: f32,
     /// Resolved path to the base-color (albedo) texture, or `None`.
-    pub base_color_map: Option<String>,
+    pub base_color_map: Option<MapRef>,
     /// Resolved path to the packed metallic-roughness texture (metallic=B,
     /// roughness=G), or `None`.
-    pub metallic_roughness_map: Option<String>,
+    pub metallic_roughness_map: Option<MapRef>,
     /// Resolved path to the normal map, or `None`.
-    pub normal_map: Option<String>,
+    pub normal_map: Option<MapRef>,
     /// Resolved path to the emissive texture, or `None`.
-    pub emissive_map: Option<String>,
+    pub emissive_map: Option<MapRef>,
     /// glTF `emissiveFactor` (linear RGB, default `[0,0,0]`).
     pub emissive: [f32; 3],
 }

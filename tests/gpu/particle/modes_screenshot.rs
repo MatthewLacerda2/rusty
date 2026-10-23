@@ -83,7 +83,7 @@ fn a_flipbook_shows_the_frame_its_particle_is_on() {
     let (mut a, id_a) = scene_with(book.clone(), first);
     let (mut b, id_b) = scene_with(book, second);
     for (scene, id) in [(&mut a, id_a), (&mut b, id_b)] {
-        scene.world.particles_mut(id).unwrap().texture = Some(sheet_sprite());
+        scene.world.particles_mut(id).unwrap().texture = Some(sheet_sprite().into());
     }
     let (Some(frame0), Some(frame1)) = (
         pixel(&mut host, &a, "flipbook0", 32, 32),

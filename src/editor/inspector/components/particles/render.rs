@@ -4,6 +4,7 @@
 
 use super::widgets::{clamped, combo, drag_u32};
 use super::{apply, Cx};
+use crate::asset::MapRef;
 use crate::components::{Flipbook, ParticleRenderMode};
 use crate::scene::authoring::particles as particle_ops;
 use crate::scene::{ParticleBlend, ParticleEmitterComponent};
@@ -34,7 +35,7 @@ fn draw_blend(ui: &mut egui::Ui, cx: &mut Cx<'_>, p: &ParticleEmitterComponent) 
         apply(cx, |c| particle_ops::set_blend(c, blend));
         changed = true;
     }
-    if let Some(tex) = text_row(ui, "Texture:", p.texture.as_deref()) {
+    if let Some(tex) = text_row(ui, "Texture:", p.texture.as_ref().map(MapRef::as_str)) {
         apply(cx, |c| particle_ops::set_texture(c, tex));
         changed = true;
     }

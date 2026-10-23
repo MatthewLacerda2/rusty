@@ -35,6 +35,7 @@ pub use sub_emitter::{SubEmitTrigger, SubEmitters};
 use glam::Vec3;
 use serde::{Deserialize, Serialize};
 
+use crate::asset::MapRef;
 use crate::core::curve::{ColorRange, Curve, Gradient, Range};
 
 /// How particles are released over time.
@@ -97,7 +98,7 @@ pub struct ParticleEmitterComponent {
     pub collision: CollisionResponse,
     /// Optional sprite texture path; falls back to the renderer's default texture.
     #[serde(default)]
-    pub texture: Option<String>,
+    pub texture: Option<MapRef>,
 
     /// Continuous emission rate (particles/second).
     pub rate: f32,

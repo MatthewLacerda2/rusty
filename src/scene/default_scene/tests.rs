@@ -2,6 +2,7 @@ use glam::Vec3;
 
 use super::looks::{self, FLOOR};
 use super::*;
+use crate::asset::MapRef;
 use crate::scene::authoring::material::MAPS_DIR;
 use crate::scene::{apply_scene_data, to_scene_data};
 
@@ -52,7 +53,10 @@ fn every_mesh_wears_a_defined_material() {
 fn the_floor_names_the_map_its_recipe_bakes() {
     assert_eq!(CHECKER_MAP, format!("{MAPS_DIR}/{FLOOR}_base_color.png"));
     let floor = &built().materials[FLOOR];
-    assert_eq!(floor.base_color_map.as_deref(), Some(CHECKER_MAP));
+    assert_eq!(
+        floor.base_color_map.as_ref().map(MapRef::as_str),
+        Some(CHECKER_MAP)
+    );
     assert_eq!(floor.maps_recipe, Some(checker_recipe()));
 }
 

@@ -144,8 +144,8 @@ impl GameWorld {
 
     /// Advance the simulation by `dt` seconds. Returns any play-state transition so
     /// the caller can handle platform-only concerns (cursor grab/visibility). Every
-    /// tick reads the UI's texture sizes, before the schedule in Play and in the edit
-    /// frame outside it, so no loop that ticks can skip them (#1241).
+    /// tick reads the UI's texture sizes after the transition, before the schedule in
+    /// Play and in the edit frame outside it, so no loop that ticks can skip them.
     pub fn tick(&mut self, dt: f32) -> PlayTransition {
         let transition = self.handle_transition();
         // Publish input written since the last tick as this tick's edges (#416).
@@ -175,9 +175,11 @@ impl GameWorld {
 
     /// Process only the play-state transition, **without advancing the sim** (#283):
     /// a paused, no-step frame, where a Play/Stop must still take effect. Outside
-    /// Play the caller runs [`edit_frame`](Self::edit_frame) after it.
+    /// Play the caller runs [`edit_frame`](Self::edit_frame) after it. A transition
+    /// re-reads the UI's texture sizes against the scene it swapped in.
     pub fn poll_transition(&mut self) -> PlayTransition {
-        self.handle_transition()
+        let transition = self.handle_transition();
+        self.refreshed_after(transition)
     }
 
     /// Run the schedule's per-frame stages. The schedule is moved out of `Resources`

@@ -160,9 +160,7 @@ impl World {
     /// Visit every Image, in no set order and without allocating: for a per-tick
     /// scan whose answer does not depend on order (`ui::TextureSizeReader`, #1241).
     /// Work whose order matters walks `ids_with_image`.
-    pub fn each_image(&self, mut visit: impl FnMut(&ImageComponent)) {
-        for (_, img) in self.inner.query::<&ImageComponent>().iter() {
-            visit(img);
-        }
+    pub fn each_image(&self, visit: impl FnMut(&ImageComponent)) {
+        self.each_component(visit);
     }
 }

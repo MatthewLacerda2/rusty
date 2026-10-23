@@ -6,22 +6,17 @@
 //! `Vec<ScriptComponent>`, and every optional first-class component attached
 //! only when present. hecs itself enforces one-per-type storage. This wrapper
 //! layers the engine's stable `u32` ids — the surface Lua scripts, the editor,
-//! and the scene file all speak — plus a name lookup, fixing the old
-//! `Player == 2` / `Enemy == 5` fragility.
+//! and the scene file all speak — plus a name lookup.
 //!
 //! `spawn(name)` always attaches a Transform (via `Entity::new`): Transform is
 //! the one mandatory component. Iteration is in insertion order so the former
 //! `Vec<Entity>` semantics (physics pair ordering, render order) are preserved.
 //!
-//! The generic `component`/`component_mut`/`set_component`/`take_component`/
-//! `has_component`/`with_pair_mut` helpers are the ONLY place raw hecs column
-//! access happens; `access.rs` and `core.rs` build the typed, named surface on
-//! top of them. `Entity` stays the on-disk *document* shape (see
-//! `components::entity`) — `bundle::build_bundle`, used by `place`/
-//! `overwrite`, decomposes a document into one `EntityBuilder` placement (a
-//! single archetype move rather than N sequential per-column migrations);
-//! `core.rs`'s `entity_document` recomposes one back out through the named
-//! accessors.
+//! The generic helpers (`component`, `each_component`, `set_component`, …) are
+//! the ONLY place raw hecs column access happens; `access.rs` and `core.rs` build
+//! the typed surface on them. `Entity` stays the on-disk *document* shape:
+//! `bundle::build_bundle` turns one into a single `EntityBuilder` placement (one
+//! archetype move), and `core.rs`'s `entity_document` recomposes it.
 
 use crate::components::Entity;
 
@@ -32,7 +27,7 @@ use super::world_space::{BoundsQueue, WorldStore};
 pub(in crate::ecs) use hecs::{Ref, RefMut};
 
 pub struct World {
-    pub(in crate::ecs) inner: hecs::World,
+    inner: hecs::World,
     /// Stable engine id -> hecs handle (generational), a dense table (#696).
     handles: Handles,
     /// Insertion order of stable ids — preserves the former `Vec<Entity>` ordering.
@@ -175,6 +170,11 @@ impl World {
     ) -> Option<RefMut<'_, T>> {
         let handle = self.handles.get(id)?;
         self.inner.get::<&mut T>(handle).ok()
+    }
+
+    /// Visit every `T`, in no set order and without allocating.
+    pub(in crate::ecs) fn each_component<T: hecs::Component>(&self, mut visit: impl FnMut(&T)) {
+        self.inner.query::<&T>().iter().for_each(|(_, v)| visit(v));
     }
 
     pub(in crate::ecs) fn has_component<T: hecs::Component>(&self, id: u32) -> bool {

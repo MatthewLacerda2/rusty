@@ -13,6 +13,7 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
+use crate::asset::MapRef;
 use crate::procgen::TextureRecipe;
 pub use decal::DecalBlend;
 
@@ -72,21 +73,21 @@ pub struct MaterialAsset {
     #[serde(default = "default_base_color")]
     pub base_color: [f32; 3],
     #[serde(default)]
-    pub base_color_map: Option<String>,
+    pub base_color_map: Option<MapRef>,
     #[serde(default)]
     pub metallic: f32,
     #[serde(default)]
-    pub metallic_map: Option<String>,
+    pub metallic_map: Option<MapRef>,
     #[serde(default = "default_roughness")]
     pub roughness: f32,
     #[serde(default)]
-    pub roughness_map: Option<String>,
+    pub roughness_map: Option<MapRef>,
     #[serde(default)]
-    pub normal_map: Option<String>,
+    pub normal_map: Option<MapRef>,
     #[serde(default)]
     pub emissive: [f32; 3],
     #[serde(default)]
-    pub emissive_map: Option<String>,
+    pub emissive_map: Option<MapRef>,
     /// Compositing mode (#242); `Opaque` when absent.
     #[serde(default)]
     pub render_mode: RenderMode,
@@ -115,7 +116,7 @@ pub struct MaterialAsset {
     /// `rt:<name>` render texture). A slot not named — or whose file is missing —
     /// samples white. Empty — and absent from the scene file — by default.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub shader_textures: BTreeMap<String, String>,
+    pub shader_textures: BTreeMap<String, MapRef>,
     /// The multi-output texture recipe the maps bake from (#409) — the `maps` key of
     /// the document. The recipe is the truth and the baked PNGs a regenerable cache
     /// (`Material.Rebake`). `None` — and absent from the scene file — by default.

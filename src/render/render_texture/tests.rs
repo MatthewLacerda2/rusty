@@ -30,14 +30,14 @@ fn referenced_textures_come_from_active_images_and_material_maps() {
     let mut scene = Scene::new();
     let img = scene.add_entity("Minimap".to_string());
     let image = ImageComponent {
-        texture: Some("rt:minimap".to_string()),
+        texture: Some("rt:minimap".into()),
         ..Default::default()
     };
     scene.world.set_image(img, Some(image));
 
     let hidden = scene.add_entity("Hidden".to_string());
     let image = ImageComponent {
-        texture: Some("rt:hidden".to_string()),
+        texture: Some("rt:hidden".into()),
         ..Default::default()
     };
     scene.world.set_image(hidden, Some(image));
@@ -45,7 +45,7 @@ fn referenced_textures_come_from_active_images_and_material_maps() {
 
     let file = scene.add_entity("Icon".to_string());
     let image = ImageComponent {
-        texture: Some("assets/icon.png".to_string()),
+        texture: Some("assets/icon.png".into()),
         ..Default::default()
     };
     scene.world.set_image(file, Some(image));
@@ -56,9 +56,9 @@ fn referenced_textures_come_from_active_images_and_material_maps() {
     };
     scene.world.set_material(monitor, Some(material));
     let asset = MaterialAsset {
-        emissive_map: Some("rt:security".to_string()),
+        emissive_map: Some("rt:security".into()),
         // An extra shader texture slot (#400) may name one too.
-        shader_textures: [("mask".to_string(), "rt:scanner".to_string())].into(),
+        shader_textures: [("mask".to_string(), "rt:scanner".into())].into(),
         ..Default::default()
     };
     scene.materials.insert("screen".to_string(), asset);
