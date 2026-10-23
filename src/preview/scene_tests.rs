@@ -201,13 +201,15 @@ fn a_centimetre_model_is_scaled_up_to_fill_the_frame() {
 }
 
 #[test]
-fn a_flat_or_empty_bounds_keeps_its_size() {
+fn a_point_keeps_its_size_and_a_flat_quad_is_fitted() {
     assert_eq!(fit_scale(Vec3::ONE, Vec3::ONE), 1.0);
     let unit = fit_scale(Vec3::splat(-0.5), Vec3::splat(0.5));
     assert!(
         (unit - 1.0).abs() < 1e-5,
         "a unit cube previews at its size"
     );
+    let quad = fit_scale(Vec3::new(-0.01, 0.0, -0.01), Vec3::new(0.01, 0.0, 0.01));
+    assert!(quad > 1.0, "flat in one axis is still fitted: {quad}");
 }
 
 #[test]
@@ -223,6 +225,21 @@ fn the_bundled_suzanne_is_pulled_into_frame() {
         position.length() > 1.0 && position.is_finite(),
         "Suzanne needs a real recentring offset, got {position:?}"
     );
+}
+
+#[test]
+fn the_bundled_suzanne_is_fitted_like_a_model() {
+    // It used to only re-centre, so the Suzanne preview mesh and Suzanne previewed
+    // as a model showed at two sizes (#1287).
+    let scene = build_preview_scene(
+        PreviewMesh::Suzanne,
+        &PreviewSubject::Shader("unused.wgsl".to_string()),
+    );
+    let asset = asset::import_and_sync_sidecar(Path::new(&suzanne_path())).unwrap();
+    let (min, max) = union_bounds(&asset.sub_meshes).unwrap();
+    let id = scene.world.ids_with_mesh()[0];
+    let scale = scene.world.transform(id).unwrap().scale;
+    assert_eq!(scale, Vec3::splat(fit_scale(min, max)));
 }
 
 #[test]

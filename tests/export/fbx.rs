@@ -88,10 +88,9 @@ fn the_export_plays_from_its_cache_and_converts_nothing() {
     assert!(red.is_file(), "{} is exported", red.display());
 }
 
-/// [`START`], the quad scaled to a metre (it is 1 cm, the FBX default unit) and
-/// the camera half a metre in front of its face.
-const SHOW: &str = r#"local quad = Scene.Instantiate("assets/models/embedded_textures.fbx::Quad", "ExportedQuad")
-Transform.SetLocalScale(quad, 100, 100, 100)
+/// What [`START`] spawns, scaled to a metre (it is 1 cm, the FBX default unit),
+/// with the camera half a metre in front of its face.
+const FRAME: &str = r#"Transform.SetLocalScale(quad, 100, 100, 100)
 Camera.SetPosition(0.5, 0.5, 1.2)
 Camera.SetYaw(-90)
 Camera.SetPitch(0)"#;
@@ -100,7 +99,7 @@ Camera.SetPitch(0)"#;
 fn gpu_the_exported_quad_renders_red_from_its_cache() {
     // Coloured only by its texture, the quad rendered black before the converter
     // read a colour the file leaves out as white (#1280).
-    let game = project(&[QUAD], SHOW);
+    let game = project(&[QUAD], &format!("local quad = {START}\n{FRAME}"));
     let out = crate::temp::dir().join("out");
     assert!(export(&game, &out).status.success());
     let png = crate::temp::dir().join("quad.png");
@@ -108,7 +107,11 @@ fn gpu_the_exported_quad_renders_red_from_its_cache() {
         "{SCENARIO}Harness.Screenshot({:?})\n",
         png.to_string_lossy()
     );
-    let (_, results) = play_scenario(&out, &shot, &[]);
+    let (ran, results) = play_scenario(&out, &shot, &[]);
+    assert!(
+        ran.status.success() && results["passed"] == true,
+        "the scenario passes: {results}"
+    );
     if !png.is_file() {
         // Only a real skip may pass (#885).
         assert!(!rusty::render::gpu_required(), "no shot: {results}");

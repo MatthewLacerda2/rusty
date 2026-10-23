@@ -76,7 +76,8 @@ pub const CONVERTERS: &[Converter] = &[
         //    scene references (#1130).
         // 9: an extracted texture's extension follows its bytes, not its name (#1072).
         // 10: a colour the file leaves out is glTF's default, white base colour (#1280).
-        version: 10,
+        // 11: a base colour bound to a texture is white × its factor, as Unity's (#1287).
+        version: 11,
         tool: None,
         convert: fbx::convert,
     },
