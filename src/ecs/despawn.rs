@@ -33,10 +33,7 @@
 //! and the list above; `scene::skeleton`'s `despawn_refs_tests` builds every kind
 //! and checks none survives a despawn.
 
-use crate::components::{
-    JointComponent, LodGroupComponent, ParticleEmitterComponent, SelectableComponent,
-    TransformComponent,
-};
+use crate::components::TransformComponent;
 
 use super::world::World;
 
@@ -55,17 +52,25 @@ impl World {
             self.set_parent_id(child, None);
         }
         let keep = |r: u32| (r != id).then_some(r);
-        for (_, s) in self.inner.query_mut::<&mut SelectableComponent>() {
-            s.remap_refs(&keep);
+        for e in self.ids_with_selectable() {
+            if let Some(mut s) = self.selectable_mut(e) {
+                s.remap_refs(&keep);
+            }
         }
-        for (_, j) in self.inner.query_mut::<&mut JointComponent>() {
-            j.remap_refs(&keep);
+        for e in self.ids_with_joint() {
+            if let Some(mut j) = self.joint_mut(e) {
+                j.remap_refs(&keep);
+            }
         }
-        for (_, p) in self.inner.query_mut::<&mut ParticleEmitterComponent>() {
-            p.remap_refs(&keep);
+        for e in self.ids_with_particles() {
+            if let Some(mut p) = self.particles_mut(e) {
+                p.remap_refs(&keep);
+            }
         }
-        for (_, g) in self.inner.query_mut::<&mut LodGroupComponent>() {
-            g.remap_refs(&keep);
+        for e in self.ids_with_lod_group() {
+            if let Some(mut g) = self.lod_group_mut(e) {
+                g.remap_refs(&keep);
+            }
         }
         for marker in self.ids_with_rect_transform() {
             let Some(mut r) = self.rect_transform_mut(marker) else {
