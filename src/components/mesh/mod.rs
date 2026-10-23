@@ -190,6 +190,16 @@ pub fn material_runs(runs: Vec<Range<u32>>, slots: Option<usize>) -> Vec<(usize,
         .collect()
 }
 
+/// `runs` clipped to the first `count` indices, empty runs dropped (#1285). A mesh's
+/// runs always cover its own indices; the clip only matters when its geometry changed
+/// ahead of a GPU upload. The renderer and the lightmap bake both clip through this
+/// before [`material_runs`], so the two never pair slots with different runs.
+pub fn clip_runs(runs: impl Iterator<Item = Range<u32>>, count: u32) -> Vec<Range<u32>> {
+    runs.map(|r| r.start.min(count)..r.end.min(count))
+        .filter(|r| !r.is_empty())
+        .collect()
+}
+
 #[cfg(test)]
 mod box_lightmap_tests;
 #[cfg(test)]

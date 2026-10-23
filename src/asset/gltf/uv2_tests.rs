@@ -81,6 +81,7 @@ fn bake_input(mesh: &SubMesh) -> crate::scene::lighting::lightmap::BakeScene {
                 end: mesh.indices.len() as u32,
                 albedo: glam::Vec3::ONE,
                 emissive: glam::Vec3::ZERO,
+                occludes: true,
             }],
         }],
         lights: Vec::new(),

@@ -183,15 +183,6 @@ impl From<Range<u32>> for IndexRun {
     }
 }
 
-/// `runs` clipped to the `count` indices a GPU mesh holds, empty runs dropped
-/// (#1285). A mesh's runs always cover its own indices; the clip only matters when
-/// its CPU geometry changed ahead of the upload.
-pub(crate) fn clip_runs(runs: impl Iterator<Item = Range<u32>>, count: u32) -> Vec<Range<u32>> {
-    runs.map(|r| r.start.min(count)..r.end.min(count))
-        .filter(|r| !r.is_empty())
-        .collect()
-}
-
 #[cfg(test)]
 mod tests;
 

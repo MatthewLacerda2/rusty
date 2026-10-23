@@ -54,6 +54,8 @@ mod probe_direct_tests;
 #[cfg(test)]
 mod progress_tests;
 #[cfg(test)]
+mod run_bake_tests;
+#[cfg(test)]
 mod run_tests;
 #[cfg(test)]
 mod tests;

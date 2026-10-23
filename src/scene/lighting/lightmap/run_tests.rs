@@ -1,17 +1,19 @@
 //! A multi-material mesh bakes each run with its own material (#1290), paired with
 //! its slots the way the renderer draws them.
 
-use glam::{Vec2, Vec3};
+use std::cell::Cell;
 
-use super::tests::{floor, settings};
+use glam::Vec3;
+
 use super::*;
+use crate::asset::MapRef;
 use crate::components::mesh::Vertex;
 use crate::components::{MaterialAsset, MaterialComponent, MeshComponent, RenderMode};
 use crate::scene::Scene;
 
 /// A static 4×4 panel at y = 1 facing down, as two runs: the half over x < 0, then
 /// the half over x > 0. No lightmap UV: it only occludes, bounces and emits.
-fn panel(scene: &mut Scene, slots: Option<&[&str]>) -> u32 {
+pub(super) fn panel(scene: &mut Scene, slots: Option<&[&str]>) -> u32 {
     let half = |x0: f32, x1: f32| {
         let p = |x, z| Vertex::new(Vec3::new(x, 1.0, z), Vec3::NEG_Y, [0.0; 2]);
         [p(x0, -2.0), p(x1, -2.0), p(x1, 2.0), p(x0, 2.0)]
@@ -33,8 +35,8 @@ fn panel(scene: &mut Scene, slots: Option<&[&str]>) -> u32 {
 }
 
 /// A scene with a `black`, a `glow` (black, emitting white) and a `glass`
-/// (Transparent) material in its library.
-fn library() -> Scene {
+/// (Transparent at alpha 0.5, glowing) material in its library.
+pub(super) fn library() -> Scene {
     let mut scene = Scene::new();
     let black = MaterialAsset {
         base_color: [0.0; 3],
@@ -46,6 +48,7 @@ fn library() -> Scene {
     };
     let glass = MaterialAsset {
         render_mode: RenderMode::Transparent,
+        alpha: 0.5,
         ..glow.clone()
     };
     for (key, m) in [("black", black), ("glow", glow), ("glass", glass)] {
@@ -54,86 +57,91 @@ fn library() -> Scene {
     scene
 }
 
-/// The panel's gathered index count and each run's (end, albedo.x, emissive.x).
-fn gathered(slots: Option<&[&str]>) -> (usize, Vec<(u32, f32, f32)>) {
+/// The panel's gathered index count and each run's (end, albedo.x, emissive.x,
+/// occludes).
+fn gathered(slots: Option<&[&str]>) -> (usize, Vec<(u32, f32, f32, bool)>) {
     let mut scene = library();
     panel(&mut scene, slots);
     let baked = BakeScene::gather(&scene, &|_| None);
     let Some(mesh) = baked.meshes.first() else {
         return (0, Vec::new());
     };
-    let runs = mesh.runs.iter().map(|r| (r.end, r.albedo.x, r.emissive.x));
+    let runs = mesh
+        .runs
+        .iter()
+        .map(|r| (r.end, r.albedo.x, r.emissive.x, r.occludes));
     (mesh.indices.len(), runs.collect())
 }
 
 #[test]
 fn each_run_bakes_with_its_own_slot() {
+    let (black, white) = ((0.0, 0.0, true), (1.0, 0.0, true));
+    let at = |end, (a, e, o): (f32, f32, bool)| (end, a, e, o);
+    let glow = (0.0, 1.0, true);
     assert_eq!(
         gathered(Some(&["black", "glow"])),
-        (12, vec![(6, 0.0, 0.0), (12, 0.0, 1.0)])
+        (12, vec![at(6, black), at(12, glow)])
     );
     assert_eq!(
         gathered(None),
-        (12, vec![(6, 1.0, 0.0), (12, 1.0, 0.0)]),
+        (12, vec![at(6, white), at(12, white)]),
         "no Material: every run is the default white"
     );
     assert_eq!(
         gathered(Some(&["glow"])),
-        (6, vec![(6, 0.0, 1.0)]),
+        (6, vec![at(6, glow)]),
         "a run with no slot is left out"
     );
     assert_eq!(
         gathered(Some(&["black", "black", "glow"])),
-        (12, vec![(6, 0.0, 0.0), (12, 0.0, 1.0)]),
+        (12, vec![at(6, black), at(12, glow)]),
         "an extra slot adds its emission to the last run"
     );
 }
 
+/// A Transparent run stays drawn (it receives its lightmap) but lets light through;
+/// an extra slot over it is judged by its own material (#1290).
 #[test]
-fn a_transparent_run_is_left_out_not_the_whole_mesh() {
-    assert_eq!(gathered(Some(&["glass", "glow"])), (6, vec![(6, 0.0, 1.0)]));
+fn a_transparent_run_receives_but_does_not_occlude() {
+    let glass = |end| (end, 0.0, 0.5, false);
     assert_eq!(
-        gathered(Some(&["black", "glass"])),
-        (6, vec![(6, 0.0, 0.0)])
+        gathered(Some(&["glass", "glow"])),
+        (12, vec![glass(6), (12, 0.0, 1.0, true)])
+    );
+    assert_eq!(
+        gathered(Some(&["glass", "glass"])),
+        (12, vec![glass(6), glass(12)])
     );
     assert_eq!(
         gathered(Some(&["black", "glass", "glow"])),
-        (6, vec![(6, 0.0, 0.0)]),
-        "an extra slot over a left-out run adds nothing"
+        (12, vec![(6, 0.0, 0.0, true), (12, 0.0, 1.5, true)]),
+        "an opaque layer over glass occludes"
     );
-    assert_eq!(gathered(Some(&["glass", "glass"])), (0, Vec::new()));
+    assert_eq!(
+        gathered(Some(&["black", "black", "glass"])),
+        (12, vec![(6, 0.0, 0.0, true), (12, 0.0, 0.5, true)]),
+        "a Transparent layer adds its emission scaled by alpha"
+    );
 }
 
-/// Mean brightness of the floor's lightmap columns under x < 0, then under x > 0.
-fn floor_halves(slots: &[&str]) -> (f32, f32) {
-    let mut scene = library();
-    scene.ambient_intensity = 0.0;
-    panel(&mut scene, Some(slots));
-    let mut baked = BakeScene::gather(&scene, &|_| None);
-    let receiver = BakeMesh {
-        entity: 999,
-        ..floor()
-    };
-    assert!(receiver.lightmap_uvs.iter().any(|uv| *uv != Vec2::ZERO));
-    baked.meshes.push(receiver);
-    let maps = bake(&baked, &settings());
-    let map = maps.iter().find(|m| m.entity == 999).expect("floor baked");
-    let size = map.size as usize;
-    let half = |right: bool| {
-        let texels = map.texels.iter().enumerate();
-        let picked: Vec<f32> = texels
-            .filter(|(i, _)| (i % size >= size / 2) == right)
-            .map(|(_, t)| t.x)
-            .collect();
-        picked.iter().sum::<f32>() / picked.len() as f32
-    };
-    (half(false), half(true))
-}
-
+/// A texture several slots share is averaged once per gather.
 #[test]
-fn only_the_emissive_half_lights_the_floor_below_it() {
-    let (left, right) = floor_halves(&["black", "glow"]);
-    assert!(right > 0.05 && right > 2.0 * left, "{left} | {right}");
-    let (left, right) = floor_halves(&["glow", "black"]);
-    assert!(left > 0.05 && left > 2.0 * right, "{left} | {right}");
+fn a_shared_map_is_averaged_once() {
+    let mut scene = library();
+    let mapped = MaterialAsset {
+        base_color_map: Some(MapRef::from("t.png")),
+        ..MaterialAsset::default()
+    };
+    scene.materials.insert("mapped".to_string(), mapped);
+    panel(&mut scene, Some(&["mapped", "mapped", "mapped"]));
+    let asked = Cell::new(0);
+    let baked = BakeScene::gather(&scene, &|_| {
+        asked.set(asked.get() + 1);
+        Some(Vec3::splat(0.5))
+    });
+    assert_eq!(asked.get(), 1);
+    assert!(baked.meshes[0]
+        .runs
+        .iter()
+        .all(|r| r.albedo == Vec3::splat(0.5)));
 }

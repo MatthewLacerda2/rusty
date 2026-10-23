@@ -73,13 +73,13 @@ impl GpuMesh {
     /// The draws of `mesh` under `material` (#1285): each material slot with the
     /// index run it draws ([`crate::components::mesh::material_runs`]), clipped to this
     /// geometry's indices so a mesh edited ahead of its upload never reads past the
-    /// buffer ([`draw::batch::clip_runs`]).
+    /// buffer ([`crate::components::mesh::clip_runs`]).
     pub(crate) fn runs(
         &self,
         mesh: &crate::scene::MeshComponent,
         material: Option<&crate::components::MaterialComponent>,
     ) -> Vec<(usize, std::ops::Range<u32>)> {
-        let runs = draw::batch::clip_runs(mesh.index_ranges(), self.num_indices);
+        let runs = crate::components::mesh::clip_runs(mesh.index_ranges(), self.num_indices);
         crate::components::mesh::material_runs(runs, material.map(|m| m.materials.len()))
     }
 }
