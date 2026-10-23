@@ -80,6 +80,8 @@ pub mod ui;
 mod ui_look;
 pub mod video;
 
+pub use lua_json::recipe_from_json_str;
+
 use std::cell::RefCell;
 use std::sync::RwLock;
 

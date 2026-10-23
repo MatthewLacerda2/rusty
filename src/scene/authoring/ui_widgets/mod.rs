@@ -24,7 +24,7 @@ mod scroll;
 use std::path::Path;
 
 use crate::scene::prefab::extract_prefab;
-use crate::scene::Scene;
+use crate::scene::{Scene, PREFAB_EXTENSION};
 
 /// Where [`seed`] writes the widget prefabs, relative to the project root.
 const PREFAB_DIR: &str = "assets/prefabs/ui";
@@ -89,7 +89,7 @@ impl UiWidget {
 
     /// The prefab [`seed`] writes for it (`None` for `Canvas`, a scene root).
     pub fn prefab_path(self) -> Option<String> {
-        (self != Self::Canvas).then(|| format!("{PREFAB_DIR}/{}.prefab", self.label()))
+        (self != Self::Canvas).then(|| format!("{PREFAB_DIR}/{}.{PREFAB_EXTENSION}", self.label()))
     }
 }
 

@@ -1,4 +1,4 @@
-use super::test_support::ground;
+use super::test_support::{full_path, ground};
 use super::*;
 use glam::Vec3;
 
@@ -8,14 +8,6 @@ fn open(size: f32) -> NavigationGraph {
 
 fn cells(path: &[SpanRef]) -> Vec<(i32, i32)> {
     path.iter().map(|s| (s.gx, s.gz)).collect()
-}
-
-/// The span path between two ground cells over every area, which must arrive.
-fn full_path(g: &NavigationGraph, from: (i32, i32), to: (i32, i32)) -> Vec<SpanRef> {
-    let (path, complete) =
-        g.find_path_masked(ground(g, from.0, from.1), ground(g, to.0, to.1), ALL_AREAS);
-    assert!(complete, "{from:?} -> {to:?} should arrive");
-    path
 }
 
 /// The next step is the path's next corner (#458): around a wall it is the corner

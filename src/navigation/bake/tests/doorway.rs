@@ -1,9 +1,8 @@
 //! The doorway level the rebake and carving tests share (#456): a floor split by
 //! a wall with a doorway, and whether a path still goes through it.
 
-use super::super::super::test_support::{add_box, add_floor, ground, move_to};
+use super::super::super::test_support::{add_box, add_floor, arrives, ground, move_to};
 use super::super::super::{NavBounds, NavigationGraph};
-use crate::navigation::ALL_AREAS;
 use crate::scene::Scene;
 use glam::Vec3;
 
@@ -27,8 +26,7 @@ pub(super) fn doorway() -> Scene {
 }
 
 pub(super) fn through(g: &NavigationGraph) -> bool {
-    g.find_path_masked(ground(g, 3, 5), ground(g, 17, 5), ALL_AREAS)
-        .1
+    arrives(g, ground(g, 3, 5), ground(g, 17, 5))
 }
 
 pub(super) fn baked(scene: &Scene) -> NavigationGraph {

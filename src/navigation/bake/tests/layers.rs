@@ -1,6 +1,6 @@
 //! Stacked floors (#454): several spans per cell, linked floor by floor.
 
-use super::super::super::test_support::{add_box, add_floor, bake_pinned, floors, ground};
+use super::super::super::test_support::{add_box, add_floor, arrives, bake_pinned, floors, ground};
 use crate::navigation::ALL_AREAS;
 use crate::scene::Scene;
 use glam::Vec3;
@@ -41,10 +41,7 @@ fn ground_walks_under_the_deck_and_the_deck_stays_apart() {
         gz: 5,
         index: deck,
     };
-    assert!(
-        !g.find_path_masked(ground(&g, 0, 5), deck, ALL_AREAS).1,
-        "no stairs yet"
-    );
+    assert!(!arrives(&g, ground(&g, 0, 5), deck), "no stairs yet");
 }
 
 #[test]

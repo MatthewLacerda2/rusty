@@ -32,6 +32,14 @@ pub fn recipe_from_lua<T: DeserializeOwned>(value: &Value) -> Result<T, String> 
     decode(recipe_json(value)?)
 }
 
+/// Decode a recipe held as a JSON **string** into `T`, the way [`recipe_from_lua`]
+/// reads one passed as a string. The `pub` entry (re-exported as
+/// `api::recipe_from_json_str`) for code outside the crate, such as integration
+/// tests, that has no Lua value but must read a recipe the way the engine does.
+pub fn recipe_from_json_str<T: DeserializeOwned>(json: &str) -> Result<T, String> {
+    decode(serde_json::from_str(json).map_err(|e| e.to_string())?)
+}
+
 /// The recipe argument as a `serde_json::Value`, for a caller that must inspect
 /// the document before decoding it (`Material.DefineAsset` lifts its validated
 /// fields out first). Anything but a table or a string is an error naming both.

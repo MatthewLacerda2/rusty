@@ -21,8 +21,11 @@ impl Baked {
         let name = format!("test_post_params_{tag}_{}", std::process::id());
         let json =
             format!(r#"{{"pass":"postfx","name":"{name}","blocks":[{{"id":"damage_vignette"}}]}}"#);
-        let recipe: ShaderRecipe =
-            crate::api::lua_json::decode(serde_json::from_str(&json).unwrap()).unwrap();
+        let lua = Lua::new();
+        let recipe: ShaderRecipe = crate::api::lua_json::recipe_from_lua(&mlua::Value::String(
+            lua.create_string(&json).unwrap(),
+        ))
+        .unwrap();
         bake_recipe(&recipe, engine_shader_dir(), DEFAULT_OUT_DIR).unwrap();
         Self(name)
     }
