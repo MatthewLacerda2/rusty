@@ -24,8 +24,8 @@ use std::rc::Rc;
 
 use glam::Vec3;
 
-use self::slots::SlotTable;
 pub(crate) use self::slots::MAX_REFLECTION_PROBES;
+use self::slots::{SlotPlan, SlotTable};
 use super::cubemap::CubemapTexture;
 use crate::render::Renderer;
 use crate::scene::{ReflectionProbe, ReflectionProbeSet, Scene};
@@ -121,12 +121,15 @@ impl ProbeArray {
         wanted: &[(&ReflectionProbe, Rc<CubemapTexture>)],
     ) -> bool {
         let face = wanted.iter().map(|(_, c)| c.size).max().unwrap_or(1);
-        let fits = |c: &CubemapTexture| face % c.size == 0 && (face / c.size).is_power_of_two();
-        let wanted: Vec<_> = wanted.iter().filter(|(_, c)| fits(c)).collect();
-        let shift = |c: &CubemapTexture| (face / c.size).trailing_zeros();
+        // Each fitting cube with the number of mips it lands below the array's base.
+        let wanted: Vec<Resident> = wanted
+            .iter()
+            .filter(|(_, c)| face % c.size == 0 && (face / c.size).is_power_of_two())
+            .map(|(p, c)| (*p, &**c, (face / c.size).trailing_zeros()))
+            .collect();
         let mips = wanted
             .iter()
-            .map(|(_, c)| shift(c) + c.texture.mip_level_count())
+            .map(|(_, c, shift)| shift + c.texture.mip_level_count())
             .max()
             .unwrap_or(1);
         if face != self.face || mips != self.mips {
@@ -134,7 +137,7 @@ impl ProbeArray {
         }
         let paths: Vec<&str> = wanted
             .iter()
-            .map(|(p, _)| p.cubemap_path.as_str())
+            .map(|(p, ..)| p.cubemap_path.as_str())
             .collect();
         let plan = self.table.plan(&paths);
         let rebuilt = plan.capacity.max(1) != self.cubes || face != self.face || mips != self.mips;
@@ -143,38 +146,56 @@ impl ProbeArray {
             (self.texture, self.view) = array_texture(device, face, mips, self.cubes);
             (self.face, self.mips) = (face, mips);
         }
+        self.copy_planned(device, queue, &wanted, &plan);
+        self.activate(&wanted, &plan.slot_of);
+        rebuilt
+    }
+
+    /// Copy the cubes `plan` names into their slots, in one submission.
+    fn copy_planned(
+        &self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        wanted: &[Resident],
+        plan: &SlotPlan,
+    ) {
+        if plan.copies.is_empty() {
+            return;
+        }
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("Reflection Probe Copies"),
         });
         for &slot in &plan.copies {
-            let k = plan
-                .slot_of
-                .iter()
-                .position(|&s| s == slot)
-                .expect("planned slot");
-            let cube = &wanted[k].1;
-            copy_cube(&mut encoder, cube, &self.texture, slot as u32, shift(cube));
+            let k = plan.slot_of.iter().position(|&s| s == slot);
+            let (_, cube, shift) = wanted[k.expect("a copied slot is planned")];
+            copy_cube(&mut encoder, cube, &self.texture, slot as u32, shift);
         }
-        if !plan.copies.is_empty() {
-            queue.submit([encoder.finish()]);
-        }
+        queue.submit([encoder.finish()]);
+    }
+
+    /// Record `wanted` as the frame's probes in `slot_of`'s slots: the selection set
+    /// draws query and the uniforms the shader reads.
+    fn activate(&mut self, wanted: &[Resident], slot_of: &[usize]) {
         self.active.probes.clear();
         self.active_slot.clear();
-        for ((probe, cube), &slot) in wanted.iter().zip(&plan.slot_of) {
-            self.active.probes.push((*probe).clone());
+        for (&(probe, cube, shift), &slot) in wanted.iter().zip(slot_of) {
+            self.active.probes.push(probe.clone());
             self.active_slot.push(slot as u32);
             self.uniforms[slot] = ReflectionProbeUniform {
                 center: probe.position.to_array(),
-                mip_base: shift(cube) as f32,
+                mip_base: shift as f32,
                 box_min: probe.box_min.to_array(),
                 mip_count: cube.texture.mip_level_count() as f32,
                 box_max: probe.box_max.to_array(),
                 _pad: 0.0,
             };
         }
-        rebuilt
     }
 }
+
+/// A probe the array holds this frame: the probe, its cube, and how many mips below
+/// the array's base level the cube's chain starts.
+type Resident<'a> = (&'a ReflectionProbe, &'a CubemapTexture, u32);
 
 /// A cube-array texture of `cubes` black cubes, `face` texels square with `mips`
 /// levels, and its `CubeArray` view.
