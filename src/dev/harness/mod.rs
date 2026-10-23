@@ -242,10 +242,12 @@ impl Harness {
         });
 
         let results_path = self.out_dir.join("results.json");
+        // lint: allow(asset-write) a harness report, not read by a path-keyed cache
         std::fs::write(&results_path, serde_json::to_string_pretty(&results)?)?;
 
         // Timings differ run to run, so they live beside results.json, not in it.
         let stats = self.stats.borrow().to_json(true);
+        // lint: allow(asset-write) a harness report, not read by a path-keyed cache
         std::fs::write(
             self.out_dir.join("stats.json"),
             serde_json::to_string_pretty(&stats)?,
@@ -261,6 +263,7 @@ impl Harness {
             };
             buf.push_str(&format!("[{}] {}\n", tag, msg));
         }
+        // lint: allow(asset-write) a harness report, not read by a path-keyed cache
         std::fs::write(console_path, buf)?;
 
         Ok(results_path)

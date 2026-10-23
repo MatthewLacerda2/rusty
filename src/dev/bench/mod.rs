@@ -149,7 +149,9 @@ fn read(out_dir: &Path) -> Option<Report> {
 fn write(out_dir: &Path, report: &Report, text: &str) -> std::io::Result<()> {
     std::fs::create_dir_all(out_dir)?;
     let json = serde_json::to_string_pretty(report).map_err(std::io::Error::other)?;
+    // lint: allow(asset-write) a bench report, not read by a path-keyed cache
     std::fs::write(out_dir.join("bench.json"), json)?;
+    // lint: allow(asset-write) a bench report, not read by a path-keyed cache
     std::fs::write(out_dir.join("bench.txt"), text)
 }
 

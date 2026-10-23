@@ -69,6 +69,7 @@ fn draw_code_editor(
         )
         .clicked()
     {
+        // lint: allow(asset-write) a script the editor saves; not an asset a path-keyed cache reads
         match fs::write(path, &editor.asset_script_content) {
             Ok(_) => {
                 console.info(format!("Saved script changes to {}", filename));

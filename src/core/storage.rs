@@ -80,6 +80,7 @@ impl Storage {
         }
         let text = serde_json::to_string_pretty(&Value::Object(self.data.clone()))
             .map_err(|e| format!("Failed to serialize storage: {}", e))?;
+        // lint: allow(asset-write) game save data, not read by a path-keyed cache
         std::fs::write(path, text).map_err(|e| format!("Failed to write storage file: {}", e))
     }
 

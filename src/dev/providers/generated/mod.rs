@@ -105,6 +105,7 @@ pub fn store<B: Brief + ?Sized>(
         generated_on: generated_on.to_owned(),
         estimate_cents,
     };
+    // lint: allow(asset-write) a generated file's sidecar json, not an asset a cache reads
     sidecar.save(&file)?;
     Ok(address)
 }

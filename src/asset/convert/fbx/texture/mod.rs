@@ -124,6 +124,7 @@ impl Textures {
         }
         let path = self.dir.join(name);
         hook::io(Step::ExtractTexture)
+            // lint: allow(asset-write) written into a staging folder that is swapped in whole, not a path a cache has seen
             .and_then(|()| std::fs::write(&path, bytes))
             .map_err(|e| ImportError::Parse(format!("writing {}: {e}", path.display())))
     }

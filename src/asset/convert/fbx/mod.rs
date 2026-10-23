@@ -42,6 +42,7 @@ pub fn convert(source: &Path, to: &Staging) -> Result<Converted, ImportError> {
     let mut takes = Vec::new();
     let document = document(&scene, &mut textures, &mut takes)?;
     hook::io(Step::WriteGltf)
+        // lint: allow(asset-write) written into a staging folder that is swapped in whole, not a path a cache has seen
         .and_then(|()| std::fs::write(&to.glb, glb::write(&document)))
         .map_err(|e| ImportError::Parse(format!("writing {}: {e}", to.glb.display())))?;
     let mut skipped = textures.skipped;

@@ -59,6 +59,7 @@ fn seed_shader(dir: &Path) -> Result<(), String> {
     let out = staging.0.to_string_lossy();
     bake_recipe(&recipe, engine_shader_dir(), &out).map_err(|e| e.to_string())?;
     let json_name = format!("{SHADER_NAME}.recipe.json");
+    // lint: allow(asset-write) a scene, prefab or lighting document, read whole on load
     std::fs::write(staging.0.join(&json_name), recipe.to_json()?).map_err(|e| e.to_string())?;
     // The module last: the renderer keys on `<name>.wgsl`, so its params are there first.
     let params = format!("{SHADER_NAME}.params.json");

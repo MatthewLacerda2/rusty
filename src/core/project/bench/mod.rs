@@ -111,6 +111,7 @@ impl Bench {
 
     fn save(&self) -> Result<(), String> {
         match &self.path {
+            // lint: allow(asset-write) project settings, not read by a path-keyed cache
             Some(path) => self.recent.save(path),
             None => Ok(()),
         }
