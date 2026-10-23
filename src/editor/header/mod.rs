@@ -75,15 +75,27 @@ fn file_menu(
     is_playing: bool,
 ) {
     ui.menu_button("File", |ui| {
-        if ui.button(format!("{}  New Scene", icon::FILE)).clicked() {
-            scene_io::new_scene(editor, scene, console);
+        let stop_first = "Stop Play first";
+        if ui
+            .add_enabled(
+                !is_playing,
+                egui::Button::new(format!("{}  New Scene", icon::FILE)),
+            )
+            .on_disabled_hover_text(stop_first)
+            .clicked()
+        {
+            scene_io::new_scene(editor, scene, console, is_playing);
             ui.close();
         }
         if ui
-            .button(format!("{}  Reset Scene", icon::ARROW_COUNTER_CLOCKWISE))
+            .add_enabled(
+                !is_playing,
+                egui::Button::new(format!("{}  Reset Scene", icon::ARROW_COUNTER_CLOCKWISE)),
+            )
+            .on_disabled_hover_text(stop_first)
             .clicked()
         {
-            scene_io::reset_scene(editor, scene, console);
+            scene_io::reset_scene(editor, scene, console, is_playing);
             ui.close();
         }
         if ui
