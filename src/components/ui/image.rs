@@ -125,10 +125,7 @@ impl Default for ImageComponent {
 
 impl ImageComponent {
     /// The texture this image draws: a `SpriteSwap` override, else its own.
-    pub fn shown_texture(&self) -> Option<&str> {
-        self.override_texture
-            .as_ref()
-            .or(self.texture.as_ref())
-            .map(MapRef::as_str)
+    pub fn shown_texture(&self) -> Option<&MapRef> {
+        self.override_texture.as_ref().or(self.texture.as_ref())
     }
 }

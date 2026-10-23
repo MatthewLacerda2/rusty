@@ -4,6 +4,7 @@
 
 use std::rc::Rc;
 
+use crate::asset::MapRef;
 use crate::render::{GpuTexture, Renderer};
 
 /// Repeat in U, clamp in V, filtered like every other image texture.
@@ -25,7 +26,7 @@ impl Renderer {
     /// material using the same file, which keeps its repeating sampler) re-bound
     /// with [`panorama_sampler`]. A failed load yields the default texture, likewise.
     pub(crate) fn load_panorama(&mut self, path: &str) -> Rc<GpuTexture> {
-        let image = self.load_texture(path);
+        let image = self.load_texture(&MapRef::from(path));
         Rc::new(Self::finalize_texture(
             &self.device,
             &self.texture_layout,

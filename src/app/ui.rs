@@ -42,10 +42,11 @@ impl super::GameWorld {
             .refresh(&scene.world, textures);
     }
 
-    /// Re-read the texture sizes when `transition` swapped the scene (a paused
-    /// frame's Play or Stop, `poll_transition`), and hand it back.
+    /// Re-read the texture sizes when a paused frame's Play swapped the scene in
+    /// (`poll_transition`), and hand `transition` back. A Stop needs nothing here:
+    /// the edit frame that follows it refreshes them (#1269).
     pub(super) fn refreshed_after(&self, transition: PlayTransition) -> PlayTransition {
-        if !matches!(transition, PlayTransition::None) {
+        if matches!(transition, PlayTransition::Entered) {
             self.refresh_ui_textures();
         }
         transition

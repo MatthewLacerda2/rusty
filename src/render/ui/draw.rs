@@ -28,6 +28,7 @@ use super::cache::{CanvasPlace, UiViewCache};
 use super::effects::GroupKey;
 use super::mesh::build_canvas_meshes;
 use super::pipeline::UiPass;
+use crate::asset::MapRef;
 use crate::render::gpu::fullscreen::color_pass;
 use crate::render::timing::GpuPass;
 use crate::render::{RenderView, Renderer};
@@ -53,7 +54,7 @@ impl Renderer {
         for path in texture_paths(scene, &layout) {
             let tex = self.load_texture(&path);
             self.ui_renderer
-                .bind_group(&self.device, Some((&path, Rc::clone(&tex))));
+                .bind_group(&self.device, Some((path.as_str(), Rc::clone(&tex))));
         }
         let textures = &self.gpu_textures;
         let tex_size = |p: &str| {
@@ -161,10 +162,10 @@ impl Renderer {
 
 /// Every texture path an active, laid-out Image samples — gathered first so the
 /// scene borrow ends before the textures load.
-fn texture_paths(scene: &Scene, layout: &UiLayout) -> Vec<String> {
-    let mut paths: Vec<String> = layout
+fn texture_paths(scene: &Scene, layout: &UiLayout) -> Vec<MapRef> {
+    let mut paths: Vec<MapRef> = layout
         .iter()
-        .filter_map(|(id, _)| Some(scene.world.image(id)?.shown_texture()?.to_string()))
+        .filter_map(|(id, _)| scene.world.image(id)?.shown_texture().cloned())
         .collect();
     paths.sort();
     paths.dedup();

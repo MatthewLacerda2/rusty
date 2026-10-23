@@ -175,8 +175,8 @@ impl GameWorld {
 
     /// Process only the play-state transition, **without advancing the sim** (#283):
     /// a paused, no-step frame, where a Play/Stop must still take effect. Outside
-    /// Play the caller runs [`edit_frame`](Self::edit_frame) after it. A transition
-    /// re-reads the UI's texture sizes against the scene it swapped in.
+    /// Play the caller runs [`edit_frame`](Self::edit_frame) after it, which re-reads
+    /// UI texture sizes after a Stop; entering Play re-reads them here.
     pub fn poll_transition(&mut self) -> PlayTransition {
         let transition = self.handle_transition();
         self.refreshed_after(transition)

@@ -86,7 +86,7 @@ impl Renderer {
 
     /// Resolve a material map path to a resident GPU texture, falling back to the
     /// default texture when the path is absent or not yet uploaded.
-    fn resolve_map(&self, path: Option<&String>) -> Rc<GpuTexture> {
+    fn resolve_map(&self, path: Option<&MapRef>) -> Rc<GpuTexture> {
         match path {
             Some(p) => self
                 .gpu_textures
@@ -100,11 +100,11 @@ impl Renderer {
     /// The cache key a map path resolves to: the path when its texture is resident,
     /// else empty (the default texture). Lets the pool detect a late-loaded map. A
     /// render texture's key also names its allocation (#430), so a resize rebinds.
-    fn resolved_key(&self, path: Option<&String>) -> String {
+    fn resolved_key(&self, path: Option<&MapRef>) -> String {
         match path {
-            Some(p) if self.gpu_textures.contains_key(p) => {
-                self.render_texture_key(p).unwrap_or_else(|| p.clone())
-            }
+            Some(p) if self.gpu_textures.contains_key(p) => self
+                .render_texture_key(p.as_str())
+                .unwrap_or_else(|| p.to_string()),
             _ => String::new(),
         }
     }
@@ -168,7 +168,7 @@ pub(crate) fn is_colour_map(index: usize) -> bool {
 /// [`MapSignature`]: crate::render::gpu::material_cache::MapSignature
 pub(crate) fn material_texture_paths(
     material: Option<&MaterialAsset>,
-) -> [Option<String>; MATERIAL_TEXTURES] {
+) -> [Option<MapRef>; MATERIAL_TEXTURES] {
     let Some(m) = material else {
         return Default::default();
     };
@@ -183,5 +183,5 @@ pub(crate) fn material_texture_paths(
         .iter()
         .map(|s| m.shader_textures.get(s.name));
     let mut paths = maps.into_iter().map(Option::as_ref).chain(slots);
-    std::array::from_fn(|_| paths.next().flatten().map(MapRef::to_string))
+    std::array::from_fn(|_| paths.next().flatten().cloned())
 }

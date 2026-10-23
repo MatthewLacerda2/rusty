@@ -150,10 +150,10 @@ impl SelectableComponent {
     }
 
     /// The sprite for `state` (`None` for `Normal`: the Image's own texture).
-    pub fn sprite(&self, state: SelectionState) -> Option<&str> {
+    pub fn sprite(&self, state: SelectionState) -> Option<&MapRef> {
         match state {
             SelectionState::Normal => None,
-            _ => self.sprites[state as usize].as_ref().map(MapRef::as_str),
+            _ => self.sprites[state as usize].as_ref(),
         }
     }
 
@@ -186,7 +186,10 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(sel.sprite(SelectionState::Normal), None);
-        assert_eq!(sel.sprite(SelectionState::Pressed), Some("s2.png"));
+        assert_eq!(
+            sel.sprite(SelectionState::Pressed),
+            Some(&MapRef::from("s2.png"))
+        );
         assert_eq!(sel.color(SelectionState::Normal), Vec4::ONE);
     }
 

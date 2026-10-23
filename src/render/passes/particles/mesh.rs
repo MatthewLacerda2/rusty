@@ -12,6 +12,7 @@
 
 use glam::{Mat4, Quat, Vec3};
 
+use crate::asset::MapRef;
 use crate::components::{MaterialAsset, ParticleEmitterComponent, ParticleRenderMode};
 use crate::render::draw::batch::sort::view_depth;
 use crate::render::draw::batch::{BatchKey, DrawItem};
@@ -133,7 +134,7 @@ impl Renderer {
 }
 
 /// The texture maps `material` samples, to upload before its bind group is built.
-fn material_maps(material: Option<&MaterialAsset>) -> Vec<String> {
+fn material_maps(material: Option<&MaterialAsset>) -> Vec<MapRef> {
     crate::render::draw::materials::material_texture_paths(material)
         .into_iter()
         .flatten()

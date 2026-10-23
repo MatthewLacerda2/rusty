@@ -24,7 +24,7 @@ use crate::scene::{Camera, Scene};
 /// One ribbon's slice of the frame's index buffer and how to draw it.
 struct RibbonDraw {
     blend: ParticleBlend,
-    texture: Option<String>,
+    texture: Option<MapRef>,
     first: u32,
     count: u32,
 }
@@ -80,7 +80,7 @@ impl Renderer {
         let textures: Vec<Option<Rc<GpuTexture>>> = ribbons
             .draws
             .iter()
-            .map(|d| d.texture.as_deref().map(|p| self.load_texture(p)))
+            .map(|d| d.texture.as_ref().map(|p| self.load_texture(p)))
             .collect();
         self.encode_ribbon_pass(view, &ribbons, &textures);
         ribbons.draws.len() as u32
@@ -228,7 +228,7 @@ impl Ribbons {
         let centroid = points.iter().sum::<Vec3>() / points.len() as f32;
         let draw = RibbonDraw {
             blend: style.blend,
-            texture: style.texture.as_ref().map(MapRef::to_string),
+            texture: style.texture.clone(),
             first,
             count,
         };

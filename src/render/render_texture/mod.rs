@@ -26,6 +26,7 @@ use std::rc::Rc;
 
 pub use slots::RenderTextures;
 
+use crate::asset::MapRef;
 pub(crate) use crate::components::is_render_texture;
 use crate::render::draw::stack::StackPass;
 use crate::render::{RenderView, Renderer, TextureCamera};
@@ -54,13 +55,14 @@ impl Renderer {
             }
         }
         let bloom = self.quality.bloom_divisor();
-        self.gpu_textures.retain(|path, _| !is_render_texture(path));
+        self.gpu_textures
+            .retain(|path, _| !is_render_texture(path.as_str()));
         self.render_texture_ids.0.clear();
         for (path, slot) in &mut rts.slots {
             let (w, h) = slot.size;
             slot.view.resize(&self.device, w, h, bloom);
             self.gpu_textures
-                .insert(path.clone(), Rc::clone(&slot.front));
+                .insert(MapRef::new(path.clone()), Rc::clone(&slot.front));
             self.render_texture_ids.0.insert(path.clone(), slot.id);
         }
     }
@@ -137,11 +139,12 @@ pub(crate) fn referenced_render_textures(scene: &Scene) -> HashSet<String> {
         .ids_with_image()
         .into_iter()
         .filter(|&id| scene.world.is_active(id))
-        .filter_map(|id| Some(scene.world.image(id)?.shown_texture()?.to_string()));
+        .filter_map(|id| scene.world.image(id)?.shown_texture().cloned());
     let maps = crate::render::draw::active_material_map_paths(scene).into_iter();
     images
         .chain(maps)
-        .filter(|path| is_render_texture(path))
+        .filter(|path| is_render_texture(path.as_str()))
+        .map(|path| path.to_string())
         .collect()
 }
 

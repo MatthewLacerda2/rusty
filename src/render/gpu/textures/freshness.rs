@@ -62,7 +62,7 @@ impl Renderer {
         // The decal atlas keeps its own copy of each map (#638).
         self.decals.atlas.forget(is_stale);
         let before = self.gpu_textures.len();
-        self.gpu_textures.retain(|key, _| !is_stale(key));
+        self.gpu_textures.retain(|key, _| !is_stale(key.as_str()));
         let missed = self.texture_freshness.forget_misses_where(is_stale);
         let dropped = self.gpu_textures.len() != before || missed;
         if !dropped {

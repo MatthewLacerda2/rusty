@@ -153,7 +153,7 @@ pub struct Renderer {
     // Asset cache keyed by mesh-asset identity (#127): identical geometry shared
     // across entities resolves to one buffer pair, not one per entity.
     pub gpu_meshes: HashMap<MeshId, GpuMesh>,
-    pub gpu_textures: HashMap<String, Rc<GpuTexture>>,
+    pub gpu_textures: HashMap<crate::asset::MapRef, Rc<GpuTexture>>,
     /// Which cached uploads went stale: re-written files and failed loads (#689).
     pub(crate) texture_freshness: crate::core::fs::freshness::Freshness,
     pub default_texture: Rc<GpuTexture>,
