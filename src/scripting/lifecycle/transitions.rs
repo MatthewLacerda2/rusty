@@ -57,23 +57,28 @@ impl ScriptManager {
     /// despawn exactly that set and forget its script instances. The entities stay
     /// live through dispatch (so an `OnDestroy` can read its own transform).
     /// Cascading destroys requested from within an `OnDestroy` fall to the next
-    /// tick's drain, since the queue was taken up front.
-    pub fn apply_pending_destroys(&mut self) {
+    /// tick's drain, since the queue was taken up front. Returns what was removed,
+    /// each id with its position, for the caller to silence its sound (#1297).
+    pub fn apply_pending_destroys(&mut self) -> Vec<(u32, [f32; 3])> {
         let ids = self.scene.borrow_mut().take_pending_destroys();
         if ids.is_empty() {
-            return;
+            return Vec::new();
         }
-        let (doomed, order) = {
+        let (doomed, order, removed) = {
             let scene = self.scene.borrow();
             let doomed: BTreeSet<u32> = ids.iter().flat_map(|&id| scene.destroy_set(id)).collect();
             let mut order: Vec<u32> = doomed.iter().copied().collect();
             // Children before parents, as Unity tears a hierarchy down.
             order.sort_by_key(|&id| Reverse(scene.world.ancestors(id).count()));
-            (doomed, order)
+            // World space: a child's sound stops where it was heard, not at its local offset.
+            let at = |id: u32| (id, scene.world.world_position(id).to_array());
+            let removed = order.iter().map(|&id| at(id)).collect();
+            (doomed, order, removed)
         };
         self.dispatch_teardown(&order);
         self.scene.borrow_mut().despawn_batch(&doomed);
         self.forget_entities(&doomed.into_iter().collect::<Vec<_>>());
+        removed
     }
 
     /// A scene unload (#432): the same teardown as a destroy for every entity in

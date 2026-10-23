@@ -138,8 +138,9 @@ pub fn oneshot_source(clip: &str, rolloff: Rolloff) -> AudioSourceComponent {
 impl AudioMaestro {
     /// Re-resolve every live voice against `env` and hand changed mixes to the
     /// backend — the per-frame step the windowed shell runs after the sim advances.
-    /// `lookup` gives an entity's current `AudioSource` + world position; an entity
-    /// that no longer has one keeps its last settings. Finished one-shots are reaped.
+    /// `lookup` gives an entity's current `AudioSource` + world position; a voice
+    /// whose entity no longer has one is stopped (the destroy path's safety net,
+    /// #1297). Finished one-shots are reaped.
     pub fn apply_mix(
         &mut self,
         env: &MixEnv,
@@ -147,6 +148,17 @@ impl AudioMaestro {
     ) {
         self.env = *env;
         let (master, mode) = (self.master_volume, self.speaker_mode);
+        let gone: Vec<u32> = self
+            .entity_voices
+            .keys()
+            .copied()
+            .filter(|&id| lookup(id).is_none())
+            .collect();
+        for id in gone {
+            if let Some(live) = self.entity_voices.remove(&id) {
+                self.backend.stop(live.voice);
+            }
+        }
         let occlusion = &self.occlusion;
         for (&id, live) in self.entity_voices.iter_mut() {
             if let Some((source, position)) = lookup(id) {
