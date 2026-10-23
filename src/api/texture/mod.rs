@@ -134,7 +134,9 @@ mod tests {
             )
             .eval()
             .unwrap();
-        let recipe = TextureRecipe::from_json(&json).expect("json parses");
+        let recipe: TextureRecipe =
+            crate::api::lua_json::decode(serde_json::from_str(&json).unwrap())
+                .expect("json parses");
         assert_eq!(recipe.resolution, 8);
         assert_eq!(recipe.seed, 2);
     }

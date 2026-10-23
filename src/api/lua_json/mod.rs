@@ -84,3 +84,6 @@ mod tests;
 
 #[cfg(test)]
 mod enum_case_tests;
+
+#[cfg(test)]
+mod recipe_tests;

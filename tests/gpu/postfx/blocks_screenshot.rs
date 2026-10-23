@@ -15,7 +15,7 @@ use super::super::fog::scene::{shot, wall_scene};
 fn bake(name: &str, block: &str) {
     let json = format!(r#"{{"pass":"postfx","name":"{name}","blocks":[{block}]}}"#);
     bake_recipe(
-        &ShaderRecipe::from_json(&json).unwrap(),
+        &serde_json::from_str::<ShaderRecipe>(&json).unwrap(),
         engine_shader_dir(),
         DEFAULT_OUT_DIR,
     )

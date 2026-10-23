@@ -27,14 +27,6 @@ fn sample_recipe() -> TextureRecipe {
 }
 
 #[test]
-fn recipe_round_trips_through_json_unchanged() {
-    let r = sample_recipe();
-    let json = r.to_json().expect("serialize");
-    let back = TextureRecipe::from_json(&json).expect("deserialize");
-    assert_eq!(r, back);
-}
-
-#[test]
 fn op_tag_is_snake_case() {
     let json = serde_json::to_string(&OpKind::WhiteNoise).unwrap();
     assert!(json.contains("\"white_noise\""), "got {json}");
@@ -51,19 +43,7 @@ fn voronoi_output_defaults_to_distance_when_absent() {
 }
 
 #[test]
-fn an_unknown_recipe_key_is_refused() {
-    let err =
-        TextureRecipe::from_json(r#"{ "resolution": 8, "nodes": [], "seeed": 3 }"#).unwrap_err();
-    assert!(err.contains("seeed"), "{err}");
-}
-
-#[test]
-fn outputs_round_trip_and_stay_out_of_single_output_json() {
+fn outputs_stay_out_of_single_output_json() {
     let single = sample_recipe().to_json().unwrap();
     assert!(!single.contains("outputs"), "{single}");
-    let mut r = sample_recipe();
-    r.outputs.insert("base_color".into(), "n0".into());
-    r.outputs.insert("normal".into(), "n1".into());
-    let back = TextureRecipe::from_json(&r.to_json().unwrap()).unwrap();
-    assert_eq!(r, back);
 }

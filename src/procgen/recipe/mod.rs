@@ -272,11 +272,6 @@ impl TextureRecipe {
     pub fn to_json(&self) -> Result<String, String> {
         serde_json::to_string_pretty(self).map_err(|e| e.to_string())
     }
-
-    /// Parse a recipe from its JSON form.
-    pub fn from_json(s: &str) -> Result<Self, String> {
-        serde_json::from_str(s).map_err(|e| e.to_string())
-    }
 }
 
 #[cfg(test)]

@@ -108,15 +108,4 @@ mod tests {
             assert_eq!(img.get_wrapped(y, 0), img.get_wrapped(y, 64));
         }
     }
-
-    #[test]
-    fn recipe_round_trip_re_bakes_identically() {
-        let recipe = checker_recipe(48, 99);
-        let json = recipe.to_json().unwrap();
-        let back = TextureRecipe::from_json(&json).unwrap();
-        assert_eq!(recipe, back);
-        let a = evaluate(&recipe).unwrap();
-        let b = evaluate(&back).unwrap();
-        assert_eq!(a, b);
-    }
 }
