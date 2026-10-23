@@ -13,6 +13,7 @@ use crate::components::{
     Entity, JointComponent, LodGroupComponent, ParticleEmitterComponent, RectTransformComponent,
     SelectableComponent,
 };
+use crate::ecs::World;
 use crate::scene::lighting::lightmap::LightmapEntry;
 use crate::scene::serialize::to_scene_data;
 use crate::scene::Scene;
@@ -45,7 +46,20 @@ fn every_kind(tag: &str) -> Scene {
     );
     scene.set_parent(c, Some(p)).unwrap();
     scene.set_parent(g, Some(c)).unwrap();
-    let w = &mut scene.world;
+    referrers(&mut scene.world, [p, c, g], bone, gun);
+    scene.selected_entity_id = Some(c);
+    scene.persistent.insert(g);
+    scene.lightmaps.entries.push(LightmapEntry {
+        entity: p,
+        page: 0,
+        scale_offset: [1.0, 1.0, 0.0, 0.0],
+    });
+    scene
+}
+
+/// One entity per component reference kind, each naming one of `p, c, g`, `bone`
+/// or `gun`.
+fn referrers(w: &mut World, [p, c, g]: [u32; 3], bone: u32, gun: u32) {
     for (name, body) in [("Rope", p), ("BoneRope", bone)] {
         let joint = JointComponent {
             connected_body: Some(body),
@@ -66,11 +80,13 @@ fn every_kind(tag: &str) -> Scene {
     emitter.sub_emitters.death = Some(gun);
     let fx = w.spawn("Fx".into());
     w.set_particles(fx, Some(emitter));
-    let mut lod = LodGroupComponent::default();
-    lod.levels = vec![LodLevel {
-        renderers: vec![c, g],
-        ..LodLevel::default()
-    }];
+    let lod = LodGroupComponent {
+        levels: vec![LodLevel {
+            renderers: vec![c, g],
+            ..LodLevel::default()
+        }],
+        ..LodGroupComponent::default()
+    };
     let lod_id = w.spawn("Lod".into());
     w.set_lod_group(lod_id, Some(lod));
     let marker = RectTransformComponent {
@@ -82,14 +98,6 @@ fn every_kind(tag: &str) -> Scene {
     };
     let marker_id = w.spawn("Marker".into());
     w.set_rect_transform(marker_id, Some(marker));
-    scene.selected_entity_id = Some(c);
-    scene.persistent.insert(g);
-    scene.lightmaps.entries.push(LightmapEntry {
-        entity: p,
-        page: 0,
-        scale_offset: [1.0, 1.0, 0.0, 0.0],
-    });
-    scene
 }
 
 /// Every id the scene names, live: hierarchy, components, and scene-level state.
