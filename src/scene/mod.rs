@@ -38,6 +38,7 @@ pub mod io;
 pub mod layers;
 pub mod lighting;
 pub mod lod_instance;
+pub mod model_writes;
 pub mod nav_settings;
 pub mod prefab;
 pub mod rehydrate;

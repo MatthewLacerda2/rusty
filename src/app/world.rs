@@ -18,6 +18,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use crate::scene::model_writes::ModelWrites;
 use crate::scene::Scene;
 
 /// The world of record threaded into every system as `&mut World`. A thin handle to
@@ -32,5 +33,14 @@ impl World {
     /// Wrap a shared scene handle as the world of record.
     pub fn new(scene: Rc<RefCell<Scene>>) -> Self {
         Self { scene }
+    }
+
+    /// What an edit-mode tick does in place of the schedule: a model the engine
+    /// re-wrote reloads into its entities (#1242), and a bone the designer moved
+    /// still skins (#453).
+    pub(super) fn edit_frame(&self, writes: &mut ModelWrites) {
+        let mut scene = self.scene.borrow_mut();
+        writes.follow(&mut scene);
+        scene.build_skin_palettes();
     }
 }

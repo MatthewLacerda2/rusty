@@ -165,8 +165,7 @@ impl GameWorld {
             self.resources.frame_dt = scaled_dt;
             self.run_schedule_frame();
         } else {
-            // No schedule in edit mode, but a bone the designer moved still skins (#453).
-            self.world.scene.borrow_mut().build_skin_palettes();
+            self.world.edit_frame(&mut self.resources.model_writes);
         }
         self.sync_render_camera();
         self.sync_shader_time();

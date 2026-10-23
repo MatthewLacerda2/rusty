@@ -4,8 +4,9 @@
 //! Unity reimports an asset when it is written; rusty's analog is that every asset
 //! file the engine writes (a PNG bake, a `Sound.*` WAV bake, a reflection cubemap,
 //! a provider's generated file…) is noted here, and each path-keyed cache (the
-//! renderer's textures and cubemaps, the audio `ClipCache`) drains the notes before
-//! it answers a lookup. A note is data the cache reads, never a call into it, so a
+//! renderer's textures, cubemaps and particle meshes, the audio `ClipCache`) drains
+//! the notes before it answers a lookup. The edit scene follows them too: an entity
+//! whose mesh names a re-written model re-reads it (`scene::model_writes`, #1242). A note is data the cache reads, never a call into it, so a
 //! sim-side baker never reaches up into `render` or `audio` (the direction rule).
 //! The log holds one entry per distinct path, so it stays as small as the set of
 //! baked files.
