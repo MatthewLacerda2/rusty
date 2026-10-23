@@ -102,12 +102,12 @@ impl DecalAtlas {
             let Some(layer) = self.free_layer() else {
                 break;
             };
-            match image::open(path) {
-                Ok(img) => {
+            match crate::render::gpu::textures::open(path) {
+                Some(img) => {
                     upload(queue, &self.texture, layer, img.to_rgba8());
                     self.slots.insert(path.to_string(), layer);
                 }
-                Err(_) => {
+                None => {
                     misses.insert(path.to_string());
                 }
             }

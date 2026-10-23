@@ -2,11 +2,11 @@
 //! chunk, every accessor tightly packed and 4-byte aligned (glTF 2.0 §4.4).
 
 use super::bin::{pad, Bin};
-use super::{anim, Document, Material, Mesh, Node, Primitive, Skin};
+use super::{anim, Document, Material, Mesh, Node, Primitive, Skin, Texture};
 use serde_json::{json, Map, Value};
 
-const GLB_MAGIC: u32 = 0x4654_6C67; // "glTF"
-const CHUNK_JSON: u32 = 0x4E4F_534A;
+pub(super) const GLB_MAGIC: u32 = 0x4654_6C67; // "glTF"
+pub(super) const CHUNK_JSON: u32 = 0x4E4F_534A;
 const CHUNK_BIN: u32 = 0x004E_4942;
 
 /// `doc` as the bytes of a `.glb` file.
@@ -40,7 +40,7 @@ pub fn write(doc: &Document) -> Vec<u8> {
     insert_nonempty(&mut root, "materials", materials);
     let textures: Vec<Value> = (0..images.len()).map(|i| json!({"source": i})).collect();
     insert_nonempty(&mut root, "textures", textures);
-    let images: Vec<Value> = images.into_iter().map(|uri| json!({"uri": uri})).collect();
+    let images: Vec<Value> = images.into_iter().map(image).collect();
     insert_nonempty(&mut root, "images", images);
     if !bin.bytes.is_empty() {
         root.insert("buffers".into(), json!([{"byteLength": bin.bytes.len()}]));
@@ -139,28 +139,39 @@ fn skin(skin: &Skin, bin: &mut Bin) -> Value {
     json!({"joints": skin.joints, "inverseBindMatrices": matrices})
 }
 
-/// A material, its texture URIs added to `images` (one image per distinct URI).
-fn material(m: &Material, images: &mut Vec<String>) -> Value {
-    let mut texture = |uri: &String| {
-        let index = images.iter().position(|u| u == uri).unwrap_or_else(|| {
-            images.push(uri.clone());
-            images.len() - 1
-        });
+/// One image: its URI, and its name when it has one.
+fn image(texture: &Texture) -> Value {
+    match &texture.name {
+        Some(name) => json!({"uri": texture.uri, "name": name}),
+        None => json!({"uri": texture.uri}),
+    }
+}
+
+/// A material, its textures added to `images` (one image per distinct URI).
+fn material<'a>(m: &'a Material, images: &mut Vec<&'a Texture>) -> Value {
+    let mut texture = |t: &'a Texture| {
+        let index = images
+            .iter()
+            .position(|u| u.uri == t.uri)
+            .unwrap_or_else(|| {
+                images.push(t);
+                images.len() - 1
+            });
         json!({"index": index})
     };
     let mut pbr = Map::new();
     pbr.insert("baseColorFactor".into(), json!(m.base_color));
     pbr.insert("metallicFactor".into(), json!(m.metallic));
     pbr.insert("roughnessFactor".into(), json!(m.roughness));
-    if let Some(uri) = &m.base_color_texture {
-        pbr.insert("baseColorTexture".into(), texture(uri));
+    if let Some(t) = &m.base_color_texture {
+        pbr.insert("baseColorTexture".into(), texture(t));
     }
     let mut out = Map::new();
     out.insert("name".into(), json!(m.name));
     out.insert("pbrMetallicRoughness".into(), Value::Object(pbr));
     out.insert("emissiveFactor".into(), json!(m.emissive));
-    if let Some(uri) = &m.normal_texture {
-        out.insert("normalTexture".into(), texture(uri));
+    if let Some(t) = &m.normal_texture {
+        out.insert("normalTexture".into(), texture(t));
     }
     Value::Object(out)
 }

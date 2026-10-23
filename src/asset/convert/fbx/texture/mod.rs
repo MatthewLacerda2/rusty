@@ -14,13 +14,18 @@
 //! is used instead, so a name in the textures folder holds the same bytes
 //! whatever is on disk (`stage::move_in` relies on it).
 //!
+//! An extracted texture is named in the `.glb` by its [`identity`], which a saved
+//! scene references it by (#1130); one on disk is not, and stays a plain path.
+//!
 //! A texture that is neither on disk nor embedded, is on disk but cannot be
 //! read, or embeds a format the importer does not read, is a [`Skip`]; one that fails to extract, or lies on
 //! disk where no URI can reach it, fails the conversion (#1168).
 
+mod identity;
+
 use super::super::stage;
 use super::super::stage::hook::{self, Step};
-use super::super::{Dependency, Seen, Skip, Staging};
+use super::super::{glb, Dependency, Seen, Skip, Staging};
 use crate::asset::gltf::uri;
 use crate::asset::{ImportError, IMAGE_EXTENSIONS};
 use crate::core::collections::Map;
@@ -33,7 +38,9 @@ pub struct Textures {
     out_dir: PathBuf,
     /// Where embedded textures are extracted.
     dir: PathBuf,
-    by_id: Map<u32, Option<String>>,
+    by_id: Map<u32, Option<glb::Texture>>,
+    /// Each texture's [`identity`], by element id.
+    identities: Map<u32, String>,
     /// File names reserved in `dir` so far, extracted or not.
     written: Vec<String>,
     /// What was left out on purpose, in the order it was met.
@@ -43,8 +50,8 @@ pub struct Textures {
 }
 
 impl Textures {
-    /// The textures of the `.glb` `to` stages.
-    pub fn new(to: &Staging) -> Self {
+    /// The textures of the `.glb` `to` stages, out of the scene's `textures`.
+    pub fn new<'a>(to: &Staging, textures: impl IntoIterator<Item = &'a ufbx::Texture>) -> Self {
         Self {
             // `.` for a bare file name, as `stage` reads it: a URI is relative to
             // a folder that exists.
@@ -54,28 +61,32 @@ impl Textures {
             },
             dir: to.textures.clone(),
             by_id: Map::default(),
+            identities: identity::identities(textures),
             written: Vec::new(),
             skipped: Vec::new(),
             looked_at: Vec::new(),
         }
     }
 
-    /// The URI of `map`'s texture, extracting it on first use when it is embedded;
-    /// `None` when it has none or it was skipped.
-    pub fn uri(&mut self, map: &ufbx::MaterialMap) -> Result<Option<String>, ImportError> {
+    /// `map`'s texture, extracting it on first use when it is embedded; `None`
+    /// when it has none or it was skipped.
+    pub fn texture(
+        &mut self,
+        map: &ufbx::MaterialMap,
+    ) -> Result<Option<glb::Texture>, ImportError> {
         let Some(texture) = map.texture.as_ref() else {
             return Ok(None);
         };
         let id = texture.element.element_id;
-        if let Some(uri) = self.by_id.get(&id) {
-            return Ok(uri.clone());
+        if let Some(known) = self.by_id.get(&id) {
+            return Ok(known.clone());
         }
-        let uri = self.resolve(texture)?;
-        self.by_id.insert(id, uri.clone());
-        Ok(uri)
+        let resolved = self.resolve(texture)?;
+        self.by_id.insert(id, resolved.clone());
+        Ok(resolved)
     }
 
-    fn resolve(&mut self, texture: &ufbx::Texture) -> Result<Option<String>, ImportError> {
+    fn resolve(&mut self, texture: &ufbx::Texture) -> Result<Option<glb::Texture>, ImportError> {
         // Reserved before the disk is looked at, so names never shift with it.
         let embedded = (!texture.content.is_empty())
             .then(|| file_name(raw_name(texture), &texture.content))
@@ -86,7 +97,10 @@ impl Textures {
                 (name, ext)
             });
         let unreadable = match self.on_disk(texture)? {
-            Disk::Found(file) => return self.reference(&file).map(Some),
+            Disk::Found(file) => {
+                let uri = self.reference(&file)?;
+                return Ok(Some(glb::Texture { uri, name: None }));
+            }
             Disk::Unreadable(file) => Some(file),
             Disk::Absent => None,
         };
@@ -113,10 +127,10 @@ impl Textures {
                 self.dir.display()
             )));
         };
-        Ok(Some(uri::encode_path(&format!(
-            "{}/{name}",
-            dir.to_string_lossy()
-        ))))
+        Ok(Some(glb::Texture {
+            uri: uri::encode_path(&format!("{}/{name}", dir.to_string_lossy())),
+            name: self.identities.get(&texture.element.element_id).cloned(),
+        }))
     }
 
     /// The URI of `file`, a texture on disk, from the `.glb`'s folder.
@@ -153,7 +167,7 @@ impl Textures {
     }
 
     /// Record `texture` as left out, for `why`: no URI.
-    fn skip(&mut self, texture: &ufbx::Texture, why: String) -> Option<String> {
+    fn skip(&mut self, texture: &ufbx::Texture, why: String) -> Option<glb::Texture> {
         self.skipped.push(Skip {
             what: format!("FBX texture `{}`", texture.element.name),
             why,

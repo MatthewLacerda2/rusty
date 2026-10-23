@@ -3,6 +3,7 @@
 
 pub mod anim;
 pub mod import;
+mod material;
 pub mod skin;
 pub mod uri;
 

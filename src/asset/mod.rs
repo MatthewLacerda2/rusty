@@ -130,7 +130,8 @@ fn parse_file(path: &Path) -> Result<ImportedAsset, ImportError> {
         "gltf" | "glb" => gltf::import::import(path),
         "obj" => obj_import::import(path),
         _ if convert::converter_for(path).is_some() => {
-            gltf::import::import(&convert::cached_gltf(path)?)
+            let source = path.to_string_lossy();
+            gltf::import::import_from(&convert::cached_gltf(path)?, Some(&source))
         }
         other => Err(ImportError::UnsupportedFormat(other.to_string())),
     }

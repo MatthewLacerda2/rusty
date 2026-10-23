@@ -10,7 +10,16 @@ material and attaches the reference. `SetTexture` sets the albedo (`base_color`)
 map; an empty path clears it. Any map path may be `"rt:<name>"` — a camera's render
 texture ([`Camera`](Camera.md#camera-entities-projection-and-render-textures-430)),
 the in-world security monitor: put it on the emissive map so the screen glows its
-picture whatever the lighting.
+picture whatever the lighting. A map may also be `"<model>#tex/<name>"`, a texture
+an imported model embeds (`assets/soldier.fbx#tex/Skin`): that is what instancing an
+`.fbx` with embedded textures puts on its material, resolved through the import cache
+whenever the texture is read, so a saved scene never names a cached file (#1130).
+`<name>` is the FBX texture element's own name. A texture with no name, one whose
+name starts with `#`, and every texture after the first to share a name is named by
+its position among the model's textures instead: `assets/soldier.fbx#tex/#2`. That
+form shifts when a texture is inserted before it in the FBX, so give textures
+distinct names. A texture that is a file on disk beside the model is not embedded and
+stays its plain path (`models/skin.png`).
 
 | Function | Signature |
 |---|---|

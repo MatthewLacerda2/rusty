@@ -1,6 +1,8 @@
 //! The GLB writer (#1024): what it writes parses as glTF and carries what it was given.
 
-use super::{write, Animation, Channel, Document, Keys, Material, Mesh, Node, Primitive, Skin};
+use super::{
+    write, Animation, Channel, Document, Keys, Material, Mesh, Node, Primitive, Skin, Texture,
+};
 
 fn triangle() -> Document {
     let mut root = Node::new("Tri");
@@ -15,7 +17,10 @@ fn triangle() -> Document {
         indices: vec![0, 1, 2],
         material: Some(0),
     };
-    let texture = Some("../textures/a b.png".to_string());
+    let texture = Some(Texture {
+        uri: "../textures/a b.png".into(),
+        name: Some("Skin".into()),
+    });
     Document {
         nodes: vec![root],
         roots: vec![0],
@@ -61,6 +66,7 @@ fn a_written_triangle_reads_back() {
 fn one_texture_used_twice_is_one_image() {
     let glb = gltf::Gltf::from_slice(&write(&triangle())).unwrap();
     assert_eq!(glb.images().count(), 1);
+    assert_eq!(glb.images().next().unwrap().name(), Some("Skin"));
     let material = glb.materials().next().unwrap();
     assert!(material.normal_texture().is_some());
 }
@@ -92,4 +98,15 @@ fn an_animation_reads_back_as_a_linear_channel() {
     );
     assert_eq!(sampler.input().max(), Some(serde_json::json!([0.5])));
     assert!(sampler.input().view().unwrap().target().is_none());
+}
+
+#[test]
+fn a_json_length_past_the_end_of_the_file_reads_nothing() {
+    let path = crate::test_temp::dir().join("corrupt.glb");
+    let mut bytes = Vec::new();
+    for word in [write::GLB_MAGIC, 2, 20, u32::MAX, write::CHUNK_JSON] {
+        bytes.extend(word.to_le_bytes());
+    }
+    std::fs::write(&path, bytes).unwrap();
+    assert_eq!(super::image_uri(&path, "Skin"), None);
 }

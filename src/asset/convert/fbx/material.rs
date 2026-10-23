@@ -32,8 +32,8 @@ pub fn material(
         metallic: value_or(&pbr.metalness, 0.0),
         roughness: value_or(&pbr.roughness, 0.5),
         emissive,
-        base_color_texture: textures.uri(&pbr.base_color)?,
-        normal_texture: textures.uri(&pbr.normal_map)?,
+        base_color_texture: textures.texture(&pbr.base_color)?,
+        normal_texture: textures.texture(&pbr.normal_map)?,
     })
 }
 

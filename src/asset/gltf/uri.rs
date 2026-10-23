@@ -5,6 +5,22 @@
 //! a space or a literal `%` survives the round trip: unencoded, `Soldier: v2.png`
 //! reads as a URI scheme and `a%20b.png` as `a b.png`.
 
+use crate::core::paths;
+use std::path::{Path, PathBuf};
+
+/// The file a glTF's relative `uri` names, anchored at `base_dir` (the glTF's
+/// folder): decoded, joined, and folded lexically (`paths::fold`), so a URI that
+/// climbs out of the import cache names the file where it lies, never a path
+/// through the cache (#1130). A URI that doesn't decode is warned about and
+/// names nothing. The one join the importer and `convert::texture_ref` share.
+pub fn file(base_dir: &Path, uri: &str) -> Option<PathBuf> {
+    let Some(decoded) = decode(uri) else {
+        log::warn!("[Asset] glTF texture URI `{uri}` is not valid percent-encoding");
+        return None;
+    };
+    Some(paths::fold(&base_dir.join(decoded)))
+}
+
 /// `path`'s `/`-separated segments with every byte outside RFC 3986's unreserved
 /// set (`A-Z a-z 0-9 - . _ ~`) percent-encoded, the `/`s kept.
 pub fn encode_path(path: &str) -> String {
@@ -41,7 +57,8 @@ pub fn decode(uri: &str) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{decode, encode_path};
+    use super::{decode, encode_path, file};
+    use std::path::Path;
 
     #[test]
     fn a_path_round_trips_whatever_its_name_holds() {
@@ -62,5 +79,13 @@ mod tests {
         assert_eq!(decode("a%zz"), None);
         assert_eq!(decode("%C0"), None, "not UTF-8");
         assert_eq!(decode("plain/ok.png").as_deref(), Some("plain/ok.png"));
+        assert_eq!(file(Path::new("m"), "a%2"), None);
+    }
+
+    #[test]
+    fn a_uri_climbing_out_of_its_folder_names_the_file_where_it_lies() {
+        let base = Path::new("./assets/generated/imported/models");
+        let found = file(base, "../../../../models/a%20b.png");
+        assert_eq!(found.as_deref(), Some(Path::new("models/a b.png")));
     }
 }

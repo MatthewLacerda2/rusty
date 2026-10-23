@@ -6,6 +6,7 @@ use std::rc::Rc;
 
 use image::GenericImageView;
 
+use crate::asset::convert::texture_ref;
 use crate::render::{GpuTexture, Renderer};
 
 /// The storage format of every image the renderer uploads: colour is authored in
@@ -167,7 +168,7 @@ impl Renderer {
             return Rc::clone(&self.default_texture);
         }
 
-        let Ok(img) = image::open(path_str) else {
+        let Some(img) = open(path_str) else {
             self.texture_freshness.misses.insert(path_str.to_string());
             return Rc::clone(&self.default_texture);
         };
@@ -239,3 +240,10 @@ impl Renderer {
 mod formats_tests;
 #[cfg(test)]
 mod freshness_tests;
+
+/// The image a texture path names, decoded: a material map that references a
+/// texture a conversion extracted is read where the import cache holds it
+/// (`asset::convert::texture_ref`, #1130). `None` when it cannot be read.
+pub(crate) fn open(path: &str) -> Option<image::DynamicImage> {
+    image::open(texture_ref::file(path)?).ok()
+}

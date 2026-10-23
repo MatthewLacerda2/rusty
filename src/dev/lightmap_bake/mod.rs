@@ -179,7 +179,8 @@ fn clear_old_lightmaps(dir: &Path) -> Result<(), String> {
 /// A texture's average linear colour (its texels are sRGB), for the bake's albedo
 /// and emission. `None` when it cannot be read; the material colour then stands alone.
 fn texture_average(path: &str) -> Option<Vec3> {
-    let rgba = image::open(path).ok()?.to_rgba8();
+    let file = crate::asset::convert::texture_ref::file(path)?;
+    let rgba = image::open(file).ok()?.to_rgba8();
     let count = (rgba.width() * rgba.height()).max(1) as f32;
     let to_linear = crate::core::color::srgb_to_linear;
     let sum = rgba.pixels().fold(Vec3::ZERO, |acc, p| {
