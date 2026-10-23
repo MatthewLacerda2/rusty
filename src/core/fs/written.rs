@@ -6,8 +6,9 @@
 //! a provider's generated file…) is noted here, and each path-keyed cache (the
 //! renderer's textures, cubemaps and particle meshes, the audio `ClipCache`) drains
 //! the notes before it answers a lookup. The edit scene follows them too: an entity
-//! whose mesh names a re-written model re-reads it (`scene::model_writes`, #1242). A note is data the cache reads, never a call into it, so a
-//! sim-side baker never reaches up into `render` or `audio` (the direction rule).
+//! whose mesh names a re-written model re-reads it (`scene::model_writes`, #1242).
+//! A note is data the cache reads, never a call into it, so a sim-side baker never
+//! reaches up into `render` or `audio` (the direction rule).
 //! The log holds one entry per distinct path, so it stays as small as the set of
 //! baked files.
 //!
