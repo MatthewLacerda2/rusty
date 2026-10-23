@@ -1,4 +1,4 @@
-//! src/scene/asset_instance.rs — Instantiate one imported sub-object (#182).
+//! src/scene/asset_instance/ — Instantiate one imported sub-object (#182).
 //!
 //! The "drag a glTF from the content browser into the scene" verb, given an API
 //! equivalent: spawn ONE entity from a path-based asset reference
@@ -141,11 +141,9 @@ fn sync_collider(scene: &mut Scene, id: u32, path: &str, asset: &ImportedAsset, 
 }
 
 #[cfg(test)]
-#[path = "asset_instance_tests.rs"]
-mod asset_instance_tests;
+mod tests;
 #[cfg(test)]
-#[path = "asset_instance_texture_tests.rs"]
-mod asset_instance_texture_tests;
+mod texture_tests;
 
 /// Set a model's Generate Lightmap UVs settings (#831) in its `.meta` sidecar and
 /// re-import every mesh in `scene` instanced from it, so the change shows at once
@@ -162,5 +160,5 @@ pub fn set_lightmap_uv_settings(
 }
 
 #[cfg(test)]
-#[path = "asset_instance_lightmap_tests.rs"]
+#[path = "lightmap_tests.rs"]
 pub(crate) mod lightmap_test_support;

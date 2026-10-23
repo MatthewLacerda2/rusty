@@ -66,6 +66,7 @@ fn passes_the_same_skip_returned_and_code_outside_a_converter() {
         "src/asset/convert/mod.rs",
         "src/asset/convert/lock.rs",
         "src/asset/convert/stage/mod.rs",
+        "src/asset/convert/texture_ref.rs",
         "src/asset/convert/tests/skips.rs",
         "src/asset/mod.rs",
     ] {

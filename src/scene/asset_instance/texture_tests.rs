@@ -7,7 +7,7 @@ use super::instantiate_asset;
 use crate::asset::convert::texture_ref;
 use crate::scene::{apply_scene_data, to_scene_data, Scene, SceneData};
 
-const FIXTURE: &str = include_str!("../../tests/fixtures/models/embedded_textures.fbx");
+const FIXTURE: &str = include_str!("../../../tests/fixtures/models/embedded_textures.fbx");
 
 /// A texture of the same file name as Red's (`skin.png`), on a material listed
 /// before Red, holding Blue's pixels: converted first, it takes `skin.png` and
