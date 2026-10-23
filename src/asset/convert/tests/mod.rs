@@ -5,9 +5,11 @@ use super::{converter_for, is_import_cache, refresh, Converted, Converter, Stagi
 use crate::asset::ImportError;
 use std::path::Path;
 
+mod depends;
 mod failures;
 mod identity;
 mod locking;
+mod looks;
 mod skips;
 mod staging;
 mod unlocked;

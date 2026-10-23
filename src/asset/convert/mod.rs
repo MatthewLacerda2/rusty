@@ -17,10 +17,12 @@
 //! source path, so two sources never share one (#1167).
 //!
 //! **When it is re-made.** A `<cache>.glb.source` stamp beside each cached file
-//! records the converter, its [`Converter::version`] and a digest of the source's
-//! bytes; any difference re-converts. Content, not timestamps: a fresh clone gives
-//! every file a new mtime, and a sim module reads no clock. Files a conversion
-//! writes for the glTF to reference (FBX's embedded textures, #1082) live in a
+//! records the converter, its [`Converter::version`], a digest of the source's
+//! bytes, and every external file the conversion looked at (an FBX's on-disk
+//! texture), with a digest or as absent (#1189); any difference re-converts.
+//! Content, not timestamps: a fresh clone gives every file a new mtime, and a
+//! sim module reads no clock. Files a conversion writes for the glTF to
+//! reference (FBX's embedded textures, #1082) live in a
 //! `<cache>.glb.<digest>.textures/` folder beside it and are re-made with it.
 //!
 //! **How it is re-made.** A converter writes plain files into a fresh staging
@@ -41,12 +43,14 @@
 //! **Adding a converter** is one row in [`CONVERTERS`]: an extension and a
 //! function that writes a glTF where its [`Staging`] says.
 
+mod depends;
 mod fbx;
 pub mod glb;
 mod lock;
 mod record;
 mod stage;
 
+pub use depends::{Dependency, Seen};
 pub use stage::{textures_dirs, Staging};
 
 use super::ImportError;
@@ -71,6 +75,11 @@ pub struct Converter {
     /// makes (FBX's embedded textures) in [`Staging::textures`]. [`refresh`] swaps
     /// them into place whole, and removes what an earlier conversion left. Any
     /// failure is an `Err`; only what is left out on purpose goes in [`Converted`].
+    ///
+    /// A conversion re-made only because a file it looked at changed reuses the
+    /// textures folder (its name digests the stamp, not the files), so a written
+    /// file's name must hold the same bytes whatever is found on disk: name every
+    /// file the source embeds before looking at the disk (`fbx::texture`, #1189).
     pub convert: fn(source: &Path, to: &Staging) -> Result<Converted, ImportError>,
 }
 
@@ -79,6 +88,9 @@ pub struct Converter {
 pub struct Converted {
     /// What it left out on purpose, each with its reason.
     pub skipped: Vec<Skip>,
+    /// Every file beside the source it looked at, found or not: the cache
+    /// re-converts when one reads differently (`record`, #1189).
+    pub depends_on: Vec<Dependency>,
 }
 
 /// One part of a source a conversion left out on purpose.
@@ -106,7 +118,9 @@ pub const CONVERTERS: &[Converter] = &[Converter {
     // 4: embedded textures are extracted beside the `.glb` (#1082).
     // 5: the textures folder is named by the conversion's digest (#1129).
     // 6: a texture that fails to extract fails the conversion (#1168).
-    version: 6,
+    // 7: an embedded texture's name is reserved even when a file on disk is
+    //    used instead, and the files looked at are recorded (#1189).
+    version: 7,
     convert: fbx::convert,
 }];
 
@@ -154,13 +168,12 @@ pub fn refresh(converter: &Converter, source: &Path, out: &Path) -> Result<(), I
     };
     match stage::convert(converter, source, out, &stamp) {
         Ok(converted) => {
-            let skipped: Vec<String> = converted.skipped.iter().map(Skip::line).collect();
-            record::report(source, out, &stamp, &skipped);
+            record::report(source, out, &record::Stored::written(&stamp, &converted));
         }
         // Without a lock, another process converted the same source meanwhile.
         Err(e) => {
-            let skipped = record::current(out, &stamp).ok_or(e)?;
-            record::replay(source, out, &stamp, &skipped);
+            let stored = record::current(out, &stamp).ok_or(e)?;
+            record::replay(source, out, &stored);
         }
     }
     Ok(())
@@ -172,18 +185,18 @@ fn stale(converter: &Converter, source: &Path, out: &Path) -> Result<Option<Stri
     let bytes = match std::fs::read(source) {
         Ok(bytes) => bytes,
         Err(_) if out.is_file() => {
-            if let Some((stamp, skipped)) = record::stored(out) {
-                record::replay(source, out, &stamp, &skipped);
+            if let Some(stored) = record::stored(out) {
+                record::replay(source, out, &stored);
             }
             return Ok(None);
         }
         Err(e) => return Err(ImportError::Parse(format!("{}: {e}", source.display()))),
     };
     let stamp = record::stamp(converter, &bytes);
-    let Some(skipped) = record::current(out, &stamp) else {
+    let Some(stored) = record::current(out, &stamp) else {
         return Ok(Some(stamp));
     };
-    record::replay(source, out, &stamp, &skipped);
+    record::replay(source, out, &stored);
     Ok(None)
 }
 

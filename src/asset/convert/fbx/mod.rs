@@ -47,7 +47,10 @@ pub fn convert(source: &Path, to: &Staging) -> Result<Converted, ImportError> {
         .map_err(|e| ImportError::Parse(format!("writing {}: {e}", to.glb.display())))?;
     let mut skipped = textures.skipped;
     skipped.append(&mut takes);
-    Ok(Converted { skipped })
+    Ok(Converted {
+        skipped,
+        depends_on: textures.looked_at,
+    })
 }
 
 /// The FBX at `source` converted to a cached `.glb` at `out` through

@@ -66,7 +66,7 @@ fn a_save_while_waiting_for_the_lock_is_what_gets_stamped() {
     assert_eq!(std::fs::read_to_string(&out).unwrap(), "three");
     let stamp = record::stamp(&COPY, b"three");
     assert_eq!(
-        record::current(&out, &stamp),
+        record::current(&out, &stamp).map(|stored| stored.skipped),
         Some(Vec::new()),
         "stamped as what it holds"
     );
