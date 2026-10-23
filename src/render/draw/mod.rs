@@ -150,8 +150,9 @@ impl Renderer {
 }
 
 /// Every active entity's resolved material map paths (albedo, metallic, roughness,
-/// normal, emissive, then the extra shader texture slots, #400) the forward shader samples — gathered as owned strings so the
-/// scene borrow ends before the textures are uploaded (#202, #207).
+/// normal, emissive, then the extra shader texture slots, #400) the forward shader
+/// samples, gathered as owned `MapRef`s so the scene borrow ends before the textures
+/// are uploaded (#202, #207).
 pub(crate) fn active_material_map_paths(scene: &Scene) -> Vec<crate::asset::MapRef> {
     scene
         .world
