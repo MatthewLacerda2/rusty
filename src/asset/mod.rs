@@ -53,7 +53,8 @@ use crate::core::paths;
 use std::path::Path;
 
 /// The separator between a source path and a sub-object id in a scene reference:
-/// `crates.glb::Barrel`.
+/// `crates.glb::Barrel`. Only its first occurrence separates: a sub id may hold
+/// more (`crates.glb::Body::Mesh`, [`AssetRef::parse`]).
 pub const REF_SEPARATOR: &str = "::";
 
 /// Anything that can go wrong importing a source file. Kept small and string-y:
@@ -154,16 +155,34 @@ impl AssetRef {
         format!("{}{}{}", self.path, REF_SEPARATOR, self.sub_object)
     }
 
-    /// Parse `path::sub_object`. The path may itself contain no `::` (paths don't),
-    /// so we split on the LAST separator to be safe.
+    /// Parse `path::sub_object`. The path ends at the FIRST `::`, and everything
+    /// after it is the sub id, `::` included (#1295): a sub-object name is taken
+    /// verbatim from the model (`Body::Mesh`), while a file path can't hold `::` on
+    /// the supported platforms. So the path must end in a [`MODEL_EXTENSIONS`]
+    /// extension, and a reference whose path holds `::` is refused, not misread.
     pub fn parse(reference: &str) -> Result<AssetRef, ImportError> {
-        match reference.rsplit_once(REF_SEPARATOR) {
-            Some((path, sub)) if !path.is_empty() && !sub.is_empty() => Ok(AssetRef {
-                path: path.to_string(),
-                sub_object: sub.to_string(),
-            }),
-            _ => Err(ImportError::BadReference(reference.to_string())),
+        let bad = |why: &str| ImportError::BadReference(format!("'{reference}': {why}"));
+        let (path, sub) = reference
+            .split_once(REF_SEPARATOR)
+            .ok_or_else(|| bad("expected `path::sub_object`"))?;
+        if path.is_empty() || sub.is_empty() {
+            return Err(bad("expected `path::sub_object`"));
         }
+        if !is_model_path(path) {
+            let later_model_path = reference
+                .match_indices(REF_SEPARATOR)
+                .any(|(at, _)| is_model_path(&reference[..at]));
+            let why = if later_model_path {
+                "a file path may not contain `::`"
+            } else {
+                "the file path must end in a model extension before `::`"
+            };
+            return Err(bad(why));
+        }
+        Ok(AssetRef {
+            path: path.to_string(),
+            sub_object: sub.to_string(),
+        })
     }
 }
 
@@ -189,5 +208,7 @@ pub(crate) mod flat_normals_tests;
 mod manifest_tests;
 #[cfg(test)]
 mod multi_material_tests;
+#[cfg(test)]
+mod ref_tests;
 #[cfg(test)]
 mod tests;

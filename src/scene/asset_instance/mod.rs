@@ -66,7 +66,11 @@ pub fn instantiate_imported(
     name: Option<&str>,
     position: Vec3,
 ) -> Result<u32, String> {
-    let reference = format!("{path}{}{sub}", asset::REF_SEPARATOR);
+    let reference = asset::AssetRef {
+        path: path.to_string(),
+        sub_object: sub.to_string(),
+    }
+    .to_string_ref();
     if asset.sub_mesh(sub).is_none() {
         // A `_LOD<n>` set's base name addresses the whole set (#472).
         return match asset::lod::lod_set(asset, sub) {
@@ -178,6 +182,8 @@ fn sync_collider(scene: &mut Scene, id: u32, path: &str, asset: &ImportedAsset, 
 
 #[cfg(test)]
 mod multi_material_tests;
+#[cfg(test)]
+mod separator_tests;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]

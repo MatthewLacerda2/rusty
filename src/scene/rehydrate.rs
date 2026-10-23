@@ -133,8 +133,9 @@ fn install(mesh: &mut crate::scene::MeshComponent, rebuilt: RehydratedMesh) {
 /// touches them, and re-binding their rig would touch their bones for nothing.
 /// Returns how many were rebuilt.
 pub fn reimport_model(scene: &mut Scene, path: &str) -> usize {
-    let prefix = format!("{path}{}", asset::REF_SEPARATOR);
-    reimport_where(scene, Rig::Keep, |reference| reference.starts_with(&prefix))
+    reimport_where(scene, Rig::Keep, |reference| {
+        asset_ref_file(reference).is_some_and(|file| file == path)
+    })
 }
 
 /// Re-import every mesh in `scene` whose model file `stale` names: the engine
