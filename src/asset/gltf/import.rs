@@ -8,12 +8,14 @@
 //!
 //! Each glTF *mesh* becomes one addressable `SubMesh`; its primitives are merged
 //! (index offsets fixed up) into one vertex/index stream, since a primitive split
-//! is a material boundary, not a separate addressable object. Topology is
+//! is a material boundary, not a separate addressable object: each primitive's
+//! indices are a `MaterialRange` with its own material (#1285). Topology is
 //! normalized on the way in (#317): every triangle mode (`TRIANGLES`,
 //! `TRIANGLE_STRIP`, `TRIANGLE_FAN`) becomes a plain triangle list, and
 //! non-surface modes (`POINTS`/`LINES`/`LINE_*`) are skipped with a warning.
 
 use super::{anim, material, skin};
+use crate::asset::material_range::push_range;
 use crate::asset::mesh_data::{ImportedAsset, MeshVertex, SkinData, SubMesh};
 use crate::asset::ImportError;
 use gltf::mesh::Mode;
@@ -83,13 +85,15 @@ fn sub_mesh_from_gltf(
 
     let mut vertices: Vec<MeshVertex> = Vec::new();
     let mut indices: Vec<u32> = Vec::new();
-    let mut material: Option<usize> = None;
+    let mut ranges = Vec::new();
 
+    // Each primitive is a material boundary: its indices become a run drawn with its
+    // own material (#1285), merged with the last when the material is the same.
     for primitive in mesh.primitives() {
-        if material.is_none() {
-            material = primitive.material().index();
-        }
+        let start = indices.len() as u32;
         append_primitive(&primitive, buffers, &mut vertices, &mut indices);
+        let run = start..indices.len() as u32;
+        push_range(&mut ranges, run, primitive.material().index());
     }
 
     // Clips are keyed to this skin's joint slots, so only a skinned mesh carries
@@ -103,7 +107,7 @@ fn sub_mesh_from_gltf(
         id,
         vertices,
         indices,
-        material,
+        ranges,
         skin,
         clips,
         node_name: None,

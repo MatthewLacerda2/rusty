@@ -51,9 +51,7 @@ fn referenced_textures_come_from_active_images_and_material_maps() {
     scene.world.set_image(file, Some(image));
 
     let monitor = scene.add_entity("Monitor".to_string());
-    let material = MaterialComponent {
-        material: "screen".to_string(),
-    };
+    let material = MaterialComponent::new("screen".to_string());
     scene.world.set_material(monitor, Some(material));
     let asset = MaterialAsset {
         emissive_map: Some("rt:security".into()),

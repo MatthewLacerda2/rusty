@@ -35,9 +35,9 @@ pub fn extract_prefab(scene: &Scene, root_id: u32) -> Option<PrefabData> {
     for mut entity in docs {
         let is_root = entity.id == root_id;
         remap_entity(&mut entity, &local, is_root);
-        if let Some(mat) = &entity.material {
-            if let Some(asset) = scene.materials.get(&mat.material) {
-                materials.insert(mat.material.clone(), asset.clone());
+        for key in entity.material.iter().flat_map(|m| &m.materials) {
+            if let Some(asset) = scene.materials.get(key) {
+                materials.insert(key.clone(), asset.clone());
             }
         }
         entities.push(entity);

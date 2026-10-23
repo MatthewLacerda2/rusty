@@ -9,7 +9,13 @@ use crate::scene::Scene;
 /// Two entities sharing one material whose shader is `shader`: (scene, a, b, key).
 fn pair(shader: &str) -> (std::cell::RefCell<Scene>, u32, u32, String) {
     let (scene, a) = scene_with(shader);
-    let key = scene.borrow().world.material(a).unwrap().material.clone();
+    let key = scene
+        .borrow()
+        .world
+        .material(a)
+        .unwrap()
+        .first()
+        .to_string();
     let b = {
         let mut s = scene.borrow_mut();
         let b = s.add_entity("B".into());

@@ -3,9 +3,9 @@
 //! A *material* is an authored/imported asset (glTF 2.0 metallic-roughness data):
 //! its values live ONCE in the per-World material library (`Scene.materials`), and
 //! many entities can reference the same one. The entity itself carries only a thin
-//! reference — `MaterialComponent { material: <library key> }` — which IS a
-//! first-class component (an engine-provided per-entity type), while the data it
-//! points at is the shared asset.
+//! reference — `MaterialComponent { materials: [<library key>, …] }`, one key per
+//! sub-mesh of its mesh (#1285) — which IS a first-class component (an
+//! engine-provided per-entity type), while the data it points at is the shared asset.
 
 mod decal;
 
@@ -169,20 +169,44 @@ impl MaterialAsset {
     }
 }
 
-/// The entity's reference to a library material — the first-class component. Holds
-/// only the library key/name; the data lives in `Scene.materials`.
+/// The entity's references to library materials — the first-class component. Holds
+/// only library keys; the data lives in `Scene.materials`.
+///
+/// One key per sub-mesh of the entity's mesh, in the mesh's range order (Unity's
+/// `Renderer.sharedMaterials`, #1285): a mesh imported with two materials draws its
+/// first index range with `materials[0]` and its second with `materials[1]`. A
+/// one-range mesh has a one-entry list. A range past the end of the list draws with
+/// the first material ([`Self::for_range`]), so no geometry goes invisible.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MaterialComponent {
-    pub material: String,
+    pub materials: Vec<String>,
 }
 
 impl MaterialComponent {
+    /// A one-material reference to library key `key`.
+    pub fn new(key: impl Into<String>) -> Self {
+        Self {
+            materials: vec![key.into()],
+        }
+    }
+
     /// The reference to entity `id`'s own library material, keyed
     /// [`entity_material_key`] — what every "give this entity a material" path attaches.
     pub fn for_entity(id: u32) -> Self {
-        Self {
-            material: entity_material_key(id),
-        }
+        Self::new(entity_material_key(id))
+    }
+
+    /// The first material's key (Unity's `Renderer.sharedMaterial`), or `""` for an
+    /// empty list, which no library entry has.
+    pub fn first(&self) -> &str {
+        self.materials.first().map_or("", String::as_str)
+    }
+
+    /// The key sub-mesh range `range` draws with: its own entry, else the first.
+    pub fn for_range(&self, range: usize) -> &str {
+        self.materials
+            .get(range)
+            .map_or(self.first(), String::as_str)
     }
 }
 

@@ -21,9 +21,7 @@ fn box_scene(mode: RenderMode) -> Scene {
     scene
         .world
         .set_mesh(id, Some(MeshComponent::new("Box", vertices, indices)));
-    let material = MaterialComponent {
-        material: "m".to_string(),
-    };
+    let material = MaterialComponent::new("m".to_string());
     scene.world.set_material(id, Some(material));
     let asset = MaterialAsset {
         render_mode: mode,

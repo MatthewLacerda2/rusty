@@ -75,7 +75,7 @@ mod tests {
             id: id.to_string(),
             vertices: Vec::new(),
             indices: Vec::new(),
-            material: None,
+            ranges: Vec::new(),
             skin: None,
             clips: Vec::new(),
             node_name: node.map(str::to_string),

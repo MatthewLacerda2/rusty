@@ -31,7 +31,10 @@ fn an_outlined_item_names_its_own_instance_and_slot() {
             tag
         );
         assert_eq!(outline.uniform_slot, batch.uniform_slot);
-        assert_eq!((&outline.mesh, outline.num_indices), (&batch.key.mesh, 36));
+        assert_eq!(
+            (&outline.mesh, outline.indices.clone()),
+            (&batch.key.mesh, 0..36)
+        );
         assert_eq!(outline.material, batch.key.material);
     }
     // The ringed box still shares the boxes' one instanced draw.

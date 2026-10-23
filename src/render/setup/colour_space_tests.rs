@@ -26,12 +26,9 @@ fn mid_grey_scene() -> Scene {
     scene
         .world
         .set_mesh(id, Some(MeshComponent::new("Box", vertices, indices)));
-    scene.world.set_material(
-        id,
-        Some(MaterialComponent {
-            material: "grey".to_string(),
-        }),
-    );
+    scene
+        .world
+        .set_material(id, Some(MaterialComponent::new("grey".to_string())));
     scene.materials.insert(
         "grey".to_string(),
         MaterialAsset {

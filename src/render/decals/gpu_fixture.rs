@@ -29,7 +29,7 @@ pub(super) fn stage(floor: MaterialAsset, ambient: f32) -> Scene {
     let material = "floor".to_string();
     scene
         .world
-        .set_material(id, Some(MaterialComponent { material }));
+        .set_material(id, Some(MaterialComponent::new(material)));
     scene
 }
 

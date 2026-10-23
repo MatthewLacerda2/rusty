@@ -75,7 +75,7 @@ impl Renderer {
                 let (use_sh, sh) = probe_sh_at(scene, p.position);
                 let item = DrawItem {
                     key: key.clone(),
-                    num_indices,
+                    indices: 0..num_indices,
                     instance: InstanceData {
                         model_matrix: model.to_cols_array(),
                         use_sh,
@@ -125,6 +125,8 @@ impl Renderer {
         let key = BatchKey {
             pipeline,
             mesh,
+            // The emitter names one material: the whole mesh is one run.
+            first_index: 0,
             material: self.material_index(entry, pipeline, None),
             uniform: uniform.words(),
         };

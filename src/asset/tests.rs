@@ -39,7 +39,7 @@ fn gltf_imports_mesh_and_material() {
     assert_eq!(tri.indices.len(), 3);
     assert_eq!(tri.vertices[1].position, [1.0, 0.0, 0.0]);
     // The base-color material round-tripped.
-    assert_eq!(tri.material, Some(0));
+    assert_eq!(tri.first_material(), Some(0));
     assert_eq!(asset.materials[0].name, "Red");
     assert_eq!(asset.materials[0].base_color, [1.0, 0.0, 0.0, 1.0]);
 }

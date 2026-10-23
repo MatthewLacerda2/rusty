@@ -46,9 +46,7 @@ pub(super) fn scene(material: MaterialAsset) -> Scene {
     let id = s.add_entity("Plane".to_string());
     let (vertices, indices) = rusty::components::mesh::primitives::generate_plane(16.0, 16.0);
     let mesh = MeshComponent::new("Plane", vertices, indices);
-    let mat = MaterialComponent {
-        material: "mat".to_string(),
-    };
+    let mat = MaterialComponent::new("mat".to_string());
     s.world.set_mesh(id, Some(mesh));
     s.world.set_material(id, Some(mat));
     s.world.set_visual_correction(id, Some(vc()));

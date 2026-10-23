@@ -26,9 +26,7 @@ fn scene(ssr: bool) -> Scene {
     scene.ambient_intensity = 1.0;
     let id = create_entity(&mut scene, "Sphere", Some(Primitive::Sphere));
     scene.world.transform_mut(id).unwrap().scale = Vec3::splat(3.0);
-    let material = MaterialComponent {
-        material: "metal".to_string(),
-    };
+    let material = MaterialComponent::new("metal".to_string());
     scene.world.set_material(id, Some(material));
     let metal = MaterialAsset {
         base_color: [1.0, 1.0, 1.0],

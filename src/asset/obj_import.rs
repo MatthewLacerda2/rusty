@@ -1,9 +1,13 @@
 //! src/asset/obj_import.rs — Wavefront `.obj` import (static meshes only).
 //!
 //! `.obj` is the static-mesh path: no skinning, no animation. Each OBJ object/group
-//! `tobj` reports becomes one addressable `SubMesh`; the `.mtl` materials become the
-//! shared material table. Pure data — `tobj` + `glam`, no GPU types.
+//! becomes one addressable `SubMesh`; the `.mtl` materials become the shared material
+//! table. `tobj` splits an object at every `usemtl`, reporting the pieces as models
+//! sharing a name: they are joined back into one sub-mesh, each piece a
+//! `MaterialRange` with its own material (#1285). Pure data — `tobj` + `glam`, no GPU
+//! types.
 
+use super::material_range::push_range;
 use super::mesh_data::{ImportedAsset, MaterialData, MeshVertex, SubMesh};
 use super::ImportError;
 use crate::asset::MapRef;
@@ -43,11 +47,14 @@ pub fn import(path: &Path) -> Result<ImportedAsset, ImportError> {
         })
         .collect();
 
-    let sub_meshes = models
-        .into_iter()
-        .enumerate()
-        .map(|(i, model)| sub_mesh_from_model(i, model))
-        .collect();
+    let mut sub_meshes: Vec<SubMesh> = Vec::new();
+    for (i, model) in models.into_iter().enumerate() {
+        let piece = sub_mesh_from_model(i, model);
+        match sub_meshes.iter_mut().find(|s| s.id == piece.id) {
+            Some(sub) => append_piece(sub, piece),
+            None => sub_meshes.push(piece),
+        }
+    }
 
     Ok(ImportedAsset {
         sub_meshes,
@@ -106,13 +113,26 @@ fn sub_mesh_from_model(index: usize, model: tobj::Model) -> SubMesh {
 
     SubMesh {
         id,
+        ranges: super::material_range::whole(indices.len(), mesh.material_id),
         vertices,
         indices,
-        material: mesh.material_id,
         // `.obj` is static-mesh only: no skin/anim, ever.
         skin: None,
         clips: Vec::new(),
         node_name: None,
+    }
+}
+
+/// Join `piece` (one `usemtl` run of the same object) onto `sub`: its vertices and
+/// offset indices appended, its material run after `sub`'s.
+fn append_piece(sub: &mut SubMesh, piece: SubMesh) {
+    let base = sub.vertices.len() as u32;
+    let start = sub.indices.len() as u32;
+    sub.vertices.extend(piece.vertices);
+    sub.indices.extend(piece.indices.iter().map(|i| i + base));
+    for run in piece.ranges {
+        let indices = run.indices.start + start..run.indices.end + start;
+        push_range(&mut sub.ranges, indices, run.material);
     }
 }
 

@@ -12,6 +12,7 @@
 //! `Material.*` API calls too, so the panel and the binding are siblings over one op.
 
 mod shader_params;
+mod slots;
 
 use crate::editor::inspector::components::card::remove_component;
 use crate::scene::authoring::ComponentKind;
@@ -41,13 +42,18 @@ pub fn draw_material_card(
     id: u32,
     materials: &mut BTreeMap<String, MaterialAsset>,
 ) {
-    let Some(key) = world.material(id).map(|m| m.material.clone()) else {
+    let Some(first) = world.material(id).map(|m| m.first().to_string()) else {
         return;
     };
     // The Add menu's staged default fills the key only when the library has nothing
     // there: an existing asset is kept, the rule every attach path shares (#997).
     let pending = world.take_pending_material(id).unwrap_or_default();
-    mat_ops::fold_pending(materials, &key, pending);
+    mat_ops::fold_pending(materials, &first, pending);
+    // A multi-material mesh lists its slots; the card edits the one selected (#1285).
+    let Some(key) = slots::draw_slots(ui, world, id, materials, &mut editor.is_dirty) else {
+        return;
+    };
+    mat_ops::fold_pending(materials, &key, MaterialAsset::default());
 
     preview::draw_tab_strip(ui, &mut editor.preview_tab_active, editor.theme);
     if editor.preview_tab_active {

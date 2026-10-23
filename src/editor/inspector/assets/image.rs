@@ -115,7 +115,11 @@ fn apply_albedo_to_entity(scene: &mut Scene, entity_id: u32, path: &str) {
     {
         return;
     }
-    let Some(key) = scene.world.material(entity_id).map(|m| m.material.clone()) else {
+    let Some(key) = scene
+        .world
+        .material(entity_id)
+        .map(|m| m.first().to_string())
+    else {
         return;
     };
     let mat = scene.materials.entry(key).or_default();

@@ -89,8 +89,8 @@ fn instantiate_places_textured_entity_and_dedups_material() {
     // Both sub-objects share ONE library key (dedup).
     let key = format!("{path}::Shared");
     assert_eq!(scene.materials.len(), 1);
-    assert_eq!(scene.world.material(a).unwrap().material, key);
-    assert_eq!(scene.world.material(b).unwrap().material, key);
+    assert_eq!(scene.world.material(a).unwrap().first(), key);
+    assert_eq!(scene.world.material(b).unwrap().first(), key);
 }
 
 #[test]
@@ -124,7 +124,7 @@ fn material_less_asset_gets_engine_default() {
 
     let m = scene.world.material(id).expect("default material");
     assert!(
-        scene.materials.contains_key(&m.material),
+        scene.materials.contains_key(m.first()),
         "reference resolves"
     );
 }

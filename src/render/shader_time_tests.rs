@@ -42,12 +42,9 @@ fn glowing_box() -> Scene {
     scene
         .world
         .set_mesh(id, Some(MeshComponent::new("Box", vertices, indices)));
-    scene.world.set_material(
-        id,
-        Some(MaterialComponent {
-            material: "glow".to_string(),
-        }),
-    );
+    scene
+        .world
+        .set_material(id, Some(MaterialComponent::new("glow".to_string())));
     let glow = MaterialAsset {
         emissive: [0.6; 3],
         ..MaterialAsset::default()

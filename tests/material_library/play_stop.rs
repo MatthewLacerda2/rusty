@@ -10,7 +10,7 @@ use rusty::scene::{MaterialAsset, MaterialComponent, Scene};
 fn staged_entity(scene: &mut Scene, default: MaterialAsset) -> (u32, String) {
     let id = scene.add_entity("Crate".to_string());
     let reference = MaterialComponent::for_entity(id);
-    let key = reference.material.clone();
+    let key = reference.first().to_string();
     scene.world.set_material(id, Some(reference));
     assert!(scene.world.stage_pending_material(id, default));
     (id, key)

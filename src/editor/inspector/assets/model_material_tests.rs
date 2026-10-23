@@ -82,7 +82,7 @@ fn instantiate_sets_material_component_and_shares_library_entry() {
         .filter_map(|e| e.material.as_ref())
         .collect();
     assert_eq!(refs.len(), 2, "both sub-objects carry a MaterialComponent");
-    assert!(refs.iter().all(|m| m.material == key), "both share one key");
+    assert!(refs.iter().all(|m| m.first() == key), "both share one key");
 }
 
 #[test]
@@ -107,7 +107,7 @@ fn imported_material_round_trips_through_scene_data() {
         .world
         .collect_entities()
         .iter()
-        .filter(|e| e.material.as_ref().is_some_and(|m| m.material == key))
+        .filter(|e| e.material.as_ref().is_some_and(|m| m.first() == key))
         .count();
     assert_eq!(count, 2, "both material references round-tripped");
 }
@@ -125,6 +125,6 @@ fn instantiate_dresses_material_less_meshes_with_engine_default() {
     assert_eq!(meshed.len(), 2, "both sub-objects instantiated");
     for e in meshed {
         let m = e.material.as_ref().expect("default material attached");
-        assert!(scene.materials.contains_key(&m.material), "ref resolves");
+        assert!(scene.materials.contains_key(m.first()), "ref resolves");
     }
 }

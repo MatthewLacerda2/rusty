@@ -42,7 +42,7 @@ fn add_static_box(scene: &mut Scene, name: &str, pos: Vec3, scale: Vec3, emissiv
     }
     scene.world.set_material(
         id,
-        Some(crate::components::MaterialComponent { material: mat_name }),
+        Some(crate::components::MaterialComponent::new(mat_name)),
     );
 }
 

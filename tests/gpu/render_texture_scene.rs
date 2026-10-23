@@ -84,9 +84,7 @@ fn add_box(scene: &mut Scene, name: &str, material: &str) -> u32 {
     let (vertices, indices) = rusty::components::mesh::primitives::generate_box(2.0, 2.0, 2.0);
     let mesh = MeshComponent::new("Box", vertices, indices);
     scene.world.set_mesh(id, Some(mesh));
-    let material = MaterialComponent {
-        material: material.to_string(),
-    };
+    let material = MaterialComponent::new(material.to_string());
     scene.world.set_material(id, Some(material));
     id
 }

@@ -28,6 +28,9 @@ pub(crate) struct BatchKey {
     pub pipeline: usize,
     /// The geometry (vertex + index buffers), by asset identity (#127).
     pub mesh: MeshId,
+    /// Where the drawn index run starts (#1285): each material run of one mesh is a
+    /// draw of its own.
+    pub first_index: u32,
     /// The group-2 material bind group (the resolved texture maps), by cache index.
     pub material: usize,
     /// The per-draw uniform's words (tint, PBR scalars, map and cutout flags, and the
@@ -46,7 +49,8 @@ impl BatchKey {
 /// One visible solid, ready to batch.
 pub(crate) struct DrawItem {
     pub key: BatchKey,
-    pub num_indices: u32,
+    /// The run of the mesh's index buffer this draw reads (#1285).
+    pub indices: Range<u32>,
     pub instance: InstanceData,
     /// Whether the selection outline rings this solid (#1175): it is then drawn a
     /// second time, from this same draw, into the selection mask.
@@ -60,7 +64,7 @@ pub(crate) struct DrawItem {
 pub(crate) struct OutlineDraw {
     pub mesh: MeshId,
     pub material: usize,
-    pub num_indices: u32,
+    pub indices: Range<u32>,
     pub uniform_slot: u32,
     pub instance: u32,
 }
@@ -71,7 +75,7 @@ impl OutlineDraw {
         Self {
             mesh: batch.key.mesh.clone(),
             material: batch.key.material,
-            num_indices: batch.num_indices,
+            indices: batch.indices.clone(),
             uniform_slot: batch.uniform_slot,
             instance,
         }
@@ -82,7 +86,7 @@ impl OutlineDraw {
 /// `uniform_slot` of the frame's packed uniforms.
 pub(crate) struct DrawBatch {
     pub key: BatchKey,
-    pub num_indices: u32,
+    pub indices: Range<u32>,
     pub uniform_slot: u32,
     pub instances: Range<u32>,
 }
@@ -128,7 +132,7 @@ impl FrameDraws {
                 Some(run) if merge && run.key == item.key => run.instances.end = index + 1,
                 _ => batches.push(DrawBatch {
                     key: item.key,
-                    num_indices: item.num_indices,
+                    indices: item.indices,
                     uniform_slot: slot_base + batches.len() as u32,
                     instances: index..index + 1,
                 }),
@@ -151,6 +155,15 @@ impl FrameDraws {
     pub(crate) fn batches(&self) -> impl Iterator<Item = &DrawBatch> {
         self.opaque.iter().chain(&self.transparent)
     }
+}
+
+/// `runs` clipped to the `count` indices a GPU mesh holds, empty runs dropped
+/// (#1285). A mesh's runs always cover its own indices; the clip only matters when
+/// its CPU geometry changed ahead of the upload.
+pub(crate) fn clip_runs(runs: impl Iterator<Item = Range<u32>>, count: u32) -> Vec<Range<u32>> {
+    runs.map(|r| r.start.min(count)..r.end.min(count))
+        .filter(|r| !r.is_empty())
+        .collect()
 }
 
 #[cfg(test)]

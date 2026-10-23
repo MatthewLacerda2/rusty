@@ -28,12 +28,9 @@ pub fn wall_scene(distance: f32, color: [f32; 3]) -> Scene {
         .world
         .set_mesh(id, Some(MeshComponent::new("Box", vertices, indices)));
     let material = "wall".to_string();
-    scene.world.set_material(
-        id,
-        Some(MaterialComponent {
-            material: material.clone(),
-        }),
-    );
+    scene
+        .world
+        .set_material(id, Some(MaterialComponent::new(material.clone())));
     scene.materials.insert(
         material,
         MaterialAsset {

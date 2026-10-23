@@ -28,12 +28,9 @@ fn floor_scene(mode: Option<LightMode>) -> Scene {
         .world
         .set_mesh(floor, primitive_mesh_component(Primitive::Box));
     scene.world.set_static(floor, true);
-    scene.world.set_material(
-        floor,
-        Some(MaterialComponent {
-            material: "white".into(),
-        }),
-    );
+    scene
+        .world
+        .set_material(floor, Some(MaterialComponent::new("white")));
     {
         let mut t = scene.world.transform_mut(floor).unwrap();
         t.position = Vec3::new(0.0, -0.5, 0.0);

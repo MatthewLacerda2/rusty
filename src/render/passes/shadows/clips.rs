@@ -45,33 +45,41 @@ pub(crate) struct CasterClip {
 }
 
 impl Renderer {
-    /// Every active mesh entity whose shadow is clipped, by id — resolving each one's
-    /// surface pipeline and material group exactly as its forward draw does, so both
-    /// passes read one param buffer and mask.
-    pub(super) fn shadow_clips(&mut self, scene: &Scene) -> HashMap<u32, CasterClip> {
+    /// Every active mesh entity's clipped material runs, by `(id, run)` (#1285) —
+    /// resolving each run's surface pipeline and material group exactly as its
+    /// forward draw does, so both passes read one param buffer and mask.
+    pub(super) fn shadow_clips(&mut self, scene: &Scene) -> HashMap<(u32, usize), CasterClip> {
         let mut clips = HashMap::new();
         for id in scene.world.ids_with_mesh() {
             if !scene.world.is_active(id) {
                 continue;
             }
-            let Some(entry) = scene.material_entry_of(id) else {
-                continue;
-            };
-            let asset = entry.1;
-            let shader = asset.shader.as_deref();
-            let pipeline = self.surface_shaders.pipeline_id(&self.device, shader);
-            let cuts = self.surface_shaders.cut(pipeline).is_some();
-            let cutout = (asset.render_mode == RenderMode::Cutout)
-                .then(|| (asset.alpha_cutoff, asset.base_color_map.is_some()));
-            if !cuts && cutout.is_none() {
-                continue;
+            let runs = scene.world.mesh(id).map_or(0, |m| m.index_ranges().count());
+            for run in 0..runs {
+                if let Some(clip) = self.run_clip(scene, id, run) {
+                    clips.insert((id, run), clip);
+                }
             }
-            let clip = Clip {
-                pipeline: if cuts { pipeline } else { STANDARD },
-                material: self.material_index(Some(entry), pipeline, entity_params(scene, id)),
-            };
-            clips.insert(id, CasterClip { clip, cutout });
         }
         clips
+    }
+
+    /// How run `run` of entity `id` clips its shadow, or `None` when it doesn't.
+    fn run_clip(&mut self, scene: &Scene, id: u32, run: usize) -> Option<CasterClip> {
+        let entry = scene.material_entry_at(id, run)?;
+        let asset = entry.1;
+        let shader = asset.shader.as_deref();
+        let pipeline = self.surface_shaders.pipeline_id(&self.device, shader);
+        let cuts = self.surface_shaders.cut(pipeline).is_some();
+        let cutout = (asset.render_mode == RenderMode::Cutout)
+            .then(|| (asset.alpha_cutoff, asset.base_color_map.is_some()));
+        if !cuts && cutout.is_none() {
+            return None;
+        }
+        let clip = Clip {
+            pipeline: if cuts { pipeline } else { STANDARD },
+            material: self.material_index(Some(entry), pipeline, entity_params(scene, id)),
+        };
+        Some(CasterClip { clip, cutout })
     }
 }

@@ -50,9 +50,7 @@ fn a_destroyed_lod_renderer_override_keeps_the_other_overrides() {
     scene
         .materials
         .insert("Brick".into(), MaterialAsset::default());
-    let brick = MaterialComponent {
-        material: "Brick".into(),
-    };
+    let brick = MaterialComponent::new("Brick");
     scene.world.set_material(root, Some(brick));
     scene.world.lod_group_mut(root).unwrap().levels[0].renderers = vec![post];
     record_instance_overrides(&mut scene, root).unwrap();
@@ -63,7 +61,7 @@ fn a_destroyed_lod_renderer_override_keeps_the_other_overrides() {
 
     let x = loaded.world.transform(root).unwrap().position.x;
     assert_eq!(x, 3.0, "the transform override survives");
-    let material = loaded.world.material(root).unwrap().material.clone();
+    let material = loaded.world.material(root).unwrap().first().to_string();
     assert_eq!(material, "Brick", "the material override survives");
     let lod = loaded.world.lod_group(root).unwrap().clone();
     assert!(

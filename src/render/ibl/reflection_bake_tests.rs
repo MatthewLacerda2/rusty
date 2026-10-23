@@ -43,7 +43,7 @@ fn add_wall(scene: &mut Scene, name: &str, pos: Vec3, scale: Vec3, emissive: [f3
     }
     scene.world.set_material(
         id,
-        Some(crate::components::MaterialComponent { material: mat_name }),
+        Some(crate::components::MaterialComponent::new(mat_name)),
     );
 }
 

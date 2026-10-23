@@ -38,12 +38,9 @@ fn add_quad(scene: &mut Scene, name: &str, z: f32, color: [f32; 3], alpha: f32) 
     scene
         .world
         .set_mesh(id, Some(MeshComponent::new("Box", vertices, indices)));
-    scene.world.set_material(
-        id,
-        Some(MaterialComponent {
-            material: name.to_string(),
-        }),
-    );
+    scene
+        .world
+        .set_material(id, Some(MaterialComponent::new(name.to_string())));
     scene.world.set_visual_correction(id, Some(vc()));
     scene.materials.insert(
         name.to_string(),

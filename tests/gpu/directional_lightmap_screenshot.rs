@@ -48,9 +48,7 @@ fn scene(dir: &std::path::Path) -> Scene {
         ..MaterialAsset::default()
     };
     scene.materials.insert("bumpy".to_string(), material);
-    let bumpy = MaterialComponent {
-        material: "bumpy".to_string(),
-    };
+    let bumpy = MaterialComponent::new("bumpy".to_string());
     scene.world.set_material(floor, Some(bumpy));
     let sun = scene.add_entity("Sun".to_string());
     scene.world.set_light(

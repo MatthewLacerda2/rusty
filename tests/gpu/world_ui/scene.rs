@@ -23,9 +23,7 @@ pub fn emissive_box(scene: &mut Scene, name: &str, pos: Vec3, size: Vec3, emissi
     scene.world.transform_mut(id).expect("transform").position = pos;
     let mesh = MeshComponent::new("Box", vertices, indices);
     scene.world.set_mesh(id, Some(mesh));
-    let material = Some(MaterialComponent {
-        material: name.to_string(),
-    });
+    let material = Some(MaterialComponent::new(name.to_string()));
     scene.world.set_material(id, material);
     let asset = MaterialAsset {
         base_color: [0.0, 0.0, 0.0],

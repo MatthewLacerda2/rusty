@@ -25,7 +25,7 @@ fn emissive_scene(map: &str) -> Scene {
     let material = "glow".to_string();
     scene
         .world
-        .set_material(id, Some(MaterialComponent { material }));
+        .set_material(id, Some(MaterialComponent::new(material)));
     let asset = MaterialAsset {
         base_color: [0.0; 3],
         emissive: [1.0; 3],

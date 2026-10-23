@@ -54,8 +54,8 @@ fn instanced(path: &str, node: &str) -> (Scene, String) {
         .world
         .material(id)
         .expect("a material")
-        .material
-        .clone();
+        .first()
+        .to_string();
     (scene, key)
 }
 
