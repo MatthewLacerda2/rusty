@@ -28,7 +28,7 @@ fn empty_world() -> GameWorld {
 fn standalone_boot_enters_play_on_the_first_tick_without_a_snapshot() {
     let mut gw = empty_world();
     gw.boot_standalone();
-    assert!(gw.is_playing());
+    assert!(gw.play_requested());
     assert!(gw.tick(DT) == PlayTransition::Entered);
     assert!(
         gw.resources.edit_snapshot.is_none(),

@@ -103,7 +103,7 @@ impl EditorFrontend {
     fn draw_dashboard(&mut self, shell: &mut Shell, game: &mut GameWorld) -> ViewportInteraction {
         self.follow_scene_swap(game);
         // The transport asks through `set_playing`, like every other host (#1302).
-        let mut playing = game.is_playing();
+        let mut playing = game.play_requested();
         let interaction = {
             let mut s = game.world.scene.borrow_mut();
             let mut c = game.resources.console.borrow_mut();
@@ -203,7 +203,7 @@ impl Frontend for EditorFrontend {
 
     /// The game hears input only while playing with the Game view focused.
     fn game_has_input(&self, game: &GameWorld) -> bool {
-        game.is_playing() && self.game_focused
+        game.play_requested() && self.game_focused
     }
 
     fn game_view(&self, shell: &Shell) -> GameViewRect {

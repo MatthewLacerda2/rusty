@@ -8,7 +8,10 @@
 //! the real removal. The queue is a plain `Vec<u32>` field on `Scene`; these
 //! verbs are its only writers/readers, split out here to keep `scene.rs` lean.
 //! Every engine destroy that may run in Play (`Scene.DestroyEntity`, a stale
-//! hitbox, an orphaned one) calls [`Scene::destroy`], which picks (#1298).
+//! hitbox) calls [`Scene::destroy`], which picks (#1298). An orphaned hitbox,
+//! whose bone a re-import or a load dropped, is the one exception:
+//! `Scene::attach_to_bones` removes it at once through `despawn_batch`, since it
+//! runs outside Play or while a document is applied (`Despawn::Applying`).
 
 use crate::scene::Scene;
 
@@ -43,6 +46,14 @@ impl Scene {
         ids.dedup();
         ids
     }
+
+    /// Whether `id` goes at the next destroy phase: it, or an ancestor whose
+    /// subtree the destroy takes, is queued (#1304).
+    pub fn is_doomed(&self, id: u32) -> bool {
+        std::iter::once(id)
+            .chain(self.world.ancestors(id))
+            .any(|a| self.pending_destroy.contains(&a))
+    }
 }
 
 #[cfg(test)]
@@ -74,6 +85,18 @@ mod tests {
         scene.destroy(play);
         assert!(scene.world.contains(play), "Play: live until the drain");
         assert_eq!(scene.take_pending_destroys(), vec![play]);
+    }
+
+    #[test]
+    fn a_queued_ancestor_dooms_its_subtree() {
+        let mut scene = Scene::new();
+        let root = scene.add_entity("Root".into());
+        let child = scene.add_entity("Child".into());
+        let other = scene.add_entity("Other".into());
+        scene.set_parent(child, Some(root)).unwrap();
+        scene.request_destroy(root);
+        assert!(scene.is_doomed(root) && scene.is_doomed(child));
+        assert!(!scene.is_doomed(other));
     }
 
     #[test]

@@ -33,7 +33,7 @@ impl Scene {
     /// Enter or leave Play. Only `GameWorld`'s transition (`enter_play` /
     /// `exit_play`) calls this outside tests, so every reader sees the state
     /// change at the same moment.
-    pub fn set_playing(&mut self, playing: bool) {
+    pub(crate) fn set_playing(&mut self, playing: bool) {
         self.playing = playing;
     }
 

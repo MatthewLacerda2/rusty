@@ -35,7 +35,7 @@ fn accessors_expose_shared_handles() {
     assert!(Rc::ptr_eq(gw.console(), &gw.resources.console));
     assert!(Rc::ptr_eq(gw.camera(), &gw.resources.camera));
     assert!(Rc::ptr_eq(gw.time(), &gw.resources.time));
-    assert!(!gw.is_playing());
+    assert!(!gw.play_requested());
     assert_eq!(gw.play_frame(), 0);
     let _ = gw.script_manager();
 }
@@ -43,11 +43,11 @@ fn accessors_expose_shared_handles() {
 #[test]
 fn set_playing_flips_state() {
     let mut gw = empty_world();
-    assert!(!gw.is_playing());
+    assert!(!gw.play_requested());
     gw.set_playing(true);
-    assert!(gw.is_playing());
+    assert!(gw.play_requested());
     gw.set_playing(false);
-    assert!(!gw.is_playing());
+    assert!(!gw.play_requested());
 }
 
 #[test]

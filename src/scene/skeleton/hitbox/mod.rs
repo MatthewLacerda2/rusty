@@ -76,13 +76,14 @@ impl Scene {
     }
 
     /// The generated hitbox under `bone`: its child named [`HITBOX_NAME`] that
-    /// carries a collider. One queued for destruction is already gone to every
-    /// lookup (#1298), so a ragdoll or a regeneration in the same tick skips it.
+    /// carries a collider. One queued for destruction, alone or with its bone or
+    /// a bone above it, is already gone to every hitbox lookup (#1298, #1304), so
+    /// a ragdoll or a regeneration in the same tick skips it.
     pub fn hitbox_of(&self, bone: u32) -> Option<u32> {
         self.world
             .children(bone)
             .into_iter()
-            .find(|&c| self.is_generated_hitbox(c) && !self.pending_destroy.contains(&c))
+            .find(|&c| self.is_generated_hitbox(c) && !self.is_doomed(c))
     }
 
     /// Whether `id` is a hitbox [`Scene::generate_hitboxes`] made: named
