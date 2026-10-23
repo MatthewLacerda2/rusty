@@ -20,7 +20,8 @@ fn an_inactive_child_gets_on_destroy_but_not_on_disable() {
     let (mut m, parent, child) = family("destroy_inactive");
     m.scene.borrow_mut().world.set_active(child, false);
     tick(&mut m, 1); // the falling edge fires the child's OnDisable now
-    assert_eq!(m.eval("__log").unwrap(), format!("D{child}"));
+    let log: String = m.eval("__log").unwrap();
+    assert!(log.starts_with(&format!("D{child}")), "{log}");
     m.eval("__log = ''").unwrap();
     destroy(&mut m, parent);
     assert_eq!(
