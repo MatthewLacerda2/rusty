@@ -129,6 +129,16 @@ fn draw_repl_input(editor: &mut EditorUi, ui: &mut egui::Ui) {
                 )
                 .font(egui::TextStyle::Monospace),
         );
+        // Up/Down recall submitted lines while the field has focus. egui moves the
+        // cursor on these keys itself; consume them first so recall wins.
+        if resp.has_focus() {
+            if ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::ArrowUp)) {
+                editor.dev.repl_input.recall_prev();
+            }
+            if ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::ArrowDown)) {
+                editor.dev.repl_input.recall_next();
+            }
+        }
         let submit = resp.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
         if submit {
             if let Some(line) = editor.dev.repl_input.take_submit() {
