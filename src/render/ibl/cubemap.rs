@@ -71,8 +71,6 @@ fn is_rgba8(format: Format) -> bool {
 /// copies it into a layer of its own (#1206).
 pub struct CubemapTexture {
     pub texture: wgpu::Texture,
-    pub view: wgpu::TextureView,
-    pub sampler: wgpu::Sampler,
     pub size: u32,
 }
 
@@ -138,7 +136,7 @@ impl Renderer {
             let level_size = (data.size >> level).max(1);
             self.write_cube_level(&texture, level as u32, level_size, bytes);
         }
-        self.finish_cube_texture(label, texture, data.size)
+        Self::finish_cube_texture(texture, data.size)
     }
 
     /// Write one mip level's six faces into a cube texture.
@@ -164,33 +162,9 @@ impl Renderer {
         );
     }
 
-    /// Build the cube view + trilinear sampler wrapping an uploaded cube texture.
-    fn finish_cube_texture(
-        &self,
-        label: &str,
-        texture: wgpu::Texture,
-        size: u32,
-    ) -> CubemapTexture {
-        let view = texture.create_view(&wgpu::TextureViewDescriptor {
-            label: Some(label),
-            dimension: Some(wgpu::TextureViewDimension::Cube),
-            ..Default::default()
-        });
-        let sampler = self.device.create_sampler(&wgpu::SamplerDescriptor {
-            address_mode_u: wgpu::AddressMode::ClampToEdge,
-            address_mode_v: wgpu::AddressMode::ClampToEdge,
-            address_mode_w: wgpu::AddressMode::ClampToEdge,
-            mag_filter: wgpu::FilterMode::Linear,
-            min_filter: wgpu::FilterMode::Linear,
-            mipmap_filter: wgpu::MipmapFilterMode::Linear,
-            ..Default::default()
-        });
-        CubemapTexture {
-            texture,
-            view,
-            sampler,
-            size,
-        }
+    /// Wrap an uploaded cube texture.
+    fn finish_cube_texture(texture: wgpu::Texture, size: u32) -> CubemapTexture {
+        CubemapTexture { texture, size }
     }
 }
 

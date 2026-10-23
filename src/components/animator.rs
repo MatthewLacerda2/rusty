@@ -115,11 +115,13 @@ impl AnimatorComponent {
     }
 
     /// The base layer's crossfade weight (see [`Playback::crossfade_weight`]).
+    #[cfg(test)]
     pub fn crossfade_weight(&self) -> f32 {
         self.base.crossfade_weight()
     }
 
     /// True while the base layer is crossfading.
+    #[cfg(test)]
     pub fn is_crossfading(&self) -> bool {
         self.base.is_crossfading()
     }

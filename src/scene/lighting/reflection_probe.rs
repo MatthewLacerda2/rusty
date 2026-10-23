@@ -87,6 +87,7 @@ impl ReflectionProbe {
     /// infinitely-distant skybox. A fragment outside the box, or a ray with no forward
     /// hit, keeps the plain normalized direction. The shader's `parallax_correct` runs
     /// these same steps.
+    /// Test seam for `tests/reflection_probes.rs`.
     pub fn parallax_correct(&self, world_pos: Vec3, reflection: Vec3) -> Vec3 {
         let dir = reflection.normalize_or_zero();
         if !self.contains(world_pos) {

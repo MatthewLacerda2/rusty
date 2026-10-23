@@ -257,12 +257,14 @@ impl TextureRecipe {
     }
 
     /// Set the noise seed.
+    /// Test seam for `tests/procgen/mod.rs`.
     pub fn with_seed(mut self, seed: u64) -> Self {
         self.seed = seed;
         self
     }
 
     /// Name the output node explicitly instead of the last one.
+    /// Test seam for `tests/procgen/mod.rs`.
     pub fn with_output(mut self, id: impl Into<String>) -> Self {
         self.output = Some(id.into());
         self

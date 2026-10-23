@@ -55,16 +55,6 @@ impl TextureSizes {
         self.edits += u64::from(self.sizes.remove(path).is_some());
     }
 
-    /// How many paths the table holds a size for.
-    pub fn len(&self) -> usize {
-        self.sizes.len()
-    }
-
-    /// Whether the table holds no size.
-    pub fn is_empty(&self) -> bool {
-        self.sizes.is_empty()
-    }
-
     /// How many writes changed the table: a filler that remembers it knows when
     /// someone else edited the table since.
     pub fn edits(&self) -> u64 {

@@ -15,6 +15,7 @@
 //! backend, while the actual sound is a platform-layer side effect the `NullBackend`
 //! simply skips.
 
+#[cfg(test)]
 use super::mixer::settings::LOW_PASS_OFF;
 use super::mixer::{GroupId, GroupMix};
 use super::speaker::SpeakerMode;
@@ -49,6 +50,7 @@ pub struct VoiceMix {
 
 impl VoiceMix {
     /// Full gain, centred, 2D, normal speed — a plain un-spatialized voice.
+    #[cfg(test)]
     pub const FLAT: VoiceMix = VoiceMix {
         gain: 1.0,
         pan: 0.0,

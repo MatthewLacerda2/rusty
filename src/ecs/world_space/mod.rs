@@ -87,6 +87,7 @@ impl World {
 
     /// Whether `id`'s world matrix reflects (its determinant is negative): what the
     /// renderer flips winding for.
+    /// Test seam for `tests/proptest/world_space.rs`.
     pub fn is_mirrored(&self, id: u32) -> bool {
         self.local_to_world(id).determinant() < 0.0
     }

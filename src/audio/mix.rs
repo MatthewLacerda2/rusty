@@ -261,11 +261,13 @@ impl AudioMaestro {
     }
 
     /// The pre-master mix last applied to entity `id`'s voice, if it is playing.
+    #[cfg(test)]
     pub fn voice_mix(&self, id: u32) -> Option<VoiceMix> {
         self.entity_voices.get(&id).map(|live| live.mix)
     }
 
     /// How many `PlayAt` one-shots are still sounding.
+    #[cfg(test)]
     pub fn live_oneshots(&self) -> usize {
         self.oneshots.len()
     }

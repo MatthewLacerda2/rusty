@@ -54,11 +54,13 @@ impl UiViewCache {
     }
 
     /// Canvas buffers (re-)uploaded by the last render of this view.
+    #[cfg(test)]
     pub fn last_uploads(&self) -> usize {
         self.uploads
     }
 
     /// Canvases the last render of this view drew (0 when it had nowhere to draw).
+    #[cfg(test)]
     pub fn last_drawn(&self) -> usize {
         self.drawn
     }

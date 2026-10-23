@@ -81,6 +81,9 @@ impl<T: ?Sized> DerefMut for CompMut<'_, T> {
 /// None = detach), `take` (detach returning the component — the sim's
 /// take/simulate/write-back idiom), and `ids_with` (stable ids carrying the
 /// component, in insertion order).
+///
+/// A uniform family on purpose: `make dead-pub` lists the members nothing calls
+/// today (most `take_*`), and they stay so every component has the same shape.
 macro_rules! optional_component_accessors {
     ($($ty:ty => $get:ident, $get_mut:ident, $has:ident, $set:ident, $take:ident, $ids_with:ident;)*) => {
         impl World {

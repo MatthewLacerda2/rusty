@@ -114,7 +114,7 @@ fn handle_line(backend: &dyn EvalBackend, line: &str) -> Option<String> {
         }
         // Notifications are processed for side effects only; `notifications/*` here
         // carry none, so we simply acknowledge by writing nothing back.
-        Some(Incoming::Notification { .. }) => None,
+        Some(Incoming::Notification) => None,
         None => Some(protocol::parse_error()),
     }
 }

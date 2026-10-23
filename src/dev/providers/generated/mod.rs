@@ -10,7 +10,7 @@
 //! word back is free. One convention for every endpoint: speech, sound effects and
 //! music are three [`Brief`]s and one lifecycle.
 //!
-//! **The lifecycle** ([`GenerationState`]): `Sketch` (a brief with nothing generated
+//! **The lifecycle** (`GenerationState`): `Sketch` (a brief with nothing generated
 //! yet: the ordinary state of a line somebody is still writing, never an error) →
 //! `Generated` (the file is there) → `Stale` (the brief changed since). A changed
 //! brief marks its asset stale; it never regenerates on its own, because the agent
@@ -44,6 +44,7 @@ pub fn address<B: Brief + ?Sized>(brief: &B) -> serde_json::Result<PathBuf> {
 /// Where a generated asset stands. No `queued` and no `expired`: none of the
 /// endpoints is long-running, so a state for work in flight would only be a state
 /// every reader has to rule out.
+#[cfg(test)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GenerationState {
     /// Nothing generated for this brief, nor for an earlier one. Plays silence and
@@ -61,6 +62,7 @@ pub enum GenerationState {
 ///
 /// A brief edited back to an earlier wording finds that wording's file again, so a
 /// revert is `Generated`, not `Stale`.
+#[cfg(test)]
 pub fn state<B: Brief + ?Sized>(
     root: &Path,
     brief: &B,

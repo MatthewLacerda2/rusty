@@ -40,6 +40,7 @@ pub fn run(scenario_path: &Path, out_dir: &Path) -> Result<RunReport, String> {
 
 /// [`run`] on a workspace of the run's own, seeded from the engine's bundled
 /// scripts (see `Harness::new`) — for tests, which must not read a developer's project (#782).
+/// Test seam for `tests/input_harness.rs`.
 pub fn run_isolated(scenario_path: &Path, out_dir: &Path) -> Result<RunReport, String> {
     run_on(scenario_path, out_dir, false)
 }

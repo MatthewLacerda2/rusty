@@ -35,6 +35,7 @@ pub use validate::GraphError;
 
 /// The graph asset's file extension: `guard.animgraph` (rusty-only format, JSON
 /// inside for diffability — matching the scene document and `.meta` sidecars).
+#[cfg(test)]
 pub const GRAPH_EXTENSION: &str = "animgraph";
 
 /// Declaration of one graph parameter: its type plus the default value an entity's

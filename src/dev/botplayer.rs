@@ -13,6 +13,7 @@ use crate::scene::authoring::add_script;
 use crate::scene::Scene;
 
 /// Canonical path to the example bot-player script (attached to the Player).
+/// Test seam for `tests/bot_player_session.rs`.
 pub const PLAYER_BOT_SCRIPT: &str = "assets/scripts/bot_player.lua";
 
 /// Attach a bot-player script to the entity named `Player` in `scene`.

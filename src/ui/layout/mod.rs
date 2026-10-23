@@ -115,16 +115,6 @@ impl UiLayout {
         self.rects.iter().map(|(id, r)| (*id, r))
     }
 
-    /// Number of laid-out elements.
-    pub fn len(&self) -> usize {
-        self.rects.len()
-    }
-
-    /// Whether nothing was laid out (no canvas in the scene).
-    pub fn is_empty(&self) -> bool {
-        self.rects.is_empty()
-    }
-
     /// Record `id`'s node, then its rect-carrying children in hierarchy order.
     fn walk(&mut self, world: &World, view: &UiView, id: u32, node: Node) {
         self.index.insert(id, self.rects.len());

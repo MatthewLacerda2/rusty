@@ -42,6 +42,7 @@ pub struct DecodedAudio {
 
 impl DecodedAudio {
     /// Whole frames (one sample per channel) in the clip.
+    #[cfg(test)]
     pub fn frames(&self) -> usize {
         self.samples.len() / usize::from(self.channels.max(1))
     }

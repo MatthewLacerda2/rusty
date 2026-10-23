@@ -62,22 +62,26 @@ impl AnimatorComponent {
     }
 
     /// Set a `Bool` parameter (`Animator.SetBool`).
+    /// Test seam for `tests/animator/parameters.rs`.
     pub fn set_bool(&mut self, name: &str, value: bool) -> bool {
         self.set_parameter(name, AnimatorParameter::Bool(value))
     }
 
     /// Set a `Float` parameter (`Animator.SetFloat`).
+    /// Test seam for `tests/animator/parameters.rs`.
     pub fn set_float(&mut self, name: &str, value: f32) -> bool {
         self.set_parameter(name, AnimatorParameter::Float(value))
     }
 
     /// Set an `Int` parameter (`Animator.SetInt`).
+    /// Test seam for `tests/animator/parameters.rs`.
     pub fn set_int(&mut self, name: &str, value: i32) -> bool {
         self.set_parameter(name, AnimatorParameter::Int(value))
     }
 
     /// Latch the one-shot `Trigger` parameter `name` (`Animator.SetTrigger`). It
     /// stays latched until [`consume_trigger`](Self::consume_trigger) clears it.
+    /// Test seam for `tests/animator/parameters.rs`.
     pub fn set_trigger(&mut self, name: &str) -> bool {
         self.set_parameter(name, AnimatorParameter::Trigger(true))
     }

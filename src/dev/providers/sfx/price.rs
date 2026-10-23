@@ -8,9 +8,10 @@
 //! credits, at the rate scorsese's speech table implies (1 credit ≈ 0.01¢), so it can
 //! only over-estimate and the budget can never be crossed by a guess. Re-read
 //! <https://elevenlabs.io/pricing/api> and correct [`MILLS_PER_SECOND`] and
-//! [`CHECKED`] together.
+//! `CHECKED` together.
 
 /// The day the rate below was last checked.
+#[cfg(test)]
 pub const CHECKED: &str = "2026-10-06";
 
 /// Tenths of a US cent per second of requested duration: 40 credits a second.

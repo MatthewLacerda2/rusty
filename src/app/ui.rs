@@ -154,7 +154,7 @@ mod tests {
         game.set_playing(true);
         game.tick(crate::time::FIXED_DELTA_TIME);
         let layout = &game.resources.ui_layout;
-        assert_eq!(layout.len(), 2);
+        assert_eq!(layout.iter().count(), 2);
         // Headless: the default 1280×720 video resolution, matching width → the
         // canvas spans the 1920×1080 reference; the element sits centred.
         let r = layout.get(hud).expect("laid out");

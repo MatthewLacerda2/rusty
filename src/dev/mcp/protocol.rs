@@ -17,8 +17,8 @@ pub enum Incoming {
         method: String,
         params: Value,
     },
-    /// A notification: a method + params with no `id`, so no response is written.
-    Notification { method: String, params: Value },
+    /// A notification: no `id`, so no response is written (and nothing of it is read).
+    Notification,
 }
 
 /// Parse one wire line into an [`Incoming`].
@@ -39,7 +39,7 @@ pub fn parse(line: &str) -> Option<Incoming> {
             method,
             params,
         },
-        None => Incoming::Notification { method, params },
+        None => Incoming::Notification,
     })
 }
 
@@ -94,10 +94,7 @@ mod tests {
     fn a_message_without_id_is_a_notification() {
         let line = r#"{"jsonrpc":"2.0","method":"notifications/initialized"}"#;
         match parse(line).expect("valid notification") {
-            Incoming::Notification { method, params } => {
-                assert_eq!(method, "notifications/initialized");
-                assert_eq!(params, Value::Null);
-            }
+            Incoming::Notification => {}
             _ => panic!("expected a notification"),
         }
     }

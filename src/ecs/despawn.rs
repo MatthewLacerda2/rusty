@@ -65,6 +65,7 @@ with_ref_components!(world_walk);
 
 impl World {
     /// Despawn an entity by stable id: [`World::despawn_all`] of one.
+    #[cfg(test)]
     pub fn despawn(&mut self, id: u32) {
         self.despawn_all(&BTreeSet::from([id]));
     }

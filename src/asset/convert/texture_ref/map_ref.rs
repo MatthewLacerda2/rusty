@@ -40,13 +40,9 @@ impl MapRef {
     }
 
     /// The source a reference names (`soldier.fbx`), `None` for a plain path.
+    #[cfg(test)]
     pub fn source(&self) -> Option<&str> {
         super::source(&self.0)
-    }
-
-    /// Whether the map names nothing (an editor field left blank).
-    pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
     }
 }
 
