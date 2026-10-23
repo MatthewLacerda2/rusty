@@ -52,11 +52,24 @@ pub fn create_window(
     let attributes = Window::default_attributes()
         .with_title(title)
         .with_inner_size(winit::dpi::PhysicalSize::new(width, height));
+    #[cfg(all(feature = "editor", target_os = "linux"))]
+    let attributes = editor_app_id(attributes);
     Arc::new(
         event_loop
             .create_window(attributes)
             .expect("the OS refused to create a window"),
     )
+}
+
+/// Name the editor's window `rusty` (Wayland's `app_id`, X11's `WM_CLASS`; winit
+/// keeps one name for both), so the desktop matches it to the `rusty.desktop`
+/// entry `make launcher` installs: the dock shows the logo, which Wayland takes
+/// only from that entry, and groups the window with the launcher (#1315). Not a
+/// shipped player's: that window is the game's.
+#[cfg(all(feature = "editor", target_os = "linux"))]
+fn editor_app_id(attributes: winit::window::WindowAttributes) -> winit::window::WindowAttributes {
+    use winit::platform::wayland::WindowAttributesExtWayland;
+    WindowAttributesExtWayland::with_name(attributes, "rusty", "rusty")
 }
 
 /// Build the renderer on `window`. Exits the process if no compatible GPU exists.

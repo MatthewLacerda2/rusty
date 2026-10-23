@@ -78,10 +78,11 @@ The tools describe themselves; what they don't say:
   session will use. `rusty` attaches to the editor window the operator watches; open
   it first, from the checkout, with a `dev` build (a build without `dev` has no
   command socket): `cd <engine> && cargo run --features dev -- --project <game>`.
+  The app search's **Rusty** (`make launcher`) opens that same dev build.
   `rusty-headless` runs its own world with no window, for when none is open. Two
   worlds saving the same scene overwrite each other;
-- if a server fails to start, build it in the checkout:
-  `cd <engine> && cargo build --bin session-mcp --features dev`.
+- if a server fails to start, build it in the checkout, with the editor beside it:
+  `cd <engine> && cargo build --features dev --bin session-mcp --bin rusty`.
 
 More: `docs/mcp.md`.
 

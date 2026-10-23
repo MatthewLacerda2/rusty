@@ -31,7 +31,7 @@ SELF_CHECKS := target-dir inventory
 
 .DEFAULT_GOAL := help
 .NOTPARALLEL:
-.PHONY: help setup compile-cache check gates quick-gates pre-commit resolved $(SELF_CHECKS) $(GATES) mergeable queue queue-daemon queue-stop blockers checks reclaim mutants-remote dead-pub editor-capture export bench bless-converters
+.PHONY: help setup compile-cache check gates quick-gates pre-commit resolved $(SELF_CHECKS) $(GATES) mergeable queue queue-daemon queue-stop blockers checks reclaim mutants-remote dead-pub editor-capture export launcher bench bless-converters
 
 help: ## List the verbs
 	@grep -E '^[a-z-]+:.*## ' $(firstword $(MAKEFILE_LIST)) | \
@@ -199,8 +199,9 @@ deny: ## [gate] Advisories, bans, sources, licenses (cargo-deny)
 # The merge helpers' own tests: stdlib `unittest`, no build, well under a
 # second — and a gate, because `mergeable` is the only thing between a red PR
 # and `main` while it has no required checks (#491).
-scripts: ## [gate] Tests of the merge and mutation helpers in .github/scripts
+scripts: ## [gate] Tests of the merge and mutation helpers in .github/scripts, and of tools/launcher
 	python3 -m unittest discover --start-directory .github/scripts/tests --top-level-directory .github/scripts --quiet
+	python3 -m unittest discover --start-directory tools/launcher/tests --top-level-directory tools/launcher --quiet
 
 # Did CI really run, and pass, on this PR's head commit? Both workflows' gates,
 # a gated job that genuinely ran, and no red run beside a green one. The last
@@ -291,6 +292,13 @@ dead-pub: ## Signal: pub items nothing uses, and items only tests use (tools/lin
 OUT ?= editor-capture.png
 editor-capture: ## Render the editor to a PNG headlessly. make editor-capture OUT=after.png ARGS="--select Player"
 	cargo run --quiet --features dev --bin editor-capture -- --out $(OUT) $(ARGS)
+
+# Rusty in the desktop's app search (#1315): the Linux app grid, Spotlight on macOS.
+# Builds the dev editor (the window the `rusty` MCP attaches to) and session-mcp, then
+# installs an entry in the user's home that starts this checkout's binary from here.
+launcher: ## Put Rusty in the desktop's app search. ARGS=--remove takes it away
+	@case "$(ARGS)" in *--remove*) ;; *) cargo build --quiet --features dev --bin rusty --bin session-mcp ;; esac
+	@python3 tools/launcher/launcher.py $(ARGS)
 
 # Ship a project (#1267): bring its converted sources (.fbx, .blend) up to date, then
 # copy its runtime files and import cache into OUT, leaving those sources behind, so

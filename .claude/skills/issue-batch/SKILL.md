@@ -281,9 +281,10 @@ compiling:
    squash) or it has no commits beyond `main`; other unmerged work is the user's
    to delete.
 2. `git pull --ff-only` on `main`.
-3. `cargo build --bin session-mcp --features dev` in the main checkout, so local
-   MCP clients drive the new engine (`docs/mcp.md`); a connected client keeps the
-   old process until it reconnects.
+3. `cargo build --features dev --bin session-mcp --bin rusty` in the main
+   checkout, so local MCP clients drive the new engine (`docs/mcp.md`) and the app
+   search's **Rusty** (`make launcher`) opens it; a connected client keeps the old
+   process until it reconnects.
 
 **The report opens with `make checks SINCE=<batch start>`**: the unticked human
 checks and the `planning`+`human` issues. Then the result, what surprised you
