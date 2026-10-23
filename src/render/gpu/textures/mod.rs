@@ -5,7 +5,7 @@ use std::rc::Rc;
 
 use image::GenericImageView;
 
-use crate::asset::convert::texture_ref;
+use crate::asset::MapRef;
 use crate::render::{GpuTexture, Renderer};
 
 /// The storage format of every image the renderer uploads: colour is authored in
@@ -150,10 +150,11 @@ impl Renderer {
         pixels
     }
 
-    /// Loads and registers a new texture from a filepath. Caches results dynamically;
-    /// a failed load is remembered as a miss (drawn with the default) and retried
-    /// once the file appears, never cached under its path (#689).
-    pub fn load_texture(&mut self, path_str: &str) -> Rc<GpuTexture> {
+    /// Loads and registers the texture `map` names. Caches results dynamically,
+    /// keyed by the map; a failed load is remembered as a miss (drawn with the
+    /// default) and retried once the file appears, never cached under its path (#689).
+    pub fn load_texture(&mut self, map: &MapRef) -> Rc<GpuTexture> {
+        let path_str = map.as_str();
         if let Some(tex) = self.gpu_textures.get(path_str) {
             return Rc::clone(tex);
         }
@@ -167,13 +168,12 @@ impl Renderer {
             return Rc::clone(&self.default_texture);
         }
 
-        let Some(img) = open(path_str) else {
+        let Some(img) = open(map) else {
             self.texture_freshness.miss(path_str);
             return Rc::clone(&self.default_texture);
         };
         let tex = self.upload_image_texture(path_str, &img);
-        self.gpu_textures
-            .insert(path_str.to_string(), Rc::clone(&tex));
+        self.gpu_textures.insert(map.clone(), Rc::clone(&tex));
         tex
     }
 
@@ -240,9 +240,10 @@ mod formats_tests;
 #[cfg(test)]
 mod freshness_tests;
 
-/// The image a texture path names, decoded: a material map that references a
-/// texture a conversion extracted is read where the import cache holds it
-/// (`asset::convert::texture_ref`, #1130). `None` when it cannot be read.
-pub(crate) fn open(path: &str) -> Option<image::DynamicImage> {
-    image::open(texture_ref::file(path)?).ok()
+/// The image `map` names, decoded: a map that references a texture a conversion
+/// extracted is read where the import cache holds it ([`MapRef::file`], #1130).
+/// `None` when it cannot be read. Takes a [`MapRef`], never a bare string, so no
+/// reader opens a reference as if it were a path (#1269).
+pub(crate) fn open(map: &MapRef) -> Option<image::DynamicImage> {
+    image::open(map.file()?).ok()
 }

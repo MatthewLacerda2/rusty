@@ -185,7 +185,9 @@ fn push_image_tris(
     fill: Fill,
 ) -> UiSource {
     let size = rect.rect.1;
-    let tex = image.shown_texture().and_then(frame.tex_size);
+    let tex = image
+        .shown_texture()
+        .and_then(|t| (frame.tex_size)(t.as_str()));
     let tris = image_triangles(image, size, tex);
     let [bl, tl, _, br] = rect.corners;
     let half = size * 0.5;

@@ -33,6 +33,7 @@ mod file;
 mod locate;
 
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 
 pub use commit::{engine_commit, UNKNOWN_COMMIT};
 pub use file::{EngineCheck, ProjectFile, PROJECT_FILE};
@@ -130,6 +131,7 @@ pub fn open(dir: &Path, access: Access) -> Result<Opened, String> {
         reason = "opening a project makes it the working directory, once, at startup"
     )]
     std::env::set_current_dir(root).map_err(|e| format!("{}: {e}", root.display()))?;
+    MOVES.fetch_add(1, Ordering::Relaxed);
     lines.push(format!("Opened {}", root.display()));
     lines.extend(opened.engine.warning());
     for line in lines {
@@ -137,6 +139,28 @@ pub fn open(dir: &Path, access: Access) -> Result<Opened, String> {
     }
     Ok(opened)
 }
+
+/// Make `dir` the working directory again: a switch that [`open`]ed a project
+/// and then failed goes back to the one it left (`session-mcp`).
+pub fn return_to(dir: &Path) -> std::io::Result<()> {
+    // lint: allow(statement-opt-out) the working-directory restore, not a clock read
+    #[expect(
+        clippy::disallowed_methods,
+        reason = "a failed switch restores the working directory `open` moved"
+    )]
+    std::env::set_current_dir(dir)?;
+    MOVES.fetch_add(1, Ordering::Relaxed);
+    Ok(())
+}
+
+/// How many times this process moved the working directory to a project ([`open`],
+/// [`return_to`]). A cache keyed by project paths compares it with what it last saw
+/// and drops what it read under another project, on any thread (#1269).
+pub fn moves() -> u64 {
+    MOVES.load(Ordering::Relaxed)
+}
+
+static MOVES: AtomicU64 = AtomicU64::new(0);
 
 /// Everything [`open`] does but move the working directory: make the folder a project
 /// and check its engine. Returns what it found and the progress lines to report.

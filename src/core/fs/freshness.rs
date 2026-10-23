@@ -13,9 +13,12 @@
 //!   ones. A miss whose file is still absent is not retried (#1240).
 //!
 //! The cache drops whatever the returned paths name, misses included
-//! ([`Freshness::forget_misses`]), so their next lookup reads the file again. The
-//! renderer's texture cache (`render::gpu::textures::freshness`) and the UI's
-//! texture-size table (`ui::TextureSizeReader`) are its two users.
+//! ([`Freshness::forget_misses`]), so their next lookup reads the file again. Its
+//! users are the renderer's texture cache (`render::gpu::textures::freshness`,
+//! whose misses the decal atlas shares) and the UI's texture-size table
+//! (`ui::TextureSizeReader`). The resolved texture-reference cache
+//! (`asset::convert::texture_ref`) reads the write log directly and keeps no
+//! retry beat: it answers on these callers' (#1269).
 
 use std::collections::BTreeSet;
 use std::path::Path;

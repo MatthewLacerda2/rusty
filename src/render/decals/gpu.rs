@@ -51,10 +51,9 @@ impl Renderer {
             .iter()
             .filter_map(|d| Some((d, scene.decal_pose(d)?, record::maps(d, material(d)))))
             .collect();
-        let paths: Vec<&str> = drawn
+        let paths: Vec<&MapRef> = drawn
             .iter()
             .flat_map(|(_, _, maps)| maps.iter().flatten())
-            .map(MapRef::as_str)
             .collect();
         let misses = &mut self.texture_freshness;
         let d = &mut self.decals;

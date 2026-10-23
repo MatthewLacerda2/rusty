@@ -15,6 +15,7 @@ use std::collections::{HashMap, HashSet};
 use image::imageops::FilterType;
 
 use super::record::NO_LAYER;
+use crate::asset::MapRef;
 use crate::core::fs::freshness::Freshness;
 
 /// The side of one layer, in texels.
@@ -38,7 +39,7 @@ pub(crate) struct DecalAtlas {
     /// Trilinear, anisotropic, clamped to the layer's edge.
     pub sampler: wgpu::Sampler,
     /// Which layer holds each loaded map.
-    slots: HashMap<String, u32>,
+    slots: HashMap<MapRef, u32>,
 }
 
 impl DecalAtlas {
@@ -74,12 +75,13 @@ impl DecalAtlas {
         &mut self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
-        paths: &[&str],
+        paths: &[&MapRef],
         misses: &mut Freshness,
     ) -> bool {
-        let mut fresh: Vec<&str> = Vec::new();
+        let mut fresh: Vec<&MapRef> = Vec::new();
         for &path in paths {
-            if !self.slots.contains_key(path) && !misses.is_miss(path) && !fresh.contains(&path) {
+            let known = self.slots.contains_key(path) || misses.is_miss(path.as_str());
+            if !known && !fresh.contains(&path) {
                 fresh.push(path);
             }
         }
@@ -90,7 +92,7 @@ impl DecalAtlas {
         let mut replaced = false;
         if wanted > self.capacity() {
             if wanted > MAX_LAYERS as usize {
-                self.slots.retain(|path, _| paths.contains(&path.as_str()));
+                self.slots.retain(|path, _| paths.contains(&path));
             }
             let needed = (self.slots.len() + fresh.len()) as u32;
             let capacity = needed.next_power_of_two().clamp(MIN_LAYERS, MAX_LAYERS);
@@ -106,10 +108,10 @@ impl DecalAtlas {
             match crate::render::gpu::textures::open(path) {
                 Some(img) => {
                     upload(queue, &self.texture, layer, img.to_rgba8());
-                    self.slots.insert(path.to_string(), layer);
+                    self.slots.insert(path.clone(), layer);
                 }
                 None => {
-                    misses.miss(path);
+                    misses.miss(path.as_str());
                 }
             }
         }
@@ -118,7 +120,7 @@ impl DecalAtlas {
 
     /// Forget the maps `is_stale` names, so the next frame loads them again.
     pub(crate) fn forget(&mut self, is_stale: impl Fn(&str) -> bool) {
-        self.slots.retain(|path, _| !is_stale(path));
+        self.slots.retain(|path, _| !is_stale(path.as_str()));
     }
 
     fn capacity(&self) -> usize {

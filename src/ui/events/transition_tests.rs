@@ -4,6 +4,7 @@
 use glam::{Vec2, Vec4};
 
 use super::fixture::{button, panel, scene, Handlers, Rig};
+use crate::asset::MapRef;
 use crate::components::{SelectableTransition, SelectionState, TextComponent};
 
 fn tint(rig: &Rig, id: u32) -> Vec4 {
@@ -63,7 +64,7 @@ fn sprite_swap_and_a_separate_target_graphic() {
     assert_eq!(rig.events.state_of(world, btn), SelectionState::Disabled);
     rig.events.apply_transitions(&mut rig.scene.world, 0.0);
     let image = rig.scene.world.image(icon).expect("image").clone();
-    assert_eq!(image.shown_texture(), Some("off.png"));
+    assert_eq!(image.shown_texture(), Some(&MapRef::from("off.png")));
     assert_eq!(
         rig.scene.world.image(btn).expect("image").override_texture,
         None

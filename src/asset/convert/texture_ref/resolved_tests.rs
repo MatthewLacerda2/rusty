@@ -1,9 +1,13 @@
-//! The resolved-reference cache (#1256): one read per source until it converts again.
+//! The resolved-reference cache (#1256): one read per source until it converts
+//! again, absolute keys across a project switch, and the callers' retry beat (#1269).
 
-use super::resolved::reads;
+use std::path::PathBuf;
+
+use super::resolved::{file_in, reads};
 use super::tests::{base_color_map, quad, quad_at};
-use super::{file, reference};
-use crate::core::fs::freshness::MISS_RETRY_FRAMES;
+use super::{exists, file, reference};
+use crate::asset::convert::cache_location;
+use crate::core::fs::freshness::{Freshness, MISS_RETRY_FRAMES};
 
 #[test]
 fn a_source_is_read_once_until_it_converts_again() {
@@ -47,4 +51,51 @@ fn a_reference_with_no_cache_is_read_once_until_its_source_converts() {
         file(&red).is_some_and(|f| f.exists()),
         "the conversion is picked up"
     );
+}
+
+#[test]
+fn a_switch_to_another_project_resolves_its_namesake() {
+    let (moved_to_a, moved_to_b) = (u64::MAX - 1, u64::MAX - 2);
+    let root = crate::test_temp::dir();
+    let (a, b) = (root.join("a"), root.join("b"));
+    for dir in [&a, &b] {
+        std::fs::create_dir_all(dir).unwrap();
+    }
+    let quad_a = quad_at(&a.join("quad.fbx"), |text| text);
+    // B's "Red" is the texture A calls "Blue".
+    let quad_b = quad_at(&b.join("quad.fbx"), |text| {
+        text.replace("\"Texture::Red\"", "\"Texture::Tmp\"")
+            .replace("\"Texture::Blue\"", "\"Texture::Red\"")
+            .replace("\"Texture::Tmp\"", "\"Texture::Blue\"")
+    });
+    // Both caches current: the switch itself writes nothing.
+    base_color_map(&quad_a, "Red");
+    base_color_map(&quad_b, "Red");
+    let pixels = |f: Option<PathBuf>| std::fs::read(f.expect("resolves")).unwrap();
+    let a_blue = pixels(file_in(moved_to_a, &a, "quad.fbx", "Blue"));
+    assert_ne!(pixels(file_in(moved_to_a, &a, "quad.fbx", "Red")), a_blue);
+
+    let before = reads();
+    let b_red = pixels(file_in(moved_to_b, &b, "quad.fbx", "Red"));
+    assert_eq!(b_red, a_blue, "the new project's own texture");
+    assert!(file_in(moved_to_b, &b, "./quad.fbx", "Red").is_some_and(|f| f.is_absolute()));
+    assert_eq!(reads(), before + 1, "one table, under one absolute key");
+}
+
+#[test]
+fn a_glb_another_process_writes_is_picked_up_on_the_callers_beat() {
+    let path = quad(|text| text);
+    let red = base_color_map(&path, "Red");
+    let glb = cache_location(&path).unwrap();
+    let aside = glb.with_extension("aside");
+    std::fs::rename(&glb, &aside).unwrap();
+    assert_eq!(file(&red), None, "no cache to read");
+
+    // The caller remembers its miss, and the `.glb` comes back outside the write log.
+    let mut caller = Freshness::new();
+    caller.miss(&red);
+    std::fs::rename(&aside, &glb).unwrap();
+    let picked_up = (1..=MISS_RETRY_FRAMES).find(|_| caller.poll_with(exists).stale.contains(&red));
+    assert!(picked_up.is_some(), "within one beat of the caller");
+    assert!(file(&red).is_some_and(|f| f.exists()));
 }

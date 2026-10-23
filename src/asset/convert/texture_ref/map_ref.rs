@@ -24,8 +24,10 @@ impl MapRef {
         Self(spelling.into())
     }
 
-    /// The map as stored: a cache key, a label, what a script reads back. Not a
-    /// file to open: [`Self::file`] is that.
+    /// The map as stored: a cache key, a label, what the editor shows and a Lua
+    /// script reads back. Never a file to open: [`Self::file`] is that, and every
+    /// reader that opens one (`render::gpu::textures::open`, the UI's size
+    /// reader, the lightmap bake) takes the `MapRef` itself (#1269).
     pub fn as_str(&self) -> &str {
         &self.0
     }

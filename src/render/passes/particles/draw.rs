@@ -41,7 +41,7 @@ fn billboard_basis(camera: &Camera) -> (Vec3, Vec3) {
 /// One emitter's sprites, before textures are resolved.
 struct EmitterRun {
     blend: ParticleBlend,
-    texture: Option<String>,
+    texture: Option<MapRef>,
     instances: Vec<ParticleInstance>,
 }
 
@@ -233,7 +233,7 @@ fn collect_runs(scene: &Scene, culling_mask: u32, eye: Eye) -> Vec<EmitterRun> {
         let (instances, depth) = emitter_instances(&emitter, light, eye);
         let run = EmitterRun {
             blend: emitter.blend,
-            texture: emitter.texture.as_ref().map(MapRef::to_string),
+            texture: emitter.texture.clone(),
             instances,
         };
         runs.push((run, depth));
