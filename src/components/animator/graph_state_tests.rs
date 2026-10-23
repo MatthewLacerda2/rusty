@@ -1,6 +1,6 @@
 //! Unit tests for the graph-state writes (#316): entering a node adopts its clip,
 //! loop flag and speed; binding seeds declared defaults without clobbering script
-//! writes; the per-node speed stacks into `advance`; and the new graph fields
+//! writes; and the new graph fields
 //! round-trip through serde with the entity.
 
 use std::collections::BTreeMap;
@@ -76,24 +76,6 @@ fn bind_graph_seeds_defaults_and_enters_the_entry_node() {
     assert_eq!(
         anim.parameters.get("Jump"),
         Some(&AnimatorParameter::Trigger(false))
-    );
-}
-
-#[test]
-fn advance_stacks_component_and_node_speed() {
-    let mut anim = AnimatorComponent {
-        base: Playback {
-            node_speed: 0.5,
-            ..Default::default()
-        },
-        is_playing: true,
-        speed: 2.0,
-        ..Default::default()
-    };
-    anim.advance(1.0, 0.0);
-    assert_eq!(
-        anim.base.time, 1.0,
-        "dt * speed * node_speed = 1.0 * 2.0 * 0.5"
     );
 }
 

@@ -181,6 +181,8 @@ fn blend_joint(a: JointTransform, b: JointTransform, t: f32) -> JointTransform {
 #[cfg(test)]
 mod layer_tests;
 #[cfg(test)]
+mod playhead_tests;
+#[cfg(test)]
 mod test_rig;
 #[cfg(test)]
 mod tests;

@@ -6,6 +6,8 @@
 use std::collections::BTreeMap;
 
 use super::*;
+use crate::app::animation::advance;
+use crate::app::animation::test_rig::{mesh, slide, HIPS};
 use crate::asset::animation_graph::{GraphNode, ParameterDeclaration, StateMachine};
 
 fn node(name: &str, clip: &str, is_loop: bool, speed: Option<f32>) -> GraphNode {
@@ -232,6 +234,8 @@ fn bool_condition_requires_the_matching_value_and_type() {
 /// byte-identical animator — the property the headless replay depends on.
 #[test]
 fn replaying_the_same_inputs_is_byte_identical() {
+    let clips = ["IdleClip", "RunClip", "JumpClip"].map(|n| slide(n, &[HIPS], 0.0, 1.0, 1.5));
+    let clips = mesh(clips.to_vec());
     let run = || {
         let graph = locomotion();
         let mut anim = graph_animator();
@@ -246,7 +250,7 @@ fn replaying_the_same_inputs_is_byte_identical() {
                 anim.set_trigger("Jump");
             }
             step_graph(&mut anim, &graph);
-            anim.advance(1.0 / 60.0, 1.5);
+            advance(&mut anim, Some(&clips), Some(&graph), 1.0 / 60.0);
         }
         serde_json::to_string(&anim).unwrap()
     };
