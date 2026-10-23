@@ -35,9 +35,21 @@ impl GameWorld {
     /// Play button would. A shipped game never converts a model (#1253), so the
     /// import cache serves what it holds from here on.
     pub fn boot_standalone(&mut self) {
-        crate::asset::convert::allow_conversion(false);
+        crate::asset::convert::ship();
         self.resources.standalone = true;
         self.set_playing(true);
+    }
+
+    /// Bring the project's converted sources up to date, then refuse conversion for
+    /// the session (#1253), as Unity refreshes its assets before Play and its
+    /// runtime loads never import. A standalone game ships its caches, so it only
+    /// holds.
+    pub(super) fn refresh_then_hold_imports(&mut self) {
+        use crate::asset::convert::{refresh_sources, PlayHold};
+        if !self.resources.standalone {
+            refresh_sources(&self.resources.sources_root);
+        }
+        self.resources.play_hold = Some(PlayHold::take());
     }
 
     /// Whether the game called `Application.Quit()` and no host has consumed it yet.
@@ -268,3 +280,7 @@ mod play_tests;
 #[cfg(test)]
 #[path = "import_gate_tests.rs"]
 mod import_gate_tests;
+
+#[cfg(test)]
+#[path = "import_refresh_tests.rs"]
+mod import_refresh_tests;

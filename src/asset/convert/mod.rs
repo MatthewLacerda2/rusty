@@ -41,9 +41,10 @@
 //! again, once (`record`), as Unity shows a model's import warnings on every
 //! reimport.
 //!
-//! **When it is not re-made.** Play never converts (`gate`, #1253): it reads
-//! the cache as it stands, and a source changed meanwhile converts at the first
-//! edit frame after Stop. The standalone player never converts at all.
+//! **When it is not re-made.** Play never converts (`gate`, #1253): entering it
+//! brings every source under the project's `assets/` up to date first, then it
+//! reads the cache as it stands, and a source changed meanwhile converts at the
+//! first edit frame after Stop. The standalone player never converts at all.
 //!
 //! **What a scene saves** for an extracted texture is never its cache path but
 //! `model.fbx#tex/<identity>`, which [`texture_ref`] resolves (#1130).
@@ -63,7 +64,7 @@ pub mod texture_ref;
 
 pub use converter::{converter_for, Converted, Converter, Skip, CONVERTERS};
 pub use depends::{Dependency, Seen};
-pub use gate::{allow_conversion, conversion_allowed, convert_held};
+pub use gate::{conversion_allowed, convert_held, refresh_sources, ship, PlayHold};
 pub use stage::{textures_dirs, Staging};
 
 use super::ImportError;

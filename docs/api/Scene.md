@@ -202,9 +202,12 @@ one name and never drift.
   engine default when the glTF names none), and syncs a mesh collider when the asset's
   `.meta` sidecar records one. Returns the new entity's id; errors (without spawning)
   when the reference is malformed, the file fails to import, or the sub-object is absent.
-  A converted source (`.fbx`) is never converted during Play, as Unity's Play never
-  imports: Play reads its last import, stale or not, and converts it at Stop; one never
-  imported fails with "import it in edit mode first". A shipped game never converts.
+  A converted source (`.fbx`) is never converted during Play: as Unity refreshes its
+  assets before Play and its runtime loads never import, entering Play brings every
+  converted source under `assets/` up to date, and Play then reads that import. A
+  source changed during Play keeps its last import until Stop converts it; one that
+  appeared during Play, or whose conversion failed, fails with "import it in edit mode
+  first", and a mistyped path with "file not found". A shipped game never converts.
   A sub-object name that is the **base of a `_LOD<n>` set** (`props.glb::Crate` for
   objects named `Crate_LOD0`, `Crate_LOD1`) spawns the whole set as one entity carrying
   an `LODGroup`, one child per level, and returns the group's id — see

@@ -219,7 +219,7 @@ impl GameWorld {
     }
 
     fn enter_play(&mut self) {
-        crate::asset::convert::allow_conversion(false); // Play never imports (#1253)
+        self.refresh_then_hold_imports(); // #1253
         self.resources.play_frame = 0;
         self.resources.time.borrow_mut().reset();
         // Reload animation graphs fresh each Play session (#316), so asset edits
@@ -287,7 +287,7 @@ impl GameWorld {
                 .bake(&self.world.scene.borrow());
         }
         self.restore_play_origin();
-        crate::asset::convert::allow_conversion(!self.resources.standalone); // #1253
+        self.resources.play_hold = None; // conversion back on (#1253)
     }
 }
 

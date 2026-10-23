@@ -89,6 +89,12 @@ pub struct Resources {
     /// A standalone run (the player, #431) has no edit mode to return to, so Play
     /// takes no edit snapshot. Set once by `GameWorld::boot_standalone`.
     pub(super) standalone: bool,
+    /// Conversion refused while this world plays (#1253): taken on Play, dropped
+    /// on Stop or with the world.
+    pub(super) play_hold: Option<crate::asset::convert::PlayHold>,
+    /// The folder whose converted sources Play brings up to date before it starts
+    /// (#1253): the project's `assets/`.
+    pub(super) sources_root: std::path::PathBuf,
     /// The scaled per-frame delta (`Time::delta_time`) for the tick in flight, set by
     /// `GameWorld::tick` before the schedule runs. Systems read it instead of taking
     /// `dt` as a third argument, keeping the call shape `(&mut World, &mut Resources)`.
@@ -167,6 +173,8 @@ impl Resources {
             edit_snapshot: None,
             play_origin: None,
             standalone: false,
+            play_hold: None,
+            sources_root: crate::core::project::ASSETS_DIR.into(),
             frame_dt: 0.0,
             schedule: super::build().into_schedule(),
             animation_graphs: GraphCache::default(),

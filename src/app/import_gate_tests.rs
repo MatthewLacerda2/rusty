@@ -19,14 +19,14 @@ use crate::scripting::ConsoleLogs;
 const DT: f32 = 1.0 / 60.0;
 
 /// A quad (6 indices) under the object name `Quad`.
-const QUAD: &str = include_str!("../../tests/fixtures/models/embedded_textures.fbx");
+pub(super) const QUAD: &str = include_str!("../../tests/fixtures/models/embedded_textures.fbx");
 
 /// One triangle (3 indices) under the same object name.
 fn triangle() -> String {
     include_str!("../../tests/fixtures/models/missing_texture.fbx").replace("Tri", "Quad")
 }
 
-fn world() -> GameWorld {
+pub(super) fn world() -> GameWorld {
     GameWorld::new(
         Rc::new(RefCell::new(Scene::new())),
         Rc::new(RefCell::new(InputState::new())),
@@ -47,7 +47,7 @@ fn reference(path: &Path) -> String {
     format!("{}::Quad", path.display())
 }
 
-fn stamp(path: &Path) -> String {
+pub(super) fn stamp(path: &Path) -> String {
     let cache = cache_location(path).unwrap();
     std::fs::read_to_string(format!("{}.source", cache.display())).unwrap()
 }
