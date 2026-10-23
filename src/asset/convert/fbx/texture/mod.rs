@@ -23,14 +23,12 @@
 
 mod identity;
 
-use super::super::stage;
-use super::super::stage::hook::{self, Step};
+use super::super::texture_file::{self, file_name, relative_uri, unique};
 use super::super::{glb, Dependency, Seen, Skip, Staging};
 use crate::asset::gltf::uri;
 use crate::asset::{ImportError, IMAGE_EXTENSIONS};
 use crate::core::collections::Map;
-use crate::core::paths;
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 
 /// Every texture one conversion references, by FBX element id.
 pub struct Textures {
@@ -119,7 +117,7 @@ impl Textures {
                 return Ok(self.skip(texture, why));
             }
         };
-        self.extract(&name, &texture.content)?;
+        texture_file::write(&self.dir, &name, &texture.content)?;
         let Some(dir) = self.dir.file_name() else {
             return Err(ImportError::Parse(format!(
                 "FBX texture `{}`: {} names no folder to reference",
@@ -174,25 +172,6 @@ impl Textures {
         });
         None
     }
-
-    /// Write one texture. Only the textures folder is created, never the staging
-    /// folder above it: a concurrent conversion that cleared that one must make
-    /// this conversion fail, not resurrect half of it.
-    fn extract(&self, name: &str, bytes: &[u8]) -> Result<(), ImportError> {
-        match std::fs::create_dir(&self.dir) {
-            Err(e) if e.kind() != std::io::ErrorKind::AlreadyExists => {
-                return Err(ImportError::Parse(format!(
-                    "writing {}: {e}",
-                    self.dir.display()
-                )))
-            }
-            _ => {}
-        }
-        let path = self.dir.join(name);
-        hook::io(Step::ExtractTexture)
-            .and_then(|()| stage::write(&path, bytes))
-            .map_err(|e| ImportError::Parse(format!("writing {}: {e}", path.display())))
-    }
 }
 
 /// What looking on disk for a texture found.
@@ -209,85 +188,6 @@ fn raw_name(texture: &ufbx::Texture) -> &str {
         .map(|name| name.as_ref() as &str)
         .find(|name| !name.is_empty())
         .unwrap_or(texture.element.name.as_ref())
-}
-
-/// The sanitised stem and lowercase extension of the file `raw` names, holding
-/// `bytes`: only ASCII letters, digits, `-`, `_` and inner `.`, so no separator,
-/// `..` or URI escape survives. A name without an image extension whose bytes are
-/// a PNG or a JPEG gets that extension (`Material #25` → `Material__25.png`).
-fn file_name(raw: &str, bytes: &[u8]) -> (String, String) {
-    // FBX paths are often Windows ones: split on both separators.
-    let base = raw.rsplit(['/', '\\']).next().unwrap_or(raw);
-    let (stem, ext) = base.rsplit_once('.').unwrap_or((base, ""));
-    let ext = clean(ext).to_ascii_lowercase();
-    let (stem, ext) = match sniff(bytes) {
-        Some(sniffed) if !IMAGE_EXTENSIONS.contains(&ext.as_str()) => {
-            (clean(base), sniffed.to_string())
-        }
-        _ => (clean(stem), ext),
-    };
-    let stem = if stem.is_empty() {
-        "texture".to_string()
-    } else {
-        stem
-    };
-    (stem, ext)
-}
-
-/// `s` with every character but ASCII letters, digits, `-`, `_` and `.` made `_`,
-/// and no leading or trailing `.`.
-fn clean(s: &str) -> String {
-    let s: String = s
-        .chars()
-        .map(|c| match c {
-            'a'..='z' | 'A'..='Z' | '0'..='9' | '-' | '_' | '.' => c,
-            _ => '_',
-        })
-        .collect();
-    s.trim_matches('.').to_string()
-}
-
-/// The extension `bytes`' magic number says they are, for the formats a name
-/// alone may not tell: PNG and JPEG.
-fn sniff(bytes: &[u8]) -> Option<&'static str> {
-    if bytes.starts_with(b"\x89PNG\r\n\x1a\n") {
-        Some("png")
-    } else if bytes.starts_with(&[0xFF, 0xD8, 0xFF]) {
-        Some("jpg")
-    } else {
-        None
-    }
-}
-
-/// `<stem>.<ext>`, or `<stem>.1.<ext>`, … when a name already `taken` matches it
-/// ignoring case (a macOS disk would make the two one file).
-fn unique(stem: &str, ext: &str, taken: &[String]) -> String {
-    let free = |name: &str| !taken.iter().any(|t| t.eq_ignore_ascii_case(name));
-    let base = format!("{stem}.{ext}");
-    if free(&base) {
-        return base;
-    }
-    (1..)
-        .map(|n| format!("{stem}.{n}.{ext}"))
-        .find(|name| free(name))
-        .unwrap_or(base)
-}
-
-/// `target` as a `/`-separated, percent-encoded URI from directory `from`, both
-/// resolved first.
-pub fn relative_uri(from: &Path, target: &Path) -> Option<String> {
-    let from = paths::canonicalize(from).ok()?;
-    let target = paths::canonicalize(target).ok()?;
-    let from: Vec<Component> = from.components().collect();
-    let target: Vec<Component> = target.components().collect();
-    let shared = from.iter().zip(&target).take_while(|(a, b)| a == b).count();
-    let up = std::iter::repeat_n("..".to_string(), from.len() - shared);
-    let down = target[shared..]
-        .iter()
-        .map(|c| c.as_os_str().to_string_lossy().into_owned());
-    Some(uri::encode_path(
-        &up.chain(down).collect::<Vec<_>>().join("/"),
-    ))
 }
 
 #[cfg(test)]

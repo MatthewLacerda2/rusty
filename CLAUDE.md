@@ -487,7 +487,8 @@ only its adapter (Lua → zimmer document, file writes, patch-path resolution).
   it changes, and nothing past the importer learns another format (operator,
   2026-10-17):
   - `.fbx` is converted inside the engine with the `ufbx` crate (#1024);
-  - `.blend` is converted by **Blender**, run headless (#1072).
+  - `.blend` is converted by **Blender**, run headless (#1072; `RUSTY_BLENDER` names a
+    non-standard install).
   **Blender 5 or later is a requirement**, with the Blender MCP set up: rusty assumes it
   is installed, and when it isn't, the import says so and asks for it — no fallback
   parser and no promise of support without it. Running Blender is **authoring only**

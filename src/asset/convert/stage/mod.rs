@@ -10,7 +10,7 @@
 //! 1. The converter writes plain files into `.<cache>.<pid>.<n>.staging/` beside
 //!    the cache: the same filesystem, so every later move is a rename.
 //! 2. Its textures folder is renamed in. A folder cannot replace a full one, so each
-//!    conversion's folder has its own name, `<cache>.<digest>.textures`, and the
+//!    conversion's folder has its own name, `<cache>.<tag>.textures`, and the
 //!    old `.glb`'s folder stays untouched beside it.
 //! 3. The old stamp is removed, then the `.glb` is renamed over the old one: the
 //!    one step a reader can observe. A crash between the two leaves an unstamped
@@ -43,7 +43,7 @@ pub use clear::textures_dirs;
 pub(in crate::asset::convert) use note::write;
 
 use super::{record, stamp_path, write_error, Converted, Converter, ImportError};
-use crate::core::{fs, hash};
+use crate::core::fs;
 use hook::{at, Step};
 use std::path::{Path, PathBuf};
 
@@ -64,24 +64,25 @@ const STAGING: &str = "staging";
 const TEXTURES: &str = "textures";
 
 /// Run `converter` on `source` into a staging folder beside `out`, and swap the
-/// result in, stamped `stamp`: what the converter reported, once it is in place.
+/// result in, stamped `stamp`, its textures folder tagged `tag`
+/// (`record::folder_tag`): what the converter reported, once it is in place.
 pub(super) fn convert(
     converter: &Converter,
     source: &Path,
     out: &Path,
-    stamp: &str,
+    (stamp, tag): (&str, &str),
 ) -> Result<Converted, ImportError> {
     let (dir, name) = clear::split(out);
     let staging = fs::unique_sibling(&dir.join(format!(".{name}")), STAGING);
     std::fs::create_dir(&staging).map_err(|e| write_error(&staging, &e))?;
     let to = Staging {
         glb: staging.join(&name),
-        textures: staging.join(textures_name(&name, stamp)),
+        textures: staging.join(textures_name(&name, tag)),
         out: out.to_path_buf(),
     };
     at(Step::Staged);
     let result = (converter.convert)(source, &to)
-        .and_then(|converted| swap(&to, &dir, &record(stamp, &converted)).map(|()| converted));
+        .and_then(|converted| swap(&to, &dir, &record(stamp, tag, &converted)).map(|()| converted));
     let _ = std::fs::remove_dir_all(&staging);
     let converted = result?;
     at(Step::Stamped);
@@ -90,10 +91,9 @@ pub(super) fn convert(
     Ok(converted)
 }
 
-/// `<name>.<digest>.textures`: the folder of the conversion stamped `stamp`.
-fn textures_name(name: &str, stamp: &str) -> String {
-    let tag = hash::fnv1a64(stamp.as_bytes());
-    format!("{name}.{tag:016x}.{TEXTURES}")
+/// `<name>.<tag>.textures`: the folder of the conversion tagged `tag`.
+fn textures_name(name: &str, tag: &str) -> String {
+    format!("{name}.{tag}.{TEXTURES}")
 }
 
 /// Steps 2 to 4: move the staged set into `dir`, the `.glb` last, then write its
@@ -121,11 +121,12 @@ fn swap(to: &Staging, dir: &Path, record: &str) -> Result<(), ImportError> {
 }
 
 /// Move the folder `from` to `to`, returning `to` when it moved whole. When `to`
-/// is already a folder, it holds the same conversion's output (same digest), kept
-/// when its stamp was lost or a file the conversion looked at changed (#1189): a
-/// file name there holds the same bytes whatever was found on disk (`fbx::texture`
-/// reserves every embedded texture's name), so its files are replaced one by one
-/// and nothing a reader relies on changes. Any other failure is reported as it is.
+/// is already a folder, it holds the same conversion's output (same tag), kept
+/// when its stamp was lost or its swap failed: a file name there holds the same
+/// bytes whatever was found on disk (`fbx::texture` reserves every embedded
+/// texture's name, and a changed file the conversion looked at changes the tag,
+/// `record::folder_tag`), so its files are replaced one by one and nothing a
+/// reader relies on changes. Any other failure is reported as it is.
 fn move_in(from: &Path, to: &Path) -> Result<Option<PathBuf>, ImportError> {
     if !to.is_dir() {
         // lint: allow(atomic-write) step 2 of the swap: a staged folder moves in whole

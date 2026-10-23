@@ -14,12 +14,14 @@ picture whatever the lighting. A map may also be `"<model>#tex/<name>"`, a textu
 an imported model embeds (`assets/soldier.fbx#tex/Skin`): that is what instancing an
 `.fbx` with embedded textures puts on its material, resolved through the import cache
 whenever the texture is read, so a saved scene never names a cached file (#1130).
-`<name>` is the FBX texture element's own name. A texture with no name, one whose
+`<name>` is the FBX texture element's own name, or, for a `.blend`, the name of an
+image packed into it (`assets/crate.blend#tex/Planks`). A texture with no name, one whose
 name starts with `#`, and every texture after the first to share a name is named by
 its position among the model's textures instead: `assets/soldier.fbx#tex/#2`. That
 form shifts when a texture is inserted before it in the FBX, so give textures
 distinct names. A texture that is a file on disk beside the model is not embedded and
-stays its plain path (`models/skin.png`).
+stays its plain path (`models/skin.png`), in a `.blend` too: only an image the
+conversion wrote into the import cache is a reference (#1072).
 
 | Function | Signature |
 |---|---|

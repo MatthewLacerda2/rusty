@@ -7,14 +7,17 @@ use std::path::Path;
 
 mod depends;
 mod failures;
+mod folder_tag;
 mod gate;
 mod identity;
 mod locking;
 mod looks;
 mod notes;
+mod on_disk;
 mod refresh;
 mod skips;
 mod staging;
+mod tool;
 mod unlocked;
 
 /// A converter that copies its source, so a test can see which bytes it wrote.
@@ -22,6 +25,7 @@ const COPY: Converter = Converter {
     extension: "src",
     name: "copy",
     version: 1,
+    tool: None,
     convert: copy,
 };
 

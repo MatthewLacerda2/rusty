@@ -63,7 +63,7 @@ from __future__ import annotations
 # is not a shipped platform, so its run informs and never holds a merge) — is
 # not asked about, and counting it would be the same mistake in a new costume.
 WORKFLOWS: dict[str, tuple[str, tuple[str, ...]]] = {
-    "ci": ("ci-gate", ("build-test", "build-test-cross", "deny")),
+    "ci": ("ci-gate", ("build-test", "build-test-cross", "blender", "deny")),
     "lint": ("lint-gate", ("lint",)),
 }
 

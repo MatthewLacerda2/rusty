@@ -21,6 +21,24 @@ fn a_file_name_keeps_no_separator_climb_or_escape() {
 }
 
 #[test]
+fn the_bytes_format_wins_over_the_name() {
+    let png = b"\x89PNG\r\n\x1a\nrest";
+    let exr = [0x76, 0x2F, 0x31, 0x01, 0x02];
+    let jpeg = [0xFF, 0xD8, 0xFF, 0xE0];
+    let named = |raw: &str, bytes: &[u8]| file_name(raw, bytes);
+    // A painted-over JPG packed into a `.blend` holds PNG bytes (#1072).
+    assert_eq!(named("wood.jpg", png), ("wood".into(), "png".into()));
+    assert_eq!(named("sky.png", &exr), ("sky".into(), "exr".into()));
+    assert_eq!(named("sky.exr", &exr), ("sky".into(), "exr".into()));
+    assert_eq!(named("scan.JPEG", &jpeg), ("scan".into(), "jpeg".into()));
+    assert_eq!(
+        named("skin.tga", b"\0\0\x02"),
+        ("skin".into(), "tga".into()),
+        "a TGA has no magic number: its name stays"
+    );
+}
+
+#[test]
 fn a_name_without_an_image_extension_takes_its_bytes_format() {
     let png = b"\x89PNG\r\n\x1a\nrest";
     let jpeg = [0xFF, 0xD8, 0xFF, 0xE0];
@@ -31,11 +49,6 @@ fn a_name_without_an_image_extension_takes_its_bytes_format() {
     );
     assert_eq!(named("scan.bmp", &jpeg), ("scan.bmp".into(), "jpg".into()));
     assert_eq!(named("...", png), ("texture".into(), "png".into()));
-    assert_eq!(
-        named("skin.tga", png),
-        ("skin".into(), "tga".into()),
-        "an image name stays"
-    );
 }
 
 #[test]

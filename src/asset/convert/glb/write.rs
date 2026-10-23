@@ -59,7 +59,7 @@ fn insert_nonempty(root: &mut Map<String, Value>, key: &str, values: Vec<Value>)
 
 /// The GLB container around the two chunks: JSON padded with spaces, BIN with
 /// zeros, each to a 4-byte boundary.
-fn container(mut json: Vec<u8>, mut bin: Vec<u8>) -> Vec<u8> {
+pub fn container(mut json: Vec<u8>, mut bin: Vec<u8>) -> Vec<u8> {
     pad(&mut json, b' ');
     pad(&mut bin, 0);
     let mut chunks = vec![(CHUNK_JSON, json)];

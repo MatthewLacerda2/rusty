@@ -18,13 +18,19 @@
 //!
 //! **When it is re-made.** A `<cache>.glb.source` stamp beside each cached file
 //! records the converter, its [`Converter::version`], a digest of the source's
-//! bytes, and every external file the conversion looked at (an FBX's on-disk
-//! texture), with a digest or as absent (#1189); any difference re-converts.
+//! bytes, the version of the program it runs ([`Converter::tool`]: Blender's, for a
+//! `.blend`), and every external file the conversion looked at (an FBX's on-disk
+//! texture, a `.blend`'s linked library), with a digest or as absent (#1189); any
+//! difference re-converts. With the program missing, a cache of the unchanged
+//! source stands, made by whichever version of it; Play never asks the program at
+//! all (`gate::serve`), and a refresh asks it once (`stale`).
 //! Content, not timestamps: a fresh clone gives every file a new mtime. A source's
 //! digest is remembered by its length and mtime (`depends`), so a Play that looks
 //! at every source reads only the ones that changed. Files a conversion writes for the glTF to
 //! reference (FBX's embedded textures, #1082) live in a
-//! `<cache>.glb.<digest>.textures/` folder beside it and are re-made with it.
+//! `<cache>.glb.<tag>.textures/` folder beside it and are re-made with it; the tag,
+//! recorded in the stamp file, digests the stamp and how the files the last
+//! conversion looked at read now (`record::folder_tag`).
 //!
 //! **How it is re-made.** A converter writes plain files into a fresh staging
 //! folder, and `stage` swaps the set into place, so a reader in another process
@@ -54,6 +60,7 @@
 //! **Adding a converter** is one row in [`CONVERTERS`]: an extension and a
 //! function that writes a glTF where its [`Staging`] says.
 
+mod blend;
 mod converter;
 mod depends;
 mod fbx;
@@ -62,6 +69,8 @@ pub mod glb;
 mod lock;
 mod record;
 mod stage;
+mod stale;
+mod texture_file;
 pub mod texture_ref;
 
 pub use converter::{converter_for, Converted, Converter, Skip, CONVERTERS};
@@ -71,7 +80,8 @@ pub use stage::{textures_dirs, Staging};
 
 use super::ImportError;
 use crate::core::{hash, paths, project};
-use record::{record, split_record, stamp_path};
+use record::{record, stamp_path};
+use stale::{stale, Tool};
 use std::path::{Component, Path, PathBuf};
 
 /// Where an open project keeps converted sources, relative to its root: a folder
@@ -110,7 +120,20 @@ pub fn cache_location(path: &Path) -> Result<PathBuf, ImportError> {
 /// What the conversion skipped is warned of as it runs, and once per process
 /// from the cache (`record`), the source present or not.
 pub fn refresh(converter: &Converter, source: &Path, out: &Path) -> Result<(), ImportError> {
-    if stale(converter, source, out)?.is_none() {
+    // Asked once: the program's lookup and version serve both checks below. A
+    // missing source is served from its cache, so its program is never asked: a
+    // player shipped without its `.blend` sources never starts Blender.
+    let present = source.is_file();
+    let asked = converter
+        .tool
+        .filter(|_| present)
+        .map(|identify| identify());
+    let tool = if present {
+        Tool::of(asked.as_ref())
+    } else {
+        Tool::unasked(converter)
+    };
+    if stale(converter, source, out, tool)?.is_none() {
         return Ok(());
     }
     if let Some(dir) = out.parent() {
@@ -121,12 +144,14 @@ pub fn refresh(converter: &Converter, source: &Path, out: &Path) -> Result<(), I
     let _lock = lock::hold(out);
     // Stamped again under the lock: what waited may have been converted
     // meanwhile, or the source saved, and the stamp names what the converter reads.
-    let Some(stamp) = stale(converter, source, out)? else {
+    let Some(stamp) = stale(converter, source, out, tool)? else {
         return Ok(());
     };
-    match stage::convert(converter, source, out, &stamp) {
+    let tag = record::folder_tag(out, &stamp);
+    match stage::convert(converter, source, out, (&stamp, &tag)) {
         Ok(converted) => {
-            record::report(source, out, &record::Stored::written(&stamp, &converted));
+            let stored = record::Stored::written(&stamp, &tag, &converted);
+            record::report(source, out, &stored);
         }
         // Without a lock, another process converted the same source meanwhile.
         Err(e) => {
@@ -135,27 +160,6 @@ pub fn refresh(converter: &Converter, source: &Path, out: &Path) -> Result<(), I
         }
     }
     Ok(())
-}
-
-/// The stamp `source` converts to, when the cache at `out` is not its conversion
-/// yet; `None`, its skips replayed, when it is, or stands in for a missing source.
-fn stale(converter: &Converter, source: &Path, out: &Path) -> Result<Option<String>, ImportError> {
-    let digest = match depends::digest(source) {
-        Seen::Read(digest) => digest,
-        _ if out.is_file() => {
-            if let Some(stored) = record::stored(out) {
-                record::replay(source, out, &stored);
-            }
-            return Ok(None);
-        }
-        _ => return Err(unreadable(source)),
-    };
-    let stamp = record::stamp(converter, digest);
-    let Some(stored) = record::current(out, &stamp) else {
-        return Ok(Some(stamp));
-    };
-    record::replay(source, out, &stored);
-    Ok(None)
 }
 
 /// Where the project at `root` caches the source at `rel` (project-relative): the

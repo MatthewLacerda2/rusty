@@ -1,6 +1,7 @@
 //! Step 5 of the swap: what earlier conversions of one cache left beside it.
 
-use super::super::{split_record, stamp_path};
+use super::super::record::tag_of;
+use super::super::stamp_path;
 use super::{textures_name, STAGING, TEXTURES};
 use crate::core::fs;
 use std::path::{Path, PathBuf};
@@ -17,10 +18,12 @@ use std::path::{Path, PathBuf};
 /// conversion in place or fails that one import.
 pub(super) fn clear(dir: &Path, name: &str) {
     let stamp = stamp_path(&dir.join(name));
-    let current =
-        || std::fs::read_to_string(&stamp).map(|s| textures_name(name, split_record(&s).0));
+    let current = || {
+        let record = std::fs::read_to_string(&stamp).ok()?;
+        tag_of(&record).map(|tag| textures_name(name, tag))
+    };
     for old in textures_dirs(&dir.join(name)) {
-        let stale = current().is_ok_and(|keep| old.file_name() != Some(keep.as_ref()));
+        let stale = current().is_some_and(|keep| old.file_name() != Some(keep.as_ref()));
         if stale {
             let _ = std::fs::remove_dir_all(old);
         }
@@ -38,7 +41,7 @@ pub(super) fn clear(dir: &Path, name: &str) {
 }
 
 /// The textures folders beside the cached glTF at `out`, current or left by an
-/// earlier conversion: `<out>.<digest>.textures/`, and the undigested
+/// earlier conversion: `<out>.<tag>.textures/`, and the untagged
 /// `<out>.textures/` of converters before #1129.
 pub fn textures_dirs(out: &Path) -> Vec<PathBuf> {
     let (dir, name) = split(out);

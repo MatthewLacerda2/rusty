@@ -21,7 +21,7 @@
 //! state lives in `app`, above this module, so `app` holds the switch and this
 //! module never reads it.
 
-use super::{cached_gltf, converter_for, stale, Converter};
+use super::{cached_gltf, converter_for, stale, Converter, Tool};
 use crate::asset::ImportError;
 use std::path::{Component, Path, PathBuf};
 
@@ -163,13 +163,17 @@ pub fn convert_held() -> usize {
 /// `cached_gltf` with conversion off: the cache at `out` as it stands. A source
 /// changed since is held back for [`convert_held`], and said so once; a source
 /// never converted fails, since nothing may convert it now, and one that does not
-/// exist fails as a missing file.
+/// exist fails as a missing file. A program a converter runs is never started
+/// here, not even to ask its version: a cache of the unchanged source, made by
+/// any version of it, is served (#1072).
 pub(super) fn serve(converter: &Converter, source: &Path, out: &Path) -> Result<(), ImportError> {
     if !out.is_file() {
         return Err(not_imported(source));
     }
     let key = key(source);
-    if with_gate(|gate| gate.held.contains(&key)) || stale(converter, source, out)?.is_none() {
+    if with_gate(|gate| gate.held.contains(&key))
+        || stale(converter, source, out, Tool::unasked(converter))?.is_none()
+    {
         return Ok(());
     }
     let uses = with_gate(|gate| {

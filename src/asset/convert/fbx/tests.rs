@@ -104,8 +104,10 @@ fn a_texture_uri_climbs_out_of_the_cache_folder() {
     std::fs::create_dir_all(dir.join("cache/models")).unwrap();
     std::fs::create_dir_all(dir.join("textures")).unwrap();
     std::fs::write(dir.join("textures/skin.png"), b"").unwrap();
-    let uri =
-        super::texture::relative_uri(&dir.join("cache/models"), &dir.join("textures/skin.png"));
+    let uri = crate::asset::convert::texture_file::relative_uri(
+        &dir.join("cache/models"),
+        &dir.join("textures/skin.png"),
+    );
     assert_eq!(uri.as_deref(), Some("../../textures/skin.png"));
 }
 

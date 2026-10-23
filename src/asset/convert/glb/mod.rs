@@ -7,8 +7,8 @@
 //! loses nothing the engine uses. Output is byte-for-byte deterministic: the same
 //! document always writes the same file, so a versioned cache does not churn.
 //!
-//! A converter backed by another tool (Blender, #1072) writes its own glTF and
-//! never touches this module.
+//! A converter backed by another tool (Blender, #1072) has the tool write the
+//! glTF and only frames it as a binary one here ([`container`]).
 // A converter's (#1172): a `let _ =` or a discarded `.ok()` here would drop a
 // failure the cache must not be stamped over, and a print would bypass the one
 // warning path; the rest of the crate keeps `let _ =` for best-effort cleanup.
@@ -25,7 +25,7 @@ mod read;
 mod write;
 
 pub use read::image_uris;
-pub use write::write;
+pub use write::{container, write};
 
 /// One glTF scene: a node forest plus the meshes, materials, skins and animations
 /// it uses.

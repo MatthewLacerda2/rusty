@@ -50,8 +50,8 @@ fn converted(name: &str) -> (std::path::PathBuf, std::path::PathBuf) {
     let record = std::fs::read_to_string(dir.join("a.src.glb.source")).unwrap();
     assert_eq!(
         record.lines().count(),
-        2,
-        "the stamp, then one line per skip"
+        3,
+        "the stamp, the textures folder's tag, then one line per skip"
     );
     std::fs::write(&out, "kept").unwrap();
     (source, out)
@@ -105,8 +105,8 @@ fn a_reconversion_elsewhere_for_a_changed_file_warns_of_its_new_skips() {
         }],
         depends_on: vec![Dependency::look(&texture_of(&source)).unwrap()],
     };
-    let stamp = record::stamp(&LOOKING, crate::core::hash::fnv1a64(b"one"));
-    let stamp_file = record::record(&stamp, &converted);
+    let stamp = record::stamp(&LOOKING, crate::core::hash::fnv1a64(b"one"), None);
+    let stamp_file = record::record(&stamp, &record::folder_tag(&out, &stamp), &converted);
     std::fs::write(super::super::stamp_path(&out), stamp_file).unwrap();
 
     refresh(&LOOKING, &source, &out).unwrap();

@@ -241,6 +241,58 @@ jobs:
       - name: Test (lint xtask)
         run: cargo test --manifest-path tools/lint/Cargo.toml --locked
 
+  # The `.blend` import through a real Blender (#1072). Its tests are `#[ignore]`d
+  # in every other run, since rusty requires Blender but a runner has none; this
+  # job installs one and runs exactly those (`--run-ignored only`), so the
+  # conversion is proven somewhere on every code change. The tarball is cached by
+  # version; `RUSTY_BLENDER` names it, as a non-standard install would.
+  blender:
+    needs: changes
+    timeout-minutes: 30
+    runs-on: ubuntu-24.04
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      ((github.event_name == 'push' ||
+        (github.event_name == 'pull_request' && github.event.pull_request.draft == false)) &&
+       needs.changes.outputs.code != 'false')
+    env:
+      BLENDER_VERSION: "5.2.3"
+      BLENDER_SERIES: "5.2"
+      # The filter below runs no GPU test; set as on every suite job (#978).
+      RUSTY_REQUIRE_GPU: "1"
+    steps:
+      - uses: actions/checkout@v7
+      - name: Toolchain (from rust-toolchain.toml)
+        run: rustup show
+      - name: Cache cargo registry + target
+        uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: System libs for winit/wgpu builds
+        run: sudo apt-get update && sudo apt-get install -y pkg-config libxkbcommon-dev libwayland-dev libudev-dev libasound2-dev
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
+      - name: Cache Blender
+        id: blender-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/blender
+          key: blender-${{ env.BLENDER_VERSION }}-linux-x64
+      - name: Install Blender
+        if: steps.blender-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/blender
+          curl -sSfL "https://download.blender.org/release/Blender${BLENDER_SERIES}/blender-${BLENDER_VERSION}-linux-x64.tar.xz" \
+            | tar -xJ -C ~/blender --strip-components=1
+      - name: Blender version
+        run: ~/blender/blender --version | head -1
+      - name: Test (the .blend import, through Blender)
+        run: |
+          export RUSTY_BLENDER="$HOME/blender/blender"
+          cargo nextest run --profile ci --locked --run-ignored only -E 'test(/convert::blend::/)'
+
   # The one gating job that also runs nightly — see the `schedule` trigger note.
   deny:
     needs: changes
@@ -279,7 +331,7 @@ jobs:
   # report a run where nothing was checked as green. That happened on every
   # post-merge run until #480 (`changes` failed, `ci-gate` said success).
   ci-gate:
-    needs: [changes, build-test, build-test-cross, deny]
+    needs: [changes, build-test, build-test-cross, blender, deny]
     # `!cancelled()`, not `always()` (#515): a failed or skipped gating job still
     # reaches this gate and fails it, but a run cancelled because a newer push
     # superseded it (#482) leaves no red `ci-gate` beside the live one.
