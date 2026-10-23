@@ -15,8 +15,11 @@ impl Baked {
     pub(super) fn new(pass: &str, block: &str, tag: &str) -> Self {
         let name = format!("test_tween_{tag}_{}", std::process::id());
         let json = format!(r#"{{"pass":"{pass}","name":"{name}","blocks":[{{"id":"{block}"}}]}}"#);
-        let recipe: ShaderRecipe =
-            crate::api::lua_json::decode(serde_json::from_str(&json).unwrap()).unwrap();
+        let lua = mlua::Lua::new();
+        let recipe: ShaderRecipe = crate::api::lua_json::recipe_from_lua(&mlua::Value::String(
+            lua.create_string(&json).unwrap(),
+        ))
+        .unwrap();
         bake_recipe(&recipe, engine_shader_dir(), DEFAULT_OUT_DIR).unwrap();
         Self(name)
     }

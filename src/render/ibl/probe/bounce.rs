@@ -28,6 +28,7 @@
 
 use glam::Vec3;
 
+use super::bake::project_cubemap;
 use crate::render::Renderer;
 use crate::scene::lighting::lightmap::{baked_direct_sh, BakeScene};
 use crate::scene::lighting::sh::Sh9;
@@ -120,7 +121,7 @@ impl Renderer {
             .map(|&p| {
                 if with_probes {
                     let capture = self.capture_static_cubemap_lit(scene, p, resolution);
-                    crate::render::ibl::probe::bake::project_cubemap(&capture)
+                    project_cubemap(&capture)
                 } else {
                     self.bake_probe(scene, p, resolution)
                 }

@@ -1,7 +1,7 @@
 //! Shared helpers for the navigation tests: real box colliders (transform + shape,
 //! so the bake rasterises what physics would collide with) and span lookups.
 
-use super::{NavBounds, NavigationGraph, SpanRef};
+use super::{NavBounds, NavigationGraph, SpanRef, ALL_AREAS};
 use crate::scene::{ColliderComponent, ColliderShape, Scene};
 use glam::{Quat, Vec3};
 
@@ -122,4 +122,17 @@ pub fn assert_same_mesh(a: &NavigationGraph, b: &NavigationGraph) {
             .collect()
     };
     assert_eq!(bits(a), bits(b), "span heights or areas differ");
+}
+
+/// Whether the path from `from` to `to` over every area arrives (not a partial path).
+pub fn arrives(g: &NavigationGraph, from: SpanRef, to: SpanRef) -> bool {
+    g.find_path_masked(from, to, ALL_AREAS).1
+}
+
+/// The span path between two ground cells over every area, which must arrive.
+pub fn full_path(g: &NavigationGraph, from: (i32, i32), to: (i32, i32)) -> Vec<SpanRef> {
+    let (path, complete) =
+        g.find_path_masked(ground(g, from.0, from.1), ground(g, to.0, to.1), ALL_AREAS);
+    assert!(complete, "{from:?} -> {to:?} should arrive");
+    path
 }

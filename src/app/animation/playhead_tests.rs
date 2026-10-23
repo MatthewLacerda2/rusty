@@ -31,6 +31,7 @@ fn crossfade_blends_then_resolves_to_target() {
     let mut anim = idle();
     anim.base.time = 2.0;
     anim.crossfade("Walk".to_string(), 0.4);
+    assert!(anim.is_crossfading());
     // The outgoing clip is captured with its playhead frozen.
     assert_eq!(anim.base.previous_clip.as_deref(), Some("Idle"));
     assert_eq!(anim.base.previous_time, 2.0);

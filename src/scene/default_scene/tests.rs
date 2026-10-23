@@ -106,8 +106,12 @@ fn seeding_bakes_the_texture_and_shader_once() {
         );
     }
     let json = std::fs::read_to_string(shaders.join(format!("{SHADER_NAME}.recipe.json")));
-    let json = serde_json::from_str(&json.unwrap()).unwrap();
-    assert_eq!(crate::api::lua_json::decode(json), Ok(shader_recipe()));
+    let lua = mlua::Lua::new();
+    let json = mlua::Value::String(lua.create_string(json.unwrap()).unwrap());
+    assert_eq!(
+        crate::api::lua_json::recipe_from_lua(&json),
+        Ok(shader_recipe())
+    );
 
     // An edited copy is the user's: a second seed leaves it alone.
     std::fs::write(&png, b"edited").unwrap();

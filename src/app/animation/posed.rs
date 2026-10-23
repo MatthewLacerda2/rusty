@@ -31,6 +31,10 @@ pub fn posed_palette(skin: &SkinData, clip: &AnimationClip, time: f32) -> Vec<Ma
     anim.base.play(Motion::Clip(&clip.name));
     anim.base.time = time;
     let writes = bone_writes(&anim, &scene.world.mesh(owner).unwrap(), None);
+    assert!(
+        !writes.is_empty(),
+        "the clip posed no bone: the palette would be the bind one"
+    );
     for (bone, local) in writes {
         *scene.world.transform_mut(bone).unwrap() = local;
     }

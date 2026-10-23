@@ -111,3 +111,10 @@ fn zimmers_patch_enums_read_in_any_case_from_lua() {
         serde_json::to_value(b).unwrap()
     );
 }
+
+#[test]
+fn a_capitalised_pass_tag_parses_through_the_public_entry() {
+    let json = r#"{"pass":"PostFx","name":"x","blocks":[{"id":"tint"}]}"#;
+    let r: ShaderRecipe = recipe_from_json_str(json).unwrap();
+    assert_eq!(r.pass, PassKind::Postfx);
+}
