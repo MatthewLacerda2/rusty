@@ -92,7 +92,7 @@ scene's lighting settings (above), whose defaults are the ones listed here.
 - **Who gets one.** Every active, **static**, opaque mesh with a **second UV map** (the
   lightmap UV: glTF `TEXCOORD_1`, or one generated at import by the model's **Generate
   Lightmap UVs** setting, see [`Assets`](Assets.md#generate-lightmap-uvs)). Every built-in
-  primitive carries one (the Sphere and Cylinder through that same unwrap); an imported
+  primitive carries one (the Sphere, Cylinder and Capsule through that same unwrap); an imported
   mesh without one keeps probe / ambient lighting, and the bake logs once how many static
   meshes were left out that way: *"N static meshes have no lightmap UV — enable Generate
   Lightmap UVs"*.

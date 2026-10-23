@@ -1,7 +1,7 @@
 //! src/components/mesh/primitives.rs — procedural primitive geometry.
 //!
 //! CPU-only builders for the engine's built-in shapes (box, sphere, plane,
-//! cylinder). Each returns `(vertices, indices)` ready for a `MeshComponent`, with
+//! cylinder, capsule). Each returns `(vertices, indices)` ready for a `MeshComponent`, with
 //! the tangent basis derived from positions + UVs via the asset layer's pure
 //! [`generate_tangents`] so primitives sample normal maps exactly like an imported
 //! mesh (#207). No GPU types — the renderer uploads the result (#494).
@@ -11,7 +11,9 @@ use crate::asset::lightmap_uv::{unwrap_vertices, LightmapUvSettings};
 use crate::asset::tangents::generate_tangents;
 use glam::Vec3;
 
+mod capsule;
 mod cylinder;
+pub use capsule::generate_capsule;
 pub use cylinder::generate_cylinder;
 
 /// Generates a 3D box centered at the origin
@@ -174,7 +176,8 @@ pub fn generate_plane(width: f32, depth: f32) -> (Vec<Vertex>, Vec<u32>) {
 }
 
 /// [`fill_tangents`] after a generated lightmap UV (#831), the unwrap Generate
-/// Lightmap UVs gives a model: a Sphere or a Cylinder has no flat layout to author.
+/// Lightmap UVs gives a model: a Sphere, a Cylinder or a
+/// Capsule has no flat layout to author.
 fn fill_tangents_unwrapped(vertices: Vec<Vertex>, indices: Vec<u32>) -> (Vec<Vertex>, Vec<u32>) {
     let with_uv = |v: &Vertex, uv| v.with_lightmap_uv(uv);
     let s = LightmapUvSettings::default();

@@ -9,7 +9,7 @@ use rapier3d::prelude::{Pose as RapierPose, Shape};
 
 use super::bounds_tests::tolerance;
 use super::{samples, turns, world_poses, KINDS, SCALES};
-use crate::components::{ColliderShape, Pose};
+use crate::components::{CapsuleAxis, ColliderShape, Pose};
 use crate::physics::shape::build::build_shape;
 use crate::physics::shape::hull::{beyond_faces, has_volume};
 use crate::scene::authoring::{primitive_geometry, Primitive};
@@ -38,8 +38,14 @@ fn drawn(kind: &ColliderShape) -> Vec<Drawn> {
                 height: 1.0,
             },
         ),
-        // The engine has no Capsule primitive to draw one with.
-        ColliderShape::Capsule { .. } => vec![],
+        ColliderShape::Capsule { .. } => primitive(
+            Primitive::Capsule,
+            ColliderShape::Capsule {
+                radius: 0.5,
+                height: 2.0,
+                axis: CapsuleAxis::Y,
+            },
+        ),
         // A mesh collider is drawn as the mesh it is built from.
         ColliderShape::Mesh { .. } => samples(kind)
             .into_iter()
@@ -95,12 +101,28 @@ fn check(drawn: &Drawn, pose: Pose) {
     );
 }
 
+/// Whether `shape` can hold its drawn mesh at `scale`. Unity's capsule rule
+/// (length × the axial scale, radius × the larger cross scale) can't hold a
+/// capsule scaled wider than it is long: the caps grow into the tube and its rim
+/// pokes out, in Unity too. rusty keeps Unity's rule (#1191, PR #1227), so those
+/// scales are left out; every other scale, turn and parenting still runs.
+fn holds_at(shape: &ColliderShape, scale: Vec3) -> bool {
+    let ColliderShape::Capsule { axis, .. } = shape else {
+        return true;
+    };
+    let along = scale.abs().dot(axis.unit());
+    (scale.abs() - along * axis.unit()).max_element() <= along
+}
+
 /// `drawn` under every scale, turn and parenting.
 fn check_everywhere(drawn: &Drawn) {
     for scale in SCALES {
         for (turn, _) in turns() {
+            // A turned child sees its parent's scale on other axes: read the pose's.
             for pose in world_poses(scale, turn) {
-                check(drawn, pose);
+                if holds_at(&drawn.0, pose.scale) {
+                    check(drawn, pose);
+                }
             }
         }
     }

@@ -50,8 +50,9 @@ until its scripts load at the head of the next (see the spawn note in
 [`index.md`](index.md)).
 
 **`primitive`** (optional) is one of the GameObject menu's primitives,
-case-insensitive: `Box`, `Sphere`, `Plane`, `Cylinder` (meshes) or `PointLight`,
-`DirectionalLight`, `SpotLight`. Omit it (or pass an unknown name) to create a bare
+case-insensitive: `Box`, `Sphere`, `Plane`, `Cylinder`, `Capsule` (meshes) or
+`PointLight`, `DirectionalLight`, `SpotLight`. The Capsule is Unity's: radius 0.5,
+full height 2, along Y. Omit it (or pass an unknown name) to create a bare
 entity carrying only its mandatory `Transform` — the menu's **Create Empty**.
 
 **`kind`** is one of the Add Component menu's first-class components,
