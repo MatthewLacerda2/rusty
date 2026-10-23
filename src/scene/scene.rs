@@ -179,7 +179,7 @@ impl Scene {
 
     /// Remove entity `id` and everything under it ([`Scene::destroy_set`]), as
     /// Unity's `Object.Destroy` takes a GameObject's children (#1283). Nothing
-    /// keeps naming them ([`Scene::despawn_batch`]).
+    /// keeps naming them (`Scene::despawn_batch`).
     pub fn destroy_entity(&mut self, id: u32) {
         let doomed = self.destroy_set(id);
         self.despawn_batch(&doomed);
