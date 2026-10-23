@@ -148,13 +148,7 @@ impl ProbeArray {
         if face != self.face || mips != self.mips {
             self.table.clear();
         }
-        // One layer per distinct cube, in first-wanted order.
-        let mut unique: Vec<Resident> = Vec::new();
-        for r in &kept {
-            if !unique.iter().any(|u| u.0.cubemap_path == r.0.cubemap_path) {
-                unique.push(*r);
-            }
-        }
+        let unique = distinct_cubes(&kept);
         let paths: Vec<&str> = unique
             .iter()
             .map(|(p, ..)| p.cubemap_path.as_str())
@@ -184,8 +178,7 @@ impl ProbeArray {
         let layers: Vec<u32> = kept
             .iter()
             .map(|r| {
-                let k = paths.iter().position(|p| *p == r.0.cubemap_path).unwrap();
-                plan.slot_of[k] as u32
+                plan.slot_of[paths.iter().position(|p| *p == r.0.cubemap_path).unwrap()] as u32
             })
             .collect();
         self.activate(&kept, &layers);
@@ -201,7 +194,7 @@ impl ProbeArray {
         let face = wanted.iter().map(|(_, c)| c.size).max().unwrap_or(1);
         let mut kept = Vec::new();
         for (probe, cube) in wanted {
-            if face % cube.size == 0 && (face / cube.size).is_power_of_two() {
+            if fits(face, cube.size) {
                 kept.push((*probe, &**cube));
             } else if !self.warned.contains(&probe.cubemap_path) {
                 log::warn!(
@@ -223,7 +216,7 @@ impl ProbeArray {
         let needs = |face: u32| {
             let mut mips = 0;
             for (_, cube) in kept {
-                if face % cube.size != 0 || !(face / cube.size).is_power_of_two() {
+                if !fits(face, cube.size) {
                     return None;
                 }
                 let shift = (face / cube.size).trailing_zeros();
@@ -259,6 +252,24 @@ impl ProbeArray {
             }
         }
     }
+}
+
+/// Whether a `size`-texel cube fits an array of `face` texels: `face` halved a whole
+/// number of times.
+fn fits(face: u32, size: u32) -> bool {
+    face.is_multiple_of(size) && (face / size).is_power_of_two()
+}
+
+/// One entry per distinct cube path in `kept`, in first-wanted order: the cubes that
+/// take an array layer.
+fn distinct_cubes<'a>(kept: &[Resident<'a>]) -> Vec<Resident<'a>> {
+    let mut unique: Vec<Resident> = Vec::new();
+    for r in kept {
+        if !unique.iter().any(|u| u.0.cubemap_path == r.0.cubemap_path) {
+            unique.push(*r);
+        }
+    }
+    unique
 }
 
 #[cfg(test)]
