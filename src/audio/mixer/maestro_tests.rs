@@ -79,7 +79,7 @@ fn a_snapshot_transition_reaches_the_device_frame_by_frame() {
     assert_eq!(rec.borrow().group(sfx).unwrap().volume, 0.5);
     m.advance_mixer(1.0);
     assert_eq!(rec.borrow().group(sfx).unwrap().volume, 0.0);
-    assert_eq!(m.group_state("SFX").unwrap().effective_volume, 0.0);
+    assert_eq!(m.mixer().state(sfx).effective_volume, 0.0);
 }
 
 #[test]
@@ -109,6 +109,7 @@ fn reset_restores_the_default_mixer() {
     )
     .unwrap();
     m.reset_mixer();
-    assert!(m.group_state("Guns").is_none());
-    assert!(!m.group_state("Music").unwrap().settings.mute);
+    assert!(m.mixer().find("Guns").is_none());
+    let music = m.mixer().find("Music").unwrap();
+    assert!(!m.mixer().state(music).settings.mute);
 }

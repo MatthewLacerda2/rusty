@@ -6,7 +6,7 @@
 //! per-frame [`AudioMaestro::advance_mixer`] runs as a `LateUpdate` system on sim
 //! time (`app/audio/`).
 
-use super::{Duck, GroupId, GroupPatch, GroupState, Mixer};
+use super::{Duck, GroupId, GroupPatch, Mixer};
 use crate::audio::reverb::ReverbState;
 use crate::audio::AudioMaestro;
 
@@ -106,11 +106,6 @@ impl AudioMaestro {
     pub fn clear_ducks(&mut self) {
         self.mixer.clear_ducks();
         self.push_groups();
-    }
-
-    /// Group `name` as the agent reads it back.
-    pub fn group_state(&self, name: &str) -> Option<GroupState> {
-        self.mixer.find(name).map(|id| self.mixer.state(id))
     }
 
     /// Step the mixer to sim time `now` (snapshot blends, ducks) and send the groups
