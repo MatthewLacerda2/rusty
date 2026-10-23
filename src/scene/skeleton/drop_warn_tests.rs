@@ -46,13 +46,13 @@ fn two_bones_of_one_name_each_keep_their_own_override() {
     let rig = armature_owner(&mut scene);
     scene.world.mesh_mut(rig).unwrap().skin = Some(chain_skin(&["hips", "arm", "arm"]));
     scene.sync_skeleton(rig);
-    let bones = scene.world.mesh(rig).unwrap().skeleton.bones.clone();
+    let bones = scene.world.mesh(rig).unwrap().skeleton.ids();
     scene.world.transform_mut(bones[1]).unwrap().position = Vec3::X;
     scene.world.transform_mut(bones[2]).unwrap().position = Vec3::Z;
 
     reimport_to(&mut scene, rig, chain_skin(&["hips", "arm", "arm"]));
 
-    assert_eq!(scene.world.mesh(rig).unwrap().skeleton.bones, bones);
+    assert_eq!(scene.world.mesh(rig).unwrap().skeleton.ids(), bones);
     let at = |b: u32| scene.world.transform(b).unwrap().position;
     assert_eq!((at(bones[1]), at(bones[2])), (Vec3::X, Vec3::Z));
 }

@@ -91,17 +91,10 @@ impl Scene {
 
     /// `owner`'s bones, each with its bone chain; empty without a skin.
     fn bones_with_chains(&self, owner: u32) -> Vec<(u32, Vec<String>)> {
-        let Some((skin, bones)) = self
-            .world
-            .mesh(owner)
-            .and_then(|m| Some((m.skin.clone()?, m.skeleton.bones.clone())))
-        else {
+        let Some(skin) = self.world.mesh(owner).and_then(|m| m.skin.clone()) else {
             return Vec::new();
         };
-        let slots = bones
-            .into_iter()
-            .enumerate()
-            .filter(|(_, b)| self.is_under(*b, owner));
+        let slots = self.live_slots(owner).into_iter();
         slots.map(|(s, b)| (b, bone_chain(&skin, s))).collect()
     }
 

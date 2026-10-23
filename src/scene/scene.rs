@@ -201,6 +201,7 @@ impl Scene {
     /// through here.
     pub(crate) fn despawn_batch(&mut self, ids: &BTreeSet<u32>) {
         self.world.despawn_all(ids);
+        self.forget_bones(ids); // their skeleton slots go missing (#1273)
         for &id in ids {
             self.shader_overrides.clear(id, None);
         }

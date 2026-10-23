@@ -38,18 +38,11 @@ impl Scene {
     /// pose. Nothing is despawned. Empty for an entity with no skin. A bone moved
     /// out from under `owner` is no longer a bone, and is left where it is.
     pub(crate) fn take_skeleton(&self, owner: u32) -> Parked {
-        let Some((skin, bones)) = self
-            .world
-            .mesh(owner)
-            .and_then(|m| Some((m.skin.clone()?, m.skeleton.bones.clone())))
-        else {
+        let Some(skin) = self.world.mesh(owner).and_then(|m| m.skin.clone()) else {
             return Parked::default();
         };
         let mut parked = Parked::default();
-        for (slot, bone) in bones.into_iter().enumerate() {
-            if !self.is_under(bone, owner) {
-                continue;
-            }
+        for (slot, bone) in self.live_slots(owner) {
             let Some(transform) = self.world.transform(bone).map(|t| t.clone()) else {
                 continue;
             };

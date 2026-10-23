@@ -77,7 +77,7 @@ fn a_changed_bind_pose_rebinds_the_rig_and_keeps_what_was_authored() {
     scene.world.transform_mut(root).unwrap().position = Vec3::new(0.5, 0.0, 0.0);
     let gun = hang_gun(&mut scene, hero, "Joint1");
     let old_palette = scene.world.mesh(hero).unwrap().bind_palette.clone();
-    let old_bones = scene.world.mesh(hero).unwrap().skeleton.bones.clone();
+    let old_bones = scene.world.mesh(hero).unwrap().skeleton.ids();
     let mut writes = ModelWrites::default();
 
     rewrite(
@@ -92,7 +92,7 @@ fn a_changed_bind_pose_rebinds_the_rig_and_keeps_what_was_authored() {
     assert_eq!(skin.local_bind[1].translation, 2.0 * Vec3::Y, "the new rig");
     assert_ne!(mesh.bind_palette, old_palette, "and its bind palette");
     assert!(mesh.is_dirty.get(), "re-uploaded");
-    let bones = mesh.skeleton.bones.clone();
+    let bones = mesh.skeleton.ids();
     drop(mesh);
     assert_eq!(bones, old_bones, "the bones are kept");
     assert_eq!(scene.bone_ids().len(), 2, "and no bone was added");
@@ -122,13 +122,13 @@ fn a_removed_bone_hands_what_hung_from_it_to_its_parent_bone() {
     scene.world.set_collider(hitbox, Some(collider));
     let joint1 = scene.find_bone(hero, "Joint1").unwrap();
     scene.selected_entity_id = Some(joint1);
-    let old_bones = scene.world.mesh(hero).unwrap().skeleton.bones.clone();
+    let old_bones = scene.world.mesh(hero).unwrap().skeleton.ids();
     let mut writes = ModelWrites::default();
 
     rewrite(&path, DROP_JOINT1.0, DROP_JOINT1.1);
     assert_eq!(writes.follow(&mut scene), 1);
 
-    let bones = scene.world.mesh(hero).unwrap().skeleton.bones.clone();
+    let bones = scene.world.mesh(hero).unwrap().skeleton.ids();
     assert_eq!(
         bones,
         old_bones[..1],
@@ -165,7 +165,7 @@ fn a_model_rewritten_as_static_drops_its_bones_and_what_was_authored_on_them() {
     scene.world.set_rigidbody(joint1, Some(body));
     scene.world.transform_mut(joint1).unwrap().position = Vec3::X;
     let gun = hang_gun(&mut scene, hero, "Joint1");
-    let old_bones = scene.world.mesh(hero).unwrap().skeleton.bones.clone();
+    let old_bones = scene.world.mesh(hero).unwrap().skeleton.ids();
     let mut writes = ModelWrites::default();
 
     rewrite(&path, r#""mesh": 0, "skin": 0"#, r#""mesh": 0"#);
@@ -198,7 +198,7 @@ fn an_attachment_named_like_the_root_joint_is_not_taken_for_it() {
     );
     assert_eq!(writes.follow(&mut scene), 1);
 
-    let bones = scene.world.mesh(hero).unwrap().skeleton.bones.clone();
+    let bones = scene.world.mesh(hero).unwrap().skeleton.ids();
     assert!(!bones.contains(&decoy), "the decoy is no bone");
     assert_eq!(scene.world.parent_id(decoy), Some(bones[1]), "it hangs on");
 }
@@ -225,7 +225,7 @@ fn a_bone_gone_with_its_ancestors_leaves_its_child_on_the_rig() {
     hang_gun(&mut scene, rig, "head");
     let pistol = hang_gun(&mut scene, rig, "hips");
 
-    let old_bones = scene.world.mesh(rig).unwrap().skeleton.bones.clone();
+    let old_bones = scene.world.mesh(rig).unwrap().skeleton.ids();
     // The new rig keeps only the root, renamed: `head`'s whole chain is gone.
     let warned = warnings_of(|| reimport_to(&mut scene, rig, chain_skin(&["pelvis"])));
     let named = |b: &str| {

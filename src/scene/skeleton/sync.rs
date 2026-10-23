@@ -51,7 +51,7 @@ impl Scene {
         else {
             return Vec::new();
         };
-        let bones = if self.binding_is_live(owner, &skin, &bound) {
+        let bones = if self.binding_is_live(&skin, &bound) {
             bound
         } else {
             self.bind_bones(owner, &skin, parked)
@@ -114,26 +114,43 @@ impl Scene {
             .collect();
         let mut joint = body.joint;
         if let Some(j) = joint.as_mut().filter(|_| !body.connected_bone.is_empty()) {
-            j.connected_body = Some(self.resolve_bone(bone, owner, &body.connected_bone));
+            let to = self.resolve_bone(bone, owner, &body.connected_bone);
+            if to == bone || to == owner {
+                let what = if to == bone {
+                    "itself"
+                } else {
+                    "its skinned entity"
+                };
+                log::warn!(
+                    "[Asset] entity {owner}: bone '{name}''s joint now connects it to \
+                     {what}; the joint is inert."
+                );
+            }
+            j.connected_body = Some(to);
         }
         self.world.set_rigidbody(bone, body.rigidbody);
         self.world.set_joint(bone, joint);
         refs
     }
 
-    /// Whether `bones` is a complete binding of `owner`'s `skin`: one entry per
-    /// joint, each a bone under `owner` or a destroyed one, a missing slot that
-    /// stays missing (`Scene::despawn_bone`, #1273). A list naming entities
-    /// elsewhere (another instance's bones) is stale, and re-bound.
-    fn binding_is_live(&self, owner: u32, skin: &SkinData, bones: &[u32]) -> bool {
-        let bound = |b: u32| !self.world.contains(b) || self.is_under(b, owner);
-        bones.len() == skin.local_bind.len() && bones.iter().all(|&b| bound(b))
+    /// Whether `bones` is a complete binding of `skin`: one slot per joint, each
+    /// a live entity or missing (a destroyed bone stays missing, #1273). A bone a
+    /// script re-parented elsewhere is still live and stays bound: the palette
+    /// skins it by its world matrix, as Unity does.
+    fn binding_is_live(&self, skin: &SkinData, bones: &[Option<u32>]) -> bool {
+        let live = |b: &u32| self.world.contains(*b);
+        bones.len() == skin.local_bind.len() && bones.iter().flatten().all(live)
     }
 
     /// Walk the joint slots in order (parents first), finding each bone by name
     /// under its parent (never one of `parked`) or spawning it at rest. Returns the
     /// slot → entity binding.
-    fn bind_bones(&mut self, owner: u32, skin: &SkinData, parked: &BTreeSet<u32>) -> Vec<u32> {
+    fn bind_bones(
+        &mut self,
+        owner: u32,
+        skin: &SkinData,
+        parked: &BTreeSet<u32>,
+    ) -> Vec<Option<u32>> {
         let mut taken: BTreeSet<u32> = BTreeSet::new();
         self.walk_slots(owner, skin, |scene, slot, parent| {
             let name = skin.name(slot);
@@ -158,7 +175,7 @@ impl Scene {
         owner: u32,
         skin: &SkinData,
         mut pick: impl FnMut(&mut Scene, usize, u32) -> u32,
-    ) -> Vec<u32> {
+    ) -> Vec<Option<u32>> {
         let mut bones: Vec<u32> = Vec::with_capacity(skin.local_bind.len());
         for slot in 0..skin.local_bind.len() {
             let parent = match skin.parents.get(slot).copied().flatten() {
@@ -167,7 +184,7 @@ impl Scene {
             };
             bones.push(pick(self, slot, parent));
         }
-        bones
+        bones.into_iter().map(Some).collect()
     }
 
     pub(super) fn spawn_bone(

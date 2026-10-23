@@ -169,7 +169,7 @@ fn crossfade_between_opposite_rotations_keeps_limb_length() {
 fn bone_writes_cover_only_the_driven_joints() {
     let mut mesh = two_clip_mesh();
     mesh.clips = vec![translate_clip()];
-    mesh.skeleton.bones = vec![10, 11];
+    mesh.skeleton.bones = vec![Some(10), Some(11)];
     let mut anim = looping_animator("Slide");
     anim.base.time = 0.5;
     let writes = bone_writes(&anim, &mesh, None);

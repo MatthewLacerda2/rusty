@@ -227,7 +227,8 @@ else, and is an ordinary entity in every API — `Transform.*`, `Scene.SetParent
   `Joint` (a ragdoll's, #466 — see [`Ragdoll`](Ragdoll.md)) are saved by bone
   name too, the joint's connected bone by its name and then its ancestors', so a
   joint to a bone the model dropped holds to its nearest surviving ancestor, as
-  on a live re-import (#1277). Any other component added to a
+  on a live re-import (#1277); one that lands on the bone itself or on the
+  skinned entity is inert, and the warning says so. Any other component added to a
   bone itself is not saved: put a hitbox `Collider` on a child of the bone —
   `Physics.GenerateHitboxes(id)` does exactly that for every bone (see
   `Physics`, *Per-bone hitboxes*, #464).
@@ -256,6 +257,12 @@ else, and is an ordinary entity in every API — `Transform.*`, `Scene.SetParent
   stay missing until the skeleton is rebuilt from the model: a reload (bones are
   never saved, so a saved scene gets them back), a prefab propagation or a
   re-import.
+- **A bone moved out from under the skinned entity** (a script parents `head`
+  under a prop) stays bound: the mesh keeps skinning that slot by the bone's
+  world matrix, wherever it is, as Unity does. To the scene it is an ordinary
+  entity: destroying the character leaves it where it is, and a save keeps it as
+  a plain entity under the prop, so a reload gives the rig a fresh bone of that
+  name, as a live re-import does.
 
 `Debug.Snapshot()` leaves bones out by default; `Debug.Snapshot({ bones = true })`
 includes them. The editor's Hierarchy shows a skeleton collapsed.

@@ -74,14 +74,31 @@ impl Scene {
         self.world
             .ids_with_mesh()
             .into_iter()
-            .filter_map(|id| self.world.mesh(id).map(|m| (id, m.skeleton.bones.clone())))
-            .flat_map(|(owner, bones)| bones.into_iter().filter(move |&b| self.is_under(b, owner)))
+            .flat_map(|owner| self.live_bones(owner))
             .collect()
+    }
+
+    /// `owner`'s bones that are still its bones, with their slots: present (not
+    /// missing) and under `owner` ([`Scene::is_under`]). The one walk every reader
+    /// that treats a slot as a bone of the skeleton goes through.
+    pub(super) fn live_slots(&self, owner: u32) -> Vec<(usize, u32)> {
+        let Some(mesh) = self.world.mesh(owner) else {
+            return Vec::new();
+        };
+        let slots = mesh.skeleton.bones.iter().enumerate();
+        let present = slots.filter_map(|(s, b)| Some((s, (*b)?)));
+        present.filter(|&(_, b)| self.is_under(b, owner)).collect()
+    }
+
+    /// [`Scene::live_slots`]' bones alone.
+    fn live_bones(&self, owner: u32) -> impl Iterator<Item = u32> {
+        self.live_slots(owner).into_iter().map(|(_, b)| b)
     }
 
     /// Whether `bone`, listed by `owner`'s skeleton, is still one of its bones:
     /// live and under `owner`. A bone a script moved out from under it (under a
-    /// prop, say) is an ordinary entity now; a destroyed one is a missing slot.
+    /// prop, say) is an ordinary entity to the scene (destroy, save, re-import),
+    /// though its slot still skins by it; a destroyed one is a missing slot.
     pub(super) fn is_under(&self, bone: u32, owner: u32) -> bool {
         self.world.ancestors(bone).any(|a| a == owner)
     }
@@ -98,19 +115,38 @@ impl Scene {
         self.world.ancestors(id).find(|&c| {
             self.world
                 .mesh(c)
-                .is_some_and(|m| m.skeleton.bones.contains(&id))
+                .is_some_and(|m| m.skeleton.bones.contains(&Some(id)))
         })
     }
 
     /// Despawn `owner`'s bones and everything under them — a skinned entity's
     /// skeleton goes with it — in one batch, dropping whatever pointed at them as
-    /// [`Scene::destroy_entity`] does.
+    /// [`Scene::destroy_entity`] does. A bone a script moved out from under
+    /// `owner` is an ordinary entity now, and stays.
     pub(crate) fn despawn_skeleton(&mut self, owner: u32) {
-        let Some(bones) = self.world.mesh(owner).map(|m| m.skeleton.bones.clone()) else {
-            return;
-        };
-        let doomed = self.subtrees(bones.into_iter().collect());
+        let doomed = self.subtrees(self.live_bones(owner).collect());
         self.despawn_batch(&doomed);
+    }
+
+    /// Mark every slot naming one of `ids`, entities being despawned, missing:
+    /// a skeleton never keeps a dead id, which a later entity could be given (a
+    /// `Scene.Load` carrying a `DontDestroyOnLoad` rig hands out the old ids).
+    pub(crate) fn forget_bones(&mut self, ids: &BTreeSet<u32>) {
+        for owner in self.world.ids_with_mesh() {
+            let names_one = |m: &crate::components::MeshComponent| {
+                m.skeleton.bones.iter().flatten().any(|b| ids.contains(b))
+            };
+            if !self.world.mesh(owner).is_some_and(|m| names_one(&m)) {
+                continue;
+            }
+            if let Some(mut mesh) = self.world.mesh_mut(owner) {
+                for slot in &mut mesh.skeleton.bones {
+                    if slot.is_some_and(|b| ids.contains(&b)) {
+                        *slot = None;
+                    }
+                }
+            }
+        }
     }
 
     /// `bones` and everything under them, walked from the top ones only: the rest
@@ -127,8 +163,8 @@ impl Scene {
     /// Despawn bone `id` with everything under it, its descendant bones and what
     /// hangs from them, in one batch: Unity destroys a GameObject's children with
     /// it, and no bone of the rig is left a root posed as if it were a child
-    /// (#1273). Their slots in the owner's skeleton keep the dead ids, which mark
-    /// them **missing**: they skin at their bind pose (`palette`) until the
+    /// (#1273). Their slots in the owner's skeleton become `None`, **missing**
+    /// (`Scene::forget_bones`): they skin at their bind pose (`palette`) until the
     /// skeleton is rebuilt (a load, a prefab propagation, a re-import).
     pub(crate) fn despawn_bone(&mut self, id: u32) {
         let doomed: BTreeSet<u32> = self.world.self_and_descendants(id).collect();
@@ -140,6 +176,7 @@ impl Scene {
         let bones = self.world.mesh(owner)?.skeleton.bones.clone();
         bones
             .into_iter()
+            .flatten()
             .find(|&b| self.world.name(b).is_some_and(|n| *n == name))
     }
 }
@@ -156,6 +193,10 @@ mod destroy_bone_tests;
 mod drop_warn_tests;
 #[cfg(test)]
 mod fixture;
+#[cfg(test)]
+mod missing_slot_tests;
+#[cfg(test)]
+mod moved_bone_tests;
 #[cfg(test)]
 mod persist_tests;
 #[cfg(test)]

@@ -23,9 +23,11 @@ pub struct BoneBinding {
     /// The bone entity of each joint slot, in the skin's joint order — what the
     /// palette build reads. Runtime only: bones get fresh ids every load, and an
     /// empty or stale list is re-bound by name (`Scene::sync_skeletons`). A
-    /// destroyed bone's id stays in its slot, marking it missing (#1273).
+    /// destroyed bone's slot is `None`, **missing** (#1273): it skins at its bind
+    /// pose until the skeleton is rebuilt, and never holds a dead id a later
+    /// entity could be given.
     #[serde(skip)]
-    pub bones: Vec<u32>,
+    pub bones: Vec<Option<u32>>,
     /// Bone name → the local transform a designer gave it, applied when the
     /// skeleton is (re)built. Filled from the live bones on save and consumed on
     /// load, so the live value is empty and the bones themselves are authoritative.
@@ -41,6 +43,15 @@ impl BoneBinding {
     /// Whether there is nothing to save: no override or bone body recorded.
     pub fn is_unmodified(&self) -> bool {
         self.overrides.is_empty() && self.bodies.is_empty()
+    }
+
+    /// Every slot's bone, for a test of a whole skeleton: panics on a missing one.
+    #[cfg(test)]
+    pub fn ids(&self) -> Vec<u32> {
+        self.bones
+            .iter()
+            .map(|b| b.expect("no slot is missing"))
+            .collect()
     }
 }
 

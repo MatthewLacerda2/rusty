@@ -38,14 +38,16 @@ impl Scene {
         let owner_inverse = self.world.local_to_world(owner).inverse();
         let mut in_mesh: Vec<Mat4> = Vec::with_capacity(bones.len());
         for (slot, &bone) in bones.iter().enumerate() {
-            let Some((local, parent)) = self.world.local_and_parent(bone) else {
+            let Some((bone, (local, parent))) =
+                bone.and_then(|b| Some((b, self.world.local_and_parent(b)?)))
+            else {
                 in_mesh.push(*skin.bind_global.get(slot)?);
                 continue;
             };
             let parent_slot = skin.parents.get(slot).copied().flatten();
             let m = match (parent, parent_slot) {
                 (Some(p), _) if p == owner => local,
-                (Some(p), Some(ps)) if ps < slot && bones[ps] == p => in_mesh[ps] * local,
+                (Some(p), Some(ps)) if ps < slot && bones[ps] == Some(p) => in_mesh[ps] * local,
                 _ => owner_inverse * self.world.local_to_world(bone),
             };
             in_mesh.push(m);

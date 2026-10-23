@@ -2,7 +2,7 @@
 //! (#1277), so a load and a live re-import send a joint to a dropped bone to the
 //! same place: the nearest surviving ancestor.
 
-use super::fixture::{armature_owner, chain_skin, connected, joint_to, reimport_to};
+use super::fixture::{armature_owner, chain_skin, connected, joint_to, reimport_to, warnings_of};
 use crate::components::mesh::BoneBody;
 use crate::scene::serialize::to_scene_data;
 use crate::scene::Scene;
@@ -56,4 +56,37 @@ fn a_load_and_a_live_reimport_joint_a_dropped_bone_to_the_same_ancestor() {
     loaded.sync_skeleton(rig);
     let head = loaded.find_bone(rig, "head").unwrap();
     assert_eq!(connected(&loaded, head), loaded.find_bone(rig, "hips"));
+}
+
+#[test]
+fn a_loaded_joint_that_lands_on_its_own_bone_is_warned_inert() {
+    // `spine` jointed to `head`; the model drops `head`, so the chain lands on
+    // `spine`, the joint's own bone.
+    let mut saved = Scene::new();
+    let rig = armature_owner(&mut saved);
+    saved.sync_skeleton(rig);
+    let (spine, head) = (
+        saved.find_bone(rig, "spine").unwrap(),
+        saved.find_bone(rig, "head").unwrap(),
+    );
+    joint_to(&mut saved, spine, Some(head));
+    let data = to_scene_data(&saved);
+    let doc = data.entities.iter().find(|e| e.name == "Rig").unwrap();
+    let body: BoneBody = doc.mesh.as_ref().unwrap().skeleton.bodies["spine"].clone();
+
+    let mut loaded = Scene::new();
+    let rig = armature_owner(&mut loaded);
+    let mut mesh = loaded.world.mesh_mut(rig).unwrap();
+    mesh.skin = Some(chain_skin(&["hips", "spine"]));
+    mesh.skeleton.bodies.insert("spine".into(), body);
+    drop(mesh);
+    let warned = warnings_of(|| loaded.sync_skeleton(rig));
+    let spine = loaded.find_bone(rig, "spine").unwrap();
+    assert_eq!(connected(&loaded, spine), Some(spine));
+    assert!(
+        warned
+            .iter()
+            .any(|w| w.contains("itself") && w.contains("inert")),
+        "{warned:?}"
+    );
 }
