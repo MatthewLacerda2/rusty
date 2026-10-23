@@ -96,7 +96,7 @@ class WorkflowBumps(unittest.TestCase):
             fx = argparse.Namespace(
                 pulls=pulls, issue_labels=dict, clashes=lambda p: set(),
                 main_conflicts=lambda p: {}, stale_code=list, stop_requested=bool, turn=lambda n, tick: taken.append(n) or (n, outcomes.MERGED, "why"), head=lambda n: None,
-                attempts=lambda n, sha: None,
+                attempts=lambda n, sha: None, blocks=lambda issues: None,
                 clock=lambda: now[0], sleep=sleep, say=lambda *a: said.append(a[0]),
                 memory=Path(tmp, handbacks.MEMORY), bots=BOTS, merged=outcomes.MERGED,
                 ends=set(), stops={outcomes.STOPPED}, skips={outcomes.NOT_READY},
