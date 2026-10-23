@@ -32,8 +32,10 @@ impl GameWorld {
     /// no edit snapshot is taken (there is no edit mode to return to) and Play is
     /// requested at once, so the next `tick` enters it and reports
     /// [`PlayTransition::Entered`](super::PlayTransition::Entered) like the editor's
-    /// Play button would.
+    /// Play button would. A shipped game never converts a model (#1253), so the
+    /// import cache serves what it holds from here on.
     pub fn boot_standalone(&mut self) {
+        crate::asset::convert::allow_conversion(false);
         self.resources.standalone = true;
         self.set_playing(true);
     }

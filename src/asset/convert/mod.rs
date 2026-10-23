@@ -41,6 +41,10 @@
 //! again, once (`record`), as Unity shows a model's import warnings on every
 //! reimport.
 //!
+//! **When it is not re-made.** Play never converts (`gate`, #1253): it reads
+//! the cache as it stands, and a source changed meanwhile converts at the first
+//! edit frame after Stop. The standalone player never converts at all.
+//!
 //! **What a scene saves** for an extracted texture is never its cache path but
 //! `model.fbx#tex/<identity>`, which [`texture_ref`] resolves (#1130).
 //!
@@ -50,6 +54,7 @@
 mod converter;
 mod depends;
 mod fbx;
+mod gate;
 pub mod glb;
 mod lock;
 mod record;
@@ -58,6 +63,7 @@ pub mod texture_ref;
 
 pub use converter::{converter_for, Converted, Converter, Skip, CONVERTERS};
 pub use depends::{Dependency, Seen};
+pub use gate::{allow_conversion, conversion_allowed, convert_held};
 pub use stage::{textures_dirs, Staging};
 
 use super::ImportError;
@@ -71,12 +77,17 @@ pub const IMPORT_CACHE_DIR: &str = "assets/generated/imported";
 
 /// The up-to-date glTF standing in for the converted source at `path`, converting
 /// it first when the cache is missing or stale. Cached relative to the working
-/// directory when that is a project (see the module doc).
+/// directory when that is a project (see the module doc). While conversion is off
+/// (Play, a shipped game), the cache as it stands, and an error when there is none.
 pub fn cached_gltf(path: &Path) -> Result<PathBuf, ImportError> {
     let converter = converter_for(path)
         .ok_or_else(|| ImportError::UnsupportedFormat(paths::extension(path)))?;
     let out = cache_location(path)?;
-    refresh(converter, path, &out)?;
+    if conversion_allowed() {
+        refresh(converter, path, &out)?;
+    } else {
+        gate::serve(converter, path, &out)?;
+    }
     Ok(out)
 }
 
