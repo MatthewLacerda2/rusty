@@ -159,7 +159,9 @@ pub fn capture_asset(
 /// typo'd path pass for a working preview. A converted source an export left behind
 /// (#1267) is there while its import cache is.
 fn resolve_subject(asset_path: &str) -> Result<PreviewSubject, String> {
-    if !Path::new(asset_path).is_file() && !cached_without_source(asset_path) {
+    if !Path::new(asset_path).is_file()
+        && !crate::asset::convert::cached_without_source(Path::new(asset_path))
+    {
         return Err(format!("no such asset: {asset_path}"));
     }
     preview::subject_for_path(asset_path).ok_or_else(|| {
@@ -170,13 +172,6 @@ fn resolve_subject(asset_path: &str) -> Result<PreviewSubject, String> {
             crate::asset::IMAGE_EXTENSIONS.join("/"),
         )
     })
-}
-
-/// Whether `asset_path` names a converted source whose cached glTF exists.
-fn cached_without_source(asset_path: &str) -> bool {
-    use crate::asset::convert::{cache_location, converter_for};
-    let path = Path::new(asset_path);
-    converter_for(path).is_some() && cache_location(path).is_ok_and(|cache| cache.is_file())
 }
 
 #[cfg(test)]

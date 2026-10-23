@@ -11,11 +11,13 @@ use serde_json::Value;
 
 mod blend;
 mod fbx;
+mod scene;
+mod textures;
 
 /// The import cache, relative to a project (`asset::convert::IMPORT_CACHE_DIR`).
 const CACHE: &str = "assets/generated/imported";
 
-fn fixture(name: &str) -> PathBuf {
+pub(super) fn fixture(name: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests/fixtures/models")
         .join(name)
@@ -43,7 +45,7 @@ fn project(models: &[&str], start: &str) -> PathBuf {
 const SPAWN: &str = "assets/scripts/spawn.lua";
 
 /// The scenario: the player runs [`SPAWN`], a few frames pass.
-const SCENARIO: &str = r#"
+pub(super) const SCENARIO: &str = r#"
 Harness.Expect(Harness.AttachPlayerBot("assets/scripts/spawn.lua"), "the player runs the script")
 Harness.Step(3)
 "#;
@@ -63,12 +65,23 @@ fn export(game: &Path, out: &Path) -> Output {
 }
 
 /// `play --project <game>` on [`SCENARIO`] with `env` set, and its
-/// `results.json`; the run's folder is `<test>/run`, outside the project.
+/// `results.json`.
 fn play(game: &Path, env: &[(&str, &Path)]) -> (Output, Value) {
-    let dir = crate::temp::dir().join("run");
+    play_scenario(game, SCENARIO, env)
+}
+
+/// `play --project <game>` on the Lua `scenario` with `env` set, and its
+/// `results.json`; the run's folder is `<test>/run-<n>`, outside the project.
+fn play_scenario(game: &Path, scenario: &str, env: &[(&str, &Path)]) -> (Output, Value) {
+    let tmp = crate::temp::dir();
+    let dir = (0..)
+        .map(|n| tmp.join(format!("run-{n}")))
+        .find(|d| !d.exists())
+        .unwrap();
     std::fs::create_dir_all(&dir).unwrap();
+    let lua = scenario;
     let scenario = dir.join("scenario.lua");
-    std::fs::write(&scenario, SCENARIO).unwrap();
+    std::fs::write(&scenario, lua).unwrap();
     let mut command = Command::new(env!("CARGO_BIN_EXE_play"));
     command.arg("--project").arg(game).arg(&scenario).arg(&dir);
     command.envs(env.iter().copied());

@@ -24,7 +24,7 @@ mod bin;
 mod read;
 mod write;
 
-pub use read::image_uris;
+pub use read::{image_files, image_uris};
 pub use write::{container, write};
 
 /// One glTF scene: a node forest plus the meshes, materials, skins and animations

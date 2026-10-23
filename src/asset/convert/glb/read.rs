@@ -12,18 +12,34 @@ use std::path::Path;
 /// (percent-encoded, relative to the file's folder); the first image of a name
 /// keeps it. `None` when the file is not a `.glb`.
 pub fn image_uris(path: &Path) -> Option<BTreeMap<String, String>> {
-    let doc: Value = serde_json::from_slice(&json_chunk(path)?).ok()?;
     let mut uris = BTreeMap::new();
-    let images = doc.get("images").and_then(Value::as_array);
-    for image in images.into_iter().flatten() {
-        let name = image.get("name").and_then(Value::as_str);
-        let uri = image.get("uri").and_then(Value::as_str);
-        if let (Some(name), Some(uri)) = (name, uri) {
-            uris.entry(name.to_string())
-                .or_insert_with(|| uri.to_string());
+    for (name, uri) in images(path)? {
+        if let Some(name) = name {
+            uris.entry(name).or_insert(uri);
         }
     }
     Some(uris)
+}
+
+/// The URI of every image in the `.glb` at `path` that names a file, named or
+/// not, in order, as written. `None` when the file is not a `.glb`.
+pub fn image_files(path: &Path) -> Option<Vec<String>> {
+    Some(images(path)?.into_iter().map(|(_, uri)| uri).collect())
+}
+
+/// Each image with a URI, as (name, URI).
+fn images(path: &Path) -> Option<Vec<(Option<String>, String)>> {
+    let doc: Value = serde_json::from_slice(&json_chunk(path)?).ok()?;
+    let images = doc.get("images").and_then(Value::as_array);
+    let named = images.into_iter().flatten().filter_map(|image| {
+        let name = image
+            .get("name")
+            .and_then(Value::as_str)
+            .map(str::to_string);
+        let uri = image.get("uri").and_then(Value::as_str)?;
+        Some((name, uri.to_string()))
+    });
+    Some(named.collect())
 }
 
 /// The JSON chunk of the `.glb` at `path`: the 12-byte header, then the first

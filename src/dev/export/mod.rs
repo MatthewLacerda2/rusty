@@ -13,9 +13,12 @@
 //! source's cache by its path, the source present or not).
 //!
 //! What is copied: `project.rusty` (the build settings, and the mark that makes
-//! the import cache project-relative), the seed manifest, and everything under
-//! `assets/` but the convertible sources, import cache included. What is not:
-//! `cache/` (machine-local, regenerable) and `saved/` (this machine's save data).
+//! the import cache project-relative), the seed manifest, everything under
+//! `assets/` but the convertible sources (and Blender's backups of them), and the
+//! import cache of each source, under its lock; a cache whose source is gone stays
+//! behind. What is not: `cache/` (machine-local, regenerable) and `saved/` (this
+//! machine's save data), which the export makes empty, with the rest of the
+//! project skeleton, so the player's first launch writes nothing into an install.
 //! The engine's own content (`engine/`) ships beside the player, not in the
 //! project (`core::project::engine_dir`).
 //!
@@ -24,47 +27,72 @@
 //! byte-identical.
 
 mod copy;
+mod textures;
 
 use std::path::{Path, PathBuf};
 
 use crate::asset::convert::{cached_gltf, convertible_sources};
-use crate::core::project::{ASSETS_DIR, PROJECT_FILE};
+use crate::core::paths;
+use crate::core::project::{create_skeleton, is_project, ASSETS_DIR, PROJECT_FILE};
 use crate::scene::io::SEED_MANIFEST_PATH;
 
 /// What an export did.
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct Exported {
     /// Files written into the output, as `/`-separated paths relative to it, in the
-    /// order written.
+    /// order written (the project skeleton's folders aside).
     pub files: Vec<String>,
     /// Convertible sources brought up to date and left behind, project-relative.
     pub sources: Vec<PathBuf>,
 }
 
 /// Export the open project (the working directory, `core::project::open`) into
-/// `out`, which must be absent or empty and outside the project. A source that
-/// fails to convert fails the export, naming it, before anything is written.
+/// `out`, which must pass [`check`]. A source that fails to convert fails the
+/// export, naming it, before anything is written; a texture a cache names outside
+/// what was copied fails it after, naming each, and the output is emptied again.
 pub fn export(out: &Path) -> Result<Exported, String> {
-    let root = crate::core::project::root();
     let out = std::path::absolute(out).map_err(|e| format!("{}: {e}", out.display()))?;
-    check_out(&root, &out)?;
-    if !Path::new(PROJECT_FILE).is_file() {
-        return Err(format!(
-            "{}: no {PROJECT_FILE}; open the project in the editor once",
-            root.display()
-        ));
-    }
+    check(&crate::core::project::root(), &out)?;
     let sources = convertible_sources(Path::new(ASSETS_DIR));
     for source in &sources {
         cached_gltf(source).map_err(|e| format!("{}: {e}", source.display()))?;
     }
-    let files = copy_runtime_files(Path::new("."), &out)?;
-    Ok(Exported { files, sources })
+    let existed = out.is_dir();
+    let written = copy_runtime_files(Path::new("."), &sources, &out).and_then(|files| {
+        create_skeleton(&out)?;
+        Ok(files)
+    });
+    match written {
+        Ok(files) => Ok(Exported { files, sources }),
+        Err(e) => {
+            // `out` was absent or empty (`check`): leave it so.
+            let _ = std::fs::remove_dir_all(&out);
+            if existed {
+                let _ = std::fs::create_dir(&out);
+            }
+            Err(e)
+        }
+    }
+}
+
+/// Refuse a `project` that is not one (`core::project::is_project`), and an `out`
+/// [`check_out`] refuses: what the `export` binary asks before it opens the
+/// project, so a refusal writes nothing into it.
+pub fn check(project: &Path, out: &Path) -> Result<(), String> {
+    if !is_project(project) {
+        return Err(format!(
+            "{}: not a rusty project (no {PROJECT_FILE} and no {ASSETS_DIR}/)",
+            project.display()
+        ));
+    }
+    check_out(project, out)
 }
 
 /// Copy the runtime files of the project at `root` into `out` (see the module
-/// doc), and return them in the order written.
-fn copy_runtime_files(root: &Path, out: &Path) -> Result<Vec<String>, String> {
+/// doc), the import caches of `sources` (project-relative) among them, and return
+/// them in the order written. Fails naming every texture a copied cache names
+/// that was not copied.
+fn copy_runtime_files(root: &Path, sources: &[PathBuf], out: &Path) -> Result<Vec<String>, String> {
     let mut files = Vec::new();
     for file in [PROJECT_FILE, SEED_MANIFEST_PATH] {
         if root.join(file).is_file() {
@@ -72,14 +100,28 @@ fn copy_runtime_files(root: &Path, out: &Path) -> Result<Vec<String>, String> {
         }
     }
     copy::tree(root, Path::new(ASSETS_DIR), out, &mut files)?;
+    let glbs = copy::caches(root, sources, out, &mut files)?;
+    let missing = textures::missing(out, &glbs, &files);
+    if !missing.is_empty() {
+        return Err(format!(
+            "textures outside the exported folders (move them under {ASSETS_DIR}/):\n  {}",
+            missing.join("\n  ")
+        ));
+    }
     Ok(files)
 }
 
-/// Refuse an output that holds anything, or that overlaps the project: a copy
-/// into the tree it walks would copy itself.
+/// Refuse an output that is a file, holds anything, or overlaps the project: a
+/// copy into the tree it walks would copy itself. Compared through symlinks, the
+/// output by its nearest folder that exists.
 fn check_out(root: &Path, out: &Path) -> Result<(), String> {
-    let canonical = |p: &Path| crate::core::paths::canonicalize(p).unwrap_or(p.to_path_buf());
-    let (root, resolved) = (canonical(root), canonical(out));
+    if out.exists() && !out.is_dir() {
+        return Err(format!(
+            "{}: a file; export into a new or empty folder",
+            out.display()
+        ));
+    }
+    let (root, resolved) = (resolved(root), resolved(out));
     if resolved.starts_with(&root) || root.starts_with(&resolved) {
         return Err(format!(
             "{}: the output must lie outside the project {}",
@@ -95,6 +137,19 @@ fn check_out(root: &Path, out: &Path) -> Result<(), String> {
         ));
     }
     Ok(())
+}
+
+/// `path` with its nearest existing ancestor canonicalized (symlinks resolved)
+/// and the rest, which does not exist yet, folded on.
+fn resolved(path: &Path) -> PathBuf {
+    let path = paths::fold(&std::path::absolute(path).unwrap_or(path.to_path_buf()));
+    for ancestor in path.ancestors() {
+        if let Ok(canonical) = paths::canonicalize(ancestor) {
+            let rest = path.strip_prefix(ancestor).unwrap_or(Path::new(""));
+            return canonical.join(rest);
+        }
+    }
+    path
 }
 
 #[cfg(test)]

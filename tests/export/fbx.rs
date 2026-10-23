@@ -5,11 +5,11 @@ use std::path::{Path, PathBuf};
 use super::{cache, entity, export, play, project, tree, with_extension, CACHE};
 
 /// The fixture quad, its `Quad` textured by the embedded `Red`.
-const QUAD: &str = "embedded_textures.fbx";
-const SOURCE: &str = "assets/models/embedded_textures.fbx";
+pub(super) const QUAD: &str = "embedded_textures.fbx";
+pub(super) const SOURCE: &str = "assets/models/embedded_textures.fbx";
 
 /// Instantiate the quad by its source path, which the export leaves behind.
-const START: &str =
+pub(super) const START: &str =
     r#"Scene.Instantiate("assets/models/embedded_textures.fbx::Quad", "ExportedQuad")"#;
 
 #[test]
@@ -58,27 +58,9 @@ fn an_output_holding_files_is_refused() {
     assert_eq!(tree(&out).len(), 1, "left as it was");
 }
 
-/// The file the cached `.glb` at `glb` names for the texture `identity`: where
-/// `texture_ref` resolves `<source>#tex/<identity>`, the source present or not.
-fn extracted(glb: &Path, identity: &str) -> PathBuf {
-    let uris = rusty::asset::convert::glb::image_uris(glb).expect("the cache reads");
-    let (_, uri) = uris
-        .into_iter()
-        .find(|(name, _)| name == identity)
-        .expect(identity);
-    glb.parent().unwrap().join(uri)
-}
-
 #[test]
-fn gpu_the_export_plays_from_its_cache_and_converts_nothing() {
-    let png = crate::temp::dir().join("quad.png");
-    // A failed preview names an entity after its error, for the snapshot to show.
-    let preview = format!(
-        "local ok, err = pcall(Debug.Preview, {SOURCE:?}, {:?}, {{ resolution = 64 }})\n\
-         if not ok then Scene.CreateEntity(\"PreviewFailed: \" .. tostring(err)) end",
-        png.to_string_lossy()
-    );
-    let game = project(&[QUAD], &format!("{START}\n{preview}"));
+fn the_export_plays_from_its_cache_and_converts_nothing() {
+    let game = project(&[QUAD], START);
     let out = crate::temp::dir().join("out");
     assert!(export(&game, &out).status.success());
     let before = tree(&out);
@@ -87,15 +69,6 @@ fn gpu_the_export_plays_from_its_cache_and_converts_nothing() {
         ran.status.success() && results["passed"] == true,
         "the scenario passes"
     );
-
-    let names = results["final_snapshot"]["entities"].as_array().unwrap();
-    let failed = names.iter().find(|e| {
-        e["name"]
-            .as_str()
-            .unwrap_or("")
-            .starts_with("PreviewFailed")
-    });
-    assert!(failed.is_none(), "{failed:?}");
     let quad = entity(&results, "ExportedQuad");
     assert!(quad["bounds"].is_object(), "the quad has geometry: {quad}");
     let reference = format!("{SOURCE}#tex/Red");
@@ -111,8 +84,15 @@ fn gpu_the_export_plays_from_its_cache_and_converts_nothing() {
     );
     let red = extracted(&out.join(format!("{CACHE}/{SOURCE}.glb")), "Red");
     assert!(red.is_file(), "{} is exported", red.display());
-    // The preview renders from the cache; with no adapter it writes nothing.
-    if png.is_file() {
-        assert!(image::open(&png).is_ok(), "the preview is a PNG");
-    }
+}
+
+/// The file the cached `.glb` at `glb` names for the texture `identity`: where
+/// `texture_ref` resolves `<source>#tex/<identity>`, the source present or not.
+pub(super) fn extracted(glb: &Path, identity: &str) -> PathBuf {
+    let uris = rusty::asset::convert::glb::image_uris(glb).expect("the cache reads");
+    let (_, uri) = uris
+        .into_iter()
+        .find(|(name, _)| name == identity)
+        .expect(identity);
+    glb.parent().unwrap().join(uri)
 }

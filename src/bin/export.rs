@@ -34,9 +34,15 @@ fn main() {
     }
     // Named from the launch directory; opening the project moves it.
     let out = absolute(out).unwrap_or_else(|_| PathBuf::from(out));
+    // Checked before opening: `open` would fill a stray folder with a skeleton.
+    let dir = rusty::core::project::locate(project);
+    if let Err(e) = rusty::dev::export::check(&dir, &out) {
+        eprintln!("export: {e}");
+        exit(1);
+    }
     // `Edit`, as the editor opens it: the export needs `project.rusty`, which makes
     // the import cache project-relative and carries the build settings.
-    let opened = rusty::core::project::open(&rusty::core::project::locate(project), Access::Edit);
+    let opened = rusty::core::project::open(&dir, Access::Edit);
     if let Err(e) = opened {
         eprintln!("export: cannot open the project: {e}");
         exit(2);

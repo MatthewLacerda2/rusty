@@ -287,7 +287,7 @@ editor-capture: ## Render the editor to a PNG headlessly. make editor-capture OU
 # copy its runtime files and import cache into OUT, leaving those sources behind, so
 # the player runs the result with no converter and no Blender. OUT must be new or
 # empty, outside the project. Both are required: OUT has a default above.
-export: ## Ship a project without its convertible sources. make export PROJECT=~/games/horde OUT=build/horde
+export: ## Ship a project without its convertible sources. make export PROJECT=~/games/horde OUT=~/builds/horde
 	@test -n "$(PROJECT)" && test "$(origin OUT)" = "command line" || { \
 		echo "export: make export PROJECT=<project dir> OUT=<new or empty folder>" >&2; \
 		exit 1; }
