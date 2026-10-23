@@ -26,12 +26,11 @@ fn colon_named_sub_object_survives_save_and_reload() {
 
 #[test]
 fn model_under_a_colon_folder_is_refused_with_the_rule() {
-    let dir = crate::test_temp::dir().join("my::kit");
-    std::fs::create_dir_all(&dir).unwrap();
-    let path = dir.join("crate.gltf");
-    std::fs::write(&path, NO_MATERIAL_GLTF).unwrap();
-    let path = crate::core::paths::to_slash(&path);
-    let asset = crate::asset::import_file(std::path::Path::new(&path)).unwrap();
+    // The refusal comes before any file access, so the folder is only named, never
+    // made: Windows can't create one holding `:`.
+    let real = write_gltf("rusty_1295_kit.gltf", NO_MATERIAL_GLTF);
+    let asset = crate::asset::import_file(std::path::Path::new(&real)).unwrap();
+    let path = "my::kit/crate.gltf".to_string();
     let mut scene = Scene::new();
     let before = scene.world.collect_entities().len();
 
