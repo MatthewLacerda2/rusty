@@ -1,4 +1,4 @@
-//! src/scene/fog.rs — the scene's distance + height fog setting (#437).
+//! src/scene/settings/fog.rs — the scene's distance + height fog setting (#437).
 //!
 //! Unity's Lighting-window fog: one per scene, saved with it, applied by the
 //! renderer to every world-space pass (opaque, transparent, particles, decals, and

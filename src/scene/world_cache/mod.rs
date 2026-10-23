@@ -1,4 +1,4 @@
-//! src/scene/world_cache.rs — the scene's world-space reads, over the ECS's store (#331, #1170).
+//! src/scene/world_cache/mod.rs — the scene's world-space reads, over the ECS's store (#331, #1170).
 //!
 //! The world matrices used to live here, as a per-frame cache the render path filled
 //! once and everything else bypassed with a live walk — two sources that could
@@ -23,8 +23,6 @@ impl Scene {
 }
 
 #[cfg(test)]
-#[path = "world_cache_guard_tests.rs"]
-mod world_cache_guard_tests;
+mod guard_tests;
 #[cfg(test)]
-#[path = "world_cache_tests.rs"]
-mod world_cache_tests;
+mod tests;

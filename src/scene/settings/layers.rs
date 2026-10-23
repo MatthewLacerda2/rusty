@@ -1,4 +1,4 @@
-//! src/scene/layers.rs — the project-wide Layers registry.
+//! src/scene/settings/layers.rs — the project-wide Layers registry.
 //!
 //! One shared, Unity-style **Layers** list per World (issue #90). Every entity
 //! carries a single `layer: u8` (an index into this registry); the same 32 slots

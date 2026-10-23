@@ -202,7 +202,7 @@ change.)
 
 | Setter | Status | Read-site |
 |---|---|---|
-| `SetSize` / `SetLevelHeight` / `SetRenderers` / `AddLevel` / `RemoveLevel` | ✅ | render — `render::lod::LodSelection` picks each group's level per camera and the solid pass and shadow sweeps skip the other levels' renderers (`src/render/lod_tests.rs`, `src/render/lod_gpu_tests.rs`); round-trips, renderers remapped through prefabs (`tests/lod_group_api.rs`, `src/scene/lod_instance_tests.rs`) |
+| `SetSize` / `SetLevelHeight` / `SetRenderers` / `AddLevel` / `RemoveLevel` | ✅ | render — `render::lod::LodSelection` picks each group's level per camera and the solid pass and shadow sweeps skip the other levels' renderers (`src/render/lod_tests.rs`, `src/render/lod_gpu_tests.rs`); round-trips, renderers remapped through prefabs (`tests/lod_group_api.rs`, `src/scene/lod_instance/tests.rs`) |
 
 ### `Time` — over the `Time` resource
 

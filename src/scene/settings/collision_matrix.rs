@@ -1,4 +1,4 @@
-//! src/scene/collision_matrix.rs — the project-wide layer collision matrix.
+//! src/scene/settings/collision_matrix.rs — the project-wide layer collision matrix.
 //!
 //! Unity's Layer Collision Matrix: a symmetric NxN table over the 32 shared Layers
 //! (#90) deciding which layer collides with which. It drives rapier's
