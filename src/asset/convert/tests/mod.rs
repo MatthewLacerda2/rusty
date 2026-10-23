@@ -7,6 +7,7 @@ use std::path::Path;
 
 mod depends;
 mod failures;
+mod gate;
 mod identity;
 mod locking;
 mod looks;

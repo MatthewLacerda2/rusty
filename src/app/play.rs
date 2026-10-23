@@ -264,3 +264,7 @@ mod standalone_tests;
 #[cfg(test)]
 #[path = "play_tests.rs"]
 mod play_tests;
+
+#[cfg(test)]
+#[path = "import_gate_tests.rs"]
+mod import_gate_tests;
