@@ -1,34 +1,18 @@
-//! A sub-object whose own name holds `::` (#1295): the reference splits on the
-//! first separator, so `file.gltf::Body::Mesh` instantiates, saves, reloads and
-//! keeps its mesh.
+//! References and `::` (#1295): a sub-object whose own name holds `::` instantiates,
+//! saves, reloads and keeps its mesh; a model under a folder whose name holds `::`
+//! is refused when instantiated, rather than spawned with a mesh that loads empty.
 
 use glam::Vec3;
 
 use super::instantiate_asset;
+use super::tests::{write_gltf, NO_MATERIAL_GLTF};
 use crate::scene::{apply_scene_data, to_scene_data, Scene};
-
-/// One mesh named `Body::Mesh`, the way a glTF exporter can name it.
-const COLON_NAMED_GLTF: &str = r#"{
-  "asset": { "version": "2.0" },
-  "scene": 0,
-  "scenes": [ { "nodes": [ 0 ] } ],
-  "nodes": [ { "mesh": 0 } ],
-  "meshes": [ { "name": "Body::Mesh", "primitives": [ { "attributes": { "POSITION": 0 } } ] } ],
-  "accessors": [
-    { "bufferView": 0, "componentType": 5126, "count": 3, "type": "VEC3",
-      "min": [0.0, 0.0, 0.0], "max": [1.0, 1.0, 0.0] }
-  ],
-  "bufferViews": [ { "buffer": 0, "byteOffset": 0, "byteLength": 36 } ],
-  "buffers": [ { "byteLength": 36,
-    "uri": "data:application/octet-stream;base64,AAAAAAAAAAAAAAAAAACAPwAAAAAAAAAAAAAAAAAAgD8AAAAA" } ]
-}
-"#;
 
 #[test]
 fn colon_named_sub_object_survives_save_and_reload() {
-    let path = crate::test_temp::dir().join("rusty_1295_colons.gltf");
-    std::fs::write(&path, COLON_NAMED_GLTF).unwrap();
-    let reference = format!("{}::Body::Mesh", path.to_string_lossy());
+    let body = NO_MATERIAL_GLTF.replace(r#""name": "Bare""#, r#""name": "Body::Mesh""#);
+    let path = write_gltf("rusty_1295_colons.gltf", &body);
+    let reference = format!("{path}::Body::Mesh");
     let mut scene = Scene::new();
     let id = instantiate_asset(&mut scene, &reference, None, Vec3::ZERO).unwrap();
     assert_eq!(*scene.world.name(id).unwrap(), "Body::Mesh");
@@ -38,4 +22,29 @@ fn colon_named_sub_object_survives_save_and_reload() {
     let mesh = restored.world.mesh(id).expect("mesh kept on reload");
     assert_eq!(mesh.asset_ref.as_deref(), Some(reference.as_str()));
     assert!(!mesh.vertices.is_empty(), "geometry re-imported");
+}
+
+#[test]
+fn model_under_a_colon_folder_is_refused_with_the_rule() {
+    let dir = crate::test_temp::dir().join("my::kit");
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("crate.gltf");
+    std::fs::write(&path, NO_MATERIAL_GLTF).unwrap();
+    let path = crate::core::paths::to_slash(&path);
+    let asset = crate::asset::import_file(std::path::Path::new(&path)).unwrap();
+    let mut scene = Scene::new();
+    let before = scene.world.collect_entities().len();
+
+    let err = super::instantiate_imported(&mut scene, &path, &asset, "Bare", None, Vec3::ZERO)
+        .expect_err("a path holding `::` can't be referenced");
+    assert!(err.contains(&path), "names the path: {err}");
+    assert!(
+        err.contains("may not contain `::`"),
+        "names the rule: {err}"
+    );
+    assert_eq!(
+        scene.world.collect_entities().len(),
+        before,
+        "nothing spawned"
+    );
 }

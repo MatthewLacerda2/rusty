@@ -15,9 +15,10 @@ use crate::scene::Scene;
 /// Instantiate the animated fixture written under `tag`: the entity, and the
 /// model file's path.
 fn hero(scene: &mut Scene, tag: &str) -> (u32, String) {
-    let reference = animated_model(tag);
+    let model = animated_model(tag);
+    let reference = model.to_string_ref();
     let id = instantiate_asset(scene, &reference, Some("Hero"), Vec3::ZERO).unwrap();
-    (id, reference.trim_end_matches("::Animated").to_string())
+    (id, model.path)
 }
 
 fn bones(scene: &Scene, owner: u32) -> Vec<u32> {

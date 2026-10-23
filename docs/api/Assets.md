@@ -10,8 +10,10 @@ this returns a Lua **table** (not a scalar triple): the result is nested data.
 
 Each `subObject`'s `reference` is the canonical `path::sub_object` string and
 round-trips with `AssetRef` / `import_sub_mesh`, so it can be handed straight to the
-mesh-instantiation path to place exactly what the manifest names. Files that fail to
-import are skipped; a missing root yields an empty list. Output is deterministic
+mesh-instantiation path to place exactly what the manifest names. A sub-object name
+may hold `::` (the reference splits on its first `::`); a file whose path holds `::`
+can't be referenced, so it is skipped with a warning naming why (rusty's rule; see
+`Scene.Instantiate` in [`Scene`](Scene.md)). Files that fail to import are skipped; a missing root yields an empty list. Output is deterministic
 (files sorted by path, sub-objects in source order). During Play nothing is converted
 (#1253), so an `.fbx` or a `.blend` is listed from its last import: the one made as Play began, or
 before a source changed during Play. An exported project (`make export`, #1267)

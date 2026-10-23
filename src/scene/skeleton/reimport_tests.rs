@@ -23,10 +23,10 @@ const DROP_JOINT1: (&str, &str) = (
 /// Instantiate the animated fixture written under `tag`, and return the entity and
 /// the model file's path.
 fn hero(scene: &mut Scene, tag: &str) -> (u32, String) {
-    let reference = animated_model(tag);
+    let model = animated_model(tag);
+    let reference = model.to_string_ref();
     let id = instantiate_asset(scene, &reference, Some("Hero"), Vec3::ZERO).unwrap();
-    let path = reference.trim_end_matches("::Animated").to_string();
-    (id, path)
+    (id, model.path)
 }
 
 /// Re-write the model at `path` as the engine does (so the write is noted), with

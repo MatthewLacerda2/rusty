@@ -35,7 +35,7 @@ const SHARED_MATERIAL_GLTF: &str = r#"{
 "#;
 
 /// A glTF whose mesh names NO material — must be dressed with the engine default.
-const NO_MATERIAL_GLTF: &str = r#"{
+pub(super) const NO_MATERIAL_GLTF: &str = r#"{
   "asset": { "version": "2.0" },
   "scene": 0,
   "scenes": [ { "nodes": [ 0 ] } ],
@@ -51,7 +51,7 @@ const NO_MATERIAL_GLTF: &str = r#"{
 }
 "#;
 
-fn write_gltf(name: &str, body: &str) -> String {
+pub(super) fn write_gltf(name: &str, body: &str) -> String {
     let path = crate::test_temp::dir().join(name);
     std::fs::write(&path, body).unwrap();
     path.to_string_lossy().into_owned()

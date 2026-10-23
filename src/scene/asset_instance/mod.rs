@@ -66,11 +66,9 @@ pub fn instantiate_imported(
     name: Option<&str>,
     position: Vec3,
 ) -> Result<u32, String> {
-    let reference = asset::AssetRef {
-        path: path.to_string(),
-        sub_object: sub.to_string(),
-    }
-    .to_string_ref();
+    let reference = asset::AssetRef::new(path, sub)
+        .map_err(|e| e.to_string())?
+        .to_string_ref();
     if asset.sub_mesh(sub).is_none() {
         // A `_LOD<n>` set's base name addresses the whole set (#472).
         return match asset::lod::lod_set(asset, sub) {

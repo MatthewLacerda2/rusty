@@ -6,27 +6,27 @@
 use glam::{Mat4, Quat, Vec3};
 
 use crate::asset::fixtures_anim::{animated_buffer, ANIMATED_GLTF};
-use crate::asset::{JointTransform, SkinData};
+use crate::asset::{AssetRef, JointTransform, SkinData};
 use crate::components::{JointComponent, MeshComponent};
 use crate::scene::serialize::{apply_scene_data, to_scene_data, SceneData};
 use crate::scene::Scene;
 
 /// Write the animated fixture under a per-test folder and return its
 /// `path::Animated` reference.
-pub(super) fn animated_model(tag: &str) -> String {
+pub(super) fn animated_model(tag: &str) -> AssetRef {
     let dir = crate::test_temp::dir().join(format!("rusty_453_{tag}"));
     std::fs::create_dir_all(&dir).unwrap();
     std::fs::write(dir.join("anim.bin"), animated_buffer()).unwrap();
     let path = dir.join("model.gltf");
     std::fs::write(&path, ANIMATED_GLTF).unwrap();
-    format!("{}::Animated", crate::core::paths::to_slash(&path))
+    AssetRef::new(&crate::core::paths::to_slash(&path), "Animated").unwrap()
 }
 
 /// Instantiate the animated fixture as `Hero`, skeleton and all.
 pub(super) fn hero(scene: &mut Scene, tag: &str) -> u32 {
     crate::scene::asset_instance::instantiate_asset(
         scene,
-        &animated_model(tag),
+        &animated_model(tag).to_string_ref(),
         Some("Hero"),
         Vec3::ZERO,
     )

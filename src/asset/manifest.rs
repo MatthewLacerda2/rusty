@@ -20,7 +20,7 @@ use glam::Vec3;
 
 use crate::core::paths;
 
-use super::{import_file, is_model_path, AssetRef, SubMesh};
+use super::{import_file, is_model_path, AssetRef, ImportError, SubMesh};
 
 /// One addressable sub-object within a source file, with the footprint an agent
 /// needs to place it without overlap.
@@ -49,18 +49,15 @@ impl SubObjectEntry {
         }
     }
 
-    fn from_sub_mesh(path: &str, sub: &SubMesh) -> Self {
-        let reference = AssetRef {
-            path: path.to_string(),
-            sub_object: sub.id.clone(),
-        }
-        .to_string_ref();
-        Self {
+    /// The entry for `sub` in the file at `path`, or why `path` can't be referenced.
+    fn from_sub_mesh(path: &str, sub: &SubMesh) -> Result<Self, ImportError> {
+        let reference = AssetRef::new(path, &sub.id)?.to_string_ref();
+        Ok(Self {
             id: sub.id.clone(),
             reference,
             bounds: sub.bounds(),
             material_count: distinct_materials(sub),
-        }
+        })
     }
 }
 
@@ -117,14 +114,17 @@ pub fn build_manifest(root: &Path) -> AssetManifest {
     AssetManifest { assets }
 }
 
-/// Import one file into its [`AssetEntry`], or `None` if it can't be imported.
+/// Import one file into its [`AssetEntry`], or `None` if it can't be imported. A
+/// file whose path can't be referenced (#1295) is skipped with a warning naming why.
 fn entry_for(path: &str) -> Option<AssetEntry> {
     let asset = import_file(Path::new(path)).ok()?;
     let sub_objects = asset
         .sub_meshes
         .iter()
         .map(|sub| SubObjectEntry::from_sub_mesh(path, sub))
-        .collect();
+        .collect::<Result<_, _>>()
+        .inspect_err(|e| log::warn!("[Asset] manifest skips {path}: {e}"))
+        .ok()?;
     Some(AssetEntry {
         path: path.to_string(),
         sub_objects,
