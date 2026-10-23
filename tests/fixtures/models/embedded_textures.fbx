@@ -64,6 +64,10 @@ Objects:  {
 	Material: 3100, "Material::Blue", "" {
 		Version: 102
 		ShadingModel: "lambert"
+		Properties70:  {
+			P: "DiffuseColor", "Color", "", "A",0,0,0
+			P: "DiffuseFactor", "Number", "", "A",0.5
+		}
 	}
 	Video: 4000, "Video::Red", "Clip" {
 		Type: "Clip"

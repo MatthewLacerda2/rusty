@@ -161,41 +161,66 @@ fn spawn_preview_mesh(scene: &mut Scene, mesh: PreviewMesh) -> u32 {
 /// Instantiate the embedded Suzanne `.obj` exactly like any other model asset — same
 /// `asset::import_and_sync_sidecar` + `authoring::instantiate_asset` path the model
 /// inspector's "Instantiate into Scene" button uses (#352 leans on existing plumbing
-/// rather than a bespoke embedded-mesh loader).
+/// rather than a bespoke embedded-mesh loader) — then fitted like a model subject.
 fn spawn_suzanne(scene: &mut Scene) -> u32 {
-    let asset = match asset::import_and_sync_sidecar(Path::new(&suzanne_path())) {
-        Ok(a) => a,
-        Err(_) => return authoring::create_entity(scene, "PreviewMesh", Some(Primitive::Sphere)),
+    let fallback =
+        |scene: &mut Scene| authoring::create_entity(scene, "PreviewMesh", Some(Primitive::Sphere));
+    let Ok(asset) = asset::import_and_sync_sidecar(Path::new(&suzanne_path())) else {
+        return fallback(scene);
     };
     let Some(sub) = asset.sub_meshes.first() else {
-        return authoring::create_entity(scene, "PreviewMesh", Some(Primitive::Sphere));
+        return fallback(scene);
     };
     let reference = format!("{}{}{}", suzanne_path(), asset::REF_SEPARATOR, sub.id);
-    authoring::instantiate_asset(
-        scene,
-        &reference,
-        Some("PreviewMesh"),
-        -bounds_centre(&asset.sub_meshes),
-    )
-    .unwrap_or_else(|_| authoring::create_entity(scene, "PreviewMesh", Some(Primitive::Sphere)))
+    let ids = spawn_fitted(scene, &asset.sub_meshes, |scene, origin| {
+        authoring::instantiate_asset(scene, &reference, Some("PreviewMesh"), origin)
+            .into_iter()
+            .collect()
+    });
+    ids.first().copied().unwrap_or_else(|| fallback(scene))
 }
 
 /// Instantiate every sub-object of `path`, fitted to the frame and carrying its own
-/// imported materials — mirrors `inspector/assets/model.rs`'s "Instantiate into Scene".
-/// All sub-objects share one offset and one scale, so a multi-part model keeps its
-/// internal layout.
+/// imported materials. Unlike the model inspector's "Instantiate into Scene", which
+/// spawns at the file's own size, the preview rescales it (see [`fit_scale`]).
 fn spawn_model(scene: &mut Scene, path: &str) {
     let Ok(asset) = asset::import_and_sync_sidecar(Path::new(path)) else {
         return;
     };
-    let bounds = union_bounds(&asset.sub_meshes);
-    let scale = bounds.map_or(1.0, |(min, max)| fit_scale(min, max));
-    let origin = -bounds_centre(&asset.sub_meshes) * scale;
-    for id in authoring::instantiate_model(scene, path, &asset, origin) {
+    spawn_fitted(scene, &asset.sub_meshes, |scene, origin| {
+        authoring::instantiate_model(scene, path, &asset, origin)
+    });
+}
+
+/// Centre and fit: `spawn` instantiates the subject whose sub-meshes are `subs` at
+/// the origin it is handed, and every entity it returns is scaled by
+/// [`fit_scale`], so the subject lands centred on the world origin at the fitted
+/// size. All entities share one offset and one scale, so a multi-part model keeps
+/// its internal layout. Returns `spawn`'s ids.
+///
+/// The preview camera always orbits the **world origin**, so a subject whose vertices
+/// were authored somewhere else renders as empty sky — the mesh is in the scene, just
+/// never in shot. That is not a rare edge case: the engine's own bundled Suzanne sits
+/// around `(-2.5, 1.3, 4.1)`, and exported models routinely carry whatever offset they
+/// had in the authoring tool. Spawning at `-centre` puts the subject where the camera
+/// is already looking, for the Inspector tab and `Debug.Preview` alike.
+fn spawn_fitted(
+    scene: &mut Scene,
+    subs: &[asset::SubMesh],
+    spawn: impl FnOnce(&mut Scene, Vec3) -> Vec<u32>,
+) -> Vec<u32> {
+    let (centre, scale) = union_bounds(subs).map_or((Vec3::ZERO, 1.0), |(min, max)| {
+        ((min + max) * 0.5, fit_scale(min, max))
+    });
+    let ids = spawn(scene, -centre * scale);
+    for &id in &ids {
         if let Some(mut transform) = scene.world.transform_mut(id) {
             transform.scale *= scale;
         }
     }
+    // The spawn refreshed the colliders at the file's size.
+    scene.update_all_colliders();
+    ids
 }
 
 /// The bounding radius a model is fitted to: a unit cube's, the size of the stock
@@ -217,19 +242,6 @@ fn fit_scale(min: Vec3, max: Vec3) -> f32 {
     } else {
         1.0
     }
-}
-
-/// The centre of the union of `subs`' local bounds (`Vec3::ZERO` when they have no
-/// geometry).
-///
-/// The preview camera always orbits the **world origin**, so a subject whose vertices
-/// were authored somewhere else renders as empty sky — the mesh is in the scene, just
-/// never in shot. That is not a rare edge case: the engine's own bundled Suzanne sits
-/// around `(-2.5, 1.3, 4.1)`, and exported models routinely carry whatever offset they
-/// had in the authoring tool. Spawning at `-centre` puts the subject where the camera
-/// is already looking, for the Inspector tab and `Debug.Preview` alike.
-fn bounds_centre(subs: &[asset::SubMesh]) -> Vec3 {
-    union_bounds(subs).map_or(Vec3::ZERO, |(min, max)| (min + max) * 0.5)
 }
 
 /// The union of `subs`' local bounds, `None` when none has geometry.
