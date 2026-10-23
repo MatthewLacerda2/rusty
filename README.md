@@ -229,7 +229,7 @@ cargo build --release --bin player --no-default-features
 `--no-default-features` drops the `editor` feature, so egui and the editor UI are not
 compiled in (and `dev` is off, so neither is the harness or console). The player
 reads the build settings in its project's `project.rusty` — the startup scene, the product name (window
-title) and the first-launch window mode — which you edit in the editor under
+title; a new project starts with its folder's name) and the first-launch window mode — which you edit in the editor under
 **File → Build Settings** or from a script through the `Application` namespace. It
 boots that scene straight into Play and exits when the game calls
 `Application.Quit()` (a main-menu Quit button) or the window closes, saving

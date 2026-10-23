@@ -148,13 +148,18 @@ fn short(commit: &str) -> String {
 
 /// Bring the project file at `root` up to date when the project is opened for
 /// editing: create it if missing, and record the running engine. Returns the check made against what
-/// the file held before, and one line per change.
+/// the file held before, and one line per change. A file it creates names the product
+/// after the project's folder, Unity's default Product Name (#1317); an existing file
+/// keeps whatever it says.
 pub(super) fn record(root: &Path) -> Result<(EngineCheck, Vec<String>), String> {
     let path = root.join(PROJECT_FILE);
     let existed = path.exists();
     let mut file = ProjectFile::load(root)?;
     let check = EngineCheck::against(Some(&file.engine_commit));
     let mut lines = Vec::new();
+    if let Some(name) = root.file_name().filter(|_| !existed) {
+        file.build.product_name = name.to_string_lossy().into_owned();
+    }
     // An `unknown` build can't say which engine it is: keep the last known record.
     if engine_commit() != UNKNOWN_COMMIT || file.engine_commit.is_empty() {
         file.engine_commit = engine_commit().to_string();

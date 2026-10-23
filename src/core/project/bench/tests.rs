@@ -53,6 +53,8 @@ fn create_makes_the_project_and_lists_it_first() {
     assert_eq!(root, dir.join("Horde"));
     assert!(root.join(PROJECT_FILE).is_file() && root.join("assets/scenes").is_dir());
     assert_eq!(RecentProjects::load(&path).projects[0].path, root);
+    let file = ProjectFile::load(&root).unwrap();
+    assert_eq!(file.build.product_name, "Horde", "named after the project");
     assert!(
         bench.create(&dir, "Horde", 8).is_err(),
         "not over a project"

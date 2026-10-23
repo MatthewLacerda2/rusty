@@ -27,7 +27,8 @@ This is what a main-menu "Quit" button calls.
 
 **Build settings** live in the project root's tracked `project.rusty`, under `"build"`
 (a missing file or key means the defaults: the seeded `assets/scenes/default.scene`, `"rusty game"`,
-`Windowed`). In the editor the setters write that file, leaving the rest of it alone — they are the API twin of
+`Windowed`; a `project.rusty` the editor creates, as *New Project* does, names the product
+after the project's folder instead, Unity's default Product Name). In the editor the setters write that file, leaving the rest of it alone — they are the API twin of
 **File → Build Settings**. In the player and the harness the settings are read but
 never written back, so a setter only changes the running value. Saved `Video`
 settings (a player's own fullscreen choice) win over `SetWindowMode`, which is only
