@@ -35,6 +35,7 @@ impl Renderer {
     /// Bake one probe: capture the static scene from `position` and project the
     /// captured radiance into an L2 irradiance SH. `resolution` is the per-face edge
     /// length (clamped to the renderer's offscreen size by the capture primitive).
+    /// The direct-only bounce 1 of [`Renderer::bake_probes`] is this, per probe.
     pub fn bake_probe(&mut self, scene: &Scene, position: Vec3, resolution: u32) -> Sh9 {
         let capture = self.capture_static_cubemap(scene, position, resolution);
         project_cubemap(&capture)
