@@ -100,9 +100,9 @@ pub(crate) struct LightingUniform {
     // reflects the procedural sky. The pad keeps the probe array 16-byte aligned.
     pub sky_textured: f32,
     pub _sky_pad: [f32; 3],
-    // The resident reflection probes (#1206), by slot: a draw's instance names one
+    // The resident reflection probes (#1206): a draw's instance names one
     // (`InstanceData::reflection_probe`), and the shader box-projects against its box
-    // and samples its layer of the binding-4 cube array.
+    // and samples its cube's layer of the binding-4 cube array.
     pub refl_probes: [ReflectionProbeUniform; MAX_REFLECTION_PROBES],
 }
 
@@ -180,7 +180,7 @@ pub(crate) struct InstanceData {
     // 1 when the lightmap's direction page is bound (#810): normal maps then
     // reshape the baked light.
     pub lightmap_directional: u32,
-    // The slot of the reflection probe this instance reflects, plus one; 0 for none
+    // The resident reflection probe this instance reflects, plus one; 0 for none
     // (the sky). Picked per object at its world-bounds centre (#1206).
     pub reflection_probe: u32,
     pub lightmap_st: [f32; 4],

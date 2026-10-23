@@ -230,7 +230,8 @@ fn eval_sh(N: vec3<f32>, instance: u32) -> vec3<f32> {
 }
 
 // The environment a surface reflects along the mirror direction `R` (#244, #718). With
-// a reflection probe (`probe` is its slot plus one, picked per object, #1206), the
+// a reflection probe (`probe` is its resident index plus one, picked per object,
+// #1206), the
 // direction is parallax-corrected against that probe's box and its baked, prefiltered
 // cube is sampled (roughness selects the mip within its chain, #245). Without one, the
 // skybox panorama; and with neither, the same procedural sky the sky pass draws (#256),
@@ -242,7 +243,7 @@ fn environment_reflection(world_pos: vec3<f32>, raw_r: vec3<f32>, roughness: f32
         let p = lighting.refl_probes[probe - 1u];
         let corrected = parallax_correct(p, world_pos, R);
         let lod = p.mip_base + roughness * (p.mip_count - 1.0);
-        return textureSampleLevel(t_refl_cube, s_refl_cube, corrected, probe - 1u, lod).rgb;
+        return textureSampleLevel(t_refl_cube, s_refl_cube, corrected, p.layer, lod).rgb;
     }
     if (lighting.sky_textured > 0.5) {
         // The equirectangular panorama, mapped as the skybox pass maps it.

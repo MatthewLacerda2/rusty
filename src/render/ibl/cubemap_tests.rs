@@ -113,19 +113,20 @@ fn gpu_a_cubemap_rebaked_at_a_cached_path_reloads() {
     );
 }
 
-/// Re-baking a resident probe's cubemap reaches the probe array on the next frame
-/// (#1207, #1206): its slot is forgotten, so the new cube is copied in.
+/// Re-baking a resident probe's cubemap at the same size reaches the probe array on
+/// the next frame (#1207, #1206): `forget` empties its slot, so the new cube is copied
+/// into the same array, which needs no rebind.
 #[test]
 fn gpu_rebaking_a_resident_cubemap_recopies_it() {
     let Some(mut renderer) = crate::render::test_gpu::headless_or_skip(4, 4) else {
         return;
     };
     let path = crate::test_temp::dir().join("bound.ktx2");
-    let write = |size| {
-        let bytes = build_cubemap_ktx2(size, R8G8B8A8_SRGB, 6);
+    let write = || {
+        let bytes = build_cubemap_ktx2(2, R8G8B8A8_SRGB, 6);
         crate::core::fs::written::write(&path, &bytes).unwrap();
     };
-    write(2);
+    write();
     let mut scene = crate::scene::Scene::new();
     let i = scene
         .reflection_probes
@@ -133,16 +134,18 @@ fn gpu_rebaking_a_resident_cubemap_recopies_it() {
     let key = path.to_string_lossy().into_owned();
     scene.reflection_probes.set_cubemap(i, key);
     renderer.update_reflection_probes(&scene, glam::Vec3::ZERO);
-    assert_eq!(renderer.reflection_probes.face(), 2);
-    assert_ne!(renderer.reflection_probes.slot_for(glam::Vec3::ZERO), 0);
+    renderer.update_reflection_probes(&scene, glam::Vec3::ZERO);
+    assert_eq!(
+        renderer.reflection_probes.copies, 1,
+        "a resident cube stays"
+    );
     renderer.global_bind_group_dirty = false;
-    write(4);
+    write();
     renderer.refresh_textures();
     renderer.update_reflection_probes(&scene, glam::Vec3::ZERO);
     assert_eq!(
-        renderer.reflection_probes.face(),
-        4,
-        "the old cube stays resident"
+        renderer.reflection_probes.copies, 2,
+        "the re-bake is copied in"
     );
-    assert!(renderer.global_bind_group_dirty, "group 0 must rebind");
+    assert!(!renderer.global_bind_group_dirty, "same size: same array");
 }

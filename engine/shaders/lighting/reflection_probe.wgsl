@@ -5,16 +5,17 @@
 
 #define_import_path lighting::reflection_probe
 
-// One resident reflection probe (#1206): its capture point, its parallax box, and
-// where its prefiltered mip chain (#245) sits in its layer of the probe cube array.
-// Mirrors the Rust `ReflectionProbeUniform` byte-for-byte.
+// One resident reflection probe (#1206): its capture point, its parallax box, the
+// layer of the probe cube array its cube sits in (probes sharing a cube share it),
+// and where that cube's prefiltered mip chain (#245) starts. Mirrors the Rust
+// `ReflectionProbeUniform` byte-for-byte.
 struct ReflectionProbe {
     center: vec3<f32>,
     mip_base: f32,
     box_min: vec3<f32>,
     mip_count: f32,
     box_max: vec3<f32>,
-    _probe_pad: f32,
+    layer: u32,
 };
 
 // Box-projected parallax correction (#244), the standard Lagarde technique. Given a

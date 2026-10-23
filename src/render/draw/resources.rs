@@ -114,12 +114,13 @@ impl Renderer {
             }
             // View-frustum cull (#330): skip the uniform sync, binds, and draw for any
             // entity whose world-space AABB is fully outside what this camera can see.
-            if self.is_culled(scene, id, frustum) {
+            let bounds = self.world_bounds(scene, id);
+            if bounds.is_some_and(|(min, max)| !frustum.intersects_aabb(min, max)) {
                 culled += 1;
                 continue;
             }
             let Some((mut item, world_pos, is_transparent)) =
-                self.solid_draw_item(scene, id, &mut joints)
+                self.solid_draw_item(scene, id, bounds, &mut joints)
             else {
                 continue;
             };
@@ -165,34 +166,31 @@ impl Renderer {
         draws
     }
 
-    /// Whether `entity` is fully outside `frustum` and can be skipped this pass (#330).
-    /// Tests the mesh's world bounds — its cached local AABB under the entity's world
-    /// matrix, or its animated bound when skinned (#833). An entity with no mesh, whose
-    /// geometry is not resident on the GPU yet, or whose pose cannot be bounded, is never
-    /// culled here — the downstream sync produces no draw for a non-resident mesh anyway,
-    /// and culling a not-yet-uploaded mesh could wrongly hide it on its first frame.
-    fn is_culled(&self, scene: &Scene, id: u32, frustum: &Frustum) -> bool {
-        let Some(mesh) = scene.world.mesh(id) else {
-            return false;
-        };
-        let Some(gpu_mesh) = self.gpu_meshes.get(&MeshId::from_mesh(&mesh)) else {
-            return false;
-        };
-        gpu_mesh
-            .world_bounds(&mesh, scene.world.local_to_world(id))
-            .is_some_and(|(min, max)| !frustum.intersects_aabb(min, max))
+    /// The entity's world bounds `(min, max)`: its mesh's cached local AABB under the
+    /// entity's world matrix, or its animated bound when skinned (#833). The frustum
+    /// cull (#330) tests them and the draw picks its reflection probe at their centre
+    /// (#1206). `None` for an entity with no mesh, whose geometry is not resident on
+    /// the GPU yet, or whose pose cannot be bounded: it is never culled, since the
+    /// downstream sync produces no draw for a non-resident mesh anyway, and culling a
+    /// not-yet-uploaded mesh could wrongly hide it on its first frame.
+    fn world_bounds(&self, scene: &Scene, id: u32) -> Option<(glam::Vec3, glam::Vec3)> {
+        let mesh = scene.world.mesh(id)?;
+        let gpu_mesh = self.gpu_meshes.get(&MeshId::from_mesh(&mesh))?;
+        gpu_mesh.world_bounds(&mesh, scene.world.local_to_world(id))
     }
 
     /// One solid's draw item: its batch key (mesh, material group, per-draw
     /// uniform) and instance, plus its world-space origin (the transparent sort key's
     /// anchor) and whether its material is Transparent. A skinned mesh's palette is
     /// appended to `joints`, and its uniform's `bone_base` points at it — so it is a
-    /// draw of its own.
+    /// draw of its own. `bounds` are its world bounds when known
+    /// ([`Self::world_bounds`]); its reflection probe is picked at their centre.
     /// `None` if its mesh is not resident on the GPU yet.
     fn solid_draw_item(
         &mut self,
         scene: &Scene,
         id: u32,
+        bounds: Option<(glam::Vec3, glam::Vec3)>,
         joints: &mut Vec<JointMatrix>,
     ) -> Option<(DrawItem, glam::Vec3, bool)> {
         let mesh = scene.world.mesh(id)?;
@@ -213,14 +211,10 @@ impl Renderer {
         );
         // Like Unity, the reflection probe is picked per object, at the centre of its
         // world bounds (its origin when they are unknown), #1206.
-        let centre = self
-            .gpu_meshes
-            .get(&mesh_id)
-            .and_then(|gpu| gpu.world_bounds(&mesh, model_matrix))
-            .map_or(model_matrix.w_axis.truncate(), |(min, max)| {
-                (min + max) * 0.5
-            });
-        instance.reflection_probe = self.reflection_probes.slot_for(centre);
+        let centre = bounds.map_or(model_matrix.w_axis.truncate(), |(min, max)| {
+            (min + max) * 0.5
+        });
+        instance.reflection_probe = self.reflection_probes.probe_for(centre);
 
         // The active bone palette: the live animated pose when a clip plays (#80),
         // else the bind pose (#79). Primitives/static meshes leave it empty and bind

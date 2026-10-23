@@ -49,7 +49,7 @@ struct InstanceData {
     lightmap_page: u32,
     // 1 when the lightmap's direction page is bound (#810).
     lightmap_directional: u32,
-    // The slot of the reflection probe this instance reflects, plus one; 0 for none
+    // The resident reflection probe this instance reflects, plus one; 0 for none
     // (the sky). Picked per object at its world-bounds centre (#1206).
     reflection_probe: u32,
     lightmap_st: vec4<f32>,

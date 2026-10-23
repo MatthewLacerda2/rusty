@@ -1,40 +1,45 @@
 //! The reflection probes the forward pass shades with (#1206): the baked cubes of
 //! the probes nearest the camera, copied into one cube-array texture at group-0
-//! binding 4, and their boxes in `LightingUniforms.refl_probes`.
+//! binding 4, and the probes themselves in `LightingUniforms.refl_probes`.
 //!
 //! Like Unity, a probe is picked per drawn object, not per camera or per pixel: the
-//! draw's instance carries the slot of the probe whose box contains its world-bounds
-//! centre ([`ProbeArray::slot_for`]), and every fragment of it box-projects against
-//! that probe and samples its layer. Only probes with a loaded cube take a slot.
+//! draw's instance carries the index of the probe whose box contains its
+//! world-bounds centre ([`ProbeArray::probe_for`]), and every fragment of it
+//! box-projects against that probe and samples its cube's layer. Only probes with a
+//! loaded cube are resident. A layer holds one cube *path*: probes that share a
+//! cube share its layer, each keeping its own box and centre.
 //!
 //! **Per-frame cost.** Ordering the scene's probes by distance to the camera is
 //! O(P log P) over P probes, then each draw tests at most [`MAX_REFLECTION_PROBES`]
-//! boxes. GPU work happens only when the set of nearest probes changes: one
+//! boxes. GPU work happens only when the set of nearest cubes changes: one
 //! texture-to-texture copy per newly resident cube (about 0.5 MB at the bake's
-//! 128-texel face), or a rebuild of the array when it must grow.
+//! 128-texel face), or a rebuild of the array when it cannot hold them. A scene with
+//! no baked probe (the Inspector preview, rendered every frame beside the viewport)
+//! leaves the resident cubes alone, so the next scene finds them still in place.
 //!
 //! Cubes of different sizes share the array when each is the array's face size
 //! halved some number of times: a smaller cube lands that many mips down, and its
 //! `mip_base` tells the shader where its chain starts. A cube of any other size is
-//! left out, and the objects it would cover reflect the sky.
+//! left out with a warning, and the objects it would cover reflect the sky.
 
+mod frame;
+mod gpu;
 pub(crate) mod slots;
 
 use std::rc::Rc;
 
 use glam::Vec3;
 
+use self::slots::SlotTable;
 pub(crate) use self::slots::MAX_REFLECTION_PROBES;
-use self::slots::{SlotPlan, SlotTable};
 use super::cubemap::CubemapTexture;
-use crate::render::Renderer;
-use crate::scene::{ReflectionProbe, ReflectionProbeSet, Scene};
+use crate::scene::{ReflectionProbe, ReflectionProbeSet};
 
-/// One shaded probe as the shader reads it: its capture point, its parallax box and
-/// where its mip chain sits in its array layer. Mirrors `ReflectionProbe` in
-/// `common.wgsl` byte-for-byte.
+/// One resident probe as the shader reads it: its capture point, its parallax box,
+/// its cube's array layer and where the cube's mip chain sits in it. Mirrors
+/// `ReflectionProbe` in `engine/shaders/lighting/reflection_probe.wgsl` byte-for-byte.
 #[repr(C)]
-#[derive(Copy, Clone, Debug, Default, bytemuck::Pod, bytemuck::Zeroable)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub(crate) struct ReflectionProbeUniform {
     pub center: [f32; 3],
     /// The array mip holding this cube's base level.
@@ -43,8 +48,13 @@ pub(crate) struct ReflectionProbeUniform {
     /// How many mips its chain has.
     pub mip_count: f32,
     pub box_max: [f32; 3],
-    pub _pad: f32,
+    /// The array layer (cube) its cube was copied into.
+    pub layer: u32,
 }
+
+/// A probe the array holds this frame: the probe, its cube, and how many mips below
+/// the array's base level the cube's chain starts.
+type Resident<'a> = (&'a ReflectionProbe, &'a CubemapTexture, u32);
 
 /// The probe cube array and this frame's probes.
 pub(crate) struct ProbeArray {
@@ -56,16 +66,20 @@ pub(crate) struct ProbeArray {
     mips: u32,
     cubes: usize,
     table: SlotTable,
-    /// This frame's shaded probes in selection form, and the slot of each.
+    /// This frame's resident probes in selection form; probe `i` is uniform `i`.
     active: ReflectionProbeSet,
-    active_slot: Vec<u32>,
     uniforms: [ReflectionProbeUniform; MAX_REFLECTION_PROBES],
+    /// Cube paths already warned about for not fitting the array.
+    warned: Vec<String>,
+    /// How many cubes were copied in, for tests that a frame did no GPU work.
+    #[cfg(test)]
+    pub(crate) copies: usize,
 }
 
 impl ProbeArray {
     /// One black 1×1 cube: the array before any probe is resident.
     pub(crate) fn new(device: &wgpu::Device) -> Self {
-        let (texture, view) = array_texture(device, 1, 1, 1);
+        let (texture, view) = gpu::array_texture(device, 1, 1, 1);
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
             label: Some("Reflection Probe Sampler"),
             mag_filter: wgpu::FilterMode::Linear,
@@ -82,20 +96,20 @@ impl ProbeArray {
             cubes: 1,
             table: SlotTable::default(),
             active: ReflectionProbeSet::new(),
-            active_slot: Vec::new(),
             uniforms: [ReflectionProbeUniform::default(); MAX_REFLECTION_PROBES],
+            warned: Vec::new(),
+            #[cfg(test)]
+            copies: 0,
         }
     }
 
-    /// The probe slot plus one for an object whose world bounds centre on `centre`,
-    /// or 0 when no resident probe's box contains it (the object reflects the sky).
-    pub(crate) fn slot_for(&self, centre: Vec3) -> u32 {
-        self.active
-            .select(centre)
-            .map_or(0, |(i, _)| self.active_slot[i] + 1)
+    /// The resident probe plus one for an object whose world bounds centre on
+    /// `centre`, or 0 when no resident probe's box contains it (it reflects the sky).
+    pub(crate) fn probe_for(&self, centre: Vec3) -> u32 {
+        self.active.select(centre).map_or(0, |(i, _)| i as u32 + 1)
     }
 
-    /// Every slot's probe, as `LightingUniforms.refl_probes` holds them.
+    /// Every resident probe, as `LightingUniforms.refl_probes` holds them.
     pub(crate) fn uniforms(&self) -> &[ReflectionProbeUniform; MAX_REFLECTION_PROBES] {
         &self.uniforms
     }
@@ -112,7 +126,7 @@ impl ProbeArray {
     }
 
     /// Make `wanted` (nearest first, at most the budget) this frame's probes: copy the
-    /// cubes that are not resident yet, growing the array when they do not fit.
+    /// cubes that are not resident yet, rebuilding the array when it cannot hold them.
     /// Returns true when the array texture was replaced, so group 0 must rebind.
     fn update(
         &mut self,
@@ -120,175 +134,133 @@ impl ProbeArray {
         queue: &wgpu::Queue,
         wanted: &[(&ReflectionProbe, Rc<CubemapTexture>)],
     ) -> bool {
-        let face = wanted.iter().map(|(_, c)| c.size).max().unwrap_or(1);
-        // Each fitting cube with the number of mips it lands below the array's base.
-        let wanted: Vec<Resident> = wanted
-            .iter()
-            .filter(|(_, c)| face % c.size == 0 && (face / c.size).is_power_of_two())
-            .map(|(p, c)| (*p, &**c, (face / c.size).trailing_zeros()))
+        let kept = self.fitting(wanted);
+        if kept.is_empty() {
+            // Nothing to shade: keep the resident cubes for the next scene.
+            self.activate(&[], &[]);
+            return false;
+        }
+        let (face, mips) = self.target_size(&kept);
+        let kept: Vec<Resident> = kept
+            .into_iter()
+            .map(|(p, c)| (p, c, (face / c.size).trailing_zeros()))
             .collect();
-        let mips = wanted
-            .iter()
-            .map(|(_, c, shift)| shift + c.texture.mip_level_count())
-            .max()
-            .unwrap_or(1);
         if face != self.face || mips != self.mips {
             self.table.clear();
         }
-        let paths: Vec<&str> = wanted
+        // One layer per distinct cube, in first-wanted order.
+        let mut unique: Vec<Resident> = Vec::new();
+        for r in &kept {
+            if !unique.iter().any(|u| u.0.cubemap_path == r.0.cubemap_path) {
+                unique.push(*r);
+            }
+        }
+        let paths: Vec<&str> = unique
             .iter()
             .map(|(p, ..)| p.cubemap_path.as_str())
             .collect();
         let plan = self.table.plan(&paths);
-        let rebuilt = plan.capacity.max(1) != self.cubes || face != self.face || mips != self.mips;
+        let rebuilt = plan.capacity != self.cubes || face != self.face || mips != self.mips;
         if rebuilt {
-            self.cubes = plan.capacity.max(1);
-            (self.texture, self.view) = array_texture(device, face, mips, self.cubes);
+            self.cubes = plan.capacity;
+            (self.texture, self.view) = gpu::array_texture(device, face, mips, self.cubes);
             (self.face, self.mips) = (face, mips);
         }
-        self.copy_planned(device, queue, &wanted, &plan);
-        self.activate(&wanted, &plan.slot_of);
+        let copies: Vec<_> = plan
+            .copies
+            .iter()
+            .map(|&slot| {
+                (
+                    unique[plan.slot_of.iter().position(|&s| s == slot).unwrap()],
+                    slot,
+                )
+            })
+            .collect();
+        gpu::copy_into(device, queue, &self.texture, &copies);
+        #[cfg(test)]
+        {
+            self.copies += copies.len();
+        }
+        let layers: Vec<u32> = kept
+            .iter()
+            .map(|r| {
+                let k = paths.iter().position(|p| *p == r.0.cubemap_path).unwrap();
+                plan.slot_of[k] as u32
+            })
+            .collect();
+        self.activate(&kept, &layers);
         rebuilt
     }
 
-    /// Copy the cubes `plan` names into their slots, in one submission.
-    fn copy_planned(
-        &self,
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
-        wanted: &[Resident],
-        plan: &SlotPlan,
-    ) {
-        if plan.copies.is_empty() {
-            return;
+    /// The wanted probes whose cube fits an array sized to the largest of them (its
+    /// face halved a whole number of times); each other cube is warned about once.
+    fn fitting<'a>(
+        &mut self,
+        wanted: &'a [(&'a ReflectionProbe, Rc<CubemapTexture>)],
+    ) -> Vec<(&'a ReflectionProbe, &'a CubemapTexture)> {
+        let face = wanted.iter().map(|(_, c)| c.size).max().unwrap_or(1);
+        let mut kept = Vec::new();
+        for (probe, cube) in wanted {
+            if face % cube.size == 0 && (face / cube.size).is_power_of_two() {
+                kept.push((*probe, &**cube));
+            } else if !self.warned.contains(&probe.cubemap_path) {
+                log::warn!(
+                    "[Reflection] cubemap {} is {} texels, not {face} halved a whole number \
+                     of times; its objects reflect the sky",
+                    probe.cubemap_path,
+                    cube.size
+                );
+                self.warned.push(probe.cubemap_path.clone());
+            }
         }
-        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("Reflection Probe Copies"),
-        });
-        for &slot in &plan.copies {
-            let k = plan.slot_of.iter().position(|&s| s == slot);
-            let (_, cube, shift) = wanted[k.expect("a copied slot is planned")];
-            copy_cube(&mut encoder, cube, &self.texture, slot as u32, shift);
-        }
-        queue.submit([encoder.finish()]);
+        kept
     }
 
-    /// Record `wanted` as the frame's probes in `slot_of`'s slots: the selection set
-    /// draws query and the uniforms the shader reads.
-    fn activate(&mut self, wanted: &[Resident], slot_of: &[usize]) {
-        self.active.probes.clear();
-        self.active_slot.clear();
-        for (&(probe, cube, shift), &slot) in wanted.iter().zip(slot_of) {
-            self.active.probes.push(probe.clone());
-            self.active_slot.push(slot as u32);
-            self.uniforms[slot] = ReflectionProbeUniform {
+    /// The face size and mip count to hold `kept`: the current array's when it can
+    /// hold every cube (so a scene with smaller cubes does not reallocate), else the
+    /// set's own.
+    fn target_size(&self, kept: &[(&ReflectionProbe, &CubemapTexture)]) -> (u32, u32) {
+        let needs = |face: u32| {
+            let mut mips = 0;
+            for (_, cube) in kept {
+                if face % cube.size != 0 || !(face / cube.size).is_power_of_two() {
+                    return None;
+                }
+                let shift = (face / cube.size).trailing_zeros();
+                mips = mips.max(shift + cube.texture.mip_level_count());
+            }
+            Some(mips)
+        };
+        if needs(self.face).is_some_and(|mips| mips <= self.mips) {
+            return (self.face, self.mips);
+        }
+        let face = kept.iter().map(|(_, c)| c.size).max().unwrap_or(1);
+        (face, needs(face).unwrap_or(1))
+    }
+
+    /// Record `kept` as the frame's probes, probe `i` in layer `layers[i]`: the
+    /// selection set draws query and the uniforms the shader reads. Only a probe that
+    /// changed since the last frame is cloned.
+    fn activate(&mut self, kept: &[Resident], layers: &[u32]) {
+        self.active.probes.truncate(kept.len());
+        for (i, (&(probe, cube, shift), &layer)) in kept.iter().zip(layers).enumerate() {
+            self.uniforms[i] = ReflectionProbeUniform {
                 center: probe.position.to_array(),
                 mip_base: shift as f32,
                 box_min: probe.box_min.to_array(),
                 mip_count: cube.texture.mip_level_count() as f32,
                 box_max: probe.box_max.to_array(),
-                _pad: 0.0,
+                layer,
             };
-        }
-    }
-}
-
-/// A probe the array holds this frame: the probe, its cube, and how many mips below
-/// the array's base level the cube's chain starts.
-type Resident<'a> = (&'a ReflectionProbe, &'a CubemapTexture, u32);
-
-/// A cube-array texture of `cubes` black cubes, `face` texels square with `mips`
-/// levels, and its `CubeArray` view.
-fn array_texture(
-    device: &wgpu::Device,
-    face: u32,
-    mips: u32,
-    cubes: usize,
-) -> (wgpu::Texture, wgpu::TextureView) {
-    let texture = device.create_texture(&wgpu::TextureDescriptor {
-        label: Some("Reflection Probe Array"),
-        size: wgpu::Extent3d {
-            width: face,
-            height: face,
-            depth_or_array_layers: 6 * cubes as u32,
-        },
-        mip_level_count: mips,
-        sample_count: 1,
-        dimension: wgpu::TextureDimension::D2,
-        format: wgpu::TextureFormat::Rgba8UnormSrgb,
-        usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-        view_formats: &[],
-    });
-    let view = texture.create_view(&wgpu::TextureViewDescriptor {
-        label: Some("Reflection Probe Array"),
-        dimension: Some(wgpu::TextureViewDimension::CubeArray),
-        ..Default::default()
-    });
-    (texture, view)
-}
-
-/// Record the copy of every mip of `cube` into array layer `slot`, `shift` mips down.
-fn copy_cube(
-    encoder: &mut wgpu::CommandEncoder,
-    cube: &CubemapTexture,
-    array: &wgpu::Texture,
-    slot: u32,
-    shift: u32,
-) {
-    for level in 0..cube.texture.mip_level_count() {
-        let size = (cube.size >> level).max(1);
-        encoder.copy_texture_to_texture(
-            wgpu::TexelCopyTextureInfo {
-                texture: &cube.texture,
-                mip_level: level,
-                origin: wgpu::Origin3d::ZERO,
-                aspect: wgpu::TextureAspect::All,
-            },
-            wgpu::TexelCopyTextureInfo {
-                texture: array,
-                mip_level: level + shift,
-                origin: wgpu::Origin3d {
-                    x: 0,
-                    y: 0,
-                    z: 6 * slot,
-                },
-                aspect: wgpu::TextureAspect::All,
-            },
-            wgpu::Extent3d {
-                width: size,
-                height: size,
-                depth_or_array_layers: 6,
-            },
-        );
-    }
-}
-
-impl Renderer {
-    /// Make the baked probes nearest `camera_pos` this frame's resident probes
-    /// (#1206), loading their cubes through the by-path cache (#355), and mark group 0
-    /// for a rebind when the array texture was replaced. Ties in distance go to the
-    /// lower probe index, so the set is the same every run.
-    pub(crate) fn update_reflection_probes(&mut self, scene: &Scene, camera_pos: Vec3) {
-        let probes = &scene.reflection_probes.probes;
-        let mut order: Vec<usize> = (0..probes.len())
-            .filter(|&i| !probes[i].cubemap_path.is_empty())
-            .collect();
-        let distance = |i: usize| probes[i].position.distance_squared(camera_pos);
-        order.sort_by(|&a, &b| distance(a).total_cmp(&distance(b)).then(a.cmp(&b)));
-        let mut wanted = Vec::new();
-        for i in order {
-            if wanted.len() == MAX_REFLECTION_PROBES {
-                break;
-            }
-            if let Some(cube) = self.cached_cubemap(&probes[i].cubemap_path) {
-                wanted.push((&probes[i], cube));
+            match self.active.probes.get_mut(i) {
+                Some(resident) if resident == probe => {}
+                Some(resident) => *resident = probe.clone(),
+                None => self.active.probes.push(probe.clone()),
             }
         }
-        if self
-            .reflection_probes
-            .update(&self.device, &self.queue, &wanted)
-        {
-            self.global_bind_group_dirty = true;
-        }
     }
 }
+
+#[cfg(test)]
+#[path = "gpu_tests.rs"]
+mod gpu_tests;

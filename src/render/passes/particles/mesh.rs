@@ -80,7 +80,7 @@ impl Renderer {
                         use_sh,
                         sh,
                         // Picked per particle like any object (#1206).
-                        reflection_probe: self.reflection_probes.slot_for(p.position),
+                        reflection_probe: self.reflection_probes.probe_for(p.position),
                         ..InstanceData::IDENTITY
                     },
                     outline: false,

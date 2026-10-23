@@ -21,7 +21,7 @@
 //!
 //! The probe-selection + box-projected parallax correction (the standard Lagarde
 //! technique) is factored into pure functions here so it is unit-testable without a
-//! GPU; `parallax_correct` in `engine/shaders/forward/lighting.wgsl` runs the same
+//! GPU; `parallax_correct` in `engine/shaders/lighting/reflection_probe.wgsl` runs the same
 //! steps with the same guards (no division by a zero component, no hit at or past
 //! [`NO_HIT`]), since WGSL may assume no inf or NaN.
 //!
