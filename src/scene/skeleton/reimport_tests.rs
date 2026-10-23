@@ -1,13 +1,24 @@
 //! A re-written skinned model rebuilds the rig and bones of the entities built from
 //! it (#1252), keeping the bone overrides and what hangs from a bone.
 
+use std::collections::BTreeSet;
+
 use glam::Vec3;
 
 use super::fixture::{animated_model, armature_owner};
+use super::HITBOX_NAME;
 use crate::asset::fixtures_anim::ANIMATED_GLTF;
+use crate::components::ColliderComponent;
 use crate::scene::asset_instance::instantiate_asset;
 use crate::scene::model_writes::ModelWrites;
+use crate::scene::serialize::{apply_scene_data, to_scene_data};
 use crate::scene::Scene;
+
+/// The rewrite that drops `Joint1` from the fixture's skin.
+const DROP_JOINT1: (&str, &str) = (
+    r#""joints": [ 1, 2 ], "inverseBindMatrices": 3"#,
+    r#""joints": [ 1 ]"#,
+);
 
 /// Instantiate the animated fixture written under `tag`, and return the entity and
 /// the model file's path.
@@ -40,6 +51,24 @@ fn parent_name(scene: &Scene, id: u32) -> String {
     scene.world.name(parent).unwrap().clone()
 }
 
+/// `old` are all gone, no live entity lists a dead child, and a saved scene names
+/// none either.
+fn assert_dead_and_unlisted(scene: &Scene, old: &[u32]) {
+    for &id in old {
+        assert!(!scene.world.contains(id), "entity {id} was despawned");
+    }
+    for id in scene.entity_ids() {
+        for child in scene.world.children(id) {
+            assert!(scene.world.contains(child), "{id} lists dead child {child}");
+        }
+    }
+    let data = to_scene_data(scene);
+    let saved: BTreeSet<u32> = data.entities.iter().map(|e| e.id).collect();
+    for entity in &data.entities {
+        assert!(entity.children.iter().all(|c| saved.contains(c)), "saved");
+    }
+}
+
 #[test]
 fn a_changed_bind_pose_rebuilds_the_rig_and_keeps_what_was_authored() {
     let mut scene = Scene::new();
@@ -48,6 +77,7 @@ fn a_changed_bind_pose_rebuilds_the_rig_and_keeps_what_was_authored() {
     scene.world.transform_mut(root).unwrap().position = Vec3::new(0.5, 0.0, 0.0);
     let gun = hang_gun(&mut scene, hero, "Joint1");
     let old_palette = scene.world.mesh(hero).unwrap().bind_palette.clone();
+    let old_bones = scene.world.mesh(hero).unwrap().skeleton.bones.clone();
     let mut writes = ModelWrites::default();
 
     rewrite(
@@ -79,6 +109,7 @@ fn a_changed_bind_pose_rebuilds_the_rig_and_keeps_what_was_authored() {
         "the gun hangs on"
     );
     assert_eq!(scene.world.transform(gun).unwrap().position, Vec3::Z);
+    assert_dead_and_unlisted(&scene, &old_bones);
 }
 
 #[test]
@@ -86,19 +117,100 @@ fn a_removed_bone_hands_what_hung_from_it_to_its_parent_bone() {
     let mut scene = Scene::new();
     let (hero, path) = hero(&mut scene, "reimport_removed");
     let gun = hang_gun(&mut scene, hero, "Joint1");
+    let hitbox = hang_gun(&mut scene, hero, "Joint1");
+    scene.world.set_name(hitbox, HITBOX_NAME.to_string());
+    let collider = ColliderComponent::from_mesh_bounds(true, -Vec3::ONE, Vec3::ONE);
+    scene.world.set_collider(hitbox, Some(collider));
+    let joint1 = scene.find_bone(hero, "Joint1").unwrap();
+    scene.selected_entity_id = Some(joint1);
+    let old_bones = scene.world.mesh(hero).unwrap().skeleton.bones.clone();
     let mut writes = ModelWrites::default();
 
-    rewrite(
-        &path,
-        r#""joints": [ 1, 2 ], "inverseBindMatrices": 3"#,
-        r#""joints": [ 1 ]"#,
-    );
+    rewrite(&path, DROP_JOINT1.0, DROP_JOINT1.1);
     assert_eq!(writes.follow(&mut scene), 1);
 
     let bones = scene.world.mesh(hero).unwrap().skeleton.bones.clone();
     assert_eq!(bones.len(), 1, "the rig lost Joint1");
     assert_eq!(scene.world.parent_id(gun), Some(bones[0]));
     assert_eq!(parent_name(&scene, gun), "Joint0");
+    assert!(!scene.world.contains(hitbox), "a hitbox goes with its bone");
+    assert_eq!(scene.selected_entity_id, None, "the selected bone is gone");
+    assert_dead_and_unlisted(&scene, &old_bones);
+}
+
+#[test]
+fn a_reload_after_the_bone_went_hangs_the_same_way_a_live_reimport_does() {
+    let mut scene = Scene::new();
+    let (hero, path) = hero(&mut scene, "reimport_reload");
+    hang_gun(&mut scene, hero, "Joint1");
+    let saved = to_scene_data(&scene);
+
+    rewrite(&path, DROP_JOINT1.0, DROP_JOINT1.1);
+    let mut loaded = Scene::new();
+    apply_scene_data(&mut loaded, saved);
+
+    let gun = loaded.find_entity_by_name("Gun").unwrap();
+    assert_eq!(parent_name(&loaded, gun), "Joint0", "the nearest ancestor");
+}
+
+#[test]
+fn a_model_rewritten_as_static_drops_its_bones_and_what_was_authored_on_them() {
+    let mut scene = Scene::new();
+    let (hero, path) = hero(&mut scene, "reimport_static");
+    let joint1 = scene.find_bone(hero, "Joint1").unwrap();
+    let body = crate::scene::authoring::default_rigidbody();
+    scene.world.set_rigidbody(joint1, Some(body));
+    scene.world.transform_mut(joint1).unwrap().position = Vec3::X;
+    let gun = hang_gun(&mut scene, hero, "Joint1");
+    let old_bones = scene.world.mesh(hero).unwrap().skeleton.bones.clone();
+    let mut writes = ModelWrites::default();
+
+    rewrite(&path, r#""mesh": 0, "skin": 0"#, r#""mesh": 0"#);
+    assert_eq!(writes.follow(&mut scene), 1);
+
+    let mesh = scene.world.mesh(hero).unwrap();
+    assert!(mesh.skin.is_none(), "static now");
+    assert!(mesh.skeleton.overrides.is_empty() && mesh.skeleton.bodies.is_empty());
+    drop(mesh);
+    assert_eq!(
+        scene.world.parent_id(gun),
+        Some(hero),
+        "kept, on the entity"
+    );
+    assert_dead_and_unlisted(&scene, &old_bones);
+}
+
+#[test]
+fn an_attachment_named_like_the_root_joint_is_not_taken_for_it() {
+    let mut scene = Scene::new();
+    let (hero, path) = hero(&mut scene, "reimport_namesake");
+    let decoy = hang_gun(&mut scene, hero, "Joint1");
+    scene.world.set_name(decoy, "Joint0".to_string());
+    let mut writes = ModelWrites::default();
+
+    rewrite(
+        &path,
+        r#""translation": [0.0, 1.0, 0.0]"#,
+        r#""translation": [0.0, 2.0, 0.0]"#,
+    );
+    assert_eq!(writes.follow(&mut scene), 1);
+
+    let bones = scene.world.mesh(hero).unwrap().skeleton.bones.clone();
+    assert!(!bones.contains(&decoy), "the decoy is no bone");
+    assert_eq!(scene.world.parent_id(decoy), Some(bones[1]), "it hangs on");
+}
+
+#[test]
+fn destroying_a_child_takes_it_out_of_its_parents_children() {
+    let mut scene = Scene::new();
+    let parent = scene.add_entity("Parent".to_string());
+    let child = scene.add_entity("Child".to_string());
+    scene.set_parent(child, Some(parent)).unwrap();
+
+    scene.destroy_entity(child);
+
+    assert!(scene.world.children(parent).is_empty());
+    assert_dead_and_unlisted(&scene, &[child]);
 }
 
 #[test]
@@ -107,6 +219,7 @@ fn a_bone_gone_with_its_ancestors_is_warned_about_and_leaves_its_child_on_the_ri
     let rig = armature_owner(&mut scene);
     scene.sync_skeleton(rig);
     let hat = hang_gun(&mut scene, rig, "head");
+    hang_gun(&mut scene, rig, "head");
     let pistol = hang_gun(&mut scene, rig, "hips");
 
     let attachments = scene.take_skeleton(rig);
@@ -123,7 +236,7 @@ fn a_bone_gone_with_its_ancestors_is_warned_about_and_leaves_its_child_on_the_ri
     scene.world.mesh_mut(rig).unwrap().skin = Some(skin);
 
     let missing = scene.restore_skeleton(rig, attachments);
-    assert_eq!(missing, ["hips", "head"], "each bone gone is warned about");
+    assert_eq!(missing, ["hips", "head"], "each bone gone, once");
     assert_eq!(scene.world.parent_id(hat), Some(rig));
     assert_eq!(scene.world.parent_id(pistol), Some(rig));
     assert_eq!(scene.bone_ids().len(), 1, "the new rig's one bone");

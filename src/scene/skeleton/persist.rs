@@ -3,16 +3,17 @@
 //! Bones are never saved. A document keeps, per skinned entity, the bones whose
 //! transform differs from the model's rest pose (`BoneBinding::overrides`), and
 //! every entity parented under a bone, re-pointed at the skinned entity with the
-//! bone's name in `parent_bone`, and the `Rigidbody` / `Joint` a ragdoll put on a
-//! bone (`BoneBinding::bodies`, #466). All re-bind by name on load.
+//! bone's name (then its ancestor bones') in `parent_bone`, and the `Rigidbody` /
+//! `Joint` a ragdoll put on a bone (`BoneBinding::bodies`, #466). All re-bind by
+//! name on load.
 
 use std::collections::BTreeMap;
 
+use super::hang::Hung;
 use super::sync::rest_local;
 use crate::asset::SkinData;
 use crate::components::mesh::BoneBody;
 use crate::components::{Entity, TransformComponent};
-use crate::scene::Scene;
 
 /// How far a bone may drift from its rest pose before it counts as an override.
 const OVERRIDE_EPS: f32 = 1.0e-5;
@@ -24,13 +25,28 @@ const OVERRIDE_EPS: f32 = 1.0e-5;
 /// about: only its transform and physics are kept, so a component belongs on a
 /// child of the bone.
 pub fn strip_bones(entities: &mut Vec<Entity>) {
+    strip(entities, Why::Saved);
+}
+
+/// Why bones are being taken out of a document, for the warning about the
+/// components a bone carried.
+#[derive(Clone, Copy)]
+pub(super) enum Why {
+    /// A save or extract: the components are not written.
+    Saved,
+    /// A live re-import (#1252): the bones are despawned, and the components with them.
+    Reimported,
+}
+
+/// [`strip_bones`], warning about a bone's other components as `why` says.
+pub(super) fn strip(entities: &mut Vec<Entity>, why: Why) {
     let index: BTreeMap<u32, usize> = entities
         .iter()
         .enumerate()
         .map(|(i, e)| (e.id, i))
         .collect();
-    // bone id -> (skinned entity id, bone name)
-    let mut bone_of: BTreeMap<u32, (u32, String)> = BTreeMap::new();
+    // bone id -> (skinned entity id, the bone's name then its ancestors')
+    let mut bone_of: BTreeMap<u32, (u32, Vec<String>)> = BTreeMap::new();
     for i in 0..entities.len() {
         let Some(mesh) = &entities[i].mesh else {
             continue;
@@ -44,9 +60,8 @@ pub fn strip_bones(entities: &mut Vec<Entity>) {
             let Some(&b) = index.get(bone) else {
                 continue;
             };
-            let name = skin.name(slot);
-            saved.record(&entities[b], skin, bones, slot);
-            bone_of.insert(*bone, (entities[i].id, name));
+            saved.record(&entities[b], skin, bones, slot, why);
+            bone_of.insert(*bone, (entities[i].id, bone_chain(skin, slot)));
         }
         if let Some(mesh) = &mut entities[i].mesh {
             mesh.skeleton.overrides = saved.overrides;
@@ -73,7 +88,7 @@ struct SavedBones {
 impl SavedBones {
     /// Record bone `slot`'s document: its transform when it is off the rest
     /// pose, its physics, and a warning for any other component.
-    fn record(&mut self, doc: &Entity, skin: &SkinData, bones: &[u32], slot: usize) {
+    fn record(&mut self, doc: &Entity, skin: &SkinData, bones: &[u32], slot: usize, why: Why) {
         let name = skin.name(slot);
         if !doc
             .transform
@@ -85,13 +100,34 @@ impl SavedBones {
         if let Some(body) = bone_body(doc, bone_name) {
             self.bodies.insert(name.clone(), body);
         }
-        if carries_components(doc) {
-            log::warn!(
+        if !carries_components(doc) {
+            return;
+        }
+        match why {
+            Why::Saved => log::warn!(
                 "[Scene] bone '{name}' carries components that are not saved (bones are \
                  rebuilt from the model); put them on a child of the bone instead."
-            );
+            ),
+            Why::Reimported => log::warn!(
+                "[Asset] bone '{name}' carried components; re-importing its model rebuilt \
+                 the bone and deleted them. Put them on a child of the bone instead."
+            ),
         }
     }
+}
+
+/// `slot`'s joint name, then the names of its ancestor joints in `skin`, nearest
+/// first: what an attachment saves, so a bone the model later drops hands it to
+/// the nearest one left. A parent link that does not point to an earlier slot ends
+/// the chain, as `bind_bones` treats such a joint as a root.
+fn bone_chain(skin: &SkinData, slot: usize) -> Vec<String> {
+    let mut chain = vec![skin.name(slot)];
+    let mut at = slot;
+    while let Some(p) = skin.parents.get(at).copied().flatten().filter(|&p| p < at) {
+        chain.push(skin.name(p));
+        at = p;
+    }
+    chain
 }
 
 /// Point every non-bone child of a bone at the bone's skinned entity instead,
@@ -99,18 +135,18 @@ impl SavedBones {
 fn reparent_attachments(
     entities: &mut [Entity],
     index: &BTreeMap<u32, usize>,
-    bone_of: &BTreeMap<u32, (u32, String)>,
+    bone_of: &BTreeMap<u32, (u32, Vec<String>)>,
 ) {
     let mut moved: Vec<(u32, u32)> = Vec::new(); // (attachment, skinned entity)
     for entity in entities.iter_mut() {
         if bone_of.contains_key(&entity.id) {
             continue;
         }
-        let Some((owner, name)) = entity.parent_id.and_then(|p| bone_of.get(&p)) else {
+        let Some((owner, chain)) = entity.parent_id.and_then(|p| bone_of.get(&p)) else {
             continue;
         };
         entity.parent_id = Some(*owner);
-        entity.parent_bone = Some(name.clone());
+        entity.parent_bone = chain.clone();
         moved.push((entity.id, *owner));
     }
     for (child, owner) in moved {
@@ -156,34 +192,12 @@ fn carries_components(doc: &Entity) -> bool {
     serde_json::to_value(&bare).ok() != serde_json::to_value(doc).ok()
 }
 
-/// Take the `parent_bone` marks out of a document about to be inserted, as
-/// `(entity, bone name)` pairs for [`Scene::attach_to_bones`] once the skeletons
-/// exist.
-pub fn take_bone_parents(entities: &mut [Entity]) -> Vec<(u32, String)> {
+/// Take the `parent_bone` marks out of a document about to be inserted, for
+/// [`Scene::hang_on_skeletons`] once the skeletons exist.
+pub fn take_bone_parents(entities: &mut [Entity]) -> Vec<Hung> {
     entities
         .iter_mut()
-        .filter_map(|e| Some((e.id, e.parent_bone.take()?)))
+        .filter(|e| !e.parent_bone.is_empty())
+        .map(|e| (e.id, std::mem::take(&mut e.parent_bone)))
         .collect()
-}
-
-impl Scene {
-    /// Re-parent each `(entity, bone name)` under that bone of the skinned entity
-    /// it was saved under. A bone the skeleton no longer has leaves the entity
-    /// under the skinned entity, with a warning.
-    pub fn attach_to_bones(&mut self, pending: Vec<(u32, String)>) {
-        for (child, name) in pending {
-            let Some(owner) = self.world.parent_id(child) else {
-                continue;
-            };
-            match self.find_bone(owner, &name) {
-                Some(bone) => {
-                    let _ = self.set_parent(child, Some(bone));
-                }
-                None => log::warn!(
-                    "[Asset] entity {child} was attached to bone '{name}', which the skeleton \
-                     of entity {owner} no longer has; it stays under entity {owner}."
-                ),
-            }
-        }
-    }
 }

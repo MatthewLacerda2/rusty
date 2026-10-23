@@ -25,6 +25,13 @@ impl Scene {
     /// pending per-bone overrides and bone bodies (#466) are applied by name; one
     /// whose bone no longer exists is dropped with a warning.
     pub fn sync_skeleton(&mut self, owner: u32) {
+        self.sync_skeleton_past(owner, &[]);
+    }
+
+    /// [`Scene::sync_skeleton`], never taking one of `parked` for a bone: they are
+    /// attachments waiting under `owner` to hang from a bone again, and one named
+    /// like a root joint is still not that joint.
+    pub(super) fn sync_skeleton_past(&mut self, owner: u32, parked: &[u32]) {
         let Some((skin, bound)) = self
             .world
             .mesh(owner)
@@ -35,7 +42,7 @@ impl Scene {
         let bones = if self.binding_is_live(&skin, &bound) {
             bound
         } else {
-            self.bind_bones(owner, &skin)
+            self.bind_bones(owner, &skin, parked)
         };
         let (overrides, bodies) = match self.world.mesh_mut(owner) {
             Some(mut mesh) => {
@@ -95,8 +102,9 @@ impl Scene {
     }
 
     /// Walk the joint slots in order (parents first), finding each bone by name
-    /// under its parent or spawning it at rest. Returns the slot → entity binding.
-    fn bind_bones(&mut self, owner: u32, skin: &SkinData) -> Vec<u32> {
+    /// under its parent (never one of `parked`) or spawning it at rest. Returns the
+    /// slot → entity binding.
+    fn bind_bones(&mut self, owner: u32, skin: &SkinData, parked: &[u32]) -> Vec<u32> {
         let mut bones: Vec<u32> = Vec::with_capacity(skin.local_bind.len());
         for slot in 0..skin.local_bind.len() {
             let parent = match skin.parents.get(slot).copied().flatten() {
@@ -104,10 +112,11 @@ impl Scene {
                 _ => owner,
             };
             let name = skin.name(slot);
-            let existing =
-                self.world.children(parent).into_iter().find(|&c| {
-                    !bones.contains(&c) && self.world.name(c).is_some_and(|n| *n == name)
-                });
+            let existing = self.world.children(parent).into_iter().find(|&c| {
+                !bones.contains(&c)
+                    && !parked.contains(&c)
+                    && self.world.name(c).is_some_and(|n| *n == name)
+            });
             let bone =
                 existing.unwrap_or_else(|| self.spawn_bone(parent, name, rest_local(skin, slot)));
             bones.push(bone);

@@ -163,11 +163,13 @@ pub struct Entity {
     pub prefab_link: Option<PrefabLink>,
     pub parent_id: Option<u32>,
     /// Document-only (#453): the bone of the parent's skeleton this entity hangs
-    /// from. Bones are rebuilt from the model on load, so a child of `hand_r` is
-    /// saved under the skinned entity with `parent_bone: "hand_r"` and re-parented
-    /// by name once the skeleton is back. Always `None` on a live entity.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub parent_bone: Option<String>,
+    /// from, then that bone's ancestor bones, nearest first. Bones are rebuilt from
+    /// the model on load, so a child of `hand_r` is saved under the skinned entity
+    /// with `parent_bone: ["hand_r", "forearm_r", …]` and re-parented by name once
+    /// the skeleton is back; when the model no longer has `hand_r`, the nearest
+    /// ancestor it still has takes it (#1252). Always empty on a live entity.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub parent_bone: Vec<String>,
     pub children: Vec<u32>,
 }
 
@@ -216,7 +218,7 @@ impl Entity {
             shape: None,
             prefab_link: None,
             parent_id: None,
-            parent_bone: None,
+            parent_bone: Vec::new(),
             children: Vec::new(),
         }
     }

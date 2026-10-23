@@ -189,6 +189,9 @@ fn reimport_entity_mesh(scene: &mut Scene, id: u32, rig: Rig) -> bool {
     else {
         return false;
     };
+    if was_skinned && rig == Rig::Keep {
+        return false;
+    }
     let Ok(sub) = asset::import_sub_mesh(&reference) else {
         return false;
     };
@@ -201,12 +204,12 @@ fn reimport_entity_mesh(scene: &mut Scene, id: u32, rig: Rig) -> bool {
     };
     // The bones come down before the rig they were built from is replaced, and
     // go back up from the new one, keeping what was authored on them.
-    let attachments = skinned.then(|| scene.take_skeleton(id));
+    let hung = skinned.then(|| scene.take_skeleton(id));
     if let Some(mut mesh) = scene.world.mesh_mut(id) {
         install(&mut mesh, RehydratedMesh::from_sub_mesh(&sub));
     }
-    if let Some(attachments) = attachments {
-        scene.restore_skeleton(id, attachments);
+    if let Some(hung) = hung {
+        scene.restore_skeleton(id, hung);
     }
     refit_mesh_collider(&mut scene.world, id, bounds);
     true
