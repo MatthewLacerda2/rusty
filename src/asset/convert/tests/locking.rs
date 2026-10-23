@@ -3,7 +3,7 @@
 
 use super::super::{cache_path, lock, record, refresh};
 use super::COPY;
-use crate::core::project;
+use crate::core::{paths, project};
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{channel, Receiver};
 use std::time::Duration;
@@ -99,7 +99,9 @@ fn a_projects_lock_lives_in_its_cache_folder_never_in_assets() {
     let assets = files_under(&root.join(project::ASSETS_DIR));
     let is_lock = |p: &PathBuf| p.extension().is_some_and(|e| e == "lock");
     assert!(!assets.iter().any(is_lock), "{assets:?}");
-    let locks = files_under(&root.join(project::CACHE_DIR).join(lock::LOCKS_DIR));
+    // Canonical, as `lock::path` is: macOS's temp dir `/var` is a link to `/private/var`.
+    let locks = paths::canonicalize(&root.join(project::CACHE_DIR).join(lock::LOCKS_DIR));
+    let locks = files_under(&locks.unwrap());
     assert_eq!(locks, vec![lock::path(&out).unwrap()], "one lock, reused");
 }
 
