@@ -11,7 +11,7 @@ use crate::core::paths;
 use crate::editor::content_browser::{file_name, ROOT};
 use crate::editor::theme::Theme;
 use crate::editor::EditorUi;
-use crate::scene::Scene;
+use crate::scene::{Scene, PREFAB_EXTENSION, SCENE_EXTENSION};
 use crate::scripting::ConsoleLogs;
 
 /// A click on a content tile, resolved after the grid is drawn (so the borrow on
@@ -144,7 +144,7 @@ fn collect_tiles(
                 t.warning.linear_multiply(0.8),
                 TileKind::Folder,
             ),
-            (false, "scene") => (type_glyph(&ext), t.asset_color(&ext), TileKind::Scene),
+            (false, SCENE_EXTENSION) => (type_glyph(&ext), t.asset_color(&ext), TileKind::Scene),
             (false, _) => (type_glyph(&ext), t.asset_color(&ext), TileKind::File),
         };
         tiles.push(Tile {
@@ -213,8 +213,8 @@ fn type_glyph(ext: &str) -> &'static str {
     match ext {
         e if IMAGE_EXTENSIONS.contains(&e) => icon::IMAGE,
         "wav" | "mp3" | "ogg" => icon::MUSIC_NOTES,
-        "scene" => icon::FILM_SLATE,
-        "prefab" => icon::PACKAGE,
+        SCENE_EXTENSION => icon::FILM_SLATE,
+        PREFAB_EXTENSION => icon::PACKAGE,
         e if MODEL_EXTENSIONS.contains(&e) => icon::CUBE,
         "lua" => icon::FILE_CODE,
         _ => icon::FILE,

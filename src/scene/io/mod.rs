@@ -20,8 +20,6 @@ mod lighting_block;
 mod manifest;
 mod seed;
 
-use std::path::Path;
-
 pub use lighting_block::{save_lighting, LightingSave};
 pub use manifest::{SeedManifest, SeedOutcome};
 pub use seed::{
@@ -34,15 +32,6 @@ use crate::scene::Scene;
 
 /// The one standardised scene file extension (JSON inside).
 pub const SCENE_EXTENSION: &str = "scene";
-
-/// True if `path` looks like a scene file (`.scene`).
-pub fn is_scene_path(path: &str) -> bool {
-    Path::new(path)
-        .extension()
-        .and_then(|e| e.to_str())
-        .map(|e| e.eq_ignore_ascii_case(SCENE_EXTENSION))
-        .unwrap_or(false)
-}
 
 /// Serialize the live scene's component VALUES to `path` (pretty JSON, no GPU
 /// buffers). Single active scene: this is the only persisted document.

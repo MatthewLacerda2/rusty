@@ -64,14 +64,6 @@ fn the_seeded_default_scene_loads_back() {
 }
 
 #[test]
-fn scene_paths_are_told_by_their_extension() {
-    assert!(super::super::is_scene_path("assets/scenes/default.scene"));
-    assert!(super::super::is_scene_path("A.SCENE"));
-    assert!(!super::super::is_scene_path("assets/scripts/bot.lua"));
-    assert!(!super::super::is_scene_path("scene"));
-}
-
-#[test]
 fn the_embedded_seeds_are_exactly_the_engine_folders_scripts() {
     use super::super::bundled::{SCRIPTS, UI_SCRIPTS};
     let on_disk = |dir: &str| {
