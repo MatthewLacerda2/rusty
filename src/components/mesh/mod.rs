@@ -130,7 +130,10 @@ impl MeshComponent {
     /// The index runs to draw, one per material slot: `ranges`, or the whole index
     /// list as one run when it is empty.
     pub fn index_ranges(&self) -> impl Iterator<Item = Range<u32>> + '_ {
-        let whole = self.ranges.is_empty().then(|| 0..self.indices.len() as u32);
+        let whole = self
+            .ranges
+            .is_empty()
+            .then_some(0..self.indices.len() as u32);
         whole.into_iter().chain(self.ranges.iter().cloned())
     }
 
