@@ -57,7 +57,11 @@ mesh's primitives, an FBX mesh's per-polygon materials, an `.obj` object's `usem
 groups — while the mesh stays one addressable sub-object (`model.fbx::Body`).
 Instancing it fills one slot per run with that run's imported material (the engine
 default for a run that names none). A primitive, or any one-material mesh, has one
-slot. A run past the end of the list draws with the first material.
+slot. As in Unity, the list and the runs need not match:
+
+- **fewer materials than runs:** a run past the end of the list is not drawn;
+- **more materials than runs:** each extra material draws the last run again, over
+  it (a second pass, as Unity does).
 
 | Function | Signature | Returns |
 |---|---|---|
@@ -66,9 +70,20 @@ slot. A run past the end of the list draws with the first material.
 | `Material.GetAll` | `(id)` | an array of the library key of every slot, in run order (empty if the entity has no Material) |
 | `Material.SetAt` | `(id, index, key)` | — points slot `index` (0-based, Unity's `sharedMaterials[i]`) at library material `key`; the other slots are untouched |
 
+`index` is 0-based, like every index argument in rusty's API (`Probe`,
+`Reflection`, `Layers`, pads). `GetAll` returns a Lua array, which starts at 1, so a
+loop over it passes `i - 1`:
+
+```lua with=e:Material
+for i, key in ipairs(Material.GetAll(e)) do
+    Material.SetAt(e, i - 1, key)
+end
+```
+
 `Set` and `SetAt` raise an error, and change nothing, when `index` is past the
-entity's slots (one per run of its mesh) or the library has no material `key`. The
-slots save with the scene.
+entity's slots (one per run of its mesh, or its list's length when that is longer)
+or the library has no material `key`. Setting a slot past the end of the list grows
+it, every new slot up to `index` taking `key`. The slots save with the scene.
 
 ```lua with=e:Material
 Material.DefineAsset("chrome", { metallic = 1.0, roughness = 0.1 })

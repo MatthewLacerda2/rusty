@@ -21,18 +21,21 @@ pub(super) fn draw_slots(
     is_dirty: &mut bool,
 ) -> Option<String> {
     let keys = mat_ops::keys(world, id);
-    if keys.len() <= 1 {
+    let count = mat_ops::slot_count(world, id);
+    if count <= 1 {
         return keys.into_iter().next();
     }
     let memory = egui::Id::new(("material_slot", id));
     let mut selected: usize = ui.data_mut(|d| d.get_temp(memory).unwrap_or(0));
-    selected = selected.min(keys.len() - 1);
+    selected = selected.min(count - 1);
     ui.label("Materials:");
-    for (slot, key) in keys.iter().enumerate() {
+    for slot in 0..count {
+        // A sub-mesh past the end of the list draws nothing, as in Unity (#1285).
+        let key = keys.get(slot).map_or("(none)", String::as_str);
         ui.horizontal(|ui| {
             ui.radio_value(&mut selected, slot, format!("Element {slot}"));
             egui::ComboBox::from_id_salt(("material_slot_pick", id, slot))
-                .selected_text(key.as_str())
+                .selected_text(key)
                 .show_ui(ui, |ui| {
                     for name in materials.keys() {
                         if ui.selectable_label(name == key, name.as_str()).clicked()

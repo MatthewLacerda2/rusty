@@ -66,7 +66,7 @@ impl Renderer {
             {
                 continue;
             }
-            let Some((key, num_indices, glass)) = self.mesh_emitter_key(scene, &emitter) else {
+            let Some((key, glass)) = self.mesh_emitter_key(scene, &emitter) else {
                 continue;
             };
             for p in &emitter.runtime.particles {
@@ -75,7 +75,6 @@ impl Renderer {
                 let (use_sh, sh) = probe_sh_at(scene, p.position);
                 let item = DrawItem {
                     key: key.clone(),
-                    indices: 0..num_indices,
                     instance: InstanceData {
                         model_matrix: model.to_cols_array(),
                         use_sh,
@@ -97,13 +96,14 @@ impl Renderer {
     }
 
     /// What every particle of a mesh emitter shares: the batch key (pipeline — the
-    /// material's surface shader, #396 — mesh, material bind group, per-draw uniform), the index count, and whether the material is
-    /// translucent. `None` when the mesh is unset or fails to load.
+    /// material's surface shader, #396 — mesh and its whole index run, material bind
+    /// group, per-draw uniform) and whether the material is translucent. `None` when
+    /// the mesh is unset or fails to load.
     fn mesh_emitter_key(
         &mut self,
         scene: &Scene,
         emitter: &ParticleEmitterComponent,
-    ) -> Option<(BatchKey, u32, bool)> {
+    ) -> Option<(BatchKey, bool)> {
         let (mesh, num_indices) = self.particle_mesh(emitter)?;
         let entry = emitter
             .render
@@ -126,12 +126,12 @@ impl Renderer {
             pipeline,
             mesh,
             // The emitter names one material: the whole mesh is one run.
-            first_index: 0,
+            indices: (0..num_indices).into(),
             material: self.material_index(entry, pipeline, None),
             uniform: uniform.words(),
         };
         let glass = material.is_some_and(MaterialAsset::is_transparent);
-        Some((key, num_indices, glass))
+        Some((key, glass))
     }
 }
 

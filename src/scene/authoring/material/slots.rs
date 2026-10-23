@@ -15,22 +15,20 @@ pub fn slot_count(world: &World, id: u32) -> usize {
     runs.max(listed).max(1)
 }
 
-/// Entity `id`'s material keys, one per slot ([`slot_count`]): a slot its list does
-/// not reach draws with the first material, so it reads as that. Empty when it has
-/// no Material.
+/// Entity `id`'s material keys, in slot order (Unity's `sharedMaterials`): its list
+/// as stored, which may be shorter than [`slot_count`] (a run past its end is not
+/// drawn). Empty when it has no Material.
 pub fn keys(world: &World, id: u32) -> Vec<String> {
-    let Some(material) = world.material(id) else {
-        return Vec::new();
-    };
-    let count = slot_count(world, id);
-    (0..count)
-        .map(|slot| material.for_range(slot).to_string())
-        .collect()
+    world
+        .material(id)
+        .map(|m| m.materials.clone())
+        .unwrap_or_default()
 }
 
 /// Point entity `id`'s material slot `slot` at library material `key` (Unity's
 /// `renderer.sharedMaterials[slot] = …`), attaching a Material when it has none. A
-/// missing entity, a slot past [`slot_count`] or a key the library lacks is an
+/// slot past the end of the list grows it, every new slot up to `slot` taking `key`.
+/// A missing entity, a slot past [`slot_count`] or a key the library lacks is an
 /// error naming it, and changes nothing.
 pub fn set_slot(
     world: &mut World,
@@ -52,7 +50,9 @@ pub fn set_slot(
         return Err(format!("no material asset {key:?}"));
     }
     let mut list = keys(world, id);
-    list.resize(count, key.to_string());
+    if list.len() <= slot {
+        list.resize(slot + 1, key.to_string());
+    }
     list[slot] = key.to_string();
     world.set_material(id, Some(MaterialComponent { materials: list }));
     Ok(())

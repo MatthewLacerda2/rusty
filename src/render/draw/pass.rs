@@ -193,7 +193,7 @@ impl Renderer {
                 .set_index_buffer(gpu_mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
             render_pass.set_bind_group(1, self.draw_buffers.bind_group(), &offsets);
             render_pass.set_bind_group(2, self.materials.group(batch.key.material), &[]);
-            render_pass.draw_indexed(batch.indices.clone(), 0, batch.instances.clone());
+            render_pass.draw_indexed(batch.key.indices.range(), 0, batch.instances.clone());
         }
     }
 }

@@ -67,7 +67,7 @@ pub struct MeshComponent {
     #[serde(skip)]
     pub indices: Vec<u32>,
     /// The sub-mesh runs of `indices` (#1285), in order: run `i` draws with the
-    /// entity's material `i` (`MaterialComponent::for_range`). Empty means one run
+    /// entity's material `i` (`MaterialComponent::materials`). Empty means one run
     /// over every index, as a primitive has. Rehydrated from the imported sub-mesh's
     /// material ranges, never serialized (like `indices`).
     #[serde(skip)]

@@ -146,3 +146,5 @@ fn gpu_a_hit_flash_set_from_lua_changes_the_next_frame_by_a_buffer_write() {
 
 #[path = "overrides_tests.rs"]
 mod overrides_tests;
+#[path = "slot_overrides_tests.rs"]
+mod slot_overrides_tests;

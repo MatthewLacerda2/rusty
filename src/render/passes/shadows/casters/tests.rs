@@ -5,21 +5,22 @@ fn at(x: f32, bone_base: u32) -> CasterData {
     CasterData::new(Mat4::from_translation(Vec3::X * x), bone_base)
 }
 
-fn mesh(m: &str) -> CasterKey {
+/// A plain caster key of mesh `m`, drawing indices `0..n`.
+fn mesh(m: &str, n: u32) -> CasterKey {
     CasterKey {
         mirrored: false,
         clip: None,
         mesh: MeshId(m.to_string()),
-        first_index: 0,
+        indices: (0..n).into(),
     }
 }
 
 #[test]
 fn casters_of_one_mesh_become_one_instanced_draw() {
     let casters = vec![
-        (mesh("Box"), 0..36, at(0.0, 0)),
-        (mesh("Pillar"), 0..96, at(1.0, 0)),
-        (mesh("Box"), 0..36, at(2.0, 0)),
+        (mesh("Box", 36), at(0.0, 0)),
+        (mesh("Pillar", 96), at(1.0, 0)),
+        (mesh("Box", 36), at(2.0, 0)),
     ];
     let (packed, batches) = batch_casters(casters.clone(), true);
     let counts: Vec<_> = batches.iter().map(CasterBatch::counts).collect();
@@ -35,8 +36,8 @@ fn casters_of_one_mesh_become_one_instanced_draw() {
 #[test]
 fn skinned_copies_of_one_mesh_share_a_draw_with_their_own_palettes() {
     let casters = vec![
-        (mesh("Rig"), 0..900, at(0.0, 1)),
-        (mesh("Rig"), 0..900, at(4.0, 31)),
+        (mesh("Rig", 900), at(0.0, 1)),
+        (mesh("Rig", 900), at(4.0, 31)),
     ];
     let (packed, batches) = batch_casters(casters, true);
     let counts: Vec<_> = batches.iter().map(CasterBatch::counts).collect();
@@ -55,12 +56,12 @@ fn a_clipped_caster_draws_apart_from_plain_copies_of_its_mesh() {
     };
     let clipped = CasterKey {
         clip: Some(clip),
-        ..mesh("Box")
+        ..mesh("Box", 36)
     };
     let casters = vec![
-        (clipped.clone(), 0..36, at(0.0, 0).cutout(0.5, true)),
-        (mesh("Box"), 0..36, at(1.0, 0)),
-        (clipped, 0..36, at(2.0, 0)),
+        (clipped.clone(), at(0.0, 0).cutout(0.5, true)),
+        (mesh("Box", 36), at(1.0, 0)),
+        (clipped, at(2.0, 0)),
     ];
     let (packed, batches) = batch_casters(casters, true);
     let keys: Vec<_> = batches.iter().map(|b| b.key.clip).collect();
@@ -84,12 +85,12 @@ fn a_mirrored_caster_draws_apart_from_unmirrored_copies() {
     assert!(!is_mirrored(twice), "two flips are a turn");
     let mirrored = CasterKey {
         mirrored: true,
-        ..mesh("Box")
+        ..mesh("Box", 36)
     };
     let casters = vec![
-        (mirrored.clone(), 0..36, at(0.0, 0)),
-        (mesh("Box"), 0..36, at(1.0, 0)),
-        (mirrored, 0..36, at(2.0, 0)),
+        (mirrored.clone(), at(0.0, 0)),
+        (mesh("Box", 36), at(1.0, 0)),
+        (mirrored, at(2.0, 0)),
     ];
     let (_, batches) = batch_casters(casters, true);
     let runs: Vec<_> = batches
@@ -109,10 +110,10 @@ fn mirrored_runs_sort_before_the_clip_material() {
             pipeline: 1,
             material,
         }),
-        ..mesh("Box")
+        ..mesh("Box", 36)
     };
     let casters = [(true, 3), (false, 4), (true, 4), (false, 3)]
-        .map(|(m, mat)| (key(m, mat), 0..36, at(0.0, 0)))
+        .map(|(m, mat)| (key(m, mat), at(0.0, 0)))
         .to_vec();
     let (_, batches) = batch_casters(casters, true);
     let order: Vec<_> = batches

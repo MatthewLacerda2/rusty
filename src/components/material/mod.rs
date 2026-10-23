@@ -175,8 +175,8 @@ impl MaterialAsset {
 /// One key per sub-mesh of the entity's mesh, in the mesh's range order (Unity's
 /// `Renderer.sharedMaterials`, #1285): a mesh imported with two materials draws its
 /// first index range with `materials[0]` and its second with `materials[1]`. A
-/// one-range mesh has a one-entry list. A range past the end of the list draws with
-/// the first material ([`Self::for_range`]), so no geometry goes invisible.
+/// one-range mesh has a one-entry list. As in Unity, a range past the end of the list
+/// is not drawn, and a material past the last range draws that range again over it.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MaterialComponent {
     pub materials: Vec<String>,
@@ -200,13 +200,6 @@ impl MaterialComponent {
     /// empty list, which no library entry has.
     pub fn first(&self) -> &str {
         self.materials.first().map_or("", String::as_str)
-    }
-
-    /// The key sub-mesh range `range` draws with: its own entry, else the first.
-    pub fn for_range(&self, range: usize) -> &str {
-        self.materials
-            .get(range)
-            .map_or(self.first(), String::as_str)
     }
 }
 

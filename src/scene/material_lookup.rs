@@ -1,6 +1,6 @@
 //! src/scene/material_lookup.rs — resolving an entity's material slots against the
-//! scene's library (#1285): the first one (Unity's `sharedMaterial`), the one a mesh
-//! run draws with, and all of them.
+//! scene's library (#1285): the first one (Unity's `sharedMaterial`), the one in a
+//! given slot, and all of them.
 
 use crate::scene::{MaterialAsset, Scene};
 
@@ -16,19 +16,19 @@ impl Scene {
         self.material_entry_at(id, 0)
     }
 
-    /// The material (and key) entity `id`'s mesh run `range` draws with (#1285).
-    pub fn material_entry_at(&self, id: u32, range: usize) -> Option<(&str, &MaterialAsset)> {
-        let key = self.world.material(id)?.for_range(range).to_string();
-        let (key, asset) = self.materials.get_key_value(&key)?;
+    /// The material (and key) in entity `id`'s material slot `slot` (#1285); `None`
+    /// past the end of its list, without a Material, or for a missing key.
+    pub fn material_entry_at(&self, id: u32, slot: usize) -> Option<(&str, &MaterialAsset)> {
+        let material = self.world.material(id)?;
+        let (key, asset) = self
+            .materials
+            .get_key_value(material.materials.get(slot)?)?;
         Some((key.as_str(), asset))
     }
 
     /// Every library material entity `id` references, in slot order.
-    pub fn material_assets_of(&self, id: u32) -> Vec<&MaterialAsset> {
-        let keys = self.world.material(id).map(|m| m.materials.clone());
-        keys.unwrap_or_default()
-            .iter()
-            .filter_map(|k| self.materials.get(k))
-            .collect()
+    pub fn material_assets_of(&self, id: u32) -> impl Iterator<Item = &MaterialAsset> {
+        let count = self.world.material(id).map_or(0, |m| m.materials.len());
+        (0..count).filter_map(move |slot| self.material_entry_at(id, slot).map(|(_, a)| a))
     }
 }

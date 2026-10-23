@@ -18,15 +18,17 @@ use crate::scene::shader_overrides::ParamValues;
 use crate::scene::{Scene, SceneId};
 use crate::shadergen::textures;
 
-/// One drawn entity's own param values (#670): its scene, its id, its overrides.
-pub(crate) type EntityParams<'a> = (SceneId, u32, &'a ParamValues);
+/// One drawn entity's own param values (#670): its scene, its id, the material slot
+/// drawn (#1285), its overrides.
+pub(crate) type EntityParams<'a> = (SceneId, u32, usize, &'a ParamValues);
 
-/// Entity `id`'s overrides in `scene`, in the form [`Renderer::material_index`] takes.
-pub(crate) fn entity_params(scene: &Scene, id: u32) -> Option<EntityParams<'_>> {
+/// Entity `id`'s overrides in `scene`, for its material slot `slot`, in the form
+/// [`Renderer::material_index`] takes.
+pub(crate) fn entity_params(scene: &Scene, id: u32, slot: usize) -> Option<EntityParams<'_>> {
     scene
         .shader_overrides
         .of(id)
-        .map(|own| (scene.id(), id, own))
+        .map(|own| (scene.id(), id, slot, own))
 }
 
 impl Renderer {
@@ -38,8 +40,10 @@ impl Renderer {
     /// its own param buffer first (#399).
     ///
     /// `overrides` is the drawn entity's own values (#670): when it has any and the
-    /// shader has runtime params, the entity owns a buffer holding the material's
-    /// values with its overrides on top, and a group of its own.
+    /// shader has runtime params, the entity owns a buffer per material slot (#1285)
+    /// holding that slot's material values with its overrides on top, and a group of
+    /// its own — so two slots with different materials never share, or rewrite each
+    /// frame, one buffer.
     pub(crate) fn material_index(
         &mut self,
         material: Option<(&str, &MaterialAsset)>,
@@ -49,10 +53,10 @@ impl Renderer {
         let owner = material.and_then(|(key, asset)| {
             let layout = self.surface_shaders.params(pipeline)?;
             let (owner, values) = match overrides {
-                Some((scene, id, own)) => {
+                Some((scene, id, slot, own)) => {
                     let mut merged = asset.shader_params.clone();
                     merged.extend(own.iter().map(|(k, v)| (k.clone(), v.clone())));
-                    (ParamOwner::Entity(scene, id), layout.pack(&merged))
+                    (ParamOwner::Entity(scene, id, slot), layout.pack(&merged))
                 }
                 None => (
                     ParamOwner::Material(key.to_owned()),

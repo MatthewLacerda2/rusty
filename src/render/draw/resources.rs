@@ -6,6 +6,7 @@
 
 use super::batch::sort::{back_to_front, view_depth};
 use super::batch::{BatchKey, DrawItem, FrameDraws};
+use super::materials::entity_params;
 use crate::components::MaterialAsset;
 use crate::render::gpu::draw_buffers::{group1, push_palette, FrameUpload, JointMatrix};
 use crate::render::lod::LodSelection;
@@ -24,6 +25,8 @@ pub(crate) struct SolidResources {
     pub culled: u32,
     /// Mesh entities hidden because their LOD level is not the one shown (#472).
     pub lod_hidden: u32,
+    /// Mesh entities drawn: one each, however many material runs it draws in (#1285).
+    pub visible: u32,
     /// Mesh particles among the instances (#440) — counted as particles, not entities.
     pub mesh_particles: u32,
     /// Where the solids the selection outline rings sit in world space (#1175);
@@ -87,7 +90,7 @@ impl Renderer {
     ) -> SolidResources {
         let (cam_pos, cam_fwd) = (cam.position, cam.forward());
         let (mut opaque, mut transparent, mut joints) = (Vec::new(), Vec::new(), Vec::new());
-        let (mut culled, mut lod_hidden) = (0, 0);
+        let (mut culled, mut lod_hidden, mut visible) = (0, 0, 0);
         let ringed = if outline {
             outlined(scene, lod)
         } else {
@@ -119,9 +122,9 @@ impl Renderer {
                 culled += 1;
                 continue;
             }
-            for (mut item, world_pos, is_transparent) in
-                self.solid_draw_items(scene, id, bounds, &mut joints)
-            {
+            let items = self.solid_draw_items(scene, id, bounds, &mut joints);
+            visible += u32::from(!items.is_empty());
+            for (mut item, world_pos, is_transparent) in items {
                 item.outline = ringed.contains(&id);
                 if is_transparent {
                     transparent.push((item, view_depth(world_pos, cam_pos, cam_fwd)));
@@ -136,6 +139,7 @@ impl Renderer {
             draws: self.upload_solids(opaque, transparent, &joints),
             culled,
             lod_hidden,
+            visible,
             mesh_particles,
             outline_bounds,
         }
@@ -178,9 +182,9 @@ impl Renderer {
         gpu_mesh.world_bounds(&mesh, scene.world.local_to_world(id))
     }
 
-    /// One solid's draw items, one per index run of its mesh (#1285), each drawn with
-    /// that run's material: its batch key (mesh, run, material group, per-draw
-    /// uniform) and instance, plus its world-space origin (the transparent sort key's
+    /// One solid's draw items, one per material slot (#1285), each drawing its index
+    /// run with that slot's material ([`GpuMesh::runs`](crate::render::GpuMesh::runs)):
+    /// its batch key (mesh, run, material group, per-draw uniform) and instance, plus its world-space origin (the transparent sort key's
     /// anchor) and whether its material is Transparent. A skinned mesh's palette is
     /// appended to `joints` once, and its uniform's `bone_base` points at it — so it is
     /// a draw of its own. `bounds` are its world bounds when known
@@ -200,7 +204,7 @@ impl Renderer {
         let Some(gpu_mesh) = self.gpu_meshes.get(&mesh_id) else {
             return Vec::new();
         };
-        let runs = gpu_mesh.runs(&mesh);
+        let runs = gpu_mesh.runs(&mesh, scene.world.material(id).as_deref());
         let model_matrix = scene.world.local_to_world(id);
         let origin = model_matrix.w_axis.truncate();
         let mut instance = super::uniforms::solid_instance(
@@ -220,9 +224,8 @@ impl Renderer {
         // the shared identity joint at element 0. The base lives in the uniform, so
         // two skinned entities never share a batch.
         let bone_base = push_palette(joints, mesh.active_palette());
-        let params = super::materials::entity_params(scene, id);
         let mut items = Vec::with_capacity(runs.len());
-        for (slot, indices) in runs.into_iter().enumerate() {
+        for (slot, indices) in runs {
             let entry = scene.material_entry_at(id, slot);
             let material = entry.map(|(_, asset)| asset);
             let transparent = material.is_some_and(MaterialAsset::is_transparent);
@@ -233,13 +236,12 @@ impl Renderer {
             let key = BatchKey {
                 pipeline,
                 mesh: mesh_id.clone(),
-                first_index: indices.start,
-                material: self.material_index(entry, pipeline, params),
+                indices: indices.into(),
+                material: self.material_index(entry, pipeline, entity_params(scene, id, slot)),
                 uniform: uniform.words(),
             };
             let item = DrawItem {
                 key,
-                indices,
                 instance,
                 outline: false,
             };
