@@ -33,7 +33,10 @@ just created, or a texture just baked (`Texture.Bake`), still measures what the 
 held when the tick began: zero for a path it has never read, the old size after a
 re-bake. `GetRect`, `Raycast`, `Click` and `List` called in that same chunk see that
 size. To read the real size, step the sim first (`Harness.Step(1)` in a scenario, or
-the next frame in a script) and query after. An Image with an explicit size, or a
+the next frame in a script) and query after. The frame drawn after that tick uses the
+same table, so an Image textured during `Update` is also **drawn** for one frame at
+the old size (zero for a path never read), and at the new one from the next frame
+on. An Image with an explicit size, or a
 `Sliced` / `Tiled` one, is unaffected.
 
 **Custom shaders** (`UI.SetShader` & co., #427) are Unity's `Graphic.material`: bake

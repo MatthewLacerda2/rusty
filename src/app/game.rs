@@ -3,15 +3,13 @@
 //! Owns the world of record ([`World`] — a handle to the active `Scene`) and the
 //! engine singletons ([`Resources`] — input, nav, console, camera, time, the live
 //! rapier world, the script runtime, and the play-mode bookkeeping). It advances
-//! both one frame via `tick(dt)`. The windowed front-end (main.rs) and the headless
-//! harness drive the same `tick`; only the input source and the rendering differ.
+//! both one frame via `tick(dt)`. The windowed shell and the headless harness drive
+//! the same `tick`; only the input source and the rendering differ.
 //!
-//! A system is the canonical two-argument `fn(&mut World, &mut Resources)` (#39):
-//! `tick` threads `(&mut self.world, &mut self.resources)` through the schedule, so
-//! the borrow checker keeps world-storage and engine-state distinct at the system
-//! boundary. The handles inside `Resources` are still `Rc<RefCell<…>>` (the mlua
-//! closures capture them); converting that script surface off `Rc<RefCell>` is the
-//! follow-up the issue flags as its hardest part.
+//! A system is the canonical `fn(&mut World, &mut Resources)` (#39): `tick` threads
+//! both through the schedule, so the borrow checker keeps world storage and engine
+//! state apart. The handles inside `Resources` stay `Rc<RefCell<…>>` (the mlua
+//! closures capture them).
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -145,7 +143,9 @@ impl GameWorld {
     }
 
     /// Advance the simulation by `dt` seconds. Returns any play-state transition so
-    /// the caller can handle platform-only concerns (cursor grab/visibility).
+    /// the caller can handle platform-only concerns (cursor grab/visibility). Every
+    /// tick reads the UI's texture sizes, before the schedule in Play and in the edit
+    /// frame outside it, so no loop that ticks can skip them (#1241).
     pub fn tick(&mut self, dt: f32) -> PlayTransition {
         let transition = self.handle_transition();
         // Publish input written since the last tick as this tick's edges (#416).
@@ -163,6 +163,7 @@ impl GameWorld {
             // systems take `&mut Resources`) and restored after, avoiding a
             // self-aliasing borrow. `Startup` runs once, in `enter_play`.
             self.resources.frame_dt = scaled_dt;
+            self.refresh_ui_textures();
             self.run_schedule_frame();
         } else {
             self.edit_frame();
@@ -172,12 +173,9 @@ impl GameWorld {
         transition
     }
 
-    /// Process only the play-state transition (enter/exit play) **without advancing
-    /// the sim** (issue #283). The windowed "playing-but-stepped" loop calls this on a
-    /// paused, no-step frame: the world is frozen, but a Play/Stop pressed while paused
-    /// must still take effect (Stop → `exit_play` restores the edit snapshot). Returns
-    /// the transition so the platform layer can grab/release the cursor exactly as a
-    /// normal `tick` would. No clock advance, no schedule run.
+    /// Process only the play-state transition, **without advancing the sim** (#283):
+    /// a paused, no-step frame, where a Play/Stop must still take effect. Outside
+    /// Play the caller runs [`edit_frame`](Self::edit_frame) after it.
     pub fn poll_transition(&mut self) -> PlayTransition {
         self.handle_transition()
     }

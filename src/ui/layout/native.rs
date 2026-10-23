@@ -2,10 +2,10 @@
 //!
 //! An `Image`'s preferred size is its texture's size in texels (one texel is one
 //! reference unit, as the renderer draws it). The sim never reads a file for it:
-//! [`TextureSizes`] is a table the platform fills before every tick — the window
-//! shell and the headless harness through `render::TextureSizeReader`, which reads
-//! each file's header and follows the engine's own re-bakes (`core::fs::written`)
-//! — and every layout reads it through the [`UiView`](crate::ui::UiView), beside
+//! [`TextureSizes`] is a table `GameWorld::tick` fills before it steps, through
+//! [`TextureSizeReader`](crate::ui::TextureSizeReader), which reads each file's
+//! header and follows the engine's own re-bakes (`core::fs::written`) — and every
+//! layout reads it through the [`UiView`](crate::ui::UiView), beside
 //! the screen size. The renderer draws with the same table, so what is drawn is
 //! what is clicked. Like the screen size it is a **sim input**.
 //!
@@ -13,7 +13,9 @@
 //! late): an Image created, or a texture baked, during a tick measures what the
 //! table held when the tick began. A path with no entry (not baked yet,
 //! unreadable, a render texture) measures zero, as an Image with no texture does;
-//! a miss is never stored as a size.
+//! a miss is never stored as a size. The frame drawn after that tick uses the
+//! same table, so such an Image is also drawn for one frame at the old (or zero)
+//! size.
 
 use std::collections::BTreeMap;
 
@@ -41,6 +43,16 @@ impl TextureSizes {
     /// Forget `path`'s size.
     pub fn remove(&mut self, path: &str) {
         self.sizes.remove(path);
+    }
+
+    /// How many paths the table holds a size for.
+    pub fn len(&self) -> usize {
+        self.sizes.len()
+    }
+
+    /// Whether the table holds no size.
+    pub fn is_empty(&self) -> bool {
+        self.sizes.is_empty()
     }
 
     /// Every path the table holds a size for.

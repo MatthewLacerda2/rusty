@@ -4,8 +4,9 @@
 
 use glam::Vec3;
 
-use super::freshness::{is_stale, MISS_RETRY_FRAMES};
+use super::freshness::is_stale;
 use crate::components::{MaterialAsset, MaterialComponent, Tonemap};
+use crate::core::fs::freshness::MISS_RETRY_FRAMES;
 use crate::core::fs::written::contract::{follows_rebakes, Bake};
 use crate::procgen::{bake::bake_to_png, Image, Slot};
 use crate::render::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};

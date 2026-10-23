@@ -1,6 +1,5 @@
 pub(crate) mod freshness;
 mod panorama;
-pub(crate) mod sizes;
 
 use std::rc::Rc;
 
@@ -158,7 +157,7 @@ impl Renderer {
         if let Some(tex) = self.gpu_textures.get(path_str) {
             return Rc::clone(tex);
         }
-        if self.texture_freshness.misses.contains(path_str) {
+        if self.texture_freshness.is_miss(path_str) {
             return Rc::clone(&self.default_texture);
         }
         // A render texture (#430) is never on disk: it is registered by the frame
@@ -169,7 +168,7 @@ impl Renderer {
         }
 
         let Some(img) = open(path_str) else {
-            self.texture_freshness.misses.insert(path_str.to_string());
+            self.texture_freshness.miss(path_str);
             return Rc::clone(&self.default_texture);
         };
         let tex = self.upload_image_texture(path_str, &img);

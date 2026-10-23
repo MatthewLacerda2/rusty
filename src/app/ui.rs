@@ -26,6 +26,22 @@ use super::world::World;
 use crate::ui::events::{Frame, UiHook, WALL_RANGE, WALL_TOLERANCE};
 use crate::ui::UiLayout;
 
+impl super::GameWorld {
+    /// Read the texture sizes the UI lays out with into the screen resource
+    /// (`ui::TextureSizeReader`, #1221): before the schedule of every Play tick, and
+    /// in every edit frame. Public for a caller that draws without ticking
+    /// (the editor's capture).
+    pub fn refresh_ui_textures(&self) {
+        let scene = self.world.scene.borrow();
+        let mut screen = self.resources.screen.borrow_mut();
+        let textures = screen.shared_textures_mut();
+        self.resources
+            .ui_textures
+            .borrow_mut()
+            .refresh(&scene.world, textures);
+    }
+}
+
 /// Register the sway and layout passes: the first `LateUpdate` systems, after
 /// every `FixedUpdate` system of the tick.
 pub(super) fn register(app: &mut App) {

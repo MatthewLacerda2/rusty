@@ -37,7 +37,6 @@ use std::rc::Rc;
 
 pub use camera::{build_camera_stack, texture_cameras, TextureCamera};
 pub use frustum::{Frustum, SkinBounds};
-pub use gpu::textures::sizes::TextureSizeReader;
 pub use ibl::cubemap_capture::{CubemapCapture, CubemapFace};
 pub use ibl::probe::bake::{project_cubemap, DEFAULT_BAKE_RESOLUTION};
 pub use ibl::probe::bounce::{BounceReport, CONVERGENCE_EPSILON, MAX_BOUNCES};
@@ -156,7 +155,7 @@ pub struct Renderer {
     pub gpu_meshes: HashMap<MeshId, GpuMesh>,
     pub gpu_textures: HashMap<String, Rc<GpuTexture>>,
     /// Which cached uploads went stale: re-written files and failed loads (#689).
-    pub(crate) texture_freshness: gpu::textures::freshness::TextureFreshness,
+    pub(crate) texture_freshness: crate::core::fs::freshness::Freshness,
     pub default_texture: Rc<GpuTexture>,
     /// What an extra shader texture slot samples with no texture of its own (#400).
     pub white_texture: Rc<GpuTexture>,

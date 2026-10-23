@@ -32,7 +32,7 @@ use super::world_space::{BoundsQueue, WorldStore};
 pub(in crate::ecs) use hecs::{Ref, RefMut};
 
 pub struct World {
-    inner: hecs::World,
+    pub(in crate::ecs) inner: hecs::World,
     /// Stable engine id -> hecs handle (generational), a dense table (#696).
     handles: Handles,
     /// Insertion order of stable ids — preserves the former `Vec<Entity>` ordering.

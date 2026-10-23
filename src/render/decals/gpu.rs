@@ -55,7 +55,7 @@ impl Renderer {
             .flat_map(|(_, _, maps)| maps.iter().flatten())
             .map(String::as_str)
             .collect();
-        let misses = &mut self.texture_freshness.misses;
+        let misses = &mut self.texture_freshness;
         let d = &mut self.decals;
         self.global_bind_group_dirty |= d.atlas.prepare(&self.device, &self.queue, &paths, misses);
 
@@ -68,7 +68,7 @@ impl Renderer {
                         return NO_LAYER;
                     };
                     let layer = d.atlas.layer(&path);
-                    dropped += u32::from(layer == NO_LAYER && !misses.contains(&path));
+                    dropped += u32::from(layer == NO_LAYER && !misses.is_miss(&path));
                     layer
                 });
                 record::record(decal, pose, material(decal), layers)
