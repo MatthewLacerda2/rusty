@@ -130,7 +130,15 @@ pub const LAYERS: &[Layer] = &[
     platform("preview", &["asset", "components", "core", "scene"]),
     platform(
         "render",
-        &["components", "core", "ecs", "scene", "shadergen", "ui"],
+        &[
+            "asset",
+            "components",
+            "core",
+            "ecs",
+            "scene",
+            "shadergen",
+            "ui",
+        ],
     )
     .uses(&[
         "ab_glyph", "bytemuck", "image", "ktx2", "naga_oil", "pollster", "wgpu",

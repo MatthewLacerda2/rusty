@@ -143,6 +143,9 @@ fn sync_collider(scene: &mut Scene, id: u32, path: &str, asset: &ImportedAsset, 
 #[cfg(test)]
 #[path = "asset_instance_tests.rs"]
 mod asset_instance_tests;
+#[cfg(test)]
+#[path = "asset_instance_texture_tests.rs"]
+mod asset_instance_texture_tests;
 
 /// Set a model's Generate Lightmap UVs settings (#831) in its `.meta` sidecar and
 /// re-import every mesh in `scene` instanced from it, so the change shows at once

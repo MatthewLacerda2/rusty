@@ -41,6 +41,9 @@
 //! again, once (`record`), as Unity shows a model's import warnings on every
 //! reimport.
 //!
+//! **What a scene saves** for an extracted texture is never its cache path but
+//! `model.fbx#tex/<identity>`, which [`texture_ref`] resolves (#1130).
+//!
 //! **Adding a converter** is one row in [`CONVERTERS`]: an extension and a
 //! function that writes a glTF where its [`Staging`] says.
 
@@ -50,6 +53,7 @@ pub mod glb;
 mod lock;
 mod record;
 mod stage;
+pub mod texture_ref;
 
 pub use depends::{Dependency, Seen};
 pub use stage::{textures_dirs, Staging};
@@ -137,13 +141,18 @@ pub fn converter_for(path: &Path) -> Option<&'static Converter> {
 pub fn cached_gltf(path: &Path) -> Result<PathBuf, ImportError> {
     let converter = converter_for(path)
         .ok_or_else(|| ImportError::UnsupportedFormat(paths::extension(path)))?;
-    let root = Path::new(".");
-    let out = match project_relative(root, path)? {
-        Some(rel) => cache_path(root, &rel),
-        None => temp_path(path),
-    };
+    let out = cache_location(path)?;
     refresh(converter, path, &out)?;
     Ok(out)
+}
+
+/// Where the cached glTF for the converted source at `path` lives, made or not.
+pub fn cache_location(path: &Path) -> Result<PathBuf, ImportError> {
+    let root = Path::new(".");
+    Ok(match project_relative(root, path)? {
+        Some(rel) => cache_path(root, &rel),
+        None => temp_path(path),
+    })
 }
 
 /// Make `out` the conversion of `source`, unless its stamp says it already is. A

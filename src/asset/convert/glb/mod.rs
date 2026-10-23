@@ -21,8 +21,10 @@
 
 mod anim;
 mod bin;
+mod read;
 mod write;
 
+pub use read::image_uri;
 pub use write::write;
 
 /// One glTF scene: a node forest plus the meshes, materials, skins and animations
@@ -89,8 +91,7 @@ pub struct Primitive {
     pub material: Option<usize>,
 }
 
-/// A metallic-roughness material. Texture paths are URIs relative to the written
-/// `.glb`'s directory, `/`-separated.
+/// A metallic-roughness material.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Material {
     pub name: String,
@@ -98,8 +99,18 @@ pub struct Material {
     pub metallic: f32,
     pub roughness: f32,
     pub emissive: [f32; 3],
-    pub base_color_texture: Option<String>,
-    pub normal_texture: Option<String>,
+    pub base_color_texture: Option<Texture>,
+    pub normal_texture: Option<Texture>,
+}
+
+/// One texture a material samples: its image's URI, relative to the written
+/// `.glb`'s directory and `/`-separated, and the image's name, when the
+/// conversion gave it a stable identity (an extracted texture, #1130). One image
+/// is written per distinct URI.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Texture {
+    pub uri: String,
+    pub name: Option<String>,
 }
 
 impl Default for Material {

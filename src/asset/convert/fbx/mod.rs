@@ -39,7 +39,7 @@ use texture::Textures;
 /// extracted beside it (`texture`): what it skipped, the textures first.
 pub fn convert(source: &Path, to: &Staging) -> Result<Converted, ImportError> {
     let scene = load(source)?;
-    let mut textures = Textures::new(to);
+    let mut textures = Textures::new(to, scene.textures.iter().map(|t| &**t));
     let mut takes = Vec::new();
     let document = document(&scene, &mut textures, &mut takes)?;
     hook::io(Step::WriteGltf)

@@ -1,6 +1,8 @@
 //! The GLB writer (#1024): what it writes parses as glTF and carries what it was given.
 
-use super::{write, Animation, Channel, Document, Keys, Material, Mesh, Node, Primitive, Skin};
+use super::{
+    write, Animation, Channel, Document, Keys, Material, Mesh, Node, Primitive, Skin, Texture,
+};
 
 fn triangle() -> Document {
     let mut root = Node::new("Tri");
@@ -15,7 +17,10 @@ fn triangle() -> Document {
         indices: vec![0, 1, 2],
         material: Some(0),
     };
-    let texture = Some("../textures/a b.png".to_string());
+    let texture = Some(Texture {
+        uri: "../textures/a b.png".into(),
+        name: Some("Skin".into()),
+    });
     Document {
         nodes: vec![root],
         roots: vec![0],
@@ -61,6 +66,7 @@ fn a_written_triangle_reads_back() {
 fn one_texture_used_twice_is_one_image() {
     let glb = gltf::Gltf::from_slice(&write(&triangle())).unwrap();
     assert_eq!(glb.images().count(), 1);
+    assert_eq!(glb.images().next().unwrap().name(), Some("Skin"));
     let material = glb.materials().next().unwrap();
     assert!(material.normal_texture().is_some());
 }

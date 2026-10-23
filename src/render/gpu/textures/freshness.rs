@@ -19,12 +19,15 @@
 //!   emitter's model that was missing is retried on the same beat, once its
 //!   file has appeared.
 //!
+//! A material map naming a texture an import extracted (`model.fbx#tex/Skin`,
+//! #1130) is dropped when its source is noted, which a re-conversion does.
+//!
 //! A file changed on disk by an outside tool at a path that already loaded is not
 //! noticed: that would need the per-frame stat this module exists to avoid.
 
 use std::collections::HashSet;
-use std::path::Path;
 
+use crate::asset::convert::texture_ref;
 use crate::core::fs::written::{written_since, Stale};
 use crate::render::Renderer;
 
@@ -65,7 +68,7 @@ impl Renderer {
                 freshness
                     .misses
                     .iter()
-                    .filter(|p| Path::new(p).exists())
+                    .filter(|p| texture_ref::file(p).is_some_and(|f| f.exists()))
                     .cloned(),
             );
             // A mesh emitter's model whose file has appeared is tried again too.
@@ -81,7 +84,10 @@ impl Renderer {
     /// vs absolute) goes too.
     pub(crate) fn invalidate_textures(&mut self, paths: &[String]) {
         let stale = Stale::new(paths.to_vec());
-        let is_stale = |key: &str| stale.matches(key);
+        // A reference to an extracted texture goes with its source's re-import.
+        let is_stale = |key: &str| {
+            stale.matches(key) || texture_ref::source(key).is_some_and(|s| stale.matches(s))
+        };
         // A cubemap loaded from a re-written file (#1207). Its probe-array slot
         // goes too, so the next frame copies the new cube in (#1206).
         self.cubemaps.retain(|key, _| !is_stale(key));

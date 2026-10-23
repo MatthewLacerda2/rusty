@@ -13,8 +13,8 @@
 //! `TRIANGLE_STRIP`, `TRIANGLE_FAN`) becomes a plain triangle list, and
 //! non-surface modes (`POINTS`/`LINES`/`LINE_*`) are skipped with a warning.
 
-use super::{anim, skin, uri};
-use crate::asset::mesh_data::{ImportedAsset, MaterialData, MeshVertex, SkinData, SubMesh};
+use super::{anim, material, skin};
+use crate::asset::mesh_data::{ImportedAsset, MeshVertex, SkinData, SubMesh};
 use crate::asset::ImportError;
 use gltf::mesh::Mode;
 use std::path::Path;
@@ -24,6 +24,13 @@ use std::path::Path;
 /// a texture by its path), so one the `gltf` crate can't decode, a TGA say, never
 /// fails the model (#1082).
 pub fn import(path: &Path) -> Result<ImportedAsset, ImportError> {
+    import_from(path, None)
+}
+
+/// [`import`], for the glTF a conversion of `source` wrote: a texture the
+/// conversion extracted and named comes back as a reference to it in `source`
+/// (`convert::texture_ref`), never as its path in the cache (#1130).
+pub fn import_from(path: &Path, source: Option<&str>) -> Result<ImportedAsset, ImportError> {
     let parse = |e: gltf::Error| ImportError::Parse(e.to_string());
     let gltf::Gltf { document, blob } = gltf::Gltf::open(path).map_err(parse)?;
     // External texture and buffer URIs resolve relative to the glTF file's own directory.
@@ -31,7 +38,7 @@ pub fn import(path: &Path) -> Result<ImportedAsset, ImportError> {
     let buffers = gltf::import_buffers(&document, Some(base_dir), blob).map_err(parse)?;
     let materials = document
         .materials()
-        .map(|m| material_data(m, base_dir))
+        .map(|m| material::material_data(m, base_dir, source))
         .collect();
     let skins = skin::skins_by_mesh(&document, &buffers);
 
@@ -61,51 +68,6 @@ fn node_name(document: &gltf::Document, mesh: usize) -> Option<String> {
         .nodes()
         .find(|n| n.mesh().is_some_and(|m| m.index() == mesh))
         .and_then(|n| n.name().map(str::to_string))
-}
-
-/// Read one glTF material into the pure-data [`MaterialData`]: the metallic-roughness
-/// factors plus the resolved file paths of its external textures (`base_dir` anchors
-/// relative URIs). Embedded images yield `None` maps (see [`texture_path`]).
-fn material_data(material: gltf::Material, base_dir: &Path) -> MaterialData {
-    let pbr = material.pbr_metallic_roughness();
-    MaterialData {
-        name: material.name().unwrap_or("").to_string(),
-        base_color: pbr.base_color_factor(),
-        metallic: pbr.metallic_factor(),
-        roughness: pbr.roughness_factor(),
-        base_color_map: pbr
-            .base_color_texture()
-            .and_then(|t| texture_path(&t.texture(), base_dir)),
-        metallic_roughness_map: pbr
-            .metallic_roughness_texture()
-            .and_then(|t| texture_path(&t.texture(), base_dir)),
-        normal_map: material
-            .normal_texture()
-            .and_then(|t| texture_path(&t.texture(), base_dir)),
-        emissive_map: material
-            .emissive_texture()
-            .and_then(|t| texture_path(&t.texture(), base_dir)),
-        emissive: material.emissive_factor(),
-    }
-}
-
-/// Resolve a glTF texture's image to a file path, anchored at the glTF file's
-/// directory. Only the EXTERNAL-URI case is handled: an embedded image
-/// (`Source::View`, a buffer view / data URI) returns `None` — extracting its pixels
-/// to disk is a documented follow-up, out of scope for #203. The URI is
-/// percent-decoded (`uri`); one that doesn't decode is warned about and dropped.
-fn texture_path(texture: &gltf::Texture, base_dir: &Path) -> Option<String> {
-    match texture.source().source() {
-        gltf::image::Source::Uri { uri, .. } => {
-            let Some(decoded) = uri::decode(uri) else {
-                log::warn!("[Asset] glTF texture URI `{uri}` is not valid percent-encoding");
-                return None;
-            };
-            Some(base_dir.join(decoded).to_string_lossy().into_owned())
-        }
-        // Embedded image: no on-disk path to reference (follow-up).
-        gltf::image::Source::View { .. } => None,
-    }
 }
 
 fn sub_mesh_from_gltf(
