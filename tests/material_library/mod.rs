@@ -3,3 +3,4 @@
 
 mod api_parity;
 mod library;
+mod play_stop;

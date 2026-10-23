@@ -46,7 +46,7 @@ pub fn draw_material_card(
     // The Add menu's staged default fills the key only when the library has nothing
     // there: an existing asset is kept, the rule every attach path shares (#997).
     let pending = world.take_pending_material(id).unwrap_or_default();
-    materials.entry(key.clone()).or_insert(pending);
+    mat_ops::fold_pending(materials, &key, pending);
 
     preview::draw_tab_strip(ui, &mut editor.preview_tab_active, editor.theme);
     if editor.preview_tab_active {
