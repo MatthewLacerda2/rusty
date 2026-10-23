@@ -1,6 +1,7 @@
 //! src/render/passes/particles/ — the particle pass (#13, #440): resources +
 //! pipelines here, per-frame orchestration in `draw`, instance building in
-//! `instance`, and mesh particles (which join the forward solids) in `mesh`.
+//! `instance`, and mesh particles (which join the forward solids) in `mesh`, their
+//! loaded meshes cached in `mesh_cache`.
 //!
 //! Sprite particles draw into the HDR scene target BEFORE the post-FX chain — so
 //! bloom/tonemap apply to additive (emissive) sparks. Two pipelines share one
@@ -16,6 +17,8 @@ mod draw;
 pub(crate) use draw::ParticleDraws;
 pub(crate) mod instance;
 mod mesh;
+mod mesh_cache;
+pub(crate) use mesh_cache::CachedMesh;
 
 use std::collections::HashMap;
 
@@ -25,7 +28,6 @@ use crate::components::particle::ParticleBlend;
 use crate::render::gpu::pipelines::LazyPipeline;
 use crate::render::gpu::shaders::ShaderRegistry;
 use crate::render::passes::blended::{BlendPipelines, Globals};
-use crate::render::MeshId;
 use instance::{ParticleGlobals, ParticleInstance};
 
 /// The layouts the particle pipelines share with other passes: the single-texture
@@ -43,9 +45,9 @@ pub struct ParticleRenderer {
     pub(crate) globals_buffer: wgpu::Buffer,
     pub(crate) globals_bind_group: wgpu::BindGroup,
     pub(crate) index_buffer: wgpu::Buffer,
-    /// Mesh-particle mesh names resolved to their GPU mesh (`None`: failed to load),
-    /// so a model is read from disk once, not every frame.
-    pub(crate) meshes: HashMap<String, Option<MeshId>>,
+    /// Mesh-particle specs resolved to their GPU mesh, so a model is read from
+    /// disk once, not every frame, yet follows a re-import (`mesh_cache`).
+    pub(crate) meshes: HashMap<String, CachedMesh>,
 }
 
 impl ParticleRenderer {

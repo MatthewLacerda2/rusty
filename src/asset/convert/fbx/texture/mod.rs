@@ -18,6 +18,7 @@
 //! read, or embeds a format the importer does not read, is a [`Skip`]; one that fails to extract, or lies on
 //! disk where no URI can reach it, fails the conversion (#1168).
 
+use super::super::stage;
 use super::super::stage::hook::{self, Step};
 use super::super::{Dependency, Seen, Skip, Staging};
 use crate::asset::gltf::uri;
@@ -175,8 +176,7 @@ impl Textures {
         }
         let path = self.dir.join(name);
         hook::io(Step::ExtractTexture)
-            // lint: allow(asset-write) written into a staging folder that is swapped in whole, not a path a cache has seen
-            .and_then(|()| std::fs::write(&path, bytes))
+            .and_then(|()| stage::write(&path, bytes))
             .map_err(|e| ImportError::Parse(format!("writing {}: {e}", path.display())))
     }
 }

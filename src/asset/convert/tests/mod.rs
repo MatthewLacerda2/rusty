@@ -10,6 +10,7 @@ mod failures;
 mod identity;
 mod locking;
 mod looks;
+mod notes;
 mod skips;
 mod staging;
 mod unlocked;

@@ -16,7 +16,7 @@ use crate::components::{MaterialAsset, ParticleEmitterComponent, ParticleRenderM
 use crate::render::draw::batch::sort::view_depth;
 use crate::render::draw::batch::{BatchKey, DrawItem};
 use crate::render::draw::uniforms::{material_uniform, probe_sh_at};
-use crate::render::{EntityUniform, InstanceData, MeshId, Renderer};
+use crate::render::{EntityUniform, InstanceData, Renderer};
 use crate::scene::authoring::{primitive_mesh_component, Primitive};
 use crate::scene::serialize::asset_mesh_component;
 use crate::scene::{Camera, MeshComponent, Scene};
@@ -25,7 +25,7 @@ use crate::scene::{Camera, MeshComponent, Scene};
 type SolidLists<'a> = (&'a mut Vec<DrawItem>, &'a mut Vec<(DrawItem, f32)>);
 
 /// A mesh named by one string: a primitive (`"Box"`) or a model reference.
-fn mesh_for_spec(spec: &str) -> MeshComponent {
+pub(super) fn mesh_for_spec(spec: &str) -> MeshComponent {
     Primitive::parse(spec)
         .and_then(primitive_mesh_component)
         .unwrap_or_else(|| asset_mesh_component(spec))
@@ -129,33 +129,6 @@ impl Renderer {
         };
         let glass = material.is_some_and(MaterialAsset::is_transparent);
         Some((key, num_indices, glass))
-    }
-
-    /// The emitter's mesh, resident on the GPU: `(id, index count)`. Loaded once per
-    /// mesh name and remembered — including a name that fails to load, which is then
-    /// skipped instead of re-read from disk every frame.
-    fn particle_mesh(&mut self, emitter: &ParticleEmitterComponent) -> Option<(MeshId, u32)> {
-        let spec = emitter.render.mesh.as_deref()?;
-        let cached = self.particle_renderer.meshes.get(spec).cloned();
-        let id = match cached {
-            Some(None) => return None,
-            Some(Some(id)) if self.gpu_meshes.contains_key(&id) => id,
-            _ => {
-                let mesh = mesh_for_spec(spec);
-                let id = MeshId::from_mesh(&mesh);
-                // An entity may already have it resident (the same model or primitive).
-                if !self.gpu_meshes.contains_key(&id) {
-                    self.update_gpu_mesh(id.clone(), &mesh.vertices, &mesh.indices);
-                }
-                let loaded = self.gpu_meshes.contains_key(&id).then_some(id);
-                self.particle_renderer
-                    .meshes
-                    .insert(spec.to_string(), loaded.clone());
-                loaded?
-            }
-        };
-        let num_indices = self.gpu_meshes.get(&id)?.num_indices;
-        Some((id, num_indices))
     }
 }
 

@@ -9,15 +9,17 @@
 //! propagation, and an atlas may back every material of a model: hashing each
 //! texture on each check would read gigabytes per load. So this process remembers
 //! each path's digest with the file's length, and reads it again only when the
-//! length changes (a file appearing or vanishing included). An edit that keeps the
-//! length is seen by the next process (until the write log, `core::fs::written`,
-//! #1219, can name the files the editor itself wrote).
+//! length changes (a file appearing or vanishing included). A file the engine
+//! itself wrote is read again whatever its length: each look first drains the
+//! write log, `core::fs::written`, and forgets the paths it names (#1219). An
+//! outside tool's edit that keeps the length is seen by the next process.
 //!
 //! Only a regular file is read: a texture path naming a folder, a FIFO or
 //! `/dev/zero` is absent, never read (which would hang or never end).
 
 use super::ImportError;
 use crate::asset::gltf::uri;
+use crate::core::fs::written::{written_since, Stale};
 use crate::core::{collections::Map, hash};
 use std::path::{Path, PathBuf};
 use std::sync::{LazyLock, Mutex, PoisonError};
@@ -41,7 +43,31 @@ pub enum Seen {
 }
 
 /// This process's looks, by path: the length each was read at, and what it held.
-static LOOKS: LazyLock<Mutex<Map<PathBuf, Look>>> = LazyLock::new(Mutex::default);
+static LOOKS: LazyLock<Mutex<Looks>> = LazyLock::new(|| {
+    Mutex::new(Looks {
+        seen: written_since(u64::MAX).0,
+        files: Map::default(),
+    })
+});
+
+struct Looks {
+    /// The newest write generation already applied to `files`.
+    seen: u64,
+    files: Map<PathBuf, Look>,
+}
+
+impl Looks {
+    /// Forget every look at a file the engine wrote since the last call.
+    fn forget_written(&mut self) {
+        let (seen, paths) = written_since(self.seen);
+        self.seen = seen;
+        let stale = Stale::new(paths);
+        if !stale.is_empty() {
+            self.files
+                .retain(|path, _| !stale.matches(&path.to_string_lossy()));
+        }
+    }
+}
 
 struct Look {
     len: u64,
@@ -126,8 +152,17 @@ fn seen(path: &Path) -> Seen {
         return Seen::Absent;
     };
     let lock = || LOOKS.lock().unwrap_or_else(PoisonError::into_inner);
-    if let Some(look) = lock().get(path).filter(|look| look.len == len) {
-        return Seen::Read(look.digest);
+    let known = {
+        let mut looks = lock();
+        looks.forget_written();
+        looks
+            .files
+            .get(path)
+            .filter(|look| look.len == len)
+            .map(|look| look.digest)
+    };
+    if let Some(digest) = known {
+        return Seen::Read(digest);
     }
     // Read without the lock: another thread's look of another file needn't wait.
     let Ok(bytes) = std::fs::read(path) else {
@@ -135,10 +170,12 @@ fn seen(path: &Path) -> Seen {
     };
     let digest = hash::fnv1a64(&bytes);
     let mut looks = lock();
-    let reads = looks.get(path).map_or(0, |look| look.reads) + 1;
+    let reads = looks.files.get(path).map_or(0, |look| look.reads) + 1;
     // The length read, not the one stat'd: a write between the two is seen next time.
     let len = bytes.len() as u64;
-    looks.insert(path.to_path_buf(), Look { len, digest, reads });
+    looks
+        .files
+        .insert(path.to_path_buf(), Look { len, digest, reads });
     Seen::Read(digest)
 }
 
@@ -146,5 +183,5 @@ fn seen(path: &Path) -> Seen {
 #[cfg(test)]
 pub(super) fn reads(path: &Path) -> u32 {
     let looks = LOOKS.lock().unwrap_or_else(PoisonError::into_inner);
-    looks.get(path).map_or(0, |look| look.reads)
+    looks.files.get(path).map_or(0, |look| look.reads)
 }
