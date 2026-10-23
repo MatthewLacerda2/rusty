@@ -9,17 +9,21 @@ What it installs, in the user's home and nowhere else:
 
 - **Linux:** `rusty.desktop` in `$XDG_DATA_HOME/applications` (default
   `~/.local/share`), and the logo from `engine/icon/` in the user's `hicolor`
-  icon theme. The editor's window names itself `rusty` (`shell::boot`), which is
-  how the desktop matches the open window to this entry and gives it the logo:
-  Wayland takes a window's icon from its `.desktop` file only.
+  icon theme. The editor's window names itself `rusty` (`shell::editor::start`'s
+  `APP_ID`, held equal to ours by a test), which is how the desktop matches the
+  open window to this entry and gives it the logo: Wayland takes a window's icon
+  from its `.desktop` file only. The theme's icon cache is refreshed only when one
+  exists, as `xdg-icon-resource` does: a cache made here would go stale when
+  another app adds an icon, hiding it.
 - **macOS:** `~/Applications/Rusty.app`, whose executable is a script that starts
   the checkout's binary, with an `.icns` built by `sips` and `iconutil` (both ship
   with macOS); `mdimport` then has Spotlight index it at once.
 
-Both start `<checkout>/target/debug/rusty` **from the checkout**: the engine reads
-`engine/shaders` and `engine/scripts` relative to the working directory, and a
-launcher starts apps from `$HOME`. The entry points at the binary, not a copy, so
-every later `cargo build --features dev --bin rusty` is what it opens.
+Both start `<checkout>/target/debug/rusty`, the binary itself, so every later
+`cargo build --features dev --bin rusty` is what it opens. The binary finds the
+engine's files from its own location (`core::project::locate::engine_dir`), so
+the working directory does not matter. A linked worktree is refused: it is
+removed when its branch merges, and the entry would start nothing.
 """
 
 from __future__ import annotations
@@ -67,7 +71,6 @@ def desktop_entry(root: Path) -> str:
             "GenericName=Game Engine",
             f"Comment={_desktop_string(f'The rusty editor, from {root}')}",
             f"Exec={_exec_arg(str(binary(root)))}",
-            f"Path={_desktop_string(str(root))}",
             f"Icon={APP_ID}",
             "Terminal=false",
             "Categories=Development;",
@@ -83,8 +86,8 @@ def _sh(value: str) -> str:
 
 
 def mac_runner(root: Path) -> str:
-    """The bundle's executable: start the checkout's editor from the checkout."""
-    return f'#!/bin/sh\ncd {_sh(str(root))} && exec {_sh(str(binary(root)))} "$@"\n'
+    """The bundle's executable: start the checkout's editor."""
+    return f'#!/bin/sh\nexec {_sh(str(binary(root)))} "$@"\n'
 
 
 def info_plist() -> str:
@@ -118,6 +121,20 @@ def mac_bundle(home: Path) -> Path:
     return home / "Applications" / "Rusty.app"
 
 
+def linked_worktree(root: Path) -> bool:
+    """True in a linked worktree, whose `.git` is a file naming the main one."""
+    return (root / ".git").is_file()
+
+
+def _refresh_icons(theme: Path) -> None:
+    """Tell the desktop the theme changed: bump its folder's mtime, and rebuild
+    the cache only when one exists (`xdg-icon-resource`'s rule)."""
+    if theme.is_dir():
+        os.utime(theme)
+    if (theme / "icon-theme.cache").exists():
+        _quietly("gtk-update-icon-cache", "--quiet", "--ignore-theme-index", str(theme))
+
+
 def _quietly(*argv: str) -> None:
     """Run a desktop's optional refresh tool; its absence is not an error."""
     if shutil.which(argv[0]):
@@ -130,9 +147,9 @@ def install_linux(root: Path, entry: Path, theme: Path) -> None:
         icon.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(ICONS / f"rusty-{side}.png", icon)
     entry.parent.mkdir(parents=True, exist_ok=True)
-    entry.write_text(desktop_entry(root))
+    entry.write_text(desktop_entry(root), encoding="utf-8")
     _quietly("update-desktop-database", str(entry.parent))
-    _quietly("gtk-update-icon-cache", "--quiet", "--ignore-theme-index", str(theme))
+    _refresh_icons(theme)
 
 
 def remove_linux(entry: Path, theme: Path) -> None:
@@ -140,6 +157,7 @@ def remove_linux(entry: Path, theme: Path) -> None:
     for side in LINUX_ICON_SIDES:
         (theme / f"{side}x{side}" / "apps" / f"{APP_ID}.png").unlink(missing_ok=True)
     _quietly("update-desktop-database", str(entry.parent))
+    _refresh_icons(theme)
 
 
 def _icns(out: Path) -> None:
@@ -165,9 +183,9 @@ def install_mac(root: Path, bundle: Path) -> None:
     contents = bundle / "Contents"
     (contents / "MacOS").mkdir(parents=True)
     (contents / "Resources").mkdir()
-    (contents / "Info.plist").write_text(info_plist())
+    (contents / "Info.plist").write_text(info_plist(), encoding="utf-8")
     runner = contents / "MacOS" / APP_ID
-    runner.write_text(mac_runner(root))
+    runner.write_text(mac_runner(root), encoding="utf-8")
     runner.chmod(0o755)
     _icns(contents / "Resources" / f"{APP_ID}.icns")
     _quietly("mdimport", str(bundle))
@@ -177,6 +195,13 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--remove", action="store_true", help="take the entry away")
     args = parser.parse_args(argv)
+    if not args.remove and linked_worktree(CHECKOUT):
+        print(
+            f"launcher: {CHECKOUT} is a linked worktree, removed when its branch merges;"
+            " run `make launcher` in the main checkout",
+            file=sys.stderr,
+        )
+        return 1
     home = Path.home()
     if sys.platform == "darwin":
         bundle = mac_bundle(home)

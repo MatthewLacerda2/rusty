@@ -107,6 +107,8 @@ pub fn launch() {
     let launch = Launch {
         video_defaults: video_defaults(&build),
         title: build.product_name,
+        // The game's own `.desktop` entry is its packager's to name.
+        app_id: None,
         frontend: |_: &Shell, _: &GameWorld| PlayerFrontend::default(),
     };
     super::run(game, launch);

@@ -25,10 +25,9 @@ def keys(entry: str) -> dict[str, str]:
 
 
 class DesktopEntry(unittest.TestCase):
-    def test_starts_the_checkout_binary_from_the_checkout(self):
+    def test_starts_the_checkout_binary(self):
         entry = keys(launcher.desktop_entry(Path("/home/me/rusty")))
         self.assertEqual(entry["Exec"], '"/home/me/rusty/target/debug/rusty"')
-        self.assertEqual(entry["Path"], "/home/me/rusty")
         self.assertEqual(entry["Icon"], "rusty")
         # The window's app id (`shell::boot::editor_app_id`) matches the entry.
         self.assertEqual(entry["StartupWMClass"], "rusty")
@@ -36,13 +35,17 @@ class DesktopEntry(unittest.TestCase):
     def test_quotes_what_exec_would_read_as_syntax(self):
         entry = keys(launcher.desktop_entry(Path('/w/a b$"%\\c')))
         self.assertEqual(entry["Exec"], '"/w/a b\\\\$\\\\"%%\\\\\\\\c/target/debug/rusty"')
-        self.assertEqual(entry["Path"], '/w/a b$"%\\\\c')
+
+    def test_the_app_id_is_the_editor_windows(self):
+        # The window names itself after the entry; renamed alone, the dock loses it.
+        start = launcher.CHECKOUT / "src" / "shell" / "editor" / "start" / "mod.rs"
+        self.assertIn(f'const APP_ID: &str = "{launcher.APP_ID}";', start.read_text())
 
 
 class Mac(unittest.TestCase):
-    def test_the_runner_cds_into_the_checkout(self):
+    def test_the_runner_starts_the_checkout_binary(self):
         runner = launcher.mac_runner(Path("/Users/me/it's"))
-        self.assertIn("cd '/Users/me/it'\\''s' && exec '/Users/me/it'\\''s/target/debug/rusty'", runner)
+        self.assertIn("exec '/Users/me/it'\\''s/target/debug/rusty' \"$@\"", runner)
 
     def test_the_plist_names_the_executable_and_icon(self):
         plist = launcher.info_plist()
@@ -69,6 +72,25 @@ class Linux(unittest.TestCase):
             launcher.remove_linux(entry, theme)
             left = [p for p in Path(tmp).rglob("*") if p.is_file()]
             self.assertEqual(left, [])
+
+    @mock.patch.object(launcher, "_quietly")
+    def test_the_icon_cache_is_rebuilt_only_when_one_exists(self, run):
+        with tempfile.TemporaryDirectory() as tmp:
+            theme = Path(tmp)
+            launcher._refresh_icons(theme)
+            run.assert_not_called()
+            (theme / "icon-theme.cache").touch()
+            launcher._refresh_icons(theme)
+            self.assertEqual(run.call_args.args[0], "gtk-update-icon-cache")
+
+    def test_a_linked_worktree_is_told_apart(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / ".git").mkdir()
+            self.assertFalse(launcher.linked_worktree(root))
+            (root / ".git").rmdir()
+            (root / ".git").write_text("gitdir: /main/.git/worktrees/x\n")
+            self.assertTrue(launcher.linked_worktree(root))
 
 
 if __name__ == "__main__":

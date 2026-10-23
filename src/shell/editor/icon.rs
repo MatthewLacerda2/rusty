@@ -5,7 +5,7 @@
 //! set on `NSApplication` instead, which works for an unbundled `cargo run` binary.
 //! Wayland compositors read the icon from a `.desktop` file, not the window, so there
 //! it is a no-op: `make launcher` installs that file, and the window names itself
-//! after it (`shell::boot::create_window`, #1315). Only the editor calls this: a
+//! after it (`shell::editor::start`'s `APP_ID`, #1315). Only the editor calls this: a
 //! shipped game shows its own icon.
 
 use winit::window::{Icon, Window};

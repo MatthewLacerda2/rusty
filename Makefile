@@ -295,8 +295,9 @@ editor-capture: ## Render the editor to a PNG headlessly. make editor-capture OU
 
 # Rusty in the desktop's app search (#1315): the Linux app grid, Spotlight on macOS.
 # Builds the dev editor (the window the `rusty` MCP attaches to) and session-mcp, then
-# installs an entry in the user's home that starts this checkout's binary from here.
-launcher: ## Put Rusty in the desktop's app search. ARGS=--remove takes it away
+# installs an entry in the user's home that starts this checkout's binary. Run it in
+# the main checkout: a worktree is refused, since it goes away when its branch merges.
+launcher: target-dir ## Put Rusty in the desktop's app search. ARGS=--remove takes it away
 	@case "$(ARGS)" in *--remove*) ;; *) cargo build --quiet --features dev --bin rusty --bin session-mcp ;; esac
 	@python3 tools/launcher/launcher.py $(ARGS)
 
