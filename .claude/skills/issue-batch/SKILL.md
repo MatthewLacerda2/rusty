@@ -96,15 +96,17 @@ Issue(s): #N. Your brief is the newest comment on it that starts with `Brief`.
 ```
 
 A re-brief (a rebase, a fix, a new sibling) is a new `Brief` comment, with
-"force-push authorised" when it works a pushed branch, and the PR turned back to
-draft. **The coder's own session takes it about half the time:** a cloud coder
-stays subscribed to its PR, and a review comment or the turn to draft can wake
-it within a minute or two; on 2026-10-22, five of ten re-briefed sessions never
-woke. A fresh routine launched beside a woken one works the same branch twice
-(2026-10-20: #1108, #1124). So check its session (`RemoteTrigger list_runs` on
-its routine) about four minutes after the re-brief: if `last_event_at` has moved
-past the re-brief, it took it; if not, or it has ended, launch a fresh routine
-then, its prompt naming the existing branch and draft PR to continue from.
+"force-push authorised" when it works a pushed branch, the PR turned back to
+draft, **and a PR comment pointing at it** ("Re-brief: the newest `Brief` on
+#N"). The coder's session is subscribed to its **PR**, not its issue. In the
+2026-10-22 batch sessions woke on the draft flip, read only the PR, found no
+reason and stood down, which looked like "half never wake". `cloud-brief.md`
+now sends a woken session to the issue for a newer `Brief`. Check its session
+(`RemoteTrigger list_runs` on its routine) about four minutes later: a push or
+a `last_event_at` past the pointer means it took it. If not, or the session
+ended, `RemoteTrigger run` the coder's **own** routine (its prompt already
+points at the newest `Brief`). Never launch a second routine beside a session
+still working the branch (2026-10-20: #1108, #1124).
 
 **The pull request is the report.** A cloud coder cannot message back; it opens a
 draft, pushes often, readies when its gates are green and ends. Watch the PR, not
