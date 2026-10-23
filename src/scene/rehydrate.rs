@@ -118,7 +118,8 @@ pub fn rehydrate_entity_mesh(entity: &mut Entity) {
 
 /// Re-import the geometry of every unskinned mesh in `scene` instanced from the model
 /// at `path`, so a changed import setting (Generate Lightmap UVs, #831) shows at once
-/// rather than on the next load. Returns how many were rebuilt ([`reimport_where`]).
+/// rather than on the next load. Skinned meshes keep theirs: the setting never
+/// touches them, and their rig is bound to live bones. Returns how many were rebuilt.
 pub fn reimport_model(scene: &mut crate::scene::Scene, path: &str) -> usize {
     let prefix = format!("{path}{}", asset::REF_SEPARATOR);
     reimport_where(scene, |reference| reference.starts_with(&prefix))
@@ -126,7 +127,8 @@ pub fn reimport_model(scene: &mut crate::scene::Scene, path: &str) -> usize {
 
 /// Re-import every unskinned mesh in `scene` whose model file `stale` names: the
 /// engine re-wrote it (#1242), and Unity updates every instance of a re-imported
-/// model. Returns how many were rebuilt ([`reimport_where`]).
+/// model. Skinned meshes keep theirs, as in [`reimport_model`]. Returns how many
+/// were rebuilt.
 pub fn reimport_written(scene: &mut crate::scene::Scene, stale: &Stale) -> usize {
     if stale.is_empty() {
         return 0;
