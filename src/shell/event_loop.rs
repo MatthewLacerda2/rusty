@@ -24,6 +24,10 @@ use crate::render::Renderer;
 pub struct Launch<M> {
     /// The window title.
     pub title: String,
+    /// The window's desktop identity on Linux (Wayland's `app_id`, X11's
+    /// `WM_CLASS`), which the desktop matches to a `.desktop` entry for the dock
+    /// icon and grouping. `None` leaves it unset.
+    pub app_id: Option<&'static str>,
     /// What a first launch (no saved video settings) gets.
     pub video_defaults: VideoSettings,
     /// Builds the frontend once the shell is up.
@@ -90,7 +94,7 @@ where
             return;
         };
         let size = launch.video_defaults.resolution();
-        let window = boot::create_window(event_loop, &launch.title, size);
+        let window = boot::create_window(event_loop, &launch.title, launch.app_id, size);
         let renderer = boot::init_renderer(&window);
         self.start(window, renderer);
     }

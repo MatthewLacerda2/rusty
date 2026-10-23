@@ -23,6 +23,11 @@ use crate::shell::{boot, Launch, Shell};
 const TITLE: &str = "Rusty 3D Game Engine & Editor";
 /// The window's title while the picker shows.
 const PICKER_TITLE: &str = "rusty — Projects";
+/// The editor window's desktop identity on Linux: the name of the `rusty.desktop`
+/// entry `make launcher` installs (`tools/launcher/launcher.py`'s `APP_ID`, a test
+/// there holds the two equal), so the dock shows the logo, which Wayland takes from
+/// that entry only, and groups the window with the launcher (#1315).
+const APP_ID: &str = "rusty";
 
 /// Boot the editor on the project `opened` and run until the window closes.
 pub fn launch(opened: &Opened) {
@@ -35,6 +40,7 @@ pub fn launch_picker() {
     let size = VideoSettings::default().resolution();
     crate::shell::run_after(
         PICKER_TITLE,
+        Some(APP_ID),
         size,
         |window, renderer| {
             icon::apply(window);
@@ -72,6 +78,7 @@ fn prepare(
 
     let launch = Launch {
         title: TITLE.to_string(),
+        app_id: Some(APP_ID),
         video_defaults: VideoSettings::default(),
         frontend: |shell: &Shell, game: &GameWorld| {
             icon::apply(&shell.window);

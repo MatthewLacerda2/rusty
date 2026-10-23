@@ -141,6 +141,11 @@ jobs:
       - name: Merge helper tests (.github/scripts)
         if: needs.changes.outputs.code != 'false'
         run: python3 -m unittest discover --start-directory .github/scripts/tests --top-level-directory .github/scripts --verbose
+      # `make launcher`'s files (#1315): what the desktop entry and the macOS bundle
+      # start, and from where. Stdlib `unittest`, no build.
+      - name: Launcher tests (tools/launcher)
+        if: needs.changes.outputs.code != 'false'
+        run: python3 -m unittest discover --start-directory tools/launcher/tests --top-level-directory tools/launcher --verbose
 
   # The single required status check for lint.yml (issue #229) — the lint-workflow
   # analog of ci.yml's `ci-gate`. Branch protection requires this job, not `lint` by

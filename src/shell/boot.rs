@@ -43,15 +43,27 @@ pub fn refresh_assets() -> crate::asset::audio::Refresh {
     crate::asset::audio::refresh(std::path::Path::new(ASSET_ROOT))
 }
 
-/// Open the window at `size` with `title`.
+/// Open the window at `size` with `title`, named `app_id` on Linux when one is given
+/// ([`Launch::app_id`](super::Launch::app_id)).
 pub fn create_window(
     event_loop: &ActiveEventLoop,
     title: &str,
+    app_id: Option<&str>,
     (width, height): (u32, u32),
 ) -> Arc<Window> {
     let attributes = Window::default_attributes()
         .with_title(title)
         .with_inner_size(winit::dpi::PhysicalSize::new(width, height));
+    #[cfg(target_os = "linux")]
+    let attributes = match app_id {
+        // winit keeps one name for Wayland's `app_id` and X11's `WM_CLASS`.
+        Some(id) => {
+            winit::platform::wayland::WindowAttributesExtWayland::with_name(attributes, id, id)
+        }
+        None => attributes,
+    };
+    #[cfg(not(target_os = "linux"))]
+    let _ = app_id;
     Arc::new(
         event_loop
             .create_window(attributes)

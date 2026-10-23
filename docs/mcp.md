@@ -135,8 +135,9 @@ in the folder. It registers two servers, both the checkout's built
 window) and `rusty-headless` in embed mode (`--project <root>`). They run the binary,
 not `cargo run`: from a game folder cargo would ignore the checkout's
 `rust-toolchain.toml` and `.cargo/config.toml` and cold-build the engine past Claude
-Code's server startup timeout, so build it once (`cargo build --bin session-mcp
---features dev`). Use one at a time: two worlds saving the same scene overwrite each
+Code's server startup timeout, so build it once (`cargo build --features dev --bin
+session-mcp --bin rusty`, the editor beside it so the window `rusty` attaches to is as
+new as the server). Use one at a time: two worlds saving the same scene overwrite each
 other. The engine owns only those two entries under `mcpServers`, keeping any other
 server and key in the file; the paths are absolute, so each edit-open rewrites them to
 this machine's checkout.

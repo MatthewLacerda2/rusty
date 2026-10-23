@@ -109,6 +109,13 @@ the game for you, and only open a window when you want to.
 
 - `cargo run` — the editor, starting on the project picker (`-- --project <dir>`
   skips it).
+- `make launcher` — put **Rusty** in the desktop's app search (the Linux app grid,
+  Spotlight on macOS): it builds the dev editor and installs an entry that opens it
+  from this checkout. `make launcher ARGS=--remove` takes it away. An app started
+  this way gets the desktop session's environment, not your shell's: a provider key
+  exported only in `.bashrc`/`.zshrc` belongs in `.env` (`docs/providers.md`), and
+  `RUSTY_BLENDER` in the session's environment (`~/.config/environment.d/` on
+  Linux, `launchctl setenv` on macOS).
 - `cargo run --bin player` — the standalone player: the project's startup scene,
   straight into Play, full-window, no editor (see *Shipping a build* below).
 - `cargo run --bin play --features dev -- [--project <dir>] <scenario.lua> <out_dir>` — the headless

@@ -26,7 +26,7 @@ fn a_new_project_gets_claude_md_and_in_dev_mcp_json_and_nothing_else() {
     let claude = std::fs::read_to_string(root.join(CLAUDE_FILE)).unwrap();
     assert!(claude.starts_with("# Horde\n"), "{claude}");
     assert!(claude.contains("rusty://game-guide.md"), "{claude}");
-    assert!(claude.contains("cargo build --bin session-mcp"), "{claude}");
+    assert!(claude.contains("--bin session-mcp --bin rusty"), "{claude}");
     let engine = crate::core::paths::canonicalize(Path::new(env!("CARGO_MANIFEST_DIR")));
     let engine = engine.unwrap().to_string_lossy().into_owned();
     assert!(claude.contains(&engine), "names the checkout");
