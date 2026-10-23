@@ -15,7 +15,7 @@ pub struct Converter {
     pub version: u32,
     /// Read `source` and write plain files where `to` says: the glTF (binary or
     /// not) at [`Staging::glb`], and the files it references that the conversion
-    /// makes (FBX's embedded textures) in [`Staging::textures`]. [`refresh`] swaps
+    /// makes (FBX's embedded textures) in [`Staging::textures`]. [`refresh`](super::refresh) swaps
     /// them into place whole, and removes what an earlier conversion left. Any
     /// failure is an `Err`; only what is left out on purpose goes in [`Converted`].
     ///
