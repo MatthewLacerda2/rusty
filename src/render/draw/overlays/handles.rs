@@ -19,7 +19,7 @@ impl Renderer {
         scene: &Scene,
         output: &wgpu::TextureView,
     ) {
-        let overlays = self.precreate_overlays(scene, true);
+        let overlays = self.precreate_overlays(scene);
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {

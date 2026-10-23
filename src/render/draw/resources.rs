@@ -42,9 +42,9 @@ pub(crate) type AxisResource = (usize, wgpu::Buffer, wgpu::BindGroup);
 // overlay uniform it owns, its group-1 bind group, and the vertex count to draw.
 pub(crate) type ProbeResource = (wgpu::Buffer, wgpu::Buffer, wgpu::BindGroup, u32);
 
-/// The editor-only overlay resources for one scene pass (grid, collider AABBs, axis
-/// arrows, probe gizmos). Empty outside editor mode. Bundled so the scene pass
-/// and the per-camera loop pass a single value instead of four (#93).
+/// The editor-only overlay resources for one handles pass (grid, collider AABBs,
+/// axis arrows, probe gizmos), drawn after post-FX (#1224). Bundled so the pass
+/// takes a single value instead of four (#93).
 #[derive(Default)]
 pub(crate) struct Overlays {
     pub grid: Option<GridResource>,
@@ -62,11 +62,9 @@ impl Renderer {
         self.draw_buffers.default_bones()
     }
 
-    /// Pre-create the editor overlay resources for a pass; all-empty in play mode.
-    pub(crate) fn precreate_overlays(&self, scene: &Scene, editor_mode: bool) -> Overlays {
-        if !editor_mode {
-            return Overlays::default();
-        }
+    /// Pre-create the editor overlay resources for one handles pass. Only an editor
+    /// camera draws one (`draw::camera`'s `handles` stage).
+    pub(crate) fn precreate_overlays(&self, scene: &Scene) -> Overlays {
         Overlays {
             grid: self.precreate_grid(),
             aabb: self.precreate_aabb(scene),
