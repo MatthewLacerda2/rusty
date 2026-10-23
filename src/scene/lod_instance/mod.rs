@@ -1,4 +1,4 @@
-//! src/scene/lod_instance.rs — Instantiate a `_LOD<n>` set as one LODGroup (#472).
+//! src/scene/lod_instance/mod.rs — Instantiate a `_LOD<n>` set as one LODGroup (#472).
 //!
 //! A model whose sub-objects follow the `_LOD0`, `_LOD1`, … convention
 //! (`asset::lod`) is one prop at several levels of detail. Instantiating it builds
@@ -99,5 +99,4 @@ fn lod0_size(asset: &ImportedAsset, set: &LodSet) -> f32 {
 }
 
 #[cfg(test)]
-#[path = "lod_instance_tests.rs"]
-mod lod_instance_tests;
+mod tests;

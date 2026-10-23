@@ -1,4 +1,4 @@
-//! src/scene/shader_overrides.rs — per-entity runtime shader-param overrides (#670):
+//! src/scene/settings/shader_overrides.rs — per-entity runtime shader-param overrides (#670):
 //! Unity's `MaterialPropertyBlock`.
 //!
 //! A runtime param (#399) normally lives on the material asset, so every entity

@@ -1,9 +1,11 @@
-//! src/scene/rehydrate.rs — rebuild a mesh's runtime data from its on-disk reference.
+//! src/scene/rehydrate/mod.rs — rebuild a mesh's runtime data from its on-disk reference.
 //!
 //! A saved mesh is a REFERENCE (a primitive name, or an asset's `path::sub_object`);
 //! its geometry, bind palette, skeleton and clips are rebuilt here on load, prefab
 //! stamp and propagation. Split out of `serialize` (#453) to keep it under the size
 //! cap. GPU buffers are never stored on disk, only rebuilt here.
+
+pub mod model_writes;
 
 use std::collections::BTreeMap;
 
@@ -278,5 +280,4 @@ pub fn asset_ref_file(reference: &str) -> Option<String> {
 }
 
 #[cfg(test)]
-#[path = "rehydrate_tests.rs"]
-mod rehydrate_tests;
+mod tests;

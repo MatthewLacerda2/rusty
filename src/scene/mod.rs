@@ -14,7 +14,9 @@
 //! Submodules:
 //!   scene     — the `Scene` aggregate (the `ecs::World` + scene-level state)
 //!   serialize — World <-> SceneData
-//!   rehydrate — rebuild a mesh's geometry + rig from its on-disk reference
+//!   rehydrate — rebuild a mesh's geometry + rig from its on-disk reference; `model_writes` reloads re-written models
+//!   settings  — project/scene-wide settings: fog, layers, collision matrix, shader overrides
+//!   lod_instance, world_cache — LOD-set instantiation; the world-space read cache
 //!   skeleton  — bones as GameObjects: spawn, save-strip, palette build (#453)
 //!   nav_settings — the per-scene navmesh bake settings (`navigation` reads them)
 //!   io        — save/load, path + extension, default-scene seeding
@@ -29,17 +31,13 @@
 pub mod asset_instance;
 pub mod authoring;
 pub mod camera;
-pub mod collision_matrix;
 pub mod decal;
 pub mod default_scene;
-pub mod fog;
 pub mod identity;
 pub mod io;
-pub mod layers;
 pub mod lighting;
 pub mod lod_instance;
 mod material_lookup;
-pub mod model_writes;
 pub mod nav_settings;
 pub mod prefab;
 pub mod rehydrate;
@@ -50,7 +48,7 @@ pub mod runtime;
 )]
 pub mod scene;
 pub mod serialize;
-pub mod shader_overrides;
+pub mod settings;
 pub mod skeleton;
 pub mod snapshot;
 pub mod world_cache;
@@ -58,15 +56,12 @@ pub mod world_cache;
 pub use camera::{
     camera_for_entity, game_camera_from_scene, sync_lens_from_scene, Camera, ScreenPoint,
 };
-pub use collision_matrix::CollisionMatrix;
-pub use fog::{FogMode, FogSettings};
 pub use identity::SceneId;
 pub use io::{
     build_default_scene, bundled, load_from_file, read_scene_file, save_lighting, save_to_file,
     seed_default_scene, seed_default_scripts, seed_workspace, LightingSave, DEFAULT_SCENE_PATH,
     DEFAULT_SCRIPTS_DEST_DIR, SCENE_EXTENSION,
 };
-pub use layers::{layer_in_mask, LayerRegistry, LAYER_COUNT};
 pub use lighting::io::{sidecar_path, LightingData};
 pub use lighting::probe::{Probe, ProbeGrid, ProbeVolume};
 pub use lighting::probe_fill::analytic_fill;
@@ -80,6 +75,7 @@ pub use prefab::{
     extract_prefab, instantiate_prefab, is_prefab_path, load_and_instantiate,
     load_and_instantiate_linked, read_prefab_file, save_prefab, PrefabData, PREFAB_EXTENSION,
 };
+pub use rehydrate::model_writes;
 pub use runtime::despawn::Despawn;
 pub use scene::{
     AnimatorComponent, AudioSourceComponent, CameraComponent, ClearFlags, ColliderComponent,
@@ -90,4 +86,8 @@ pub use scene::{
     VisualCorrectionComponent, DEFAULT_AMBIENT_COLOR, DEFAULT_AMBIENT_INTENSITY,
 };
 pub use serialize::{apply_scene_data, asset_mesh_component, to_scene_data, SceneData};
+pub use settings::collision_matrix::CollisionMatrix;
+pub use settings::fog::{FogMode, FogSettings};
+pub use settings::layers::{layer_in_mask, LayerRegistry, LAYER_COUNT};
+pub use settings::{collision_matrix, fog, layers, shader_overrides};
 pub use snapshot::SceneSnapshot;
