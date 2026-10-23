@@ -1,5 +1,6 @@
 //! What a despawn clears in the World (#1264): component references to the dead
-//! id go, each to its component's `None`, and a marker that followed it hides.
+//! id go, each to its component's `None`, and a marker that followed it is hidden
+//! but stays active.
 
 use crate::components::ui::rect_transform::WorldAnchor;
 use crate::components::{JointComponent, RectTransformComponent};
@@ -38,14 +39,23 @@ fn a_marker_whose_target_is_despawned_hides() {
     w.set_rect_transform(marker, Some(rect));
     let bystander = w.spawn("bystander".into());
     w.despawn(bystander);
-    assert!(w.is_active(marker), "only its own target hides it");
+    let anchor = |w: &World| {
+        w.rect_transform(marker)
+            .unwrap()
+            .world_anchor
+            .clone()
+            .unwrap()
+    };
+    assert!(!anchor(&w).target_lost, "only its own target hides it");
     w.despawn(enemy);
-    let anchor = w
-        .rect_transform(marker)
-        .unwrap()
-        .world_anchor
-        .clone()
-        .unwrap();
-    assert_eq!(anchor.target, None);
-    assert!(!w.is_active(marker));
+    assert_eq!(anchor(&w).target, None);
+    assert!(anchor(&w).target_lost, "hidden, not a fixed world point");
+    assert!(w.is_active(marker), "its scripts keep running");
+
+    let mut rect = w.rect_transform(marker).unwrap().clone();
+    crate::scene::authoring::rect_transform::set_world_anchor(&mut rect, None, glam::Vec3::ZERO);
+    assert!(
+        !rect.world_anchor.unwrap().target_lost,
+        "pinning it again shows it"
+    );
 }

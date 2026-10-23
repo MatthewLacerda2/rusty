@@ -4,31 +4,40 @@
 //! mesh and rig, and its bones are rebuilt from the new rig at its rest pose. What
 //! a designer authored on the old bones survives the way a save and load keeps it
 //! (`persist`): per-bone overrides and bone bodies by bone name, every entity
-//! hung from a bone hung back by the same rule as a load (`hang`), and every joint
-//! tied to a bone re-bound by name (`joints`). A model
+//! hung from a bone hung back by the same rule as a load (`hang`), and every id
+//! leaf naming a bone re-bound by name (`bone_refs`). A model
 //! re-written as static keeps no bones, so what was authored on them is dropped,
 //! with a warning.
 
 use std::collections::BTreeSet;
 
+use super::bone_refs::BoneRef;
 use super::hang::Hung;
 use super::persist::{strip, Why};
 use crate::scene::Scene;
+
+/// What [`Scene::take_skeleton`] parks on the skinned entity while its bones are
+/// rebuilt: the entities hung from a bone, and the id leaves naming one.
+#[derive(Debug, Default)]
+pub struct Parked {
+    hung: Vec<Hung>,
+    refs: Vec<BoneRef>,
+}
 
 impl Scene {
     /// Take `owner`'s skeleton down: its bone overrides and bodies go to the mesh's
     /// `BoneBinding` (which [`Scene::sync_skeleton`] applies), the entities hung
     /// from its bones are parked under `owner` and returned with their bone
-    /// chains, joints tied to a bone are parked on `owner` by bone name
-    /// (`joints`), and the bones are despawned. Empty for an entity with no skin.
-    pub(crate) fn take_skeleton(&mut self, owner: u32) -> Vec<Hung> {
+    /// chains, id leaves naming a bone are parked on `owner` by bone name
+    /// (`bone_refs`), and the bones are despawned. Empty for an entity with no skin.
+    pub(crate) fn take_skeleton(&mut self, owner: u32) -> Parked {
         let Some(bones) = self
             .world
             .mesh(owner)
             .filter(|m| m.skin.is_some())
             .map(|m| m.skeleton.bones.clone())
         else {
-            return Vec::new();
+            return Parked::default();
         };
         // The documents `strip` needs: the owner, its bones, and what hangs from a
         // bone (descendants of those keep their parent, so are not needed).
@@ -59,23 +68,24 @@ impl Scene {
         for (child, _) in &hung {
             let _ = self.set_parent(*child, Some(owner));
         }
-        self.park_bone_joints(owner);
+        let refs = self.park_bone_refs(owner);
         self.despawn_skeleton(owner);
         if let Some(mut mesh) = self.world.mesh_mut(owner) {
             mesh.skeleton.bones.clear();
         }
-        hung
+        Parked { hung, refs }
     }
 
-    /// Build `owner`'s skeleton from its (new) rig and hang `hung` back on it
-    /// ([`Scene::attach_to_bones`]). Returns the bones the rig no longer has that
+    /// Build `owner`'s skeleton from its (new) rig, hang what was `parked` back on
+    /// it ([`Scene::attach_to_bones`]) and re-bind the leaves naming a bone. Returns the bones the rig no longer has that
     /// something hung from, each warned about. A mesh left unskinned drops the bone
     /// overrides and bodies it carried, warning about the bodies.
-    pub(crate) fn restore_skeleton(&mut self, owner: u32, hung: Vec<Hung>) -> Vec<String> {
-        let parked: Vec<u32> = hung.iter().map(|(id, _)| *id).collect();
-        self.sync_skeleton_past(owner, &parked);
-        let missing = self.attach_to_bones(hung);
-        self.bind_bone_joints();
+    pub(crate) fn restore_skeleton(&mut self, owner: u32, parked: Parked) -> Vec<String> {
+        let ids: Vec<u32> = parked.hung.iter().map(|(id, _)| *id).collect();
+        let mut refs = parked.refs;
+        refs.extend(self.sync_skeleton_past(owner, &ids));
+        let missing = self.attach_to_bones(parked.hung);
+        self.bind_bone_refs(refs);
         if let Some(mut mesh) = self.world.mesh_mut(owner).filter(|m| m.skin.is_none()) {
             mesh.skeleton.overrides.clear();
             let bodies: Vec<String> = std::mem::take(&mut mesh.skeleton.bodies)

@@ -41,8 +41,8 @@ impl BoneBinding {
 }
 
 /// A bone's saved `Rigidbody` and `Joint`. Bones get fresh ids on every load, so
-/// the joint's `connected_body` is saved as `connected_bone`, a bone name of the
-/// same skeleton, and its id field is cleared.
+/// a joint to a bone of the same skeleton is saved as `connected_bone`, that bone's
+/// name, with its id field cleared; one to another skeleton's bone by `bone_refs`.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct BoneBody {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -51,4 +51,8 @@ pub struct BoneBody {
     pub joint: Option<JointComponent>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub connected_bone: Option<String>,
+    /// A joint to a bone of another skeleton (#1264): the joint names that skinned
+    /// entity, and this the bone, as `Entity::bone_refs` does (keyed `/joint/…`).
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub bone_refs: BTreeMap<String, Vec<String>>,
 }

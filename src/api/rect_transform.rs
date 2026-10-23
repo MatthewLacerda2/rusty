@@ -196,6 +196,7 @@ fn register_get_world_anchor<'scope>(
         };
         let t = lua.create_table()?;
         t.set("target", a.target)?;
+        t.set("target_lost", a.target_lost)?;
         let offset = lua.create_table()?;
         offset.set("x", a.offset.x)?;
         offset.set("y", a.offset.y)?;

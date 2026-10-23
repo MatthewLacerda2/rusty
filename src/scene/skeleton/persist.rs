@@ -4,12 +4,13 @@
 //! transform differs from the model's rest pose (`BoneBinding::overrides`), and
 //! every entity parented under a bone, re-pointed at the skinned entity with the
 //! bone's name (then its ancestor bones') in `parent_bone`, and the `Rigidbody` /
-//! `Joint` a ragdoll put on a bone (`BoneBinding::bodies`, #466); a joint from
-//! outside the skeleton to a bone keeps the bone by name too (`joints`, #1264).
-//! All re-bind by name on load.
+//! `Joint` a ragdoll put on a bone (`BoneBinding::bodies`, #466); any other id leaf
+//! naming a bone keeps the bone by name too (`bone_refs`, #1264). All re-bind by
+//! name on load.
 
 use std::collections::BTreeMap;
 
+use super::bone_refs::{repoint_refs, BoneIndex};
 use super::hang::Hung;
 use super::sync::rest_local;
 use crate::asset::SkinData;
@@ -46,8 +47,13 @@ pub(super) fn strip(entities: &mut Vec<Entity>, why: Why) {
         .enumerate()
         .map(|(i, e)| (e.id, i))
         .collect();
-    // bone id -> (skinned entity id, the bone's name then its ancestors')
-    let mut bone_of: BTreeMap<u32, (u32, Vec<String>)> = BTreeMap::new();
+    let bone_of = index_bones(entities, &index);
+    if bone_of.is_empty() {
+        return;
+    }
+    // Before the bones are recorded, so one jointed to another skeleton's bone saves
+    // that bone by name too.
+    repoint_refs(entities, &bone_of);
     for i in 0..entities.len() {
         let Some(mesh) = &entities[i].mesh else {
             continue;
@@ -58,26 +64,40 @@ pub(super) fn strip(entities: &mut Vec<Entity>, why: Why) {
         let mut saved = SavedBones::default();
         let bones = &mesh.skeleton.bones;
         for (slot, bone) in bones.iter().enumerate() {
-            let Some(&b) = index.get(bone) else {
-                continue;
-            };
-            saved.record(&entities[b], skin, bones, slot, why);
-            bone_of.insert(*bone, (entities[i].id, bone_chain(skin, slot)));
+            if let Some(&b) = index.get(bone) {
+                saved.record(&entities[b], skin, bones, slot, why);
+            }
         }
         if let Some(mesh) = &mut entities[i].mesh {
             mesh.skeleton.overrides = saved.overrides;
             mesh.skeleton.bodies = saved.bodies;
         }
     }
-    if bone_of.is_empty() {
-        return;
-    }
     reparent_attachments(entities, &index, &bone_of);
-    super::joints::repoint_joints(entities, &bone_of);
     entities.retain(|e| !bone_of.contains_key(&e.id));
     for entity in entities.iter_mut() {
         entity.children.retain(|c| !bone_of.contains_key(c));
     }
+}
+
+/// Every bone document in `entities` (`index` finds them by id), with its skinned
+/// entity and bone chain.
+fn index_bones(entities: &[Entity], index: &BTreeMap<u32, usize>) -> BoneIndex {
+    let mut bone_of = BoneIndex::new();
+    for entity in entities {
+        let Some(mesh) = &entity.mesh else {
+            continue;
+        };
+        let Some(skin) = &mesh.skin else {
+            continue;
+        };
+        for (slot, bone) in mesh.skeleton.bones.iter().enumerate() {
+            if index.contains_key(bone) {
+                bone_of.insert(*bone, (entity.id, bone_chain(skin, slot)));
+            }
+        }
+    }
+    bone_of
 }
 
 /// What one skeleton saves of its bones, by bone name.
@@ -137,7 +157,7 @@ pub(super) fn bone_chain(skin: &SkinData, slot: usize) -> Vec<String> {
 fn reparent_attachments(
     entities: &mut [Entity],
     index: &BTreeMap<u32, usize>,
-    bone_of: &BTreeMap<u32, (u32, Vec<String>)>,
+    bone_of: &BoneIndex,
 ) {
     let mut moved: Vec<(u32, u32)> = Vec::new(); // (attachment, skinned entity)
     for entity in entities.iter_mut() {
@@ -159,8 +179,9 @@ fn reparent_attachments(
 }
 
 /// A bone's `Rigidbody` and `Joint`, with a joint to another bone of the same
-/// skeleton (`bone_name` resolves it) saved by that bone's name. A joint to any
-/// other entity keeps its id. `None` for a bone with neither.
+/// skeleton (`bone_name` resolves it) saved by that bone's name, and one to another
+/// skeleton's bone by its `bone_refs`. A joint to any other entity keeps its id.
+/// `None` for a bone with neither.
 fn bone_body(doc: &Entity, bone_name: impl Fn(u32) -> Option<String>) -> Option<BoneBody> {
     if doc.rigidbody.is_none() && doc.joint.is_none() {
         return None;
@@ -171,10 +192,17 @@ fn bone_body(doc: &Entity, bone_name: impl Fn(u32) -> Option<String>) -> Option<
         j.connected_body = None;
         Some(name)
     });
+    let bone_refs = doc
+        .bone_refs
+        .iter()
+        .filter(|(pointer, _)| pointer.starts_with("/joint/"))
+        .map(|(p, chain)| (p.clone(), chain.clone()))
+        .collect();
     Some(BoneBody {
         rigidbody: doc.rigidbody.clone(),
         joint,
         connected_bone,
+        bone_refs,
     })
 }
 
@@ -185,6 +213,7 @@ fn carries_components(doc: &Entity) -> bool {
     let mut bare = Entity::new(doc.id, doc.name.clone());
     bare.rigidbody = doc.rigidbody.clone();
     bare.joint = doc.joint.clone();
+    bare.bone_refs = doc.bone_refs.clone();
     bare.active = doc.active;
     bare.is_static = doc.is_static;
     bare.layer = doc.layer;

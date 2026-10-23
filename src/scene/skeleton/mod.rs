@@ -17,8 +17,8 @@
 //! - [`take_bone_parents`] + [`Scene::hang_on_skeletons`] put those attachments
 //!   back under their bones on load (`hang`). A bone that no longer exists hands
 //!   them to its nearest surviving ancestor, with a warning, never silently.
-//! - `joints`: a joint from outside the skeleton to a bone is saved and re-bound by
-//!   the bone's name the same way (#1264).
+//! - `bone_refs`: any other id leaf naming a bone (a joint, a marker, an override)
+//!   is saved and re-bound by the bone's name the same way (#1264).
 //! - `reimport`: `Scene::take_skeleton` + `Scene::restore_skeleton` rebuild a live
 //!   skeleton from a re-imported rig, keeping what was authored on it (#1252), and
 //!   hang its attachments back by the same rule as a load.
@@ -29,10 +29,10 @@
 //! - `ik` bends the posed bones toward script-set targets after `LateUpdate`;
 //!   bones a ragdoll's dynamic body carries are skipped (#461).
 
+mod bone_refs;
 mod hang;
 mod hitbox;
 mod ik;
-mod joints;
 mod palette;
 mod persist;
 mod ragdoll;
@@ -41,6 +41,7 @@ mod sync;
 
 use std::collections::BTreeSet;
 
+pub use bone_refs::{take_bone_refs, BoneRef};
 pub use hang::Hung;
 pub use hitbox::{HitboxFit, HitboxOptions, HITBOX_NAME};
 pub use ik::{AimSettings, BonePose};
@@ -101,10 +102,13 @@ impl Scene {
         let Some(bones) = self.world.mesh(owner).map(|m| m.skeleton.bones.clone()) else {
             return;
         };
-        let doomed: Vec<u32> = bones
+        let mut doomed: Vec<u32> = bones
             .into_iter()
             .flat_map(|b| self.world.self_and_descendants(b))
             .collect();
+        // A bone is a descendant of every bone above it: despawn each once.
+        let mut seen = BTreeSet::new();
+        doomed.retain(|&id| seen.insert(id));
         for id in doomed {
             self.despawn_one(id);
         }
@@ -120,13 +124,15 @@ impl Scene {
 }
 
 #[cfg(test)]
+mod bone_refs_tests;
+#[cfg(test)]
 mod despawn_refs_tests;
 #[cfg(test)]
 mod fixture;
 #[cfg(test)]
-mod joints_tests;
-#[cfg(test)]
 mod persist_tests;
+#[cfg(test)]
+mod prefab_refs_tests;
 #[cfg(test)]
 mod reimport_tests;
 #[cfg(test)]

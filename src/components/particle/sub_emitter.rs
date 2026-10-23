@@ -11,6 +11,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::components::RefVisit;
+
 /// The moment in a particle's life that fires a sub-emitter.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SubEmitTrigger {
@@ -80,10 +82,20 @@ impl SubEmitters {
         }
     }
 
-    /// Rewrite every target through `map`; a target `map` drops is cleared.
-    pub fn remap_refs(&mut self, map: &dyn Fn(u32) -> Option<u32>) {
-        for t in SubEmitTrigger::ALL {
-            self.set(t, self.get(t).and_then(map));
+    /// Visit every target slot with its pointer (under the emitter component); a
+    /// dropped target is cleared.
+    pub fn visit_refs(&mut self, visit: &mut RefVisit<'_>) {
+        let slots = [&mut self.birth, &mut self.death, &mut self.collision];
+        for (p, r) in Self::REF_POINTERS.into_iter().zip(slots) {
+            visit(p, r);
+        }
+    }
+
+    /// Every target set, with its pointer.
+    pub fn each_ref(&self, visit: &mut dyn FnMut(&str, u32)) {
+        let slots = [self.birth, self.death, self.collision];
+        for (p, r) in Self::REF_POINTERS.into_iter().zip(slots) {
+            r.inspect(|&r| visit(p, r));
         }
     }
 }
@@ -93,14 +105,14 @@ mod tests {
     use super::*;
 
     #[test]
-    fn remap_rewrites_and_drops_targets() {
+    fn the_walk_rewrites_and_drops_targets() {
         let mut s = SubEmitters {
             birth: Some(1),
             death: Some(2),
             collision: None,
             inherit_velocity: 0.5,
         };
-        s.remap_refs(&|id| (id != 2).then_some(id + 10));
+        s.visit_refs(&mut |_, r| *r = r.and_then(|id| (id != 2).then_some(id + 10)));
         assert_eq!((s.birth, s.death, s.collision), (Some(11), None, None));
         assert_eq!(SubEmitTrigger::parse("DEATH"), Some(SubEmitTrigger::Death));
         assert_eq!(SubEmitTrigger::parse("landing"), None);

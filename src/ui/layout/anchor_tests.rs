@@ -94,12 +94,17 @@ fn place_projects_the_target_through_the_camera() {
         ),
         None
     );
-    // A destroyed target hides the marker.
+    // A destroyed target hides the marker, as does one whose target was cleared.
     scene.world.despawn(enemy);
-    assert_eq!(
-        place(&scene.world, &a, &view, SIZE, 1.0),
-        Some(Placement::Hidden)
-    );
+    let lost = WorldAnchor {
+        target: None,
+        target_lost: true,
+        ..a.clone()
+    };
+    for a in [a, lost] {
+        let placed = place(&scene.world, &a, &view, SIZE, 1.0);
+        assert_eq!(placed, Some(Placement::Hidden));
+    }
 }
 
 #[test]

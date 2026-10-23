@@ -210,6 +210,7 @@ impl World {
             prefab_link: self.prefab_link(id).map(|c| (*c).clone()),
             parent_id: core.parent_id,
             parent_bone: Vec::new(),
+            bone_refs: Default::default(),
             children: core.children.clone(),
         })
     }

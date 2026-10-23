@@ -22,6 +22,8 @@
 use glam::{Vec2, Vec3};
 use serde::{Deserialize, Serialize};
 
+use crate::components::{EntityRefs, RefVisit};
+
 /// A UI element's placement relative to its parent rect. See the module docs.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
@@ -52,6 +54,10 @@ pub struct WorldAnchor {
     /// The entity followed (its world position); `None` makes `offset` a fixed
     /// world point. A target that no longer exists hides the marker.
     pub target: Option<u32>,
+    /// The target was destroyed (#1264): `target` is cleared and the marker hidden,
+    /// its entity and scripts still active, until it is pinned again.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub target_lost: bool,
     /// Added to the target's world position, in metres (a bar above a head).
     pub offset: Vec3,
     /// Keep the marker on screen: an off-screen or behind-the-camera target pins it
@@ -71,6 +77,7 @@ impl Default for WorldAnchor {
     fn default() -> Self {
         Self {
             target: None,
+            target_lost: false,
             offset: Vec3::ZERO,
             clamp_to_screen_edge: false,
             edge_padding: 0.0,
@@ -112,12 +119,29 @@ impl RectTransformComponent {
     /// The entity references, as JSON pointers under the component (how prefab
     /// overrides recognise them).
     pub const REF_POINTERS: [&'static str; 1] = ["/world_anchor/target"];
+}
 
-    /// Rewrite the world anchor's target through `map` (a reference `map` drops
-    /// becomes `None`) — how the reference follows a prefab save / stamp.
-    pub fn remap_refs(&mut self, map: &dyn Fn(u32) -> Option<u32>) {
+/// A marker whose target is dropped is marked `target_lost`, and hides.
+impl EntityRefs for RectTransformComponent {
+    fn visit_refs(&mut self, visit: &mut RefVisit<'_>) {
         if let Some(a) = &mut self.world_anchor {
-            a.target = a.target.and_then(map);
+            let had = a.target.is_some();
+            visit(Self::REF_POINTERS[0], &mut a.target);
+            a.target_lost |= had && a.target.is_none();
+        }
+    }
+
+    fn each_ref(&self, visit: &mut dyn FnMut(&str, u32)) {
+        if let Some(r) = self.world_anchor.as_ref().and_then(|a| a.target) {
+            visit(Self::REF_POINTERS[0], r);
+        }
+    }
+
+    #[cfg(test)]
+    fn every_ref() -> Self {
+        Self {
+            world_anchor: Some(WorldAnchor::default()),
+            ..Self::default()
         }
     }
 }

@@ -1,38 +1,41 @@
 //! No reference outlives its entity (#1264): a scene holding every kind of entity
 //! reference has each entity destroyed in turn, and afterwards no live reference
-//! and no field of the saved document names a dead id. A new id-bearing field
-//! joins its component's `remap_refs`, which is how this test finds it.
+//! and no field of the saved document names a dead id. The references are built
+//! and read through the one id-field walk (`components::entity::refs`), so a new
+//! kind is covered the moment it joins the walk.
 
-use std::cell::RefCell;
 use std::collections::BTreeSet;
 
 use super::fixture::hero;
-use crate::components::lod_group::LodLevel;
-use crate::components::ui::rect_transform::WorldAnchor;
-use crate::components::{
-    Entity, JointComponent, LodGroupComponent, ParticleEmitterComponent, RectTransformComponent,
-    SelectableComponent,
-};
-use crate::ecs::World;
+use crate::components::Entity;
 use crate::scene::lighting::lightmap::LightmapEntry;
 use crate::scene::serialize::to_scene_data;
 use crate::scene::Scene;
 
 /// Every entity a document names: hierarchy links and component references.
 fn named(doc: &Entity) -> Vec<u32> {
-    let seen = RefCell::new(doc.children.clone());
-    seen.borrow_mut().extend(doc.parent_id);
-    let mut doc = doc.clone();
-    doc.remap_refs(&|r| {
-        seen.borrow_mut().push(r);
-        Some(r)
-    });
-    seen.into_inner()
+    let mut seen = doc.children.clone();
+    seen.extend(doc.parent_id);
+    doc.each_ref(&mut |_, r| seen.push(r));
+    seen
 }
 
-/// A hero with a gun on a bone and a rope to a bone; a parent → child → grandchild
-/// chain each kind of reference points into; selection, `DontDestroyOnLoad` and a
-/// lightmap entry on it too.
+/// An entity carrying every reference-holding component, every slot naming
+/// `target`. Returns the components the walk visited (the pointers' first token).
+fn referrer(scene: &mut Scene, target: u32) -> BTreeSet<String> {
+    let mut doc = Entity::with_every_ref(scene.world.next_id());
+    let mut kinds = BTreeSet::new();
+    doc.visit_refs(&mut |pointer, r| {
+        kinds.insert(pointer.split('/').nth(1).unwrap_or_default().to_string());
+        *r = Some(target);
+    });
+    scene.world.insert_entity(doc);
+    kinds
+}
+
+/// A hero with a gun on a bone; a parent → child → grandchild chain; one referrer
+/// naming each of those, the bone and the gun; selection, `DontDestroyOnLoad` and
+/// a lightmap entry on the chain too.
 fn every_kind(tag: &str) -> Scene {
     let mut scene = Scene::new();
     let hero = hero(&mut scene, tag);
@@ -46,7 +49,9 @@ fn every_kind(tag: &str) -> Scene {
     );
     scene.set_parent(c, Some(p)).unwrap();
     scene.set_parent(g, Some(c)).unwrap();
-    referrers(&mut scene.world, [p, c, g], bone, gun);
+    for target in [p, c, g, bone, gun] {
+        referrer(&mut scene, target);
+    }
     scene.selected_entity_id = Some(c);
     scene.persistent.insert(g);
     scene.lightmaps.entries.push(LightmapEntry {
@@ -57,47 +62,25 @@ fn every_kind(tag: &str) -> Scene {
     scene
 }
 
-/// One entity per component reference kind, each naming one of `p, c, g`, `bone`
-/// or `gun`.
-fn referrers(w: &mut World, [p, c, g]: [u32; 3], bone: u32, gun: u32) {
-    for (name, body) in [("Rope", p), ("BoneRope", bone)] {
-        let joint = JointComponent {
-            connected_body: Some(body),
-            ..JointComponent::default()
-        };
-        let id = w.spawn(name.into());
-        w.set_joint(id, Some(joint));
+#[test]
+fn the_walk_reaches_every_reference_holding_component() {
+    let mut scene = Scene::new();
+    let kinds = referrer(&mut scene, 0);
+    // Every component the fixture carries, read off its saved form.
+    let doc = serde_json::to_value(Entity::with_every_ref(0)).unwrap();
+    let carried: BTreeSet<String> = doc
+        .as_object()
+        .unwrap()
+        .iter()
+        .filter(|(key, v)| v.is_object() && *key != "transform")
+        .map(|(key, _)| key.clone())
+        .collect();
+    assert_eq!(kinds, carried, "each listed component has a slot");
+    let mut pointers = Vec::new();
+    Entity::with_every_ref(0).visit_refs(&mut |p, _| pointers.push(p.to_string()));
+    for p in pointers.iter().filter(|p| !p.starts_with("/prefab_link/")) {
+        assert!(Entity::is_ref_pointer(p), "{p} is a reference pointer");
     }
-    let mut sel = SelectableComponent {
-        target_graphic: Some(c),
-        ..SelectableComponent::default()
-    };
-    sel.select_on[0] = Some(g);
-    let button = w.spawn("Button".into());
-    w.set_selectable(button, Some(sel));
-    let mut emitter = ParticleEmitterComponent::default();
-    emitter.sub_emitters.birth = Some(p);
-    emitter.sub_emitters.death = Some(gun);
-    let fx = w.spawn("Fx".into());
-    w.set_particles(fx, Some(emitter));
-    let lod = LodGroupComponent {
-        levels: vec![LodLevel {
-            renderers: vec![c, g],
-            ..LodLevel::default()
-        }],
-        ..LodGroupComponent::default()
-    };
-    let lod_id = w.spawn("Lod".into());
-    w.set_lod_group(lod_id, Some(lod));
-    let marker = RectTransformComponent {
-        world_anchor: Some(WorldAnchor {
-            target: Some(p),
-            ..WorldAnchor::default()
-        }),
-        ..RectTransformComponent::default()
-    };
-    let marker_id = w.spawn("Marker".into());
-    w.set_rect_transform(marker_id, Some(marker));
 }
 
 /// Every id the scene names, live: hierarchy, components, and scene-level state.
@@ -118,7 +101,7 @@ fn live_refs(scene: &Scene) -> Vec<u32> {
 #[test]
 fn destroying_any_entity_leaves_no_reference_to_it() {
     let ids = every_kind("refs_all").entity_ids();
-    assert!(ids.len() > 12, "the scene holds every kind: {ids:?}");
+    assert!(ids.len() >= 12, "the scene holds every kind: {ids:?}");
     for (n, &dead) in ids.iter().enumerate() {
         let mut scene = every_kind(&format!("refs_{n}"));
         scene.request_destroy(dead);

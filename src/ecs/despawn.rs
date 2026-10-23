@@ -6,40 +6,57 @@
 //! - the parent's `Core::children` (the id leaves the list);
 //! - each child's `Core::parent_id` (the child becomes a root, keeping its world
 //!   pose, as Unity's `SetParent(null)` does);
-//! - every component field that names an entity, through the component's own
-//!   `remap_refs` (`Entity::remap_refs` walks the same set on a document): a
-//!   reference to the dead id is dropped.
-//!   - `SelectableComponent::target_graphic` and `select_on` (its navigation);
-//!   - `JointComponent::connected_body` (the joint then holds to the world, as
-//!     Unity's does when its connected body is destroyed);
-//!   - `ParticleEmitterComponent`'s sub-emitters (`birth`, `death`, `collision`);
-//!   - `LodGroupComponent`'s `renderers`;
-//!   - the `target` of a `RectTransformComponent`'s world anchor. A marker with no
-//!     target sits at a fixed world point, so the marker is also deactivated: it
-//!     stays hidden, as a marker whose target is gone always was.
+//! - every component id leaf that names it, found by the one walk over id fields
+//!   (`components::entity::refs`, which lists them): the leaf takes its field's
+//!   `None`. A Joint then holds to the world (Unity's, when its connected body is
+//!   destroyed), a Selectable with no `target_graphic` tints itself, a lost
+//!   sub-emitter or LOD renderer draws nothing, a marker whose target is gone is
+//!   `target_lost` and hidden (its scripts keep running, so it can be pinned
+//!   again), and a prefab override naming it becomes `null`.
 //!
-//! What a dropped reference means is each component's own `None`: a
-//! `Selectable` with no `target_graphic` tints itself, a sub-emitter slot or an
-//! LOD renderer that is gone draws nothing.
-//!
-//! `MeshComponent`'s `skeleton.bones` is not cleared: bones go with their skinned
-//! entity (`Scene::despawn_skeleton`), and a stale list is re-bound by name.
-//! Runtime-only ids (`OffMeshLinkData::owner`, `SubEmitEvent::target`) are never
-//! saved and are read through `World::contains`. Scene-level references (the
-//! selection, `DontDestroyOnLoad`, lightmap entries, shader overrides) are
-//! `Scene::destroy_entity`'s.
-//!
-//! A new component field holding an entity id joins its component's `remap_refs`
-//! and the list above; `scene::skeleton`'s `despawn_refs_tests` builds every kind
-//! and checks none survives a despawn.
+//! The World walk below goes over the same component list the document walk does
+//! ([`with_ref_components`]), so the two cannot disagree. Scene-level references
+//! (the selection, `DontDestroyOnLoad`, lightmap entries, shader overrides) are
+//! `Scene::despawn_one`'s.
 
-use crate::components::TransformComponent;
+use std::collections::BTreeSet;
+
+use crate::components::{with_ref_components, EntityRefs, RefVisit, TransformComponent};
 
 use super::world::World;
 
+macro_rules! world_walk {
+    ($($field:ident: $ty:ty,)*) => {
+        impl World {
+            /// Visit every component id slot of entity `id`, with its pointer under
+            /// the entity, as `Entity::visit_refs` does on its document.
+            pub fn visit_refs(&mut self, id: u32, visit: &mut RefVisit<'_>) {
+                $(if let Some(mut c) = self.component_mut::<$ty>(id) {
+                    let prefix = concat!("/", stringify!($field));
+                    c.visit_refs(&mut |p, r| visit(&format!("{prefix}{p}"), r));
+                })*
+            }
+
+            /// Whether any component of entity `id` names `target`.
+            pub fn names(&self, id: u32, target: u32) -> bool {
+                false $(|| self.component::<$ty>(id).is_some_and(|c| c.names(target)))*
+            }
+
+            /// Every entity carrying a component that can hold an id, in id order.
+            pub fn ref_holders(&self) -> Vec<u32> {
+                let mut ids = BTreeSet::new();
+                $(ids.extend(self.ids_with_component::<$ty>());)*
+                ids.into_iter().collect()
+            }
+        }
+    };
+}
+with_ref_components!(world_walk);
+
 impl World {
     /// Clear every reference the World holds to `id`, which is about to be despawned.
-    /// See the module docs for the list.
+    /// See the module docs. Entities that name it are found with a read pass first,
+    /// so a despawn nothing points at takes no mutable borrow.
     pub(super) fn forget_references(&mut self, id: u32) {
         if let Some(parent) = self.parent_id(id) {
             self.remove_child(parent, id);
@@ -51,37 +68,17 @@ impl World {
             }
             self.set_parent_id(child, None);
         }
-        let keep = |r: u32| (r != id).then_some(r);
-        for e in self.ids_with_selectable() {
-            if let Some(mut s) = self.selectable_mut(e) {
-                s.remap_refs(&keep);
-            }
-        }
-        for e in self.ids_with_joint() {
-            if let Some(mut j) = self.joint_mut(e) {
-                j.remap_refs(&keep);
-            }
-        }
-        for e in self.ids_with_particles() {
-            if let Some(mut p) = self.particles_mut(e) {
-                p.remap_refs(&keep);
-            }
-        }
-        for e in self.ids_with_lod_group() {
-            if let Some(mut g) = self.lod_group_mut(e) {
-                g.remap_refs(&keep);
-            }
-        }
-        for marker in self.ids_with_rect_transform() {
-            let Some(mut r) = self.rect_transform_mut(marker) else {
-                continue;
-            };
-            let followed = r.world_anchor.as_ref().and_then(|a| a.target) == Some(id);
-            r.remap_refs(&keep);
-            drop(r);
-            if followed {
-                self.set_active(marker, false);
-            }
+        let naming: Vec<u32> = self
+            .ref_holders()
+            .into_iter()
+            .filter(|&e| self.names(e, id))
+            .collect();
+        for e in naming {
+            self.visit_refs(e, &mut |_, r| {
+                if *r == Some(id) {
+                    *r = None;
+                }
+            });
         }
     }
 }

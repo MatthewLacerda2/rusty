@@ -2,6 +2,7 @@
 
 use glam::Mat4;
 
+use super::bone_refs::BoneRef;
 use crate::asset::SkinData;
 use crate::components::mesh::BoneBody;
 use crate::components::TransformComponent;
@@ -12,9 +13,11 @@ impl Scene {
     /// Idempotent and cheap when nothing changed; called after a scene load, a
     /// prefab stamp and an asset instantiate.
     pub fn sync_skeletons(&mut self) {
+        let mut refs = Vec::new();
         for owner in self.world.ids_with_mesh() {
-            self.sync_skeleton(owner);
+            refs.extend(self.sync_skeleton_past(owner, &[]));
         }
+        self.bind_bone_refs(refs);
     }
 
     /// Bind `owner`'s skin to its bone entities, spawning the missing ones. Each
@@ -25,19 +28,22 @@ impl Scene {
     /// pending per-bone overrides and bone bodies (#466) are applied by name; one
     /// whose bone no longer exists is dropped with a warning.
     pub fn sync_skeleton(&mut self, owner: u32) {
-        self.sync_skeleton_past(owner, &[]);
+        let refs = self.sync_skeleton_past(owner, &[]);
+        self.bind_bone_refs(refs);
     }
 
     /// [`Scene::sync_skeleton`], never taking one of `parked` for a bone: they are
     /// attachments waiting under `owner` to hang from a bone again, and one named
-    /// like a root joint is still not that joint.
-    pub(super) fn sync_skeleton_past(&mut self, owner: u32, parked: &[u32]) {
+    /// like a root joint is still not that joint. Returns the restored bone joints
+    /// tied to another skeleton's bone, for [`Scene::bind_bone_refs`] once every
+    /// skeleton is built.
+    pub(super) fn sync_skeleton_past(&mut self, owner: u32, parked: &[u32]) -> Vec<BoneRef> {
         let Some((skin, bound)) = self
             .world
             .mesh(owner)
             .and_then(|m| Some((m.skin.clone()?, m.skeleton.bones.clone())))
         else {
-            return;
+            return Vec::new();
         };
         let bones = if self.binding_is_live(&skin, &bound) {
             bound
@@ -52,7 +58,7 @@ impl Scene {
                     std::mem::take(&mut mesh.skeleton.bodies),
                 )
             }
-            None => return,
+            None => return Vec::new(),
         };
         for (name, transform) in overrides {
             match self.find_bone(owner, &name) {
@@ -67,21 +73,38 @@ impl Scene {
                 ),
             }
         }
+        let mut refs = Vec::new();
         for (name, body) in bodies {
-            self.restore_bone_body(owner, &name, body);
+            refs.extend(self.restore_bone_body(owner, &name, body));
         }
+        refs
     }
 
     /// Put a saved [`BoneBody`] back on `owner`'s bone `name`, its joint's
-    /// connected bone resolved by name.
-    fn restore_bone_body(&mut self, owner: u32, name: &str, body: BoneBody) {
+    /// connected bone of the same skeleton resolved by name. One of another
+    /// skeleton is returned, to bind once that skeleton is built.
+    fn restore_bone_body(&mut self, owner: u32, name: &str, body: BoneBody) -> Vec<BoneRef> {
         let Some(bone) = self.find_bone(owner, name) else {
             log::warn!(
                 "[Asset] entity {owner}: the skeleton has no bone '{name}' any more; \
                  its saved Rigidbody / Joint were dropped."
             );
-            return;
+            return Vec::new();
         };
+        let other = body.joint.as_ref().and_then(|j| j.connected_body);
+        let refs = body
+            .bone_refs
+            .into_iter()
+            .filter_map(|(pointer, chain)| {
+                let owner = other?;
+                Some(BoneRef {
+                    holder: bone,
+                    pointer,
+                    owner,
+                    chain,
+                })
+            })
+            .collect();
         let mut joint = body.joint;
         if let (Some(j), Some(other)) = (joint.as_mut(), body.connected_bone) {
             j.connected_body = self.find_bone(owner, &other);
@@ -94,6 +117,7 @@ impl Scene {
         }
         self.world.set_rigidbody(bone, body.rigidbody);
         self.world.set_joint(bone, joint);
+        refs
     }
 
     /// Whether `bones` is a complete binding of `skin` to live entities.

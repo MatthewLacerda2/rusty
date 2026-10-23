@@ -83,6 +83,10 @@ scene.entities[].backdrop_filter.saturation: f32
 scene.entities[].backdrop_filter.tint: tuple(4)
 scene.entities[].backdrop_filter.tint[]: f32
 scene.entities[].backdrop_filter: option
+scene.entities[].bone_refs: map
+scene.entities[].bone_refs{key}: string
+scene.entities[].bone_refs{}: seq
+scene.entities[].bone_refs{}[]: string
 scene.entities[].camera.active: bool
 scene.entities[].camera.clear_flags: enum Skybox|SolidColor|DepthOnly
 scene.entities[].camera.culling_mask: u32
@@ -193,8 +197,6 @@ scene.entities[].joint.connected_anchor: tuple(3)
 scene.entities[].joint.connected_anchor[]: f32
 scene.entities[].joint.connected_body: option
 scene.entities[].joint.connected_body: u32
-scene.entities[].joint.connected_bone: seq
-scene.entities[].joint.connected_bone[]: string
 scene.entities[].joint.enable_collision: bool
 scene.entities[].joint.kind: enum Fixed|Hinge|Ball
 scene.entities[].joint.limits: tuple(2)
@@ -284,6 +286,10 @@ scene.entities[].mesh.asset_ref: string
 scene.entities[].mesh.primitive_type: string
 scene.entities[].mesh.skeleton.bodies: map
 scene.entities[].mesh.skeleton.bodies{key}: string
+scene.entities[].mesh.skeleton.bodies{}.bone_refs: map
+scene.entities[].mesh.skeleton.bodies{}.bone_refs{key}: string
+scene.entities[].mesh.skeleton.bodies{}.bone_refs{}: seq
+scene.entities[].mesh.skeleton.bodies{}.bone_refs{}[]: string
 scene.entities[].mesh.skeleton.bodies{}.connected_bone: option
 scene.entities[].mesh.skeleton.bodies{}.connected_bone: string
 scene.entities[].mesh.skeleton.bodies{}.joint.anchor: tuple(3)
@@ -297,8 +303,6 @@ scene.entities[].mesh.skeleton.bodies{}.joint.connected_anchor: tuple(3)
 scene.entities[].mesh.skeleton.bodies{}.joint.connected_anchor[]: f32
 scene.entities[].mesh.skeleton.bodies{}.joint.connected_body: option
 scene.entities[].mesh.skeleton.bodies{}.joint.connected_body: u32
-scene.entities[].mesh.skeleton.bodies{}.joint.connected_bone: seq
-scene.entities[].mesh.skeleton.bodies{}.joint.connected_bone[]: string
 scene.entities[].mesh.skeleton.bodies{}.joint.enable_collision: bool
 scene.entities[].mesh.skeleton.bodies{}.joint.kind: enum Fixed|Hinge|Ball
 scene.entities[].mesh.skeleton.bodies{}.joint.limits: tuple(2)
@@ -476,6 +480,7 @@ scene.entities[].rect_transform.world_anchor.offset[]: f32
 scene.entities[].rect_transform.world_anchor.rotate_toward_target: bool
 scene.entities[].rect_transform.world_anchor.target: option
 scene.entities[].rect_transform.world_anchor.target: u32
+scene.entities[].rect_transform.world_anchor.target_lost: bool
 scene.entities[].rect_transform.world_anchor: option
 scene.entities[].rect_transform: option
 scene.entities[].reverb_zone.max_distance: f32

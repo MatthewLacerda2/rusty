@@ -8,6 +8,8 @@
 //! component is `Option<…>`. Originally moved verbatim from the former
 //! `core/scene.rs`.
 
+use std::collections::BTreeMap;
+
 use serde::{Deserialize, Serialize};
 
 use super::ShapeComponent;
@@ -23,7 +25,12 @@ use super::{
     BackdropFilterComponent, MaskComponent, NavMeshObstacleComponent, OffMeshLinkComponent,
 };
 use super::{CharacterControllerComponent, JointComponent, LineComponent, LodGroupComponent};
-use super::{NavMeshModifierVolumeComponent, ReverbZoneComponent, SubEmitters, TrailComponent};
+use super::{NavMeshModifierVolumeComponent, ReverbZoneComponent, TrailComponent};
+
+mod refs;
+
+pub(crate) use refs::with_ref_components;
+pub use refs::{visit_override_refs, EntityRefs, RefVisit};
 
 /// The live link from an instance entity back to the `.prefab` it was stamped from
 /// (#216). Set on EVERY entity of a linked instance — not just the root — so that
@@ -51,7 +58,7 @@ pub struct PrefabLink {
     /// ones are preserved. `#[serde(default)]` so a link saved before overrides
     /// existed loads with none.
     #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
-    pub overrides: std::collections::BTreeMap<String, serde_json::Value>,
+    pub overrides: BTreeMap<String, serde_json::Value>,
 }
 
 // Not sorted (#911): field order is the order a saved scene writes its keys in.
@@ -170,6 +177,14 @@ pub struct Entity {
     /// ancestor it still has takes it (#1252). Always empty on a live entity.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub parent_bone: Vec<String>,
+    /// Document-only (#1264): each component id leaf (by its pointer, see `refs`)
+    /// that names a bone, saved as that bone's name, then its ancestor bones',
+    /// nearest first, the way `parent_bone` keeps a bone child. The leaf itself
+    /// names the skinned entity, and is re-bound to the bone by name once the
+    /// skeleton is rebuilt (`scene::skeleton::bone_refs`). Always empty on a live
+    /// entity.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub bone_refs: BTreeMap<String, Vec<String>>,
     pub children: Vec<u32>,
 }
 
@@ -219,38 +234,8 @@ impl Entity {
             prefab_link: None,
             parent_id: None,
             parent_bone: Vec::new(),
+            bone_refs: BTreeMap::new(),
             children: Vec::new(),
         }
-    }
-
-    /// Rewrite every entity reference a component holds (a Selectable's targets,
-    /// #420; a Joint's connected body, #449; an emitter's sub-emitters, #439; an LODGroup's
-    /// renderers, #472; a marker's target, #429) through `map` — how the references
-    /// follow the entity when a prefab is saved, stamped or propagated.
-    pub fn remap_refs(&mut self, map: &dyn Fn(u32) -> Option<u32>) {
-        self.selectable.iter_mut().for_each(|s| s.remap_refs(map));
-        self.joint.iter_mut().for_each(|j| j.remap_refs(map));
-        self.particles.iter_mut().for_each(|p| p.remap_refs(map));
-        self.lod_group.iter_mut().for_each(|g| g.remap_refs(map));
-        self.rect_transform
-            .iter_mut()
-            .for_each(|r| r.remap_refs(map));
-    }
-
-    /// Whether `pointer` (a JSON pointer into the entity document, as prefab
-    /// overrides key their leaves) names one of those entity references.
-    pub fn is_ref_pointer(pointer: &str) -> bool {
-        let under = |prefix: &str, refs: &[&str]| {
-            pointer
-                .strip_prefix(prefix)
-                .is_some_and(|rest| refs.contains(&rest))
-        };
-        under("/selectable", &SelectableComponent::REF_POINTERS)
-            || under("/joint", &JointComponent::REF_POINTERS)
-            || under("/particles", &SubEmitters::REF_POINTERS)
-            || pointer
-                .strip_prefix("/lod_group")
-                .is_some_and(LodGroupComponent::is_ref_pointer)
-            || under("/rect_transform", &RectTransformComponent::REF_POINTERS)
     }
 }

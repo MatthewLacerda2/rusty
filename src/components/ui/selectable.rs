@@ -22,6 +22,8 @@ use crate::asset::MapRef;
 use glam::Vec4;
 use serde::{Deserialize, Serialize};
 
+use crate::components::{EntityRefs, RefVisit};
+
 /// How a Selectable shows its state. See the module docs.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SelectableTransition {
@@ -161,14 +163,27 @@ impl SelectableComponent {
     pub fn target(&self, id: u32) -> u32 {
         self.target_graphic.unwrap_or(id)
     }
+}
 
-    /// Rewrite every entity reference through `map` (a reference `map` drops
-    /// becomes `None`) — how the references follow a prefab save / stamp.
-    pub fn remap_refs(&mut self, map: &dyn Fn(u32) -> Option<u32>) {
-        self.target_graphic = self.target_graphic.and_then(map);
-        for r in &mut self.select_on {
-            *r = r.and_then(map);
+impl EntityRefs for SelectableComponent {
+    fn visit_refs(&mut self, visit: &mut RefVisit<'_>) {
+        let [graphic, up, down, left, right] = Self::REF_POINTERS;
+        visit(graphic, &mut self.target_graphic);
+        for (p, r) in [up, down, left, right].into_iter().zip(&mut self.select_on) {
+            visit(p, r);
         }
+    }
+
+    fn each_ref(&self, visit: &mut dyn FnMut(&str, u32)) {
+        let slots = std::iter::once(&self.target_graphic).chain(&self.select_on);
+        for (p, r) in Self::REF_POINTERS.into_iter().zip(slots) {
+            r.inspect(|&r| visit(p, r));
+        }
+    }
+
+    #[cfg(test)]
+    fn every_ref() -> Self {
+        Self::default()
     }
 }
 

@@ -20,7 +20,7 @@ use std::collections::BTreeMap;
 
 use serde_json::Value;
 
-use crate::components::Entity;
+use crate::components::visit_override_refs;
 use crate::scene::prefab::instance::{self, instance_members};
 use crate::scene::prefab::overrides::apply_overrides;
 use crate::scene::prefab::{read_prefab_file, write_prefab_file};
@@ -41,8 +41,8 @@ pub fn apply_instance_to_source(scene: &mut Scene, root_id: u32) -> Result<usize
             continue;
         }
         if let Some(local_id) = local_id_of(scene, id) {
-            let overrides = to_local_refs(scene, root_id, &overrides);
-            if write_onto_source(&mut prefab, local_id, &overrides) {
+            let local = to_local_refs(scene, root_id, &overrides);
+            if write_onto_source(&mut prefab, local_id, &local) {
                 applied += 1;
             }
         }
@@ -103,48 +103,55 @@ pub fn revert_instance_field(
     Ok(true)
 }
 
+/// Overrides in the source's local ids, and for each id leaf the bone it names by
+/// name (`Some`), or none, so a stale `bone_refs` entry goes (`None`).
+struct LocalOverrides {
+    values: BTreeMap<String, Value>,
+    bones: BTreeMap<String, Option<Vec<String>>>,
+}
+
 /// Write `overrides` onto the source entity with `local_id` inside `prefab`, in place.
 /// Reuses [`apply_overrides`] — the same setter the live instance uses — so the
 /// write-back and propagation share one mechanism. `false` if no such source entity.
-fn write_onto_source(
-    prefab: &mut PrefabData,
-    local_id: u32,
-    overrides: &BTreeMap<String, Value>,
-) -> bool {
-    match prefab.entities.iter_mut().find(|e| e.id == local_id) {
-        Some(entity) => {
-            apply_overrides(entity, overrides);
-            true
-        }
-        None => false,
+fn write_onto_source(prefab: &mut PrefabData, local_id: u32, overrides: &LocalOverrides) -> bool {
+    let Some(entity) = prefab.entities.iter_mut().find(|e| e.id == local_id) else {
+        return false;
+    };
+    apply_overrides(entity, &overrides.values);
+    for (path, chain) in &overrides.bones {
+        match chain {
+            Some(chain) => entity.bone_refs.insert(path.clone(), chain.clone()),
+            None => entity.bone_refs.remove(path),
+        };
     }
+    true
 }
 
 /// `overrides` with every entity-reference leaf (a Selectable's target, #420) moved
 /// from the instance's ids to the source's local ids — a reference outside the
-/// instance becomes `null`, as prefab extraction drops it.
+/// instance becomes `null`, as prefab extraction drops it. A leaf naming a bone of
+/// the instance names its skinned entity, the bone kept by name (#1264).
 fn to_local_refs(
     scene: &Scene,
     root_id: u32,
     overrides: &BTreeMap<String, Value>,
-) -> BTreeMap<String, Value> {
+) -> LocalOverrides {
     let local: BTreeMap<u32, u32> = instance_ids(scene, root_id)
         .unwrap_or_default()
         .into_iter()
         .filter_map(|id| Some((id, local_id_of(scene, id)?)))
         .collect();
-    let to_local = |v: &Value| {
-        let id = v.as_u64().and_then(|n| u32::try_from(n).ok());
-        id.and_then(|id| local.get(&id))
-            .map_or(Value::Null, |&l| Value::from(l))
-    };
-    overrides
-        .iter()
-        .map(|(path, v)| match Entity::is_ref_pointer(path) {
-            true => (path.clone(), to_local(v)),
-            false => (path.clone(), v.clone()),
-        })
-        .collect()
+    let mut values = overrides.clone();
+    let mut bones = BTreeMap::new();
+    visit_override_refs(&mut values, &mut |path, r| {
+        let (target, chain) = match r.and_then(|id| scene.bone_ref(id)) {
+            Some((owner, chain)) => (Some(owner), Some(chain)),
+            None => (*r, None),
+        };
+        *r = target.and_then(|id| local.get(&id).copied());
+        bones.insert(path.to_string(), chain.filter(|_| r.is_some()));
+    });
+    LocalOverrides { values, bones }
 }
 
 /// The instance rooted at `root_id` ([`instance_members`]). Errors if `root_id` is not

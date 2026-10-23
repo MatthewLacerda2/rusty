@@ -48,7 +48,8 @@ pub use collider::{
     capsule_dims, CapsuleAxis, ColliderComponent, ColliderShape, CombineMode, PhysicsMaterial,
     ScaledShape,
 };
-pub use entity::{Entity, PrefabLink};
+pub(crate) use entity::with_ref_components;
+pub use entity::{visit_override_refs, Entity, EntityRefs, PrefabLink, RefVisit};
 pub use joint::{JointComponent, JointKind};
 pub use light::{LightComponent, LightMode, LightType};
 pub use lod_group::{LodGroupComponent, LodLevel};

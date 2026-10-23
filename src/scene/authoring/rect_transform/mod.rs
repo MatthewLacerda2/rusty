@@ -49,10 +49,11 @@ pub fn set_size_delta(r: &mut RectTransformComponent, size_delta: Vec2) {
 
 /// Make the element a marker pinned to `target` (+ `offset`, metres), or to the
 /// fixed world point `offset` when `target` is `None`. An existing marker keeps its
-/// options.
+/// options, and one whose target was destroyed shows again.
 pub fn set_world_anchor(r: &mut RectTransformComponent, target: Option<u32>, offset: Vec3) {
     let anchor = r.world_anchor.get_or_insert_with(WorldAnchor::default);
     anchor.target = target;
+    anchor.target_lost = false;
     anchor.offset = offset;
 }
 

@@ -18,6 +18,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::components::{EntityRefs, RefVisit};
+
 /// One level of detail: which entities draw it, and down to what screen height.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
@@ -96,12 +98,38 @@ impl LodGroupComponent {
         let index = |s: &str| !s.is_empty() && s.bytes().all(|b| b.is_ascii_digit());
         matches!(parts.as_slice(), ["", "levels", n, "renderers", m] if index(n) && index(m))
     }
+}
 
-    /// Rewrite every renderer reference through `map`; a reference `map` drops leaves
-    /// its level — how the group follows a prefab save / stamp.
-    pub fn remap_refs(&mut self, map: &dyn Fn(u32) -> Option<u32>) {
-        for level in &mut self.levels {
-            level.renderers = level.renderers.iter().filter_map(|&r| map(r)).collect();
+/// A dropped renderer leaves its level.
+impl EntityRefs for LodGroupComponent {
+    fn visit_refs(&mut self, visit: &mut RefVisit<'_>) {
+        for (n, level) in self.levels.iter_mut().enumerate() {
+            let mut kept = Vec::with_capacity(level.renderers.len());
+            for (m, &r) in level.renderers.iter().enumerate() {
+                let mut slot = Some(r);
+                visit(&format!("/levels/{n}/renderers/{m}"), &mut slot);
+                kept.extend(slot);
+            }
+            level.renderers = kept;
+        }
+    }
+
+    fn each_ref(&self, visit: &mut dyn FnMut(&str, u32)) {
+        for (n, level) in self.levels.iter().enumerate() {
+            for (m, &r) in level.renderers.iter().enumerate() {
+                visit(&format!("/levels/{n}/renderers/{m}"), r);
+            }
+        }
+    }
+
+    #[cfg(test)]
+    fn every_ref() -> Self {
+        Self {
+            levels: vec![LodLevel {
+                renderers: vec![0],
+                ..LodLevel::default()
+            }],
+            ..Self::default()
         }
     }
 }

@@ -150,6 +150,7 @@ pub fn apply_scene_data(scene: &mut Scene, mut data: SceneData) {
     }
 
     let bone_parents = crate::scene::skeleton::take_bone_parents(&mut data.entities);
+    let bone_refs = crate::scene::skeleton::take_bone_refs(&mut data.entities);
     scene.world.clear();
     // The overrides named the replaced World's entities; they are runtime-only (#670).
     scene.shader_overrides.clear_all();
@@ -178,7 +179,7 @@ pub fn apply_scene_data(scene: &mut Scene, mut data: SceneData) {
     // Rebuild every skeleton from its model, then hang the saved attachments back
     // on their bones by name (#453) — before prefab propagation, which rebuilds a
     // linked skinned entity from its source and would drop its bone overrides.
-    scene.hang_on_skeletons(bone_parents);
+    scene.hang_on_skeletons(bone_parents, bone_refs);
 
     scene.update_all_colliders();
 

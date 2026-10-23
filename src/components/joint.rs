@@ -28,6 +28,8 @@
 use glam::{Vec2, Vec3};
 use serde::{Deserialize, Serialize};
 
+use crate::components::{EntityRefs, RefVisit};
+
 /// Which rotations a joint leaves free. See the module docs.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum JointKind {
@@ -96,14 +98,6 @@ pub struct JointComponent {
     pub break_torque: f32,
     /// Whether the two joined bodies still collide with each other.
     pub enable_collision: bool,
-    /// Document-only (#1264): the bone `connected_body` names, then that bone's
-    /// ancestor bones, nearest first — the way `Entity::parent_bone` keeps a child
-    /// of a bone. Bones get fresh ids on every load and re-import, so a joint to a
-    /// bone is saved with `connected_body` naming the skinned entity and re-bound
-    /// by name once the skeleton is back (`scene::skeleton::joints`). Always empty
-    /// on a live joint.
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub connected_bone: Vec<String>,
 }
 
 impl Default for JointComponent {
@@ -123,7 +117,6 @@ impl Default for JointComponent {
             break_force: 0.0,
             break_torque: 0.0,
             enable_collision: false,
-            connected_bone: Vec::new(),
         }
     }
 }
@@ -132,11 +125,23 @@ impl JointComponent {
     /// The JSON pointer (inside the component) of its entity reference — how
     /// prefab write-back finds the override leaf holding an entity id.
     pub const REF_POINTERS: [&'static str; 1] = ["/connected_body"];
+}
 
-    /// Rewrite the entity reference through `map` (a reference `map` drops becomes
-    /// `None`, joining the body to the world) — how it follows a prefab save / stamp.
-    pub fn remap_refs(&mut self, map: &dyn Fn(u32) -> Option<u32>) {
-        self.connected_body = self.connected_body.and_then(map);
+/// A dropped `connected_body` joins the body to the world.
+impl EntityRefs for JointComponent {
+    fn visit_refs(&mut self, visit: &mut RefVisit<'_>) {
+        visit(Self::REF_POINTERS[0], &mut self.connected_body);
+    }
+
+    fn each_ref(&self, visit: &mut dyn FnMut(&str, u32)) {
+        if let Some(r) = self.connected_body {
+            visit(Self::REF_POINTERS[0], r);
+        }
+    }
+
+    #[cfg(test)]
+    fn every_ref() -> Self {
+        Self::default()
     }
 }
 

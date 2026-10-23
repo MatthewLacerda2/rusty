@@ -36,6 +36,7 @@ use glam::Vec3;
 use serde::{Deserialize, Serialize};
 
 use crate::asset::MapRef;
+use crate::components::{EntityRefs, RefVisit};
 use crate::core::curve::{ColorRange, Curve, Gradient, Range};
 
 /// How particles are released over time.
@@ -224,10 +225,20 @@ impl ParticleEmitterComponent {
         let g = self.color_over_life.evaluate(p.life_t());
         std::array::from_fn(|i| p.color[i] * g[i])
     }
+}
 
-    /// Rewrite the sub-emitter entity references through `map` (prefab save /
-    /// stamp, #420/#449); a reference `map` drops is cleared.
-    pub fn remap_refs(&mut self, map: &dyn Fn(u32) -> Option<u32>) {
-        self.sub_emitters.remap_refs(map);
+/// The sub-emitters are its only references.
+impl EntityRefs for ParticleEmitterComponent {
+    fn visit_refs(&mut self, visit: &mut RefVisit<'_>) {
+        self.sub_emitters.visit_refs(visit);
+    }
+
+    fn each_ref(&self, visit: &mut dyn FnMut(&str, u32)) {
+        self.sub_emitters.each_ref(visit);
+    }
+
+    #[cfg(test)]
+    fn every_ref() -> Self {
+        Self::default()
     }
 }

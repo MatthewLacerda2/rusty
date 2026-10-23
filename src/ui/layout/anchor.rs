@@ -44,6 +44,9 @@ pub(super) fn place(
     scale: f32,
 ) -> Option<Placement> {
     let cam = view.camera.as_ref()?;
+    if anchor.target_lost {
+        return Some(Placement::Hidden);
+    }
     let point = match anchor.target {
         Some(t) if world.transform(t).is_none() => return Some(Placement::Hidden),
         Some(t) => world.local_to_world(t).transform_point3(Vec3::ZERO) + anchor.offset,

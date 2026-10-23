@@ -38,6 +38,7 @@ pub(crate) fn rect_transform_value(r: &RectTransformComponent) -> Value {
         "size_delta": v(r.size_delta),
         "world_anchor": r.world_anchor.as_ref().map(|a| json!({
             "target": a.target,
+            "target_lost": a.target_lost,
             "offset": [a.offset.x, a.offset.y, a.offset.z],
             "clamp_to_screen_edge": a.clamp_to_screen_edge,
             "edge_padding": a.edge_padding,
