@@ -12,3 +12,5 @@ pub mod load;
 
 #[cfg(test)]
 mod load_tests;
+#[cfg(test)]
+mod swap_refs_tests;

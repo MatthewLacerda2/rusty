@@ -19,7 +19,7 @@
 
 use std::collections::BTreeMap;
 
-use crate::components::Entity;
+use crate::components::{Entity, EntityRefs};
 use crate::scene::prefab::instance::instance_members;
 use crate::scene::prefab::overrides::{apply_overrides, diff_entity};
 use crate::scene::prefab::read_prefab_file;
@@ -32,7 +32,9 @@ use crate::scene::{instantiate_prefab, PrefabData, Scene};
 /// the very same library keys the instance uses — then folds any newly-introduced
 /// materials back into `scene`. The returned entities are mesh-rehydrated and carry
 /// their LOCAL ids, component references included (callers move those into the
-/// instance's ids with [`in_instance_space`] and overwrite identity/structure).
+/// instance's ids with [`in_instance_space`] and overwrite identity/structure). A
+/// reference to one of the scratch skeleton's bones keeps the bone by name in
+/// `bone_refs` (#1264), naming its skinned entity meanwhile.
 fn fresh_baselines(scene: &mut Scene, prefab: &PrefabData) -> BTreeMap<u32, Entity> {
     let mut scratch = Scene::new();
     scratch.materials = scene.materials.clone();
@@ -42,12 +44,16 @@ fn fresh_baselines(scene: &mut Scene, prefab: &PrefabData) -> BTreeMap<u32, Enti
     // instantiate assigned local `l` -> `base + l`, so subtracting the base recovers
     // `l`. The base is the scratch root's id minus the prefab root's local id.
     let base = root.wrapping_sub(prefab.root);
+    let mut docs: Vec<Entity> = scratch
+        .entity_ids()
+        .into_iter()
+        .filter_map(|id| scratch.world.entity_document(id))
+        .collect();
+    scratch.bone_doc_refs(&mut docs);
     let mut out = BTreeMap::new();
-    for id in scratch.entity_ids() {
-        if let Some(mut entity) = scratch.world.entity_document(id) {
-            entity.remap_refs(&|r| Some(r.wrapping_sub(base)));
-            out.insert(id.wrapping_sub(base), entity);
-        }
+    for mut entity in docs {
+        entity.remap_refs(&|r| Some(r.wrapping_sub(base)));
+        out.insert(entity.id.wrapping_sub(base), entity);
     }
 
     // Carry back any materials the merge added (a brand-new key, or a uniquified one).
@@ -57,7 +63,8 @@ fn fresh_baselines(scene: &mut Scene, prefab: &PrefabData) -> BTreeMap<u32, Enti
 
 /// `baselines` (keyed by local id) with their component references moved from
 /// local ids to the ids of the instance entities `ids`, so an untouched reference
-/// diffs clean and a rebuilt one points inside its own instance.
+/// diffs clean and a rebuilt one points inside its own instance; one kept by bone
+/// name is bound to the instance's live bone.
 fn in_instance_space(
     scene: &Scene,
     ids: &[u32],
@@ -67,8 +74,10 @@ fn in_instance_space(
         .iter()
         .filter_map(|&id| Some((local_id_of(scene, id)?, id)))
         .collect();
-    for entity in baselines.values_mut() {
+    for (local, entity) in baselines.iter_mut() {
         entity.remap_refs(&|l| map.get(&l).copied());
+        let holder = map.get(local).copied().unwrap_or(entity.id);
+        scene.bind_doc_bone_refs(entity, holder);
     }
     baselines
 }
@@ -230,6 +239,9 @@ fn link_source(scene: &Scene, root_id: u32) -> Result<String, String> {
 #[cfg(test)]
 #[path = "link_tests.rs"]
 mod prefab_link_tests;
+#[cfg(test)]
+#[path = "lod_override_tests.rs"]
+mod prefab_lod_override_tests;
 #[cfg(test)]
 #[path = "refs_tests.rs"]
 mod prefab_refs_tests;

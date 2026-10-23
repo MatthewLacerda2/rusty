@@ -1,5 +1,6 @@
-//! The store's queue: a despawn re-roots only its own subtree, and writes made parents
-//! first, as the Animator makes them, are all seen by the next read (#1170).
+//! The store's queue: a despawn re-roots its children where they stand (#1264),
+//! and writes made parents first, as the Animator makes them, are all seen by the
+//! next read (#1170).
 
 use glam::{Mat4, Vec3};
 
@@ -14,7 +15,7 @@ fn child_of(w: &mut World, parent: u32) -> u32 {
 }
 
 #[test]
-fn despawning_a_parent_leaves_its_children_at_their_local_pose() {
+fn despawning_a_parent_leaves_its_children_as_roots_at_their_world_pose() {
     let mut w = World::new();
     let p = w.spawn("p".into());
     w.transform_mut(p).unwrap().position = Vec3::new(0.0, 5.0, 0.0);
@@ -28,11 +29,13 @@ fn despawning_a_parent_leaves_its_children_at_their_local_pose() {
     assert_eq!(w.world_position(c), Vec3::new(1.0, 5.0, 0.0));
     assert_eq!(w.world_position(other), Vec3::Z);
     w.despawn(p);
-    assert_eq!(w.world_position(c), Vec3::X);
+    assert_eq!(w.parent_id(c), None, "a root, not a child of a dead id");
+    assert_eq!(w.transform(c).unwrap().position, Vec3::new(1.0, 5.0, 0.0));
+    assert_eq!(w.world_position(c), Vec3::new(1.0, 5.0, 0.0));
     assert_eq!(w.local_to_world(p), Mat4::IDENTITY);
     assert_eq!(
         w.collider_bounds(c).unwrap(),
-        (Vec3::new(0.5, -0.5, -0.5), Vec3::new(1.5, 0.5, 0.5))
+        (Vec3::new(0.5, 4.5, -0.5), Vec3::new(1.5, 5.5, 0.5))
     );
     w.flush_bounds();
     let c_box = w.collider(c).unwrap();

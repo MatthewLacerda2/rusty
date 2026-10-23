@@ -25,6 +25,9 @@ pub mod core;
 mod descendants;
 #[cfg(test)]
 mod descendants_tests;
+mod despawn;
+#[cfg(test)]
+mod despawn_tests;
 mod handles;
 #[cfg(test)]
 mod query_tests;

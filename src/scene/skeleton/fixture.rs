@@ -1,12 +1,14 @@
 //! Test fixtures for the skeleton module: an animated glTF on disk (the asset
 //! layer's two-joint `Joint0 → Joint1` rig) and a synthetic skin whose root sits
-//! under a rotated, scaled `Armature`.
+//! under a rotated, scaled `Armature`; and the save/load and joint helpers the
+//! skeleton tests share.
 
 use glam::{Mat4, Quat, Vec3};
 
 use crate::asset::fixtures_anim::{animated_buffer, ANIMATED_GLTF};
 use crate::asset::{JointTransform, SkinData};
-use crate::components::MeshComponent;
+use crate::components::{JointComponent, MeshComponent};
+use crate::scene::serialize::{apply_scene_data, to_scene_data, SceneData};
 use crate::scene::Scene;
 
 /// Write the animated fixture under a per-test folder and return its
@@ -76,4 +78,39 @@ pub(super) fn armature_owner(scene: &mut Scene) -> u32 {
         }),
     );
     id
+}
+
+/// Save `scene` to JSON (the on-disk path) and load it into a fresh scene.
+pub(super) fn reload(scene: &Scene) -> Scene {
+    reload_json(&serde_json::to_string(&to_scene_data(scene)).unwrap())
+}
+
+/// Load a saved scene's JSON into a fresh scene.
+pub(super) fn reload_json(json: &str) -> Scene {
+    let data: SceneData = serde_json::from_str(json).unwrap();
+    let mut out = Scene::new();
+    apply_scene_data(&mut out, data);
+    out
+}
+
+/// A `Rope` entity jointed to `owner`'s bone `bone`.
+pub(super) fn rope_to(scene: &mut Scene, owner: u32, bone: &str) -> u32 {
+    let rope = scene.add_entity("Rope".to_string());
+    let body = scene.find_bone(owner, bone);
+    joint_to(scene, rope, body);
+    rope
+}
+
+/// Give `id` a Joint connected to `body`.
+pub(super) fn joint_to(scene: &mut Scene, id: u32, body: Option<u32>) {
+    let joint = JointComponent {
+        connected_body: body,
+        ..JointComponent::default()
+    };
+    scene.world.set_joint(id, Some(joint));
+}
+
+/// The body `id`'s Joint is connected to.
+pub(super) fn connected(scene: &Scene, id: u32) -> Option<u32> {
+    scene.world.joint(id).unwrap().connected_body
 }

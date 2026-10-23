@@ -12,6 +12,8 @@
 //! directly — that lives in `world.rs`'s generic column accessors, used only
 //! from this module and `access.rs`.
 
+use std::collections::BTreeMap;
+
 use crate::components::{
     AnimatorComponent, Entity, MaterialAsset, MeshComponent, ScriptComponent, TransformComponent,
 };
@@ -135,18 +137,6 @@ impl World {
             .is_some()
     }
 
-    /// Cut `id` out of the hierarchy as it is despawned: it leaves its parent's
-    /// `children`, so no dead id stays listed (or saved), and its own children,
-    /// which now read as roots, move in world space.
-    pub(super) fn detach(&mut self, id: u32) {
-        if let Some(parent) = self.parent_id(id) {
-            self.remove_child(parent, id);
-        }
-        for child in self.children(id) {
-            self.moved(child);
-        }
-    }
-
     /// Take the material staged for the scene's library, if one is staged.
     pub fn take_pending_material(&mut self, id: u32) -> Option<MaterialAsset> {
         self.take_component::<MaterialAsset>(id)
@@ -177,7 +167,6 @@ impl World {
         let core = self.component::<Core>(id)?;
         let name = (*self.name(id)?).clone();
         let transform = (*self.transform(id)?).clone();
-        let scripts = (*self.scripts(id)?).clone();
         Some(Entity {
             id: core.id,
             name,
@@ -188,7 +177,7 @@ impl World {
             mesh: self.mesh(id).map(|c| (*c).clone()),
             material: self.material(id).map(|c| (*c).clone()),
             pending_material: self.component::<MaterialAsset>(id).map(|c| (*c).clone()),
-            scripts,
+            scripts: (*self.scripts(id)?).clone(),
             animator: self.animator(id).map(|c| (*c).clone()),
             light: self.light(id).map(|c| (*c).clone()),
             collider: self.collider(id).map(|c| (*c).clone()),
@@ -221,7 +210,8 @@ impl World {
             shape: self.shape(id).map(|c| (*c).clone()),
             prefab_link: self.prefab_link(id).map(|c| (*c).clone()),
             parent_id: core.parent_id,
-            parent_bone: Vec::new(),
+            parent_bone: Vec::new(), // document-only, as `bone_refs`: a save fills them
+            bone_refs: BTreeMap::new(),
             children: core.children.clone(),
         })
     }

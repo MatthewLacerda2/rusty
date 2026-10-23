@@ -3,6 +3,7 @@
 
 use glam::Vec3;
 use rusty::components::particle::{CollisionResponse, EmitMode, ParticleEmitterComponent};
+use rusty::components::EntityRefs;
 use rusty::core::curve::Range;
 use rusty::scene::{ColliderComponent, ColliderShape, Entity, Scene};
 

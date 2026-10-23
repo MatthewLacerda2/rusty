@@ -3,22 +3,9 @@
 
 use glam::{Quat, Vec3};
 
-use super::fixture::hero;
-use crate::scene::serialize::{apply_scene_data, to_scene_data, SceneData};
+use super::fixture::{hero, reload, reload_json};
+use crate::scene::serialize::to_scene_data;
 use crate::scene::{Scene, SceneSnapshot};
-
-/// Save `scene` to JSON (the on-disk path) and load it into a fresh scene.
-fn reload(scene: &Scene) -> Scene {
-    let json = serde_json::to_string(&to_scene_data(scene)).unwrap();
-    reload_json(&json)
-}
-
-fn reload_json(json: &str) -> Scene {
-    let data: SceneData = serde_json::from_str(json).unwrap();
-    let mut out = Scene::new();
-    apply_scene_data(&mut out, data);
-    out
-}
 
 /// A hero whose `Joint1` the designer turned, holding a `Gun` under `Joint1`.
 fn armed_hero(tag: &str) -> (Scene, u32) {

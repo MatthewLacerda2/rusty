@@ -112,7 +112,12 @@ fn draw_world_anchor(
     let mut a = anchor.clone().unwrap_or_default();
     let mut changed = ui.checkbox(&mut on, "World Anchor (marker)").changed();
     if on {
-        changed |= entity_row(ui, "Target:", "world point", &mut a.target);
+        let none = if a.target_lost {
+            "target lost"
+        } else {
+            "world point"
+        };
+        changed |= entity_row(ui, "Target:", none, &mut a.target);
         let mut o = a.offset.to_array();
         changed |= ui
             .horizontal(|ui| {

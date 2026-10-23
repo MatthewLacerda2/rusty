@@ -17,6 +17,8 @@
 //! - [`take_bone_parents`] + [`Scene::hang_on_skeletons`] put those attachments
 //!   back under their bones on load (`hang`). A bone that no longer exists hands
 //!   them to its nearest surviving ancestor, with a warning, never silently.
+//! - `bone_refs`: any other id leaf naming a bone (a joint, a marker, an override)
+//!   is saved and re-bound by the bone's name the same way (#1264).
 //! - `reimport`: `Scene::take_skeleton` + `Scene::restore_skeleton` rebuild a live
 //!   skeleton from a re-imported rig, keeping what was authored on it (#1252), and
 //!   hang its attachments back by the same rule as a load.
@@ -27,6 +29,7 @@
 //! - `ik` bends the posed bones toward script-set targets after `LateUpdate`;
 //!   bones a ragdoll's dynamic body carries are skipped (#461).
 
+mod bone_refs;
 mod hang;
 mod hitbox;
 mod ik;
@@ -38,6 +41,7 @@ mod sync;
 
 use std::collections::BTreeSet;
 
+pub use bone_refs::{take_bone_refs, BoneRef};
 pub use hang::Hung;
 pub use hitbox::{HitboxFit, HitboxOptions, HITBOX_NAME};
 pub use ik::{AimSettings, BonePose};
@@ -92,23 +96,21 @@ impl Scene {
     }
 
     /// Despawn `owner`'s bones and everything under them — a skinned entity's
-    /// skeleton goes with it — dropping whatever pointed at them as
+    /// skeleton goes with it — in one batch, dropping whatever pointed at them as
     /// [`Scene::destroy_entity`] does.
     pub(crate) fn despawn_skeleton(&mut self, owner: u32) {
         let Some(bones) = self.world.mesh(owner).map(|m| m.skeleton.bones.clone()) else {
             return;
         };
-        let doomed: Vec<u32> = bones
-            .into_iter()
-            .flat_map(|b| self.world.self_and_descendants(b))
+        // Walk from the top bones only: the rest are their descendants.
+        let set: BTreeSet<u32> = bones.into_iter().collect();
+        let doomed: BTreeSet<u32> = set
+            .iter()
+            .filter(|&&b| self.world.contains(b))
+            .filter(|&&b| !self.world.parent_id(b).is_some_and(|p| set.contains(&p)))
+            .flat_map(|&b| self.world.self_and_descendants(b))
             .collect();
-        for id in doomed {
-            self.world.despawn(id);
-            self.shader_overrides.clear(id, None);
-            if self.selected_entity_id == Some(id) {
-                self.selected_entity_id = None;
-            }
-        }
+        self.despawn_batch(&doomed);
     }
 
     /// The bone of `owner`'s skeleton named `name` (the glTF joint name).
@@ -121,9 +123,17 @@ impl Scene {
 }
 
 #[cfg(test)]
+mod bone_refs_tests;
+#[cfg(test)]
+mod despawn_refs_tests;
+#[cfg(test)]
 mod fixture;
 #[cfg(test)]
 mod persist_tests;
+#[cfg(test)]
+mod prefab_refs_tests;
+#[cfg(test)]
+mod ragdoll_refs_tests;
 #[cfg(test)]
 mod reimport_tests;
 #[cfg(test)]

@@ -20,7 +20,7 @@ In `Debug.Snapshot` the component appears as `rect_transform`.
 | `RectTransform.SetAnchorPreset` | `(id, x, y, setPivot?, setPosition?)` | — the editor's anchor-preset grid: `x` is `"left"`/`"center"`/`"right"`/`"stretch"`, `y` is `"bottom"`/`"middle"`/`"top"`/`"stretch"`. Re-anchors **without moving** the element (position and size delta re-derived against the parent's rect); `setPivot` also moves the pivot to the preset point (centre on a stretched axis); `setPosition` also snaps the element onto its anchors (a stretched axis fills the parent). An unknown name is an error |
 | `RectTransform.SetWorldAnchor` | `(id, target, ox, oy, oz)` | — makes the element a **marker** pinned to entity `target` + offset (metres); `target = nil` pins it to the world point `(ox, oy, oz)` |
 | `RectTransform.ClearWorldAnchor` | `(id)` | — back to ordinary anchors |
-| `RectTransform.GetWorldAnchor` | `(id)` | `{ target, offset = {x, y, z}, clamp_to_screen_edge, edge_padding, rotate_toward_target, hide_when_behind }`, or `nil` for a non-marker |
+| `RectTransform.GetWorldAnchor` | `(id)` | `{ target, target_lost, offset = {x, y, z}, clamp_to_screen_edge, edge_padding, rotate_toward_target, hide_when_behind }`, or `nil` for a non-marker |
 | `RectTransform.SetWorldAnchorClamp` | `(id, clamp, padding)` | — keep it on screen, `padding` reference units inside the edge |
 | `RectTransform.SetWorldAnchorRotate` | `(id, on)` | — while clamped, turn its up toward the target (an off-screen arrow) |
 | `RectTransform.SetWorldAnchorHideWhenBehind` | `(id, on)` | — hide it (and its children) while the target is behind the camera (default on) |
@@ -32,7 +32,15 @@ element's **pivot** there; its size still comes from its anchors and `SizeDelta`
 Off screen: behind the camera with `hide_when_behind` → hidden; with
 `clamp_to_screen_edge` → pinned to the padded screen edge toward the target
 (turned toward it with `rotate_toward_target`); otherwise at the raw projection.
-A destroyed target hides the marker. Markers only apply on `ScreenSpaceOverlay` /
+A destroyed target hides the marker: its target is cleared and the marker stays
+hidden (`target_lost`) while its entity and scripts stay active, until
+`SetWorldAnchor` gives it a target again; changing only its offset or options
+(`SetWorldAnchor(id, nil, …)` included, or an edit in the inspector, which shows
+"target lost") keeps it hidden. A target left behind by a scene load counts as
+destroyed. A target dropped any other way (a prefab save leaving it outside the
+subtree, `target = nil` set by a script) makes the marker a fixed world point
+instead. A target that is a bone follows the bone by name through a save and a
+re-import of its model. Markers only apply on `ScreenSpaceOverlay` /
 `ScreenSpaceCamera` canvases, and need a camera (`UI.GetRect` and the per-tick
 layout use the active one). The option setters do nothing to a non-marker; saving
 a prefab keeps a target inside it and drops one outside.

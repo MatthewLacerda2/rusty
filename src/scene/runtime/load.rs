@@ -9,10 +9,13 @@
 //! ([`Scene::dont_destroy_on_load`]); at the swap it and every descendant are carried
 //! into the incoming World **with their ids**, because scripts, timers and the UI
 //! event system hold those ids. An incoming entity whose id a survivor already holds
-//! is moved to a fresh id instead (`make_room`), its references rewritten with it.
+//! is moved to a fresh id instead (`make_room`), its references rewritten with it
+//! through the one id-field walk; a survivor's references to the entities left
+//! behind are cleared through the same walk.
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use crate::components::EntityRefs;
 use crate::scene::serialize::{apply_scene_data, SceneData};
 use crate::scene::{Entity, MaterialAsset, Scene};
 
@@ -78,6 +81,9 @@ impl Scene {
             if entity.parent_id.is_some_and(|p| !survivors.contains(&p)) {
                 entity.parent_id = None;
             }
+            // The outgoing scene is destroyed: what a survivor named in it is gone,
+            // as after a despawn (#1264), and its id may now be an incoming entity's.
+            entity.forget(&|r| !survivors.contains(&r));
             self.world.insert_entity(entity);
         }
         for (name, material) in materials {

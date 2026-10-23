@@ -106,7 +106,24 @@ and **`Joint` requires `RigidBody`** (a joint constrains a body — Unity's `Joi
 
 **`Scene.Deactivate`** is Unity's deferred `Object.Destroy`: it sets `active =
 false` but leaves the entity in the scene. **`Scene.DestroyEntity`** is the
-editor's Destroy button: it actually removes the entity.
+editor's Destroy button: it actually removes the entity (and, for a skinned
+entity, its bones and what hangs from them).
+
+**Nothing keeps naming a destroyed entity** (#1264). Its children stay in the
+scene as roots, where they stood in the world (their local Transform becomes
+their old world pose). Every reference to it is dropped, live and in the next
+save: the selection, `DontDestroyOnLoad`, its lightmap entry, and each component
+field that names it, which falls back to that field's `nil`. A `Joint` to it then
+holds to the world (as Unity's does), a `Selectable`'s target graphic becomes the
+Selectable itself, a sub-emitter slot or an LOD renderer is gone, a
+[marker](RectTransform.md) that followed it loses its target and stays hidden (its
+scripts keep running, so it can be given a target again), and a linked prefab
+instance's override that named it becomes `nil` (an override in a list, such as an
+LOD renderer, drops that element; the instance's other overrides are untouched). A
+`Scene.Load` treats what it leaves behind the same way: an entity carried across by
+`DontDestroyOnLoad` keeps no reference to an entity that did not survive. A
+reference to a bone is kept by the bone's name, so it survives a save, a load and a
+re-import of the model.
 
 **`Scene.Save([path])`** persists the live world. With no path it writes back to
 the current scene file (the file the editor/session loaded); an explicit path

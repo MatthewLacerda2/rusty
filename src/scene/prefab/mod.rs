@@ -27,7 +27,7 @@ use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
-use crate::components::{Entity, MaterialAsset};
+use crate::components::{Entity, EntityRefs, MaterialAsset};
 use crate::scene::serialize::rehydrate_entity_mesh;
 use crate::scene::Scene;
 
@@ -97,6 +97,7 @@ fn stamp_prefab(
     let base = scene.world.next_id();
     let mut new_root = base + prefab.root;
     let mut bone_parents = Vec::new();
+    let mut bone_refs = Vec::new();
     for entity in &prefab.entities {
         let local_id = entity.id;
         let mut entity = entity.clone();
@@ -119,9 +120,12 @@ fn stamp_prefab(
         if !entity.parent_bone.is_empty() {
             bone_parents.push((entity.id, std::mem::take(&mut entity.parent_bone)));
         }
+        bone_refs.extend(crate::scene::skeleton::take_bone_refs(
+            std::slice::from_mut(&mut entity),
+        ));
         scene.world.insert_entity(entity);
     }
-    scene.hang_on_skeletons(bone_parents);
+    scene.hang_on_skeletons(bone_parents, bone_refs);
 
     // Parent the new root under the requested parent (cycle-checked by `set_parent`).
     if let Some(parent_id) = parent {
