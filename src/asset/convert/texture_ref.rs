@@ -46,9 +46,9 @@ pub fn file(map: &str) -> Option<PathBuf> {
         return Some(PathBuf::from(map));
     };
     let glb = cache_location(Path::new(source)).ok()?;
-    let decoded = uri::decode(&glb::image_uri(&glb, identity)?)?;
     // The folder the glTF importer anchors the same URI at.
-    Some(glb.parent().unwrap_or_else(|| Path::new("")).join(decoded))
+    let base_dir = glb.parent().unwrap_or_else(|| Path::new(""));
+    uri::file(base_dir, &glb::image_uri(&glb, identity)?)
 }
 
 #[cfg(test)]

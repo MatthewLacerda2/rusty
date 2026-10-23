@@ -42,7 +42,8 @@ pub(super) fn material_data(
 /// reference to it instead (`convert::texture_ref`). Only the EXTERNAL-URI case
 /// is handled: an embedded image (`Source::View`, a buffer view / data URI) returns `None` — extracting its pixels
 /// to disk is a documented follow-up, out of scope for #203. The URI is
-/// percent-decoded (`uri`); one that doesn't decode is warned about and dropped.
+/// percent-decoded and folded (`uri::file`); one that doesn't decode is warned
+/// about and dropped.
 fn texture_path(texture: &gltf::Texture, base_dir: &Path, source: Option<&str>) -> Option<String> {
     let image = texture.source();
     if let (Some(source), Some(name)) = (source, image.name()) {
@@ -50,11 +51,7 @@ fn texture_path(texture: &gltf::Texture, base_dir: &Path, source: Option<&str>) 
     }
     match image.source() {
         gltf::image::Source::Uri { uri, .. } => {
-            let Some(decoded) = uri::decode(uri) else {
-                log::warn!("[Asset] glTF texture URI `{uri}` is not valid percent-encoding");
-                return None;
-            };
-            Some(base_dir.join(decoded).to_string_lossy().into_owned())
+            Some(uri::file(base_dir, uri)?.to_string_lossy().into_owned())
         }
         // Embedded image: no on-disk path to reference (follow-up).
         gltf::image::Source::View { .. } => None,

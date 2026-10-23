@@ -6,12 +6,15 @@ use std::path::{Path, PathBuf};
 
 /// A copy of the embedded-textures fixture in a fresh folder, `text` edited by `edit`.
 fn quad(edit: impl Fn(String) -> String) -> PathBuf {
+    quad_at(&crate::test_temp::dir().join("quad.fbx"), edit)
+}
+
+/// The fixture written to `path`, `text` edited by `edit`.
+fn quad_at(path: &Path, edit: impl Fn(String) -> String) -> PathBuf {
     let fixture =
         Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/models/embedded_textures.fbx");
-    let text = edit(std::fs::read_to_string(fixture).unwrap());
-    let path = crate::test_temp::dir().join("quad.fbx");
-    std::fs::write(&path, text).unwrap();
-    path
+    std::fs::write(path, edit(std::fs::read_to_string(fixture).unwrap())).unwrap();
+    path.to_path_buf()
 }
 
 fn base_color_map(path: &Path, material: &str) -> String {
@@ -55,9 +58,17 @@ fn an_import_names_an_extracted_texture_by_reference_and_it_resolves() {
 }
 
 #[test]
-fn textures_sharing_a_name_are_named_by_index() {
-    let path = quad(|text| text.replace("\"Texture::Blue\"", "\"Texture::Red\""));
-    let source = path.to_string_lossy();
-    assert_eq!(base_color_map(&path, "Red"), reference(&source, "#0"));
+fn the_first_of_textures_sharing_a_name_keeps_it_and_later_ones_take_an_index() {
+    let path = quad(|text| text);
+    let source = path.to_string_lossy().into_owned();
+    let red = base_color_map(&path, "Red");
+    let pixels = std::fs::read(file(&red).expect("resolves")).unwrap();
+
+    // A namesake added after Red: the reference saved before still finds Red.
+    quad_at(&path, |text| {
+        text.replace("\"Texture::Blue\"", "\"Texture::Red\"")
+    });
+    assert_eq!(base_color_map(&path, "Red"), red);
     assert_eq!(base_color_map(&path, "Blue"), reference(&source, "#1"));
+    assert_eq!(std::fs::read(file(&red).unwrap()).unwrap(), pixels);
 }

@@ -99,3 +99,14 @@ fn an_animation_reads_back_as_a_linear_channel() {
     assert_eq!(sampler.input().max(), Some(serde_json::json!([0.5])));
     assert!(sampler.input().view().unwrap().target().is_none());
 }
+
+#[test]
+fn a_json_length_past_the_end_of_the_file_reads_nothing() {
+    let path = crate::test_temp::dir().join("corrupt.glb");
+    let mut bytes = Vec::new();
+    for word in [write::GLB_MAGIC, 2, 20, u32::MAX, write::CHUNK_JSON] {
+        bytes.extend(word.to_le_bytes());
+    }
+    std::fs::write(&path, bytes).unwrap();
+    assert_eq!(super::image_uri(&path, "Skin"), None);
+}

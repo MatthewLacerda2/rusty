@@ -82,6 +82,32 @@ pub fn has_extension(path: impl AsRef<Path>, ext: &str) -> bool {
     extension(path) == ext
 }
 
+/// `path` with every `.` dropped and every `..` folded into the name before it,
+/// without reading the disk: `a/b/../c` → `a/c`. A `..` with no name before it
+/// is kept on a relative path and dropped at a root (`/..` is `/`). A path that
+/// folds to nothing is `.`.
+pub fn fold(path: &Path) -> PathBuf {
+    use std::path::Component;
+    let mut out: Vec<Component> = Vec::new();
+    for part in path.components() {
+        match part {
+            Component::CurDir => {}
+            Component::ParentDir => match out.last() {
+                Some(Component::Normal(_)) => {
+                    out.pop();
+                }
+                Some(Component::RootDir | Component::Prefix(_)) => {}
+                _ => out.push(part),
+            },
+            _ => out.push(part),
+        }
+    }
+    if out.is_empty() {
+        return PathBuf::from(".");
+    }
+    out.iter().collect()
+}
+
 /// `path` without a verbatim prefix: `\\?\C:\x` → `C:\x`, `\\?\UNC\host\share`
 /// → `\\host\share`. Any other path, `/`-rooted ones included, comes back as is.
 pub fn strip_verbatim(path: &str) -> String {

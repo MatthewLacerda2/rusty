@@ -30,7 +30,13 @@ fn json_chunk(path: &Path) -> Option<Vec<u8>> {
     if word(0) != GLB_MAGIC || word(16) != CHUNK_JSON {
         return None;
     }
-    let mut json = vec![0; usize::try_from(word(12)).ok()?];
+    // Bounded by the file before allocating: a corrupt length word must not ask
+    // for gigabytes.
+    let len = u64::from(word(12));
+    if len > file.metadata().ok()?.len().saturating_sub(20) {
+        return None;
+    }
+    let mut json = vec![0; usize::try_from(len).ok()?];
     file.read_exact(&mut json).ok()?;
     Some(json)
 }

@@ -108,3 +108,16 @@ fn extension_matching_ignores_case() {
     assert_eq!(extension("Crate.GLB"), "glb");
     assert_eq!(extension("noext"), "");
 }
+
+#[test]
+fn fold_drops_dots_and_folds_climbs_without_the_disk() {
+    let fold = |p: &str| super::fold(Path::new(p));
+    assert_eq!(
+        fold("./a/b/../../../../m/s.png"),
+        Path::new("../../m/s.png")
+    );
+    assert_eq!(fold("./cache/x/../../m/s.png"), Path::new("m/s.png"));
+    assert_eq!(fold("/tmp/r/../../../home/s.png"), Path::new("/home/s.png"));
+    assert_eq!(fold("a/.."), Path::new("."));
+    assert_eq!(fold("a/./b"), Path::new("a/b"));
+}

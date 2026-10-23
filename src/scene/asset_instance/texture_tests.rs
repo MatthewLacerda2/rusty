@@ -46,10 +46,10 @@ fn write_quad(dir: &std::path::Path, green: bool) -> String {
     path.to_string_lossy().into_owned()
 }
 
-/// A scene holding the quad at `path`, and the key of its material.
-fn instanced(path: &str) -> (Scene, String) {
+/// A scene holding `node` of the model at `path`, and the key of its material.
+fn instanced(path: &str, node: &str) -> (Scene, String) {
     let mut scene = Scene::new();
-    let id = instantiate_asset(&mut scene, &format!("{path}::Quad"), None, Vec3::ZERO).unwrap();
+    let id = instantiate_asset(&mut scene, &format!("{path}::{node}"), None, Vec3::ZERO).unwrap();
     let key = scene
         .world
         .material(id)
@@ -67,7 +67,7 @@ fn base_color_map(scene: &Scene, key: &str) -> String {
 fn a_saved_scene_never_names_the_import_cache() {
     let dir = crate::test_temp::dir();
     let path = write_quad(&dir, false);
-    let (scene, key) = instanced(&path);
+    let (scene, key) = instanced(&path, "Quad");
     let json = serde_json::to_string(&to_scene_data(&scene)).unwrap();
     assert!(!json.contains("generated/imported"), "{json}");
     assert!(!json.contains(".textures/"), "{json}");
@@ -78,10 +78,29 @@ fn a_saved_scene_never_names_the_import_cache() {
 }
 
 #[test]
+fn a_texture_on_disk_beside_the_fbx_is_saved_as_its_own_path() {
+    let dir = crate::test_temp::dir();
+    let fixture = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/fixtures/models/missing_texture.fbx"
+    );
+    let path = dir.join("tri.fbx");
+    std::fs::copy(fixture, &path).unwrap();
+    // The FBX names it `gone.png`, relative to itself.
+    std::fs::write(dir.join("gone.png"), b"\x89PNG").unwrap();
+    let (scene, key) = instanced(&path.to_string_lossy(), "Tri");
+    let json = serde_json::to_string(&to_scene_data(&scene)).unwrap();
+    assert!(!json.contains("generated/imported"), "{json}");
+    assert!(!json.contains(".."), "{json}");
+    let map = base_color_map(&scene, &key);
+    assert_eq!(std::fs::read(map).unwrap(), b"\x89PNG", "the file itself");
+}
+
+#[test]
 fn a_reconversion_inserting_a_same_named_texture_keeps_each_map_its_own() {
     let dir = crate::test_temp::dir();
     let path = write_quad(&dir, false);
-    let (scene, key) = instanced(&path);
+    let (scene, key) = instanced(&path, "Quad");
     let map = base_color_map(&scene, &key);
     let red = std::fs::read(texture_ref::file(&map).expect("resolves")).unwrap();
 
@@ -99,7 +118,7 @@ fn a_reconversion_inserting_a_same_named_texture_keeps_each_map_its_own() {
 #[test]
 fn a_scene_with_a_texture_reference_round_trips() {
     let dir = crate::test_temp::dir();
-    let (scene, key) = instanced(&write_quad(&dir, false));
+    let (scene, key) = instanced(&write_quad(&dir, false), "Quad");
     let json = serde_json::to_string(&to_scene_data(&scene)).unwrap();
     let data: SceneData = serde_json::from_str(&json).unwrap();
     let mut restored = Scene::new();
