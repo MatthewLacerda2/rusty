@@ -24,10 +24,11 @@ pub struct Converter {
     /// them into place whole, and removes what an earlier conversion left. Any
     /// failure is an `Err`; only what is left out on purpose goes in [`Converted`].
     ///
-    /// A conversion re-made only because a file it looked at changed reuses the
-    /// textures folder (its name digests the stamp, not the files), so a written
-    /// file's name must hold the same bytes whatever is found on disk: name every
-    /// file the source embeds before looking at the disk (`fbx::texture`, #1189).
+    /// A conversion whose stamp file was lost, or whose swap failed, meets its own
+    /// textures folder again (its tag digests the stamp and the files the last
+    /// stamp file names, `record::folder_tag`), so a written file's name must hold
+    /// the same bytes whatever is found on disk: name every file the source embeds
+    /// before looking at the disk (`fbx::texture`, #1189).
     pub convert: fn(source: &Path, to: &Staging) -> Result<Converted, ImportError>,
 }
 

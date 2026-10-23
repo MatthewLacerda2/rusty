@@ -18,6 +18,7 @@ pub(super) fn script(dir: &Path, body: &str) -> PathBuf {
     let (draft, path) = (dir.join("blender.draft"), dir.join("blender"));
     std::fs::write(&draft, format!("#!/bin/sh\n{body}\n")).unwrap();
     std::fs::set_permissions(&draft, std::fs::Permissions::from_mode(0o755)).unwrap();
+    // lint: allow(atomic-write) the draft is executable before it takes the name, which `write_atomic` can't do
     std::fs::rename(&draft, &path).unwrap();
     path
 }

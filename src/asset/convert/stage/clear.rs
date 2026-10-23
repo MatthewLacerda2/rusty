@@ -41,7 +41,7 @@ pub(super) fn clear(dir: &Path, name: &str) {
 }
 
 /// The textures folders beside the cached glTF at `out`, current or left by an
-/// earlier conversion: `<out>.<digest>.textures/`, and the undigested
+/// earlier conversion: `<out>.<tag>.textures/`, and the untagged
 /// `<out>.textures/` of converters before #1129.
 pub fn textures_dirs(out: &Path) -> Vec<PathBuf> {
     let (dir, name) = split(out);

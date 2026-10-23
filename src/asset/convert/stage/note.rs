@@ -8,8 +8,9 @@
 //! and mesh emitters name (`soldier.fbx::Body`), so a consumer keyed by the
 //! source matches too. A staged path is never noted: no cache has seen it, and it
 //! is gone after the swap. Nor is the textures folder: its name carries the
-//! conversion's digest, so changed textures land at new paths no cache has read,
-//! and a re-conversion with the same digest puts back the same bytes (`move_in`).
+//! conversion's tag (`record::folder_tag`), so changed textures land at new paths
+//! no cache has read, and a re-conversion with the same tag puts back the same
+//! bytes (`move_in`).
 //! The old folder `clear` removes is named by the old `.glb` only, so an upload
 //! still holding one of its paths is the old model's, which nothing draws once
 //! it is re-imported.

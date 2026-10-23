@@ -22,12 +22,15 @@
 //! `.blend`), and every external file the conversion looked at (an FBX's on-disk
 //! texture, a `.blend`'s linked library), with a digest or as absent (#1189); any
 //! difference re-converts. With the program missing, a cache of the unchanged
-//! source stands, made by whichever version of it.
+//! source stands, made by whichever version of it; Play never asks the program at
+//! all (`gate::serve`), and a refresh asks it once (`stale`).
 //! Content, not timestamps: a fresh clone gives every file a new mtime. A source's
 //! digest is remembered by its length and mtime (`depends`), so a Play that looks
 //! at every source reads only the ones that changed. Files a conversion writes for the glTF to
 //! reference (FBX's embedded textures, #1082) live in a
-//! `<cache>.glb.<digest>.textures/` folder beside it and are re-made with it.
+//! `<cache>.glb.<tag>.textures/` folder beside it and are re-made with it; the tag,
+//! recorded in the stamp file, digests the stamp and how the files the last
+//! conversion looked at read now (`record::folder_tag`).
 //!
 //! **How it is re-made.** A converter writes plain files into a fresh staging
 //! folder, and `stage` swaps the set into place, so a reader in another process

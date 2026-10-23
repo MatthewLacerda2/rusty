@@ -14,14 +14,24 @@
 //! ([`identify`]), so a different Blender re-converts; with no Blender at all, a
 //! cache of the unchanged source still loads.
 //!
-//! **Textures.** An image packed into the `.blend` (or generated in it) is
-//! written into the textures folder beside the `.glb`, flat, and a scene names it
-//! `model.blend#tex/<image name>` (#1130); an image that is a file on disk stays
-//! a plain path to that file. Each file on disk the `.blend` names, linked
-//! libraries included, is a dependency of the cache (#1189).
+//! A run of Blender has a time limit (`run`): ten seconds to say its version, ten
+//! minutes to export unless `RUSTY_BLENDER_TIMEOUT` says otherwise. One past it is
+//! stopped and fails, so a hung Blender never holds the editor or the cache's lock.
 //!
-//! **Authoring only.** Conversion is refused during Play (`gate`), so a game
-//! never starts Blender; it reads the cached glTF.
+//! **Textures.** Only the images a material uses are looked at. One packed into
+//! the `.blend` (or generated in it) is written into the textures folder beside
+//! the `.glb`, flat, under its identity: the image's name, unique within the
+//! export (the first keeps it; a linked library's namesake takes `.1`), its
+//! extension the format of its bytes. A scene names it
+//! `model.blend#tex/<identity>` (#1130). An image that is a file on disk stays a
+//! plain path to that file. Each linked library, and each image on disk, is a
+//! dependency of the cache (#1189), and a changed one re-converts into a textures
+//! folder of its own (`record::folder_tag`).
+//!
+//! **Authoring only.** A running game never starts Blender, not even to ask its
+//! version: Play serves the cache as it stands (`gate::serve`). Only the refresh
+//! before Play (`gate::refresh_sources`) converts, in the editor and, while a game
+//! still ships with its sources (until #1267's export), in the standalone player.
 //!
 //! A converter never logs or drops a `Result`: what it leaves out on purpose is a
 //! [`Skip`](super::Skip) in what it returns, and any failure fails the conversion

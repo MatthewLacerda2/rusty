@@ -10,7 +10,7 @@
 //! 1. The converter writes plain files into `.<cache>.<pid>.<n>.staging/` beside
 //!    the cache: the same filesystem, so every later move is a rename.
 //! 2. Its textures folder is renamed in. A folder cannot replace a full one, so each
-//!    conversion's folder has its own name, `<cache>.<digest>.textures`, and the
+//!    conversion's folder has its own name, `<cache>.<tag>.textures`, and the
 //!    old `.glb`'s folder stays untouched beside it.
 //! 3. The old stamp is removed, then the `.glb` is renamed over the old one: the
 //!    one step a reader can observe. A crash between the two leaves an unstamped

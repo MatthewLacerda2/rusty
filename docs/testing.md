@@ -237,8 +237,12 @@ on `PATH` or named by `RUSTY_BLENDER`:
 
     cargo nextest run --run-ignored only -E 'test(/convert::blend::/)'
 
-Finding Blender (not found, too old, the override) is tested in the ordinary suite
-with fake executables, so it never needs one.
+Finding Blender (not found, too old, the override, a version that fails or hangs)
+is tested in the ordinary suite with fake executables, and the cache's handling of
+a converter's program (its version in the stamp, none installed, Play never asking)
+with a fake `Converter::tool`, so neither needs Blender. The `.blend` fixtures in
+`tests/fixtures/models/` are made by the `make_*_blend.py` scripts beside them:
+re-run one with Blender to change its fixture.
 
 ## Editor captures (#731)
 `screenshot::capture` shows the game; **`shell::editor::capture`** shows the *editor* —

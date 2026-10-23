@@ -54,14 +54,19 @@ only FBX and had Blender export one:
   with the export settings pinned in one script (+Y up, modifiers applied, animations
   and skins on). Blender is found on `PATH`, then where it usually installs; set
   `RUSTY_BLENDER` to its executable for any other install. Without it, a `.blend`
-  import fails saying so, and an unchanged `.blend` still loads its last import.
-  Images packed into the `.blend` are extracted; images on disk are used where they lie.
+  import fails saying so, and an unchanged `.blend` still loads its last import. An
+  export that runs past ten minutes is stopped (`RUSTY_BLENDER_TIMEOUT` sets the limit
+  in seconds). Images packed into the `.blend` are extracted and named after their
+  image (a namesake from a linked library takes `.1`); images on disk are used where
+  they lie.
 
 The converted copy is cached under `assets/generated/imported/` and re-made when the
 source changes, or the Blender that made it does (outside Play, and for every source
 as Play starts; Play itself never converts), while scenes keep naming the source. A
-shipped game reads the cache and never runs Blender; the engine never parses a
-`.blend` itself. Levels of detail
+running game never starts Blender, not even to ask its version: it reads the cache as
+it stands. Only the refresh before Play does, in the editor and, while a game still
+ships with its sources (until #1267's export), in the standalone player. The engine
+never parses a `.blend` itself. Levels of detail
 follow the Unity / Blender naming convention: objects named `Crate_LOD0`,
 `Crate_LOD1`, … import as one `Crate` carrying an `LODGroup` that shows one level at
 a time by on-screen size (see `docs/api/LODGroup.md`). A mesh's second UV map (glTF
