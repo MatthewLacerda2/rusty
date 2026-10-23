@@ -68,19 +68,6 @@ impl PhysicsWorld {
         ids
     }
 
-    /// [`Self::sphere_cast_hit`] reduced to (entity id, distance traveled).
-    pub fn cast_sphere_filtered(
-        &self,
-        origin: Vec3,
-        dir: Vec3,
-        radius: f32,
-        max_toi: f32,
-        accept: impl Fn(u32) -> bool,
-    ) -> Option<(u32, f32)> {
-        self.sphere_cast_hit(origin, dir, radius, max_toi, accept)
-            .map(|hit| (hit.id, hit.distance))
-    }
-
     /// Closest accepted collider touched by a sphere of `radius` swept from
     /// `origin` along `dir` — Unity's `Physics.SphereCast`, i.e. a thick
     /// raycast, the volume sibling of [`Self::raycast_hit`]. `distance` is how

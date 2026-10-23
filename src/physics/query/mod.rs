@@ -94,24 +94,6 @@ impl PhysicsWorld {
         }
     }
 
-    /// Closest collider hit by `ray` within `max_toi`, as (entity id, toi).
-    pub fn cast_ray(&self, origin: Vec3, dir: Vec3, max_toi: f32) -> Option<(u32, f32)> {
-        self.cast_ray_filtered(origin, dir, max_toi, |_| true)
-    }
-
-    /// [`Self::raycast_hit`] reduced to (entity id, distance) — the shape the
-    /// engine hitscan wants.
-    pub fn cast_ray_filtered(
-        &self,
-        origin: Vec3,
-        dir: Vec3,
-        max_toi: f32,
-        accept: impl Fn(u32) -> bool,
-    ) -> Option<(u32, f32)> {
-        self.raycast_hit(origin, dir, max_toi, accept)
-            .map(|hit| (hit.id, hit.distance))
-    }
-
     /// Closest hit by `ray` within `max_toi`, returning the distance and the
     /// world-space surface normal. Used by the particle system to reflect a
     /// bouncing particle off the surface it struck. A ray starting inside a

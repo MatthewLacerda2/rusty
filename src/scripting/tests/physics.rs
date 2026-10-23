@@ -12,7 +12,7 @@ use crate::scripting::manager::ScriptManager;
 use crate::time::Time;
 use glam::Vec3;
 
-/// #31: a script's `Physics.Raycast` and the engine's `cast_ray` resolve to
+/// #31: a script's `Physics.Raycast` and the engine's `raycast_hit` resolve to
 /// the *same* entity for the same ray, because both go through the one rapier
 /// world. The binding casts against the live world shared via the handle.
 #[test]
@@ -49,8 +49,8 @@ fn raycast_matches_engine_cast_through_rapier() {
         .borrow()
         .as_ref()
         .unwrap()
-        .cast_ray(Vec3::ZERO, Vec3::Z, f32::MAX)
-        .map(|(id, _)| id);
+        .raycast_hit(Vec3::ZERO, Vec3::Z, f32::MAX, |_| true)
+        .map(|hit| hit.id);
     assert_eq!(engine, Some(target), "engine cast should hit the target");
 
     // Script path: the binding returns (hit, id, dist); pull the id back out.

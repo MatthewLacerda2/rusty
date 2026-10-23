@@ -25,25 +25,28 @@ fn static_box(scene: &mut Scene, pos: Vec3, size: Vec3) -> u32 {
 }
 
 #[test]
-fn cast_ray_reports_entity_and_distance() {
+fn raycast_hit_reports_entity_and_distance() {
     let mut scene = Scene::new();
     // Box centre z=5, size 2 -> half-extent 1 -> front face at z=4.
     let target = static_box(&mut scene, Vec3::new(0.0, 0.0, 5.0), Vec3::splat(2.0));
     let physics = PhysicsWorld::from_scene(&scene);
-    let (id, toi) = physics
-        .cast_ray(Vec3::ZERO, Vec3::Z, 100.0)
+    let hit = physics
+        .raycast_hit(Vec3::ZERO, Vec3::Z, 100.0, |_| true)
         .expect("should hit");
-    assert_eq!(id, target, "hits the target entity");
+    assert_eq!(hit.id, target, "hits the target entity");
+    let toi = hit.distance;
     assert!((toi - 4.0).abs() < 0.05, "front face is at 4.0, got {toi}");
 }
 
 #[test]
-fn cast_ray_misses_into_empty_space() {
+fn raycast_hit_misses_into_empty_space() {
     let mut scene = Scene::new();
     static_box(&mut scene, Vec3::new(0.0, 0.0, 5.0), Vec3::splat(2.0));
     let physics = PhysicsWorld::from_scene(&scene);
     // Fire away from the box: a real miss must be None, never a constant hit.
-    assert!(physics.cast_ray(Vec3::ZERO, -Vec3::Z, 100.0).is_none());
+    assert!(physics
+        .raycast_hit(Vec3::ZERO, -Vec3::Z, 100.0, |_| true)
+        .is_none());
 }
 
 #[test]
