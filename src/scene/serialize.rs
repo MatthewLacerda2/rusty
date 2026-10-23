@@ -178,8 +178,7 @@ pub fn apply_scene_data(scene: &mut Scene, mut data: SceneData) {
     // Rebuild every skeleton from its model, then hang the saved attachments back
     // on their bones by name (#453) — before prefab propagation, which rebuilds a
     // linked skinned entity from its source and would drop its bone overrides.
-    scene.sync_skeletons();
-    scene.attach_to_bones(bone_parents);
+    scene.hang_on_skeletons(bone_parents);
 
     scene.update_all_colliders();
 

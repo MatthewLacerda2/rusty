@@ -75,9 +75,16 @@ impl Scene {
     /// The generated hitbox under `bone`: its child named [`HITBOX_NAME`] that
     /// carries a collider.
     pub fn hitbox_of(&self, bone: u32) -> Option<u32> {
-        self.world.children(bone).into_iter().find(|&c| {
-            self.world.has_collider(c) && self.world.name(c).is_some_and(|n| *n == HITBOX_NAME)
-        })
+        self.world
+            .children(bone)
+            .into_iter()
+            .find(|&c| self.is_generated_hitbox(c))
+    }
+
+    /// Whether `id` is a hitbox [`Scene::generate_hitboxes`] made: named
+    /// [`HITBOX_NAME`] and carrying a collider.
+    pub(in crate::scene::skeleton) fn is_generated_hitbox(&self, id: u32) -> bool {
+        self.world.has_collider(id) && self.world.name(id).is_some_and(|n| *n == HITBOX_NAME)
     }
 
     /// Put `fit` on `bone`'s hitbox child, spawning it when absent.

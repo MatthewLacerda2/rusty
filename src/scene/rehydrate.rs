@@ -15,6 +15,7 @@ use crate::components::{ColliderShape, Entity};
 use crate::core::fs::written::Stale;
 use crate::ecs::World;
 use crate::scene::authoring::{primitive_geometry, Primitive};
+use crate::scene::Scene;
 
 /// Convert one imported `MeshVertex` (pure data) into the renderer's `Vertex`,
 /// carrying the skin binding (`joint_indices`/`joint_weights`) through to the GPU
@@ -105,38 +106,44 @@ fn rehydrate_one(primitive_type: &str, asset_ref: &Option<String>) -> Rehydrated
 pub fn rehydrate_entity_mesh(entity: &mut Entity) {
     if let Some(mesh) = &mut entity.mesh {
         let rebuilt = rehydrate_one(&mesh.primitive_type, &mesh.asset_ref);
-        mesh.vertices = rebuilt.vertices;
-        mesh.indices = rebuilt.indices;
-        mesh.bind_palette = rebuilt.bind_palette;
-        mesh.skin = rebuilt.skin;
-        mesh.clips = rebuilt.clips;
-        // A freshly rehydrated mesh starts at its rest pose; the animation
-        // system repopulates the posed palette once a clip plays.
-        mesh.pose_palette = Vec::new();
-        mesh.skeleton.bones.clear();
-        mesh.is_dirty.set(true);
+        install(mesh, rebuilt);
     }
+}
+
+/// Put `rebuilt`'s geometry and rig on `mesh`, unbound from any bones: a fresh
+/// mesh starts at its rest pose, and the animation system repopulates the posed
+/// palette once a clip plays. `Scene::sync_skeleton` binds the bones.
+fn install(mesh: &mut crate::scene::MeshComponent, rebuilt: RehydratedMesh) {
+    mesh.vertices = rebuilt.vertices;
+    mesh.indices = rebuilt.indices;
+    mesh.bind_palette = rebuilt.bind_palette;
+    mesh.skin = rebuilt.skin;
+    mesh.clips = rebuilt.clips;
+    mesh.pose_palette = Vec::new();
+    mesh.skeleton.bones.clear();
+    mesh.is_dirty.set(true);
 }
 
 /// Re-import the geometry of every unskinned mesh in `scene` instanced from the model
 /// at `path`, so a changed import setting (Generate Lightmap UVs, #831) shows at once
 /// rather than on the next load. Skinned meshes keep theirs: the setting never
-/// touches them, and their rig is bound to live bones. Returns how many were rebuilt.
-pub fn reimport_model(scene: &mut crate::scene::Scene, path: &str) -> usize {
+/// touches them, and rebuilding their rig would respawn their bones for nothing.
+/// Returns how many were rebuilt.
+pub fn reimport_model(scene: &mut Scene, path: &str) -> usize {
     let prefix = format!("{path}{}", asset::REF_SEPARATOR);
-    reimport_where(scene, |reference| reference.starts_with(&prefix))
+    reimport_where(scene, Rig::Keep, |reference| reference.starts_with(&prefix))
 }
 
-/// Re-import every unskinned mesh in `scene` whose model file `stale` names: the
-/// engine re-wrote it (#1242), and Unity updates every instance of a re-imported
-/// model. Skinned meshes keep theirs, as in [`reimport_model`]. Each distinct file
-/// is matched against `stale` once. Returns how many were rebuilt.
-pub fn reimport_written(scene: &mut crate::scene::Scene, stale: &Stale) -> usize {
+/// Re-import every mesh in `scene` whose model file `stale` names: the engine
+/// re-wrote it (#1242), and Unity updates every instance of a re-imported model.
+/// A skinned one takes the new rig too, its bones rebuilt from it (#1252). Each
+/// distinct file is matched against `stale` once. Returns how many were rebuilt.
+pub fn reimport_written(scene: &mut Scene, stale: &Stale) -> usize {
     if stale.is_empty() {
         return 0;
     }
     let mut named: BTreeMap<String, bool> = BTreeMap::new();
-    reimport_where(scene, |reference| {
+    reimport_where(scene, Rig::Rebuild, |reference| {
         let Some(file) = asset_ref_file(reference) else {
             return false;
         };
@@ -146,44 +153,65 @@ pub fn reimport_written(scene: &mut crate::scene::Scene, stale: &Stale) -> usize
     })
 }
 
+/// What a re-import does with a skinned mesh (one skinned before or after it).
+#[derive(Clone, Copy, PartialEq)]
+enum Rig {
+    /// Leave it as it is.
+    Keep,
+    /// Take the new mesh and rig, and rebuild the bones from it.
+    Rebuild,
+}
+
 /// Re-import every mesh whose reference `names` accepts ([`reimport_entity_mesh`]).
-fn reimport_where(scene: &mut crate::scene::Scene, mut names: impl FnMut(&str) -> bool) -> usize {
+fn reimport_where(scene: &mut Scene, rig: Rig, mut names: impl FnMut(&str) -> bool) -> usize {
     let mut rebuilt = 0;
     for id in scene.world.ids_with_mesh() {
         let named = scene
             .world
             .mesh(id)
             .is_some_and(|mesh| mesh.asset_ref.as_deref().is_some_and(&mut names));
-        if named && reimport_entity_mesh(&mut scene.world, id) {
+        if named && reimport_entity_mesh(scene, id, rig) {
             rebuilt += 1;
         }
     }
     rebuilt
 }
 
-/// Re-import one entity's mesh geometry from its reference, and refit its mesh
-/// collider's box to it. Skinned meshes keep theirs: their rig is bound to live
-/// bones. A model that yields nothing (gone, or now skinned) keeps the old geometry.
-/// Returns whether the mesh was rebuilt.
-fn reimport_entity_mesh(world: &mut World, id: u32) -> bool {
-    let Some(mut mesh) = world.mesh_mut(id) else {
+/// Re-import one entity's mesh from its reference, and refit its mesh collider's
+/// box to it. A skinned mesh (before or after) is rebuilt whole, rig and bones,
+/// when `rig` says so, and kept otherwise. A model that yields nothing (gone)
+/// keeps the old mesh. Returns whether the mesh was rebuilt.
+fn reimport_entity_mesh(scene: &mut Scene, id: u32, rig: Rig) -> bool {
+    let Some((reference, was_skinned)) = scene
+        .world
+        .mesh(id)
+        .and_then(|m| Some((m.asset_ref.clone()?, m.skin.is_some())))
+    else {
         return false;
     };
-    if mesh.skin.is_some() {
+    if was_skinned && rig == Rig::Keep {
         return false;
     }
-    let reference = mesh.asset_ref.as_deref();
-    let Some(sub) = reference.and_then(|r| asset::import_sub_mesh(r).ok()) else {
+    let Ok(sub) = asset::import_sub_mesh(&reference) else {
         return false;
     };
-    let Some(bounds) = sub.bounds().filter(|_| sub.skin.is_none()) else {
+    let skinned = was_skinned || sub.skin.is_some();
+    if skinned && rig == Rig::Keep {
+        return false;
+    }
+    let Some(bounds) = sub.bounds() else {
         return false;
     };
-    mesh.vertices = sub.vertices.iter().map(vertex_from_imported).collect();
-    mesh.indices = sub.indices;
-    mesh.is_dirty.set(true);
-    drop(mesh);
-    refit_mesh_collider(world, id, bounds);
+    // The bones come down before the rig they were built from is replaced, and
+    // go back up from the new one, keeping what was authored on them.
+    let hung = skinned.then(|| scene.take_skeleton(id));
+    if let Some(mut mesh) = scene.world.mesh_mut(id) {
+        install(&mut mesh, RehydratedMesh::from_sub_mesh(&sub));
+    }
+    if let Some(hung) = hung {
+        scene.restore_skeleton(id, hung);
+    }
+    refit_mesh_collider(&mut scene.world, id, bounds);
     true
 }
 

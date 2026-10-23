@@ -13,10 +13,13 @@
 //! - [`strip_bones`] takes them out of a saved document, keeping only what the
 //!   designer authored: per-bone transform overrides (on the mesh's
 //!   `BoneBinding`) and the entities parented under a bone, re-pointed at the
-//!   skinned entity with their bone's name in `parent_bone`.
-//! - [`take_bone_parents`] + [`Scene::attach_to_bones`] put those attachments back
-//!   under their bones on load. A bone that no longer exists is warned about, never
-//!   dropped silently.
+//!   skinned entity with their bone's name (then its ancestors') in `parent_bone`.
+//! - [`take_bone_parents`] + [`Scene::hang_on_skeletons`] put those attachments
+//!   back under their bones on load (`hang`). A bone that no longer exists hands
+//!   them to its nearest surviving ancestor, with a warning, never silently.
+//! - `reimport`: `Scene::take_skeleton` + `Scene::restore_skeleton` rebuild a live
+//!   skeleton from a re-imported rig, keeping what was authored on it (#1252), and
+//!   hang its attachments back by the same rule as a load.
 //! - `palette` builds each skinned mesh's posed palette from the bones.
 //! - `hitbox` fits per-bone hitbox colliders and names the bone a hit struck (#464).
 //! - `ragdoll` turns those hitboxes into jointed bodies and switches them between
@@ -24,15 +27,18 @@
 //! - `ik` bends the posed bones toward script-set targets after `LateUpdate`;
 //!   bones a ragdoll's dynamic body carries are skipped (#461).
 
+mod hang;
 mod hitbox;
 mod ik;
 mod palette;
 mod persist;
 mod ragdoll;
+mod reimport;
 mod sync;
 
 use std::collections::BTreeSet;
 
+pub use hang::Hung;
 pub use hitbox::{HitboxFit, HitboxOptions, HITBOX_NAME};
 pub use ik::{AimSettings, BonePose};
 pub use persist::{strip_bones, take_bone_parents};
@@ -86,7 +92,8 @@ impl Scene {
     }
 
     /// Despawn `owner`'s bones and everything under them — a skinned entity's
-    /// skeleton goes with it.
+    /// skeleton goes with it — dropping whatever pointed at them as
+    /// [`Scene::destroy_entity`] does.
     pub(crate) fn despawn_skeleton(&mut self, owner: u32) {
         let Some(bones) = self.world.mesh(owner).map(|m| m.skeleton.bones.clone()) else {
             return;
@@ -97,6 +104,10 @@ impl Scene {
             .collect();
         for id in doomed {
             self.world.despawn(id);
+            self.shader_overrides.clear(id, None);
+            if self.selected_entity_id == Some(id) {
+                self.selected_entity_id = None;
+            }
         }
     }
 
@@ -113,5 +124,7 @@ impl Scene {
 mod fixture;
 #[cfg(test)]
 mod persist_tests;
+#[cfg(test)]
+mod reimport_tests;
 #[cfg(test)]
 mod tests;

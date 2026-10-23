@@ -372,8 +372,8 @@ scene.entities[].offmesh_link.end[]: f32
 scene.entities[].offmesh_link.start: tuple(3)
 scene.entities[].offmesh_link.start[]: f32
 scene.entities[].offmesh_link: option
-scene.entities[].parent_bone: option
-scene.entities[].parent_bone: string
+scene.entities[].parent_bone: seq
+scene.entities[].parent_bone[]: string
 scene.entities[].parent_id: option
 scene.entities[].parent_id: u32
 scene.entities[].particles.active: bool

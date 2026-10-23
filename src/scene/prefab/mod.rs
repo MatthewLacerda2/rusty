@@ -116,11 +116,12 @@ fn stamp_prefab(
         if entity.parent_id.is_none() {
             new_root = entity.id;
         }
-        bone_parents.extend(entity.parent_bone.take().map(|b| (entity.id, b)));
+        if !entity.parent_bone.is_empty() {
+            bone_parents.push((entity.id, std::mem::take(&mut entity.parent_bone)));
+        }
         scene.world.insert_entity(entity);
     }
-    scene.sync_skeletons();
-    scene.attach_to_bones(bone_parents);
+    scene.hang_on_skeletons(bone_parents);
 
     // Parent the new root under the requested parent (cycle-checked by `set_parent`).
     if let Some(parent_id) = parent {

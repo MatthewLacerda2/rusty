@@ -51,7 +51,11 @@ fn a_saved_scene_holds_no_bones_only_overrides_and_bone_attachments() {
     );
     let gun = &data.entities[1];
     assert_eq!(gun.parent_id, Some(hero));
-    assert_eq!(gun.parent_bone.as_deref(), Some("Joint1"));
+    assert_eq!(
+        gun.parent_bone,
+        ["Joint1", "Joint0"],
+        "its bone, then the ancestors"
+    );
     assert_eq!(owner.children, vec![gun.id]);
 }
 
@@ -97,9 +101,10 @@ fn an_override_or_attachment_whose_bone_vanished_is_dropped_not_fatal() {
         .skeleton
         .overrides
         .is_empty());
-    // The gun stays on the character rather than being lost.
+    // The gun goes to the nearest bone left above its own rather than being lost.
     let gun = loaded.find_entity_by_name("Gun").unwrap();
-    assert_eq!(loaded.world.parent_id(gun), Some(hero));
+    let joint0 = loaded.find_bone(hero, "Joint0").unwrap();
+    assert_eq!(loaded.world.parent_id(gun), Some(joint0));
 }
 
 #[test]

@@ -218,14 +218,24 @@ else, and is an ordinary entity in every API — `Transform.*`, `Scene.SetParent
   stores the skeleton. It stores what you authored on it: a bone moved away from
   its rest pose is saved as a per-bone **override** (by bone name), and anything
   parented under a bone is saved with that bone's name. Both re-bind by name when
-  the scene loads, so a re-exported skeleton keeps them; an override or
-  attachment whose bone no longer exists is dropped with a warning in the log
-  (the attachment stays under the skinned entity). A bone's `Rigidbody` and
+  the scene loads, so a re-exported skeleton keeps them. An override whose bone
+  no longer exists is dropped with a warning in the log. An attachment whose bone
+  no longer exists moves to that bone's nearest ancestor the model still has (the
+  skinned entity itself when none is left), with a warning, keeping its local
+  transform. A hitbox `Physics.GenerateHitboxes` made for a removed bone is
+  destroyed. A bone's `Rigidbody` and
   `Joint` (a ragdoll's, #466 — see [`Ragdoll`](Ragdoll.md)) are saved by bone
   name too, the joint's connected bone included. Any other component added to a
   bone itself is not saved: put a hitbox `Collider` on a child of the bone —
   `Physics.GenerateHitboxes(id)` does exactly that for every bone (see
   `Physics`, *Per-bone hitboxes*, #464).
+- **Re-importing the model** (its file re-written while the editor runs, #1252)
+  applies the same rules live, without a reload: the skeleton is rebuilt from the
+  new rig, so **every bone gets a new id**. Look bones up again with
+  `Animator.GetBone` rather than keeping an id across a re-import. Overrides,
+  attachments, ragdoll bodies and joints carry over by bone name, as on a load;
+  any other component on a bone is deleted, with a warning. A model re-written
+  without a skin drops its overrides and ragdoll bodies, with a warning.
 - **Destroying** the skinned entity destroys its skeleton and what hangs from it.
 
 `Debug.Snapshot()` leaves bones out by default; `Debug.Snapshot({ bones = true })`

@@ -108,11 +108,9 @@ impl World {
         self.world_space.invalidate_all(); // an orphan may already name this id as parent
     }
 
-    /// Despawn an entity by stable id: its children then read as roots, it as identity.
+    /// Despawn an entity by stable id: cut out of the hierarchy (`detach`), it reads as identity.
     pub fn despawn(&mut self, id: u32) {
-        for child in self.children(id) {
-            self.moved(child);
-        }
+        self.detach(id);
         self.world_space.forget(id);
         if let Some(handle) = self.handles.remove(id) {
             let _ = self.inner.despawn(handle);
