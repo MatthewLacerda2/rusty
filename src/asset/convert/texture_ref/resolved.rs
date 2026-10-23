@@ -10,11 +10,12 @@
 //!   the project root, and its `.glb` and texture files are stored absolute too.
 //!   Opening another project (`core::project::moves`) drops every table, so
 //!   `models/soldier.fbx` in the new project never finds the old one's textures.
-//! - **A `.glb` that cannot be read is held as unread**, and the lookup that next
-//!   asks for it checks whether it has appeared (one `Path::exists`) and reads it
-//!   if so. The cache keeps no retry beat of its own: the callers remember a miss
-//!   and ask again only on theirs (`core::fs::freshness`), so a `.glb` another
-//!   process writes is picked up within one caller beat.
+//! - **A `.glb` that cannot be read is held as unread** with the size and modified
+//!   time it had (#1272). A lookup re-reads it only when those changed (one
+//!   `metadata` call), so a truncated `.glb` is parsed once, not once per lookup.
+//!   The cache keeps no retry beat of its own: the callers remember a miss and ask
+//!   again only on theirs (`core::fs::freshness`), so a `.glb` another process
+//!   writes or finishes is picked up within one caller beat.
 //! - **What another process does is otherwise not seen.** A `.glb` it re-writes
 //!   after the table was read keeps the old table, a texture it adds included,
 //!   until the engine itself converts the source again: the same as every
@@ -27,6 +28,7 @@
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::path::{Component, Path, PathBuf};
+use std::time::Duration;
 
 use super::super::{cache_location, glb};
 use crate::asset::gltf::uri;
@@ -38,6 +40,21 @@ use crate::core::project;
 struct Table {
     glb: String,
     files: Option<BTreeMap<String, PathBuf>>,
+    /// The `.glb`'s size and modified time when it was read (`None`: absent).
+    stamp: Option<Stamp>,
+}
+
+type Stamp = (u64, Option<Duration>);
+
+/// What `glb` looks like on disk now.
+fn stamp(glb: &str) -> Option<Stamp> {
+    let meta = std::fs::metadata(glb).ok()?;
+    let modified = meta
+        .modified()
+        .ok()?
+        .duration_since(std::time::UNIX_EPOCH)
+        .ok();
+    Some((meta.len(), modified))
 }
 
 #[derive(Default)]
@@ -122,7 +139,8 @@ impl Resolved {
     /// The table of the source at `key`, read now if it is not held or its `.glb`
     /// was missing and has appeared. `None` when the source has no cache location.
     fn table(&mut self, root: &Path, key: String) -> Option<&Table> {
-        let unread = |t: &Table| t.files.is_none() && Path::new(&t.glb).exists();
+        let unread =
+            |t: &Table| t.files.is_none() && stamp(&t.glb).is_some_and(|s| Some(s) != t.stamp);
         if self.by_source.get(&key).is_none_or(unread) {
             let table = read(root, Path::new(&key))?;
             self.by_source.insert(key.clone(), table);
@@ -155,5 +173,6 @@ fn read(root: &Path, source: &Path) -> Option<Table> {
             .collect()
     });
     let glb = glb.to_string_lossy().into_owned();
-    Some(Table { glb, files })
+    let stamp = stamp(&glb);
+    Some(Table { glb, files, stamp })
 }

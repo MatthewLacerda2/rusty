@@ -101,3 +101,23 @@ fn a_glb_another_process_writes_is_picked_up_on_the_callers_beat() {
     assert!(picked_up.is_some(), "within one beat of the caller");
     assert!(file(&red).is_some_and(|f| f.exists()));
 }
+
+#[test]
+fn an_unparseable_glb_is_read_once_until_it_changes() {
+    let path = quad(|text| text);
+    let red = reference(&path.to_string_lossy(), "Red");
+    let glb = cache_location(&path).unwrap();
+    std::fs::create_dir_all(glb.parent().unwrap()).unwrap();
+    // lint: allow(atomic-write) the test plays a truncated cache
+    std::fs::write(&glb, b"glTF").unwrap();
+    let before = reads();
+    for _ in 0..=2 * MISS_RETRY_FRAMES {
+        assert_eq!(file(&red), None, "nothing to resolve in a broken cache");
+    }
+    assert_eq!(reads(), before + 1, "the broken `.glb` is not re-parsed");
+
+    // lint: allow(atomic-write) the test plays another process still writing it
+    std::fs::write(&glb, b"glTF, longer").unwrap();
+    assert_eq!(file(&red), None);
+    assert_eq!(reads(), before + 2, "a changed `.glb` is read again");
+}
