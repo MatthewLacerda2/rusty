@@ -70,15 +70,8 @@ impl ScriptManager {
             let mut order: Vec<u32> = doomed.iter().copied().collect();
             // Children before parents, as Unity tears a hierarchy down.
             order.sort_by_key(|&id| Reverse(scene.world.ancestors(id).count()));
-            let at = |id: u32| {
-                (
-                    id,
-                    scene
-                        .world
-                        .transform(id)
-                        .map_or([0.0; 3], |t| t.position.to_array()),
-                )
-            };
+            // World space: a child's sound stops where it was heard, not at its local offset.
+            let at = |id: u32| (id, scene.world.world_position(id).to_array());
             let removed = order.iter().map(|&id| at(id)).collect();
             (doomed, order, removed)
         };

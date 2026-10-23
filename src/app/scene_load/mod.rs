@@ -106,15 +106,7 @@ pub(super) fn apply_scene_load(world: &mut World, res: &mut Resources) {
 /// source leaves with its scene unless it was marked `DontDestroyOnLoad`.
 fn stop_voices(world: &World, res: &Resources, ids: &[u32]) {
     let scene = world.scene.borrow();
-    let at = |&id: &u32| {
-        (
-            id,
-            scene
-                .world
-                .transform(id)
-                .map_or([0.0; 3], |t| t.position.to_array()),
-        )
-    };
+    let at = |&id: &u32| (id, scene.world.world_position(id).to_array());
     let tick = res.play_frame();
     res.audio
         .borrow_mut()
