@@ -88,26 +88,18 @@ impl NavigationGraph {
     }
 
     /// The span path from the span `start` snaps to to the one `target` snaps to.
+    /// `None` when either end is off the navmesh or the target is not reachable.
     pub fn path_between(&self, start: Vec3, target: Vec3) -> Option<Vec<SpanRef>> {
-        self.find_path(self.snap(start)?, self.snap(target)?)
-    }
-
-    /// A\* from span `start` to span `goal`, both ends included, or `None` when the
-    /// goal is not reachable.
-    pub fn find_path(&self, start: SpanRef, goal: SpanRef) -> Option<Vec<SpanRef>> {
-        let (path, complete) = self.find_path_or_closest(start, goal);
+        let (path, complete) =
+            self.find_path_masked(self.snap(start)?, self.snap(target)?, ALL_AREAS);
         complete.then_some(path)
     }
 
-    /// A\* from `start` toward `goal`. When the goal is unreachable, the path ends on
+    /// A\* from span `start` toward span `goal`, both ends included, entering only
+    /// the areas in `mask` (#460). When the goal is unreachable, the path ends on
     /// the reached span nearest to it instead (Unity's `PathPartial`): least octile
     /// distance, then least cost, then lowest index, so the choice is deterministic.
     /// The flag says whether the path reaches `goal`.
-    pub fn find_path_or_closest(&self, start: SpanRef, goal: SpanRef) -> (Vec<SpanRef>, bool) {
-        self.find_path_masked(start, goal, ALL_AREAS)
-    }
-
-    /// [`Self::find_path_or_closest`] entering only the areas in `mask` (#460).
     pub fn find_path_masked(
         &self,
         start: SpanRef,

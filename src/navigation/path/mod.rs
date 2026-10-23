@@ -44,11 +44,6 @@ impl NavPath {
             links: Vec::new(),
         }
     }
-
-    /// The path's length along its corners, in world units (0 for no path).
-    pub fn length(&self) -> f32 {
-        path_length(&self.corners)
-    }
 }
 
 /// The length of a polyline through `corners`, in world units.

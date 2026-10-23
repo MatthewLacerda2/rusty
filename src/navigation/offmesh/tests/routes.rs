@@ -5,6 +5,7 @@ use glam::Vec3;
 
 use super::*;
 use crate::components::{NavPathStatus, OffMeshLinkData};
+use crate::navigation::path_length;
 
 #[test]
 fn a_drop_is_taken_when_it_is_the_shortest_route() {
@@ -24,7 +25,7 @@ fn a_drop_is_taken_when_it_is_the_shortest_route() {
     let around = baked(&scene).calculate_path(top, floor);
     assert_eq!(around.status, NavPathStatus::Complete, "down the ramp");
     assert!(around.links.is_empty());
-    assert!(with.length() + 5.0 < around.length());
+    assert!(path_length(&with.corners) + 5.0 < path_length(&around.corners));
 }
 
 #[test]

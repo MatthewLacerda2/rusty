@@ -14,7 +14,7 @@
 
 use glam::Vec3;
 
-use super::super::{in_mask, NavigationGraph, SpanRef, ALL_AREAS};
+use super::super::{in_mask, NavigationGraph, SpanRef};
 
 /// Two crossings closer than this (in segment parameter `t`) count as one corner.
 const CORNER_EPSILON: f32 = 1e-5;
@@ -31,14 +31,10 @@ pub struct NavRaycastHit {
 }
 
 impl NavigationGraph {
-    /// Walk the navmesh straight from `from` toward `to`. `from` must stand on the
-    /// navmesh (`span_under`); off it the walk is blocked at once, at `from` (Unity
-    /// reports a hit for a source off the mesh). `None` when the graph is empty there.
-    pub fn raycast(&self, from: Vec3, to: Vec3) -> Option<NavRaycastHit> {
-        self.raycast_masked(from, to, ALL_AREAS)
-    }
-
-    /// [`Self::raycast`] walking only across the areas in `mask` (#460).
+    /// Walk the navmesh straight from `from` toward `to`, only across the areas in
+    /// `mask` (#460; `ALL_AREAS` for every area). `from` must stand on the navmesh
+    /// (`span_under`); off it the walk is blocked at once, at `from` (Unity reports
+    /// a hit for a source off the mesh). `None` when the graph is empty there.
     pub fn raycast_masked(&self, from: Vec3, to: Vec3, mask: u32) -> Option<NavRaycastHit> {
         match self.span_under(from) {
             Some(start) => Some(self.trace(start, from, to, |a| in_mask(mask, a))),

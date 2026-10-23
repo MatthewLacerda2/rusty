@@ -1,6 +1,7 @@
 //! Stacked floors (#454): several spans per cell, linked floor by floor.
 
 use super::super::super::test_support::{add_box, add_floor, bake_pinned, floors, ground};
+use crate::navigation::ALL_AREAS;
 use crate::scene::Scene;
 use glam::Vec3;
 
@@ -31,9 +32,8 @@ fn a_deck_over_the_ground_keeps_both_floors() {
 #[test]
 fn ground_walks_under_the_deck_and_the_deck_stays_apart() {
     let g = bake_pinned(&mut two_floors());
-    let under = g
-        .find_path(ground(&g, 0, 5), ground(&g, 9, 5))
-        .expect("under the deck");
+    let (under, complete) = g.find_path_masked(ground(&g, 0, 5), ground(&g, 9, 5), ALL_AREAS);
+    assert!(complete, "under the deck");
     assert!(under.iter().all(|s| g.spans[s.index as usize].y == 0.0));
     let deck = g.span_range(5, 5).start as u32 + 1;
     let deck = crate::navigation::SpanRef {
@@ -42,7 +42,7 @@ fn ground_walks_under_the_deck_and_the_deck_stays_apart() {
         index: deck,
     };
     assert!(
-        g.find_path(ground(&g, 0, 5), deck).is_none(),
+        !g.find_path_masked(ground(&g, 0, 5), deck, ALL_AREAS).1,
         "no stairs yet"
     );
 }
