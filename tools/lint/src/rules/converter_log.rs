@@ -27,6 +27,7 @@ const ROOT: &str = "src/asset/convert/";
 const NOT_CONVERTERS: &[&str] = &[
     "converter",
     "depends",
+    "fingerprint",
     "gate",
     "lock",
     "mod",

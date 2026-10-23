@@ -31,7 +31,7 @@ SELF_CHECKS := target-dir inventory
 
 .DEFAULT_GOAL := help
 .NOTPARALLEL:
-.PHONY: help setup compile-cache check gates quick-gates pre-commit resolved $(SELF_CHECKS) $(GATES) mergeable queue queue-daemon queue-stop blockers checks reclaim mutants-remote dead-pub editor-capture export bench
+.PHONY: help setup compile-cache check gates quick-gates pre-commit resolved $(SELF_CHECKS) $(GATES) mergeable queue queue-daemon queue-stop blockers checks reclaim mutants-remote dead-pub editor-capture export bench bless-converters
 
 help: ## List the verbs
 	@grep -E '^[a-z-]+:.*## ' $(firstword $(MAKEFILE_LIST)) | \
@@ -177,6 +177,15 @@ test: ## [gate] Engine tests (nextest) and doctests, both feature sets
 	$(TEST) --features dev
 	cargo test --doc --locked
 	cargo test --doc --locked --features dev
+
+# The converters' fingerprints (#1286): re-blessed after a bump of a converter's
+# `version`, never in place of one (the test refuses). Blender's rows only where
+# Blender runs (RUSTY_BLENDER, or `blender` on the PATH), as CI's `blender` job does.
+bless-converters: ## Re-bless src/asset/convert/fingerprints.txt after a converter's version bump
+	RUSTY_BLESS_CONVERTERS=1 $(TEST) -E 'test(converter_fingerprints)'
+	@if command -v "$${RUSTY_BLENDER:-blender}" >/dev/null 2>&1; then \
+		RUSTY_BLESS_CONVERTERS=1 $(TEST) --run-ignored only -E 'test(converter_fingerprints)'; \
+	else echo "bless-converters: no Blender found, its rows left as they are"; fi
 
 # The git CLI fetches the advisory DB: cargo-deny's built-in fetcher can't get
 # through the cloud sessions' proxy, and the CLI works everywhere else too.

@@ -1,0 +1,11 @@
+# The converters' output, pinned (#1286): converter version fixture hash tool.
+# Written by `make bless-converters`, never by hand (docs/testing.md).
+blender 1 linked.blend 2861551bbbc062f3 5.2.3
+blender 1 linked_lib.blend ec83a2c2bbcd2b86 5.2.3
+blender 1 packed_formats.blend 0a663337f1995071 5.2.3
+blender 1 textured.blend 91e47b63eac50838 5.2.3
+ufbx 10 embedded_odd_textures.fbx 656aebb529a9d759 -
+ufbx 10 embedded_textures.fbx 7a008549f6618da5 -
+ufbx 10 mirrored_bone.fbx aa97a82e286aae8c -
+ufbx 10 missing_texture.fbx d73b6c155e6eb654 -
+ufbx 10 skinned_cube.fbx 2e37dc37d728d38c -

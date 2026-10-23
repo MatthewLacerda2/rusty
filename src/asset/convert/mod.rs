@@ -65,6 +65,8 @@ mod blend;
 mod converter;
 mod depends;
 mod fbx;
+#[cfg(test)]
+mod fingerprint;
 mod gate;
 pub mod glb;
 mod lock;

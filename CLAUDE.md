@@ -394,7 +394,8 @@ only its adapter (Lua → zimmer document, file writes, patch-path resolution).
   compatibility shim, no legacy alias and no format-version bump. A PR that changes one
   updates the engine's own fixtures and the default scene in the same change.
   `Converter::version` is not a format version: it only tells the import cache to
-  re-make its files, and still bumps when a converter's output changes. When games
+  re-make its files, and still bumps when a converter's output changes (a test holds
+  it: `asset::convert::fingerprint`, #1286). When games
   exist, the operator revisits this rule.
 - **Unity is the reference; rusty is a deliberate subset.** Use Unity Engine as the
   yardstick for what rusty *must* be capable of. Unity is exhaustive, so we implement
