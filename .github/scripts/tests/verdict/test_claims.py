@@ -115,7 +115,7 @@ class Taken(unittest.TestCase):
             mock.patch.object(github, "gh", side_effect=answers({927: issue("human")})), \
             mock.patch.object(rebase, "advance") as rebased, mock.patch("builtins.print"):
             _, state, why = taking.take("o/r", 927, cli.parse(["927"]))
-        self.assertEqual(state, outcomes.HANDED_BACK)
+        self.assertEqual(state, outcomes.AWAITS_ISSUE)  # only the issue can change (#1279)
         self.assertEqual(why, "it closes #927, which is labelled `human`.")
         rebased.assert_not_called()
 

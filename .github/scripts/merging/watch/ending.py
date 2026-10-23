@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import shlex
 
+from merging.queue import outcomes
 from merging.watch import board
 
 
@@ -104,9 +105,20 @@ def relaunch(paths: list[str], results: list[tuple[int, str, str]], merged: str)
     )
 
 
-def handed_back(number: int, why: str) -> str:
-    """The line a hand-back prints as it happens, beginning [`HANDED_BACK_LINE`]."""
-    return f"{HANDED_BACK_LINE} #{number}: {why} Passed over until its head moves; the watch carries on."
+def handed_back(number: int, why: str, waits: str | None = None) -> str:
+    """The line a hand-back prints as it happens, beginning [`HANDED_BACK_LINE`].
+    It says which fix it waits for (#1279): an edit of the description or labels
+    (`waits` is `outcomes.AWAITS_EDIT`), a change to the issue it closes
+    (`AWAITS_ISSUE`), or else a push or a re-run."""
+    if waits == outcomes.AWAITS_EDIT:
+        fix = "Fix the description or labels; no push needed: passed over until they change (or its head moves)"
+    elif waits == outcomes.AWAITS_ISSUE:
+        fix = ("The issue blocks it: fix the issue (its label, blocker or state), then it re-queues on its own:"
+               " passed over until the issue no longer blocks it (or its description, labels or head change)")
+    else:
+        fix = ("Push a fix, or re-run the failed jobs (`gh run rerun --failed`) when it was runners or a flake:"
+               " passed over until its head moves or runs again")
+    return f"{HANDED_BACK_LINE} #{number}: {why} {fix}; the watch carries on."
 
 
 def over_budget(for_minutes: float | None, deadline: float) -> str | None:

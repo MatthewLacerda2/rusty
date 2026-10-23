@@ -17,12 +17,16 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
     tick)` (one pull request through the queue, as [`queue.taking.take`]; it
     calls `tick()` on each poll of its CI wait, so the board is reported
     during it), `head(number)`, `attempts(number, sha)`
-    (the runs on that head, [`handbacks.attempts`], or `None`), `clock()`, `sleep(seconds)`,
+    (the runs on that head, [`handbacks.attempts`], or `None`), `blocks(issues)`
+    (which of those issues still refuse a merge, or `None`), `clock()`, `sleep(seconds)`,
     `say(...)` (also each board change, [`board.transitions`]), `memory` (a path), `bots`, and the end states: `merged`, `ends`
     (ended without a hand-back: green under `--no-merge`, previewed by a dry run)
     `stops` (the machine's failure, [`queue.stopping.Stopped`]) and `skips` (it
     turned draft or closed after the listing). Anything else is a hand-back: it is
-    remembered, announced ([`ending.handed_back`]) and passed over.
+    remembered, announced ([`ending.handed_back`]) and passed over until its head
+    moves or runs again; one in [`outcomes.AWAITING`] also until its body or labels
+    change ([`handbacks.reworded`]), and an `AWAITS_ISSUE` one until its issues no
+    longer refuse it ([`handbacks.unblocked`], #1279).
     `stale_code()` names the queue's files that changed on `main` since launch
     ([`freshness.changed`]); asked before each take, a non-empty answer ends the
     watch ([`ending.relaunch`]) with the pull request untaken.
@@ -33,12 +37,21 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
     """
     results, done, failed, handed, told, landed = [], set(), 0, [], set(), set()
     memory, marks = handbacks.recall(fx.memory), handbacks.recall(fx.memory.with_name(handbacks.RUNS_MEMORY))
+    claims = handbacks.recall(fx.memory.with_name(handbacks.CLAIMS_MEMORY))
+    issues = handbacks.recall(fx.memory.with_name(handbacks.ISSUES_MEMORY))
     line = aging.Line()
     shown = [None]  # the board as last reported; `None` until the first listing
 
     def save() -> None:
         handbacks.remember(fx.memory, memory)
         handbacks.remember(fx.memory.with_name(handbacks.RUNS_MEMORY), {n: m for n, m in marks.items() if n in memory})
+        handbacks.remember(fx.memory.with_name(handbacks.CLAIMS_MEMORY), {n: c for n, c in claims.items() if n in memory})
+        handbacks.remember(fx.memory.with_name(handbacks.ISSUES_MEMORY), {n: i for n, i in issues.items() if n in memory})
+
+    def forget(number: int) -> None:
+        """Drop everything remembered against `number`: it is back in line."""
+        for kept in (memory, marks, claims, issues):
+            kept.pop(number, None)
 
     def report(pulls: list[dict]) -> None:
         now = board.heads(board.recent(pulls, getattr(opts, "since", None)))
@@ -53,11 +66,12 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
 
     def settle(number: int, result: tuple[int, str, str], head: str, ask: bool = True) -> str | None:
         """Record how a pull request ended; why to exit, if the machine failed.
-        A hand-back remembers the head GitHub reports now when `ask`, else `head`."""
-        results.append(result)
+        A hand-back remembers the head GitHub reports now when `ask`, else `head`;
+        an [`outcomes.Awaiting`] one also the claim and issues it was judged on."""
+        results.append(tuple(result))
         state = result[1]
         if state == fx.merged:
-            memory.pop(number, None)
+            forget(number)
             landed.add(number)
         elif state in fx.ends:
             done.add(number)
@@ -66,13 +80,18 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
         elif state in fx.stops:
             return f"the machine failed on #{number}, not the branch; nothing is remembered against it."
         else:
+            forget(number)
             memory[number] = (fx.head(number) if ask else None) or head
-            marks.pop(number, None)
+            waits = state if isinstance(result, outcomes.Awaiting) else None
+            if waits:
+                claims[number] = result.claim
+                if result.issues:
+                    issues[number] = handbacks.spell(result.issues)
             mark = fx.attempts(number, memory[number])
             if mark is not None:
                 marks[number] = mark
             handed.append(number)
-            fx.say(ending.handed_back(number, result[2]))
+            fx.say(ending.handed_back(number, result[2], waits))
         return None
 
     last, moved = None, fx.clock()
@@ -95,9 +114,14 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
         failed = 0
         memory = handbacks.forget_closed(memory, pulls)
         for number in handbacks.rerun_heads(pulls, memory, marks, fx.attempts):
-            memory.pop(number, None)
-            marks.pop(number, None)
+            forget(number)
             fx.say(f"watch: #{number} has run again on its handed-back head; back in line.")
+        for number in handbacks.reworded(pulls, memory, claims):
+            forget(number)
+            fx.say(f"watch: #{number}'s description or labels changed since its hand-back; back in line.")
+        for number in handbacks.unblocked(pulls, memory, issues, fx.blocks):
+            forget(number)
+            fx.say(f"watch: #{number}'s issues no longer refuse it; back in line.")
         report(pulls)
         now = board.heads(pulls)
         if now != last:
