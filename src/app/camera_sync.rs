@@ -18,7 +18,7 @@ impl GameWorld {
     pub(crate) fn sync_render_camera(&mut self) {
         let scene = self.world.scene.borrow();
         let mut camera = self.resources.camera.borrow_mut();
-        sync_lens_from_scene(&mut camera, &scene, self.resources.is_playing);
+        sync_lens_from_scene(&mut camera, &scene, scene.is_playing());
     }
 
     /// Hand the sim's clocks to the renderer: game time (#398) as
@@ -27,7 +27,7 @@ impl GameWorld {
     /// and preview shots stay pixel-comparable; the renderer only reads them, never
     /// owns the clock.
     pub(crate) fn sync_shader_time(&mut self) {
-        let (time, ui_time) = if self.resources.is_playing {
+        let (time, ui_time) = if self.world.scene.borrow().is_playing() {
             let t = self.resources.time.borrow();
             (t.time as f32, t.unscaled_time as f32)
         } else {

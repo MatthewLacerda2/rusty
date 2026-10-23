@@ -70,7 +70,7 @@ mod tests {
         scene.destroy(edit);
         assert!(!scene.world.contains(edit), "edit mode: gone at once");
         let play = scene.add_entity("Play".into());
-        scene.playing = true;
+        scene.set_playing(true);
         scene.destroy(play);
         assert!(scene.world.contains(play), "Play: live until the drain");
         assert_eq!(scene.take_pending_destroys(), vec![play]);
@@ -82,7 +82,7 @@ mod tests {
     fn an_immediate_destroy_in_play_is_refused() {
         let mut scene = Scene::new();
         let id = scene.add_entity("Doomed".into());
-        scene.playing = true;
+        scene.set_playing(true);
         scene.destroy_entity(id);
     }
 }

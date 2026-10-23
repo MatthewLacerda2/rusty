@@ -80,6 +80,7 @@ pub use prefab::{
     extract_prefab, instantiate_prefab, is_prefab_path, load_and_instantiate,
     load_and_instantiate_linked, read_prefab_file, save_prefab, PrefabData, PREFAB_EXTENSION,
 };
+pub use runtime::despawn::Despawn;
 pub use scene::{
     AnimatorComponent, AudioSourceComponent, CameraComponent, ClearFlags, ColliderComponent,
     ColliderShape, CollisionDetection, CollisionResponse, DirtyFlag, EmitMode, Entity,

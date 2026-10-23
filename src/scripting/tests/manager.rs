@@ -72,12 +72,11 @@ fn load_entity_script_missing_file_returns_error() {
     assert!(result.unwrap_err().contains("Script file not found"));
 }
 
-// `Debug.Snapshot` reports play-state from the shared cell `set_playing` writes,
-// so `play_state_cell()` must alias the live flag the evaluator reads — flipping it
-// must show up in the snapshot (#180).
+// `Debug.Snapshot` reports the scene's one play state (#180, #1302): flipping it
+// must show up in the snapshot.
 #[cfg(feature = "dev")]
 #[test]
-fn play_state_cell_drives_debug_snapshot_play_state() {
+fn the_scene_play_state_drives_debug_snapshot_play_state() {
     crate::dev::lua_surface::install_api(); // `Debug` is dev's extension (#737)
     let m = live_manager();
     assert!(
@@ -87,12 +86,12 @@ fn play_state_cell_drives_debug_snapshot_play_state() {
         "edit mode by default"
     );
 
-    *m.play_state_cell().borrow_mut() = true;
+    m.scene.borrow_mut().set_playing(true);
     assert!(
         m.eval("Debug.Snapshot()")
             .unwrap()
             .contains("\"play_state\": \"playing\""),
-        "the cell handle must alias the flag the snapshot reads"
+        "the snapshot reads the scene's play state"
     );
 }
 

@@ -12,7 +12,7 @@
 use std::collections::BTreeSet;
 
 use super::bone_refs::BoneRef;
-use crate::scene::Scene;
+use crate::scene::{Despawn, Scene};
 
 /// An entity waiting to hang from a bone: its id, and its bone's name followed by
 /// that bone's ancestors', nearest first (`Entity::parent_bone`).
@@ -27,14 +27,17 @@ impl Scene {
         for owner in self.world.ids_with_mesh() {
             refs.extend(self.sync_skeleton_past(owner, &parked));
         }
-        self.attach_to_bones(pending);
+        self.attach_to_bones(pending, Despawn::Applying);
         self.bind_bone_refs(refs);
     }
 
     /// Re-parent each pending entity under the first bone its chain names that the
     /// skeleton of the skinned entity it is parked under has, warning about each
-    /// one whose own bone is gone.
-    pub fn attach_to_bones(&mut self, pending: Vec<Hung>) {
+    /// one whose own bone is gone. A generated hitbox whose bone is gone is
+    /// removed at once; `why` says why that may skip script teardown (#1298): a
+    /// document being applied made it with no script instance, or a re-import
+    /// runs it outside Play.
+    pub fn attach_to_bones(&mut self, pending: Vec<Hung>, why: Despawn) {
         for (child, chain) in pending {
             let (Some(owner), Some(name)) = (self.world.parent_id(child), chain.first()) else {
                 continue;
@@ -48,10 +51,11 @@ impl Scene {
                 continue;
             }
             if self.is_generated_hitbox(child) {
-                self.destroy(child);
+                let doomed = self.destroy_set(child);
+                self.despawn_batch(&doomed, why);
                 log::warn!(
                     "[Asset] the skeleton of entity {owner} no longer has bone '{name}'; \
-                     its generated hitbox (entity {child}) is removed."
+                     its generated hitbox (entity {child}) was removed."
                 );
                 continue;
             }

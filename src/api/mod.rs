@@ -130,10 +130,6 @@ pub struct ApiScopedCtx<'scope> {
     /// The current scene file — `Scene.Save()`'s no-path write-back target. Shared
     /// with the platform layer (synced from `EditorUi.current_scene_path`).
     pub scene_path: &'scope RefCell<Option<String>>,
-    /// Whether the world is in play mode — mirrored from `GameWorld` so the
-    /// dev-only `Debug.Snapshot` can report play-state without reaching into the
-    /// `Resources` the evaluator deliberately doesn't hold.
-    pub is_playing: &'scope RefCell<bool>,
     /// The audio engine singleton (#212): the `Audio` namespace drives it
     /// (Play/Stop/SetVolume/PlayAt + master volume). The same maestro the play-mode
     /// systems use, so a scripted play and `play_on_start` share one device + log.
@@ -216,7 +212,7 @@ pub fn register<'scope>(
     register_navigation(lua, scope, ctx)?;
     register_ui_components(lua, scope, ctx.scene)?;
     reverb_zone::register(lua, scope, ctx.scene)?;
-    scene::register(lua, scope, ctx.scene, ctx.scene_path, ctx.is_playing)?;
+    scene::register(lua, scope, ctx.scene, ctx.scene_path)?;
     selectable::register(lua, scope, ctx.scene, ctx.event_system)?;
     // `Shader` (#272) borrows no engine state — it reads a recipe, validates it
     // through naga_oil, and writes a `.wgsl` file — so it is a plain static namespace.

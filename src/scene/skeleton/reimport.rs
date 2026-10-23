@@ -18,7 +18,7 @@ use super::hang::Hung;
 use super::persist::{bone_chain, carries_components, OVERRIDE_EPS};
 use super::sync::rest_local;
 use crate::components::TransformComponent;
-use crate::scene::Scene;
+use crate::scene::{Despawn, Scene};
 
 /// What [`Scene::take_skeleton`] notes of `owner`'s bones against the old rig,
 /// for [`Scene::restore_skeleton`] to re-bind them to the new one.
@@ -130,8 +130,8 @@ impl Scene {
         }
         let refs: Vec<BoneRef> = self.park_bone_refs(owner, removed);
         let doomed = self.subtrees(removed.keys().copied().collect());
-        self.despawn_batch(&doomed);
-        self.attach_to_bones(hung);
+        self.despawn_batch(&doomed, Despawn::EditMode); // imports wait out Play (#1253)
+        self.attach_to_bones(hung, Despawn::EditMode);
         self.bind_bone_refs(refs);
     }
 

@@ -210,7 +210,8 @@ headless replays stay byte-identical):
   so a first activation runs `Awake → OnEnable → Start`, all before that tick's
   `Update`. `OnDestroy` runs in a dedicated destroy phase at the **tail** of the
   tick (after `LateUpdate`), draining the ids `Scene.DestroyEntity` queued this
-  tick and everything under them (#1283): all `OnDisable`s first, then all
+  tick — and those the engine queued, such as a hitbox `Physics.GenerateHitboxes`
+  dropped (#1298) — and everything under them (#1283): all `OnDisable`s first, then all
   `OnDestroy`s, each pass children before parents (deepest first, then ascending
   entity id) and an entity's scripts by index, before the entities are removed. Every
   edge fires exactly once, so replays stay byte-identical.

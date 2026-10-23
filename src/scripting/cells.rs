@@ -42,12 +42,6 @@ impl ScriptManager {
         self.application = application;
     }
 
-    /// Handle to the shared play-state cell, so `GameWorld::set_playing` can keep
-    /// it in step with the live play-mode flag for `Debug.Snapshot`.
-    pub fn play_state_cell(&self) -> Rc<RefCell<bool>> {
-        Rc::clone(&self.is_playing)
-    }
-
     /// Handle to the shared scene-path cell, so the platform layer can read/sync
     /// the current scene file with the editor's `current_scene_path`.
     pub fn scene_path_cell(&self) -> Rc<RefCell<Option<String>>> {

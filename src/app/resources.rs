@@ -75,8 +75,10 @@ pub struct Resources {
     /// Build settings + the quit request (#431), shared with the script runtime's
     /// `Application` namespace. Unbound by default; the platform layer loads it.
     pub application: Rc<RefCell<Application>>,
-    pub is_playing: bool,
-    pub(super) was_playing: bool,
+    /// Whether the host asked for Play (`GameWorld::set_playing`). The next tick's
+    /// transition acts on it; whether the World *is* in Play is the scene's one
+    /// play state (`Scene::is_playing`, #1302).
+    pub(super) play_requested: bool,
     /// Play-mode frame counter. Drives nav rebaking off a deterministic tick count
     /// instead of the wall clock, so a fixed-timestep replay is bit-for-bit stable.
     pub(super) play_frame: u64,
@@ -167,8 +169,7 @@ impl Resources {
             event_system,
             application,
             physics,
-            is_playing: false,
-            was_playing: false,
+            play_requested: false,
             play_frame: 0,
             edit_snapshot: None,
             play_origin: None,

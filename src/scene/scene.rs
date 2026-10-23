@@ -8,7 +8,7 @@
 //! (whose deps are restricted to hecs + components). This wrapper lives in the
 //! `scene` layer, which is allowed to depend on `crate::scene` and rendering.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 
 use glam::Vec3;
 
@@ -106,10 +106,10 @@ pub struct Scene {
     /// Ids queued for deferred destruction by play-mode `Scene.DestroyEntity`
     /// (#323); drained in `runtime::destroy_queue`. Transient, never serialized.
     pub pending_destroy: Vec<u32>,
-    /// Whether this World is in Play (#1298): set on entering Play, cleared on
-    /// leaving it. While it holds, every destroy goes through the queue so its
-    /// scripts are torn down ([`Scene::destroy`]). Transient, never serialized.
-    pub playing: bool,
+    /// Whether this World is in Play: the one play state (#1302) the Lua API, the
+    /// destroy door and `GameWorld`'s transitions all read
+    /// ([`Scene::is_playing`]). Transient, never serialized.
+    pub(in crate::scene) playing: bool,
     /// The scene file a play-mode `Scene.Load` asked for (#432); swapped in at the
     /// tick's tail by the scene-load phase (`scene_load`). Transient, never serialized.
     pub pending_load: Option<String>,
@@ -180,46 +180,6 @@ impl Scene {
 
     pub fn add_entity(&mut self, name: String) -> u32 {
         self.world.spawn(name)
-    }
-
-    /// Remove entity `id` and everything under it ([`Scene::destroy_set`]), as
-    /// Unity's `Object.Destroy` takes a GameObject's children (#1283). Nothing
-    /// keeps naming them (`Scene::despawn_batch`). Edit mode only: in Play a
-    /// destroy must tear its scripts down first, so it goes through
-    /// [`Scene::destroy`] (#1298).
-    pub fn destroy_entity(&mut self, id: u32) {
-        debug_assert!(
-            !self.playing,
-            "destroy_entity({id}) in Play skips script teardown; use Scene::destroy"
-        );
-        let doomed = self.destroy_set(id);
-        self.despawn_batch(&doomed);
-    }
-
-    /// What destroying `id` removes: `id` and every descendant, so a skinned
-    /// entity's bones and what hangs from them, and a bone's subtree (#1273). The
-    /// one answer [`Scene::destroy_entity`] despawns and the script teardown
-    /// notifies, so the two cannot drift (#1283). Empty for a dead id.
-    pub fn destroy_set(&self, id: u32) -> BTreeSet<u32> {
-        self.world.self_and_descendants(id).collect()
-    }
-
-    /// Despawn every entity of `ids` together, then drop the scene's own references
-    /// to them (#1264): the selection, `DontDestroyOnLoad`, a queued destroy, their
-    /// lightmap entries and shader overrides. The World's references go in
-    /// `World::despawn_all`, one pass for the batch. Every despawn in the scene runs
-    /// through here.
-    pub(crate) fn despawn_batch(&mut self, ids: &BTreeSet<u32>) {
-        self.world.despawn_all(ids);
-        for &id in ids {
-            self.shader_overrides.clear(id, None);
-        }
-        if self.selected_entity_id.is_some_and(|s| ids.contains(&s)) {
-            self.selected_entity_id = None;
-        }
-        self.persistent.retain(|id| !ids.contains(id));
-        self.pending_destroy.retain(|e| !ids.contains(e));
-        self.lightmaps.entries.retain(|e| !ids.contains(&e.entity));
     }
 
     pub fn find_entity_by_name(&self, name: &str) -> Option<u32> {

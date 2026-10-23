@@ -42,13 +42,15 @@ impl GameWorld {
         });
     }
 
-    /// On Stop, after the snapshot restore: drop any load still queued and every
+    /// On Stop, after the snapshot restore: drop any load or destroy still queued
+    /// (a paused Play can leave one, #1298) and every
     /// `DontDestroyOnLoad` mark, and — if play loaded another scene — hand back the
     /// original scene file and a fresh identity (the restored World is a different
     /// scene from the one the renderer last cached).
     pub(super) fn restore_play_origin(&mut self) {
         let mut scene = self.world.scene.borrow_mut();
         scene.pending_load = None;
+        scene.pending_destroy.clear(); // the next Play must not destroy edit entities
         scene.persistent.clear();
         let Some(origin) = self.resources.play_origin.take() else {
             return;
@@ -119,6 +121,9 @@ mod fixture;
 #[cfg(test)]
 #[path = "api_tests.rs"]
 mod scene_load_api_tests;
+#[cfg(test)]
+#[path = "play_state_tests.rs"]
+mod scene_load_play_state_tests;
 #[cfg(test)]
 #[path = "tests.rs"]
 mod scene_load_tests;

@@ -76,9 +76,6 @@ impl Scene {
             .filter_map(|key| Some((key.clone(), self.materials.get(key)?.clone())))
             .collect();
 
-        // Before the incoming scene is applied: its load may queue a destroy of its
-        // own (an orphaned hitbox, #1298), which must stay queued.
-        self.pending_destroy.retain(|id| survivors.contains(id));
         make_room(&mut data, survivors);
         apply_scene_data(self, data);
         for mut entity in carried {
@@ -94,6 +91,7 @@ impl Scene {
             self.materials.entry(name).or_insert(material);
         }
         self.persistent.retain(|id| survivors.contains(id));
+        self.pending_destroy.retain(|id| survivors.contains(id));
         self.decals.clear();
         self.renew_id();
         crate::scene::lighting::io::load_lighting_sidecar(self, path)

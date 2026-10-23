@@ -77,10 +77,6 @@ pub struct ScriptManager {
     /// save and an editor save hit the same file. `None` until a scene is loaded
     /// or the path is set; an argument-less `Scene.Save()` then errors cleanly.
     pub(super) scene_path: Rc<RefCell<Option<String>>>,
-    /// Mirror of `GameWorld`'s play-mode flag, synced by `set_playing`. The
-    /// evaluator doesn't hold `Resources`, so this shared cell is how the dev-only
-    /// `Debug.Snapshot` reports play-state. Defaults to `false` (edit mode).
-    pub(super) is_playing: Rc<RefCell<bool>>,
     /// The audio engine singleton (#212), shared with `Resources` and the platform
     /// layer so the `Audio` namespace drives the same maestro the systems do.
     /// Defaults to a maestro with a no-op backend (harness/tests need no device).
@@ -133,7 +129,6 @@ impl ScriptManager {
             video: Rc::new(RefCell::new(VideoSettings::default())),
             physics: Rc::new(RefCell::new(None)),
             scene_path: Rc::new(RefCell::new(None)),
-            is_playing: Rc::new(RefCell::new(false)),
             audio: Rc::new(RefCell::new(AudioMaestro::default())),
             random: Rc::new(RefCell::new(Random::default())),
             screen: Rc::new(RefCell::new(ScreenSize::default())),
@@ -220,7 +215,6 @@ impl ScriptManager {
             quality: &self.quality,
             video: &self.video,
             scene_path: &self.scene_path,
-            is_playing: &self.is_playing,
             audio: &self.audio,
             random: &self.random,
             screen: &self.screen,

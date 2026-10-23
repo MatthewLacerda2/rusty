@@ -29,7 +29,6 @@ impl SystemProbe for Recorder {
 
 fn probed_frame(log: &Log) -> (World, Resources) {
     let (mut w, mut r) = bare();
-    r.is_playing = true;
     r.probe = Some(Box::new(Recorder(Rc::clone(log))));
     build().into_schedule().run_frame(&mut w, &mut r);
     (w, r)
@@ -59,7 +58,6 @@ fn probe_sees_each_system_once_by_name_then_the_frame_end() {
 fn a_probe_does_not_change_the_sim() {
     let (w_probed, r_probed) = probed_frame(&Log::default());
     let (mut w, mut r) = bare();
-    r.is_playing = true;
     build().into_schedule().run_frame(&mut w, &mut r);
     assert_eq!(r.play_frame(), r_probed.play_frame());
     let data = |w: &World| {

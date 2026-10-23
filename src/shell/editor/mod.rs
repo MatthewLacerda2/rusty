@@ -102,6 +102,8 @@ impl EditorFrontend {
     /// Returns the viewport panel's pointer interaction for picking/dragging (#183).
     fn draw_dashboard(&mut self, shell: &mut Shell, game: &mut GameWorld) -> ViewportInteraction {
         self.follow_scene_swap(game);
+        // The transport asks through `set_playing`, like every other host (#1302).
+        let mut playing = game.is_playing();
         let interaction = {
             let mut s = game.world.scene.borrow_mut();
             let mut c = game.resources.console.borrow_mut();
@@ -111,12 +113,13 @@ impl EditorFrontend {
                 &mut s,
                 &mut c,
                 &mut n,
-                &mut game.resources.is_playing,
+                &mut playing,
                 shell.clock.fps(),
                 shell.clock.frame_ms(),
                 self.viewport_texture_id,
             )
         };
+        game.set_playing(playing);
         crate::editor::build_settings::draw(
             &mut self.editor_ui,
             &self.egui_ctx,

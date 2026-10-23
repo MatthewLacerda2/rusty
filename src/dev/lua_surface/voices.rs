@@ -4,7 +4,6 @@
 //! Added to the `Speech` table [`super::speech`] creates, so it registers after it.
 //! Free (no budget, no ledger), still `dev`-only and refused during Play.
 
-use std::cell::RefCell;
 use std::path::Path;
 
 use mlua::{Lua, Table, Value};
@@ -22,7 +21,7 @@ pub(super) fn register<'scope>(
     scope: &'scope mlua::Scope<'scope, '_>,
     ctx: &ApiScopedCtx<'scope>,
 ) -> Reg {
-    let playing: &'scope RefCell<bool> = ctx.is_playing;
+    let scene = ctx.scene;
     let table = global_table(lua, "Speech")?;
     put(
         &table,
@@ -32,7 +31,7 @@ pub(super) fn register<'scope>(
             let account = Account { environment: &env };
             let answer = voices::list(
                 Path::new(""),
-                *playing.borrow(),
+                scene.borrow().is_playing(),
                 &account,
                 refresh.unwrap_or(false),
             );
@@ -45,7 +44,7 @@ pub(super) fn register<'scope>(
         scope.create_function(move |lua, (query, refresh): (String, Option<bool>)| {
             let env = environment();
             let account = Account { environment: &env };
-            let at = (Path::new(""), *playing.borrow());
+            let at = (Path::new(""), scene.borrow().is_playing());
             let answer = voices::find(at.0, at.1, &account, &query, refresh.unwrap_or(false));
             listing(lua, answer.map_err(mlua::Error::external)?)
         }),
@@ -56,7 +55,9 @@ pub(super) fn register<'scope>(
         scope.create_function(move |lua, id: String| {
             let env = environment();
             let account = Account { environment: &env };
-            match voices::info(*playing.borrow(), &account, &id).map_err(mlua::Error::external)? {
+            match voices::info(scene.borrow().is_playing(), &account, &id)
+                .map_err(mlua::Error::external)?
+            {
                 Availability::Available(voice) => {
                     Ok((Value::Table(voice_table(lua, &voice)?), None))
                 }

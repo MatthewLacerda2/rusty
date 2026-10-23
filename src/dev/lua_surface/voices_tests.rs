@@ -21,7 +21,7 @@ fn the_voice_verbs_sit_on_the_speech_table() {
 #[test]
 fn listing_voices_during_play_raises_before_any_key_is_read() {
     let s = session();
-    *s.world().script_manager().play_state_cell().borrow_mut() = true;
+    s.world().world.scene.borrow_mut().set_playing(true);
     for call in [
         "Speech.Voices()",
         "Speech.FindVoice('calm')",

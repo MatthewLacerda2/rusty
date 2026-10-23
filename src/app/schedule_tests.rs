@@ -125,7 +125,6 @@ fn build_registers_seven_fixed_update_systems() {
     let sched = build().into_schedule();
     drop(r);
     let (mut w2, mut r2) = bare();
-    r2.is_playing = true;
     sched.run_frame(&mut w2, &mut r2);
     // advance_frame is one of the registered FixedUpdate systems, so play_frame ticked.
     assert_eq!(r2.play_frame(), 1);

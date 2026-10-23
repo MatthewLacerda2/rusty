@@ -295,7 +295,11 @@ card) fits one collider per bone of `id`'s skinned mesh and returns
   its parent, so the hand's hitbox covers the fingers. `bones = {"head", ..}`
   limits generation to those bones (the others fold into their nearest listed
   ancestor). Same skin, same hitboxes: regenerating refits the existing ones in
-  place and removes those that no longer qualify.
+  place and removes those that no longer qualify. In Play that removal waits for
+  the tick's destroy phase, as `Scene.DestroyEntity` does, so a script under a
+  dropped hitbox gets its `OnDisable`/`OnDestroy` (#1298); until then the
+  hitbox is already gone to the engine (a `Ragdoll.Build` in the same
+  tick builds no body for its bone), though its entity is still readable.
 - **On a child of the bone.** Each hitbox is an ordinary entity named `Hitbox`
   under its bone, carrying a plain `Collider`, so it stays hand-tweakable
   (`SetColliderShape`, `Transform.*`). Bones are rebuilt from the model on load,

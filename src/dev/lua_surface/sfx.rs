@@ -5,7 +5,6 @@
 //! every `Sound.*` verb is free and offline, and the namespace boundary is the
 //! warning that this one is not.
 
-use std::cell::RefCell;
 use std::path::Path;
 
 use mlua::{Lua, Table};
@@ -24,7 +23,7 @@ pub(super) fn register<'scope>(
     scope: &'scope mlua::Scope<'scope, '_>,
     ctx: &ApiScopedCtx<'scope>,
 ) -> Reg {
-    let playing: &'scope RefCell<bool> = ctx.is_playing;
+    let scene = ctx.scene;
     let table = lua.create_table().map_err(|e| e.to_string())?;
     put(
         &table,
@@ -34,7 +33,7 @@ pub(super) fn register<'scope>(
             let (environment, ledger, today) = (environment(), ledger::path(), generated::today());
             let at = Context {
                 root: Path::new(""),
-                playing: *playing.borrow(),
+                playing: scene.borrow().is_playing(),
                 environment: &environment,
                 ledger: &ledger,
                 today: &today,

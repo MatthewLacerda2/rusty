@@ -99,7 +99,7 @@ fn an_incomplete_speech_brief_returns_nil_and_why_so_a_batch_goes_on() {
 #[test]
 fn speech_generate_during_play_raises() {
     let s = session();
-    *s.world().script_manager().play_state_cell().borrow_mut() = true;
+    s.world().world.scene.borrow_mut().set_playing(true);
     let err = s
         .eval("return Speech.Generate({ text = 'Flank left!', voice = 'v' })")
         .unwrap_err();
@@ -123,7 +123,7 @@ fn an_sfx_brief_without_a_length_returns_nil_and_why() {
 #[test]
 fn sfx_generate_during_play_raises() {
     let s = session();
-    *s.world().script_manager().play_state_cell().borrow_mut() = true;
+    s.world().world.scene.borrow_mut().set_playing(true);
     let err = s
         .eval("return Sfx.Generate({ text = 'door slam', seconds = 2 })")
         .unwrap_err();

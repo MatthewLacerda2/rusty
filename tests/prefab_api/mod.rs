@@ -31,9 +31,8 @@ fn fixture(tag: &str) -> (RefCell<Scene>, u32, String) {
 fn run(scene: &RefCell<Scene>, body: impl FnOnce(&Lua)) {
     let lua = Lua::new();
     let scene_path: RefCell<Option<String>> = RefCell::new(None);
-    let is_playing = RefCell::new(false);
     lua.scope(|scope| {
-        rusty::api::scene::register(&lua, scope, scene, &scene_path, &is_playing).unwrap();
+        rusty::api::scene::register(&lua, scope, scene, &scene_path).unwrap();
         body(&lua);
         Ok(())
     })

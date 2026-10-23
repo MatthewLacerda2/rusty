@@ -25,7 +25,7 @@ use std::collections::BTreeSet;
 
 use super::super::callbacks::{ON_DESTROY, ON_DISABLE};
 use super::super::manager::{ScriptInstance, ScriptManager};
-use crate::scene::Scene;
+use crate::scene::{Despawn, Scene};
 
 /// The order a teardown visits `ids` (ascending): deepest first, then ascending
 /// id, so every child comes before its parent. The one order a destroy and an
@@ -90,7 +90,9 @@ impl ScriptManager {
             (doomed, order, removed)
         };
         self.dispatch_teardown(&order);
-        self.scene.borrow_mut().despawn_batch(&doomed);
+        self.scene
+            .borrow_mut()
+            .despawn_batch(&doomed, Despawn::TornDown);
         self.forget_entities(&doomed.into_iter().collect::<Vec<_>>());
         removed
     }
