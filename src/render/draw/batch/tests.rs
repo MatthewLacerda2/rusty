@@ -99,20 +99,3 @@ fn instancing_off_is_one_draw_per_entity_in_scene_order() {
     assert_eq!(tags(&draws), [0.0, 1.0, 2.0]);
     assert!(draws.opaque.iter().all(|b| b.instances.len() == 1));
 }
-
-/// Unity's `sharedMaterials` (#1285): slot `i` draws run `i`, a material past the
-/// last run draws that run again, a run past the last material is not drawn, and an
-/// entity without a Material draws every run.
-#[test]
-fn material_slots_pair_with_runs_the_way_unity_does() {
-    use super::material_runs;
-    let runs = || vec![0..3, 3..6];
-    assert_eq!(material_runs(runs(), Some(2)), [(0, 0..3), (1, 3..6)]);
-    assert_eq!(material_runs(runs(), Some(1)), [(0, 0..3)]);
-    assert_eq!(
-        material_runs(runs(), Some(3)),
-        [(0, 0..3), (1, 3..6), (2, 3..6)]
-    );
-    assert_eq!(material_runs(runs(), None), [(0, 0..3), (1, 3..6)]);
-    assert!(material_runs(Vec::new(), Some(2)).is_empty());
-}

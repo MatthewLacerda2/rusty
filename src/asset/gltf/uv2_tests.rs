@@ -67,7 +67,7 @@ fn a_mesh_without_texcoord_1_has_zero_lightmap_uvs() {
 
 /// The bake's input for one imported mesh, placed at the origin under a white sky.
 fn bake_input(mesh: &SubMesh) -> crate::scene::lighting::lightmap::BakeScene {
-    use crate::scene::lighting::lightmap::{BakeMesh, BakeScene};
+    use crate::scene::lighting::lightmap::{BakeMesh, BakeRun, BakeScene};
     let field =
         |f: fn(&crate::asset::MeshVertex) -> glam::Vec3| mesh.vertices.iter().map(f).collect();
     BakeScene {
@@ -77,8 +77,12 @@ fn bake_input(mesh: &SubMesh) -> crate::scene::lighting::lightmap::BakeScene {
             normals: field(|_| glam::Vec3::Z),
             lightmap_uvs: mesh.vertices.iter().map(|v| v.lightmap_uv.into()).collect(),
             indices: mesh.indices.clone(),
-            albedo: glam::Vec3::ONE,
-            emissive: glam::Vec3::ZERO,
+            runs: vec![BakeRun {
+                end: mesh.indices.len() as u32,
+                albedo: glam::Vec3::ONE,
+                emissive: glam::Vec3::ZERO,
+                occludes: true,
+            }],
         }],
         lights: Vec::new(),
         sky: glam::Vec3::ONE,

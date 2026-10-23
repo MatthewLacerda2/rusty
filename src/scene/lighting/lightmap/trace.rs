@@ -21,7 +21,7 @@ use std::f32::consts::{PI, TAU};
 use glam::Vec3;
 
 use super::bvh::{Bvh, Hit};
-use super::input::{BakeLight, BakeScene, LightShape};
+use super::input::{BakeLight, BakeRun, BakeScene, LightShape};
 use super::rng::Rng;
 use crate::core::color::luminance;
 
@@ -106,10 +106,9 @@ impl Tracer<'_> {
                 radiance += throughput * self.sky(dir);
                 break;
             };
-            let Some((point, hit_normal, mesh)) = self.surface(&hit, dir) else {
+            let Some((point, hit_normal, m)) = self.surface(&hit, dir) else {
                 return (radiance, first, depth == 0); // back face: nothing comes through
             };
-            let m = &self.scene.meshes[mesh];
             let lit = self.direct(point, hit_normal, false).0;
             radiance += throughput * (m.emissive + m.albedo * lit / PI);
             throughput *= m.albedo;
@@ -118,8 +117,9 @@ impl Tracer<'_> {
         (radiance, first, false)
     }
 
-    /// The offset hit point, its shading normal and mesh — `None` on a back face.
-    fn surface(&self, hit: &Hit, dir: Vec3) -> Option<(Vec3, Vec3, usize)> {
+    /// The offset hit point, its shading normal and the material run it landed on
+    /// (#1290) — `None` on a back face.
+    fn surface(&self, hit: &Hit, dir: Vec3) -> Option<(Vec3, Vec3, &BakeRun)> {
         let tri = &self.bvh.tris[hit.tri];
         if tri.normal().dot(dir) >= 0.0 {
             return None;
@@ -131,7 +131,7 @@ impl Tracer<'_> {
             .try_normalize()
             .unwrap_or(tri.normal().try_normalize().unwrap_or(Vec3::Y));
         let point = tri.a + tri.e1 * hit.u + tri.e2 * hit.v;
-        Some((point + n * SURFACE_OFFSET, n, tri.mesh as usize))
+        Some((point + n * SURFACE_OFFSET, n, mesh.run_at(tri.first)))
     }
 
     /// The direct irradiance at `point` facing `normal`, shadowed, and the

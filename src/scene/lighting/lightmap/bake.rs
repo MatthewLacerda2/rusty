@@ -206,11 +206,15 @@ fn dominant(indirect: Vec3, indirect_dir: Vec3, light: &TexelLight) -> Vec3 {
     ((indirect_dir + light.direct_dir) / weight).clamp_length_max(1.0)
 }
 
-/// Every mesh's triangles, for the BVH.
+/// Every mesh's occluding triangles, for the BVH: a Transparent run lets light
+/// through and bounces none (#1290).
 pub(super) fn triangles(scene: &BakeScene) -> Vec<Tri> {
     let mut tris = Vec::new();
     for (m, mesh) in scene.meshes.iter().enumerate() {
         for (k, t) in mesh.indices.chunks_exact(3).enumerate() {
+            if !mesh.run_at((k * 3) as u32).occludes {
+                continue;
+            }
             let [a, b, c] = [t[0], t[1], t[2]].map(|i| mesh.positions[i as usize]);
             tris.push(Tri::new(a, b, c, m as u32, (k * 3) as u32));
         }
