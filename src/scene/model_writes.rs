@@ -7,9 +7,11 @@
 //! re-imported model. The renderer's particle-mesh cache follows the same log for
 //! emitters (`render::passes::particles::mesh_cache`).
 //!
-//! It runs on the edit-mode tick (`app::World::edit_frame`). Nothing writes a model
-//! during Play, and a note made then waits for the first edit-mode tick after Stop,
-//! so it lands on the restored edit scene rather than the discarded play one.
+//! It runs on the edit frame (`app::GameWorld::edit_frame`), every frame outside
+//! Play, stepped or frozen. A model can be written during Play (`Scene.Instantiate`
+//! converts a changed source, #1253); its note waits for the first edit frame after
+//! Stop, and by then the restored edit scene was read from disk after it
+//! (`Scene::meshes_read_at`), so nothing is read twice.
 
 use crate::core::fs::written::{written_since, Stale};
 use crate::scene::rehydrate::reimport_written;
@@ -21,8 +23,9 @@ pub struct ModelWrites {
 }
 
 impl Default for ModelWrites {
-    /// Starts at the current generation: a scene is read fresh when it loads, so
-    /// earlier notes are already in it.
+    /// Starts at the current generation: whatever built the scene so far read its
+    /// models fresh. A later scene load moves the floor up through
+    /// `Scene::meshes_read_at`.
     fn default() -> Self {
         Self {
             seen: written_since(u64::MAX).0,
@@ -31,13 +34,18 @@ impl Default for ModelWrites {
 }
 
 impl ModelWrites {
-    /// Drain the notes made since the last call, and re-import every mesh in `scene`
-    /// whose model file one names. Returns how many were rebuilt. A re-import that
-    /// itself notes a write (its conversion re-ran) is re-read once more next call,
-    /// which then finds the cache current and notes nothing.
+    /// Drain the model notes made since the last call or the scene's last load,
+    /// whichever is later, and re-import every mesh in `scene` whose model file one
+    /// names. Returns how many were rebuilt. A re-import that itself notes a write
+    /// (its conversion re-ran) is re-read once more next call, which then finds the
+    /// cache current and notes nothing.
     pub fn follow(&mut self, scene: &mut Scene) -> usize {
-        let (now, paths) = written_since(self.seen);
+        let (now, mut paths) = written_since(self.seen.max(scene.meshes_read_at));
         self.seen = now;
+        paths.retain(|path| crate::asset::is_model_path(path));
+        if paths.is_empty() {
+            return 0;
+        }
         reimport_written(scene, &Stale::new(paths))
     }
 }

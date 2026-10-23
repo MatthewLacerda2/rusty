@@ -5,6 +5,8 @@
 //! stamp and propagation. Split out of `serialize` (#453) to keep it under the size
 //! cap. GPU buffers are never stored on disk, only rebuilt here.
 
+use std::collections::BTreeMap;
+
 use glam::{Mat4, Vec3};
 
 use crate::asset::{self, MeshVertex, SubMesh};
@@ -127,25 +129,31 @@ pub fn reimport_model(scene: &mut crate::scene::Scene, path: &str) -> usize {
 
 /// Re-import every unskinned mesh in `scene` whose model file `stale` names: the
 /// engine re-wrote it (#1242), and Unity updates every instance of a re-imported
-/// model. Skinned meshes keep theirs, as in [`reimport_model`]. Returns how many
-/// were rebuilt.
+/// model. Skinned meshes keep theirs, as in [`reimport_model`]. Each distinct file
+/// is matched against `stale` once. Returns how many were rebuilt.
 pub fn reimport_written(scene: &mut crate::scene::Scene, stale: &Stale) -> usize {
     if stale.is_empty() {
         return 0;
     }
+    let mut named: BTreeMap<String, bool> = BTreeMap::new();
     reimport_where(scene, |reference| {
-        asset_ref_file(reference).is_some_and(|file| stale.matches(&file))
+        let Some(file) = asset_ref_file(reference) else {
+            return false;
+        };
+        *named
+            .entry(file)
+            .or_insert_with_key(|file| stale.matches(file))
     })
 }
 
 /// Re-import every mesh whose reference `names` accepts ([`reimport_entity_mesh`]).
-fn reimport_where(scene: &mut crate::scene::Scene, names: impl Fn(&str) -> bool) -> usize {
+fn reimport_where(scene: &mut crate::scene::Scene, mut names: impl FnMut(&str) -> bool) -> usize {
     let mut rebuilt = 0;
     for id in scene.world.ids_with_mesh() {
         let named = scene
             .world
             .mesh(id)
-            .is_some_and(|mesh| mesh.asset_ref.as_deref().is_some_and(&names));
+            .is_some_and(|mesh| mesh.asset_ref.as_deref().is_some_and(&mut names));
         if named && reimport_entity_mesh(&mut scene.world, id) {
             rebuilt += 1;
         }
@@ -164,44 +172,34 @@ fn reimport_entity_mesh(world: &mut World, id: u32) -> bool {
     if mesh.skin.is_some() {
         return false;
     }
-    let fresh = rehydrate_asset_mesh(&mesh.asset_ref);
-    if fresh.skin.is_some() || fresh.vertices.is_empty() {
+    let reference = mesh.asset_ref.as_deref();
+    let Some(sub) = reference.and_then(|r| asset::import_sub_mesh(r).ok()) else {
         return false;
-    }
-    let bounds = position_bounds(&fresh.vertices);
-    (mesh.vertices, mesh.indices) = (fresh.vertices, fresh.indices);
+    };
+    let Some(bounds) = sub.bounds().filter(|_| sub.skin.is_none()) else {
+        return false;
+    };
+    mesh.vertices = sub.vertices.iter().map(vertex_from_imported).collect();
+    mesh.indices = sub.indices;
     mesh.is_dirty.set(true);
     drop(mesh);
     refit_mesh_collider(world, id, bounds);
     true
 }
 
-/// The rest-pose box `vertices` span, `(min, max)`.
-fn position_bounds(vertices: &[Vertex]) -> (Vec3, Vec3) {
-    vertices.iter().fold((Vec3::MAX, Vec3::MIN), |(lo, hi), v| {
-        let p = Vec3::from(v.position);
-        (lo.min(p), hi.max(p))
-    })
-}
-
 /// Size `id`'s mesh collider (if it has one) to `(min, max)`, as Unity's
 /// `MeshCollider` follows its shared mesh. The guard refreshes the world AABB.
 fn refit_mesh_collider(world: &mut World, id: u32, (min, max): (Vec3, Vec3)) {
-    let is_mesh = world
-        .collider(id)
-        .is_some_and(|c| matches!(c.shape, ColliderShape::Mesh { .. }));
-    if !is_mesh {
+    let Some(mut collider) = world.collider_mut(id) else {
         return;
-    }
-    if let Some(mut collider) = world.collider_mut(id) {
-        if let ColliderShape::Mesh {
-            local_min,
-            local_max,
-            ..
-        } = &mut collider.shape
-        {
-            (*local_min, *local_max) = (min, max);
-        }
+    };
+    if let ColliderShape::Mesh {
+        local_min,
+        local_max,
+        ..
+    } = &mut collider.shape
+    {
+        (*local_min, *local_max) = (min, max);
     }
 }
 

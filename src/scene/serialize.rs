@@ -130,9 +130,11 @@ fn rehydrate_meshes(data: &mut SceneData) {
 }
 
 /// Replace the scene's World (single active scene) with the document's contents,
-/// rehydrating meshes and recomputing collider AABBs. Preserves entity order/ids.
+/// rehydrating meshes (stamping `meshes_read_at`, #1242) and recomputing collider
+/// AABBs. Preserves entity order/ids.
 pub fn apply_scene_data(scene: &mut Scene, mut data: SceneData) {
     rehydrate_meshes(&mut data);
+    scene.meshes_read_at = crate::core::fs::written::written_since(u64::MAX).0;
 
     // Start from the document's library, then fold in any material an entity still
     // has staged (an Add-menu default restored from a snapshot before the inspector

@@ -98,6 +98,22 @@ fn a_write_of_another_file_leaves_the_mesh_alone() {
     assert_eq!(collider_box(&scene, id), (Vec3::ZERO, Vec3::ONE));
 }
 
+#[test]
+fn a_scene_load_reads_every_note_made_before_it() {
+    let path = model("rusty_model_writes_load");
+    let mut writes = ModelWrites { seen: 0 };
+    bake(&path, Bake::A);
+    let mut scene = Scene::new();
+    spawn(&mut scene, &path);
+    let data = crate::scene::to_scene_data(&scene);
+    crate::scene::apply_scene_data(&mut scene, data);
+    assert_eq!(
+        writes.follow(&mut scene),
+        0,
+        "the load already read the note"
+    );
+}
+
 /// An edit-mode game over `scene`.
 fn game_over(scene: Rc<RefCell<Scene>>) -> crate::app::GameWorld {
     let nav = crate::navigation::NavigationGraph::new(-1.0, 1.0, -1.0, 1.0, 1.0);

@@ -165,7 +165,7 @@ impl GameWorld {
             self.resources.frame_dt = scaled_dt;
             self.run_schedule_frame();
         } else {
-            self.world.edit_frame(&mut self.resources.model_writes);
+            self.edit_frame();
         }
         self.sync_render_camera();
         self.sync_shader_time();
