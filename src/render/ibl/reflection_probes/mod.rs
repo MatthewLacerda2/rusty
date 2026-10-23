@@ -143,8 +143,8 @@ impl ProbeArray {
         false
     }
 
-    /// Make `wanted` (each [admitted](Self::admits), in scene order, at most the
-    /// budget) this frame's probes: copy the cubes that are not resident yet,
+    /// Make `wanted` (each [admitted](Self::admits), which a debug build asserts, in
+    /// scene order, at most the budget) this frame's probes: copy the cubes that are not resident yet,
     /// rebuilding the array when it cannot hold them. Returns true when the array
     /// texture was replaced, so group 0 must rebind.
     fn update(
@@ -153,12 +153,6 @@ impl ProbeArray {
         queue: &wgpu::Queue,
         wanted: &[(&ReflectionProbe, Rc<CubemapTexture>)],
     ) -> bool {
-        debug_assert!(
-            wanted
-                .iter()
-                .all(|(_, c)| fits(DEFAULT_REFLECTION_RESOLUTION, c.size)),
-            "every wanted cube was admitted"
-        );
         let kept: Vec<_> = wanted.iter().map(|(p, c)| (*p, &**c)).collect();
         if kept.is_empty() {
             // Nothing to shade: keep the resident cubes for the next scene.
@@ -215,6 +209,10 @@ impl ProbeArray {
     /// does not reallocate), else as many as the set needs.
     fn target_size(&self, kept: &[(&ReflectionProbe, &CubemapTexture)]) -> (u32, u32) {
         let face = DEFAULT_REFLECTION_RESOLUTION;
+        debug_assert!(
+            kept.iter().all(|(_, cube)| fits(face, cube.size)),
+            "every wanted cube was admitted"
+        );
         let mips = kept
             .iter()
             .map(|(_, cube)| (face / cube.size).trailing_zeros() + cube.texture.mip_level_count())
