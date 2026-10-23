@@ -104,7 +104,10 @@ fn a_scene_with_a_texture_reference_round_trips() {
     let data: SceneData = serde_json::from_str(&json).unwrap();
     let mut restored = Scene::new();
     apply_scene_data(&mut restored, data);
-    assert_eq!(restored.materials[&key], scene.materials[&key]);
+    assert_eq!(
+        base_color_map(&restored, &key),
+        base_color_map(&scene, &key)
+    );
     let again = serde_json::to_string(&to_scene_data(&restored)).unwrap();
     assert_eq!(again, json);
 }

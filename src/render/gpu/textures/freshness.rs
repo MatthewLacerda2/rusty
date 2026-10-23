@@ -84,10 +84,7 @@ impl Renderer {
     /// vs absolute) goes too.
     pub(crate) fn invalidate_textures(&mut self, paths: &[String]) {
         let stale = Stale::new(paths.to_vec());
-        // A reference to an extracted texture goes with its source's re-import.
-        let is_stale = |key: &str| {
-            stale.matches(key) || texture_ref::source(key).is_some_and(|s| stale.matches(s))
-        };
+        let is_stale = |key: &str| is_stale(&stale, key);
         // A cubemap loaded from a re-written file (#1207). Its probe-array slot
         // goes too, so the next frame copies the new cube in (#1206).
         self.cubemaps.retain(|key, _| !is_stale(key));
@@ -111,4 +108,10 @@ impl Renderer {
             self.skybox_path.clear();
         }
     }
+}
+
+/// Whether cache key `key` names a written file: the file itself, or a texture
+/// extracted from a source that was re-imported (#1130).
+pub(crate) fn is_stale(stale: &Stale, key: &str) -> bool {
+    stale.matches(key) || texture_ref::source(key).is_some_and(|s| stale.matches(s))
 }
