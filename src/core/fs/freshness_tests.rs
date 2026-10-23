@@ -62,7 +62,9 @@ fn a_cache_with_its_own_key_rules_says_what_appeared_and_what_is_stale() {
     freshness.miss("model.fbx#tex/Skin");
     let appeared = |p: &str| p.starts_with("model.fbx");
     let retried = (0..MISS_RETRY_FRAMES).flat_map(|_| freshness.poll_with(appeared).stale);
-    assert!(retried.collect::<Vec<_>>().contains(&"model.fbx#tex/Skin".to_string()));
+    assert!(retried
+        .collect::<Vec<_>>()
+        .contains(&"model.fbx#tex/Skin".to_string()));
     assert!(freshness.forget_misses_where(|p| p.starts_with("model.fbx")));
     assert_eq!(freshness.miss_count(), 0);
 }
