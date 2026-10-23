@@ -1,8 +1,9 @@
-//! Hanging attachments back on a rebuilt skeleton (#453, #1252).
+//! Hanging attachments back on a skeleton's bones (#453, #1252, #1265).
 //!
-//! A load, a prefab stamp and a live re-import all end the same way: the bones are
-//! rebuilt from the model, and every entity that hung from a bone goes back under
-//! the bone of the same name. When the model no longer has that bone, one rule
+//! A load and a prefab stamp build the bones from the model, and every entity that
+//! hung from a bone goes back under the bone of the same name. A live re-import
+//! keeps the bones the new rig still has (same ids, #1265), so only what hung from
+//! a dropped bone is re-hung. When the model no longer has a bone, one rule
 //! holds for all three: the entity goes to the nearest ancestor bone the model
 //! still has, or stays on the skinned entity, with a warning naming the bone —
 //! Unity keeps an object parented to a removed bone rather than dropping it. A
