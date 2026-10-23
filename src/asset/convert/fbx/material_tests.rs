@@ -31,9 +31,6 @@ fn colours_bound_to_a_texture_are_white_times_their_factor() {
     // map shows as itself (#1293).
     assert_eq!(red.emissive, [1.0; 3]);
     assert!(red.emissive_map.as_ref().and_then(MapRef::file).is_some());
-    // `Blue`'s is a plain colour × `EmissiveFactor`, linearised.
-    assert_eq!(blue.emissive, [half, 0.0, 0.0]);
-    assert_eq!(blue.emissive_map, None);
 }
 
 #[test]
@@ -44,6 +41,9 @@ fn a_colour_whose_texture_is_not_written_stays_without_its_factor() {
     let gone = material(&materials, "Gone");
     assert_eq!(gone.base_color, [0.2, 0.4, 0.6, 1.0]);
     assert_eq!(gone.base_color_map, None);
+    // A plain emissive colour is × `EmissiveFactor` (1), linearised.
+    assert_eq!(gone.emissive, [gamma_to_linear(0.5), 0.0, 0.0]);
+    assert_eq!(gone.emissive_map, None);
 }
 
 #[test]

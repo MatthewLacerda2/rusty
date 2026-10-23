@@ -79,7 +79,9 @@ pub const CONVERTERS: &[Converter] = &[
         // 11: a base colour bound to a texture is white × its factor, as Unity's (#1287).
         // 12: colours follow URP's FBX import, linearised; the emissive map is carried;
         //     an on-disk texture the importer can't read is skipped (#1293).
-        version: 12,
+        // 13: those colour rules for classic shading only; an on-disk texture must
+        //     load, by extension and bytes (#1293, its review).
+        version: 13,
         tool: None,
         convert: fbx::convert,
     },

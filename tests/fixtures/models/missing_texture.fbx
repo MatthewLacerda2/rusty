@@ -1,6 +1,7 @@
 ; FBX 7.4.0 project file
 ; One triangle whose material's texture is neither on disk nor embedded, so the
-; converter skips it (#1197) and its colour stays, without its factor (#1293).
+; converter skips it (#1197) and its colour stays, without its factor; its
+; emissive colour is a plain one (#1293).
 ; Hand-written.
 FBXHeaderExtension:  {
 	FBXHeaderVersion: 1003
@@ -26,6 +27,8 @@ Objects:  {
 		Properties70:  {
 			P: "DiffuseColor", "Color", "", "A",0.2,0.4,0.6
 			P: "DiffuseFactor", "Number", "", "A",0.5
+			P: "EmissiveColor", "Color", "", "A",0.5,0,0
+			P: "EmissiveFactor", "Number", "", "A",1
 		}
 	}
 	Texture: 4100, "Texture::Gone", "" {

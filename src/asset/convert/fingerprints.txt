@@ -4,9 +4,9 @@ blender 1 linked.blend 2861551bbbc062f3 5.2.3
 blender 1 linked_lib.blend ec83a2c2bbcd2b86 5.2.3
 blender 1 packed_formats.blend 0a663337f1995071 5.2.3
 blender 1 textured.blend 91e47b63eac50838 5.2.3
-ufbx 12 embedded_odd_textures.fbx 656aebb529a9d759 -
-ufbx 12 embedded_textures.fbx 35e91332a29b57ab -
-ufbx 12 mirrored_bone.fbx aa97a82e286aae8c -
-ufbx 12 missing_texture.fbx e388bc8238d781ea -
-ufbx 12 physical_material.fbx 0898afa3a09b51c6 -
-ufbx 12 skinned_cube.fbx 2e37dc37d728d38c -
+ufbx 13 embedded_odd_textures.fbx 656aebb529a9d759 -
+ufbx 13 embedded_textures.fbx 4fbd8293b5e41106 -
+ufbx 13 mirrored_bone.fbx aa97a82e286aae8c -
+ufbx 13 missing_texture.fbx 76b73909a6c06695 -
+ufbx 13 physical_material.fbx 0898afa3a09b51c6 -
+ufbx 13 skinned_cube.fbx 2e37dc37d728d38c -
