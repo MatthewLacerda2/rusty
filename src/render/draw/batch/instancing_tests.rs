@@ -13,12 +13,9 @@ const W: u32 = 96;
 const H: u32 = 64;
 
 fn material(scene: &mut Scene, id: u32, name: &str) {
-    scene.world.set_material(
-        id,
-        Some(MaterialComponent {
-            material: name.to_string(),
-        }),
-    );
+    scene
+        .world
+        .set_material(id, Some(MaterialComponent::new(name.to_string())));
 }
 
 /// A 6×6 yard of three prop meshes under a shadow-casting sun: most share the default

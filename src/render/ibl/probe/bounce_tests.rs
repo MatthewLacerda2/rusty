@@ -89,7 +89,7 @@ fn add_box(
     }
     scene.world.set_material(
         id,
-        Some(crate::components::MaterialComponent { material: mat_name }),
+        Some(crate::components::MaterialComponent::new(mat_name)),
     );
 }
 

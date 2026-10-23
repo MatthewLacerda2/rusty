@@ -77,16 +77,14 @@ fn apply_round_trips_a_diff() {
     let mut instance = baseline.clone();
     instance.name = "Renamed".into();
     instance.transform.position.y = 42.0;
-    instance.material = Some(MaterialComponent {
-        material: "Gold".into(),
-    });
+    instance.material = Some(MaterialComponent::new("Gold"));
     let diff = diff_entity(&instance, &baseline);
 
     let mut rebuilt = baseline.clone();
     apply_overrides(&mut rebuilt, &diff);
     assert_eq!(rebuilt.name, "Renamed");
     assert_eq!(rebuilt.transform.position.y, 42.0);
-    assert_eq!(rebuilt.material.as_ref().unwrap().material, "Gold");
+    assert_eq!(rebuilt.material.as_ref().unwrap().first(), "Gold");
     // Applying the diff reproduces the instance: re-diffing yields nothing.
     assert!(diff_entity(&rebuilt, &baseline) == diff_entity(&instance, &baseline));
 }

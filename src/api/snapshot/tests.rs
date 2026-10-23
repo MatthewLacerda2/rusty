@@ -63,7 +63,7 @@ fn mesh_and_material_reflect_authored_values() {
     let id = create_entity(&mut scene, "Box", Some(Primitive::Box));
     add_component(&mut scene, id, ComponentKind::Texture);
     // Edit the entity's referenced library material (the data is shared, not inline).
-    let key = scene.world.material(id).unwrap().material.clone();
+    let key = scene.world.material(id).unwrap().first().to_string();
     if let Some(mat) = scene.materials.get_mut(&key) {
         mat.base_color = [0.5, 0.25, 0.125];
         mat.base_color_map = Some("assets/textures/wood.png".into());

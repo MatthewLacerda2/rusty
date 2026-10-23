@@ -15,10 +15,11 @@ pub(super) fn item(mesh: &str, bone_base: u32, tint: f32, tag: f32) -> DrawItem 
         key: BatchKey {
             pipeline: 0,
             mesh: MeshId(mesh.to_string()),
+            first_index: 0,
             material: 0,
             uniform,
         },
-        num_indices: 36,
+        indices: 0..36,
         instance,
         outline: false,
     }

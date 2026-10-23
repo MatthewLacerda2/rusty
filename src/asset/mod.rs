@@ -32,6 +32,7 @@ pub mod gltf;
 pub mod lightmap_uv;
 pub mod lod;
 pub mod manifest;
+pub mod material_range;
 pub mod mesh_data;
 pub mod obj_import;
 pub mod sidecar;
@@ -44,6 +45,7 @@ pub use animation_graph::{
 pub use convert::texture_ref::MapRef;
 pub use lightmap_uv::LightmapUvSettings;
 pub use manifest::{build_manifest, AssetEntry, AssetManifest, SubObjectEntry};
+pub use material_range::MaterialRange;
 pub use mesh_data::{ImportedAsset, JointTransform, MaterialData, MeshVertex, SkinData, SubMesh};
 pub use sidecar::{import_and_sync_sidecar, ImportSettings, MeshColliderKind};
 

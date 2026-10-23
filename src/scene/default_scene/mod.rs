@@ -114,7 +114,7 @@ fn wear(scene: &mut Scene, id: u32, key: &str) {
     let material = key.to_string();
     scene
         .world
-        .set_material(id, Some(MaterialComponent { material }));
+        .set_material(id, Some(MaterialComponent::new(material)));
 }
 
 fn attach_script(scene: &mut Scene, id: u32, path: &str) {

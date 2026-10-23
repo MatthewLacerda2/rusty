@@ -7,6 +7,7 @@
 
 use super::anim_data::AnimationClip;
 use super::convert::texture_ref::MapRef;
+use super::material_range::MaterialRange;
 use glam::{Mat4, Quat, Vec3};
 
 /// One vertex of imported geometry: position, normal, the texture and lightmap UVs and the
@@ -208,14 +209,16 @@ impl Default for MaterialData {
 ///
 /// `id` is the stable, human-readable handle used in scene references; it is the
 /// source mesh's name when present, else a deterministic fallback (`mesh_<n>`).
-/// Geometry is plain `MeshVertex` + index data; `material` indexes into the parent
-/// `ImportedAsset::materials`, or `None` when the sub-mesh declares no material.
+/// Geometry is plain `MeshVertex` + index data; `ranges` splits the index list into
+/// runs, each drawn with its own material (#1285).
 #[derive(Clone, Debug, PartialEq)]
 pub struct SubMesh {
     pub id: String,
     pub vertices: Vec<MeshVertex>,
     pub indices: Vec<u32>,
-    pub material: Option<usize>,
+    /// The runs of `indices` and the material each draws with, in index order and
+    /// covering every index: Unity's sub-meshes. One run for a one-material mesh.
+    pub ranges: Vec<MaterialRange>,
     /// The skeleton bound to this sub-mesh, when the source declared a glTF `skin`.
     /// `None` for static meshes (every `.obj`, and any glTF mesh without a skin);
     /// the per-vertex bindings then stay at their unskinned identity default.
@@ -231,6 +234,11 @@ pub struct SubMesh {
 }
 
 impl SubMesh {
+    /// The material the first run draws with, which a one-material mesh is all of.
+    pub fn first_material(&self) -> Option<usize> {
+        self.ranges.first().and_then(|r| r.material)
+    }
+
     /// Axis-aligned bounds of this sub-mesh, or `None` when it has no vertices.
     pub fn bounds(&self) -> Option<(Vec3, Vec3)> {
         let mut iter = self.vertices.iter();

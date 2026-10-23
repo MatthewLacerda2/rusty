@@ -128,7 +128,7 @@ fn material_source(scene: &Scene, id: u32) -> Result<Source, String> {
     let key = scene
         .world
         .material(id)
-        .map(|m| m.material.clone())
+        .map(|m| m.first().to_string())
         .ok_or_else(|| format!("entity {id} has no Material"))?;
     material::shader_layout(&scene.materials, &key).map(Source::Material)
 }

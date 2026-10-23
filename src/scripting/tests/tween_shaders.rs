@@ -57,9 +57,9 @@ fn a_material_tween_eases_the_entitys_override_not_the_shared_material() {
     tick(&mut m, 2);
     assert_eq!(eval(&m, &get), "1");
     let s = m.scene.borrow();
-    let key = &s.world.material(id).unwrap().material;
+    let key = s.world.material(id).unwrap().first().to_string();
     assert!(
-        s.materials[key].shader_params.is_empty(),
+        s.materials[&key].shader_params.is_empty(),
         "the asset is untouched"
     );
     assert_eq!(

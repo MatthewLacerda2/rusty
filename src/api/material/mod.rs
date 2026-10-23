@@ -11,13 +11,16 @@
 //! 2. **Standalone named-asset authoring** (`asset`, #271) — `DefineAsset` /
 //!    `GetAsset` / `HasAsset`: author a reusable `MaterialAsset`
 //!    into the library under a chosen *name*, decoupled from any entity. An entity then
-//!    uses it by pointing its `MaterialComponent.material` at that name. Round-trips
+//!    uses it by pointing a slot at that name (`Material.Set`). Round-trips
 //!    through `SceneData` like any library asset.
 //! 3. **Surface shader** (#396, #399) — `SetShader` names the material's authored
 //!    surface shader; `SetAssetShaderParam` / `GetAssetShaderParam` (`shader_params`)
 //!    drive the params it exposes at runtime, and `SetShaderParam` / `GetShaderParam` /
 //!    `ClearShaderParam` override them for one entity (#670); `SetShaderTexture` (`shader_textures`, #400) names
 //!    the texture an extra shader slot (`mask`) samples.
+//!
+//! 4. **Slots** (`slots`, #1285) — `Get` / `Set` / `GetAll` / `SetAt`: which library
+//!    material each sub-mesh run of the entity's mesh draws with.
 //!
 //! Both are THIN adapters (#287): each setter resolves a library key (the entity's via
 //! `authoring::material::ensure_material_key`, or the chosen name via
@@ -29,6 +32,7 @@
 mod asset;
 mod from_lua;
 pub(crate) mod shader;
+mod slots;
 
 use std::cell::RefCell;
 
@@ -51,6 +55,7 @@ pub fn register<'scope>(
     register_maps(scope, &table, scene)?;
     register_transparency(scope, &table, scene)?;
     asset::register(scope, &table, scene)?;
+    slots::register(scope, &table, scene)?;
     shader::params::register(scope, &table, scene)?;
     shader::textures::register(scope, &table, scene)?;
     put(

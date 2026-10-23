@@ -35,9 +35,7 @@ fn scene(last: Mat4) -> Scene {
             ..MeshComponent::new("Box", vertices, indices)
         }),
     );
-    let material = MaterialComponent {
-        material: "glow".to_string(),
-    };
+    let material = MaterialComponent::new("glow".to_string());
     scene.world.set_material(id, Some(material));
     let glow = MaterialAsset {
         base_color: [0.0, 0.0, 0.0],

@@ -132,13 +132,13 @@ fn stamp_prefab(
     new_root
 }
 
-/// Rewrite an entity's material reference through the merge rename map (a no-op when
+/// Rewrite an entity's material references through the merge rename map (a no-op when
 /// the key wasn't uniquified). Shared by stamping and baseline-building so an
 /// instance and its propagation baseline resolve the same library key.
 fn rename_entity_material(entity: &mut Entity, renames: &BTreeMap<String, String>) {
-    if let Some(mat) = &mut entity.material {
-        if let Some(renamed) = renames.get(&mat.material) {
-            mat.material = renamed.clone();
+    for key in entity.material.iter_mut().flat_map(|m| &mut m.materials) {
+        if let Some(renamed) = renames.get(key) {
+            *key = renamed.clone();
         }
     }
 }

@@ -69,6 +69,15 @@ pub struct GpuMesh {
     pub skin_bounds: SkinBounds,
 }
 
+impl GpuMesh {
+    /// The index runs to draw `mesh` in (#1285), one per material slot, clipped to
+    /// this geometry's indices so a mesh edited ahead of its upload never reads past
+    /// the buffer (see [`draw::batch::clip_runs`]).
+    pub(crate) fn runs(&self, mesh: &crate::scene::MeshComponent) -> Vec<std::ops::Range<u32>> {
+        draw::batch::clip_runs(mesh.index_ranges(), self.num_indices)
+    }
+}
+
 /// Stable identity for a mesh's GPU geometry, derived from its *source*
 /// (`primitive_type` + `asset_ref`) rather than the entity referencing it (#127).
 /// Many entities sharing the same primitive or imported asset therefore map to a

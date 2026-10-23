@@ -124,7 +124,7 @@ pub fn entity_shader_param_with(
     {
         return Ok(v.clone());
     }
-    let key = scene.world.material(id).map(|m| m.material.clone());
+    let key = scene.world.material(id).map(|m| m.first().to_string());
     shader_param(&scene.materials, &key.unwrap_or_default(), layout, name)
 }
 

@@ -34,8 +34,8 @@ pub struct SubObjectEntry {
     /// Axis-aligned bounds `(min, max)` in the source file's units, or `None`
     /// when the sub-object has no geometry (an empty mesh).
     pub bounds: Option<(Vec3, Vec3)>,
-    /// How many materials this sub-object uses. A sub-mesh references at most one
-    /// material in the engine's data model, so this is `0` or `1`.
+    /// How many distinct materials this sub-object's runs draw with (#1285): `0`
+    /// when it names none, more than `1` for a multi-material mesh.
     pub material_count: usize,
 }
 
@@ -59,9 +59,17 @@ impl SubObjectEntry {
             id: sub.id.clone(),
             reference,
             bounds: sub.bounds(),
-            material_count: usize::from(sub.material.is_some()),
+            material_count: distinct_materials(sub),
         }
     }
+}
+
+/// How many distinct materials `sub`'s runs name.
+fn distinct_materials(sub: &SubMesh) -> usize {
+    let mut seen: Vec<usize> = sub.ranges.iter().filter_map(|r| r.material).collect();
+    seen.sort_unstable();
+    seen.dedup();
+    seen.len()
 }
 
 /// One source file under the asset root and the sub-objects it exposes.

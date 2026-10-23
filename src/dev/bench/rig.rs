@@ -47,6 +47,7 @@ pub fn soldier() -> MeshComponent {
         asset_ref: None,
         vertices,
         indices,
+        ranges: Vec::new(),
         bind_palette: skin.bind_palette(),
         skin: Some(skin),
         clips: vec![walk()],

@@ -17,12 +17,9 @@ fn fixture() -> (Scene, u32) {
     scene
         .materials
         .insert("Stone".into(), MaterialAsset::default());
-    scene.world.set_material(
-        root,
-        Some(MaterialComponent {
-            material: "Stone".into(),
-        }),
-    );
+    scene
+        .world
+        .set_material(root, Some(MaterialComponent::new("Stone")));
     (scene, root)
 }
 
@@ -123,7 +120,7 @@ fn identical_material_is_reused_conflict_is_uniquified() {
     a.materials.insert("Stone".into(), MaterialAsset::default());
     let ra = instantiate_prefab(&mut a, &prefab, None);
     assert_eq!(a.materials.len(), 1);
-    assert_eq!(a.world.material(ra).unwrap().material, "Stone");
+    assert_eq!(a.world.material(ra).unwrap().first(), "Stone");
 
     // Case 2: scene has a DIFFERENT "Stone" — prefab's is uniquified + rewritten.
     let mut b = Scene::new();
@@ -134,7 +131,7 @@ fn identical_material_is_reused_conflict_is_uniquified() {
     b.materials.insert("Stone".into(), other);
     let rb = instantiate_prefab(&mut b, &prefab, None);
     assert_eq!(b.materials.len(), 2);
-    let key = b.world.material(rb).unwrap().material.clone();
+    let key = b.world.material(rb).unwrap().first().to_string();
     assert_ne!(key, "Stone");
     assert!(b.materials.contains_key(&key));
 }

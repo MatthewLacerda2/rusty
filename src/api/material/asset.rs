@@ -162,8 +162,8 @@ mod tests {
             scene.materials["plain"].shader, None,
             "\"\" is the standard one"
         );
-        let key = &scene.world.material(id).unwrap().material;
-        assert_eq!(scene.materials[key].shader.as_deref(), Some("holo"));
+        let key = scene.world.material(id).unwrap().first().to_string();
+        assert_eq!(scene.materials[&key].shader.as_deref(), Some("holo"));
     }
 
     #[test]
