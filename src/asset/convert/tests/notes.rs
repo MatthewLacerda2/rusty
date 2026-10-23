@@ -1,6 +1,6 @@
 //! A conversion notes what it swapped in, in the write log (#1219): the cached
-//! `.glb`, each file of its textures folder, and the source, so a path-keyed
-//! cache drops what it read from the old conversion.
+//! `.glb` and the source, so a path-keyed cache drops what it read from the old
+//! conversion.
 
 use super::super::{refresh, stage, Converted, Converter, Staging};
 use crate::asset::ImportError;
@@ -32,22 +32,22 @@ fn noted_by_refresh(source: &Path, out: &Path) -> Vec<String> {
 }
 
 #[test]
-fn a_conversion_notes_the_glb_its_textures_and_the_source() {
+fn a_conversion_notes_the_glb_and_the_source_never_a_staged_file() {
     let dir = crate::test_temp::dir();
     let (source, out) = (dir.join("a.src"), dir.join("cache/a.src.glb"));
     std::fs::write(&source, "one").unwrap();
     for _ in 0..2 {
-        let noted = noted_by_refresh(&source, &out);
-        let texture = super::super::textures_dirs(&out)
+        // Only this test's paths: other tests write the same process-wide log.
+        let noted: Vec<String> = noted_by_refresh(&source, &out)
             .into_iter()
-            .map(|d| d.join("skin.png").to_string_lossy().into_owned())
-            .find(|t| Path::new(t).is_file())
-            .expect("a texture swapped in");
+            .filter(|p| Path::new(p).starts_with(&dir))
+            .collect();
         for path in [out.to_string_lossy(), source.to_string_lossy()] {
             assert!(noted.contains(&path.into_owned()), "{noted:?}");
         }
-        assert!(noted.contains(&texture), "{texture} in {noted:?}");
-        assert!(!noted.iter().any(|p| p.contains("staging")), "{noted:?}");
+        // A texture lands in a folder named by the conversion's digest: a path no
+        // cache has read, so it is not noted (`stage::note`).
+        assert_eq!(noted.len(), 2, "{noted:?}");
         std::fs::write(&source, "two").unwrap();
     }
 }

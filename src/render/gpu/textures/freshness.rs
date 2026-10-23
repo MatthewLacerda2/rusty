@@ -16,7 +16,8 @@
 //!   *miss*, not cached as the default under its path, and misses are re-checked
 //!   (`Path::exists`, one per missing path) every [`MISS_RETRY_FRAMES`] frames, so a
 //!   map that appears later — baked, imported or copied in — is picked up. A mesh
-//!   emitter's model that failed to load is retried on the same beat.
+//!   emitter's model that was missing is retried on the same beat, once its
+//!   file has appeared.
 //!
 //! A file changed on disk by an outside tool at a path that already loaded is not
 //! noticed: that would need the per-frame stat this module exists to avoid.
@@ -67,7 +68,7 @@ impl Renderer {
                     .filter(|p| Path::new(p).exists())
                     .cloned(),
             );
-            // A mesh emitter's model that failed to load is tried again too.
+            // A mesh emitter's model whose file has appeared is tried again too.
             self.retry_particle_meshes();
         }
         if !stale.is_empty() {

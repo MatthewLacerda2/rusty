@@ -19,7 +19,7 @@
 
 use super::ImportError;
 use crate::asset::gltf::uri;
-use crate::core::fs::written::{written_since, Stale};
+use crate::core::fs::written::written_since;
 use crate::core::{collections::Map, hash};
 use std::path::{Path, PathBuf};
 use std::sync::{LazyLock, Mutex, PoisonError};
@@ -61,17 +61,38 @@ impl Looks {
     fn forget_written(&mut self) {
         let (seen, paths) = written_since(self.seen);
         self.seen = seen;
-        let stale = Stale::new(paths);
-        if !stale.is_empty() {
+        let noted = Noted::new(paths);
+        if !noted.0.is_empty() {
             self.files
-                .retain(|path, _| !stale.matches(&path.to_string_lossy()));
+                .retain(|path, look| !noted.names(path, look.canonical.as_deref()));
         }
+    }
+}
+
+/// Paths the write log named, each with its canonical form: one canonicalization
+/// per note, matched against the one each look stored, never one per look.
+struct Noted(Vec<(PathBuf, Option<PathBuf>)>);
+
+impl Noted {
+    fn new(paths: Vec<String>) -> Self {
+        let canonical = |p: &String| std::fs::canonicalize(p).ok();
+        Self(paths.iter().map(|p| (p.into(), canonical(p))).collect())
+    }
+
+    /// Whether a note names the file at `path` (canonically `canonical`), by the
+    /// same spelling or another.
+    fn names(&self, path: &Path, canonical: Option<&Path>) -> bool {
+        self.0
+            .iter()
+            .any(|(p, c)| p == path || (c.is_some() && c.as_deref() == canonical))
     }
 }
 
 struct Look {
     len: u64,
     digest: u64,
+    /// The file's canonical path, which a note by another spelling matches.
+    canonical: Option<PathBuf>,
     /// How many times the file was read: what the tests count.
     reads: u32,
 }
@@ -152,14 +173,11 @@ fn seen(path: &Path) -> Seen {
         return Seen::Absent;
     };
     let lock = || LOOKS.lock().unwrap_or_else(PoisonError::into_inner);
-    let known = {
+    let (known, since) = {
         let mut looks = lock();
         looks.forget_written();
-        looks
-            .files
-            .get(path)
-            .filter(|look| look.len == len)
-            .map(|look| look.digest)
+        let known = looks.files.get(path).filter(|look| look.len == len);
+        (known.map(|look| look.digest), looks.seen)
     };
     if let Some(digest) = known {
         return Seen::Read(digest);
@@ -169,13 +187,24 @@ fn seen(path: &Path) -> Seen {
         return Seen::Unreadable;
     };
     let digest = hash::fnv1a64(&bytes);
+    let canonical = std::fs::canonicalize(path).ok();
     let mut looks = lock();
+    looks.forget_written();
+    // A note taken while the file was read (by another thread's drain, too) means
+    // these bytes may be older than the file: answer them, but remember nothing.
+    if looks.seen != since && Noted::new(written_since(since).1).names(path, canonical.as_deref()) {
+        return Seen::Read(digest);
+    }
     let reads = looks.files.get(path).map_or(0, |look| look.reads) + 1;
     // The length read, not the one stat'd: a write between the two is seen next time.
     let len = bytes.len() as u64;
-    looks
-        .files
-        .insert(path.to_path_buf(), Look { len, digest, reads });
+    let look = Look {
+        len,
+        digest,
+        canonical,
+        reads,
+    };
+    looks.files.insert(path.to_path_buf(), look);
     Seen::Read(digest)
 }
 
