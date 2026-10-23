@@ -85,11 +85,6 @@ impl World {
         set
     }
 
-    /// Detach and return the collider (`None` when absent or the entity is dead).
-    pub fn take_collider(&mut self, id: u32) -> Option<ColliderComponent> {
-        self.take_component::<ColliderComponent>(id)
-    }
-
     /// Stable ids of the entities carrying a collider, in insertion order.
     pub fn ids_with_collider(&self) -> Vec<u32> {
         self.ids_with_component::<ColliderComponent>()

@@ -302,7 +302,7 @@ new flag, gate, CI step or baseline.
 - **`world-space`** (#1170, #1196) — fifteen bugs in two days came from systems
   working out where an entity is in the world and getting a hierarchy case wrong: a
   mirror, a zero scale, a turned child under a non-uniform parent. `ecs::World`'s
-  world API (`local_to_world`, `world_pose`, `lossy_scale`, `transform_frame`, …) is
+  world API (`local_to_world`, `world_pose`, `lossy_scale`, `inverse_transform_frame`, …) is
   the one answer, so a code line of `src/` outside `src/ecs/world_space/` and
   `components::transform` fails when it decomposes a matrix
   (`to_scale_rotation_translation`), names `compute_world_matrix`,

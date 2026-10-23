@@ -11,9 +11,8 @@
 //!   [`World::lossy_scale`], the world matrix's column lengths along the entity's own
 //!   axes, signed by the mirror (#1123, #1128, #1156);
 //! - [`World::transform_point`], [`World::transform_direction`] (through the entity's
-//!   own mirror, #1145), [`World::transform_vector`] and
-//!   [`World::inverse_transform_point`], and a frame's pair, [`World::transform_frame`]
-//!   and [`World::inverse_transform_frame`] (#1196);
+//!   own mirror, #1145), [`World::inverse_transform_point`] and
+//!   [`World::inverse_transform_frame`] (#1196);
 //! - [`World::set_world_position`] and [`World::set_world_rotation`], which under a
 //!   singular parent keep the local value they cannot solve for, as Unity does (#1164).
 //!
@@ -86,12 +85,6 @@ impl World {
         self.world_pose(id).map_or(Vec3::ONE, |p| p.scale)
     }
 
-    /// The reflection `id`'s world pose carries, `±1` per axis: the signs of its
-    /// [`World::lossy_scale`].
-    pub fn world_mirror(&self, id: u32) -> Vec3 {
-        mirror(self.lossy_scale(id))
-    }
-
     /// Whether `id`'s world matrix reflects (its determinant is negative): what the
     /// renderer flips winding for.
     pub fn is_mirrored(&self, id: u32) -> bool {
@@ -101,11 +94,6 @@ impl World {
     /// A point in `id`'s local space, in world space.
     pub fn transform_point(&self, id: u32, point: Vec3) -> Vec3 {
         self.local_to_world(id).transform_point3(point)
-    }
-
-    /// A vector in `id`'s local space, in world space: scaled and turned, not moved.
-    pub fn transform_vector(&self, id: u32, vector: Vec3) -> Vec3 {
-        self.local_to_world(id).transform_vector3(vector)
     }
 
     /// A direction in `id`'s local space, in world space: turned, not scaled, and through
@@ -118,20 +106,10 @@ impl World {
         pose.rot * mirrored_direction(mirror(pose.scale), direction)
     }
 
-    /// A frame in `id`'s local space, by its X and Y axes (a joint's `axis` and
-    /// `swing_axis`), in world space: turned, and seen through the entity's mirror as a
+    /// A world frame, by its X and Y axes (a joint's `axis` and `swing_axis`), in
+    /// `id`'s local space: turned back, and seen through the entity's mirror as a
     /// rotation, so the frame stays proper under a reflection (#1125). Unchanged for a
     /// dead id.
-    pub fn transform_frame(&self, id: u32, x: Vec3, y: Vec3) -> (Vec3, Vec3) {
-        let Some(pose) = self.world_pose(id) else {
-            return (x, y);
-        };
-        let (x, y) = pose.mirror_frame(x, y);
-        (pose.rot * x, pose.rot * y)
-    }
-
-    /// A world frame in `id`'s local space: the exact inverse of
-    /// [`World::transform_frame`]. Unchanged for a dead id.
     pub fn inverse_transform_frame(&self, id: u32, x: Vec3, y: Vec3) -> (Vec3, Vec3) {
         let Some(pose) = self.world_pose(id) else {
             return (x, y);
