@@ -64,6 +64,7 @@ fn passes_the_same_skip_returned_and_code_outside_a_converter() {
     let warn = "log::warn!(\"[Asset] {skip}\");\n";
     for path in [
         "src/asset/convert/mod.rs",
+        "src/asset/convert/converter.rs",
         "src/asset/convert/lock.rs",
         "src/asset/convert/stage/mod.rs",
         "src/asset/convert/texture_ref.rs",
