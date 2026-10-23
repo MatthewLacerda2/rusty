@@ -64,6 +64,16 @@ impl ReflectionProbe {
         point.cmpge(self.box_min).all() && point.cmple(self.box_max).all()
     }
 
+    /// Squared distance from `point` to the nearest point of the probe's box, zero
+    /// inside it: how the renderer ranks probes for its resident budget (#1238), so a
+    /// big room whose capture point is far away still counts as near when the camera
+    /// stands in it.
+    pub fn box_distance_sq(&self, point: Vec3) -> f32 {
+        point
+            .clamp(self.box_min, self.box_max)
+            .distance_squared(point)
+    }
+
     /// Squared distance from `point` to the probe's capture position — the
     /// nearest-probe tiebreak metric.
     fn distance_sq(&self, point: Vec3) -> f32 {
@@ -179,7 +189,8 @@ impl ReflectionProbeSet {
 
     /// Pick the reflection probe that applies at `world_pos`, with its index: the
     /// NEAREST probe (by capture distance) whose box contains the point, the lower
-    /// index on a tie. `None` when no probe's box covers the point — the caller then
+    /// index in this set on a tie (the renderer keeps its resident set in scene order,
+    /// so that is the lower scene index there too, wherever the camera is, #1238). `None` when no probe's box covers the point — the caller then
     /// falls back to the global skybox. The renderer calls it per draw, at the
     /// object's world-bounds centre (#1206).
     pub fn select(&self, world_pos: Vec3) -> Option<(usize, &ReflectionProbe)> {

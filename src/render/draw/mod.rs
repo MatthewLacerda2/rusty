@@ -19,7 +19,7 @@ use crate::scene::{Camera, Scene};
 
 impl Renderer {
     /// Per-frame work that doesn't depend on the camera stack: the view's post-FX
-    /// buffers, scene assets, the reflection cube and the lighting uniform.
+    /// buffers, scene assets, the resident reflection probes and the lighting uniform.
     fn prepare_frame(&mut self, view: &mut RenderView, scene: &Scene, camera: &Camera) {
         // Keep this view's post-FX bloom buffers sized to the active quality tier — a
         // cheap no-op unless a live quality switch changed the divisor (#355).

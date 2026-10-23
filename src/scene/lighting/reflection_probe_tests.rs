@@ -123,3 +123,11 @@ fn set_round_trips_through_json() {
     let back: ReflectionProbeSet = serde_json::from_str(&json).unwrap();
     assert_eq!(back.probes, set.probes);
 }
+
+#[test]
+fn box_distance_is_zero_inside_and_to_the_nearest_face_outside() {
+    let probe = ReflectionProbe::new(Vec3::ZERO, Vec3::ONE);
+    assert_eq!(probe.box_distance_sq(Vec3::new(0.5, -0.9, 0.0)), 0.0);
+    assert_eq!(probe.box_distance_sq(Vec3::new(3.0, 0.0, 0.0)), 4.0);
+    assert_eq!(probe.box_distance_sq(Vec3::new(2.0, 2.0, 0.0)), 2.0);
+}
