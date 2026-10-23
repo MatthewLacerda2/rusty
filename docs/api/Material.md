@@ -57,23 +57,36 @@ mesh's primitives, an FBX mesh's per-polygon materials, an `.obj` object's `usem
 groups — while the mesh stays one addressable sub-object (`model.fbx::Body`).
 Instancing it fills one slot per run with that run's imported material (the engine
 default for a run that names none). A primitive, or any one-material mesh, has one
-slot. A run past the end of the list draws with the first material.
+slot. Slot `i` draws run `i`. When the list and the runs differ in length, rusty
+does what Unity does:
+
+- **more slots than runs:** each extra slot draws the **last** run again, a second
+  pass over it with that material (an outline or a glow layered on top);
+- **fewer slots than runs:** a run with no slot is **not drawn**.
+
+A slot naming a key the library lacks draws its run with the engine default.
 
 | Function | Signature | Returns |
 |---|---|---|
 | `Material.Get` | `(id)` | the first slot's library key (Unity's `sharedMaterial`), or `nil` if the entity has no Material |
 | `Material.Set` | `(id, key)` | — points the first slot at library material `key`, attaching a Material if the entity has none |
-| `Material.GetAll` | `(id)` | an array of the library key of every slot, in run order (empty if the entity has no Material) |
-| `Material.SetAt` | `(id, index, key)` | — points slot `index` (0-based, Unity's `sharedMaterials[i]`) at library material `key`; the other slots are untouched |
+| `Material.GetAll` | `(id)` | a Lua array of every slot's library key, in slot order (empty if the entity has no Material) |
+| `Material.SetAt` | `(id, index, key)` | — points slot `index` at library material `key`; the other slots are untouched. `index` is **0-based**, like every index argument in this API (`Probe`, `Reflection`, `Input` pads) and Unity's `sharedMaterials[i]`; `index` equal to the slot count adds a slot |
 
-`Set` and `SetAt` raise an error, and change nothing, when `index` is past the
-entity's slots (one per run of its mesh) or the library has no material `key`. The
-slots save with the scene.
+`Set` and `SetAt` raise an error, and change nothing, when `index` is beyond one
+past the last slot or the library has no material `key`. The slots save with the
+scene.
+
+`GetAll` returns an ordinary Lua array, so its positions start at 1: subtract one
+to get a slot index.
 
 ```lua with=e:Material
 Material.DefineAsset("chrome", { metallic = 1.0, roughness = 0.1 })
 Material.Set(e, "chrome")
-print(Material.Get(e), #Material.GetAll(e))   -- chrome  1
+for i, key in ipairs(Material.GetAll(e)) do
+  print("slot " .. (i - 1) .. ": " .. key)   -- slot 0: chrome
+  Material.SetAt(e, i - 1, key)              -- the same slot, by its 0-based index
+end
 ```
 
 ### Standalone material assets

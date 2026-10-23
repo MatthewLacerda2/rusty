@@ -28,6 +28,7 @@ use std::ops::Range;
 
 use super::clips::{CasterClip, Clip};
 use super::ShadowRenderer;
+use crate::render::draw::batch::IndexRun;
 use crate::render::gpu::draw_buffers::{push_palette, JointMatrix};
 use crate::render::gpu::material_cache::MaterialCache;
 use crate::render::gpu::pipelines::surface::SurfaceShaders;
@@ -38,7 +39,7 @@ use crate::scene::Scene;
 pub(super) use buffer::CasterBuffer;
 use buffer::CasterData;
 use glam::Mat4;
-use runs::clip_runs;
+use runs::join_runs;
 
 /// What a run of casters shares: whether it is mirrored (drawn with the winding
 /// flipped, #1134), its clip (`None` for plain depth), then its mesh. Field order is
@@ -49,23 +50,22 @@ pub(super) struct CasterKey {
     pub mirrored: bool,
     pub clip: Option<Clip>,
     pub mesh: MeshId,
-    /// Where the drawn index run starts: material runs that clip differently are
-    /// draws of their own (#1285).
-    pub first_index: u32,
+    /// The run of the mesh's index buffer drawn, start and end: material runs that
+    /// clip differently are draws of their own, and two casters over differently
+    /// joined runs never merge (#1285).
+    pub indices: IndexRun,
 }
 
-/// One instanced depth draw: `instances` of `key`'s mesh, the index run `indices`
-/// each.
+/// One instanced depth draw: `instances` of `key`'s mesh, its index run each.
 pub(super) struct CasterBatch {
     key: CasterKey,
-    indices: Range<u32>,
     instances: Range<u32>,
 }
 
 impl CasterBatch {
     /// `(num_indices, instances)` — the draw as the frame counters take it (#433).
     pub(super) fn counts(&self) -> (u32, u32) {
-        (self.indices.len() as u32, self.instances.len() as u32)
+        (self.key.indices.count(), self.instances.len() as u32)
     }
 }
 
@@ -75,7 +75,7 @@ impl CasterBatch {
 /// make the order between runs irrelevant. With `instancing` off, one draw per caster
 /// in scene order (the pre-#470 path, for comparison).
 pub(super) fn batch_casters(
-    mut casters: Vec<(CasterKey, Range<u32>, CasterData)>,
+    mut casters: Vec<(CasterKey, CasterData)>,
     instancing: bool,
 ) -> (Vec<CasterData>, Vec<CasterBatch>) {
     if instancing {
@@ -83,14 +83,13 @@ pub(super) fn batch_casters(
     }
     let mut matrices = Vec::with_capacity(casters.len());
     let mut batches: Vec<CasterBatch> = Vec::new();
-    for (key, indices, caster) in casters {
+    for (key, caster) in casters {
         let index = matrices.len() as u32;
         matrices.push(caster);
         match batches.last_mut() {
             Some(run) if instancing && run.key == key => run.instances.end = index + 1,
             _ => batches.push(CasterBatch {
                 key,
-                indices,
                 instances: index..index + 1,
             }),
         }
@@ -163,7 +162,7 @@ impl ShadowRenderer {
                     c.bounds
                         .is_none_or(|(lo, hi)| frustum.intersects_aabb(lo, hi))
                 })
-                .map(|c| (c.key.clone(), c.indices.clone(), c.caster))
+                .map(|c| (c.key.clone(), c.caster))
                 .collect();
             let (packed, mut batches) = batch_casters(casters, self.instancing);
             let base = matrices.len() as u32;
@@ -199,29 +198,31 @@ impl ShadowRenderer {
         let mut casters = Vec::new();
         let mut joints = Vec::new();
         for id in scene.world.ids_with_mesh() {
+            // A level of detail this sweep does not draw (#472).
+            if !scene.world.is_active(id) || lod.hides(id) {
+                continue;
+            }
+            let slots = scene.world.material(id).map_or(0, |m| m.materials.len());
+            let moving = (0..slots)
+                .filter_map(|slot| frame.clips.get(&(id, slot)))
+                .any(|c| c.clip.is_variant());
+            if !sweep.takes(scene.world.is_static(id) && !moving) {
+                continue;
+            }
             let mesh = scene.world.mesh(id).expect("id came from ids_with_mesh");
             let mesh_id = MeshId::from_mesh(&mesh);
             let Some(gpu_mesh) = frame.gpu_meshes.get(&mesh_id) else {
                 continue;
             };
-            let runs = clip_runs(gpu_mesh.runs(&mesh), |run| frame.clips.get(&(id, run)));
-            let moving = runs
-                .iter()
-                .any(|(_, c)| c.is_some_and(|c| c.clip.is_variant()));
-            let is_static = scene.world.is_static(id) && !moving;
-            if !scene.world.is_active(id) || !sweep.takes(is_static) {
-                continue;
-            }
-            // A level of detail this sweep does not draw (#472).
-            if lod.hides(id) {
-                continue;
-            }
+            let runs = gpu_mesh.runs(&mesh);
+            let draws = scene.material_draws(id, runs.len()).into_iter();
+            let clipped = draws.map(|d| (runs[d.run].clone(), frame.clips.get(&(id, d.slot))));
             let world = scene.world.local_to_world(id);
             // A skinned caster is bounded by its posed skeleton (#833); one whose pose
             // cannot be bounded is never culled — a wrongly-culled caster drops its shadow.
             let bounds = gpu_mesh.world_bounds(&mesh, world);
             let bone_base = push_palette(&mut joints, mesh.active_palette());
-            for (indices, clip) in runs {
+            for (indices, clip) in join_runs(clipped) {
                 let mut caster = CasterData::new(world, bone_base);
                 if let Some((cutoff, textured)) = clip.and_then(|c| c.cutout) {
                     caster = caster.cutout(cutoff, textured);
@@ -231,9 +232,8 @@ impl ShadowRenderer {
                         mirrored: is_mirrored(world),
                         clip: clip.map(|c| c.clip),
                         mesh: mesh_id.clone(),
-                        first_index: indices.start,
+                        indices: indices.into(),
                     },
-                    indices,
                     caster,
                     bounds,
                 });
@@ -280,7 +280,7 @@ impl ShadowRenderer {
             render_pass.set_vertex_buffer(0, gpu_mesh.vertex_buffer.slice(..));
             render_pass
                 .set_index_buffer(gpu_mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
-            render_pass.draw_indexed(batch.indices.clone(), 0, batch.instances.clone());
+            render_pass.draw_indexed(batch.key.indices.range(), 0, batch.instances.clone());
         }
     }
 }
@@ -289,7 +289,6 @@ impl ShadowRenderer {
 /// when they cannot be bounded — never culled).
 struct Candidate {
     key: CasterKey,
-    indices: Range<u32>,
     caster: CasterData,
     bounds: Option<(glam::Vec3, glam::Vec3)>,
 }

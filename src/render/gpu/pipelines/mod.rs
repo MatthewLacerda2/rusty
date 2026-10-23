@@ -181,3 +181,7 @@ mod scrolled_cut_tests;
 #[cfg(test)]
 #[path = "tests/lazy_tests.rs"]
 mod lazy_tests;
+
+#[cfg(test)]
+#[path = "tests/slot_params_tests.rs"]
+mod slot_params_tests;

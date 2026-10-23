@@ -14,11 +14,11 @@ use crate::scene::{Camera, Scene};
 use crate::shadergen::recipe::{BlockSel, ParamValue, PassKind, ShaderRecipe};
 use crate::shadergen::{bake_recipe, engine_shader_dir, DEFAULT_OUT_DIR};
 
-pub(super) const RES: u32 = 32;
+pub(crate) const RES: u32 = 32;
 
 /// A red hit-flash surface shader baked where scripts and the renderer resolve it,
 /// under a name unique to this run; removed on drop.
-pub(super) struct Flash(pub(super) String);
+pub(crate) struct Flash(pub(crate) String);
 
 impl Flash {
     pub(super) fn bake() -> Self {
@@ -26,7 +26,7 @@ impl Flash {
     }
 
     /// Baked under a name carrying `tag`, so tests sharing a process never share it.
-    pub(super) fn bake_as(tag: &str) -> Self {
+    pub(crate) fn bake_as(tag: &str) -> Self {
         let name = format!("test_hit_flash{tag}_{}", std::process::id());
         let params = [("color".to_string(), ParamValue::Vector(vec![1.0, 0.0, 0.0]))];
         let recipe = ShaderRecipe {
@@ -62,7 +62,7 @@ pub(super) fn sphere(scene: &mut Scene, x: f32, shader: &str) -> u32 {
     id
 }
 
-pub(super) fn lua(scene: &RefCell<Scene>, script: &str) {
+pub(crate) fn lua(scene: &RefCell<Scene>, script: &str) {
     let lua = Lua::new();
     lua.scope(|s| {
         crate::api::material::register(&lua, s, scene).unwrap();
@@ -72,7 +72,7 @@ pub(super) fn lua(scene: &RefCell<Scene>, script: &str) {
 }
 
 /// The summed (red, blue) of the centre row's left and right halves.
-pub(super) fn halves(renderer: &mut Renderer, scene: &Scene) -> [(u32, u32); 2] {
+pub(crate) fn halves(renderer: &mut Renderer, scene: &Scene) -> [(u32, u32); 2] {
     let mut view = RenderView::offscreen(&renderer.device, OFFSCREEN_FORMAT, RES, RES, 2);
     let out = view.color_target_view().unwrap();
     let cam = Camera::new(Vec3::new(0.0, 0.0, 6.0), -90.0, 0.0);

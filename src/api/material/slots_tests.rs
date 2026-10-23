@@ -76,14 +76,25 @@ fn set_at_changes_only_its_slot_and_set_the_first() {
 #[test]
 fn a_slot_out_of_range_or_an_unknown_key_is_an_error_that_changes_nothing() {
     let (scene, id) = two_run_quad();
-    let out = eval(&scene, &format!(r#"Material.SetAt({id}, 2, "green")"#)).unwrap_err();
-    assert!(out.contains("slot 2 is out of range"), "{out}");
+    let out = eval(&scene, &format!(r#"Material.SetAt({id}, 3, "green")"#)).unwrap_err();
+    assert!(out.contains("slot 3 is out of range"), "{out}");
     let out = eval(&scene, &format!(r#"Material.Set({id}, "chrome")"#)).unwrap_err();
     assert!(out.contains("no material asset \"chrome\""), "{out}");
     assert_eq!(
         scene.borrow().world.material(id).unwrap().materials,
         ["red", "blue"]
     );
+}
+
+#[test]
+fn set_at_one_past_the_last_slot_adds_one_and_getall_round_trips_through_ipairs() {
+    let (scene, id) = two_run_quad();
+    eval(&scene, &format!(r#"Material.SetAt({id}, 2, "green")"#)).unwrap();
+    let copy = format!(
+        "for i, key in ipairs(Material.GetAll({id})) do Material.SetAt({id}, i - 1, key) end
+         return Material.GetAll({id})"
+    );
+    assert_eq!(eval(&scene, &copy).unwrap(), "red,blue,green");
 }
 
 #[test]

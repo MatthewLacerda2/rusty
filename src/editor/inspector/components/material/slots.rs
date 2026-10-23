@@ -1,6 +1,6 @@
-//! The Material card's slot list (#1285): one row per sub-mesh run of the entity's
-//! mesh (Unity's `Materials` list, `Element 0`, `Element 1`, …). Each row picks the
-//! library material that run draws with, through the shared
+//! The Material card's slot list (#1285): one row per material slot of the entity
+//! (Unity's `Materials` list, `Element 0`, `Element 1`, …). Each row picks the
+//! library material its slot draws with, through the shared
 //! `authoring::material::set_slot` op `Material.SetAt` calls too, and the selected
 //! row is the one the card below edits. A one-slot entity shows no list.
 

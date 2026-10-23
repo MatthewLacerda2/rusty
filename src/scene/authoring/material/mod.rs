@@ -32,7 +32,7 @@ pub use shader_params::{
     set_entity_shader_param, set_entity_shader_param_with, set_shader_param, shader_layout,
     shader_param,
 };
-pub use slots::{keys, set_slot, slot_count};
+pub use slots::{keys, set_slot};
 
 use super::sanitize::unit;
 use crate::asset::MapRef;

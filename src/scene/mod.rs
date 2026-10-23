@@ -72,6 +72,7 @@ pub use lighting::probe::{Probe, ProbeGrid, ProbeVolume};
 pub use lighting::probe_fill::analytic_fill;
 pub use lighting::reflection_probe::{ReflectionProbe, ReflectionProbeSet};
 pub use lighting::sh::Sh9;
+pub use material_lookup::{MaterialEntry, SlotDraw};
 pub use prefab::link::{
     list_instance_overrides, record_instance_overrides, reimport_instance,
     revert_instance_overrides,

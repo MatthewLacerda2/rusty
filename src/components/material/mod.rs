@@ -172,11 +172,10 @@ impl MaterialAsset {
 /// The entity's references to library materials — the first-class component. Holds
 /// only library keys; the data lives in `Scene.materials`.
 ///
-/// One key per sub-mesh of the entity's mesh, in the mesh's range order (Unity's
-/// `Renderer.sharedMaterials`, #1285): a mesh imported with two materials draws its
-/// first index range with `materials[0]` and its second with `materials[1]`. A
-/// one-range mesh has a one-entry list. A range past the end of the list draws with
-/// the first material ([`Self::for_range`]), so no geometry goes invisible.
+/// One key per material slot, Unity's `Renderer.sharedMaterials` (#1285): slot `i`
+/// draws the entity's mesh run `i`. As in Unity, a slot past the mesh's last run
+/// draws that last run again (a second pass over it), and a run past the last slot
+/// is not drawn ([`Self::slot_runs`]). Instancing a model fills one slot per run.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MaterialComponent {
     pub materials: Vec<String>,
@@ -202,11 +201,12 @@ impl MaterialComponent {
         self.materials.first().map_or("", String::as_str)
     }
 
-    /// The key sub-mesh range `range` draws with: its own entry, else the first.
-    pub fn for_range(&self, range: usize) -> &str {
-        self.materials
-            .get(range)
-            .map_or(self.first(), String::as_str)
+    /// The `(slot, run)` pairs drawn over a mesh of `runs` runs, Unity's way: slot `i`
+    /// draws run `i`, a slot past the last run draws the last run again, and a run
+    /// past the last slot is not drawn. Nothing for a mesh with no runs.
+    pub fn slot_runs(&self, runs: usize) -> impl Iterator<Item = (usize, usize)> {
+        let last = runs.checked_sub(1);
+        (0..self.materials.len()).filter_map(move |slot| last.map(|l| (slot, slot.min(l))))
     }
 }
 

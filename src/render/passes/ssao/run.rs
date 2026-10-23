@@ -41,7 +41,7 @@ impl Renderer {
         c.add_draws(
             solids
                 .iter()
-                .map(|b| (b.indices.len() as u32, b.instances.len() as u32)),
+                .map(|b| (b.key.indices.count(), b.instances.len() as u32)),
         );
         c.ssao_samples += u64::from(w) * u64::from(h) * u64::from(frame.plan.tier.samples);
     }

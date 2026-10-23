@@ -6,20 +6,25 @@ fn at(x: f32, bone_base: u32) -> CasterData {
 }
 
 fn mesh(m: &str) -> CasterKey {
+    run(m, 0..36)
+}
+
+/// A plain caster of mesh `m` over its index run `indices`.
+fn run(m: &str, indices: std::ops::Range<u32>) -> CasterKey {
     CasterKey {
         mirrored: false,
         clip: None,
         mesh: MeshId(m.to_string()),
-        first_index: 0,
+        indices: indices.into(),
     }
 }
 
 #[test]
 fn casters_of_one_mesh_become_one_instanced_draw() {
     let casters = vec![
-        (mesh("Box"), 0..36, at(0.0, 0)),
-        (mesh("Pillar"), 0..96, at(1.0, 0)),
-        (mesh("Box"), 0..36, at(2.0, 0)),
+        (mesh("Box"), at(0.0, 0)),
+        (run("Pillar", 0..96), at(1.0, 0)),
+        (mesh("Box"), at(2.0, 0)),
     ];
     let (packed, batches) = batch_casters(casters.clone(), true);
     let counts: Vec<_> = batches.iter().map(CasterBatch::counts).collect();
@@ -30,13 +35,27 @@ fn casters_of_one_mesh_become_one_instanced_draw() {
     assert_eq!(solo.len(), 3, "instancing off: one draw per caster");
 }
 
+/// Two casters of one mesh over differently joined runs (#1285: one entity's
+/// materials all plain, another's slot 1 cutout) never share a draw: each draws
+/// its own indices.
+#[test]
+fn casters_over_different_runs_of_one_mesh_draw_apart() {
+    let casters = vec![
+        (run("Quad", 0..6), at(0.0, 0)),
+        (run("Quad", 0..3), at(1.0, 0)),
+    ];
+    let (_, batches) = batch_casters(casters, true);
+    let counts: Vec<_> = batches.iter().map(CasterBatch::counts).collect();
+    assert_eq!(counts, [(3, 1), (6, 1)]);
+}
+
 /// The pose rides each instance (#599), so two skinned copies of one rig cost one
 /// shadow draw, each still reading its own palette.
 #[test]
 fn skinned_copies_of_one_mesh_share_a_draw_with_their_own_palettes() {
     let casters = vec![
-        (mesh("Rig"), 0..900, at(0.0, 1)),
-        (mesh("Rig"), 0..900, at(4.0, 31)),
+        (run("Rig", 0..900), at(0.0, 1)),
+        (run("Rig", 0..900), at(4.0, 31)),
     ];
     let (packed, batches) = batch_casters(casters, true);
     let counts: Vec<_> = batches.iter().map(CasterBatch::counts).collect();
@@ -58,9 +77,9 @@ fn a_clipped_caster_draws_apart_from_plain_copies_of_its_mesh() {
         ..mesh("Box")
     };
     let casters = vec![
-        (clipped.clone(), 0..36, at(0.0, 0).cutout(0.5, true)),
-        (mesh("Box"), 0..36, at(1.0, 0)),
-        (clipped, 0..36, at(2.0, 0)),
+        (clipped.clone(), at(0.0, 0).cutout(0.5, true)),
+        (mesh("Box"), at(1.0, 0)),
+        (clipped, at(2.0, 0)),
     ];
     let (packed, batches) = batch_casters(casters, true);
     let keys: Vec<_> = batches.iter().map(|b| b.key.clip).collect();
@@ -87,9 +106,9 @@ fn a_mirrored_caster_draws_apart_from_unmirrored_copies() {
         ..mesh("Box")
     };
     let casters = vec![
-        (mirrored.clone(), 0..36, at(0.0, 0)),
-        (mesh("Box"), 0..36, at(1.0, 0)),
-        (mirrored, 0..36, at(2.0, 0)),
+        (mirrored.clone(), at(0.0, 0)),
+        (mesh("Box"), at(1.0, 0)),
+        (mirrored, at(2.0, 0)),
     ];
     let (_, batches) = batch_casters(casters, true);
     let runs: Vec<_> = batches
@@ -112,7 +131,7 @@ fn mirrored_runs_sort_before_the_clip_material() {
         ..mesh("Box")
     };
     let casters = [(true, 3), (false, 4), (true, 4), (false, 3)]
-        .map(|(m, mat)| (key(m, mat), 0..36, at(0.0, 0)))
+        .map(|(m, mat)| (key(m, mat), at(0.0, 0)))
         .to_vec();
     let (_, batches) = batch_casters(casters, true);
     let order: Vec<_> = batches

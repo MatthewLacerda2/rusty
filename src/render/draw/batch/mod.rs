@@ -28,15 +28,45 @@ pub(crate) struct BatchKey {
     pub pipeline: usize,
     /// The geometry (vertex + index buffers), by asset identity (#127).
     pub mesh: MeshId,
-    /// Where the drawn index run starts (#1285): each material run of one mesh is a
-    /// draw of its own.
-    pub first_index: u32,
+    /// The run of the mesh's index buffer drawn, start and end (#1285): each material
+    /// run of one mesh is a draw of its own, and two draws over differently joined
+    /// runs never merge.
+    pub indices: IndexRun,
     /// The group-2 material bind group (the resolved texture maps), by cache index.
     pub material: usize,
     /// The per-draw uniform's words (tint, PBR scalars, map and cutout flags, and the
     /// skinned palette's `bone_base`), compared bit-for-bit — so each skinned entity,
     /// with a palette of its own, is a draw of its own.
     pub uniform: [u32; 36],
+}
+
+/// A run of a mesh's index buffer as part of a draw key (#1285): its start and its
+/// end, ordered, so runs that differ anywhere are different draws.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub(crate) struct IndexRun {
+    pub start: u32,
+    pub end: u32,
+}
+
+impl IndexRun {
+    /// The indices this run draws.
+    pub(crate) fn range(self) -> Range<u32> {
+        self.start..self.end
+    }
+
+    /// How many indices it draws.
+    pub(crate) fn count(self) -> u32 {
+        self.end - self.start
+    }
+}
+
+impl From<Range<u32>> for IndexRun {
+    fn from(r: Range<u32>) -> Self {
+        Self {
+            start: r.start,
+            end: r.end,
+        }
+    }
 }
 
 impl BatchKey {
@@ -49,8 +79,6 @@ impl BatchKey {
 /// One visible solid, ready to batch.
 pub(crate) struct DrawItem {
     pub key: BatchKey,
-    /// The run of the mesh's index buffer this draw reads (#1285).
-    pub indices: Range<u32>,
     pub instance: InstanceData,
     /// Whether the selection outline rings this solid (#1175): it is then drawn a
     /// second time, from this same draw, into the selection mask.
@@ -75,7 +103,7 @@ impl OutlineDraw {
         Self {
             mesh: batch.key.mesh.clone(),
             material: batch.key.material,
-            indices: batch.indices.clone(),
+            indices: batch.key.indices.range(),
             uniform_slot: batch.uniform_slot,
             instance,
         }
@@ -86,7 +114,6 @@ impl OutlineDraw {
 /// `uniform_slot` of the frame's packed uniforms.
 pub(crate) struct DrawBatch {
     pub key: BatchKey,
-    pub indices: Range<u32>,
     pub uniform_slot: u32,
     pub instances: Range<u32>,
 }
@@ -132,7 +159,6 @@ impl FrameDraws {
                 Some(run) if merge && run.key == item.key => run.instances.end = index + 1,
                 _ => batches.push(DrawBatch {
                     key: item.key,
-                    indices: item.indices,
                     uniform_slot: slot_base + batches.len() as u32,
                     instances: index..index + 1,
                 }),

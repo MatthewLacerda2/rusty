@@ -16,6 +16,8 @@
 //! GPU buffers are ever inlined, so save + reload preserves the reference exactly
 //! as a primitive's `primitive_type` rehydrates.
 
+use std::collections::BTreeMap;
+
 use glam::Vec3;
 
 use crate::asset::{self, ImportedAsset};
@@ -86,10 +88,14 @@ fn apply_material(scene: &mut Scene, id: u32, path: &str, asset: &ImportedAsset,
         .sub_mesh(sub)
         .map(|s| s.ranges.iter().map(|r| r.material).collect())
         .unwrap_or_default();
-    let keys: Vec<Option<String>> = runs
-        .iter()
-        .map(|run| run.and_then(|idx| import_material(scene, path, asset, idx)))
-        .collect();
+    // Each distinct material is converted once, however many runs draw with it.
+    let mut converted: BTreeMap<usize, Option<String>> = BTreeMap::new();
+    let mut key_of = |idx: usize| {
+        let key = converted.entry(idx);
+        key.or_insert_with(|| import_material(scene, path, asset, idx))
+            .clone()
+    };
+    let keys: Vec<Option<String>> = runs.iter().map(|run| run.and_then(&mut key_of)).collect();
     // A run with no material, or none at all, draws with the entity's own default.
     if keys.is_empty() || keys.iter().any(Option::is_none) {
         crate::scene::authoring::attach_default_material(scene, id);

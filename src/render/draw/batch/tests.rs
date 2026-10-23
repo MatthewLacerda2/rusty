@@ -15,11 +15,10 @@ pub(super) fn item(mesh: &str, bone_base: u32, tint: f32, tag: f32) -> DrawItem 
         key: BatchKey {
             pipeline: 0,
             mesh: MeshId(mesh.to_string()),
-            first_index: 0,
+            indices: (0..36).into(),
             material: 0,
             uniform,
         },
-        indices: 0..36,
         instance,
         outline: false,
     }
@@ -99,4 +98,17 @@ fn instancing_off_is_one_draw_per_entity_in_scene_order() {
     assert_eq!(draws.opaque.len(), 3);
     assert_eq!(tags(&draws), [0.0, 1.0, 2.0]);
     assert!(draws.opaque.iter().all(|b| b.instances.len() == 1));
+}
+
+/// Two draws of one mesh and material over different index runs (#1285) never merge,
+/// even when one run starts where the other does: each keeps its own count.
+#[test]
+fn draws_over_different_runs_of_one_mesh_stay_apart() {
+    let mut joined = item("Quad", 0, 1.0, 0.0);
+    joined.key.indices = (0..6).into();
+    let mut half = item("Quad", 0, 1.0, 1.0);
+    half.key.indices = (0..3).into();
+    let draws = FrameDraws::build(vec![joined, half], Vec::new(), true);
+    let counts: Vec<_> = draws.opaque.iter().map(|b| b.key.indices.count()).collect();
+    assert_eq!(counts, [3, 6]);
 }

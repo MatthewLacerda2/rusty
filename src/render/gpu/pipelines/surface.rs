@@ -285,7 +285,7 @@ mod surface_tests;
 
 #[cfg(test)]
 #[path = "tests/params_tests.rs"]
-mod params_tests;
+pub(crate) mod params_tests;
 
 #[cfg(test)]
 #[path = "tests/mask_tests.rs"]
