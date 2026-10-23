@@ -203,6 +203,24 @@ boots that scene straight into Play and exits when the game calls
 `Application.Quit()` (a main-menu Quit button) or the window closes, saving
 `Storage` on the way out.
 
+The project it ships is an **export** of yours, Unity's Build for rusty's one
+runtime:
+
+```sh
+make export PROJECT=~/games/horde OUT=build/horde
+```
+
+It brings every converted model (`.fbx`, `.blend`) up to date in the import cache
+(`assets/generated/imported/`), then copies `project.rusty` and `assets/` into
+`OUT`, import cache included, and leaves those sources behind. A source that fails
+to convert fails the export, naming it. `cache/` and `saved/` are not copied, and
+`OUT` must be new or empty, outside the project. Files are copied in sorted order,
+so two exports of one project are identical. The exported project has nothing to
+convert, so the player never converts and never needs Blender; scenes still name
+`soldier.fbx::Body` and `soldier.fbx#tex/Skin`, which resolve through the cache.
+Run straight from a project folder instead, the player brings its sources up to
+date before Play, as the editor does.
+
 A shipped game is laid out with its project and the engine's content beside the
 binary; the player finds both from wherever it is launched:
 
@@ -210,7 +228,7 @@ binary; the player finds both from wherever it is launched:
 MyGame/                       MyGame.app/Contents/
   player                        MacOS/player
   engine/   (from rusty)        Resources/engine/
-  project/  (the game)          Resources/project/
+  project/  (an export)        Resources/project/
 ```
 
 `--project <dir>` still overrides. Packaging and installers are not covered yet.

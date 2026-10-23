@@ -231,11 +231,12 @@ rule cannot drift apart.
 
 rusty requires Blender 5+ to import a `.blend`, but `make test` and the suite jobs
 run without one, so the tests that convert through a real Blender
-(`asset::convert::blend::tests`) are `#[ignore]`d, each with its `skip` reason.
+(`asset::convert::blend::tests`, and exporting a `.blend` project in
+`tests/export/blend.rs`) are `#[ignore]`d, each with its `skip` reason.
 CI's `blender` job installs Blender and runs exactly those; locally, with Blender
 on `PATH` or named by `RUSTY_BLENDER`:
 
-    cargo nextest run --run-ignored only -E 'test(/convert::blend::/)'
+    cargo nextest run --features dev --run-ignored only -E 'test(/convert::blend::|^export::blend::/)'
 
 Finding Blender (not found, too old, the override, a version that fails, hangs or
 cannot start, a newer one put earlier on `PATH`)

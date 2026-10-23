@@ -31,7 +31,7 @@ SELF_CHECKS := target-dir inventory
 
 .DEFAULT_GOAL := help
 .NOTPARALLEL:
-.PHONY: help setup compile-cache check gates quick-gates pre-commit resolved $(SELF_CHECKS) $(GATES) mergeable queue queue-daemon queue-stop blockers checks reclaim mutants-remote dead-pub editor-capture bench
+.PHONY: help setup compile-cache check gates quick-gates pre-commit resolved $(SELF_CHECKS) $(GATES) mergeable queue queue-daemon queue-stop blockers checks reclaim mutants-remote dead-pub editor-capture export bench
 
 help: ## List the verbs
 	@grep -E '^[a-z-]+:.*## ' $(firstword $(MAKEFILE_LIST)) | \
@@ -282,6 +282,16 @@ dead-pub: ## Signal: pub items nothing uses, and items only tests use (tools/lin
 OUT ?= editor-capture.png
 editor-capture: ## Render the editor to a PNG headlessly. make editor-capture OUT=after.png ARGS="--select Player"
 	cargo run --quiet --features dev --bin editor-capture -- --out $(OUT) $(ARGS)
+
+# Ship a project (#1267): bring its converted sources (.fbx, .blend) up to date, then
+# copy its runtime files and import cache into OUT, leaving those sources behind, so
+# the player runs the result with no converter and no Blender. OUT must be new or
+# empty, outside the project. Both are required: OUT has a default above.
+export: ## Ship a project without its convertible sources. make export PROJECT=~/games/horde OUT=build/horde
+	@test -n "$(PROJECT)" && test "$(origin OUT)" = "command line" || { \
+		echo "export: make export PROJECT=<project dir> OUT=<new or empty folder>" >&2; \
+		exit 1; }
+	cargo run --quiet --locked --features dev --bin export -- --project $(PROJECT) --out $(OUT)
 
 # The shooter-shaped stress scene (#835): 50 skinned soldiers on the navmesh, 32
 # lights, a full decal registry, smoke. Prints frame / render / GPU ms (avg and p95),

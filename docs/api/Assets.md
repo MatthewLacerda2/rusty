@@ -14,7 +14,9 @@ mesh-instantiation path to place exactly what the manifest names. Files that fai
 import are skipped; a missing root yields an empty list. Output is deterministic
 (files sorted by path, sub-objects in source order). During Play nothing is converted
 (#1253), so an `.fbx` or a `.blend` is listed from its last import: the one made as Play began, or
-before a source changed during Play.
+before a source changed during Play. An exported project (`make export`, #1267)
+has the cache but not the sources, so it lists no `.fbx` or `.blend`; instancing
+one by its source path still works.
 
 | Function | Signature | Returns |
 |---|---|---|

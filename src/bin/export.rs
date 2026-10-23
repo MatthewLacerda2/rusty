@@ -42,12 +42,17 @@ fn main() {
         exit(2);
     }
     match rusty::dev::export::export(&out) {
-        Ok(done) => println!(
-            "export: wrote {} files to {} ({} sources converted and left behind)",
-            done.files.len(),
-            out.display(),
-            done.sources.len()
-        ),
+        Ok(done) => {
+            let sources = match done.sources.len() {
+                1 => "1 source".to_string(),
+                n => format!("{n} sources"),
+            };
+            println!(
+                "export: wrote {} files to {}; converted and left behind {sources}",
+                done.files.len(),
+                out.display(),
+            );
+        }
         Err(e) => {
             eprintln!("export: {e}");
             exit(1);
