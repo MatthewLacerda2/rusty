@@ -89,7 +89,7 @@ pub struct Resources {
     pub(super) standalone: bool,
     /// The scaled per-frame delta (`Time::delta_time`) for the tick in flight, set by
     /// `GameWorld::tick` before the schedule runs. Systems read it instead of taking
-    /// `dt` as a third argument, keeping the call shape `(&mut Scene, &mut Resources)`.
+    /// `dt` as a third argument, keeping the call shape `(&mut World, &mut Resources)`.
     pub(super) frame_dt: f32,
     /// The ordered per-stage system registry that drives the tick. Built once at
     /// construction from `app::build()`, where every module self-registers.
@@ -168,11 +168,6 @@ impl Resources {
             animation_events: Vec::new(),
             probe: None,
         }
-    }
-
-    /// The scaled per-frame delta for the tick in flight (`Time::delta_time`).
-    pub fn dt(&self) -> f32 {
-        self.frame_dt
     }
 
     /// Flush the persistent store at a boundary (Stop / quit), logging any failure

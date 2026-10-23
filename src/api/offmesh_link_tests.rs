@@ -24,7 +24,6 @@ fn scene_with_link() -> (Scene, u32, u32) {
         size: Vec3::new(12.0, 0.1, 12.0),
     };
     scene.world.set_collider(floor, Some(col));
-    scene.update_entity_collider(floor);
     let id = scene.add_entity("ladder".to_string());
     scene.world.transform_mut(id).unwrap().position = Vec3::new(3.0, 0.0, 3.0);
     scene

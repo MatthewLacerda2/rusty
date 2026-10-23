@@ -12,7 +12,7 @@ use super::preview;
 use crate::asset::{IMAGE_EXTENSIONS, MODEL_EXTENSIONS};
 use crate::editor::EditorUi;
 use crate::navigation::NavigationGraph;
-use crate::scene::Scene;
+use crate::scene::{Scene, PREFAB_EXTENSION, SCENE_EXTENSION};
 use crate::scripting::ConsoleLogs;
 use egui_phosphor::regular as icon;
 
@@ -45,10 +45,10 @@ pub fn draw_inspector(
         "wav" | "mp3" | "ogg" => {
             audio::draw(ui, editor, path);
         }
-        "scene" => {
+        SCENE_EXTENSION => {
             scene::draw(ui, editor, scene, console, nav, path);
         }
-        "prefab" => {
+        PREFAB_EXTENSION => {
             prefab::draw(ui, editor, scene, path);
         }
         e if MODEL_EXTENSIONS.contains(&e) => {

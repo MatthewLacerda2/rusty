@@ -2,6 +2,7 @@
 
 use super::super::super::test_support::{add_box, add_floor, bake_pinned, floors, ground};
 use super::super::super::NavigationGraph;
+use crate::navigation::ALL_AREAS;
 use crate::scene::Scene;
 use glam::Vec3;
 
@@ -27,7 +28,8 @@ fn thin_passage_closes_under_erosion() {
         assert!(!g.is_walkable(4, gz), "passage cell (4,{gz}) eroded shut");
     }
     assert!(
-        g.find_path(ground(&g, 1, 5), ground(&g, 8, 5)).is_none(),
+        !g.find_path_masked(ground(&g, 1, 5), ground(&g, 8, 5), ALL_AREAS)
+            .1,
         "sides cut apart"
     );
 }

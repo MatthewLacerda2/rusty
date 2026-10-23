@@ -13,9 +13,10 @@
 //!    submits (`OnSubmit`), Escape or pad `B` cancels (`OnCancel`); a focused
 //!    entity defining `OnMove` takes the Move itself.
 //! 3. **Pointer** (`pointer`): the top-most raycast target under the mouse
-//!    ([`raycast()`]) drives `OnPointerEnter` / `OnPointerExit`; each mouse button's
-//!    edges drive `OnPointerDown` / `OnPointerUp` / `OnPointerClick` and the drag
-//!    callbacks; the wheel drives `OnScroll`.
+//!    ([`raycast_pointer`], screen and world canvases alike) drives
+//!    `OnPointerEnter` / `OnPointerExit`; each mouse button's edges drive
+//!    `OnPointerDown` / `OnPointerUp` / `OnPointerClick` and the drag callbacks;
+//!    the wheel drives `OnScroll`.
 //!
 //! Events **bubble**: each goes to the nearest ancestor-or-self of the hit entity
 //! that handles it. A `Selectable` that is not interactable (its own flag or a
@@ -48,7 +49,7 @@ use crate::ui::{UiLayout, UiPointer, UiView};
 
 use focus::MoveRepeat;
 pub use focus::{find_selectable, NavAction};
-pub use raycast::{raycast, raycast_pointer};
+pub use raycast::raycast_pointer;
 
 /// How far behind a wall's surface a world canvas still counts as in front of it —
 /// a sign authored flush on a wall stays clickable (#429).

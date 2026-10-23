@@ -20,7 +20,7 @@ fn bake_green(name: &str) {
         r#"{{"pass":"postfx","name":"{name}","blocks":[{{"id":"tint","params":{{"color":[0,1,0]}}}}]}}"#
     );
     bake_recipe(
-        &ShaderRecipe::from_json(&json).unwrap(),
+        &serde_json::from_str::<ShaderRecipe>(&json).unwrap(),
         engine_shader_dir(),
         DEFAULT_OUT_DIR,
     )

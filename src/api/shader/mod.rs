@@ -230,7 +230,9 @@ mod tests {
             )
             .eval()
             .unwrap();
-        let recipe = ShaderRecipe::from_json(&json).expect("json parses");
+        let recipe: ShaderRecipe =
+            crate::api::lua_json::decode(serde_json::from_str(&json).unwrap())
+                .expect("json parses");
         assert_eq!(recipe.name, "toon");
         assert_eq!(recipe.blocks[0].id, "toon_ramp");
     }

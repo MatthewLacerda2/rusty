@@ -83,7 +83,6 @@ fn collider_yields_world_bounds() {
     let mut scene = Scene::new();
     let id = create_entity(&mut scene, "Solid", Some(Primitive::Box));
     add_component(&mut scene, id, ComponentKind::Collider);
-    scene.update_entity_collider(id);
 
     let ent = &world_value(&scene, &cam(), 0, false, &view())["entities"][0];
     let bounds = &ent["bounds"];

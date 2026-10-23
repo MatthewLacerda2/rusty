@@ -47,7 +47,6 @@ fn add(
     let mut c = ColliderComponent::from_mesh_bounds(false, Vec3::ZERO, Vec3::ZERO);
     c.shape = shape.clone();
     scene.world.set_collider(id, Some(c));
-    scene.update_entity_collider(id);
     id
 }
 

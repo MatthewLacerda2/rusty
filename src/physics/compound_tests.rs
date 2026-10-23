@@ -46,8 +46,8 @@ fn rigidbody(scene: &mut Scene, id: u32, kinematic: bool, velocity: Vec3) {
 /// The entity a straight-down ray from 5 m above `(x, _, z)` hits, if any.
 fn hit_below(world: &PhysicsWorld, x: f32, z: f32) -> Option<u32> {
     world
-        .cast_ray(Vec3::new(x, 5.0, z), DOWN, 20.0)
-        .map(|(id, _)| id)
+        .raycast_hit(Vec3::new(x, 5.0, z), DOWN, 20.0, |_| true)
+        .map(|hit| hit.id)
 }
 
 fn pos(scene: &Scene, id: u32) -> Vec3 {

@@ -104,37 +104,11 @@ impl ShaderRecipe {
     pub fn to_json(&self) -> Result<String, String> {
         serde_json::to_string_pretty(self).map_err(|e| e.to_string())
     }
-
-    /// Parse a recipe from its JSON form.
-    pub fn from_json(s: &str) -> Result<Self, String> {
-        serde_json::from_str(s).map_err(|e| e.to_string())
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn sample_recipe() -> ShaderRecipe {
-        let mut params = BTreeMap::new();
-        params.insert("steps".to_string(), ParamValue::Scalar(4.0));
-        ShaderRecipe {
-            pass: PassKind::Surface,
-            name: "toon".into(),
-            blocks: vec![BlockSel {
-                id: "toon_ramp".into(),
-                params,
-            }],
-        }
-    }
-
-    #[test]
-    fn recipe_round_trips_through_json_unchanged() {
-        let r = sample_recipe();
-        let json = r.to_json().expect("serialize");
-        let back = ShaderRecipe::from_json(&json).expect("deserialize");
-        assert_eq!(r, back);
-    }
 
     #[test]
     fn pass_tag_is_snake_case() {

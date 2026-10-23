@@ -1,8 +1,8 @@
 //! Path queries (#458) on baked primitive-box rooms.
 
 use super::super::test_support::{add_box, add_floor, bake_pinned};
-use super::super::NavigationGraph;
-use super::NavPathStatus;
+use super::super::{NavigationGraph, ALL_AREAS};
+use super::{path_length, NavPathStatus};
 use crate::scene::Scene;
 use glam::Vec3;
 
@@ -31,7 +31,7 @@ fn open_room_path_is_one_straight_run() {
     let path = g.calculate_path(v(2.0, 2.0), v(8.0, 7.0));
     assert_eq!(path.status, NavPathStatus::Complete);
     assert_eq!(path.corners, vec![v(2.0, 2.0), v(8.0, 7.0)], "no staircase");
-    assert!((path.length() - 61f32.sqrt()).abs() < 1e-4);
+    assert!((path_length(&path.corners) - 61f32.sqrt()).abs() < 1e-4);
     assert_eq!(g.get_next_path_step(v(2.0, 2.0), v(8.0, 7.0)), v(8.0, 7.0));
 }
 
@@ -51,13 +51,15 @@ fn path_around_a_wall_turns_only_at_its_end_and_cuts_across() {
         (v(2.0, 2.0), v(8.0, 2.0))
     );
     for leg in path.corners.windows(2) {
-        let walk = g.raycast(leg[0], leg[1]).expect("on the mesh");
+        let walk = g
+            .raycast_masked(leg[0], leg[1], ALL_AREAS)
+            .expect("on the mesh");
         assert!(!walk.hit, "leg {leg:?} crosses unwalkable ground");
     }
     let staircase = g.path_between(v(2.0, 2.0), v(8.0, 2.0)).expect("a path");
     let cells: Vec<Vec3> = staircase.iter().map(|&s| g.span_world(s)).collect();
     assert!(
-        path.length() < super::path_length(&cells),
+        path_length(&path.corners) < path_length(&cells),
         "shorter than the cell path"
     );
 }
@@ -69,7 +71,9 @@ fn raycast_stops_at_the_eroded_edge_of_a_wall() {
         !g.is_walkable(4, 5) && g.is_walkable(3, 5),
         "erosion left x = 3"
     );
-    let walk = g.raycast(v(2.0, 5.0), v(8.0, 5.0)).expect("on the mesh");
+    let walk = g
+        .raycast_masked(v(2.0, 5.0), v(8.0, 5.0), ALL_AREAS)
+        .expect("on the mesh");
     assert!(walk.hit);
     assert!(
         (walk.position.x - 3.5).abs() < 0.01,
@@ -81,7 +85,9 @@ fn raycast_stops_at_the_eroded_edge_of_a_wall() {
         (3, 5),
         "inside the last cell"
     );
-    let clear = g.raycast(v(2.0, 2.0), v(3.0, 8.0)).expect("on the mesh");
+    let clear = g
+        .raycast_masked(v(2.0, 2.0), v(3.0, 8.0), ALL_AREAS)
+        .expect("on the mesh");
     assert!(!clear.hit);
     assert_eq!(clear.position, v(3.0, 8.0));
 }
@@ -89,7 +95,9 @@ fn raycast_stops_at_the_eroded_edge_of_a_wall() {
 #[test]
 fn raycast_from_off_the_mesh_is_blocked_at_once() {
     let g = room(Some((-5.0, 15.0)), 1.0);
-    let walk = g.raycast(v(5.0, 5.0), v(2.0, 5.0)).expect("a mesh nearby");
+    let walk = g
+        .raycast_masked(v(5.0, 5.0), v(2.0, 5.0), ALL_AREAS)
+        .expect("a mesh nearby");
     assert!(walk.hit);
     assert_eq!(walk.position, v(5.0, 5.0));
 }
@@ -139,6 +147,6 @@ fn no_navmesh_means_an_invalid_path() {
     let g = bake_pinned(&mut Scene::new());
     let path = g.calculate_path(v(2.0, 2.0), v(8.0, 2.0));
     assert_eq!(path.status, NavPathStatus::Invalid);
-    assert!(path.corners.is_empty() && path.length() == 0.0);
+    assert!(path.corners.is_empty());
     assert_eq!(g.get_next_path_step(v(2.0, 2.0), v(8.0, 2.0)), v(8.0, 2.0));
 }

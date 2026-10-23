@@ -129,18 +129,6 @@ impl AnimatorComponent {
         self.is_playing && !self.freeze
     }
 
-    /// Advance the base layer's clip playhead by `dt` (scaled by `speed` and the
-    /// node's rate), wrapping at `clip_duration` when looping — the single-clip
-    /// shorthand of [`Playback::advance`] (the `animate` system advances every
-    /// layer, blend trees included, through that directly).
-    pub fn advance(&mut self, dt: f32, clip_duration: f32) {
-        if self.is_running() {
-            let speed = self.speed;
-            self.base
-                .advance(dt, speed, Playhead::clip(clip_duration), 1.0);
-        }
-    }
-
     /// The IK constraint named `name` (#461).
     pub fn ik_mut(&mut self, name: &str) -> Option<&mut IkConstraint> {
         self.ik.iter_mut().find(|c| c.name == name)

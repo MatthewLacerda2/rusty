@@ -4,7 +4,7 @@
 use glam::{Mat4, Quat, Vec3, Vec4};
 
 use super::SkinBounds;
-use crate::app::animation::sample_palette;
+use crate::app::animation::posed::posed_palette;
 use crate::asset::{AnimationClip, Interpolation, JointTrack, JointTransform, SkinData, Track};
 use crate::components::mesh::Vertex;
 
@@ -116,7 +116,7 @@ fn the_bound_holds_every_vertex_of_every_animated_pose() {
     let clip = bend();
     let mut left_the_rest_box = false;
     for k in 0..=40 {
-        let palette = sample_palette(&skin, &clip, k as f32 * clip.duration / 40.0);
+        let palette = posed_palette(&skin, &clip, k as f32 * clip.duration / 40.0);
         let posed = bounds
             .posed(&palette)
             .expect("a well-formed skin is bounded");

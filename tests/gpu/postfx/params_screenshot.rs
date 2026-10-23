@@ -22,7 +22,7 @@ fn scene() -> RefCell<Scene> {
         r#"{{"pass":"postfx","name":"{NAME}","blocks":[{{"id":"damage_vignette","params":{{"color":[1,0,0]}}}}]}}"#
     );
     bake_recipe(
-        &ShaderRecipe::from_json(&json).unwrap(),
+        &serde_json::from_str::<ShaderRecipe>(&json).unwrap(),
         engine_shader_dir(),
         DEFAULT_OUT_DIR,
     )

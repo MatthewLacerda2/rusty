@@ -29,7 +29,6 @@ fn scene_with_wall(response: CollisionResponse) -> (Scene, u32) {
             ..rusty::scene::authoring::default_collider()
         }),
     );
-    scene.update_entity_collider(wall);
 
     let emitter = scene.add_entity("Emitter".to_string());
     scene.world.transform_mut(emitter).unwrap().position = Vec3::ZERO;

@@ -24,7 +24,7 @@ use crate::physics::PhysicsWorld;
 
 type Physics = std::rc::Rc<std::cell::RefCell<Option<PhysicsWorld>>>;
 
-/// Advance every emitter in the scene by `res.dt()`. The one localised call wired
+/// Advance every emitter in the scene by `res.frame_dt`. The one localised call wired
 /// into the play loop, a canonical `fn(&mut World, &mut Resources)` system.
 pub(super) fn tick_particles(world: &mut World, res: &mut Resources) {
     let dt = res.frame_dt;

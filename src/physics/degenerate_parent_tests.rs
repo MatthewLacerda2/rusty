@@ -40,7 +40,6 @@ fn child_under(scene: &mut Scene, parent_scale: Vec3) -> u32 {
         axis: CapsuleAxis::Y,
     };
     scene.world.set_collider(id, Some(c));
-    scene.update_entity_collider(id);
     id
 }
 

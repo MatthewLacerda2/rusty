@@ -10,6 +10,14 @@ fn cells(path: &[SpanRef]) -> Vec<(i32, i32)> {
     path.iter().map(|s| (s.gx, s.gz)).collect()
 }
 
+/// The span path between two ground cells over every area, which must arrive.
+fn full_path(g: &NavigationGraph, from: (i32, i32), to: (i32, i32)) -> Vec<SpanRef> {
+    let (path, complete) =
+        g.find_path_masked(ground(g, from.0, from.1), ground(g, to.0, to.1), ALL_AREAS);
+    assert!(complete, "{from:?} -> {to:?} should arrive");
+    path
+}
+
 /// The next step is the path's next corner (#458): around a wall it is the corner
 /// past the wall, not the goal and not the adjacent cell.
 #[test]
@@ -30,7 +38,7 @@ fn next_step_is_the_next_corner() {
 #[test]
 fn find_path_exact_cardinal_sequence() {
     let g = open(5.0);
-    let path = g.find_path(ground(&g, 0, 0), ground(&g, 3, 0)).unwrap();
+    let path = full_path(&g, (0, 0), (3, 0));
     assert_eq!(cells(&path), vec![(0, 0), (1, 0), (2, 0), (3, 0)]);
 }
 
@@ -38,7 +46,7 @@ fn find_path_exact_cardinal_sequence() {
 #[test]
 fn find_path_single_diagonal_beats_two_cardinals() {
     let g = open(5.0);
-    let path = g.find_path(ground(&g, 0, 0), ground(&g, 1, 1)).unwrap();
+    let path = full_path(&g, (0, 0), (1, 1));
     assert_eq!(cells(&path), vec![(0, 0), (1, 1)]);
 }
 
@@ -63,7 +71,7 @@ fn link_boundary_at_max_step() {
 #[test]
 fn find_path_three_diagonal_steps_exact_sequence() {
     let g = open(5.0);
-    let path = g.find_path(ground(&g, 0, 0), ground(&g, 3, 3)).unwrap();
+    let path = full_path(&g, (0, 0), (3, 3));
     assert_eq!(cells(&path), vec![(0, 0), (1, 1), (2, 2), (3, 3)]);
 }
 
@@ -73,8 +81,7 @@ fn isolated_goal_has_no_path() {
     let mut g = open(5.0);
     let i = g.span_range(3, 3).start;
     g.spans[i].y = 5.0; // a pillar top
-    assert!(g.find_path(ground(&g, 0, 0), ground(&g, 3, 3)).is_none());
-    let (path, complete) = g.find_path_or_closest(ground(&g, 0, 0), ground(&g, 3, 3));
+    let (path, complete) = g.find_path_masked(ground(&g, 0, 0), ground(&g, 3, 3), ALL_AREAS);
     assert!(!complete);
     assert_eq!(cells(&path).last(), Some(&(3, 2)), "ends beside the pillar");
 }

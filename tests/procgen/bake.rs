@@ -107,7 +107,7 @@ fn metallic_roughness_packs_metallic_b_roughness_g() {
 fn loaded_recipe_re_bakes_identically() {
     let recipe = noise_recipe(48, 77);
     let json = recipe.to_json().unwrap();
-    let back = TextureRecipe::from_json(&json).unwrap();
+    let back: TextureRecipe = serde_json::from_str(&json).unwrap();
     let from_recipe = tmp("rusty_bake_roundtrip_a.png");
     let from_json = tmp("rusty_bake_roundtrip_b.png");
     bake_recipe(&recipe, Slot::Data, &from_recipe).unwrap();

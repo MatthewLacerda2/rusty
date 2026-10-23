@@ -85,10 +85,14 @@ fn sphere_cast_hits_what_a_thin_ray_misses() {
         Vec3::splat(2.0),
     );
     let world = PhysicsWorld::from_scene(&scene);
-    assert_eq!(world.cast_ray(Vec3::ZERO, Vec3::Z, f32::MAX), None);
-    let (id, toi) = world
-        .cast_sphere_filtered(Vec3::ZERO, Vec3::Z, 1.0, f32::MAX, |_| true)
+    assert_eq!(
+        world.raycast_hit(Vec3::ZERO, Vec3::Z, f32::MAX, |_| true),
+        None
+    );
+    let hit = world
+        .sphere_cast_hit(Vec3::ZERO, Vec3::Z, 1.0, f32::MAX, |_| true)
         .expect("swept sphere should clip the high box");
+    let (id, toi) = (hit.id, hit.distance);
     assert_eq!(id, target);
     assert!(
         toi > 0.0 && toi < 5.0,
@@ -96,7 +100,7 @@ fn sphere_cast_hits_what_a_thin_ray_misses() {
     );
     // The accept filter makes the same sweep miss.
     assert_eq!(
-        world.cast_sphere_filtered(Vec3::ZERO, Vec3::Z, 1.0, f32::MAX, |id| id != target),
+        world.sphere_cast_hit(Vec3::ZERO, Vec3::Z, 1.0, f32::MAX, |id| id != target),
         None
     );
 }

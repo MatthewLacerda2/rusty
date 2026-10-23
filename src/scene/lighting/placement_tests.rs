@@ -27,7 +27,6 @@ fn add_static_box(scene: &mut Scene, name: &str, pos: Vec3, size: Vec3) {
             ..crate::scene::authoring::default_collider()
         }),
     );
-    scene.update_entity_collider(id);
 }
 
 /// A 20×6×20 room: a single static floor box spanning [-10,10] in XZ, 6 tall.

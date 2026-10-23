@@ -34,7 +34,6 @@ fn move_to(scene: &mut Scene, id: u32, position: Vec3) {
     if let Some(mut t) = scene.world.transform_mut(id) {
         t.position = position;
     }
-    scene.update_entity_collider(id);
 }
 
 #[test]

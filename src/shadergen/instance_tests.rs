@@ -98,16 +98,3 @@ fn a_param_of_the_wrong_arity_is_refused() {
         assert!(err.contains(want), "{err}");
     }
 }
-
-#[test]
-fn an_unknown_recipe_or_block_key_is_refused() {
-    let bad_block =
-        r#"{ "pass": "postfx", "name": "t", "blocks": [{ "id": "tint", "param": {} }] }"#;
-    let bad_recipe = r#"{ "pass": "postfx", "name": "t", "block": [] }"#;
-    assert!(ShaderRecipe::from_json(bad_block)
-        .unwrap_err()
-        .contains("param"));
-    assert!(ShaderRecipe::from_json(bad_recipe)
-        .unwrap_err()
-        .contains("block"));
-}

@@ -9,8 +9,10 @@
 //!     one-shots — which leave no persistent component, so the log is the *only*
 //!     record they ever played.
 //!
-//! These are plain serde data (no audio-device types), so they serialize straight
-//! into the agent snapshot and a scenario can assert on them with no sound card.
+//! These are plain serde data (no audio-device types), so a test can assert on them
+//! with no sound card (`AudioMaestro::events`). No Lua, MCP or harness surface
+//! exposes them yet: `Debug.Snapshot` shows each entity's `AudioSource` component,
+//! not this log, so a fire-and-forget one-shot is invisible to an agent (#1247).
 
 use serde::{Deserialize, Serialize};
 

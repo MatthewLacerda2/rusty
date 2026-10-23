@@ -78,7 +78,6 @@ fn collision_fires_at_the_hit_point_once() {
         ..rusty::scene::authoring::default_collider()
     };
     scene.world.set_collider(wall, Some(collider));
-    scene.update_entity_collider(wall);
     let dust = child(&mut scene, "Dust", 1);
     let mut cfg = parent(4, 5.0);
     cfg.collision = CollisionResponse::Die;

@@ -113,8 +113,8 @@ fn set_active(scene: &mut Scene, world: &mut PhysicsWorld, id: u32, active: bool
 fn hit_below(world: &PhysicsWorld, x: f32) -> Option<u32> {
     let origin = Vec3::new(x, 5.0, 0.0);
     world
-        .cast_ray_filtered(origin, Vec3::NEG_Y, 20.0, |_| true)
-        .map(|(id, _)| id)
+        .raycast_hit(origin, Vec3::NEG_Y, 20.0, |_| true)
+        .map(|hit| hit.id)
 }
 
 /// Every query family's answer about a unit box `target` at the origin, as
@@ -123,12 +123,12 @@ fn answers(world: &PhysicsWorld, target: u32) -> [bool; 10] {
     let from = Vec3::new(0.0, 0.0, -5.0);
     let only = |id: u32| id == target;
     [
-        world.cast_ray(from, Vec3::Z, 20.0).is_some(),
-        world.cast_ray_filtered(from, Vec3::Z, 20.0, only).is_some(),
+        world.raycast_hit(from, Vec3::Z, 20.0, |_| true).is_some(),
+        world.raycast_hit(from, Vec3::Z, 20.0, only).is_some(),
         world.cast_ray_with_normal(from, Vec3::Z, 20.0).is_some(),
         world.raycast_all(from, Vec3::Z, 20.0, only).len() == 1,
         world
-            .cast_sphere_filtered(from, Vec3::Z, 0.2, 20.0, only)
+            .sphere_cast_hit(from, Vec3::Z, 0.2, 20.0, only)
             .is_some(),
         world.overlap_sphere(Vec3::ZERO, 0.2, only) == [target],
         world.overlap_box(Vec3::ZERO, Vec3::splat(0.2), only) == [target],

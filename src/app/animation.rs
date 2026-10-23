@@ -26,7 +26,6 @@ pub(crate) mod graph;
 mod layers;
 mod motion;
 
-pub use clip::sample_palette;
 pub use events::{Crossed, END_EVENT};
 pub use motion::Pose;
 
@@ -180,6 +179,10 @@ fn blend_joint(a: JointTransform, b: JointTransform, t: f32) -> JointTransform {
 
 #[cfg(test)]
 mod layer_tests;
+#[cfg(test)]
+mod playhead_tests;
+#[cfg(test)]
+pub(crate) mod posed;
 #[cfg(test)]
 mod test_rig;
 #[cfg(test)]

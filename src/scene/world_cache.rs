@@ -12,15 +12,6 @@
 use crate::scene::Scene;
 
 impl Scene {
-    /// Bring one entity's stored collider AABB up to date, along with every one a
-    /// transform write has queued ([`World::flush_bounds`]).
-    ///
-    /// [`World::flush_bounds`]: crate::ecs::World::flush_bounds
-    pub fn update_entity_collider(&mut self, id: u32) {
-        self.world.flush_bounds();
-        self.world.refresh_collider_aabb(id);
-    }
-
     /// Refresh every entity's collider world-AABB (editor/load batch operation).
     pub fn update_all_colliders(&mut self) {
         self.world.flush_bounds();

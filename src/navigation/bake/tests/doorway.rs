@@ -3,6 +3,7 @@
 
 use super::super::super::test_support::{add_box, add_floor, ground, move_to};
 use super::super::super::{NavBounds, NavigationGraph};
+use crate::navigation::ALL_AREAS;
 use crate::scene::Scene;
 use glam::Vec3;
 
@@ -26,7 +27,8 @@ pub(super) fn doorway() -> Scene {
 }
 
 pub(super) fn through(g: &NavigationGraph) -> bool {
-    g.find_path(ground(g, 3, 5), ground(g, 17, 5)).is_some()
+    g.find_path_masked(ground(g, 3, 5), ground(g, 17, 5), ALL_AREAS)
+        .1
 }
 
 pub(super) fn baked(scene: &Scene) -> NavigationGraph {

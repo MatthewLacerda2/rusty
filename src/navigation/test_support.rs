@@ -38,7 +38,6 @@ pub fn add_rotated_box(
     let mut col = ColliderComponent::from_mesh_bounds(false, Vec3::ZERO, Vec3::ZERO);
     col.shape = ColliderShape::Box { size };
     scene.world.set_collider(id, Some(col));
-    scene.update_entity_collider(id);
     id
 }
 
@@ -104,12 +103,12 @@ pub fn add_modifier(scene: &mut Scene, center: Vec3, size: Vec3, area: u8) -> u3
     id
 }
 
-/// Move entity `id` to `position`, keeping its collider's cached bounds current.
+/// Move entity `id` to `position`; its collider bounds follow on their own
+/// (`World::collider_bounds` reads through a queued transform write).
 pub fn move_to(scene: &mut Scene, id: u32, position: Vec3) {
     if let Some(mut t) = scene.world.transform_mut(id) {
         t.position = position;
     }
-    scene.update_entity_collider(id);
 }
 
 /// Assert two graphs hold the same spans in the same cells, bit for bit, with the

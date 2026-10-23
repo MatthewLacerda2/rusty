@@ -106,7 +106,8 @@ impl Renderer {
 
     /// One full pass: capture and project every probe at `positions`. `with_probes`
     /// selects the lit capture (static surfaces sample the current probe field, for
-    /// bounce ≥2) versus the direct-only capture (bounce 1).
+    /// bounce ≥2) versus the direct-only [`Renderer::bake_probe`] (bounce 1), so
+    /// the single-bounce baseline the tests read is the shipped code.
     fn bake_pass(
         &mut self,
         scene: &Scene,
@@ -117,12 +118,12 @@ impl Renderer {
         positions
             .iter()
             .map(|&p| {
-                let capture = if with_probes {
-                    self.capture_static_cubemap_lit(scene, p, resolution)
+                if with_probes {
+                    let capture = self.capture_static_cubemap_lit(scene, p, resolution);
+                    crate::render::ibl::probe::bake::project_cubemap(&capture)
                 } else {
-                    self.capture_static_cubemap(scene, p, resolution)
-                };
-                crate::render::ibl::probe::bake::project_cubemap(&capture)
+                    self.bake_probe(scene, p, resolution)
+                }
             })
             .collect()
     }

@@ -4,7 +4,6 @@ use super::looks::{self, FLOOR};
 use super::*;
 use crate::scene::authoring::material::MAPS_DIR;
 use crate::scene::{apply_scene_data, to_scene_data};
-use crate::shadergen::ShaderRecipe;
 
 fn built() -> Scene {
     let mut scene = Scene::new();
@@ -107,7 +106,8 @@ fn seeding_bakes_the_texture_and_shader_once() {
         );
     }
     let json = std::fs::read_to_string(shaders.join(format!("{SHADER_NAME}.recipe.json")));
-    assert_eq!(ShaderRecipe::from_json(&json.unwrap()), Ok(shader_recipe()));
+    let json = serde_json::from_str(&json.unwrap()).unwrap();
+    assert_eq!(crate::api::lua_json::decode(json), Ok(shader_recipe()));
 
     // An edited copy is the user's: a second seed leaves it alone.
     std::fs::write(&png, b"edited").unwrap();

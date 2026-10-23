@@ -1,6 +1,7 @@
 //! Unit tests for the keyframe sampler (#80): known-time poses, fallback to bind,
 //! crossfade blending, and bitwise determinism across repeated runs.
 
+use super::posed::posed_palette;
 use super::*;
 use crate::asset::anim_data::{AnimationClip, Interpolation, JointTrack, Track};
 use crate::asset::mesh_data::{JointTransform, SkinData};
@@ -61,7 +62,7 @@ fn sampling_at_zero_matches_bind_pose() {
     let skin = chain_skin();
     // A clip whose only track sits at the bind value should reproduce the identity
     // bind palette at t = 0.
-    let palette = sample_palette(&skin, &translate_clip(), 0.0);
+    let palette = posed_palette(&skin, &translate_clip(), 0.0);
     let bind = skin.bind_palette();
     assert_eq!(palette.len(), 2);
     for (got, want) in palette.iter().zip(bind.iter()) {
@@ -75,7 +76,7 @@ fn linear_interpolation_at_known_time() {
     let clip = translate_clip();
     // Half-way through, joint0 has slid +1 on X. inverse_bind[0] is identity, so the
     // joint0 palette column 3 (translation) is exactly (1, 0, 0).
-    let palette = sample_palette(&skin, &clip, 0.5);
+    let palette = posed_palette(&skin, &clip, 0.5);
     let t0 = palette[0].to_cols_array();
     assert!((t0[12] - 1.0).abs() < 1e-5, "joint0 x = {}", t0[12]);
 
@@ -92,7 +93,7 @@ fn step_interpolation_holds_previous_key() {
     let mut clip = translate_clip();
     clip.tracks[0].translation.interpolation = Interpolation::Step;
     // At t = 0.5 a STEP track holds the t = 0 key (no slide yet).
-    let palette = sample_palette(&skin, &clip, 0.5);
+    let palette = posed_palette(&skin, &clip, 0.5);
     let t0 = palette[0].to_cols_array();
     assert!(t0[12].abs() < 1e-5, "step should hold 0, got {}", t0[12]);
 }
@@ -114,7 +115,7 @@ fn rotation_slerps_between_keys() {
         ..JointTrack::default()
     };
     // Half-way the rotation is 45° about Z; transforming +X yields (cos45, sin45, 0).
-    let palette = sample_palette(&skin, &clip, 0.5);
+    let palette = posed_palette(&skin, &clip, 0.5);
     let rotated = palette[0].transform_vector3(Vec3::X);
     let c = std::f32::consts::FRAC_1_SQRT_2;
     assert!(
@@ -150,7 +151,10 @@ fn crossfade_between_opposite_rotations_keeps_limb_length() {
     let half_pi = std::f32::consts::FRAC_PI_2;
     for t in [0.25, 0.5, 0.75] {
         let blended = blend_poses(&pose(half_pi), &pose(-half_pi), t);
-        let tip = clip::compose_globals(&skin, &blended)[1].w_axis.truncate();
+        // The chain's root has no offset, so the tip's global is root * child.
+        let tip = (blended[0].matrix() * blended[1].matrix())
+            .w_axis
+            .truncate();
         assert!(
             (tip.length() - 1.0).abs() < 1e-5,
             "t={t}: limb length {}",
@@ -255,8 +259,8 @@ fn sampling_is_bitwise_deterministic() {
     let clip = translate_clip();
     // Same (skin, clip, time) must yield byte-identical matrices on every call —
     // the property the headless replay depends on.
-    let first = sample_palette(&skin, &clip, 0.37);
-    let second = sample_palette(&skin, &clip, 0.37);
+    let first = posed_palette(&skin, &clip, 0.37);
+    let second = posed_palette(&skin, &clip, 0.37);
     for (a, b) in first.iter().zip(second.iter()) {
         assert_eq!(a.to_cols_array(), b.to_cols_array());
     }
