@@ -54,12 +54,6 @@ impl ScreenSize {
         &mut self.textures
     }
 
-    /// The table, for a test or a scenario to fill by hand. Copies it first only while
-    /// a view or the renderer still holds the old one.
-    pub fn textures_mut(&mut self) -> &mut TextureSizes {
-        Rc::make_mut(&mut self.textures)
-    }
-
     /// The view the UI is computed against: this screen (sized against `video`)
     /// and its texture sizes, through `camera` when there is one.
     pub fn view(&self, video: &VideoSettings, camera: Option<Camera>) -> UiView {

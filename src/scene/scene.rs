@@ -191,6 +191,7 @@ impl Scene {
         self.world.ids().to_vec()
     }
 
+    /// Test seam for `tests/scene_roundtrip.rs`.
     pub fn entity_count(&self) -> usize {
         self.world.len()
     }

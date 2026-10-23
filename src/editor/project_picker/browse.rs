@@ -41,6 +41,7 @@ impl FolderBrowser {
     }
 
     /// The subfolders of [`Self::dir`] the list shows, sorted.
+    #[cfg(test)]
     pub fn subdirs(&self) -> &[String] {
         &self.subdirs
     }

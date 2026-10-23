@@ -61,6 +61,7 @@ impl ScriptManager {
     /// ground truth the doc-drift gate checks `docs/api/` against, so it
     /// can never silently lie about *what exists* (#280). Empty when the runtime is
     /// not live. Signatures are out of scope — Lua closures are opaque at runtime.
+    /// Test seam for `tests/api_doc_drift.rs`.
     pub fn api_surface(&self) -> BTreeMap<String, BTreeSet<String>> {
         let Some(lua) = self.lua.as_ref() else {
             return BTreeMap::new();

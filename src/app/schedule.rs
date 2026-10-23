@@ -35,6 +35,7 @@ pub struct Schedule {
 
 impl Schedule {
     /// An empty schedule with no systems in any stage.
+    #[cfg(test)]
     pub fn new() -> Self {
         Self::default()
     }
@@ -54,6 +55,7 @@ impl Schedule {
     }
 
     /// The names of `stage`'s systems, in execution order.
+    #[cfg(test)]
     pub fn system_names(&self, stage: Stage) -> Vec<&'static str> {
         self.stages[stage.index()].iter().map(|e| e.name).collect()
     }

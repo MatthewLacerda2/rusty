@@ -20,6 +20,7 @@ pub fn api_doc_dir() -> PathBuf {
 }
 
 /// The scripting-API reference: `docs/api/` assembled into one document.
+/// Test seam for `tests/api_doc_drift.rs`.
 pub fn api_reference() -> Result<String, String> {
     assemble(&api_doc_dir())
 }

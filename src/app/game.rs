@@ -82,7 +82,7 @@ impl GameWorld {
         &self.resources.input
     }
 
-    /// The navigation graph resource.
+    /// The navigation graph resource (test seam for `tests/nav/bounds_boot.rs`).
     pub fn nav(&self) -> &Rc<RefCell<NavigationGraph>> {
         &self.resources.nav
     }

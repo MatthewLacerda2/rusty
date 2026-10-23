@@ -90,6 +90,7 @@ pub struct AssetManifest {
 impl AssetManifest {
     /// Total sub-object count across every file — the number of distinct things
     /// an agent could instantiate.
+    #[cfg(test)]
     pub fn sub_object_count(&self) -> usize {
         self.assets.iter().map(|a| a.sub_objects.len()).sum()
     }

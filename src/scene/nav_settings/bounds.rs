@@ -20,6 +20,7 @@ pub struct NavBounds {
 }
 
 impl NavBounds {
+    /// Test seam for `tests/navigation_layered/building.rs`.
     pub const fn new(min_x: f32, max_x: f32, min_z: f32, max_z: f32) -> Self {
         Self {
             min_x,

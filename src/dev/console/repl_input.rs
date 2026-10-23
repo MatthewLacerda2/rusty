@@ -24,6 +24,7 @@ pub struct ReplInput {
 }
 
 impl ReplInput {
+    #[cfg(test)]
     pub fn new() -> Self {
         Self::default()
     }
@@ -47,6 +48,7 @@ impl ReplInput {
         Some(line)
     }
 
+    #[cfg(test)]
     pub fn history(&self) -> &[String] {
         &self.history
     }

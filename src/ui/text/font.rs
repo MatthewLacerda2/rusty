@@ -92,6 +92,7 @@ fn cache() -> &'static Cache {
 }
 
 /// The bundled default font.
+#[cfg(test)]
 pub fn default_font() -> FontHandle {
     load(None)
 }

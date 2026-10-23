@@ -139,7 +139,7 @@ impl AudioEventLog {
         self.events.push(event);
     }
 
-    /// Every logged event, oldest first.
+    /// Every logged event, oldest first. Test seam for `tests/audio_api/oneshot.rs`.
     pub fn events(&self) -> &[AudioEvent] {
         &self.events
     }
@@ -164,11 +164,13 @@ impl AudioEventLog {
     }
 
     /// Number of logged events.
+    #[cfg(test)]
     pub fn len(&self) -> usize {
         self.events.len()
     }
 
     /// Whether the log is empty.
+    #[cfg(test)]
     pub fn is_empty(&self) -> bool {
         self.events.is_empty()
     }
@@ -177,6 +179,7 @@ impl AudioEventLog {
 /// The maestro's reads of its event log.
 impl AudioMaestro {
     /// The agent-facing event log (play / stop / one-shot), oldest first.
+    /// Test seam for `tests/audio_api/parented.rs`.
     pub fn events(&self) -> &[AudioEvent] {
         self.log.events()
     }

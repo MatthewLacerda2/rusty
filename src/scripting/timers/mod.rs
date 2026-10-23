@@ -198,6 +198,7 @@ impl TimerScheduler {
     }
 
     /// Whether nothing is pending.
+    #[cfg(test)]
     pub fn is_empty(&self) -> bool {
         self.jobs.is_empty()
     }

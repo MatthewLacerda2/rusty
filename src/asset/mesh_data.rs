@@ -235,6 +235,7 @@ pub struct SubMesh {
 
 impl SubMesh {
     /// The material the first run draws with, which a one-material mesh is all of.
+    #[cfg(test)]
     pub fn first_material(&self) -> Option<usize> {
         self.ranges.first().and_then(|r| r.material)
     }

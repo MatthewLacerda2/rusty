@@ -31,6 +31,7 @@ pub struct Particle {
 impl Particle {
     /// A particle at `position` with the render-only extras at their defaults — for
     /// tests and tools that place particles by hand.
+    /// Test seam for `tests/gpu/particle/scene.rs`.
     pub fn at(position: Vec3, size: f32, color: [f32; 4], lifetime: f32) -> Self {
         Self {
             position,

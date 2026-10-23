@@ -4,7 +4,7 @@
 //! Every cache keyed by a file path has the same two ways to go stale, and keeps
 //! them with one [`Freshness`]:
 //!
-//! - **The engine re-wrote a file** ([`super::written`]): [`Freshness::poll`] drains
+//! - **The engine re-wrote a file** ([`super::written`]): [`Freshness::poll_with`] drains
 //!   the log once per frame (or tick) and hands back the paths written since.
 //! - **A file was missing when first read.** The cache records a *miss*
 //!   ([`Freshness::miss`]) instead of a default under its path, and every
@@ -13,7 +13,7 @@
 //!   ones. A miss whose file is still absent is not retried (#1240).
 //!
 //! The cache drops whatever the returned paths name, misses included
-//! ([`Freshness::forget_misses`]), so their next lookup reads the file again. Its
+//! ([`Freshness::forget_misses_where`]), so their next lookup reads the file again. Its
 //! users are the renderer's texture cache (`render::gpu::textures::freshness`,
 //! whose misses the decal atlas shares) and the UI's texture-size table
 //! (`ui::TextureSizeReader`). The resolved texture-reference cache
@@ -21,9 +21,12 @@
 //! retry beat: it answers on these callers' (#1269).
 
 use std::collections::BTreeSet;
+#[cfg(test)]
 use std::path::Path;
 
-use super::written::{written_since, Stale};
+use super::written::written_since;
+#[cfg(test)]
+use super::written::Stale;
 
 /// How many polls apart missing paths are re-checked on disk.
 pub const MISS_RETRY_FRAMES: u64 = 60;
@@ -39,7 +42,7 @@ pub struct Freshness {
     polls: u64,
 }
 
-/// What changed since the last [`Freshness::poll`].
+/// What changed since the last [`Freshness::poll_with`].
 #[derive(Debug, Default, PartialEq)]
 pub struct Changes {
     /// Paths the engine wrote, then misses whose file has appeared.
@@ -67,11 +70,12 @@ impl Freshness {
 
     /// Drain the write log, and on the retry beat add the misses whose file has
     /// appeared. Allocates nothing when nothing was written and no retry is due.
+    #[cfg(test)]
     pub fn poll(&mut self) -> Changes {
         self.poll_with(|p| Path::new(p).exists())
     }
 
-    /// [`Self::poll`] for a cache whose keys are not all file paths: `appeared`
+    /// Drain the write log for a cache whose keys are not all file paths: `appeared`
     /// says whether the file a missed key names now exists (the renderer resolves
     /// a texture reference through the import cache, #1130).
     pub fn poll_with(&mut self, appeared: impl Fn(&str) -> bool) -> Changes {
@@ -97,11 +101,13 @@ impl Freshness {
     }
 
     /// How many misses are remembered.
+    #[cfg(test)]
     pub fn miss_count(&self) -> usize {
         self.misses.len()
     }
 
     /// Forget every miss `stale` names. Returns whether one went.
+    #[cfg(test)]
     pub fn forget_misses(&mut self, stale: &Stale) -> bool {
         self.forget_misses_where(|p| stale.matches(p))
     }

@@ -61,6 +61,7 @@ pub struct TextureSizeReader {
 
 impl TextureSizeReader {
     /// A reader that starts at the write log's current generation.
+    #[cfg(test)]
     pub fn new() -> Self {
         Self::default()
     }

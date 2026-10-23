@@ -22,6 +22,7 @@ pub fn load(path: &Path) -> Result<AnimationGraph, GraphError> {
 
 /// Validate and write `graph` to `path` as pretty (diffable) JSON. Validation
 /// first, so an invalid graph can never reach disk from code.
+/// Test seam for `tests/animation_runtime/layers.rs`.
 pub fn save(path: &Path, graph: &AnimationGraph) -> Result<(), GraphError> {
     graph.validate()?;
     let json = serde_json::to_string_pretty(graph).map_err(|e| GraphError::Parse(e.to_string()))?;

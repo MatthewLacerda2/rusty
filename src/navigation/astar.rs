@@ -89,6 +89,7 @@ impl NavigationGraph {
 
     /// The span path from the span `start` snaps to to the one `target` snaps to.
     /// `None` when either end is off the navmesh or the target is not reachable.
+    /// Test seam for `tests/navigation_layered/building.rs`.
     pub fn path_between(&self, start: Vec3, target: Vec3) -> Option<Vec<SpanRef>> {
         let (path, complete) =
             self.find_path_masked(self.snap(start)?, self.snap(target)?, ALL_AREAS);

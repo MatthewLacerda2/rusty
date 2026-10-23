@@ -34,6 +34,7 @@ impl Sidecar {
     }
 
     /// Read the sidecar of the generated file at `file`.
+    #[cfg(test)]
     pub fn load(file: &Path) -> std::io::Result<Self> {
         let text = std::fs::read_to_string(Self::path_for(file))?;
         serde_json::from_str(&text).map_err(std::io::Error::other)
