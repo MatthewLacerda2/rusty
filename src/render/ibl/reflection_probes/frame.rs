@@ -13,8 +13,9 @@ impl Renderer {
     /// resident probes (#1206, #1238), loading their cubes through the by-path cache
     /// (#355), and mark group 0 for a rebind when the array texture was replaced.
     /// Cubes that don't fit the array are passed over before the budget is counted,
-    /// and the residents are handed over in scene order, so which probe an object
-    /// gets never depends on where the camera stands.
+    /// and never uploaded (#1245). Which probes are resident depends on the camera's
+    /// distance to each box; only ties are broken by scene index, and the residents
+    /// are handed over in scene order, so two runs from one camera agree.
     pub(crate) fn update_reflection_probes(&mut self, scene: &Scene, camera_pos: Vec3) {
         let probes = &scene.reflection_probes.probes;
         let mut wanted = Vec::new();
@@ -23,10 +24,9 @@ impl Renderer {
                 break;
             }
             let path = &probes[i].cubemap_path;
-            if let Some(cube) = self.cached_cubemap(path) {
-                if self.reflection_probes.admits(path, cube.size) {
-                    wanted.push((i, cube));
-                }
+            let admits = |renderer: &mut Self, size| renderer.reflection_probes.admits(path, size);
+            if let Some(cube) = self.cached_cubemap_where(path, admits) {
+                wanted.push((i, cube));
             }
         }
         wanted.sort_by_key(|&(i, _)| i);

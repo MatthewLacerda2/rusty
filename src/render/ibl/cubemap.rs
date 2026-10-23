@@ -96,10 +96,25 @@ impl Renderer {
     /// retried on every flip either. A path the engine (re)writes, such as a
     /// reflection bake, is dropped from the cache by `refresh_textures` (#1207).
     pub fn cached_cubemap(&mut self, path: &str) -> Option<Rc<CubemapTexture>> {
+        self.cached_cubemap_where(path, |_, _| true)
+    }
+
+    /// [`cached_cubemap`](Self::cached_cubemap) for a caller that takes only some
+    /// sizes: a file whose base size `accept` refuses is decoded but never uploaded,
+    /// and is cached as absent, so `accept` runs once per load of a path (#1245).
+    pub(crate) fn cached_cubemap_where(
+        &mut self,
+        path: &str,
+        accept: impl FnOnce(&mut Self, u32) -> bool,
+    ) -> Option<Rc<CubemapTexture>> {
         if let Some(hit) = self.cubemaps.get(path) {
             return hit.clone();
         }
-        let loaded = self.load_cubemap_mips(path).map(Rc::new);
+        let loaded = std::fs::read(path)
+            .ok()
+            .and_then(|bytes| parse_ktx2_cubemap_mips(&bytes))
+            .filter(|data| accept(self, data.size))
+            .map(|data| Rc::new(self.upload_cubemap_mips(path, &data)));
         self.cubemaps.insert(path.to_string(), loaded.clone());
         loaded
     }

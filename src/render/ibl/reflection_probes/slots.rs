@@ -5,8 +5,9 @@
 //! through a level copies only the probes that come into range, never the whole set.
 
 /// The most reflection probes shaded in one frame: the array's layer budget and the
-/// length of `LightingUniforms.refl_probes`. The frame keeps the probes nearest the
-/// camera; an object whose probe is past them reflects the sky. 32 cubes are 192
+/// length of `LightingUniforms.refl_probes`. The frame keeps the probes whose boxes
+/// are nearest the camera (its distance to each box, zero inside it, #1238); an
+/// object whose probe is past them reflects the sky. 32 cubes are 192
 /// array layers (under wgpu's default limit of 256) and, at the bake's 128-texel
 /// face, about 17 MB of RGBA8 with mips.
 pub(crate) const MAX_REFLECTION_PROBES: usize = 32;

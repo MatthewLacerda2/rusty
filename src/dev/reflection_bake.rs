@@ -45,6 +45,6 @@ pub fn bake_scene_reflections(scene: &mut Scene, scene_path: Option<&str>) -> Re
             return Ok(false);
         }
     };
-    renderer.bake_reflections(scene, &out_dir, res)?;
+    renderer.bake_reflections(scene, &out_dir)?;
     Ok(true)
 }

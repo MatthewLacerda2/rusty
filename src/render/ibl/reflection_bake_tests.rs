@@ -11,10 +11,10 @@ use glam::{Quat, Vec3};
 use crate::components::MaterialAsset;
 use crate::render::ibl::cube_sample::srgb_to_linear;
 use crate::render::ibl::cubemap::parse_ktx2_cubemap_mips;
-use crate::render::CubemapFace;
+use crate::render::{CubemapFace, DEFAULT_REFLECTION_RESOLUTION};
 use crate::scene::{MeshComponent, Scene};
 
-const RES: u32 = 32;
+const RES: u32 = DEFAULT_REFLECTION_RESOLUTION;
 
 fn box_mesh() -> MeshComponent {
     let (vertices, indices) = crate::components::mesh::primitives::generate_box(1.0, 1.0, 1.0);
@@ -88,7 +88,7 @@ fn gpu_bake_shows_room_and_mips_blur() {
         return; // No GPU/software adapter — skip, same contract as the screenshots.
     };
     let scene = colored_room();
-    let bytes = renderer.bake_reflection(&scene, Vec3::ZERO, RES);
+    let bytes = renderer.bake_reflection(&scene, Vec3::ZERO);
 
     let mips = parse_ktx2_cubemap_mips(&bytes).expect("baked KTX2 parses");
     assert_eq!(mips.size, RES);
@@ -135,7 +135,7 @@ fn gpu_bake_writes_file_and_sets_path() {
     let dir = crate::test_temp::dir().join(format!("rusty_refl_bake_{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
 
-    let n = renderer.bake_reflections(&mut scene, &dir, RES).unwrap();
+    let n = renderer.bake_reflections(&mut scene, &dir).unwrap();
     assert_eq!(n, 1);
 
     let path = scene.reflection_probes.probes[0].cubemap_path.clone();
