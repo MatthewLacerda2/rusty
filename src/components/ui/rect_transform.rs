@@ -17,7 +17,7 @@
 //! layout pins its pivot to where a world point (an entity, plus an offset) lands on
 //! screen each tick, optionally clamped to the screen edge and turned toward the
 //! target — enemy health bars, waypoints, damage numbers. The anchor holds an
-//! entity reference, so it follows prefab save / stamp ([`RectTransformComponent::remap_refs`]).
+//! entity reference, so it follows prefab save / stamp (its `EntityRefs` impl, the one id-field walk).
 
 use glam::{Vec2, Vec3};
 use serde::{Deserialize, Serialize};

@@ -16,7 +16,7 @@
 //! the fade) lives in the `ui::EventSystem` resource, never here — this is pure
 //! authoring data. The entity references (`target_graphic`, `select_on_*`) are
 //! remapped with the entity when a prefab is saved or stamped
-//! ([`SelectableComponent::remap_refs`]).
+//! (its `EntityRefs` impl, the one id-field walk).
 
 use crate::asset::MapRef;
 use glam::Vec4;

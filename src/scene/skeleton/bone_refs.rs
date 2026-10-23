@@ -57,7 +57,7 @@ pub(super) fn repoint_refs(entities: &mut [Entity], bone_of: &BoneIndex) {
 }
 
 /// Take the `bone_refs` out of documents about to be inserted, for
-/// [`Scene::bind_bone_refs`] once the skeletons exist.
+/// `Scene::hang_on_skeletons` once the skeletons exist.
 pub fn take_bone_refs(entities: &mut [Entity]) -> Vec<BoneRef> {
     let mut out = Vec::new();
     for entity in entities.iter_mut().filter(|e| !e.bone_refs.is_empty()) {

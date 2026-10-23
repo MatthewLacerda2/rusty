@@ -7,7 +7,7 @@
 //! velocity: spark → smoke puff, debris → dust on landing.
 //!
 //! The targets are entity ids, so they follow the entity through prefab save /
-//! stamp ([`SubEmitters::remap_refs`], the same mechanism as a Joint's body).
+//! stamp ([`SubEmitters::visit_refs`], the one id-field walk, `components::entity::refs`).
 
 use serde::{Deserialize, Serialize};
 

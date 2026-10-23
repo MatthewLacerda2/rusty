@@ -167,8 +167,6 @@ impl World {
         let transform = (*self.transform(id)?).clone();
         let scripts = (*self.scripts(id)?).clone();
         Some(Entity {
-            id: core.id,
-            name,
             active: core.active,
             is_static: core.is_static,
             layer: core.layer,
@@ -209,9 +207,9 @@ impl World {
             shape: self.shape(id).map(|c| (*c).clone()),
             prefab_link: self.prefab_link(id).map(|c| (*c).clone()),
             parent_id: core.parent_id,
-            parent_bone: Vec::new(),
-            bone_refs: Default::default(),
             children: core.children.clone(),
+            // The document-only fields (`parent_bone`, `bone_refs`) stay empty.
+            ..Entity::new(core.id, name)
         })
     }
 

@@ -23,7 +23,7 @@
 //! rest pose is the pose the two bodies are in when it is built. A non-zero
 //! `break_force` / `break_torque` breaks the joint when exceeded (see
 //! `physics::joints`). The one entity reference, `connected_body`, follows the
-//! entity through prefab save / stamp ([`JointComponent::remap_refs`]).
+//! entity through prefab save / stamp (its `EntityRefs` impl, the one id-field walk).
 
 use glam::{Vec2, Vec3};
 use serde::{Deserialize, Serialize};

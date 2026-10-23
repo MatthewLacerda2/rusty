@@ -13,7 +13,7 @@
 //! Selection is **render-side only** (`render::lod`): the sim never reads which
 //! level is shown, so it cannot break determinism. The renderer references are
 //! entity ids that follow the entity through prefab save / stamp
-//! ([`LodGroupComponent::remap_refs`]). glTF files whose sub-objects are suffixed
+//! (its `EntityRefs` impl, the one id-field walk). glTF files whose sub-objects are suffixed
 //! `_LOD0`, `_LOD1`, … build one of these on instantiate (`scene::lod_instance`).
 
 use serde::{Deserialize, Serialize};
