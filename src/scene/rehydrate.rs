@@ -127,7 +127,7 @@ fn install(mesh: &mut crate::scene::MeshComponent, rebuilt: RehydratedMesh) {
 /// Re-import the geometry of every unskinned mesh in `scene` instanced from the model
 /// at `path`, so a changed import setting (Generate Lightmap UVs, #831) shows at once
 /// rather than on the next load. Skinned meshes keep theirs: the setting never
-/// touches them, and rebuilding their rig would respawn their bones for nothing.
+/// touches them, and re-binding their rig would touch their bones for nothing.
 /// Returns how many were rebuilt.
 pub fn reimport_model(scene: &mut Scene, path: &str) -> usize {
     let prefix = format!("{path}{}", asset::REF_SEPARATOR);
@@ -136,7 +136,7 @@ pub fn reimport_model(scene: &mut Scene, path: &str) -> usize {
 
 /// Re-import every mesh in `scene` whose model file `stale` names: the engine
 /// re-wrote it (#1242), and Unity updates every instance of a re-imported model.
-/// A skinned one takes the new rig too, its bones rebuilt from it (#1252). Each
+/// A skinned one takes the new rig too, its bones re-bound to it by name (#1265). Each
 /// distinct file is matched against `stale` once. Returns how many were rebuilt.
 pub fn reimport_written(scene: &mut Scene, stale: &Stale) -> usize {
     if stale.is_empty() {
@@ -158,7 +158,7 @@ pub fn reimport_written(scene: &mut Scene, stale: &Stale) -> usize {
 enum Rig {
     /// Leave it as it is.
     Keep,
-    /// Take the new mesh and rig, and rebuild the bones from it.
+    /// Take the new mesh and rig, and re-bind the bones to it.
     Rebuild,
 }
 
@@ -178,7 +178,7 @@ fn reimport_where(scene: &mut Scene, rig: Rig, mut names: impl FnMut(&str) -> bo
 }
 
 /// Re-import one entity's mesh from its reference, and refit its mesh collider's
-/// box to it. A skinned mesh (before or after) is rebuilt whole, rig and bones,
+/// box to it. A skinned mesh (before or after) takes the new rig, its bones re-bound,
 /// when `rig` says so, and kept otherwise. A model that yields nothing (gone)
 /// keeps the old mesh. Returns whether the mesh was rebuilt.
 fn reimport_entity_mesh(scene: &mut Scene, id: u32, rig: Rig) -> bool {
@@ -202,8 +202,8 @@ fn reimport_entity_mesh(scene: &mut Scene, id: u32, rig: Rig) -> bool {
     let Some(bounds) = sub.bounds() else {
         return false;
     };
-    // The bones come down before the rig they were built from is replaced, and
-    // go back up from the new one, keeping what was authored on them.
+    // The bones are noted against the rig they were built from before it is
+    // replaced, and re-bound to the new one by name.
     let hung = skinned.then(|| scene.take_skeleton(id));
     if let Some(mut mesh) = scene.world.mesh_mut(id) {
         install(&mut mesh, RehydratedMesh::from_sub_mesh(&sub));
@@ -237,18 +237,12 @@ fn refit_mesh_collider(world: &mut World, id: u32, (min, max): (Vec3, Vec3)) {
 /// an empty-geometry component if the import fails.
 pub fn asset_mesh_component(reference: &str) -> crate::scene::MeshComponent {
     let rebuilt = rehydrate_asset_mesh(&Some(reference.to_string()));
-    crate::scene::MeshComponent {
-        primitive_type: "Asset".to_string(),
+    let mut mesh = crate::scene::MeshComponent {
         asset_ref: Some(reference.to_string()),
-        vertices: rebuilt.vertices,
-        indices: rebuilt.indices,
-        bind_palette: rebuilt.bind_palette,
-        skin: rebuilt.skin,
-        clips: rebuilt.clips,
-        pose_palette: Vec::new(),
-        skeleton: Default::default(),
-        is_dirty: crate::scene::DirtyFlag::new(true),
-    }
+        ..crate::scene::MeshComponent::new("Asset", Vec::new(), Vec::new())
+    };
+    install(&mut mesh, rebuilt);
+    mesh
 }
 
 /// The file a mesh reference rehydrates from (`models/a.fbx::Body` →

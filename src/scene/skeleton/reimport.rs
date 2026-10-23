@@ -1,103 +1,167 @@
-//! Re-binding a live skeleton to a re-imported rig (#1252).
+//! Re-binding a live skeleton to a re-imported rig (#1252, #1265).
 //!
 //! When a skinned model is re-written, every entity built from it takes the new
-//! mesh and rig, and its bones are rebuilt from the new rig at its rest pose. What
-//! a designer authored on the old bones survives the way a save and load keeps it
-//! (`persist`): per-bone overrides and bone bodies by bone name, every entity
-//! hung from a bone hung back by the same rule as a load (`hang`), and every id
-//! leaf naming a bone re-bound by name (`bone_refs`). A model
-//! re-written as static keeps no bones, so what was authored on them is dropped,
-//! with a warning.
+//! mesh and rig, and its bones are re-bound to the new rig **in place, by name**,
+//! as Unity keeps a model's bone Transforms on a re-import: a bone the new rig
+//! still names keeps its entity (id, `active`, `layer`, components, children,
+//! the selection), moved to its new parent bone and to the new rest pose unless
+//! it was off the old one (an override). A bone new to the rig is spawned at
+//! rest. A bone the rig dropped is despawned; what hung from it hangs from its
+//! nearest surviving ancestor by the same rule as a load (`hang`), and an id
+//! leaf naming it is re-bound the same way (`bone_refs`). A model re-written as
+//! static drops every bone, with a warning for what was authored on them.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use super::bone_refs::BoneRef;
 use super::hang::Hung;
-use super::persist::{strip, Why};
+use super::persist::{bone_chain, carries_components, OVERRIDE_EPS};
+use super::sync::rest_local;
+use crate::components::TransformComponent;
 use crate::scene::Scene;
 
-/// What [`Scene::take_skeleton`] parks on the skinned entity while its bones are
-/// rebuilt: the entities hung from a bone, and the id leaves naming one.
+/// What [`Scene::take_skeleton`] notes of `owner`'s bones against the old rig,
+/// for [`Scene::restore_skeleton`] to re-bind them to the new one.
 #[derive(Debug, Default)]
 pub struct Parked {
-    hung: Vec<Hung>,
-    refs: Vec<BoneRef>,
+    /// Each live bone, in slot order: its id and its bone chain (its name first).
+    bones: Vec<(u32, Vec<String>)>,
+    /// The bones off the old rig's rest pose, by name: kept as they are.
+    overrides: BTreeMap<String, TransformComponent>,
 }
 
 impl Scene {
-    /// Take `owner`'s skeleton down: its bone overrides and bodies go to the mesh's
-    /// `BoneBinding` (which [`Scene::sync_skeleton`] applies), the entities hung
-    /// from its bones are parked under `owner` and returned with their bone
-    /// chains, id leaves naming a bone are parked on `owner` by bone name
-    /// (`bone_refs`), and the bones are despawned. Empty for an entity with no skin.
-    pub(crate) fn take_skeleton(&mut self, owner: u32) -> Parked {
-        let Some(bones) = self
+    /// Note `owner`'s bones against the rig they were built from, before it is
+    /// replaced: each bone's name and chain, and which were moved off its rest
+    /// pose. Nothing is despawned. Empty for an entity with no skin.
+    pub(crate) fn take_skeleton(&self, owner: u32) -> Parked {
+        let Some((skin, bones)) = self
             .world
             .mesh(owner)
-            .filter(|m| m.skin.is_some())
-            .map(|m| m.skeleton.bones.clone())
+            .and_then(|m| Some((m.skin.clone()?, m.skeleton.bones.clone())))
         else {
             return Parked::default();
         };
-        // The documents `strip` needs: the owner, its bones, and what hangs from a
-        // bone (descendants of those keep their parent, so are not needed).
-        let bone_set: BTreeSet<u32> = bones.iter().copied().collect();
-        let mut ids = vec![owner];
-        ids.extend(bones.iter().copied());
-        for &bone in &bones {
-            let hung = self.world.children(bone);
-            ids.extend(hung.into_iter().filter(|c| !bone_set.contains(c)));
+        let mut parked = Parked::default();
+        for (slot, bone) in bones.into_iter().enumerate() {
+            let Some(transform) = self.world.transform(bone).map(|t| t.clone()) else {
+                continue;
+            };
+            let chain = bone_chain(&skin, slot);
+            if !transform.approx_eq(&rest_local(&skin, slot), OVERRIDE_EPS) {
+                parked.overrides.insert(chain[0].clone(), transform);
+            }
+            parked.bones.push((bone, chain));
         }
-        let mut docs: Vec<_> = ids
-            .into_iter()
-            .filter_map(|id| self.world.entity_document(id))
-            .collect();
-        strip(&mut docs, Why::Reimported);
+        parked
+    }
 
-        let mut hung = Vec::new();
-        for doc in &mut docs {
-            if doc.id == owner {
-                if let (Some(saved), Some(mut mesh)) = (&doc.mesh, self.world.mesh_mut(owner)) {
-                    mesh.skeleton.overrides = saved.skeleton.overrides.clone();
-                    mesh.skeleton.bodies = saved.skeleton.bodies.clone();
+    /// Re-bind `parked` to `owner`'s (new) rig: keep each bone the rig still
+    /// names, spawn the new ones, and despawn the rest, hanging what hung from
+    /// them, and re-binding the leaves naming them, by bone name.
+    pub(crate) fn restore_skeleton(&mut self, owner: u32, parked: Parked) {
+        let Parked {
+            bones: old,
+            mut overrides,
+        } = parked;
+        let skin = self.world.mesh(owner).and_then(|m| m.skin.clone());
+        // Name → the old bones of that name, last slot first, so `pop` takes the first.
+        let mut pool: BTreeMap<&str, Vec<u32>> = BTreeMap::new();
+        for (id, chain) in old.iter().rev() {
+            pool.entry(chain[0].as_str()).or_default().push(*id);
+        }
+        let mut bones: Vec<u32> = Vec::new();
+        for (slot, skin) in skin
+            .iter()
+            .flat_map(|s| (0..s.local_bind.len()).map(move |i| (i, s)))
+        {
+            let parent = match skin.parents.get(slot).copied().flatten() {
+                Some(p) if p < slot => bones[p],
+                _ => owner,
+            };
+            let name = skin.name(slot);
+            let pose = overrides
+                .remove(&name)
+                .unwrap_or_else(|| rest_local(skin, slot));
+            let bone = match pool.get_mut(name.as_str()).and_then(Vec::pop) {
+                Some(bone) => {
+                    if self.world.parent_id(bone) != Some(parent) {
+                        let _ = self.set_parent(bone, Some(parent));
+                    }
+                    if let Some(mut t) = self.world.transform_mut(bone) {
+                        *t = pose;
+                    }
+                    bone
                 }
-            } else if !doc.parent_bone.is_empty() {
-                hung.push((doc.id, std::mem::take(&mut doc.parent_bone)));
+                None => self.spawn_bone(parent, name, pose),
+            };
+            bones.push(bone);
+        }
+        let left: BTreeSet<u32> = pool.into_values().flatten().collect();
+        if let Some(mut mesh) = self.world.mesh_mut(owner) {
+            mesh.skeleton.bones = bones;
+        }
+        let removed: BTreeMap<u32, Vec<String>> = old
+            .into_iter()
+            .filter(|(id, _)| left.contains(id))
+            .collect();
+        self.drop_bones(owner, &removed, overrides);
+    }
+
+    /// Despawn `removed`, `owner`'s bones the new rig no longer has: what hung
+    /// from them hangs on by bone name, the leaves naming them re-bind the same
+    /// way, and what was authored on them (`overrides` left unmatched included)
+    /// is warned about.
+    fn drop_bones(
+        &mut self,
+        owner: u32,
+        removed: &BTreeMap<u32, Vec<String>>,
+        overrides: BTreeMap<String, TransformComponent>,
+    ) {
+        for name in overrides.into_keys() {
+            log::warn!(
+                "[Asset] entity {owner}: the skeleton has no bone '{name}' any more; \
+                 its transform override was dropped."
+            );
+        }
+        let mut hung: Vec<Hung> = Vec::new();
+        for (&bone, chain) in removed {
+            self.warn_dropped_bone(owner, bone, &chain[0]);
+            for child in self.world.children(bone) {
+                if !removed.contains_key(&child) && !self.is_bone(child) {
+                    hung.push((child, chain.clone()));
+                }
             }
         }
         for (child, _) in &hung {
             let _ = self.set_parent(*child, Some(owner));
         }
-        let refs = self.park_bone_refs(owner);
-        self.despawn_skeleton(owner);
-        if let Some(mut mesh) = self.world.mesh_mut(owner) {
-            mesh.skeleton.bones.clear();
-        }
-        Parked { hung, refs }
+        let refs: Vec<BoneRef> = self.park_bone_refs(owner, removed);
+        let doomed: BTreeSet<u32> = removed
+            .keys()
+            .flat_map(|&b| self.world.self_and_descendants(b))
+            .collect();
+        self.despawn_batch(&doomed);
+        self.attach_to_bones(hung);
+        self.bind_bone_refs(refs);
     }
 
-    /// Build `owner`'s skeleton from its (new) rig, hang what was `parked` back on
-    /// it ([`Scene::attach_to_bones`]) and re-bind the leaves naming a bone. Returns the bones the rig no longer has that
-    /// something hung from, each warned about. A mesh left unskinned drops the bone
-    /// overrides and bodies it carried, warning about the bodies.
-    pub(crate) fn restore_skeleton(&mut self, owner: u32, parked: Parked) -> Vec<String> {
-        let ids: Vec<u32> = parked.hung.iter().map(|(id, _)| *id).collect();
-        let mut refs = parked.refs;
-        refs.extend(self.sync_skeleton_past(owner, &ids));
-        let missing = self.attach_to_bones(parked.hung);
-        self.bind_bone_refs(refs);
-        if let Some(mut mesh) = self.world.mesh_mut(owner).filter(|m| m.skin.is_none()) {
-            mesh.skeleton.overrides.clear();
-            let bodies: Vec<String> = std::mem::take(&mut mesh.skeleton.bodies)
-                .into_keys()
-                .collect();
-            if !bodies.is_empty() {
-                log::warn!(
-                    "[Asset] entity {owner}'s re-imported model is no longer skinned; the \
-                     Rigidbody / Joint on its bones {bodies:?} (its ragdoll) were dropped."
-                );
-            }
+    /// Warn about what removing `owner`'s bone `name` deletes from it.
+    fn warn_dropped_bone(&self, owner: u32, bone: u32, name: &str) {
+        let Some(doc) = self.world.entity_document(bone) else {
+            return;
+        };
+        if doc.rigidbody.is_some() || doc.joint.is_some() {
+            log::warn!(
+                "[Asset] entity {owner}: the re-imported model has no bone '{name}' any \
+                 more; its Rigidbody / Joint (its ragdoll) were dropped."
+            );
         }
-        missing
+        if carries_components(&doc) {
+            log::warn!(
+                "[Asset] entity {owner}: the re-imported model has no bone '{name}' any \
+                 more; the components it carried were deleted with it."
+            );
+        }
     }
 }

@@ -2,16 +2,17 @@
 //!
 //! Any component id leaf can name a bone: a prop's Joint tied to `spine`, a
 //! marker over `head`, one ragdoll's bone jointed to another skeleton's. Bones get
-//! fresh ids on every load and every re-import, so such a leaf is saved the way a
-//! child of a bone is (`Entity::parent_bone`): the leaf names the skinned entity, and
+//! fresh ids on every load (a re-import keeps the ones its rig still names), so
+//! such a leaf is saved the way a child of a bone is (`Entity::parent_bone`): the
+//! leaf names the skinned entity, and
 //! `Entity::bone_refs`, keyed by the leaf's pointer (`components::entity::refs`),
 //! holds the bone's name, then its ancestor bones', nearest first. Once the skeleton
 //! is back the leaf is re-bound to the first bone of that chain the skeleton still
 //! has, or, with none, keeps the skinned entity, with a warning.
 //!
-//! One mechanism, every path: a save (`persist`'s `strip`), a load and a prefab stamp
-//! ([`take_bone_refs`], then `Scene::hang_on_skeletons`), a live re-import
-//! ([`Scene::park_bone_refs`]), a linked prefab's fresh baseline
+//! One mechanism, every path: a save ([`strip_bones`](super::strip_bones)), a load and a prefab stamp
+//! ([`take_bone_refs`], then `Scene::hang_on_skeletons`), a live re-import that
+//! drops the bone ([`Scene::park_bone_refs`]), a linked prefab's fresh baseline
 //! ([`Scene::bone_doc_refs`] then [`Scene::bind_doc_bone_refs`]) and a prefab
 //! apply-to-source ([`Scene::bone_ref`]). A reference between two bones of one
 //! skeleton is a ragdoll's, kept on the mesh's `BoneBinding` instead (`persist`).
@@ -119,18 +120,21 @@ impl Scene {
         repoint_refs(docs, &self.bone_index());
     }
 
-    /// Before `owner`'s bones are despawned (a re-import), point every live leaf
-    /// naming one of them from outside its skeleton at `owner`, returning them for
-    /// [`Scene::bind_bone_refs`] once the skeleton is rebuilt.
-    pub(super) fn park_bone_refs(&mut self, owner: u32) -> Vec<BoneRef> {
-        let bones: BTreeMap<u32, Vec<String>> = self.bones_with_chains(owner).into_iter().collect();
+    /// Before `removed`, bones of `owner` a re-import dropped, are despawned, point
+    /// every live leaf naming one of them from outside them at `owner`, returning
+    /// them for [`Scene::bind_bone_refs`] once the skeleton is re-bound.
+    pub(super) fn park_bone_refs(
+        &mut self,
+        owner: u32,
+        removed: &BTreeMap<u32, Vec<String>>,
+    ) -> Vec<BoneRef> {
         let mut out = Vec::new();
         for holder in self.world.ref_holders() {
-            if bones.contains_key(&holder) {
+            if removed.contains_key(&holder) {
                 continue;
             }
             self.world.visit_refs(holder, &mut |pointer, r| {
-                if let Some(chain) = r.and_then(|b| bones.get(&b)) {
+                if let Some(chain) = r.and_then(|b| removed.get(&b)) {
                     *r = Some(owner);
                     let (pointer, chain) = (pointer.to_string(), chain.clone());
                     out.push(BoneRef {

@@ -33,7 +33,7 @@ fn a_joint_to_a_bone_is_saved_by_name_and_rebound_on_load() {
 }
 
 #[test]
-fn a_reimport_rebinds_a_joint_to_the_new_bone() {
+fn a_reimport_keeps_a_joint_to_a_bone_the_rig_still_has() {
     let mut scene = Scene::new();
     let rig = armature_owner(&mut scene);
     scene.sync_skeleton(rig);
@@ -41,11 +41,9 @@ fn a_reimport_rebinds_a_joint_to_the_new_bone() {
     let old = connected(&scene, rope).unwrap();
 
     let hung = scene.take_skeleton(rig);
-    assert_eq!(connected(&scene, rope), Some(rig), "parked on the rig");
     scene.restore_skeleton(rig, hung);
-    let spine = scene.find_bone(rig, "spine").unwrap();
-    assert_ne!(spine, old, "the bone was rebuilt");
-    assert_eq!(connected(&scene, rope), Some(spine));
+    assert_eq!(scene.find_bone(rig, "spine"), Some(old), "the bone is kept");
+    assert_eq!(connected(&scene, rope), Some(old));
 }
 
 #[test]

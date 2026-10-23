@@ -8,6 +8,8 @@
 //! Unity keeps an object parented to a removed bone rather than dropping it. A
 //! generated hitbox is the exception: it belongs to its bone, so it goes with it.
 
+use std::collections::BTreeSet;
+
 use super::bone_refs::BoneRef;
 use crate::scene::Scene;
 
@@ -20,7 +22,7 @@ impl Scene {
     /// skinned entities) back on it and re-bind `refs`, the id leaves saved against
     /// a bone by name (`bone_refs`): what a load or a prefab stamp ends with.
     pub fn hang_on_skeletons(&mut self, pending: Vec<Hung>, mut refs: Vec<BoneRef>) {
-        let parked: Vec<u32> = pending.iter().map(|(id, _)| *id).collect();
+        let parked: BTreeSet<u32> = pending.iter().map(|(id, _)| *id).collect();
         for owner in self.world.ids_with_mesh() {
             refs.extend(self.sync_skeleton_past(owner, &parked));
         }
@@ -29,10 +31,9 @@ impl Scene {
     }
 
     /// Re-parent each pending entity under the first bone its chain names that the
-    /// skeleton of the skinned entity it is parked under has. Returns the bones
-    /// the skeleton no longer has, once each, every one warned about.
-    pub fn attach_to_bones(&mut self, pending: Vec<Hung>) -> Vec<String> {
-        let mut missing: Vec<String> = Vec::new();
+    /// skeleton of the skinned entity it is parked under has, warning about each
+    /// one whose own bone is gone.
+    pub fn attach_to_bones(&mut self, pending: Vec<Hung>) {
         for (child, chain) in pending {
             let (Some(owner), Some(name)) = (self.world.parent_id(child), chain.first()) else {
                 continue;
@@ -44,9 +45,6 @@ impl Scene {
             if let Some((0, _, bone)) = found {
                 let _ = self.set_parent(child, Some(bone));
                 continue;
-            }
-            if !missing.contains(name) {
-                missing.push(name.clone());
             }
             if self.is_generated_hitbox(child) {
                 self.destroy_entity(child);
@@ -68,6 +66,5 @@ impl Scene {
                  entity {owner} no longer has; it now hangs from {landed}."
             );
         }
-        missing
     }
 }
