@@ -75,5 +75,5 @@ fn the_skeleton_is_created_and_its_derived_folders_ignore_themselves() {
     }
     let ignore = std::fs::read_to_string(root.join(CACHE_DIR).join(".gitignore")).unwrap();
     assert_eq!(ignore, "*\n");
-    assert!(!root.join(".gitignore").exists(), "the root is the user's");
+    assert!(!root.join(".gitignore").exists(), "no root .gitignore");
 }
