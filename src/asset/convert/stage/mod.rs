@@ -21,6 +21,10 @@
 //! 5. Textures folders the stamp **on disk** does not name, staging folders and
 //!    stamp temp files a crashed conversion left, are removed (`clear`).
 //!
+//! Between steps 4 and 5 the swapped-in `.glb` and the source are noted in the
+//! write log, `core::fs::written` (`note`, #1219): a converter writes staged
+//! files through [`write`] and never notes them itself.
+//!
 //! A failing converter stops before step 2: its staging folder is removed and the
 //! old cache is as it was.
 //!
@@ -33,8 +37,10 @@
 
 mod clear;
 pub(in crate::asset::convert) mod hook;
+mod note;
 
 pub use clear::textures_dirs;
+pub(in crate::asset::convert) use note::write;
 
 use super::{record, stamp_path, write_error, Converted, Converter, ImportError};
 use crate::core::{fs, hash};
@@ -79,6 +85,7 @@ pub(super) fn convert(
     let _ = std::fs::remove_dir_all(&staging);
     let converted = result?;
     at(Step::Stamped);
+    note::swapped_in(source, out);
     clear::clear(&dir, &name);
     Ok(converted)
 }

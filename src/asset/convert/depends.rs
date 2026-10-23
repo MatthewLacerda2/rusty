@@ -9,15 +9,17 @@
 //! propagation, and an atlas may back every material of a model: hashing each
 //! texture on each check would read gigabytes per load. So this process remembers
 //! each path's digest with the file's length, and reads it again only when the
-//! length changes (a file appearing or vanishing included). An edit that keeps the
-//! length is seen by the next process (until the write log, `core::fs::written`,
-//! #1219, can name the files the editor itself wrote).
+//! length changes (a file appearing or vanishing included). A file the engine
+//! itself wrote is read again whatever its length: each look first drains the
+//! write log, `core::fs::written`, and forgets the paths it names (#1219). An
+//! outside tool's edit that keeps the length is seen by the next process.
 //!
 //! Only a regular file is read: a texture path naming a folder, a FIFO or
 //! `/dev/zero` is absent, never read (which would hang or never end).
 
 use super::ImportError;
 use crate::asset::gltf::uri;
+use crate::core::fs::written::written_since;
 use crate::core::{collections::Map, hash};
 use std::path::{Path, PathBuf};
 use std::sync::{LazyLock, Mutex, PoisonError};
@@ -41,11 +43,56 @@ pub enum Seen {
 }
 
 /// This process's looks, by path: the length each was read at, and what it held.
-static LOOKS: LazyLock<Mutex<Map<PathBuf, Look>>> = LazyLock::new(Mutex::default);
+static LOOKS: LazyLock<Mutex<Looks>> = LazyLock::new(|| {
+    Mutex::new(Looks {
+        seen: written_since(u64::MAX).0,
+        files: Map::default(),
+    })
+});
+
+struct Looks {
+    /// The newest write generation already applied to `files`.
+    seen: u64,
+    files: Map<PathBuf, Look>,
+}
+
+impl Looks {
+    /// Forget every look at a file the engine wrote since the last call.
+    fn forget_written(&mut self) {
+        let (seen, paths) = written_since(self.seen);
+        self.seen = seen;
+        let noted = Noted::new(paths);
+        if !noted.0.is_empty() {
+            self.files
+                .retain(|path, look| !noted.names(path, look.canonical.as_deref()));
+        }
+    }
+}
+
+/// Paths the write log named, each with its canonical form: one canonicalization
+/// per note, matched against the one each look stored, never one per look.
+struct Noted(Vec<(PathBuf, Option<PathBuf>)>);
+
+impl Noted {
+    fn new(paths: Vec<String>) -> Self {
+        let canonical = |p: &String| std::fs::canonicalize(p).ok();
+        Self(paths.iter().map(|p| (p.into(), canonical(p))).collect())
+    }
+
+    /// Whether a note names the file at `path` (canonically `canonical`), by the
+    /// same spelling or another.
+    fn names(&self, path: &Path, canonical: Option<&Path>) -> bool {
+        self.0
+            .iter()
+            .any(|(p, c)| p == path || (c.is_some() && c.as_deref() == canonical))
+    }
+}
 
 struct Look {
     len: u64,
     digest: u64,
+    /// The file's canonical path, which a note by another spelling matches.
+    canonical: Option<PathBuf>,
     /// How many times the file was read: what the tests count.
     reads: u32,
 }
@@ -126,19 +173,38 @@ fn seen(path: &Path) -> Seen {
         return Seen::Absent;
     };
     let lock = || LOOKS.lock().unwrap_or_else(PoisonError::into_inner);
-    if let Some(look) = lock().get(path).filter(|look| look.len == len) {
-        return Seen::Read(look.digest);
+    let (known, since) = {
+        let mut looks = lock();
+        looks.forget_written();
+        let known = looks.files.get(path).filter(|look| look.len == len);
+        (known.map(|look| look.digest), looks.seen)
+    };
+    if let Some(digest) = known {
+        return Seen::Read(digest);
     }
     // Read without the lock: another thread's look of another file needn't wait.
     let Ok(bytes) = std::fs::read(path) else {
         return Seen::Unreadable;
     };
     let digest = hash::fnv1a64(&bytes);
+    let canonical = std::fs::canonicalize(path).ok();
     let mut looks = lock();
-    let reads = looks.get(path).map_or(0, |look| look.reads) + 1;
+    looks.forget_written();
+    // A note taken while the file was read (by another thread's drain, too) means
+    // these bytes may be older than the file: answer them, but remember nothing.
+    if looks.seen != since && Noted::new(written_since(since).1).names(path, canonical.as_deref()) {
+        return Seen::Read(digest);
+    }
+    let reads = looks.files.get(path).map_or(0, |look| look.reads) + 1;
     // The length read, not the one stat'd: a write between the two is seen next time.
     let len = bytes.len() as u64;
-    looks.insert(path.to_path_buf(), Look { len, digest, reads });
+    let look = Look {
+        len,
+        digest,
+        canonical,
+        reads,
+    };
+    looks.files.insert(path.to_path_buf(), look);
     Seen::Read(digest)
 }
 
@@ -146,5 +212,5 @@ fn seen(path: &Path) -> Seen {
 #[cfg(test)]
 pub(super) fn reads(path: &Path) -> u32 {
     let looks = LOOKS.lock().unwrap_or_else(PoisonError::into_inner);
-    looks.get(path).map_or(0, |look| look.reads)
+    looks.files.get(path).map_or(0, |look| look.reads)
 }

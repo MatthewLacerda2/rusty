@@ -9,12 +9,15 @@
 //!   noting the path in [`crate::core::fs::written`], #1207). The renderer drains the
 //!   notes and drops the matching upload — colour and data views together, they are
 //!   one `GpuTexture` — plus every material bind group, which still holds the old
-//!   upload, and the matching reflection cubemap. Unity reimports on write; this is
-//!   that.
+//!   upload, the matching reflection cubemap, and a mesh emitter's model whose
+//!   source was re-imported (`passes::particles::mesh_cache`). Unity reimports on
+//!   write; this is that.
 //! - **The file was missing when first drawn.** A failed load is remembered as a
 //!   *miss*, not cached as the default under its path, and misses are re-checked
 //!   (`Path::exists`, one per missing path) every [`MISS_RETRY_FRAMES`] frames, so a
-//!   map that appears later — baked, imported or copied in — is picked up.
+//!   map that appears later — baked, imported or copied in — is picked up. A mesh
+//!   emitter's model that was missing is retried on the same beat, once its
+//!   file has appeared.
 //!
 //! A file changed on disk by an outside tool at a path that already loaded is not
 //! noticed: that would need the per-frame stat this module exists to avoid.
@@ -65,6 +68,8 @@ impl Renderer {
                     .filter(|p| Path::new(p).exists())
                     .cloned(),
             );
+            // A mesh emitter's model whose file has appeared is tried again too.
+            self.retry_particle_meshes();
         }
         if !stale.is_empty() {
             self.invalidate_textures(&stale);
@@ -81,6 +86,8 @@ impl Renderer {
         // goes too, so the next frame copies the new cube in (#1206).
         self.cubemaps.retain(|key, _| !is_stale(key));
         self.reflection_probes.forget(is_stale);
+        // A mesh emitter's re-imported model (#1219).
+        self.forget_particle_meshes(&stale);
         // The decal atlas keeps its own copy of each map (#638).
         self.decals.atlas.forget(is_stale);
         let before = self.gpu_textures.len();

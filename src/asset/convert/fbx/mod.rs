@@ -26,6 +26,7 @@ mod material;
 mod mesh;
 mod texture;
 
+use super::stage;
 use super::stage::hook::{self, Step};
 use super::{glb, Converted, Skip, Staging};
 use crate::asset::ImportError;
@@ -42,8 +43,7 @@ pub fn convert(source: &Path, to: &Staging) -> Result<Converted, ImportError> {
     let mut takes = Vec::new();
     let document = document(&scene, &mut textures, &mut takes)?;
     hook::io(Step::WriteGltf)
-        // lint: allow(asset-write) written into a staging folder that is swapped in whole, not a path a cache has seen
-        .and_then(|()| std::fs::write(&to.glb, glb::write(&document)))
+        .and_then(|()| stage::write(&to.glb, &glb::write(&document)))
         .map_err(|e| ImportError::Parse(format!("writing {}: {e}", to.glb.display())))?;
     let mut skipped = textures.skipped;
     skipped.append(&mut takes);

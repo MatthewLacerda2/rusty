@@ -162,6 +162,13 @@ pub fn asset_mesh_component(reference: &str) -> crate::scene::MeshComponent {
     }
 }
 
+/// The file a mesh reference rehydrates from (`models/a.fbx::Body` →
+/// `models/a.fbx`): what a renderer cache keyed by reference matches against the
+/// write log (#1219). `None` for a string that is not a reference (a primitive).
+pub fn asset_ref_file(reference: &str) -> Option<String> {
+    asset::AssetRef::parse(reference).ok().map(|r| r.path)
+}
+
 #[cfg(test)]
 #[path = "rehydrate_tests.rs"]
 mod rehydrate_tests;
