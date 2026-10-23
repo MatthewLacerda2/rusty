@@ -16,14 +16,15 @@
 //! `(seed, inputs, fixed dt)`. `core` is outside the determinism guard's sim dirs.
 //!
 //! ## Persistence
-//! A keymap round-trips through the [`Storage`](crate::core::storage::Storage)
-//! layer as a flat JSON object of `{ physical: logical }` pairs. Only entries that
-//! differ from identity are stored, so a default (unremapped) install persists an
-//! empty object. Loaded at startup, editable at runtime.
+//! A game writes its bindings through the [`Storage`](crate::core::storage::Storage)
+//! layer as a flat `{ physical: logical }` table (Lua
+//! `Storage.SetTable("keybindings", { bindings = { … } })`, `docs/api/Storage.md`);
+//! only entries that differ from identity need storing. The shell reads it once, at
+//! boot ([`Keymap::from_json`]), so a rebinding takes effect on the next launch.
 
 use std::collections::BTreeMap;
 
-use serde_json::{Map, Value};
+use serde_json::Value;
 
 /// The `Storage` namespace a keymap persists under.
 pub const KEYBINDINGS_NAMESPACE: &str = "keybindings";
@@ -36,7 +37,7 @@ pub const KEYBINDINGS_KEY: &str = "bindings";
 #[derive(Clone, Debug, Default)]
 pub struct Keymap {
     /// Only non-identity overrides are stored; a physical key with no entry maps to
-    /// itself. Ordered, because [`Keymap::to_json`] writes them out in this order.
+    /// itself.
     overrides: BTreeMap<String, String>,
 }
 
@@ -58,11 +59,6 @@ impl Keymap {
         }
     }
 
-    /// Drop any override for `physical`, restoring identity for that key.
-    pub fn unbind(&mut self, physical: &str) {
-        self.overrides.remove(&physical.to_uppercase());
-    }
-
     /// The logical key a physical key resolves to: its override if one exists,
     /// otherwise the physical key itself (identity).
     pub fn resolve(&self, physical: &str) -> String {
@@ -70,26 +66,9 @@ impl Keymap {
         self.overrides.get(&physical).cloned().unwrap_or(physical)
     }
 
-    /// The explicit logical binding for `physical`, or `None` when it is identity.
-    pub fn get(&self, physical: &str) -> Option<&str> {
-        self.overrides
-            .get(&physical.to_uppercase())
-            .map(String::as_str)
-    }
-
-    /// The overrides as a flat JSON object of `{ physical: logical }`, suitable for
-    /// `Storage::set`. Identity (no overrides) serializes to an empty object.
-    pub fn to_json(&self) -> Value {
-        let mut map = Map::new();
-        for (physical, logical) in &self.overrides {
-            map.insert(physical.clone(), Value::String(logical.clone()));
-        }
-        Value::Object(map)
-    }
-
-    /// Build a keymap from a `{ physical: logical }` JSON object (as produced by
-    /// [`Keymap::to_json`]). Non-string values and identity entries are ignored, so
-    /// a malformed or partial blob degrades to identity rather than failing.
+    /// Build a keymap from the `{ physical: logical }` JSON object a script stored.
+    /// Non-string values and identity entries are ignored, so a malformed or partial
+    /// blob degrades to identity rather than failing.
     pub fn from_json(value: &Value) -> Self {
         let mut keymap = Self::new();
         if let Value::Object(map) = value {
@@ -105,6 +84,8 @@ impl Keymap {
 
 #[cfg(test)]
 mod tests {
+    use serde_json::json;
+
     use super::*;
 
     #[test]
@@ -113,18 +94,16 @@ mod tests {
         assert!(keymap.overrides.is_empty());
         assert_eq!(keymap.resolve("W"), "W");
         assert_eq!(keymap.resolve("space"), "SPACE");
-        assert!(keymap.get("W").is_none());
     }
 
     #[test]
-    fn bind_remaps_and_normalizes_case() {
-        let mut keymap = Keymap::new();
-        keymap.bind("up", "w");
+    fn a_stored_blob_remaps_and_normalizes_case() {
+        // The table `Storage.SetTable("keybindings", { bindings = { up = "w" } })` stores.
+        let keymap = Keymap::from_json(&json!({ "up": "w", "Down": "S" }));
         assert_eq!(keymap.resolve("UP"), "W");
-        assert_eq!(keymap.get("up"), Some("W"));
-        assert!(!keymap.overrides.is_empty());
+        assert_eq!(keymap.resolve("down"), "S");
         // An untouched key still maps to itself.
-        assert_eq!(keymap.resolve("D"), "D");
+        assert_eq!(keymap.resolve("LEFT"), "LEFT");
     }
 
     #[test]
@@ -138,39 +117,13 @@ mod tests {
     }
 
     #[test]
-    fn unbind_restores_identity() {
-        let mut keymap = Keymap::new();
-        keymap.bind("UP", "W");
-        keymap.unbind("up");
-        assert_eq!(keymap.resolve("UP"), "UP");
-    }
-
-    #[test]
-    fn json_roundtrips_only_overrides() {
-        let mut keymap = Keymap::new();
-        keymap.bind("UP", "W");
-        keymap.bind("DOWN", "S");
-        let json = keymap.to_json();
-
-        let restored = Keymap::from_json(&json);
-        assert_eq!(restored.resolve("UP"), "W");
-        assert_eq!(restored.resolve("DOWN"), "S");
-        assert_eq!(restored.resolve("LEFT"), "LEFT");
-    }
-
-    #[test]
-    fn identity_serializes_to_empty_object() {
-        assert_eq!(Keymap::new().to_json(), serde_json::json!({}));
-    }
-
-    #[test]
-    fn from_json_ignores_malformed_entries() {
-        let value = serde_json::json!({ "UP": "W", "DOWN": 42, "X": "X" });
-        let keymap = Keymap::from_json(&value);
+    fn a_malformed_blob_degrades_to_identity() {
+        let keymap = Keymap::from_json(&json!({ "UP": "W", "DOWN": 42, "X": "x" }));
         assert_eq!(keymap.resolve("UP"), "W");
         // Non-string value ignored -> identity.
         assert_eq!(keymap.resolve("DOWN"), "DOWN");
-        // Identity entry ("X" -> "X") ignored.
-        assert!(keymap.get("X").is_none());
+        // Identity entry ("X" -> "x") stores nothing.
+        assert_eq!(keymap.overrides.len(), 1);
+        assert!(Keymap::from_json(&json!([1, 2])).overrides.is_empty());
     }
 }
