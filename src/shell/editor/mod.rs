@@ -264,9 +264,8 @@ impl Frontend for EditorFrontend {
     }
 }
 
-/// Read the UI's texture sizes into the sim and mirror them into the editor, so
-/// the overlay and the inspector lay the UI out as the game does (#1221).
+/// Hand the sim's texture-size table to the editor, so the overlay and the
+/// inspector lay the UI out with the very table the game does (#1221).
 pub(super) fn sync_ui_textures(ui: &mut EditorUi, game: &GameWorld) {
-    crate::shell::frame::refresh_ui_textures(game);
-    ui.ui_textures = game.resources.screen.borrow().textures().clone();
+    ui.ui_textures = std::rc::Rc::clone(game.resources.screen.borrow().textures());
 }

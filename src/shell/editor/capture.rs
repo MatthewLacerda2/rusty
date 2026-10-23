@@ -8,9 +8,9 @@
 //!
 //! **The same frame the editor draws, minus the window.** Each frame runs
 //! [`EditorUi::draw`] exactly as the [`EditorFrontend`](super::EditorFrontend) does,
-//! renders the scene into the viewport rect the layout asked for (through a [`CaptureHost`], so it is the
-//! screenshot's renderer), rebinds that target as the viewport's egui texture, and on
-//! the last frame paints egui into an offscreen target and reads it back.
+//! renders the scene into the viewport rect the layout asked for (through the
+//! screenshot's [`CaptureHost`]), rebinds that target as the viewport's egui texture,
+//! and on the last frame paints egui into an offscreen target and reads it back.
 //!
 //! **Deterministic by construction:** a fixed size, a fixed pixel scale (1×), a fixed
 //! frame count and a synthetic egui clock. Several frames are needed because egui loads
@@ -26,8 +26,7 @@ use std::{cell::RefCell, path::Path, rc::Rc};
 use crate::app::GameWorld;
 use crate::core::input::InputState;
 use crate::dev::capture::CaptureHost;
-use crate::editor::viewport::scene_nav::selection_bounds;
-use crate::editor::{EditorUi, ViewportTab};
+use crate::editor::{viewport::scene_nav::selection_bounds, EditorUi, ViewportTab};
 use crate::navigation::NavigationGraph;
 use crate::render::{readback, OFFSCREEN_FORMAT};
 use crate::scene::Scene;
@@ -156,6 +155,8 @@ pub fn capture_into(
 /// A fresh editor with `opts`' tab, selection and framing applied.
 fn initial_ui(game: &GameWorld, opts: &EditorCaptureOptions) -> Result<EditorUi, String> {
     let mut ui = EditorUi::new();
+    crate::shell::frame::refresh_ui_textures(&mut Default::default(), game);
+    super::sync_ui_textures(&mut ui, game);
     ui.viewport_tab = opts.tab;
     if let Some(name) = &opts.select {
         let id = game.scene().borrow().find_entity_by_name(name);
@@ -198,7 +199,6 @@ fn draw_ui(
     texture_id: Option<egui::TextureId>,
 ) -> egui::Vec2 {
     let mut is_playing = playing;
-    super::sync_ui_textures(ui, game);
     let interaction = ui.draw(
         ctx,
         &mut game.world.scene.borrow_mut(),
@@ -237,6 +237,7 @@ fn render_viewport(
     let scene_tab = ui.viewport_tab == ViewportTab::Scene;
     view.ui.screen_in_editor = scene_tab && ui.ui_overlay;
     let camera = super::viewport::viewport_camera(ui, game, &scene, ui.viewport_tab);
+    renderer.set_ui_textures(Rc::clone(&ui.ui_textures));
     renderer.render(view, &scene, &camera, &target, scene_tab);
     super::viewport::rebind_egui_texture(egui_renderer, &renderer.device, texture_id, view);
 }

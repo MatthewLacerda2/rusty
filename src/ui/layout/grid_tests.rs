@@ -84,7 +84,10 @@ fn a_fitted_grid_takes_its_blocks_preferred_size() {
         ..LayoutElementComponent::default()
     };
     f.scene.world.set_layout_element(f.panel, Some(fit));
-    let layout = UiLayout::compute(&f.scene.world, HD);
+    let layout = UiLayout::compute_in(
+        &f.scene.world,
+        &crate::ui::UiView::screen(HD, Default::default()),
+    );
     let r = layout.get(f.panel).expect("laid out").rect;
     // Two columns, three rows: 2·100 + 10 by 3·50 + 2·10, centred on the pivot.
     assert_rect(r, [855.0, 455.0], [210.0, 170.0]);

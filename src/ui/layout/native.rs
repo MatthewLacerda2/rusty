@@ -2,39 +2,32 @@
 //!
 //! An `Image`'s preferred size is its texture's size in texels (one texel is one
 //! reference unit, as the renderer draws it). The sim never reads a file for it:
-//! [`TextureSizes`] is a table the platform fills — the shell and the headless
-//! harness through `render::refresh_texture_sizes`, which reads each file's header
-//! and follows the engine's own re-bakes (`core::fs::written`) — and the layout
-//! reads it through the [`UiView`](crate::ui::UiView), beside the screen size.
-//! Like the screen size it is a **sim input**: a test or a harness may set it.
+//! [`TextureSizes`] is a table the platform fills before every tick — the window
+//! shell and the headless harness through `render::TextureSizeReader`, which reads
+//! each file's header and follows the engine's own re-bakes (`core::fs::written`)
+//! — and every layout reads it through the [`UiView`](crate::ui::UiView), beside
+//! the screen size. The renderer draws with the same table, so what is drawn is
+//! what is clicked. Like the screen size it is a **sim input**.
 //!
-//! A path with no entry (not baked yet, unreadable, a render texture) measures
-//! zero, as an Image with no texture does. A miss is never stored, so the size
-//! appears the frame the file does.
+//! **A size appears at the next tick** (Unity's content-size fitting, applied
+//! late): an Image created, or a texture baked, during a tick measures what the
+//! table held when the tick began. A path with no entry (not baked yet,
+//! unreadable, a render texture) measures zero, as an Image with no texture does;
+//! a miss is never stored as a size.
 
 use std::collections::BTreeMap;
 
 use glam::Vec2;
 
 /// Texture path → native size in texels, as the platform last read it (a sim
-/// input; see the module docs).
+/// input; see the module docs). Shared, not copied: the resource, every
+/// [`UiView`](crate::ui::UiView) and the renderer hold one `Rc` of it.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct TextureSizes {
     sizes: BTreeMap<String, Vec2>,
-    /// The platform's write-log generation the table is current as of. The sim
-    /// never reads it; it lets the filler drain only what changed since.
-    generation: u64,
 }
 
 impl TextureSizes {
-    /// An empty table.
-    pub const fn new() -> Self {
-        Self {
-            sizes: BTreeMap::new(),
-            generation: 0,
-        }
-    }
-
     /// The size of the texture at `path`, when the platform knows it.
     pub fn get(&self, path: &str) -> Option<Vec2> {
         self.sizes.get(path).copied()
@@ -45,18 +38,13 @@ impl TextureSizes {
         self.sizes.insert(path.into(), size);
     }
 
-    /// Keep only the entries whose path `keep` accepts.
-    pub fn retain(&mut self, mut keep: impl FnMut(&str) -> bool) {
-        self.sizes.retain(|path, _| keep(path));
+    /// Forget `path`'s size.
+    pub fn remove(&mut self, path: &str) {
+        self.sizes.remove(path);
     }
 
-    /// The platform's write-log generation (see the field docs).
-    pub fn generation(&self) -> u64 {
-        self.generation
-    }
-
-    /// Record the write-log generation the table now reflects.
-    pub fn set_generation(&mut self, generation: u64) {
-        self.generation = generation;
+    /// Every path the table holds a size for.
+    pub fn paths(&self) -> impl Iterator<Item = &str> {
+        self.sizes.keys().map(String::as_str)
     }
 }

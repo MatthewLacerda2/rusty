@@ -118,9 +118,11 @@ ported faithfully:
   (unwrapped width; height wrapped at the width it will get), its `Image` (the texture's
   native size, or for `Sliced` / `Tiled` the sum of its borders) — the largest of
   several wins, and zeros when there is no content. The native size is a sim input like
-  the screen size: the platform reads each texture file's header into a table before
-  every tick (the window, the editor and the headless harness alike) and follows the
-  engine's own re-bakes; a texture not on disk yet measures zero until it is.
+  the screen size: the platform reads each texture file's header into one shared table
+  before every tick (the window and the headless harness alike), and the renderer and
+  the editor lay out with that same table, so what is drawn is what is clicked. It
+  follows the engine's own re-bakes; a texture not on disk yet measures zero until it
+  is. A size therefore appears at the **next** tick (`docs/api/UI.md`).
 - **`LayoutElement`** overrides any of those six numbers (`None` keeps the content's),
   and `ignore_layout` takes the element out of its parent's group.
 - **Row / column placement** (Unity's `HorizontalOrVerticalLayoutGroup`). Along the main

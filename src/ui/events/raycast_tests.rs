@@ -9,7 +9,10 @@ use crate::ui::events::fixture::{panel, scene, SCREEN};
 use crate::ui::UiLayout;
 
 fn hit(scene: &crate::scene::Scene, x: f32, y: f32) -> Option<u32> {
-    let layout = UiLayout::compute(&scene.world, SCREEN);
+    let layout = UiLayout::compute_in(
+        &scene.world,
+        &crate::ui::UiView::screen(SCREEN, Default::default()),
+    );
     raycast(&scene.world, &layout, Vec2::new(x, y))
 }
 

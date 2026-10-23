@@ -39,7 +39,7 @@ fn scene() -> (Scene, u32) {
 }
 
 fn rects(s: &Scene, id: u32) -> (UiRect, UiRect) {
-    let layout = UiLayout::compute(&s.world, HD);
+    let layout = UiLayout::compute_in(&s.world, &crate::ui::UiView::screen(HD, Default::default()));
     let parent = s.world.parent_id(id).expect("parent");
     (
         *layout.get(id).expect("laid out"),

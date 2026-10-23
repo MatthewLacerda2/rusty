@@ -16,7 +16,7 @@ fn cam() -> Camera {
 
 /// The UI view the fixtures are snapshotted through.
 fn view() -> UiView {
-    UiView::with_camera(SCREEN, cam())
+    UiView::with_camera(SCREEN, cam(), Default::default())
 }
 
 #[test]
@@ -97,7 +97,12 @@ fn entity_value_matches_world_entry() {
     let mut scene = Scene::new();
     let id = create_entity(&mut scene, "Solo", None);
     let wm = scene.world.local_to_world(id);
-    let direct = entity_value(&scene, id, wm, &crate::ui::UiView::screen(SCREEN));
+    let direct = entity_value(
+        &scene,
+        id,
+        wm,
+        &crate::ui::UiView::screen(SCREEN, Default::default()),
+    );
     assert_eq!(direct["name"].as_str(), Some("Solo"));
     // A transform-only entity has no mesh/collider, so no bounds.
     assert!(direct["bounds"].is_null());

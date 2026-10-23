@@ -54,7 +54,10 @@ fn anchor_point_places_the_pivot_off_the_anchor() {
         Vec2::new(200.0, 50.0),
     );
     let id = element(&mut scene, root, rt);
-    let layout = UiLayout::compute(&scene.world, HD);
+    let layout = UiLayout::compute_in(
+        &scene.world,
+        &crate::ui::UiView::screen(HD, Default::default()),
+    );
     let r = layout.get(id).expect("laid out");
     assert_near(r.rect.0, Vec2::new(1710.0, 1020.0));
     assert_near(r.rect.1, Vec2::new(200.0, 50.0));
@@ -71,7 +74,12 @@ fn anchor_stretch_insets_from_the_parent_edges() {
         ..RectTransformComponent::default()
     };
     let id = element(&mut scene, root, rt);
-    let r = UiLayout::compute(&scene.world, HD).get(id).copied();
+    let r = UiLayout::compute_in(
+        &scene.world,
+        &crate::ui::UiView::screen(HD, Default::default()),
+    )
+    .get(id)
+    .copied();
     let r = r.expect("laid out");
     assert_near(r.rect.0, Vec2::new(20.0, 10.0));
     assert_near(r.rect.1, Vec2::new(1880.0, 1060.0));
@@ -95,11 +103,22 @@ fn nested_rects_lay_out_inside_their_parent() {
         Vec2::splat(40.0),
     );
     let child = element(&mut scene, panel, child);
-    let layout = UiLayout::compute(&scene.world, HD);
+    let layout = UiLayout::compute_in(
+        &scene.world,
+        &crate::ui::UiView::screen(HD, Default::default()),
+    );
     let r = layout.get(child).expect("laid out");
     assert_near(r.rect.0, Vec2::new(280.0, 280.0));
     assert_eq!(r.canvas, root);
-    assert_eq!(rect_of(&scene.world, child, HD).as_ref(), Some(r));
+    assert_eq!(
+        rect_in(
+            &scene.world,
+            child,
+            &crate::ui::UiView::screen(HD, Default::default())
+        )
+        .as_ref(),
+        Some(r)
+    );
 }
 
 #[test]
@@ -140,7 +159,10 @@ fn rotation_and_scale_apply_around_the_pivot_and_carry_children() {
         ..RectTransformComponent::default()
     };
     let child = element(&mut scene, panel, fill);
-    let layout = UiLayout::compute(&scene.world, HD);
+    let layout = UiLayout::compute_in(
+        &scene.world,
+        &crate::ui::UiView::screen(HD, Default::default()),
+    );
     let r = layout.get(panel).expect("panel");
     // Pivot (0,0) sits at (100,100); 90° CCW then ×2: the quad spans x∈[-100,100].
     assert_near(r.corners[0], Vec2::new(100.0, 100.0));
@@ -163,11 +185,19 @@ fn draw_order_is_sort_order_then_hierarchy_preorder() {
     let plain = scene.add_entity("Plain".to_string());
     scene.set_parent(plain, Some(top)).expect("parent exists");
     let hidden = element(&mut scene, plain, RectTransformComponent::default());
-    let layout = UiLayout::compute(&scene.world, HD);
+    let layout = UiLayout::compute_in(
+        &scene.world,
+        &crate::ui::UiView::screen(HD, Default::default()),
+    );
     let order: Vec<u32> = layout.iter().map(|(id, _)| id).collect();
     assert_eq!(order, vec![bottom, top, a, a1, b]);
     assert!(layout.get(hidden).is_none());
-    assert!(rect_of(&scene.world, hidden, HD).is_none());
+    assert!(rect_in(
+        &scene.world,
+        hidden,
+        &crate::ui::UiView::screen(HD, Default::default())
+    )
+    .is_none());
 }
 
 #[test]
@@ -183,7 +213,10 @@ fn layout_is_deterministic_across_runs() {
         );
         let e = element(&mut scene, root, rt);
         element(&mut scene, e, RectTransformComponent::default());
-        UiLayout::compute(&scene.world, Vec2::new(1366.0, 768.0))
+        UiLayout::compute_in(
+            &scene.world,
+            &crate::ui::UiView::screen(Vec2::new(1366.0, 768.0), Default::default()),
+        )
     };
     assert_eq!(build(), build());
 }

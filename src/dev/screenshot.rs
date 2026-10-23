@@ -71,6 +71,16 @@ pub fn capture_world_into(
     width: u32,
     height: u32,
 ) -> Result<bool, String> {
+    share_ui_textures(host, world, width, height);
     let scene = world.scene().borrow();
     capture_into(host, &scene, &world.camera().borrow(), path, width, height)
+}
+
+/// Hand `world`'s texture-size table to `host`'s renderer (#1221), so a capture
+/// draws the UI exactly as the sim laid it out.
+pub fn share_ui_textures(host: &mut CaptureHost, world: &GameWorld, width: u32, height: u32) {
+    if let Some(renderer) = host.renderer(width, height) {
+        let textures = world.resources.screen.borrow().textures().clone();
+        renderer.set_ui_textures(textures);
+    }
 }

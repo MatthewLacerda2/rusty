@@ -8,7 +8,10 @@
 //!
 //! The textures' native sizes ride along (#1221): an `Image` measures by its
 //! texture's size, which the platform reads and writes here ([`TextureSizes`])
-//! before each tick, so the layout never reads a file.
+//! before every tick, so the layout never reads a file. One `Rc` is shared with
+//! every view and the renderer; a write copies it only while one is held.
+
+use std::rc::Rc;
 
 use glam::Vec2;
 
@@ -24,7 +27,7 @@ pub struct ScreenSize {
     game_view: Option<(u32, u32)>,
     /// The native size of each texture the scene's Images use, as the platform
     /// last read them.
-    textures: TextureSizes,
+    textures: Rc<TextureSizes>,
 }
 
 impl ScreenSize {
@@ -40,25 +43,30 @@ impl ScreenSize {
         Vec2::new(w.max(1) as f32, h.max(1) as f32)
     }
 
-    /// The textures' native sizes the layout measures Images by.
-    pub fn textures(&self) -> &TextureSizes {
+    /// The textures' native sizes the layout measures Images by (the shared table).
+    pub fn textures(&self) -> &Rc<TextureSizes> {
         &self.textures
     }
 
-    /// The table, for the platform (or a harness) to fill.
+    /// Replace the shared table (the platform, after a refresh).
+    pub fn set_textures(&mut self, textures: Rc<TextureSizes>) {
+        self.textures = textures;
+    }
+
+    /// The table, for a test or a scenario to fill by hand. Copies it first only while
+    /// a view or the renderer still holds the old one.
     pub fn textures_mut(&mut self) -> &mut TextureSizes {
-        &mut self.textures
+        Rc::make_mut(&mut self.textures)
     }
 
     /// The view the UI is computed against: this screen (sized against `video`)
     /// and its texture sizes, through `camera` when there is one.
     pub fn view(&self, video: &VideoSettings, camera: Option<Camera>) -> UiView {
-        let px = self.pixels(video);
-        let view = match camera {
-            Some(camera) => UiView::with_camera(px, camera),
-            None => UiView::screen(px),
-        };
-        view.with_textures(self.textures.clone())
+        let (px, textures) = (self.pixels(video), Rc::clone(&self.textures));
+        match camera {
+            Some(camera) => UiView::with_camera(px, camera, textures),
+            None => UiView::screen(px, textures),
+        }
     }
 }
 

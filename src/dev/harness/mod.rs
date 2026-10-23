@@ -31,6 +31,7 @@ use crate::app::GameWorld;
 use crate::core::frame_stats::FrameStats;
 use crate::core::input::InputState;
 use crate::navigation::NavigationGraph;
+use crate::render::TextureSizeReader;
 use crate::scene::Scene;
 use crate::scripting::{ConsoleLogs, LogLevel};
 
@@ -53,17 +54,18 @@ pub struct Expectation {
 /// so a scenario's remaining observations read the state the game quit in and
 /// `results.json` records `"quit": true`. Returns whether a tick ran.
 ///
-/// Before the tick the harness reads the UI's texture sizes from the files, as the
-/// window does (#1221), so a headless layout matches the drawn one; a scenario
-/// that wants other sizes writes `resources.screen`'s table between steps.
-pub fn tick_unless_quit(world: &mut GameWorld) -> bool {
+/// Before the tick `ui_textures` reads the UI's texture sizes from the files into
+/// the sim, as the window does before each of its ticks (#1221), so a headless
+/// layout matches the drawn one. No Lua binding writes the table: Rust code driving
+/// a harness may set sizes on `resources.screen.textures_mut()` between steps (only
+/// for paths the scene's Images use; see `render::TextureSizeReader`).
+pub fn tick_unless_quit(world: &mut GameWorld, ui_textures: &mut TextureSizeReader) -> bool {
     if world.quit_requested() {
         return false;
     }
     {
         let scene = world.scene().borrow();
-        let mut screen = world.resources.screen.borrow_mut();
-        crate::render::refresh_texture_sizes(&scene.world, screen.textures_mut());
+        ui_textures.refresh_screen(&scene.world, &mut world.resources.screen.borrow_mut());
     }
     world.tick(FIXED_DT);
     // Engine warnings join the console, so a scenario's `console.log` carries them.
@@ -95,6 +97,8 @@ pub struct Harness {
     capture: super::capture::CaptureHost,
     /// The run's frame stats, filled by the timing probe and the screenshots.
     pub stats: Rc<RefCell<FrameStats>>,
+    /// Reads the UI's texture sizes into the sim before every tick (#1221).
+    pub ui_textures: Rc<RefCell<TextureSizeReader>>,
 }
 
 impl Harness {
@@ -160,14 +164,15 @@ impl Harness {
             out_dir: out_dir.as_ref().to_path_buf(),
             capture: super::capture::CaptureHost::new(),
             stats,
+            ui_textures: Rc::default(),
         }
     }
 
     /// Advance the simulation by exactly `n` fixed ticks, or fewer if the game quits.
     pub fn step(&self, n: u32) {
-        let mut world = self.world.borrow_mut();
+        let (mut world, mut sizes) = (self.world.borrow_mut(), self.ui_textures.borrow_mut());
         for _ in 0..n {
-            if !tick_unless_quit(&mut world) {
+            if !tick_unless_quit(&mut world, &mut sizes) {
                 break;
             }
         }

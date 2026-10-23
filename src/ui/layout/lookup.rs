@@ -4,22 +4,15 @@
 //! from the live scene (edit mode included): walk only its ancestor chain with the
 //! same maths [`UiLayout::compute_in`](super::UiLayout::compute_in) runs.
 
-use glam::Vec2;
-
 use super::sizes::layout_children;
 use super::{child_node, group, root_canvas_of, root_node, UiRect};
 use crate::ecs::World;
 use crate::ui::UiView;
 
-/// The rect of one entity, computed on demand by walking only its ancestor chain —
-/// identical to what [`UiLayout::compute`](super::UiLayout::compute) yields for it. `None` when the entity is
-/// not under a canvas, or a link of the chain lacks a `RectTransform`.
-pub fn rect_of(world: &World, id: u32, screen: Vec2) -> Option<UiRect> {
-    rect_in(world, id, &UiView::screen(screen))
-}
-
-/// [`rect_of`] against `view` (markers placed, world canvases at their reference
-/// resolution).
+/// The rect of one entity against `view`, computed on demand by walking only its
+/// ancestor chain — identical to what [`UiLayout::compute_in`](super::UiLayout::compute_in)
+/// yields for it. `None` when the entity is not under a canvas, or a link of the
+/// chain lacks a `RectTransform`.
 pub fn rect_in(world: &World, id: u32, view: &UiView) -> Option<UiRect> {
     let root = root_canvas_of(world, id)?;
     let mut chain = Vec::new();

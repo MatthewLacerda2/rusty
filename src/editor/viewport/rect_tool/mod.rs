@@ -25,6 +25,8 @@
 pub mod geometry;
 pub mod overlay;
 
+use std::rc::Rc;
+
 use glam::{Vec2, Vec3};
 
 use crate::components::RectTransformComponent;
@@ -45,7 +47,7 @@ const HANDLE_RADIUS: f32 = 7.0;
 pub struct OverlayFrame {
     pub size: Vec2,
     pub pixels_per_point: f32,
-    pub textures: TextureSizes,
+    pub textures: Rc<TextureSizes>,
 }
 
 impl OverlayFrame {
@@ -75,7 +77,7 @@ impl OverlayFrame {
 
     /// The overlay's layout of `world` (no camera: markers sit at their anchors).
     pub fn layout(&self, world: &World) -> UiLayout {
-        let view = UiView::screen(self.screen()).with_textures(self.textures.clone());
+        let view = UiView::screen(self.screen(), Rc::clone(&self.textures));
         UiLayout::compute_in(world, &view)
     }
 }

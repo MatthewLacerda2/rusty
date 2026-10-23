@@ -49,35 +49,35 @@ fn clock_never_goes_backwards() {
 #[test]
 fn live_advance_ticks_with_the_wall_clock_delta() {
     let mut game = playing_world();
-    assert!(advance_sim(&mut game, 0.02) == PlayTransition::Entered);
-    advance_sim(&mut game, 0.02);
+    assert!(advance_sim(&mut game, 0.02, &mut Default::default()) == PlayTransition::Entered);
+    advance_sim(&mut game, 0.02, &mut Default::default());
     assert_eq!(game.play_frame(), 2);
 }
 
 #[test]
 fn paused_advance_runs_only_the_queued_fixed_steps() {
     let mut game = playing_world();
-    advance_sim(&mut game, 0.02); // enter Play
+    advance_sim(&mut game, 0.02, &mut Default::default()); // enter Play
     let before = game.play_frame();
     game.time().borrow_mut().pause();
-    advance_sim(&mut game, 0.5);
+    advance_sim(&mut game, 0.5, &mut Default::default());
     assert_eq!(
         game.play_frame(),
         before,
         "a paused frame with no steps is frozen"
     );
     game.time().borrow_mut().request_steps(3);
-    advance_sim(&mut game, 0.5);
+    advance_sim(&mut game, 0.5, &mut Default::default());
     assert_eq!(game.play_frame(), before + 3);
 }
 
 #[test]
 fn paused_advance_still_processes_a_stop() {
     let mut game = playing_world();
-    advance_sim(&mut game, 0.02);
+    advance_sim(&mut game, 0.02, &mut Default::default());
     game.time().borrow_mut().pause();
     game.set_playing(false);
-    assert!(advance_sim(&mut game, 0.02) == PlayTransition::Exited);
+    assert!(advance_sim(&mut game, 0.02, &mut Default::default()) == PlayTransition::Exited);
 }
 
 #[test]

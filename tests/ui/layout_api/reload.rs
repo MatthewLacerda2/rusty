@@ -55,7 +55,10 @@ fn menu() -> (Scene, Vec<u32>) {
 fn layout_components_round_trip_and_lay_out_identically_after_reload() {
     let (scene, ids) = menu();
     let screen = Vec2::new(1920.0, 1080.0);
-    let before = UiLayout::compute(&scene.world, screen);
+    let before = UiLayout::compute_in(
+        &scene.world,
+        &rusty::ui::UiView::screen(screen, Default::default()),
+    );
     // 8 + 3·30 + 2·4 + 8 tall, rows 384 wide inside the padding.
     let list = before.get(ids[0]).unwrap().rect;
     assert!((list.1 - Vec2::new(400.0, 114.0)).abs().max_element() < 1e-3);
@@ -74,5 +77,11 @@ fn layout_components_round_trip_and_lay_out_identically_after_reload() {
     }
     let group = scene.world.layout_group(ids[0]).map(|g| g.clone());
     assert_eq!(loaded.world.layout_group(ids[0]).map(|g| g.clone()), group);
-    assert_eq!(UiLayout::compute(&loaded.world, screen), before);
+    assert_eq!(
+        UiLayout::compute_in(
+            &loaded.world,
+            &rusty::ui::UiView::screen(screen, Default::default())
+        ),
+        before
+    );
 }

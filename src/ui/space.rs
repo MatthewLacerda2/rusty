@@ -19,6 +19,8 @@
 //! hit-tests with: the screen point, and the camera ray through it (the screen
 //! centre while the cursor is locked, for "look at it and press E" terminals).
 
+use std::rc::Rc;
+
 use glam::{Mat4, Quat, Vec2, Vec3};
 
 use crate::components::{CanvasComponent, CanvasRenderMode};
@@ -33,34 +35,28 @@ pub struct UiView {
     pub screen: Vec2,
     /// The camera looking through it; `None` places no world UI and no marker.
     pub camera: Option<Camera>,
-    /// The native size of each texture an `Image` measures by (`layout::native`);
-    /// empty unless the caller hands the platform's table over.
-    pub textures: TextureSizes,
+    /// The native size of each texture an `Image` measures by (`layout::native`):
+    /// the platform's shared table (`ScreenSize::textures`).
+    pub textures: Rc<TextureSizes>,
 }
 
 impl UiView {
-    /// A view with no camera: overlay layout only.
-    pub fn screen(screen: Vec2) -> Self {
+    /// A view with no camera: overlay layout only, Images measured by `textures`.
+    pub fn screen(screen: Vec2, textures: Rc<TextureSizes>) -> Self {
         Self {
             screen: screen.max(Vec2::ONE),
             camera: None,
-            textures: TextureSizes::default(),
+            textures,
         }
     }
 
-    /// A view through `camera`.
-    pub fn with_camera(screen: Vec2, camera: Camera) -> Self {
+    /// A view through `camera`, Images measured by `textures`.
+    pub fn with_camera(screen: Vec2, camera: Camera, textures: Rc<TextureSizes>) -> Self {
         Self {
             screen: screen.max(Vec2::ONE),
             camera: Some(camera),
-            textures: TextureSizes::default(),
+            textures,
         }
-    }
-
-    /// This view, with `textures` as the native sizes its Images measure by.
-    pub fn with_textures(mut self, textures: TextureSizes) -> Self {
-        self.textures = textures;
-        self
     }
 
     /// The pointer for a mouse at `mouse` (UI screen pixels), or a locked cursor

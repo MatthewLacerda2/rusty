@@ -90,9 +90,9 @@ pub struct UiRenderer {
     world: world::WorldUiPipeline,
     /// Custom ui shaders' pipelines (#427).
     shaders: custom::UiShaders,
-    /// The texture sizes this pass lays out with, refreshed each prepare
-    /// (`gpu::textures::sizes`, #1221).
-    texture_sizes: crate::ui::TextureSizes,
+    /// The texture sizes this pass lays out with: the sim's own table, handed
+    /// over by [`Renderer::set_ui_textures`] (#1221). Empty until then.
+    texture_sizes: Rc<crate::ui::TextureSizes>,
 }
 
 impl UiRenderer {
@@ -140,7 +140,7 @@ impl UiRenderer {
             fonts: HashMap::new(),
             world,
             shaders,
-            texture_sizes: crate::ui::TextureSizes::new(),
+            texture_sizes: Rc::default(),
         }
     }
 
@@ -207,6 +207,13 @@ impl UiRenderer {
 }
 
 impl crate::render::Renderer {
+    /// Draw the UI with the sim's texture-size table (`ScreenSize::textures`, #1221),
+    /// so the drawn layout is the one the sim hit-tests. Set before each `render`
+    /// of a game's scene; a renderer never handed one lays Images out at zero.
+    pub fn set_ui_textures(&mut self, textures: Rc<crate::ui::TextureSizes>) {
+        self.ui_renderer.texture_sizes = textures;
+    }
+
     /// The view of a swapchain frame the UI pass draws through, and its format: the
     /// frame's non-sRGB twin when the surface was configured with one (display-space
     /// blending), else the frame itself. Hand it to [`RenderView::set_ui_output`].

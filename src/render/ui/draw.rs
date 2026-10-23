@@ -3,8 +3,8 @@
 //! [`Renderer::prepare_ui`] runs inside `Renderer::render` before the camera stack:
 //! the layout is recomputed for the view's own pixel size through its camera (the
 //! same pure `UiLayout::compute_in` the sim's `LateUpdate` system runs, with the
-//! texture sizes read the same way, `gpu::textures::sizes` — so in Play it equals
-//! `Resources::ui_layout` whenever the view is the game view) and turned
+//! sim's own texture-size table ([`Renderer::set_ui_textures`]) — so in Play it
+//! equals `Resources::ui_layout` whenever the view is the game view) and turned
 //! into per-canvas meshes. World canvases then draw inside the stack (`world`,
 //! #429); [`Renderer::draw_ui`] draws the screen canvases right after post-FX, with
 //! `LoadOp::Load` over the finished frame. The Scene view (editor mode) keeps only
@@ -47,9 +47,8 @@ impl Renderer {
         (view.ui.uploads, view.ui.drawn) = (0, 0);
         let size = view.size();
         let screen = Vec2::new(size.width as f32, size.height as f32);
-        let sizes = &mut self.ui_renderer.texture_sizes;
-        crate::render::refresh_texture_sizes(&scene.world, sizes);
-        let ui_view = UiView::with_camera(screen, camera.clone()).with_textures(sizes.clone());
+        let textures = Rc::clone(&self.ui_renderer.texture_sizes);
+        let ui_view = UiView::with_camera(screen, camera.clone(), textures);
         let layout = UiLayout::compute_in(&scene.world, &ui_view);
         for path in texture_paths(scene, &layout) {
             let tex = self.load_texture(&path);

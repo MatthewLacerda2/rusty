@@ -238,8 +238,10 @@ fn draw_components(
     ribbons::draw_line(ui, world, id, &mut editor.is_dirty);
     audio::draw(ui, world, id, &mut editor.is_dirty);
 
-    let view = (editor.viewport_image_size, &editor.ui_textures);
-    ui_cards::draw(ui, world, id, view, &mut editor.is_dirty);
+    let px = editor.viewport_image_size * ui.ctx().pixels_per_point();
+    let screen = glam::Vec2::new(px.x, px.y).round();
+    let view = crate::ui::UiView::screen(screen, std::rc::Rc::clone(&editor.ui_textures));
+    ui_cards::draw(ui, world, id, &view, &mut editor.is_dirty);
 
     add::draw(ui, world, id, &mut editor.is_dirty);
 }

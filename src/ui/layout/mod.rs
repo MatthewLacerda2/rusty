@@ -1,7 +1,8 @@
 //! src/ui/layout.rs — the UI layout pass: canvases + rect transforms → rectangles (#417).
 //!
-//! Pure and GPU-free: [`UiLayout::compute`] reads the ECS world and the screen size
-//! and returns every UI element's rect, so the headless harness lays out exactly as
+//! Pure and GPU-free: [`UiLayout::compute_in`] reads the ECS world and a [`UiView`]
+//! (the screen size, the camera and the textures' native sizes, `native`) and
+//! returns every UI element's rect, so the headless harness lays out exactly as
 //! the window does and a bot can reason about (and later hit-test) the UI.
 //!
 //! **Coordinates.** Everything is in the owning canvas's *reference units*, y-up,
@@ -35,7 +36,7 @@
 //! whatever the screen; every root's [`CanvasSpace`] (screen, or a world plane) is
 //! recorded beside its rects. With a camera, an element carrying a `WorldAnchor`
 //! is a marker placed by projection (`anchor`); a hidden marker is left out with
-//! its subtree. [`UiLayout::compute`] is the camera-less view.
+//! its subtree. A view with no camera ([`UiView::screen`]) places no marker.
 
 use std::collections::BTreeMap;
 
@@ -56,7 +57,7 @@ mod native;
 mod rect;
 mod sizes;
 
-pub use lookup::{driven_by_group, rect_in, rect_of};
+pub use lookup::{driven_by_group, rect_in};
 pub use native::TextureSizes;
 pub use rect::UiRect;
 pub use sizes::Sizes;
@@ -70,12 +71,6 @@ pub struct UiLayout {
 }
 
 impl UiLayout {
-    /// Lay out every root canvas in `world` on a `screen`-pixel screen, with no
-    /// camera (no world planes, no markers).
-    pub fn compute(world: &World, screen: Vec2) -> Self {
-        Self::compute_in(world, &UiView::screen(screen))
-    }
-
     /// Lay out every root canvas in `world` against `view`.
     pub fn compute_in(world: &World, view: &UiView) -> Self {
         let mut roots: Vec<(i32, u32)> = world

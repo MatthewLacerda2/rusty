@@ -74,9 +74,9 @@ fn an_image_fits_its_native_texture_size() {
     // The layout reads the platform's table, never the file (#1221): unknown
     // until the table has it, then its size.
     assert_rect(f.rect(f.panel), [0.0, 0.0], [0.0, 0.0]);
-    let mut sizes = TextureSizes::new();
+    let mut sizes = TextureSizes::default();
     sizes.set("icons/64x32.png", Vec2::new(64.0, 32.0));
-    let view = UiView::screen(HD).with_textures(sizes);
+    let view = UiView::screen(HD, std::rc::Rc::new(sizes));
     let r = UiLayout::compute_in(&f.scene.world, &view)
         .get(f.panel)
         .expect("laid out")
