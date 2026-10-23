@@ -113,29 +113,39 @@ fn gpu_a_cubemap_rebaked_at_a_cached_path_reloads() {
     );
 }
 
-/// Re-baking the bound probe's cubemap unbinds it at once, so a camera that next
-/// picks no probe does not keep sampling the old cube.
+/// Re-baking a resident probe's cubemap at the same size reaches the probe array on
+/// the next frame (#1207, #1206): `forget` empties its slot, so the new cube is copied
+/// into the same array, which needs no rebind.
 #[test]
-fn gpu_rebaking_the_bound_cubemap_unbinds_it() {
+fn gpu_rebaking_a_resident_cubemap_recopies_it() {
     let Some(mut renderer) = crate::render::test_gpu::headless_or_skip(4, 4) else {
         return;
     };
     let path = crate::test_temp::dir().join("bound.ktx2");
-    let write = |size| {
-        let bytes = build_cubemap_ktx2(size, R8G8B8A8_SRGB, 6);
+    let write = || {
+        let bytes = build_cubemap_ktx2(2, R8G8B8A8_SRGB, 6);
         crate::core::fs::written::write(&path, &bytes).unwrap();
     };
-    write(2);
+    write();
+    let mut scene = crate::scene::Scene::new();
+    let i = scene
+        .reflection_probes
+        .add(glam::Vec3::ZERO, glam::Vec3::ONE);
     let key = path.to_string_lossy().into_owned();
-    renderer.reflection_cube = renderer.cached_cubemap(&key);
-    renderer.reflection_cube_path = key;
-    renderer.global_bind_group_dirty = false;
-    write(4);
-    renderer.refresh_textures();
-    assert!(
-        renderer.reflection_cube.is_none(),
-        "the old cube stays bound"
+    scene.reflection_probes.set_cubemap(i, key);
+    renderer.update_reflection_probes(&scene, glam::Vec3::ZERO);
+    renderer.update_reflection_probes(&scene, glam::Vec3::ZERO);
+    assert_eq!(
+        renderer.reflection_probes.copies, 1,
+        "a resident cube stays"
     );
-    assert!(renderer.reflection_cube_path.is_empty());
-    assert!(renderer.global_bind_group_dirty, "group 0 must rebind");
+    renderer.global_bind_group_dirty = false;
+    write();
+    renderer.refresh_textures();
+    renderer.update_reflection_probes(&scene, glam::Vec3::ZERO);
+    assert_eq!(
+        renderer.reflection_probes.copies, 2,
+        "the re-bake is copied in"
+    );
+    assert!(!renderer.global_bind_group_dirty, "same size: same array");
 }

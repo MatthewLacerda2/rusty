@@ -58,7 +58,8 @@ fn nearest_containing_probe_is_selected() {
         .reflection_probes
         .add(Vec3::new(2.0, 0.0, 0.0), Vec3::splat(10.0)); // covers origin, near
 
-    assert_eq!(scene.reflection_probes.select_index(Vec3::ZERO), Some(1));
+    let selected = scene.reflection_probes.select(Vec3::ZERO);
+    assert_eq!(selected.map(|(i, _)| i), Some(1));
     assert!(scene
         .reflection_probes
         .select(Vec3::new(100.0, 0.0, 0.0))

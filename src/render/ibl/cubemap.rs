@@ -66,8 +66,8 @@ fn is_rgba8(format: Format) -> bool {
 
 /// A reflection-probe cubemap resident on the GPU: a 6-layer cube texture + its cube
 /// view + a sampler. Deliberately NOT a `GpuTexture` (that type's bind group targets the
-/// 2D material layout); the forward pipeline's cube binding + per-probe selection land
-/// with the bake (#245), at which point this view feeds it.
+/// 2D material layout). The forward pass never binds it directly: the probe array
+/// copies it into a layer of its own (#1206).
 pub struct CubemapTexture {
     pub texture: wgpu::Texture,
     pub view: wgpu::TextureView,
@@ -118,7 +118,10 @@ impl Renderer {
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
             format: wgpu::TextureFormat::Rgba8UnormSrgb,
-            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            // COPY_SRC: the probe array copies it into its layer (#1206).
+            usage: wgpu::TextureUsages::TEXTURE_BINDING
+                | wgpu::TextureUsages::COPY_DST
+                | wgpu::TextureUsages::COPY_SRC,
             view_formats: &[],
         });
         for (level, bytes) in data.mips.iter().enumerate() {
@@ -178,39 +181,6 @@ impl Renderer {
             sampler,
             size,
         }
-    }
-}
-
-/// A 1×1×6 black fallback cube, always available so the group-0 bind group satisfies the
-/// cube-texture binding even when no reflection probe is active (#245). The shader ignores
-/// it via the `refl_has_cubemap` flag and samples the 2D skybox instead. Built from a raw
-/// device so it can be constructed during renderer assembly before `self` exists.
-pub fn fallback_cube(device: &wgpu::Device) -> CubemapTexture {
-    let texture = device.create_texture(&wgpu::TextureDescriptor {
-        label: Some("Fallback Reflection Cube"),
-        size: wgpu::Extent3d {
-            width: 1,
-            height: 1,
-            depth_or_array_layers: 6,
-        },
-        mip_level_count: 1,
-        sample_count: 1,
-        dimension: wgpu::TextureDimension::D2,
-        format: wgpu::TextureFormat::Rgba8UnormSrgb,
-        usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-        view_formats: &[],
-    });
-    let view = texture.create_view(&wgpu::TextureViewDescriptor {
-        label: Some("Fallback Reflection Cube"),
-        dimension: Some(wgpu::TextureViewDimension::Cube),
-        ..Default::default()
-    });
-    let sampler = device.create_sampler(&wgpu::SamplerDescriptor::default());
-    CubemapTexture {
-        texture,
-        view,
-        sampler,
-        size: 1,
     }
 }
 

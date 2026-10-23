@@ -1,6 +1,6 @@
 //! The forward renderer's group 0 (camera, lighting, skybox, reflection cube, the
 //! light clusters, the decals and the lightmap pages), built in one place: at setup
-//! and whenever a resource it names is swapped (a new skybox or probe cube, a grown
+//! and whenever a resource it names is swapped (a new skybox or probe cube array, a grown
 //! cluster or decal buffer, a grown decal atlas, a rebaked lightmap set).
 
 use crate::render::clusters::ClusterBuffers;

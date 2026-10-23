@@ -272,7 +272,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let R = reflect(-V, N);
     let F_refl = FresnelSchlick(max(dot(N, V), 0.0), F0);
     let reflection_scale = (1.0 - roughness) * (metallic + (1.0 - metallic) * 0.2);
-    lighting_color += environment_reflection(in.world_position, R, roughness) * F_refl * reflection_scale * ao;
+    lighting_color += environment_reflection(in.world_position, R, roughness, instances[in.instance].reflection_probe) * F_refl * reflection_scale * ao;
 
     // 6. Emissive (#222 factor, #207 map): self-illumination added on top of the lit
     // colour, independent of any light. The factor is modulated by the emissive map's

@@ -95,7 +95,8 @@ pub(crate) fn solid_instance(
         use_sh,
         lightmap_page: lightmap.map_or(0, |l| l.page + 1),
         lightmap_directional: u32::from(lightmap.is_some() && lightmaps.directional()),
-        _pad: 0,
+        // The draw sets its probe from its world bounds (`solid_draw_item`, #1206).
+        reflection_probe: 0,
         lightmap_st: lightmap.map_or([0.0; 4], |l| l.scale_offset),
         sh,
     }

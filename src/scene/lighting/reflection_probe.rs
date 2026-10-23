@@ -1,10 +1,12 @@
-//! src/scene/reflection_probe.rs — Reflection-probe data model + parallax math.
+//! src/scene/lighting/reflection_probe.rs — Reflection-probe data model + parallax math.
 //!
 //! A reflection probe captures the surrounding environment as a prefiltered cubemap
 //! so glossy surfaces reflect their actual room instead of the single global skybox.
 //! Like light probes (#240), reflection probes are a SCENE-LEVEL DATASET, not a
-//! first-class component: an array of probes lives on the scene, and lit objects pick
-//! the nearest applicable probe at shading time.
+//! first-class component: an array of probes lives on the scene. Like Unity, the
+//! renderer picks one probe per DRAWN OBJECT (#1206): the nearest probe whose box
+//! contains the object's world-bounds centre ([`ReflectionProbeSet::select`]), and
+//! every fragment of that object reflects that probe's cubemap.
 //!
 //! This is the SIBLING of the light-probe dataset, kept deliberately DISTINCT:
 //!   * light probes (`probe.rs`) carry baked L2 SH irradiance for DIFFUSE ambient;
@@ -13,13 +15,15 @@
 //! Storage split (mirrors `skybox_path`): each probe stores a world POSITION, a box
 //! VOLUME (`box_min`/`box_max`, the parallax-correction bounds), and a PATH to its
 //! baked cubemap sidecar (a KTX2 file). No GPU data lives in the scene document — the
-//! cubemap is a referenced file, exactly like the skybox. The bake that produces
-//! those cubemaps is a separate later issue (#245); until then a probe may reference a
-//! file that doesn't exist yet, and the runtime falls back to the skybox.
+//! cubemap is a referenced file, exactly like the skybox. `Probe.Bake()` writes those
+//! cubemaps (#245); until a probe is baked it may reference a file that doesn't exist
+//! yet, and the objects it would cover reflect the skybox.
 //!
 //! The probe-selection + box-projected parallax correction (the standard Lagarde
 //! technique) is factored into pure functions here so it is unit-testable without a
-//! GPU; the forward shader mirrors the exact same math.
+//! GPU; `parallax_correct` in `engine/shaders/lighting/reflection_probe.wgsl` runs the same
+//! steps with the same guards (no division by a zero component, no hit at or past
+//! [`NO_HIT`]), since WGSL may assume no inf or NaN.
 //!
 //! This module is pure data + math — deterministic, no RNG/clock.
 
@@ -70,28 +74,42 @@ impl ReflectionProbe {
     /// a raw reflection direction, intersect the ray against this probe's box and return
     /// the direction from the probe centre to that hit point. This is what makes the
     /// reflection track the room as the camera moves, instead of behaving like an
-    /// infinitely-distant skybox. Mirrored byte-for-byte by the shader.
+    /// infinitely-distant skybox. A fragment outside the box, or a ray with no forward
+    /// hit, keeps the plain normalized direction. The shader's `parallax_correct` runs
+    /// these same steps.
     pub fn parallax_correct(&self, world_pos: Vec3, reflection: Vec3) -> Vec3 {
         let dir = reflection.normalize_or_zero();
-        if dir == Vec3::ZERO {
-            return reflection;
-        }
-        // Per-axis ray/box-plane intersection; pick the nearest forward exit per axis,
-        // then the closest of the three. `1/dir` may be inf where a component is 0 —
-        // that axis then yields inf and is discarded by the `min`.
-        let inv = Vec3::ONE / dir;
-        let first = (self.box_max - world_pos) * inv;
-        let second = (self.box_min - world_pos) * inv;
-        let furthest = first.max(second); // forward intersection on each axis
-        let t = furthest.x.min(furthest.y).min(furthest.z);
-        if !t.is_finite() || t <= 0.0 {
-            // Degenerate (probe centre outside box, or no forward hit): no correction.
+        if !self.contains(world_pos) {
             return dir;
         }
-        let hit = world_pos + dir * t;
-        (hit - self.position).normalize_or_zero()
+        // Per-axis ray/box-plane intersection; the forward exit per axis, then the
+        // closest of the three. An axis the ray runs parallel to never exits through
+        // its planes, so it is set to `NO_HIT` instead of dividing by zero.
+        let mut t = NO_HIT;
+        for axis in 0..3 {
+            if dir[axis].abs() > PARALLEL_EPSILON {
+                let first = (self.box_max[axis] - world_pos[axis]) / dir[axis];
+                let second = (self.box_min[axis] - world_pos[axis]) / dir[axis];
+                t = t.min(first.max(second));
+            }
+        }
+        if t <= 0.0 || t >= NO_HIT {
+            return dir;
+        }
+        let to_hit = world_pos + dir * t - self.position;
+        if to_hit.length_squared() <= 0.0 {
+            return dir;
+        }
+        to_hit.normalize()
     }
 }
+
+/// A component of a reflection direction at or below this is parallel to that
+/// axis's box planes. Shared with the shader's `parallax_correct`.
+pub const PARALLEL_EPSILON: f32 = 1e-6;
+/// The "no hit" distance of a parallax ray; the shader's `parallax_correct` uses
+/// the same value.
+pub const NO_HIT: f32 = 1e30;
 
 /// The scene-level reflection-probe dataset. Owned by `Scene`, serialized into the
 /// scene document (positions + boxes + cubemap paths; no GPU data).
@@ -159,22 +177,12 @@ impl ReflectionProbeSet {
         self.probes.clear();
     }
 
-    /// Pick the reflection probe that applies at `world_pos`: the NEAREST probe (by
-    /// capture distance) whose box contains the point. `None` when no probe's box covers
-    /// the point — the caller then falls back to the global skybox.
-    pub fn select(&self, world_pos: Vec3) -> Option<&ReflectionProbe> {
-        self.probes
-            .iter()
-            .filter(|p| p.contains(world_pos))
-            .min_by(|a, b| {
-                a.distance_sq(world_pos)
-                    .total_cmp(&b.distance_sq(world_pos))
-            })
-    }
-
-    /// Index of the selected probe at `world_pos` (the GPU side keys its cubemap array
-    /// by index). `None` when no probe applies.
-    pub fn select_index(&self, world_pos: Vec3) -> Option<usize> {
+    /// Pick the reflection probe that applies at `world_pos`, with its index: the
+    /// NEAREST probe (by capture distance) whose box contains the point, the lower
+    /// index on a tie. `None` when no probe's box covers the point — the caller then
+    /// falls back to the global skybox. The renderer calls it per draw, at the
+    /// object's world-bounds centre (#1206).
+    pub fn select(&self, world_pos: Vec3) -> Option<(usize, &ReflectionProbe)> {
         self.probes
             .iter()
             .enumerate()
@@ -183,7 +191,6 @@ impl ReflectionProbeSet {
                 a.distance_sq(world_pos)
                     .total_cmp(&b.distance_sq(world_pos))
             })
-            .map(|(i, _)| i)
     }
 }
 

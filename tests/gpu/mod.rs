@@ -46,6 +46,7 @@ mod postfx;
 mod preview_api;
 mod preview_material;
 mod probe_ambient_screenshot;
+mod reflection_probe_per_object_screenshot;
 mod render_texture_scene;
 mod render_texture_screenshot;
 mod ribbons_screenshot;

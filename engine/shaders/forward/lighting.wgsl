@@ -5,6 +5,7 @@
 #define_import_path forward::lighting
 
 #import common::{DecalSurface, PI, apply_decal, equirect_uv, procedural_sky}
+#import lighting::reflection_probe::parallax_correct
 #import forward::bindings::{camera, cluster_lights, cluster_ranges, decals, instances, lighting, s_decal, s_refl_cube, s_shadow, s_skybox, shadow, t_ao, t_decal_color, t_decal_data, t_refl_cube, t_shadow, t_skybox}
 
 // Fold the decals binned into `cluster` into `s`, oldest first (FIFO, #638): each
@@ -228,40 +229,21 @@ fn eval_sh(N: vec3<f32>, instance: u32) -> vec3<f32> {
     return max(out, vec3<f32>(0.0));
 }
 
-// Box-projected parallax correction (#244), the standard Lagarde technique. Given a
-// fragment world position and a raw reflection direction, intersect the ray against the
-// active probe's box and return the direction from the probe centre to that hit point —
-// so the reflection tracks the room as the camera moves. Mirrors the Rust
-// `ReflectionProbe::parallax_correct` byte-for-byte (unit-tested there without a GPU).
-fn parallax_correct(world_pos: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
-    let inv = vec3<f32>(1.0) / dir;
-    let first = (lighting.refl_box_max.xyz - world_pos) * inv;
-    let second = (lighting.refl_box_min.xyz - world_pos) * inv;
-    let furthest = max(first, second);
-    let t = min(min(furthest.x, furthest.y), furthest.z);
-    if (t <= 0.0) {
-        return dir;
-    }
-    let hit = world_pos + dir * t;
-    return normalize(hit - lighting.refl_center.xyz);
-}
-
-// The environment a surface reflects along the mirror direction `R` (#244, #718). The
-// raw direction is parallax-corrected against the active reflection probe's box when one
-// covers the fragment, so the reflection tracks the room as the camera moves rather than
-// behaving like an infinitely-distant sky. Then the source, in order: the probe's baked,
-// prefiltered cube (roughness selects the mip, #245); the skybox panorama; and with
-// neither, the same procedural sky the sky pass draws (#256), so the reflection matches
-// what is on screen. (Roughness blurs only the baked cube; the 2D skies stay sharp until
-// #245 prefilters them.)
-fn environment_reflection(world_pos: vec3<f32>, raw_r: vec3<f32>, roughness: f32) -> vec3<f32> {
-    var R = normalize(raw_r);
-    if (lighting.refl_active > 0.5) {
-        R = parallax_correct(world_pos, R);
-    }
-    if (lighting.refl_has_cubemap > 0.5) {
-        let max_mip = f32(textureNumLevels(t_refl_cube) - 1u);
-        return textureSampleLevel(t_refl_cube, s_refl_cube, R, roughness * max_mip).rgb;
+// The environment a surface reflects along the mirror direction `R` (#244, #718). With
+// a reflection probe (`probe` is its resident index plus one, picked per object,
+// #1206), the
+// direction is parallax-corrected against that probe's box and its baked, prefiltered
+// cube is sampled (roughness selects the mip within its chain, #245). Without one, the
+// skybox panorama; and with neither, the same procedural sky the sky pass draws (#256),
+// so the reflection matches what is on screen. (Roughness blurs only the baked cube;
+// the 2D skies stay sharp until #245 prefilters them.)
+fn environment_reflection(world_pos: vec3<f32>, raw_r: vec3<f32>, roughness: f32, probe: u32) -> vec3<f32> {
+    let R = normalize(raw_r);
+    if (probe > 0u) {
+        let p = lighting.refl_probes[probe - 1u];
+        let corrected = parallax_correct(p, world_pos, R);
+        let lod = p.mip_base + roughness * (p.mip_count - 1.0);
+        return textureSampleLevel(t_refl_cube, s_refl_cube, corrected, p.layer, lod).rgb;
     }
     if (lighting.sky_textured > 0.5) {
         // The equirectangular panorama, mapped as the skybox pass maps it.

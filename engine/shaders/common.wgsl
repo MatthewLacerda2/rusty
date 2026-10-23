@@ -3,6 +3,7 @@
 // Every name here is part of what a baked shader may import, so none ever moves out;
 // a helper only common itself calls may live in a module of its own (`sky/noise.wgsl`).
 
+#import lighting::reflection_probe::ReflectionProbe
 #import sky::noise::sky_fbm
 
 // The scene's distance + height fog (#437). Mirrors the Rust `FogUniform`
@@ -92,22 +93,16 @@ struct LightingUniforms {
     ssr_active: f32,
     ssr_quality: f32,
     ssr_temporal_upsampling: f32,
-    // Active reflection probe (#244): when `refl_active > 0.5` the env reflection is
-    // box-projected (Lagarde parallax) against this probe's box around `refl_center`
-    // instead of sampled as an infinitely-distant skybox. Mirrors the Rust
-    // `LightingUniform` byte-for-byte; the `.w` lanes are padding.
-    refl_active: f32,
-    // 1.0 when the active probe has a baked, prefiltered cubemap bound at binding 4 (#245):
-    // the env reflection samples THAT cube (roughness -> mip) with parallax correction
-    // instead of the 2D skybox. 0.0 falls back to the skybox. Mirrors the Rust uniform.
-    refl_has_cubemap: f32,
     // 1.0 when a skybox panorama is bound at binding 2 (#718); 0.0 means the sky on
     // screen is the procedural gradient, which the env reflection then reflects too.
     sky_textured: f32,
-    _refl_pad_b: f32,
-    refl_center: vec4<f32>,
-    refl_box_min: vec4<f32>,
-    refl_box_max: vec4<f32>,
+    _sky_pad_a: f32,
+    _sky_pad_b: f32,
+    _sky_pad_c: f32,
+    // The resident reflection probes (#1206); a draw's instance names its probe
+    // (`InstanceData.reflection_probe`, index + 1). Length is the Rust
+    // `MAX_REFLECTION_PROBES`. Mirrors the Rust `LightingUniform` byte-for-byte.
+    refl_probes: array<ReflectionProbe, 32>,
 };
 
 // One point or spot light of the frame (#434), in the storage array at group 0
