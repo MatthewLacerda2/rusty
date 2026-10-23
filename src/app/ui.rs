@@ -19,6 +19,7 @@
 
 use glam::Vec3;
 
+use super::game::PlayTransition;
 use super::registry::App;
 use super::resources::Resources;
 use super::stage::Stage;
@@ -39,6 +40,15 @@ impl super::GameWorld {
             .ui_textures
             .borrow_mut()
             .refresh(&scene.world, textures);
+    }
+
+    /// Re-read the texture sizes when `transition` swapped the scene (a paused
+    /// frame's Play or Stop, `poll_transition`), and hand it back.
+    pub(super) fn refreshed_after(&self, transition: PlayTransition) -> PlayTransition {
+        if !matches!(transition, PlayTransition::None) {
+            self.refresh_ui_textures();
+        }
+        transition
     }
 }
 

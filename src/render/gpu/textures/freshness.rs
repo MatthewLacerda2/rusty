@@ -37,9 +37,7 @@ impl Renderer {
     /// Drop every cached upload whose file was re-written or has appeared since the
     /// last frame. Called once per frame, before any texture is resolved.
     pub(crate) fn refresh_textures(&mut self) {
-        let changes = self
-            .texture_freshness
-            .poll_with(|p| texture_ref::file(p).is_some_and(|f| f.exists()));
+        let changes = self.texture_freshness.poll_with(texture_ref::exists);
         if changes.retried {
             // A mesh emitter's model whose file has appeared is tried again too.
             self.retry_particle_meshes();
@@ -54,7 +52,7 @@ impl Renderer {
     /// vs absolute) goes too.
     pub(crate) fn invalidate_textures(&mut self, paths: &[String]) {
         let stale = Stale::new(paths.to_vec());
-        let is_stale = |key: &str| is_stale(&stale, key);
+        let is_stale = |key: &str| texture_ref::is_written(&stale, key);
         // A cubemap loaded from a re-written file (#1207). Its probe-array slot
         // goes too, so the next frame copies the new cube in (#1206).
         self.cubemaps.retain(|key, _| !is_stale(key));
@@ -76,10 +74,4 @@ impl Renderer {
             self.skybox_path.clear();
         }
     }
-}
-
-/// Whether cache key `key` names a written file: the file itself, or a texture
-/// extracted from a source that was re-imported (#1130).
-pub(crate) fn is_stale(stale: &Stale, key: &str) -> bool {
-    stale.matches(key) || texture_ref::source(key).is_some_and(|s| stale.matches(s))
 }

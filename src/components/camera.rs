@@ -156,6 +156,11 @@ impl RenderTarget {
 /// convention for every consumer (`Image.texture`, material maps).
 pub const RENDER_TEXTURE_PREFIX: &str = "rt:";
 
+/// Whether `path` names a render texture rather than a file.
+pub fn is_render_texture(path: &str) -> bool {
+    path.starts_with(RENDER_TEXTURE_PREFIX)
+}
+
 fn default_true() -> bool {
     true
 }

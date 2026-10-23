@@ -108,5 +108,5 @@ fn a_json_length_past_the_end_of_the_file_reads_nothing() {
         bytes.extend(word.to_le_bytes());
     }
     std::fs::write(&path, bytes).unwrap();
-    assert_eq!(super::image_uri(&path, "Skin"), None);
+    assert_eq!(super::image_uris(&path), None);
 }

@@ -69,7 +69,11 @@ pub const LAYERS: &[Layer] = &[
         &["asset", "components", "core", "ecs", "procgen", "shadergen"],
     ),
     // The in-game UI's layout runs headless inside the sim (#417).
-    sim("ui", &["components", "core", "ecs", "scene"]).uses(&["ab_glyph", "image", "ttf_parser"]),
+    sim("ui", &["asset", "components", "core", "ecs", "scene"]).uses(&[
+        "ab_glyph",
+        "image",
+        "ttf_parser",
+    ]),
     sim("physics", &["components", "core", "ecs", "scene", "time"]).uses(&["rapier3d"]),
     sim("navigation", &["components", "core", "physics", "scene"]),
     // `scripting` and `api` are one layer (see PEERS): scripting installs the Lua

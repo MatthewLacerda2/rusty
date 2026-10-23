@@ -4,7 +4,7 @@
 
 use glam::Vec3;
 
-use super::freshness::is_stale;
+use crate::asset::convert::texture_ref::is_written;
 use crate::components::{MaterialAsset, MaterialComponent, Tonemap};
 use crate::core::fs::freshness::MISS_RETRY_FRAMES;
 use crate::core::fs::written::contract::{follows_rebakes, Bake};
@@ -127,7 +127,7 @@ fn gpu_a_missing_map_written_outside_the_engine_appears_within_the_retry_window(
 #[test]
 fn a_texture_reference_goes_stale_with_its_source() {
     let stale = crate::core::fs::written::Stale::new(vec!["assets/quad.fbx".into()]);
-    assert!(is_stale(&stale, "assets/quad.fbx#tex/Skin"));
-    assert!(!is_stale(&stale, "assets/other.fbx#tex/Skin"));
-    assert!(!is_stale(&stale, "assets/skin.png"));
+    assert!(is_written(&stale, "assets/quad.fbx#tex/Skin"));
+    assert!(!is_written(&stale, "assets/other.fbx#tex/Skin"));
+    assert!(!is_written(&stale, "assets/skin.png"));
 }

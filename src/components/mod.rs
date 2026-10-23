@@ -40,7 +40,9 @@ pub use animator::{
     LayerState, Motion, Playback, Playhead,
 };
 pub use audio_source::AudioSourceComponent;
-pub use camera::{CameraComponent, ClearFlags, Projection, RenderTarget, RENDER_TEXTURE_PREFIX};
+pub use camera::{
+    is_render_texture, CameraComponent, ClearFlags, Projection, RenderTarget, RENDER_TEXTURE_PREFIX,
+};
 pub use character_controller::CharacterControllerComponent;
 pub use collider::{
     capsule_dims, CapsuleAxis, ColliderComponent, ColliderShape, CombineMode, PhysicsMaterial,

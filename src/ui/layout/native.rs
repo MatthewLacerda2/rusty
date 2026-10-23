@@ -24,9 +24,18 @@ use glam::Vec2;
 /// Texture path → native size in texels, as the platform last read it (a sim
 /// input; see the module docs). Shared, not copied: the resource, every
 /// [`UiView`](crate::ui::UiView) and the renderer hold one `Rc` of it.
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default)]
 pub struct TextureSizes {
     sizes: BTreeMap<String, Vec2>,
+    /// Writes so far ([`Self::edits`]).
+    edits: u64,
+}
+
+/// Two tables are equal when they hold the same sizes, however they got there.
+impl PartialEq for TextureSizes {
+    fn eq(&self, other: &Self) -> bool {
+        self.sizes == other.sizes
+    }
 }
 
 impl TextureSizes {
@@ -38,11 +47,12 @@ impl TextureSizes {
     /// Record `path`'s size in texels.
     pub fn set(&mut self, path: impl Into<String>, size: Vec2) {
         self.sizes.insert(path.into(), size);
+        self.edits += 1;
     }
 
     /// Forget `path`'s size.
     pub fn remove(&mut self, path: &str) {
-        self.sizes.remove(path);
+        self.edits += u64::from(self.sizes.remove(path).is_some());
     }
 
     /// How many paths the table holds a size for.
@@ -53,6 +63,12 @@ impl TextureSizes {
     /// Whether the table holds no size.
     pub fn is_empty(&self) -> bool {
         self.sizes.is_empty()
+    }
+
+    /// How many writes changed the table: a filler that remembers it knows when
+    /// someone else edited the table since.
+    pub fn edits(&self) -> u64 {
+        self.edits
     }
 
     /// Every path the table holds a size for.

@@ -26,15 +26,10 @@ use std::rc::Rc;
 
 pub use slots::RenderTextures;
 
-use crate::components::RENDER_TEXTURE_PREFIX;
+pub(crate) use crate::components::is_render_texture;
 use crate::render::draw::stack::StackPass;
 use crate::render::{RenderView, Renderer, TextureCamera};
 use crate::scene::Scene;
-
-/// Whether `path` names a render texture rather than a file.
-pub(crate) fn is_render_texture(path: &str) -> bool {
-    path.starts_with(RENDER_TEXTURE_PREFIX)
-}
 
 impl Renderer {
     /// Make `view`'s render textures match `cameras`' targets — allocate new ones,

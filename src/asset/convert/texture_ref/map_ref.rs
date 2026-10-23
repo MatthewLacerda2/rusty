@@ -1,5 +1,6 @@
 //! [`MapRef`]: a texture map as a component stores it (#1256).
 
+use std::borrow::Borrow;
 use std::fmt;
 use std::path::PathBuf;
 
@@ -56,6 +57,13 @@ impl From<String> for MapRef {
 impl From<&str> for MapRef {
     fn from(spelling: &str) -> Self {
         Self(spelling.to_string())
+    }
+}
+
+/// A table keyed by maps looks one up by its spelling.
+impl Borrow<str> for MapRef {
+    fn borrow(&self) -> &str {
+        &self.0
     }
 }
 
