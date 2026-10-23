@@ -431,6 +431,21 @@ name: `RUSTY_BLESS_SCENE_FORMAT=1 cargo nextest run -E
 struct's own fields, a type that parses a whole `serde_json::Value`) is listed by
 hand in `hidden.rs`; an unlisted flatten struct fails the test by name.
 
+## Converter fingerprints
+`asset::convert::fingerprint` (#1286) holds the rule that a converter's output never
+changes without a bump of its `Converter::version`, which is what tells the import
+cache to re-make its files. Each converter in `CONVERTERS` converts each fixture of
+its extension in `tests/fixtures/models/` twice (the two must be byte-identical),
+and the hash of the `.glb` and the files written beside it is compared with
+`src/asset/convert/fingerprints.txt`, one row per converter, version, fixture and
+program. A changed output at the blessed version fails, naming the converter: bump
+its `version` in `convert/converter.rs`, then re-bless with `make bless-converters`.
+A bumped version, a different Blender or an added fixture fails until re-blessed;
+re-blessing a changed output at the blessed version is refused, so the bless never
+stands in for the bump. The check runs on Linux only (another platform's maths
+library may round a float differently): `make test` holds the engine's own
+converters, CI's `blender` job holds Blender's rows, at the Blender it pins.
+
 ## Example (unit, in-module)
 See `tools/lint/src/size/` — `mod.rs` mounts a `#[cfg(test)] mod tests` (`tests.rs`)
 testing the size-cap selection and path normalization.

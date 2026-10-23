@@ -9,6 +9,7 @@ use crate::asset::{ImportedAsset, MapRef};
 use std::path::{Path, PathBuf};
 
 mod drop;
+mod fingerprint;
 mod library_image;
 mod linked;
 #[cfg(unix)]

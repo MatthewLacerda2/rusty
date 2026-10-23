@@ -12,6 +12,8 @@ pub struct Converter {
     /// What does the conversion, recorded in the stamp.
     pub name: &'static str,
     /// Bump when the converter's output changes, so every cached file re-makes.
+    /// A test holds it (`fingerprint`, #1286): a changed output at an unchanged
+    /// version fails until it is bumped and `make bless-converters` re-blesses.
     pub version: u32,
     /// The program the conversion runs, by the version it reports (`5.0.1`),
     /// recorded in the stamp so a different one re-converts; `None` for a
