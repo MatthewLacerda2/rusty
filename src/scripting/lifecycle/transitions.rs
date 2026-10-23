@@ -7,12 +7,16 @@
 //!     *inactive* set (`disabled_keys`), the mirror of `mod.rs`'s `eligible_keys`.
 //!   - `OnDestroy` (preceded by `OnDisable` for still-active instances) on the
 //!     deferred-destroy drain: `Scene.DestroyEntity` queued ids this tick, and
-//!     `apply_pending_destroys` fires teardown then removes the entities.
+//!     `apply_pending_destroys` fires teardown, children before parents, then
+//!     removes the entities with their subtrees.
 //!   - The same teardown for a whole outgoing scene on `Scene.Load` (#432):
 //!     `unload_entities` fires it for every non-surviving entity.
 //!
 //! Both reuse the shared dispatch core (`dispatch_keys`, `call_hook`,
 //! `entity_active`) so they stay loops, not copies.
+
+use std::cmp::Reverse;
+use std::collections::BTreeSet;
 
 use super::super::callbacks::{ON_DESTROY, ON_DISABLE};
 use super::super::manager::{ScriptInstance, ScriptManager};
@@ -48,8 +52,9 @@ impl ScriptManager {
     }
 
     /// Drain the scene's deferred-destroy queue (filled by play-mode
-    /// `Scene.DestroyEntity`) and dispatch each doomed entity's teardown (#323),
-    /// then remove the entities along with their script instances. The entities stay
+    /// `Scene.DestroyEntity`) and dispatch the teardown (#323) of everything those
+    /// destroys remove, children included (`Scene::destroy_set`, #1283), then
+    /// despawn exactly that set and forget its script instances. The entities stay
     /// live through dispatch (so an `OnDestroy` can read its own transform).
     /// Cascading destroys requested from within an `OnDestroy` fall to the next
     /// tick's drain, since the queue was taken up front.
@@ -58,11 +63,17 @@ impl ScriptManager {
         if ids.is_empty() {
             return;
         }
-        self.dispatch_teardown(&ids);
-        for &id in &ids {
-            self.scene.borrow_mut().destroy_entity(id);
-        }
-        self.forget_entities(&ids);
+        let (doomed, order) = {
+            let scene = self.scene.borrow();
+            let doomed: BTreeSet<u32> = ids.iter().flat_map(|&id| scene.destroy_set(id)).collect();
+            let mut order: Vec<u32> = doomed.iter().copied().collect();
+            // Children before parents, as Unity tears a hierarchy down.
+            order.sort_by_key(|&id| Reverse(scene.world.ancestors(id).count()));
+            (doomed, order)
+        };
+        self.dispatch_teardown(&order);
+        self.scene.borrow_mut().despawn_batch(&doomed);
+        self.forget_entities(&doomed.into_iter().collect::<Vec<_>>());
     }
 
     /// A scene unload (#432): the same teardown as a destroy for every entity in
@@ -73,15 +84,15 @@ impl ScriptManager {
         self.forget_entities(ids);
     }
 
-    /// Fire the teardown of the entities in `ids` (sorted ascending): `OnDisable` for
-    /// every still-enabled instance, then `OnDestroy` for every awoken instance — the
-    /// whole batch in ascending `(entity, script index)` order, matching Unity's
+    /// Fire the teardown of the entities in `order`: `OnDisable` for every
+    /// still-enabled instance, then `OnDestroy` for every awoken instance — each pass
+    /// over the entities in `order`, an entity's scripts by index, matching Unity's
     /// "OnDisable immediately before OnDestroy".
-    fn dispatch_teardown(&self, ids: &[u32]) {
+    fn dispatch_teardown(&self, order: &[u32]) {
         let mut disable_keys = Vec::new();
         let mut destroy_keys = Vec::new();
-        for (&key, inst) in &self.entity_scripts {
-            if ids.binary_search(&key.0).is_ok() {
+        for &id in order {
+            for (&key, inst) in self.entity_scripts.range((id, 0)..=(id, usize::MAX)) {
                 if inst.enabled_last {
                     disable_keys.push(key);
                 }

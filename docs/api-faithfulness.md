@@ -87,7 +87,7 @@ per-module unit tests (e.g. `api/light.rs`) are the pattern.
 
 | Setter | Status | Read-site |
 |---|---|---|
-| `DestroyEntity` | ✅ | sim + renderer — sets `active=false`; both `draw_resources` and the sim skip inactive entities; round-trips |
+| `DestroyEntity` | ✅ | sim + renderer — despawns the entity and its subtree (`Scene::destroy_set`, #1283), so nothing reads it again; in Play the destroy phase tears its scripts down first |
 | `Instantiate` (linked prefab) | ✅ | stamps `Entity.prefab_link` on every instance entity; read by `apply_scene_data`'s load-time propagation + `ReimportPrefab`; the link + its overrides round-trip through `SceneData` (#216) |
 | `RecordPrefabOverrides` | ✅ | round-trip — records the instance↔source diff into `prefab_link.overrides`; observable via `ListPrefabOverrides` and re-applied by propagation |
 | `RevertPrefabOverrides` / `ReimportPrefab` | ✅ | rebuild each instance entity from a fresh source baseline (re-applying overrides on reimport); the resulting component values feed the same renderer/sim read-sites as any edited entity |

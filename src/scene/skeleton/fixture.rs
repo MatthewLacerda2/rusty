@@ -95,7 +95,7 @@ pub(super) fn warnings_of(f: impl FnOnce()) -> Vec<String> {
 }
 
 /// An entity carrying a skinned mesh of [`armature_skin`] (no file behind it).
-pub(super) fn armature_owner(scene: &mut Scene) -> u32 {
+pub(crate) fn armature_owner(scene: &mut Scene) -> u32 {
     let skin = armature_skin();
     let id = scene.add_entity("Rig".to_string());
     scene.world.set_mesh(

@@ -20,7 +20,7 @@
 //! The World walk below goes over the same component list the document walk does
 //! ([`with_ref_components`]), so the two cannot disagree. Scene-level references
 //! (the selection, `DontDestroyOnLoad`, lightmap entries, shader overrides) are
-//! `Scene::despawn_one`'s.
+//! `Scene::despawn_batch`'s.
 
 use std::collections::BTreeSet;
 
