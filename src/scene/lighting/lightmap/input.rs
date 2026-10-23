@@ -34,14 +34,14 @@ pub struct BakeMesh {
 #[derive(Clone, Copy, Debug)]
 pub struct BakeRun {
     pub end: u32,
-    /// Whether the run blocks and bounces light. A Transparent run does not, but
-    /// still receives its share of the entity's lightmap, which the renderer samples
-    /// for it too ([`super::bake::triangles`] reads this).
     /// Diffuse reflectance: the material colour times its albedo map's average.
     pub albedo: Vec3,
     /// Emitted radiance, as the forward shader adds it (a Transparent material's
     /// scaled by its alpha, as it blends).
     pub emissive: Vec3,
+    /// Whether the run blocks and bounces light (it is in the bake's BVH). A
+    /// Transparent run does not, but still receives its share of the entity's
+    /// lightmap, which the renderer samples for it too.
     pub occludes: bool,
 }
 
@@ -100,16 +100,7 @@ impl BakeScene {
     /// and the ambient sky. `map_average` turns a texture path into its average linear
     /// colour (`None` when it cannot be read); it is asked once per path.
     pub fn gather(scene: &Scene, map_average: &dyn Fn(&MapRef) -> Option<Vec3>) -> Self {
-        let cache = RefCell::new(Map::default());
-        let map_average = |map: &MapRef| {
-            let cached = cache.borrow().get(map).copied();
-            cached.unwrap_or_else(|| {
-                *cache
-                    .borrow_mut()
-                    .entry(map.clone())
-                    .or_insert_with(|| map_average(map))
-            })
-        };
+        let map_average = once_per_path(map_average);
         let mut out = BakeScene {
             sky: scene.ambient_color * scene.ambient_intensity,
             ..Default::default()
@@ -196,6 +187,23 @@ impl BakeScene {
                 });
             }
         }
+    }
+}
+
+/// `map_average`, asked at most once per path: a map many slots or entities share is
+/// decoded once per gather.
+fn once_per_path(
+    map_average: &dyn Fn(&MapRef) -> Option<Vec3>,
+) -> impl Fn(&MapRef) -> Option<Vec3> + '_ {
+    let cache = RefCell::new(Map::default());
+    move |map: &MapRef| {
+        let cached = cache.borrow().get(map).copied();
+        cached.unwrap_or_else(|| {
+            *cache
+                .borrow_mut()
+                .entry(map.clone())
+                .or_insert_with(|| map_average(map))
+        })
     }
 }
 
