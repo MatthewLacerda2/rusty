@@ -20,12 +20,13 @@ pub const RULE: &str = "converter-log";
 const ROOT: &str = "src/asset/convert/";
 /// Modules under [`ROOT`] that are not converters: the cache itself, the table of
 /// converters, the files a
-/// conversion depends on, its lock and its stamp record, which report, the swap,
+/// conversion depends on, the switch Play turns off, its lock and its stamp record, which report, the swap,
 /// what resolves a texture reference through the cache, and the cache's tests. A
 /// new module of the cache's own goes here.
 const NOT_CONVERTERS: &[&str] = &[
     "converter",
     "depends",
+    "gate",
     "lock",
     "mod",
     "record",
