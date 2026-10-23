@@ -22,14 +22,6 @@ fn resources() -> Resources {
 }
 
 #[test]
-fn dt_reads_the_frame_delta() {
-    let mut res = resources();
-    assert_eq!(res.dt(), 0.0);
-    res.frame_dt = 0.25;
-    assert_eq!(res.dt(), 0.25);
-}
-
-#[test]
 fn play_frame_reads_the_counter() {
     let mut res = resources();
     assert_eq!(res.play_frame(), 0);

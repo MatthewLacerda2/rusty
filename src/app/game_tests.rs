@@ -117,7 +117,7 @@ fn tick_scales_dt_by_time_scale() {
     gw.time().borrow_mut().set_time_scale(0.5);
     gw.tick(DT);
     // The schedule sees the scaled delta the tick stored in frame_dt.
-    assert!((gw.resources.dt() - DT * 0.5).abs() < 1e-7);
+    assert!((gw.resources.frame_dt - DT * 0.5).abs() < 1e-7);
     // Raw (unscaled) delta is preserved on the clock.
     assert!((gw.time().borrow().unscaled_delta_time - DT).abs() < 1e-7);
 }
