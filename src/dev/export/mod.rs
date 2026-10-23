@@ -76,8 +76,8 @@ pub fn export(out: &Path) -> Result<Exported, String> {
 }
 
 /// Refuse a `project` that is not one (`core::project::is_project`), and an `out`
-/// [`check_out`] refuses: what the `export` binary asks before it opens the
-/// project, so a refusal writes nothing into it.
+/// that is a file, holds anything or overlaps the project: what the `export`
+/// binary asks before it opens the project, so a refusal writes nothing into it.
 pub fn check(project: &Path, out: &Path) -> Result<(), String> {
     if !is_project(project) {
         return Err(format!(

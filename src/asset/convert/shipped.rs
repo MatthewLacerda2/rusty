@@ -1,6 +1,12 @@
 //! A cache without its source (#1267): an exported project ships the import
 //! cache and leaves its converted sources behind, so the cache stands in for
 //! them. The one rule for when it does, and the files a cache is made of.
+#![deny(
+    clippy::let_underscore_must_use,
+    clippy::unused_result_ok,
+    clippy::print_stdout,
+    clippy::print_stderr
+)]
 
 use super::{cache_location, converter_for, lock, stage, stamp_path};
 use std::path::{Path, PathBuf};
