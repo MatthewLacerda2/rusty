@@ -46,13 +46,13 @@ pub fn strip_bones(entities: &mut Vec<Entity>) {
         let Some(skin) = &mesh.skin else {
             continue;
         };
+        let owner = entities[i].id;
         let mut saved = SavedBones::default();
-        let bones = &mesh.skeleton.bones;
-        for (slot, bone) in bones.iter().enumerate() {
+        for (slot, bone) in mesh.skeleton.bones.iter().enumerate() {
             let Some(bone) = bone.filter(|b| bone_of.contains_key(b)) else {
                 continue;
             };
-            saved.record(&entities[index[&bone]], skin, bones, slot);
+            saved.record(&entities[index[&bone]], skin, (owner, &bone_of), slot);
         }
         if let Some(mesh) = &mut entities[i].mesh {
             mesh.skeleton.overrides = saved.overrides;
@@ -113,8 +113,17 @@ struct SavedBones {
 
 impl SavedBones {
     /// Record bone `slot`'s document: its transform when it is off the rest
-    /// pose, its physics, and a warning for any other component.
-    fn record(&mut self, doc: &Entity, skin: &SkinData, bones: &[Option<u32>], slot: usize) {
+    /// pose, its physics, and a warning for any other component. A joint is saved
+    /// by bone chain only to a bone `bone_of` lists for `owner`, still under it:
+    /// one to a bone a script moved away keeps that entity's id, as a live
+    /// re-import keeps the joint on it (#1277).
+    fn record(
+        &mut self,
+        doc: &Entity,
+        skin: &SkinData,
+        (owner, bone_of): (u32, &BoneIndex),
+        slot: usize,
+    ) {
         let name = skin.name(slot);
         if !doc
             .transform
@@ -122,7 +131,10 @@ impl SavedBones {
         {
             self.overrides.insert(name.clone(), doc.transform.clone());
         }
-        let chain_of = |id: u32| Some(bone_chain(skin, bones.iter().position(|&b| b == Some(id))?));
+        let chain_of = |id: u32| {
+            let (of, chain) = bone_of.get(&id)?;
+            (*of == owner).then(|| chain.clone())
+        };
         if let Some(body) = bone_body(doc, chain_of) {
             self.bodies.insert(name.clone(), body);
         }

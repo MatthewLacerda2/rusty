@@ -83,10 +83,49 @@ fn a_loaded_joint_that_lands_on_its_own_bone_is_warned_inert() {
     let warned = warnings_of(|| loaded.sync_skeleton(rig));
     let spine = loaded.find_bone(rig, "spine").unwrap();
     assert_eq!(connected(&loaded, spine), Some(spine));
+    let about_head: Vec<_> = warned.iter().filter(|w| w.contains("'head'")).collect();
+    assert_eq!(about_head.len(), 1, "warned once: {warned:?}");
+    assert!(about_head[0].contains("inert"), "{warned:?}");
+}
+
+/// What a loaded `head` joint to `spine` warns once the model keeps neither
+/// `spine` nor `hips`, so the chain lands on the skinned entity, given `rig_body`.
+fn landed_on_the_rig(rig_body: bool) -> (u32, Vec<String>) {
+    let mut saved = Scene::new();
+    let rig = jointed_rig(&mut saved);
+    let data = to_scene_data(&saved);
+    let doc = data.entities.iter().find(|e| e.name == "Rig").unwrap();
+    let body: BoneBody = doc.mesh.as_ref().unwrap().skeleton.bodies["head"].clone();
+
+    let mut loaded = Scene::new();
+    assert_eq!(armature_owner(&mut loaded), rig);
+    if rig_body {
+        let body = crate::scene::authoring::default_rigidbody();
+        loaded.world.set_rigidbody(rig, Some(body));
+    }
+    let mut mesh = loaded.world.mesh_mut(rig).unwrap();
+    mesh.skin = Some(chain_skin(&["root", "head"]));
+    mesh.skeleton.bodies.insert("head".into(), body);
+    drop(mesh);
+    let warned = warnings_of(|| loaded.sync_skeleton(rig));
+    let head = loaded.find_bone(rig, "head").unwrap();
+    assert_eq!(connected(&loaded, head), Some(rig));
+    let about: Vec<String> = warned
+        .into_iter()
+        .filter(|w| w.contains("'spine'"))
+        .collect();
+    assert_eq!(about.len(), 1, "warned once: {about:?}");
+    (rig, about)
+}
+
+#[test]
+fn a_loaded_joint_landing_on_a_body_says_what_it_constrains_to() {
+    let (rig, warned) = landed_on_the_rig(true);
+    let body = format!("constraining it to entity {rig}'s body");
+    assert!(warned[0].contains(&body), "{warned:?}");
+    let (_, warned) = landed_on_the_rig(false);
     assert!(
-        warned
-            .iter()
-            .any(|w| w.contains("itself") && w.contains("inert")),
-        "{warned:?}"
+        warned[0].contains("inert"),
+        "nothing above has a body: {warned:?}"
     );
 }

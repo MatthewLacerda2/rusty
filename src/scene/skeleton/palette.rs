@@ -6,6 +6,7 @@
 
 use glam::Mat4;
 
+use crate::asset::SkinData;
 use crate::scene::Scene;
 
 impl Scene {
@@ -27,7 +28,7 @@ impl Scene {
     /// One mesh's palette. Each bone's mesh-space matrix is composed down the
     /// skeleton (parents first, so every parent is already resolved); a bone a
     /// script re-parented elsewhere falls back to its live world matrix, and a
-    /// destroyed (missing) bone to its bind pose (#1273).
+    /// destroyed (missing) bone rides with its parent ([`missing_in_mesh`]).
     fn skin_palette(&self, owner: u32) -> Option<Vec<Mat4>> {
         let mesh = self.world.mesh(owner)?;
         let skin = mesh.skin.as_ref()?;
@@ -38,13 +39,13 @@ impl Scene {
         let owner_inverse = self.world.local_to_world(owner).inverse();
         let mut in_mesh: Vec<Mat4> = Vec::with_capacity(bones.len());
         for (slot, &bone) in bones.iter().enumerate() {
+            let parent_slot = skin.parents.get(slot).copied().flatten();
             let Some((bone, (local, parent))) =
                 bone.and_then(|b| Some((b, self.world.local_and_parent(b)?)))
             else {
-                in_mesh.push(*skin.bind_global.get(slot)?);
+                in_mesh.push(missing_in_mesh(skin, slot, parent_slot, &in_mesh)?);
                 continue;
             };
-            let parent_slot = skin.parents.get(slot).copied().flatten();
             let m = match (parent, parent_slot) {
                 (Some(p), _) if p == owner => local,
                 (Some(p), Some(ps)) if ps < slot && bones[ps] == Some(p) => in_mesh[ps] * local,
@@ -59,5 +60,21 @@ impl Scene {
                 .map(|(g, ib)| *g * *ib)
                 .collect(),
         )
+    }
+}
+
+/// A missing (destroyed, #1273) slot's mesh-space matrix: its bind local on top of
+/// its parent joint's posed matrix, so it rides with the nearest surviving bone
+/// above it (no head left floating at the bind pose after a decapitation); its
+/// bind pose only for a skeleton root, when no parent is left to ride with.
+fn missing_in_mesh(
+    skin: &SkinData,
+    slot: usize,
+    parent_slot: Option<usize>,
+    in_mesh: &[Mat4],
+) -> Option<Mat4> {
+    match parent_slot.filter(|&p| p < slot) {
+        Some(p) => Some(in_mesh[p] * skin.local_bind.get(slot)?.matrix()),
+        None => skin.bind_global.get(slot).copied(),
     }
 }

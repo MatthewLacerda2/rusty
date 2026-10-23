@@ -227,8 +227,11 @@ else, and is an ordinary entity in every API — `Transform.*`, `Scene.SetParent
   `Joint` (a ragdoll's, #466 — see [`Ragdoll`](Ragdoll.md)) are saved by bone
   name too, the joint's connected bone by its name and then its ancestors', so a
   joint to a bone the model dropped holds to its nearest surviving ancestor, as
-  on a live re-import (#1277); one that lands on the bone itself or on the
-  skinned entity is inert, and the warning says so. Any other component added to a
+  on a live re-import (#1277). The warning says what the joint now does: one
+  that lands on the bone itself, or on the skinned entity with no body above it,
+  is inert; one that lands on a body constrains the bone to it. A joint to a bone
+  a script moved under a prop is saved to that entity, so it still holds it after
+  a load. Any other component added to a
   bone itself is not saved: put a hitbox `Collider` on a child of the bone —
   `Physics.GenerateHitboxes(id)` does exactly that for every bone (see
   `Physics`, *Per-bone hitboxes*, #464).
@@ -252,17 +255,23 @@ else, and is an ordinary entity in every API — `Transform.*`, `Scene.SetParent
 - **Destroying** the skinned entity destroys its skeleton and what hangs from it.
   Destroying **one bone** destroys its subtree with it, Unity's way (#1273): its
   descendant bones and everything hanging from them. Their slots in the skeleton
-  are then **missing**: the mesh skins them at their bind pose, the Animator's
-  writes to them do nothing, and `Animator.GetBone` returns `nil` for them. They
+  are then **missing**: the mesh skins each at its bind pose relative to its
+  nearest surviving parent bone, so it rides with the body (a destroyed head stays
+  on the neck), the Animator's writes to them do nothing, and `Animator.GetBone`
+  returns `nil` for them. They
   stay missing until the skeleton is rebuilt from the model: a reload (bones are
   never saved, so a saved scene gets them back), a prefab propagation or a
   re-import.
 - **A bone moved out from under the skinned entity** (a script parents `head`
   under a prop) stays bound: the mesh keeps skinning that slot by the bone's
-  world matrix, wherever it is, as Unity does. To the scene it is an ordinary
-  entity: destroying the character leaves it where it is, and a save keeps it as
-  a plain entity under the prop, so a reload gives the rig a fresh bone of that
-  name, as a live re-import does.
+  world matrix, wherever it is, and `Animator.GetBone` still returns it, as
+  Unity's `SkinnedMeshRenderer.bones` keeps the Transform. To the scene it is an
+  ordinary entity: destroying the character leaves it where it is, destroying it
+  by id destroys it and its children like any entity (its slot goes missing), an
+  attachment or reference re-bound by bone name never lands on it, and a save
+  keeps it as a plain entity under the prop, so a reload gives the rig a fresh
+  bone of that name, as a live re-import does. A `Scene.Load` that carries the
+  character with `DontDestroyOnLoad` but not the prop leaves the slot missing.
 
 `Debug.Snapshot()` leaves bones out by default; `Debug.Snapshot({ bones = true })`
 includes them. The editor's Hierarchy shows a skeleton collapsed.

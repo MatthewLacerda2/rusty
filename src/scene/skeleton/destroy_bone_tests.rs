@@ -1,5 +1,5 @@
 //! Destroying one bone takes its subtree, Unity's way (#1273): no bone of the rig
-//! is left a root posed as a child, and the missing slots skin at their bind pose.
+//! is left a root posed as a child, and the missing slots ride with their parent bone.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -37,7 +37,7 @@ fn destroying_a_bone_takes_its_descendant_bones_and_what_hangs_from_them() {
 }
 
 #[test]
-fn a_destroyed_bone_stays_missing_and_skins_at_its_bind_pose() {
+fn a_destroyed_bone_stays_missing_and_a_frame_skins_it() {
     let mut scene = Scene::new();
     let (rig, bones, _) = rig_with_gun(&mut scene);
     scene.destroy_entity(bones[1]);
@@ -65,6 +65,28 @@ fn a_destroyed_bone_stays_missing_and_skins_at_its_bind_pose() {
     assert_eq!(palette.len(), 3);
     for (got, want) in palette.iter().zip(bind.iter()) {
         assert!(got.abs_diff_eq(*want, 1e-5), "got {got:?} want {want:?}");
+    }
+}
+
+#[test]
+fn a_missing_bone_rides_with_its_surviving_parent() {
+    let mut scene = Scene::new();
+    let (rig, bones, _) = rig_with_gun(&mut scene);
+    scene.destroy_entity(bones[1]); // spine and head
+    let mut hips = scene.world.transform_mut(bones[0]).unwrap();
+    hips.rotation = glam::Quat::from_rotation_z(1.0);
+    hips.position += glam::Vec3::X;
+    drop(hips);
+    scene.build_skin_palettes();
+    let palette = scene.world.mesh(rig).unwrap().pose_palette.clone();
+    let bind = armature_skin().bind_palette();
+    assert!(!palette[0].abs_diff_eq(bind[0], 1e-3), "hips moved");
+    for slot in [1, 2] {
+        let (got, hips) = (palette[slot], palette[0]);
+        assert!(
+            got.abs_diff_eq(hips, 1e-5),
+            "slot {slot} rides rigidly with hips"
+        );
     }
 }
 

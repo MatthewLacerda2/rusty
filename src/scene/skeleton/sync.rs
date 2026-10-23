@@ -67,7 +67,7 @@ impl Scene {
             None => return Vec::new(),
         };
         for (name, transform) in overrides {
-            match self.find_bone(owner, &name) {
+            match self.live_bone(owner, &name) {
                 Some(bone) => {
                     if let Some(mut t) = self.world.transform_mut(bone) {
                         *t = transform;
@@ -91,7 +91,7 @@ impl Scene {
     /// re-import resolves it (#1277). One of another skeleton is returned, to bind
     /// once that skeleton is built.
     fn restore_bone_body(&mut self, owner: u32, name: &str, body: BoneBody) -> Vec<BoneRef> {
-        let Some(bone) = self.find_bone(owner, name) else {
+        let Some(bone) = self.live_bone(owner, name) else {
             log::warn!(
                 "[Asset] entity {owner}: the skeleton has no bone '{name}' any more; \
                  its saved Rigidbody / Joint were dropped."
@@ -113,24 +113,36 @@ impl Scene {
             })
             .collect();
         let mut joint = body.joint;
+        let mut landed = None;
         if let Some(j) = joint.as_mut().filter(|_| !body.connected_bone.is_empty()) {
-            let to = self.resolve_bone(bone, owner, &body.connected_bone);
-            if to == bone || to == owner {
-                let what = if to == bone {
-                    "itself"
-                } else {
-                    "its skinned entity"
-                };
-                log::warn!(
-                    "[Asset] entity {owner}: bone '{name}''s joint now connects it to \
-                     {what}; the joint is inert."
-                );
-            }
+            let (to, moved) = self.resolve_chain(owner, &body.connected_bone);
             j.connected_body = Some(to);
+            landed = moved.map(|what| (to, what));
         }
         self.world.set_rigidbody(bone, body.rigidbody);
         self.world.set_joint(bone, joint);
+        if let Some((to, what)) = landed {
+            let lost = body.connected_bone.first().map_or("", String::as_str);
+            log::warn!(
+                "[Asset] entity {owner}: bone '{name}''s joint was to bone '{lost}', which \
+                 the skeleton no longer has; it now joins {what}, {}.",
+                self.joint_effect(bone, to)
+            );
+        }
         refs
+    }
+
+    /// What a joint on `bone` connected to `to` does, by the body that carries
+    /// `to` (`World::body_carrier`, as the physics plan reads it): a joint with
+    /// no second body, or with the bone's own, is inert.
+    fn joint_effect(&self, bone: u32, to: u32) -> String {
+        let own = self.world.body_carrier(bone);
+        match self.world.body_carrier(to) {
+            Some(carrier) if Some(carrier) != own => {
+                format!("constraining it to entity {carrier}'s body")
+            }
+            _ => "so the joint is inert".to_string(),
+        }
     }
 
     /// Whether `bones` is a complete binding of `skin`: one slot per joint, each

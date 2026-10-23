@@ -102,6 +102,15 @@ impl World {
         std::iter::once(id).chain(self.ancestors(id))
     }
 
+    /// The entity whose physics body carries `id`: `id` itself or its nearest
+    /// ancestor with a `Rigidbody` or a `CharacterController` (a body of its own,
+    /// #451); `None` when nothing up the hierarchy has one. The one rule the
+    /// physics body plan and a loaded joint's warning share.
+    pub fn body_carrier(&self, id: u32) -> Option<u32> {
+        self.self_and_ancestors(id)
+            .find(|&c| self.has_rigidbody(c) || self.has_character_controller(c))
+    }
+
     /// Write the raw parent link. Hierarchy INVARIANTS (cycle checks, the
     /// parent's `children` list) are `Scene::set_parent`'s job; this is the
     /// storage-level write it and scene rehydration route through.

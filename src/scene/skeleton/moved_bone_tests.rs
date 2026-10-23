@@ -2,7 +2,7 @@
 //! to the scene (#1273, #1277): destroying the character leaves it, and a save
 //! keeps it, so a load agrees with a live re-import.
 
-use super::fixture::{hero, reload};
+use super::fixture::{connected, hero, joint_to, reload};
 use crate::scene::{to_scene_data, Scene};
 
 /// A hero whose `Joint1` a script moved under a `Prop`; returns the hero, the
@@ -49,4 +49,23 @@ fn a_save_keeps_a_moved_bone_and_a_load_gives_the_rig_a_fresh_one() {
     assert!(!loaded.is_bone(on_prop[0]));
     let fresh = loaded.find_bone(hero, "Joint1").expect("the rig is whole");
     assert_ne!(fresh, on_prop[0]);
+}
+
+#[test]
+fn a_joint_to_a_moved_bone_targets_it_after_a_load() {
+    let mut scene = Scene::new();
+    let (hero, joint1, _) = hero_with_moved_bone(&mut scene, "1277_joint_moved");
+    let joint0 = scene.find_bone(hero, "Joint0").unwrap();
+    joint_to(&mut scene, joint0, Some(joint1));
+
+    let loaded = reload(&scene);
+    let hero = loaded.find_entity_by_name("Hero").unwrap();
+    let prop = loaded.find_entity_by_name("Prop").unwrap();
+    let moved = loaded.world.children(prop)[0];
+    let joint0 = loaded.find_bone(hero, "Joint0").unwrap();
+    assert_eq!(
+        connected(&loaded, joint0),
+        Some(moved),
+        "the prop's Joint1, not the rig's fresh one"
+    );
 }

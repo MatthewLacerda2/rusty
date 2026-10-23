@@ -124,29 +124,12 @@ impl Scene {
     /// [`Scene::destroy_entity`] does. A bone a script moved out from under
     /// `owner` is an ordinary entity now, and stays.
     pub(crate) fn despawn_skeleton(&mut self, owner: u32) {
-        let doomed = self.subtrees(self.live_bones(owner).collect());
-        self.despawn_batch(&doomed);
-    }
-
-    /// Mark every slot naming one of `ids`, entities being despawned, missing:
-    /// a skeleton never keeps a dead id, which a later entity could be given (a
-    /// `Scene.Load` carrying a `DontDestroyOnLoad` rig hands out the old ids).
-    pub(crate) fn forget_bones(&mut self, ids: &BTreeSet<u32>) {
-        for owner in self.world.ids_with_mesh() {
-            let names_one = |m: &crate::components::MeshComponent| {
-                m.skeleton.bones.iter().flatten().any(|b| ids.contains(b))
-            };
-            if !self.world.mesh(owner).is_some_and(|m| names_one(&m)) {
-                continue;
-            }
-            if let Some(mut mesh) = self.world.mesh_mut(owner) {
-                for slot in &mut mesh.skeleton.bones {
-                    if slot.is_some_and(|b| ids.contains(&b)) {
-                        *slot = None;
-                    }
-                }
-            }
+        let bones: BTreeSet<u32> = self.live_bones(owner).collect();
+        if bones.is_empty() {
+            return; // a plain entity: no despawn pass to pay for
         }
+        let doomed = self.subtrees(bones);
+        self.despawn_batch(&doomed);
     }
 
     /// `bones` and everything under them, walked from the top ones only: the rest
@@ -164,19 +147,33 @@ impl Scene {
     /// hangs from them, in one batch: Unity destroys a GameObject's children with
     /// it, and no bone of the rig is left a root posed as if it were a child
     /// (#1273). Their slots in the owner's skeleton become `None`, **missing**
-    /// (`Scene::forget_bones`): they skin at their bind pose (`palette`) until the
-    /// skeleton is rebuilt (a load, a prefab propagation, a re-import).
+    /// (the despawn's reference-clearing pass, `MeshComponent`'s
+    /// `EntityRefs::forget`): they ride with their nearest surviving parent bone
+    /// (`palette`) until the skeleton is rebuilt (a load, a prefab propagation, a
+    /// re-import).
     pub(crate) fn despawn_bone(&mut self, id: u32) {
         let doomed: BTreeSet<u32> = self.world.self_and_descendants(id).collect();
         self.despawn_batch(&doomed);
     }
 
-    /// The bone of `owner`'s skeleton named `name` (the glTF joint name).
+    /// The bone of `owner`'s skeleton named `name` (the glTF joint name), present
+    /// in its slots, as Unity's `SkinnedMeshRenderer.bones` keeps a bone Transform
+    /// a script moved elsewhere: `Animator.GetBone` reads it.
     pub fn find_bone(&self, owner: u32, name: &str) -> Option<u32> {
         let bones = self.world.mesh(owner)?.skeleton.bones.clone();
         bones
             .into_iter()
             .flatten()
+            .find(|&b| self.world.name(b).is_some_and(|n| *n == name))
+    }
+
+    /// [`Scene::find_bone`] among the bones still under `owner` only
+    /// ([`Scene::live_slots`]): where a stamp hangs an attachment or re-binds a
+    /// reference by name, never onto a bone a script moved away.
+    pub(super) fn live_bone(&self, owner: u32, name: &str) -> Option<u32> {
+        let slots = self.live_slots(owner).into_iter();
+        slots
+            .map(|(_, b)| b)
             .find(|&b| self.world.name(b).is_some_and(|n| *n == name))
     }
 }

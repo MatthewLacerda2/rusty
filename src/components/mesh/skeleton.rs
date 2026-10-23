@@ -109,6 +109,29 @@ impl EntityRefs for MeshComponent {
         }
     }
 
+    /// Also marks a bone slot naming a destroyed entity missing (#1273): the slots
+    /// join this one clearing pass (a despawn, a load leaving the entity behind),
+    /// so no path leaves a dead id a later entity could be given. They stay out of
+    /// [`EntityRefs::visit_refs`], the saved-id walk: they are never saved.
+    fn forget(&mut self, dead: &dyn Fn(u32) -> bool) {
+        self.visit_refs(&mut |_, r| {
+            if r.is_some_and(dead) {
+                *r = None;
+            }
+        });
+        for slot in &mut self.skeleton.bones {
+            if slot.is_some_and(dead) {
+                *slot = None;
+            }
+        }
+    }
+
+    fn names_any(&self, dead: &dyn Fn(u32) -> bool) -> bool {
+        let mut hit = self.skeleton.bones.iter().flatten().any(|&b| dead(b));
+        self.each_ref(&mut |_, r| hit |= dead(r));
+        hit
+    }
+
     #[cfg(test)]
     fn every_ref() -> Self {
         let body = BoneBody {
