@@ -99,7 +99,8 @@ unimplemented = "deny"
 [dependencies]
 winit = { version = "0.30.13" }
 wgpu = { version = "30.0.1", features = ["naga-ir"] }
-naga_oil = { version = "0.23" }
+# WGSL only (`shadergen`): its default `glsl` front end would build naga's GLSL parser for nothing.
+naga_oil = { version = "0.23", default-features = false }
 # The IR `naga_oil` composes into, named directly so GPU-free shader composition
 # (`shadergen::compose`, #722) needs no `wgpu`. Same 30 that wgpu 30 links:
 # wgpu, naga and naga_oil upgrade as a unit.
@@ -114,7 +115,7 @@ glam = { version = "0.33", features = ["bytemuck", "serde"] }
 bevy_mikktspace = "1.0.0"
 hecs = { version = "0.10.5" }
 # The sim's hash maps (#764): FxHash has no per-process seed, so a map iterates in the
-# same order every run. Already in the tree through rapier and wgpu: same version.
+# same order every run. Already in the tree through mlua and type-map: same version.
 rustc-hash = "2.1.2"
 rapier3d = { version = "0.36.0" }
 image = { version = "0.25.10", default-features = false, features = ["jpeg", "png", "tga"] }
@@ -126,13 +127,14 @@ gltf = { version = "1.4.1", default-features = false, features = ["import", "uti
 # at import (`asset::convert`), so nothing past the importer reads FBX.
 ufbx = "0.11.5"
 bytemuck = { version = "1.16.1", features = ["derive"] }
-env_logger = "0.11.3"
+# No default features: RUST_LOG filtering stays, colour and timestamps (anstream, jiff) go.
+env_logger = { version = "0.11.3", default-features = false }
 log = "0.4.22"
 pollster = "0.4.0"
 serde = { version = "1.0.203", features = ["derive"] }
 serde_json = "1.0.120"
 # Font parsing, metrics and glyph outlines for UI `Text` (#419). Direct, not through
-# egui: egui is editor-only (#431) and the player needs text. Same version egui pulls.
+# egui: egui is editor-only (#431) and the player needs text. Already in the tree through winit's sctk-adwaita on Linux: same version.
 ab_glyph = "0.2.32"
 # Its OpenType parser, read directly for GPOS pair kerning (ab_glyph reads only the
 # legacy `kern` table). Already in the tree through ab_glyph: same version.
@@ -142,7 +144,8 @@ ttf-parser = "0.25.1"
 gilrs = "0.11.2"
 # The OS clipboard for `Input.GetClipboard` / `SetClipboard` (#612), read by the shell
 # in both frontends: X11 and macOS. Already in the tree through egui-winit (same
-# version, same no-image features), but the player build has no egui.
+# version), but the player build has no egui. egui-winit's `clipboard` feature also
+# turns on its `image-data`.
 arboard = { version = "3.6.1", default-features = false }
 # The audio device and mixer (#465): kira's cpal backend, mixer tracks, filters,
 # sends and tweened parameters. Caret on 0.x pins the minor: 0.13 is a deliberate bump.
@@ -151,12 +154,6 @@ arboard = { version = "3.6.1", default-features = false }
 kira = { version = "0.12.5", default-features = false, features = ["cpal"] }
 # Clip decoding (#212, #545): `.ogg` Vorbis, `.wav` and `.mp3`. The version kira uses.
 symphonia = { version = "0.6", default-features = false, features = ["mp3", "ogg", "vorbis", "wav", "pcm"] }
-# Not used by rusty's code (#552). proptest turns on getrandom's `std` feature (via
-# rand_core), so without this line `cargo build` and `cargo test` resolve getrandom
-# differently. That split rebuilt ahash, hashbrown, hecs, the wgpu and egui stacks
-# and rusty itself once more for tests. Enabling `std` here makes both builds
-# resolve the same features. Keep the major version in step with Cargo.lock.
-getrandom = { version = "0.3", features = ["std"] }
 # The synthesiser behind `Sound.*` (#413): scorsese's zimmer crate, pinned to a
 # commit — never a branch — because `zimmer::SYNTH_VERSION` moves whenever a recipe
 # would render differently, and rusty's bakes should change only when someone moves
@@ -184,13 +181,16 @@ objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 # The Wayland half of the clipboard (#612), on the window's own `wl_display`; also
-# already in the tree through egui-winit.
-smithay-clipboard = "0.7.3"
+# already in the tree through egui-winit. Pinned to 0.7.2: 0.7.3 only moves to SCTK 0.20,
+# which duplicates winit 0.30's SCTK 0.19 stack (5 crates). Remove the pin when winit moves
+# to SCTK 0.20; egui-winit requires `^0.7.2`.
+smithay-clipboard = "=0.7.2"
 
 [dev-dependencies]
 # Property-based testing for the deterministic sim (#123): generators are seeded
-# by proptest itself (no wall-clock), so the determinism guard is respected.
-proptest = "1"
+# by proptest itself (no wall-clock), so the determinism guard is respected. `std` is for
+# the regex strategies; no test uses fork, timeout or bit-set strategies.
+proptest = { version = "1", default-features = false, features = ["std"] }
 
 # Dev builds (#487); `cargo test` inherits this profile, and so do CI, coverage and
 # mutants. rusty's own crate stays at opt-level 0 so an edit rebuilds in seconds, and

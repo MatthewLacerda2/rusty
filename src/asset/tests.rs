@@ -1,6 +1,6 @@
 //! src/asset/tests.rs — importer unit tests over tiny embedded fixtures.
 
-use super::fixtures::{ONE_PX_PNG, SKINNED_GLTF, TEXTURED_GLTF, TRIANGLE_GLTF, TRIANGLE_OBJ};
+use super::fixtures::{SKINNED_GLTF, TEXTURED_GLTF, TRIANGLE_GLTF, TRIANGLE_OBJ};
 use super::*;
 use std::path::PathBuf;
 
@@ -47,11 +47,9 @@ fn gltf_imports_mesh_and_material() {
 #[test]
 fn gltf_reads_full_metallic_roughness_material() {
     // The fixture lives in its own dir so the resolved texture path is predictable.
-    // `gltf::import` eagerly decodes external images, so the referenced PNG must exist
-    // on disk — write a 1x1 PNG at the URI the fixture points at.
+    // The importer only resolves the texture's path, never reads the file, so none is written.
     let dir = crate::test_temp::dir().join("rusty_textured_fixture");
-    std::fs::create_dir_all(dir.join("tex")).unwrap();
-    std::fs::write(dir.join("tex/brick wall.png"), ONE_PX_PNG).unwrap();
+    std::fs::create_dir_all(&dir).unwrap();
     let gltf_path = dir.join("model.gltf");
     std::fs::write(&gltf_path, TEXTURED_GLTF).unwrap();
 
