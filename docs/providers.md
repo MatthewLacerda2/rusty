@@ -53,7 +53,8 @@ your vendor dashboard for the real bill.
   authoring, and a network call inside the sim would break the determinism the
   harness depends on.
 - **No test makes a real call.** Every provider sits behind a trait, and tests use
-  mocks.
+  mocks. A headless run (a harness scenario, a bench) refuses every provider verb
+  for its whole life, before its world enters Play too.
 
 ## Generated assets
 

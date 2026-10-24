@@ -95,7 +95,7 @@ impl ScriptManager {
             return;
         }
         let mut rows: Vec<ScriptRow> = {
-            let scene = self.scene.borrow();
+            let scene = self.cells.scene.borrow();
             scene
                 .entity_ids()
                 .into_iter()
@@ -119,7 +119,7 @@ impl ScriptManager {
         for (id, index, path, values) in rows {
             if let Err(e) = self.load_entity_script(id, index, &path, &values) {
                 let msg = format!("Lua compile error (Entity {}): {}", id, e);
-                self.console.borrow_mut().error(msg);
+                self.cells.console.borrow_mut().error(msg);
             }
         }
     }

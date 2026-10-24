@@ -13,7 +13,8 @@
 //!   were generated while authoring, the same lifecycle bakes follow.
 //! - **Edit mode only.** Generation is authoring. A call during Play would make the
 //!   sim depend on a network, which the determinism guard cannot see (it scans for
-//!   clocks, not sockets), so [`permit`] refuses while playing.
+//!   clocks, not sockets), so [`permit`] refuses while playing, and inside a
+//!   headless run (a scenario is a test; [`HeadlessHold`], #1384).
 //! - **A budget an unattended agent cannot cross.** Each project keeps a `budget`
 //!   and a running `spent` ([`ledger`]); a call that would cross it is refused with
 //!   both numbers and the overage. Raising the budget is one edit to that file.
@@ -32,6 +33,7 @@
 
 mod credentials;
 pub mod generated;
+mod headless;
 pub mod ledger;
 mod refusal;
 pub mod sfx;
@@ -44,6 +46,7 @@ mod tests;
 use std::path::Path;
 
 pub use credentials::{environment, keys_blanked, resolve};
+pub use headless::{edit_mode, HeadlessHold};
 pub use ledger::Ledger;
 pub use refusal::Refusal;
 pub use scorsese_providers::credentials::{Environment, Provider, Secret};
@@ -99,9 +102,7 @@ pub fn permit(
     environment: &Environment,
     ledger_path: &Path,
 ) -> Result<Permit, Refusal> {
-    if playing {
-        return Err(Refusal::Playing);
-    }
+    edit_mode(playing)?;
     let key = resolve(provider, environment)?;
     let ledger = Ledger::load(ledger_path)?;
     ledger.check(estimate_cents, ledger_path)?;

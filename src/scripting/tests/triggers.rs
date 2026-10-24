@@ -2,9 +2,7 @@
 //! (stay) / `OnTriggerExit` dispatch in that fixed order, each fed by its own
 //! event list.
 
-use std::cell::RefCell;
 use std::collections::BTreeMap;
-use std::rc::Rc;
 
 use super::lifecycle::{manager_with_entity, write_script};
 use crate::physics::TriggerEvents;
@@ -12,7 +10,7 @@ use crate::physics::TriggerEvents;
 #[test]
 fn dispatch_fires_enter_stay_exit_in_order() {
     let (mut m, id) = manager_with_entity();
-    m.init_runtime(&Rc::new(RefCell::new(None))).unwrap();
+    m.init_runtime().unwrap();
     let path = write_script(
         "edges",
         "_G.__log = ''\nreturn {\n\
@@ -52,7 +50,7 @@ fn dispatch_fires_enter_stay_exit_in_order() {
 fn missing_edge_callbacks_are_optional() {
     // A script defining only the stay-edge OnTrigger keeps working untouched.
     let (mut m, id) = manager_with_entity();
-    m.init_runtime(&Rc::new(RefCell::new(None))).unwrap();
+    m.init_runtime().unwrap();
     let path = write_script(
         "stay_only",
         "_G.__n = 0\nreturn { OnTrigger = function() __n = __n + 1 end }",

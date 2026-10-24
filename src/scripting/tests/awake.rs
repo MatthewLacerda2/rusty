@@ -2,9 +2,7 @@
 //! at play-enter, exactly-once semantics, the disabled-at-load deferral, and
 //! the queued load + next-tick init for scripts on entities spawned mid-play.
 
-use std::cell::RefCell;
 use std::collections::BTreeMap;
-use std::rc::Rc;
 
 use crate::components::ScriptComponent;
 
@@ -22,8 +20,8 @@ const LOGGER: &str = "_G.__log = _G.__log or ''\n\
 #[test]
 fn init_runs_all_awakes_then_all_starts_exactly_once() {
     let (mut m, a) = manager_with_entity();
-    let b = m.scene.borrow_mut().add_entity("E2".to_string());
-    m.init_runtime(&Rc::new(RefCell::new(None))).unwrap();
+    let b = m.cells.scene.borrow_mut().add_entity("E2".to_string());
+    m.init_runtime().unwrap();
     let path = write_script("awake_order", LOGGER);
     m.load_entity_script(a, 0, &path, &BTreeMap::new()).unwrap();
     m.load_entity_script(b, 0, &path, &BTreeMap::new()).unwrap();
@@ -44,8 +42,8 @@ fn init_runs_all_awakes_then_all_starts_exactly_once() {
 #[test]
 fn disabled_at_load_defers_awake_and_start_until_first_active_tick() {
     let (mut m, id) = manager_with_entity();
-    m.scene.borrow_mut().world.set_active(id, false);
-    m.init_runtime(&Rc::new(RefCell::new(None))).unwrap();
+    m.cells.scene.borrow_mut().world.set_active(id, false);
+    m.init_runtime().unwrap();
     let path = write_script("awake_disabled", LOGGER);
     m.load_entity_script(id, 0, &path, &BTreeMap::new())
         .unwrap();
@@ -58,7 +56,7 @@ fn disabled_at_load_defers_awake_and_start_until_first_active_tick() {
     assert_eq!(m.eval("__log").unwrap(), "");
 
     // First active tick: Awake, then Start, then Update — all in one tick.
-    m.scene.borrow_mut().world.set_active(id, true);
+    m.cells.scene.borrow_mut().world.set_active(id, true);
     m.init_scripts();
     m.update_scripts(0.016);
     assert_eq!(m.eval("__log").unwrap(), format!("A{id}S{id}U{id}"));
@@ -67,7 +65,7 @@ fn disabled_at_load_defers_awake_and_start_until_first_active_tick() {
 #[test]
 fn runtime_spawned_entity_scripts_run_from_the_next_tick() {
     let (mut m, _) = manager_with_entity();
-    m.init_runtime(&Rc::new(RefCell::new(None))).unwrap();
+    m.init_runtime().unwrap();
     m.init_scripts(); // play-enter: nothing attached yet
 
     // Mid-play spawn: a new entity appears carrying a script — the scene state
@@ -75,7 +73,7 @@ fn runtime_spawned_entity_scripts_run_from_the_next_tick() {
     // Update leaves behind. The rest of the spawn tick must not touch it.
     let path = write_script("awake_spawn", LOGGER);
     let spawned = {
-        let mut scene = m.scene.borrow_mut();
+        let mut scene = m.cells.scene.borrow_mut();
         let id = scene.add_entity("Spawned".to_string());
         scene.world.scripts_mut(id).unwrap().push(ScriptComponent {
             path: path.clone(),

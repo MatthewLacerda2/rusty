@@ -39,10 +39,9 @@ fn raycast_matches_engine_cast_through_rapier() {
     let camera = Rc::new(RefCell::new(Camera::new(Vec3::ZERO, 0.0, 0.0)));
     let time = Rc::new(RefCell::new(Time::new()));
     let mut m = ScriptManager::new(Rc::clone(&scene), input, nav, console, camera, time);
-    let physics = Rc::new(RefCell::new(Some(PhysicsWorld::from_scene(
-        &scene.borrow(),
-    ))));
-    m.init_runtime(&physics).expect("runtime inits");
+    let physics = m.physics_cell();
+    *physics.borrow_mut() = Some(PhysicsWorld::from_scene(&scene.borrow()));
+    m.init_runtime().expect("runtime inits");
 
     // Engine path: cast straight down +Z, expect the target.
     let engine = physics
@@ -88,10 +87,9 @@ fn manager_with_dynamic_body() -> (ScriptManager, Rc<RefCell<Option<PhysicsWorld
     let camera = Rc::new(RefCell::new(Camera::new(Vec3::ZERO, 0.0, 0.0)));
     let time = Rc::new(RefCell::new(Time::new()));
     let mut m = ScriptManager::new(Rc::clone(&scene), input, nav, console, camera, time);
-    let physics = Rc::new(RefCell::new(Some(PhysicsWorld::from_scene(
-        &scene.borrow(),
-    ))));
-    m.init_runtime(&physics).expect("runtime inits");
+    let physics = m.physics_cell();
+    *physics.borrow_mut() = Some(PhysicsWorld::from_scene(&scene.borrow()));
+    m.init_runtime().expect("runtime inits");
     (m, physics, id)
 }
 

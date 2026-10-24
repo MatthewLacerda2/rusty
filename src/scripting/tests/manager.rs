@@ -29,7 +29,7 @@ fn make_manager() -> ScriptManager {
 
 fn live_manager() -> ScriptManager {
     let mut m = make_manager();
-    m.init_runtime(&Rc::new(RefCell::new(None))).expect("init");
+    m.init_runtime().expect("init");
     m
 }
 
@@ -37,7 +37,7 @@ fn live_manager() -> ScriptManager {
 fn is_live_false_before_init_true_after() {
     let mut m = make_manager();
     assert!(!m.is_live(), "not live before init_runtime");
-    m.init_runtime(&Rc::new(RefCell::new(None))).unwrap();
+    m.init_runtime().unwrap();
     assert!(m.is_live(), "live after init_runtime");
 }
 
@@ -57,7 +57,7 @@ fn set_storage_replaces_underlying_cell() {
     let mut m = make_manager();
     let storage = Rc::new(RefCell::new(Storage::new()));
     m.set_storage(Rc::clone(&storage));
-    m.init_runtime(&Rc::new(RefCell::new(None))).unwrap();
+    m.init_runtime().unwrap();
     m.exec("Storage.Set('ns', 'k', 7)").unwrap();
     let val = storage.borrow().get("ns", "k");
     assert_eq!(val.and_then(|v| v.as_f64()), Some(7.0));
@@ -86,7 +86,7 @@ fn the_scene_play_state_drives_debug_snapshot_play_state() {
         "edit mode by default"
     );
 
-    m.scene.borrow_mut().set_playing(true);
+    m.cells.scene.borrow_mut().set_playing(true);
     assert!(
         m.eval("Debug.Snapshot()")
             .unwrap()

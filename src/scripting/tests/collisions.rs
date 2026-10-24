@@ -3,9 +3,7 @@
 //! `(id, other)`, and they dispatch after the trigger callbacks of the same tick;
 //! `OnJointBreak` (#449) follows them.
 
-use std::cell::RefCell;
 use std::collections::BTreeMap;
-use std::rc::Rc;
 
 use glam::Vec3;
 
@@ -32,7 +30,7 @@ fn landing(id: u32) -> CollisionPair {
 #[test]
 fn collision_callbacks_get_the_receivers_contact() {
     let (mut m, id) = manager_with_entity();
-    m.init_runtime(&Rc::new(RefCell::new(None))).unwrap();
+    m.init_runtime().unwrap();
     let path = write_script(
         "hits",
         "_G.__log = ''\nreturn {\n\
@@ -76,7 +74,7 @@ fn collision_callbacks_get_the_receivers_contact() {
 #[test]
 fn the_other_side_sees_the_contact_flipped() {
     let (mut m, id) = manager_with_entity();
-    m.init_runtime(&Rc::new(RefCell::new(None))).unwrap();
+    m.init_runtime().unwrap();
     let path = write_script(
         "flip",
         "_G.__n = ''\nreturn { OnCollisionEnter = function(id, other, c)\n\
@@ -99,7 +97,7 @@ fn the_other_side_sees_the_contact_flipped() {
 #[test]
 fn joint_breaks_dispatch_after_collisions() {
     let (mut m, id) = manager_with_entity();
-    m.init_runtime(&Rc::new(RefCell::new(None))).unwrap();
+    m.init_runtime().unwrap();
     let path = write_script(
         "snaps",
         "_G.__log = ''\nreturn {\n\

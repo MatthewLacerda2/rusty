@@ -65,7 +65,7 @@ impl ScriptManager {
             return;
         };
         if let Err(e) = func.call::<()>(args) {
-            self.console.borrow_mut().error(format!(
+            self.cells.console.borrow_mut().error(format!(
                 "[Lua Error] {} on entity {} failed: {}",
                 hook, key.0, e
             ));
@@ -78,7 +78,7 @@ impl ScriptManager {
     /// `Update`/`LateUpdate`/trigger dispatch all read it, so no hook can drift
     /// from the rule "a disabled entity receives no callbacks".
     pub(super) fn entity_active(&self, id: u32) -> Option<bool> {
-        let scene = self.scene.borrow();
+        let scene = self.cells.scene.borrow();
         scene
             .world
             .contains(id)

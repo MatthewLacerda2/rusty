@@ -7,7 +7,7 @@ use mlua::{Lua, Table, Value};
 use super::super::timer::{require_active, runtime};
 use crate::scene::Scene;
 use crate::scripting::tween::{Ease, Property, Tween};
-use crate::scripting::Clock;
+use crate::scripting::{require_sim_vm, Clock};
 
 /// The `opts` keys `Tween.To` accepts; anything else is a typo, and an error.
 const OPTS: [&str; 7] = [
@@ -155,6 +155,7 @@ fn read_opt(lua: &Lua, key: &str, value: Value, spec: &mut Spec) -> mlua::Result
         "from" => t.from = Some(to_vec4(&t.property, value)?),
         "on_complete" => {
             let f: mlua::Function = lua.unpack(value)?;
+            require_sim_vm(lua, "Tween on_complete")?;
             t.on_complete = Some(lua.create_registry_value(f)?);
         }
         _ => spec.join = lua.unpack(value)?,

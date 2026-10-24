@@ -55,10 +55,9 @@ pub(super) fn runtime_over(raw: Scene) -> ScriptManager {
     let camera = Rc::new(RefCell::new(Camera::new(Vec3::ZERO, 0.0, 0.0)));
     let time = Rc::new(RefCell::new(Time::new()));
     let mut m = ScriptManager::new(Rc::clone(&scene), input, nav, console, camera, time);
-    let physics = Rc::new(RefCell::new(Some(PhysicsWorld::from_scene(
-        &scene.borrow(),
-    ))));
-    m.init_runtime(&physics).expect("runtime inits");
+    let physics = m.physics_cell();
+    *physics.borrow_mut() = Some(PhysicsWorld::from_scene(&scene.borrow()));
+    m.init_runtime().expect("runtime inits");
     m
 }
 

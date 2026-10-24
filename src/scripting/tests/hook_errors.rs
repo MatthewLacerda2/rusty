@@ -3,16 +3,13 @@
 //! no instruction, a failing `on_complete`; and a due job its own phase disarmed
 //! never runs.
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use super::lifecycle::{manager_with_entity, write_script};
 use super::timers::{counted, rig, tick};
 use crate::components::{CanvasGroupComponent, ScriptComponent};
 use crate::scripting::manager::ScriptManager;
 
 fn logs(m: &ScriptManager) -> Vec<String> {
-    let console = m.console.borrow();
+    let console = m.cells.console.borrow();
     console.messages.iter().map(|l| l.0.clone()).collect()
 }
 
@@ -23,13 +20,14 @@ fn logged(m: &ScriptManager, needle: &str) -> bool {
 #[test]
 fn a_script_that_does_not_compile_is_logged_once_and_never_retried() {
     let (mut m, id) = manager_with_entity();
-    m.init_runtime(&Rc::new(RefCell::new(None))).unwrap();
+    m.init_runtime().unwrap();
     let path = write_script("err_compile", "return {");
     let slot = ScriptComponent {
         path,
         ..Default::default()
     };
-    m.scene
+    m.cells
+        .scene
         .borrow_mut()
         .world
         .scripts_mut(id)
@@ -50,9 +48,9 @@ fn a_raising_transition_callback_is_logged_and_play_goes_on() {
                 Update = function(id) _G.__u = (_G.__u or 0) + 1 end }";
     let (mut m, id) = rig("err_disable", code);
     tick(&mut m, 1);
-    m.scene.borrow_mut().world.set_active(id, false);
+    m.cells.scene.borrow_mut().world.set_active(id, false);
     tick(&mut m, 1);
-    m.scene.borrow_mut().world.set_active(id, true);
+    m.cells.scene.borrow_mut().world.set_active(id, true);
     tick(&mut m, 1);
     assert!(
         logged(&m, &format!("OnDisable on entity {id} failed")) && logged(&m, "disable failed"),
@@ -82,7 +80,7 @@ fn a_yield_that_is_no_instruction_retires_the_coroutine() {
         tick(&mut m, 2);
         assert!(logged(&m, error), "{name}: {:?}", logs(&m));
         assert!(
-            m.timers.borrow().is_empty(),
+            m.cells.timers.borrow().is_empty(),
             "{name}: a failed coroutine retires"
         );
     }
@@ -102,7 +100,7 @@ fn a_job_cancelled_or_deactivated_earlier_in_the_phase_never_runs() {
     let (mut m, _) = rig("err_deactivated", &counted(deactivate));
     tick(&mut m, 3);
     assert_eq!(m.eval("__log").unwrap(), "");
-    assert!(m.timers.borrow().is_empty());
+    assert!(m.cells.timers.borrow().is_empty());
 }
 
 #[test]
@@ -110,11 +108,11 @@ fn a_tween_whose_component_went_away_before_its_first_step_ends_silently() {
     let body = "Tween.To(id, 'CanvasGroup.alpha', 0, 1)";
     let (mut m, id) = rig("err_tween_gone", &counted(body));
     let group = Some(CanvasGroupComponent::default());
-    m.scene.borrow_mut().world.set_canvas_group(id, group);
+    m.cells.scene.borrow_mut().world.set_canvas_group(id, group);
     tick(&mut m, 1);
-    m.scene.borrow_mut().world.set_canvas_group(id, None);
+    m.cells.scene.borrow_mut().world.set_canvas_group(id, None);
     tick(&mut m, 2);
-    assert!(m.timers.borrow().is_empty(), "the tween retired");
+    assert!(m.cells.timers.borrow().is_empty(), "the tween retired");
     assert!(!logged(&m, "Tween"), "{:?}", logs(&m));
 }
 

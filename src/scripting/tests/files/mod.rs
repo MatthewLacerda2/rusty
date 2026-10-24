@@ -51,7 +51,7 @@ pub(super) fn manager(workspace: &Path) -> (ScriptManager, Rc<RefCell<ConsoleLog
         Rc::new(RefCell::new(Camera::new(Vec3::ZERO, 0.0, 0.0))),
         Rc::new(RefCell::new(Time::new())),
     );
-    m.init_runtime(&Rc::new(RefCell::new(None))).expect("init");
+    m.init_runtime().expect("init");
     m.set_workspace_root(workspace);
     (m, console)
 }

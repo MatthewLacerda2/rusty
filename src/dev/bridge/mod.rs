@@ -1,16 +1,24 @@
-//! src/dev/bridge.rs — Lua bindings for the scenario VM.
+//! src/dev/bridge/ — the scenario-only half of the scenario VM's surface.
 //!
-//! Registers the control surface a scenario script calls. This is a SEPARATE Lua VM
-//! from the gameplay scripts inside `GameWorld` — the scenario drives the world from
-//! the outside (Step/StepUntil), it does not run as an entity behaviour.
+//! A scenario runs in a SEPARATE Lua VM from the gameplay scripts inside
+//! `GameWorld`: it drives the world from the outside (Step/StepUntil), it does not
+//! run as an entity behaviour. Everything a gameplay script can call, a scenario
+//! calls too: `scenario::run` registers the real API (`api::register`) over the
+//! harness world's cells, read-write, the way a Unity editor test can call any
+//! runtime API (#1384). That includes `Input`'s injection verbs (`Press`,
+//! `MoveMouse`, `SetAxis`, …); shooting is just pressing `Mouse0`.
 //!
-//! Tables: Harness.{Step,StepUntil,Snapshot,Log,Expect,Frame,Stats,AssertBudget,Screenshot,
-//! Render,LoadStress,Bench}, plus read helpers
-//! Scene.FindEntityByName / Transform.GetPosition / Animator.GetClip and the
-//! writable Input injection (Press/Release, MoveMouse, AddMouseDelta, Scroll,
-//! TypeText, SetAxis, SetPadConnected). Shooting is just pressing `Mouse0` (left
-//! mouse), which the player-controller script edge-detects (Space jumps) — there is
-//! no separate click/shoot signal.
+//! This module adds only what is the scenario's own: the `Harness` table
+//! (Step, StepUntil, Snapshot, Log, Expect, Frame, Stats, AssertBudget, Screenshot,
+//! Render, AttachPlayerBot, LoadStress, Bench), `Scene.GetScript` answered across
+//! the VM boundary (`script_ref`), and the refusal of what entering Play would wipe
+//! (`before_play`).
+
+mod before_play;
+mod copy;
+mod script_ref;
+#[cfg(test)]
+mod tests;
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -19,7 +27,6 @@ use mlua::{Function, Lua, Result as LuaResult};
 
 use super::harness::{tick_unless_quit, Harness};
 use crate::app::GameWorld;
-use crate::core::input::InputState;
 
 type Shared = Rc<RefCell<Harness>>;
 
@@ -27,12 +34,12 @@ fn world_of(h: &Shared) -> Rc<RefCell<GameWorld>> {
     Rc::clone(&h.borrow().world)
 }
 
-/// Register every scenario-facing table on `lua`'s globals.
+/// Register the scenario-only surface on `lua`'s globals, after the API (it
+/// replaces the API's `Scene.GetScript`, and guards what Play would wipe).
 pub fn register(lua: &Lua, harness: &Shared) -> LuaResult<()> {
     register_harness(lua, harness)?;
-    register_scene(lua, harness)?;
-    register_input(lua, harness)?;
-    Ok(())
+    before_play::register(lua, &world_of(harness))?;
+    script_ref::register(lua, &world_of(harness))
 }
 
 fn register_harness(lua: &Lua, harness: &Shared) -> LuaResult<()> {
@@ -170,113 +177,6 @@ fn register_harness_actions(lua: &Lua, harness: &Shared, t: &mlua::Table) -> Lua
             let w = world.borrow();
             let attached = super::botplayer::attach_player_bot(&mut w.scene().borrow_mut(), &path);
             Ok(attached)
-        })?,
-    )
-}
-
-fn register_scene(lua: &Lua, harness: &Shared) -> LuaResult<()> {
-    register_scene_lookup(lua, harness)?;
-    register_scene_transform(lua, harness)?;
-    register_scene_animator(lua, harness)
-}
-
-/// Scene.FindEntityByName — name -> entity id.
-fn register_scene_lookup(lua: &Lua, harness: &Shared) -> LuaResult<()> {
-    let scene_t = lua.create_table()?;
-    let world = world_of(harness);
-    scene_t.set(
-        "FindEntityByName",
-        lua.create_function(move |_, name: String| {
-            Ok(world.borrow().scene().borrow().find_entity_by_name(&name))
-        })?,
-    )?;
-    lua.globals().set("Scene", scene_t)
-}
-
-/// Transform.GetPosition — entity id -> world position tuple.
-fn register_scene_transform(lua: &Lua, harness: &Shared) -> LuaResult<()> {
-    let transform_t = lua.create_table()?;
-    let world = world_of(harness);
-    transform_t.set(
-        "GetPosition",
-        lua.create_function(move |_, id: u32| {
-            let w = world.borrow();
-            let s = w.scene().borrow();
-            let p = s.world.world_position(id);
-            Ok((p.x, p.y, p.z))
-        })?,
-    )?;
-    lua.globals().set("Transform", transform_t)
-}
-
-/// Animator.GetClip — entity id -> current clip name.
-fn register_scene_animator(lua: &Lua, harness: &Shared) -> LuaResult<()> {
-    let anim_t = lua.create_table()?;
-    let world = world_of(harness);
-    anim_t.set(
-        "GetClip",
-        lua.create_function(move |_, id: u32| {
-            let w = world.borrow();
-            let s = w.scene().borrow();
-            let clip = s
-                .world
-                .animator(id)
-                .map(|a| a.base.current_clip.clone())
-                .unwrap_or_default();
-            Ok(clip)
-        })?,
-    )?;
-    lua.globals().set("Animator", anim_t)
-}
-
-/// The scenario's writable `Input`: the same injection verbs gameplay scripts get
-/// (`api::input`), bound to the harness world. Injection bypasses the keymap.
-fn register_input(lua: &Lua, harness: &Shared) -> LuaResult<()> {
-    let t = lua.create_table()?;
-    inject(lua, &t, harness, "Press", |i, key: String| i.press(&key))?;
-    inject(lua, &t, harness, "Release", |i, key: String| {
-        i.release(&key)
-    })?;
-    inject(lua, &t, harness, "MoveMouse", |i, (x, y)| {
-        i.move_mouse(x, y)
-    })?;
-    inject(lua, &t, harness, "AddMouseDelta", |i, (dx, dy)| {
-        i.add_mouse_delta(dx, dy)
-    })?;
-    inject(lua, &t, harness, "Scroll", |i, dy: f64| i.scroll(dy))?;
-    inject(lua, &t, harness, "TypeText", |i, text: String| {
-        i.type_text(&text)
-    })?;
-    inject(
-        lua,
-        &t,
-        harness,
-        "SetAxis",
-        |i, (axis, v): (String, f32)| i.set_axis(&axis, v),
-    )?;
-    inject(lua, &t, harness, "SetPadConnected", |i, (pad, on)| {
-        i.pads.set_connected(pad, on)
-    })?;
-    lua.globals().set("Input", t)
-}
-
-/// Bind one injection verb: `f` writes the decoded Lua arguments into the world's input.
-fn inject<A>(
-    lua: &Lua,
-    t: &mlua::Table,
-    harness: &Shared,
-    name: &str,
-    f: impl Fn(&mut InputState, A) + 'static,
-) -> LuaResult<()>
-where
-    A: mlua::FromLuaMulti,
-{
-    let world = world_of(harness);
-    t.set(
-        name,
-        lua.create_function(move |_, args: A| {
-            f(&mut world.borrow().input().borrow_mut(), args);
-            Ok(())
         })?,
     )
 }

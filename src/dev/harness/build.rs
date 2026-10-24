@@ -110,6 +110,7 @@ impl Harness {
             out_dir: out_dir.as_ref().to_path_buf(),
             capture: crate::dev::capture::CaptureHost::new(),
             stats,
+            _providers: crate::dev::providers::HeadlessHold::take(),
         }
     }
 }

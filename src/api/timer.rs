@@ -17,7 +17,7 @@ use mlua::{Function, Lua, MultiValue, Table, Value};
 
 use super::{put, Reg};
 use crate::scene::Scene;
-use crate::scripting::{wait, ConsoleLogs, Target, TimerScheduler, Wait, Work};
+use crate::scripting::{require_sim_vm, wait, ConsoleLogs, Target, TimerScheduler, Wait, Work};
 
 /// Register the `Timer` namespace onto `lua`.
 pub fn register<'scope>(
@@ -43,8 +43,9 @@ fn register_invoke<'scope>(
     timers: &'scope RefCell<TimerScheduler>,
 ) -> Reg {
     let schedule = move |lua: &Lua, id: u32, target: Value, delay: f64, interval: Option<f64>| {
+        let verb = ["Timer.Invoke", "Timer.InvokeRepeating"][usize::from(interval.is_some())];
         require_active(&scene.borrow(), id)?;
-        let target = to_target(lua, target)?;
+        let target = to_target(lua, target, verb)?;
         let mut t = timers.borrow_mut();
         let handle = t.alloc();
         t.insert(
@@ -123,6 +124,7 @@ fn register_coroutines<'scope>(
         "StartCoroutine",
         scope.create_function(move |lua, (id, f, args): (u32, Function, MultiValue)| {
             require_active(&scene.borrow(), id)?;
+            require_sim_vm(lua, "Timer.StartCoroutine")?;
             let thread = lua.create_thread(f)?;
             let handle = timers.borrow_mut().alloc();
             let mut call = args.into_vec();
@@ -193,9 +195,13 @@ pub(super) fn require_active(scene: &Scene, id: u32) -> mlua::Result<()> {
 }
 
 /// A function, or the name of a function on the owner's scripts.
-fn to_target(lua: &Lua, value: Value) -> mlua::Result<Target> {
+/// `verb` names the caller in the refusal of a function from another VM.
+fn to_target(lua: &Lua, value: Value, verb: &str) -> mlua::Result<Target> {
     match value {
-        Value::Function(f) => Ok(Target::Func(lua.create_registry_value(f)?)),
+        Value::Function(f) => {
+            require_sim_vm(lua, verb)?;
+            Ok(Target::Func(lua.create_registry_value(f)?))
+        }
         Value::String(s) => Ok(Target::Name(s.to_str()?.to_string())),
         other => Err(runtime(&format!(
             "expected a function or a function name, got {}",

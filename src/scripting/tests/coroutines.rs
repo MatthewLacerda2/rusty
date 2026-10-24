@@ -25,7 +25,10 @@ fn coroutine_runs_to_first_yield_then_resumes_on_schedule() {
     tick(&mut m, 10);
     // Start runs before tick 1's Update, so the first beat reads 0.
     assert_eq!(log(&m), "0,2,5,6,");
-    assert!(m.timers.borrow().is_empty(), "a finished coroutine retires");
+    assert!(
+        m.cells.timers.borrow().is_empty(),
+        "a finished coroutine retires"
+    );
 }
 
 #[test]
@@ -34,10 +37,10 @@ fn time_scale_zero_freezes_scaled_waits_but_not_realtime() {
                 coroutine.yield(Timer.WaitForSecondsRealtime(0.05)) __log = __log .. 'R' .. __t .. ',' end)\n\
                 coroutine.yield(Timer.WaitForSeconds(0.05)) __log = __log .. 'S' .. __t .. ','";
     let (mut m, _) = rig("co_scale", &co(body));
-    m.time.borrow_mut().set_time_scale(0.0);
+    m.cells.time.borrow_mut().set_time_scale(0.0);
     tick(&mut m, 10);
     assert_eq!(log(&m), "R4,");
-    m.time.borrow_mut().set_time_scale(1.0);
+    m.cells.time.borrow_mut().set_time_scale(1.0);
     tick(&mut m, 3);
     assert_eq!(log(&m), "R4,S13,");
 }
@@ -58,9 +61,9 @@ fn deactivation_stops_a_coroutine_for_good() {
     );
     tick(&mut m, 3);
     assert_eq!(log(&m), "2,3,");
-    m.scene.borrow_mut().world.set_active(id, false);
+    m.cells.scene.borrow_mut().world.set_active(id, false);
     tick(&mut m, 1);
-    m.scene.borrow_mut().world.set_active(id, true);
+    m.cells.scene.borrow_mut().world.set_active(id, true);
     tick(&mut m, 3);
     assert_eq!(log(&m), "2,3,", "Unity: coroutines stop on deactivate");
     assert!(m.eval(&format!("Timer.StopAllCoroutines({id})")).is_ok());
@@ -76,7 +79,7 @@ fn stop_all_coroutines_and_cancel_end_pending_coroutines() {
     m.eval(&format!("Timer.StopAllCoroutines({id})")).unwrap();
     tick(&mut m, 3);
     assert_eq!(log(&m), "2,");
-    assert!(m.timers.borrow().is_empty());
+    assert!(m.cells.timers.borrow().is_empty());
 }
 
 /// The run as a string: two runtimes, same script, same ticks → same bytes.

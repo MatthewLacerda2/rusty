@@ -38,7 +38,7 @@ pub(super) fn write_script(name: &str, code: &str) -> String {
 #[test]
 fn eval_expression_returns_value_string() {
     let (mut m, _) = manager_with_entity();
-    m.init_runtime(&Rc::new(RefCell::new(None))).unwrap();
+    m.init_runtime().unwrap();
     assert_eq!(m.eval("1 + 1").unwrap(), "2");
     assert_eq!(m.eval("'hello'").unwrap(), "hello");
     assert_eq!(m.eval("true").unwrap(), "true");
@@ -50,7 +50,7 @@ fn eval_expression_returns_value_string() {
 #[test]
 fn eval_empty_returns_empty_string() {
     let (mut m, _) = manager_with_entity();
-    m.init_runtime(&Rc::new(RefCell::new(None))).unwrap();
+    m.init_runtime().unwrap();
     assert_eq!(m.eval("").unwrap(), "");
     assert_eq!(m.eval("   ").unwrap(), "");
 }
@@ -58,7 +58,7 @@ fn eval_empty_returns_empty_string() {
 #[test]
 fn eval_statement_is_accepted() {
     let (mut m, _) = manager_with_entity();
-    m.init_runtime(&Rc::new(RefCell::new(None))).unwrap();
+    m.init_runtime().unwrap();
     m.eval("x = 99").unwrap();
     assert_eq!(m.eval("x").unwrap(), "99");
 }
@@ -66,14 +66,14 @@ fn eval_statement_is_accepted() {
 #[test]
 fn eval_lua_error_propagates_as_err() {
     let (mut m, _) = manager_with_entity();
-    m.init_runtime(&Rc::new(RefCell::new(None))).unwrap();
+    m.init_runtime().unwrap();
     assert!(m.eval("error('boom')").is_err());
 }
 
 #[test]
 fn init_scripts_invokes_start_for_each_entity() {
     let (mut m, id) = manager_with_entity();
-    m.init_runtime(&Rc::new(RefCell::new(None))).unwrap();
+    m.init_runtime().unwrap();
     let path = write_script(
         "start",
         "_G.__start_id = 0\nreturn { Start = function(id) _G.__start_id = id end }",
@@ -87,7 +87,7 @@ fn init_scripts_invokes_start_for_each_entity() {
 #[test]
 fn update_scripts_passes_delta_time_to_update() {
     let (mut m, id) = manager_with_entity();
-    m.init_runtime(&Rc::new(RefCell::new(None))).unwrap();
+    m.init_runtime().unwrap();
     let path = write_script(
         "update",
         "_G.__update_dt = 0\nreturn { Update = function(id, dt) _G.__update_dt = dt end }",
@@ -103,7 +103,7 @@ fn update_scripts_passes_delta_time_to_update() {
 #[test]
 fn dispatch_trigger_events_calls_on_trigger() {
     let (mut m, id) = manager_with_entity();
-    m.init_runtime(&Rc::new(RefCell::new(None))).unwrap();
+    m.init_runtime().unwrap();
     let path = write_script(
         "trigger",
         "_G.__other = 0\nreturn { OnTrigger = function(id, other) _G.__other = other end }",

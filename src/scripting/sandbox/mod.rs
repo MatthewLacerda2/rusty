@@ -58,7 +58,26 @@ pub(super) fn new_sim_vm() -> Result<Lua, String> {
         .set_name("=sandbox")
         .exec()
         .map_err(|e| e.to_string())?;
+    lua.set_named_registry_value(SIM_VM, true)
+        .map_err(|e| e.to_string())?;
     Ok(lua)
+}
+
+/// The registry mark of a gameplay VM, the one VM the timer scheduler runs.
+const SIM_VM: &str = "rusty.sim_vm";
+
+/// Refuse a callback `verb` would hand the timer scheduler from any VM but a
+/// gameplay one (#1384). The scheduler resumes and calls its work in the gameplay
+/// VM, and a Lua function never leaves the VM that made it: one from the scenario
+/// VM would never run.
+pub(crate) fn require_sim_vm(lua: &Lua, verb: &str) -> mlua::Result<()> {
+    if lua.named_registry_value::<Option<bool>>(SIM_VM)? == Some(true) {
+        return Ok(());
+    }
+    Err(mlua::Error::RuntimeError(format!(
+        "{verb}: its function belongs to this VM, and timers run in the gameplay VM; \
+         a scenario drives gameplay by stepping the world"
+    )))
 }
 
 /// A throwaway VM for *reading* a script's returned table (its `fields` schema,

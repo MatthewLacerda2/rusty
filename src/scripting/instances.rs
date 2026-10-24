@@ -66,3 +66,21 @@ pub fn find(lua: &Lua, id: u32, name: &str) -> mlua::Result<Option<Table>> {
     hits.sort_by_key(|(slot, _)| *slot);
     Ok(hits.into_iter().next().map(|(_, t)| t))
 }
+
+impl super::ScriptManager {
+    /// Run `f` on entity `id`'s live script named `name`, in this runtime's VM:
+    /// `None` when the runtime is down or the entity has no such script. For a
+    /// caller in another VM (the dev layer's scenario proxy, #1384), which cannot
+    /// hold the table itself: a Lua table never leaves the VM that made it.
+    pub fn with_script<R>(
+        &self,
+        id: u32,
+        name: &str,
+        f: impl FnOnce(&Lua, &Table) -> mlua::Result<R>,
+    ) -> mlua::Result<Option<R>> {
+        let Some(lua) = &self.lua else {
+            return Ok(None);
+        };
+        find(lua, id, name)?.map(|t| f(lua, &t)).transpose()
+    }
+}
