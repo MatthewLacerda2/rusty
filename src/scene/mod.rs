@@ -57,6 +57,8 @@ pub use camera::{
     camera_for_entity, game_camera_from_scene, sync_lens_from_scene, Camera, ScreenPoint,
 };
 pub use identity::SceneId;
+// The editor compares the live scene with its file (#1340); a player never does.
+#[cfg(feature = "editor")]
 pub(crate) use io::scene_json;
 pub use io::{
     build_default_scene, bundled, load_from_file, read_scene_file, save_lighting, save_to_file,
