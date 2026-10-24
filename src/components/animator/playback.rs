@@ -24,8 +24,8 @@ pub enum Motion<'a> {
 
 /// How one motion's playhead moves this step: playhead units per second of
 /// play (`1` for a clip, `1 / blended length` for a tree) and the length it wraps
-/// at when looping (the clip's duration, `1` for a tree; non-positive: unknown,
-/// never wrap).
+/// at when looping, or clamps to when not (the clip's duration, `1` for a tree;
+/// non-positive: unknown, neither).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Playhead {
     pub per_second: f32,
@@ -54,8 +54,9 @@ pub struct Playback {
     /// Playhead: clip seconds, or a tree's normalized phase.
     #[serde(default)]
     pub time: f32,
-    /// Loop the current motion: the playhead wraps instead of running past the
-    /// end (where the sampler holds the last frame). Persists across
+    /// Loop the current motion: the playhead wraps instead of stopping at the
+    /// end. Without it the playhead is clamped to the motion's length (#1362), so
+    /// the pose holds the last frame and reversing moves back at once. Persists across
     /// `play`/`crossfade`, like `speed` (#313).
     #[serde(default)]
     pub loop_clip: bool,
@@ -187,11 +188,14 @@ impl Playback {
 
     /// Advance the playheads by `dt` seconds at `speed × node_speed`: the current
     /// one by `current`, wrapping when looping (a pure `rem_euclid`, so the fixed
-    /// timestep stays deterministic); the outgoing one at `previous_per_second`,
-    /// never wrapping. The crossfade itself runs on unscaled `dt` and, once done,
-    /// drops the outgoing motion. Returns the current playhead's travel this step,
-    /// `(from, to)` before any wrap — what animation events (#459) are crossed
-    /// against.
+    /// timestep stays deterministic) and otherwise clamped to `[0, wrap]` (#1362),
+    /// so reversing from past an end moves back at once; the outgoing one at
+    /// `previous_per_second`, never wrapping. The crossfade itself runs on unscaled
+    /// `dt` and, once done, drops the outgoing motion. Returns the current
+    /// playhead's travel this step, `(from, to)` before any wrap or clamp — what
+    /// animation events (#459) are crossed against. A clamped playhead already
+    /// resting on the end it is pushed against travels nothing, so a marker there
+    /// fires once per pass, not every step.
     pub fn advance(
         &mut self,
         dt: f32,
@@ -200,12 +204,15 @@ impl Playback {
         previous_per_second: f32,
     ) -> (f32, f32) {
         let step = dt * speed * self.node_speed;
-        let from = self.time;
-        self.time += step * current.per_second;
-        let to = self.time;
-        if self.loop_clip && current.wrap > 0.0 {
-            self.time = self.time.rem_euclid(current.wrap);
-        }
+        let clamp = (!self.loop_clip && current.wrap > 0.0).then_some(current.wrap);
+        let from = clamp.map_or(self.time, |end| self.time.clamp(0.0, end));
+        // Held finite, so a huge speed can't push the playhead to `inf`.
+        let to = (from + step * current.per_second).clamp(f32::MIN, f32::MAX);
+        self.time = match clamp {
+            Some(end) => to.clamp(0.0, end),
+            None if self.loop_clip && current.wrap > 0.0 => to.rem_euclid(current.wrap),
+            None => to,
+        };
         if self.is_crossfading() {
             self.previous_time += step * previous_per_second;
             self.crossfade_elapsed += dt;
@@ -213,7 +220,13 @@ impl Playback {
                 self.end_crossfade();
             }
         }
-        (from, to)
+        let pinned =
+            clamp.is_some_and(|end| (from >= end && to > from) || (from <= 0.0 && to < from));
+        if pinned {
+            (from, from)
+        } else {
+            (from, to)
+        }
     }
 
     fn set_current(&mut self, motion: Motion<'_>) {
