@@ -32,7 +32,8 @@ replayed exactly:
 ```text
 assets/          the game: scenes/, scripts/, prefabs/, models/, textures/,
                  audio/, materials/, shaders/
-project.rusty    engine-owned: the engine commit and the build settings
+project.rusty    engine-owned: the engine commit, its place in history, and the
+                 build settings
 scenarios/       headless play-tests (optional)
 cache/  saved/   regenerable output and save data, ignored by git
 CLAUDE.md        the game's rules: yours
@@ -50,6 +51,26 @@ Every path the game stores is **relative to the project root**, `/`-separated
   later installed).
 - **Test content is primitive**: greybox levels and fixtures from cubes, planes and
   capsules, not authored art.
+
+## After an engine upgrade
+
+Every merge to the engine's `main` is a new engine, and the engine keeps **no
+backward compatibility**: an upgrade may break the game, by design, and the game
+is what moves. Opening the project with a newer engine doesn't ask; it records the
+new engine in `project.rusty` and logs one engine warning:
+
+```text
+[Project] upgraded from engine <old> to <new>; what changed: git -C <engine> log --oneline <old>..<new>
+```
+
+Where you find it: `session-mcp --project` returns it in the first call's
+`engine warnings:` block; `bench_open` answers with it as `upgrade` (embed and attach
+mode alike); the editor shows it in its console, and every binary prints it on
+stderr.
+
+Run that `git log`, read what changed, and bring the game up to date (scenes,
+scripts, prefabs) before carrying on. Only an **older** engine, or a branch build,
+warns and asks before it opens.
 
 ## Play-testing headlessly
 

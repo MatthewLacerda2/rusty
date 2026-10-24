@@ -37,7 +37,8 @@ pub fn new_project_dir(parent: &Path, name: &str) -> Result<PathBuf, String> {
 }
 
 /// Whether an existing folder may be opened: `Err` when it is not a project, else
-/// the engine warning to confirm first (`None` when the engines match).
+/// the engine warning to confirm first (`None` unless a newer engine or a branch
+/// build last opened it: an upgrade needs no confirming, #1319).
 pub fn check_existing(dir: &Path) -> Result<Option<String>, String> {
     if !dir.is_dir() {
         return Err(format!("{} does not exist", dir.display()));
@@ -87,8 +88,8 @@ impl Bench {
     }
 
     /// *Open*: check `dir` is a project ([`check_existing`]) and put it at the top of
-    /// the list. Returns its root and the engine warning, if another engine last
-    /// opened it. Nothing in the folder is written.
+    /// the list. Returns its root and the engine warning, if a newer engine or a
+    /// branch build last opened it. Nothing in the folder is written.
     pub fn open(&mut self, dir: &Path, now: u64) -> Result<(PathBuf, Option<String>), String> {
         let warning = check_existing(dir)?;
         let root = canonical(dir);

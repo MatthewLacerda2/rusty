@@ -3,7 +3,7 @@
 use std::cell::RefCell;
 
 use super::*;
-use crate::core::project::{engine_commit, ProjectFile, PROJECT_FILE, UNKNOWN_COMMIT};
+use crate::core::project::{pin_engine, ProjectFile, PROJECT_FILE};
 
 /// Attach mode's shape: evaluates nothing, cannot move to another project.
 struct Window;
@@ -89,24 +89,35 @@ fn attach_mode_answers_with_the_relaunch_command() {
 }
 
 #[test]
-fn another_engines_project_opens_only_when_confirmed() {
+fn an_older_engines_project_opens_only_when_confirmed() {
     let dir = fresh("mismatch");
     let file = ProjectFile {
         engine_commit: "0123456789abcdef0123456789abcdef01234567".to_string(),
+        engine_order: Some(7),
         ..ProjectFile::default()
     };
     file.write(&dir.join(PROJECT_FILE)).unwrap();
+    pin_engine("fedcba9876543210fedcba9876543210fedcba98", Some(6));
     let mut bench = Bench::at(None);
     let asked = run(&Window, &mut bench, "bench_open", json!({ "path": dir }));
-    if engine_commit() == UNKNOWN_COMMIT {
-        assert!(asked.is_ok(), "a build without git can't compare");
-        return;
-    }
     assert!(asked.unwrap_err().contains("confirm: true"));
     assert!(bench.recent.projects.is_empty(), "nothing opened");
     let args = json!({ "path": dir, "confirm": true });
     let opened = run(&Window, &mut bench, "bench_open", args).unwrap();
     assert!(opened["warning"].is_string());
+    assert_eq!(opened["upgrade"], Value::Null, "an older engine");
+    pin_engine("fedcba9876543210fedcba9876543210fedcba98", Some(8));
+    let upgraded = run(&Window, &mut bench, "bench_open", json!({ "path": dir })).unwrap();
+    assert_eq!(
+        upgraded["warning"],
+        Value::Null,
+        "a newer engine just opens"
+    );
+    let upgrade = upgraded["upgrade"].as_str().unwrap_or_default();
+    assert!(
+        upgrade.starts_with("upgraded from engine 0123"),
+        "{upgrade}"
+    );
 }
 
 /// Embed mode's shape, minus the move: records the root `bench_open` hands it. The
@@ -130,10 +141,12 @@ impl EvalBackend for Mover {
 fn embed_mode_hands_the_opened_root_to_the_backend() {
     let dir = fresh("embed");
     let mut bench = Bench::at(None);
+    pin_engine("0123456789abcdef0123456789abcdef01234567", Some(7));
     let root = bench.create(&dir, "Horde", 1).unwrap();
     let mover = Mover::default();
     let opened = run(&mover, &mut bench, "bench_open", json!({ "path": root })).unwrap();
     assert_eq!(opened["opened"], json!(true));
+    assert_eq!(opened["upgrade"], Value::Null, "the same engine");
     assert_eq!(opened["root"], json!(root));
     assert_eq!(mover.0.take(), Some(root.clone()));
     assert_eq!(bench.recent.projects[0].path, root);

@@ -58,9 +58,11 @@ tools, so an agent manages projects without the window. They share the picker's 
   *New Project*: the same checks (a plain name, an empty or new folder) and the same
   skeleton and `project.rusty`. It goes to the top of the list but is not opened.
 - `bench_open` — open the project at `path` (one holding `project.rusty` or
-  `assets/`). One last opened by a different engine is reported in-band instead of
-  opened; call again with `confirm: true` to open it anyway (the picker's *Open
-  anyway*). In **embed** mode the bridge then drives that project: like Unity's *Open
+  `assets/`). One last opened by a newer engine, or by a branch build, is reported
+  in-band instead of opened; call again with `confirm: true` to open it anyway (the
+  picker's *Open anyway*). A project an older engine last opened opens at once: an
+  engine upgrade, which the answer's `upgrade` reports (the line naming the `git log`
+  of what changed; `null` otherwise, in both modes). In **embed** mode the bridge then drives that project: like Unity's *Open
   Project*, the current one closes (unsaved scene edits are lost) and a fresh session
   boots on the new root's default scene, exactly as `--project <path>` would. In
   **attach** mode the window can't change project from here, so the answer carries
@@ -78,9 +80,10 @@ call ran (an asset it skipped, a mesh collider it dropped), the `eval` or `snaps
 result carries a **second text block** after the answer, starting `engine warnings:`
 with one warning per line; the first block stays the answer, so a snapshot's JSON
 still parses. Headless, it holds everything raised since the previous call (the first
-call also gets what the boot raised); attached to a window, what was raised while
-that call's line was evaluated, the rest showing in the window's console. A warning
-that repeated in a row is shown once with its count, `… (×3)`.
+call also gets what the boot raised, `--project`'s engine upgrade line among it);
+attached to a window, what was raised while that call's line was evaluated, the rest
+showing in the window's console. A warning that repeated in a row is shown once with
+its count, `… (×3)`.
 
 **Resources** (`resources/list`, `resources/read`):
 
