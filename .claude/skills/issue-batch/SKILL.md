@@ -33,7 +33,9 @@ avoid:
 - `src/app/registry.rs`'s `build()`, where order *is* execution order, so a merge
   that reorders it changes behaviour silently;
 - `docs/api/index.md`, `docs/api/Scene.md`'s component list,
-  `docs/api-faithfulness.md`;
+  `docs/api-faithfulness.md`,
+  `docs/linting.md` (a rule's table row and section; both are kept sorted under
+  markers, so two rules land on different lines);
 - `Cargo.toml` / `Cargo.lock`: one owner per wave. Name the owner in every
   sibling's brief ("stay out of `Cargo.toml`"); the watch holds a second one
   anyway (#969).
