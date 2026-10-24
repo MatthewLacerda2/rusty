@@ -29,6 +29,14 @@ pub(crate) enum TextureKind {
 }
 
 impl TextureKind {
+    /// How a warning names the kind.
+    pub(crate) fn name(self) -> &'static str {
+        match self {
+            Self::Colour => "colour",
+            Self::Data => "data",
+        }
+    }
+
     /// The view format a level of this kind is read and written through: the
     /// sRGB one averages in linear light, the raw one averages the bytes.
     pub(crate) fn view_format(self) -> wgpu::TextureFormat {

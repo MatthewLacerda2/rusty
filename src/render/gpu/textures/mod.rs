@@ -1,4 +1,5 @@
 pub(crate) mod freshness;
+pub(crate) mod kind_watch;
 pub(crate) mod mips;
 mod panorama;
 mod sampler;
@@ -101,10 +102,12 @@ impl Renderer {
 
     /// [`Self::load_texture`] for a texture holding `kind`, which decides how its
     /// mips average. The first load of a file decides it: the cache keeps one
-    /// upload per file.
+    /// upload per file, and a later request of the other kind warns once
+    /// ([`kind_watch::KindWatch`]).
     pub(crate) fn load_texture_as(&mut self, map: &MapRef, kind: TextureKind) -> Rc<GpuTexture> {
         let path_str = map.as_str();
         if let Some(tex) = self.gpu_textures.get(path_str) {
+            self.texture_kinds.requested(path_str, kind, "material");
             return Rc::clone(tex);
         }
         if self.texture_freshness.is_miss(path_str) {
@@ -123,6 +126,7 @@ impl Renderer {
         };
         let import = import_settings(map);
         let tex = self.upload_image_texture(path_str, &img, &import, kind);
+        self.texture_kinds.uploaded(path_str, kind);
         self.gpu_textures.insert(map.clone(), Rc::clone(&tex));
         tex
     }

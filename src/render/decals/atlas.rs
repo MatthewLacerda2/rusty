@@ -20,6 +20,7 @@ use image::imageops::FilterType;
 use super::record::NO_LAYER;
 use crate::asset::MapRef;
 use crate::core::fs::freshness::Freshness;
+use crate::render::gpu::textures::kind_watch::KindWatch;
 use crate::render::gpu::textures::{TextureKind, Uploader};
 
 /// The side of one layer, in texels.
@@ -44,6 +45,8 @@ pub(crate) struct DecalAtlas {
     pub sampler: wgpu::Sampler,
     /// Which layer holds each loaded map.
     slots: HashMap<MapRef, u32>,
+    /// What each loaded map was uploaded as (#1416).
+    kinds: KindWatch,
 }
 
 impl DecalAtlas {
@@ -64,6 +67,7 @@ impl DecalAtlas {
             data_view,
             sampler,
             slots: HashMap::new(),
+            kinds: KindWatch::default(),
         }
     }
 
@@ -84,6 +88,7 @@ impl DecalAtlas {
     ) -> bool {
         let mut fresh: Vec<(&MapRef, TextureKind)> = Vec::new();
         for &(path, kind) in maps {
+            self.kinds.requested(path.as_str(), kind, "decal");
             let known = self.slots.contains_key(path) || misses.is_miss(path.as_str());
             if !known && !fresh.iter().any(|&(p, _)| p == path) {
                 fresh.push((path, kind));
@@ -114,6 +119,7 @@ impl DecalAtlas {
                 Some(img) => {
                     upload(queue, &self.texture, layer, img.to_rgba8());
                     mips.generate_layer(device, queue, (&self.texture, layer), kind);
+                    self.kinds.uploaded(path.as_str(), kind);
                     self.slots.insert(path.clone(), layer);
                 }
                 None => {
