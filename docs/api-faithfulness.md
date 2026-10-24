@@ -54,6 +54,7 @@ per-module unit tests (e.g. `api/light.rs`) are the pattern.
 |---|---|---|
 | `SetMetallic` | ✅ | renderer — `draw_resources::solid_entity_uniform` packs `metallic` into `EntityUniform`; `shader.wgsl` PBR uses it |
 | `SetRoughness` | ✅ | renderer — same path, `roughness` uniform |
+| `SetColor` | ✅ | renderer — writes `base_color` through `authoring::material::set_base_color`, the inspector's op; `draw::uniforms::solid_entity_uniform` packs it as `EntityUniform.color_tint`, and `shader.wgsl` multiplies the albedo by it (#1368) |
 | `SetTexture` | ✅ | renderer — `draw::upload_scene_assets` calls `load_texture(path)` for every active entity **each frame**, and `draw_resources::build_solid_resource` binds `gpu_textures[path]`. A runtime path change loads + binds next frame. (This is the issue's "canonical no-op"; it is **wired** in the current renderer.) Round-trips. |
 | `SetMetallicMap` | ✅ | renderer — `draw::upload_scene_assets` loads the map, `draw_resources::build_solid_resource` assembles the per-entity group(2) material bind group, and `shader.wgsl` samples `t_metallic` (`.b` channel) × the metallic scalar (#202, closed #184) |
 | `SetRoughnessMap` | ✅ | renderer — same path; `shader.wgsl` samples `t_roughness` (`.g` channel) × the roughness scalar (#202, closed #184) |
@@ -160,6 +161,9 @@ re-bake reflects it) and, at the bake itself, in `src/navigation/bake/tests/sett
 | `AddForceAtPosition` / `AddImpulseAtPosition` | ✅ | sim — `physics/joints/ragdoll.rs::impulse_response` turns the push into `velocity` / `angular_velocity` (read above) from the body's mass properties (`src/physics/live_tests.rs`, `tests/ragdoll/fall.rs`) |
 | `SetKinematic` | ✅ | sim — `physics/shape/build.rs::class_of`; a mid-play switch reaches rapier through `physics/live.rs::body_type` in `world.rs::apply_body_state` (`set_kinematic_mid_play_stops_and_restarts_a_falling_body`) |
 | `SetCollisionDetection` | ✅ | sim — `physics/shape/build.rs::ccd_enabled` / `world.rs` `enable_ccd` (proven by `physics/ccd_tests.rs`: against a moving wall Discrete tunnels, Continuous stops; a static wall stops both since rapier 0.36, #754) |
+| `SetMass` | ✅ | sim — through `authoring::rigidbody::set_mass` (the card's clamp); `physics/live.rs::sync_masses` spreads it over the body's solid colliders each step (`a_rigidbody_mass_is_the_body_mass_whatever_its_size`, #1365) |
+| `SetUseGravity` | ✅ | sim — through `authoring::rigidbody::set_use_gravity`; `world.rs::apply_body_state` re-applies the gravity scale each step and wakes the body (`tests/physics/gravity.rs`, #1365) |
+| `SetTrigger` | ✅ | sim — through `authoring::collider::set_trigger`; built as rapier's sensor flag in `physics/assemble.rs`, and a mid-play change reaches it through `physics/live.rs::sync_sensors`, before `sync_masses` re-spreads the mass (`set_trigger_mid_play_turns_a_floor_into_a_trigger`, #1368) |
 
 (The #311 spatial query surface — `Raycast`'s siblings `SphereCast`,
 `OverlapSphere`/`OverlapBox`/`OverlapCapsule`, `CheckSphere`/`CheckBox`,
@@ -278,7 +282,7 @@ change.)
 |---|---|---|
 | `Play` | ✅ | platform (`AudioMaestro::play_source` → backend voice) + introspection log; the `AudioSource` it reads round-trips |
 | `Stop` | ✅ | platform — drops the live voice; logs a Stop event |
-| `SetVolume` | ✅ | platform — re-folds the live voice's gain (master × per-source) |
+| `SetVolume` | ✅ | `AudioSource.volume` through `authoring::audio::set_volume` (the inspector's op, clamped to `[0, 1]`), then platform — re-folds the live voice's gain (master × per-source); observable via `GetVolume` and round-trips (#1368) |
 | `PlayAt` | ✅ | platform (`play_at` one-shot) + introspection log — the log entry is the one-shot's only trace |
 | `SetMasterVolume` | ✅ | platform — re-folds every live voice; observable via `GetMasterVolume` |
 | `SetSpeakerMode` | ✅ | platform — re-sends every live voice shaped for the mode (headphones narrows pan) and retunes the device's output stage (TV compression); observable via `GetSpeakerMode`, persisted as `audio.speaker_mode` |

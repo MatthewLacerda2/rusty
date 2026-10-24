@@ -96,3 +96,48 @@ fn finds_an_op_reexported_from_a_folder_file() {
         ("src/scene/authoring/particles/render.rs", 2)
     );
 }
+
+#[test]
+fn counts_a_setter_imported_by_name_and_called_bare() {
+    let src = "use crate::scene::authoring::rigidbody::{set_mass, set_kinematic as kin};\n\
+               fn f() { set_mass(r, 1.0); kin(r, true); }\n";
+    assert_eq!(
+        named(src),
+        ["rigidbody::set_kinematic", "rigidbody::set_mass"]
+    );
+}
+
+#[test]
+fn an_allow_in_a_reexported_file_excuses_its_op_and_can_go_stale() {
+    let fx = BTreeMap::from([
+        (
+            "src/scene/authoring/particles/mod.rs".to_string(),
+            "pub use render::*;\n",
+        ),
+        (
+            "src/scene/authoring/particles/render.rs".to_string(),
+            "// lint: allow(api-parity) a preview toggle\npub fn set_blend() {}\n",
+        ),
+    ]);
+    let ed = set(&["particles::set_blend"]);
+    assert!(check(&ed, &set(&[]), &fx).is_empty());
+    let stale = check(&ed, &ed, &fx);
+    assert_eq!((stale.len(), stale[0].line), (1, 1));
+    assert!(stale[0]
+        .message
+        .contains("`particles::set_blend`: Lua reaches it"));
+}
+
+#[test]
+fn a_trailing_allow_excuses_and_goes_stale() {
+    let src = "pub fn set_mass() {} // lint: allow(api-parity) a display toggle\n";
+    let ed = ["rigidbody::set_mass"];
+    assert!(findings(&ed, &[], src).is_empty());
+    assert_eq!(findings(&ed, &ed, src), [(1, true)]);
+}
+
+#[test]
+fn an_op_with_no_definition_says_so() {
+    let f = check(&set(&["ghost::set_x"]), &set(&[]), &BTreeMap::new());
+    assert!(f[0].message.contains("not found"), "{}", f[0].message);
+}

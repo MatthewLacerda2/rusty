@@ -31,7 +31,9 @@ file is what a coder changing the tool must keep.
   the sorted `RULES` table (#911), so parallel rule branches touch different lines:
   no new flag, gate, CI step or baseline. Its row says `Allow::Inline` when an inline
   allow may excuse it, `Allow::Never` when nothing may: `ignored` is the one, because
-  its fix is the `.gitignore` pattern.
+  its fix is the `.gitignore` pattern. `Allow::Own` is for a rule that reads its own
+  allows, so the shared filter is skipped: `api-parity`, whose allow sits on the op
+  rather than on the finding's cause, and must be reported when it goes stale.
 - **Signals print and never fail.** What CLAUDE.md only says to *aim* for (≲10 files
   per directory) prints under `signal (not a failure)` after the findings and leaves
   the exit code alone. It becomes a finding only with the decision that makes it a

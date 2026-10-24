@@ -210,13 +210,17 @@ new flag, gate, CI step or baseline.
   `api::component`'s field tables (`op!("mass", rb::set_mass)`, which `Component.Set`
   dispatches through), so editor and Lua share one validation. Ops are matched by
   path: each file's `use crate::scene::authoring::…` trees give its aliases
-  (`rigidbody as rb`, `{self as ops, …}`, `nav::{agent, …}`), so the finding names
-  `nav::agent::set_speed` however a file spells it. An op only the inspector may write
-  (a display toggle) takes `// lint: allow(api-parity) <why>` above its `fn`; the
-  rule reads its own allows, so one on an op Lua reaches, or that no inspector
-  names, fails as stale. A line scan (`rules/api_parity.rs`): an op Lua reaches only
-  through a helper in another module reads as unreached; call the op from the
-  binding instead.
+  (`rigidbody as rb`, `{self as ops, …}`, `nav::{agent, …}`, a setter imported by
+  name and called bare), so the finding names `nav::agent::set_speed` however a file
+  spells it. An op only the inspector may write (a display toggle) takes
+  `// lint: allow(api-parity) <why>` above its `fn` or trailing it; the rule reads its
+  own allows (`Allow::Own`), matching each to the op defined below it (so one in a
+  re-exported sub-file such as `particles/render.rs` counts), and one on an op Lua
+  reaches, or that no inspector names, fails as stale. A line scan
+  (`rules/api_parity.rs`) with two blind spots: a glob import (`use …::rigidbody::*`)
+  and an op reached only through a helper in another module. On the API side that
+  reads as unreached (call the op from the binding instead); on the **editor side
+  the rule fails open**: an op the inspector writes that way is never asked about.
 - **`asset-write`** (#1220) — a file a path-keyed cache reads is written through
   `core::fs::written::write`, or its writer calls `note_written` after (#1207).
   A non-test line of `src/` outside `src/core/fs/` calling `fs::write(`,

@@ -6,20 +6,27 @@
 //! `src/editor/` names is also named from `src/api/`, either called by a named setter
 //! or listed in `api::component`'s `op!`/`with!`/`group!` tables (a table entry names
 //! the op as a path, which counts the same). An op the inspector alone may write (a
-//! display toggle) says why at its `fn` with `// lint: allow(api-parity) <why>`, and
-//! an allow on an op that is reached, or that no inspector names, is itself a
-//! finding: the rule reads its own allows (`Allow::Own`), so a stale one can't hide.
+//! display toggle) says why at its `fn` with `// lint: allow(api-parity) <why>`, above
+//! it or trailing it, and an allow on an op that is reached, or that no inspector
+//! names, is itself a finding: the rule reads its own allows (`Allow::Own`), so a
+//! stale one can't hide. An allow is matched to its op by where the op is defined,
+//! so one in a re-exported sub-file (`particles/render.rs`) counts.
 //!
 //! A line scan, not a parser, with known limits:
 //! - an op is matched by path: `use crate::scene::authoring::…` trees give each
-//!   file's aliases (`rigidbody as rb`, `{self as ops, …}`, `nav::{agent, …}`), and
-//!   `alias::…::set_x` or `crate::scene::authoring::…::set_x` names the op;
-//! - an op reached only through a helper in another module is not seen as reached;
+//!   file's aliases (`rigidbody as rb`, `{self as ops, …}`, `nav::{agent, …}`,
+//!   `rigidbody::{set_mass}`), and `alias::…::set_x`, a bare imported `set_x` (or its
+//!   `as` name), or `crate::scene::authoring::…::set_x` names the op;
+//! - a glob import (`use …::rigidbody::*`) and an op reached only through a helper
+//!   in another module are not seen. On the API side that is a false finding; on
+//!   the editor side the rule **fails open**: an op the inspector writes that way is
+//!   never asked about;
 //! - test code is not scanned.
 
 use super::finding::{allowed, Finding};
 use super::scan::Scan;
 use crate::code::{code_lines, is_ident};
+use crate::layers::flatten_use;
 use std::collections::{BTreeMap, BTreeSet};
 
 pub const RULE: &str = "api-parity";
@@ -56,41 +63,47 @@ pub fn check(
     authoring: &BTreeMap<String, &str>,
 ) -> Vec<Finding> {
     let mut found = Vec::new();
+    let finding = |path: String, line: usize, message: String| Finding {
+        path,
+        line,
+        rule: RULE,
+        message,
+    };
     for op in editor.difference(api) {
-        let (path, line) = definition(op, authoring).unwrap_or_default();
-        if path.is_empty() || !allowed(authoring[&path], line, RULE) {
-            found.push(Finding {
-                path: if path.is_empty() {
-                    AUTHORING.into()
-                } else {
-                    path
-                },
-                line: line.max(1),
-                rule: RULE,
-                message: format!(
-                    "the inspector writes through `authoring::{op}` and no Lua binding \
-                     reaches it: add an `op!` to `api::component`'s table or a named \
-                     setter, or say why it is editor-only (docs/linting.md)"
-                ),
-            });
+        let fix = "add an `op!` to `api::component`'s table or a named setter, or say \
+                   why it is editor-only (docs/linting.md)";
+        let msg = |s: &str| {
+            format!("the inspector writes through `authoring::{op}`{s} and no Lua binding reaches it: {fix}")
+        };
+        match definition(op, authoring) {
+            Some((path, line)) if !allowed(authoring[&path], line, RULE) => {
+                found.push(finding(path, line, msg("")));
+            }
+            Some(_) => {}
+            None => found.push(finding(
+                AUTHORING.into(),
+                1,
+                msg(" (its `fn` is not found under src/scene/authoring/)"),
+            )),
         }
     }
     for (path, source) in authoring {
-        for (line, name) in allows(source) {
-            let op = format!("{}::{name}", module_of(path));
-            let why = if !editor.contains(&op) {
-                "no inspector writes through it"
-            } else if api.contains(&op) {
-                "Lua reaches it"
-            } else {
-                continue;
+        for (line, at, name) in allows(source) {
+            let here = Some((path.clone(), at));
+            let op = editor
+                .iter()
+                .chain(api)
+                .find(|op| definition(op, authoring) == here);
+            let why = match op {
+                _ if name.is_empty() => "it sits on no `set_*` fn",
+                None => "no inspector writes through it",
+                Some(op) if !editor.contains(op) => "no inspector writes through it",
+                Some(op) if api.contains(op) => "Lua reaches it",
+                Some(_) => continue,
             };
-            found.push(Finding {
-                path: path.clone(),
-                line,
-                rule: RULE,
-                message: format!("stale `lint: allow({RULE})` on `{op}`: {why}; remove it"),
-            });
+            let op = op.cloned().unwrap_or_else(|| join(&module_of(path), &name));
+            let msg = format!("stale `lint: allow({RULE})` on `{op}`: {why}; remove it");
+            found.push(finding(path.clone(), line, msg));
         }
     }
     found
@@ -105,10 +118,23 @@ pub fn ops_named(source: &str, test: &[bool]) -> BTreeSet<Op> {
         .collect();
     let text = live.join("\n");
     let aliases = aliases(&text);
-    paths(&text)
+    let is_op = |path: &str| {
+        path.rsplit("::")
+            .next()
+            .is_some_and(|l| l.starts_with("set_"))
+    };
+    let bare: BTreeSet<&str> = aliases
+        .iter()
+        .filter(|(_, path)| is_op(path))
+        .map(|(name, _)| name.as_str())
+        .collect();
+    paths(&text, &bare)
         .into_iter()
         .filter_map(|segs| {
             let (head, rest) = segs.split_first()?;
+            let Some((tail, _)) = rest.split_last() else {
+                return aliases.get(head).cloned();
+            };
             let base = match aliases.get(head.as_str()) {
                 Some(base) => base.clone(),
                 None if segs.join("::").starts_with(&format!("{ROOT}::")) => {
@@ -120,7 +146,7 @@ pub fn ops_named(source: &str, test: &[bool]) -> BTreeSet<Op> {
                 [first, ..] if first == "crate" => base,
                 _ => join(&base, &rest[..rest.len() - 1].join("::")),
             };
-            Some(join(&base, &segs[segs.len() - 1]))
+            Some(join(&base, tail))
         })
         .collect()
 }
@@ -134,16 +160,15 @@ fn join(a: &str, b: &str) -> String {
 }
 
 /// Each name a `use` of `scene::authoring` binds, to its path under `authoring`
-/// (`""` for `authoring` itself).
+/// (`""` for `authoring` itself, `rigidbody::set_mass` for a setter by name).
 fn aliases(text: &str) -> BTreeMap<String, String> {
     let mut out = BTreeMap::new();
     let mut rest = text;
     while let Some(at) = rest.find("use crate::") {
         let after = &rest[at + 4..];
         let end = after.find(';').unwrap_or(after.len());
-        let mut leaves = Vec::new();
-        use_tree(&after[..end], "", &mut leaves);
-        for (path, name) in leaves {
+        for (path, name) in flatten_use(&after[..end]) {
+            let path = path.join("::");
             if path == ROOT || path.starts_with(&format!("{ROOT}::")) {
                 out.insert(name, path[ROOT.len()..].trim_start_matches("::").into());
             }
@@ -153,62 +178,9 @@ fn aliases(text: &str) -> BTreeMap<String, String> {
     out
 }
 
-/// The leaves of a use tree as (full path, the name it binds).
-fn use_tree(tree: &str, prefix: &str, out: &mut Vec<(String, String)>) {
-    let tree = tree.split_whitespace().collect::<Vec<_>>().join(" ");
-    for item in split_top(&tree) {
-        let item = item.trim();
-        if let Some(open) = item.find('{') {
-            let base = item[..open].trim().trim_end_matches("::");
-            let inner = item[open + 1..].trim_end().strip_suffix('}').unwrap_or("");
-            use_tree(inner, &join_path(prefix, base), out);
-            continue;
-        }
-        let (path, alias) = match item.split_once(" as ") {
-            Some((p, a)) => (p.trim(), Some(a.trim())),
-            None => (item, None),
-        };
-        let full = if path == "self" {
-            prefix.to_string()
-        } else {
-            join_path(prefix, path)
-        };
-        let name = alias.unwrap_or_else(|| full.rsplit("::").next().unwrap_or(""));
-        if !name.is_empty() && name != "_" {
-            out.push((full.clone(), name.to_string()));
-        }
-    }
-}
-
-fn join_path(a: &str, b: &str) -> String {
-    if a.is_empty() {
-        b.to_string()
-    } else {
-        format!("{a}::{b}")
-    }
-}
-
-/// `s` split at its top-level commas.
-fn split_top(s: &str) -> Vec<&str> {
-    let (mut depth, mut from, mut parts) = (0i32, 0, Vec::new());
-    for (at, c) in s.char_indices() {
-        match c {
-            '{' => depth += 1,
-            '}' => depth -= 1,
-            ',' if depth == 0 => {
-                parts.push(&s[from..at]);
-                from = at + 1;
-            }
-            _ => {}
-        }
-    }
-    parts.push(&s[from..]);
-    parts.into_iter().filter(|p| !p.trim().is_empty()).collect()
-}
-
 /// Every path in `text` whose last segment is `set_*`, as its segments, of two or
-/// more.
-fn paths(text: &str) -> Vec<Vec<String>> {
+/// more; and every lone `bare` name not called as a method.
+fn paths(text: &str, bare: &BTreeSet<&str>) -> Vec<Vec<String>> {
     let chars: Vec<char> = text.chars().collect();
     let mut out = Vec::new();
     let mut i = 0;
@@ -233,7 +205,9 @@ fn paths(text: &str) -> Vec<Vec<String>> {
             }
             j += 2;
         }
-        if segs.len() >= 2 && segs.last().is_some_and(|s| s.starts_with("set_")) {
+        let method = i > 0 && chars[i - 1] == '.';
+        let lone = segs.len() == 1 && !method && bare.contains(segs[0].as_str());
+        if lone || segs.len() >= 2 && segs.last().is_some_and(|s| s.starts_with("set_")) {
             out.push(segs);
         }
         i = j.max(i + 1);
@@ -253,10 +227,9 @@ fn module_of(path: &str) -> String {
 fn definition(op: &str, authoring: &BTreeMap<String, &str>) -> Option<(String, usize)> {
     let (module, name) = op.rsplit_once("::").unwrap_or(("", op));
     let dir = format!("{AUTHORING}{}", module.replace("::", "/"));
+    let dir = format!("{}/", dir.trim_end_matches('/'));
     let candidates = authoring.iter().filter(|(p, _)| {
-        module_of(p) == module
-            || p.strip_prefix(&format!("{dir}/"))
-                .is_some_and(|f| !f.contains('/'))
+        module_of(p) == module || p.strip_prefix(&dir).is_some_and(|f| !f.contains('/'))
     });
     let needle = format!("fn {name}(");
     candidates.into_iter().find_map(|(p, src)| {
@@ -265,24 +238,33 @@ fn definition(op: &str, authoring: &BTreeMap<String, &str>) -> Option<(String, u
     })
 }
 
-/// Each `lint: allow(api-parity)` in `source`, with the `set_*` fn it sits on.
-fn allows(source: &str) -> Vec<(usize, String)> {
+/// Each `lint: allow(api-parity)` in `source`: its line, the line of the item it
+/// excuses (the next one below a comment, or its own when it trails), and that
+/// item's `set_*` name (empty when it is no such fn).
+fn allows(source: &str) -> Vec<(usize, usize, String)> {
     let lines: Vec<&str> = source.lines().collect();
+    let code = code_lines(source);
     let marker = format!("lint: allow({RULE})");
     let mut out = Vec::new();
     for (i, l) in lines.iter().enumerate() {
-        if !l.contains(&marker) || !l.trim_start().starts_with("//") {
+        let code = code.get(i).map_or("", |c| c.as_ref());
+        if !l.contains(&marker) || code.contains(&marker) {
             continue;
         }
-        let item = lines[i..].iter().find(|l| {
-            let t = l.trim_start();
-            !t.starts_with("//") && !t.starts_with("#[")
+        let at = if code.trim().is_empty() {
+            let below = lines[i..].iter().position(|l| {
+                let t = l.trim_start();
+                !t.starts_with("//") && !t.starts_with("#[")
+            });
+            below.map_or(lines.len(), |n| i + n)
+        } else {
+            i
+        };
+        let name = lines.get(at).and_then(|l| {
+            let from = l.find("fn set_")? + 3;
+            Some(l[from..].chars().take_while(|c| is_ident(*c)).collect())
         });
-        let name = item.and_then(|l| {
-            let at = l.find("fn set_")? + 3;
-            Some(l[at..].chars().take_while(|c| is_ident(*c)).collect())
-        });
-        out.push((i + 1, name.unwrap_or_default()));
+        out.push((i + 1, at + 1, name.unwrap_or_default()));
     }
     out
 }
