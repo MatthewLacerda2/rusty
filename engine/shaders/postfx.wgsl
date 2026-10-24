@@ -12,6 +12,7 @@
 // `PostParams` lives in `common.wgsl` so authored postfx effects (#397) can bind it
 // too (binding 0) — they read the game time from it (#398).
 #import common::{PostParams, equirect_uv}
+#import fullscreen
 
 @group(0) @binding(0) var<uniform> params: PostParams;
 @group(0) @binding(1) var t_color: texture_2d<f32>;
@@ -32,10 +33,8 @@ struct VsOut {
 fn vs_fullscreen(@builtin(vertex_index) vid: u32) -> VsOut {
     // Oversized triangle covering the screen; UVs in [0,1].
     var out: VsOut;
-    let x = f32((vid << 1u) & 2u);
-    let y = f32(vid & 2u);
-    out.uv = vec2<f32>(x, y);
-    out.pos = vec4<f32>(x * 2.0 - 1.0, 1.0 - y * 2.0, 0.0, 1.0);
+    out.uv = fullscreen::uv(vid);
+    out.pos = fullscreen::triangle_down(vid);
     return out;
 }
 

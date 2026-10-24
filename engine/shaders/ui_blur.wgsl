@@ -6,6 +6,8 @@
 // resolution that halves each step — so a wide frosted-glass blur costs a fraction
 // of a gaussian. Fullscreen triangle; every read is by uv, sized from the source.
 
+#import fullscreen
+
 @group(0) @binding(0) var src: texture_2d<f32>;
 @group(0) @binding(1) var src_sampler: sampler;
 
@@ -17,10 +19,8 @@ struct VsOut {
 @vertex
 fn vs_full(@builtin(vertex_index) vid: u32) -> VsOut {
     var out: VsOut;
-    let x = f32((vid << 1u) & 2u);
-    let y = f32(vid & 2u);
-    out.uv = vec2<f32>(x, y);
-    out.pos = vec4<f32>(x * 2.0 - 1.0, 1.0 - y * 2.0, 0.0, 1.0);
+    out.uv = fullscreen::uv(vid);
+    out.pos = fullscreen::triangle_down(vid);
     return out;
 }
 

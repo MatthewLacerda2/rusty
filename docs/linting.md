@@ -27,6 +27,7 @@ agent can read exactly what failed.
 | Active in the hierarchy | `tools/lint -- --rules` (`active-self`) | **hard gate**: outside `src/ecs/`, no non-test line of `src/` calls `is_active_self(` — systems ask `World::is_active_in_hierarchy`, so an inactive parent hides its subtree; what shows or stores the own flag takes `// lint: allow(active-self) <why>` (#1363) |
 | One world space | `tools/lint -- --rules` (`world-space`) | **hard gate**: outside `ecs::world_space` and `components::transform`, no engine code line decomposes a matrix (`to_scale_rotation_translation`), names the retired `compute_world_matrix` / `world_matrix(` / `parent_world_matrix`, or folds a Transform over `ancestors(` — world space is read from `ecs::World`'s world API; test code is not scanned, and converting file data takes `// lint: allow(world-space) <why>` (#1196) |
 | Finite authoring floats | `tools/lint -- --rules` (`sanitize`) | **hard gate**: every `pub fn set_*` under `src/scene/authoring/` that takes an `f32` or a glam vector passes it to a `scene::authoring::sanitize` helper (or a sibling setter of its file), so NaN and `±inf` from Lua or the editor take the field's fallback and never reach a field; a value checked another way takes `// lint: allow(sanitize) <why>` (#1361) |
+| One fullscreen triangle | `tools/lint -- --rules` (`fullscreen-triangle`) | **hard gate**: no `.wgsl` under `engine/` but `fullscreen.wgsl` spells the triangle's `(i << 1u) & 2u`; `#import fullscreen` and call `fullscreen::triangle` / `uv` (#1370) |
 | No subprocesses | `tools/lint -- --rules` (`subprocess`) | **hard gate**: no line of `src/` names `std::process::Command` — the engine starts no other program but Blender, to convert a `.blend` while authoring; a real need takes `// lint: allow(subprocess) <why>` (#975) |
 | One name table per enum | `tools/lint -- --rules` (`named-enum`) | **hard gate**: no file of `src/` hand-writes both a parse (`fn parse(_: &str) -> Option<Self>` in an `impl T`, or a free `fn parse_*(_: &str) -> Option<T>`) and a name (`fn name`/`fn as_str(self) -> &'static str`, or a free `fn *_name(_: T) -> &'static str`) for one type, nor a `const`/`static` table of `(T, &str)` pairs — a script-facing enum declares its names once with `core::named_enum!`, which writes `ALL`, `name`, a case-insensitive `parse` and `Display`; a parse that does more takes `// lint: allow(named-enum) <why>` (#1329) |
 | Tagged engine warnings | `tools/lint -- --rules` (`log-tag`) | **hard gate**: every engine warning or error in `src/` (`log::warn!` / `log::error!`, an imported bare `warn!` / `error!`, `log!` at `Level::Warn`/`Level::Error`) opens its message with its module, `[Asset] …`, since those records reach the console and the session/MCP replies (#1139); a message that is not a literal takes `// lint: allow(log-tag) <why>` |
@@ -327,6 +328,16 @@ new flag, gate, CI step or baseline.
   `static`; and a bare `"/a/b"` expectation (test code is full of `/`-led JSON
   pointers): those use the same helper. A path that must keep its `/`, or a
   misfire, says why with `// lint: allow(slash-join) <why>`.
+- **`fullscreen-triangle`** (#1370) — the fullscreen triangle's vertex maths is
+  written once, in `engine/shaders/fullscreen.wgsl`. Any other `.wgsl` under
+  `engine/` whose code spells `(i << 1u) & 2u` is a finding (comments never count);
+  `#import fullscreen` and call `fullscreen::triangle`, `triangle_down` or `uv`.
+  The rule reads the shaders itself, since `Scan` holds only Rust, and applies the
+  inline allow to them (a reasonless one is reported under `allow`). WGSL inside
+  Rust strings is out of reach: `shadergen`'s postfx scaffold imports the module
+  like any shader, and a test fixture that must stand alone (`tests/gpu/`) is not
+  scanned. A shader that must stand alone says why with
+  `// lint: allow(fullscreen-triangle) <why>`.
 - **`asset-write`** (#1220) — a file a path-keyed cache reads is written through
   `core::fs::written::write`, or its writer calls `note_written` after (#1207).
   A non-test line of `src/` outside `src/core/fs/` calling `fs::write(`,

@@ -21,6 +21,7 @@ a `.wgsl` there too.** The root `CLAUDE.md` keeps the project-wide rules;
   it in with `#import "common"`. When two shaders need the same struct or function,
   move it into a module rather than pasting it (#1063 splits the forward shader this
   way).
+  The fullscreen triangle is one: `#import fullscreen`, and `make rules` flags a copy (#1370).
 - `render::gpu::shaders::ShaderRegistry` reads shaders from disk at runtime, so a
   shader edit needs no Rust rebuild.
 - wgpu, naga and naga_oil upgrade as a unit (`Cargo.toml`).

@@ -8,6 +8,8 @@
 //                the forward shader reads one texel per pixel.
 // The forward shader multiplies only its ambient/indirect terms by the result.
 
+#import fullscreen
+
 struct SsaoParams {
     inv_view_proj: mat4x4<f32>,
     view_proj: mat4x4<f32>,
@@ -28,8 +30,7 @@ var t_raw: texture_2d<f32>;
 
 @vertex
 fn vs_fullscreen(@builtin(vertex_index) i: u32) -> @builtin(position) vec4<f32> {
-    let uv = vec2<f32>(f32((i << 1u) & 2u), f32(i & 2u));
-    return vec4<f32>(uv * 2.0 - 1.0, 0.0, 1.0);
+    return fullscreen::triangle(i);
 }
 
 fn load_depth(px: vec2<i32>) -> f32 {
