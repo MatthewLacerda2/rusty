@@ -221,7 +221,7 @@ new flag, gate, CI step or baseline.
   and an op reached only through a helper in another module. On the API side that
   reads as unreached (call the op from the binding instead); on the **editor side
   the rule fails open**: an op the inspector writes that way is never asked about.
-  `src/scene/authoring/fields/` counts as the API side too: #1418 moves
+  `scene::authoring::fields` counts as the API side too: #1418 moves
   `Component.Set`'s field table there.
 - **`asset-write`** (#1220) — a file a path-keyed cache reads is written through
   `core::fs::written::write`, or its writer calls `note_written` after (#1207).
