@@ -21,6 +21,7 @@ inspect! {
         ro!("current_tree", PLAYBACK),
         ro!("time", PLAYBACK),
         op!("loop_clip", animator::set_looping),
+        ro!("ended", PLAYBACK),
         ro!("previous_clip", PLAYBACK),
         ro!("previous_tree", PLAYBACK),
         ro!("previous_time", PLAYBACK),
