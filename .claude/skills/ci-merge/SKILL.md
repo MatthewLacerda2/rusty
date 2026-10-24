@@ -273,7 +273,7 @@ incidents behind each):
   directory since #525, so on a fresh run it does; the check stays as the guard.
 
 It ignores what is not a gate: `main-health` (a `workflow_run` on `main`), `docs`,
-and the coverage and mutation workflows, none of which runs on a pull request
+the coverage, mutation and Windows (#1395) workflows, none of which runs on a pull request
 (#750). A job inside a gated run but outside its gate's `needs:` decides nothing:
 a `ci` run still in progress counts as settled once `ci-gate` has concluded
 (#555). Its own tests run as `make scripts`, a gate, and in `lint.yml`.

@@ -1,43 +1,34 @@
 name: windows
 # The Windows build+test as an informational signal (#741), not a gate. Windows
 # is a planned target, not a shipped one (CLAUDE.md, *Ships for macOS and Linux;
-# Windows comes later*), and this job was the long pole of every pull request
-# run, 2–3× the real gate, with the merge queue waiting on it. So it lives in
-# its own workflow: `ci-gate` never `needs:` it, and `mergeable.py` reads only
-# `ci` and `lint`, so a red or slow Windows run here never holds a merge.
+# Windows comes later*), so `ci-gate` never `needs:` it and `mergeable.py` reads
+# only `ci` and `lint`: a red or slow Windows run here never holds a merge.
 #
-# It still runs on every ready pull request touching code, so a Windows break
-# shows up beside the change that caused it; and nightly on `main`, where
-# `main-health.yml` files the issue when it fails to run or goes red — the same
-# path as the other signals. Not on `push`: the nightly covers `main`, and a
-# Windows run per merge held a runner for a check nothing waits on.
+# It runs nightly on `main`, where `main-health.yml` files the issue when it fails
+# to run or goes red, naming the commit range, and on `workflow_dispatch` for a
+# branch that touches paths or platform code (`gh workflow run windows.yml --ref
+# <branch>`, quoted in its PR). Not on pull requests (#1395): one run per ready PR
+# held about a third of the account's concurrent jobs during a batch, and the merge
+# queue's gating `ci`/`lint` runs sat queued behind a check nothing waits on. The
+# `slash-join` lint rule (#1332) catches the commonest Windows break before any run.
+# Not on `push` either: the nightly covers `main`.
 on:
-  pull_request:
-    types: [opened, reopened, synchronize, ready_for_review]
-    # The same `code` test ci.yml's `changes` job applies: everything but
-    # Markdown, with the scripting-API reference counted as code (#525). A
-    # skipped run is fine here — nothing requires this workflow.
-    paths:
-      - '**'
-      - '!**/*.md'
-      - 'docs/api/**'
   # Off the hour, and off ci.yml's 03:07 deny run.
   schedule:
     - cron: '37 3 * * *'
   workflow_dispatch:
 
-# As in ci.yml (#482): a new push to a pull request cancels its stale run; every
-# other event keeps its own group, so each finishes.
+# A branch dispatched again cancels its stale run, so one branch holds one Windows
+# runner; the nightly keeps its own group and always finishes.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: ${{ github.workflow }}-${{ github.event_name == 'workflow_dispatch' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'workflow_dispatch' }}
 
 jobs:
   # Same steps as ci.yml's `build-test-cross`; bash so Windows runs the same
-  # script. Drafts skip, as the gates do.
+  # script.
   build-test-windows:
     runs-on: windows-latest
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     env:
       # WARP is always there; require it (#489).
       RUSTY_REQUIRE_GPU: "1"

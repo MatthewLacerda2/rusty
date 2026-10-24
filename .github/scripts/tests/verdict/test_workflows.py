@@ -53,6 +53,14 @@ class Workflows(unittest.TestCase):
         first = (WORKFLOW_DIR / "windows.yml").read_text().splitlines()[0]
         self.assertEqual(first, "name: windows")
 
+    def test_windows_never_runs_on_pull_requests(self):
+        # #1395: a per-PR Windows run starved the merge queue's gating runs of
+        # runners. It runs nightly and on dispatch only.
+        text = (WORKFLOW_DIR / "windows.yml").read_text()
+        on = text[text.index("\non:\n") : text.index("\njobs:\n")]
+        self.assertNotIn("pull_request", on)
+        self.assertNotIn("push:", on)
+
     def test_macos_still_gates(self):
         # The other shipped platform: in `ci-gate`'s `needs:` and on its runner.
         self.assertIn("build-test-cross", gate_needs("ci.yml", "ci-gate"))
