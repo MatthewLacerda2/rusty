@@ -172,13 +172,19 @@ starts:
 - A looping clip fires each marker once per loop, across the wrap. A step long
   enough to loop twice fires it twice (at most 16 times per step).
 - A step (large `dt`, high speed) that skips over a marker still fires it, once.
-- A playhead that stands still (speed 0, `Pause`, `Stop`) fires nothing, even
-  parked on a marker.
+- A playhead that stands still (speed 0, `Pause`, `Stop`) fires no marker, even
+  parked on one. `"End"` is the exception, below: it can fire with no travel.
 - **`"End"`** fires automatically when a **non-looping** clip or blend tree
   reaches its end playing **forwards**: once per pass, since the playhead stops
   there. Reversing away from the end doesn't fire it; a new forward pass that
   reaches the end fires it again. It also fires for a clip started with
-  `Animator.Play`, outside any graph.
+  `Animator.Play`, outside any graph. Two cases fire it without forward travel,
+  even at speed 0 (#1386): a clip that resolved late (`Play` before the mesh
+  carrying it was attached) fires it once on the step its length becomes known
+  with the playhead already past it, with no marker replayed; and a
+  **zero-length** clip (a single-keyframe pose) fires it on its first step, as
+  Unity counts a zero-length state finished once evaluated. A zero-length
+  *looping* clip has nothing to wrap at and never ends.
 - On a **non-looping** motion, a marker at either end fires on arriving there
   and again on leaving it the other way (reversing from the end, or playing
   forwards from the start); resting on it fires nothing. A marker placed past

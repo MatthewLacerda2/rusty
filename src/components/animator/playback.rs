@@ -14,6 +14,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::asset::animation_graph::GraphNode;
 
+use super::playhead::{finite, Bounds, Playhead};
+
 /// What a playback plays: a clip by name, or the blend tree of the named graph
 /// node.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -22,70 +24,28 @@ pub enum Motion<'a> {
     Tree(&'a str),
 }
 
-/// How one motion's playhead moves this step: playhead units per second of
-/// play (`1` for a clip, `1 / blended length` for a tree) and the length it wraps
-/// at when looping, or clamps to when not (the clip's duration, `1` for a tree;
-/// non-positive: unknown, neither).
+/// What one [`Playback::advance`] did to the current playhead.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct Playhead {
-    pub per_second: f32,
-    pub wrap: f32,
+pub struct Step {
+    /// The playhead's travel, `(from, to)` before any wrap or clamp — what
+    /// animation events (#459) are crossed against. A clamped playhead already
+    /// resting on the end it is pushed against travels nothing, so a marker there
+    /// fires once per pass, not every step; nor does the step a clip's length
+    /// becomes known, since its unresolved run already crossed the markers (#1386).
+    pub span: (f32, f32),
+    /// A non-looping playhead reached its end this step, playing forwards or
+    /// standing still: once per pass, including the step a clip's length became
+    /// known with the playhead already past it, and a zero-length clip's first
+    /// (#1386). What fires the automatic `End` event.
+    pub end: bool,
 }
 
-impl Playhead {
-    /// A clip's playhead: seconds, wrapping at `duration`.
-    pub fn clip(duration: f32) -> Self {
+impl Step {
+    fn travel(from: f32, to: f32) -> Self {
         Self {
-            per_second: 1.0,
-            wrap: duration,
+            span: (from, to),
+            end: false,
         }
-    }
-
-    /// A blend tree's playhead: normalized, one cycle is `1`.
-    pub fn tree(per_second: f32) -> Self {
-        Self {
-            per_second,
-            wrap: 1.0,
-        }
-    }
-
-    /// How this playhead treats its length under `loop_clip` — the one decision
-    /// advancing, sampling and animation events all read (#1362).
-    pub fn bounds(self, loop_clip: bool) -> Bounds {
-        match (loop_clip, self.wrap > 0.0) {
-            (true, true) => Bounds::Wrap(self.wrap),
-            (false, true) => Bounds::Clamp(self.wrap),
-            (_, false) => Bounds::Open,
-        }
-    }
-}
-
-/// How a playhead treats its motion's length: wraps at it (looping), clamps to
-/// `[0, length]` (non-looping, #1362), or has none (unknown length).
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum Bounds {
-    Wrap(f32),
-    Clamp(f32),
-    Open,
-}
-
-impl Bounds {
-    /// `time` within these bounds (a pure `rem_euclid` when wrapping: deterministic).
-    pub fn apply(self, time: f32) -> f32 {
-        match self {
-            Bounds::Wrap(w) => time.rem_euclid(w),
-            Bounds::Clamp(end) => time.clamp(0.0, end),
-            Bounds::Open => time,
-        }
-    }
-}
-
-/// `x` held within `f32` range, NaN as `0` (a node's `speed: 0` × an infinite one).
-fn finite(x: f32) -> f32 {
-    if x.is_nan() {
-        0.0
-    } else {
-        x.clamp(f32::MIN, f32::MAX)
     }
 }
 
@@ -106,6 +66,10 @@ pub struct Playback {
     /// across `play`/`crossfade`, like `speed` (#313).
     #[serde(default)]
     pub loop_clip: bool,
+    /// A non-looping playhead has reached its end and rests there, so its next
+    /// steps don't fire `End` again; cleared when it leaves the end (#1386).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub ended: bool,
     /// The clip being faded *out* during a crossfade. `None` outside one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub previous_clip: Option<String>,
@@ -152,6 +116,7 @@ impl Default for Playback {
             current_tree: None,
             time: 0.0,
             loop_clip: false,
+            ended: false,
             previous_clip: None,
             previous_tree: None,
             previous_time: 0.0,
@@ -242,20 +207,19 @@ impl Playback {
     /// looping, otherwise clamped to `[0, wrap]` (#1362), so reversing from past an
     /// end moves back at once; the outgoing one at `previous_per_second`, never
     /// wrapping. Both stay finite whatever the speed. The crossfade itself runs on
-    /// unscaled `dt` and, once done, drops the outgoing motion. Returns the current
-    /// playhead's travel this step, `(from, to)` before any wrap or clamp — what
-    /// animation events (#459) are crossed against. A clamped playhead already
-    /// resting on the end it is pushed against travels nothing, so a marker there
-    /// fires once per pass, not every step.
+    /// unscaled `dt` and, once done, drops the outgoing motion.
     pub fn advance(
         &mut self,
         dt: f32,
         speed: f32,
         current: Playhead,
         previous_per_second: f32,
-    ) -> (f32, f32) {
+    ) -> Step {
         let step = finite(dt * speed * self.node_speed);
         let bounds = current.bounds(self.loop_clip);
+        // Past the end before any clamp: the clip's length was unknown while it
+        // ran on and is known now (#1386).
+        let late = matches!(bounds, Bounds::Clamp(end) if self.time > end);
         let from = finite(match bounds {
             Bounds::Clamp(end) => self.time.clamp(0.0, end),
             _ => self.time,
@@ -269,16 +233,27 @@ impl Playback {
                 self.end_crossfade();
             }
         }
-        let pinned = matches!(bounds, Bounds::Clamp(end)
-            if (from >= end && to > from) || (from <= 0.0 && to < from));
-        if pinned {
-            (from, from)
-        } else {
-            (from, to)
+        // A length that isn't known (or doesn't clamp) says nothing about the
+        // end: `ended` holds, so a clip that stops resolving for a step doesn't
+        // end (and fire its end markers) again once it resolves.
+        let Bounds::Clamp(end) = bounds else {
+            return Step::travel(from, to);
+        };
+        let resting = self.ended && from >= end;
+        let end_now = !self.ended && (late || (self.time >= end && to >= from));
+        self.ended = (self.ended || end_now) && self.time >= end;
+        // Pinned: a push against the end it rests on, a reverse push against the
+        // start, and the late step, whose travel the unresolved run already made,
+        // so a marker it crossed isn't replayed where it clamps onto the end.
+        let pinned = late || (resting && to > from) || (from <= 0.0 && to < from);
+        Step {
+            span: if pinned { (from, from) } else { (from, to) },
+            end: end_now,
         }
     }
 
     fn set_current(&mut self, motion: Motion<'_>) {
+        self.ended = false;
         match motion {
             Motion::Clip(clip) => {
                 self.current_clip = clip.to_string();
