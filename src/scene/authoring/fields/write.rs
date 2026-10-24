@@ -82,7 +82,7 @@ fn apply<C: Inspect>(
         .filter(|(k, v)| !skip.skips(k, v, &held))
         .map(|(k, v)| (k.clone(), v.clone()))
         .collect();
-    run_ops(draft, &changed, &mut |name, e| Err(format!("{name}: {e}")))
+    run_ops(draft, &changed, &mut |name, e| Err(named(name, e)))
 }
 
 /// The one walk over a component's fields, `Set`'s and a load's ([`super::hold`]):
@@ -125,10 +125,27 @@ pub(super) fn run_ops<C: Inspect>(
             Access::ReadOnly(_) => continue,
         };
         if let Err(e) = outcome {
-            refused(field.name, e)?;
+            // A group's error already names the part that failed (`Values::take`), so
+            // it goes on unprefixed: naming the group's first part would point at a
+            // field the caller never wrote.
+            let name = match field.access {
+                Access::Group(_) => "",
+                _ => field.name,
+            };
+            refused(name, e)?;
         }
     }
     Ok(())
+}
+
+/// `e`, prefixed with the field `name` that raised it (a group's error names its own
+/// part, so it comes with an empty `name`).
+pub(super) fn named(name: &str, e: String) -> String {
+    if name.is_empty() {
+        e
+    } else {
+        format!("{name}: {e}")
+    }
 }
 
 pub(super) fn serialized<C: Inspect>(c: &C) -> Result<Value, String> {

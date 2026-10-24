@@ -22,7 +22,7 @@ use serde_json::{Map, Value};
 use super::kinds::KINDS;
 use super::table::{Access, Field, Inspect};
 use super::value::same;
-use super::write::{run_ops, serialized};
+use super::write::{named, run_ops, serialized};
 use crate::components::Entity;
 use crate::ecs::World;
 
@@ -66,7 +66,10 @@ pub(super) fn hold<C: Inspect>(world: &mut World, id: u32, kind: &str) {
     }
     C::update(world, id, &mut |live| {
         let mut refused = |field: &str, e: String| {
-            log::warn!("[Scene] entity {id}: a loaded {kind}.{field} was kept as read: {e}");
+            log::warn!(
+                "[Scene] entity {id}: a loaded {kind} value was kept as read: {}",
+                named(field, e)
+            );
             Ok(())
         };
         if let Err(e) = hold_one(live, &mut refused) {

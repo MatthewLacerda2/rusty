@@ -3,7 +3,8 @@
 //! Converts between the runtime hecs-backed `Scene` and the serde `SceneData`
 //! document:
 //!   to_scene_data(&Scene)             -> SceneData   (read component VALUES out)
-//!   apply_scene_data(&mut Scene, ..)  -> ()          (rebuild the World)
+//!   apply_scene_data(&mut Scene, ..)  -> ()          (rebuild the World, holding loaded values)
+//!   apply_world_data(&mut Scene, ..)  -> ()          (rebuild from a Play snapshot, not held again)
 //!
 //! `SceneData` is the on-disk format: entity component values + scene settings,
 //! never baked GPU buffers. On load we rehydrate the non-serialized data —
@@ -138,7 +139,8 @@ pub fn apply_scene_data(scene: &mut Scene, data: SceneData) {
 }
 
 /// [`apply_scene_data`] for a document the World itself wrote (a Play snapshot):
-/// its values were held when they came in, so they are not held again.
+/// its values were held when they came in, so they are not held again (linked prefab
+/// instances still re-read their source, which holds it once more: no value changes).
 pub fn apply_world_data(scene: &mut Scene, data: SceneData) {
     apply(scene, data, false);
 }
