@@ -128,6 +128,9 @@ pub struct Scene {
     /// The write-log generation (`core::fs::written`) when the meshes were last read
     /// from a document: every note up to it is in them (#1242). Never serialized.
     pub meshes_read_at: u64,
+    /// The text the engine last read or wrote at this scene's file (#1340), so the
+    /// editor tells an outside change from its own write. Never serialized.
+    pub(in crate::scene) disk_text: crate::scene::io::DiskText,
 }
 
 impl Default for Scene {
@@ -157,6 +160,7 @@ impl Default for Scene {
             ui_time: 0.0,
             shader_overrides: Default::default(),
             meshes_read_at: 0,
+            disk_text: Default::default(),
         }
     }
 }

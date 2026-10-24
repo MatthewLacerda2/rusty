@@ -85,7 +85,12 @@ The editor picks up a file changed outside the engine without a restart, as Unit
 asset refresh does: a model re-exported from Blender, a texture saved from an image
 editor, a shader or a script edited elsewhere. It watches the project's `assets/`
 (and the engine's shaders) and reloads what changed on the next frame; a source
-re-converts there and then. A change made during Play waits for Stop. On a filesystem
+re-converts there and then. The open scene follows its file too, as long as it lies
+under `assets/` (the only scenes watched): the file on disk wins, so the scene reloads,
+and unsaved edits in the editor are discarded with a warning in the console, never a
+dialog. The editor's own Save and Generate Lighting are not outside changes, and Play
+refuses both, since the World then holds the play state. A change made during Play
+waits for Stop. On a filesystem
 that gives no change events (some network or container mounts), set
 `RUSTY_WATCH_POLL=1` and it compares the files every second instead. Only the editor
 watches: a headless or MCP-embedded session, and a shipped game, see an outside edit

@@ -16,10 +16,12 @@
 //!     #746; the seeds are embedded in the binary, `bundled`, #829).
 
 pub mod bundled;
+mod disk_text;
 mod lighting_block;
 mod manifest;
 mod seed;
 
+pub use disk_text::DiskText;
 pub use lighting_block::{save_lighting, LightingSave};
 pub use manifest::{SeedManifest, SeedOutcome, SEED_MANIFEST_PATH};
 pub use seed::{
@@ -35,15 +37,30 @@ pub const SCENE_EXTENSION: &str = "scene";
 
 /// Serialize the live scene's component VALUES to `path` (pretty JSON, no GPU
 /// buffers). Single active scene: this is the only persisted document.
+///
+/// Refused during Play, as Unity refuses it: the live World then holds the play
+/// state (moved enemies, spawned bullets), never the authored scene (#1340). The
+/// scene file has two writers, and both refuse: this one (the editor's File menu and
+/// Ctrl+S, `Scene.Save`) and [`save_lighting`] (Generate Lighting, `Lighting.Generate`).
 pub fn save_to_file(scene: &Scene, path: &str) -> Result<(), String> {
+    if scene.is_playing() {
+        return Err(SAVE_IN_PLAY.to_string());
+    }
     let json = scene_json(scene)?;
     // lint: allow(asset-write) a scene, prefab or lighting document, read whole on load
-    std::fs::write(path, json).map_err(|e| format!("Failed to write scene file: {}", e))?;
+    std::fs::write(path, &json).map_err(|e| format!("Failed to write scene file: {}", e))?;
+    scene.disk_text.record(path, json);
     // Heavy baked SH lives beside the scene in `<scene>.lighting.json`, not inline in
     // the human-diffable scene doc (#240). Written only when probes are baked.
     crate::scene::lighting::io::save_lighting_sidecar(scene, path)?;
     Ok(())
 }
+
+/// Why [`save_to_file`] refused: the World holds the play state, not the scene.
+pub const SAVE_IN_PLAY: &str = "a scene cannot be saved during Play: stop Play first";
+
+/// Why Generate Lighting refused: it writes the scene file, as a save does (#1340).
+pub const LIGHTING_IN_PLAY: &str = "lighting cannot be generated during Play: stop Play first";
 
 /// The scene document exactly as [`save_to_file`] writes it, so a seeded default and
 /// a saved one compare byte for byte. A script attached by absolute path inside the
@@ -64,9 +81,11 @@ pub(crate) fn scene_json(scene: &Scene) -> Result<String, String> {
 /// Meshes are rehydrated from their `primitive_type` on the way in.
 /// A load is a new scene, so it earns a new runtime identity (#355).
 pub fn load_from_file(scene: &mut Scene, path: &str) -> Result<(), String> {
-    let data = read_scene_file(path)?;
+    let json = read_text(path)?;
+    let data = read_scene_text(&json, path)?;
     apply_scene_data(scene, data);
     scene.renew_id();
+    scene.disk_text.record(path, json);
     // Merge the baked SH back onto the just-loaded probe positions (#240). A missing
     // sidecar is fine — probes load with zero SH (positions placed, never baked).
     crate::scene::lighting::io::load_lighting_sidecar(scene, path)?;
@@ -76,9 +95,16 @@ pub fn load_from_file(scene: &mut Scene, path: &str) -> Result<(), String> {
 /// Read and parse the scene document at `path` without touching any live scene — so
 /// a caller can fail cleanly before tearing the current one down (#432).
 pub fn read_scene_file(path: &str) -> Result<SceneData, String> {
-    let json = std::fs::read_to_string(path)
-        .map_err(|e| format!("Failed to read scene file {}: {}", path, e))?;
-    serde_json::from_str(&json).map_err(|e| format!("Failed to deserialize scene {}: {}", path, e))
+    read_scene_text(&read_text(path)?, path)
+}
+
+fn read_text(path: &str) -> Result<String, String> {
+    std::fs::read_to_string(path).map_err(|e| format!("Failed to read scene file {}: {}", path, e))
+}
+
+/// Parse `json`, the scene document read from `path` (named in the error).
+fn read_scene_text(json: &str, path: &str) -> Result<SceneData, String> {
+    serde_json::from_str(json).map_err(|e| format!("Failed to deserialize scene {}: {}", path, e))
 }
 
 #[cfg(test)]

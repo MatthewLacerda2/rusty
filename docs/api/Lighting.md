@@ -36,6 +36,8 @@ path. The two individual verbs stay for a script that wants only one of them.
   and saving the scene keeps the lighting. A lightmapped mesh that exists only in the
   unsaved edits keeps its lightmap once the scene is saved; until then the file names it
   but has no such entity, and the entry is ignored.
+- **Refused during Play**, as `Scene.Save` is (#1340): it writes the scene file, and the
+  World then holds the play state. The editor's button is greyed out while playing.
 - **Needs a saved scene** (the bakes write beside its file); errors otherwise. The
   probe step needs a GPU/software adapter and skips gracefully without one, as
   `Lighting.Bake` does.

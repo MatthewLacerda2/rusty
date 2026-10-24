@@ -81,3 +81,19 @@ fn the_summary_says_whether_the_scene_needs_saving() {
     report.saved = LightingSave::NeedsSceneSave;
     assert!(report.summary().ends_with("; save the scene to keep it"));
 }
+
+/// Generate Lighting writes the scene file, so Play refuses it as it refuses Save
+/// (#1340), before any bake runs.
+#[test]
+fn generate_is_refused_in_play() {
+    let (mut scene, path) = saved_floor("play");
+    let before = std::fs::read(&path).unwrap();
+    scene.set_playing(true);
+    let refused = generate_lighting(&mut scene, Some(&path), None);
+    assert_eq!(refused.unwrap_err(), crate::scene::LIGHTING_IN_PLAY);
+    assert_eq!(
+        std::fs::read(&path).unwrap(),
+        before,
+        "the file is untouched"
+    );
+}

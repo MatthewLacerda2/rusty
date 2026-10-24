@@ -30,8 +30,12 @@ pub enum LightingSave {
 }
 
 /// Write `scene`'s lighting fields into the scene file at `path`, and its baked SH
-/// into the sidecar beside it. Errors when the file cannot be read or written.
+/// into the sidecar beside it. Errors when the file cannot be read or written, and
+/// during Play, when the World holds the play state (#1340).
 pub fn save_lighting(scene: &Scene, path: &str) -> Result<LightingSave, String> {
+    if scene.is_playing() {
+        return Err(super::LIGHTING_IN_PLAY.to_string());
+    }
     let original: Value = parse(&std::fs::read_to_string(path).map_err(|e| e.to_string())?)?;
     let mut data = read_scene_file(path)?;
     if to_value(&data)? != original {
@@ -40,7 +44,8 @@ pub fn save_lighting(scene: &Scene, path: &str) -> Result<LightingSave, String> 
     copy_lighting(scene, &mut data);
     let json = serde_json::to_string_pretty(&data).map_err(|e| e.to_string())?;
     // lint: allow(asset-write) a scene, prefab or lighting document, read whole on load
-    std::fs::write(path, json).map_err(|e| format!("Failed to write scene file: {e}"))?;
+    std::fs::write(path, &json).map_err(|e| format!("Failed to write scene file: {e}"))?;
+    scene.disk_text.record(path, json);
     crate::scene::lighting::io::save_lighting_sidecar(scene, path)?;
     Ok(LightingSave::Written)
 }

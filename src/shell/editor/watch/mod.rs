@@ -38,6 +38,7 @@
 //! (`asset::convert::IMPORT_CACHE_DIR`, which only conversions write, and note) are
 //! never noted.
 
+pub mod follow;
 mod root;
 
 use root::{files_under, Root};

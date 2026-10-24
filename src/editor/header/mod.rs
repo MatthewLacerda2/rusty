@@ -75,26 +75,11 @@ fn file_menu(
     is_playing: bool,
 ) {
     ui.menu_button("File", |ui| {
-        let stop_first = "Stop Play first";
-        if ui
-            .add_enabled(
-                !is_playing,
-                egui::Button::new(format!("{}  New Scene", icon::FILE)),
-            )
-            .on_disabled_hover_text(stop_first)
-            .clicked()
-        {
+        if edit_only(ui, is_playing, icon::FILE, "New Scene") {
             scene_io::new_scene(editor, scene, console, is_playing);
             ui.close();
         }
-        if ui
-            .add_enabled(
-                !is_playing,
-                egui::Button::new(format!("{}  Reset Scene", icon::ARROW_COUNTER_CLOCKWISE)),
-            )
-            .on_disabled_hover_text(stop_first)
-            .clicked()
-        {
+        if edit_only(ui, is_playing, icon::ARROW_COUNTER_CLOCKWISE, "Reset Scene") {
             scene_io::reset_scene(editor, scene, console, is_playing);
             ui.close();
         }
@@ -105,10 +90,8 @@ fn file_menu(
             scene_io::load_scene(editor, scene, console, is_playing);
             ui.close();
         }
-        if ui
-            .button(format!("{}  Save Scene", icon::FLOPPY_DISK))
-            .clicked()
-        {
+        // Save is refused in Play by the scene layer (#1340); greyed out here.
+        if edit_only(ui, is_playing, icon::FLOPPY_DISK, "Save Scene") {
             scene_io::save_scene(editor, scene, console);
             ui.close();
         }
@@ -121,6 +104,14 @@ fn file_menu(
             ui.close();
         }
     });
+}
+
+/// A File-menu entry unavailable in Play: greyed out, with a hint, while playing.
+/// Returns whether it was clicked.
+fn edit_only(ui: &mut egui::Ui, is_playing: bool, icon: &str, label: &str) -> bool {
+    ui.add_enabled(!is_playing, egui::Button::new(format!("{icon}  {label}")))
+        .on_disabled_hover_text("Stop Play first")
+        .clicked()
 }
 
 /// The Config menu — video/quality presets, the speaker mode and Scene Settings.
