@@ -17,7 +17,7 @@ screenshots, benches; `dev::bridge`). `Input`'s injection verbs (`Press`,
 `MoveMouse`, `SetAxis`, …) are the API's own, so a scenario plays as the user.
 
 It runs in a Lua VM of its own, beside the gameplay scripts' (which Play rebuilds
-on its first tick), and steps the world between calls, never inside one. Four
+on its first tick), and steps the world between calls, never inside one. Five
 things follow:
 
 - `Scene.GetScript(id, name)` answers a live **handle** on the gameplay instance,
@@ -43,6 +43,11 @@ things follow:
   `Timer.Invoke` / `InvokeRepeating` / `StartCoroutine`, `Tween.To` / `Sequence`
   and `Random.SetSeed` are refused with an error until then: call
   `Harness.Step(1)` first.
+- The scenario VM has the gameplay VM's deterministic stdlib (#1408): no `os` or
+  `io` (write results through `Harness.*`), and `math.random` /
+  `math.randomseed` draw from the world's one seeded `Random`, so a scenario's
+  draws move the game's stream as `Random.*` calls do, and two runs of a
+  scenario write the same `results.json`.
 - A scenario is a test, so the paid provider verbs (`Sfx.Generate`, `Speech.*`)
   are refused for the whole run, before its first `Harness.Step` too (CLAUDE.md,
   *Provider calls are authoring, never gameplay*).

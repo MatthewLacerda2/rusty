@@ -33,7 +33,7 @@ mod timers;
 pub use console::{ConsoleLogs, LogLevel};
 pub use discovery::{monobehaviour_scripts, script_label};
 pub use manager::ScriptManager;
-pub(crate) use sandbox::require_sim_vm;
+pub(crate) use sandbox::{require_sim_vm, sandboxed_vm};
 pub use schema::{parse_fields, FieldKind, ScriptField};
 pub use shared::ApiCells;
 pub use timers::TimerScheduler;
