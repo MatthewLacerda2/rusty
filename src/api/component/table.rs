@@ -166,7 +166,8 @@ pub(super) use inspect;
 pub type FieldInfo = (&'static str, Option<&'static str>);
 
 /// Applies a change table to an entity's component; `Ok(false)` without one.
-pub type WriteAny = fn(&mut World, u32, &Map<String, Value>) -> Result<bool, String>;
+pub type WriteAny =
+    fn(&mut World, u32, &Map<String, Value>, super::write::Skip) -> Result<bool, String>;
 
 /// A component the namespace can name, with its type erased.
 pub struct Kind {

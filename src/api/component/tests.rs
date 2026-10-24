@@ -8,6 +8,7 @@ use serde_json::Value;
 use super::introspect::serde_fields;
 use super::kinds::KINDS;
 use super::table::Kind;
+use super::write::Skip;
 use crate::components::animator::Playback;
 use crate::components::Entity;
 use crate::scene::authoring::{add_component, ComponentKind};
@@ -111,6 +112,8 @@ fn each_kind_reads_its_entity_key() {
     }
 }
 
+/// Each op, driven with the field's own serialized value (no unchanged-key skip),
+/// leaves the component as it was: an op that can't decode what `Get` reads fails.
 #[test]
 fn every_writable_field_takes_back_what_get_reads() {
     let (mut scene, id) = dressed();
@@ -124,7 +127,7 @@ fn every_writable_field_takes_back_what_get_reads() {
                 continue;
             };
             let one = serde_json::Map::from_iter([(name.to_string(), value.clone())]);
-            let written = (kind.write)(&mut scene.world, id, &one);
+            let written = (kind.write)(&mut scene.world, id, &one, Skip::Nothing);
             assert_eq!(written, Ok(true), "{}.{name} = {value}", kind.name);
         }
         let after = (kind.read)(&scene.world, id).unwrap().unwrap();

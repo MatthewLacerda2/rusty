@@ -6,7 +6,9 @@
 //! - `Set(id, name, fields)` — write the named fields, all or nothing. Each goes
 //!   through the `scene::authoring` op the inspector's card calls, so clamping,
 //!   sanitizing and what follows a write are the inspector's own; a field with no
-//!   op is read-only and writing it is an error naming why (`table`).
+//!   op is read-only and writing it is an error naming why (`table`). A key left
+//!   as `Get` returned it is skipped (`write::Skip`): `Get` keeps what it returned
+//!   in the table's metatable, so a table held across ticks writes only its edits.
 //! - `Fields(name)` — what an inspector lists: each field's name, the Lua type of
 //!   its default, the default, and whether it can be written.
 //!
@@ -27,6 +29,8 @@ mod lua_tests;
 #[cfg(test)]
 mod set_tests;
 #[cfg(test)]
+mod since_get_tests;
+#[cfg(test)]
 mod tests;
 
 use std::cell::RefCell;
@@ -39,6 +43,11 @@ use crate::scene::authoring;
 use crate::scene::Scene;
 use table::Kind;
 use value::{from_lua, to_lua};
+use write::Skip;
+
+/// The metatable key under which `Get` keeps what it returned, for `Set` to tell a
+/// field the script edited from one the sim moved since.
+const GOT: &str = "__component_get";
 
 fn err(msg: String) -> mlua::Error {
     mlua::Error::RuntimeError(msg)
@@ -56,11 +65,20 @@ pub fn register<'scope>(
         let value = (kind.read)(&scene.borrow().world, id)
             .transpose()
             .map_err(err)?;
-        value.map(|v| to_lua(lua, &v)).transpose()
+        let Some(value) = value else {
+            return Ok(mlua::Value::Nil);
+        };
+        let table = to_lua(lua, &value)?;
+        if let mlua::Value::Table(t) = &table {
+            remember(lua, t, id, kind, &value)?;
+        }
+        Ok(table)
     });
     put(&t, "Get", get)?;
     let set = scope.create_function(move |lua, (id, name, fields): (u32, String, Table)| {
         let kind = kinds::find(&name).map_err(err)?;
+        let got = recall(&fields, id, kind);
+        let skip = got.as_ref().map_or(Skip::Held, Skip::SinceGet);
         let fields = from_lua(lua, &mlua::Value::Table(fields))
             .map_err(|e| err(format!("Component.Set: {}: {e}", kind.name)))?;
         let changes = match fields {
@@ -72,7 +90,7 @@ pub fn register<'scope>(
                 )))
             }
         };
-        let written = (kind.write)(&mut scene.borrow_mut().world, id, &changes)
+        let written = (kind.write)(&mut scene.borrow_mut().world, id, &changes, skip)
             .map_err(|e| err(format!("Component.Set: {}: {e}", kind.name)))?;
         if !written {
             return Err(err(format!(
@@ -91,8 +109,30 @@ pub fn register<'scope>(
     lua.globals().set("Component", t).map_err(|e| e.to_string())
 }
 
+/// Keep `value`, what `Get` returned for `id`'s `kind`, in `table`'s metatable.
+fn remember(lua: &Lua, table: &Table, id: u32, kind: &Kind, value: &Value) -> mlua::Result<()> {
+    let got = lua.create_table()?;
+    got.set("id", id)?;
+    got.set("kind", kind.name)?;
+    got.set("value", value.to_string())?;
+    let meta = lua.create_table()?;
+    meta.set(GOT, got)?;
+    table.set_metatable(Some(meta))
+}
+
+/// What `Get` returned into `table`, when it was `id`'s `kind`: a table read from
+/// another entity, or written by hand, has none.
+fn recall(table: &Table, id: u32, kind: &Kind) -> Option<serde_json::Map<String, Value>> {
+    let got: Table = table.metatable()?.raw_get(GOT).ok()?;
+    let same = got.get::<u32>("id").ok()? == id && got.get::<String>("kind").ok()? == kind.name;
+    match serde_json::from_str(&got.get::<String>("value").ok()?).ok()? {
+        Value::Object(map) if same => Some(map),
+        _ => None,
+    }
+}
+
 /// `Component.Fields`: one `{ name, type, default, writable, read_only }` row per
-/// field, in the order a saved scene writes them. The defaults are the Add
+/// field, in the field table's order (the order `Set` writes them in). The defaults are the Add
 /// Component menu's (a fresh entity's, for `Transform`; `Mesh` has none).
 fn fields_table(lua: &Lua, kind: &Kind) -> mlua::Result<Table> {
     let defaults = defaults(kind).map_err(err)?;

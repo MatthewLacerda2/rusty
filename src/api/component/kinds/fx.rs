@@ -32,7 +32,10 @@ inspect! {
         op!("is_playing", animator::set_playing),
         op!("freeze", animator::set_freeze),
         ro!("parameters", "Animator.SetFloat / SetInt / SetBool / SetTrigger write them"),
-        op!("graph", animator::set_graph),
+        // `""` is no graph, as `Animator.SetGraph` and the card read it.
+        with!("graph", |a, v: Option<String>| {
+            animator::set_graph(a, v.filter(|p| !p.is_empty()))
+        }),
         op!("graph_enabled", animator::set_graph_enabled),
         ro!("layers", "Animator.SetLayerWeight writes a layer's weight"),
         ro!("ik", "Animator.AddTwoBoneIK / AddAimIK / SetIKWeight write them"),

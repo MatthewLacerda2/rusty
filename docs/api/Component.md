@@ -10,7 +10,7 @@ every field added later, with nothing new to bind.
 |---|---|---|
 | `Component.Get` | `(id, name)` | the component as a table of its fields (`{ mass = 1, use_gravity = true, … }`), or `nil` when the entity has none |
 | `Component.Set` | `(id, name, fields)` | — writes the fields named in `fields`, leaving the rest as they are; an error when the entity has no such component |
-| `Component.Fields` | `(name)` | one row per field, in the order a saved scene writes them: `{ name, type, default, writable, read_only }`; `type` is a Lua type, `"optional <type>"` for a field that can hold nothing |
+| `Component.Fields` | `(name)` | one row per field, in the order `Set` writes them: `{ name, type, default, writable, read_only }`; `type` is a Lua type, `"optional <type>"` for a field that can hold nothing |
 
 **`name`** is any component name [`Scene.AddComponent`](Scene.md) takes (in any
 case, aliases too), plus `Transform` and `Mesh`. Each answers to one name first:
@@ -48,11 +48,15 @@ live particles, a trail's points) is not a field and never appears.
   animator's playhead) is read-only too.
 - **Strict names:** an unknown component or field is an error naming the valid
   ones.
-- **Read it, change it, `Set` it back.** A field given the value it already
-  holds is skipped: no op runs, and a read-only field given its own value is not
-  an error. So handing back a whole table from `Get` writes only what changed: an
-  edited `AudioReverbZone`'s `params` stay (its `preset` becomes `Custom`), and an
-  unchanged Animator `graph` does not restart the state machine.
+- **Read it, change it, `Set` it back.** A field left as `Get` returned it is
+  skipped: no op runs, and a read-only field is not an error. So handing back a
+  whole table from `Get` writes only what the script edited, even a frame or more
+  later: a `velocity` the physics moved since is not put back, an animator's
+  `time` that ticked is not an error, an edited `AudioReverbZone`'s `params` stay
+  (its `preset` becomes `Custom`), and an unchanged Animator `graph` does not
+  restart the state machine. `Get` remembers what it returned in the table's
+  metatable; a table written by hand, copied, or read from another entity skips
+  only the fields already holding the value given.
 - **Fields one op writes together are written together.** A light's
   `inner_cone` / `outer_cone`, a Text's `auto_size` / `auto_size_min` /
   `auto_size_max`, an outline's width and colour: their op runs once, with each
@@ -61,14 +65,19 @@ live particles, a trail's points) is not a field and never appears.
 - **All or nothing:** every field is checked, then written in the order
   `Component.Fields` lists them; when one fails (a bad value, an unknown enum
   name) nothing is written. The order matters where one op resets another: an
-  `AudioReverbZone`'s `params` are written before its `preset`, so a preset named
-  beside them wins.
+  `AudioReverbZone`'s `params` are written before its `preset`, so a preset that
+  changes in the same call wins (it loads its own params).
+- **Param maps insert, they don't replace.** A `VisualCorrection`'s `post_params`
+  and a UI graphic's `shader.params` write each key given; a key removed from the
+  table keeps its value. Renaming a UI `shader` drops the old shader's params, and
+  the ones still in a `Get` table at their old values are not carried over.
 - **Where it lands:** the live world, as the inspector's write does. In edit mode
   it is saved with the scene; in Play it is discarded on Stop with the rest of the
   play-mode world, as in Unity.
 - **Clearing a value:** a Lua table cannot hold `nil`, so a field that can be
   absent (a `Joint`'s `connected_body`) is cleared through its named setter, or
-  by an empty string where the op reads one as nothing (an `Image`'s `texture`).
+  by an empty string where the op reads one as nothing (an `Image`'s `texture`,
+  an Animator's `graph`).
 
 ```lua with=crate:RigidBody
 local rb = Component.Get(crate, "RigidBody")

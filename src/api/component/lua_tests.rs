@@ -3,9 +3,12 @@
 use std::cell::RefCell;
 
 use mlua::Lua;
+use serde_json::Value;
 
 use super::kinds::KINDS;
 use super::register;
+use super::value::from_lua;
+use super::write::Skip;
 use crate::scene::authoring::{add_component, ComponentKind};
 use crate::scene::Scene;
 
@@ -107,8 +110,9 @@ fn fields_lists_types_defaults_and_access() {
 
 #[test]
 fn every_component_round_trips_get_into_set_through_lua() {
-    // What `Get` returns, `Set` takes back: read-only fields dropped, empty lists
-    // crossing as `{}`, enums as their names.
+    // What Lua's `Get` returns, `Set`'s decode takes back and every writable
+    // field's op accepts: empty lists crossing as `{}`, enums as their names. The
+    // ops run with no unchanged-key skip, so one that can't take its own value fails.
     let mut scene = Scene::new();
     let id = scene.add_entity("Dressed".to_string());
     for add in ComponentKind::ALL {
@@ -121,17 +125,18 @@ fn every_component_round_trips_get_into_set_through_lua() {
         register(&lua, s, &scene).unwrap();
         for kind in KINDS.iter().filter(|k| k.add.is_some()) {
             let before = (kind.read)(&scene.borrow().world, id);
-            let chunk = format!(
-                r#"local c = Component.Get(id, "{0}")
-                for _, row in ipairs(Component.Fields("{0}")) do
-                    if not row.writable then c[row.name] = nil end
-                end
-                Component.Set(id, "{0}", c)"#,
-                kind.name
-            );
-            lua.load(&chunk)
-                .exec()
-                .unwrap_or_else(|e| panic!("{}: {e}", kind.name));
+            let got = format!(r#"return Component.Get(id, "{}")"#, kind.name);
+            let table: mlua::Value = lua.load(&got).eval()?;
+            let Value::Object(mut fields) = from_lua(&lua, &table).unwrap() else {
+                panic!("{} is not a table", kind.name)
+            };
+            for (name, read_only) in (kind.fields)() {
+                if read_only.is_some() {
+                    fields.remove(name);
+                }
+            }
+            let written = (kind.write)(&mut scene.borrow_mut().world, id, &fields, Skip::Nothing);
+            assert_eq!(written, Ok(true), "{}", kind.name);
             let after = (kind.read)(&scene.borrow().world, id);
             assert_eq!(before, after, "{}: Get then Set changed it", kind.name);
         }

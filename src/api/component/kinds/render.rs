@@ -13,6 +13,7 @@ use crate::components::{
     ShadowSettings, SsaoSettings, TransformComponent, VisualCorrectionComponent,
 };
 use crate::scene::authoring::{camera, light, lod_group as lod, visual_correction as vc};
+use crate::shadergen::post_params::PostChain;
 
 const CONES: Group<LightComponent> =
     group!(|l, inner_cone: f32, outer_cone: f32| light::set_cones(l, inner_cone, outer_cone));
@@ -81,8 +82,9 @@ inspect! {
         }),
         with!("custom_effects", |c, v: Vec<String>| vc::set_custom_effects(c, v)?),
         with!("post_params", |c, v: BTreeMap<String, Vec<f32>>| {
+            let chain = PostChain::load(&c.custom_effects);
             for (name, value) in v {
-                vc::set_post_param(c, &name, value)?;
+                vc::set_post_param_with(c, &chain, &name, value)?;
             }
         }),
     ];
@@ -103,8 +105,10 @@ fn set_target(c: &mut CameraComponent, target: Option<RenderTarget>) {
 }
 
 /// The LOD levels, whole: the count through add/remove, then each level's
-/// renderers and threshold. A threshold is clamped between its neighbours, so the
-/// thresholds are set once per level: each pass frees the next one to move.
+/// renderers and threshold. A threshold is clamped between its neighbours, so
+/// they are first dropped to zero, coarsest first, and then set finest first: each
+/// one is then clamped only by the finer threshold just set. Two passes, not one
+/// per level.
 fn set_levels(g: &mut LodGroupComponent, levels: Vec<LodLevel>) {
     while g.levels.len() > levels.len() {
         lod::remove_level(g, g.levels.len() - 1);
@@ -112,10 +116,11 @@ fn set_levels(g: &mut LodGroupComponent, levels: Vec<LodLevel>) {
     while g.levels.len() < levels.len() {
         lod::add_level(g);
     }
-    for _ in 0..levels.len() {
-        for (i, level) in levels.iter().enumerate() {
-            lod::set_level_height(g, i, level.screen_height);
-        }
+    for i in (0..levels.len()).rev() {
+        lod::set_level_height(g, i, 0.0);
+    }
+    for (i, level) in levels.iter().enumerate() {
+        lod::set_level_height(g, i, level.screen_height);
     }
     for (i, level) in levels.into_iter().enumerate() {
         lod::set_renderers(g, i, level.renderers);
