@@ -131,7 +131,10 @@ fn the_outside_warning_prints_a_slash_path_without_a_verbatim_prefix() {
 #[test]
 fn a_module_name_that_is_not_a_relative_path_is_refused_and_reads_nothing() {
     let root = dir("empty_segment");
-    write(&root.join("assets/scripts/a/b.lua"), "return { v = 'ab' }");
+    write(
+        &root.join(crate::core::paths::native("assets/scripts/a/b.lua")),
+        "return { v = 'ab' }",
+    );
     let outside = dir("empty_segment_outside");
     write(&outside.join("x.lua"), "ran = true; return 1");
     let (m, console) = manager(&root);
