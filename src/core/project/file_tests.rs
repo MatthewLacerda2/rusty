@@ -55,7 +55,7 @@ fn every_build_field_roundtrips() {
 fn a_new_project_gets_a_default_file_named_after_its_folder() {
     let root = fresh("Horde");
     let (engine, lines) = record(&root).unwrap();
-    assert!(engine.matches());
+    assert_eq!(engine.verdict(), Verdict::Same);
     assert_eq!(lines, vec![format!("created {PROJECT_FILE}")]);
     let file = ProjectFile::read(&root.join(PROJECT_FILE))
         .unwrap()

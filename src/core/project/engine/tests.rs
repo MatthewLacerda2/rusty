@@ -18,7 +18,7 @@ fn check(recorded: Option<&str>, old: Option<u64>, running: &str, new: Option<u6
 
 #[test]
 fn the_verdict_follows_the_count() {
-    let verdict = |old, new, running| check(Some(A), old, running, new).verdict();
+    let verdict = |old, new, running: &str| check(Some(A), old, running, new).verdict();
     assert_eq!(verdict(Some(5), Some(5), A), Verdict::Same);
     assert_eq!(
         verdict(Some(5), Some(9), &format!("{A}-dirty")),
