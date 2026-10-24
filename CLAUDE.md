@@ -406,16 +406,21 @@ only its adapter (Lua → zimmer document, file writes, patch-path resolution).
   write or even read the engine's code. As long as the docs stay current, Claude can tell
   the developer how anything is done — so keeping documentation truthful is load-bearing,
   not a nicety.
-- **When in doubt, Unity's way.** When the work hits a call its issue never foresaw (a
-  default, an edge-case behaviour, how an API takes its arguments), do what Unity does
-  and say so in the PR; most of it is well figured out. This fills gaps the planning
-  missed. It does not override a decision the issue made, and it does not bring in what
-  rusty deliberately leaves out.
-- **AI-driven, editor↔API parity.** rusty is built for an agent-driven workflow in the
-  *Claude Code + Blender-MCP* style: the agent can do anything a user can do in the
-  editor — create entities, place and configure components, instantiate assets, save
-  scenes — **except pure UI chrome** (collapsing a card, resizing a panel). Every
-  user-facing editor capability has an API equivalent.
+- **When in doubt on how to approach, just follow Unity Engine and you should be
+  good** (the operator, 2026-10-24). This holds when planning an issue and when the work
+  hits a call its issue never foresaw (a default, an edge-case behaviour, how an API
+  takes its arguments, which side wins when the editor and the disk disagree). Do what
+  Unity does and say so in the issue or PR; most of it is well figured out. It does not
+  override a decision already made, and it does not bring in what rusty deliberately
+  leaves out.
+- **Our engine must give support for the agentic AI to do anything a game dev can do**
+  (the operator, 2026-10-24). rusty is built for an agent-driven workflow in the
+  *Claude Code + Blender-MCP* style. The agent can do anything a game developer does,
+  both in the editor (create entities, place and configure components, instantiate
+  assets, save scenes) and around it (author and import assets, play-test, build),
+  **except pure UI chrome** (collapsing a card, resizing a panel). Every user-facing
+  editor capability has an API equivalent, and a dev task the agent can't do yet is a
+  gap to file.
 - **Keep the API doc in lockstep.** When you add or change an API function, update
   its namespace's page in `docs/api/` (`docs/api/<Namespace>.md`) in the *same* change. That doc is the API reference the agent
   reads to drive the engine, so it must never lag the bindings. This is no longer just
