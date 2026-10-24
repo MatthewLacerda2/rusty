@@ -20,6 +20,7 @@
 
 use crate::components::Entity;
 
+use super::activity::ActivityStore;
 use super::bundle::{build_bundle, Core};
 use super::handles::Handles;
 use super::world_space::{BoundsQueue, WorldStore};
@@ -40,6 +41,8 @@ pub struct World {
     pub(super) world_space: WorldStore,
     /// The moved entities whose colliders' AABBs are due a refresh (`ecs::world_space`).
     pub(super) bounds: BoundsQueue,
+    /// Every entity's `activeInHierarchy`, kept (`ecs::activity`).
+    pub(super) activity: ActivityStore,
 }
 
 impl Default for World {
@@ -58,6 +61,7 @@ impl World {
             next_seq: 0,
             world_space: WorldStore::default(),
             bounds: BoundsQueue::default(),
+            activity: ActivityStore::default(),
         }
     }
 
@@ -100,7 +104,7 @@ impl World {
             self.next_id = entity.id + 1;
         }
         self.place(entity);
-        self.world_space.invalidate_all(); // an orphan may already name this id as parent
+        self.invalidate_caches(); // an orphan may already name this id as parent
     }
 
     /// Drop the rows of `ids`, whose references `World::despawn_all` cleared first.
@@ -112,6 +116,7 @@ impl World {
             }
         }
         self.order.retain(|e| !ids.contains(e));
+        self.activity.invalidate_all();
     }
 
     /// Remove all entities and reset the id allocator (used on scene load).
@@ -121,7 +126,7 @@ impl World {
         self.order.clear();
         self.next_id = 1;
         self.next_seq = 0;
-        self.world_space.reset();
+        self.reset_caches();
         self.bounds = BoundsQueue::default();
     }
 
@@ -287,7 +292,7 @@ impl World {
         let new_handle = self.inner.spawn(builder.build());
         self.handles.insert(id, new_handle);
         self.moved(id);
-        self.world_space.invalidate_all(); // its transform and parent may both differ
+        self.invalidate_caches(); // its transform, parent and flag may all differ
         true
     }
 }

@@ -58,15 +58,21 @@ impl World {
     /// Unity's `activeInHierarchy`: the entity exists and it and every ancestor
     /// are active. An inactive parent hides and stops its whole subtree without
     /// touching the children's own flags (#1363). The one question every system
-    /// asks before drawing, simulating or ticking an entity.
+    /// asks before drawing, simulating or ticking an entity; answered once and kept
+    /// until a flag or a parent link changes (`ecs::activity`, #1388).
     pub fn is_active_in_hierarchy(&self, id: u32) -> bool {
-        self.contains(id) && self.self_and_ancestors(id).all(|c| self.is_active_self(c))
+        self.contains(id) && self.activity.resolve(self, id)
     }
 
     pub fn set_active(&mut self, id: u32, active: bool) -> bool {
-        self.component_mut::<Core>(id)
-            .map(|mut c| c.active = active)
-            .is_some()
+        let Some(mut core) = self.component_mut::<Core>(id) else {
+            return false;
+        };
+        if std::mem::replace(&mut core.active, active) != active {
+            drop(core);
+            self.activity.invalidate_all();
+        }
+        true
     }
 
     pub fn is_static(&self, id: u32) -> bool {
@@ -129,14 +135,16 @@ impl World {
     /// The subtree moves in world space, so its world matrices go dirty and its
     /// colliders' AABBs follow (`ecs::world_space`).
     pub fn set_parent_id(&mut self, id: u32, parent: Option<u32>) -> bool {
-        let written = self
-            .component_mut::<Core>(id)
-            .map(|mut c| c.parent_id = parent)
-            .is_some();
-        if written {
-            self.moved(id);
+        let Some(mut core) = self.component_mut::<Core>(id) else {
+            return false;
+        };
+        let relinked = std::mem::replace(&mut core.parent_id, parent) != parent;
+        drop(core);
+        self.moved(id);
+        if relinked {
+            self.activity.invalidate_all();
         }
-        written
+        true
     }
 
     /// The entity's child ids (cloned; empty for a dead id).
