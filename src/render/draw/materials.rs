@@ -115,41 +115,20 @@ impl Renderer {
     }
 
     /// Build a group(2) material bind group from the resolved textures (albedo,
-    /// metallic, roughness, normal, emissive, then the extra slots — that order) +
-    /// one shared sampler (the default texture's trilinear one, #1322), against
-    /// `material_layout`. Maps bind at 0,2,3,4,5; sampler at 1 (binding 1 samples
-    /// them all) (#202, #207); `owner`'s param buffer (or the shared zero one) at 6
-    /// (#399); each extra slot at its own binding (7, #400).
+    /// metallic, roughness, normal, emissive, then the extra slots — that order),
+    /// against `material_layout`. Maps bind at 0,2,3,4,5 (#202, #207), each extra
+    /// slot at its own binding (7, #400), and each texture's own sampler — its
+    /// import settings' wrap and filter (#1323) — beside it: albedo's at 1, the
+    /// rest at `textures::sampler_binding`. `owner`'s param buffer (or the shared
+    /// zero one) binds at 6 (#399).
     pub(crate) fn material_bind_group(
         &self,
         maps: &[Rc<GpuTexture>; MATERIAL_TEXTURES],
         owner: Option<&ParamOwner>,
     ) -> wgpu::BindGroup {
-        let mut entries = vec![wgpu::BindGroupEntry {
-            binding: 1,
-            resource: wgpu::BindingResource::Sampler(&self.default_texture.sampler),
-        }];
-        let slots = textures::SLOTS.iter().map(|slot| slot.binding);
-        let bindings = [0u32, 2, 3, 4, 5].into_iter().chain(slots);
-        for (i, (map, binding)) in maps.iter().zip(bindings).enumerate() {
-            let view = match is_colour_map(i) {
-                true => &map.view,
-                false => &map.data_view,
-            };
-            entries.push(wgpu::BindGroupEntry {
-                binding,
-                resource: wgpu::BindingResource::TextureView(view),
-            });
-        }
-        entries.push(wgpu::BindGroupEntry {
-            binding: crate::shadergen::params::PARAM_BINDING,
-            resource: self.materials.params_buffer(owner).as_entire_binding(),
-        });
-        self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("Material Bind Group"),
-            layout: &self.material_layout,
-            entries: &entries,
-        })
+        let maps = maps.each_ref().map(|m| m.as_ref());
+        let params = self.materials.params_buffer(owner);
+        material_group(&self.device, &self.material_layout, maps, params)
     }
 
     /// Distinct material bind groups built so far — tests prove they are shared and
@@ -157,6 +136,53 @@ impl Renderer {
     #[cfg(test)]
     pub(crate) fn material_group_count(&self) -> usize {
         self.materials.len()
+    }
+}
+
+/// A group(2) bind group against `layout` over `maps` (in
+/// [`material_texture_paths`] order) and the param uniform `params`: the layout
+/// [`Renderer::material_bind_group`] describes. The one builder of a material
+/// group, so the default group and every material's bind the same entries.
+pub(crate) fn material_group(
+    device: &wgpu::Device,
+    layout: &wgpu::BindGroupLayout,
+    maps: [&GpuTexture; MATERIAL_TEXTURES],
+    params: &wgpu::Buffer,
+) -> wgpu::BindGroup {
+    let mut entries = Vec::with_capacity(2 * MATERIAL_TEXTURES + 1);
+    let slots = textures::SLOTS.iter().map(|slot| slot.binding);
+    let bindings = [0u32, 2, 3, 4, 5].into_iter().chain(slots);
+    for (i, (map, binding)) in maps.into_iter().zip(bindings).enumerate() {
+        let view = match is_colour_map(i) {
+            true => &map.view,
+            false => &map.data_view,
+        };
+        entries.push(wgpu::BindGroupEntry {
+            binding,
+            resource: wgpu::BindingResource::TextureView(view),
+        });
+        entries.push(wgpu::BindGroupEntry {
+            binding: map_sampler_binding(binding),
+            resource: wgpu::BindingResource::Sampler(&map.sampler),
+        });
+    }
+    entries.push(wgpu::BindGroupEntry {
+        binding: crate::shadergen::params::PARAM_BINDING,
+        resource: params.as_entire_binding(),
+    });
+    device.create_bind_group(&wgpu::BindGroupDescriptor {
+        label: Some("Material Bind Group"),
+        layout,
+        entries: &entries,
+    })
+}
+
+/// The binding of the sampler paired with the material texture at `binding`:
+/// albedo's `s_diffuse` at 1, every other at `textures::sampler_binding` (#1323).
+fn map_sampler_binding(binding: u32) -> u32 {
+    match binding {
+        0 => 1,
+        b => textures::sampler_binding(b),
     }
 }
 

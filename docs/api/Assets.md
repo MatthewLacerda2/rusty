@@ -27,6 +27,8 @@ one by its source path still works.
 | `Assets.Refresh` | `()` | `{ converted = { wavPath, ... }, skipped = { { path, reason }, ... } }` — imports what arrived (below) |
 | `Assets.GetLightmapUVSettings` | `(path)` | `{ generate, hardAngle, packMargin }` — a model's Generate Lightmap UVs setting (below) |
 | `Assets.SetLightmapUVSettings` | `(path, { generate?, hardAngle?, packMargin? })` | how many of the scene's meshes it re-imported |
+| `Assets.GetTextureImportSettings` | `(path)` | `{ wrapMode, filterMode, generateMipmaps }` — an image's import settings (below) |
+| `Assets.SetTextureImportSettings` | `(path, { wrapMode?, filterMode?, generateMipmaps? })` | nothing |
 
 Returned shape (Lua, 1-indexed arrays):
 
@@ -97,4 +99,33 @@ same UVs, so a bake stays byte-identical across machines.
 Assets.SetLightmapUVSettings("project/levels/warehouse.glb", { generate = true })
 print(Assets.GetLightmapUVSettings("project/levels/warehouse.glb").hardAngle)  -- 88
 Lighting.BakeLightmaps()
+```
+
+### Texture import settings
+
+Unity's Texture Import Settings (#1323), and the image inspector's **Texture Import
+Settings** card: how a texture is sampled, stored per image in its `<file>.meta`
+sidecar. Each material map (albedo, metallic, roughness, normal, emissive, a
+shader's `mask`) samples through its own texture's settings, and so do particle and
+ribbon textures. UI images do not yet: they keep the UI's own clamped, linear
+sampler.
+
+- `wrapMode` — how UVs outside 0–1 read it: `"Repeat"` (tile, the default),
+  `"Clamp"` (stretch the edge texels) or `"Mirror"` (tile, flipping every other copy).
+  Unity's `MirrorOnce` is left out: the GPU layer has no such mode.
+- `filterMode` — `"Point"` (nearest texel, pixelated), `"Bilinear"` (smooth within a
+  mip, snapping between mips) or `"Trilinear"` (smooth between mips too, and
+  anisotropic; the default).
+- `generateMipmaps` — upload a full mip chain (on by default, as in Unity). Off, only
+  the full-size image is uploaded, so a tiled surface far away shimmers.
+
+`SetTextureImportSettings` changes only the keys it is given, writes the sidecar (a
+file with none gets one), and the texture is re-uploaded with the new settings on the
+next frame — the same verb the inspector's card runs. An unknown mode name is an
+error naming the known ones. A texture extracted from a converted model
+(`model.fbx#tex/Skin`) keeps the defaults.
+
+```lua no-run
+Assets.SetTextureImportSettings("project/textures/pixel_font.png", { filterMode = "Point" })
+print(Assets.GetTextureImportSettings("project/textures/pixel_font.png").wrapMode)  -- Repeat
 ```

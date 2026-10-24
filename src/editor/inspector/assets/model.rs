@@ -20,7 +20,8 @@ pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, path: &
 
     draw_sub_objects(ui, path);
 
-    draw_import_settings(ui, editor);
+    ui.heading("Model Import Settings");
+    ui.add_space(5.0);
     draw_lightmap_uvs(ui, scene, path);
 
     ui.add_space(15.0);
@@ -52,40 +53,6 @@ fn draw_metadata(ui: &mut egui::Ui, path: &str) {
         .to_uppercase();
     super::metadata::draw_metadata_card(ui, path, |ui| {
         ui.label(format!("Type: {} Model Asset", ext));
-    });
-}
-
-/// Model import settings: scale factor, normal/tangent import, and mesh
-/// compression level.
-fn draw_import_settings(ui: &mut egui::Ui, editor: &mut EditorUi) {
-    ui.heading("Model Import Settings");
-    ui.add_space(5.0);
-
-    ui.horizontal(|ui| {
-        ui.label("Scale Factor:");
-        ui.add(
-            egui::DragValue::new(&mut editor.asset_model_scale)
-                .speed(0.05)
-                .ranged(0.01..=100.0),
-        );
-    });
-
-    ui.checkbox(
-        &mut editor.asset_model_import_normals,
-        "Import Normals & Tangents",
-    );
-
-    ui.horizontal(|ui| {
-        ui.label("Mesh Compression:");
-        let mut compression = "Off";
-        egui::ComboBox::from_id_salt("MeshCompressionCombo")
-            .selected_text(compression)
-            .show_ui(ui, |ui| {
-                ui.selectable_value(&mut compression, "Off", "Off");
-                ui.selectable_value(&mut compression, "Low", "Low");
-                ui.selectable_value(&mut compression, "Medium", "Medium");
-                ui.selectable_value(&mut compression, "High", "High");
-            });
     });
 }
 

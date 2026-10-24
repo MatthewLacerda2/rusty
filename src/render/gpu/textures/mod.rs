@@ -1,14 +1,17 @@
 pub(crate) mod freshness;
 pub(crate) mod mips;
 mod panorama;
+mod sampler;
 
 use std::rc::Rc;
 
+use crate::asset::sidecar::TextureSettings;
 use crate::asset::MapRef;
 use crate::render::{GpuTexture, Renderer};
 use image::GenericImageView;
 use mips::full_chain_len;
 pub(crate) use mips::{MipGenerator, MipSettings, TextureKind};
+pub(crate) use sampler::sampler;
 
 /// The storage format of every image the renderer uploads: colour is authored in
 /// sRGB, so the colour view decodes it on sample.
@@ -19,9 +22,9 @@ const DATA_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8Unorm;
 
 impl Renderer {
     /// Generates a standard checkerboard texture for meshes that don't have texture
-    /// files assigned. Its sampler is the one every material map samples through
-    /// (`material_bind_group`), so it is the image textures' trilinear one; 32-texel
-    /// cells keep the checker's edges crisp under its linear magnification.
+    /// files assigned. Its sampler is an image texture's default one (trilinear,
+    /// repeating); 32-texel cells keep the checker's edges crisp under its linear
+    /// magnification.
     pub(crate) fn create_default_checkerboard_texture(
         (device, queue, mips): Uploader,
         layout: &wgpu::BindGroupLayout,
@@ -30,7 +33,7 @@ impl Renderer {
         let checker = checkerboard(256, 32);
         let texture = upload((device, queue), label, &checker, full_chain_len(256, 256));
         mips.generate(device, queue, &texture, TextureKind::Colour);
-        let sampler = image_sampler(device);
+        let sampler = sampler(device, &TextureSettings::default());
         Self::finalize_texture(device, layout, (texture, DATA_FORMAT), sampler, Some(label))
     }
 
@@ -44,7 +47,7 @@ impl Renderer {
         let label = "White Texture";
         let white = image::RgbaImage::from_pixel(1, 1, image::Rgba([255; 4]));
         let texture = upload((device, queue), label, &white, 1);
-        let sampler = image_sampler(device);
+        let sampler = sampler(device, &TextureSettings::default());
         Self::finalize_texture(device, layout, (texture, DATA_FORMAT), sampler, Some(label))
     }
 
@@ -118,20 +121,22 @@ impl Renderer {
             self.texture_freshness.miss(path_str);
             return Rc::clone(&self.default_texture);
         };
-        let settings = MipSettings::for_map(map, kind);
-        let tex = self.upload_image_texture(path_str, &img, settings);
+        let import = import_settings(map);
+        let tex = self.upload_image_texture(path_str, &img, &import, kind);
         self.gpu_textures.insert(map.clone(), Rc::clone(&tex));
         tex
     }
 
-    /// Uploads a decoded image, with the mips `settings` ask for, and wraps it in a
-    /// cached `GpuTexture`.
+    /// Uploads a decoded image holding `kind`, with the mips and the sampler its
+    /// import settings ask for (#1323), and wraps it in a cached `GpuTexture`.
     fn upload_image_texture(
         &self,
         path_str: &str,
         img: &image::DynamicImage,
-        settings: MipSettings,
+        import: &TextureSettings,
+        kind: TextureKind,
     ) -> Rc<GpuTexture> {
+        let settings = MipSettings::for_map(import, kind);
         let (width, height) = img.dimensions();
         let levels = settings.levels(width, height);
         let gpu = (&self.device, &self.queue);
@@ -143,7 +148,7 @@ impl Renderer {
             &self.device,
             &self.texture_layout,
             (texture, DATA_FORMAT),
-            image_sampler(&self.device),
+            sampler(&self.device, import),
             Some(path_str),
         ))
     }
@@ -207,19 +212,12 @@ fn extent(width: u32, height: u32) -> wgpu::Extent3d {
     }
 }
 
-/// Every image texture's sampler: repeating, trilinear (Unity's default for a
-/// texture with mips), anisotropic.
-fn image_sampler(device: &wgpu::Device) -> wgpu::Sampler {
-    device.create_sampler(&wgpu::SamplerDescriptor {
-        label: Some("Image Sampler"),
-        address_mode_u: wgpu::AddressMode::Repeat,
-        address_mode_v: wgpu::AddressMode::Repeat,
-        mag_filter: wgpu::FilterMode::Linear,
-        min_filter: wgpu::FilterMode::Linear,
-        mipmap_filter: wgpu::MipmapFilterMode::Linear,
-        anisotropy_clamp: 16,
-        ..Default::default()
-    })
+/// The import settings of the image `map` names (#1323), from the sidecar beside
+/// the file it resolves to; the defaults when it has none.
+fn import_settings(map: &MapRef) -> TextureSettings {
+    let file = map.file();
+    file.map(|f| crate::asset::sidecar::texture(&f))
+        .unwrap_or_default()
 }
 
 /// A `side`² dark neon checker of `cell`-texel squares.

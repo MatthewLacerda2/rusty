@@ -17,8 +17,8 @@
 //! add is the material's param uniform (#399): a param marked `runtime` is read from
 //! it, so gameplay drives it (`hit_flash.amount` from a script) with no re-bake.
 //! A block that needs a pattern samples an extra texture slot (#400): `t_mask`, the
-//! texture the material names under `mask` (white when it names none), through the
-//! material's sampler `s_diffuse`.
+//! texture the material names under `mask` (white when it names none), through its
+//! own sampler `s_mask` (the texture's wrap and filter, #1323).
 //!
 //! A [`Stage::Uv`] block (`uv_scroll`, #401) is the exception to "transform the lit
 //! color": it rewrites `in.tex_coords` at the top of `fs_main`, before any map is
@@ -70,7 +70,7 @@ pub const BLOCKS: &[Block] = &[
             Param::live("color", 1.0, 3),
             Param::live("strength", 1.0, 1),
         ],
-        helper: "fn srf_emissive_boost(c: vec3<f32>, in: VertexOutput, color: vec3<f32>, strength: f32) -> vec3<f32> {\n    let mask = textureSample(t_emissive, s_diffuse, in.tex_coords).rgb;\n    return c + color * mask * strength;\n}",
+        helper: "fn srf_emissive_boost(c: vec3<f32>, in: VertexOutput, color: vec3<f32>, strength: f32) -> vec3<f32> {\n    let mask = textureSample(t_emissive, s_emissive, in.tex_coords).rgb;\n    return c + color * mask * strength;\n}",
         call: "srf_emissive_boost({prev}, in{args})",
         textures: &[],
         stage: Stage::Color,
@@ -136,7 +136,7 @@ pub const BLOCKS: &[Block] = &[
             Param::live("edge_color", 1.0, 3),
             Param::baked("tiling", 1.0, 1),
         ],
-        helper: "fn srf_dissolve_cut(in: VertexOutput, amount: f32, edge_width: f32, edge_color: vec3<f32>, tiling: f32) -> f32 {\n    let m = textureSample(t_mask, s_diffuse, in.tex_coords * tiling).r;\n    if (amount > 0.0 && m < amount) {\n        discard;\n    }\n    return m;\n}\nfn srf_dissolve(c: vec3<f32>, in: VertexOutput, amount: f32, edge_width: f32, edge_color: vec3<f32>, tiling: f32) -> vec3<f32> {\n    let m = srf_dissolve_cut(in, amount, edge_width, edge_color, tiling);\n    let edge = 1.0 - smoothstep(amount, amount + max(edge_width, 0.0001), m);\n    return mix(c, edge_color, select(0.0, edge, amount > 0.0));\n}",
+        helper: "fn srf_dissolve_cut(in: VertexOutput, amount: f32, edge_width: f32, edge_color: vec3<f32>, tiling: f32) -> f32 {\n    let m = textureSample(t_mask, s_mask, in.tex_coords * tiling).r;\n    if (amount > 0.0 && m < amount) {\n        discard;\n    }\n    return m;\n}\nfn srf_dissolve(c: vec3<f32>, in: VertexOutput, amount: f32, edge_width: f32, edge_color: vec3<f32>, tiling: f32) -> vec3<f32> {\n    let m = srf_dissolve_cut(in, amount, edge_width, edge_color, tiling);\n    let edge = 1.0 - smoothstep(amount, amount + max(edge_width, 0.0001), m);\n    return mix(c, edge_color, select(0.0, edge, amount > 0.0));\n}",
         call: "srf_dissolve({prev}, in{args})",
         textures: &["mask"],
         stage: Stage::Color,
@@ -150,7 +150,7 @@ pub const BLOCKS: &[Block] = &[
             Param::live("strength", 1.0, 1),
             Param::baked("scroll", 0.0, 2),
         ],
-        helper: "fn srf_detail_overlay(c: vec3<f32>, in: VertexOutput, tiling: f32, strength: f32, scroll: vec2<f32>) -> vec3<f32> {\n    let uv = in.tex_coords * tiling + scroll * camera.time;\n    let d = textureSample(t_mask, s_diffuse, uv).rgb;\n    return c * mix(vec3<f32>(1.0), d * 2.0, strength);\n}",
+        helper: "fn srf_detail_overlay(c: vec3<f32>, in: VertexOutput, tiling: f32, strength: f32, scroll: vec2<f32>) -> vec3<f32> {\n    let uv = in.tex_coords * tiling + scroll * camera.time;\n    let d = textureSample(t_mask, s_mask, uv).rgb;\n    return c * mix(vec3<f32>(1.0), d * 2.0, strength);\n}",
         call: "srf_detail_overlay({prev}, in{args})",
         textures: &["mask"],
         stage: Stage::Color,
@@ -187,7 +187,7 @@ pub const BLOCKS: &[Block] = &[
             Param::baked("scale", 0.5, 1),
             Param::live("strength", 1.0, 1),
         ],
-        helper: "fn srf_triplanar_detail(c: vec3<f32>, in: VertexOutput, scale: f32, strength: f32) -> vec3<f32> {\n    let a = pow(abs(normalize(in.world_normal)), vec3<f32>(4.0));\n    let w = a / max(a.x + a.y + a.z, 0.0001);\n    let p = in.world_position * scale;\n    let x = textureSample(t_mask, s_diffuse, p.zy).rgb;\n    let y = textureSample(t_mask, s_diffuse, p.xz).rgb;\n    let z = textureSample(t_mask, s_diffuse, p.xy).rgb;\n    let d = x * w.x + y * w.y + z * w.z;\n    return c * mix(vec3<f32>(1.0), d * 2.0, strength);\n}",
+        helper: "fn srf_triplanar_detail(c: vec3<f32>, in: VertexOutput, scale: f32, strength: f32) -> vec3<f32> {\n    let a = pow(abs(normalize(in.world_normal)), vec3<f32>(4.0));\n    let w = a / max(a.x + a.y + a.z, 0.0001);\n    let p = in.world_position * scale;\n    let x = textureSample(t_mask, s_mask, p.zy).rgb;\n    let y = textureSample(t_mask, s_mask, p.xz).rgb;\n    let z = textureSample(t_mask, s_mask, p.xy).rgb;\n    let d = x * w.x + y * w.y + z * w.z;\n    return c * mix(vec3<f32>(1.0), d * 2.0, strength);\n}",
         call: "srf_triplanar_detail({prev}, in{args})",
         textures: &["mask"],
         stage: Stage::Color,

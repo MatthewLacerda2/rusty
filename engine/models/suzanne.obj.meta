@@ -9,5 +9,10 @@
     "generate": false,
     "hard_angle": 88.0,
     "pack_margin": 4.0
+  },
+  "texture": {
+    "wrap_mode": "Repeat",
+    "filter_mode": "Trilinear",
+    "generate_mipmaps": true
   }
 }

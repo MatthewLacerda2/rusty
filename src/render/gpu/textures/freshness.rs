@@ -26,12 +26,18 @@
 //! #1130) is dropped when its source is noted, which a re-conversion does, and a
 //! missing one is retried once the file it resolves to exists.
 //!
+//! A texture whose import settings changed (#1323) is dropped the same way: the
+//! settings live in the image's `.meta` sidecar, whose write is noted, so the
+//! upload goes when its sidecar's path is in the log and the next lookup builds it
+//! with the new mips and sampler.
+//!
 //! A file changed on disk by an outside tool at a path that already loaded reaches
 //! the same log: in the editor, its file watch notes every change under the
 //! project's `assets/` (#1327), so an image editor's save reloads like a bake, with
 //! no per-frame stat. A shipped game watches nothing.
 
 use crate::asset::convert::texture_ref;
+use crate::asset::sidecar::meta_path;
 use crate::core::fs::written::Stale;
 use crate::render::Renderer;
 
@@ -54,7 +60,8 @@ impl Renderer {
     /// vs absolute) goes too.
     pub(crate) fn invalidate_textures(&mut self, paths: &[String]) {
         let stale = Stale::new(paths.to_vec());
-        let is_stale = |key: &str| texture_ref::is_written(&stale, key);
+        let is_stale =
+            |key: &str| texture_ref::is_written(&stale, key) || settings_written(&stale, key);
         // A cubemap loaded from a re-written file (#1207). Its probe-array slot
         // goes too, so the next frame copies the new cube in (#1206).
         self.cubemaps.retain(|key, _| !is_stale(key));
@@ -76,4 +83,11 @@ impl Renderer {
             self.skybox_path.clear();
         }
     }
+}
+
+/// Whether the import-settings sidecar of the file the map `key` names is in
+/// `stale` (#1323).
+fn settings_written(stale: &Stale, key: &str) -> bool {
+    let file = texture_ref::file(key);
+    file.is_some_and(|f| stale.matches(&meta_path(&f).to_string_lossy()))
 }

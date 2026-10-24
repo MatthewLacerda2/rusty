@@ -11,6 +11,8 @@
 //! arrived since the last look (MP3 → WAV, #385).
 //! `Assets.GetLightmapUVSettings` / `SetLightmapUVSettings` (#831) read and write a
 //! model's Generate Lightmap UVs import setting, the model inspector's checkbox.
+//! `Assets.GetTextureImportSettings` / `SetTextureImportSettings` (#1323) read and
+//! write an image's wrap, filter and mipmap settings, the image inspector's card.
 
 use std::cell::RefCell;
 use std::path::Path;
@@ -19,6 +21,7 @@ use mlua::{Lua, Table};
 
 use super::{global_table, put, Reg};
 use crate::asset::audio::{refresh, Refresh};
+use crate::asset::sidecar::{FilterMode, TextureSettings, WrapMode};
 use crate::asset::{build_manifest, AssetEntry, SubObjectEntry};
 use crate::asset::{sidecar, LightmapUvSettings};
 use crate::scene::Scene;
@@ -55,6 +58,25 @@ pub fn register(lua: &Lua) -> Reg {
         lua.create_function(|lua, path: String| {
             let stored = sidecar::load(Path::new(&path)).map_err(runtime)?;
             lightmap_uv_table(lua, &stored.lightmap_uvs)
+        }),
+    )?;
+
+    put(
+        &table,
+        "GetTextureImportSettings",
+        lua.create_function(|lua, path: String| {
+            let stored = sidecar::load(Path::new(&path)).map_err(runtime)?;
+            texture_table(lua, &stored.texture)
+        }),
+    )?;
+    put(
+        &table,
+        "SetTextureImportSettings",
+        lua.create_function(|_, (path, t): (String, Table)| {
+            let path = Path::new(&path);
+            let stored = sidecar::load(path).map_err(runtime)?.texture;
+            let s = texture_settings(stored, &t)?;
+            sidecar::set_texture(path, s).map_err(runtime)
         }),
     )?;
 
@@ -96,6 +118,28 @@ fn lightmap_uv_table(lua: &Lua, s: &LightmapUvSettings) -> mlua::Result<Table> {
     t.raw_set("hardAngle", s.hard_angle)?;
     t.raw_set("packMargin", s.pack_margin)?;
     Ok(t)
+}
+
+/// `{ wrapMode, filterMode, generateMipmaps }`.
+fn texture_table(lua: &Lua, s: &TextureSettings) -> mlua::Result<Table> {
+    let t = lua.create_table()?;
+    t.raw_set("wrapMode", s.wrap_mode.name())?;
+    t.raw_set("filterMode", s.filter_mode.name())?;
+    t.raw_set("generateMipmaps", s.generate_mipmaps)?;
+    Ok(t)
+}
+
+/// `stored` with the keys `t` names replaced; an unknown mode name is an error.
+fn texture_settings(mut s: TextureSettings, t: &Table) -> mlua::Result<TextureSettings> {
+    if let Some(name) = t.get::<Option<String>>("wrapMode")? {
+        s.wrap_mode = WrapMode::parse(&name).map_err(runtime)?;
+    }
+    if let Some(name) = t.get::<Option<String>>("filterMode")? {
+        s.filter_mode = FilterMode::parse(&name).map_err(runtime)?;
+    }
+    let mipmaps = t.get::<Option<bool>>("generateMipmaps")?;
+    s.generate_mipmaps = mipmaps.unwrap_or(s.generate_mipmaps);
+    Ok(s)
 }
 
 fn runtime(e: impl ToString) -> mlua::Error {

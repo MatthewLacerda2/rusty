@@ -133,6 +133,9 @@ fn vertex_to_world(model: VertexInput, instance: u32) -> mat4x4<f32> {
     return entity.model_matrix * instances[instance].model_matrix * bone_transform;
 }
 
+// The material maps, each with its own sampler (#1323): wrap and filter are the
+// texture's import settings. A map's sampler sits 16 bindings past it
+// (`shadergen::textures::sampler_binding`); albedo's stays at 1.
 @group(2) @binding(0)
 var t_diffuse: texture_2d<f32>;
 @group(2) @binding(1)
@@ -145,6 +148,14 @@ var t_roughness: texture_2d<f32>;
 var t_normal: texture_2d<f32>;
 @group(2) @binding(5)
 var t_emissive: texture_2d<f32>;
+@group(2) @binding(18)
+var s_metallic: sampler;
+@group(2) @binding(19)
+var s_roughness: sampler;
+@group(2) @binding(20)
+var s_normal: sampler;
+@group(2) @binding(21)
+var s_emissive: sampler;
 
 // The sun's cascaded shadow maps (#435): one light volume per slice of the view,
 // written by `render::passes::shadows::CascadeUniform`.

@@ -1,7 +1,7 @@
 #import common::{DecalSurface, NO_SHADOW, PI, VertexInput, apply_fog, blend_joints, cluster_index, local_light_radiance, local_shadow_tile, sample_local_shadow}
 // Every forward binding but `shadow` (the cascades, read only by `calculate_shadow`;
 // `fs_main` names its result `shadow`), so a surface variant's blocks can read any.
-#import forward::bindings::{bones, camera, cluster_lights, cluster_ranges, decals, entity, instances, lighting, local_lights, s_decal, s_diffuse, s_lightmaps, s_refl_cube, s_shadow, s_skybox, shadow_tiles, t_ao, t_decal_color, t_decal_data, t_diffuse, t_emissive, t_lightmap_dirs, t_lightmaps, t_metallic, t_normal, t_refl_cube, t_roughness, t_shadow, t_shadow_atlas, t_skybox, vertex_to_world}
+#import forward::bindings::{bones, camera, cluster_lights, cluster_ranges, decals, entity, instances, lighting, local_lights, s_decal, s_diffuse, s_emissive, s_lightmaps, s_metallic, s_normal, s_refl_cube, s_roughness, s_shadow, s_skybox, shadow_tiles, t_ao, t_decal_color, t_decal_data, t_diffuse, t_emissive, t_lightmap_dirs, t_lightmaps, t_metallic, t_normal, t_refl_cube, t_roughness, t_shadow, t_shadow_atlas, t_skybox, vertex_to_world}
 #import forward::lighting::{FresnelSchlick, LIGHTMAP_RGBM_RANGE, ambient_occlusion, calculate_pbr, calculate_shadow, decode_lightmap_direction, environment_reflection, eval_sh, fold_decals, lightmap_direction_rebalance}
 
 // The forward pass (and its SSAO prepass and shadow-cascade entry points). Its
@@ -168,15 +168,15 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     if (entity.use_normal_map == 1u) {
         let T = normalize(in.world_tangent.xyz);
         let B = cross(N, T) * in.world_tangent.w;
-        let sampled = textureSample(t_normal, s_diffuse, in.tex_coords).xyz * 2.0 - 1.0;
+        let sampled = textureSample(t_normal, s_normal, in.tex_coords).xyz * 2.0 - 1.0;
         N = normalize(mat3x3<f32>(T, B, N) * sampled);
     }
     let V = normalize(camera.camera_pos - in.world_position);
 
     // glTF metallic-roughness packs metallic in BLUE, roughness in GREEN. Each scalar
     // multiplies its map channel when the flag is set, else acts alone (#202).
-    let surface_metallic = clamp(entity.metallic * select(1.0, textureSample(t_metallic, s_diffuse, in.tex_coords).b, entity.use_metallic_map == 1u), 0.0, 1.0);
-    let surface_roughness = clamp(entity.roughness * select(1.0, textureSample(t_roughness, s_diffuse, in.tex_coords).g, entity.use_roughness_map == 1u), 0.04, 1.0);
+    let surface_metallic = clamp(entity.metallic * select(1.0, textureSample(t_metallic, s_metallic, in.tex_coords).b, entity.use_metallic_map == 1u), 0.0, 1.0);
+    let surface_roughness = clamp(entity.roughness * select(1.0, textureSample(t_roughness, s_roughness, in.tex_coords).g, entity.use_roughness_map == 1u), 0.04, 1.0);
 
     // 0. Surface decals (#638): this cluster's decals change the material inputs
     // before any light is summed, so a decal is lit, shadowed and occluded like the
@@ -280,7 +280,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     // bloom bright-pass turn values >1.0 into a glow with no post-FX work here.
     var emissive = entity.emissive.rgb;
     if (entity.use_emissive_map == 1u) {
-        emissive *= textureSample(t_emissive, s_diffuse, in.tex_coords).rgb;
+        emissive *= textureSample(t_emissive, s_emissive, in.tex_coords).rgb;
     }
     lighting_color += emissive;
 

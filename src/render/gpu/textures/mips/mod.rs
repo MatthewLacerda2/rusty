@@ -9,13 +9,13 @@
 //! mip of a high-contrast texture), a data map its raw values.
 //!
 //! [`MipSettings::for_map`] is the one place an upload decides whether to build a
-//! chain and how; texture import settings (#1323) plug in there.
+//! chain and how, from the texture's import settings (#1323).
 
 mod blit;
 
 pub(crate) use blit::MipGenerator;
 
-use crate::asset::MapRef;
+use crate::asset::sidecar::TextureSettings;
 
 /// What a texture's texels hold, which decides how its mips average. A texture's
 /// first use decides it: the cache keeps one upload per file.
@@ -48,11 +48,11 @@ pub(crate) struct MipSettings {
 }
 
 impl MipSettings {
-    /// The settings for `map`, used as `kind`. Unity's default: a full chain.
-    /// Texture import settings (#1323) read the map's sidecar here.
-    pub(crate) fn for_map(_map: &MapRef, kind: TextureKind) -> Self {
+    /// The settings for a map with import settings `import`, used as `kind`: a
+    /// full chain unless its *Generate Mip Maps* is off (Unity's default is on).
+    pub(crate) fn for_map(import: &TextureSettings, kind: TextureKind) -> Self {
         Self {
-            generate: true,
+            generate: import.generate_mipmaps,
             kind,
         }
     }

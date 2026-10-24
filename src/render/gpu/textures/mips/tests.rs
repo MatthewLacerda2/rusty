@@ -3,7 +3,7 @@
 use super::*;
 
 fn settings(kind: TextureKind) -> MipSettings {
-    MipSettings::for_map(&MapRef::from("assets/floor.png"), kind)
+    MipSettings::for_map(&TextureSettings::default(), kind)
 }
 
 #[test]
@@ -24,10 +24,11 @@ fn a_material_texture_gets_a_full_chain_by_default() {
 
 #[test]
 fn with_generation_off_only_the_base_is_uploaded() {
-    let off = MipSettings {
-        generate: false,
-        kind: TextureKind::Colour,
+    let import = TextureSettings {
+        generate_mipmaps: false,
+        ..TextureSettings::default()
     };
+    let off = MipSettings::for_map(&import, TextureKind::Colour);
     assert_eq!(off.levels(64, 64), 1);
 }
 
