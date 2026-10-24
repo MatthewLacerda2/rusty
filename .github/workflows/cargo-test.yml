@@ -1,27 +1,30 @@
 name: cargo-test
-# Plain `cargo test` on `main`, weekly (#981), on the default feature set. A signal,
-# never a gate (CLAUDE.md, *Gates vs. signals*): the gate is nextest plus a plain
-# `cargo test` of the `dev` set (`make test`, #1338). docs/testing.md promises the suite
-# is runner-independent: nextest gives each test its own process, but
+# Plain `cargo test` on `main`, nightly (#981, #1338). A signal, never a gate
+# (CLAUDE.md, *Gates vs. signals*): nextest is the gate. docs/testing.md promises the
+# suite is runner-independent: nextest gives each test its own process, but
 # `cargo test` runs a whole binary in one, so a test that leans on having its
-# process to itself (`set_var`, `set_current_dir`, a shared scratch path) passes
-# the gate and races here. Nothing else runs it on the default feature set; the
-# `dev` set runs single-process on every PR too, in `build-test` (#1338).
+# process to itself (`set_var`, `set_current_dir`, a `static` left set) passes
+# the gate and races here. cargo-mutants runs `cargo test` too, so such a leak
+# broke the mutation baseline of every branch after it (#1042, #1069, #1337);
+# nightly puts it on the board the morning after it merges, days before the weekly
+# sweep. The `dev` step runs exactly what `make test-one-process` runs on demand.
 #
 # A red run files itself on the board through `main-health.yml`: a failure here
 # is the finding. Never on pull requests (the batch brief for #981); dispatch it
 # on a branch to measure that branch: `gh workflow run cargo-test.yml --ref <branch>`.
 #
-# A second job rides the same schedule: `make dead-pub` (#1205), below.
+# A second job, `make dead-pub` (#1205) below, stays weekly: it runs on the
+# Sunday schedule and on dispatch only.
 #
 # `schedule:` fires only from the default branch, and GitHub disables it after
 # 60 days without repository activity; check the Actions tab if a week passes
 # with no run.
 on:
-  # Sundays, 04:17 UTC: off the hour, clear of `ci.yml`'s nightly `deny` (03:07),
-  # a day after `mutants-sweep.yml` starts (Saturdays 04:41) and a day before
-  # `coverage.yml` (Mondays 05:23).
+  # Nightly, 04:17 UTC: off the hour, clear of `ci.yml`'s nightly `deny` (03:07)
+  # and of `mutants-sweep.yml` (Saturdays 04:41) and `coverage.yml` (Mondays 05:23).
+  # Two lines so the `dead-pub` job's `if:` can tell Sunday's run from the rest.
   schedule:
+    - cron: '17 4 * * 1-6'
     - cron: '17 4 * * 0'
   workflow_dispatch:
 
@@ -50,20 +53,24 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y pkg-config libxkbcommon-dev libwayland-dev libudev-dev libasound2-dev
       - name: Software Vulkan driver (lavapipe)
         run: sudo apt-get install -y mesa-vulkan-drivers libvulkan1
-      # Both feature sets, as `make test` runs them. Each step keeps its log so the
-      # summary below can name the failing tests instead of pointing at the raw log.
+      # Both feature sets. Each step keeps its log so the summary below can name the
+      # failing tests instead of pointing at the raw log; `--no-fail-fast` runs every
+      # binary, so every leak is named, not only the first binary's. The `dev` step is
+      # `make test-one-process` without `--quiet` (the summary reads the per-test
+      # lines); `NEXTEST=1` keeps a provider key out of the tests (#974), and
+      # doctests are left to `make test`, which runs them in the gate.
       - name: cargo test (default)
-        run: cargo test --locked 2>&1 | tee test-default.log
+        run: cargo test --locked --no-fail-fast 2>&1 | tee test-default.log
         shell: bash -o pipefail {0}
       - name: cargo test (dev features)
         if: always()
-        run: cargo test --locked --features dev 2>&1 | tee test-dev.log
+        run: NEXTEST=1 cargo test --locked --features dev --tests --no-fail-fast 2>&1 | tee test-dev.log
         shell: bash -o pipefail {0}
       - name: Summary
         if: always()
         run: |
           {
-            echo '### Plain `cargo test` on `main` (weekly signal, #981)'
+            echo '### Plain `cargo test` on `main` (nightly signal, #981, #1338)'
             echo ''
             for fs in default dev; do
               log="test-$fs.log"
@@ -87,6 +94,7 @@ jobs:
   # when an integration test first named `CARGO_BIN_EXE_*`. That red files
   # through `main-health` like the job above.
   dead-pub:
+    if: github.event_name != 'schedule' || github.event.schedule == '17 4 * * 0'
     runs-on: ubuntu-24.04
     # A cold check of the copied crate plus tools/lint; ~3 min warm in a container.
     timeout-minutes: 45

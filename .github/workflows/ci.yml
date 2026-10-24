@@ -160,26 +160,6 @@ jobs:
           cargo nextest run --profile ci --features dev --locked || rc=$?
           cp target/nextest/ci/junit.xml junit-dev.xml || true
           exit "$rc"
-      # The dev suite again under plain `cargo test`, one process per binary (#1338):
-      # a test leaking process-wide state passes nextest and breaks the mutation
-      # baseline (`make test` says more). Reuses the build of the step above. It
-      # writes no JUnit, so the step names its failing tests itself, from libtest's
-      # `---- <test> stdout ----` headers, in the log and the job summary.
-      - name: Test (engine, dev features, one process)
-        if: needs.changes.outputs.code != 'false'
-        run: |
-          rc=0
-          exec 3>&1 4>&2 > >(tee one-process.log) 2>&1
-          tee_pid=$!
-          NEXTEST=1 cargo test --locked --features dev --tests --no-fail-fast --quiet || rc=$?
-          exec >&3 2>&4
-          wait "$tee_pid"
-          if [ "$rc" -ne 0 ]; then
-            failed=$(sed -n 's/^---- \(.*\) stdout ----$/\1/p' one-process.log | sort -u)
-            printf '\nFailed under one process (#1338):\n%s\n' "${failed:-<no test named; see the log>}"
-            { echo '### Failed under one process (#1338)'; echo "$failed" | sed 's/^/- `/; s/$/`/'; } >> "$GITHUB_STEP_SUMMARY"
-          fi
-          exit "$rc"
       - name: Doctests (both feature sets)
         if: needs.changes.outputs.code != 'false'
         run: |

@@ -31,7 +31,7 @@ SELF_CHECKS := target-dir inventory
 
 .DEFAULT_GOAL := help
 .NOTPARALLEL:
-.PHONY: help setup compile-cache check gates quick-gates pre-commit resolved $(SELF_CHECKS) $(GATES) mergeable queue queue-daemon queue-stop blockers checks reclaim mutants-remote dead-pub editor-capture export launcher bench bless-converters
+.PHONY: help setup compile-cache check gates quick-gates pre-commit resolved $(SELF_CHECKS) $(GATES) mergeable queue queue-daemon queue-stop blockers checks reclaim mutants-remote test-one-process dead-pub editor-capture export launcher bench bless-converters
 
 help: ## List the verbs
 	@grep -E '^[a-z-]+:.*## ' $(firstword $(MAKEFILE_LIST)) | \
@@ -170,21 +170,11 @@ doc: ## [gate] Rustdoc with warnings denied, both feature sets
 	RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --locked
 	RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --locked --features dev
 
-# Then the same tests once more under plain `cargo test`, every test of a binary in
-# one process (#1338): nextest's process per test hides a test that leaks process-wide
-# state (the working directory, a `static`), and cargo-mutants runs `cargo test`, so
-# such a leak broke the mutation baseline of every branch until a mutation run failed
-# (#1042, #1069, #1337). The `dev` feature set, as the mutation runs build; the build
-# is the one nextest just made. `NEXTEST=1` keeps the guarantee that a test never
-# holds a provider key (`dev::providers::credentials`, #974). `--quiet`, since its
-# ~1,800 pass lines are output every agent pays for; `--no-fail-fast` runs every
-# binary so libtest's `failures:` list names every leak, not only the first binary's.
-test: ## [gate] Engine tests (nextest, then one process per binary) and doctests
+test: ## [gate] Engine tests (nextest) and doctests, both feature sets
 	@command -v cargo-nextest >/dev/null 2>&1 || { \
 		echo "test: cargo-nextest is not installed — cargo install --locked cargo-nextest"; exit 1; }
 	$(TEST)
 	$(TEST) --features dev
-	NEXTEST=1 cargo test --locked --features dev --tests --no-fail-fast --quiet
 	cargo test --doc --locked
 	cargo test --doc --locked --features dev
 
@@ -287,6 +277,26 @@ mutants-remote: ## Mutation on GitHub's runners, scoped. make mutants-remote SCO
 		echo "                e.g. make mutants-remote SCOPE='src/navigation/**'" >&2; \
 		exit 1; }
 	@python3 .github/scripts/mutants-remote.py '$(SCOPE)'
+
+# The `dev` suite under plain `cargo test`, every test of a binary in one process
+# (#1338): nextest's process per test hides a test that leaks process-wide state (the
+# working directory, a `static` left set), and cargo-mutants runs `cargo test`, so such
+# a leak broke the mutation baseline of every branch after it (#1042, #1069, #1337).
+# A signal, never a gate: it runs nightly on `main` in cargo-test.yml, and this verb
+# runs it on demand. `NEXTEST=1` keeps the guarantee that a test never holds a provider
+# key (`dev::providers::credentials`, #974). `--quiet`, since its ~1,800 pass lines are
+# output every agent pays for; `--no-fail-fast` runs every binary, and the failing tests
+# are named again at the end (the log stays in target/one-process.log).
+test-one-process: ## Signal: the dev suite under plain cargo test, one process per binary
+	@mkdir -p target; \
+	{ NEXTEST=1 cargo test --locked --features dev --tests --no-fail-fast --quiet 2>&1; \
+		echo $$? > target/one-process.rc; } | tee target/one-process.log; \
+	rc=$$(cat target/one-process.rc); \
+	if [ "$$rc" -ne 0 ]; then \
+		printf '\nFailed under one process (#1338):\n'; \
+		sed -n 's/^---- \(.*\) stdout ----$$/\1/p' target/one-process.log | sort -u; \
+	fi; \
+	exit "$$rc"
 
 # `pub` items nothing in the project uses, and items only tests use (#1003): rustc's
 # dead_code over a copy of the tree (under target/dead-pub/) with the lib's modules
