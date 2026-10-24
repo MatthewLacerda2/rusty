@@ -24,6 +24,7 @@ inspect! {
         ro!("previous_clip", PLAYBACK),
         ro!("previous_tree", PLAYBACK),
         ro!("previous_time", PLAYBACK),
+        ro!("previous_loop", PLAYBACK),
         ro!("crossfade_elapsed", PLAYBACK),
         ro!("crossfade_duration", PLAYBACK),
         ro!("current_node", PLAYBACK),
