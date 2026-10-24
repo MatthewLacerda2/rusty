@@ -9,17 +9,18 @@
 
 use glam::Vec4;
 
+use super::sanitize::{finite4, non_negative};
 use crate::components::{MaskComponent, RectMaskComponent};
 
 /// Set the clip's inset from the element's bounds (left, bottom, right, top), in
 /// reference units. Negative values grow the clip past the rect.
 pub fn set_padding(m: &mut RectMaskComponent, padding: Vec4) {
-    m.padding = padding;
+    m.padding = finite4(padding);
 }
 
 /// Set the soft edge's width in reference units, clamped to `>= 0` (`0`: hard).
 pub fn set_feather(m: &mut RectMaskComponent, feather: f32) {
-    m.feather = feather.max(0.0);
+    m.feather = non_negative(feather);
 }
 
 /// Set whether a Mask also draws its own graphic.

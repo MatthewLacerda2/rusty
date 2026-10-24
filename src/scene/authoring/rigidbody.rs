@@ -16,6 +16,7 @@
 
 use glam::Vec3;
 
+use super::sanitize::{clamped, finite3};
 use crate::components::{CollisionDetection, RigidBodyComponent};
 
 /// Set the rigidbody's `active` flag.
@@ -36,17 +37,17 @@ pub fn set_use_gravity(rb: &mut RigidBodyComponent, use_gravity: bool) {
 /// Set the rigidbody's mass, clamped to `[0.01, 1000.0]` (the editor card's range;
 /// the clamp lives HERE, once, so a script set is bounded the same way).
 pub fn set_mass(rb: &mut RigidBodyComponent, mass: f32) {
-    rb.mass = mass.clamp(0.01, 1000.0);
+    rb.mass = clamped(mass, 0.01, 1000.0);
 }
 
 /// Set the rigidbody's linear velocity.
 pub fn set_velocity(rb: &mut RigidBodyComponent, velocity: Vec3) {
-    rb.velocity = velocity;
+    rb.velocity = finite3(velocity);
 }
 
 /// Set the rigidbody's angular velocity (radians/sec per axis).
 pub fn set_angular_velocity(rb: &mut RigidBodyComponent, angular_velocity: Vec3) {
-    rb.angular_velocity = angular_velocity;
+    rb.angular_velocity = finite3(angular_velocity);
 }
 
 /// Set the rigidbody's collision-detection mode (Discrete / Continuous).

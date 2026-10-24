@@ -12,7 +12,7 @@
 
 use glam::Vec3;
 
-use super::sanitize::{at_least, non_negative};
+use super::sanitize::{at_least, finite3_or, non_negative};
 use crate::components::CharacterControllerComponent;
 
 /// The smallest radius / skin a capsule may have: a zero would make the sweep
@@ -33,9 +33,7 @@ pub fn set_radius(c: &mut CharacterControllerComponent, radius: f32) {
 
 /// Set the capsule's centre, in local space. A non-finite centre is ignored.
 pub fn set_center(c: &mut CharacterControllerComponent, center: Vec3) {
-    if center.is_finite() {
-        c.center = center;
-    }
+    c.center = finite3_or(center, c.center);
 }
 
 /// Set the tallest step a move climbs, floored at 0 (no stepping).

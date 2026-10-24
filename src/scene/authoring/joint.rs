@@ -10,7 +10,7 @@
 
 use glam::{Vec2, Vec3};
 
-use super::sanitize::{clamped, non_negative};
+use super::sanitize::{clamped, finite3, non_negative};
 use crate::components::{JointComponent, JointKind};
 
 /// The widest angle (degrees) a limit may name: just short of a half-turn, where
@@ -29,12 +29,12 @@ pub fn set_connected_body(j: &mut JointComponent, body: Option<u32>) {
 
 /// Set the pivot, in this entity's local space.
 pub fn set_anchor(j: &mut JointComponent, anchor: Vec3) {
-    j.anchor = anchor;
+    j.anchor = finite3(anchor);
 }
 
 /// Set the pivot on the connected body (world space with no connected body).
 pub fn set_connected_anchor(j: &mut JointComponent, anchor: Vec3) {
-    j.connected_anchor = anchor;
+    j.connected_anchor = finite3(anchor);
 }
 
 /// Set whether the connected anchor is derived from `anchor` at build time.
@@ -44,6 +44,7 @@ pub fn set_auto_configure_connected_anchor(j: &mut JointComponent, auto: bool) {
 
 /// Set the hinge / twist axis, normalized. A zero (or non-finite) axis names no
 /// direction and is ignored.
+// lint: allow(sanitize) try_normalize refuses a NaN, infinite or zero axis; the old one stays
 pub fn set_axis(j: &mut JointComponent, axis: Vec3) {
     if let Some(unit) = axis.try_normalize() {
         j.axis = unit;
@@ -52,6 +53,7 @@ pub fn set_axis(j: &mut JointComponent, axis: Vec3) {
 
 /// Set a Ball joint's swing-1 axis, normalized. A zero (or non-finite) axis
 /// names no direction and is ignored.
+// lint: allow(sanitize) try_normalize refuses a NaN, infinite or zero axis; the old one stays
 pub fn set_swing_axis(j: &mut JointComponent, axis: Vec3) {
     if let Some(unit) = axis.try_normalize() {
         j.swing_axis = unit;
@@ -66,20 +68,23 @@ pub fn set_use_limits(j: &mut JointComponent, use_limits: bool) {
 /// Set the hinge / twist range in degrees, each end clamped to `±MAX_ANGLE` and
 /// the pair ordered so `min <= max`.
 pub fn set_limits(j: &mut JointComponent, min: f32, max: f32) {
-    let (a, b) = (clamp_angle(min), clamp_angle(max));
+    let (a, b) = (
+        clamped(min, -MAX_ANGLE, MAX_ANGLE),
+        clamped(max, -MAX_ANGLE, MAX_ANGLE),
+    );
     j.limits = Vec2::new(a.min(b), a.max(b));
 }
 
 /// Set a Ball joint's swing-1 limit (degrees, about the swing axis), clamped to
 /// `[0, MAX_ANGLE]`.
 pub fn set_swing_limit(j: &mut JointComponent, degrees: f32) {
-    j.swing_limit = clamp_angle(degrees).max(0.0);
+    j.swing_limit = clamped(degrees, 0.0, MAX_ANGLE);
 }
 
 /// Set a Ball joint's swing-2 limit (degrees, about `axis × swing_axis`),
 /// clamped to `[0, MAX_ANGLE]`.
 pub fn set_swing2_limit(j: &mut JointComponent, degrees: f32) {
-    j.swing2_limit = clamp_angle(degrees).max(0.0);
+    j.swing2_limit = clamped(degrees, 0.0, MAX_ANGLE);
 }
 
 /// Set the breaking force, floored at 0 (unbreakable).
@@ -95,10 +100,6 @@ pub fn set_break_torque(j: &mut JointComponent, torque: f32) {
 /// Set whether the two joined bodies collide with each other.
 pub fn set_enable_collision(j: &mut JointComponent, enable: bool) {
     j.enable_collision = enable;
-}
-
-fn clamp_angle(degrees: f32) -> f32 {
-    clamped(degrees, -MAX_ANGLE, MAX_ANGLE)
 }
 
 #[cfg(test)]

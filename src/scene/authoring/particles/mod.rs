@@ -30,6 +30,7 @@ use crate::components::{
     SubEmitTrigger,
 };
 use crate::core::curve::{ColorRange, Curve, Gradient, Range};
+use crate::scene::authoring::sanitize::{finite, finite3, finite3_or, non_negative};
 
 /// Set the emitter's `active` gate.
 pub fn set_active(p: &mut ParticleEmitterComponent, active: bool) {
@@ -48,7 +49,7 @@ pub fn set_looping(p: &mut ParticleEmitterComponent, looping: bool) {
 
 /// Set the continuous emission rate, clamped to `≥ 0` (matches `Particles.SetRate`).
 pub fn set_rate(p: &mut ParticleEmitterComponent, rate: f32) {
-    p.rate = rate.max(0.0);
+    p.rate = non_negative(rate);
 }
 
 /// Set the per-burst particle count.
@@ -83,17 +84,17 @@ pub fn set_speed(p: &mut ParticleEmitterComponent, speed: Range) {
 
 /// Set the emission direction (the shape's axis).
 pub fn set_direction(p: &mut ParticleEmitterComponent, direction: Vec3) {
-    p.direction = direction;
+    p.direction = finite3_or(direction, p.direction);
 }
 
 /// Set the emission spread.
 pub fn set_spread(p: &mut ParticleEmitterComponent, spread: f32) {
-    p.spread = spread;
+    p.spread = non_negative(spread);
 }
 
 /// Set the per-particle gravity.
 pub fn set_gravity(p: &mut ParticleEmitterComponent, gravity: Vec3) {
-    p.gravity = gravity;
+    p.gravity = finite3(gravity);
 }
 
 /// Set the emission shape.
@@ -156,7 +157,7 @@ pub fn set_sub_emitter(
 
 /// Set the fraction of a parent particle's velocity sub-particles inherit.
 pub fn set_inherit_velocity(p: &mut ParticleEmitterComponent, fraction: f32) {
-    p.sub_emitters.inherit_velocity = fraction;
+    p.sub_emitters.inherit_velocity = finite(fraction);
 }
 
 /// Set the collision response (none / die / bounce).
@@ -166,7 +167,7 @@ pub fn set_collision(p: &mut ParticleEmitterComponent, collision: CollisionRespo
 
 /// Set the collision bounciness (restitution).
 pub fn set_bounciness(p: &mut ParticleEmitterComponent, bounciness: f32) {
-    p.bounciness = bounciness;
+    p.bounciness = non_negative(bounciness);
 }
 
 /// Set the deterministic spawn seed.

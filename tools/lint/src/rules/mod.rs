@@ -21,6 +21,7 @@ mod log_tag;
 mod markers;
 mod named_enum;
 mod prefix;
+mod sanitize;
 mod skip;
 mod slash_join;
 mod sorted;
@@ -62,6 +63,7 @@ const RULES: &[(Rule, Allow)] = &[
     (markers::run, Allow::Inline),
     (named_enum::run, Allow::Inline),
     (prefix::run, Allow::Inline),
+    (sanitize::run, Allow::Inline),
     (skip::run, Allow::Inline),
     (slash_join::run, Allow::Inline),
     (sorted::run, Allow::Inline),

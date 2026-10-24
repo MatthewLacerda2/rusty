@@ -10,6 +10,7 @@
 
 use glam::Vec3;
 
+use super::sanitize::{finite, finite3, non_negative};
 use crate::scene::fog::{FogMode, FogSettings};
 
 /// Set the fog mode (`Off` disables fog everywhere).
@@ -19,33 +20,33 @@ pub fn set_mode(fog: &mut FogSettings, mode: FogMode) {
 
 /// Set the fog colour (linear RGB), each channel clamped to `≥ 0`.
 pub fn set_color(fog: &mut FogSettings, color: Vec3) {
-    fog.color = color.max(Vec3::ZERO);
+    fog.color = finite3(color).max(Vec3::ZERO);
 }
 
 /// Set the exponential density, clamped to `≥ 0`.
 pub fn set_density(fog: &mut FogSettings, density: f32) {
-    fog.density = density.max(0.0);
+    fog.density = non_negative(density);
 }
 
 /// Set where fog begins, clamped to `≥ 0`.
 pub fn set_start(fog: &mut FogSettings, start: f32) {
-    fog.start = start.max(0.0);
+    fog.start = non_negative(start);
 }
 
 /// Set where linear fog is full, clamped to `≥ 0`. An end at or before the start
 /// fogs everything past the start fully; the shader guards the divide.
 pub fn set_end(fog: &mut FogSettings, end: f32) {
-    fog.end = end.max(0.0);
+    fog.end = non_negative(end);
 }
 
 /// Set how fast fog thins with height, clamped to `≥ 0` (`0` is uniform fog).
 pub fn set_height_falloff(fog: &mut FogSettings, falloff: f32) {
-    fog.height_falloff = falloff.max(0.0);
+    fog.height_falloff = non_negative(falloff);
 }
 
 /// Set the height below which fog is at full thickness.
 pub fn set_base_height(fog: &mut FogSettings, height: f32) {
-    fog.base_height = height;
+    fog.base_height = finite(height);
 }
 
 #[cfg(test)]

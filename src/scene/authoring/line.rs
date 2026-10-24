@@ -7,6 +7,7 @@
 
 use glam::Vec3;
 
+use super::sanitize::finite3_or;
 use crate::components::LineComponent;
 
 /// The most points a line holds — a guard against a runaway script loop.
@@ -20,8 +21,8 @@ pub fn set_positions(l: &mut LineComponent, positions: &[Vec3]) {
 
 /// Move point `index` (0-based); out of range or non-finite is ignored.
 pub fn set_position(l: &mut LineComponent, index: usize, position: Vec3) {
-    if let (Some(p), true) = (l.positions.get_mut(index), position.is_finite()) {
-        *p = position;
+    if let Some(p) = l.positions.get_mut(index) {
+        *p = finite3_or(position, *p);
     }
 }
 

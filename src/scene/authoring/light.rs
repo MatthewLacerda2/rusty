@@ -15,21 +15,22 @@
 
 use glam::Vec3;
 
+use super::sanitize::{clamped, finite3, non_negative};
 use crate::components::{LightComponent, LightMode, LightType};
 
 /// Set the light's linear RGB colour.
 pub fn set_color(l: &mut LightComponent, rgb: Vec3) {
-    l.color = rgb;
+    l.color = finite3(rgb).max(Vec3::ZERO);
 }
 
 /// Set the light's intensity, clamped to `≥ 0` (a negative emit is meaningless).
 pub fn set_intensity(l: &mut LightComponent, value: f32) {
-    l.intensity = value.max(0.0);
+    l.intensity = non_negative(value);
 }
 
 /// Set the light's range, clamped to `≥ 0`.
 pub fn set_range(l: &mut LightComponent, value: f32) {
-    l.range = value.max(0.0);
+    l.range = non_negative(value);
 }
 
 /// The cone angles (degrees) a new light carries, and a spot seeds when it has none.
@@ -51,11 +52,16 @@ pub fn set_mode(l: &mut LightComponent, mode: LightMode) {
     l.mode = mode;
 }
 
-/// Set the spotlight cone angles (degrees), keeping `inner ≤ outer` so the inner
-/// cone never exceeds the outer one. The validation lives HERE, once.
+/// The widest cone half-angle (degrees): Unity's spot angle tops out under 180°
+/// full, and the inspector's slider stops here.
+pub const MAX_CONE: f32 = 90.0;
+
+/// Set the spotlight cone half-angles (degrees): `outer` in `[0, MAX_CONE]`, and
+/// `inner` in `[0, outer]` so the inner cone never exceeds the outer one. NaN or
+/// infinite takes `0`. The validation lives HERE, once.
 pub fn set_cones(l: &mut LightComponent, inner: f32, outer: f32) {
-    l.outer_cone = outer;
-    l.inner_cone = inner.min(outer);
+    l.outer_cone = clamped(outer, 0.0, MAX_CONE);
+    l.inner_cone = clamped(inner, 0.0, l.outer_cone);
 }
 
 /// Set whether a point or spot light casts shadows through the shadow atlas (#468).

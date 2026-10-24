@@ -8,6 +8,7 @@
 
 use glam::Vec4;
 
+use super::sanitize::{non_negative, unit_color};
 use crate::asset::MapRef;
 use crate::components::{
     NavigationMode, SelectableComponent, SelectableTransition, SelectionState,
@@ -38,12 +39,12 @@ pub fn set_target_graphic(s: &mut SelectableComponent, target: Option<u32>) {
 
 /// Set `state`'s tint colour, each channel clamped to `[0, 1]`.
 pub fn set_color(s: &mut SelectableComponent, state: SelectionState, color: Vec4) {
-    s.colors[state as usize] = color.clamp(Vec4::ZERO, Vec4::ONE);
+    s.colors[state as usize] = unit_color(color);
 }
 
 /// Set the fade duration in seconds, floored at 0 (instant).
 pub fn set_fade_duration(s: &mut SelectableComponent, seconds: f32) {
-    s.fade_duration = seconds.max(0.0);
+    s.fade_duration = non_negative(seconds);
 }
 
 /// Set `state`'s swap sprite (`None`: the Image's own texture). `Normal` has no slot

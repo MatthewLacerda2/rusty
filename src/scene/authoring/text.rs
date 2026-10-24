@@ -10,7 +10,7 @@
 
 use glam::{Vec2, Vec4};
 
-use super::sanitize::{at_least, unit_color};
+use super::sanitize::{at_least, finite, finite2, non_negative, unit_color};
 use crate::components::{TextAlignment, TextComponent, TextOverflow};
 
 /// The smallest size a text can be set to, in reference units.
@@ -67,12 +67,12 @@ pub fn set_overflow(t: &mut TextComponent, overflow: TextOverflow) {
 
 /// Set the line-pitch multiplier, kept ≥ 0.
 pub fn set_line_spacing(t: &mut TextComponent, spacing: f32) {
-    t.line_spacing = spacing.max(0.0);
+    t.line_spacing = non_negative(spacing);
 }
 
 /// Set the extra advance between characters, in ems (negative tightens).
 pub fn set_letter_spacing(t: &mut TextComponent, spacing: f32) {
-    t.letter_spacing = spacing;
+    t.letter_spacing = finite(spacing);
 }
 
 /// Set auto-size and its size range; both bounds stay positive and `min ≤ max`.
@@ -100,19 +100,19 @@ pub fn set_blend(t: &mut TextComponent, blend: crate::components::UiBlend) {
 
 /// Set the outline: thickness in ems (≥ 0) and colour.
 pub fn set_outline(t: &mut TextComponent, width: f32, color: Vec4) {
-    t.outline_width = width.max(0.0);
+    t.outline_width = non_negative(width);
     t.outline_color = unit_color(color);
 }
 
 /// Set the drop shadow: offset in reference units and colour.
 pub fn set_shadow(t: &mut TextComponent, offset: Vec2, color: Vec4) {
-    t.shadow_offset = offset;
+    t.shadow_offset = finite2(offset);
     t.shadow_color = unit_color(color);
 }
 
 /// Set the glow: reach in ems (≥ 0) and colour.
 pub fn set_glow(t: &mut TextComponent, size: f32, color: Vec4) {
-    t.glow_size = size.max(0.0);
+    t.glow_size = non_negative(size);
     t.glow_color = unit_color(color);
 }
 

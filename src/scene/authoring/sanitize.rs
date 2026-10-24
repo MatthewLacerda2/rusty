@@ -4,8 +4,11 @@
 //!
 //! Every setter uses these, so `+inf` from Lua (`math.huge`) is refused the same way
 //! everywhere: it takes the fallback, as NaN does, and never reaches a field (#993).
+//! The `sanitize` lint rule holds it (#1361): a `pub fn set_*` in this module that
+//! takes an `f32` or a glam vector passes it to one of these (or to a sibling
+//! setter that does), or says why not with `// lint: allow(sanitize) <why>`.
 
-use glam::Vec4;
+use glam::{Vec2, Vec3, Vec4};
 
 /// The smallest size a box side, radius, height or scale may have: one floor for the
 /// one idea, shared by the nav obstacle and modifier, the LOD group, the canvas and
@@ -42,13 +45,10 @@ pub(super) fn non_negative(v: f32) -> f32 {
     at_least(v, 0.0)
 }
 
-/// `v` clamped to `[lo, hi]`; `0.0` when `v` is NaN or infinite.
+/// `v` clamped to `[lo, hi]`; `0.0` (itself clamped into the range) when `v` is
+/// NaN or infinite.
 pub(super) fn clamped(v: f32, lo: f32, hi: f32) -> f32 {
-    if v.is_finite() {
-        v.clamp(lo, hi)
-    } else {
-        0.0
-    }
+    finite(v).clamp(lo, hi)
 }
 
 /// `v` clamped to `[0, 1]`; `0.0` when `v` is NaN or infinite.
@@ -56,9 +56,39 @@ pub(super) fn unit(v: f32) -> f32 {
     clamped(v, 0.0, 1.0)
 }
 
-/// An RGBA colour with each channel clamped to `[0, 1]`.
+/// An RGBA colour with each channel clamped to `[0, 1]`; a NaN or infinite
+/// channel is `0.0`.
 pub(super) fn unit_color(c: Vec4) -> Vec4 {
-    c.clamp(Vec4::ZERO, Vec4::ONE)
+    Vec4::new(unit(c.x), unit(c.y), unit(c.z), unit(c.w))
+}
+
+/// `v` with each NaN or infinite component `0.0`.
+pub(super) fn finite2(v: Vec2) -> Vec2 {
+    finite2_or(v, Vec2::ZERO)
+}
+
+/// `v` with each NaN or infinite component taken from `fallback`.
+pub(super) fn finite2_or(v: Vec2, fallback: Vec2) -> Vec2 {
+    Vec2::new(finite_or(v.x, fallback.x), finite_or(v.y, fallback.y))
+}
+
+/// `v` with each NaN or infinite component `0.0`.
+pub(super) fn finite3(v: Vec3) -> Vec3 {
+    finite3_or(v, Vec3::ZERO)
+}
+
+/// `v` with each NaN or infinite component taken from `fallback`.
+pub(super) fn finite3_or(v: Vec3, fallback: Vec3) -> Vec3 {
+    Vec3::new(
+        finite_or(v.x, fallback.x),
+        finite_or(v.y, fallback.y),
+        finite_or(v.z, fallback.z),
+    )
+}
+
+/// `v` with each NaN or infinite component `0.0`.
+pub(super) fn finite4(v: Vec4) -> Vec4 {
+    Vec4::new(finite(v.x), finite(v.y), finite(v.z), finite(v.w))
 }
 
 #[cfg(test)]
@@ -74,6 +104,11 @@ mod tests {
             assert_eq!(non_negative(bad), 0.0);
             assert_eq!(unit(bad), 0.0);
             assert_eq!(clamped(bad, -5.0, 5.0), 0.0);
+            assert_eq!(
+                clamped(bad, 0.01, 10.0),
+                0.01,
+                "the fallback stays in range"
+            );
         }
     }
 
@@ -88,5 +123,17 @@ mod tests {
             unit_color(Vec4::new(-1.0, 0.5, 2.0, 1.0)),
             Vec4::new(0.0, 0.5, 1.0, 1.0)
         );
+    }
+
+    #[test]
+    fn vectors_sanitize_each_component() {
+        let bad = Vec4::new(f32::NAN, 0.5, f32::INFINITY, f32::NEG_INFINITY);
+        assert_eq!(unit_color(bad), Vec4::new(0.0, 0.5, 0.0, 0.0));
+        assert_eq!(finite4(bad), Vec4::new(0.0, 0.5, 0.0, 0.0));
+        assert_eq!(finite3(bad.truncate()), Vec3::new(0.0, 0.5, 0.0));
+        let kept = finite3_or(bad.truncate(), Vec3::splat(7.0));
+        assert_eq!(kept, Vec3::new(7.0, 0.5, 7.0));
+        assert_eq!(finite2(bad.truncate().truncate()), Vec2::new(0.0, 0.5));
+        assert_eq!(finite2_or(Vec2::NAN, Vec2::ONE), Vec2::ONE);
     }
 }
