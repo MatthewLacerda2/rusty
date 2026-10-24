@@ -42,6 +42,7 @@ pub fn launch_picker() {
         PICKER_TITLE,
         Some(APP_ID),
         size,
+        true,
         |window, renderer| {
             icon::apply(window);
             picker::PickerStage::new(window, renderer, ProjectPicker::for_user())
@@ -83,6 +84,7 @@ fn prepare(
     let launch = Launch {
         title: TITLE.to_string(),
         app_id: Some(APP_ID),
+        maximized: true,
         video_defaults: VideoSettings::default(),
         frontend: |shell: &Shell, game: &GameWorld| {
             icon::apply(&shell.window);

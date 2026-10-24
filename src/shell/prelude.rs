@@ -38,12 +38,14 @@ pub trait Prelude {
 }
 
 /// Run a prelude on a window titled `title` (named `app_id`, as
-/// [`Launch::app_id`]) and `size` big, then the game `boot` builds from its
-/// output, until the window closes.
+/// [`Launch::app_id`]) and `size` big (`maximized` fills the screen instead, see
+/// [`boot::create_window`]), then the game `boot` builds from its output, until the
+/// window closes.
 pub fn run_after<P, K, B, F, M>(
     title: &str,
     app_id: Option<&'static str>,
     size: (u32, u32),
+    maximized: bool,
     make: K,
     boot: B,
 ) where
@@ -60,6 +62,7 @@ pub fn run_after<P, K, B, F, M>(
             title: title.to_string(),
             app_id,
             size,
+            maximized,
             make,
             boot,
         },
@@ -75,6 +78,7 @@ enum Stage<P, K, B, F, M> {
         title: String,
         app_id: Option<&'static str>,
         size: (u32, u32),
+        maximized: bool,
         make: K,
         boot: B,
     },
@@ -157,10 +161,11 @@ where
                 title,
                 app_id,
                 size,
+                maximized,
                 make,
                 boot,
             } => {
-                let window = boot::create_window(event_loop, &title, app_id, size);
+                let window = boot::create_window(event_loop, &title, app_id, size, maximized);
                 let renderer = boot::init_renderer(&window);
                 let prelude = make(&window, &renderer);
                 self.stage = Stage::Prelude(Box::new(Open {

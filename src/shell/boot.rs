@@ -43,17 +43,21 @@ pub fn refresh_assets() -> crate::asset::audio::Refresh {
     crate::asset::audio::refresh(std::path::Path::new(ASSET_ROOT))
 }
 
-/// Open the window at `size` with `title`, named `app_id` on Linux when one is given
-/// ([`Launch::app_id`](super::Launch::app_id)).
-pub fn create_window(
-    event_loop: &ActiveEventLoop,
+/// The attributes of a window at `size` with `title`, named `app_id` on Linux when one
+/// is given ([`Launch::app_id`](super::Launch::app_id)). `maximized` asks the window
+/// manager to fill the screen (winit: the maximized state on Linux and Windows, the
+/// zoom to the visible frame on macOS, never native fullscreen); `size` is then only
+/// the size it returns to.
+fn window_attributes(
     title: &str,
     app_id: Option<&str>,
     (width, height): (u32, u32),
-) -> Arc<Window> {
+    maximized: bool,
+) -> winit::window::WindowAttributes {
     let attributes = Window::default_attributes()
         .with_title(title)
-        .with_inner_size(winit::dpi::PhysicalSize::new(width, height));
+        .with_inner_size(winit::dpi::PhysicalSize::new(width, height))
+        .with_maximized(maximized);
     #[cfg(target_os = "linux")]
     let attributes = match app_id {
         // winit keeps one name for Wayland's `app_id` and X11's `WM_CLASS`.
@@ -64,9 +68,21 @@ pub fn create_window(
     };
     #[cfg(not(target_os = "linux"))]
     let _ = app_id;
+    attributes
+}
+
+/// Open the window at `size` with `title` and `app_id`, `maximized` or not (the editor
+/// asks for it; the player follows its build's `window_mode` instead).
+pub fn create_window(
+    event_loop: &ActiveEventLoop,
+    title: &str,
+    app_id: Option<&str>,
+    size: (u32, u32),
+    maximized: bool,
+) -> Arc<Window> {
     Arc::new(
         event_loop
-            .create_window(attributes)
+            .create_window(window_attributes(title, app_id, size, maximized))
             .expect("the OS refused to create a window"),
     )
 }
@@ -193,5 +209,16 @@ impl Shell {
         // Boundary read: apply the persisted settings before the first frame.
         settings::load(&mut shell, game, video_defaults);
         shell
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::window_attributes;
+
+    #[test]
+    fn only_a_maximized_request_maximizes_the_window() {
+        assert!(window_attributes("editor", None, (1280, 720), true).maximized);
+        assert!(!window_attributes("player", None, (1280, 720), false).maximized);
     }
 }
