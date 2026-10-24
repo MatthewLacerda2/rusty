@@ -121,3 +121,17 @@ fn fold_drops_dots_and_folds_climbs_without_the_disk() {
     assert_eq!(fold("a/.."), Path::new("."));
     assert_eq!(fold("a/./b"), Path::new("a/b"));
 }
+
+#[test]
+fn a_slashed_path_comes_out_in_the_platforms_separator() {
+    use std::path::MAIN_SEPARATOR_STR as SEP;
+    assert_eq!(native_string("a/b/c"), ["a", "b", "c"].join(SEP));
+    assert_eq!(native("a/b/c"), Path::new("a").join("b").join("c"));
+    let rooted = Path::new("/").join("engine").join("target");
+    assert_eq!(native("/engine/target"), rooted);
+    assert_eq!(
+        native("a//b/"),
+        Path::new("a").join("b"),
+        "empty parts drop"
+    );
+}

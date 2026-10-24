@@ -37,7 +37,7 @@ const BLESS: &str = "RUSTY_BLESS_CONVERTERS";
 
 /// Check (or, with [`BLESS`] set, re-bless) every converter `which` picks.
 pub fn gate(which: impl Fn(&Converter) -> bool) {
-    let path = crate_root().join(FINGERPRINTS);
+    let path = crate_root().join(crate::core::paths::native(FINGERPRINTS));
     let text = std::fs::read_to_string(&path).unwrap_or_default();
     let mut rows: Vec<Row> = table::parse(&text).unwrap_or_else(|e| panic!("{FINGERPRINTS}: {e}"));
     let bless = std::env::var_os(BLESS).is_some();
@@ -120,7 +120,7 @@ fn convert(converter: &Converter, source: &Path, name: &str, run: &str) -> Vec<u
 
 /// The fixtures of `extension`, by name.
 fn fixtures(extension: &str) -> Vec<PathBuf> {
-    let dir = crate_root().join(crate::test_path::native("tests/fixtures/models"));
+    let dir = crate_root().join(crate::core::paths::native("tests/fixtures/models"));
     let mut found: Vec<PathBuf> = std::fs::read_dir(&dir)
         .expect("the model fixtures")
         .map(|e| e.expect("a fixtures entry").path())

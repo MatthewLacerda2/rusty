@@ -38,7 +38,7 @@ pub use crate::core::project::GENERATED_DIR;
 /// Where a brief's output lives, relative to the working directory.
 pub fn address<B: Brief + ?Sized>(brief: &B) -> serde_json::Result<PathBuf> {
     let name = format!("{}-{}.{}", brief.kind(), digest(brief)?, brief.extension());
-    Ok(Path::new(GENERATED_DIR).join(name))
+    Ok(crate::core::paths::native(GENERATED_DIR).join(name))
 }
 
 /// Where a generated asset stands. No `queued` and no `expired`: none of the

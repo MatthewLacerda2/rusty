@@ -174,7 +174,10 @@ pub fn refresh(converter: &Converter, source: &Path, out: &Path) -> Result<(), I
 /// whole of `rel` under [`IMPORT_CACHE_DIR`], plus `.glb`. Nothing is stripped or
 /// re-encoded, so distinct sources never share a cache (#1167).
 pub fn cache_path(root: &Path, rel: &Path) -> PathBuf {
-    with_suffix(&root.join(IMPORT_CACHE_DIR).join(rel), ".glb")
+    with_suffix(
+        &root.join(paths::native(IMPORT_CACHE_DIR)).join(rel),
+        ".glb",
+    )
 }
 
 /// True when `path` is inside an import cache: what the manifest and the content

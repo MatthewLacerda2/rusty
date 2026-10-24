@@ -88,7 +88,7 @@ impl RecentProjects {
 pub fn config_dir(var: impl Fn(&str) -> Option<String>) -> Option<PathBuf> {
     let nonempty = |name: &str| var(name).filter(|v| !v.is_empty()).map(PathBuf::from);
     let base = if cfg!(target_os = "macos") {
-        nonempty("HOME").map(|home| home.join("Library/Application Support"))
+        nonempty("HOME").map(|home| home.join("Library").join("Application Support"))
     } else {
         nonempty("XDG_CONFIG_HOME").or_else(|| nonempty("HOME").map(|h| h.join(".config")))
     };

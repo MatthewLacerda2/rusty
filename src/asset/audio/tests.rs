@@ -82,10 +82,10 @@ fn project(name: &str) -> std::path::PathBuf {
 #[test]
 fn refresh_converts_dropped_mp3s_and_removes_them() {
     let root = project("rusty_refresh_converts");
-    let mp3 = root.join(crate::test_path::native("audio/sfx/Shot.MP3"));
+    let mp3 = root.join(crate::core::paths::native("audio/sfx/Shot.MP3"));
     std::fs::copy(FIXTURE, &mp3).unwrap();
     let report = refresh(&root);
-    let wav = root.join(crate::test_path::native("audio/sfx/Shot.wav"));
+    let wav = root.join(crate::core::paths::native("audio/sfx/Shot.wav"));
     assert_eq!(report.converted, vec![(mp3.clone(), wav.clone())]);
     assert!(report.skipped.is_empty());
     assert!(!mp3.exists() && wav.exists());
@@ -106,7 +106,7 @@ fn refresh_never_overwrites_a_wav_and_retries_an_mp3_that_fails() {
     );
     std::fs::copy(FIXTURE, &kept).unwrap();
     std::fs::write(&kept_wav, b"somebody's file").unwrap();
-    let broken = root.join(crate::test_path::native("audio/sfx/half_copied.mp3"));
+    let broken = root.join(crate::core::paths::native("audio/sfx/half_copied.mp3"));
     std::fs::write(&broken, b"not audio yet").unwrap();
     let report = refresh(&root);
     assert!(report.converted.is_empty());

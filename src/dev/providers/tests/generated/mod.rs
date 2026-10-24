@@ -110,7 +110,9 @@ fn a_sketch_reports_as_a_sketch_and_spends_nothing() {
     assert_eq!(state(&root, &brief, None).unwrap(), GenerationState::Sketch);
     assert_eq!(cached(&root, &brief).unwrap(), None);
     assert!(
-        !root.join(GENERATED_DIR).exists(),
+        !root
+            .join(crate::core::paths::native(GENERATED_DIR))
+            .exists(),
         "a sketch writes nothing"
     );
 }

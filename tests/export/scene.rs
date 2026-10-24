@@ -20,8 +20,9 @@ fn a_saved_scene_loads_its_model_and_texture_from_an_export() {
     save_scene(&game);
     // A game script loads the scene, as a main menu would.
     let lua = format!("local L = {{}}\nfunction L.Start(id) Scene.Load({SCENE:?}) end\nreturn L\n");
-    std::fs::write(game.join(LOADER), lua).unwrap();
-    let text = std::fs::read_to_string(game.join(SCENE)).expect("the saved scene");
+    std::fs::write(game.join(rusty::core::paths::native(LOADER)), lua).unwrap();
+    let text = std::fs::read_to_string(game.join(rusty::core::paths::native(SCENE)))
+        .expect("the saved scene");
     let (mesh, texture) = (format!("{SOURCE}::Quad"), format!("{SOURCE}#tex/Red"));
     assert!(text.contains(&mesh) && text.contains(&texture), "{text}");
 

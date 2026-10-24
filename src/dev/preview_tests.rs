@@ -92,7 +92,7 @@ fn gpu_a_centimetre_fbx_quad_previews_as_its_red_and_blue_textures() {
     // have no colour of their own, only an embedded red texture on one and a blue one
     // on the other. It used to preview as empty sky — a sub-pixel speck, and black
     // besides (#1280) — then all red, its second material dropped (#1285).
-    let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join(crate::test_path::native(
+    let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join(crate::core::paths::native(
         "tests/fixtures/models/embedded_textures.fbx",
     ));
     let dir = crate::test_temp::dir();

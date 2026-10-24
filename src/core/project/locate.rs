@@ -61,16 +61,19 @@ fn exe_dir() -> Option<PathBuf> {
 /// The first `engine/` holding the marker in `exe_dir` or above it, then in the
 /// macOS bundle's `Resources/`.
 pub(super) fn find_engine_dir(exe_dir: &Path) -> Option<PathBuf> {
-    let bundle = exe_dir.join("../Resources").join(ENGINE_DIR);
+    let bundle = exe_dir.join("..").join("Resources").join(ENGINE_DIR);
     exe_dir
         .ancestors()
         .map(|dir| dir.join(ENGINE_DIR))
         .chain(std::iter::once(bundle))
-        .find(|dir| dir.join(ENGINE_MARKER).is_file())
+        .find(|dir| {
+            dir.join(crate::core::paths::native(ENGINE_MARKER))
+                .is_file()
+        })
 }
 
 pub(super) fn find_packaged_project(exe_dir: &Path) -> Option<PathBuf> {
-    [exe_dir.to_path_buf(), exe_dir.join("../Resources")]
+    [exe_dir.to_path_buf(), exe_dir.join("..").join("Resources")]
         .into_iter()
         .map(|dir| dir.join(DEFAULT_PROJECT_DIR))
         .find(|dir| dir.join(ASSETS_DIR).is_dir())

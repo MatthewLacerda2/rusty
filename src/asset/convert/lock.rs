@@ -110,5 +110,5 @@ fn project_of(cache: &Path) -> Option<&Path> {
     cache
         .ancestors()
         .skip(1)
-        .find(|root| cache.starts_with(root.join(IMPORT_CACHE_DIR)))
+        .find(|root| cache.starts_with(root.join(crate::core::paths::native(IMPORT_CACHE_DIR))))
 }

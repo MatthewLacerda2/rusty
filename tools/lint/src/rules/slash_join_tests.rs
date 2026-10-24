@@ -1,50 +1,97 @@
-use super::RULE;
-use crate::rules::{allowed, test_code::test_lines, Finding};
+use super::{slashed_constants, RULE};
+use crate::rules::{allowed, Finding};
+use std::collections::BTreeSet;
 
-fn check_file(path: &str, src: &str) -> Vec<Finding> {
-    super::check_file(path, src, &test_lines(path, src, false))
+fn check(path: &str, src: &str) -> Vec<Finding> {
+    let consts = "const CACHE: &str = \"assets/generated\";\nconst ALIAS: &str = a::CACHE;\n";
+    let slashed = slashed_constants([("src/k.rs", consts)].into_iter());
+    super::check_file(path, src, &slashed)
+}
+
+fn flagged(path: &str, src: &str) -> bool {
+    check(path, src).len() == 1
 }
 
 const JOIN: &str = "    let f = dir.join(\"models/b.fbx\");\n";
 
 #[test]
-fn a_joined_slash_literal_in_test_code_is_flagged() {
-    for path in ["src/a/tests.rs", "src/a/b_tests.rs", "tests/c.rs"] {
-        let found = check_file(path, &format!("fn f() {{\n{JOIN}}}\n"));
+fn a_joined_slash_literal_is_flagged_in_tests_and_production() {
+    for path in ["src/a/tests.rs", "src/a/b.rs", "tests/c.rs"] {
+        let found = check(path, &format!("fn f() {{\n{JOIN}}}\n"));
         assert_eq!(found.len(), 1, "{path}");
         assert_eq!((found[0].rule, found[0].line), (RULE, 2));
     }
-    let later = "    let f = dir.join(\"a\").join(\"b/c\");\n";
-    assert_eq!(
-        check_file("tests/c.rs", later).len(),
-        1,
-        "any join on the line"
+    assert!(flagged("src/a.rs", "dir.join(\"a\").join(\"b/c\");\n"));
+}
+
+#[test]
+fn every_form_of_a_slash_path_is_flagged() {
+    for src in [
+        "p.push(\"a/b\");\n",
+        "dir.join(r\"a/b\");\n",
+        "dir.join(r#\"a/b\"#);\n",
+        "dir.join(format!(\"{X}/y\"));\n",
+        "dir.join(&format!(\"{X}/y\"));\n",
+        "dir.join(CACHE);\n",
+        "dir.join(crate::k::CACHE);\n",
+        "dir.join(ALIAS);\n",
+    ] {
+        assert!(flagged("src/a.rs", src), "{src}");
+    }
+    let wrapped = "let f = dir.join(\n    \"a/b\",\n);\n";
+    assert_eq!(check("tests/c.rs", wrapped)[0].line, 1, "the call's line");
+}
+
+#[test]
+fn one_part_per_join_and_separators_pass() {
+    for src in [
+        "dir.join(\"models\").join(\"b.fbx\");\n",
+        "dir.join(name).join(\"x\");\n",
+        "let s = [\"a\", \"b/c\"].join(\",\");\n",
+        "let rel = parts.join(\"/\");\n",
+        "let rel = parts.join(\" / \");\n",
+        "let rel = parts.join(\"//\");\n",
+        "dir.join(OTHER);\n",
+        "dir.join(CACHE.len());\n",
+        "v.push(\"a/b\".into());\n",
+        "v.push(format!(\"a/{b}\"));\n",
+        "// dir.join(\"a/b\")\n",
+    ] {
+        assert!(check("tests/c.rs", src).is_empty(), "{src}");
+    }
+    assert!(
+        check("tools/x.rs", JOIN).is_empty(),
+        "outside src/ and tests/"
     );
 }
 
 #[test]
-fn one_part_per_join_and_production_code_pass() {
-    let parts = "    let f = dir.join(\"models\").join(\"b.fbx\");\n";
-    assert!(check_file("tests/c.rs", parts).is_empty());
-    let joined_var = "    let f = dir.join(name).join(\"x\");\n";
-    assert!(check_file("tests/c.rs", joined_var).is_empty());
-    let words = "    let s = [\"a\", \"b/c\"].join(\",\");\n";
-    assert!(
-        check_file("tests/c.rs", words).is_empty(),
-        "a slash outside the join"
+fn the_message_names_the_helper_each_crate_can_reach() {
+    assert!(check("src/a.rs", JOIN)[0]
+        .message
+        .contains("crate::core::paths::native"));
+    assert!(check("tests/a.rs", JOIN)[0]
+        .message
+        .contains("rusty::core::paths::native"));
+}
+
+#[test]
+fn only_slash_path_constants_are_collected() {
+    let src = "const A: &str = \"a/b\";\nconst U: &str = \"rusty://x\";\n\
+               const S: &str = \"/\";\nconst W: &str = \"word\";\n";
+    let got = slashed_constants(
+        [
+            ("src/k.rs", src),
+            ("tools/t.rs", "const T: &str = \"x/y\";\n"),
+        ]
+        .into_iter(),
     );
-    let slice = "    let rel = parts.join(\"/\");\n";
-    assert!(
-        check_file("tests/c.rs", slice).is_empty(),
-        "a separator, not a path"
-    );
-    assert!(check_file("src/a/b.rs", JOIN).is_empty(), "not test code");
-    assert!(check_file("tests/c.rs", "// dir.join(\"a/b\")\n").is_empty());
+    assert_eq!(got, BTreeSet::from(["A".to_string()]));
 }
 
 #[test]
 fn an_allow_with_a_reason_excuses_a_slashed_path() {
     let src = format!("// lint: allow(slash-join) an asset path is `/`-separated\n{JOIN}");
-    let found = check_file("tests/a.rs", &src);
+    let found = check("tests/a.rs", &src);
     assert!(allowed(&src, found[0].line, RULE));
 }

@@ -48,7 +48,7 @@ fn a_shipped_layout_finds_its_engine_and_project_beside_the_executable() {
     let ship = fresh("ship");
     std::fs::create_dir_all(ship.join("engine").join("shaders")).unwrap();
     std::fs::write(
-        ship.join(crate::test_path::native("engine/shaders/common.wgsl")),
+        ship.join(crate::core::paths::native("engine/shaders/common.wgsl")),
         "",
     )
     .unwrap();
@@ -62,7 +62,7 @@ fn a_shipped_layout_finds_its_engine_and_project_beside_the_executable() {
     std::fs::create_dir_all(&macos).unwrap();
     std::fs::create_dir_all(res.join("engine").join("shaders")).unwrap();
     std::fs::write(
-        res.join(crate::test_path::native("engine/shaders/common.wgsl")),
+        res.join(crate::core::paths::native("engine/shaders/common.wgsl")),
         "",
     )
     .unwrap();
