@@ -41,26 +41,28 @@ pub(crate) fn read_texture_bytes(
     size: (u32, u32),
     texel_bytes: u32,
 ) -> Vec<u8> {
-    read_level(device, queue, (texture, 0), size, texel_bytes)
+    read_level(device, queue, (texture, 0, 0), size, texel_bytes)
 }
 
-/// [`read_texture_rgba8`] of mip level `mip`, `width × height` being that level's
+/// [`read_texture_rgba8`] of mip level `mip` in array layer `layer` (0 for a plain
+/// texture; the decal atlas has many, #1364), `width × height` being that level's
 /// region (#1322).
 #[cfg(test)]
 pub(crate) fn read_mip_rgba8(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
-    (texture, mip): (&wgpu::Texture, u32),
+    level: (&wgpu::Texture, u32, u32),
     size: (u32, u32),
 ) -> Vec<u8> {
-    read_level(device, queue, (texture, mip), size, 4)
+    read_level(device, queue, level, size, 4)
 }
 
-/// The texels of `size`'s top-left region of `texture`'s level `mip`, packed.
+/// The texels of `size`'s top-left region of `texture`'s level `mip` in array
+/// layer `layer`, packed.
 fn read_level(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
-    level: (&wgpu::Texture, u32),
+    level: (&wgpu::Texture, u32, u32),
     (width, height): (u32, u32),
     texel_bytes: u32,
 ) -> Vec<u8> {
@@ -94,7 +96,7 @@ fn read_level(
 fn submit_copy(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
-    (texture, mip_level): (&wgpu::Texture, u32),
+    (texture, mip_level, layer): (&wgpu::Texture, u32, u32),
     buffer: &wgpu::Buffer,
     padded_bytes_per_row: u32,
     size: wgpu::Extent3d,
@@ -106,7 +108,11 @@ fn submit_copy(
         wgpu::TexelCopyTextureInfo {
             texture,
             mip_level,
-            origin: wgpu::Origin3d::ZERO,
+            origin: wgpu::Origin3d {
+                x: 0,
+                y: 0,
+                z: layer,
+            },
             aspect: wgpu::TextureAspect::All,
         },
         wgpu::TexelCopyBufferInfo {

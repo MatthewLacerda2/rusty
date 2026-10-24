@@ -68,6 +68,19 @@ impl MipGenerator {
         texture: &wgpu::Texture,
         kind: TextureKind,
     ) {
+        self.generate_layer(device, queue, (texture, 0), kind);
+    }
+
+    /// [`generate`](Self::generate) for one array `layer` of `texture` (the decal
+    /// atlas's, #1364): each level is read and drawn through views of that layer
+    /// alone.
+    pub(crate) fn generate_layer(
+        &self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        (texture, layer): (&wgpu::Texture, u32),
+        kind: TextureKind,
+    ) {
         if texture.mip_level_count() == 1 {
             return;
         }
@@ -78,8 +91,11 @@ impl MipGenerator {
         let level = |mip| {
             texture.create_view(&wgpu::TextureViewDescriptor {
                 format: Some(kind.view_format()),
+                dimension: Some(wgpu::TextureViewDimension::D2),
                 base_mip_level: mip,
                 mip_level_count: Some(1),
+                base_array_layer: layer,
+                array_layer_count: Some(1),
                 ..Default::default()
             })
         };

@@ -5,7 +5,10 @@
 //!
 //! The array is sRGB with a linear view beside it, as material maps are (#647):
 //! albedo is read through the sRGB view and decoded, the normal, metallic and
-//! roughness maps through the linear one, raw. It starts small and doubles (copying
+//! roughness maps through the linear one, raw. A layer's mips are drawn on the GPU
+//! through the views of the [`TextureKind`] it is loaded as (#1364), so an albedo
+//! averages in linear light and a data map its bytes, as material maps do (#1322);
+//! a map's first use decides its kind. It starts small and doubles (copying
 //! what it holds) up to [`MAX_LAYERS`]; past that, layers no decal of the frame
 //! uses are reclaimed, and a map that still finds no room is drawn without (counted
 //! in `RenderCounters::decal_maps_dropped`).
@@ -17,6 +20,7 @@ use image::imageops::FilterType;
 use super::record::NO_LAYER;
 use crate::asset::MapRef;
 use crate::core::fs::freshness::Freshness;
+use crate::render::gpu::textures::{TextureKind, Uploader};
 
 /// The side of one layer, in texels.
 pub(crate) const LAYER_SIZE: u32 = 512;
@@ -68,21 +72,21 @@ impl DecalAtlas {
         self.slots.get(path).copied().unwrap_or(NO_LAYER)
     }
 
-    /// Give every map in `paths` (the frame's) a layer, loading the new ones. A path
-    /// that fails to load joins `misses`, which the renderer re-checks on disk
-    /// (#689). Returns whether the texture was replaced, so group 0 is rebuilt.
+    /// Give every map in `maps` (the frame's, each with the kind it is sampled as)
+    /// a layer, loading the new ones. A path that fails to load joins `misses`,
+    /// which the renderer re-checks on disk (#689). Returns whether the texture was
+    /// replaced, so group 0 is rebuilt.
     pub(crate) fn prepare(
         &mut self,
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
-        paths: &[&MapRef],
+        (device, queue, mips): Uploader,
+        maps: &[(&MapRef, TextureKind)],
         misses: &mut Freshness,
     ) -> bool {
-        let mut fresh: Vec<&MapRef> = Vec::new();
-        for &path in paths {
+        let mut fresh: Vec<(&MapRef, TextureKind)> = Vec::new();
+        for &(path, kind) in maps {
             let known = self.slots.contains_key(path) || misses.is_miss(path.as_str());
-            if !known && !fresh.contains(&path) {
-                fresh.push(path);
+            if !known && !fresh.iter().any(|&(p, _)| p == path) {
+                fresh.push((path, kind));
             }
         }
         if fresh.is_empty() {
@@ -92,7 +96,8 @@ impl DecalAtlas {
         let mut replaced = false;
         if wanted > self.capacity() {
             if wanted > MAX_LAYERS as usize {
-                self.slots.retain(|path, _| paths.contains(&path));
+                self.slots
+                    .retain(|path, _| maps.iter().any(|&(p, _)| p == path));
             }
             let needed = (self.slots.len() + fresh.len()) as u32;
             let capacity = needed.next_power_of_two().clamp(MIN_LAYERS, MAX_LAYERS);
@@ -101,13 +106,14 @@ impl DecalAtlas {
                 replaced = true;
             }
         }
-        for path in fresh {
+        for (path, kind) in fresh {
             let Some(layer) = self.free_layer() else {
                 break;
             };
             match crate::render::gpu::textures::open(path) {
                 Some(img) => {
                     upload(queue, &self.texture, layer, img.to_rgba8());
+                    mips.generate_layer(device, queue, (&self.texture, layer), kind);
                     self.slots.insert(path.clone(), layer);
                 }
                 None => {
@@ -175,7 +181,8 @@ fn create(device: &wgpu::Device, layers: u32) -> wgpu::Texture {
         format: COLOR_FORMAT,
         usage: wgpu::TextureUsages::TEXTURE_BINDING
             | wgpu::TextureUsages::COPY_DST
-            | wgpu::TextureUsages::COPY_SRC,
+            | wgpu::TextureUsages::COPY_SRC
+            | wgpu::TextureUsages::RENDER_ATTACHMENT,
         view_formats: &[DATA_FORMAT],
     })
 }
@@ -192,35 +199,35 @@ fn views(texture: &wgpu::Texture) -> (wgpu::TextureView, wgpu::TextureView) {
     (view(COLOR_FORMAT), view(DATA_FORMAT))
 }
 
-/// Resize `img` to a layer, then write it and each halved mip into `layer`.
+/// Resize `img` to a layer and write it to `layer`'s base level; the mip pass
+/// draws the rest.
 fn upload(queue: &wgpu::Queue, texture: &wgpu::Texture, layer: u32, img: image::RgbaImage) {
-    let mut level = image::imageops::resize(&img, LAYER_SIZE, LAYER_SIZE, FilterType::Triangle);
-    for mip in 0..MIPS {
-        let side = level.width();
-        queue.write_texture(
-            wgpu::TexelCopyTextureInfo {
-                texture,
-                mip_level: mip,
-                origin: wgpu::Origin3d {
-                    x: 0,
-                    y: 0,
-                    z: layer,
-                },
-                aspect: wgpu::TextureAspect::All,
+    let base = image::imageops::resize(&img, LAYER_SIZE, LAYER_SIZE, FilterType::Triangle);
+    queue.write_texture(
+        wgpu::TexelCopyTextureInfo {
+            texture,
+            mip_level: 0,
+            origin: wgpu::Origin3d {
+                x: 0,
+                y: 0,
+                z: layer,
             },
-            &level,
-            wgpu::TexelCopyBufferLayout {
-                offset: 0,
-                bytes_per_row: Some(4 * side),
-                rows_per_image: Some(side),
-            },
-            wgpu::Extent3d {
-                width: side,
-                height: side,
-                depth_or_array_layers: 1,
-            },
-        );
-        let half = (side / 2).max(1);
-        level = image::imageops::resize(&level, half, half, FilterType::Triangle);
-    }
+            aspect: wgpu::TextureAspect::All,
+        },
+        &base,
+        wgpu::TexelCopyBufferLayout {
+            offset: 0,
+            bytes_per_row: Some(4 * LAYER_SIZE),
+            rows_per_image: Some(LAYER_SIZE),
+        },
+        wgpu::Extent3d {
+            width: LAYER_SIZE,
+            height: LAYER_SIZE,
+            depth_or_array_layers: 1,
+        },
+    );
 }
+
+#[cfg(test)]
+#[path = "atlas_gpu_tests.rs"]
+mod gpu_tests;
