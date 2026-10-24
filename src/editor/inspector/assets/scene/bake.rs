@@ -187,3 +187,7 @@ pub fn poll(
         Err(e) => log.error(format!("Generate Lighting failed: {e}")),
     }
 }
+
+#[cfg(test)]
+#[path = "bake_tests.rs"]
+mod tests;

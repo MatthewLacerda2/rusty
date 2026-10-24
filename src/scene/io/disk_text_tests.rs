@@ -64,3 +64,44 @@ fn a_lighting_save_is_refused_in_play() {
         "the file is untouched"
     );
 }
+
+/// Generate Lighting over an outside edit the follow has not applied yet: the merged
+/// text is not recorded, so the follow still reloads it (#1374).
+#[test]
+fn a_lighting_save_over_an_outside_edit_is_not_recorded() {
+    let (scene, path) = loaded("outside");
+    let mut outside = Scene::new();
+    outside.add_entity("Outside".into());
+    outside.save_to_file(&path).unwrap();
+    assert_eq!(save_lighting(&scene, &path), Ok(LightingSave::Written));
+    let text = std::fs::read_to_string(&path).unwrap();
+    assert!(text.contains("\"Outside\""), "the edit survives the merge");
+    assert!(!scene.is_disk_text(&path, &text));
+}
+
+/// A load whose sidecar fails is not "what the engine read" (#1374).
+#[test]
+fn a_load_with_a_broken_sidecar_is_not_recorded() {
+    let (_, path) = loaded("sidecar");
+    std::fs::write(crate::scene::sidecar_path(&path), "{ broken").unwrap();
+    let text = std::fs::read_to_string(&path).unwrap();
+    let mut fresh = Scene::new();
+    assert!(fresh.load_from_file(&path).is_err());
+    assert!(!fresh.is_disk_text(&path, &text));
+}
+
+/// Reset Scene: the record is the file's text only when the file holds the live
+/// scene exactly; otherwise there is none (#1374).
+#[test]
+fn adopting_a_file_records_it_only_when_it_matches() {
+    let (mut scene, path) = loaded("adopt");
+    let text = std::fs::read_to_string(&path).unwrap();
+    scene.adopt_disk_text(&path);
+    assert!(
+        scene.is_disk_text(&path, &text),
+        "the file holds the live scene"
+    );
+    scene.add_entity("Rebuilt".into());
+    scene.adopt_disk_text(&path);
+    assert!(!scene.is_disk_text(&path, &text), "it does not: no record");
+}
