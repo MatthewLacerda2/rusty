@@ -15,9 +15,11 @@
 //! all four UI entry points, then built under a validation error scope. A module
 //! that is missing, fails to compose, is not a ui module, or fails wgpu validation is
 //! logged **once** and its graphics draw with the standard shader — never a crash.
-//! After a bake anywhere in the process (`shadergen::bake_generation`) each variant
-//! re-reads its module and params sidecar, and only one whose files changed is
-//! dropped: a re-baked shader is picked up next frame, every other one stays built.
+//! After a shader file is written anywhere in the process (the write log,
+//! `core::fs::written`: `Shader.Bake` notes its module, the editor's file watch an
+//! outside edit, #1327) each variant re-reads its module and params sidecar, and only
+//! one whose files changed is dropped: a re-baked shader is picked up next frame,
+//! every other one stays built.
 //!
 //! The per-graphic uniforms each view packs every frame are in `uniforms`.
 
@@ -33,9 +35,10 @@ use uniforms::SLOT;
 use super::cache::UiViewCache;
 use super::pipeline::{self, UiPass};
 use crate::components::UiBlend;
+use crate::core::fs::written::written_since;
 use crate::render::gpu::layout_entries::dynamic_uniform_entry;
 use crate::shadergen::params::{self, ParamLayout};
-use crate::shadergen::{bake_generation, compose, engine_shader_dir, DEFAULT_OUT_DIR};
+use crate::shadergen::{compose, engine_shader_dir, DEFAULT_OUT_DIR};
 
 /// One built variant.
 struct Variant {
@@ -63,7 +66,8 @@ pub(crate) struct UiShaders {
     empty: wgpu::BindGroup,
     screen_layout: wgpu::PipelineLayout,
     world_layout: wgpu::PipelineLayout,
-    generation: u64,
+    /// The newest write-log generation already looked at.
+    seen: u64,
     /// Each with its [`Source`]; `None` records a failure, logged once until the
     /// module changes.
     variants: HashMap<String, (Source, Option<Variant>)>,
@@ -109,7 +113,7 @@ impl UiShaders {
             ),
             shade_layout,
             empty,
-            generation: bake_generation(),
+            seen: written_since(u64::MAX).0,
             variants: HashMap::new(),
             builds: 0,
         }
@@ -179,12 +183,13 @@ impl UiShaders {
         self.variants.get(name).is_some_and(|(_, v)| v.is_some())
     }
 
-    /// After a bake since the last look, drop every variant whose module or params
+    /// After a shader file was written, drop every variant whose module or params
     /// changed on disk (re-baked, appeared, vanished), so it rebuilds on next use.
     fn refresh(&mut self) {
-        let generation = bake_generation();
-        if generation != self.generation {
-            self.generation = generation;
+        let (seen, paths) = written_since(self.seen);
+        self.seen = seen;
+        let shader_file = |p: &String| p.ends_with(".wgsl") || p.ends_with(".params.json");
+        if paths.iter().any(shader_file) {
             self.variants
                 .retain(|name, (built_from, _)| *built_from == source(name));
         }

@@ -64,6 +64,16 @@ pub fn is_unique_sibling(name: &str, of: &str, suffix: &str) -> bool {
         .is_some_and(|(pid, n)| is_number(pid) && is_number(n))
 }
 
+/// True when `name` is a [`write_atomic`] temp file of any target, in any process:
+/// a name that is never an asset, only a write in flight (or a crash's leftover).
+pub fn is_temp_name(name: &str) -> bool {
+    let mut parts = name.rsplitn(4, '.');
+    parts.next() == Some(TEMP_SUFFIX)
+        && parts.next().is_some_and(is_number)
+        && parts.next().is_some_and(is_number)
+        && parts.next().is_some_and(|of| !of.is_empty())
+}
+
 fn is_number(s: &str) -> bool {
     !s.is_empty() && s.bytes().all(|b| b.is_ascii_digit())
 }

@@ -20,10 +20,12 @@
 //! fails wgpu validation is logged **once** and draws with the standard pipeline —
 //! a bad shader never crashes a frame.
 //!
-//! **Hot reload.** [`SurfaceShaders::refresh`] re-stats each slot's file once per
-//! render; a re-bake (new mtime or length) or a module appearing in the workspace marks
-//! the slot stale, and the next draw that names it rebuilds — the agent's bake → look
-//! → iterate loop works in a live session.
+//! **Hot reload.** [`SurfaceShaders::refresh`] drains the write log
+//! (`core::fs::written`) once per render: a slot whose module or params file was
+//! written — re-baked (`Shader.Bake` notes it), appeared, edited or removed outside the
+//! engine (the editor's file watch notes those, #1327) — goes stale, and the next draw
+//! that names it rebuilds. The agent's bake → look → iterate loop works in a live
+//! session, and costs nothing on a frame nothing was written.
 //!
 //! **Depth passes.** A variant's `vs_main` is the forward one verbatim, so one whose
 //! blocks only restyle colour rides the standard SSAO prepass (#436) and shadow
@@ -33,11 +35,11 @@
 //! shadow and fills no SSAO depth. Only those variants pay for a depth fragment.
 
 use std::collections::HashMap;
-use std::path::PathBuf;
-use std::time::SystemTime;
+use std::path::{Path, PathBuf};
 
+use crate::core::fs::written::{written_since, Stale};
 use crate::shadergen::assemble::{CUT_PREPASS, CUT_SHADOW};
-use crate::shadergen::params::ParamLayout;
+use crate::shadergen::params::{resolve_module, sidecar_path, ParamLayout};
 use crate::shadergen::{compose, engine_shader_dir, DEFAULT_OUT_DIR};
 
 /// The pipeline id of the renderer's standard forward shader.
@@ -75,12 +77,8 @@ pub(crate) enum SolidPass<'a> {
     Transparent(&'a super::LazyPipeline),
 }
 
-/// What a slot's file looked like when it was last built: its path, mtime and length.
-type Stamp = Option<(PathBuf, Option<SystemTime>, u64)>;
-
 struct Slot {
     name: String,
-    stamp: Stamp,
     /// `None` when the module failed (it was logged; draws fall back to [`STANDARD`]).
     pipelines: Option<SurfacePipelines>,
     /// The module's runtime params (#399); empty when it has none.
@@ -101,6 +99,8 @@ pub(crate) struct SurfaceShaders {
     slots: Vec<Slot>,
     /// Modules built so far — a runtime param change must never add one (#399).
     builds: usize,
+    /// The newest write-log generation already looked at.
+    seen: u64,
 }
 
 impl SurfaceShaders {
@@ -119,6 +119,7 @@ impl SurfaceShaders {
             index: HashMap::new(),
             slots: Vec::new(),
             builds: 0,
+            seen: written_since(u64::MAX).0,
         }
     }
 
@@ -139,7 +140,6 @@ impl SurfaceShaders {
             None => {
                 self.slots.push(Slot {
                     name: name.to_owned(),
-                    stamp: None,
                     pipelines: None,
                     params: ParamLayout::default(),
                     stale: true,
@@ -190,21 +190,33 @@ impl SurfaceShaders {
         self.get(id)?.cut.as_ref()
     }
 
-    /// Mark every slot whose file changed (re-baked, appeared, vanished) stale.
+    /// Mark every slot stale whose module or params file, in any of the dirs it
+    /// resolves against, was written since the last look (re-baked, appeared, edited,
+    /// vanished).
     pub(crate) fn refresh(&mut self) {
-        for i in 0..self.slots.len() {
-            if !self.slots[i].stale && self.stamp(&self.slots[i].name) != self.slots[i].stamp {
-                self.slots[i].stale = true;
-            }
+        let (seen, paths) = written_since(self.seen);
+        self.seen = seen;
+        if paths.is_empty() {
+            return;
+        }
+        let written = Stale::new(paths);
+        let dirs = &self.dirs;
+        for slot in self.slots.iter_mut().filter(|s| !s.stale) {
+            slot.stale = dirs.iter().any(|dir| {
+                let wgsl = PathBuf::from(format!("{dir}/{}.wgsl", slot.name));
+                written.matches(&wgsl.to_string_lossy())
+                    || written.matches(&sidecar_path(&wgsl).to_string_lossy())
+            });
         }
     }
 
     /// Rebuild slot `i` from its current file, logging once per failed version.
     fn rebuild(&mut self, device: &wgpu::Device, i: usize) {
-        let stamp = self.stamp(&self.slots[i].name);
+        let dirs: Vec<&str> = self.dirs.iter().map(String::as_str).collect();
+        let module = resolve_module(&dirs, &self.slots[i].name);
         self.builds += 1;
-        let built = match &stamp {
-            Some((path, ..)) => self
+        let built = match &module {
+            Some(path) => self
                 .build(device, path)
                 .and_then(|pipelines| Ok((pipelines, ParamLayout::read_beside(path)?))),
             None => Err(format!(
@@ -226,26 +238,12 @@ impl SurfaceShaders {
             Some((pipelines, params)) => (Some(pipelines), params),
             None => (None, ParamLayout::default()),
         };
-        slot.stamp = stamp;
         slot.stale = false;
-    }
-
-    /// Where `name` resolves now, with its mtime and length; `None` if nowhere (or the
-    /// name is not a bare module name, so it can never escape the shader dirs).
-    fn stamp(&self, name: &str) -> Stamp {
-        if name.is_empty() || name.contains(['/', '\\']) || name.contains("..") {
-            return None;
-        }
-        self.dirs.iter().find_map(|dir| {
-            let path = PathBuf::from(format!("{dir}/{name}.wgsl"));
-            let meta = std::fs::metadata(&path).ok()?;
-            Some((path, meta.modified().ok(), meta.len()))
-        })
     }
 
     /// Compose `path` against `common`, check it is a surface module, and build its
     /// pipelines under a validation error scope, so wgpu refuses instead of panicking.
-    fn build(&self, device: &wgpu::Device, path: &PathBuf) -> Result<SurfacePipelines, String> {
+    fn build(&self, device: &wgpu::Device, path: &Path) -> Result<SurfacePipelines, String> {
         let source = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
         let mut composer = compose::composer_with_common(engine_shader_dir())?;
         let module = compose::compose(&mut composer, &source, &path.to_string_lossy())?;

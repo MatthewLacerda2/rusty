@@ -11,8 +11,8 @@ a `.wgsl` there too.** The root `CLAUDE.md` keeps the project-wide rules;
   `wgpu` or `egui` (`make direction`). What the sim needs from shaders (validating a
   bake, say) lives in a sim module render reads, as `shadergen` does, never in a call
   up into render.
-- The module root opts out of the clock ban because GPU timing and shader hot-reload
-  are wall-clock (#757); the opt-out stays at the root, never in a file below it.
+- The module root opts out of the clock ban because GPU timing is wall-clock (#757);
+  the opt-out stays at the root, never in a file below it.
 
 ## Shaders
 - **Shared WGSL is a naga_oil composable module, never a copy.** WGSL has no

@@ -74,7 +74,7 @@ default = ["editor"]
 dev = ["dep:scorsese-providers", "dep:scorsese-core"]
 # The egui editor (#431): `src/editor` and the shell's editor frontend. Default-on so
 # `cargo run` opens the editor; a shipped player builds with `--no-default-features`.
-editor = ["dep:egui", "dep:egui-wgpu", "dep:egui-winit", "dep:egui-phosphor"]
+editor = ["dep:egui", "dep:egui-wgpu", "dep:egui-winit", "dep:egui-phosphor", "dep:notify"]
 
 # The crate's lint policy lives here, not in command-line flags, so a plain
 # `cargo clippy`, rust-analyzer and CI all read the same rules (#485). The
@@ -142,6 +142,12 @@ ttf-parser = "0.25.1"
 # Gamepads (#471): buttons, sticks, triggers and rumble, polled once by the shell.
 # Needs libudev on Linux (already in CI's apt list for winit).
 gilrs = "0.11.2"
+# The editor's watch on the project's files (#1327): a change made outside the engine
+# (Blender, an image editor) is noted like an engine write, so every path-keyed cache
+# reloads it. Editor-only: a shipped game never watches its files. Its default
+# features are cut to the FSEvents backend on macOS; on Linux its inotify crate is
+# already in the tree through gilrs (same version), and it adds mio for its loop.
+notify = { version = "8.2", default-features = false, features = ["macos_fsevent"], optional = true }
 # The OS clipboard for `Input.GetClipboard` / `SetClipboard` (#612), read by the shell
 # in both frontends: X11 and macOS. Already in the tree through egui-winit (same
 # version), but the player build has no egui. egui-winit's `clipboard` feature also

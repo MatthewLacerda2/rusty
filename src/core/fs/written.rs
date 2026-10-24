@@ -12,6 +12,11 @@
 //! The log holds one entry per distinct path, so it stays as small as the set of
 //! baked files.
 //!
+//! A change made **outside** the engine (a Blender re-export, an image editor) goes
+//! through the same log: the editor's file watch (`shell::editor::watch`, #1327)
+//! notes each file it sees change under the project's `assets/`, so no cache needs a
+//! watch or a per-frame stat of its own.
+//!
 //! The rule that keeps it whole: **an engine write of a file some cache reads by
 //! path goes through [`write()`] (or, for a writer with its own encoder, calls
 //! [`note_written`] right after)**, and **a cache treats a failed load as a miss it

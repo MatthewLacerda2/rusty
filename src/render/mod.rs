@@ -1,7 +1,7 @@
 #![allow(
     clippy::disallowed_methods,
     clippy::disallowed_types,
-    reason = "platform layer, exempt from the sim's clock ban (#757): GPU timing and shader hot-reload mtimes are wall-clock"
+    reason = "platform layer, exempt from the sim's clock ban (#757): GPU timing is wall-clock"
 )]
 
 mod camera;

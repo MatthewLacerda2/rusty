@@ -26,8 +26,10 @@
 //! #1130) is dropped when its source is noted, which a re-conversion does, and a
 //! missing one is retried once the file it resolves to exists.
 //!
-//! A file changed on disk by an outside tool at a path that already loaded is not
-//! noticed: that would need the per-frame stat this module exists to avoid.
+//! A file changed on disk by an outside tool at a path that already loaded reaches
+//! the same log: in the editor, its file watch notes every change under the
+//! project's `assets/` (#1327), so an image editor's save reloads like a bake, with
+//! no per-frame stat. A shipped game watches nothing.
 
 use crate::asset::convert::texture_ref;
 use crate::core::fs::written::Stale;
