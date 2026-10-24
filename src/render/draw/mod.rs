@@ -126,7 +126,9 @@ impl Renderer {
             .release_entities(scene.id(), |id| overrides.has(id));
         // The material maps the shader samples (albedo #201, metallic/roughness #202),
         // collected paths-only first to end the scene borrow before uploading.
-        for (path, kind) in active_material_map_paths(scene) {
+        // Every entity's, active or not: re-enabling one must not stall on uploads
+        // and mip generation (#1363).
+        for (path, kind) in material_map_paths(scene, |_| true) {
             self.load_texture_as(&path, kind);
         }
 
@@ -154,16 +156,20 @@ impl Renderer {
     }
 }
 
-/// Every active entity's resolved material map paths (albedo, metallic, roughness,
-/// normal, emissive, then the extra shader texture slots, #400) the forward shader
-/// samples, gathered as owned `MapRef`s so the scene borrow ends before the textures
-/// are uploaded (#202, #207), each with what its slot holds (#1322).
-pub(crate) fn active_material_map_paths(scene: &Scene) -> Vec<(MapRef, TextureKind)> {
+/// The resolved material map paths (albedo, metallic, roughness, normal, emissive,
+/// then the extra shader texture slots, #400) the forward shader samples, of every
+/// entity `admit` passes, gathered as owned `MapRef`s so the scene borrow ends
+/// before the textures are uploaded (#202, #207), each with what its slot holds
+/// (#1322).
+pub(crate) fn material_map_paths(
+    scene: &Scene,
+    admit: impl Fn(u32) -> bool,
+) -> Vec<(MapRef, TextureKind)> {
     scene
         .world
         .ids_with_material()
         .into_iter()
-        .filter(|&id| scene.world.is_active_in_hierarchy(id))
+        .filter(|&id| admit(id))
         .flat_map(|id| scene.material_assets_of(id))
         .flat_map(|m| materials::material_maps(Some(m)))
         .collect()

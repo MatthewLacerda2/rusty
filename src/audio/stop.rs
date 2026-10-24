@@ -1,4 +1,5 @@
-//! src/audio/stop.rs — silencing the voices of entities that leave the scene (#1297).
+//! src/audio/stop.rs — silencing the voices of entities that leave the scene (#1297)
+//! or go inactive in the hierarchy (#1363).
 
 use super::maestro::AudioMaestro;
 
@@ -12,5 +13,21 @@ impl AudioMaestro {
                 self.stop_source(id, position, tick, true);
             }
         }
+    }
+
+    /// Record whether entity `id`'s `AudioSource` is active in the hierarchy this
+    /// frame, returning `true` on an edge: a source never seen counts as inactive,
+    /// so its first active frame is a rising edge (Unity's OnEnable).
+    pub fn note_source_active(&mut self, id: u32, active: bool) -> bool {
+        if active {
+            self.enabled_sources.insert(id)
+        } else {
+            self.enabled_sources.remove(&id)
+        }
+    }
+
+    /// Forget the activity of every source `keep` rejects (gone from the scene).
+    pub fn retain_sources(&mut self, keep: impl Fn(u32) -> bool) {
+        self.enabled_sources.retain(|&id| keep(id));
     }
 }

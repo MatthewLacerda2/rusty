@@ -14,7 +14,7 @@
 //! ids are a monotone counter and the event `tick` is supplied by the caller — no
 //! wall clock or unseeded RNG, so nothing here threatens replay.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::core::collections::Map;
 
@@ -76,6 +76,9 @@ pub struct AudioMaestro {
     /// The agent-facing log of play/stop/one-shot actions; read through the
     /// accessors in `introspection`.
     pub(super) log: AudioEventLog,
+    /// The entities whose `AudioSource` was active in the hierarchy last frame, so
+    /// `note_source_active` sees the OnEnable/OnDisable edges (#1363).
+    pub(super) enabled_sources: BTreeSet<u32>,
     /// Monotone id source for backend voices (deterministic — never a clock/RNG).
     next_voice: u64,
 }
@@ -102,6 +105,7 @@ impl AudioMaestro {
             occlusion: Occlusion::default(),
             reverb: ReverbState::DRY,
             log: AudioEventLog::new(DEFAULT_EVENT_CAP),
+            enabled_sources: BTreeSet::new(),
             next_voice: 1,
         };
         maestro.sync_groups();
@@ -279,6 +283,7 @@ impl AudioMaestro {
     pub fn stop_all(&mut self) {
         self.entity_voices.clear();
         self.oneshots.clear();
+        self.enabled_sources.clear();
         self.backend.stop_all();
     }
 }

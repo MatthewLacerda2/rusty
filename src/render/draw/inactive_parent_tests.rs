@@ -50,3 +50,19 @@ fn gpu_children_of_an_inactive_pivot_draw_nothing() {
     let parts = scene.world.children(pivot);
     assert!(parts.iter().all(|&p| scene.world.is_active_self(p)));
 }
+
+#[test]
+fn gpu_a_pivot_hidden_from_the_first_frame_still_uploads_its_meshes() {
+    let Some(mut renderer) = crate::render::test_gpu::headless_or_skip(W, H) else {
+        return;
+    };
+    let (mut scene, pivot) = holstered();
+    scene.world.set_active(pivot, false);
+    counters(&mut renderer, &scene);
+    // Only drawing follows activity: showing the weapon later must not stall on
+    // uploads, so the box is resident before it is ever drawn.
+    assert!(
+        !renderer.gpu_meshes.is_empty(),
+        "the hidden box is uploaded"
+    );
+}

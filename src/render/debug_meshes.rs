@@ -26,18 +26,17 @@ fn local_aabb(vertices: &[Vertex]) -> (Vec3, Vec3) {
 }
 
 impl Renderer {
-    /// Upload every active entity's mesh once per unique mesh-asset identity
-    /// (#127): N entities sharing a primitive/asset collapse to a single buffer
-    /// pair. `seen` dedups within the frame; resident-and-clean ids are skipped.
+    /// Upload every entity's mesh once per unique mesh-asset identity (#127): N
+    /// entities sharing a primitive/asset collapse to a single buffer pair. An
+    /// inactive entity's mesh is uploaded too, as Unity keeps it loaded: only what
+    /// is drawn follows activity, so re-enabling a holstered weapon doesn't stall on
+    /// uploads (#1363). `seen` dedups within the frame; resident-and-clean ids are skipped.
     /// Each mesh's dirty flag is cleared as it's visited, so a re-bake re-uploads
     /// the shared geometry exactly once.
     pub(crate) fn upload_scene_meshes(&mut self, scene: &Scene) {
         let mut seen: HashSet<MeshId> = HashSet::new();
         let mut updates: Vec<(MeshId, Vec<Vertex>, Vec<u32>)> = Vec::new();
         for entity_id in scene.world.ids_with_mesh() {
-            if !scene.world.is_active_in_hierarchy(entity_id) {
-                continue;
-            }
             let mesh = scene
                 .world
                 .mesh(entity_id)

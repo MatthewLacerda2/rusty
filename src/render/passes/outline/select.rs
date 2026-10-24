@@ -51,9 +51,9 @@ fn owning_group(scene: &Scene, id: u32) -> Option<u32> {
         return Some(id);
     }
     world.ids_with_lod_group().into_iter().find(|&g| {
-        world.is_active_in_hierarchy(g)
-            && world
-                .lod_group(g)
-                .is_some_and(|l| l.renderers().any(|r| r == id))
+        world
+            .lod_group(g)
+            .is_some_and(|l| l.renderers().any(|r| r == id))
+            && world.is_active_in_hierarchy(g)
     })
 }

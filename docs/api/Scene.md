@@ -44,7 +44,10 @@ skinned meshes, particles, lights, decals, UI), simulating (bodies, colliders, n
 agents, audio) and ticking (scripts, Animators), and each child's scripts get
 `OnDisable`. The children's own flags are untouched, so `IsActive(child)` stays
 `true` while `IsActiveInHierarchy(child)` reads `false`; reactivating the pivot
-brings back exactly the children that were active on their own.
+brings back exactly the children that were active on their own. An `AudioSource`
+stops its voice when its entity goes inactive and, when `play_on_start` is set,
+plays again when it comes back (Unity's play-on-enable). Meshes and textures stay
+uploaded while hidden, so showing a holstered weapon costs no load.
 
 **Hierarchy reads (#422).** `FindChild` walks one level per `/`-separated
 segment, taking the first child with that name in hierarchy order — Unity's

@@ -28,7 +28,6 @@ mod actions;
 use glam::Vec2;
 
 use super::pointer::emit;
-use super::tree::is_visible;
 use super::{
     accepts, is_interactable, Delivery, EventSystem, Frame, PointerButton, PointerEvent, UiHook,
 };
@@ -45,7 +44,7 @@ impl EventSystem {
     /// Drop a focus that went inactive or was destroyed, and announce a focus a
     /// script changed since last tick.
     pub(super) fn refresh_selection(&mut self, f: &Frame, out: &mut Vec<Delivery>) {
-        let live = self.selected.filter(|&s| is_visible(f.world, s));
+        let live = self.selected.filter(|&s| f.world.is_active_in_hierarchy(s));
         self.select(f, live, out);
     }
 
@@ -124,7 +123,7 @@ fn candidates(world: &World, layout: &UiLayout) -> Vec<u32> {
             world
                 .selectable(id)
                 .is_some_and(|s| s.navigation != NavigationMode::None)
-                && is_visible(world, id)
+                && world.is_active_in_hierarchy(id)
                 && is_interactable(world, id)
         })
         .collect()
@@ -138,7 +137,7 @@ pub fn find_selectable(world: &World, layout: &UiLayout, from: u32, dir: usize) 
         NavigationMode::None => None,
         NavigationMode::Explicit => {
             let to = world.selectable(from)?.select_on[dir]?;
-            is_visible(world, to).then_some(to)
+            world.is_active_in_hierarchy(to).then_some(to)
         }
         NavigationMode::Automatic => by_geometry(world, layout, from, DIRECTIONS[dir]),
     }

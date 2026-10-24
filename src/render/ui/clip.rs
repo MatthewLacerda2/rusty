@@ -109,7 +109,7 @@ impl Inherited {
     /// A root canvas's starting state: visible only when it and every ancestor are
     /// active.
     pub(super) fn root(world: &World, id: u32) -> Self {
-        // The event system's rule (`ui::events::tree::is_visible`): a dangling parent
+        // The event system's rule (`World::is_active_in_hierarchy`): a dangling parent
         // ends the chain (#991).
         Self {
             visible: world.is_active_in_hierarchy(id),

@@ -1,7 +1,7 @@
 //! src/ui/events/tree.rs — hierarchy questions the event system asks (#420).
 //!
-//! Every rule that depends on an entity's ancestors lives here, once: whether it is
-//! visible (it and every ancestor `active`), whether a `CanvasGroup` above it stops
+//! Every rule that depends on an entity's ancestors lives here, once (whether it is
+//! visible is `World::is_active_in_hierarchy`, #1363): whether a `CanvasGroup` above it stops
 //! the pointer or disables its selectables, and the ancestor-or-self walk event
 //! bubbling follows. The walk is `World::self_and_ancestors`, bounded by the entity
 //! count, so a malformed parent cycle cannot hang the sim; it stops at an id no
@@ -11,15 +11,10 @@ use crate::ecs::World;
 
 /// `id`, then its parent, grandparent, … up to the scene root.
 pub fn ancestors_or_self(world: &World, id: u32) -> Vec<u32> {
-    world
-        .self_and_ancestors(id)
-        .take_while(|&c| world.contains(c))
-        .collect()
-}
-
-/// Whether `id` and every ancestor are active — the rule drawing uses too.
-pub fn is_visible(world: &World, id: u32) -> bool {
-    world.is_active_in_hierarchy(id)
+    if !world.contains(id) {
+        return Vec::new();
+    }
+    world.self_and_ancestors(id).collect()
 }
 
 /// Whether a `CanvasGroup` with `blocks_raycasts = false` sits on `id` or above it
