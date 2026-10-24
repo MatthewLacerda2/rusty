@@ -1,4 +1,5 @@
 use super::{check, markdown, RULE};
+use crate::repo::scaffold::Repo;
 
 fn lines(found: &[crate::rules::Finding]) -> Vec<(usize, &str)> {
     found.iter().map(|f| (f.line, f.rule)).collect()
@@ -61,10 +62,7 @@ fn skips_a_table_header_only_right_under_the_marker() {
 
 #[test]
 fn finds_tracked_markdown_under_docs_and_at_the_root() {
-    let root = std::env::temp_dir().join(format!("lint_sorted_{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&root);
-    std::fs::create_dir_all(root.join("docs/api")).expect("temp dir");
-    std::fs::create_dir_all(root.join("src")).expect("src");
+    let repo = Repo::new("sorted-md", true);
     let files = [
         "README.md",
         "docs/api/A.md",
@@ -73,22 +71,11 @@ fn finds_tracked_markdown_under_docs_and_at_the_root() {
         "src/b.md",
     ];
     for f in files.iter().chain(&["notes.md"]) {
-        std::fs::write(root.join(f), "").expect("write");
+        repo.file(f, "");
     }
-    let git = |args: &[&str]| {
-        let ok = std::process::Command::new("git")
-            .args(args)
-            .current_dir(&root)
-            .status()
-            .expect("git");
-        assert!(ok.success());
-    };
-    git(&["init", "-q"]);
-    git(&[&["add", "--"][..], &files].concat());
-    let found = markdown(&root);
-    std::fs::remove_dir_all(&root).ok();
+    repo.git(&[&["add", "--"][..], &files].concat());
     assert_eq!(
-        found.expect("git"),
+        markdown(&repo.0).expect("git"),
         ["README.md", "docs/api/A.md", "src.md"]
     );
 }

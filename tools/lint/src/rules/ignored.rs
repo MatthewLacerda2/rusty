@@ -7,8 +7,10 @@
 
 use super::finding::Finding;
 use super::scan::Scan;
+use crate::repo::git;
 use std::io::Write;
-use std::process::{Command, Stdio};
+use std::path::Path;
+use std::process::Stdio;
 
 pub const RULE: &str = "ignored";
 
@@ -39,8 +41,8 @@ fn finding(path: String) -> Finding {
 /// `--no-index` matches tracked files too: they were added before the pattern, and
 /// the next new file beside them is the one that goes missing.
 fn ignored_paths(dir: &str, files: &[String]) -> Result<Vec<String>, String> {
-    let mut child = Command::new("git")
-        .args(["-C", dir, "check-ignore", "--no-index", "--stdin"])
+    let mut child = git(Path::new(dir))
+        .args(["check-ignore", "--no-index", "--stdin"])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())

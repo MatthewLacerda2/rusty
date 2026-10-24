@@ -18,6 +18,7 @@ mod determinism;
 mod direction;
 mod layers;
 mod parity;
+mod repo;
 mod rules;
 mod size;
 

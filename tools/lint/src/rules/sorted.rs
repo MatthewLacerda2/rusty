@@ -22,9 +22,9 @@
 
 use super::finding::Finding;
 use super::scan::Scan;
+use crate::repo::ls_files;
 use std::fs;
 use std::path::Path;
-use std::process::Command;
 
 pub const RULE: &str = "sorted";
 /// Words skipped before an entry's key starts.
@@ -157,19 +157,10 @@ fn key(line: &str) -> Option<String> {
 /// `root`, relative to it. Only tracked ones: a gitignored note (the operator's
 /// `auxmd.md`) never reaches CI, so it must not fail the gate locally either.
 pub fn markdown(root: &Path) -> Result<Vec<String>, String> {
-    let out = Command::new("git")
-        .arg("-C")
-        .arg(root)
-        .args(["ls-files", "-z", "--", "*.md"])
-        .output()
-        .map_err(|e| e.to_string())?;
-    if !out.status.success() {
-        return Err(String::from_utf8_lossy(&out.stderr).trim().to_string());
-    }
-    let mut md: Vec<String> = String::from_utf8_lossy(&out.stdout)
-        .split('\0')
-        .filter(|p| !p.is_empty() && (!p.contains('/') || in_roots(p)))
-        .map(str::to_string)
+    let mut md: Vec<String> = ls_files(root, &[], &["*.md"])?
+        .iter()
+        .map(|p| p.to_string_lossy().into_owned())
+        .filter(|p| !p.contains('/') || in_roots(p))
         .collect();
     md.sort();
     Ok(md)
