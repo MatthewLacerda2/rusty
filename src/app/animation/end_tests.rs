@@ -8,10 +8,10 @@ use super::test_rig::{graph, mesh, node, slide, HIPS};
 use crate::asset::animation_graph::{AnimationGraph, GraphNode};
 use crate::components::{AnimatorComponent, MeshComponent};
 
-const DT: f32 = 0.1;
+pub(super) const DT: f32 = 0.1;
 
 /// Clip `A` on a node, looping or not, and an animator bound to it.
-fn rig(is_loop: bool) -> (AnimationGraph, AnimatorComponent) {
+pub(super) fn rig(is_loop: bool) -> (AnimationGraph, AnimatorComponent) {
     let a = GraphNode {
         is_loop,
         ..node("A", "A")
@@ -23,12 +23,12 @@ fn rig(is_loop: bool) -> (AnimationGraph, AnimatorComponent) {
 }
 
 /// A mesh whose only clip, `name`, lasts `duration` seconds.
-fn clip_mesh(name: &str, duration: f32) -> MeshComponent {
+pub(super) fn clip_mesh(name: &str, duration: f32) -> MeshComponent {
     mesh(vec![slide(name, &[HIPS], 0.0, 1.0, duration)])
 }
 
 /// The `End` events `steps` fixed steps over `mesh` fire.
-fn ends(
+pub(super) fn ends(
     anim: &mut AnimatorComponent,
     mesh: &MeshComponent,
     graph: &AnimationGraph,

@@ -23,6 +23,7 @@ use crate::components::AnimatorComponent;
 pub fn set_clip(a: &mut AnimatorComponent, clip: String) {
     a.base.current_clip = clip;
     a.base.current_tree = None;
+    a.base.ended = false;
 }
 
 /// Set the animator's playback speed multiplier: any finite value (0 holds the

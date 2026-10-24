@@ -30,7 +30,8 @@ pub struct Step {
     /// The playhead's travel, `(from, to)` before any wrap or clamp — what
     /// animation events (#459) are crossed against. A clamped playhead already
     /// resting on the end it is pushed against travels nothing, so a marker there
-    /// fires once per pass, not every step.
+    /// fires once per pass, not every step; nor does the step a clip's length
+    /// becomes known, since its unresolved run already crossed the markers (#1386).
     pub span: (f32, f32),
     /// A non-looping playhead reached its end this step, playing forwards or
     /// standing still: once per pass, including the step a clip's length became
@@ -67,7 +68,7 @@ pub struct Playback {
     pub loop_clip: bool,
     /// A non-looping playhead has reached its end and rests there, so its next
     /// steps don't fire `End` again; cleared when it leaves the end (#1386).
-    #[serde(default, skip_serializing_if = "is_false")]
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub ended: bool,
     /// The clip being faded *out* during a crossfade. `None` outside one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -102,10 +103,6 @@ pub struct Playback {
 
 fn default_node_speed() -> f32 {
     1.0
-}
-
-fn is_false(v: &bool) -> bool {
-    !*v
 }
 
 fn is_default_speed(v: &f32) -> bool {
@@ -220,6 +217,9 @@ impl Playback {
     ) -> Step {
         let step = finite(dt * speed * self.node_speed);
         let bounds = current.bounds(self.loop_clip);
+        // Past the end before any clamp: the clip's length was unknown while it
+        // ran on and is known now (#1386).
+        let late = matches!(bounds, Bounds::Clamp(end) if self.time > end);
         let from = finite(match bounds {
             Bounds::Clamp(end) => self.time.clamp(0.0, end),
             _ => self.time,
@@ -233,16 +233,22 @@ impl Playback {
                 self.end_crossfade();
             }
         }
+        // A length that isn't known (or doesn't clamp) says nothing about the
+        // end: `ended` holds, so a clip that stops resolving for a step doesn't
+        // end (and fire its end markers) again once it resolves.
         let Bounds::Clamp(end) = bounds else {
-            self.ended = false;
             return Step::travel(from, to);
         };
         let resting = self.ended && from >= end;
-        self.ended = self.time >= end && to >= from;
-        let pinned = (resting && to > from) || (from <= 0.0 && to < from);
+        let end_now = !self.ended && (late || (self.time >= end && to >= from));
+        self.ended = (self.ended || end_now) && self.time >= end;
+        // Pinned: a push against the end it rests on, a reverse push against the
+        // start, and the late step, whose travel the unresolved run already made,
+        // so a marker it crossed isn't replayed where it clamps onto the end.
+        let pinned = late || (resting && to > from) || (from <= 0.0 && to < from);
         Step {
             span: if pinned { (from, from) } else { (from, to) },
-            end: self.ended && !resting,
+            end: end_now,
         }
     }
 

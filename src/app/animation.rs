@@ -183,6 +183,8 @@ mod bounds_tests;
 #[cfg(test)]
 mod clamp_tests;
 #[cfg(test)]
+mod end_resolve_tests;
+#[cfg(test)]
 mod end_tests;
 #[cfg(test)]
 mod layer_tests;
