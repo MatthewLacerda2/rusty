@@ -2,11 +2,13 @@
 //!
 //! `SetSpeed` / `GetSpeed` over the component's own `speed` multiplier, Unity's
 //! `animator.speed`: it scales every layer's playhead on top of each graph
-//! node's own speed, and the sampler reads it on the next fixed step. The write
-//! goes through `authoring::animator::set_speed`, the same op the inspector's
-//! Animator card uses, so both accept the same values: any finite number
-//! (0 holds the pose, negative runs the playhead backwards). NaN and infinity
-//! are refused with a Lua error, since they would poison the playhead for good.
+//! node's own speed. Set from `Update` it takes effect in the same fixed step
+//! (`update_scripts` runs before `animate`); from `LateUpdate`, the next one. The
+//! write goes through `authoring::animator::set_speed`, the same op the
+//! inspector's Animator card uses, so both accept the same values: any finite
+//! number (0 holds the pose, negative runs the playhead backwards). That op keeps
+//! the old speed on NaN or infinity; the binding also raises a Lua error, so a
+//! script learns its value was refused.
 
 use std::cell::RefCell;
 

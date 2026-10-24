@@ -15,6 +15,7 @@
 //!
 //! Pure.
 
+use super::sanitize::finite_or;
 use crate::components::AnimatorComponent;
 
 /// Set the animator's current clip name (the base layer's motion becomes that
@@ -24,9 +25,12 @@ pub fn set_clip(a: &mut AnimatorComponent, clip: String) {
     a.base.current_tree = None;
 }
 
-/// Set the animator's playback speed multiplier.
+/// Set the animator's playback speed multiplier: any finite value (0 holds the
+/// pose, negative runs the playhead backwards). NaN or infinity keeps the current
+/// speed, since either would poison the playhead for good; the inspector's Speed
+/// field parses `inf`/`NaN`, so the guard lives here, not in a caller.
 pub fn set_speed(a: &mut AnimatorComponent, speed: f32) {
-    a.speed = speed;
+    a.speed = finite_or(speed, a.speed);
 }
 
 /// Set the animator's `is_playing` flag.
@@ -96,6 +100,17 @@ mod tests {
         assert!(a.base.loop_clip);
         assert_eq!(a.graph.as_deref(), Some("guard.animgraph"));
         assert!(!a.graph_enabled);
+    }
+
+    #[test]
+    fn set_speed_keeps_the_old_speed_on_a_non_finite_value() {
+        let (mut scene, id) = scene_with_animator();
+        let mut e = scene.world.animator_mut(id).unwrap();
+        set_speed(&mut e, -0.5);
+        for bad in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+            set_speed(&mut e, bad);
+            assert_eq!(e.speed, -0.5, "{bad} is refused");
+        }
     }
 
     #[test]
