@@ -34,14 +34,19 @@ pub const RULE: &str = "api-parity";
 const AUTHORING: &str = "src/scene/authoring/";
 const ROOT: &str = "crate::scene::authoring";
 const EDITOR: &str = "src/editor/";
-const API: &str = "src/api/";
+/// Where Lua reaches ops from: the bindings, and `Component.Set`'s field table
+/// once it sits under `scene::authoring` (#1418 moves it there).
+const API: &[&str] = &["src/api/", "src/scene/authoring/fields/"];
 
 /// An op by its path under `scene::authoring`: `nav::agent::set_speed`.
 type Op = String;
 
 pub fn run(scan: &Scan) -> Vec<Finding> {
-    let named = |dir: &str| -> BTreeSet<Op> {
-        let files = scan.files.iter().filter(|p| p.starts_with(dir));
+    let named = |dirs: &[&str]| -> BTreeSet<Op> {
+        let files = scan
+            .files
+            .iter()
+            .filter(|p| dirs.iter().any(|d| p.starts_with(d)));
         files
             .flat_map(|p| ops_named(scan.source(p), scan.test_lines(p)))
             .collect()
@@ -52,7 +57,7 @@ pub fn run(scan: &Scan) -> Vec<Finding> {
         .filter(|p| p.starts_with(AUTHORING))
         .map(|p| (p.clone(), scan.source(p)))
         .collect();
-    check(&named(EDITOR), &named(API), &ops)
+    check(&named(&[EDITOR]), &named(API), &ops)
 }
 
 /// The findings, given the ops the editor and the API name and the sources of
