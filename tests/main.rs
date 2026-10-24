@@ -26,6 +26,7 @@ mod api_doc_layout;
 mod asset_scene_reference;
 mod audio_api;
 mod callback_doc_drift;
+mod camera_stack_api;
 mod camera_target_api;
 mod character_controller;
 mod decals;

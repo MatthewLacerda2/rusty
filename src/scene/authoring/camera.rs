@@ -8,7 +8,11 @@
 //! The editor's Camera card routes every field write through these (#287). The Lua
 //! `Camera.*` namespace mostly drives the *render* `Camera` (yaw/pitch/position/fov
 //! of the viewport); its per-entity functions (projection, culling mask, render
-//! target — #430, #827) take an id and write this component through these ops.
+//! target, lens and stacking — #430, #827, #1341) take an id and write this
+//! component through these ops. The lens ops hold Unity's bounds (FOV 1–179°,
+//! near above 0, far beyond near) on every write, so neither the card nor a script
+//! can write a broken frustum. A value read from a scene file does not pass through
+//! here, so a loaded camera is not held to them (#1359).
 //! The component's motion-blur fields ARE also written from `Graphics.*`
 //! (`SetMotionBlurActive` / `SetMotionBlurSamples`); those route through
 //! [`set_motion_blur_active`] / [`set_motion_blur_samples`] here, so the card and the
@@ -21,19 +25,55 @@
 
 use crate::components::{CameraComponent, ClearFlags, Projection, RenderTarget};
 
-/// Set the camera's field of view (degrees).
+/// The field-of-view range, in degrees: Unity's Camera inspector bounds, applied
+/// to every write (the view camera's `Camera.SetFov` too).
+pub const MIN_FOV: f32 = 1.0;
+pub const MAX_FOV: f32 = 179.0;
+/// The nearest a near plane may sit (Unity's inspector floor): a viewmodel's
+/// 0.01 is allowed, 0 (an infinite depth range) is not.
+pub const MIN_NEAR: f32 = 0.01;
+/// How far beyond the near plane the far plane must at least sit (Unity's gap).
+pub const MIN_CLIP_GAP: f32 = 0.01;
+
+/// Set the camera's vertical field of view (degrees), clamped to
+/// [`MIN_FOV`]..=[`MAX_FOV`]. A NaN takes [`MIN_FOV`] (`f32::clamp` would keep it).
 pub fn set_fov(c: &mut CameraComponent, fov: f32) {
-    c.fov = fov;
+    c.fov = if fov.is_nan() {
+        MIN_FOV
+    } else {
+        fov.clamp(MIN_FOV, MAX_FOV)
+    };
 }
 
-/// Set the camera's near clip plane.
-pub fn set_near(c: &mut CameraComponent, near: f32) {
+/// Set both clip planes the way Unity holds them: `near` at least [`MIN_NEAR`],
+/// `far` at least [`MIN_CLIP_GAP`] beyond it (a near plane past the far one pushes
+/// the far one out). A non-finite plane takes its lower bound, and the far plane
+/// always sits strictly beyond the near one, even where `near + MIN_CLIP_GAP`
+/// rounds back to `near`.
+pub fn set_clip_planes(c: &mut CameraComponent, near: f32, far: f32) {
+    // Below f32::MAX, so the plane just beyond it is still finite.
+    let near = if near.is_finite() {
+        near.clamp(MIN_NEAR, f32::MAX.next_down())
+    } else {
+        MIN_NEAR
+    };
+    let min_far = (near + MIN_CLIP_GAP).max(near.next_up());
     c.near = near;
+    c.far = if far.is_finite() {
+        far.max(min_far)
+    } else {
+        min_far
+    };
 }
 
-/// Set the camera's far clip plane.
+/// Set the camera's near clip plane (see [`set_clip_planes`]).
+pub fn set_near(c: &mut CameraComponent, near: f32) {
+    set_clip_planes(c, near, c.far);
+}
+
+/// Set the camera's far clip plane (see [`set_clip_planes`]).
 pub fn set_far(c: &mut CameraComponent, far: f32) {
-    c.far = far;
+    set_clip_planes(c, c.near, far);
 }
 
 /// Set the camera's layer culling mask (one bit per layer).

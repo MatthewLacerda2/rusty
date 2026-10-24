@@ -1,4 +1,4 @@
-//! The projection and render-texture ops (#430).
+//! The projection and render-texture ops (#430), and the lens clamps (#1341).
 
 use super::*;
 
@@ -39,4 +39,59 @@ fn projection_names_round_trip_and_size_stays_positive() {
         Some(Projection::Perspective)
     );
     assert_eq!(parse_projection("fisheye", 5.0), None);
+}
+
+#[test]
+fn lens_ops_hold_unitys_bounds() {
+    let mut c = CameraComponent::default();
+    set_fov(&mut c, 0.0);
+    assert_eq!(c.fov, MIN_FOV);
+    set_fov(&mut c, 500.0);
+    assert_eq!(c.fov, MAX_FOV);
+    for (fov, bound) in [
+        (f32::NAN, MIN_FOV),
+        (f32::INFINITY, MAX_FOV),
+        (f32::NEG_INFINITY, MIN_FOV),
+    ] {
+        set_fov(&mut c, fov);
+        assert_eq!(c.fov, bound, "a non-finite FOV ({fov}) takes the bound");
+    }
+
+    set_clip_planes(&mut c, 0.0, 100.0);
+    assert_eq!((c.near, c.far), (MIN_NEAR, 100.0), "near stays above 0");
+    set_near(&mut c, 150.0);
+    assert_eq!(
+        (c.near, c.far),
+        (150.0, 150.0 + MIN_CLIP_GAP),
+        "far is pushed out"
+    );
+    set_far(&mut c, 1.0);
+    assert_eq!(
+        c.far,
+        150.0 + MIN_CLIP_GAP,
+        "far never drops to the near plane"
+    );
+    let floor = (MIN_NEAR, MIN_NEAR + MIN_CLIP_GAP);
+    for bad in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+        set_clip_planes(&mut c, bad, bad);
+        assert_eq!(
+            (c.near, c.far),
+            floor,
+            "non-finite planes ({bad}) take the bound"
+        );
+    }
+}
+
+#[test]
+fn far_stays_beyond_a_large_near() {
+    let mut c = CameraComponent::default();
+    for near in [1e6, f32::MAX] {
+        set_clip_planes(&mut c, near, 0.0);
+        assert!(
+            c.far > c.near && c.far.is_finite(),
+            "near {near}: far {} must sit beyond {}",
+            c.far,
+            c.near
+        );
+    }
 }

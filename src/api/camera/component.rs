@@ -1,6 +1,6 @@
 //! src/api/camera/component.rs — the `Camera` functions that take an entity id and
 //! tune its `CameraComponent` (#430): projection, culling mask (#827) and
-//! render-texture target. Every
+//! render-texture target, plus the lens and stacking fields (`lens`, #1341). Every
 //! setter routes through `scene::authoring::camera`, the ops the inspector's Camera
 //! card uses. Getters return `nil` without a camera; setters are then no-ops.
 
@@ -48,6 +48,7 @@ pub fn register<'scope>(
         }),
     )?;
     register_culling_mask(scope, table, scene)?;
+    super::lens::register(scope, table, scene)?;
     register_target(scope, table, scene)
 }
 
@@ -152,12 +153,16 @@ fn register_target_settings<'scope>(
 }
 
 /// `f` over `id`'s camera, `None` without one.
-fn read<R>(scene: &RefCell<Scene>, id: u32, f: impl FnOnce(&CameraComponent) -> R) -> Option<R> {
+pub(super) fn read<R>(
+    scene: &RefCell<Scene>,
+    id: u32,
+    f: impl FnOnce(&CameraComponent) -> R,
+) -> Option<R> {
     scene.borrow().world.camera(id).map(|c| f(&c))
 }
 
 /// Run `f` on `id`'s camera when it has one.
-fn write(scene: &RefCell<Scene>, id: u32, f: impl FnOnce(&mut CameraComponent)) {
+pub(super) fn write(scene: &RefCell<Scene>, id: u32, f: impl FnOnce(&mut CameraComponent)) {
     if let Some(mut c) = scene.borrow_mut().world.camera_mut(id) {
         f(&mut c);
     }
