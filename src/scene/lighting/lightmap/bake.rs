@@ -10,11 +10,11 @@ use std::thread;
 
 use glam::Vec3;
 
-use super::bvh::{Bvh, Tri};
 use super::filter::smooth;
 use super::input::BakeScene;
 use super::progress::BakeProgress;
 use super::raster::{dilate, lightmap_size, rasterize, world_per_uv, TexelPoint};
+use super::rays::{Rays, Tri};
 use super::rng::Rng;
 use super::trace::{TexelLight, Tracer};
 use crate::core::color::luminance;
@@ -119,8 +119,8 @@ pub fn bake_with_progress(
     settings: &BakeSettings,
     progress: &BakeProgress,
 ) -> Option<Vec<Lightmap>> {
-    let bvh = Bvh::build(triangles(scene));
-    let tracer = Tracer { scene, bvh: &bvh };
+    let rays = Rays::build(triangles(scene));
+    let tracer = Tracer { scene, rays: &rays };
     // Every lightmap must fit an atlas page with its ring around it.
     let max = settings.max_resolution.min(super::atlas::MAX_PAGE - 2);
     // Rasterize everything first, so the total is known before the first texel.

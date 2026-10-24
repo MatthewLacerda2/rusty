@@ -13,8 +13,8 @@
 use glam::Vec3;
 
 use super::bake::triangles;
-use super::bvh::Bvh;
 use super::input::BakeScene;
+use super::rays::Rays;
 use super::trace::{arrival, T_MIN};
 use crate::scene::lighting::sh::Sh9;
 
@@ -25,14 +25,14 @@ pub fn baked_direct_sh(scene: &BakeScene, positions: &[Vec3]) -> Vec<Sh9> {
     if !scene.lights.iter().any(|l| l.bakes_direct) {
         return vec![Sh9::zero(); positions.len()];
     }
-    let bvh = Bvh::build(triangles(scene));
+    let rays = Rays::build(triangles(scene));
     positions
         .iter()
         .map(|&p| {
             let mut sh = Sh9::zero();
             for light in scene.lights.iter().filter(|l| l.bakes_direct) {
                 if let Some((to_light, distance, received)) = arrival(light, p) {
-                    if !bvh.occluded(p, to_light, T_MIN, distance) {
+                    if !rays.occluded(p, to_light, T_MIN, distance) {
                         sh.add_sample(to_light, received, 1.0);
                     }
                 }

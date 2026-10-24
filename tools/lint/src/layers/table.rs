@@ -64,10 +64,13 @@ pub const LAYERS: &[Layer] = &[
     sim("ecs", &["components"]).uses(&["hecs"]),
     // A sim `Resource` stepped by sim time; its device thread never reads a clock.
     sim("audio", &["asset", "components", "core"]).uses(&["kira"]),
+    // The lightmap bake traces rays through parry's `TriMesh` (#1330); `physics` sits
+    // above `scene`, so the crate is named here rather than the module.
     sim(
         "scene",
         &["asset", "components", "core", "ecs", "procgen", "shadergen"],
-    ),
+    )
+    .uses(&["rapier3d"]),
     // The in-game UI's layout runs headless inside the sim (#417).
     sim("ui", &["asset", "components", "core", "ecs", "scene"]).uses(&[
         "ab_glyph",
