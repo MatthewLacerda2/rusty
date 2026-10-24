@@ -1,12 +1,14 @@
 pub(crate) mod freshness;
+pub(crate) mod mips;
 mod panorama;
 
 use std::rc::Rc;
 
-use image::GenericImageView;
-
 use crate::asset::MapRef;
 use crate::render::{GpuTexture, Renderer};
+use image::GenericImageView;
+use mips::full_chain_len;
+pub(crate) use mips::{MipGenerator, MipSettings, TextureKind};
 
 /// The storage format of every image the renderer uploads: colour is authored in
 /// sRGB, so the colour view decodes it on sample.
@@ -16,15 +18,20 @@ const IMAGE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
 const DATA_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8Unorm;
 
 impl Renderer {
-    /// Generates a standard checkerboard texture for meshes that don't have texture files assigned
+    /// Generates a standard checkerboard texture for meshes that don't have texture
+    /// files assigned. Its sampler is the one every material map samples through
+    /// (`material_bind_group`), so it is the image textures' trilinear one; 32-texel
+    /// cells keep the checker's edges crisp under its linear magnification.
     pub(crate) fn create_default_checkerboard_texture(
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
+        (device, queue, mips): Uploader,
         layout: &wgpu::BindGroupLayout,
     ) -> GpuTexture {
-        let pixels = Self::checkerboard_pixels(64, 64);
         let label = "Default Checkerboard Texture";
-        Self::create_pixel_texture(device, queue, layout, (64, &pixels), label)
+        let checker = checkerboard(256, 32);
+        let texture = upload((device, queue), label, &checker, full_chain_len(256, 256));
+        mips.generate(device, queue, &texture, TextureKind::Colour);
+        let sampler = image_sampler(device);
+        Self::finalize_texture(device, layout, (texture, DATA_FORMAT), sampler, Some(label))
     }
 
     /// A 1×1 white texture: what an effect with no texture of its own samples, so
@@ -34,59 +41,10 @@ impl Renderer {
         queue: &wgpu::Queue,
         layout: &wgpu::BindGroupLayout,
     ) -> GpuTexture {
-        Self::create_pixel_texture(device, queue, layout, (1, &[255; 4]), "White Texture")
-    }
-
-    /// Upload a square `(side, rgba8 pixels)` sRGB texture with a repeating,
-    /// nearest-filtered sampler.
-    fn create_pixel_texture(
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
-        layout: &wgpu::BindGroupLayout,
-        (side, pixels): (u32, &[u8]),
-        label: &str,
-    ) -> GpuTexture {
-        let size = wgpu::Extent3d {
-            width: side,
-            height: side,
-            depth_or_array_layers: 1,
-        };
-
-        let texture = device.create_texture(&wgpu::TextureDescriptor {
-            label: Some(label),
-            size,
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: IMAGE_FORMAT,
-            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-            view_formats: &[DATA_FORMAT],
-        });
-
-        queue.write_texture(
-            wgpu::TexelCopyTextureInfo {
-                texture: &texture,
-                mip_level: 0,
-                origin: wgpu::Origin3d::ZERO,
-                aspect: wgpu::TextureAspect::All,
-            },
-            pixels,
-            wgpu::TexelCopyBufferLayout {
-                offset: 0,
-                bytes_per_row: Some(4 * side),
-                rows_per_image: Some(side),
-            },
-            size,
-        );
-
-        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            address_mode_u: wgpu::AddressMode::Repeat,
-            address_mode_v: wgpu::AddressMode::Repeat,
-            mag_filter: wgpu::FilterMode::Nearest,
-            min_filter: wgpu::FilterMode::Nearest,
-            ..Default::default()
-        });
-
+        let label = "White Texture";
+        let white = image::RgbaImage::from_pixel(1, 1, image::Rgba([255; 4]));
+        let texture = upload((device, queue), label, &white, 1);
+        let sampler = image_sampler(device);
         Self::finalize_texture(device, layout, (texture, DATA_FORMAT), sampler, Some(label))
     }
 
@@ -130,30 +88,18 @@ impl Renderer {
         }
     }
 
-    /// Builds the RGBA8 pixel buffer for the glowing dark neon checker pattern.
-    fn checkerboard_pixels(width: usize, height: usize) -> Vec<u8> {
-        let mut pixels = Vec::with_capacity(width * height * 4);
-        for y in 0..height {
-            for x in 0..width {
-                let is_even = ((x / 8) + (y / 8)) % 2 == 0;
-                let (r, g, b) = if is_even {
-                    (28, 30, 42) // Dark violet grey
-                } else {
-                    (52, 45, 78) // Glowing neon violet
-                };
-                pixels.push(r);
-                pixels.push(g);
-                pixels.push(b);
-                pixels.push(255);
-            }
-        }
-        pixels
-    }
-
     /// Loads and registers the texture `map` names. Caches results dynamically,
     /// keyed by the map; a failed load is remembered as a miss (drawn with the
     /// default) and retried once the file appears, never cached under its path (#689).
+    /// A colour texture; `load_texture_as` names what the texels hold.
     pub fn load_texture(&mut self, map: &MapRef) -> Rc<GpuTexture> {
+        self.load_texture_as(map, TextureKind::Colour)
+    }
+
+    /// [`Self::load_texture`] for a texture holding `kind`, which decides how its
+    /// mips average. The first load of a file decides it: the cache keeps one
+    /// upload per file.
+    pub(crate) fn load_texture_as(&mut self, map: &MapRef, kind: TextureKind) -> Rc<GpuTexture> {
         let path_str = map.as_str();
         if let Some(tex) = self.gpu_textures.get(path_str) {
             return Rc::clone(tex);
@@ -172,73 +118,124 @@ impl Renderer {
             self.texture_freshness.miss(path_str);
             return Rc::clone(&self.default_texture);
         };
-        let tex = self.upload_image_texture(path_str, &img);
+        let settings = MipSettings::for_map(map, kind);
+        let tex = self.upload_image_texture(path_str, &img, settings);
         self.gpu_textures.insert(map.clone(), Rc::clone(&tex));
         tex
     }
 
-    /// Uploads a decoded image to the GPU and wraps it in a cached `GpuTexture`.
-    fn upload_image_texture(&self, path_str: &str, img: &image::DynamicImage) -> Rc<GpuTexture> {
-        let rgba = img.to_rgba8();
-        let dimensions = img.dimensions();
-
-        let size = wgpu::Extent3d {
-            width: dimensions.0,
-            height: dimensions.1,
-            depth_or_array_layers: 1,
-        };
-
-        let texture = self.device.create_texture(&wgpu::TextureDescriptor {
-            label: Some(path_str),
-            size,
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: IMAGE_FORMAT,
-            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-            view_formats: &[DATA_FORMAT],
-        });
-
-        self.queue.write_texture(
-            wgpu::TexelCopyTextureInfo {
-                texture: &texture,
-                mip_level: 0,
-                origin: wgpu::Origin3d::ZERO,
-                aspect: wgpu::TextureAspect::All,
-            },
-            &rgba,
-            wgpu::TexelCopyBufferLayout {
-                offset: 0,
-                bytes_per_row: Some(4 * dimensions.0),
-                rows_per_image: Some(dimensions.1),
-            },
-            size,
-        );
-
-        let sampler = self.device.create_sampler(&wgpu::SamplerDescriptor {
-            address_mode_u: wgpu::AddressMode::Repeat,
-            address_mode_v: wgpu::AddressMode::Repeat,
-            mag_filter: wgpu::FilterMode::Linear,
-            min_filter: wgpu::FilterMode::Linear,
-            mipmap_filter: wgpu::MipmapFilterMode::Linear,
-            anisotropy_clamp: 16,
-            ..Default::default()
-        });
-
+    /// Uploads a decoded image, with the mips `settings` ask for, and wraps it in a
+    /// cached `GpuTexture`.
+    fn upload_image_texture(
+        &self,
+        path_str: &str,
+        img: &image::DynamicImage,
+        settings: MipSettings,
+    ) -> Rc<GpuTexture> {
+        let (width, height) = img.dimensions();
+        let levels = settings.levels(width, height);
+        let gpu = (&self.device, &self.queue);
+        let texture = upload(gpu, path_str, &img.to_rgba8(), levels);
+        let kind = settings.kind;
+        self.mip_generator
+            .generate(&self.device, &self.queue, &texture, kind);
         Rc::new(Self::finalize_texture(
             &self.device,
             &self.texture_layout,
             (texture, DATA_FORMAT),
-            sampler,
+            image_sampler(&self.device),
             Some(path_str),
         ))
     }
+}
+
+/// What uploading an image with mips needs of the GPU: the device, the queue and
+/// the mip pass.
+pub(crate) type Uploader<'a> = (&'a wgpu::Device, &'a wgpu::Queue, &'a MipGenerator);
+
+/// Create an sRGB texture of `levels` mips with `image` written to its base; the
+/// caller draws the rest ([`MipGenerator::generate`]).
+pub(super) fn upload(
+    (device, queue): (&wgpu::Device, &wgpu::Queue),
+    label: &str,
+    image: &image::RgbaImage,
+    levels: u32,
+) -> wgpu::Texture {
+    let (width, height) = image.dimensions();
+    let mut usage = wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST;
+    if cfg!(test) {
+        // Tests read the mips back.
+        usage |= wgpu::TextureUsages::COPY_SRC;
+    }
+    if levels > 1 {
+        // The mip pass draws each level.
+        usage |= wgpu::TextureUsages::RENDER_ATTACHMENT;
+    }
+    let texture = device.create_texture(&wgpu::TextureDescriptor {
+        label: Some(label),
+        size: extent(width, height),
+        mip_level_count: levels,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: IMAGE_FORMAT,
+        usage,
+        view_formats: &[DATA_FORMAT],
+    });
+    queue.write_texture(
+        wgpu::TexelCopyTextureInfo {
+            texture: &texture,
+            mip_level: 0,
+            origin: wgpu::Origin3d::ZERO,
+            aspect: wgpu::TextureAspect::All,
+        },
+        image,
+        wgpu::TexelCopyBufferLayout {
+            offset: 0,
+            bytes_per_row: Some(4 * width),
+            rows_per_image: Some(height),
+        },
+        extent(width, height),
+    );
+    texture
+}
+
+fn extent(width: u32, height: u32) -> wgpu::Extent3d {
+    wgpu::Extent3d {
+        width,
+        height,
+        depth_or_array_layers: 1,
+    }
+}
+
+/// Every image texture's sampler: repeating, trilinear (Unity's default for a
+/// texture with mips), anisotropic.
+fn image_sampler(device: &wgpu::Device) -> wgpu::Sampler {
+    device.create_sampler(&wgpu::SamplerDescriptor {
+        label: Some("Image Sampler"),
+        address_mode_u: wgpu::AddressMode::Repeat,
+        address_mode_v: wgpu::AddressMode::Repeat,
+        mag_filter: wgpu::FilterMode::Linear,
+        min_filter: wgpu::FilterMode::Linear,
+        mipmap_filter: wgpu::MipmapFilterMode::Linear,
+        anisotropy_clamp: 16,
+        ..Default::default()
+    })
+}
+
+/// A `side`² dark neon checker of `cell`-texel squares.
+fn checkerboard(side: u32, cell: u32) -> image::RgbaImage {
+    image::RgbaImage::from_fn(side, side, |x, y| match (x / cell + y / cell) % 2 {
+        0 => image::Rgba([28, 30, 42, 255]), // Dark violet grey
+        _ => image::Rgba([52, 45, 78, 255]), // Glowing neon violet
+    })
 }
 
 #[cfg(test)]
 mod formats_tests;
 #[cfg(test)]
 mod freshness_tests;
+#[cfg(test)]
+mod panorama_tests;
 
 /// The image `map` names, decoded: a map that references a texture a conversion
 /// extracted is read where the import cache holds it ([`MapRef::file`], #1130).

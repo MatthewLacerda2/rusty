@@ -246,8 +246,9 @@ fn environment_reflection(world_pos: vec3<f32>, raw_r: vec3<f32>, roughness: f32
         return textureSampleLevel(t_refl_cube, s_refl_cube, corrected, p.layer, lod).rgb;
     }
     if (lighting.sky_textured > 0.5) {
-        // The equirectangular panorama, mapped as the skybox pass maps it.
-        return textureSample(t_skybox, s_skybox, equirect_uv(R)).rgb;
+        // The equirectangular panorama, mapped (and read at level 0, past the
+        // atan2 seam's derivatives) as the skybox pass does (#1322).
+        return textureSampleLevel(t_skybox, s_skybox, equirect_uv(R), 0.0).rgb;
     }
     return procedural_sky(lighting.ambient.color, R);
 }

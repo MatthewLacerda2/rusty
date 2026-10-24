@@ -13,6 +13,7 @@ use std::rc::Rc;
 use crate::asset::MapRef;
 use crate::components::MaterialAsset;
 use crate::render::gpu::material_cache::{ParamOwner, MATERIAL_TEXTURES};
+use crate::render::gpu::textures::TextureKind;
 use crate::render::{GpuTexture, Renderer};
 use crate::scene::shader_overrides::ParamValues;
 use crate::scene::{Scene, SceneId};
@@ -115,9 +116,10 @@ impl Renderer {
 
     /// Build a group(2) material bind group from the resolved textures (albedo,
     /// metallic, roughness, normal, emissive, then the extra slots — that order) +
-    /// one shared sampler, against `material_layout`. Maps bind at 0,2,3,4,5; sampler
-    /// at 1 (binding 1 samples them all) (#202, #207); `owner`'s param buffer (or the
-    /// shared zero one) at 6 (#399); each extra slot at its own binding (7, #400).
+    /// one shared sampler (the default texture's trilinear one, #1322), against
+    /// `material_layout`. Maps bind at 0,2,3,4,5; sampler at 1 (binding 1 samples
+    /// them all) (#202, #207); `owner`'s param buffer (or the shared zero one) at 6
+    /// (#399); each extra slot at its own binding (7, #400).
     pub(crate) fn material_bind_group(
         &self,
         maps: &[Rc<GpuTexture>; MATERIAL_TEXTURES],
@@ -163,6 +165,26 @@ impl Renderer {
 /// shader texture slot holds data and samples its texels raw (glTF 2.0, #647).
 pub(crate) fn is_colour_map(index: usize) -> bool {
     matches!(index, 0 | 4)
+}
+
+/// Every texture `material` samples (as [`material_texture_paths`]), each with what
+/// its slot holds, which decides how its mips average (#1322): what to upload
+/// before its bind group is built.
+pub(crate) fn material_maps(
+    material: Option<&MaterialAsset>,
+) -> impl Iterator<Item = (MapRef, TextureKind)> {
+    material_texture_paths(material)
+        .into_iter()
+        .enumerate()
+        .filter_map(|(i, path)| Some((path?, map_kind(i))))
+}
+
+/// What the map at `index` holds, which decides how its mips average (#1322).
+fn map_kind(index: usize) -> TextureKind {
+    match is_colour_map(index) {
+        true => TextureKind::Colour,
+        false => TextureKind::Data,
+    }
 }
 
 /// Every texture path `material`'s group 2 binds, in [`MapSignature`] order: the

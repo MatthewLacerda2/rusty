@@ -38,6 +38,29 @@ pub(crate) fn read_texture_bytes(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
     texture: &wgpu::Texture,
+    size: (u32, u32),
+    texel_bytes: u32,
+) -> Vec<u8> {
+    read_level(device, queue, (texture, 0), size, texel_bytes)
+}
+
+/// [`read_texture_rgba8`] of mip level `mip`, `width × height` being that level's
+/// region (#1322).
+#[cfg(test)]
+pub(crate) fn read_mip_rgba8(
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    (texture, mip): (&wgpu::Texture, u32),
+    size: (u32, u32),
+) -> Vec<u8> {
+    read_level(device, queue, (texture, mip), size, 4)
+}
+
+/// The texels of `size`'s top-left region of `texture`'s level `mip`, packed.
+fn read_level(
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    level: (&wgpu::Texture, u32),
     (width, height): (u32, u32),
     texel_bytes: u32,
 ) -> Vec<u8> {
@@ -57,7 +80,7 @@ pub(crate) fn read_texture_bytes(
         height,
         depth_or_array_layers: 1,
     };
-    submit_copy(device, queue, texture, &buffer, padded_bytes_per_row, size);
+    submit_copy(device, queue, level, &buffer, padded_bytes_per_row, size);
     map_and_unpad(
         device,
         &buffer,
@@ -67,11 +90,11 @@ pub(crate) fn read_texture_bytes(
     )
 }
 
-/// Encode and submit the texture → padded-buffer copy of `size`'s top-left region.
+/// Encode and submit the level → padded-buffer copy of `size`'s top-left region.
 fn submit_copy(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
-    texture: &wgpu::Texture,
+    (texture, mip_level): (&wgpu::Texture, u32),
     buffer: &wgpu::Buffer,
     padded_bytes_per_row: u32,
     size: wgpu::Extent3d,
@@ -82,7 +105,7 @@ fn submit_copy(
     encoder.copy_texture_to_buffer(
         wgpu::TexelCopyTextureInfo {
             texture,
-            mip_level: 0,
+            mip_level,
             origin: wgpu::Origin3d::ZERO,
             aspect: wgpu::TextureAspect::All,
         },

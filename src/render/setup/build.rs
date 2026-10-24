@@ -98,7 +98,7 @@ impl GpuResources {
         let mut registry = ShaderRegistry::new(crate::shadergen::engine_shader_dir());
         let camera_lighting_layout = bind_layouts::create_camera_lighting_layout(device);
         let entity_bones_layout = bind_layouts::create_entity_bones_layout(device);
-        let textures = create_textures(device, queue);
+        let textures = create_textures(device, queue, &mut registry);
         let global =
             create_global_bindings(device, &camera_lighting_layout, &textures.default_texture);
         let ssao = ssao::SsaoRenderer::new(device, queue, &mut registry);

@@ -21,6 +21,7 @@ pub use naga::Module;
 /// base. `common.wgsl` names itself here (its import name is `common`); every other
 /// module names itself with `#define_import_path` (#1015).
 pub const MODULES: &[&str] = &[
+    "fullscreen.wgsl",
     "sky/noise.wgsl",
     "lighting/reflection_probe.wgsl",
     "common.wgsl",

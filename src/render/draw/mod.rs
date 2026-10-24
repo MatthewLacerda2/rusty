@@ -13,6 +13,8 @@ pub(crate) mod stack;
 pub(crate) mod uniforms;
 
 use self::stack::StackPass;
+use crate::asset::MapRef;
+use crate::render::gpu::textures::TextureKind;
 use crate::render::lod::LodSelection;
 use crate::render::{build_camera_stack, texture_cameras, GpuTexture, RenderView, Renderer};
 use crate::scene::{Camera, Scene};
@@ -121,8 +123,8 @@ impl Renderer {
             .release_entities(scene.id(), |id| overrides.has(id));
         // The material maps the shader samples (albedo #201, metallic/roughness #202),
         // collected paths-only first to end the scene borrow before uploading.
-        for path in active_material_map_paths(scene) {
-            self.load_texture(&path);
+        for (path, kind) in active_material_map_paths(scene) {
+            self.load_texture_as(&path, kind);
         }
 
         // Update skybox texture if path changed, marking the global bind group dirty
@@ -152,15 +154,14 @@ impl Renderer {
 /// Every active entity's resolved material map paths (albedo, metallic, roughness,
 /// normal, emissive, then the extra shader texture slots, #400) the forward shader
 /// samples, gathered as owned `MapRef`s so the scene borrow ends before the textures
-/// are uploaded (#202, #207).
-pub(crate) fn active_material_map_paths(scene: &Scene) -> Vec<crate::asset::MapRef> {
+/// are uploaded (#202, #207), each with what its slot holds (#1322).
+pub(crate) fn active_material_map_paths(scene: &Scene) -> Vec<(MapRef, TextureKind)> {
     scene
         .world
         .ids_with_material()
         .into_iter()
         .filter(|&id| scene.world.is_active(id))
         .flat_map(|id| scene.material_assets_of(id))
-        .flat_map(|m| materials::material_texture_paths(Some(m)))
-        .flatten()
+        .flat_map(|m| materials::material_maps(Some(m)))
         .collect()
 }

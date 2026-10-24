@@ -1,6 +1,11 @@
 //! The skybox panorama's own sampler (#1037). An equirect image wraps in U (φ = ±π
 //! is one seam) but not in V: v = θ/π runs zenith (0) to nadir (1), so a repeating
 //! V blends the top row into the bottom one at each pole under linear filtering.
+//!
+//! The upload is the material texture's, mip chain included (#1322), so every
+//! equirect read (`skybox.wgsl`, the reflection fallback in `forward/lighting.wgsl`,
+//! SSR's in `postfx.wgsl`) samples level 0: derivatives across `equirect_uv`'s
+//! atan2 seam would pick the coarsest mip, a flat line down the sky.
 
 use std::rc::Rc;
 

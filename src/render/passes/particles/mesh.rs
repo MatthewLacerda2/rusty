@@ -12,10 +12,10 @@
 
 use glam::{Mat4, Quat, Vec3};
 
-use crate::asset::MapRef;
 use crate::components::{MaterialAsset, ParticleEmitterComponent, ParticleRenderMode};
 use crate::render::draw::batch::sort::view_depth;
 use crate::render::draw::batch::{BatchKey, DrawItem};
+use crate::render::draw::materials::material_maps;
 use crate::render::draw::uniforms::{material_uniform, probe_sh_at};
 use crate::render::{EntityUniform, InstanceData, Renderer};
 use crate::scene::authoring::{primitive_mesh_component, Primitive};
@@ -112,8 +112,8 @@ impl Renderer {
             .and_then(|m| scene.materials.get_key_value(m))
             .map(|(key, asset)| (key.as_str(), asset));
         let material = entry.map(|(_, asset)| asset);
-        for path in material_maps(material) {
-            self.load_texture(&path);
+        for (path, kind) in material_maps(material) {
+            self.load_texture_as(&path, kind);
         }
         let shader = material.and_then(|m| m.shader.as_deref());
         let pipeline = self.surface_shaders.pipeline_id(&self.device, shader);
@@ -133,12 +133,4 @@ impl Renderer {
         let glass = material.is_some_and(MaterialAsset::is_transparent);
         Some((key, glass))
     }
-}
-
-/// The texture maps `material` samples, to upload before its bind group is built.
-fn material_maps(material: Option<&MaterialAsset>) -> Vec<MapRef> {
-    crate::render::draw::materials::material_texture_paths(material)
-        .into_iter()
-        .flatten()
-        .collect()
 }
