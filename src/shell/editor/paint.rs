@@ -89,7 +89,8 @@ pub(in crate::shell::editor) fn paint_pass(
 }
 
 /// Run a submitted REPL line through the single live evaluator. Dev builds only — the
-/// console input line and the harness share `evaluate_line`.
+/// console input line and the harness share `evaluate_line`. A line outside Play may
+/// have moved static geometry, so it marks the scene dirty (#1339).
 #[cfg(feature = "dev")]
 pub(super) fn drain_repl(editor_ui: &mut EditorUi, game: &GameWorld) {
     if let Some(line) = editor_ui.dev.pending_repl.take() {
@@ -100,6 +101,7 @@ pub(super) fn drain_repl(editor_ui: &mut EditorUi, game: &GameWorld) {
             &game.resources.console,
             &line,
         );
+        editor_ui.is_dirty |= !game.scene().borrow().is_playing();
     }
 }
 

@@ -38,12 +38,21 @@ impl GameWorld {
         if !self.resources.edit_runtime {
             return;
         }
-        if let Err(err) = self.init_edit_runtime() {
-            self.resources
-                .console
-                .borrow_mut()
-                .error(format!("Lua init error: {err}"));
-        }
+        let init = self.init_edit_runtime();
+        self.report_lua_init(init);
+    }
+
+    /// Log a failed runtime start to the console as `Lua init error: …`, the one
+    /// wording Play, Stop and the editor's boot share. Returns whether it started.
+    pub fn report_lua_init(&self, init: Result<(), String>) -> bool {
+        let Err(err) = init else {
+            return true;
+        };
+        self.resources
+            .console
+            .borrow_mut()
+            .error(format!("Lua init error: {err}"));
+        false
     }
 }
 

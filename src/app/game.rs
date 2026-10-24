@@ -222,15 +222,11 @@ impl GameWorld {
             .borrow_mut()
             .info("Capturing cursor, entering PlayMode!".to_string());
 
-        if let Err(err) = self
+        let init = self
             .resources
             .script_manager
-            .init_runtime(&self.resources.physics)
-        {
-            self.resources
-                .console
-                .borrow_mut()
-                .error(format!("Lua init error: {}", err));
+            .init_runtime(&self.resources.physics);
+        if !self.report_lua_init(init) {
             return;
         }
         // Load every scene entity's scripts, then run the two-phase init (#322):

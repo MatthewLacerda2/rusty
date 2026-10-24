@@ -9,6 +9,8 @@ publish = false
 # Integration tests build as ONE binary, not one per `tests/*.rs` (#483): each of those
 # linked the whole engine (wgpu, egui, rapier, Lua). See the `[[test]]` target below.
 autotests = false
+# A plain `cargo run` opens the editor; the other binaries are named with `--bin`.
+default-run = "rusty"
 
 [lib]
 name = "rusty"

@@ -100,13 +100,16 @@ impl CommandChannel {
     /// once-per-frame poll), runs each through [`console::evaluate_line`] against the
     /// live world, frames the outcome with `session::response_line` (identical to
     /// the headless session), and sends it back. Send errors are ignored — the client
-    /// may have disconnected between sending and our reply.
-    pub fn drain(&self, scripts: &ScriptManager, console: &RefCell<ConsoleLogs>) {
+    /// may have disconnected between sending and our reply. Returns how many ran.
+    pub fn drain(&self, scripts: &ScriptManager, console: &RefCell<ConsoleLogs>) -> usize {
+        let mut ran = 0;
         while let Ok((line, reply_tx)) = self.rx.try_recv() {
             let outcome = console::evaluate_line(scripts, console, &line);
             let warnings = crate::logging::forward(console);
             let _ = reply_tx.send(session::response_line(&outcome, &warnings));
+            ran += 1;
         }
+        ran
     }
 }
 
@@ -146,7 +149,8 @@ mod tests {
         let (reply_tx, reply_rx) = mpsc::channel::<String>();
         tx.send((line.to_string(), reply_tx))
             .expect("queue command");
-        ch.drain(s.world().script_manager(), s.world().console());
+        let ran = ch.drain(s.world().script_manager(), s.world().console());
+        assert_eq!(ran, 1, "drain counts the one line it ran");
         reply_rx.recv().expect("drain replies once")
     }
 

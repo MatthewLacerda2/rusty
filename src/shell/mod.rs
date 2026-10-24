@@ -260,14 +260,19 @@ fn capture_clipboard(shell: &mut Shell, game: &GameWorld) {
 
 /// Drain socket-delivered commands (#282) through the one live evaluator, so a
 /// windowed playtest — editor or player — answers an external agent exactly like the
-/// headless session does. Dev builds only.
+/// headless session does. A command outside Play may have moved static geometry, so
+/// the static shadow bake is dropped (#1339). Dev builds only.
 #[cfg(feature = "dev")]
-fn drain_commands(shell: &Shell, game: &GameWorld) {
-    if let Some(channel) = shell.cmd_channel.as_ref() {
-        channel.drain(game.script_manager(), &game.resources.console);
+fn drain_commands(shell: &mut Shell, game: &GameWorld) {
+    let Some(channel) = shell.cmd_channel.as_ref() else {
+        return;
+    };
+    let ran = channel.drain(game.script_manager(), &game.resources.console);
+    if ran > 0 && !game.scene().borrow().is_playing() {
+        shell.renderer.shadow_renderer.invalidate_static_cache();
     }
 }
 
 /// No command channel in ship builds.
 #[cfg(not(feature = "dev"))]
-fn drain_commands(_shell: &Shell, _game: &GameWorld) {}
+fn drain_commands(_shell: &mut Shell, _game: &GameWorld) {}
