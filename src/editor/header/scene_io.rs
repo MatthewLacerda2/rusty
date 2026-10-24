@@ -1,5 +1,5 @@
-//! The editor's scene-file verbs: the File menu's new / reset / load / save, and the
-//! one open and one save every other editor surface (the content grid's double-click,
+//! The editor's current scene file and its verbs: the File menu's new / reset /
+//! load / save, and the one open and one save every other editor surface (the content grid's double-click,
 //! the scene asset's inspector buttons) goes through, so they never drift apart (#997).
 
 use std::path::Path;
@@ -9,6 +9,17 @@ use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;
 
 impl EditorUi {
+    /// The scene file the editor is editing, `None` for a scene never saved. One
+    /// value with the script runtime's `Scene.Save()` target (#1366).
+    pub fn current_scene_path(&self) -> Option<String> {
+        self.scene_path.borrow().clone()
+    }
+
+    /// Make `path` the scene file the editor (and `Scene.Save()`) writes back to.
+    pub fn set_current_scene_path(&mut self, path: Option<String>) {
+        *self.scene_path.borrow_mut() = path;
+    }
+
     /// Open the scene file at `path` — the editor face of `Scene.Load`, with its rules:
     /// a path that is not a file is refused, and during play the swap is deferred to
     /// the tick's tail. In edit mode the scene loads at once, becomes the current

@@ -101,12 +101,14 @@ pub fn load_parsed(
 ) -> Result<(), LoadError> {
     apply_scene_data(scene, data);
     scene.renew_id();
+    // The World is now this document, so it is "what the engine read" whether or not
+    // the sidecar loads: a sidecar changing alone never triggers the follow, so
+    // withholding the record would buy no retry, only a reload that discards
+    // unsaved edits on the next Generate Lighting, `touch` or rescan (#1374).
+    scene.disk_text.record(path, json);
     // Merge the baked SH back onto the just-loaded probe positions (#240). A missing
     // sidecar is fine — probes load with zero SH (positions placed, never baked).
-    crate::scene::lighting::io::load_lighting_sidecar(scene, path).map_err(LoadError::Sidecar)?;
-    // Recorded last: a load that errored is not "what the engine read" (#1374).
-    scene.disk_text.record(path, json);
-    Ok(())
+    crate::scene::lighting::io::load_lighting_sidecar(scene, path).map_err(LoadError::Sidecar)
 }
 
 /// Read and parse the scene document at `path` without touching any live scene — so

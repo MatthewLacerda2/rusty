@@ -88,9 +88,9 @@ fn stop_restores_the_scene_play_started_in() {
     assert_eq!(path.as_deref(), Some(menu.as_str()), "and its scene file");
     let scene = gw.scene().borrow();
     assert!(scene.persistent.is_empty() && scene.pending_load.is_none());
-    assert_ne!(
+    assert_eq!(
         scene.id(),
         id,
-        "the renderer must not reuse the played scene's caches"
+        "and its identity, for a bake waiting on Stop"
     );
 }

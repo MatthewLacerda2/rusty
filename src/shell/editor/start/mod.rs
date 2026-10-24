@@ -64,8 +64,7 @@ fn prepare(
         eprintln!("[Project] could not update the recent projects: {err}");
     }
     boot::seed_project_workspace();
-    let scene_path = crate::scene::DEFAULT_SCENE_PATH.to_string();
-    let mut game = boot::load_game(&scene_path);
+    let mut game = boot::load_game(crate::scene::DEFAULT_SCENE_PATH);
     // Editor scripting works outside Play, as in Unity (#1339): the console line
     // and MCP `eval` drive the edit scene; Stop brings this runtime back.
     let init = game.init_edit_runtime();
@@ -88,7 +87,7 @@ fn prepare(
         video_defaults: VideoSettings::default(),
         frontend: |shell: &Shell, game: &GameWorld| {
             icon::apply(&shell.window);
-            EditorFrontend::new(shell, game, scene_path)
+            EditorFrontend::new(shell, game)
         },
     };
     (game, launch)

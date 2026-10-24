@@ -68,8 +68,10 @@ pub struct EditorFrontend {
 }
 
 impl EditorFrontend {
-    /// Set up egui on the shell's window and open the editor on `scene_path`.
-    pub fn new(shell: &Shell, game: &GameWorld, scene_path: String) -> Self {
+    /// Set up egui on the shell's window and open the editor on the game's current
+    /// scene file: the boot set it only if the scene loaded, so a startup scene that
+    /// doesn't parse opens as Untitled (#1374).
+    pub fn new(shell: &Shell, game: &GameWorld) -> Self {
         let egui_ctx = egui::Context::default();
         let egui_winit = egui_winit::State::new(
             egui_ctx.clone(),
@@ -85,7 +87,6 @@ impl EditorFrontend {
             paint::EGUI_RENDERER,
         );
         let mut editor_ui = EditorUi::new(game.script_manager().scene_path_cell());
-        editor_ui.set_current_scene_path(Some(scene_path));
         editor_ui.quality_preset = *game.script_manager().quality_cell().borrow();
         Self {
             egui_ctx,

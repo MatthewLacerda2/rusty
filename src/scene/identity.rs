@@ -9,9 +9,11 @@
 //!
 //! A [`SceneId`] is the missing half of that key. It identifies the live `Scene`
 //! *instance*, not its contents: assigned once at construction, never serialized,
-//! never reused. Save/load builds a new `Scene` and so earns a new id (its cached
-//! GPU resources should not be inherited); entering and leaving Play keeps the same
-//! `Scene` object, and so keeps its id (its resources should persist).
+//! never handed to another scene. Save/load builds a new `Scene` and so earns a new
+//! id (its cached GPU resources should not be inherited); entering and leaving Play
+//! keeps the same `Scene` object, and so keeps its id (its resources should
+//! persist), even when a play-mode `Scene.Load` swapped it meanwhile: Stop restores
+//! the pre-Play scene and its id together.
 //!
 //! The counter is a plain atomic — no wall clock, no RNG — so it respects the
 //! determinism discipline even though the renderer that consumes it is platform
