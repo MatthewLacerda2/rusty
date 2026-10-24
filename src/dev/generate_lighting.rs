@@ -14,7 +14,7 @@
 use super::lighting_bake::{bake_lighting, LightingBakeParams, LightingBakeReport};
 use super::lightmap_bake::bake_scene_lightmaps;
 use crate::navigation::NavigationGraph;
-use crate::scene::{save_lighting, LightingSave, Scene};
+use crate::scene::{save_lighting, LightingSave, Scene, LIGHTING_IN_PLAY};
 
 /// Why Generate Lighting cannot start: the bakes write beside the scene file.
 pub const UNSAVED: &str = "save the scene before generating lighting";
@@ -47,12 +47,14 @@ impl GenerateReport {
 }
 
 /// Bake lightmaps then probes with the scene's settings, and write the result.
-/// Errors when the scene was never saved or a bake's own contract fails.
+/// Errors when the scene was never saved, during Play (the bakes write the scene
+/// file, as a save does, #1340), or when a bake's own contract fails.
 pub fn generate_lighting(
     scene: &mut Scene,
     scene_path: Option<&str>,
     nav: Option<&NavigationGraph>,
 ) -> Result<GenerateReport, String> {
+    refuse_in_play(scene)?;
     let path = scene_path.ok_or(UNSAVED)?;
     let settings = scene.lighting_settings.lightmaps;
     let lightmaps = bake_scene_lightmaps(scene, Some(path), &settings)?;
@@ -60,13 +62,15 @@ pub fn generate_lighting(
 }
 
 /// The steps after the lightmaps (already applied to `scene`, `lightmaps` of them):
-/// the probe bake, then writing the lighting into the file at `path`.
+/// the probe bake, then writing the lighting into the file at `path`. Refused in
+/// Play, which the editor's background bake can reach when Play starts mid-bake.
 pub fn finish(
     scene: &mut Scene,
     path: &str,
     nav: Option<&NavigationGraph>,
     lightmaps: usize,
 ) -> Result<GenerateReport, String> {
+    refuse_in_play(scene)?;
     let probes = bake_lighting(scene, Some(path), nav, LightingBakeParams::default())?;
     let saved = save_lighting(scene, path)?;
     Ok(GenerateReport {
@@ -74,6 +78,14 @@ pub fn finish(
         probes,
         saved,
     })
+}
+
+/// Generate Lighting writes the scene file, so Play refuses it as it refuses Save.
+fn refuse_in_play(scene: &Scene) -> Result<(), String> {
+    match scene.is_playing() {
+        true => Err(LIGHTING_IN_PLAY.to_string()),
+        false => Ok(()),
+    }
 }
 
 #[cfg(test)]

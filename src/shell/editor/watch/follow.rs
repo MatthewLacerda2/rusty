@@ -8,28 +8,34 @@
 //! edits are discarded with a warning, never a dialog, so an agent editing the file
 //! is never blocked (the operator, 2026-10-24; Unity would ask).
 //!
-//! - **Which changes.** The #1327 watch notes every outside change in
-//!   `core::fs::written`; this reads that log for the current scene path. A
-//!   `.lighting.json` sidecar changing alone is not the scene.
-//! - **The editor's own Save is no change.** A save writes the file the watch then
-//!   reports; a file whose text is what the live scene serialises to is skipped.
-//! - **"Unsaved" is computed, not a flag**: the live scene serialises differently
-//!   from the document as last loaded (or saved). It only picks the console line.
-//! - **Held through Play**, like every #1327 note: the log is read only in edit
+//! - **Which changes.** The watch notes every outside change in `core::fs::written`;
+//!   this reads that log for the current scene path. A `.lighting.json` sidecar
+//!   changing alone is not the scene.
+//! - **The engine's own writes are no change.** A file holding exactly the text the
+//!   engine last read or wrote there (`Scene::is_disk_text`) is skipped: the echo of
+//!   a Save, Generate Lighting rewriting its fields (whose unsaved edits stay
+//!   unsaved, #832), a `touch`, a rescan, the same bytes written again.
+//! - **"Unsaved" is computed, not a flag** (`Scene::has_unsaved_edits`), and only
+//!   picks the console line: info, or a warning that edits were discarded.
+//! - **A half-written file is retried.** A read or parse failure keeps the path
+//!   pending, so the next frame reads it again, until it loads or a newer note comes.
+//! - **Held through Play**, like every watch note: the log is read only in edit
 //!   mode, so a change seen in Play applies after Stop, against the restored scene.
 
-use super::EditorFrontend;
 use crate::app::GameWorld;
 use crate::core::fs::written::{written_since, Stale};
-use crate::scene::{scene_json, Scene, SceneId};
+use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;
+use crate::shell::editor::EditorFrontend;
 
 /// What the follow needs to remember between frames.
 pub struct SceneFollow {
     /// The write-log generation already read.
     seen: u64,
-    /// The scene document as last loaded or saved, by the scene it belongs to.
-    baseline: Option<(SceneId, String)>,
+    /// The scene file noted changed and not yet read whole.
+    pending: Option<String>,
+    /// Whether the pending file's failure to load was already logged.
+    warned: bool,
 }
 
 impl SceneFollow {
@@ -37,13 +43,14 @@ impl SceneFollow {
     pub fn new() -> Self {
         Self {
             seen: written_since(u64::MAX).0,
-            baseline: None,
+            pending: None,
+            warned: false,
         }
     }
 
     /// Once per edit-mode frame, after the watch noted its changes: reload `scene`
-    /// from `path` when that file changed to something else than the live scene.
-    /// `selected` is kept by name path. Returns whether the scene was reloaded.
+    /// from `path` when that file changed outside the engine. `selected` is kept by
+    /// name path. Returns whether the scene was reloaded.
     pub fn apply(
         &mut self,
         scene: &mut Scene,
@@ -54,36 +61,38 @@ impl SceneFollow {
         if scene.is_playing() {
             return false;
         }
-        if self
-            .baseline
-            .as_ref()
-            .is_none_or(|(id, _)| *id != scene.id())
-        {
-            self.baseline = scene_json(scene).ok().map(|doc| (scene.id(), doc));
-        }
         let (seen, written) = written_since(self.seen);
         self.seen = seen;
-        let Some(path) = path.filter(|p| Stale::new(written).matches(p)) else {
+        let Some(path) = path else {
+            self.pending = None;
             return false;
         };
-        let Ok(on_disk) = std::fs::read_to_string(path) else {
-            return false; // deleted or mid-write: keep the working copy
-        };
-        let live = scene_json(scene).ok();
-        if live.as_deref() == Some(on_disk.as_str()) {
-            self.baseline = live.map(|doc| (scene.id(), doc)); // a save's own echo
+        if Stale::new(written).matches(path) {
+            self.pending = Some(path.to_string());
+            self.warned = false;
+        }
+        if self.pending.as_deref() != Some(path) {
             return false;
         }
-        let unsaved = self.baseline.as_ref().map(|(_, doc)| doc) != live.as_ref();
+        let Ok(on_disk) = std::fs::read_to_string(path) else {
+            return false; // deleted or mid-write: keep the working copy, read again
+        };
+        if scene.is_disk_text(path, &on_disk) {
+            self.pending = None;
+            return false;
+        }
+        let unsaved = scene.has_unsaved_edits(path);
         let keep = selected.and_then(|id| name_path(scene, id));
         if let Err(err) = scene.load_from_file(path) {
-            console.warn(format!(
-                "Scene {path} changed on disk but did not load: {err}"
-            ));
+            if !std::mem::replace(&mut self.warned, true) {
+                console.warn(format!(
+                    "Scene {path} changed on disk but did not load: {err}"
+                ));
+            }
             return false;
         }
+        self.pending = None;
         *selected = keep.and_then(|names| find_by_name_path(scene, &names));
-        self.baseline = scene_json(scene).ok().map(|doc| (scene.id(), doc));
         if unsaved {
             console.warn(format!(
                 "Scene reloaded: {path} changed on disk; unsaved edits were discarded"
@@ -98,7 +107,7 @@ impl SceneFollow {
 impl EditorFrontend {
     /// Reload the open scene when its file changed on disk (#1340). The reload is
     /// the editor's own, so it keeps the selection `follow_scene_swap` would drop.
-    pub(super) fn follow_scene_file(&mut self, game: &GameWorld) {
+    pub(in crate::shell::editor) fn follow_scene_file(&mut self, game: &GameWorld) {
         let ui = &mut self.editor_ui;
         let mut scene = game.world.scene.borrow_mut();
         let mut console = game.resources.console.borrow_mut();
@@ -136,3 +145,7 @@ fn find_by_name_path(scene: &Scene, names: &[String]) -> Option<u32> {
 #[cfg(test)]
 #[path = "follow_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "follow_echo_tests.rs"]
+mod echo_tests;

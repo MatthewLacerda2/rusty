@@ -47,9 +47,11 @@ pub fn draw(
     let idle = editor.dev.lightmap_bake.is_none();
     let button = egui::Button::new(format!("{}  Generate Lighting", icon::LIGHTBULB))
         .min_size(egui::Vec2::new(160.0, 24.0));
+    // It writes the scene file, so Play greys it out as it does Save (#1340).
     let generate = ui
-        .add_enabled(idle, button)
-        .on_hover_text("Bake lightmaps, then light & reflection probes, and save the result");
+        .add_enabled(idle && !scene.is_playing(), button)
+        .on_hover_text("Bake lightmaps, then light & reflection probes, and save the result")
+        .on_disabled_hover_text("Stop Play first, or wait for the bake");
     let changed = ui
         .add_enabled_ui(idle, |ui| {
             draw_settings(ui, &mut scene.lighting_settings.lightmaps)
