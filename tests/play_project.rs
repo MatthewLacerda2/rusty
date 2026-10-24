@@ -12,7 +12,7 @@ use serde_json::Value;
 /// beside it holding `Other`.
 fn game() -> PathBuf {
     let root = crate::temp::dir().join("game");
-    let scenes = root.join("assets/scenes");
+    let scenes = root.join("assets").join("scenes");
     std::fs::create_dir_all(&scenes).unwrap();
     for (file, name) in [("arena.scene", "Arena"), ("other.scene", "Other")] {
         let mut scene = Scene::new();
@@ -87,13 +87,16 @@ fn a_missing_scene_fails_the_run() {
 #[test]
 fn a_corrupt_lighting_sidecar_is_logged_not_fatal() {
     let game = game();
-    let sidecar = game.join("assets/scenes/arena.scene.lighting.json");
+    let sidecar = game
+        .join("assets")
+        .join("scenes")
+        .join("arena.scene.lighting.json");
     std::fs::write(sidecar, "not json").unwrap();
     let (out, results) = play(&game, &[]);
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(out.status.success(), "the player only logs it: {stderr}");
     assert_eq!(names(&results.unwrap()), ["Arena"]);
-    let log = crate::temp::dir().join("run/console.log");
+    let log = crate::temp::dir().join("run").join("console.log");
     let log = std::fs::read_to_string(log).unwrap();
     assert!(
         log.contains("lighting sidecar"),
