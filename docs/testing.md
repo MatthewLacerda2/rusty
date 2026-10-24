@@ -262,7 +262,7 @@ Options: `--scene <path>` (default: the built-in default scene, in memory), `--s
 <name>`, `--select-asset <path>` (project-relative, e.g. `assets/scenes/a.scene`: open an asset's Inspector card — a `.scene`'s bake
 buttons, an image, audio or prefab card; exclusive with `--select`), `--frame` (frame the selection in the Scene view, as the F key does), `--play`
 (the Play-mode chrome; the sim is not stepped), `--game` (the Game tab), `--size <W>x<H>`
-(default 1600x900), `--picker [new|open|mismatch]` (the project picker the editor starts
+(default 1600x900), `--picker [new|open|mismatch|focus]` (the project picker the editor starts
 on, #854, over a sample recent list dated against a fixed time; the page names show
 *New Project*, *Open* and the different-engine prompt). From Rust, `capture::capture(&game,
 path, &EditorCaptureOptions { .. })` takes any `GameWorld`, and `capture_into` shares a

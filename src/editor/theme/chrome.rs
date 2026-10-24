@@ -49,6 +49,16 @@ pub fn hairline(ui: &mut Ui, t: &Theme) {
     ui.add_space(t.space_xs);
 }
 
+/// The keyboard focus ring: an accent outline around `response`'s rect while it has
+/// focus, for custom-painted widgets (list rows) that egui draws no focus state for.
+pub fn focus_ring(ui: &Ui, t: &Theme, response: &Response) {
+    if response.has_focus() {
+        let stroke = Stroke::new(2.0, t.accent);
+        ui.painter()
+            .rect_stroke(response.rect, 4.0, stroke, egui::StrokeKind::Inside);
+    }
+}
+
 /// A frameless glyph button with a tooltip: the collapse carets and per-panel tools.
 pub fn icon_button(ui: &mut Ui, glyph: &str, hint: &str) -> Response {
     let t = super::from_ui(ui);

@@ -84,3 +84,24 @@ fn the_browsers_start_beside_the_latest_project_that_still_exists() {
     assert_eq!(browser.dir(), dir.join("games"));
     assert_eq!(browser.subdirs(), ["horde"]);
 }
+
+#[test]
+fn a_removed_project_comes_back_where_it_was_until_the_next_action() {
+    let dir = fresh("undo");
+    let path = dir.join(recent::RECENT_FILE);
+    let mut list = RecentProjects::default();
+    for (name, at) in [("a", 1), ("b", 2), ("c", 3)] {
+        list.touch(&dir.join(name), at);
+    }
+    let mut picker = ProjectPicker::new(list.clone(), Some(path.clone()), dir.clone());
+    picker.apply(Action::Remove(dir.join("b")));
+    assert_eq!(picker.recent.projects.len(), 2);
+    picker.apply(Action::UndoRemove);
+    assert_eq!(picker.recent, list);
+    assert_eq!(RecentProjects::load(&path), list);
+    picker.apply(Action::Remove(dir.join("b")));
+    picker.apply(Action::ShowNew);
+    assert!(picker.removed.is_none());
+    picker.apply(Action::UndoRemove);
+    assert_eq!(picker.recent.projects.len(), 2);
+}

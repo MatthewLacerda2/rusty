@@ -8,14 +8,11 @@
 use egui::{Align, Layout, RichText, Ui};
 use egui_phosphor::regular as icon;
 
-use super::{Action, Page, ProjectPicker};
-use crate::core::project::bench::recent::{ago, RecentProject};
+use super::{list, Action, Page, ProjectPicker};
 use crate::editor::theme::{self, chrome, fonts, Theme};
 
 /// The title strip's text size.
 const TITLE_SIZE: f32 = 20.0;
-/// A recent project row's height.
-const ROW_HEIGHT: f32 = 46.0;
 /// The folder list's height on the New and Open pages.
 const BROWSER_HEIGHT: f32 = 320.0;
 
@@ -31,12 +28,15 @@ pub(super) fn draw(picker: &mut ProjectPicker, ctx: &egui::Context, now: u64) ->
         .frame(frame)
         .show(&mut root, |ui| {
             action = match &mut picker.page {
-                Page::Projects => projects(ui, &t, &picker.recent.projects, now),
+                Page::Projects => list::projects(ui, &t, picker, now),
                 Page::New { browser, name } => {
                     let mut act = None;
                     header(ui, &t, "New Project", |_| {});
                     ui.label("Project name");
-                    ui.add(egui::TextEdit::singleline(name).desired_width(360.0));
+                    let field = ui.add(egui::TextEdit::singleline(name).desired_width(360.0));
+                    if field.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+                        act = Some(Action::Create);
+                    }
                     ui.add_space(t.space_md);
                     ui.label("Location");
                     browser.ui(ui, BROWSER_HEIGHT);
@@ -44,7 +44,7 @@ pub(super) fn draw(picker: &mut ProjectPicker, ctx: &egui::Context, now: u64) ->
                     let hint = format!("Creates {}", target.display());
                     ui.label(RichText::new(hint).color(t.text_secondary));
                     footer(ui, &mut act, "Create Project", Action::Create);
-                    act
+                    act.or_else(|| escape_back(ui))
                 }
                 Page::Open(browser) => {
                     let mut act = None;
@@ -52,7 +52,7 @@ pub(super) fn draw(picker: &mut ProjectPicker, ctx: &egui::Context, now: u64) ->
                     ui.label("Pick a project folder (it holds project.rusty)");
                     browser.ui(ui, BROWSER_HEIGHT);
                     footer(ui, &mut act, "Open", Action::OpenBrowsed);
-                    act
+                    act.or_else(|| enter_opens(ui)).or_else(|| escape_back(ui))
                 }
             };
             if let Some(err) = &picker.error {
@@ -67,8 +67,24 @@ pub(super) fn draw(picker: &mut ProjectPicker, ctx: &egui::Context, now: u64) ->
     action
 }
 
+/// Escape on the New / Open page is *Cancel*.
+fn escape_back(ui: &Ui) -> Option<Action> {
+    let pressed = ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Escape));
+    pressed.then_some(Action::Back)
+}
+
+/// Enter on the Open page, with nothing focused and the path field not having used
+/// it, opens the browsed folder.
+fn enter_opens(ui: &Ui) -> Option<Action> {
+    if ui.memory(|m| m.focused()).is_some() {
+        return None;
+    }
+    let pressed = ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Enter));
+    pressed.then_some(Action::OpenBrowsed)
+}
+
 /// The title strip: `title` left, `buttons` right, then a hairline.
-fn header(ui: &mut Ui, t: &Theme, title: &str, buttons: impl FnOnce(&mut Ui)) {
+pub(super) fn header(ui: &mut Ui, t: &Theme, title: &str, buttons: impl FnOnce(&mut Ui)) {
     ui.horizontal(|ui| {
         let font = fonts::semibold(ui.ctx(), TITLE_SIZE);
         ui.label(RichText::new(title).font(font));
@@ -92,78 +108,6 @@ fn footer(ui: &mut Ui, act: &mut Option<Action>, verb: &str, on_verb: Action) {
     });
 }
 
-/// The Projects page: the title strip and the recent list.
-fn projects(ui: &mut Ui, t: &Theme, list: &[RecentProject], now: u64) -> Option<Action> {
-    let mut act = None;
-    header(ui, t, "Projects", |ui| {
-        if ui.button(format!("{}  New Project", icon::PLUS)).clicked() {
-            act = Some(Action::ShowNew);
-        }
-        if ui.button(format!("{}  Open", icon::FOLDER_OPEN)).clicked() {
-            act = Some(Action::ShowOpen);
-        }
-    });
-    if list.is_empty() {
-        let hint = "No projects yet. Make one with New Project, or Open a project folder.";
-        ui.label(RichText::new(hint).color(t.text_secondary));
-        return act;
-    }
-    egui::ScrollArea::vertical()
-        .auto_shrink([false, false])
-        .show(ui, |ui| {
-            for project in list {
-                if let Some(a) = row(ui, t, project, now) {
-                    act = Some(a);
-                }
-            }
-        });
-    act
-}
-
-/// One recent project: name and path, when it was opened, and Remove. A missing
-/// folder is greyed out and can only be removed.
-fn row(ui: &mut Ui, t: &Theme, project: &RecentProject, now: u64) -> Option<Action> {
-    let missing = project.is_missing();
-    let (name_color, path_color) = if missing {
-        (t.text_secondary, t.outline)
-    } else {
-        (t.text_primary, t.text_secondary)
-    };
-    let width = ui.available_width();
-    let (rect, response) =
-        ui.allocate_exact_size(egui::vec2(width, ROW_HEIGHT), egui::Sense::click());
-    if response.hovered() && !missing {
-        ui.painter().rect_filled(rect, 4.0, t.bg_hover);
-    }
-    let mut act =
-        (response.clicked() && !missing).then(|| Action::OpenRecent(project.path.clone()));
-    let inner = rect.shrink2(egui::vec2(t.space_md, t.space_xs));
-    ui.scope_builder(egui::UiBuilder::new().max_rect(inner), |ui| {
-        ui.horizontal_centered(|ui| {
-            ui.vertical(|ui| {
-                let font = fonts::semibold(ui.ctx(), 14.0);
-                ui.label(RichText::new(project.name()).font(font).color(name_color));
-                let path = project.path.display().to_string();
-                ui.label(RichText::new(path).small().color(path_color));
-            });
-            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                if chrome::icon_button(ui, icon::X, "Remove from list").clicked() {
-                    act = Some(Action::Remove(project.path.clone()));
-                }
-                ui.add_space(t.space_md);
-                let when = if missing {
-                    "Missing".to_string()
-                } else {
-                    ago(project.opened_at, now)
-                };
-                ui.label(RichText::new(when).color(path_color));
-            });
-        });
-    });
-    chrome::hairline(ui, t);
-    act
-}
-
 /// The engine-mismatch prompt (#853), Unity Hub's "different editor version" one:
 /// opening records this engine in the project, so it asks first.
 fn confirm(ctx: &egui::Context, t: &Theme, dir: &std::path::Path, warning: &str) -> Option<Action> {
@@ -180,6 +124,18 @@ fn confirm(ctx: &egui::Context, t: &Theme, dir: &std::path::Path, warning: &str)
         ui.label(format!("{}: {warning}.", dir.display()));
         ui.label("Opening it records this engine in its project.rusty.");
         ui.add_space(t.space_md);
+        let (enter, escape) = ui.input_mut(|i| {
+            let enter = i.consume_key(egui::Modifiers::NONE, egui::Key::Enter);
+            (
+                enter,
+                i.consume_key(egui::Modifiers::NONE, egui::Key::Escape),
+            )
+        });
+        if enter {
+            act = Some(Action::ConfirmOpen);
+        } else if escape {
+            act = Some(Action::CancelConfirm);
+        }
         ui.horizontal(|ui| {
             if ui.button(RichText::new("Open anyway").strong()).clicked() {
                 act = Some(Action::ConfirmOpen);
