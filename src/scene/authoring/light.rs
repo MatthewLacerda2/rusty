@@ -118,6 +118,21 @@ mod tests {
         assert_eq!((e.inner_cone, e.outer_cone), (10.0, 20.0));
     }
 
+    /// `math.huge` and NaN from Lua take the fallback, never the field (#1361).
+    #[test]
+    fn non_finite_inputs_take_the_fallback() {
+        let (mut scene, id) = scene_with_light();
+        let mut e = scene.world.light_mut(id).unwrap();
+        set_intensity(&mut e, f32::INFINITY);
+        set_color(&mut e, Vec3::new(f32::NAN, 0.5, f32::INFINITY));
+        set_cones(&mut e, f32::NAN, f32::INFINITY);
+        assert_eq!(e.intensity, 0.0);
+        assert_eq!(e.color, Vec3::new(0.0, 0.5, 0.0));
+        assert_eq!((e.inner_cone, e.outer_cone), (0.0, 0.0));
+        set_cones(&mut e, 10.0, 500.0);
+        assert_eq!((e.inner_cone, e.outer_cone), (10.0, MAX_CONE));
+    }
+
     #[test]
     fn op_on_lightless_entity_is_a_no_op() {
         let mut scene = Scene::new();

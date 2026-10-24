@@ -89,4 +89,15 @@ mod tests {
         assert_eq!(rb.angular_velocity, Vec3::new(0.0, 4.0, 0.0));
         assert_eq!(rb.collision_detection, CollisionDetection::Continuous);
     }
+
+    /// NaN mass falls back into the clamp range; a NaN velocity axis is zero (#1361).
+    #[test]
+    fn non_finite_inputs_take_the_fallback() {
+        let (mut scene, id) = scene_with_rb();
+        let mut e = scene.world.rigidbody_mut(id).unwrap();
+        set_mass(&mut e, f32::NAN);
+        set_velocity(&mut e, Vec3::new(1.0, f32::NAN, f32::NEG_INFINITY));
+        assert_eq!(e.mass, 0.01);
+        assert_eq!(e.velocity, Vec3::new(1.0, 0.0, 0.0));
+    }
 }

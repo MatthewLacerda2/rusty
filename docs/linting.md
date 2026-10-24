@@ -25,6 +25,7 @@ agent can read exactly what failed.
 | One atomic write | `tools/lint -- --rules` (`atomic-write`) | **hard gate**: no line of `src/` outside `src/core/fs/` names `fs::rename` — a file a reader may open is written through `core::fs::write_atomic`; a rename that moves rather than writes takes `// lint: allow(atomic-write) <why>` (#1129) |
 | Converters report, never log | `tools/lint -- --rules` (`converter-log`) | **hard gate**: no code line of a converter under `src/asset/convert/` (every module, folder or single file, but the cache's own `mod`, `converter`, `depends`, `gate`, `lock`, `record`, `stage`, `stale`, `texture_ref` and `tests`) names `log::` or a bare logging macro — a converter returns what it skipped in `Converted` and fails on anything else, and `convert::refresh` alone warns; each converter's root carries `#![deny(clippy::let_underscore_must_use, clippy::unused_result_ok, clippy::print_stdout, clippy::print_stderr)]`, wrapped or not, so clippy refuses a dropped `Result` and a print there (#1172) |
 | One world space | `tools/lint -- --rules` (`world-space`) | **hard gate**: outside `ecs::world_space` and `components::transform`, no engine code line decomposes a matrix (`to_scale_rotation_translation`), names the retired `compute_world_matrix` / `world_matrix(` / `parent_world_matrix`, or folds a Transform over `ancestors(` — world space is read from `ecs::World`'s world API; test code is not scanned, and converting file data takes `// lint: allow(world-space) <why>` (#1196) |
+| Finite authoring floats | `tools/lint -- --rules` (`sanitize`) | **hard gate**: every `pub fn set_*` under `src/scene/authoring/` that takes an `f32` or a glam vector passes it to a `scene::authoring::sanitize` helper (or a sibling setter of its file), so NaN and `±inf` from Lua or the editor take the field's fallback and never reach a field; a value checked another way takes `// lint: allow(sanitize) <why>` (#1361) |
 | No subprocesses | `tools/lint -- --rules` (`subprocess`) | **hard gate**: no line of `src/` names `std::process::Command` — the engine starts no other program but Blender, to convert a `.blend` while authoring; a real need takes `// lint: allow(subprocess) <why>` (#975) |
 | One name table per enum | `tools/lint -- --rules` (`named-enum`) | **hard gate**: no file of `src/` hand-writes both a parse (`fn parse(_: &str) -> Option<Self>` in an `impl T`, or a free `fn parse_*(_: &str) -> Option<T>`) and a name (`fn name`/`fn as_str(self) -> &'static str`, or a free `fn *_name(_: T) -> &'static str`) for one type, nor a `const`/`static` table of `(T, &str)` pairs — a script-facing enum declares its names once with `core::named_enum!`, which writes `ALL`, `name`, a case-insensitive `parse` and `Display`; a parse that does more takes `// lint: allow(named-enum) <why>` (#1329) |
 | Tagged engine warnings | `tools/lint -- --rules` (`log-tag`) | **hard gate**: every engine warning or error in `src/` (`log::warn!` / `log::error!`, an imported bare `warn!` / `error!`, `log!` at `Level::Warn`/`Level::Error`) opens its message with its module, `[Asset] …`, since those records reach the console and the session/MCP replies (#1139); a message that is not a literal takes `// lint: allow(log-tag) <why>` |
@@ -194,6 +195,16 @@ new flag, gate, CI step or baseline.
   exempts (`src/api/`, one file per Lua namespace; `src/components/`, one file per
   first-class component) are listed in `rules/prefix.rs` with the reason, and the
   exemption covers that directory only, not its subfolders.
+- **`sanitize`** — every authoring setter refuses a non-finite float (#1361).
+  A `pub fn set_*` under `src/scene/authoring/` (test code aside) that takes an
+  `f32`, `Vec2`, `Vec3`, `Vec4` or `Quat` fails unless each such parameter is
+  passed whole to a helper `scene::authoring::sanitize` defines (`finite`,
+  `finite_or`, `at_least`, `non_negative`, `clamped`, `unit`, `unit_color`,
+  `finite2`/`3`/`4` and their `_or` forms; the rule reads the list from that file)
+  or to another `set_*` of the same file, which it checks in turn. `finite(v.x)`
+  sanitizes one component, not `v`, and does not count. The finding anchors on the
+  `fn` line; a value refused another way (a joint axis through `try_normalize`)
+  says so with `// lint: allow(sanitize) <why>` above it.
 - **`markers`** — nothing in rusty is temporary. A marker word (`TODO`, `FIXME`,
   `XXX`, `HACK`) standing alone in a scanned `.rs` file fails, comment or not;
   part of a longer identifier (`TODOS`, `MY_HACK`) does not. File an issue instead.
