@@ -13,6 +13,7 @@ use super::super::providers::generated::{self, Realised};
 use super::super::providers::sfx::{self, Draft, ElevenLabs, SfxError};
 use super::super::providers::{environment, ledger, Context};
 use crate::api::{put, ApiScopedCtx, Reg};
+use crate::core::paths::to_slash;
 
 /// `Sfx.Generate(brief)` → the generated WAV's path; or `nil, why` when the brief is
 /// not finished, so a loop over a weapon's twenty sounds loses none to one typo.
@@ -40,7 +41,7 @@ pub(super) fn register<'scope>(
             };
             match sfx::generate(draft, &at, &ElevenLabs) {
                 Ok(Realised::Cached(path) | Realised::Generated(path)) => {
-                    Ok((Some(path.to_string_lossy().into_owned()), None))
+                    Ok((Some(to_slash(&path)), None))
                 }
                 Err(SfxError::Incomplete(why)) => Ok((None, Some(why.to_string()))),
                 Err(other) => Err(mlua::Error::external(other)),
