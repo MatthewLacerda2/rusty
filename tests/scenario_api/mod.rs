@@ -1,8 +1,7 @@
 //! The scenario VM gets the one API surface (#1384): the namespaces a gameplay
 //! script calls, read-write, plus the scenario-only `Harness`.
 
-use std::path::Path;
-
+use rusty::core::paths::native;
 use rusty::dev::scenario;
 
 mod crossing;
@@ -62,9 +61,9 @@ Harness.Expect(pc.vy > 0, "the jump the gameplay VM just set reads through the s
 
 #[test]
 fn the_smoke_fixture_still_passes() {
-    let path = Path::new("tests/fixtures/project/scenarios/smoke.lua");
+    let path = native("tests/fixtures/project/scenarios/smoke.lua");
     let out = crate::temp::dir().join("rusty_scenario_smoke");
-    let report = scenario::run_isolated(path, &out).expect("scenario runs");
+    let report = scenario::run_isolated(&path, &out).expect("scenario runs");
     let json = std::fs::read_to_string(report.results_path).unwrap();
     assert!(report.passed, "smoke.lua passes on the real API: {json}");
 }
