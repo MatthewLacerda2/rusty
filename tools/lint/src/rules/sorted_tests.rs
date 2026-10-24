@@ -1,5 +1,7 @@
-use super::{check, markdown, RULE};
+use super::{check, markdown, markdown_findings, RULE};
 use crate::repo::scaffold::Repo;
+use std::fs;
+use std::path::PathBuf;
 
 fn lines(found: &[crate::rules::Finding]) -> Vec<(usize, &str)> {
     found.iter().map(|f| (f.line, f.rule)).collect()
@@ -76,6 +78,40 @@ fn finds_tracked_markdown_under_docs_and_at_the_root() {
     repo.git(&[&["add", "--"][..], &files].concat());
     assert_eq!(
         markdown(&repo.0).expect("git"),
-        ["README.md", "docs/api/A.md", "src.md"]
+        [
+            PathBuf::from("README.md"),
+            PathBuf::from("docs/api/A.md"),
+            PathBuf::from("src.md")
+        ]
     );
+}
+
+const BAD: &str = "<!-- sorted: an index -->\n- b\n- a\n";
+
+#[test]
+fn fails_on_a_listed_file_it_cannot_read() {
+    let repo = Repo::new("sorted-gone", true);
+    let kept = repo.file("docs/ok.md", BAD);
+    let gone = repo.file("docs/gone.md", "");
+    repo.git(&["add", "docs"]);
+    fs::remove_file(gone).expect("remove");
+    assert!(kept.exists());
+    let found = markdown_findings(&repo.0);
+    let at: Vec<_> = found.iter().map(|f| f.path.as_str()).collect();
+    assert_eq!(at, ["docs/gone.md", "docs/ok.md"], "{found:?}");
+    assert!(found[0].message.contains("could not read"), "{found:?}");
+}
+
+// Linux only: APFS refuses a file name that isn't UTF-8.
+#[cfg(target_os = "linux")]
+#[test]
+fn checks_a_markdown_file_whose_name_is_not_utf8() {
+    use std::os::unix::ffi::OsStrExt;
+    let repo = Repo::new("sorted-bytes", true);
+    let name = std::ffi::OsStr::from_bytes(b"docs/\xff.md");
+    fs::create_dir_all(repo.0.join("docs")).expect("dirs");
+    fs::write(repo.0.join(name), BAD).expect("write");
+    repo.git(&["add", "-A"]);
+    let found = markdown_findings(&repo.0);
+    assert_eq!(lines(&found), [(3, RULE)], "{found:?}");
 }
