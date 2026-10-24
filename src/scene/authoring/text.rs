@@ -116,51 +116,6 @@ pub fn set_glow(t: &mut TextComponent, size: f32, color: Vec4) {
     t.glow_color = unit_color(color);
 }
 
-/// Parse an alignment name (case-insensitive), e.g. `"MiddleCenter"`.
-pub fn parse_alignment(name: &str) -> Option<TextAlignment> {
-    TextAlignment::ALL
-        .into_iter()
-        .find(|a| alignment_name(*a).eq_ignore_ascii_case(name))
-}
-
-/// The alignment's Unity name.
-pub fn alignment_name(a: TextAlignment) -> &'static str {
-    match a {
-        TextAlignment::TopLeft => "TopLeft",
-        TextAlignment::TopCenter => "TopCenter",
-        TextAlignment::TopRight => "TopRight",
-        TextAlignment::MiddleLeft => "MiddleLeft",
-        TextAlignment::MiddleCenter => "MiddleCenter",
-        TextAlignment::MiddleRight => "MiddleRight",
-        TextAlignment::BottomLeft => "BottomLeft",
-        TextAlignment::BottomCenter => "BottomCenter",
-        TextAlignment::BottomRight => "BottomRight",
-    }
-}
-
-/// Every overflow mode.
-pub const OVERFLOWS: [TextOverflow; 3] = [
-    TextOverflow::Overflow,
-    TextOverflow::Truncate,
-    TextOverflow::Ellipsis,
-];
-
-/// Parse an overflow name (case-insensitive).
-pub fn parse_overflow(name: &str) -> Option<TextOverflow> {
-    OVERFLOWS
-        .into_iter()
-        .find(|o| overflow_name(*o).eq_ignore_ascii_case(name))
-}
-
-/// The overflow mode's name.
-pub fn overflow_name(o: TextOverflow) -> &'static str {
-    match o {
-        TextOverflow::Overflow => "Overflow",
-        TextOverflow::Truncate => "Truncate",
-        TextOverflow::Ellipsis => "Ellipsis",
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -190,20 +145,5 @@ mod tests {
         set_auto_size(&mut t, true, 40.0, 12.0);
         assert!(t.auto_size);
         assert_eq!((t.auto_size_min, t.auto_size_max), (12.0, 40.0));
-    }
-
-    #[test]
-    fn names_round_trip() {
-        for a in TextAlignment::ALL {
-            assert_eq!(parse_alignment(alignment_name(a)), Some(a));
-        }
-        for o in OVERFLOWS {
-            assert_eq!(parse_overflow(overflow_name(o)), Some(o));
-        }
-        assert_eq!(
-            parse_alignment("middlecenter"),
-            Some(TextAlignment::MiddleCenter)
-        );
-        assert_eq!(parse_overflow("Scroll"), None);
     }
 }

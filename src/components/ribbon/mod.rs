@@ -24,32 +24,15 @@ use crate::asset::MapRef;
 use crate::components::ParticleBlend;
 use crate::core::curve::{Curve, Gradient};
 
-/// How the texture's `u` coordinate runs along the ribbon.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub enum TextureMode {
-    /// One copy of the texture stretched over the whole length.
-    #[default]
-    Stretch,
-    /// The texture repeats once per world unit of length.
-    Tile,
-}
-
-impl TextureMode {
-    /// The mode's name, as the API spells it.
-    pub fn name(self) -> &'static str {
-        match self {
-            Self::Stretch => "Stretch",
-            Self::Tile => "Tile",
-        }
-    }
-
-    /// Parse a mode name (case-insensitive).
-    pub fn parse(name: &str) -> Option<Self> {
-        match name.to_lowercase().as_str() {
-            "stretch" => Some(Self::Stretch),
-            "tile" => Some(Self::Tile),
-            _ => None,
-        }
+crate::core::named_enum! {
+    /// How the texture's `u` coordinate runs along the ribbon.
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+    pub enum TextureMode {
+        /// One copy of the texture stretched over the whole length.
+        #[default]
+        Stretch = "Stretch",
+        /// The texture repeats once per world unit of length.
+        Tile = "Tile",
     }
 }
 

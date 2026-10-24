@@ -85,7 +85,7 @@ fn shape_to_table(lua: &Lua, shape: &ColliderShape) -> mlua::Result<Table> {
             t.set("kind", "Capsule")?;
             t.set("radius", *radius)?;
             t.set("height", *height)?;
-            t.set("axis", axis.as_str())?;
+            t.set("axis", axis.name())?;
         }
         ColliderShape::Mesh { convex, .. } => {
             t.set("kind", "Mesh")?;
@@ -127,7 +127,8 @@ fn shape_from_table(t: &Table) -> mlua::Result<ColliderShape> {
                 None => CapsuleAxis::default(),
                 Some(a) => CapsuleAxis::parse(&a).ok_or_else(|| {
                     err(format!(
-                        "SetColliderShape: unknown axis {a:?} (want \"X\", \"Y\" or \"Z\")"
+                        "SetColliderShape: unknown axis {a:?} (want one of {})",
+                        CapsuleAxis::names()
                     ))
                 })?,
             };
@@ -167,8 +168,8 @@ fn register_material<'scope>(
             Ok((
                 m.friction,
                 m.bounciness,
-                m.friction_combine.as_str(),
-                m.bounce_combine.as_str(),
+                m.friction_combine.name(),
+                m.bounce_combine.name(),
             ))
         }),
     )?;
@@ -211,8 +212,8 @@ fn combine_mode(name: Option<String>) -> mlua::Result<CombineMode> {
     };
     CombineMode::parse(&name).ok_or_else(|| {
         err(format!(
-            "SetPhysicsMaterial: unknown combine mode {name:?} (want Average, Minimum, \
-             Multiply or Maximum)"
+            "SetPhysicsMaterial: unknown combine mode {name:?} (want one of {})",
+            CombineMode::names()
         ))
     })
 }

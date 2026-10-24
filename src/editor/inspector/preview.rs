@@ -99,7 +99,7 @@ fn mesh_toggle(ui: &mut egui::Ui, editor: &mut EditorUi) {
     ui.horizontal(|ui| {
         for mesh in PreviewMesh::ALL {
             if ui
-                .selectable_label(editor.preview_mesh == mesh, mesh.label())
+                .selectable_label(editor.preview_mesh == mesh, mesh.name())
                 .clicked()
             {
                 editor.preview_mesh = mesh;

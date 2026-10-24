@@ -16,6 +16,7 @@ use mlua::{Lua, Table};
 
 use super::{put, Reg};
 use crate::components::TextComponent;
+use crate::components::{TextAlignment, TextOverflow};
 use crate::core::video::VideoSettings;
 use crate::scene::authoring::text::{self as ops, FontSlot};
 use crate::scene::Scene;
@@ -81,18 +82,18 @@ const STRS: [(&str, StrGet, StrSet); 6] = [
     ),
     (
         "Alignment",
-        |t| Some(ops::alignment_name(t.alignment).to_string()),
+        |t| Some(t.alignment.name().to_string()),
         |t, n| {
-            if let Some(a) = n.as_deref().and_then(ops::parse_alignment) {
+            if let Some(a) = n.as_deref().and_then(TextAlignment::parse) {
                 ops::set_alignment(t, a);
             }
         },
     ),
     (
         "Overflow",
-        |t| Some(ops::overflow_name(t.overflow).to_string()),
+        |t| Some(t.overflow.name().to_string()),
         |t, n| {
-            if let Some(o) = n.as_deref().and_then(ops::parse_overflow) {
+            if let Some(o) = n.as_deref().and_then(TextOverflow::parse) {
                 ops::set_overflow(t, o);
             }
         },

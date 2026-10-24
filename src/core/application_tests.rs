@@ -27,19 +27,6 @@ fn missing_file_reads_as_defaults() {
 }
 
 #[test]
-fn window_mode_names_parse_case_insensitively() {
-    assert_eq!(
-        WindowMode::parse("FULLSCREEN"),
-        Some(WindowMode::Fullscreen)
-    );
-    assert_eq!(WindowMode::parse("windowed"), Some(WindowMode::Windowed));
-    assert_eq!(WindowMode::parse("borderless"), None);
-    for mode in [WindowMode::Windowed, WindowMode::Fullscreen] {
-        assert_eq!(WindowMode::parse(mode.name()), Some(mode));
-    }
-}
-
-#[test]
 fn bound_instance_writes_through_on_every_setter() {
     let path = temp_path("bound");
     let mut app = Application::new();

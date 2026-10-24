@@ -51,59 +51,28 @@ impl ReverbParams {
     }
 }
 
-/// A named starting point for a zone's params (Unity's `AudioReverbPreset`, cut
-/// down to the rooms a shooter needs).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub enum ReverbPreset {
-    /// Dry: a zone that cancels the reverb around it.
-    Off,
-    /// A small room: short and dense.
-    #[default]
-    Room,
-    /// A large hall: long and smooth.
-    Hall,
-    /// A concrete tunnel: long, bright tail.
-    Tunnel,
-    /// Open air: almost dry, a faint late echo.
-    Outdoor,
-    /// Hand-set params (Unity's `User`).
-    Custom,
+crate::core::named_enum! {
+    /// A named starting point for a zone's params (Unity's `AudioReverbPreset`, cut
+    /// down to the rooms a shooter needs).
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+    pub enum ReverbPreset {
+        /// Dry: a zone that cancels the reverb around it.
+        Off = "Off",
+        /// A small room: short and dense.
+        #[default]
+        Room = "Room",
+        /// A large hall: long and smooth.
+        Hall = "Hall",
+        /// A concrete tunnel: long, bright tail.
+        Tunnel = "Tunnel",
+        /// Open air: almost dry, a faint late echo.
+        Outdoor = "Outdoor",
+        /// Hand-set params (Unity's `User`, which its parse also reads).
+        Custom = "Custom" | "User",
+    }
 }
 
 impl ReverbPreset {
-    /// Every preset, in menu order.
-    pub const ALL: [ReverbPreset; 6] = [
-        Self::Off,
-        Self::Room,
-        Self::Hall,
-        Self::Tunnel,
-        Self::Outdoor,
-        Self::Custom,
-    ];
-
-    /// The preset's name, as the API and inspector show it.
-    pub fn name(self) -> &'static str {
-        match self {
-            Self::Off => "Off",
-            Self::Room => "Room",
-            Self::Hall => "Hall",
-            Self::Tunnel => "Tunnel",
-            Self::Outdoor => "Outdoor",
-            Self::Custom => "Custom",
-        }
-    }
-
-    /// The preset called `name` (case-insensitive; `User` is Unity's `Custom`).
-    pub fn parse(name: &str) -> Option<Self> {
-        let lower = name.to_lowercase();
-        if lower == "user" {
-            return Some(Self::Custom);
-        }
-        Self::ALL
-            .into_iter()
-            .find(|p| p.name().to_lowercase() == lower)
-    }
-
     /// The params this preset stands for; `None` for `Custom`, which has none.
     pub fn params(self) -> Option<ReverbParams> {
         let p = |decay_time, pre_delay, damping, wet| ReverbParams {

@@ -21,7 +21,7 @@ every number after `hit` is `0` and the rest are `nil`.
 | `Physics.AddImpulseAtPosition` | `(id, jx, jy, jz, px, py, pz)` | — (impulse in N·s at a world point — a shot hitting a ragdoll bone) |
 | `Physics.SetKinematic` | `(id, is_kinematic)` | — |
 | `Physics.GetCollisionDetection` | `(id)` | `"Discrete"` \| `"Continuous"` |
-| `Physics.SetCollisionDetection` | `(id, mode)` | — (`mode` is `"Discrete"` or `"Continuous"`) |
+| `Physics.SetCollisionDetection` | `(id, mode)` | — (`mode` is `"Discrete"` or `"Continuous"`, case-insensitive; an unknown name is an error) |
 | `Physics.Raycast` | `(ox, oy, oz, dx, dy, dz [, ignore_id [, layer_mask]])` | `hit, entity_id, distance, px, py, pz, nx, ny, nz, bone, bone_name, root` |
 | `Physics.SphereCast` | `(ox, oy, oz, dx, dy, dz, radius [, ignore_id [, layer_mask]])` | `hit, entity_id, distance, px, py, pz, nx, ny, nz, bone, bone_name, root` |
 | `Physics.RaycastAll` | `(ox, oy, oz, dx, dy, dz, max_distance [, layer_mask])` | array of `{id, distance, point = {x,y,z}, normal = {x,y,z}, bone, bone_name, root}`, nearest first |
@@ -213,7 +213,7 @@ A collider's **shape** is a table with a `kind` and that kind's extents — what
 | `"Box"` | `x, y, z` — full size |
 | `"Sphere"` | `radius` |
 | `"Cylinder"` | `radius, height` (along local Y) |
-| `"Capsule"` | `radius, height, axis` — `axis` is `"X"`, `"Y"` (default) or `"Z"` |
+| `"Capsule"` | `radius, height, axis` — `axis` is `"X"`, `"Y"` (default) or `"Z"`, case-insensitive |
 | `"Mesh"` | `convex` — read-only: baked from an imported mesh, never set from script |
 
 **Capsule** (Unity: `CapsuleCollider`) is the character and limb shape: a
@@ -236,7 +236,7 @@ and bounces:
   full speed. A ball dropped from `h` rebounds to about `bounciness² · h`.
 - **`friction_combine` / `bounce_combine`** — how two touching colliders'
   values combine: `"Average"` (default), `"Minimum"`, `"Multiply"` or
-  `"Maximum"`. When the two colliders disagree, the later mode in that list wins
+  `"Maximum"` (case-insensitive; an unknown name is an error). When the two colliders disagree, the later mode in that list wins
   (Unity's priority): a `Maximum`-bounce grenade still bounces off an `Average`
   wall, and a `Minimum`-friction ice floor stays slippery under any boot.
 

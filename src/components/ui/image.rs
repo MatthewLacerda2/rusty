@@ -23,41 +23,47 @@ use serde::{Deserialize, Serialize};
 use super::look::{UiBlend, UiGradient};
 use super::shader::UiShader;
 
-/// How the texture maps onto the rect. See the module docs.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub enum ImageType {
-    /// Stretched over the whole rect.
-    #[default]
-    Simple,
-    /// 9-slice by `border`.
-    Sliced,
-    /// Repeated at native size.
-    Tiled,
-    /// Partially shown by `fill_method` / `fill_origin` / `fill_amount`.
-    Filled,
+crate::core::named_enum! {
+    /// How the texture maps onto the rect. See the module docs.
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+    pub enum ImageType {
+        /// Stretched over the whole rect.
+        #[default]
+        Simple = "Simple",
+        /// 9-slice by `border`.
+        Sliced = "Sliced",
+        /// Repeated at native size.
+        Tiled = "Tiled",
+        /// Partially shown by `fill_method` / `fill_origin` / `fill_amount`.
+        Filled = "Filled",
+    }
 }
 
-/// The shape a `Filled` image sweeps.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub enum FillMethod {
-    /// A bar filling left↔right.
-    #[default]
-    Horizontal,
-    /// A bar filling bottom↔top.
-    Vertical,
-    /// A full-circle sweep around the rect's centre.
-    Radial360,
+crate::core::named_enum! {
+    /// The shape a `Filled` image sweeps.
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+    pub enum FillMethod {
+        /// A bar filling left↔right.
+        #[default]
+        Horizontal = "Horizontal",
+        /// A bar filling bottom↔top.
+        Vertical = "Vertical",
+        /// A full-circle sweep around the rect's centre.
+        Radial360 = "Radial360",
+    }
 }
 
-/// Where a fill starts. `Horizontal` uses `Left` / `Right`, `Vertical` uses
-/// `Bottom` / `Top`, `Radial360` any of the four (the edge its sweep starts at).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub enum FillOrigin {
-    #[default]
-    Left,
-    Right,
-    Bottom,
-    Top,
+crate::core::named_enum! {
+    /// Where a fill starts. `Horizontal` uses `Left` / `Right`, `Vertical` uses
+    /// `Bottom` / `Top`, `Radial360` any of the four (the edge its sweep starts at).
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+    pub enum FillOrigin {
+        #[default]
+        Left = "Left",
+        Right = "Right",
+        Bottom = "Bottom",
+        Top = "Top",
+    }
 }
 
 /// A UI graphic. See the module docs.

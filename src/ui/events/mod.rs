@@ -87,26 +87,21 @@ pub enum UiHook {
     Move,
 }
 
-/// A mouse button the pointer events track (Unity's `InputButton`).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum PointerButton {
-    Left,
-    Right,
-    Middle,
+crate::core::named_enum! {
+    /// A mouse button the pointer events track (Unity's `InputButton`), declared in
+    /// processing order; its name is what scripts see in the event table.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub enum PointerButton {
+        Left = "Left",
+        Right = "Right",
+        Middle = "Middle",
+    }
 }
 
 impl PointerButton {
-    /// Every tracked button, in processing order.
-    pub const ALL: [PointerButton; 3] = [Self::Left, Self::Right, Self::Middle];
-
     /// The input key the button is (`Input`'s `"MOUSE0"` …).
     pub fn key(self) -> &'static str {
         ["MOUSE0", "MOUSE1", "MOUSE2"][self as usize]
-    }
-
-    /// The name scripts see in the event table.
-    pub fn name(self) -> &'static str {
-        ["Left", "Right", "Middle"][self as usize]
     }
 }
 

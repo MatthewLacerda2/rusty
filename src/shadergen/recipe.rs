@@ -17,38 +17,29 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
-/// The base pass a recipe targets — selects the contract the assembled module
-/// must honour (entry points, bind groups, vertex/fragment IO) and which block
-/// catalog is valid.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum PassKind {
-    /// Forward/surface pass: the standard `vs_main` vertex stage + lighting from
-    /// `shader.wgsl`, with the fragment look varied by the chosen surface blocks.
-    /// Consumes `LightingUniforms`, `EntityUniforms`, and the group(2) material
-    /// texture bindings.
-    Surface,
-    /// Postfx pass: a fullscreen-triangle fragment program over the HDR target,
-    /// the most self-contained pass. The chosen postfx blocks transform the
-    /// sampled scene color before output.
-    Postfx,
-    /// UI pass (#427): the UI shader (`ui.wgsl`) kept verbatim, with the chosen ui
-    /// blocks folded over a graphic's own shaded colour — glitch, scanlines,
-    /// hologram — on screen and world canvases alike.
-    Ui,
-}
-
-impl PassKind {
-    /// Every pass kind, in declaration order.
-    pub const ALL: [PassKind; 3] = [PassKind::Surface, PassKind::Postfx, PassKind::Ui];
-
-    /// The lowercase tag used in error messages and the block catalog lookup.
-    pub fn tag(self) -> &'static str {
-        match self {
-            PassKind::Surface => "surface",
-            PassKind::Postfx => "postfx",
-            PassKind::Ui => "ui",
-        }
+crate::core::named_enum! {
+    /// The base pass a recipe targets — selects the contract the assembled module
+    /// must honour (entry points, bind groups, vertex/fragment IO) and which block
+    /// catalog is valid.
+    ///
+    /// Its name is the lowercase tag used in error messages and the block catalog
+    /// lookup, the same spelling serde stores.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+    #[serde(rename_all = "snake_case")]
+    pub enum PassKind {
+        /// Forward/surface pass: the standard `vs_main` vertex stage + lighting from
+        /// `shader.wgsl`, with the fragment look varied by the chosen surface blocks.
+        /// Consumes `LightingUniforms`, `EntityUniforms`, and the group(2) material
+        /// texture bindings.
+        Surface = "surface",
+        /// Postfx pass: a fullscreen-triangle fragment program over the HDR target,
+        /// the most self-contained pass. The chosen postfx blocks transform the
+        /// sampled scene color before output.
+        Postfx = "postfx",
+        /// UI pass (#427): the UI shader (`ui.wgsl`) kept verbatim, with the chosen ui
+        /// blocks folded over a graphic's own shaded colour — glitch, scanlines,
+        /// hologram — on screen and world canvases alike.
+        Ui = "ui",
     }
 }
 

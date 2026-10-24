@@ -82,10 +82,10 @@ fn draw_shape(
 ) {
     let mut shape = o.shape;
     egui::ComboBox::from_label("Shape")
-        .selected_text(shape.as_str())
+        .selected_text(shape.name())
         .show_ui(ui, |ui| {
             for k in ObstacleShape::ALL {
-                ui.selectable_value(&mut shape, k, k.as_str());
+                ui.selectable_value(&mut shape, k, k.name());
             }
         });
     if shape != o.shape {

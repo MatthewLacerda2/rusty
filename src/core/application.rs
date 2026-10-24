@@ -36,32 +36,15 @@ pub const DEFAULT_STARTUP_SCENE: &str = "assets/scenes/default.scene";
 /// The product name when none is configured.
 pub const DEFAULT_PRODUCT_NAME: &str = "rusty game";
 
-/// How the player's window opens on a first launch. A player who later changes
-/// `Video.SetFullscreen` keeps that choice (it persists through `Storage`); this is
-/// only the default before any such choice exists.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub enum WindowMode {
-    #[default]
-    Windowed,
-    Fullscreen,
-}
-
-impl WindowMode {
-    /// The canonical name, as the `Application` namespace speaks it.
-    pub fn name(self) -> &'static str {
-        match self {
-            WindowMode::Windowed => "Windowed",
-            WindowMode::Fullscreen => "Fullscreen",
-        }
-    }
-
-    /// `"Windowed"` / `"Fullscreen"` (case-insensitive) → mode; anything else `None`.
-    pub fn parse(name: &str) -> Option<Self> {
-        match name.to_ascii_lowercase().as_str() {
-            "windowed" => Some(WindowMode::Windowed),
-            "fullscreen" => Some(WindowMode::Fullscreen),
-            _ => None,
-        }
+crate::core::named_enum! {
+    /// How the player's window opens on a first launch. A player who later changes
+    /// `Video.SetFullscreen` keeps that choice (it persists through `Storage`); this is
+    /// only the default before any such choice exists.
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+    pub enum WindowMode {
+        #[default]
+        Windowed = "Windowed",
+        Fullscreen = "Fullscreen",
     }
 }
 

@@ -9,41 +9,23 @@
 
 use serde::{Deserialize, Serialize};
 
-/// How two touching colliders' coefficients combine into the contact's value
-/// (Unity: `PhysicMaterialCombine`). When the two colliders disagree, the mode
-/// later in this list wins — `Average < Minimum < Multiply < Maximum`, Unity's
-/// priority and rapier's `CoefficientCombineRule` order alike.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub enum CombineMode {
-    /// `(a + b) / 2`. The default.
-    #[default]
-    Average,
-    /// `min(a, b)` — e.g. ice keeps its slipperiness against anything.
-    Minimum,
-    /// `a * b`.
-    Multiply,
-    /// `max(a, b)` — e.g. a rubber ball bounces off mud.
-    Maximum,
-}
-
-impl CombineMode {
-    /// The Unity-style name the Lua API and inspector show.
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Average => "Average",
-            Self::Minimum => "Minimum",
-            Self::Multiply => "Multiply",
-            Self::Maximum => "Maximum",
-        }
+crate::core::named_enum! {
+    /// How two touching colliders' coefficients combine into the contact's value
+    /// (Unity: `PhysicMaterialCombine`). When the two colliders disagree, the mode
+    /// later in this list wins — `Average < Minimum < Multiply < Maximum`, Unity's
+    /// priority and rapier's `CoefficientCombineRule` order alike.
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+    pub enum CombineMode {
+        /// `(a + b) / 2`. The default.
+        #[default]
+        Average = "Average",
+        /// `min(a, b)` — e.g. ice keeps its slipperiness against anything.
+        Minimum = "Minimum",
+        /// `a * b`.
+        Multiply = "Multiply",
+        /// `max(a, b)` — e.g. a rubber ball bounces off mud.
+        Maximum = "Maximum",
     }
-
-    /// Parse the Lua/editor name back to the mode, `None` on an unknown string.
-    pub fn parse(s: &str) -> Option<Self> {
-        Self::ALL.into_iter().find(|m| m.as_str() == s)
-    }
-
-    /// Every mode, in priority order (the inspector's combo box lists these).
-    pub const ALL: [Self; 4] = [Self::Average, Self::Minimum, Self::Multiply, Self::Maximum];
 }
 
 /// Surface response of one collider: how much it grips and how much it bounces.
@@ -88,15 +70,6 @@ impl Default for PhysicsMaterial {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn combine_mode_names_round_trip() {
-        for m in CombineMode::ALL {
-            assert_eq!(CombineMode::parse(m.as_str()), Some(m));
-        }
-        assert_eq!(CombineMode::Minimum.as_str(), "Minimum");
-        assert_eq!(CombineMode::parse("Min"), None);
-    }
 
     #[test]
     fn new_clamps_into_range() {

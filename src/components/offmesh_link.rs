@@ -17,26 +17,17 @@ use serde::{Deserialize, Serialize};
 /// How far (world units) a link end may lie from the navmesh and still connect.
 pub const LINK_SNAP_DISTANCE: f32 = 1.0;
 
-/// Where a link came from (Unity's `OffMeshLinkType`).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum OffMeshLinkKind {
-    /// An authored `OffMeshLink` component.
-    #[default]
-    Manual,
-    /// Auto-generated: a drop off a ledge onto the floor below.
-    Drop,
-    /// Auto-generated: a jump across a gap or up onto a ledge.
-    Jump,
-}
-
-impl OffMeshLinkKind {
-    /// The lowercase name scripts see (`"manual"`, `"drop"`, `"jump"`).
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Manual => "manual",
-            Self::Drop => "drop",
-            Self::Jump => "jump",
-        }
+crate::core::named_enum! {
+    /// Where a link came from (Unity's `OffMeshLinkType`).
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    pub enum OffMeshLinkKind {
+        /// An authored `OffMeshLink` component.
+        #[default]
+        Manual = "manual",
+        /// Auto-generated: a drop off a ledge onto the floor below.
+        Drop = "drop",
+        /// Auto-generated: a jump across a gap or up onto a ledge.
+        Jump = "jump",
     }
 }
 
@@ -119,7 +110,7 @@ mod tests {
             OffMeshLinkKind::Drop,
             OffMeshLinkKind::Jump,
         ]
-        .map(OffMeshLinkKind::as_str);
+        .map(OffMeshLinkKind::name);
         assert_eq!(names, ["manual", "drop", "jump"]);
     }
 }

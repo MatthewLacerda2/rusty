@@ -13,31 +13,13 @@ use serde::{Deserialize, Serialize};
 
 use crate::components::RefVisit;
 
-/// The moment in a particle's life that fires a sub-emitter.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum SubEmitTrigger {
-    Birth,
-    Death,
-    Collision,
-}
-
-impl SubEmitTrigger {
-    pub const ALL: [Self; 3] = [Self::Birth, Self::Death, Self::Collision];
-
-    /// Lowercase name (`"birth"` / `"death"` / `"collision"`).
-    pub fn name(self) -> &'static str {
-        match self {
-            Self::Birth => "birth",
-            Self::Death => "death",
-            Self::Collision => "collision",
-        }
-    }
-
-    /// Parse a trigger name, case-insensitively.
-    pub fn parse(name: &str) -> Option<Self> {
-        Self::ALL
-            .into_iter()
-            .find(|t| t.name().eq_ignore_ascii_case(name))
+crate::core::named_enum! {
+    /// The moment in a particle's life that fires a sub-emitter.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub enum SubEmitTrigger {
+        Birth = "birth",
+        Death = "death",
+        Collision = "collision",
     }
 }
 
@@ -114,7 +96,5 @@ mod tests {
         };
         s.visit_refs(&mut |_, r| *r = r.and_then(|id| (id != 2).then_some(id + 10)));
         assert_eq!((s.birth, s.death, s.collision), (Some(11), None, None));
-        assert_eq!(SubEmitTrigger::parse("DEATH"), Some(SubEmitTrigger::Death));
-        assert_eq!(SubEmitTrigger::parse("landing"), None);
     }
 }

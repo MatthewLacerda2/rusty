@@ -15,7 +15,6 @@ use mlua::{Table, Value};
 use super::lua_json::{recipe_from_lua, to_lua};
 use super::{put, Reg};
 use crate::components::{UiBlend, UiGradient};
-use crate::scene::authoring::ui_look::{blend_name, parse_blend};
 use crate::scene::Scene;
 
 /// How a namespace reads and writes its component's blend mode.
@@ -45,14 +44,14 @@ pub(super) fn register_blend<'scope>(
         "GetBlend",
         scope.create_function(move |_, id: u32| {
             let blend = get(&scene.borrow(), id);
-            Ok(blend.map_or("None", blend_name).to_string())
+            Ok(blend.map_or("None", UiBlend::name).to_string())
         }),
     )?;
     put(
         table,
         "SetBlend",
         scope.create_function(move |_, (id, name): (u32, String)| {
-            if let Some(blend) = parse_blend(&name) {
+            if let Some(blend) = UiBlend::parse(&name) {
                 set(&mut scene.borrow_mut(), id, blend);
             }
             Ok(())

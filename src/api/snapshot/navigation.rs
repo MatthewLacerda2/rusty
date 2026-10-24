@@ -13,7 +13,7 @@ use crate::components::{
 pub(crate) fn nav_obstacle_value(o: &NavMeshObstacleComponent) -> Value {
     json!({
         "active": o.active,
-        "shape": o.shape.as_str(),
+        "shape": o.shape.name(),
         "center": vec3(o.center),
         "size": vec3(o.size),
         "radius": o.radius,

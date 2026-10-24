@@ -19,30 +19,13 @@
 use glam::{Mat4, Vec3};
 use serde::{Deserialize, Serialize};
 
-/// The obstacle's shape (Unity's `NavMeshObstacleShape`).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub enum ObstacleShape {
-    #[default]
-    Box,
-    Capsule,
-}
-
-impl ObstacleShape {
-    pub const ALL: [Self; 2] = [Self::Box, Self::Capsule];
-
-    /// The name the Lua API and inspector show (`"Box"` / `"Capsule"`).
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Box => "Box",
-            Self::Capsule => "Capsule",
-        }
-    }
-
-    /// Parse the Lua/editor name back, case-insensitively; `None` when unknown.
-    pub fn parse(s: &str) -> Option<Self> {
-        Self::ALL
-            .into_iter()
-            .find(|k| k.as_str().eq_ignore_ascii_case(s))
+crate::core::named_enum! {
+    /// The obstacle's shape (Unity's `NavMeshObstacleShape`).
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+    pub enum ObstacleShape {
+        #[default]
+        Box = "Box",
+        Capsule = "Capsule",
     }
 }
 
@@ -125,18 +108,6 @@ impl NavMeshObstacleComponent {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn shape_names_round_trip_case_insensitively() {
-        for k in ObstacleShape::ALL {
-            assert_eq!(ObstacleShape::parse(k.as_str()), Some(k));
-        }
-        assert_eq!(
-            ObstacleShape::parse("capsule"),
-            Some(ObstacleShape::Capsule)
-        );
-        assert_eq!(ObstacleShape::parse("cone"), None);
-    }
 
     #[test]
     fn carving_waits_for_stationary_once_ticked() {

@@ -26,6 +26,7 @@ agent can read exactly what failed.
 | Converters report, never log | `tools/lint -- --rules` (`converter-log`) | **hard gate**: no code line of a converter under `src/asset/convert/` (every module, folder or single file, but the cache's own `mod`, `converter`, `depends`, `gate`, `lock`, `record`, `stage`, `stale`, `texture_ref` and `tests`) names `log::` or a bare logging macro — a converter returns what it skipped in `Converted` and fails on anything else, and `convert::refresh` alone warns; each converter's root carries `#![deny(clippy::let_underscore_must_use, clippy::unused_result_ok, clippy::print_stdout, clippy::print_stderr)]`, wrapped or not, so clippy refuses a dropped `Result` and a print there (#1172) |
 | One world space | `tools/lint -- --rules` (`world-space`) | **hard gate**: outside `ecs::world_space` and `components::transform`, no engine code line decomposes a matrix (`to_scale_rotation_translation`), names the retired `compute_world_matrix` / `world_matrix(` / `parent_world_matrix`, or folds a Transform over `ancestors(` — world space is read from `ecs::World`'s world API; test code is not scanned, and converting file data takes `// lint: allow(world-space) <why>` (#1196) |
 | No subprocesses | `tools/lint -- --rules` (`subprocess`) | **hard gate**: no line of `src/` names `std::process::Command` — the engine starts no other program but Blender, to convert a `.blend` while authoring; a real need takes `// lint: allow(subprocess) <why>` (#975) |
+| One name table per enum | `tools/lint -- --rules` (`named-enum`) | **hard gate**: no file of `src/` hand-writes both a parse (`fn parse(_: &str) -> Option<Self>` in an `impl T`, or a free `fn parse_*(_: &str) -> Option<T>`) and a name (`fn name`/`fn as_str(self) -> &'static str`, or a free `fn *_name(_: T) -> &'static str`) for one type, nor a `const`/`static` table of `(T, &str)` pairs — a script-facing enum declares its names once with `core::named_enum!`, which writes `ALL`, `name`, a case-insensitive `parse` and `Display`; a parse that does more takes `// lint: allow(named-enum) <why>` (#1329) |
 | Tagged engine warnings | `tools/lint -- --rules` (`log-tag`) | **hard gate**: every engine warning or error in `src/` (`log::warn!` / `log::error!`, an imported bare `warn!` / `error!`, `log!` at `Level::Warn`/`Level::Error`) opens its message with its module, `[Asset] …`, since those records reach the console and the session/MCP replies (#1139); a message that is not a literal takes `// lint: allow(log-tag) <why>` |
 | Order-free lists stay sorted | `tools/lint -- --rules` (`sorted`) | **hard gate**: a list under a `// sorted: <why>` (or `<!-- sorted: <why> -->`) marker stays in order up to its first blank line, so two branches adding entries touch different lines (#911) |
 | Dependency locks | cargo-deny (`deny.toml`) | **hard gate**: every git dependency is pinned by `rev` (`required-git-spec`); `nalgebra` only through the physics stack and no `cgmath` — glam is the one math crate (#975) |
@@ -188,6 +189,22 @@ new flag, gate, CI step or baseline.
 - **`skip`** — an ignored test reads as passing to anyone who reads only the
   summary. `#[ignore]` and `#[cfg_attr(…, ignore)]` fail unless an allow says why:
   `// lint: allow(skip) a timing measurement, run by hand` right above it.
+- **`named-enum`** — a script-facing enum's names are written once, by
+  `core::named_enum!` (#1329), which writes `ALL`, `name()`, a case-insensitive
+  `parse()` (aliases too), `names()` for an error's list and `Display`, and fails
+  the build when two spellings match ignoring case. A hand-written table is the
+  finding: a file of `src/` that has, for one type `T`, both a parse
+  (`fn parse(_: &str) -> Option<Self | T>` in an `impl T`, or a free
+  `fn parse_*(_: &str) -> Option<T>`) and a name (`fn name` / `fn as_str` on
+  `self` returning `&'static str` in an `impl T`, or a free
+  `fn *_name(_: T) -> &'static str`). The two may sit in different `impl T` blocks,
+  and an `impl` may be indented or carry a comment after its `{`. It anchors on
+  the parse. A `const` / `static` table of `(T, &str)` pairs (`[(T, &str); N]`,
+  `&[(T, &'static str)]`) is the same table read both ways, and a finding at its
+  declaration; a type `named_enum!` cannot declare (an external crate's enum, such
+  as winit's `KeyCode`) takes the allow. A parse that does more than read one name per variant (separators
+  ignored, a name built from parts, a `Result` with its own listing) is left alone
+  or takes `// lint: allow(named-enum) <why>`. Test code is not scanned.
 - **Test code**, for every rule in this list that says it and for the layering
   lint, is one definition (`rules/test_code.rs` over `layers/gate.rs`, #1068,
   #1122): all of `tests/`, every `tests.rs` / `*_tests.rs`, every file only a

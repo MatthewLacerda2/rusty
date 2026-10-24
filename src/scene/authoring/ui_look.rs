@@ -10,32 +10,7 @@
 use glam::Vec2;
 
 use super::sanitize::{finite, unit_color, MIN_EXTENT};
-use crate::components::{GradientKind, UiBlend, UiGradient, MAX_GRADIENT_STOPS};
-
-/// The blend mode's name.
-pub fn blend_name(b: UiBlend) -> &'static str {
-    match b {
-        UiBlend::Normal => "Normal",
-        UiBlend::Additive => "Additive",
-        UiBlend::Multiply => "Multiply",
-        UiBlend::Screen => "Screen",
-    }
-}
-
-/// Parse a blend-mode name (case-insensitive).
-pub fn parse_blend(name: &str) -> Option<UiBlend> {
-    UiBlend::ALL
-        .into_iter()
-        .find(|b| blend_name(*b).eq_ignore_ascii_case(name))
-}
-
-/// The gradient kind's name.
-pub fn gradient_kind_name(k: GradientKind) -> &'static str {
-    match k {
-        GradientKind::Linear => "Linear",
-        GradientKind::Radial => "Radial",
-    }
-}
+use crate::components::{UiGradient, MAX_GRADIENT_STOPS};
 
 /// `g` made valid, or `None` when it has fewer than two stops: at most
 /// [`MAX_GRADIENT_STOPS`] stops (the first ones), sorted by `t`, `t` and colours
@@ -67,14 +42,6 @@ mod tests {
             t,
             color: Vec4::splat(2.0),
         }
-    }
-
-    #[test]
-    fn blend_names_round_trip_case_insensitively() {
-        for b in UiBlend::ALL {
-            assert_eq!(parse_blend(&blend_name(b).to_uppercase()), Some(b));
-        }
-        assert_eq!(parse_blend("Overlay"), None);
     }
 
     #[test]

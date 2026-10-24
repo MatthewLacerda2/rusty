@@ -105,11 +105,10 @@ fn dry_run(recipe: &ShaderRecipe) -> Result<Vec<String>, String> {
 
 /// Parse a pass tag from Lua (`"surface"` | `"postfx"` | `"ui"`).
 fn parse_pass(name: &str) -> Result<PassKind, String> {
-    let lower = name.to_ascii_lowercase();
-    PassKind::ALL
-        .into_iter()
-        .find(|p| p.tag() == lower)
-        .ok_or_else(|| format!("unknown shader pass: {lower} (want surface | postfx | ui)"))
+    PassKind::parse(name).ok_or_else(|| {
+        let lower = name.to_ascii_lowercase();
+        format!("unknown shader pass: {lower} (want surface | postfx | ui)")
+    })
 }
 
 #[cfg(test)]

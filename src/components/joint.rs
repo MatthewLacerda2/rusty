@@ -30,36 +30,17 @@ use serde::{Deserialize, Serialize};
 
 use crate::components::{EntityRefs, RefVisit};
 
-/// Which rotations a joint leaves free. See the module docs.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub enum JointKind {
-    /// No relative motion at all.
-    #[default]
-    Fixed,
-    /// One free rotation, about the joint axis.
-    Hinge,
-    /// Three free rotations: twist about the axis plus a swing cone.
-    Ball,
-}
-
-impl JointKind {
-    /// Every kind, in menu order.
-    pub const ALL: [JointKind; 3] = [Self::Fixed, Self::Hinge, Self::Ball];
-
-    /// The kind's name as scripts and the snapshot spell it.
-    pub fn name(self) -> &'static str {
-        match self {
-            Self::Fixed => "Fixed",
-            Self::Hinge => "Hinge",
-            Self::Ball => "Ball",
-        }
-    }
-
-    /// Parse a kind name (case-insensitive).
-    pub fn parse(name: &str) -> Option<Self> {
-        Self::ALL
-            .into_iter()
-            .find(|k| k.name().eq_ignore_ascii_case(name))
+crate::core::named_enum! {
+    /// Which rotations a joint leaves free. See the module docs.
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+    pub enum JointKind {
+        /// No relative motion at all.
+        #[default]
+        Fixed = "Fixed",
+        /// One free rotation, about the joint axis.
+        Hinge = "Hinge",
+        /// Three free rotations: twist about the axis plus a swing cone.
+        Ball = "Ball",
     }
 }
 
@@ -148,14 +129,6 @@ impl EntityRefs for JointComponent {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn kinds_round_trip_by_name() {
-        for k in JointKind::ALL {
-            assert_eq!(JointKind::parse(&k.name().to_uppercase()), Some(k));
-        }
-        assert_eq!(JointKind::parse("slider"), None);
-    }
 
     #[test]
     fn remap_rewrites_and_drops_the_connected_body() {

@@ -17,26 +17,17 @@ const DEFAULT_ANGULAR_ACCELERATION: f32 = 720.0;
 /// The highest (least important) avoidance priority, as in Unity.
 pub const MAX_AVOIDANCE_PRIORITY: u8 = 99;
 
-/// Whether a computed path reaches its target (Unity's `NavMeshPathStatus`, #458).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum NavPathStatus {
-    /// The path ends on the target.
-    Complete,
-    /// The target is unreachable; the path ends on the reachable point nearest to it.
-    Partial,
-    /// No path: the start or the target has no navmesh nearby (or none was planned).
-    #[default]
-    Invalid,
-}
-
-impl NavPathStatus {
-    /// The lowercase name scripts see (`"complete"`, `"partial"`, `"invalid"`).
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Complete => "complete",
-            Self::Partial => "partial",
-            Self::Invalid => "invalid",
-        }
+crate::core::named_enum! {
+    /// Whether a computed path reaches its target (Unity's `NavMeshPathStatus`, #458).
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    pub enum NavPathStatus {
+        /// The path ends on the target.
+        Complete = "complete",
+        /// The target is unreachable; the path ends on the reachable point nearest to it.
+        Partial = "partial",
+        /// No path: the start or the target has no navmesh nearby (or none was planned).
+        #[default]
+        Invalid = "invalid",
     }
 }
 

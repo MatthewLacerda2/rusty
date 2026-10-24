@@ -72,17 +72,6 @@ pub fn register<'scope>(
         .map_err(|e| e.to_string())
 }
 
-/// Parse a render-mode name (case-insensitive) into a [`RenderMode`]; unknown names
-/// fall back to `Opaque` so a typo degrades to the safe default rather than erroring.
-/// Shared with [`asset`] so the standalone recipe parses modes identically.
-pub(super) fn parse_render_mode(name: &str) -> RenderMode {
-    match name.to_ascii_lowercase().as_str() {
-        "cutout" => RenderMode::Cutout,
-        "transparent" => RenderMode::Transparent,
-        _ => RenderMode::Opaque,
-    }
-}
-
 /// Resolve entity `id`'s (resolved or freshly created) library material key and run
 /// `apply` against the shared library + key. The resolve-or-create is the shared
 /// `authoring::material::ensure_material_key`; `apply` is one of the shared
@@ -207,7 +196,8 @@ fn register_transparency<'scope>(
         table,
         "SetRenderMode",
         scope.create_function(|_, (id, mode): (u32, String)| {
-            let mode = parse_render_mode(&mode);
+            // An unknown name degrades to the safe default, `Opaque`, rather than erroring.
+            let mode = RenderMode::parse(&mode).unwrap_or_default();
             with_material(scene, id, |m, key| mat_ops::set_render_mode(m, key, mode));
             Ok(())
         }),

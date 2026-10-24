@@ -31,8 +31,8 @@ use std::cell::RefCell;
 use std::path::Path;
 
 use super::from_lua::{asset_from_lua, Validated};
-use super::{parse_render_mode, put, Reg};
-use crate::components::MaterialAsset;
+use super::{put, Reg};
+use crate::components::{MaterialAsset, RenderMode};
 use crate::scene::authoring::material as mat_ops;
 use crate::scene::Scene;
 
@@ -103,7 +103,11 @@ fn define(
     mat_ops::set_metallic(materials, name, metallic);
     mat_ops::set_roughness(materials, name, roughness);
     if let Some(mode) = validated.render_mode {
-        mat_ops::set_render_mode(materials, name, parse_render_mode(&mode));
+        mat_ops::set_render_mode(
+            materials,
+            name,
+            RenderMode::parse(&mode).unwrap_or_default(),
+        );
     }
     if let Some(alpha) = validated.alpha {
         mat_ops::set_alpha(materials, name, alpha);

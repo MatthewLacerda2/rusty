@@ -15,6 +15,7 @@ use glam::Vec4;
 use mlua::{Lua, Table};
 
 use super::{put, Reg};
+use crate::components::{NavigationMode, SelectableTransition};
 use crate::components::{SelectableComponent, SelectionState};
 use crate::scene::authoring::selectable as ops;
 use crate::scene::Scene;
@@ -86,12 +87,11 @@ fn register_transition<'scope>(
     t: &Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
-    let f = scope.create_function(move |_, id: u32| {
-        Ok(get(scene, id).map(|s| ops::transition_name(s.transition)))
-    });
+    let f =
+        scope.create_function(move |_, id: u32| Ok(get(scene, id).map(|s| s.transition.name())));
     put(t, "GetTransition", f)?;
     let f = scope.create_function(move |_, (id, name): (u32, String)| {
-        if let Some(v) = ops::parse_transition(&name) {
+        if let Some(v) = SelectableTransition::parse(&name) {
             set(scene, id, &|s| ops::set_transition(s, v));
         }
         Ok(())
@@ -157,12 +157,11 @@ fn register_navigation<'scope>(
     t: &Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
-    let f = scope.create_function(move |_, id: u32| {
-        Ok(get(scene, id).map(|s| ops::navigation_name(s.navigation)))
-    });
+    let f =
+        scope.create_function(move |_, id: u32| Ok(get(scene, id).map(|s| s.navigation.name())));
     put(t, "GetNavigation", f)?;
     let f = scope.create_function(move |_, (id, name): (u32, String)| {
-        if let Some(v) = ops::parse_navigation(&name) {
+        if let Some(v) = NavigationMode::parse(&name) {
             set(scene, id, &|s| ops::set_navigation(s, v));
         }
         Ok(())

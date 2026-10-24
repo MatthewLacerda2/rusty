@@ -6,40 +6,22 @@
 use glam::Vec3;
 use serde::{Deserialize, Serialize};
 
-/// How a rigid body's contacts are resolved each tick (Unity:
-/// `Rigidbody.collisionDetectionMode`, reduced to the two modes a game needs).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub enum CollisionDetection {
-    /// Overlap is tested at the tick's poses; a fast dynamic body is still swept
-    /// against *static* geometry (rapier does that for every fast body). Cheap;
-    /// correct for slow/large bodies. The default for every body class.
-    #[default]
-    Discrete,
-    /// The sweep extends to *moving* (kinematic and dynamic) bodies: the motion
-    /// is swept from its previous pose to its new pose within the tick and
-    /// stopped at the time of impact — rapier's full CCD. Prevents a fast, small
-    /// body from tunnelling through a moving one between two fixed ticks (a
-    /// 100 m/s bullet moves ~1.6 m per 60 Hz tick).
-    Continuous,
-}
-
-impl CollisionDetection {
-    /// The Unity-style name the Lua API and inspector show (`"Discrete"` /
-    /// `"Continuous"`).
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Discrete => "Discrete",
-            Self::Continuous => "Continuous",
-        }
-    }
-
-    /// Parse the Lua/editor name back to the mode, `None` on an unknown string.
-    pub fn parse(s: &str) -> Option<Self> {
-        match s {
-            "Discrete" => Some(Self::Discrete),
-            "Continuous" => Some(Self::Continuous),
-            _ => None,
-        }
+crate::core::named_enum! {
+    /// How a rigid body's contacts are resolved each tick (Unity:
+    /// `Rigidbody.collisionDetectionMode`, reduced to the two modes a game needs).
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+    pub enum CollisionDetection {
+        /// Overlap is tested at the tick's poses; a fast dynamic body is still swept
+        /// against *static* geometry (rapier does that for every fast body). Cheap;
+        /// correct for slow/large bodies. The default for every body class.
+        #[default]
+        Discrete = "Discrete",
+        /// The sweep extends to *moving* (kinematic and dynamic) bodies: the motion
+        /// is swept from its previous pose to its new pose within the tick and
+        /// stopped at the time of impact — rapier's full CCD. Prevents a fast, small
+        /// body from tunnelling through a moving one between two fixed ticks (a
+        /// 100 m/s bullet moves ~1.6 m per 60 Hz tick).
+        Continuous = "Continuous",
     }
 }
 

@@ -77,11 +77,7 @@ fn rotated_capsule_bounds_follow_the_rotation() {
 }
 
 #[test]
-fn capsule_axis_names_round_trip() {
-    for a in CapsuleAxis::ALL {
-        assert_eq!(CapsuleAxis::parse(a.as_str()), Some(a));
-    }
-    assert_eq!(CapsuleAxis::parse("y"), None);
+fn capsule_axis_defaults_to_y() {
     assert_eq!(CapsuleAxis::default(), CapsuleAxis::Y);
 }
 

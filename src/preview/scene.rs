@@ -30,26 +30,15 @@ fn suzanne_path() -> String {
     crate::core::project::engine_path("models/suzanne.obj")
 }
 
-/// Which mesh the Preview tab shows the subject on (models render as themselves
-/// instead — see [`PreviewSubject::Model`]).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum PreviewMesh {
-    #[default]
-    Sphere,
-    Cube,
-    Suzanne,
-}
-
-impl PreviewMesh {
-    pub const ALL: [PreviewMesh; 3] =
-        [PreviewMesh::Sphere, PreviewMesh::Cube, PreviewMesh::Suzanne];
-
-    pub fn label(self) -> &'static str {
-        match self {
-            PreviewMesh::Sphere => "Sphere",
-            PreviewMesh::Cube => "Cube",
-            PreviewMesh::Suzanne => "Suzanne",
-        }
+crate::core::named_enum! {
+    /// Which mesh the Preview tab shows the subject on (models render as themselves
+    /// instead — see [`PreviewSubject::Model`]); its name is the tab's label.
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    pub enum PreviewMesh {
+        #[default]
+        Sphere = "Sphere",
+        Cube = "Cube",
+        Suzanne = "Suzanne",
     }
 }
 

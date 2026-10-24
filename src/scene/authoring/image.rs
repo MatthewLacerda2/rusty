@@ -89,66 +89,6 @@ fn fit_origin(method: FillMethod, origin: FillOrigin) -> FillOrigin {
     }
 }
 
-/// Parse an image-type name (case-insensitive).
-pub fn parse_image_type(name: &str) -> Option<ImageType> {
-    [
-        ImageType::Simple,
-        ImageType::Sliced,
-        ImageType::Tiled,
-        ImageType::Filled,
-    ]
-    .into_iter()
-    .find(|t| image_type_name(*t).eq_ignore_ascii_case(name))
-}
-
-/// The image type's Unity name.
-pub fn image_type_name(t: ImageType) -> &'static str {
-    match t {
-        ImageType::Simple => "Simple",
-        ImageType::Sliced => "Sliced",
-        ImageType::Tiled => "Tiled",
-        ImageType::Filled => "Filled",
-    }
-}
-
-/// Parse a fill-method name (case-insensitive).
-pub fn parse_fill_method(name: &str) -> Option<FillMethod> {
-    [
-        FillMethod::Horizontal,
-        FillMethod::Vertical,
-        FillMethod::Radial360,
-    ]
-    .into_iter()
-    .find(|m| fill_method_name(*m).eq_ignore_ascii_case(name))
-}
-
-/// The fill method's Unity name.
-pub fn fill_method_name(m: FillMethod) -> &'static str {
-    match m {
-        FillMethod::Horizontal => "Horizontal",
-        FillMethod::Vertical => "Vertical",
-        FillMethod::Radial360 => "Radial360",
-    }
-}
-
-/// Parse a fill-origin name (case-insensitive).
-pub fn parse_fill_origin(name: &str) -> Option<FillOrigin> {
-    use FillOrigin::{Bottom, Left, Right, Top};
-    [Left, Right, Bottom, Top]
-        .into_iter()
-        .find(|o| fill_origin_name(*o).eq_ignore_ascii_case(name))
-}
-
-/// The fill origin's name.
-pub fn fill_origin_name(o: FillOrigin) -> &'static str {
-    match o {
-        FillOrigin::Left => "Left",
-        FillOrigin::Right => "Right",
-        FillOrigin::Bottom => "Bottom",
-        FillOrigin::Top => "Top",
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -178,20 +118,5 @@ mod tests {
         set_fill_method(&mut i, FillMethod::Radial360);
         set_fill_origin(&mut i, FillOrigin::Left);
         assert_eq!(i.fill_origin, FillOrigin::Left, "radial takes any edge");
-    }
-
-    #[test]
-    fn names_round_trip() {
-        for t in [
-            ImageType::Simple,
-            ImageType::Sliced,
-            ImageType::Tiled,
-            ImageType::Filled,
-        ] {
-            assert_eq!(parse_image_type(image_type_name(t)), Some(t));
-        }
-        assert_eq!(parse_fill_method("radial360"), Some(FillMethod::Radial360));
-        assert_eq!(parse_fill_origin("TOP"), Some(FillOrigin::Top));
-        assert_eq!(parse_image_type("Mesh"), None);
     }
 }

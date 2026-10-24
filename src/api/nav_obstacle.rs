@@ -108,7 +108,7 @@ fn register_shape<'scope>(
     t: &Table,
     scene: SceneCell<'scope>,
 ) -> Reg {
-    let f = scope.create_function(move |_, id: u32| Ok(get(scene, id).map(|o| o.shape.as_str())));
+    let f = scope.create_function(move |_, id: u32| Ok(get(scene, id).map(|o| o.shape.name())));
     put(t, "GetShape", f)?;
     let f = scope.create_function(move |_, (id, name): (u32, String)| {
         let shape = ObstacleShape::parse(&name).ok_or_else(|| {

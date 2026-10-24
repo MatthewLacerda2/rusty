@@ -9,10 +9,11 @@ use crate::scene::authoring::ComponentKind;
 use egui_phosphor::regular as icon;
 
 use super::{combo, vec2_row, vec4_row};
-use crate::components::{LayoutGroupComponent, LayoutKind, TextAlignment};
+use crate::components::{
+    LayoutConstraint, LayoutCorner, LayoutGroupComponent, LayoutKind, TextAlignment,
+};
 use crate::editor::inspector::components::card::component_card;
-use crate::scene::authoring::layout_group::{self as ops, name_of, CONSTRAINTS, CORNERS, KINDS};
-use crate::scene::authoring::text::alignment_name;
+use crate::scene::authoring::layout_group as ops;
 
 /// Layout Group card. A THIN client (#287): widgets edit a snapshot and the
 /// changed snapshot is written back through the shared ops; remove detaches.
@@ -23,8 +24,8 @@ pub fn draw(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, is_dirty:
     let mut remove = false;
     let mut changed = false;
     component_card(ui, icon::LAYOUT, "Layout Group", Some(&mut remove), |ui| {
-        let kinds = KINDS.map(|(k, _)| k);
-        changed |= combo(ui, "Kind", &mut edit.kind, &kinds, |k| name_of(&KINDS, k));
+        let kinds = LayoutKind::ALL;
+        changed |= combo(ui, "Kind", &mut edit.kind, &kinds, LayoutKind::name);
         changed |= draw_common(ui, &mut edit);
         if edit.kind == LayoutKind::Grid {
             changed |= draw_grid(ui, &mut edit);
@@ -61,7 +62,7 @@ fn draw_common(ui: &mut egui::Ui, g: &mut LayoutGroupComponent) -> bool {
             "Child Alignment",
             &mut g.child_alignment,
             &all,
-            alignment_name,
+            TextAlignment::name,
         )
 }
 
@@ -92,18 +93,22 @@ fn draw_grid(ui: &mut egui::Ui, g: &mut LayoutGroupComponent) -> bool {
         g.cell_size = s;
         changed = true;
     }
-    let constraints = CONSTRAINTS.map(|(c, _)| c);
-    let name = |c| name_of(&CONSTRAINTS, c);
+    let constraints = LayoutConstraint::ALL;
+    let name = LayoutConstraint::name;
     changed |= combo(ui, "Constraint", &mut g.constraint, &constraints, name);
     ui.horizontal(|ui| {
         ui.label("Constraint Count:");
         let count = egui::DragValue::new(&mut g.constraint_count).ranged(1..=64);
         changed |= ui.add(count).changed();
     });
-    let corners = CORNERS.map(|(c, _)| c);
-    changed |= combo(ui, "Start Corner", &mut g.start_corner, &corners, |c| {
-        name_of(&CORNERS, c)
-    });
+    let corners = LayoutCorner::ALL;
+    changed |= combo(
+        ui,
+        "Start Corner",
+        &mut g.start_corner,
+        &corners,
+        LayoutCorner::name,
+    );
     changed
         | ui.checkbox(&mut g.start_vertical, "Fill Columns First")
             .changed()

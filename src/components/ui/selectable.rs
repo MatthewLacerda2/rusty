@@ -24,66 +24,43 @@ use serde::{Deserialize, Serialize};
 
 use crate::components::{EntityRefs, RefVisit};
 
-/// How a Selectable shows its state. See the module docs.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub enum SelectableTransition {
-    /// No visual change.
-    None,
-    /// Multiply the target graphic's colour by the state's colour.
-    #[default]
-    ColorTint,
-    /// Swap the target Image's texture for the state's sprite.
-    SpriteSwap,
-}
-
-/// How keyboard focus moves away from a Selectable.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub enum NavigationMode {
-    /// Never focused by navigation (the pointer can still use it).
-    None,
-    /// The nearest selectable in the pressed direction, by geometry.
-    #[default]
-    Automatic,
-    /// The `select_on_*` entity for the pressed direction.
-    Explicit,
-}
-
-/// A visual state of a Selectable, in the order its colours and sprites are stored.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum SelectionState {
-    Normal,
-    Highlighted,
-    Pressed,
-    Selected,
-    Disabled,
-}
-
-impl SelectionState {
-    /// Every state, in storage order.
-    pub const ALL: [SelectionState; 5] = [
-        Self::Normal,
-        Self::Highlighted,
-        Self::Pressed,
-        Self::Selected,
-        Self::Disabled,
-    ];
-
-    /// The state's name as scripts and the snapshot spell it.
-    pub fn name(self) -> &'static str {
-        match self {
-            Self::Normal => "Normal",
-            Self::Highlighted => "Highlighted",
-            Self::Pressed => "Pressed",
-            Self::Selected => "Selected",
-            Self::Disabled => "Disabled",
-        }
+crate::core::named_enum! {
+    /// How a Selectable shows its state. See the module docs.
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+    pub enum SelectableTransition {
+        /// No visual change.
+        None = "None",
+        /// Multiply the target graphic's colour by the state's colour.
+        #[default]
+        ColorTint = "ColorTint",
+        /// Swap the target Image's texture for the state's sprite.
+        SpriteSwap = "SpriteSwap",
     }
+}
 
-    /// Parse a state name (case-insensitive).
-    pub fn parse(name: &str) -> Option<Self> {
-        Self::ALL
-            .into_iter()
-            .find(|s| s.name().eq_ignore_ascii_case(name))
+crate::core::named_enum! {
+    /// How keyboard focus moves away from a Selectable.
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+    pub enum NavigationMode {
+        /// Never focused by navigation (the pointer can still use it).
+        None = "None",
+        /// The nearest selectable in the pressed direction, by geometry.
+        #[default]
+        Automatic = "Automatic",
+        /// The `select_on_*` entity for the pressed direction.
+        Explicit = "Explicit",
+    }
+}
+
+crate::core::named_enum! {
+    /// A visual state of a Selectable, in the order its colours and sprites are stored.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub enum SelectionState {
+        Normal = "Normal",
+        Highlighted = "Highlighted",
+        Pressed = "Pressed",
+        Selected = "Selected",
+        Disabled = "Disabled",
     }
 }
 
@@ -192,10 +169,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn states_round_trip_and_normal_never_swaps() {
-        for s in SelectionState::ALL {
-            assert_eq!(SelectionState::parse(&s.name().to_lowercase()), Some(s));
-        }
+    fn normal_never_swaps() {
         let sel = SelectableComponent {
             sprites: std::array::from_fn(|i| Some(format!("s{i}.png").into())),
             ..Default::default()

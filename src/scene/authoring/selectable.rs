@@ -66,44 +66,6 @@ pub fn set_select_on(s: &mut SelectableComponent, dir: usize, target: Option<u32
     }
 }
 
-/// A transition's name, as `parse_transition` reads it.
-pub fn transition_name(t: SelectableTransition) -> &'static str {
-    match t {
-        SelectableTransition::None => "None",
-        SelectableTransition::ColorTint => "ColorTint",
-        SelectableTransition::SpriteSwap => "SpriteSwap",
-    }
-}
-
-/// A navigation mode's name, as `parse_navigation` reads it.
-pub fn navigation_name(m: NavigationMode) -> &'static str {
-    match m {
-        NavigationMode::None => "None",
-        NavigationMode::Automatic => "Automatic",
-        NavigationMode::Explicit => "Explicit",
-    }
-}
-
-/// Parse a transition name (case-insensitive).
-pub fn parse_transition(name: &str) -> Option<SelectableTransition> {
-    match name.to_lowercase().as_str() {
-        "none" => Some(SelectableTransition::None),
-        "colortint" => Some(SelectableTransition::ColorTint),
-        "spriteswap" => Some(SelectableTransition::SpriteSwap),
-        _ => None,
-    }
-}
-
-/// Parse a navigation-mode name (case-insensitive).
-pub fn parse_navigation(name: &str) -> Option<NavigationMode> {
-    match name.to_lowercase().as_str() {
-        "none" => Some(NavigationMode::None),
-        "automatic" => Some(NavigationMode::Automatic),
-        "explicit" => Some(NavigationMode::Explicit),
-        _ => None,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -130,11 +92,5 @@ mod tests {
         );
         set_select_on(&mut s, 9, Some(8));
         assert_eq!(s.select_on, [None, None, None, Some(7)]);
-        assert_eq!(
-            parse_transition("SpriteSwap"),
-            Some(SelectableTransition::SpriteSwap)
-        );
-        assert_eq!(parse_navigation("EXPLICIT"), Some(NavigationMode::Explicit));
-        assert_eq!(parse_navigation("sideways"), None);
     }
 }

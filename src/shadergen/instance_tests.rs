@@ -64,7 +64,7 @@ fn every_catalogued_block_twice_composes() {
             let twice = vec![sel(b.id, &[]), sel(b.id, &[])];
             let wgsl = assemble_real(&recipe(pass, twice)).unwrap();
             validate(ENGINE_SHADERS, &wgsl)
-                .unwrap_or_else(|e| panic!("{} {} twice: {e}", pass.tag(), b.id));
+                .unwrap_or_else(|e| panic!("{} {} twice: {e}", pass.name(), b.id));
         }
     }
 }

@@ -174,21 +174,12 @@ fn draw_material_transparency(
     let mut render_mode = materials[key].render_mode;
     ui.horizontal(|ui| {
         ui.label("Rendering Mode:");
-        let label = match render_mode {
-            RenderMode::Opaque => "Opaque",
-            RenderMode::Cutout => "Cutout",
-            RenderMode::Transparent => "Transparent",
-        };
         egui::ComboBox::from_id_salt("RenderModeSelector")
-            .selected_text(label)
+            .selected_text(render_mode.name())
             .show_ui(ui, |ui| {
-                for mode in [
-                    RenderMode::Opaque,
-                    RenderMode::Cutout,
-                    RenderMode::Transparent,
-                ] {
+                for mode in RenderMode::ALL {
                     if ui
-                        .selectable_value(&mut render_mode, mode, format!("{mode:?}"))
+                        .selectable_value(&mut render_mode, mode, mode.name())
                         .changed()
                     {
                         mat_ops::set_render_mode(materials, key, render_mode);

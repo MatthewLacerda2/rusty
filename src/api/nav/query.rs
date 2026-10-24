@@ -33,7 +33,7 @@ pub(super) fn path_table(
         list.set(i + 1, t)?;
     }
     let path = lua.create_table()?;
-    path.set("status", status.as_str())?;
+    path.set("status", status.name())?;
     path.set("corners", list)?;
     path.set("length", path_length(corners))?;
     Ok(path)

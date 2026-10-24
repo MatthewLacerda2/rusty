@@ -88,7 +88,7 @@ fn resolve(recipe: &ShaderRecipe) -> Result<Vec<Instance<'_>>, String> {
         .enumerate()
         .map(|(index, sel)| {
             let block = find(recipe.pass, &sel.id)
-                .ok_or_else(|| format!("unknown {} block: {}", recipe.pass.tag(), sel.id))?;
+                .ok_or_else(|| format!("unknown {} block: {}", recipe.pass.name(), sel.id))?;
             check_params(block, sel, index)?;
             Ok((block, sel))
         })

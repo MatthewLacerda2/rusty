@@ -17,6 +17,7 @@ use mlua::{Lua, Table, Variadic};
 use super::ui_look::{register_blend, register_gradient, BlendAccess, GradientAccess};
 use super::{put, Reg};
 use crate::components::ShapeComponent;
+use crate::components::{ShapeCorner, ShapeKind};
 use crate::scene::authoring::shape as ops;
 use crate::scene::Scene;
 
@@ -170,18 +171,18 @@ type NameSet = fn(&mut ShapeComponent, &str);
 const NAMES: [(&str, NameGet, NameSet); 2] = [
     (
         "Kind",
-        |c| ops::kind_name(c.kind),
+        |c| c.kind.name(),
         |c, n| {
-            if let Some(k) = ops::parse_kind(n) {
+            if let Some(k) = ShapeKind::parse(n) {
                 ops::set_kind(c, k);
             }
         },
     ),
     (
         "Corner",
-        |c| ops::corner_name(c.corner),
+        |c| c.corner.name(),
         |c, n| {
-            if let Some(k) = ops::parse_corner(n) {
+            if let Some(k) = ShapeCorner::parse(n) {
                 ops::set_corner(c, k);
             }
         },

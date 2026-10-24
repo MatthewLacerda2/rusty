@@ -155,10 +155,11 @@ fn draw_rb_collision_detection(
 ) {
     let mut mode = current;
     egui::ComboBox::from_label("Collision Detection")
-        .selected_text(mode.as_str())
+        .selected_text(mode.name())
         .show_ui(ui, |ui| {
-            ui.selectable_value(&mut mode, CollisionDetection::Discrete, "Discrete");
-            ui.selectable_value(&mut mode, CollisionDetection::Continuous, "Continuous");
+            for m in CollisionDetection::ALL {
+                ui.selectable_value(&mut mode, m, m.name());
+            }
         });
     if mode != current {
         if let Some(mut r) = world.rigidbody_mut(id) {

@@ -5,16 +5,18 @@
 //! passes run and how large the bloom buffers are. Plain data with its per-tier
 //! decisions, no GPU types — the render layer maps it onto its passes (#494).
 
-/// Scalability tier. Gates SSR, motion blur and SSAO, and the bloom buffer size.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
-pub enum QualityPreset {
-    /// iGPU floor: SSR off (cubemap only), motion blur off, quarter-res bloom.
-    Low,
-    /// Balanced: cubemap reflection, motion blur on, half-res bloom.
-    #[default]
-    Medium,
-    /// Discrete GPU: real screen-space reflections, motion blur, half-res bloom.
-    High,
+crate::core::named_enum! {
+    /// Scalability tier. Gates SSR, motion blur and SSAO, and the bloom buffer size.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+    pub enum QualityPreset {
+        /// iGPU floor: SSR off (cubemap only), motion blur off, quarter-res bloom.
+        Low = "Low",
+        /// Balanced: cubemap reflection, motion blur on, half-res bloom.
+        #[default]
+        Medium = "Medium",
+        /// Discrete GPU: real screen-space reflections, motion blur, half-res bloom.
+        High = "High",
+    }
 }
 
 impl QualityPreset {

@@ -85,7 +85,7 @@ impl ParamLayout {
                 if params.len() == PARAM_SLOTS {
                     return Err(format!(
                         "more than {PARAM_SLOTS} runtime params in one {} shader",
-                        pass.tag()
+                        pass.name()
                     ));
                 }
                 let default = match sel.params.get(p.name) {

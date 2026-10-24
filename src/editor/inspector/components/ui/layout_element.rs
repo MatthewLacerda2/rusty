@@ -9,16 +9,9 @@ use crate::scene::authoring::ComponentKind;
 use egui_phosphor::regular as icon;
 
 use super::combo;
-use crate::components::LayoutElementComponent;
+use crate::components::{LayoutAxisFit, LayoutElementComponent};
 use crate::editor::inspector::components::card::component_card;
-use crate::scene::authoring::layout_element::{self as ops, SizeKind, FITS};
-use crate::scene::authoring::layout_group::name_of;
-
-const SIZES: [(SizeKind, &str); 3] = [
-    (SizeKind::Min, "Min"),
-    (SizeKind::Preferred, "Preferred"),
-    (SizeKind::Flexible, "Flexible"),
-];
+use crate::scene::authoring::layout_element::{self as ops, SizeKind};
 
 /// Layout Element card. A THIN client (#287): widgets edit a snapshot and the
 /// changed snapshot is written back through the shared ops; remove detaches.
@@ -26,7 +19,7 @@ pub fn draw(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, is_dirty:
     let Some(mut edit) = world.layout_element(id).map(|e| e.clone()) else {
         return;
     };
-    let mut sizes = SIZES.map(|(k, _)| ops::size(&edit, k));
+    let mut sizes = SizeKind::ALL.map(|k| ops::size(&edit, k));
     let mut remove = false;
     let mut changed = false;
     component_card(
@@ -38,15 +31,15 @@ pub fn draw(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, is_dirty:
             changed |= ui
                 .checkbox(&mut edit.ignore_layout, "Ignore Layout")
                 .changed();
-            for ((_, label), (w, h)) in SIZES.iter().zip(sizes.iter_mut()) {
+            for (kind, (w, h)) in SizeKind::ALL.iter().zip(sizes.iter_mut()) {
                 ui.horizontal(|ui| {
-                    ui.label(format!("{label}:"));
+                    ui.label(format!("{kind}:"));
                     changed |= optional(ui, "w", w);
                     changed |= optional(ui, "h", h);
                 });
             }
-            let fits = FITS.map(|(f, _)| f);
-            let name = |f| name_of(&FITS, f);
+            let fits = LayoutAxisFit::ALL;
+            let name = LayoutAxisFit::name;
             changed |= combo(ui, "Horizontal Fit", &mut edit.horizontal_fit, &fits, name);
             changed |= combo(ui, "Vertical Fit", &mut edit.vertical_fit, &fits, name);
         },
@@ -83,7 +76,7 @@ fn write_back(
     sizes: [(Option<f32>, Option<f32>); 3],
 ) {
     ops::set_ignore_layout(e, edit.ignore_layout);
-    for ((kind, _), (w, h)) in SIZES.iter().zip(sizes) {
+    for (kind, (w, h)) in SizeKind::ALL.iter().zip(sizes) {
         ops::set_size(e, *kind, w, h);
     }
     ops::set_fit(e, edit.horizontal_fit, edit.vertical_fit);

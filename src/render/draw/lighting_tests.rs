@@ -13,7 +13,7 @@ fn one_per_mode(light_type: LightType) -> Scene {
     for (k, mode) in LightMode::ALL.into_iter().enumerate() {
         let id = scene.add_entity(mode.name().to_string());
         let light = LightComponent {
-            light_type: light_type.clone(),
+            light_type,
             intensity: (k + 1) as f32,
             inner_cone: 20.0,
             outer_cone: 30.0,

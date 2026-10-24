@@ -161,10 +161,10 @@ fn radius_height(ui: &mut egui::Ui, radius: &mut f32, height: &mut f32) -> bool 
 fn axis_combo(ui: &mut egui::Ui, axis: &mut CapsuleAxis) -> bool {
     let before = *axis;
     egui::ComboBox::from_label("Direction")
-        .selected_text(axis.as_str())
+        .selected_text(axis.name())
         .show_ui(ui, |ui| {
             for a in CapsuleAxis::ALL {
-                ui.selectable_value(axis, a, a.as_str());
+                ui.selectable_value(axis, a, a.name());
             }
         });
     *axis != before
@@ -206,10 +206,10 @@ fn draw_material(ui: &mut egui::Ui, mut m: PhysicsMaterial) -> Option<PhysicsMat
 fn combine_combo(ui: &mut egui::Ui, label: &str, mode: &mut CombineMode) -> bool {
     let before = *mode;
     egui::ComboBox::from_label(label)
-        .selected_text(mode.as_str())
+        .selected_text(mode.name())
         .show_ui(ui, |ui| {
             for m in CombineMode::ALL {
-                ui.selectable_value(mode, m, m.as_str());
+                ui.selectable_value(mode, m, m.name());
             }
         });
     *mode != before

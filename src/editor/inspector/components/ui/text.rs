@@ -3,6 +3,7 @@
 //! SDF effects (outline, shadow, glow) and the blend mode (#425). Widgets edit a snapshot; every write
 //! routes through `scene::authoring::text`.
 
+use crate::components::TextOverflow;
 use crate::editor::inspector::components::card::remove_component;
 use crate::scene::authoring::ComponentKind;
 use egui_phosphor::regular as icon;
@@ -71,15 +72,15 @@ fn draw_paragraph(ui: &mut egui::Ui, t: &mut TextComponent) -> bool {
         "Alignment",
         &mut t.alignment,
         &aligns,
-        ops::alignment_name,
+        TextAlignment::name,
     );
     changed |= ui.checkbox(&mut t.wrap, "Wrap").changed();
     changed |= combo(
         ui,
         "Overflow",
         &mut t.overflow,
-        &ops::OVERFLOWS,
-        ops::overflow_name,
+        &TextOverflow::ALL,
+        TextOverflow::name,
     );
     changed |= drag_row(ui, "Line Spacing:", &mut t.line_spacing, 0.01);
     changed |= drag_row(ui, "Letter Spacing (em):", &mut t.letter_spacing, 0.005);
