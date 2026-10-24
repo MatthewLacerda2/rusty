@@ -44,21 +44,11 @@ pub(crate) fn read_texture_bytes(
     read_level(device, queue, (texture, 0, 0), size, texel_bytes)
 }
 
-/// [`read_texture_rgba8`] of mip level `mip`, `width × height` being that level's
+/// [`read_texture_rgba8`] of mip level `mip` in array layer `layer` (0 for a plain
+/// texture; the decal atlas has many, #1364), `width × height` being that level's
 /// region (#1322).
 #[cfg(test)]
 pub(crate) fn read_mip_rgba8(
-    device: &wgpu::Device,
-    queue: &wgpu::Queue,
-    (texture, mip): (&wgpu::Texture, u32),
-    size: (u32, u32),
-) -> Vec<u8> {
-    read_level(device, queue, (texture, mip, 0), size, 4)
-}
-
-/// [`read_mip_rgba8`] of array layer `layer` (the decal atlas's, #1364).
-#[cfg(test)]
-pub(crate) fn read_layer_mip_rgba8(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
     level: (&wgpu::Texture, u32, u32),

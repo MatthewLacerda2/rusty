@@ -122,3 +122,17 @@ pub(crate) fn bounds(pose: &DecalPose) -> (Vec3, f32) {
 #[cfg(test)]
 #[path = "record_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+mod kind_tests {
+    use super::*;
+
+    #[test]
+    fn the_albedo_slot_is_colour_and_the_others_data() {
+        let [a, n, r] = ["a.png", "n.png", "r.png"].map(MapRef::from);
+        let maps = [Some(a.clone()), Some(n.clone()), None, Some(r.clone())];
+        let got: Vec<_> = kinded(&maps).collect();
+        let (colour, data) = (TextureKind::Colour, TextureKind::Data);
+        assert_eq!(got, [(&a, colour), (&n, data), (&r, data)]);
+    }
+}

@@ -7,7 +7,7 @@ use super::{DecalAtlas, LAYER_SIZE, MIPS};
 use crate::asset::MapRef;
 use crate::core::fs::freshness::Freshness;
 use crate::render::gpu::textures::TextureKind;
-use crate::render::readback::read_layer_mip_rgba8;
+use crate::render::readback::read_mip_rgba8;
 use crate::render::Renderer;
 
 /// A layer-sized black and white checker of 1-texel cells saved under `name`, so
@@ -29,7 +29,7 @@ fn checker(name: &str) -> MapRef {
 fn level(renderer: &Renderer, atlas: &DecalAtlas, layer: u32, mip: u32) -> Vec<u8> {
     let side = (LAYER_SIZE >> mip).max(1);
     let (device, queue) = (&renderer.device, &renderer.queue);
-    read_layer_mip_rgba8(device, queue, (&atlas.texture, mip, layer), (side, side))
+    read_mip_rgba8(device, queue, (&atlas.texture, mip, layer), (side, side))
 }
 
 /// Whether every RGB channel of `texels` is within 1 of `want`.

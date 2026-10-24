@@ -104,7 +104,7 @@ fn level_one(renderer: &Renderer, kind: TextureKind, image: &image::RgbaImage) -
         .mip_generator
         .generate(device, queue, &texture, kind);
     let below = ((w / 2).max(1), (h / 2).max(1));
-    readback::read_mip_rgba8(device, queue, (&texture, 1), below)
+    readback::read_mip_rgba8(device, queue, (&texture, 1, 0), below)
 }
 
 /// A one-row image of grey `values`, opaque.
