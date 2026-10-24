@@ -7,7 +7,7 @@ it behaves identically to the editor and uses the same default values.
 
 | Function | Signature | Returns |
 |---|---|---|
-| `Scene.FindEntityByName` | `(name)` | `id` of the first entity so named that is active in the hierarchy, as Unity's `GameObject.Find` (or `nil` if none) |
+| `Scene.FindEntityByName` | `(name)` | `id` of the first entity so named that is active in the hierarchy, as Unity's `GameObject.Find` (or `nil` if none, as `null` there) |
 | `Scene.CreateEntity` | `(name, [primitive])` | new entity `id` |
 | `Scene.Deactivate` | `(id)` | — |
 | `Scene.DestroyEntity` | `(id)` | `true` if an entity existed at `id` |
@@ -17,12 +17,12 @@ it behaves identically to the editor and uses the same default values.
 | `Scene.SetParent` | `(id, parent_id)` | — (errors on a parenting cycle) |
 | `Scene.ClearParent` | `(id)` | — |
 | `Scene.SetActive` | `(id, active)` | `true` if an entity existed at `id` — Unity's `SetActive`; its callbacks follow the edge (`OnEnable` / `OnDisable`) |
-| `Scene.IsActive` | `(id)` | Unity's `activeSelf`: the entity's own `active` flag (`false` for a missing id; an inactive ancestor still hides it) |
-| `Scene.IsActiveInHierarchy` | `(id)` | Unity's `activeInHierarchy`: `true` when the entity and every ancestor are active — what decides whether it draws, simulates and ticks |
-| `Scene.GetParent` | `(id)` | the parent's `id`, or `nil` |
-| `Scene.GetChildren` | `(id)` | array of child ids, in hierarchy order |
-| `Scene.FindChild` | `(id, path)` | the descendant at name path `path` (`"Viewport/Content"`), or `nil` |
-| `Scene.GetScript` | `(id, name)` | the entity's live script instance named `name`, or `nil` — see below |
+| `Scene.IsActive` | `(id)` | Unity's `activeSelf`: the entity's own `active` flag (`false` for a missing or `nil` id; an inactive ancestor still hides it) |
+| `Scene.IsActiveInHierarchy` | `(id)` | Unity's `activeInHierarchy`: `true` when the entity and every ancestor are active (`false` for a missing or `nil` id) — what decides whether it draws, simulates and ticks |
+| `Scene.GetParent` | `(id)` | the parent's `id`, or `nil` (also for a `nil` id) |
+| `Scene.GetChildren` | `(id)` | array of child ids, in hierarchy order (empty for a `nil` id) |
+| `Scene.FindChild` | `(id, path)` | the descendant at name path `path` (`"Viewport/Content"`), or `nil` (also for a `nil` id) |
+| `Scene.GetScript` | `(id, name)` | the entity's live script instance named `name`, or `nil` (also for a `nil` id) — see below |
 | `Scene.Save` | `([path])` | the written path |
 | `Scene.Load` | `(path)` | `nil`, or in edit mode a warning string when the scene loaded but its lighting sidecar did not (errors, naming `path`, if there is no file there) |
 | `Scene.GetActivePath` | `()` | the current scene file, or `nil` |

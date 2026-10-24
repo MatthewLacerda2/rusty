@@ -14,7 +14,7 @@ end
 function BotAI.Update(entity_id, delta_time)
     -- Fetch the player position from the engine scene system
     local player_id = Scene.FindEntityByName("Player")
-    if player_id == 0 or player_id == nil then
+    if player_id == nil then
         return
     end
 
