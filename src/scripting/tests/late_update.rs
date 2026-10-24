@@ -17,8 +17,7 @@ use super::lifecycle::{manager_with_entity, write_script};
 #[test]
 fn late_update_passes_delta_time() {
     let (mut m, id) = manager_with_entity();
-    m.init_runtime(&std::rc::Rc::new(std::cell::RefCell::new(None)))
-        .unwrap();
+    m.init_runtime().unwrap();
     let path = write_script(
         "late_dt",
         "_G.__late_dt = 0\nreturn { LateUpdate = function(id, dt) _G.__late_dt = dt end }",
@@ -37,8 +36,7 @@ fn late_update_passes_delta_time() {
 #[test]
 fn late_update_observes_post_physics_transform_same_tick() {
     let (mut m, id) = manager_with_entity();
-    m.init_runtime(&std::rc::Rc::new(std::cell::RefCell::new(None)))
-        .unwrap();
+    m.init_runtime().unwrap();
     let path = write_script(
         "late_post_physics",
         "_G.__u = -1\n_G.__l = -1\nreturn {\n\
@@ -52,7 +50,8 @@ fn late_update_observes_post_physics_transform_same_tick() {
     // Update reads the pre-physics x (0.0, the default).
     m.update_scripts(1.0 / 60.0);
     // "Physics" resolves this tick: the body ends up at x = 5.
-    m.scene
+    m.cells
+        .scene
         .borrow_mut()
         .world
         .transform_mut(id)
@@ -75,8 +74,7 @@ fn late_update_observes_post_physics_transform_same_tick() {
 #[test]
 fn inactive_entity_late_update_does_not_fire() {
     let (mut m, id) = manager_with_entity();
-    m.init_runtime(&std::rc::Rc::new(std::cell::RefCell::new(None)))
-        .unwrap();
+    m.init_runtime().unwrap();
     let path = write_script(
         "late_inactive",
         "_G.__fired = false\nreturn { LateUpdate = function(id) _G.__fired = true end }",
@@ -84,7 +82,7 @@ fn inactive_entity_late_update_does_not_fire() {
     m.load_entity_script(id, 0, &path, &BTreeMap::new())
         .unwrap();
     m.init_scripts(); // starts while active
-    m.scene.borrow_mut().world.set_active(id, false);
+    m.cells.scene.borrow_mut().world.set_active(id, false);
     m.late_update_scripts(1.0 / 60.0);
     assert_eq!(
         m.eval("__fired").unwrap(),
@@ -99,9 +97,8 @@ fn inactive_entity_late_update_does_not_fire() {
 /// fixed dt must return byte-identical strings (the determinism contract).
 fn late_update_order_log() -> String {
     let (mut m, a) = manager_with_entity();
-    let b = m.scene.borrow_mut().add_entity("E2".to_string());
-    m.init_runtime(&std::rc::Rc::new(std::cell::RefCell::new(None)))
-        .unwrap();
+    let b = m.cells.scene.borrow_mut().add_entity("E2".to_string());
+    m.init_runtime().unwrap();
     let tag = |name: &str, t: &str| {
         write_script(
             name,

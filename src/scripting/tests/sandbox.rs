@@ -25,7 +25,7 @@ fn live_manager() -> ScriptManager {
         Rc::new(RefCell::new(Camera::new(Vec3::ZERO, 0.0, 0.0))),
         Rc::new(RefCell::new(Time::new())),
     );
-    m.init_runtime(&Rc::new(RefCell::new(None))).expect("init");
+    m.init_runtime().expect("init");
     m
 }
 
@@ -79,8 +79,7 @@ fn every_play_restarts_the_stream_from_the_default_seed() {
         run(&m, DRAWS),
         "the stream advances within a session"
     );
-    m.init_runtime(&Rc::new(RefCell::new(None)))
-        .expect("re-init");
+    m.init_runtime().expect("re-init");
     assert_eq!(first, run(&m, DRAWS), "a new Play restarts it");
 }
 

@@ -29,7 +29,7 @@ fn a_ui_tween_reads_its_start_and_ends_when_the_shader_goes() {
     let shader = Baked::new("ui", "dissolve", "read_ui");
     let (mut m, id) = rig("tween_read_ui", &counted(""));
     let image = crate::components::ImageComponent::default();
-    m.scene.borrow_mut().world.set_image(id, Some(image));
+    m.cells.scene.borrow_mut().world.set_image(id, Some(image));
     tick(&mut m, 1);
     m.eval(&format!(
         "UI.SetShader({id}, '{}') \
@@ -43,7 +43,7 @@ fn a_ui_tween_reads_its_start_and_ends_when_the_shader_goes() {
     assert_eq!(eval(&m, &get), "0.625", "a quarter of the way from 0.5");
     m.eval(&format!("UI.SetShader({id}, nil)")).unwrap();
     tick(&mut m, 1);
-    assert!(m.timers.borrow().is_empty(), "no shader, no tween");
+    assert!(m.cells.timers.borrow().is_empty(), "no shader, no tween");
 }
 
 #[test]

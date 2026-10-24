@@ -58,7 +58,10 @@ impl ScriptManager {
         self.dispatch_keys(&keys, ON_DISABLE);
         for &(id, _) in &keys {
             // Unity: a deactivated object's coroutines stop (#444) — timers too.
-            self.timers.borrow_mut().retain_owners(|owner| owner != id);
+            self.cells
+                .timers
+                .borrow_mut()
+                .retain_owners(|owner| owner != id);
         }
         for key in keys {
             if let Some(inst) = self.entity_scripts.get_mut(&key) {
@@ -76,12 +79,12 @@ impl ScriptManager {
     /// tick's drain, since the queue was taken up front. Returns what was removed,
     /// each id with its position, for the caller to silence its sound (#1297).
     pub fn apply_pending_destroys(&mut self) -> Vec<(u32, [f32; 3])> {
-        let ids = self.scene.borrow_mut().take_pending_destroys();
+        let ids = self.cells.scene.borrow_mut().take_pending_destroys();
         if ids.is_empty() {
             return Vec::new();
         }
         let (doomed, order, removed) = {
-            let scene = self.scene.borrow();
+            let scene = self.cells.scene.borrow();
             let doomed: BTreeSet<u32> = ids.iter().flat_map(|&id| scene.destroy_set(id)).collect();
             let order = teardown_order(&scene, &doomed.iter().copied().collect::<Vec<_>>());
             // World space: a child's sound stops where it was heard, not at its local offset.
@@ -90,7 +93,8 @@ impl ScriptManager {
             (doomed, order, removed)
         };
         self.dispatch_teardown(&order);
-        self.scene
+        self.cells
+            .scene
             .borrow_mut()
             .despawn_batch(&doomed, Despawn::TornDown);
         self.forget_entities(&doomed.into_iter().collect::<Vec<_>>());
@@ -102,7 +106,7 @@ impl ScriptManager {
     /// coroutines forgotten — but no per-entity removal, because the scene swap that
     /// follows replaces the World.
     pub fn unload_entities(&mut self, ids: &[u32]) {
-        let order = teardown_order(&self.scene.borrow(), ids);
+        let order = teardown_order(&self.cells.scene.borrow(), ids);
         self.dispatch_teardown(&order);
         self.forget_entities(ids);
     }
@@ -142,7 +146,8 @@ impl ScriptManager {
     /// so a later entity reusing an id starts clean.
     fn forget_entities(&mut self, ids: &[u32]) {
         let gone = |id: &u32| ids.binary_search(id).is_ok();
-        self.timers
+        self.cells
+            .timers
             .borrow_mut()
             .retain_owners(|owner| !gone(&owner));
         self.entity_scripts.retain(|(eid, _), _| !gone(eid));

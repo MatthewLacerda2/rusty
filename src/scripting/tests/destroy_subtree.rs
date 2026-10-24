@@ -28,7 +28,7 @@ pub(super) fn scripted(
     under: impl FnOnce(&mut crate::scene::Scene, u32) -> u32,
 ) -> (ScriptManager, u32, u32) {
     let (mut m, parent) = rig(name, LOGGER);
-    let child = under(&mut m.scene.borrow_mut(), parent);
+    let child = under(&mut m.cells.scene.borrow_mut(), parent);
     let path = write_script(&format!("{name}_child"), BUSY);
     m.load_entity_script(child, 0, &path, &BTreeMap::new())
         .unwrap();
@@ -37,7 +37,7 @@ pub(super) fn scripted(
     let live = crate::scripting::instances::find(m.lua.as_ref().unwrap(), child, &stem);
     assert!(live.unwrap().is_some(), "the child's Lua table is indexed");
     assert!(
-        !m.timers.borrow().is_empty(),
+        !m.cells.timers.borrow().is_empty(),
         "the child's invoke and coroutine wait"
     );
     m.eval("__log = ''").unwrap();
@@ -46,7 +46,7 @@ pub(super) fn scripted(
 
 /// Request `id`'s destroy and drain it, as the Play schedule does.
 pub(super) fn destroy(m: &mut ScriptManager, id: u32) {
-    m.scene.borrow_mut().request_destroy(id);
+    m.cells.scene.borrow_mut().request_destroy(id);
     m.apply_pending_destroys();
 }
 
@@ -54,7 +54,7 @@ pub(super) fn destroy(m: &mut ScriptManager, id: u32) {
 /// file stem is `stem`) or timer.
 fn assert_forgotten(m: &ScriptManager, id: u32, stem: &str) {
     assert!(
-        !m.scene.borrow().world.contains(id),
+        !m.cells.scene.borrow().world.contains(id),
         "entity {id} is despawned"
     );
     assert!(
@@ -65,7 +65,7 @@ fn assert_forgotten(m: &ScriptManager, id: u32, stem: &str) {
     let table = crate::scripting::instances::find(lua, id, stem).unwrap();
     assert!(table.is_none(), "no Lua table of {id}");
     assert!(
-        m.timers.borrow().is_empty(),
+        m.cells.timers.borrow().is_empty(),
         "no timer or coroutine of {id}"
     );
 }
@@ -88,12 +88,12 @@ fn rig_with_scripted_gun(name: &str) -> (ScriptManager, u32, u32, Vec<u32>) {
 #[test]
 fn destroying_a_rig_tears_down_the_script_on_its_bone() {
     let (mut m, holder, gun, _) = rig_with_scripted_gun("destroy_rig");
-    let rig = m.scene.borrow().world.children(holder)[0];
+    let rig = m.cells.scene.borrow().world.children(holder)[0];
     destroy(&mut m, rig);
     assert_eq!(m.eval("__log").unwrap(), format!("D{gun}X{gun}"));
     assert_forgotten(&m, gun, "rusty_lifecycle_destroy_rig_child");
     assert!(
-        m.scene.borrow().world.contains(holder),
+        m.cells.scene.borrow().world.contains(holder),
         "the rig's parent stays"
     );
 }

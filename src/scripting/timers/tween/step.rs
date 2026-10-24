@@ -10,10 +10,10 @@ impl ScriptManager {
     /// step — retire it and call its `on_complete(owner)`. A tween whose
     /// component was removed ends silently.
     pub(in super::super) fn step_tween(&self, lua: &Lua, handle: u64, owner: u32) {
-        let t = self.timers.borrow().overshoot(handle);
+        let t = self.cells.timers.borrow().overshoot(handle);
         let done = {
-            let mut timers = self.timers.borrow_mut();
-            let mut scene = self.scene.borrow_mut();
+            let mut timers = self.cells.timers.borrow_mut();
+            let mut scene = self.cells.scene.borrow_mut();
             let Some(tween) = timers.tween_mut(handle) else {
                 return;
             };
@@ -32,7 +32,7 @@ impl ScriptManager {
         if !done {
             return;
         }
-        let finished = self.timers.borrow_mut().take_tween(handle);
+        let finished = self.cells.timers.borrow_mut().take_tween(handle);
         let Some(key) = finished.and_then(|t| t.on_complete) else {
             return;
         };

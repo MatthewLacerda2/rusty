@@ -18,7 +18,7 @@ fn family(name: &str) -> (ScriptManager, u32, u32) {
 #[test]
 fn an_inactive_child_gets_on_destroy_but_not_on_disable() {
     let (mut m, parent, child) = family("destroy_inactive");
-    m.scene.borrow_mut().world.set_active(child, false);
+    m.cells.scene.borrow_mut().world.set_active(child, false);
     tick(&mut m, 1); // the falling edge fires the child's OnDisable now
     let log: String = m.eval("__log").unwrap();
     assert!(log.starts_with(&format!("D{child}")), "{log}");
@@ -35,7 +35,7 @@ fn an_inactive_child_gets_on_destroy_but_not_on_disable() {
 fn a_parent_and_child_queued_together_fire_each_hook_once() {
     let (mut m, parent, child) = family("destroy_both");
     {
-        let mut scene = m.scene.borrow_mut();
+        let mut scene = m.cells.scene.borrow_mut();
         scene.request_destroy(child);
         scene.request_destroy(parent);
         scene.request_destroy(child);

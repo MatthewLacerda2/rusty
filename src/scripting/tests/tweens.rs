@@ -28,7 +28,10 @@ fn a_tween_starts_next_tick_and_lands_on_its_target() {
     tick(&mut m, 2);
     assert_eq!(x(&m, id), "4");
     assert_eq!(m.eval("__log").unwrap(), "done5");
-    assert!(m.timers.borrow().is_empty(), "a finished tween retires");
+    assert!(
+        m.cells.timers.borrow().is_empty(),
+        "a finished tween retires"
+    );
 }
 
 #[test]
@@ -71,7 +74,7 @@ fn kill_and_deactivate_stop_a_tween() {
     m.eval(&format!("Scene.Deactivate({id})")).unwrap();
     tick(&mut m, 1);
     assert!(
-        m.timers.borrow().is_empty(),
+        m.cells.timers.borrow().is_empty(),
         "a deactivated entity's tweens stop"
     );
 }
@@ -127,7 +130,7 @@ fn a_scene_unload_drops_the_unloaded_entitys_tweens() {
     let body = "Tween.To(id, 'Transform.position', {1, 0, 0}, 1)";
     let (mut m, id) = rig("tween_unload", &counted(body));
     tick(&mut m, 1);
-    assert!(!m.timers.borrow().is_empty());
+    assert!(!m.cells.timers.borrow().is_empty());
     m.unload_entities(&[id]);
-    assert!(m.timers.borrow().is_empty());
+    assert!(m.cells.timers.borrow().is_empty());
 }

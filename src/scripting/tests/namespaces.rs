@@ -34,8 +34,7 @@ fn manager() -> (ScriptManager, Rc<RefCell<Scene>>, Rc<RefCell<Camera>>) {
         time,
     );
     // No live physics world in these unit tests, so Physics.Raycast misses.
-    let physics = Rc::new(RefCell::new(None));
-    m.init_runtime(&physics).expect("runtime inits");
+    m.init_runtime().expect("runtime inits");
     (m, scene, camera)
 }
 

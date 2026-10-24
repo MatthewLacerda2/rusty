@@ -2,9 +2,7 @@
 //! sibling, the unified active gate (a disabled entity gets no `OnTrigger`), and
 //! deterministic dispatch order. Tags as in `transitions.rs`.
 
-use std::cell::RefCell;
 use std::collections::BTreeMap;
-use std::rc::Rc;
 
 use crate::components::ScriptComponent;
 use crate::physics::TriggerEvents;
@@ -23,11 +21,12 @@ fn destroying_one_entity_leaves_a_sibling_running() {
     // lone-entity destroy triangulates neither; it needs a surviving sibling, and
     // the sibling must carry a real ScriptComponent so the reload path is live.
     let (mut m, a) = manager_with_entity();
-    let b = m.scene.borrow_mut().add_entity("B".to_string());
-    m.init_runtime(&Rc::new(RefCell::new(None))).unwrap();
+    let b = m.cells.scene.borrow_mut().add_entity("B".to_string());
+    m.init_runtime().unwrap();
     let path = write_script("trans_sibling", LOGGER);
     for id in [a, b] {
-        m.scene
+        m.cells
+            .scene
             .borrow_mut()
             .world
             .scripts_mut(id)
@@ -44,7 +43,7 @@ fn destroying_one_entity_leaves_a_sibling_running() {
     m.update_scripts(DT);
     // Destroy A; isolate the log so only the teardown + B's next tick show up.
     m.eval("__log = ''").unwrap();
-    m.scene.borrow_mut().request_destroy(a);
+    m.cells.scene.borrow_mut().request_destroy(a);
     m.apply_pending_destroys();
     // A full next tick: the spawn scan (the reload path), init, then update.
     m.load_new_scripts();
@@ -57,16 +56,19 @@ fn destroying_one_entity_leaves_a_sibling_running() {
          — its instance is neither evicted nor reloaded"
     );
     assert!(
-        !m.scene.borrow().world.contains(a),
+        !m.cells.scene.borrow().world.contains(a),
         "the destroyed entity is gone"
     );
-    assert!(m.scene.borrow().world.contains(b), "the sibling survives");
+    assert!(
+        m.cells.scene.borrow().world.contains(b),
+        "the sibling survives"
+    );
 }
 
 #[test]
 fn disabled_entity_receives_no_on_trigger() {
     let (mut m, id) = manager_with_entity();
-    m.init_runtime(&Rc::new(RefCell::new(None))).unwrap();
+    m.init_runtime().unwrap();
     let path = write_script(
         "trans_trigger",
         "_G.__t = false\nreturn { OnTrigger = function(id, other) _G.__t = true end }",
@@ -74,7 +76,7 @@ fn disabled_entity_receives_no_on_trigger() {
     m.load_entity_script(id, 0, &path, &BTreeMap::new())
         .unwrap();
     m.init_scripts(); // awoken while active
-    m.scene.borrow_mut().world.set_active(id, false);
+    m.cells.scene.borrow_mut().world.set_active(id, false);
     m.dispatch_trigger_events(TriggerEvents {
         stayed: vec![(id, 99)],
         ..Default::default()
@@ -91,8 +93,8 @@ fn disabled_entity_receives_no_on_trigger() {
 /// enable dispatch order. A pure function of its inputs, so replays match.
 fn on_enable_order_log() -> String {
     let (mut m, a) = manager_with_entity();
-    let b = m.scene.borrow_mut().add_entity("E2".to_string());
-    m.init_runtime(&Rc::new(RefCell::new(None))).unwrap();
+    let b = m.cells.scene.borrow_mut().add_entity("E2".to_string());
+    m.init_runtime().unwrap();
     let tag = |name: &str, t: &str| {
         write_script(
             name,

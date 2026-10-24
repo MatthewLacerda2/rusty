@@ -70,9 +70,7 @@ fn flush_storage_logs_on_write_failure() {
 fn the_ui_api_reads_the_shared_screen_cell() {
     let mut res = resources();
     res.screen.borrow_mut().set_game_view(640, 480);
-    res.script_manager
-        .init_runtime(&res.physics)
-        .expect("runtime boots");
+    res.script_manager.init_runtime().expect("runtime boots");
     let size = res.script_manager.eval("UI.GetScreenSize()").unwrap();
     assert_eq!(size, "640, 480");
     assert_eq!(res.ui_view().screen, glam::Vec2::new(640.0, 480.0));

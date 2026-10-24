@@ -7,7 +7,6 @@ use std::rc::Rc;
 use crate::components::{CapsuleAxis, ColliderShape, CombineMode, PhysicsMaterial};
 use crate::core::input::InputState;
 use crate::navigation::NavigationGraph;
-use crate::physics::PhysicsWorld;
 use crate::scene::authoring::defaults::default_collider;
 use crate::scene::{Camera, Scene};
 use crate::scripting::console::ConsoleLogs;
@@ -30,8 +29,7 @@ fn manager_with_collider() -> (ScriptManager, Rc<RefCell<Scene>>, u32) {
     let camera = Rc::new(RefCell::new(Camera::new(Vec3::ZERO, 0.0, 0.0)));
     let time = Rc::new(RefCell::new(Time::new()));
     let mut m = ScriptManager::new(Rc::clone(&scene), input, nav, console, camera, time);
-    let physics = Rc::new(RefCell::new(None::<PhysicsWorld>));
-    m.init_runtime(&physics).expect("runtime inits");
+    m.init_runtime().expect("runtime inits");
     (m, scene, id)
 }
 

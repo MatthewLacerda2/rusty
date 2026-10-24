@@ -230,10 +230,7 @@ impl GameWorld {
             .borrow_mut()
             .info("Capturing cursor, entering PlayMode!".to_string());
 
-        let init = self
-            .resources
-            .script_manager
-            .init_runtime(&self.resources.physics);
+        let init = self.resources.script_manager.init_runtime();
         if !self.report_lua_init(init) {
             return;
         }

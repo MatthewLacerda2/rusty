@@ -13,7 +13,10 @@
 //! Render, AttachPlayerBot, LoadStress, Bench), and `Scene.GetScript` answered across
 //! the VM boundary (`script_ref`).
 
+mod copy;
 mod script_ref;
+#[cfg(test)]
+mod tests;
 
 use std::cell::RefCell;
 use std::rc::Rc;

@@ -8,6 +8,9 @@ use std::fmt;
 pub enum Refusal {
     /// The sim is in Play. Generation is authoring: stop, then generate.
     Playing,
+    /// Inside a headless run (a scenario or a bench), which is a test, and a test
+    /// never calls a vendor (#1384).
+    Headless,
     /// No key in the environment or the `.env`.
     MissingKey {
         provider: &'static str,
@@ -35,6 +38,11 @@ impl fmt::Display for Refusal {
                 f,
                 "provider calls are refused during Play: generation is an edit-mode \
                  verb (stop, then generate)"
+            ),
+            Self::Headless => write!(
+                f,
+                "provider calls are refused in a headless run (a scenario or a bench): \
+                 generation is authoring, and a test never calls a vendor"
             ),
             Self::MissingKey {
                 provider,

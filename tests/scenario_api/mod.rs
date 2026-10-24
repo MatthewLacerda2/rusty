@@ -5,8 +5,11 @@ use std::path::Path;
 
 use rusty::dev::scenario;
 
+mod crossing;
+mod refusals;
+
 /// Write `code` as a scenario and run it on an isolated workspace; its results.
-fn run(name: &str, code: &str) -> (bool, String) {
+pub(super) fn run(name: &str, code: &str) -> (bool, String) {
     let dir = crate::temp::dir().join(name);
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("scenario.lua");

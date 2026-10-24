@@ -26,9 +26,7 @@ impl GameWorld {
         if self.resources.script_manager.is_live() {
             return Ok(());
         }
-        self.resources
-            .script_manager
-            .init_runtime(&self.resources.physics)
+        self.resources.script_manager.init_runtime()
     }
 
     /// On Stop, after Play's runtime is shut down and the edit scene restored:

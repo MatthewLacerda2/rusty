@@ -91,6 +91,9 @@ pub struct Harness {
     capture: super::capture::CaptureHost,
     /// The run's frame stats, filled by the timing probe and the screenshots.
     pub stats: Rc<RefCell<FrameStats>>,
+    /// Refuses provider calls for the run's whole life, before its first step
+    /// enters Play too: a headless run is a test (#1384).
+    _providers: super::providers::HeadlessHold,
 }
 
 impl Harness {

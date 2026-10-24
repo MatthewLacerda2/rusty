@@ -25,6 +25,9 @@ enum Step {
     },
     /// A tween: sample and write its property (`tween/step.rs`).
     Tween,
+    /// A function or thread the job holds no longer resolves in this VM (it was
+    /// made in another one): the job can never run, so it is cancelled.
+    Lost(&'static str),
 }
 
 impl ScriptManager {
@@ -32,11 +35,13 @@ impl ScriptManager {
     /// scaled `dt` (or the unscaled step, for the realtime waits) and run the ones
     /// that came due, in ascending `(owner entity, handle)` order.
     pub fn tick_timers(&mut self, delta_time: f32) {
-        let unscaled = self.time.borrow().unscaled_delta_time;
-        self.timers
+        let unscaled = self.cells.time.borrow().unscaled_delta_time;
+        self.cells
+            .timers
             .borrow_mut()
             .retain_owners(|id| self.entity_active(id) == Some(true));
         let due = self
+            .cells
             .timers
             .borrow_mut()
             .advance(f64::from(delta_time), f64::from(unscaled));
@@ -47,7 +52,7 @@ impl ScriptManager {
                 }
             });
         }
-        self.timers.borrow_mut().end_phase();
+        self.cells.timers.borrow_mut().end_phase();
     }
 
     /// Run one due job, if it is still pending and its owner still active (an
@@ -57,7 +62,7 @@ impl ScriptManager {
             return;
         };
         if self.entity_active(owner) != Some(true) {
-            self.timers.borrow_mut().cancel(handle);
+            self.cells.timers.borrow_mut().cancel(handle);
             return;
         }
         match step {
@@ -72,31 +77,50 @@ impl ScriptManager {
             }
             Step::Resume { thread, until } => self.resume(lua, handle, owner, thread, until),
             Step::Tween => self.step_tween(lua, handle, owner),
+            Step::Lost(what) => {
+                self.cells.timers.borrow_mut().cancel(handle);
+                let msg = "its function does not resolve in the gameplay VM; cancelled";
+                self.log_error(owner, what, msg);
+            }
         }
     }
 
     fn take_step(&self, lua: &Lua, handle: u64) -> Option<(u32, Step)> {
-        let timers = self.timers.borrow();
+        let timers = self.cells.timers.borrow();
         let job = timers.get(handle)?;
         let step = match &job.work {
-            Work::Invoke { target, interval } => {
-                let (func, name) = match target {
-                    Target::Func(key) => (lua.registry_value(key).ok(), None),
-                    Target::Name(n) => (None, Some(n.clone())),
-                };
-                Step::Call {
-                    func,
-                    name,
+            Work::Invoke { target, interval } => match target {
+                Target::Func(key) => match lua.registry_value(key) {
+                    Ok(func) => Step::Call {
+                        func: Some(func),
+                        name: None,
+                        interval: *interval,
+                    },
+                    Err(_) => Step::Lost("Invoke"),
+                },
+                Target::Name(n) => Step::Call {
+                    func: None,
+                    name: Some(n.clone()),
                     interval: *interval,
-                }
-            }
-            Work::Coroutine { thread } => Step::Resume {
-                thread: lua.registry_value(thread).ok()?,
-                until: match &job.wait {
-                    Wait::Until(key) => lua.registry_value(key).ok(),
-                    Wait::Elapsed { .. } => None,
                 },
             },
+            Work::Coroutine { thread } => {
+                let until = match &job.wait {
+                    Wait::Until(key) => Some(lua.registry_value(key).ok()),
+                    Wait::Elapsed { .. } => None,
+                };
+                match (lua.registry_value(thread), until) {
+                    (Ok(thread), None) => Step::Resume {
+                        thread,
+                        until: None,
+                    },
+                    (Ok(thread), Some(Some(pred))) => Step::Resume {
+                        thread,
+                        until: Some(pred),
+                    },
+                    _ => Step::Lost("Coroutine"),
+                }
+            }
             Work::Tween(_) => Step::Tween,
         };
         Some((job.owner, step))
@@ -117,14 +141,14 @@ impl ScriptManager {
             Err(name) => {
                 let msg = format!("no function `{name}` on its scripts");
                 self.log_error(owner, "Invoke", &msg);
-                self.timers.borrow_mut().cancel(handle);
+                self.cells.timers.borrow_mut().cancel(handle);
                 return;
             }
         };
         if let Err(e) = func.call::<()>(owner) {
             self.log_error(owner, "Invoke", &e.to_string());
         }
-        let mut timers = self.timers.borrow_mut();
+        let mut timers = self.cells.timers.borrow_mut();
         match interval {
             Some(every) => {
                 let carry = timers.overshoot(handle);
@@ -157,12 +181,12 @@ impl ScriptManager {
         match thread.resume::<MultiValue>(()) {
             Err(e) => self.retire(handle, owner, &e.to_string()),
             Ok(_) if !thread.is_resumable() => {
-                self.timers.borrow_mut().cancel(handle);
+                self.cells.timers.borrow_mut().cancel(handle);
             }
             Ok(yielded) => {
                 let first = yielded.into_iter().next().unwrap_or(Value::Nil);
                 match wait::parse(lua, first) {
-                    Ok(next) => self.timers.borrow_mut().rearm(handle, next, 0.0),
+                    Ok(next) => self.cells.timers.borrow_mut().rearm(handle, next, 0.0),
                     Err(e) => self.retire(handle, owner, &e),
                 }
             }
@@ -171,12 +195,12 @@ impl ScriptManager {
 
     /// Drop a coroutine that failed, surfacing the error like an `Update` error.
     fn retire(&self, handle: u64, owner: u32, err: &str) {
-        self.timers.borrow_mut().cancel(handle);
+        self.cells.timers.borrow_mut().cancel(handle);
         self.log_error(owner, "Coroutine", err);
     }
 
     pub(super) fn log_error(&self, owner: u32, what: &str, err: &str) {
-        self.console.borrow_mut().error(format!(
+        self.cells.console.borrow_mut().error(format!(
             "[Lua Error] {what} on entity {owner} failed: {err}"
         ));
     }

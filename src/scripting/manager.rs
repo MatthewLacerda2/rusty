@@ -5,22 +5,16 @@ use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
 use crate::api::ApiScopedCtx;
-use crate::audio::AudioMaestro;
-use crate::core::application::Application;
-use crate::core::frame_stats::FrameStats;
 use crate::core::input::InputState;
-use crate::core::quality::QualityPreset;
 use crate::core::random::Random;
-use crate::core::storage::Storage;
-use crate::core::video::VideoSettings;
 use crate::navigation::NavigationGraph;
 use crate::scene::Camera;
 use crate::scene::Scene;
 use crate::time::Time;
-use crate::ui::{EventSystem, ScreenSize};
+use crate::ui::EventSystem;
 
 use super::console::ConsoleLogs;
-use super::timers::TimerScheduler;
+use super::shared::ApiCells;
 
 /// One live script instance: the Lua registry key of its lifecycle table plus
 /// the per-instance lifecycle flags. `awoken` / `started` record that `Awake` /
@@ -49,57 +43,9 @@ pub struct ScriptManager {
     /// including failures — so the per-tick spawn scan (`load_new_scripts`)
     /// never retries (and re-logs) a script that failed to compile.
     pub(super) load_attempted: BTreeSet<(u32, usize)>,
-    pub(super) scene: Rc<RefCell<Scene>>,
-    pub(super) input: Rc<RefCell<InputState>>,
-    pub(super) nav: Rc<RefCell<NavigationGraph>>,
-    pub(super) console: Rc<RefCell<ConsoleLogs>>,
-    pub(super) camera: Rc<RefCell<Camera>>,
-    pub(super) time: Rc<RefCell<Time>>,
-    /// The persistent key-value store, shared with the app so it can flush at
-    /// boundaries. Injected by `Resources` via [`ScriptManager::set_storage`];
-    /// defaults to an empty, pathless store (harness/tests never touch disk).
-    pub(super) storage: Rc<RefCell<Storage>>,
-    /// Global post-FX scalability tier (`Graphics.Get/SetQuality`). Shared with
-    /// the platform layer, which reads it each frame and hands it to
-    /// `renderer.set_quality`; defaults to `Medium` (harness/tests need no GPU).
-    pub(super) quality: Rc<RefCell<QualityPreset>>,
-    /// Runtime video settings (`Video.*`: resolution / vsync / fullscreen). Shared
-    /// with the platform layer, which reads it each frame and reconfigures the
-    /// surface + window; defaults to the windowed boot settings (harness needs no
-    /// window).
-    pub(super) video: Rc<RefCell<VideoSettings>>,
-    /// Live rapier physics world shared with `GameWorld` — used by
-    /// `Physics.Raycast`. `None` until Play builds the world.
-    pub(super) physics: Rc<RefCell<Option<crate::physics::PhysicsWorld>>>,
-    /// The scene file the editor/session is currently editing — the write-back
-    /// target for `Scene.Save()` (no-path). Shared with the platform layer (the
-    /// editor reads and writes this very cell as its current scene file, #1366), so
-    /// a scripted save and an editor save hit the same file. `None` until a scene is loaded
-    /// or the path is set; an argument-less `Scene.Save()` then errors cleanly.
-    pub(super) scene_path: Rc<RefCell<Option<String>>>,
-    /// The audio engine singleton (#212), shared with `Resources` and the platform
-    /// layer so the `Audio` namespace drives the same maestro the systems do.
-    /// Defaults to a maestro with a no-op backend (harness/tests need no device).
-    pub(super) audio: Rc<RefCell<AudioMaestro>>,
-    /// The seeded gameplay RNG (#443) behind `Random` and the sandboxed
-    /// `math.random`. Restarted from its fixed default seed by every
-    /// [`ScriptManager::init_runtime`]: on every Play, and on every Stop that
-    /// brings the edit-mode runtime back.
-    pub(super) random: Rc<RefCell<Random>>,
-    /// The screen the UI lays out on (#417), shared with `Resources` so `UI.GetRect`
-    /// and the layout system agree on one size.
-    pub(super) screen: Rc<RefCell<ScreenSize>>,
-    /// Build settings + the quit request (#431), shared with `Resources` and the
-    /// platform layer, which acts on `Application.Quit`. Defaults to unbound.
-    pub(super) application: Rc<RefCell<Application>>,
-    /// Frame stats (#433), filled by the dev layer and read by `Debug.Stats()`.
-    pub(super) stats: Rc<RefCell<FrameStats>>,
-    /// Pending script timers and coroutines (#444), behind the `Timer` namespace.
-    /// Cleared with every fresh VM: its jobs hold keys into the old one.
-    pub(super) timers: Rc<RefCell<TimerScheduler>>,
-    /// The UI event system (#420): selection, hover and press state, shared with
-    /// `Resources` (whose systems drive it) and the `UI` namespace. Reset every Play.
-    pub(super) event_system: Rc<RefCell<EventSystem>>,
+    /// Every cell the `api::` surface borrows, shared with `Resources` and the
+    /// platform layer; a second VM over the same world clones it (#1384).
+    pub(super) cells: ApiCells,
     /// The workspace root a scene's relative script paths resolve against (#782).
     /// Empty — the process's working directory — for the editor and the player;
     /// the headless harness points it at a workspace it seeded itself.
@@ -119,24 +65,7 @@ impl ScriptManager {
             lua: None,
             entity_scripts: BTreeMap::new(),
             load_attempted: BTreeSet::new(),
-            scene,
-            input,
-            nav,
-            console,
-            camera,
-            time,
-            storage: Rc::new(RefCell::new(Storage::new())),
-            quality: Rc::new(RefCell::new(QualityPreset::default())),
-            video: Rc::new(RefCell::new(VideoSettings::default())),
-            physics: Rc::new(RefCell::new(None)),
-            scene_path: Rc::new(RefCell::new(None)),
-            audio: Rc::new(RefCell::new(AudioMaestro::default())),
-            random: Rc::new(RefCell::new(Random::default())),
-            screen: Rc::new(RefCell::new(ScreenSize::default())),
-            application: Rc::new(RefCell::new(Application::new())),
-            stats: Rc::new(RefCell::new(FrameStats::default())),
-            timers: Rc::new(RefCell::new(TimerScheduler::default())),
-            event_system: Rc::new(RefCell::new(EventSystem::default())),
+            cells: ApiCells::new(scene, input, nav, console, camera, time),
             workspace: PathBuf::new(),
         }
     }
@@ -146,7 +75,7 @@ impl ScriptManager {
     pub fn set_workspace_root(&mut self, root: impl Into<PathBuf>) {
         self.workspace = root.into();
         if let Some(lua) = &self.lua {
-            super::sandbox::install_file_access(lua, &self.workspace, &self.console).ok();
+            super::sandbox::install_file_access(lua, &self.workspace, &self.cells.console).ok();
         }
     }
 
@@ -160,26 +89,18 @@ impl ScriptManager {
     /// here; they are registered per-evaluation inside `lua.scope(...)` in
     /// `lifecycle.rs`, so closures capture `&RefCell<T>` references (no
     /// `Rc::clone` in the `api/` tree).
-    ///
-    /// `physics` is the live rapier world shared with `GameWorld`; stored here
-    /// so `lifecycle.rs` can dereference it when building `ApiScopedCtx`.
-    pub fn init_runtime(
-        &mut self,
-        physics: &Rc<RefCell<Option<crate::physics::PhysicsWorld>>>,
-    ) -> Result<(), String> {
-        self.physics = Rc::clone(physics);
-
+    pub fn init_runtime(&mut self) -> Result<(), String> {
         // Deterministic sandbox (#443): no `os`/`io`, `math.random` over the
         // seeded RNG — which restarts from its default seed with every fresh VM.
         let lua = super::sandbox::new_sim_vm()?;
-        super::sandbox::install_file_access(&lua, &self.workspace, &self.console)?;
-        *self.random.borrow_mut() = Random::default();
-        *self.event_system.borrow_mut() = EventSystem::default();
+        super::sandbox::install_file_access(&lua, &self.workspace, &self.cells.console)?;
+        *self.cells.random.borrow_mut() = Random::default();
+        *self.cells.event_system.borrow_mut() = EventSystem::default();
 
         // Override print to write to our console panel. This stays as a
         // `lua.create_function` (static closure) because `print` is in the
         // scripting layer, not the api/ tree — the Rc borrow here is fine.
-        let console_clone = Rc::clone(&self.console);
+        let console_clone = Rc::clone(&self.cells.console);
         let print_fn = lua
             .create_function(move |_, msg: String| {
                 console_clone.borrow_mut().info(msg);
@@ -193,7 +114,7 @@ impl ScriptManager {
         self.lua = Some(lua);
         self.entity_scripts.clear();
         self.load_attempted.clear();
-        self.timers.borrow_mut().clear();
+        self.cells.timers.borrow_mut().clear();
 
         Ok(())
     }
@@ -204,33 +125,14 @@ impl ScriptManager {
     /// references to the caller's lifetime. Used inside `lua.scope(...)` blocks in
     /// `lifecycle.rs` so the borrow can't outlive the scope.
     pub(super) fn make_ctx(&self) -> ApiScopedCtx<'_> {
-        ApiScopedCtx {
-            scene: &self.scene,
-            input: &self.input,
-            nav: &self.nav,
-            camera: &self.camera,
-            time: &self.time,
-            physics: &self.physics,
-            console: &self.console,
-            storage: &self.storage,
-            quality: &self.quality,
-            video: &self.video,
-            scene_path: &self.scene_path,
-            audio: &self.audio,
-            random: &self.random,
-            screen: &self.screen,
-            application: &self.application,
-            stats: &self.stats,
-            timers: &self.timers,
-            event_system: &self.event_system,
-        }
+        self.cells.ctx()
     }
 
     /// Stops and clears the script environment
     pub fn shutdown(&mut self) {
         self.entity_scripts.clear();
         self.load_attempted.clear();
-        self.timers.borrow_mut().clear();
+        self.cells.timers.borrow_mut().clear();
         self.lua = None;
     }
 

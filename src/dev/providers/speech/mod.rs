@@ -127,9 +127,7 @@ pub fn generate(
     at: &Context<'_>,
     speaker: &dyn Speaker,
 ) -> Result<Realised, SpeechError> {
-    if at.playing {
-        return Err(Refusal::Playing.into());
-    }
+    super::edit_mode(at.playing)?;
     let brief = draft.gather().map_err(SpeechError::Incomplete)?;
     generated::realise(at.root, &brief, at.today, |brief| {
         let estimate = estimate_cents(brief)?;

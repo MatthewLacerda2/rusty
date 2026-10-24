@@ -56,7 +56,7 @@ fn a_material_tween_eases_the_entitys_override_not_the_shared_material() {
     assert_eq!(eval(&m, &get), "0.5");
     tick(&mut m, 2);
     assert_eq!(eval(&m, &get), "1");
-    let s = m.scene.borrow();
+    let s = m.cells.scene.borrow();
     let key = s.world.material(id).unwrap().first().to_string();
     assert!(
         s.materials[&key].shader_params.is_empty(),
@@ -73,7 +73,7 @@ fn a_ui_tween_runs_on_unscaled_time() {
     let shader = Baked::new("ui", "dissolve", "ui");
     let (mut m, id) = rig("tween_ui", &counted(""));
     let image = crate::components::ImageComponent::default();
-    m.scene.borrow_mut().world.set_image(id, Some(image));
+    m.cells.scene.borrow_mut().world.set_image(id, Some(image));
     tick(&mut m, 1);
     m.eval(&format!(
         "Time.SetTimeScale(0) UI.SetShader({id}, '{}') \
@@ -94,7 +94,8 @@ fn a_graphics_tween_fades_the_volumes_post_param() {
     let (mut m, id) = rig("tween_post", &counted(""));
     let mut vc = defaults::default_visual_correction();
     vc.custom_effects = vec![effect.0.clone()];
-    m.scene
+    m.cells
+        .scene
         .borrow_mut()
         .world
         .set_visual_correction(id, Some(vc));
@@ -109,7 +110,10 @@ fn a_graphics_tween_fades_the_volumes_post_param() {
     assert_eq!(eval(&m, get), "0.5");
     tick(&mut m, 1);
     assert_eq!(eval(&m, get), "0");
-    assert!(m.timers.borrow().is_empty(), "the finished tween retires");
+    assert!(
+        m.cells.timers.borrow().is_empty(),
+        "the finished tween retires"
+    );
 }
 
 #[test]

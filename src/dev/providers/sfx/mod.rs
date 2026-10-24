@@ -137,9 +137,7 @@ impl std::error::Error for SfxError {}
 
 /// Make one effect, or find it already made: speech's order exactly.
 pub fn generate(draft: Draft, at: &Context<'_>, foley: &dyn Foley) -> Result<Realised, SfxError> {
-    if at.playing {
-        return Err(Refusal::Playing.into());
-    }
+    super::edit_mode(at.playing)?;
     let brief = draft.gather().map_err(SfxError::Incomplete)?;
     generated::realise(at.root, &brief, at.today, |brief| {
         let estimate = estimate_cents(brief.seconds);

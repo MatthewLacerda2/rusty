@@ -2,9 +2,7 @@
 //! time elapses (never the tick they were scheduled), repeat without drift, cancel
 //! by handle / name, and die with a deactivated or destroyed entity.
 
-use std::cell::RefCell;
 use std::collections::BTreeMap;
-use std::rc::Rc;
 
 use super::lifecycle::{manager_with_entity, write_script};
 use crate::scripting::manager::ScriptManager;
@@ -15,7 +13,7 @@ pub(super) const DT: f32 = 1.0 / 60.0;
 /// number read `__t`, which the prelude's `Update` counter maintains.
 pub(super) fn rig(name: &str, code: &str) -> (ScriptManager, u32) {
     let (mut m, id) = manager_with_entity();
-    m.init_runtime(&Rc::new(RefCell::new(None))).unwrap();
+    m.init_runtime().unwrap();
     let path = write_script(name, code);
     m.load_entity_script(id, 0, &path, &BTreeMap::new())
         .unwrap();
@@ -27,7 +25,7 @@ pub(super) fn rig(name: &str, code: &str) -> (ScriptManager, u32) {
 pub(super) fn tick(m: &mut ScriptManager, n: u32) {
     for _ in 0..n {
         let dt = {
-            let mut t = m.time.borrow_mut();
+            let mut t = m.cells.time.borrow_mut();
             t.advance(DT);
             t.delta_time
         };
@@ -53,7 +51,7 @@ fn invoke_fires_once_on_the_tick_its_delay_elapses() {
     let (mut m, _) = rig("timer_once", &counted("Timer.Invoke(id, 'Beat', 0.05)"));
     tick(&mut m, 10);
     assert_eq!(m.eval("__log").unwrap(), "4,");
-    assert!(m.timers.borrow().is_empty(), "a one-shot retires");
+    assert!(m.cells.timers.borrow().is_empty(), "a one-shot retires");
 }
 
 #[test]
@@ -100,10 +98,10 @@ fn a_handle_cancels_exactly_its_own_timer() {
 fn time_scale_zero_freezes_invokes() {
     let (mut m, _) = rig("timer_scale", &counted("Timer.Invoke(id, 'Beat', 0.05)"));
     tick(&mut m, 1);
-    m.time.borrow_mut().set_time_scale(0.0);
+    m.cells.time.borrow_mut().set_time_scale(0.0);
     tick(&mut m, 10);
     assert_eq!(m.eval("__log").unwrap(), "");
-    m.time.borrow_mut().set_time_scale(1.0);
+    m.cells.time.borrow_mut().set_time_scale(1.0);
     tick(&mut m, 3);
     assert_eq!(m.eval("__log").unwrap(), "14,");
 }
@@ -112,14 +110,17 @@ fn time_scale_zero_freezes_invokes() {
 fn deactivate_and_destroy_drop_pending_timers() {
     let (mut m, id) = rig("timer_life", &counted("Timer.Invoke(id, 'Beat', 0.05)"));
     tick(&mut m, 1);
-    m.scene.borrow_mut().world.set_active(id, false);
+    m.cells.scene.borrow_mut().world.set_active(id, false);
     tick(&mut m, 1);
-    assert!(m.timers.borrow().is_empty(), "deactivation stops timers");
-    m.scene.borrow_mut().world.set_active(id, true);
+    assert!(
+        m.cells.timers.borrow().is_empty(),
+        "deactivation stops timers"
+    );
+    m.cells.scene.borrow_mut().world.set_active(id, true);
     tick(&mut m, 1);
     m.eval(&format!("Timer.Invoke({id}, 'Beat', 0)")).unwrap();
-    m.scene.borrow_mut().request_destroy(id);
+    m.cells.scene.borrow_mut().request_destroy(id);
     m.apply_pending_destroys();
-    assert!(m.timers.borrow().is_empty(), "destroy stops timers");
+    assert!(m.cells.timers.borrow().is_empty(), "destroy stops timers");
     assert_eq!(m.eval("__log").unwrap(), "");
 }

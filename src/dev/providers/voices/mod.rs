@@ -56,11 +56,7 @@ impl fmt::Display for VoicesError {
 impl std::error::Error for VoicesError {}
 
 fn edit_mode(playing: bool) -> Result<(), VoicesError> {
-    if playing {
-        Err(VoicesError::Refused(Refusal::Playing))
-    } else {
-        Ok(())
-    }
+    super::edit_mode(playing).map_err(VoicesError::Refused)
 }
 
 /// Every voice on the account, out of `root`'s cache when it is current, from the

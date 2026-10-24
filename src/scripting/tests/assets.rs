@@ -63,6 +63,6 @@ fn manager(scene: &Rc<RefCell<Scene>>) -> ScriptManager {
         Rc::new(RefCell::new(Camera::new(Vec3::ZERO, 0.0, 0.0))),
         Rc::new(RefCell::new(Time::new())),
     );
-    m.init_runtime(&Rc::new(RefCell::new(None))).unwrap();
+    m.init_runtime().unwrap();
     m
 }

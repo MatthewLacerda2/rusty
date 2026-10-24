@@ -7,8 +7,10 @@ script, a console line, and a headless harness scenario.
 A scenario runs in a Lua VM of its own (the gameplay scripts' VM is rebuilt
 every Play), so the two things that are tables *of* the gameplay VM reach it
 by value: `Scene.GetScript` answers a live handle whose fields read and write
-as plain data, and a callback a scenario hands the API (`Timer`, `Tween`, a UI
-handler) never runs. See `docs/testing.md`, *What a scenario can call*.
+as plain data, and a callback a scenario hands `Timer` or `Tween` is refused,
+since the gameplay tick would never run it. A scenario is a test, so the
+provider verbs (`Sfx.Generate`, `Speech.*`) are refused in it too. See
+`docs/testing.md`, *What a scenario can call*.
 
 Entities are addressed by a numeric `id` (`u32`). `Vector3` values cross the
 boundary as three `f32`s (`x, y, z`) rather than a table. Getters that miss
