@@ -34,7 +34,8 @@ fn watched(backend: Backend) -> (Watch, PathBuf) {
 
 /// Change `file` outside the engine, then check the watch notes it only after Play.
 fn notes_an_outside_change_after_play(mut watch: Watch, file: &Path) -> bool {
-    std::thread::sleep(Duration::from_millis(50));
+    // The poller reads modification times to the second: move into the next one.
+    std::thread::sleep(Duration::from_millis(1100));
     std::fs::write(file, b"a longer blue").unwrap();
     if !waits_for(&mut watch, file) {
         return false;

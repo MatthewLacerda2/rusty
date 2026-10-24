@@ -16,7 +16,9 @@
 //!   first frame after Stop, as conversion already waits for Stop (#1253).
 //! - **A polling fallback.** When the native backend (inotify, FSEvents) cannot
 //!   start, or `RUSTY_WATCH_POLL` is set (a network or container filesystem that
-//!   gives no events), `notify`'s `PollWatcher` compares the files every second.
+//!   gives no events), `notify`'s `PollWatcher` compares the files every second, by
+//!   modification time to the second: a second save within the same second as the
+//!   one before it waits for the next change to be seen.
 //! - **Spelled as the caches spell it.** A path is noted relative to the working
 //!   directory (the project root) when it lies under a root given that way, so a
 //!   deleted file still matches its cache key by name.
