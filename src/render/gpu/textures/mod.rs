@@ -6,7 +6,9 @@ use std::rc::Rc;
 
 use crate::asset::MapRef;
 use crate::render::{GpuTexture, Renderer};
-pub(crate) use mips::{MipSettings, TextureKind};
+use image::GenericImageView;
+use mips::full_chain_len;
+pub(crate) use mips::{MipGenerator, MipSettings, TextureKind};
 
 /// The storage format of every image the renderer uploads: colour is authored in
 /// sRGB, so the colour view decodes it on sample.
@@ -21,12 +23,15 @@ impl Renderer {
     /// (`material_bind_group`), so it is the image textures' trilinear one; 32-texel
     /// cells keep the checker's edges crisp under its linear magnification.
     pub(crate) fn create_default_checkerboard_texture(
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
+        (device, queue, mips): Uploader,
         layout: &wgpu::BindGroupLayout,
     ) -> GpuTexture {
         let label = "Default Checkerboard Texture";
-        Self::create_pixel_texture(device, queue, layout, checkerboard(256, 32), label)
+        let checker = checkerboard(256, 32);
+        let texture = upload((device, queue), label, &checker, full_chain_len(256, 256));
+        mips.generate(device, queue, &texture, TextureKind::Colour);
+        let sampler = image_sampler(device);
+        Self::finalize_texture(device, layout, (texture, DATA_FORMAT), sampler, Some(label))
     }
 
     /// A 1×1 white texture: what an effect with no texture of its own samples, so
@@ -36,24 +41,9 @@ impl Renderer {
         queue: &wgpu::Queue,
         layout: &wgpu::BindGroupLayout,
     ) -> GpuTexture {
+        let label = "White Texture";
         let white = image::RgbaImage::from_pixel(1, 1, image::Rgba([255; 4]));
-        Self::create_pixel_texture(device, queue, layout, white, "White Texture")
-    }
-
-    /// Upload a built-in sRGB `image`, with its mips, and the image textures'
-    /// sampler.
-    fn create_pixel_texture(
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
-        layout: &wgpu::BindGroupLayout,
-        image: image::RgbaImage,
-        label: &str,
-    ) -> GpuTexture {
-        let colour = MipSettings {
-            generate: true,
-            kind: TextureKind::Colour,
-        };
-        let texture = upload(device, queue, label, mips::chain(image, colour));
+        let texture = upload((device, queue), label, &white, 1);
         let sampler = image_sampler(device);
         Self::finalize_texture(device, layout, (texture, DATA_FORMAT), sampler, Some(label))
     }
@@ -101,7 +91,7 @@ impl Renderer {
     /// Loads and registers the texture `map` names. Caches results dynamically,
     /// keyed by the map; a failed load is remembered as a miss (drawn with the
     /// default) and retried once the file appears, never cached under its path (#689).
-    /// A colour texture; [`Self::load_texture_as`] names what the texels hold.
+    /// A colour texture; `load_texture_as` names what the texels hold.
     pub fn load_texture(&mut self, map: &MapRef) -> Rc<GpuTexture> {
         self.load_texture_as(map, TextureKind::Colour)
     }
@@ -142,8 +132,13 @@ impl Renderer {
         img: &image::DynamicImage,
         settings: MipSettings,
     ) -> Rc<GpuTexture> {
-        let levels = mips::chain(img.to_rgba8(), settings);
-        let texture = upload(&self.device, &self.queue, path_str, levels);
+        let (width, height) = img.dimensions();
+        let levels = settings.levels(width, height);
+        let gpu = (&self.device, &self.queue);
+        let texture = upload(gpu, path_str, &img.to_rgba8(), levels);
+        let kind = settings.kind;
+        self.mip_generator
+            .generate(&self.device, &self.queue, &texture, kind);
         Rc::new(Self::finalize_texture(
             &self.device,
             &self.texture_layout,
@@ -154,43 +149,53 @@ impl Renderer {
     }
 }
 
-/// Create an sRGB texture holding `levels` (the base, then each mip) and write
-/// every level.
-fn upload(
-    device: &wgpu::Device,
-    queue: &wgpu::Queue,
+/// What uploading an image with mips needs of the GPU: the device, the queue and
+/// the mip pass.
+pub(crate) type Uploader<'a> = (&'a wgpu::Device, &'a wgpu::Queue, &'a MipGenerator);
+
+/// Create an sRGB texture of `levels` mips with `image` written to its base; the
+/// caller draws the rest ([`MipGenerator::generate`]).
+pub(super) fn upload(
+    (device, queue): (&wgpu::Device, &wgpu::Queue),
     label: &str,
-    levels: Vec<image::RgbaImage>,
+    image: &image::RgbaImage,
+    levels: u32,
 ) -> wgpu::Texture {
-    let (width, height) = levels[0].dimensions();
+    let (width, height) = image.dimensions();
+    let mut usage = wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST;
+    if cfg!(test) {
+        // Tests read the mips back.
+        usage |= wgpu::TextureUsages::COPY_SRC;
+    }
+    if levels > 1 {
+        // The mip pass draws each level.
+        usage |= wgpu::TextureUsages::RENDER_ATTACHMENT;
+    }
     let texture = device.create_texture(&wgpu::TextureDescriptor {
         label: Some(label),
         size: extent(width, height),
-        mip_level_count: levels.len() as u32,
+        mip_level_count: levels,
         sample_count: 1,
         dimension: wgpu::TextureDimension::D2,
         format: IMAGE_FORMAT,
-        usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+        usage,
         view_formats: &[DATA_FORMAT],
     });
-    for (mip_level, level) in (0..).zip(&levels) {
-        let (w, h) = level.dimensions();
-        queue.write_texture(
-            wgpu::TexelCopyTextureInfo {
-                texture: &texture,
-                mip_level,
-                origin: wgpu::Origin3d::ZERO,
-                aspect: wgpu::TextureAspect::All,
-            },
-            level,
-            wgpu::TexelCopyBufferLayout {
-                offset: 0,
-                bytes_per_row: Some(4 * w),
-                rows_per_image: Some(h),
-            },
-            extent(w, h),
-        );
-    }
+    queue.write_texture(
+        wgpu::TexelCopyTextureInfo {
+            texture: &texture,
+            mip_level: 0,
+            origin: wgpu::Origin3d::ZERO,
+            aspect: wgpu::TextureAspect::All,
+        },
+        image,
+        wgpu::TexelCopyBufferLayout {
+            offset: 0,
+            bytes_per_row: Some(4 * width),
+            rows_per_image: Some(height),
+        },
+        extent(width, height),
+    );
     texture
 }
 
@@ -229,8 +234,6 @@ fn checkerboard(side: u32, cell: u32) -> image::RgbaImage {
 mod formats_tests;
 #[cfg(test)]
 mod freshness_tests;
-#[cfg(test)]
-mod mips_gpu_tests;
 
 /// The image `map` names, decoded: a map that references a texture a conversion
 /// extracted is read where the import cache holds it ([`MapRef::file`], #1130).

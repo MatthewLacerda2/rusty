@@ -6,6 +6,8 @@
 use std::rc::Rc;
 
 use crate::render::gpu::bind_layouts;
+use crate::render::gpu::shaders::ShaderRegistry;
+use crate::render::gpu::textures::MipGenerator;
 use crate::render::{GpuTexture, Renderer};
 
 /// The group(2) texture layouts and the default texture/material bind group.
@@ -20,16 +22,23 @@ pub(crate) struct Textures {
     /// All-zero runtime shader params (#399), bound by every material whose shader
     /// has none — the standard shader never reads them.
     pub zero_params: wgpu::Buffer,
+    /// Draws every uploaded image's mip chain (#1322).
+    pub mip_generator: MipGenerator,
 }
 
 /// Build the single-texture + expanded-material group(2) layouts, the default
 /// checker texture, and the all-default material bind group (#202).
-pub(crate) fn create_textures(device: &wgpu::Device, queue: &wgpu::Queue) -> Textures {
+pub(crate) fn create_textures(
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    registry: &mut ShaderRegistry,
+) -> Textures {
     let texture_layout = bind_layouts::create_texture_layout(device);
     let material_layout = bind_layouts::create_material_layout(device);
+    let mip_generator = MipGenerator::new(device, registry);
+    let gpu = (device, queue, &mip_generator);
     let default_texture = Rc::new(Renderer::create_default_checkerboard_texture(
-        device,
-        queue,
+        gpu,
         &texture_layout,
     ));
     let white_texture = Rc::new(Renderer::create_white_texture(
@@ -50,6 +59,7 @@ pub(crate) fn create_textures(device: &wgpu::Device, queue: &wgpu::Queue) -> Tex
         &zero_params,
     );
     Textures {
+        mip_generator,
         texture_layout,
         material_layout,
         default_texture,
