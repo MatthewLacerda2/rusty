@@ -25,11 +25,11 @@ impl ScriptManager {
         self.audio = audio;
     }
 
-    /// Inject the live rapier world's cell, the one `Resources` rebuilds on Play, so
-    /// the runtime holds it from construction rather than from the first
-    /// `init_runtime`: [`ScriptManager::api_cells`] clones it once (#1384).
-    pub fn set_physics_cell(&mut self, physics: Rc<RefCell<Option<PhysicsWorld>>>) {
-        self.physics = physics;
+    /// Handle to the live rapier world's cell, which `Resources` builds on Play and
+    /// hands back to every `init_runtime`: one cell from construction on, so
+    /// [`ScriptManager::api_cells`] can clone it once (#1384).
+    pub fn physics_cell(&self) -> Rc<RefCell<Option<PhysicsWorld>>> {
+        Rc::clone(&self.physics)
     }
 
     /// Inject the shared UI screen-size cell (#417). `Resources` calls this so the
