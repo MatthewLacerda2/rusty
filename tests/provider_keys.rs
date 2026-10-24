@@ -1,8 +1,9 @@
 //! The integration binary holds no provider key either (#974). `cfg(test)` is off for
 //! the library here, so the blanking rests on nextest's `NEXTEST` variable reaching
 //! this process; this fails if the library stops honouring it, before a test could
-//! spend. Plain `cargo test` (the mutation jobs' runner) sets no such variable and is
-//! not the gate, so there these return early. Gated on `dev`.
+//! spend. A bare `cargo test` (the mutation jobs' runner) sets no such variable, so
+//! there these return early; `make test-one-process` and the nightly `cargo-test.yml`
+//! run set `NEXTEST=1` and are checked like nextest (#1338). Gated on `dev`.
 
 fn under_nextest() -> bool {
     std::env::var_os("NEXTEST").is_some()

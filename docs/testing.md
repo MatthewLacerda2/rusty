@@ -59,13 +59,24 @@ cargo-nextest` (CI uses `taiki-e/install-action`). What it buys over `cargo test
 - **No retries.** A retried pass is still green, and a flaky test is a bug.
 
 `cargo test` still works and is still correct — nothing in the suite depends on the
-runner — but the gate is nextest. A weekly signal holds the promise: `cargo-test.yml`
-runs plain `cargo test`, both feature sets, on `main` every Sunday, and a red run files
-itself through `main-health` (#981). One guarantee is nextest's alone: **a test never
+runner — but the gate is nextest. A nightly signal holds the promise: `cargo-test.yml`
+runs plain `cargo test`, both feature sets, on `main` every night, and a red run files
+itself through `main-health` (#981). It is what catches a test that **leaks
+process-wide state** (a moved working directory, a `static` left set): nextest's
+process per test hides one, but `cargo test`, which the mutation runs use too, puts a
+binary's tests in one process, so before the signal went nightly such a leak broke the
+mutation baseline of every branch until a mutation run failed (#1042, #1069, #1337).
+It is a signal, not a PR gate, because it would add about two minutes to every PR's
+CI for a leak that only breaks the informational mutation runs (#1338).
+To check a branch before it merges: `make test-one-process` runs the `dev` suite that
+way locally (quiet, every binary, the failing tests named at the end), and
+`gh workflow run cargo-test.yml --ref <branch>` runs the whole signal on GitHub.
+One guarantee is nextest's alone: **a test never
 holds a provider key** (#974). Inside a unit test, or any process nextest starts (it
 sets `NEXTEST`), `dev::providers::environment()` drops every `*_API_KEY` and skips the
-`.env`; the integration binary under plain `cargo test` gets neither signal, so on a
-machine with a key it is not covered. Doctests stay on `cargo test --doc`, which nextest
+`.env`; the integration binary under plain `cargo test` gets neither signal unless
+`NEXTEST` is set by hand, as `make test-one-process` and the signal's `dev` run do, so
+on a machine with a key a bare `cargo test` is not covered. Doctests stay on `cargo test --doc`, which nextest
 cannot run. CI's `ci` profile additionally writes JUnit, rendered as the
 `build-test` job summary.
 

@@ -29,6 +29,7 @@ mod callback_doc_drift;
 mod camera_stack_api;
 mod camera_target_api;
 mod character_controller;
+mod conversion_gate;
 mod decals;
 mod default_ambient;
 mod gamepad_api;
