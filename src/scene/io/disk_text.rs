@@ -36,7 +36,7 @@ impl DiskText {
         *self.0.borrow_mut() = None;
     }
 
-    fn text(&self, path: &str) -> Option<String> {
+    pub(super) fn text(&self, path: &str) -> Option<String> {
         let last = self.0.borrow();
         last.as_ref()
             .filter(|(p, _)| p == path)
@@ -52,14 +52,14 @@ impl Scene {
     }
 
     /// The World was rebuilt to stand for `path` without reading it (Reset Scene,
-    /// #1374): record the file's text when it holds exactly the live scene, so a
-    /// `touch` or rescan of it is no change; otherwise forget any record, so an
-    /// outside change reloads and says the rebuilt scene was unsaved.
+    /// #1374): record the file's text as it is, whatever it holds, so a `touch`, a
+    /// rescan or the editor's own Generate Lighting is no change. A real outside edit
+    /// changes the text, so it still reloads, and says the rebuilt scene was unsaved
+    /// when it differs from the file. An unreadable file leaves no record.
     pub fn adopt_disk_text(&self, path: &str) {
-        let live = super::scene_json(self).ok();
         match std::fs::read_to_string(path) {
-            Ok(disk) if live.as_deref() == Some(disk.as_str()) => self.disk_text.record(path, disk),
-            _ => self.disk_text.forget(),
+            Ok(disk) => self.disk_text.record(path, disk),
+            Err(_) => self.disk_text.forget(),
         }
     }
 

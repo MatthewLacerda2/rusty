@@ -101,13 +101,8 @@ impl SceneFollow {
         selected: &mut Option<u32>,
         console: &mut ConsoleLogs,
     ) -> bool {
-        let loaded = parse_scene_text(&on_disk, path).and_then(|data| {
-            let unsaved = scene.has_unsaved_edits(path);
-            let keep = selected.and_then(|id| name_path(scene, id));
-            load_parsed(scene, path, on_disk.clone(), data).map(|()| (unsaved, keep))
-        });
-        let (unsaved, keep) = match loaded {
-            Ok(done) => done,
+        let data = match parse_scene_text(&on_disk, path) {
+            Ok(data) => data,
             Err(err) => {
                 if self.failed.replace(on_disk).is_none() {
                     console.warn(format!(
@@ -117,6 +112,13 @@ impl SceneFollow {
                 return false;
             }
         };
+        let unsaved = scene.has_unsaved_edits(path);
+        let keep = selected.and_then(|id| name_path(scene, id));
+        // Only the sidecar can fail now, after the World was replaced: it is still a
+        // reload, with its selection remapped, and the error is a warning (#1374).
+        if let Err(err) = load_parsed(scene, path, on_disk, data) {
+            console.warn(format!("Scene {path}: {err}"));
+        }
         self.pending = None;
         self.failed = None;
         *selected = keep.and_then(|names| find_by_name_path(scene, &names));

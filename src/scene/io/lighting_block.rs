@@ -47,12 +47,30 @@ pub fn save_lighting(scene: &Scene, path: &str) -> Result<LightingSave, String> 
     std::fs::write(path, &json).map_err(|e| format!("Failed to write scene file: {e}"))?;
     // Only when the file held the engine's own text: an outside edit the follow has
     // not applied yet stays unrecorded, so the follow reloads it (edit + lighting)
-    // instead of the next Save writing over it (#1374).
+    // instead of the next Save writing over it (#1374). The old record takes the
+    // lighting instead, so that reload does not count the bake as an unsaved edit.
     if scene.is_disk_text(path, &text) {
         scene.disk_text.record(path, json);
+    } else {
+        add_lighting_to_record(scene, path);
     }
     crate::scene::lighting::io::save_lighting_sidecar(scene, path)?;
     Ok(LightingSave::Written)
+}
+
+/// Write `scene`'s lighting into the engine's record of `path`, when it has one.
+fn add_lighting_to_record(scene: &Scene, path: &str) {
+    let Some(mut data) = scene
+        .disk_text
+        .text(path)
+        .and_then(|old| parse_scene_text(&old, path).ok())
+    else {
+        return;
+    };
+    copy_lighting(scene, &mut data);
+    if let Ok(json) = serde_json::to_string_pretty(&data) {
+        scene.disk_text.record(path, json);
+    }
 }
 
 /// The fields a lighting bake writes: probe layout, reflection probes, lightmaps and

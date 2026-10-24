@@ -106,9 +106,13 @@ fn a_lighting_save_over_an_unapplied_edit_still_reloads() {
     write_outside(&path, &["Kept"]);
     scene.lighting_settings.lightmaps.samples = 7;
     save_lighting(&scene, &path).unwrap();
-    assert!(
-        frame(&mut follow, &mut scene, &path).0,
-        "the edit is applied"
+    let (reloaded, console) = frame(&mut follow, &mut scene, &path);
+    assert!(reloaded, "the edit is applied");
+    let (line, level) = console.messages.last().unwrap();
+    assert_eq!(
+        *level,
+        LogLevel::Info,
+        "the bake is no unsaved edit: {line}"
     );
     assert!(scene.find_entity_by_name("Gone").is_none());
     assert_eq!(

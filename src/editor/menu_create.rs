@@ -95,7 +95,7 @@ mod tests {
     // themselves are exercised by hand — egui has no headless click harness here).
     #[test]
     fn spawn_routes_through_authoring() {
-        let mut editor = EditorUi::new();
+        let mut editor = EditorUi::new(Default::default());
         let mut scene = Scene::new();
 
         spawn(&mut editor, &mut scene, "GameObject", None);

@@ -90,18 +90,21 @@ fn a_load_with_a_broken_sidecar_is_not_recorded() {
     assert!(!fresh.is_disk_text(&path, &text));
 }
 
-/// Reset Scene: the record is the file's text only when the file holds the live
-/// scene exactly; otherwise there is none (#1374).
+/// Reset Scene: the record is the file's text whatever it holds, so a `touch` or
+/// the editor's own Generate Lighting is no change; the rebuilt World is unsaved
+/// against it (#1374).
 #[test]
-fn adopting_a_file_records_it_only_when_it_matches() {
+fn adopting_a_file_records_its_text() {
     let (mut scene, path) = loaded("adopt");
     let text = std::fs::read_to_string(&path).unwrap();
-    scene.adopt_disk_text(&path);
-    assert!(
-        scene.is_disk_text(&path, &text),
-        "the file holds the live scene"
-    );
     scene.add_entity("Rebuilt".into());
     scene.adopt_disk_text(&path);
-    assert!(!scene.is_disk_text(&path, &text), "it does not: no record");
+    assert!(scene.is_disk_text(&path, &text));
+    assert!(scene.has_unsaved_edits(&path), "the rebuilt World differs");
+    assert_eq!(save_lighting(&scene, &path), Ok(LightingSave::Written));
+    let lit = std::fs::read_to_string(&path).unwrap();
+    assert!(
+        scene.is_disk_text(&path, &lit),
+        "the bake is the engine's own"
+    );
 }

@@ -23,7 +23,7 @@ it behaves identically to the editor and uses the same default values.
 | `Scene.FindChild` | `(id, path)` | the descendant at name path `path` (`"Viewport/Content"`), or `nil` |
 | `Scene.GetScript` | `(id, name)` | the entity's live script instance named `name`, or `nil` — see below |
 | `Scene.Save` | `([path])` | the written path |
-| `Scene.Load` | `(path)` | — (errors, naming `path`, if there is no file there) |
+| `Scene.Load` | `(path)` | `nil`, or in edit mode a warning string when the scene loaded but its lighting sidecar did not (errors, naming `path`, if there is no file there) |
 | `Scene.GetActivePath` | `()` | the current scene file, or `nil` |
 | `Scene.DontDestroyOnLoad` | `(id)` | `true` if an entity existed at `id` (errors outside play) |
 | `Scene.SavePrefab` | `(rootId, path)` | the written path |
@@ -170,7 +170,9 @@ scene — additive loading is not supported.
   lasts until the entity is destroyed or play stops; it is an error in edit mode.
 - **Edit mode:** `Scene.Load` is the API face of the editor's File ▸ Open — the
   scene loads immediately (no callbacks: no scripts run in edit mode) and becomes
-  the current scene file that `Scene.Save()` writes back to.
+  the current scene file that `Scene.Save()` writes back to. If the scene document
+  loads but its lighting sidecar does not, the scene is still loaded and still the
+  current file (probes keep zero SH); `Load` returns the warning as a string.
 - **Editor Play:** a `Scene.Load` swaps the running world, and **Stop restores
   the scene Play was pressed in** (and its scene file), not the one play ended in
   — Stop rewinds to the edit snapshot, as always. The standalone player has no

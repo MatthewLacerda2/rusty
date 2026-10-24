@@ -84,8 +84,7 @@ impl EditorFrontend {
             shell.renderer.config.format,
             paint::EGUI_RENDERER,
         );
-        let mut editor_ui = EditorUi::new();
-        editor_ui.share_scene_path(game.script_manager().scene_path_cell());
+        let mut editor_ui = EditorUi::new(game.script_manager().scene_path_cell());
         editor_ui.set_current_scene_path(Some(scene_path));
         editor_ui.quality_preset = *game.script_manager().quality_cell().borrow();
         Self {

@@ -51,12 +51,13 @@ pub fn draw(
     let idle = editor.dev.lightmap_bake.is_none();
     let button = egui::Button::new(format!("{}  Generate Lighting", icon::LIGHTBULB))
         .min_size(egui::Vec2::new(160.0, 24.0));
-    // The inspector is drawn only in edit mode, so Play never reaches this button;
-    // `finish` still refuses in Play for the script verb (#1340).
+    // It writes the scene file, so Play greys it out as it does Save (#1340): the
+    // inspector is gated on the *requested* play state, so it can still be drawn on
+    // the frame Play starts or stops.
     let generate = ui
-        .add_enabled(idle, button)
+        .add_enabled(idle && !scene.is_playing(), button)
         .on_hover_text("Bake lightmaps, then light & reflection probes, and save the result")
-        .on_disabled_hover_text("Wait for the running bake");
+        .on_disabled_hover_text("Stop Play first, or wait for the bake");
     let changed = ui
         .add_enabled_ui(idle, |ui| {
             draw_settings(ui, &mut scene.lighting_settings.lightmaps)
@@ -144,9 +145,9 @@ fn draw_progress(ui: &mut egui::Ui, editor: &mut EditorUi) {
     });
 }
 
-/// Each edit-mode frame: keep the UI repainting while a bake runs, and once the
-/// lightmaps land, apply them, bake the probes and write the lighting. Runs whether
-/// or not the scene card is showing.
+/// Each frame the inspector draws: keep the UI repainting while a bake runs, and once
+/// the lightmaps land, apply them, bake the probes and write the lighting. Runs
+/// whether or not the scene card is showing, and waits while the scene plays.
 pub fn poll(
     editor: &mut EditorUi,
     ctx: &egui::Context,
@@ -158,6 +159,10 @@ pub fn poll(
     let Some(active) = &mut editor.dev.lightmap_bake else {
         return;
     };
+    if scene.is_playing() {
+        // The World holds the play state; the result waits for Stop's restore (#1374).
+        return ctx.request_repaint_after(PROGRESS_REPAINT);
+    }
     if active.scene != scene.id() || active.path != open {
         // Its result would land on another scene's entities: drop it (dropping the
         // job stops the worker) rather than apply it.

@@ -94,3 +94,19 @@ fn a_change_seen_in_play_applies_at_stop() {
     assert!(follow.apply(&mut scene, Some(&path), &mut selected, &mut console));
     assert_eq!(names(&scene), ["Root", "Gun"]);
 }
+
+/// A broken lighting sidecar fails after the World was replaced: still a reload,
+/// with the selection remapped, and the sidecar error is a warning (#1374).
+#[test]
+fn a_broken_sidecar_still_reloads_and_keeps_the_selection() {
+    let (path, mut scene, mut follow, mut selected) = open("sidecar");
+    write_outside(&path, &[]); // the save writes a sidecar too: break it after
+    std::fs::write(crate::scene::sidecar_path(&path), "{ broken").unwrap();
+    let mut console = ConsoleLogs::new();
+    assert!(follow.apply(&mut scene, Some(&path), &mut selected, &mut console));
+    assert_eq!(names(&scene), ["Root", "Gun"]);
+    assert_eq!(selected, scene.find_entity_by_name("Gun"));
+    let (sidecar, level) = &console.messages[0];
+    assert_eq!(*level, LogLevel::Warning, "{sidecar}");
+    assert!(sidecar.contains("lighting"), "{sidecar}");
+}

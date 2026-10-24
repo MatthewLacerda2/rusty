@@ -48,7 +48,7 @@ pub struct EditorUi {
     pub selected_asset_path: Option<String>,
     /// The scene file the editor is currently editing: Save writes back here. One
     /// value with `Scene.Save()`'s write-back target (#1366): the shell hands the
-    /// editor the script runtime's own cell ([`EditorUi::share_scene_path`]), so
+    /// editor the script runtime's own cell ([`EditorUi::new`]), so
     /// File ▸ Open/New, saving to a scene asset, `Scene.Load` and `Scene.Save(path)`
     /// all change it, and nothing reconciles two copies.
     scene_path: Rc<RefCell<Option<String>>>,
@@ -140,18 +140,15 @@ pub struct EditorUi {
     pub dev: DevEditorState,
 }
 
-impl Default for EditorUi {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl EditorUi {
-    pub fn new() -> Self {
+    /// An editor whose current scene file is `scene_path`: the script runtime's own
+    /// cell (`ScriptManager::scene_path_cell`), so the editor and `Scene.Save()` share
+    /// one value (#1366). A constructor argument, so no caller can forget it.
+    pub fn new(scene_path: Rc<RefCell<Option<String>>>) -> Self {
         Self {
             selected_entity_id: None,
             selected_asset_path: None,
-            scene_path: Default::default(),
+            scene_path,
             current_dir: crate::editor::content_browser::ROOT.to_string(),
             is_dirty: true,
 

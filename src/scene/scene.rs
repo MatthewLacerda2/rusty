@@ -250,7 +250,7 @@ impl Scene {
 
     /// Load `path`, REPLACING this scene's World (single active scene).
     /// Delegates to `crate::scene::io`; meshes are rehydrated from disk there.
-    pub fn load_from_file(&mut self, path: &str) -> Result<(), String> {
+    pub fn load_from_file(&mut self, path: &str) -> Result<(), crate::scene::LoadError> {
         crate::scene::load_from_file(self, path)
     }
 }

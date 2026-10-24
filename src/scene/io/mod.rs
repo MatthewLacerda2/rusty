@@ -19,11 +19,13 @@
 pub mod bundled;
 mod disk_text;
 mod lighting_block;
+mod load_error;
 mod manifest;
 mod seed;
 
 pub use disk_text::DiskText;
 pub use lighting_block::{save_lighting, LightingSave};
+pub use load_error::LoadError;
 pub use manifest::{SeedManifest, SeedOutcome, SEED_MANIFEST_PATH};
 pub use seed::{
     build_default_scene, seed_default_scene, seed_default_scripts, seed_workspace,
@@ -81,7 +83,7 @@ pub(crate) fn scene_json(scene: &Scene) -> Result<String, String> {
 /// Load `path` into `scene`, REPLACING the current World (single active scene).
 /// Meshes are rehydrated from their `primitive_type` on the way in.
 /// A load is a new scene, so it earns a new runtime identity (#355).
-pub fn load_from_file(scene: &mut Scene, path: &str) -> Result<(), String> {
+pub fn load_from_file(scene: &mut Scene, path: &str) -> Result<(), LoadError> {
     let json = read_text(path)?;
     let data = parse_scene_text(&json, path)?;
     load_parsed(scene, path, json, data)
@@ -90,17 +92,18 @@ pub fn load_from_file(scene: &mut Scene, path: &str) -> Result<(), String> {
 /// The second half of [`load_from_file`], for a caller that already read and parsed
 /// the file (the editor's follow, which must know the text parses before it looks
 /// at the live scene, #1374): replace the World with `data`, parsed from `json`.
+/// Fails only with [`LoadError::Sidecar`], after the World was replaced.
 pub fn load_parsed(
     scene: &mut Scene,
     path: &str,
     json: String,
     data: SceneData,
-) -> Result<(), String> {
+) -> Result<(), LoadError> {
     apply_scene_data(scene, data);
     scene.renew_id();
     // Merge the baked SH back onto the just-loaded probe positions (#240). A missing
     // sidecar is fine — probes load with zero SH (positions placed, never baked).
-    crate::scene::lighting::io::load_lighting_sidecar(scene, path)?;
+    crate::scene::lighting::io::load_lighting_sidecar(scene, path).map_err(LoadError::Sidecar)?;
     // Recorded last: a load that errored is not "what the engine read" (#1374).
     scene.disk_text.record(path, json);
     Ok(())

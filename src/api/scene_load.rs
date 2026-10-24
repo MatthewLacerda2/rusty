@@ -32,14 +32,17 @@ pub fn register<'scope>(
             }
             if scene.borrow().is_playing() {
                 scene.borrow_mut().request_load(path);
-            } else {
-                scene
-                    .borrow_mut()
-                    .load_from_file(&path)
-                    .map_err(|e| runtime(format!("Scene.Load: {e}")))?;
-                *scene_path.borrow_mut() = Some(path);
+                return Ok(None);
             }
-            Ok(())
+            // A sidecar failure comes after the World became the new file's, so the
+            // current scene file follows it and the load returns a warning (#1374).
+            let warning = match scene.borrow_mut().load_from_file(&path) {
+                Ok(()) => None,
+                Err(e) if e.replaced_world() => Some(format!("Scene.Load: {path}: {e}")),
+                Err(e) => return Err(runtime(format!("Scene.Load: {e}"))),
+            };
+            *scene_path.borrow_mut() = Some(path);
+            Ok(warning)
         }),
     )?;
 

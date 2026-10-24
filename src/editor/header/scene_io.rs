@@ -30,15 +30,15 @@ impl EditorUi {
             return;
         }
         match scene.load_from_file(path) {
-            Ok(_) => {
-                self.set_current_scene_path(Some(path.to_string()));
-                self.selected_entity_id = None;
-                self.selected_asset_path = None;
-                self.is_dirty = true;
-                console.info(format!("Scene loaded from {path}"));
-            }
-            Err(err) => console.error(format!("Failed to load scene: {err}")),
+            Ok(()) => console.info(format!("Scene loaded from {path}")),
+            // The World is the new file's: so is the current scene file (#1374).
+            Err(err) if err.replaced_world() => console.warn(format!("Scene {path}: {err}")),
+            Err(err) => return console.error(format!("Failed to load scene: {err}")),
         }
+        self.set_current_scene_path(Some(path.to_string()));
+        self.selected_entity_id = None;
+        self.selected_asset_path = None;
+        self.is_dirty = true;
     }
 
     /// Save the scene to `path`, which becomes the current scene file.
@@ -53,17 +53,24 @@ impl EditorUi {
     }
 }
 
-/// Save writes back to the CURRENT scene path (set on load / double-click),
-/// falling back to the seeded default scene.
-fn current_path(editor: &EditorUi) -> String {
-    editor
-        .current_scene_path()
-        .unwrap_or_else(|| crate::scene::DEFAULT_SCENE_PATH.to_string())
+/// Save and Load act on the CURRENT scene file (set on load / double-click). A scene
+/// never saved (File ▸ New) has none, and the verb is refused: falling back to a
+/// real file would write an empty scene over it (#1374). Unity would open Save As;
+/// the editor has none yet, so it says so, as `Scene.Save()` does.
+fn current_path(editor: &EditorUi, console: &mut ConsoleLogs, verb: &str) -> Option<String> {
+    let path = editor.current_scene_path();
+    if path.is_none() {
+        console.error(format!(
+            "{verb}: the scene has no file yet; use a scene asset's Overwrite with Current, or Scene.Save(path)"
+        ));
+    }
+    path
 }
 
 pub(super) fn save_scene(editor: &mut EditorUi, scene: &Scene, console: &mut ConsoleLogs) {
-    let path = current_path(editor);
-    editor.save_scene_to(scene, console, &path);
+    if let Some(path) = current_path(editor, console, "Save Scene") {
+        editor.save_scene_to(scene, console, &path);
+    }
 }
 
 pub(super) fn load_scene(
@@ -72,8 +79,9 @@ pub(super) fn load_scene(
     console: &mut ConsoleLogs,
     is_playing: bool,
 ) {
-    let path = current_path(editor);
-    editor.open_scene(scene, console, &path, is_playing);
+    if let Some(path) = current_path(editor, console, "Load Scene") {
+        editor.open_scene(scene, console, &path, is_playing);
+    }
 }
 
 /// New / Reset replace the World outright, with no `OnDisable`/`OnDestroy`, so in
