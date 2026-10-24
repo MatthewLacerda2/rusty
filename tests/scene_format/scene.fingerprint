@@ -654,7 +654,7 @@ scene.entities[].visual_correction.ssao.radius: f32
 scene.entities[].visual_correction.ssr_active: bool
 scene.entities[].visual_correction.ssr_quality: string
 scene.entities[].visual_correction.ssr_temporal_upsampling: bool
-scene.entities[].visual_correction.tonemap: enum None|Reinhard|Aces
+scene.entities[].visual_correction.tonemap: enum Aces|Reinhard|None
 scene.entities[].visual_correction: option
 scene.fog.base_height: f32
 scene.fog.color: tuple(3)
