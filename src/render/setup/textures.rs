@@ -5,6 +5,7 @@
 
 use std::rc::Rc;
 
+use crate::render::draw::materials::material_group;
 use crate::render::gpu::bind_layouts;
 use crate::render::gpu::shaders::ShaderRegistry;
 use crate::render::gpu::textures::MipGenerator;
@@ -70,8 +71,8 @@ pub(crate) fn create_textures(
 }
 
 /// A group(2) material bind group with all five texture slots (albedo, metallic,
-/// roughness, normal, emissive) pointing at the default texture (one shared sampler)
-/// and every extra shader texture slot at white (#400).
+/// roughness, normal, emissive) pointing at the default texture and every extra
+/// shader texture slot at white (#400).
 /// Bound by passes that need group(2) but never sample the maps (the editor grid
 /// and gizmos) (#202, #207).
 fn create_default_material_bind_group(
@@ -80,31 +81,9 @@ fn create_default_material_bind_group(
     [default_texture, white_texture]: [&GpuTexture; 2],
     zero_params: &wgpu::Buffer,
 ) -> wgpu::BindGroup {
-    let view = wgpu::BindingResource::TextureView(&default_texture.view);
-    // Textures at 0,2,3,4,5; sampler at 1.
-    let mut entries = vec![wgpu::BindGroupEntry {
-        binding: 1,
-        resource: wgpu::BindingResource::Sampler(&default_texture.sampler),
-    }];
-    for binding in [0, 2, 3, 4, 5] {
-        entries.push(wgpu::BindGroupEntry {
-            binding,
-            resource: view.clone(),
-        });
-    }
-    entries.push(wgpu::BindGroupEntry {
-        binding: crate::shadergen::params::PARAM_BINDING,
-        resource: zero_params.as_entire_binding(),
+    let maps = std::array::from_fn(|i| match i < 5 {
+        true => default_texture,
+        false => white_texture,
     });
-    for slot in crate::shadergen::textures::SLOTS {
-        entries.push(wgpu::BindGroupEntry {
-            binding: slot.binding,
-            resource: wgpu::BindingResource::TextureView(&white_texture.view),
-        });
-    }
-    device.create_bind_group(&wgpu::BindGroupDescriptor {
-        label: Some("Default Material Bind Group"),
-        layout: material_layout,
-        entries: &entries,
-    })
+    material_group(device, material_layout, maps, zero_params)
 }

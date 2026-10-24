@@ -1,3 +1,4 @@
+use crate::asset::sidecar::{self, FilterMode, WrapMode};
 use crate::editor::EditorUi;
 use crate::scene::{MaterialComponent, Scene};
 use egui_phosphor::regular as icon;
@@ -19,7 +20,7 @@ pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, path: &
     ui.separator();
     ui.add_space(5.0);
 
-    draw_import_settings(ui, editor);
+    draw_import_settings(ui, path);
     ui.add_space(15.0);
     ui.separator();
     ui.add_space(5.0);
@@ -27,45 +28,40 @@ pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, path: &
     draw_apply_to_entity(ui, editor, scene, path);
 }
 
-/// Texture import settings: wrap mode, filter mode, and mipmap generation.
-fn draw_import_settings(ui: &mut egui::Ui, editor: &mut EditorUi) {
+/// Texture import settings (#1323): wrap mode, filter mode and mipmap generation,
+/// kept in the image's `.meta` sidecar. An edit goes through the setter
+/// `Assets.SetTextureImportSettings` uses, so the renderer re-uploads the texture.
+fn draw_import_settings(ui: &mut egui::Ui, path: &str) {
     ui.heading("Texture Import Settings");
     ui.add_space(5.0);
 
+    let source = Path::new(path);
+    let stored = sidecar::texture(source);
+    let mut s = stored;
     ui.horizontal(|ui| {
         ui.label("Wrap Mode:");
         egui::ComboBox::from_id_salt("ImgWrapMode")
-            .selected_text(&editor.asset_image_wrap)
+            .selected_text(s.wrap_mode.name())
             .show_ui(ui, |ui| {
-                ui.selectable_value(&mut editor.asset_image_wrap, "Repeat".to_string(), "Repeat");
-                ui.selectable_value(
-                    &mut editor.asset_image_wrap,
-                    "Clamp".to_string(),
-                    "Clamp to Edge",
-                );
-                ui.selectable_value(&mut editor.asset_image_wrap, "Mirror".to_string(), "Mirror");
+                for mode in WrapMode::ALL {
+                    ui.selectable_value(&mut s.wrap_mode, mode, mode.name());
+                }
             });
     });
-
     ui.horizontal(|ui| {
         ui.label("Filter Mode:");
         egui::ComboBox::from_id_salt("ImgFilterMode")
-            .selected_text(&editor.asset_image_filter)
+            .selected_text(s.filter_mode.name())
             .show_ui(ui, |ui| {
-                ui.selectable_value(
-                    &mut editor.asset_image_filter,
-                    "Linear".to_string(),
-                    "Linear (Smooth)",
-                );
-                ui.selectable_value(
-                    &mut editor.asset_image_filter,
-                    "Nearest".to_string(),
-                    "Nearest (Pixelated)",
-                );
+                for mode in FilterMode::ALL {
+                    ui.selectable_value(&mut s.filter_mode, mode, mode.name());
+                }
             });
     });
-
-    ui.checkbox(&mut editor.asset_image_mipmaps, "Generate Mipmaps");
+    ui.checkbox(&mut s.generate_mipmaps, "Generate Mipmaps");
+    if s != stored {
+        let _ = sidecar::set_texture(source, s);
+    }
 }
 
 /// Entity picker that applies this texture to the chosen scene entity.

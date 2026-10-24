@@ -40,12 +40,25 @@ pub fn slot(name: &str) -> Result<&'static Slot, String> {
     })
 }
 
-/// The WGSL declaring `slot` in a surface variant: `t_<name>` at its binding. It is
-/// sampled with the material's shared sampler, `s_diffuse`.
+/// How far past a material texture's binding its own sampler sits (#1323): each
+/// map samples with the wrap and filter its import settings chose. Albedo is the
+/// one exception, its sampler `s_diffuse` staying at binding 1.
+pub const SAMPLER_OFFSET: u32 = 16;
+
+/// The group-2 binding of the sampler paired with the texture at `texture_binding`.
+pub const fn sampler_binding(texture_binding: u32) -> u32 {
+    texture_binding + SAMPLER_OFFSET
+}
+
+/// The WGSL declaring `slot` in a surface variant: `t_<name>` at its binding and
+/// its sampler `s_<name>` at [`sampler_binding`].
 pub fn decl(slot: &Slot) -> String {
     format!(
-        "@group(2) @binding({}) var t_{}: texture_2d<f32>;\n",
-        slot.binding, slot.name
+        "@group(2) @binding({}) var t_{name}: texture_2d<f32>;\n\
+         @group(2) @binding({}) var s_{name}: sampler;\n",
+        slot.binding,
+        sampler_binding(slot.binding),
+        name = slot.name
     )
 }
 
@@ -72,7 +85,8 @@ mod tests {
     fn decl_names_the_texture_after_its_slot() {
         assert_eq!(
             decl(slot("mask").unwrap()),
-            "@group(2) @binding(7) var t_mask: texture_2d<f32>;\n"
+            "@group(2) @binding(7) var t_mask: texture_2d<f32>;\n\
+             @group(2) @binding(23) var s_mask: sampler;\n"
         );
     }
 }

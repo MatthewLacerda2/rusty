@@ -55,16 +55,6 @@ pub struct EditorUi {
     pub is_dirty: bool,
 
     // Custom asset inspector properties
-    pub asset_image_wrap: String,
-    pub asset_image_filter: String,
-    pub asset_image_mipmaps: bool,
-    pub asset_audio_volume: f32,
-    pub asset_audio_pitch: f32,
-    pub asset_audio_loop: bool,
-    pub asset_audio_playing: bool,
-    pub asset_audio_play_time: Option<std::time::Instant>,
-    pub asset_model_scale: f32,
-    pub asset_model_import_normals: bool,
     pub asset_script_content: String,
     pub active_bottom_tab: String,
     /// Content-browser name filter (the search bar above the tile grid).
@@ -151,16 +141,6 @@ impl EditorUi {
             current_dir: crate::editor::content_browser::ROOT.to_string(),
             is_dirty: true,
 
-            asset_image_wrap: "Repeat".to_string(),
-            asset_image_filter: "Linear".to_string(),
-            asset_image_mipmaps: true,
-            asset_audio_volume: 0.8,
-            asset_audio_pitch: 1.0,
-            asset_audio_loop: false,
-            asset_audio_playing: false,
-            asset_audio_play_time: None,
-            asset_model_scale: 1.0,
-            asset_model_import_normals: true,
             asset_script_content: String::new(),
             active_bottom_tab: "assets".to_string(),
             asset_search: String::new(),

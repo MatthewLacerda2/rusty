@@ -106,22 +106,28 @@ fn material_texture_entry(binding: u32) -> wgpu::BindGroupLayoutEntry {
     texture_entry(binding, wgpu::TextureViewDimension::D2)
 }
 
-/// Group 2 (per-entity material): albedo (0), shared sampler (1), metallic map (2),
+/// A filtering sampler bind-group-layout entry at `binding`, FRAGMENT-visible.
+fn material_sampler_entry(binding: u32) -> wgpu::BindGroupLayoutEntry {
+    wgpu::BindGroupLayoutEntry {
+        binding,
+        visibility: wgpu::ShaderStages::FRAGMENT,
+        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+        count: None,
+    }
+}
+
+/// Group 2 (per-entity material): albedo (0) and its sampler (1), metallic map (2),
 /// roughness map (3), normal map (4), emissive map (5), and the material's runtime
 /// shader params (6, #399) — a fixed `array<vec4<f32>, 16>` uniform only a surface
 /// variant with runtime params reads — then one texture per extra shader slot (7 =
-/// `mask`, #400), which only a variant with a block sampling it reads. One sampler
-/// (binding 1) services every texture. This is the layout the forward pass's
-/// group(2) is built against (#202, #207).
+/// `mask`, #400), which only a variant with a block sampling it reads. Every
+/// texture but albedo has its own sampler at `textures::sampler_binding` (16 past
+/// it), the wrap and filter of its import settings (#1323). This is the layout the
+/// forward pass's group(2) is built against (#202, #207).
 pub(crate) fn create_material_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
     let mut entries = vec![
         material_texture_entry(0),
-        wgpu::BindGroupLayoutEntry {
-            binding: 1,
-            visibility: wgpu::ShaderStages::FRAGMENT,
-            ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-            count: None,
-        },
+        material_sampler_entry(1),
         material_texture_entry(2),
         material_texture_entry(3),
         material_texture_entry(4),
@@ -137,8 +143,16 @@ pub(crate) fn create_material_layout(device: &wgpu::Device) -> wgpu::BindGroupLa
             count: None,
         },
     ];
-    let slots = crate::shadergen::textures::SLOTS.iter();
-    entries.extend(slots.map(|slot| material_texture_entry(slot.binding)));
+    use crate::shadergen::textures::{sampler_binding, SLOTS};
+    entries.extend(
+        SLOTS
+            .iter()
+            .map(|slot| material_texture_entry(slot.binding)),
+    );
+    let paired = [2, 3, 4, 5]
+        .into_iter()
+        .chain(SLOTS.iter().map(|s| s.binding));
+    entries.extend(paired.map(|b| material_sampler_entry(sampler_binding(b))));
     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: Some("Material Layout"),
         entries: &entries,

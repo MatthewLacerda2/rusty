@@ -13,6 +13,10 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
+mod texture;
+
+pub use texture::{set_texture, texture, FilterMode, TextureSettings, WrapMode};
+
 use super::lightmap_uv::LightmapUvSettings;
 use super::mesh_data::ImportedAsset;
 use super::ImportError;
@@ -61,6 +65,9 @@ pub struct ImportSettings {
     /// how. Off by default, as in Unity.
     #[serde(default)]
     pub lightmap_uvs: LightmapUvSettings,
+    /// A texture's wrap, filter and mipmap settings (#1323); defaults for a model.
+    #[serde(default)]
+    pub texture: TextureSettings,
 }
 
 fn default_scale() -> f32 {
@@ -78,6 +85,7 @@ impl Default for ImportSettings {
             sub_objects: Vec::new(),
             colliders: BTreeMap::new(),
             lightmap_uvs: LightmapUvSettings::default(),
+            texture: TextureSettings::default(),
         }
     }
 }

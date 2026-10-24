@@ -43,7 +43,7 @@ pub fn draw_inspector(
             image::draw(ui, editor, scene, path);
         }
         "wav" | "mp3" | "ogg" => {
-            audio::draw(ui, editor, path);
+            audio::draw(ui, path);
         }
         SCENE_EXTENSION => {
             scene::draw(ui, editor, scene, console, nav, path);

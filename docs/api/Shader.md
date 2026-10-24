@@ -128,9 +128,11 @@ What a block's helper can read (#398). Surface blocks get the forward contract:
   and is **0 in edit mode and `Debug.Preview`**, so previews stay pixel-comparable and
   a replay renders the same frames. Pulses, scrolling, flicker: drive them off this.
 - `entity` — the per-draw `EntityUniforms`; the material maps (`t_diffuse`,
-  `t_emissive`, … with `s_diffuse`).
+  `t_emissive`, …), each with its own sampler (`s_diffuse`, `s_emissive`, …) that
+  carries the texture's wrap and filter import settings
+  ([`Assets.SetTextureImportSettings`](Assets.md#texture-import-settings)).
 - **`t_mask`** — the material's extra *mask* texture (#400), sampled with
-  `s_diffuse`: whatever texture the material names under `shader_textures.mask`,
+  `s_mask`: whatever texture the material names under `shader_textures.mask`,
   **white** when it names none or the file is missing. Only blocks that list
   `mask` in their `textures` read it, and a module declares it only when one of
   its blocks does.
