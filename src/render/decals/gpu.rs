@@ -12,6 +12,7 @@ use super::record::{self, DecalMaps, GpuDecal, NO_LAYER};
 use crate::asset::MapRef;
 use crate::components::MaterialAsset;
 use crate::render::gpu::grow_buffer::GrowBuffer;
+use crate::render::gpu::textures::TextureKind;
 use crate::render::Renderer;
 use crate::scene::decal::{Decal, DecalPose};
 use crate::scene::Scene;
@@ -51,13 +52,14 @@ impl Renderer {
             .iter()
             .filter_map(|d| Some((d, scene.decal_pose(d)?, record::maps(d, material(d)))))
             .collect();
-        let paths: Vec<&MapRef> = drawn
+        let maps: Vec<(&MapRef, TextureKind)> = drawn
             .iter()
-            .flat_map(|(_, _, maps)| maps.iter().flatten())
+            .flat_map(|(_, _, maps)| record::kinded(maps))
             .collect();
         let misses = &mut self.texture_freshness;
         let d = &mut self.decals;
-        self.global_bind_group_dirty |= d.atlas.prepare(&self.device, &self.queue, &paths, misses);
+        let gpu = (&self.device, &self.queue, &self.mip_generator);
+        self.global_bind_group_dirty |= d.atlas.prepare(gpu, &maps, misses);
 
         let mut dropped = 0;
         let records: Vec<GpuDecal> = drawn

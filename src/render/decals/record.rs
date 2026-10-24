@@ -6,6 +6,7 @@ use glam::Vec3;
 
 use crate::asset::MapRef;
 use crate::components::{DecalBlend, MaterialAsset};
+use crate::render::gpu::textures::TextureKind;
 use crate::scene::decal::{Decal, DecalPose};
 
 /// `GpuDecal::layers` for a map the decal does not have.
@@ -40,6 +41,22 @@ pub(crate) struct GpuDecal {
 
 /// The maps one decal samples, by path: albedo, normal, metallic, roughness.
 pub(crate) type DecalMaps = [Option<MapRef>; 4];
+
+/// What each of [`DecalMaps`]' slots holds, which decides how its mips average
+/// (#1364): the albedo is colour, the rest data.
+const MAP_KINDS: [TextureKind; 4] = [
+    TextureKind::Colour,
+    TextureKind::Data,
+    TextureKind::Data,
+    TextureKind::Data,
+];
+
+/// The maps of `maps` that are set, each with the kind its slot samples it as.
+pub(crate) fn kinded(maps: &DecalMaps) -> impl Iterator<Item = (&MapRef, TextureKind)> {
+    maps.iter()
+        .zip(MAP_KINDS)
+        .filter_map(|(map, kind)| Some((map.as_ref()?, kind)))
+}
 
 /// The maps `decal` samples: its material's when it names one, else its own
 /// albedo `texture`.

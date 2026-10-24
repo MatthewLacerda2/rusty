@@ -108,7 +108,9 @@ Settings** card: how a texture is sampled, stored per image in its `<file>.meta`
 sidecar. Each material map (albedo, metallic, roughness, normal, emissive, a
 shader's `mask`) samples through its own texture's settings, and so do particle and
 ribbon textures. UI images do not yet: they keep the UI's own clamped, linear
-sampler.
+sampler. Nor do decals: a decal's maps are copied into the one decal atlas, which
+always builds a full mip chain and samples every decal through one trilinear,
+clamped sampler.
 
 - `wrapMode` — how UVs outside 0–1 read it: `"Repeat"` (tile, the default),
   `"Clamp"` (stretch the edge texels) or `"Mirror"` (tile, flipping every other copy).
