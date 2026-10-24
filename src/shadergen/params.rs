@@ -30,6 +30,7 @@ use serde::{Deserialize, Serialize};
 use super::blocks::{find, Block};
 use super::recipe::{BlockSel, ParamValue, PassKind};
 use super::{engine_shader_dir, DEFAULT_OUT_DIR};
+use crate::core::paths::native;
 
 /// Runtime param slots per material: one `vec4` each, so 16 slots = 64 floats.
 pub const PARAM_SLOTS: usize = 16;
@@ -249,7 +250,7 @@ pub fn resolve_module(dirs: &[&str], name: &str) -> Option<PathBuf> {
         return None;
     }
     dirs.iter()
-        .map(|dir| PathBuf::from(format!("{dir}/{name}.wgsl")))
+        .map(|dir| native(dir).join(format!("{name}.wgsl")))
         .find(|p| p.is_file())
 }
 

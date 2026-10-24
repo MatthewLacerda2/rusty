@@ -24,7 +24,7 @@ use std::rc::Rc;
 
 use mlua::{Function, IntoLuaMulti, Lua, MultiValue, Table, Value};
 
-use crate::core::paths::{self, to_slash};
+use crate::core::paths::{self, native, to_slash};
 use crate::core::project::SCRIPTS_DIR;
 use crate::scene::io::bundled;
 use crate::scripting::console::ConsoleLogs;
@@ -130,10 +130,10 @@ fn found(lua: &Lua, code: &str, origin: &Path) -> mlua::Result<MultiValue> {
 fn project_searcher(lua: &Lua, access: Rc<Access>) -> mlua::Result<Function> {
     lua.create_function(move |lua, name: String| {
         let rel = name.replace('.', "/");
-        let dir = access.workspace.join(SCRIPTS_DIR);
+        let dir = access.workspace.join(native(SCRIPTS_DIR));
         let mut tried = Vec::new();
         for file in [format!("{rel}.lua"), format!("{rel}/init.lua")] {
-            let path = dir.join(file);
+            let path = dir.join(native(&file));
             if let Some(code) = access.read(&path, &format!("require(\"{name}\")")) {
                 return found(lua, &code, &path);
             }
@@ -147,7 +147,7 @@ fn engine_searcher(lua: &Lua) -> mlua::Result<Function> {
     lua.create_function(|lua, name: String| {
         let rel = format!("{}.lua", name.replace('.', "/"));
         match bundled::script(&rel) {
-            Some(code) => found(lua, code, Path::new(&format!("engine/scripts/{rel}"))),
+            Some(code) => found(lua, code, &native(&format!("engine/scripts/{rel}"))),
             None => format!("no engine script 'engine/scripts/{rel}'").into_lua_multi(lua),
         }
     })

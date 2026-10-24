@@ -28,7 +28,10 @@ fn an_export_carries_the_cache_and_leaves_the_fbx_behind() {
     assert!(files.contains_key(&glb), "{:?}", files.keys());
     assert!(files.contains_key("assets/scripts/spawn.lua"));
     assert!(files.contains_key("project.rusty"));
-    assert!(game.join(SOURCE).is_file(), "the project keeps its source");
+    assert!(
+        game.join(rusty::core::paths::native(SOURCE)).is_file(),
+        "the project keeps its source"
+    );
 
     let again = crate::temp::dir().join("again");
     assert!(export(&game, &again).status.success());
@@ -88,7 +91,10 @@ fn the_export_plays_from_its_cache_and_converts_nothing() {
         with_extension(&after, &["fbx", "blend"]),
         Vec::<&str>::new()
     );
-    let red = extracted(&out.join(format!("{CACHE}/{SOURCE}.glb")), "Red");
+    let red = extracted(
+        &out.join(rusty::core::paths::native(&format!("{CACHE}/{SOURCE}.glb"))),
+        "Red",
+    );
     assert!(red.is_file(), "{} is exported", red.display());
 }
 

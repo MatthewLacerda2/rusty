@@ -6,9 +6,7 @@ use glam::Vec3;
 use std::path::PathBuf;
 
 fn fixture() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(crate::test_path::native(
-        "tests/fixtures/models/skinned_cube.fbx",
-    ))
+    super::fixture("skinned_cube.fbx")
 }
 
 /// The fixture converted fresh into this test's own folder (the shared cache would

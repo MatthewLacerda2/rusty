@@ -3,6 +3,7 @@
 
 use super::{converter_for, is_import_cache, refresh, Converted, Converter, Staging};
 use crate::asset::ImportError;
+use crate::core::paths::native;
 use std::path::Path;
 
 mod changed;
@@ -38,17 +39,17 @@ fn copy(source: &Path, to: &Staging) -> Result<Converted, ImportError> {
 
 #[test]
 fn the_cache_folder_is_recognised_and_ordinary_folders_are_not() {
-    assert!(is_import_cache(Path::new(
+    assert!(is_import_cache(&native(
         "assets/generated/imported/models/a.fbx.glb"
     )));
-    assert!(!is_import_cache(Path::new("assets/generated/voice.mp3")));
-    assert!(!is_import_cache(Path::new("assets/models/a.glb")));
+    assert!(!is_import_cache(&native("assets/generated/voice.mp3")));
+    assert!(!is_import_cache(&native("assets/models/a.glb")));
 }
 
 #[test]
 fn fbx_is_converted_and_gltf_is_not() {
-    assert!(converter_for(Path::new("a/B.FBX")).is_some());
-    assert!(converter_for(Path::new("a/b.glb")).is_none());
+    assert!(converter_for(&native("a/B.FBX")).is_some());
+    assert!(converter_for(&native("a/b.glb")).is_none());
 }
 
 #[test]

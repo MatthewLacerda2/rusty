@@ -9,7 +9,7 @@ const STEPS: [Step; 3] = [Step::ReadSource, Step::ExtractTexture, Step::WriteGlt
 
 /// The fixture with embedded textures, so every step runs.
 fn fixture() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(crate::test_path::native(
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(crate::core::paths::native(
         "tests/fixtures/models/embedded_textures.fbx",
     ))
 }

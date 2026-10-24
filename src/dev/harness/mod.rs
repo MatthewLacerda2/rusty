@@ -75,7 +75,8 @@ pub const FIXTURE_PROJECT: &str = "tests/fixtures/project";
 /// [`FIXTURE_PROJECT`] in the checkout this binary belongs to, from any directory.
 pub fn fixture_project() -> PathBuf {
     let engine = crate::core::project::engine_dir();
-    engine.parent().unwrap_or(engine).join(FIXTURE_PROJECT)
+    let root = engine.parent().unwrap_or(engine);
+    root.join(crate::core::paths::native(FIXTURE_PROJECT))
 }
 
 /// The headless harness: owns the world and the run record.
@@ -104,7 +105,9 @@ impl Harness {
     /// judges the engine's scripts, never a developer's project.
     pub fn new(out_dir: impl AsRef<Path>, bot_script: &str) -> Self {
         let workspace = Self::workspace_of(&out_dir);
-        let samples = fixture_project().join(crate::scene::DEFAULT_SCRIPTS_DEST_DIR);
+        let samples = fixture_project().join(crate::core::paths::native(
+            crate::scene::DEFAULT_SCRIPTS_DEST_DIR,
+        ));
         crate::scene::seed_workspace(&workspace, Some(&samples));
         Self::in_workspace(out_dir, bot_script, workspace)
     }

@@ -11,6 +11,7 @@ use std::path::{Path, PathBuf};
 use super::bundled::{self, STARTER_MATERIALS, STARTER_MATERIALS_PATH};
 use super::manifest::{SeedManifest, SEED_MANIFEST_PATH};
 use super::scene_json;
+use crate::core::paths::native;
 use crate::scene::{default_scene, Scene};
 
 /// Where the default scene is seeded in the project.
@@ -38,7 +39,7 @@ pub fn seed_default_scene() -> String {
     match default_scene_bytes() {
         Ok(json) => {
             let hint = "File ▸ Reset Scene, or delete the file, to take the new one";
-            let files = [(Path::new(DEFAULT_SCENE_PATH).to_path_buf(), json)];
+            let files = [(native(DEFAULT_SCENE_PATH), json)];
             seed_files(Path::new(SEED_MANIFEST_PATH), &files, hint);
         }
         Err(e) => eprintln!("[Scene] seeding the default scene failed: {e}"),
@@ -52,8 +53,8 @@ pub fn seed_default_scene() -> String {
 /// `authoring::ui_widgets::seed`).
 pub fn seed_default_scripts() {
     crate::scene::authoring::ui_widgets::seed();
-    let mut files = embedded(bundled::SCRIPTS, Path::new(DEFAULT_SCRIPTS_DEST_DIR));
-    files.push((STARTER_MATERIALS_PATH.into(), STARTER_MATERIALS.to_vec()));
+    let mut files = embedded(bundled::SCRIPTS, &native(DEFAULT_SCRIPTS_DEST_DIR));
+    files.push((native(STARTER_MATERIALS_PATH), STARTER_MATERIALS.to_vec()));
     seed_files(
         Path::new(SEED_MANIFEST_PATH),
         &files,
@@ -69,12 +70,15 @@ pub fn seed_default_scripts() {
 /// edited copy is kept on purpose.
 pub fn seed_workspace(root: &Path, samples: Option<&Path>) {
     use crate::scene::authoring::ui_widgets::parts::SCRIPT_DIR;
-    let scripts = root.join(DEFAULT_SCRIPTS_DEST_DIR);
+    let scripts = root.join(native(DEFAULT_SCRIPTS_DEST_DIR));
     let mut files = samples.map_or_else(Vec::new, |dir| lua_files(dir, &scripts));
     files.extend(embedded(bundled::SCRIPTS, &scripts));
-    files.extend(embedded(bundled::UI_SCRIPTS, &root.join(SCRIPT_DIR)));
+    files.extend(embedded(
+        bundled::UI_SCRIPTS,
+        &root.join(native(SCRIPT_DIR)),
+    ));
     files.push((
-        root.join(STARTER_MATERIALS_PATH),
+        root.join(native(STARTER_MATERIALS_PATH)),
         STARTER_MATERIALS.to_vec(),
     ));
     for (to, bytes) in files {

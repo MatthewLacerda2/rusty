@@ -6,14 +6,11 @@ use crate::app::animation::blend_poses;
 use crate::asset::mesh_data::{JointTransform, SkinData};
 use crate::asset::{anim_data::AnimationClip, gltf};
 use glam::{Quat, Vec3};
-use std::path::PathBuf;
 
 /// The fixture converted, written as a `.glb` and imported: the cube's skin and
 /// its one clip, as the animator receives them.
 fn import() -> (SkinData, AnimationClip) {
-    let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(crate::test_path::native(
-        "tests/fixtures/models/mirrored_bone.fbx",
-    ));
+    let fixture = super::super::fixture("mirrored_bone.fbx");
     let out = crate::test_temp::dir().join("mirrored_bone.fbx.glb");
     super::super::convert_to(&fixture, &out).expect("the fixture converts");
     let mut asset = gltf::import::import(&out).expect("its glTF imports");

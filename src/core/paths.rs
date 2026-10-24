@@ -3,7 +3,9 @@
 //! A scene names its scripts by paths relative to the project root (#829, the
 //! working directory once `core::project::open` ran), written with `/` on every OS, so a scene saved on one
 //! machine — or by one test run — names the same files on the next. These helpers
-//! turn an absolute path under a root back into that form.
+//! turn an absolute path under a root back into that form, and [`native`] turns
+//! such a path (or a `/`-spelled constant like `IMPORT_CACHE_DIR`) into the
+//! platform's own (#1371).
 
 use std::path::{Path, PathBuf};
 
@@ -57,6 +59,26 @@ pub fn canonicalize(path: &Path) -> std::io::Result<PathBuf> {
         Some(s) => PathBuf::from(strip_verbatim(s)),
         None => canonical,
     })
+}
+
+/// `slashed`, a `/`-separated path, joined one part at a time: the platform's own
+/// spelling (#1332, #1371). `Path::join("a/b")` keeps the `/`, so on Windows
+/// `root.join("a/b")` is `root\a/b`; `root.join(native("a/b"))` is `root\a\b`,
+/// the one spelling the engine writes everywhere and its tests compare against.
+/// A leading `/` stays the root, as `Path::new("/")` is; empty parts drop.
+pub fn native(slashed: &str) -> PathBuf {
+    let (start, rest) = match slashed.strip_prefix('/') {
+        Some(rest) => (PathBuf::from("/"), rest),
+        None => (PathBuf::new(), slashed),
+    };
+    rest.split('/')
+        .filter(|part| !part.is_empty())
+        .fold(start, |path, part| path.join(part))
+}
+
+/// [`native`] as the string the engine writes into a file or a log line.
+pub fn native_string(slashed: &str) -> String {
+    native(slashed).to_string_lossy().into_owned()
 }
 
 /// `path` as a `/`-separated string, the form scenes and the editor store (#939):

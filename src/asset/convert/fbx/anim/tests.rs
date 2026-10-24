@@ -3,12 +3,9 @@
 
 use crate::asset::{gltf, ImportedAsset};
 use glam::{Quat, Vec3};
-use std::path::PathBuf;
 
 fn import() -> ImportedAsset {
-    let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(crate::test_path::native(
-        "tests/fixtures/models/skinned_cube.fbx",
-    ));
+    let fixture = super::super::fixture("skinned_cube.fbx");
     let out = crate::test_temp::dir().join("skinned_cube_anim.fbx.glb");
     super::super::convert_to(&fixture, &out).expect("the fixture converts");
     gltf::import::import(&out).expect("its glTF imports")

@@ -6,6 +6,7 @@ use super::{changes, Backend, Root, Watch};
 
 mod events;
 use crate::core::fs::written::written_since;
+use crate::core::paths::native;
 use notify::event::{AccessKind, AccessMode, CreateKind, EventKind, ModifyKind};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
@@ -116,8 +117,8 @@ fn a_change_under_an_ignored_folder_is_not_noted() {
 fn a_path_is_spelled_under_its_root_as_given() {
     let root = Root::new(Path::new("assets"));
     let cwd = std::env::current_dir().unwrap();
-    let spelled = root.spell(&cwd.join(crate::test_path::native("assets/textures/a.png")));
-    assert_eq!(spelled, Some(PathBuf::from("assets/textures/a.png")));
+    let spelled = root.spell(&cwd.join(crate::core::paths::native("assets/textures/a.png")));
+    assert_eq!(spelled, Some(native("assets/textures/a.png")));
     assert_eq!(root.spell(&cwd.join("elsewhere").join("a.png")), None);
 }
 

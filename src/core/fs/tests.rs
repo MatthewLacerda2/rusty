@@ -1,6 +1,7 @@
 //! The atomic write (#1129): no torn file, no litter, no collision.
 
 use super::{is_temp_name, is_unique_sibling, unique_sibling, write_atomic, TEMP_SUFFIX};
+use crate::core::paths::native;
 use std::path::Path;
 
 /// Every file name in `dir`, sorted.
@@ -61,7 +62,7 @@ fn two_writers_in_one_process_never_collide() {
 
 #[test]
 fn a_unique_sibling_is_recognised_and_other_names_are_not() {
-    let made = unique_sibling(Path::new("dir/a.glb"), "staging");
+    let made = unique_sibling(&native("dir/a.glb"), "staging");
     let name = made.file_name().unwrap().to_string_lossy().into_owned();
     assert_eq!(made.parent(), Some(Path::new("dir")));
     assert!(is_unique_sibling(&name, "a.glb", "staging"));
@@ -77,7 +78,7 @@ fn a_unique_sibling_is_recognised_and_other_names_are_not() {
 
 #[test]
 fn only_a_write_in_flight_is_a_temp_name() {
-    let made = unique_sibling(Path::new("dir/a.png"), TEMP_SUFFIX);
+    let made = unique_sibling(&native("dir/a.png"), TEMP_SUFFIX);
     assert!(is_temp_name(&made.file_name().unwrap().to_string_lossy()));
     for name in [
         "a.png",

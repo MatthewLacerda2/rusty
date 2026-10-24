@@ -11,7 +11,8 @@ const STALE: &str = r#"print("[stale] the workspace copy ran"); return {}"#;
 #[test]
 fn a_stale_player_controller_in_the_workspace_is_replaced_by_the_bundled_one() {
     let dir = crate::temp::dir().join("rusty_stale_controller");
-    let planted = Harness::workspace_of(&dir).join(PLAYER_CONTROLLER_SCRIPT);
+    let planted =
+        Harness::workspace_of(&dir).join(rusty::core::paths::native(PLAYER_CONTROLLER_SCRIPT));
     std::fs::create_dir_all(planted.parent().unwrap()).unwrap();
     std::fs::write(&planted, STALE).unwrap();
 

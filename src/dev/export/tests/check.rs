@@ -44,7 +44,11 @@ fn an_output_reaching_the_project_through_a_symlink_is_refused() {
     let root = dir.join("game");
     project(&root);
     std::os::unix::fs::symlink(&root, dir.join("link")).unwrap();
-    let err = check_out(&root, &dir.join(crate::test_path::native("link/build/new"))).unwrap_err();
+    let err = check_out(
+        &root,
+        &dir.join(crate::core::paths::native("link/build/new")),
+    )
+    .unwrap_err();
     assert!(err.contains("outside the project"), "{err}");
 }
 

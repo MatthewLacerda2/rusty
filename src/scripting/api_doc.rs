@@ -16,7 +16,9 @@ use std::path::{Path, PathBuf};
 
 /// `docs/api/` in the checkout this binary was built from.
 pub fn api_doc_dir() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("docs/api")
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("docs")
+        .join("api")
 }
 
 /// The scripting-API reference: `docs/api/` assembled into one document.

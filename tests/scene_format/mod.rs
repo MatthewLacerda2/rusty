@@ -30,7 +30,8 @@ fn fingerprint() -> String {
 
 #[test]
 fn scene_format_matches_its_fingerprint() {
-    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(FINGERPRINT);
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join(rusty::core::paths::native(FINGERPRINT));
     let now = fingerprint();
     if std::env::var_os("RUSTY_BLESS_SCENE_FORMAT").is_some() {
         std::fs::write(&path, &now).expect("write the fingerprint");

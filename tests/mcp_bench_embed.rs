@@ -79,7 +79,8 @@ fn bench_open_moves_the_session_to_the_project() {
     assert_eq!(opened["opened"], json!(true));
     assert_eq!(opened["root"], json!(root));
     assert!(
-        root.join(rusty::scene::DEFAULT_SCENE_PATH).is_file(),
+        root.join(rusty::core::paths::native(rusty::scene::DEFAULT_SCENE_PATH))
+            .is_file(),
         "the opened project's default scene is seeded"
     );
     assert_eq!(text(&out[3]), "2", "the new session answers");

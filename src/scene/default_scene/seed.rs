@@ -15,6 +15,7 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use super::looks::{checker_recipe, shader_recipe, FLOOR, SHADER_NAME};
+use crate::core::paths::native;
 use crate::scene::authoring::material::{bake_maps, MAPS_DIR};
 use crate::scene::MaterialAsset;
 use crate::shadergen::{bake_recipe, engine_shader_dir, DEFAULT_OUT_DIR};
@@ -23,8 +24,8 @@ use crate::shadergen::{bake_recipe, engine_shader_dir, DEFAULT_OUT_DIR};
 /// and boot carries on: the floor then draws the missing-texture checker and the
 /// enemy the standard shader.
 pub fn seed_default_assets() {
-    let (textures, shaders) = (Path::new(MAPS_DIR), Path::new(DEFAULT_OUT_DIR));
-    if let Err(e) = seed_default_assets_into(textures, shaders) {
+    let (textures, shaders) = (native(MAPS_DIR), native(DEFAULT_OUT_DIR));
+    if let Err(e) = seed_default_assets_into(&textures, &shaders) {
         eprintln!("[Scene] seeding the default scene's assets failed: {e}");
     }
 }

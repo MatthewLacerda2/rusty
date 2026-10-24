@@ -16,7 +16,7 @@ fn watched() -> (Watch, PathBuf) {
 }
 
 fn pending(watch: &Watch, dir: &std::path::Path, name: &str) -> bool {
-    let key = dir.join(crate::test_path::native(name));
+    let key = dir.join(crate::core::paths::native(name));
     let key = key.to_string_lossy().into_owned();
     watch.pending().contains(&key)
 }

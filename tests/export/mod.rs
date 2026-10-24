@@ -35,7 +35,7 @@ fn project(models: &[&str], start: &str) -> PathBuf {
     for name in models {
         std::fs::copy(fixture(name), models_dir.join(name)).unwrap();
     }
-    let script = root.join(SPAWN);
+    let script = root.join(rusty::core::paths::native(SPAWN));
     std::fs::create_dir_all(script.parent().unwrap()).unwrap();
     let lua = format!("local Spawn = {{}}\nfunction Spawn.Start(id)\n{start}\nend\nreturn Spawn\n");
     std::fs::write(script, lua).unwrap();

@@ -23,6 +23,7 @@ mod scroll;
 
 use std::path::Path;
 
+use crate::core::paths::native;
 use crate::scene::prefab::extract_prefab;
 use crate::scene::{Scene, PREFAB_EXTENSION};
 
@@ -144,12 +145,12 @@ fn first_root_canvas(scene: &Scene) -> Option<u32> {
 /// `engine/scripts/ui/` (`scene::io::bundled`), and one prefab per widget built fresh. Called on boot
 /// (and by tests); failures are skipped, like the other seeders.
 pub fn seed() {
-    let scripts = parts::SCRIPT_DIR;
-    std::fs::create_dir_all(scripts).ok();
+    let scripts = native(parts::SCRIPT_DIR);
+    std::fs::create_dir_all(&scripts).ok();
     for (name, code) in crate::scene::io::bundled::UI_SCRIPTS {
-        write_if_changed(&Path::new(scripts).join(name), code.as_bytes());
+        write_if_changed(&scripts.join(name), code.as_bytes());
     }
-    std::fs::create_dir_all(PREFAB_DIR).ok();
+    std::fs::create_dir_all(native(PREFAB_DIR)).ok();
     for kind in UiWidget::ALL {
         let Some(path) = kind.prefab_path() else {
             continue;
@@ -158,7 +159,7 @@ pub fn seed() {
         let root = build(&mut scene, kind, None);
         let json = extract_prefab(&scene, root).and_then(|p| serde_json::to_vec_pretty(&p).ok());
         if let Some(json) = json {
-            write_if_changed(Path::new(&path), &json);
+            write_if_changed(&native(&path), &json);
         }
     }
 }

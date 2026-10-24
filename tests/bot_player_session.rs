@@ -1,8 +1,7 @@
 //! Bot-player end-to-end session (issue #10).
 //! Gated on `dev`: a no-op under a plain `cargo test`, real under `--features dev`.
 
-use std::path::Path;
-
+use rusty::core::paths::native;
 use rusty::dev::botplayer::{attach_player_bot, PLAYER_BOT_SCRIPT};
 use rusty::dev::harness::Harness;
 use rusty::dev::scenario;
@@ -19,7 +18,7 @@ fn attach_player_bot_tags_the_player() {
 
 #[test]
 fn play_session_scenario_wins_and_is_deterministic() {
-    let scenario = Path::new("tests/fixtures/project/scenarios/play_session.lua");
+    let scenario = &native("tests/fixtures/project/scenarios/play_session.lua");
     let run = |dir: &str| {
         let out = crate::temp::dir().join(dir);
         let report = scenario::run_isolated(scenario, &out).expect("scenario runs");

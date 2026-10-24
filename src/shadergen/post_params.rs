@@ -14,12 +14,12 @@
 //! matching set wrote; the renderer resolves each stored name per effect.
 
 use std::collections::BTreeMap;
-use std::path::PathBuf;
 
 use super::blocks::find;
 use super::params::{unknown_param, ParamLayout, ParamSlot};
 use super::recipe::PassKind;
 use super::DEFAULT_OUT_DIR;
+use crate::core::paths::native;
 
 /// The param layouts of a volume's effects, in run order.
 #[derive(Clone, Debug, Default)]
@@ -34,7 +34,7 @@ impl PostChain {
     pub fn load(effects: &[String]) -> Self {
         let layouts = effects
             .iter()
-            .map(|name| PathBuf::from(format!("{DEFAULT_OUT_DIR}/{name}.wgsl")))
+            .map(|name| native(DEFAULT_OUT_DIR).join(format!("{name}.wgsl")))
             .map(|path| ParamLayout::read_beside(&path).unwrap_or_default())
             .collect();
         Self { layouts }

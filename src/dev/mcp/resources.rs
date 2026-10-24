@@ -21,7 +21,9 @@ pub const GAME_GUIDE_URI: &str = "rusty://game-guide.md";
 
 /// The game guide in this build's engine checkout.
 fn game_guide_path() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("docs/game-agent.md")
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("docs")
+        .join("game-agent.md")
 }
 
 /// The `resources/list` result: the game guide and the scripting-API reference.

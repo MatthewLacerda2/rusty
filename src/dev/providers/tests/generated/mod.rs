@@ -73,7 +73,10 @@ fn the_address_is_kind_digest_extension_under_the_generated_dir() {
     let brief = line("Reload!");
     let path = address(&brief).unwrap();
     let name = path.file_name().unwrap().to_str().unwrap();
-    assert_eq!(path.parent().unwrap(), std::path::Path::new(GENERATED_DIR));
+    assert_eq!(
+        path.parent().unwrap(),
+        crate::core::paths::native(GENERATED_DIR)
+    );
     assert_eq!(name, format!("speech-{}.mp3", digest(&brief).unwrap()));
     assert_eq!(digest(&brief).unwrap().len(), 64, "sha256, lowercase hex");
 }
@@ -110,7 +113,9 @@ fn a_sketch_reports_as_a_sketch_and_spends_nothing() {
     assert_eq!(state(&root, &brief, None).unwrap(), GenerationState::Sketch);
     assert_eq!(cached(&root, &brief).unwrap(), None);
     assert!(
-        !root.join(GENERATED_DIR).exists(),
+        !root
+            .join(crate::core::paths::native(GENERATED_DIR))
+            .exists(),
         "a sketch writes nothing"
     );
 }

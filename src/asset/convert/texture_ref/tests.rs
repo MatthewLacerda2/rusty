@@ -12,7 +12,7 @@ pub(super) fn quad(edit: impl Fn(String) -> String) -> PathBuf {
 
 /// The fixture written to `path`, `text` edited by `edit`.
 pub(super) fn quad_at(path: &Path, edit: impl Fn(String) -> String) -> PathBuf {
-    let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join(crate::test_path::native(
+    let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join(crate::core::paths::native(
         "tests/fixtures/models/embedded_textures.fbx",
     ));
     std::fs::write(path, edit(std::fs::read_to_string(fixture).unwrap())).unwrap();
