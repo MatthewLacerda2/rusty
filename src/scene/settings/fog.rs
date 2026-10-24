@@ -13,29 +13,23 @@
 use glam::Vec3;
 use serde::{Deserialize, Serialize};
 
-/// How fog thickens with distance from the camera.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub enum FogMode {
-    /// No fog — the default.
-    #[default]
-    Off,
-    /// Ramps from none at `start` to full at `end`.
-    Linear,
-    /// `1 - e^(-density·d)`: thick fog that never quite reaches full.
-    Exponential,
-    /// `1 - e^(-(density·d)²)`: clear near the camera, then closes in fast.
-    ExponentialSquared,
+crate::core::named_enum! {
+    /// How fog thickens with distance from the camera.
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+    pub enum FogMode {
+        /// No fog — the default.
+        #[default]
+        Off = "Off",
+        /// Ramps from none at `start` to full at `end`.
+        Linear = "Linear",
+        /// `1 - e^(-density·d)`: thick fog that never quite reaches full.
+        Exponential = "Exponential",
+        /// `1 - e^(-(density·d)²)`: clear near the camera, then closes in fast.
+        ExponentialSquared = "ExponentialSquared",
+    }
 }
 
 impl FogMode {
-    /// Every mode, in shader-index order.
-    pub const ALL: [FogMode; 4] = [
-        FogMode::Off,
-        FogMode::Linear,
-        FogMode::Exponential,
-        FogMode::ExponentialSquared,
-    ];
-
     /// Stable index handed to the shader as a `u32` (`0` means off).
     pub fn to_index(self) -> u32 {
         match self {
@@ -44,21 +38,6 @@ impl FogMode {
             FogMode::Exponential => 2,
             FogMode::ExponentialSquared => 3,
         }
-    }
-
-    /// The name scripts and the Scene Settings panel use.
-    pub fn name(self) -> &'static str {
-        match self {
-            FogMode::Off => "Off",
-            FogMode::Linear => "Linear",
-            FogMode::Exponential => "Exponential",
-            FogMode::ExponentialSquared => "ExponentialSquared",
-        }
-    }
-
-    /// Parse a [`FogMode::name`]; `None` for anything else.
-    pub fn parse(name: &str) -> Option<FogMode> {
-        Self::ALL.into_iter().find(|m| m.name() == name)
     }
 }
 
@@ -124,11 +103,9 @@ mod tests {
     }
 
     #[test]
-    fn names_round_trip_and_indices_are_stable() {
+    fn indices_are_stable() {
         for (i, m) in FogMode::ALL.into_iter().enumerate() {
-            assert_eq!(FogMode::parse(m.name()), Some(m));
             assert_eq!(m.to_index(), i as u32);
         }
-        assert_eq!(FogMode::parse("fog"), None);
     }
 }

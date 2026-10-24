@@ -3,40 +3,23 @@
 
 use serde::{Deserialize, Serialize};
 
-/// Tonemapping operator applied as the final color-correction step.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub enum Tonemap {
-    /// No tonemap — clamp only. Mostly useful for debugging.
-    None,
-    /// Reinhard `c / (1 + c)` — cheap, soft rolloff.
-    Reinhard,
-    /// Filmic ACES fit — the default, richer contrast in highlights.
-    #[default]
-    Aces,
+crate::core::named_enum! {
+    /// Tonemapping operator applied as the final color-correction step. Declared in
+    /// the order the editor lists them (the default first); the names are Unity's
+    /// (`TonemappingMode.ACES`, #997).
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+    pub enum Tonemap {
+        /// Filmic ACES fit — the default, richer contrast in highlights.
+        #[default]
+        Aces = "ACES",
+        /// Reinhard `c / (1 + c)` — cheap, soft rolloff.
+        Reinhard = "Reinhard",
+        /// No tonemap — clamp only. Mostly useful for debugging.
+        None = "None",
+    }
 }
 
 impl Tonemap {
-    /// Every operator, in the order the editor lists them (the default first).
-    pub const ALL: [Tonemap; 3] = [Tonemap::Aces, Tonemap::Reinhard, Tonemap::None];
-
-    /// The operator's name, as the editor and the API spell it — Unity's
-    /// (`TonemappingMode.ACES`, #997).
-    pub fn name(self) -> &'static str {
-        match self {
-            Tonemap::None => "None",
-            Tonemap::Reinhard => "Reinhard",
-            Tonemap::Aces => "ACES",
-        }
-    }
-
-    /// Parse an operator name, case-insensitively, as every name setter does; `None`
-    /// for an unknown one.
-    pub fn parse(name: &str) -> Option<Tonemap> {
-        Self::ALL
-            .into_iter()
-            .find(|t| t.name().eq_ignore_ascii_case(name))
-    }
-
     /// Stable index handed to the shader as a `u32`.
     pub fn to_index(self) -> u32 {
         match self {

@@ -8,15 +8,6 @@ fn default_is_home_theater() {
 }
 
 #[test]
-fn names_round_trip_and_parse_ignores_case() {
-    for mode in SpeakerMode::ALL {
-        assert_eq!(SpeakerMode::parse(mode.name()), Some(mode));
-    }
-    assert_eq!(SpeakerMode::parse("TV"), Some(SpeakerMode::Tv));
-    assert_eq!(SpeakerMode::parse("surround"), None);
-}
-
-#[test]
 fn headphones_narrow_a_hard_pan_other_modes_pass_through() {
     let hard_left = VoiceMix {
         pan: -1.0,

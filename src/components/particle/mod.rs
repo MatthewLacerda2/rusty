@@ -48,32 +48,14 @@ pub enum EmitMode {
     Burst,
 }
 
-/// GPU blend used when drawing the sprites.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub enum ParticleBlend {
-    /// Standard src-alpha blending (smoke).
-    Alpha,
-    /// Additive — colours sum, brightens the HDR target (sparks, fire).
-    Additive,
-}
-
-impl ParticleBlend {
-    /// Every blend, in inspector order.
-    pub const ALL: [ParticleBlend; 2] = [ParticleBlend::Alpha, ParticleBlend::Additive];
-
-    /// The blend's name, as the API and the inspector spell it.
-    pub fn name(self) -> &'static str {
-        match self {
-            ParticleBlend::Alpha => "Alpha",
-            ParticleBlend::Additive => "Additive",
-        }
-    }
-
-    /// Parse a blend name, case-insensitively; `None` for an unknown one.
-    pub fn parse(name: &str) -> Option<ParticleBlend> {
-        Self::ALL
-            .into_iter()
-            .find(|b| b.name().eq_ignore_ascii_case(name))
+crate::core::named_enum! {
+    /// GPU blend used when drawing the sprites.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+    pub enum ParticleBlend {
+        /// Standard src-alpha blending (smoke).
+        Alpha = "Alpha",
+        /// Additive — colours sum, brightens the HDR target (sparks, fire).
+        Additive = "Additive",
     }
 }
 

@@ -15,32 +15,18 @@ use glam::Vec3;
 use super::Pose;
 use serde::{Deserialize, Serialize};
 
-/// The local axis a capsule's length runs along (Unity: `CapsuleCollider.direction`).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub enum CapsuleAxis {
-    X,
-    #[default]
-    Y,
-    Z,
+crate::core::named_enum! {
+    /// The local axis a capsule's length runs along (Unity: `CapsuleCollider.direction`).
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+    pub enum CapsuleAxis {
+        X = "X",
+        #[default]
+        Y = "Y",
+        Z = "Z",
+    }
 }
 
 impl CapsuleAxis {
-    /// The name the Lua API and inspector show (`"X"` / `"Y"` / `"Z"`).
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::X => "X",
-            Self::Y => "Y",
-            Self::Z => "Z",
-        }
-    }
-
-    /// Parse the Lua/editor name back to the axis, `None` on an unknown string.
-    pub fn parse(s: &str) -> Option<Self> {
-        Self::ALL.into_iter().find(|a| a.as_str() == s)
-    }
-
-    pub const ALL: [Self; 3] = [Self::X, Self::Y, Self::Z];
-
     /// The unit vector of this axis in the collider's local space.
     pub fn unit(self) -> Vec3 {
         match self {

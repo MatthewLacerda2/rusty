@@ -142,7 +142,7 @@ fn register_collision_detection<'scope>(
                 .rigidbody(id)
                 .map(|rb| rb.collision_detection)
                 .unwrap_or_default();
-            Ok(mode.as_str().to_string())
+            Ok(mode.name().to_string())
         }),
     )?;
 

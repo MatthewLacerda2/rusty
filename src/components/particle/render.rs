@@ -9,48 +9,21 @@ use serde::{Deserialize, Serialize};
 
 use super::runtime::Particle;
 
-/// The shape each particle is drawn as.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub enum ParticleRenderMode {
-    /// A quad that always faces the camera (smoke, fire, muzzle flash).
-    #[default]
-    Billboard,
-    /// A quad stretched along the particle's velocity (sparks, tracers, streaks).
-    Stretched,
-    /// A quad lying flat in the world XZ plane (ground splashes, shockwave rings).
-    Horizontal,
-    /// A camera-facing quad that stays upright — turns about world Y only.
-    Vertical,
-    /// An instanced mesh with its own material (shell casings, debris, glass).
-    Mesh,
-}
-
-impl ParticleRenderMode {
-    /// Every mode, in inspector / API order.
-    pub const ALL: [Self; 5] = [
-        Self::Billboard,
-        Self::Stretched,
-        Self::Horizontal,
-        Self::Vertical,
-        Self::Mesh,
-    ];
-
-    /// The mode's API / inspector name.
-    pub fn name(self) -> &'static str {
-        match self {
-            Self::Billboard => "billboard",
-            Self::Stretched => "stretched",
-            Self::Horizontal => "horizontal",
-            Self::Vertical => "vertical",
-            Self::Mesh => "mesh",
-        }
-    }
-
-    /// Parse an API name (case-insensitive).
-    pub fn parse(name: &str) -> Option<Self> {
-        Self::ALL
-            .into_iter()
-            .find(|m| m.name().eq_ignore_ascii_case(name))
+crate::core::named_enum! {
+    /// The shape each particle is drawn as.
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+    pub enum ParticleRenderMode {
+        /// A quad that always faces the camera (smoke, fire, muzzle flash).
+        #[default]
+        Billboard = "billboard",
+        /// A quad stretched along the particle's velocity (sparks, tracers, streaks).
+        Stretched = "stretched",
+        /// A quad lying flat in the world XZ plane (ground splashes, shockwave rings).
+        Horizontal = "horizontal",
+        /// A camera-facing quad that stays upright — turns about world Y only.
+        Vertical = "vertical",
+        /// An instanced mesh with its own material (shell casings, debris, glass).
+        Mesh = "mesh",
     }
 }
 

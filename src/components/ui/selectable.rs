@@ -48,42 +48,15 @@ pub enum NavigationMode {
     Explicit,
 }
 
-/// A visual state of a Selectable, in the order its colours and sprites are stored.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum SelectionState {
-    Normal,
-    Highlighted,
-    Pressed,
-    Selected,
-    Disabled,
-}
-
-impl SelectionState {
-    /// Every state, in storage order.
-    pub const ALL: [SelectionState; 5] = [
-        Self::Normal,
-        Self::Highlighted,
-        Self::Pressed,
-        Self::Selected,
-        Self::Disabled,
-    ];
-
-    /// The state's name as scripts and the snapshot spell it.
-    pub fn name(self) -> &'static str {
-        match self {
-            Self::Normal => "Normal",
-            Self::Highlighted => "Highlighted",
-            Self::Pressed => "Pressed",
-            Self::Selected => "Selected",
-            Self::Disabled => "Disabled",
-        }
-    }
-
-    /// Parse a state name (case-insensitive).
-    pub fn parse(name: &str) -> Option<Self> {
-        Self::ALL
-            .into_iter()
-            .find(|s| s.name().eq_ignore_ascii_case(name))
+crate::core::named_enum! {
+    /// A visual state of a Selectable, in the order its colours and sprites are stored.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub enum SelectionState {
+        Normal = "Normal",
+        Highlighted = "Highlighted",
+        Pressed = "Pressed",
+        Selected = "Selected",
+        Disabled = "Disabled",
     }
 }
 
@@ -192,10 +165,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn states_round_trip_and_normal_never_swaps() {
-        for s in SelectionState::ALL {
-            assert_eq!(SelectionState::parse(&s.name().to_lowercase()), Some(s));
-        }
+    fn normal_never_swaps() {
         let sel = SelectableComponent {
             sprites: std::array::from_fn(|i| Some(format!("s{i}.png").into())),
             ..Default::default()

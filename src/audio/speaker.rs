@@ -35,28 +35,18 @@ pub const SPEAKER_MODE_KEY: &str = "speaker_mode";
 /// `-0.6`, so the right ear still hears it at 40 %.
 pub const HEADPHONE_WIDTH: f32 = 0.6;
 
-/// The output profile the final mix is shaped for. See the module docs.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
-pub enum SpeakerMode {
-    Headphones,
-    Tv,
-    #[default]
-    HomeTheater,
+crate::core::named_enum! {
+    /// The output profile the final mix is shaped for. See the module docs.
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+    pub enum SpeakerMode {
+        Headphones = "headphones",
+        Tv = "tv",
+        #[default]
+        HomeTheater = "home_theater",
+    }
 }
 
 impl SpeakerMode {
-    /// Every mode, in menu order.
-    pub const ALL: [SpeakerMode; 3] = [Self::Headphones, Self::Tv, Self::HomeTheater];
-
-    /// The script / storage name: `headphones`, `tv`, `home_theater`.
-    pub fn name(self) -> &'static str {
-        match self {
-            Self::Headphones => "headphones",
-            Self::Tv => "tv",
-            Self::HomeTheater => "home_theater",
-        }
-    }
-
     /// The editor label.
     pub fn label(self) -> &'static str {
         match self {
@@ -64,13 +54,6 @@ impl SpeakerMode {
             Self::Tv => "TV",
             Self::HomeTheater => "Home theater",
         }
-    }
-
-    /// The mode named `name` (case-insensitive), or `None`.
-    pub fn parse(name: &str) -> Option<Self> {
-        Self::ALL
-            .into_iter()
-            .find(|m| m.name().eq_ignore_ascii_case(name))
     }
 
     /// The mode's per-voice shaping of an output mix. Headphones narrows the pan;

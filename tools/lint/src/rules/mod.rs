@@ -19,6 +19,7 @@ mod full_literal;
 mod ignored;
 mod log_tag;
 mod markers;
+mod named_enum;
 mod prefix;
 mod skip;
 mod sorted;
@@ -58,6 +59,7 @@ const RULES: &[(Rule, Allow)] = &[
     (ignored::run, Allow::Never),
     (log_tag::run, Allow::Inline),
     (markers::run, Allow::Inline),
+    (named_enum::run, Allow::Inline),
     (prefix::run, Allow::Inline),
     (skip::run, Allow::Inline),
     (sorted::run, Allow::Inline),

@@ -6,81 +6,40 @@
 use glam::Vec3;
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub enum LightType {
-    Ambient,
-    Directional,
-    Point,
-    Spotlight,
-}
-
-impl LightType {
-    /// Every type, in declaration order.
-    pub const ALL: [LightType; 4] = [
-        LightType::Ambient,
-        LightType::Directional,
-        LightType::Point,
-        LightType::Spotlight,
-    ];
-
-    /// The type's name, as the editor, the API and the scene snapshot spell it —
-    /// Unity's (`LightType.Spot`, #997).
-    pub fn name(&self) -> &'static str {
-        match self {
-            LightType::Ambient => "Ambient",
-            LightType::Directional => "Directional",
-            LightType::Point => "Point",
-            LightType::Spotlight => "Spot",
-        }
-    }
-
-    /// Parse a type name, case-insensitively; `None` for an unknown one.
-    pub fn parse(name: &str) -> Option<LightType> {
-        Self::ALL
-            .into_iter()
-            .find(|t| t.name().eq_ignore_ascii_case(name))
+crate::core::named_enum! {
+    /// What kind of light it is. Its names are the editor's, the API's and the scene
+    /// snapshot's: Unity's (`LightType.Spot`, #997).
+    #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+    pub enum LightType {
+        Ambient = "Ambient",
+        Directional = "Directional",
+        Point = "Point",
+        Spotlight = "Spot",
     }
 }
 
-/// How a light takes part in baked lighting (#438) — Unity's Light Mode.
-///
-/// * `Realtime` — direct light and shadows every frame; neither the lightmap bake nor
-///   the probe bake sees it, so it bounces nowhere.
-/// * `Mixed` — Unity's *Baked Indirect*: realtime direct light and shadows, plus its
-///   bounce baked into lightmaps and light probes. The default, because it is what
-///   every light did before modes existed (rendered live, bounced into the probe bake).
-/// * `Baked` — direct and bounce both baked, and never drawn live (#809): static
-///   surfaces get it from their lightmap, dynamic objects from the light probes (whose
-///   bake adds its direct light). It costs nothing at runtime and casts no realtime
-///   shadow.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub enum LightMode {
-    Realtime,
-    #[default]
-    Mixed,
-    Baked,
+crate::core::named_enum! {
+    /// How a light takes part in baked lighting (#438) — Unity's Light Mode.
+    ///
+    /// * `Realtime` — direct light and shadows every frame; neither the lightmap bake nor
+    ///   the probe bake sees it, so it bounces nowhere.
+    /// * `Mixed` — Unity's *Baked Indirect*: realtime direct light and shadows, plus its
+    ///   bounce baked into lightmaps and light probes. The default, because it is what
+    ///   every light did before modes existed (rendered live, bounced into the probe bake).
+    /// * `Baked` — direct and bounce both baked, and never drawn live (#809): static
+    ///   surfaces get it from their lightmap, dynamic objects from the light probes (whose
+    ///   bake adds its direct light). It costs nothing at runtime and casts no realtime
+    ///   shadow.
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+    pub enum LightMode {
+        Realtime = "Realtime",
+        #[default]
+        Mixed = "Mixed",
+        Baked = "Baked",
+    }
 }
 
 impl LightMode {
-    /// Every mode, in inspector order.
-    pub const ALL: [LightMode; 3] = [LightMode::Realtime, LightMode::Mixed, LightMode::Baked];
-
-    /// The mode's name, as the API and the inspector spell it.
-    pub fn name(self) -> &'static str {
-        match self {
-            LightMode::Realtime => "Realtime",
-            LightMode::Mixed => "Mixed",
-            LightMode::Baked => "Baked",
-        }
-    }
-
-    /// Parse a mode name, case-insensitively; `None` for an unknown one.
-    pub fn parse(name: &str) -> Option<LightMode> {
-        Self::ALL
-            .into_iter()
-            .find(|m| m.name().eq_ignore_ascii_case(name))
-    }
-
     /// Whether the lightmap bake includes this light's direct light (`Baked` only).
     pub fn bakes_direct(self) -> bool {
         self == LightMode::Baked
@@ -128,11 +87,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn mode_names_round_trip_and_bake_rules() {
-        for mode in LightMode::ALL {
-            assert_eq!(LightMode::parse(&mode.name().to_lowercase()), Some(mode));
-        }
-        assert_eq!(LightMode::parse("shadowmask"), None);
+    fn mode_bake_rules() {
         assert_eq!(LightMode::default(), LightMode::Mixed);
         assert!(!LightMode::Realtime.bakes_indirect() && !LightMode::Realtime.bakes_direct());
         assert!(LightMode::Mixed.bakes_indirect() && !LightMode::Mixed.bakes_direct());
@@ -140,17 +95,13 @@ mod tests {
     }
 
     #[test]
-    fn type_names_round_trip_and_only_unitys_names_parse() {
-        for t in LightType::ALL {
-            assert_eq!(LightType::parse(&t.name().to_lowercase()), Some(t));
-        }
+    fn only_unitys_type_names_parse() {
         assert_eq!(LightType::Spotlight.name(), "Spot", "Unity's name (#997)");
         assert_eq!(
             LightType::parse("Spotlight"),
             None,
             "the pre-#997 name is gone"
         );
-        assert_eq!(LightType::parse("Area"), None);
     }
 
     #[test]

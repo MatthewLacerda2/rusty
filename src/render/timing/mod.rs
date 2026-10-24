@@ -39,61 +39,34 @@ use std::cell::{Cell, RefCell};
 pub use clock::ClockProbe;
 use readback::Ring;
 
-/// The render passes the timer reports, under the stable names the stats use.
-///
-/// Every pass of one kind adds into its entry — the six cascade sweeps are one
-/// `shadows`, each render-texture camera's scene pass is in `forward`. New
-/// passes join a kind, or add one here (and to `docs/api/Debug.md`).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum GpuPass {
-    /// The sun's cascades and the point/spot shadow atlas.
-    Shadows,
-    /// The SSAO depth prepass, occlusion and blur.
-    Ssao,
-    /// The opaque scene pass: solids, skybox.
-    Forward,
-    /// Translucent solids.
-    Transparent,
-    /// Trails and lines.
-    Ribbons,
-    /// Particle systems.
-    Particles,
-    /// The post-FX chain: bloom, composite, authored effects, FXAA.
-    PostFx,
-    /// The editor's selection outline (its mask, dilation and ring, #1175) and the
-    /// gizmos drawn over it, both after post-FX (#1224).
-    Outline,
-    /// World and screen UI, its masks and backdrop blur.
-    Ui,
-}
-
-impl GpuPass {
-    /// Every pass, in frame order.
-    pub const ALL: [GpuPass; 9] = [
-        GpuPass::Shadows,
-        GpuPass::Ssao,
-        GpuPass::Forward,
-        GpuPass::Transparent,
-        GpuPass::Ribbons,
-        GpuPass::Particles,
-        GpuPass::PostFx,
-        GpuPass::Outline,
-        GpuPass::Ui,
-    ];
-
-    /// The pass's key in `Debug.Stats().gpu_passes`. Stable: reports diff on it.
-    pub fn name(self) -> &'static str {
-        match self {
-            GpuPass::Shadows => "shadows",
-            GpuPass::Ssao => "ssao",
-            GpuPass::Forward => "forward",
-            GpuPass::Transparent => "transparent",
-            GpuPass::Ribbons => "ribbons",
-            GpuPass::Particles => "particles",
-            GpuPass::Outline => "outline",
-            GpuPass::PostFx => "post_fx",
-            GpuPass::Ui => "ui",
-        }
+crate::core::named_enum! {
+    /// The render passes the timer reports, under the stable names the stats use
+    /// (each name is the pass's key in `Debug.Stats().gpu_passes`; reports diff on it).
+    ///
+    /// Every pass of one kind adds into its entry — the six cascade sweeps are one
+    /// `shadows`, each render-texture camera's scene pass is in `forward`. New
+    /// passes join a kind, or add one here (and to `docs/api/Debug.md`).
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+    pub enum GpuPass {
+        /// The sun's cascades and the point/spot shadow atlas.
+        Shadows = "shadows",
+        /// The SSAO depth prepass, occlusion and blur.
+        Ssao = "ssao",
+        /// The opaque scene pass: solids, skybox.
+        Forward = "forward",
+        /// Translucent solids.
+        Transparent = "transparent",
+        /// Trails and lines.
+        Ribbons = "ribbons",
+        /// Particle systems.
+        Particles = "particles",
+        /// The post-FX chain: bloom, composite, authored effects, FXAA.
+        PostFx = "post_fx",
+        /// The editor's selection outline (its mask, dilation and ring, #1175) and the
+        /// gizmos drawn over it, both after post-FX (#1224).
+        Outline = "outline",
+        /// World and screen UI, its masks and backdrop blur.
+        Ui = "ui",
     }
 }
 

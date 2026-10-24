@@ -32,7 +32,7 @@ fn point(lua: &Lua, p: Vec3) -> mlua::Result<Table> {
 /// A link as its Lua table.
 fn link_table(lua: &Lua, l: &OffMeshLinkData) -> mlua::Result<Table> {
     let t = lua.create_table()?;
-    t.set("type", l.kind.as_str())?;
+    t.set("type", l.kind.name())?;
     t.set("startPos", point(lua, l.start)?)?;
     t.set("endPos", point(lua, l.end)?)?;
     t.set("owner", l.owner)?;

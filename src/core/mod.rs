@@ -13,9 +13,12 @@ pub mod gamepad;
 pub mod hash;
 pub mod input;
 pub mod keymap;
+pub mod named_enum;
 pub mod paths;
 pub mod project;
 pub mod quality;
 pub mod random;
 pub mod storage;
 pub mod video;
+
+pub(crate) use named_enum::named_enum;

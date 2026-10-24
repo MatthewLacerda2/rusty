@@ -53,7 +53,7 @@ pub(super) fn register_reads<'scope>(
         scope.create_function(|_, id: u32| {
             let scene = scene.borrow();
             let status = scene.world.nav_agent(id).map(|a| a.path_status);
-            Ok(status.unwrap_or_default().as_str())
+            Ok(status.unwrap_or_default().name())
         }),
     )?;
     put(

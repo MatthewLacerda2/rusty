@@ -82,7 +82,7 @@ fn collider_shape_value(shape: &ColliderShape) -> Value {
             "kind": "Capsule",
             "radius": radius,
             "height": height,
-            "axis": axis.as_str(),
+            "axis": axis.name(),
         }),
         ColliderShape::Mesh {
             convex,
@@ -105,8 +105,8 @@ pub(crate) fn collider_value(c: &ColliderComponent) -> Value {
         "material": {
             "friction": c.material.friction,
             "bounciness": c.material.bounciness,
-            "friction_combine": c.material.friction_combine.as_str(),
-            "bounce_combine": c.material.bounce_combine.as_str(),
+            "friction_combine": c.material.friction_combine.name(),
+            "bounce_combine": c.material.bounce_combine.name(),
         },
     })
 }
@@ -119,7 +119,7 @@ pub(crate) fn rigidbody_value(r: &RigidBodyComponent) -> Value {
         "velocity": vec3(r.velocity),
         "angular_velocity": vec3(r.angular_velocity),
         "use_gravity": r.use_gravity,
-        "collision_detection": r.collision_detection.as_str(),
+        "collision_detection": r.collision_detection.name(),
     })
 }
 
