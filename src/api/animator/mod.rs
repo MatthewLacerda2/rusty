@@ -8,7 +8,8 @@
 //! component's `freeze` flag; `SetLooping` wraps the playhead at the clip's end.
 //! `SetBool`/`SetFloat`/`SetInt`/`SetTrigger` (#314) write the typed graph
 //! parameters the animation-graph evaluator (#316) reads to decide transitions.
-//! `GetBone` (#453) finds a bone GameObject of the entity's skeleton by name.
+//! `GetBone` (#453) finds a bone GameObject of the entity's skeleton by name, and
+//! `GetClip` (#1384) reads the base layer's current clip.
 //! The graph control surface (#316: `SetGraph`, `SetGraphEnabled`, `PlayNode`,
 //! `PlayAnimation`) lives in `graph.rs`, and the layer surface (#457:
 //! `SetLayerWeight`, `GetLayerWeight`, `GetCurrentNode`) in `layers.rs`, and the
@@ -99,7 +100,8 @@ fn register_play<'scope>(
 }
 
 /// `GetBone` — the bone GameObject of the entity's skeleton named `name` (#453),
-/// or `nil`. Bones are ordinary entities: parent to one, move it, add to it.
+/// or `nil`. Bones are ordinary entities: parent to one, move it, add to it. Also
+/// `GetClip`, the other per-entity read.
 fn register_get_bone<'scope>(
     scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
@@ -110,6 +112,19 @@ fn register_get_bone<'scope>(
         "GetBone",
         scope.create_function(|_, (id, name): (u32, String)| {
             Ok(scene.borrow().find_bone(id, &name))
+        }),
+    )?;
+    // `GetClip` (#1384): the base layer's current clip, Unity's
+    // `GetCurrentAnimatorClipInfo(0)`; `nil` without an animator.
+    put(
+        table,
+        "GetClip",
+        scope.create_function(|_, id: u32| {
+            let scene = scene.borrow();
+            Ok(scene
+                .world
+                .animator(id)
+                .map(|a| a.base.current_clip.clone()))
         }),
     )
 }

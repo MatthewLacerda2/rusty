@@ -4,7 +4,8 @@
 //! Split into focused submodules — `console` (log buffer + levels), `manager`
 //! (runtime init / live-state), `loader` (script compile + the queued spawn
 //! scan), `lifecycle` (the hook dispatch: init/update/trigger), `eval` (the
-//! REPL evaluator + API-surface walk), `timers` (the `Timer` scheduler: invokes
+//! REPL evaluator + API-surface walk), `shared` (the API's cells, owned, for a
+//! second VM over the same world), `timers` (the `Timer` scheduler: invokes
 //! and coroutines, #444), `callbacks` (the lifecycle-callback
 //! names, kept public and namespaced) and `api_doc` (the `docs/api/` reference,
 //! assembled for the drift gates and MCP) — and re-exported here so the public
@@ -26,12 +27,14 @@ mod loader;
 mod manager;
 mod sandbox;
 mod schema;
+mod shared;
 mod timers;
 
 pub use console::{ConsoleLogs, LogLevel};
 pub use discovery::{monobehaviour_scripts, script_label};
 pub use manager::ScriptManager;
 pub use schema::{parse_fields, FieldKind, ScriptField};
+pub use shared::ApiCells;
 pub use timers::TimerScheduler;
 pub(crate) use timers::{tween, wait, Clock, Target, Wait, Work};
 

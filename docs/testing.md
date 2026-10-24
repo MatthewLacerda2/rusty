@@ -7,6 +7,28 @@
 | Doctests | `///` examples | `cargo test --doc` (nextest does not run them) |
 | Harness scenarios | a project's `scenarios/*.lua` (dev-only); the engine's own in `tests/fixtures/project/scenarios/` | the headless `play` binary, `--project <dir>` |
 
+## What a scenario can call
+
+A scenario gets **the whole API** in `docs/api/`, read-write, through the same
+registration the gameplay VM uses (`api::register`, #1384) — a Unity editor test
+can call any runtime API, and a scenario that must not write the world simply
+doesn't — plus the scenario-only `Harness` table (step, assert, log, stats,
+screenshots, benches; `dev::bridge`). `Input`'s injection verbs (`Press`,
+`MoveMouse`, `SetAxis`, …) are the API's own, so a scenario plays as the user.
+
+It runs in a Lua VM of its own, beside the gameplay scripts' (which Play rebuilds
+on its first tick), and steps the world between calls, never inside one. Two
+things follow:
+
+- `Scene.GetScript(id, name)` answers a live **handle** on the gameplay instance,
+  not the table itself: `pc.vy` reads the field now, `pc.marker = {…}` writes it,
+  both by value (tables copy; a function field raises an error, and no gameplay
+  metamethod runs). It is `nil` before Play loads the script, and errors once the
+  instance is gone.
+- A Lua function a scenario passes the API (to `Timer.Invoke`, a `Tween`, a UI
+  handler) belongs to the scenario's VM, which the gameplay tick never calls:
+  drive time with `Harness.Step` instead.
+
 ## Rules
 - Test and fixture files are capped at **150 lines** by the size gate
   (`tools/lint`), except a `<x>_tests.rs` sibling of `<x>.rs` (or of a `<x>/`

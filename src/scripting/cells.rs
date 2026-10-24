@@ -12,6 +12,7 @@ use crate::core::frame_stats::FrameStats;
 use crate::core::quality::QualityPreset;
 use crate::core::storage::Storage;
 use crate::core::video::VideoSettings;
+use crate::physics::PhysicsWorld;
 use crate::ui::{EventSystem, ScreenSize};
 
 use super::ScriptManager;
@@ -22,6 +23,13 @@ impl ScriptManager {
     /// play-mode systems must agree on one device/log).
     pub fn set_audio_cell(&mut self, audio: Rc<RefCell<AudioMaestro>>) {
         self.audio = audio;
+    }
+
+    /// Inject the live rapier world's cell, the one `Resources` rebuilds on Play, so
+    /// the runtime holds it from construction rather than from the first
+    /// `init_runtime`: [`ScriptManager::api_cells`] clones it once (#1384).
+    pub fn set_physics_cell(&mut self, physics: Rc<RefCell<Option<PhysicsWorld>>>) {
+        self.physics = physics;
     }
 
     /// Inject the shared UI screen-size cell (#417). `Resources` calls this so the

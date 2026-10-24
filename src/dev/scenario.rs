@@ -15,7 +15,9 @@
 //!   local x1, _, z1 = Transform.GetPosition(player)
 //!   Harness.Expect(x1 ~= x0 or z1 ~= z0, "W should move the player")
 //!
-//! Runs in its own Lua VM, separate from the gameplay scripts inside `GameWorld`.
+//! Runs in its own Lua VM, separate from the gameplay scripts inside `GameWorld`,
+//! with the same API they get (`api::register`) plus the scenario-only `Harness`
+//! table (`dev::bridge`).
 
 use std::cell::RefCell;
 use std::path::{Path, PathBuf};
@@ -24,6 +26,7 @@ use std::rc::Rc;
 use mlua::Lua;
 
 use super::harness::Harness;
+use crate::api;
 use crate::core::application::BuildSettings;
 
 /// Default enemy brain used by the default scene when running scenarios.
@@ -60,13 +63,23 @@ fn run_in(harness: Harness, scenario_path: &Path) -> Result<RunReport, String> {
         .map_err(|e| format!("Failed to read scenario {}: {}", scenario_path.display(), e))?;
     let harness = Rc::new(RefCell::new(harness));
 
+    // The real API over the harness world's own cells (#1384), held for the whole
+    // run: every call borrows a cell only while it runs, and `Harness.Step` ticks
+    // the world (whose gameplay VM registers the same surface in its own scope)
+    // between calls, never inside one.
+    let cells = harness.borrow().world.borrow().script_manager().api_cells();
+    let ctx = cells.ctx();
     let lua = Lua::new();
-    super::bridge::register(&lua, &harness).map_err(|e| format!("Lua bridge error: {}", e))?;
-
     let exec = lua
-        .load(&code)
-        .set_name(scenario_path.to_string_lossy())
-        .exec();
+        .scope(|scope| {
+            api::register(&lua, scope, &ctx).map_err(mlua::Error::RuntimeError)?;
+            super::bridge::register(&lua, &harness)?;
+            Ok(lua
+                .load(&code)
+                .set_name(scenario_path.to_string_lossy())
+                .exec())
+        })
+        .map_err(|e| format!("Lua bridge error: {}", e))?;
     if let Err(e) = &exec {
         harness
             .borrow()

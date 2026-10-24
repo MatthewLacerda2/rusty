@@ -4,6 +4,11 @@ The stable surface available to Lua gameplay scripts, the console REPL, and
 bot-players — the rusty equivalent of Unity's Scripting Reference. One surface,
 three callers: anything documented here works identically in a `.lua` entity
 script, a console line, and a headless harness scenario.
+A scenario runs in a Lua VM of its own (the gameplay scripts' VM is rebuilt
+every Play), so the two things that are tables *of* the gameplay VM reach it
+by value: `Scene.GetScript` answers a live handle whose fields read and write
+as plain data, and a callback a scenario hands the API (`Timer`, `Tween`, a UI
+handler) never runs. See `docs/testing.md`, *What a scenario can call*.
 
 Entities are addressed by a numeric `id` (`u32`). `Vector3` values cross the
 boundary as three `f32`s (`x, y, z`) rather than a table. Getters that miss

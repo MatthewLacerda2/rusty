@@ -142,6 +142,7 @@ impl Resources {
         // platform layer binds it to a file at startup.
         let storage = Rc::new(RefCell::new(Storage::new()));
         script_manager.set_storage(Rc::clone(&storage));
+        script_manager.set_physics_cell(Rc::clone(&physics));
         // The audio maestro starts with a no-op backend (the harness path); the
         // windowed app injects the real `KiraBackend` after construction. Shared
         // with the script runtime so the `Audio` namespace drives the same maestro.
