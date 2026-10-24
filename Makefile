@@ -170,11 +170,19 @@ doc: ## [gate] Rustdoc with warnings denied, both feature sets
 	RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --locked
 	RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --locked --features dev
 
-test: ## [gate] Engine tests (nextest) and doctests, both feature sets
+# Then the same tests once more under plain `cargo test`, every test of a binary in
+# one process (#1338): nextest's process per test hides a test that leaks process-wide
+# state (the working directory, a `static`), and cargo-mutants runs `cargo test`, so
+# such a leak broke the mutation baseline of every branch until a mutation run failed
+# (#1042, #1069, #1337). The `dev` feature set, as the mutation runs build; the build
+# is the one nextest just made. `NEXTEST=1` keeps the guarantee that a test never
+# holds a provider key (`dev::providers::credentials`, #974).
+test: ## [gate] Engine tests (nextest, then one process per binary) and doctests
 	@command -v cargo-nextest >/dev/null 2>&1 || { \
 		echo "test: cargo-nextest is not installed — cargo install --locked cargo-nextest"; exit 1; }
 	$(TEST)
 	$(TEST) --features dev
+	NEXTEST=1 cargo test --locked --features dev --tests
 	cargo test --doc --locked
 	cargo test --doc --locked --features dev
 

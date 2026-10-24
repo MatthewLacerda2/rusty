@@ -160,6 +160,12 @@ jobs:
           cargo nextest run --profile ci --features dev --locked || rc=$?
           cp target/nextest/ci/junit.xml junit-dev.xml || true
           exit "$rc"
+      # The dev suite again under plain `cargo test`, one process per binary (#1338):
+      # a test leaking process-wide state passes nextest and breaks the mutation
+      # baseline (`make test` says more). Reuses the build of the step above.
+      - name: Test (engine, dev features, one process)
+        if: needs.changes.outputs.code != 'false'
+        run: NEXTEST=1 cargo test --locked --features dev --tests
       - name: Doctests (both feature sets)
         if: needs.changes.outputs.code != 'false'
         run: |

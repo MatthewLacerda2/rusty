@@ -18,7 +18,7 @@
 //! conversion failed at the refresh but has an older cache plays from that one,
 //! warned of as changed.
 //!
-//! Process-wide, as the cache and its lock are (per thread under test). The play
+//! Per thread (see `GATE`), while the cache and its lock are process-wide. The play
 //! state lives in `app`, above this module, so `app` holds the switch and this
 //! module never reads it.
 
@@ -63,41 +63,35 @@ const ON: Gate = Gate {
     missing: Vec::new(),
 };
 
-#[cfg(not(test))]
-static GATE: std::sync::Mutex<Gate> = std::sync::Mutex::new(ON);
-
-/// Run `f` on the gate.
-#[cfg(not(test))]
-fn with_gate<T>(f: impl FnOnce(&mut Gate) -> T) -> T {
-    // Nothing a panic could leave half-written: counters and lists of paths.
-    f(&mut GATE
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner))
-}
-
-// Per thread under test: `cargo test` (and cargo-mutants) runs every test of the
-// binary in one process, and one test's Play must not stop another's import.
-#[cfg(test)]
+// Per thread, in every build (#1337): a world plays on the thread that ticks it, and
+// that thread is the one that loads its assets, as Unity's asset database answers on
+// its main thread only. So a hold taken by one world refuses that world's thread
+// alone, and `cargo test` (cargo-mutants' runner), which runs every test of a
+// binary in one process, cannot have one test's Play refuse another's import. A
+// `cfg(test)`-only split missed the integration binary, which links the library
+// without `cfg(test)`. Converting off the world's thread would need the hold handed
+// across with the work.
 thread_local! {
     static GATE: std::cell::RefCell<Gate> = const { std::cell::RefCell::new(ON) };
 }
 
-#[cfg(test)]
+/// Run `f` on this thread's gate.
 fn with_gate<T>(f: impl FnOnce(&mut Gate) -> T) -> T {
     GATE.with(|gate| f(&mut gate.borrow_mut()))
 }
 
 /// Conversion refused while this lives: a world takes one as it enters Play and
 /// drops it at Stop, or when the world itself is dropped, so a world that never
-/// stops cannot leave conversion off for the rest of the process.
+/// stops cannot leave conversion off for the rest of its thread. Not `Send`: it
+/// counts on its thread's gate, so it drops there too.
 #[must_use = "conversion is refused only while the hold lives"]
-pub struct PlayHold(());
+pub struct PlayHold(std::marker::PhantomData<*const ()>);
 
 impl PlayHold {
     /// Refuse conversion until the hold drops.
     pub fn take() -> Self {
         with_gate(|gate| gate.plays += 1);
-        Self(())
+        Self(std::marker::PhantomData)
     }
 }
 

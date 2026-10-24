@@ -15,8 +15,9 @@
 - The sim must stay deterministic (fixed timestep, seeded RNG, no wall-clock in the
   tick) so harness/scenario tests are reproducible.
 - CI (`.github/workflows/ci.yml`) and `make test` run the engine suite with
-  **cargo-nextest** plus `cargo test --doc`, both feature sets; the lint xtask keeps
-  plain `cargo test`. See *The test runner* below.
+  **cargo-nextest** plus `cargo test --doc`, both feature sets, then the `dev` suite
+  once more under plain `cargo test` (one process per binary, #1338); the lint xtask
+  keeps plain `cargo test`. See *The test runner* below.
 - A test never reads a developer's game project (#782). `Harness::new` runs in a
   workspace of its own, `<out_dir>/workspace`, seeded fresh from the test-fixture
   project's scripts and the bundled ones, and the scene's relative script paths
@@ -59,13 +60,19 @@ cargo-nextest` (CI uses `taiki-e/install-action`). What it buys over `cargo test
 - **No retries.** A retried pass is still green, and a flaky test is a bug.
 
 `cargo test` still works and is still correct — nothing in the suite depends on the
-runner — but the gate is nextest. A weekly signal holds the promise: `cargo-test.yml`
-runs plain `cargo test`, both feature sets, on `main` every Sunday, and a red run files
-itself through `main-health` (#981). One guarantee is nextest's alone: **a test never
+runner — and the gate holds the promise for the `dev` feature set: after nextest,
+`make test` and CI's `build-test` run `NEXTEST=1 cargo test --locked --features dev
+--tests` on the same build (#1338). nextest's process per test hides a test that leaks
+process-wide state (a moved working directory, a `static` left set), while
+cargo-mutants runs `cargo test`, so before this gate such a leak passed every PR and
+broke the mutation baseline of every branch after it (#1042, #1069, #1337). `NEXTEST=1`
+is there for the provider-key guarantee below. The default feature set stays a weekly
+signal: `cargo-test.yml` runs plain `cargo test`, both feature sets, on `main` every
+Sunday, and a red run files itself through `main-health` (#981). One guarantee is nextest's alone: **a test never
 holds a provider key** (#974). Inside a unit test, or any process nextest starts (it
 sets `NEXTEST`), `dev::providers::environment()` drops every `*_API_KEY` and skips the
-`.env`; the integration binary under plain `cargo test` gets neither signal, so on a
-machine with a key it is not covered. Doctests stay on `cargo test --doc`, which nextest
+`.env`; the integration binary under plain `cargo test` gets neither signal unless
+`NEXTEST` is set by hand, as the gate's single-process run does. Doctests stay on `cargo test --doc`, which nextest
 cannot run. CI's `ci` profile additionally writes JUnit, rendered as the
 `build-test` job summary.
 

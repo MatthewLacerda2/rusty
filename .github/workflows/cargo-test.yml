@@ -5,7 +5,7 @@ name: cargo-test
 # `cargo test` runs a whole binary in one, so a test that leans on having its
 # process to itself (`set_var`, `set_current_dir`, a shared scratch path) passes
 # the gate and races here. Nothing else runs it on the default feature set; the
-# weekly mutation sweep's baseline covers `dev` only when that sweep runs.
+# `dev` set runs single-process on every PR too, in `build-test` (#1338).
 #
 # A red run files itself on the board through `main-health.yml`: a failure here
 # is the finding. Never on pull requests (the batch brief for #981); dispatch it
