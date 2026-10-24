@@ -58,7 +58,7 @@ fn gpu_import_settings_choose_the_mips_and_filter_and_follow_a_change() {
         // Each pixel is one texel: dark (up to ~60 on lavapipe, where the edges
         // of a black texel blend) or white, never the mips' grey.
         assert!(
-            c < 100 || c > 230,
+            !(100..=230).contains(&c),
             "pixel {at:?} is {c}: filtered or a mip was sampled"
         );
     }
