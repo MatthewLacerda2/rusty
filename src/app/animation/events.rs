@@ -17,7 +17,7 @@
 //! Every step's events are ordered by when in the step they were crossed, then
 //! by layer, then authored order — deterministic, and true time order.
 
-use crate::components::{Motion, Playback, Playhead};
+use crate::components::{Bounds, Motion, Playback, Playhead};
 
 use super::blend_tree::tree_weights;
 use super::motion::MotionContext;
@@ -55,16 +55,19 @@ impl MotionContext<'_> {
         span: (f32, f32),
         layer: usize,
     ) -> Vec<Crossed> {
-        let bounds = match (playback.loop_clip, playhead.wrap > 0.0) {
-            (true, true) => Bounds::Wrap(playhead.wrap),
-            (false, true) => Bounds::Clamp(playhead.wrap),
-            (_, false) => Bounds::Open,
-        };
+        let bounds = playhead.bounds(playback.loop_clip);
         let mut marks: Vec<(f32, &str)> = self.marks(playback);
-        // `End` fires on arriving at the end playing forwards, not on leaving it
-        // in reverse: once per pass (#1362).
-        if matches!(bounds, Bounds::Clamp(_)) && span.1 > span.0 {
-            marks.push((playhead.wrap, END_EVENT));
+        if let Bounds::Clamp(end) = bounds {
+            // A clamped playhead never passes the clip's ends, so a marker beyond
+            // them sits on the end (Unity keeps events within the clip).
+            for (mark, _) in &mut marks {
+                *mark = mark.clamp(0.0, end);
+            }
+            // `End` fires on arriving at the end playing forwards, not on leaving
+            // it in reverse: once per pass (#1362).
+            if span.1 > span.0 {
+                marks.push((end, END_EVENT));
+            }
         }
         let mut out = Vec::new();
         for (mark, name) in marks {
@@ -119,15 +122,6 @@ impl MotionContext<'_> {
             }
         }
     }
-}
-
-/// How a playhead treats its motion's length: wraps at it (looping), clamps to
-/// `[0, length]` (non-looping, #1362), or has none (unknown length).
-#[derive(Clone, Copy)]
-enum Bounds {
-    Wrap(f32),
-    Clamp(f32),
-    Open,
 }
 
 /// Where in `span` (as a fraction of it, `[0, 1]`) the playhead passes `mark`,

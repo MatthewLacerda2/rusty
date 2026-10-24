@@ -44,6 +44,7 @@ scene.entities[].animator.layers[].name: string
 scene.entities[].animator.layers[].node_speed: f32
 scene.entities[].animator.layers[].previous_clip: option
 scene.entities[].animator.layers[].previous_clip: string
+scene.entities[].animator.layers[].previous_loop: bool
 scene.entities[].animator.layers[].previous_time: f32
 scene.entities[].animator.layers[].previous_tree: option
 scene.entities[].animator.layers[].previous_tree: string
@@ -60,6 +61,7 @@ scene.entities[].animator.parameters{}<Int>: i32
 scene.entities[].animator.parameters{}<Trigger>: bool
 scene.entities[].animator.previous_clip: option
 scene.entities[].animator.previous_clip: string
+scene.entities[].animator.previous_loop: bool
 scene.entities[].animator.previous_time: f32
 scene.entities[].animator.previous_tree: option
 scene.entities[].animator.previous_tree: string

@@ -459,6 +459,7 @@
         "time": 0.0,
         "loop_clip": false,
         "previous_time": 0.0,
+        "previous_loop": false,
         "crossfade_elapsed": 0.0,
         "crossfade_duration": 0.0,
         "speed": 3.0,

@@ -83,17 +83,15 @@ fn an_end_reached_exactly_fires_once() {
 
 #[test]
 fn a_huge_speed_keeps_the_playhead_finite() {
-    for is_loop in [false, true] {
-        let (graph, mut anim) = rig(is_loop);
-        run(&graph, &mut anim, 200, 3e38);
-        assert!(
-            anim.base.time.is_finite(),
-            "loop {is_loop}: {}",
-            anim.base.time
-        );
-        run(&graph, &mut anim, 1, -1.0);
-        assert!(anim.base.time.is_finite(), "loop {is_loop}");
+    // The clip doesn't resolve, so nothing wraps or clamps it (`Bounds::Open`):
+    // only the finite guard holds it.
+    let (graph, mut anim) = rig(false);
+    anim.speed = 3e38;
+    let unresolved = mesh(vec![slide("B", &[HIPS], 0.0, 1.0, 1.0)]);
+    for _ in 0..200 {
+        advance(&mut anim, Some(&unresolved), Some(&graph), DT);
     }
+    assert!(anim.base.time.is_finite(), "{}", anim.base.time);
     let (graph, mut anim) = rig(false);
     run(&graph, &mut anim, 200, 3e38);
     run(&graph, &mut anim, 1, -1.0);

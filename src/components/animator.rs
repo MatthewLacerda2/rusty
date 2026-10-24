@@ -16,7 +16,7 @@ mod parameters;
 mod playback;
 pub use ik::{IkChain, IkConstraint, IkTarget};
 pub use parameters::{AnimatorParameter, AnimatorParameters};
-pub use playback::{Motion, Playback, Playhead};
+pub use playback::{Bounds, Motion, Playback, Playhead};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AnimatorComponent {
