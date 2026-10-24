@@ -12,12 +12,15 @@
 //!   first authored on a tie — so a walk/run blend plays one footstep, not two;
 //! - on an extra layer, only while its weight is above 0;
 //! - plus the automatic [`END_EVENT`] when a non-looping motion reaches its end
-//!   playing forwards: once per pass, since its playhead clamps there (#1362).
+//!   playing forwards: once per pass, since its playhead clamps there (#1362),
+//!   and also on the step a clip's length becomes known with the playhead
+//!   already past it, and on a zero-length clip's first step ([`Step::end`],
+//!   #1386).
 //!
 //! Every step's events are ordered by when in the step they were crossed, then
 //! by layer, then authored order — deterministic, and true time order.
 
-use crate::components::{Bounds, Motion, Playback, Playhead};
+use crate::components::{Bounds, Motion, Playback, Playhead, Step};
 
 use super::blend_tree::tree_weights;
 use super::motion::MotionContext;
@@ -46,15 +49,16 @@ pub fn sort(events: &mut [Crossed]) {
 }
 
 impl MotionContext<'_> {
-    /// The events `playback`'s current motion crossed travelling `span` this
-    /// step. `playhead` is the motion's rate and wrap.
+    /// The events `playback`'s current motion crossed on `step`. `playhead` is
+    /// the motion's rate and wrap.
     pub fn crossed(
         &self,
         playback: &Playback,
         playhead: Playhead,
-        span: (f32, f32),
+        step: Step,
         layer: usize,
     ) -> Vec<Crossed> {
+        let span = step.span;
         let bounds = playhead.bounds(playback.loop_clip);
         let mut marks: Vec<(f32, &str)> = self.marks(playback);
         if let Bounds::Clamp(end) = bounds {
@@ -62,11 +66,6 @@ impl MotionContext<'_> {
             // them sits on the end (Unity keeps events within the clip).
             for (mark, _) in &mut marks {
                 *mark = mark.clamp(0.0, end);
-            }
-            // `End` fires on arriving at the end playing forwards, not on leaving
-            // it in reverse: once per pass (#1362).
-            if span.1 > span.0 {
-                marks.push((end, END_EVENT));
             }
         }
         let mut out = Vec::new();
@@ -78,6 +77,20 @@ impl MotionContext<'_> {
                     layer,
                 });
             }
+        }
+        if let (Bounds::Clamp(end), true) = (bounds, step.end) {
+            // Partway through a step that travels onto the end; at its start when
+            // the playhead was already there (#1386).
+            let at = if span.1 > span.0 {
+                ((end - span.0) / (span.1 - span.0)).clamp(0.0, 1.0)
+            } else {
+                0.0
+            };
+            out.push(Crossed {
+                name: END_EVENT.to_string(),
+                at,
+                layer,
+            });
         }
         out
     }

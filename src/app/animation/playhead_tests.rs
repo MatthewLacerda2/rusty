@@ -20,10 +20,15 @@ fn idle() -> AnimatorComponent {
 }
 
 /// Step `anim` by `dt` over a mesh whose `Idle` and `Walk` clips last `length`
-/// seconds (0: a clip that never wraps).
+/// seconds (0: no clips, so neither resolves and the playhead runs free).
 fn step(anim: &mut AnimatorComponent, dt: f32, length: f32) {
     let clips = ["Idle", "Walk"].map(|n| slide(n, &[HIPS], 0.0, 1.0, length));
-    advance(anim, Some(&mesh(clips.to_vec())), None, dt);
+    let clips = if length > 0.0 {
+        clips.to_vec()
+    } else {
+        Vec::new()
+    };
+    advance(anim, Some(&mesh(clips)), None, dt);
 }
 
 #[test]

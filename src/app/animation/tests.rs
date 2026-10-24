@@ -231,8 +231,8 @@ fn a_clip_playhead_wraps_at_the_actual_clip_length() {
     assert_eq!(wrap(&mesh.clips[..], "Short"), 0.75);
     assert_eq!(wrap(&mesh.clips[..], "Long"), 2.5);
     // The "unknown, never wrap" sentinel: no clips, or a clip the mesh lacks.
-    assert_eq!(wrap(&[][..], "Short"), 0.0);
-    assert_eq!(wrap(&mesh.clips[..], "Ghost"), 0.0);
+    assert!(wrap(&[][..], "Short") < 0.0);
+    assert!(wrap(&mesh.clips[..], "Ghost") < 0.0);
 }
 
 /// Two clips of different lengths wrap the looping playhead at different, exact

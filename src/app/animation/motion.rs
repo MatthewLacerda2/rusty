@@ -133,12 +133,14 @@ impl MotionContext<'_> {
     }
 
     /// How `motion`'s playhead moves: a clip in seconds wrapping at its duration
-    /// (0, never wrap, when it doesn't resolve); a tree normalized, at one cycle
-    /// per weighted-mean child length (Unity's blended duration), standing still
-    /// when it has no length.
+    /// ([`Playhead::unresolved`], never wrap, when it doesn't resolve); a tree
+    /// normalized, at one cycle per weighted-mean child length (Unity's blended
+    /// duration), standing still when it has no length.
     pub fn playhead(&self, motion: Motion<'_>) -> Playhead {
         match motion {
-            Motion::Clip(name) => Playhead::clip(self.clip(name).map_or(0.0, |c| c.duration)),
+            Motion::Clip(name) => self
+                .clip(name)
+                .map_or(Playhead::unresolved(), |c| Playhead::clip(c.duration)),
             Motion::Tree(node) => {
                 let children = self.tree_node(node).map(|n| self.weighted_children(n));
                 let (sum, total) = children
@@ -167,7 +169,7 @@ impl MotionContext<'_> {
         let previous = playback
             .previous_motion()
             .map_or(1.0, |m| self.playhead(m).per_second);
-        let span = playback.advance(dt, speed, current, previous);
-        self.crossed(playback, current, span, layer)
+        let step = playback.advance(dt, speed, current, previous);
+        self.crossed(playback, current, step, layer)
     }
 }

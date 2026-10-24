@@ -70,6 +70,8 @@ fn a_nan_step_stands_still() {
     playback.time = 0.5;
     // A node's `speed: 0` times an infinite animator speed is NaN.
     playback.node_speed = 0.0;
-    let span = playback.advance(0.1, f32::INFINITY, Playhead::clip(1.0), 1.0);
+    let span = playback
+        .advance(0.1, f32::INFINITY, Playhead::clip(1.0), 1.0)
+        .span;
     assert_eq!((playback.time, span), (0.5, (0.5, 0.5)));
 }

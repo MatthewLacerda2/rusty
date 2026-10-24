@@ -14,9 +14,11 @@ mod graph_state;
 mod ik;
 mod parameters;
 mod playback;
+mod playhead;
 pub use ik::{IkChain, IkConstraint, IkTarget};
 pub use parameters::{AnimatorParameter, AnimatorParameters};
-pub use playback::{Bounds, Motion, Playback, Playhead};
+pub use playback::{Motion, Playback, Step};
+pub use playhead::{Bounds, Playhead};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AnimatorComponent {

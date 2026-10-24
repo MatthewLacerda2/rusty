@@ -37,7 +37,7 @@ pub mod visual_correction;
 
 pub use animator::{
     AnimatorComponent, AnimatorParameter, AnimatorParameters, Bounds, IkChain, IkConstraint,
-    IkTarget, LayerState, Motion, Playback, Playhead,
+    IkTarget, LayerState, Motion, Playback, Playhead, Step,
 };
 pub use audio_source::AudioSourceComponent;
 pub use camera::{
