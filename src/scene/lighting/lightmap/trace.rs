@@ -20,8 +20,8 @@ use std::f32::consts::{PI, TAU};
 
 use glam::Vec3;
 
-use super::bvh::{Bvh, Hit};
 use super::input::{BakeLight, BakeRun, BakeScene, LightShape};
+use super::rays::{Hit, Rays};
 use super::rng::Rng;
 use crate::core::color::luminance;
 
@@ -52,7 +52,7 @@ pub(super) struct TexelLight {
 /// The static scene ready to trace.
 pub(super) struct Tracer<'a> {
     pub scene: &'a BakeScene,
-    pub bvh: &'a Bvh,
+    pub rays: &'a Rays,
 }
 
 impl Tracer<'_> {
@@ -102,7 +102,7 @@ impl Tracer<'_> {
             if depth == 0 {
                 first = dir;
             }
-            let Some(hit) = self.bvh.closest(origin, dir, T_MIN, f32::MAX) else {
+            let Some(hit) = self.rays.closest(origin, dir, T_MIN, f32::MAX) else {
                 radiance += throughput * self.sky(dir);
                 break;
             };
@@ -120,7 +120,7 @@ impl Tracer<'_> {
     /// The offset hit point, its shading normal and the material run it landed on
     /// (#1290) — `None` on a back face.
     fn surface(&self, hit: &Hit, dir: Vec3) -> Option<(Vec3, Vec3, &BakeRun)> {
-        let tri = &self.bvh.tris[hit.tri];
+        let tri = &self.rays.tris[hit.tri];
         if tri.normal().dot(dir) >= 0.0 {
             return None;
         }
@@ -146,7 +146,7 @@ impl Tracer<'_> {
             }
             if let Some((to_light, distance, received)) = arrival(light, point) {
                 let cos = normal.dot(to_light);
-                if cos > 0.0 && !self.bvh.occluded(point, to_light, T_MIN, distance) {
+                if cos > 0.0 && !self.rays.occluded(point, to_light, T_MIN, distance) {
                     e += received * cos;
                     dir += to_light * luminance(received * cos);
                 }

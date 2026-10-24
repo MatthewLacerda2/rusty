@@ -6,8 +6,8 @@
 //! lighting. The pieces:
 //!
 //! * `input` — the static scene flattened for the bake ([`BakeScene::gather`]);
-//! * `bvh` / `raster` / `trace` — ray acceleration, texel → surface point, and the
-//!   per-texel estimate (the units it stores are explained in `trace`);
+//! * `rays` / `raster` / `trace` — ray queries (parry's `TriMesh`), texel → surface
+//!   point, and the per-texel estimate (the units it stores are explained in `trace`);
 //! * `filter` — the edge-aware Gaussian that smooths the baked bounce;
 //! * `bake` — the parallel, seeded driver ([`bake`]), watched and stopped through
 //!   `progress` ([`BakeProgress`], #808);
@@ -23,13 +23,13 @@
 
 mod atlas;
 mod bake;
-mod bvh;
 mod encode;
 mod filter;
 mod input;
 mod probe_direct;
 mod progress;
 mod raster;
+mod rays;
 mod rng;
 mod set;
 mod trace;
@@ -53,6 +53,8 @@ mod gather_tests;
 mod probe_direct_tests;
 #[cfg(test)]
 mod progress_tests;
+#[cfg(test)]
+mod rays_tests;
 #[cfg(test)]
 mod run_bake_tests;
 #[cfg(test)]
