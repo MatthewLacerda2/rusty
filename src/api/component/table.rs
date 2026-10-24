@@ -127,6 +127,9 @@ pub(super) use inspect;
 /// (`None`: writable).
 pub type FieldInfo = (&'static str, Option<&'static str>);
 
+/// Applies a change table to an entity's component; `Ok(false)` without one.
+pub type WriteAny = fn(&mut World, u32, &Map<String, Value>) -> Result<bool, String>;
+
 /// A component the namespace can name, with its type erased.
 pub struct Kind {
     /// The name `Component.*` answers to first (any name `Scene.AddComponent`
@@ -139,8 +142,7 @@ pub struct Kind {
     #[cfg(test)]
     pub key: &'static str,
     pub read: fn(&World, u32) -> Option<Result<Value, String>>,
-    /// Apply a change table; `Ok(false)` when the entity has no such component.
-    pub write: fn(&mut World, u32, &Map<String, Value>) -> Result<bool, String>,
+    pub write: WriteAny,
     pub fields: fn() -> Vec<FieldInfo>,
     /// The field names the component's serde derive declares (the table test).
     #[cfg(test)]
@@ -151,8 +153,10 @@ pub struct Kind {
 pub const fn kind<C: Inspect>(
     name: &'static str,
     add: Option<ComponentKind>,
-    #[cfg_attr(not(test), allow(unused_variables))] key: &'static str,
+    key: &'static str,
 ) -> Kind {
+    #[cfg(not(test))]
+    let _ = key;
     Kind {
         name,
         add,

@@ -289,6 +289,7 @@ serves an agent. A new entry goes where it reads best. -->
 - [`Animator`](Animator.md)
 - [`Input`](Input.md)
 - [`Scene`](Scene.md)
+- [`Component`](Component.md)
 - [`Assets`](Assets.md)
 - [`Texture`](Texture.md)
 - [`Shader`](Shader.md)

@@ -42,7 +42,7 @@ fn get_reads_fields_and_set_writes_through_the_op() {
     );
     // The op's clamp, the enum read in any case and written back by its name.
     assert_eq!(out.unwrap(), (1000.0, false, "Continuous".to_string()));
-    assert!(!scene.world.rigidbody(1).map_or(true, |rb| rb.use_gravity));
+    assert!(scene.world.rigidbody(1).is_some_and(|rb| !rb.use_gravity));
 }
 
 #[test]

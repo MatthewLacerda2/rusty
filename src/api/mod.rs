@@ -2,7 +2,7 @@
 //!
 //! The single stable API surface shared by Lua scripts, the console REPL and
 //! bot-players. Every namespace (`Transform`, `Input`, `Time`, `Physics`,
-//! `Scene`, `Random`, `Timer`, `Tween`, `Camera`, `Light`, `Animator`, `Nav`, `Material`,
+//! `Scene`, `Component`, `Random`, `Timer`, `Tween`, `Camera`, `Light`, `Animator`, `Nav`, `Material`,
 //! `Assets`, `Texture`, `Shader`, `Sound`, `Particles`, `Layers`, `Graphics`, `Video`,
 //! `Storage`, `Canvas`, `RectTransform`, `UI`, `Image`, `CanvasGroup`, `RectMask`, `Mask`,
 //! `BackdropFilter`, `Text`, `Shape`, `Selectable`,
@@ -168,6 +168,17 @@ fn register_navigation<'scope>(
     offmesh_link::register(lua, scope, ctx.scene, ctx.nav)
 }
 
+/// The scene namespaces: `Scene` (structure) and `Component` (fields by name, #1369).
+fn register_scene<'scope>(
+    lua: &Lua,
+    scope: &'scope mlua::Scope<'scope, '_>,
+    ctx: &ApiScopedCtx<'scope>,
+) -> Reg {
+    // sorted: each registrar makes its own global table
+    component::register(lua, scope, ctx.scene)?;
+    scene::register(lua, scope, ctx.scene, ctx.scene_path)
+}
+
 /// Register every namespace onto `lua` using `scope`-tied closures that borrow
 /// the engine resources via `ctx`. This is the one place the whole script
 /// surface is wired up, shared by gameplay scripts, the console REPL and
@@ -191,7 +202,6 @@ pub fn register<'scope>(
     camera::register(lua, scope, ctx)?;
     canvas::register(lua, scope, ctx.scene, ctx.screen, ctx.video)?;
     character_controller::register(lua, scope, ctx.scene, ctx.physics)?;
-    component::register(lua, scope, ctx.scene)?;
     decals::register(lua, scope, ctx.scene)?;
     graphics::register(lua, scope, ctx.scene, ctx.quality)?;
     input::register_readable(lua, scope, ctx.input)?;
@@ -212,9 +222,9 @@ pub fn register<'scope>(
     rect_transform::register(lua, scope, ctx.scene, (ctx.screen, ctx.video))?;
     reflection::register(lua, scope, ctx.scene)?;
     register_navigation(lua, scope, ctx)?;
+    register_scene(lua, scope, ctx)?;
     register_ui_components(lua, scope, ctx.scene)?;
     reverb_zone::register(lua, scope, ctx.scene)?;
-    scene::register(lua, scope, ctx.scene, ctx.scene_path)?;
     selectable::register(lua, scope, ctx.scene, ctx.event_system)?;
     // `Shader` (#272) borrows no engine state — it reads a recipe, validates it
     // through naga_oil, and writes a `.wgsl` file — so it is a plain static namespace.
