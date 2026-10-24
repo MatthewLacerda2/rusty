@@ -35,7 +35,8 @@ Dev builds read it back with `Debug.AudioEvents` and the live per-source roster 
 |---|---|---|
 | `Audio.Play` | `(id)` | `bool` — started the entity's `AudioSource` (logs a Play event) |
 | `Audio.Stop` | `(id)` | — (stops the entity's voice, logs a Stop event) |
-| `Audio.SetVolume` | `(id, v)` | — (retunes the live voice's volume, pre-master; no-op if not playing) |
+| `Audio.SetVolume` | `(id, v)` | — (Unity `AudioSource.volume`: sets the entity's `AudioSource` volume, clamped to `[0, 1]` as the inspector's is, and retunes its live voice, pre-master; no-op without an `AudioSource`) |
+| `Audio.GetVolume` | `(id)` | `number` — the `AudioSource`'s volume, `[0, 1]` (`0` without one) |
 | `Audio.PlayAt` | `(path, x, y, z [, vol [, min_distance, max_distance [, group]]])` | `bool` — fire-and-forget one-shot at a world position (`vol` defaults to 1.0; `nil` keeps the default); fully 3D and time-scaled (see below); the optional rolloff band (both or neither, `0 <= min_distance <= max_distance`, finite — else an error) replaces the default 1 → 16 m so a gunshot or explosion carries further; `group` is the mixer group it plays through (Master by default; an unknown name plays through Master with a warning); leaves no component, logged as a `PlayAt` event |
 | `Audio.GetMasterVolume` | `()` | `number` (linear, `[0, 1]`) |
 | `Audio.SetMasterVolume` | `(v)` | — (clamped to `[0, 1]`; re-folds every live voice) |

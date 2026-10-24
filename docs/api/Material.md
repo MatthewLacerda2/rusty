@@ -31,6 +31,7 @@ conversion wrote into the import cache is a reference (#1072).
 |---|---|
 | `Material.SetMetallic` | `(id, value)` — clamped to `[0,1]` (NaN or `math.huge` reads as 0) |
 | `Material.SetRoughness` | `(id, value)` — clamped to `[0,1]` (NaN or `math.huge` reads as 0) |
+| `Material.SetColor` | `(id, {r, g, b})` — the base-colour (albedo tint) factor, Unity's `material.color`; each channel clamped to `[0,1]`, and a colour with a NaN or infinite channel is ignored |
 | `Material.SetEmissive` | `(id, {r, g, b})` — the flat emissive factor (self-illumination; values >1.0 bloom on the HDR target; each channel floored at 0, and a colour with a NaN or infinite channel is ignored) |
 | `Material.SetMetallicMap` | `(id, path)` — sampled by the renderer; the map's blue channel scales the metallic value (glTF metallic-roughness convention) |
 | `Material.SetRoughnessMap` | `(id, path)` — sampled by the renderer; the map's green channel scales the roughness value |

@@ -27,6 +27,7 @@ fn lua_material_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::E
             Material.SetMetallic({via_lua}, 0.7)
             Material.SetRoughness({via_lua}, 0.2)
             Material.SetEmissive({via_lua}, {{1.0, 0.5, 0.0}})
+            Material.SetColor({via_lua}, {{0.25, 2.0, 0.5}})
             Material.SetTexture({via_lua}, "albedo.png")
             Material.SetRenderMode({via_lua}, "transparent")
             Material.SetAlpha({via_lua}, 2.0)
@@ -46,6 +47,7 @@ fn lua_material_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::E
         mat_ops::set_metallic(&mut sc.materials, &key, 0.7);
         mat_ops::set_roughness(&mut sc.materials, &key, 0.2);
         mat_ops::set_emissive(&mut sc.materials, &key, [1.0, 0.5, 0.0]);
+        mat_ops::set_base_color(&mut sc.materials, &key, [0.25, 2.0, 0.5]);
         mat_ops::set_base_color_map(&mut sc.materials, &key, "albedo.png".to_string());
         mat_ops::set_render_mode(&mut sc.materials, &key, RenderMode::Transparent);
         mat_ops::set_alpha(&mut sc.materials, &key, 2.0);
@@ -59,6 +61,8 @@ fn lua_material_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::E
     assert_eq!(lua_mat.metallic, op_mat.metallic);
     assert_eq!(lua_mat.roughness, op_mat.roughness);
     assert_eq!(lua_mat.emissive, op_mat.emissive);
+    assert_eq!(lua_mat.base_color, [0.25, 1.0, 0.5], "clamped by the op");
+    assert_eq!(lua_mat.base_color, op_mat.base_color);
     assert_eq!(lua_mat.base_color_map, op_mat.base_color_map);
     assert_eq!(lua_mat.render_mode, op_mat.render_mode);
     // Both clamped identically by the single shared op.

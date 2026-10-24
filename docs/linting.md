@@ -18,6 +18,7 @@ agent can read exactly what failed.
 | Dependency direction | `tools/lint -- --direction` | the table's sim modules never reference `crate::render`, `crate::editor`, `wgpu` or `egui` — the arrow is render/editor → sim (#494) |
 | Dependency locks | cargo-deny (`deny.toml`) | **hard gate**: every git dependency is pinned by `rev` (`required-git-spec`); `nalgebra` only through the physics stack and no `cgmath` — glam is the one math crate (#975) |
 | Docs name what exists | `make docrefs` (`.github/scripts/docrefs.py`) | **hard gate**: every `src/`, `tests/`, `tools/`, `docs/` or `.github/` path in a tracked `*.md`'s inline code is tracked, every `` `make <verb>` `` is a target, and CLAUDE.md's namespaces each have a `docs/api/` page; placeholders pass, anything else takes `<!-- docrefs: allow <why> -->`. Runs on Markdown-only PRs too (#973) |
+| Editor↔API parity per op | `tools/lint -- --rules` (`api-parity`) | **hard gate**: every `scene::authoring::<module>::set_*` op a non-test line of `src/editor/` names is also named from `src/api/` — a named setter's call or an `op!`/`with!`/`group!` row of `api::component`'s tables — so anything the inspector writes, Lua can; an editor-only op takes `// lint: allow(api-parity) <why>` at its `fn`, and an allow on an op Lua reaches or no inspector names is stale and fails (#1368) |
 | Editor↔shared-op parity | `tools/lint -- --parity` | every first-class component's inspector card routes its mutations through a shared `scene::authoring` op (never direct field writes through the #344 accessor guard) |
 | File length | `tools/lint` | <= 300 lines: every line of a `.rs` file, the lines of code of a `.py`, `.lua` or `.wgsl` one (docstrings, comments and blank lines free, #926, #1015); nothing grandfathered |
 | Finite authoring floats | `tools/lint -- --rules` (`sanitize`) | **hard gate**: every `pub fn set_*` under `src/scene/authoring/` that takes an `f32` or a glam vector passes it to a `scene::authoring::sanitize` helper (or a sibling setter of its file), so NaN and `±inf` from Lua or the editor take the field's fallback and never reach a field; a value checked another way takes `// lint: allow(sanitize) <why>` (#1361) |
@@ -201,6 +202,21 @@ new flag, gate, CI step or baseline.
   callers carry an inline allow. The rule is lexical (`rules/active_self.rs`): it
   misses a read of the flag that does not go through that name, which the private
   `ecs::bundle::Core` keeps inside `src/ecs/`.
+- **`api-parity`** (#1368) — "anything the editor does, the API does"
+  (`docs/game-agent.md`), field by field. `--parity` holds that the inspector writes
+  through a shared `scene::authoring` op; this rule holds that Lua reaches the same
+  op: every `authoring::<module>::set_*` op a non-test line of `src/editor/` names
+  must be named from `src/api/` too, by a named setter (`Physics.SetMass`) or by
+  `api::component`'s field tables (`op!("mass", rb::set_mass)`, which `Component.Set`
+  dispatches through), so editor and Lua share one validation. Ops are matched by
+  path: each file's `use crate::scene::authoring::…` trees give its aliases
+  (`rigidbody as rb`, `{self as ops, …}`, `nav::{agent, …}`), so the finding names
+  `nav::agent::set_speed` however a file spells it. An op only the inspector may write
+  (a display toggle) takes `// lint: allow(api-parity) <why>` above its `fn`; the
+  rule reads its own allows, so one on an op Lua reaches, or that no inspector
+  names, fails as stale. A line scan (`rules/api_parity.rs`): an op Lua reaches only
+  through a helper in another module reads as unreached; call the op from the
+  binding instead.
 - **`asset-write`** (#1220) — a file a path-keyed cache reads is written through
   `core::fs::written::write`, or its writer calls `note_written` after (#1207).
   A non-test line of `src/` outside `src/core/fs/` calling `fs::write(`,
