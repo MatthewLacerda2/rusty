@@ -47,6 +47,17 @@ fn get_script_hands_out_the_live_instance() {
 }
 
 #[test]
+fn a_nil_id_reads_as_nothing() {
+    let ui = Ui::new(|_| {});
+    assert_eq!(ui.eval("Scene.FindEntityByName('Nope')"), "nil");
+    assert_eq!(ui.eval("Scene.GetScript(nil, 'button')"), "nil");
+    assert_eq!(ui.eval("Scene.GetParent(nil)"), "nil");
+    assert_eq!(ui.eval("Scene.FindChild(nil, 'a')"), "nil");
+    assert_eq!(ui.eval("#Scene.GetChildren(nil)"), "0");
+    assert_eq!(ui.eval("Scene.IsActive(nil)"), "false");
+}
+
+#[test]
 fn measure_string_counts_trailing_spaces() {
     let mut label = 0;
     let ui = Ui::new(|s| {
