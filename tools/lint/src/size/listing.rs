@@ -12,46 +12,21 @@
 //! compiles, and an ignored `.rs` under a scan root is compiled all the same. The
 //! `ignored` rule flags exactly that file, so it must see it.
 
+use crate::repo::ls_files;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 /// The committable files under `roots` in the repository at `base`, joined onto
-/// `base`, sorted; `None` when git can't list them (no `.git`, as in a tarball, or
-/// no `git` at all), and the caller walks the disk instead.
-pub(super) fn committable(base: &Path, roots: &[&str]) -> Option<Vec<PathBuf>> {
-    let dir = if base.as_os_str().is_empty() {
-        Path::new(".")
-    } else {
-        base
-    };
-    let out = Command::new("git")
-        .arg("-C")
-        .arg(dir)
-        .args([
-            "ls-files",
-            "-z",
-            "--cached",
-            "--others",
-            "--exclude-standard",
-        ])
-        .arg("--")
-        .args(roots)
-        .output()
-        .ok()?;
-    if !out.status.success() {
-        return None;
-    }
-    let mut files: Vec<PathBuf> = String::from_utf8_lossy(&out.stdout)
-        .split('\0')
-        .filter(|p| !p.is_empty())
+/// `base`, sorted; `Err` with git's own message when git can't list them (no `.git`,
+/// as in a tarball, no `git` at all, or git refusing the checkout), and the caller
+/// walks the disk instead.
+pub(super) fn committable(base: &Path, roots: &[&str]) -> Result<Vec<PathBuf>, String> {
+    let flags = ["--cached", "--others", "--exclude-standard"];
+    Ok(ls_files(base, &flags, roots)?
+        .into_iter()
         .map(|p| base.join(p))
         // `--cached` still lists a tracked file deleted from the working tree.
         .filter(|p| p.is_file())
-        .collect();
-    // A file with a merge conflict is listed once per stage.
-    files.sort();
-    files.dedup();
-    Some(files)
+        .collect())
 }
 
 #[cfg(test)]

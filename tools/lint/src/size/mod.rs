@@ -96,16 +96,18 @@ pub fn run(args: &[String]) {
 /// committable ones git lists, or, where git can't list them (a tarball with no
 /// `.git`), every file on disk, build output aside, and a note on stderr saying so.
 fn full_scan(base: &Path) -> Vec<PathBuf> {
-    if let Some(files) = listing::committable(base, SIZE_ROOTS) {
-        return files
-            .into_iter()
-            .filter(|p| Lang::of(p).is_some())
-            .collect();
+    match listing::committable(base, SIZE_ROOTS) {
+        Ok(files) => {
+            return files
+                .into_iter()
+                .filter(|p| Lang::of(p).is_some())
+                .collect()
+        }
+        Err(why) => eprintln!(
+            "lint: git can't list the committable files here ({why}); measuring every \
+             file on disk, gitignored ones included"
+        ),
     }
-    eprintln!(
-        "lint: git can't list the committable files here; measuring every file on \
-         disk, gitignored ones included"
-    );
     SIZE_ROOTS
         .iter()
         .flat_map(|root| measured_in(&base.join(root)))
