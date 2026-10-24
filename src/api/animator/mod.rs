@@ -12,12 +12,14 @@
 //! The graph control surface (#316: `SetGraph`, `SetGraphEnabled`, `PlayNode`,
 //! `PlayAnimation`) lives in `graph.rs`, and the layer surface (#457:
 //! `SetLayerWeight`, `GetLayerWeight`, `GetCurrentNode`) in `layers.rs`, and the
-//! IK surface (#461: `Add*IK`, `RemoveIK`, `SetIK*`, `GetIKWeight`) in `ik.rs` —
+//! IK surface (#461: `Add*IK`, `RemoveIK`, `SetIK*`, `GetIKWeight`) in `ik.rs`,
+//! and the playback-speed surface (#1342: `SetSpeed`, `GetSpeed`) in `speed.rs` —
 //! one namespace, split to stay under the size cap.
 
 mod graph;
 mod ik;
 mod layers;
+mod speed;
 
 use std::cell::RefCell;
 
@@ -42,6 +44,7 @@ pub fn register<'scope>(
     register_stop(scope, &table, scene)?;
     register_pause_resume(scope, &table, scene)?;
     register_set_looping(scope, &table, scene)?;
+    speed::register(scope, &table, scene)?;
     register_set_bool_float(scope, &table, scene, console)?;
     register_set_int_trigger(scope, &table, scene, console)?;
     register_get_bone(scope, &table, scene)?;

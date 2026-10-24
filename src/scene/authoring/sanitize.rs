@@ -15,10 +15,16 @@ pub const MIN_EXTENT: f32 = 1e-3;
 
 /// `v`, or `0.0` when it is NaN or infinite.
 pub(super) fn finite(v: f32) -> f32 {
+    finite_or(v, 0.0)
+}
+
+/// `v`, or `fallback` when it is NaN or infinite. A setter whose field has no
+/// natural zero passes the field's current value, so a bad input changes nothing.
+pub(super) fn finite_or(v: f32, fallback: f32) -> f32 {
     if v.is_finite() {
         v
     } else {
-        0.0
+        fallback
     }
 }
 
@@ -63,6 +69,7 @@ mod tests {
     fn non_finite_inputs_take_the_fallback() {
         for bad in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
             assert_eq!(finite(bad), 0.0);
+            assert_eq!(finite_or(bad, 1.5), 1.5);
             assert_eq!(at_least(bad, 2.0), 2.0);
             assert_eq!(non_negative(bad), 0.0);
             assert_eq!(unit(bad), 0.0);
@@ -72,6 +79,7 @@ mod tests {
 
     #[test]
     fn finite_inputs_are_clamped_into_range() {
+        assert_eq!(finite_or(-3.0, 1.5), -3.0);
         assert_eq!(at_least(0.5, 2.0), 2.0);
         assert_eq!(non_negative(-1.0), 0.0);
         assert_eq!(unit(1.5), 1.0);

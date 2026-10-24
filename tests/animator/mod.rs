@@ -1,6 +1,7 @@
 mod graph_api;
 mod layers_api;
 mod parameters;
+mod speed_api;
 
 use std::cell::RefCell;
 
