@@ -11,6 +11,7 @@
 #[cfg(feature = "dev")]
 pub mod capture;
 mod cursor_release;
+mod follow;
 mod game_focus;
 mod icon;
 mod paint;
@@ -63,6 +64,8 @@ pub struct EditorFrontend {
     scene_id: Option<SceneId>,
     /// The watch on the project's files (#1327); `None` when nothing could be watched.
     watch: Option<watch::Watch>,
+    /// The open scene following its file on disk (#1340).
+    follow: follow::SceneFollow,
 }
 
 impl EditorFrontend {
@@ -99,6 +102,7 @@ impl EditorFrontend {
             game_view: None,
             scene_id: None,
             watch: watch::Watch::editor(),
+            follow: follow::SceneFollow::new(),
         }
     }
 
@@ -250,6 +254,7 @@ impl Frontend for EditorFrontend {
         if let Some(watch) = &mut self.watch {
             watch.apply(game.scene().borrow().is_playing());
         }
+        self.follow_scene_file(game);
         let raw_input = self.egui_winit.take_egui_input(&shell.window);
         self.egui_ctx.begin_pass(raw_input);
 

@@ -59,3 +59,21 @@ fn a_destroy_queued_in_a_paused_play_does_not_outlive_stop() {
         "the edit entity survives"
     );
 }
+
+/// `Scene.Save` in Play raises a Lua error naming the rule and leaves the scene
+/// file as it was (#1340).
+#[test]
+fn scene_save_is_refused_in_play() {
+    let path = write_scene("save");
+    let before = std::fs::read(&path).unwrap();
+    let (mut gw, _) = world_at(&path);
+    gw.set_playing(true);
+    gw.poll_transition();
+    let err = gw.script_manager().eval("Scene.Save()").unwrap_err();
+    assert!(err.contains("stop Play first"), "{err}");
+    assert_eq!(
+        std::fs::read(&path).unwrap(),
+        before,
+        "the file is untouched"
+    );
+}

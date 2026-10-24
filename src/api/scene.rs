@@ -236,6 +236,7 @@ fn register_parenting<'scope>(
 /// `Save([path])` — persist the live world. No path writes back to the current
 /// scene file (the shared `scene_path` cell); an explicit path writes there and
 /// also becomes the new current scene file (mirroring the editor's Save As).
+/// Refused during Play by the scene layer (#1340).
 fn register_save<'scope>(
     scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
@@ -257,7 +258,7 @@ fn register_save<'scope>(
             scene
                 .borrow()
                 .save_to_file(&target)
-                .map_err(mlua::Error::RuntimeError)?;
+                .map_err(|e| mlua::Error::RuntimeError(format!("Scene.Save: {e}")))?;
             *scene_path.borrow_mut() = Some(target.clone());
             Ok(target)
         }),

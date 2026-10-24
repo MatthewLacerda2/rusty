@@ -106,7 +106,11 @@ fn file_menu(
             ui.close();
         }
         if ui
-            .button(format!("{}  Save Scene", icon::FLOPPY_DISK))
+            .add_enabled(
+                !is_playing,
+                egui::Button::new(format!("{}  Save Scene", icon::FLOPPY_DISK)),
+            )
+            .on_disabled_hover_text(stop_first)
             .clicked()
         {
             scene_io::save_scene(editor, scene, console);

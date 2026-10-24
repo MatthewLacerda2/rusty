@@ -35,7 +35,14 @@ pub const SCENE_EXTENSION: &str = "scene";
 
 /// Serialize the live scene's component VALUES to `path` (pretty JSON, no GPU
 /// buffers). Single active scene: this is the only persisted document.
+///
+/// Refused during Play, as Unity refuses it: the live World then holds the play
+/// state (moved enemies, spawned bullets), never the authored scene (#1340). Every
+/// caller (the editor's File menu, `Scene.Save`) passes through here.
 pub fn save_to_file(scene: &Scene, path: &str) -> Result<(), String> {
+    if scene.is_playing() {
+        return Err(SAVE_IN_PLAY.to_string());
+    }
     let json = scene_json(scene)?;
     // lint: allow(asset-write) a scene, prefab or lighting document, read whole on load
     std::fs::write(path, json).map_err(|e| format!("Failed to write scene file: {}", e))?;
@@ -44,6 +51,9 @@ pub fn save_to_file(scene: &Scene, path: &str) -> Result<(), String> {
     crate::scene::lighting::io::save_lighting_sidecar(scene, path)?;
     Ok(())
 }
+
+/// Why [`save_to_file`] refused: the World holds the play state, not the scene.
+pub const SAVE_IN_PLAY: &str = "a scene cannot be saved during Play: stop Play first";
 
 /// The scene document exactly as [`save_to_file`] writes it, so a seeded default and
 /// a saved one compare byte for byte. A script attached by absolute path inside the

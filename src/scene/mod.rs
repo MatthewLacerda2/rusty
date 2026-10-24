@@ -57,6 +57,7 @@ pub use camera::{
     camera_for_entity, game_camera_from_scene, sync_lens_from_scene, Camera, ScreenPoint,
 };
 pub use identity::SceneId;
+pub(crate) use io::scene_json;
 pub use io::{
     build_default_scene, bundled, load_from_file, read_scene_file, save_lighting, save_to_file,
     seed_default_scene, seed_default_scripts, seed_workspace, LightingSave, DEFAULT_SCENE_PATH,
