@@ -1,6 +1,7 @@
 //! src/api/component/kinds/nav.rs — the navigation components' field tables.
 
-use super::super::table::{inspect, op, ro};
+use super::super::table::{inspect, op, ro, with};
+use super::super::value::Mask;
 use crate::components::{
     NavMeshAgentComponent, NavMeshModifierVolumeComponent, NavMeshObstacleComponent,
     OffMeshLinkComponent,
@@ -21,7 +22,7 @@ inspect! {
         op!("avoidance_enabled", agent::set_avoidance_enabled),
         op!("auto_traverse_off_mesh_link", agent::set_auto_traverse_off_mesh_link),
         op!("base_offset", agent::set_base_offset),
-        op!("area_mask", agent::set_area_mask),
+        with!("area_mask", |a, v: Mask| agent::set_area_mask(a, v.0)),
         op!("update_rotation", agent::set_update_rotation),
         op!("angular_speed", agent::set_angular_speed),
         op!("angular_acceleration", agent::set_angular_acceleration),

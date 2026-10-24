@@ -10,7 +10,7 @@ every field added later, with nothing new to bind.
 |---|---|---|
 | `Component.Get` | `(id, name)` | the component as a table of its fields (`{ mass = 1, use_gravity = true, … }`), or `nil` when the entity has none |
 | `Component.Set` | `(id, name, fields)` | — writes the fields named in `fields`, leaving the rest as they are; an error when the entity has no such component |
-| `Component.Fields` | `(name)` | one row per field, in the order a saved scene writes them: `{ name, type, default, writable, read_only }` |
+| `Component.Fields` | `(name)` | one row per field, in the order a saved scene writes them: `{ name, type, default, writable, read_only }`; `type` is a Lua type, `"optional <type>"` for a field that can hold nothing |
 
 **`name`** is any component name [`Scene.AddComponent`](Scene.md) takes (in any
 case, aliases too), plus `Transform` and `Mesh`. Each answers to one name first:
@@ -27,6 +27,11 @@ with `Scene.GetScript`.
 `render_order`); `Component.Fields` lists them. Values are what the scene file
 holds: numbers, booleans, strings, a vector as a list (`{ 0, 1, 0 }`), an enum by
 its name (`"Continuous"`, read in any case), a struct as a table of its fields.
+Numbers are taken as the named setters take them: a whole-number float is an
+integer (`render_order = 2.0`), and a bit mask is any integer kept to its low 32
+bits (`culling_mask = -1` is every layer). A list entry that holds nothing (a
+`Selectable`'s unset `sprites`) reads as a `nil` hole, and `Set` keeps the
+entries after it; `{}` is an empty list where a list is expected.
 A table-valued field (`Collider.shape`, `Camera.target_texture`) is written whole:
 read it with `Get`, change it, `Set` it back. Runtime state (a particle system's
 live particles, a trail's points) is not a field and never appears.
@@ -43,6 +48,16 @@ live particles, a trail's points) is not a field and never appears.
   animator's playhead) is read-only too.
 - **Strict names:** an unknown component or field is an error naming the valid
   ones.
+- **Read it, change it, `Set` it back.** A field given the value it already
+  holds is skipped: no op runs, and a read-only field given its own value is not
+  an error. So handing back a whole table from `Get` writes only what changed: an
+  edited `AudioReverbZone`'s `params` stay (its `preset` becomes `Custom`), and an
+  unchanged Animator `graph` does not restart the state machine.
+- **Fields one op writes together are written together.** A light's
+  `inner_cone` / `outer_cone`, a Text's `auto_size` / `auto_size_min` /
+  `auto_size_max`, an outline's width and colour: their op runs once, with each
+  field's new value, or its current one when the call does not name it. So
+  `{ inner_cone = 70, outer_cone = 80 }` widens both, even past the old outer cone.
 - **All or nothing:** every field is checked, then written in the order
   `Component.Fields` lists them; when one fails (a bad value, an unknown enum
   name) nothing is written. The order matters where one op resets another: an
@@ -68,6 +83,9 @@ end
 
 ```lua with=cam:Camera
 Component.Set(cam, "Camera", { fov = 68, render_order = 1, clear_flags = "DepthOnly" })
+local c = Component.Get(cam, "Camera")                  -- read it, change it, Set it back
+c.fov = 70
+Component.Set(cam, "Camera", c)
 local t = Component.Get(cam, "Transform")               -- position, rotation, scale
 local ok, err = pcall(Component.Set, cam, "Camera", { fvo = 60 })
 assert(not ok and tostring(err):find("fov"))            -- the error lists the fields

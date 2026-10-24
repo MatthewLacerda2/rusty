@@ -4,7 +4,8 @@
 
 use std::collections::BTreeMap;
 
-use super::super::table::{inspect, op, ro, with};
+use super::super::table::{group, inspect, op, part, ro, with, Group};
+use super::super::value::Mask;
 use super::NO_OP;
 use crate::components::camera::RenderTarget;
 use crate::components::{
@@ -12,6 +13,9 @@ use crate::components::{
     ShadowSettings, SsaoSettings, TransformComponent, VisualCorrectionComponent,
 };
 use crate::scene::authoring::{camera, light, lod_group as lod, visual_correction as vc};
+
+const CONES: Group<LightComponent> =
+    group!(|l, inner_cone: f32, outer_cone: f32| light::set_cones(l, inner_cone, outer_cone));
 
 const MESH: &str = "set by the model or primitive the entity was made from";
 
@@ -34,8 +38,8 @@ inspect! {
         op!("color", light::set_color),
         op!("intensity", light::set_intensity),
         op!("range", light::set_range),
-        with!("inner_cone", |l, v: f32| light::set_cones(l, v, l.outer_cone)),
-        with!("outer_cone", |l, v: f32| light::set_cones(l, l.inner_cone, v)),
+        part!("inner_cone", CONES),
+        part!("outer_cone", CONES),
         op!("cast_shadows", light::set_cast_shadows),
         op!("mode", light::set_mode),
     ];
@@ -44,7 +48,7 @@ inspect! {
         op!("fov", camera::set_fov),
         op!("near", camera::set_near),
         op!("far", camera::set_far),
-        op!("culling_mask", camera::set_culling_mask),
+        with!("culling_mask", |c, v: Mask| camera::set_culling_mask(c, v.0)),
         op!("render_order", camera::set_render_order),
         op!("clear_flags", camera::set_clear_flags),
         op!("motion_blur_active", camera::set_motion_blur_active),

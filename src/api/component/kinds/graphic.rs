@@ -1,14 +1,34 @@
 //! src/api/component/kinds/graphic.rs — the drawn UI components' field tables:
-//! `Text` and `Shape`. Paired setters (`set_outline(width, color)`) are split per
-//! field, the other half kept as it is.
+//! `Text` and `Shape`. A setter taking several fields (`set_outline(width,
+//! color)`) is one group, called once with each field's new or current value.
 
 use glam::{Vec2, Vec4};
 
-use super::super::table::{inspect, op, with};
+use super::super::table::{group, inspect, op, part, with, Group};
 use super::set_ui_shader;
 use crate::components::{ShapeComponent, ShapeGlow, ShapeShadow, TextComponent, UiShader};
 use crate::scene::authoring::shape;
 use crate::scene::authoring::text::{self, FontSlot};
+
+const AUTO_SIZE: Group<TextComponent> = group!(
+    |t, auto_size: bool, auto_size_min: f32, auto_size_max: f32| {
+        text::set_auto_size(t, auto_size, auto_size_min, auto_size_max)
+    }
+);
+const OUTLINE: Group<TextComponent> = group!(|t, outline_width: f32, outline_color: Vec4| {
+    text::set_outline(t, outline_width, outline_color)
+});
+const TEXT_SHADOW: Group<TextComponent> = group!(|t, shadow_offset: Vec2, shadow_color: Vec4| {
+    text::set_shadow(t, shadow_offset, shadow_color)
+});
+const TEXT_GLOW: Group<TextComponent> =
+    group!(|t, glow_size: f32, glow_color: Vec4| text::set_glow(t, glow_size, glow_color));
+const ARC: Group<ShapeComponent> =
+    group!(|s, arc_start: f32, arc_end: f32| shape::set_arc(s, arc_start, arc_end));
+const DASH: Group<ShapeComponent> = group!(|s, dash: f32, gap: f32| shape::set_dash(s, dash, gap));
+const BORDER: Group<ShapeComponent> = group!(|s, border_width: f32, border_color: Vec4| {
+    shape::set_border(s, border_width, border_color)
+});
 
 inspect! {
     TextComponent => text, text_mut, &[
@@ -23,23 +43,17 @@ inspect! {
         op!("overflow", text::set_overflow),
         op!("line_spacing", text::set_line_spacing),
         op!("letter_spacing", text::set_letter_spacing),
-        with!("auto_size", |t, v: bool| {
-            text::set_auto_size(t, v, t.auto_size_min, t.auto_size_max)
-        }),
-        with!("auto_size_min", |t, v: f32| {
-            text::set_auto_size(t, t.auto_size, v, t.auto_size_max)
-        }),
-        with!("auto_size_max", |t, v: f32| {
-            text::set_auto_size(t, t.auto_size, t.auto_size_min, v)
-        }),
+        part!("auto_size", AUTO_SIZE),
+        part!("auto_size_min", AUTO_SIZE),
+        part!("auto_size_max", AUTO_SIZE),
         op!("rich_text", text::set_rich_text),
         op!("raycast_target", text::set_raycast_target),
-        with!("outline_width", |t, v: f32| text::set_outline(t, v, t.outline_color)),
-        with!("outline_color", |t, v: Vec4| text::set_outline(t, t.outline_width, v)),
-        with!("shadow_offset", |t, v: Vec2| text::set_shadow(t, v, t.shadow_color)),
-        with!("shadow_color", |t, v: Vec4| text::set_shadow(t, t.shadow_offset, v)),
-        with!("glow_size", |t, v: f32| text::set_glow(t, v, t.glow_color)),
-        with!("glow_color", |t, v: Vec4| text::set_glow(t, t.glow_size, v)),
+        part!("outline_width", OUTLINE),
+        part!("outline_color", OUTLINE),
+        part!("shadow_offset", TEXT_SHADOW),
+        part!("shadow_color", TEXT_SHADOW),
+        part!("glow_size", TEXT_GLOW),
+        part!("glow_color", TEXT_GLOW),
         op!("blend", text::set_blend),
         with!("shader", |t, v: Option<UiShader>| set_ui_shader(&mut t.shader, v)?),
     ];
@@ -48,15 +62,15 @@ inspect! {
         op!("corner", shape::set_corner),
         op!("radius", shape::set_radius),
         op!("inner_radius", shape::set_inner_radius),
-        with!("arc_start", |s, v: f32| shape::set_arc(s, v, s.arc_end)),
-        with!("arc_end", |s, v: f32| shape::set_arc(s, s.arc_start, v)),
+        part!("arc_start", ARC),
+        part!("arc_end", ARC),
         op!("thickness", shape::set_thickness),
-        with!("dash", |s, v: f32| shape::set_dash(s, v, s.gap)),
-        with!("gap", |s, v: f32| shape::set_dash(s, s.dash, v)),
+        part!("dash", DASH),
+        part!("gap", DASH),
         op!("color", shape::set_color),
         op!("gradient", shape::set_gradient),
-        with!("border_width", |s, v: f32| shape::set_border(s, v, s.border_color)),
-        with!("border_color", |s, v: Vec4| shape::set_border(s, s.border_width, v)),
+        part!("border_width", BORDER),
+        part!("border_color", BORDER),
         with!("shadow", |s, v: ShapeShadow| shape::set_shadow(s, v.offset, v.blur, v.color)),
         with!("glow", |s, v: ShapeGlow| shape::set_glow(s, v.size, v.intensity, v.color)),
         op!("blend", shape::set_blend),

@@ -16,25 +16,29 @@
 //! component or field is an error naming the valid ones. `#[serde(skip)]` runtime
 //! state is never in a table: there is no field to name it by.
 
+mod introspect;
 mod kinds;
 mod table;
+mod value;
+mod write;
 
 #[cfg(test)]
-mod introspect;
-#[cfg(test)]
 mod lua_tests;
+#[cfg(test)]
+mod set_tests;
 #[cfg(test)]
 mod tests;
 
 use std::cell::RefCell;
 
-use mlua::{Lua, LuaSerdeExt, Table};
+use mlua::{Lua, Table};
 use serde_json::Value;
 
 use super::{put, Reg};
 use crate::scene::authoring;
 use crate::scene::Scene;
 use table::Kind;
+use value::{from_lua, to_lua};
 
 fn err(msg: String) -> mlua::Error {
     mlua::Error::RuntimeError(msg)
@@ -55,9 +59,11 @@ pub fn register<'scope>(
         value.map(|v| to_lua(lua, &v)).transpose()
     });
     put(&t, "Get", get)?;
-    let set = scope.create_function(move |_, (id, name, fields): (u32, String, Table)| {
+    let set = scope.create_function(move |lua, (id, name, fields): (u32, String, Table)| {
         let kind = kinds::find(&name).map_err(err)?;
-        let changes = match from_lua(fields).map_err(err)? {
+        let fields = from_lua(lua, &mlua::Value::Table(fields))
+            .map_err(|e| err(format!("Component.Set: {}: {e}", kind.name)))?;
+        let changes = match fields {
             Value::Object(map) => map,
             _ => {
                 return Err(err(format!(
@@ -95,7 +101,7 @@ fn fields_table(lua: &Lua, kind: &Kind) -> mlua::Result<Table> {
         let default = defaults.as_ref().and_then(|d| d.get(name));
         let row = lua.create_table()?;
         row.set("name", name)?;
-        row.set("type", lua_type(default))?;
+        row.set("type", type_name(kind, name, default))?;
         row.set("default", default.map(|v| to_lua(lua, v)).transpose()?)?;
         row.set("writable", read_only.is_none())?;
         row.set("read_only", read_only)?;
@@ -114,30 +120,22 @@ fn defaults(kind: &Kind) -> Result<Option<Value>, String> {
     (kind.read)(&scene.world, id).transpose()
 }
 
-/// A value as a Lua table, its lists marked with mlua's array metatable so that an
-/// empty one goes back to `Set` as a list, not an empty table of fields. `nil`
-/// for null: a field that holds nothing is absent from the table.
-fn to_lua(lua: &Lua, value: &Value) -> mlua::Result<mlua::Value> {
-    let options = mlua::serde::SerializeOptions::new()
-        .serialize_none_to_null(false)
-        .serialize_unit_to_null(false);
-    lua.to_value_with(value, options)
-}
-
-/// `Set`'s change table as JSON: a table with a list part (or the array metatable
-/// `Get` put on a list) is a list, any other a table of fields. Unlike
-/// `lua_json::lua_to_json`, an empty list read by `Get` stays a list here.
-fn from_lua(fields: Table) -> Result<Value, String> {
-    serde_json::to_value(mlua::Value::Table(fields).to_serializable()).map_err(|e| e.to_string())
-}
-
-/// The Lua type a value reads back as.
-fn lua_type(value: Option<&Value>) -> &'static str {
-    match value {
-        None | Some(Value::Null) => "nil",
-        Some(Value::Bool(_)) => "boolean",
-        Some(Value::Number(_)) => "number",
-        Some(Value::String(_)) => "string",
-        Some(Value::Array(_) | Value::Object(_)) => "table",
+/// A field's type as `Fields` reports it: the Lua type of its default (an enum
+/// carrying data is a table), else of what its derive reads; `optional <type>`
+/// when it can hold nothing.
+fn type_name(kind: &Kind, name: &'static str, default: Option<&Value>) -> String {
+    let (optional, read_as) = (kind.field_type)(name);
+    let held = match default {
+        None | Some(Value::Null) => None,
+        Some(Value::Bool(_)) => Some("boolean"),
+        Some(Value::Number(_)) => Some("number"),
+        Some(Value::String(_)) => Some("string"),
+        Some(Value::Array(_) | Value::Object(_)) => Some("table"),
+    };
+    let lua = held.or(read_as).unwrap_or("any");
+    if optional {
+        format!("optional {lua}")
+    } else {
+        lua.to_owned()
     }
 }

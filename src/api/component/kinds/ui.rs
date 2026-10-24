@@ -4,7 +4,7 @@
 
 use glam::Vec4;
 
-use super::super::table::{inspect, op, with};
+use super::super::table::{group, inspect, op, part, with, Group};
 use super::set_ui_shader;
 use crate::components::{
     BackdropFilterComponent, CanvasComponent, CanvasGroupComponent, ImageComponent, LayoutAxisFit,
@@ -14,6 +14,35 @@ use crate::components::{
 use crate::scene::authoring::layout_element::{self as element, SizeKind};
 use crate::scene::authoring::{backdrop, canvas, canvas_group as group, image, layout_group};
 use crate::scene::authoring::{rect_mask, rect_transform as rect, selectable};
+
+const CONTROL: Group<LayoutGroupComponent> =
+    group!(|g, control_child_width: bool, control_child_height: bool| {
+        layout_group::set_control_child_size(g, control_child_width, control_child_height)
+    });
+const EXPAND: Group<LayoutGroupComponent> = group!(
+    |g, child_force_expand_width: bool, child_force_expand_height: bool| {
+        layout_group::set_child_force_expand(g, child_force_expand_width, child_force_expand_height)
+    }
+);
+const MIN: Group<LayoutElementComponent> =
+    group!(|e, min_width: Option<f32>, min_height: Option<f32>| {
+        element::set_size(e, SizeKind::Min, min_width, min_height)
+    });
+const PREFERRED: Group<LayoutElementComponent> = group!(
+    |e, preferred_width: Option<f32>, preferred_height: Option<f32>| {
+        element::set_size(e, SizeKind::Preferred, preferred_width, preferred_height)
+    }
+);
+const FLEXIBLE: Group<LayoutElementComponent> = group!(
+    |e, flexible_width: Option<f32>, flexible_height: Option<f32>| {
+        element::set_size(e, SizeKind::Flexible, flexible_width, flexible_height)
+    }
+);
+const FIT: Group<LayoutElementComponent> = group!(
+    |e, horizontal_fit: LayoutAxisFit, vertical_fit: LayoutAxisFit| {
+        element::set_fit(e, horizontal_fit, vertical_fit)
+    }
+);
 
 inspect! {
     CanvasComponent => canvas, canvas_mut, &[
@@ -77,8 +106,8 @@ inspect! {
             }
         }),
         op!("fade_duration", selectable::set_fade_duration),
-        // Lists of optional values are read with a short or holed list in mind:
-        // Lua drops a `nil`, so a missing entry is `None`.
+        // A list of optional values may come back short: `Get` reads an empty
+        // entry as a `nil` hole, and a missing entry is `None`.
         with!("sprites", |s, v: Vec<Option<String>>| {
             for state in SelectionState::ALL {
                 selectable::set_sprite(s, state, v.get(state as usize).cloned().flatten());
@@ -96,18 +125,10 @@ inspect! {
         op!("padding", layout_group::set_padding),
         op!("spacing", layout_group::set_spacing),
         op!("child_alignment", layout_group::set_child_alignment),
-        with!("control_child_width", |g, v: bool| {
-            layout_group::set_control_child_size(g, v, g.control_child_height)
-        }),
-        with!("control_child_height", |g, v: bool| {
-            layout_group::set_control_child_size(g, g.control_child_width, v)
-        }),
-        with!("child_force_expand_width", |g, v: bool| {
-            layout_group::set_child_force_expand(g, v, g.child_force_expand_height)
-        }),
-        with!("child_force_expand_height", |g, v: bool| {
-            layout_group::set_child_force_expand(g, g.child_force_expand_width, v)
-        }),
+        part!("control_child_width", CONTROL),
+        part!("control_child_height", CONTROL),
+        part!("child_force_expand_width", EXPAND),
+        part!("child_force_expand_height", EXPAND),
         op!("cell_size", layout_group::set_cell_size),
         op!("constraint", layout_group::set_constraint),
         op!("constraint_count", layout_group::set_constraint_count),
@@ -116,22 +137,14 @@ inspect! {
     ];
     LayoutElementComponent => layout_element, layout_element_mut, &[
         op!("ignore_layout", element::set_ignore_layout),
-        with!("min_width", |e, v: Option<f32>| element::set_size(e, SizeKind::Min, v, e.min_height)),
-        with!("min_height", |e, v: Option<f32>| element::set_size(e, SizeKind::Min, e.min_width, v)),
-        with!("preferred_width", |e, v: Option<f32>| {
-            element::set_size(e, SizeKind::Preferred, v, e.preferred_height)
-        }),
-        with!("preferred_height", |e, v: Option<f32>| {
-            element::set_size(e, SizeKind::Preferred, e.preferred_width, v)
-        }),
-        with!("flexible_width", |e, v: Option<f32>| {
-            element::set_size(e, SizeKind::Flexible, v, e.flexible_height)
-        }),
-        with!("flexible_height", |e, v: Option<f32>| {
-            element::set_size(e, SizeKind::Flexible, e.flexible_width, v)
-        }),
-        with!("horizontal_fit", |e, v: LayoutAxisFit| element::set_fit(e, v, e.vertical_fit)),
-        with!("vertical_fit", |e, v: LayoutAxisFit| element::set_fit(e, e.horizontal_fit, v)),
+        part!("min_width", MIN),
+        part!("min_height", MIN),
+        part!("preferred_width", PREFERRED),
+        part!("preferred_height", PREFERRED),
+        part!("flexible_width", FLEXIBLE),
+        part!("flexible_height", FLEXIBLE),
+        part!("horizontal_fit", FIT),
+        part!("vertical_fit", FIT),
     ];
 }
 

@@ -4,7 +4,8 @@
 //! field is either written through the `scene::authoring` op the inspector's card
 //! calls ([`Access::Op`]) or read-only with the reason ([`Access::ReadOnly`]). There
 //! is no serde write-back: a field with no op cannot be written, so the inspector's
-//! clamping, sanitizing and side effects are the only way in. `tests.rs` fails when a
+//! clamping, sanitizing and side effects are the only way in. Fields one op writes
+//! together (a light's two cone angles) form a [`Group`], written once per `Set`. `tests.rs` fails when a
 //! component's serialized fields and its table disagree.
 //!
 //! [`Kind`] erases the component type so the namespace can pick one by name.
@@ -23,8 +24,34 @@ pub type Write<C> = fn(&mut C, Value) -> Result<(), String>;
 pub enum Access<C> {
     /// Written by the inspector's op (decode the value, then call it).
     Op(Write<C>),
+    /// Written with the other fields of its group, by one op (`group!`).
+    Group(Group<C>),
     /// Readable only; the text says why, or which verb writes it.
     ReadOnly(&'static str),
+}
+
+/// Fields one op writes together, `set_cones(light, inner, outer)`: a `Set`
+/// naming any of them calls it once, with each field's new value or, when not
+/// named, its current one. So an op that clamps one half against the other sees
+/// both halves as they are meant to end up.
+pub struct Group<C> {
+    pub names: &'static [&'static str],
+    pub write: fn(&mut C, &Values) -> Result<(), String>,
+}
+
+/// What a group's op reads its fields from: the changes, else the component.
+pub struct Values<'a> {
+    pub changes: &'a Map<String, Value>,
+    pub current: &'a Value,
+}
+
+impl Values<'_> {
+    /// Field `name`'s value as `T`: the one written, else the one held.
+    pub fn take<T: DeserializeOwned>(&self, name: &str) -> Result<T, String> {
+        let value = self.changes.get(name).or_else(|| self.current.get(name));
+        super::value::decode(value.cloned().unwrap_or(Value::Null))
+            .map_err(|e| format!("{name}: {e}"))
+    }
 }
 
 /// One serialized field of a component, by its serialized name.
@@ -33,27 +60,13 @@ pub struct Field<C> {
     pub access: Access<C>,
 }
 
-/// Decode a field's value as `T` (enum names in any case, `lua_json::decode`). An
-/// empty Lua table crosses as `{}`, so an empty list read back by `Get` decodes as
-/// `[]` when `{}` does not.
-pub fn decode<T: DeserializeOwned>(json: Value) -> Result<T, String> {
-    let empty = json.as_object().is_some_and(Map::is_empty);
-    crate::api::lua_json::decode(json).or_else(|e| {
-        if empty {
-            crate::api::lua_json::decode(Value::Array(Vec::new())).map_err(|_| e)
-        } else {
-            Err(e)
-        }
-    })
-}
-
 /// A field written by one op, `fn(&mut C, T)` with `T` decoded from the value.
 macro_rules! op {
     ($name:literal, $op:path) => {
         $crate::api::component::table::Field {
             name: $name,
             access: $crate::api::component::table::Access::Op(|c, json| {
-                $op(c, $crate::api::component::table::decode(json)?);
+                $op(c, $crate::api::component::value::decode(json)?);
                 Ok(())
             }),
         }
@@ -67,10 +80,35 @@ macro_rules! with {
         $crate::api::component::table::Field {
             name: $name,
             access: $crate::api::component::table::Access::Op(|$c, json| {
-                let $v: $t = $crate::api::component::table::decode(json)?;
+                let $v: $t = $crate::api::component::value::decode(json)?;
                 $body;
                 Ok(())
             }),
+        }
+    };
+}
+
+/// A [`Group`]: `|component, field: Type, …| body`, each field named as its
+/// binding. List each of its fields with `part!`.
+macro_rules! group {
+    (|$c:ident $(, $f:ident: $t:ty)+ $(,)?| $body:expr) => {
+        $crate::api::component::table::Group {
+            names: &[$(stringify!($f)),+],
+            write: |$c, values| {
+                $(let $f: $t = values.take(stringify!($f))?;)+
+                $body;
+                Ok(())
+            },
+        }
+    };
+}
+
+/// A field written by its [`Group`]'s op.
+macro_rules! part {
+    ($name:literal, $group:expr) => {
+        $crate::api::component::table::Field {
+            name: $name,
+            access: $crate::api::component::table::Access::Group($group),
         }
     };
 }
@@ -85,7 +123,7 @@ macro_rules! ro {
     };
 }
 
-pub(super) use {op, ro, with};
+pub(super) use {group, op, part, ro, with};
 
 /// A first-class component the table covers: its fields, and how to reach it on
 /// an entity.
@@ -144,6 +182,8 @@ pub struct Kind {
     pub read: fn(&World, u32) -> Option<Result<Value, String>>,
     pub write: WriteAny,
     pub fields: fn() -> Vec<FieldInfo>,
+    /// A field's type as its derive reads it: optional, and the Lua type it holds.
+    pub field_type: fn(&'static str) -> (bool, Option<&'static str>),
     /// The field names the component's serde derive declares (the table test).
     #[cfg(test)]
     pub serde_fields: fn() -> Option<&'static [&'static str]>,
@@ -163,8 +203,9 @@ pub const fn kind<C: Inspect>(
         #[cfg(test)]
         key,
         read: C::read,
-        write: write::<C>,
+        write: super::write::write::<C>,
         fields: fields::<C>,
+        field_type: super::introspect::field_type::<C>,
         #[cfg(test)]
         serde_fields: super::introspect::serde_fields::<C>,
     }
@@ -173,48 +214,14 @@ pub const fn kind<C: Inspect>(
 fn fields<C: Inspect>() -> Vec<FieldInfo> {
     C::FIELDS
         .iter()
-        .map(|f| match f.access {
+        .map(|f| match &f.access {
+            Access::ReadOnly(why) => (f.name, Some(*why)),
+            Access::Group(g) => {
+                // Checked wherever the table is listed, the table tests included.
+                debug_assert!(g.names.contains(&f.name), "{} not in its group", f.name);
+                (f.name, None)
+            }
             Access::Op(_) => (f.name, None),
-            Access::ReadOnly(why) => (f.name, Some(why)),
         })
         .collect()
-}
-
-/// Write `changes` onto `id`'s `C`, all or nothing: every key is checked before
-/// anything is written, and the ops run on a copy that replaces the component only
-/// when every one succeeded. They run in the table's order, not the caller's, so
-/// a field whose op resets another (a reverb `preset` its `params`) is listed after
-/// it and wins.
-fn write<C: Inspect>(
-    world: &mut World,
-    id: u32,
-    changes: &Map<String, Value>,
-) -> Result<bool, String> {
-    for key in changes.keys() {
-        let field = C::FIELDS.iter().find(|f| f.name == key).ok_or_else(|| {
-            let names: Vec<&str> = C::FIELDS.iter().map(|f| f.name).collect();
-            format!("unknown field '{key}' (fields: {})", names.join(", "))
-        })?;
-        if let Access::ReadOnly(why) = field.access {
-            return Err(format!("field '{key}' is read-only: {why}"));
-        }
-    }
-    let mut ops: Vec<_> = C::FIELDS
-        .iter()
-        .filter_map(|f| match (&f.access, changes.get(f.name)) {
-            (Access::Op(op), Some(value)) => Some((f.name, *op, value.clone())),
-            _ => None,
-        })
-        .collect();
-    let mut outcome = Ok(());
-    let found = C::update(world, id, &mut |live| {
-        let mut draft = live.clone();
-        outcome = ops.drain(..).try_for_each(|(name, op, value)| {
-            op(&mut draft, value).map_err(|e| format!("{name}: {e}"))
-        });
-        if outcome.is_ok() {
-            *live = draft;
-        }
-    });
-    outcome.map(|()| found)
 }
