@@ -33,7 +33,7 @@
 
 mod agent;
 pub mod bench;
-mod commit;
+mod engine;
 mod file;
 mod locate;
 
@@ -41,8 +41,11 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 pub use agent::{CLAUDE_FILE, MCP_FILE};
-pub use commit::{engine_commit, UNKNOWN_COMMIT};
-pub use file::{EngineCheck, ProjectFile, PROJECT_FILE};
+#[cfg(test)]
+pub(crate) use engine::commit::pin as pin_engine;
+pub use engine::commit::{engine_commit, engine_order, UNKNOWN_COMMIT};
+pub use engine::{EngineCheck, Verdict};
+pub use file::{ProjectFile, PROJECT_FILE};
 pub use locate::{engine_dir, engine_path, locate};
 
 /// The project's content folder, relative to its root (Unity's `Assets/`).
@@ -187,7 +190,7 @@ pub(crate) fn prepare(dir: &Path, access: Access) -> Result<(Opened, Vec<String>
 }
 
 /// The engine check of the project at `dir`, without opening it or writing anything:
-/// what a picker shows before it opens a project last opened by another engine.
+/// what a picker shows before it opens a project a newer engine last opened.
 pub fn inspect(dir: &Path) -> Result<EngineCheck, String> {
     file::inspect(dir)
 }

@@ -20,16 +20,15 @@ fn project_with_commit(dir: &Path, commit: &str) {
 }
 
 #[test]
-fn another_engines_project_asks_first_and_cancel_keeps_the_picker() {
+fn an_older_engines_project_asks_first_and_cancel_keeps_the_picker() {
     let dir = fresh("mismatch");
     project_with_commit(&dir, "0123456789abcdef0123456789abcdef01234567");
-    let warning = check_existing(&dir).unwrap();
-    // A build without git can't compare, so it never asks.
-    if crate::core::project::engine_commit() == crate::core::project::UNKNOWN_COMMIT {
-        assert_eq!(warning, None);
-        return;
-    }
-    assert!(warning.is_some());
+    // Opened last by a newer engine than this one: only that asks (#1319).
+    let mut file = ProjectFile::load(&dir).unwrap();
+    file.engine_order = Some(5);
+    file.write(&dir.join(PROJECT_FILE)).unwrap();
+    crate::core::project::pin_engine("fedcba9876543210fedcba9876543210fedcba98", Some(4));
+    assert!(check_existing(&dir).unwrap().is_some());
     let mut picker = ProjectPicker::new(RecentProjects::default(), None, dir.clone());
     assert_eq!(picker.apply(Action::OpenRecent(dir.clone())), None);
     assert!(picker.confirm.is_some());

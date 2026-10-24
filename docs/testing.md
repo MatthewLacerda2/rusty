@@ -30,8 +30,9 @@
   project — `cargo run --bin play --features dev -- --project tests/fixtures/project
   tests/fixtures/project/scenarios/smoke.lua out/`. What the engine seeds into it
   when opened is git-ignored. `play` opens a project without writing its
-  `project.rusty`, so the fixture's recorded engine commit is stale by design: a
-  run prints the mismatch line and carries on (#853). In-process tests run with the checkout as their
+  `project.rusty`, so the fixture's recorded engine commit is stale by design; it
+  records no count, so a run reads it as an engine upgrade and carries on without a
+  warning (#853, #1319). In-process tests run with the checkout as their
   working directory, so anything they seed lands under the git-ignored `/assets/`.
   A test's own scripts go in that workspace too, attached by workspace-relative
   path, so its snapshot carries no machine path (#783).

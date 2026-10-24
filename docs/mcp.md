@@ -58,8 +58,8 @@ tools, so an agent manages projects without the window. They share the picker's 
   *New Project*: the same checks (a plain name, an empty or new folder) and the same
   skeleton and `project.rusty`. It goes to the top of the list but is not opened.
 - `bench_open` — open the project at `path` (one holding `project.rusty` or
-  `assets/`). One last opened by a different engine is reported in-band instead of
-  opened; call again with `confirm: true` to open it anyway (the picker's *Open
+  `assets/`). One last opened by a newer engine, or by a branch build, is reported
+  in-band instead of opened (an older one opens without asking: an engine upgrade); call again with `confirm: true` to open it anyway (the picker's *Open
   anyway*). In **embed** mode the bridge then drives that project: like Unity's *Open
   Project*, the current one closes (unsaved scene edits are lost) and a fresh session
   boots on the new root's default scene, exactly as `--project <path>` would. In

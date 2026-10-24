@@ -143,7 +143,8 @@ Without `--project` the **editor** starts on the **project picker**, Unity Hub's
 Projects page: the projects opened before (most recent first, with when; a folder
 that has gone is greyed out and can be removed from the list), *New Project* (a name
 and a parent folder) and *Open* (an existing project folder: one holding
-`project.rusty` or `assets/`). A project last opened by a different engine asks
+`project.rusty` or `assets/`). A project last opened by an older engine opens
+without asking; one last opened by a newer engine, or by a branch build, asks
 before it opens. The list is yours, not the project's: it lives in
 `$XDG_CONFIG_HOME/rusty/recent_projects.json` (default `~/.config/rusty/`) on Linux and
 `~/Library/Application Support/rusty/` on macOS, and every project the editor opens,
@@ -194,15 +195,20 @@ or be cloned anywhere.
 
 `project.rusty` is the project's one engine-owned file, like Unreal's `.uproject`
 or Unity's `ProjectVersion.txt`. It records the **engine commit** the project was
-last opened with (embedded in each engine build) and the build settings. When the
-running engine is a different commit, opening says so: one `[Project]` line on
-stderr, and a warning in the editor console. Then it proceeds, and the editor and
-the agent sessions (`session`, `session-mcp`) record the running commit, so a
-broken scene after an engine update reads as version skew, not as a bug in the
-game. The player, `play` and `editor-capture` only check, never write. A dirty
-build (`<commit>-dirty`) counts as its commit, and a build made without git
-(`unknown`) can't be compared, so neither warns. A project without the file
-gets it on its first edit-open.
+last opened with (embedded in each engine build), that commit's place in history
+(`git rev-list --count`), and the build settings. Every merge to `main` is a new
+engine and rusty keeps no backward compatibility, so moving **forward** is the
+normal case: a newer engine opens the project without asking, and an edit-open
+records it and prints one `[Project]` line (also in the editor console) naming the
+`git log` of what changed, so the game can be brought up to date (#1319). Only an
+**older** engine, or a branch build (the same count, another commit), warns: one
+`[Project]` line on stderr, a warning in the editor console, and the picker and
+`bench_open` ask first. Then it proceeds, and the editor and the agent sessions
+(`session`, `session-mcp`) record the running engine. The player, `play` and
+`editor-capture` only check, never write. A dirty build (`<commit>-dirty`) counts as
+its commit, and a build that can't name its commit (`unknown`, no git) or count it
+(a shallow clone) can't be compared, so neither warns. A file that records no count
+reads as an upgrade. A project without the file gets it on its first edit-open.
 
 The engine's own content (shaders, the bundled scripts) is not part of a project:
 it ships with the engine (`engine/`), and the scripts and starter materials are

@@ -75,6 +75,11 @@ fn prepare(
             .borrow_mut()
             .warn(format!("[Project] {warning}"));
     }
+    if let Some(upgrade) = opened.engine.upgrade() {
+        game.console()
+            .borrow_mut()
+            .info(format!("[Project] {upgrade}"));
+    }
 
     let launch = Launch {
         title: TITLE.to_string(),

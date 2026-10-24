@@ -2,7 +2,7 @@
 //! does to the recent list.
 
 use super::*;
-use crate::core::project::{engine_commit, ProjectFile, PROJECT_FILE, UNKNOWN_COMMIT};
+use crate::core::project::{pin_engine, ProjectFile, PROJECT_FILE};
 
 fn fresh(name: &str) -> PathBuf {
     let dir = crate::test_temp::dir().join("project_bench").join(name);
@@ -62,20 +62,27 @@ fn create_makes_the_project_and_lists_it_first() {
 }
 
 #[test]
-fn open_lists_a_project_and_reports_another_engine() {
+fn open_lists_a_project_and_reports_an_older_engine_only() {
     let dir = fresh("bench_open");
     let mut bench = Bench::at(None);
     assert!(bench.open(&dir, 1).is_err(), "not a project");
     assert!(bench.recent.projects.is_empty());
     let file = ProjectFile {
         engine_commit: "0123456789abcdef0123456789abcdef01234567".to_string(),
+        engine_order: Some(5),
         ..ProjectFile::default()
     };
     file.write(&dir.join(PROJECT_FILE)).unwrap();
+    pin_engine("fedcba9876543210fedcba9876543210fedcba98", Some(6));
     let (root, warning) = bench.open(&dir.join("."), 2).unwrap();
     assert_eq!(root, dir, "listed resolved");
-    assert_eq!(warning.is_some(), engine_commit() != UNKNOWN_COMMIT);
+    assert_eq!(warning, None, "an upgrade opens without asking");
     assert_eq!(bench.recent.projects[0].path, dir);
+    pin_engine("fedcba9876543210fedcba9876543210fedcba98", Some(4));
+    assert!(
+        bench.open(&dir, 3).unwrap().1.is_some(),
+        "an older engine asks"
+    );
 }
 
 #[test]

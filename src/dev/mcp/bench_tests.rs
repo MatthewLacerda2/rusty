@@ -3,7 +3,7 @@
 use std::cell::RefCell;
 
 use super::*;
-use crate::core::project::{engine_commit, ProjectFile, PROJECT_FILE, UNKNOWN_COMMIT};
+use crate::core::project::{pin_engine, ProjectFile, PROJECT_FILE};
 
 /// Attach mode's shape: evaluates nothing, cannot move to another project.
 struct Window;
@@ -89,24 +89,29 @@ fn attach_mode_answers_with_the_relaunch_command() {
 }
 
 #[test]
-fn another_engines_project_opens_only_when_confirmed() {
+fn an_older_engines_project_opens_only_when_confirmed() {
     let dir = fresh("mismatch");
     let file = ProjectFile {
         engine_commit: "0123456789abcdef0123456789abcdef01234567".to_string(),
+        engine_order: Some(7),
         ..ProjectFile::default()
     };
     file.write(&dir.join(PROJECT_FILE)).unwrap();
+    pin_engine("fedcba9876543210fedcba9876543210fedcba98", Some(6));
     let mut bench = Bench::at(None);
     let asked = run(&Window, &mut bench, "bench_open", json!({ "path": dir }));
-    if engine_commit() == UNKNOWN_COMMIT {
-        assert!(asked.is_ok(), "a build without git can't compare");
-        return;
-    }
     assert!(asked.unwrap_err().contains("confirm: true"));
     assert!(bench.recent.projects.is_empty(), "nothing opened");
     let args = json!({ "path": dir, "confirm": true });
     let opened = run(&Window, &mut bench, "bench_open", args).unwrap();
     assert!(opened["warning"].is_string());
+    pin_engine("fedcba9876543210fedcba9876543210fedcba98", Some(8));
+    let upgraded = run(&Window, &mut bench, "bench_open", json!({ "path": dir }));
+    assert_eq!(
+        upgraded.unwrap()["warning"],
+        Value::Null,
+        "a newer engine just opens"
+    );
 }
 
 /// Embed mode's shape, minus the move: records the root `bench_open` hands it. The

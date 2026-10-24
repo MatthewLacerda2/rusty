@@ -38,9 +38,12 @@ pub fn build(page: &str) -> Result<ProjectPicker, String> {
         "open" => picker.show_open(),
         "focus" => picker.focus_row = Some(1),
         "mismatch" => {
+            // A newer engine opened it last: the case that still asks (#1319).
             let check = EngineCheck {
                 recorded: Some(OTHER_ENGINE.to_string()),
+                recorded_order: Some(u64::MAX),
                 running: engine_commit().to_string(),
+                running_order: Some(0),
             };
             let warning = check
                 .warning()

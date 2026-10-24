@@ -3,8 +3,8 @@
 //!
 //! Four `bench_*` tools over [`Bench`] (`core::project::bench`), the code the
 //! picker calls too. `bench_open` checks the folder as the picker does; a project
-//! another engine last opened is *reported*, and opens only when the call repeats
-//! with `confirm: true` (the picker's *Open anyway*). Then the backend moves to it
+//! a newer engine (or a branch build) last opened is *reported*, and opens only when
+//! the call repeats with `confirm: true` (the picker's *Open anyway*). Then the backend moves to it
 //! ([`EvalBackend::reopen`]): embed mode drives the new project at once, attach
 //! mode answers with the command that relaunches the window on it.
 
@@ -42,8 +42,9 @@ pub fn tools() -> Vec<Value> {
             "name": "bench_open",
             "description": "rusty bench: open an existing project and drive it from now \
                 on (embed mode; attach mode returns the command that relaunches the window \
-                on it). A project last opened by another engine is reported; repeat with \
-                confirm: true to open it anyway.",
+                on it). A project last opened by a newer engine or a branch build is \
+                reported; repeat with confirm: true to open it anyway. An older one \
+                opens at once: an engine upgrade.",
             "inputSchema": schema(
                 json!({ "path": path, "confirm": { "type": "boolean" } }),
                 &["path"],

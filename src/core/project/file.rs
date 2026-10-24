@@ -4,7 +4,7 @@
 //! `ProjectVersion.txt` plus Player Settings in one:
 //!
 //! ```json
-//! { "engine_commit": "<git commit>", "build": { "startup_scene": "…", … } }
+//! { "engine_commit": "<git commit>", "engine_order": 1318, "build": { … } }
 //! ```
 //!
 //! * **`engine_commit`** — the engine build the project was last opened with, so a
@@ -12,18 +12,21 @@
 //!   [`open`](super::open) compares it with the running build ([`EngineCheck`]) and,
 //!   when it may write, records the running one (Unity rewrites its version file the
 //!   same way).
+//! * **`engine_order`** — that commit's place in history, which tells a newer engine
+//!   from an older one (#1319); absent when the engine couldn't count (a shallow
+//!   clone).
 //! * **`build`** — the [`BuildSettings`].
 
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
-use super::commit::{engine_commit, UNKNOWN_COMMIT};
+use super::engine::commit::{engine_commit, engine_order, UNKNOWN_COMMIT};
+use super::engine::{base, EngineCheck};
 use crate::core::application::BuildSettings;
 
 /// The project file, at the project root.
 pub const PROJECT_FILE: &str = "project.rusty";
-const DIRTY: &str = "-dirty";
 
 /// What `project.rusty` holds. Every field is `#[serde(default)]`, so a partial file
 /// keeps the defaults for what it omits.
@@ -32,6 +35,11 @@ const DIRTY: &str = "-dirty";
 pub struct ProjectFile {
     /// The engine commit the project was last opened with.
     pub engine_commit: String,
+    /// Where that commit sits in history ([`engine_order`]). A file that omits it
+    /// reads as `None`, never as the running engine's, so a record from before
+    /// counts were kept is an upgrade.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub engine_order: Option<u64>,
     /// The project's build settings.
     pub build: BuildSettings,
 }
@@ -40,6 +48,7 @@ impl Default for ProjectFile {
     fn default() -> Self {
         Self {
             engine_commit: engine_commit().to_string(),
+            engine_order: engine_order(),
             build: BuildSettings::default(),
         }
     }
@@ -87,94 +96,44 @@ impl ProjectFile {
     }
 }
 
-/// The open-time engine check: which engine the project was last opened with, and
-/// which one is running. A frontend decides how to tell the user ([`warning`]);
-/// [`open`](super::open) only reports it.
-///
-/// [`warning`]: EngineCheck::warning
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct EngineCheck {
-    /// The commit the project recorded; `None` when it recorded none (a new project,
-    /// or one from before `project.rusty`).
-    pub recorded: Option<String>,
-    /// The running engine's commit ([`engine_commit`]).
-    pub running: String,
-}
-
-impl EngineCheck {
-    /// The check of a project that recorded `recorded` against this build.
-    pub fn against(recorded: Option<&str>) -> Self {
-        Self {
-            recorded: recorded.filter(|c| !c.is_empty()).map(str::to_string),
-            running: engine_commit().to_string(),
-        }
-    }
-
-    /// Whether the project was last opened with this engine, as far as can be told.
-    /// Only two known, different commits are a mismatch: no record and an `unknown`
-    /// build (on either side) can't be compared, and a `-dirty` suffix is ignored —
-    /// local edits on the same commit are the engine developer's normal state, not
-    /// version skew.
-    pub fn matches(&self) -> bool {
-        let Some(recorded) = self.recorded.as_deref() else {
-            return true;
-        };
-        let (recorded, running) = (base(recorded), base(&self.running));
-        recorded == running || recorded == UNKNOWN_COMMIT || running == UNKNOWN_COMMIT
-    }
-
-    /// The one line to show when the commits differ; `None` when they match.
-    pub fn warning(&self) -> Option<String> {
-        let recorded = self.recorded.as_deref().filter(|_| !self.matches())?;
-        Some(format!(
-            "this project was last opened with engine {}, this is engine {}: \
-             scenes and scripts may not behave as they did",
-            short(recorded),
-            short(&self.running)
-        ))
-    }
-}
-
-fn base(commit: &str) -> &str {
-    commit.strip_suffix(DIRTY).unwrap_or(commit)
-}
-
-/// A commit as people read it: 12 hex digits, plus `-dirty` when it had one.
-fn short(commit: &str) -> String {
-    let hash = base(commit);
-    let dirty = if hash.len() < commit.len() { DIRTY } else { "" };
-    format!("{}{dirty}", &hash[..hash.len().min(12)])
-}
-
 /// Bring the project file at `root` up to date when the project is opened for
-/// editing: create it if missing, and record the running engine. Returns the check made against what
-/// the file held before, and one line per change. A file it creates names the product
+/// editing: create it if missing, and record the running engine. Returns the check
+/// made against what the file held before, and one line per change (an upgrade
+/// reports itself: [`EngineCheck::upgrade`]). A file it creates names the product
 /// after the project's folder, Unity's default Product Name (#1317); an existing file
 /// keeps whatever it says.
 pub(super) fn record(root: &Path) -> Result<(EngineCheck, Vec<String>), String> {
     let path = root.join(PROJECT_FILE);
     let existed = path.exists();
     let mut file = ProjectFile::load(root)?;
-    let check = EngineCheck::against(Some(&file.engine_commit));
+    let check = EngineCheck::against(Some(&file.engine_commit), file.engine_order);
     let mut lines = Vec::new();
     if let Some(name) = root.file_name().filter(|_| !existed) {
         file.build.product_name = name.to_string_lossy().into_owned();
     }
     // An `unknown` build can't say which engine it is: keep the last known record.
+    // A shallow build can't count: keep the record's count while the commit holds.
     if engine_commit() != UNKNOWN_COMMIT || file.engine_commit.is_empty() {
+        if engine_order().is_some() || base(&file.engine_commit) != base(engine_commit()) {
+            file.engine_order = engine_order();
+        }
         file.engine_commit = engine_commit().to_string();
     }
     file.write(&path)?;
     if !existed {
         lines.push(format!("created {PROJECT_FILE}"));
     }
+    lines.extend(check.upgrade());
     Ok((check, lines))
 }
 
 /// The check alone, for a project opened only to run: nothing is written.
 pub(super) fn inspect(root: &Path) -> Result<EngineCheck, String> {
     let file = ProjectFile::load(root)?;
-    Ok(EngineCheck::against(Some(&file.engine_commit)))
+    Ok(EngineCheck::against(
+        Some(&file.engine_commit),
+        file.engine_order,
+    ))
 }
 
 #[cfg(test)]
