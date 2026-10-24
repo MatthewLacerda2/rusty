@@ -38,8 +38,13 @@ fn every_field_reads_back_what_it_wrote() {
         assert_eq!(Field::parse(path), Some(field));
         assert_eq!(field.path(), path);
         assert_eq!(field.arity(), arity);
-        // In range for every clamp (unit colours, anchors, alpha, a font's minimum).
-        let v = lanes(Vec4::new(0.75, 0.5, 0.25, 0.625), arity);
+        // In range for every clamp (unit colours, anchors, alpha, a font's minimum,
+        // a lens's 1–179° field of view).
+        let probe = match path {
+            "Camera.fov" => Vec4::splat(60.0),
+            _ => Vec4::new(0.75, 0.5, 0.25, 0.625),
+        };
+        let v = lanes(probe, arity);
         assert!(field.set(&mut s, id, v), "{path} writes");
         let got = lanes(field.get(&s, id).expect(path), arity);
         assert!(got.abs_diff_eq(v, 1e-4), "{path}: wrote {v}, read {got}");

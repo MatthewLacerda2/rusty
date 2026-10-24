@@ -9,8 +9,8 @@
 //! `Camera.*` namespace mostly drives the *render* `Camera` (yaw/pitch/position/fov
 //! of the viewport); its per-entity functions (projection, culling mask, render
 //! target, lens and stacking — #430, #827, #1341) take an id and write this
-//! component through these ops. The lens ops hold Unity's bounds (FOV 1–179°, near
-//! > 0, far > near), so the card and a script can't store a broken frustum.
+//! component through these ops. The lens ops hold Unity's bounds (FOV 1–179°,
+//! near above 0, far beyond near), so the card and a script can't store a broken frustum.
 //! The component's motion-blur fields ARE also written from `Graphics.*`
 //! (`SetMotionBlurActive` / `SetMotionBlurSamples`); those route through
 //! [`set_motion_blur_active`] / [`set_motion_blur_samples`] here, so the card and the
