@@ -79,6 +79,8 @@ mod busy_replay;
 #[cfg(feature = "dev")]
 mod doc_examples;
 #[cfg(feature = "dev")]
+mod editor_play;
+#[cfg(feature = "dev")]
 mod export;
 #[cfg(feature = "dev")]
 mod frame_stats;

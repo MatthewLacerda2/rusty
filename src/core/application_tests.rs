@@ -63,3 +63,24 @@ fn quit_request_is_taken_exactly_once() {
     assert!(!app.quit_requested());
     assert!(!app.take_quit_request());
 }
+
+#[test]
+fn play_request_keeps_the_latest_and_is_taken_once() {
+    let mut app = Application::new();
+    assert_eq!(app.take_play_request(), None);
+    app.request_play(true);
+    app.request_play(false);
+    assert!(!app.play_heading());
+    assert_eq!(app.take_play_request(), Some(false));
+    assert_eq!(app.take_play_request(), None);
+}
+
+#[test]
+fn the_heading_falls_back_to_the_host_request() {
+    let mut app = Application::new();
+    assert!(!app.play_heading());
+    app.set_host_play(true);
+    assert!(app.play_heading(), "the host's pending Play counts");
+    app.request_play(false);
+    assert!(!app.play_heading(), "a script's request wins until taken");
+}

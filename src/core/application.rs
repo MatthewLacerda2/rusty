@@ -13,6 +13,14 @@
 //!   quit. What that means is the host's call: the player closes the window, the editor
 //!   stops Play (Unity ignores `Quit` in the editor), and the headless harness ends the
 //!   run. The sim never touches the window; it raises a flag the platform layer reads.
+//! * **The play request** — every host asks to enter or leave Play here
+//!   (`GameWorld::set_playing`: the editor transport, the player, the harness), and so
+//!   do the dev-only `Editor.EnterPlay()` / `Editor.ExitPlay()` (#1360, Unity's
+//!   `EditorApplication.isPlaying`). A script's request is kept apart from the host's
+//!   until `GameWorld` takes it at the next frame boundary, so a script never runs the
+//!   transition from inside its own call and the transport, writing its own request
+//!   back every frame, never overwrites it. A **standalone** run (the player, the
+//!   harness) has no edit mode to return to, and refuses a script's request.
 //!
 //! ## Persistence
 //! Like [`Storage`](crate::core::storage::Storage), the file is read once at a boundary
@@ -87,6 +95,13 @@ pub struct Application {
     /// `Some` once bound to a file via [`Application::open`]: setters then write it.
     path: Option<PathBuf>,
     quit_requested: bool,
+    /// Whether the host asked for Play (`GameWorld::set_playing`); the next tick's
+    /// transition acts on it.
+    host_play: bool,
+    /// `Some(playing)` once a script asked to enter or leave Play (#1360).
+    play_request: Option<bool>,
+    /// A standalone run (the player, the harness, #431): no edit mode to return to.
+    standalone: bool,
 }
 
 impl Application {
@@ -149,6 +164,43 @@ impl Application {
     /// Consume a pending quit request: `true` exactly once per `Quit()` call.
     pub fn take_quit_request(&mut self) -> bool {
         std::mem::take(&mut self.quit_requested)
+    }
+
+    /// Whether the host asked for Play: the state the next transition heads to.
+    pub fn host_play(&self) -> bool {
+        self.host_play
+    }
+
+    /// Record the host's own request (`GameWorld::set_playing`).
+    pub fn set_host_play(&mut self, playing: bool) {
+        self.host_play = playing;
+    }
+
+    /// Where the next transition heads: a script's request not yet taken, else the
+    /// host's.
+    pub fn play_heading(&self) -> bool {
+        self.play_request.unwrap_or(self.host_play)
+    }
+
+    /// Ask the host to enter (`true`) or leave (`false`) Play at the next frame
+    /// boundary (#1360). A later request before that boundary replaces this one.
+    pub fn request_play(&mut self, playing: bool) {
+        self.play_request = Some(playing);
+    }
+
+    /// Consume the pending play request: the host's frame boundary calls it once.
+    pub fn take_play_request(&mut self) -> Option<bool> {
+        self.play_request.take()
+    }
+
+    /// Whether this is a standalone run, with no edit mode to return to.
+    pub fn standalone(&self) -> bool {
+        self.standalone
+    }
+
+    /// Mark the run standalone, once, at boot (`GameWorld::boot_standalone`).
+    pub fn mark_standalone(&mut self) {
+        self.standalone = true;
     }
 }
 

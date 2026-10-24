@@ -37,7 +37,8 @@ impl World {
 
 impl super::GameWorld {
     /// The edit frame: what runs in place of the schedule on every frame outside
-    /// Play, stepped or frozen (`shell::frame::advance_sim` calls it on a frozen one).
+    /// Play, stepped or frozen ([`paused_frame`](Self::paused_frame) calls it on a
+    /// frozen one).
     /// Every edit-mode follower hangs off it: a model Play found changed converts
     /// now (#1253), a model the engine re-wrote reloads into its entities (#1242),
     /// a bone the designer moved still skins (#453), and the UI's texture sizes are
@@ -48,5 +49,34 @@ impl super::GameWorld {
         let mut scene = self.world.scene.borrow_mut();
         self.resources.model_writes.follow(&mut scene);
         scene.build_skin_palettes();
+    }
+
+    /// One paused frame (#283): the wall clock is bypassed and the world moves only
+    /// by the queued `Time.Step(n)` steps, each one
+    /// [`FIXED_DELTA_TIME`](crate::time::FIXED_DELTA_TIME) tick, the fixed-dt the
+    /// headless harness uses, so windowed and headless stepping are frame-identical.
+    /// Every queued step drains now. With none queued the sim stays frozen but a
+    /// Play/Stop still takes effect, and outside Play the edit frame runs on the
+    /// scene the transition left (a pause can outlive Stop: `Time::reset` keeps it).
+    /// The windowed loop runs it while paused; the headless session after every
+    /// command (#1360). Returns the first tick's transition.
+    pub fn paused_frame(&mut self) -> super::PlayTransition {
+        use super::PlayTransition;
+        let mut transition = PlayTransition::None;
+        let mut stepped = false;
+        while self.time().borrow_mut().take_pending_step() {
+            let t = self.tick(crate::time::FIXED_DELTA_TIME);
+            if t != PlayTransition::None {
+                transition = t;
+            }
+            stepped = true;
+        }
+        if !stepped {
+            transition = self.poll_transition();
+            if !self.play_requested() {
+                self.edit_frame();
+            }
+        }
+        transition
     }
 }

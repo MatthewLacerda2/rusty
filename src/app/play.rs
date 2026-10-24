@@ -36,7 +36,7 @@ impl GameWorld {
     /// then holds conversion off, as the editor's Play does (#1253).
     pub fn boot_standalone(&mut self) {
         crate::asset::convert::mark_standalone();
-        self.resources.standalone = true;
+        self.resources.application.borrow_mut().mark_standalone();
         self.set_playing(true);
     }
 

@@ -111,13 +111,16 @@ impl GameWorld {
     /// World enters it at the next tick's transition. Whether it *is* in Play is
     /// the scene's single play state, `Scene::is_playing` (#1302, #1304).
     pub fn play_requested(&self) -> bool {
-        self.resources.play_requested
+        self.resources.application.borrow().host_play()
     }
 
     /// Ask to enter or leave Play, every host's one way in (the editor transport,
     /// the player, the harness): the next tick's transition acts on it.
     pub fn set_playing(&mut self, playing: bool) {
-        self.resources.play_requested = playing;
+        self.resources
+            .application
+            .borrow_mut()
+            .set_host_play(playing);
     }
 
     /// Advance the simulation by `dt` seconds. Returns any play-state transition so
@@ -174,7 +177,12 @@ impl GameWorld {
     }
 
     fn handle_transition(&mut self) -> PlayTransition {
-        let asked = self.resources.play_requested;
+        // A script's `Editor.EnterPlay/ExitPlay` (#1360) asks like any host does.
+        let scripted = self.resources.application.borrow_mut().take_play_request();
+        if let Some(playing) = scripted {
+            self.set_playing(playing);
+        }
+        let asked = self.play_requested();
         let playing = self.world.scene.borrow().is_playing();
         if asked && !playing {
             // Before `Start`, so a script can override the locked+hidden default.
@@ -212,7 +220,7 @@ impl GameWorld {
         }
         // Snapshot the edit scene so Stop can restore it, discarding play-mode mutations.
         // A standalone run has no edit mode to return to (#431).
-        if !self.resources.standalone {
+        if !self.resources.application.borrow().standalone() {
             self.resources.edit_snapshot = Some(SceneSnapshot::capture(&self.world.scene.borrow()));
             self.capture_play_origin();
         }
