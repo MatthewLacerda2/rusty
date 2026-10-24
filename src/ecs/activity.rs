@@ -8,7 +8,7 @@
 //!
 //! **What invalidates.** Anything that can change an answer bumps the generation, O(1),
 //! and every flag goes dirty at once: an `active` flag that changed, a parent link
-//! written, a despawn (a dead parent ends its children's chains), a document inserted
+//! changed, a despawn (a dead parent ends its children's chains), a document inserted
 //! or overwritten, a `clear`. These are rare next to the reads, and after one the next
 //! pass re-resolves each entity once, its ancestors already answered. A per-subtree
 //! dirty walk (as `world_space` does) would follow `children`, which a raw
@@ -40,16 +40,20 @@ struct Flags {
 impl Default for ActivityStore {
     fn default() -> Self {
         Self {
-            inner: RefCell::new(Flags {
-                flags: Vec::new(),
-                generation: 1,
-                chain: Vec::new(),
-            }),
+            inner: RefCell::new(Flags::new()),
         }
     }
 }
 
 impl Flags {
+    fn new() -> Self {
+        Self {
+            flags: Vec::new(),
+            generation: 1,
+            chain: Vec::new(),
+        }
+    }
+
     fn clean(&self, id: u32) -> Option<bool> {
         let &(stamp, active) = self.flags.get(id as usize)?;
         (stamp == self.generation).then_some(active)
@@ -76,33 +80,37 @@ impl ActivityStore {
         }
     }
 
+    /// Forget every answer (a `clear`, after which ids restart at 1).
+    pub(in crate::ecs) fn reset(&self) {
+        *self.inner.borrow_mut() = Flags::new();
+    }
+
     /// Whether live entity `id` and every ancestor are active, cleaning the dirty chain
     /// above it first. The climb is [`World::self_and_ancestors`], bounded, so a
     /// malformed parent cycle ends it instead of hanging it (#991).
+    ///
+    /// The climb stops at the first clean ancestor (its answer is the chain's) or the
+    /// first inactive one (it and everything below it answer `false`, as the old walk's
+    /// `all` stopped there). Every answer it fills is the one the whole walk would give,
+    /// even in a cycle: a climb the bound cuts found every node of the loop active, so
+    /// each of them answers `true`.
     pub(in crate::ecs) fn resolve(&self, world: &World, id: u32) -> bool {
         let mut store = self.inner.borrow_mut();
         if let Some(active) = store.clean(id) {
             return active;
         }
         let mut chain = std::mem::take(&mut store.chain);
-        let mut above = None;
+        let mut above = true;
         for c in world.self_and_ancestors(id) {
-            above = store.clean(c);
-            if above.is_some() {
+            if let Some(active) = store.clean(c) {
+                above = active;
                 break;
             }
             chain.push(c);
+            if !world.is_active_self(c) {
+                break;
+            }
         }
-        let reached_root = chain
-            .last()
-            .is_some_and(|&top| world.ancestors(top).next().is_none());
-        let mut above = match above {
-            Some(active) => active,
-            None if reached_root => true,
-            // The bound cut a parent cycle: answer it whole and remember nothing, since
-            // a node near the top of the chain would see only part of the loop.
-            None => chain.drain(..).all(|c| world.is_active_self(c)),
-        };
         while let Some(c) = chain.pop() {
             above = above && world.is_active_self(c);
             store.put(c, above);
@@ -118,5 +126,11 @@ impl World {
     pub(in crate::ecs) fn invalidate_caches(&self) {
         self.world_space.invalidate_all();
         self.activity.invalidate_all();
+    }
+
+    /// Every cached world matrix and activity answer forgotten (a `clear`).
+    pub(in crate::ecs) fn reset_caches(&self) {
+        self.world_space.reset();
+        self.activity.reset();
     }
 }

@@ -22,6 +22,8 @@ pub mod access;
 mod active_tests;
 mod activity;
 #[cfg(test)]
+mod activity_tests;
+#[cfg(test)]
 mod ancestors_tests;
 mod bundle;
 pub mod core;

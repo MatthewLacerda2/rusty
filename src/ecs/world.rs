@@ -126,8 +126,7 @@ impl World {
         self.order.clear();
         self.next_id = 1;
         self.next_seq = 0;
-        self.world_space.reset();
-        self.activity = ActivityStore::default();
+        self.reset_caches();
         self.bounds = BoundsQueue::default();
     }
 
