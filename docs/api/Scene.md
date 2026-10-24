@@ -7,7 +7,7 @@ it behaves identically to the editor and uses the same default values.
 
 | Function | Signature | Returns |
 |---|---|---|
-| `Scene.FindEntityByName` | `(name)` | `id` (or `nil` if none) |
+| `Scene.FindEntityByName` | `(name)` | `id` of the first entity so named that is active in the hierarchy, as Unity's `GameObject.Find` (or `nil` if none) |
 | `Scene.CreateEntity` | `(name, [primitive])` | new entity `id` |
 | `Scene.Deactivate` | `(id)` | — |
 | `Scene.DestroyEntity` | `(id)` | `true` if an entity existed at `id` |

@@ -73,8 +73,9 @@ pub fn hidden_mask(scene: &mut Scene, id: u32) {
 pub fn minimap_world() -> Scene {
     use super::super::render_texture_scene::pip_scene;
     let mut scene = pip_scene(Some(RenderTarget::new("minimap", 64, 64)));
-    for name in ["Canvas", "Pip"] {
-        let id = scene.find_entity_by_name(name).expect("pip scene entity");
+    // Both found first: `Pip` sits under `Canvas`, and Find skips a hidden subtree.
+    let ids = ["Canvas", "Pip"].map(|n| scene.find_entity_by_name(n).expect("pip scene entity"));
+    for id in ids {
         scene.world.set_active(id, false);
     }
     let cam = scene.find_entity_by_name("PipCamera").expect("pip camera");
