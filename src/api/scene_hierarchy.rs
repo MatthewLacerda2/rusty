@@ -62,8 +62,8 @@ pub fn register<'scope>(
         Ok(scene.borrow_mut().world.set_active(id, on))
     });
     put(table, "SetActive", f)?;
-    // lint: allow(active-self) `IsActive` is Unity's `activeSelf`
     let f = scope.create_function(move |_, id: Option<u32>| {
+        // lint: allow(active-self) `IsActive` is Unity's `activeSelf`
         Ok(id.is_some_and(|id| scene.borrow().world.is_active_self(id)))
     });
     put(table, "IsActive", f)?;
