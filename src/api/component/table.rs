@@ -1,0 +1,228 @@
+//! src/api/component/table.rs — the field table behind `Component.*` (#1369).
+//!
+//! Each first-class component lists its serialized fields once, as [`Field`]s: a
+//! field is either written through the `scene::authoring` op the inspector's card
+//! calls ([`Access::Op`]) or read-only with the reason ([`Access::ReadOnly`]). There
+//! is no serde write-back: a field with no op cannot be written, so the inspector's
+//! clamping, sanitizing and side effects are the only way in. Fields one op writes
+//! together (a light's two cone angles) form a [`Group`], written once per `Set`. `tests.rs` fails when a
+//! component's serialized fields and its table disagree.
+//!
+//! [`Kind`] erases the component type so the namespace can pick one by name.
+
+use serde::de::DeserializeOwned;
+use serde::Serialize;
+use serde_json::{Map, Value};
+
+use crate::ecs::World;
+use crate::scene::authoring::ComponentKind;
+
+/// Writes one field of `C` from its serialized value, through the field's op.
+pub type Write<C> = fn(&mut C, Value) -> Result<(), String>;
+
+/// How a field may be reached from `Component.Set`.
+pub enum Access<C> {
+    /// Written by the inspector's op (decode the value, then call it).
+    Op(Write<C>),
+    /// Written with the other fields of its group, by one op (`group!`).
+    Group(Group<C>),
+    /// Readable only; the text says why, or which verb writes it.
+    ReadOnly(&'static str),
+}
+
+/// Fields one op writes together, `set_cones(light, inner, outer)`: a `Set`
+/// naming any of them calls it once, with each field's new value or, when not
+/// named, its current one. So an op that clamps one half against the other sees
+/// both halves as they are meant to end up.
+pub struct Group<C> {
+    pub names: &'static [&'static str],
+    pub write: fn(&mut C, &Values) -> Result<(), String>,
+}
+
+/// What a group's op reads its fields from: the changes, else the component.
+pub struct Values<'a> {
+    pub changes: &'a Map<String, Value>,
+    pub current: &'a Value,
+}
+
+impl Values<'_> {
+    /// Field `name`'s value as `T`: the one written, else the one held.
+    pub fn take<T: DeserializeOwned>(&self, name: &str) -> Result<T, String> {
+        let value = self.changes.get(name).or_else(|| self.current.get(name));
+        super::value::decode(value.cloned().unwrap_or(Value::Null))
+            .map_err(|e| format!("{name}: {e}"))
+    }
+}
+
+/// One serialized field of a component, by its serialized name.
+pub struct Field<C> {
+    pub name: &'static str,
+    pub access: Access<C>,
+}
+
+/// A field written by one op, `fn(&mut C, T)` with `T` decoded from the value.
+macro_rules! op {
+    ($name:literal, $op:path) => {
+        $crate::api::component::table::Field {
+            name: $name,
+            access: $crate::api::component::table::Access::Op(|c, json| {
+                $op(c, $crate::api::component::value::decode(json)?);
+                Ok(())
+            }),
+        }
+    };
+}
+
+/// A field written by an adapter over its op(s): the value decoded as `$t`, then
+/// `$body` (which may use `?` on a fallible op).
+macro_rules! with {
+    ($name:literal, |$c:ident, $v:ident: $t:ty| $body:expr) => {
+        $crate::api::component::table::Field {
+            name: $name,
+            access: $crate::api::component::table::Access::Op(|$c, json| {
+                let $v: $t = $crate::api::component::value::decode(json)?;
+                $body;
+                Ok(())
+            }),
+        }
+    };
+}
+
+/// A [`Group`]: `|component, field: Type, …| body`, each field named as its
+/// binding. List each of its fields with `part!`.
+macro_rules! group {
+    (|$c:ident $(, $f:ident: $t:ty)+ $(,)?| $body:expr) => {
+        $crate::api::component::table::Group {
+            names: &[$(stringify!($f)),+],
+            write: |$c, values| {
+                $(let $f: $t = values.take(stringify!($f))?;)+
+                $body;
+                Ok(())
+            },
+        }
+    };
+}
+
+/// A field written by its [`Group`]'s op.
+macro_rules! part {
+    ($name:literal, $group:expr) => {
+        $crate::api::component::table::Field {
+            name: $name,
+            access: $crate::api::component::table::Access::Group($group),
+        }
+    };
+}
+
+/// A read-only field and why it is read-only.
+macro_rules! ro {
+    ($name:literal, $why:expr) => {
+        $crate::api::component::table::Field {
+            name: $name,
+            access: $crate::api::component::table::Access::ReadOnly($why),
+        }
+    };
+}
+
+pub(super) use {group, op, part, ro, with};
+
+/// A first-class component the table covers: its fields, and how to reach it on
+/// an entity.
+pub trait Inspect: Clone + Serialize + DeserializeOwned + 'static {
+    const FIELDS: &'static [Field<Self>];
+    /// The entity's component, serialized, or `None` without one.
+    fn read(world: &World, id: u32) -> Option<Result<Value, String>>;
+    /// Run `f` on the entity's component; `false` without one.
+    fn update(world: &mut World, id: u32, f: &mut dyn FnMut(&mut Self)) -> bool;
+}
+
+/// Implement [`Inspect`] for each `Type => getter, mutable getter, field table`.
+macro_rules! inspect {
+    ($($ty:ty => $get:ident, $get_mut:ident, $fields:expr;)*) => {$(
+        impl $crate::api::component::table::Inspect for $ty {
+            const FIELDS: &'static [$crate::api::component::table::Field<Self>] = $fields;
+            fn read(
+                world: &$crate::ecs::World,
+                id: u32,
+            ) -> Option<Result<serde_json::Value, String>> {
+                world
+                    .$get(id)
+                    .map(|c| serde_json::to_value(&*c).map_err(|e| e.to_string()))
+            }
+            fn update(
+                world: &mut $crate::ecs::World,
+                id: u32,
+                f: &mut dyn FnMut(&mut Self),
+            ) -> bool {
+                world.$get_mut(id).map(|mut c| f(&mut c)).is_some()
+            }
+        }
+    )*};
+}
+
+pub(super) use inspect;
+
+/// One field as `Component.Fields` lists it: its name, and why it is read-only
+/// (`None`: writable).
+pub type FieldInfo = (&'static str, Option<&'static str>);
+
+/// Applies a change table to an entity's component; `Ok(false)` without one.
+pub type WriteAny =
+    fn(&mut World, u32, &Map<String, Value>, super::write::Skip) -> Result<bool, String>;
+
+/// A component the namespace can name, with its type erased.
+pub struct Kind {
+    /// The name `Component.*` answers to first (any name `Scene.AddComponent`
+    /// takes resolves too, through `add`).
+    pub name: &'static str,
+    /// The Add Component kind, `None` for `Transform` and `Mesh`, which the menu
+    /// does not add.
+    pub add: Option<ComponentKind>,
+    /// The component's key in a saved entity (`Entity`'s field name; the table test).
+    #[cfg(test)]
+    pub key: &'static str,
+    pub read: fn(&World, u32) -> Option<Result<Value, String>>,
+    pub write: WriteAny,
+    pub fields: fn() -> Vec<FieldInfo>,
+    /// A field's type as its derive reads it: optional, and the Lua type it holds.
+    pub field_type: fn(&'static str) -> (bool, Option<&'static str>),
+    /// The field names the component's serde derive declares (the table test).
+    #[cfg(test)]
+    pub serde_fields: fn() -> Option<&'static [&'static str]>,
+}
+
+/// The [`Kind`] for `C`.
+pub const fn kind<C: Inspect>(
+    name: &'static str,
+    add: Option<ComponentKind>,
+    key: &'static str,
+) -> Kind {
+    #[cfg(not(test))]
+    let _ = key;
+    Kind {
+        name,
+        add,
+        #[cfg(test)]
+        key,
+        read: C::read,
+        write: super::write::write::<C>,
+        fields: fields::<C>,
+        field_type: super::introspect::field_type::<C>,
+        #[cfg(test)]
+        serde_fields: super::introspect::serde_fields::<C>,
+    }
+}
+
+fn fields<C: Inspect>() -> Vec<FieldInfo> {
+    C::FIELDS
+        .iter()
+        .map(|f| match &f.access {
+            Access::ReadOnly(why) => (f.name, Some(*why)),
+            Access::Group(g) => {
+                // Checked wherever the table is listed, the table tests included.
+                debug_assert!(g.names.contains(&f.name), "{} not in its group", f.name);
+                (f.name, None)
+            }
+            Access::Op(_) => (f.name, None),
+        })
+        .collect()
+}
