@@ -127,7 +127,7 @@ mod tests {
         set_color(&mut e, Vec3::new(f32::NAN, 0.5, f32::INFINITY));
         set_cones(&mut e, f32::NAN, f32::INFINITY);
         assert_eq!(e.intensity, 0.0);
-        assert_eq!(e.color, Vec3::new(0.0, 0.5, 0.0));
+        assert_eq!(e.color, Vec3::ZERO, "a colour is refused whole");
         assert_eq!((e.inner_cone, e.outer_cone), (0.0, 0.0));
         set_cones(&mut e, 10.0, 500.0);
         assert_eq!((e.inner_cone, e.outer_cone), (10.0, MAX_CONE));
