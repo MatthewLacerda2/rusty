@@ -5,54 +5,55 @@ hook runs the fast ones. `tools/lint` writes its result to `.lint/report.txt` so
 agent can read exactly what failed.
 
 ## What's enforced
+<!-- sorted: each check is one row, so two branches adding a rule land on different lines (#1409) -->
 | Check | Tool | Rule |
 |---|---|---|
-| Style | rustfmt (`rustfmt.toml`) | `cargo fmt --check` |
+| Active in the hierarchy | `tools/lint -- --rules` (`active-self`) | **hard gate**: outside `src/ecs/`, no non-test line of `src/` calls `is_active_self(` — systems ask `World::is_active_in_hierarchy`, so an inactive parent hides its subtree; what shows or stores the own flag takes `// lint: allow(active-self) <why>` (#1363) |
+| Asset writes tell the caches | `tools/lint -- --rules` (`asset-write`) | **hard gate**: a non-test line of `src/` outside `src/core/fs/` that calls `fs::write(`, `File::create(` or `.save(<arg>)` has a `note_written` later in its function, or `// lint: allow(asset-write) <why>` (a file no path-keyed cache reads) (#1220) |
 | Code smells | clippy (`clippy.toml`) | **hard gate**: `cargo clippy --all-targets -- -D warnings` (default, `--features dev`, and `--no-default-features` — the editor-free player build), plus `tools/lint` itself (#935) |
-| Merge helpers | `unittest` (`make scripts`) | **hard gate**: `.github/scripts/tests` pass — `make mergeable` is the only thing between a red PR and `main` while it has no required checks (#486, #491) |
+| Component completeness | `tools/lint -- --components` | every first-class component has all 4 axes (field, Add Component entry, inspector card, API namespace), or a written waiver (`WAIVERS`) |
+| Converters report, never log | `tools/lint -- --rules` (`converter-log`) | **hard gate**: no code line of a converter under `src/asset/convert/` (every module, folder or single file, but the cache's own `mod`, `converter`, `depends`, `gate`, `lock`, `record`, `stage`, `stale`, `texture_ref` and `tests`) names `log::` or a bare logging macro — a converter returns what it skipped in `Converted` and fails on anything else, and `convert::refresh` alone warns; each converter's root carries `#![deny(clippy::let_underscore_must_use, clippy::unused_result_ok, clippy::print_stdout, clippy::print_stderr)]`, wrapped or not, so clippy refuses a dropped `Result` and a print there (#1172) |
+| Coverage floors drop with a reason | `unittest` (`make scripts`, `.github/scripts/coverage_floors.py`) | **hard gate**: a floor in `coverage-baseline.txt` lowered from the merge base with `origin/main` needs an inline `# reason: <why>` on its line, and a removed floor passes only once its `src/<module>/` is gone; the weekly coverage run stays a signal (#963) |
+| Dead `pub` items | `make dead-pub` (`tools/lint -- --dead-pub`) | **signal**, never a gate: `src/lib.rs` exports every module, so rustc's `dead_code` never fires on a `pub` item. On a copy under `target/dead-pub/` the modules go `pub(crate)` and every bin and the integration suite fold into the lib; the report lists items nothing uses, items only tests use (a test seam may be fine), and unused imports apart (#940, #1003). It builds for the host only, so a finding in a file with a platform `cfg` (or in a module declared under one) is listed under *Platform-gated*: check it on that platform before narrowing (#1092). It runs weekly on `main` as `cargo-test.yml`'s `dead-pub` job, the report in its job summary; the job goes red only when no report came out, and `main-health` files that (#1205) |
+| Dependency direction | `tools/lint -- --direction` | the table's sim modules never reference `crate::render`, `crate::editor`, `wgpu` or `egui` — the arrow is render/editor → sim (#494) |
+| Dependency locks | cargo-deny (`deny.toml`) | **hard gate**: every git dependency is pinned by `rev` (`required-git-spec`); `nalgebra` only through the physics stack and no `cgmath` — glam is the one math crate (#975) |
+| Docs name what exists | `make docrefs` (`.github/scripts/docrefs.py`) | **hard gate**: every `src/`, `tests/`, `tools/`, `docs/` or `.github/` path in a tracked `*.md`'s inline code is tracked, every `` `make <verb>` `` is a target, and CLAUDE.md's namespaces each have a `docs/api/` page; placeholders pass, anything else takes `<!-- docrefs: allow <why> -->`. Runs on Markdown-only PRs too (#973) |
+| Editor↔shared-op parity | `tools/lint -- --parity` | every first-class component's inspector card routes its mutations through a shared `scene::authoring` op (never direct field writes through the #344 accessor guard) |
+| File length | `tools/lint` | <= 300 lines: every line of a `.rs` file, the lines of code of a `.py`, `.lua` or `.wgsl` one (docstrings, comments and blank lines free, #926, #1015); nothing grandfathered |
+| Finite authoring floats | `tools/lint -- --rules` (`sanitize`) | **hard gate**: every `pub fn set_*` under `src/scene/authoring/` that takes an `f32` or a glam vector passes it to a `scene::authoring::sanitize` helper (or a sibling setter of its file), so NaN and `±inf` from Lua or the editor take the field's fallback and never reach a field; a value checked another way takes `// lint: allow(sanitize) <why>` (#1361) |
+| Folder grouping | `tools/lint -- --rules` | **hard gate** (`prefix-group`): no three sibling `.rs` files share a first word (`nav_agent.rs`, `nav_obstacle.rs`, …); make it a subfolder and drop the prefix. Prints the ≲10-files-per-directory signal beside it, never failing on it (#934) |
+| Full component literals in tests | `tools/lint -- --rules` (`full-literal`) | **hard gate**: test code builds a first-class component with `..rest` or a constructor, never a literal naming every field (#663, #976) |
 | Function ("endpoint") length | clippy `too_many_lines` + `tools/lint -- --determinism` | **hard gate**: `too-many-lines-threshold = 50` (`clippy.toml`), denied crate-wide in `Cargo.toml`'s `[lints]`; its one exception, `Renderer::assemble`, is locked (`ESCAPE`, #961) |
 | Lint exceptions carry a reason | clippy `allow_attributes` + `allow_attributes_without_reason` | **hard gate**: an exception is `#[expect(lint, reason = "…")]` (outer `#[allow]` is denied; a module-root `#![allow]` still needs its `reason`), and an expectation that no longer fires fails too (#961) |
-| File length | `tools/lint` | <= 300 lines: every line of a `.rs` file, the lines of code of a `.py`, `.lua` or `.wgsl` one (docstrings, comments and blank lines free, #926, #1015); nothing grandfathered |
-| Test / fixture file length | `tools/lint` | <= 150 lines (standalone `*_test.rs` / `tests/` / `fixtures/`, a `*_tests.rs` with no source beside it, and every `.py` under a `tests/` directory); a `<x>_tests.rs` **sibling** of `<x>.rs` (or of a `<x>/` module directory) shares the 300-line source cap |
-| Folder grouping | `tools/lint -- --rules` | **hard gate** (`prefix-group`): no three sibling `.rs` files share a first word (`nav_agent.rs`, `nav_obstacle.rs`, …); make it a subfolder and drop the prefix. Prints the ≲10-files-per-directory signal beside it, never failing on it (#934) |
+| Local gate = CI gate | `unittest` (`make scripts`, `test_gate_mirror.py`) | **hard gate**: every command a `GATES` recipe runs appears in a step of `ci.yml`/`lint.yml`, and every clippy run passes nothing after `--` but `-D warnings` (#964) |
+| Lua paths are `/` | `tools/lint -- --rules` | **hard gate** (`lua-path-slash`): a path returned to a script goes through `core::paths::to_slash`, never `to_string_lossy()`/`display()` (#1390) |
+| Merge helpers | `unittest` (`make scripts`) | **hard gate**: `.github/scripts/tests` pass — `make mergeable` is the only thing between a red PR and `main` while it has no required checks (#486, #491) |
+| Module layering | `tools/lint -- --layers` | every `crate::<module>` import and every external crate a module names matches the declared table (`tools/lint/src/layers/table.rs`): nothing undeclared, nothing stale, no cycle, no sim → platform edge (#724, #938) |
+| No shared process state | clippy `disallowed_methods` + `tools/lint -- --determinism` | **hard gate**: `std::env::{set_var, remove_var, set_current_dir}` are banned crate-wide in `clippy.toml`, tests included, since `cargo test` runs every in-crate test in one process; production opts out inline with a reason (`project::open`), and `--determinism` keeps the three on the list (#977) |
+| No subprocesses | `tools/lint -- --rules` (`subprocess`) | **hard gate**: no line of `src/` names `std::process::Command` — the engine starts no other program but Blender, to convert a `.blend` while authoring; a real need takes `// lint: allow(subprocess) <why>` (#975) |
 | Nothing temporary | clippy `dbg_macro`/`todo`/`unimplemented` + `tools/lint -- --rules` (`markers`) | **hard gate**: the three are denied in `Cargo.toml`'s `[lints]` (and `tools/lint`'s); a marker word (`TODO`, `FIXME`, `XXX`, `HACK`) in a scanned `.rs` file fails — an unfinished thing is an issue (#935) |
-| Test source shape | `tools/lint -- --rules` (`test-inner-cfg`, `test-user-workspace`, `test-gpu-entry`) | **hard gate**: no inner `#![cfg]` in `tests/`, no user workspace in tests, a GPU only through `headless_or_skip` (#980) |
-| Full component literals in tests | `tools/lint -- --rules` (`full-literal`) | **hard gate**: test code builds a first-class component with `..rest` or a constructor, never a literal naming every field (#663, #976) |
-| Skipped tests | `tools/lint -- --rules` (`skip`) | **hard gate**: `#[ignore]` / `#[cfg_attr(…, ignore)]` needs `// lint: allow(skip) <why>` (#935) |
+| One atomic write | `tools/lint -- --rules` (`atomic-write`) | **hard gate**: no line of `src/` outside `src/core/fs/` names `fs::rename` — a file a reader may open is written through `core::fs::write_atomic`; a rename that moves rather than writes takes `// lint: allow(atomic-write) <why>` (#1129) |
+| One dependency graph | `make feature-split` (`.github/scripts/feature_split.py`) | **hard gate**: no dev-dependency turns on a feature the normal build lacks, so `cargo test` never rebuilds a shared crate (#552, #979; `docs/testing.md`) |
+| One fullscreen triangle | `tools/lint -- --rules` (`fullscreen-triangle`) | **hard gate**: no `.wgsl` under `engine/` but `fullscreen.wgsl` spells the triangle's `(i << 1u) & 2u`; `#import fullscreen` and call `fullscreen::triangle` / `uv` (#1370) |
+| One name table per enum | `tools/lint -- --rules` (`named-enum`) | **hard gate**: no file of `src/` hand-writes both a parse (`fn parse(_: &str) -> Option<Self>` in an `impl T`, or a free `fn parse_*(_: &str) -> Option<T>`) and a name (`fn name`/`fn as_str(self) -> &'static str`, or a free `fn *_name(_: T) -> &'static str`) for one type, nor a `const`/`static` table of `(T, &str)` pairs — a script-facing enum declares its names once with `core::named_enum!`, which writes `ALL`, `name`, a case-insensitive `parse` and `Display`; a parse that does more takes `// lint: allow(named-enum) <why>` (#1329) |
+| One world space | `tools/lint -- --rules` (`world-space`) | **hard gate**: outside `ecs::world_space` and `components::transform`, no engine code line decomposes a matrix (`to_scale_rotation_translation`), names the retired `compute_world_matrix` / `world_matrix(` / `parent_world_matrix`, or folds a Transform over `ancestors(` — world space is read from `ecs::World`'s world API; test code is not scanned, and converting file data takes `// lint: allow(world-space) <why>` (#1196) |
+| Order-free lists stay sorted | `tools/lint -- --rules` (`sorted`) | **hard gate**: a list under a `// sorted: <why>` (or `<!-- sorted: <why> -->`) marker stays in order up to its first blank line, so two branches adding entries touch different lines (#911) |
+| Portable paths | `tools/lint -- --rules` | **hard gate** (`slash-join`): `src/` and `tests/` never join a `/`-separated path (literal, `format!` or constant) onto a path or make a path from one; they join one part per call or join `core::paths::native(…)` (#1332, #1371) |
 | Pushed = built | `tools/lint -- --rules` (`ignored`) | **hard gate**: no scanned `.rs` file may match a `.gitignore` pattern, tracked or not; no allow (#935) |
 | Ranged editor drags | `tools/lint -- --rules` (`drag-range`) | **hard gate**: a `DragValue` under `src/editor` bounds its range with `.ranged(..)` (`editor::widgets::DragRange`), never egui's `.range(..)`, which also rewrites an out-of-range value just by selecting the entity (#1158); a real need takes `// lint: allow(drag-range) <why>` |
-| Asset writes tell the caches | `tools/lint -- --rules` (`asset-write`) | **hard gate**: a non-test line of `src/` outside `src/core/fs/` that calls `fs::write(`, `File::create(` or `.save(<arg>)` has a `note_written` later in its function, or `// lint: allow(asset-write) <why>` (a file no path-keyed cache reads) (#1220) |
-| One atomic write | `tools/lint -- --rules` (`atomic-write`) | **hard gate**: no line of `src/` outside `src/core/fs/` names `fs::rename` — a file a reader may open is written through `core::fs::write_atomic`; a rename that moves rather than writes takes `// lint: allow(atomic-write) <why>` (#1129) |
-| Converters report, never log | `tools/lint -- --rules` (`converter-log`) | **hard gate**: no code line of a converter under `src/asset/convert/` (every module, folder or single file, but the cache's own `mod`, `converter`, `depends`, `gate`, `lock`, `record`, `stage`, `stale`, `texture_ref` and `tests`) names `log::` or a bare logging macro — a converter returns what it skipped in `Converted` and fails on anything else, and `convert::refresh` alone warns; each converter's root carries `#![deny(clippy::let_underscore_must_use, clippy::unused_result_ok, clippy::print_stdout, clippy::print_stderr)]`, wrapped or not, so clippy refuses a dropped `Result` and a print there (#1172) |
-| Active in the hierarchy | `tools/lint -- --rules` (`active-self`) | **hard gate**: outside `src/ecs/`, no non-test line of `src/` calls `is_active_self(` — systems ask `World::is_active_in_hierarchy`, so an inactive parent hides its subtree; what shows or stores the own flag takes `// lint: allow(active-self) <why>` (#1363) |
-| One world space | `tools/lint -- --rules` (`world-space`) | **hard gate**: outside `ecs::world_space` and `components::transform`, no engine code line decomposes a matrix (`to_scale_rotation_translation`), names the retired `compute_world_matrix` / `world_matrix(` / `parent_world_matrix`, or folds a Transform over `ancestors(` — world space is read from `ecs::World`'s world API; test code is not scanned, and converting file data takes `// lint: allow(world-space) <why>` (#1196) |
-| Finite authoring floats | `tools/lint -- --rules` (`sanitize`) | **hard gate**: every `pub fn set_*` under `src/scene/authoring/` that takes an `f32` or a glam vector passes it to a `scene::authoring::sanitize` helper (or a sibling setter of its file), so NaN and `±inf` from Lua or the editor take the field's fallback and never reach a field; a value checked another way takes `// lint: allow(sanitize) <why>` (#1361) |
-| One fullscreen triangle | `tools/lint -- --rules` (`fullscreen-triangle`) | **hard gate**: no `.wgsl` under `engine/` but `fullscreen.wgsl` spells the triangle's `(i << 1u) & 2u`; `#import fullscreen` and call `fullscreen::triangle` / `uv` (#1370) |
-| No subprocesses | `tools/lint -- --rules` (`subprocess`) | **hard gate**: no line of `src/` names `std::process::Command` — the engine starts no other program but Blender, to convert a `.blend` while authoring; a real need takes `// lint: allow(subprocess) <why>` (#975) |
-| One name table per enum | `tools/lint -- --rules` (`named-enum`) | **hard gate**: no file of `src/` hand-writes both a parse (`fn parse(_: &str) -> Option<Self>` in an `impl T`, or a free `fn parse_*(_: &str) -> Option<T>`) and a name (`fn name`/`fn as_str(self) -> &'static str`, or a free `fn *_name(_: T) -> &'static str`) for one type, nor a `const`/`static` table of `(T, &str)` pairs — a script-facing enum declares its names once with `core::named_enum!`, which writes `ALL`, `name`, a case-insensitive `parse` and `Display`; a parse that does more takes `// lint: allow(named-enum) <why>` (#1329) |
-| Tagged engine warnings | `tools/lint -- --rules` (`log-tag`) | **hard gate**: every engine warning or error in `src/` (`log::warn!` / `log::error!`, an imported bare `warn!` / `error!`, `log!` at `Level::Warn`/`Level::Error`) opens its message with its module, `[Asset] …`, since those records reach the console and the session/MCP replies (#1139); a message that is not a literal takes `// lint: allow(log-tag) <why>` |
-| Order-free lists stay sorted | `tools/lint -- --rules` (`sorted`) | **hard gate**: a list under a `// sorted: <why>` (or `<!-- sorted: <why> -->`) marker stays in order up to its first blank line, so two branches adding entries touch different lines (#911) |
-| Dependency locks | cargo-deny (`deny.toml`) | **hard gate**: every git dependency is pinned by `rev` (`required-git-spec`); `nalgebra` only through the physics stack and no `cgmath` — glam is the one math crate (#975) |
-| `tools/lint` stays std-only | `make test-lint` | its `Cargo.lock` names one package, itself (#935) |
-| Test temp dirs | `tools/lint -- --rules` | **hard gate** (`test-temp-dir`): test code writes under `crate::test_temp::dir()` / `crate::temp::dir()`, never a bare `std::env::temp_dir()` (#999) |
-| Lua paths are `/` | `tools/lint -- --rules` | **hard gate** (`lua-path-slash`): a path returned to a script goes through `core::paths::to_slash`, never `to_string_lossy()`/`display()` (#1390) |
-| Portable paths | `tools/lint -- --rules` | **hard gate** (`slash-join`): `src/` and `tests/` never join a `/`-separated path (literal, `format!` or constant) onto a path or make a path from one; they join one part per call or join `core::paths::native(…)` (#1332, #1371) |
-| Module layering | `tools/lint -- --layers` | every `crate::<module>` import and every external crate a module names matches the declared table (`tools/lint/src/layers/table.rs`): nothing undeclared, nothing stale, no cycle, no sim → platform edge (#724, #938) |
-| Sim determinism | clippy `disallowed_methods`/`disallowed_types` + `tools/lint -- --determinism` | **hard gate**: clock reads, OS/unseeded RNG and `std`'s randomly seeded hash maps are banned crate-wide in `clippy.toml`; only a platform row's `mod.rs` may opt out, and the ban list must stay whole (#757, #764) |
-| No shared process state | clippy `disallowed_methods` + `tools/lint -- --determinism` | **hard gate**: `std::env::{set_var, remove_var, set_current_dir}` are banned crate-wide in `clippy.toml`, tests included, since `cargo test` runs every in-crate test in one process; production opts out inline with a reason (`project::open`), and `--determinism` keeps the three on the list (#977) |
-| Dependency direction | `tools/lint -- --direction` | the table's sim modules never reference `crate::render`, `crate::editor`, `wgpu` or `egui` — the arrow is render/editor → sim (#494) |
-| Sim panic-freedom | clippy `unwrap_used` + `tools/lint -- --rules` (`unwrap-deny`) | **hard gate**: every sim row of the layer table carries `#![deny(clippy::unwrap_used)]` at its `mod.rs`, and no sim file lifts it; bare `.unwrap()` banned in production (test code exempt via `allow-unwrap-in-tests`, which `--determinism` keeps set); no `allow`/`expect` of `unwrap_used` anywhere (`ESCAPE`, #961) (#195, #962) |
-| Component completeness | `tools/lint -- --components` | every first-class component has all 4 axes (field, Add Component entry, inspector card, API namespace), or a written waiver (`WAIVERS`) |
-| Editor↔shared-op parity | `tools/lint -- --parity` | every first-class component's inspector card routes its mutations through a shared `scene::authoring` op (never direct field writes through the #344 accessor guard) |
 | Rust API reference | rustdoc | **hard gate**: `RUSTDOCFLAGS="-D warnings" cargo doc --no-deps` (both feature sets) — no broken intra-doc links, no public docs linking private items; name a private item as plain `code`, not a link |
-| Tests | nextest + `cargo test --doc` (`make test`) | **hard gate**: the engine's tests and doctests, both feature sets; the GPU tests run on lavapipe (`docs/testing.md`) |
-| Supply chain | cargo-deny (`make deny`) | **hard gate**: advisories, bans, sources and licenses (`deny.toml`) |
-| Local gate = CI gate | `unittest` (`make scripts`, `test_gate_mirror.py`) | **hard gate**: every command a `GATES` recipe runs appears in a step of `ci.yml`/`lint.yml`, and every clippy run passes nothing after `--` but `-D warnings` (#964) |
-| Coverage floors drop with a reason | `unittest` (`make scripts`, `.github/scripts/coverage_floors.py`) | **hard gate**: a floor in `coverage-baseline.txt` lowered from the merge base with `origin/main` needs an inline `# reason: <why>` on its line, and a removed floor passes only once its `src/<module>/` is gone; the weekly coverage run stays a signal (#963) |
-| One dependency graph | `make feature-split` (`.github/scripts/feature_split.py`) | **hard gate**: no dev-dependency turns on a feature the normal build lacks, so `cargo test` never rebuilds a shared crate (#552, #979; `docs/testing.md`) |
 | Shared process | `make test-one-process` (`cargo test --features dev --tests`) | **signal**, never a gate: the `dev` suite with every test of a binary in one process, as cargo-mutants runs it, so a test leaking process-wide state (a moved working directory, a `static` left set) is named before it breaks the mutation baseline. Nightly on `main` in `cargo-test.yml` (both feature sets), filed by `main-health` when red; `gh workflow run cargo-test.yml --ref <branch>` runs it on a branch (#1338) |
-| Dead `pub` items | `make dead-pub` (`tools/lint -- --dead-pub`) | **signal**, never a gate: `src/lib.rs` exports every module, so rustc's `dead_code` never fires on a `pub` item. On a copy under `target/dead-pub/` the modules go `pub(crate)` and every bin and the integration suite fold into the lib; the report lists items nothing uses, items only tests use (a test seam may be fine), and unused imports apart (#940, #1003). It builds for the host only, so a finding in a file with a platform `cfg` (or in a module declared under one) is listed under *Platform-gated*: check it on that platform before narrowing (#1092). It runs weekly on `main` as `cargo-test.yml`'s `dead-pub` job, the report in its job summary; the job goes red only when no report came out, and `main-health` files that (#1205) |
-| Docs name what exists | `make docrefs` (`.github/scripts/docrefs.py`) | **hard gate**: every `src/`, `tests/`, `tools/`, `docs/` or `.github/` path in a tracked `*.md`'s inline code is tracked, every `` `make <verb>` `` is a target, and CLAUDE.md's namespaces each have a `docs/api/` page; placeholders pass, anything else takes `<!-- docrefs: allow <why> -->`. Runs on Markdown-only PRs too (#973) |
+| Sim determinism | clippy `disallowed_methods`/`disallowed_types` + `tools/lint -- --determinism` | **hard gate**: clock reads, OS/unseeded RNG and `std`'s randomly seeded hash maps are banned crate-wide in `clippy.toml`; only a platform row's `mod.rs` may opt out, and the ban list must stay whole (#757, #764) |
+| Sim panic-freedom | clippy `unwrap_used` + `tools/lint -- --rules` (`unwrap-deny`) | **hard gate**: every sim row of the layer table carries `#![deny(clippy::unwrap_used)]` at its `mod.rs`, and no sim file lifts it; bare `.unwrap()` banned in production (test code exempt via `allow-unwrap-in-tests`, which `--determinism` keeps set); no `allow`/`expect` of `unwrap_used` anywhere (`ESCAPE`, #961) (#195, #962) |
+| Skipped tests | `tools/lint -- --rules` (`skip`) | **hard gate**: `#[ignore]` / `#[cfg_attr(…, ignore)]` needs `// lint: allow(skip) <why>` (#935) |
+| Style | rustfmt (`rustfmt.toml`) | `cargo fmt --check` |
+| Supply chain | cargo-deny (`make deny`) | **hard gate**: advisories, bans, sources and licenses (`deny.toml`) |
+| Tagged engine warnings | `tools/lint -- --rules` (`log-tag`) | **hard gate**: every engine warning or error in `src/` (`log::warn!` / `log::error!`, an imported bare `warn!` / `error!`, `log!` at `Level::Warn`/`Level::Error`) opens its message with its module, `[Asset] …`, since those records reach the console and the session/MCP replies (#1139); a message that is not a literal takes `// lint: allow(log-tag) <why>` |
+| Test / fixture file length | `tools/lint` | <= 150 lines (standalone `*_test.rs` / `tests/` / `fixtures/`, a `*_tests.rs` with no source beside it, and every `.py` under a `tests/` directory); a `<x>_tests.rs` **sibling** of `<x>.rs` (or of a `<x>/` module directory) shares the 300-line source cap |
+| Test source shape | `tools/lint -- --rules` (`test-inner-cfg`, `test-user-workspace`, `test-gpu-entry`) | **hard gate**: no inner `#![cfg]` in `tests/`, no user workspace in tests, a GPU only through `headless_or_skip` (#980) |
+| Test temp dirs | `tools/lint -- --rules` | **hard gate** (`test-temp-dir`): test code writes under `crate::test_temp::dir()` / `crate::temp::dir()`, never a bare `std::env::temp_dir()` (#999) |
+| Tests | nextest + `cargo test --doc` (`make test`) | **hard gate**: the engine's tests and doctests, both feature sets; the GPU tests run on lavapipe (`docs/testing.md`) |
+| `tools/lint` stays std-only | `make test-lint` | its `Cargo.lock` names one package, itself (#935) |
 
 ## The `*_tests.rs` sibling rule
 The tight test cap exists to discourage over-splitting a bundle of `#[test]`s. But a
@@ -189,166 +190,17 @@ rule is a module with its own `<rule>_tests.rs`, one line in the sorted `mod` li
 and one row in the sorted `RULES` table of `tools/lint/src/rules/mod.rs` (#911): no
 new flag, gate, CI step or baseline.
 
-- **`prefix-group`** — CLAUDE.md's "group by subfolder, not by filename prefix".
-  Three or more sibling `.rs` files whose names start with the same word (up to the
-  first `_` or `-`) fail. Files count by stem, so `x.rs` and `x_tests.rs` are one,
-  and a bare `nav.rs` counts with the `nav_*` files beside it; `mod.rs`, `main.rs`
-  and `lib.rs` never count. The finding anchors on the first `mod` line that
-  declares the group, which is where its allow goes. The flat registries CLAUDE.md
-  exempts (`src/api/`, one file per Lua namespace; `src/components/`, one file per
-  first-class component) are listed in `rules/prefix.rs` with the reason, and the
-  exemption covers that directory only, not its subfolders.
-- **`sanitize`** — every authoring setter refuses a non-finite float (#1361).
-  A `pub fn set_*` under `src/scene/authoring/` (test code aside) that takes an
-  `f32`, `Vec2`, `Vec3`, `Vec4` or `Quat` fails unless each such parameter is
-  passed whole to a helper `scene::authoring::sanitize` defines (`finite`,
-  `finite_or`, `at_least`, `non_negative`, `clamped`, `unit`, `unit_color`,
-  `finite2`/`3`/`4` and their `_or` forms; the rule reads the list from that file)
-  or to another `set_*` of the same file, which it checks in turn. `finite(v.x)`
-  sanitizes one component, not `v`, and does not count. The finding anchors on the
-  `fn` line; a value refused another way (a joint axis through `try_normalize`)
-  says so with `// lint: allow(sanitize) <why>` above it.
-- **`markers`** — nothing in rusty is temporary. A marker word (`TODO`, `FIXME`,
-  `XXX`, `HACK`) standing alone in a scanned `.rs` file fails, comment or not;
-  part of a longer identifier (`TODOS`, `MY_HACK`) does not. File an issue instead.
-- **`skip`** — an ignored test reads as passing to anyone who reads only the
-  summary. `#[ignore]` and `#[cfg_attr(…, ignore)]` fail unless an allow says why:
-  `// lint: allow(skip) a timing measurement, run by hand` right above it.
-- **`named-enum`** — a script-facing enum's names are written once, by
-  `core::named_enum!` (#1329), which writes `ALL`, `name()`, a case-insensitive
-  `parse()` (aliases too), `names()` for an error's list and `Display`, and fails
-  the build when two spellings match ignoring case. A hand-written table is the
-  finding: a file of `src/` that has, for one type `T`, both a parse
-  (`fn parse(_: &str) -> Option<Self | T>` in an `impl T`, or a free
-  `fn parse_*(_: &str) -> Option<T>`) and a name (`fn name` / `fn as_str` on
-  `self` returning `&'static str` in an `impl T`, or a free
-  `fn *_name(_: T) -> &'static str`). The two may sit in different `impl T` blocks,
-  and an `impl` may be indented or carry a comment after its `{`. It anchors on
-  the parse. A `const` / `static` table of `(T, &str)` pairs (`[(T, &str); N]`,
-  `&[(T, &'static str)]`) is the same table read both ways, and a finding at its
-  declaration; a type `named_enum!` cannot declare (an external crate's enum, such
-  as winit's `KeyCode`) takes the allow. A parse that does more than read one name per variant (separators
-  ignored, a name built from parts, a `Result` with its own listing) is left alone
-  or takes `// lint: allow(named-enum) <why>`. Test code is not scanned.
-- **Test code**, for every rule in this list that says it and for the layering
-  lint, is one definition (`rules/test_code.rs` over `layers/gate.rs`, #1068,
-  #1122): all of `tests/`, every `tests.rs` / `*_tests.rs`, every file only a
-  test-gated `mod x;` declares (with or without `#[path]`, and every file it declares
-  in turn, #1120), and the item under each `#[cfg(test)]` or
-  `#[cfg(all(…, test, …))]` (`test` anywhere among `all`'s arguments, the attribute
-  wrapped or not). The rules scan only `src/` and `tests/` for it. `any(test, …)`
-  is not test-only (it also compiles outside tests), so it stays production code,
-  and its imports are checked against the layer table. A gate covers its own item
-  and no more (#1113): a `mod tests { … }` or a `fn` to its closing brace, however
-  its signature wraps, a `use` to its `;`, a gated field, variant or arm to its `,`
-  (or to the line before its parent's `}`); production code below a gated `use`
-  stays production code. Brackets and `//` inside a string or char literal don't
-  count, a string that spans lines (a multi-line raw string) included; a `/* */`
-  comment (nested ones too) is dropped, so neither its brackets nor its `//` count.
-  Every text-scanning rule reads code through the one stripper, `tools/lint/src/code.rs` (#1199). A
-  gated field or `let` whose generic type wraps over lines can end early, at a `,`
-  inside its `<…>`. Clippy's test exemption (`allow-unwrap-in-tests`, set in
-  `clippy.toml`) is Clippy's own and classifies its own way.
-- **`test-inner-cfg`, `test-user-workspace`, `test-gpu-entry`** (#980) — three
-  `docs/testing.md` locks on test code; comment lines never count. A `tests/` file never gates itself with an inner `#![cfg(…)]` (gate
-  its `mod` line); test code never calls `in_user_workspace` or `scenario::run(`
-  (use `scenario::run_isolated`); and test code reaches a GPU only through
-  `render::test_gpu::headless_or_skip`, never `new_headless` directly
-  (`rules/test_shape.rs`).
-- **`sorted`** (#911) — two branches appending to the end of one list always
-  collide on its last line; entries inserted in order land on different lines. A
-  list whose order means nothing carries `// sorted: <why order is free>` (Markdown:
-  `<!-- sorted: <why> -->`) on the line above it, and fails when an entry sorts
-  before the one above it. The list ends at the first blank line or the first line
-  indented less than its first entry; an entry's key is the rest of its line from
-  the first word that is not a Rust keyword (`pub`, `crate`, `mod`, …), compared
-  ignoring case, so `pub(crate) mod a;` sorts as `a;`. Deeper lines continue an
-  entry; comment and attribute lines and a Markdown table's header (right under the
-  marker) are skipped. A marker with no reason, one wrapped over two lines, or one
-  that governs no entries (a blank line under it, or a first entry indented deeper
-  than it) is itself a finding. Rust files and the tracked Markdown under `docs/`,
-  `.claude/skills/` and the repo root are scanned. A list
-  whose order matters (`src/app/registry.rs`'s `build()`, the `Entity` fields,
-  `ComponentKind`, `docs/api/index.md`'s namespaces) gets a comment saying why instead of a marker
-  (`rules/sorted.rs`).
-- **`full-literal`** (#976) — a test builds a first-class component (a `…Component`
-  type `Entity` names, with three or more fields) through a constructor or a
-  `..rest`, never a struct expression naming every field: such a literal breaks the
-  day the component gains a field. When every field is the point, say so:
-  `// lint: allow(full-literal) <why>` (`rules/full_literal.rs`).
-- **`ignored`** — what you push must be what CI builds. A scanned `.rs` file that
-  `git check-ignore --no-index` matches fails, tracked or not, because the next
-  new file beside it is the one a push silently drops
-  (MatthewLacerda2/scorsese#872). It takes **no allow**: anchor the pattern
-  (`/out/`, not `out/`) or move the file. A failed `git` call is a finding too.
-- **`log-tag`** (#1139) — engine warnings reach the console and the session and
-  MCP replies (`src/logging`), so a reader must see where each came from. In
-  `src/`, a warning or error call whose message literal does not open with
-  `[Module]` (`[Asset] …`, `[Render] …`) fails. The calls read are `log::warn!` and
-  `log::error!` (a space before the parenthesis included), the bare `warn!` /
-  `error!` of a file that has a `use log::…`, and `log!` whose level is
-  `Level::Warn` or `Level::Error`; an optional `target: "…",` comes first, the
-  arguments may spread over the next few lines, and the message may be a raw
-  string. A message that is not a literal takes `// lint: allow(log-tag) <why>`
-  (`rules/log_tag.rs`).
-- **`unwrap-deny`** — the unwrap ban covers exactly the layer table's sim rows
-  (#962). Each sim row's `src/<module>/mod.rs` must carry
-  `#![deny(clippy::unwrap_used)]`, and no file under a sim module may `allow`,
-  `expect` or `warn` `clippy::unwrap_used` (or the `clippy::restriction` group).
-  A new sim row is covered the day it is added. Platform files are not scanned.
-- **`test-temp-dir`** — a path under `std::env::temp_dir()` is shared by every test
-  process, every worktree and (under `cargo test` and cargo-mutants) every test
-  thread, so a fixed or process-keyed name races. Test code (the *Test code* bullet)
-  calls `crate::test_temp::dir()` (in-crate) or `crate::temp::dir()`
-  (integration) instead: both key on the process *and* the running test (#709,
-  #999). Comment lines never count. The
-  helper itself and Unix socket paths (which must stay short) carry an inline
-  allow. `tools/` is not scanned: the lint crate's own tests are not the engine's.
-- **`slash-join`** (#1332, #1371) — `Path::join("a/b")` keeps the `/`, so on
-  Windows it builds `dir\a/b` where joining one part at a time builds `dir\a\b`:
-  equal as `Path`s, unequal as strings, and a test comparing strings fails on
-  Windows only. The engine keeps one spelling everywhere, production and tests
-  alike: in `src/` and `tests/`, a `.join(…)`, `.push(…)`, `Path::new(…)` or
-  `PathBuf::from(…)` whose whole argument is a string literal holding a `/` (raw
-  or not, wrapped by rustfmt or not), a `format!` whose template holds one, or a
-  `/`-holding `&str` constant the scan defines (matched by name, aliases followed)
-  is a finding: a path *made* from a `/` path turns mixed the moment something is
-  joined onto it. A literal of only `/`s and spaces (`parts.join(" / ")`) is a
-  slice's separator, and one starting with `/` is an absolute Unix path (a socket,
-  a test's out-of-tree root); neither is flagged. Join one part per call, or use
-  `core::paths::native("a/b")` (`crate::core::paths::native` in the library,
-  `rusty::core::paths::native` in `tests/`; `native_string` for the written
-  string), which turns a `/`-spelled path or constant such as `IMPORT_CACHE_DIR`
-  into the platform's. The rule reads text, not types, so it **misfires** on a
-  `.push` of a `/` literal (or of a space-free `/` `format!`) onto a list of
-  strings, on a slice join whose separator holds a `/` beside other text, and on a
-  constant matched by bare name: a `/` constant in one module flags a same-named
-  plain one joined in another. It is **blind** to a `/` path held in a variable or
-  handed to a helper that joins it; a constant built by a macro, wrapped by rustfmt
-  onto the line after `const X: &str =`, typed `&'static str` or declared
-  `static`; and a bare `"/a/b"` expectation (test code is full of `/`-led JSON
-  pointers): those use the same helper. A path that must keep its `/`, or a
-  misfire, says why with `// lint: allow(slash-join) <why>`.
-- **`fullscreen-triangle`** (#1370) — the fullscreen triangle's vertex maths is
-  written once, in `engine/shaders/fullscreen.wgsl`. Any other `.wgsl` under
-  `engine/` whose code spells `(i << 1u) & 2u` is a finding (comments never count);
-  `#import fullscreen` and call `fullscreen::triangle`, `triangle_down` or `uv`.
-  The rule reads the shaders itself, since `Scan` holds only Rust, and applies the
-  inline allow to them (a reasonless one is reported under `allow`). WGSL inside
-  Rust strings is out of reach: `shadergen`'s postfx scaffold imports the module
-  like any shader, and a test fixture that must stand alone (`tests/gpu/`) is not
-  scanned. A shader that must stand alone says why with
-  `// lint: allow(fullscreen-triangle) <why>`.
-- **`lua-path-slash`** (#1390) — scene asset paths are `/` on every OS, so a path
-  an API function returns to a script must be too: a bare `to_string_lossy()` keeps
-  the `\` on Windows and the scene a script writes it into stops resolving on macOS
-  and Linux. A non-test `.to_string_lossy()` or `.display()` in `src/api/` or
-  `src/dev/lua_surface/` (the two directories that build Lua values) is a finding;
-  spell it `crate::core::paths::to_slash`. The rule is lexical: it cannot see a
-  `PathBuf` handed to Lua directly (mlua keeps the `\`), and it skips `.to_str()`
-  because `mlua::String::to_str` is far commoner there. It does flag a call on an
-  `mlua::String` or a literal; that line says so with
-  `// lint: allow(lua-path-slash) <why>`.
+<!-- sorted: each rule is one section, so two branches adding a rule land on different lines (#1409) -->
+- **`active-self`** (#1363) — every system read an entity's own `active` flag, so
+  the children of an inactive pivot kept drawing and ticking. Unity's
+  `activeInHierarchy` is `World::is_active_in_hierarchy`, and it is the one
+  question a system asks; `World::is_active_self` (Unity's `activeSelf`) is for
+  what shows or stores the flag itself: the inspector checkbox, `Scene.IsActive`,
+  the snapshot, and the UI clip walk that folds one level at a time. A non-test
+  line of `src/` outside `src/ecs/` that calls `is_active_self(` fails; those
+  callers carry an inline allow. The rule is lexical (`rules/active_self.rs`): it
+  misses a read of the flag that does not go through that name, which the private
+  `ecs::bundle::Core` keeps inside `src/ecs/`.
 - **`asset-write`** (#1220) — a file a path-keyed cache reads is written through
   `core::fs::written::write`, or its writer calls `note_written` after (#1207).
   A non-test line of `src/` outside `src/core/fs/` calling `fs::write(`,
@@ -385,16 +237,170 @@ new flag, gate, CI step or baseline.
   lints are per converter, not in `Cargo.toml`, because the rest of the crate has
   some eighty best-effort `let _ =` (a cleanup, a send to a closed channel). A
   future converter is covered the day it is added (`rules/converter_log.rs`).
-- **`active-self`** (#1363) — every system read an entity's own `active` flag, so
-  the children of an inactive pivot kept drawing and ticking. Unity's
-  `activeInHierarchy` is `World::is_active_in_hierarchy`, and it is the one
-  question a system asks; `World::is_active_self` (Unity's `activeSelf`) is for
-  what shows or stores the flag itself: the inspector checkbox, `Scene.IsActive`,
-  the snapshot, and the UI clip walk that folds one level at a time. A non-test
-  line of `src/` outside `src/ecs/` that calls `is_active_self(` fails; those
-  callers carry an inline allow. The rule is lexical (`rules/active_self.rs`): it
-  misses a read of the flag that does not go through that name, which the private
-  `ecs::bundle::Core` keeps inside `src/ecs/`.
+- **`full-literal`** (#976) — a test builds a first-class component (a `…Component`
+  type `Entity` names, with three or more fields) through a constructor or a
+  `..rest`, never a struct expression naming every field: such a literal breaks the
+  day the component gains a field. When every field is the point, say so:
+  `// lint: allow(full-literal) <why>` (`rules/full_literal.rs`).
+- **`fullscreen-triangle`** (#1370) — the fullscreen triangle's vertex maths is
+  written once, in `engine/shaders/fullscreen.wgsl`. Any other `.wgsl` under
+  `engine/` whose code spells `(i << 1u) & 2u` is a finding (comments never count);
+  `#import fullscreen` and call `fullscreen::triangle`, `triangle_down` or `uv`.
+  The rule reads the shaders itself, since `Scan` holds only Rust, and applies the
+  inline allow to them (a reasonless one is reported under `allow`). WGSL inside
+  Rust strings is out of reach: `shadergen`'s postfx scaffold imports the module
+  like any shader, and a test fixture that must stand alone (`tests/gpu/`) is not
+  scanned. A shader that must stand alone says why with
+  `// lint: allow(fullscreen-triangle) <why>`.
+- **`ignored`** — what you push must be what CI builds. A scanned `.rs` file that
+  `git check-ignore --no-index` matches fails, tracked or not, because the next
+  new file beside it is the one a push silently drops
+  (MatthewLacerda2/scorsese#872). It takes **no allow**: anchor the pattern
+  (`/out/`, not `out/`) or move the file. A failed `git` call is a finding too.
+- **`log-tag`** (#1139) — engine warnings reach the console and the session and
+  MCP replies (`src/logging`), so a reader must see where each came from. In
+  `src/`, a warning or error call whose message literal does not open with
+  `[Module]` (`[Asset] …`, `[Render] …`) fails. The calls read are `log::warn!` and
+  `log::error!` (a space before the parenthesis included), the bare `warn!` /
+  `error!` of a file that has a `use log::…`, and `log!` whose level is
+  `Level::Warn` or `Level::Error`; an optional `target: "…",` comes first, the
+  arguments may spread over the next few lines, and the message may be a raw
+  string. A message that is not a literal takes `// lint: allow(log-tag) <why>`
+  (`rules/log_tag.rs`).
+- **`lua-path-slash`** (#1390) — scene asset paths are `/` on every OS, so a path
+  an API function returns to a script must be too: a bare `to_string_lossy()` keeps
+  the `\` on Windows and the scene a script writes it into stops resolving on macOS
+  and Linux. A non-test `.to_string_lossy()` or `.display()` in `src/api/` or
+  `src/dev/lua_surface/` (the two directories that build Lua values) is a finding;
+  spell it `crate::core::paths::to_slash`. The rule is lexical: it cannot see a
+  `PathBuf` handed to Lua directly (mlua keeps the `\`), and it skips `.to_str()`
+  because `mlua::String::to_str` is far commoner there. It does flag a call on an
+  `mlua::String` or a literal; that line says so with
+  `// lint: allow(lua-path-slash) <why>`.
+- **`markers`** — nothing in rusty is temporary. A marker word (`TODO`, `FIXME`,
+  `XXX`, `HACK`) standing alone in a scanned `.rs` file fails, comment or not;
+  part of a longer identifier (`TODOS`, `MY_HACK`) does not. File an issue instead.
+- **`named-enum`** — a script-facing enum's names are written once, by
+  `core::named_enum!` (#1329), which writes `ALL`, `name()`, a case-insensitive
+  `parse()` (aliases too), `names()` for an error's list and `Display`, and fails
+  the build when two spellings match ignoring case. A hand-written table is the
+  finding: a file of `src/` that has, for one type `T`, both a parse
+  (`fn parse(_: &str) -> Option<Self | T>` in an `impl T`, or a free
+  `fn parse_*(_: &str) -> Option<T>`) and a name (`fn name` / `fn as_str` on
+  `self` returning `&'static str` in an `impl T`, or a free
+  `fn *_name(_: T) -> &'static str`). The two may sit in different `impl T` blocks,
+  and an `impl` may be indented or carry a comment after its `{`. It anchors on
+  the parse. A `const` / `static` table of `(T, &str)` pairs (`[(T, &str); N]`,
+  `&[(T, &'static str)]`) is the same table read both ways, and a finding at its
+  declaration; a type `named_enum!` cannot declare (an external crate's enum, such
+  as winit's `KeyCode`) takes the allow. A parse that does more than read one name per variant (separators
+  ignored, a name built from parts, a `Result` with its own listing) is left alone
+  or takes `// lint: allow(named-enum) <why>`. Test code is not scanned.
+- **`prefix-group`** — CLAUDE.md's "group by subfolder, not by filename prefix".
+  Three or more sibling `.rs` files whose names start with the same word (up to the
+  first `_` or `-`) fail. Files count by stem, so `x.rs` and `x_tests.rs` are one,
+  and a bare `nav.rs` counts with the `nav_*` files beside it; `mod.rs`, `main.rs`
+  and `lib.rs` never count. The finding anchors on the first `mod` line that
+  declares the group, which is where its allow goes. The flat registries CLAUDE.md
+  exempts (`src/api/`, one file per Lua namespace; `src/components/`, one file per
+  first-class component) are listed in `rules/prefix.rs` with the reason, and the
+  exemption covers that directory only, not its subfolders.
+- **`sanitize`** — every authoring setter refuses a non-finite float (#1361).
+  A `pub fn set_*` under `src/scene/authoring/` (test code aside) that takes an
+  `f32`, `Vec2`, `Vec3`, `Vec4` or `Quat` fails unless each such parameter is
+  passed whole to a helper `scene::authoring::sanitize` defines (`finite`,
+  `finite_or`, `at_least`, `non_negative`, `clamped`, `unit`, `unit_color`,
+  `finite2`/`3`/`4` and their `_or` forms; the rule reads the list from that file)
+  or to another `set_*` of the same file, which it checks in turn. `finite(v.x)`
+  sanitizes one component, not `v`, and does not count. The finding anchors on the
+  `fn` line; a value refused another way (a joint axis through `try_normalize`)
+  says so with `// lint: allow(sanitize) <why>` above it.
+- **`skip`** — an ignored test reads as passing to anyone who reads only the
+  summary. `#[ignore]` and `#[cfg_attr(…, ignore)]` fail unless an allow says why:
+  `// lint: allow(skip) a timing measurement, run by hand` right above it.
+- **`slash-join`** (#1332, #1371) — `Path::join("a/b")` keeps the `/`, so on
+  Windows it builds `dir\a/b` where joining one part at a time builds `dir\a\b`:
+  equal as `Path`s, unequal as strings, and a test comparing strings fails on
+  Windows only. The engine keeps one spelling everywhere, production and tests
+  alike: in `src/` and `tests/`, a `.join(…)`, `.push(…)`, `Path::new(…)` or
+  `PathBuf::from(…)` whose whole argument is a string literal holding a `/` (raw
+  or not, wrapped by rustfmt or not), a `format!` whose template holds one, or a
+  `/`-holding `&str` constant the scan defines (matched by name, aliases followed)
+  is a finding: a path *made* from a `/` path turns mixed the moment something is
+  joined onto it. A literal of only `/`s and spaces (`parts.join(" / ")`) is a
+  slice's separator, and one starting with `/` is an absolute Unix path (a socket,
+  a test's out-of-tree root); neither is flagged. Join one part per call, or use
+  `core::paths::native("a/b")` (`crate::core::paths::native` in the library,
+  `rusty::core::paths::native` in `tests/`; `native_string` for the written
+  string), which turns a `/`-spelled path or constant such as `IMPORT_CACHE_DIR`
+  into the platform's. The rule reads text, not types, so it **misfires** on a
+  `.push` of a `/` literal (or of a space-free `/` `format!`) onto a list of
+  strings, on a slice join whose separator holds a `/` beside other text, and on a
+  constant matched by bare name: a `/` constant in one module flags a same-named
+  plain one joined in another. It is **blind** to a `/` path held in a variable or
+  handed to a helper that joins it; a constant built by a macro, wrapped by rustfmt
+  onto the line after `const X: &str =`, typed `&'static str` or declared
+  `static`; and a bare `"/a/b"` expectation (test code is full of `/`-led JSON
+  pointers): those use the same helper. A path that must keep its `/`, or a
+  misfire, says why with `// lint: allow(slash-join) <why>`.
+- **`sorted`** (#911) — two branches appending to the end of one list always
+  collide on its last line; entries inserted in order land on different lines. A
+  list whose order means nothing carries `// sorted: <why order is free>` (Markdown:
+  `<!-- sorted: <why> -->`) on the line above it, and fails when an entry sorts
+  before the one above it. The list ends at the first blank line or the first line
+  indented less than its first entry; an entry's key is the rest of its line from
+  the first word that is not a Rust keyword (`pub`, `crate`, `mod`, …), compared
+  ignoring case, so `pub(crate) mod a;` sorts as `a;`. Deeper lines continue an
+  entry; comment and attribute lines and a Markdown table's header (right under the
+  marker) are skipped. A marker with no reason, one wrapped over two lines, or one
+  that governs no entries (a blank line under it, or a first entry indented deeper
+  than it) is itself a finding. Rust files and the tracked Markdown under `docs/`,
+  `.claude/skills/` and the repo root are scanned. A list
+  whose order matters (`src/app/registry.rs`'s `build()`, the `Entity` fields,
+  `ComponentKind`, `docs/api/index.md`'s namespaces) gets a comment saying why instead of a marker
+  (`rules/sorted.rs`).
+- **Test code**, for every rule in this list that says it and for the layering
+  lint, is one definition (`rules/test_code.rs` over `layers/gate.rs`, #1068,
+  #1122): all of `tests/`, every `tests.rs` / `*_tests.rs`, every file only a
+  test-gated `mod x;` declares (with or without `#[path]`, and every file it declares
+  in turn, #1120), and the item under each `#[cfg(test)]` or
+  `#[cfg(all(…, test, …))]` (`test` anywhere among `all`'s arguments, the attribute
+  wrapped or not). The rules scan only `src/` and `tests/` for it. `any(test, …)`
+  is not test-only (it also compiles outside tests), so it stays production code,
+  and its imports are checked against the layer table. A gate covers its own item
+  and no more (#1113): a `mod tests { … }` or a `fn` to its closing brace, however
+  its signature wraps, a `use` to its `;`, a gated field, variant or arm to its `,`
+  (or to the line before its parent's `}`); production code below a gated `use`
+  stays production code. Brackets and `//` inside a string or char literal don't
+  count, a string that spans lines (a multi-line raw string) included; a `/* */`
+  comment (nested ones too) is dropped, so neither its brackets nor its `//` count.
+  Every text-scanning rule reads code through the one stripper, `tools/lint/src/code.rs` (#1199). A
+  gated field or `let` whose generic type wraps over lines can end early, at a `,`
+  inside its `<…>`. Clippy's test exemption (`allow-unwrap-in-tests`, set in
+  `clippy.toml`) is Clippy's own and classifies its own way.
+- **`test-inner-cfg`, `test-user-workspace`, `test-gpu-entry`** (#980) — three
+  `docs/testing.md` locks on test code; comment lines never count. A `tests/` file never gates itself with an inner `#![cfg(…)]` (gate
+  its `mod` line); test code never calls `in_user_workspace` or `scenario::run(`
+  (use `scenario::run_isolated`); and test code reaches a GPU only through
+  `render::test_gpu::headless_or_skip`, never `new_headless` directly
+  (`rules/test_shape.rs`).
+- **`test-temp-dir`** — a path under `std::env::temp_dir()` is shared by every test
+  process, every worktree and (under `cargo test` and cargo-mutants) every test
+  thread, so a fixed or process-keyed name races. Test code (the *Test code* bullet)
+  calls `crate::test_temp::dir()` (in-crate) or `crate::temp::dir()`
+  (integration) instead: both key on the process *and* the running test (#709,
+  #999). Comment lines never count. The
+  helper itself and Unix socket paths (which must stay short) carry an inline
+  allow. `tools/` is not scanned: the lint crate's own tests are not the engine's.
+- **The ≲10-files-per-directory signal** prints after the findings: every scanned
+  directory holding more than ten `.rs` files (`mod.rs` aside), most crowded first.
+  CLAUDE.md says "aim for", so it never fails the gate; it tells you where to
+  cluster by responsibility when you next work in that directory.
+- **`unwrap-deny`** — the unwrap ban covers exactly the layer table's sim rows
+  (#962). Each sim row's `src/<module>/mod.rs` must carry
+  `#![deny(clippy::unwrap_used)]`, and no file under a sim module may `allow`,
+  `expect` or `warn` `clippy::unwrap_used` (or the `clippy::restriction` group).
+  A new sim row is covered the day it is added. Platform files are not scanned.
 - **`world-space`** (#1170, #1196) — fifteen bugs in two days came from systems
   working out where an entity is in the world and getting a hierarchy case wrong: a
   mirror, a zero scale, a turned child under a non-uniform parent. `ecs::World`'s
@@ -414,10 +420,6 @@ new flag, gate, CI step or baseline.
   fold whose Transform read sits more than five lines below its walk. It **falsely
   flags** a membership or depth walk that happens to have an unrelated Transform
   read within five lines; that line takes `// lint: allow(world-space) <why>`.
-- **The ≲10-files-per-directory signal** prints after the findings: every scanned
-  directory holding more than ten `.rs` files (`mod.rs` aside), most crowded first.
-  CLAUDE.md says "aim for", so it never fails the gate; it tells you where to
-  cluster by responsibility when you next work in that directory.
 
 ## Module layering (`--layers`)
 Which module may import which is declared once, in `tools/lint/src/layers/table.rs`
