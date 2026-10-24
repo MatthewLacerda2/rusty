@@ -70,5 +70,5 @@ end
 Component.Set(cam, "Camera", { fov = 68, render_order = 1, clear_flags = "DepthOnly" })
 local t = Component.Get(cam, "Transform")               -- position, rotation, scale
 local ok, err = pcall(Component.Set, cam, "Camera", { fvo = 60 })
-assert(not ok and err:find("fov"))                      -- the error lists the fields
+assert(not ok and tostring(err):find("fov"))            -- the error lists the fields
 ```
