@@ -12,6 +12,7 @@ scene.entities[].animator.current_node: option
 scene.entities[].animator.current_node: string
 scene.entities[].animator.current_tree: option
 scene.entities[].animator.current_tree: string
+scene.entities[].animator.ended: bool
 scene.entities[].animator.freeze: bool
 scene.entities[].animator.graph: option
 scene.entities[].animator.graph: string
@@ -39,6 +40,7 @@ scene.entities[].animator.layers[].current_node: option
 scene.entities[].animator.layers[].current_node: string
 scene.entities[].animator.layers[].current_tree: option
 scene.entities[].animator.layers[].current_tree: string
+scene.entities[].animator.layers[].ended: bool
 scene.entities[].animator.layers[].loop_clip: bool
 scene.entities[].animator.layers[].name: string
 scene.entities[].animator.layers[].node_speed: f32
