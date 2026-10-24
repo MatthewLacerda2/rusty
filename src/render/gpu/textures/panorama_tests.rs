@@ -20,9 +20,9 @@ fn gpu_the_sky_across_the_panorama_seam_keeps_its_colour() {
     // Red for 67° either side of the seam (-X), blue everywhere else: the average
     // a coarse mip would show is mostly blue.
     let path = temp_png("panorama_seam");
-    image::RgbaImage::from_fn(256, 128, |x, _| match x < 48 || x >= 208 {
-        true => image::Rgba([255, 0, 0, 255]),
-        false => image::Rgba([0, 0, 255, 255]),
+    image::RgbaImage::from_fn(256, 128, |x, _| match (48..208).contains(&x) {
+        true => image::Rgba([0, 0, 255, 255]),
+        false => image::Rgba([255, 0, 0, 255]),
     })
     .save(&path)
     .unwrap();
