@@ -83,6 +83,18 @@ impl ProjectFile {
         Ok(Self::read(&root.join(PROJECT_FILE))?.unwrap_or_default())
     }
 
+    /// The build settings of the project at `root`, or the defaults when its file
+    /// can't be read, said on stderr under `tag`. How the player and `play` find
+    /// the startup scene they boot (#1343).
+    pub fn build_or_default(root: &Path, tag: &str) -> BuildSettings {
+        Self::load(root)
+            .map(|file| file.build)
+            .unwrap_or_else(|err| {
+                eprintln!("[{tag}] {err} — using the default build settings");
+                BuildSettings::default()
+            })
+    }
+
     /// Write the file to `path`, unless it already holds exactly this — a project
     /// opened by the same engine is left untouched (no git noise, no write to a
     /// read-only bundle).

@@ -28,6 +28,7 @@ use std::rc::Rc;
 use serde_json::{json, Value};
 
 use crate::app::GameWorld;
+use crate::core::application::BuildSettings;
 use crate::core::frame_stats::FrameStats;
 use crate::core::input::InputState;
 use crate::navigation::NavigationGraph;
@@ -109,15 +110,37 @@ impl Harness {
             crate::scene::DEFAULT_SCRIPTS_DEST_DIR,
         ));
         crate::scene::seed_workspace(&workspace, Some(&samples));
-        Self::in_workspace(out_dir, bot_script, workspace)
+        // The default scene's texture and shader, seeded into the working directory
+        // only when missing; only screenshots read them.
+        crate::scene::default_scene::seed_default_assets();
+        let mut scene = Scene::new();
+        crate::scene::default_scene::build(&mut scene, bot_script);
+        Self::in_workspace(out_dir, scene, workspace)
     }
 
-    /// [`Harness::new`] on the open project (`core::project`, the working directory)
-    /// — what an agent play-testing its game wants (the `play` binary). The bundled
-    /// scripts are seeded through the seed manifest, as the windowed boot does.
-    pub fn in_user_workspace(out_dir: impl AsRef<Path>, bot_script: &str) -> Self {
+    /// A harness on the open project (`core::project`, the working directory),
+    /// playing the scene at `scene_path` — what an agent play-testing its game wants
+    /// (the `play` binary passes the project's startup scene, #1343). The bundled
+    /// scripts and the default scene are seeded through the seed manifest first, as
+    /// the standalone player's boot does, so a fresh project's startup scene exists.
+    /// A scene that can't be read is an error: a play-test of nothing proves nothing.
+    pub fn in_user_workspace(
+        out_dir: impl AsRef<Path>,
+        scene_path: &str,
+        build: BuildSettings,
+    ) -> Result<Self, String> {
         crate::scene::seed_default_scripts();
-        Self::in_workspace(out_dir, bot_script, PathBuf::new())
+        crate::scene::seed_default_scene();
+        let mut scene = Scene::new();
+        scene.load_from_file(scene_path)?;
+        let harness = Self::in_workspace(out_dir, scene, PathBuf::new());
+        {
+            let world = harness.world.borrow();
+            *world.script_manager().scene_path_cell().borrow_mut() = Some(scene_path.into());
+            // Unbound, as in the player: a run reads the build settings, never writes them.
+            let _ = world.resources.application.borrow_mut().set_build(build);
+        }
+        Ok(harness)
     }
 
     /// The workspace a harness built in `out_dir` runs in: see [`Harness::new`].
@@ -125,14 +148,7 @@ impl Harness {
         out_dir.as_ref().join("workspace")
     }
 
-    fn in_workspace(out_dir: impl AsRef<Path>, bot_script: &str, workspace: PathBuf) -> Self {
-        // The default scene's texture and shader, seeded into the working directory
-        // only when missing; only screenshots read them.
-        crate::scene::default_scene::seed_default_assets();
-
-        let mut scene = Scene::new();
-        crate::scene::default_scene::build(&mut scene, bot_script);
-
+    fn in_workspace(out_dir: impl AsRef<Path>, scene: Scene, workspace: PathBuf) -> Self {
         // Baked over the scene's own bounds (#452) — the same path the windowed game takes.
         let nav = NavigationGraph::from_scene(&scene);
         let scene = Rc::new(RefCell::new(scene));

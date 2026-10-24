@@ -83,13 +83,7 @@ pub fn video_defaults(build: &BuildSettings) -> VideoSettings {
 /// Boot the standalone player and run until the game quits or the window closes.
 pub fn launch() {
     boot::seed_project_workspace();
-    let build = match ProjectFile::load(&project::root()) {
-        Ok(file) => file.build,
-        Err(err) => {
-            eprintln!("[Player] {err} — using the default build settings");
-            BuildSettings::default()
-        }
-    };
+    let build = ProjectFile::build_or_default(&project::root(), "Player");
     println!(
         "[Player] Starting {} ({})...",
         build.product_name, build.startup_scene

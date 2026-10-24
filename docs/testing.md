@@ -22,7 +22,9 @@
   project's scripts and the bundled ones, and the scene's relative script paths
   resolve there; a test runs a scenario with `scenario::run_isolated`. The `play`
   binary is the one harness that runs a real project (`--project <dir>`, default
-  `./project`; `Harness::in_user_workspace`): an agent play-tests its game. Test code
+  `./project`; `Harness::in_user_workspace`): an agent play-tests its game, on the
+  project's startup scene or `--scene <path>` (#1343). `Harness::new` builds the
+  engine's demo scene in memory instead, the fixture the engine's own tests use. Test code
   that names `in_user_workspace` or `scenario::run(` fails `make rules`
   (`test-user-workspace`, #980).
 - **The test-fixture project** is `tests/fixtures/project/` (#829): the committed

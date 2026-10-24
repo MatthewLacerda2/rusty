@@ -133,8 +133,8 @@ the game for you, and only open a window when you want to.
   Linux, `launchctl setenv` on macOS).
 - `cargo run --bin player` — the standalone player: the project's startup scene,
   straight into Play, full-window, no editor (see *Shipping a build* below).
-- `cargo run --bin play --features dev -- [--project <dir>] <scenario.lua> <out_dir>` — the headless
-  harness; writes `results.json` + `console.log` (and any screenshots) to `<out_dir>`.
+- `cargo run --bin play --features dev -- [--project <dir>] [--scene <path>] <scenario.lua> <out_dir>` — the headless
+  harness on the project's startup scene (or `--scene`); writes `results.json` + `console.log` (and any screenshots) to `<out_dir>`.
 - `make editor-capture OUT=editor.png` — the editor over the default scene, headless,
   to a PNG (see [`docs/testing.md`](docs/testing.md) § Editor captures).
 - `cargo run --bin session-mcp --features dev` — drive the live engine from Claude
