@@ -55,7 +55,7 @@ pub mod recipe;
 pub mod textures;
 pub mod validate;
 
-pub use bake::{bake_generation, bake_recipe, BakeError};
+pub use bake::{bake_recipe, BakeError};
 pub use recipe::{BlockSel, PassKind, ShaderRecipe};
 
 /// The engine's committed shader set — read-only at bake time: it supplies the

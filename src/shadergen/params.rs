@@ -231,6 +231,12 @@ pub(crate) fn unknown_param(name: &str, names: &[String]) -> String {
     format!("shader param {name:?} {what}; runtime params: {list}")
 }
 
+/// Whether `path` is a shader file the renderer builds from: a `.wgsl` module or
+/// its params sidecar. What a written or changed path must be to rebuild a shader.
+pub fn is_shader_file(path: &str) -> bool {
+    path.ends_with(".wgsl") || path.ends_with(".params.json")
+}
+
 /// `<dir>/<name>.params.json` for `<dir>/<name>.wgsl`.
 pub fn sidecar_path(wgsl: &Path) -> PathBuf {
     wgsl.with_extension("params.json")

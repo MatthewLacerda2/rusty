@@ -9,8 +9,18 @@
 //! whose mesh names a re-written model re-reads it (`scene::model_writes`, #1242).
 //! A note is data the cache reads, never a call into it, so a sim-side baker never
 //! reaches up into `render` or `audio` (the direction rule).
-//! The log holds one entry per distinct path, so it stays as small as the set of
-//! baked files.
+//!
+//! A change made **outside** the engine (a Blender re-export, an image editor) goes
+//! through the same log: the editor's file watch (`shell::editor::watch`, #1327)
+//! notes each file it sees change under the project's `assets/` and the engine's
+//! shader set, so no cache needs a watch or a per-frame stat of its own.
+//!
+//! The log holds one entry per distinct path, never forgotten: every file the
+//! engine wrote this session and, in the editor, every file seen changing outside
+//! it (a rescan after lost events notes every file under the watched folders). Each
+//! consumer's [`written_since`] walks the whole log when anything is newer, so its
+//! cost grows with the number of distinct files touched in a session, not with how
+//! often they change.
 //!
 //! The rule that keeps it whole: **an engine write of a file some cache reads by
 //! path goes through [`write()`] (or, for a writer with its own encoder, calls

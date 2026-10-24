@@ -6,25 +6,31 @@
 //! default control inferred from type for plain fields. Edits are written back
 //! into the [`ScriptComponent`]'s persisted `values` map.
 //!
-//! The schema is cached per path and only re-parsed when the file's mtime
-//! changes, so the inspector doesn't spin up a Lua VM every frame. This is
-//! editor-only state (the determinism guard covers `app`/`scripting`/`physics`/
-//! `navigation`, not `editor`).
+//! The schema is cached per path and only re-parsed when the file is written: the
+//! write log (`core::fs::written`) names it, which the editor's file watch does for
+//! an edit made outside the engine (#1327). So the inspector neither spins up a Lua
+//! VM nor stats the file every frame. This is editor-only state (the determinism
+//! guard covers the sim modules, not `editor`).
 
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
-use std::time::SystemTime;
 
+use crate::core::fs::written::{written_since, Stale};
 use crate::scene::{ScriptComponent, ScriptFieldValue};
 use crate::scripting::{parse_fields, FieldKind, ScriptField};
 
-/// Cached parse for one script path: the file mtime it was parsed at, plus the
-/// parsed fields. Re-parsed only when the mtime changes.
-type SchemaCacheEntry = (Option<SystemTime>, Vec<ScriptField>);
+/// The parsed schemas by script path, and how far into the write log they are
+/// current.
+struct SchemaCache {
+    seen: u64,
+    schemas: HashMap<String, Vec<ScriptField>>,
+}
 
 thread_local! {
-    static SCHEMA_CACHE: RefCell<HashMap<String, SchemaCacheEntry>> =
-        RefCell::new(HashMap::new());
+    static SCHEMA_CACHE: RefCell<SchemaCache> = RefCell::new(SchemaCache {
+        seen: written_since(u64::MAX).0,
+        schemas: HashMap::new(),
+    });
 }
 
 /// Draw the field controls for one script. Scripts with no `fields` schema draw
@@ -123,20 +129,62 @@ fn as_text(v: &ScriptFieldValue) -> String {
     }
 }
 
-/// Return the parsed schema for `path`, re-parsing only when the file changed.
+/// Return the parsed schema for `path`, re-parsing only once the file was written.
 fn cached_schema(path: &str) -> Vec<ScriptField> {
-    let mtime = std::fs::metadata(path).and_then(|m| m.modified()).ok();
     SCHEMA_CACHE.with(|cache| {
-        let mut cache = cache.borrow_mut();
-        if let Some((cached_mtime, fields)) = cache.get(path) {
-            if *cached_mtime == mtime {
-                return fields.clone();
-            }
+        let cache = &mut *cache.borrow_mut();
+        let (seen, written) = written_since(cache.seen);
+        cache.seen = seen;
+        if !written.is_empty() {
+            let stale = Stale::new(written);
+            cache.schemas.retain(|p, _| !stale.matches(p));
         }
-        let fields = std::fs::read_to_string(path)
-            .map(|code| parse_fields(&code))
-            .unwrap_or_default();
-        cache.insert(path.to_string(), (mtime, fields.clone()));
+        if let Some(fields) = cache.schemas.get(path) {
+            return fields.clone();
+        }
+        // A failed read is a miss retried next frame, never a cached empty schema.
+        let Ok(code) = std::fs::read_to_string(path) else {
+            return Vec::new();
+        };
+        let fields = parse_fields(&code);
+        cache.schemas.insert(path.to_string(), fields.clone());
         fields
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::cached_schema;
+    use crate::core::fs::written::note_written;
+
+    fn script(fields: &str) -> String {
+        format!("return {{ fields = {{ {fields} }} }}")
+    }
+
+    #[test]
+    fn a_schema_is_re_parsed_once_its_file_is_noted() {
+        let path = crate::test_temp::dir().join("fields.lua");
+        let path = path.to_str().unwrap();
+        std::fs::write(path, script("speed = { default = 1 }")).unwrap();
+        assert_eq!(cached_schema(path).len(), 1);
+        // An edit nobody noted yet: the cached parse stands, no stat per frame.
+        std::fs::write(
+            path,
+            script("speed = { default = 1 }, jump = { default = 2 }"),
+        )
+        .unwrap();
+        assert_eq!(cached_schema(path).len(), 1);
+        // The editor's watch (or an engine write) notes it: re-parsed.
+        note_written(path);
+        assert_eq!(cached_schema(path).len(), 2);
+    }
+
+    #[test]
+    fn a_failed_read_is_not_cached() {
+        let path = crate::test_temp::dir().join("late.lua");
+        let path = path.to_str().unwrap();
+        assert!(cached_schema(path).is_empty(), "nothing there yet");
+        std::fs::write(path, script("speed = { default = 1 }")).unwrap();
+        assert_eq!(cached_schema(path).len(), 1, "a miss retries");
+    }
 }

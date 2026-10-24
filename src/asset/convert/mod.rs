@@ -80,8 +80,8 @@ pub mod texture_ref;
 pub use converter::{converter_for, Converted, Converter, Skip, CONVERTERS};
 pub use depends::{Dependency, Seen};
 pub use gate::{
-    conversion_allowed, convert_held, convertible_sources, mark_standalone, refresh_sources,
-    PlayHold,
+    conversion_allowed, convert_held, convertible_sources, mark_standalone, refresh_changed,
+    refresh_sources, PlayHold,
 };
 pub use shipped::{cached_without_source, served_from_cache, with_cache_files};
 pub use stage::{textures_dirs, Staging};

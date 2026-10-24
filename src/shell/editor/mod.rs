@@ -16,6 +16,7 @@ mod icon;
 mod paint;
 mod start;
 mod viewport;
+mod watch;
 
 #[cfg(feature = "dev")]
 pub use start::capture_picker;
@@ -60,6 +61,8 @@ pub struct EditorFrontend {
     /// The scene identity the editor last drew, so a scene swapped in under it — a
     /// scripted `Scene.Load` (#432), Stop after one — drops the stale selection.
     scene_id: Option<SceneId>,
+    /// The watch on the project's files (#1327); `None` when nothing could be watched.
+    watch: Option<watch::Watch>,
 }
 
 impl EditorFrontend {
@@ -95,6 +98,7 @@ impl EditorFrontend {
             cursor_release: Default::default(),
             game_view: None,
             scene_id: None,
+            watch: watch::Watch::editor(),
         }
     }
 
@@ -242,6 +246,10 @@ impl Frontend for EditorFrontend {
         _frame: &wgpu::Texture,
         target: &wgpu::TextureView,
     ) {
+        // Files changed outside the engine reach the caches before this frame draws.
+        if let Some(watch) = &mut self.watch {
+            watch.apply(game.scene().borrow().is_playing());
+        }
         let raw_input = self.egui_winit.take_egui_input(&shell.window);
         self.egui_ctx.begin_pass(raw_input);
 

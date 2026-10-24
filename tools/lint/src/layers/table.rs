@@ -194,7 +194,7 @@ pub const LAYERS: &[Layer] = &[
     )
     .uses(&["egui", "egui_phosphor"]),
     // The window owner: winit, the OS input crates, and wgpu only where it presents
-    // frames and hosts the editor's egui-wgpu painter.
+    // frames and hosts the editor's egui-wgpu painter; the editor's file watch (notify).
     platform(
         "shell",
         &[
@@ -221,6 +221,7 @@ pub const LAYERS: &[Layer] = &[
         "egui_winit",
         "gilrs",
         "image",
+        "notify",
         "objc2",
         "objc2_app_kit",
         "objc2_foundation",

@@ -3,7 +3,6 @@ use crate::scene::authoring;
 use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;
 use egui_phosphor::regular as icon;
-use std::fs;
 use std::path::Path;
 
 pub fn draw(
@@ -69,8 +68,9 @@ fn draw_code_editor(
         )
         .clicked()
     {
-        // lint: allow(asset-write) a script the editor saves; not an asset a path-keyed cache reads
-        match fs::write(path, &editor.asset_script_content) {
+        // Through the write log: the script inspector's schema cache re-reads it (#1327).
+        let bytes = editor.asset_script_content.as_bytes();
+        match crate::core::fs::written::write(Path::new(path), bytes) {
             Ok(_) => {
                 console.info(format!("Saved script changes to {}", filename));
             }

@@ -1,6 +1,6 @@
 //! The atomic write (#1129): no torn file, no litter, no collision.
 
-use super::{is_unique_sibling, unique_sibling, write_atomic};
+use super::{is_temp_name, is_unique_sibling, unique_sibling, write_atomic, TEMP_SUFFIX};
 use std::path::Path;
 
 /// Every file name in `dir`, sorted.
@@ -73,4 +73,20 @@ fn a_unique_sibling_is_recognised_and_other_names_are_not() {
         "staging"
     ));
     assert!(!is_unique_sibling("a.glb.1.staging", "a.glb", "staging"));
+}
+
+#[test]
+fn only_a_write_in_flight_is_a_temp_name() {
+    let made = unique_sibling(Path::new("dir/a.png"), TEMP_SUFFIX);
+    assert!(is_temp_name(&made.file_name().unwrap().to_string_lossy()));
+    for name in [
+        "a.png",
+        "a.tmp",
+        "a.1.tmp",
+        "a.x.1.tmp",
+        ".1.2.tmp",
+        "a.1.2.staging",
+    ] {
+        assert!(!is_temp_name(name), "{name}");
+    }
 }

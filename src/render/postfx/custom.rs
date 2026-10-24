@@ -16,8 +16,10 @@
 //! the volume's `post_params` against the module's baked layout, so a script changing
 //! a value costs one buffer write — never a re-bake or a pipeline rebuild.
 //!
-//! Modules are compiled once per name and cached; a successful bake anywhere in the
-//! process drops the cache, so a re-baked effect is picked up next frame. A module
+//! Modules are compiled once per name and cached; a shader file written anywhere in
+//! the process (the write log, `core::fs::written`: a bake, or an outside edit the
+//! editor's file watch noted, #1327) drops the cache, so a re-baked effect is
+//! picked up next frame. A module
 //! that is missing or fails to compile is logged once and skipped — never a crash,
 //! never a black frame.
 
@@ -26,9 +28,10 @@ use std::collections::{BTreeMap, HashMap};
 use naga_oil::compose::Composer;
 
 use super::{PfxTarget, PostFx};
+use crate::core::fs::written::written_since;
 use crate::render::gpu::layout_entries::uniform_entry;
-use crate::shadergen::params::{PackedParams, ParamLayout};
-use crate::shadergen::{bake_generation, compose, engine_shader_dir, DEFAULT_OUT_DIR};
+use crate::shadergen::params::{is_shader_file, PackedParams, ParamLayout};
+use crate::shadergen::{compose, engine_shader_dir, DEFAULT_OUT_DIR};
 
 /// One loaded authored effect: its pipeline, its runtime-param layout, and the
 /// uniform buffer + group-1 bind group that layout is packed into.
@@ -73,7 +76,7 @@ impl CustomChain {
                 layout,
                 params_layout,
                 format,
-                generation: bake_generation(),
+                seen: written_since(u64::MAX).0,
                 composer: None,
                 pipelines: HashMap::new(),
             },
@@ -125,22 +128,23 @@ impl CustomChain {
 }
 
 /// Compiled authored modules by name. `None` records a failure, so it is logged once
-/// rather than every frame, until the next bake invalidates the cache.
+/// rather than every frame, until a written shader file invalidates the cache.
 struct EffectCache {
     dir: String,
     layout: wgpu::PipelineLayout,
     params_layout: wgpu::BindGroupLayout,
     format: wgpu::TextureFormat,
-    generation: u64,
+    /// The newest write-log generation already looked at.
+    seen: u64,
     composer: Option<Composer>,
     pipelines: HashMap<String, Option<Effect>>,
 }
 
 impl EffectCache {
     fn prepare(&mut self, device: &wgpu::Device, names: &[String]) {
-        let generation = bake_generation();
-        if generation != self.generation {
-            self.generation = generation;
+        let (seen, written) = written_since(self.seen);
+        self.seen = seen;
+        if written.iter().any(|p| is_shader_file(p)) {
             self.pipelines.clear();
         }
         for name in names {
