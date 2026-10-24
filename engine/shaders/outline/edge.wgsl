@@ -13,6 +13,8 @@
 //    post-FX output (#1224), as Unity's selection outline draws over the finished
 //    scene: no tonemap, grade, bloom, SSR, motion blur or FXAA touches the ring.
 
+#import fullscreen
+
 struct EdgeParams {
     color: vec4<f32>,
     // The ring's width in pixels (the view's pixel scale already applied).
@@ -33,8 +35,7 @@ var t_mask: texture_2d<f32>;
 
 @vertex
 fn vs_fullscreen(@builtin(vertex_index) i: u32) -> @builtin(position) vec4<f32> {
-    let uv = vec2<f32>(f32((i << 1u) & 2u), f32(i & 2u));
-    return vec4<f32>(uv * 2.0 - 1.0, 0.0, 1.0);
+    return fullscreen::triangle(i);
 }
 
 fn inside(px: vec2<i32>, dims: vec2<i32>) -> bool {

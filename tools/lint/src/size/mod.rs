@@ -119,6 +119,13 @@ pub(crate) fn scan_dir(dir: &Path) -> Vec<PathBuf> {
     out
 }
 
+/// Every `.wgsl` shader under `dir`, build output aside: what the shader rules read.
+pub(crate) fn shaders_in(dir: &Path) -> Vec<PathBuf> {
+    let mut out = Vec::new();
+    walk(dir, &mut out, &|p| Lang::of(p) == Some(Lang::Wgsl));
+    out
+}
+
 /// Every file under `dir` the size gate measures, build output aside.
 fn measured_in(dir: &Path) -> Vec<PathBuf> {
     let mut out = Vec::new();

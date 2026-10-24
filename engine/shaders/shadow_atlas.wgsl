@@ -7,13 +7,14 @@
 //                 atlas starts each frame from the cached static casters.
 //  * `fs_clear` — the far plane (1.0), before a stale tile's statics are re-baked.
 
+#import fullscreen
+
 @group(0) @binding(0)
 var t_static: texture_depth_2d;
 
 @vertex
 fn vs_fullscreen(@builtin(vertex_index) i: u32) -> @builtin(position) vec4<f32> {
-    let uv = vec2<f32>(f32((i << 1u) & 2u), f32(i & 2u));
-    return vec4<f32>(uv * 2.0 - 1.0, 0.0, 1.0);
+    return fullscreen::triangle(i);
 }
 
 // Both atlases are the same size, so a fragment's framebuffer texel is its texel

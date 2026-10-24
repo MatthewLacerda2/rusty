@@ -17,6 +17,7 @@ mod atomic_write;
 mod converter_log;
 mod drag_range;
 mod full_literal;
+mod fullscreen_triangle;
 mod ignored;
 mod log_tag;
 mod markers;
@@ -60,6 +61,7 @@ const RULES: &[(Rule, Allow)] = &[
     (converter_log::run, Allow::Inline),
     (drag_range::run, Allow::Inline),
     (full_literal::run, Allow::Inline),
+    (fullscreen_triangle::run, Allow::Inline),
     (ignored::run, Allow::Never),
     (log_tag::run, Allow::Inline),
     (markers::run, Allow::Inline),
