@@ -1,8 +1,9 @@
 //! Every animatable field (#424) reads and writes its component through the
 //! authoring ops, and a missing component reads `None` and refuses the write.
 
-use glam::{Vec3, Vec4};
+use glam::{Vec2, Vec3, Vec4};
 
+use super::super::{Ease, Property, Tween};
 use super::{Field, FIELDS};
 use crate::components::{
     AudioSourceComponent, CanvasGroupComponent, ImageComponent, RectTransformComponent,
@@ -94,4 +95,50 @@ fn a_missing_component_reads_none_and_refuses_the_write() {
     );
     assert!(Field::parse("Light.colour").is_none());
     assert!(Field::paths().contains("Camera.fov"));
+}
+
+#[test]
+fn a_loaded_fov_past_its_bound_tweens_from_the_first_step() {
+    let (mut s, id) = dressed();
+    // A scene file skips the op: the stored lens is out of Unity's bounds.
+    s.world.camera_mut(id).expect("camera").fov = 500.0;
+    let fov = Field::Fov;
+    let from = fov.get(&s, id).expect("camera");
+    assert_eq!(from.x, 179.0, "the start is the held value");
+    let tween = Tween {
+        property: Property::Field(fov),
+        from: None,
+        to: Vec4::splat(60.0),
+        duration: 1.0,
+        ease: Ease::Linear,
+        loops: Some(1),
+        yoyo: false,
+        on_complete: None,
+        group: None,
+    };
+    let (first, _) = tween.sample(from, 0.1);
+    assert!(fov.set(&mut s, id, first));
+    let after = s.world.camera(id).expect("camera").fov;
+    assert!(after < 179.0, "the first step moves the lens, read {after}");
+}
+
+#[test]
+fn every_clamped_field_reads_its_stored_value_as_held() {
+    let (mut s, id) = dressed();
+    let w = &mut s.world;
+    w.canvas_group_mut(id).expect("group").alpha = 3.0;
+    w.image_mut(id).expect("image").fill_amount = -1.0;
+    w.light_mut(id).expect("light").range = -2.0;
+    w.audio_mut(id).expect("audio").volume = 4.0;
+    w.rect_transform_mut(id).expect("rect").anchor_min = Vec2::splat(2.0);
+    for (field, held) in [
+        (Field::Alpha, 1.0),
+        (Field::FillAmount, 0.0),
+        (Field::Range, 0.0),
+        (Field::Volume, 1.0),
+        (Field::AnchorMin, 1.0),
+    ] {
+        let got = field.get(&s, id).map(|v| v.x);
+        assert_eq!(got, Some(held), "{}", field.path());
+    }
 }
