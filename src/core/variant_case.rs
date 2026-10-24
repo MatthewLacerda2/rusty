@@ -1,4 +1,4 @@
-//! src/api/lua_json/variant_case.rs — enum names from Lua are case-insensitive (#1216).
+//! src/core/variant_case.rs — enum names read in any case (#1216).
 //!
 //! Every hand-written name setter (`Light.SetType`, `Graphics.SetTonemap`, …) reads
 //! its name in any case; a recipe or a UI look reaches its enums through serde

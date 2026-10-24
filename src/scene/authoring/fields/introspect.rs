@@ -1,4 +1,4 @@
-//! src/api/component/introspect.rs — a component's serialized fields and their
+//! src/scene/authoring/fields/introspect.rs — a component's serialized fields and their
 //! types, read from its serde derive.
 //!
 //! A derived `Deserialize` hands its struct's field list to

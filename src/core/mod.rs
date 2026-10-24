@@ -19,6 +19,7 @@ pub mod project;
 pub mod quality;
 pub mod random;
 pub mod storage;
+pub mod variant_case;
 pub mod video;
 
 pub(crate) use named_enum::named_enum;

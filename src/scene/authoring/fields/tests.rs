@@ -77,7 +77,7 @@ fn every_serialized_field_is_mapped_or_read_only() {
 }
 
 /// An entity carrying every component the Add Component menu can attach.
-fn dressed() -> (Scene, u32) {
+pub(super) fn dressed() -> (Scene, u32) {
     let mut scene = Scene::new();
     let id = scene.add_entity("Dressed".to_string());
     for add in ComponentKind::ALL {

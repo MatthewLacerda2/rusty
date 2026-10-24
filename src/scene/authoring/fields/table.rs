@@ -1,4 +1,5 @@
-//! src/api/component/table.rs — the field table behind `Component.*` (#1369).
+//! src/scene/authoring/fields/table.rs — the field table behind `Component.*` (#1369)
+//! and the load-time hold (#1418).
 //!
 //! Each first-class component lists its serialized fields once, as [`Field`]s: a
 //! field is either written through the `scene::authoring` op the inspector's card
@@ -63,10 +64,10 @@ pub struct Field<C> {
 /// A field written by one op, `fn(&mut C, T)` with `T` decoded from the value.
 macro_rules! op {
     ($name:literal, $op:path) => {
-        $crate::api::component::table::Field {
+        $crate::scene::authoring::fields::table::Field {
             name: $name,
-            access: $crate::api::component::table::Access::Op(|c, json| {
-                $op(c, $crate::api::component::value::decode(json)?);
+            access: $crate::scene::authoring::fields::table::Access::Op(|c, json| {
+                $op(c, $crate::scene::authoring::fields::value::decode(json)?);
                 Ok(())
             }),
         }
@@ -77,10 +78,10 @@ macro_rules! op {
 /// `$body` (which may use `?` on a fallible op).
 macro_rules! with {
     ($name:literal, |$c:ident, $v:ident: $t:ty| $body:expr) => {
-        $crate::api::component::table::Field {
+        $crate::scene::authoring::fields::table::Field {
             name: $name,
-            access: $crate::api::component::table::Access::Op(|$c, json| {
-                let $v: $t = $crate::api::component::value::decode(json)?;
+            access: $crate::scene::authoring::fields::table::Access::Op(|$c, json| {
+                let $v: $t = $crate::scene::authoring::fields::value::decode(json)?;
                 $body;
                 Ok(())
             }),
@@ -92,7 +93,7 @@ macro_rules! with {
 /// binding. List each of its fields with `part!`.
 macro_rules! group {
     (|$c:ident $(, $f:ident: $t:ty)+ $(,)?| $body:expr) => {
-        $crate::api::component::table::Group {
+        $crate::scene::authoring::fields::table::Group {
             names: &[$(stringify!($f)),+],
             write: |$c, values| {
                 $(let $f: $t = values.take(stringify!($f))?;)+
@@ -106,9 +107,9 @@ macro_rules! group {
 /// A field written by its [`Group`]'s op.
 macro_rules! part {
     ($name:literal, $group:expr) => {
-        $crate::api::component::table::Field {
+        $crate::scene::authoring::fields::table::Field {
             name: $name,
-            access: $crate::api::component::table::Access::Group($group),
+            access: $crate::scene::authoring::fields::table::Access::Group($group),
         }
     };
 }
@@ -116,9 +117,9 @@ macro_rules! part {
 /// A read-only field and why it is read-only.
 macro_rules! ro {
     ($name:literal, $why:expr) => {
-        $crate::api::component::table::Field {
+        $crate::scene::authoring::fields::table::Field {
             name: $name,
-            access: $crate::api::component::table::Access::ReadOnly($why),
+            access: $crate::scene::authoring::fields::table::Access::ReadOnly($why),
         }
     };
 }
@@ -138,8 +139,8 @@ pub trait Inspect: Clone + Serialize + DeserializeOwned + 'static {
 /// Implement [`Inspect`] for each `Type => getter, mutable getter, field table`.
 macro_rules! inspect {
     ($($ty:ty => $get:ident, $get_mut:ident, $fields:expr;)*) => {$(
-        impl $crate::api::component::table::Inspect for $ty {
-            const FIELDS: &'static [$crate::api::component::table::Field<Self>] = $fields;
+        impl $crate::scene::authoring::fields::table::Inspect for $ty {
+            const FIELDS: &'static [$crate::scene::authoring::fields::table::Field<Self>] = $fields;
             fn read(
                 world: &$crate::ecs::World,
                 id: u32,
@@ -182,6 +183,8 @@ pub struct Kind {
     pub key: &'static str,
     pub read: fn(&World, u32) -> Option<Result<Value, String>>,
     pub write: WriteAny,
+    /// Hold a loaded component's numeric fields through their ops (#1418).
+    pub hold: fn(&mut World, u32),
     pub fields: fn() -> Vec<FieldInfo>,
     /// A field's type as its derive reads it: optional, and the Lua type it holds.
     pub field_type: fn(&'static str) -> (bool, Option<&'static str>),
@@ -205,6 +208,7 @@ pub const fn kind<C: Inspect>(
         key,
         read: C::read,
         write: super::write::write::<C>,
+        hold: super::hold::hold::<C>,
         fields: fields::<C>,
         field_type: super::introspect::field_type::<C>,
         #[cfg(test)]

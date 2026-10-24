@@ -1,4 +1,4 @@
-//! src/api/component/kinds/ui.rs — the UI layout and container components' field
+//! src/scene/authoring/fields/kinds/ui.rs — the UI layout and container components' field
 //! tables: `Canvas`, `RectTransform`, `Image`, `CanvasGroup`, `RectMask`, `Mask`,
 //! `BackdropFilter`, `Selectable`, `LayoutGroup` and `LayoutElement`.
 

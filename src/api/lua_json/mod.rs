@@ -19,7 +19,8 @@
 //! in any case, as every hand-written name setter reads them (#1216).
 //!
 //! One caller converts Lua tables by its own rules and only shares [`decode`]:
-//! `Component.Set` (`api::component::value`, #1369) walks its table by hand, so a
+//! `Component.Set` (`api::component::value`, and the field table's ops in
+//! `scene::authoring::fields`, #1369) walks its table by hand, so a
 //! whole-number float is an integer, a list keeps the entries after a `nil` hole,
 //! and a nested `{}` is an empty list where a list is expected.
 
@@ -27,9 +28,7 @@ use mlua::{Lua, LuaSerdeExt, Value};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
-mod variant_case;
-
-pub use variant_case::decode;
+pub use crate::core::variant_case::decode;
 
 /// Decode a recipe argument into `T`: a Lua **table** or a **JSON string** (the
 /// on-disk form). Both reach `T`'s serde derive through the same [`decode`] call.

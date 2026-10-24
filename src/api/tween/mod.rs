@@ -73,7 +73,8 @@ pub fn register<'scope>(
 }
 
 /// Start a validated tween: write its `from` at once (so a delayed fade-in is
-/// already hidden while it waits), then schedule it behind its delay.
+/// already hidden while it waits) and start from the value the field then holds,
+/// then schedule it behind its delay.
 fn schedule(
     scene: &RefCell<Scene>,
     timers: &RefCell<TimerScheduler>,
@@ -81,9 +82,11 @@ fn schedule(
     group: Option<u64>,
 ) -> u64 {
     if let Some(from) = spec.tween.from {
-        spec.tween
-            .property
-            .set(&mut scene.borrow_mut(), spec.owner, from);
+        let mut scene = scene.borrow_mut();
+        spec.tween.property.set(&mut scene, spec.owner, from);
+        // The start is what the op held, not the number given (#1418): an alpha
+        // tween `from = 500` starts at 1, as the field reads.
+        spec.tween.from = spec.tween.property.get(&scene, spec.owner).or(Some(from));
     }
     spec.tween.group = group;
     let mut t = timers.borrow_mut();

@@ -1,4 +1,4 @@
-//! src/api/component/kinds/render.rs — the rendering components' field tables:
+//! src/scene/authoring/fields/kinds/render.rs — the rendering components' field tables:
 //! `Transform`, `Mesh`, `Material`, `Light`, `Camera`, `VisualCorrection` and
 //! `LODGroup`.
 

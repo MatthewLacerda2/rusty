@@ -1,4 +1,4 @@
-//! src/api/component/kinds/physics.rs — the physics components' field tables.
+//! src/scene/authoring/fields/kinds/physics.rs — the physics components' field tables.
 
 use glam::Vec2;
 

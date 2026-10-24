@@ -1,4 +1,4 @@
-//! src/api/component/kinds/fx.rs — the animation, effects and audio components'
+//! src/scene/authoring/fields/kinds/fx.rs — the animation, effects and audio components'
 //! field tables: `Animator`, `Particles`, `Audio`, `AudioReverbZone`, `Trail` and
 //! `Line`.
 

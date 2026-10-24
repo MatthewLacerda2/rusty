@@ -1,4 +1,4 @@
-//! src/api/component/write.rs — `Component.Set`'s write: a change table onto one
+//! src/scene/authoring/fields/write.rs — `Component.Set`'s write: a change table onto one
 //! component, through the field table's ops (#1369).
 
 use serde_json::{Map, Value};

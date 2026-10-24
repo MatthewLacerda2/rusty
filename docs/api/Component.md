@@ -40,7 +40,9 @@ live particles, a trail's points) is not a field and never appears.
 
 - **Each field is written through the op the inspector's card calls**, so the
   clamping, sanitizing and side effects are the card's own: `mass = 5000` is
-  stored as the card's upper bound, `1000`.
+  stored as the card's upper bound, `1000`. A scene or prefab file is held the
+  same way when it loads: a hand-edited `mass: 5000` reads back `1000`, though the
+  file keeps what it says until the next Save.
 - **A field no op writes is read-only.** `Component.Fields` says so
   (`writable = false`, and `read_only` says why or names the verb that writes it,
   such as `Transform.SetLocalPosition` or `Animator.SetFloat`); `Set` on it is an

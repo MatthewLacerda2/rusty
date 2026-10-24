@@ -1,4 +1,4 @@
-//! src/api/component/kinds/nav.rs — the navigation components' field tables.
+//! src/scene/authoring/fields/kinds/nav.rs — the navigation components' field tables.
 
 use super::super::table::{inspect, op, ro, with};
 use super::super::value::Mask;
