@@ -93,39 +93,6 @@ pub fn set_raycast_target(s: &mut ShapeComponent, target: bool) {
     s.raycast_target = target;
 }
 
-/// The kind's name.
-pub fn kind_name(k: ShapeKind) -> &'static str {
-    match k {
-        ShapeKind::Rect => "Rect",
-        ShapeKind::Ellipse => "Ellipse",
-        ShapeKind::Ring => "Ring",
-        ShapeKind::Line => "Line",
-    }
-}
-
-/// Parse a kind name (case-insensitive).
-pub fn parse_kind(name: &str) -> Option<ShapeKind> {
-    use ShapeKind::{Ellipse, Line, Rect, Ring};
-    [Rect, Ellipse, Ring, Line]
-        .into_iter()
-        .find(|k| kind_name(*k).eq_ignore_ascii_case(name))
-}
-
-/// The corner style's name.
-pub fn corner_name(c: ShapeCorner) -> &'static str {
-    match c {
-        ShapeCorner::Round => "Round",
-        ShapeCorner::Chamfer => "Chamfer",
-    }
-}
-
-/// Parse a corner-style name (case-insensitive).
-pub fn parse_corner(name: &str) -> Option<ShapeCorner> {
-    [ShapeCorner::Round, ShapeCorner::Chamfer]
-        .into_iter()
-        .find(|c| corner_name(*c).eq_ignore_ascii_case(name))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -141,19 +108,5 @@ mod tests {
         assert_eq!((s.dash, s.gap), (0.0, 2.0));
         assert_eq!((s.border_width, s.border_color), (0.0, Vec4::ONE));
         assert!(!s.glow.is_on(), "zero intensity is off");
-    }
-
-    #[test]
-    fn names_round_trip() {
-        for k in [
-            ShapeKind::Rect,
-            ShapeKind::Ellipse,
-            ShapeKind::Ring,
-            ShapeKind::Line,
-        ] {
-            assert_eq!(parse_kind(&kind_name(k).to_lowercase()), Some(k));
-        }
-        assert_eq!(parse_corner("CHAMFER"), Some(ShapeCorner::Chamfer));
-        assert_eq!(parse_kind("Star"), None);
     }
 }

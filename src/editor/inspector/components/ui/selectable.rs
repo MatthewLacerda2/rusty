@@ -60,7 +60,7 @@ fn draw_transition(ui: &mut egui::Ui, edit: &mut SelectableComponent) -> bool {
         "Transition",
         &mut edit.transition,
         &kinds,
-        ops::transition_name,
+        SelectableTransition::name,
     );
     changed |= entity_row(ui, "Target Graphic:", "self", &mut edit.target_graphic);
     let states = &SelectionState::ALL;
@@ -113,7 +113,7 @@ fn draw_navigation(ui: &mut egui::Ui, edit: &mut SelectableComponent) -> bool {
         "Navigation",
         &mut edit.navigation,
         &modes,
-        ops::navigation_name,
+        NavigationMode::name,
     );
     if edit.navigation == NavigationMode::Explicit {
         for (target, dir) in edit.select_on.iter_mut().zip(ops::DIRECTIONS) {

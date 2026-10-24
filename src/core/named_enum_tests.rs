@@ -37,6 +37,19 @@ fn parse_round_trips_every_name_in_any_case() {
 }
 
 #[test]
+fn names_joins_every_name_for_an_error() {
+    assert_eq!(Probe::names(), "Plain, home_theater, Custom");
+}
+
+#[test]
+fn unique_refuses_two_spellings_that_differ_only_in_case() {
+    assert!(super::unique(&["Plain", "home_theater", "Custom", "User"]));
+    assert!(!super::unique(&["Plain", "Custom", "PLAIN"]));
+    assert!(!super::unique(&["A", "a"]));
+    assert!(super::unique(&[]));
+}
+
+#[test]
 fn parse_reads_aliases_and_refuses_anything_else() {
     assert_eq!(Probe::parse("user"), Some(Probe::Aliased));
     assert_eq!(Probe::parse("HAND SET"), Some(Probe::Aliased));

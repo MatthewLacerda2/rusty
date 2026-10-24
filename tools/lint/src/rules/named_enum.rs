@@ -2,76 +2,137 @@
 //! `core::named_enum!` (#1329).
 //!
 //! A hand-written name table drifts: one copy forgets case-insensitivity, another a
-//! variant (#1216). So a top-level `impl X { … }` block of `src/` that holds both a
-//! `fn parse(<arg>: &str) -> Option<Self>` (or `Option<X>`) and a
-//! `fn name(self) -> &'static str` (or `as_str`, `&self` too) is a finding at the
-//! `parse` line: declare the enum through the macro instead. A parse that does more
-//! than read one name per variant (aliases with separators ignored, a name built
-//! from parts) says why with `// lint: allow(named-enum) <why>`. Test code is not
-//! scanned.
+//! variant (#1216). So a file of `src/` that writes, for one type `T`, both
+//!
+//! - a parse — `fn parse(_: &str) -> Option<Self>` (or `Option<T>`) in an
+//!   `impl T` block, or a free `fn parse_*(_: &str) -> Option<T>` — and
+//! - a name — `fn name` / `fn as_str` taking `self` (or `&self`) and returning
+//!   `&'static str` in an `impl T` block, or a free `fn *_name(_: T) -> &'static str`
+//!
+//! is a finding at the parse: declare `T` through the macro instead. The two may sit
+//! in different `impl T` blocks, an `impl` may be indented (an inline `mod`) and
+//! carry a comment after its `{`. A parse that does more than read one name per
+//! variant (separators ignored, a name built from parts) says why with
+//! `// lint: allow(named-enum) <why>`. Test code is not scanned.
 
 use super::finding::Finding;
 use super::scan::Scan;
-use crate::code::code_lines;
+use crate::code::{code_of, Open};
+use std::collections::BTreeMap;
 
 pub const RULE: &str = "named-enum";
 
-/// Every hand-written `parse` beside a `name` / `as_str` in one impl block.
+/// Every hand-written parse of a type that also has a hand-written name.
 pub fn check(path: &str, source: &str, test: &[bool]) -> Vec<Finding> {
     if !path.starts_with("src/") {
         return Vec::new();
     }
-    let lines = code_lines(source);
-    let mut found = Vec::new();
-    let mut block: Option<(String, Option<usize>, bool)> = None;
-    for (i, code) in lines.iter().enumerate() {
-        if test.get(i).copied().unwrap_or(false) {
-            continue;
-        }
-        if let Some(ty) = impl_type(code) {
-            block = Some((ty, None, false));
-            continue;
-        }
-        let Some((ty, parse, name)) = block.as_mut() else {
-            continue;
-        };
-        if code.starts_with('}') {
-            if let (Some(at), true) = (*parse, *name) {
-                found.push(finding(path, at));
+    // Per type: the line of its first parse, and whether it has a name.
+    let mut types: BTreeMap<String, (Option<usize>, bool)> = BTreeMap::new();
+    let (mut open, mut depth) = (Open::None, 0usize);
+    let mut block: Option<(String, usize)> = None;
+    for (i, line) in source.lines().enumerate() {
+        let mut braces = (0usize, 0usize);
+        let code = code_of(line, &mut open, |_, c| match c {
+            '{' => braces.0 += 1,
+            '}' => braces.1 += 1,
+            _ => {}
+        });
+        let code = code.trim();
+        if !test.get(i).copied().unwrap_or(false) {
+            if let Some(ty) = block.as_ref().map(|b| b.0.as_str()) {
+                if is_method_parse(code, ty) {
+                    types
+                        .entry(ty.to_string())
+                        .or_default()
+                        .0
+                        .get_or_insert(i + 1);
+                } else if is_method_name(code) {
+                    types.entry(ty.to_string()).or_default().1 = true;
+                }
             }
+            if let Some(ty) = free_parse(code) {
+                types.entry(ty).or_default().0.get_or_insert(i + 1);
+            } else if let Some(ty) = free_name(code) {
+                types.entry(ty).or_default().1 = true;
+            }
+            if block.is_none() {
+                block = impl_type(code).map(|ty| (ty, depth));
+            }
+        }
+        depth = (depth + braces.0).saturating_sub(braces.1);
+        if block.as_ref().is_some_and(|b| depth <= b.1) && braces.1 > 0 {
             block = None;
-        } else if is_parse(code, ty) {
-            *parse = Some(i + 1);
-        } else if is_name(code) {
-            *name = true;
         }
     }
-    found
+    types
+        .into_values()
+        .filter_map(|(parse, name)| parse.filter(|_| name))
+        .map(|line| finding(path, line))
+        .collect()
 }
 
-/// `X` of a top-level `impl X {` line (no trait, no generics).
+/// `T` of an `impl T {` line (no trait, no generics), a comment after it cut.
 fn impl_type(code: &str) -> Option<String> {
     let ty = code.strip_prefix("impl ")?.strip_suffix('{')?.trim();
-    ty.chars()
-        .all(|c| c.is_alphanumeric() || c == '_')
-        .then(|| ty.to_string())
-        .filter(|t| !t.is_empty())
+    is_type(ty).then(|| ty.to_string())
 }
 
-fn is_parse(code: &str, ty: &str) -> bool {
+fn is_type(ty: &str) -> bool {
+    !ty.is_empty() && ty.chars().all(|c| c.is_alphanumeric() || c == '_')
+}
+
+fn is_method_parse(code: &str, ty: &str) -> bool {
     let Some(rest) = code.split("fn parse(").nth(1) else {
         return false;
     };
-    let returns = |t: &str| rest.contains(&format!(": &str) -> Option<{t}>"));
-    returns("Self") || returns(ty)
+    returns_option(rest).is_some_and(|t| t == "Self" || t == ty)
 }
 
-fn is_name(code: &str) -> bool {
+fn is_method_name(code: &str) -> bool {
     ["fn name(", "fn as_str("].iter().any(|f| {
         code.split(f).nth(1).is_some_and(|r| {
             r.starts_with("self) -> &'static str") || r.starts_with("&self) -> &'static str")
         })
     })
+}
+
+/// `T` of a free `fn parse_*(<arg>: &str) -> Option<T>`.
+fn free_parse(code: &str) -> Option<String> {
+    let rest = code.split("fn parse_").nth(1)?;
+    let rest = &rest[rest.find('(')?..];
+    returns_option(rest)
+        .filter(|t| *t != "Self")
+        .map(str::to_string)
+}
+
+/// `T` of a free `fn *_name(<arg>: T) -> &'static str`.
+fn free_name(code: &str) -> Option<String> {
+    let at = code.find("fn ")?;
+    let sig = &code[at + 3..];
+    let open = sig.find('(')?;
+    if !sig[..open].ends_with("_name") {
+        return None;
+    }
+    let (arg, rest) = sig[open + 1..].split_once(')')?;
+    let ty = arg.split_once(':')?.1.trim();
+    (is_type(ty) && rest.trim_start().starts_with("-> &'static str")).then(|| ty.to_string())
+}
+
+/// `T` when `rest` (from just after a parse's `(`, or at it) is a single `&str`
+/// argument returning `Option<T>`.
+fn returns_option(rest: &str) -> Option<&str> {
+    let rest = rest.strip_prefix('(').unwrap_or(rest);
+    let (arg, ret) = rest.split_once(')')?;
+    if arg.split_once(':')?.1.trim() != "&str" {
+        return None;
+    }
+    let ty = ret
+        .trim_start()
+        .strip_prefix("-> Option<")?
+        .split_once('>')?
+        .0;
+    is_type(ty).then_some(ty)
 }
 
 fn finding(path: &str, line: usize) -> Finding {

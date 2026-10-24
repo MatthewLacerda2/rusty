@@ -21,14 +21,8 @@ pub fn draw(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, is_dirty:
     let mut changed = false;
     component_card(ui, icon::MONITOR, "Canvas", Some(&mut remove), |ui| {
         let mut mode = c.render_mode;
-        let modes = &canvas_ops::RENDER_MODES;
-        if combo(
-            ui,
-            "Render Mode",
-            &mut mode,
-            modes,
-            canvas_ops::render_mode_name,
-        ) {
+        let modes = &CanvasRenderMode::ALL;
+        if combo(ui, "Render Mode", &mut mode, modes, CanvasRenderMode::name) {
             if let Some(mut c) = world.canvas_mut(id) {
                 canvas_ops::set_render_mode(&mut c, mode);
             }

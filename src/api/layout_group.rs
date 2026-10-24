@@ -16,8 +16,8 @@ use mlua::{FromLuaMulti, IntoLuaMulti, Lua, Table};
 
 use super::{put, Reg};
 use crate::components::LayoutGroupComponent;
+use crate::components::TextAlignment;
 use crate::scene::authoring::layout_group::{self as ops, CONSTRAINTS, CORNERS, KINDS};
-use crate::scene::authoring::text::{alignment_name, parse_alignment};
 use crate::scene::Scene;
 
 type Cell<'s> = &'s RefCell<Scene>;
@@ -38,9 +38,9 @@ const NAMES: [(&str, NameGet, NameSet); 4] = [
     ),
     (
         "ChildAlignment",
-        |g| alignment_name(g.child_alignment),
+        |g| g.child_alignment.name(),
         |g, n| {
-            if let Some(v) = parse_alignment(n) {
+            if let Some(v) = TextAlignment::parse(n) {
                 ops::set_child_alignment(g, v);
             }
         },

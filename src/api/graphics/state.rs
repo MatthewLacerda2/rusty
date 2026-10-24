@@ -12,7 +12,7 @@ use crate::core::quality::QualityPreset;
 use crate::scene::Scene;
 
 /// Global quality preset value get/set over the shared resource cell. Lives here (not
-/// `mod.rs`) to keep that file under the size cap; reaches `quality_name`/`parse_quality`
+/// `mod.rs`) to keep that file under the size cap; reaches `QualityPreset::name`/`QualityPreset::parse`
 /// directly.
 pub(super) fn register_quality<'scope>(
     scope: &'scope mlua::Scope<'scope, '_>,
@@ -22,13 +22,13 @@ pub(super) fn register_quality<'scope>(
     put(
         table,
         "GetQuality",
-        scope.create_function(|_, ()| Ok(quality_name(*quality.borrow()).to_string())),
+        scope.create_function(|_, ()| Ok(quality.borrow().name().to_string())),
     )?;
     put(
         table,
         "SetQuality",
         scope.create_function(|_, name: String| {
-            if let Some(p) = parse_quality(&name) {
+            if let Some(p) = QualityPreset::parse(&name) {
                 *quality.borrow_mut() = p;
             }
             Ok(())
@@ -104,22 +104,5 @@ pub(super) fn with_cam_mut(scene: &RefCell<Scene>, f: impl FnOnce(&mut CameraCom
     let guard = scene.world.camera_mut(id);
     if let Some(mut c) = guard {
         f(&mut c);
-    }
-}
-
-pub(super) fn parse_quality(name: &str) -> Option<QualityPreset> {
-    match name.to_ascii_lowercase().as_str() {
-        "low" => Some(QualityPreset::Low),
-        "medium" => Some(QualityPreset::Medium),
-        "high" => Some(QualityPreset::High),
-        _ => None,
-    }
-}
-
-pub(super) fn quality_name(p: QualityPreset) -> &'static str {
-    match p {
-        QualityPreset::Low => "Low",
-        QualityPreset::Medium => "Medium",
-        QualityPreset::High => "High",
     }
 }

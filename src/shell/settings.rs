@@ -64,7 +64,7 @@ fn read(storage: &Storage, defaults: VideoSettings) -> (VideoSettings, QualityPr
         .unwrap_or(defaults);
     let quality = storage
         .get(QUALITY_NAMESPACE, QUALITY_KEY)
-        .and_then(|v| v.as_str().and_then(parse_quality))
+        .and_then(|v| v.as_str().and_then(QualityPreset::parse))
         .unwrap_or_default();
     (video, quality)
 }
@@ -132,25 +132,6 @@ pub fn persist(shell: &Shell, game: &GameWorld) {
     storage.set(
         QUALITY_NAMESPACE,
         QUALITY_KEY,
-        serde_json::Value::String(quality_name(quality).to_string()),
+        serde_json::Value::String(quality.name().to_string()),
     );
-}
-
-/// `"Low"` / `"Medium"` / `"High"` -> tier (case-insensitive); unknown -> `None`.
-fn parse_quality(name: &str) -> Option<QualityPreset> {
-    match name.to_ascii_lowercase().as_str() {
-        "low" => Some(QualityPreset::Low),
-        "medium" => Some(QualityPreset::Medium),
-        "high" => Some(QualityPreset::High),
-        _ => None,
-    }
-}
-
-/// The canonical string name of a quality tier, for persistence.
-fn quality_name(p: QualityPreset) -> &'static str {
-    match p {
-        QualityPreset::Low => "Low",
-        QualityPreset::Medium => "Medium",
-        QualityPreset::High => "High",
-    }
 }

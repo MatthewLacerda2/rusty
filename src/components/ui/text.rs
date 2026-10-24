@@ -18,35 +18,24 @@ use serde::{Deserialize, Serialize};
 use super::look::UiBlend;
 use super::shader::UiShader;
 
-/// Where the text block sits in its rect — Unity's nine `TextAnchor`s.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub enum TextAlignment {
-    #[default]
-    TopLeft,
-    TopCenter,
-    TopRight,
-    MiddleLeft,
-    MiddleCenter,
-    MiddleRight,
-    BottomLeft,
-    BottomCenter,
-    BottomRight,
+crate::core::named_enum! {
+    /// Where the text block sits in its rect — Unity's nine `TextAnchor`s.
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+    pub enum TextAlignment {
+        #[default]
+        TopLeft = "TopLeft",
+        TopCenter = "TopCenter",
+        TopRight = "TopRight",
+        MiddleLeft = "MiddleLeft",
+        MiddleCenter = "MiddleCenter",
+        MiddleRight = "MiddleRight",
+        BottomLeft = "BottomLeft",
+        BottomCenter = "BottomCenter",
+        BottomRight = "BottomRight",
+    }
 }
 
 impl TextAlignment {
-    /// Every alignment, in Unity's order (rows top to bottom, left to right).
-    pub const ALL: [TextAlignment; 9] = [
-        Self::TopLeft,
-        Self::TopCenter,
-        Self::TopRight,
-        Self::MiddleLeft,
-        Self::MiddleCenter,
-        Self::MiddleRight,
-        Self::BottomLeft,
-        Self::BottomCenter,
-        Self::BottomRight,
-    ];
-
     /// The block's placement as fractions of the free space: `x` 0 left … 1 right,
     /// `y` 0 bottom … 1 top.
     pub fn fractions(self) -> Vec2 {
@@ -55,16 +44,18 @@ impl TextAlignment {
     }
 }
 
-/// What happens to text that does not fit its rect.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub enum TextOverflow {
-    /// Draw it anyway, spilling past the rect.
-    #[default]
-    Overflow,
-    /// Drop the lines (and, unwrapped, the characters) that do not fit.
-    Truncate,
-    /// As `Truncate`, ending the last visible line with `…`.
-    Ellipsis,
+crate::core::named_enum! {
+    /// What happens to text that does not fit its rect.
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+    pub enum TextOverflow {
+        /// Draw it anyway, spilling past the rect.
+        #[default]
+        Overflow = "Overflow",
+        /// Drop the lines (and, unwrapped, the characters) that do not fit.
+        Truncate = "Truncate",
+        /// As `Truncate`, ending the last visible line with `…`.
+        Ellipsis = "Ellipsis",
+    }
 }
 
 /// A UI text label. See the module docs.

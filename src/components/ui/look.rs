@@ -14,39 +14,33 @@
 use glam::{Vec2, Vec4};
 use serde::{Deserialize, Serialize};
 
-/// How a graphic composites onto the frame. See the module docs.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum UiBlend {
-    /// Ordinary alpha blending ("over").
-    #[default]
-    Normal,
-    /// Adds the colour: brightens, never darkens (neon, glows, flashes).
-    Additive,
-    /// Multiplies the colour under it: darkens (white leaves it unchanged).
-    Multiply,
-    /// The inverse of multiplying the inverses: lightens (black leaves it unchanged).
-    Screen,
+crate::core::named_enum! {
+    /// How a graphic composites onto the frame. See the module docs.
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+    pub enum UiBlend {
+        /// Ordinary alpha blending ("over").
+        #[default]
+        Normal = "Normal",
+        /// Adds the colour: brightens, never darkens (neon, glows, flashes).
+        Additive = "Additive",
+        /// Multiplies the colour under it: darkens (white leaves it unchanged).
+        Multiply = "Multiply",
+        /// The inverse of multiplying the inverses: lightens (black leaves it unchanged).
+        Screen = "Screen",
+    }
 }
 
-impl UiBlend {
-    /// Every mode, in declaration order.
-    pub const ALL: [UiBlend; 4] = [
-        UiBlend::Normal,
-        UiBlend::Additive,
-        UiBlend::Multiply,
-        UiBlend::Screen,
-    ];
-}
-
-/// How a gradient sweeps across the rect. Scripts may write the name in any case
-/// (`api::lua_json::decode`, #1216); a stored file holds `"Linear"`/`"Radial"`.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub enum GradientKind {
-    /// Along a direction at `angle` degrees, corner to corner.
-    #[default]
-    Linear,
-    /// Outward from `center`, reaching the last stop at `radius`.
-    Radial,
+crate::core::named_enum! {
+    /// How a gradient sweeps across the rect. Scripts may write the name in any case
+    /// (`api::lua_json::decode`, #1216); a stored file holds `"Linear"`/`"Radial"`.
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+    pub enum GradientKind {
+        /// Along a direction at `angle` degrees, corner to corner.
+        #[default]
+        Linear = "Linear",
+        /// Outward from `center`, reaching the last stop at `radius`.
+        Radial = "Radial",
+    }
 }
 
 /// One colour stop: a straight-alpha display-space colour at position `t` in `[0, 1]`.

@@ -9,13 +9,12 @@ use crate::components::{
     CanvasComponent, CanvasGroupComponent, ImageComponent, RectMaskComponent,
     RectTransformComponent, ShapeComponent,
 };
-use crate::scene::authoring::ui_look::blend_name;
 
 /// Canvas authoring view (#417): render mode, sort order and the scaler. The
 /// computed rect is the entity's `ui_rect`, not part of the component.
 pub(crate) fn canvas_value(c: &CanvasComponent) -> Value {
     json!({
-        "render_mode": crate::scene::authoring::canvas::render_mode_name(c.render_mode),
+        "render_mode": c.render_mode.name(),
         "sort_order": c.sort_order,
         "reference_resolution": [c.reference_resolution.x, c.reference_resolution.y],
         "match_width_or_height": c.match_width_or_height,
@@ -51,21 +50,20 @@ pub(crate) fn rect_transform_value(r: &RectTransformComponent) -> Value {
 /// Image authoring view (#418): tint, texture, type, 9-slice border and the fill.
 /// Enum values are their `Image.*` names.
 pub(crate) fn image_value(i: &ImageComponent) -> Value {
-    use crate::scene::authoring::image as ops;
     let v4 = |v: glam::Vec4| json!([v.x, v.y, v.z, v.w]);
     json!({
         "color": v4(i.color),
         "texture": i.texture,
-        "type": ops::image_type_name(i.image_type),
+        "type": i.image_type.name(),
         "border": v4(i.border),
-        "fill_method": ops::fill_method_name(i.fill_method),
-        "fill_origin": ops::fill_origin_name(i.fill_origin),
+        "fill_method": i.fill_method.name(),
+        "fill_origin": i.fill_origin.name(),
         "fill_amount": i.fill_amount,
         "fill_clockwise": i.fill_clockwise,
         "preserve_aspect": i.preserve_aspect,
         "raycast_target": i.raycast_target,
         "gradient": i.gradient,
-        "blend": blend_name(i.blend),
+        "blend": i.blend.name(),
     })
 }
 
@@ -73,11 +71,10 @@ pub(crate) fn image_value(i: &ImageComponent) -> Value {
 /// Enum values are their `Shape.*` names; the gradient is the `Shape.SetGradient`
 /// table's shape.
 pub(crate) fn shape_value(s: &ShapeComponent) -> Value {
-    use crate::scene::authoring::shape as ops;
     let v4 = |v: glam::Vec4| json!([v.x, v.y, v.z, v.w]);
     json!({
-        "kind": ops::kind_name(s.kind),
-        "corner": ops::corner_name(s.corner),
+        "kind": s.kind.name(),
+        "corner": s.corner.name(),
         "radius": v4(s.radius),
         "inner_radius": s.inner_radius,
         "arc": [s.arc_start, s.arc_end],
@@ -92,7 +89,7 @@ pub(crate) fn shape_value(s: &ShapeComponent) -> Value {
             "color": v4(s.shadow.color),
         },
         "glow": { "size": s.glow.size, "intensity": s.glow.intensity, "color": v4(s.glow.color) },
-        "blend": blend_name(s.blend),
+        "blend": s.blend.name(),
         "raycast_target": s.raycast_target,
     })
 }
@@ -126,12 +123,12 @@ pub(crate) fn selectable_value(s: &crate::components::SelectableComponent) -> Va
         .collect();
     json!({
         "interactable": s.interactable,
-        "transition": ops::transition_name(s.transition),
+        "transition": s.transition.name(),
         "target_graphic": s.target_graphic,
         "colors": colors,
         "fade_duration": s.fade_duration,
         "sprites": sprites,
-        "navigation": ops::navigation_name(s.navigation),
+        "navigation": s.navigation.name(),
         "select_on": select_on,
     })
 }
@@ -161,7 +158,6 @@ pub(crate) fn backdrop_filter_value(b: &crate::components::BackdropFilterCompone
 
 /// Text authoring view (#419): the string, fonts, sizing, wrapping and effects.
 pub(crate) fn text_value(t: &crate::components::TextComponent) -> Value {
-    use crate::scene::authoring::text as ops;
     let v4 = |v: glam::Vec4| json!([v.x, v.y, v.z, v.w]);
     json!({
         "text": t.text,
@@ -170,9 +166,9 @@ pub(crate) fn text_value(t: &crate::components::TextComponent) -> Value {
         "font_italic": t.font_italic,
         "font_size": t.font_size,
         "color": v4(t.color),
-        "alignment": ops::alignment_name(t.alignment),
+        "alignment": t.alignment.name(),
         "wrap": t.wrap,
-        "overflow": ops::overflow_name(t.overflow),
+        "overflow": t.overflow.name(),
         "line_spacing": t.line_spacing,
         "letter_spacing": t.letter_spacing,
         "auto_size": [t.auto_size, t.auto_size_min, t.auto_size_max],
@@ -181,7 +177,7 @@ pub(crate) fn text_value(t: &crate::components::TextComponent) -> Value {
         "outline": { "width": t.outline_width, "color": v4(t.outline_color) },
         "shadow": { "offset": [t.shadow_offset.x, t.shadow_offset.y], "color": v4(t.shadow_color) },
         "glow": { "size": t.glow_size, "color": v4(t.glow_color) },
-        "blend": blend_name(t.blend),
+        "blend": t.blend.name(),
     })
 }
 
@@ -194,7 +190,7 @@ pub(crate) fn layout_group_value(g: &crate::components::LayoutGroupComponent) ->
         "kind": name_of(&KINDS, g.kind),
         "padding": [p.x, p.y, p.z, p.w],
         "spacing": [g.spacing.x, g.spacing.y],
-        "child_alignment": crate::scene::authoring::text::alignment_name(g.child_alignment),
+        "child_alignment": g.child_alignment.name(),
         "control_child_size": [g.control_child_width, g.control_child_height],
         "child_force_expand": [g.child_force_expand_width, g.child_force_expand_height],
         "cell_size": [g.cell_size.x, g.cell_size.y],

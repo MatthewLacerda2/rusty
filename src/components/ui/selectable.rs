@@ -24,28 +24,32 @@ use serde::{Deserialize, Serialize};
 
 use crate::components::{EntityRefs, RefVisit};
 
-/// How a Selectable shows its state. See the module docs.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub enum SelectableTransition {
-    /// No visual change.
-    None,
-    /// Multiply the target graphic's colour by the state's colour.
-    #[default]
-    ColorTint,
-    /// Swap the target Image's texture for the state's sprite.
-    SpriteSwap,
+crate::core::named_enum! {
+    /// How a Selectable shows its state. See the module docs.
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+    pub enum SelectableTransition {
+        /// No visual change.
+        None = "None",
+        /// Multiply the target graphic's colour by the state's colour.
+        #[default]
+        ColorTint = "ColorTint",
+        /// Swap the target Image's texture for the state's sprite.
+        SpriteSwap = "SpriteSwap",
+    }
 }
 
-/// How keyboard focus moves away from a Selectable.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub enum NavigationMode {
-    /// Never focused by navigation (the pointer can still use it).
-    None,
-    /// The nearest selectable in the pressed direction, by geometry.
-    #[default]
-    Automatic,
-    /// The `select_on_*` entity for the pressed direction.
-    Explicit,
+crate::core::named_enum! {
+    /// How keyboard focus moves away from a Selectable.
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+    pub enum NavigationMode {
+        /// Never focused by navigation (the pointer can still use it).
+        None = "None",
+        /// The nearest selectable in the pressed direction, by geometry.
+        #[default]
+        Automatic = "Automatic",
+        /// The `select_on_*` entity for the pressed direction.
+        Explicit = "Explicit",
+    }
 }
 
 crate::core::named_enum! {

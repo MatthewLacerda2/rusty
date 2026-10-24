@@ -152,7 +152,8 @@ fn register_collision_detection<'scope>(
         scope.create_function(|_, (id, mode): (u32, String)| {
             let mode = CollisionDetection::parse(&mode).ok_or_else(|| {
                 mlua::Error::RuntimeError(format!(
-                    "SetCollisionDetection: unknown mode {mode:?} (want \"Discrete\" or \"Continuous\")"
+                    "SetCollisionDetection: unknown mode {mode:?} (want one of {})",
+                    CollisionDetection::names()
                 ))
             })?;
             let mut scene = scene.borrow_mut();

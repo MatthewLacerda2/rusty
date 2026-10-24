@@ -7,7 +7,6 @@ use glam::{Vec2, Vec4};
 
 use super::{combo, vec2_row};
 use crate::components::{GradientKind, GradientStop, UiBlend, UiGradient, MAX_GRADIENT_STOPS};
-use crate::scene::authoring::ui_look::{blend_name, gradient_kind_name};
 
 /// A labelled colour button (straight alpha).
 pub(super) fn color_row(ui: &mut egui::Ui, label: &str, color: &mut Vec4) -> bool {
@@ -33,7 +32,7 @@ pub(super) fn drag_row(ui: &mut egui::Ui, label: &str, value: &mut f32, speed: f
 
 /// The blend-mode combo.
 pub(super) fn blend_row(ui: &mut egui::Ui, blend: &mut UiBlend) -> bool {
-    combo(ui, "Blend", blend, &UiBlend::ALL, blend_name)
+    combo(ui, "Blend", blend, &UiBlend::ALL, UiBlend::name)
 }
 
 /// A "Gradient" toggle and, when on, its kind, geometry and stops.
@@ -47,7 +46,7 @@ pub(super) fn gradient_editor(ui: &mut egui::Ui, gradient: &mut Option<UiGradien
         return toggled;
     };
     let kinds = [GradientKind::Linear, GradientKind::Radial];
-    let mut changed = toggled | combo(ui, "Kind", &mut g.kind, &kinds, gradient_kind_name);
+    let mut changed = toggled | combo(ui, "Kind", &mut g.kind, &kinds, GradientKind::name);
     match g.kind {
         GradientKind::Linear => changed |= drag_row(ui, "  Angle:", &mut g.angle, 1.0),
         GradientKind::Radial => {

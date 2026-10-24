@@ -80,9 +80,7 @@ fn draw_common(ui: &mut egui::Ui, edit: &mut ImageComponent) -> bool {
         ImageType::Tiled,
         ImageType::Filled,
     ];
-    changed |= combo(ui, "Image Type", &mut edit.image_type, &types, |t| {
-        image_ops::image_type_name(t)
-    });
+    changed |= combo(ui, "Image Type", &mut edit.image_type, &types, |t| t.name());
     changed
 }
 
@@ -100,10 +98,10 @@ fn draw_fill(ui: &mut egui::Ui, edit: &mut ImageComponent) -> bool {
         FillOrigin::Top,
     ];
     let mut changed = combo(ui, "Fill Method", &mut edit.fill_method, &methods, |m| {
-        image_ops::fill_method_name(m)
+        m.name()
     });
     changed |= combo(ui, "Fill Origin", &mut edit.fill_origin, &origins, |o| {
-        image_ops::fill_origin_name(o)
+        o.name()
     });
     changed |= ui
         .horizontal(|ui| {

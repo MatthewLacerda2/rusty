@@ -25,7 +25,7 @@ Getters return a neutral default when no active volume/camera exists.
 | `Graphics.GetQuality` / `SetQuality` | `()` / `(name)` | `"Low"` / `"Medium"` / `"High"` |
 | `Graphics.GetShadowCascades` / `SetShadowCascades` | `()` / `(n)` | `number` (clamped 1–4, **default `4`**) |
 | `Graphics.GetShadowDistance` / `SetShadowDistance` | `()` / `(units)` | `number` (world units, clamped ≥ 1, **default `100`**) |
-| `Graphics.GetFogMode` / `SetFogMode` | `()` / `(name)` | `"Off"` / `"Linear"` / `"Exponential"` / `"ExponentialSquared"` (**default `"Off"`**) |
+| `Graphics.GetFogMode` / `SetFogMode` | `()` / `(name)` | `"Off"` / `"Linear"` / `"Exponential"` / `"ExponentialSquared"` (**default `"Off"`**; names are case-insensitive) |
 | `Graphics.GetFogColor` / `SetFogColor` | `()` / `(r, g, b)` | `r, g, b` (linear, each clamped ≥ 0) |
 | `Graphics.GetFogDensity` / `SetFogDensity` | `()` / `(value)` | `number` (per world unit, clamped ≥ 0, **default `0.02`**) |
 | `Graphics.GetFogStart` / `SetFogStart` | `()` / `(units)` | `number` (clamped ≥ 0, **default `10`**) |

@@ -15,20 +15,22 @@
 use glam::Vec2;
 use serde::{Deserialize, Serialize};
 
-/// Where a canvas draws (Unity's `RenderMode`).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub enum CanvasRenderMode {
-    /// Drawn on top of the finished frame, in screen space — HUDs and menus.
-    #[default]
-    ScreenSpaceOverlay,
-    /// Laid out like the overlay, but drawn as a plane `plane_distance` in front of
-    /// the active camera — in the scene, so it can tilt and sway with the view (a
-    /// visor HUD). Without a camera it behaves as the overlay.
-    ScreenSpaceCamera,
-    /// A quad in the scene, placed by the canvas's Transform: its rect is the
-    /// reference resolution, `pixels_per_unit` reference units to the metre, centred
-    /// on the Transform and facing its +Z. Depth-tested, so walls occlude it.
-    WorldSpace,
+crate::core::named_enum! {
+    /// Where a canvas draws (Unity's `RenderMode`).
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+    pub enum CanvasRenderMode {
+        /// Drawn on top of the finished frame, in screen space — HUDs and menus.
+        #[default]
+        ScreenSpaceOverlay = "ScreenSpaceOverlay" | "Overlay",
+        /// Laid out like the overlay, but drawn as a plane `plane_distance` in front of
+        /// the active camera — in the scene, so it can tilt and sway with the view (a
+        /// visor HUD). Without a camera it behaves as the overlay.
+        ScreenSpaceCamera = "ScreenSpaceCamera" | "Camera",
+        /// A quad in the scene, placed by the canvas's Transform: its rect is the
+        /// reference resolution, `pixels_per_unit` reference units to the metre, centred
+        /// on the Transform and facing its +Z. Depth-tested, so walls occlude it.
+        WorldSpace = "WorldSpace" | "World",
+    }
 }
 
 /// Unity's default world-canvas density: 100 reference units to the metre.

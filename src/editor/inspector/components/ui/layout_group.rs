@@ -12,7 +12,6 @@ use super::{combo, vec2_row, vec4_row};
 use crate::components::{LayoutGroupComponent, LayoutKind, TextAlignment};
 use crate::editor::inspector::components::card::component_card;
 use crate::scene::authoring::layout_group::{self as ops, name_of, CONSTRAINTS, CORNERS, KINDS};
-use crate::scene::authoring::text::alignment_name;
 
 /// Layout Group card. A THIN client (#287): widgets edit a snapshot and the
 /// changed snapshot is written back through the shared ops; remove detaches.
@@ -61,7 +60,7 @@ fn draw_common(ui: &mut egui::Ui, g: &mut LayoutGroupComponent) -> bool {
             "Child Alignment",
             &mut g.child_alignment,
             &all,
-            alignment_name,
+            TextAlignment::name,
         )
 }
 

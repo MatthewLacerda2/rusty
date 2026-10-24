@@ -26,28 +26,32 @@ use serde::{Deserialize, Serialize};
 use super::look::{UiBlend, UiGradient};
 use super::shader::UiShader;
 
-/// The primitive a Shape draws. See the module docs.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub enum ShapeKind {
-    /// The rect, corners rounded or chamfered by `radius`.
-    #[default]
-    Rect,
-    /// The inscribed ellipse.
-    Ellipse,
-    /// A circular band, optionally an arc.
-    Ring,
-    /// A straight, optionally dashed line.
-    Line,
+crate::core::named_enum! {
+    /// The primitive a Shape draws. See the module docs.
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+    pub enum ShapeKind {
+        /// The rect, corners rounded or chamfered by `radius`.
+        #[default]
+        Rect = "Rect",
+        /// The inscribed ellipse.
+        Ellipse = "Ellipse",
+        /// A circular band, optionally an arc.
+        Ring = "Ring",
+        /// A straight, optionally dashed line.
+        Line = "Line",
+    }
 }
 
-/// What a `Rect`'s per-corner `radius` does to its corners.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub enum ShapeCorner {
-    /// Quarter-circle corners of `radius`.
-    #[default]
-    Round,
-    /// Corners cut off at 45°, `radius` along each edge.
-    Chamfer,
+crate::core::named_enum! {
+    /// What a `Rect`'s per-corner `radius` does to its corners.
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+    pub enum ShapeCorner {
+        /// Quarter-circle corners of `radius`.
+        #[default]
+        Round = "Round",
+        /// Corners cut off at 45°, `radius` along each edge.
+        Chamfer = "Chamfer",
+    }
 }
 
 /// A soft copy of the shape under it. Off while `color.w` is 0.

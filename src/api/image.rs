@@ -17,6 +17,7 @@ use super::ui_look::{BlendAccess, GradientAccess};
 use super::{put, Reg};
 use crate::asset::MapRef;
 use crate::components::ImageComponent;
+use crate::components::{FillMethod, FillOrigin, ImageType};
 use crate::scene::authoring::image as image_ops;
 use crate::scene::Scene;
 
@@ -37,27 +38,27 @@ const VEC4S: [(&str, Vec4Get, Vec4Set); 2] = [
 const NAMES: [(&str, NameGet, NameSet); 3] = [
     (
         "Type",
-        |i| image_ops::image_type_name(i.image_type),
+        |i| i.image_type.name(),
         |i, n| {
-            if let Some(t) = image_ops::parse_image_type(n) {
+            if let Some(t) = ImageType::parse(n) {
                 image_ops::set_image_type(i, t);
             }
         },
     ),
     (
         "FillMethod",
-        |i| image_ops::fill_method_name(i.fill_method),
+        |i| i.fill_method.name(),
         |i, n| {
-            if let Some(m) = image_ops::parse_fill_method(n) {
+            if let Some(m) = FillMethod::parse(n) {
                 image_ops::set_fill_method(i, m);
             }
         },
     ),
     (
         "FillOrigin",
-        |i| image_ops::fill_origin_name(i.fill_origin),
+        |i| i.fill_origin.name(),
         |i, n| {
-            if let Some(o) = image_ops::parse_fill_origin(n) {
+            if let Some(o) = FillOrigin::parse(n) {
                 image_ops::set_fill_origin(i, o);
             }
         },

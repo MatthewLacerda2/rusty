@@ -53,32 +53,6 @@ pub fn set_sway(c: &mut CanvasComponent, value: f32) {
     c.sway = value.clamp(0.0, 1.0);
 }
 
-/// Every render mode, in menu order.
-pub const RENDER_MODES: [CanvasRenderMode; 3] = [
-    CanvasRenderMode::ScreenSpaceOverlay,
-    CanvasRenderMode::ScreenSpaceCamera,
-    CanvasRenderMode::WorldSpace,
-];
-
-/// Parse a render-mode name (case-insensitive). `None` for an unknown name.
-pub fn parse_render_mode(name: &str) -> Option<CanvasRenderMode> {
-    match name.to_lowercase().as_str() {
-        "screenspaceoverlay" | "overlay" => Some(CanvasRenderMode::ScreenSpaceOverlay),
-        "screenspacecamera" | "camera" => Some(CanvasRenderMode::ScreenSpaceCamera),
-        "worldspace" | "world" => Some(CanvasRenderMode::WorldSpace),
-        _ => None,
-    }
-}
-
-/// The render mode's Unity name.
-pub fn render_mode_name(mode: CanvasRenderMode) -> &'static str {
-    match mode {
-        CanvasRenderMode::ScreenSpaceOverlay => "ScreenSpaceOverlay",
-        CanvasRenderMode::ScreenSpaceCamera => "ScreenSpaceCamera",
-        CanvasRenderMode::WorldSpace => "WorldSpace",
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -95,14 +69,6 @@ mod tests {
         assert_eq!(c.match_width_or_height, 1.0);
         set_match_width_or_height(&mut c, -1.0);
         assert_eq!(c.match_width_or_height, 0.0);
-    }
-
-    #[test]
-    fn render_mode_names_round_trip() {
-        for mode in RENDER_MODES {
-            assert_eq!(parse_render_mode(render_mode_name(mode)), Some(mode));
-        }
-        assert_eq!(parse_render_mode("Holographic"), None);
     }
 
     #[test]

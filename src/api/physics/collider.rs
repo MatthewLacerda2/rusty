@@ -127,7 +127,8 @@ fn shape_from_table(t: &Table) -> mlua::Result<ColliderShape> {
                 None => CapsuleAxis::default(),
                 Some(a) => CapsuleAxis::parse(&a).ok_or_else(|| {
                     err(format!(
-                        "SetColliderShape: unknown axis {a:?} (want \"X\", \"Y\" or \"Z\")"
+                        "SetColliderShape: unknown axis {a:?} (want one of {})",
+                        CapsuleAxis::names()
                     ))
                 })?,
             };
@@ -211,8 +212,8 @@ fn combine_mode(name: Option<String>) -> mlua::Result<CombineMode> {
     };
     CombineMode::parse(&name).ok_or_else(|| {
         err(format!(
-            "SetPhysicsMaterial: unknown combine mode {name:?} (want Average, Minimum, \
-             Multiply or Maximum)"
+            "SetPhysicsMaterial: unknown combine mode {name:?} (want one of {})",
+            CombineMode::names()
         ))
     })
 }

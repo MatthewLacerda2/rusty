@@ -15,6 +15,7 @@ use mlua::Lua;
 
 use super::{put, Reg};
 use crate::components::CanvasComponent;
+use crate::components::CanvasRenderMode;
 use crate::core::video::VideoSettings;
 use crate::scene::authoring::canvas as canvas_ops;
 use crate::scene::Scene;
@@ -77,16 +78,14 @@ fn register_order_and_mode<'scope>(
         scope.create_function(|_, id: u32| {
             let scene = scene.borrow();
             let mode = scene.world.canvas(id).map(|c| c.render_mode);
-            Ok(mode
-                .map_or("None", canvas_ops::render_mode_name)
-                .to_string())
+            Ok(mode.map_or("None", CanvasRenderMode::name).to_string())
         }),
     )?;
     put(
         table,
         "SetRenderMode",
         scope.create_function(|_, (id, name): (u32, String)| {
-            let mode = canvas_ops::parse_render_mode(&name);
+            let mode = CanvasRenderMode::parse(&name);
             if let (Some(mut c), Some(mode)) = (scene.borrow_mut().world.canvas_mut(id), mode) {
                 canvas_ops::set_render_mode(&mut c, mode);
             }

@@ -56,12 +56,12 @@ fn draw_kind(ui: &mut egui::Ui, s: &mut ShapeComponent) -> bool {
         "Kind",
         &mut s.kind,
         &[Rect, Ellipse, Ring, Line],
-        ops::kind_name,
+        ShapeKind::name,
     );
     match s.kind {
         Rect => {
             let corners = [ShapeCorner::Round, ShapeCorner::Chamfer];
-            changed |= combo(ui, "Corners", &mut s.corner, &corners, ops::corner_name);
+            changed |= combo(ui, "Corners", &mut s.corner, &corners, ShapeCorner::name);
             if let Some(r) = vec4_row(ui, "Radius (tl tr br bl):", s.radius) {
                 s.radius = r;
                 changed = true;
