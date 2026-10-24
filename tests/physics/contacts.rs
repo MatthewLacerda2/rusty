@@ -83,7 +83,7 @@ fn set_trigger_mid_play_turns_a_floor_into_a_trigger() -> mlua::Result<()> {
     );
     let lua = mlua::Lua::new();
     lua.scope(|s| {
-        rusty::api::physics::register(&lua, s, &scene)?;
+        rusty::api::physics::register(&lua, s, &scene).map_err(mlua::Error::runtime)?;
         lua.load(format!("Physics.SetTrigger({floor}, true)"))
             .exec()
     })?;
