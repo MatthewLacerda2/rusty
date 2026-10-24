@@ -381,7 +381,7 @@ per-bone overrides and what hangs from a bone.
    Unity's play-mode behaviour.
 5. **The API surface** — one stable set of namespaces (`Transform`, `Input`, `Time`,
    `Physics`, `Scene`, `Animator`, `Navigation`, `Camera`, `Material`, `Application`, and
-   the dev-only `Debug`) shared by gameplay scripts, the console REPL, and bot-players.
+   the dev-only `Debug` and `Editor`) shared by gameplay scripts, the console REPL, and bot-players.
    One surface, three callers — they never drift apart.
 
 One thing sits outside those five: **zimmer**, the synthesiser behind `Sound.*`, is

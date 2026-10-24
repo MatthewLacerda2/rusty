@@ -90,10 +90,10 @@ fn logging_through_the_real_shared_cell_does_not_panic() {
 
 #[test]
 fn run_frames_one_response_per_command() {
-    let s = session();
+    let mut s = session();
     let input = b"1 + 1\n\nnope %%%\n" as &[u8];
     let mut out = Vec::new();
-    run(&s, input, &mut out).expect("channel runs to EOF");
+    run(&mut s, input, &mut out).expect("channel runs to EOF");
     let text = String::from_utf8(out).unwrap();
     let lines: Vec<&str> = text.lines().collect();
     // Two non-blank commands -> two response lines (the blank line is skipped).
@@ -135,10 +135,10 @@ fn debug_snapshot_round_trips_authored_state() {
 fn engine_warnings_ride_along_with_the_reply() {
     // #1139: a `log::warn!` from engine code reaches the agent driving the session.
     crate::logging::init();
-    let s = session();
+    let mut s = session();
     log::warn!("[Test] session: an asset was skipped");
     let mut out = Vec::new();
-    run(&s, b"1 + 1\n2 + 2\n" as &[u8], &mut out).expect("channel runs to EOF");
+    run(&mut s, b"1 + 1\n2 + 2\n" as &[u8], &mut out).expect("channel runs to EOF");
     let text = String::from_utf8(out).unwrap();
     let lines: Vec<&str> = text.lines().collect();
     assert!(lines[0].contains("\"warnings\":[") && lines[0].contains("session: an asset"));

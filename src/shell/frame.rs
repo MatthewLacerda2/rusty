@@ -58,51 +58,20 @@ impl FrameClock {
 }
 
 /// Advance the simulation for one rendered frame, honouring the "playing-but-stepped"
-/// mode (#283).
-///
-/// - **Not paused:** a normal real-time tick with the wall-clock `delta_time`.
-/// - **Paused:** the wall-clock advance is bypassed entirely. The world only moves
-///   when steps were queued (`Time.Step(n)`), and each step is one
-///   [`FIXED_DELTA_TIME`](crate::time::FIXED_DELTA_TIME) tick — the *same* fixed-dt
-///   semantics the headless harness uses, so windowed and headless stepping produce
-///   identical frame sequences. All currently-queued steps drain this frame, then the
-///   loop halts again. A paused frame with no pending steps runs no schedule at all,
-///   but still processes a Play/Stop transition (so Stop restores the edit snapshot
-///   even while paused). Rendering continues every frame regardless.
+/// mode (#283): not paused, a normal real-time tick with the wall-clock `delta_time`;
+/// paused, [`GameWorld::paused_frame`] (only the queued fixed-dt steps move the world,
+/// and a Play/Stop still takes effect). Rendering continues every frame regardless.
 ///
 /// Every edit-mode follower (a re-written model reloading into its entities, a
 /// moved bone skinning, the UI's texture sizes) hangs off [`GameWorld::edit_frame`],
-/// which runs on every frame outside Play, stepped or frozen: a tick runs it in
-/// place of the schedule, and a frozen frame here calls it directly. Add a new one
-/// there, not here. In Play, a tick reads the UI's texture sizes itself.
+/// which runs on every frame outside Play, stepped or frozen. Add a new one there,
+/// not here. In Play, a tick reads the UI's texture sizes itself.
 pub fn advance_sim(game: &mut GameWorld, delta_time: f32) -> PlayTransition {
     let paused = game.time().borrow().paused;
     if !paused {
         return game.tick(delta_time);
     }
-
-    // Paused: pump exactly the queued number of fixed-dt steps, capturing the first
-    // tick's transition (the rest are `None` once the boundary is crossed).
-    let mut transition = PlayTransition::None;
-    let mut stepped = false;
-    while game.time().borrow_mut().take_pending_step() {
-        let t = game.tick(crate::time::FIXED_DELTA_TIME);
-        if t != PlayTransition::None {
-            transition = t;
-        }
-        stepped = true;
-    }
-    // No step this frame: the sim is frozen, but a Play/Stop pressed while paused must
-    // still take effect without advancing the clock or the schedule. Outside Play a
-    // pause can outlive Stop (`Time::reset` keeps it), so the edit frame still runs,
-    // on the scene the transition left; in Play it stays tick-driven, as headless.
-    if !stepped {
-        transition = game.poll_transition();
-        if !game.play_requested() {
-            game.edit_frame();
-        }
-    }
-    transition
+    game.paused_frame()
 }
 
 /// Which frontend is hosting the game — it decides what `Application.Quit()` means.

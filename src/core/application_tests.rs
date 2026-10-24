@@ -63,3 +63,14 @@ fn quit_request_is_taken_exactly_once() {
     assert!(!app.quit_requested());
     assert!(!app.take_quit_request());
 }
+
+#[test]
+fn play_request_keeps_the_latest_and_is_taken_once() {
+    let mut app = Application::new();
+    assert_eq!(app.take_play_request(), None);
+    app.request_play(true);
+    app.request_play(false);
+    assert_eq!(app.play_request(), Some(false));
+    assert_eq!(app.take_play_request(), Some(false));
+    assert_eq!(app.take_play_request(), None);
+}

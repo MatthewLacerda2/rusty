@@ -178,5 +178,6 @@ claude mcp add rusty -- /path/to/rusty/target/debug/session-mcp --attach
 
 Now `eval`/`snapshot` mutate the **live, rendered** world: create an entity and it
 appears in the viewport; `Lighting.Bake()`, the inspector-equivalent setters, and
-Play/Step all drive the world on screen. Close and reopen the window freely — the next
+Play/Step all drive the world on screen: `Editor.EnterPlay()` presses Play,
+`Editor.ExitPlay()` presses Stop ([`api/Editor.md`](api/Editor.md)). Close and reopen the window freely — the next
 tool call reconnects, and you never have to `/mcp reconnect`.

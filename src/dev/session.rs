@@ -14,8 +14,11 @@
 //!
 //! Determinism: the session builds the world exactly like the windowed boot (same
 //! empty scene + boot-scene load + nav bake) but takes no wall-clock reads itself —
-//! the loop only blocks on input. It does NOT force play mode; the agent steps the
-//! sim explicitly (e.g. via the `Time`/play surface) if and when it wants to.
+//! the loop only blocks on input. It does NOT force play mode: the agent enters it with
+//! `Editor.EnterPlay()` (#1360) and steps the sim explicitly with `Time.Pause()` +
+//! `Time.Step(n)`. Nothing advances on its own: after each command the channel runs
+//! one paused frame ([`Session::command`]), which takes a Play/Stop request and pumps
+//! the queued fixed-dt steps, exactly as the windowed loop does while paused.
 
 use std::cell::RefCell;
 use std::io::{BufRead, Write};
@@ -78,9 +81,19 @@ impl Session {
         Ok(Self { world })
     }
 
+    /// One command from the channel: [`eval`](Self::eval) the line, then run one
+    /// paused frame ([`GameWorld::paused_frame`]) so a Play/Stop it asked for takes
+    /// effect and the `Time.Step` steps it queued run before the next command (#1360).
+    pub fn command(&mut self, line: &str) -> Result<String, String> {
+        let outcome = self.eval(line);
+        self.world.paused_frame();
+        outcome
+    }
+
     /// Evaluate one command line against the live world, returning the rendered
     /// result or the error message. Drives the full `api::` surface through the one
-    /// evaluator; never panics on a bad line.
+    /// evaluator; never panics on a bad line. Runs no frame: see
+    /// [`command`](Self::command).
     pub fn eval(&self, line: &str) -> Result<String, String> {
         // Pass the shared console *cell*, not a held borrow: `evaluate_line` borrows
         // it narrowly only at the log sites, leaving it free during eval so a script
@@ -149,15 +162,15 @@ pub(crate) fn response_line(outcome: &Result<String, String>, warnings: &[String
     value.to_string()
 }
 
-/// Run the command channel: read commands line-by-line from `input`, evaluate each
-/// against `session`, and write one framed JSON response line per command to
+/// Run the command channel: read commands line-by-line from `input`, run each as a
+/// [`Session::command`], and write one framed JSON response line per command to
 /// `output`. Blank lines are skipped silently. Loop ends at EOF (channel closed).
 ///
 /// Errors in a command are reported in the response and do **not** end the loop —
 /// the session stays up across bad commands. An I/O error on the channel itself is
 /// fatal and propagates.
 pub fn run<R: BufRead, W: Write>(
-    session: &Session,
+    session: &mut Session,
     input: R,
     mut output: W,
 ) -> std::io::Result<()> {
@@ -166,7 +179,7 @@ pub fn run<R: BufRead, W: Write>(
         if line.trim().is_empty() {
             continue;
         }
-        let outcome = session.eval(&line);
+        let outcome = session.command(&line);
         let warnings = session.take_warnings();
         writeln!(output, "{}", response_line(&outcome, &warnings))?;
         output.flush()?;

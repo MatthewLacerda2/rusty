@@ -31,7 +31,7 @@ fn main() {
     // boots that scene, and no argument boots (and seeds) the bundled default scene.
     let boot_scene = session::boot_scene_from_args(&args);
 
-    let sess = match Session::new(&boot_scene) {
+    let mut sess = match Session::new(&boot_scene) {
         Ok(s) => s,
         Err(e) => {
             eprintln!("session: failed to start: {}", e);
@@ -41,7 +41,7 @@ fn main() {
 
     let stdin = io::stdin();
     let stdout = io::stdout();
-    if let Err(e) = session::run(&sess, BufReader::new(stdin.lock()), stdout.lock()) {
+    if let Err(e) = session::run(&mut sess, BufReader::new(stdin.lock()), stdout.lock()) {
         eprintln!("session: channel error: {}", e);
         exit(2);
     }

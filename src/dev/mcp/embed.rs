@@ -28,7 +28,7 @@ impl Embedded {
 
 impl EvalBackend for Embedded {
     fn eval(&self, line: &str) -> Result<String, String> {
-        self.session.borrow().eval(line)
+        self.session.borrow_mut().command(line)
     }
 
     fn reopen(&self, root: &Path) -> Option<Result<(), String>> {

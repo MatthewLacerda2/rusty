@@ -65,7 +65,9 @@ commands. **Globals do not survive Play or Stop**: each builds a fresh Lua VM, a
 Unity's domain reload does, so a global set in edit mode is gone once Play starts,
 and one set during Play is gone after Stop. Edit-mode world changes survive Play
 (Stop restores them); Play-mode ones are discarded. The session runs in
-**edit mode** — it does *not* force play — and a failed command is reported in its
+**edit mode** — it does *not* force play; `Editor.EnterPlay()` enters it
+([`Editor`](Editor.md), #1360), and after every command the session runs one paused
+frame that takes the request and the steps `Time.Step` queued — and a failed command is reported in its
 response **without** tearing the session down. The channel ends at EOF.
 
 ```
@@ -337,6 +339,7 @@ serves an agent. A new entry goes where it reads best. -->
 - [`Application`](Application.md)
 - [`Storage`](Storage.md)
 - [`Debug`](Debug.md)
+- [`Editor`](Editor.md)
 
 **The UI widget kit** (#422) — Button, Toggle, Toggle Group, Slider, Scrollbar,
 Scroll View, Dropdown, Input Field — is not a namespace: each widget is an

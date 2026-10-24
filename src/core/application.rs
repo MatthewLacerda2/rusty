@@ -13,6 +13,10 @@
 //!   quit. What that means is the host's call: the player closes the window, the editor
 //!   stops Play (Unity ignores `Quit` in the editor), and the headless harness ends the
 //!   run. The sim never touches the window; it raises a flag the platform layer reads.
+//! * **The play request** — the dev-only `Editor.EnterPlay()` / `Editor.ExitPlay()`
+//!   (#1360, Unity's `EditorApplication.isPlaying`) record the transition they want
+//!   here; `GameWorld` takes it at the next frame boundary, as it takes the editor's
+//!   Play button, so a script never runs the transition from inside its own call.
 //!
 //! ## Persistence
 //! Like [`Storage`](crate::core::storage::Storage), the file is read once at a boundary
@@ -87,6 +91,8 @@ pub struct Application {
     /// `Some` once bound to a file via [`Application::open`]: setters then write it.
     path: Option<PathBuf>,
     quit_requested: bool,
+    /// `Some(playing)` once a script asked to enter or leave Play (#1360).
+    play_request: Option<bool>,
 }
 
 impl Application {
@@ -149,6 +155,22 @@ impl Application {
     /// Consume a pending quit request: `true` exactly once per `Quit()` call.
     pub fn take_quit_request(&mut self) -> bool {
         std::mem::take(&mut self.quit_requested)
+    }
+
+    /// Ask the host to enter (`true`) or leave (`false`) Play at the next frame
+    /// boundary (#1360). A later request before that boundary replaces this one.
+    pub fn request_play(&mut self, playing: bool) {
+        self.play_request = Some(playing);
+    }
+
+    /// The play request not yet taken, if any.
+    pub fn play_request(&self) -> Option<bool> {
+        self.play_request
+    }
+
+    /// Consume the pending play request: the host's frame boundary calls it once.
+    pub fn take_play_request(&mut self) -> Option<bool> {
+        self.play_request.take()
     }
 }
 

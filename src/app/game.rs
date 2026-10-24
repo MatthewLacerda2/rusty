@@ -174,6 +174,11 @@ impl GameWorld {
     }
 
     fn handle_transition(&mut self) -> PlayTransition {
+        // A script's `Editor.EnterPlay/ExitPlay` (#1360) asks like any host does.
+        let scripted = self.resources.application.borrow_mut().take_play_request();
+        if let Some(playing) = scripted {
+            self.set_playing(playing);
+        }
         let asked = self.resources.play_requested;
         let playing = self.world.scene.borrow().is_playing();
         if asked && !playing {
