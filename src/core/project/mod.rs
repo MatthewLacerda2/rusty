@@ -146,6 +146,11 @@ pub fn open(dir: &Path, access: Access) -> Result<Opened, String> {
     for line in lines {
         eprintln!("[Project] {line}");
     }
+    // A logged warning, not a stderr line: the editor console, the session and the
+    // MCP replies carry what `logging::forward` drains, so the agent sees it (#1319).
+    if let Some(upgrade) = opened.engine.upgrade().filter(|_| access == Access::Edit) {
+        log::warn!("[Project] {upgrade}");
+    }
     Ok(opened)
 }
 

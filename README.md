@@ -199,8 +199,9 @@ last opened with (embedded in each engine build), that commit's place in history
 (`git rev-list --count`), and the build settings. Every merge to `main` is a new
 engine and rusty keeps no backward compatibility, so moving **forward** is the
 normal case: a newer engine opens the project without asking, and an edit-open
-records it and prints one `[Project]` line (also in the editor console) naming the
-`git log` of what changed, so the game can be brought up to date (#1319). Only an
+records it and logs one `[Project]` warning naming the `git log` of what changed (on
+stderr, in the editor console and in the MCP's replies), so the game can be brought
+up to date (#1319). Only an
 **older** engine, or a branch build (the same count, another commit), warns: one
 `[Project]` line on stderr, a warning in the editor console, and the picker and
 `bench_open` ask first. Then it proceeds, and the editor and the agent sessions

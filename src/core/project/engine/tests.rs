@@ -111,3 +111,11 @@ fn an_empty_record_is_no_record_and_the_running_engine_is_this_one() {
     assert_eq!(check.recorded.as_deref(), Some(A));
     assert_eq!((check.running.as_str(), check.running_order), (B, Some(3)));
 }
+
+#[test]
+fn a_hand_edited_commit_that_is_not_ascii_is_cut_by_characters() {
+    let edited = "ééééééééééééé-dirty";
+    let line = check(Some(edited), Some(6), B, Some(5)).warning().unwrap();
+    assert!(line.contains("éééééééééééé-dirty,"), "{line}");
+    assert_eq!(short("äb"), "äb");
+}

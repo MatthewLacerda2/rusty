@@ -105,12 +105,18 @@ fn an_older_engines_project_opens_only_when_confirmed() {
     let args = json!({ "path": dir, "confirm": true });
     let opened = run(&Window, &mut bench, "bench_open", args).unwrap();
     assert!(opened["warning"].is_string());
+    assert_eq!(opened["upgrade"], Value::Null, "an older engine");
     pin_engine("fedcba9876543210fedcba9876543210fedcba98", Some(8));
-    let upgraded = run(&Window, &mut bench, "bench_open", json!({ "path": dir }));
+    let upgraded = run(&Window, &mut bench, "bench_open", json!({ "path": dir })).unwrap();
     assert_eq!(
-        upgraded.unwrap()["warning"],
+        upgraded["warning"],
         Value::Null,
         "a newer engine just opens"
+    );
+    let upgrade = upgraded["upgrade"].as_str().unwrap_or_default();
+    assert!(
+        upgrade.starts_with("upgraded from engine 0123"),
+        "{upgrade}"
     );
 }
 
@@ -135,10 +141,12 @@ impl EvalBackend for Mover {
 fn embed_mode_hands_the_opened_root_to_the_backend() {
     let dir = fresh("embed");
     let mut bench = Bench::at(None);
+    pin_engine("0123456789abcdef0123456789abcdef01234567", Some(7));
     let root = bench.create(&dir, "Horde", 1).unwrap();
     let mover = Mover::default();
     let opened = run(&mover, &mut bench, "bench_open", json!({ "path": root })).unwrap();
     assert_eq!(opened["opened"], json!(true));
+    assert_eq!(opened["upgrade"], Value::Null, "the same engine");
     assert_eq!(opened["root"], json!(root));
     assert_eq!(mover.0.take(), Some(root.clone()));
     assert_eq!(bench.recent.projects[0].path, root);

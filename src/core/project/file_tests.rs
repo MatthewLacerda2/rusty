@@ -54,6 +54,7 @@ fn every_build_field_roundtrips() {
 #[test]
 fn a_new_project_gets_a_default_file_named_after_its_folder() {
     let root = fresh("Horde");
+    pin_engine(A, Some(5));
     let (engine, lines) = record(&root).unwrap();
     assert_eq!(engine.verdict(), Verdict::Same);
     assert_eq!(lines, vec![format!("created {PROJECT_FILE}")]);
@@ -83,11 +84,11 @@ fn an_upgrade_records_the_new_engine_and_says_so() {
         Some(A),
         "the check sees the old record"
     );
-    assert_eq!(engine.warning(), None);
-    assert_eq!(lines.len(), 1, "{lines:?}");
+    assert_eq!((engine.warning(), lines), (None, vec![]));
+    let upgrade = engine.upgrade().unwrap_or_default();
     assert!(
-        lines[0].starts_with("upgraded from engine aaaa"),
-        "{lines:?}"
+        upgrade.starts_with("upgraded from engine aaaa"),
+        "{upgrade}"
     );
     let now = ProjectFile::read(&path).unwrap().unwrap();
     assert_eq!((now.engine_commit.as_str(), now.engine_order), (B, Some(6)));

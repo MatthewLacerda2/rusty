@@ -3,10 +3,12 @@
 //!
 //! Four `bench_*` tools over [`Bench`] (`core::project::bench`), the code the
 //! picker calls too. `bench_open` checks the folder as the picker does; a project
-//! a newer engine (or a branch build) last opened is *reported*, and opens only when
-//! the call repeats with `confirm: true` (the picker's *Open anyway*). Then the backend moves to it
-//! ([`EvalBackend::reopen`]): embed mode drives the new project at once, attach
-//! mode answers with the command that relaunches the window on it.
+//! a newer engine (or a branch build) last opened is *reported*, and opens only
+//! when the call repeats with `confirm: true` (the picker's *Open anyway*). Then the
+//! backend moves to it ([`EvalBackend::reopen`]): embed mode drives the new project
+//! at once, attach mode answers with the command that relaunches the window on it.
+//! Either way the result's `upgrade` says when this engine is newer than the one
+//! that last opened the project, and names the `git log` of what changed (#1319).
 
 use std::path::{Path, PathBuf};
 
@@ -14,6 +16,7 @@ use serde_json::{json, Value};
 
 use super::EvalBackend;
 use crate::core::project::bench::{check_existing, recent::ago, Bench};
+use crate::core::project::inspect;
 
 /// A protocol error: `(code, message)`.
 type Fault = (i64, String);
@@ -43,8 +46,9 @@ pub fn tools() -> Vec<Value> {
             "description": "rusty bench: open an existing project and drive it from now \
                 on (embed mode; attach mode returns the command that relaunches the window \
                 on it). A project last opened by a newer engine or a branch build is \
-                reported; repeat with confirm: true to open it anyway. An older one \
-                opens at once: an engine upgrade.",
+                reported; repeat with confirm: true to open it anyway. A project an \
+                older engine last opened opens at once: an engine upgrade, which the \
+                result's `upgrade` reports with the git log of what changed.",
             "inputSchema": schema(
                 json!({ "path": path, "confirm": { "type": "boolean" } }),
                 &["path"],
@@ -119,14 +123,22 @@ fn open(
             ));
         }
     }
+    // Read before the backend opens it: an edit-open records this engine.
+    let upgrade = inspect(dir)?.upgrade();
     let (root, warning) = bench.open(dir, now)?;
     match backend.reopen(&root) {
-        Some(Ok(())) => Ok(json!({ "root": root, "opened": true, "warning": warning })),
+        Some(Ok(())) => Ok(json!({
+            "root": root,
+            "opened": true,
+            "warning": warning,
+            "upgrade": upgrade,
+        })),
         Some(Err(err)) => Err(format!("could not open {}: {err}", root.display())),
         None => Ok(json!({
             "root": root,
             "opened": false,
             "warning": warning,
+            "upgrade": upgrade,
             "relaunch": format!("rusty --project {}", root.display()),
             "why": "attach mode drives a running window: relaunch it on the project",
         })),

@@ -38,7 +38,8 @@ fn main() {
     // Rerun when HEAD moves: `HEAD` itself (a checkout) and the ref it points to (a
     // commit), and when a shallow clone deepens (its `shallow` file goes away). A
     // rerun-if-changed path that doesn't exist reruns every build, so only name the
-    // files git really has (a packed ref has no loose file; packed-refs covers it). `-dirty` is as fresh as the last commit or checkout, not the last edit.
+    // files git really has (a packed ref has no loose file; packed-refs covers it).
+    // `-dirty` is as fresh as the last commit or checkout, not the last edit.
     let head_ref = commit::git(root, &["symbolic-ref", "-q", "HEAD"]);
     let head = head_ref.as_deref().unwrap_or("HEAD");
     let watched = ["HEAD", head, "packed-refs", "shallow"];

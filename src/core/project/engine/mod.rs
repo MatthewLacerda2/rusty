@@ -120,10 +120,13 @@ pub(super) fn base(commit: &str) -> &str {
     commit.strip_suffix(DIRTY).unwrap_or(commit)
 }
 
-/// A commit's hash as people (and `git log`) read it: 12 hex digits.
+/// A commit's hash as people (and `git log`) read it: 12 hex digits. Cut by
+/// characters, so a hand-edited commit that isn't ASCII can't split one.
 fn hash(commit: &str) -> &str {
     let hash = base(commit);
-    &hash[..hash.len().min(12)]
+    hash.char_indices()
+        .nth(12)
+        .map_or(hash, |(end, _)| &hash[..end])
 }
 
 /// [`hash`], plus `-dirty` when it had one.
