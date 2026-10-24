@@ -96,8 +96,9 @@ fn use_tree_start(code: &str) -> Option<&str> {
 }
 
 /// Flatten a use tree (`a::{b, c::{d as e}}`) into `(path, binding)` pairs. A glob
-/// binds nothing and is dropped; `self` binds the segment before it.
-fn flatten(tree: &str) -> Paths {
+/// binds nothing and is dropped; `self` binds the segment before it. Shared with
+/// the `api-parity` rule's alias scan.
+pub fn flatten(tree: &str) -> Paths {
     let tokens = tokenize(tree);
     let mut out = Vec::new();
     let mut i = 0;

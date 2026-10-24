@@ -14,7 +14,12 @@
 //!   whatever its colliders' size), so a compound body keeps a sensible centre of
 //!   mass and inertia, and a ragdoll's per-bone masses are what the builder set.
 //!
-//! Both walk the sorted plan and touch a collider only when it differs, so an
+//! - **Trigger.** A collider's sensor flag follows its `is_trigger`, so
+//!   `Physics.SetTrigger` (or the inspector) in Play makes a door stop blocking
+//!   and start reporting overlaps; the mass sync after it re-spreads the body's
+//!   mass, since a trigger carries none.
+//!
+//! All walk the sorted plan and touch a collider only when it differs, so an
 //! unchanged scene costs comparisons, not rapier change-tracking.
 
 use rapier3d::prelude::*;
@@ -54,6 +59,32 @@ impl PhysicsWorld {
                 if let Some(c) = self.colliders.get_mut(handle) {
                     c.set_collision_groups(groups);
                     c.set_solver_groups(groups);
+                }
+            }
+        }
+    }
+
+    /// Mirror each built collider's `is_trigger` onto rapier's sensor flag. A
+    /// CharacterController's capsule supersedes the entity's Collider (#451) and
+    /// is never a trigger, so it is left alone. Runs before
+    /// [`Self::sync_masses`], which reads the flag.
+    pub(super) fn sync_sensors(&mut self, scene: &Scene) {
+        for ids in self.plan.values() {
+            for id in ids {
+                let Some(&handle) = self.id_to_collider.get(id) else {
+                    continue;
+                };
+                let world = &scene.world;
+                let Some(is_trigger) = world.collider(*id).map(|c| c.is_trigger) else {
+                    continue;
+                };
+                if world.character_controller(*id).is_some() {
+                    continue;
+                }
+                if let Some(c) = self.colliders.get_mut(handle) {
+                    if c.is_sensor() != is_trigger {
+                        c.set_sensor(is_trigger);
+                    }
                 }
             }
         }

@@ -1,4 +1,4 @@
-//! Per-entity voices: `Play`, `Stop`, `SetVolume` and `GetSpatial`.
+//! Per-entity voices: `Play`, `Stop`, `SetVolume` / `GetVolume` and `GetSpatial`.
 
 use super::{fixture, register};
 use mlua::Lua;
@@ -60,6 +60,39 @@ fn spatial_state_tracks_play_and_stop() {
             .eval()
             .unwrap();
         assert_eq!(spatial, (0.0, 0.0, false));
+        Ok(())
+    })
+    .unwrap();
+}
+
+/// `SetVolume` is `AudioSource.volume`: it writes the component through the
+/// inspector's op (clamped to `[0, 1]`) and the live voice follows (#1368).
+#[test]
+fn set_volume_writes_the_source_and_retunes_its_voice() {
+    let lua = Lua::new();
+    let f = fixture();
+
+    lua.scope(|scope| {
+        register(&lua, scope, &f);
+        let id = f.source_id;
+        lua.load(format!("Audio.Play({id}); Audio.SetVolume({id}, 0.5)"))
+            .exec()
+            .unwrap();
+        let (vol, gain): (f32, f32) = lua
+            .load(format!(
+                "return Audio.GetVolume({id}), (Audio.GetSpatial({id}))"
+            ))
+            .eval()
+            .unwrap();
+        assert_eq!((vol, gain), (0.5, 0.5));
+        let read = |src: String| lua.load(src).eval::<f32>().unwrap();
+        assert_eq!(
+            read(format!(
+                "Audio.SetVolume({id}, 7); return Audio.GetVolume({id})"
+            )),
+            1.0
+        );
+        assert_eq!(read(format!("return Audio.GetVolume({})", f.bare_id)), 0.0);
         Ok(())
     })
     .unwrap();

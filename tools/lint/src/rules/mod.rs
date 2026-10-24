@@ -12,6 +12,7 @@ mod test_code;
 
 // sorted: one module per rule, each a row of `RULES`
 mod active_self;
+mod api_parity;
 mod asset_write;
 mod atomic_write;
 mod converter_log;
@@ -48,6 +49,9 @@ enum Allow {
     Inline,
     /// `ignored`: its fix is the `.gitignore` pattern, never an allow.
     Never,
+    /// The rule reads its own allows, so it can report a stale one
+    /// (`api-parity`, whose allow sits on the op, not on the finding's cause).
+    Own,
 }
 
 /// A rule: every finding it has over the scan.
@@ -57,6 +61,7 @@ type Rule = fn(&Scan) -> Vec<Finding>;
 const RULES: &[(Rule, Allow)] = &[
     // sorted: rules are independent; allows apply to each rule's own findings
     (active_self::run, Allow::Inline),
+    (api_parity::run, Allow::Own),
     (asset_write::run, Allow::Inline),
     (atomic_write::run, Allow::Inline),
     (converter_log::run, Allow::Inline),

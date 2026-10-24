@@ -8,11 +8,12 @@
 //! (`ClosestPoint`/`ContainsPoint`/`GetBounds`) in `point`, and the collider's
 //! authorable shape + physics material (#447) in `collider`, the per-bone
 //! hitbox generator (#464) in `hitbox`, forces / impulses at a point (#466)
-//! in `impulse`, the layer collision matrix (#827) in `matrix`, and the
+//! in `impulse`, mass, gravity and the trigger flag (#1365) in `body`, the layer collision matrix (#827) in `matrix`, and the
 //! enter/exit penetration cast (`RaycastThrough`, #830) in `through`.
 //! `register` creates the `Physics` table; `register_hitscan` extends it once
 //! the live physics handle is available.
 
+mod body;
 mod cast;
 mod collider;
 mod hitbox;
@@ -47,6 +48,7 @@ pub fn register<'scope>(
     register_angular(scope, &table, scene)?;
     register_force(scope, &table, scene)?;
     register_collision_detection(scope, &table, scene)?;
+    body::register(scope, &table, scene)?;
     collider::register(scope, &table, scene)?;
     hitbox::register(scope, &table, scene)?;
     matrix::register(scope, &table, scene)?;

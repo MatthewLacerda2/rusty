@@ -11,6 +11,8 @@ pub mod policy;
 #[cfg(test)]
 mod tests;
 
+pub use find::flatten;
+
 use super::graph::owner;
 use super::scan::Tree;
 use super::table::Layer;

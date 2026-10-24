@@ -20,6 +20,12 @@ every number after `hit` is `0` and the rest are `nil`.
 | `Physics.AddForceAtPosition` | `(id, fx, fy, fz, px, py, pz)` | — (continuous force at a world point: moves and spins the body) |
 | `Physics.AddImpulseAtPosition` | `(id, jx, jy, jz, px, py, pz)` | — (impulse in N·s at a world point — a shot hitting a ragdoll bone) |
 | `Physics.SetKinematic` | `(id, is_kinematic)` | — |
+| `Physics.GetMass` | `(id)` | `number` — kilograms (`0` without a Rigidbody) |
+| `Physics.SetMass` | `(id, kg)` | — (clamped to `[0.01, 1000]`, as the inspector's field is; see [Mass](#mass-and-forces-at-a-point-466)) |
+| `Physics.GetUseGravity` | `(id)` | `bool` (`false` without a Rigidbody) |
+| `Physics.SetUseGravity` | `(id, on)` | — (Unity `Rigidbody.useGravity`) |
+| `Physics.IsTrigger` | `(id)` | `bool` (`false` without a Collider) |
+| `Physics.SetTrigger` | `(id, on)` | — (Unity `Collider.isTrigger`: a trigger reports overlaps and blocks nothing) |
 | `Physics.GetCollisionDetection` | `(id)` | `"Discrete"` \| `"Continuous"` |
 | `Physics.SetCollisionDetection` | `(id, mode)` | — (`mode` is `"Discrete"` or `"Continuous"`, case-insensitive; an unknown name is an error) |
 | `Physics.Raycast` | `(ox, oy, oz, dx, dy, dz [, ignore_id [, layer_mask]])` | `hit, entity_id, distance, px, py, pz, nx, ny, nz, bone, bone_name, root` |
@@ -347,8 +353,9 @@ layer, so a shot that should hit corpses adds that layer to its mask.
 A Rigidbody's **mass** (kilograms, default `1`) is its body's mass, whatever the
 size of its colliders (Unity's `Rigidbody.mass`): it is spread over the body's
 solid colliders in proportion to their volume (a trigger carries none), which
-also sets the body's centre of mass and inertia. Changing it during Play takes
-effect on the next step. So do `SetKinematic` and an entity's layer: the body
+also sets the body's centre of mass and inertia. `Physics.SetMass(id, kg)` sets
+it (`GetMass` reads it back), and changing it during Play takes effect on the
+next step. So do `SetKinematic` and an entity's layer: the body
 switches class in place (keeping its joints and contacts), and a collider follows
 its layer's Collision Matrix row.
 

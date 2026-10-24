@@ -113,6 +113,7 @@ impl PhysicsWorld {
         self.sync_enabled(scene);
         self.sync_materials(scene);
         self.sync_layers(scene);
+        self.sync_sensors(scene);
         self.sync_masses(scene);
         self.sync_characters(scene);
         let plan = std::mem::take(&mut self.plan);

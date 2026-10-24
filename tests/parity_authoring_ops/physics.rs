@@ -57,3 +57,36 @@ fn physics_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Error>
     assert_eq!(a.collision_detection, b.collision_detection);
     Ok(())
 }
+
+/// `SetMass` clamps through the op the card uses; `SetUseGravity` / `SetTrigger`
+/// write through theirs and the getters read them back (#1365).
+#[test]
+fn mass_gravity_and_trigger_reach_their_ops() -> Result<(), Box<dyn std::error::Error>> {
+    let scene = RefCell::new(Scene::new());
+    let id = entity_with_rb(&mut scene.borrow_mut(), "Body");
+    let collider = rusty::scene::authoring::default_collider();
+    scene.borrow_mut().world.set_collider(id, Some(collider));
+
+    let lua = Lua::new();
+    let read: (f32, f32, bool, bool, f32) = lua.scope(|s| {
+        rusty::api::physics::register(&lua, s, &scene).unwrap();
+        lua.load(format!(
+            r#"
+            local before = Physics.GetMass({id})
+            Physics.SetMass({id}, 5000)
+            Physics.SetUseGravity({id}, false)
+            Physics.SetTrigger({id}, true)
+            Physics.SetMass(9999, 3)  -- no Rigidbody: a no-op
+            return before, Physics.GetMass({id}), Physics.GetUseGravity({id}),
+                Physics.IsTrigger({id}), Physics.GetMass(9999)
+        "#
+        ))
+        .eval()
+    })?;
+
+    let mut expected = rusty::scene::authoring::default_rigidbody();
+    rb_ops::set_mass(&mut expected, 5000.0);
+    assert_eq!(read, (1.0, expected.mass, false, true, 0.0));
+    assert_eq!(expected.mass, 1000.0, "the card's clamp");
+    Ok(())
+}

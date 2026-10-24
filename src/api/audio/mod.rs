@@ -1,7 +1,7 @@
 //! src/api/audio/ — `Audio` namespace (#212).
 //!
 //! Script/REPL/bot control over the engine's audio: start/stop an entity's
-//! `AudioSource` (`Play`/`Stop`), retune its volume (`SetVolume`), fire a
+//! `AudioSource` (`Play`/`Stop`), set its volume (`SetVolume`/`GetVolume`), fire a
 //! fire-and-forget one-shot at a world position (`PlayAt`), and read/set the single
 //! master volume and the speaker mode (#546) on the `AudioMaestro`, and drive the
 //! mixer's groups, snapshots and ducks (`groups.rs`, `snapshots.rs`, #465) and
@@ -29,6 +29,7 @@ use glam::Vec3;
 
 use crate::audio::{AudioMaestro, Listener, Rolloff, Shot, SpeakerMode};
 use crate::components::AudioSourceComponent;
+use crate::scene::authoring::audio as audio_ops;
 use crate::scene::Camera;
 use crate::scene::Scene;
 use crate::time::Time;
@@ -85,7 +86,7 @@ fn source_clip_pos(scene: &RefCell<Scene>, id: u32) -> Option<(String, [f32; 3])
     Some((src.clip.clone(), [p.x, p.y, p.z]))
 }
 
-/// `Play` / `Stop` / `SetVolume` — drive an entity's own `AudioSource`.
+/// `Play` / `Stop` / `SetVolume` / `GetVolume` — drive an entity's own `AudioSource`.
 fn register_source_control<'scope>(
     scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
@@ -127,13 +128,28 @@ fn register_source_control<'scope>(
         }),
     )?;
 
-    // Retune entity `id`'s live voice volume (pre-master). No-op if not playing.
+    // Unity's `AudioSource.volume`: entity `id`'s source volume, through the op the
+    // inspector writes (clamped to `[0, 1]`), then the live voice retuned to it.
     put(
         table,
         "SetVolume",
         scope.create_function(|_, (id, v): (u32, f32)| {
-            audio.borrow_mut().set_source_volume(id, v);
+            let stored = scene.borrow_mut().world.audio_mut(id).map(|mut a| {
+                audio_ops::set_volume(&mut a, v);
+                a.volume
+            });
+            if let Some(v) = stored {
+                audio.borrow_mut().set_source_volume(id, v);
+            }
             Ok(())
+        }),
+    )?;
+
+    put(
+        table,
+        "GetVolume",
+        scope.create_function(|_, id: u32| {
+            Ok(scene.borrow().world.audio(id).map_or(0.0, |a| a.volume))
         }),
     )
 }

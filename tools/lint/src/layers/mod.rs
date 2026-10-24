@@ -25,6 +25,8 @@ mod tests;
 /// One item's extent and what test code is, shared with the rules' test-code
 /// classifier.
 pub use extent::item_end;
+/// The use-tree flattener, shared with the `api-parity` rule.
+pub use externs::flatten as flatten_use;
 pub use gate::{is_test_gate, test_only_files};
 use std::fs;
 use std::path::Path;

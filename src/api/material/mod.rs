@@ -87,7 +87,7 @@ fn with_material(
     }
 }
 
-/// Scalar PBR knobs: `SetMetallic` / `SetRoughness`.
+/// The PBR factors: `SetMetallic` / `SetRoughness` / `SetColor` / `SetEmissive`.
 fn register_scalars<'scope>(
     scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
@@ -107,6 +107,15 @@ fn register_scalars<'scope>(
         "SetRoughness",
         scope.create_function(|_, (id, val): (u32, f32)| {
             with_material(scene, id, |m, key| mat_ops::set_roughness(m, key, val));
+            Ok(())
+        }),
+    )?;
+
+    put(
+        table,
+        "SetColor",
+        scope.create_function(|_, (id, rgb): (u32, [f32; 3])| {
+            with_material(scene, id, |m, key| mat_ops::set_base_color(m, key, rgb));
             Ok(())
         }),
     )?;
