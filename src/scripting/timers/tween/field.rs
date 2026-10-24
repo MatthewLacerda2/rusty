@@ -100,33 +100,50 @@ impl Field {
             .expect("every Field is listed in FIELDS")
     }
 
-    /// The field's current value, or `None` when `id` lacks the component.
+    /// The field's current value as its write op holds it, or `None` when `id`
+    /// lacks the component. A stored value the op would clamp (a loaded
+    /// `fov: 500`) reads as the value the op makes of it, so a tween starts where
+    /// the target actually sits and moves from its first step (#1407).
     pub(crate) fn get(self, scene: &Scene, id: u32) -> Option<Vec4> {
         let w = &scene.world;
         let v3 = |v: Vec3| v.extend(0.0);
         let v2 = |v: Vec2| v.extend(0.0).extend(0.0);
         let f = |v: f32| Vec4::new(v, 0.0, 0.0, 0.0);
+        // Run the field's own op over a copy of the component, so the read applies
+        // exactly the rule the write does (`scene::camera::held_fov`'s shape).
+        macro_rules! held {
+            ($get:ident, $field:ident, $op:path) => {{
+                let mut c = (*w.$get(id)?).clone();
+                let raw = c.$field;
+                $op(&mut c, raw);
+                c.$field
+            }};
+        }
         Some(match self {
             Self::Position => v3(w.contains(id).then(|| w.world_position(id))?),
             Self::Rotation => v3(w
                 .contains(id)
                 .then(|| euler_degrees(w.world_rotation(id)))?),
             Self::Scale => v3(w.transform(id)?.scale),
-            Self::AnchoredPosition => v2(w.rect_transform(id)?.anchored_position),
-            Self::SizeDelta => v2(w.rect_transform(id)?.size_delta),
-            Self::Pivot => v2(w.rect_transform(id)?.pivot),
-            Self::AnchorMin => v2(w.rect_transform(id)?.anchor_min),
-            Self::AnchorMax => v2(w.rect_transform(id)?.anchor_max),
-            Self::Alpha => f(w.canvas_group(id)?.alpha),
-            Self::ImageColor => w.image(id)?.color,
-            Self::FillAmount => f(w.image(id)?.fill_amount),
-            Self::TextColor => w.text(id)?.color,
-            Self::FontSize => f(w.text(id)?.font_size),
-            Self::LightColor => v3(w.light(id)?.color),
-            Self::Intensity => f(w.light(id)?.intensity),
-            Self::Range => f(w.light(id)?.range),
-            Self::Fov => f(w.camera(id)?.fov),
-            Self::Volume => f(w.audio(id)?.volume),
+            Self::AnchoredPosition => v2(held!(
+                rect_transform,
+                anchored_position,
+                rect::set_anchored_position
+            )),
+            Self::SizeDelta => v2(held!(rect_transform, size_delta, rect::set_size_delta)),
+            Self::Pivot => v2(held!(rect_transform, pivot, rect::set_pivot)),
+            Self::AnchorMin => v2(held!(rect_transform, anchor_min, rect::set_anchor_min)),
+            Self::AnchorMax => v2(held!(rect_transform, anchor_max, rect::set_anchor_max)),
+            Self::Alpha => f(held!(canvas_group, alpha, canvas_group::set_alpha)),
+            Self::ImageColor => held!(image, color, image::set_color),
+            Self::FillAmount => f(held!(image, fill_amount, image::set_fill_amount)),
+            Self::TextColor => held!(text, color, text::set_color),
+            Self::FontSize => f(held!(text, font_size, text::set_font_size)),
+            Self::LightColor => v3(held!(light, color, light::set_color)),
+            Self::Intensity => f(held!(light, intensity, light::set_intensity)),
+            Self::Range => f(held!(light, range, light::set_range)),
+            Self::Fov => f(held!(camera, fov, camera::set_fov)),
+            Self::Volume => f(held!(audio, volume, audio::set_volume)),
         })
     }
 
