@@ -81,6 +81,15 @@ follow the Unity / Blender naming convention: objects named `Crate_LOD0`,
 a time by on-screen size (see `docs/api/LODGroup.md`). A mesh's second UV map (glTF
 `TEXCOORD_1`) is its lightmap UV for baked lighting ([`Lighting`](docs/api/Lighting.md)).
 
+The editor picks up a file changed outside the engine without a restart, as Unity's
+asset refresh does: a model re-exported from Blender, a texture saved from an image
+editor, a shader or a script edited elsewhere. It watches the project's `assets/`
+(and the engine's shaders) and reloads what changed on the next frame; a source
+re-converts there and then. A change made during Play waits for Stop. On a filesystem
+that gives no change events (some network or container mounts), set
+`RUSTY_WATCH_POLL=1` and it compares the files every second instead. A shipped game
+watches nothing.
+
 ## Built to be played by an agent
 
 The headline feature: the entire simulation runs **headlessly** — no window, no GPU —

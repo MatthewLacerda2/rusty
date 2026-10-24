@@ -12,6 +12,9 @@
 //! - **Coalesced per frame, on the main thread.** `notify` delivers on its own
 //!   thread into a channel; [`Watch::apply`] drains it once per editor frame, so
 //!   a save that fires several events notes its path once.
+//! - **Sources refreshed after.** A frame that noted anything then runs Play's
+//!   refresh (`asset::convert::refresh_sources`): a model source, or a texture its
+//!   conversion read, re-converts, and the swap's note reloads every entity using it.
 //! - **Held through Play.** A change seen while playing is kept, and noted on the
 //!   first frame after Stop, as conversion already waits for Stop (#1253).
 //! - **A polling fallback.** When the native backend (inotify, FSEvents) cannot
@@ -23,8 +26,10 @@
 //!   directory (the project root) when it lies under a root given that way, so a
 //!   deleted file still matches its cache key by name.
 //!
-//! Editor only: a shipped game never watches its files, and the engine's own
-//! write-in-flight temp files (`core::fs::is_temp_name`) are never noted.
+//! Editor only: a shipped game never watches its files. The engine's own
+//! write-in-flight temp files (`core::fs::is_temp_name`) and the import cache
+//! (`asset::convert::IMPORT_CACHE_DIR`, which only conversions write, and note) are
+//! never noted.
 
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
@@ -55,6 +60,12 @@ pub struct Watch {
     pending: BTreeSet<String>,
     /// Whether the last watcher error was already logged.
     warned: bool,
+    /// The folder whose converted sources are refreshed after a change, as Play's
+    /// refresh does; `None` refreshes nothing.
+    sources: Option<PathBuf>,
+    /// Folders under a root whose changes are never noted: only the engine writes
+    /// there, and notes its own writes.
+    ignored: Vec<PathBuf>,
 }
 
 /// A watched folder as it was given, and as `notify` reports paths under it.
@@ -103,9 +114,12 @@ impl Watch {
             .into_iter()
             .filter(|r| r.is_dir())
             .collect();
-        Self::start(&roots, backend)
+        let mut watch = Self::start(&roots, backend)
             .map_err(|e| log::warn!("[Editor] not watching the project's files: {e}"))
-            .ok()
+            .ok()?;
+        watch.sources = Some(assets.to_path_buf());
+        watch.ignored = vec![crate::asset::convert::IMPORT_CACHE_DIR.into()];
+        Some(watch)
     }
 
     /// Watch every folder in `roots`, recursively. A native backend that fails to
@@ -138,6 +152,8 @@ impl Watch {
             roots: roots.iter().map(|r| Root::new(r)).collect(),
             pending: BTreeSet::new(),
             warned: false,
+            sources: None,
+            ignored: Vec::new(),
         })
     }
 
@@ -163,7 +179,9 @@ impl Watch {
     }
 
     /// Once per frame: drain the events, and unless `playing`, note every pending
-    /// path in the write log. Returns how many were noted.
+    /// path in the write log, then bring the converted sources up to date (a texture
+    /// an FBX's conversion read is no model path, so only this re-converts it).
+    /// Returns how many were noted.
     pub fn apply(&mut self, playing: bool) -> usize {
         self.collect();
         if playing {
@@ -172,6 +190,9 @@ impl Watch {
         let noted = self.pending.len();
         for path in std::mem::take(&mut self.pending) {
             crate::core::fs::written::note_written(&path);
+        }
+        if let Some(root) = self.sources.as_deref().filter(|_| noted > 0) {
+            crate::asset::convert::refresh_sources(root);
         }
         noted
     }
@@ -182,13 +203,19 @@ impl Watch {
         &self.pending
     }
 
-    /// `path` as the caches spell it, or `None` for a write-in-flight temp file.
+    /// `path` as the caches spell it, or `None` for a write-in-flight temp file or
+    /// a path under an ignored folder.
     fn spell(&self, path: &Path) -> Option<String> {
         let name = path.file_name()?.to_string_lossy();
         if crate::core::fs::is_temp_name(&name) {
             return None;
         }
         let spelled = self.roots.iter().find_map(|r| r.spell(path));
+        if let Some(spelled) = &spelled {
+            if self.ignored.iter().any(|dir| spelled.starts_with(dir)) {
+                return None;
+            }
+        }
         Some(
             spelled
                 .unwrap_or_else(|| path.to_path_buf())

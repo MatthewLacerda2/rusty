@@ -78,6 +78,20 @@ fn a_file_appearing_is_noted_and_a_write_in_flight_is_not() {
 }
 
 #[test]
+fn a_change_under_an_ignored_folder_is_not_noted() {
+    let (mut watch, file) = watched(POLL);
+    let cache = file.with_file_name("imported");
+    std::fs::create_dir(&cache).unwrap();
+    watch.ignored.push(cache.clone());
+    std::fs::write(cache.join("model.glb"), b"x").unwrap();
+    let after = file.with_file_name("after.png");
+    std::fs::write(&after, b"x").unwrap();
+    assert!(waits_for(&mut watch, &after));
+    let cached = |p: &String| Path::new(p).starts_with(&cache);
+    assert!(!watch.pending().iter().any(cached), "{:?}", watch.pending());
+}
+
+#[test]
 fn a_path_is_spelled_under_its_root_as_given() {
     let root = Root::new(Path::new("assets"));
     let cwd = std::env::current_dir().unwrap();
