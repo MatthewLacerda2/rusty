@@ -98,7 +98,7 @@ The tools describe themselves; what they don't say:
   `target/debug/session-mcp`. **Use one at a time**, and approve only the one this
   session will use. `rusty` attaches to the editor window the operator watches; open
   it first, from the checkout, with a `dev` build (a build without `dev` has no
-  command socket): `cd <engine> && cargo run --features dev -- --project <game>`.
+  command socket): `cd <engine> && cargo run --bin rusty --features dev -- --project <game>`.
   The app search's **Rusty** (`make launcher`) opens that same dev build.
   `rusty-headless` runs its own world with no window, for when none is open. Two
   worlds saving the same scene overwrite each other;

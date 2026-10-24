@@ -4,7 +4,7 @@
 //! the inspector's Add Component menu (issue #181). Every verb routes through the
 //! shared `scene::authoring` module so the API and the editor can never drift:
 //!
-//!   - `FindEntityByName(name)` — lookup, `0` if absent.
+//!   - `FindEntityByName(name)` — lookup, `nil` if absent.
 //!   - `CreateEntity(name, [primitive])` — the GameObject menu's primitive set.
 //!   - `Deactivate(id)` — Unity's deferred `Object.Destroy` (sets `active = false`).
 //!   - `DestroyEntity(id)` — **really** removes the entity (the editor's Destroy).

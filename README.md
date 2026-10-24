@@ -122,8 +122,8 @@ the game for you, and only open a window when you want to.
 
 ## Running it
 
-- `cargo run` — the editor, starting on the project picker (`-- --project <dir>`
-  skips it).
+- `cargo run --bin rusty` — the editor, starting on the project picker
+  (`-- --project <dir>` skips it).
 - `make launcher` — put **Rusty** in the desktop's app search (the Linux app grid,
   Spotlight on macOS): it builds the dev editor and installs an entry that opens it
   from this checkout. `make launcher ARGS=--remove` takes it away. An app started
@@ -148,7 +148,7 @@ repo — and the engine opens it, the way Unity opens a project folder. Every bi
 takes `--project <dir>`:
 
 ```sh
-cargo run -- --project ~/games/horde            # the editor
+cargo run --bin rusty -- --project ~/games/horde  # the editor
 cargo run --bin player -- --project ~/games/horde
 cargo run --bin play --features dev -- --project ~/games/horde \
     ~/games/horde/scenarios/smoke.lua out/

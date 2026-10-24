@@ -26,6 +26,7 @@ pub mod animation;
 mod audio;
 mod camera_sync;
 mod decals;
+mod edit_runtime;
 pub mod game;
 mod particles;
 mod play;

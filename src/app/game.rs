@@ -107,27 +107,6 @@ impl GameWorld {
         &self.resources.script_manager
     }
 
-    /// Bring the Lua runtime live **in edit mode**, without entering Play.
-    ///
-    /// Play's `enter_play` initialises the runtime as a side effect of starting
-    /// the simulation (snapshot, physics build, lifecycle `start`). A headless
-    /// edit-mode session needs the *evaluator* live against the authoritative edit
-    /// scene without any of that: no snapshot is taken, no entity scripts are
-    /// loaded, and `physics` stays `None` (edit mode has no rapier world). The
-    /// runtime binds the same shared `scene`/`input`/`nav`/… cells, so every
-    /// `api::` namespace resolves against the live world and mutations stick.
-    ///
-    /// Idempotent: a no-op once the runtime is live (re-initialising would drop
-    /// any session state held in the VM). Errors surface as the Lua init message.
-    pub fn init_edit_runtime(&mut self) -> Result<(), String> {
-        if self.resources.script_manager.is_live() {
-            return Ok(());
-        }
-        self.resources
-            .script_manager
-            .init_runtime(&self.resources.physics)
-    }
-
     /// Whether the host asked for Play ([`set_playing`](Self::set_playing)); the
     /// World enters it at the next tick's transition. Whether it *is* in Play is
     /// the scene's single play state, `Scene::is_playing` (#1302, #1304).
@@ -288,6 +267,7 @@ impl GameWorld {
                 .bake(&self.world.scene.borrow());
         }
         self.restore_play_origin();
+        self.restore_edit_runtime(); // after the restore: it binds the edit scene (#1339)
     }
 }
 

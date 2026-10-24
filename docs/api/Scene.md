@@ -7,7 +7,7 @@ it behaves identically to the editor and uses the same default values.
 
 | Function | Signature | Returns |
 |---|---|---|
-| `Scene.FindEntityByName` | `(name)` | `id` (or `0` if none) |
+| `Scene.FindEntityByName` | `(name)` | `id` (or `nil` if none) |
 | `Scene.CreateEntity` | `(name, [primitive])` | new entity `id` |
 | `Scene.Deactivate` | `(id)` | — |
 | `Scene.DestroyEntity` | `(id)` | `true` if an entity existed at `id` |

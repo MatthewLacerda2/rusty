@@ -77,7 +77,7 @@ to carry a value across commands, as with `pid` above.
 ### Attaching to a windowed playtest
 
 The same command channel is also exposed by the **windowed** engine (`cargo run
---features dev`), so an agent can attach to a *running, rendered* playtest and drive
+--bin rusty --features dev`), so an agent can attach to a *running, rendered* playtest and drive
 it live — not just the headless `session` binary. The framing and protocol are
 **identical** to the headless session above; only the transport differs:
 
