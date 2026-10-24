@@ -11,7 +11,7 @@ use rusty::editor::project_picker::ProjectPicker;
 /// The fixed "now" the sample is dated against (Unix seconds).
 pub const NOW: u64 = 1_800_000_000;
 /// The pages besides the list: `--picker <page>`.
-pub const PAGES: &[&str] = &["new", "open", "mismatch"];
+pub const PAGES: &[&str] = &["new", "open", "mismatch", "focus"];
 
 const MINUTE: u64 = 60;
 const DAY: u64 = 86_400;
@@ -36,6 +36,7 @@ pub fn build(page: &str) -> Result<ProjectPicker, String> {
     match page {
         "new" => picker.show_new(),
         "open" => picker.show_open(),
+        "focus" => picker.focus_row = Some(1),
         "mismatch" => {
             let check = EngineCheck {
                 recorded: Some(OTHER_ENGINE.to_string()),

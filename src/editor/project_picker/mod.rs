@@ -15,12 +15,14 @@
 //! [`core::project::is_project`]: crate::core::project::is_project
 
 pub mod browse;
+mod list;
 mod pages;
 
 use std::path::{Path, PathBuf};
 
 use browse::FolderBrowser;
 
+use crate::core::project::bench::recent::RecentProject;
 use crate::core::project::bench::{check_existing, new_project_dir};
 use crate::core::project::bench::{recent, RecentProjects};
 
@@ -44,6 +46,7 @@ pub enum Page {
 pub(crate) enum Action {
     OpenRecent(PathBuf),
     Remove(PathBuf),
+    UndoRemove,
     ShowNew,
     ShowOpen,
     Back,
@@ -64,6 +67,11 @@ pub struct ProjectPicker {
     pub confirm: Option<(PathBuf, String)>,
     /// The last failure, shown under the page until the next action.
     pub error: Option<String>,
+    /// The project just taken off the list and where it sat, kept for *Undo* until
+    /// the next action.
+    pub removed: Option<(usize, RecentProject)>,
+    /// A row to give keyboard focus on the next frame (the capture's focus ring).
+    pub focus_row: Option<usize>,
     home: PathBuf,
     fonts_installed: bool,
 }
@@ -78,6 +86,8 @@ impl ProjectPicker {
             page: Page::Projects,
             confirm: None,
             error: None,
+            removed: None,
+            focus_row: None,
             home,
             fonts_installed: false,
         }
@@ -125,9 +135,25 @@ impl ProjectPicker {
 
     fn apply(&mut self, action: Action) -> Option<PathBuf> {
         self.error = None;
+        let removed = self.removed.take();
         match action {
             Action::OpenRecent(dir) => return self.request_existing(dir),
-            Action::Remove(dir) => self.remove_recent(&dir),
+            Action::Remove(dir) => {
+                self.removed = self
+                    .recent
+                    .projects
+                    .iter()
+                    .position(|p| p.path == dir)
+                    .map(|at| (at, self.recent.projects[at].clone()));
+                self.remove_recent(&dir);
+            }
+            Action::UndoRemove => {
+                if let Some((at, project)) = removed {
+                    let at = at.min(self.recent.projects.len());
+                    self.recent.projects.insert(at, project);
+                    self.save_recent();
+                }
+            }
             Action::ShowNew => self.show_new(),
             Action::ShowOpen => self.show_open(),
             Action::Back => self.page = Page::Projects,
@@ -168,6 +194,10 @@ impl ProjectPicker {
 
     fn remove_recent(&mut self, dir: &Path) {
         self.recent.remove(dir);
+        self.save_recent();
+    }
+
+    fn save_recent(&mut self) {
         if let Some(path) = &self.recent_path {
             // lint: allow(asset-write) the recent-projects list, not an asset
             if let Err(err) = self.recent.save(path) {

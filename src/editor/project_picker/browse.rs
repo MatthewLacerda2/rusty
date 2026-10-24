@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 use egui::{RichText, Ui};
 use egui_phosphor::regular as icon;
 
-use crate::editor::theme;
+use crate::editor::theme::{self, chrome};
 
 /// The folder being browsed and its subfolders, listed once per move.
 pub struct FolderBrowser {
@@ -69,7 +69,10 @@ impl FolderBrowser {
             }
             let field = egui::TextEdit::singleline(&mut self.typed).desired_width(f32::INFINITY);
             let response = ui.add(field);
-            if response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+            // Only the field's own Enter is taken, so the page's Enter still opens.
+            let entered = response.lost_focus()
+                && ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Enter));
+            if entered {
                 target = Some(PathBuf::from(self.typed.trim()));
             }
         });
@@ -87,7 +90,9 @@ impl FolderBrowser {
                         }
                         for name in &self.subdirs {
                             let label = format!("{}  {name}", icon::FOLDER);
-                            if ui.selectable_label(false, label).clicked() {
+                            let entry = ui.selectable_label(false, label);
+                            chrome::focus_ring(ui, &t, &entry);
+                            if entry.clicked() {
                                 target = Some(self.dir.join(name));
                             }
                         }
