@@ -33,4 +33,6 @@ pub mod ui;
 pub mod dev;
 
 #[cfg(test)]
+mod test_path;
+#[cfg(test)]
 mod test_temp;

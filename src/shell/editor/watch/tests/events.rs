@@ -11,12 +11,13 @@ fn watched() -> (Watch, PathBuf) {
     let dir = crate::test_temp::dir();
     std::fs::create_dir_all(dir.join("models")).unwrap();
     std::fs::write(dir.join("a.png"), b"a").unwrap();
-    std::fs::write(dir.join("models/b.fbx"), b"b").unwrap();
+    std::fs::write(dir.join("models").join("b.fbx"), b"b").unwrap();
     (Watch::start(&[&dir], POLL).unwrap(), dir)
 }
 
 fn pending(watch: &Watch, dir: &std::path::Path, name: &str) -> bool {
-    let key = dir.join(name).to_string_lossy().into_owned();
+    let key = dir.join(crate::test_path::native(name));
+    let key = key.to_string_lossy().into_owned();
     watch.pending().contains(&key)
 }
 

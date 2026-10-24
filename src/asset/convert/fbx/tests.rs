@@ -6,7 +6,9 @@ use glam::Vec3;
 use std::path::PathBuf;
 
 fn fixture() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/models/skinned_cube.fbx")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(crate::test_path::native(
+        "tests/fixtures/models/skinned_cube.fbx",
+    ))
 }
 
 /// The fixture converted fresh into this test's own folder (the shared cache would
@@ -101,12 +103,12 @@ fn converting_twice_writes_the_same_bytes() {
 #[test]
 fn a_texture_uri_climbs_out_of_the_cache_folder() {
     let dir = crate::test_temp::dir().join("fbx_uri");
-    std::fs::create_dir_all(dir.join("cache/models")).unwrap();
+    std::fs::create_dir_all(dir.join("cache").join("models")).unwrap();
     std::fs::create_dir_all(dir.join("textures")).unwrap();
-    std::fs::write(dir.join("textures/skin.png"), b"").unwrap();
+    std::fs::write(dir.join("textures").join("skin.png"), b"").unwrap();
     let uri = crate::asset::convert::texture_file::relative_uri(
-        &dir.join("cache/models"),
-        &dir.join("textures/skin.png"),
+        &dir.join("cache").join("models"),
+        &dir.join("textures").join("skin.png"),
     );
     assert_eq!(uri.as_deref(), Some("../../textures/skin.png"));
 }

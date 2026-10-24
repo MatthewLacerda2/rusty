@@ -23,7 +23,9 @@ use rusty::dev::session::Session;
 
 #[test]
 fn every_lua_example_in_docs_api_runs() {
-    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("docs/api");
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("docs")
+        .join("api");
     let mut names: Vec<String> = fs::read_dir(&dir)
         .expect("docs/api/")
         .filter_map(|e| e.ok()?.file_name().into_string().ok())

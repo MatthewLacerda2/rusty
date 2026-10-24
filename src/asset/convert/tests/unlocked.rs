@@ -19,7 +19,7 @@ fn warnings_of(out: &Path) -> usize {
 fn only_the_first_lock_that_cannot_be_taken_warns() {
     logging::init();
     // No folder for the cache: `hold` cannot name its lock.
-    let out = crate::test_temp::dir().join("absent/a.src.glb");
+    let out = crate::test_temp::dir().join("absent").join("a.src.glb");
     assert!(lock::hold(&out).is_none());
     assert_eq!(warnings_of(&out), 1, "the first failure warns");
     assert!(lock::hold(&out).is_none());

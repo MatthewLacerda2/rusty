@@ -93,7 +93,7 @@ fn a_symlinked_folder_fails_the_export_naming_it() {
     let (root, out) = (dir.join("game"), dir.join("out"));
     project(&root);
     std::fs::create_dir_all(dir.join("shared")).unwrap();
-    std::os::unix::fs::symlink(dir.join("shared"), root.join("assets/shared")).unwrap();
+    std::os::unix::fs::symlink(dir.join("shared"), root.join("assets").join("shared")).unwrap();
     let err = copy_runtime_files(&root, &sources(), &out).unwrap_err();
     assert!(err.contains("assets/shared: a symlinked folder"), "{err}");
 }

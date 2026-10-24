@@ -88,8 +88,8 @@ fn files_under(dir: &Path) -> Vec<PathBuf> {
 fn a_projects_lock_lives_in_its_cache_folder_never_in_assets() {
     let root = crate::test_temp::dir();
     std::fs::write(root.join(project::PROJECT_FILE), "").unwrap();
-    std::fs::create_dir_all(root.join("assets/models")).unwrap();
-    let source = root.join("assets/models/a.src");
+    std::fs::create_dir_all(root.join("assets").join("models")).unwrap();
+    let source = root.join(crate::test_path::native("assets/models/a.src"));
     std::fs::write(&source, "one").unwrap();
     let out = cache_path(&root, Path::new("assets/models/a.src"));
     refresh(&COPY, &source, &out).unwrap();
@@ -110,6 +110,9 @@ fn two_spellings_of_one_cache_share_its_lock() {
     let dir = crate::test_temp::dir();
     std::fs::create_dir_all(dir.join("sub")).unwrap();
     let plain = lock::path(&dir.join("a.src.glb")).unwrap();
-    assert_eq!(lock::path(&dir.join("sub/../a.src.glb")).unwrap(), plain);
+    assert_eq!(
+        lock::path(&dir.join(crate::test_path::native("sub/../a.src.glb"))).unwrap(),
+        plain
+    );
     assert_ne!(lock::path(&dir.join("b.src.glb")).unwrap(), plain);
 }

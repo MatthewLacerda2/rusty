@@ -75,17 +75,17 @@ fn the_wav_writer_keeps_stereo_channels_apart() {
 fn project(name: &str) -> std::path::PathBuf {
     let root = crate::test_temp::dir().join(name);
     let _ = std::fs::remove_dir_all(&root);
-    std::fs::create_dir_all(root.join("audio/sfx")).unwrap();
+    std::fs::create_dir_all(root.join("audio").join("sfx")).unwrap();
     root
 }
 
 #[test]
 fn refresh_converts_dropped_mp3s_and_removes_them() {
     let root = project("rusty_refresh_converts");
-    let mp3 = root.join("audio/sfx/Shot.MP3");
+    let mp3 = root.join(crate::test_path::native("audio/sfx/Shot.MP3"));
     std::fs::copy(FIXTURE, &mp3).unwrap();
     let report = refresh(&root);
-    let wav = root.join("audio/sfx/Shot.wav");
+    let wav = root.join(crate::test_path::native("audio/sfx/Shot.wav"));
     assert_eq!(report.converted, vec![(mp3.clone(), wav.clone())]);
     assert!(report.skipped.is_empty());
     assert!(!mp3.exists() && wav.exists());
@@ -100,10 +100,13 @@ fn refresh_converts_dropped_mp3s_and_removes_them() {
 #[test]
 fn refresh_never_overwrites_a_wav_and_retries_an_mp3_that_fails() {
     let root = project("rusty_refresh_skips");
-    let (kept, kept_wav) = (root.join("audio/keep.mp3"), root.join("audio/keep.wav"));
+    let (kept, kept_wav) = (
+        root.join("audio").join("keep.mp3"),
+        root.join("audio").join("keep.wav"),
+    );
     std::fs::copy(FIXTURE, &kept).unwrap();
     std::fs::write(&kept_wav, b"somebody's file").unwrap();
-    let broken = root.join("audio/sfx/half_copied.mp3");
+    let broken = root.join(crate::test_path::native("audio/sfx/half_copied.mp3"));
     std::fs::write(&broken, b"not audio yet").unwrap();
     let report = refresh(&root);
     assert!(report.converted.is_empty());

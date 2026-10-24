@@ -71,10 +71,10 @@ fn removing_a_recent_project_saves_the_list() {
 #[test]
 fn the_browsers_start_beside_the_latest_project_that_still_exists() {
     let dir = fresh("start");
-    std::fs::create_dir_all(dir.join("games/horde")).unwrap();
+    std::fs::create_dir_all(dir.join("games").join("horde")).unwrap();
     let mut list = RecentProjects::default();
-    list.touch(&dir.join("games/horde"), 1);
-    list.touch(&dir.join("gone/old"), 2);
+    list.touch(&dir.join("games").join("horde"), 1);
+    list.touch(&dir.join("gone").join("old"), 2);
     let mut picker = ProjectPicker::new(list, None, dir.clone());
     picker.show_open();
     let Page::Open(browser) = &picker.page else {

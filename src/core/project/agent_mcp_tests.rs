@@ -18,7 +18,7 @@ fn the_servers_run_the_checkouts_built_binary_in_attach_and_embed_mode() {
     let mut config = json!({});
     merge(&mut config, "/games/horde", Path::new(ENGINE)).unwrap();
     let servers = &config["mcpServers"];
-    let binary = "/engine/target/debug/session-mcp";
+    let binary = crate::test_path::native_string("/engine/target/debug/session-mcp");
     assert_eq!(
         servers[SERVERS[0]],
         json!({ "command": binary, "args": ["--attach"] })

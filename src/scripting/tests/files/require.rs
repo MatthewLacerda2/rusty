@@ -6,16 +6,16 @@ use super::{backslash_dir, dir, manager, out, warnings, write};
 fn require_finds_project_modules_first_without_warning() {
     let root = dir("project");
     write(
-        &root.join("assets/scripts/util/math2.lua"),
+        &root.join(crate::test_path::native("assets/scripts/util/math2.lua")),
         "return { v = 'project' }",
     );
     write(
-        &root.join("assets/scripts/pkg/init.lua"),
+        &root.join(crate::test_path::native("assets/scripts/pkg/init.lua")),
         "return { v = 'init' }",
     );
     // A project copy of an engine helper wins over the bundled one.
     write(
-        &root.join("assets/scripts/ui/range_axis.lua"),
+        &root.join(crate::test_path::native("assets/scripts/ui/range_axis.lua")),
         "return { v = 'mine' }",
     );
     let (m, console) = manager(&root);
@@ -82,7 +82,10 @@ pub(super) const SOURCE: &str = "local _, e = pcall(function() error('here') end
 #[test]
 fn a_project_module_is_named_with_slashes_only() {
     let root = backslash_dir("slash_project");
-    write(&root.join("assets/scripts/ui/axis.lua"), SOURCE);
+    write(
+        &root.join(crate::test_path::native("assets/scripts/ui/axis.lua")),
+        SOURCE,
+    );
     let (m, _) = manager(&root);
     let named = out(&m, "local s, o = require('ui.axis'); out = s .. '|' .. o");
     assert!(!named.contains('\\'), "{named}");

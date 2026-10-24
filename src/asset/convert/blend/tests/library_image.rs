@@ -50,7 +50,7 @@ fn the_library_image_is_its_own(decoy: bool) {
         None,
         "a plain path: {linked}"
     );
-    let tex = std::fs::canonicalize(dir.join("sub2/tex.png")).unwrap();
+    let tex = std::fs::canonicalize(dir.join("sub2").join("tex.png")).unwrap();
     assert_eq!(std::fs::canonicalize(&linked).unwrap(), tex);
     assert_eq!(
         pixel(&out, "Linked"),

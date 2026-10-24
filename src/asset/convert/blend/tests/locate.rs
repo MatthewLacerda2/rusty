@@ -48,7 +48,7 @@ fn no_blender_anywhere_says_so_and_where_to_get_it() {
 
 #[test]
 fn an_override_naming_no_file_is_refused_by_name() {
-    let missing = crate::test_temp::dir().join("nowhere/blender");
+    let missing = crate::test_temp::dir().join("nowhere").join("blender");
     let why = error(&search(Some(&missing), None));
     assert!(why.contains(&missing.display().to_string()), "{why}");
     assert!(why.contains("not a file"), "{why}");
@@ -80,7 +80,7 @@ fn a_place_is_looked_at_after_path() {
     let dir = crate::test_temp::dir();
     let placed = fake(&dir.join("app"), "Blender 5.0.1\n\tbuild date: 2025-12-16");
     let mut search = search(None, Some(&dir.join("empty")));
-    search.places = vec![dir.join("missing/blender"), placed.clone()];
+    search.places = vec![dir.join("missing").join("blender"), placed.clone()];
     assert_eq!(search.find().expect("found").path, placed);
 }
 

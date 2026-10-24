@@ -19,7 +19,9 @@ const CACHE: &str = "assets/generated/imported";
 
 pub(super) fn fixture(name: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/fixtures/models")
+        .join("tests")
+        .join("fixtures")
+        .join("models")
         .join(name)
 }
 
@@ -28,7 +30,7 @@ pub(super) fn fixture(name: &str) -> PathBuf {
 /// Never opened, so it has no `project.rusty` until the export opens it.
 fn project(models: &[&str], start: &str) -> PathBuf {
     let root = crate::temp::dir().join("game");
-    let models_dir = root.join("assets/models");
+    let models_dir = root.join("assets").join("models");
     std::fs::create_dir_all(&models_dir).unwrap();
     for name in models {
         std::fs::copy(fixture(name), models_dir.join(name)).unwrap();

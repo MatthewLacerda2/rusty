@@ -22,6 +22,7 @@ mod markers;
 mod named_enum;
 mod prefix;
 mod skip;
+mod slash_join;
 mod sorted;
 mod subprocess;
 mod temp_dir;
@@ -62,6 +63,7 @@ const RULES: &[(Rule, Allow)] = &[
     (named_enum::run, Allow::Inline),
     (prefix::run, Allow::Inline),
     (skip::run, Allow::Inline),
+    (slash_join::run, Allow::Inline),
     (sorted::run, Allow::Inline),
     (subprocess::run, Allow::Inline),
     (temp_dir::run, Allow::Inline),

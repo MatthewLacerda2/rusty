@@ -65,7 +65,9 @@ fn resolution_is_clamped_to_a_sane_range() {
 
 #[test]
 fn gpu_capture_writes_a_square_png_at_the_requested_resolution() {
-    let out = crate::test_temp::dir().join("rusty-preview-test/shader.png");
+    let out = crate::test_temp::dir()
+        .join("rusty-preview-test")
+        .join("shader.png");
     let _ = std::fs::remove_file(&out);
 
     let options = PreviewOptions {
@@ -90,8 +92,9 @@ fn gpu_a_centimetre_fbx_quad_previews_as_its_red_and_blue_textures() {
     // have no colour of their own, only an embedded red texture on one and a blue one
     // on the other. It used to preview as empty sky — a sub-pixel speck, and black
     // besides (#1280) — then all red, its second material dropped (#1285).
-    let fixture =
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/models/embedded_textures.fbx");
+    let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join(crate::test_path::native(
+        "tests/fixtures/models/embedded_textures.fbx",
+    ));
     let dir = crate::test_temp::dir();
     let fbx = dir.join("quad.fbx");
     std::fs::copy(fixture, &fbx).unwrap();

@@ -71,18 +71,9 @@ fn the_native_watch_notes_an_outside_change() {
     assert!(noted, "no event from the native backend");
 }
 
-/// `dir` spelled relative to the working directory, as the editor gives `assets`.
-fn relative(dir: &Path) -> PathBuf {
-    let cwd = std::env::current_dir().unwrap();
-    let ups = cwd.components().count() - 1;
-    let mut path: PathBuf = std::iter::repeat_n("..", ups).collect();
-    path.push(dir.strip_prefix("/").unwrap());
-    path
-}
-
 #[test]
 fn polling_a_relative_root_spells_and_ignores_as_given() {
-    let root = relative(&crate::test_temp::dir());
+    let root = crate::test_path::relative(&crate::test_temp::dir());
     let mut watch = Watch::start(&[&root], POLL).unwrap();
     let cache = root.join("imported");
     std::fs::create_dir(&cache).unwrap();
@@ -125,9 +116,9 @@ fn a_change_under_an_ignored_folder_is_not_noted() {
 fn a_path_is_spelled_under_its_root_as_given() {
     let root = Root::new(Path::new("assets"));
     let cwd = std::env::current_dir().unwrap();
-    let spelled = root.spell(&cwd.join("assets/textures/a.png"));
+    let spelled = root.spell(&cwd.join(crate::test_path::native("assets/textures/a.png")));
     assert_eq!(spelled, Some(PathBuf::from("assets/textures/a.png")));
-    assert_eq!(root.spell(&cwd.join("elsewhere/a.png")), None);
+    assert_eq!(root.spell(&cwd.join("elsewhere").join("a.png")), None);
 }
 
 #[test]
