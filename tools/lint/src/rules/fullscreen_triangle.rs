@@ -7,11 +7,14 @@
 //! finding; the fix is `fullscreen::triangle` / `fullscreen::uv`. A shader that must
 //! stand alone says why with `// lint: allow(fullscreen-triangle) <why>`.
 //!
-//! The rule reads `engine/**/*.wgsl` itself: `Scan` holds only Rust. Shaders written
+//! The rule reads `engine/**/*.wgsl` itself: `Scan` holds only Rust, so `rules::run`
+//! cannot see a shader's allow. The rule applies the allow (and reports one with no
+//! reason) on its own files, via [`finding::allowed`] / [`finding::unexplained`].
+//! Shaders written
 //! inside Rust strings (`shadergen`'s baked post-FX module, which is self-contained
 //! by design) are out of its reach.
 
-use super::finding::Finding;
+use super::finding::{self, Finding};
 use super::scan::Scan;
 use std::fs;
 use std::path::Path;
@@ -50,9 +53,18 @@ pub fn run(_: &Scan) -> Vec<Finding> {
         .iter()
         .flat_map(|p| {
             let path = p.to_string_lossy().replace('\\', "/");
-            check(&path, &fs::read_to_string(p).unwrap_or_default())
+            let source = fs::read_to_string(p).unwrap_or_default();
+            judged(&path, &source)
         })
         .collect()
+}
+
+/// [`check`], minus the lines carrying a reasoned allow, plus any allow without one.
+pub fn judged(path: &str, source: &str) -> Vec<Finding> {
+    let mut found = check(path, source);
+    found.retain(|f| !finding::allowed(source, f.line, f.rule));
+    found.extend(finding::unexplained(path, source));
+    found
 }
 
 #[cfg(test)]

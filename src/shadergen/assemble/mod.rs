@@ -189,7 +189,8 @@ fn assemble_postfx(recipe: &ShaderRecipe, resolved: &[Instance], layout: &ParamL
 }
 
 /// The fixed postfx scaffolding: scene-color bindings and the fullscreen-triangle
-/// vertex stage, matching `postfx.wgsl`'s self-contained fullscreen contract
+/// vertex stage (the `fullscreen` module's triangle, imported as `postfx.wgsl` does),
+/// matching `postfx.wgsl`'s fullscreen contract
 /// (group(0) binding 0 = the post params, 1 = the colour so far, 2 = its sampler).
 /// `game_time()` is the sim's game time (#398), the surface blocks' `camera.time`.
 /// `source_tap(uv)` and `source_texel()` let a sampling block (#402) read this
@@ -197,6 +198,7 @@ fn assemble_postfx(recipe: &ShaderRecipe, resolved: &[Instance], layout: &ParamL
 /// a tap legal wherever a helper is called (no derivative uniformity rule).
 const POSTFX_SCAFFOLD: &str = r#"
 #import common::{PostParams}
+#import fullscreen
 
 @group(0) @binding(0) var<uniform> params: PostParams;
 @group(0) @binding(1) var t_color: texture_2d<f32>;
@@ -210,10 +212,8 @@ struct VsOut {
 @vertex
 fn vs_fullscreen(@builtin(vertex_index) vid: u32) -> VsOut {
     var out: VsOut;
-    let x = f32((vid << 1u) & 2u);
-    let y = f32(vid & 2u);
-    out.uv = vec2<f32>(x, y);
-    out.pos = vec4<f32>(x * 2.0 - 1.0, 1.0 - y * 2.0, 0.0, 1.0);
+    out.uv = fullscreen::uv(vid);
+    out.pos = fullscreen::triangle_down(vid);
     return out;
 }
 

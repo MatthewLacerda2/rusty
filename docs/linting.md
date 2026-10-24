@@ -328,6 +328,16 @@ new flag, gate, CI step or baseline.
   `static`; and a bare `"/a/b"` expectation (test code is full of `/`-led JSON
   pointers): those use the same helper. A path that must keep its `/`, or a
   misfire, says why with `// lint: allow(slash-join) <why>`.
+- **`fullscreen-triangle`** (#1370) — the fullscreen triangle's vertex maths is
+  written once, in `engine/shaders/fullscreen.wgsl`. Any other `.wgsl` under
+  `engine/` whose code spells `(i << 1u) & 2u` is a finding (comments never count);
+  `#import fullscreen` and call `fullscreen::triangle`, `triangle_down` or `uv`.
+  The rule reads the shaders itself, since `Scan` holds only Rust, and applies the
+  inline allow to them (a reasonless one is reported under `allow`). WGSL inside
+  Rust strings is out of reach: `shadergen`'s postfx scaffold imports the module
+  like any shader, and a test fixture that must stand alone (`tests/gpu/`) is not
+  scanned. A shader that must stand alone says why with
+  `// lint: allow(fullscreen-triangle) <why>`.
 - **`asset-write`** (#1220) — a file a path-keyed cache reads is written through
   `core::fs::written::write`, or its writer calls `note_written` after (#1207).
   A non-test line of `src/` outside `src/core/fs/` calling `fs::write(`,

@@ -1,4 +1,4 @@
-use super::{check, HOME, RULE};
+use super::{check, judged, HOME, RULE};
 
 #[test]
 fn flags_a_pasted_triangle() {
@@ -21,4 +21,17 @@ fn passes_the_module_imports_and_comments() {
     assert!(check("engine/shaders/a.wgsl", user).is_empty());
     let note = "// the old copy: f32((i << 1u) & 2u)\nlet y = i << 1u;\n";
     assert!(check("engine/shaders/a.wgsl", note).is_empty());
+}
+
+#[test]
+fn a_reasoned_allow_excuses_a_copy_and_a_bare_one_is_reported() {
+    let copy = "let x = f32((i << 1u) & 2u);";
+    let ok = format!("// lint: allow({RULE}) test fixture, stands alone\n{copy}\n");
+    assert!(judged("engine/shaders/a.wgsl", &ok).is_empty());
+    let bare = format!("// lint: allow({RULE})\n{copy}\n");
+    let rules: Vec<_> = judged("engine/shaders/a.wgsl", &bare)
+        .iter()
+        .map(|f| f.rule)
+        .collect();
+    assert_eq!(rules, [RULE, "allow"]);
 }
