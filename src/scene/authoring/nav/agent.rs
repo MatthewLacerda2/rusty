@@ -17,7 +17,9 @@
 use glam::Vec3;
 
 use crate::components::{NavMeshAgentComponent, MAX_AVOIDANCE_PRIORITY};
-use crate::scene::authoring::sanitize::{at_least, finite, finite3_or, non_negative, MIN_EXTENT};
+use crate::scene::authoring::sanitize::{
+    at_least, finite, finite3_or, finite_f64_or, non_negative, MIN_EXTENT,
+};
 
 /// Set the agent's `active` flag.
 pub fn set_active(a: &mut NavMeshAgentComponent, active: bool) {
@@ -73,8 +75,11 @@ pub fn set_target(a: &mut NavMeshAgentComponent, target: Vec3) {
 
 /// Set the agent's avoidance priority (Unity's `avoidancePriority`: lower is more
 /// important). The one clamp among these ops: the field is `u8` and the range is
-/// 0–99, so anything outside lands on the nearest end (fractions truncate).
+/// 0–99, so anything outside lands on the nearest end (fractions truncate). NaN or
+/// infinity keeps the current priority: a bare `as u8` would make it 0, the most
+/// important.
 pub fn set_avoidance_priority(a: &mut NavMeshAgentComponent, priority: f64) {
+    let priority = finite_f64_or(priority, f64::from(a.avoidance_priority));
     a.avoidance_priority = priority.clamp(0.0, f64::from(MAX_AVOIDANCE_PRIORITY)) as u8;
 }
 

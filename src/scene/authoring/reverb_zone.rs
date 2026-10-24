@@ -31,6 +31,7 @@ pub fn set_preset(z: &mut ReverbZoneComponent, preset: ReverbPreset) {
 }
 
 /// Set the params (clamped into range); the zone becomes `Custom`.
+// lint: allow(sanitize) `ReverbParams::clamped` takes NaN to each field's floor and clamps ±inf into range
 pub fn set_params(z: &mut ReverbZoneComponent, params: ReverbParams) {
     z.params = params.clamped();
     z.preset = ReverbPreset::Custom;

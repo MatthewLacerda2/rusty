@@ -56,6 +56,7 @@ pub fn set_color(s: &mut ShapeComponent, color: Vec4) {
 }
 
 /// Set (or clear, `None`) the gradient fill; one with fewer than two stops clears it.
+// lint: allow(sanitize) `ui_look::sanitize_gradient` runs every field through the helpers
 pub fn set_gradient(s: &mut ShapeComponent, g: Option<UiGradient>) {
     s.gradient = g.and_then(sanitize_gradient);
 }

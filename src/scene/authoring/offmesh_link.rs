@@ -60,6 +60,8 @@ mod tests {
         set_start(&mut l, Vec3::Y);
         set_start(&mut l, Vec3::NAN);
         assert_eq!(l.start, Vec3::Y, "a non-finite start is ignored");
+        set_start(&mut l, Vec3::new(5.0, f32::NAN, 9.0));
+        assert_eq!(l.start, Vec3::Y, "a partly-NaN start is refused whole");
         set_end(&mut l, Vec3::new(0.0, 4.0, 1.0));
         set_end(&mut l, Vec3::INFINITY);
         assert_eq!(l.end, Vec3::new(0.0, 4.0, 1.0));

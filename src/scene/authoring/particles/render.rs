@@ -29,11 +29,12 @@ pub fn set_render_material(p: &mut ParticleEmitterComponent, material: String) {
 }
 
 /// Set the flipbook grid; `columns`/`rows` clamp to `≥ 1`, `cycles` to `≥ 0`.
+// lint: allow(sanitize) its one float, `cycles`, goes through `non_negative`
 pub fn set_flipbook(p: &mut ParticleEmitterComponent, flipbook: Flipbook) {
     p.render.flipbook = Flipbook {
         columns: flipbook.columns.max(1),
         rows: flipbook.rows.max(1),
-        cycles: flipbook.cycles.max(0.0),
+        cycles: non_negative(flipbook.cycles),
         random_start: flipbook.random_start,
     };
 }

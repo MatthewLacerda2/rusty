@@ -9,6 +9,7 @@
 //! ([`ShaderOverrides`](crate::scene::shader_overrides::ShaderOverrides)).
 
 use super::{ensure_material_key, MaterialLibrary};
+use crate::scene::authoring::sanitize::finite_values;
 use crate::scene::Scene;
 use crate::shadergen::params::{self, ParamLayout};
 
@@ -44,7 +45,7 @@ pub fn set_shader_param(
     name: &str,
     value: Vec<f32>,
 ) -> Result<(), String> {
-    let (name, value) = checked(layout, name, value)?;
+    let (name, value) = checked(layout, name, finite_values(value)?)?;
     if let Some(m) = materials.get_mut(key) {
         m.shader_params.insert(name, value);
     }
@@ -96,7 +97,7 @@ pub fn set_entity_shader_param_with(
     name: &str,
     value: Vec<f32>,
 ) -> Result<(), String> {
-    let (name, value) = checked(layout, name, value)?;
+    let (name, value) = checked(layout, name, finite_values(value)?)?;
     scene.shader_overrides.set(id, name, value);
     Ok(())
 }

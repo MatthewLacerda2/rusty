@@ -4,20 +4,20 @@ Per-entity navmesh agent control.
 
 | Function | Signature | Returns |
 |---|---|---|
-| `NavMeshAgent.SetTarget` | `(id, x, y, z)` | — |
+| `NavMeshAgent.SetTarget` | `(id, x, y, z)` | — (a target with a NaN or infinite axis is ignored) |
 | `NavMeshAgent.GetTarget` | `(id)` | `x, y, z` |
-| `NavMeshAgent.SetSpeed` | `(id, speed)` | — top speed, m/s |
-| `NavMeshAgent.SetAcceleration` | `(id, acceleration)` | — m/s², for speeding up and braking alike (see *Moving and stopping*) |
-| `NavMeshAgent.SetStoppingDistance` | `(id, distance)` | — how far from its path's end it comes to rest, measured from its feet (centre, not body edge) |
-| `NavMeshAgent.SetRadius` | `(id, radius)` | — |
+| `NavMeshAgent.SetSpeed` | `(id, speed)` | — top speed, m/s (≥ 0) |
+| `NavMeshAgent.SetAcceleration` | `(id, acceleration)` | — m/s² (≥ 0), for speeding up and braking alike (see *Moving and stopping*) |
+| `NavMeshAgent.SetStoppingDistance` | `(id, distance)` | — how far from its path's end it comes to rest (≥ 0), measured from its feet (centre, not body edge) |
+| `NavMeshAgent.SetRadius` | `(id, radius)` | — (at least `0.001`) |
 | `NavMeshAgent.SetBaseOffset` / `GetBaseOffset` | `(id, offset)` / `(id)` | how far the entity's origin sits above the agent's feet (Unity's `baseOffset`, default `0`) |
 | `NavMeshAgent.IsAtTarget` | `(id)` | `bool` — its feet are within `StoppingDistance` of where its path ends (the target projected onto the navmesh) |
 | `NavMeshAgent.GetVelocity` | `(id)` | `x, y, z` — the velocity it is really moving at; `0, 0, 0` once at rest |
 | `NavMeshAgent.SetActive` | `(id, active)` | — |
 | `NavMeshAgent.GetUpdateRotation` / `SetUpdateRotation` | `(id)` / `(id, bool)` | whether the agent turns to face where it steers (Unity's `updateRotation`, default `true`; see *Turning*) |
-| `NavMeshAgent.GetAngularSpeed` / `SetAngularSpeed` | `(id)` / `(id, degrees)` | top turn rate, degrees/second (Unity's `angularSpeed`, default `120`) |
-| `NavMeshAgent.GetAngularAcceleration` / `SetAngularAcceleration` | `(id)` / `(id, degrees)` | how fast the turn rate builds up and winds down, degrees/second² (default `720`) |
-| `NavMeshAgent.SetAvoidancePriority` | `(id, priority)` | — (0–99, clamped; lower = more important) |
+| `NavMeshAgent.GetAngularSpeed` / `SetAngularSpeed` | `(id)` / `(id, degrees)` | top turn rate, degrees/second (≥ 0; Unity's `angularSpeed`, default `120`) |
+| `NavMeshAgent.GetAngularAcceleration` / `SetAngularAcceleration` | `(id)` / `(id, degrees)` | how fast the turn rate builds up and winds down, degrees/second² (≥ 0, default `720`) |
+| `NavMeshAgent.SetAvoidancePriority` | `(id, priority)` | — (0–99, clamped; lower = more important; NaN or `math.huge` keeps the current priority) |
 | `NavMeshAgent.SetAvoidanceEnabled` | `(id, enabled)` | — |
 | `NavMeshAgent.HasPath` | `(id)` | `bool` — the agent holds a planned path |
 | `NavMeshAgent.RemainingDistance` | `(id)` | distance left along the path from where it stands; `math.huge` with no path |
@@ -30,6 +30,8 @@ Per-entity navmesh agent control.
 | `NavMeshAgent.CompleteOffMeshLink` | `(id)` | `bool` — puts the agent on the link's end and resumes its path; `false` when it is on no link |
 | `NavMeshAgent.GetAutoTraverseOffMeshLink` / `SetAutoTraverseOffMeshLink` | `(id)` / `(id, bool)` | whether the engine crosses links for it (default `true`) |
 | `NavMeshAgent.GetAreaMask` / `SetAreaMask` | `(id)` / `(id, mask)` | the areas it may enter (Unity's `areaMask`): bit `i` allows area `i`; `-1` (the default) is every area. A new mask re-plans on the next tick |
+
+The floors are Unity's inspector minimums. A NaN or infinite number (`math.huge`) never reaches the agent: a floored field takes its floor (`0`, or `0.001` for the radius), `SetBaseOffset` takes `0`, and the target and priority keep their current value.
 
 ### Moving and stopping (#742)
 

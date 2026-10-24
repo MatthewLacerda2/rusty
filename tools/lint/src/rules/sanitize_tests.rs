@@ -52,3 +52,23 @@ fn helpers_skip_the_test_module_and_an_allow_excuses() {
     let f = check(PATH, src, &[], &[]);
     assert!(crate::rules::allowed(src, f[0].line, RULE));
 }
+
+#[test]
+fn any_pub_visibility_and_float_carrying_types_are_checked() {
+    let scoped = "pub(crate) fn set_a(c: &mut C, v: f32) {\n    c.a = v;\n}\n";
+    assert_eq!(found(scoped), [1]);
+    for ty in [
+        "[f32; 3]",
+        "f64",
+        "Option<f32>",
+        "Vec<f32>",
+        "&[Vec3]",
+        "Range",
+        "core::curve::ColorRange",
+    ] {
+        let src = format!("pub fn set_a(c: &mut C, v: {ty}) {{\n    c.a = v;\n}}\n");
+        assert_eq!(found(&src), [1], "{ty}");
+    }
+    let other = "pub fn set_a(c: &mut C, v: Option<String>, w: &[u32]) {\n    c.a = v;\n}\n";
+    assert!(found(other).is_empty());
+}

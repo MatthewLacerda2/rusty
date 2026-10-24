@@ -13,6 +13,7 @@
 //!
 //! Pure.
 
+use super::sanitize::{non_negative, unit};
 use crate::components::{ColliderComponent, ColliderShape, PhysicsMaterial};
 
 /// Set the collider's `active` flag.
@@ -35,11 +36,12 @@ pub fn set_shape(c: &mut ColliderComponent, shape: ColliderShape) {
 /// Replace the collider's physics material, clamping its coefficients into range
 /// (friction `>= 0`, bounciness `[0, 1]`) so neither surface can author an
 /// out-of-range value.
+// lint: allow(sanitize) both coefficients go through a helper below
 pub fn set_material(c: &mut ColliderComponent, material: PhysicsMaterial) {
     c.material = PhysicsMaterial {
         friction_combine: material.friction_combine,
         bounce_combine: material.bounce_combine,
-        ..PhysicsMaterial::new(material.friction, material.bounciness)
+        ..PhysicsMaterial::new(non_negative(material.friction), unit(material.bounciness))
     };
 }
 

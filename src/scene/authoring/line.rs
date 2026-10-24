@@ -14,6 +14,7 @@ use crate::components::LineComponent;
 pub const MAX_POSITIONS: usize = 4096;
 
 /// Replace every point (non-finite ones dropped, capped at [`MAX_POSITIONS`]).
+// lint: allow(sanitize) the `is_finite` filter drops every non-finite point
 pub fn set_positions(l: &mut LineComponent, positions: &[Vec3]) {
     let finite = positions.iter().copied().filter(|p| p.is_finite());
     l.positions = finite.take(MAX_POSITIONS).collect();

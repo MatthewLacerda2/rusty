@@ -3,16 +3,22 @@
 //! `scene::authoring::sanitize` holds the float rules the authoring setters share: a
 //! value from Lua, the editor or a scene file is finite and in range before it is
 //! stored, and NaN or `±inf` takes the field's fallback. Setters kept skipping it
-//! (#993, #1341, #1342), so a `pub fn set_*` under `src/scene/authoring/` that takes
-//! an `f32` or a glam vector (`Vec2`/`Vec3`/`Vec4`/`Quat`) is a finding unless each
-//! such parameter is passed to a `sanitize` helper (a call `helper(param…` of any
+//! (#993, #1341, #1342), so a `set_*` under `src/scene/authoring/` with any `pub`
+//! visibility that takes a float-carrying parameter is a finding unless each such
+//! parameter is passed whole to a `sanitize` helper (a call `helper(param…` of any
 //! `fn` that `sanitize.rs` defines) or to another `set_*` of the same file, which this
-//! rule checks in turn. A value that is legitimately unbounded and checked elsewhere
-//! says so with `// lint: allow(sanitize) <why>`. Test code is not scanned.
+//! rule checks in turn. A parameter carries a float when its type, under `&`,
+//! `Option<…>`, `Vec<…>` and `[…; N]`, is one of [`FLOATS`]. A value checked another
+//! way says so with `// lint: allow(sanitize) <why>`. Test code is not scanned.
 //!
-//! A line scan, not a parser: the signature runs from `fn set_` to the first `{`,
-//! the body to its matching `}`. `param.x` passed alone sanitizes one component, not
-//! the parameter, so a helper must take the parameter itself.
+//! A line scan, not a parser, with known limits:
+//! - it checks that the parameter reaches a helper, not that the helper's result is
+//!   what gets stored;
+//! - `param.x` passed alone sanitizes one component, not the parameter, and does not
+//!   count, so a helper must take the parameter itself;
+//! - the signature runs from the name's `(` to its match and the body from the next
+//!   `{`, so a parameter type with `->` in it (a closure type) miscounts its `<>`s;
+//! - [`FLOATS`] names the float structs the setters take today: a new one joins it.
 
 use super::finding::Finding;
 use super::scan::Scan;
@@ -24,8 +30,27 @@ pub const RULE: &str = "sanitize";
 const DIR: &str = "src/scene/authoring/";
 const HELPERS: &str = "src/scene/authoring/sanitize.rs";
 
-/// Parameter types that can carry a NaN or an infinity.
-const FLOATS: &[&str] = &["f32", "Vec2", "Vec3", "Vec4", "Quat"];
+/// Parameter types that can carry a NaN or an infinity: the float scalars, glam's
+/// vectors, and the float structs the setters take.
+const FLOATS: &[&str] = &[
+    // sorted: a membership list
+    "ColorRange",
+    "Curve",
+    "EmitShape",
+    "f32",
+    "f64",
+    "Flipbook",
+    "Gradient",
+    "PhysicsMaterial",
+    "Projection",
+    "Quat",
+    "Range",
+    "ReverbParams",
+    "UiGradient",
+    "Vec2",
+    "Vec3",
+    "Vec4",
+];
 
 /// One `pub fn set_*`: its name, the line it starts on, its float parameters and
 /// its body.
@@ -100,7 +125,8 @@ fn setter(code: &[&str], i: usize) -> Option<Setter> {
     }
     let name = ident_after(line, "fn ").filter(|n| n.starts_with("set_"))?;
     let rest: String = code[i..].join("\n");
-    let open = rest.find('(')?;
+    let after_name = rest.find(&format!("fn {name}"))? + 3 + name.len();
+    let open = after_name + rest[after_name..].find('(')?;
     let close = open + matching(&rest[open..], '(', ')')?;
     let brace = close + rest[close..].find('{')?;
     let end = brace + matching(&rest[brace..], '{', '}')?;
@@ -117,13 +143,27 @@ fn float_params(params: &str) -> Vec<String> {
     split_top(params)
         .iter()
         .filter_map(|p| p.split_once(':'))
-        .filter(|(_, ty)| {
-            let ty = ty.trim();
-            let ty = ty.rsplit("::").next().unwrap_or(ty);
-            FLOATS.contains(&ty)
-        })
+        .filter(|(_, ty)| carries_float(ty))
         .map(|(name, _)| name.trim().trim_start_matches("mut ").trim().to_string())
         .collect()
+}
+
+/// Whether `ty`, under `&`, `Option<…>`, `Vec<…>` and `[…; N]`, is one of [`FLOATS`].
+fn carries_float(ty: &str) -> bool {
+    let ty = ty
+        .trim()
+        .trim_start_matches('&')
+        .trim_start_matches("mut ")
+        .trim();
+    if let Some(inner) = ty.strip_prefix('[') {
+        return carries_float(inner.split([';', ']']).next().unwrap_or(""));
+    }
+    for wrapper in ["Option<", "Vec<"] {
+        if let Some(inner) = ty.strip_prefix(wrapper).and_then(|t| t.strip_suffix('>')) {
+            return carries_float(inner);
+        }
+    }
+    FLOATS.contains(&ty.rsplit("::").next().unwrap_or(ty))
 }
 
 /// `s` split at its top-level commas.

@@ -16,7 +16,7 @@
 //!
 //! Pure.
 
-use super::sanitize::{at_least, clamped, finite_or, non_negative};
+use super::sanitize::{at_least, clamped, finite_or, finite_values, non_negative};
 use crate::components::{ShadowSettings, SsaoSettings, Tonemap, VisualCorrectionComponent};
 use crate::shadergen::post_params::PostChain;
 
@@ -146,7 +146,7 @@ pub fn set_post_param_with(
     name: &str,
     value: Vec<f32>,
 ) -> Result<(), String> {
-    chain.set(&mut vc.post_params, name, value)
+    chain.set(&mut vc.post_params, name, finite_values(value)?)
 }
 
 /// The value runtime param `name` of the volume's effects draws with: the stored one,

@@ -11,6 +11,7 @@
 //!
 //! Pure apart from reading the sidecar.
 
+use super::sanitize::finite_values;
 use crate::components::UiShader;
 use crate::ecs::World;
 use crate::shadergen::params::{self, ParamLayout};
@@ -48,7 +49,7 @@ pub fn set_param(
     value: Vec<f32>,
 ) -> Result<(), String> {
     let s = layout.resolve(name)?;
-    let value = layout.coerce(s, value)?;
+    let value = layout.coerce(s, finite_values(value)?)?;
     if let Some(shader) = slot {
         shader.params.insert(layout.name(s), value);
     }

@@ -8,14 +8,14 @@
 //!
 //! Pure.
 
-use super::sanitize::{non_negative, unit};
+use super::sanitize::{finite_curve, finite_gradient, non_negative, unit};
 use crate::asset::MapRef;
 use crate::components::{ParticleBlend, RibbonStyle, TextureMode};
 use crate::core::curve::{Curve, Gradient};
 
 /// Set the width curve along the length; keys clamped to `t ∈ [0, 1]`, `≥ 0`.
 pub fn set_width(s: &mut RibbonStyle, width: Curve) {
-    let keys: Vec<(f32, f32)> = width
+    let keys: Vec<(f32, f32)> = finite_curve(width)
         .keys
         .iter()
         .map(|k| (unit(k.t), non_negative(k.value)))
@@ -26,7 +26,7 @@ pub fn set_width(s: &mut RibbonStyle, width: Curve) {
 /// Set the colour gradient along the length; keys clamped to `t ∈ [0, 1]`,
 /// channels `≥ 0`, alpha to `[0, 1]`.
 pub fn set_color(s: &mut RibbonStyle, color: Gradient) {
-    let mut g = color;
+    let mut g = finite_gradient(color);
     for key in &mut g.color_keys {
         key.t = unit(key.t);
         key.color = key.color.map(non_negative);

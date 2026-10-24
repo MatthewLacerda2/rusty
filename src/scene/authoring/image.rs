@@ -69,6 +69,7 @@ pub fn set_raycast_target(i: &mut ImageComponent, target: bool) {
 }
 
 /// Set (or clear, `None`) the gradient tint; one with fewer than two stops clears it.
+// lint: allow(sanitize) `ui_look::sanitize_gradient` runs every field through the helpers
 pub fn set_gradient(i: &mut ImageComponent, g: Option<UiGradient>) {
     i.gradient = g.and_then(sanitize_gradient);
 }
