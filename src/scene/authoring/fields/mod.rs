@@ -3,7 +3,7 @@
 //!
 //! One table, two readers: `Component.Set` (`api::component`) writes a Lua table's
 //! fields through it, and a scene or prefab load holds what it read through it
-//! ([`hold`], #1418), so a value the inspector's setters would refuse never reaches
+//! ([`hold_world`], #1418), so a value the inspector's setters would refuse never reaches
 //! the World from a file either. It lives here, not in `api`, because loading is
 //! `scene`'s and `scene` sits below `api` in the layer table.
 
