@@ -55,7 +55,7 @@ fn every_build_field_roundtrips() {
 fn a_new_project_gets_a_default_file_named_after_its_folder() {
     let root = fresh("Horde");
     pin_engine(A, Some(5));
-    let (engine, lines) = record(&root).unwrap();
+    let (engine, _, lines) = record(&root).unwrap();
     assert_eq!(engine.verdict(), Verdict::Same);
     assert_eq!(lines, vec![format!("created {PROJECT_FILE}")]);
     let file = ProjectFile::read(&root.join(PROJECT_FILE))
@@ -70,7 +70,7 @@ fn a_new_project_gets_a_default_file_named_after_its_folder() {
 fn an_upgrade_records_the_new_engine_and_says_so() {
     let (root, stale) = opened_by_a("upgrade", Some(5));
     pin_engine(B, Some(6));
-    assert_eq!(inspect(&root).unwrap().verdict(), Verdict::Upgrade);
+    assert_eq!(inspect(&root).unwrap().0.verdict(), Verdict::Upgrade);
     let path = root.join(PROJECT_FILE);
     assert_eq!(
         ProjectFile::read(&path).unwrap(),
@@ -78,7 +78,7 @@ fn an_upgrade_records_the_new_engine_and_says_so() {
         "run: untouched"
     );
 
-    let (engine, lines) = record(&root).unwrap();
+    let (engine, _, lines) = record(&root).unwrap();
     assert_eq!(
         engine.recorded.as_deref(),
         Some(A),
@@ -102,7 +102,7 @@ fn an_upgrade_records_the_new_engine_and_says_so() {
 fn a_file_without_a_count_is_an_upgrade() {
     let (root, _) = opened_by_a("countless", None);
     pin_engine(B, Some(6));
-    assert_eq!(inspect(&root).unwrap().verdict(), Verdict::Upgrade);
+    assert_eq!(inspect(&root).unwrap().0.verdict(), Verdict::Upgrade);
     let text = std::fs::read_to_string(root.join(PROJECT_FILE)).unwrap();
     assert!(!text.contains("engine_order"), "no count, no field: {text}");
 }
@@ -111,7 +111,7 @@ fn a_file_without_a_count_is_an_upgrade() {
 fn an_older_engine_still_warns_and_records_itself() {
     let (root, _) = opened_by_a("older", Some(7));
     pin_engine(B, Some(6));
-    let (engine, lines) = record(&root).unwrap();
+    let (engine, _, lines) = record(&root).unwrap();
     assert!(engine.warning().is_some() && lines.is_empty(), "{lines:?}");
     let now = ProjectFile::load(&root).unwrap();
     assert_eq!((now.engine_commit.as_str(), now.engine_order), (B, Some(6)));
@@ -126,7 +126,7 @@ fn a_build_that_cannot_count_or_name_itself_keeps_what_it_can() {
     assert_eq!(now.engine_order, Some(5), "same commit: the count holds");
 
     pin_engine(UNKNOWN_COMMIT, None);
-    let (engine, lines) = record(&root).unwrap();
+    let (engine, _, lines) = record(&root).unwrap();
     assert_eq!((engine.warning(), lines), (None, vec![]));
     assert_eq!(
         ProjectFile::load(&root).unwrap(),

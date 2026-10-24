@@ -29,11 +29,9 @@ use serde_json::{json, Value};
 
 use crate::app::GameWorld;
 use crate::core::frame_stats::FrameStats;
-use crate::core::input::InputState;
-use crate::navigation::NavigationGraph;
-use crate::scene::Scene;
 use crate::scripting::{ConsoleLogs, LogLevel};
 
+mod build;
 mod render;
 
 /// The simulation timestep. 60 Hz, fixed — the source of determinism.
@@ -96,75 +94,6 @@ pub struct Harness {
 }
 
 impl Harness {
-    /// Build a harness around the default scene — the one the editor seeds (#667) —
-    /// and enter play mode. `bot_script` is the enemy brain path (empty to skip it).
-    ///
-    /// The run gets its own workspace, `<out_dir>/workspace`, seeded fresh from the
-    /// test-fixture project's scripts ([`fixture_project`]) and the engine's bundled
-    /// ones, and the scene's relative script paths resolve there (#782): a test
-    /// judges the engine's scripts, never a developer's project.
-    pub fn new(out_dir: impl AsRef<Path>, bot_script: &str) -> Self {
-        let workspace = Self::workspace_of(&out_dir);
-        let samples = fixture_project().join(crate::core::paths::native(
-            crate::scene::DEFAULT_SCRIPTS_DEST_DIR,
-        ));
-        crate::scene::seed_workspace(&workspace, Some(&samples));
-        Self::in_workspace(out_dir, bot_script, workspace)
-    }
-
-    /// [`Harness::new`] on the open project (`core::project`, the working directory)
-    /// — what an agent play-testing its game wants (the `play` binary). The bundled
-    /// scripts are seeded through the seed manifest, as the windowed boot does.
-    pub fn in_user_workspace(out_dir: impl AsRef<Path>, bot_script: &str) -> Self {
-        crate::scene::seed_default_scripts();
-        Self::in_workspace(out_dir, bot_script, PathBuf::new())
-    }
-
-    /// The workspace a harness built in `out_dir` runs in: see [`Harness::new`].
-    pub fn workspace_of(out_dir: impl AsRef<Path>) -> PathBuf {
-        out_dir.as_ref().join("workspace")
-    }
-
-    fn in_workspace(out_dir: impl AsRef<Path>, bot_script: &str, workspace: PathBuf) -> Self {
-        // The default scene's texture and shader, seeded into the working directory
-        // only when missing; only screenshots read them.
-        crate::scene::default_scene::seed_default_assets();
-
-        let mut scene = Scene::new();
-        crate::scene::default_scene::build(&mut scene, bot_script);
-
-        // Baked over the scene's own bounds (#452) — the same path the windowed game takes.
-        let nav = NavigationGraph::from_scene(&scene);
-        let scene = Rc::new(RefCell::new(scene));
-        let input = Rc::new(RefCell::new(InputState::new()));
-        let nav = Rc::new(RefCell::new(nav));
-        let console = Rc::new(RefCell::new(ConsoleLogs::new()));
-
-        super::lua_surface::install_api();
-        let mut world = GameWorld::new(
-            Rc::clone(&scene),
-            Rc::clone(&input),
-            Rc::clone(&nav),
-            Rc::clone(&console),
-        );
-        // Headless harness always runs the simulation (play mode), with no edit mode
-        // to return to: standalone, so `Editor.ExitPlay()` is refused (#1360).
-        world.resources.script_manager.set_workspace_root(workspace);
-        world.resources.application.borrow_mut().mark_standalone();
-        world.set_playing(true);
-        let stats = super::stats::install(&mut world);
-
-        Self {
-            world: Rc::new(RefCell::new(world)),
-            console,
-            logs: Vec::new(),
-            expectations: Vec::new(),
-            out_dir: out_dir.as_ref().to_path_buf(),
-            capture: super::capture::CaptureHost::new(),
-            stats,
-        }
-    }
-
     /// Advance the simulation by exactly `n` fixed ticks, or fewer if the game quits.
     pub fn step(&self, n: u32) {
         let mut world = self.world.borrow_mut();

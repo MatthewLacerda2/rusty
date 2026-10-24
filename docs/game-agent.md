@@ -79,10 +79,13 @@ API plus `Harness.*` (press keys, step ticks, assert), run with the `play` binar
 
 ```sh
 cd <engine> && cargo run --bin play --features dev -- \
-    --project <game> scenarios/smoke.lua <game>/out/
+    --project <game> <game>/scenarios/smoke.lua <game>/out/
 ```
 
-It writes `results.json` and `console.log` into the output folder. See `docs/testing.md` for
+It plays the game's startup scene (`build.startup_scene` in `project.rusty`), the
+same one the standalone player boots; `--scene <path>`, relative to the game like
+the startup scene, plays another. The scenario and output paths are read from where
+the command runs. It writes `results.json` and `console.log` into the output folder. See `docs/testing.md` for
 scenarios and captures, and `docs/ui.md` for the in-game UI.
 
 ## The MCP

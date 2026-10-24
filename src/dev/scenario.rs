@@ -4,14 +4,16 @@
 //! harness through the SAME observe/act surface an agent uses. The loop is:
 //!
 //!   1. write   `scenarios/<name>.lua` in the game project
-//!   2. run     `cargo run --bin play --features dev -- --project <dir> <scenario> <out_dir>`
+//!   2. run     `cargo run --bin play --features dev -- --project <dir> [--scene <path>] <scenario> <out_dir>`
 //!   3. read    `<out_dir>/results.json` + `console.log`
 //!
-//! Example scenario:
-//!   local enemy = Scene.FindEntityByName("Enemy_1")
+//! It plays the project's startup scene, or the `--scene` named. Example scenario
+//! (`Player` stands for an entity of that scene):
+//!   local player = Scene.FindEntityByName("Player")
+//!   local x0, _, z0 = Transform.GetPosition(player)
 //!   Input.Press("W"); Harness.Step(120)            -- walk 2s @ 1/60
-//!   local _, _, ez = Transform.GetPosition(enemy)
-//!   Harness.Expect(ez ~= nil, "the bot should have advanced toward the enemy")
+//!   local x1, _, z1 = Transform.GetPosition(player)
+//!   Harness.Expect(x1 ~= x0 or z1 ~= z0, "W should move the player")
 //!
 //! Runs in its own Lua VM, separate from the gameplay scripts inside `GameWorld`.
 
@@ -22,6 +24,7 @@ use std::rc::Rc;
 use mlua::Lua;
 
 use super::harness::Harness;
+use crate::core::application::BuildSettings;
 
 /// Default enemy brain used by the default scene when running scenarios.
 const DEFAULT_BOT_SCRIPT: &str = crate::scene::default_scene::BOT_SCRIPT;
@@ -33,31 +36,28 @@ pub struct RunReport {
 }
 
 /// Load and run `scenario_path` headlessly, writing results into `out_dir`, on the
-/// open project (`core::project`): a scenario play-tests the game being built.
-pub fn run(scenario_path: &Path, out_dir: &Path) -> Result<RunReport, String> {
-    run_on(scenario_path, out_dir, true)
+/// open project (`core::project`), playing `scene` (project-relative) under the
+/// project's `build` settings: a scenario play-tests the game being built.
+pub fn run(
+    scenario_path: &Path,
+    out_dir: &Path,
+    scene: &str,
+    build: BuildSettings,
+) -> Result<RunReport, String> {
+    let harness = Harness::in_user_workspace(out_dir, scene, build)?;
+    run_in(harness, scenario_path)
 }
 
 /// [`run`] on a workspace of the run's own, seeded from the engine's bundled
 /// scripts (see `Harness::new`) — for tests, which must not read a developer's project (#782).
 /// Test seam for `tests/input_harness.rs`.
 pub fn run_isolated(scenario_path: &Path, out_dir: &Path) -> Result<RunReport, String> {
-    run_on(scenario_path, out_dir, false)
+    run_in(Harness::new(out_dir, DEFAULT_BOT_SCRIPT), scenario_path)
 }
 
-fn run_on(scenario_path: &Path, out_dir: &Path, user: bool) -> Result<RunReport, String> {
+fn run_in(harness: Harness, scenario_path: &Path) -> Result<RunReport, String> {
     let code = std::fs::read_to_string(scenario_path)
         .map_err(|e| format!("Failed to read scenario {}: {}", scenario_path.display(), e))?;
-
-    // Both harnesses seed the bundled scripts before the scene attaches them, so
-    // the very first run and every rerun see the same files — otherwise the enemy
-    // brain would be absent on the first run and present afterwards, breaking
-    // byte-determinism.
-    let harness = if user {
-        Harness::in_user_workspace(out_dir, DEFAULT_BOT_SCRIPT)
-    } else {
-        Harness::new(out_dir, DEFAULT_BOT_SCRIPT)
-    };
     let harness = Rc::new(RefCell::new(harness));
 
     let lua = Lua::new();
