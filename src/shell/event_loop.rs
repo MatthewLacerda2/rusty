@@ -28,6 +28,8 @@ pub struct Launch<M> {
     /// `WM_CLASS`), which the desktop matches to a `.desktop` entry for the dock
     /// icon and grouping. `None` leaves it unset.
     pub app_id: Option<&'static str>,
+    /// Whether the window opens filling the screen (the editor) or at its size.
+    pub maximized: bool,
     /// What a first launch (no saved video settings) gets.
     pub video_defaults: VideoSettings,
     /// Builds the frontend once the shell is up.
@@ -94,7 +96,13 @@ where
             return;
         };
         let size = launch.video_defaults.resolution();
-        let window = boot::create_window(event_loop, &launch.title, launch.app_id, size);
+        let window = boot::create_window(
+            event_loop,
+            &launch.title,
+            launch.app_id,
+            size,
+            launch.maximized,
+        );
         let renderer = boot::init_renderer(&window);
         self.start(window, renderer);
     }

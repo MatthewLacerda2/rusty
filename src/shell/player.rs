@@ -109,6 +109,7 @@ pub fn launch() {
         title: build.product_name,
         // The game's own `.desktop` entry is its packager's to name.
         app_id: None,
+        maximized: false,
         frontend: |_: &Shell, _: &GameWorld| PlayerFrontend::default(),
     };
     super::run(game, launch);
