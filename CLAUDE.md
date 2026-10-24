@@ -245,14 +245,17 @@ the ones tooling or a past mistake depends on.
   asking it again when work begins adds nothing.
 - **Issue-less PRs are allowed only** for documentation updates or bug fixes; everything
   else starts as an issue.
-- **Filing what you notice is a duty, not an option.** Every finding is either folded
-  into the task in hand or filed, never dropped. Small findings, or ones in the way (a
-  stale doc included), are folded in; anything outside the branch is **filed rather
-  than fixed** — a branch that grows to cover everything it noticed is a branch nobody
-  can review. Whether something is worth *building* is a cost/benefit call; whether a
-  defect is worth *recording* never is: **a bug is always filed**. If it questions a
-  decision or exposes a foundational crack, tell the user; otherwise keep it brief and
-  carry on. The strongest issues come out of doing the work.
+- **Issues are for what matters** (the operator, 2026-10-24). A finding becomes an
+  issue when it **has already caused a real problem**, or when **leaving it costs more
+  than fixing it**. A code review reports what it found; Claude decides what is worth
+  fixing in the branch and drops the rest without filing it. A finding nobody hit and
+  that costs little is not filed. What must stay absolutely organised is the project's
+  **structure and architecture and its tools**, so development stays easy and fast: a
+  crack there (a slow build, a CI gap, a missing gate, a module out of shape) is always
+  worth an issue. Small findings in the way (a stale doc included) are folded in;
+  something worth filing outside the branch is filed rather than fixed, since a branch
+  that grows to cover everything it noticed is a branch nobody can review. If a finding
+  questions a decision or exposes a foundational crack, tell the user.
   **Before filing a bug** (orchestrator, coder or reviewer): look for earlier cases of
   its kind, open and closed, by symbol, module and wording; decide whether it is a
   **case** (a discrete slip) or a **symptom** (a problem that will produce more), even
@@ -265,10 +268,9 @@ the ones tooling or a past mistake depends on.
 - **Once is a case; twice is an issue** (the operator, 2026-10-18). Something that
   happens once is handled as a case. The second time, it is an issue: attack the root
   of the problem so it never becomes a bottleneck again — fix the cause, build the tool
-  or add the check — and prefer what scales over a one-off fix. This is why a bug or a
-  stale doc is filed and fixed right away rather than worked around. **A kind of bug
+  or add the check — and prefer what scales over a one-off fix. **A kind of bug
   counts, not only the same bug:** the second case of a kind with no root issue
-  triggers one.
+  triggers one. It counts problems that happened, not ones a review imagined.
 - **Every issue Claude files unprompted carries the `agent` label.** It says only who
   decided to file it, and never stops work.
 - **The approval test.** A finding is filed with `planning`, and never folded in, when

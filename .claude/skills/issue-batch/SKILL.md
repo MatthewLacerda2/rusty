@@ -104,6 +104,12 @@ So, before writing a brief:
 - before citing Unity, check that rusty has the machinery that makes Unity's way safe;
 - when a decision removes data or a capability, grep its consumers;
 - verify any claim about a platform or a tool in one command.
+- write "Builds on PR #N merged" only after `gh pr view N --json state` says
+  `MERGED`: a coder that finds the groundwork missing stands down (2026-10-24, #1387);
+- put no closing keyword in a routine prompt for an issue already closed: the
+  queue hands back a PR that closes a closed issue (#1422);
+- file an issue first and cite the number it got, never the one you expect: two
+  briefs named the wrong issue in one batch.
 
 The routine prompt:
 
@@ -147,11 +153,12 @@ watch, and restarts the watch by itself on every planned exit: the deadline and 
 hand-back at once, "nothing left" after ten minutes, `relaunch:` (status 5, the
 queue's own code changed, #967) at once, the machine or GitHub failing with a
 backoff, five times in a row at most. Put a `Monitor` on `tail -F
-.git/merge-queue/queue.log | grep --line-buffered -E 'HANDED BACK|supervisor:.*stopped'`,
+.git/merge-queue/queue.log | grep --line-buffered -E 'HANDED BACK|supervisor:.*stopped'` and on new issue comments matching `Standing down` (a coder that stops says so on its issue, not on a PR),
 never on the watch itself (a `Monitor` dies at 30 minutes and takes its command
 with it). The log's `watch:` lines are the whole view of the coders: no second
 poller. **Stop it with `make queue-stop`**, between pull requests; never by
-pattern: `pkill -f` kills scorsese's watch too. Run bare (`make queue ARGS="--watch
+pattern: `pkill -f` kills scorsese's watch too. Never `pkill -f` a pattern your own
+command line contains either: it kills the shell running it. Run bare (`make queue ARGS="--watch
 --no-check --for 70"` in the background), the watch needs relaunching by hand on
 each exit: its last line is `watch: resume: <command>`.
 `ci-merge` has everything else about the queue.
@@ -195,6 +202,11 @@ From 2026-10-19 to 21 the same kind of bug got about twelve separate patches,
 each one's review finding the next, before anyone filed the root fix (#1170).
 So whoever files a bug (orchestrator, coder or reviewer) first:
 
+0. **Checks it is worth an issue** (CLAUDE.md, *Issues are for what matters*): it
+   already caused a problem, or leaving it costs more than fixing it, or it is a
+   crack in the structure or the tooling. In the 2026-10-24 batch, reviews filed
+   about as many issues as the batch closed, mostly for edges nobody had hit; the
+   operator closed them unbuilt.
 1. **Looks for earlier cases** of its kind, open and closed, by symbol, module
    and wording. `gh search issues` answers 403 in a cloud session; there, page
    `gh api 'repos/MatthewLacerda2/rusty/issues?state=all&per_page=100&page=N'` and
