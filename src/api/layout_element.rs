@@ -13,9 +13,8 @@ use std::cell::RefCell;
 use mlua::{FromLuaMulti, IntoLuaMulti, Lua, Table};
 
 use super::{put, Reg};
-use crate::components::LayoutElementComponent;
-use crate::scene::authoring::layout_element::{self as ops, SizeKind, FITS};
-use crate::scene::authoring::layout_group::{name_of, parse};
+use crate::components::{LayoutAxisFit, LayoutElementComponent};
+use crate::scene::authoring::layout_element::{self as ops, SizeKind};
 use crate::scene::Scene;
 
 type Cell<'s> = &'s RefCell<Scene>;
@@ -42,14 +41,9 @@ pub fn register<'scope>(
         let set = move |e: &mut E, (w, h): Size| ops::set_size(e, kind, w, h);
         pair(scope, &t, scene, suffix, get, set)?;
     }
-    let fit = |e: &E| {
-        (
-            name_of(&FITS, e.horizontal_fit),
-            name_of(&FITS, e.vertical_fit),
-        )
-    };
+    let fit = |e: &E| (e.horizontal_fit.name(), e.vertical_fit.name());
     let set_fit = |e: &mut E, (h, v): (String, String)| {
-        if let (Some(h), Some(v)) = (parse(&FITS, &h), parse(&FITS, &v)) {
+        if let (Some(h), Some(v)) = (LayoutAxisFit::parse(&h), LayoutAxisFit::parse(&v)) {
             ops::set_fit(e, h, v);
         }
     };

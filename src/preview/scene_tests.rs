@@ -82,7 +82,7 @@ fn every_mesh_choice_spawns_a_mesh_entity() {
             meshed,
             1,
             "{}: should spawn exactly one mesh entity",
-            mesh.label()
+            mesh.name()
         );
     }
 }

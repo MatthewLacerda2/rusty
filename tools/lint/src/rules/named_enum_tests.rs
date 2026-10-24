@@ -69,10 +69,33 @@ fn passes_a_lone_parse_or_name_other_types_and_shapes() {
     assert!(lines(&free_two_types).is_empty());
     let two_args = FREE.replace("(name: &str)", "(name: &str, size: f32)");
     assert!(lines(&two_args).is_empty());
-    let braces_in_strings = "impl A {\n    fn f() { let _ = \"}}\"; }\n}\n\
+    let braces_in_strings = "impl A {\n    fn f() { let _ = \"{{\"; }\n}\n\
                              impl B {\n    fn name(self) -> &'static str { \"\" }\n}\n\
                              fn parse_a(s: &str) -> Option<A> { None }\n";
     assert!(lines(braces_in_strings).is_empty());
+}
+
+#[test]
+fn flags_a_pair_table() {
+    let table = "/// Every kind with its name.\npub const KINDS: [(Mode, &str); 2] = [\n    \
+                 (Mode::A, \"A\"),\n    (Mode::B, \"B\"),\n];\n";
+    assert_eq!(lines(table), [2]);
+    assert_eq!(lines("static NAMES: &[(Mode, &'static str)] = &[];\n"), [1]);
+    assert_eq!(
+        lines("pub(crate) const N: &'static [(Mode, &str)] = &[];\n"),
+        [1]
+    );
+}
+
+#[test]
+fn passes_other_tables_and_trait_impls() {
+    assert!(lines("const KINDS: &[(Has, &str, Tint)] = &[];\n").is_empty());
+    assert!(lines("const PATHS: [(&str, Field, usize); 1] = [];\n").is_empty());
+    assert!(lines("const SHAPES: [ColliderShape; 2] = [];\n").is_empty());
+    assert!(lines("let pairs: [(Mode, &str); 1] = [(Mode::A, \"A\")];\n").is_empty());
+    let display = "impl Display for Mode {\n    fn name(&self) -> &'static str { \"\" }\n}\n\
+                   impl Mode {\n    fn parse(s: &str) -> Option<Self> { None }\n}\n";
+    assert!(lines(display).is_empty());
 }
 
 #[test]

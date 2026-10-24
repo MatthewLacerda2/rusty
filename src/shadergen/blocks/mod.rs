@@ -148,7 +148,7 @@ mod tests {
                     cat.iter().skip(i + 1).all(|o| o.id != b.id),
                     "duplicate block id {} in {}",
                     b.id,
-                    pass.tag()
+                    pass.name()
                 );
             }
         }

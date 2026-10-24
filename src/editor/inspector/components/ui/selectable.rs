@@ -50,11 +50,7 @@ pub fn draw(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, is_dirty:
 
 /// Transition, target graphic, and the per-state colours + fade or sprites.
 fn draw_transition(ui: &mut egui::Ui, edit: &mut SelectableComponent) -> bool {
-    let kinds = [
-        SelectableTransition::None,
-        SelectableTransition::ColorTint,
-        SelectableTransition::SpriteSwap,
-    ];
+    let kinds = SelectableTransition::ALL;
     let mut changed = combo(
         ui,
         "Transition",
@@ -103,11 +99,7 @@ fn draw_transition(ui: &mut egui::Ui, edit: &mut SelectableComponent) -> bool {
 
 /// Navigation mode and, for `Explicit`, the four targets.
 fn draw_navigation(ui: &mut egui::Ui, edit: &mut SelectableComponent) -> bool {
-    let modes = [
-        NavigationMode::None,
-        NavigationMode::Automatic,
-        NavigationMode::Explicit,
-    ];
+    let modes = NavigationMode::ALL;
     let mut changed = combo(
         ui,
         "Navigation",

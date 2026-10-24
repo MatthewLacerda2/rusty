@@ -184,19 +184,18 @@ pub(crate) fn text_value(t: &crate::components::TextComponent) -> Value {
 /// LayoutGroup authoring view (#421): the arrangement and its knobs. Where the
 /// children land is each child's `ui_rect`.
 pub(crate) fn layout_group_value(g: &crate::components::LayoutGroupComponent) -> Value {
-    use crate::scene::authoring::layout_group::{name_of, CONSTRAINTS, CORNERS, KINDS};
     let p = g.padding;
     json!({
-        "kind": name_of(&KINDS, g.kind),
+        "kind": g.kind.name(),
         "padding": [p.x, p.y, p.z, p.w],
         "spacing": [g.spacing.x, g.spacing.y],
         "child_alignment": g.child_alignment.name(),
         "control_child_size": [g.control_child_width, g.control_child_height],
         "child_force_expand": [g.child_force_expand_width, g.child_force_expand_height],
         "cell_size": [g.cell_size.x, g.cell_size.y],
-        "constraint": name_of(&CONSTRAINTS, g.constraint),
+        "constraint": g.constraint.name(),
         "constraint_count": g.constraint_count,
-        "start_corner": name_of(&CORNERS, g.start_corner),
+        "start_corner": g.start_corner.name(),
         "start_vertical": g.start_vertical,
     })
 }
@@ -204,13 +203,11 @@ pub(crate) fn layout_group_value(g: &crate::components::LayoutGroupComponent) ->
 /// LayoutElement authoring view (#421): the size overrides as `[width, height]`
 /// (`null` = the content's size) and the content fitter per axis.
 pub(crate) fn layout_element_value(e: &crate::components::LayoutElementComponent) -> Value {
-    use crate::scene::authoring::layout_element::FITS;
-    use crate::scene::authoring::layout_group::name_of;
     json!({
         "ignore_layout": e.ignore_layout,
         "min_size": [e.min_width, e.min_height],
         "preferred_size": [e.preferred_width, e.preferred_height],
         "flexible_size": [e.flexible_width, e.flexible_height],
-        "fit": [name_of(&FITS, e.horizontal_fit), name_of(&FITS, e.vertical_fit)],
+        "fit": [e.horizontal_fit.name(), e.vertical_fit.name()],
     })
 }

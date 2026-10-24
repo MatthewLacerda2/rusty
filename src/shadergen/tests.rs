@@ -147,7 +147,7 @@ fn every_catalogued_block_bakes_into_a_composing_module() {
                 blocks: vec![block(b.id, BTreeMap::new())],
             };
             let path = bake_recipe(&recipe, ENGINE_SHADERS, out.to_str().unwrap())
-                .unwrap_or_else(|e| panic!("block {} ({}) failed to bake: {e}", b.id, pass.tag()));
+                .unwrap_or_else(|e| panic!("block {} ({}) failed to bake: {e}", b.id, pass.name()));
             std::fs::remove_file(path).ok();
         }
     }

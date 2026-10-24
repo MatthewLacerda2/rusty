@@ -45,7 +45,7 @@ pub(super) fn gradient_editor(ui: &mut egui::Ui, gradient: &mut Option<UiGradien
     let Some(g) = gradient else {
         return toggled;
     };
-    let kinds = [GradientKind::Linear, GradientKind::Radial];
+    let kinds = GradientKind::ALL;
     let mut changed = toggled | combo(ui, "Kind", &mut g.kind, &kinds, GradientKind::name);
     match g.kind {
         GradientKind::Linear => changed |= drag_row(ui, "  Angle:", &mut g.angle, 1.0),

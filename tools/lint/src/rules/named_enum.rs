@@ -11,7 +11,9 @@
 //!
 //! is a finding at the parse: declare `T` through the macro instead. The two may sit
 //! in different `impl T` blocks, an `impl` may be indented (an inline `mod`) and
-//! carry a comment after its `{`. A parse that does more than read one name per
+//! carry a comment after its `{`. So is a `const` / `static` table of
+//! `(T, &str)` pairs (`[(T, &str); N]`, `&[(T, &'static str)]`), a name table read
+//! both ways by a generic lookup, at its declaration. A parse that does more than read one name per
 //! variant (separators ignored, a name built from parts) says why with
 //! `// lint: allow(named-enum) <why>`. Test code is not scanned.
 
@@ -31,6 +33,7 @@ pub fn check(path: &str, source: &str, test: &[bool]) -> Vec<Finding> {
     let mut types: BTreeMap<String, (Option<usize>, bool)> = BTreeMap::new();
     let (mut open, mut depth) = (Open::None, 0usize);
     let mut block: Option<(String, usize)> = None;
+    let mut tables = Vec::new();
     for (i, line) in source.lines().enumerate() {
         let mut braces = (0usize, 0usize);
         let code = code_of(line, &mut open, |_, c| match c {
@@ -59,17 +62,60 @@ pub fn check(path: &str, source: &str, test: &[bool]) -> Vec<Finding> {
             if block.is_none() {
                 block = impl_type(code).map(|ty| (ty, depth));
             }
+            if is_pair_table(code) {
+                tables.push(i + 1);
+            }
         }
         depth = (depth + braces.0).saturating_sub(braces.1);
         if block.as_ref().is_some_and(|b| depth <= b.1) && braces.1 > 0 {
             block = None;
         }
     }
-    types
+    let mut lines: Vec<usize> = types
         .into_values()
         .filter_map(|(parse, name)| parse.filter(|_| name))
-        .map(|line| finding(path, line))
-        .collect()
+        .chain(tables)
+        .collect();
+    lines.sort_unstable();
+    lines.into_iter().map(|line| finding(path, line)).collect()
+}
+
+/// A `const` / `static` whose type is an array or slice of `(T, &str)` pairs.
+fn is_pair_table(code: &str) -> bool {
+    let decl = ["const ", "static "].iter().find_map(|k| {
+        code.split_once(k)
+            .filter(|(before, _)| is_visibility(before))
+    });
+    let Some((_, rest)) = decl else {
+        return false;
+    };
+    let Some(ty) = rest
+        .split_once(':')
+        .and_then(|(_, t)| t.split_once('='))
+        .map(|t| t.0)
+    else {
+        return false;
+    };
+    let ty = ty
+        .trim()
+        .trim_start_matches('&')
+        .trim_start_matches("'static")
+        .trim();
+    let Some(pair) = ty
+        .strip_prefix("[(")
+        .and_then(|t| t.split_once(')'))
+        .map(|t| t.0)
+    else {
+        return false;
+    };
+    let parts: Vec<&str> = pair.split(',').map(str::trim).collect();
+    matches!(parts[..], [t, "&str" | "&'static str"] if is_type(t))
+}
+
+/// Whether `before` (the text before `const` / `static`) is only a visibility.
+fn is_visibility(before: &str) -> bool {
+    let b = before.trim();
+    b.is_empty() || b == "pub" || (b.starts_with("pub(") && b.ends_with(')'))
 }
 
 /// `T` of an `impl T {` line (no trait, no generics), a comment after it cut.

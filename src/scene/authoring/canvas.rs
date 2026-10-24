@@ -58,6 +58,24 @@ mod tests {
     use super::*;
 
     #[test]
+    fn render_modes_read_unitys_short_names_in_any_case() {
+        use CanvasRenderMode::{ScreenSpaceCamera, ScreenSpaceOverlay, WorldSpace};
+        for (name, mode) in [
+            ("Overlay", ScreenSpaceOverlay),
+            ("camera", ScreenSpaceCamera),
+            ("WORLD", WorldSpace),
+            ("screenspaceoverlay", ScreenSpaceOverlay),
+        ] {
+            assert_eq!(CanvasRenderMode::parse(name), Some(mode), "{name}");
+        }
+        assert_eq!(
+            WorldSpace.name(),
+            "WorldSpace",
+            "the alias is never the name"
+        );
+    }
+
+    #[test]
     fn ops_write_through_and_clamp() {
         let mut c = CanvasComponent::default();
         set_sort_order(&mut c, 7);

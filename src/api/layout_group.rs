@@ -15,9 +15,10 @@ use glam::{Vec2, Vec4};
 use mlua::{FromLuaMulti, IntoLuaMulti, Lua, Table};
 
 use super::{put, Reg};
-use crate::components::LayoutGroupComponent;
-use crate::components::TextAlignment;
-use crate::scene::authoring::layout_group::{self as ops, CONSTRAINTS, CORNERS, KINDS};
+use crate::components::{
+    LayoutConstraint, LayoutCorner, LayoutGroupComponent, LayoutKind, TextAlignment,
+};
+use crate::scene::authoring::layout_group as ops;
 use crate::scene::Scene;
 
 type Cell<'s> = &'s RefCell<Scene>;
@@ -29,9 +30,9 @@ type NameSet = fn(&mut G, &str);
 const NAMES: [(&str, NameGet, NameSet); 4] = [
     (
         "Kind",
-        |g| ops::name_of(&KINDS, g.kind),
+        |g| g.kind.name(),
         |g, n| {
-            if let Some(v) = ops::parse(&KINDS, n) {
+            if let Some(v) = LayoutKind::parse(n) {
                 ops::set_kind(g, v);
             }
         },
@@ -47,18 +48,18 @@ const NAMES: [(&str, NameGet, NameSet); 4] = [
     ),
     (
         "Constraint",
-        |g| ops::name_of(&CONSTRAINTS, g.constraint),
+        |g| g.constraint.name(),
         |g, n| {
-            if let Some(v) = ops::parse(&CONSTRAINTS, n) {
+            if let Some(v) = LayoutConstraint::parse(n) {
                 ops::set_constraint(g, v);
             }
         },
     ),
     (
         "StartCorner",
-        |g| ops::name_of(&CORNERS, g.start_corner),
+        |g| g.start_corner.name(),
         |g, n| {
-            if let Some(v) = ops::parse(&CORNERS, n) {
+            if let Some(v) = LayoutCorner::parse(n) {
                 ops::set_start_corner(g, v);
             }
         },

@@ -16,16 +16,18 @@
 
 use serde::{Deserialize, Serialize};
 
-/// What a content fitter sizes one axis to.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub enum LayoutAxisFit {
-    /// Leave the RectTransform's size alone.
-    #[default]
-    Unconstrained,
-    /// The content's min size.
-    MinSize,
-    /// The content's preferred size.
-    PreferredSize,
+crate::core::named_enum! {
+    /// What a content fitter sizes one axis to.
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+    pub enum LayoutAxisFit {
+        /// Leave the RectTransform's size alone.
+        #[default]
+        Unconstrained = "Unconstrained",
+        /// The content's min size.
+        MinSize = "MinSize",
+        /// The content's preferred size.
+        PreferredSize = "PreferredSize",
+    }
 }
 
 /// Layout sizes and content fitting for one UI element. See the module docs.

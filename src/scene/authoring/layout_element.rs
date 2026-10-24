@@ -10,20 +10,15 @@
 
 use crate::components::{LayoutAxisFit, LayoutElementComponent};
 
-/// Which of an element's three layout sizes.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum SizeKind {
-    Min,
-    Preferred,
-    Flexible,
+crate::core::named_enum! {
+    /// Which of an element's three layout sizes; its name is the inspector's label.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub enum SizeKind {
+        Min = "Min",
+        Preferred = "Preferred",
+        Flexible = "Flexible",
+    }
 }
-
-/// Every fit mode with its name.
-pub const FITS: [(LayoutAxisFit, &str); 3] = [
-    (LayoutAxisFit::Unconstrained, "Unconstrained"),
-    (LayoutAxisFit::MinSize, "MinSize"),
-    (LayoutAxisFit::PreferredSize, "PreferredSize"),
-];
 
 /// Set whether its parent's layout group skips it.
 pub fn set_ignore_layout(le: &mut LayoutElementComponent, ignore: bool) {

@@ -41,21 +41,23 @@ fn is_true(value: &bool) -> bool {
     *value
 }
 
-/// How a material's surface is composited — Unity's "Rendering Mode" (#242). Plain
-/// serde data, mirroring [`ParticleBlend`](super::ParticleBlend) as prior art for a
-/// blend selector. `Opaque` is the default and the fast path.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub enum RenderMode {
-    /// Fully opaque (`REPLACE`, depth write on). The default; rides the solids pass.
-    #[default]
-    Opaque,
-    /// Alpha-tested: the fragment is `discard`ed below `alpha_cutoff`, else fully
-    /// opaque. Writes depth, needs no sorting, so it also rides the solids pass
-    /// (foliage, chain-link, grates).
-    Cutout,
-    /// Alpha-blended (`ALPHA_BLENDING`), depth test on / write off, drawn in a
-    /// separate back-to-front-sorted pass after opaque (glass, holograms, fades).
-    Transparent,
+crate::core::named_enum! {
+    /// How a material's surface is composited — Unity's "Rendering Mode" (#242). Plain
+    /// serde data, mirroring [`ParticleBlend`](super::ParticleBlend) as prior art for a
+    /// blend selector. `Opaque` is the default and the fast path.
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+    pub enum RenderMode {
+        /// Fully opaque (`REPLACE`, depth write on). The default; rides the solids pass.
+        #[default]
+        Opaque = "Opaque",
+        /// Alpha-tested: the fragment is `discard`ed below `alpha_cutoff`, else fully
+        /// opaque. Writes depth, needs no sorting, so it also rides the solids pass
+        /// (foliage, chain-link, grates).
+        Cutout = "Cutout",
+        /// Alpha-blended (`ALPHA_BLENDING`), depth test on / write off, drawn in a
+        /// separate back-to-front-sorted pass after opaque (glass, holograms, fades).
+        Transparent = "Transparent",
+    }
 }
 
 /// The glTF 2.0 metallic-roughness material data — a reusable asset. Stored in the

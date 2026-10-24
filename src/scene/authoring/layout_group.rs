@@ -13,44 +13,6 @@ use crate::components::{
     LayoutConstraint, LayoutCorner, LayoutGroupComponent, LayoutKind, TextAlignment,
 };
 
-/// Every kind with its name.
-pub const KINDS: [(LayoutKind, &str); 3] = [
-    (LayoutKind::Horizontal, "Horizontal"),
-    (LayoutKind::Vertical, "Vertical"),
-    (LayoutKind::Grid, "Grid"),
-];
-
-/// Every grid constraint with its name.
-pub const CONSTRAINTS: [(LayoutConstraint, &str); 3] = [
-    (LayoutConstraint::Flexible, "Flexible"),
-    (LayoutConstraint::FixedColumnCount, "FixedColumnCount"),
-    (LayoutConstraint::FixedRowCount, "FixedRowCount"),
-];
-
-/// Every start corner with its name.
-pub const CORNERS: [(LayoutCorner, &str); 4] = [
-    (LayoutCorner::UpperLeft, "UpperLeft"),
-    (LayoutCorner::UpperRight, "UpperRight"),
-    (LayoutCorner::LowerLeft, "LowerLeft"),
-    (LayoutCorner::LowerRight, "LowerRight"),
-];
-
-/// `value`'s name in `table`.
-pub fn name_of<T: Copy + PartialEq>(table: &[(T, &'static str)], value: T) -> &'static str {
-    table
-        .iter()
-        .find(|(v, _)| *v == value)
-        .map_or("", |(_, n)| n)
-}
-
-/// Parse a name from `table` (case-insensitive).
-pub fn parse<T: Copy>(table: &[(T, &str)], name: &str) -> Option<T> {
-    table
-        .iter()
-        .find(|(_, n)| n.eq_ignore_ascii_case(name))
-        .map(|(v, _)| *v)
-}
-
 /// Set the arrangement.
 pub fn set_kind(g: &mut LayoutGroupComponent, kind: LayoutKind) {
     g.kind = kind;
@@ -119,18 +81,5 @@ mod tests {
         set_constraint_count(&mut g, 0);
         assert_eq!(g.cell_size, Vec2::new(0.0, 20.0));
         assert_eq!(g.constraint_count, 1);
-    }
-
-    #[test]
-    fn names_round_trip_case_insensitively() {
-        for (kind, name) in KINDS {
-            assert_eq!(parse(&KINDS, &name.to_lowercase()), Some(kind));
-            assert_eq!(name_of(&KINDS, kind), name);
-        }
-        assert_eq!(
-            parse(&CORNERS, "lowerright"),
-            Some(LayoutCorner::LowerRight)
-        );
-        assert_eq!(parse(&CONSTRAINTS, "nope"), None);
     }
 }

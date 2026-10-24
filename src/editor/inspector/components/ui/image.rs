@@ -74,29 +74,15 @@ fn draw_common(ui: &mut egui::Ui, edit: &mut ImageComponent) -> bool {
         })
         .inner;
     edit.texture = Some(path.into());
-    let types = [
-        ImageType::Simple,
-        ImageType::Sliced,
-        ImageType::Tiled,
-        ImageType::Filled,
-    ];
+    let types = ImageType::ALL;
     changed |= combo(ui, "Image Type", &mut edit.image_type, &types, |t| t.name());
     changed
 }
 
 /// Fill method, origin, amount and direction.
 fn draw_fill(ui: &mut egui::Ui, edit: &mut ImageComponent) -> bool {
-    let methods = [
-        FillMethod::Horizontal,
-        FillMethod::Vertical,
-        FillMethod::Radial360,
-    ];
-    let origins = [
-        FillOrigin::Left,
-        FillOrigin::Right,
-        FillOrigin::Bottom,
-        FillOrigin::Top,
-    ];
+    let methods = FillMethod::ALL;
+    let origins = FillOrigin::ALL;
     let mut changed = combo(ui, "Fill Method", &mut edit.fill_method, &methods, |m| {
         m.name()
     });

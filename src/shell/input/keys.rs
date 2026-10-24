@@ -11,6 +11,7 @@ use winit::event::MouseButton;
 use winit::keyboard::KeyCode;
 
 /// Every forwarded key and its engine name.
+// lint: allow(named-enum) `KeyCode` is winit's enum, which `named_enum!` cannot declare
 const KEY_NAMES: &[(KeyCode, &str)] = &[
     (KeyCode::KeyA, "A"),
     (KeyCode::KeyB, "B"),

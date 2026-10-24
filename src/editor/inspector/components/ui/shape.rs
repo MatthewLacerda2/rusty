@@ -51,16 +51,10 @@ pub fn draw(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, is_dirty:
 /// The kind and the fields it uses.
 fn draw_kind(ui: &mut egui::Ui, s: &mut ShapeComponent) -> bool {
     use ShapeKind::{Ellipse, Line, Rect, Ring};
-    let mut changed = combo(
-        ui,
-        "Kind",
-        &mut s.kind,
-        &[Rect, Ellipse, Ring, Line],
-        ShapeKind::name,
-    );
+    let mut changed = combo(ui, "Kind", &mut s.kind, &ShapeKind::ALL, ShapeKind::name);
     match s.kind {
         Rect => {
-            let corners = [ShapeCorner::Round, ShapeCorner::Chamfer];
+            let corners = ShapeCorner::ALL;
             changed |= combo(ui, "Corners", &mut s.corner, &corners, ShapeCorner::name);
             if let Some(r) = vec4_row(ui, "Radius (tl tr br bl):", s.radius) {
                 s.radius = r;

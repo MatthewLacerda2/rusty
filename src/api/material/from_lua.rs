@@ -40,7 +40,7 @@ use crate::procgen::TextureRecipe;
 #[derive(Default)]
 pub struct Validated {
     /// The raw `render_mode` recipe string (e.g. `"Cutout"`), parsed by the shared
-    /// `parse_render_mode` so an unknown name degrades to `Opaque`.
+    /// `RenderMode::parse`, an unknown name degrading to `Opaque`.
     pub render_mode: Option<String>,
     /// The raw `alpha`, clamped to `[0,1]` by the shared `set_alpha` op.
     pub alpha: Option<f32>,

@@ -13,38 +13,44 @@ use serde::{Deserialize, Serialize};
 
 use super::TextAlignment;
 
-/// Which arrangement a group makes.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub enum LayoutKind {
-    /// One row, left to right.
-    #[default]
-    Horizontal,
-    /// One column, top to bottom.
-    Vertical,
-    /// Equal `cell_size` cells in rows and columns.
-    Grid,
+crate::core::named_enum! {
+    /// Which arrangement a group makes.
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+    pub enum LayoutKind {
+        /// One row, left to right.
+        #[default]
+        Horizontal = "Horizontal",
+        /// One column, top to bottom.
+        Vertical = "Vertical",
+        /// Equal `cell_size` cells in rows and columns.
+        Grid = "Grid",
+    }
 }
 
-/// How a grid picks its column / row count.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub enum LayoutConstraint {
-    /// As many columns (or rows) as fit the rect.
-    #[default]
-    Flexible,
-    /// Exactly `constraint_count` columns.
-    FixedColumnCount,
-    /// Exactly `constraint_count` rows.
-    FixedRowCount,
+crate::core::named_enum! {
+    /// How a grid picks its column / row count.
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+    pub enum LayoutConstraint {
+        /// As many columns (or rows) as fit the rect.
+        #[default]
+        Flexible = "Flexible",
+        /// Exactly `constraint_count` columns.
+        FixedColumnCount = "FixedColumnCount",
+        /// Exactly `constraint_count` rows.
+        FixedRowCount = "FixedRowCount",
+    }
 }
 
-/// The grid corner the first child sits in.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub enum LayoutCorner {
-    #[default]
-    UpperLeft,
-    UpperRight,
-    LowerLeft,
-    LowerRight,
+crate::core::named_enum! {
+    /// The grid corner the first child sits in.
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+    pub enum LayoutCorner {
+        #[default]
+        UpperLeft = "UpperLeft",
+        UpperRight = "UpperRight",
+        LowerLeft = "LowerLeft",
+        LowerRight = "LowerRight",
+    }
 }
 
 /// A layout group. See the module docs.
