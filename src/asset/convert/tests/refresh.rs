@@ -41,6 +41,11 @@ fn a_second_refresh_reads_no_unchanged_source_again() {
     let enemy = root.join("enemy.fbx");
     std::fs::write(&enemy, QUAD).unwrap();
     refresh_sources(&root);
+    // The conversion notes its source as written (`stage::note`), so the next look
+    // reads it once more; only from then on is it unchanged. Counting straight
+    // after the first refresh passed alone and failed under `cargo test`, where
+    // another test's look drains the note first (#1338).
+    refresh_sources(&root);
     let reads = depends::reads(&enemy);
     refresh_sources(&root);
     refresh_sources(&root);
