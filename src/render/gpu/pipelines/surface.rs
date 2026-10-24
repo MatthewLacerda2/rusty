@@ -35,9 +35,10 @@
 //! shadow and fills no SSAO depth. Only those variants pay for a depth fragment.
 
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use crate::core::fs::written::{written_since, Stale};
+use crate::core::paths::native;
 use crate::shadergen::assemble::{CUT_PREPASS, CUT_SHADOW};
 use crate::shadergen::params::{resolve_module, sidecar_path, ParamLayout};
 use crate::shadergen::{compose, engine_shader_dir, DEFAULT_OUT_DIR};
@@ -203,7 +204,7 @@ impl SurfaceShaders {
         let dirs = &self.dirs;
         for slot in self.slots.iter_mut().filter(|s| !s.stale) {
             slot.stale = dirs.iter().any(|dir| {
-                let wgsl = PathBuf::from(format!("{dir}/{}.wgsl", slot.name));
+                let wgsl = native(dir).join(format!("{}.wgsl", slot.name));
                 written.matches(&wgsl.to_string_lossy())
                     || written.matches(&sidecar_path(&wgsl).to_string_lossy())
             });

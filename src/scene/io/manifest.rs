@@ -25,6 +25,7 @@ use std::path::{Path, PathBuf};
 
 use crate::core::fs;
 use crate::core::hash::fnv1a64;
+use crate::core::paths;
 
 /// The manifest's place, relative to the project root.
 pub const SEED_MANIFEST_PATH: &str = ".seeded";
@@ -42,7 +43,9 @@ pub enum SeedOutcome {
     Kept,
 }
 
-/// The recorded seed hashes, keyed by the destination path as the caller names it.
+/// The recorded seed hashes, keyed by the destination path `/`-spelled
+/// (`core::paths::to_slash`), so one committed manifest names the same files on
+/// every OS (#1371).
 pub struct SeedManifest {
     path: PathBuf,
     entries: BTreeMap<String, u64>,
@@ -64,7 +67,7 @@ impl SeedManifest {
     /// Seed `dest` with `bundled`, under the rules in the module docs. Prints one
     /// line when a file is refreshed or kept; `hint` says how to take the new default.
     pub fn seed(&mut self, dest: &Path, bundled: &[u8], hint: &str) -> SeedOutcome {
-        let key = dest.to_string_lossy().into_owned();
+        let key = paths::to_slash(dest);
         let want = fnv1a64(bundled);
         let outcome = match std::fs::read(dest) {
             Err(_) => SeedOutcome::Written,

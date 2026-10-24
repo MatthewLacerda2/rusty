@@ -58,6 +58,7 @@ pub fn decode(uri: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::{decode, encode_path, file};
+    use crate::core::paths::native;
     use std::path::Path;
 
     #[test]
@@ -84,8 +85,8 @@ mod tests {
 
     #[test]
     fn a_uri_climbing_out_of_its_folder_names_the_file_where_it_lies() {
-        let base = Path::new("./assets/generated/imported/models");
+        let base = &native("./assets/generated/imported/models");
         let found = file(base, "../../../../models/a%20b.png");
-        assert_eq!(found.as_deref(), Some(Path::new("models/a b.png")));
+        assert_eq!(found.as_deref(), Some(native("models/a b.png").as_path()));
     }
 }

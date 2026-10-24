@@ -3,7 +3,8 @@ use crate::rules::{allowed, Finding};
 use std::collections::BTreeSet;
 
 fn check(path: &str, src: &str) -> Vec<Finding> {
-    let consts = "const CACHE: &str = \"assets/generated\";\nconst ALIAS: &str = a::CACHE;\n";
+    let consts = "const CACHE: &str = \"assets/generated\";\nconst ALIAS: &str = a::CACHE;\n\
+                  const ROOTED: &str = \"/engine\";\n";
     let slashed = slashed_constants([("src/k.rs", consts)].into_iter());
     super::check_file(path, src, &slashed)
 }
@@ -35,6 +36,10 @@ fn every_form_of_a_slash_path_is_flagged() {
         "dir.join(CACHE);\n",
         "dir.join(crate::k::CACHE);\n",
         "dir.join(ALIAS);\n",
+        "let p = Path::new(\"a/b\");\n",
+        "let p = std::path::Path::new(CACHE);\n",
+        "let p = PathBuf::from(format!(\"{X}/y\"));\n",
+        "p.push(format!(\"{X}/y.glb\"));\n",
     ] {
         assert!(flagged("src/a.rs", src), "{src}");
     }
@@ -54,7 +59,10 @@ fn one_part_per_join_and_separators_pass() {
         "dir.join(OTHER);\n",
         "dir.join(CACHE.len());\n",
         "v.push(\"a/b\".into());\n",
-        "v.push(format!(\"a/{b}\"));\n",
+        "v.push(format!(\"no file '{b}/c'\"));\n",
+        "let p = Path::new(\"/tmp/rusty.sock\");\n",
+        "let p = PathBuf::from(\"x\");\n",
+        "dir.join(ROOTED);\n",
         "// dir.join(\"a/b\")\n",
     ] {
         assert!(check("tests/c.rs", src).is_empty(), "{src}");
@@ -73,6 +81,8 @@ fn the_message_names_the_helper_each_crate_can_reach() {
     assert!(check("tests/a.rs", JOIN)[0]
         .message
         .contains("rusty::core::paths::native"));
+    let made = check("src/a.rs", "let p = Path::new(\"a/b\");\n");
+    assert!(made[0].message.starts_with("a path made from"));
 }
 
 #[test]

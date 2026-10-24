@@ -73,7 +73,10 @@ fn the_address_is_kind_digest_extension_under_the_generated_dir() {
     let brief = line("Reload!");
     let path = address(&brief).unwrap();
     let name = path.file_name().unwrap().to_str().unwrap();
-    assert_eq!(path.parent().unwrap(), std::path::Path::new(GENERATED_DIR));
+    assert_eq!(
+        path.parent().unwrap(),
+        crate::core::paths::native(GENERATED_DIR)
+    );
     assert_eq!(name, format!("speech-{}.mp3", digest(&brief).unwrap()));
     assert_eq!(digest(&brief).unwrap().len(), 64, "sha256, lowercase hex");
 }

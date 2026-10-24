@@ -9,15 +9,26 @@
 //! keep one spelling: join one part per call, or join
 //! `core::paths::native("a/b")`, which does that for a `/`-spelled path or constant.
 //!
-//! In `src/` and `tests/`, a `.join(…)` or `.push(…)` whose argument is a string
-//! literal holding a `/` (raw or not, even wrapped onto the next lines by
-//! rustfmt), a `format!` whose template holds one, or a `/`-holding `&str`
-//! constant the scan defines (by its name) is a finding. A literal of only `/`s
-//! and spaces is a slice's separator (`parts.join(" / ")`), not a path. Two forms
-//! it can't see: a `/` path held in a variable, and a `/` constant built by
-//! `concat!` or another macro. A path that must keep its `/` (a project-relative
-//! asset path is `/`-separated by design) says why with
-//! `// lint: allow(slash-join) <why>`.
+//! In `src/` and `tests/`, a `.join(…)`, `.push(…)`, `Path::new(…)` or
+//! `PathBuf::from(…)` whose argument is a string literal holding a `/` (raw or
+//! not, even wrapped onto the next lines by rustfmt), a `format!` whose template
+//! holds one, or a `/`-holding `&str` constant the scan defines (by its name) is a
+//! finding. A path made from a `/` path is all-`/` until something joins onto it,
+//! then mixed, so it is made with `native` too. A literal of only `/`s and spaces
+//! is a slice's separator (`parts.join(" / ")`), not a path, and a literal or
+//! constant starting with `/` is an absolute Unix path (a socket, a test's root),
+//! not a relative one to respell.
+//!
+//! Where it misfires, since it reads text, not types: a `.push` of a `/` literal,
+//! or of a `format!` whose template has a `/` and no space, onto a `Vec<&str>` or
+//! `Vec<String>`; a slice join whose separator holds a `/` beside other text; and
+//! a constant matched by its bare name, so a `/` constant in one module flags a
+//! same-named plain one joined in another. Where it is blind: a `/` path held in a
+//! variable; a `/` constant built by `concat!` or another macro; one whose value
+//! rustfmt wrapped onto the line after `const X: &str =`; and one typed
+//! `&'static str` or declared `static`. A path that must keep its `/` (a
+//! project-relative asset path is `/`-separated by design), or a misfire, says why
+//! with `// lint: allow(slash-join) <why>`.
 
 use super::finding::Finding;
 use super::scan::Scan;
@@ -25,7 +36,22 @@ use crate::code::code_lines;
 use std::collections::BTreeSet;
 
 pub const RULE: &str = "slash-join";
-const CALLS: [&str; 2] = [".join(", ".push("];
+/// The calls that build a path from their argument, and how each reads it.
+const CALLS: [(&str, Call); 4] = [
+    (".join(", Call::Join),
+    (".push(", Call::Push),
+    ("Path::new(", Call::Make),
+    ("PathBuf::from(", Call::Make),
+];
+
+/// How a call's argument is read. `Push` may be a `Vec<String>`'s, so a pushed
+/// `format!` counts only when its template reads as a path (no spaces).
+#[derive(Clone, Copy, PartialEq)]
+enum Call {
+    Join,
+    Push,
+    Make,
+}
 
 /// Every line of `path` where a call joins a `/` path; `slashed` names the
 /// `/`-holding constants.
@@ -38,38 +64,48 @@ pub fn check_file(path: &str, source: &str, slashed: &BTreeSet<String>) -> Vec<F
         true => "rusty::core::paths::native",
         false => "crate::core::paths::native",
     };
-    let mut lines: Vec<usize> = CALLS
+    let mut lines: Vec<(usize, bool)> = CALLS
         .iter()
-        .flat_map(|call| code.match_indices(call))
-        .filter(|&(at, call)| {
-            let arg = code[at + call.len()..].trim_start();
-            joins_a_slash(arg, call == ".push(", slashed)
+        .flat_map(|&(name, call)| {
+            code.match_indices(name)
+                .map(move |(at, _)| (at, name, call))
         })
-        .map(|(at, _)| code[..at].matches('\n').count() + 1)
+        .filter(|&(at, name, call)| {
+            let arg = code[at + name.len()..].trim_start();
+            joins_a_slash(arg, call, slashed)
+        })
+        .map(|(at, _, call)| (code[..at].matches('\n').count() + 1, call == Call::Make))
         .collect();
     lines.sort_unstable();
-    lines.dedup();
+    lines.dedup_by_key(|(line, _)| *line);
     lines
         .into_iter()
-        .map(|line| Finding {
+        .map(|(line, make)| Finding {
             path: path.to_string(),
             line,
             rule: RULE,
-            message: format!(
-                "a joined `/` path builds a mixed-separator path on Windows; \
-                 join one part per call, or join `{helper}(\"a/b\")`"
-            ),
+            message: match make {
+                true => format!(
+                    "a path made from a `/` path is mixed-separator on Windows once joined; \
+                     make it with `{helper}(\"a/b\")`"
+                ),
+                false => format!(
+                    "a joined `/` path builds a mixed-separator path on Windows; \
+                     join one part per call, or join `{helper}(\"a/b\")`"
+                ),
+            },
         })
         .collect()
 }
 
 /// Does the call argument starting `arg` name a `/`-separated path? A literal or
 /// constant counts only as the whole argument: `"a/b".into()` is a `String` pushed
-/// onto a list, and so is a `.push(format!(…))`.
-fn joins_a_slash(arg: &str, push: bool, slashed: &BTreeSet<String>) -> bool {
+/// onto a list.
+fn joins_a_slash(arg: &str, call: Call, slashed: &BTreeSet<String>) -> bool {
     let arg = arg.strip_prefix('&').unwrap_or(arg);
-    if let Some(template) = arg.strip_prefix("format!(").filter(|_| !push) {
-        return literal(template.trim_start()).is_some_and(|(text, _)| is_path(text));
+    if let Some(template) = arg.strip_prefix("format!(") {
+        let spaced = |text: &str| call == Call::Push && text.contains(char::is_whitespace);
+        return literal(template.trim_start()).is_some_and(|(t, _)| is_path(t) && !spaced(t));
     }
     if let Some((text, rest)) = literal(arg) {
         return is_path(text) && ends_argument(rest);
@@ -108,10 +144,12 @@ fn literal(code: &str) -> Option<(&str, &str)> {
     Some((&body[..end], &body[end + close.len()..]))
 }
 
-/// A path holds a `/` and a part beside it; `"/"`, `"//"` or `" / "` alone is a
-/// slice's separator.
+/// A relative path holds a `/` and a part beside it; `"/"`, `"//"` or `" / "`
+/// alone is a slice's separator, and a leading `/` is an absolute Unix path (a
+/// socket, a test's out-of-tree root), which has no Windows spelling to match.
 fn is_path(text: &str) -> bool {
-    text.contains('/') && !text.chars().all(|c| c == '/' || c.is_whitespace())
+    let separator = text.chars().all(|c| c == '/' || c.is_whitespace());
+    text.contains('/') && !separator && !text.starts_with('/')
 }
 
 /// The names of every `&str` constant in `src/` and `tests/` whose value holds a

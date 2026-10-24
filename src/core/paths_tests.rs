@@ -90,6 +90,7 @@ fn the_verbatim_prefix_is_stripped_so_a_slash_join_reads_on_windows() {
 #[test]
 fn to_slash_turns_every_backslash_into_a_slash() {
     assert_eq!(
+        // lint: allow(slash-join) a mixed spelling on purpose: the input under test
         to_slash(Path::new(r"assets\scripts/a.lua")),
         "assets/scripts/a.lua"
     );
@@ -99,7 +100,7 @@ fn to_slash_turns_every_backslash_into_a_slash() {
 #[test]
 fn extension_matching_ignores_case() {
     assert!(has_extension("assets/scripts/Enemy.LUA", "lua"));
-    assert!(has_extension(Path::new("a/b.Lua"), "lua"));
+    assert!(has_extension(native("a/b.Lua"), "lua"));
     assert!(
         !has_extension("a/lua", "lua"),
         "a bare name has no extension"
@@ -112,14 +113,11 @@ fn extension_matching_ignores_case() {
 #[test]
 fn fold_drops_dots_and_folds_climbs_without_the_disk() {
     let fold = |p: &str| super::fold(Path::new(p));
-    assert_eq!(
-        fold("./a/b/../../../../m/s.png"),
-        Path::new("../../m/s.png")
-    );
-    assert_eq!(fold("./cache/x/../../m/s.png"), Path::new("m/s.png"));
+    assert_eq!(fold("./a/b/../../../../m/s.png"), native("../../m/s.png"));
+    assert_eq!(fold("./cache/x/../../m/s.png"), native("m/s.png"));
     assert_eq!(fold("/tmp/r/../../../home/s.png"), Path::new("/home/s.png"));
     assert_eq!(fold("a/.."), Path::new("."));
-    assert_eq!(fold("a/./b"), Path::new("a/b"));
+    assert_eq!(fold("a/./b"), native("a/b"));
 }
 
 #[test]

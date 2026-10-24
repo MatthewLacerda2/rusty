@@ -4,6 +4,7 @@
 
 use super::locate::{find_engine_dir, find_packaged_project};
 use super::*;
+use crate::core::paths::native;
 
 fn fresh(name: &str) -> PathBuf {
     let dir = crate::test_temp::dir().join("project_seam").join(name);
@@ -19,7 +20,7 @@ fn args(list: &[&str]) -> Vec<String> {
 #[test]
 fn the_project_flag_is_taken_out_of_the_arguments() {
     let mut a = args(&["scene.scene", "--project", "../game", "--empty"]);
-    assert_eq!(take_flag(&mut a), Ok(Some(PathBuf::from("../game"))));
+    assert_eq!(take_flag(&mut a), Ok(Some(native("../game"))));
     assert_eq!(a, args(&["scene.scene", "--empty"]));
     let mut b = args(&["--project=/abs/game"]);
     assert_eq!(take_flag(&mut b), Ok(Some(PathBuf::from("/abs/game"))));

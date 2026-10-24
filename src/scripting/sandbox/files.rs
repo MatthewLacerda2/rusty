@@ -147,7 +147,7 @@ fn engine_searcher(lua: &Lua) -> mlua::Result<Function> {
     lua.create_function(|lua, name: String| {
         let rel = format!("{}.lua", name.replace('.', "/"));
         match bundled::script(&rel) {
-            Some(code) => found(lua, code, Path::new(&format!("engine/scripts/{rel}"))),
+            Some(code) => found(lua, code, &native(&format!("engine/scripts/{rel}"))),
             None => format!("no engine script 'engine/scripts/{rel}'").into_lua_multi(lua),
         }
     })

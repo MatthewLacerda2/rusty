@@ -28,11 +28,11 @@
 //! editor card call — so validation lives once.
 
 use std::cell::RefCell;
-use std::path::Path;
 
 use super::from_lua::{asset_from_lua, Validated};
 use super::{put, Reg};
 use crate::components::{MaterialAsset, RenderMode};
+use crate::core::paths::native;
 use crate::scene::authoring::material as mat_ops;
 use crate::scene::Scene;
 
@@ -71,7 +71,7 @@ pub fn register<'scope>(
         "Rebake",
         scope.create_function(|_, (name, resolution): (String, Option<u32>)| {
             let mut scene = scene.borrow_mut();
-            let dir = Path::new(mat_ops::MAPS_DIR);
+            let dir = &native(mat_ops::MAPS_DIR);
             mat_ops::rebake_maps(&mut scene.materials, &name, resolution, dir)
                 .map_err(mlua::Error::RuntimeError)
         }),
@@ -95,7 +95,7 @@ fn define(
     mut asset: MaterialAsset,
     validated: Validated,
 ) -> Result<(), String> {
-    mat_ops::bake_maps(&mut asset, name, Path::new(mat_ops::MAPS_DIR))?;
+    mat_ops::bake_maps(&mut asset, name, &native(mat_ops::MAPS_DIR))?;
     let mut scene = scene.borrow_mut();
     let materials = &mut scene.materials;
     let (metallic, roughness) = (asset.metallic, asset.roughness);

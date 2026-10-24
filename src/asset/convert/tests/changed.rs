@@ -4,13 +4,14 @@
 use super::super::gate::{refresh_changed, touched};
 use super::super::{cache_location, cached_gltf, record};
 use crate::core::fs::written::Stale;
+use crate::core::paths::native;
 use std::path::{Path, PathBuf};
 
 /// A folder holding a model whose texture is missing (its conversion read that
 /// path) and one whose textures are embedded, both converted.
 fn converted() -> (PathBuf, PathBuf, PathBuf) {
     let dir = crate::test_temp::dir();
-    let fixtures = Path::new("tests/fixtures/models");
+    let fixtures = &native("tests/fixtures/models");
     let missing = dir.join("missing.fbx");
     let embedded = dir.join("embedded.fbx");
     std::fs::copy(fixtures.join("missing_texture.fbx"), &missing).unwrap();

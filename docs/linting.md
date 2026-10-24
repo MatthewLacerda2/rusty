@@ -32,7 +32,7 @@ agent can read exactly what failed.
 | Dependency locks | cargo-deny (`deny.toml`) | **hard gate**: every git dependency is pinned by `rev` (`required-git-spec`); `nalgebra` only through the physics stack and no `cgmath` — glam is the one math crate (#975) |
 | `tools/lint` stays std-only | `make test-lint` | its `Cargo.lock` names one package, itself (#935) |
 | Test temp dirs | `tools/lint -- --rules` | **hard gate** (`test-temp-dir`): test code writes under `crate::test_temp::dir()` / `crate::temp::dir()`, never a bare `std::env::temp_dir()` (#999) |
-| Portable paths | `tools/lint -- --rules` | **hard gate** (`slash-join`): `src/` and `tests/` never join a `/`-separated path (literal, `format!` or constant) onto a path; they join one part per call or join `core::paths::native(…)` (#1332, #1371) |
+| Portable paths | `tools/lint -- --rules` | **hard gate** (`slash-join`): `src/` and `tests/` never join a `/`-separated path (literal, `format!` or constant) onto a path or make a path from one; they join one part per call or join `core::paths::native(…)` (#1332, #1371) |
 | Module layering | `tools/lint -- --layers` | every `crate::<module>` import and every external crate a module names matches the declared table (`tools/lint/src/layers/table.rs`): nothing undeclared, nothing stale, no cycle, no sim → platform edge (#724, #938) |
 | Sim determinism | clippy `disallowed_methods`/`disallowed_types` + `tools/lint -- --determinism` | **hard gate**: clock reads, OS/unseeded RNG and `std`'s randomly seeded hash maps are banned crate-wide in `clippy.toml`; only a platform row's `mod.rs` may opt out, and the ban list must stay whole (#757, #764) |
 | No shared process state | clippy `disallowed_methods` + `tools/lint -- --determinism` | **hard gate**: `std::env::{set_var, remove_var, set_current_dir}` are banned crate-wide in `clippy.toml`, tests included, since `cargo test` runs every in-crate test in one process; production opts out inline with a reason (`project::open`), and `--determinism` keeps the three on the list (#977) |
@@ -294,19 +294,27 @@ new flag, gate, CI step or baseline.
   Windows it builds `dir\a/b` where joining one part at a time builds `dir\a\b`:
   equal as `Path`s, unequal as strings, and a test comparing strings fails on
   Windows only. The engine keeps one spelling everywhere, production and tests
-  alike: in `src/` and `tests/`, a `.join(…)` or `.push(…)` whose whole argument
-  is a string literal holding a `/` (raw or not, wrapped by rustfmt or not), a
-  `.join(format!(…))` whose template holds one, or a `/`-holding `&str` constant
-  the scan defines (matched by name, aliases followed) is a finding. A literal of
-  only `/`s and spaces (`parts.join(" / ")`) is a slice's separator, not a path.
-  Join one part per call, or join `core::paths::native("a/b")`
-  (`crate::core::paths::native` in the library, `rusty::core::paths::native` in
-  `tests/`; `native_string` for the written string), which turns a `/`-spelled path
-  or constant such as `IMPORT_CACHE_DIR` into the platform's. What the rule cannot
-  see: a `/` path held in a variable or handed to a helper that joins it, a
-  constant built by a macro, and a bare `"/a/b"` expectation (test code is full of
-  `/`-led JSON pointers): those use the same helper. A path that must keep its `/`
-  says why with `// lint: allow(slash-join) <why>`.
+  alike: in `src/` and `tests/`, a `.join(…)`, `.push(…)`, `Path::new(…)` or
+  `PathBuf::from(…)` whose whole argument is a string literal holding a `/` (raw
+  or not, wrapped by rustfmt or not), a `format!` whose template holds one, or a
+  `/`-holding `&str` constant the scan defines (matched by name, aliases followed)
+  is a finding: a path *made* from a `/` path turns mixed the moment something is
+  joined onto it. A literal of only `/`s and spaces (`parts.join(" / ")`) is a
+  slice's separator, and one starting with `/` is an absolute Unix path (a socket,
+  a test's out-of-tree root); neither is flagged. Join one part per call, or use
+  `core::paths::native("a/b")` (`crate::core::paths::native` in the library,
+  `rusty::core::paths::native` in `tests/`; `native_string` for the written
+  string), which turns a `/`-spelled path or constant such as `IMPORT_CACHE_DIR`
+  into the platform's. The rule reads text, not types, so it **misfires** on a
+  `.push` of a `/` literal (or of a space-free `/` `format!`) onto a list of
+  strings, on a slice join whose separator holds a `/` beside other text, and on a
+  constant matched by bare name: a `/` constant in one module flags a same-named
+  plain one joined in another. It is **blind** to a `/` path held in a variable or
+  handed to a helper that joins it; a constant built by a macro, wrapped by rustfmt
+  onto the line after `const X: &str =`, typed `&'static str` or declared
+  `static`; and a bare `"/a/b"` expectation (test code is full of `/`-led JSON
+  pointers): those use the same helper. A path that must keep its `/`, or a
+  misfire, says why with `// lint: allow(slash-join) <why>`.
 - **`asset-write`** (#1220) — a file a path-keyed cache reads is written through
   `core::fs::written::write`, or its writer calls `note_written` after (#1207).
   A non-test line of `src/` outside `src/core/fs/` calling `fs::write(`,

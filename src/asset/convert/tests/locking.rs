@@ -91,7 +91,7 @@ fn a_projects_lock_lives_in_its_cache_folder_never_in_assets() {
     std::fs::create_dir_all(root.join("assets").join("models")).unwrap();
     let source = root.join(crate::core::paths::native("assets/models/a.src"));
     std::fs::write(&source, "one").unwrap();
-    let out = cache_path(&root, Path::new("assets/models/a.src"));
+    let out = cache_path(&root, &paths::native("assets/models/a.src"));
     refresh(&COPY, &source, &out).unwrap();
     std::fs::write(&source, "two").unwrap();
     refresh(&COPY, &source, &out).unwrap();

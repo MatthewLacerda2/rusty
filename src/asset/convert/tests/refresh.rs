@@ -4,7 +4,7 @@
 
 use super::super::{cache_location, depends, gate, refresh_sources, PlayHold};
 use super::gate::{indices, stamp, QUAD};
-use std::path::Path;
+use crate::core::paths::native;
 
 #[test]
 fn refreshing_converts_every_source_under_the_root_and_skips_a_broken_one() {
@@ -65,7 +65,7 @@ fn a_symlinked_folder_is_not_followed() {
 
 #[test]
 fn a_leading_dot_names_the_same_held_source() {
-    let plain = gate::key(Path::new("assets/x.fbx"));
-    assert_eq!(gate::key(Path::new("./assets/x.fbx")), plain);
-    assert_eq!(gate::key(Path::new("assets/./x.fbx")), plain);
+    let plain = gate::key(&native("assets/x.fbx"));
+    assert_eq!(gate::key(&native("./assets/x.fbx")), plain);
+    assert_eq!(gate::key(&native("assets/./x.fbx")), plain);
 }
