@@ -16,6 +16,9 @@ mod tests;
 /// kin point at the outer repository.
 pub fn git(root: &Path) -> Command {
     let mut cmd = Command::new("git");
+    // Git's own messages in English, whatever the user's locale, so a caller (and
+    // a test) reading git's error sees one wording.
+    cmd.env("LC_ALL", "C");
     for var in ["GIT_DIR", "GIT_INDEX_FILE", "GIT_WORK_TREE"] {
         cmd.env_remove(var);
     }

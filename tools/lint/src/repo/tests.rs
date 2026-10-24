@@ -14,7 +14,8 @@ fn lists_what_the_flags_ask_for_relative_to_the_root() {
     assert_eq!(all, Ok(vec![PathBuf::from("b/c.rs")]));
 }
 
-#[cfg(unix)]
+// Linux only: macOS (APFS) refuses a file name that is not valid UTF-8.
+#[cfg(target_os = "linux")]
 #[test]
 fn a_non_utf8_name_survives_the_listing() {
     use std::os::unix::ffi::OsStrExt;
