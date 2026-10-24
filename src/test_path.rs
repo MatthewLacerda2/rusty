@@ -48,7 +48,7 @@ pub(crate) fn relative(dir: &Path) -> PathBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::{Path, MAIN_SEPARATOR_STR as SEP};
+    use std::path::MAIN_SEPARATOR_STR as SEP;
 
     #[test]
     fn a_slashed_path_comes_out_in_the_platforms_separator() {
@@ -61,5 +61,15 @@ mod tests {
             Path::new("a").join("b"),
             "empty parts drop"
         );
+    }
+
+    #[test]
+    fn a_relative_spelling_names_the_same_folder() {
+        let dir = crate::test_temp::dir();
+        let rel = relative(&dir);
+        assert!(rel.is_relative() || cfg!(windows), "another drive: {rel:?}");
+        let cwd = std::env::current_dir().unwrap();
+        let canonical = |p: &Path| p.canonicalize().unwrap();
+        assert_eq!(canonical(&cwd.join(&rel)), canonical(&dir), "{rel:?}");
     }
 }
