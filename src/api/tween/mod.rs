@@ -16,6 +16,7 @@ use mlua::{Lua, Table, Value};
 
 use super::timer::runtime;
 use super::{put, Reg};
+use crate::api::entity_arg::EntityArg;
 use crate::scene::Scene;
 use crate::scripting::{TimerScheduler, Wait, Work};
 use spec::{Args, Spec};
@@ -32,8 +33,21 @@ pub fn register<'scope>(
         &table,
         "To",
         scope.create_function(
-            move |lua, (id, path, target, duration, opts): (u32, String, Value, f64, Option<Table>)| {
-                let args = Args { id, path, target, duration };
+            move |lua,
+                  (id, path, target, duration, opts): (
+                EntityArg,
+                String,
+                Value,
+                f64,
+                Option<Table>,
+            )| {
+                let id = id.live("Tween", "To")?;
+                let args = Args {
+                    id,
+                    path,
+                    target,
+                    duration,
+                };
                 let spec = spec::parse(lua, &scene.borrow(), args, opts, false)?;
                 Ok(schedule(scene, timers, spec, None))
             },
@@ -59,7 +73,8 @@ pub fn register<'scope>(
     put(
         &table,
         "KillAll",
-        scope.create_function(|_, id: u32| {
+        scope.create_function(|_, id: EntityArg| {
+            let id = id.live("Tween", "KillAll")?;
             timers.borrow_mut().kill_owner_tweens(id);
             Ok(())
         }),

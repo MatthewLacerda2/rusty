@@ -9,6 +9,7 @@ use std::cell::RefCell;
 use mlua::{FromLua, IntoLua, Table};
 
 use super::super::{put, Reg};
+use crate::api::entity_arg::EntityArg;
 use crate::components::NavMeshAgentComponent;
 use crate::scene::authoring::nav::agent as nav_ops;
 use crate::scene::Scene;
@@ -58,7 +59,8 @@ fn field<'scope, T>(
 where
     T: Default + IntoLua + FromLua + 'static,
 {
-    let f = scope.create_function(move |_, id: u32| {
+    let f = scope.create_function(move |_, id: EntityArg| {
+        let id = id.read();
         Ok(scene
             .borrow()
             .world
@@ -66,7 +68,9 @@ where
             .map_or_else(T::default, |a| get(&a)))
     });
     put(t, &format!("Get{name}"), f)?;
-    let f = scope.create_function(move |_, (id, value): (u32, T)| {
+    let verb = format!("Set{name}");
+    let f = scope.create_function(move |_, (id, value): (EntityArg, T)| {
+        let id = id.live("NavMeshAgent", &verb)?;
         if let Some(mut a) = scene.borrow_mut().world.nav_agent_mut(id) {
             set(&mut a, value);
         }

@@ -20,6 +20,15 @@ Entities are addressed by a numeric `id` (`u32`). `Vector3` values cross the
 boundary as three `f32`s (`x, y, z`) rather than a table. Getters that miss
 return a sensible default (zeros, or `(1,1,1)` for scale) instead of erroring.
 
+**A `nil` id is no entity, everywhere** (#1383): a lookup that misses answers
+`nil` (`Scene.FindEntityByName`, `Scene.FindChild`), and any id argument takes
+it. A **read** answers what it answers for a missing entity, so
+`Transform.GetPosition(Scene.FindEntityByName("Gone"))` is `0, 0, 0`. A
+**write** follows Unity, where calling a member on a destroyed object throws: it
+raises `"Scene.SetActive: no entity (nil id)"`, naming the verb. A dead (but
+non-`nil`) id on a write stays a no-op. Where `nil` means "none" on purpose (a
+joint's connected body, `UI.SetSelected(nil)`), the page says so.
+
 > **Maintenance:** this file is currently **hand-written** and must be kept in
 > sync with `src/scripting/mod.rs` and the bindings in `src/api/`. A generator
 > that emits it from self-describing bindings (with a CI drift check) is a tracked

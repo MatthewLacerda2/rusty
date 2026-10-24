@@ -172,7 +172,11 @@ function Dropdown.show()
     RectTransform.SetAnchoredPosition(template, r.x, below and r.y or r.y + r.height)
     RectTransform.SetSizeDelta(template, r.width, height)
     for i, e in ipairs(items) do
-        Scene.SetActive(Scene.FindChild(e, "Item Checkmark"), i == Dropdown.value + 1)
+        -- An item built without a checkmark has none to show.
+        local mark = Scene.FindChild(e, "Item Checkmark")
+        if mark then
+            Scene.SetActive(mark, i == Dropdown.value + 1)
+        end
     end
     Scene.SetActive(template, true)
     UI.SetSelected(items[Dropdown.value + 1])

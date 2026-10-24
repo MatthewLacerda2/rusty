@@ -14,6 +14,7 @@ use mlua::{IntoLua, Value};
 
 use super::super::material::shader::params::floats;
 use super::super::{put, Reg};
+use crate::api::entity_arg::EntityArg;
 use crate::scene::authoring::ui_shader as ops;
 use crate::scene::Scene;
 
@@ -36,7 +37,8 @@ fn register_name<'scope>(
     put(
         table,
         "SetShader",
-        scope.create_function(|_, (id, name): (u32, Option<String>)| {
+        scope.create_function(|_, (id, name): (EntityArg, Option<String>)| {
+            let id = id.live("UI", "SetShader")?;
             let world = &mut scene.borrow_mut().world;
             match ops::for_each_graphic(world, id, |slot| ops::set_shader(slot, name.clone())) {
                 0 => Err(no_graphic(id)),
@@ -47,7 +49,8 @@ fn register_name<'scope>(
     put(
         table,
         "GetShader",
-        scope.create_function(|_, id: u32| {
+        scope.create_function(|_, id: EntityArg| {
+            let id = id.read();
             let slot = ops::graphic_shader(&scene.borrow().world, id).flatten();
             Ok(slot.map(|s| s.name))
         }),
@@ -63,7 +66,8 @@ fn register_params<'scope>(
     put(
         table,
         "SetShaderParam",
-        scope.create_function(|_, (id, name, value): (u32, String, Value)| {
+        scope.create_function(|_, (id, name, value): (EntityArg, String, Value)| {
+            let id = id.live("UI", "SetShaderParam")?;
             let value = floats(value)?;
             let world = &mut scene.borrow_mut().world;
             let mut results = Vec::new();
@@ -87,7 +91,8 @@ fn register_params<'scope>(
     put(
         table,
         "GetShaderParam",
-        scope.create_function(|lua, (id, name): (u32, String)| {
+        scope.create_function(|lua, (id, name): (EntityArg, String)| {
+            let id = id.read();
             let slot =
                 ops::graphic_shader(&scene.borrow().world, id).ok_or_else(|| no_graphic(id))?;
             let layout = ops::layout(&slot).map_err(err)?;

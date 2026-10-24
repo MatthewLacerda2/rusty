@@ -10,6 +10,7 @@ use std::cell::RefCell;
 use mlua::Lua;
 
 use super::{put, Reg};
+use crate::api::entity_arg::EntityArg;
 use crate::scene::authoring::rect_mask as mask_ops;
 use crate::scene::Scene;
 
@@ -23,7 +24,8 @@ pub fn register<'scope>(
     put(
         &table,
         "GetShowMaskGraphic",
-        scope.create_function(|_, id: u32| {
+        scope.create_function(|_, id: EntityArg| {
+            let id = id.read();
             let scene = scene.borrow();
             Ok(scene.world.mask(id).is_some_and(|m| m.show_mask_graphic))
         }),
@@ -31,7 +33,8 @@ pub fn register<'scope>(
     put(
         &table,
         "SetShowMaskGraphic",
-        scope.create_function(|_, (id, show): (u32, bool)| {
+        scope.create_function(|_, (id, show): (EntityArg, bool)| {
+            let id = id.live("Mask", "SetShowMaskGraphic")?;
             if let Some(mut m) = scene.borrow_mut().world.mask_mut(id) {
                 mask_ops::set_show_mask_graphic(&mut m, show);
             }

@@ -13,6 +13,7 @@
 use std::cell::RefCell;
 
 use super::{put, Reg};
+use crate::api::entity_arg::EntityArg;
 use crate::scene::authoring;
 use crate::scene::Scene;
 
@@ -36,7 +37,8 @@ fn register_save_and_spawn<'scope>(
     put(
         table,
         "SavePrefab",
-        scope.create_function(|_, (root_id, path): (u32, String)| {
+        scope.create_function(|_, (root_id, path): (EntityArg, String)| {
+            let root_id = root_id.live("Scene", "SavePrefab")?;
             crate::scene::save_prefab(&scene.borrow(), root_id, &path)
                 .map(|()| path)
                 .map_err(mlua::Error::RuntimeError)
@@ -97,7 +99,8 @@ fn register_overrides<'scope>(
     put(
         table,
         "RecordPrefabOverrides",
-        scope.create_function(|_, root_id: u32| {
+        scope.create_function(|_, root_id: EntityArg| {
+            let root_id = root_id.live("Scene", "RecordPrefabOverrides")?;
             authoring::record_instance_overrides(&mut scene.borrow_mut(), root_id)
                 .map_err(mlua::Error::RuntimeError)
         }),
@@ -106,7 +109,8 @@ fn register_overrides<'scope>(
     put(
         table,
         "RevertPrefabOverrides",
-        scope.create_function(|_, root_id: u32| {
+        scope.create_function(|_, root_id: EntityArg| {
+            let root_id = root_id.live("Scene", "RevertPrefabOverrides")?;
             authoring::revert_instance_overrides(&mut scene.borrow_mut(), root_id)
                 .map_err(mlua::Error::RuntimeError)
         }),
@@ -115,7 +119,8 @@ fn register_overrides<'scope>(
     put(
         table,
         "ReimportPrefab",
-        scope.create_function(|_, root_id: u32| {
+        scope.create_function(|_, root_id: EntityArg| {
+            let root_id = root_id.live("Scene", "ReimportPrefab")?;
             authoring::reimport_instance(&mut scene.borrow_mut(), root_id)
                 .map_err(mlua::Error::RuntimeError)
         }),
@@ -124,7 +129,8 @@ fn register_overrides<'scope>(
     put(
         table,
         "ListPrefabOverrides",
-        scope.create_function(|_, root_id: u32| {
+        scope.create_function(|_, root_id: EntityArg| {
+            let root_id = root_id.read();
             authoring::list_instance_overrides(&scene.borrow(), root_id)
                 .map_err(mlua::Error::RuntimeError)
         }),
@@ -144,7 +150,8 @@ fn register_apply_to_source<'scope>(
     put(
         table,
         "ApplyPrefabToSource",
-        scope.create_function(|_, root_id: u32| {
+        scope.create_function(|_, root_id: EntityArg| {
+            let root_id = root_id.live("Scene", "ApplyPrefabToSource")?;
             authoring::apply_instance_to_source(&mut scene.borrow_mut(), root_id)
                 .map_err(mlua::Error::RuntimeError)
         }),
@@ -154,7 +161,8 @@ fn register_apply_to_source<'scope>(
     put(
         table,
         "RevertPrefabField",
-        scope.create_function(|_, (entity_id, path): (u32, String)| {
+        scope.create_function(|_, (entity_id, path): (EntityArg, String)| {
+            let entity_id = entity_id.live("Scene", "RevertPrefabField")?;
             authoring::revert_instance_field(&mut scene.borrow_mut(), entity_id, &path)
                 .map_err(mlua::Error::RuntimeError)
         }),
@@ -163,7 +171,8 @@ fn register_apply_to_source<'scope>(
     put(
         table,
         "ApplyPrefabFieldToSource",
-        scope.create_function(|_, (entity_id, path): (u32, String)| {
+        scope.create_function(|_, (entity_id, path): (EntityArg, String)| {
+            let entity_id = entity_id.live("Scene", "ApplyPrefabFieldToSource")?;
             authoring::apply_instance_field_to_source(&mut scene.borrow_mut(), entity_id, &path)
                 .map_err(mlua::Error::RuntimeError)
         }),

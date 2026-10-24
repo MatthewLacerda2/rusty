@@ -27,6 +27,7 @@ use std::cell::RefCell;
 use mlua::Lua;
 
 use super::{put, Reg};
+use crate::api::entity_arg::EntityArg;
 use crate::components::AnimatorParameter;
 use crate::scene::authoring::animator as animator_ops;
 use crate::scene::Scene;
@@ -68,7 +69,8 @@ fn register_play<'scope>(
     put(
         table,
         "Play",
-        scope.create_function(|_, (id, clip): (u32, String)| {
+        scope.create_function(|_, (id, clip): (EntityArg, String)| {
+            let id = id.live("Animator", "Play")?;
             let mut scene = scene.borrow_mut();
             let played = scene
                 .world
@@ -88,7 +90,8 @@ fn register_play<'scope>(
     put(
         table,
         "Crossfade",
-        scope.create_function(|_, (id, clip, duration): (u32, String, f32)| {
+        scope.create_function(|_, (id, clip, duration): (EntityArg, String, f32)| {
+            let id = id.live("Animator", "Crossfade")?;
             // Blend out of the current clip over `duration` seconds (#80).
             let mut scene = scene.borrow_mut();
             if let Some(mut anim) = scene.world.animator_mut(id) {
@@ -110,7 +113,8 @@ fn register_get_bone<'scope>(
     put(
         table,
         "GetBone",
-        scope.create_function(|_, (id, name): (u32, String)| {
+        scope.create_function(|_, (id, name): (EntityArg, String)| {
+            let id = id.read();
             Ok(scene.borrow().find_bone(id, &name))
         }),
     )?;
@@ -119,7 +123,8 @@ fn register_get_bone<'scope>(
     put(
         table,
         "GetClip",
-        scope.create_function(|_, id: u32| {
+        scope.create_function(|_, id: EntityArg| {
+            let id = id.read();
             let scene = scene.borrow();
             Ok(scene
                 .world
@@ -138,7 +143,8 @@ fn register_stop<'scope>(
     put(
         table,
         "Stop",
-        scope.create_function(|_, id: u32| {
+        scope.create_function(|_, id: EntityArg| {
+            let id = id.live("Animator", "Stop")?;
             let mut scene = scene.borrow_mut();
             if let Some(mut c) = scene.world.animator_mut(id) {
                 animator_ops::set_playing(&mut c, false);
@@ -159,7 +165,8 @@ fn register_pause_resume<'scope>(
     put(
         table,
         "Pause",
-        scope.create_function(|_, id: u32| {
+        scope.create_function(|_, id: EntityArg| {
+            let id = id.live("Animator", "Pause")?;
             let mut scene = scene.borrow_mut();
             if let Some(mut c) = scene.world.animator_mut(id) {
                 animator_ops::set_freeze(&mut c, true);
@@ -171,7 +178,8 @@ fn register_pause_resume<'scope>(
     put(
         table,
         "Resume",
-        scope.create_function(|_, id: u32| {
+        scope.create_function(|_, id: EntityArg| {
+            let id = id.live("Animator", "Resume")?;
             let mut scene = scene.borrow_mut();
             if let Some(mut c) = scene.world.animator_mut(id) {
                 animator_ops::set_freeze(&mut c, false);
@@ -191,7 +199,8 @@ fn register_set_looping<'scope>(
     put(
         table,
         "SetLooping",
-        scope.create_function(|_, (id, looping): (u32, bool)| {
+        scope.create_function(|_, (id, looping): (EntityArg, bool)| {
+            let id = id.live("Animator", "SetLooping")?;
             let mut scene = scene.borrow_mut();
             if let Some(mut c) = scene.world.animator_mut(id) {
                 animator_ops::set_looping(&mut c, looping);
@@ -211,7 +220,8 @@ fn register_set_bool_float<'scope>(
     put(
         table,
         "SetBool",
-        scope.create_function(|_, (id, name, value): (u32, String, bool)| {
+        scope.create_function(|_, (id, name, value): (EntityArg, String, bool)| {
+            let id = id.live("Animator", "SetBool")?;
             write_parameter(scene, console, id, &name, AnimatorParameter::Bool(value));
             Ok(())
         }),
@@ -220,7 +230,8 @@ fn register_set_bool_float<'scope>(
     put(
         table,
         "SetFloat",
-        scope.create_function(|_, (id, name, value): (u32, String, f32)| {
+        scope.create_function(|_, (id, name, value): (EntityArg, String, f32)| {
+            let id = id.live("Animator", "SetFloat")?;
             write_parameter(scene, console, id, &name, AnimatorParameter::Float(value));
             Ok(())
         }),
@@ -239,7 +250,8 @@ fn register_set_int_trigger<'scope>(
     put(
         table,
         "SetInt",
-        scope.create_function(|_, (id, name, value): (u32, String, i32)| {
+        scope.create_function(|_, (id, name, value): (EntityArg, String, i32)| {
+            let id = id.live("Animator", "SetInt")?;
             write_parameter(scene, console, id, &name, AnimatorParameter::Int(value));
             Ok(())
         }),
@@ -248,7 +260,8 @@ fn register_set_int_trigger<'scope>(
     put(
         table,
         "SetTrigger",
-        scope.create_function(|_, (id, name): (u32, String)| {
+        scope.create_function(|_, (id, name): (EntityArg, String)| {
+            let id = id.live("Animator", "SetTrigger")?;
             write_parameter(scene, console, id, &name, AnimatorParameter::Trigger(true));
             Ok(())
         }),

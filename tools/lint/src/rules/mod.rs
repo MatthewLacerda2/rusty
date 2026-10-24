@@ -17,6 +17,7 @@ mod asset_write;
 mod atomic_write;
 mod converter_log;
 mod drag_range;
+mod entity_arg;
 mod full_literal;
 mod fullscreen_triangle;
 mod ignored;
@@ -66,6 +67,7 @@ const RULES: &[(Rule, Allow)] = &[
     (atomic_write::run, Allow::Inline),
     (converter_log::run, Allow::Inline),
     (drag_range::run, Allow::Inline),
+    (entity_arg::run, Allow::Inline),
     (full_literal::run, Allow::Inline),
     (fullscreen_triangle::run, Allow::Inline),
     (ignored::run, Allow::Never),

@@ -25,6 +25,7 @@ mod reverb;
 mod snapshots;
 
 use super::{put, Reg};
+use crate::api::entity_arg::EntityArg;
 use glam::Vec3;
 
 use crate::audio::{AudioMaestro, Listener, Rolloff, Shot, SpeakerMode};
@@ -99,7 +100,8 @@ fn register_source_control<'scope>(
     put(
         table,
         "Play",
-        scope.create_function(|_, id: u32| {
+        scope.create_function(|_, id: EntityArg| {
+            let id = id.live("Audio", "Play")?;
             let now = tick(time);
             let src = scene.borrow().world.audio(id).map(|c| c.clone());
             let pos = src
@@ -118,7 +120,8 @@ fn register_source_control<'scope>(
     put(
         table,
         "Stop",
-        scope.create_function(|_, id: u32| {
+        scope.create_function(|_, id: EntityArg| {
+            let id = id.live("Audio", "Stop")?;
             let now = tick(time);
             let pos = source_clip_pos(scene, id)
                 .map(|(_, p)| p)
@@ -133,7 +136,8 @@ fn register_source_control<'scope>(
     put(
         table,
         "SetVolume",
-        scope.create_function(|_, (id, v): (u32, f32)| {
+        scope.create_function(|_, (id, v): (EntityArg, f32)| {
+            let id = id.live("Audio", "SetVolume")?;
             let stored = scene.borrow_mut().world.audio_mut(id).map(|mut a| {
                 audio_ops::set_volume(&mut a, v);
                 a.volume
@@ -148,7 +152,8 @@ fn register_source_control<'scope>(
     put(
         table,
         "GetVolume",
-        scope.create_function(|_, id: u32| {
+        scope.create_function(|_, id: EntityArg| {
+            let id = id.read();
             Ok(scene.borrow().world.audio(id).map_or(0.0, |a| a.volume))
         }),
     )
@@ -276,7 +281,8 @@ fn register_spatial<'scope>(
     put(
         table,
         "GetSpatial",
-        scope.create_function(|_, id: u32| {
+        scope.create_function(|_, id: EntityArg| {
+            let id = id.read();
             let Some((src, pos)) = emitter(&scene.borrow(), id) else {
                 // No source: report silent + centred + not playing + clear.
                 return Ok((0.0_f32, 0.0_f32, false, 0.0_f32));

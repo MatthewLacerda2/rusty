@@ -29,6 +29,7 @@ use glam::Vec3;
 use mlua::Lua;
 
 use super::{global_table, put, Reg};
+use crate::api::entity_arg::EntityArg;
 use crate::components::CollisionDetection;
 use crate::physics::PhysicsWorld;
 use crate::scene::authoring::rigidbody as rb_ops;
@@ -67,7 +68,8 @@ fn register_velocity<'scope>(
     put(
         table,
         "GetVelocity",
-        scope.create_function(|_, id: u32| {
+        scope.create_function(|_, id: EntityArg| {
+            let id = id.read();
             let scene = scene.borrow();
             let v = scene
                 .world
@@ -81,7 +83,8 @@ fn register_velocity<'scope>(
     put(
         table,
         "SetVelocity",
-        scope.create_function(|_, (id, vx, vy, vz): (u32, f32, f32, f32)| {
+        scope.create_function(|_, (id, vx, vy, vz): (EntityArg, f32, f32, f32)| {
+            let id = id.live("Physics", "SetVelocity")?;
             let mut scene = scene.borrow_mut();
             if let Some(mut c) = scene.world.rigidbody_mut(id) {
                 rb_ops::set_velocity(&mut c, Vec3::new(vx, vy, vz));
@@ -102,7 +105,8 @@ fn register_angular<'scope>(
     put(
         table,
         "GetAngularVelocity",
-        scope.create_function(|_, id: u32| {
+        scope.create_function(|_, id: EntityArg| {
+            let id = id.read();
             let scene = scene.borrow();
             let w = scene
                 .world
@@ -116,7 +120,8 @@ fn register_angular<'scope>(
     put(
         table,
         "SetAngularVelocity",
-        scope.create_function(|_, (id, wx, wy, wz): (u32, f32, f32, f32)| {
+        scope.create_function(|_, (id, wx, wy, wz): (EntityArg, f32, f32, f32)| {
+            let id = id.live("Physics", "SetAngularVelocity")?;
             let mut scene = scene.borrow_mut();
             if let Some(mut c) = scene.world.rigidbody_mut(id) {
                 rb_ops::set_angular_velocity(&mut c, Vec3::new(wx, wy, wz));
@@ -137,7 +142,8 @@ fn register_collision_detection<'scope>(
     put(
         table,
         "GetCollisionDetection",
-        scope.create_function(|_, id: u32| {
+        scope.create_function(|_, id: EntityArg| {
+            let id = id.read();
             let scene = scene.borrow();
             let mode = scene
                 .world
@@ -151,7 +157,8 @@ fn register_collision_detection<'scope>(
     put(
         table,
         "SetCollisionDetection",
-        scope.create_function(|_, (id, mode): (u32, String)| {
+        scope.create_function(|_, (id, mode): (EntityArg, String)| {
+            let id = id.live("Physics", "SetCollisionDetection")?;
             let mode = CollisionDetection::parse(&mode).ok_or_else(|| {
                 mlua::Error::RuntimeError(format!(
                     "SetCollisionDetection: unknown mode {mode:?} (want one of {})",
@@ -177,7 +184,8 @@ fn register_force<'scope>(
     put(
         table,
         "AddForce",
-        scope.create_function(|_, (id, fx, fy, fz): (u32, f32, f32, f32)| {
+        scope.create_function(|_, (id, fx, fy, fz): (EntityArg, f32, f32, f32)| {
+            let id = id.live("Physics", "AddForce")?;
             let mut scene = scene.borrow_mut();
             if let Some(mut rb) = scene.world.rigidbody_mut(id) {
                 if !rb.is_kinematic {
@@ -196,7 +204,8 @@ fn register_force<'scope>(
     put(
         table,
         "SetKinematic",
-        scope.create_function(|_, (id, is_kinematic): (u32, bool)| {
+        scope.create_function(|_, (id, is_kinematic): (EntityArg, bool)| {
+            let id = id.live("Physics", "SetKinematic")?;
             let mut scene = scene.borrow_mut();
             if let Some(mut c) = scene.world.rigidbody_mut(id) {
                 rb_ops::set_kinematic(&mut c, is_kinematic);

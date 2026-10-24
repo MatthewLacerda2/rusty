@@ -13,6 +13,7 @@ use glam::Vec3;
 use mlua::Lua;
 
 use super::{put, Reg};
+use crate::api::entity_arg::EntityArg;
 use crate::components::transform::{euler_degrees, from_euler_degrees};
 use crate::ecs::World;
 use crate::scene::Scene;
@@ -119,8 +120,8 @@ fn getter<'scope>(
     read: Read,
     default: Vec3,
 ) -> Reg {
-    let f = scope.create_function(move |_, id: u32| {
-        let v = read(&scene.borrow().world, id).unwrap_or(default);
+    let f = scope.create_function(move |_, id: EntityArg| {
+        let v = read(&scene.borrow().world, id.read()).unwrap_or(default);
         Ok((v.x, v.y, v.z))
     });
     put(table, name, f)
@@ -133,7 +134,9 @@ fn setter<'scope>(
     name: &str,
     write: Write,
 ) -> Reg {
-    let f = scope.create_function(move |_, (id, x, y, z): (u32, f32, f32, f32)| {
+    let verb = name.to_string();
+    let f = scope.create_function(move |_, (id, x, y, z): (EntityArg, f32, f32, f32)| {
+        let id = id.live("Transform", &verb)?;
         write(&mut scene.borrow_mut().world, id, Vec3::new(x, y, z));
         Ok(())
     });
@@ -147,8 +150,8 @@ fn mapper<'scope>(
     name: &str,
     map: Map,
 ) -> Reg {
-    let f = scope.create_function(move |_, (id, x, y, z): (u32, f32, f32, f32)| {
-        let v = map(&scene.borrow().world, id, Vec3::new(x, y, z));
+    let f = scope.create_function(move |_, (id, x, y, z): (EntityArg, f32, f32, f32)| {
+        let v = map(&scene.borrow().world, id.read(), Vec3::new(x, y, z));
         Ok(v.map_or((None, None, None), |v| (Some(v.x), Some(v.y), Some(v.z))))
     });
     put(table, name, f)
@@ -162,14 +165,17 @@ fn register_move_towards<'scope>(
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
-    let f = scope.create_function(|_, (id, tx, ty, tz, step): (u32, f32, f32, f32, f32)| {
-        let world = &mut scene.borrow_mut().world;
-        // A dead id reads the origin and the write is a no-op.
-        let at = world
-            .world_position(id)
-            .move_towards(Vec3::new(tx, ty, tz), step);
-        world.set_world_position(id, at);
-        Ok(())
-    });
+    let f = scope.create_function(
+        |_, (id, tx, ty, tz, step): (EntityArg, f32, f32, f32, f32)| {
+            let id = id.live("Transform", "MoveTowards")?;
+            let world = &mut scene.borrow_mut().world;
+            // A dead id reads the origin and the write is a no-op.
+            let at = world
+                .world_position(id)
+                .move_towards(Vec3::new(tx, ty, tz), step);
+            world.set_world_position(id, at);
+            Ok(())
+        },
+    );
     put(table, "MoveTowards", f)
 }

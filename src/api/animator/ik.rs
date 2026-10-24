@@ -13,6 +13,7 @@ use glam::Vec3;
 use mlua::Table;
 
 use super::{put, Reg};
+use crate::api::entity_arg::EntityArg;
 use crate::components::{IkChain, IkConstraint, IkTarget};
 use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;
@@ -67,7 +68,8 @@ fn register_add<'scope>(
         table,
         "AddTwoBoneIK",
         scope.create_function(
-            |_, (id, name, root, mid, tip): (u32, String, String, String, String)| {
+            |_, (id, name, root, mid, tip): (EntityArg, String, String, String, String)| {
+                let id = id.live("Animator", "AddTwoBoneIK")?;
                 let chain = IkChain::TwoBone { root, mid, tip };
                 Ok(add(scene, console, id, IkConstraint::new(name, chain)))
             },
@@ -77,7 +79,8 @@ fn register_add<'scope>(
         table,
         "AddAimIK",
         scope.create_function(
-            |_, (id, name, bones, opts): (u32, String, Vec<String>, Option<Table>)| {
+            |_, (id, name, bones, opts): (EntityArg, String, Vec<String>, Option<Table>)| {
+                let id = id.live("Animator", "AddAimIK")?;
                 if bones.is_empty() {
                     console
                         .borrow_mut()
@@ -129,7 +132,8 @@ fn register_remove<'scope>(
     put(
         table,
         "RemoveIK",
-        scope.create_function(|_, (id, name): (u32, String)| {
+        scope.create_function(|_, (id, name): (EntityArg, String)| {
+            let id = id.live("Animator", "RemoveIK")?;
             let mut scene = scene.borrow_mut();
             let removed = scene.world.animator_mut(id).and_then(|mut a| {
                 let at = a.ik.iter().position(|c| c.name == name)?;
@@ -177,7 +181,8 @@ fn register_targets<'scope>(
             table,
             func,
             scope.create_function(
-                move |_, (id, name, x, y, z): (u32, String, f32, f32, f32)| {
+                move |_, (id, name, x, y, z): (EntityArg, String, f32, f32, f32)| {
+                    let id = id.live("Animator", func)?;
                     let point = IkTarget::Point(Vec3::new(x, y, z));
                     Ok(with_ik(scene, console, (func, id, &name), |c| {
                         set(c, point)
@@ -193,12 +198,16 @@ fn register_targets<'scope>(
         put(
             table,
             entity_func,
-            scope.create_function(move |_, (id, name, target): (u32, String, u32)| {
-                let to = IkTarget::Entity(target);
-                Ok(with_ik(scene, console, (entity_func, id, &name), |c| {
-                    set(c, to)
-                }))
-            }),
+            scope.create_function(
+                move |_, (id, name, target): (EntityArg, String, EntityArg)| {
+                    let id = id.live("Animator", entity_func)?;
+                    let target = target.live("Animator", entity_func)?;
+                    let to = IkTarget::Entity(target);
+                    Ok(with_ik(scene, console, (entity_func, id, &name), |c| {
+                        set(c, to)
+                    }))
+                },
+            ),
         )?;
     }
     Ok(())
@@ -214,7 +223,8 @@ fn register_weight<'scope>(
     put(
         table,
         "SetIKWeight",
-        scope.create_function(|_, (id, name, w): (u32, String, f32)| {
+        scope.create_function(|_, (id, name, w): (EntityArg, String, f32)| {
+            let id = id.live("Animator", "SetIKWeight")?;
             let w = w.clamp(0.0, 1.0);
             Ok(with_ik(scene, console, ("SetIKWeight", id, &name), |c| {
                 c.weight = w
@@ -224,7 +234,8 @@ fn register_weight<'scope>(
     put(
         table,
         "GetIKWeight",
-        scope.create_function(|_, (id, name): (u32, String)| {
+        scope.create_function(|_, (id, name): (EntityArg, String)| {
+            let id = id.read();
             let mut scene = scene.borrow_mut();
             let mut anim = scene.world.animator_mut(id);
             Ok(anim

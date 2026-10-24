@@ -12,6 +12,7 @@ use glam::Vec3;
 use mlua::Table;
 
 use super::super::{put, Reg};
+use crate::api::entity_arg::EntityArg;
 use crate::physics::PhysicsWorld;
 use crate::scene::Scene;
 
@@ -39,7 +40,8 @@ fn register_closest<'scope>(
     put(
         table,
         "ClosestPoint",
-        scope.create_function(|_, (id, x, y, z): (u32, f32, f32, f32)| {
+        scope.create_function(|_, (id, x, y, z): (EntityArg, f32, f32, f32)| {
+            let id = id.read();
             let physics = physics.borrow();
             let closest = physics
                 .as_ref()
@@ -62,7 +64,8 @@ fn register_contains<'scope>(
     put(
         table,
         "ContainsPoint",
-        scope.create_function(|_, (id, x, y, z): (u32, f32, f32, f32)| {
+        scope.create_function(|_, (id, x, y, z): (EntityArg, f32, f32, f32)| {
+            let id = id.read();
             let physics = physics.borrow();
             Ok(physics
                 .as_ref()
@@ -85,7 +88,8 @@ fn register_bounds<'scope>(
     put(
         table,
         "GetBounds",
-        scope.create_function(|_, id: u32| {
+        scope.create_function(|_, id: EntityArg| {
+            let id = id.read();
             let scene = scene.borrow();
             let bounds = scene.world.collider_bounds(id);
             Ok(match bounds {

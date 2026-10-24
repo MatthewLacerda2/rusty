@@ -14,6 +14,7 @@ use mlua::{Table, Value};
 
 use super::lua_json::{recipe_from_lua, to_lua};
 use super::{put, Reg};
+use crate::api::entity_arg::EntityArg;
 use crate::components::{UiBlend, UiGradient};
 use crate::scene::Scene;
 
@@ -36,13 +37,14 @@ pub(super) fn register_blend<'scope>(
     scope: &'scope mlua::Scope<'scope, '_>,
     table: &Table,
     scene: &'scope RefCell<Scene>,
-    access: BlendAccess,
+    (namespace, access): (&'static str, BlendAccess),
 ) -> Reg {
     let BlendAccess { get, set } = access;
     put(
         table,
         "GetBlend",
-        scope.create_function(move |_, id: u32| {
+        scope.create_function(move |_, id: EntityArg| {
+            let id = id.read();
             let blend = get(&scene.borrow(), id);
             Ok(blend.map_or("None", UiBlend::name).to_string())
         }),
@@ -50,7 +52,8 @@ pub(super) fn register_blend<'scope>(
     put(
         table,
         "SetBlend",
-        scope.create_function(move |_, (id, name): (u32, String)| {
+        scope.create_function(move |_, (id, name): (EntityArg, String)| {
+            let id = id.live(namespace, "SetBlend")?;
             if let Some(blend) = UiBlend::parse(&name) {
                 set(&mut scene.borrow_mut(), id, blend);
             }
@@ -64,13 +67,14 @@ pub(super) fn register_gradient<'scope>(
     scope: &'scope mlua::Scope<'scope, '_>,
     table: &Table,
     scene: &'scope RefCell<Scene>,
-    access: GradientAccess,
+    (namespace, access): (&'static str, GradientAccess),
 ) -> Reg {
     let GradientAccess { get, set } = access;
     put(
         table,
         "GetGradient",
-        scope.create_function(move |lua, id: u32| {
+        scope.create_function(move |lua, id: EntityArg| {
+            let id = id.read();
             let Some(Some(g)) = get(&scene.borrow(), id) else {
                 return Ok(Value::Nil);
             };
@@ -80,7 +84,8 @@ pub(super) fn register_gradient<'scope>(
     put(
         table,
         "SetGradient",
-        scope.create_function(move |_, (id, value): (u32, Value)| {
+        scope.create_function(move |_, (id, value): (EntityArg, Value)| {
+            let id = id.live(namespace, "SetGradient")?;
             let g = match value {
                 Value::Nil => None,
                 v => Some(recipe_from_lua::<UiGradient>(&v).map_err(mlua::Error::RuntimeError)?),

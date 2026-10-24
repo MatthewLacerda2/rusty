@@ -15,6 +15,7 @@ use glam::Vec3;
 use mlua::{Lua, Table};
 
 use super::{put, Reg};
+use crate::api::entity_arg::EntityArg;
 use crate::components::NavMeshModifierVolumeComponent as Volume;
 use crate::scene::authoring::nav::modifier as ops;
 use crate::scene::Scene;
@@ -59,12 +60,15 @@ fn register_box<'scope>(
         ("Size", (|v| v.size, ops::set_size)),
     ];
     for (name, (read, set)) in fields {
-        let f = scope.create_function(move |_, id: u32| {
+        let f = scope.create_function(move |_, id: EntityArg| {
+            let id = id.read();
             let v = get(scene, id).map_or(Vec3::ZERO, |v| read(&v));
             Ok((v.x, v.y, v.z))
         });
         put(t, &format!("Get{name}"), f)?;
-        let f = scope.create_function(move |_, (id, x, y, z): (u32, f32, f32, f32)| {
+        let verb = format!("Set{name}");
+        let f = scope.create_function(move |_, (id, x, y, z): (EntityArg, f32, f32, f32)| {
+            let id = id.live("NavMeshModifierVolume", &verb)?;
             write(scene, id, |v| set(v, Vec3::new(x, y, z)));
             Ok(())
         });
@@ -79,16 +83,24 @@ fn register_options<'scope>(
     t: &Table,
     scene: SceneCell<'scope>,
 ) -> Reg {
-    let f = scope.create_function(move |_, id: u32| Ok(get(scene, id).is_some_and(|v| v.active)));
+    let f = scope.create_function(move |_, id: EntityArg| {
+        let id = id.read();
+        Ok(get(scene, id).is_some_and(|v| v.active))
+    });
     put(t, "GetActive", f)?;
-    let f = scope.create_function(move |_, (id, on): (u32, bool)| {
+    let f = scope.create_function(move |_, (id, on): (EntityArg, bool)| {
+        let id = id.live("NavMeshModifierVolume", "SetActive")?;
         write(scene, id, |v| ops::set_active(v, on));
         Ok(())
     });
     put(t, "SetActive", f)?;
-    let f = scope.create_function(move |_, id: u32| Ok(get(scene, id).map_or(0, |v| v.area)));
+    let f = scope.create_function(move |_, id: EntityArg| {
+        let id = id.read();
+        Ok(get(scene, id).map_or(0, |v| v.area))
+    });
     put(t, "GetArea", f)?;
-    let f = scope.create_function(move |_, (id, area): (u32, i64)| {
+    let f = scope.create_function(move |_, (id, area): (EntityArg, i64)| {
+        let id = id.live("NavMeshModifierVolume", "SetArea")?;
         write(scene, id, |v| ops::set_area(v, area));
         Ok(())
     });

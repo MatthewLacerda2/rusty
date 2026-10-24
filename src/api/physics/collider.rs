@@ -12,6 +12,7 @@ use glam::Vec3;
 use mlua::{Lua, Table};
 
 use super::super::{put, Reg};
+use crate::api::entity_arg::EntityArg;
 use crate::components::{CapsuleAxis, ColliderShape, CombineMode, PhysicsMaterial};
 use crate::scene::authoring::collider as collider_ops;
 use crate::scene::Scene;
@@ -40,7 +41,8 @@ fn register_shape<'scope>(
     put(
         table,
         "GetColliderShape",
-        scope.create_function(|lua, id: u32| {
+        scope.create_function(|lua, id: EntityArg| {
+            let id = id.read();
             let shape = scene.borrow().world.collider(id).map(|c| c.shape.clone());
             shape.map(|s| shape_to_table(lua, &s)).transpose()
         }),
@@ -48,7 +50,8 @@ fn register_shape<'scope>(
     put(
         table,
         "SetColliderShape",
-        scope.create_function(|_, (id, t): (u32, Table)| {
+        scope.create_function(|_, (id, t): (EntityArg, Table)| {
+            let id = id.live("Physics", "SetColliderShape")?;
             let shape = shape_from_table(&t)?;
             let mut scene = scene.borrow_mut();
             if let Some(mut c) = scene.world.collider_mut(id) {
@@ -158,7 +161,8 @@ fn register_material<'scope>(
     put(
         table,
         "GetPhysicsMaterial",
-        scope.create_function(|_, id: u32| {
+        scope.create_function(|_, id: EntityArg| {
+            let id = id.read();
             let m = scene
                 .borrow()
                 .world
@@ -179,12 +183,13 @@ fn register_material<'scope>(
         scope.create_function(
             |_,
              (id, friction, bounciness, fc, bc): (
-                u32,
+                EntityArg,
                 f32,
                 f32,
                 Option<String>,
                 Option<String>,
             )| {
+                let id = id.live("Physics", "SetPhysicsMaterial")?;
                 if !friction.is_finite() || !bounciness.is_finite() {
                     return Err(err(
                         "SetPhysicsMaterial: friction and bounciness must be finite".into(),

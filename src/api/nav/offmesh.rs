@@ -16,6 +16,7 @@ use mlua::{Lua, Table};
 
 use super::super::{put, Reg};
 use super::settings::set_and_rebake;
+use crate::api::entity_arg::EntityArg;
 use crate::components::OffMeshLinkData;
 use crate::navigation::{complete_off_mesh_link, NavMeshSettings, NavigationGraph};
 use crate::scene::authoring::nav::agent as nav_ops;
@@ -46,12 +47,18 @@ pub(super) fn register_agent<'scope>(
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
     let current = move |id: u32| scene.borrow().world.nav_agent(id)?.off_mesh_link;
-    let f = scope.create_function(move |_, id: u32| Ok(current(id).is_some()));
+    let f = scope.create_function(move |_, id: EntityArg| {
+        let id = id.read();
+        Ok(current(id).is_some())
+    });
     put(t, "IsOnOffMeshLink", f)?;
-    let f = scope
-        .create_function(move |lua, id: u32| current(id).map(|l| link_table(lua, &l)).transpose());
+    let f = scope.create_function(move |lua, id: EntityArg| {
+        let id = id.read();
+        current(id).map(|l| link_table(lua, &l)).transpose()
+    });
     put(t, "GetCurrentOffMeshLink", f)?;
-    let f = scope.create_function(move |_, id: u32| {
+    let f = scope.create_function(move |_, id: EntityArg| {
+        let id = id.live("NavMeshAgent", "CompleteOffMeshLink")?;
         let mut scene = scene.borrow_mut();
         let end = match scene.world.nav_agent_mut(id) {
             Some(mut a) => complete_off_mesh_link(&mut a),
@@ -63,7 +70,8 @@ pub(super) fn register_agent<'scope>(
         Ok(end.is_some())
     });
     put(t, "CompleteOffMeshLink", f)?;
-    let f = scope.create_function(move |_, id: u32| {
+    let f = scope.create_function(move |_, id: EntityArg| {
+        let id = id.read();
         let auto = scene
             .borrow()
             .world
@@ -72,7 +80,8 @@ pub(super) fn register_agent<'scope>(
         Ok(auto.unwrap_or(false))
     });
     put(t, "GetAutoTraverseOffMeshLink", f)?;
-    let f = scope.create_function(move |_, (id, auto): (u32, bool)| {
+    let f = scope.create_function(move |_, (id, auto): (EntityArg, bool)| {
+        let id = id.live("NavMeshAgent", "SetAutoTraverseOffMeshLink")?;
         if let Some(mut a) = scene.borrow_mut().world.nav_agent_mut(id) {
             nav_ops::set_auto_traverse_off_mesh_link(&mut a, auto);
         }

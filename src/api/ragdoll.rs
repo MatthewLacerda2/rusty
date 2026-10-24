@@ -12,6 +12,7 @@ use std::cell::RefCell;
 use mlua::{Lua, Table};
 
 use super::{put, Reg};
+use crate::api::entity_arg::EntityArg;
 use crate::physics::PhysicsWorld;
 use crate::scene::skeleton::RagdollOptions;
 use crate::scene::Scene;
@@ -27,7 +28,8 @@ pub fn register<'scope>(
     put(
         &t,
         "Build",
-        scope.create_function(|lua, (id, opts): (u32, Option<Table>)| {
+        scope.create_function(|lua, (id, opts): (EntityArg, Option<Table>)| {
+            let id = id.live("Ragdoll", "Build")?;
             let mut options = RagdollOptions::default();
             if let Some(mass) = opts.map(|o| o.get::<Option<f32>>("mass")).transpose()? {
                 options.mass = mass.unwrap_or(options.mass).max(0.001);
@@ -44,7 +46,8 @@ pub fn register<'scope>(
         }),
     )?;
     for (name, on) in [("Enable", true), ("Disable", false)] {
-        let f = scope.create_function(move |_, id: u32| {
+        let f = scope.create_function(move |_, id: EntityArg| {
+            let id = id.live("Ragdoll", name)?;
             let velocity = |bone: u32| physics.borrow().as_ref()?.body_velocity(bone);
             scene
                 .borrow_mut()
@@ -56,7 +59,10 @@ pub fn register<'scope>(
     put(
         &t,
         "IsEnabled",
-        scope.create_function(|_, id: u32| Ok(scene.borrow().ragdoll_enabled(id))),
+        scope.create_function(|_, id: EntityArg| {
+            let id = id.read();
+            Ok(scene.borrow().ragdoll_enabled(id))
+        }),
     )?;
     lua.globals().set("Ragdoll", t).map_err(|e| e.to_string())
 }

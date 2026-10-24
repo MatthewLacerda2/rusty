@@ -11,6 +11,7 @@ use mlua::{Table, Variadic};
 
 use super::text::Effect;
 use super::{put, Reg};
+use crate::api::entity_arg::EntityArg;
 use crate::scene::authoring::text as ops;
 use crate::scene::Scene;
 
@@ -25,7 +26,8 @@ pub(super) fn register<'scope>(
         put(
             table,
             &format!("Get{suffix}"),
-            scope.create_function(move |_, id: u32| {
+            scope.create_function(move |_, id: EntityArg| {
+                let id = id.read();
                 let scene = scene.borrow();
                 let v = scene.world.text(id).map_or([0.0; 6], |t| get(&t));
                 Ok(Variadic::from_iter(
@@ -33,10 +35,12 @@ pub(super) fn register<'scope>(
                 ))
             }),
         )?;
+        let verb = format!("Set{suffix}");
         put(
             table,
             &format!("Set{suffix}"),
-            scope.create_function(move |_, (id, args): (u32, Variadic<f32>)| {
+            scope.create_function(move |_, (id, args): (EntityArg, Variadic<f32>)| {
+                let id = id.live("Text", &verb)?;
                 if args.len() < lead + 4 {
                     let msg = format!("Text.Set{suffix} expects {} numbers", lead + 4);
                     return Err(mlua::Error::RuntimeError(msg));
@@ -64,7 +68,8 @@ pub(super) fn register_auto_size<'scope>(
     put(
         table,
         "GetAutoSize",
-        scope.create_function(|_, id: u32| {
+        scope.create_function(|_, id: EntityArg| {
+            let id = id.read();
             let scene = scene.borrow();
             let t = scene.world.text(id);
             Ok(t.map_or((false, 0.0, 0.0), |t| {
@@ -76,7 +81,8 @@ pub(super) fn register_auto_size<'scope>(
         table,
         "SetAutoSize",
         scope.create_function(
-            |_, (id, on, min, max): (u32, bool, Option<f32>, Option<f32>)| {
+            |_, (id, on, min, max): (EntityArg, bool, Option<f32>, Option<f32>)| {
+                let id = id.live("Text", "SetAutoSize")?;
                 if let Some(mut t) = scene.borrow_mut().world.text_mut(id) {
                     let (lo, hi) = (
                         min.unwrap_or(t.auto_size_min),

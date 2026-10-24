@@ -18,6 +18,7 @@ use std::cell::RefCell;
 use mlua::{IntoLua, Lua, Value};
 
 use super::super::{put, Reg};
+use crate::api::entity_arg::EntityArg;
 use crate::scene::authoring::material as mat_ops;
 use crate::scene::Scene;
 
@@ -30,7 +31,8 @@ pub fn register<'scope>(
     put(
         table,
         "SetShaderParam",
-        scope.create_function(|_, (id, name, value): (u32, String, Value)| {
+        scope.create_function(|_, (id, name, value): (EntityArg, String, Value)| {
+            let id = id.live("Material", "SetShaderParam")?;
             let value = floats(value)?;
             mat_ops::set_entity_shader_param(&mut scene.borrow_mut(), id, &name, value).map_err(err)
         }),
@@ -38,7 +40,8 @@ pub fn register<'scope>(
     put(
         table,
         "GetShaderParam",
-        scope.create_function(|lua, (id, name): (u32, String)| {
+        scope.create_function(|lua, (id, name): (EntityArg, String)| {
+            let id = id.read();
             let v = mat_ops::entity_shader_param(&mut scene.borrow_mut(), id, &name);
             to_lua(lua, v.map_err(err)?)
         }),
@@ -46,7 +49,8 @@ pub fn register<'scope>(
     put(
         table,
         "ClearShaderParam",
-        scope.create_function(|_, (id, name): (u32, Option<String>)| {
+        scope.create_function(|_, (id, name): (EntityArg, Option<String>)| {
+            let id = id.live("Material", "ClearShaderParam")?;
             let mut scene = scene.borrow_mut();
             mat_ops::clear_entity_shader_param(&mut scene, id, name.as_deref()).map_err(err)
         }),

@@ -12,6 +12,7 @@ use glam::Vec4;
 use mlua::Lua;
 
 use super::{put, Reg};
+use crate::api::entity_arg::EntityArg;
 use crate::components::BackdropFilterComponent;
 use crate::scene::authoring::backdrop as ops;
 use crate::scene::Scene;
@@ -37,16 +38,19 @@ pub fn register<'scope>(
         put(
             &table,
             &format!("Get{suffix}"),
-            scope.create_function(move |_, id: u32| {
+            scope.create_function(move |_, id: EntityArg| {
+                let id = id.read();
                 let scene = scene.borrow();
                 let b = scene.world.backdrop_filter(id).map(|b| (*b).clone());
                 Ok(get(&b.unwrap_or_default()))
             }),
         )?;
+        let verb = format!("Set{suffix}");
         put(
             &table,
             &format!("Set{suffix}"),
-            scope.create_function(move |_, (id, v): (u32, f32)| {
+            scope.create_function(move |_, (id, v): (EntityArg, f32)| {
+                let id = id.live("BackdropFilter", &verb)?;
                 if let Some(mut b) = scene.borrow_mut().world.backdrop_filter_mut(id) {
                     set(&mut b, v);
                 }
@@ -57,7 +61,8 @@ pub fn register<'scope>(
     put(
         &table,
         "GetTint",
-        scope.create_function(|_, id: u32| {
+        scope.create_function(|_, id: EntityArg| {
+            let id = id.read();
             let scene = scene.borrow();
             let t = scene
                 .world
@@ -69,7 +74,8 @@ pub fn register<'scope>(
     put(
         &table,
         "SetTint",
-        scope.create_function(|_, (id, r, g, b, a): (u32, f32, f32, f32, f32)| {
+        scope.create_function(|_, (id, r, g, b, a): (EntityArg, f32, f32, f32, f32)| {
+            let id = id.live("BackdropFilter", "SetTint")?;
             if let Some(mut f) = scene.borrow_mut().world.backdrop_filter_mut(id) {
                 ops::set_tint(&mut f, Vec4::new(r, g, b, a));
             }

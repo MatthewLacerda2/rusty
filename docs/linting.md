@@ -20,6 +20,7 @@ agent can read exactly what failed.
 | Docs name what exists | `make docrefs` (`.github/scripts/docrefs.py`) | **hard gate**: every `src/`, `tests/`, `tools/`, `docs/` or `.github/` path in a tracked `*.md`'s inline code is tracked, every `` `make <verb>` `` is a target, and CLAUDE.md's namespaces each have a `docs/api/` page; placeholders pass, anything else takes `<!-- docrefs: allow <why> -->`. Runs on Markdown-only PRs too (#973) |
 | Editor↔API parity per op | `tools/lint -- --rules` (`api-parity`) | **hard gate**: every `scene::authoring::<module>::set_*` op a non-test line of `src/editor/` names is also named from `src/api/` — a named setter's call or an `op!`/`with!`/`group!` row of `api::component`'s tables — so anything the inspector writes, Lua can; an editor-only op takes `// lint: allow(api-parity) <why>` at its `fn`, and an allow on an op Lua reaches or no inspector names is stale and fails (#1368) |
 | Editor↔shared-op parity | `tools/lint -- --parity` | every first-class component's inspector card routes its mutations through a shared `scene::authoring` op (never direct field writes through the #344 accessor guard) |
+| Entity ids from Lua | `tools/lint -- --rules` (`entity-arg`) | **hard gate**: in `src/api/`, a Lua callback never takes an entity (`id`, `…_id`, `parent`, `child`, `target`, `entity`, `body`, `canvas`) as a bare `u32` or `Option<u32>`: it takes `api::entity_arg::EntityArg`, so a `nil` id reads as a missing entity and fails a write with the verb's name (#1383) |
 | File length | `tools/lint` | <= 300 lines: every line of a `.rs` file, the lines of code of a `.py`, `.lua` or `.wgsl` one (docstrings, comments and blank lines free, #926, #1015); nothing grandfathered |
 | Finite authoring floats | `tools/lint -- --rules` (`sanitize`) | **hard gate**: every `pub fn set_*` under `src/scene/authoring/` that takes an `f32` or a glam vector passes it to a `scene::authoring::sanitize` helper (or a sibling setter of its file), so NaN and `±inf` from Lua or the editor take the field's fallback and never reach a field; a value checked another way takes `// lint: allow(sanitize) <why>` (#1361) |
 | Folder grouping | `tools/lint -- --rules` | **hard gate** (`prefix-group`): no three sibling `.rs` files share a first word (`nav_agent.rs`, `nav_obstacle.rs`, …); make it a subfolder and drop the prefix. Prints the ≲10-files-per-directory signal beside it, never failing on it (#934) |
@@ -259,6 +260,17 @@ new flag, gate, CI step or baseline.
   lints are per converter, not in `Cargo.toml`, because the rest of the crate has
   some eighty best-effort `let _ =` (a cleanup, a send to a closed channel). A
   future converter is covered the day it is added (`rules/converter_log.rs`).
+- **`entity-arg`** (#1383) — a script passes `nil` for "no entity" (a failed
+  `Scene.FindEntityByName`). Bindings that took `id: u32` threw `error converting
+  Lua nil to u32` where their neighbours answered the missing-entity default, and
+  the reads that took `Option<u32>` each decided what `nil` meant by hand.
+  `api::entity_arg::EntityArg` decides it once: `read()` names no entity (id 0,
+  which the allocator never hands out), `live(namespace, verb)` is the write's
+  error, `get()` the `Option` where `nil` means "none" on purpose. In `src/api/`, a
+  closure whose first parameter is the Lua state (`_`, `lua`, `_: &Lua`) and whose
+  arguments name an entity typed `u32` or `Option<u32>` fails. The rule reads one
+  line and goes by the parameter's name (`rules/entity_arg.rs`): an id under
+  another name, or in a hand-parsed `MultiValue`, gets past it.
 - **`full-literal`** (#976) — a test builds a first-class component (a `…Component`
   type `Entity` names, with three or more fields) through a constructor or a
   `..rest`, never a struct expression naming every field: such a literal breaks the

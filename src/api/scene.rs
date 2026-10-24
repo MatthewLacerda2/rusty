@@ -28,6 +28,7 @@ use std::collections::BTreeMap;
 use mlua::Lua;
 
 use super::{put, Reg};
+use crate::api::entity_arg::EntityArg;
 use crate::components::ScriptFieldValue;
 use crate::scene::authoring::{self, ComponentKind, Primitive};
 use crate::scene::Scene;
@@ -94,7 +95,8 @@ fn register_destroy<'scope>(
     put(
         table,
         "Deactivate",
-        scope.create_function(|_, id: u32| {
+        scope.create_function(|_, id: EntityArg| {
+            let id = id.live("Scene", "Deactivate")?;
             scene.borrow_mut().world.set_active(id, false);
             Ok(())
         }),
@@ -113,7 +115,8 @@ fn register_destroy<'scope>(
     put(
         table,
         "DestroyEntity",
-        scope.create_function(|_, id: u32| {
+        scope.create_function(|_, id: EntityArg| {
+            let id = id.live("Scene", "DestroyEntity")?;
             let mut s = scene.borrow_mut();
             let existed = s.world.contains(id);
             if existed {
@@ -134,7 +137,8 @@ fn register_components<'scope>(
     put(
         table,
         "AddComponent",
-        scope.create_function(|_, (id, kind): (u32, String)| {
+        scope.create_function(|_, (id, kind): (EntityArg, String)| {
+            let id = id.live("Scene", "AddComponent")?;
             let parsed = ComponentKind::parse(&kind).ok_or_else(|| {
                 mlua::Error::RuntimeError(format!("unknown component '{}'", kind))
             })?;
@@ -149,7 +153,8 @@ fn register_components<'scope>(
     put(
         table,
         "RemoveComponent",
-        scope.create_function(|_, (id, kind): (u32, String)| {
+        scope.create_function(|_, (id, kind): (EntityArg, String)| {
+            let id = id.live("Scene", "RemoveComponent")?;
             let parsed = ComponentKind::parse(&kind).ok_or_else(|| {
                 mlua::Error::RuntimeError(format!("unknown component '{}'", kind))
             })?;
@@ -165,7 +170,8 @@ fn register_components<'scope>(
         table,
         "AddScript",
         scope.create_function(
-            |_, (id, path, fields): (u32, String, Option<mlua::Table>)| {
+            |_, (id, path, fields): (EntityArg, String, Option<mlua::Table>)| {
+                let id = id.live("Scene", "AddScript")?;
                 let values = field_values(fields)?;
                 Ok(authoring::add_script(
                     &mut scene.borrow_mut().world,
@@ -213,7 +219,9 @@ fn register_parenting<'scope>(
     put(
         table,
         "SetParent",
-        scope.create_function(|_, (id, parent): (u32, u32)| {
+        scope.create_function(|_, (id, parent): (EntityArg, EntityArg)| {
+            let id = id.live("Scene", "SetParent")?;
+            let parent = parent.live("Scene", "SetParent")?;
             scene
                 .borrow_mut()
                 .set_parent(id, Some(parent))
@@ -224,7 +232,8 @@ fn register_parenting<'scope>(
     put(
         table,
         "ClearParent",
-        scope.create_function(|_, id: u32| {
+        scope.create_function(|_, id: EntityArg| {
+            let id = id.live("Scene", "ClearParent")?;
             scene
                 .borrow_mut()
                 .set_parent(id, None)

@@ -14,12 +14,13 @@ use glam::Vec3;
 use mlua::Table;
 
 use super::super::{put, Reg};
+use crate::api::entity_arg::EntityArg;
 use crate::physics::PhysicsWorld;
 use crate::scene::Scene;
 use crate::time::FIXED_DELTA_TIME;
 
 /// `(id, x, y, z, px, py, pz)`: a vector and the world point it acts at.
-type AtPoint = (u32, f32, f32, f32, f32, f32, f32);
+type AtPoint = (EntityArg, f32, f32, f32, f32, f32, f32);
 
 /// Register `AddForceAtPosition` / `AddImpulseAtPosition` onto `Physics`.
 pub(super) fn register<'scope>(
@@ -34,6 +35,7 @@ pub(super) fn register<'scope>(
         ("AddImpulseAtPosition", 1.0),
     ] {
         let f = scope.create_function(move |_, (id, x, y, z, px, py, pz): AtPoint| {
+            let id = id.live("Physics", name)?;
             let impulse = Vec3::new(x, y, z) * scale;
             apply(scene, physics, id, impulse, Vec3::new(px, py, pz));
             Ok(())

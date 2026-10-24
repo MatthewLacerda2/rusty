@@ -13,6 +13,7 @@ use mlua::{Lua, Table};
 
 use super::ribbon_style::{self, Ribbon};
 use super::{put, Reg};
+use crate::api::entity_arg::EntityArg;
 use crate::components::TrailComponent;
 use crate::scene::authoring::trail as ops;
 use crate::scene::Scene;
@@ -51,26 +52,35 @@ fn register_settings<'scope>(
     t: &Table,
     scene: SceneCell<'scope>,
 ) -> Reg {
-    let f =
-        scope.create_function(move |_, id: u32| Ok(read(scene, id, |t| t.emitting) == Some(true)));
+    let f = scope.create_function(move |_, id: EntityArg| {
+        let id = id.read();
+        Ok(read(scene, id, |t| t.emitting) == Some(true))
+    });
     put(t, "IsEmitting", f)?;
-    let f = scope.create_function(move |_, (id, on): (u32, bool)| {
+    let f = scope.create_function(move |_, (id, on): (EntityArg, bool)| {
+        let id = id.live("Trail", "SetEmitting")?;
         write(scene, id, |t| ops::set_emitting(t, on));
         Ok(())
     });
     put(t, "SetEmitting", f)?;
-    let f = scope.create_function(move |_, id: u32| Ok(read(scene, id, |t| t.time).unwrap_or(0.0)));
+    let f = scope.create_function(move |_, id: EntityArg| {
+        let id = id.read();
+        Ok(read(scene, id, |t| t.time).unwrap_or(0.0))
+    });
     put(t, "GetTime", f)?;
-    let f = scope.create_function(move |_, (id, v): (u32, f32)| {
+    let f = scope.create_function(move |_, (id, v): (EntityArg, f32)| {
+        let id = id.live("Trail", "SetTime")?;
         write(scene, id, |t| ops::set_time(t, v));
         Ok(())
     });
     put(t, "SetTime", f)?;
-    let f = scope.create_function(move |_, id: u32| {
+    let f = scope.create_function(move |_, id: EntityArg| {
+        let id = id.read();
         Ok(read(scene, id, |t| t.min_vertex_distance).unwrap_or(0.0))
     });
     put(t, "GetMinVertexDistance", f)?;
-    let f = scope.create_function(move |_, (id, v): (u32, f32)| {
+    let f = scope.create_function(move |_, (id, v): (EntityArg, f32)| {
+        let id = id.live("Trail", "SetMinVertexDistance")?;
         write(scene, id, |t| ops::set_min_vertex_distance(t, v));
         Ok(())
     });
@@ -84,16 +94,19 @@ fn register_points<'scope>(
     t: &Table,
     scene: SceneCell<'scope>,
 ) -> Reg {
-    let f = scope.create_function(move |_, id: u32| {
+    let f = scope.create_function(move |_, id: EntityArg| {
+        let id = id.live("Trail", "Clear")?;
         write(scene, id, TrailComponent::clear);
         Ok(())
     });
     put(t, "Clear", f)?;
-    let f = scope.create_function(move |_, id: u32| {
+    let f = scope.create_function(move |_, id: EntityArg| {
+        let id = id.read();
         Ok(read(scene, id, |t| t.runtime.points.len()).unwrap_or(0))
     });
     put(t, "GetPositionCount", f)?;
-    let f = scope.create_function(move |_, id: u32| {
+    let f = scope.create_function(move |_, id: EntityArg| {
+        let id = id.read();
         let points = read(scene, id, |t| t.positions().map(|p| p.to_array()).collect());
         Ok(points.unwrap_or_else(Vec::new))
     });

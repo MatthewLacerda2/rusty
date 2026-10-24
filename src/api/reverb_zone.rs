@@ -12,6 +12,7 @@ use std::cell::RefCell;
 use mlua::{Lua, Table, Value};
 
 use super::{put, Reg};
+use crate::api::entity_arg::EntityArg;
 use crate::components::{ReverbParams, ReverbPreset, ReverbZoneComponent};
 use crate::scene::authoring::reverb_zone as ops;
 use crate::scene::Scene;
@@ -62,15 +63,23 @@ fn register_radii<'scope>(
     t: &Table,
     scene: SceneCell<'scope>,
 ) -> Reg {
-    let f = scope.create_function(move |_, id: u32| Ok(get(scene, id).map(|z| z.min_distance)));
+    let f = scope.create_function(move |_, id: EntityArg| {
+        let id = id.read();
+        Ok(get(scene, id).map(|z| z.min_distance))
+    });
     put(t, "GetMinDistance", f)?;
-    let f = scope.create_function(move |_, (id, d): (u32, f32)| {
+    let f = scope.create_function(move |_, (id, d): (EntityArg, f32)| {
+        let id = id.live("AudioReverbZone", "SetMinDistance")?;
         set(scene, id, |z| ops::set_min_distance(z, d))
     });
     put(t, "SetMinDistance", f)?;
-    let f = scope.create_function(move |_, id: u32| Ok(get(scene, id).map(|z| z.max_distance)));
+    let f = scope.create_function(move |_, id: EntityArg| {
+        let id = id.read();
+        Ok(get(scene, id).map(|z| z.max_distance))
+    });
     put(t, "GetMaxDistance", f)?;
-    let f = scope.create_function(move |_, (id, d): (u32, f32)| {
+    let f = scope.create_function(move |_, (id, d): (EntityArg, f32)| {
+        let id = id.live("AudioReverbZone", "SetMaxDistance")?;
         set(scene, id, |z| ops::set_max_distance(z, d))
     });
     put(t, "SetMaxDistance", f)
@@ -82,9 +91,13 @@ fn register_preset<'scope>(
     t: &Table,
     scene: SceneCell<'scope>,
 ) -> Reg {
-    let f = scope.create_function(move |_, id: u32| Ok(get(scene, id).map(|z| z.preset.name())));
+    let f = scope.create_function(move |_, id: EntityArg| {
+        let id = id.read();
+        Ok(get(scene, id).map(|z| z.preset.name()))
+    });
     put(t, "GetPreset", f)?;
-    let f = scope.create_function(move |_, (id, name): (u32, String)| {
+    let f = scope.create_function(move |_, (id, name): (EntityArg, String)| {
+        let id = id.live("AudioReverbZone", "SetPreset")?;
         let preset = ReverbPreset::parse(&name).ok_or_else(|| {
             let names: Vec<_> = ReverbPreset::ALL.iter().map(|p| p.name()).collect();
             err(format!(
@@ -105,13 +118,15 @@ fn register_params<'scope>(
     t: &Table,
     scene: SceneCell<'scope>,
 ) -> Reg {
-    let f = scope.create_function(move |lua, id: u32| {
+    let f = scope.create_function(move |lua, id: EntityArg| {
+        let id = id.read();
         get(scene, id)
             .map(|z| params_table(lua, &z.params))
             .transpose()
     });
     put(t, "GetParams", f)?;
-    let f = scope.create_function(move |_, (id, patch): (u32, Table)| {
+    let f = scope.create_function(move |_, (id, patch): (EntityArg, Table)| {
+        let id = id.live("AudioReverbZone", "SetParams")?;
         let Some(zone) = get(scene, id) else {
             return Err(err(format!("entity {id} has no AudioReverbZone")));
         };

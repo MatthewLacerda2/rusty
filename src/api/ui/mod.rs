@@ -23,6 +23,7 @@ use mlua::{Lua, Table};
 use serde_json::{json, Value};
 
 use super::{put, Reg};
+use crate::api::entity_arg::EntityArg;
 use crate::core::video::VideoSettings;
 use crate::scene::authoring::ui_widgets::{create_ui, UiWidget};
 use crate::scene::{Camera, Scene};
@@ -42,7 +43,8 @@ pub fn register<'scope>(
     put(
         &table,
         "GetRect",
-        scope.create_function(move |lua, id: u32| {
+        scope.create_function(move |lua, id: EntityArg| {
+            let id = id.read();
             let view = ui_view();
             let world = &scene.borrow().world;
             let Some(rect) = layout::rect_in(world, id, &view) else {
@@ -65,7 +67,8 @@ pub fn register<'scope>(
     put(
         &table,
         "Create",
-        scope.create_function(|_, (kind, parent): (String, Option<u32>)| {
+        scope.create_function(|_, (kind, parent): (String, EntityArg)| {
+            let parent = parent.get();
             let widget = UiWidget::parse(&kind).ok_or_else(|| {
                 let all: Vec<_> = UiWidget::ALL.iter().map(|w| w.label()).collect();
                 mlua::Error::RuntimeError(format!(

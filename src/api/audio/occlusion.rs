@@ -10,6 +10,7 @@ use mlua::{Table, Value};
 
 use super::super::{put, Reg};
 use super::groups::err;
+use crate::api::entity_arg::EntityArg;
 use crate::audio::{AudioMaestro, OcclusionSettings};
 use crate::scene::authoring::audio as audio_ops;
 use crate::scene::Scene;
@@ -76,7 +77,8 @@ pub(super) fn register_occlusion<'scope>(
     put(
         table,
         "SetOcclusionEnabled",
-        scope.create_function(|_, (id, on): (u32, bool)| {
+        scope.create_function(|_, (id, on): (EntityArg, bool)| {
+            let id = id.live("Audio", "SetOcclusionEnabled")?;
             let mut scene = scene.borrow_mut();
             let mut source = scene
                 .world
@@ -89,7 +91,8 @@ pub(super) fn register_occlusion<'scope>(
     put(
         table,
         "GetOcclusionEnabled",
-        scope.create_function(|_, id: u32| {
+        scope.create_function(|_, id: EntityArg| {
+            let id = id.read();
             let scene = scene.borrow();
             Ok(scene.world.audio(id).map(|a| a.occlusion_enabled))
         }),

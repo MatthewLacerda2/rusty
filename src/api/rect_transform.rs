@@ -16,6 +16,7 @@ use glam::{Vec2, Vec3};
 use mlua::{Lua, Table};
 
 use super::{put, Reg};
+use crate::api::entity_arg::EntityArg;
 use crate::components::RectTransformComponent;
 use crate::core::video::VideoSettings;
 use crate::scene::authoring::rect_transform::{self as rect_ops, AnchorPreset, AxisPreset};
@@ -70,17 +71,20 @@ fn register_pair<'scope>(
     put(
         table,
         &format!("Get{suffix}"),
-        scope.create_function(move |_, id: u32| {
+        scope.create_function(move |_, id: EntityArg| {
+            let id = id.read();
             let scene = scene.borrow();
             let v = scene.world.rect_transform(id).map(|r| get(&r));
             let v = v.unwrap_or(Vec2::ZERO);
             Ok((v.x, v.y))
         }),
     )?;
+    let verb = format!("Set{suffix}");
     put(
         table,
         &format!("Set{suffix}"),
-        scope.create_function(move |_, (id, x, y): (u32, f32, f32)| {
+        scope.create_function(move |_, (id, x, y): (EntityArg, f32, f32)| {
+            let id = id.live("RectTransform", &verb)?;
             let mut scene = scene.borrow_mut();
             if let Some(mut r) = scene.world.rect_transform_mut(id) {
                 set(&mut r, Vec2::new(x, y));
@@ -99,8 +103,9 @@ fn register_preset<'scope>(
     scene: &'scope RefCell<Scene>,
     (screen, video): (&'scope RefCell<ScreenSize>, &'scope RefCell<VideoSettings>),
 ) -> Reg {
-    type Args = (u32, String, String, Option<bool>, Option<bool>);
+    type Args = (EntityArg, String, String, Option<bool>, Option<bool>);
     let f = scope.create_function(move |_, (id, x, y, pivot, position): Args| {
+        let id = id.live("RectTransform", "SetAnchorPreset")?;
         let axis = |name: &str, axis| {
             AxisPreset::from_name(name, axis).ok_or_else(|| {
                 let want = AxisPreset::ALL.map(|p| p.name(axis)).join(", ");
@@ -143,19 +148,22 @@ fn register_world_anchor<'scope>(
             f(&mut r);
         }
     };
-    type Args = (u32, Option<u32>, Option<f32>, Option<f32>, Option<f32>);
+    type Args = (EntityArg, EntityArg, Option<f32>, Option<f32>, Option<f32>);
     let f = scope.create_function(move |_, (id, target, x, y, z): Args| {
+        let (id, target) = (id.live("RectTransform", "SetWorldAnchor")?, target.get());
         let offset = Vec3::new(x.unwrap_or(0.0), y.unwrap_or(0.0), z.unwrap_or(0.0));
         edit(id, &|r| rect_ops::set_world_anchor(r, target, offset));
         Ok(())
     });
     put(table, "SetWorldAnchor", f)?;
-    let f = scope.create_function(move |_, id: u32| {
+    let f = scope.create_function(move |_, id: EntityArg| {
+        let id = id.live("RectTransform", "ClearWorldAnchor")?;
         edit(id, &rect_ops::clear_world_anchor);
         Ok(())
     });
     put(table, "ClearWorldAnchor", f)?;
-    let f = scope.create_function(move |_, (id, clamp, pad): (u32, bool, Option<f32>)| {
+    let f = scope.create_function(move |_, (id, clamp, pad): (EntityArg, bool, Option<f32>)| {
+        let id = id.live("RectTransform", "SetWorldAnchorClamp")?;
         edit(id, &|r| {
             rect_ops::set_anchor_clamp(r, clamp, pad.unwrap_or(0.0))
         });
@@ -170,7 +178,8 @@ fn register_world_anchor<'scope>(
         ),
     ];
     for (name, set) in flags {
-        let f = scope.create_function(move |_, (id, on): (u32, bool)| {
+        let f = scope.create_function(move |_, (id, on): (EntityArg, bool)| {
+            let id = id.live("RectTransform", name)?;
             edit(id, &|r| set(r, on));
             Ok(())
         });
@@ -185,7 +194,8 @@ fn register_get_world_anchor<'scope>(
     table: &Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
-    let f = scope.create_function(move |lua, id: u32| {
+    let f = scope.create_function(move |lua, id: EntityArg| {
+        let id = id.read();
         let scene = scene.borrow();
         let anchor = scene
             .world

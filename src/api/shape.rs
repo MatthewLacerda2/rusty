@@ -16,6 +16,7 @@ use mlua::{Lua, Table, Variadic};
 
 use super::ui_look::{register_blend, register_gradient, BlendAccess, GradientAccess};
 use super::{put, Reg};
+use crate::api::entity_arg::EntityArg;
 use crate::components::ShapeComponent;
 use crate::components::{ShapeCorner, ShapeKind};
 use crate::scene::authoring::shape as ops;
@@ -109,8 +110,8 @@ pub fn register<'scope>(
         register_nums(scope, &table, scene, (suffix, count), get, set)?;
     }
     register_names(scope, &table, scene)?;
-    register_blend(scope, &table, scene, BLEND)?;
-    register_gradient(scope, &table, scene, GRADIENT)?;
+    register_blend(scope, &table, scene, ("Shape", BLEND))?;
+    register_gradient(scope, &table, scene, ("Shape", GRADIENT))?;
     lua.globals().set("Shape", table).map_err(|e| e.to_string())
 }
 
@@ -144,16 +145,19 @@ fn register_nums<'scope>(
     put(
         table,
         &format!("Get{suffix}"),
-        scope.create_function(move |_, id: u32| {
+        scope.create_function(move |_, id: EntityArg| {
+            let id = id.read();
             let s = scene.borrow();
             let v = s.world.shape(id).map_or(vec![0.0; count], |c| get(&c));
             Ok(Variadic::from_iter(v))
         }),
     )?;
+    let verb = format!("Set{suffix}");
     put(
         table,
         &format!("Set{suffix}"),
-        scope.create_function(move |_, (id, args): (u32, Variadic<f32>)| {
+        scope.create_function(move |_, (id, args): (EntityArg, Variadic<f32>)| {
+            let id = id.live("Shape", &verb)?;
             if args.len() < count {
                 let msg = format!("Shape.Set{suffix} expects {count} numbers");
                 return Err(mlua::Error::RuntimeError(msg));
@@ -196,12 +200,17 @@ fn register_names<'scope>(
     scene: Scoped<'scope>,
 ) -> Reg {
     for (suffix, get, set) in NAMES {
-        let read = move |_: &Lua, id: u32| {
+        let read = move |_: &Lua, id: EntityArg| {
             let s = scene.borrow();
-            Ok(s.world.shape(id).map_or("None", |c| get(&c)).to_string())
+            Ok(s.world
+                .shape(id.read())
+                .map_or("None", |c| get(&c))
+                .to_string())
         };
         put(table, &format!("Get{suffix}"), scope.create_function(read))?;
-        let write = move |_: &Lua, (id, name): (u32, String)| {
+        let verb = format!("Set{suffix}");
+        let write = move |_: &Lua, (id, name): (EntityArg, String)| {
+            let id = id.live("Shape", &verb)?;
             with_shape(&mut scene.borrow_mut(), id, |c| set(c, &name));
             Ok(())
         };
@@ -210,7 +219,8 @@ fn register_names<'scope>(
     put(
         table,
         "GetRaycastTarget",
-        scope.create_function(move |_, id: u32| {
+        scope.create_function(move |_, id: EntityArg| {
+            let id = id.read();
             Ok(scene
                 .borrow()
                 .world
@@ -221,7 +231,8 @@ fn register_names<'scope>(
     put(
         table,
         "SetRaycastTarget",
-        scope.create_function(move |_, (id, on): (u32, bool)| {
+        scope.create_function(move |_, (id, on): (EntityArg, bool)| {
+            let id = id.live("Shape", "SetRaycastTarget")?;
             with_shape(&mut scene.borrow_mut(), id, |c| {
                 ops::set_raycast_target(c, on)
             });

@@ -14,6 +14,7 @@ use std::cell::RefCell;
 use mlua::{Lua, Table};
 
 use super::{put, Reg};
+use crate::api::entity_arg::EntityArg;
 use crate::components::LodGroupComponent;
 use crate::scene::authoring::lod_group as ops;
 use crate::scene::Scene;
@@ -50,19 +51,29 @@ fn register_group<'scope>(
     t: &Table,
     scene: SceneCell<'scope>,
 ) -> Reg {
-    let f = scope.create_function(move |_, id: u32| Ok(get(scene, id).map_or(0.0, |g| g.size)));
+    let f = scope.create_function(move |_, id: EntityArg| {
+        let id = id.read();
+        Ok(get(scene, id).map_or(0.0, |g| g.size))
+    });
     put(t, "GetSize", f)?;
-    let f = scope.create_function(move |_, (id, size): (u32, f32)| {
+    let f = scope.create_function(move |_, (id, size): (EntityArg, f32)| {
+        let id = id.live("LODGroup", "SetSize")?;
         set(scene, id, |g| ops::set_size(g, size));
         Ok(())
     });
     put(t, "SetSize", f)?;
-    let f =
-        scope.create_function(move |_, id: u32| Ok(get(scene, id).map_or(0, |g| g.levels.len())));
+    let f = scope.create_function(move |_, id: EntityArg| {
+        let id = id.read();
+        Ok(get(scene, id).map_or(0, |g| g.levels.len()))
+    });
     put(t, "GetLevelCount", f)?;
-    let f = scope.create_function(move |_, id: u32| Ok(set(scene, id, ops::add_level)));
+    let f = scope.create_function(move |_, id: EntityArg| {
+        let id = id.live("LODGroup", "AddLevel")?;
+        Ok(set(scene, id, ops::add_level))
+    });
     put(t, "AddLevel", f)?;
-    let f = scope.create_function(move |_, (id, level): (u32, usize)| {
+    let f = scope.create_function(move |_, (id, level): (EntityArg, usize)| {
+        let id = id.live("LODGroup", "RemoveLevel")?;
         set(scene, id, |g| ops::remove_level(g, level));
         Ok(())
     });
@@ -75,17 +86,20 @@ fn register_levels<'scope>(
     t: &Table,
     scene: SceneCell<'scope>,
 ) -> Reg {
-    let f = scope.create_function(move |_, (id, level): (u32, usize)| {
+    let f = scope.create_function(move |_, (id, level): (EntityArg, usize)| {
+        let id = id.read();
         let g = get(scene, id);
         Ok(g.and_then(|g| g.levels.get(level).map(|l| l.screen_height)))
     });
     put(t, "GetLevelHeight", f)?;
-    let f = scope.create_function(move |_, (id, level, h): (u32, usize, f32)| {
+    let f = scope.create_function(move |_, (id, level, h): (EntityArg, usize, f32)| {
+        let id = id.live("LODGroup", "SetLevelHeight")?;
         set(scene, id, |g| ops::set_level_height(g, level, h));
         Ok(())
     });
     put(t, "SetLevelHeight", f)?;
-    let f = scope.create_function(move |_, (id, level): (u32, usize)| {
+    let f = scope.create_function(move |_, (id, level): (EntityArg, usize)| {
+        let id = id.read();
         let g = get(scene, id);
         Ok(
             g.and_then(|g| g.levels.get(level).map(|l| l.renderers.clone()))
@@ -93,7 +107,8 @@ fn register_levels<'scope>(
         )
     });
     put(t, "GetRenderers", f)?;
-    let f = scope.create_function(move |_, (id, level, ids): (u32, usize, Vec<u32>)| {
+    let f = scope.create_function(move |_, (id, level, ids): (EntityArg, usize, Vec<u32>)| {
+        let id = id.live("LODGroup", "SetRenderers")?;
         set(scene, id, |g| ops::set_renderers(g, level, ids));
         Ok(())
     });

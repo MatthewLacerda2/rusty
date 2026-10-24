@@ -15,6 +15,7 @@ use glam::Vec4;
 use mlua::{Lua, Table};
 
 use super::{put, Reg};
+use crate::api::entity_arg::EntityArg;
 use crate::components::{NavigationMode, SelectableTransition};
 use crate::components::{SelectableComponent, SelectionState};
 use crate::scene::authoring::selectable as ops;
@@ -59,20 +60,25 @@ fn register_state<'scope>(
     scene: &'scope RefCell<Scene>,
     events: &'scope RefCell<EventSystem>,
 ) -> Reg {
-    let f =
-        scope.create_function(move |_, id: u32| Ok(get(scene, id).is_some_and(|s| s.interactable)));
+    let f = scope.create_function(move |_, id: EntityArg| {
+        let id = id.read();
+        Ok(get(scene, id).is_some_and(|s| s.interactable))
+    });
     put(t, "GetInteractable", f)?;
-    let f = scope.create_function(move |_, (id, v): (u32, bool)| {
+    let f = scope.create_function(move |_, (id, v): (EntityArg, bool)| {
+        let id = id.live("Selectable", "SetInteractable")?;
         set(scene, id, &|s| ops::set_interactable(s, v));
         Ok(())
     });
     put(t, "SetInteractable", f)?;
-    let f = scope.create_function(move |_, id: u32| {
+    let f = scope.create_function(move |_, id: EntityArg| {
+        let id = id.read();
         let world = &scene.borrow().world;
         Ok(world.has_selectable(id) && is_interactable(world, id))
     });
     put(t, "IsInteractable", f)?;
-    let f = scope.create_function(move |_, id: u32| {
+    let f = scope.create_function(move |_, id: EntityArg| {
+        let id = id.read();
         let world = &scene.borrow().world;
         let has = world.has_selectable(id);
         Ok(has.then(|| events.borrow().state_of(world, id).name()))
@@ -87,28 +93,38 @@ fn register_transition<'scope>(
     t: &Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
-    let f =
-        scope.create_function(move |_, id: u32| Ok(get(scene, id).map(|s| s.transition.name())));
+    let f = scope.create_function(move |_, id: EntityArg| {
+        let id = id.read();
+        Ok(get(scene, id).map(|s| s.transition.name()))
+    });
     put(t, "GetTransition", f)?;
-    let f = scope.create_function(move |_, (id, name): (u32, String)| {
+    let f = scope.create_function(move |_, (id, name): (EntityArg, String)| {
+        let id = id.live("Selectable", "SetTransition")?;
         if let Some(v) = SelectableTransition::parse(&name) {
             set(scene, id, &|s| ops::set_transition(s, v));
         }
         Ok(())
     });
     put(t, "SetTransition", f)?;
-    let f =
-        scope.create_function(move |_, id: u32| Ok(get(scene, id).and_then(|s| s.target_graphic)));
+    let f = scope.create_function(move |_, id: EntityArg| {
+        let id = id.read();
+        Ok(get(scene, id).and_then(|s| s.target_graphic))
+    });
     put(t, "GetTargetGraphic", f)?;
-    let f = scope.create_function(move |_, (id, target): (u32, Option<u32>)| {
+    let f = scope.create_function(move |_, (id, target): (EntityArg, EntityArg)| {
+        let id = id.live("Selectable", "SetTargetGraphic")?;
+        let target = target.get();
         set(scene, id, &|s| ops::set_target_graphic(s, target));
         Ok(())
     });
     put(t, "SetTargetGraphic", f)?;
-    let f = scope
-        .create_function(move |_, id: u32| Ok(get(scene, id).map_or(0.0, |s| s.fade_duration)));
+    let f = scope.create_function(move |_, id: EntityArg| {
+        let id = id.read();
+        Ok(get(scene, id).map_or(0.0, |s| s.fade_duration))
+    });
     put(t, "GetFadeDuration", f)?;
-    let f = scope.create_function(move |_, (id, v): (u32, f32)| {
+    let f = scope.create_function(move |_, (id, v): (EntityArg, f32)| {
+        let id = id.live("Selectable", "SetFadeDuration")?;
         set(scene, id, &|s| ops::set_fade_duration(s, v));
         Ok(())
     });
@@ -122,14 +138,16 @@ fn register_per_state<'scope>(
     t: &Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
-    let f = scope.create_function(move |_, (id, name): (u32, String)| {
+    let f = scope.create_function(move |_, (id, name): (EntityArg, String)| {
+        let id = id.read();
         let c = SelectionState::parse(&name).and_then(|st| Some(get(scene, id)?.color(st)));
         let c = c.unwrap_or(Vec4::ZERO);
         Ok((c.x, c.y, c.z, c.w))
     });
     put(t, "GetColor", f)?;
-    type Rgba = (u32, String, f32, f32, f32, Option<f32>);
+    type Rgba = (EntityArg, String, f32, f32, f32, Option<f32>);
     let f = scope.create_function(move |_, (id, name, r, g, b, a): Rgba| {
+        let id = id.live("Selectable", "SetColor")?;
         if let Some(st) = SelectionState::parse(&name) {
             let c = Vec4::new(r, g, b, a.unwrap_or(1.0));
             set(scene, id, &|s| ops::set_color(s, st, c));
@@ -137,17 +155,21 @@ fn register_per_state<'scope>(
         Ok(())
     });
     put(t, "SetColor", f)?;
-    let f = scope.create_function(move |_, (id, name): (u32, String)| {
+    let f = scope.create_function(move |_, (id, name): (EntityArg, String)| {
+        let id = id.read();
         let st = SelectionState::parse(&name);
         Ok(get(scene, id).and_then(|s| Some(s.sprite(st?)?.to_string())))
     });
     put(t, "GetSprite", f)?;
-    let f = scope.create_function(move |_, (id, name, path): (u32, String, Option<String>)| {
-        if let Some(st) = SelectionState::parse(&name) {
-            set(scene, id, &|s| ops::set_sprite(s, st, path.clone()));
-        }
-        Ok(())
-    });
+    let f = scope.create_function(
+        move |_, (id, name, path): (EntityArg, String, Option<String>)| {
+            let id = id.live("Selectable", "SetSprite")?;
+            if let Some(st) = SelectionState::parse(&name) {
+                set(scene, id, &|s| ops::set_sprite(s, st, path.clone()));
+            }
+            Ok(())
+        },
+    );
     put(t, "SetSprite", f)
 }
 
@@ -157,26 +179,34 @@ fn register_navigation<'scope>(
     t: &Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
-    let f =
-        scope.create_function(move |_, id: u32| Ok(get(scene, id).map(|s| s.navigation.name())));
+    let f = scope.create_function(move |_, id: EntityArg| {
+        let id = id.read();
+        Ok(get(scene, id).map(|s| s.navigation.name()))
+    });
     put(t, "GetNavigation", f)?;
-    let f = scope.create_function(move |_, (id, name): (u32, String)| {
+    let f = scope.create_function(move |_, (id, name): (EntityArg, String)| {
+        let id = id.live("Selectable", "SetNavigation")?;
         if let Some(v) = NavigationMode::parse(&name) {
             set(scene, id, &|s| ops::set_navigation(s, v));
         }
         Ok(())
     });
     put(t, "SetNavigation", f)?;
-    let f = scope.create_function(move |_, (id, dir): (u32, String)| {
+    let f = scope.create_function(move |_, (id, dir): (EntityArg, String)| {
+        let id = id.read();
         let i = ops::direction_index(&dir);
         Ok(get(scene, id).and_then(|s| s.select_on[i?]))
     });
     put(t, "GetSelectOn", f)?;
-    let f = scope.create_function(move |_, (id, dir, target): (u32, String, Option<u32>)| {
-        if let Some(i) = ops::direction_index(&dir) {
-            set(scene, id, &|s| ops::set_select_on(s, i, target));
-        }
-        Ok(())
-    });
+    let f = scope.create_function(
+        move |_, (id, dir, target): (EntityArg, String, EntityArg)| {
+            let id = id.live("Selectable", "SetSelectOn")?;
+            let target = target.get();
+            if let Some(i) = ops::direction_index(&dir) {
+                set(scene, id, &|s| ops::set_select_on(s, i, target));
+            }
+            Ok(())
+        },
+    );
     put(t, "SetSelectOn", f)
 }

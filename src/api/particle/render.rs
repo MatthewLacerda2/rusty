@@ -5,6 +5,7 @@
 use std::cell::RefCell;
 
 use super::with_emitter;
+use crate::api::entity_arg::EntityArg;
 use crate::api::{put, Reg};
 use crate::components::{Flipbook, ParticleRenderMode};
 use crate::scene::authoring::particles as particle_ops;
@@ -32,7 +33,8 @@ fn register_shape<'scope>(
     put(
         table,
         "SetRenderMode",
-        scope.create_function(|_, (id, mode): (u32, String)| {
+        scope.create_function(|_, (id, mode): (EntityArg, String)| {
+            let id = id.live("Particles", "SetRenderMode")?;
             let Some(mode) = ParticleRenderMode::parse(&mode) else {
                 return Ok(false);
             };
@@ -43,7 +45,8 @@ fn register_shape<'scope>(
     put(
         table,
         "GetRenderMode",
-        scope.create_function(|_, id: u32| {
+        scope.create_function(|_, id: EntityArg| {
+            let id = id.read();
             let scene = scene.borrow();
             let mode = scene.world.particles(id).map(|p| p.render.mode.name());
             Ok(mode)
@@ -54,7 +57,8 @@ fn register_shape<'scope>(
     put(
         table,
         "SetStretch",
-        scope.create_function(|_, (id, length, speed): (u32, f32, Option<f32>)| {
+        scope.create_function(|_, (id, length, speed): (EntityArg, f32, Option<f32>)| {
+            let id = id.live("Particles", "SetStretch")?;
             with_emitter(scene, id, |p| {
                 particle_ops::set_stretch(p, length, speed.unwrap_or(0.0))
             });
@@ -67,7 +71,8 @@ fn register_shape<'scope>(
         table,
         "SetMesh",
         scope.create_function(
-            |_, (id, mesh, material): (u32, Option<String>, Option<String>)| {
+            |_, (id, mesh, material): (EntityArg, Option<String>, Option<String>)| {
+                let id = id.live("Particles", "SetMesh")?;
                 with_emitter(scene, id, |p| {
                     particle_ops::set_render_mesh(p, mesh.unwrap_or_default());
                     particle_ops::set_render_material(p, material.unwrap_or_default());
@@ -90,7 +95,8 @@ fn register_look<'scope>(
         table,
         "SetFlipbook",
         scope.create_function(
-            |_, (id, columns, rows, opts): (u32, u32, u32, Option<mlua::Table>)| {
+            |_, (id, columns, rows, opts): (EntityArg, u32, u32, Option<mlua::Table>)| {
+                let id = id.live("Particles", "SetFlipbook")?;
                 let cycles = opts.as_ref().and_then(|o| o.get("cycles").ok());
                 let random_start = opts.as_ref().and_then(|o| o.get("random_start").ok());
                 let flipbook = Flipbook {
@@ -107,7 +113,8 @@ fn register_look<'scope>(
     put(
         table,
         "SetSoft",
-        scope.create_function(|_, (id, distance): (u32, f32)| {
+        scope.create_function(|_, (id, distance): (EntityArg, f32)| {
+            let id = id.live("Particles", "SetSoft")?;
             with_emitter(scene, id, |p| particle_ops::set_soft_distance(p, distance));
             Ok(())
         }),
@@ -115,7 +122,8 @@ fn register_look<'scope>(
     put(
         table,
         "SetLit",
-        scope.create_function(|_, (id, lit): (u32, bool)| {
+        scope.create_function(|_, (id, lit): (EntityArg, bool)| {
+            let id = id.live("Particles", "SetLit")?;
             with_emitter(scene, id, |p| particle_ops::set_lit(p, lit));
             Ok(())
         }),

@@ -15,6 +15,7 @@ use std::cell::RefCell;
 
 use mlua::Lua;
 
+use crate::api::entity_arg::EntityArg;
 use crate::api::{put, Reg};
 use crate::components::{EmitFrom, EmitShape, SubEmitTrigger};
 use crate::core::curve::{ColorRange, Range};
@@ -52,7 +53,8 @@ fn register_emission<'scope>(
     put(
         table,
         "Emit",
-        scope.create_function(|_, (id, count): (u32, u32)| {
+        scope.create_function(|_, (id, count): (EntityArg, u32)| {
+            let id = id.live("Particles", "Emit")?;
             let mut scene = scene.borrow_mut();
             let origin = scene.world.world_position(id);
             let spawned = scene
@@ -68,7 +70,8 @@ fn register_emission<'scope>(
     put(
         table,
         "Burst",
-        scope.create_function(|_, id: u32| {
+        scope.create_function(|_, id: EntityArg| {
+            let id = id.live("Particles", "Burst")?;
             let mut scene = scene.borrow_mut();
             let origin = scene.world.world_position(id);
             let spawned = scene.world.particles_mut(id).map(|mut p| {
@@ -89,7 +92,8 @@ fn register_tuning<'scope>(
     put(
         table,
         "SetActive",
-        scope.create_function(|_, (id, active): (u32, bool)| {
+        scope.create_function(|_, (id, active): (EntityArg, bool)| {
+            let id = id.live("Particles", "SetActive")?;
             let mut scene = scene.borrow_mut();
             if let Some(mut c) = scene.world.particles_mut(id) {
                 particle_ops::set_active(&mut c, active);
@@ -101,7 +105,8 @@ fn register_tuning<'scope>(
     put(
         table,
         "SetRate",
-        scope.create_function(|_, (id, rate): (u32, f32)| {
+        scope.create_function(|_, (id, rate): (EntityArg, f32)| {
+            let id = id.live("Particles", "SetRate")?;
             let mut scene = scene.borrow_mut();
             if let Some(mut c) = scene.world.particles_mut(id) {
                 particle_ops::set_rate(&mut c, rate);
@@ -122,34 +127,38 @@ fn register_shape<'scope>(
     put(
         table,
         "SetShape",
-        scope.create_function(|_, (id, kind, opts): (u32, String, Option<mlua::Table>)| {
-            let get = |k: &str, d: f32| opts.as_ref().and_then(|o| o.get(k).ok()).unwrap_or(d);
-            let size = glam::Vec3::new(get("x", 1.0), get("y", 1.0), get("z", 1.0));
-            let surface: bool = opts
-                .as_ref()
-                .and_then(|o| o.get("surface").ok())
-                .unwrap_or(false);
-            let from = if surface {
-                EmitFrom::Surface
-            } else {
-                EmitFrom::Volume
-            };
-            let Some(shape) =
-                EmitShape::from_parts(&kind, get("radius", 1.0), get("angle", 25.0), size)
-            else {
-                return Ok(false);
-            };
-            with_emitter(scene, id, |p| {
-                particle_ops::set_shape(p, shape);
-                particle_ops::set_emit_from(p, from);
-            });
-            Ok(true)
-        }),
+        scope.create_function(
+            |_, (id, kind, opts): (EntityArg, String, Option<mlua::Table>)| {
+                let id = id.live("Particles", "SetShape")?;
+                let get = |k: &str, d: f32| opts.as_ref().and_then(|o| o.get(k).ok()).unwrap_or(d);
+                let size = glam::Vec3::new(get("x", 1.0), get("y", 1.0), get("z", 1.0));
+                let surface: bool = opts
+                    .as_ref()
+                    .and_then(|o| o.get("surface").ok())
+                    .unwrap_or(false);
+                let from = if surface {
+                    EmitFrom::Surface
+                } else {
+                    EmitFrom::Volume
+                };
+                let Some(shape) =
+                    EmitShape::from_parts(&kind, get("radius", 1.0), get("angle", 25.0), size)
+                else {
+                    return Ok(false);
+                };
+                with_emitter(scene, id, |p| {
+                    particle_ops::set_shape(p, shape);
+                    particle_ops::set_emit_from(p, from);
+                });
+                Ok(true)
+            },
+        ),
     )?;
     put(
         table,
         "SetDirection",
-        scope.create_function(|_, (id, x, y, z): (u32, f32, f32, f32)| {
+        scope.create_function(|_, (id, x, y, z): (EntityArg, f32, f32, f32)| {
+            let id = id.live("Particles", "SetDirection")?;
             let dir = glam::Vec3::new(x, y, z);
             with_emitter(scene, id, |p| particle_ops::set_direction(p, dir));
             Ok(())
@@ -175,7 +184,8 @@ fn register_start<'scope>(
         put(
             table,
             name,
-            scope.create_function(move |_, (id, min, max): (u32, f32, Option<f32>)| {
+            scope.create_function(move |_, (id, min, max): (EntityArg, f32, Option<f32>)| {
+                let id = id.live("Particles", name)?;
                 let range = Range::new(min, max.unwrap_or(min));
                 with_emitter(scene, id, |p| op(p, range));
                 Ok(())
@@ -185,17 +195,22 @@ fn register_start<'scope>(
     put(
         table,
         "SetColor",
-        scope.create_function(|_, (id, r, g, b, a): (u32, f32, f32, f32, Option<f32>)| {
-            let color = ColorRange::constant([r, g, b, a.unwrap_or(1.0)]);
-            with_emitter(scene, id, |p| particle_ops::set_color(p, color));
-            Ok(())
-        }),
+        scope.create_function(
+            |_, (id, r, g, b, a): (EntityArg, f32, f32, f32, Option<f32>)| {
+                let id = id.live("Particles", "SetColor")?;
+                let color = ColorRange::constant([r, g, b, a.unwrap_or(1.0)]);
+                with_emitter(scene, id, |p| particle_ops::set_color(p, color));
+                Ok(())
+            },
+        ),
     )?;
     // `SetSubEmitter(id, "birth"|"death"|"collision", target?)` — nil clears.
     put(
         table,
         "SetSubEmitter",
-        scope.create_function(|_, (id, trigger, target): (u32, String, Option<u32>)| {
+        scope.create_function(|_, (id, trigger, target): (EntityArg, String, EntityArg)| {
+            let id = id.live("Particles", "SetSubEmitter")?;
+            let target = target.get();
             let Some(trigger) = SubEmitTrigger::parse(&trigger) else {
                 return Ok(false);
             };
@@ -216,7 +231,8 @@ fn register_state<'scope>(
     put(
         table,
         "IsActive",
-        scope.create_function(|_, id: u32| {
+        scope.create_function(|_, id: EntityArg| {
+            let id = id.read();
             let scene = scene.borrow();
             let active = scene.world.particles(id).map(|p| p.active);
             Ok(active.unwrap_or(false))
@@ -226,7 +242,8 @@ fn register_state<'scope>(
     put(
         table,
         "GetCount",
-        scope.create_function(|_, id: u32| {
+        scope.create_function(|_, id: EntityArg| {
+            let id = id.read();
             let scene = scene.borrow();
             let count = scene.world.particles(id).map(|p| p.live_count() as u32);
             Ok(count.unwrap_or(0))
@@ -236,7 +253,8 @@ fn register_state<'scope>(
     put(
         table,
         "Clear",
-        scope.create_function(|_, id: u32| {
+        scope.create_function(|_, id: EntityArg| {
+            let id = id.live("Particles", "Clear")?;
             with_emitter(scene, id, |p| p.runtime.particles.clear());
             Ok(())
         }),

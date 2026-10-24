@@ -15,6 +15,7 @@ use glam::Vec3;
 use mlua::{Lua, Table};
 
 use super::{put, Reg};
+use crate::api::entity_arg::EntityArg;
 use crate::components::OffMeshLinkComponent as Link;
 use crate::navigation::NavigationGraph;
 use crate::scene::authoring::offmesh_link as ops;
@@ -32,7 +33,10 @@ pub fn register<'scope>(
     let t = lua.create_table().map_err(|e| e.to_string())?;
     register_ends(scope, &t, scene)?;
     register_options(scope, &t, scene)?;
-    let f = scope.create_function(move |_, id: u32| Ok(nav.borrow().link_connected(id)));
+    let f = scope.create_function(move |_, id: EntityArg| {
+        let id = id.read();
+        Ok(nav.borrow().link_connected(id))
+    });
     put(&t, "IsConnected", f)?;
     lua.globals()
         .set("OffMeshLink", t)
@@ -63,12 +67,15 @@ fn register_ends<'scope>(
         ("End", (|l| l.end, ops::set_end)),
     ];
     for (name, (read, set)) in ends {
-        let f = scope.create_function(move |_, id: u32| {
+        let f = scope.create_function(move |_, id: EntityArg| {
+            let id = id.read();
             let v = get(scene, id).map_or(Vec3::ZERO, |l| read(&l));
             Ok((v.x, v.y, v.z))
         });
         put(t, &format!("Get{name}"), f)?;
-        let f = scope.create_function(move |_, (id, x, y, z): (u32, f32, f32, f32)| {
+        let verb = format!("Set{name}");
+        let f = scope.create_function(move |_, (id, x, y, z): (EntityArg, f32, f32, f32)| {
+            let id = id.live("OffMeshLink", &verb)?;
             write(scene, id, |l| set(l, Vec3::new(x, y, z)));
             Ok(())
         });
@@ -93,26 +100,37 @@ fn register_options<'scope>(
         ),
     ];
     for (name, (read, set)) in flags {
-        let f =
-            scope.create_function(move |_, id: u32| Ok(get(scene, id).is_some_and(|l| read(&l))));
+        let f = scope.create_function(move |_, id: EntityArg| {
+            let id = id.read();
+            Ok(get(scene, id).is_some_and(|l| read(&l)))
+        });
         put(t, &format!("Get{name}"), f)?;
-        let f = scope.create_function(move |_, (id, v): (u32, bool)| {
+        let verb = format!("Set{name}");
+        let f = scope.create_function(move |_, (id, v): (EntityArg, bool)| {
+            let id = id.live("OffMeshLink", &verb)?;
             write(scene, id, |l| set(l, v));
             Ok(())
         });
         put(t, &format!("Set{name}"), f)?;
     }
-    let f = scope.create_function(move |_, id: u32| Ok(get(scene, id).map_or(0, |l| l.area)));
+    let f = scope.create_function(move |_, id: EntityArg| {
+        let id = id.read();
+        Ok(get(scene, id).map_or(0, |l| l.area))
+    });
     put(t, "GetArea", f)?;
-    let f = scope.create_function(move |_, (id, area): (u32, i64)| {
+    let f = scope.create_function(move |_, (id, area): (EntityArg, i64)| {
+        let id = id.live("OffMeshLink", "SetArea")?;
         write(scene, id, |l| ops::set_area(l, area));
         Ok(())
     });
     put(t, "SetArea", f)?;
-    let f = scope
-        .create_function(move |_, id: u32| Ok(get(scene, id).map_or(-1.0, |l| l.cost_override)));
+    let f = scope.create_function(move |_, id: EntityArg| {
+        let id = id.read();
+        Ok(get(scene, id).map_or(-1.0, |l| l.cost_override))
+    });
     put(t, "GetCost", f)?;
-    let f = scope.create_function(move |_, (id, cost): (u32, f32)| {
+    let f = scope.create_function(move |_, (id, cost): (EntityArg, f32)| {
+        let id = id.live("OffMeshLink", "SetCost")?;
         write(scene, id, |l| ops::set_cost_override(l, cost));
         Ok(())
     });

@@ -11,6 +11,7 @@ use std::cell::RefCell;
 use mlua::Lua;
 
 use super::{put, Reg};
+use crate::api::entity_arg::EntityArg;
 use crate::components::CanvasGroupComponent;
 use crate::scene::authoring::canvas_group as group_ops;
 use crate::scene::Scene;
@@ -42,7 +43,8 @@ pub fn register<'scope>(
     put(
         &table,
         "GetAlpha",
-        scope.create_function(|_, id: u32| {
+        scope.create_function(|_, id: EntityArg| {
+            let id = id.read();
             let scene = scene.borrow();
             Ok(scene.world.canvas_group(id).map_or(1.0, |g| g.alpha))
         }),
@@ -50,7 +52,8 @@ pub fn register<'scope>(
     put(
         &table,
         "SetAlpha",
-        scope.create_function(|_, (id, alpha): (u32, f32)| {
+        scope.create_function(|_, (id, alpha): (EntityArg, f32)| {
+            let id = id.live("CanvasGroup", "SetAlpha")?;
             if let Some(mut g) = scene.borrow_mut().world.canvas_group_mut(id) {
                 group_ops::set_alpha(&mut g, alpha);
             }
@@ -77,15 +80,18 @@ fn register_bool<'scope>(
     put(
         table,
         &format!("Get{suffix}"),
-        scope.create_function(move |_, id: u32| {
+        scope.create_function(move |_, id: EntityArg| {
+            let id = id.read();
             let scene = scene.borrow();
             Ok(scene.world.canvas_group(id).is_some_and(|g| get(&g)))
         }),
     )?;
+    let verb = format!("Set{suffix}");
     put(
         table,
         &format!("Set{suffix}"),
-        scope.create_function(move |_, (id, value): (u32, bool)| {
+        scope.create_function(move |_, (id, value): (EntityArg, bool)| {
+            let id = id.live("CanvasGroup", &verb)?;
             if let Some(mut g) = scene.borrow_mut().world.canvas_group_mut(id) {
                 set(&mut g, value);
             }

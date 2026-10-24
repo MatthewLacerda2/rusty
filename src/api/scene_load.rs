@@ -14,6 +14,7 @@ use std::cell::RefCell;
 use std::path::Path;
 
 use super::{put, Reg};
+use crate::api::entity_arg::EntityArg;
 use crate::scene::Scene;
 
 /// Register the scene-loading verbs onto the (already-created) `Scene` `table`.
@@ -56,7 +57,8 @@ pub fn register<'scope>(
     put(
         table,
         "DontDestroyOnLoad",
-        scope.create_function(move |_, id: u32| {
+        scope.create_function(move |_, id: EntityArg| {
+            let id = id.live("Scene", "DontDestroyOnLoad")?;
             if !scene.borrow().is_playing() {
                 return Err(runtime(
                     "Scene.DontDestroyOnLoad only works during play".to_string(),

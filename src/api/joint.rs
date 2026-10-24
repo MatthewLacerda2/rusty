@@ -15,6 +15,7 @@ use glam::Vec3;
 use mlua::{Lua, Table};
 
 use super::{put, Reg};
+use crate::api::entity_arg::EntityArg;
 use crate::components::{JointComponent, JointKind};
 use crate::scene::authoring::joint as ops;
 use crate::scene::Scene;
@@ -23,7 +24,7 @@ type SceneCell<'s> = &'s RefCell<Scene>;
 /// A field's reader and its shared-op writer.
 type Field<T> = (fn(&JointComponent) -> T, fn(&mut JointComponent, T));
 /// `(id, min, max)`.
-type IdRange = (u32, f32, f32);
+type IdRange = (EntityArg, f32, f32);
 
 /// Register the `Joint` namespace onto `lua`.
 pub fn register<'scope>(
@@ -57,9 +58,14 @@ fn f32_pair<'scope>(
     name: &str,
     (read, write): Field<f32>,
 ) -> Reg {
-    let f = scope.create_function(move |_, id: u32| Ok(get(scene, id).map_or(0.0, |j| read(&j))));
+    let f = scope.create_function(move |_, id: EntityArg| {
+        let id = id.read();
+        Ok(get(scene, id).map_or(0.0, |j| read(&j)))
+    });
     put(t, &format!("Get{name}"), f)?;
-    let f = scope.create_function(move |_, (id, v): (u32, f32)| {
+    let verb = format!("Set{name}");
+    let f = scope.create_function(move |_, (id, v): (EntityArg, f32)| {
+        let id = id.live("Joint", &verb)?;
         set(scene, id, &|j| write(j, v));
         Ok(())
     });
@@ -74,9 +80,14 @@ fn bool_pair<'scope>(
     name: &str,
     (read, write): Field<bool>,
 ) -> Reg {
-    let f = scope.create_function(move |_, id: u32| Ok(get(scene, id).is_some_and(|j| read(&j))));
+    let f = scope.create_function(move |_, id: EntityArg| {
+        let id = id.read();
+        Ok(get(scene, id).is_some_and(|j| read(&j)))
+    });
     put(t, &format!("Get{name}"), f)?;
-    let f = scope.create_function(move |_, (id, v): (u32, bool)| {
+    let verb = format!("Set{name}");
+    let f = scope.create_function(move |_, (id, v): (EntityArg, bool)| {
+        let id = id.live("Joint", &verb)?;
         set(scene, id, &|j| write(j, v));
         Ok(())
     });
@@ -91,12 +102,15 @@ fn vec3_pair<'scope>(
     name: &str,
     (read, write): Field<Vec3>,
 ) -> Reg {
-    let f = scope.create_function(move |_, id: u32| {
+    let f = scope.create_function(move |_, id: EntityArg| {
+        let id = id.read();
         let v = get(scene, id).map_or(Vec3::ZERO, |j| read(&j));
         Ok((v.x, v.y, v.z))
     });
     put(t, &format!("Get{name}"), f)?;
-    let f = scope.create_function(move |_, (id, x, y, z): (u32, f32, f32, f32)| {
+    let verb = format!("Set{name}");
+    let f = scope.create_function(move |_, (id, x, y, z): (EntityArg, f32, f32, f32)| {
+        let id = id.live("Joint", &verb)?;
         set(scene, id, &|j| write(j, Vec3::new(x, y, z)));
         Ok(())
     });
@@ -110,19 +124,27 @@ fn register_shape<'scope>(
     t: &Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
-    let f = scope.create_function(move |_, id: u32| Ok(get(scene, id).map(|j| j.kind.name())));
+    let f = scope.create_function(move |_, id: EntityArg| {
+        let id = id.read();
+        Ok(get(scene, id).map(|j| j.kind.name()))
+    });
     put(t, "GetKind", f)?;
-    let f = scope.create_function(move |_, (id, name): (u32, String)| {
+    let f = scope.create_function(move |_, (id, name): (EntityArg, String)| {
+        let id = id.live("Joint", "SetKind")?;
         if let Some(k) = JointKind::parse(&name) {
             set(scene, id, &|j| ops::set_kind(j, k));
         }
         Ok(())
     });
     put(t, "SetKind", f)?;
-    let f =
-        scope.create_function(move |_, id: u32| Ok(get(scene, id).and_then(|j| j.connected_body)));
+    let f = scope.create_function(move |_, id: EntityArg| {
+        let id = id.read();
+        Ok(get(scene, id).and_then(|j| j.connected_body))
+    });
     put(t, "GetConnectedBody", f)?;
-    let f = scope.create_function(move |_, (id, body): (u32, Option<u32>)| {
+    let f = scope.create_function(move |_, (id, body): (EntityArg, EntityArg)| {
+        let id = id.live("Joint", "SetConnectedBody")?;
+        let body = body.get();
         set(scene, id, &|j| ops::set_connected_body(j, body));
         Ok(())
     });
@@ -156,12 +178,14 @@ fn register_limits<'scope>(
         "UseLimits",
         (|j| j.use_limits, ops::set_use_limits),
     )?;
-    let f = scope.create_function(move |_, id: u32| {
+    let f = scope.create_function(move |_, id: EntityArg| {
+        let id = id.read();
         let l = get(scene, id).map_or_else(Default::default, |j| j.limits);
         Ok((l.x, l.y))
     });
     put(t, "GetLimits", f)?;
     let f = scope.create_function(move |_, (id, min, max): IdRange| {
+        let id = id.live("Joint", "SetLimits")?;
         set(scene, id, &|j| ops::set_limits(j, min, max));
         Ok(())
     });

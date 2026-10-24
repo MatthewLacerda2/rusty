@@ -14,6 +14,7 @@ use glam::Vec3;
 use mlua::Lua;
 
 use super::{put, Reg};
+use crate::api::entity_arg::EntityArg;
 use crate::components::{LightMode, LightType};
 use crate::scene::authoring::light as light_ops;
 use crate::scene::Scene;
@@ -45,7 +46,8 @@ fn register_color<'scope>(
     put(
         table,
         "GetColor",
-        scope.create_function(|_, id: u32| {
+        scope.create_function(|_, id: EntityArg| {
+            let id = id.read();
             let scene = scene.borrow();
             let c = scene.world.light(id).map(|l| l.color);
             let c = c.unwrap_or(Vec3::ONE);
@@ -56,7 +58,8 @@ fn register_color<'scope>(
     put(
         table,
         "SetColor",
-        scope.create_function(|_, (id, r, g, b): (u32, f32, f32, f32)| {
+        scope.create_function(|_, (id, r, g, b): (EntityArg, f32, f32, f32)| {
+            let id = id.live("Light", "SetColor")?;
             let mut scene = scene.borrow_mut();
             if let Some(mut c) = scene.world.light_mut(id) {
                 light_ops::set_color(&mut c, Vec3::new(r, g, b));
@@ -75,7 +78,8 @@ fn register_intensity<'scope>(
     put(
         table,
         "GetIntensity",
-        scope.create_function(|_, id: u32| {
+        scope.create_function(|_, id: EntityArg| {
+            let id = id.read();
             let scene = scene.borrow();
             Ok(scene.world.light(id).map(|l| l.intensity).unwrap_or(0.0))
         }),
@@ -84,7 +88,8 @@ fn register_intensity<'scope>(
     put(
         table,
         "SetIntensity",
-        scope.create_function(|_, (id, value): (u32, f32)| {
+        scope.create_function(|_, (id, value): (EntityArg, f32)| {
+            let id = id.live("Light", "SetIntensity")?;
             let mut scene = scene.borrow_mut();
             if let Some(mut c) = scene.world.light_mut(id) {
                 light_ops::set_intensity(&mut c, value);
@@ -103,7 +108,8 @@ fn register_range<'scope>(
     put(
         table,
         "GetRange",
-        scope.create_function(|_, id: u32| {
+        scope.create_function(|_, id: EntityArg| {
+            let id = id.read();
             let scene = scene.borrow();
             Ok(scene.world.light(id).map(|l| l.range).unwrap_or(0.0))
         }),
@@ -112,7 +118,8 @@ fn register_range<'scope>(
     put(
         table,
         "SetRange",
-        scope.create_function(|_, (id, value): (u32, f32)| {
+        scope.create_function(|_, (id, value): (EntityArg, f32)| {
+            let id = id.live("Light", "SetRange")?;
             let mut scene = scene.borrow_mut();
             if let Some(mut c) = scene.world.light_mut(id) {
                 light_ops::set_range(&mut c, value);
@@ -132,7 +139,8 @@ fn register_type<'scope>(
     put(
         table,
         "GetType",
-        scope.create_function(|_, id: u32| {
+        scope.create_function(|_, id: EntityArg| {
+            let id = id.read();
             let scene = scene.borrow();
             let name = scene
                 .world
@@ -146,7 +154,8 @@ fn register_type<'scope>(
     put(
         table,
         "SetType",
-        scope.create_function(|_, (id, name): (u32, String)| {
+        scope.create_function(|_, (id, name): (EntityArg, String)| {
+            let id = id.live("Light", "SetType")?;
             let mut scene = scene.borrow_mut();
             if let Some(mut c) = scene.world.light_mut(id) {
                 if let Some(t) = LightType::parse(&name) {
@@ -168,7 +177,8 @@ fn register_cast_shadows<'scope>(
     put(
         table,
         "GetCastShadows",
-        scope.create_function(|_, id: u32| {
+        scope.create_function(|_, id: EntityArg| {
+            let id = id.read();
             let scene = scene.borrow();
             Ok(scene.world.light(id).is_some_and(|l| l.cast_shadows))
         }),
@@ -177,7 +187,8 @@ fn register_cast_shadows<'scope>(
     put(
         table,
         "SetCastShadows",
-        scope.create_function(|_, (id, on): (u32, bool)| {
+        scope.create_function(|_, (id, on): (EntityArg, bool)| {
+            let id = id.live("Light", "SetCastShadows")?;
             let mut scene = scene.borrow_mut();
             if let Some(mut c) = scene.world.light_mut(id) {
                 light_ops::set_cast_shadows(&mut c, on);
@@ -197,7 +208,8 @@ fn register_mode<'scope>(
     put(
         table,
         "GetMode",
-        scope.create_function(|_, id: u32| {
+        scope.create_function(|_, id: EntityArg| {
+            let id = id.read();
             let scene = scene.borrow();
             let mode = scene.world.light(id).map(|l| l.mode.name());
             Ok(mode.unwrap_or("None").to_string())
@@ -207,7 +219,8 @@ fn register_mode<'scope>(
     put(
         table,
         "SetMode",
-        scope.create_function(|_, (id, name): (u32, String)| {
+        scope.create_function(|_, (id, name): (EntityArg, String)| {
+            let id = id.live("Light", "SetMode")?;
             let mut scene = scene.borrow_mut();
             if let (Some(mut c), Some(mode)) = (scene.world.light_mut(id), LightMode::parse(&name))
             {
