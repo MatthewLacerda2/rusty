@@ -8,6 +8,7 @@
 //!
 //! Pure.
 
+use super::sanitize::optional_non_negative;
 use crate::components::{LayoutAxisFit, LayoutElementComponent};
 
 crate::core::named_enum! {
@@ -32,7 +33,7 @@ pub fn set_size(
     width: Option<f32>,
     height: Option<f32>,
 ) {
-    let (w, h) = (valid(width), valid(height));
+    let (w, h) = (optional_non_negative(width), optional_non_negative(height));
     match kind {
         SizeKind::Min => (le.min_width, le.min_height) = (w, h),
         SizeKind::Preferred => (le.preferred_width, le.preferred_height) = (w, h),
@@ -54,10 +55,6 @@ pub fn set_fit(
 ) {
     le.horizontal_fit = horizontal;
     le.vertical_fit = vertical;
-}
-
-fn valid(v: Option<f32>) -> Option<f32> {
-    v.filter(|v| *v >= 0.0 && v.is_finite())
 }
 
 #[cfg(test)]

@@ -6,11 +6,12 @@
 //!
 //! Pure.
 
+use super::sanitize::unit;
 use crate::components::CanvasGroupComponent;
 
 /// Set the subtree opacity, clamped to `[0, 1]`.
 pub fn set_alpha(g: &mut CanvasGroupComponent, alpha: f32) {
-    g.alpha = alpha.clamp(0.0, 1.0);
+    g.alpha = unit(alpha);
 }
 
 /// Set whether the subtree's selectables accept input.

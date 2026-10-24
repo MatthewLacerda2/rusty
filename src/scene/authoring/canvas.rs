@@ -10,7 +10,7 @@
 
 use glam::Vec2;
 
-use super::sanitize::{at_least, MIN_EXTENT};
+use super::sanitize::{at_least, finite2, finite2_or, unit, MIN_EXTENT};
 use crate::components::{CanvasComponent, CanvasRenderMode};
 
 /// Set where the canvas draws.
@@ -25,12 +25,12 @@ pub fn set_sort_order(c: &mut CanvasComponent, sort_order: i32) {
 
 /// Set the authoring resolution, each axis clamped to at least 1.
 pub fn set_reference_resolution(c: &mut CanvasComponent, resolution: Vec2) {
-    c.reference_resolution = resolution.max(Vec2::ONE);
+    c.reference_resolution = finite2_or(resolution, c.reference_resolution).max(Vec2::ONE);
 }
 
 /// Set the width (0) ↔ height (1) scale match, clamped to `[0, 1]`.
 pub fn set_match_width_or_height(c: &mut CanvasComponent, value: f32) {
-    c.match_width_or_height = value.clamp(0.0, 1.0);
+    c.match_width_or_height = unit(value);
 }
 
 /// Set the `WorldSpace` density (reference units per metre), kept above zero.
@@ -45,12 +45,12 @@ pub fn set_plane_distance(c: &mut CanvasComponent, value: f32) {
 
 /// Set the `ScreenSpaceCamera` tilt in degrees, each axis clamped to ±89.
 pub fn set_tilt(c: &mut CanvasComponent, tilt: Vec2) {
-    c.tilt = tilt.clamp(Vec2::splat(-89.0), Vec2::splat(89.0));
+    c.tilt = finite2(tilt).clamp(Vec2::splat(-89.0), Vec2::splat(89.0));
 }
 
 /// Set the `ScreenSpaceCamera` sway amount, clamped to `[0, 1]`.
 pub fn set_sway(c: &mut CanvasComponent, value: f32) {
-    c.sway = value.clamp(0.0, 1.0);
+    c.sway = unit(value);
 }
 
 #[cfg(test)]

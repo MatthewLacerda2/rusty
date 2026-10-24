@@ -34,7 +34,7 @@ pub use shader_params::{
 };
 pub use slots::{keys, set_slot, slot_count};
 
-use super::sanitize::unit;
+use super::sanitize::{finite_array_or, non_negative, unit};
 use crate::asset::MapRef;
 use crate::scene::{MaterialAsset, MaterialComponent, RenderMode, Scene};
 
@@ -97,7 +97,7 @@ pub fn ensure_material_key(scene: &mut Scene, id: u32) -> Option<String> {
 /// Set the base-color (albedo tint) factor.
 pub fn set_base_color(materials: &mut MaterialLibrary, key: &str, rgb: [f32; 3]) {
     if let Some(m) = materials.get_mut(key) {
-        m.base_color = rgb;
+        m.base_color = finite_array_or(rgb, m.base_color).map(unit);
     }
 }
 
@@ -146,7 +146,7 @@ pub fn set_normal_map(materials: &mut MaterialLibrary, key: &str, path: Option<S
 /// Set the emissive factor.
 pub fn set_emissive(materials: &mut MaterialLibrary, key: &str, rgb: [f32; 3]) {
     if let Some(m) = materials.get_mut(key) {
-        m.emissive = rgb;
+        m.emissive = finite_array_or(rgb, m.emissive).map(non_negative);
     }
 }
 

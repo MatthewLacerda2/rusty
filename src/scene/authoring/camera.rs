@@ -23,6 +23,7 @@
 //!
 //! Pure.
 
+use super::sanitize::{at_least, saturated};
 use crate::components::{CameraComponent, ClearFlags, Projection, RenderTarget};
 
 /// The field-of-view range, in degrees: Unity's Camera inspector bounds, applied
@@ -38,11 +39,7 @@ pub const MIN_CLIP_GAP: f32 = 0.01;
 /// Set the camera's vertical field of view (degrees), clamped to
 /// [`MIN_FOV`]..=[`MAX_FOV`]. A NaN takes [`MIN_FOV`] (`f32::clamp` would keep it).
 pub fn set_fov(c: &mut CameraComponent, fov: f32) {
-    c.fov = if fov.is_nan() {
-        MIN_FOV
-    } else {
-        fov.clamp(MIN_FOV, MAX_FOV)
-    };
+    c.fov = saturated(fov, MIN_FOV, MAX_FOV);
 }
 
 /// Set both clip planes the way Unity holds them: `near` at least [`MIN_NEAR`],
@@ -52,18 +49,10 @@ pub fn set_fov(c: &mut CameraComponent, fov: f32) {
 /// rounds back to `near`.
 pub fn set_clip_planes(c: &mut CameraComponent, near: f32, far: f32) {
     // Below f32::MAX, so the plane just beyond it is still finite.
-    let near = if near.is_finite() {
-        near.clamp(MIN_NEAR, f32::MAX.next_down())
-    } else {
-        MIN_NEAR
-    };
+    let near = at_least(near, MIN_NEAR).min(f32::MAX.next_down());
     let min_far = (near + MIN_CLIP_GAP).max(near.next_up());
     c.near = near;
-    c.far = if far.is_finite() {
-        far.max(min_far)
-    } else {
-        min_far
-    };
+    c.far = at_least(far, min_far);
 }
 
 /// Set the camera's near clip plane (see [`set_clip_planes`]).
@@ -112,10 +101,11 @@ pub fn set_fxaa_active(c: &mut CameraComponent, active: bool) {
 pub const MAX_TARGET_SIZE: u32 = 4096;
 
 /// Set the camera's projection (#430). An orthographic size is clamped to > 0.
+// lint: allow(sanitize) the orthographic size, its one float, goes through `at_least`
 pub fn set_projection(c: &mut CameraComponent, projection: Projection) {
     c.projection = match projection {
         Projection::Orthographic { size } => Projection::Orthographic {
-            size: size.max(0.01),
+            size: at_least(size, 0.01),
         },
         p => p,
     };

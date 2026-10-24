@@ -11,13 +11,14 @@
 
 use glam::Vec4;
 
+use super::sanitize::{finite4, unit, unit_color};
 use super::ui_look::sanitize_gradient;
 use crate::asset::MapRef;
 use crate::components::{FillMethod, FillOrigin, ImageComponent, ImageType, UiBlend, UiGradient};
 
 /// Set the RGBA tint (display space, straight alpha), each channel clamped to `[0, 1]`.
 pub fn set_color(i: &mut ImageComponent, color: Vec4) {
-    i.color = color.clamp(Vec4::ZERO, Vec4::ONE);
+    i.color = unit_color(color);
 }
 
 /// Set the texture path; `None` or an empty path draws a solid colour.
@@ -32,7 +33,7 @@ pub fn set_image_type(i: &mut ImageComponent, image_type: ImageType) {
 
 /// Set the 9-slice borders in texels (left, bottom, right, top), each kept ≥ 0.
 pub fn set_border(i: &mut ImageComponent, border: Vec4) {
-    i.border = border.max(Vec4::ZERO);
+    i.border = finite4(border).max(Vec4::ZERO);
 }
 
 /// Set the fill shape, re-fitting the origin to it.
@@ -49,7 +50,7 @@ pub fn set_fill_origin(i: &mut ImageComponent, origin: FillOrigin) {
 
 /// Set the visible fraction of a `Filled` image, clamped to `[0, 1]`.
 pub fn set_fill_amount(i: &mut ImageComponent, amount: f32) {
-    i.fill_amount = amount.clamp(0.0, 1.0);
+    i.fill_amount = unit(amount);
 }
 
 /// Set the radial sweep's direction.
@@ -68,6 +69,7 @@ pub fn set_raycast_target(i: &mut ImageComponent, target: bool) {
 }
 
 /// Set (or clear, `None`) the gradient tint; one with fewer than two stops clears it.
+// lint: allow(sanitize) `ui_look::sanitize_gradient` runs every field through the helpers
 pub fn set_gradient(i: &mut ImageComponent, g: Option<UiGradient>) {
     i.gradient = g.and_then(sanitize_gradient);
 }

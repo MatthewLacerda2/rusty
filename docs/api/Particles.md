@@ -15,12 +15,12 @@ actually spawned (the `max_particles` cap may swallow some).
 | `Particles.IsActive` | `(id)` | `bool` |
 | `Particles.GetCount` | `(id)` | live particle count |
 | `Particles.Clear` | `(id)` | — (despawns all live particles) |
-| `Particles.SetShape` | `(id, kind, opts?)` | `bool` (false for an unknown kind) |
+| `Particles.SetShape` | `(id, kind, opts?)` | `bool` (false for an unknown kind; radii and a box's size clamped ≥ 0, a cone's angle to `[0, 90]`) |
 | `Particles.SetDirection` | `(id, x, y, z)` | — (the shape's axis / launch direction) |
 | `Particles.SetLifetime` | `(id, min, max?)` | — (seconds, clamped ≥ 0) |
-| `Particles.SetSpeed` | `(id, min, max?)` | — |
+| `Particles.SetSpeed` | `(id, min, max?)` | — (a range with a NaN or infinite end is ignored, as for every range here) |
 | `Particles.SetSize` | `(id, min, max?)` | — (start size, clamped ≥ 0) |
-| `Particles.SetColor` | `(id, r, g, b, a?)` | — (start tint; `a` defaults to 1) |
+| `Particles.SetColor` | `(id, r, g, b, a?)` | — (start tint; `a` defaults to 1; a NaN or infinite channel is ignored) |
 | `Particles.SetSubEmitter` | `(id, trigger, target?)` | `bool` (false for an unknown trigger) |
 | `Particles.SetRenderMode` | `(id, mode)` | `bool` (false for an unknown mode) |
 | `Particles.GetRenderMode` | `(id)` | mode name, or `nil` without an emitter |

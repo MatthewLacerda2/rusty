@@ -17,6 +17,9 @@
 use glam::Vec3;
 
 use crate::components::{NavMeshAgentComponent, MAX_AVOIDANCE_PRIORITY};
+use crate::scene::authoring::sanitize::{
+    at_least, finite, finite3_or, finite_f64_or, non_negative, MIN_EXTENT,
+};
 
 /// Set the agent's `active` flag.
 pub fn set_active(a: &mut NavMeshAgentComponent, active: bool) {
@@ -25,17 +28,17 @@ pub fn set_active(a: &mut NavMeshAgentComponent, active: bool) {
 
 /// Set the agent's max speed.
 pub fn set_speed(a: &mut NavMeshAgentComponent, speed: f32) {
-    a.speed = speed;
+    a.speed = non_negative(speed);
 }
 
 /// Set the agent's acceleration.
 pub fn set_acceleration(a: &mut NavMeshAgentComponent, acceleration: f32) {
-    a.acceleration = acceleration;
+    a.acceleration = non_negative(acceleration);
 }
 
 /// Set the agent's stopping distance.
 pub fn set_stopping_distance(a: &mut NavMeshAgentComponent, stopping_distance: f32) {
-    a.stopping_distance = stopping_distance;
+    a.stopping_distance = non_negative(stopping_distance);
 }
 
 /// Set whether the agent turns itself to face where it steers (#744, Unity's
@@ -46,34 +49,37 @@ pub fn set_update_rotation(a: &mut NavMeshAgentComponent, update: bool) {
 
 /// Set the agent's top yaw rate, degrees/second (Unity's `angularSpeed`).
 pub fn set_angular_speed(a: &mut NavMeshAgentComponent, angular_speed: f32) {
-    a.angular_speed = angular_speed;
+    a.angular_speed = non_negative(angular_speed);
 }
 
 /// Set how fast the agent's yaw rate ramps up and down, degrees/second².
 pub fn set_angular_acceleration(a: &mut NavMeshAgentComponent, angular_acceleration: f32) {
-    a.angular_acceleration = angular_acceleration;
+    a.angular_acceleration = non_negative(angular_acceleration);
 }
 
 /// Set the agent's footprint radius.
 pub fn set_radius(a: &mut NavMeshAgentComponent, radius: f32) {
-    a.radius = radius;
+    a.radius = at_least(radius, MIN_EXTENT);
 }
 
 /// Set how far the entity's origin sits above the agent's feet (#666, Unity's
 /// `baseOffset`).
 pub fn set_base_offset(a: &mut NavMeshAgentComponent, base_offset: f32) {
-    a.base_offset = base_offset;
+    a.base_offset = finite(base_offset);
 }
 
 /// Set the agent's destination target.
 pub fn set_target(a: &mut NavMeshAgentComponent, target: Vec3) {
-    a.target = target;
+    a.target = finite3_or(target, a.target);
 }
 
 /// Set the agent's avoidance priority (Unity's `avoidancePriority`: lower is more
 /// important). The one clamp among these ops: the field is `u8` and the range is
-/// 0–99, so anything outside lands on the nearest end (fractions truncate).
+/// 0–99, so anything outside lands on the nearest end (fractions truncate). NaN or
+/// infinity keeps the current priority: a bare `as u8` would make it 0, the most
+/// important.
 pub fn set_avoidance_priority(a: &mut NavMeshAgentComponent, priority: f64) {
+    let priority = finite_f64_or(priority, f64::from(a.avoidance_priority));
     a.avoidance_priority = priority.clamp(0.0, f64::from(MAX_AVOIDANCE_PRIORITY)) as u8;
 }
 

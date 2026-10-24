@@ -9,7 +9,7 @@
 
 use glam::{Vec2, Vec4};
 
-use super::sanitize::unit_color;
+use super::sanitize::{finite2, finite4, finite_or, non_negative, unit_color};
 use super::ui_look::sanitize_gradient;
 use crate::components::{
     ShapeComponent, ShapeCorner, ShapeGlow, ShapeKind, ShapeShadow, UiBlend, UiGradient,
@@ -27,27 +27,27 @@ pub fn set_corner(s: &mut ShapeComponent, corner: ShapeCorner) {
 
 /// Set the per-corner radius (top-left, top-right, bottom-right, bottom-left), each ≥ 0.
 pub fn set_radius(s: &mut ShapeComponent, radius: Vec4) {
-    s.radius = radius.max(Vec4::ZERO);
+    s.radius = finite4(radius).max(Vec4::ZERO);
 }
 
 /// Set a `Ring`'s hole radius (≥ 0).
 pub fn set_inner_radius(s: &mut ShapeComponent, r: f32) {
-    s.inner_radius = r.max(0.0);
+    s.inner_radius = non_negative(r);
 }
 
 /// Set a `Ring`'s arc, degrees clockwise from 12 o'clock.
 pub fn set_arc(s: &mut ShapeComponent, start: f32, end: f32) {
-    (s.arc_start, s.arc_end) = (start, end);
+    (s.arc_start, s.arc_end) = (finite_or(start, s.arc_start), finite_or(end, s.arc_end));
 }
 
 /// Set a `Line`'s thickness (≥ 0).
 pub fn set_thickness(s: &mut ShapeComponent, t: f32) {
-    s.thickness = t.max(0.0);
+    s.thickness = non_negative(t);
 }
 
 /// Set a `Line`'s dash and gap lengths (each ≥ 0; a dash of 0 is solid).
 pub fn set_dash(s: &mut ShapeComponent, dash: f32, gap: f32) {
-    (s.dash, s.gap) = (dash.max(0.0), gap.max(0.0));
+    (s.dash, s.gap) = (non_negative(dash), non_negative(gap));
 }
 
 /// Set the fill colour, clamped to `[0, 1]`.
@@ -56,20 +56,21 @@ pub fn set_color(s: &mut ShapeComponent, color: Vec4) {
 }
 
 /// Set (or clear, `None`) the gradient fill; one with fewer than two stops clears it.
+// lint: allow(sanitize) `ui_look::sanitize_gradient` runs every field through the helpers
 pub fn set_gradient(s: &mut ShapeComponent, g: Option<UiGradient>) {
     s.gradient = g.and_then(sanitize_gradient);
 }
 
 /// Set the border band's width (≥ 0) and colour.
 pub fn set_border(s: &mut ShapeComponent, width: f32, color: Vec4) {
-    (s.border_width, s.border_color) = (width.max(0.0), unit_color(color));
+    (s.border_width, s.border_color) = (non_negative(width), unit_color(color));
 }
 
 /// Set the drop shadow (blur ≥ 0; a transparent colour turns it off).
 pub fn set_shadow(s: &mut ShapeComponent, offset: Vec2, blur: f32, color: Vec4) {
     s.shadow = ShapeShadow {
-        offset,
-        blur: blur.max(0.0),
+        offset: finite2(offset),
+        blur: non_negative(blur),
         color: unit_color(color),
     };
 }
@@ -77,8 +78,8 @@ pub fn set_shadow(s: &mut ShapeComponent, offset: Vec2, blur: f32, color: Vec4) 
 /// Set the outer glow (size and intensity ≥ 0; 0 or a transparent colour is off).
 pub fn set_glow(s: &mut ShapeComponent, size: f32, intensity: f32, color: Vec4) {
     s.glow = ShapeGlow {
-        size: size.max(0.0),
-        intensity: intensity.max(0.0),
+        size: non_negative(size),
+        intensity: non_negative(intensity),
         color: unit_color(color),
     };
 }

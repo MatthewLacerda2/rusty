@@ -11,7 +11,7 @@
 use glam::Vec3;
 
 use crate::components::{NavMeshObstacleComponent as Obstacle, ObstacleShape};
-use crate::scene::authoring::sanitize::{at_least, non_negative, MIN_EXTENT};
+use crate::scene::authoring::sanitize::{at_least, finite3_or, non_negative, MIN_EXTENT};
 
 /// The smallest extent a box side, radius or height may have.
 pub const MIN_SIZE: f32 = MIN_EXTENT;
@@ -28,16 +28,12 @@ pub fn set_shape(o: &mut Obstacle, shape: ObstacleShape) {
 
 /// Set the shape's centre, in local space. A non-finite centre is ignored.
 pub fn set_center(o: &mut Obstacle, center: Vec3) {
-    if center.is_finite() {
-        o.center = center;
-    }
+    o.center = finite3_or(center, o.center);
 }
 
 /// Set the box's size, each side floored at [`MIN_SIZE`]. Non-finite is ignored.
 pub fn set_size(o: &mut Obstacle, size: Vec3) {
-    if size.is_finite() {
-        o.size = size.max(Vec3::splat(MIN_SIZE));
-    }
+    o.size = finite3_or(size, o.size).max(Vec3::splat(MIN_SIZE));
 }
 
 /// Set the capsule's radius, floored at [`MIN_SIZE`].

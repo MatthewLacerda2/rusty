@@ -15,6 +15,7 @@
 use glam::{Vec2, Vec3};
 
 use crate::components::{RectTransformComponent, WorldAnchor};
+use crate::scene::authoring::sanitize::{finite2, finite2_or, finite3, non_negative};
 
 mod preset;
 
@@ -22,29 +23,29 @@ pub use preset::{apply_anchor_preset, AnchorPreset, AxisPreset};
 
 /// Set the lower-left anchor, clamped to `[0, 1]`; `anchor_max` is raised to stay ≥ it.
 pub fn set_anchor_min(r: &mut RectTransformComponent, anchor: Vec2) {
-    r.anchor_min = anchor.clamp(Vec2::ZERO, Vec2::ONE);
+    r.anchor_min = finite2(anchor).clamp(Vec2::ZERO, Vec2::ONE);
     r.anchor_max = r.anchor_max.max(r.anchor_min);
 }
 
 /// Set the upper-right anchor, clamped to `[0, 1]`; `anchor_min` is lowered to stay ≤ it.
 pub fn set_anchor_max(r: &mut RectTransformComponent, anchor: Vec2) {
-    r.anchor_max = anchor.clamp(Vec2::ZERO, Vec2::ONE);
+    r.anchor_max = finite2(anchor).clamp(Vec2::ZERO, Vec2::ONE);
     r.anchor_min = r.anchor_min.min(r.anchor_max);
 }
 
 /// Set the pivot (a fraction of the element's own rect).
 pub fn set_pivot(r: &mut RectTransformComponent, pivot: Vec2) {
-    r.pivot = pivot;
+    r.pivot = finite2_or(pivot, r.pivot);
 }
 
 /// Set the pivot's offset from the anchor reference point.
 pub fn set_anchored_position(r: &mut RectTransformComponent, position: Vec2) {
-    r.anchored_position = position;
+    r.anchored_position = finite2(position);
 }
 
 /// Set the size relative to the anchor region.
 pub fn set_size_delta(r: &mut RectTransformComponent, size_delta: Vec2) {
-    r.size_delta = size_delta;
+    r.size_delta = finite2(size_delta);
 }
 
 /// Make the element a marker pinned to `target` (+ `offset`, metres), or to the
@@ -56,7 +57,7 @@ pub fn set_world_anchor(r: &mut RectTransformComponent, target: Option<u32>, off
         anchor.target_lost = false;
     }
     anchor.target = target;
-    anchor.offset = offset;
+    anchor.offset = finite3(offset);
 }
 
 /// Stop the element being a marker: its anchors place it again.
@@ -68,7 +69,7 @@ pub fn clear_world_anchor(r: &mut RectTransformComponent) {
 pub fn set_anchor_clamp(r: &mut RectTransformComponent, clamp: bool, padding: f32) {
     if let Some(a) = &mut r.world_anchor {
         a.clamp_to_screen_edge = clamp;
-        a.edge_padding = padding.max(0.0);
+        a.edge_padding = non_negative(padding);
     }
 }
 

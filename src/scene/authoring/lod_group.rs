@@ -9,6 +9,7 @@
 //!
 //! Pure.
 
+use super::sanitize::{at_least, finite_or};
 use crate::components::lod_group::{default_thresholds, LodGroupComponent, LodLevel};
 
 /// The smallest group size, in metres: a zero size would make every level cull.
@@ -17,21 +18,20 @@ pub const MIN_SIZE: f32 = super::sanitize::MIN_EXTENT;
 /// Set the group's world-space size, floored at [`MIN_SIZE`]. A non-finite size is
 /// ignored.
 pub fn set_size(g: &mut LodGroupComponent, size: f32) {
-    if size.is_finite() {
-        g.size = size.max(MIN_SIZE);
-    }
+    g.size = at_least(finite_or(size, g.size), MIN_SIZE);
 }
 
 /// Set level `level`'s screen height, clamped between its neighbours' so the order
 /// holds. Out of range: no-op.
 pub fn set_level_height(g: &mut LodGroupComponent, level: usize, height: f32) {
-    if level >= g.levels.len() || !height.is_finite() {
+    if level >= g.levels.len() {
         return;
     }
     let finer = level
         .checked_sub(1)
         .map_or(1.0, |i| g.levels[i].screen_height);
     let coarser = g.levels.get(level + 1).map_or(0.0, |l| l.screen_height);
+    let height = finite_or(height, g.levels[level].screen_height);
     g.levels[level].screen_height = height.clamp(coarser, finer);
 }
 

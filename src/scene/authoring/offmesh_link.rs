@@ -9,6 +9,7 @@
 
 use glam::Vec3;
 
+use super::sanitize::{finite3_or, finite_or};
 use crate::components::OffMeshLinkComponent as Link;
 
 /// Enable or disable the link (Unity's `activated`).
@@ -18,16 +19,12 @@ pub fn set_active(l: &mut Link, active: bool) {
 
 /// Set the start point, local to the entity. A non-finite point is ignored.
 pub fn set_start(l: &mut Link, start: Vec3) {
-    if start.is_finite() {
-        l.start = start;
-    }
+    l.start = finite3_or(start, l.start);
 }
 
 /// Set the end point, local to the entity. A non-finite point is ignored.
 pub fn set_end(l: &mut Link, end: Vec3) {
-    if end.is_finite() {
-        l.end = end;
-    }
+    l.end = finite3_or(end, l.end);
 }
 
 /// Let agents cross end to start as well (Unity's `biDirectional`).
@@ -38,11 +35,11 @@ pub fn set_bidirectional(l: &mut Link, both_ways: bool) {
 /// Set the path cost of crossing the link, in world units. Negative or NaN means
 /// "the link's length" (Unity's `costOverride = -1`); infinity is ignored.
 pub fn set_cost_override(l: &mut Link, cost: f32) {
-    if cost.is_nan() || cost < 0.0 {
-        l.cost_override = -1.0;
-    } else if cost.is_finite() {
-        l.cost_override = cost;
-    }
+    l.cost_override = if cost >= 0.0 {
+        finite_or(cost, l.cost_override)
+    } else {
+        -1.0
+    };
 }
 
 /// Set the link's navigation area (#460). An id past the area table's limit is
@@ -63,6 +60,8 @@ mod tests {
         set_start(&mut l, Vec3::Y);
         set_start(&mut l, Vec3::NAN);
         assert_eq!(l.start, Vec3::Y, "a non-finite start is ignored");
+        set_start(&mut l, Vec3::new(5.0, f32::NAN, 9.0));
+        assert_eq!(l.start, Vec3::Y, "a partly-NaN start is refused whole");
         set_end(&mut l, Vec3::new(0.0, 4.0, 1.0));
         set_end(&mut l, Vec3::INFINITY);
         assert_eq!(l.end, Vec3::new(0.0, 4.0, 1.0));

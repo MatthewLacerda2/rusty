@@ -16,6 +16,7 @@
 
 use glam::Vec3;
 
+use super::sanitize::{clamped, finite3};
 use crate::components::{CollisionDetection, RigidBodyComponent};
 
 /// Set the rigidbody's `active` flag.
@@ -36,17 +37,17 @@ pub fn set_use_gravity(rb: &mut RigidBodyComponent, use_gravity: bool) {
 /// Set the rigidbody's mass, clamped to `[0.01, 1000.0]` (the editor card's range;
 /// the clamp lives HERE, once, so a script set is bounded the same way).
 pub fn set_mass(rb: &mut RigidBodyComponent, mass: f32) {
-    rb.mass = mass.clamp(0.01, 1000.0);
+    rb.mass = clamped(mass, 0.01, 1000.0);
 }
 
 /// Set the rigidbody's linear velocity.
 pub fn set_velocity(rb: &mut RigidBodyComponent, velocity: Vec3) {
-    rb.velocity = velocity;
+    rb.velocity = finite3(velocity);
 }
 
 /// Set the rigidbody's angular velocity (radians/sec per axis).
 pub fn set_angular_velocity(rb: &mut RigidBodyComponent, angular_velocity: Vec3) {
-    rb.angular_velocity = angular_velocity;
+    rb.angular_velocity = finite3(angular_velocity);
 }
 
 /// Set the rigidbody's collision-detection mode (Discrete / Continuous).
@@ -87,5 +88,16 @@ mod tests {
         assert_eq!(rb.velocity, Vec3::new(1.0, 2.0, 3.0));
         assert_eq!(rb.angular_velocity, Vec3::new(0.0, 4.0, 0.0));
         assert_eq!(rb.collision_detection, CollisionDetection::Continuous);
+    }
+
+    /// NaN mass falls back into the clamp range; a partly-NaN velocity is zero (#1361).
+    #[test]
+    fn non_finite_inputs_take_the_fallback() {
+        let (mut scene, id) = scene_with_rb();
+        let mut e = scene.world.rigidbody_mut(id).unwrap();
+        set_mass(&mut e, f32::NAN);
+        set_velocity(&mut e, Vec3::new(1.0, f32::NAN, f32::NEG_INFINITY));
+        assert_eq!(e.mass, 0.01);
+        assert_eq!(e.velocity, Vec3::ZERO, "a velocity is refused whole");
     }
 }

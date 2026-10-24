@@ -16,6 +16,7 @@
 //!
 //! Pure.
 
+use super::sanitize::{at_least, clamped, finite_or, finite_values, non_negative};
 use crate::components::{ShadowSettings, SsaoSettings, Tonemap, VisualCorrectionComponent};
 use crate::shadergen::post_params::PostChain;
 
@@ -31,33 +32,33 @@ pub fn set_bloom_active(vc: &mut VisualCorrectionComponent, active: bool) {
 
 /// Set the bloom intensity, clamped to `≥ 0`.
 pub fn set_bloom_intensity(vc: &mut VisualCorrectionComponent, value: f32) {
-    vc.bloom_intensity = value.max(0.0);
+    vc.bloom_intensity = non_negative(value);
 }
 
 /// Set the bloom threshold, clamped to `≥ 0`.
 pub fn set_bloom_threshold(vc: &mut VisualCorrectionComponent, value: f32) {
-    vc.bloom_threshold = value.max(0.0);
+    vc.bloom_threshold = non_negative(value);
 }
 
 /// Set the exposure (EV).
 pub fn set_exposure(vc: &mut VisualCorrectionComponent, value: f32) {
-    vc.exposure = value;
+    vc.exposure = finite_or(value, vc.exposure);
 }
 
 /// Set the contrast.
 pub fn set_contrast(vc: &mut VisualCorrectionComponent, value: f32) {
-    vc.contrast = value;
+    vc.contrast = finite_or(value, vc.contrast);
 }
 
 /// Set the saturation.
 pub fn set_saturation(vc: &mut VisualCorrectionComponent, value: f32) {
-    vc.saturation = value;
+    vc.saturation = finite_or(value, vc.saturation);
 }
 
 /// Set the display-gamma tweak (neutral `1.0`), clamped to `≥ 0.01` (avoids a
 /// divide-by-zero in the shader's `c^(1/gamma)`).
 pub fn set_gamma(vc: &mut VisualCorrectionComponent, value: f32) {
-    vc.gamma = value.max(0.01);
+    vc.gamma = at_least(value, 0.01);
 }
 
 /// Set the tonemap operator (typed — string parsing stays in the API adapter).
@@ -87,7 +88,7 @@ pub fn set_shadow_cascades(vc: &mut VisualCorrectionComponent, count: u32) {
 
 /// Set how far from the camera sun shadows reach, clamped to `≥ 1` world unit.
 pub fn set_shadow_distance(vc: &mut VisualCorrectionComponent, distance: f32) {
-    vc.shadows.distance = distance.max(ShadowSettings::MIN_DISTANCE);
+    vc.shadows.distance = at_least(distance, ShadowSettings::MIN_DISTANCE);
 }
 
 /// Set whether screen-space ambient occlusion runs (#436).
@@ -97,12 +98,12 @@ pub fn set_ssao_active(vc: &mut VisualCorrectionComponent, active: bool) {
 
 /// Set the AO search radius in world units, clamped to `≥ 0.01`.
 pub fn set_ssao_radius(vc: &mut VisualCorrectionComponent, radius: f32) {
-    vc.ssao.radius = radius.max(SsaoSettings::MIN_RADIUS);
+    vc.ssao.radius = at_least(radius, SsaoSettings::MIN_RADIUS);
 }
 
 /// Set the AO strength, clamped to `0..=4`.
 pub fn set_ssao_intensity(vc: &mut VisualCorrectionComponent, intensity: f32) {
-    vc.ssao.intensity = intensity.clamp(0.0, SsaoSettings::MAX_INTENSITY);
+    vc.ssao.intensity = clamped(intensity, 0.0, SsaoSettings::MAX_INTENSITY);
 }
 
 /// Replace the ordered list of authored postfx modules the volume runs (#397).
@@ -145,7 +146,7 @@ pub fn set_post_param_with(
     name: &str,
     value: Vec<f32>,
 ) -> Result<(), String> {
-    chain.set(&mut vc.post_params, name, value)
+    chain.set(&mut vc.post_params, name, finite_values(value)?)
 }
 
 /// The value runtime param `name` of the volume's effects draws with: the stored one,

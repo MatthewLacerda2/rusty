@@ -15,21 +15,22 @@
 
 use glam::Vec3;
 
+use super::sanitize::{clamped, finite3, non_negative};
 use crate::components::{LightComponent, LightMode, LightType};
 
 /// Set the light's linear RGB colour.
 pub fn set_color(l: &mut LightComponent, rgb: Vec3) {
-    l.color = rgb;
+    l.color = finite3(rgb).max(Vec3::ZERO);
 }
 
 /// Set the light's intensity, clamped to `≥ 0` (a negative emit is meaningless).
 pub fn set_intensity(l: &mut LightComponent, value: f32) {
-    l.intensity = value.max(0.0);
+    l.intensity = non_negative(value);
 }
 
 /// Set the light's range, clamped to `≥ 0`.
 pub fn set_range(l: &mut LightComponent, value: f32) {
-    l.range = value.max(0.0);
+    l.range = non_negative(value);
 }
 
 /// The cone angles (degrees) a new light carries, and a spot seeds when it has none.
@@ -51,11 +52,16 @@ pub fn set_mode(l: &mut LightComponent, mode: LightMode) {
     l.mode = mode;
 }
 
-/// Set the spotlight cone angles (degrees), keeping `inner ≤ outer` so the inner
-/// cone never exceeds the outer one. The validation lives HERE, once.
+/// The widest cone half-angle (degrees): Unity's spot angle tops out under 180°
+/// full, and the inspector's slider stops here.
+pub const MAX_CONE: f32 = 90.0;
+
+/// Set the spotlight cone half-angles (degrees): `outer` in `[0, MAX_CONE]`, and
+/// `inner` in `[0, outer]` so the inner cone never exceeds the outer one. NaN or
+/// infinite takes `0`. The validation lives HERE, once.
 pub fn set_cones(l: &mut LightComponent, inner: f32, outer: f32) {
-    l.outer_cone = outer;
-    l.inner_cone = inner.min(outer);
+    l.outer_cone = clamped(outer, 0.0, MAX_CONE);
+    l.inner_cone = clamped(inner, 0.0, l.outer_cone);
 }
 
 /// Set whether a point or spot light casts shadows through the shadow atlas (#468).
@@ -110,6 +116,21 @@ mod tests {
         set_cones(&mut e, 10.0, 20.0);
         set_type(&mut e, LightType::Spotlight);
         assert_eq!((e.inner_cone, e.outer_cone), (10.0, 20.0));
+    }
+
+    /// `math.huge` and NaN from Lua take the fallback, never the field (#1361).
+    #[test]
+    fn non_finite_inputs_take_the_fallback() {
+        let (mut scene, id) = scene_with_light();
+        let mut e = scene.world.light_mut(id).unwrap();
+        set_intensity(&mut e, f32::INFINITY);
+        set_color(&mut e, Vec3::new(f32::NAN, 0.5, f32::INFINITY));
+        set_cones(&mut e, f32::NAN, f32::INFINITY);
+        assert_eq!(e.intensity, 0.0);
+        assert_eq!(e.color, Vec3::ZERO, "a colour is refused whole");
+        assert_eq!((e.inner_cone, e.outer_cone), (0.0, 0.0));
+        set_cones(&mut e, 10.0, 500.0);
+        assert_eq!((e.inner_cone, e.outer_cone), (10.0, MAX_CONE));
     }
 
     #[test]

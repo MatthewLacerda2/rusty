@@ -3,6 +3,7 @@
 //! render bindings both call, so the two can never clamp differently.
 
 use crate::components::{Flipbook, ParticleEmitterComponent, ParticleRenderMode};
+use crate::scene::authoring::sanitize::non_negative;
 
 /// Set how the particles are drawn (billboard / stretched / flat / mesh).
 pub fn set_render_mode(p: &mut ParticleEmitterComponent, mode: ParticleRenderMode) {
@@ -12,8 +13,8 @@ pub fn set_render_mode(p: &mut ParticleEmitterComponent, mode: ParticleRenderMod
 /// Set the stretched-billboard length: `length_scale × size + speed_scale × speed`,
 /// each factor clamped to `≥ 0`.
 pub fn set_stretch(p: &mut ParticleEmitterComponent, length_scale: f32, speed_scale: f32) {
-    p.render.length_scale = length_scale.max(0.0);
-    p.render.speed_scale = speed_scale.max(0.0);
+    p.render.length_scale = non_negative(length_scale);
+    p.render.speed_scale = non_negative(speed_scale);
 }
 
 /// Set (or, with an empty string, clear) the mesh-particle mesh: a primitive name
@@ -28,18 +29,19 @@ pub fn set_render_material(p: &mut ParticleEmitterComponent, material: String) {
 }
 
 /// Set the flipbook grid; `columns`/`rows` clamp to `≥ 1`, `cycles` to `≥ 0`.
+// lint: allow(sanitize) its one float, `cycles`, goes through `non_negative`
 pub fn set_flipbook(p: &mut ParticleEmitterComponent, flipbook: Flipbook) {
     p.render.flipbook = Flipbook {
         columns: flipbook.columns.max(1),
         rows: flipbook.rows.max(1),
-        cycles: flipbook.cycles.max(0.0),
+        cycles: non_negative(flipbook.cycles),
         random_start: flipbook.random_start,
     };
 }
 
 /// Set the soft-particle fade distance (world units, `≥ 0`; `0` = hard edges).
 pub fn set_soft_distance(p: &mut ParticleEmitterComponent, distance: f32) {
-    p.render.soft_distance = distance.max(0.0);
+    p.render.soft_distance = non_negative(distance);
 }
 
 /// Set whether the particles are lit by the scene.

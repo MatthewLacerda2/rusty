@@ -7,12 +7,14 @@
 
 use glam::Vec3;
 
+use super::sanitize::finite3_or;
 use crate::components::LineComponent;
 
 /// The most points a line holds — a guard against a runaway script loop.
 pub const MAX_POSITIONS: usize = 4096;
 
 /// Replace every point (non-finite ones dropped, capped at [`MAX_POSITIONS`]).
+// lint: allow(sanitize) the `is_finite` filter drops every non-finite point
 pub fn set_positions(l: &mut LineComponent, positions: &[Vec3]) {
     let finite = positions.iter().copied().filter(|p| p.is_finite());
     l.positions = finite.take(MAX_POSITIONS).collect();
@@ -20,8 +22,8 @@ pub fn set_positions(l: &mut LineComponent, positions: &[Vec3]) {
 
 /// Move point `index` (0-based); out of range or non-finite is ignored.
 pub fn set_position(l: &mut LineComponent, index: usize, position: Vec3) {
-    if let (Some(p), true) = (l.positions.get_mut(index), position.is_finite()) {
-        *p = position;
+    if let Some(p) = l.positions.get_mut(index) {
+        *p = finite3_or(position, *p);
     }
 }
 

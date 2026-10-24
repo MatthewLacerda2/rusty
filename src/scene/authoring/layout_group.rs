@@ -9,6 +9,7 @@
 
 use glam::{Vec2, Vec4};
 
+use super::sanitize::{finite2, finite4};
 use crate::components::{
     LayoutConstraint, LayoutCorner, LayoutGroupComponent, LayoutKind, TextAlignment,
 };
@@ -20,12 +21,12 @@ pub fn set_kind(g: &mut LayoutGroupComponent, kind: LayoutKind) {
 
 /// Set the inset from the rect (left, bottom, right, top), reference units.
 pub fn set_padding(g: &mut LayoutGroupComponent, padding: Vec4) {
-    g.padding = padding;
+    g.padding = finite4(padding);
 }
 
 /// Set the gap between columns (`x`) and rows (`y`).
 pub fn set_spacing(g: &mut LayoutGroupComponent, spacing: Vec2) {
-    g.spacing = spacing;
+    g.spacing = finite2(spacing);
 }
 
 /// Set where the children sit when they do not fill the rect.
@@ -47,7 +48,7 @@ pub fn set_child_force_expand(g: &mut LayoutGroupComponent, width: bool, height:
 
 /// Set the grid's cell size, each axis floored at 0.
 pub fn set_cell_size(g: &mut LayoutGroupComponent, size: Vec2) {
-    g.cell_size = size.max(Vec2::ZERO);
+    g.cell_size = finite2(size).max(Vec2::ZERO);
 }
 
 /// Set how the grid picks its column / row count.

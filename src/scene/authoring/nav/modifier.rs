@@ -10,6 +10,7 @@
 use glam::Vec3;
 
 use crate::components::NavMeshModifierVolumeComponent as Volume;
+use crate::scene::authoring::sanitize::finite3_or;
 use crate::scene::nav_settings::MAX_AREAS;
 
 /// The smallest extent a box side may have.
@@ -22,16 +23,12 @@ pub fn set_active(v: &mut Volume, active: bool) {
 
 /// Set the box's centre, local to the entity. A non-finite centre is ignored.
 pub fn set_center(v: &mut Volume, center: Vec3) {
-    if center.is_finite() {
-        v.center = center;
-    }
+    v.center = finite3_or(center, v.center);
 }
 
 /// Set the box's size, each side at least [`MIN_SIZE`]. A non-finite size is ignored.
 pub fn set_size(v: &mut Volume, size: Vec3) {
-    if size.is_finite() {
-        v.size = size.max(Vec3::splat(MIN_SIZE));
-    }
+    v.size = finite3_or(size, v.size).max(Vec3::splat(MIN_SIZE));
 }
 
 /// Set the area the volume assigns. An id past the area table's limit is ignored.

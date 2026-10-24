@@ -30,6 +30,10 @@ use crate::components::{
     SubEmitTrigger,
 };
 use crate::core::curve::{ColorRange, Curve, Gradient, Range};
+use crate::scene::authoring::sanitize::{
+    clamped, color_range_or, finite, finite3, finite3_or, finite_curve, finite_gradient,
+    non_negative, range_or,
+};
 
 /// Set the emitter's `active` gate.
 pub fn set_active(p: &mut ParticleEmitterComponent, active: bool) {
@@ -48,7 +52,7 @@ pub fn set_looping(p: &mut ParticleEmitterComponent, looping: bool) {
 
 /// Set the continuous emission rate, clamped to `≥ 0` (matches `Particles.SetRate`).
 pub fn set_rate(p: &mut ParticleEmitterComponent, rate: f32) {
-    p.rate = rate.max(0.0);
+    p.rate = non_negative(rate);
 }
 
 /// Set the per-burst particle count.
@@ -73,32 +77,53 @@ pub fn set_texture(p: &mut ParticleEmitterComponent, texture: String) {
 
 /// Set the per-particle lifetime range (seconds), each bound clamped to `≥ 0`.
 pub fn set_lifetime(p: &mut ParticleEmitterComponent, lifetime: Range) {
-    p.lifetime = Range::new(lifetime.min.max(0.0), lifetime.max.max(0.0));
+    let r = range_or(lifetime, p.lifetime);
+    p.lifetime = Range::new(non_negative(r.min), non_negative(r.max));
 }
 
 /// Set the per-particle launch speed range.
 pub fn set_speed(p: &mut ParticleEmitterComponent, speed: Range) {
-    p.speed = speed;
+    p.speed = range_or(speed, p.speed);
 }
 
 /// Set the emission direction (the shape's axis).
 pub fn set_direction(p: &mut ParticleEmitterComponent, direction: Vec3) {
-    p.direction = direction;
+    p.direction = finite3_or(direction, p.direction);
 }
 
 /// Set the emission spread.
 pub fn set_spread(p: &mut ParticleEmitterComponent, spread: f32) {
-    p.spread = spread;
+    p.spread = non_negative(spread);
 }
 
 /// Set the per-particle gravity.
 pub fn set_gravity(p: &mut ParticleEmitterComponent, gravity: Vec3) {
-    p.gravity = gravity;
+    p.gravity = finite3(gravity);
 }
 
-/// Set the emission shape.
+/// Set the emission shape: radii `≥ 0`, a box's size `≥ 0` (a non-finite size is
+/// zero), a cone's angle in `[0, 90]` degrees (Unity's shape module range).
+// lint: allow(sanitize) each variant's floats go through a helper in the match
 pub fn set_shape(p: &mut ParticleEmitterComponent, shape: EmitShape) {
-    p.shape = shape;
+    p.shape = match shape {
+        EmitShape::Point => EmitShape::Point,
+        EmitShape::Sphere { radius } => EmitShape::Sphere {
+            radius: non_negative(radius),
+        },
+        EmitShape::Hemisphere { radius } => EmitShape::Hemisphere {
+            radius: non_negative(radius),
+        },
+        EmitShape::Box { size } => EmitShape::Box {
+            size: finite3(size).max(Vec3::ZERO),
+        },
+        EmitShape::Cone { angle, radius } => EmitShape::Cone {
+            angle: clamped(angle, 0.0, 90.0),
+            radius: non_negative(radius),
+        },
+        EmitShape::Circle { radius } => EmitShape::Circle {
+            radius: non_negative(radius),
+        },
+    };
 }
 
 /// Set whether the shape emits from its volume or its surface / edge.
@@ -108,41 +133,39 @@ pub fn set_emit_from(p: &mut ParticleEmitterComponent, from: EmitFrom) {
 
 /// Set the start size range, each bound clamped to `≥ 0`.
 pub fn set_size(p: &mut ParticleEmitterComponent, size: Range) {
-    p.size = Range::new(size.min.max(0.0), size.max.max(0.0));
+    let r = range_or(size, p.size);
+    p.size = Range::new(non_negative(r.min), non_negative(r.max));
 }
 
 /// Set the start rotation range (degrees).
 pub fn set_rotation(p: &mut ParticleEmitterComponent, rotation: Range) {
-    p.rotation = rotation;
+    p.rotation = range_or(rotation, p.rotation);
 }
 
 /// Set the start colour range (RGBA, unmultiplied).
 pub fn set_color(p: &mut ParticleEmitterComponent, color: ColorRange) {
-    p.color = color;
+    p.color = color_range_or(color, p.color);
 }
 
-/// Set the size-over-life multiplier curve (keys re-sorted by `t`).
-pub fn set_size_over_life(p: &mut ParticleEmitterComponent, mut curve: Curve) {
-    curve.sort();
-    p.size_over_life = curve;
+/// Set the size-over-life multiplier curve (keys re-sorted by `t`, non-finite
+/// keys dropped).
+pub fn set_size_over_life(p: &mut ParticleEmitterComponent, curve: Curve) {
+    p.size_over_life = finite_curve(curve);
 }
 
 /// Set the colour-over-life gradient (keys re-sorted by `t`).
-pub fn set_color_over_life(p: &mut ParticleEmitterComponent, mut gradient: Gradient) {
-    gradient.sort();
-    p.color_over_life = gradient;
+pub fn set_color_over_life(p: &mut ParticleEmitterComponent, gradient: Gradient) {
+    p.color_over_life = finite_gradient(gradient);
 }
 
 /// Set the drag-over-life curve (fraction of velocity lost per second).
-pub fn set_drag(p: &mut ParticleEmitterComponent, mut curve: Curve) {
-    curve.sort();
-    p.drag = curve;
+pub fn set_drag(p: &mut ParticleEmitterComponent, curve: Curve) {
+    p.drag = finite_curve(curve);
 }
 
 /// Set the rotation-speed-over-life curve (degrees/second).
-pub fn set_rotation_speed(p: &mut ParticleEmitterComponent, mut curve: Curve) {
-    curve.sort();
-    p.rotation_speed = curve;
+pub fn set_rotation_speed(p: &mut ParticleEmitterComponent, curve: Curve) {
+    p.rotation_speed = finite_curve(curve);
 }
 
 /// Set (or, with `None`, clear) the sub-emitter fired at `trigger`.
@@ -156,7 +179,7 @@ pub fn set_sub_emitter(
 
 /// Set the fraction of a parent particle's velocity sub-particles inherit.
 pub fn set_inherit_velocity(p: &mut ParticleEmitterComponent, fraction: f32) {
-    p.sub_emitters.inherit_velocity = fraction;
+    p.sub_emitters.inherit_velocity = finite(fraction);
 }
 
 /// Set the collision response (none / die / bounce).
@@ -166,7 +189,7 @@ pub fn set_collision(p: &mut ParticleEmitterComponent, collision: CollisionRespo
 
 /// Set the collision bounciness (restitution).
 pub fn set_bounciness(p: &mut ParticleEmitterComponent, bounciness: f32) {
-    p.bounciness = bounciness;
+    p.bounciness = non_negative(bounciness);
 }
 
 /// Set the deterministic spawn seed.

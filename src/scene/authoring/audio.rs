@@ -16,6 +16,7 @@
 //!
 //! Pure.
 
+use super::sanitize::{non_negative, unit};
 use crate::components::AudioSourceComponent;
 
 /// Set the source's clip path.
@@ -25,7 +26,7 @@ pub fn set_clip(a: &mut AudioSourceComponent, clip: String) {
 
 /// Set the source's per-source linear volume.
 pub fn set_volume(a: &mut AudioSourceComponent, volume: f32) {
-    a.volume = volume;
+    a.volume = unit(volume);
 }
 
 /// Set whether the source loops.
@@ -45,17 +46,17 @@ pub fn set_time_scaled(a: &mut AudioSourceComponent, is_time_scaled: bool) {
 
 /// Set the source's spatial blend (0 = 2D, 1 = fully 3D).
 pub fn set_spatial_blend(a: &mut AudioSourceComponent, spatial_blend: f32) {
-    a.spatial_blend = spatial_blend;
+    a.spatial_blend = unit(spatial_blend);
 }
 
 /// Set the rolloff's near (full-volume) distance.
 pub fn set_initial_distance(a: &mut AudioSourceComponent, initial_distance: f32) {
-    a.initial_distance = initial_distance;
+    a.initial_distance = non_negative(initial_distance);
 }
 
 /// Set the rolloff's far (silent) distance.
 pub fn set_final_distance(a: &mut AudioSourceComponent, final_distance: f32) {
-    a.final_distance = final_distance;
+    a.final_distance = non_negative(final_distance);
 }
 
 /// Set the mixer group the source plays through (`""` is Master, #465).
