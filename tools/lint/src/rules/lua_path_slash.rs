@@ -4,10 +4,14 @@
 //! script (and the script then writes into a scene) must be too. A bare
 //! `to_string_lossy()` keeps the native `\` on Windows, and the scene it ends up in
 //! stops resolving on macOS and Linux. In `src/api/` and `src/dev/lua_surface/`
-//! (the code that marshals values to Lua), a `to_string_lossy()` outside test code
-//! is a finding: spell the path with `crate::core::paths::to_slash`. A call on
-//! something that is not a path (a Lua string) says so with
-//! `// lint: allow(lua-path-slash) <why>`.
+//! (the two directories that marshal values to Lua; nothing else builds a Lua
+//! value from a path), a `.to_string_lossy()` or `.display()` outside test code is a
+//! finding: spell the path with `crate::core::paths::to_slash`.
+//!
+//! What it cannot see: a `PathBuf` handed to Lua directly (mlua keeps the `\`), and
+//! `.to_str()`, left out because `mlua::String::to_str` is far more common here than
+//! `Path::to_str`. The rule is lexical, so it also flags a call on an `mlua::String`
+//! or a literal; those say so with `// lint: allow(lua-path-slash) <why>`.
 
 use super::finding::Finding;
 use super::scan::Scan;
@@ -16,7 +20,7 @@ use crate::code::code_lines;
 pub const RULE: &str = "lua-path-slash";
 const SCOPES: [&str; 2] = ["src/api/", "src/dev/lua_surface/"];
 
-/// Every non-test line of a Lua-facing source that calls `to_string_lossy()`.
+/// Every non-test line of a Lua-facing source that calls `to_string_lossy()` or `display()`.
 pub fn check_file(path: &str, source: &str, test: &[bool]) -> Vec<Finding> {
     if !SCOPES.iter().any(|s| path.starts_with(s)) {
         return Vec::new();
@@ -24,7 +28,9 @@ pub fn check_file(path: &str, source: &str, test: &[bool]) -> Vec<Finding> {
     code_lines(source)
         .iter()
         .enumerate()
-        .filter(|(i, code)| !test[*i] && code.contains(".to_string_lossy()"))
+        .filter(|(i, code)| {
+            !test[*i] && (code.contains(".to_string_lossy()") || code.contains(".display()"))
+        })
         .map(|(i, _)| Finding {
             path: path.to_string(),
             line: i + 1,

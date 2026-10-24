@@ -17,6 +17,12 @@ fn a_bare_to_string_lossy_in_lua_facing_code_is_flagged() {
 }
 
 #[test]
+fn display_is_flagged_too() {
+    let src = "fn f() {\n    let s = p.display().to_string();\n}\n";
+    assert_eq!(check_file("src/api/a.rs", src).len(), 1);
+}
+
+#[test]
 fn to_slash_other_modules_and_test_code_pass() {
     let slashed = "fn f() {\n    let s = to_slash(p);\n}\n";
     assert!(check_file("src/api/assets.rs", slashed).is_empty());

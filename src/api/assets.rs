@@ -215,3 +215,7 @@ fn vec3_table(lua: &Lua, x: f32, y: f32, z: f32) -> mlua::Result<Table> {
     t.raw_set("z", z)?;
     Ok(t)
 }
+
+#[cfg(test)]
+#[path = "assets_tests.rs"]
+mod tests;

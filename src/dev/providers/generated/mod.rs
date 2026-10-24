@@ -35,7 +35,9 @@ use crate::asset::audio::{decode_bytes, wav};
 
 pub use crate::core::project::GENERATED_DIR;
 
-/// Where a brief's output lives, relative to the working directory.
+/// Where a brief's output lives, relative to the working directory, as a **native**
+/// path (the file it names is written there). What reaches Lua or a scene goes
+/// through `core::paths::to_slash` first (#1390).
 pub fn address<B: Brief + ?Sized>(brief: &B) -> serde_json::Result<PathBuf> {
     let name = format!("{}-{}.{}", brief.kind(), digest(brief)?, brief.extension());
     Ok(crate::core::paths::native(GENERATED_DIR).join(name))
