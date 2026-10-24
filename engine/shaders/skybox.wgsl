@@ -30,7 +30,10 @@ var s_skybox: sampler;
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let dir = normalize(in.view_dir);
-    let sky = textureSample(t_skybox, s_skybox, equirect_uv(dir));
+    // Level 0: the panorama shares its cached upload, mips and all, with any
+    // material using the file, and `equirect_uv`'s atan2 seam would make the
+    // derivatives pick a coarse mip, a flat line down the sky (#1322).
+    let sky = textureSampleLevel(t_skybox, s_skybox, equirect_uv(dir), 0.0);
     // Blend toward the scene fog at the horizon (#437) so fogged geometry doesn't
     // silhouette against a clear sky.
     return vec4<f32>(sky_fog(camera.fog, sky.rgb, dir, camera.camera_pos), sky.a);

@@ -167,8 +167,20 @@ pub(crate) fn is_colour_map(index: usize) -> bool {
     matches!(index, 0 | 4)
 }
 
+/// Every texture `material` samples (as [`material_texture_paths`]), each with what
+/// its slot holds, which decides how its mips average (#1322): what to upload
+/// before its bind group is built.
+pub(crate) fn material_maps(
+    material: Option<&MaterialAsset>,
+) -> impl Iterator<Item = (MapRef, TextureKind)> {
+    material_texture_paths(material)
+        .into_iter()
+        .enumerate()
+        .filter_map(|(i, path)| Some((path?, map_kind(i))))
+}
+
 /// What the map at `index` holds, which decides how its mips average (#1322).
-pub(crate) fn map_kind(index: usize) -> TextureKind {
+fn map_kind(index: usize) -> TextureKind {
     match is_colour_map(index) {
         true => TextureKind::Colour,
         false => TextureKind::Data,

@@ -52,20 +52,25 @@ fn gpu_a_distant_checker_renders_as_its_average() {
     }
 }
 
-/// Black and white texels in a 2×2 checker, alpha 0 under black: the one-texel
-/// mip `kind` draws from it.
-fn checker_mip(renderer: &Renderer, kind: TextureKind) -> [u8; 4] {
-    let checker = image::RgbaImage::from_fn(2, 2, |x, y| match (x + y) % 2 {
-        0 => image::Rgba([0, 0, 0, 0]),
-        _ => image::Rgba([255, 255, 255, 255]),
-    });
+/// Level 1 of `image` with its mips drawn as `kind`, packed RGBA8.
+fn level_one(renderer: &Renderer, kind: TextureKind, image: &image::RgbaImage) -> Vec<u8> {
     let (device, queue) = (&renderer.device, &renderer.queue);
-    let texture = super::super::upload((device, queue), "checker", &checker, 2);
+    let (w, h) = image.dimensions();
+    let levels = super::full_chain_len(w, h);
+    let texture = super::super::upload((device, queue), "mip test", image, levels);
     renderer
         .mip_generator
         .generate(device, queue, &texture, kind);
-    let texel = readback::read_mip_rgba8(device, queue, (&texture, 1), (1, 1));
-    texel.try_into().unwrap()
+    let below = ((w / 2).max(1), (h / 2).max(1));
+    readback::read_mip_rgba8(device, queue, (&texture, 1), below)
+}
+
+/// A one-row image of grey `values`, opaque.
+fn row(values: &[u8]) -> image::RgbaImage {
+    image::RgbaImage::from_fn(values.len() as u32, 1, |x, _| {
+        let v = values[x as usize];
+        image::Rgba([v, v, v, 255])
+    })
 }
 
 #[test]
@@ -73,11 +78,30 @@ fn gpu_a_colour_map_averages_in_linear_light_and_a_data_map_its_bytes() {
     let Some(renderer) = crate::render::test_gpu::headless_or_skip(SIDE, SIDE) else {
         return;
     };
-    // Half the light of white is sRGB 188, not the byte midpoint 128; alpha is
-    // linear in both.
-    let colour = checker_mip(&renderer, TextureKind::Colour);
-    let data = checker_mip(&renderer, TextureKind::Data);
-    let near = |a: [u8; 4], b: [u8; 4]| a.iter().zip(b).all(|(&x, y)| x.abs_diff(y) <= 1);
-    assert!(near(colour, [188, 188, 188, 128]), "colour mip {colour:?}");
-    assert!(near(data, [128, 128, 128, 128]), "data mip {data:?}");
+    // Black and white texels in a 2×2 checker, alpha 0 under black. Half the light
+    // of white is sRGB 188, not the byte midpoint 128; alpha is linear in both.
+    let checker = image::RgbaImage::from_fn(2, 2, |x, y| match (x + y) % 2 {
+        0 => image::Rgba([0, 0, 0, 0]),
+        _ => image::Rgba([255, 255, 255, 255]),
+    });
+    let colour = level_one(&renderer, TextureKind::Colour, &checker);
+    let data = level_one(&renderer, TextureKind::Data, &checker);
+    let near = |a: &[u8], b: [u8; 4]| a.iter().zip(b).all(|(&x, y)| x.abs_diff(y) <= 1);
+    assert!(near(&colour, [188, 188, 188, 128]), "colour mip {colour:?}");
+    assert!(near(&data, [128, 128, 128, 128]), "data mip {data:?}");
+}
+
+#[test]
+fn gpu_an_odd_side_averages_every_texel_it_covers() {
+    let Some(renderer) = crate::render::test_gpu::headless_or_skip(SIDE, SIDE) else {
+        return;
+    };
+    // 3 → 1: a third each, so the white ends count (a centre tap alone reads 0).
+    let three = level_one(&renderer, TextureKind::Data, &row(&[255, 0, 255]));
+    assert!(three[0].abs_diff(170) <= 1, "3 → 1 gave {}", three[0]);
+    // 5 → 2: each texel spans 2.5, weighted 2/5, 2/5, 1/5 from its outer edge.
+    let five = level_one(&renderer, TextureKind::Data, &row(&[255, 0, 0, 0, 255]));
+    for texel in [five[0], five[4]] {
+        assert!(texel.abs_diff(102) <= 1, "5 → 2 gave {five:?}");
+    }
 }

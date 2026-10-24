@@ -129,7 +129,9 @@ fn screen_space_reflection(uv: vec2<f32>, world_pos: vec3<f32>, n: vec3<f32>) ->
 }
 
 fn sky_reflection(r: vec3<f32>) -> vec3<f32> {
-    return textureSample(t_skybox, s_skybox, equirect_uv(r)).rgb;
+    // Level 0, as the skybox pass reads it: the atan2 seam's derivatives would
+    // pick a coarse mip (#1322).
+    return textureSampleLevel(t_skybox, s_skybox, equirect_uv(r), 0.0).rgb;
 }
 
 // Camera motion blur: blur along the screen-space velocity of the pixel between

@@ -3,7 +3,8 @@
 //! instead of aliasing the full-size image; Unity generates mipmaps by default too.
 //!
 //! The chain is drawn on the GPU at upload ([`MipGenerator`], `mips.wgsl`), each
-//! level a 2×2 box filter of the one above. What the texels hold decides how they
+//! level a box filter of the one above (2×2 on even sides, 3 overlap-weighted taps
+//! on odd ones). What the texels hold decides how they
 //! average: a colour map in linear light (averaging the sRGB bytes darkens every
 //! mip of a high-contrast texture), a data map its raw values.
 //!

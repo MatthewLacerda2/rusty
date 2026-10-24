@@ -1,6 +1,6 @@
 //! Drawing a texture's mip chain on the GPU (#1322), `mips.wgsl`: each level is a
-//! fullscreen triangle sampling the level above through the views of the texture's
-//! [`TextureKind`].
+//! fullscreen triangle box-filtering the level above (`textureLoad`, odd sides
+//! weighted by overlap) through the views of the texture's [`TextureKind`].
 //!
 //! Done on the GPU because the CPU box filter it replaced cost about 42 ms per 2K
 //! texture in an optimised build and 670 ms in the unoptimised dev build the editor
@@ -8,7 +8,7 @@
 
 use super::TextureKind;
 use crate::render::gpu::fullscreen::Fullscreen;
-use crate::render::gpu::layout_entries::{sampler_entry, texture_entry};
+use crate::render::gpu::layout_entries::texture_entry;
 use crate::render::gpu::pipelines::LazyPipeline;
 use crate::render::gpu::shaders::ShaderRegistry;
 
@@ -17,7 +17,6 @@ use crate::render::gpu::shaders::ShaderRegistry;
 /// waits for the first data map.
 pub(crate) struct MipGenerator {
     layout: wgpu::BindGroupLayout,
-    sampler: wgpu::Sampler,
     colour: wgpu::RenderPipeline,
     data: LazyPipeline,
 }
@@ -27,10 +26,7 @@ impl MipGenerator {
         let shader = registry.load(device, "mips.wgsl", "Mip Shader");
         let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("Mip Layout"),
-            entries: &[
-                texture_entry(0, wgpu::TextureViewDimension::D2),
-                sampler_entry(1),
-            ],
+            entries: &[texture_entry(0, wgpu::TextureViewDimension::D2)],
         });
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Mip Pipeline Layout"),
@@ -50,17 +46,10 @@ impl MipGenerator {
                 pass.colour(device, &[Some(kind.view_format().into())])
             }
         };
-        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            label: Some("Mip Sampler"),
-            mag_filter: wgpu::FilterMode::Linear,
-            min_filter: wgpu::FilterMode::Linear,
-            ..Default::default()
-        });
         Self {
             colour: pipeline(TextureKind::Colour)(device),
             data: LazyPipeline::new(device, pipeline(TextureKind::Data)),
             layout,
-            sampler,
         }
     }
 
@@ -117,16 +106,10 @@ impl MipGenerator {
         let group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Mip Source"),
             layout: &self.layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: wgpu::BindingResource::TextureView(above),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: wgpu::BindingResource::Sampler(&self.sampler),
-                },
-            ],
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: wgpu::BindingResource::TextureView(above),
+            }],
         });
         let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("Mip Level"),

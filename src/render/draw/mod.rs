@@ -162,11 +162,6 @@ pub(crate) fn active_material_map_paths(scene: &Scene) -> Vec<(MapRef, TextureKi
         .into_iter()
         .filter(|&id| scene.world.is_active(id))
         .flat_map(|id| scene.material_assets_of(id))
-        .flat_map(|m| {
-            materials::material_texture_paths(Some(m))
-                .into_iter()
-                .enumerate()
-        })
-        .filter_map(|(i, path)| Some((path?, materials::map_kind(i))))
+        .flat_map(|m| materials::material_maps(Some(m)))
         .collect()
 }
