@@ -9,6 +9,9 @@
 //! 1,074 lines unseen. The shaders and the engine's script components had reached
 //! twice the cap the same way before #1015.
 //!
+//! The full scan measures what can be committed ([`listing`], #1373): a file the
+//! engine seeds into a gitignored folder is never pushed, so it never counts.
+//!
 //! **Nothing is grandfathered** (#926). A file over its cap is split, never excused;
 //! the burn-down list this gate once read emptied and was retired.
 
@@ -16,6 +19,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::exit;
 
+mod listing;
 mod lua;
 mod python;
 #[cfg(test)]
@@ -34,7 +38,8 @@ pub(crate) const SCAN_ROOTS: &[&str] = &["src", "tests", "fuzz", "tools"];
 /// What the size gate walks: [`SCAN_ROOTS`] plus `.github`, where the merge and
 /// mutation scripts live (#926), and `engine`, the shipped shaders and script
 /// components (#1015). `assets/` is not one: it is gitignored, the open project's
-/// seeded and baked copies, so nothing in it is ever pushed.
+/// seeded and baked copies, so nothing in it is ever pushed; nor is a gitignored
+/// path inside a root ([`full_scan`]).
 const SIZE_ROOTS: &[&str] = &["src", "tests", "fuzz", "tools", ".github", "engine"];
 const REPORT: &str = ".lint/report.txt";
 
@@ -73,10 +78,7 @@ impl Lang {
 /// Entry point: check `args` (explicit files) or, when empty, every size root.
 pub fn run(args: &[String]) {
     let files: Vec<PathBuf> = if args.is_empty() {
-        SIZE_ROOTS
-            .iter()
-            .flat_map(|root| measured_in(Path::new(root)))
-            .collect()
+        full_scan(Path::new(""))
     } else {
         args.iter().map(PathBuf::from).collect()
     };
@@ -88,6 +90,26 @@ pub fn run(args: &[String]) {
     } else {
         exit(1);
     }
+}
+
+/// Every measured file under [`SIZE_ROOTS`] in the repository at `base`: the
+/// committable ones git lists, or, where git can't list them (a tarball with no
+/// `.git`), every file on disk, build output aside, and a note on stderr saying so.
+fn full_scan(base: &Path) -> Vec<PathBuf> {
+    if let Some(files) = listing::committable(base, SIZE_ROOTS) {
+        return files
+            .into_iter()
+            .filter(|p| Lang::of(p).is_some())
+            .collect();
+    }
+    eprintln!(
+        "lint: git can't list the committable files here; measuring every file on \
+         disk, gitignored ones included"
+    );
+    SIZE_ROOTS
+        .iter()
+        .flat_map(|root| measured_in(&base.join(root)))
+        .collect()
 }
 
 /// Every `.rs` file under `dir`, build output aside: what the rules gate scans.
