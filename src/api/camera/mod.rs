@@ -5,9 +5,10 @@
 //! script can move and aim relative to where the camera looks, and the world ↔
 //! screen projections (`WorldToScreen`, `ScreenToWorldRay`, #429). Those drive the
 //! view camera; the per-entity functions (`component`) tune a camera *entity's*
-//! projection and render-texture target (#430).
+//! projection and render-texture target (#430), lens and stacking (`lens`, #1341).
 
 pub mod component;
+mod lens;
 
 use std::cell::RefCell;
 
@@ -15,6 +16,7 @@ use glam::{Vec2, Vec3};
 use mlua::Lua;
 
 use super::{put, ApiScopedCtx, Reg};
+use crate::scene::authoring::camera as camera_ops;
 use crate::scene::camera::MAX_PITCH;
 use crate::scene::Camera;
 
@@ -119,7 +121,7 @@ fn register_orientation<'scope>(
     )
 }
 
-/// `GetFov` / `SetFov` (fov clamped to 1..179°).
+/// `GetFov` / `SetFov` (fov clamped to 1..179°, the entity ops' bounds).
 fn register_fov<'scope>(
     scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
@@ -134,7 +136,7 @@ fn register_fov<'scope>(
         table,
         "SetFov",
         scope.create_function(|_, fov: f32| {
-            camera.borrow_mut().fov = fov.clamp(1.0, 179.0);
+            camera.borrow_mut().fov = fov.clamp(camera_ops::MIN_FOV, camera_ops::MAX_FOV);
             Ok(())
         }),
     )

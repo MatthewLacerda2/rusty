@@ -8,7 +8,7 @@
 | `Camera.GetRight` | `()` | `x, y, z` (unit right vector) |
 | `Camera.GetYaw` / `SetYaw` | `()` / `(yaw)` | degrees |
 | `Camera.GetPitch` / `SetPitch` | `()` / `(pitch)` | degrees (clamped ±89) |
-| `Camera.GetFov` / `SetFov` | `()` / `(fov)` | degrees (clamped 1–179) |
+| `Camera.GetFov` / `SetFov` | `()` / `(fov)` | degrees (clamped 1–179); the view camera's — a camera entity's is `SetFieldOfView` |
 | `Camera.WorldToScreen` | `(x, y, z [, canvas])` | `sx, sy, depth, onScreen` — see below |
 | `Camera.ScreenToWorldRay` | `(x, y)` | `ox, oy, oz, dx, dy, dz` — the ray's origin (on the near plane) and unit direction |
 
@@ -43,6 +43,10 @@ return `nil` without a camera; setters are then no-ops.
 | Function | Signature | Returns |
 |---|---|---|
 | `Camera.GetProjection` / `SetProjection` | `(id)` / `(id, name [, size])` | `name, size` — `"Perspective"` (size `nil`) or `"Orthographic"`; `size` is half the view's height in world units (Unity's `orthographicSize`, > 0; omitted keeps the current one, else 5) |
+| `Camera.GetFieldOfView` / `SetFieldOfView` | `(id)` / `(id, degrees)` | the vertical field of view (Unity's `fieldOfView`), clamped 1–179 |
+| `Camera.GetClipPlanes` / `SetClipPlanes` | `(id)` / `(id, near, far)` | `near, far` (Unity's `nearClipPlane` / `farClipPlane`): `near` is at least 0.01, `far` at least 0.01 beyond it |
+| `Camera.GetRenderOrder` / `SetRenderOrder` | `(id)` / `(id, order)` | the stacking order (Unity's `depth`, default 0): screen cameras draw from lowest to highest, so a higher one composites on top |
+| `Camera.GetClearFlags` / `SetClearFlags` | `(id)` / `(id, name)` | `"Skybox"` (default), `"SolidColor"` or `"DepthOnly"` — what the camera clears before it draws (Unity's `clearFlags`); any case, and Unity's `"Color"` / `"Depth"` too. An unknown name is an error |
 | `Camera.GetCullingMask` / `SetCullingMask` | `(id)` / `(id, mask)` | the layers it draws, one bit per layer (Unity's `cullingMask`; default all). Any integer is kept to its low 32 bits, so `-1` (`~0`) is everything |
 | `Camera.GetTargetTexture` / `SetTargetTexture` | `(id)` / `(id, name [, width, height])` | `name, width, height`, or `nil` for a screen camera; `nil` / `""` clears the target. Sides clamp to 1..4096; omitted ones keep the current size, else 256 |
 | `Camera.GetTargetPostFx` / `SetTargetPostFx` | `(id)` / `(id, bool)` | full post-FX chain (default) or tonemap only; `nil` / no-op without a target |
@@ -72,6 +76,19 @@ a UI `Image` (`Image.SetTexture(id, "rt:minimap")`) or a material map
   too: every camera after the base one (the lowest `render_order`, whose pose the
   view camera supplies) renders from its own entity — parent a viewmodel camera to
   the player's head and it follows.
+
+**A viewmodel stack** (Unity's camera stacking): the world camera keeps
+`render_order` 0 and `"Skybox"`; the gun's camera draws after it with
+`"DepthOnly"`, which keeps the world's colour and clears only depth, so the gun
+never clips into a wall. Give the gun's layer to the viewmodel camera alone
+(`Layers`, culling masks), and the viewmodel its own narrow lens.
+
+```lua with=viewmodelCam:Camera
+Camera.SetRenderOrder(viewmodelCam, 1)
+Camera.SetClearFlags(viewmodelCam, "DepthOnly")
+Camera.SetFieldOfView(viewmodelCam, 55)
+Camera.SetClipPlanes(viewmodelCam, 0.01, 100)
+```
 
 ```lua with=minimapCam:Camera,minimapImage
 -- A top-down minimap in the HUD's corner.

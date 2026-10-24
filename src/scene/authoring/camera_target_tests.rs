@@ -1,4 +1,4 @@
-//! The projection and render-texture ops (#430).
+//! The projection and render-texture ops (#430), and the lens clamps (#1341).
 
 use super::*;
 
@@ -39,4 +39,30 @@ fn projection_names_round_trip_and_size_stays_positive() {
         Some(Projection::Perspective)
     );
     assert_eq!(parse_projection("fisheye", 5.0), None);
+}
+
+#[test]
+fn lens_ops_hold_unitys_bounds() {
+    let mut c = CameraComponent::default();
+    set_fov(&mut c, 0.0);
+    assert_eq!(c.fov, MIN_FOV);
+    set_fov(&mut c, 500.0);
+    assert_eq!(c.fov, MAX_FOV);
+
+    set_clip_planes(&mut c, 0.0, 100.0);
+    assert_eq!((c.near, c.far), (MIN_NEAR, 100.0), "near stays above 0");
+    set_near(&mut c, 150.0);
+    assert_eq!(
+        (c.near, c.far),
+        (150.0, 150.0 + MIN_CLIP_GAP),
+        "far is pushed out"
+    );
+    set_far(&mut c, 1.0);
+    assert_eq!(
+        c.far,
+        150.0 + MIN_CLIP_GAP,
+        "far never drops to the near plane"
+    );
+    set_clip_planes(&mut c, f32::NAN, f32::NAN);
+    assert_eq!((c.near, c.far), (MIN_NEAR, MIN_NEAR + MIN_CLIP_GAP));
 }

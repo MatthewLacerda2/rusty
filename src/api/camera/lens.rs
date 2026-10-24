@@ -1,0 +1,93 @@
+//! src/api/camera/lens.rs — the per-entity lens and stacking functions (#1341):
+//! field of view, clip planes, render order and clear flags, Unity's
+//! `fieldOfView`, `nearClipPlane` / `farClipPlane`, `depth` and `clearFlags`.
+//! Registered by `component::register`, with its `read` / `write` contract: getters
+//! return `nil` without a camera, setters are then no-ops.
+
+use std::cell::RefCell;
+
+use super::component::{read, write};
+use crate::api::{put, Reg};
+use crate::components::ClearFlags;
+use crate::scene::authoring::camera as camera_ops;
+use crate::scene::Scene;
+
+/// Register `Get/SetFieldOfView`, `Get/SetClipPlanes`, `Get/SetRenderOrder` and
+/// `Get/SetClearFlags` onto the `Camera` table.
+pub(super) fn register<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
+    table: &mlua::Table,
+    scene: &'scope RefCell<Scene>,
+) -> Reg {
+    put(
+        table,
+        "GetFieldOfView",
+        scope.create_function(|_, id: u32| Ok(read(scene, id, |c| c.fov))),
+    )?;
+    put(
+        table,
+        "SetFieldOfView",
+        scope.create_function(|_, (id, fov): (u32, f32)| {
+            write(scene, id, |c| camera_ops::set_fov(c, fov));
+            Ok(())
+        }),
+    )?;
+    put(
+        table,
+        "GetClipPlanes",
+        scope.create_function(|_, id: u32| {
+            let planes = read(scene, id, |c| (c.near, c.far));
+            Ok(planes.map_or((None, None), |(n, f)| (Some(n), Some(f))))
+        }),
+    )?;
+    put(
+        table,
+        "SetClipPlanes",
+        scope.create_function(|_, (id, near, far): (u32, f32, f32)| {
+            write(scene, id, |c| camera_ops::set_clip_planes(c, near, far));
+            Ok(())
+        }),
+    )?;
+    register_stacking(scope, table, scene)
+}
+
+/// `Get/SetRenderOrder` (Unity's `depth`: higher draws later, on top) and
+/// `Get/SetClearFlags` by name; an unknown name is an error naming the choices.
+fn register_stacking<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
+    table: &mlua::Table,
+    scene: &'scope RefCell<Scene>,
+) -> Reg {
+    put(
+        table,
+        "GetRenderOrder",
+        scope.create_function(|_, id: u32| Ok(read(scene, id, |c| c.render_order))),
+    )?;
+    put(
+        table,
+        "SetRenderOrder",
+        scope.create_function(|_, (id, order): (u32, i32)| {
+            write(scene, id, |c| camera_ops::set_render_order(c, order));
+            Ok(())
+        }),
+    )?;
+    put(
+        table,
+        "GetClearFlags",
+        scope.create_function(|_, id: u32| Ok(read(scene, id, |c| c.clear_flags.name()))),
+    )?;
+    put(
+        table,
+        "SetClearFlags",
+        scope.create_function(|_, (id, name): (u32, String)| {
+            let flags = ClearFlags::parse(&name).ok_or_else(|| {
+                mlua::Error::RuntimeError(format!(
+                    "SetClearFlags: unknown clear flags {name:?} (want one of {})",
+                    ClearFlags::names()
+                ))
+            })?;
+            write(scene, id, |c| camera_ops::set_clear_flags(c, flags));
+            Ok(())
+        }),
+    )
+}

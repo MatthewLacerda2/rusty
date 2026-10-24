@@ -11,20 +11,23 @@ fn default_culling_mask() -> u32 {
     u32::MAX
 }
 
-/// How a stacked camera initializes the framebuffer before it draws (Unity's
-/// `Camera.clearFlags`). The renderer sorts active cameras by
-/// [`CameraComponent::render_order`] and applies each pass's clear behavior in turn,
-/// so later cameras composite over earlier ones (#93).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub enum ClearFlags {
-    /// Clear color to the skybox/backdrop and clear depth — a world/base camera.
-    #[default]
-    Skybox,
-    /// Clear color to a solid backdrop and clear depth.
-    SolidColor,
-    /// Clear depth only, PRESERVING the color already drawn — an FPS viewmodel or
-    /// UI/overlay camera that draws on top of the world without wall-clipping.
-    DepthOnly,
+crate::core::named_enum! {
+    /// How a stacked camera initializes the framebuffer before it draws (Unity's
+    /// `Camera.clearFlags`). The renderer sorts active cameras by
+    /// [`CameraComponent::render_order`] and applies each pass's clear behavior in
+    /// turn, so later cameras composite over earlier ones (#93). Scripts also accept
+    /// Unity's `CameraClearFlags` spellings, `"Color"` and `"Depth"`.
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+    pub enum ClearFlags {
+        /// Clear color to the skybox/backdrop and clear depth — a world/base camera.
+        #[default]
+        Skybox = "Skybox",
+        /// Clear color to a solid backdrop and clear depth.
+        SolidColor = "SolidColor" | "Color",
+        /// Clear depth only, PRESERVING the color already drawn — an FPS viewmodel or
+        /// UI/overlay camera that draws on top of the world without wall-clipping.
+        DepthOnly = "DepthOnly" | "Depth",
+    }
 }
 
 /// A camera whose file names no `clear_flags` loads as a world/base camera.
