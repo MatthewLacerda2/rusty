@@ -72,13 +72,11 @@ pub struct Resources {
     /// The UI event system (#420) — hover, press and focus state — shared with the
     /// script runtime's `UI` namespace. Reset on every Play.
     pub event_system: Rc<RefCell<EventSystem>>,
-    /// Build settings + the quit request (#431), shared with the script runtime's
-    /// `Application` namespace. Unbound by default; the platform layer loads it.
+    /// Build settings, the quit request (#431) and the play request (#1360): the
+    /// host's, a script's, and whether the run is standalone (no edit snapshot on
+    /// Play). Shared with the script runtime; unbound by default, the platform layer
+    /// loads it.
     pub application: Rc<RefCell<Application>>,
-    /// Whether the host asked for Play (`GameWorld::set_playing`). The next tick's
-    /// transition acts on it; whether the World *is* in Play is the scene's one
-    /// play state (`Scene::is_playing`, #1302).
-    pub(super) play_requested: bool,
     /// Play-mode frame counter. Drives nav rebaking off a deterministic tick count
     /// instead of the wall clock, so a fixed-timestep replay is bit-for-bit stable.
     pub(super) play_frame: u64,
@@ -88,9 +86,6 @@ pub struct Resources {
     /// The scene file and identity editor Play started in, put back on Stop after a
     /// play-mode `Scene.Load` (#432). Taken with `edit_snapshot`.
     pub(super) play_origin: Option<super::scene_load::PlayOrigin>,
-    /// A standalone run (the player, #431) has no edit mode to return to, so Play
-    /// takes no edit snapshot. Set once by `GameWorld::boot_standalone`.
-    pub(super) standalone: bool,
     /// The host brought the Lua runtime up in edit mode (`init_edit_runtime`, the
     /// editor and the headless session): Stop brings it back after Play's runtime
     /// shuts down, so the console and MCP `eval` keep working (#1339).
@@ -173,11 +168,9 @@ impl Resources {
             event_system,
             application,
             physics,
-            play_requested: false,
             play_frame: 0,
             edit_snapshot: None,
             play_origin: None,
-            standalone: false,
             edit_runtime: false,
             play_hold: None,
             sources_root: crate::core::project::ASSETS_DIR.into(),

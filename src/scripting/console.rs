@@ -6,6 +6,9 @@ pub struct ConsoleLogs {
     /// The record the newest entry collapses, and how many times it has arrived in a
     /// row ([`ConsoleLogs::repeated`]).
     repeat: Option<(String, u32)>,
+    /// How many entries were ever added, the dropped ones included: a mark for
+    /// [`ConsoleLogs::since`].
+    logged: u64,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -26,6 +29,7 @@ impl ConsoleLogs {
         Self {
             messages: Vec::new(),
             repeat: None,
+            logged: 0,
         }
     }
 
@@ -69,7 +73,21 @@ impl ConsoleLogs {
         }
     }
 
+    /// A mark to read the entries added after it with [`since`](Self::since).
+    pub fn logged(&self) -> u64 {
+        self.logged
+    }
+
+    /// The entries added since `mark` ([`logged`](Self::logged)) still in the buffer,
+    /// oldest first.
+    pub fn since(&self, mark: u64) -> impl Iterator<Item = &(String, LogLevel)> {
+        let added = usize::try_from(self.logged - mark).unwrap_or(usize::MAX);
+        let kept = added.min(self.messages.len());
+        self.messages[self.messages.len() - kept..].iter()
+    }
+
     fn add_log(&mut self, msg: String, level: LogLevel) {
+        self.logged += 1;
         self.repeat = None;
         if self.messages.len() >= 100 {
             self.messages.remove(0);
@@ -108,5 +126,19 @@ mod tests {
                 "[Asset] gone"
             ]
         );
+    }
+
+    #[test]
+    fn since_reads_what_came_after_the_mark_even_past_the_cap() {
+        let mut log = ConsoleLogs::new();
+        log.info("before".into());
+        let mark = log.logged();
+        assert_eq!(log.since(mark).count(), 0);
+        for i in 0..150 {
+            log.error(format!("e{i}"));
+        }
+        let after: Vec<_> = log.since(mark).map(|(m, _)| m.as_str()).collect();
+        assert_eq!(after.len(), 100, "only what the buffer still holds");
+        assert_eq!((after[0], after[99]), ("e50", "e149"));
     }
 }

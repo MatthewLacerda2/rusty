@@ -91,9 +91,10 @@ The tools describe themselves; what they don't say:
 - read **`rusty://scripting-api.md`** before writing Lua: it is the whole API
   (`docs/api/`, one page per namespace);
 - `eval` runs one line of that API; `snapshot` returns the world as JSON;
-- to play-test the game's own scene, in the window or headless: `Editor.EnterPlay()`,
-  then `Time.Pause()`, `Input.Press`, `Time.Step(n)` and `snapshot`, then
-  `Editor.ExitPlay()` to get the authored scene back (`docs/api/Editor.md`). Globals
+- to play-test the game's own scene, in the window or headless, one `eval` each:
+  `Time.Pause()` first, then `Editor.EnterPlay()`, then `Input.Press`, `Time.Step(n)`
+  and `snapshot`, then `Editor.ExitPlay()` to get the authored scene back and
+  `Time.Resume()` last, so the next Play runs live (`docs/api/Editor.md`). Globals
   set before a switch are gone after it;
 - when the engine warned during a call, the result carries a second text block
   starting `engine warnings:`. Read it: a skipped asset or a dropped collider shows

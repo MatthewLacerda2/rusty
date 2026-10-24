@@ -1,7 +1,7 @@
 //! src/dev/mcp/tools.rs — the MCP `tools/list` and `tools/call` handlers.
 //!
 //! Two tools front the *one* evaluator: `eval` (run a line of the rusty Lua API
-//! against the live edit-mode world) and `snapshot` (a convenience wrapper for
+//! against the live world, in edit mode or Play) and `snapshot` (a convenience wrapper for
 //! `Debug.Snapshot()`). Both ultimately call the active [`EvalBackend`], so the MCP
 //! surface is the same control surface the console and the headless session already
 //! drive — no second engine API exists, and the embed and attach modes go through one
@@ -19,9 +19,10 @@ pub fn tools_list() -> Value {
             {
                 "name": "eval",
                 "description": "Evaluate one line of the rusty Lua API against the \
-                    live edit-mode engine world and return the result. This is the \
-                    full engine control surface: create/edit/inspect entities, \
-                    author assets, save scenes, step the sim, etc. See the \
+                    live engine world, in edit mode or Play, and return the result. \
+                    This is the full engine control surface: create/edit/inspect \
+                    entities, author assets, save scenes, enter Play \
+                    (Editor.EnterPlay), step the sim, etc. See the \
                     scripting-api resource for the available namespaces and functions.",
                 "inputSchema": {
                     "type": "object",

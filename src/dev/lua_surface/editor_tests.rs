@@ -23,7 +23,7 @@ fn enter_play_takes_effect_at_the_next_frame() {
             &mut s,
             "local asked = Editor.EnterPlay(); return asked, Editor.IsPlaying()"
         ),
-        run_shape("true", "false")
+        run_shape(&s, "true", "false")
     );
     // The command's frame took the request, so the next call runs in Play.
     assert_eq!(run(&mut s, "Editor.IsPlaying()"), "true");
@@ -31,9 +31,8 @@ fn enter_play_takes_effect_at_the_next_frame() {
 }
 
 /// How the evaluator renders two results, read from the evaluator itself.
-fn run_shape(a: &str, b: &str) -> String {
-    session()
-        .eval(&format!("return {a}, {b}"))
+fn run_shape(s: &Session, a: &str, b: &str) -> String {
+    s.eval(&format!("return {a}, {b}"))
         .expect("two literals evaluate")
 }
 
@@ -56,7 +55,7 @@ fn a_repeated_transition_is_a_no_op_that_returns_false() {
         &mut s,
         "local a = Editor.ExitPlay(); return a, Editor.ExitPlay()",
     );
-    assert_eq!(both, run_shape("true", "false"));
+    assert_eq!(both, run_shape(&s, "true", "false"));
     assert_eq!(run(&mut s, "Editor.IsPlaying()"), "false");
 }
 
@@ -84,6 +83,48 @@ fn steps_queued_in_play_run_before_the_next_command() {
     run(&mut s, "Time.Step(3)");
     assert_eq!(s.world().play_frame(), 3);
     assert_eq!(run(&mut s, "Time.PendingSteps()"), "0");
+}
+
+#[test]
+fn a_host_request_pending_this_frame_counts() {
+    let s = session();
+    let app = &s.world().resources.application;
+    app.borrow_mut().set_host_play(true); // the Play button, pressed this frame
+    assert_eq!(s.eval("Editor.EnterPlay()").as_deref(), Ok("false"));
+    assert_eq!(s.eval("Editor.ExitPlay()").as_deref(), Ok("true"));
+}
+
+#[test]
+fn a_standalone_run_refuses_with_a_warning() {
+    let mut s = session();
+    let app = &s.world().resources.application;
+    app.borrow_mut().mark_standalone(); // a dev-built player, the `play` harness
+    assert_eq!(run(&mut s, "Editor.EnterPlay()"), "false");
+    assert_eq!(run(&mut s, "Editor.IsPlaying()"), "false");
+    let console = s.world().console().borrow();
+    let warned = console
+        .messages
+        .iter()
+        .any(|(m, _)| m.contains("standalone"));
+    assert!(warned, "the refusal says why");
+}
+
+#[test]
+fn an_error_in_the_frame_rides_along_with_the_reply() {
+    let mut s = session();
+    let id = run(&mut s, "Scene.CreateEntity(\"Broken\", \"Box\")");
+    run(
+        &mut s,
+        &format!("Scene.AddScript({id}, 'no_such_script_1360.lua')"),
+    );
+    s.take_warnings();
+    run(&mut s, "Editor.EnterPlay()");
+    let warnings = s.take_warnings();
+    let named = warnings.iter().any(|w| w.contains("no_such_script_1360"));
+    assert!(
+        named,
+        "the script's load error reaches the agent: {warnings:?}"
+    );
 }
 
 #[test]

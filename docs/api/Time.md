@@ -30,10 +30,12 @@ These are easy to conflate but do very different things; keep them straight:
   The windowed loop reads the pause flag *before* it ticks and skips the real-time
   advance entirely. The world is frozen but fully inspectable and mutable through the
   API — the right primitive for "freeze → decide → continue the same playthrough."
+  The headless session never advances on its own: after each command it runs one
+  paused frame, so there too the world moves only by `Time.Step` ([`Editor`](Editor.md)).
 - **Step** (`Time.Step(n)`): while paused, **advance exactly `n` fixed-dt frames**,
   then halt again. Frame-precise and deterministic (the fixed-dt path), so the same
   `n` steps from the same state always produce the same result.
-- **Stop** (`set_playing(false)`, the editor's Stop button / Ctrl+P, Cmd+P on macOS): leaves play mode
+- **Stop** (`Editor.ExitPlay()`, the editor's Stop button / Ctrl+P, Cmd+P on macOS): leaves play mode
   and **restores the edit snapshot, discarding all play-mode state**. Stop is a
   *reset*, not a pause — use it to return to the authored scene, never to "continue
   later."

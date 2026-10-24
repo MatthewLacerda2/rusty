@@ -31,11 +31,14 @@ use crate::app::GameWorld;
 use crate::core::input::InputState;
 use crate::navigation::NavigationGraph;
 use crate::scene::Scene;
-use crate::scripting::ConsoleLogs;
+use crate::scripting::{ConsoleLogs, LogLevel};
 
 /// A live edit-mode engine session: owns the world and the live evaluator.
 pub struct Session {
     world: GameWorld,
+    /// Errors the console took during a command's frame (a script's `Start`, a Lua
+    /// init failure), until [`take_warnings`](Session::take_warnings) hands them on.
+    frame_errors: RefCell<Vec<String>>,
 }
 
 impl Session {
@@ -78,15 +81,25 @@ impl Session {
         world.init_edit_runtime()?;
         // Frame stats for `Debug.Stats()` once the agent plays the world (#433).
         super::stats::install(&mut world);
-        Ok(Self { world })
+        Ok(Self {
+            world,
+            frame_errors: RefCell::default(),
+        })
     }
 
     /// One command from the channel: [`eval`](Self::eval) the line, then run one
     /// paused frame ([`GameWorld::paused_frame`]) so a Play/Stop it asked for takes
     /// effect and the `Time.Step` steps it queued run before the next command (#1360).
+    /// An error that frame logs (a script's `Awake`/`Start`/`Update`, a Lua init
+    /// failure) rides along with the reply, through [`take_warnings`](Self::take_warnings).
     pub fn command(&mut self, line: &str) -> Result<String, String> {
         let outcome = self.eval(line);
+        let mark = self.world.console().borrow().logged();
         self.world.paused_frame();
+        let console = self.world.console().borrow();
+        let errors = console.since(mark).filter(|(_, l)| *l == LogLevel::Error);
+        let mut kept = self.frame_errors.borrow_mut();
+        kept.extend(errors.map(|(m, _)| m.clone()));
         outcome
     }
 
@@ -102,10 +115,13 @@ impl Session {
     }
 
     /// The engine warnings and errors logged since the last call (#1139), moved into
-    /// the console as they are taken. The first call also returns what the boot
+    /// the console as they are taken, then the errors a command's frame wrote to the
+    /// console (#1360). The first call also returns what the boot
     /// raised (a scene that failed to load an asset, say).
     pub fn take_warnings(&self) -> Vec<String> {
-        crate::logging::forward(self.world.console())
+        let mut taken = crate::logging::forward(self.world.console());
+        taken.append(&mut self.frame_errors.borrow_mut());
+        taken
     }
 
     /// The live world, for tests / embedders that want to inspect state directly.
