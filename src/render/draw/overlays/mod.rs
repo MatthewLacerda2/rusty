@@ -49,7 +49,7 @@ impl Renderer {
     pub(crate) fn precreate_aabb(&self, scene: &Scene) -> Vec<AabbResource> {
         let mut aabb_resources = Vec::new();
         for id in scene.world.ids_with_collider() {
-            if !scene.world.is_active(id) {
+            if !scene.world.is_active_in_hierarchy(id) {
                 continue;
             }
             if scene.selected_entity_id == Some(id) {

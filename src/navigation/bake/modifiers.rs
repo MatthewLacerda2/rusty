@@ -63,7 +63,7 @@ pub(super) fn modifier_keys(scene: &Scene) -> Vec<(u32, ModifierVolume)> {
         .world
         .ids_with_nav_modifier()
         .into_iter()
-        .filter(|&id| scene.world.is_active(id))
+        .filter(|&id| scene.world.is_active_in_hierarchy(id))
         .filter_map(|id| {
             let m = scene.world.nav_modifier(id)?.clone();
             m.active.then_some(())?;

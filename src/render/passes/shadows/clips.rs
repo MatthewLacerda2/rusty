@@ -51,7 +51,7 @@ impl Renderer {
     pub(super) fn shadow_clips(&mut self, scene: &Scene) -> HashMap<(u32, usize), CasterClip> {
         let mut clips = HashMap::new();
         for id in scene.world.ids_with_mesh() {
-            if !scene.world.is_active(id) {
+            if !scene.world.is_active_in_hierarchy(id) {
                 continue;
             }
             let slots = scene.world.material(id).map_or(0, |m| m.materials.len());

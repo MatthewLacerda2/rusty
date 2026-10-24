@@ -55,7 +55,7 @@ impl Renderer {
         let (opaque, transparent) = lists;
         let before = opaque.len() + transparent.len();
         for id in scene.world.ids_with_particles() {
-            if !scene.world.is_active(id)
+            if !scene.world.is_active_in_hierarchy(id)
                 || !crate::scene::layer_in_mask(scene.world.layer(id), cam.culling_mask)
             {
                 continue;

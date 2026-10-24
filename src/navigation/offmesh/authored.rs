@@ -29,7 +29,7 @@ pub fn authored_keys(scene: &Scene) -> Vec<(u32, AuthoredKey)> {
         .world
         .ids_with_offmesh_link()
         .into_iter()
-        .filter(|&id| scene.world.is_active(id))
+        .filter(|&id| scene.world.is_active_in_hierarchy(id))
         .filter_map(|id| {
             let link = scene.world.offmesh_link(id)?.clone();
             link.active.then_some(())?;

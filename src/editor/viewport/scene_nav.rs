@@ -159,7 +159,8 @@ pub fn pinch_steps(factor: f32) -> f32 {
 }
 
 /// The world-space sphere (center, radius) that frames entity `id`: the union of the
-/// mesh bounds in its subtree, or a unit sphere at its position when it has none.
+/// mesh bounds in its subtree, active or not (an inactive pivot frames by its
+/// children's meshes, as Unity's Frame Selected does), or a unit sphere at its position when it has none.
 /// `None` when the entity is gone.
 pub fn selection_bounds(scene: &Scene, id: u32) -> Option<(Vec3, f32)> {
     if !scene.world.contains(id) {
@@ -170,9 +171,6 @@ pub fn selection_bounds(scene: &Scene, id: u32) -> Option<(Vec3, f32)> {
         let Some(mesh) = scene.world.mesh(next) else {
             continue;
         };
-        if !scene.world.is_active(next) {
-            continue;
-        }
         if let Some((lo, hi)) = mesh.world_aabb(scene.world.local_to_world(next)) {
             bounds = Some(bounds.map_or((lo, hi), |(a, b)| (a.min(lo), b.max(hi))));
         }

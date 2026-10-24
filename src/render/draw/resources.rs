@@ -97,7 +97,7 @@ impl Renderer {
             Vec::new()
         };
         for id in scene.world.ids_with_mesh() {
-            if !scene.world.is_active(id) {
+            if !scene.world.is_active_in_hierarchy(id) {
                 continue;
             }
             // During a static-cubemap capture, gather only static geometry — dynamic

@@ -109,10 +109,10 @@ impl Inherited {
     /// A root canvas's starting state: visible only when it and every ancestor are
     /// active.
     pub(super) fn root(world: &World, id: u32) -> Self {
-        // The event system's rule (`ui::events::tree::is_visible`): a dangling parent
+        // The event system's rule (`World::is_active_in_hierarchy`): a dangling parent
         // ends the chain (#991).
         Self {
-            visible: world.self_and_ancestors(id).all(|c| world.is_active(c)),
+            visible: world.is_active_in_hierarchy(id),
             alpha: 1.0,
             clip: None,
             mask: None,
@@ -125,7 +125,8 @@ impl Inherited {
     /// its graphic is what shapes them.
     pub(super) fn child(self, world: &World, id: u32, rect: &UiRect) -> (Self, Self) {
         let mut own = Self {
-            visible: self.visible && world.is_active(id),
+            // lint: allow(active-self) folds one level of the walk `root` began
+            visible: self.visible && world.is_active_self(id),
             alpha: self.alpha * world.canvas_group(id).map_or(1.0, |g| g.alpha),
             ..self
         };

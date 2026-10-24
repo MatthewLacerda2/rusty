@@ -36,7 +36,7 @@ pub(super) fn tick_particles(world: &mut World, res: &mut Resources) {
         // ray-casts (which immutably borrow the scene through the filter).
         let taken = {
             let mut scene = world.scene.borrow_mut();
-            if !scene.world.contains(id) || !scene.world.is_active(id) {
+            if !scene.world.contains(id) || !scene.world.is_active_in_hierarchy(id) {
                 continue;
             }
             // World space, as `render::passes::particles::draw` reads it (#1196).
@@ -71,7 +71,7 @@ fn dispatch_sub_emitters(world: &mut World, events: &[SubEmitEvent]) {
     }
     let mut scene = world.scene.borrow_mut();
     for e in events {
-        if !scene.world.contains(e.target) || !scene.world.is_active(e.target) {
+        if !scene.world.contains(e.target) || !scene.world.is_active_in_hierarchy(e.target) {
             continue;
         }
         if let Some(mut target) = scene.world.particles_mut(e.target) {

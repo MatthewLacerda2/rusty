@@ -52,7 +52,7 @@ impl Scene {
     pub fn decal_pose(&self, decal: &Decal) -> Option<DecalPose> {
         let mut pose = DecalPose::unowned(decal);
         if let Some(owner) = decal.owner {
-            if !self.world.is_active(owner.entity) {
+            if !self.world.is_active_in_hierarchy(owner.entity) {
                 return None;
             }
             pose.model = self.world.local_to_world(owner.entity) * owner.local;

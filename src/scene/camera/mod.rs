@@ -126,7 +126,7 @@ pub fn sync_lens_from_scene(camera: &mut Camera, scene: &Scene, is_playing: bool
                 .expect("id came from ids_with_camera");
             // A render-texture camera (#430) is not the screen's camera.
             let screen = c.active && c.target_texture.is_none();
-            if scene.world.is_active(id) && screen && c.render_order <= best_order {
+            if scene.world.is_active_in_hierarchy(id) && screen && c.render_order <= best_order {
                 best_order = c.render_order;
                 lens = Some((c.fov, c.near, c.far, c.culling_mask, c.projection));
             }
@@ -168,7 +168,11 @@ pub fn game_camera_from_scene(base: &Camera, scene: &Scene) -> Camera {
     let mut chosen: Option<Camera> = None;
     for id in scene.world.ids_with_camera() {
         let order = match scene.world.camera(id) {
-            Some(c) if scene.world.is_active(id) && c.active && c.target_texture.is_none() => {
+            Some(c)
+                if scene.world.is_active_in_hierarchy(id)
+                    && c.active
+                    && c.target_texture.is_none() =>
+            {
                 c.render_order
             }
             _ => continue,

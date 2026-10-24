@@ -1,7 +1,9 @@
 //! src/app/audio/mod.rs — audio play-mode system (#212).
 //!
 //! A `Startup`-stage system: when the world enters Play, start every
-//! `AudioSource` flagged `play_on_start` (Unity's "Play On Awake"). And a
+//! `AudioSource` flagged `play_on_start` (Unity's "Play On Awake"); afterwards a
+//! source stops when its entity goes inactive in the hierarchy and a
+//! `play_on_start` one plays again when it comes back (`activity`, #1363). And a
 //! `LateUpdate` one stepping the mixer (#465), voice occlusion (#467) and the
 //! listener's reverb zones (#469) — snapshot blends and ducking — on
 //! `Time.unscaledTime`, so the mix state is a function of sim time and a replay
@@ -14,6 +16,8 @@
 //! the right sources auto-started. The per-frame mix (3D rolloff, pan, time scale)
 //! is not a sim system: the windowed shell applies it after each advance
 //! (`shell/audio.rs`, #412), so no device is threaded through a deterministic stage.
+
+mod activity;
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -31,6 +35,7 @@ use crate::scene::{layer_in_mask, Scene};
 /// source's flags before it fires).
 pub(super) fn register(app: &mut App) {
     app.add_system(Stage::Startup, start_play_on_start);
+    app.add_system(Stage::LateUpdate, activity::follow_activity);
     app.add_system(Stage::LateUpdate, advance_mixer);
     app.add_system(Stage::LateUpdate, occlude_voices);
     app.add_system(Stage::LateUpdate, resolve_reverb);
@@ -42,7 +47,7 @@ fn resolve_reverb(world: &mut World, res: &mut Resources) {
     let listener = res.camera.borrow().position;
     let scene = world.scene.borrow();
     let mut ids = scene.world.ids_with_reverb_zone();
-    ids.retain(|&id| scene.world.is_active(id));
+    ids.retain(|&id| scene.world.is_active_in_hierarchy(id));
     ids.sort_unstable();
     let zones: Vec<_> = ids
         .iter()
@@ -117,7 +122,7 @@ pub(super) fn start_sources(world: &World, res: &Resources, admit: impl Fn(u32) 
             .world
             .ids_with_audio()
             .into_iter()
-            .filter(|&id| admit(id) && scene.world.is_active(id))
+            .filter(|&id| admit(id) && scene.world.is_active_in_hierarchy(id))
             .filter_map(|id| {
                 let src = scene.world.audio(id)?;
                 if !src.play_on_start {
@@ -131,6 +136,7 @@ pub(super) fn start_sources(world: &World, res: &Resources, admit: impl Fn(u32) 
     let tick = res.play_frame();
     let mut audio = res.audio.borrow_mut();
     for (id, src, pos) in rows {
+        audio.note_source_active(id, true);
         audio.play_source(id, &src, pos, tick);
     }
 }
@@ -146,3 +152,7 @@ mod audio_occlusion_tests;
 #[cfg(test)]
 #[path = "reverb_tests.rs"]
 mod audio_reverb_tests;
+
+#[cfg(test)]
+#[path = "activity_tests.rs"]
+mod audio_activity_tests;

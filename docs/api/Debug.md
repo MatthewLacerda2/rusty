@@ -233,7 +233,7 @@ Each `<entity>` (also what `Debug.SnapshotEntity(id)` returns):
 
 ```json
 {
-  "id": 1, "name": "Crate", "active": true, "static": false, "layer": 0,
+  "id": 1, "name": "Crate", "active": true, "active_in_hierarchy": true, "static": false, "layer": 0,
   "parent": null, "children": [],
   "components": ["Mesh", "Material", "Collider"],   // optional-component inventory
   "transform": { "pos": [x,y,z], "rot": [x,y,z], "scale": [x,y,z] },  // rot = Euler°

@@ -43,7 +43,7 @@ pub(crate) fn apply_scene_lights(
 ) {
     let mut dirs = Vec::new();
     for id in scene.world.ids_with_light() {
-        if !scene.world.is_active(id) {
+        if !scene.world.is_active_in_hierarchy(id) {
             continue;
         }
         let light = scene.world.light(id).expect("id came from ids_with_light");
@@ -83,7 +83,7 @@ pub(crate) fn apply_ssr_settings(lighting_uniform: &mut LightingUniform, scene: 
     let mut ssr_quality = 2.0; // High default
     let mut ssr_temporal = 0.0;
     for id in scene.world.ids_with_visual_correction() {
-        if !scene.world.is_active(id) {
+        if !scene.world.is_active_in_hierarchy(id) {
             continue;
         }
         let vc = scene

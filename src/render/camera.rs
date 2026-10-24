@@ -72,7 +72,7 @@ pub fn texture_cameras(base: &Camera, scene: &Scene) -> Vec<TextureCamera> {
 fn active_cameras(scene: &Scene) -> impl Iterator<Item = (u32, Option<RenderTarget>)> + '_ {
     scene.world.ids_with_camera().into_iter().filter_map(|id| {
         let c = scene.world.camera(id)?;
-        (scene.world.is_active(id) && c.active).then(|| (id, c.target_texture.clone()))
+        (scene.world.is_active_in_hierarchy(id) && c.active).then(|| (id, c.target_texture.clone()))
     })
 }
 

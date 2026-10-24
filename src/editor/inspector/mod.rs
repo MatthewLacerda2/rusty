@@ -155,7 +155,8 @@ fn draw_object_header(
             }
         });
         ui.horizontal(|ui| {
-            let mut active = world.is_active(id);
+            // lint: allow(active-self) the checkbox shows and sets the own flag
+            let mut active = world.is_active_self(id);
             if ui.checkbox(&mut active, "Active").changed() {
                 world.set_active(id, active);
                 *is_dirty = true;

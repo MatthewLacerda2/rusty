@@ -11,7 +11,9 @@
 //!   - `FindChild(id, path)` — a descendant by name path (`"Viewport/Content"`),
 //!     one level per segment, the first match in hierarchy order; `nil` if absent.
 //!   - `SetActive(id, bool)` / `IsActive(id)` — Unity's `SetActive` / `activeSelf`:
-//!     the entity's own flag (an inactive ancestor still hides it). A pooled
+//!     the entity's own flag (an inactive ancestor still hides it).
+//!     `IsActiveInHierarchy(id)` — Unity's `activeInHierarchy`: it and every
+//!     ancestor are active, the rule every system follows (#1363). A pooled
 //!     object comes back with `SetActive(id, true)`; `Deactivate` is the old
 //!     one-way soft delete.
 //!   - `GetScript(id, name)` — entity `id`'s live script instance named `name` (the
@@ -52,11 +54,12 @@ pub fn register<'scope>(
         Ok(scene.borrow_mut().world.set_active(id, on))
     });
     put(table, "SetActive", f)?;
-    let f = scope.create_function(move |_, id: u32| {
-        let world = &scene.borrow().world;
-        Ok(world.contains(id) && world.is_active(id))
-    });
+    // lint: allow(active-self) `IsActive` is Unity's `activeSelf`
+    let f = scope.create_function(move |_, id: u32| Ok(scene.borrow().world.is_active_self(id)));
     put(table, "IsActive", f)?;
+    let f = scope
+        .create_function(move |_, id: u32| Ok(scene.borrow().world.is_active_in_hierarchy(id)));
+    put(table, "IsActiveInHierarchy", f)?;
     let f = scope.create_function(|lua, (id, name): (u32, String)| instances::find(lua, id, &name));
     put(table, "GetScript", f)
 }

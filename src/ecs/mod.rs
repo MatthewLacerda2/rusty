@@ -19,6 +19,8 @@
 
 pub mod access;
 #[cfg(test)]
+mod active_tests;
+#[cfg(test)]
 mod ancestors_tests;
 mod bundle;
 pub mod core;

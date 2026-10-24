@@ -42,7 +42,7 @@ pub fn build_post_params(
     let mut bloom_enabled = false;
 
     for id in scene.world.ids_with_visual_correction() {
-        if !scene.world.is_active(id) {
+        if !scene.world.is_active_in_hierarchy(id) {
             continue;
         }
         let vc = scene
@@ -115,7 +115,7 @@ fn with_active_volume<R>(scene: &Scene, f: impl Fn(&VisualCorrectionComponent) -
         .world
         .ids_with_visual_correction()
         .into_iter()
-        .filter(|&id| scene.world.is_active(id))
+        .filter(|&id| scene.world.is_active_in_hierarchy(id))
         .find_map(|id| {
             let vc = scene.world.visual_correction(id)?;
             vc.active.then(|| f(&vc))
@@ -140,7 +140,10 @@ pub fn fxaa_enabled(scene: &Scene) -> bool {
         .world
         .ids_with_camera()
         .into_iter()
-        .find(|&id| scene.world.is_active(id) && scene.world.camera(id).is_some_and(|c| c.active))
+        .find(|&id| {
+            scene.world.is_active_in_hierarchy(id)
+                && scene.world.camera(id).is_some_and(|c| c.active)
+        })
         .and_then(|id| scene.world.camera(id).map(|c| c.fxaa_active))
         .unwrap_or(true)
 }

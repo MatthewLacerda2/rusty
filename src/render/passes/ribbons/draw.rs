@@ -169,7 +169,7 @@ fn effect_pass<'e>(
 /// least two distinct points.
 fn collect(scene: &Scene, camera: &Camera) -> Ribbons {
     let visible = |id| {
-        scene.world.is_active(id)
+        scene.world.is_active_in_hierarchy(id)
             && crate::scene::layer_in_mask(scene.world.layer(id), camera.culling_mask)
     };
     let eye = (camera.position, camera.forward());

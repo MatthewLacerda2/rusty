@@ -4,7 +4,7 @@ Read and tune an entity's `LightComponent` — colour, intensity, range, type an
 whether it casts shadows, and its mode.
 Every setter maps onto a field the renderer reads when it packs the lighting
 uniform, so a change takes effect on the next frame. A light has no per-component
-"active" flag: it is gated by its owning entity's `active` (a `Scene` concern), so
+"active" flag: it is gated by whether its owning entity is active in the hierarchy (`Scene.IsActiveInHierarchy`), so
 this surface exposes the light's own data and nothing more. Getters return a
 neutral default (`(1,1,1)` colour, `0` scalars, `"None"` type) when the entity has
 no light.

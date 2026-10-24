@@ -47,7 +47,7 @@ fn a_reimport_that_changes_only_vertices_keeps_every_bone_and_its_flags() {
     let moved = scene.world.mesh(hero).unwrap().vertices[1].position;
     assert_ne!(moved, first, "the new vertices");
     assert_eq!(bones(&scene, hero), old, "every bone keeps its id");
-    assert!(!scene.world.is_active(old[1]), "and its active flag");
+    assert!(!scene.world.is_active_self(old[1]), "and its active flag");
     assert_eq!(scene.world.layer(old[0]), 5, "and its layer");
     assert_eq!(
         scene.selected_entity_id,

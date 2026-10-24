@@ -36,7 +36,7 @@ impl AnalyticEnv {
         let mut sun_dir = None;
         let mut sun_radiance = Vec3::ZERO;
         for id in scene.world.ids_with_light() {
-            if !scene.world.is_active(id) {
+            if !scene.world.is_active_in_hierarchy(id) {
                 continue;
             }
             let light = scene.world.light(id).expect("id came from ids_with_light");

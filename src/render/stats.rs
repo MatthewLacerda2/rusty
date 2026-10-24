@@ -192,7 +192,7 @@ impl Renderer {
 pub(crate) fn count_lights(scene: &Scene) -> (u32, u32) {
     let mut per_type = [0u32; 5];
     for id in scene.world.ids_with_light() {
-        if !scene.world.is_active(id) {
+        if !scene.world.is_active_in_hierarchy(id) {
             continue;
         }
         let Some(light) = scene.world.light(id) else {

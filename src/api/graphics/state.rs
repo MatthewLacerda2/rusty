@@ -43,7 +43,7 @@ fn active_vc_id(scene: &Scene) -> Option<u32> {
         .ids_with_visual_correction()
         .into_iter()
         .find(|&id| {
-            scene.world.is_active(id)
+            scene.world.is_active_in_hierarchy(id)
                 && scene
                     .world
                     .visual_correction(id)
@@ -53,11 +53,9 @@ fn active_vc_id(scene: &Scene) -> Option<u32> {
 
 /// The first *active* entity whose camera component is itself active.
 fn active_cam_id(scene: &Scene) -> Option<u32> {
-    scene
-        .world
-        .ids_with_camera()
-        .into_iter()
-        .find(|&id| scene.world.is_active(id) && scene.world.camera(id).is_some_and(|c| c.active))
+    scene.world.ids_with_camera().into_iter().find(|&id| {
+        scene.world.is_active_in_hierarchy(id) && scene.world.camera(id).is_some_and(|c| c.active)
+    })
 }
 
 /// Run `f` on the first active visual-correction volume, returning its result.

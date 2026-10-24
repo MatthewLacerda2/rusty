@@ -216,7 +216,7 @@ fn collect_runs(scene: &Scene, culling_mask: u32, eye: Eye) -> Vec<EmitterRun> {
     let mut runs: Vec<(EmitterRun, f32)> = Vec::new();
     for id in scene.world.ids_with_particles() {
         // Inactive emitters, and those on a layer the camera culls (#92), don't draw.
-        if !scene.world.is_active(id)
+        if !scene.world.is_active_in_hierarchy(id)
             || !crate::scene::layer_in_mask(scene.world.layer(id), culling_mask)
         {
             continue;

@@ -23,7 +23,7 @@
 
 use glam::Vec2;
 
-use super::tree::{ancestors_or_self, is_visible, raycasts_blocked};
+use super::tree::{ancestors_or_self, raycasts_blocked};
 use crate::ecs::World;
 use crate::ui::space::ray_to_canvas;
 use crate::ui::{CanvasSpace, UiLayout, UiPointer, UiRect};
@@ -72,7 +72,7 @@ pub fn raycast_pointer(world: &World, layout: &UiLayout, pointer: &UiPointer) ->
 fn is_hit(world: &World, layout: &UiLayout, id: u32, rect: &UiRect, point: Vec2) -> bool {
     is_raycast_target(world, id)
         && in_quad(rect, point)
-        && is_visible(world, id)
+        && world.is_active_in_hierarchy(id)
         && !raycasts_blocked(world, id)
         && inside_masks(world, layout, id, point)
 }

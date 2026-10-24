@@ -60,7 +60,7 @@ pub const WALL_RANGE: f32 = 1000.0;
 /// How far along a ray (origin, unit direction) the nearest wall is — the scene's
 /// blocking geometry, `f32::INFINITY` for none. World canvases behind it are not hit.
 pub type Walls<'a> = &'a dyn Fn(Vec3, Vec3) -> f32;
-pub use tree::{is_interactable, is_under, is_visible};
+pub use tree::{is_interactable, is_under};
 
 /// How far (screen pixels) a held pointer moves before a drag begins — Unity's
 /// `EventSystem.pixelDragThreshold` default.

@@ -19,7 +19,7 @@ pub(crate) fn outlined(scene: &Scene, lod: &LodSelection) -> Vec<u32> {
 /// does: selecting Hat in a `[Body, Hat]` level rings Hat. Only active, shown meshes
 /// ring.
 pub(super) fn outline_targets(scene: &Scene, selected: u32, lod: &LodSelection) -> Vec<u32> {
-    if !scene.world.is_active(selected) {
+    if !scene.world.is_active_in_hierarchy(selected) {
         return Vec::new();
     }
     let mut ids = vec![selected];
@@ -35,7 +35,10 @@ pub(super) fn outline_targets(scene: &Scene, selected: u32, lod: &LodSelection) 
     ids.retain(|&id| {
         let fresh = !seen.contains(&id);
         seen.push(id);
-        fresh && scene.world.has_mesh(id) && scene.world.is_active(id) && !lod.hides(id)
+        fresh
+            && scene.world.has_mesh(id)
+            && scene.world.is_active_in_hierarchy(id)
+            && !lod.hides(id)
     });
     ids
 }
@@ -48,9 +51,9 @@ fn owning_group(scene: &Scene, id: u32) -> Option<u32> {
         return Some(id);
     }
     world.ids_with_lod_group().into_iter().find(|&g| {
-        world.is_active(g)
-            && world
-                .lod_group(g)
-                .is_some_and(|l| l.renderers().any(|r| r == id))
+        world
+            .lod_group(g)
+            .is_some_and(|l| l.renderers().any(|r| r == id))
+            && world.is_active_in_hierarchy(g)
     })
 }

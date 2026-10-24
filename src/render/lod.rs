@@ -52,7 +52,7 @@ impl LodSelection {
     fn build(scene: &Scene, pick: impl Fn(&LodGroupComponent, Mat4) -> Option<usize>) -> Self {
         let mut hidden = HashSet::new();
         for id in scene.world.ids_with_lod_group() {
-            if !scene.world.is_active(id) {
+            if !scene.world.is_active_in_hierarchy(id) {
                 continue;
             }
             let Some(group) = scene.world.lod_group(id) else {

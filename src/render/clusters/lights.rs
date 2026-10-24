@@ -80,7 +80,7 @@ pub(crate) fn local_lights(scene: &Scene, capture: bool) -> Vec<(LocalLight, boo
         .world
         .ids_with_light()
         .into_iter()
-        .filter(|&id| scene.world.is_active(id))
+        .filter(|&id| scene.world.is_active_in_hierarchy(id))
         .filter_map(|id| {
             let light = scene.world.light(id)?;
             if !light.mode.renders_live(capture) {

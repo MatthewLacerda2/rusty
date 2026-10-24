@@ -15,7 +15,7 @@ use mlua::{Lua, Table};
 use super::super::{global_table, put, ApiScopedCtx, Reg};
 use super::view::{pointer, ui_view};
 use crate::ecs::World;
-use crate::ui::events::{find_selectable, is_interactable, is_under, is_visible, raycast_pointer};
+use crate::ui::events::{find_selectable, is_interactable, is_under, raycast_pointer};
 use crate::ui::space::{canvas_to_screen, rect_screen_bounds};
 use crate::ui::{EventSystem, UiLayout, UiRect, UiView};
 
@@ -122,7 +122,7 @@ fn list(
 ) -> mlua::Result<Table> {
     let out = lua.create_table()?;
     for (id, rect) in layout.iter() {
-        if !world.has_selectable(id) || !is_visible(world, id) {
+        if !world.has_selectable(id) || !world.is_active_in_hierarchy(id) {
             continue;
         }
         let e = lua.create_table()?;

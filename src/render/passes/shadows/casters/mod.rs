@@ -204,7 +204,7 @@ impl ShadowRenderer {
                 continue;
             };
             // An inactive caster, or a level of detail this sweep does not draw (#472).
-            if !scene.world.is_active(id) || lod.hides(id) {
+            if !scene.world.is_active_in_hierarchy(id) || lod.hides(id) {
                 continue;
             }
             let material = scene.world.material(id);

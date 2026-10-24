@@ -62,7 +62,7 @@ fn a_marker_over_a_bone_follows_it_through_a_reimport_and_a_load() {
     let anchor = target(&scene).unwrap();
     assert_eq!(anchor.target, scene.find_bone(rig, "head"));
     assert!(!anchor.target_lost, "re-bound, not lost");
-    assert!(scene.world.is_active(marker));
+    assert!(scene.world.is_active_in_hierarchy(marker));
 
     let saved = to_scene_data(&scene);
     let doc = saved.entities.iter().find(|e| e.id == marker).unwrap();

@@ -83,7 +83,7 @@ fn destroy_really_removes_while_deactivate_keeps() {
     let gone_id: u32 = gone.parse().unwrap();
     let scene = session.world().scene().borrow();
     assert!(
-        scene.world.contains(keep_id) && !scene.world.is_active(keep_id),
+        scene.world.contains(keep_id) && !scene.world.is_active_self(keep_id),
         "Deactivate keeps the entity but clears its active flag"
     );
     assert!(
