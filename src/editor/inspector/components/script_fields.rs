@@ -139,16 +139,16 @@ fn cached_schema(path: &str) -> Vec<ScriptField> {
             let stale = Stale::new(written);
             cache.schemas.retain(|p, _| !stale.matches(p));
         }
-        let parse = || {
-            std::fs::read_to_string(path)
-                .map(|code| parse_fields(&code))
-                .unwrap_or_default()
+        if let Some(fields) = cache.schemas.get(path) {
+            return fields.clone();
+        }
+        // A failed read is a miss retried next frame, never a cached empty schema.
+        let Ok(code) = std::fs::read_to_string(path) else {
+            return Vec::new();
         };
-        cache
-            .schemas
-            .entry(path.to_string())
-            .or_insert_with(parse)
-            .clone()
+        let fields = parse_fields(&code);
+        cache.schemas.insert(path.to_string(), fields.clone());
+        fields
     })
 }
 
@@ -177,5 +177,14 @@ mod tests {
         // The editor's watch (or an engine write) notes it: re-parsed.
         note_written(path);
         assert_eq!(cached_schema(path).len(), 2);
+    }
+
+    #[test]
+    fn a_failed_read_is_not_cached() {
+        let path = crate::test_temp::dir().join("late.lua");
+        let path = path.to_str().unwrap();
+        assert!(cached_schema(path).is_empty(), "nothing there yet");
+        std::fs::write(path, script("speed = { default = 1 }")).unwrap();
+        assert_eq!(cached_schema(path).len(), 1, "a miss retries");
     }
 }

@@ -188,8 +188,7 @@ impl UiShaders {
     fn refresh(&mut self) {
         let (seen, paths) = written_since(self.seen);
         self.seen = seen;
-        let shader_file = |p: &String| p.ends_with(".wgsl") || p.ends_with(".params.json");
-        if paths.iter().any(shader_file) {
+        if paths.iter().any(|p| params::is_shader_file(p)) {
             self.variants
                 .retain(|name, (built_from, _)| *built_from == source(name));
         }

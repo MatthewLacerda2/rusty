@@ -130,6 +130,11 @@ impl Dependency {
         }
     }
 
+    /// The file looked at, as the converter named it.
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
+
     /// What the look found.
     pub fn seen(&self) -> Seen {
         self.seen

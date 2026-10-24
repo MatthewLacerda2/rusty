@@ -12,9 +12,14 @@
 //! - **Coalesced per frame, on the main thread.** `notify` delivers on its own
 //!   thread into a channel; [`Watch::apply`] drains it once per editor frame, so
 //!   a save that fires several events notes its path once.
-//! - **Sources refreshed after.** A frame that noted anything then runs Play's
-//!   refresh (`asset::convert::refresh_sources`): a model source, or a texture its
-//!   conversion read, re-converts, and the swap's note reloads every entity using it.
+//! - **Only touched sources re-convert.** A frame that noted anything re-converts
+//!   the model sources among the notes, and those whose last conversion read a
+//!   noted file (an FBX's texture) (`asset::convert::refresh_changed`); the swap's
+//!   note reloads every entity using it. A source whose conversion failed waits
+//!   until it, or a file it read, changes again: never a Blender run per frame.
+//! - **Folders and lost events.** A folder that appears or moves notes every file
+//!   under it; an event asking for a rescan (inotify's queue overflowed) notes every
+//!   file under the roots.
 //! - **Held through Play.** A change seen while playing is kept, and noted on the
 //!   first frame after Stop, as conversion already waits for Stop (#1253).
 //! - **A polling fallback.** When the native backend (inotify, FSEvents) cannot
@@ -24,13 +29,18 @@
 //!   one before it waits for the next change to be seen.
 //! - **Spelled as the caches spell it.** A path is noted relative to the working
 //!   directory (the project root) when it lies under a root given that way, so a
-//!   deleted file still matches its cache key by name.
+//!   deleted file still matches its cache key by name. The native backends report
+//!   absolute paths and the poller keeps the root as given; both are spelled alike
+//!   (`root`).
 //!
 //! Editor only: a shipped game never watches its files. The engine's own
 //! write-in-flight temp files (`core::fs::is_temp_name`) and the import cache
 //! (`asset::convert::IMPORT_CACHE_DIR`, which only conversions write, and note) are
 //! never noted.
 
+mod root;
+
+use root::{files_under, Root};
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{channel, Receiver};
@@ -66,35 +76,6 @@ pub struct Watch {
     /// Folders under a root whose changes are never noted: only the engine writes
     /// there, and notes its own writes.
     ignored: Vec<PathBuf>,
-}
-
-/// A watched folder as it was given, and as `notify` reports paths under it.
-struct Root {
-    given: PathBuf,
-    absolute: PathBuf,
-    canonical: Option<PathBuf>,
-}
-
-impl Root {
-    fn new(given: &Path) -> Self {
-        let absolute = std::env::current_dir()
-            .map(|cwd| cwd.join(given))
-            .unwrap_or_else(|_| given.to_path_buf());
-        Self {
-            given: given.to_path_buf(),
-            absolute,
-            canonical: std::fs::canonicalize(given).ok(),
-        }
-    }
-
-    /// `path` re-spelled under this root as it was given, if it lies under it.
-    fn spell(&self, path: &Path) -> Option<PathBuf> {
-        let rest = path.strip_prefix(&self.absolute).ok().or_else(|| {
-            let canonical = self.canonical.as_ref()?;
-            path.strip_prefix(canonical).ok()
-        })?;
-        Some(self.given.join(rest))
-    }
 }
 
 impl Watch {
@@ -161,14 +142,7 @@ impl Watch {
     pub fn collect(&mut self) {
         while let Ok(event) = self.events.try_recv() {
             match event {
-                Ok(event) if changes(&event.kind) => {
-                    for path in &event.paths {
-                        if let Some(spelled) = self.spell(path) {
-                            self.pending.insert(spelled);
-                        }
-                    }
-                }
-                Ok(_) => {}
+                Ok(event) => self.take(&event),
                 Err(e) if !self.warned => {
                     self.warned = true;
                     log::warn!("[Editor] the file watch reported: {e}");
@@ -178,50 +152,69 @@ impl Watch {
         }
     }
 
+    /// Note what one event changed. A folder notes every file under it (a folder
+    /// moved in or out); an event that asks for a rescan, or names no path (inotify
+    /// overflowed, events were lost), notes every file under the roots.
+    fn take(&mut self, event: &Event) {
+        if event.need_rescan() || event.paths.is_empty() {
+            let mut found = Vec::new();
+            for root in &self.roots {
+                files_under(&root.given, &mut found);
+            }
+            return self.pend(found);
+        }
+        if !changes(&event.kind) {
+            return;
+        }
+        let mut found = Vec::new();
+        for path in &event.paths {
+            match self.roots.iter().find_map(|r| r.spell(path)) {
+                Some(spelled) if spelled.is_dir() => files_under(&spelled, &mut found),
+                Some(spelled) => found.push(spelled),
+                None => found.push(path.clone()),
+            }
+        }
+        self.pend(found);
+    }
+
+    /// Add `paths`, already spelled, to the pending set, but for write-in-flight temp
+    /// files and paths under an ignored folder.
+    fn pend(&mut self, paths: Vec<PathBuf>) {
+        for path in paths {
+            let temp = path
+                .file_name()
+                .is_some_and(|n| crate::core::fs::is_temp_name(&n.to_string_lossy()));
+            if temp || self.ignored.iter().any(|dir| path.starts_with(dir)) {
+                continue;
+            }
+            self.pending.insert(path.to_string_lossy().into_owned());
+        }
+    }
+
     /// Once per frame: drain the events, and unless `playing`, note every pending
-    /// path in the write log, then bring the converted sources up to date (a texture
-    /// an FBX's conversion read is no model path, so only this re-converts it).
-    /// Returns how many were noted.
+    /// path in the write log, then re-convert the sources the notes touched (a
+    /// texture an FBX's conversion read is no model path, so only this re-converts
+    /// it). Returns how many were noted.
     pub fn apply(&mut self, playing: bool) -> usize {
         self.collect();
         if playing {
             return 0;
         }
-        let noted = self.pending.len();
-        for path in std::mem::take(&mut self.pending) {
-            crate::core::fs::written::note_written(&path);
+        let noted: Vec<String> = std::mem::take(&mut self.pending).into_iter().collect();
+        for path in &noted {
+            crate::core::fs::written::note_written(path);
         }
-        if let Some(root) = self.sources.as_deref().filter(|_| noted > 0) {
-            crate::asset::convert::refresh_sources(root);
+        let count = noted.len();
+        if let Some(root) = self.sources.as_deref().filter(|_| count > 0) {
+            crate::asset::convert::refresh_changed(root, noted);
         }
-        noted
+        count
     }
 
     /// Paths seen and not yet noted.
     #[cfg(test)]
     pub fn pending(&self) -> &BTreeSet<String> {
         &self.pending
-    }
-
-    /// `path` as the caches spell it, or `None` for a write-in-flight temp file or
-    /// a path under an ignored folder.
-    fn spell(&self, path: &Path) -> Option<String> {
-        let name = path.file_name()?.to_string_lossy();
-        if crate::core::fs::is_temp_name(&name) {
-            return None;
-        }
-        let spelled = self.roots.iter().find_map(|r| r.spell(path));
-        if let Some(spelled) = &spelled {
-            if self.ignored.iter().any(|dir| spelled.starts_with(dir)) {
-                return None;
-            }
-        }
-        Some(
-            spelled
-                .unwrap_or_else(|| path.to_path_buf())
-                .to_string_lossy()
-                .into_owned(),
-        )
     }
 }
 

@@ -12,7 +12,11 @@ shader is caught at authoring time and never ships. On success the module is wri
 to the authored-shader workspace (`assets/shaders/<name>.wgsl` by default),
 registered by name. A **surface** module is then used by naming it on a material —
 `Material.SetShader(id, "enemy_toon")` or a recipe's `shader` key (see `Material.md`);
-re-baking it in a running session rebuilds it on the next frame. A **ui** module is
+re-baking it in a running session rebuilds it on the next frame. An edit made to a
+`.wgsl` module (or its `.params.json`) **outside** the engine, in a text editor, is
+picked up only by the **editor**, whose file watch notes it (#1327); a headless or
+MCP-embedded session, or the standalone player, sees it only once it is baked again
+with `Shader.Bake`. A **ui** module is
 used by naming it on a UI graphic — `UI.SetShader(id, "hud_glitch")` (see
 [*The `ui` pass*](#the-ui-pass)).
 

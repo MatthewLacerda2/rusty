@@ -62,6 +62,7 @@
 //! function that writes a glTF where its [`Staging`] says.
 
 mod blend;
+mod changed;
 mod converter;
 mod depends;
 mod fbx;
@@ -77,6 +78,7 @@ mod stale;
 mod texture_file;
 pub mod texture_ref;
 
+pub use changed::refresh_changed;
 pub use converter::{converter_for, Converted, Converter, Skip, CONVERTERS};
 pub use depends::{Dependency, Seen};
 pub use gate::{

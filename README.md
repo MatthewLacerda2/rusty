@@ -87,8 +87,9 @@ editor, a shader or a script edited elsewhere. It watches the project's `assets/
 (and the engine's shaders) and reloads what changed on the next frame; a source
 re-converts there and then. A change made during Play waits for Stop. On a filesystem
 that gives no change events (some network or container mounts), set
-`RUSTY_WATCH_POLL=1` and it compares the files every second instead. A shipped game
-watches nothing.
+`RUSTY_WATCH_POLL=1` and it compares the files every second instead. Only the editor
+watches: a headless or MCP-embedded session, and a shipped game, see an outside edit
+to a shader only once it is baked again (`Shader.Bake`).
 
 ## Built to be played by an agent
 

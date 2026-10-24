@@ -96,7 +96,7 @@ pub(super) struct Stored {
     /// The whole stamp file.
     text: String,
     stamp: String,
-    depends_on: Vec<Dependency>,
+    pub(super) depends_on: Vec<Dependency>,
     pub skipped: Vec<String>,
 }
 

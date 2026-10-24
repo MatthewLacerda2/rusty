@@ -3,6 +3,8 @@
 //! wherever the filesystem gives events.
 
 use super::{changes, Backend, Root, Watch};
+
+mod events;
 use crate::core::fs::written::written_since;
 use notify::event::{AccessKind, AccessMode, CreateKind, EventKind, ModifyKind};
 use std::path::{Path, PathBuf};
@@ -59,10 +61,38 @@ fn the_polling_watch_notes_an_outside_change() {
 
 #[test]
 fn the_native_watch_notes_an_outside_change() {
-    let (watch, file) = watched(Backend::Native);
+    let dir = crate::test_temp::dir();
+    let file = dir.join("texture.png");
+    std::fs::write(&file, b"red").unwrap();
+    // `with`, not `start`: no fallback to polling hides a broken native backend.
+    let watch = Watch::with(&[&dir], Backend::Native).expect("the native backend starts");
     let noted = notes_an_outside_change_after_play(watch, &file);
     // inotify and FSEvents both report a temp folder's writes.
     assert!(noted, "no event from the native backend");
+}
+
+/// `dir` spelled relative to the working directory, as the editor gives `assets`.
+fn relative(dir: &Path) -> PathBuf {
+    let cwd = std::env::current_dir().unwrap();
+    let ups = cwd.components().count() - 1;
+    let mut path: PathBuf = std::iter::repeat_n("..", ups).collect();
+    path.push(dir.strip_prefix("/").unwrap());
+    path
+}
+
+#[test]
+fn polling_a_relative_root_spells_and_ignores_as_given() {
+    let root = relative(&crate::test_temp::dir());
+    let mut watch = Watch::start(&[&root], POLL).unwrap();
+    let cache = root.join("imported");
+    std::fs::create_dir(&cache).unwrap();
+    watch.ignored.push(cache.clone());
+    std::fs::write(cache.join("model.glb"), b"x").unwrap();
+    let file = root.join("texture.png");
+    std::fs::write(&file, b"x").unwrap();
+    assert!(waits_for(&mut watch, &file), "{:?}", watch.pending());
+    let cached = |p: &String| Path::new(p).starts_with(&cache);
+    assert!(!watch.pending().iter().any(cached), "{:?}", watch.pending());
 }
 
 #[test]

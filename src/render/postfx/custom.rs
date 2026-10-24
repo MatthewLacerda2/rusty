@@ -30,7 +30,7 @@ use naga_oil::compose::Composer;
 use super::{PfxTarget, PostFx};
 use crate::core::fs::written::written_since;
 use crate::render::gpu::layout_entries::uniform_entry;
-use crate::shadergen::params::{PackedParams, ParamLayout};
+use crate::shadergen::params::{is_shader_file, PackedParams, ParamLayout};
 use crate::shadergen::{compose, engine_shader_dir, DEFAULT_OUT_DIR};
 
 /// One loaded authored effect: its pipeline, its runtime-param layout, and the
@@ -144,10 +144,7 @@ impl EffectCache {
     fn prepare(&mut self, device: &wgpu::Device, names: &[String]) {
         let (seen, written) = written_since(self.seen);
         self.seen = seen;
-        if written
-            .iter()
-            .any(|p| p.ends_with(".wgsl") || p.ends_with(".params.json"))
-        {
+        if written.iter().any(|p| is_shader_file(p)) {
             self.pipelines.clear();
         }
         for name in names {
