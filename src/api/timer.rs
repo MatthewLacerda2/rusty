@@ -43,11 +43,7 @@ fn register_invoke<'scope>(
     timers: &'scope RefCell<TimerScheduler>,
 ) -> Reg {
     let schedule = move |lua: &Lua, id: u32, target: Value, delay: f64, interval: Option<f64>| {
-        let verb = if interval.is_some() {
-            "Timer.InvokeRepeating"
-        } else {
-            "Timer.Invoke"
-        };
+        let verb = ["Timer.Invoke", "Timer.InvokeRepeating"][usize::from(interval.is_some())];
         require_active(&scene.borrow(), id)?;
         let target = to_target(lua, target, verb)?;
         let mut t = timers.borrow_mut();
