@@ -22,8 +22,9 @@
 //! state lives in `app`, above this module, so `app` holds the switch and this
 //! module never reads it.
 
-use super::{cached_gltf, converter_for, stale, Converter, Tool};
+use super::{cache_location, cached_gltf, converter_for, record, stale, Converter, Tool};
 use crate::asset::ImportError;
+use crate::core::fs::written::Stale;
 use std::path::{Component, Path, PathBuf};
 
 /// Who refuses conversion, and the sources found changed while it was refused.
@@ -145,6 +146,47 @@ pub fn convertible_sources(root: &Path) -> Vec<PathBuf> {
     });
     sources.sort();
     sources
+}
+
+/// The watch's refresh (#1327): only the sources a change touched. Play's refresh
+/// checks every source; the editor's file watch must not, since a source whose
+/// conversion fails (a `.blend` timing out in Blender) would run again on every frame
+/// that noted anything. A failed source is left alone until it, or a file it read,
+/// changes again.
+/// Convert every source under `root` that `changed` names, or whose cached
+/// conversion read a file `changed` names. Returns how many it converted; a failure
+/// is warned of, as an import's is. A no-op while conversion is off.
+pub fn refresh_changed(root: &Path, changed: Vec<String>) -> usize {
+    if !conversion_allowed() {
+        return 0;
+    }
+    let touched = touched(root, &Stale::new(changed));
+    let mut converted = 0;
+    for source in touched {
+        match cached_gltf(&source) {
+            Ok(_) => converted += 1,
+            Err(e) => log::warn!("[Asset] {}: {e}", source.display()),
+        }
+    }
+    converted
+}
+
+/// The sources under `root` a note in `changed` touches, sorted.
+pub(super) fn touched(root: &Path, changed: &Stale) -> Vec<PathBuf> {
+    if changed.is_empty() {
+        return Vec::new();
+    }
+    let names = |path: &Path| changed.matches(&path.to_string_lossy());
+    let read_one = |source: &Path| {
+        let stored = cache_location(source)
+            .ok()
+            .and_then(|out| record::stored(&out));
+        stored.is_some_and(|s| s.depends_on.iter().any(|d| names(d.path())))
+    };
+    convertible_sources(root)
+        .into_iter()
+        .filter(|source| names(source) || read_one(source))
+        .collect()
 }
 
 /// Convert every source held back while conversion was off, once it is on again.
