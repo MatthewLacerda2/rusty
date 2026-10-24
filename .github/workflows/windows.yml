@@ -18,10 +18,11 @@ on:
     - cron: '37 3 * * *'
   workflow_dispatch:
 
-# Each run keeps its own group, so each finishes.
+# A branch dispatched again cancels its stale run, so one branch holds one Windows
+# runner; the nightly keeps its own group and always finishes.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.run_id }}
-  cancel-in-progress: false
+  group: ${{ github.workflow }}-${{ github.event_name == 'workflow_dispatch' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'workflow_dispatch' }}
 
 jobs:
   # Same steps as ci.yml's `build-test-cross`; bash so Windows runs the same
