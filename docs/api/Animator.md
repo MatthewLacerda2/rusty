@@ -3,8 +3,9 @@
 Drive an entity's animation clips. Clips are imported from the entity's skinned
 glTF mesh (its `animations`); the named `clip` selects one to play. A keyframe
 sampler poses the skeleton each fixed step, so playback — including a looping
-clip's wrap — is deterministic. A non-looping clip holds its last frame at the
-end.
+clip's wrap — is deterministic. A non-looping clip's playhead stops at its ends
+(#1362): it holds the last frame, and played in reverse (a negative speed) it
+moves back from the end at once and holds the first frame at the start.
 
 The `Set*` parameter setters write the animator's named, typed **graph
 parameters** (Unity's Animator parameters): the variables the animation graph's
@@ -39,8 +40,8 @@ path + active state are saved with the entity.
 | `Animator.Stop` | `(id)` | Halt playback (freezes the pose). |
 | `Animator.Pause` | `(id)` | Hold the playhead where it is: the pose freezes but playback stays active (a hold, not a `Stop`). |
 | `Animator.Resume` | `(id)` | Release a `Pause`, continuing from the held playhead. |
-| `Animator.SetLooping` | `(id, loop)` | `loop = true` wraps the playhead at the current clip's end so it repeats seamlessly (idle/run/walk cycles); `false` (the default) holds the last frame. Persists across `Play`/`Crossfade`; entering a graph node overwrites it with the node's `is_loop`. |
-| `Animator.SetSpeed` | `(id, speed)` | Set the animator's playback-speed multiplier (Unity's `animator.speed`): it scales every layer, on top of each graph node's own speed. Set from `Update` it applies in the same fixed step (scripts update before animation), from `LateUpdate` the next one. `1` is authored speed, `2` double, `0` holds the pose; negative plays a **looping** clip backwards (a non-looping clip's reverse is not supported yet, #1362). Persists across `Play`/`Crossfade` and graph transitions. NaN or infinity raises a Lua error and keeps the old speed. |
+| `Animator.SetLooping` | `(id, loop)` | `loop = true` wraps the playhead at the current clip's end so it repeats seamlessly (idle/run/walk cycles); `false` (the default) holds the last frame (for a blend tree too, whatever its node's `is_loop`). Persists across `Play`/`Crossfade`; entering a graph node overwrites it with the node's `is_loop`. |
+| `Animator.SetSpeed` | `(id, speed)` | Set the animator's playback-speed multiplier (Unity's `animator.speed`): it scales every layer, on top of each graph node's own speed. Set from `Update` it applies in the same fixed step (scripts update before animation), from `LateUpdate` the next one. `1` is authored speed, `2` double, `0` holds the pose; negative plays backwards: a looping clip wraps, and a non-looping one moves back from its end at once and holds its first frame at the start (#1362). Persists across `Play`/`Crossfade` and graph transitions. NaN or infinity raises a Lua error and keeps the old speed. |
 | `Animator.GetSpeed` | `(id)` | The animator's playback-speed multiplier, or `nil` when the entity has no animator. |
 | `Animator.SetBool` | `(id, name, value)` | Set the `Bool` parameter `name` (e.g. `Animator.SetBool(id, "isGrounded", true)`). |
 | `Animator.SetFloat` | `(id, name, value)` | Set the `Float` parameter `name` (e.g. `Animator.SetFloat(id, "speed", 4.2)`). |
@@ -173,9 +174,16 @@ starts:
 - A step (large `dt`, high speed) that skips over a marker still fires it, once.
 - A playhead that stands still (speed 0, `Pause`, `Stop`) fires nothing, even
   parked on a marker.
-- **`"End"`** fires automatically, once, when a **non-looping** clip or blend
-  tree reaches its end. It also fires for a clip started with `Animator.Play`,
-  outside any graph.
+- **`"End"`** fires automatically when a **non-looping** clip or blend tree
+  reaches its end playing **forwards**: once per pass, since the playhead stops
+  there. Reversing away from the end doesn't fire it; a new forward pass that
+  reaches the end fires it again. It also fires for a clip started with
+  `Animator.Play`, outside any graph.
+- On a **non-looping** motion, a marker at either end fires on arriving there
+  and again on leaving it the other way (reversing from the end, or playing
+  forwards from the start); resting on it fires nothing. A marker placed past
+  the clip's length sits on its end, so it fires once on arrival whatever the
+  step size (Unity keeps events within the clip).
 
 **Which motion fires.** Only what is really playing:
 

@@ -115,12 +115,12 @@ fn looping_clip_wraps_byte_identically_across_periods() {
 }
 
 #[test]
-fn non_looping_clip_runs_past_the_end_and_holds() {
+fn non_looping_clip_clamps_at_the_end_and_holds() {
     let mut anim = idle();
     step(&mut anim, 1.5, 1.0);
-    assert!(
-        (anim.base.time - 1.5).abs() < 1e-6,
-        "without loop_clip the playhead is never wrapped (sampler holds last frame)"
+    assert_eq!(
+        anim.base.time, 1.0,
+        "without loop_clip the playhead clamps to the clip's length (#1362)"
     );
 }
 

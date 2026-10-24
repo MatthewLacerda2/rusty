@@ -11,12 +11,13 @@
 //! - in a blend tree, only the **dominant** child's — the highest weight, the
 //!   first authored on a tie — so a walk/run blend plays one footstep, not two;
 //! - on an extra layer, only while its weight is above 0;
-//! - plus the automatic [`END_EVENT`] when a non-looping motion reaches its end.
+//! - plus the automatic [`END_EVENT`] when a non-looping motion reaches its end
+//!   playing forwards: once per pass, since its playhead clamps there (#1362).
 //!
 //! Every step's events are ordered by when in the step they were crossed, then
 //! by layer, then authored order — deterministic, and true time order.
 
-use crate::components::{Motion, Playback, Playhead};
+use crate::components::{Bounds, Motion, Playback, Playhead};
 
 use super::blend_tree::tree_weights;
 use super::motion::MotionContext;
@@ -54,14 +55,23 @@ impl MotionContext<'_> {
         span: (f32, f32),
         layer: usize,
     ) -> Vec<Crossed> {
-        let wrap = (playback.loop_clip && playhead.wrap > 0.0).then_some(playhead.wrap);
+        let bounds = playhead.bounds(playback.loop_clip);
         let mut marks: Vec<(f32, &str)> = self.marks(playback);
-        if wrap.is_none() && playhead.wrap > 0.0 {
-            marks.push((playhead.wrap, END_EVENT));
+        if let Bounds::Clamp(end) = bounds {
+            // A clamped playhead never passes the clip's ends, so a marker beyond
+            // them sits on the end (Unity keeps events within the clip).
+            for (mark, _) in &mut marks {
+                *mark = mark.clamp(0.0, end);
+            }
+            // `End` fires on arriving at the end playing forwards, not on leaving
+            // it in reverse: once per pass (#1362).
+            if span.1 > span.0 {
+                marks.push((end, END_EVENT));
+            }
         }
         let mut out = Vec::new();
         for (mark, name) in marks {
-            for at in crossings(span, mark, wrap) {
+            for at in crossings(span, mark, bounds) {
                 out.push(Crossed {
                     name: name.to_string(),
                     at,
@@ -114,30 +124,39 @@ impl MotionContext<'_> {
     }
 }
 
-/// Where in `span` (as a fraction of it, `[0, 1)`) the playhead passes `mark`,
-/// repeated every `wrap` when looping. Forward travel covers `[from, to)`,
-/// backward `(to, from]`.
-fn crossings((from, to): (f32, f32), mark: f32, wrap: Option<f32>) -> Vec<f32> {
+/// Where in `span` (as a fraction of it, `[0, 1]`) the playhead passes `mark`,
+/// repeated every wrap when looping. Forward travel covers `[from, to)`,
+/// backward `(to, from]`; a clamped playhead that reaches an end also covers the
+/// end itself, since it stops there and the next push against it travels nothing.
+fn crossings((from, to): (f32, f32), mark: f32, bounds: Bounds) -> Vec<f32> {
     let span = to - from;
     if span == 0.0 || !span.is_finite() {
         return Vec::new();
     }
-    let (first, last) = match (wrap, span > 0.0) {
-        (None, true) => (0, i64::from(from <= mark && mark < to) - 1),
-        (None, false) => (0, i64::from(to < mark && mark <= from) - 1),
-        (Some(w), true) => (
+    let (lo, hi) = match bounds {
+        Bounds::Clamp(end) => (to <= 0.0 && mark == 0.0, to >= end && mark == end),
+        _ => (false, false),
+    };
+    let (first, last) = match (bounds, span > 0.0) {
+        (Bounds::Wrap(w), true) => (
             ((from - mark) / w).ceil() as i64,
             ((to - mark) / w).ceil() as i64 - 1,
         ),
-        (Some(w), false) => (
+        (Bounds::Wrap(w), false) => (
             ((to - mark) / w).floor() as i64 + 1,
             ((from - mark) / w).floor() as i64,
         ),
+        (_, true) => (0, i64::from(from <= mark && (mark < to || hi)) - 1),
+        (_, false) => (0, i64::from((to < mark || lo) && mark <= from) - 1),
+    };
+    let wrap = match bounds {
+        Bounds::Wrap(w) => w,
+        _ => 0.0,
     };
     let last = last.min(first + MAX_CROSSINGS - 1);
     (first..=last)
         .map(|k| {
-            let at = mark + k as f32 * wrap.unwrap_or(0.0);
+            let at = mark + k as f32 * wrap;
             ((at - from) / span).clamp(0.0, 1.0)
         })
         .collect()

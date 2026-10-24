@@ -24,8 +24,8 @@ pub enum Motion<'a> {
 
 /// How one motion's playhead moves this step: playhead units per second of
 /// play (`1` for a clip, `1 / blended length` for a tree) and the length it wraps
-/// at when looping (the clip's duration, `1` for a tree; non-positive: unknown,
-/// never wrap).
+/// at when looping, or clamps to when not (the clip's duration, `1` for a tree;
+/// non-positive: unknown, neither).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Playhead {
     pub per_second: f32,
@@ -39,6 +39,53 @@ impl Playhead {
             per_second: 1.0,
             wrap: duration,
         }
+    }
+
+    /// A blend tree's playhead: normalized, one cycle is `1`.
+    pub fn tree(per_second: f32) -> Self {
+        Self {
+            per_second,
+            wrap: 1.0,
+        }
+    }
+
+    /// How this playhead treats its length under `loop_clip` — the one decision
+    /// advancing, sampling and animation events all read (#1362).
+    pub fn bounds(self, loop_clip: bool) -> Bounds {
+        match (loop_clip, self.wrap > 0.0) {
+            (true, true) => Bounds::Wrap(self.wrap),
+            (false, true) => Bounds::Clamp(self.wrap),
+            (_, false) => Bounds::Open,
+        }
+    }
+}
+
+/// How a playhead treats its motion's length: wraps at it (looping), clamps to
+/// `[0, length]` (non-looping, #1362), or has none (unknown length).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Bounds {
+    Wrap(f32),
+    Clamp(f32),
+    Open,
+}
+
+impl Bounds {
+    /// `time` within these bounds (a pure `rem_euclid` when wrapping: deterministic).
+    pub fn apply(self, time: f32) -> f32 {
+        match self {
+            Bounds::Wrap(w) => time.rem_euclid(w),
+            Bounds::Clamp(end) => time.clamp(0.0, end),
+            Bounds::Open => time,
+        }
+    }
+}
+
+/// `x` held within `f32` range, NaN as `0` (a node's `speed: 0` × an infinite one).
+fn finite(x: f32) -> f32 {
+    if x.is_nan() {
+        0.0
+    } else {
+        x.clamp(f32::MIN, f32::MAX)
     }
 }
 
@@ -54,9 +101,9 @@ pub struct Playback {
     /// Playhead: clip seconds, or a tree's normalized phase.
     #[serde(default)]
     pub time: f32,
-    /// Loop the current motion: the playhead wraps instead of running past the
-    /// end (where the sampler holds the last frame). Persists across
-    /// `play`/`crossfade`, like `speed` (#313).
+    /// Loop the current motion: the playhead wraps at its end; without it, it is
+    /// clamped to the length (#1362), so reversing moves back at once. Persists
+    /// across `play`/`crossfade`, like `speed` (#313).
     #[serde(default)]
     pub loop_clip: bool,
     /// The clip being faded *out* during a crossfade. `None` outside one.
@@ -68,6 +115,9 @@ pub struct Playback {
     /// Playhead of the outgoing motion; it keeps running, never wraps.
     #[serde(default)]
     pub previous_time: f32,
+    /// The outgoing motion's `loop_clip`, so it samples the way it played.
+    #[serde(default)]
+    pub previous_loop: bool,
     /// Seconds elapsed in the active crossfade.
     #[serde(default)]
     pub crossfade_elapsed: f32,
@@ -105,6 +155,7 @@ impl Default for Playback {
             previous_clip: None,
             previous_tree: None,
             previous_time: 0.0,
+            previous_loop: false,
             crossfade_elapsed: 0.0,
             crossfade_duration: 0.0,
             current_node: None,
@@ -151,6 +202,7 @@ impl Playback {
         self.previous_clip = Some(std::mem::take(&mut self.current_clip));
         self.previous_tree = self.current_tree.take();
         self.previous_time = self.time;
+        self.previous_loop = self.loop_clip;
         self.set_current(motion);
         self.time = 0.0;
         self.crossfade_elapsed = 0.0;
@@ -186,12 +238,15 @@ impl Playback {
     }
 
     /// Advance the playheads by `dt` seconds at `speed × node_speed`: the current
-    /// one by `current`, wrapping when looping (a pure `rem_euclid`, so the fixed
-    /// timestep stays deterministic); the outgoing one at `previous_per_second`,
-    /// never wrapping. The crossfade itself runs on unscaled `dt` and, once done,
-    /// drops the outgoing motion. Returns the current playhead's travel this step,
-    /// `(from, to)` before any wrap — what animation events (#459) are crossed
-    /// against.
+    /// one by `current`, within its [`Bounds`] under `loop_clip` — wrapped when
+    /// looping, otherwise clamped to `[0, wrap]` (#1362), so reversing from past an
+    /// end moves back at once; the outgoing one at `previous_per_second`, never
+    /// wrapping. Both stay finite whatever the speed. The crossfade itself runs on
+    /// unscaled `dt` and, once done, drops the outgoing motion. Returns the current
+    /// playhead's travel this step, `(from, to)` before any wrap or clamp — what
+    /// animation events (#459) are crossed against. A clamped playhead already
+    /// resting on the end it is pushed against travels nothing, so a marker there
+    /// fires once per pass, not every step.
     pub fn advance(
         &mut self,
         dt: f32,
@@ -199,21 +254,28 @@ impl Playback {
         current: Playhead,
         previous_per_second: f32,
     ) -> (f32, f32) {
-        let step = dt * speed * self.node_speed;
-        let from = self.time;
-        self.time += step * current.per_second;
-        let to = self.time;
-        if self.loop_clip && current.wrap > 0.0 {
-            self.time = self.time.rem_euclid(current.wrap);
-        }
+        let step = finite(dt * speed * self.node_speed);
+        let bounds = current.bounds(self.loop_clip);
+        let from = finite(match bounds {
+            Bounds::Clamp(end) => self.time.clamp(0.0, end),
+            _ => self.time,
+        });
+        let to = finite(from + finite(step * current.per_second));
+        self.time = bounds.apply(to);
         if self.is_crossfading() {
-            self.previous_time += step * previous_per_second;
+            self.previous_time = finite(self.previous_time + finite(step * previous_per_second));
             self.crossfade_elapsed += dt;
             if self.crossfade_elapsed >= self.crossfade_duration {
                 self.end_crossfade();
             }
         }
-        (from, to)
+        let pinned = matches!(bounds, Bounds::Clamp(end)
+            if (from >= end && to > from) || (from <= 0.0 && to < from));
+        if pinned {
+            (from, from)
+        } else {
+            (from, to)
+        }
     }
 
     fn set_current(&mut self, motion: Motion<'_>) {

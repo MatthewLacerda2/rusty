@@ -52,10 +52,12 @@ impl MotionContext<'_> {
     /// resolve.
     pub fn sample(&self, skin: &SkinData, playback: &Playback, at_start: bool) -> Option<Pose> {
         let time = |t: f32| if at_start { 0.0 } else { t };
-        let mut pose = self.sample_motion(skin, playback.motion(), time(playback.time))?;
-        let outgoing = playback
-            .previous_motion()
-            .and_then(|m| self.sample_motion(skin, m, time(playback.previous_time)));
+        let current = (playback.motion(), playback.loop_clip);
+        let mut pose = self.sample_motion(skin, current, time(playback.time))?;
+        let outgoing = playback.previous_motion().and_then(|m| {
+            let motion = (m, playback.previous_loop);
+            self.sample_motion(skin, motion, time(playback.previous_time))
+        });
         if let Some(from) = outgoing {
             pose.locals = blend_poses(&from.locals, &pose.locals, playback.crossfade_weight());
             for (d, p) in pose.driven.iter_mut().zip(from.driven) {
@@ -72,7 +74,15 @@ impl MotionContext<'_> {
         )
     }
 
-    fn sample_motion(&self, skin: &SkinData, motion: Motion<'_>, time: f32) -> Option<Sampled> {
+    /// One motion's pose at `time`, under its `loop_clip` flag: a tree's phase is
+    /// bounded the way its playhead advances ([`Playhead::bounds`]), so the flag,
+    /// not the graph node's `is_loop`, decides both (#1362).
+    fn sample_motion(
+        &self,
+        skin: &SkinData,
+        (motion, looping): (Motion<'_>, bool),
+        time: f32,
+    ) -> Option<Sampled> {
         let joints = skin.local_bind.len();
         match motion {
             Motion::Clip(name) => {
@@ -84,11 +94,7 @@ impl MotionContext<'_> {
             }
             Motion::Tree(node) => {
                 let node = self.tree_node(node)?;
-                let phase = if node.is_loop {
-                    time.rem_euclid(1.0)
-                } else {
-                    time.clamp(0.0, 1.0)
-                };
+                let phase = Playhead::tree(0.0).bounds(looping).apply(time);
                 let mut blended: Option<Sampled> = None;
                 let mut total = 0.0;
                 for (clip, weight) in self.weighted_children(node) {
@@ -142,10 +148,7 @@ impl MotionContext<'_> {
                         (sum + clip.duration * w, total + w)
                     });
                 let length = if total > 0.0 { sum / total } else { 0.0 };
-                Playhead {
-                    per_second: if length > 0.0 { 1.0 / length } else { 0.0 },
-                    wrap: 1.0,
-                }
+                Playhead::tree(if length > 0.0 { 1.0 / length } else { 0.0 })
             }
         }
     }
