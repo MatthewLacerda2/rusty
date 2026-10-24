@@ -45,7 +45,7 @@ end
 
 function Bot.Update(entity_id, delta_time)
     local enemy = Scene.FindEntityByName(ENEMY)
-    if enemy == nil or enemy == 0 then
+    if enemy == nil then
         return
     end
 

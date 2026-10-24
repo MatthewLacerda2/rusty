@@ -30,7 +30,7 @@ function Soldier.Update(id, dt)
         s.repath = math.random(90, 180)
     end
     local player = Scene.FindEntityByName("Player")
-    if player == nil or player == 0 then
+    if player == nil then
         return
     end
     local x, y, z = Transform.GetPosition(id)
