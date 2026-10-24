@@ -85,6 +85,12 @@ fn hits_respect_the_ray_s_reach() {
     assert!(rays.closest(origin, down, 1e-4, 2.5).is_none());
     assert!(!rays.occluded(origin, down, 1e-4, 2.5));
     assert!(rays.occluded(origin, down, 1e-4, 3.5));
+    // The reach ends before `t_max`: the quad at exactly t = 3 is out of it for
+    // both queries, and in it just past.
+    assert!(rays.closest(origin, down, 0.0, 3.0).is_none());
+    assert!(!rays.occluded(origin, down, 0.0, 3.0));
+    assert!(rays.closest(origin, down, 0.0, 3.01).is_some());
+    assert!(rays.occluded(origin, down, 0.0, 3.01));
     // A ray that misses everything.
     assert!(!rays.occluded(Vec3::new(5.0, 5.0, 3.0), down, 1e-4, f32::MAX));
 }

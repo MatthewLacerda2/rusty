@@ -60,4 +60,6 @@ mod run_bake_tests;
 #[cfg(test)]
 mod run_tests;
 #[cfg(test)]
+mod sliver_tests;
+#[cfg(test)]
 mod tests;

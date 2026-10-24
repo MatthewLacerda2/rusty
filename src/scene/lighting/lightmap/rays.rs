@@ -1,8 +1,8 @@
 //! The lightmap bake's ray queries (#438, #1330): every static triangle in one
 //! parry `TriMesh`, whose BVH answers the bake's two questions — the nearest
 //! triangle a ray hits, with the barycentrics to shade it, and whether anything
-//! blocks a shadow ray. A hit names its triangle (the intersection's `subshape`);
-//! the barycentrics come back from the hit point and the triangle's corners.
+//! blocks a shadow ray. A hit names its triangle (the BVH leaf it came from)
+//! and its barycentrics, both from parry's own ray–triangle test.
 //!
 //! Deterministic without rapier's `enhanced-determinism`: the mesh's BVH build is a
 //! pure function of the triangles, and the ray path walks it on one thread with
@@ -11,7 +11,8 @@
 
 use glam::Vec3;
 use rapier3d::parry::partitioning::TraversalAction;
-use rapier3d::parry::query::{Ray, RayCast};
+use rapier3d::parry::query::details::local_ray_intersection_with_triangle;
+use rapier3d::parry::query::Ray;
 use rapier3d::parry::shape::TriMesh;
 
 /// One triangle: a corner and the two edges from it, plus where it came from.
@@ -41,19 +42,6 @@ impl Tri {
     pub(super) fn normal(&self) -> Vec3 {
         self.e1.cross(self.e2)
     }
-
-    /// The barycentrics `(u, v)` of `b` and `c` at `point`, on the triangle's plane.
-    fn barycentrics(&self, point: Vec3) -> (f32, f32) {
-        let p = point - self.a;
-        let (d11, d12, d22) = (
-            self.e1.dot(self.e1),
-            self.e1.dot(self.e2),
-            self.e2.dot(self.e2),
-        );
-        let (p1, p2) = (p.dot(self.e1), p.dot(self.e2));
-        let inv = 1.0 / (d11 * d22 - d12 * d12);
-        ((d22 * p1 - d12 * p2) * inv, (d11 * p2 - d12 * p1) * inv)
-    }
 }
 
 /// The nearest hit along a ray: the triangle, and the barycentrics of `b` and `c`.
@@ -73,6 +61,9 @@ pub(super) struct Rays {
 
 impl Rays {
     pub(super) fn build(tris: Vec<Tri>) -> Self {
+        if tris.is_empty() {
+            return Rays { tris, mesh: None };
+        }
         let vertices = tris
             .iter()
             .flat_map(|t| [t.a, t.a + t.e1, t.a + t.e2])
@@ -80,23 +71,32 @@ impl Rays {
         let indices = (0..tris.len() as u32)
             .map(|i| [3 * i, 3 * i + 1, 3 * i + 2])
             .collect();
-        let mesh = TriMesh::new(vertices, indices).ok();
-        Rays { tris, mesh }
+        // Only an empty index list is refused, and that case returned above: any
+        // other error is a parry change that must fail loudly, not bake unshadowed.
+        let mesh = TriMesh::new(vertices, indices).expect("a non-empty triangle soup");
+        Rays {
+            tris,
+            mesh: Some(mesh),
+        }
     }
 
-    /// The nearest hit along `origin + t * dir` with `t` in `(t_min, t_max]`.
+    /// The nearest hit along `origin + t * dir` with `t` in `[t_min, t_max)`.
     pub(super) fn closest(&self, origin: Vec3, dir: Vec3, t_min: f32, t_max: f32) -> Option<Hit> {
+        let mesh = self.mesh.as_ref()?;
         let ray = Ray::new(origin + dir * t_min, dir);
-        let hit = self
-            .mesh
-            .as_ref()?
-            .cast_local_ray_and_get_normal(&ray, t_max - t_min, false)?;
-        let tri = hit.subshape as usize;
-        let (u, v) = self.tris[tri].barycentrics(ray.point_at(hit.time_of_impact));
-        Some(Hit { tri, u, v })
+        let (tri, (_, weights)) = mesh.bvh().find_best(
+            t_max - t_min,
+            |node, best| node.cast_ray(&ray, best),
+            |i, best| hit(mesh, i, &ray, best),
+        )?;
+        Some(Hit {
+            tri: tri as usize,
+            u: weights.y,
+            v: weights.z,
+        })
     }
 
-    /// Whether anything blocks `origin + t * dir` for `t` in `(t_min, t_max]`. Stops
+    /// Whether anything blocks `origin + t * dir` for `t` in `[t_min, t_max)`. Stops
     /// at the first blocker rather than looking for the nearest.
     pub(super) fn occluded(&self, origin: Vec3, dir: Vec3, t_min: f32, t_max: f32) -> bool {
         let Some(mesh) = &self.mesh else {
@@ -110,7 +110,7 @@ impl Rays {
                 return TraversalAction::Prune;
             }
             if let Some(i) = node.leaf_data() {
-                if mesh.triangle(i).intersects_local_ray(&ray, reach) {
+                if hit(mesh, i, &ray, reach).is_some() {
                     blocked = true;
                     return TraversalAction::EarlyExit;
                 }
@@ -119,4 +119,13 @@ impl Rays {
         });
         blocked
     }
+}
+
+/// Where `ray` meets the mesh's triangle `i` short of `reach`, from either side: the
+/// time of impact and the barycentric weights of its corners. parry solves both from
+/// the ray, so a sliver triangle still gives finite weights at the point it was hit.
+fn hit(mesh: &TriMesh, i: u32, ray: &Ray, reach: f32) -> Option<(f32, Vec3)> {
+    let t = mesh.triangle(i);
+    let (inter, weights) = local_ray_intersection_with_triangle(t.a, t.b, t.c, ray)?;
+    (inter.time_of_impact < reach).then_some((inter.time_of_impact, weights))
 }

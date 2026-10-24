@@ -12,7 +12,7 @@ use crate::components::mesh::Vertex;
 use crate::components::{MaterialComponent, MeshComponent};
 
 /// The mean brightness of `map`'s columns left of its middle, then right of it.
-fn halves(map: &Lightmap) -> (f32, f32) {
+pub(super) fn halves(map: &Lightmap) -> (f32, f32) {
     let size = map.size as usize;
     let half = |right: bool| {
         let texels = map.texels.iter().enumerate();
