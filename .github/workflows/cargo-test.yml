@@ -1,6 +1,7 @@
 name: cargo-test
-# Plain `cargo test` on `main`, weekly (#981). A signal, never a gate (CLAUDE.md,
-# *Gates vs. signals*): nextest is the gate. docs/testing.md promises the suite
+# Plain `cargo test` on `main`, weekly (#981), on the default feature set. A signal,
+# never a gate (CLAUDE.md, *Gates vs. signals*): the gate is nextest plus a plain
+# `cargo test` of the `dev` set (`make test`, #1338). docs/testing.md promises the suite
 # is runner-independent: nextest gives each test its own process, but
 # `cargo test` runs a whole binary in one, so a test that leans on having its
 # process to itself (`set_var`, `set_current_dir`, a shared scratch path) passes

@@ -176,13 +176,15 @@ doc: ## [gate] Rustdoc with warnings denied, both feature sets
 # such a leak broke the mutation baseline of every branch until a mutation run failed
 # (#1042, #1069, #1337). The `dev` feature set, as the mutation runs build; the build
 # is the one nextest just made. `NEXTEST=1` keeps the guarantee that a test never
-# holds a provider key (`dev::providers::credentials`, #974).
+# holds a provider key (`dev::providers::credentials`, #974). `--quiet`, since its
+# ~1,800 pass lines are output every agent pays for; `--no-fail-fast` runs every
+# binary so libtest's `failures:` list names every leak, not only the first binary's.
 test: ## [gate] Engine tests (nextest, then one process per binary) and doctests
 	@command -v cargo-nextest >/dev/null 2>&1 || { \
 		echo "test: cargo-nextest is not installed — cargo install --locked cargo-nextest"; exit 1; }
 	$(TEST)
 	$(TEST) --features dev
-	NEXTEST=1 cargo test --locked --features dev --tests
+	NEXTEST=1 cargo test --locked --features dev --tests --no-fail-fast --quiet
 	cargo test --doc --locked
 	cargo test --doc --locked --features dev
 
