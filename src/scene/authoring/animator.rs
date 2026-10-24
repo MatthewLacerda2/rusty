@@ -8,9 +8,10 @@
 //! `Animator.*` surface is mostly *operations* over the component's own state machine
 //! (`Play` / `Crossfade` call `AnimatorComponent::play`/`crossfade`), which are not
 //! field writes; the plain field writes — `Animator.Stop` (`is_playing = false`),
-//! `Animator.Pause`/`Resume` (`freeze`, #313) and `Animator.SetLooping`
-//! (`loop_clip`, #313) — route through [`set_playing`] / [`set_freeze`] /
-//! [`set_looping`] here, so the card's toggles and the bindings share each write.
+//! `Animator.Pause`/`Resume` (`freeze`, #313), `Animator.SetLooping`
+//! (`loop_clip`, #313) and `Animator.SetSpeed` (`speed`, #1342) — route through
+//! [`set_playing`] / [`set_freeze`] / [`set_looping`] / [`set_speed`] here, so
+//! the card's widgets and the bindings share each write.
 //!
 //! Pure.
 
