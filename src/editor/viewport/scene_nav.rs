@@ -9,16 +9,39 @@
 //! | RMB held | look; with WASD fly, Q/E down/up, Shift faster, scroll = fly speed |
 //! | MMB drag | pan |
 //! | Alt + LMB drag | orbit around the pivot |
-//! | Alt + RMB drag, or scroll | zoom toward the pivot |
+//! | Alt + RMB drag, mouse wheel, or pinch | zoom toward the pivot |
+//! | two-finger trackpad scroll | look (Shift: pan), [`scroll`] (#1344) |
+//! | arrow keys (viewport hovered) | look |
 //! | F (viewport hovered) | frame the selection |
+//!
+//! WASD/QE fly only while RMB is held, as in Unity, which keeps them free for tool
+//! hotkeys. [`BINDINGS`] is this table as the viewport's help hint shows it.
 //!
 //! A gesture only starts with the button pressed on the viewport, so a drag that
 //! began on a panel never turns the camera. Plain LMB stays the gizmo/pick/rect tool.
 
 use glam::{Vec2, Vec3};
 
-use super::scene_camera::{SceneCamera, POINTS_PER_STEP};
+use super::scene_camera::{SceneCamera, POINTS_PER_STEP, ZOOM_PER_STEP};
 use crate::scene::Scene;
+
+pub mod scroll;
+
+/// Points of look the arrow keys turn per second (90 degrees).
+pub const ARROW_POINTS_PER_SECOND: f32 = 360.0;
+
+/// The navigation bindings, (input, gesture), for the viewport's help hint.
+pub const BINDINGS: &[(&str, &str)] = &[
+    ("RMB drag", "look"),
+    ("RMB + WASD / Q E", "fly (Shift faster, scroll = speed)"),
+    ("Two-finger scroll", "look"),
+    ("Shift + two-finger scroll", "pan"),
+    ("Arrow keys", "look"),
+    ("MMB drag", "pan"),
+    ("Alt + LMB drag", "orbit"),
+    ("Mouse wheel, pinch, Alt + RMB drag", "zoom"),
+    ("F", "frame the selection"),
+];
 
 /// The Scene view's navigation state, kept on the editor across frames.
 #[derive(Clone, Copy, Debug, Default)]
@@ -73,8 +96,16 @@ pub struct NavFrame {
     pub motion: Vec2,
     /// Pointer movement in points, for pan to track the cursor exactly.
     pub delta: Vec2,
-    /// Vertical scroll in points while hovered; positive is away from the user.
+    /// Mouse-wheel scroll in points while hovered; positive is away from the user.
     pub scroll: f32,
+    /// Two-finger trackpad scroll in points while hovered (look).
+    pub swipe: Vec2,
+    /// Shift + two-finger trackpad scroll in points while hovered (pan).
+    pub swipe_pan: Vec2,
+    /// Zoom steps from a pinch this frame, [`pinch_steps`].
+    pub pinch: f32,
+    /// Arrow-key look axes (right, down), each in -1..=1.
+    pub turn: Vec2,
     /// Fly axes (right, up, forward) from WASD/QE, each in -1..=1.
     pub fly: Vec3,
     /// Shift held.
@@ -86,14 +117,15 @@ pub struct NavFrame {
 }
 
 /// Apply one frame of navigation to the camera. Scroll zooms, except while looking,
-/// where it changes the fly speed (Unity's behaviour).
+/// where it changes the fly speed (Unity's behaviour); a trackpad swipe looks or pans.
 pub fn apply(camera: &mut SceneCamera, f: &NavFrame) {
     let steps = f.scroll / POINTS_PER_STEP;
+    let turn = f.turn * ARROW_POINTS_PER_SECOND * f.dt;
     match f.gesture {
         Some(Gesture::Look) => {
-            camera.look(f.motion);
+            look(camera, f.motion + turn);
             camera.fly(f.fly, f.fast, f.dt);
-            camera.adjust_fly_speed(steps);
+            camera.adjust_fly_speed(steps + f.swipe.y / POINTS_PER_STEP);
             return;
         }
         Some(Gesture::Orbit) => camera.orbit(f.motion),
@@ -102,7 +134,28 @@ pub fn apply(camera: &mut SceneCamera, f: &NavFrame) {
         Some(Gesture::Zoom) => camera.zoom((f.motion.x - f.motion.y) / POINTS_PER_STEP),
         None => {}
     }
-    camera.zoom(steps);
+    camera.zoom(steps + f.pinch);
+    look(camera, f.swipe + turn);
+    if f.swipe_pan != Vec2::ZERO {
+        camera.pan(f.swipe_pan, f.viewport_height);
+    }
+}
+
+/// Look by `delta` points, skipping a still frame so the pivot never drifts.
+fn look(camera: &mut SceneCamera, delta: Vec2) {
+    if delta != Vec2::ZERO {
+        camera.look(delta);
+    }
+}
+
+/// The zoom steps a pinch of `factor` (egui's `zoom_delta`, > 1 spreads) is worth:
+/// spreading to twice the size halves the distance to the pivot.
+pub fn pinch_steps(factor: f32) -> f32 {
+    if factor > 0.0 {
+        factor.ln() / -(1.0 - ZOOM_PER_STEP).ln()
+    } else {
+        0.0
+    }
 }
 
 /// The world-space sphere (center, radius) that frames entity `id`: the union of the
@@ -134,6 +187,9 @@ pub fn selection_bounds(scene: &Scene, id: u32) -> Option<(Vec3, f32)> {
 /// whether a button was pressed on the image and is still down.
 pub fn read(response: &egui::Response, held: bool) -> NavFrame {
     let viewport_height = response.rect.height();
+    let line_points = response.ctx.options(|o| o.input_options.line_scroll_speed);
+    let hovered = response.hovered() || held;
+    let keys = hovered && !response.ctx.text_edit_focused();
     response.ctx.input(|i| {
         let buttons = Buttons {
             primary: i.pointer.primary_down(),
@@ -146,14 +202,30 @@ pub fn read(response: &egui::Response, held: bool) -> NavFrame {
             f32::from(u8::from(i.key_down(pos))) - f32::from(u8::from(i.key_down(neg)))
         };
         use egui::Key;
+        let wheel = if hovered {
+            scroll::split(&i.events, line_points, viewport_height)
+        } else {
+            scroll::Scroll::default()
+        };
         NavFrame {
             gesture,
             motion: to_vec2(i.pointer.motion().unwrap_or_else(|| i.pointer.delta())),
             delta: to_vec2(i.pointer.delta()),
-            scroll: if response.hovered() || held {
-                i.smooth_scroll_delta.y
+            scroll: wheel.wheel,
+            swipe: wheel.swipe,
+            swipe_pan: wheel.swipe_pan,
+            pinch: if hovered {
+                pinch_steps(i.zoom_delta())
             } else {
                 0.0
+            },
+            turn: if keys {
+                Vec2::new(
+                    axis(Key::ArrowRight, Key::ArrowLeft),
+                    axis(Key::ArrowDown, Key::ArrowUp),
+                )
+            } else {
+                Vec2::ZERO
             },
             fly: Vec3::new(
                 axis(Key::D, Key::A),
@@ -174,3 +246,7 @@ fn to_vec2(v: egui::Vec2) -> Vec2 {
 #[cfg(test)]
 #[path = "scene_nav_tests.rs"]
 mod scene_nav_tests;
+
+#[cfg(test)]
+#[path = "scene_nav/trackpad_tests.rs"]
+mod trackpad_tests;

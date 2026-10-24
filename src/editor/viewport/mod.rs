@@ -104,7 +104,7 @@ pub fn draw(
 }
 
 /// The tab strip: Scene / Game selectors (Unity's viewport tabs), and on the Scene
-/// tab the UI overlay toggle.
+/// tab the UI overlay toggle and the navigation help.
 fn draw_tab_strip(
     ui: &mut egui::Ui,
     tab: &mut ViewportTab,
@@ -131,9 +131,23 @@ fn draw_tab_strip(
                     ui.toggle_value(overlay, "UI").on_hover_text(
                         "Draw the screen-space canvases and edit them with the rect tool",
                     );
+                    ui.label(egui::RichText::new(icon::QUESTION).color(t.text_secondary))
+                        .on_hover_ui(navigation_help);
                 }
             });
         });
+}
+
+/// The Scene view's navigation bindings (#1344), the tooltip of the tab strip's `?`.
+fn navigation_help(ui: &mut egui::Ui) {
+    ui.strong("Scene view navigation");
+    egui::Grid::new("scene_nav_help").show(ui, |ui| {
+        for (input, gesture) in scene_nav::BINDINGS {
+            ui.label(*input);
+            ui.label(*gesture);
+            ui.end_row();
+        }
+    });
 }
 
 /// Draw the scene image filling the remaining space, sensing clicks + drags. Before
