@@ -128,7 +128,7 @@ pub struct ApiScopedCtx<'scope> {
     /// platform layer so a `Video.*` write reaches the surface + window.
     pub video: &'scope RefCell<VideoSettings>,
     /// The current scene file — `Scene.Save()`'s no-path write-back target. Shared
-    /// with the platform layer (synced from `EditorUi.current_scene_path`).
+    /// with the platform layer (the editor's current scene file is this cell, #1366).
     pub scene_path: &'scope RefCell<Option<String>>,
     /// The audio engine singleton (#212): the `Audio` namespace drives it
     /// (Play/Stop/SetVolume/PlayAt + master volume). The same maestro the play-mode

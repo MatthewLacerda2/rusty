@@ -19,12 +19,14 @@
 //!   picks the console line: info, or a warning that edits were discarded.
 //! - **A half-written file is retried.** A read or parse failure keeps the path
 //!   pending, so the next frame reads it again, until it loads or a newer note comes.
+//!   The file is parsed before anything else, and text that already failed is not
+//!   parsed again, so a broken file left on disk costs one read a frame (#1374).
 //! - **Held through Play**, like every watch note: the log is read only in edit
 //!   mode, so a change seen in Play applies after Stop, against the restored scene.
 
 use crate::app::GameWorld;
 use crate::core::fs::written::{written_since, Stale};
-use crate::scene::Scene;
+use crate::scene::{load_parsed, parse_scene_text, Scene};
 use crate::scripting::ConsoleLogs;
 use crate::shell::editor::EditorFrontend;
 
@@ -34,8 +36,9 @@ pub struct SceneFollow {
     seen: u64,
     /// The scene file noted changed and not yet read whole.
     pending: Option<String>,
-    /// Whether the pending file's failure to load was already logged.
-    warned: bool,
+    /// The pending file's text that last failed to load, so the same bytes are not
+    /// parsed again every frame (#1374); `Some` also means the failure was logged.
+    failed: Option<String>,
 }
 
 impl SceneFollow {
@@ -44,7 +47,7 @@ impl SceneFollow {
         Self {
             seen: written_since(u64::MAX).0,
             pending: None,
-            warned: false,
+            failed: None,
         }
     }
 
@@ -69,7 +72,7 @@ impl SceneFollow {
         };
         if Stale::new(written).matches(path) {
             self.pending = Some(path.to_string());
-            self.warned = false;
+            self.failed = None;
         }
         if self.pending.as_deref() != Some(path) {
             return false;
@@ -81,17 +84,29 @@ impl SceneFollow {
             self.pending = None;
             return false;
         }
-        let unsaved = scene.has_unsaved_edits(path);
-        let keep = selected.and_then(|id| name_path(scene, id));
-        if let Err(err) = scene.load_from_file(path) {
-            if !std::mem::replace(&mut self.warned, true) {
-                console.warn(format!(
-                    "Scene {path} changed on disk but did not load: {err}"
-                ));
-            }
-            return false;
+        if self.failed.as_deref() == Some(on_disk.as_str()) {
+            return false; // the same bytes failed last frame: wait for new ones
         }
+        // Parse first: the live scene is serialised (for `unsaved`) only once the
+        // file is known to load, so a broken Dust2-sized file costs one parse.
+        let loaded = parse_scene_text(&on_disk, path).and_then(|data| {
+            let unsaved = scene.has_unsaved_edits(path);
+            let keep = selected.and_then(|id| name_path(scene, id));
+            load_parsed(scene, path, on_disk.clone(), data).map(|()| (unsaved, keep))
+        });
+        let (unsaved, keep) = match loaded {
+            Ok(done) => done,
+            Err(err) => {
+                if self.failed.replace(on_disk).is_none() {
+                    console.warn(format!(
+                        "Scene {path} changed on disk but did not load: {err}"
+                    ));
+                }
+                return false;
+            }
+        };
         self.pending = None;
+        self.failed = None;
         *selected = keep.and_then(|names| find_by_name_path(scene, &names));
         if unsaved {
             console.warn(format!(
@@ -111,11 +126,13 @@ impl EditorFrontend {
         let ui = &mut self.editor_ui;
         let mut scene = game.world.scene.borrow_mut();
         let mut console = game.resources.console.borrow_mut();
-        let path = ui.current_scene_path.as_deref();
-        if self
-            .follow
-            .apply(&mut scene, path, &mut ui.selected_entity_id, &mut console)
-        {
+        let path = ui.current_scene_path();
+        if self.follow.apply(
+            &mut scene,
+            path.as_deref(),
+            &mut ui.selected_entity_id,
+            &mut console,
+        ) {
             ui.is_dirty = true;
             self.scene_id = Some(scene.id());
         }

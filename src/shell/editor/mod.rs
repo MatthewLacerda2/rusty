@@ -85,7 +85,8 @@ impl EditorFrontend {
             paint::EGUI_RENDERER,
         );
         let mut editor_ui = EditorUi::new();
-        editor_ui.current_scene_path = Some(scene_path);
+        editor_ui.share_scene_path(game.script_manager().scene_path_cell());
+        editor_ui.set_current_scene_path(Some(scene_path));
         editor_ui.quality_preset = *game.script_manager().quality_cell().borrow();
         Self {
             egui_ctx,
@@ -139,7 +140,6 @@ impl EditorFrontend {
         }
         self.sync_quality(shell, game);
         self.sync_speaker_mode(game);
-        self.sync_scene_path(game);
         interaction
     }
 
@@ -178,19 +178,6 @@ impl EditorFrontend {
             self.editor_ui.selected_entity_id = None;
         }
         self.scene_id = Some(id);
-    }
-
-    /// Keep the script-side `Scene.Save()` write-back target in lockstep with the
-    /// editor's current scene file. A scripted Save-with-path (Save As) or
-    /// `Scene.Load` (#432) updates the cell; reflect that back into the editor so
-    /// both agree on the file.
-    fn sync_scene_path(&mut self, game: &GameWorld) {
-        let path_cell = game.script_manager().scene_path_cell();
-        let scripted_path = path_cell.borrow().clone();
-        if scripted_path.is_some() && scripted_path != self.editor_ui.current_scene_path {
-            self.editor_ui.current_scene_path = scripted_path;
-        }
-        *path_cell.borrow_mut() = self.editor_ui.current_scene_path.clone();
     }
 }
 

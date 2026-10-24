@@ -13,7 +13,7 @@
 
 use std::cell::RefCell;
 
-use super::read_scene_text;
+use super::parse_scene_text;
 use crate::scene::Scene;
 
 /// The last `(path, text)` the engine read or wrote for this scene.
@@ -32,6 +32,10 @@ impl DiskText {
         last.as_ref().is_some_and(|(p, t)| p == path && t == text)
     }
 
+    fn forget(&self) {
+        *self.0.borrow_mut() = None;
+    }
+
     fn text(&self, path: &str) -> Option<String> {
         let last = self.0.borrow();
         last.as_ref()
@@ -47,6 +51,18 @@ impl Scene {
         self.disk_text.is(path, text)
     }
 
+    /// The World was rebuilt to stand for `path` without reading it (Reset Scene,
+    /// #1374): record the file's text when it holds exactly the live scene, so a
+    /// `touch` or rescan of it is no change; otherwise forget any record, so an
+    /// outside change reloads and says the rebuilt scene was unsaved.
+    pub fn adopt_disk_text(&self, path: &str) {
+        let live = super::scene_json(self).ok();
+        match std::fs::read_to_string(path) {
+            Ok(disk) if live.as_deref() == Some(disk.as_str()) => self.disk_text.record(path, disk),
+            _ => self.disk_text.forget(),
+        }
+    }
+
     /// Whether the live scene has edits the document last read or written at `path`
     /// lacks. Computed, never a flag: both sides are read as a `SceneData` and
     /// compared without the selection, which the editor copies into the scene every
@@ -57,7 +73,7 @@ impl Scene {
         };
         let live = super::scene_json(self);
         let canon = |text: &str| {
-            let mut data = read_scene_text(text, path).ok()?;
+            let mut data = parse_scene_text(text, path).ok()?;
             data.selected_entity_id = None;
             serde_json::to_string(&data).ok()
         };

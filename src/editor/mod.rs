@@ -16,9 +16,13 @@ mod hierarchy_tree;
 pub mod inspector;
 mod menu_create;
 pub mod project_picker;
+mod scene_path;
 pub mod theme;
 pub mod viewport;
 pub mod widgets;
+
+use std::cell::RefCell;
+use std::rc::Rc;
 
 use crate::navigation::NavigationGraph;
 use crate::scene::Scene;
@@ -42,9 +46,12 @@ pub enum InspectorTarget {
 pub struct EditorUi {
     pub selected_entity_id: Option<u32>,
     pub selected_asset_path: Option<String>,
-    /// The scene file the editor is currently editing. Save writes back HERE;
-    /// double-clicking a `.scene` in the assets browser loads it and sets this.
-    pub current_scene_path: Option<String>,
+    /// The scene file the editor is currently editing: Save writes back here. One
+    /// value with `Scene.Save()`'s write-back target (#1366): the shell hands the
+    /// editor the script runtime's own cell ([`EditorUi::share_scene_path`]), so
+    /// File ▸ Open/New, saving to a scene asset, `Scene.Load` and `Scene.Save(path)`
+    /// all change it, and nothing reconciles two copies.
+    scene_path: Rc<RefCell<Option<String>>>,
     pub current_dir: String,
     pub is_dirty: bool,
 
@@ -144,7 +151,7 @@ impl EditorUi {
         Self {
             selected_entity_id: None,
             selected_asset_path: None,
-            current_scene_path: None,
+            scene_path: Default::default(),
             current_dir: crate::editor::content_browser::ROOT.to_string(),
             is_dirty: true,
 

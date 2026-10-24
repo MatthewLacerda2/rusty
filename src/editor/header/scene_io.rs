@@ -31,7 +31,7 @@ impl EditorUi {
         }
         match scene.load_from_file(path) {
             Ok(_) => {
-                self.current_scene_path = Some(path.to_string());
+                self.set_current_scene_path(Some(path.to_string()));
                 self.selected_entity_id = None;
                 self.selected_asset_path = None;
                 self.is_dirty = true;
@@ -45,7 +45,7 @@ impl EditorUi {
     pub(crate) fn save_scene_to(&mut self, scene: &Scene, console: &mut ConsoleLogs, path: &str) {
         match scene.save_to_file(path) {
             Ok(_) => {
-                self.current_scene_path = Some(path.to_string());
+                self.set_current_scene_path(Some(path.to_string()));
                 console.info(format!("Scene saved to {path}"));
             }
             Err(err) => console.error(format!("Failed to save scene: {err}")),
@@ -57,8 +57,7 @@ impl EditorUi {
 /// falling back to the seeded default scene.
 fn current_path(editor: &EditorUi) -> String {
     editor
-        .current_scene_path
-        .clone()
+        .current_scene_path()
         .unwrap_or_else(|| crate::scene::DEFAULT_SCENE_PATH.to_string())
 }
 
@@ -101,7 +100,7 @@ pub(super) fn new_scene(
         return;
     }
     scene.clear();
-    editor.current_scene_path = None;
+    editor.set_current_scene_path(None);
     editor.selected_entity_id = None;
     editor.selected_asset_path = None;
     editor.is_dirty = true;
@@ -120,7 +119,8 @@ pub(super) fn reset_scene(
         return;
     }
     let path = crate::scene::build_default_scene(scene);
-    editor.current_scene_path = Some(path);
+    scene.adopt_disk_text(&path);
+    editor.set_current_scene_path(Some(path));
     editor.selected_entity_id = None;
     editor.selected_asset_path = None;
     editor.is_dirty = true;
@@ -130,3 +130,7 @@ pub(super) fn reset_scene(
 #[cfg(test)]
 #[path = "scene_io_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "scene_path_tests.rs"]
+mod scene_path_tests;

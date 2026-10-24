@@ -4,7 +4,8 @@
 //! REPLACES the current World (no multi-scene).
 //!
 //! Editor integration:
-//!   - `EditorUi.current_scene_path: Option<String>` — Save writes back HERE
+//!   - the current scene file (`EditorUi::current_scene_path`, one value with the
+//!     script runtime's `Scene.Save()` target, #1366) — Save writes back HERE
 //!     (not a hardcoded demo path); Load (incl. double-click in the assets
 //!     browser) sets it.
 //!   - one standardised scene extension (`.scene`, JSON inside).
@@ -40,8 +41,8 @@ pub const SCENE_EXTENSION: &str = "scene";
 ///
 /// Refused during Play, as Unity refuses it: the live World then holds the play
 /// state (moved enemies, spawned bullets), never the authored scene (#1340). The
-/// scene file has two writers, and both refuse: this one (the editor's File menu and
-/// Ctrl+S, `Scene.Save`) and [`save_lighting`] (Generate Lighting, `Lighting.Generate`).
+/// scene file has two writers, and both refuse: this one (the editor's File menu,
+/// `Scene.Save`) and [`save_lighting`] (Generate Lighting, `Lighting.Generate`).
 pub fn save_to_file(scene: &Scene, path: &str) -> Result<(), String> {
     if scene.is_playing() {
         return Err(SAVE_IN_PLAY.to_string());
@@ -82,20 +83,33 @@ pub(crate) fn scene_json(scene: &Scene) -> Result<String, String> {
 /// A load is a new scene, so it earns a new runtime identity (#355).
 pub fn load_from_file(scene: &mut Scene, path: &str) -> Result<(), String> {
     let json = read_text(path)?;
-    let data = read_scene_text(&json, path)?;
+    let data = parse_scene_text(&json, path)?;
+    load_parsed(scene, path, json, data)
+}
+
+/// The second half of [`load_from_file`], for a caller that already read and parsed
+/// the file (the editor's follow, which must know the text parses before it looks
+/// at the live scene, #1374): replace the World with `data`, parsed from `json`.
+pub fn load_parsed(
+    scene: &mut Scene,
+    path: &str,
+    json: String,
+    data: SceneData,
+) -> Result<(), String> {
     apply_scene_data(scene, data);
     scene.renew_id();
-    scene.disk_text.record(path, json);
     // Merge the baked SH back onto the just-loaded probe positions (#240). A missing
     // sidecar is fine — probes load with zero SH (positions placed, never baked).
     crate::scene::lighting::io::load_lighting_sidecar(scene, path)?;
+    // Recorded last: a load that errored is not "what the engine read" (#1374).
+    scene.disk_text.record(path, json);
     Ok(())
 }
 
 /// Read and parse the scene document at `path` without touching any live scene — so
 /// a caller can fail cleanly before tearing the current one down (#432).
 pub fn read_scene_file(path: &str) -> Result<SceneData, String> {
-    read_scene_text(&read_text(path)?, path)
+    parse_scene_text(&read_text(path)?, path)
 }
 
 fn read_text(path: &str) -> Result<String, String> {
@@ -103,7 +117,7 @@ fn read_text(path: &str) -> Result<String, String> {
 }
 
 /// Parse `json`, the scene document read from `path` (named in the error).
-fn read_scene_text(json: &str, path: &str) -> Result<SceneData, String> {
+pub fn parse_scene_text(json: &str, path: &str) -> Result<SceneData, String> {
     serde_json::from_str(json).map_err(|e| format!("Failed to deserialize scene {}: {}", path, e))
 }
 

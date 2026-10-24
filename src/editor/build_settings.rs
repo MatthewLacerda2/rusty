@@ -23,7 +23,7 @@ pub fn draw(
         editor.build_settings_draft = None;
         return;
     }
-    let current_scene = editor.current_scene_path.clone();
+    let current_scene = editor.current_scene_path();
     let draft = editor
         .build_settings_draft
         .get_or_insert_with(|| app.build().clone());

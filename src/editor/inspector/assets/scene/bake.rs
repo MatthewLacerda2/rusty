@@ -22,18 +22,22 @@ use crate::dev::lightmap_bake::{BakeOutcome, LightmapBakeJob};
 use crate::editor::EditorUi;
 use crate::navigation::NavigationGraph;
 use crate::scene::lighting::lightmap::BakeSettings;
-use crate::scene::{LightingSave, Scene};
+use crate::scene::{LightingSave, Scene, SceneId};
 use crate::scripting::ConsoleLogs;
 
 /// How often the editor repaints while a bake runs, so the bar moves on its own.
 const PROGRESS_REPAINT: Duration = Duration::from_millis(100);
 
-/// A background Generate Lighting and the scene it belongs to: the editor's open
-/// scene file when it started. A result for a scene that has since been swapped out
-/// is dropped, because its entity ids no longer mean the same meshes.
+/// A background Generate Lighting and the scene it belongs to: the scene's runtime
+/// identity and the editor's open scene file when it started. A result for a scene
+/// that has since been replaced (File ▸ Open/New, or the follow reloading the file
+/// after an outside edit, #1374) or saved elsewhere is dropped: its entity ids no
+/// longer mean the same meshes, and its lighting would be written into a file as if
+/// it were current.
 pub struct ActiveBake {
     job: LightmapBakeJob,
-    scene: Option<String>,
+    scene: SceneId,
+    path: Option<String>,
 }
 
 pub fn draw(
@@ -47,11 +51,12 @@ pub fn draw(
     let idle = editor.dev.lightmap_bake.is_none();
     let button = egui::Button::new(format!("{}  Generate Lighting", icon::LIGHTBULB))
         .min_size(egui::Vec2::new(160.0, 24.0));
-    // It writes the scene file, so Play greys it out as it does Save (#1340).
+    // The inspector is drawn only in edit mode, so Play never reaches this button;
+    // `finish` still refuses in Play for the script verb (#1340).
     let generate = ui
-        .add_enabled(idle && !scene.is_playing(), button)
+        .add_enabled(idle, button)
         .on_hover_text("Bake lightmaps, then light & reflection probes, and save the result")
-        .on_disabled_hover_text("Stop Play first, or wait for the bake");
+        .on_disabled_hover_text("Wait for the running bake");
     let changed = ui
         .add_enabled_ui(idle, |ui| {
             draw_settings(ui, &mut scene.lighting_settings.lightmaps)
@@ -107,8 +112,11 @@ fn start(editor: &mut EditorUi, scene: &mut Scene, console: &mut ConsoleLogs, pa
     match LightmapBakeJob::start(scene, Some(path), settings) {
         Ok(job) => {
             console.info("Generating lighting in the background…".into());
-            let scene = editor.current_scene_path.clone();
-            editor.dev.lightmap_bake = Some(ActiveBake { job, scene });
+            editor.dev.lightmap_bake = Some(ActiveBake {
+                job,
+                scene: scene.id(),
+                path: editor.current_scene_path(),
+            });
         }
         Err(e) => console.error(format!("Generate Lighting failed: {e}")),
     }
@@ -146,10 +154,11 @@ pub fn poll(
     log: &mut ConsoleLogs,
     nav: &NavigationGraph,
 ) {
+    let open = editor.current_scene_path();
     let Some(active) = &mut editor.dev.lightmap_bake else {
         return;
     };
-    if active.scene != editor.current_scene_path {
+    if active.scene != scene.id() || active.path != open {
         // Its result would land on another scene's entities: drop it (dropping the
         // job stops the worker) rather than apply it.
         editor.dev.lightmap_bake = None;

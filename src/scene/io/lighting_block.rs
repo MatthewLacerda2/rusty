@@ -15,7 +15,7 @@
 
 use serde_json::Value;
 
-use super::read_scene_file;
+use super::parse_scene_text;
 use crate::scene::serialize::SceneData;
 use crate::scene::Scene;
 
@@ -36,16 +36,21 @@ pub fn save_lighting(scene: &Scene, path: &str) -> Result<LightingSave, String> 
     if scene.is_playing() {
         return Err(super::LIGHTING_IN_PLAY.to_string());
     }
-    let original: Value = parse(&std::fs::read_to_string(path).map_err(|e| e.to_string())?)?;
-    let mut data = read_scene_file(path)?;
-    if to_value(&data)? != original {
+    let text = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
+    let mut data = parse_scene_text(&text, path)?;
+    if to_value(&data)? != parse(&text)? {
         return Ok(LightingSave::NeedsSceneSave);
     }
     copy_lighting(scene, &mut data);
     let json = serde_json::to_string_pretty(&data).map_err(|e| e.to_string())?;
     // lint: allow(asset-write) a scene, prefab or lighting document, read whole on load
     std::fs::write(path, &json).map_err(|e| format!("Failed to write scene file: {e}"))?;
-    scene.disk_text.record(path, json);
+    // Only when the file held the engine's own text: an outside edit the follow has
+    // not applied yet stays unrecorded, so the follow reloads it (edit + lighting)
+    // instead of the next Save writing over it (#1374).
+    if scene.is_disk_text(path, &text) {
+        scene.disk_text.record(path, json);
+    }
     crate::scene::lighting::io::save_lighting_sidecar(scene, path)?;
     Ok(LightingSave::Written)
 }

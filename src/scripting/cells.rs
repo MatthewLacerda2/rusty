@@ -42,8 +42,8 @@ impl ScriptManager {
         self.application = application;
     }
 
-    /// Handle to the shared scene-path cell, so the platform layer can read/sync
-    /// the current scene file with the editor's `current_scene_path`.
+    /// Handle to the shared scene-path cell: the editor holds this very cell as its
+    /// current scene file (#1366), so the two never need syncing.
     pub fn scene_path_cell(&self) -> Rc<RefCell<Option<String>>> {
         Rc::clone(&self.scene_path)
     }
