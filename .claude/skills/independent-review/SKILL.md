@@ -153,6 +153,13 @@ Paste every list whose trigger the PR hits.
 The reviewer can be wrong, so the orchestrator checks every finding against the
 code first, then:
 
+0. **Sort them first** (CLAUDE.md, *Issues are for what matters*). A finding is
+   **must-fix** when it is a failure someone will hit on a real path: a wrong
+   result, data loss, a crash, a regression, a doc that now says the wrong thing,
+   a structural or tooling crack. A finding nobody would hit, a hypothetical edge,
+   a test that could be stronger, a style nit: fold it in only when it costs a line,
+   otherwise drop it, and don't file it. A reviewer told to look hard always finds
+   more; most of it is noise for this project.
 1. **Must-fix** findings go back to the coder: a local coder is resumed with
    `SendMessage`; a cloud coder gets a new `Brief` comment listing them and a
    fresh routine (`issue-batch`, *The brief is a comment on the issue*), on the
@@ -160,9 +167,9 @@ code first, then:
    needs a decision no rule settles goes to the user, and the PR goes to draft
    naming it.
 2. **One PR comment, headed `Independent review`**, lists every finding and what
-   became of it: fixed (with the commit), declined (with why), sent to the user,
-   or filed as an issue when it lies outside the branch (*Filing what you notice
-   is a duty*). No findings is said too. It is the record that the review
+   became of it: fixed (with the commit), dropped (in a word), sent to the user,
+   or filed as an issue when it lies outside the branch and passes *Issues are
+   for what matters*. No findings is said too. It is the record that the review
    happened.
    **Before filing a pre-existing finding, class it** (`issue-batch`, *Filing a
    bug*): look for earlier cases of its kind; a case is filed with `Kind: case —

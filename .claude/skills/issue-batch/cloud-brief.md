@@ -9,9 +9,11 @@ work, change it **here**, once, not in the next prompt.
 MCP tools (`issue_read`, `create_pull_request`, `update_pull_request`,
 `add_issue_comment`); load them with ToolSearch.
 
-**A finding is yours to deal with**: fold it in or file it, as CLAUDE.md's
-*Issues, labels & priority* says (the `agent` label; `planning` when it fails the
-approval test).
+**A finding is yours to deal with**: fold it in when it's in your way or costs a
+line; file it only when it passes CLAUDE.md's *Issues are for what matters* (it
+already caused a problem, costs more to leave than to fix, or cracks the structure
+or tooling), with the `agent` label (`planning` when it fails the approval test);
+otherwise drop it.
 
 **A bug you file is classed first** (`issue-batch`, *Filing a bug*, #1173): look
 for earlier cases of its kind, open and closed (search answers 403 here, so page
