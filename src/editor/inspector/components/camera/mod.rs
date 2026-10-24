@@ -99,7 +99,13 @@ fn draw_projection(
     let mut fov = cam.fov;
     ui.horizontal(|ui| {
         ui.label("FOV:");
-        if ui.add(egui::Slider::new(&mut fov, 1.0..=120.0)).changed() {
+        if ui
+            .add(egui::Slider::new(
+                &mut fov,
+                camera_ops::MIN_FOV..=camera_ops::MAX_FOV,
+            ))
+            .changed()
+        {
             if let Some(mut c) = world.camera_mut(id) {
                 camera_ops::set_fov(&mut c, fov);
             }
@@ -211,19 +217,11 @@ fn draw_stacking(
     ui.horizontal(|ui| {
         ui.label("Clear Flags:");
         egui::ComboBox::from_id_salt("clear_flags")
-            .selected_text(match clear_flags {
-                ClearFlags::Skybox => "Skybox",
-                ClearFlags::SolidColor => "Solid Color",
-                ClearFlags::DepthOnly => "Depth Only",
-            })
+            .selected_text(clear_flags.name())
             .show_ui(ui, |ui| {
-                for (value, label) in [
-                    (ClearFlags::Skybox, "Skybox"),
-                    (ClearFlags::SolidColor, "Solid Color"),
-                    (ClearFlags::DepthOnly, "Depth Only"),
-                ] {
+                for value in ClearFlags::ALL {
                     if ui
-                        .selectable_value(&mut clear_flags, value, label)
+                        .selectable_value(&mut clear_flags, value, value.name())
                         .changed()
                     {
                         if let Some(mut c) = world.camera_mut(id) {

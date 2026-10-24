@@ -10,7 +10,9 @@
 //! of the viewport); its per-entity functions (projection, culling mask, render
 //! target, lens and stacking — #430, #827, #1341) take an id and write this
 //! component through these ops. The lens ops hold Unity's bounds (FOV 1–179°,
-//! near above 0, far beyond near), so the card and a script can't store a broken frustum.
+//! near above 0, far beyond near) on every write, so neither the card nor a script
+//! can write a broken frustum. A value read from a scene file does not pass through
+//! here, so a loaded camera is not held to them (#1359).
 //! The component's motion-blur fields ARE also written from `Graphics.*`
 //! (`SetMotionBlurActive` / `SetMotionBlurSamples`); those route through
 //! [`set_motion_blur_active`] / [`set_motion_blur_samples`] here, so the card and the
@@ -34,17 +36,34 @@ pub const MIN_NEAR: f32 = 0.01;
 pub const MIN_CLIP_GAP: f32 = 0.01;
 
 /// Set the camera's vertical field of view (degrees), clamped to
-/// [`MIN_FOV`]..=[`MAX_FOV`].
+/// [`MIN_FOV`]..=[`MAX_FOV`]. A NaN takes [`MIN_FOV`] (`f32::clamp` would keep it).
 pub fn set_fov(c: &mut CameraComponent, fov: f32) {
-    c.fov = fov.clamp(MIN_FOV, MAX_FOV);
+    c.fov = if fov.is_nan() {
+        MIN_FOV
+    } else {
+        fov.clamp(MIN_FOV, MAX_FOV)
+    };
 }
 
 /// Set both clip planes the way Unity holds them: `near` at least [`MIN_NEAR`],
 /// `far` at least [`MIN_CLIP_GAP`] beyond it (a near plane past the far one pushes
-/// the far one out). A NaN takes the bound.
+/// the far one out). A non-finite plane takes its lower bound, and the far plane
+/// always sits strictly beyond the near one, even where `near + MIN_CLIP_GAP`
+/// rounds back to `near`.
 pub fn set_clip_planes(c: &mut CameraComponent, near: f32, far: f32) {
-    c.near = near.max(MIN_NEAR);
-    c.far = far.max(c.near + MIN_CLIP_GAP);
+    // Below f32::MAX, so the plane just beyond it is still finite.
+    let near = if near.is_finite() {
+        near.clamp(MIN_NEAR, f32::MAX.next_down())
+    } else {
+        MIN_NEAR
+    };
+    let min_far = (near + MIN_CLIP_GAP).max(near.next_up());
+    c.near = near;
+    c.far = if far.is_finite() {
+        far.max(min_far)
+    } else {
+        min_far
+    };
 }
 
 /// Set the camera's near clip plane (see [`set_clip_planes`]).

@@ -36,8 +36,9 @@ pub(super) fn register<'scope>(
         table,
         "GetClipPlanes",
         scope.create_function(|_, id: u32| {
-            let planes = read(scene, id, |c| (c.near, c.far));
-            Ok(planes.map_or((None, None), |(n, f)| (Some(n), Some(f))))
+            let (near, far): (Option<f32>, Option<f32>) =
+                read(scene, id, |c| (c.near, c.far)).unzip();
+            Ok((near, far))
         }),
     )?;
     put(
