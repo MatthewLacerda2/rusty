@@ -44,7 +44,7 @@ fn world() -> GameWorld {
 fn assets() -> (PathBuf, PathBuf) {
     let root = crate::test_temp::dir().join("assets");
     std::fs::create_dir_all(root.join("enemies")).unwrap();
-    let enemy = root.join("enemies/enemy.fbx");
+    let enemy = root.join("enemies").join("enemy.fbx");
     std::fs::write(&enemy, QUAD).unwrap();
     (root, enemy)
 }

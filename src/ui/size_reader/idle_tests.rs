@@ -67,8 +67,9 @@ fn a_file_that_cannot_be_read_copies_nothing_on_a_retry() {
 fn a_texture_reference_measures_the_file_it_resolves_to() {
     let dir = crate::test_temp::dir();
     let source = dir.join("quad.fbx");
-    let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/fixtures/models/embedded_textures.fbx");
+    let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(crate::test_path::native(
+        "tests/fixtures/models/embedded_textures.fbx",
+    ));
     std::fs::copy(fixture, &source).expect("copy the fixture");
     let asset = crate::asset::import_file(&source).expect("imports");
     let red = asset.materials.iter().find(|m| m.name == "Red");

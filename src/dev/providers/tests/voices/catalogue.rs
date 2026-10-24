@@ -52,7 +52,7 @@ fn a_cold_cache_fetches_and_a_warm_one_answers_without_asking() {
         (Freshness::Fetched, 3)
     );
     assert!(
-        root.join("cache/voices").is_dir(),
+        root.join("cache").join("voices").is_dir(),
         "kept under the project's cache/"
     );
 

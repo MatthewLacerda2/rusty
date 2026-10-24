@@ -120,7 +120,7 @@ fn convert(converter: &Converter, source: &Path, name: &str, run: &str) -> Vec<u
 
 /// The fixtures of `extension`, by name.
 fn fixtures(extension: &str) -> Vec<PathBuf> {
-    let dir = crate_root().join("tests/fixtures/models");
+    let dir = crate_root().join(crate::test_path::native("tests/fixtures/models"));
     let mut found: Vec<PathBuf> = std::fs::read_dir(&dir)
         .expect("the model fixtures")
         .map(|e| e.expect("a fixtures entry").path())

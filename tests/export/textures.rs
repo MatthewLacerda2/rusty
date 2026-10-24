@@ -18,7 +18,7 @@ fn a_texture_outside_assets_fails_the_export_naming_it() {
             "RelativeFilename: \"gone.png\"",
             "RelativeFilename: \"../../textures/gone.png\"",
         );
-    std::fs::write(game.join("assets/models/tri.fbx"), fbx).unwrap();
+    std::fs::write(game.join("assets").join("models").join("tri.fbx"), fbx).unwrap();
 
     let out = crate::temp::dir().join("out");
     let result = export(&game, &out);

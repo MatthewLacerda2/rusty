@@ -41,7 +41,11 @@ fn an_export_carries_the_cache_and_leaves_the_fbx_behind() {
 #[test]
 fn a_source_that_fails_to_convert_fails_the_export_naming_it() {
     let game = project(&[QUAD], START);
-    std::fs::write(game.join("assets/models/broken.fbx"), "not an fbx").unwrap();
+    std::fs::write(
+        game.join("assets").join("models").join("broken.fbx"),
+        "not an fbx",
+    )
+    .unwrap();
     let out = crate::temp::dir().join("out");
     let result = export(&game, &out);
     assert_eq!(result.status.code(), Some(1));

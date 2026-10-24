@@ -1,3 +1,6 @@
-# Blessed text snapshots compare byte-for-byte against LF text, so Windows must
-# not check them out as CRLF (#1036).
-tests/scene_format/scene.fingerprint text eol=lf
+# Every text file checks out with LF, Windows included. Git for Windows' default
+# (`core.autocrlf=true`) would otherwise hand a Windows checkout CRLF text, and
+# whatever the build embeds or a test compares byte-for-byte breaks there only:
+# blessed snapshots (#1036), the game `CLAUDE.md` template `include_str!` reads
+# (#1345). Binary files are detected and left alone.
+* text=auto eol=lf

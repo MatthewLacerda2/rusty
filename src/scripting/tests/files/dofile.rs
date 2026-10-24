@@ -6,7 +6,7 @@ use super::{backslash_dir, dir, manager, out, warnings, write};
 #[test]
 fn dofile_and_loadfile_read_from_the_project_root() {
     let root = dir("dofile");
-    write(&root.join("data/level.lua"), "return 3");
+    write(&root.join("data").join("level.lua"), "return 3");
     let (m, console) = manager(&root);
     let code = "out = tostring(dofile('data/level.lua') + loadfile('data/level.lua')())";
     assert_eq!(out(&m, code), "6");
@@ -33,7 +33,7 @@ fn an_outside_dofile_or_loadfile_still_runs_but_warns() {
 #[test]
 fn dofile_names_its_chunk_as_the_os_opens_it() {
     let root = backslash_dir("slash_dofile");
-    write(&root.join("data/level.lua"), SOURCE);
+    write(&root.join("data").join("level.lua"), SOURCE);
     let (m, _) = manager(&root);
     let named = out(
         &m,

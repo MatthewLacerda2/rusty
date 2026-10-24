@@ -32,6 +32,7 @@ agent can read exactly what failed.
 | Dependency locks | cargo-deny (`deny.toml`) | **hard gate**: every git dependency is pinned by `rev` (`required-git-spec`); `nalgebra` only through the physics stack and no `cgmath` — glam is the one math crate (#975) |
 | `tools/lint` stays std-only | `make test-lint` | its `Cargo.lock` names one package, itself (#935) |
 | Test temp dirs | `tools/lint -- --rules` | **hard gate** (`test-temp-dir`): test code writes under `crate::test_temp::dir()` / `crate::temp::dir()`, never a bare `std::env::temp_dir()` (#999) |
+| Portable test paths | `tools/lint -- --rules` | **hard gate** (`slash-join`): test code never joins a `/`-separated literal onto a path; it joins one part per call or uses `crate::test_path::native` (#1332) |
 | Module layering | `tools/lint -- --layers` | every `crate::<module>` import and every external crate a module names matches the declared table (`tools/lint/src/layers/table.rs`): nothing undeclared, nothing stale, no cycle, no sim → platform edge (#724, #938) |
 | Sim determinism | clippy `disallowed_methods`/`disallowed_types` + `tools/lint -- --determinism` | **hard gate**: clock reads, OS/unseeded RNG and `std`'s randomly seeded hash maps are banned crate-wide in `clippy.toml`; only a platform row's `mod.rs` may opt out, and the ban list must stay whole (#757, #764) |
 | No shared process state | clippy `disallowed_methods` + `tools/lint -- --determinism` | **hard gate**: `std::env::{set_var, remove_var, set_current_dir}` are banned crate-wide in `clippy.toml`, tests included, since `cargo test` runs every in-crate test in one process; production opts out inline with a reason (`project::open`), and `--determinism` keeps the three on the list (#977) |
@@ -279,6 +280,16 @@ new flag, gate, CI step or baseline.
   #999). Comment lines never count. The
   helper itself and Unix socket paths (which must stay short) carry an inline
   allow. `tools/` is not scanned: the lint crate's own tests are not the engine's.
+- **`slash-join`** (#1332) — `Path::join("a/b")` keeps the `/`, so on Windows it
+  builds `dir\a/b` where the engine, joining one part at a time, builds `dir\a\b`:
+  equal as `Path`s, unequal as strings, and a test comparing strings fails on
+  Windows only. A `.join("…")` on a test-code line whose literal holds a `/` is a
+  finding (`parts.join("/")`, a slice joined with a separator, is not). Join one
+  part per call, or spell it `crate::test_path::native("a/b")`, the path as the
+  engine writes it (`native_string` for the written string). The rule cannot see a
+  `/` literal handed to a helper that joins it, nor a bare `"/a/b"` expectation
+  (test code is full of `/`-led JSON pointers): those use the same helpers. A
+  literal that must keep its `/` says why with `// lint: allow(slash-join) <why>`.
 - **`asset-write`** (#1220) — a file a path-keyed cache reads is written through
   `core::fs::written::write`, or its writer calls `note_written` after (#1207).
   A non-test line of `src/` outside `src/core/fs/` calling `fs::write(`,

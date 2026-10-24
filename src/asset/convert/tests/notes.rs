@@ -35,7 +35,7 @@ fn noted_by_refresh(source: &Path, out: &Path) -> Vec<String> {
 #[test]
 fn a_conversion_notes_the_glb_and_the_source_never_a_staged_file() {
     let dir = crate::test_temp::dir();
-    let (source, out) = (dir.join("a.src"), dir.join("cache/a.src.glb"));
+    let (source, out) = (dir.join("a.src"), dir.join("cache").join("a.src.glb"));
     std::fs::write(&source, "one").unwrap();
     for _ in 0..2 {
         // Only this test's paths: other tests write the same process-wide log.
@@ -56,7 +56,7 @@ fn a_conversion_notes_the_glb_and_the_source_never_a_staged_file() {
 #[test]
 fn a_current_cache_notes_nothing() {
     let dir = crate::test_temp::dir();
-    let (source, out) = (dir.join("b.src"), dir.join("cache/b.src.glb"));
+    let (source, out) = (dir.join("b.src"), dir.join("cache").join("b.src.glb"));
     std::fs::write(&source, "one").unwrap();
     refresh(&WITH_TEXTURE, &source, &out).unwrap();
     let noted = noted_by_refresh(&source, &out);

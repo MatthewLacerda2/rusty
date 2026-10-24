@@ -65,7 +65,7 @@ fn convert_to(source: &Path, out: &Path) -> Result<(), ImportError> {
 #[cfg(test)]
 fn fixture(name: &str) -> std::path::PathBuf {
     std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/fixtures/models")
+        .join(crate::test_path::native("tests/fixtures/models"))
         .join(name)
 }
 

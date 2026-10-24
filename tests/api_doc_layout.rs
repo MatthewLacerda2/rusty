@@ -9,7 +9,9 @@ use std::path::Path;
 
 #[test]
 fn every_namespace_file_is_named_after_its_namespace_and_indexed() {
-    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("docs/api");
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("docs")
+        .join("api");
     let index = fs::read_to_string(dir.join("index.md")).expect("docs/api/index.md");
     let mut problems = Vec::new();
     for entry in fs::read_dir(&dir).expect("docs/api/") {

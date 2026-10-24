@@ -26,7 +26,7 @@ fn a_new_project_needs_a_plain_name_and_an_empty_folder() {
         new_project_dir(&parent, "empty").is_ok(),
         "an empty folder is fine"
     );
-    std::fs::write(parent.join("empty/x"), "").unwrap();
+    std::fs::write(parent.join("empty").join("x"), "").unwrap();
     assert!(new_project_dir(&parent, "empty").is_err());
 }
 
@@ -51,7 +51,7 @@ fn create_makes_the_project_and_lists_it_first() {
     let mut bench = Bench::at(Some(path.clone()));
     let root = bench.create(&dir, "Horde", 7).unwrap();
     assert_eq!(root, dir.join("Horde"));
-    assert!(root.join(PROJECT_FILE).is_file() && root.join("assets/scenes").is_dir());
+    assert!(root.join(PROJECT_FILE).is_file() && root.join("assets").join("scenes").is_dir());
     assert_eq!(RecentProjects::load(&path).projects[0].path, root);
     let file = ProjectFile::load(&root).unwrap();
     assert_eq!(file.build.product_name, "Horde", "named after the project");

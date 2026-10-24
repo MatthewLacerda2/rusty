@@ -10,7 +10,7 @@ use std::path::Path;
 fn refreshing_converts_every_source_under_the_root_and_skips_a_broken_one() {
     let root = crate::test_temp::dir().join("assets");
     std::fs::create_dir_all(root.join("enemies")).unwrap();
-    let enemy = root.join("enemies/enemy.fbx");
+    let enemy = root.join("enemies").join("enemy.fbx");
     std::fs::write(&enemy, QUAD).unwrap();
     std::fs::write(root.join("broken.fbx"), "not an fbx").unwrap();
     std::fs::write(root.join("notes.txt"), "not a model").unwrap();
@@ -53,8 +53,8 @@ fn a_second_refresh_reads_no_unchanged_source_again() {
 fn a_symlinked_folder_is_not_followed() {
     let root = crate::test_temp::dir().join("assets");
     std::fs::create_dir_all(root.join("a")).unwrap();
-    std::fs::write(root.join("a/enemy.fbx"), QUAD).unwrap();
-    std::os::unix::fs::symlink(&root, root.join("a/loop")).unwrap();
+    std::fs::write(root.join("a").join("enemy.fbx"), QUAD).unwrap();
+    std::os::unix::fs::symlink(&root, root.join("a").join("loop")).unwrap();
     assert_eq!(refresh_sources(&root), 1, "the loop is not walked");
 }
 

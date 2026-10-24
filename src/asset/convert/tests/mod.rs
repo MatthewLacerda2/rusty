@@ -55,7 +55,7 @@ fn fbx_is_converted_and_gltf_is_not() {
 fn the_cache_is_remade_only_when_the_source_changes() {
     let dir = crate::test_temp::dir().join("convert_refresh");
     std::fs::create_dir_all(&dir).unwrap();
-    let (source, out) = (dir.join("a.src"), dir.join("cache/a.src.glb"));
+    let (source, out) = (dir.join("a.src"), dir.join("cache").join("a.src.glb"));
     std::fs::write(&source, "one").unwrap();
 
     refresh(&COPY, &source, &out).unwrap();

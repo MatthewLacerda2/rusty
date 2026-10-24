@@ -39,28 +39,39 @@ fn a_named_project_wins_and_the_default_is_dot_project() {
 
 #[test]
 fn the_engine_content_is_found_from_this_checkout() {
-    assert!(engine_dir().join("shaders/common.wgsl").is_file());
+    assert!(engine_dir().join("shaders").join("common.wgsl").is_file());
     assert!(engine_path("shaders/common.wgsl").ends_with("engine/shaders/common.wgsl"));
 }
 
 #[test]
 fn a_shipped_layout_finds_its_engine_and_project_beside_the_executable() {
     let ship = fresh("ship");
-    std::fs::create_dir_all(ship.join("engine/shaders")).unwrap();
-    std::fs::write(ship.join("engine/shaders/common.wgsl"), "").unwrap();
-    std::fs::create_dir_all(ship.join("project/assets")).unwrap();
+    std::fs::create_dir_all(ship.join("engine").join("shaders")).unwrap();
+    std::fs::write(
+        ship.join(crate::test_path::native("engine/shaders/common.wgsl")),
+        "",
+    )
+    .unwrap();
+    std::fs::create_dir_all(ship.join("project").join("assets")).unwrap();
     assert_eq!(find_engine_dir(&ship), Some(ship.join("engine")));
     assert_eq!(find_packaged_project(&ship), Some(ship.join("project")));
 
     // A macOS bundle: Contents/MacOS/<exe>, Contents/Resources/{engine,project}.
-    let bundle = fresh("bundle").join("Game.app/Contents");
+    let bundle = fresh("bundle").join("Game.app").join("Contents");
     let (macos, res) = (bundle.join("MacOS"), bundle.join("Resources"));
     std::fs::create_dir_all(&macos).unwrap();
-    std::fs::create_dir_all(res.join("engine/shaders")).unwrap();
-    std::fs::write(res.join("engine/shaders/common.wgsl"), "").unwrap();
-    std::fs::create_dir_all(res.join("project/assets")).unwrap();
+    std::fs::create_dir_all(res.join("engine").join("shaders")).unwrap();
+    std::fs::write(
+        res.join(crate::test_path::native("engine/shaders/common.wgsl")),
+        "",
+    )
+    .unwrap();
+    std::fs::create_dir_all(res.join("project").join("assets")).unwrap();
     let found = find_engine_dir(&macos).unwrap();
-    assert!(found.join("shaders/common.wgsl").is_file(), "{found:?}");
+    assert!(
+        found.join("shaders").join("common.wgsl").is_file(),
+        "{found:?}"
+    );
     assert!(find_packaged_project(&macos).is_some());
     assert_eq!(find_packaged_project(&fresh("bare")), None);
 }
