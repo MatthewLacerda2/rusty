@@ -73,8 +73,8 @@ pub struct ScriptManager {
     pub(super) physics: Rc<RefCell<Option<crate::physics::PhysicsWorld>>>,
     /// The scene file the editor/session is currently editing — the write-back
     /// target for `Scene.Save()` (no-path). Shared with the platform layer (the
-    /// editor keeps `EditorUi.current_scene_path` synced into it), so a scripted
-    /// save and an editor save hit the same file. `None` until a scene is loaded
+    /// editor reads and writes this very cell as its current scene file, #1366), so
+    /// a scripted save and an editor save hit the same file. `None` until a scene is loaded
     /// or the path is set; an argument-less `Scene.Save()` then errors cleanly.
     pub(super) scene_path: Rc<RefCell<Option<String>>>,
     /// The audio engine singleton (#212), shared with `Resources` and the platform

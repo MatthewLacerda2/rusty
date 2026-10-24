@@ -97,3 +97,26 @@ fn a_file_that_does_not_parse_yet_is_read_again() {
     assert!(frame(&mut follow, &mut scene, &path).0);
     assert!(scene.find_entity_by_name("Gone").is_none());
 }
+
+/// Generate Lighting lands before the follow applied an outside edit: the merged
+/// file (edit + lighting) is not the engine's own text, so it still reloads (#1374).
+#[test]
+fn a_lighting_save_over_an_unapplied_edit_still_reloads() {
+    let (path, mut scene, mut follow) = open("lighting_race");
+    write_outside(&path, &["Kept"]);
+    scene.lighting_settings.lightmaps.samples = 7;
+    save_lighting(&scene, &path).unwrap();
+    let (reloaded, console) = frame(&mut follow, &mut scene, &path);
+    assert!(reloaded, "the edit is applied");
+    let (line, level) = console.messages.last().unwrap();
+    assert_eq!(
+        *level,
+        LogLevel::Info,
+        "the bake is no unsaved edit: {line}"
+    );
+    assert!(scene.find_entity_by_name("Gone").is_none());
+    assert_eq!(
+        scene.lighting_settings.lightmaps.samples, 7,
+        "with the lighting"
+    );
+}

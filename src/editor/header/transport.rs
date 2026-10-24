@@ -94,7 +94,7 @@ fn transport(
 /// The open scene's file stem, or "Untitled" for a scene never saved.
 fn scene_name(editor: &EditorUi) -> String {
     editor
-        .current_scene_path
+        .current_scene_path()
         .as_deref()
         .and_then(|p| std::path::Path::new(p).file_stem())
         .map(|s| s.to_string_lossy().into_owned())

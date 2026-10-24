@@ -23,7 +23,7 @@ fn moved_crate() -> (Scene, NavigationGraph) {
 /// Draw one headless editor frame over `scene` and `nav`.
 fn draw_frame(scene: &mut Scene, nav: &mut NavigationGraph, mut playing: bool) {
     let ctx = egui::Context::default();
-    let mut editor = EditorUi::new();
+    let mut editor = EditorUi::new(Default::default());
     let mut console = ConsoleLogs::new();
     ctx.begin_pass(egui::RawInput::default());
     editor.draw(

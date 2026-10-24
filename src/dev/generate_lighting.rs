@@ -63,7 +63,8 @@ pub fn generate_lighting(
 
 /// The steps after the lightmaps (already applied to `scene`, `lightmaps` of them):
 /// the probe bake, then writing the lighting into the file at `path`. Refused in
-/// Play, which the editor's background bake can reach when Play starts mid-bake.
+/// Play like [`generate_lighting`]; the editor's background bake never reaches that,
+/// since `bake::poll` holds a finished bake while the scene plays.
 pub fn finish(
     scene: &mut Scene,
     path: &str,

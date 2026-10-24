@@ -64,3 +64,49 @@ fn a_lighting_save_is_refused_in_play() {
         "the file is untouched"
     );
 }
+
+/// Generate Lighting over an outside edit the follow has not applied yet: the merged
+/// text is not recorded, so the follow still reloads it (#1374).
+#[test]
+fn a_lighting_save_over_an_outside_edit_is_not_recorded() {
+    let (scene, path) = loaded("outside");
+    let mut outside = Scene::new();
+    outside.add_entity("Outside".into());
+    outside.save_to_file(&path).unwrap();
+    assert_eq!(save_lighting(&scene, &path), Ok(LightingSave::Written));
+    let text = std::fs::read_to_string(&path).unwrap();
+    assert!(text.contains("\"Outside\""), "the edit survives the merge");
+    assert!(!scene.is_disk_text(&path, &text));
+}
+
+/// A load whose sidecar fails still replaced the World, so the document is "what
+/// the engine read": a `touch` or rescan is no change (#1374).
+#[test]
+fn a_load_with_a_broken_sidecar_is_recorded() {
+    let (_, path) = loaded("sidecar");
+    std::fs::write(crate::scene::sidecar_path(&path), "{ broken").unwrap();
+    let text = std::fs::read_to_string(&path).unwrap();
+    let mut fresh = Scene::new();
+    assert!(fresh.load_from_file(&path).unwrap_err().replaced_world());
+    assert!(fresh.is_disk_text(&path, &text));
+    assert!(!fresh.has_unsaved_edits(&path));
+}
+
+/// Reset Scene: the record is the file's text whatever it holds, so a `touch` or
+/// the editor's own Generate Lighting is no change; the rebuilt World is unsaved
+/// against it (#1374).
+#[test]
+fn adopting_a_file_records_its_text() {
+    let (mut scene, path) = loaded("adopt");
+    let text = std::fs::read_to_string(&path).unwrap();
+    scene.add_entity("Rebuilt".into());
+    scene.adopt_disk_text(&path);
+    assert!(scene.is_disk_text(&path, &text));
+    assert!(scene.has_unsaved_edits(&path), "the rebuilt World differs");
+    assert_eq!(save_lighting(&scene, &path), Ok(LightingSave::Written));
+    let lit = std::fs::read_to_string(&path).unwrap();
+    assert!(
+        scene.is_disk_text(&path, &lit),
+        "the bake is the engine's own"
+    );
+}

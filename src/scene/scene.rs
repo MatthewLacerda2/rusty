@@ -182,6 +182,13 @@ impl Scene {
         self.id = SceneId::next();
     }
 
+    /// Take back `id`, an identity this World held before (Stop's restore after a
+    /// play-mode `Scene.Load`, #1374): the restored World is that scene again, so a
+    /// Generate Lighting waiting for Stop still recognises it.
+    pub(crate) fn restore_id(&mut self, id: SceneId) {
+        self.id = id;
+    }
+
     pub fn add_entity(&mut self, name: String) -> u32 {
         self.world.spawn(name)
     }
@@ -250,7 +257,7 @@ impl Scene {
 
     /// Load `path`, REPLACING this scene's World (single active scene).
     /// Delegates to `crate::scene::io`; meshes are rehydrated from disk there.
-    pub fn load_from_file(&mut self, path: &str) -> Result<(), String> {
+    pub fn load_from_file(&mut self, path: &str) -> Result<(), crate::scene::LoadError> {
         crate::scene::load_from_file(self, path)
     }
 }

@@ -30,7 +30,7 @@ fn draw_frame(editor: &mut EditorUi, scene: &mut Scene) {
 fn a_destroyed_selection_stays_cleared_after_the_next_frame() {
     let mut scene = Scene::new();
     let doomed = scene.add_entity("doomed".into());
-    let mut editor = EditorUi::new();
+    let mut editor = EditorUi::new(Default::default());
     editor.selected_entity_id = Some(doomed);
     draw_frame(&mut editor, &mut scene);
     assert_eq!(scene.selected_entity_id, Some(doomed));
@@ -45,7 +45,7 @@ fn a_destroyed_selection_stays_cleared_after_the_next_frame() {
 fn a_live_selection_survives_the_frame() {
     let mut scene = Scene::new();
     let kept = scene.add_entity("kept".into());
-    let mut editor = EditorUi::new();
+    let mut editor = EditorUi::new(Default::default());
     editor.selected_entity_id = Some(kept);
     draw_frame(&mut editor, &mut scene);
     assert_eq!(editor.selected_entity_id, Some(kept));

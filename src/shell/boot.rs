@@ -108,17 +108,26 @@ pub fn pixel_size(size: winit::dpi::PhysicalSize<u32>) -> PixelSize {
 
 /// Build the simulation around the scene at `scene_path`: shared engine state, baked
 /// nav, and the persistent store bound to its file. A scene that fails to load is
-/// logged to the console and leaves an empty scene.
+/// logged to the console and leaves an empty, Untitled scene; one whose lighting
+/// sidecar alone fails is loaded, with a warning.
 pub fn load_game(scene_path: &str) -> GameWorld {
     let scene = Rc::new(RefCell::new(Scene::new()));
     let console = Rc::new(RefCell::new(ConsoleLogs::new()));
-    {
+    let loaded = {
         let mut c = console.borrow_mut();
         c.info(format!("Loading scene from {scene_path}..."));
-        if let Err(err) = scene.borrow_mut().load_from_file(scene_path) {
-            c.error(format!("Failed to load scene {scene_path}: {err}"));
+        match scene.borrow_mut().load_from_file(scene_path) {
+            Ok(()) => true,
+            Err(err) if err.replaced_world() => {
+                c.warn(format!("Scene {scene_path}: {err}"));
+                true
+            }
+            Err(err) => {
+                c.error(format!("Failed to load scene {scene_path}: {err}"));
+                false
+            }
         }
-    }
+    };
     // Baked over the scene's own bounds (#452) — the same path the headless harness takes.
     let nav = Rc::new(RefCell::new(NavigationGraph::from_scene(&scene.borrow())));
     let input = Rc::new(RefCell::new(InputState::new()));
@@ -134,7 +143,12 @@ pub fn load_game(scene_path: &str) -> GameWorld {
         crate::dev::stats::install(&mut game);
         crate::dev::lua_surface::install_api();
     }
-    *game.script_manager().scene_path_cell().borrow_mut() = Some(scene_path.to_string());
+    // The current scene file only when the World is that file's: a startup scene
+    // that doesn't parse leaves the editor on Untitled (Unity's way), so a Save can't
+    // write an empty scene over a recoverable file (#1374).
+    if loaded {
+        *game.script_manager().scene_path_cell().borrow_mut() = Some(scene_path.to_string());
+    }
 
     // Bind the persistent store to its file and load it once — this boundary read is
     // a sim input. Writes flush at Stop and on loop exit. The harness leaves the store

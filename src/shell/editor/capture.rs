@@ -154,7 +154,7 @@ pub fn capture_into(
 
 /// A fresh editor with `opts`' tab, selection and framing applied.
 fn initial_ui(game: &GameWorld, opts: &EditorCaptureOptions) -> Result<EditorUi, String> {
-    let mut ui = EditorUi::new();
+    let mut ui = EditorUi::new(game.script_manager().scene_path_cell());
     game.refresh_ui_textures();
     super::sync_ui_textures(&mut ui, game);
     ui.viewport_tab = opts.tab;

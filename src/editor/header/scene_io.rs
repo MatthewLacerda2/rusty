@@ -1,5 +1,5 @@
-//! The editor's scene-file verbs: the File menu's new / reset / load / save, and the
-//! one open and one save every other editor surface (the content grid's double-click,
+//! The editor's current scene file and its verbs: the File menu's new / reset /
+//! load / save, and the one open and one save every other editor surface (the content grid's double-click,
 //! the scene asset's inspector buttons) goes through, so they never drift apart (#997).
 
 use std::path::Path;
@@ -9,6 +9,17 @@ use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;
 
 impl EditorUi {
+    /// The scene file the editor is editing, `None` for a scene never saved. One
+    /// value with the script runtime's `Scene.Save()` target (#1366).
+    pub fn current_scene_path(&self) -> Option<String> {
+        self.scene_path.borrow().clone()
+    }
+
+    /// Make `path` the scene file the editor (and `Scene.Save()`) writes back to.
+    pub fn set_current_scene_path(&mut self, path: Option<String>) {
+        *self.scene_path.borrow_mut() = path;
+    }
+
     /// Open the scene file at `path` — the editor face of `Scene.Load`, with its rules:
     /// a path that is not a file is refused, and during play the swap is deferred to
     /// the tick's tail. In edit mode the scene loads at once, becomes the current
@@ -30,22 +41,22 @@ impl EditorUi {
             return;
         }
         match scene.load_from_file(path) {
-            Ok(_) => {
-                self.current_scene_path = Some(path.to_string());
-                self.selected_entity_id = None;
-                self.selected_asset_path = None;
-                self.is_dirty = true;
-                console.info(format!("Scene loaded from {path}"));
-            }
-            Err(err) => console.error(format!("Failed to load scene: {err}")),
+            Ok(()) => console.info(format!("Scene loaded from {path}")),
+            // The World is the new file's: so is the current scene file (#1374).
+            Err(err) if err.replaced_world() => console.warn(format!("Scene {path}: {err}")),
+            Err(err) => return console.error(format!("Failed to load scene: {err}")),
         }
+        self.set_current_scene_path(Some(path.to_string()));
+        self.selected_entity_id = None;
+        self.selected_asset_path = None;
+        self.is_dirty = true;
     }
 
     /// Save the scene to `path`, which becomes the current scene file.
     pub(crate) fn save_scene_to(&mut self, scene: &Scene, console: &mut ConsoleLogs, path: &str) {
         match scene.save_to_file(path) {
             Ok(_) => {
-                self.current_scene_path = Some(path.to_string());
+                self.set_current_scene_path(Some(path.to_string()));
                 console.info(format!("Scene saved to {path}"));
             }
             Err(err) => console.error(format!("Failed to save scene: {err}")),
@@ -53,18 +64,24 @@ impl EditorUi {
     }
 }
 
-/// Save writes back to the CURRENT scene path (set on load / double-click),
-/// falling back to the seeded default scene.
-fn current_path(editor: &EditorUi) -> String {
-    editor
-        .current_scene_path
-        .clone()
-        .unwrap_or_else(|| crate::scene::DEFAULT_SCENE_PATH.to_string())
+/// Save and Load act on the CURRENT scene file (set on load / double-click). A scene
+/// never saved (File ▸ New) has none, and the verb is refused: falling back to a
+/// real file would write an empty scene over it (#1374). Unity would open Save As;
+/// the editor has none yet, so it says so, as `Scene.Save()` does.
+fn current_path(editor: &EditorUi, console: &mut ConsoleLogs, verb: &str) -> Option<String> {
+    let path = editor.current_scene_path();
+    if path.is_none() {
+        console.error(format!(
+            "{verb}: the scene has no file yet; use a scene asset's Overwrite with Current, or Scene.Save(path)"
+        ));
+    }
+    path
 }
 
 pub(super) fn save_scene(editor: &mut EditorUi, scene: &Scene, console: &mut ConsoleLogs) {
-    let path = current_path(editor);
-    editor.save_scene_to(scene, console, &path);
+    if let Some(path) = current_path(editor, console, "Save Scene") {
+        editor.save_scene_to(scene, console, &path);
+    }
 }
 
 pub(super) fn load_scene(
@@ -73,8 +90,9 @@ pub(super) fn load_scene(
     console: &mut ConsoleLogs,
     is_playing: bool,
 ) {
-    let path = current_path(editor);
-    editor.open_scene(scene, console, &path, is_playing);
+    if let Some(path) = current_path(editor, console, "Load Scene") {
+        editor.open_scene(scene, console, &path, is_playing);
+    }
 }
 
 /// New / Reset replace the World outright, with no `OnDisable`/`OnDestroy`, so in
@@ -101,7 +119,7 @@ pub(super) fn new_scene(
         return;
     }
     scene.clear();
-    editor.current_scene_path = None;
+    editor.set_current_scene_path(None);
     editor.selected_entity_id = None;
     editor.selected_asset_path = None;
     editor.is_dirty = true;
@@ -120,7 +138,8 @@ pub(super) fn reset_scene(
         return;
     }
     let path = crate::scene::build_default_scene(scene);
-    editor.current_scene_path = Some(path);
+    scene.adopt_disk_text(&path);
+    editor.set_current_scene_path(Some(path));
     editor.selected_entity_id = None;
     editor.selected_asset_path = None;
     editor.is_dirty = true;
@@ -130,3 +149,7 @@ pub(super) fn reset_scene(
 #[cfg(test)]
 #[path = "scene_io_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "scene_path_tests.rs"]
+mod scene_path_tests;

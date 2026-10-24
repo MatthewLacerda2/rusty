@@ -70,7 +70,7 @@ fn write_gltf(name: &str, body: &str) -> String {
 fn instantiate_sets_material_component_and_shares_library_entry() {
     let path = write_fixture("rusty_203_instantiate.gltf");
     let mut scene = Scene::new();
-    instantiate(&mut EditorUi::new(), &mut scene, &path);
+    instantiate(&mut EditorUi::new(Default::default()), &mut scene, &path);
 
     // Two entities, each with the mesh's shared material reference; ONE library entry.
     let key = format!("{path}::Shared");
@@ -89,7 +89,7 @@ fn instantiate_sets_material_component_and_shares_library_entry() {
 fn imported_material_round_trips_through_scene_data() {
     let path = write_fixture("rusty_203_roundtrip.gltf");
     let mut scene = Scene::new();
-    instantiate(&mut EditorUi::new(), &mut scene, &path);
+    instantiate(&mut EditorUi::new(Default::default()), &mut scene, &path);
 
     let data = to_scene_data(&scene);
     let mut restored = Scene::new();
@@ -116,7 +116,7 @@ fn imported_material_round_trips_through_scene_data() {
 fn instantiate_dresses_material_less_meshes_with_engine_default() {
     let path = write_gltf("rusty_214_default.gltf", NO_MATERIAL_GLTF);
     let mut scene = Scene::new();
-    instantiate(&mut EditorUi::new(), &mut scene, &path);
+    instantiate(&mut EditorUi::new(Default::default()), &mut scene, &path);
 
     // Both created mesh entities carry a RESOLVABLE material (key present in the shared
     // library) even though the glTF named none.

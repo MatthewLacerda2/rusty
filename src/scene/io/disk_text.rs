@@ -13,7 +13,7 @@
 
 use std::cell::RefCell;
 
-use super::read_scene_text;
+use super::parse_scene_text;
 use crate::scene::Scene;
 
 /// The last `(path, text)` the engine read or wrote for this scene.
@@ -32,7 +32,11 @@ impl DiskText {
         last.as_ref().is_some_and(|(p, t)| p == path && t == text)
     }
 
-    fn text(&self, path: &str) -> Option<String> {
+    fn forget(&self) {
+        *self.0.borrow_mut() = None;
+    }
+
+    pub(super) fn text(&self, path: &str) -> Option<String> {
         let last = self.0.borrow();
         last.as_ref()
             .filter(|(p, _)| p == path)
@@ -47,6 +51,18 @@ impl Scene {
         self.disk_text.is(path, text)
     }
 
+    /// The World was rebuilt to stand for `path` without reading it (Reset Scene,
+    /// #1374): record the file's text as it is, whatever it holds, so a `touch`, a
+    /// rescan or the editor's own Generate Lighting is no change. A real outside edit
+    /// changes the text, so it still reloads, and says the rebuilt scene was unsaved
+    /// when it differs from the file. An unreadable file leaves no record.
+    pub fn adopt_disk_text(&self, path: &str) {
+        match std::fs::read_to_string(path) {
+            Ok(disk) => self.disk_text.record(path, disk),
+            Err(_) => self.disk_text.forget(),
+        }
+    }
+
     /// Whether the live scene has edits the document last read or written at `path`
     /// lacks. Computed, never a flag: both sides are read as a `SceneData` and
     /// compared without the selection, which the editor copies into the scene every
@@ -57,7 +73,7 @@ impl Scene {
         };
         let live = super::scene_json(self);
         let canon = |text: &str| {
-            let mut data = read_scene_text(text, path).ok()?;
+            let mut data = parse_scene_text(text, path).ok()?;
             data.selected_entity_id = None;
             serde_json::to_string(&data).ok()
         };

@@ -55,14 +55,20 @@ impl Session {
         let input = Rc::new(RefCell::new(InputState::new()));
         let console = Rc::new(RefCell::new(ConsoleLogs::new()));
 
-        if !boot_scene.is_empty() {
-            let mut s = scene.borrow_mut();
-            if let Err(err) = s.load_from_file(boot_scene) {
-                console
-                    .borrow_mut()
-                    .error(format!("Failed to load scene {}: {}", boot_scene, err));
+        let loaded = !boot_scene.is_empty() && {
+            let mut c = console.borrow_mut();
+            match scene.borrow_mut().load_from_file(boot_scene) {
+                Ok(()) => true,
+                Err(err) if err.replaced_world() => {
+                    c.warn(format!("Scene {boot_scene}: {err}"));
+                    true
+                }
+                Err(err) => {
+                    c.error(format!("Failed to load scene {boot_scene}: {err}"));
+                    false
+                }
             }
-        }
+        };
         // Baked over the scene's own bounds (#452), as the windowed boot does.
         let nav = Rc::new(RefCell::new(NavigationGraph::from_scene(&scene.borrow())));
 
@@ -70,8 +76,9 @@ impl Session {
         let mut world = GameWorld::new(scene, input, nav, console);
         // The boot scene is the `Scene.Save()` write-back target, so an
         // argument-less save from the agent persists back to the loaded file —
-        // just as the editor's Save writes to `current_scene_path`.
-        if !boot_scene.is_empty() {
+        // just as the editor's Save writes to its current scene file. Only when it
+        // loaded: an unparseable one stays untouched by an argument-less save (#1374).
+        if loaded {
             *world
                 .resources
                 .script_manager
@@ -203,6 +210,9 @@ pub fn run<R: BufRead, W: Write>(
     Ok(())
 }
 
+#[cfg(test)]
+#[path = "session_boot_tests.rs"]
+mod boot_tests;
 #[cfg(test)]
 #[path = "session_tests.rs"]
 mod tests;

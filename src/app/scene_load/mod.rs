@@ -44,9 +44,11 @@ impl GameWorld {
 
     /// On Stop, after the snapshot restore: drop any load or destroy still queued
     /// (a paused Play can leave one, #1298) and every
-    /// `DontDestroyOnLoad` mark, and — if play loaded another scene — hand back the
-    /// original scene file and a fresh identity (the restored World is a different
-    /// scene from the one the renderer last cached).
+    /// `DontDestroyOnLoad` mark, and hand back the scene file and identity Play
+    /// started in: the restored World is that scene again, so a bake waiting for Stop
+    /// still applies (#1374). The renderer's caches keyed by that identity are as
+    /// valid as after a Stop with no load (a static shadow bake records its scene,
+    /// and the swapped-in scene's bakes replaced it).
     pub(super) fn restore_play_origin(&mut self) {
         let mut scene = self.world.scene.borrow_mut();
         scene.pending_load = None;
@@ -55,9 +57,7 @@ impl GameWorld {
         let Some(origin) = self.resources.play_origin.take() else {
             return;
         };
-        if scene.id() != origin.scene {
-            scene.renew_id();
-        }
+        scene.restore_id(origin.scene);
         *self.resources.script_manager.scene_path_cell().borrow_mut() = origin.path;
     }
 }
