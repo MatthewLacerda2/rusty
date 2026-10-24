@@ -10,8 +10,7 @@
 //! `Application`) is registered from this tree onto the live Lua runtime. Layers above
 //! the sim add their own namespaces through [`extend`]: `dev` installs `Debug` and the
 //! GPU bake verbs that way (#737), so the sim surface never imports the platform layer.
-//! `scripting`
-//! owns the runtime and lifecycle; `api` owns the surface. One surface, three
+//! `scripting` owns the runtime and lifecycle; `api` owns the surface. One surface, three
 //! callers — they never drift apart.
 
 // Panic-free sim (#195, #962): bare `.unwrap()` is denied in every sim module (use `?`
@@ -30,6 +29,7 @@ pub mod canvas_group;
 pub mod character_controller;
 pub mod component;
 pub mod decals;
+pub mod entity_arg;
 pub mod graphics;
 pub mod image;
 pub mod input;

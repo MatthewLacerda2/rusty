@@ -43,3 +43,7 @@ pub use access::{CompMut, CompRef};
 pub use descendants::Descendants;
 pub use world::World;
 pub use world_space::{ColliderMut, TransformMut};
+
+/// The id no entity has: the allocator hands out ids from 1 (`World::new`,
+/// `World::clear`), so 0 names nothing. The API reads a `nil` id as it (#1383).
+pub const NO_ENTITY: u32 = 0;
