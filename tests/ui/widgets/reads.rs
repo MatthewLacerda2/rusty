@@ -55,6 +55,7 @@ fn a_nil_id_reads_as_nothing() {
     assert_eq!(ui.eval("Scene.FindChild(nil, 'a')"), "nil");
     assert_eq!(ui.eval("#Scene.GetChildren(nil)"), "0");
     assert_eq!(ui.eval("Scene.IsActive(nil)"), "false");
+    assert_eq!(ui.eval("Scene.IsActiveInHierarchy(nil)"), "false");
 }
 
 #[test]
