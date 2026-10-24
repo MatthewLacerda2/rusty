@@ -138,7 +138,7 @@ fn every_clamped_field_reads_its_stored_value_as_held() {
         (Field::Volume, 1.0),
         (Field::AnchorMin, 1.0),
     ] {
-        let got = field.get(&s, id).expect(field.path()).x;
-        assert_eq!(got, held, "{}", field.path());
+        let got = field.get(&s, id).map(|v| v.x);
+        assert_eq!(got, Some(held), "{}", field.path());
     }
 }
