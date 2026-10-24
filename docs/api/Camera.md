@@ -43,8 +43,8 @@ return `nil` without a camera; setters are then no-ops.
 | Function | Signature | Returns |
 |---|---|---|
 | `Camera.GetProjection` / `SetProjection` | `(id)` / `(id, name [, size])` | `name, size` — `"Perspective"` (size `nil`) or `"Orthographic"`; `size` is half the view's height in world units (Unity's `orthographicSize`, > 0; omitted keeps the current one, else 5) |
-| `Camera.GetFieldOfView` / `SetFieldOfView` | `(id)` / `(id, degrees)` | the vertical field of view (Unity's `fieldOfView`), clamped 1–179 (NaN takes 1) |
-| `Camera.GetClipPlanes` / `SetClipPlanes` | `(id)` / `(id, near, far)` | `near, far` (Unity's `nearClipPlane` / `farClipPlane`): `near` is at least 0.01, `far` at least 0.01 beyond it; a NaN or infinite plane takes that bound |
+| `Camera.GetFieldOfView` / `SetFieldOfView` | `(id)` / `(id, degrees)` | the vertical field of view (Unity's `fieldOfView`), clamped 1–179 (NaN takes 1); a loaded value out of range reads back held |
+| `Camera.GetClipPlanes` / `SetClipPlanes` | `(id)` / `(id, near, far)` | `near, far` (Unity's `nearClipPlane` / `farClipPlane`): `near` is at least 0.01, `far` at least 0.01 beyond it; a NaN or infinite plane takes that bound. A loaded value reads back held the same way (and `near` at most 1e18, `far` at most `f32::MAX / near`) |
 | `Camera.GetRenderOrder` / `SetRenderOrder` | `(id)` / `(id, order)` | the stacking order (Unity's `depth`, default 0): screen cameras draw from lowest to highest, so a higher one composites on top |
 | `Camera.GetClearFlags` / `SetClearFlags` | `(id)` / `(id, name)` | `"Skybox"` (default), `"SolidColor"` or `"DepthOnly"` — what the camera clears before it draws (Unity's `clearFlags`); any case, and Unity's `"Color"` / `"Depth"` too. An unknown name is an error |
 | `Camera.GetCullingMask` / `SetCullingMask` | `(id)` / `(id, mask)` | the layers it draws, one bit per layer (Unity's `cullingMask`; default all). Any integer is kept to its low 32 bits, so `-1` (`~0`) is everything |

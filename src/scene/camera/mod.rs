@@ -7,8 +7,10 @@
 use glam::camera::rh::proj::directx;
 use glam::{Mat4, Vec3};
 
+mod lens;
 mod projection;
 
+pub use lens::{held_fov, held_lens, Lens, MAX_LENS_EXTENT};
 pub use projection::ScreenPoint;
 
 use crate::components::Projection;
@@ -18,6 +20,10 @@ use crate::scene::{layer_in_mask, ClearFlags, Scene};
 /// position + yaw/pitch plus the lens and culling state reconciled from the scene's
 /// `CameraComponent`s. Gameplay scripts, the audio listener and the renderer all
 /// read this one camera.
+///
+/// Its lens is always valid: every copy from a component goes through
+/// [`held_lens`] (#1359), so a reader uses `fov` / `near` / `far` / `projection` as
+/// they are and gets a finite projection.
 #[derive(Clone)]
 pub struct Camera {
     pub position: Vec3,
@@ -86,16 +92,13 @@ impl Camera {
 
     /// The view → clip matrix for a viewport of `aspect` (wgpu depth `0..1`).
     pub fn projection_matrix(&self, aspect: f32) -> Mat4 {
-        // Guard against a degenerate range (e.g. far <= near from hand-edited values),
-        // which would otherwise produce a NaN projection.
-        let far = self.far.max(self.near + 0.001);
+        let (near, far) = (self.near, self.far);
         match self.projection {
             Projection::Perspective => {
-                directx::perspective(self.fov.to_radians(), aspect, self.near, far)
+                directx::perspective(self.fov.to_radians(), aspect, near, far)
             }
-            Projection::Orthographic { size } => {
-                let (h, w) = (size.max(0.001), size.max(0.001) * aspect);
-                directx::orthographic(-w, w, -h, h, self.near, far)
+            Projection::Orthographic { size: h } => {
+                directx::orthographic(-h * aspect, h * aspect, -h, h, near, far)
             }
         }
     }
@@ -128,18 +131,15 @@ pub fn sync_lens_from_scene(camera: &mut Camera, scene: &Scene, is_playing: bool
             let screen = c.active && c.target_texture.is_none();
             if scene.world.is_active_in_hierarchy(id) && screen && c.render_order <= best_order {
                 best_order = c.render_order;
-                lens = Some((c.fov, c.near, c.far, c.culling_mask, c.projection));
+                lens = Some((held_lens(&c), c.culling_mask));
             }
         }
     }
 
     let had_scene_lens = std::mem::replace(&mut camera.scene_lens, lens.is_some());
     match lens {
-        Some((fov, near, far, mask, projection)) => {
-            camera.projection = projection;
-            camera.fov = fov;
-            camera.near = near;
-            camera.far = far;
+        Some((lens, mask)) => {
+            lens.apply(camera);
             camera.culling_mask = mask;
         }
         None => {
@@ -203,10 +203,7 @@ pub fn camera_for_entity(base: &Camera, scene: &Scene, id: u32) -> Option<Camera
 /// Layer `c`'s lens (fov/near/far/projection), culling mask and clear flags onto
 /// `cam`, keeping its pose.
 pub fn apply_lens(cam: &mut Camera, c: &crate::components::CameraComponent) {
-    cam.fov = c.fov;
-    cam.near = c.near;
-    cam.far = c.far;
-    cam.projection = c.projection;
+    held_lens(c).apply(cam);
     cam.culling_mask = c.culling_mask;
     cam.clear_flags = c.clear_flags;
 }
@@ -214,6 +211,10 @@ pub fn apply_lens(cam: &mut Camera, c: &crate::components::CameraComponent) {
 #[cfg(test)]
 #[path = "sync_tests.rs"]
 mod sync_tests;
+
+#[cfg(test)]
+#[path = "lens_tests.rs"]
+mod lens_tests;
 
 /// Yaw/pitch (degrees) of a world matrix's forward (-Z) axis, the inverse of
 /// [`Camera::forward`], so a camera entity's orientation maps onto the render camera.

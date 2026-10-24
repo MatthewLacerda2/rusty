@@ -77,7 +77,7 @@ pub fn fit(
     settings: &ShadowSettings,
     map_size: u32,
 ) -> Vec<Cascade> {
-    let near = camera.near.max(0.01);
+    let near = camera.near;
     let far = settings.distance.min(camera.far).max(near * 2.0);
     let count = settings.cascades.clamp(1, MAX_CASCADES as u32) as usize;
     let light_view = light_view(light_dir);

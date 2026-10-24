@@ -11,8 +11,9 @@
 //! target, lens and stacking — #430, #827, #1341) take an id and write this
 //! component through these ops. The lens ops hold Unity's bounds (FOV 1–179°,
 //! near above 0, far beyond near) on every write, so neither the card nor a script
-//! can write a broken frustum. A value read from a scene file does not pass through
-//! here, so a loaded camera is not held to them (#1359).
+//! can write a broken frustum. A value that skips them (a scene file, a prefab) is
+//! held to them where the view camera copies its lens (`scene::camera::held_lens`,
+//! #1359).
 //! The component's motion-blur fields ARE also written from `Graphics.*`
 //! (`SetMotionBlurActive` / `SetMotionBlurSamples`); those route through
 //! [`set_motion_blur_active`] / [`set_motion_blur_samples`] here, so the card and the
@@ -35,6 +36,8 @@ pub const MAX_FOV: f32 = 179.0;
 pub const MIN_NEAR: f32 = 0.01;
 /// How far beyond the near plane the far plane must at least sit (Unity's gap).
 pub const MIN_CLIP_GAP: f32 = 0.01;
+/// The smallest orthographic half-height, so the view keeps a volume.
+pub const MIN_ORTHO_SIZE: f32 = 0.01;
 
 /// Set the camera's vertical field of view (degrees), clamped to
 /// [`MIN_FOV`]..=[`MAX_FOV`]. A NaN takes [`MIN_FOV`] (`f32::clamp` would keep it).
@@ -100,12 +103,13 @@ pub fn set_fxaa_active(c: &mut CameraComponent, active: bool) {
 /// gigabytes, not a quality bound (4096² is a 64 MB colour target).
 pub const MAX_TARGET_SIZE: u32 = 4096;
 
-/// Set the camera's projection (#430). An orthographic size is clamped to > 0.
+/// Set the camera's projection (#430). An orthographic size is at least
+/// [`MIN_ORTHO_SIZE`].
 // lint: allow(sanitize) the orthographic size, its one float, goes through `at_least`
 pub fn set_projection(c: &mut CameraComponent, projection: Projection) {
     c.projection = match projection {
         Projection::Orthographic { size } => Projection::Orthographic {
-            size: at_least(size, 0.01),
+            size: at_least(size, MIN_ORTHO_SIZE),
         },
         p => p,
     };

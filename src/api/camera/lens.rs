@@ -2,7 +2,9 @@
 //! field of view, clip planes, render order and clear flags, Unity's
 //! `fieldOfView`, `nearClipPlane` / `farClipPlane`, `depth` and `clearFlags`.
 //! Registered by `component::register`, with its `read` / `write` contract: getters
-//! return `nil` without a camera, setters are then no-ops.
+//! return `nil` without a camera, setters are then no-ops. The lens getters return
+//! the held lens the camera draws with (`scene::camera::held_lens`, #1359), as
+//! Unity's do, so a value loaded out of bounds reads back within them.
 
 use std::cell::RefCell;
 
@@ -10,6 +12,7 @@ use super::component::{read, write};
 use crate::api::{put, Reg};
 use crate::components::ClearFlags;
 use crate::scene::authoring::camera as camera_ops;
+use crate::scene::camera::held_lens;
 use crate::scene::Scene;
 
 /// Register `Get/SetFieldOfView`, `Get/SetClipPlanes`, `Get/SetRenderOrder` and
@@ -22,7 +25,7 @@ pub(super) fn register<'scope>(
     put(
         table,
         "GetFieldOfView",
-        scope.create_function(|_, id: u32| Ok(read(scene, id, |c| c.fov))),
+        scope.create_function(|_, id: u32| Ok(read(scene, id, |c| held_lens(c).fov))),
     )?;
     put(
         table,
@@ -36,8 +39,11 @@ pub(super) fn register<'scope>(
         table,
         "GetClipPlanes",
         scope.create_function(|_, id: u32| {
-            let (near, far): (Option<f32>, Option<f32>) =
-                read(scene, id, |c| (c.near, c.far)).unzip();
+            let (near, far): (Option<f32>, Option<f32>) = read(scene, id, |c| {
+                let lens = held_lens(c);
+                (lens.near, lens.far)
+            })
+            .unzip();
             Ok((near, far))
         }),
     )?;
