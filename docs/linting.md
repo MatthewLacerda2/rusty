@@ -75,6 +75,15 @@ so oversized integration-test files passed unseen, and until #541 it skipped `to
 so the lint crate itself could drift past the cap. Any `target/` directory (cargo
 <!-- docrefs: allow build output, never tracked -->
 build output, e.g. `tools/lint/target/` or `fuzz/target/`) is never descended into.
+It measures what can be committed (#1373): git lists the tracked files and the
+untracked ones `.gitignore` doesn't exclude (`git ls-files --cached --others
+--exclude-standard`), so what the engine seeds into a gitignored folder (the UI
+kit's scripts and the default shader it copies into the fixture project's
+`assets/`) never counts, and a new file is measured before it is added. Where git
+can't list them (a tarball with no `.git`) it walks the disk and says so on stderr.
+The code gates (rules, layers, determinism, direction, components, parity) keep
+walking the disk: they check what cargo compiles, and an ignored `.rs` file is
+compiled all the same, which is the file the `ignored` rule flags.
 The commit hook checks whatever `.rs`, `.py`, `.lua` and `.wgsl` files are staged, wherever they live.
 
 ## Run it
