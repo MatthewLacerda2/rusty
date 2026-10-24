@@ -170,6 +170,8 @@ pub struct Renderer {
     pub gpu_meshes: HashMap<MeshId, GpuMesh>,
     pub gpu_textures: HashMap<crate::asset::MapRef, Rc<GpuTexture>>,
     /// Which cached uploads went stale: re-written files and failed loads (#689).
+    /// What each cached upload's mips were built for (#1416).
+    pub(crate) texture_kinds: crate::render::gpu::textures::kind_watch::KindWatch,
     pub(crate) texture_freshness: crate::core::fs::freshness::Freshness,
     pub default_texture: Rc<GpuTexture>,
     /// What an extra shader texture slot samples with no texture of its own (#400).
