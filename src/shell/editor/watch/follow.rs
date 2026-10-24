@@ -87,8 +87,20 @@ impl SceneFollow {
         if self.failed.as_deref() == Some(on_disk.as_str()) {
             return false; // the same bytes failed last frame: wait for new ones
         }
-        // Parse first: the live scene is serialised (for `unsaved`) only once the
-        // file is known to load, so a broken Dust2-sized file costs one parse.
+        self.reload(scene, path, on_disk, selected, console)
+    }
+
+    /// Replace `scene` with `on_disk`, the changed text of `path`, and say so.
+    /// Parse first: the live scene is serialised (for `unsaved`) only once the file
+    /// is known to load, so a broken Dust2-sized file costs one parse.
+    fn reload(
+        &mut self,
+        scene: &mut Scene,
+        path: &str,
+        on_disk: String,
+        selected: &mut Option<u32>,
+        console: &mut ConsoleLogs,
+    ) -> bool {
         let loaded = parse_scene_text(&on_disk, path).and_then(|data| {
             let unsaved = scene.has_unsaved_edits(path);
             let keep = selected.and_then(|id| name_path(scene, id));
