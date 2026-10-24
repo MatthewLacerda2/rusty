@@ -65,12 +65,19 @@ fn stop_brings_the_edit_runtime_back_on_the_restored_scene() {
 }
 
 #[test]
-fn a_scene_replaced_in_place_is_what_eval_sees() {
+fn a_scene_reloaded_from_disk_is_what_eval_sees() {
+    let dir = crate::test_temp::dir().join("rusty_1339_reload");
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = crate::core::paths::to_slash(&dir.join("disk.scene"));
+    let mut on_disk = Scene::new();
+    on_disk.add_entity("FromDisk".to_string());
+    on_disk.save_to_file(&path).unwrap();
     let gw = edit_world();
-    let mut reloaded = Scene::new();
-    reloaded.add_entity("FromDisk".to_string());
-    *gw.scene().borrow_mut() = reloaded; // what a reload from disk does to the cell
+    eval(&gw, "Scene.CreateEntity(\"Unsaved\")");
+    // What the editor's follow-the-file reload does to the shared cell (#1340).
+    gw.scene().borrow_mut().load_from_file(&path).unwrap();
     assert_ne!(find(&gw, "FromDisk"), "nil");
+    assert_eq!(find(&gw, "Unsaved"), "nil");
 }
 
 #[test]

@@ -17,8 +17,7 @@ impl GameWorld {
     /// entity scripts are loaded, and `physics` stays `None` (edit mode has no
     /// rapier world). The runtime binds the same shared `scene`/`input`/`nav`/…
     /// cells, so every `api::` namespace resolves against the live world and
-    /// mutations stick. Stop restores it after Play
-    /// ([`restore_edit_runtime`](Self::restore_edit_runtime)).
+    /// mutations stick. Stop restores it after Play (`restore_edit_runtime`).
     ///
     /// Idempotent: a no-op once the runtime is live (re-initialising would drop
     /// any session state held in the VM). Errors surface as the Lua init message.
