@@ -127,3 +127,17 @@ fn the_outside_warning_prints_a_slash_path_without_a_verbatim_prefix() {
     assert!(!shown.contains('\\'), "no `\\` and no `\\\\?\\`: {shown}");
     assert!(shown.ends_with("a/b/shared.lua"), "{shown}");
 }
+
+#[test]
+fn a_module_name_with_an_empty_segment_is_refused_before_any_path_is_built() {
+    let root = dir("empty_segment");
+    write(&root.join("assets/scripts/a/b.lua"), "return { v = 'ab' }");
+    let (m, _) = manager(&root);
+    for name in [".util", "a..b", "a.", "."] {
+        let err = m
+            .exec(&format!("require('{name}')"))
+            .expect_err("empty segment");
+        assert!(err.contains(&format!("bad module name '{name}'")), "{err}");
+    }
+    assert_eq!(out(&m, "out = require('a.b').v"), "ab");
+}

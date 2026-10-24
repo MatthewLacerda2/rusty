@@ -129,6 +129,13 @@ fn found(lua: &Lua, code: &str, origin: &Path) -> mlua::Result<MultiValue> {
 
 fn project_searcher(lua: &Lua, access: Rc<Access>) -> mlua::Result<Function> {
     lua.create_function(move |lua, name: String| {
+        // An empty segment would make a leading `/`, and `Path::join` then drops
+        // the scripts directory and probes the filesystem root (#1391).
+        if name.split('.').any(str::is_empty) {
+            return Err(mlua::Error::runtime(format!(
+                "bad module name '{name}': empty segment (a leading, trailing or doubled '.')"
+            )));
+        }
         let rel = name.replace('.', "/");
         let dir = access.workspace.join(native(SCRIPTS_DIR));
         let mut tried = Vec::new();
