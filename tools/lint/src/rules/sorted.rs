@@ -24,7 +24,7 @@ use super::finding::Finding;
 use super::scan::Scan;
 use crate::repo::ls_files;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 pub const RULE: &str = "sorted";
 /// Words skipped before an entry's key starts.
@@ -155,38 +155,50 @@ fn key(line: &str) -> Option<String> {
 
 /// The tracked Markdown files under [`MARKDOWN_ROOTS`] and at the top of the repo at
 /// `root`, relative to it. Only tracked ones: a gitignored note (the operator's
-/// `auxmd.md`) never reaches CI, so it must not fail the gate locally either.
-pub fn markdown(root: &Path) -> Result<Vec<String>, String> {
-    let mut md: Vec<String> = ls_files(root, &[], &["*.md"])?
-        .iter()
-        .map(|p| p.to_string_lossy().into_owned())
-        .filter(|p| !p.contains('/') || in_roots(p))
-        .collect();
-    md.sort();
+/// `auxmd.md`) never reaches CI, so it must not fail the gate locally either. The
+/// paths stay raw, so a name that isn't UTF-8 still names the file to read.
+pub fn markdown(root: &Path) -> Result<Vec<PathBuf>, String> {
+    let mut md = ls_files(root, &[], &["*.md"])?;
+    md.retain(|p| p.components().count() == 1 || in_roots(p));
     Ok(md)
 }
 
-fn in_roots(path: &str) -> bool {
-    MARKDOWN_ROOTS
-        .iter()
-        .any(|r| path.strip_prefix(r).is_some_and(|p| p.starts_with('/')))
+fn in_roots(path: &Path) -> bool {
+    MARKDOWN_ROOTS.iter().any(|r| path.starts_with(r))
 }
 
 /// The rule over every scanned file and the Markdown under the working directory.
 pub fn run(scan: &Scan) -> Vec<Finding> {
     let mut found = scan.each_file(check);
-    match markdown(Path::new(".")) {
-        Ok(paths) => {
-            for path in paths {
-                found.extend(check(&path, &fs::read_to_string(&path).unwrap_or_default()));
-            }
+    found.extend(markdown_findings(Path::new(".")));
+    found
+}
+
+/// The rule over the tracked Markdown of the repository at `root`. A listed file
+/// that can't be read is a finding, never a skip: a list in it would pass unchecked.
+fn markdown_findings(root: &Path) -> Vec<Finding> {
+    let problem = |path: String, message: String| Finding {
+        path,
+        line: 1,
+        rule: RULE,
+        message,
+    };
+    let paths = match markdown(root) {
+        Ok(paths) => paths,
+        Err(why) => {
+            return vec![problem(
+                ".".into(),
+                format!("could not list the tracked Markdown: {why}"),
+            )]
         }
-        Err(why) => found.push(Finding {
-            path: ".".into(),
-            line: 1,
-            rule: RULE,
-            message: format!("could not list the tracked Markdown: {why}"),
-        }),
+    };
+    let mut found = Vec::new();
+    for path in paths {
+        let shown = path.to_string_lossy().into_owned();
+        match fs::read_to_string(root.join(&path)) {
+            Ok(source) => found.extend(check(&shown, &source)),
+            Err(why) => found.push(problem(shown, format!("could not read this file: {why}"))),
+        }
     }
     found
 }

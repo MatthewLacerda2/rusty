@@ -1,7 +1,7 @@
 //! The full scan measures what can be committed (#1373), and walks the disk where
 //! git can't say.
 
-use super::super::{check_file, full_scan, MAX_TEST_FILE_LINES};
+use super::super::{check_file, fallback_note, full_scan, MAX_TEST_FILE_LINES};
 use super::committable;
 use crate::repo::scaffold::Repo;
 use std::fs;
@@ -50,4 +50,14 @@ fn without_a_repository_the_scan_walks_the_disk() {
     let seeded = dir.file("tests/fixtures/project/assets/kit.lua", &too_long());
     dir.file("tests/target/gen.rs", "//\n");
     assert_eq!(full_scan(&dir.0), vec![seeded]);
+}
+
+#[test]
+fn the_fallback_note_keeps_gits_message_on_its_own_lines() {
+    let note = fallback_note("git exit status: 128: fatal: dubious\n  line two\n  line three");
+    let mut lines = note.lines();
+    let first = lines.next().expect("note");
+    assert!(first.ends_with("gitignored ones included"), "{first}");
+    assert!(!first.contains("dubious"), "{first}");
+    assert_eq!(lines.count(), 4, "{note}");
 }

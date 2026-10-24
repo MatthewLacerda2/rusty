@@ -103,15 +103,21 @@ fn full_scan(base: &Path) -> Vec<PathBuf> {
                 .filter(|p| Lang::of(p).is_some())
                 .collect()
         }
-        Err(why) => eprintln!(
-            "lint: git can't list the committable files here ({why}); measuring every \
-             file on disk, gitignored ones included"
-        ),
+        Err(why) => eprintln!("{}", fallback_note(&why)),
     }
     SIZE_ROOTS
         .iter()
         .flat_map(|root| measured_in(&base.join(root)))
         .collect()
+}
+
+/// The stderr note for the disk walk: one line saying so, then git's own message
+/// (several lines for "dubious ownership") on lines of its own.
+fn fallback_note(why: &str) -> String {
+    format!(
+        "lint: git can't list the committable files here; measuring every file on disk, \
+         gitignored ones included\ngit said:\n{why}"
+    )
 }
 
 /// Every `.rs` file under `dir`, build output aside: what the rules gate scans.
