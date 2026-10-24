@@ -91,6 +91,10 @@ pub struct Resources {
     /// A standalone run (the player, #431) has no edit mode to return to, so Play
     /// takes no edit snapshot. Set once by `GameWorld::boot_standalone`.
     pub(super) standalone: bool,
+    /// The host brought the Lua runtime up in edit mode (`init_edit_runtime`, the
+    /// editor and the headless session): Stop brings it back after Play's runtime
+    /// shuts down, so the console and MCP `eval` keep working (#1339).
+    pub(super) edit_runtime: bool,
     /// Conversion refused while this world plays (#1253): taken on Play, dropped
     /// on Stop or with the world.
     pub(super) play_hold: Option<crate::asset::convert::PlayHold>,
@@ -174,6 +178,7 @@ impl Resources {
             edit_snapshot: None,
             play_origin: None,
             standalone: false,
+            edit_runtime: false,
             play_hold: None,
             sources_root: crate::core::project::ASSETS_DIR.into(),
             frame_dt: 0.0,

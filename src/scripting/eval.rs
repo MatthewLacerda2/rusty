@@ -20,10 +20,11 @@ impl ScriptManager {
     /// echoed back; if that fails to compile it is run as a statement (assignments,
     /// `print(...)`, control flow). Multiple returned values are comma-joined.
     pub fn eval(&self, line: &str) -> Result<String, String> {
-        let lua = self
-            .lua
-            .as_ref()
-            .ok_or_else(|| "runtime not initialized (enter Play to evaluate)".to_string())?;
+        let lua = self.lua.as_ref().ok_or_else(|| {
+            "no Lua runtime: this host has none outside Play, or it failed to start \
+             (see the console's `Lua init error`)"
+                .to_string()
+        })?;
 
         let trimmed = line.trim();
         if trimmed.is_empty() {

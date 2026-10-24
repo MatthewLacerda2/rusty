@@ -64,7 +64,11 @@ fn prepare(
     }
     boot::seed_project_workspace();
     let scene_path = crate::scene::DEFAULT_SCENE_PATH.to_string();
-    let game = boot::load_game(&scene_path);
+    let mut game = boot::load_game(&scene_path);
+    // Editor scripting works outside Play, as in Unity (#1339): the console line
+    // and MCP `eval` drive the edit scene; Stop brings this runtime back.
+    let init = game.init_edit_runtime();
+    game.report_lua_init(init);
     // Bound: the File → Build Settings window and `Application.Set*` write the file.
     let bound = game.resources.application.borrow_mut().open(PROJECT_FILE);
     if let Err(err) = bound {

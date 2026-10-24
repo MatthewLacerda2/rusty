@@ -5,8 +5,8 @@
 //! `src/bin/player.rs`; both share the same shell (#431).
 //!
 //! ```text
-//! cargo run                     # the project picker: recent projects, New, Open
-//! cargo run -- --project <dir>  # open the game project at <dir> (created if missing)
+//! cargo run --bin rusty                     # the project picker: recent projects, New, Open
+//! cargo run --bin rusty -- --project <dir>  # open the game project at <dir> (created if missing)
 //! ```
 //!
 //! Without `--project` the editor starts on the project picker (#854), as Unity starts

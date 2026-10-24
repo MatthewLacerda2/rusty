@@ -59,9 +59,12 @@ was raised while *its* line was evaluated; the rest shows in the window's consol
 - `{"ok":true,"result":"","warnings":["[Asset] texture 'rock.png' skipped: not found"]}`
 
 A line is evaluated as an expression first (so it echoes its value), then as a
-statement. **State persists for the life of the process**: globals set on one line
-are visible on the next, and any world mutation (a loaded scene, baked nav, an
-imported mesh, a moved transform) stays put across commands. The session runs in
+statement. Globals set on one line are visible on the next, and any world mutation
+(a loaded scene, baked nav, an imported mesh, a moved transform) stays put across
+commands. **Globals do not survive Play or Stop**: each builds a fresh Lua VM, as
+Unity's domain reload does, so a global set in edit mode is gone once Play starts,
+and one set during Play is gone after Stop. Edit-mode world changes survive Play
+(Stop restores them); Play-mode ones are discarded. The session runs in
 **edit mode** — it does *not* force play — and a failed command is reported in its
 response **without** tearing the session down. The channel ends at EOF.
 
@@ -77,9 +80,10 @@ to carry a value across commands, as with `pid` above.
 ### Attaching to a windowed playtest
 
 The same command channel is also exposed by the **windowed** engine (`cargo run
---features dev`), so an agent can attach to a *running, rendered* playtest and drive
+--bin rusty --features dev`), so an agent can attach to a *running, rendered* playtest and drive
 it live — not just the headless `session` binary. The framing and protocol are
-**identical** to the headless session above; only the transport differs:
+the headless session's above, edit mode and the Play/Stop rule for globals
+included; the transport differs:
 
 - **Linux / macOS:** a unix domain socket. Path is `$RUSTY_CMD_SOCK` if set, else
   `$XDG_RUNTIME_DIR/rusty.sock`, else `/tmp/rusty.sock`.

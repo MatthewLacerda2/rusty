@@ -83,7 +83,8 @@ pub struct ScriptManager {
     pub(super) audio: Rc<RefCell<AudioMaestro>>,
     /// The seeded gameplay RNG (#443) behind `Random` and the sandboxed
     /// `math.random`. Restarted from its fixed default seed by every
-    /// [`ScriptManager::init_runtime`], i.e. on every Play.
+    /// [`ScriptManager::init_runtime`]: on every Play, and on every Stop that
+    /// brings the edit-mode runtime back.
     pub(super) random: Rc<RefCell<Random>>,
     /// The screen the UI lays out on (#417), shared with `Resources` so `UI.GetRect`
     /// and the layout system agree on one size.
@@ -248,7 +249,8 @@ impl ScriptManager {
         .map_err(|e| e.to_string())
     }
 
-    /// Whether the live runtime exists yet (only during play / a loaded scenario).
+    /// Whether the live runtime exists: during Play, and outside it on a host that
+    /// brought the edit-mode runtime up (the editor, the headless session).
     pub fn is_live(&self) -> bool {
         self.lua.is_some()
     }

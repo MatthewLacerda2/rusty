@@ -22,12 +22,17 @@ fn getter_setter_round_trip_through_channel() {
     let s = session();
     // Author an entity into the live edit world, then round-trip a setter and a
     // getter through the same command channel against that live state.
-    s.world()
+    let authored = s
+        .world()
         .scene()
         .borrow_mut()
         .add_entity("Probe".to_string());
     let id = s.eval("Scene.FindEntityByName(\"Probe\")").unwrap();
-    assert_ne!(id, "0", "the live scene must resolve the authored entity");
+    assert_eq!(
+        id,
+        authored.to_string(),
+        "the live scene resolves the entity"
+    );
 
     s.eval(&format!("Transform.SetPosition({}, 1, 2, 3)", id))
         .unwrap();
