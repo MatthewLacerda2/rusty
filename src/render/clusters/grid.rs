@@ -28,7 +28,7 @@ impl ClusterGrid {
             proj,
             inv_proj: proj.inverse(),
             near: cam.near,
-            far: cam.far.max(cam.near + 0.001),
+            far: cam.far,
             log_slices: matches!(cam.projection, Projection::Perspective),
         }
     }

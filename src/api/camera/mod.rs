@@ -16,7 +16,6 @@ use glam::{Vec2, Vec3};
 use mlua::Lua;
 
 use super::{put, ApiScopedCtx, Reg};
-use crate::scene::authoring::camera as camera_ops;
 use crate::scene::camera::MAX_PITCH;
 use crate::scene::Camera;
 
@@ -136,7 +135,7 @@ fn register_fov<'scope>(
         table,
         "SetFov",
         scope.create_function(|_, fov: f32| {
-            camera.borrow_mut().fov = fov.clamp(camera_ops::MIN_FOV, camera_ops::MAX_FOV);
+            camera.borrow_mut().fov = crate::scene::camera::held_fov(fov);
             Ok(())
         }),
     )

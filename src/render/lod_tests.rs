@@ -88,3 +88,22 @@ fn the_static_bake_and_inactive_groups() {
     let sel = LodSelection::for_camera(&scene, &camera());
     assert!(hidden(&sel).is_empty(), "an inactive group hides nothing");
 }
+
+#[test]
+fn an_orthographic_view_uses_the_held_half_height() {
+    use crate::components::{CameraComponent, Projection};
+    use crate::scene::authoring::camera::MIN_ORTHO_SIZE;
+    let (scene, group) = scene_with_group(4.0);
+    let ortho = |size| CameraComponent {
+        projection: Projection::Orthographic { size },
+        ..CameraComponent::default()
+    };
+    let mut cam = camera();
+    crate::scene::camera::apply_lens(&mut cam, &ortho(5.0));
+    let h = screen_height(2.0, &cam, scene.world.local_to_world(group));
+    assert!((h - 0.2).abs() < 1e-6, "2 m under a 5 m half-height: {h}");
+    // A zero size loaded from a file is held to the floor, not divided by.
+    crate::scene::camera::apply_lens(&mut cam, &ortho(0.0));
+    let h = screen_height(2.0, &cam, scene.world.local_to_world(group));
+    assert_eq!(h, 2.0 / (2.0 * MIN_ORTHO_SIZE));
+}
