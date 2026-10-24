@@ -28,6 +28,7 @@ pub mod camera;
 pub mod canvas;
 pub mod canvas_group;
 pub mod character_controller;
+pub mod component;
 pub mod decals;
 pub mod graphics;
 pub mod image;
@@ -190,6 +191,7 @@ pub fn register<'scope>(
     camera::register(lua, scope, ctx)?;
     canvas::register(lua, scope, ctx.scene, ctx.screen, ctx.video)?;
     character_controller::register(lua, scope, ctx.scene, ctx.physics)?;
+    component::register(lua, scope, ctx.scene)?;
     decals::register(lua, scope, ctx.scene)?;
     graphics::register(lua, scope, ctx.scene, ctx.quality)?;
     input::register_readable(lua, scope, ctx.input)?;
