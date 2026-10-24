@@ -13,6 +13,7 @@
 //! as `Lighting.SetSettings{…}` edits them.
 
 use crate::editor::widgets::DragRange;
+use std::path::Path;
 use std::time::Duration;
 
 use egui_phosphor::regular as icon;
@@ -49,15 +50,20 @@ pub fn draw(
 ) {
     ui.add_space(8.0);
     let idle = editor.dev.lightmap_bake.is_none();
+    let open = is_open_scene(editor, path);
     let button = egui::Button::new(format!("{}  Generate Lighting", icon::LIGHTBULB))
         .min_size(egui::Vec2::new(160.0, 24.0));
     // It writes the scene file, so Play greys it out as it does Save (#1340): the
     // inspector is gated on the *requested* play state, so it can still be drawn on
     // the frame Play starts or stops.
     let generate = ui
-        .add_enabled(idle && !scene.is_playing(), button)
+        .add_enabled(idle && open && !scene.is_playing(), button)
         .on_hover_text("Bake lightmaps, then light & reflection probes, and save the result")
-        .on_disabled_hover_text("Stop Play first, or wait for the bake");
+        .on_disabled_hover_text(if open {
+            "Stop Play first, or wait for the bake"
+        } else {
+            "Open this scene to bake it"
+        });
     let changed = ui
         .add_enabled_ui(idle, |ui| {
             draw_settings(ui, &mut scene.lighting_settings.lightmaps)
@@ -65,7 +71,7 @@ pub fn draw(
         .inner;
     editor.is_dirty |= changed;
     if generate.clicked() {
-        start(editor, scene, console, path);
+        start(editor, scene, console);
     }
     draw_progress(ui, editor);
 }
@@ -107,16 +113,38 @@ fn draw_settings(ui: &mut egui::Ui, s: &mut BakeSettings) -> bool {
     changed
 }
 
-/// Start the lightmap step of the live scene in the background.
-fn start(editor: &mut EditorUi, scene: &mut Scene, console: &mut ConsoleLogs, path: &str) {
+/// Whether the card's scene file is the editor's open scene. Unity bakes the open
+/// scene only, so the button is live on that card alone (#1394). Compared
+/// canonically: the same file spelled relative and absolute is one scene, while
+/// `DiskText` keys the engine's own writes by exact spelling.
+fn is_open_scene(editor: &EditorUi, card: &str) -> bool {
+    let Some(open) = editor.current_scene_path() else {
+        return false;
+    };
+    open == card
+        || matches!(
+            (
+                crate::core::paths::canonicalize(Path::new(&open)),
+                crate::core::paths::canonicalize(Path::new(card)),
+            ),
+            (Ok(a), Ok(b)) if a == b
+        )
+}
+
+/// Start the lightmap step of the live scene in the background. It writes to the
+/// open scene's file, never to whichever scene asset the card shows.
+fn start(editor: &mut EditorUi, scene: &mut Scene, console: &mut ConsoleLogs) {
+    let Some(path) = editor.current_scene_path() else {
+        return console.error("Generate Lighting failed: save the scene first".into());
+    };
     let settings = scene.lighting_settings.lightmaps;
-    match LightmapBakeJob::start(scene, Some(path), settings) {
+    match LightmapBakeJob::start(scene, Some(&path), settings) {
         Ok(job) => {
             console.info("Generating lighting in the background…".into());
             editor.dev.lightmap_bake = Some(ActiveBake {
                 job,
                 scene: scene.id(),
-                path: editor.current_scene_path(),
+                path: Some(path),
             });
         }
         Err(e) => console.error(format!("Generate Lighting failed: {e}")),
