@@ -136,7 +136,7 @@ impl PhysicsWorld {
             let Some(joint) = scene.world.joint(id).map(|j| shape_of(&j)) else {
                 continue;
             };
-            if !scene.world.is_active(id) {
+            if !scene.world.is_active_in_hierarchy(id) {
                 continue;
             }
             let body = |e: u32| self.id_to_body.get(&body_owner(scene, e)).copied();

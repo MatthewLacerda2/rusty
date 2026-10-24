@@ -130,7 +130,7 @@ pub(super) fn layout_children(world: &World, id: u32) -> Vec<u32> {
     world
         .children(id)
         .into_iter()
-        .filter(|&c| world.is_active(c) && world.has_rect_transform(c))
+        .filter(|&c| world.is_active_in_hierarchy(c) && world.has_rect_transform(c))
         .filter(|&c| !world.layout_element(c).is_some_and(|le| le.ignore_layout))
         .collect()
 }

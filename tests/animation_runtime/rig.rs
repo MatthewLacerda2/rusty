@@ -8,7 +8,7 @@ use glam::{Mat4, Vec3};
 use rusty::asset::anim_data::{AnimationClip, Interpolation, JointTrack, Track};
 use rusty::asset::mesh_data::{JointTransform, SkinData};
 use rusty::components::{AnimatorComponent, MeshComponent};
-use rusty::scene::{Scene, ScriptComponent};
+use rusty::scene::Scene;
 
 /// A one-joint skin, `hand`, whose clip slides it +X over [0, 1] s — the smallest
 /// rig that produces a non-identity pose.
@@ -44,7 +44,22 @@ fn slide_clip() -> AnimationClip {
 /// its hand; returns the scene with the (character, hand bone, gun) ids.
 pub fn armed_scene(script: Option<&str>) -> (Scene, u32, u32, u32) {
     let mut scene = Scene::new();
-    let hero = scene.add_entity("Hero".to_string());
+    let hero = add_hero(&mut scene, "Hero");
+    if let Some(source) = script {
+        crate::play::attach_script(&mut scene, hero, "rusty_453_late.lua", source);
+    }
+    let hand = scene
+        .find_bone(hero, "hand")
+        .expect("the skeleton was spawned");
+    let gun = scene.add_entity("Gun".to_string());
+    scene.world.transform_mut(gun).unwrap().position = Vec3::new(0.0, 0.5, 0.0);
+    scene.set_parent(gun, Some(hand)).unwrap();
+    (scene, hero, hand, gun)
+}
+
+/// A skinned `name` playing the slide clip, its skeleton spawned.
+pub fn add_hero(scene: &mut Scene, name: &str) -> u32 {
+    let hero = scene.add_entity(name.to_string());
     scene.world.set_mesh(
         hero,
         Some(MeshComponent {
@@ -58,22 +73,8 @@ pub fn armed_scene(script: Option<&str>) -> (Scene, u32, u32, u32) {
     let mut anim = AnimatorComponent::default();
     anim.play("Slide".to_string());
     scene.world.set_animator(hero, Some(anim));
-    if let Some(source) = script {
-        let path = crate::temp::dir().join("rusty_453_late.lua");
-        std::fs::write(&path, source).unwrap();
-        *scene.world.scripts_mut(hero).unwrap() = vec![ScriptComponent {
-            path: path.to_string_lossy().replace('\\', "/"),
-            ..Default::default()
-        }];
-    }
     scene.sync_skeleton(hero);
-    let hand = scene
-        .find_bone(hero, "hand")
-        .expect("the skeleton was spawned");
-    let gun = scene.add_entity("Gun".to_string());
-    scene.world.transform_mut(gun).unwrap().position = Vec3::new(0.0, 0.5, 0.0);
-    scene.set_parent(gun, Some(hand)).unwrap();
-    (scene, hero, hand, gun)
+    hero
 }
 
 /// Play `scene` for `ticks` fixed steps through the real schedule.

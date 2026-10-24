@@ -138,7 +138,7 @@ pub(crate) fn referenced_render_textures(scene: &Scene) -> HashSet<String> {
         .world
         .ids_with_image()
         .into_iter()
-        .filter(|&id| scene.world.is_active(id))
+        .filter(|&id| scene.world.is_active_in_hierarchy(id))
         .filter_map(|id| scene.world.image(id)?.shown_texture().cloned());
     let maps = crate::render::draw::active_material_map_paths(scene)
         .into_iter()

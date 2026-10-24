@@ -15,7 +15,7 @@ pub(super) fn tick_trails(world: &mut World, res: &mut Resources) {
     let dt = res.frame_dt;
     let mut scene = world.scene.borrow_mut();
     for id in scene.world.ids_with_trail() {
-        if !scene.world.is_active(id) {
+        if !scene.world.is_active_in_hierarchy(id) {
             continue;
         }
         let position = scene.world.world_position(id);

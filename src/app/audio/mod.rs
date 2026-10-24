@@ -42,7 +42,7 @@ fn resolve_reverb(world: &mut World, res: &mut Resources) {
     let listener = res.camera.borrow().position;
     let scene = world.scene.borrow();
     let mut ids = scene.world.ids_with_reverb_zone();
-    ids.retain(|&id| scene.world.is_active(id));
+    ids.retain(|&id| scene.world.is_active_in_hierarchy(id));
     ids.sort_unstable();
     let zones: Vec<_> = ids
         .iter()
@@ -117,7 +117,7 @@ pub(super) fn start_sources(world: &World, res: &Resources, admit: impl Fn(u32) 
             .world
             .ids_with_audio()
             .into_iter()
-            .filter(|&id| admit(id) && scene.world.is_active(id))
+            .filter(|&id| admit(id) && scene.world.is_active_in_hierarchy(id))
             .filter_map(|id| {
                 let src = scene.world.audio(id)?;
                 if !src.play_on_start {

@@ -19,10 +19,7 @@ pub fn ancestors_or_self(world: &World, id: u32) -> Vec<u32> {
 
 /// Whether `id` and every ancestor are active — the rule drawing uses too.
 pub fn is_visible(world: &World, id: u32) -> bool {
-    world.contains(id)
-        && ancestors_or_self(world, id)
-            .into_iter()
-            .all(|c| world.is_active(c))
+    world.is_active_in_hierarchy(id)
 }
 
 /// Whether a `CanvasGroup` with `blocks_raycasts = false` sits on `id` or above it

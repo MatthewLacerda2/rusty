@@ -17,7 +17,8 @@ it behaves identically to the editor and uses the same default values.
 | `Scene.SetParent` | `(id, parent_id)` | — (errors on a parenting cycle) |
 | `Scene.ClearParent` | `(id)` | — |
 | `Scene.SetActive` | `(id, active)` | `true` if an entity existed at `id` — Unity's `SetActive`; its callbacks follow the edge (`OnEnable` / `OnDisable`) |
-| `Scene.IsActive` | `(id)` | the entity's own `active` flag (`false` for a missing id; an inactive ancestor still hides it) |
+| `Scene.IsActive` | `(id)` | Unity's `activeSelf`: the entity's own `active` flag (`false` for a missing id; an inactive ancestor still hides it) |
+| `Scene.IsActiveInHierarchy` | `(id)` | Unity's `activeInHierarchy`: `true` when the entity and every ancestor are active — what decides whether it draws, simulates and ticks |
 | `Scene.GetParent` | `(id)` | the parent's `id`, or `nil` |
 | `Scene.GetChildren` | `(id)` | array of child ids, in hierarchy order |
 | `Scene.FindChild` | `(id, path)` | the descendant at name path `path` (`"Viewport/Content"`), or `nil` |
@@ -36,6 +37,14 @@ it behaves identically to the editor and uses the same default values.
 | `Scene.ApplyPrefabFieldToSource` | `(entityId, jsonPointer)` | — (writes one leaf to the `.prefab`) |
 | `Scene.RevertPrefabField` | `(entityId, jsonPointer)` | `true` if an override was reverted, `false` if there was none at `jsonPointer` |
 | `Scene.ListPrefabOverrides` | `(instanceRootId)` | array of `"localId:json-pointer"` strings |
+
+**Active, self and in the hierarchy (#1363).** As in Unity, `SetActive(pivot, false)`
+hides and stops the whole subtree under `pivot`: its children stop drawing (meshes,
+skinned meshes, particles, lights, decals, UI), simulating (bodies, colliders, nav
+agents, audio) and ticking (scripts, Animators), and each child's scripts get
+`OnDisable`. The children's own flags are untouched, so `IsActive(child)` stays
+`true` while `IsActiveInHierarchy(child)` reads `false`; reactivating the pivot
+brings back exactly the children that were active on their own.
 
 **Hierarchy reads (#422).** `FindChild` walks one level per `/`-separated
 segment, taking the first child with that name in hierarchy order — Unity's

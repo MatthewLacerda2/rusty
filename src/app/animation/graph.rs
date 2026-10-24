@@ -73,7 +73,7 @@ impl GraphCache {
 pub fn evaluate_graphs(world: &mut World, res: &mut Resources) {
     let mut scene = world.scene.borrow_mut();
     for id in scene.world.ids_with_animator() {
-        if !scene.world.is_active(id) {
+        if !scene.world.is_active_in_hierarchy(id) {
             continue;
         }
         let Some(path) = scene

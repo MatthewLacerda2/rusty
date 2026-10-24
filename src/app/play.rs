@@ -231,7 +231,7 @@ fn animate(world: &mut World, res: &mut Resources) {
     let dt = res.frame_dt;
     let mut s = world.scene.borrow_mut();
     for id in s.world.ids_with_animator() {
-        if !s.world.is_active(id) {
+        if !s.world.is_active_in_hierarchy(id) {
             continue;
         }
         let path = s.world.animator(id).and_then(|a| a.graph.clone());

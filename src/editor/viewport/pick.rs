@@ -53,7 +53,7 @@ pub fn local_to_ndc(local_x: f32, local_y: f32, width: f32, height: f32) -> Opti
 pub fn pick_entity(scene: &Scene, ray: Ray) -> Option<(u32, f32)> {
     let mut best: Option<(u32, f32)> = None;
     for id in scene.world.ids_with_mesh() {
-        if !scene.world.is_active(id) {
+        if !scene.world.is_active_in_hierarchy(id) {
             continue;
         }
         let mesh = scene.world.mesh(id).expect("id came from ids_with_mesh");

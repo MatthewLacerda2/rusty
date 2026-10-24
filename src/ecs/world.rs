@@ -129,18 +129,12 @@ impl World {
         self.handles.get(id).is_some()
     }
 
-    /// Find the first *active* entity with this name, returning its stable id.
-    /// Matches the former `Scene::find_entity_by_name` semantics.
+    /// Find the first entity with this name that is active in the hierarchy
+    /// (Unity's `GameObject.Find`), returning its stable id.
     pub fn find_by_name(&self, name: &str) -> Option<u32> {
         self.order.iter().copied().find(|&id| {
-            let Some(handle) = self.handles.get(id) else {
-                return false;
-            };
-            self.inner
-                .query_one::<(&String, &Core)>(handle)
-                .ok()
-                .and_then(|mut q| q.get().map(|(n, c)| *n == *name && c.active))
-                .unwrap_or(false)
+            self.component::<String>(id).is_some_and(|n| *n == *name)
+                && self.is_active_in_hierarchy(id)
         })
     }
 

@@ -79,7 +79,10 @@ impl ScriptManager {
     /// from the rule "a disabled entity receives no callbacks".
     pub(super) fn entity_active(&self, id: u32) -> Option<bool> {
         let scene = self.scene.borrow();
-        scene.world.contains(id).then(|| scene.world.is_active(id))
+        scene
+            .world
+            .contains(id)
+            .then(|| scene.world.is_active_in_hierarchy(id))
     }
 
     /// Ascending keys of instances passing `pred` whose owning entity is active —

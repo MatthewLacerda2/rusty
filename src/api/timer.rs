@@ -186,7 +186,7 @@ pub(super) fn require_active(scene: &Scene, id: u32) -> mlua::Result<()> {
     if !scene.world.contains(id) {
         return Err(runtime(&format!("no entity {id}")));
     }
-    if !scene.world.is_active(id) {
+    if !scene.world.is_active_in_hierarchy(id) {
         return Err(runtime(&format!("entity {id} is inactive")));
     }
     Ok(())

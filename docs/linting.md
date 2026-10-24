@@ -24,6 +24,7 @@ agent can read exactly what failed.
 | Asset writes tell the caches | `tools/lint -- --rules` (`asset-write`) | **hard gate**: a non-test line of `src/` outside `src/core/fs/` that calls `fs::write(`, `File::create(` or `.save(<arg>)` has a `note_written` later in its function, or `// lint: allow(asset-write) <why>` (a file no path-keyed cache reads) (#1220) |
 | One atomic write | `tools/lint -- --rules` (`atomic-write`) | **hard gate**: no line of `src/` outside `src/core/fs/` names `fs::rename` — a file a reader may open is written through `core::fs::write_atomic`; a rename that moves rather than writes takes `// lint: allow(atomic-write) <why>` (#1129) |
 | Converters report, never log | `tools/lint -- --rules` (`converter-log`) | **hard gate**: no code line of a converter under `src/asset/convert/` (every module, folder or single file, but the cache's own `mod`, `converter`, `depends`, `gate`, `lock`, `record`, `stage`, `stale`, `texture_ref` and `tests`) names `log::` or a bare logging macro — a converter returns what it skipped in `Converted` and fails on anything else, and `convert::refresh` alone warns; each converter's root carries `#![deny(clippy::let_underscore_must_use, clippy::unused_result_ok, clippy::print_stdout, clippy::print_stderr)]`, wrapped or not, so clippy refuses a dropped `Result` and a print there (#1172) |
+| Active in the hierarchy | `tools/lint -- --rules` (`active-self`) | **hard gate**: outside `src/ecs/`, no non-test line of `src/` calls `is_active_self(` — systems ask `World::is_active_in_hierarchy`, so an inactive parent hides its subtree; what shows or stores the own flag takes `// lint: allow(active-self) <why>` (#1363) |
 | One world space | `tools/lint -- --rules` (`world-space`) | **hard gate**: outside `ecs::world_space` and `components::transform`, no engine code line decomposes a matrix (`to_scale_rotation_translation`), names the retired `compute_world_matrix` / `world_matrix(` / `parent_world_matrix`, or folds a Transform over `ancestors(` — world space is read from `ecs::World`'s world API; test code is not scanned, and converting file data takes `// lint: allow(world-space) <why>` (#1196) |
 | Finite authoring floats | `tools/lint -- --rules` (`sanitize`) | **hard gate**: every `pub fn set_*` under `src/scene/authoring/` that takes an `f32` or a glam vector passes it to a `scene::authoring::sanitize` helper (or a sibling setter of its file), so NaN and `±inf` from Lua or the editor take the field's fallback and never reach a field; a value checked another way takes `// lint: allow(sanitize) <why>` (#1361) |
 | No subprocesses | `tools/lint -- --rules` (`subprocess`) | **hard gate**: no line of `src/` names `std::process::Command` — the engine starts no other program but Blender, to convert a `.blend` while authoring; a real need takes `// lint: allow(subprocess) <why>` (#975) |
@@ -362,6 +363,16 @@ new flag, gate, CI step or baseline.
   lints are per converter, not in `Cargo.toml`, because the rest of the crate has
   some eighty best-effort `let _ =` (a cleanup, a send to a closed channel). A
   future converter is covered the day it is added (`rules/converter_log.rs`).
+- **`active-self`** (#1363) — every system read an entity's own `active` flag, so
+  the children of an inactive pivot kept drawing and ticking. Unity's
+  `activeInHierarchy` is `World::is_active_in_hierarchy`, and it is the one
+  question a system asks; `World::is_active_self` (Unity's `activeSelf`) is for
+  what shows or stores the flag itself: the inspector checkbox, `Scene.IsActive`,
+  the snapshot, and the UI clip walk that folds one level at a time. A non-test
+  line of `src/` outside `src/ecs/` that calls `is_active_self(` fails; those
+  callers carry an inline allow. The rule is lexical (`rules/active_self.rs`): it
+  misses a read of the flag that does not go through that name, which the private
+  `ecs::bundle::Core` keeps inside `src/ecs/`.
 - **`world-space`** (#1170, #1196) — fifteen bugs in two days came from systems
   working out where an entity is in the world and getting a hierarchy case wrong: a
   mirror, a zero scale, a turned child under a non-uniform parent. `ecs::World`'s

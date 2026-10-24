@@ -35,7 +35,7 @@ impl Renderer {
         let mut seen: HashSet<MeshId> = HashSet::new();
         let mut updates: Vec<(MeshId, Vec<Vertex>, Vec<u32>)> = Vec::new();
         for entity_id in scene.world.ids_with_mesh() {
-            if !scene.world.is_active(entity_id) {
+            if !scene.world.is_active_in_hierarchy(entity_id) {
                 continue;
             }
             let mesh = scene

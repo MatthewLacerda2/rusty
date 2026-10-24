@@ -36,7 +36,7 @@ impl NavigationGraph {
         let mut ticked = Vec::new();
         let mut inputs = Vec::new();
         for id in scene.world.ids_with_nav_agent() {
-            if !scene.world.is_active(id) {
+            if !scene.world.is_active_in_hierarchy(id) {
                 continue;
             }
             // Take the agent out, steer, write it back — the same idiom as the

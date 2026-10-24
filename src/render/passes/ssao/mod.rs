@@ -75,7 +75,7 @@ impl SsaoPlan {
             .world
             .ids_with_visual_correction()
             .into_iter()
-            .filter(|&id| scene.world.is_active(id))
+            .filter(|&id| scene.world.is_active_in_hierarchy(id))
             .find_map(|id| {
                 let vc = scene.world.visual_correction(id)?;
                 vc.active.then_some(vc.ssao)

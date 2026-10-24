@@ -170,7 +170,7 @@ pub fn selection_bounds(scene: &Scene, id: u32) -> Option<(Vec3, f32)> {
         let Some(mesh) = scene.world.mesh(next) else {
             continue;
         };
-        if !scene.world.is_active(next) {
+        if !scene.world.is_active_in_hierarchy(next) {
             continue;
         }
         if let Some((lo, hi)) = mesh.world_aabb(scene.world.local_to_world(next)) {

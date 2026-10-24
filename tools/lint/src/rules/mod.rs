@@ -11,6 +11,7 @@ mod scan;
 mod test_code;
 
 // sorted: one module per rule, each a row of `RULES`
+mod active_self;
 mod asset_write;
 mod atomic_write;
 mod converter_log;
@@ -53,6 +54,7 @@ type Rule = fn(&Scan) -> Vec<Finding>;
 /// Every rule. A new rule is one row, in its sorted place.
 const RULES: &[(Rule, Allow)] = &[
     // sorted: rules are independent; allows apply to each rule's own findings
+    (active_self::run, Allow::Inline),
     (asset_write::run, Allow::Inline),
     (atomic_write::run, Allow::Inline),
     (converter_log::run, Allow::Inline),

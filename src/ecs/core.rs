@@ -46,9 +46,21 @@ impl World {
         self.set_component(id, Some(name))
     }
 
-    /// Whether the entity exists AND is active (`false` for a dead id).
-    pub fn is_active(&self, id: u32) -> bool {
+    /// Unity's `activeSelf`: the entity's own `active` flag (`false` for a dead id).
+    /// Only what shows or stores the flag itself reads it (the inspector checkbox,
+    /// `Scene.IsActive`, the snapshot); every system asks
+    /// [`World::is_active_in_hierarchy`] instead, and the `active-self` lint holds
+    /// that (#1363).
+    pub fn is_active_self(&self, id: u32) -> bool {
         self.component::<Core>(id).is_some_and(|c| c.active)
+    }
+
+    /// Unity's `activeInHierarchy`: the entity exists and it and every ancestor
+    /// are active. An inactive parent hides and stops its whole subtree without
+    /// touching the children's own flags (#1363). The one question every system
+    /// asks before drawing, simulating or ticking an entity.
+    pub fn is_active_in_hierarchy(&self, id: u32) -> bool {
+        self.contains(id) && self.self_and_ancestors(id).all(|c| self.is_active_self(c))
     }
 
     pub fn set_active(&mut self, id: u32, active: bool) -> bool {

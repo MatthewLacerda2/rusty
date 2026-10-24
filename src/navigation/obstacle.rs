@@ -188,7 +188,7 @@ pub(super) fn carving_volumes(scene: &Scene) -> Vec<(u32, ObstacleVolume)> {
         .world
         .ids_with_nav_obstacle()
         .into_iter()
-        .filter(|&id| scene.world.is_active(id))
+        .filter(|&id| scene.world.is_active_in_hierarchy(id))
         .filter_map(|id| {
             let o = scene.world.nav_obstacle(id)?;
             o.is_carving().then(|| {
@@ -209,7 +209,7 @@ pub(super) fn avoidance_obstacles(scene: &Scene) -> Vec<AvoidanceAgent> {
     let mut ids = scene.world.ids_with_nav_obstacle();
     ids.sort_unstable();
     ids.into_iter()
-        .filter(|&id| scene.world.is_active(id))
+        .filter(|&id| scene.world.is_active_in_hierarchy(id))
         .filter_map(|id| {
             let o = scene.world.nav_obstacle(id)?;
             if !o.active || o.is_carving() {

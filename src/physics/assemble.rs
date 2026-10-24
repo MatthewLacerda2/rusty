@@ -136,7 +136,7 @@ impl PhysicsWorld {
             to_pose(offset_pos, offset_rot)
         };
         collider.set_position(offset);
-        collider.set_enabled(scene.world.is_active(id));
+        collider.set_enabled(scene.world.is_active_in_hierarchy(id));
         collider.set_sensor(inp.is_trigger);
         apply_material(&mut collider, &inp.material);
         collider.set_active_events(ActiveEvents::COLLISION_EVENTS);
@@ -165,12 +165,12 @@ impl PhysicsWorld {
                 .get(&owner)
                 .and_then(|&h| self.bodies.get_mut(h))
             {
-                body.set_enabled(scene.world.is_active(owner));
+                body.set_enabled(scene.world.is_active_in_hierarchy(owner));
             }
             for &id in ids {
                 let handle = self.id_to_collider.get(&id);
                 if let Some(collider) = handle.and_then(|&h| self.colliders.get_mut(h)) {
-                    collider.set_enabled(scene.world.is_active(id));
+                    collider.set_enabled(scene.world.is_active_in_hierarchy(id));
                 }
             }
         }

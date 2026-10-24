@@ -4,6 +4,7 @@
 //! skinning reads the bones, and the whole path is deterministic.
 
 mod events;
+mod inactive_parent;
 mod layers;
 mod rig;
 

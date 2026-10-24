@@ -61,7 +61,7 @@ pub(super) fn static_collider_ids(scene: &Scene) -> impl Iterator<Item = u32> + 
         .ids_with_collider()
         .into_iter()
         .filter(move |&id| {
-            scene.world.is_active(id)
+            scene.world.is_active_in_hierarchy(id)
                 && scene.world.is_static(id)
                 && scene
                     .world

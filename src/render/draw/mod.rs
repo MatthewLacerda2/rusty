@@ -12,6 +12,9 @@ pub(crate) mod resources;
 pub(crate) mod stack;
 pub(crate) mod uniforms;
 
+#[cfg(test)]
+mod inactive_parent_tests;
+
 use self::stack::StackPass;
 use crate::asset::MapRef;
 use crate::render::gpu::textures::TextureKind;
@@ -160,7 +163,7 @@ pub(crate) fn active_material_map_paths(scene: &Scene) -> Vec<(MapRef, TextureKi
         .world
         .ids_with_material()
         .into_iter()
-        .filter(|&id| scene.world.is_active(id))
+        .filter(|&id| scene.world.is_active_in_hierarchy(id))
         .flat_map(|id| scene.material_assets_of(id))
         .flat_map(|m| materials::material_maps(Some(m)))
         .collect()

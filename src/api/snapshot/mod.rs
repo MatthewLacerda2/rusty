@@ -101,7 +101,9 @@ pub fn entity_value(scene: &Scene, id: u32, world_matrix: Mat4, view: &UiView) -
     let mut value = json!({
         "id": id,
         "name": world.name(id).map(|n| n.clone()).unwrap_or_default(),
-        "active": world.is_active(id),
+        // lint: allow(active-self) the snapshot reports both flags, as Unity does
+        "active": world.is_active_self(id),
+        "active_in_hierarchy": world.is_active_in_hierarchy(id),
         "static": world.is_static(id),
         "layer": world.layer(id),
         "parent": world.parent_id(id),

@@ -50,7 +50,7 @@ fn a_marker_whose_target_is_despawned_hides() {
     w.despawn(enemy);
     assert_eq!(anchor(&w).target, None);
     assert!(anchor(&w).target_lost, "hidden, not a fixed world point");
-    assert!(w.is_active(marker), "its scripts keep running");
+    assert!(w.is_active_in_hierarchy(marker), "its scripts keep running");
 
     let mut rect = w.rect_transform(marker).unwrap().clone();
     crate::scene::authoring::rect_transform::set_world_anchor(

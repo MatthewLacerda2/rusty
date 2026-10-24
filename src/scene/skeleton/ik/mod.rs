@@ -42,7 +42,7 @@ impl Scene {
     /// Solve every active animator's IK constraints, in id order (deterministic).
     pub fn solve_ik(&mut self) {
         for owner in self.world.ids_with_animator() {
-            if !self.world.is_active(owner) {
+            if !self.world.is_active_in_hierarchy(owner) {
                 continue;
             }
             let Some(mut constraints) = self
