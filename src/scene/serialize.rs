@@ -130,10 +130,20 @@ fn rehydrate_meshes(data: &mut SceneData) {
 }
 
 /// Replace the scene's World (single active scene) with the document's contents,
-/// rehydrating meshes (stamping `meshes_read_at`, #1242), holding every numeric
-/// field through its authoring op (#1418) and recomputing collider AABBs.
+/// rehydrating meshes (stamping `meshes_read_at`, #1242), holding every loaded
+/// number through its authoring op (#1418) and recomputing collider AABBs.
 /// Preserves entity order/ids.
-pub fn apply_scene_data(scene: &mut Scene, mut data: SceneData) {
+pub fn apply_scene_data(scene: &mut Scene, data: SceneData) {
+    apply(scene, data, true);
+}
+
+/// [`apply_scene_data`] for a document the World itself wrote (a Play snapshot):
+/// its values were held when they came in, so they are not held again.
+pub fn apply_world_data(scene: &mut Scene, data: SceneData) {
+    apply(scene, data, false);
+}
+
+fn apply(scene: &mut Scene, mut data: SceneData, hold: bool) {
     rehydrate_meshes(&mut data);
     scene.meshes_read_at = crate::core::fs::written::written_since(u64::MAX).0;
 
@@ -182,10 +192,12 @@ pub fn apply_scene_data(scene: &mut Scene, mut data: SceneData) {
     // linked skinned entity from its source and would drop its bone overrides.
     scene.hang_on_skeletons(bone_parents, bone_refs);
 
-    // Every loaded numeric field through its authoring op, once (#1418): the World
-    // never holds a value its own setters would refuse. Before the collider AABBs,
-    // which read the held shapes; prefab propagation holds what it rebuilds.
-    crate::scene::authoring::fields::hold_world(&mut scene.world);
+    // Every loaded number through its authoring op, once (#1418): the World never
+    // holds a value its own setters would refuse. Before the collider AABBs, which
+    // read the held shapes; prefab propagation holds what it rebuilds.
+    if hold {
+        crate::scene::authoring::fields::hold_world(&mut scene.world);
+    }
 
     scene.update_all_colliders();
 

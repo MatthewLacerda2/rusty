@@ -82,37 +82,55 @@ fn apply<C: Inspect>(
         .filter(|(k, v)| !skip.skips(k, v, &held))
         .map(|(k, v)| (k.clone(), v.clone()))
         .collect();
+    run_ops(draft, &changed, &mut |name, e| Err(format!("{name}: {e}")))
+}
+
+/// The one walk over a component's fields, `Set`'s and a load's ([`super::hold`]):
+/// call the op of every field `changes` names, in the table's order, with its
+/// value there; a group's op once, for any of its fields, each part from
+/// `changes`, else as `c` holds it by then. A named read-only field is an error;
+/// an op that refuses its value goes to `refused`, which says whether to stop.
+pub(super) fn run_ops<C: Inspect>(
+    c: &mut C,
+    changes: &Map<String, Value>,
+    refused: &mut dyn FnMut(&str, String) -> Result<(), String>,
+) -> Result<(), String> {
     let mut groups_run: Vec<&str> = Vec::new();
     for field in C::FIELDS {
-        let named = changed.get(field.name);
-        match &field.access {
+        let named = changes.get(field.name);
+        let outcome = match &field.access {
             Access::ReadOnly(why) if named.is_some() => {
                 return Err(format!("field '{}' is read-only: {why}", field.name));
             }
-            Access::Op(op) => {
-                if let Some(value) = named {
-                    op(draft, value.clone()).map_err(|e| format!("{}: {e}", field.name))?;
-                }
-            }
+            Access::Op(op) => match named {
+                Some(value) => op(c, value.clone()),
+                None => continue,
+            },
             Access::Group(group) => {
                 let first = group.names[0];
-                let touched = group.names.iter().any(|n| changed.contains_key(*n));
-                if touched && !groups_run.contains(&first) {
-                    groups_run.push(first);
-                    let current = serialized(draft)?;
-                    let values = Values {
-                        changes: &changed,
-                        current: &current,
-                    };
-                    (group.write)(draft, &values)?;
+                let touched = group.names.iter().any(|n| changes.contains_key(*n));
+                if !touched || groups_run.contains(&first) {
+                    continue;
                 }
+                groups_run.push(first);
+                let current = serialized(c)?;
+                (group.write)(
+                    c,
+                    &Values {
+                        changes,
+                        current: &current,
+                    },
+                )
             }
-            Access::ReadOnly(_) => {}
+            Access::ReadOnly(_) => continue,
+        };
+        if let Err(e) = outcome {
+            refused(field.name, e)?;
         }
     }
     Ok(())
 }
 
-fn serialized<C: Inspect>(c: &C) -> Result<Value, String> {
+pub(super) fn serialized<C: Inspect>(c: &C) -> Result<Value, String> {
     serde_json::to_value(c).map_err(|e| e.to_string())
 }

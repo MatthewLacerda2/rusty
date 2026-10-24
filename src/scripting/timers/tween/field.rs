@@ -100,6 +100,14 @@ impl Field {
             .expect("every Field is listed in FIELDS")
     }
 
+    /// Whether the field's op holds a bound (the `held!` arms of [`Self::get`]),
+    /// so what it reads back is what was written, held. Transform's fields read
+    /// back through world space and an Euler decomposition, never a bound: a
+    /// `rotation` of 360 reads as 0 (#1418).
+    pub(crate) fn is_held(self) -> bool {
+        !matches!(self, Self::Position | Self::Rotation | Self::Scale)
+    }
+
     /// The field's current value as its write op holds it, or `None` when `id`
     /// lacks the component. A stored value the op would clamp (a loaded
     /// `fov: 500`) reads as the value the op makes of it, so a tween starts where

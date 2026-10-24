@@ -59,6 +59,9 @@ impl Values<'_> {
 pub struct Field<C> {
     pub name: &'static str,
     pub access: Access<C>,
+    /// Why a scene or prefab load leaves this field as read instead of running its
+    /// op (`unheld!`); `None`: a load holds it (#1418).
+    pub unheld: Option<&'static str>,
 }
 
 /// A field written by one op, `fn(&mut C, T)` with `T` decoded from the value.
@@ -70,6 +73,7 @@ macro_rules! op {
                 $op(c, $crate::scene::authoring::fields::value::decode(json)?);
                 Ok(())
             }),
+            unheld: None,
         }
     };
 }
@@ -85,6 +89,7 @@ macro_rules! with {
                 $body;
                 Ok(())
             }),
+            unheld: None,
         }
     };
 }
@@ -110,6 +115,7 @@ macro_rules! part {
         $crate::scene::authoring::fields::table::Field {
             name: $name,
             access: $crate::scene::authoring::fields::table::Access::Group($group),
+            unheld: None,
         }
     };
 }
@@ -120,11 +126,23 @@ macro_rules! ro {
         $crate::scene::authoring::fields::table::Field {
             name: $name,
             access: $crate::scene::authoring::fields::table::Access::ReadOnly($why),
+            unheld: None,
         }
     };
 }
 
-pub(super) use {group, op, part, ro, with};
+/// `$field` (any field above) left as read by a load, and why: its op reads from
+/// disk or warns, so running it on every load costs more than the bound it holds.
+macro_rules! unheld {
+    ($why:literal, $field:expr) => {
+        $crate::scene::authoring::fields::table::Field {
+            unheld: Some($why),
+            ..$field
+        }
+    };
+}
+
+pub(super) use {group, op, part, ro, unheld, with};
 
 /// A first-class component the table covers: its fields, and how to reach it on
 /// an entity.
@@ -183,14 +201,18 @@ pub struct Kind {
     pub key: &'static str,
     pub read: fn(&World, u32) -> Option<Result<Value, String>>,
     pub write: WriteAny,
-    /// Hold a loaded component's numeric fields through their ops (#1418).
-    pub hold: fn(&mut World, u32),
+    /// Hold a loaded component's numbers through their ops (#1418); the last
+    /// argument is the component's name, for the warnings.
+    pub hold: fn(&mut World, u32, &'static str),
     pub fields: fn() -> Vec<FieldInfo>,
     /// A field's type as its derive reads it: optional, and the Lua type it holds.
     pub field_type: fn(&'static str) -> (bool, Option<&'static str>),
     /// The field names the component's serde derive declares (the table test).
     #[cfg(test)]
     pub serde_fields: fn() -> Option<&'static [&'static str]>,
+    /// Whether a load runs field `name`'s op (the hold tests).
+    #[cfg(test)]
+    pub held_on_load: fn(&str) -> bool,
 }
 
 /// The [`Kind`] for `C`.
@@ -213,6 +235,8 @@ pub const fn kind<C: Inspect>(
         field_type: super::introspect::field_type::<C>,
         #[cfg(test)]
         serde_fields: super::introspect::serde_fields::<C>,
+        #[cfg(test)]
+        held_on_load: super::hold::named_held::<C>,
     }
 }
 

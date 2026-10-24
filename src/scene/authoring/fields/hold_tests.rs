@@ -1,59 +1,40 @@
-//! A loaded scene is held through the field table's ops (#1418): no first-class
-//! component's numeric field skips the pass, and an in-range file loads unchanged.
+//! A scene load holds what it read through the field table's ops (#1418): no
+//! number in a first-class component skips the pass, and an in-range file loads
+//! exactly as saved.
 
-use serde_json::Value;
+use serde_json::{json, Map, Value};
 
-use super::hold::is_numeric;
+use super::hold::has_number;
 use super::tests::dressed;
 use super::{Skip, KINDS};
 use crate::scene::{apply_scene_data, to_scene_data, Scene};
 
-/// Every float in `v` pushed far out of any bound: `sign` 1 up, -1 down.
-fn push_out(v: &mut Value, sign: f64) {
+/// Every number in `v` pushed out of any bound: a float far up (`up`) or down;
+/// an integer to 250 or 0, the widest every integer type (`u8` too) still reads.
+fn push_out(v: &mut Value, up: bool) {
     match v {
         Value::Number(n) if n.is_f64() => {
-            let far = sign * (n.as_f64().unwrap().abs() * 1000.0 + 1000.0);
-            *v = serde_json::json!(far);
+            let far = n.as_f64().unwrap().abs() * 1000.0 + 1000.0;
+            *v = json!(if up { far } else { -far });
         }
-        Value::Array(list) => list.iter_mut().for_each(|v| push_out(v, sign)),
-        Value::Object(map) => map.values_mut().for_each(|v| push_out(v, sign)),
+        Value::Number(_) => *v = json!(if up { 250 } else { 0 }),
+        Value::Array(list) => list.iter_mut().for_each(|v| push_out(v, up)),
+        Value::Object(map) => map.values_mut().for_each(|v| push_out(v, up)),
         _ => {}
     }
 }
 
-/// The same numbers, give or take float rounding (renormalizing a unit axis
-/// moves it by an ulp).
-fn close(a: &Value, b: &Value) -> bool {
-    match (a, b) {
-        (Value::Number(a), Value::Number(b)) => {
-            let (a, b) = (a.as_f64().unwrap(), b.as_f64().unwrap());
-            (a - b).abs() <= 1e-5 * a.abs().max(1.0)
-        }
-        (Value::Array(a), Value::Array(b)) => {
-            a.len() == b.len() && a.iter().zip(b).all(|(a, b)| close(a, b))
-        }
-        (Value::Object(a), Value::Object(b)) => {
-            a.len() == b.len() && a.iter().all(|(k, v)| b.get(k).is_some_and(|w| close(v, w)))
-        }
-        _ => a == b,
-    }
-}
-
-/// `dressed()` saved with every writable numeric field pushed out, and loaded.
-fn load_pushed(sign: f64) -> (Scene, u32) {
+/// `dressed()` saved with every number a load holds pushed out, and loaded.
+fn load_pushed(up: bool) -> (Scene, u32) {
     let (scene, id) = dressed();
     let mut doc = serde_json::to_value(to_scene_data(&scene)).unwrap();
-    let entity = doc["entities"]
-        .as_array_mut()
-        .unwrap()
-        .iter_mut()
-        .find(|e| e["id"] == id)
-        .unwrap();
+    let entities = doc["entities"].as_array_mut().unwrap();
+    let entity = entities.iter_mut().find(|e| e["id"] == id).unwrap();
     for kind in KINDS {
-        for (name, read_only) in (kind.fields)() {
+        for (name, _) in (kind.fields)() {
             let field = entity.get_mut(kind.key).and_then(|c| c.get_mut(name));
-            if let Some(field) = field.filter(|f| read_only.is_none() && is_numeric(f)) {
-                push_out(field, sign);
+            if let Some(field) = field.filter(|_| (kind.held_on_load)(name)) {
+                push_out(field, up);
             }
         }
     }
@@ -62,68 +43,81 @@ fn load_pushed(sign: f64) -> (Scene, u32) {
     (loaded, id)
 }
 
-/// The walk: after a load, every writable numeric field of every first-class
-/// component holds a value its own op keeps as is, so a field added to a table
-/// is held on load with nothing more to write.
+/// The walk: after a load, every field a load holds (each one with a number in
+/// it, mixed fields like `ssao` included) carries a value its own op keeps bit for
+/// bit, so a field added to a table is held on load with nothing more to write.
 #[test]
-fn every_numeric_field_loads_as_its_op_would_hold_it() {
-    for sign in [1.0, -1.0] {
-        let (mut scene, id) = load_pushed(sign);
+fn every_held_field_loads_as_its_op_would_hold_it() {
+    for up in [true, false] {
+        let (mut scene, id) = load_pushed(up);
         for kind in KINDS {
             let held = (kind.read)(&scene.world, id).unwrap().unwrap();
-            for (name, read_only) in (kind.fields)() {
-                if read_only.is_some() || !is_numeric(&held[name]) {
+            for (name, _) in (kind.fields)() {
+                if !(kind.held_on_load)(name) || !has_number(&held[name]) {
                     continue;
                 }
-                let one = serde_json::Map::from_iter([(name.to_string(), held[name].clone())]);
+                let one = Map::from_iter([(name.to_string(), held[name].clone())]);
                 let written = (kind.write)(&mut scene.world, id, &one, Skip::Nothing);
                 assert_eq!(written, Ok(true), "{}.{name}", kind.name);
                 let again = (kind.read)(&scene.world, id).unwrap().unwrap();
-                assert!(
-                    close(&again[name], &held[name]),
-                    "{}.{name} loaded as {} (sign {sign}), which its op moves to {}",
-                    kind.name,
-                    held[name],
-                    again[name]
+                assert_eq!(
+                    again[name], held[name],
+                    "{}.{name} loaded (up: {up}) as a value its op moves",
+                    kind.name
                 );
             }
         }
     }
 }
 
-/// The issue's cases: a loaded `volume: 4` plays at 1, a `CanvasGroup.alpha: 3` at 1.
+/// The issue's cases, a float inside a mixed field, and an integer both ways.
 #[test]
 fn out_of_range_values_are_held_on_load() {
-    let (scene, id) = load_pushed(1.0);
+    use crate::components::{ShadowSettings, SsaoSettings};
+    let (scene, id) = load_pushed(true);
     assert_eq!(scene.world.audio(id).unwrap().volume, 1.0);
     assert_eq!(scene.world.canvas_group(id).unwrap().alpha, 1.0);
-    let (scene, id) = load_pushed(-1.0);
+    let vc = scene.world.visual_correction(id).unwrap();
+    assert_eq!(vc.ssao.intensity, SsaoSettings::MAX_INTENSITY);
+    assert_eq!(vc.shadows.cascades, ShadowSettings::MAX_CASCADES);
+    let (scene, id) = load_pushed(false);
     assert_eq!(scene.world.audio(id).unwrap().volume, 0.0);
     assert_eq!(scene.world.audio(id).unwrap().final_distance, 0.0);
+    assert_eq!(
+        scene.world.visual_correction(id).unwrap().shadows.cascades,
+        1
+    );
 }
 
-/// A file already in range loads exactly as saved: no op's side effect (a reverb's
-/// `params` making its preset `Custom`) runs on a value the ops would keep.
+/// A file already in range loads exactly as saved, over and over: no op's side
+/// effect (a reverb's `params` making its preset `Custom`) runs on a value the
+/// ops would keep, and a diagonal joint axis is not renormalized an ulp away.
 #[test]
 fn an_in_range_scene_loads_unchanged() {
+    use crate::scene::authoring::{joint, reverb_zone};
     let (mut scene, id) = dressed();
     let hall = crate::components::ReverbPreset::Hall;
-    crate::scene::authoring::reverb_zone::set_preset(
-        &mut scene.world.reverb_zone_mut(id).unwrap(),
-        hall,
-    );
+    reverb_zone::set_preset(&mut scene.world.reverb_zone_mut(id).unwrap(), hall);
+    // Both diagonals move an ulp when renormalized, and then stay.
+    let mut j = scene.world.joint_mut(id).unwrap();
+    joint::set_axis(&mut j, glam::Vec3::new(1.0, 1.0, 0.0));
+    joint::set_swing_axis(&mut j, glam::Vec3::new(0.0, 1.0, 1.0));
+    drop(j);
     let saved = serde_json::to_value(to_scene_data(&scene)).unwrap();
-    let mut loaded = Scene::new();
-    apply_scene_data(&mut loaded, serde_json::from_value(saved.clone()).unwrap());
-    assert_eq!(serde_json::to_value(to_scene_data(&loaded)).unwrap(), saved);
+    let mut doc = saved.clone();
+    for _ in 0..3 {
+        let mut loaded = Scene::new();
+        apply_scene_data(&mut loaded, serde_json::from_value(doc).unwrap());
+        doc = serde_json::to_value(to_scene_data(&loaded)).unwrap();
+        assert_eq!(doc, saved);
+    }
 }
 
-/// A prefab file is held as a scene file is.
+/// A Play snapshot is the World's own data, so its restore holds nothing again.
 #[test]
-fn an_instantiated_prefab_is_held() {
+fn a_snapshot_restore_is_not_held_again() {
     let (mut scene, id) = dressed();
     scene.world.audio_mut(id).unwrap().volume = 4.0;
-    let prefab = crate::scene::prefab::extract_prefab(&scene, id).unwrap();
-    let root = crate::scene::prefab::instantiate_prefab(&mut scene, &prefab, None);
-    assert_eq!(scene.world.audio(root).unwrap().volume, 1.0);
+    crate::scene::SceneSnapshot::capture(&scene).restore(&mut scene);
+    assert_eq!(scene.world.audio(id).unwrap().volume, 4.0);
 }

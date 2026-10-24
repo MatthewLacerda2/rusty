@@ -4,7 +4,7 @@
 
 use glam::{Vec2, Vec4};
 
-use super::super::table::{group, inspect, op, part, with, Group};
+use super::super::table::{group, inspect, op, part, unheld, with, Group};
 use super::set_ui_shader;
 use crate::components::{ShapeComponent, ShapeGlow, ShapeShadow, TextComponent, UiShader};
 use crate::scene::authoring::shape;
@@ -55,7 +55,10 @@ inspect! {
         part!("glow_size", TEXT_GLOW),
         part!("glow_color", TEXT_GLOW),
         op!("blend", text::set_blend),
-        with!("shader", |t, v: Option<UiShader>| set_ui_shader(&mut t.shader, v)?),
+        unheld!(
+            "its op reads the shader's baked param layout from disk",
+            with!("shader", |t, v: Option<UiShader>| set_ui_shader(&mut t.shader, v)?)
+        ),
     ];
     ShapeComponent => shape, shape_mut, &[
         op!("kind", shape::set_kind),
@@ -75,6 +78,9 @@ inspect! {
         with!("glow", |s, v: ShapeGlow| shape::set_glow(s, v.size, v.intensity, v.color)),
         op!("blend", shape::set_blend),
         op!("raycast_target", shape::set_raycast_target),
-        with!("shader", |s, v: Option<UiShader>| set_ui_shader(&mut s.shader, v)?),
+        unheld!(
+            "its op reads the shader's baked param layout from disk",
+            with!("shader", |s, v: Option<UiShader>| set_ui_shader(&mut s.shader, v)?)
+        ),
     ];
 }

@@ -98,7 +98,6 @@ fn stamp_prefab(
     let mut new_root = base + prefab.root;
     let mut bone_parents = Vec::new();
     let mut bone_refs = Vec::new();
-    let mut stamped = Vec::with_capacity(prefab.entities.len());
     for entity in &prefab.entities {
         let local_id = entity.id;
         let mut entity = entity.clone();
@@ -121,14 +120,9 @@ fn stamp_prefab(
         let one = std::slice::from_mut(&mut entity);
         bone_parents.extend(crate::scene::skeleton::take_bone_parents(one));
         bone_refs.extend(crate::scene::skeleton::take_bone_refs(one));
-        stamped.push(entity.id);
         scene.world.insert_entity(entity);
     }
     scene.hang_on_skeletons(bone_parents, bone_refs);
-    // A prefab file is held as a scene file is (#1418).
-    for id in stamped {
-        crate::scene::authoring::fields::hold_entity(&mut scene.world, id);
-    }
 
     // Parent the new root under the requested parent (cycle-checked by `set_parent`).
     if let Some(parent_id) = parent {
@@ -205,12 +199,17 @@ pub fn write_prefab_file(prefab: &PrefabData, path: &str) -> Result<(), String> 
     std::fs::write(path, json).map_err(|e| format!("Failed to write prefab file: {e}"))
 }
 
-/// Read and deserialize a `.prefab` document from `path`. Shared by every loader so
-/// the read/parse error wording stays in one place.
+/// Read and deserialize a `.prefab` document from `path`, its values held through
+/// their authoring ops as a scene file's are (#1418), once here rather than on
+/// every stamp. Shared by every loader so the read/parse error wording stays in
+/// one place.
 pub fn read_prefab_file(path: &str) -> Result<PrefabData, String> {
     let json =
         std::fs::read_to_string(path).map_err(|e| format!("Failed to read prefab file: {e}"))?;
-    serde_json::from_str(&json).map_err(|e| format!("Failed to deserialize prefab: {e}"))
+    let mut prefab: PrefabData =
+        serde_json::from_str(&json).map_err(|e| format!("Failed to deserialize prefab: {e}"))?;
+    crate::scene::authoring::fields::hold_entities(&mut prefab.entities);
+    Ok(prefab)
 }
 
 /// Load a `.prefab` from `path` and instantiate it into `scene` under `parent` (or

@@ -45,18 +45,6 @@ fn delay_holds_and_from_is_written_at_once() {
     assert_eq!(x(&m, id), "4");
 }
 
-/// An explicit `from` starts at what the field's op holds, not the raw number
-/// (#1418): `from = 500` on an alpha starts at 1, so one step of two is 0.5.
-#[test]
-fn an_explicit_from_starts_at_the_held_value() {
-    let body = "Scene.AddComponent(id, 'CanvasGroup') \
-                Tween.To(id, 'CanvasGroup.alpha', 0, 2 / 60, { from = 500 })";
-    let (mut m, id) = rig("tween_from_held", &counted(body));
-    tick(&mut m, 2);
-    let alpha = format!("Component.Get({id}, 'CanvasGroup').alpha");
-    assert_eq!(m.eval(&alpha).unwrap(), "0.5");
-}
-
 #[test]
 fn time_scale_zero_pauses_a_scaled_tween_but_not_an_unscaled_one() {
     let body = "Time.SetTimeScale(0) \
