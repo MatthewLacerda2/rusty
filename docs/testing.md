@@ -17,14 +17,19 @@ screenshots, benches; `dev::bridge`). `Input`'s injection verbs (`Press`,
 `MoveMouse`, `SetAxis`, …) are the API's own, so a scenario plays as the user.
 
 It runs in a Lua VM of its own, beside the gameplay scripts' (which Play rebuilds
-on its first tick), and steps the world between calls, never inside one. Three
+on its first tick), and steps the world between calls, never inside one. Four
 things follow:
 
 - `Scene.GetScript(id, name)` answers a live **handle** on the gameplay instance,
   not the table itself: `pc.vy` reads the field now, `pc.marker = {…}` writes it,
   both by value, copied Lua to Lua: integer keys, mixed tables, integers vs
   floats and `math.huge`/NaN all keep their type; a function field raises an
-  error, and no gameplay metamethod runs. It is `nil` before Play loads the
+  error, and no gameplay metamethod runs. Each read is a **copy**, so assign a
+  whole field through the handle: `pc.marker.hits = 5` changes the scenario's
+  copy only, while `local m = pc.marker; m.hits = 5; pc.marker = m` writes it.
+  Fields are read raw, so one the instance inherits through its metatable (a
+  class's method or default) reads `nil`, and the handle has no `==`, `#` or
+  `pairs`. It is `nil` before Play loads the
   script, and errors once that instance is gone, even when a new one (a restarted
   Play) has the same entity id and script name: look it up again.
 - A Lua function a scenario passes `Timer.Invoke` / `InvokeRepeating` /
@@ -32,6 +37,12 @@ things follow:
   to the scenario's VM, which the gameplay tick never calls. Drive time with
   `Harness.Step`; an invoke by *name* (`Timer.Invoke(id, "Fire", 1)`) resolves on
   the gameplay scripts and works.
+- The world enters Play on the first `Harness.Step`, not before: a scenario's
+  opening lines run in edit mode, which is when `Harness.AttachPlayerBot` swaps
+  the Player's script. Entering Play clears the timers and restarts `Random`, so
+  `Timer.Invoke` / `InvokeRepeating` / `StartCoroutine`, `Tween.To` / `Sequence`
+  and `Random.SetSeed` are refused with an error until then: call
+  `Harness.Step(1)` first.
 - A scenario is a test, so the paid provider verbs (`Sfx.Generate`, `Speech.*`)
   are refused for the whole run, before its first `Harness.Step` too (CLAUDE.md,
   *Provider calls are authoring, never gameplay*).

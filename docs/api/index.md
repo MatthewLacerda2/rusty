@@ -7,8 +7,12 @@ script, a console line, and a headless harness scenario.
 A scenario runs in a Lua VM of its own (the gameplay scripts' VM is rebuilt
 every Play), so the two things that are tables *of* the gameplay VM reach it
 by value: `Scene.GetScript` answers a live handle whose fields read and write
-as plain data, and a callback a scenario hands `Timer` or `Tween` is refused,
-since the gameplay tick would never run it. A scenario is a test, so the
+as plain data (each read a copy: assign a whole field, since a nested edit
+changes the copy only; an inherited field reads `nil`; no `==`, `#` or
+`pairs` on the handle), and a callback a scenario hands `Timer` or `Tween` is refused,
+since the gameplay tick would never run it. A scenario's world enters Play on
+its first `Harness.Step`, so a timer, tween or `Random.SetSeed` before that is
+refused (Play would wipe it). A scenario is a test, so the
 provider verbs (`Sfx.Generate`, `Speech.*`) are refused in it too. See
 `docs/testing.md`, *What a scenario can call*.
 

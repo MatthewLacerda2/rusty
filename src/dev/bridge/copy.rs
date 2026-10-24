@@ -6,17 +6,24 @@
 //! are, tables recursively, keys included, so `{[0]=true}` keeps its integer key
 //! and `{"rifle", ammo=30}` stays one mixed table. A table met twice is copied
 //! once (shared and cyclic tables keep their shape). Metatables are not copied;
-//! a function, userdata or thread cannot cross and is an error.
+//! a function, userdata or thread cannot cross and is an error, and so is a table
+//! nested deeper than [`MAX_DEPTH`] (an error, not a stack overflow).
 
 use std::collections::BTreeMap;
 
 use mlua::{Lua, Result as LuaResult, Table, Value};
+
+/// How deep a copied table may nest. Lua's own C-call limit is 200, so no data a
+/// script means to pass comes near it; a deeper chain is refused before the
+/// recursion can overflow the native stack.
+pub const MAX_DEPTH: usize = 200;
 
 /// `value`, rebuilt in `into` (see the module doc).
 pub fn copy(value: &Value, into: &Lua) -> LuaResult<Value> {
     Copier {
         into,
         seen: BTreeMap::new(),
+        depth: 0,
     }
     .value(value)
 }
@@ -25,6 +32,8 @@ struct Copier<'a> {
     into: &'a Lua,
     /// Source tables already copied, by address, so each is copied once.
     seen: BTreeMap<usize, Table>,
+    /// Tables entered and not yet left, against [`MAX_DEPTH`].
+    depth: usize,
 }
 
 impl Copier<'_> {
@@ -51,12 +60,20 @@ impl Copier<'_> {
         if let Some(copied) = self.seen.get(&address) {
             return Ok(copied.clone());
         }
+        if self.depth == MAX_DEPTH {
+            return Err(mlua::Error::RuntimeError(format!(
+                "a table nested deeper than {MAX_DEPTH} cannot cross between the scenario VM \
+                 and the gameplay VM"
+            )));
+        }
         let copied = self.into.create_table()?;
         self.seen.insert(address, copied.clone());
+        self.depth += 1;
         for pair in source.pairs::<Value, Value>() {
             let (key, value) = pair?;
             copied.raw_set(self.value(&key)?, self.value(&value)?)?;
         }
+        self.depth -= 1;
         Ok(copied)
     }
 }

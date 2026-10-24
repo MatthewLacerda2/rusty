@@ -30,6 +30,7 @@ fn provider_verbs_are_refused_from_the_start() {
 
 const TIMERS: &str = r#"
 local player = Scene.FindEntityByName("Player")
+Harness.Step(1)
 local function refused(verb, f, ...)
     local ok, err = pcall(f, ...)
     return not ok and tostring(err):find(verb, 1, true) ~= nil

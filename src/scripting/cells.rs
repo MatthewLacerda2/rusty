@@ -25,9 +25,9 @@ impl ScriptManager {
         self.cells.audio = audio;
     }
 
-    /// Handle to the live rapier world's cell, which `Resources` builds on Play and
-    /// hands back to every `init_runtime`: one cell from construction on, so
-    /// [`ScriptManager::api_cells`] can clone it once (#1384).
+    /// Handle to the live rapier world's cell: the manager owns it from construction
+    /// on, `Resources` fills it on Play and empties it on Stop, and `init_runtime`
+    /// reads the same cell, so [`ScriptManager::api_cells`] can clone it once (#1384).
     pub fn physics_cell(&self) -> Rc<RefCell<Option<PhysicsWorld>>> {
         Rc::clone(&self.cells.physics)
     }

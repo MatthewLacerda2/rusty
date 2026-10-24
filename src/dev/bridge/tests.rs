@@ -43,3 +43,17 @@ fn a_handle_errors_once_its_instance_is_replaced() {
     })
     .unwrap();
 }
+
+/// A table nested past `copy::MAX_DEPTH` is a Lua error, not a stack overflow;
+/// one just inside the cap still crosses.
+#[test]
+fn a_too_deep_table_is_refused_not_overflowed() {
+    let (from, into) = (Lua::new(), Lua::new());
+    let nest = |depth: usize| -> mlua::Value {
+        let code = format!("local t = {{}} for _ = 2, {depth} do t = {{t}} end return t");
+        from.load(code).eval().unwrap()
+    };
+    let deep = super::copy::copy(&nest(super::copy::MAX_DEPTH + 1), &into).unwrap_err();
+    assert!(deep.to_string().contains("nested deeper"), "{deep}");
+    assert!(super::copy::copy(&nest(super::copy::MAX_DEPTH), &into).is_ok());
+}

@@ -10,9 +10,11 @@
 //!
 //! This module adds only what is the scenario's own: the `Harness` table
 //! (Step, StepUntil, Snapshot, Log, Expect, Frame, Stats, AssertBudget, Screenshot,
-//! Render, AttachPlayerBot, LoadStress, Bench), and `Scene.GetScript` answered across
-//! the VM boundary (`script_ref`).
+//! Render, AttachPlayerBot, LoadStress, Bench), `Scene.GetScript` answered across
+//! the VM boundary (`script_ref`), and the refusal of what entering Play would wipe
+//! (`before_play`).
 
+mod before_play;
 mod copy;
 mod script_ref;
 #[cfg(test)]
@@ -33,9 +35,10 @@ fn world_of(h: &Shared) -> Rc<RefCell<GameWorld>> {
 }
 
 /// Register the scenario-only surface on `lua`'s globals, after the API (it
-/// replaces the API's `Scene.GetScript`).
+/// replaces the API's `Scene.GetScript`, and guards what Play would wipe).
 pub fn register(lua: &Lua, harness: &Shared) -> LuaResult<()> {
     register_harness(lua, harness)?;
+    before_play::register(lua, &world_of(harness))?;
     script_ref::register(lua, &world_of(harness))
 }
 

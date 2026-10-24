@@ -4,6 +4,7 @@
 use rusty::core::paths::native;
 use rusty::dev::scenario;
 
+mod before_play;
 mod crossing;
 mod refusals;
 
