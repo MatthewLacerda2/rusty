@@ -113,10 +113,12 @@ count and filled `target/` with near-identical binaries (#483). So `Cargo.toml` 
   `std::env::temp_dir()` in test code (see `linting.md`).
 - **A path a test expects is spelled as the engine writes it**: on Windows the
   engine's `Path::join`s build `\`-separated paths, so an expectation written
-  `"a/b/c"` matches on macOS and Linux only. In-crate tests use
-  `crate::test_path::native("a/b/c")` / `native_string(…)`, and `relative(dir)`
-  for a relative root; the `slash-join` rule fails a `/` literal joined onto a
-  path (#1332). Every text file checks out LF (`.gitattributes`), so embedded and
+  `"a/b/c"` matches on macOS and Linux only. Tests use `core::paths::native("a/b/c")`
+  / `native_string(…)` (`crate::` in-crate, `rusty::` under `tests/`), the helper
+  the engine itself joins `/`-spelled paths with, and in-crate tests
+  `crate::test_path::relative(dir)` for a relative root; the `slash-join` rule
+  fails a `/` path joined onto a path anywhere in `src/` and `tests/` (#1332,
+  #1371). Every text file checks out LF (`.gitattributes`), so embedded and
   byte-compared text reads the same on Windows.
 - Filtering works by module path: `cargo nextest run -E 'binary(integration)' physics_`.
 
