@@ -128,6 +128,9 @@ a coder real time.
   in the PR description, the way `docs/testing.md` § Editor captures says. Never
   leave a PNG on the branch that merges.
 - `make gates` (foreground, split as *The container* says) before readying.
+- **Windows runs only when asked** (#1395): a branch that touches paths, separators,
+  process spawning or other platform code dispatches `gh workflow run windows.yml --ref
+  <branch>` and quotes the run in its PR. Nothing else runs Windows on a PR.
 - Never fall back to `cargo test`: CI runs nextest, and its per-test process
   isolation and the `gpu` test group are what the gate measures.
 - Don't run `cargo mutants` locally; ask for a scoped run (above).
