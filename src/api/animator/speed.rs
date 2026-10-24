@@ -45,8 +45,7 @@ pub(super) fn register<'scope>(
         table,
         "GetSpeed",
         scope.create_function(|_, id: EntityArg| {
-            let id = id.read();
-            Ok(scene.borrow().world.animator(id).map(|a| a.speed))
+            Ok(scene.borrow().world.animator(id.read()).map(|a| a.speed))
         }),
     )
 }

@@ -53,8 +53,7 @@ fn register_settings<'scope>(
     scene: SceneCell<'scope>,
 ) -> Reg {
     let f = scope.create_function(move |_, id: EntityArg| {
-        let id = id.read();
-        Ok(read(scene, id, |t| t.emitting) == Some(true))
+        Ok(read(scene, id.read(), |t| t.emitting) == Some(true))
     });
     put(t, "IsEmitting", f)?;
     let f = scope.create_function(move |_, (id, on): (EntityArg, bool)| {
@@ -64,8 +63,7 @@ fn register_settings<'scope>(
     });
     put(t, "SetEmitting", f)?;
     let f = scope.create_function(move |_, id: EntityArg| {
-        let id = id.read();
-        Ok(read(scene, id, |t| t.time).unwrap_or(0.0))
+        Ok(read(scene, id.read(), |t| t.time).unwrap_or(0.0))
     });
     put(t, "GetTime", f)?;
     let f = scope.create_function(move |_, (id, v): (EntityArg, f32)| {
@@ -75,8 +73,7 @@ fn register_settings<'scope>(
     });
     put(t, "SetTime", f)?;
     let f = scope.create_function(move |_, id: EntityArg| {
-        let id = id.read();
-        Ok(read(scene, id, |t| t.min_vertex_distance).unwrap_or(0.0))
+        Ok(read(scene, id.read(), |t| t.min_vertex_distance).unwrap_or(0.0))
     });
     put(t, "GetMinVertexDistance", f)?;
     let f = scope.create_function(move |_, (id, v): (EntityArg, f32)| {
@@ -101,13 +98,13 @@ fn register_points<'scope>(
     });
     put(t, "Clear", f)?;
     let f = scope.create_function(move |_, id: EntityArg| {
-        let id = id.read();
-        Ok(read(scene, id, |t| t.runtime.points.len()).unwrap_or(0))
+        Ok(read(scene, id.read(), |t| t.runtime.points.len()).unwrap_or(0))
     });
     put(t, "GetPositionCount", f)?;
     let f = scope.create_function(move |_, id: EntityArg| {
-        let id = id.read();
-        let points = read(scene, id, |t| t.positions().map(|p| p.to_array()).collect());
+        let points = read(scene, id.read(), |t| {
+            t.positions().map(|p| p.to_array()).collect()
+        });
         Ok(points.unwrap_or_else(Vec::new))
     });
     put(t, "GetPositions", f)

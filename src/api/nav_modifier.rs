@@ -61,8 +61,7 @@ fn register_box<'scope>(
     ];
     for (name, (read, set)) in fields {
         let f = scope.create_function(move |_, id: EntityArg| {
-            let id = id.read();
-            let v = get(scene, id).map_or(Vec3::ZERO, |v| read(&v));
+            let v = get(scene, id.read()).map_or(Vec3::ZERO, |v| read(&v));
             Ok((v.x, v.y, v.z))
         });
         put(t, &format!("Get{name}"), f)?;
@@ -84,8 +83,7 @@ fn register_options<'scope>(
     scene: SceneCell<'scope>,
 ) -> Reg {
     let f = scope.create_function(move |_, id: EntityArg| {
-        let id = id.read();
-        Ok(get(scene, id).is_some_and(|v| v.active))
+        Ok(get(scene, id.read()).is_some_and(|v| v.active))
     });
     put(t, "GetActive", f)?;
     let f = scope.create_function(move |_, (id, on): (EntityArg, bool)| {
@@ -94,10 +92,8 @@ fn register_options<'scope>(
         Ok(())
     });
     put(t, "SetActive", f)?;
-    let f = scope.create_function(move |_, id: EntityArg| {
-        let id = id.read();
-        Ok(get(scene, id).map_or(0, |v| v.area))
-    });
+    let f = scope
+        .create_function(move |_, id: EntityArg| Ok(get(scene, id.read()).map_or(0, |v| v.area)));
     put(t, "GetArea", f)?;
     let f = scope.create_function(move |_, (id, area): (EntityArg, i64)| {
         let id = id.live("NavMeshModifierVolume", "SetArea")?;

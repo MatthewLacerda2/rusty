@@ -61,8 +61,7 @@ fn register_state<'scope>(
     events: &'scope RefCell<EventSystem>,
 ) -> Reg {
     let f = scope.create_function(move |_, id: EntityArg| {
-        let id = id.read();
-        Ok(get(scene, id).is_some_and(|s| s.interactable))
+        Ok(get(scene, id.read()).is_some_and(|s| s.interactable))
     });
     put(t, "GetInteractable", f)?;
     let f = scope.create_function(move |_, (id, v): (EntityArg, bool)| {
@@ -94,8 +93,7 @@ fn register_transition<'scope>(
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
     let f = scope.create_function(move |_, id: EntityArg| {
-        let id = id.read();
-        Ok(get(scene, id).map(|s| s.transition.name()))
+        Ok(get(scene, id.read()).map(|s| s.transition.name()))
     });
     put(t, "GetTransition", f)?;
     let f = scope.create_function(move |_, (id, name): (EntityArg, String)| {
@@ -107,8 +105,7 @@ fn register_transition<'scope>(
     });
     put(t, "SetTransition", f)?;
     let f = scope.create_function(move |_, id: EntityArg| {
-        let id = id.read();
-        Ok(get(scene, id).and_then(|s| s.target_graphic))
+        Ok(get(scene, id.read()).and_then(|s| s.target_graphic))
     });
     put(t, "GetTargetGraphic", f)?;
     let f = scope.create_function(move |_, (id, target): (EntityArg, EntityArg)| {
@@ -119,8 +116,7 @@ fn register_transition<'scope>(
     });
     put(t, "SetTargetGraphic", f)?;
     let f = scope.create_function(move |_, id: EntityArg| {
-        let id = id.read();
-        Ok(get(scene, id).map_or(0.0, |s| s.fade_duration))
+        Ok(get(scene, id.read()).map_or(0.0, |s| s.fade_duration))
     });
     put(t, "GetFadeDuration", f)?;
     let f = scope.create_function(move |_, (id, v): (EntityArg, f32)| {
@@ -139,8 +135,7 @@ fn register_per_state<'scope>(
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
     let f = scope.create_function(move |_, (id, name): (EntityArg, String)| {
-        let id = id.read();
-        let c = SelectionState::parse(&name).and_then(|st| Some(get(scene, id)?.color(st)));
+        let c = SelectionState::parse(&name).and_then(|st| Some(get(scene, id.read())?.color(st)));
         let c = c.unwrap_or(Vec4::ZERO);
         Ok((c.x, c.y, c.z, c.w))
     });
@@ -156,9 +151,8 @@ fn register_per_state<'scope>(
     });
     put(t, "SetColor", f)?;
     let f = scope.create_function(move |_, (id, name): (EntityArg, String)| {
-        let id = id.read();
         let st = SelectionState::parse(&name);
-        Ok(get(scene, id).and_then(|s| Some(s.sprite(st?)?.to_string())))
+        Ok(get(scene, id.read()).and_then(|s| Some(s.sprite(st?)?.to_string())))
     });
     put(t, "GetSprite", f)?;
     let f = scope.create_function(
@@ -180,8 +174,7 @@ fn register_navigation<'scope>(
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
     let f = scope.create_function(move |_, id: EntityArg| {
-        let id = id.read();
-        Ok(get(scene, id).map(|s| s.navigation.name()))
+        Ok(get(scene, id.read()).map(|s| s.navigation.name()))
     });
     put(t, "GetNavigation", f)?;
     let f = scope.create_function(move |_, (id, name): (EntityArg, String)| {
@@ -193,9 +186,8 @@ fn register_navigation<'scope>(
     });
     put(t, "SetNavigation", f)?;
     let f = scope.create_function(move |_, (id, dir): (EntityArg, String)| {
-        let id = id.read();
         let i = ops::direction_index(&dir);
-        Ok(get(scene, id).and_then(|s| s.select_on[i?]))
+        Ok(get(scene, id.read()).and_then(|s| s.select_on[i?]))
     });
     put(t, "GetSelectOn", f)?;
     let f = scope.create_function(

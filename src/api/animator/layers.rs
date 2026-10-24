@@ -94,9 +94,8 @@ fn register_layer_weight<'scope>(
         table,
         "GetLayerWeight",
         scope.create_function(|_, (id, layer): (EntityArg, Value)| {
-            let id = id.read();
             let mut scene = scene.borrow_mut();
-            let Some(mut anim) = scene.world.animator_mut(id) else {
+            let Some(mut anim) = scene.world.animator_mut(id.read()) else {
                 return Ok(None);
             };
             Ok(match resolve(&mut anim, &layer) {
@@ -120,9 +119,8 @@ fn register_get_current_node<'scope>(
         table,
         "GetCurrentNode",
         scope.create_function(|_, (id, layer): (EntityArg, Option<Value>)| {
-            let id = id.read();
             let scene = scene.borrow();
-            let Some(anim) = scene.world.animator(id) else {
+            let Some(anim) = scene.world.animator(id.read()) else {
                 return Ok(None);
             };
             let playback = match layer.map_or(Some(0), |l| lookup(&anim, &l)) {

@@ -63,20 +63,16 @@ fn register_radii<'scope>(
     t: &Table,
     scene: SceneCell<'scope>,
 ) -> Reg {
-    let f = scope.create_function(move |_, id: EntityArg| {
-        let id = id.read();
-        Ok(get(scene, id).map(|z| z.min_distance))
-    });
+    let f = scope
+        .create_function(move |_, id: EntityArg| Ok(get(scene, id.read()).map(|z| z.min_distance)));
     put(t, "GetMinDistance", f)?;
     let f = scope.create_function(move |_, (id, d): (EntityArg, f32)| {
         let id = id.live("AudioReverbZone", "SetMinDistance")?;
         set(scene, id, |z| ops::set_min_distance(z, d))
     });
     put(t, "SetMinDistance", f)?;
-    let f = scope.create_function(move |_, id: EntityArg| {
-        let id = id.read();
-        Ok(get(scene, id).map(|z| z.max_distance))
-    });
+    let f = scope
+        .create_function(move |_, id: EntityArg| Ok(get(scene, id.read()).map(|z| z.max_distance)));
     put(t, "GetMaxDistance", f)?;
     let f = scope.create_function(move |_, (id, d): (EntityArg, f32)| {
         let id = id.live("AudioReverbZone", "SetMaxDistance")?;
@@ -92,8 +88,7 @@ fn register_preset<'scope>(
     scene: SceneCell<'scope>,
 ) -> Reg {
     let f = scope.create_function(move |_, id: EntityArg| {
-        let id = id.read();
-        Ok(get(scene, id).map(|z| z.preset.name()))
+        Ok(get(scene, id.read()).map(|z| z.preset.name()))
     });
     put(t, "GetPreset", f)?;
     let f = scope.create_function(move |_, (id, name): (EntityArg, String)| {
@@ -119,8 +114,7 @@ fn register_params<'scope>(
     scene: SceneCell<'scope>,
 ) -> Reg {
     let f = scope.create_function(move |lua, id: EntityArg| {
-        let id = id.read();
-        get(scene, id)
+        get(scene, id.read())
             .map(|z| params_table(lua, &z.params))
             .transpose()
     });

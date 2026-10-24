@@ -28,10 +28,7 @@ fn a_nil_id_reads_as_a_missing_entity() {
         eval(&format!("return Transform.GetPosition({gone})")),
         "0, 0, 0"
     );
-    assert_eq!(
-        eval(&format!("return Transform.GetPosition(99999)")),
-        "0, 0, 0"
-    );
+    assert_eq!(eval("return Transform.GetPosition(99999)"), "0, 0, 0");
     assert_eq!(eval("return Transform.GetLocalScale(nil)"), "1, 1, 1");
     assert_eq!(eval("return Layers.GetLayer(nil)"), "0");
     assert_eq!(

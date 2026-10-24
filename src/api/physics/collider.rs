@@ -42,8 +42,11 @@ fn register_shape<'scope>(
         table,
         "GetColliderShape",
         scope.create_function(|lua, id: EntityArg| {
-            let id = id.read();
-            let shape = scene.borrow().world.collider(id).map(|c| c.shape.clone());
+            let shape = scene
+                .borrow()
+                .world
+                .collider(id.read())
+                .map(|c| c.shape.clone());
             shape.map(|s| shape_to_table(lua, &s)).transpose()
         }),
     )?;
@@ -162,11 +165,10 @@ fn register_material<'scope>(
         table,
         "GetPhysicsMaterial",
         scope.create_function(|_, id: EntityArg| {
-            let id = id.read();
             let m = scene
                 .borrow()
                 .world
-                .collider(id)
+                .collider(id.read())
                 .map(|c| c.material)
                 .unwrap_or_default();
             Ok((

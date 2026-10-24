@@ -36,7 +36,7 @@ pub fn register<'scope>(
     lua.globals().set("Timer", table).map_err(|e| e.to_string())
 }
 
-/// `Invoke` / `InvokeRepeating` / `CancelInvoke` / `IsInvoking`.
+/// `Invoke` / `InvokeRepeating`, then the queries.
 fn register_invoke<'scope>(
     scope: &'scope mlua::Scope<'scope, '_>,
     table: &Table,
@@ -78,12 +78,22 @@ fn register_invoke<'scope>(
             },
         ),
     )?;
+    register_invoke_queries(scope, table, timers)
+}
+
+/// `CancelInvoke` / `IsInvoking`.
+fn register_invoke_queries<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
+    table: &Table,
+    timers: &'scope RefCell<TimerScheduler>,
+) -> Reg {
     put(
         table,
         "CancelInvoke",
         scope.create_function(|_, (id, name): (EntityArg, Option<String>)| {
-            let id = id.read();
-            timers.borrow_mut().cancel_invokes(id, name.as_deref());
+            timers
+                .borrow_mut()
+                .cancel_invokes(id.read(), name.as_deref());
             Ok(())
         }),
     )?;
@@ -91,8 +101,7 @@ fn register_invoke<'scope>(
         table,
         "IsInvoking",
         scope.create_function(|_, (id, name): (EntityArg, Option<String>)| {
-            let id = id.read();
-            Ok(timers.borrow().is_invoking(id, name.as_deref()))
+            Ok(timers.borrow().is_invoking(id.read(), name.as_deref()))
         }),
     )
 }

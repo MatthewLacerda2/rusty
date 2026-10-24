@@ -25,9 +25,11 @@ pub fn register<'scope>(
         &table,
         "GetShowMaskGraphic",
         scope.create_function(|_, id: EntityArg| {
-            let id = id.read();
             let scene = scene.borrow();
-            Ok(scene.world.mask(id).is_some_and(|m| m.show_mask_graphic))
+            Ok(scene
+                .world
+                .mask(id.read())
+                .is_some_and(|m| m.show_mask_graphic))
         }),
     )?;
     put(

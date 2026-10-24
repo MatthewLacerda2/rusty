@@ -69,11 +69,10 @@ where
     A: FromLuaMulti,
 {
     let f = scope.create_function(move |_, id: EntityArg| {
-        let id = id.read();
         Ok(scene
             .borrow()
             .world
-            .layout_element(id)
+            .layout_element(id.read())
             .map(|e| get(&e))
             .unwrap_or_default())
     });

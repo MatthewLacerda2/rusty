@@ -114,8 +114,7 @@ fn register_get_bone<'scope>(
         table,
         "GetBone",
         scope.create_function(|_, (id, name): (EntityArg, String)| {
-            let id = id.read();
-            Ok(scene.borrow().find_bone(id, &name))
+            Ok(scene.borrow().find_bone(id.read(), &name))
         }),
     )?;
     // `GetClip` (#1384): the base layer's current clip, Unity's
@@ -124,11 +123,10 @@ fn register_get_bone<'scope>(
         table,
         "GetClip",
         scope.create_function(|_, id: EntityArg| {
-            let id = id.read();
             let scene = scene.borrow();
             Ok(scene
                 .world
-                .animator(id)
+                .animator(id.read())
                 .map(|a| a.base.current_clip.clone()))
         }),
     )

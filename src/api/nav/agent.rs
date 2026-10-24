@@ -63,11 +63,10 @@ fn register_agent_target<'scope>(
         table,
         "GetTarget",
         scope.create_function(|_, id: EntityArg| {
-            let id = id.read();
             let scene = scene.borrow();
             let t = scene
                 .world
-                .nav_agent(id)
+                .nav_agent(id.read())
                 .map(|a| a.target)
                 .unwrap_or(Vec3::ZERO);
             Ok((t.x, t.y, t.z))
@@ -157,9 +156,11 @@ fn register_agent_size<'scope>(
         table,
         "GetBaseOffset",
         scope.create_function(|_, id: EntityArg| {
-            let id = id.read();
             let scene = scene.borrow();
-            Ok(scene.world.nav_agent(id).map_or(0.0, |a| a.base_offset))
+            Ok(scene
+                .world
+                .nav_agent(id.read())
+                .map_or(0.0, |a| a.base_offset))
         }),
     )
 }
@@ -189,11 +190,10 @@ fn register_agent_queries<'scope>(
         table,
         "GetVelocity",
         scope.create_function(|_, id: EntityArg| {
-            let id = id.read();
             let scene = scene.borrow();
             let v = scene
                 .world
-                .nav_agent(id)
+                .nav_agent(id.read())
                 .map(|a| a.velocity)
                 .unwrap_or(Vec3::ZERO);
             Ok((v.x, v.y, v.z))

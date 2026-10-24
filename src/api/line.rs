@@ -56,8 +56,7 @@ fn register_positions<'scope>(
     scene: SceneCell<'scope>,
 ) -> Reg {
     let f = scope.create_function(move |_, id: EntityArg| {
-        let id = id.read();
-        let points = read(scene, id, |l| {
+        let points = read(scene, id.read(), |l| {
             l.positions.iter().map(|p| p.to_array()).collect()
         });
         Ok(points.unwrap_or_else(Vec::new))
@@ -71,8 +70,7 @@ fn register_positions<'scope>(
     });
     put(t, "SetPositions", f)?;
     let f = scope.create_function(move |_, (id, i): (EntityArg, usize)| {
-        let id = id.read();
-        let p = read(scene, id, |l| l.positions.get(i).copied()).flatten();
+        let p = read(scene, id.read(), |l| l.positions.get(i).copied()).flatten();
         let p = p.unwrap_or(Vec3::ZERO);
         Ok((p.x, p.y, p.z))
     });
@@ -84,8 +82,7 @@ fn register_positions<'scope>(
     });
     put(t, "SetPosition", f)?;
     let f = scope.create_function(move |_, id: EntityArg| {
-        let id = id.read();
-        Ok(read(scene, id, |l| l.positions.len()).unwrap_or(0))
+        Ok(read(scene, id.read(), |l| l.positions.len()).unwrap_or(0))
     });
     put(t, "GetPositionCount", f)?;
     let f = scope.create_function(move |_, (id, n): (EntityArg, usize)| {
@@ -103,8 +100,7 @@ fn register_flags<'scope>(
     scene: SceneCell<'scope>,
 ) -> Reg {
     let f = scope.create_function(move |_, id: EntityArg| {
-        let id = id.read();
-        Ok(read(scene, id, |l| l.use_world_space) == Some(true))
+        Ok(read(scene, id.read(), |l| l.use_world_space) == Some(true))
     });
     put(t, "GetUseWorldSpace", f)?;
     let f = scope.create_function(move |_, (id, on): (EntityArg, bool)| {
@@ -114,8 +110,7 @@ fn register_flags<'scope>(
     });
     put(t, "SetUseWorldSpace", f)?;
     let f = scope.create_function(move |_, id: EntityArg| {
-        let id = id.read();
-        Ok(read(scene, id, |l| l.looping) == Some(true))
+        Ok(read(scene, id.read(), |l| l.looping) == Some(true))
     });
     put(t, "GetLoop", f)?;
     let f = scope.create_function(move |_, (id, on): (EntityArg, bool)| {

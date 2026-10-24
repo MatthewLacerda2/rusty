@@ -46,9 +46,11 @@ fn register_shape<'scope>(
         table,
         "GetRenderMode",
         scope.create_function(|_, id: EntityArg| {
-            let id = id.read();
             let scene = scene.borrow();
-            let mode = scene.world.particles(id).map(|p| p.render.mode.name());
+            let mode = scene
+                .world
+                .particles(id.read())
+                .map(|p| p.render.mode.name());
             Ok(mode)
         }),
     )?;

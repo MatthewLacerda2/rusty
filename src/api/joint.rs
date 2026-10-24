@@ -59,8 +59,7 @@ fn f32_pair<'scope>(
     (read, write): Field<f32>,
 ) -> Reg {
     let f = scope.create_function(move |_, id: EntityArg| {
-        let id = id.read();
-        Ok(get(scene, id).map_or(0.0, |j| read(&j)))
+        Ok(get(scene, id.read()).map_or(0.0, |j| read(&j)))
     });
     put(t, &format!("Get{name}"), f)?;
     let verb = format!("Set{name}");
@@ -81,8 +80,7 @@ fn bool_pair<'scope>(
     (read, write): Field<bool>,
 ) -> Reg {
     let f = scope.create_function(move |_, id: EntityArg| {
-        let id = id.read();
-        Ok(get(scene, id).is_some_and(|j| read(&j)))
+        Ok(get(scene, id.read()).is_some_and(|j| read(&j)))
     });
     put(t, &format!("Get{name}"), f)?;
     let verb = format!("Set{name}");
@@ -103,8 +101,7 @@ fn vec3_pair<'scope>(
     (read, write): Field<Vec3>,
 ) -> Reg {
     let f = scope.create_function(move |_, id: EntityArg| {
-        let id = id.read();
-        let v = get(scene, id).map_or(Vec3::ZERO, |j| read(&j));
+        let v = get(scene, id.read()).map_or(Vec3::ZERO, |j| read(&j));
         Ok((v.x, v.y, v.z))
     });
     put(t, &format!("Get{name}"), f)?;
@@ -124,10 +121,8 @@ fn register_shape<'scope>(
     t: &Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
-    let f = scope.create_function(move |_, id: EntityArg| {
-        let id = id.read();
-        Ok(get(scene, id).map(|j| j.kind.name()))
-    });
+    let f = scope
+        .create_function(move |_, id: EntityArg| Ok(get(scene, id.read()).map(|j| j.kind.name())));
     put(t, "GetKind", f)?;
     let f = scope.create_function(move |_, (id, name): (EntityArg, String)| {
         let id = id.live("Joint", "SetKind")?;
@@ -138,8 +133,7 @@ fn register_shape<'scope>(
     });
     put(t, "SetKind", f)?;
     let f = scope.create_function(move |_, id: EntityArg| {
-        let id = id.read();
-        Ok(get(scene, id).and_then(|j| j.connected_body))
+        Ok(get(scene, id.read()).and_then(|j| j.connected_body))
     });
     put(t, "GetConnectedBody", f)?;
     let f = scope.create_function(move |_, (id, body): (EntityArg, EntityArg)| {
@@ -179,8 +173,7 @@ fn register_limits<'scope>(
         (|j| j.use_limits, ops::set_use_limits),
     )?;
     let f = scope.create_function(move |_, id: EntityArg| {
-        let id = id.read();
-        let l = get(scene, id).map_or_else(Default::default, |j| j.limits);
+        let l = get(scene, id.read()).map_or_else(Default::default, |j| j.limits);
         Ok((l.x, l.y))
     });
     put(t, "GetLimits", f)?;

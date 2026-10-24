@@ -33,10 +33,8 @@ pub fn register<'scope>(
     let t = lua.create_table().map_err(|e| e.to_string())?;
     register_ends(scope, &t, scene)?;
     register_options(scope, &t, scene)?;
-    let f = scope.create_function(move |_, id: EntityArg| {
-        let id = id.read();
-        Ok(nav.borrow().link_connected(id))
-    });
+    let f =
+        scope.create_function(move |_, id: EntityArg| Ok(nav.borrow().link_connected(id.read())));
     put(&t, "IsConnected", f)?;
     lua.globals()
         .set("OffMeshLink", t)
@@ -68,8 +66,7 @@ fn register_ends<'scope>(
     ];
     for (name, (read, set)) in ends {
         let f = scope.create_function(move |_, id: EntityArg| {
-            let id = id.read();
-            let v = get(scene, id).map_or(Vec3::ZERO, |l| read(&l));
+            let v = get(scene, id.read()).map_or(Vec3::ZERO, |l| read(&l));
             Ok((v.x, v.y, v.z))
         });
         put(t, &format!("Get{name}"), f)?;
@@ -101,8 +98,7 @@ fn register_options<'scope>(
     ];
     for (name, (read, set)) in flags {
         let f = scope.create_function(move |_, id: EntityArg| {
-            let id = id.read();
-            Ok(get(scene, id).is_some_and(|l| read(&l)))
+            Ok(get(scene, id.read()).is_some_and(|l| read(&l)))
         });
         put(t, &format!("Get{name}"), f)?;
         let verb = format!("Set{name}");
@@ -113,10 +109,8 @@ fn register_options<'scope>(
         });
         put(t, &format!("Set{name}"), f)?;
     }
-    let f = scope.create_function(move |_, id: EntityArg| {
-        let id = id.read();
-        Ok(get(scene, id).map_or(0, |l| l.area))
-    });
+    let f = scope
+        .create_function(move |_, id: EntityArg| Ok(get(scene, id.read()).map_or(0, |l| l.area)));
     put(t, "GetArea", f)?;
     let f = scope.create_function(move |_, (id, area): (EntityArg, i64)| {
         let id = id.live("OffMeshLink", "SetArea")?;
@@ -125,8 +119,7 @@ fn register_options<'scope>(
     });
     put(t, "SetArea", f)?;
     let f = scope.create_function(move |_, id: EntityArg| {
-        let id = id.read();
-        Ok(get(scene, id).map_or(-1.0, |l| l.cost_override))
+        Ok(get(scene, id.read()).map_or(-1.0, |l| l.cost_override))
     });
     put(t, "GetCost", f)?;
     let f = scope.create_function(move |_, (id, cost): (EntityArg, f32)| {

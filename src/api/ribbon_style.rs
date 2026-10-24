@@ -83,9 +83,8 @@ fn register_width<'scope>(
     which: Ribbon,
 ) -> Reg {
     let f = scope.create_function(move |_, (id, at): (EntityArg, Option<f32>)| {
-        let id = id.read();
         Ok(which
-            .read(scene, id, |s| s.width.evaluate(at.unwrap_or(0.0)))
+            .read(scene, id.read(), |s| s.width.evaluate(at.unwrap_or(0.0)))
             .unwrap_or(0.0))
     });
     put(t, "GetWidth", f)?;
@@ -114,8 +113,7 @@ fn register_color<'scope>(
     which: Ribbon,
 ) -> Reg {
     let f = scope.create_function(move |_, (id, at): (EntityArg, Option<f32>)| {
-        let id = id.read();
-        let c = which.read(scene, id, |s| s.color.evaluate(at.unwrap_or(0.0)));
+        let c = which.read(scene, id.read(), |s| s.color.evaluate(at.unwrap_or(0.0)));
         let [r, g, b, a] = c.unwrap_or([0.0; 4]);
         Ok::<Rgba, _>((r, g, b, a))
     });
@@ -145,9 +143,10 @@ fn register_look<'scope>(
     which: Ribbon,
 ) -> Reg {
     let f = scope.create_function(move |_, id: EntityArg| {
-        let id = id.read();
         Ok(which
-            .read(scene, id, |s| s.texture.as_ref().map(MapRef::to_string))
+            .read(scene, id.read(), |s| {
+                s.texture.as_ref().map(MapRef::to_string)
+            })
             .flatten())
     });
     put(t, "GetTexture", f)?;
@@ -158,8 +157,7 @@ fn register_look<'scope>(
     });
     put(t, "SetTexture", f)?;
     let f = scope.create_function(move |_, id: EntityArg| {
-        let id = id.read();
-        Ok(which.read(scene, id, |s| s.texture_mode.name()))
+        Ok(which.read(scene, id.read(), |s| s.texture_mode.name()))
     });
     put(t, "GetTextureMode", f)?;
     let f = scope.create_function(move |_, (id, name): (EntityArg, String)| {
@@ -171,8 +169,7 @@ fn register_look<'scope>(
     });
     put(t, "SetTextureMode", f)?;
     let f = scope.create_function(move |_, id: EntityArg| {
-        let id = id.read();
-        Ok(which.read(scene, id, |s| s.blend.name()))
+        Ok(which.read(scene, id.read(), |s| s.blend.name()))
     });
     put(t, "GetBlend", f)?;
     let f = scope.create_function(move |_, (id, name): (EntityArg, String)| {

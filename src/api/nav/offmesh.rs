@@ -47,14 +47,10 @@ pub(super) fn register_agent<'scope>(
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
     let current = move |id: u32| scene.borrow().world.nav_agent(id)?.off_mesh_link;
-    let f = scope.create_function(move |_, id: EntityArg| {
-        let id = id.read();
-        Ok(current(id).is_some())
-    });
+    let f = scope.create_function(move |_, id: EntityArg| Ok(current(id.read()).is_some()));
     put(t, "IsOnOffMeshLink", f)?;
     let f = scope.create_function(move |lua, id: EntityArg| {
-        let id = id.read();
-        current(id).map(|l| link_table(lua, &l)).transpose()
+        current(id.read()).map(|l| link_table(lua, &l)).transpose()
     });
     put(t, "GetCurrentOffMeshLink", f)?;
     let f = scope.create_function(move |_, id: EntityArg| {
@@ -71,11 +67,10 @@ pub(super) fn register_agent<'scope>(
     });
     put(t, "CompleteOffMeshLink", f)?;
     let f = scope.create_function(move |_, id: EntityArg| {
-        let id = id.read();
         let auto = scene
             .borrow()
             .world
-            .nav_agent(id)
+            .nav_agent(id.read())
             .map(|a| a.auto_traverse_off_mesh_link);
         Ok(auto.unwrap_or(false))
     });

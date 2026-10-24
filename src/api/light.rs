@@ -47,9 +47,8 @@ fn register_color<'scope>(
         table,
         "GetColor",
         scope.create_function(|_, id: EntityArg| {
-            let id = id.read();
             let scene = scene.borrow();
-            let c = scene.world.light(id).map(|l| l.color);
+            let c = scene.world.light(id.read()).map(|l| l.color);
             let c = c.unwrap_or(Vec3::ONE);
             Ok((c.x, c.y, c.z))
         }),
@@ -79,9 +78,12 @@ fn register_intensity<'scope>(
         table,
         "GetIntensity",
         scope.create_function(|_, id: EntityArg| {
-            let id = id.read();
             let scene = scene.borrow();
-            Ok(scene.world.light(id).map(|l| l.intensity).unwrap_or(0.0))
+            Ok(scene
+                .world
+                .light(id.read())
+                .map(|l| l.intensity)
+                .unwrap_or(0.0))
         }),
     )?;
 
@@ -109,9 +111,8 @@ fn register_range<'scope>(
         table,
         "GetRange",
         scope.create_function(|_, id: EntityArg| {
-            let id = id.read();
             let scene = scene.borrow();
-            Ok(scene.world.light(id).map(|l| l.range).unwrap_or(0.0))
+            Ok(scene.world.light(id.read()).map(|l| l.range).unwrap_or(0.0))
         }),
     )?;
 
@@ -140,11 +141,10 @@ fn register_type<'scope>(
         table,
         "GetType",
         scope.create_function(|_, id: EntityArg| {
-            let id = id.read();
             let scene = scene.borrow();
             let name = scene
                 .world
-                .light(id)
+                .light(id.read())
                 .map(|l| l.light_type.name())
                 .unwrap_or("None");
             Ok(name.to_string())
@@ -178,9 +178,8 @@ fn register_cast_shadows<'scope>(
         table,
         "GetCastShadows",
         scope.create_function(|_, id: EntityArg| {
-            let id = id.read();
             let scene = scene.borrow();
-            Ok(scene.world.light(id).is_some_and(|l| l.cast_shadows))
+            Ok(scene.world.light(id.read()).is_some_and(|l| l.cast_shadows))
         }),
     )?;
 
@@ -209,9 +208,8 @@ fn register_mode<'scope>(
         table,
         "GetMode",
         scope.create_function(|_, id: EntityArg| {
-            let id = id.read();
             let scene = scene.borrow();
-            let mode = scene.world.light(id).map(|l| l.mode.name());
+            let mode = scene.world.light(id.read()).map(|l| l.mode.name());
             Ok(mode.unwrap_or("None").to_string())
         }),
     )?;

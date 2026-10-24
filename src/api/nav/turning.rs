@@ -60,11 +60,10 @@ where
     T: Default + IntoLua + FromLua + 'static,
 {
     let f = scope.create_function(move |_, id: EntityArg| {
-        let id = id.read();
         Ok(scene
             .borrow()
             .world
-            .nav_agent(id)
+            .nav_agent(id.read())
             .map_or_else(T::default, |a| get(&a)))
     });
     put(t, &format!("Get{name}"), f)?;

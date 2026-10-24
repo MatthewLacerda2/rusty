@@ -16,7 +16,6 @@ use glam::Vec3;
 use mlua::{Lua, Variadic};
 
 use super::{put, Reg};
-use crate::api::entity_arg::EntityArg;
 use crate::asset::MapRef;
 use crate::scene::decal::DecalSpec;
 use crate::scene::Scene;
@@ -76,9 +75,8 @@ pub fn register<'scope>(
     put(
         &table,
         "Remove",
-        scope.create_function(|_, (id, fade): (EntityArg, Option<f32>)| {
-            let id = id.live("Decals", "Remove")?;
-            Ok(scene.borrow_mut().decals.remove(id, fade.unwrap_or(0.0)))
+        scope.create_function(|_, (decal, fade): (u32, Option<f32>)| {
+            Ok(scene.borrow_mut().decals.remove(decal, fade.unwrap_or(0.0)))
         }),
     )?;
 

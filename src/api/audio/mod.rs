@@ -23,6 +23,7 @@ mod groups;
 mod occlusion;
 mod reverb;
 mod snapshots;
+mod volume;
 
 use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
@@ -30,7 +31,6 @@ use glam::Vec3;
 
 use crate::audio::{AudioMaestro, Listener, Rolloff, Shot, SpeakerMode};
 use crate::components::AudioSourceComponent;
-use crate::scene::authoring::audio as audio_ops;
 use crate::scene::Camera;
 use crate::scene::Scene;
 use crate::time::Time;
@@ -130,33 +130,7 @@ fn register_source_control<'scope>(
             Ok(())
         }),
     )?;
-
-    // Unity's `AudioSource.volume`: entity `id`'s source volume, through the op the
-    // inspector writes (clamped to `[0, 1]`), then the live voice retuned to it.
-    put(
-        table,
-        "SetVolume",
-        scope.create_function(|_, (id, v): (EntityArg, f32)| {
-            let id = id.live("Audio", "SetVolume")?;
-            let stored = scene.borrow_mut().world.audio_mut(id).map(|mut a| {
-                audio_ops::set_volume(&mut a, v);
-                a.volume
-            });
-            if let Some(v) = stored {
-                audio.borrow_mut().set_source_volume(id, v);
-            }
-            Ok(())
-        }),
-    )?;
-
-    put(
-        table,
-        "GetVolume",
-        scope.create_function(|_, id: EntityArg| {
-            let id = id.read();
-            Ok(scene.borrow().world.audio(id).map_or(0.0, |a| a.volume))
-        }),
-    )
+    volume::register(scope, table, scene, audio)
 }
 
 /// `Audio.PlayAt(path, x, y, z [, vol [, min_distance, max_distance [, group]]])`.

@@ -59,10 +59,7 @@ pub fn register<'scope>(
     put(
         &t,
         "IsEnabled",
-        scope.create_function(|_, id: EntityArg| {
-            let id = id.read();
-            Ok(scene.borrow().ragdoll_enabled(id))
-        }),
+        scope.create_function(|_, id: EntityArg| Ok(scene.borrow().ragdoll_enabled(id.read()))),
     )?;
     lua.globals().set("Ragdoll", t).map_err(|e| e.to_string())
 }

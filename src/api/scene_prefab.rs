@@ -130,8 +130,7 @@ fn register_overrides<'scope>(
         table,
         "ListPrefabOverrides",
         scope.create_function(|_, root_id: EntityArg| {
-            let root_id = root_id.read();
-            authoring::list_instance_overrides(&scene.borrow(), root_id)
+            authoring::list_instance_overrides(&scene.borrow(), root_id.read())
                 .map_err(mlua::Error::RuntimeError)
         }),
     )

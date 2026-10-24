@@ -44,9 +44,8 @@ pub fn register<'scope>(
         &table,
         "GetAlpha",
         scope.create_function(|_, id: EntityArg| {
-            let id = id.read();
             let scene = scene.borrow();
-            Ok(scene.world.canvas_group(id).map_or(1.0, |g| g.alpha))
+            Ok(scene.world.canvas_group(id.read()).map_or(1.0, |g| g.alpha))
         }),
     )?;
     put(
@@ -81,9 +80,8 @@ fn register_bool<'scope>(
         table,
         &format!("Get{suffix}"),
         scope.create_function(move |_, id: EntityArg| {
-            let id = id.read();
             let scene = scene.borrow();
-            Ok(scene.world.canvas_group(id).is_some_and(|g| get(&g)))
+            Ok(scene.world.canvas_group(id.read()).is_some_and(|g| get(&g)))
         }),
     )?;
     let verb = format!("Set{suffix}");

@@ -21,6 +21,9 @@ use crate::scene::Scene;
 use crate::scripting::{TimerScheduler, Wait, Work};
 use spec::{Args, Spec};
 
+/// `Tween.To`'s `(id, path, target, duration, opts?)`.
+type ToArgs = (EntityArg, String, Value, f64, Option<Table>);
+
 /// Register the `Tween` namespace onto `lua`.
 pub fn register<'scope>(
     lua: &Lua,
@@ -32,26 +35,17 @@ pub fn register<'scope>(
     put(
         &table,
         "To",
-        scope.create_function(
-            move |lua,
-                  (id, path, target, duration, opts): (
-                EntityArg,
-                String,
-                Value,
-                f64,
-                Option<Table>,
-            )| {
-                let id = id.live("Tween", "To")?;
-                let args = Args {
-                    id,
-                    path,
-                    target,
-                    duration,
-                };
-                let spec = spec::parse(lua, &scene.borrow(), args, opts, false)?;
-                Ok(schedule(scene, timers, spec, None))
-            },
-        ),
+        scope.create_function(move |lua, (id, path, target, duration, opts): ToArgs| {
+            let id = id.live("Tween", "To")?;
+            let args = Args {
+                id,
+                path,
+                target,
+                duration,
+            };
+            let spec = spec::parse(lua, &scene.borrow(), args, opts, false)?;
+            Ok(schedule(scene, timers, spec, None))
+        }),
     )?;
     put(
         &table,

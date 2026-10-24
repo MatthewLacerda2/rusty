@@ -51,10 +51,8 @@ fn register_group<'scope>(
     t: &Table,
     scene: SceneCell<'scope>,
 ) -> Reg {
-    let f = scope.create_function(move |_, id: EntityArg| {
-        let id = id.read();
-        Ok(get(scene, id).map_or(0.0, |g| g.size))
-    });
+    let f = scope
+        .create_function(move |_, id: EntityArg| Ok(get(scene, id.read()).map_or(0.0, |g| g.size)));
     put(t, "GetSize", f)?;
     let f = scope.create_function(move |_, (id, size): (EntityArg, f32)| {
         let id = id.live("LODGroup", "SetSize")?;
@@ -63,8 +61,7 @@ fn register_group<'scope>(
     });
     put(t, "SetSize", f)?;
     let f = scope.create_function(move |_, id: EntityArg| {
-        let id = id.read();
-        Ok(get(scene, id).map_or(0, |g| g.levels.len()))
+        Ok(get(scene, id.read()).map_or(0, |g| g.levels.len()))
     });
     put(t, "GetLevelCount", f)?;
     let f = scope.create_function(move |_, id: EntityArg| {
@@ -87,8 +84,7 @@ fn register_levels<'scope>(
     scene: SceneCell<'scope>,
 ) -> Reg {
     let f = scope.create_function(move |_, (id, level): (EntityArg, usize)| {
-        let id = id.read();
-        let g = get(scene, id);
+        let g = get(scene, id.read());
         Ok(g.and_then(|g| g.levels.get(level).map(|l| l.screen_height)))
     });
     put(t, "GetLevelHeight", f)?;
@@ -99,8 +95,7 @@ fn register_levels<'scope>(
     });
     put(t, "SetLevelHeight", f)?;
     let f = scope.create_function(move |_, (id, level): (EntityArg, usize)| {
-        let id = id.read();
-        let g = get(scene, id);
+        let g = get(scene, id.read());
         Ok(
             g.and_then(|g| g.levels.get(level).map(|l| l.renderers.clone()))
                 .unwrap_or_default(),

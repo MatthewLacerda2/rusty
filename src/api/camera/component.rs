@@ -22,8 +22,7 @@ pub fn register<'scope>(
         table,
         "GetProjection",
         scope.create_function(|_, id: EntityArg| {
-            let id = id.read();
-            let got = read(scene, id, |c| {
+            let got = read(scene, id.read(), |c| {
                 let size = match c.projection {
                     Projection::Orthographic { size } => Some(size),
                     Projection::Perspective => None,
@@ -66,10 +65,7 @@ fn register_culling_mask<'scope>(
     put(
         table,
         "GetCullingMask",
-        scope.create_function(|_, id: EntityArg| {
-            let id = id.read();
-            Ok(read(scene, id, |c| c.culling_mask))
-        }),
+        scope.create_function(|_, id: EntityArg| Ok(read(scene, id.read(), |c| c.culling_mask))),
     )?;
     put(
         table,
@@ -92,8 +88,7 @@ fn register_target<'scope>(
         table,
         "GetTargetTexture",
         scope.create_function(|_, id: EntityArg| {
-            let id = id.read();
-            let target = read(scene, id, |c| c.target_texture.clone()).flatten();
+            let target = read(scene, id.read(), |c| c.target_texture.clone()).flatten();
             Ok(target.map_or((None, None, None), |t| {
                 (Some(t.name), Some(t.width), Some(t.height))
             }))
@@ -130,8 +125,10 @@ fn register_target_settings<'scope>(
         table,
         "GetTargetPostFx",
         scope.create_function(|_, id: EntityArg| {
-            let id = id.read();
-            Ok(read(scene, id, |c| c.target_texture.as_ref().map(|t| t.post_fx)).flatten())
+            Ok(read(scene, id.read(), |c| {
+                c.target_texture.as_ref().map(|t| t.post_fx)
+            })
+            .flatten())
         }),
     )?;
     put(
@@ -147,8 +144,7 @@ fn register_target_settings<'scope>(
         table,
         "GetTargetUpdateEvery",
         scope.create_function(|_, id: EntityArg| {
-            let id = id.read();
-            Ok(read(scene, id, |c| {
+            Ok(read(scene, id.read(), |c| {
                 c.target_texture.as_ref().map(|t| t.update_every)
             })
             .flatten())

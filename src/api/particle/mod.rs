@@ -232,9 +232,8 @@ fn register_state<'scope>(
         table,
         "IsActive",
         scope.create_function(|_, id: EntityArg| {
-            let id = id.read();
             let scene = scene.borrow();
-            let active = scene.world.particles(id).map(|p| p.active);
+            let active = scene.world.particles(id.read()).map(|p| p.active);
             Ok(active.unwrap_or(false))
         }),
     )?;
@@ -243,9 +242,11 @@ fn register_state<'scope>(
         table,
         "GetCount",
         scope.create_function(|_, id: EntityArg| {
-            let id = id.read();
             let scene = scene.borrow();
-            let count = scene.world.particles(id).map(|p| p.live_count() as u32);
+            let count = scene
+                .world
+                .particles(id.read())
+                .map(|p| p.live_count() as u32);
             Ok(count.unwrap_or(0))
         }),
     )?;

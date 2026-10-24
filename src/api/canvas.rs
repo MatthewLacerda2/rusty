@@ -38,10 +38,9 @@ pub fn register<'scope>(
         &table,
         "GetScaleFactor",
         scope.create_function(|_, id: EntityArg| {
-            let id = id.read();
             let px = screen.borrow().pixels(&video.borrow());
             let scene = scene.borrow();
-            Ok(scene.world.canvas(id).map(|c| c.scale_factor(px)))
+            Ok(scene.world.canvas(id.read()).map(|c| c.scale_factor(px)))
         }),
     )?;
     lua.globals()
@@ -60,9 +59,12 @@ fn register_order_and_mode<'scope>(
         table,
         "GetSortOrder",
         scope.create_function(|_, id: EntityArg| {
-            let id = id.read();
             let scene = scene.borrow();
-            Ok(scene.world.canvas(id).map(|c| c.sort_order).unwrap_or(0))
+            Ok(scene
+                .world
+                .canvas(id.read())
+                .map(|c| c.sort_order)
+                .unwrap_or(0))
         }),
     )?;
     put(
@@ -80,9 +82,8 @@ fn register_order_and_mode<'scope>(
         table,
         "GetRenderMode",
         scope.create_function(|_, id: EntityArg| {
-            let id = id.read();
             let scene = scene.borrow();
-            let mode = scene.world.canvas(id).map(|c| c.render_mode);
+            let mode = scene.world.canvas(id.read()).map(|c| c.render_mode);
             Ok(mode.map_or("None", CanvasRenderMode::name).to_string())
         }),
     )?;
@@ -111,9 +112,11 @@ fn register_scaler<'scope>(
         table,
         "GetReferenceResolution",
         scope.create_function(|_, id: EntityArg| {
-            let id = id.read();
             let scene = scene.borrow();
-            let r = scene.world.canvas(id).map(|c| c.reference_resolution);
+            let r = scene
+                .world
+                .canvas(id.read())
+                .map(|c| c.reference_resolution);
             let r = r.unwrap_or(Vec2::ZERO);
             Ok((r.x, r.y))
         }),
@@ -133,9 +136,11 @@ fn register_scaler<'scope>(
         table,
         "GetMatchWidthOrHeight",
         scope.create_function(|_, id: EntityArg| {
-            let id = id.read();
             let scene = scene.borrow();
-            let m = scene.world.canvas(id).map(|c| c.match_width_or_height);
+            let m = scene
+                .world
+                .canvas(id.read())
+                .map(|c| c.match_width_or_height);
             Ok(m.unwrap_or(0.0))
         }),
     )?;
@@ -175,11 +180,10 @@ fn register_world<'scope>(
     ];
     for (suffix, (get, set)) in scalars {
         let f = scope.create_function(move |_, id: EntityArg| {
-            let id = id.read();
             Ok(scene
                 .borrow()
                 .world
-                .canvas(id)
+                .canvas(id.read())
                 .map(|c| get(&c))
                 .unwrap_or(0.0))
         });
@@ -195,8 +199,7 @@ fn register_world<'scope>(
         put(table, &format!("Set{suffix}"), f)?;
     }
     let f = scope.create_function(move |_, id: EntityArg| {
-        let id = id.read();
-        let t = scene.borrow().world.canvas(id).map(|c| c.tilt);
+        let t = scene.borrow().world.canvas(id.read()).map(|c| c.tilt);
         let t = t.unwrap_or(Vec2::ZERO);
         Ok((t.x, t.y))
     });

@@ -23,8 +23,11 @@ pub(super) fn register<'scope>(
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
     let f = scope.create_function(|_, id: EntityArg| {
-        let id = id.read();
-        Ok(scene.borrow().world.rigidbody(id).map_or(0.0, |rb| rb.mass))
+        Ok(scene
+            .borrow()
+            .world
+            .rigidbody(id.read())
+            .map_or(0.0, |rb| rb.mass))
     });
     put(table, "GetMass", f)?;
     let f = scope.create_function(|_, (id, mass): (EntityArg, f32)| {
@@ -36,9 +39,8 @@ pub(super) fn register<'scope>(
     });
     put(table, "SetMass", f)?;
     let f = scope.create_function(|_, id: EntityArg| {
-        let id = id.read();
         let world = &scene.borrow().world;
-        Ok(world.rigidbody(id).is_some_and(|rb| rb.use_gravity))
+        Ok(world.rigidbody(id.read()).is_some_and(|rb| rb.use_gravity))
     });
     put(table, "GetUseGravity", f)?;
     let f = scope.create_function(|_, (id, on): (EntityArg, bool)| {
@@ -50,9 +52,8 @@ pub(super) fn register<'scope>(
     });
     put(table, "SetUseGravity", f)?;
     let f = scope.create_function(|_, id: EntityArg| {
-        let id = id.read();
         let world = &scene.borrow().world;
-        Ok(world.collider(id).is_some_and(|c| c.is_trigger))
+        Ok(world.collider(id.read()).is_some_and(|c| c.is_trigger))
     });
     put(table, "IsTrigger", f)?;
     let f = scope.create_function(|_, (id, on): (EntityArg, bool)| {

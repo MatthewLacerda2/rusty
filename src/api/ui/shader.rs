@@ -50,8 +50,7 @@ fn register_name<'scope>(
         table,
         "GetShader",
         scope.create_function(|_, id: EntityArg| {
-            let id = id.read();
-            let slot = ops::graphic_shader(&scene.borrow().world, id).flatten();
+            let slot = ops::graphic_shader(&scene.borrow().world, id.read()).flatten();
             Ok(slot.map(|s| s.name))
         }),
     )

@@ -147,9 +147,12 @@ fn register_vec4<'scope>(
         table,
         &format!("Get{suffix}"),
         scope.create_function(move |_, id: EntityArg| {
-            let id = id.read();
             let scene = scene.borrow();
-            let v = scene.world.image(id).map(|i| get(&i)).unwrap_or(Vec4::ZERO);
+            let v = scene
+                .world
+                .image(id.read())
+                .map(|i| get(&i))
+                .unwrap_or(Vec4::ZERO);
             Ok((v.x, v.y, v.z, v.w))
         }),
     )?;
@@ -180,11 +183,10 @@ fn register_name<'scope>(
         table,
         &format!("Get{suffix}"),
         scope.create_function(move |_, id: EntityArg| {
-            let id = id.read();
             let scene = scene.borrow();
             Ok(scene
                 .world
-                .image(id)
+                .image(id.read())
                 .map_or("None", |i| get(&i))
                 .to_string())
         }),
@@ -214,9 +216,8 @@ fn register_bool<'scope>(
         table,
         &format!("Get{suffix}"),
         scope.create_function(move |_, id: EntityArg| {
-            let id = id.read();
             let scene = scene.borrow();
-            Ok(scene.world.image(id).is_some_and(|i| get(&i)))
+            Ok(scene.world.image(id.read()).is_some_and(|i| get(&i)))
         }),
     )?;
     let verb = format!("Set{suffix}");
@@ -241,11 +242,10 @@ fn register_texture_and_amount<'scope>(
         table,
         "GetTexture",
         scope.create_function(|_, id: EntityArg| {
-            let id = id.read();
             let scene = scene.borrow();
             Ok(scene
                 .world
-                .image(id)
+                .image(id.read())
                 .and_then(|i| i.texture.as_ref().map(MapRef::to_string)))
         }),
     )?;
@@ -262,9 +262,8 @@ fn register_texture_and_amount<'scope>(
         table,
         "GetFillAmount",
         scope.create_function(|_, id: EntityArg| {
-            let id = id.read();
             let scene = scene.borrow();
-            Ok(scene.world.image(id).map_or(0.0, |i| i.fill_amount))
+            Ok(scene.world.image(id.read()).map_or(0.0, |i| i.fill_amount))
         }),
     )?;
     put(

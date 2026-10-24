@@ -87,7 +87,6 @@ fn register_find<'scope>(
 ) -> Reg {
     let (scene, screen, video, camera) = (ctx.scene, ctx.screen, ctx.video, ctx.camera);
     let f = scope.create_function(move |_, (id, dir): (EntityArg, String)| {
-        let id = id.read();
         let Some(dir) = direction(&dir) else {
             return Err(mlua::Error::RuntimeError(format!(
                 "UI.FindSelectable: unknown direction '{dir}' (Up, Down, Left, Right)"
@@ -95,7 +94,7 @@ fn register_find<'scope>(
         };
         let world = &scene.borrow().world;
         let layout = UiLayout::compute_in(world, &ui_view(screen, video, camera));
-        Ok(find_selectable(world, &layout, id, dir))
+        Ok(find_selectable(world, &layout, id.read(), dir))
     });
     put(table, "FindSelectable", f)
 }

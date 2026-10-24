@@ -41,8 +41,7 @@ pub fn register<'scope>(
         table,
         "GetShaderParam",
         scope.create_function(|lua, (id, name): (EntityArg, String)| {
-            let id = id.read();
-            let v = mat_ops::entity_shader_param(&mut scene.borrow_mut(), id, &name);
+            let v = mat_ops::entity_shader_param(&mut scene.borrow_mut(), id.read(), &name);
             to_lua(lua, v.map_err(err)?)
         }),
     )?;

@@ -39,9 +39,8 @@ pub fn register<'scope>(
             &table,
             &format!("Get{suffix}"),
             scope.create_function(move |_, id: EntityArg| {
-                let id = id.read();
                 let scene = scene.borrow();
-                let b = scene.world.backdrop_filter(id).map(|b| (*b).clone());
+                let b = scene.world.backdrop_filter(id.read()).map(|b| (*b).clone());
                 Ok(get(&b.unwrap_or_default()))
             }),
         )?;
@@ -62,11 +61,10 @@ pub fn register<'scope>(
         &table,
         "GetTint",
         scope.create_function(|_, id: EntityArg| {
-            let id = id.read();
             let scene = scene.borrow();
             let t = scene
                 .world
-                .backdrop_filter(id)
+                .backdrop_filter(id.read())
                 .map_or(Vec4::ZERO, |b| b.tint);
             Ok((t.x, t.y, t.z, t.w))
         }),

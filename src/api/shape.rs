@@ -146,9 +146,11 @@ fn register_nums<'scope>(
         table,
         &format!("Get{suffix}"),
         scope.create_function(move |_, id: EntityArg| {
-            let id = id.read();
             let s = scene.borrow();
-            let v = s.world.shape(id).map_or(vec![0.0; count], |c| get(&c));
+            let v = s
+                .world
+                .shape(id.read())
+                .map_or(vec![0.0; count], |c| get(&c));
             Ok(Variadic::from_iter(v))
         }),
     )?;
@@ -220,11 +222,10 @@ fn register_names<'scope>(
         table,
         "GetRaycastTarget",
         scope.create_function(move |_, id: EntityArg| {
-            let id = id.read();
             Ok(scene
                 .borrow()
                 .world
-                .shape(id)
+                .shape(id.read())
                 .is_some_and(|c| c.raycast_target))
         }),
     )?;

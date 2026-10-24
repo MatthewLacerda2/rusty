@@ -26,9 +26,11 @@ pub fn register<'scope>(
         &table,
         "GetPadding",
         scope.create_function(|_, id: EntityArg| {
-            let id = id.read();
             let scene = scene.borrow();
-            let p = scene.world.rect_mask(id).map_or(Vec4::ZERO, |m| m.padding);
+            let p = scene
+                .world
+                .rect_mask(id.read())
+                .map_or(Vec4::ZERO, |m| m.padding);
             Ok((p.x, p.y, p.z, p.w))
         }),
     )?;
@@ -47,9 +49,8 @@ pub fn register<'scope>(
         &table,
         "GetFeather",
         scope.create_function(|_, id: EntityArg| {
-            let id = id.read();
             let scene = scene.borrow();
-            Ok(scene.world.rect_mask(id).map_or(0.0, |m| m.feather))
+            Ok(scene.world.rect_mask(id.read()).map_or(0.0, |m| m.feather))
         }),
     )?;
     put(

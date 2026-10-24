@@ -235,9 +235,8 @@ fn register_weight<'scope>(
         table,
         "GetIKWeight",
         scope.create_function(|_, (id, name): (EntityArg, String)| {
-            let id = id.read();
             let mut scene = scene.borrow_mut();
-            let mut anim = scene.world.animator_mut(id);
+            let mut anim = scene.world.animator_mut(id.read());
             Ok(anim
                 .as_mut()
                 .and_then(|a| a.ik_mut(&name).map(|c| c.weight)))

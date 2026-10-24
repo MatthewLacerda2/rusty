@@ -26,10 +26,7 @@ pub fn register<'scope>(
     put(
         &table,
         "GetLayer",
-        scope.create_function(|_, id: EntityArg| {
-            let id = id.read();
-            Ok(scene.borrow().world.layer(id))
-        }),
+        scope.create_function(|_, id: EntityArg| Ok(scene.borrow().world.layer(id.read()))),
     )?;
 
     put(

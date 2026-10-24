@@ -72,9 +72,8 @@ fn register_pair<'scope>(
         table,
         &format!("Get{suffix}"),
         scope.create_function(move |_, id: EntityArg| {
-            let id = id.read();
             let scene = scene.borrow();
-            let v = scene.world.rect_transform(id).map(|r| get(&r));
+            let v = scene.world.rect_transform(id.read()).map(|r| get(&r));
             let v = v.unwrap_or(Vec2::ZERO);
             Ok((v.x, v.y))
         }),
@@ -195,11 +194,10 @@ fn register_get_world_anchor<'scope>(
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
     let f = scope.create_function(move |lua, id: EntityArg| {
-        let id = id.read();
         let scene = scene.borrow();
         let anchor = scene
             .world
-            .rect_transform(id)
+            .rect_transform(id.read())
             .and_then(|r| r.world_anchor.clone());
         let Some(a) = anchor else {
             return Ok(None);

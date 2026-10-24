@@ -143,65 +143,31 @@ fn register_maps<'scope>(
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
-    put(
-        table,
-        "SetMetallicMap",
-        scope.create_function(|_, (id, path): (EntityArg, String)| {
-            let id = id.live("Material", "SetMetallicMap")?;
-            with_material(scene, id, |m, key| {
-                mat_ops::set_metallic_map(m, key, Some(path))
-            });
-            Ok(())
+    type SetMap = fn(&mut mat_ops::MaterialLibrary, &str, String);
+    let maps: [(&str, SetMap); 5] = [
+        ("SetMetallicMap", |m, k, p| {
+            mat_ops::set_metallic_map(m, k, Some(p))
         }),
-    )?;
-
-    put(
-        table,
-        "SetRoughnessMap",
-        scope.create_function(|_, (id, path): (EntityArg, String)| {
-            let id = id.live("Material", "SetRoughnessMap")?;
-            with_material(scene, id, |m, key| {
-                mat_ops::set_roughness_map(m, key, Some(path))
-            });
-            Ok(())
+        ("SetRoughnessMap", |m, k, p| {
+            mat_ops::set_roughness_map(m, k, Some(p))
         }),
-    )?;
-
-    put(
-        table,
-        "SetTexture",
-        scope.create_function(|_, (id, path): (EntityArg, String)| {
-            let id = id.live("Material", "SetTexture")?;
-            with_material(scene, id, |m, key| {
-                mat_ops::set_base_color_map(m, key, path)
-            });
-            Ok(())
+        ("SetTexture", mat_ops::set_base_color_map),
+        ("SetNormalMap", |m, k, p| {
+            mat_ops::set_normal_map(m, k, Some(p))
         }),
-    )?;
-
-    put(
-        table,
-        "SetNormalMap",
-        scope.create_function(|_, (id, path): (EntityArg, String)| {
-            let id = id.live("Material", "SetNormalMap")?;
-            with_material(scene, id, |m, key| {
-                mat_ops::set_normal_map(m, key, Some(path))
-            });
-            Ok(())
+        ("SetEmissiveMap", |m, k, p| {
+            mat_ops::set_emissive_map(m, k, Some(p))
         }),
-    )?;
-
-    put(
-        table,
-        "SetEmissiveMap",
-        scope.create_function(|_, (id, path): (EntityArg, String)| {
-            let id = id.live("Material", "SetEmissiveMap")?;
-            with_material(scene, id, |m, key| {
-                mat_ops::set_emissive_map(m, key, Some(path))
-            });
+    ];
+    for (verb, set) in maps {
+        let f = scope.create_function(move |_, (id, path): (EntityArg, String)| {
+            let id = id.live("Material", verb)?;
+            with_material(scene, id, |m, key| set(m, key, path));
             Ok(())
-        }),
-    )
+        });
+        put(table, verb, f)?;
+    }
+    Ok(())
 }
 
 /// Transparency controls (#242): `SetRenderMode` / `SetAlpha` / `SetAlphaCutoff`.

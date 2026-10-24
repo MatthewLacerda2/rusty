@@ -83,8 +83,11 @@ pub(super) fn register_agent<'scope>(
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
     let f = scope.create_function(move |_, id: EntityArg| {
-        let id = id.read();
-        let mask = scene.borrow().world.nav_agent(id).map(|a| a.area_mask);
+        let mask = scene
+            .borrow()
+            .world
+            .nav_agent(id.read())
+            .map(|a| a.area_mask);
         Ok(i64::from(mask.unwrap_or(0)))
     });
     put(t, "GetAreaMask", f)?;

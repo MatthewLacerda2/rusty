@@ -26,16 +26,16 @@ pub fn register<'scope>(
         table,
         "Get",
         scope.create_function(|_, id: EntityArg| {
-            let id = id.read();
-            Ok(mat_ops::keys(&scene.borrow().world, id).into_iter().next())
+            Ok(mat_ops::keys(&scene.borrow().world, id.read())
+                .into_iter()
+                .next())
         }),
     )?;
     put(
         table,
         "GetAll",
         scope.create_function(|_, id: EntityArg| {
-            let id = id.read();
-            Ok(mat_ops::keys(&scene.borrow().world, id))
+            Ok(mat_ops::keys(&scene.borrow().world, id.read()))
         }),
     )?;
     put(

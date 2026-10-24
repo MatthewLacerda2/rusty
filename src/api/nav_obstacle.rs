@@ -58,8 +58,7 @@ fn f32_pair<'scope>(
     (read, set): Field<f32>,
 ) -> Reg {
     let f = scope.create_function(move |_, id: EntityArg| {
-        let id = id.read();
-        Ok(get(scene, id).map_or(0.0, |o| read(&o)))
+        Ok(get(scene, id.read()).map_or(0.0, |o| read(&o)))
     });
     put(t, &format!("Get{name}"), f)?;
     let verb = format!("Set{name}");
@@ -80,8 +79,7 @@ fn bool_pair<'scope>(
     (read, set): Field<bool>,
 ) -> Reg {
     let f = scope.create_function(move |_, id: EntityArg| {
-        let id = id.read();
-        Ok(get(scene, id).is_some_and(|o| read(&o)))
+        Ok(get(scene, id.read()).is_some_and(|o| read(&o)))
     });
     put(t, &format!("Get{name}"), f)?;
     let verb = format!("Set{name}");
@@ -102,8 +100,7 @@ fn vec3_pair<'scope>(
     (read, set): Field<Vec3>,
 ) -> Reg {
     let f = scope.create_function(move |_, id: EntityArg| {
-        let id = id.read();
-        let v = get(scene, id).map_or(Vec3::ZERO, |o| read(&o));
+        let v = get(scene, id.read()).map_or(Vec3::ZERO, |o| read(&o));
         Ok((v.x, v.y, v.z))
     });
     put(t, &format!("Get{name}"), f)?;
@@ -122,10 +119,8 @@ fn register_shape<'scope>(
     t: &Table,
     scene: SceneCell<'scope>,
 ) -> Reg {
-    let f = scope.create_function(move |_, id: EntityArg| {
-        let id = id.read();
-        Ok(get(scene, id).map(|o| o.shape.name()))
-    });
+    let f = scope
+        .create_function(move |_, id: EntityArg| Ok(get(scene, id.read()).map(|o| o.shape.name())));
     put(t, "GetShape", f)?;
     let f = scope.create_function(move |_, (id, name): (EntityArg, String)| {
         let id = id.live("NavMeshObstacle", "SetShape")?;
@@ -160,13 +155,11 @@ fn register_carving<'scope>(
     let wait: Field<f32> = (|o| o.time_to_stationary, ops::set_time_to_stationary);
     f32_pair(scope, t, scene, "TimeToStationary", wait)?;
     let f = scope.create_function(move |_, id: EntityArg| {
-        let id = id.read();
-        Ok(get(scene, id).is_some_and(|o| o.is_carving()))
+        Ok(get(scene, id.read()).is_some_and(|o| o.is_carving()))
     });
     put(t, "IsCarving", f)?;
     let f = scope.create_function(move |_, id: EntityArg| {
-        let id = id.read();
-        let v = get(scene, id).map_or(Vec3::ZERO, |o| o.velocity);
+        let v = get(scene, id.read()).map_or(Vec3::ZERO, |o| o.velocity);
         Ok((v.x, v.y, v.z))
     });
     put(t, "GetVelocity", f)

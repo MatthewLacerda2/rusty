@@ -69,11 +69,10 @@ fn register_velocity<'scope>(
         table,
         "GetVelocity",
         scope.create_function(|_, id: EntityArg| {
-            let id = id.read();
             let scene = scene.borrow();
             let v = scene
                 .world
-                .rigidbody(id)
+                .rigidbody(id.read())
                 .map(|rb| rb.velocity)
                 .unwrap_or(Vec3::ZERO);
             Ok((v.x, v.y, v.z))
@@ -106,11 +105,10 @@ fn register_angular<'scope>(
         table,
         "GetAngularVelocity",
         scope.create_function(|_, id: EntityArg| {
-            let id = id.read();
             let scene = scene.borrow();
             let w = scene
                 .world
-                .rigidbody(id)
+                .rigidbody(id.read())
                 .map(|rb| rb.angular_velocity)
                 .unwrap_or(Vec3::ZERO);
             Ok((w.x, w.y, w.z))
@@ -143,11 +141,10 @@ fn register_collision_detection<'scope>(
         table,
         "GetCollisionDetection",
         scope.create_function(|_, id: EntityArg| {
-            let id = id.read();
             let scene = scene.borrow();
             let mode = scene
                 .world
-                .rigidbody(id)
+                .rigidbody(id.read())
                 .map(|rb| rb.collision_detection)
                 .unwrap_or_default();
             Ok(mode.name().to_string())

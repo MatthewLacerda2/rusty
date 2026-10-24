@@ -29,11 +29,10 @@ pub(super) fn register_reads<'scope>(
         table,
         "HasPath",
         scope.create_function(|_, id: EntityArg| {
-            let id = id.read();
             let scene = scene.borrow();
             Ok(scene
                 .world
-                .nav_agent(id)
+                .nav_agent(id.read())
                 .is_some_and(|a| !a.cached_path.is_empty()))
         }),
     )?;
@@ -54,9 +53,8 @@ pub(super) fn register_reads<'scope>(
         table,
         "GetPathStatus",
         scope.create_function(|_, id: EntityArg| {
-            let id = id.read();
             let scene = scene.borrow();
-            let status = scene.world.nav_agent(id).map(|a| a.path_status);
+            let status = scene.world.nav_agent(id.read()).map(|a| a.path_status);
             Ok(status.unwrap_or_default().name())
         }),
     )?;

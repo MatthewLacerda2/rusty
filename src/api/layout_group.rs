@@ -140,11 +140,10 @@ where
     A: FromLuaMulti,
 {
     let f = scope.create_function(move |_, id: EntityArg| {
-        let id = id.read();
         Ok(scene
             .borrow()
             .world
-            .layout_group(id)
+            .layout_group(id.read())
             .map(|g| get(&g))
             .unwrap_or_default())
     });

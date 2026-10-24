@@ -44,10 +44,9 @@ pub fn register<'scope>(
         &table,
         "GetRect",
         scope.create_function(move |lua, id: EntityArg| {
-            let id = id.read();
             let view = ui_view();
             let world = &scene.borrow().world;
-            let Some(rect) = layout::rect_in(world, id, &view) else {
+            let Some(rect) = layout::rect_in(world, id.read(), &view) else {
                 return Ok(None);
             };
             let space = space_of(world, rect.canvas, &view);

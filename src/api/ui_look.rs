@@ -44,8 +44,7 @@ pub(super) fn register_blend<'scope>(
         table,
         "GetBlend",
         scope.create_function(move |_, id: EntityArg| {
-            let id = id.read();
-            let blend = get(&scene.borrow(), id);
+            let blend = get(&scene.borrow(), id.read());
             Ok(blend.map_or("None", UiBlend::name).to_string())
         }),
     )?;
@@ -74,8 +73,7 @@ pub(super) fn register_gradient<'scope>(
         table,
         "GetGradient",
         scope.create_function(move |lua, id: EntityArg| {
-            let id = id.read();
-            let Some(Some(g)) = get(&scene.borrow(), id) else {
+            let Some(Some(g)) = get(&scene.borrow(), id.read()) else {
                 return Ok(Value::Nil);
             };
             to_lua(lua, &g)

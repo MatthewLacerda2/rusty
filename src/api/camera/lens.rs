@@ -26,10 +26,7 @@ pub(super) fn register<'scope>(
     put(
         table,
         "GetFieldOfView",
-        scope.create_function(|_, id: EntityArg| {
-            let id = id.read();
-            Ok(read(scene, id, |c| held_lens(c).fov))
-        }),
+        scope.create_function(|_, id: EntityArg| Ok(read(scene, id.read(), |c| held_lens(c).fov))),
     )?;
     put(
         table,
@@ -44,8 +41,7 @@ pub(super) fn register<'scope>(
         table,
         "GetClipPlanes",
         scope.create_function(|_, id: EntityArg| {
-            let id = id.read();
-            let (near, far): (Option<f32>, Option<f32>) = read(scene, id, |c| {
+            let (near, far): (Option<f32>, Option<f32>) = read(scene, id.read(), |c| {
                 let lens = held_lens(c);
                 (lens.near, lens.far)
             })
@@ -75,10 +71,7 @@ fn register_stacking<'scope>(
     put(
         table,
         "GetRenderOrder",
-        scope.create_function(|_, id: EntityArg| {
-            let id = id.read();
-            Ok(read(scene, id, |c| c.render_order))
-        }),
+        scope.create_function(|_, id: EntityArg| Ok(read(scene, id.read(), |c| c.render_order))),
     )?;
     put(
         table,
@@ -93,8 +86,7 @@ fn register_stacking<'scope>(
         table,
         "GetClearFlags",
         scope.create_function(|_, id: EntityArg| {
-            let id = id.read();
-            Ok(read(scene, id, |c| c.clear_flags.name()))
+            Ok(read(scene, id.read(), |c| c.clear_flags.name()))
         }),
     )?;
     put(

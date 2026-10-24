@@ -27,9 +27,8 @@ pub(super) fn register<'scope>(
             table,
             &format!("Get{suffix}"),
             scope.create_function(move |_, id: EntityArg| {
-                let id = id.read();
                 let scene = scene.borrow();
-                let v = scene.world.text(id).map_or([0.0; 6], |t| get(&t));
+                let v = scene.world.text(id.read()).map_or([0.0; 6], |t| get(&t));
                 Ok(Variadic::from_iter(
                     v[..lead].iter().chain(&v[2..]).copied(),
                 ))
@@ -69,9 +68,8 @@ pub(super) fn register_auto_size<'scope>(
         table,
         "GetAutoSize",
         scope.create_function(|_, id: EntityArg| {
-            let id = id.read();
             let scene = scene.borrow();
-            let t = scene.world.text(id);
+            let t = scene.world.text(id.read());
             Ok(t.map_or((false, 0.0, 0.0), |t| {
                 (t.auto_size, t.auto_size_min, t.auto_size_max)
             }))

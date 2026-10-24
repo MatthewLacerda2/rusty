@@ -92,9 +92,8 @@ pub(super) fn register_occlusion<'scope>(
         table,
         "GetOcclusionEnabled",
         scope.create_function(|_, id: EntityArg| {
-            let id = id.read();
             let scene = scene.borrow();
-            Ok(scene.world.audio(id).map(|a| a.occlusion_enabled))
+            Ok(scene.world.audio(id.read()).map(|a| a.occlusion_enabled))
         }),
     )
 }

@@ -65,8 +65,7 @@ pub(super) fn register<'scope>(
         table,
         "MeasureString",
         scope.create_function(move |_, (id, s): (EntityArg, String)| {
-            let id = id.read();
-            let text = scene.borrow().world.text(id).map(|t| t.clone());
+            let text = scene.borrow().world.text(id.read()).map(|t| t.clone());
             let size = text.map_or(Vec2::ZERO, |t| ui_text::measure_string(&t, &s));
             Ok((size.x, size.y))
         }),

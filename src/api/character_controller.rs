@@ -77,28 +77,26 @@ fn register_motion<'scope>(
     });
     put(t, "Move", f)?;
     let f = scope.create_function(move |_, id: EntityArg| {
-        let id = id.read();
-        Ok(get(scene, id).is_some_and(|c| c.is_grounded))
+        Ok(get(scene, id.read()).is_some_and(|c| c.is_grounded))
     });
     put(t, "IsGrounded", f)?;
     let f = scope.create_function(move |_, id: EntityArg| {
-        let id = id.read();
-        Ok(flags(get(scene, id).map_or(0, |c| c.collision_flags)))
+        Ok(flags(
+            get(scene, id.read()).map_or(0, |c| c.collision_flags),
+        ))
     });
     put(t, "GetCollisionFlags", f)?;
     let f = scope.create_function(move |_, id: EntityArg| {
-        let id = id.read();
-        let n = get(scene, id).map_or(Vec3::Y, |c| c.ground_normal);
+        let n = get(scene, id.read()).map_or(Vec3::Y, |c| c.ground_normal);
         Ok((n.x, n.y, n.z))
     });
     put(t, "GetGroundNormal", f)?;
     let f = scope.create_function(move |_, (id, height): (EntityArg, f32)| {
-        let id = id.read();
         let world = physics.borrow();
         Ok(physics::can_stand(
             world.as_ref(),
             &scene.borrow(),
-            id,
+            id.read(),
             height,
         ))
     });
@@ -114,8 +112,7 @@ fn f32_pair<'scope>(
     (read, write): Field<f32>,
 ) -> Reg {
     let f = scope.create_function(move |_, id: EntityArg| {
-        let id = id.read();
-        Ok(get(scene, id).map_or(0.0, |c| read(&c)))
+        Ok(get(scene, id.read()).map_or(0.0, |c| read(&c)))
     });
     put(t, &format!("Get{name}"), f)?;
     let verb = format!("Set{name}");
@@ -147,8 +144,7 @@ fn register_shape<'scope>(
     let min_move: Field<f32> = (|c| c.min_move_distance, ops::set_min_move_distance);
     f32_pair(scope, t, scene, "MinMoveDistance", min_move)?;
     let f = scope.create_function(move |_, id: EntityArg| {
-        let id = id.read();
-        let v = get(scene, id).map_or(Vec3::ZERO, |c| c.center);
+        let v = get(scene, id.read()).map_or(Vec3::ZERO, |c| c.center);
         Ok((v.x, v.y, v.z))
     });
     put(t, "GetCenter", f)?;

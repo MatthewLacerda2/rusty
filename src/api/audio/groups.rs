@@ -187,9 +187,8 @@ pub(super) fn register_output<'scope>(
         table,
         "GetOutputGroup",
         scope.create_function(|_, id: EntityArg| {
-            let id = id.read();
             let scene = scene.borrow();
-            Ok(scene.world.audio(id).map(|a| a.output_group.clone()))
+            Ok(scene.world.audio(id.read()).map(|a| a.output_group.clone()))
         }),
     )
 }
