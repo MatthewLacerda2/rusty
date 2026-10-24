@@ -32,6 +32,24 @@ fn the_project_flag_is_taken_out_of_the_arguments() {
 }
 
 #[test]
+fn any_flag_takes_its_value_and_an_empty_one_is_an_error() {
+    let mut a = args(&["a.lua", "--scene", "assets/scenes/x.scene", "out"]);
+    let taken = take_value(&mut a, "--scene");
+    assert_eq!(taken, Ok(Some("assets/scenes/x.scene".into())));
+    assert_eq!(a, args(&["a.lua", "out"]));
+    assert_eq!(
+        take_value(&mut args(&["--scene=s"]), "--scene"),
+        Ok(Some("s".into()))
+    );
+    assert_eq!(take_value(&mut args(&["--scenery"]), "--scene"), Ok(None));
+    assert!(
+        take_value(&mut args(&["--scene="]), "--scene").is_err(),
+        "empty"
+    );
+    assert!(take_flag(&mut args(&["--project="])).is_err(), "empty");
+}
+
+#[test]
 fn a_named_project_wins_and_the_default_is_dot_project() {
     assert_eq!(locate(Some("g".into())), PathBuf::from("g"));
     // A test binary has no packaged project beside it.

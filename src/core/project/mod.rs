@@ -40,6 +40,8 @@ mod locate;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
+use crate::core::application::BuildSettings;
+
 pub use agent::{CLAUDE_FILE, MCP_FILE};
 #[cfg(test)]
 pub(crate) use engine::commit::pin as pin_engine;
@@ -122,6 +124,9 @@ pub struct Opened {
     /// The engine the project was last opened with against the running one. Opening
     /// prints its warning on stderr; a frontend with a UI also shows it.
     pub engine: EngineCheck,
+    /// The project's build settings, as `project.rusty` holds them (the defaults
+    /// when it has none): what the player and `play` boot (the startup scene).
+    pub build: BuildSettings,
 }
 
 /// Open the project at `dir`: create its skeleton, check
@@ -183,21 +188,32 @@ pub(crate) fn prepare(dir: &Path, access: Access) -> Result<(Opened, Vec<String>
     let root =
         crate::core::paths::canonicalize(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     create_skeleton(&root)?;
-    let (engine, lines) = match access {
+    let (engine, file, lines) = match access {
         Access::Edit => {
-            let (engine, mut lines) = file::record(&root)?;
+            let (engine, file, mut lines) = file::record(&root)?;
             lines.extend(agent::write(&root, cfg!(feature = "dev")));
-            (engine, lines)
+            (engine, file, lines)
         }
-        Access::Run => (file::inspect(&root)?, Vec::new()),
+        Access::Run => {
+            let (engine, file) = file::inspect(&root)?;
+            (engine, file, Vec::new())
+        }
     };
-    Ok((Opened { root, engine }, lines))
+    let build = file.build;
+    Ok((
+        Opened {
+            root,
+            engine,
+            build,
+        },
+        lines,
+    ))
 }
 
 /// The engine check of the project at `dir`, without opening it or writing anything:
 /// what a picker shows before it opens a project a newer engine last opened.
 pub fn inspect(dir: &Path) -> Result<EngineCheck, String> {
-    file::inspect(dir)
+    Ok(file::inspect(dir)?.0)
 }
 
 /// Whether `dir` already holds a project: its [`PROJECT_FILE`], or an `assets/`
@@ -216,20 +232,30 @@ pub fn root() -> PathBuf {
 /// Remove `--project <dir>` (or `--project=<dir>`) from `args` and return the
 /// directory. `Err` when the flag has no value.
 pub fn take_flag(args: &mut Vec<String>) -> Result<Option<PathBuf>, String> {
+    Ok(take_value(args, PROJECT_FLAG)?.map(PathBuf::from))
+}
+
+/// Remove `<flag> <value>` (or `<flag>=<value>`) from `args` and return the value;
+/// `Ok(None)` when the flag is absent. `Err` when it has no value: nothing follows
+/// it, another flag does, or `<flag>=` is empty.
+pub fn take_value(args: &mut Vec<String>, flag: &str) -> Result<Option<String>, String> {
+    let joined = format!("{flag}=");
     let Some(at) = args
         .iter()
-        .position(|a| a == PROJECT_FLAG || a.starts_with("--project="))
+        .position(|a| a == flag || a.starts_with(&joined))
     else {
         return Ok(None);
     };
-    let flag = args.remove(at);
-    if let Some(dir) = flag.strip_prefix("--project=") {
-        return Ok(Some(PathBuf::from(dir)));
+    let taken = args.remove(at);
+    let value = match taken.strip_prefix(&joined) {
+        Some(value) => value.to_string(),
+        None if at < args.len() && !args[at].starts_with("--") => args.remove(at),
+        None => String::new(),
+    };
+    if value.is_empty() {
+        return Err(format!("{flag} needs a value"));
     }
-    if at >= args.len() || args[at].starts_with("--") {
-        return Err(format!("{PROJECT_FLAG} needs a directory"));
-    }
-    Ok(Some(PathBuf::from(args.remove(at))))
+    Ok(Some(value))
 }
 
 /// What every binary does first: take `--project` from `args`, find the project

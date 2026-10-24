@@ -18,7 +18,7 @@
 use std::path::{absolute, PathBuf};
 use std::process::exit;
 
-use rusty::core::project::{Access, ProjectFile};
+use rusty::core::project::Access;
 use rusty::dev::scenario;
 
 const USAGE: &str = "usage: play [--project <dir>] [--scene <path>] <scenario.lua> <out_dir>";
@@ -27,9 +27,15 @@ fn main() {
     rusty::logging::init();
     let mut args: Vec<String> = std::env::args().skip(1).collect();
     let project = rusty::core::project::take_flag(&mut args);
-    let scene = take_scene(&mut args);
-    let (Ok(project), Ok(scene), [scenario_path, out_dir]) = (project, scene, args.as_slice())
-    else {
+    let scene = rusty::core::project::take_value(&mut args, "--scene");
+    let (project, scene) = match (project, scene) {
+        (Ok(project), Ok(scene)) => (project, scene),
+        (Err(e), _) | (_, Err(e)) => {
+            eprintln!("play: {e}\n{USAGE}");
+            exit(2);
+        }
+    };
+    let [scenario_path, out_dir] = args.as_slice() else {
         eprintln!("{USAGE}");
         exit(2);
     };
@@ -44,10 +50,9 @@ fn main() {
             exit(2);
         }
     };
-    let build = ProjectFile::build_or_default(&opened.root, "play");
-    let scene = scene.unwrap_or_else(|| build.startup_scene.clone());
+    let scene = scene.unwrap_or_else(|| opened.build.startup_scene.clone());
 
-    match scenario::run(&scenario_path, &out_dir, &scene, build) {
+    match scenario::run(&scenario_path, &out_dir, &scene, opened.build) {
         Ok(report) => {
             println!(
                 "play: wrote {} (passed: {})",
@@ -63,22 +68,4 @@ fn main() {
             exit(2);
         }
     }
-}
-
-/// Take `--scene <path>` (or `--scene=<path>`) out of `args`; `Ok(None)` when absent.
-fn take_scene(args: &mut Vec<String>) -> Result<Option<String>, ()> {
-    let Some(at) = args
-        .iter()
-        .position(|a| a == "--scene" || a.starts_with("--scene="))
-    else {
-        return Ok(None);
-    };
-    let flag = args.remove(at);
-    if let Some(path) = flag.strip_prefix("--scene=") {
-        return Ok(Some(path.to_string()));
-    }
-    if at >= args.len() || args[at].starts_with("--") {
-        return Err(());
-    }
-    Ok(Some(args.remove(at)))
 }

@@ -340,7 +340,11 @@ Harness.AssertBudget{ draw_calls = 2000, lights_dropped = 0, fixed_update_ms = 4
 Measure before optimising: `make bench` runs
 `tests/fixtures/project/scenarios/bench/bench.lua` in the fixture project
 (`play --project tests/fixtures/project`, #829), a **shooter-shaped worst case** on
-the default fy_pool_day yard, and prints a short report in the terminal:
+the default fy_pool_day yard, and prints a short report in the terminal. The yard
+is the fixture project's startup scene, `assets/scenes/default.scene`, which `play`
+loads from disk (#1343). It is gitignored and seeded through the seed manifest,
+which keeps a local edit, so an edited copy changes what the bench measures; delete
+it to measure the default again.
 
 - **the scene** — 50 skinned soldiers (a procedural 16-bone, ~12k-triangle rig with a
   walk cycle and hitboxes) walking the navmesh with a Lua brain each (patrol + a

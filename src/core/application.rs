@@ -28,8 +28,9 @@
 //! harness and tests stay reproducible. Unlike `Storage`, a setter on a *bound*
 //! instance writes the file straight away: build settings are authoring-time project
 //! config, edited rarely and deliberately, never from inside `FixedUpdate`. The player
-//! reads the settings through [`ProjectFile::load`] into an unbound instance, so a
-//! shipped game can never rewrite its own build settings.
+//! and `play` take the settings opening the project read
+//! ([`Opened::build`](crate::core::project::Opened::build)) into an unbound instance,
+//! so a shipped game can never rewrite its own build settings.
 
 use std::path::{Path, PathBuf};
 

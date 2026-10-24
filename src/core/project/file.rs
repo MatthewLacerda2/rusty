@@ -83,18 +83,6 @@ impl ProjectFile {
         Ok(Self::read(&root.join(PROJECT_FILE))?.unwrap_or_default())
     }
 
-    /// The build settings of the project at `root`, or the defaults when its file
-    /// can't be read, said on stderr under `tag`. How the player and `play` find
-    /// the startup scene they boot (#1343).
-    pub fn build_or_default(root: &Path, tag: &str) -> BuildSettings {
-        Self::load(root)
-            .map(|file| file.build)
-            .unwrap_or_else(|err| {
-                eprintln!("[{tag}] {err} — using the default build settings");
-                BuildSettings::default()
-            })
-    }
-
     /// Write the file to `path`, unless it already holds exactly this — a project
     /// opened by the same engine is left untouched (no git noise, no write to a
     /// read-only bundle).
@@ -111,10 +99,10 @@ impl ProjectFile {
 /// Bring the project file at `root` up to date when the project is opened for
 /// editing: create it if missing, and record the running engine. Returns the check
 /// made against what the file held before (an upgrade reports itself through it:
-/// [`EngineCheck::upgrade`]), and one line per change. A file it creates names the product
+/// [`EngineCheck::upgrade`]), the file as it now stands, and one line per change. A file it creates names the product
 /// after the project's folder, Unity's default Product Name (#1317); an existing file
 /// keeps whatever it says.
-pub(super) fn record(root: &Path) -> Result<(EngineCheck, Vec<String>), String> {
+pub(super) fn record(root: &Path) -> Result<(EngineCheck, ProjectFile, Vec<String>), String> {
     let path = root.join(PROJECT_FILE);
     let existed = path.exists();
     let mut file = ProjectFile::load(root)?;
@@ -135,16 +123,14 @@ pub(super) fn record(root: &Path) -> Result<(EngineCheck, Vec<String>), String> 
     if !existed {
         lines.push(format!("created {PROJECT_FILE}"));
     }
-    Ok((check, lines))
+    Ok((check, file, lines))
 }
 
-/// The check alone, for a project opened only to run: nothing is written.
-pub(super) fn inspect(root: &Path) -> Result<EngineCheck, String> {
+/// The check and the file, for a project opened only to run: nothing is written.
+pub(super) fn inspect(root: &Path) -> Result<(EngineCheck, ProjectFile), String> {
     let file = ProjectFile::load(root)?;
-    Ok(EngineCheck::against(
-        Some(&file.engine_commit),
-        file.engine_order,
-    ))
+    let check = EngineCheck::against(Some(&file.engine_commit), file.engine_order);
+    Ok((check, file))
 }
 
 #[cfg(test)]

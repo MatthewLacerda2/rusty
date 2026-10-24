@@ -4,14 +4,16 @@
 //! harness through the SAME observe/act surface an agent uses. The loop is:
 //!
 //!   1. write   `scenarios/<name>.lua` in the game project
-//!   2. run     `cargo run --bin play --features dev -- --project <dir> <scenario> <out_dir>`
+//!   2. run     `cargo run --bin play --features dev -- --project <dir> [--scene <path>] <scenario> <out_dir>`
 //!   3. read    `<out_dir>/results.json` + `console.log`
 //!
-//! Example scenario:
-//!   local enemy = Scene.FindEntityByName("Enemy_1")
+//! It plays the project's startup scene, or the `--scene` named. Example scenario
+//! (`Player` stands for an entity of that scene):
+//!   local player = Scene.FindEntityByName("Player")
+//!   local x0, _, z0 = Transform.GetPosition(player)
 //!   Input.Press("W"); Harness.Step(120)            -- walk 2s @ 1/60
-//!   local _, _, ez = Transform.GetPosition(enemy)
-//!   Harness.Expect(ez ~= nil, "the bot should have advanced toward the enemy")
+//!   local x1, _, z1 = Transform.GetPosition(player)
+//!   Harness.Expect(x1 ~= x0 or z1 ~= z0, "W should move the player")
 //!
 //! Runs in its own Lua VM, separate from the gameplay scripts inside `GameWorld`.
 
@@ -53,9 +55,6 @@ pub fn run_isolated(scenario_path: &Path, out_dir: &Path) -> Result<RunReport, S
     run_in(Harness::new(out_dir, DEFAULT_BOT_SCRIPT), scenario_path)
 }
 
-// Both harnesses seed the bundled scripts before the scene attaches them, so the
-// very first run and every rerun see the same files — otherwise the enemy brain
-// would be absent on the first run and present afterwards, breaking byte-determinism.
 fn run_in(harness: Harness, scenario_path: &Path) -> Result<RunReport, String> {
     let code = std::fs::read_to_string(scenario_path)
         .map_err(|e| format!("Failed to read scenario {}: {}", scenario_path.display(), e))?;
