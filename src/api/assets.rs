@@ -24,6 +24,7 @@ use crate::asset::audio::{refresh, Refresh};
 use crate::asset::sidecar::{FilterMode, TextureSettings, WrapMode};
 use crate::asset::{build_manifest, AssetEntry, SubObjectEntry};
 use crate::asset::{sidecar, LightmapUvSettings};
+use crate::core::paths::to_slash;
 use crate::scene::Scene;
 
 /// The project asset root the manifest walks — the open project's `assets/`, the
@@ -161,12 +162,12 @@ fn manifest_table(lua: &Lua) -> mlua::Result<Table> {
 fn refresh_table(lua: &Lua, report: &Refresh) -> mlua::Result<Table> {
     let converted = lua.create_table()?;
     for (i, (_, wav)) in report.converted.iter().enumerate() {
-        converted.raw_set(i + 1, wav.to_string_lossy())?;
+        converted.raw_set(i + 1, to_slash(wav))?;
     }
     let skipped = lua.create_table()?;
     for (i, (mp3, why)) in report.skipped.iter().enumerate() {
         let t = lua.create_table()?;
-        t.raw_set("path", mp3.to_string_lossy())?;
+        t.raw_set("path", to_slash(mp3))?;
         t.raw_set("reason", why.as_str())?;
         skipped.raw_set(i + 1, t)?;
     }
@@ -214,3 +215,7 @@ fn vec3_table(lua: &Lua, x: f32, y: f32, z: f32) -> mlua::Result<Table> {
     t.raw_set("z", z)?;
     Ok(t)
 }
+
+#[cfg(test)]
+#[path = "assets_tests.rs"]
+mod tests;

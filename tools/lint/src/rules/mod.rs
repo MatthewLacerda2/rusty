@@ -20,6 +20,7 @@ mod full_literal;
 mod fullscreen_triangle;
 mod ignored;
 mod log_tag;
+mod lua_path_slash;
 mod markers;
 mod named_enum;
 mod prefix;
@@ -64,6 +65,7 @@ const RULES: &[(Rule, Allow)] = &[
     (fullscreen_triangle::run, Allow::Inline),
     (ignored::run, Allow::Never),
     (log_tag::run, Allow::Inline),
+    (lua_path_slash::run, Allow::Inline),
     (markers::run, Allow::Inline),
     (named_enum::run, Allow::Inline),
     (prefix::run, Allow::Inline),

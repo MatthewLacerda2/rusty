@@ -12,6 +12,7 @@ use super::super::providers::generated::{self, Realised};
 use super::super::providers::speech::{self, Context, Draft, ElevenLabs, SpeechError};
 use super::super::providers::{environment, ledger};
 use crate::api::{put, ApiScopedCtx, Reg};
+use crate::core::paths::to_slash;
 
 /// `Speech.Generate(brief)` → the generated WAV's path; or `nil, why` when the brief
 /// is not finished, so a loop over twenty lines loses none to one typo. Anything
@@ -38,7 +39,7 @@ pub(super) fn register<'scope>(
             };
             match speech::generate(draft, &at, &ElevenLabs) {
                 Ok(Realised::Cached(path) | Realised::Generated(path)) => {
-                    Ok((Some(path.to_string_lossy().into_owned()), None))
+                    Ok((Some(to_slash(&path)), None))
                 }
                 Err(SpeechError::Incomplete(why)) => Ok((None, Some(why.to_string()))),
                 Err(other) => Err(mlua::Error::external(other)),

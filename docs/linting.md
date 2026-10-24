@@ -35,6 +35,7 @@ agent can read exactly what failed.
 | Dependency locks | cargo-deny (`deny.toml`) | **hard gate**: every git dependency is pinned by `rev` (`required-git-spec`); `nalgebra` only through the physics stack and no `cgmath` — glam is the one math crate (#975) |
 | `tools/lint` stays std-only | `make test-lint` | its `Cargo.lock` names one package, itself (#935) |
 | Test temp dirs | `tools/lint -- --rules` | **hard gate** (`test-temp-dir`): test code writes under `crate::test_temp::dir()` / `crate::temp::dir()`, never a bare `std::env::temp_dir()` (#999) |
+| Lua paths are `/` | `tools/lint -- --rules` | **hard gate** (`lua-path-slash`): a path returned to a script goes through `core::paths::to_slash`, never `to_string_lossy()`/`display()` (#1390) |
 | Portable paths | `tools/lint -- --rules` | **hard gate** (`slash-join`): `src/` and `tests/` never join a `/`-separated path (literal, `format!` or constant) onto a path or make a path from one; they join one part per call or join `core::paths::native(…)` (#1332, #1371) |
 | Module layering | `tools/lint -- --layers` | every `crate::<module>` import and every external crate a module names matches the declared table (`tools/lint/src/layers/table.rs`): nothing undeclared, nothing stale, no cycle, no sim → platform edge (#724, #938) |
 | Sim determinism | clippy `disallowed_methods`/`disallowed_types` + `tools/lint -- --determinism` | **hard gate**: clock reads, OS/unseeded RNG and `std`'s randomly seeded hash maps are banned crate-wide in `clippy.toml`; only a platform row's `mod.rs` may opt out, and the ban list must stay whole (#757, #764) |
@@ -338,6 +339,16 @@ new flag, gate, CI step or baseline.
   like any shader, and a test fixture that must stand alone (`tests/gpu/`) is not
   scanned. A shader that must stand alone says why with
   `// lint: allow(fullscreen-triangle) <why>`.
+- **`lua-path-slash`** (#1390) — scene asset paths are `/` on every OS, so a path
+  an API function returns to a script must be too: a bare `to_string_lossy()` keeps
+  the `\` on Windows and the scene a script writes it into stops resolving on macOS
+  and Linux. A non-test `.to_string_lossy()` or `.display()` in `src/api/` or
+  `src/dev/lua_surface/` (the two directories that build Lua values) is a finding;
+  spell it `crate::core::paths::to_slash`. The rule is lexical: it cannot see a
+  `PathBuf` handed to Lua directly (mlua keeps the `\`), and it skips `.to_str()`
+  because `mlua::String::to_str` is far commoner there. It does flag a call on an
+  `mlua::String` or a literal; that line says so with
+  `// lint: allow(lua-path-slash) <why>`.
 - **`asset-write`** (#1220) — a file a path-keyed cache reads is written through
   `core::fs::written::write`, or its writer calls `note_written` after (#1207).
   A non-test line of `src/` outside `src/core/fs/` calling `fs::write(`,
