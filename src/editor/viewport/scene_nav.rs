@@ -198,15 +198,17 @@ pub fn read(response: &egui::Response, held: bool) -> NavFrame {
             alt: i.modifiers.alt,
         };
         let gesture = held.then(|| gesture(buttons)).flatten();
-        let axis = |pos: egui::Key, neg: egui::Key| {
-            f32::from(u8::from(i.key_down(pos))) - f32::from(u8::from(i.key_down(neg)))
-        };
+        let axis = |pos, neg| axis(i, pos, neg);
         use egui::Key;
         let wheel = if hovered {
             scroll::split(&i.events, line_points, viewport_height)
         } else {
             scroll::Scroll::default()
         };
+        let arrows = Vec2::new(
+            axis(Key::ArrowRight, Key::ArrowLeft),
+            axis(Key::ArrowDown, Key::ArrowUp),
+        );
         NavFrame {
             gesture,
             motion: to_vec2(i.pointer.motion().unwrap_or_else(|| i.pointer.delta())),
@@ -219,14 +221,7 @@ pub fn read(response: &egui::Response, held: bool) -> NavFrame {
             } else {
                 0.0
             },
-            turn: if keys {
-                Vec2::new(
-                    axis(Key::ArrowRight, Key::ArrowLeft),
-                    axis(Key::ArrowDown, Key::ArrowUp),
-                )
-            } else {
-                Vec2::ZERO
-            },
+            turn: if keys { arrows } else { Vec2::ZERO },
             fly: Vec3::new(
                 axis(Key::D, Key::A),
                 axis(Key::E, Key::Q),
@@ -237,6 +232,11 @@ pub fn read(response: &egui::Response, held: bool) -> NavFrame {
             dt: i.stable_dt,
         }
     })
+}
+
+/// One key axis: 1 with `pos` held, -1 with `neg`, 0 with both or neither.
+fn axis(i: &egui::InputState, pos: egui::Key, neg: egui::Key) -> f32 {
+    f32::from(u8::from(i.key_down(pos))) - f32::from(u8::from(i.key_down(neg)))
 }
 
 fn to_vec2(v: egui::Vec2) -> Vec2 {
