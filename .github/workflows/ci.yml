@@ -169,8 +169,11 @@ jobs:
         if: needs.changes.outputs.code != 'false'
         run: |
           rc=0
-          exec > >(tee one-process.log) 2>&1
+          exec 3>&1 4>&2 > >(tee one-process.log) 2>&1
+          tee_pid=$!
           NEXTEST=1 cargo test --locked --features dev --tests --no-fail-fast --quiet || rc=$?
+          exec >&3 2>&4
+          wait "$tee_pid"
           if [ "$rc" -ne 0 ]; then
             failed=$(sed -n 's/^---- \(.*\) stdout ----$/\1/p' one-process.log | sort -u)
             printf '\nFailed under one process (#1338):\n%s\n' "${failed:-<no test named; see the log>}"
