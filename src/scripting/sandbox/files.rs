@@ -127,8 +127,23 @@ fn found(lua: &Lua, code: &str, origin: &Path) -> mlua::Result<MultiValue> {
     (chunk, origin).into_lua_multi(lua)
 }
 
+/// Looks a module up under `assets/scripts`. A name that maps to anything but
+/// a relative path of plain components (an empty segment, a `/`, a drive prefix)
+/// is refused with a `require` error rather than "not found", so `package.path`
+/// is not tried for it either (#1391); `a.b` and `a.init`-style names resolve.
 fn project_searcher(lua: &Lua, access: Rc<Access>) -> mlua::Result<Function> {
     lua.create_function(move |lua, name: String| {
+        // A leading `/` makes `Path::join` drop the scripts directory and probe
+        // the filesystem root, so every component must be a plain name.
+        let plain = |segment: &str| {
+            let mut parts = Path::new(segment).components();
+            matches!(parts.next(), Some(std::path::Component::Normal(_))) && parts.next().is_none()
+        };
+        if !name.split('.').all(plain) {
+            return Err(mlua::Error::runtime(format!(
+                "bad module name '{name}': each '.'-separated part must be a plain file name"
+            )));
+        }
         let rel = name.replace('.', "/");
         let dir = access.workspace.join(native(SCRIPTS_DIR));
         let mut tried = Vec::new();

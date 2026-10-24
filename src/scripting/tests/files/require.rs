@@ -127,3 +127,22 @@ fn the_outside_warning_prints_a_slash_path_without_a_verbatim_prefix() {
     assert!(!shown.contains('\\'), "no `\\` and no `\\\\?\\`: {shown}");
     assert!(shown.ends_with("a/b/shared.lua"), "{shown}");
 }
+
+#[test]
+fn a_module_name_that_is_not_a_relative_path_is_refused_and_reads_nothing() {
+    let root = dir("empty_segment");
+    write(
+        &root.join(crate::core::paths::native("assets/scripts/a/b.lua")),
+        "return { v = 'ab' }",
+    );
+    let outside = dir("empty_segment_outside");
+    write(&outside.join("x.lua"), "ran = true; return 1");
+    let (m, console) = manager(&root);
+    let abs = format!("{}/x", outside.display());
+    for name in [".util", "a..b", "a.", ".", "", "/util", abs.as_str()] {
+        let err = m.exec(&format!("require([[{name}]])")).expect_err(name);
+        assert!(err.contains(&format!("bad module name '{name}'")), "{err}");
+    }
+    assert_eq!(out(&m, "out = tostring(ran) .. require('a.b').v"), "nilab");
+    assert!(warnings(&console).is_empty(), "{:?}", warnings(&console));
+}
