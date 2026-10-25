@@ -184,19 +184,28 @@ fn limit_for(path: &Path) -> usize {
         .file_name()
         .map(|n| n.to_string_lossy().into_owned())
         .unwrap_or_default();
-    if is_tests_sibling(path) {
+    // `tests.rs` is its module directory's own tests sibling.
+    if is_tests_sibling(path) || name == "tests.rs" {
         return MAX_FILE_LINES;
     }
-    let in_test_dir = p.split('/').any(|seg| seg == "tests" || seg == "fixtures");
-    let is_test = in_test_dir
-        || name.ends_with("_test.rs")
-        || name.ends_with("_tests.rs")
-        || name.starts_with("test_");
-    if is_test {
+    if is_test_file(&p) {
         MAX_TEST_FILE_LINES
     } else {
         MAX_FILE_LINES
     }
+}
+
+/// Is `path` (`/`-separated) a test or fixture file by its name or folder: under a
+/// `tests/` or `fixtures/` directory, `tests.rs`, `*_test.rs`, `*_tests.rs` or
+/// `test_*`? The one definition the size gate and `dir-size` share (#1367).
+pub(crate) fn is_test_file(path: &str) -> bool {
+    let (dir, name) = path.rsplit_once('/').unwrap_or(("", path));
+    dir.split('/')
+        .any(|seg| seg == "tests" || seg == "fixtures")
+        || name == "tests.rs"
+        || name.ends_with("_test.rs")
+        || name.ends_with("_tests.rs")
+        || name.starts_with("test_")
 }
 
 /// Is `path` a `<x>_tests.rs` file with its source beside it — `<x>.rs`, or a `<x>/`

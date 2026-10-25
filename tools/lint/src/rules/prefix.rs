@@ -82,7 +82,7 @@ pub fn anchor(owner: &str, files: &[&str]) -> Option<usize> {
 
 /// The file declaring `dir`'s modules: its `mod.rs` / `main.rs` / `lib.rs`, or the
 /// `<dir>.rs` beside it.
-fn owner_of(dir: &str) -> Option<String> {
+pub fn owner_of(dir: &str) -> Option<String> {
     ["mod.rs", "main.rs", "lib.rs"]
         .iter()
         .map(|f| format!("{dir}/{f}"))
