@@ -7,8 +7,8 @@ use glam::{Vec2, Vec4};
 use super::super::table::{group, inspect, op, part, unheld, with, Group};
 use super::set_ui_shader;
 use crate::components::{ShapeComponent, ShapeGlow, ShapeShadow, TextComponent, UiShader};
-use crate::scene::authoring::shape;
-use crate::scene::authoring::text::{self, FontSlot};
+use crate::scene::authoring::ui::shape;
+use crate::scene::authoring::ui::text::{self, FontSlot};
 
 const AUTO_SIZE: Group<TextComponent> = group!(
     |t, auto_size: bool, auto_size_min: f32, auto_size_max: f32| {

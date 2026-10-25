@@ -1,7 +1,7 @@
 //! Input Field clipboard (#612): Ctrl/Cmd + C, X, V through `Input.SetClipboard`,
 //! the same call a bot uses to stage a paste.
 
-use rusty::scene::authoring::ui_widgets::UiWidget;
+use rusty::scene::authoring::ui::widgets::UiWidget;
 
 use super::{widget, Ui};
 

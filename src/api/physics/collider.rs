@@ -2,7 +2,7 @@
 //! `GetPhysicsMaterial` / `SetPhysicsMaterial` (#447).
 //!
 //! The collider's authorable data — its shape and its physics material — over the
-//! same `scene::authoring::collider` ops the inspector's Collider card writes
+//! same `scene::authoring::physics::collider` ops the inspector's Collider card writes
 //! through. Unity: the `*Collider` component's size fields and its
 //! `sharedMaterial` (`PhysicMaterial`).
 
@@ -14,7 +14,7 @@ use mlua::{Lua, Table};
 use super::super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
 use crate::components::{CapsuleAxis, ColliderShape, CombineMode, PhysicsMaterial};
-use crate::scene::authoring::collider as collider_ops;
+use crate::scene::authoring::physics::collider as collider_ops;
 use crate::scene::Scene;
 
 fn err(msg: String) -> mlua::Error {

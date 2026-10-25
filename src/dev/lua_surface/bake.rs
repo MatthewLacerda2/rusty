@@ -11,7 +11,10 @@ use std::cell::RefCell;
 
 use mlua::Lua;
 
-use super::super::{lighting_bake, lightmap_bake, probe_bake, reflection_bake};
+use super::super::{
+    bake::lighting as lighting_bake, bake::lightmap as lightmap_bake, bake::probe as probe_bake,
+    bake::reflection as reflection_bake,
+};
 use super::generate::Overrides;
 use crate::api::{global_table, put, ApiScopedCtx, Reg};
 use crate::scene::Scene;

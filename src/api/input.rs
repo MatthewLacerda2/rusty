@@ -14,7 +14,7 @@ use std::cell::RefCell;
 use mlua::Lua;
 
 use super::{global_table, put, Reg};
-use crate::core::gamepad::{DeadZones, Rumble};
+use crate::core::input::gamepad::{DeadZones, Rumble};
 use crate::core::input::InputState;
 
 /// Register the readable half of `Input` and the cursor request onto `lua`,

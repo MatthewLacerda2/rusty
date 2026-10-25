@@ -8,7 +8,7 @@ use glam::{Quat, Vec3};
 
 use super::mask_tests::Dissolve;
 use super::params_tests::lua;
-use crate::core::quality::QualityPreset;
+use crate::core::settings::quality::QualityPreset;
 use crate::render::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
 use crate::scene::authoring::{create_entity, default_visual_correction, material, Primitive};
 use crate::scene::{Camera, Scene};

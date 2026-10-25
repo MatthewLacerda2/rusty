@@ -1,10 +1,10 @@
 //! The custom-shader row the Image, Shape and Text cards share (#427): the name of the
 //! baked ui shader the graphic draws with (empty: the standard UI shader). Edits go
-//! through `scene::authoring::ui_shader`, like `UI.SetShader`; runtime params are
+//! through `scene::authoring::ui::shader`, like `UI.SetShader`; runtime params are
 //! driven from scripts (`UI.SetShaderParam`).
 
 use crate::components::UiShader;
-use crate::scene::authoring::ui_shader as ops;
+use crate::scene::authoring::ui::shader as ops;
 
 /// Edit the snapshot's shader name; returns whether it changed.
 pub fn row(ui: &mut egui::Ui, slot: &mut Option<UiShader>) -> bool {

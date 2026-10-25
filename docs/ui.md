@@ -626,7 +626,7 @@ by editing its components or forks its behaviour by copying its script.
 
 - **Creating one.** The editor's **GameObject ▸ UI** menu (Canvas, Panel, Image,
   Text and each widget) and `UI.Create(kind, [parent])` build the same tree through
-  one path (`scene::authoring::ui_widgets`): under the selected entity when it is
+  one path (`scene::authoring::ui::widgets`): under the selected entity when it is
   inside a canvas, else under the scene's first root canvas, else under a new
   `Canvas`. Every widget also ships as a prefab, `assets/prefabs/ui/<Kind>.prefab`
   (`Button.prefab`, `Scroll View.prefab`, …), for `Scene.Instantiate(path, parent)`.
@@ -815,7 +815,7 @@ demand.
 ## Authoring in the editor
 
 Everything below has an API equivalent — the editor writes through the same
-`scene::authoring::rect_transform` ops as `RectTransform.*` (#423).
+`scene::authoring::ui::layout::rect_transform` ops as `RectTransform.*` (#423).
 
 - **UI overlay.** The Scene tab's **UI** toggle (on by default) draws the screen-space
   canvases (`ScreenSpaceOverlay`, and `ScreenSpaceCamera` — its plane fills the view)

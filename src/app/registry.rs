@@ -50,6 +50,6 @@ pub fn build() -> App {
     let mut app = App::new();
     super::play::register(&mut app);
     super::audio::register(&mut app);
-    super::ui::register(&mut app);
+    super::systems::ui::register(&mut app);
     app
 }

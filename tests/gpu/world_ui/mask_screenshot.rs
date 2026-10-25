@@ -8,7 +8,7 @@ use rusty::components::{
     CanvasComponent, CanvasRenderMode, LayoutElementComponent, MaskComponent, RectMaskComponent,
     ShapeComponent, ShapeKind,
 };
-use rusty::scene::authoring::ui_widgets::{create_ui, UiWidget};
+use rusty::scene::authoring::ui::widgets::{create_ui, UiWidget};
 use rusty::scene::Scene;
 
 use crate::ui::widgets::part;

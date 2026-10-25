@@ -3,7 +3,7 @@
 //! Get/Set over an entity's `MaskComponent` (Unity's `Mask`): whether the mask's
 //! own graphic also draws. Whether a mask exists is `Scene.AddComponent(id,
 //! "Mask")` / `RemoveComponent`. The setter routes through the shared
-//! `scene::authoring::rect_mask` op the inspector card uses.
+//! `scene::authoring::ui::rect_mask` op the inspector card uses.
 
 use std::cell::RefCell;
 
@@ -11,7 +11,7 @@ use mlua::Lua;
 
 use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
-use crate::scene::authoring::rect_mask as mask_ops;
+use crate::scene::authoring::ui::rect_mask as mask_ops;
 use crate::scene::Scene;
 
 /// Register the `Mask` namespace onto `lua`.

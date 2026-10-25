@@ -7,12 +7,15 @@ use std::collections::BTreeMap;
 use super::super::table::{group, inspect, op, part, ro, unheld, with, Group};
 use super::super::value::Mask;
 use super::NO_OP;
-use crate::components::camera::RenderTarget;
+use crate::components::rendering::camera::RenderTarget;
 use crate::components::{
     CameraComponent, LightComponent, LodGroupComponent, LodLevel, MaterialComponent, MeshComponent,
     ShadowSettings, SsaoSettings, TransformComponent, VisualCorrectionComponent,
 };
-use crate::scene::authoring::{camera, light, lod_group as lod, visual_correction as vc};
+use crate::scene::authoring::{
+    rendering::camera, rendering::light, rendering::lod_group as lod,
+    rendering::visual_correction as vc,
+};
 use crate::shadergen::post_params::PostChain;
 
 const CONES: Group<LightComponent> =

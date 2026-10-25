@@ -36,6 +36,7 @@
     reason = "platform layer, exempt from the sim's clock ban (#757): frame timing and screenshot timeouts measure real time"
 )]
 
+pub mod bake;
 pub mod bench;
 pub mod botplayer;
 pub mod bridge;
@@ -43,16 +44,11 @@ pub mod capture;
 pub mod command_channel;
 pub mod console;
 pub mod export;
-pub mod generate_lighting;
 pub mod harness;
-pub mod lighting_bake;
-pub mod lightmap_bake;
 pub mod lua_surface;
 pub mod mcp;
 pub mod preview;
-pub mod probe_bake;
 pub mod providers;
-pub mod reflection_bake;
 pub mod scenario;
 pub mod screenshot;
 pub mod session;

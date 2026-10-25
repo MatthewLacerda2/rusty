@@ -19,7 +19,7 @@ const RECIPE: &str = include_str!("look_recipe.lua");
 fn with_api(scene: &RefCell<Scene>, f: impl FnOnce(&Lua)) {
     let path = RefCell::new(None);
     let screen = RefCell::new(rusty::ui::ScreenSize::default());
-    let video = RefCell::new(rusty::core::video::VideoSettings::default());
+    let video = RefCell::new(rusty::core::settings::video::VideoSettings::default());
     let lua = Lua::new();
     lua.scope(|scope| {
         rusty::api::scene::register(&lua, scope, scene, &path).unwrap();

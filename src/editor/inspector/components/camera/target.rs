@@ -1,10 +1,10 @@
 //! The Camera card's projection mode and render-texture target (#430). Every write
-//! routes through `scene::authoring::camera`, the ops the `Camera.*` per-entity
+//! routes through `scene::authoring::rendering::camera`, the ops the `Camera.*` per-entity
 //! functions use.
 
 use crate::components::{CameraComponent, Projection};
 use crate::editor::widgets::DragRange;
-use crate::scene::authoring::camera as camera_ops;
+use crate::scene::authoring::rendering::camera as camera_ops;
 
 /// Perspective / orthographic, and the orthographic half-height.
 pub(super) fn draw_projection_mode(

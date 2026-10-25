@@ -12,7 +12,7 @@ use super::super::{put, Reg};
 use super::groups::err;
 use crate::api::entity_arg::EntityArg;
 use crate::audio::{AudioMaestro, OcclusionSettings};
-use crate::scene::authoring::audio as audio_ops;
+use crate::scene::authoring::audio::source as audio_ops;
 use crate::scene::Scene;
 
 /// The keys `SetOcclusionSettings` takes.

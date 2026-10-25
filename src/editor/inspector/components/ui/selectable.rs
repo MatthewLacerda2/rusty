@@ -1,7 +1,7 @@
 //! The Selectable inspector card (#420): interactable, the transition with its
 //! target graphic and per-state colours / sprites, and navigation with its explicit
 //! targets. Widgets edit a snapshot; every write routes through
-//! `scene::authoring::selectable`.
+//! `scene::authoring::ui::selectable`.
 
 use crate::editor::inspector::components::card::remove_component;
 use crate::editor::widgets::DragRange;
@@ -14,7 +14,7 @@ use crate::components::{
     NavigationMode, SelectableComponent, SelectableTransition, SelectionState,
 };
 use crate::editor::inspector::components::card::component_card;
-use crate::scene::authoring::selectable as ops;
+use crate::scene::authoring::ui::selectable as ops;
 
 /// Selectable card. A THIN client (#287): widgets edit a snapshot and the changed
 /// snapshot is written back through the shared ops; remove detaches.

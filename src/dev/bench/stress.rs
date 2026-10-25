@@ -11,8 +11,8 @@ use super::rig;
 use crate::components::{AnimatorComponent, MaterialComponent};
 use crate::core::curve::Range;
 use crate::scene::authoring::{
-    self, add_component, character_controller as cc, create_entity, nav::agent as nav_agent,
-    particles, ComponentKind, Primitive,
+    self, add_component, create_entity, nav::agent as nav_agent, particles,
+    physics::character_controller as cc, ComponentKind, Primitive,
 };
 use crate::scene::decal::DecalSpec;
 use crate::scene::default_scene::layout::{ground_at, YARD_HALF};
@@ -158,10 +158,10 @@ fn light(scene: &mut Scene, i: u32, shadowed: bool, flicker: Option<&str>) {
     t.rotation = Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2);
     drop(t);
     if let Some(mut l) = scene.world.light_mut(id) {
-        authoring::light::set_color(&mut l, Vec3::new(1.0, 0.8, 0.55));
-        authoring::light::set_intensity(&mut l, 2.0);
-        authoring::light::set_range(&mut l, 9.0);
-        authoring::light::set_cast_shadows(&mut l, shadowed);
+        authoring::rendering::light::set_color(&mut l, Vec3::new(1.0, 0.8, 0.55));
+        authoring::rendering::light::set_intensity(&mut l, 2.0);
+        authoring::rendering::light::set_range(&mut l, 9.0);
+        authoring::rendering::light::set_cast_shadows(&mut l, shadowed);
     }
     if let Some(script) = flicker {
         attach(scene, id, script);

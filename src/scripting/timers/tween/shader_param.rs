@@ -12,7 +12,9 @@
 
 use glam::Vec4;
 
-use crate::scene::authoring::{material, ui_shader, visual_correction as vc_ops};
+use crate::scene::authoring::{
+    material, rendering::visual_correction as vc_ops, ui::shader as ui_shader,
+};
 use crate::scene::Scene;
 use crate::shadergen::params::ParamLayout;
 use crate::shadergen::post_params::PostChain;

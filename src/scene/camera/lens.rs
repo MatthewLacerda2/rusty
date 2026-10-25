@@ -6,7 +6,7 @@
 
 use super::Camera;
 use crate::components::{CameraComponent, Projection};
-use crate::scene::authoring::camera as ops;
+use crate::scene::authoring::rendering::camera as ops;
 
 /// The largest near plane and orthographic half-height the view camera takes:
 /// below `sqrt(f32::MAX)`, so `near * far` (the perspective build) and the

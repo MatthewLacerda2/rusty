@@ -3,7 +3,7 @@
 //! Both cards end in the same Style section (width curve, colour gradient,
 //! texture, texture mode, blend) over the `RibbonStyle` they share. THIN clients
 //! (#287): every widget reads a snapshot and routes its write through the shared
-//! `authoring::trail` / `authoring::line` / `authoring::ribbon` ops the `Trail.*`
+//! `authoring::ribbon::trail` / `authoring::ribbon::line` / `authoring::ribbon` ops the `Trail.*`
 //! and `Line.*` Lua verbs call.
 
 mod line;

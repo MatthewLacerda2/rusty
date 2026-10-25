@@ -15,7 +15,7 @@ use super::{icon, EditorFrontend};
 use crate::app::GameWorld;
 use crate::core::project::bench::recent;
 use crate::core::project::{Opened, PROJECT_FILE};
-use crate::core::video::VideoSettings;
+use crate::core::settings::video::VideoSettings;
 use crate::editor::project_picker::ProjectPicker;
 use crate::shell::{boot, Launch, Shell};
 

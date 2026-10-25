@@ -82,7 +82,7 @@ pub struct EditorUi {
 
     /// Selected post-FX scalability tier. main.rs syncs this onto the renderer
     /// each frame so Low/Medium/High gate which passes run + buffer sizes.
-    pub quality_preset: crate::core::quality::QualityPreset,
+    pub quality_preset: crate::core::settings::quality::QualityPreset,
     /// The speaker mode shown in Config (#546), mirrored from the audio maestro.
     pub speaker_mode: crate::audio::SpeakerMode,
     /// A speaker mode picked in Config this frame, for the shell to apply.
@@ -152,7 +152,7 @@ impl EditorUi {
             bottom_open: true,
             theme: theme::Theme::dark(),
             fonts_installed: false,
-            quality_preset: crate::core::quality::QualityPreset::default(),
+            quality_preset: crate::core::settings::quality::QualityPreset::default(),
             speaker_mode: crate::audio::SpeakerMode::default(),
             speaker_mode_request: None,
             viewport_tab: ViewportTab::Scene,

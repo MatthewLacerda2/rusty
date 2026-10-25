@@ -10,7 +10,7 @@ use glam::Mat4;
 
 use super::{PostParams, PostPasses};
 use crate::components::VisualCorrectionComponent;
-use crate::core::quality::QualityPreset;
+use crate::core::settings::quality::QualityPreset;
 use crate::scene::Scene;
 
 /// Scan `scene` for the first active visual-correction volume and matching camera

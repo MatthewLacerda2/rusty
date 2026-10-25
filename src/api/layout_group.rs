@@ -4,7 +4,7 @@
 //! / Grid layout groups): the kind, padding, spacing, child alignment, the
 //! row/column control and force-expand pairs, and the grid's cell size,
 //! constraint, count, start corner and start axis. Every setter routes through
-//! the shared `scene::authoring::layout_group` ops the inspector card uses.
+//! the shared `scene::authoring::ui::layout::group` ops the inspector card uses.
 //! Getters return a neutral default without a group; setters are then no-ops.
 //! Enum values travel as their names (case-insensitive; unknown names ignored).
 //! The placed rects are read with `UI.GetRect`.
@@ -19,7 +19,7 @@ use crate::api::entity_arg::EntityArg;
 use crate::components::{
     LayoutConstraint, LayoutCorner, LayoutGroupComponent, LayoutKind, TextAlignment,
 };
-use crate::scene::authoring::layout_group as ops;
+use crate::scene::authoring::ui::layout::group as ops;
 use crate::scene::Scene;
 
 type Cell<'s> = &'s RefCell<Scene>;

@@ -20,7 +20,7 @@
 use glam::Vec2;
 
 use super::DIRECTIONS;
-use crate::core::gamepad::{pad_name, MAX_PADS};
+use crate::core::input::gamepad::{pad_name, MAX_PADS};
 use crate::core::input::InputState;
 
 /// A logical navigation action.

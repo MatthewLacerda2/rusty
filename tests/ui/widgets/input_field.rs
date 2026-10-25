@@ -1,6 +1,6 @@
 //! Input Field: typing, editing keys, selection, validation and submit / cancel.
 
-use rusty::scene::authoring::ui_widgets::UiWidget;
+use rusty::scene::authoring::ui::widgets::UiWidget;
 
 use super::{part, widget, Ui};
 

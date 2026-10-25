@@ -24,8 +24,8 @@ use serde_json::{json, Value};
 
 use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
-use crate::core::video::VideoSettings;
-use crate::scene::authoring::ui_widgets::{create_ui, UiWidget};
+use crate::core::settings::video::VideoSettings;
+use crate::scene::authoring::ui::widgets::{create_ui, UiWidget};
 use crate::scene::{Camera, Scene};
 use crate::ui::space::{rect_screen_bounds, space_of, CanvasSpace};
 use crate::ui::{layout, ScreenSize, UiRect, UiView};

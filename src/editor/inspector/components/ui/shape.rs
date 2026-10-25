@@ -1,6 +1,6 @@
 //! The Shape inspector card (#425): the primitive and its per-kind fields, the
 //! fill (colour or gradient), border, shadow, glow, blend mode and raycast target.
-//! Widgets edit a snapshot; every write routes through `scene::authoring::shape`.
+//! Widgets edit a snapshot; every write routes through `scene::authoring::ui::shape`.
 
 use crate::editor::inspector::components::card::remove_component;
 use crate::scene::authoring::ComponentKind;
@@ -10,7 +10,7 @@ use super::look::{blend_row, color_row, drag_row, gradient_editor, vec2_edit};
 use super::{combo, vec4_row};
 use crate::components::{ShapeComponent, ShapeCorner, ShapeKind};
 use crate::editor::inspector::components::card::component_card;
-use crate::scene::authoring::shape as ops;
+use crate::scene::authoring::ui::shape as ops;
 
 /// Shape card. A THIN client (#287): widgets edit a snapshot and the changed
 /// snapshot is written back field by field through the shared ops; remove detaches.

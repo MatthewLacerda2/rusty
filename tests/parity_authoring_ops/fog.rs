@@ -5,7 +5,7 @@ use std::rc::Rc;
 
 use glam::Vec3;
 use mlua::Lua;
-use rusty::core::quality::QualityPreset;
+use rusty::core::settings::quality::QualityPreset;
 use rusty::scene::authoring::fog as fog_ops;
 use rusty::scene::{FogMode, Scene};
 

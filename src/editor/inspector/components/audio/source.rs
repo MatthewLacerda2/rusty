@@ -13,11 +13,11 @@ use egui_phosphor::regular as icon;
 
 use crate::audio::mixer::DEFAULT_GROUPS;
 use crate::editor::inspector::components::card::component_card;
-use crate::scene::authoring::audio as audio_ops;
+use crate::scene::authoring::audio::source as audio_ops;
 use crate::scene::AudioSourceComponent;
 
 /// 3F-audio. AudioSource component card. A THIN client (#287): each widget reads the
-/// field from a snapshot and routes its write through a shared `authoring::audio::*`
+/// field from a snapshot and routes its write through a shared `authoring::audio::source::*`
 /// op (no mutable component borrow); remove detaches the component.
 pub fn draw(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, is_dirty: &mut bool) {
     let Some(a) = world.audio(id).map(|a| a.clone()) else {

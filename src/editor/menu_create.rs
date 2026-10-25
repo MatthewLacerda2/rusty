@@ -3,7 +3,7 @@
 //! The single, discoverable home for creating objects, mirroring Unity's
 //! `GameObject` menu: **Create Empty**, **3D Object ▸** (Cube / Sphere / Plane /
 //! Cylinder / Capsule), **UI ▸** (Canvas, Panel, Image, Text and the widget kit, #422 — via
-//! `ui_widgets::create_ui`, the path `UI.Create` takes) and **Light ▸**
+//! `widgets::create_ui`, the path `UI.Create` takes) and **Light ▸**
 //! (Directional / Point / Spot). Object creation used to
 //! live in the Hierarchy toolbar (#255); it moved here so the Hierarchy does one
 //! job (show + select the tree).
@@ -16,7 +16,7 @@
 use egui_phosphor::regular as icon;
 
 use crate::editor::EditorUi;
-use crate::scene::authoring::ui_widgets::{self, UiWidget};
+use crate::scene::authoring::ui::widgets::{self, UiWidget};
 use crate::scene::authoring::{self, Primitive};
 use crate::scene::Scene;
 
@@ -50,7 +50,7 @@ pub fn game_object_menu(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Sc
             for kind in UiWidget::ALL {
                 if ui.button(kind.label()).clicked() {
                     let parent = editor.selected_entity_id;
-                    let id = ui_widgets::create_ui(scene, kind, parent);
+                    let id = widgets::create_ui(scene, kind, parent);
                     select_new(editor, id);
                     ui.close();
                 }

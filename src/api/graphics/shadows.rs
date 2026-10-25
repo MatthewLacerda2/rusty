@@ -1,13 +1,13 @@
 //! `Graphics.{Get,Set}Shadow{Cascades,Distance}` (#435): the sun's cascaded shadow
 //! map over the active visual-correction volume, through the same
-//! `authoring::visual_correction` ops the Inspector card calls.
+//! `authoring::rendering::visual_correction` ops the Inspector card calls.
 
 use std::cell::RefCell;
 
 use super::super::{put, Reg};
 use super::state::{with_vc, with_vc_mut};
 use crate::components::ShadowSettings;
-use crate::scene::authoring::visual_correction as vc_ops;
+use crate::scene::authoring::rendering::visual_correction as vc_ops;
 use crate::scene::Scene;
 
 /// Cascade count and shadow distance. The getters report the engine defaults when

@@ -20,7 +20,7 @@ use kira::track::{SendTrackBuilder, SendTrackHandle, SendTrackId};
 use kira::{AudioManager, Frame, Mix, Tween};
 
 use super::groups::decibels;
-use crate::components::reverb_zone::MAX_PRE_DELAY;
+use crate::components::audio::reverb_zone::MAX_PRE_DELAY;
 use crate::components::ReverbParams;
 
 /// The mean delay of Freeverb's comb filters at its 44.1 kHz reference (1116–1617

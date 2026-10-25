@@ -1,7 +1,7 @@
 //! src/editor/inspector/components/gameplay/joint.rs — the Joint card (#449).
 //!
 //! A THIN client (#287): widgets read a snapshot and route every write through the
-//! shared `authoring::joint` ops the `Joint.*` Lua setters call. Rows that do not
+//! shared `authoring::physics::joint` ops the `Joint.*` Lua setters call. Rows that do not
 //! apply to the chosen kind (the axis and limits of a Fixed joint, the swing of a
 //! Hinge) are hidden, not cleared, so switching kinds back loses nothing.
 
@@ -13,7 +13,7 @@ use egui_phosphor::regular as icon;
 use super::physics::vec3_row;
 use crate::components::{JointComponent, JointKind};
 use crate::editor::inspector::components::card::component_card;
-use crate::scene::authoring::joint as joint_ops;
+use crate::scene::authoring::physics::joint as joint_ops;
 
 /// Route one edit through the shared ops and mark the scene dirty.
 fn write(

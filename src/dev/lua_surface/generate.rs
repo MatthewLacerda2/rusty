@@ -4,7 +4,7 @@
 
 use mlua::{Lua, Table};
 
-use super::super::generate_lighting::generate_lighting;
+use super::super::bake::generate_lighting::generate_lighting;
 use crate::api::{global_table, put, ApiScopedCtx, Reg};
 use crate::scene::lighting::lightmap::BakeSettings;
 

@@ -8,7 +8,7 @@ use std::cell::RefCell;
 use glam::{Vec2, Vec3};
 use mlua::{Lua, Table};
 use rusty::components::{CanvasComponent, RectTransformComponent};
-use rusty::core::video::VideoSettings;
+use rusty::core::settings::video::VideoSettings;
 use rusty::scene::{Camera, Scene};
 use rusty::ui::ScreenSize;
 

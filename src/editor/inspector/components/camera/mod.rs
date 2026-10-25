@@ -14,7 +14,7 @@ pub use visual_correction::draw_visual_correction;
 
 use crate::editor::inspector::components::card::component_card;
 use crate::editor::theme;
-use crate::scene::authoring::{self, camera as camera_ops, ComponentKind};
+use crate::scene::authoring::{self, rendering::camera as camera_ops, ComponentKind};
 use crate::scene::ClearFlags;
 
 /// Camera Component panel. `named_layers` are the `(index, label)` slots offered in

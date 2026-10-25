@@ -1,6 +1,6 @@
 //! Slider and Scrollbar: pointer, drag and the arrows through `OnMove`.
 
-use rusty::scene::authoring::ui_widgets::UiWidget;
+use rusty::scene::authoring::ui::widgets::UiWidget;
 
 use super::{part, widget, Ui};
 

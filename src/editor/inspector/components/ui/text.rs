@@ -1,7 +1,7 @@
 //! The Text inspector card (#419): the string, fonts, size, colour, alignment,
 //! wrapping, overflow, spacing, auto-size, rich text and raycast target, plus the
 //! SDF effects (outline, shadow, glow) and the blend mode (#425). Widgets edit a snapshot; every write
-//! routes through `scene::authoring::text`.
+//! routes through `scene::authoring::ui::text`.
 
 use crate::components::TextOverflow;
 use crate::editor::inspector::components::card::remove_component;
@@ -12,7 +12,7 @@ use super::look::{blend_row, color_row, drag_row};
 use super::{combo, vec2_row};
 use crate::components::{TextAlignment, TextComponent};
 use crate::editor::inspector::components::card::component_card;
-use crate::scene::authoring::text::{self as ops, FontSlot};
+use crate::scene::authoring::ui::text::{self as ops, FontSlot};
 
 /// Text card. A THIN client (#287): widgets edit a snapshot and the changed
 /// snapshot is written back field by field through the shared ops; remove detaches.

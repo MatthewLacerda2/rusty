@@ -7,7 +7,7 @@ use std::cell::RefCell;
 
 use mlua::Lua;
 
-use crate::core::quality::QualityPreset;
+use crate::core::settings::quality::QualityPreset;
 use crate::scene::authoring::defaults;
 use crate::scene::Scene;
 use crate::shadergen::{bake_recipe, engine_shader_dir, ShaderRecipe, DEFAULT_OUT_DIR};

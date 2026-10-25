@@ -10,7 +10,10 @@ use crate::components::{
     ParticleRender, ReverbZoneComponent, RibbonStyle, SubEmitTrigger, SubEmitters, TrailComponent,
 };
 use crate::scene::authoring::particles as fx;
-use crate::scene::authoring::{animator, audio, line, reverb_zone as reverb, ribbon, trail};
+use crate::scene::authoring::{
+    animator, audio::reverb_zone as reverb, audio::source as audio, ribbon, ribbon::line,
+    ribbon::trail,
+};
 
 const PLAYBACK: &str =
     "playback state the animation step advances (Animator.Play / PlayNode drive it)";

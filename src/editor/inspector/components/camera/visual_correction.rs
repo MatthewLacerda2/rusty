@@ -4,7 +4,7 @@
 //! Visual Correction volume).
 //!
 //! A THIN client (#287): each widget reads the field from a snapshot and routes its
-//! write through the shared `authoring::visual_correction::*` op (which the
+//! write through the shared `authoring::rendering::visual_correction::*` op (which the
 //! `Graphics.*` Lua surface calls too), never mutating the component directly.
 
 use crate::editor::inspector::components::card::remove_component;
@@ -12,7 +12,7 @@ use crate::scene::authoring::ComponentKind;
 use egui_phosphor::regular as icon;
 
 use crate::editor::inspector::components::card::component_card;
-use crate::scene::authoring::visual_correction as vc_ops;
+use crate::scene::authoring::rendering::visual_correction as vc_ops;
 use crate::scene::{Tonemap, VisualCorrectionComponent};
 
 /// Visual Correction Component panel.

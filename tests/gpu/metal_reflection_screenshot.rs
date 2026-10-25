@@ -11,7 +11,7 @@
 
 use glam::Vec3;
 use rusty::components::{MaterialAsset, MaterialComponent};
-use rusty::core::quality::QualityPreset;
+use rusty::core::settings::quality::QualityPreset;
 use rusty::dev::capture::CaptureHost;
 use rusty::dev::screenshot::capture_into;
 use rusty::scene::authoring::{create_entity, default_visual_correction, Primitive};

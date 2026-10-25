@@ -50,9 +50,9 @@ pub fn seed_default_scene() -> String {
 /// Seed the bundled default scripts and the starter materials into the project on
 /// boot, through the seed manifest. Idempotent. The UI widget kit's scripts and
 /// prefabs are seeded too — those directories are engine-owned and rewritten (see
-/// `authoring::ui_widgets::seed`).
+/// `authoring::ui::widgets::seed`).
 pub fn seed_default_scripts() {
-    crate::scene::authoring::ui_widgets::seed();
+    crate::scene::authoring::ui::widgets::seed();
     let mut files = embedded(bundled::SCRIPTS, &native(DEFAULT_SCRIPTS_DEST_DIR));
     files.push((native(STARTER_MATERIALS_PATH), STARTER_MATERIALS.to_vec()));
     seed_files(
@@ -69,7 +69,7 @@ pub fn seed_default_scripts() {
 /// harness runs here, so a test never reads a developer's project, where a stale or
 /// edited copy is kept on purpose.
 pub fn seed_workspace(root: &Path, samples: Option<&Path>) {
-    use crate::scene::authoring::ui_widgets::parts::SCRIPT_DIR;
+    use crate::scene::authoring::ui::widgets::parts::SCRIPT_DIR;
     let scripts = root.join(native(DEFAULT_SCRIPTS_DEST_DIR));
     let mut files = samples.map_or_else(Vec::new, |dir| lua_files(dir, &scripts));
     files.extend(embedded(bundled::SCRIPTS, &scripts));

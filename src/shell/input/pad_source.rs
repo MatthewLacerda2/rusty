@@ -11,9 +11,9 @@ use gilrs::ff::{BaseEffect, BaseEffectType, Effect, EffectBuilder, Repeat, Repla
 use gilrs::{Axis, Button, Gamepad, GamepadId, Gilrs};
 
 use super::pads::{PadSnapshot, PadSource};
-use crate::core::gamepad::Rumble;
+use crate::core::input::gamepad::Rumble;
 
-/// gilrs buttons in `core::gamepad::BUTTONS` order.
+/// gilrs buttons in `core::input::gamepad::BUTTONS` order.
 const BUTTONS: [Button; 17] = [
     Button::South,
     Button::East,
@@ -34,7 +34,7 @@ const BUTTONS: [Button; 17] = [
     Button::DPadRight,
 ];
 
-/// gilrs stick axes in `core::gamepad::AXES` order (gilrs sticks are already Y-up).
+/// gilrs stick axes in `core::input::gamepad::AXES` order (gilrs sticks are already Y-up).
 const STICKS: [Axis; 4] = [
     Axis::LeftStickX,
     Axis::LeftStickY,

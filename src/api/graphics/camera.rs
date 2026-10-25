@@ -5,14 +5,14 @@
 //! already had — the volume knobs read `VisualCorrectionComponent`, these read
 //! `CameraComponent`, and the two groups share nothing but the `Graphics` table.
 //!
-//! Both route through the shared `authoring::camera` ops the editor's Camera card
+//! Both route through the shared `authoring::rendering::camera` ops the editor's Camera card
 //! calls, so the panel and the binding are one write path (#287).
 
 use std::cell::RefCell;
 
 use super::state::{with_cam, with_cam_mut};
 use crate::api::{put, Reg};
-use crate::scene::authoring::camera as camera_ops;
+use crate::scene::authoring::rendering::camera as camera_ops;
 use crate::scene::Scene;
 
 /// Camera motion blur: active + sample count over the active camera component.

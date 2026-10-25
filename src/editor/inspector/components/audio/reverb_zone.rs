@@ -2,7 +2,7 @@
 //! (#469).
 //!
 //! A THIN client (#287): widgets read a snapshot and route every write through the
-//! shared `authoring::reverb_zone` ops the `AudioReverbZone.*` Lua setters call, so
+//! shared `authoring::audio::reverb_zone` ops the `AudioReverbZone.*` Lua setters call, so
 //! picking a preset writes its params and editing a param makes the zone `Custom`
 //! in one place.
 
@@ -11,10 +11,10 @@ use crate::editor::widgets::DragRange;
 use crate::scene::authoring::ComponentKind;
 use egui_phosphor::regular as icon;
 
-use crate::components::reverb_zone::{DECAY_RANGE, MAX_PRE_DELAY};
+use crate::components::audio::reverb_zone::{DECAY_RANGE, MAX_PRE_DELAY};
 use crate::components::{ReverbParams, ReverbPreset, ReverbZoneComponent as Zone};
 use crate::editor::inspector::components::card::component_card;
-use crate::scene::authoring::reverb_zone as ops;
+use crate::scene::authoring::audio::reverb_zone as ops;
 
 /// Route one edit through the shared ops and mark the scene dirty.
 fn write(world: &mut crate::ecs::World, id: u32, is_dirty: &mut bool, op: impl FnOnce(&mut Zone)) {

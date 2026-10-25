@@ -9,7 +9,7 @@ use std::rc::Rc;
 
 use mlua::Lua;
 use rusty::components::{CameraComponent, Tonemap, VisualCorrectionComponent};
-use rusty::core::quality::QualityPreset;
+use rusty::core::settings::quality::QualityPreset;
 use rusty::scene::authoring::default_visual_correction;
 use rusty::scene::Scene;
 

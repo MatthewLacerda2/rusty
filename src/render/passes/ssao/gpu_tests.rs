@@ -3,7 +3,7 @@
 
 use glam::Vec3;
 
-use crate::core::quality::QualityPreset;
+use crate::core::settings::quality::QualityPreset;
 use crate::render::{RenderView, Renderer, OFFSCREEN_FORMAT};
 use crate::scene::authoring::{create_entity, default_visual_correction, Primitive};
 use crate::scene::{Camera, Scene};

@@ -1,7 +1,7 @@
 //! The API the widgets stand on (#422): hierarchy reads, `SetActive`,
 //! `GetScript`, `Text.MeasureString` and `UI.FindSelectable`.
 
-use rusty::scene::authoring::ui_widgets::UiWidget;
+use rusty::scene::authoring::ui::widgets::UiWidget;
 
 use super::{part, widget, Ui};
 

@@ -24,11 +24,8 @@
 
 pub mod animation;
 mod audio;
-mod camera_sync;
-mod decals;
 mod edit_runtime;
 pub mod game;
-mod particles;
 mod play;
 mod probe;
 mod registry;
@@ -36,8 +33,7 @@ mod resources;
 mod scene_load;
 mod schedule;
 mod stage;
-mod trails;
-mod ui;
+mod systems;
 mod world;
 
 pub use game::{GameWorld, PlayTransition};

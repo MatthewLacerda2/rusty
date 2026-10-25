@@ -5,7 +5,7 @@
 //! Transform), whether it runs both ways, its path cost and area (#460), and whether
 //! it is active;
 //! plus `IsConnected`, whether both ends found the navmesh at the last rebake.
-//! Every setter routes through the shared `scene::authoring::offmesh_link` ops the
+//! Every setter routes through the shared `scene::authoring::nav::offmesh_link` ops the
 //! inspector card uses. Getters return a neutral default without a link; setters
 //! are then no-ops. Attach one with `Scene.AddComponent(id, "OffMeshLink")`.
 
@@ -18,7 +18,7 @@ use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
 use crate::components::OffMeshLinkComponent as Link;
 use crate::navigation::NavigationGraph;
-use crate::scene::authoring::offmesh_link as ops;
+use crate::scene::authoring::nav::offmesh_link as ops;
 use crate::scene::Scene;
 
 type SceneCell<'s> = &'s RefCell<Scene>;

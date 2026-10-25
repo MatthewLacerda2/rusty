@@ -15,7 +15,8 @@ use glam::{Vec2, Vec3, Vec4};
 
 use crate::components::transform::{euler_degrees, from_euler_degrees};
 use crate::scene::authoring::{
-    audio, camera, canvas_group, image, light, rect_transform as rect, text,
+    audio::source as audio, rendering::camera, rendering::light, ui::image,
+    ui::layout::canvas_group, ui::layout::rect_transform as rect, ui::text,
 };
 use crate::scene::Scene;
 

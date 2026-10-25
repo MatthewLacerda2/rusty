@@ -477,10 +477,12 @@ only its adapter (Lua → zimmer document, file writes, patch-path resolution).
   files (`draw_*`, `setup_*`, `inspector_*`, `prefab_*`) is a subfolder waiting to
   happen: make it one and drop the prefix (`draw_lighting.rs` → `draw/lighting.rs`).
   Aim for ≲10 source files per module directory; past that, cluster by responsibility
-  into subfolders. This is the missing half of the 300-line size cap — small files plus
+  into subfolders (the `dir-size` gate fails past 12, #1367; a folder of components
+  clusters by Unity's *Add Component* categories). This is the missing half of the 300-line size cap — small files plus
   flat directories is sprawl by construction, and Rust modules nest for free. **One
   exception:** flat registries where one file *is* one public unit (e.g. each `api/`
-  file is one Lua namespace) stay flat — there the flat list *is* the documentation.
+  file is one Lua namespace) stay flat — there the flat list *is* the documentation,
+  and the directory's `mod.rs` says so with `// lint: allow(dir-size) <why>`.
 - **Test content is primitive; levels are Dust2-sized.** Test levels and fixtures are
   built from primitive shapes (cubes, planes, capsules), not authored art, so they cost
   nothing to make and nothing to change. The size target for a level is CS:GO's Dust2:

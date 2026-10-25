@@ -4,7 +4,7 @@
 use glam::Vec3;
 
 use crate::components::{JointComponent, RectTransformComponent};
-use crate::scene::authoring::rect_transform::set_world_anchor;
+use crate::scene::authoring::ui::layout::rect_transform::set_world_anchor;
 use crate::scene::{to_scene_data, Scene};
 
 #[test]

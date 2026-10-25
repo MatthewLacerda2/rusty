@@ -2,12 +2,12 @@
 //! ordered list of authored post-FX modules — add by name, reorder, remove.
 //!
 //! A thin client (#287): every edit builds the new list and writes it through
-//! `authoring::visual_correction::set_custom_effects`, the op `Graphics.SetCustomEffects`
+//! `authoring::rendering::visual_correction::set_custom_effects`, the op `Graphics.SetCustomEffects`
 //! calls, so a name the op refuses is refused here too.
 
 use egui_phosphor::regular as icon;
 
-use crate::scene::authoring::visual_correction as vc_ops;
+use crate::scene::authoring::rendering::visual_correction as vc_ops;
 use crate::scene::VisualCorrectionComponent;
 
 /// Draw the list and the add row; writes the edited list back through the op.

@@ -11,7 +11,7 @@
 
 use glam::{Quat, Vec3};
 use rusty::components::{LightComponent, LightMode, LightType, MaterialAsset, MaterialComponent};
-use rusty::dev::lightmap_bake::bake_scene_lightmaps;
+use rusty::dev::bake::lightmap::bake_scene_lightmaps;
 use rusty::dev::screenshot::capture;
 use rusty::scene::authoring::{primitive_mesh_component, Primitive};
 use rusty::scene::lighting::lightmap::BakeSettings;

@@ -26,7 +26,7 @@ use crate::scene::Camera;
 use crate::scene::Scene;
 
 /// Default screenshot dimensions: the default windowed framebuffer (16:9).
-pub use crate::core::video::{DEFAULT_HEIGHT, DEFAULT_WIDTH};
+pub use crate::core::settings::video::{DEFAULT_HEIGHT, DEFAULT_WIDTH};
 
 /// Render `scene` from `camera` into a PNG at `path`, `width` x `height`, through
 /// `host`'s shared renderer.

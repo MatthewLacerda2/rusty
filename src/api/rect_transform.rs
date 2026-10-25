@@ -3,7 +3,7 @@
 //! Get/Set over an entity's `RectTransformComponent`: anchors, pivot, anchored
 //! position and size delta, each an `x, y` pair in the owning canvas's reference
 //! units (y-up). Every setter routes through the shared
-//! `scene::authoring::rect_transform` ops the inspector card uses, so validation
+//! `scene::authoring::ui::layout::rect_transform` ops the inspector card uses, so validation
 //! (anchors clamped to `[0, 1]` and kept ordered) lives once. The computed rect is
 //! read with `UI.GetRect`; the Transform keeps rotation and scale. The world
 //! anchor verbs (#429) make an element a marker pinned to a world point.
@@ -18,8 +18,10 @@ use mlua::{Lua, Table};
 use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
 use crate::components::RectTransformComponent;
-use crate::core::video::VideoSettings;
-use crate::scene::authoring::rect_transform::{self as rect_ops, AnchorPreset, AxisPreset};
+use crate::core::settings::video::VideoSettings;
+use crate::scene::authoring::ui::layout::rect_transform::{
+    self as rect_ops, AnchorPreset, AxisPreset,
+};
 use crate::scene::Scene;
 use crate::ui::layout::rect_in;
 use crate::ui::ScreenSize;

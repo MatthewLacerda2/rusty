@@ -107,7 +107,7 @@ pub(crate) fn canvas_group_value(g: &CanvasGroupComponent) -> Value {
 /// `Selectable.GetState`, not part of the component.
 pub(crate) fn selectable_value(s: &crate::components::SelectableComponent) -> Value {
     use crate::components::SelectionState;
-    use crate::scene::authoring::selectable as ops;
+    use crate::scene::authoring::ui::selectable as ops;
     let colors: serde_json::Map<String, Value> = SelectionState::ALL
         .iter()
         .map(|&st| (st.name().to_string(), json!(s.color(st).to_array())))

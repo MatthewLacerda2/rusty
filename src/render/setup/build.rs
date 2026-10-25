@@ -7,7 +7,7 @@
 //! straight into the assembled renderer, so the seams follow real boundaries (what
 //! depends on what) instead of a pass-through layer (#211). Behavior is unchanged.
 
-use crate::core::quality::QualityPreset;
+use crate::core::settings::quality::QualityPreset;
 use crate::render::clusters::ClusterBuffers;
 use crate::render::decals::DecalBuffers;
 use crate::render::gpu::bind_layouts;

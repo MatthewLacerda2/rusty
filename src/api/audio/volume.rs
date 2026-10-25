@@ -6,7 +6,7 @@ use std::cell::RefCell;
 use super::super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
 use crate::audio::AudioMaestro;
-use crate::scene::authoring::audio as audio_ops;
+use crate::scene::authoring::audio::source as audio_ops;
 use crate::scene::Scene;
 
 /// `SetVolume` / `GetVolume` on an entity's AudioSource.

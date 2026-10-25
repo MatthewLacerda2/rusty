@@ -11,9 +11,12 @@ use crate::components::{
     LayoutElementComponent, LayoutGroupComponent, MaskComponent, RectMaskComponent,
     RectTransformComponent, SelectableComponent, SelectionState, UiShader, WorldAnchor,
 };
-use crate::scene::authoring::layout_element::{self as element, SizeKind};
-use crate::scene::authoring::{backdrop, canvas, canvas_group as group, image, layout_group};
-use crate::scene::authoring::{rect_mask, rect_transform as rect, selectable};
+use crate::scene::authoring::ui::layout::element::{self as element, SizeKind};
+use crate::scene::authoring::{
+    ui::backdrop, ui::image, ui::layout::canvas, ui::layout::canvas_group as group,
+    ui::layout::group as layout_group,
+};
+use crate::scene::authoring::{ui::layout::rect_transform as rect, ui::rect_mask, ui::selectable};
 
 const CONTROL: Group<LayoutGroupComponent> =
     group!(|g, control_child_width: bool, control_child_height: bool| {

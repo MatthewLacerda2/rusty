@@ -2,7 +2,7 @@
 //! card (#462).
 //!
 //! A THIN client (#287): widgets read a snapshot and route every write through the
-//! shared `authoring::offmesh_link` ops the `OffMeshLink.*` Lua setters call. A
+//! shared `authoring::nav::offmesh_link` ops the `OffMeshLink.*` Lua setters call. A
 //! link is a navmesh input: the editor's per-frame nav sync (#992) picks an edit
 //! up (links only: no spans change).
 
@@ -14,7 +14,7 @@ use egui_phosphor::regular as icon;
 use super::physics::vec3_row;
 use crate::components::OffMeshLinkComponent as Link;
 use crate::editor::inspector::components::card::component_card;
-use crate::scene::authoring::offmesh_link as link_ops;
+use crate::scene::authoring::nav::offmesh_link as link_ops;
 
 /// Route one edit through the shared ops and mark the scene dirty.
 fn write(world: &mut crate::ecs::World, id: u32, is_dirty: &mut bool, op: impl FnOnce(&mut Link)) {

@@ -46,8 +46,8 @@ use winit::event_loop::ActiveEventLoop;
 use winit::keyboard::{KeyCode, PhysicalKey};
 
 use crate::app::{GameWorld, PlayTransition};
-use crate::core::keymap::Keymap;
-use crate::core::video::VideoSettings;
+use crate::core::input::keymap::Keymap;
+use crate::core::settings::video::VideoSettings;
 use crate::render::Renderer;
 
 pub use event_loop::{run, Launch};

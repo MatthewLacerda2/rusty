@@ -2,7 +2,7 @@
 //!
 //! Get/Set over an entity's `JointComponent`: its kind, the connected body, the
 //! anchors and axes, the limits, the break thresholds and the collision flag.
-//! Every setter routes through the shared `scene::authoring::joint` ops the
+//! Every setter routes through the shared `scene::authoring::physics::joint` ops the
 //! inspector card uses. Getters return a neutral default without a Joint; setters
 //! are then no-ops. The kind travels as its name (`"Fixed"`, `"Hinge"`, `"Ball"`,
 //! case-insensitive; an unknown name is ignored). Attach one with
@@ -17,7 +17,7 @@ use mlua::{Lua, Table};
 use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
 use crate::components::{JointComponent, JointKind};
-use crate::scene::authoring::joint as ops;
+use crate::scene::authoring::physics::joint as ops;
 use crate::scene::Scene;
 
 type SceneCell<'s> = &'s RefCell<Scene>;

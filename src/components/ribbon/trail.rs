@@ -1,7 +1,7 @@
 //! src/components/ribbon/trail.rs — TrailRenderer: a ribbon along the entity's
 //! recent path.
 //!
-//! The recorded points are **sim state**: `app::trails` samples the entity's world
+//! The recorded points are **sim state**: `app::systems::trails` samples the entity's world
 //! position once per fixed tick and ages the points on the same `dt`, so a
 //! headless replay records exactly the same trail as a windowed run. The renderer
 //! only reads [`TrailRuntime::points`].

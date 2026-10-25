@@ -9,7 +9,9 @@ use rapier3d::parry::shape::Capsule;
 use rapier3d::prelude::*;
 
 use super::{capsule, CharacterMove};
-use crate::components::character_controller::{COLLIDED_ABOVE, COLLIDED_BELOW, COLLIDED_SIDES};
+use crate::components::physics::character_controller::{
+    COLLIDED_ABOVE, COLLIDED_BELOW, COLLIDED_SIDES,
+};
 use crate::components::CharacterControllerComponent;
 use crate::physics::query::is_live;
 use crate::physics::shape::build::interaction_groups;

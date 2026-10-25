@@ -5,7 +5,7 @@
 //! overrides as `(width, height)` pairs where `nil` means "use the content's
 //! size", and the content fitter per axis (`Unconstrained` / `MinSize` /
 //! `PreferredSize`). Every setter routes through the shared
-//! `scene::authoring::layout_element` ops the inspector card uses. Getters return
+//! `scene::authoring::ui::layout::element` ops the inspector card uses. Getters return
 //! a neutral default without the component; setters are then no-ops.
 
 use std::cell::RefCell;
@@ -15,7 +15,7 @@ use mlua::{FromLuaMulti, IntoLuaMulti, Lua, Table};
 use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
 use crate::components::{LayoutAxisFit, LayoutElementComponent};
-use crate::scene::authoring::layout_element::{self as ops, SizeKind};
+use crate::scene::authoring::ui::layout::element::{self as ops, SizeKind};
 use crate::scene::Scene;
 
 type Cell<'s> = &'s RefCell<Scene>;

@@ -5,7 +5,7 @@ use egui_phosphor::regular as icon;
 mod scene_io;
 mod transport;
 
-use crate::core::quality::QualityPreset;
+use crate::core::settings::quality::QualityPreset;
 use crate::editor::menu_create;
 use crate::editor::EditorUi;
 use crate::scene::Scene;

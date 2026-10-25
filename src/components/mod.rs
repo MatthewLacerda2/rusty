@@ -12,62 +12,55 @@
 #![deny(clippy::unwrap_used)]
 
 pub mod animator;
-pub mod audio_source;
-pub mod camera;
-pub mod character_controller;
-pub mod collider;
+pub mod audio;
 pub mod entity;
-pub mod joint;
-pub mod light;
-pub mod lod_group;
 pub mod material;
 pub mod mesh;
-pub mod nav_agent;
-pub mod nav_modifier;
-pub mod nav_obstacle;
-pub mod offmesh_link;
+pub mod nav;
 pub mod particle;
-pub mod reverb_zone;
+pub mod physics;
+pub mod rendering;
 pub mod ribbon;
-pub mod rigidbody;
 pub mod script;
 pub mod transform;
 pub mod ui;
-pub mod visual_correction;
 
 pub use animator::{
     AnimatorComponent, AnimatorParameter, AnimatorParameters, Bounds, IkChain, IkConstraint,
     IkTarget, LayerState, Motion, Playback, Playhead, Step,
 };
-pub use audio_source::AudioSourceComponent;
-pub use camera::{
-    is_render_texture, CameraComponent, ClearFlags, Projection, RenderTarget, RENDER_TEXTURE_PREFIX,
-};
-pub use character_controller::CharacterControllerComponent;
-pub use collider::{
-    capsule_dims, CapsuleAxis, ColliderComponent, ColliderShape, CombineMode, PhysicsMaterial,
-    ScaledShape,
-};
+pub use audio::reverb_zone::{ReverbParams, ReverbPreset, ReverbZoneComponent};
+pub use audio::source::AudioSourceComponent;
 pub(crate) use entity::with_ref_components;
 pub use entity::{escape_token, visit_override_refs, Entity, EntityRefs, PrefabLink, RefVisit};
-pub use joint::{JointComponent, JointKind};
-pub use light::{LightComponent, LightMode, LightType};
-pub use lod_group::{LodGroupComponent, LodLevel};
 pub use material::{DecalBlend, MaterialAsset, MaterialComponent, RenderMode};
 pub use mesh::{DirtyFlag, MeshComponent};
-pub use nav_agent::{NavMeshAgentComponent, NavPathStatus, MAX_AVOIDANCE_PRIORITY};
-pub use nav_modifier::NavMeshModifierVolumeComponent;
-pub use nav_obstacle::{NavMeshObstacleComponent, ObstacleShape};
-pub use offmesh_link::{
+pub use nav::agent::{NavMeshAgentComponent, NavPathStatus, MAX_AVOIDANCE_PRIORITY};
+pub use nav::modifier::NavMeshModifierVolumeComponent;
+pub use nav::obstacle::{NavMeshObstacleComponent, ObstacleShape};
+pub use nav::offmesh_link::{
     OffMeshLinkComponent, OffMeshLinkData, OffMeshLinkKind, LINK_SNAP_DISTANCE,
 };
 pub use particle::{
     CollisionResponse, EmitFrom, EmitMode, EmitShape, Flipbook, Particle, ParticleBlend,
     ParticleEmitterComponent, ParticleRender, ParticleRenderMode, SubEmitTrigger, SubEmitters,
 };
-pub use reverb_zone::{ReverbParams, ReverbPreset, ReverbZoneComponent};
+pub use physics::character_controller::CharacterControllerComponent;
+pub use physics::collider::{
+    capsule_dims, CapsuleAxis, ColliderComponent, ColliderShape, CombineMode, PhysicsMaterial,
+    ScaledShape,
+};
+pub use physics::joint::{JointComponent, JointKind};
+pub use physics::rigidbody::{CollisionDetection, RigidBodyComponent};
+pub use rendering::camera::{
+    is_render_texture, CameraComponent, ClearFlags, Projection, RenderTarget, RENDER_TEXTURE_PREFIX,
+};
+pub use rendering::light::{LightComponent, LightMode, LightType};
+pub use rendering::lod_group::{LodGroupComponent, LodLevel};
+pub use rendering::visual_correction::{
+    ShadowSettings, SsaoSettings, Tonemap, VisualCorrectionComponent,
+};
 pub use ribbon::{LineComponent, RibbonStyle, TextureMode, TrailComponent};
-pub use rigidbody::{CollisionDetection, RigidBodyComponent};
 pub use script::{ScriptComponent, ScriptFieldValue};
 pub use transform::{Pose, TransformComponent};
 pub use ui::{
@@ -82,4 +75,3 @@ pub use ui::{
     GradientKind, GradientStop, ShapeComponent, ShapeCorner, ShapeGlow, ShapeKind, ShapeShadow,
     UiBlend, UiGradient, MAX_GRADIENT_STOPS,
 };
-pub use visual_correction::{ShadowSettings, SsaoSettings, Tonemap, VisualCorrectionComponent};

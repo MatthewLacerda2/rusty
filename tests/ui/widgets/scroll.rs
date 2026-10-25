@@ -1,7 +1,7 @@
 //! Scroll View: wheel, drag with elastic edges and inertia, and its scrollbars.
 
 use rusty::components::LayoutElementComponent;
-use rusty::scene::authoring::ui_widgets::{create_ui, UiWidget};
+use rusty::scene::authoring::ui::widgets::{create_ui, UiWidget};
 
 use super::{part, widget, Ui};
 

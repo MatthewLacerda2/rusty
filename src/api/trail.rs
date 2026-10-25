@@ -4,7 +4,7 @@
 //! start/stop recording, wipe it (`Clear`, e.g. after a teleport), tune how long
 //! points live and how far apart they are, read the recorded points back, and
 //! restyle it with the width / colour / texture / blend verbs it shares with
-//! `Line` (`ribbon_style`). Setters route through `scene::authoring::trail` /
+//! `Line` (`ribbon_style`). Setters route through `scene::authoring::ribbon::trail` /
 //! `ribbon`. Without a Trail, getters return a neutral default; setters no-op.
 
 use std::cell::RefCell;
@@ -15,7 +15,7 @@ use super::ribbon_style::{self, Ribbon};
 use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
 use crate::components::TrailComponent;
-use crate::scene::authoring::trail as ops;
+use crate::scene::authoring::ribbon::trail as ops;
 use crate::scene::Scene;
 
 type SceneCell<'s> = &'s RefCell<Scene>;

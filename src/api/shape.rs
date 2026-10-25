@@ -5,7 +5,7 @@
 //! `Arc`, `Thickness`, `Dash`), the fill (`Color`, `Gradient`), `Border`, the
 //! `Shadow` and `Glow` effects, `Blend` and `RaycastTarget`. Multi-value accessors
 //! travel as flat number lists, colours last. Every setter routes through the
-//! shared `scene::authoring::shape` ops the inspector card uses. Getters return a
+//! shared `scene::authoring::ui::shape` ops the inspector card uses. Getters return a
 //! neutral default without a Shape; setters are then no-ops. Whether a shape exists
 //! is `Scene.AddComponent(id, "Shape")` / `RemoveComponent`.
 
@@ -19,7 +19,7 @@ use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
 use crate::components::ShapeComponent;
 use crate::components::{ShapeCorner, ShapeKind};
-use crate::scene::authoring::shape as ops;
+use crate::scene::authoring::ui::shape as ops;
 use crate::scene::Scene;
 
 type Scoped<'s> = &'s RefCell<Scene>;

@@ -1,7 +1,7 @@
 //! The scene inspector's **Generate Lighting** button (#832, Unity 5's button in the
 //! Lighting window): lightmaps, then light and reflection probes, with the scene's
 //! own lighting settings, and the result written into the scene file. The same
-//! `dev::generate_lighting` path as the `Lighting.Generate()` script verb (editor↔API
+//! `dev::bake::generate_lighting` path as the `Lighting.Generate()` script verb (editor↔API
 //! parity, no second path). Dev-only: the bakes write authoring artifacts, so ship
 //! builds carry neither.
 //!
@@ -18,8 +18,8 @@ use std::time::Duration;
 
 use egui_phosphor::regular as icon;
 
-use crate::dev::generate_lighting::finish;
-use crate::dev::lightmap_bake::{BakeOutcome, LightmapBakeJob};
+use crate::dev::bake::generate_lighting::finish;
+use crate::dev::bake::lightmap::{BakeOutcome, LightmapBakeJob};
 use crate::editor::EditorUi;
 use crate::navigation::NavigationGraph;
 use crate::scene::lighting::lightmap::BakeSettings;

@@ -6,7 +6,10 @@ use super::super::table::{inspect, op, with};
 use crate::components::{
     CharacterControllerComponent, ColliderComponent, JointComponent, RigidBodyComponent,
 };
-use crate::scene::authoring::{character_controller as cc, collider, joint, rigidbody as rb};
+use crate::scene::authoring::{
+    physics::character_controller as cc, physics::collider, physics::joint,
+    physics::rigidbody as rb,
+};
 
 inspect! {
     RigidBodyComponent => rigidbody, rigidbody_mut, &[

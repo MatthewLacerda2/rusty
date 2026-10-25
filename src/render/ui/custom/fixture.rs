@@ -105,7 +105,7 @@ pub(super) fn shade(scene: &mut Scene, id: u32, shader: Option<&str>) {
 /// Run `script` against the `UI` namespace (a throwaway screen and camera).
 pub(super) fn lua(scene: &RefCell<Scene>, script: &str) {
     let screen = RefCell::new(crate::ui::ScreenSize::default());
-    let video = RefCell::new(crate::core::video::VideoSettings::default());
+    let video = RefCell::new(crate::core::settings::video::VideoSettings::default());
     let camera = RefCell::new(Camera::new(Vec3::new(0.0, 0.0, 5.0), -90.0, 0.0));
     let lua = Lua::new();
     lua.scope(|s| {

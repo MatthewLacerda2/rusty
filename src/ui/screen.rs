@@ -15,7 +15,7 @@ use std::rc::Rc;
 
 use glam::Vec2;
 
-use crate::core::video::VideoSettings;
+use crate::core::settings::video::VideoSettings;
 use crate::scene::Camera;
 use crate::ui::{TextureSizes, UiView};
 

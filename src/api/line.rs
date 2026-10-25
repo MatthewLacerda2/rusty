@@ -4,7 +4,7 @@
 //! its points all at once (`SetPositions`, e.g. a grenade arc each frame) or one
 //! at a time (0-based, like `Probe` and `Reflection`), choose world or local space
 //! and looping, and restyle it with the verbs it shares with `Trail`
-//! (`ribbon_style`). Setters route through `scene::authoring::line` / `ribbon`.
+//! (`ribbon_style`). Setters route through `scene::authoring::ribbon::line` / `ribbon`.
 //! Without a Line, getters return a neutral default; setters no-op.
 
 use std::cell::RefCell;
@@ -16,7 +16,7 @@ use super::ribbon_style::{self, Ribbon};
 use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
 use crate::components::LineComponent;
-use crate::scene::authoring::line as ops;
+use crate::scene::authoring::ribbon::line as ops;
 use crate::scene::Scene;
 
 type SceneCell<'s> = &'s RefCell<Scene>;

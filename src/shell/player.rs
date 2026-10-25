@@ -10,7 +10,7 @@ use super::frame::Host;
 use super::{boot, Frontend, Launch, Shell};
 use crate::app::GameWorld;
 use crate::core::application::{BuildSettings, WindowMode};
-use crate::core::video::VideoSettings;
+use crate::core::settings::video::VideoSettings;
 use crate::render::RenderView;
 
 /// The player's frontend state: the one full-window render view.

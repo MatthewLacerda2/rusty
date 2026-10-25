@@ -13,7 +13,7 @@ use mlua::Table;
 
 use super::super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
-use crate::scene::authoring::{collider as collider_ops, rigidbody as rb_ops};
+use crate::scene::authoring::{physics::collider as collider_ops, physics::rigidbody as rb_ops};
 use crate::scene::Scene;
 
 /// Register the mass, gravity and trigger accessors onto the `Physics` table.

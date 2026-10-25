@@ -12,11 +12,11 @@
 //! The source is a trait so tests drive the pump with a fake: no real pad exists in
 //! CI. The real one is [`GilrsSource`](super::pad_source::GilrsSource).
 
-use crate::core::gamepad::{
+use crate::core::input::gamepad::{
     axial_dead_zone, pad_name, radial_dead_zone, DeadZones, Rumble, AXES, BUTTONS, MAX_PADS,
 };
+use crate::core::input::keymap::Keymap;
 use crate::core::input::InputState;
-use crate::core::keymap::Keymap;
 
 /// One pad's raw state: buttons in [`BUTTONS`] order, axes in [`AXES`] order (sticks
 /// Y-up in `-1..1`, triggers `0..1`), before any dead zone.

@@ -28,7 +28,7 @@ pub(crate) use targets::SsaoTargets;
 use glam::{Mat4, Vec3};
 
 use crate::components::SsaoSettings;
-use crate::core::quality::{QualityPreset, SsaoTier};
+use crate::core::settings::quality::{QualityPreset, SsaoTier};
 use crate::scene::{Camera, Scene};
 
 /// The occlusion and blur targets' format: one unorm channel is all AO needs.

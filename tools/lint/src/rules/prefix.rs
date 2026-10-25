@@ -21,13 +21,7 @@ pub const AIM_FILES_PER_DIR: usize = 10;
 
 /// Flat registries CLAUDE.md exempts: one file is one public unit, so the flat list
 /// is the documentation. Exact directories, not their subfolders.
-const EXEMPT: &[(&str, &str)] = &[
-    ("src/api", "one file per Lua namespace"),
-    (
-        "src/components",
-        "one file per first-class component, named for its `Entity` field",
-    ),
-];
+const EXEMPT: &[(&str, &str)] = &[("src/api", "one file per Lua namespace")];
 
 /// A file's grouping stem: the name without `.rs` or a `_tests` suffix; `None` for
 /// the files that own a folder rather than sit in it.

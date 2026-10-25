@@ -5,7 +5,7 @@
 //! `KEYPAD0`, …), except letters and digits, which are bare (`"W"`, `"1"`). The
 //! same list is documented in `docs/api/Input.md` (Key names). Mouse
 //! buttons are named in [`mouse_button_name`]; gamepad buttons in
-//! [`core::gamepad`](crate::core::gamepad) (#471).
+//! [`core::input::gamepad`](crate::core::input::gamepad) (#471).
 
 use winit::event::MouseButton;
 use winit::keyboard::KeyCode;

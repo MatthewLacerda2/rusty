@@ -8,7 +8,7 @@ use super::draw_style;
 use crate::components::TrailComponent;
 use crate::editor::inspector::components::card::component_card;
 use crate::editor::inspector::components::particles::widgets::clamped;
-use crate::scene::authoring::trail as trail_ops;
+use crate::scene::authoring::ribbon::trail as trail_ops;
 
 /// Route one edit through the shared ops and mark the scene dirty.
 fn write(
