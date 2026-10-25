@@ -1,6 +1,6 @@
 //! The Scale Factor from the scene's side (#1398): setting it re-imports the model's
 //! meshes already in the scene, a skinned one with its bones moved to the scaled
-//! rest pose (its Lua side: `scripting::tests_assets`).
+//! rest pose (its Lua side: `scripting::tests::assets`).
 
 use glam::Vec3;
 
@@ -50,4 +50,44 @@ fn a_skinned_instances_bones_move_to_the_scaled_rest_pose() {
     let local = |bone: Option<u32>| scene.world.transform(bone.unwrap()).unwrap().position;
     assert!(local(bones[0]).abs_diff_eq(Vec3::new(0.01, 0.0, 0.0), 1e-7));
     assert!(local(bones[1]).abs_diff_eq(Vec3::new(0.0, 0.02, 0.0), 1e-7));
+}
+
+#[test]
+fn the_change_is_noted_for_other_caches_and_the_scene_reads_it_once() {
+    use crate::core::fs::written::written_since;
+    use crate::scene::rehydrate::model_writes::ModelWrites;
+    let path = quad_model("rusty_scale_noted");
+    let mut scene = Scene::new();
+    instantiate_asset(&mut scene, &format!("{path}::Quad"), None, Vec3::ZERO).unwrap();
+    let mut follow = ModelWrites::default();
+    let (seen, _) = written_since(u64::MAX);
+    assert_eq!(set_model_scale_factor(&mut scene, &path, 0.5), Ok(1));
+    assert!(
+        written_since(seen).1.contains(&path),
+        "the particle cache sees it"
+    );
+    assert_eq!(follow.follow(&mut scene), 0, "already re-imported");
+}
+
+#[test]
+fn a_saved_mesh_colliders_box_follows_a_scale_factor_set_since() {
+    use crate::components::{ColliderComponent, ColliderShape};
+    use crate::scene::serialize::{apply_scene_data, to_scene_data};
+    let path = quad_model("rusty_scale_collider");
+    let mut scene = Scene::new();
+    let id = instantiate_asset(&mut scene, &format!("{path}::Quad"), None, Vec3::ZERO).unwrap();
+    let collider = ColliderComponent::from_mesh_bounds(false, Vec3::ZERO, Vec3::ONE);
+    scene.world.set_collider(id, Some(collider));
+    let data = to_scene_data(&scene);
+    crate::asset::sidecar::set_scale(std::path::Path::new(&path), 0.01).unwrap();
+    let mut loaded = Scene::new();
+    apply_scene_data(&mut loaded, data);
+    let id = loaded.world.ids_with_collider()[0];
+    let ColliderShape::Mesh { local_max, .. } = loaded.world.collider(id).unwrap().shape else {
+        panic!("a mesh collider");
+    };
+    assert!(
+        local_max.abs_diff_eq(Vec3::new(0.01, 0.01, 0.0), 1e-7),
+        "{local_max}"
+    );
 }

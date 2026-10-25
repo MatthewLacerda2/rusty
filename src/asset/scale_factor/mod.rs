@@ -1,4 +1,4 @@
-//! src/asset/scale_factor.rs — a model's import *Scale Factor* (#1398).
+//! src/asset/scale_factor/mod.rs — a model's import *Scale Factor* (#1398).
 //!
 //! Unity's model-import Scale Factor: one uniform scale the sidecar stores and the
 //! importer applies to the model's data, so everything downstream (colliders, nav
@@ -82,5 +82,4 @@ fn scale_translation(mut m: Mat4, s: f32) -> Mat4 {
 }
 
 #[cfg(test)]
-#[path = "scale_factor_tests.rs"]
 mod tests;

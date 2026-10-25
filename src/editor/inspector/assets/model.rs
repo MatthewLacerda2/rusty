@@ -22,7 +22,7 @@ pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, path: &
 
     ui.heading("Model Import Settings");
     ui.add_space(5.0);
-    draw_scale_factor(ui, scene, path);
+    draw_scale_factor(ui, editor, scene, path);
     draw_lightmap_uvs(ui, scene, path);
 
     ui.add_space(15.0);
@@ -60,8 +60,9 @@ fn draw_metadata(ui: &mut egui::Ui, path: &str) {
 /// Scale Factor (#1398): Unity's model-import drag, kept in the `.meta` sidecar.
 /// A finished edit goes through the verb `Assets.SetModelImportSettings` uses,
 /// re-importing the model's meshes (and rigs) in the scene; mid-drag only the
-/// sidecar is written, as the lightmap knobs do.
-fn draw_scale_factor(ui: &mut egui::Ui, scene: &mut Scene, path: &str) {
+/// sidecar is written, as the lightmap knobs do. A commit that re-imported a mesh
+/// marks the scene dirty: its mesh colliders' boxes and LODGroup sizes moved.
+fn draw_scale_factor(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, path: &str) {
     let source = Path::new(path);
     let stored = crate::asset::sidecar::load(source)
         .unwrap_or_default()
@@ -78,7 +79,8 @@ fn draw_scale_factor(ui: &mut egui::Ui, scene: &mut Scene, path: &str) {
         })
         .inner;
     if r.drag_stopped() || (r.changed() && !r.dragged()) {
-        let _ = crate::scene::asset_instance::set_model_scale_factor(scene, path, scale);
+        let set = crate::scene::asset_instance::set_model_scale_factor(scene, path, scale);
+        editor.is_dirty |= set.is_ok_and(|n| n > 0);
     } else if scale != stored {
         let _ = crate::asset::sidecar::set_scale(source, scale);
     }

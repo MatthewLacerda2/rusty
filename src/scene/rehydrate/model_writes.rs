@@ -13,8 +13,8 @@
 //! frame after Stop, and by then the restored edit scene was read from disk after it
 //! (`Scene::meshes_read_at`), so nothing is read twice.
 
-use crate::core::fs::written::{written_since, Stale};
-use crate::scene::rehydrate::reimport_written;
+use crate::core::fs::written::{note_written, written_since, Stale};
+use crate::scene::rehydrate::{reimport_model_ids, reimport_written, Rig};
 use crate::scene::Scene;
 
 /// How far into the write log the scene's meshes have been brought up to date.
@@ -48,6 +48,25 @@ impl ModelWrites {
         }
         reimport_written(scene, &Stale::new(paths))
     }
+}
+
+/// Re-import the meshes in `scene` instanced from the model at `path` now, for a
+/// setting that changes what the model imports as (the Scale Factor, #1398), and
+/// note the model as written so every other cache keyed by it re-reads it too.
+/// The scene's own [`ModelWrites::follow`] then skips that note, so the meshes are
+/// not read twice; when another model's note is still waiting it is left to the
+/// follow, which re-reads both. Returns the ids of the entities rebuilt.
+pub fn reimport_noted(scene: &mut Scene, path: &str, rig: Rig) -> Vec<u32> {
+    let (_, pending) = written_since(scene.meshes_read_at);
+    let others = pending
+        .iter()
+        .any(|p| p != path && crate::asset::is_model_path(p));
+    note_written(path);
+    let ids = reimport_model_ids(scene, path, rig);
+    if !others {
+        scene.meshes_read_at = written_since(u64::MAX).0;
+    }
+    ids
 }
 
 #[cfg(test)]

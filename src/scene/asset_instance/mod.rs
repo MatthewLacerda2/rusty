@@ -204,11 +204,19 @@ pub fn set_lightmap_uv_settings(
 
 /// Set a model's Scale Factor (#1398) in its `.meta` sidecar and re-import every
 /// mesh in `scene` instanced from it, a skinned one with its new rig and its bones
-/// moved to the scaled rest pose. The one verb the model inspector and
+/// moved to the scaled rest pose; an LODGroup over those meshes has its size scaled
+/// with them. The model is noted in the write log, so every other cache keyed by it
+/// (the particle meshes) re-reads it too. The one verb the model inspector and
 /// `Assets.SetModelImportSettings` share. Returns how many meshes were re-imported.
 pub fn set_model_scale_factor(scene: &mut Scene, path: &str, scale: f32) -> Result<usize, String> {
-    asset::sidecar::set_scale(std::path::Path::new(path), scale).map_err(|e| e.to_string())?;
-    Ok(rehydrate::reimport_model(scene, path, Rig::Rebuild))
+    let source = std::path::Path::new(path);
+    let stored = |source| asset::sidecar::load(source).map(|s| s.scale);
+    let before = stored(source).map_err(|e| e.to_string())?;
+    asset::sidecar::set_scale(source, scale).map_err(|e| e.to_string())?;
+    let after = stored(source).map_err(|e| e.to_string())?;
+    let ids = rehydrate::model_writes::reimport_noted(scene, path, Rig::Rebuild);
+    crate::scene::lod_instance::rescale_groups_over(scene, &ids, after / before);
+    Ok(ids.len())
 }
 
 #[cfg(test)]

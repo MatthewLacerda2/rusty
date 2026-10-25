@@ -93,7 +93,7 @@ changes nothing, and one at or below `0.0001` is floored there.
 
 ```lua no-run
 Assets.SetModelImportSettings("project/models/crate_cm.glb", { scaleFactor = 0.01 })
-print(Assets.GetModelImportSettings("project/models/crate_cm.glb").scaleFactor)  -- 0.01
+print(Assets.GetModelImportSettings("project/models/crate_cm.glb").scaleFactor)  -- 0.0099999997764826: an f32
 ```
 
 ### Generate Lightmap UVs

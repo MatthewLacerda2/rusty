@@ -120,7 +120,7 @@ pub fn import_file(path: &Path) -> Result<ImportedAsset, ImportError> {
         );
         ImportSettings::default()
     });
-    scale_factor::apply(&mut asset, settings.scale);
+    scale_factor::apply(&mut asset, scale_factor::sanitize(settings.scale, 1.0));
     if settings.lightmap_uvs.generate {
         for sub in &mut asset.sub_meshes {
             lightmap_uv::apply(sub, &settings.lightmap_uvs);

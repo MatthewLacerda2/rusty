@@ -89,6 +89,26 @@ pub fn instantiate_model(
     ids
 }
 
+/// Scale by `ratio` the size of every LODGroup in `scene` with one of `renderers`
+/// among its levels: their meshes were re-imported at a new Scale Factor (#1398), and
+/// the size the renderer measures on screen scales with them. Scaling, not
+/// recomputing, keeps a size the author set by hand in proportion.
+pub fn rescale_groups_over(scene: &mut Scene, renderers: &[u32], ratio: f32) {
+    if renderers.is_empty() || ratio == 1.0 {
+        return;
+    }
+    for id in scene.world.ids_with_lod_group() {
+        let Some(mut group) = scene.world.lod_group_mut(id) else {
+            continue;
+        };
+        let over = group.levels.iter().flat_map(|l| &l.renderers);
+        if over.into_iter().any(|r| renderers.contains(r)) {
+            let size = group.size * ratio;
+            crate::scene::authoring::lod_group::set_size(&mut group, size);
+        }
+    }
+}
+
 /// The largest extent of LOD0's combined bounds — the height the renderer measures
 /// on screen — floored so a flat or empty level still has a size.
 fn lod0_size(asset: &ImportedAsset, set: &LodSet) -> f32 {
