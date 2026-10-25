@@ -67,12 +67,7 @@ pub fn register(lua: &Lua) -> Reg {
     put(
         &table,
         "GetModelImportSettings",
-        lua.create_function(|lua, path: String| {
-            let stored = sidecar::load(Path::new(&path)).map_err(runtime)?;
-            let t = lua.create_table()?;
-            t.raw_set("scaleFactor", stored.scale)?;
-            Ok(t)
-        }),
+        lua.create_function(|lua, path: String| model_import_table(lua, &path)),
     )?;
 
     put(
@@ -143,6 +138,14 @@ fn lightmap_uv_table(lua: &Lua, s: &LightmapUvSettings) -> mlua::Result<Table> {
     t.raw_set("generate", s.generate)?;
     t.raw_set("hardAngle", s.hard_angle)?;
     t.raw_set("packMargin", s.pack_margin)?;
+    Ok(t)
+}
+
+/// `{ scaleFactor }`: the model at `path`'s import settings.
+fn model_import_table(lua: &Lua, path: &str) -> mlua::Result<Table> {
+    let stored = sidecar::load(Path::new(path)).map_err(runtime)?;
+    let t = lua.create_table()?;
+    t.raw_set("scaleFactor", stored.scale)?;
     Ok(t)
 }
 
