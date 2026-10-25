@@ -90,7 +90,7 @@ pub fn instantiate_model(
 }
 
 /// Every LODGroup in `scene` with the largest extent of its LOD0 meshes' combined
-/// bounds, as [`lod0_size`] measures an asset's: what a re-import is compared
+/// bounds, as `lod0_size` measures an asset's: what a re-import is compared
 /// against ([`rescale_groups_over`]). A group whose LOD0 has no mesh is left out.
 pub fn lod0_extents(scene: &Scene) -> Vec<(u32, f32)> {
     let groups = scene.world.ids_with_lod_group().into_iter();
