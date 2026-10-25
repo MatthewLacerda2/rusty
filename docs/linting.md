@@ -373,8 +373,11 @@ new flag, gate, CI step or baseline.
   whose template puts a `/` after a positional `{}` filled from a native path's
   `.to_string_lossy()` or `.display()` builds `dir\a/b` on Windows, which a
   baked material once stored in its scene; spell the path with
-  `core::paths::to_slash(path)`. A `/` after a named placeholder (`{DIR}/`) is
-  not read, nor a native path stringified into a variable first. The rule reads text, not types, so it **misfires** on a
+  `core::paths::to_slash(path)`. The match is coarse: any `{}/` in the template
+  plus any `.to_string_lossy()` / `.display()` argument flags, so a ratio such as
+  `"{}/{} in {}"` beside a displayed path misfires; it misses `{0}/`, a named
+  placeholder (`{DIR}/`), `.to_str()`, `write!` / `println!`, and a native path
+  stringified into a variable first. The rule reads text, not types, so it **misfires** on a
   `.push` of a `/` literal (or of a space-free `/` `format!`) onto a list of
   strings, on a slice join whose separator holds a `/` beside other text, and on a
   constant matched by bare name: a `/` constant in one module flags a same-named
