@@ -24,9 +24,9 @@
 use super::Shell;
 use crate::app::GameWorld;
 use crate::audio::SpeakerMode;
-use crate::core::quality::QualityPreset;
+use crate::core::settings::quality::QualityPreset;
+use crate::core::settings::video::{VideoSettings, VIDEO_NAMESPACE};
 use crate::core::storage::Storage;
-use crate::core::video::{VideoSettings, VIDEO_NAMESPACE};
 
 /// `Storage` namespace + key the quality tier persists under (shares the
 /// `Graphics` post-FX category, key `quality`).

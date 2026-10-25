@@ -16,10 +16,10 @@ use glam::Vec3;
 
 use crate::asset::lod::{lod_sets, LodSet};
 use crate::asset::ImportedAsset;
-use crate::components::lod_group::default_thresholds;
+use crate::components::rendering::lod_group::default_thresholds;
 use crate::components::{LodGroupComponent, LodLevel};
 use crate::scene::asset_instance::instantiate_imported;
-use crate::scene::authoring::lod_group::MIN_SIZE;
+use crate::scene::authoring::rendering::lod_group::MIN_SIZE;
 use crate::scene::Scene;
 
 /// Spawn `set` (from the file at `path`) as an LODGroup entity at `position`, named

@@ -12,7 +12,7 @@ use mlua::{Table, Variadic};
 use super::text::Effect;
 use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
-use crate::scene::authoring::text as ops;
+use crate::scene::authoring::ui::text as ops;
 use crate::scene::Scene;
 
 /// `Get<suffix>(id)` / `Set<suffix>(id, …)` for every effect row.

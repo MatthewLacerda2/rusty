@@ -5,13 +5,13 @@
 //! never feed `FixedUpdate` — so the tests assert the cell + the storage blob, not
 //! sim evolution. GPU surface/window reconfiguration itself can't run headless, so
 //! the renderer-apply path is covered by the pure decision logic in
-//! `core::video::VideoSettings::diff`, exercised here through the cell.
+//! `core::settings::video::VideoSettings::diff`, exercised here through the cell.
 
 use std::cell::RefCell;
 
 use mlua::Lua;
+use rusty::core::settings::video::{VideoSettings, VIDEO_NAMESPACE};
 use rusty::core::storage::Storage;
-use rusty::core::video::{VideoSettings, VIDEO_NAMESPACE};
 
 #[test]
 fn resolution_writes_cell_and_clamps_zero() {

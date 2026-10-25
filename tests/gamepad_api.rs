@@ -5,7 +5,7 @@
 use std::cell::RefCell;
 
 use mlua::Lua;
-use rusty::core::gamepad::Rumble;
+use rusty::core::input::gamepad::Rumble;
 use rusty::core::input::InputState;
 
 /// Run `f` with a Lua VM whose `Input` table is bound to `input`.

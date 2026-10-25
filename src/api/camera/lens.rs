@@ -12,7 +12,7 @@ use super::component::{read, write};
 use crate::api::entity_arg::EntityArg;
 use crate::api::{put, Reg};
 use crate::components::ClearFlags;
-use crate::scene::authoring::camera as camera_ops;
+use crate::scene::authoring::rendering::camera as camera_ops;
 use crate::scene::camera::held_lens;
 use crate::scene::Scene;
 

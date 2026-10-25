@@ -3,7 +3,7 @@
 //! under the size cap; the RigidBody and NavMesh Agent cards stay in `physics`.
 //!
 //! A THIN client (#287): widgets read fields from a snapshot and route every write
-//! through a shared `authoring::collider` op, never a mutable component borrow — the
+//! through a shared `authoring::physics::collider` op, never a mutable component borrow — the
 //! same ops the `Physics.*` Lua setters call, so the panel and the bindings share
 //! one write.
 
@@ -13,7 +13,7 @@ use glam::Vec3;
 
 use crate::components::{CapsuleAxis, CombineMode, PhysicsMaterial};
 use crate::editor::inspector::components::card::{component_card, remove_component};
-use crate::scene::authoring::collider as collider_ops;
+use crate::scene::authoring::physics::collider as collider_ops;
 use crate::scene::authoring::ComponentKind;
 use crate::scene::ColliderShape;
 

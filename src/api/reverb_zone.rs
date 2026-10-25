@@ -2,7 +2,7 @@
 //!
 //! Get/Set over an entity's `ReverbZoneComponent` (Unity's `AudioReverbZone`): the
 //! full-effect and fade-out radii, the preset, and the raw params. Every setter
-//! routes through the shared `scene::authoring::reverb_zone` ops the inspector card
+//! routes through the shared `scene::authoring::audio::reverb_zone` ops the inspector card
 //! uses, so picking a preset writes its params and setting params makes the zone
 //! `Custom`. Getters return `nil` without a zone; setters are then an error naming
 //! the entity. The listener's blended result is `Audio.GetReverbState`.
@@ -14,7 +14,7 @@ use mlua::{Lua, Table, Value};
 use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
 use crate::components::{ReverbParams, ReverbPreset, ReverbZoneComponent};
-use crate::scene::authoring::reverb_zone as ops;
+use crate::scene::authoring::audio::reverb_zone as ops;
 use crate::scene::Scene;
 
 type SceneCell<'s> = &'s RefCell<Scene>;

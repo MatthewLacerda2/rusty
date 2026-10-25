@@ -5,8 +5,8 @@ use std::rc::Rc;
 
 use super::*;
 use crate::app::GameWorld;
+use crate::core::input::keymap::Keymap;
 use crate::core::input::InputState;
-use crate::core::keymap::Keymap;
 use crate::navigation::NavigationGraph;
 use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;

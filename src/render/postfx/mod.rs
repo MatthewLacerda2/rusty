@@ -6,7 +6,7 @@
 //! (`postfx.wgsl`) that finally reads the `VisualCorrectionComponent` /
 //! `CameraComponent` knobs and writes the corrected image to the real target.
 //!
-//! [`QualityPreset`](crate::core::quality::QualityPreset) (sim-side) gates which
+//! [`QualityPreset`](crate::core::settings::quality::QualityPreset) (sim-side) gates which
 //! passes run and how big the bloom buffers are so an integrated GPU can hold
 //! ~30fps (Low: no SSR/motion-blur, half-size bloom).
 

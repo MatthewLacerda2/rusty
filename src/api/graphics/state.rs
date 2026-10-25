@@ -8,7 +8,7 @@ use std::cell::RefCell;
 
 use super::super::{put, Reg};
 use crate::components::{CameraComponent, VisualCorrectionComponent};
-use crate::core::quality::QualityPreset;
+use crate::core::settings::quality::QualityPreset;
 use crate::scene::Scene;
 
 /// Global quality preset value get/set over the shared resource cell. Lives here (not
@@ -70,7 +70,7 @@ pub(super) fn with_vc<R>(
 
 /// Mutate the first active visual-correction volume (no-op when there is none).
 /// The caller routes the write through a shared
-/// `authoring::visual_correction::*` op (#287).
+/// `authoring::rendering::visual_correction::*` op (#287).
 pub(super) fn with_vc_mut(scene: &RefCell<Scene>, f: impl FnOnce(&mut VisualCorrectionComponent)) {
     let mut scene = scene.borrow_mut();
     let Some(id) = active_vc_id(&scene) else {
@@ -93,7 +93,7 @@ pub(super) fn with_cam<R>(
 }
 
 /// Mutate the first active camera component (no-op when there is none). The
-/// caller routes the write through a shared `authoring::camera::*` op (#287).
+/// caller routes the write through a shared `authoring::rendering::camera::*` op (#287).
 pub(super) fn with_cam_mut(scene: &RefCell<Scene>, f: impl FnOnce(&mut CameraComponent)) {
     let mut scene = scene.borrow_mut();
     let Some(id) = active_cam_id(&scene) else {

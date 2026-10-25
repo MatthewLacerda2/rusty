@@ -2,7 +2,7 @@
 //! id go, each to its component's `None`, and a marker that followed it is hidden
 //! but stays active.
 
-use crate::components::ui::rect_transform::WorldAnchor;
+use crate::components::ui::layout::rect_transform::WorldAnchor;
 use crate::components::{JointComponent, RectTransformComponent};
 use crate::ecs::World;
 
@@ -53,7 +53,7 @@ fn a_marker_whose_target_is_despawned_hides() {
     assert!(w.is_active_in_hierarchy(marker), "its scripts keep running");
 
     let mut rect = w.rect_transform(marker).unwrap().clone();
-    crate::scene::authoring::rect_transform::set_world_anchor(
+    crate::scene::authoring::ui::layout::rect_transform::set_world_anchor(
         &mut rect,
         Some(marker),
         glam::Vec3::ZERO,

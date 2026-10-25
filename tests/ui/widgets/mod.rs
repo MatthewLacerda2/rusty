@@ -16,7 +16,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use rusty::app::GameWorld;
-use rusty::scene::authoring::ui_widgets::{self, create_ui, UiWidget};
+use rusty::scene::authoring::ui::widgets::{self, create_ui, UiWidget};
 use rusty::scene::Scene;
 use rusty::scripting::ConsoleLogs;
 
@@ -33,7 +33,7 @@ impl Ui {
     /// Seed the widget scripts, build the scene, enter Play with a free cursor, and
     /// run one tick so every widget has woken.
     pub fn new(build: impl FnOnce(&mut Scene)) -> Self {
-        ui_widgets::seed();
+        widgets::seed();
         let mut scene = Scene::new();
         build(&mut scene);
         let console = Rc::new(RefCell::new(ConsoleLogs::new()));

@@ -5,16 +5,11 @@
 //! Element. Each is a thin client over its shared
 //! `scene::authoring` ops, the same ones the matching Lua namespace calls.
 
-pub mod anchor_presets;
 pub mod backdrop;
-pub mod canvas;
-pub mod canvas_group;
 pub mod image;
-pub mod layout_element;
-pub mod layout_group;
+pub mod layout;
 mod look;
 pub mod rect_mask;
-pub mod rect_transform;
 pub mod selectable;
 pub mod shader;
 pub mod shape;
@@ -29,9 +24,9 @@ pub fn draw(
     view: &crate::ui::UiView,
     is_dirty: &mut bool,
 ) {
-    canvas::draw(ui, world, id, is_dirty);
-    rect_transform::draw(ui, world, id, view, is_dirty);
-    canvas_group::draw(ui, world, id, is_dirty);
+    layout::canvas::draw(ui, world, id, is_dirty);
+    layout::rect_transform::draw(ui, world, id, view, is_dirty);
+    layout::canvas_group::draw(ui, world, id, is_dirty);
     rect_mask::draw(ui, world, id, is_dirty);
     rect_mask::draw_mask(ui, world, id, is_dirty);
     image::draw(ui, world, id, is_dirty);
@@ -39,8 +34,8 @@ pub fn draw(
     backdrop::draw(ui, world, id, is_dirty);
     text::draw(ui, world, id, is_dirty);
     selectable::draw(ui, world, id, is_dirty);
-    layout_group::draw(ui, world, id, is_dirty);
-    layout_element::draw(ui, world, id, is_dirty);
+    layout::group::draw(ui, world, id, is_dirty);
+    layout::element::draw(ui, world, id, is_dirty);
 }
 
 /// A labelled `x, y` drag row. Returns the edited pair when either axis changed.

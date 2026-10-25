@@ -42,7 +42,7 @@ impl Drop for Baked {
 /// Run `script` against the `UI` namespace, returning its error if any.
 fn run(scene: &RefCell<Scene>, script: &str) -> Result<(), String> {
     let screen = RefCell::new(crate::ui::ScreenSize::default());
-    let video = RefCell::new(crate::core::video::VideoSettings::default());
+    let video = RefCell::new(crate::core::settings::video::VideoSettings::default());
     let camera = RefCell::new(Camera::new(Vec3::ZERO, -90.0, 0.0));
     let lua = Lua::new();
     lua.scope(|s| {

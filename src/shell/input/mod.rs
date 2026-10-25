@@ -28,7 +28,7 @@ use winit::event::{ElementState, MouseButton, MouseScrollDelta};
 use winit::keyboard::KeyCode;
 
 use crate::app::GameWorld;
-use crate::core::keymap::Keymap;
+use crate::core::input::keymap::Keymap;
 
 pub use cursor::CursorPolicy;
 pub use keys::{mouse_button_name, physical_key_name};

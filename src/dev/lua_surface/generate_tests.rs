@@ -1,5 +1,5 @@
 //! `Lighting.Generate` and the settings verbs (#832). The bakes themselves are
-//! tested in `dev::generate_lighting`; here the bindings and their shapes.
+//! tested in `dev::bake::generate_lighting`; here the bindings and their shapes.
 
 use super::super::super::session::Session;
 

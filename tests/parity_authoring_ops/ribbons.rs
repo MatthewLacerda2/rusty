@@ -1,4 +1,4 @@
-//! `Trail.*` / `Line.*` bindings vs `authoring::{trail, line, ribbon}` (#441).
+//! `Trail.*` / `Line.*` bindings vs `authoring::{ribbon::trail, ribbon::line, ribbon}` (#441).
 
 use std::cell::RefCell;
 
@@ -6,7 +6,9 @@ use glam::Vec3;
 use mlua::Lua;
 use rusty::components::{LineComponent, ParticleBlend, TextureMode, TrailComponent};
 use rusty::core::curve::{Curve, Gradient};
-use rusty::scene::authoring::{line as line_ops, ribbon as ribbon_ops, trail as trail_ops};
+use rusty::scene::authoring::{
+    ribbon as ribbon_ops, ribbon::line as line_ops, ribbon::trail as trail_ops,
+};
 use rusty::scene::Scene;
 
 /// Two sibling entities (Lua-driven, op-driven), each given a default component

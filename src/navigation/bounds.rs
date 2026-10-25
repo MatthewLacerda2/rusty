@@ -131,7 +131,7 @@ impl NavigationGraph {
     /// its XZ cell centre and floor height. `None` when the graph is unbaked (a
     /// degenerate grid) or nothing is walkable. Bounding the *walkable* spans (not the
     /// full grid) means the agent-radius erosion (#277) tightens it. Light-probe
-    /// placement fills this extent (`dev::lighting_bake`, #721).
+    /// placement fills this extent (`dev::bake::lighting`, #721).
     pub fn walkable_aabb(&self) -> Option<(Vec3, Vec3)> {
         let baked =
             self.width > 1 && self.height > 1 && self.max_x > self.min_x && self.max_z > self.min_z;

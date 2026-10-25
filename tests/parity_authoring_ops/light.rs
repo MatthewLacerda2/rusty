@@ -1,11 +1,11 @@
-//! `Light.*` bindings vs `authoring::light`.
+//! `Light.*` bindings vs `authoring::rendering::light`.
 
 use std::cell::RefCell;
 
 use glam::Vec3;
 use mlua::Lua;
 use rusty::components::{LightComponent, LightType};
-use rusty::scene::authoring::light as light_ops;
+use rusty::scene::authoring::rendering::light as light_ops;
 use rusty::scene::Scene;
 
 /// Attach a default-ish light to a fresh entity named `name`; returns its id.

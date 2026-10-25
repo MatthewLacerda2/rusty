@@ -161,9 +161,9 @@ re-bake reflects it) and, at the bake itself, in `src/navigation/bake/tests/sett
 | `AddForceAtPosition` / `AddImpulseAtPosition` | ✅ | sim — `physics/joints/ragdoll.rs::impulse_response` turns the push into `velocity` / `angular_velocity` (read above) from the body's mass properties (`src/physics/live_tests.rs`, `tests/ragdoll/fall.rs`) |
 | `SetKinematic` | ✅ | sim — `physics/shape/build.rs::class_of`; a mid-play switch reaches rapier through `physics/live.rs::body_type` in `world.rs::apply_body_state` (`set_kinematic_mid_play_stops_and_restarts_a_falling_body`) |
 | `SetCollisionDetection` | ✅ | sim — `physics/shape/build.rs::ccd_enabled` / `world.rs` `enable_ccd` (proven by `physics/ccd_tests.rs`: against a moving wall Discrete tunnels, Continuous stops; a static wall stops both since rapier 0.36, #754) |
-| `SetMass` | ✅ | sim — through `authoring::rigidbody::set_mass` (the card's clamp); `physics/live.rs::sync_masses` spreads it over the body's solid colliders each step (`a_rigidbody_mass_is_the_body_mass_whatever_its_size`, #1365) |
-| `SetUseGravity` | ✅ | sim — through `authoring::rigidbody::set_use_gravity`; `world.rs::apply_body_state` re-applies the gravity scale each step and wakes the body (`tests/physics/gravity.rs`, #1365) |
-| `SetTrigger` | ✅ | sim — through `authoring::collider::set_trigger`; built as rapier's sensor flag in `physics/assemble.rs`, and a mid-play change reaches it through `physics/live.rs::sync_sensors`, before `sync_masses` re-spreads the mass (`set_trigger_mid_play_turns_a_floor_into_a_trigger`, #1368) |
+| `SetMass` | ✅ | sim — through `authoring::physics::rigidbody::set_mass` (the card's clamp); `physics/live.rs::sync_masses` spreads it over the body's solid colliders each step (`a_rigidbody_mass_is_the_body_mass_whatever_its_size`, #1365) |
+| `SetUseGravity` | ✅ | sim — through `authoring::physics::rigidbody::set_use_gravity`; `world.rs::apply_body_state` re-applies the gravity scale each step and wakes the body (`tests/physics/gravity.rs`, #1365) |
+| `SetTrigger` | ✅ | sim — through `authoring::physics::collider::set_trigger`; built as rapier's sensor flag in `physics/assemble.rs`, and a mid-play change reaches it through `physics/live.rs::sync_sensors`, before `sync_masses` re-spreads the mass (`set_trigger_mid_play_turns_a_floor_into_a_trigger`, #1368) |
 
 (The #311 spatial query surface — `Raycast`'s siblings `SphereCast`,
 `OverlapSphere`/`OverlapBox`/`OverlapCapsule`, `CheckSphere`/`CheckBox`,
@@ -227,7 +227,7 @@ change.)
 
 | Setter | Status | Read-site |
 |---|---|---|
-| `SetPosition` | ✅ | renderer — `app/camera_sync.rs` + view matrix |
+| `SetPosition` | ✅ | renderer — `app/systems/camera_sync.rs` + view matrix |
 | `SetYaw` / `SetPitch` | ✅ | renderer — `Camera::forward`/view matrix (pitch clamped) |
 | `SetFov` | ✅ | renderer — projection matrix (clamped 1..179°) |
 
@@ -245,14 +245,14 @@ change.)
 
 | Setter | Status | Read-site |
 |---|---|---|
-| `Emit` / `Burst` | ✅ | sim/renderer — `emit_at` spawns into the runtime buffer `app/particles.rs` advances and the renderer draws |
+| `Emit` / `Burst` | ✅ | sim/renderer — `emit_at` spawns into the runtime buffer `app/systems/particles.rs` advances and the renderer draws |
 | `SetActive` | ✅ | sim — gates continuous emission |
 | `SetRate` | ✅ | sim — continuous spawn cadence |
 | `SetShape` | ✅ | sim — `EmitShape::sample` picks each spawn's offset + launch direction in `spawn_particle`; unknown kinds return `false` and change nothing |
 | `SetDirection` | ✅ | sim — the shape's axis in `spawn_particle` |
 | `SetLifetime` / `SetSpeed` / `SetSize` | ✅ | sim/renderer — sampled per spawn in `spawn_particle`; size reaches the renderer via `size_of` |
 | `SetColor` | ✅ | renderer — start tint, scaled by the gradient in `color_of` |
-| `SetSubEmitter` | ✅ | sim — `app/particles.rs` queues and dispatches the target's burst on birth/death/collision; unknown triggers return `false` |
+| `SetSubEmitter` | ✅ | sim — `app/systems/particles.rs` queues and dispatches the target's burst on birth/death/collision; unknown triggers return `false` |
 | `Clear` | ✅ | renderer — empties the live buffer that's drawn |
 | `SetRenderMode` / `GetRenderMode` | ✅ | renderer — `render.mode` picks the sprite quad in `particles.wgsl` (`corner_offset`), or routes the emitter to the forward solids (`passes/particles/mesh.rs`); unknown modes return `false` |
 | `SetStretch` | ✅ | renderer — `stretch_length` → the instance's `stretch.w` |
@@ -265,7 +265,7 @@ change.)
 
 | Setter | Status | Read-site |
 |---|---|---|
-| `SetEmitting` / `SetTime` / `SetMinVertexDistance` | ✅ | sim — `TrailComponent::advance`, run by `app/trails.rs` each fixed tick, records and ages the points with them (`tests/ribbons/trail.rs`); round-trips |
+| `SetEmitting` / `SetTime` / `SetMinVertexDistance` | ✅ | sim — `TrailComponent::advance`, run by `app/systems/trails.rs` each fixed tick, records and ages the points with them (`tests/ribbons/trail.rs`); round-trips |
 | `Clear` | ✅ | renderer — empties the recorded points the ribbon pass draws |
 | `SetWidth` / `SetWidthCurve` / `SetColor` / `SetColors` / `SetTexture` / `SetTextureMode` / `SetBlend` | ✅ | renderer — `render/passes/ribbons` builds the strip's width, colour and `u` from the style and picks the blend pipeline and texture (`tests/gpu/ribbons_screenshot.rs`); round-trips |
 
@@ -282,7 +282,7 @@ change.)
 |---|---|---|
 | `Play` | ✅ | platform (`AudioMaestro::play_source` → backend voice) + introspection log; the `AudioSource` it reads round-trips |
 | `Stop` | ✅ | platform — drops the live voice; logs a Stop event |
-| `SetVolume` | ✅ | `AudioSource.volume` through `authoring::audio::set_volume` (the inspector's op, clamped to `[0, 1]`), then platform — re-folds the live voice's gain (master × per-source); observable via `GetVolume` and round-trips (#1368) |
+| `SetVolume` | ✅ | `AudioSource.volume` through `authoring::audio::source::set_volume` (the inspector's op, clamped to `[0, 1]`), then platform — re-folds the live voice's gain (master × per-source); observable via `GetVolume` and round-trips (#1368) |
 | `PlayAt` | ✅ | platform (`play_at` one-shot) + introspection log — the log entry is the one-shot's only trace |
 | `SetMasterVolume` | ✅ | platform — re-folds every live voice; observable via `GetMasterVolume` |
 | `SetSpeakerMode` | ✅ | platform — re-sends every live voice shaped for the mode (headphones narrows pan) and retunes the device's output stage (TV compression); observable via `GetSpeakerMode`, persisted as `audio.speaker_mode` |
@@ -311,7 +311,7 @@ fields (incl. the spatial fields stored for #213) round-trip through `SceneData`
 
 | Setter | Status | Read-site |
 |---|---|---|
-| `Spawn` | ✅ | renderer — `render/decals/gpu.rs` uploads each decal and loads its maps into the decal atlas; the clusters bin it and `fs_main` folds it into the surface's material (#638); its `owner` / `lifetime` / `fade` (#639) are read by `Scene::decal_pose` each frame and aged by `app/decals.rs::tick_decals` on the fixed tick |
+| `Spawn` | ✅ | renderer — `render/decals/gpu.rs` uploads each decal and loads its maps into the decal atlas; the clusters bin it and `fs_main` folds it into the surface's material (#638); its `owner` / `lifetime` / `fade` (#639) are read by `Scene::decal_pose` each frame and aged by `app/systems/decals.rs::tick_decals` on the fixed tick |
 | `Remove` | ✅ | sim + renderer — drops the decal (or retires it to fade out) from `Scene.decals`, which the upload reads (`tests/decals/lifecycle_api.rs`) |
 | `Clear` | ✅ | renderer — empties the uploaded set |
 
@@ -516,7 +516,7 @@ rejected patch, note or option). zimmer's own render tests live in scorsese.
 |---|---|---|
 | `SetSelected` | ✅ | sim — `EventSystem::process` announces it (`OnDeselect` / `OnSelect`) and navigation moves from it (`tests/ui/events.rs`); runtime state, not saved |
 | `Click` | ✅ | sim — writes `Input`'s pointer + `Mouse0` edges, read by the next tick's pointer dispatch (`tests/ui/events.rs`) |
-| `Create` | ✅ | builds the widget tree through `ui_widgets::create_ui` (the Create ▸ UI menu's path): ordinary entities and components every UI read-site sees, plus the widget script the next tick loads; round-trips (`tests/ui/widgets/create.rs`, #422) |
+| `Create` | ✅ | builds the widget tree through `ui::widgets::create_ui` (the Create ▸ UI menu's path): ordinary entities and components every UI read-site sees, plus the widget script the next tick loads; round-trips (`tests/ui/widgets/create.rs`, #422) |
 
 ### `Debug` (dev-only) — over `ConsoleLogs`
 

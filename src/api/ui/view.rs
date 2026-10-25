@@ -1,6 +1,6 @@
 //! src/api/ui/view.rs — the screen + camera the `UI` verbs compute against (#429).
 //!
-//! The same [`UiView`] the per-tick systems build (`app::ui`): the sim's screen
+//! The same [`UiView`] the per-tick systems build (`app::systems::ui`): the sim's screen
 //! size and texture sizes and the active camera, so `UI.GetRect`, `UI.Raycast`, `UI.Click` and
 //! `UI.List` see markers and world canvases exactly where they draw and hit.
 
@@ -8,7 +8,7 @@ use std::cell::RefCell;
 
 use glam::Vec2;
 
-use crate::core::video::VideoSettings;
+use crate::core::settings::video::VideoSettings;
 use crate::physics::PhysicsWorld;
 use crate::scene::Camera;
 use crate::ui::events::{WALL_RANGE, WALL_TOLERANCE};

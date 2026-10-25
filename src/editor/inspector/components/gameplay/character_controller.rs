@@ -2,7 +2,7 @@
 //! CharacterController card (#451).
 //!
 //! A THIN client (#287): widgets read a snapshot and route every write through the
-//! shared `authoring::character_controller` ops the `CharacterController.*` Lua
+//! shared `authoring::physics::character_controller` ops the `CharacterController.*` Lua
 //! setters call. The grounded state is what the last `Move` found, so it is shown
 //! read-only.
 
@@ -13,7 +13,7 @@ use egui_phosphor::regular as icon;
 use super::physics::vec3_row;
 use crate::components::CharacterControllerComponent as Cc;
 use crate::editor::inspector::components::card::component_card;
-use crate::scene::authoring::character_controller as cc_ops;
+use crate::scene::authoring::physics::character_controller as cc_ops;
 
 /// Route one edit through the shared ops and mark the scene dirty.
 fn write(world: &mut crate::ecs::World, id: u32, is_dirty: &mut bool, op: impl FnOnce(&mut Cc)) {

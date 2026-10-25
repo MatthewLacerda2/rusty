@@ -10,7 +10,7 @@
 //! The component splits cleanly into **config** (everything serde-persists, the
 //! authoring knobs) and **runtime** (the live `Vec<Particle>`, spawn accumulator,
 //! PRNG and pending sub-emitter events, all `#[serde(skip)]`). The simulation in
-//! `app::particles` owns the runtime; the draw pass in `render::passes::particles`
+//! `app::systems::particles` owns the runtime; the draw pass in `render::passes::particles`
 //! only reads it.
 //!
 //! Determinism: every random draw comes from a per-emitter [`Random`] stream (the

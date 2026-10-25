@@ -9,9 +9,9 @@ use std::rc::Rc;
 use crate::audio::AudioMaestro;
 use crate::core::application::Application;
 use crate::core::frame_stats::FrameStats;
-use crate::core::quality::QualityPreset;
+use crate::core::settings::quality::QualityPreset;
+use crate::core::settings::video::VideoSettings;
 use crate::core::storage::Storage;
-use crate::core::video::VideoSettings;
 use crate::physics::PhysicsWorld;
 use crate::ui::{EventSystem, ScreenSize};
 

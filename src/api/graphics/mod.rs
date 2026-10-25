@@ -19,7 +19,7 @@
 //!
 //! Every write is ONE-WAY into render-only state: it never feeds back into
 //! `FixedUpdate`, so toggling these knobs can't change the deterministic sim. The
-//! per-volume setters route through the shared `authoring::{camera,
+//! per-volume setters route through the shared `authoring::{rendering::camera,
 //! visual_correction}` ops the editor cards use, so panel and binding never drift.
 
 use std::cell::RefCell;
@@ -36,8 +36,8 @@ use mlua::Lua;
 use self::state::{register_quality, with_vc, with_vc_mut};
 use super::{put, Reg};
 use crate::components::Tonemap;
-use crate::core::quality::QualityPreset;
-use crate::scene::authoring::visual_correction as vc_ops;
+use crate::core::settings::quality::QualityPreset;
+use crate::scene::authoring::rendering::visual_correction as vc_ops;
 use crate::scene::Scene;
 
 /// Register the `Graphics` namespace onto `lua`.

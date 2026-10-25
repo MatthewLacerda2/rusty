@@ -15,7 +15,7 @@ use super::introspect::field_type;
 use super::table::{kind, Kind};
 use crate::components::animator::Playback;
 use crate::components::*;
-use crate::scene::authoring::{ui_shader, ComponentKind as K};
+use crate::scene::authoring::{ui::shader as ui_shader, ComponentKind as K};
 
 /// The reason on a field no inspector op writes yet; #1368 gates them in.
 const NO_OP: &str = "no inspector op writes it yet (#1368)";

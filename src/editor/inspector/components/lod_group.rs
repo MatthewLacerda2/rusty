@@ -1,7 +1,7 @@
 //! src/editor/inspector/components/lod_group.rs — the LOD Group card (#472).
 //!
 //! A THIN client (#287): widgets read a snapshot and route every write through the
-//! shared `authoring::lod_group` ops the `LODGroup.*` Lua setters call. One row per
+//! shared `authoring::rendering::lod_group` ops the `LODGroup.*` Lua setters call. One row per
 //! level (finest first): its screen-height threshold as a percentage, the renderer
 //! entities it shows (by name, each removable), an id field to add one, and a button
 //! to drop the level.
@@ -14,7 +14,7 @@ use egui_phosphor::regular as icon;
 use crate::components::{LodGroupComponent, LodLevel};
 use crate::ecs::World;
 use crate::editor::inspector::components::card::component_card;
-use crate::scene::authoring::lod_group as lod_ops;
+use crate::scene::authoring::rendering::lod_group as lod_ops;
 
 /// Route one edit through the shared ops and mark the scene dirty.
 fn write(world: &mut World, id: u32, is_dirty: &mut bool, op: impl FnOnce(&mut LodGroupComponent)) {

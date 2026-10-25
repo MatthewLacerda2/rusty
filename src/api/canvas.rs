@@ -5,7 +5,7 @@
 //! plus the scale factor those produce on the current screen, and the world /
 //! camera canvas knobs (#429): pixels per unit, plane distance, tilt and sway. Every
 //! setter routes
-//! through the shared `scene::authoring::canvas` ops the inspector card uses.
+//! through the shared `scene::authoring::ui::layout::canvas` ops the inspector card uses.
 //! Getters return a neutral default when the entity has no canvas.
 
 use std::cell::RefCell;
@@ -17,8 +17,8 @@ use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
 use crate::components::CanvasComponent;
 use crate::components::CanvasRenderMode;
-use crate::core::video::VideoSettings;
-use crate::scene::authoring::canvas as canvas_ops;
+use crate::core::settings::video::VideoSettings;
+use crate::scene::authoring::ui::layout::canvas as canvas_ops;
 use crate::scene::Scene;
 use crate::ui::ScreenSize;
 

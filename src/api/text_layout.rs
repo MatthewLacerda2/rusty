@@ -12,7 +12,7 @@ use mlua::Table;
 
 use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
-use crate::core::video::VideoSettings;
+use crate::core::settings::video::VideoSettings;
 use crate::scene::Scene;
 use crate::ui::{layout, text as ui_text, ScreenSize};
 

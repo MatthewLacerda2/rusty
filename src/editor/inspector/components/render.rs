@@ -4,7 +4,7 @@ use egui_phosphor::regular as icon;
 use glam::Vec3;
 
 use crate::editor::inspector::components::card::component_card;
-use crate::scene::authoring::light as light_ops;
+use crate::scene::authoring::rendering::light as light_ops;
 use crate::scene::{LightComponent, LightMode, LightType};
 
 /// The skinned-mesh tools a Mesh card button asks for, deferred because they need
@@ -64,7 +64,7 @@ pub fn draw_mesh(
 }
 
 /// 3C. Light configuration. A THIN client (#287): every widget reads the field into
-/// a local and, on change, routes the write through the shared `authoring::light::*`
+/// a local and, on change, routes the write through the shared `authoring::rendering::light::*`
 /// op — never mutating `LightComponent` fields directly. Remove detaches the
 /// reference (allowed: not a field mutation).
 pub fn draw_light(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, is_dirty: &mut bool) {

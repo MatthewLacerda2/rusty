@@ -16,7 +16,7 @@ use mlua::Lua;
 use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
 use crate::components::{LightMode, LightType};
-use crate::scene::authoring::light as light_ops;
+use crate::scene::authoring::rendering::light as light_ops;
 use crate::scene::Scene;
 
 /// Register the `Light` namespace onto `lua`.

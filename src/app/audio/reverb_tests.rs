@@ -13,7 +13,7 @@ use crate::audio::ReverbState;
 use crate::components::{ReverbPreset, ReverbZoneComponent};
 use crate::core::input::InputState;
 use crate::navigation::NavigationGraph;
-use crate::scene::authoring::reverb_zone as ops;
+use crate::scene::authoring::audio::reverb_zone as ops;
 use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;
 

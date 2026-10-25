@@ -4,7 +4,7 @@
 //! displacement with collide-and-slide against the live physics world and
 //! returns what it touched; the getters read back the grounded state that move
 //! left; the size and tuning setters route through the shared
-//! `scene::authoring::character_controller` ops the inspector card uses.
+//! `scene::authoring::physics::character_controller` ops the inspector card uses.
 //! Getters return a neutral default without a controller; setters and `Move` are
 //! then no-ops. Attach one with `Scene.AddComponent(id, "CharacterController")`.
 
@@ -15,10 +15,12 @@ use mlua::{Lua, Table};
 
 use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
-use crate::components::character_controller::{COLLIDED_ABOVE, COLLIDED_BELOW, COLLIDED_SIDES};
+use crate::components::physics::character_controller::{
+    COLLIDED_ABOVE, COLLIDED_BELOW, COLLIDED_SIDES,
+};
 use crate::components::CharacterControllerComponent as Cc;
 use crate::physics::{self, PhysicsWorld};
-use crate::scene::authoring::character_controller as ops;
+use crate::scene::authoring::physics::character_controller as ops;
 use crate::scene::Scene;
 
 type SceneCell<'s> = &'s RefCell<Scene>;

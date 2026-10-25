@@ -9,17 +9,17 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Deserializer};
 use serde_json::Value;
 
-/// Decode a field's value as `T` (enum names in any case, `core::variant_case::decode`). An
+/// Decode a field's value as `T` (enum names in any case, `core::naming::variant_case::decode`). An
 /// empty Lua table crosses as `{}`, so when that fails it is read again with every
 /// empty table a list (`LODGroup.levels[i].renderers = {}`).
 pub fn decode<T: DeserializeOwned>(json: Value) -> Result<T, String> {
-    let error = match crate::core::variant_case::decode(json.clone()) {
+    let error = match crate::core::naming::variant_case::decode(json.clone()) {
         Ok(value) => return Ok(value),
         Err(e) => e,
     };
     let mut lists = json;
     if empty_tables_as_lists(&mut lists) {
-        crate::core::variant_case::decode(lists).map_err(|_| error)
+        crate::core::naming::variant_case::decode(lists).map_err(|_| error)
     } else {
         Err(error)
     }

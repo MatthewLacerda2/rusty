@@ -6,8 +6,8 @@ use crate::components::{
     NavMeshAgentComponent, NavMeshModifierVolumeComponent, NavMeshObstacleComponent,
     OffMeshLinkComponent,
 };
+use crate::scene::authoring::nav::offmesh_link as link;
 use crate::scene::authoring::nav::{agent, modifier, obstacle};
-use crate::scene::authoring::offmesh_link as link;
 
 inspect! {
     NavMeshAgentComponent => nav_agent, nav_agent_mut, &[

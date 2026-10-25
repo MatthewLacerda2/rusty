@@ -7,7 +7,7 @@
 use std::cell::RefCell;
 
 use mlua::Lua;
-use rusty::core::quality::QualityPreset;
+use rusty::core::settings::quality::QualityPreset;
 use rusty::dev::capture::CaptureHost;
 use rusty::scene::Scene;
 use rusty::shadergen::{bake_recipe, engine_shader_dir, ShaderRecipe, DEFAULT_OUT_DIR};

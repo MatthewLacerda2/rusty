@@ -4,8 +4,8 @@
 
 use super::*;
 use crate::components::CameraComponent;
-use crate::scene::authoring::camera as ops;
 use crate::scene::authoring::default_camera;
+use crate::scene::authoring::rendering::camera as ops;
 use crate::scene::serialize::{apply_scene_data, to_scene_data};
 
 /// The view camera synced from a scene whose one camera is `c`.

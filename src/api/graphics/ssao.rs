@@ -1,13 +1,13 @@
 //! `Graphics.{Get,Set}Ssao{Active,Radius,Intensity}` (#436): screen-space ambient
 //! occlusion on the active visual-correction volume, through the same
-//! `authoring::visual_correction` ops the Inspector card calls.
+//! `authoring::rendering::visual_correction` ops the Inspector card calls.
 
 use std::cell::RefCell;
 
 use super::super::{put, Reg};
 use super::state::{with_vc, with_vc_mut};
 use crate::components::SsaoSettings;
-use crate::scene::authoring::visual_correction as vc_ops;
+use crate::scene::authoring::rendering::visual_correction as vc_ops;
 use crate::scene::Scene;
 
 /// Active flag, radius and intensity. AO lives on the volume, so without an active

@@ -29,8 +29,8 @@ pub(crate) fn light(
         color,
         intensity,
         range,
-        inner_cone: super::light::DEFAULT_CONES.0,
-        outer_cone: super::light::DEFAULT_CONES.1,
+        inner_cone: super::rendering::light::DEFAULT_CONES.0,
+        outer_cone: super::rendering::light::DEFAULT_CONES.1,
         cast_shadows: false,
         mode: Default::default(),
     }
@@ -154,9 +154,9 @@ pub fn default_nav_agent() -> NavMeshAgentComponent {
 pub fn default_camera() -> CameraComponent {
     CameraComponent {
         active: true,
-        fov: crate::components::camera::DEFAULT_FOV,
-        near: crate::components::camera::DEFAULT_NEAR,
-        far: crate::components::camera::DEFAULT_FAR,
+        fov: crate::components::rendering::camera::DEFAULT_FOV,
+        near: crate::components::rendering::camera::DEFAULT_NEAR,
+        far: crate::components::rendering::camera::DEFAULT_FAR,
         culling_mask: u32::MAX,
         render_order: 0,
         clear_flags: ClearFlags::Skybox,

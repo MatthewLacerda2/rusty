@@ -14,7 +14,7 @@ use super::super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
 use crate::audio::mixer::{Filter, GroupPatch, GroupState};
 use crate::audio::AudioMaestro;
-use crate::scene::authoring::audio as audio_ops;
+use crate::scene::authoring::audio::source as audio_ops;
 use crate::scene::Scene;
 
 /// A mixer error as a Lua error.

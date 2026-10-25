@@ -32,7 +32,7 @@ use super::{global_table, put, Reg};
 use crate::api::entity_arg::EntityArg;
 use crate::components::CollisionDetection;
 use crate::physics::PhysicsWorld;
-use crate::scene::authoring::rigidbody as rb_ops;
+use crate::scene::authoring::physics::rigidbody as rb_ops;
 use crate::scene::Scene;
 use crate::time::FIXED_DELTA_TIME;
 

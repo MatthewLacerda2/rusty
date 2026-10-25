@@ -4,7 +4,7 @@
 
 use glam::Vec3;
 use rusty::components::CanvasRenderMode;
-use rusty::scene::authoring::ui_widgets::UiWidget;
+use rusty::scene::authoring::ui::widgets::UiWidget;
 use rusty::scene::Scene;
 
 use super::{part, widget, Ui};

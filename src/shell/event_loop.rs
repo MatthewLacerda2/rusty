@@ -17,7 +17,7 @@ use winit::window::{Window, WindowId};
 
 use super::{boot, input, settings, Frontend, Shell};
 use crate::app::GameWorld;
-use crate::core::video::VideoSettings;
+use crate::core::settings::video::VideoSettings;
 use crate::render::Renderer;
 
 /// Everything a frontend decides before the window exists.

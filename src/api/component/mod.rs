@@ -15,7 +15,7 @@
 //!
 //! Component names are the ones `Scene.AddComponent` takes, plus `Transform` and
 //! `Mesh`; field names are as a saved scene spells them; enums travel by their
-//! serialized name (read in any case, through `core::variant_case::decode`). An unknown
+//! serialized name (read in any case, through `core::naming::variant_case::decode`). An unknown
 //! component or field is an error naming the valid ones. `#[serde(skip)]` runtime
 //! state is never in a table: there is no field to name it by.
 

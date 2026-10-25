@@ -3,7 +3,7 @@
 //! Get/Set over an entity's `BackdropFilterComponent`: the frosted-glass blur
 //! radius, tint, saturation and brightness. Whether one exists is
 //! `Scene.AddComponent(id, "BackdropFilter")` / `RemoveComponent`. Setters route
-//! through the shared `scene::authoring::backdrop` ops the inspector card uses;
+//! through the shared `scene::authoring::ui::backdrop` ops the inspector card uses;
 //! getters return the defaults without one, and setters are then no-ops.
 
 use std::cell::RefCell;
@@ -14,7 +14,7 @@ use mlua::Lua;
 use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
 use crate::components::BackdropFilterComponent;
-use crate::scene::authoring::backdrop as ops;
+use crate::scene::authoring::ui::backdrop as ops;
 use crate::scene::Scene;
 
 type Get = fn(&BackdropFilterComponent) -> f32;

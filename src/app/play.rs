@@ -98,7 +98,7 @@ impl GameWorld {
 pub(super) fn register(app: &mut App) {
     app.add_system(Stage::FixedUpdate, rebake_nav)
         .add_system(Stage::FixedUpdate, init_scripts)
-        .add_system(Stage::FixedUpdate, super::ui::dispatch_ui_events)
+        .add_system(Stage::FixedUpdate, super::systems::ui::dispatch_ui_events)
         .add_system(Stage::FixedUpdate, update_scripts)
         .add_system(Stage::FixedUpdate, tick_nav)
         .add_system(Stage::FixedUpdate, step_physics)
@@ -106,13 +106,16 @@ pub(super) fn register(app: &mut App) {
         .add_system(Stage::FixedUpdate, animate)
         .add_system(Stage::FixedUpdate, pose_ragdolls)
         .add_system(Stage::FixedUpdate, dispatch_animation_events)
-        .add_system(Stage::FixedUpdate, super::particles::tick_particles)
+        .add_system(
+            Stage::FixedUpdate,
+            super::systems::particles::tick_particles,
+        )
         .add_system(Stage::FixedUpdate, late_update_scripts)
         .add_system(Stage::FixedUpdate, solve_ik)
         .add_system(Stage::FixedUpdate, follow_bones)
-        .add_system(Stage::FixedUpdate, super::trails::tick_trails)
+        .add_system(Stage::FixedUpdate, super::systems::trails::tick_trails)
         .add_system(Stage::FixedUpdate, apply_destroys)
-        .add_system(Stage::FixedUpdate, super::decals::tick_decals)
+        .add_system(Stage::FixedUpdate, super::systems::decals::tick_decals)
         .add_system(Stage::FixedUpdate, super::scene_load::apply_scene_load)
         .add_system(Stage::FixedUpdate, advance_frame)
         .add_system(Stage::Render, build_skin_palettes);

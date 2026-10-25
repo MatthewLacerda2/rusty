@@ -58,7 +58,7 @@ impl Particle {
 
 /// A sub-emitter firing owed by this emitter: `target`'s burst at `position`,
 /// each spawned particle inheriting `velocity`. Queued during the tick (or by a
-/// scripted emit) and dispatched by `app::particles` once every emitter has run.
+/// scripted emit) and dispatched by `app::systems::particles` once every emitter has run.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct SubEmitEvent {
     pub target: u32,

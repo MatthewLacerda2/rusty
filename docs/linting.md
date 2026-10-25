@@ -17,13 +17,14 @@ agent can read exactly what failed.
 | Dead `pub` items | `make dead-pub` (`tools/lint -- --dead-pub`) | **signal**, never a gate: `src/lib.rs` exports every module, so rustc's `dead_code` never fires on a `pub` item. On a copy under `target/dead-pub/` the modules go `pub(crate)` and every bin and the integration suite fold into the lib; the report lists items nothing uses, items only tests use (a test seam may be fine), and unused imports apart (#940, #1003). It builds for the host only, so a finding in a file with a platform `cfg` (or in a module declared under one) is listed under *Platform-gated*: check it on that platform before narrowing (#1092). It runs weekly on `main` as `cargo-test.yml`'s `dead-pub` job, the report in its job summary; the job goes red only when no report came out, and `main-health` files that (#1205) |
 | Dependency direction | `tools/lint -- --direction` | the table's sim modules never reference `crate::render`, `crate::editor`, `wgpu` or `egui` — the arrow is render/editor → sim (#494) |
 | Dependency locks | cargo-deny (`deny.toml`) | **hard gate**: every git dependency is pinned by `rev` (`required-git-spec`); `nalgebra` only through the physics stack and no `cgmath` — glam is the one math crate (#975) |
+| Directory size | `tools/lint -- --rules` (`dir-size`) | **hard gate**: no directory under `src/` holds more than 12 source files directly in it (tests and its `mod.rs` aside); cluster by responsibility into subfolders, or a flat registry of one file per public unit says so with an inline `// lint: allow(dir-size) <why>` in its `mod.rs` (`src/api/`). The ≲10 aim prints as a signal (#1367) |
 | Docs name what exists | `make docrefs` (`.github/scripts/docrefs.py`) | **hard gate**: every `src/`, `tests/`, `tools/`, `docs/` or `.github/` path in a tracked `*.md`'s inline code is tracked, every `` `make <verb>` `` is a target, and CLAUDE.md's namespaces each have a `docs/api/` page; placeholders pass, anything else takes `<!-- docrefs: allow <why> -->`. Runs on Markdown-only PRs too (#973) |
 | Editor↔API parity per op | `tools/lint -- --rules` (`api-parity`) | **hard gate**: every `scene::authoring::<module>::set_*` op a non-test line of `src/editor/` names is also named from `src/api/` — a named setter's call or an `op!`/`with!`/`group!` row of `api::component`'s tables — so anything the inspector writes, Lua can; an editor-only op takes `// lint: allow(api-parity) <why>` at its `fn`, and an allow on an op Lua reaches or no inspector names is stale and fails (#1368) |
 | Editor↔shared-op parity | `tools/lint -- --parity` | every first-class component's inspector card routes its mutations through a shared `scene::authoring` op (never direct field writes through the #344 accessor guard) |
 | Entity ids from Lua | `tools/lint -- --rules` (`entity-arg`) | **hard gate**: in `src/api/`, a Lua callback never takes an entity (`id`, `…_id`, `parent`, `child`, `target`, `entity`, `body`, `canvas`) as a bare `u32` or `Option<u32>`: it takes `api::entity_arg::EntityArg`, so a `nil` id reads as a missing entity and fails a write with the verb's name (#1383) |
 | File length | `tools/lint` | <= 300 lines: every line of a `.rs` file, the lines of code of a `.py`, `.lua` or `.wgsl` one (docstrings, comments and blank lines free, #926, #1015); nothing grandfathered |
 | Finite authoring floats | `tools/lint -- --rules` (`sanitize`) | **hard gate**: every `pub fn set_*` under `src/scene/authoring/` that takes an `f32` or a glam vector passes it to a `scene::authoring::sanitize` helper (or a sibling setter of its file), so NaN and `±inf` from Lua or the editor take the field's fallback and never reach a field; a value checked another way takes `// lint: allow(sanitize) <why>` (#1361) |
-| Folder grouping | `tools/lint -- --rules` | **hard gate** (`prefix-group`): no three sibling `.rs` files share a first word (`nav_agent.rs`, `nav_obstacle.rs`, …); make it a subfolder and drop the prefix. Prints the ≲10-files-per-directory signal beside it, never failing on it (#934) |
+| Folder grouping | `tools/lint -- --rules` | **hard gate** (`prefix-group`): no three sibling `.rs` files share a first word (`nav_agent.rs`, `nav_obstacle.rs`, …); make it a subfolder and drop the prefix (#934) |
 | Full component literals in tests | `tools/lint -- --rules` (`full-literal`) | **hard gate**: test code builds a first-class component with `..rest` or a constructor, never a literal naming every field (#663, #976) |
 | Function ("endpoint") length | clippy `too_many_lines` + `tools/lint -- --determinism` | **hard gate**: `too-many-lines-threshold = 50` (`clippy.toml`), denied crate-wide in `Cargo.toml`'s `[lints]`; its one exception, `Renderer::assemble`, is locked (`ESCAPE`, #961) |
 | Lint exceptions carry a reason | clippy `allow_attributes` + `allow_attributes_without_reason` | **hard gate**: an exception is `#[expect(lint, reason = "…")]` (outer `#[allow]` is denied; a module-root `#![allow]` still needs its `reason`), and an expectation that no longer fires fails too (#961) |
@@ -260,6 +261,27 @@ new flag, gate, CI step or baseline.
   lints are per converter, not in `Cargo.toml`, because the rest of the crate has
   some eighty best-effort `let _ =` (a cleanup, a send to a closed channel). A
   future converter is covered the day it is added (`rules/converter_log.rs`).
+- **`dir-size`** (#1367) — CLAUDE.md's "aim for ≲10 source files per module
+  directory", gated at **12**: a directory under `src/` with more than twelve
+  source files directly in it fails, so ≲10 stays the aim and the gate leaves two
+  of room. A source file is a `.rs` the size gate does not count as a test
+  (`size::is_test_file`: under `tests/` or `fixtures/`, `tests.rs`, `*_test.rs`,
+  `*_tests.rs`, `test_*`), the directory's `mod.rs` / `main.rs` / `lib.rs` aside.
+  The fix is to cluster by responsibility into subfolders; a directory of
+  first-class components clusters by Unity's *Add Component* categories
+  (`audio/`, `nav/`, `physics/`, `rendering/`, `ui/layout/`), the same in
+  `components/`, `scene/authoring/` and the inspector. The one exception is a flat
+  registry, one file per public unit, which says so on a plain `//` comment line
+  anywhere in its owner file (`mod.rs`, or the `<dir>.rs` beside it):
+  `// lint: allow(dir-size) <why>`; a doc comment (`///`, `//!`) quoting that
+  syntax is not an allow. `src/api/` carries it (one file per Lua namespace). The
+  rule reads that allow itself, so one left on a directory back under the cap is a
+  finding too (`rules/dir_size.rs`). A directory with no owner file (`src/bin/`,
+  one binary per file) has nowhere to write the allow, so it takes no exception
+  and is reported as itself (`src/bin/:1`). **Where it misfires:** it counts files,
+  not responsibilities, so a directory of twelve unrelated files passes and a
+  thirteenth file that truly belongs beside the others fails; the fix is still a
+  subfolder unless the directory is a flat registry.
 - **`entity-arg`** (#1383) — a script passes `nil` for "no entity" (a failed
   `Scene.FindEntityByName`). Bindings that took `id: u32` threw `error converting
   Lua nil to u32` where their neighbours answered the missing-entity default, and
@@ -337,10 +359,10 @@ new flag, gate, CI step or baseline.
   first `_` or `-`) fail. Files count by stem, so `x.rs` and `x_tests.rs` are one,
   and a bare `nav.rs` counts with the `nav_*` files beside it; `mod.rs`, `main.rs`
   and `lib.rs` never count. The finding anchors on the first `mod` line that
-  declares the group, which is where its allow goes. The flat registries CLAUDE.md
-  exempts (`src/api/`, one file per Lua namespace; `src/components/`, one file per
-  first-class component) are listed in `rules/prefix.rs` with the reason, and the
-  exemption covers that directory only, not its subfolders.
+  declares the group, which is where its allow goes. The flat registry CLAUDE.md
+  exempts (`src/api/`, one file per Lua namespace) is listed in `rules/prefix.rs`
+  with the reason, and the exemption covers that directory only, not its
+  subfolders.
 - **`sanitize`** — every authoring setter refuses a non-finite float (#1361).
   A `pub fn set_*` under `src/scene/authoring/` (test code aside) that takes an
   `f32`, `Vec2`, `Vec3`, `Vec4` or `Quat` fails unless each such parameter is
@@ -437,9 +459,10 @@ new flag, gate, CI step or baseline.
   helper itself and Unix socket paths (which must stay short) carry an inline
   allow. `tools/` is not scanned: the lint crate's own tests are not the engine's.
 - **The ≲10-files-per-directory signal** prints after the findings: every scanned
-  directory holding more than ten `.rs` files (`mod.rs` aside), most crowded first.
-  CLAUDE.md says "aim for", so it never fails the gate; it tells you where to
-  cluster by responsibility when you next work in that directory.
+  directory holding more than ten source files as `dir-size` counts them, most
+  crowded first, leaving out what is past that rule's cap under `src/` (its
+  finding or allow). It never fails the gate; it tells you where to cluster by
+  responsibility when you next work in that directory, before `dir-size` makes you.
 - **`unwrap-deny`** — the unwrap ban covers exactly the layer table's sim rows
   (#962). Each sim row's `src/<module>/mod.rs` must carry
   `#![deny(clippy::unwrap_used)]`, and no file under a sim module may `allow`,
@@ -571,7 +594,7 @@ a plain dependency of the one crate, so it is linked either way; what the guard 
 is the sim's tests independent of the display layer.)
 Plain data the renderer and the sim share lives sim-side: the mesh `Vertex` and the
 primitive builders in `components::mesh`, `Camera` and `Decal` in `scene`,
-`QualityPreset` in `core::quality`; the renderer keeps only the GPU half (e.g.
+`QualityPreset` in `core::settings::quality`; the renderer keeps only the GPU half (e.g.
 `render::gpu::mesh::vertex_layout`). There is no baseline — the guard landed with
 zero violations (#494), and it is the groundwork the crate split (#495) needs.
 `api` joined the scan in #723: it is the surface scripts drive from inside the sim.

@@ -1,7 +1,7 @@
 //! src/api/camera/component.rs — the `Camera` functions that take an entity id and
 //! tune its `CameraComponent` (#430): projection, culling mask (#827) and
 //! render-texture target, plus the lens and stacking fields (`lens`, #1341). Every
-//! setter routes through `scene::authoring::camera`, the ops the inspector's Camera
+//! setter routes through `scene::authoring::rendering::camera`, the ops the inspector's Camera
 //! card uses. Getters return `nil` without a camera; setters are then no-ops.
 
 use std::cell::RefCell;
@@ -9,7 +9,7 @@ use std::cell::RefCell;
 use crate::api::entity_arg::EntityArg;
 use crate::api::{put, Reg};
 use crate::components::{CameraComponent, Projection};
-use crate::scene::authoring::camera as camera_ops;
+use crate::scene::authoring::rendering::camera as camera_ops;
 use crate::scene::Scene;
 
 /// Register the per-entity camera functions onto the `Camera` table.

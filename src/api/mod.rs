@@ -5,9 +5,8 @@
 //! `Scene`, `Component`, `Random`, `Timer`, `Tween`, `Camera`, `Light`, `Animator`, `Nav`, `Material`,
 //! `Assets`, `Texture`, `Shader`, `Sound`, `Particles`, `Layers`, `Graphics`, `Video`,
 //! `Storage`, `Canvas`, `RectTransform`, `UI`, `Image`, `CanvasGroup`, `RectMask`, `Mask`,
-//! `BackdropFilter`, `Text`, `Shape`, `Selectable`,
-//! `LayoutGroup`, `LayoutElement`, `Joint`, `LODGroup`, `Trail`, `Line`,
-//! `Application`) is registered from this tree onto the live Lua runtime. Layers above
+//! `BackdropFilter`, `Text`, `Shape`, `Selectable`, `LayoutGroup`, `LayoutElement`,
+//! `Joint`, `LODGroup`, `Trail`, `Line`, `Application`) is registered from this tree onto the live Lua runtime. Layers above
 //! the sim add their own namespaces through [`extend`]: `dev` installs `Debug` and the
 //! GPU bake verbs that way (#737), so the sim surface never imports the platform layer.
 //! `scripting` owns the runtime and lifecycle; `api` owns the surface. One surface, three
@@ -17,6 +16,7 @@
 // or a documented `.expect(...)`); test code is exempt via clippy.toml. See docs/linting.md.
 #![deny(clippy::unwrap_used)]
 
+// lint: allow(dir-size) a flat registry: one file per Lua namespace, so the list is the surface's index
 // sorted: namespace modules and their helpers; no module reads another's declaration order
 pub mod animator;
 pub mod application;
@@ -92,10 +92,10 @@ use crate::audio::AudioMaestro;
 use crate::core::application::Application;
 use crate::core::frame_stats::FrameStats;
 use crate::core::input::InputState;
-use crate::core::quality::QualityPreset;
 use crate::core::random::Random;
+use crate::core::settings::quality::QualityPreset;
+use crate::core::settings::video::VideoSettings;
 use crate::core::storage::Storage;
-use crate::core::video::VideoSettings;
 use crate::navigation::NavigationGraph;
 use crate::physics::PhysicsWorld;
 use crate::scene::Camera;

@@ -1,11 +1,11 @@
-//! `Physics.*` bindings vs `authoring::rigidbody`.
+//! `Physics.*` bindings vs `authoring::physics::rigidbody`.
 
 use std::cell::RefCell;
 
 use glam::Vec3;
 use mlua::Lua;
 use rusty::components::CollisionDetection;
-use rusty::scene::authoring::rigidbody as rb_ops;
+use rusty::scene::authoring::physics::rigidbody as rb_ops;
 use rusty::scene::Scene;
 
 /// Attach a default rigidbody to a fresh entity; returns its id.

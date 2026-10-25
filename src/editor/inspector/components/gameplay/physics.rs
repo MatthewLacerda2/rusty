@@ -15,7 +15,7 @@ use egui_phosphor::regular as icon;
 use glam::Vec3;
 
 use crate::editor::inspector::components::card::component_card;
-use crate::scene::authoring::rigidbody as rigidbody_ops;
+use crate::scene::authoring::physics::rigidbody as rigidbody_ops;
 use crate::scene::CollisionDetection;
 
 /// A checkbox row that routes its write through a shared rigidbody op (#287).

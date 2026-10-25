@@ -3,7 +3,7 @@
 //! Get/Set over an entity's `SelectableComponent`: interactable, the transition and
 //! its target graphic, per-state colours and sprites, the fade, and navigation
 //! (mode + explicit targets). Every setter routes through the shared
-//! `scene::authoring::selectable` ops the inspector card uses. `IsInteractable` and
+//! `scene::authoring::ui::selectable` ops the inspector card uses. `IsInteractable` and
 //! `GetState` read the effective, runtime answers (CanvasGroups and the event
 //! system included). Getters return a neutral default without a Selectable; setters
 //! are then no-ops. States, directions and enum values travel as their names
@@ -18,7 +18,7 @@ use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
 use crate::components::{NavigationMode, SelectableTransition};
 use crate::components::{SelectableComponent, SelectionState};
-use crate::scene::authoring::selectable as ops;
+use crate::scene::authoring::ui::selectable as ops;
 use crate::scene::Scene;
 use crate::ui::events::is_interactable;
 use crate::ui::EventSystem;

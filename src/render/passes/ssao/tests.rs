@@ -4,7 +4,7 @@ use glam::camera::rh::proj::directx;
 use glam::{Mat4, Vec3};
 
 use super::{SsaoFrame, SsaoPlan};
-use crate::core::quality::QualityPreset;
+use crate::core::settings::quality::QualityPreset;
 use crate::scene::authoring::default_visual_correction;
 use crate::scene::Scene;
 

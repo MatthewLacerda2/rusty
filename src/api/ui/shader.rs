@@ -1,7 +1,7 @@
 //! src/api/ui/shader.rs — `UI.SetShader` / `GetShader` / `SetShaderParam` /
 //! `GetShaderParam` (#427): a graphic's custom ui shader, Unity's `Graphic.material`.
 //!
-//! Thin adapters over `authoring::ui_shader`. An entity's graphics are its `Image`,
+//! Thin adapters over `authoring::ui::shader`. An entity's graphics are its `Image`,
 //! `Shape` and `Text`: `SetShader` names the shader on every one it has, and the param
 //! verbs act on them the same way, checked against the shader's baked layout (a
 //! param it does not expose at runtime, or a wrong number of values, raises an error
@@ -15,7 +15,7 @@ use mlua::{IntoLua, Value};
 use super::super::material::shader::params::floats;
 use super::super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
-use crate::scene::authoring::ui_shader as ops;
+use crate::scene::authoring::ui::shader as ops;
 use crate::scene::Scene;
 
 /// Register the four verbs onto the `UI` `table`.

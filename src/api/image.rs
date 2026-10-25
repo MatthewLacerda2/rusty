@@ -3,7 +3,7 @@
 //! Get/Set over an entity's `ImageComponent`: tint colour, texture, image type,
 //! 9-slice border, the fill (method, origin, amount, direction), preserve-aspect,
 //! raycast target, and the look (#425): blend mode and gradient tint. Every setter
-//! routes through the shared `scene::authoring::image` ops the inspector card
+//! routes through the shared `scene::authoring::ui::image` ops the inspector card
 //! uses, so validation lives once.
 //! Getters return a neutral default when the entity has no Image; setters are then
 //! no-ops. Enum values travel as their names (case-insensitive; unknown ignored).
@@ -19,7 +19,7 @@ use crate::api::entity_arg::EntityArg;
 use crate::asset::MapRef;
 use crate::components::ImageComponent;
 use crate::components::{FillMethod, FillOrigin, ImageType};
-use crate::scene::authoring::image as image_ops;
+use crate::scene::authoring::ui::image as image_ops;
 use crate::scene::Scene;
 
 type Vec4Get = fn(&ImageComponent) -> Vec4;

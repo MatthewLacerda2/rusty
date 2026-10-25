@@ -1,6 +1,6 @@
 //! Button and Toggle (+ Toggle Group): owner callbacks wired with `Scene.GetScript`.
 
-use rusty::scene::authoring::ui_widgets::UiWidget;
+use rusty::scene::authoring::ui::widgets::UiWidget;
 
 use super::{part, widget, Ui};
 

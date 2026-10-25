@@ -1,12 +1,14 @@
-//! `Graphics.*` bindings vs `authoring::{visual_correction, camera}`.
+//! `Graphics.*` bindings vs `authoring::{rendering::visual_correction, rendering::camera}`.
 
 use std::cell::RefCell;
 use std::rc::Rc;
 
 use mlua::Lua;
 use rusty::components::{CameraComponent, Tonemap, VisualCorrectionComponent};
-use rusty::core::quality::QualityPreset;
-use rusty::scene::authoring::{camera as camera_ops, visual_correction as vc_ops};
+use rusty::core::settings::quality::QualityPreset;
+use rusty::scene::authoring::{
+    rendering::camera as camera_ops, rendering::visual_correction as vc_ops,
+};
 use rusty::scene::Scene;
 
 /// A scene with one active post-FX volume + active camera; returns `(scene_rc, id)`.

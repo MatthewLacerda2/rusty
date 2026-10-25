@@ -16,6 +16,7 @@ mod api_parity;
 mod asset_write;
 mod atomic_write;
 mod converter_log;
+mod dir_size;
 mod drag_range;
 mod entity_arg;
 mod full_literal;
@@ -51,7 +52,8 @@ enum Allow {
     /// `ignored`: its fix is the `.gitignore` pattern, never an allow.
     Never,
     /// The rule reads its own allows, so it can report a stale one
-    /// (`api-parity`, whose allow sits on the op, not on the finding's cause).
+    /// (`api-parity`, whose allow sits on the op, not on the finding's cause;
+    /// `dir-size`, whose allow sits anywhere in the directory's owner file).
     Own,
 }
 
@@ -66,6 +68,7 @@ const RULES: &[(Rule, Allow)] = &[
     (asset_write::run, Allow::Inline),
     (atomic_write::run, Allow::Inline),
     (converter_log::run, Allow::Inline),
+    (dir_size::run, Allow::Own),
     (drag_range::run, Allow::Inline),
     (entity_arg::run, Allow::Inline),
     (full_literal::run, Allow::Inline),
@@ -111,12 +114,15 @@ pub fn run() {
     }
 }
 
-/// Directories past the ≲10-files aim, most crowded first. A signal, never a failure.
+/// Directories past the ≲10-files aim, most crowded first, counted as `dir-size`
+/// counts (#1367). A signal, never a failure: what is past the gate's cap under
+/// `src/` is that rule's finding or allow, so it is left out here.
 fn crowded<'a>(dirs: &BTreeMap<&'a str, Vec<&str>>) -> Vec<(&'a str, usize)> {
     let mut over: Vec<(&str, usize)> = dirs
         .iter()
-        .map(|(d, names)| (*d, names.iter().filter(|n| **n != "mod.rs").count()))
+        .map(|(d, names)| (*d, dir_size::sources(d, names).len()))
         .filter(|(_, n)| *n > prefix::AIM_FILES_PER_DIR)
+        .filter(|(d, n)| !(d.starts_with("src/") && *n > dir_size::MAX_FILES_PER_DIR))
         .collect();
     over.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(b.0)));
     over

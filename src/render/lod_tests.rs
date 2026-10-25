@@ -92,7 +92,7 @@ fn the_static_bake_and_inactive_groups() {
 #[test]
 fn an_orthographic_view_uses_the_held_half_height() {
     use crate::components::{CameraComponent, Projection};
-    use crate::scene::authoring::camera::MIN_ORTHO_SIZE;
+    use crate::scene::authoring::rendering::camera::MIN_ORTHO_SIZE;
     let (scene, group) = scene_with_group(4.0);
     let ortho = |size| CameraComponent {
         projection: Projection::Orthographic { size },

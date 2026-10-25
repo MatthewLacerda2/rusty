@@ -5,7 +5,7 @@
 //! it (`anchored_position`), its edges and corners to resize it (`size_delta`, the
 //! opposite side held), its pivot disc to move the pivot without moving the rect.
 //! Anchors show as Unity's four triangles. Every write goes through the
-//! `scene::authoring::rect_transform` setters the inspector card and the Lua
+//! `scene::authoring::ui::layout::rect_transform` setters the inspector card and the Lua
 //! `RectTransform.*` verbs use, so nothing here is an editor-only capability.
 //!
 //! **What it edits.** Elements on screen canvases (`ScreenSpaceOverlay`, and
@@ -31,7 +31,7 @@ use glam::{Vec2, Vec3};
 
 use crate::components::RectTransformComponent;
 use crate::ecs::World;
-use crate::scene::authoring::rect_transform as rect_ops;
+use crate::scene::authoring::ui::layout::rect_transform as rect_ops;
 use crate::ui::events::raycast_pointer;
 use crate::ui::layout::driven_by_group;
 use crate::ui::{CanvasSpace, TextureSizes, UiLayout, UiPointer, UiRect, UiView};

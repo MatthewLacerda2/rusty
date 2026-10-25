@@ -8,7 +8,7 @@
 //! yields the same probe layout (the determinism the headless bake relies on).
 //!
 //! The bake itself (rendering each probe → SH / prefiltered cubemap) is the render/dev
-//! half and lives in `dev::lighting_bake`; this module only decides POSITIONS + bounds.
+//! half and lives in `dev::bake::lighting`; this module only decides POSITIONS + bounds.
 //!
 //! Two surfaces are placed:
 //!   * **Light probes** — a regular grid through the navigable volume. Bounds come from

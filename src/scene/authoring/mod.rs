@@ -14,43 +14,20 @@
 
 pub mod animator;
 pub mod audio;
-pub mod backdrop;
-pub mod camera;
-pub mod canvas;
-pub mod canvas_group;
-pub mod character_controller;
-pub mod collider;
 pub mod components;
 pub mod defaults;
 pub mod dependency;
 pub mod fields;
 pub mod fog;
-pub mod image;
-pub mod joint;
-pub mod layout_element;
-pub mod layout_group;
-pub mod light;
-pub mod line;
-pub mod lod_group;
 pub mod material;
 pub mod nav;
-pub mod offmesh_link;
 pub mod particles;
-pub mod rect_mask;
-pub mod rect_transform;
-pub mod reverb_zone;
+pub mod physics;
+pub mod rendering;
 pub mod ribbon;
-pub mod rigidbody;
 mod sanitize;
 pub mod script;
-pub mod selectable;
-pub mod shape;
-pub mod text;
-pub mod trail;
-pub mod ui_look;
-pub mod ui_shader;
-pub mod ui_widgets;
-pub mod visual_correction;
+pub mod ui;
 
 use glam::Vec3;
 

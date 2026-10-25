@@ -54,6 +54,12 @@ fn one_binary_test_layout_keeps_the_tight_cap() {
         limit_for(Path::new("tests/gpu/fxaa_screenshot.rs")),
         MAX_TEST_FILE_LINES
     );
+    // A `tests.rs` there is no source's sibling: it keeps the tight cap (#1367).
+    assert_eq!(
+        limit_for(Path::new("tests/x/tests.rs")),
+        MAX_TEST_FILE_LINES
+    );
+    assert_eq!(limit_for(Path::new("src/x/tests.rs")), MAX_FILE_LINES);
 }
 
 #[test]

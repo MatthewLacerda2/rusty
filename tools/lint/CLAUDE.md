@@ -33,11 +33,12 @@ file is what a coder changing the tool must keep.
   allow may excuse it, `Allow::Never` when nothing may: `ignored` is the one, because
   its fix is the `.gitignore` pattern. `Allow::Own` is for a rule that reads its own
   allows, so the shared filter is skipped: `api-parity`, whose allow sits on the op
-  rather than on the finding's cause, and must be reported when it goes stale.
+  rather than on the finding's cause, and must be reported when it goes stale, and
+  `dir-size`, whose allow sits anywhere in the directory's owner file.
 - **Signals print and never fail.** What CLAUDE.md only says to *aim* for (≲10 files
   per directory) prints under `signal (not a failure)` after the findings and leaves
   the exit code alone. It becomes a finding only with the decision that makes it a
-  rule.
+  rule: `dir-size` (#1367) fails past 12, and the signal still prints the 11s and 12s.
 - **One report shape**: `path:line: [rule] message` on the terminal and in
   `.lint/report.txt`, exit 1 on any finding, so an agent reads exactly what failed.
 

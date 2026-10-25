@@ -19,7 +19,7 @@ use std::cell::RefCell;
 use mlua::Lua;
 
 use super::{put, Reg};
-use crate::core::video::VideoSettings;
+use crate::core::settings::video::VideoSettings;
 
 /// Register the `Video` namespace onto `lua`, backed by the shared settings cell.
 pub fn register<'scope>(

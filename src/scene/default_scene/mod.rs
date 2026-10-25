@@ -35,8 +35,8 @@ mod yard;
 use glam::{Quat, Vec3};
 
 use crate::scene::authoring::{
-    self, add_component, animator, character_controller as cc, collider, create_entity,
-    nav::agent as nav_agent, ComponentKind, Primitive,
+    self, add_component, animator, create_entity, nav::agent as nav_agent,
+    physics::character_controller as cc, physics::collider, ComponentKind, Primitive,
 };
 use crate::scene::{ColliderShape, MaterialComponent, Scene};
 
@@ -195,8 +195,8 @@ fn add_sun(scene: &mut Scene) {
     let Some(mut l) = scene.world.light_mut(id) else {
         return;
     };
-    authoring::light::set_color(&mut l, Vec3::new(1.0, 0.95, 0.85));
-    authoring::light::set_intensity(&mut l, 1.2);
+    authoring::rendering::light::set_color(&mut l, Vec3::new(1.0, 0.95, 0.85));
+    authoring::rendering::light::set_intensity(&mut l, 1.2);
 }
 
 #[cfg(test)]

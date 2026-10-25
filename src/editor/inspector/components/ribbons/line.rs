@@ -8,7 +8,7 @@ use super::draw_style;
 use crate::components::LineComponent;
 use crate::editor::inspector::components::card::component_card;
 use crate::editor::inspector::components::particles::widgets::vec3;
-use crate::scene::authoring::line as line_ops;
+use crate::scene::authoring::ribbon::line as line_ops;
 
 /// Route one edit through the shared ops and mark the scene dirty.
 fn write(

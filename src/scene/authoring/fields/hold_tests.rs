@@ -94,7 +94,7 @@ fn out_of_range_values_are_held_on_load() {
 /// ops would keep, and a diagonal joint axis is not renormalized an ulp away.
 #[test]
 fn an_in_range_scene_loads_unchanged() {
-    use crate::scene::authoring::{joint, reverb_zone};
+    use crate::scene::authoring::{audio::reverb_zone, physics::joint};
     let (mut scene, id) = dressed();
     let hall = crate::components::ReverbPreset::Hall;
     reverb_zone::set_preset(&mut scene.world.reverb_zone_mut(id).unwrap(), hall);
