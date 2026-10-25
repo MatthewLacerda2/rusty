@@ -9,7 +9,7 @@ use std::rc::Rc;
 
 /// Platform-safe temp path (the Windows runner has no `/tmp`).
 fn temp_path(name: &str) -> String {
-    format!("{}/{name}", crate::test_temp::dir().display())
+    crate::core::paths::to_slash(&crate::test_temp::dir().join(name))
 }
 
 /// End-to-end #322: a prefab spawned from inside a script's `Update` gets its

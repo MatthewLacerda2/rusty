@@ -16,6 +16,7 @@ use std::path::Path;
 
 use super::MaterialLibrary;
 use crate::asset::MapRef;
+use crate::core::paths::to_slash;
 use crate::procgen::{bake_set, Slot};
 use crate::scene::MaterialAsset;
 
@@ -36,10 +37,9 @@ pub fn bake_maps(asset: &mut MaterialAsset, name: &str, dir: &Path) -> Result<()
         ));
     }
     std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
-    // Joined with `/`, not `Path::join`: the paths land in the scene file, which must
-    // read the same on every platform (Windows accepts `/` too).
-    let dir_str = dir.to_string_lossy();
-    let prefix = format!("{}/{name}", dir_str.trim_end_matches(['/', '\\']));
+    // `/`-spelled, `dir` included, not `Path::join`: the paths land in the scene file,
+    // which must read the same on every platform (Windows accepts `/` too).
+    let prefix = format!("{}/{name}", to_slash(dir).trim_end_matches('/'));
     let baked = bake_set(recipe, &prefix).map_err(|e| format!("material {name:?} maps: {e}"))?;
     fill_empty_maps(asset, &baked);
     Ok(())

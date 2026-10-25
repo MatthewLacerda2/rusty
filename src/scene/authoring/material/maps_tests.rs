@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 
 use super::*;
 use crate::asset::MapRef;
+use crate::core::paths::to_slash;
 use crate::procgen::recipe::{Node, OpKind};
 use crate::procgen::TextureRecipe;
 
@@ -37,7 +38,7 @@ fn dir(test: &str) -> PathBuf {
 }
 
 fn png(dir: &Path, file: &str) -> String {
-    format!("{}/{file}", dir.display())
+    format!("{}/{file}", to_slash(dir))
 }
 
 fn width(map: &MapRef) -> u32 {

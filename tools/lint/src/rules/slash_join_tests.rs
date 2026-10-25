@@ -105,3 +105,25 @@ fn an_allow_with_a_reason_excuses_a_slashed_path() {
     let found = check("tests/a.rs", &src);
     assert!(allowed(&src, found[0].line, RULE));
 }
+
+#[test]
+fn a_native_path_formatted_before_a_slash_is_flagged() {
+    for src in [
+        "let p = format!(\"{}/{name}\", dir.to_string_lossy());\n",
+        "let p = format!(\"{}/x.png\", dir.display());\n",
+        "let p = format!(\n    \"{}/{rel}\",\n    root().to_string_lossy()\n);\n",
+    ] {
+        let found = check("src/a.rs", src);
+        assert_eq!((found.len(), found[0].line), (1, 1), "{src}");
+        assert!(found[0].message.contains("crate::core::paths::to_slash"));
+    }
+    for src in [
+        "let p = format!(\"{}/{name}\", to_slash(&dir));\n",
+        "let m = format!(\"{}: {e}\", dir.display());\n",
+        "let m = format!(\"{name}/x\");\n",
+        "let m = format!(\"{}: no {DIR}/\", dir.display());\n",
+        "let m = format!(\"{}/{}\", a, b); log(p.display());\n",
+    ] {
+        assert!(check("src/a.rs", src).is_empty(), "{src}");
+    }
+}

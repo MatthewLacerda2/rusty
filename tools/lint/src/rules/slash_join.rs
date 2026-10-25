@@ -19,6 +19,13 @@
 //! constant starting with `/` is an absolute Unix path (a socket, a test's root),
 //! not a relative one to respell.
 //!
+//! The same mix runs the other way: a native path stringified
+//! (`.to_string_lossy()`, `.display()`) into a `format!` that puts a `/` after a
+//! positional `{}` is `dir\a/b` on Windows, and lands in a stored path that way (#1428:
+//! a baked material map stored as `assets\textures/x.png`). It is spelled with
+//! `core::paths::to_slash(path)` instead; such a `format!` anywhere in `src/` or
+//! `tests/` is a finding.
+//!
 //! Where it misfires, since it reads text, not types: a `.push` of a `/` literal,
 //! or of a `format!` whose template has a `/` and no space, onto a `Vec<&str>` or
 //! `Vec<String>`; a slice join whose separator holds a `/` beside other text; and
@@ -45,12 +52,14 @@ const CALLS: [(&str, Call); 4] = [
 ];
 
 /// How a call's argument is read. `Push` may be a `Vec<String>`'s, so a pushed
-/// `format!` counts only when its template reads as a path (no spaces).
+/// `format!` counts only when its template reads as a path (no spaces). `Format`
+/// is a `format!` spelling a native path before a `/`.
 #[derive(Clone, Copy, PartialEq)]
 enum Call {
     Join,
     Push,
     Make,
+    Format,
 }
 
 /// Every line of `path` where a call joins a `/` path; `slashed` names the
@@ -64,7 +73,8 @@ pub fn check_file(path: &str, source: &str, slashed: &BTreeSet<String>) -> Vec<F
         true => "rusty::core::paths::native",
         false => "crate::core::paths::native",
     };
-    let mut lines: Vec<(usize, bool)> = CALLS
+    let line_of = |at: usize| code[..at].matches('\n').count() + 1;
+    let mut lines: Vec<(usize, Call)> = CALLS
         .iter()
         .flat_map(|&(name, call)| {
             code.match_indices(name)
@@ -74,28 +84,60 @@ pub fn check_file(path: &str, source: &str, slashed: &BTreeSet<String>) -> Vec<F
             let arg = code[at + name.len()..].trim_start();
             joins_a_slash(arg, call, slashed)
         })
-        .map(|(at, _, call)| (code[..at].matches('\n').count() + 1, call == Call::Make))
+        .map(|(at, _, call)| (line_of(at), call))
         .collect();
-    lines.sort_unstable();
+    lines.extend(
+        code.match_indices("format!(")
+            .filter(|&(at, name)| slashes_a_native(&code[at + name.len()..]))
+            .map(|(at, _)| (line_of(at), Call::Format)),
+    );
+    lines.sort_unstable_by_key(|(line, _)| *line);
     lines.dedup_by_key(|(line, _)| *line);
+    let slash = helper.replace("native", "to_slash");
     lines
         .into_iter()
-        .map(|(line, make)| Finding {
+        .map(|(line, call)| Finding {
             path: path.to_string(),
             line,
             rule: RULE,
-            message: match make {
-                true => format!(
+            message: match call {
+                Call::Make => format!(
                     "a path made from a `/` path is mixed-separator on Windows once joined; \
                      make it with `{helper}(\"a/b\")`"
                 ),
-                false => format!(
+                Call::Format => format!(
+                    "a native path formatted before a `/` is mixed-separator on Windows; \
+                     spell it with `{slash}(path)`"
+                ),
+                Call::Join | Call::Push => format!(
                     "a joined `/` path builds a mixed-separator path on Windows; \
                      join one part per call, or join `{helper}(\"a/b\")`"
                 ),
             },
         })
         .collect()
+}
+
+/// Does the `format!` whose arguments start `args` put a `/` after a positional
+/// `{}` and fill one from a native path's string (`.to_string_lossy()`, `.display()`)?
+fn slashes_a_native(args: &str) -> bool {
+    let Some((template, rest)) = literal(args.trim_start()) else {
+        return false;
+    };
+    let mut depth = 1;
+    let end = rest
+        .char_indices()
+        .find(|&(_, c)| {
+            depth += match c {
+                '(' => 1,
+                ')' => -1,
+                _ => 0,
+            };
+            depth == 0
+        })
+        .map_or(rest.len(), |(at, _)| at);
+    let args = &rest[..end];
+    template.contains("{}/") && (args.contains(".to_string_lossy()") || args.contains(".display()"))
 }
 
 /// Does the call argument starting `arg` name a `/`-separated path? A literal or

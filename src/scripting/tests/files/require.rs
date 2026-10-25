@@ -60,7 +60,7 @@ fn an_outside_require_loads_and_warns_once_per_file() {
     let lib = dir("outside_lib");
     write(&lib.join("shared.lua"), "return 7");
     let (m, console) = manager(&root);
-    let path = format!("{}/?.lua", lib.display());
+    let path = format!("{}/?.lua", crate::core::paths::to_slash(&lib));
     m.exec(&format!("package.path = [[{path}]]"))
         .expect("set path");
     let code = "package.loaded.shared = nil; out = tostring(require('shared'))";
@@ -104,6 +104,7 @@ fn a_package_path_module_is_named_with_slashes_only() {
     let lib = backslash_dir("slash_path_lib");
     write(&lib.join("shared.lua"), SOURCE);
     let (m, _) = manager(&root);
+    // lint: allow(slash-join) the mixed spelling is the input under test
     let path = format!("{}/?.lua", lib.display());
     m.exec(&format!("package.path = [[{path}]]"))
         .expect("set path");
@@ -119,6 +120,7 @@ fn the_outside_warning_prints_a_slash_path_without_a_verbatim_prefix() {
     let lib = backslash_dir("slash_warn_lib");
     write(&lib.join("shared.lua"), "return 1");
     let (m, console) = manager(&root);
+    // lint: allow(slash-join) the mixed spelling is the input under test
     m.exec(&format!("package.path = [[{}/?.lua]]", lib.display()))
         .expect("set path");
     m.exec("require('shared')").expect("require");
@@ -138,7 +140,7 @@ fn a_module_name_that_is_not_a_relative_path_is_refused_and_reads_nothing() {
     let outside = dir("empty_segment_outside");
     write(&outside.join("x.lua"), "ran = true; return 1");
     let (m, console) = manager(&root);
-    let abs = format!("{}/x", outside.display());
+    let abs = format!("{}/x", crate::core::paths::to_slash(&outside));
     for name in [".util", "a..b", "a.", ".", "", "/util", abs.as_str()] {
         let err = m.exec(&format!("require([[{name}]])")).expect_err(name);
         assert!(err.contains(&format!("bad module name '{name}'")), "{err}");

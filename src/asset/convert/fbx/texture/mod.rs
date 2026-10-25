@@ -126,6 +126,7 @@ impl Textures {
             )));
         };
         Ok(Some(glb::Texture {
+            // lint: allow(slash-join) `dir` is one folder name, with no separator to respell
             uri: uri::encode_path(&format!("{}/{name}", dir.to_string_lossy())),
             name: self.identities.get(&texture.element.element_id).cloned(),
         }))
