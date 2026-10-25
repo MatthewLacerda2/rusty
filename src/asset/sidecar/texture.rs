@@ -24,7 +24,7 @@ pub enum WrapMode {
 }
 
 /// How texels are blended when sampled (Unity's `FilterMode`).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum FilterMode {
     /// The nearest texel: crisp, pixelated.
     Point,

@@ -107,8 +107,9 @@ Unity's Texture Import Settings (#1323), and the image inspector's **Texture Imp
 Settings** card: how a texture is sampled, stored per image in its `<file>.meta`
 sidecar. Each material map (albedo, metallic, roughness, normal, emissive, a
 shader's `mask`) samples through its own texture's settings, and so do particle and
-ribbon textures. UI images do not yet: they keep the UI's own clamped, linear
-sampler. Nor do decals: a decal's maps are copied into the one decal atlas, which
+ribbon textures. A UI Image takes its texture's filter and mips but always clamps,
+as Unity imports a UI sprite, so its edge never bleeds the opposite side into its
+border (a `Point` image draws crisp pixel art). Decals do not: a decal's maps are copied into the one decal atlas, which
 always builds a full mip chain and samples every decal through one trilinear,
 clamped sampler.
 

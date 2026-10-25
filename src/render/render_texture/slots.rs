@@ -4,6 +4,7 @@
 use std::collections::HashMap;
 use std::rc::Rc;
 
+use crate::asset::sidecar::FilterMode;
 use crate::render::setup::headless::OFFSCREEN_FORMAT;
 use crate::render::{GpuTexture, RenderView, Renderer};
 
@@ -76,7 +77,7 @@ impl Renderer {
             // A rendered picture: a data slot reads its decoded (linear) values,
             // the same the camera shaded, so both views decode (#647).
             (texture, OFFSCREEN_FORMAT),
-            sampler,
+            (sampler, FilterMode::Bilinear),
             Some("Render Texture Bind Group"),
         );
         self.render_texture_ids.1 += 1;

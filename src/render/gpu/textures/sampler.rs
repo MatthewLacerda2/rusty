@@ -11,6 +11,26 @@ pub(crate) fn sampler(device: &wgpu::Device, settings: &TextureSettings) -> wgpu
     device.create_sampler(&descriptor(settings))
 }
 
+/// A UI image's sampler (#1397): its texture's filter, and its mips when it has
+/// them, but always clamped. Unity imports a UI sprite with Clamp, and a repeating
+/// edge would bleed the opposite side into the image's border.
+pub(crate) fn ui_sampler(device: &wgpu::Device, filter: FilterMode) -> wgpu::Sampler {
+    device.create_sampler(&ui_descriptor(filter))
+}
+
+/// What [`ui_sampler`] builds.
+fn ui_descriptor(filter: FilterMode) -> wgpu::SamplerDescriptor<'static> {
+    let settings = TextureSettings {
+        wrap_mode: WrapMode::Clamp,
+        filter_mode: filter,
+        ..Default::default()
+    };
+    wgpu::SamplerDescriptor {
+        label: Some("UI Image Sampler"),
+        ..descriptor(&settings)
+    }
+}
+
 /// What [`sampler`] builds, apart from the device so a test can read it.
 pub(super) fn descriptor(settings: &TextureSettings) -> wgpu::SamplerDescriptor<'static> {
     use wgpu::{FilterMode as F, MipmapFilterMode as M};
@@ -65,5 +85,20 @@ mod tests {
         assert_eq!(bilinear.address_mode_u, wgpu::AddressMode::MirrorRepeat);
         assert_eq!(bilinear.min_filter, wgpu::FilterMode::Linear);
         assert_eq!(bilinear.mipmap_filter, wgpu::MipmapFilterMode::Nearest);
+    }
+
+    #[test]
+    fn a_ui_image_takes_the_filter_but_always_clamps() {
+        let point = ui_descriptor(FilterMode::Point);
+        assert_eq!(point.address_mode_u, wgpu::AddressMode::ClampToEdge);
+        assert_eq!(point.address_mode_v, wgpu::AddressMode::ClampToEdge);
+        assert_eq!(point.mag_filter, wgpu::FilterMode::Nearest);
+        assert_eq!(point.min_filter, wgpu::FilterMode::Nearest);
+
+        let trilinear = ui_descriptor(FilterMode::Trilinear);
+        assert_eq!(trilinear.address_mode_u, wgpu::AddressMode::ClampToEdge);
+        assert_eq!(trilinear.mag_filter, wgpu::FilterMode::Linear);
+        assert_eq!(trilinear.mipmap_filter, wgpu::MipmapFilterMode::Linear);
+        assert_eq!(trilinear.lod_max_clamp, 32.0, "a UI image reads its mips");
     }
 }
