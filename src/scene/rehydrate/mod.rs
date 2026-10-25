@@ -148,13 +148,14 @@ fn install(mesh: &mut crate::scene::MeshComponent, rebuilt: RehydratedMesh) {
     mesh.is_dirty.set(true);
 }
 
-/// Re-import the geometry of every unskinned mesh in `scene` instanced from the model
-/// at `path`, so a changed import setting (Generate Lightmap UVs, #831) shows at once
-/// rather than on the next load. Skinned meshes keep theirs: the setting never
-/// touches them, and re-binding their rig would touch their bones for nothing.
+/// Re-import every mesh in `scene` instanced from the model at `path`, so a changed
+/// import setting shows at once rather than on the next load. `rig` says what a
+/// skinned one does: a setting that never touches them (Generate Lightmap UVs, #831)
+/// keeps them, since re-binding their rig would touch their bones for nothing; one
+/// that does (the Scale Factor, #1398) rebuilds them, their bones re-bound by name.
 /// Returns how many were rebuilt.
-pub fn reimport_model(scene: &mut Scene, path: &str) -> usize {
-    reimport_where(scene, Rig::Keep, |reference| {
+pub fn reimport_model(scene: &mut Scene, path: &str, rig: Rig) -> usize {
+    reimport_where(scene, rig, |reference| {
         reference
             .split_once(asset::REF_SEPARATOR)
             .is_some_and(|(file, _)| file == path)
@@ -181,8 +182,8 @@ pub fn reimport_written(scene: &mut Scene, stale: &Stale) -> usize {
 }
 
 /// What a re-import does with a skinned mesh (one skinned before or after it).
-#[derive(Clone, Copy, PartialEq)]
-enum Rig {
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Rig {
     /// Leave it as it is.
     Keep,
     /// Take the new mesh and rig, and re-bind the bones to it.

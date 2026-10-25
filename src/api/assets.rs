@@ -11,6 +11,8 @@
 //! arrived since the last look (MP3 → WAV, #385).
 //! `Assets.GetLightmapUVSettings` / `SetLightmapUVSettings` (#831) read and write a
 //! model's Generate Lightmap UVs import setting, the model inspector's checkbox.
+//! `Assets.GetModelImportSettings` / `SetModelImportSettings` (#1398) read and write
+//! a model's Scale Factor, the inspector's drag.
 //! `Assets.GetTextureImportSettings` / `SetTextureImportSettings` (#1323) read and
 //! write an image's wrap, filter and mipmap settings, the image inspector's card.
 
@@ -64,6 +66,17 @@ pub fn register(lua: &Lua) -> Reg {
 
     put(
         &table,
+        "GetModelImportSettings",
+        lua.create_function(|lua, path: String| {
+            let stored = sidecar::load(Path::new(&path)).map_err(runtime)?;
+            let t = lua.create_table()?;
+            t.raw_set("scaleFactor", stored.scale)?;
+            Ok(t)
+        }),
+    )?;
+
+    put(
+        &table,
         "GetTextureImportSettings",
         lua.create_function(|lua, path: String| {
             let stored = sidecar::load(Path::new(&path)).map_err(runtime)?;
@@ -89,7 +102,8 @@ pub fn register(lua: &Lua) -> Reg {
 /// Add the verbs that borrow the scene onto `Assets`: `SetLightmapUVSettings(path,
 /// t)` writes the keys `t` names (the rest keep their value) through the verb the
 /// model inspector uses, re-importing the model's meshes in the scene, and returns
-/// how many it re-imported.
+/// how many it re-imported. `SetModelImportSettings(path, t)` does the same for the
+/// Scale Factor.
 pub fn register_scoped<'scope>(
     lua: &Lua,
     scope: &'scope mlua::Scope<'scope, '_>,
@@ -107,6 +121,17 @@ pub fn register_scoped<'scope>(
             s.pack_margin = t.get::<Option<f32>>("packMargin")?.unwrap_or(s.pack_margin);
             let mut scene = scene.borrow_mut();
             crate::scene::asset_instance::set_lightmap_uv_settings(&mut scene, &path, s)
+                .map_err(mlua::Error::RuntimeError)
+        }),
+    )?;
+    put(
+        &table,
+        "SetModelImportSettings",
+        scope.create_function(move |_, (path, t): (String, Table)| {
+            let stored = sidecar::load(Path::new(&path)).map_err(runtime)?;
+            let scale = t.get::<Option<f32>>("scaleFactor")?.unwrap_or(stored.scale);
+            let mut scene = scene.borrow_mut();
+            crate::scene::asset_instance::set_model_scale_factor(&mut scene, &path, scale)
                 .map_err(mlua::Error::RuntimeError)
         }),
     )

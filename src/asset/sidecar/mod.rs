@@ -47,13 +47,11 @@ impl MeshColliderKind {
 /// cache. `#[serde(default)]` throughout so a sparse, hand-written sidecar loads.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ImportSettings {
-    /// Uniform scale applied at instantiation time (authoring-unit fix-up).
+    /// The model's *Scale Factor* (#1398): one uniform scale the importer applies
+    /// to the vertices, the skeleton and the animation translations
+    /// (`asset::scale_factor`). Default 1.
     #[serde(default = "default_scale")]
     pub scale: f32,
-    /// Whether to keep authored normals (vs. recomputing). Recompute is a later
-    /// issue; this records the intent so the setting round-trips.
-    #[serde(default = "default_true")]
-    pub import_normals: bool,
     /// Cached, human-readable list of the addressable sub-object ids in the file.
     #[serde(default)]
     pub sub_objects: Vec<String>,
@@ -73,15 +71,11 @@ pub struct ImportSettings {
 fn default_scale() -> f32 {
     1.0
 }
-fn default_true() -> bool {
-    true
-}
 
 impl Default for ImportSettings {
     fn default() -> Self {
         Self {
             scale: default_scale(),
-            import_normals: default_true(),
             sub_objects: Vec::new(),
             colliders: BTreeMap::new(),
             lightmap_uvs: LightmapUvSettings::default(),
@@ -104,6 +98,15 @@ impl ImportSettings {
 pub fn set_lightmap_uvs(source: &Path, settings: LightmapUvSettings) -> Result<(), ImportError> {
     let mut stored = load(source)?;
     stored.lightmap_uvs = settings.clamped();
+    save(source, &stored)
+}
+
+/// Set a model's Scale Factor (#1398), sanitized (`scale_factor::sanitize`),
+/// keeping the rest of its sidecar. The one setter the model inspector and
+/// `Assets.SetModelImportSettings` share; the next import of the file applies it.
+pub fn set_scale(source: &Path, scale: f32) -> Result<(), ImportError> {
+    let mut stored = load(source)?;
+    stored.scale = super::scale_factor::sanitize(scale, stored.scale);
     save(source, &stored)
 }
 

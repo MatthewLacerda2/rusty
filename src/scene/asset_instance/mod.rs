@@ -24,6 +24,7 @@ use crate::asset::{self, ImportedAsset};
 use crate::components::{ColliderComponent, MaterialComponent};
 use crate::scene::authoring::material_asset_from_import;
 use crate::scene::lod_instance::instantiate_lod_set;
+use crate::scene::rehydrate::{self, Rig};
 use crate::scene::Scene;
 
 /// Spawn one entity from a path-based asset reference (`path::sub_object`), placed
@@ -198,8 +199,20 @@ pub fn set_lightmap_uv_settings(
 ) -> Result<usize, String> {
     asset::sidecar::set_lightmap_uvs(std::path::Path::new(path), settings)
         .map_err(|e| e.to_string())?;
-    Ok(crate::scene::rehydrate::reimport_model(scene, path))
+    Ok(rehydrate::reimport_model(scene, path, Rig::Keep))
 }
+
+/// Set a model's Scale Factor (#1398) in its `.meta` sidecar and re-import every
+/// mesh in `scene` instanced from it, a skinned one with its new rig and its bones
+/// moved to the scaled rest pose. The one verb the model inspector and
+/// `Assets.SetModelImportSettings` share. Returns how many meshes were re-imported.
+pub fn set_model_scale_factor(scene: &mut Scene, path: &str, scale: f32) -> Result<usize, String> {
+    asset::sidecar::set_scale(std::path::Path::new(path), scale).map_err(|e| e.to_string())?;
+    Ok(rehydrate::reimport_model(scene, path, Rig::Rebuild))
+}
+
+#[cfg(test)]
+mod scale_tests;
 
 #[cfg(test)]
 #[path = "lightmap_tests.rs"]
