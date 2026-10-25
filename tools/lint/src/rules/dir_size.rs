@@ -10,7 +10,9 @@
 //! The one exception is a flat registry, where one file is one public unit and the
 //! flat list is the documentation (`src/api/`: one file per Lua namespace). It says
 //! so in the directory's owner file (its `mod.rs`, or the `<dir>.rs` beside it),
-//! anywhere in it: `// lint: allow(dir-size) <why>`. The rule reads that allow
+//! on a plain `//` comment line anywhere in it: `// lint: allow(dir-size) <why>`.
+//! A directory with no owner file (`src/bin/`) has nowhere to say it, so it takes
+//! no exception and is reported as itself. The rule reads that allow
 //! itself, so one past its use (the directory back under the cap) is reported.
 
 use super::finding::{parse_allow, Finding};
@@ -31,9 +33,15 @@ pub fn sources<'a>(dir: &str, files: &[&'a str]) -> Vec<&'a str> {
         .collect()
 }
 
-/// The 1-based line of `owner`'s allow, and whether it gives a reason.
+/// The 1-based line of `owner`'s allow, and whether it gives a reason. Only a plain
+/// `//` comment line counts: a doc comment (`///`, `//!`) quoting the syntax, or a
+/// comment trailing code, is not an allow.
 fn allow_in(owner: &str) -> Option<(usize, bool)> {
     owner.lines().enumerate().find_map(|(i, l)| {
+        let l = l.trim_start();
+        if !l.starts_with("//") || l.starts_with("///") || l.starts_with("//!") {
+            return None;
+        }
         let (_, why) = parse_allow(l).filter(|(r, _)| *r == RULE)?;
         Some((i + 1, !why.is_empty()))
     })
@@ -59,18 +67,28 @@ pub fn check_dir(dir: &str, files: &[&str], owner: Option<(&str, &str)>) -> Opti
             format!("{dir}/ holds {count} source files, within the cap: drop this allow"),
         )),
         Some(_) => None,
-        None if count > MAX_FILES_PER_DIR => {
-            let path = owner.map_or_else(|| format!("{dir}/mod.rs"), |(p, _)| p.to_string());
-            Some(at(
-                &path,
+        None if count > MAX_FILES_PER_DIR => Some(match owner {
+            Some((path, _)) => at(
+                path,
                 1,
                 format!(
                     "{dir}/ holds {count} source files (cap {MAX_FILES_PER_DIR}): cluster them by \
                      responsibility into subfolders, or, for a flat registry of one file per \
                      public unit, say so with `// lint: allow(dir-size) <why>` in this file"
                 ),
-            ))
-        }
+            ),
+            // No `mod.rs`, `main.rs`, `lib.rs` or `<dir>.rs` (`src/bin/`): nothing can
+            // carry an allow, so the directory itself is reported.
+            None => at(
+                &format!("{dir}/"),
+                1,
+                format!(
+                    "{dir}/ holds {count} source files (cap {MAX_FILES_PER_DIR}) and has no \
+                     owner file to carry an allow: cluster them by responsibility into \
+                     subfolders"
+                ),
+            ),
+        }),
         None => None,
     }
 }

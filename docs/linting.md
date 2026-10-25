@@ -271,11 +271,17 @@ new flag, gate, CI step or baseline.
   first-class components clusters by Unity's *Add Component* categories
   (`audio/`, `nav/`, `physics/`, `rendering/`, `ui/layout/`), the same in
   `components/`, `scene/authoring/` and the inspector. The one exception is a flat
-  registry, one file per public unit, which says so anywhere in its owner file
-  (`mod.rs`, or the `<dir>.rs` beside it): `// lint: allow(dir-size) <why>`.
-  `src/api/` carries it (one file per Lua namespace). The rule reads that allow
-  itself, so one left on a directory back under the cap is a finding too
-  (`rules/dir_size.rs`).
+  registry, one file per public unit, which says so on a plain `//` comment line
+  anywhere in its owner file (`mod.rs`, or the `<dir>.rs` beside it):
+  `// lint: allow(dir-size) <why>`; a doc comment (`///`, `//!`) quoting that
+  syntax is not an allow. `src/api/` carries it (one file per Lua namespace). The
+  rule reads that allow itself, so one left on a directory back under the cap is a
+  finding too (`rules/dir_size.rs`). A directory with no owner file (`src/bin/`,
+  one binary per file) has nowhere to write the allow, so it takes no exception
+  and is reported as itself (`src/bin/:1`). **Where it misfires:** it counts files,
+  not responsibilities, so a directory of twelve unrelated files passes and a
+  thirteenth file that truly belongs beside the others fails; the fix is still a
+  subfolder unless the directory is a flat registry.
 - **`entity-arg`** (#1383) — a script passes `nil` for "no entity" (a failed
   `Scene.FindEntityByName`). Bindings that took `id: u32` threw `error converting
   Lua nil to u32` where their neighbours answered the missing-entity default, and

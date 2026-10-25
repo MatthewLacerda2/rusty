@@ -184,8 +184,13 @@ fn limit_for(path: &Path) -> usize {
         .file_name()
         .map(|n| n.to_string_lossy().into_owned())
         .unwrap_or_default();
-    // `tests.rs` is its module directory's own tests sibling.
-    if is_tests_sibling(path) || name == "tests.rs" {
+    // `tests.rs` is its module directory's own tests sibling, but only outside a
+    // test folder: `tests/x/tests.rs` is a standalone test file like its neighbours.
+    let in_test_dir = p.rsplit_once('/').is_some_and(|(dir, _)| {
+        dir.split('/')
+            .any(|seg| seg == "tests" || seg == "fixtures")
+    });
+    if is_tests_sibling(path) || (name == "tests.rs" && !in_test_dir) {
         return MAX_FILE_LINES;
     }
     if is_test_file(&p) {

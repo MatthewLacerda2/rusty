@@ -52,3 +52,21 @@ fn an_allow_past_its_use_is_reported_on_its_line() {
     assert_eq!((f.path.as_str(), f.line), ("src/x/mod.rs", 2));
     assert!(f.message.contains("drop this allow"), "{}", f.message);
 }
+
+#[test]
+fn a_doc_comment_quoting_the_allow_is_not_one() {
+    let owner = "//! Say `// lint: allow(dir-size) flat registry` to excuse it.\n\
+                 /// // lint: allow(dir-size) flat registry\npub mod a;\n";
+    let f = check(MAX_FILES_PER_DIR + 1, owner).expect("doc text is no allow");
+    assert_eq!((f.path.as_str(), f.line), ("src/x/mod.rs", 1));
+}
+
+#[test]
+fn a_directory_with_no_owner_is_reported_as_itself() {
+    let v = names(MAX_FILES_PER_DIR + 1);
+    let files: Vec<&str> = v.iter().map(String::as_str).collect();
+    let f = check_dir("src/bin", &files, None).expect("over the cap");
+    assert_eq!((f.path.as_str(), f.line), ("src/bin/", 1));
+    assert!(f.message.contains("no owner file"), "{}", f.message);
+    assert_eq!(check_dir("src/bin", &files[..3], None), None);
+}

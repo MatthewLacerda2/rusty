@@ -227,7 +227,7 @@ change.)
 
 | Setter | Status | Read-site |
 |---|---|---|
-| `SetPosition` | ✅ | renderer — `app/camera_sync.rs` + view matrix |
+| `SetPosition` | ✅ | renderer — `app/systems/camera_sync.rs` + view matrix |
 | `SetYaw` / `SetPitch` | ✅ | renderer — `Camera::forward`/view matrix (pitch clamped) |
 | `SetFov` | ✅ | renderer — projection matrix (clamped 1..179°) |
 
@@ -245,14 +245,14 @@ change.)
 
 | Setter | Status | Read-site |
 |---|---|---|
-| `Emit` / `Burst` | ✅ | sim/renderer — `emit_at` spawns into the runtime buffer `app/particles.rs` advances and the renderer draws |
+| `Emit` / `Burst` | ✅ | sim/renderer — `emit_at` spawns into the runtime buffer `app/systems/particles.rs` advances and the renderer draws |
 | `SetActive` | ✅ | sim — gates continuous emission |
 | `SetRate` | ✅ | sim — continuous spawn cadence |
 | `SetShape` | ✅ | sim — `EmitShape::sample` picks each spawn's offset + launch direction in `spawn_particle`; unknown kinds return `false` and change nothing |
 | `SetDirection` | ✅ | sim — the shape's axis in `spawn_particle` |
 | `SetLifetime` / `SetSpeed` / `SetSize` | ✅ | sim/renderer — sampled per spawn in `spawn_particle`; size reaches the renderer via `size_of` |
 | `SetColor` | ✅ | renderer — start tint, scaled by the gradient in `color_of` |
-| `SetSubEmitter` | ✅ | sim — `app/particles.rs` queues and dispatches the target's burst on birth/death/collision; unknown triggers return `false` |
+| `SetSubEmitter` | ✅ | sim — `app/systems/particles.rs` queues and dispatches the target's burst on birth/death/collision; unknown triggers return `false` |
 | `Clear` | ✅ | renderer — empties the live buffer that's drawn |
 | `SetRenderMode` / `GetRenderMode` | ✅ | renderer — `render.mode` picks the sprite quad in `particles.wgsl` (`corner_offset`), or routes the emitter to the forward solids (`passes/particles/mesh.rs`); unknown modes return `false` |
 | `SetStretch` | ✅ | renderer — `stretch_length` → the instance's `stretch.w` |
@@ -265,7 +265,7 @@ change.)
 
 | Setter | Status | Read-site |
 |---|---|---|
-| `SetEmitting` / `SetTime` / `SetMinVertexDistance` | ✅ | sim — `TrailComponent::advance`, run by `app/trails.rs` each fixed tick, records and ages the points with them (`tests/ribbons/trail.rs`); round-trips |
+| `SetEmitting` / `SetTime` / `SetMinVertexDistance` | ✅ | sim — `TrailComponent::advance`, run by `app/systems/trails.rs` each fixed tick, records and ages the points with them (`tests/ribbons/trail.rs`); round-trips |
 | `Clear` | ✅ | renderer — empties the recorded points the ribbon pass draws |
 | `SetWidth` / `SetWidthCurve` / `SetColor` / `SetColors` / `SetTexture` / `SetTextureMode` / `SetBlend` | ✅ | renderer — `render/passes/ribbons` builds the strip's width, colour and `u` from the style and picks the blend pipeline and texture (`tests/gpu/ribbons_screenshot.rs`); round-trips |
 
@@ -311,7 +311,7 @@ fields (incl. the spatial fields stored for #213) round-trip through `SceneData`
 
 | Setter | Status | Read-site |
 |---|---|---|
-| `Spawn` | ✅ | renderer — `render/decals/gpu.rs` uploads each decal and loads its maps into the decal atlas; the clusters bin it and `fs_main` folds it into the surface's material (#638); its `owner` / `lifetime` / `fade` (#639) are read by `Scene::decal_pose` each frame and aged by `app/decals.rs::tick_decals` on the fixed tick |
+| `Spawn` | ✅ | renderer — `render/decals/gpu.rs` uploads each decal and loads its maps into the decal atlas; the clusters bin it and `fs_main` folds it into the surface's material (#638); its `owner` / `lifetime` / `fade` (#639) are read by `Scene::decal_pose` each frame and aged by `app/systems/decals.rs::tick_decals` on the fixed tick |
 | `Remove` | ✅ | sim + renderer — drops the decal (or retires it to fade out) from `Scene.decals`, which the upload reads (`tests/decals/lifecycle_api.rs`) |
 | `Clear` | ✅ | renderer — empties the uploaded set |
 
@@ -516,7 +516,7 @@ rejected patch, note or option). zimmer's own render tests live in scorsese.
 |---|---|---|
 | `SetSelected` | ✅ | sim — `EventSystem::process` announces it (`OnDeselect` / `OnSelect`) and navigation moves from it (`tests/ui/events.rs`); runtime state, not saved |
 | `Click` | ✅ | sim — writes `Input`'s pointer + `Mouse0` edges, read by the next tick's pointer dispatch (`tests/ui/events.rs`) |
-| `Create` | ✅ | builds the widget tree through `ui_widgets::create_ui` (the Create ▸ UI menu's path): ordinary entities and components every UI read-site sees, plus the widget script the next tick loads; round-trips (`tests/ui/widgets/create.rs`, #422) |
+| `Create` | ✅ | builds the widget tree through `ui::widgets::create_ui` (the Create ▸ UI menu's path): ordinary entities and components every UI read-site sees, plus the widget script the next tick loads; round-trips (`tests/ui/widgets/create.rs`, #422) |
 
 ### `Debug` (dev-only) — over `ConsoleLogs`
 
