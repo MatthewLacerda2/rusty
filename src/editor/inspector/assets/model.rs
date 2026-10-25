@@ -22,6 +22,7 @@ pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, path: &
 
     ui.heading("Model Import Settings");
     ui.add_space(5.0);
+    draw_scale_factor(ui, editor, scene, path);
     draw_lightmap_uvs(ui, scene, path);
 
     ui.add_space(15.0);
@@ -54,6 +55,40 @@ fn draw_metadata(ui: &mut egui::Ui, path: &str) {
     super::metadata::draw_metadata_card(ui, path, |ui| {
         ui.label(format!("Type: {} Model Asset", ext));
     });
+}
+
+/// Scale Factor (#1398): Unity's model-import drag, kept in the `.meta` sidecar.
+/// A finished edit goes through the verb `Assets.SetModelImportSettings` uses,
+/// re-importing the model's meshes (and rigs) in the scene. Mid-drag the value is
+/// held in egui's memory, not the sidecar: the verb changes nothing for a factor
+/// the sidecar already holds, so the sidecar must still hold the old one when the
+/// drag is released. A commit that re-imported a mesh marks the scene dirty: its
+/// mesh colliders' boxes and LODGroup sizes moved.
+fn draw_scale_factor(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, path: &str) {
+    let held = egui::Id::new(("model_scale_factor", path));
+    let stored = crate::asset::sidecar::load(Path::new(path))
+        .unwrap_or_default()
+        .scale;
+    let mut scale = ui.data(|d| d.get_temp::<f32>(held)).unwrap_or(stored);
+    let r = ui
+        .horizontal(|ui| {
+            ui.label("Scale Factor:");
+            ui.add(
+                egui::DragValue::new(&mut scale)
+                    .speed(0.01)
+                    .ranged(crate::asset::scale_factor::MIN_SCALE..=f32::MAX),
+            )
+        })
+        .inner;
+    if r.drag_stopped() || (r.changed() && !r.dragged()) {
+        ui.data_mut(|d| d.remove::<f32>(held));
+        let set = crate::scene::asset_instance::set_model_scale_factor(scene, path, scale);
+        editor.is_dirty |= set.is_ok_and(|n| n > 0);
+    } else if r.dragged() {
+        ui.data_mut(|d| d.insert_temp(held, scale));
+    } else {
+        ui.data_mut(|d| d.remove::<f32>(held));
+    }
 }
 
 /// Generate Lightmap UVs (#831): Unity's checkbox and its two knobs, kept in the

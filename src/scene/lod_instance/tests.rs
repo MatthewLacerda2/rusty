@@ -120,3 +120,28 @@ fn renderer_references_follow_a_prefab_stamp() {
         );
     }
 }
+
+#[test]
+fn a_scale_factor_scales_the_groups_size_with_its_meshes() {
+    use crate::scene::asset_instance::set_model_scale_factor;
+    let path = write_gltf("lod_scale.gltf");
+    let _ = std::fs::remove_file(format!("{path}.meta"));
+    let mut scene = Scene::new();
+    let group = instantiate_asset(&mut scene, &format!("{path}::Crate"), None, Vec3::ZERO);
+    let group = group.unwrap();
+    assert_eq!(set_model_scale_factor(&mut scene, &path, 0.5), Ok(2));
+    assert_eq!(scene.world.lod_group(group).unwrap().size, 0.5);
+}
+
+#[test]
+fn the_groups_size_follows_the_meshes_whatever_the_sidecar_held() {
+    use crate::scene::asset_instance::set_model_scale_factor;
+    let path = write_gltf("lod_scale_hand.gltf");
+    // A hand-written factor of 0 imports at the smallest one.
+    std::fs::write(format!("{path}.meta"), r#"{ "scale": 0 }"#).unwrap();
+    let mut scene = Scene::new();
+    let group = instantiate_asset(&mut scene, &format!("{path}::Crate"), None, Vec3::ZERO);
+    let group = group.unwrap();
+    assert_eq!(set_model_scale_factor(&mut scene, &path, 1.0), Ok(2));
+    assert_eq!(scene.world.lod_group(group).unwrap().size, 1.0);
+}

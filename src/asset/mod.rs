@@ -36,6 +36,7 @@ pub mod material_range;
 pub mod mesh_data;
 pub mod obj_import;
 pub mod reference;
+pub mod scale_factor;
 pub mod sidecar;
 pub mod tangents;
 
@@ -106,7 +107,8 @@ pub fn is_image_path(path: impl AsRef<Path>) -> bool {
 
 /// Import a whole source file into its addressable sub-meshes + materials,
 /// dispatching on the extension, then apply the import settings its `.meta` sidecar
-/// records (Generate Lightmap UVs, #831). Reads the sidecar, never writes it (see
+/// records: the Scale Factor (#1398), then Generate Lightmap UVs (#831), so the
+/// unwrap sees the scaled model. Reads the sidecar, never writes it (see
 /// [`import_and_sync_sidecar`] for the variant that maintains the `.meta` cache); a
 /// file with no sidecar imports with the defaults.
 pub fn import_file(path: &Path) -> Result<ImportedAsset, ImportError> {
@@ -118,6 +120,7 @@ pub fn import_file(path: &Path) -> Result<ImportedAsset, ImportError> {
         );
         ImportSettings::default()
     });
+    scale_factor::apply(&mut asset, scale_factor::sanitize(settings.scale, 1.0));
     if settings.lightmap_uvs.generate {
         for sub in &mut asset.sub_meshes {
             lightmap_uv::apply(sub, &settings.lightmap_uvs);

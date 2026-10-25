@@ -24,6 +24,7 @@ use crate::asset::{self, ImportedAsset};
 use crate::components::{ColliderComponent, MaterialComponent};
 use crate::scene::authoring::material_asset_from_import;
 use crate::scene::lod_instance::instantiate_lod_set;
+use crate::scene::rehydrate::{self, Rig};
 use crate::scene::Scene;
 
 /// Spawn one entity from a path-based asset reference (`path::sub_object`), placed
@@ -198,8 +199,33 @@ pub fn set_lightmap_uv_settings(
 ) -> Result<usize, String> {
     asset::sidecar::set_lightmap_uvs(std::path::Path::new(path), settings)
         .map_err(|e| e.to_string())?;
-    Ok(crate::scene::rehydrate::reimport_model(scene, path))
+    Ok(rehydrate::reimport_model(scene, path, Rig::Keep))
 }
+
+/// Set a model's Scale Factor (#1398) in its `.meta` sidecar and re-import every
+/// mesh in `scene` instanced from it, a skinned one with its new rig and its bones
+/// moved to the scaled rest pose; an LODGroup over those meshes has its size scaled
+/// by as much as its LOD0 meshes grew. The model is noted in the write log, so every
+/// other cache keyed by it (the particle meshes) re-reads it too. A NaN or unchanged
+/// factor changes nothing: no write, no re-import. The one verb the model inspector
+/// and `Assets.SetModelImportSettings` share. Returns how many meshes were re-imported.
+pub fn set_model_scale_factor(scene: &mut Scene, path: &str, scale: f32) -> Result<usize, String> {
+    let source = std::path::Path::new(path);
+    let stored = asset::sidecar::load(source)
+        .map_err(|e| e.to_string())?
+        .scale;
+    if asset::scale_factor::sanitize(scale, stored) == stored {
+        return Ok(0);
+    }
+    asset::sidecar::set_scale(source, scale).map_err(|e| e.to_string())?;
+    let before = crate::scene::lod_instance::lod0_extents(scene);
+    let ids = rehydrate::model_writes::reimport_noted(scene, path, Rig::Rebuild);
+    crate::scene::lod_instance::rescale_groups_over(scene, &ids, &before);
+    Ok(ids.len())
+}
+
+#[cfg(test)]
+mod scale_tests;
 
 #[cfg(test)]
 #[path = "lightmap_tests.rs"]

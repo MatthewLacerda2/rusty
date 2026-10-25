@@ -27,6 +27,8 @@ one by its source path still works.
 | `Assets.Refresh` | `()` | `{ converted = { wavPath, ... }, skipped = { { path, reason }, ... } }` — imports what arrived (below) |
 | `Assets.GetLightmapUVSettings` | `(path)` | `{ generate, hardAngle, packMargin }` — a model's Generate Lightmap UVs setting (below) |
 | `Assets.SetLightmapUVSettings` | `(path, { generate?, hardAngle?, packMargin? })` | how many of the scene's meshes it re-imported |
+| `Assets.GetModelImportSettings` | `(path)` | `{ scaleFactor }` — a model's Scale Factor (below) |
+| `Assets.SetModelImportSettings` | `(path, { scaleFactor? })` | how many of the scene's meshes it re-imported |
 | `Assets.GetTextureImportSettings` | `(path)` | `{ wrapMode, filterMode, generateMipmaps }` — an image's import settings (below) |
 | `Assets.SetTextureImportSettings` | `(path, { wrapMode?, filterMode?, generateMipmaps? })` | nothing |
 
@@ -70,6 +72,35 @@ sibling already exists (a refresh never overwrites a file) or when it does not d
 local r = Assets.Refresh()
 for _, wav in ipairs(r.converted) do print("imported " .. wav) end
 for _, s in ipairs(r.skipped) do print(s.path .. ": " .. s.reason) end
+```
+
+### Model import settings
+
+Unity's model-import **Scale Factor** (#1398), and the model inspector's *Scale Factor*
+drag: one uniform scale, stored per model in the `<file>.meta` sidecar (default `1`), that
+the importer applies to the model's data itself — its vertices, its skeleton's bind pose
+and its animations' translation keys. Everything downstream sees the scaled model: the
+mesh, its mesh collider, a nav bake, the lightmap unwrap, `Assets.Manifest()`'s footprint
+and the bone GameObjects. Use it for a model authored at the wrong unit (centimetres, say);
+an `.fbx` file's own unit is already converted on import, so this is the per-model
+override on top. It is not the entity's `Transform` scale, which stays `1`.
+
+`SetModelImportSettings` changes only the keys it is given, writes the sidecar, and
+re-imports every mesh in the open scene instanced from that model, a skinned one with its
+bones moved to the scaled rest pose (a bone moved off its rest pose keeps its pose) — the
+same verb the inspector's drag runs. `scaleFactor` must be finite: a NaN or infinite one
+changes nothing, and one at or below `0.0001` is floored there. A factor the sidecar
+already holds (or none given) changes nothing either: no write, no re-import.
+
+An LODGroup over those meshes has its `size` scaled with them, as a convenience for the
+open scene: a size still at its LOD0 meshes' extent follows the new extent, one set by
+hand is scaled by as much. The size is an authored, saved value, as Unity's LODGroup
+size is, so another scene's groups keep theirs (Unity's *Recalculate Bounds* is the
+manual step there too).
+
+```lua no-run
+Assets.SetModelImportSettings("project/models/crate_cm.glb", { scaleFactor = 0.01 })
+print(Assets.GetModelImportSettings("project/models/crate_cm.glb").scaleFactor)  -- 0.0099999997764826: an f32
 ```
 
 ### Generate Lightmap UVs

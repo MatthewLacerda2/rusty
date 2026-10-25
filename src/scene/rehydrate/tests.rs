@@ -3,7 +3,7 @@
 
 use glam::Vec3;
 
-use super::reimport_model;
+use super::{reimport_model, Rig};
 use crate::asset::SkinData;
 use crate::scene::asset_instance::instantiate_asset;
 use crate::scene::asset_instance::lightmap_test_support::quad_model;
@@ -34,7 +34,7 @@ fn a_reimport_rebuilds_only_that_models_unskinned_meshes() {
         scene.world.mesh_mut(id).unwrap().vertices.clear();
     }
 
-    assert_eq!(reimport_model(&mut scene, &a), 1);
+    assert_eq!(reimport_model(&mut scene, &a, Rig::Keep), 1);
     let counts = ids.map(|id| vertex_count(&scene, id));
     assert!(counts[0] > 0, "model A's mesh is rebuilt");
     assert_eq!(
@@ -45,7 +45,7 @@ fn a_reimport_rebuilds_only_that_models_unskinned_meshes() {
 
     std::fs::remove_file(&a).unwrap();
     assert_eq!(
-        reimport_model(&mut scene, &a),
+        reimport_model(&mut scene, &a, Rig::Keep),
         0,
         "a model that has gone rebuilds none"
     );

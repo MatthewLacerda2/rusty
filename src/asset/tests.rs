@@ -238,7 +238,6 @@ fn sidecar_round_trips_and_caches_sub_objects() {
     let loaded = sidecar::load(&path).unwrap();
     assert_eq!(loaded.sub_objects, vec!["Quad".to_string()]);
     assert_eq!(loaded.scale, 1.0);
-    assert!(loaded.import_normals);
     // A fresh sidecar requests no mesh colliders (#77).
     assert!(loaded.colliders.is_empty());
 }

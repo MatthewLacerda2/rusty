@@ -6,18 +6,16 @@
 //! cap. GPU buffers are never stored on disk, only rebuilt here.
 
 pub mod model_writes;
+mod reimport;
 
-use std::collections::BTreeMap;
+pub use reimport::{reimport_model, reimport_model_ids, reimport_written, Rig};
 
 use glam::{Mat4, Vec3};
 
 use crate::asset::{self, MeshVertex, SubMesh};
 use crate::components::mesh::Vertex;
-use crate::components::{ColliderShape, Entity};
-use crate::core::fs::written::Stale;
-use crate::ecs::World;
+use crate::components::Entity;
 use crate::scene::authoring::{primitive_geometry, Primitive};
-use crate::scene::Scene;
 
 /// Convert one imported `MeshVertex` (pure data) into the renderer's `Vertex`,
 /// carrying the skin binding (`joint_indices`/`joint_weights`) through to the GPU
@@ -126,10 +124,19 @@ fn rehydrate_one(primitive_type: &str, asset_ref: &Option<String>) -> Rehydrated
 /// Rebuild one entity's mesh (if any) from its on-disk reference. Shared by scene
 /// load and prefab instantiate (#215) so both rehydrate identically; GPU buffers
 /// are never stored on disk, only rebuilt here.
+/// A mesh collider's saved box is refit to the rebuilt mesh, so an import setting
+/// changed since the save (the Scale Factor, #1398) reaches it.
 pub fn rehydrate_entity_mesh(entity: &mut Entity) {
     if let Some(mesh) = &mut entity.mesh {
         let rebuilt = rehydrate_one(&mesh.primitive_type, &mesh.asset_ref);
         install(mesh, rebuilt);
+        let positions = mesh.vertices.iter().map(|v| Vec3::from_array(v.position));
+        let bounds = positions.fold(None, |b: Option<(Vec3, Vec3)>, p| {
+            Some(b.map_or((p, p), |(lo, hi)| (lo.min(p), hi.max(p))))
+        });
+        if let (Some(bounds), Some(collider)) = (bounds, &mut entity.collider) {
+            reimport::refit(collider, bounds);
+        }
     }
 }
 
@@ -146,116 +153,6 @@ fn install(mesh: &mut crate::scene::MeshComponent, rebuilt: RehydratedMesh) {
     mesh.pose_palette = Vec::new();
     mesh.skeleton.bones.clear();
     mesh.is_dirty.set(true);
-}
-
-/// Re-import the geometry of every unskinned mesh in `scene` instanced from the model
-/// at `path`, so a changed import setting (Generate Lightmap UVs, #831) shows at once
-/// rather than on the next load. Skinned meshes keep theirs: the setting never
-/// touches them, and re-binding their rig would touch their bones for nothing.
-/// Returns how many were rebuilt.
-pub fn reimport_model(scene: &mut Scene, path: &str) -> usize {
-    reimport_where(scene, Rig::Keep, |reference| {
-        reference
-            .split_once(asset::REF_SEPARATOR)
-            .is_some_and(|(file, _)| file == path)
-    })
-}
-
-/// Re-import every mesh in `scene` whose model file `stale` names: the engine
-/// re-wrote it (#1242), and Unity updates every instance of a re-imported model.
-/// A skinned one takes the new rig too, its bones re-bound to it by name (#1265). Each
-/// distinct file is matched against `stale` once. Returns how many were rebuilt.
-pub fn reimport_written(scene: &mut Scene, stale: &Stale) -> usize {
-    if stale.is_empty() {
-        return 0;
-    }
-    let mut named: BTreeMap<String, bool> = BTreeMap::new();
-    reimport_where(scene, Rig::Rebuild, |reference| {
-        let Some(file) = asset_ref_file(reference) else {
-            return false;
-        };
-        *named
-            .entry(file)
-            .or_insert_with_key(|file| stale.matches(file))
-    })
-}
-
-/// What a re-import does with a skinned mesh (one skinned before or after it).
-#[derive(Clone, Copy, PartialEq)]
-enum Rig {
-    /// Leave it as it is.
-    Keep,
-    /// Take the new mesh and rig, and re-bind the bones to it.
-    Rebuild,
-}
-
-/// Re-import every mesh whose reference `names` accepts ([`reimport_entity_mesh`]).
-fn reimport_where(scene: &mut Scene, rig: Rig, mut names: impl FnMut(&str) -> bool) -> usize {
-    let mut rebuilt = 0;
-    for id in scene.world.ids_with_mesh() {
-        let named = scene
-            .world
-            .mesh(id)
-            .is_some_and(|mesh| mesh.asset_ref.as_deref().is_some_and(&mut names));
-        if named && reimport_entity_mesh(scene, id, rig) {
-            rebuilt += 1;
-        }
-    }
-    rebuilt
-}
-
-/// Re-import one entity's mesh from its reference, and refit its mesh collider's
-/// box to it. A skinned mesh (before or after) takes the new rig, its bones re-bound,
-/// when `rig` says so, and kept otherwise. A model that yields nothing (gone)
-/// keeps the old mesh. Returns whether the mesh was rebuilt.
-fn reimport_entity_mesh(scene: &mut Scene, id: u32, rig: Rig) -> bool {
-    let Some((reference, was_skinned)) = scene
-        .world
-        .mesh(id)
-        .and_then(|m| Some((m.asset_ref.clone()?, m.skin.is_some())))
-    else {
-        return false;
-    };
-    if was_skinned && rig == Rig::Keep {
-        return false;
-    }
-    let Ok(sub) = asset::import_sub_mesh(&reference) else {
-        return false;
-    };
-    let skinned = was_skinned || sub.skin.is_some();
-    if skinned && rig == Rig::Keep {
-        return false;
-    }
-    let Some(bounds) = sub.bounds() else {
-        return false;
-    };
-    // The bones are noted against the rig they were built from before it is
-    // replaced, and re-bound to the new one by name.
-    let hung = skinned.then(|| scene.take_skeleton(id));
-    if let Some(mut mesh) = scene.world.mesh_mut(id) {
-        install(&mut mesh, RehydratedMesh::from_sub_mesh(&sub));
-    }
-    if let Some(hung) = hung {
-        scene.restore_skeleton(id, hung);
-    }
-    refit_mesh_collider(&mut scene.world, id, bounds);
-    true
-}
-
-/// Size `id`'s mesh collider (if it has one) to `(min, max)`, as Unity's
-/// `MeshCollider` follows its shared mesh. The guard refreshes the world AABB.
-fn refit_mesh_collider(world: &mut World, id: u32, (min, max): (Vec3, Vec3)) {
-    let Some(mut collider) = world.collider_mut(id) else {
-        return;
-    };
-    if let ColliderShape::Mesh {
-        local_min,
-        local_max,
-        ..
-    } = &mut collider.shape
-    {
-        (*local_min, *local_max) = (min, max);
-    }
 }
 
 /// Build an `"Asset"` mesh component from a path-based reference, importing its

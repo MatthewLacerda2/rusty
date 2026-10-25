@@ -13,8 +13,10 @@
 //! frame after Stop, and by then the restored edit scene was read from disk after it
 //! (`Scene::meshes_read_at`), so nothing is read twice.
 
-use crate::core::fs::written::{written_since, Stale};
-use crate::scene::rehydrate::reimport_written;
+use std::collections::BTreeMap;
+
+use crate::core::fs::written::{note_written, written_since, Stale};
+use crate::scene::rehydrate::{reimport_model_ids, reimport_written, Rig};
 use crate::scene::Scene;
 
 /// How far into the write log the scene's meshes have been brought up to date.
@@ -42,12 +44,32 @@ impl ModelWrites {
     pub fn follow(&mut self, scene: &mut Scene) -> usize {
         let (now, mut paths) = written_since(self.seen.max(scene.meshes_read_at));
         self.seen = now;
-        paths.retain(|path| crate::asset::is_model_path(path));
+        let read = std::mem::take(&mut scene.meshes_reimported);
+        paths.retain(|path| crate::asset::is_model_path(path) && !already_read(&read, path));
         if paths.is_empty() {
             return 0;
         }
         reimport_written(scene, &Stale::new(paths))
     }
+}
+
+/// Whether the scene re-imported `path` itself at its latest note (`read`, from
+/// [`reimport_noted`]): nothing wrote it again since.
+fn already_read(read: &BTreeMap<String, u64>, path: &str) -> bool {
+    read.get(path)
+        .is_some_and(|&at| !written_since(at).1.iter().any(|p| p == path))
+}
+
+/// Re-import the meshes in `scene` instanced from the model at `path` now, for a
+/// setting that changes what the model imports as (the Scale Factor, #1398), and
+/// note the model as written so every other cache keyed by it re-reads it too.
+/// The scene records the note it made, so its own [`ModelWrites::follow`] skips it
+/// and the meshes are not read twice, whatever other notes are waiting. Returns the
+/// ids of the entities rebuilt.
+pub fn reimport_noted(scene: &mut Scene, path: &str, rig: Rig) -> Vec<u32> {
+    let at = note_written(path);
+    scene.meshes_reimported.insert(path.to_string(), at);
+    reimport_model_ids(scene, path, rig)
 }
 
 #[cfg(test)]

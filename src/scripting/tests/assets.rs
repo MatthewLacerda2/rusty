@@ -34,6 +34,26 @@ fn the_assets_api_sets_and_reads_the_setting() {
 }
 
 #[test]
+fn the_assets_api_sets_and_reads_a_models_scale_factor() {
+    let path = quad_model("rusty_scale_api");
+    let mut raw = Scene::new();
+    let id = instantiate_asset(&mut raw, &format!("{path}::Quad"), None, Vec3::ZERO);
+    let scene = Rc::new(RefCell::new(raw));
+    let lua = format!(
+        "local p = {path:?}
+         assert(Assets.GetModelImportSettings(p).scaleFactor == 1)
+         assert(Assets.SetModelImportSettings(p, {{ scaleFactor = 0.5 }}) == 1)
+         assert(Assets.GetModelImportSettings(p).scaleFactor == 0.5)
+         Assets.SetModelImportSettings(p, {{ scaleFactor = 0/0 }})
+         assert(Assets.GetModelImportSettings(p).scaleFactor == 0.5, 'NaN changes nothing')"
+    );
+    manager(&scene).exec(&lua).unwrap();
+    let scene = scene.borrow();
+    let mesh = scene.world.mesh(id.unwrap()).unwrap();
+    assert!(mesh.vertices.iter().all(|v| v.position[0] <= 0.5));
+}
+
+#[test]
 fn the_assets_api_sets_and_reads_a_textures_import_settings() {
     let png = crate::test_temp::dir().join("brick.png");
     let m = manager(&Rc::new(RefCell::new(Scene::new())));

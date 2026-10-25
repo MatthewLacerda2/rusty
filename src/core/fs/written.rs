@@ -46,12 +46,14 @@ pub fn write(path: &Path, bytes: &[u8]) -> io::Result<()> {
     Ok(())
 }
 
-/// Record that the file at `path` was just written.
-pub fn note_written(path: &str) {
+/// Record that the file at `path` was just written. Returns the note's generation,
+/// for a consumer that read the file itself and so can skip this note.
+pub fn note_written(path: &str) -> u64 {
     let mut writes = WRITES.lock().unwrap_or_else(|e| e.into_inner());
     writes.0 += 1;
     let generation = writes.0;
     writes.1.insert(path.to_string(), generation);
+    generation
 }
 
 /// The newest write generation, and every path written after generation `seen`. A
