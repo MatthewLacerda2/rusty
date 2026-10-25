@@ -126,7 +126,7 @@ pub fn rescale_groups_over(scene: &mut Scene, renderers: &[u32], before: &[(u32,
         // round trip (1 → 0.0001 → 1) comes back where it started.
         let measured = (group.size - was.max(MIN_SIZE)).abs() <= group.size * 1e-4;
         let size = if measured { now } else { group.size * ratio };
-        crate::scene::authoring::lod_group::set_size(&mut group, size);
+        crate::scene::authoring::rendering::lod_group::set_size(&mut group, size);
     }
 }
 
