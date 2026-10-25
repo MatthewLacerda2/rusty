@@ -16,7 +16,9 @@
 //!   allowed but warns once per file in the console. Native (C) modules are off.
 //!
 //! The console REPL evaluates against this same VM, so it gets the same
-//! stdlib — one surface, three callers.
+//! stdlib — one surface, three callers. The `play` harness's scenario VM is a
+//! separate VM built from the same [`sandboxed_vm`] (#1408): a play-test's
+//! results are a pure function of its scenario too.
 
 use mlua::{Lua, LuaOptions, StdLib};
 
@@ -49,15 +51,23 @@ math.randomseed = function(seed)
 end
 "#;
 
-/// A fresh gameplay VM: the safe stdlib minus `os` / `io`, with the seeded
-/// `math.random` shims installed.
-pub(super) fn new_sim_vm() -> Result<Lua, String> {
+/// A fresh deterministic VM: the safe stdlib minus `os` / `io`, with the seeded
+/// `math.random` shims installed. `math.random` draws through whatever `Random`
+/// the caller registers; the scenario VM registers the harness world's own.
+pub(crate) fn sandboxed_vm() -> Result<Lua, String> {
     let libs = StdLib::ALL_SAFE ^ (StdLib::IO | StdLib::OS);
     let lua = Lua::new_with(libs, LuaOptions::default()).map_err(|e| e.to_string())?;
     lua.load(MATH_SHIMS)
         .set_name("=sandbox")
         .exec()
         .map_err(|e| e.to_string())?;
+    Ok(lua)
+}
+
+/// A fresh gameplay VM: [`sandboxed_vm`], marked as the one the timer scheduler
+/// runs.
+pub(super) fn new_sim_vm() -> Result<Lua, String> {
+    let lua = sandboxed_vm()?;
     lua.set_named_registry_value(SIM_VM, true)
         .map_err(|e| e.to_string())?;
     Ok(lua)

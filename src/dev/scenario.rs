@@ -17,13 +17,13 @@
 //!
 //! Runs in its own Lua VM, separate from the gameplay scripts inside `GameWorld`,
 //! with the same API they get (`api::register`) plus the scenario-only `Harness`
-//! table (`dev::bridge`).
+//! table (`dev::bridge`), and the same deterministic stdlib (#1408): no `os` /
+//! `io`, and `math.random` draws from the world's one seeded `Random` stream, so
+//! `results.json` is a pure function of the scenario.
 
 use std::cell::RefCell;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
-
-use mlua::Lua;
 
 use super::harness::Harness;
 use crate::api;
@@ -69,7 +69,10 @@ fn run_in(harness: Harness, scenario_path: &Path) -> Result<RunReport, String> {
     // between calls, never inside one.
     let cells = harness.borrow().world.borrow().script_manager().api_cells();
     let ctx = cells.ctx();
-    let lua = Lua::new();
+    // The world's one `Random` stream, not a scenario-only one: Unity has one
+    // `Random` too, and a scenario's draws are its inputs, as deterministic as
+    // the rest of them.
+    let lua = crate::scripting::sandboxed_vm()?;
     let exec = lua
         .scope(|scope| {
             api::register(&lua, scope, &ctx).map_err(mlua::Error::RuntimeError)?;

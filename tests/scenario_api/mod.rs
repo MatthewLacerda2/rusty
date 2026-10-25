@@ -7,6 +7,7 @@ use rusty::dev::scenario;
 mod before_play;
 mod crossing;
 mod refusals;
+mod sandbox;
 
 /// Write `code` as a scenario and run it on an isolated workspace; its results.
 pub(super) fn run(name: &str, code: &str) -> (bool, String) {
