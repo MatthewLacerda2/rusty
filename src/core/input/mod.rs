@@ -9,7 +9,7 @@
 //! `"MOUSE1"` right, `"MOUSE2"` middle, …) and gamepad buttons (`"PADA"`, #471) are
 //! entries in one keys-down set, so `IsKeyDown` / `GetKeyDown` / `Press` work on all
 //! of them unchanged. Continuous inputs are *axes*: the mouse delta and the wheel,
-//! and named axes (`"PADLEFTX"`, see [`gamepad`](crate::core::input::gamepad)) whose value
+//! and named axes (`"PADLEFTX"`, see [`gamepad`]) whose value
 //! is sampled per tick like an edge. Names are normalized to uppercase.
 //!
 //! **Edges are per sim tick.** Writes between ticks (window events, `Press`,
