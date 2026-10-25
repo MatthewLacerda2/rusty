@@ -35,7 +35,7 @@ pub fn engine_dir() -> &'static Path {
 
 /// `rel` under [`engine_dir`], as a `/`-separated string for the APIs that take one.
 pub fn engine_path(rel: &str) -> String {
-    format!("{}/{rel}", engine_dir().to_string_lossy())
+    format!("{}/{rel}", crate::core::paths::to_slash(engine_dir()))
 }
 
 /// The project to open: `named` when the command line gave one, else a packaged

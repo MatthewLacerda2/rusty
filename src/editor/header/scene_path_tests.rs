@@ -1,12 +1,16 @@
 //! The editor's current scene file is the script runtime's own cell (#1366): what
-//! File ▸ Open/New and `Scene.Load` set is what the next Save writes.
+//! File ▸ Open/New and `Scene.Load` set is what the next Save writes. The cell keeps
+//! the path as its caller spelled it: that spelling is also the key the scene's
+//! disk text is read under, and the readers that compare it compare canonically.
 
 use std::cell::RefCell;
+use std::path::Path;
 use std::rc::Rc;
 
 use super::{new_scene, save_scene};
 use crate::app::GameWorld;
 use crate::core::input::InputState;
+use crate::core::paths::to_slash;
 use crate::editor::EditorUi;
 use crate::navigation::NavigationGraph;
 use crate::scene::Scene;
@@ -83,9 +87,15 @@ fn new_leaves_no_path_for_either_caller() {
 fn a_scripted_load_is_what_the_editor_saves() {
     let ([_, _, c], mut game, mut editor) = open_a("script");
     game.init_edit_runtime().unwrap();
-    let load = format!("Scene.Load('{}')", c.replace('\\', "/"));
-    game.script_manager().eval(&load).unwrap();
-    assert_eq!(editor.current_scene_path(), Some(c.clone()));
+    let slashed = to_slash(Path::new(&c));
+    game.script_manager()
+        .eval(&format!("Scene.Load('{slashed}')"))
+        .unwrap();
+    assert_eq!(
+        editor.current_scene_path(),
+        Some(slashed),
+        "as the script spelled it"
+    );
     let mut scene = game.scene().borrow_mut();
     scene.add_entity("Edit".into());
     save_scene(&mut editor, &scene, &mut ConsoleLogs::new());
@@ -132,8 +142,9 @@ fn a_scripted_load_with_a_broken_sidecar_still_switches_file() {
     let ([_, _, c], mut game, editor) = open_a("script_sidecar");
     std::fs::write(crate::scene::sidecar_path(&c), "{ broken").unwrap();
     game.init_edit_runtime().unwrap();
-    let load = format!("return Scene.Load('{}')", c.replace('\\', "/"));
+    let slashed = to_slash(Path::new(&c));
+    let load = format!("return Scene.Load('{slashed}')");
     let warning = game.script_manager().eval(&load).unwrap();
     assert!(warning.contains("lighting"), "{warning}");
-    assert_eq!(editor.current_scene_path(), Some(c));
+    assert_eq!(editor.current_scene_path(), Some(slashed));
 }

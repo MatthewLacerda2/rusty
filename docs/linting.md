@@ -40,7 +40,7 @@ agent can read exactly what failed.
 | One name table per enum | `tools/lint -- --rules` (`named-enum`) | **hard gate**: no file of `src/` hand-writes both a parse (`fn parse(_: &str) -> Option<Self>` in an `impl T`, or a free `fn parse_*(_: &str) -> Option<T>`) and a name (`fn name`/`fn as_str(self) -> &'static str`, or a free `fn *_name(_: T) -> &'static str`) for one type, nor a `const`/`static` table of `(T, &str)` pairs — a script-facing enum declares its names once with `core::named_enum!`, which writes `ALL`, `name`, a case-insensitive `parse` and `Display`; a parse that does more takes `// lint: allow(named-enum) <why>` (#1329) |
 | One world space | `tools/lint -- --rules` (`world-space`) | **hard gate**: outside `ecs::world_space` and `components::transform`, no engine code line decomposes a matrix (`to_scale_rotation_translation`), names the retired `compute_world_matrix` / `world_matrix(` / `parent_world_matrix`, or folds a Transform over `ancestors(` — world space is read from `ecs::World`'s world API; test code is not scanned, and converting file data takes `// lint: allow(world-space) <why>` (#1196) |
 | Order-free lists stay sorted | `tools/lint -- --rules` (`sorted`) | **hard gate**: a list under a `// sorted: <why>` (or `<!-- sorted: <why> -->`) marker stays in order up to its first blank line, so two branches adding entries touch different lines (#911) |
-| Portable paths | `tools/lint -- --rules` | **hard gate** (`slash-join`): `src/` and `tests/` never join a `/`-separated path (literal, `format!` or constant) onto a path or make a path from one; they join one part per call or join `core::paths::native(…)` (#1332, #1371) |
+| Portable paths | `tools/lint -- --rules` | **hard gate** (`slash-join`): `src/` and `tests/` never join a `/`-separated path (literal, `format!` or constant) onto a path or make a path from one; they join one part per call or join `core::paths::native(…)`, and never `format!` a native path (`.to_string_lossy()`, `.display()`) before a `/`: that is `core::paths::to_slash` (#1332, #1371, #1428) |
 | Pushed = built | `tools/lint -- --rules` (`ignored`) | **hard gate**: no scanned `.rs` file may match a `.gitignore` pattern, tracked or not; no allow (#935) |
 | Ranged editor drags | `tools/lint -- --rules` (`drag-range`) | **hard gate**: a `DragValue` under `src/editor` bounds its range with `.ranged(..)` (`editor::widgets::DragRange`), never egui's `.range(..)`, which also rewrites an out-of-range value just by selecting the entity (#1158); a real need takes `// lint: allow(drag-range) <why>` |
 | Rust API reference | rustdoc | **hard gate**: `RUSTDOCFLAGS="-D warnings" cargo doc --no-deps` (both feature sets) — no broken intra-doc links, no public docs linking private items; name a private item as plain `code`, not a link |
@@ -369,7 +369,15 @@ new flag, gate, CI step or baseline.
   `core::paths::native("a/b")` (`crate::core::paths::native` in the library,
   `rusty::core::paths::native` in `tests/`; `native_string` for the written
   string), which turns a `/`-spelled path or constant such as `IMPORT_CACHE_DIR`
-  into the platform's. The rule reads text, not types, so it **misfires** on a
+  into the platform's. The mix runs the other way too (#1428): a `format!`
+  whose template puts a `/` after a positional `{}` filled from a native path's
+  `.to_string_lossy()` or `.display()` builds `dir\a/b` on Windows, which a
+  baked material once stored in its scene; spell the path with
+  `core::paths::to_slash(path)`. The match is coarse: any `{}/` in the template
+  plus any `.to_string_lossy()` / `.display()` argument flags, so a ratio such as
+  `"{}/{} in {}"` beside a displayed path misfires; it misses `{0}/`, a named
+  placeholder (`{DIR}/`), `.to_str()`, `write!` / `println!`, and a native path
+  stringified into a variable first. The rule reads text, not types, so it **misfires** on a
   `.push` of a `/` literal (or of a space-free `/` `format!`) onto a list of
   strings, on a slice join whose separator holds a `/` beside other text, and on a
   constant matched by bare name: a `/` constant in one module flags a same-named
