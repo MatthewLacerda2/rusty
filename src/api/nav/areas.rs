@@ -14,6 +14,7 @@ use std::cell::RefCell;
 use mlua::Table;
 
 use super::super::{put, Reg};
+use crate::api::entity_arg::EntityArg;
 use crate::navigation::{area_index, NavMeshSettings, NavigationGraph};
 use crate::scene::authoring::nav::agent as nav_ops;
 use crate::scene::Scene;
@@ -81,12 +82,17 @@ pub(super) fn register_agent<'scope>(
     t: &Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
-    let f = scope.create_function(move |_, id: u32| {
-        let mask = scene.borrow().world.nav_agent(id).map(|a| a.area_mask);
+    let f = scope.create_function(move |_, id: EntityArg| {
+        let mask = scene
+            .borrow()
+            .world
+            .nav_agent(id.read())
+            .map(|a| a.area_mask);
         Ok(i64::from(mask.unwrap_or(0)))
     });
     put(t, "GetAreaMask", f)?;
-    let f = scope.create_function(move |_, (id, mask): (u32, i64)| {
+    let f = scope.create_function(move |_, (id, mask): (EntityArg, i64)| {
+        let id = id.live("NavMeshAgent", "SetAreaMask")?;
         if let Some(mut a) = scene.borrow_mut().world.nav_agent_mut(id) {
             nav_ops::set_area_mask(&mut a, mask as u32);
         }

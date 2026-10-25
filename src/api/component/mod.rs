@@ -34,6 +34,7 @@ use mlua::{Lua, Table};
 use serde_json::Value;
 
 use super::{put, Reg};
+use crate::api::entity_arg::EntityArg;
 use crate::scene::authoring;
 use crate::scene::authoring::fields::{self as kinds, Kind, Skip};
 use crate::scene::Scene;
@@ -54,7 +55,8 @@ pub fn register<'scope>(
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
     let t = lua.create_table().map_err(|e| e.to_string())?;
-    let get = scope.create_function(move |lua, (id, name): (u32, String)| {
+    let get = scope.create_function(move |lua, (id, name): (EntityArg, String)| {
+        let id = id.read();
         let kind = kinds::find(&name).map_err(err)?;
         let value = (kind.read)(&scene.borrow().world, id)
             .transpose()
@@ -69,7 +71,8 @@ pub fn register<'scope>(
         Ok(table)
     });
     put(&t, "Get", get)?;
-    let set = scope.create_function(move |lua, (id, name, fields): (u32, String, Table)| {
+    let set = scope.create_function(move |lua, (id, name, fields): (EntityArg, String, Table)| {
+        let id = id.live("Component", "Set")?;
         let kind = kinds::find(&name).map_err(err)?;
         let got = recall(&fields, id, kind);
         let skip = got.as_ref().map_or(Skip::Held, Skip::SinceGet);

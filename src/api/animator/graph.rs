@@ -12,6 +12,7 @@
 use std::cell::RefCell;
 use std::path::Path;
 
+use crate::api::entity_arg::EntityArg;
 use crate::asset::animation_graph;
 use crate::scene::authoring::animator as animator_ops;
 use crate::scene::Scene;
@@ -43,7 +44,8 @@ fn register_set_graph<'scope>(
     put(
         table,
         "SetGraph",
-        scope.create_function(|_, (id, path): (u32, String)| {
+        scope.create_function(|_, (id, path): (EntityArg, String)| {
+            let id = id.live("Animator", "SetGraph")?;
             let mut scene = scene.borrow_mut();
             if let Some(mut c) = scene.world.animator_mut(id) {
                 animator_ops::set_graph(&mut c, (!path.is_empty()).then_some(path));
@@ -55,7 +57,8 @@ fn register_set_graph<'scope>(
     put(
         table,
         "SetGraphEnabled",
-        scope.create_function(|_, (id, enabled): (u32, bool)| {
+        scope.create_function(|_, (id, enabled): (EntityArg, bool)| {
+            let id = id.live("Animator", "SetGraphEnabled")?;
             let mut scene = scene.borrow_mut();
             if let Some(mut c) = scene.world.animator_mut(id) {
                 animator_ops::set_graph_enabled(&mut c, enabled);
@@ -79,7 +82,8 @@ fn register_play_node<'scope>(
     put(
         table,
         "PlayNode",
-        scope.create_function(|_, (id, node, layer): (u32, String, Option<Value>)| {
+        scope.create_function(|_, (id, node, layer): (EntityArg, String, Option<Value>)| {
+            let id = id.live("Animator", "PlayNode")?;
             let mut scene = scene.borrow_mut();
             let Some(mut anim) = scene.world.animator_mut(id) else {
                 return Ok(false);
@@ -128,7 +132,8 @@ fn register_play_animation<'scope>(
     put(
         table,
         "PlayAnimation",
-        scope.create_function(|_, (id, name): (u32, String)| {
+        scope.create_function(|_, (id, name): (EntityArg, String)| {
+            let id = id.live("Animator", "PlayAnimation")?;
             let mut scene = scene.borrow_mut();
             let exists = scene
                 .world

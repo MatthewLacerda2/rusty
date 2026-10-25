@@ -13,6 +13,7 @@ use std::path::Path;
 use mlua::Value;
 
 use super::{put, Reg};
+use crate::api::entity_arg::EntityArg;
 use crate::asset::animation_graph;
 use crate::components::AnimatorComponent;
 use crate::scene::Scene;
@@ -66,7 +67,8 @@ fn register_layer_weight<'scope>(
     put(
         table,
         "SetLayerWeight",
-        scope.create_function(|_, (id, layer, weight): (u32, Value, f32)| {
+        scope.create_function(|_, (id, layer, weight): (EntityArg, Value, f32)| {
+            let id = id.live("Animator", "SetLayerWeight")?;
             let mut scene = scene.borrow_mut();
             let Some(mut anim) = scene.world.animator_mut(id) else {
                 return Ok(false);
@@ -91,9 +93,9 @@ fn register_layer_weight<'scope>(
     put(
         table,
         "GetLayerWeight",
-        scope.create_function(|_, (id, layer): (u32, Value)| {
+        scope.create_function(|_, (id, layer): (EntityArg, Value)| {
             let mut scene = scene.borrow_mut();
-            let Some(mut anim) = scene.world.animator_mut(id) else {
+            let Some(mut anim) = scene.world.animator_mut(id.read()) else {
                 return Ok(None);
             };
             Ok(match resolve(&mut anim, &layer) {
@@ -116,9 +118,9 @@ fn register_get_current_node<'scope>(
     put(
         table,
         "GetCurrentNode",
-        scope.create_function(|_, (id, layer): (u32, Option<Value>)| {
+        scope.create_function(|_, (id, layer): (EntityArg, Option<Value>)| {
             let scene = scene.borrow();
-            let Some(anim) = scene.world.animator(id) else {
+            let Some(anim) = scene.world.animator(id.read()) else {
                 return Ok(None);
             };
             let playback = match layer.map_or(Some(0), |l| lookup(&anim, &l)) {

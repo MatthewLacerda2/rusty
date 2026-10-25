@@ -15,6 +15,7 @@ use mlua::Lua;
 
 use super::ui_look::{BlendAccess, GradientAccess};
 use super::{put, Reg};
+use crate::api::entity_arg::EntityArg;
 use crate::asset::MapRef;
 use crate::components::ImageComponent;
 use crate::components::{FillMethod, FillOrigin, ImageType};
@@ -121,8 +122,8 @@ pub fn register<'scope>(
         register_bool(scope, &table, scene, suffix, get, set)?;
     }
     register_texture_and_amount(scope, &table, scene)?;
-    super::ui_look::register_blend(scope, &table, scene, BLEND)?;
-    super::ui_look::register_gradient(scope, &table, scene, GRADIENT)?;
+    super::ui_look::register_blend(scope, &table, scene, ("Image", BLEND))?;
+    super::ui_look::register_gradient(scope, &table, scene, ("Image", GRADIENT))?;
     lua.globals().set("Image", table).map_err(|e| e.to_string())
 }
 
@@ -145,19 +146,27 @@ fn register_vec4<'scope>(
     put(
         table,
         &format!("Get{suffix}"),
-        scope.create_function(move |_, id: u32| {
+        scope.create_function(move |_, id: EntityArg| {
             let scene = scene.borrow();
-            let v = scene.world.image(id).map(|i| get(&i)).unwrap_or(Vec4::ZERO);
+            let v = scene
+                .world
+                .image(id.read())
+                .map(|i| get(&i))
+                .unwrap_or(Vec4::ZERO);
             Ok((v.x, v.y, v.z, v.w))
         }),
     )?;
+    let verb = format!("Set{suffix}");
     put(
         table,
         &format!("Set{suffix}"),
-        scope.create_function(move |_, (id, x, y, z, w): (u32, f32, f32, f32, f32)| {
-            with_image(scene, id, |i| set(i, Vec4::new(x, y, z, w)));
-            Ok(())
-        }),
+        scope.create_function(
+            move |_, (id, x, y, z, w): (EntityArg, f32, f32, f32, f32)| {
+                let id = id.live("Image", &verb)?;
+                with_image(scene, id, |i| set(i, Vec4::new(x, y, z, w)));
+                Ok(())
+            },
+        ),
     )
 }
 
@@ -173,19 +182,21 @@ fn register_name<'scope>(
     put(
         table,
         &format!("Get{suffix}"),
-        scope.create_function(move |_, id: u32| {
+        scope.create_function(move |_, id: EntityArg| {
             let scene = scene.borrow();
             Ok(scene
                 .world
-                .image(id)
+                .image(id.read())
                 .map_or("None", |i| get(&i))
                 .to_string())
         }),
     )?;
+    let verb = format!("Set{suffix}");
     put(
         table,
         &format!("Set{suffix}"),
-        scope.create_function(move |_, (id, name): (u32, String)| {
+        scope.create_function(move |_, (id, name): (EntityArg, String)| {
+            let id = id.live("Image", &verb)?;
             with_image(scene, id, |i| set(i, &name));
             Ok(())
         }),
@@ -204,15 +215,17 @@ fn register_bool<'scope>(
     put(
         table,
         &format!("Get{suffix}"),
-        scope.create_function(move |_, id: u32| {
+        scope.create_function(move |_, id: EntityArg| {
             let scene = scene.borrow();
-            Ok(scene.world.image(id).is_some_and(|i| get(&i)))
+            Ok(scene.world.image(id.read()).is_some_and(|i| get(&i)))
         }),
     )?;
+    let verb = format!("Set{suffix}");
     put(
         table,
         &format!("Set{suffix}"),
-        scope.create_function(move |_, (id, value): (u32, bool)| {
+        scope.create_function(move |_, (id, value): (EntityArg, bool)| {
+            let id = id.live("Image", &verb)?;
             with_image(scene, id, |i| set(i, value));
             Ok(())
         }),
@@ -228,18 +241,19 @@ fn register_texture_and_amount<'scope>(
     put(
         table,
         "GetTexture",
-        scope.create_function(|_, id: u32| {
+        scope.create_function(|_, id: EntityArg| {
             let scene = scene.borrow();
             Ok(scene
                 .world
-                .image(id)
+                .image(id.read())
                 .and_then(|i| i.texture.as_ref().map(MapRef::to_string)))
         }),
     )?;
     put(
         table,
         "SetTexture",
-        scope.create_function(|_, (id, path): (u32, Option<String>)| {
+        scope.create_function(|_, (id, path): (EntityArg, Option<String>)| {
+            let id = id.live("Image", "SetTexture")?;
             with_image(scene, id, |i| image_ops::set_texture(i, path));
             Ok(())
         }),
@@ -247,15 +261,16 @@ fn register_texture_and_amount<'scope>(
     put(
         table,
         "GetFillAmount",
-        scope.create_function(|_, id: u32| {
+        scope.create_function(|_, id: EntityArg| {
             let scene = scene.borrow();
-            Ok(scene.world.image(id).map_or(0.0, |i| i.fill_amount))
+            Ok(scene.world.image(id.read()).map_or(0.0, |i| i.fill_amount))
         }),
     )?;
     put(
         table,
         "SetFillAmount",
-        scope.create_function(|_, (id, amount): (u32, f32)| {
+        scope.create_function(|_, (id, amount): (EntityArg, f32)| {
+            let id = id.live("Image", "SetFillAmount")?;
             with_image(scene, id, |i| image_ops::set_fill_amount(i, amount));
             Ok(())
         }),

@@ -11,6 +11,7 @@ use std::cell::RefCell;
 use mlua::Lua;
 
 use super::{put, Reg};
+use crate::api::entity_arg::EntityArg;
 use crate::scene::Scene;
 use crate::scene::LAYER_COUNT;
 
@@ -25,13 +26,14 @@ pub fn register<'scope>(
     put(
         &table,
         "GetLayer",
-        scope.create_function(|_, id: u32| Ok(scene.borrow().world.layer(id))),
+        scope.create_function(|_, id: EntityArg| Ok(scene.borrow().world.layer(id.read()))),
     )?;
 
     put(
         &table,
         "SetLayer",
-        scope.create_function(|_, (id, layer): (u32, u8)| {
+        scope.create_function(|_, (id, layer): (EntityArg, u8)| {
+            let id = id.live("Layers", "SetLayer")?;
             scene.borrow_mut().world.set_layer(id, layer);
             Ok(())
         }),

@@ -12,6 +12,7 @@ use glam::Vec3;
 use mlua::Table;
 
 use super::super::{put, Reg};
+use crate::api::entity_arg::EntityArg;
 use crate::physics::PhysicsWorld;
 use crate::scene::Scene;
 
@@ -39,11 +40,11 @@ fn register_closest<'scope>(
     put(
         table,
         "ClosestPoint",
-        scope.create_function(|_, (id, x, y, z): (u32, f32, f32, f32)| {
+        scope.create_function(|_, (id, x, y, z): (EntityArg, f32, f32, f32)| {
             let physics = physics.borrow();
             let closest = physics
                 .as_ref()
-                .and_then(|world| world.closest_point_on(id, Vec3::new(x, y, z)));
+                .and_then(|world| world.closest_point_on(id.read(), Vec3::new(x, y, z)));
             Ok(match closest {
                 Some(p) => (true, p.x, p.y, p.z),
                 None => (false, x, y, z),
@@ -62,11 +63,11 @@ fn register_contains<'scope>(
     put(
         table,
         "ContainsPoint",
-        scope.create_function(|_, (id, x, y, z): (u32, f32, f32, f32)| {
+        scope.create_function(|_, (id, x, y, z): (EntityArg, f32, f32, f32)| {
             let physics = physics.borrow();
             Ok(physics
                 .as_ref()
-                .and_then(|world| world.collider_contains_point(id, Vec3::new(x, y, z)))
+                .and_then(|world| world.collider_contains_point(id.read(), Vec3::new(x, y, z)))
                 .unwrap_or(false))
         }),
     )
@@ -85,9 +86,9 @@ fn register_bounds<'scope>(
     put(
         table,
         "GetBounds",
-        scope.create_function(|_, id: u32| {
+        scope.create_function(|_, id: EntityArg| {
             let scene = scene.borrow();
-            let bounds = scene.world.collider_bounds(id);
+            let bounds = scene.world.collider_bounds(id.read());
             Ok(match bounds {
                 Some((min, max)) => (true, min.x, min.y, min.z, max.x, max.y, max.z),
                 None => (false, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0),

@@ -15,6 +15,7 @@ use glam::{Vec2, Vec4};
 use mlua::{Lua, Table};
 
 use super::{put, Reg};
+use crate::api::entity_arg::EntityArg;
 use crate::components::TextComponent;
 use crate::components::{TextAlignment, TextOverflow};
 use crate::core::video::VideoSettings;
@@ -202,7 +203,7 @@ pub fn register<'scope>(
             }
         },
     };
-    super::ui_look::register_blend(scope, &t, scene, blend)?;
+    super::ui_look::register_blend(scope, &t, scene, ("Text", blend))?;
     lua.globals().set("Text", t).map_err(|e| e.to_string())
 }
 
@@ -220,9 +221,12 @@ where
     put(
         table,
         name,
-        scope.create_function(move |_, id: u32| {
+        scope.create_function(move |_, id: EntityArg| {
             let scene = scene.borrow();
-            scene.world.text(id).map_or(Ok(R::default()), |t| get(&t))
+            scene
+                .world
+                .text(id.read())
+                .map_or(Ok(R::default()), |t| get(&t))
         }),
     )
 }
@@ -238,10 +242,12 @@ fn setter<'scope, V>(
 where
     V: mlua::FromLua,
 {
+    let verb = name.to_string();
     put(
         table,
         name,
-        scope.create_function(move |_, (id, value): (u32, V)| {
+        scope.create_function(move |_, (id, value): (EntityArg, V)| {
+            let id = id.live("Text", &verb)?;
             if let Some(mut t) = scene.borrow_mut().world.text_mut(id) {
                 set(&mut t, value);
             }

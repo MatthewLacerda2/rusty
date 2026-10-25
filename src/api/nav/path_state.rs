@@ -9,6 +9,7 @@ use mlua::Table;
 
 use super::super::{put, Reg};
 use super::query::path_table;
+use crate::api::entity_arg::EntityArg;
 use crate::navigation::{remaining_corners, remaining_distance, reset_path, NavigationGraph};
 use crate::scene::Scene;
 
@@ -27,18 +28,19 @@ pub(super) fn register_reads<'scope>(
     put(
         table,
         "HasPath",
-        scope.create_function(|_, id: u32| {
+        scope.create_function(|_, id: EntityArg| {
             let scene = scene.borrow();
             Ok(scene
                 .world
-                .nav_agent(id)
+                .nav_agent(id.read())
                 .is_some_and(|a| !a.cached_path.is_empty()))
         }),
     )?;
     put(
         table,
         "RemainingDistance",
-        scope.create_function(|_, id: u32| {
+        scope.create_function(|_, id: EntityArg| {
+            let id = id.read();
             let scene = scene.borrow();
             let at = position(&scene, id);
             Ok(scene
@@ -50,16 +52,17 @@ pub(super) fn register_reads<'scope>(
     put(
         table,
         "GetPathStatus",
-        scope.create_function(|_, id: u32| {
+        scope.create_function(|_, id: EntityArg| {
             let scene = scene.borrow();
-            let status = scene.world.nav_agent(id).map(|a| a.path_status);
+            let status = scene.world.nav_agent(id.read()).map(|a| a.path_status);
             Ok(status.unwrap_or_default().name())
         }),
     )?;
     put(
         table,
         "GetPath",
-        scope.create_function(|lua, id: u32| {
+        scope.create_function(|lua, id: EntityArg| {
+            let id = id.read();
             let scene = scene.borrow();
             let at = position(&scene, id);
             let (status, corners) = scene
@@ -82,7 +85,8 @@ pub(super) fn register_writes<'scope>(
     put(
         table,
         "Warp",
-        scope.create_function(|_, (id, x, y, z): (u32, f32, f32, f32)| {
+        scope.create_function(|_, (id, x, y, z): (EntityArg, f32, f32, f32)| {
+            let id = id.live("NavMeshAgent", "Warp")?;
             let mut scene = scene.borrow_mut();
             let landed = match scene.world.nav_agent_mut(id) {
                 Some(mut a) => nav.borrow().warp_agent(&mut a, Vec3::new(x, y, z)),
@@ -97,7 +101,8 @@ pub(super) fn register_writes<'scope>(
     put(
         table,
         "ResetPath",
-        scope.create_function(|_, id: u32| {
+        scope.create_function(|_, id: EntityArg| {
+            let id = id.live("NavMeshAgent", "ResetPath")?;
             let mut scene = scene.borrow_mut();
             let at = position(&scene, id);
             if let Some(mut a) = scene.world.nav_agent_mut(id) {

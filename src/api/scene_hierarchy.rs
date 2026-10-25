@@ -20,13 +20,14 @@
 //!     file stem, `"button"`), the very table its callbacks run on; `nil` outside
 //!     play or when it has none.
 //!
-//! A `nil` id (a failed `FindEntityByName`) is not an error for the reads: `GetParent`,
-//! `FindChild` and `GetScript` answer `nil`, `GetChildren` an empty array and
-//! `IsActive` `false`, as Unity's `GetComponent` on a missing object does.
+//! A `nil` id (a failed `FindEntityByName`) reads as a missing entity, as every
+//! read's does (`api::entity_arg`): `GetParent`, `FindChild` and `GetScript` answer
+//! `nil`, `GetChildren` an empty array and `IsActive` `false`.
 
 use std::cell::RefCell;
 
 use super::{put, Reg};
+use crate::api::entity_arg::EntityArg;
 use crate::scene::Scene;
 use crate::scripting::instances;
 
@@ -36,17 +37,15 @@ pub fn register<'scope>(
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
-    let f = scope.create_function(move |_, id: Option<u32>| {
-        Ok(id.and_then(|id| scene.borrow().world.parent_id(id)))
-    });
+    let f = scope
+        .create_function(move |_, id: EntityArg| Ok(scene.borrow().world.parent_id(id.read())));
     put(table, "GetParent", f)?;
-    let f = scope.create_function(move |_, id: Option<u32>| {
-        Ok(id.map_or_else(Vec::new, |id| scene.borrow().world.children(id)))
-    });
+    let f =
+        scope.create_function(move |_, id: EntityArg| Ok(scene.borrow().world.children(id.read())));
     put(table, "GetChildren", f)?;
-    let f = scope.create_function(move |_, (id, path): (Option<u32>, String)| {
+    let f = scope.create_function(move |_, (id, path): (EntityArg, String)| {
         let world = &scene.borrow().world;
-        let mut at = id.filter(|&id| world.contains(id));
+        let mut at = Some(id.read()).filter(|&id| world.contains(id));
         for segment in path.split('/').filter(|s| !s.is_empty()) {
             at = at.and_then(|p| {
                 world
@@ -58,22 +57,22 @@ pub fn register<'scope>(
         Ok(at)
     });
     put(table, "FindChild", f)?;
-    let f = scope.create_function(move |_, (id, on): (u32, bool)| {
+    let f = scope.create_function(move |_, (id, on): (EntityArg, bool)| {
+        let id = id.live("Scene", "SetActive")?;
         Ok(scene.borrow_mut().world.set_active(id, on))
     });
     put(table, "SetActive", f)?;
-    let f = scope.create_function(move |_, id: Option<u32>| {
+    let f = scope.create_function(move |_, id: EntityArg| {
         // lint: allow(active-self) `IsActive` is Unity's `activeSelf`
-        Ok(id.is_some_and(|id| scene.borrow().world.is_active_self(id)))
+        Ok(scene.borrow().world.is_active_self(id.read()))
     });
     put(table, "IsActive", f)?;
-    let f = scope.create_function(move |_, id: Option<u32>| {
-        Ok(id.is_some_and(|id| scene.borrow().world.is_active_in_hierarchy(id)))
+    let f = scope.create_function(move |_, id: EntityArg| {
+        Ok(scene.borrow().world.is_active_in_hierarchy(id.read()))
     });
     put(table, "IsActiveInHierarchy", f)?;
-    let f = scope.create_function(|lua, (id, name): (Option<u32>, String)| match id {
-        Some(id) => instances::find(lua, id, &name),
-        None => Ok(None),
+    let f = scope.create_function(|lua, (id, name): (EntityArg, String)| {
+        instances::find(lua, id.read(), &name)
     });
     put(table, "GetScript", f)
 }

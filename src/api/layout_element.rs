@@ -13,6 +13,7 @@ use std::cell::RefCell;
 use mlua::{FromLuaMulti, IntoLuaMulti, Lua, Table};
 
 use super::{put, Reg};
+use crate::api::entity_arg::EntityArg;
 use crate::components::{LayoutAxisFit, LayoutElementComponent};
 use crate::scene::authoring::layout_element::{self as ops, SizeKind};
 use crate::scene::Scene;
@@ -67,16 +68,18 @@ where
     R: IntoLuaMulti + Default,
     A: FromLuaMulti,
 {
-    let f = scope.create_function(move |_, id: u32| {
+    let f = scope.create_function(move |_, id: EntityArg| {
         Ok(scene
             .borrow()
             .world
-            .layout_element(id)
+            .layout_element(id.read())
             .map(|e| get(&e))
             .unwrap_or_default())
     });
     put(t, &format!("Get{suffix}"), f)?;
-    let f = scope.create_function(move |lua, (id, rest): (u32, mlua::MultiValue)| {
+    let verb = format!("Set{suffix}");
+    let f = scope.create_function(move |lua, (id, rest): (EntityArg, mlua::MultiValue)| {
+        let id = id.live("LayoutElement", &verb)?;
         let value = A::from_lua_multi(rest, lua)?;
         if let Some(mut e) = scene.borrow_mut().world.layout_element_mut(id) {
             set(&mut e, value);

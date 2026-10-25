@@ -14,6 +14,7 @@ use glam::Vec3;
 use mlua::{Lua, Table};
 
 use super::{put, Reg};
+use crate::api::entity_arg::EntityArg;
 use crate::components::character_controller::{COLLIDED_ABOVE, COLLIDED_BELOW, COLLIDED_SIDES};
 use crate::components::CharacterControllerComponent as Cc;
 use crate::physics::{self, PhysicsWorld};
@@ -67,31 +68,35 @@ fn register_motion<'scope>(
     scene: SceneCell<'scope>,
     physics: PhysicsCell<'scope>,
 ) -> Reg {
-    let f = scope.create_function(move |_, (id, x, y, z): (u32, f32, f32, f32)| {
+    let f = scope.create_function(move |_, (id, x, y, z): (EntityArg, f32, f32, f32)| {
+        let id = id.live("CharacterController", "Move")?;
         let world = physics.borrow();
         let mut scene = scene.borrow_mut();
         let hit = physics::move_character(world.as_ref(), &mut scene, id, Vec3::new(x, y, z));
         Ok(flags(hit.map_or(0, |m| m.flags)))
     });
     put(t, "Move", f)?;
-    let f =
-        scope.create_function(move |_, id: u32| Ok(get(scene, id).is_some_and(|c| c.is_grounded)));
+    let f = scope.create_function(move |_, id: EntityArg| {
+        Ok(get(scene, id.read()).is_some_and(|c| c.is_grounded))
+    });
     put(t, "IsGrounded", f)?;
-    let f = scope.create_function(move |_, id: u32| {
-        Ok(flags(get(scene, id).map_or(0, |c| c.collision_flags)))
+    let f = scope.create_function(move |_, id: EntityArg| {
+        Ok(flags(
+            get(scene, id.read()).map_or(0, |c| c.collision_flags),
+        ))
     });
     put(t, "GetCollisionFlags", f)?;
-    let f = scope.create_function(move |_, id: u32| {
-        let n = get(scene, id).map_or(Vec3::Y, |c| c.ground_normal);
+    let f = scope.create_function(move |_, id: EntityArg| {
+        let n = get(scene, id.read()).map_or(Vec3::Y, |c| c.ground_normal);
         Ok((n.x, n.y, n.z))
     });
     put(t, "GetGroundNormal", f)?;
-    let f = scope.create_function(move |_, (id, height): (u32, f32)| {
+    let f = scope.create_function(move |_, (id, height): (EntityArg, f32)| {
         let world = physics.borrow();
         Ok(physics::can_stand(
             world.as_ref(),
             &scene.borrow(),
-            id,
+            id.read(),
             height,
         ))
     });
@@ -106,9 +111,13 @@ fn f32_pair<'scope>(
     name: &str,
     (read, write): Field<f32>,
 ) -> Reg {
-    let f = scope.create_function(move |_, id: u32| Ok(get(scene, id).map_or(0.0, |c| read(&c))));
+    let f = scope.create_function(move |_, id: EntityArg| {
+        Ok(get(scene, id.read()).map_or(0.0, |c| read(&c)))
+    });
     put(t, &format!("Get{name}"), f)?;
-    let f = scope.create_function(move |_, (id, v): (u32, f32)| {
+    let verb = format!("Set{name}");
+    let f = scope.create_function(move |_, (id, v): (EntityArg, f32)| {
+        let id = id.live("CharacterController", &verb)?;
         if let Some(mut c) = scene.borrow_mut().world.character_controller_mut(id) {
             write(&mut c, v);
         }
@@ -134,12 +143,13 @@ fn register_shape<'scope>(
     f32_pair(scope, t, scene, "SkinWidth", skin)?;
     let min_move: Field<f32> = (|c| c.min_move_distance, ops::set_min_move_distance);
     f32_pair(scope, t, scene, "MinMoveDistance", min_move)?;
-    let f = scope.create_function(move |_, id: u32| {
-        let v = get(scene, id).map_or(Vec3::ZERO, |c| c.center);
+    let f = scope.create_function(move |_, id: EntityArg| {
+        let v = get(scene, id.read()).map_or(Vec3::ZERO, |c| c.center);
         Ok((v.x, v.y, v.z))
     });
     put(t, "GetCenter", f)?;
-    let f = scope.create_function(move |_, (id, x, y, z): (u32, f32, f32, f32)| {
+    let f = scope.create_function(move |_, (id, x, y, z): (EntityArg, f32, f32, f32)| {
+        let id = id.live("CharacterController", "SetCenter")?;
         if let Some(mut c) = scene.borrow_mut().world.character_controller_mut(id) {
             ops::set_center(&mut c, Vec3::new(x, y, z));
         }

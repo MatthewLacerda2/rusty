@@ -14,6 +14,7 @@ use glam::Vec2;
 use mlua::Lua;
 
 use super::{put, Reg};
+use crate::api::entity_arg::EntityArg;
 use crate::components::CanvasComponent;
 use crate::components::CanvasRenderMode;
 use crate::core::video::VideoSettings;
@@ -36,10 +37,10 @@ pub fn register<'scope>(
     put(
         &table,
         "GetScaleFactor",
-        scope.create_function(|_, id: u32| {
+        scope.create_function(|_, id: EntityArg| {
             let px = screen.borrow().pixels(&video.borrow());
             let scene = scene.borrow();
-            Ok(scene.world.canvas(id).map(|c| c.scale_factor(px)))
+            Ok(scene.world.canvas(id.read()).map(|c| c.scale_factor(px)))
         }),
     )?;
     lua.globals()
@@ -57,15 +58,20 @@ fn register_order_and_mode<'scope>(
     put(
         table,
         "GetSortOrder",
-        scope.create_function(|_, id: u32| {
+        scope.create_function(|_, id: EntityArg| {
             let scene = scene.borrow();
-            Ok(scene.world.canvas(id).map(|c| c.sort_order).unwrap_or(0))
+            Ok(scene
+                .world
+                .canvas(id.read())
+                .map(|c| c.sort_order)
+                .unwrap_or(0))
         }),
     )?;
     put(
         table,
         "SetSortOrder",
-        scope.create_function(|_, (id, order): (u32, i32)| {
+        scope.create_function(|_, (id, order): (EntityArg, i32)| {
+            let id = id.live("Canvas", "SetSortOrder")?;
             if let Some(mut c) = scene.borrow_mut().world.canvas_mut(id) {
                 canvas_ops::set_sort_order(&mut c, order);
             }
@@ -75,16 +81,17 @@ fn register_order_and_mode<'scope>(
     put(
         table,
         "GetRenderMode",
-        scope.create_function(|_, id: u32| {
+        scope.create_function(|_, id: EntityArg| {
             let scene = scene.borrow();
-            let mode = scene.world.canvas(id).map(|c| c.render_mode);
+            let mode = scene.world.canvas(id.read()).map(|c| c.render_mode);
             Ok(mode.map_or("None", CanvasRenderMode::name).to_string())
         }),
     )?;
     put(
         table,
         "SetRenderMode",
-        scope.create_function(|_, (id, name): (u32, String)| {
+        scope.create_function(|_, (id, name): (EntityArg, String)| {
+            let id = id.live("Canvas", "SetRenderMode")?;
             let mode = CanvasRenderMode::parse(&name);
             if let (Some(mut c), Some(mode)) = (scene.borrow_mut().world.canvas_mut(id), mode) {
                 canvas_ops::set_render_mode(&mut c, mode);
@@ -104,9 +111,12 @@ fn register_scaler<'scope>(
     put(
         table,
         "GetReferenceResolution",
-        scope.create_function(|_, id: u32| {
+        scope.create_function(|_, id: EntityArg| {
             let scene = scene.borrow();
-            let r = scene.world.canvas(id).map(|c| c.reference_resolution);
+            let r = scene
+                .world
+                .canvas(id.read())
+                .map(|c| c.reference_resolution);
             let r = r.unwrap_or(Vec2::ZERO);
             Ok((r.x, r.y))
         }),
@@ -114,7 +124,8 @@ fn register_scaler<'scope>(
     put(
         table,
         "SetReferenceResolution",
-        scope.create_function(|_, (id, w, h): (u32, f32, f32)| {
+        scope.create_function(|_, (id, w, h): (EntityArg, f32, f32)| {
+            let id = id.live("Canvas", "SetReferenceResolution")?;
             if let Some(mut c) = scene.borrow_mut().world.canvas_mut(id) {
                 canvas_ops::set_reference_resolution(&mut c, Vec2::new(w, h));
             }
@@ -124,16 +135,20 @@ fn register_scaler<'scope>(
     put(
         table,
         "GetMatchWidthOrHeight",
-        scope.create_function(|_, id: u32| {
+        scope.create_function(|_, id: EntityArg| {
             let scene = scene.borrow();
-            let m = scene.world.canvas(id).map(|c| c.match_width_or_height);
+            let m = scene
+                .world
+                .canvas(id.read())
+                .map(|c| c.match_width_or_height);
             Ok(m.unwrap_or(0.0))
         }),
     )?;
     put(
         table,
         "SetMatchWidthOrHeight",
-        scope.create_function(|_, (id, value): (u32, f32)| {
+        scope.create_function(|_, (id, value): (EntityArg, f32)| {
+            let id = id.live("Canvas", "SetMatchWidthOrHeight")?;
             if let Some(mut c) = scene.borrow_mut().world.canvas_mut(id) {
                 canvas_ops::set_match_width_or_height(&mut c, value);
             }
@@ -164,16 +179,18 @@ fn register_world<'scope>(
         ("Sway", (|c| c.sway, canvas_ops::set_sway)),
     ];
     for (suffix, (get, set)) in scalars {
-        let f = scope.create_function(move |_, id: u32| {
+        let f = scope.create_function(move |_, id: EntityArg| {
             Ok(scene
                 .borrow()
                 .world
-                .canvas(id)
+                .canvas(id.read())
                 .map(|c| get(&c))
                 .unwrap_or(0.0))
         });
         put(table, &format!("Get{suffix}"), f)?;
-        let f = scope.create_function(move |_, (id, v): (u32, f32)| {
+        let verb = format!("Set{suffix}");
+        let f = scope.create_function(move |_, (id, v): (EntityArg, f32)| {
+            let id = id.live("Canvas", &verb)?;
             if let Some(mut c) = scene.borrow_mut().world.canvas_mut(id) {
                 set(&mut c, v);
             }
@@ -181,13 +198,14 @@ fn register_world<'scope>(
         });
         put(table, &format!("Set{suffix}"), f)?;
     }
-    let f = scope.create_function(move |_, id: u32| {
-        let t = scene.borrow().world.canvas(id).map(|c| c.tilt);
+    let f = scope.create_function(move |_, id: EntityArg| {
+        let t = scene.borrow().world.canvas(id.read()).map(|c| c.tilt);
         let t = t.unwrap_or(Vec2::ZERO);
         Ok((t.x, t.y))
     });
     put(table, "GetTilt", f)?;
-    let f = scope.create_function(move |_, (id, x, y): (u32, f32, f32)| {
+    let f = scope.create_function(move |_, (id, x, y): (EntityArg, f32, f32)| {
+        let id = id.live("Canvas", "SetTilt")?;
         if let Some(mut c) = scene.borrow_mut().world.canvas_mut(id) {
             canvas_ops::set_tilt(&mut c, Vec2::new(x, y));
         }

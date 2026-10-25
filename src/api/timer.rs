@@ -16,6 +16,7 @@ use std::cell::RefCell;
 use mlua::{Function, Lua, MultiValue, Table, Value};
 
 use super::{put, Reg};
+use crate::api::entity_arg::EntityArg;
 use crate::scene::Scene;
 use crate::scripting::{require_sim_vm, wait, ConsoleLogs, Target, TimerScheduler, Wait, Work};
 
@@ -35,7 +36,7 @@ pub fn register<'scope>(
     lua.globals().set("Timer", table).map_err(|e| e.to_string())
 }
 
-/// `Invoke` / `InvokeRepeating` / `CancelInvoke` / `IsInvoking`.
+/// `Invoke` / `InvokeRepeating`, then the queries.
 fn register_invoke<'scope>(
     scope: &'scope mlua::Scope<'scope, '_>,
     table: &Table,
@@ -59,7 +60,8 @@ fn register_invoke<'scope>(
     put(
         table,
         "Invoke",
-        scope.create_function(move |lua, (id, target, delay): (u32, Value, f64)| {
+        scope.create_function(move |lua, (id, target, delay): (EntityArg, Value, f64)| {
+            let id = id.live("Timer", "Invoke")?;
             schedule(lua, id, target, delay, None)
         }),
     )?;
@@ -67,7 +69,8 @@ fn register_invoke<'scope>(
         table,
         "InvokeRepeating",
         scope.create_function(
-            move |lua, (id, target, delay, every): (u32, Value, f64, f64)| {
+            move |lua, (id, target, delay, every): (EntityArg, Value, f64, f64)| {
+                let id = id.live("Timer", "InvokeRepeating")?;
                 if every <= 0.0 {
                     return Err(runtime("InvokeRepeating interval must be > 0"));
                 }
@@ -75,10 +78,20 @@ fn register_invoke<'scope>(
             },
         ),
     )?;
+    register_invoke_queries(scope, table, timers)
+}
+
+/// `CancelInvoke` / `IsInvoking`.
+fn register_invoke_queries<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
+    table: &Table,
+    timers: &'scope RefCell<TimerScheduler>,
+) -> Reg {
     put(
         table,
         "CancelInvoke",
-        scope.create_function(|_, (id, name): (u32, Option<String>)| {
+        scope.create_function(|_, (id, name): (EntityArg, Option<String>)| {
+            let id = id.live("Timer", "CancelInvoke")?;
             timers.borrow_mut().cancel_invokes(id, name.as_deref());
             Ok(())
         }),
@@ -86,8 +99,8 @@ fn register_invoke<'scope>(
     put(
         table,
         "IsInvoking",
-        scope.create_function(|_, (id, name): (u32, Option<String>)| {
-            Ok(timers.borrow().is_invoking(id, name.as_deref()))
+        scope.create_function(|_, (id, name): (EntityArg, Option<String>)| {
+            Ok(timers.borrow().is_invoking(id.read(), name.as_deref()))
         }),
     )
 }
@@ -122,35 +135,39 @@ fn register_coroutines<'scope>(
     put(
         table,
         "StartCoroutine",
-        scope.create_function(move |lua, (id, f, args): (u32, Function, MultiValue)| {
-            require_active(&scene.borrow(), id)?;
-            require_sim_vm(lua, "Timer.StartCoroutine")?;
-            let thread = lua.create_thread(f)?;
-            let handle = timers.borrow_mut().alloc();
-            let mut call = args.into_vec();
-            call.insert(0, Value::Integer(i64::from(id)));
-            let first = match thread.resume::<MultiValue>(MultiValue::from_vec(call)) {
-                Err(e) => Err(e.to_string()),
-                Ok(_) if !thread.is_resumable() => return Ok(handle),
-                Ok(y) => wait::parse(lua, y.into_iter().next().unwrap_or(Value::Nil)),
-            };
-            match first {
-                Ok(next) => {
-                    let key = lua.create_registry_value(thread)?;
-                    let work = Work::Coroutine { thread: key };
-                    timers.borrow_mut().insert(handle, id, work, next);
+        scope.create_function(
+            move |lua, (id, f, args): (EntityArg, Function, MultiValue)| {
+                let id = id.live("Timer", "StartCoroutine")?;
+                require_active(&scene.borrow(), id)?;
+                require_sim_vm(lua, "Timer.StartCoroutine")?;
+                let thread = lua.create_thread(f)?;
+                let handle = timers.borrow_mut().alloc();
+                let mut call = args.into_vec();
+                call.insert(0, Value::Integer(i64::from(id)));
+                let first = match thread.resume::<MultiValue>(MultiValue::from_vec(call)) {
+                    Err(e) => Err(e.to_string()),
+                    Ok(_) if !thread.is_resumable() => return Ok(handle),
+                    Ok(y) => wait::parse(lua, y.into_iter().next().unwrap_or(Value::Nil)),
+                };
+                match first {
+                    Ok(next) => {
+                        let key = lua.create_registry_value(thread)?;
+                        let work = Work::Coroutine { thread: key };
+                        timers.borrow_mut().insert(handle, id, work, next);
+                    }
+                    Err(e) => console
+                        .borrow_mut()
+                        .error(format!("[Lua Error] Coroutine on entity {id} failed: {e}")),
                 }
-                Err(e) => console
-                    .borrow_mut()
-                    .error(format!("[Lua Error] Coroutine on entity {id} failed: {e}")),
-            }
-            Ok(handle)
-        }),
+                Ok(handle)
+            },
+        ),
     )?;
     put(
         table,
         "StopAllCoroutines",
-        scope.create_function(|_, id: u32| {
+        scope.create_function(|_, id: EntityArg| {
+            let id = id.live("Timer", "StopAllCoroutines")?;
             timers.borrow_mut().cancel_coroutines(id);
             Ok(())
         }),

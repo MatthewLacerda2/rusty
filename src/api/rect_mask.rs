@@ -11,6 +11,7 @@ use glam::Vec4;
 use mlua::Lua;
 
 use super::{put, Reg};
+use crate::api::entity_arg::EntityArg;
 use crate::scene::authoring::rect_mask as mask_ops;
 use crate::scene::Scene;
 
@@ -24,16 +25,20 @@ pub fn register<'scope>(
     put(
         &table,
         "GetPadding",
-        scope.create_function(|_, id: u32| {
+        scope.create_function(|_, id: EntityArg| {
             let scene = scene.borrow();
-            let p = scene.world.rect_mask(id).map_or(Vec4::ZERO, |m| m.padding);
+            let p = scene
+                .world
+                .rect_mask(id.read())
+                .map_or(Vec4::ZERO, |m| m.padding);
             Ok((p.x, p.y, p.z, p.w))
         }),
     )?;
     put(
         &table,
         "SetPadding",
-        scope.create_function(|_, (id, l, b, r, t): (u32, f32, f32, f32, f32)| {
+        scope.create_function(|_, (id, l, b, r, t): (EntityArg, f32, f32, f32, f32)| {
+            let id = id.live("RectMask", "SetPadding")?;
             if let Some(mut m) = scene.borrow_mut().world.rect_mask_mut(id) {
                 mask_ops::set_padding(&mut m, Vec4::new(l, b, r, t));
             }
@@ -43,15 +48,16 @@ pub fn register<'scope>(
     put(
         &table,
         "GetFeather",
-        scope.create_function(|_, id: u32| {
+        scope.create_function(|_, id: EntityArg| {
             let scene = scene.borrow();
-            Ok(scene.world.rect_mask(id).map_or(0.0, |m| m.feather))
+            Ok(scene.world.rect_mask(id.read()).map_or(0.0, |m| m.feather))
         }),
     )?;
     put(
         &table,
         "SetFeather",
-        scope.create_function(|_, (id, feather): (u32, f32)| {
+        scope.create_function(|_, (id, feather): (EntityArg, f32)| {
+            let id = id.live("RectMask", "SetFeather")?;
             if let Some(mut m) = scene.borrow_mut().world.rect_mask_mut(id) {
                 mask_ops::set_feather(&mut m, feather);
             }

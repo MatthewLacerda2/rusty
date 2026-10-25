@@ -12,6 +12,7 @@
 use std::cell::RefCell;
 
 use super::super::{put, Reg};
+use crate::api::entity_arg::EntityArg;
 use crate::scene::authoring::material as mat_ops;
 use crate::scene::Scene;
 
@@ -24,25 +25,34 @@ pub fn register<'scope>(
     put(
         table,
         "Get",
-        scope.create_function(|_, id: u32| {
-            Ok(mat_ops::keys(&scene.borrow().world, id).into_iter().next())
+        scope.create_function(|_, id: EntityArg| {
+            Ok(mat_ops::keys(&scene.borrow().world, id.read())
+                .into_iter()
+                .next())
         }),
     )?;
     put(
         table,
         "GetAll",
-        scope.create_function(|_, id: u32| Ok(mat_ops::keys(&scene.borrow().world, id))),
+        scope.create_function(|_, id: EntityArg| {
+            Ok(mat_ops::keys(&scene.borrow().world, id.read()))
+        }),
     )?;
     put(
         table,
         "Set",
-        scope.create_function(|_, (id, key): (u32, String)| set(scene, id, 0, &key)),
+        scope.create_function(|_, (id, key): (EntityArg, String)| {
+            let id = id.live("Material", "Set")?;
+            set(scene, id, 0, &key)
+        }),
     )?;
     put(
         table,
         "SetAt",
-        scope
-            .create_function(|_, (id, slot, key): (u32, usize, String)| set(scene, id, slot, &key)),
+        scope.create_function(|_, (id, slot, key): (EntityArg, usize, String)| {
+            let id = id.live("Material", "SetAt")?;
+            set(scene, id, slot, &key)
+        }),
     )
 }
 

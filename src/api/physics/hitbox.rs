@@ -10,6 +10,7 @@ use std::cell::RefCell;
 use mlua::Table;
 
 use super::super::{put, Reg};
+use crate::api::entity_arg::EntityArg;
 use crate::scene::skeleton::HitboxOptions;
 use crate::scene::Scene;
 
@@ -22,7 +23,8 @@ pub(super) fn register<'scope>(
     put(
         table,
         "GenerateHitboxes",
-        scope.create_function(|lua, (id, opts): (u32, Option<Table>)| {
+        scope.create_function(|lua, (id, opts): (EntityArg, Option<Table>)| {
+            let id = id.live("Physics", "GenerateHitboxes")?;
             let opts = options(opts)?;
             let made = scene
                 .borrow_mut()

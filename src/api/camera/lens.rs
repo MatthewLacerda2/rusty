@@ -9,6 +9,7 @@
 use std::cell::RefCell;
 
 use super::component::{read, write};
+use crate::api::entity_arg::EntityArg;
 use crate::api::{put, Reg};
 use crate::components::ClearFlags;
 use crate::scene::authoring::camera as camera_ops;
@@ -25,12 +26,13 @@ pub(super) fn register<'scope>(
     put(
         table,
         "GetFieldOfView",
-        scope.create_function(|_, id: u32| Ok(read(scene, id, |c| held_lens(c).fov))),
+        scope.create_function(|_, id: EntityArg| Ok(read(scene, id.read(), |c| held_lens(c).fov))),
     )?;
     put(
         table,
         "SetFieldOfView",
-        scope.create_function(|_, (id, fov): (u32, f32)| {
+        scope.create_function(|_, (id, fov): (EntityArg, f32)| {
+            let id = id.live("Camera", "SetFieldOfView")?;
             write(scene, id, |c| camera_ops::set_fov(c, fov));
             Ok(())
         }),
@@ -38,8 +40,8 @@ pub(super) fn register<'scope>(
     put(
         table,
         "GetClipPlanes",
-        scope.create_function(|_, id: u32| {
-            let (near, far): (Option<f32>, Option<f32>) = read(scene, id, |c| {
+        scope.create_function(|_, id: EntityArg| {
+            let (near, far): (Option<f32>, Option<f32>) = read(scene, id.read(), |c| {
                 let lens = held_lens(c);
                 (lens.near, lens.far)
             })
@@ -50,7 +52,8 @@ pub(super) fn register<'scope>(
     put(
         table,
         "SetClipPlanes",
-        scope.create_function(|_, (id, near, far): (u32, f32, f32)| {
+        scope.create_function(|_, (id, near, far): (EntityArg, f32, f32)| {
+            let id = id.live("Camera", "SetClipPlanes")?;
             write(scene, id, |c| camera_ops::set_clip_planes(c, near, far));
             Ok(())
         }),
@@ -68,12 +71,13 @@ fn register_stacking<'scope>(
     put(
         table,
         "GetRenderOrder",
-        scope.create_function(|_, id: u32| Ok(read(scene, id, |c| c.render_order))),
+        scope.create_function(|_, id: EntityArg| Ok(read(scene, id.read(), |c| c.render_order))),
     )?;
     put(
         table,
         "SetRenderOrder",
-        scope.create_function(|_, (id, order): (u32, i32)| {
+        scope.create_function(|_, (id, order): (EntityArg, i32)| {
+            let id = id.live("Camera", "SetRenderOrder")?;
             write(scene, id, |c| camera_ops::set_render_order(c, order));
             Ok(())
         }),
@@ -81,12 +85,15 @@ fn register_stacking<'scope>(
     put(
         table,
         "GetClearFlags",
-        scope.create_function(|_, id: u32| Ok(read(scene, id, |c| c.clear_flags.name()))),
+        scope.create_function(|_, id: EntityArg| {
+            Ok(read(scene, id.read(), |c| c.clear_flags.name()))
+        }),
     )?;
     put(
         table,
         "SetClearFlags",
-        scope.create_function(|_, (id, name): (u32, String)| {
+        scope.create_function(|_, (id, name): (EntityArg, String)| {
+            let id = id.live("Camera", "SetClearFlags")?;
             let flags = ClearFlags::parse(&name).ok_or_else(|| {
                 mlua::Error::RuntimeError(format!(
                     "SetClearFlags: unknown clear flags {name:?} (want one of {})",

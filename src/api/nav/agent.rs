@@ -9,6 +9,7 @@ use glam::Vec3;
 use mlua::Lua;
 
 use super::super::{put, Reg};
+use crate::api::entity_arg::EntityArg;
 use crate::navigation::{is_at_target, NavigationGraph};
 use crate::scene::authoring::nav::agent as nav_ops;
 use crate::scene::Scene;
@@ -48,7 +49,8 @@ fn register_agent_target<'scope>(
     put(
         table,
         "SetTarget",
-        scope.create_function(|_, (id, x, y, z): (u32, f32, f32, f32)| {
+        scope.create_function(|_, (id, x, y, z): (EntityArg, f32, f32, f32)| {
+            let id = id.live("NavMeshAgent", "SetTarget")?;
             let mut scene = scene.borrow_mut();
             if let Some(mut c) = scene.world.nav_agent_mut(id) {
                 nav_ops::set_target(&mut c, Vec3::new(x, y, z));
@@ -60,11 +62,11 @@ fn register_agent_target<'scope>(
     put(
         table,
         "GetTarget",
-        scope.create_function(|_, id: u32| {
+        scope.create_function(|_, id: EntityArg| {
             let scene = scene.borrow();
             let t = scene
                 .world
-                .nav_agent(id)
+                .nav_agent(id.read())
                 .map(|a| a.target)
                 .unwrap_or(Vec3::ZERO);
             Ok((t.x, t.y, t.z))
@@ -81,7 +83,8 @@ fn register_agent_motion<'scope>(
     put(
         table,
         "SetSpeed",
-        scope.create_function(|_, (id, speed): (u32, f32)| {
+        scope.create_function(|_, (id, speed): (EntityArg, f32)| {
+            let id = id.live("NavMeshAgent", "SetSpeed")?;
             let mut scene = scene.borrow_mut();
             if let Some(mut c) = scene.world.nav_agent_mut(id) {
                 nav_ops::set_speed(&mut c, speed);
@@ -93,7 +96,8 @@ fn register_agent_motion<'scope>(
     put(
         table,
         "SetAcceleration",
-        scope.create_function(|_, (id, acc): (u32, f32)| {
+        scope.create_function(|_, (id, acc): (EntityArg, f32)| {
+            let id = id.live("NavMeshAgent", "SetAcceleration")?;
             let mut scene = scene.borrow_mut();
             if let Some(mut c) = scene.world.nav_agent_mut(id) {
                 nav_ops::set_acceleration(&mut c, acc);
@@ -112,7 +116,8 @@ fn register_agent_size<'scope>(
     put(
         table,
         "SetStoppingDistance",
-        scope.create_function(|_, (id, dist): (u32, f32)| {
+        scope.create_function(|_, (id, dist): (EntityArg, f32)| {
+            let id = id.live("NavMeshAgent", "SetStoppingDistance")?;
             let mut scene = scene.borrow_mut();
             if let Some(mut c) = scene.world.nav_agent_mut(id) {
                 nav_ops::set_stopping_distance(&mut c, dist);
@@ -124,7 +129,8 @@ fn register_agent_size<'scope>(
     put(
         table,
         "SetRadius",
-        scope.create_function(|_, (id, r): (u32, f32)| {
+        scope.create_function(|_, (id, r): (EntityArg, f32)| {
+            let id = id.live("NavMeshAgent", "SetRadius")?;
             let mut scene = scene.borrow_mut();
             if let Some(mut c) = scene.world.nav_agent_mut(id) {
                 nav_ops::set_radius(&mut c, r);
@@ -136,7 +142,8 @@ fn register_agent_size<'scope>(
     put(
         table,
         "SetBaseOffset",
-        scope.create_function(|_, (id, offset): (u32, f32)| {
+        scope.create_function(|_, (id, offset): (EntityArg, f32)| {
+            let id = id.live("NavMeshAgent", "SetBaseOffset")?;
             let mut scene = scene.borrow_mut();
             if let Some(mut c) = scene.world.nav_agent_mut(id) {
                 nav_ops::set_base_offset(&mut c, offset);
@@ -148,9 +155,12 @@ fn register_agent_size<'scope>(
     put(
         table,
         "GetBaseOffset",
-        scope.create_function(|_, id: u32| {
+        scope.create_function(|_, id: EntityArg| {
             let scene = scene.borrow();
-            Ok(scene.world.nav_agent(id).map_or(0.0, |a| a.base_offset))
+            Ok(scene
+                .world
+                .nav_agent(id.read())
+                .map_or(0.0, |a| a.base_offset))
         }),
     )
 }
@@ -164,7 +174,8 @@ fn register_agent_queries<'scope>(
     put(
         table,
         "IsAtTarget",
-        scope.create_function(|_, id: u32| {
+        scope.create_function(|_, id: EntityArg| {
+            let id = id.read();
             let scene = scene.borrow();
             let at_target = scene
                 .world
@@ -178,11 +189,11 @@ fn register_agent_queries<'scope>(
     put(
         table,
         "GetVelocity",
-        scope.create_function(|_, id: u32| {
+        scope.create_function(|_, id: EntityArg| {
             let scene = scene.borrow();
             let v = scene
                 .world
-                .nav_agent(id)
+                .nav_agent(id.read())
                 .map(|a| a.velocity)
                 .unwrap_or(Vec3::ZERO);
             Ok((v.x, v.y, v.z))
@@ -192,7 +203,8 @@ fn register_agent_queries<'scope>(
     put(
         table,
         "SetActive",
-        scope.create_function(|_, (id, active): (u32, bool)| {
+        scope.create_function(|_, (id, active): (EntityArg, bool)| {
+            let id = id.live("NavMeshAgent", "SetActive")?;
             let mut scene = scene.borrow_mut();
             if let Some(mut c) = scene.world.nav_agent_mut(id) {
                 nav_ops::set_active(&mut c, active);
@@ -211,7 +223,8 @@ fn register_agent_avoidance<'scope>(
     put(
         table,
         "SetAvoidancePriority",
-        scope.create_function(|_, (id, priority): (u32, f64)| {
+        scope.create_function(|_, (id, priority): (EntityArg, f64)| {
+            let id = id.live("NavMeshAgent", "SetAvoidancePriority")?;
             let mut scene = scene.borrow_mut();
             if let Some(mut c) = scene.world.nav_agent_mut(id) {
                 nav_ops::set_avoidance_priority(&mut c, priority);
@@ -223,7 +236,8 @@ fn register_agent_avoidance<'scope>(
     put(
         table,
         "SetAvoidanceEnabled",
-        scope.create_function(|_, (id, enabled): (u32, bool)| {
+        scope.create_function(|_, (id, enabled): (EntityArg, bool)| {
+            let id = id.live("NavMeshAgent", "SetAvoidanceEnabled")?;
             let mut scene = scene.borrow_mut();
             if let Some(mut c) = scene.world.nav_agent_mut(id) {
                 nav_ops::set_avoidance_enabled(&mut c, enabled);

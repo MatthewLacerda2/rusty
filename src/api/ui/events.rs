@@ -14,6 +14,7 @@ use mlua::{Lua, Table};
 
 use super::super::{global_table, put, ApiScopedCtx, Reg};
 use super::view::{pointer, ui_view};
+use crate::api::entity_arg::EntityArg;
 use crate::ecs::World;
 use crate::ui::events::{find_selectable, is_interactable, is_under, raycast_pointer};
 use crate::ui::space::{canvas_to_screen, rect_screen_bounds};
@@ -29,8 +30,8 @@ pub fn register_events<'scope>(
     let (scene, input, events) = (ctx.scene, ctx.input, ctx.event_system);
     let (screen, video, camera, physics) = (ctx.screen, ctx.video, ctx.camera, ctx.physics);
     let view = move || ui_view(screen, video, camera);
-    let f = scope.create_function(move |_, id: Option<u32>| {
-        events.borrow_mut().set_selected(id);
+    let f = scope.create_function(move |_, id: EntityArg| {
+        events.borrow_mut().set_selected(id.get());
         Ok(())
     });
     put(table, "SetSelected", f)?;
@@ -48,7 +49,8 @@ pub fn register_events<'scope>(
     });
     put(table, "Raycast", f)?;
     register_find(scope, table, ctx)?;
-    let f = scope.create_function(move |_, id: u32| {
+    let f = scope.create_function(move |_, id: EntityArg| {
+        let id = id.live("UI", "Click")?;
         let (view, world) = (view(), &scene.borrow().world);
         let layout = UiLayout::compute_in(world, &view);
         let Some(centre) = layout.get(id).and_then(|r| centre_px(&layout, r, &view)) else {
@@ -84,7 +86,7 @@ fn register_find<'scope>(
     ctx: &ApiScopedCtx<'scope>,
 ) -> Reg {
     let (scene, screen, video, camera) = (ctx.scene, ctx.screen, ctx.video, ctx.camera);
-    let f = scope.create_function(move |_, (id, dir): (u32, String)| {
+    let f = scope.create_function(move |_, (id, dir): (EntityArg, String)| {
         let Some(dir) = direction(&dir) else {
             return Err(mlua::Error::RuntimeError(format!(
                 "UI.FindSelectable: unknown direction '{dir}' (Up, Down, Left, Right)"
@@ -92,7 +94,7 @@ fn register_find<'scope>(
         };
         let world = &scene.borrow().world;
         let layout = UiLayout::compute_in(world, &ui_view(screen, video, camera));
-        Ok(find_selectable(world, &layout, id, dir))
+        Ok(find_selectable(world, &layout, id.read(), dir))
     });
     put(table, "FindSelectable", f)
 }

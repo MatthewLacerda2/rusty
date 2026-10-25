@@ -32,6 +32,7 @@ mod character_controller;
 mod conversion_gate;
 mod decals;
 mod default_ambient;
+mod entity_arg_api;
 mod gamepad_api;
 mod graphics_api;
 mod hitboxes;

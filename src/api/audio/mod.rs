@@ -23,13 +23,14 @@ mod groups;
 mod occlusion;
 mod reverb;
 mod snapshots;
+mod volume;
 
 use super::{put, Reg};
+use crate::api::entity_arg::EntityArg;
 use glam::Vec3;
 
 use crate::audio::{AudioMaestro, Listener, Rolloff, Shot, SpeakerMode};
 use crate::components::AudioSourceComponent;
-use crate::scene::authoring::audio as audio_ops;
 use crate::scene::Camera;
 use crate::scene::Scene;
 use crate::time::Time;
@@ -99,7 +100,8 @@ fn register_source_control<'scope>(
     put(
         table,
         "Play",
-        scope.create_function(|_, id: u32| {
+        scope.create_function(|_, id: EntityArg| {
+            let id = id.live("Audio", "Play")?;
             let now = tick(time);
             let src = scene.borrow().world.audio(id).map(|c| c.clone());
             let pos = src
@@ -118,7 +120,8 @@ fn register_source_control<'scope>(
     put(
         table,
         "Stop",
-        scope.create_function(|_, id: u32| {
+        scope.create_function(|_, id: EntityArg| {
+            let id = id.live("Audio", "Stop")?;
             let now = tick(time);
             let pos = source_clip_pos(scene, id)
                 .map(|(_, p)| p)
@@ -127,31 +130,7 @@ fn register_source_control<'scope>(
             Ok(())
         }),
     )?;
-
-    // Unity's `AudioSource.volume`: entity `id`'s source volume, through the op the
-    // inspector writes (clamped to `[0, 1]`), then the live voice retuned to it.
-    put(
-        table,
-        "SetVolume",
-        scope.create_function(|_, (id, v): (u32, f32)| {
-            let stored = scene.borrow_mut().world.audio_mut(id).map(|mut a| {
-                audio_ops::set_volume(&mut a, v);
-                a.volume
-            });
-            if let Some(v) = stored {
-                audio.borrow_mut().set_source_volume(id, v);
-            }
-            Ok(())
-        }),
-    )?;
-
-    put(
-        table,
-        "GetVolume",
-        scope.create_function(|_, id: u32| {
-            Ok(scene.borrow().world.audio(id).map_or(0.0, |a| a.volume))
-        }),
-    )
+    volume::register(scope, table, scene, audio)
 }
 
 /// `Audio.PlayAt(path, x, y, z [, vol [, min_distance, max_distance [, group]]])`.
@@ -276,7 +255,8 @@ fn register_spatial<'scope>(
     put(
         table,
         "GetSpatial",
-        scope.create_function(|_, id: u32| {
+        scope.create_function(|_, id: EntityArg| {
+            let id = id.read();
             let Some((src, pos)) = emitter(&scene.borrow(), id) else {
                 // No source: report silent + centred + not playing + clear.
                 return Ok((0.0_f32, 0.0_f32, false, 0.0_f32));

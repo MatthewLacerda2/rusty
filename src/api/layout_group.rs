@@ -15,6 +15,7 @@ use glam::{Vec2, Vec4};
 use mlua::{FromLuaMulti, IntoLuaMulti, Lua, Table};
 
 use super::{put, Reg};
+use crate::api::entity_arg::EntityArg;
 use crate::components::{
     LayoutConstraint, LayoutCorner, LayoutGroupComponent, LayoutKind, TextAlignment,
 };
@@ -138,16 +139,18 @@ where
     R: IntoLuaMulti + Default,
     A: FromLuaMulti,
 {
-    let f = scope.create_function(move |_, id: u32| {
+    let f = scope.create_function(move |_, id: EntityArg| {
         Ok(scene
             .borrow()
             .world
-            .layout_group(id)
+            .layout_group(id.read())
             .map(|g| get(&g))
             .unwrap_or_default())
     });
     put(t, &format!("Get{suffix}"), f)?;
-    let f = scope.create_function(move |lua, (id, rest): (u32, mlua::MultiValue)| {
+    let verb = format!("Set{suffix}");
+    let f = scope.create_function(move |lua, (id, rest): (EntityArg, mlua::MultiValue)| {
+        let id = id.live("LayoutGroup", &verb)?;
         let value = A::from_lua_multi(rest, lua)?;
         if let Some(mut g) = scene.borrow_mut().world.layout_group_mut(id) {
             set(&mut g, value);

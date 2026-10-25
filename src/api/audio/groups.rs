@@ -11,6 +11,7 @@ use std::cell::RefCell;
 use mlua::{Lua, Table};
 
 use super::super::{put, Reg};
+use crate::api::entity_arg::EntityArg;
 use crate::audio::mixer::{Filter, GroupPatch, GroupState};
 use crate::audio::AudioMaestro;
 use crate::scene::authoring::audio as audio_ops;
@@ -168,7 +169,8 @@ pub(super) fn register_output<'scope>(
     put(
         table,
         "SetOutputGroup",
-        scope.create_function(|_, (id, group): (u32, String)| {
+        scope.create_function(|_, (id, group): (EntityArg, String)| {
+            let id = id.live("Audio", "SetOutputGroup")?;
             if !group.is_empty() {
                 audio.borrow().mixer().require(&group).map_err(err)?;
             }
@@ -184,9 +186,9 @@ pub(super) fn register_output<'scope>(
     put(
         table,
         "GetOutputGroup",
-        scope.create_function(|_, id: u32| {
+        scope.create_function(|_, id: EntityArg| {
             let scene = scene.borrow();
-            Ok(scene.world.audio(id).map(|a| a.output_group.clone()))
+            Ok(scene.world.audio(id.read()).map(|a| a.output_group.clone()))
         }),
     )
 }

@@ -14,7 +14,7 @@ it behaves identically to the editor and uses the same default values.
 | `Scene.AddComponent` | `(id, kind)` | `true` if the entity exists |
 | `Scene.RemoveComponent` | `(id, kind)` | `true` if the entity exists |
 | `Scene.AddScript` | `(id, path, [fields])` | `true` if the entity exists — see below |
-| `Scene.SetParent` | `(id, parent_id)` | — (errors on a parenting cycle) |
+| `Scene.SetParent` | `(id, parent_id)` | — (errors on a parenting cycle); a `nil` parent unparents, as Unity's `SetParent(null)` |
 | `Scene.ClearParent` | `(id)` | — |
 | `Scene.SetActive` | `(id, active)` | `true` if an entity existed at `id` — Unity's `SetActive`; its callbacks follow the edge (`OnEnable` / `OnDisable`) |
 | `Scene.IsActive` | `(id)` | Unity's `activeSelf`: the entity's own `active` flag (`false` for a missing or `nil` id; an inactive ancestor still hides it) |

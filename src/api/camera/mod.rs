@@ -16,6 +16,7 @@ use glam::{Vec2, Vec3};
 use mlua::Lua;
 
 use super::{put, ApiScopedCtx, Reg};
+use crate::api::entity_arg::EntityArg;
 use crate::scene::camera::MAX_PITCH;
 use crate::scene::Camera;
 
@@ -155,7 +156,8 @@ fn register_projection<'scope>(
     put(
         table,
         "WorldToScreen",
-        scope.create_function(move |_, (x, y, z, canvas): (f32, f32, f32, Option<u32>)| {
+        scope.create_function(move |_, (x, y, z, canvas): (f32, f32, f32, EntityArg)| {
+            let canvas = canvas.get();
             let screen = px();
             let p = camera.borrow().world_to_screen(Vec3::new(x, y, z), screen);
             let on_screen = p.is_on_screen(screen);

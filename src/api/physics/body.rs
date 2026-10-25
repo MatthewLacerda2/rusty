@@ -12,6 +12,7 @@ use std::cell::RefCell;
 use mlua::Table;
 
 use super::super::{put, Reg};
+use crate::api::entity_arg::EntityArg;
 use crate::scene::authoring::{collider as collider_ops, rigidbody as rb_ops};
 use crate::scene::Scene;
 
@@ -21,35 +22,42 @@ pub(super) fn register<'scope>(
     table: &Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
-    let f = scope.create_function(|_, id: u32| {
-        Ok(scene.borrow().world.rigidbody(id).map_or(0.0, |rb| rb.mass))
+    let f = scope.create_function(|_, id: EntityArg| {
+        Ok(scene
+            .borrow()
+            .world
+            .rigidbody(id.read())
+            .map_or(0.0, |rb| rb.mass))
     });
     put(table, "GetMass", f)?;
-    let f = scope.create_function(|_, (id, mass): (u32, f32)| {
+    let f = scope.create_function(|_, (id, mass): (EntityArg, f32)| {
+        let id = id.live("Physics", "SetMass")?;
         if let Some(mut rb) = scene.borrow_mut().world.rigidbody_mut(id) {
             rb_ops::set_mass(&mut rb, mass);
         }
         Ok(())
     });
     put(table, "SetMass", f)?;
-    let f = scope.create_function(|_, id: u32| {
+    let f = scope.create_function(|_, id: EntityArg| {
         let world = &scene.borrow().world;
-        Ok(world.rigidbody(id).is_some_and(|rb| rb.use_gravity))
+        Ok(world.rigidbody(id.read()).is_some_and(|rb| rb.use_gravity))
     });
     put(table, "GetUseGravity", f)?;
-    let f = scope.create_function(|_, (id, on): (u32, bool)| {
+    let f = scope.create_function(|_, (id, on): (EntityArg, bool)| {
+        let id = id.live("Physics", "SetUseGravity")?;
         if let Some(mut rb) = scene.borrow_mut().world.rigidbody_mut(id) {
             rb_ops::set_use_gravity(&mut rb, on);
         }
         Ok(())
     });
     put(table, "SetUseGravity", f)?;
-    let f = scope.create_function(|_, id: u32| {
+    let f = scope.create_function(|_, id: EntityArg| {
         let world = &scene.borrow().world;
-        Ok(world.collider(id).is_some_and(|c| c.is_trigger))
+        Ok(world.collider(id.read()).is_some_and(|c| c.is_trigger))
     });
     put(table, "IsTrigger", f)?;
-    let f = scope.create_function(|_, (id, on): (u32, bool)| {
+    let f = scope.create_function(|_, (id, on): (EntityArg, bool)| {
+        let id = id.live("Physics", "SetTrigger")?;
         if let Some(mut c) = scene.borrow_mut().world.collider_mut(id) {
             collider_ops::set_trigger(&mut c, on);
         }

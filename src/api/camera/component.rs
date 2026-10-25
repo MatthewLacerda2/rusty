@@ -6,6 +6,7 @@
 
 use std::cell::RefCell;
 
+use crate::api::entity_arg::EntityArg;
 use crate::api::{put, Reg};
 use crate::components::{CameraComponent, Projection};
 use crate::scene::authoring::camera as camera_ops;
@@ -20,8 +21,8 @@ pub fn register<'scope>(
     put(
         table,
         "GetProjection",
-        scope.create_function(|_, id: u32| {
-            let got = read(scene, id, |c| {
+        scope.create_function(|_, id: EntityArg| {
+            let got = read(scene, id.read(), |c| {
                 let size = match c.projection {
                     Projection::Orthographic { size } => Some(size),
                     Projection::Perspective => None,
@@ -34,7 +35,8 @@ pub fn register<'scope>(
     put(
         table,
         "SetProjection",
-        scope.create_function(|_, (id, name, size): (u32, String, Option<f32>)| {
+        scope.create_function(|_, (id, name, size): (EntityArg, String, Option<f32>)| {
+            let id = id.live("Camera", "SetProjection")?;
             write(scene, id, |c| {
                 let current = match c.projection {
                     Projection::Orthographic { size } => size,
@@ -63,12 +65,13 @@ fn register_culling_mask<'scope>(
     put(
         table,
         "GetCullingMask",
-        scope.create_function(|_, id: u32| Ok(read(scene, id, |c| c.culling_mask))),
+        scope.create_function(|_, id: EntityArg| Ok(read(scene, id.read(), |c| c.culling_mask))),
     )?;
     put(
         table,
         "SetCullingMask",
-        scope.create_function(|_, (id, mask): (u32, i64)| {
+        scope.create_function(|_, (id, mask): (EntityArg, i64)| {
+            let id = id.live("Camera", "SetCullingMask")?;
             write(scene, id, |c| camera_ops::set_culling_mask(c, mask as u32));
             Ok(())
         }),
@@ -84,8 +87,8 @@ fn register_target<'scope>(
     put(
         table,
         "GetTargetTexture",
-        scope.create_function(|_, id: u32| {
-            let target = read(scene, id, |c| c.target_texture.clone()).flatten();
+        scope.create_function(|_, id: EntityArg| {
+            let target = read(scene, id.read(), |c| c.target_texture.clone()).flatten();
             Ok(target.map_or((None, None, None), |t| {
                 (Some(t.name), Some(t.width), Some(t.height))
             }))
@@ -95,7 +98,8 @@ fn register_target<'scope>(
         table,
         "SetTargetTexture",
         scope.create_function(
-            |_, (id, name, w, h): (u32, Option<String>, Option<u32>, Option<u32>)| {
+            |_, (id, name, w, h): (EntityArg, Option<String>, Option<u32>, Option<u32>)| {
+                let id = id.live("Camera", "SetTargetTexture")?;
                 write(scene, id, |c| {
                     let (dw, dh) = c
                         .target_texture
@@ -120,14 +124,18 @@ fn register_target_settings<'scope>(
     put(
         table,
         "GetTargetPostFx",
-        scope.create_function(|_, id: u32| {
-            Ok(read(scene, id, |c| c.target_texture.as_ref().map(|t| t.post_fx)).flatten())
+        scope.create_function(|_, id: EntityArg| {
+            Ok(read(scene, id.read(), |c| {
+                c.target_texture.as_ref().map(|t| t.post_fx)
+            })
+            .flatten())
         }),
     )?;
     put(
         table,
         "SetTargetPostFx",
-        scope.create_function(|_, (id, on): (u32, bool)| {
+        scope.create_function(|_, (id, on): (EntityArg, bool)| {
+            let id = id.live("Camera", "SetTargetPostFx")?;
             write(scene, id, |c| camera_ops::set_target_post_fx(c, on));
             Ok(())
         }),
@@ -135,8 +143,8 @@ fn register_target_settings<'scope>(
     put(
         table,
         "GetTargetUpdateEvery",
-        scope.create_function(|_, id: u32| {
-            Ok(read(scene, id, |c| {
+        scope.create_function(|_, id: EntityArg| {
+            Ok(read(scene, id.read(), |c| {
                 c.target_texture.as_ref().map(|t| t.update_every)
             })
             .flatten())
@@ -145,7 +153,8 @@ fn register_target_settings<'scope>(
     put(
         table,
         "SetTargetUpdateEvery",
-        scope.create_function(|_, (id, n): (u32, u32)| {
+        scope.create_function(|_, (id, n): (EntityArg, u32)| {
+            let id = id.live("Camera", "SetTargetUpdateEvery")?;
             write(scene, id, |c| camera_ops::set_target_update_every(c, n));
             Ok(())
         }),

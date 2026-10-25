@@ -39,6 +39,7 @@ use std::cell::RefCell;
 use mlua::Lua;
 
 use super::{put, Reg};
+use crate::api::entity_arg::EntityArg;
 use crate::components::RenderMode;
 use crate::scene::authoring::material as mat_ops;
 use crate::scene::Scene;
@@ -61,7 +62,8 @@ pub fn register<'scope>(
     put(
         &table,
         "SetShader",
-        scope.create_function(|_, (id, name): (u32, String)| {
+        scope.create_function(|_, (id, name): (EntityArg, String)| {
+            let id = id.live("Material", "SetShader")?;
             with_material(scene, id, |m, key| mat_ops::set_shader(m, key, name));
             Ok(())
         }),
@@ -96,7 +98,8 @@ fn register_scalars<'scope>(
     put(
         table,
         "SetMetallic",
-        scope.create_function(|_, (id, val): (u32, f32)| {
+        scope.create_function(|_, (id, val): (EntityArg, f32)| {
+            let id = id.live("Material", "SetMetallic")?;
             with_material(scene, id, |m, key| mat_ops::set_metallic(m, key, val));
             Ok(())
         }),
@@ -105,7 +108,8 @@ fn register_scalars<'scope>(
     put(
         table,
         "SetRoughness",
-        scope.create_function(|_, (id, val): (u32, f32)| {
+        scope.create_function(|_, (id, val): (EntityArg, f32)| {
+            let id = id.live("Material", "SetRoughness")?;
             with_material(scene, id, |m, key| mat_ops::set_roughness(m, key, val));
             Ok(())
         }),
@@ -114,7 +118,8 @@ fn register_scalars<'scope>(
     put(
         table,
         "SetColor",
-        scope.create_function(|_, (id, rgb): (u32, [f32; 3])| {
+        scope.create_function(|_, (id, rgb): (EntityArg, [f32; 3])| {
+            let id = id.live("Material", "SetColor")?;
             with_material(scene, id, |m, key| mat_ops::set_base_color(m, key, rgb));
             Ok(())
         }),
@@ -123,7 +128,8 @@ fn register_scalars<'scope>(
     put(
         table,
         "SetEmissive",
-        scope.create_function(|_, (id, rgb): (u32, [f32; 3])| {
+        scope.create_function(|_, (id, rgb): (EntityArg, [f32; 3])| {
+            let id = id.live("Material", "SetEmissive")?;
             with_material(scene, id, |m, key| mat_ops::set_emissive(m, key, rgb));
             Ok(())
         }),
@@ -137,60 +143,31 @@ fn register_maps<'scope>(
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
-    put(
-        table,
-        "SetMetallicMap",
-        scope.create_function(|_, (id, path): (u32, String)| {
-            with_material(scene, id, |m, key| {
-                mat_ops::set_metallic_map(m, key, Some(path))
-            });
-            Ok(())
+    type SetMap = fn(&mut mat_ops::MaterialLibrary, &str, String);
+    let maps: [(&str, SetMap); 5] = [
+        ("SetMetallicMap", |m, k, p| {
+            mat_ops::set_metallic_map(m, k, Some(p))
         }),
-    )?;
-
-    put(
-        table,
-        "SetRoughnessMap",
-        scope.create_function(|_, (id, path): (u32, String)| {
-            with_material(scene, id, |m, key| {
-                mat_ops::set_roughness_map(m, key, Some(path))
-            });
-            Ok(())
+        ("SetRoughnessMap", |m, k, p| {
+            mat_ops::set_roughness_map(m, k, Some(p))
         }),
-    )?;
-
-    put(
-        table,
-        "SetTexture",
-        scope.create_function(|_, (id, path): (u32, String)| {
-            with_material(scene, id, |m, key| {
-                mat_ops::set_base_color_map(m, key, path)
-            });
-            Ok(())
+        ("SetTexture", mat_ops::set_base_color_map),
+        ("SetNormalMap", |m, k, p| {
+            mat_ops::set_normal_map(m, k, Some(p))
         }),
-    )?;
-
-    put(
-        table,
-        "SetNormalMap",
-        scope.create_function(|_, (id, path): (u32, String)| {
-            with_material(scene, id, |m, key| {
-                mat_ops::set_normal_map(m, key, Some(path))
-            });
-            Ok(())
+        ("SetEmissiveMap", |m, k, p| {
+            mat_ops::set_emissive_map(m, k, Some(p))
         }),
-    )?;
-
-    put(
-        table,
-        "SetEmissiveMap",
-        scope.create_function(|_, (id, path): (u32, String)| {
-            with_material(scene, id, |m, key| {
-                mat_ops::set_emissive_map(m, key, Some(path))
-            });
+    ];
+    for (verb, set) in maps {
+        let f = scope.create_function(move |_, (id, path): (EntityArg, String)| {
+            let id = id.live("Material", verb)?;
+            with_material(scene, id, |m, key| set(m, key, path));
             Ok(())
-        }),
-    )
+        });
+        put(table, verb, f)?;
+    }
+    Ok(())
 }
 
 /// Transparency controls (#242): `SetRenderMode` / `SetAlpha` / `SetAlphaCutoff`.
@@ -204,7 +181,8 @@ fn register_transparency<'scope>(
     put(
         table,
         "SetRenderMode",
-        scope.create_function(|_, (id, mode): (u32, String)| {
+        scope.create_function(|_, (id, mode): (EntityArg, String)| {
+            let id = id.live("Material", "SetRenderMode")?;
             // An unknown name degrades to the safe default, `Opaque`, rather than erroring.
             let mode = RenderMode::parse(&mode).unwrap_or_default();
             with_material(scene, id, |m, key| mat_ops::set_render_mode(m, key, mode));
@@ -215,7 +193,8 @@ fn register_transparency<'scope>(
     put(
         table,
         "SetAlpha",
-        scope.create_function(|_, (id, val): (u32, f32)| {
+        scope.create_function(|_, (id, val): (EntityArg, f32)| {
+            let id = id.live("Material", "SetAlpha")?;
             with_material(scene, id, |m, key| mat_ops::set_alpha(m, key, val));
             Ok(())
         }),
@@ -224,7 +203,8 @@ fn register_transparency<'scope>(
     put(
         table,
         "SetAlphaCutoff",
-        scope.create_function(|_, (id, val): (u32, f32)| {
+        scope.create_function(|_, (id, val): (EntityArg, f32)| {
+            let id = id.live("Material", "SetAlphaCutoff")?;
             with_material(scene, id, |m, key| mat_ops::set_alpha_cutoff(m, key, val));
             Ok(())
         }),

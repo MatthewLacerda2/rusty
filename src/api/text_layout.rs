@@ -11,6 +11,7 @@ use glam::Vec2;
 use mlua::Table;
 
 use super::{put, Reg};
+use crate::api::entity_arg::EntityArg;
 use crate::core::video::VideoSettings;
 use crate::scene::Scene;
 use crate::ui::{layout, text as ui_text, ScreenSize};
@@ -33,7 +34,8 @@ pub(super) fn register<'scope>(
     put(
         table,
         "GetPreferredSize",
-        scope.create_function(move |_, id: u32| {
+        scope.create_function(move |_, id: EntityArg| {
+            let id = id.read();
             let width = rect_size(id).map_or(f32::INFINITY, |s| s.x);
             let text = scene.borrow().world.text(id).map(|t| t.clone());
             let size = text.map_or(Vec2::ZERO, |t| ui_text::preferred_size(&t, width));
@@ -43,7 +45,8 @@ pub(super) fn register<'scope>(
     put(
         table,
         "GetLayout",
-        scope.create_function(move |lua, id: u32| {
+        scope.create_function(move |lua, id: EntityArg| {
+            let id = id.read();
             let text = scene.borrow().world.text(id).map(|t| t.clone());
             let (Some(text), Some(rect)) = (text, rect_size(id)) else {
                 return Ok(None);
@@ -61,8 +64,8 @@ pub(super) fn register<'scope>(
     put(
         table,
         "MeasureString",
-        scope.create_function(move |_, (id, s): (u32, String)| {
-            let text = scene.borrow().world.text(id).map(|t| t.clone());
+        scope.create_function(move |_, (id, s): (EntityArg, String)| {
+            let text = scene.borrow().world.text(id.read()).map(|t| t.clone());
             let size = text.map_or(Vec2::ZERO, |t| ui_text::measure_string(&t, &s));
             Ok((size.x, size.y))
         }),

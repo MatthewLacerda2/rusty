@@ -14,6 +14,7 @@ use glam::Vec3;
 use mlua::{Lua, Table};
 
 use super::{put, Reg};
+use crate::api::entity_arg::EntityArg;
 use crate::components::{NavMeshObstacleComponent as Obstacle, ObstacleShape};
 use crate::scene::authoring::nav::obstacle as ops;
 use crate::scene::Scene;
@@ -56,9 +57,13 @@ fn f32_pair<'scope>(
     name: &str,
     (read, set): Field<f32>,
 ) -> Reg {
-    let f = scope.create_function(move |_, id: u32| Ok(get(scene, id).map_or(0.0, |o| read(&o))));
+    let f = scope.create_function(move |_, id: EntityArg| {
+        Ok(get(scene, id.read()).map_or(0.0, |o| read(&o)))
+    });
     put(t, &format!("Get{name}"), f)?;
-    let f = scope.create_function(move |_, (id, v): (u32, f32)| {
+    let verb = format!("Set{name}");
+    let f = scope.create_function(move |_, (id, v): (EntityArg, f32)| {
+        let id = id.live("NavMeshObstacle", &verb)?;
         write(scene, id, |o| set(o, v));
         Ok(())
     });
@@ -73,9 +78,13 @@ fn bool_pair<'scope>(
     name: &str,
     (read, set): Field<bool>,
 ) -> Reg {
-    let f = scope.create_function(move |_, id: u32| Ok(get(scene, id).is_some_and(|o| read(&o))));
+    let f = scope.create_function(move |_, id: EntityArg| {
+        Ok(get(scene, id.read()).is_some_and(|o| read(&o)))
+    });
     put(t, &format!("Get{name}"), f)?;
-    let f = scope.create_function(move |_, (id, v): (u32, bool)| {
+    let verb = format!("Set{name}");
+    let f = scope.create_function(move |_, (id, v): (EntityArg, bool)| {
+        let id = id.live("NavMeshObstacle", &verb)?;
         write(scene, id, |o| set(o, v));
         Ok(())
     });
@@ -90,12 +99,14 @@ fn vec3_pair<'scope>(
     name: &str,
     (read, set): Field<Vec3>,
 ) -> Reg {
-    let f = scope.create_function(move |_, id: u32| {
-        let v = get(scene, id).map_or(Vec3::ZERO, |o| read(&o));
+    let f = scope.create_function(move |_, id: EntityArg| {
+        let v = get(scene, id.read()).map_or(Vec3::ZERO, |o| read(&o));
         Ok((v.x, v.y, v.z))
     });
     put(t, &format!("Get{name}"), f)?;
-    let f = scope.create_function(move |_, (id, x, y, z): (u32, f32, f32, f32)| {
+    let verb = format!("Set{name}");
+    let f = scope.create_function(move |_, (id, x, y, z): (EntityArg, f32, f32, f32)| {
+        let id = id.live("NavMeshObstacle", &verb)?;
         write(scene, id, |o| set(o, Vec3::new(x, y, z)));
         Ok(())
     });
@@ -108,9 +119,11 @@ fn register_shape<'scope>(
     t: &Table,
     scene: SceneCell<'scope>,
 ) -> Reg {
-    let f = scope.create_function(move |_, id: u32| Ok(get(scene, id).map(|o| o.shape.name())));
+    let f = scope
+        .create_function(move |_, id: EntityArg| Ok(get(scene, id.read()).map(|o| o.shape.name())));
     put(t, "GetShape", f)?;
-    let f = scope.create_function(move |_, (id, name): (u32, String)| {
+    let f = scope.create_function(move |_, (id, name): (EntityArg, String)| {
+        let id = id.live("NavMeshObstacle", "SetShape")?;
         let shape = ObstacleShape::parse(&name).ok_or_else(|| {
             mlua::Error::RuntimeError(format!(
                 "NavMeshObstacle.SetShape: unknown shape '{name}' (Box, Capsule)"
@@ -141,11 +154,12 @@ fn register_carving<'scope>(
     f32_pair(scope, t, scene, "MoveThreshold", threshold)?;
     let wait: Field<f32> = (|o| o.time_to_stationary, ops::set_time_to_stationary);
     f32_pair(scope, t, scene, "TimeToStationary", wait)?;
-    let f =
-        scope.create_function(move |_, id: u32| Ok(get(scene, id).is_some_and(|o| o.is_carving())));
+    let f = scope.create_function(move |_, id: EntityArg| {
+        Ok(get(scene, id.read()).is_some_and(|o| o.is_carving()))
+    });
     put(t, "IsCarving", f)?;
-    let f = scope.create_function(move |_, id: u32| {
-        let v = get(scene, id).map_or(Vec3::ZERO, |o| o.velocity);
+    let f = scope.create_function(move |_, id: EntityArg| {
+        let v = get(scene, id.read()).map_or(Vec3::ZERO, |o| o.velocity);
         Ok((v.x, v.y, v.z))
     });
     put(t, "GetVelocity", f)

@@ -200,7 +200,8 @@ fn register_snapshot<'scope>(
     put(
         table,
         "SnapshotEntity",
-        scope.create_function(move |_, id: u32| {
+        scope.create_function(move |_, id: crate::api::entity_arg::EntityArg| {
+            let id = id.read();
             let scene = scene.borrow();
             let world_matrix = scene.world.local_to_world(id);
             let value = if scene.world.contains(id) {

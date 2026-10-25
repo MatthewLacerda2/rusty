@@ -75,8 +75,8 @@ pub fn register<'scope>(
     put(
         &table,
         "Remove",
-        scope.create_function(|_, (id, fade): (u32, Option<f32>)| {
-            Ok(scene.borrow_mut().decals.remove(id, fade.unwrap_or(0.0)))
+        scope.create_function(|_, (decal, fade): (u32, Option<f32>)| {
+            Ok(scene.borrow_mut().decals.remove(decal, fade.unwrap_or(0.0)))
         }),
     )?;
 

@@ -13,6 +13,7 @@
 use std::cell::RefCell;
 
 use super::{put, Reg};
+use crate::api::entity_arg::EntityArg;
 use crate::scene::authoring::animator as animator_ops;
 use crate::scene::Scene;
 
@@ -25,7 +26,8 @@ pub(super) fn register<'scope>(
     put(
         table,
         "SetSpeed",
-        scope.create_function(|_, (id, speed): (u32, f32)| {
+        scope.create_function(|_, (id, speed): (EntityArg, f32)| {
+            let id = id.live("Animator", "SetSpeed")?;
             if !speed.is_finite() {
                 return Err(mlua::Error::RuntimeError(format!(
                     "Animator.SetSpeed: speed must be a finite number, got {speed}"
@@ -42,6 +44,8 @@ pub(super) fn register<'scope>(
     put(
         table,
         "GetSpeed",
-        scope.create_function(|_, id: u32| Ok(scene.borrow().world.animator(id).map(|a| a.speed))),
+        scope.create_function(|_, id: EntityArg| {
+            Ok(scene.borrow().world.animator(id.read()).map(|a| a.speed))
+        }),
     )
 }

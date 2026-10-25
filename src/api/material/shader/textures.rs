@@ -8,6 +8,7 @@
 use std::cell::RefCell;
 
 use super::super::{put, Reg};
+use crate::api::entity_arg::EntityArg;
 use crate::scene::authoring::material as mat_ops;
 use crate::scene::Scene;
 
@@ -20,7 +21,8 @@ pub fn register<'scope>(
     put(
         table,
         "SetShaderTexture",
-        scope.create_function(|_, (id, slot, path): (u32, String, Option<String>)| {
+        scope.create_function(|_, (id, slot, path): (EntityArg, String, Option<String>)| {
+            let id = id.live("Material", "SetShaderTexture")?;
             let mut scene = scene.borrow_mut();
             let key = mat_ops::ensure_material_key(&mut scene, id)
                 .ok_or_else(|| mlua::Error::RuntimeError(format!("no entity {id}")))?;
