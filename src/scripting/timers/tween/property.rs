@@ -61,6 +61,12 @@ impl Property {
         }
     }
 
+    /// Whether a value written reads back held by the op's bounds (a clamped
+    /// component field); never a Transform field or a shader param.
+    pub(crate) fn is_held(&self) -> bool {
+        matches!(self, Self::Field(f) if f.is_held())
+    }
+
     /// Write `v` through the property's authoring op; `false` once the component
     /// (or shader) is gone, which ends the tween.
     pub(crate) fn set(&self, scene: &mut Scene, id: u32, v: Vec4) -> bool {

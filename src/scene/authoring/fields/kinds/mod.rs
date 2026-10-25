@@ -1,4 +1,4 @@
-//! src/api/component/kinds/mod.rs — every component `Component.*` reaches, by name.
+//! src/scene/authoring/fields/kinds/mod.rs — every component `Component.*` reaches, by name.
 //!
 //! One [`Kind`] per first-class component (each of `Entity`'s `Option<…Component>`
 //! fields) plus the mandatory `Transform`; the field tables live beside, grouped

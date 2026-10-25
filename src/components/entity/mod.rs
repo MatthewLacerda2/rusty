@@ -81,7 +81,7 @@ pub struct Entity {
     /// Transient staging slot: a default library material the editor's Add menu
     /// attached at the World level (which holds no library), to be inserted into the
     /// scene's material library once one is reachable (the inspector, or
-    /// `apply_scene_data` when a snapshot is restored). Never serialized; always
+    /// `apply_world_data` when a snapshot is restored). Never serialized; always
     /// `None` on a loaded entity.
     #[serde(skip)]
     pub pending_material: Option<MaterialAsset>,

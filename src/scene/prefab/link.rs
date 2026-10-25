@@ -208,6 +208,8 @@ fn rebuild_entity(scene: &mut Scene, id: u32, baselines: &BTreeMap<u32, Entity>,
     }
     rehydrate_entity_mesh(&mut rebuilt);
     scene.world.replace_entity(rebuilt);
+    // The source file and the overrides are held as a scene file is (#1418).
+    crate::scene::authoring::fields::hold_entity(&mut scene.world, id);
 }
 
 /// The instance ids, erroring if `root_id` is not a linked instance root.

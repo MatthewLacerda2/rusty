@@ -8,9 +8,9 @@
 //! So Save never persists played state. Mirrors Unity's play-mode behaviour.
 //!
 //! Implemented as a `SceneData` snapshot taken on the play-state transition and
-//! applied back via `serialize::apply_scene_data` on Stop.
+//! applied back via `serialize::apply_world_data` on Stop.
 
-use crate::scene::serialize::{apply_scene_data, to_scene_data, SceneData};
+use crate::scene::serialize::{apply_world_data, to_scene_data, SceneData};
 use crate::scene::Scene;
 
 /// A frozen copy of the edit-mode scene, taken when entering Play.
@@ -35,7 +35,7 @@ impl SceneSnapshot {
     /// Restore the snapshot into `scene`, discarding any play-mode mutations.
     /// Consumes the snapshot since a snapshot is single-use per Play session.
     pub fn restore(self, scene: &mut Scene) {
-        apply_scene_data(scene, self.data);
+        apply_world_data(scene, self.data);
         // Re-apply the baked SH the document-level apply dropped (it only carries
         // probe positions). Positions are identical, so this overwrites cleanly.
         scene.probes = self.probes;

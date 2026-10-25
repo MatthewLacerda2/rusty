@@ -5,10 +5,9 @@ use std::cell::RefCell;
 use mlua::Lua;
 use serde_json::Value;
 
-use super::kinds::KINDS;
 use super::register;
 use super::value::from_lua;
-use super::write::Skip;
+use crate::scene::authoring::fields::{Skip, KINDS};
 use crate::scene::authoring::{add_component, ComponentKind};
 use crate::scene::Scene;
 

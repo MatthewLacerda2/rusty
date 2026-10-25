@@ -11,6 +11,7 @@ mod coroutines;
 mod destroy_order;
 mod destroy_subtree;
 mod files;
+mod held_from;
 mod hook_errors;
 mod late_update;
 mod lifecycle;

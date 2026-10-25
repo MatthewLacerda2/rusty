@@ -67,7 +67,7 @@ pub fn ensure_named(materials: &mut MaterialLibrary, name: &str) {
 /// Fold a staged material (the Add menu's default, which lacked library access) into
 /// the library under `key`. It fills the key only when the library has nothing there:
 /// an existing authored asset is kept, the rule every attach path shares (#997). The
-/// inspector's card and a Play/Stop restore (`apply_scene_data`) both fold through it.
+/// inspector's card and a Play/Stop restore (`apply_world_data`) both fold through it.
 pub fn fold_pending(materials: &mut MaterialLibrary, key: &str, pending: MaterialAsset) {
     materials.entry(key.to_string()).or_insert(pending);
 }

@@ -1,10 +1,10 @@
-//! src/api/component/kinds/ui.rs — the UI layout and container components' field
+//! src/scene/authoring/fields/kinds/ui.rs — the UI layout and container components' field
 //! tables: `Canvas`, `RectTransform`, `Image`, `CanvasGroup`, `RectMask`, `Mask`,
 //! `BackdropFilter`, `Selectable`, `LayoutGroup` and `LayoutElement`.
 
 use glam::Vec4;
 
-use super::super::table::{group, inspect, op, part, with, Group};
+use super::super::table::{group, inspect, op, part, unheld, with, Group};
 use super::set_ui_shader;
 use crate::components::{
     BackdropFilterComponent, CanvasComponent, CanvasGroupComponent, ImageComponent, LayoutAxisFit,
@@ -76,7 +76,10 @@ inspect! {
         op!("raycast_target", image::set_raycast_target),
         op!("gradient", image::set_gradient),
         op!("blend", image::set_blend),
-        with!("shader", |i, v: Option<UiShader>| set_ui_shader(&mut i.shader, v)?),
+        unheld!(
+            "its op reads the shader's baked param layout from disk",
+            with!("shader", |i, v: Option<UiShader>| set_ui_shader(&mut i.shader, v)?)
+        ),
     ];
     CanvasGroupComponent => canvas_group, canvas_group_mut, &[
         op!("alpha", group::set_alpha),

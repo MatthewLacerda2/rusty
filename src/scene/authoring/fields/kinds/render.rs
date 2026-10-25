@@ -1,10 +1,10 @@
-//! src/api/component/kinds/render.rs — the rendering components' field tables:
+//! src/scene/authoring/fields/kinds/render.rs — the rendering components' field tables:
 //! `Transform`, `Mesh`, `Material`, `Light`, `Camera`, `VisualCorrection` and
 //! `LODGroup`.
 
 use std::collections::BTreeMap;
 
-use super::super::table::{group, inspect, op, part, ro, with, Group};
+use super::super::table::{group, inspect, op, part, ro, unheld, with, Group};
 use super::super::value::Mask;
 use super::NO_OP;
 use crate::components::camera::RenderTarget;
@@ -81,12 +81,15 @@ inspect! {
             vc::set_ssao_intensity(c, v.intensity);
         }),
         with!("custom_effects", |c, v: Vec<String>| vc::set_custom_effects(c, v)?),
-        with!("post_params", |c, v: BTreeMap<String, Vec<f32>>| {
-            let chain = PostChain::load(&c.custom_effects);
-            for (name, value) in v {
-                vc::set_post_param_with(c, &chain, &name, value)?;
-            }
-        }),
+        unheld!(
+            "its op reads every effect's baked sidecar and warns on an unbaked one",
+            with!("post_params", |c, v: BTreeMap<String, Vec<f32>>| {
+                let chain = PostChain::load(&c.custom_effects);
+                for (name, value) in v {
+                    vc::set_post_param_with(c, &chain, &name, value)?;
+                }
+            })
+        ),
     ];
     LodGroupComponent => lod_group, lod_group_mut, &[
         with!("levels", |g, v: Vec<LodLevel>| set_levels(g, v)),

@@ -9,7 +9,7 @@
 //!
 //! Pure.
 
-use super::sanitize::{at_least, finite_or};
+use super::sanitize::{at_least, clamped, finite_or, unit};
 use crate::components::lod_group::{default_thresholds, LodGroupComponent, LodLevel};
 
 /// The smallest group size, in metres: a zero size would make every level cull.
@@ -21,18 +21,23 @@ pub fn set_size(g: &mut LodGroupComponent, size: f32) {
     g.size = at_least(finite_or(size, g.size), MIN_SIZE);
 }
 
-/// Set level `level`'s screen height, clamped between its neighbours' so the order
-/// holds. Out of range: no-op.
+/// Set level `level`'s screen height, within `[0, 1]` and clamped between its
+/// neighbours' so the order holds. Neighbours a loaded file left out of range or
+/// out of order (#1418) bound it as far as they can: each is first held to
+/// `[0, 1]`, and the finer one wins. Out of range: no-op.
 pub fn set_level_height(g: &mut LodGroupComponent, level: usize, height: f32) {
     if level >= g.levels.len() {
         return;
     }
     let finer = level
         .checked_sub(1)
-        .map_or(1.0, |i| g.levels[i].screen_height);
-    let coarser = g.levels.get(level + 1).map_or(0.0, |l| l.screen_height);
+        .map_or(1.0, |i| unit(g.levels[i].screen_height));
+    let coarser = g
+        .levels
+        .get(level + 1)
+        .map_or(0.0, |l| unit(l.screen_height));
     let height = finite_or(height, g.levels[level].screen_height);
-    g.levels[level].screen_height = height.clamp(coarser, finer);
+    g.levels[level].screen_height = clamped(height, coarser.min(finer), finer);
 }
 
 /// Set the entities that render level `level`. Out of range: no-op.

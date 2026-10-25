@@ -199,12 +199,17 @@ pub fn write_prefab_file(prefab: &PrefabData, path: &str) -> Result<(), String> 
     std::fs::write(path, json).map_err(|e| format!("Failed to write prefab file: {e}"))
 }
 
-/// Read and deserialize a `.prefab` document from `path`. Shared by every loader so
-/// the read/parse error wording stays in one place.
+/// Read and deserialize a `.prefab` document from `path`, its values held through
+/// their authoring ops as a scene file's are (#1418), once here rather than on
+/// every stamp. Shared by every loader so the read/parse error wording stays in
+/// one place.
 pub fn read_prefab_file(path: &str) -> Result<PrefabData, String> {
     let json =
         std::fs::read_to_string(path).map_err(|e| format!("Failed to read prefab file: {e}"))?;
-    serde_json::from_str(&json).map_err(|e| format!("Failed to deserialize prefab: {e}"))
+    let mut prefab: PrefabData =
+        serde_json::from_str(&json).map_err(|e| format!("Failed to deserialize prefab: {e}"))?;
+    crate::scene::authoring::fields::hold_entities(&mut prefab.entities);
+    Ok(prefab)
 }
 
 /// Load a `.prefab` from `path` and instantiate it into `scene` under `parent` (or

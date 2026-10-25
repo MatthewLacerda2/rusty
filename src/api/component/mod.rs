@@ -6,7 +6,8 @@
 //! - `Set(id, name, fields)` — write the named fields, all or nothing. Each goes
 //!   through the `scene::authoring` op the inspector's card calls, so clamping,
 //!   sanitizing and what follows a write are the inspector's own; a field with no
-//!   op is read-only and writing it is an error naming why (`table`). A key left
+//!   op is read-only and writing it is an error naming why. The table itself is
+//!   `scene::authoring::fields`, which a scene load also holds its values through. A key left
 //!   as `Get` returned it is skipped (`write::Skip`): `Get` keeps what it returned
 //!   in the table's metatable, so a table held across ticks writes only its edits.
 //! - `Fields(name)` — what an inspector lists: each field's name, the Lua type of
@@ -14,15 +15,11 @@
 //!
 //! Component names are the ones `Scene.AddComponent` takes, plus `Transform` and
 //! `Mesh`; field names are as a saved scene spells them; enums travel by their
-//! serialized name (read in any case, through `lua_json::decode`). An unknown
+//! serialized name (read in any case, through `core::variant_case::decode`). An unknown
 //! component or field is an error naming the valid ones. `#[serde(skip)]` runtime
 //! state is never in a table: there is no field to name it by.
 
-mod introspect;
-mod kinds;
-mod table;
 mod value;
-mod write;
 
 #[cfg(test)]
 mod lua_tests;
@@ -30,8 +27,6 @@ mod lua_tests;
 mod set_tests;
 #[cfg(test)]
 mod since_get_tests;
-#[cfg(test)]
-mod tests;
 
 use std::cell::RefCell;
 
@@ -40,10 +35,9 @@ use serde_json::Value;
 
 use super::{put, Reg};
 use crate::scene::authoring;
+use crate::scene::authoring::fields::{self as kinds, Kind, Skip};
 use crate::scene::Scene;
-use table::Kind;
 use value::{from_lua, to_lua};
-use write::Skip;
 
 /// The metatable key under which `Get` keeps what it returned, for `Set` to tell a
 /// field the script edited from one the sim moved since.

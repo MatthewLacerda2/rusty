@@ -44,19 +44,30 @@ pub fn set_auto_configure_connected_anchor(j: &mut JointComponent, auto: bool) {
 
 /// Set the hinge / twist axis, normalized. A zero (or non-finite) axis names no
 /// direction and is ignored.
-// lint: allow(sanitize) try_normalize refuses a NaN, infinite or zero axis; the old one stays
+// lint: allow(sanitize) `unit` refuses a NaN, infinite or zero axis; the old one stays
 pub fn set_axis(j: &mut JointComponent, axis: Vec3) {
-    if let Some(unit) = axis.try_normalize() {
+    if let Some(unit) = unit(axis) {
         j.axis = unit;
     }
 }
 
 /// Set a Ball joint's swing-1 axis, normalized. A zero (or non-finite) axis
 /// names no direction and is ignored.
-// lint: allow(sanitize) try_normalize refuses a NaN, infinite or zero axis; the old one stays
+// lint: allow(sanitize) `unit` refuses a NaN, infinite or zero axis; the old one stays
 pub fn set_swing_axis(j: &mut JointComponent, axis: Vec3) {
-    if let Some(unit) = axis.try_normalize() {
+    if let Some(unit) = unit(axis) {
         j.swing_axis = unit;
+    }
+}
+
+/// `axis` as a unit vector: as given when it already is one (to glam's
+/// tolerance), so a saved axis loads and writes back bit for bit instead of
+/// moving an ulp each time (#1418); else normalized; `None` for no direction.
+fn unit(axis: Vec3) -> Option<Vec3> {
+    if axis.is_normalized() {
+        Some(axis)
+    } else {
+        axis.try_normalize()
     }
 }
 

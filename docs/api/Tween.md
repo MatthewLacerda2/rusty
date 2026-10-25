@@ -69,7 +69,7 @@ does.
 |---|---|---|
 | `ease` | `"linear"` | The curve. `linear`, `ease_in` / `ease_out` / `ease_in_out` (quad), or a family — `quad`, `cubic`, `quart`, `expo`, `sine`, `back`, `elastic`, `bounce` — with `_in`, `_out` or `_in_out`: `"quad_out"`, `"back_out"`, `"elastic_in_out"`. snake_case, like zimmer's `Sound` easings. `back` and `elastic` overshoot on purpose. |
 | `delay` | `0` | Seconds before it starts. The start value is read when the delay ends. |
-| `from` | current value | Start here instead. Written **at once**, so a delayed fade-in is already hidden while it waits. |
+| `from` | current value | Start here instead. Written **at once**, so a delayed fade-in is already hidden while it waits; on a clamped field the start is what the field then holds, so `from = 500` on an alpha starts at `1`. A `Transform` field starts as given (`from = {0, 360, 0}` is a full turn, not `0`). |
 | `loops` | `1` | Cycles to play; `-1` loops until killed (needs `duration > 0`). |
 | `yoyo` | `false` | Every other cycle plays backwards (an even count ends back at the start). |
 | `unscaled` | `false` | Tick on unscaled time, so it keeps moving under `Time.SetTimeScale(0)` — a pause menu's own animations. |
