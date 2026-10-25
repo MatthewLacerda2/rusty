@@ -221,10 +221,10 @@ fn register_parenting<'scope>(
         "SetParent",
         scope.create_function(|_, (id, parent): (EntityArg, EntityArg)| {
             let id = id.live("Scene", "SetParent")?;
-            let parent = parent.live("Scene", "SetParent")?;
+            // `nil` unparents, Unity's `SetParent(null)`.
             scene
                 .borrow_mut()
-                .set_parent(id, Some(parent))
+                .set_parent(id, parent.get())
                 .map_err(mlua::Error::RuntimeError)
         }),
     )?;

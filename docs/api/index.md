@@ -27,7 +27,7 @@ it. A **read** answers what it answers for a missing entity, so
 **write** follows Unity, where calling a member on a destroyed object throws: it
 raises `"Scene.SetActive: no entity (nil id)"`, naming the verb. A dead (but
 non-`nil`) id on a write stays a no-op. Where `nil` means "none" on purpose (a
-joint's connected body, `UI.SetSelected(nil)`), the page says so.
+joint's connected body, `UI.SetSelected(nil)`, `Scene.SetParent(child, nil)`), the page says so.
 
 > **Maintenance:** this file is currently **hand-written** and must be kept in
 > sync with `src/scripting/mod.rs` and the bindings in `src/api/`. A generator

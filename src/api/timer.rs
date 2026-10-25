@@ -91,9 +91,8 @@ fn register_invoke_queries<'scope>(
         table,
         "CancelInvoke",
         scope.create_function(|_, (id, name): (EntityArg, Option<String>)| {
-            timers
-                .borrow_mut()
-                .cancel_invokes(id.read(), name.as_deref());
+            let id = id.live("Timer", "CancelInvoke")?;
+            timers.borrow_mut().cancel_invokes(id, name.as_deref());
             Ok(())
         }),
     )?;

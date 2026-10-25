@@ -270,7 +270,9 @@ new flag, gate, CI step or baseline.
   closure whose first parameter is the Lua state (`_`, `lua`, `_: &Lua`) and whose
   arguments name an entity typed `u32` or `Option<u32>` fails. The rule reads one
   line and goes by the parameter's name (`rules/entity_arg.rs`): an id under
-  another name, or in a hand-parsed `MultiValue`, gets past it.
+  another name, in a hand-parsed `MultiValue`, in a closure whose arguments are a
+  type alias (`|_, (id, x): Args|`), or after a Lua state spelled `lua: &mlua::Lua`
+  gets past it; so does any binding outside `src/api/`.
 - **`full-literal`** (#976) — a test builds a first-class component (a `…Component`
   type `Entity` names, with three or more fields) through a constructor or a
   `..rest`, never a struct expression naming every field: such a literal breaks the
