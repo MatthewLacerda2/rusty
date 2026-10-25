@@ -89,7 +89,14 @@ override on top. It is not the entity's `Transform` scale, which stays `1`.
 re-imports every mesh in the open scene instanced from that model, a skinned one with its
 bones moved to the scaled rest pose (a bone moved off its rest pose keeps its pose) — the
 same verb the inspector's drag runs. `scaleFactor` must be finite: a NaN or infinite one
-changes nothing, and one at or below `0.0001` is floored there.
+changes nothing, and one at or below `0.0001` is floored there. A factor the sidecar
+already holds (or none given) changes nothing either: no write, no re-import.
+
+An LODGroup over those meshes has its `size` scaled with them, as a convenience for the
+open scene: a size still at its LOD0 meshes' extent follows the new extent, one set by
+hand is scaled by as much. The size is an authored, saved value, as Unity's LODGroup
+size is, so another scene's groups keep theirs (Unity's *Recalculate Bounds* is the
+manual step there too).
 
 ```lua no-run
 Assets.SetModelImportSettings("project/models/crate_cm.glb", { scaleFactor = 0.01 })

@@ -205,17 +205,22 @@ pub fn set_lightmap_uv_settings(
 /// Set a model's Scale Factor (#1398) in its `.meta` sidecar and re-import every
 /// mesh in `scene` instanced from it, a skinned one with its new rig and its bones
 /// moved to the scaled rest pose; an LODGroup over those meshes has its size scaled
-/// with them. The model is noted in the write log, so every other cache keyed by it
-/// (the particle meshes) re-reads it too. The one verb the model inspector and
-/// `Assets.SetModelImportSettings` share. Returns how many meshes were re-imported.
+/// by as much as its LOD0 meshes grew. The model is noted in the write log, so every
+/// other cache keyed by it (the particle meshes) re-reads it too. A NaN or unchanged
+/// factor changes nothing: no write, no re-import. The one verb the model inspector
+/// and `Assets.SetModelImportSettings` share. Returns how many meshes were re-imported.
 pub fn set_model_scale_factor(scene: &mut Scene, path: &str, scale: f32) -> Result<usize, String> {
     let source = std::path::Path::new(path);
-    let stored = |source| asset::sidecar::load(source).map(|s| s.scale);
-    let before = stored(source).map_err(|e| e.to_string())?;
+    let stored = asset::sidecar::load(source)
+        .map_err(|e| e.to_string())?
+        .scale;
+    if asset::scale_factor::sanitize(scale, stored) == stored {
+        return Ok(0);
+    }
     asset::sidecar::set_scale(source, scale).map_err(|e| e.to_string())?;
-    let after = stored(source).map_err(|e| e.to_string())?;
+    let before = crate::scene::lod_instance::lod0_extents(scene);
     let ids = rehydrate::model_writes::reimport_noted(scene, path, Rig::Rebuild);
-    crate::scene::lod_instance::rescale_groups_over(scene, &ids, after / before);
+    crate::scene::lod_instance::rescale_groups_over(scene, &ids, &before);
     Ok(ids.len())
 }
 

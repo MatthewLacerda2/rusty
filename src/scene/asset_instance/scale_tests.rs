@@ -54,12 +54,14 @@ fn a_skinned_instances_bones_move_to_the_scaled_rest_pose() {
 
 #[test]
 fn the_change_is_noted_for_other_caches_and_the_scene_reads_it_once() {
-    use crate::core::fs::written::written_since;
+    use crate::core::fs::written::{note_written, written_since};
     use crate::scene::rehydrate::model_writes::ModelWrites;
     let path = quad_model("rusty_scale_noted");
     let mut scene = Scene::new();
     instantiate_asset(&mut scene, &format!("{path}::Quad"), None, Vec3::ZERO).unwrap();
     let mut follow = ModelWrites::default();
+    // Another model's note waiting, as any test or tool running alongside makes.
+    note_written(&quad_model("rusty_scale_noted_other"));
     let (seen, _) = written_since(u64::MAX);
     assert_eq!(set_model_scale_factor(&mut scene, &path, 0.5), Ok(1));
     assert!(
@@ -67,6 +69,19 @@ fn the_change_is_noted_for_other_caches_and_the_scene_reads_it_once() {
         "the particle cache sees it"
     );
     assert_eq!(follow.follow(&mut scene), 0, "already re-imported");
+    assert_eq!(follow.follow(&mut scene), 0, "and not again next frame");
+}
+
+#[test]
+fn a_nan_or_unchanged_factor_changes_nothing() {
+    use crate::core::fs::written::written_since;
+    let path = quad_model("rusty_scale_unchanged");
+    let mut scene = Scene::new();
+    instantiate_asset(&mut scene, &format!("{path}::Quad"), None, Vec3::ZERO).unwrap();
+    let (seen, _) = written_since(u64::MAX);
+    assert_eq!(set_model_scale_factor(&mut scene, &path, f32::NAN), Ok(0));
+    assert_eq!(set_model_scale_factor(&mut scene, &path, 1.0), Ok(0));
+    assert!(!written_since(seen).1.contains(&path), "no write noted");
 }
 
 #[test]
