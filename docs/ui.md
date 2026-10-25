@@ -177,10 +177,15 @@ adds a `RectTransform`.
 **UI sprites.** One texel is one reference unit — Unity's 100-pixels-per-unit sprite on
 a 100-reference-pixels-per-unit canvas — so a `Sliced` border or a `Tiled` tile keeps its
 authored size whatever the rect's size, and scales with the canvas. Author sprites at the
-reference resolution (1920×1080 by default) and export PNGs with straight alpha. UI
-textures are sampled with linear filtering at their base level (no mips — UI draws near
-1:1, where mips only blur). A `Sliced`/`Tiled` image without a texture draws as `Simple`;
-a `Tiled` image caps itself at 1024 tiles by growing the tile.
+reference resolution (1920×1080 by default) and export PNGs with straight alpha. A UI
+Image samples with its texture's import settings (`docs/api/Assets.md` § *Texture import
+settings*): its filter, and its mip chain when drawn smaller than its source, but always
+clamped, so an edge never bleeds the opposite side in. Mips are averaged in straight
+alpha, so a minified sprite with a transparent surround grows a dark fringe: turn
+*Generate Mipmaps* off for a crisp HUD sprite (Unity's *Sprite* import default). Glyphs
+and solid-colour graphics keep a linear, base-level sampler. A `Sliced`/`Tiled` image
+without a texture draws as `Simple`; a `Tiled` image caps itself at 1024 tiles by growing
+the tile.
 
 ### `CanvasGroup`, `RectMask` and `Mask`
 

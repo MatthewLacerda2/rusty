@@ -13,17 +13,24 @@ use super::mask_scene::{element, overlay, px, shoot};
 /// A `cells`² black/white checker sprite written to disk with `filter` in its
 /// sidecar (the rest left at the defaults: Repeat, mips), returned as its path.
 fn checker(cells: u32, filter: FilterMode) -> String {
-    let name = format!("rusty_ui_checker_{cells}_{filter:?}.png");
+    let settings = TextureSettings {
+        filter_mode: filter,
+        ..Default::default()
+    };
+    checker_with(cells, settings)
+}
+
+/// A `cells`² black/white checker sprite written to disk with `settings` in its
+/// sidecar, returned as its path.
+pub(super) fn checker_with(cells: u32, settings: TextureSettings) -> String {
+    let (filter, mips) = (settings.filter_mode, settings.generate_mipmaps);
+    let name = format!("rusty_ui_checker_{cells}_{filter:?}_{mips}.png");
     let path = crate::temp::dir().join(name);
     let img = image::RgbaImage::from_fn(cells, cells, |x, y| match (x + y) % 2 {
         0 => image::Rgba([255, 255, 255, 255]),
         _ => image::Rgba([0, 0, 0, 255]),
     });
     img.save(&path).expect("write the checker sprite");
-    let settings = TextureSettings {
-        filter_mode: filter,
-        ..Default::default()
-    };
     set_texture(&path, settings).expect("write the sidecar");
     path.to_string_lossy().into_owned()
 }

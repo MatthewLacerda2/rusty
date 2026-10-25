@@ -246,7 +246,7 @@ impl crate::render::Renderer {
     }
 }
 
-/// A texture + the UI sampler as a bind group against `layout`.
+/// A texture + the UI's sampler or an image's clamped one, bound against `layout`.
 pub(crate) fn bind(
     device: &wgpu::Device,
     layout: &wgpu::BindGroupLayout,
