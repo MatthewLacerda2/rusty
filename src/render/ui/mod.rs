@@ -48,10 +48,12 @@ pub(crate) mod world;
 use std::collections::HashMap;
 use std::rc::Rc;
 
+use crate::asset::sidecar::FilterMode;
 use crate::components::UiBlend;
 use crate::render::gpu::bind_layouts;
 use crate::render::gpu::pipelines::LazyPipeline;
 use crate::render::gpu::shaders::ShaderRegistry;
+use crate::render::gpu::textures::ui_sampler;
 use crate::render::GpuTexture;
 
 pub use cache::UiViewCache;
@@ -66,9 +68,11 @@ pub struct UiRenderer {
     pipelines: HashMap<(wgpu::TextureFormat, UiBlend), wgpu::RenderPipeline>,
     /// The backdrop batches' pipeline (#426), per target format.
     backdrops: HashMap<wgpu::TextureFormat, wgpu::RenderPipeline>,
-    /// Linear, clamped, base-level-only: UI sprites are drawn near 1:1, so mips
-    /// would only blur them.
+    /// Linear, clamped, base-level-only: the white texture's, the glyph atlases'
+    /// and the backdrop's. An image samples with its own filter instead.
     sampler: wgpu::Sampler,
+    /// An image's sampler per import filter, always clamped (`ui_sampler`, #1397).
+    image_samplers: HashMap<FilterMode, wgpu::Sampler>,
     /// A 1×1 white texture, sampled by solid-colour graphics.
     white: wgpu::BindGroup,
     /// Its view: the mask and backdrop of a batch that has neither.
@@ -130,6 +134,7 @@ impl UiRenderer {
             pipelines: HashMap::new(),
             backdrops: HashMap::new(),
             sampler,
+            image_samplers: HashMap::new(),
             white,
             white_view,
             batch_layout,
@@ -200,7 +205,11 @@ impl UiRenderer {
             .get(path)
             .is_some_and(|(cached, _)| Rc::ptr_eq(cached, &tex));
         if !fresh {
-            let group = bind(device, &self.layout, &tex.view, &self.sampler);
+            let sampler = self
+                .image_samplers
+                .entry(tex.filter)
+                .or_insert_with(|| ui_sampler(device, tex.filter));
+            let group = bind(device, &self.layout, &tex.view, sampler);
             self.textures.insert(path.to_string(), (tex, group));
         }
     }

@@ -9,6 +9,7 @@
 
 use std::rc::Rc;
 
+use crate::asset::sidecar::FilterMode;
 use crate::asset::MapRef;
 use crate::render::{GpuTexture, Renderer};
 
@@ -36,7 +37,7 @@ impl Renderer {
             &self.device,
             &self.texture_layout,
             (image.texture.clone(), super::DATA_FORMAT),
-            panorama_sampler(&self.device),
+            (panorama_sampler(&self.device), FilterMode::Trilinear),
             Some(path),
         ))
     }

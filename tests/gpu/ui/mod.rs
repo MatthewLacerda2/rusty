@@ -1,6 +1,7 @@
 mod backdrop_screenshot;
 mod hud_scene;
 mod hud_screenshot;
+mod import_filter_screenshot;
 mod marker_screenshot;
 mod mask_scene;
 mod mask_screenshot;

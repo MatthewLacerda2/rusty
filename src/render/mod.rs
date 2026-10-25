@@ -114,6 +114,9 @@ pub struct GpuTexture {
     /// data maps (metallic, roughness, normal, the shader texture slots) bind.
     pub data_view: wgpu::TextureView,
     pub sampler: wgpu::Sampler,
+    /// The filter `sampler` reads with: a UI image samples with it too, but always
+    /// clamped (`render::ui`, #1397).
+    pub filter: crate::asset::sidecar::FilterMode,
     pub bind_group: wgpu::BindGroup,
 }
 

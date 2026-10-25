@@ -6,13 +6,13 @@ mod sampler;
 
 use std::rc::Rc;
 
-use crate::asset::sidecar::TextureSettings;
+use crate::asset::sidecar::{FilterMode, TextureSettings};
 use crate::asset::MapRef;
 use crate::render::{GpuTexture, Renderer};
 use image::GenericImageView;
 use mips::full_chain_len;
 pub(crate) use mips::{MipGenerator, MipSettings, TextureKind};
-pub(crate) use sampler::sampler;
+pub(crate) use sampler::{sampler, ui_sampler};
 
 /// The storage format of every image the renderer uploads: colour is authored in
 /// sRGB, so the colour view decodes it on sample.
@@ -34,7 +34,7 @@ impl Renderer {
         let checker = checkerboard(256, 32);
         let texture = upload((device, queue), label, &checker, full_chain_len(256, 256));
         mips.generate(device, queue, &texture, TextureKind::Colour);
-        let sampler = sampler(device, &TextureSettings::default());
+        let sampler = default_sampler(device);
         Self::finalize_texture(device, layout, (texture, DATA_FORMAT), sampler, Some(label))
     }
 
@@ -48,19 +48,20 @@ impl Renderer {
         let label = "White Texture";
         let white = image::RgbaImage::from_pixel(1, 1, image::Rgba([255; 4]));
         let texture = upload((device, queue), label, &white, 1);
-        let sampler = sampler(device, &TextureSettings::default());
+        let sampler = default_sampler(device);
         Self::finalize_texture(device, layout, (texture, DATA_FORMAT), sampler, Some(label))
     }
 
     /// Create the colour and data views + bind group and assemble the final
     /// `GpuTexture`. `data_format` is the format the data view reads the texels as:
     /// the storage format itself for a texture that holds linear values, or a
-    /// format listed in the texture's `view_formats`.
+    /// format listed in the texture's `view_formats`; `filter` is the one the
+    /// sampler reads with.
     pub(crate) fn finalize_texture(
         device: &wgpu::Device,
         layout: &wgpu::BindGroupLayout,
         (texture, data_format): (wgpu::Texture, wgpu::TextureFormat),
-        sampler: wgpu::Sampler,
+        (sampler, filter): (wgpu::Sampler, FilterMode),
         label: Option<&str>,
     ) -> GpuTexture {
         let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
@@ -88,6 +89,7 @@ impl Renderer {
             view,
             data_view,
             sampler,
+            filter,
             bind_group,
         }
     }
@@ -152,10 +154,16 @@ impl Renderer {
             &self.device,
             &self.texture_layout,
             (texture, DATA_FORMAT),
-            sampler(&self.device, import),
+            (sampler(&self.device, import), import.filter_mode),
             Some(path_str),
         ))
     }
+}
+
+/// An image texture's default sampler (trilinear, repeating), with its filter.
+fn default_sampler(device: &wgpu::Device) -> (wgpu::Sampler, FilterMode) {
+    let settings = TextureSettings::default();
+    (sampler(device, &settings), settings.filter_mode)
 }
 
 /// What uploading an image with mips needs of the GPU: the device, the queue and
