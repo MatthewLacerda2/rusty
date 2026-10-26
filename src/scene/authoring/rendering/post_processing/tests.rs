@@ -43,7 +43,7 @@ fn a_partial_settings_table_keeps_the_fields_it_leaves_out() {
     let changes = serde_json::json!({"bloom": {"intensity": -2.0}});
     let changes = changes.as_object().unwrap();
     assert!((kind.write)(&mut scene.world, id, changes, Skip::Held).unwrap());
-    let bloom = scene.world.post_processing(id).unwrap().bloom;
+    let bloom = scene.world.post_processing(id).unwrap().bloom.clone();
     assert_eq!(
         (bloom.active, bloom.intensity, bloom.threshold),
         (false, 0.0, 0.25)

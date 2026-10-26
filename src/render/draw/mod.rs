@@ -130,6 +130,8 @@ impl Renderer {
         self.refresh_textures();
         // And the Color Lookups the views' grading bakes read (#1441).
         self.grade_bake.luts.refresh();
+        // And the lens dirt bloom lights (#1442), once its files are fresh.
+        self.load_lens_dirt(scene);
         self.upload_scene_meshes(scene);
         self.surface_shaders.refresh();
         // An entity whose last shader-param override was cleared draws with its

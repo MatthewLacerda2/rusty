@@ -25,13 +25,14 @@ mod exposure;
 mod grading;
 mod lens;
 mod lens_flare;
+mod path_field;
 mod ssr;
 mod volume;
 
 #[cfg(test)]
 mod slider_tests;
 
-pub use grading::commit_abandoned_lut;
+pub use path_field::commit_abandoned as commit_abandoned_paths;
 
 use grading::{color_adjustments, color_lookup, lift_gamma_gain, tonemapping, white_balance};
 use lens::{chromatic_aberration, film_grain, vignette};

@@ -1,6 +1,7 @@
-//! The Color Lookup (#1441): the LUT file ([`super::lut_field`]) and its
+//! The Color Lookup (#1441): the LUT file ([`path_field::LUT`]) and its
 //! contribution.
 
+use super::super::path_field::{self, LUT};
 use super::super::{knob, knob_row, Section, COLOR_CORRECTION};
 use crate::scene::authoring::rendering::post_processing::grading::color_lookup;
 use crate::scene::PostProcessingComponent;
@@ -20,7 +21,7 @@ fn draw(
     is_dirty: &mut bool,
 ) {
     ui.label("  Color Lookup");
-    super::lut_field::draw(ui, world, id, vc, is_dirty);
+    path_field::draw(ui, (&mut *world, id), &LUT, vc, is_dirty);
     let row = (
         "    Contribution:",
         knob(color_lookup::EFFECT.knobs, "contribution"),

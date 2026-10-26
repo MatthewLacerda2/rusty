@@ -55,6 +55,7 @@ fn neutral_volume() -> PostProcessingComponent {
             active: false,
             intensity: 0.0,
             threshold: 1.0,
+            ..Default::default()
         },
         ssr: rusty::components::Ssr {
             active: false,

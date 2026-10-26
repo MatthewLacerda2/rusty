@@ -3,7 +3,13 @@
 //! `postfx/bloom.wgsl`), and the composite's add of the blurred result on the HDR
 //! image (`postfx/effects/bloom.wgsl`). The bright pass reads the scene after depth of field
 //! and motion blur, so a moving highlight blooms along its streak, as in URP and HDRP
-//! (#1436).
+//! (#1436). The add lights the lens dirt too (`dirt`, #1442).
+
+mod dirt;
+#[cfg(test)]
+mod dirt_tests;
+
+use std::rc::Rc;
 
 use super::{Composite, EffectCx, Owner, Pass, PassCx, Phase, PostEffect};
 use crate::core::settings::graphics_options::GraphicsOption;
@@ -15,7 +21,7 @@ use crate::render::gpu::shaders::ShaderRegistry;
 use crate::render::postfx::params::Gate;
 use crate::render::postfx::{PfxTarget, PostFx, HDR_FORMAT};
 use crate::render::timing::GpuPass;
-use crate::render::{RenderView, Renderer};
+use crate::render::{GpuTexture, RenderView, Renderer};
 
 pub(crate) const EFFECT: PostEffect = PostEffect {
     name: "bloom",
@@ -39,11 +45,18 @@ fn blooms(cx: &EffectCx) -> bool {
         .is_some_and(|vc| cx.runs(EFFECT.gate, vc.bloom.active))
 }
 
-/// x: the intensity, w: `1` while bloom runs (the composite skips the add otherwise).
+/// x: the intensity, y: the dirt intensity (`0` without a dirt texture, the
+/// composite then skips the dirt), w: `1` while bloom runs (the composite skips the
+/// add otherwise).
 fn pack(cx: &EffectCx, slots: &mut [[f32; 4]]) {
     let Some(vc) = cx.volume() else { return };
     let on = if blooms(cx) { 1.0 } else { 0.0 };
-    slots[0] = [vc.bloom.intensity, 0.0, 0.0, on];
+    let dirt = if dirt::file(vc).is_some() {
+        vc.bloom.dirt_intensity
+    } else {
+        0.0
+    };
+    slots[0] = [vc.bloom.intensity, dirt, 0.0, on];
 }
 
 /// CPU mirror of `BloomParams` in `postfx/bloom.wgsl`.
@@ -110,12 +123,15 @@ impl BloomPasses {
 }
 
 /// One view's bloom ping-pong buffers, at the bloom divisor's reduced resolution: the
-/// bright pass writes `a`, the blur `b`, which the composite adds (binding 3).
+/// bright pass writes `a`, the blur `b`, which the composite adds (binding 3); and
+/// the lens dirt it lights (binding 10), picked by the bloom pass each frame.
 pub(crate) struct BloomTargets {
     pub(crate) a: PfxTarget,
     pub(crate) b: PfxTarget,
     pub(crate) size: (u32, u32),
     params: wgpu::Buffer,
+    dirt: Option<Rc<GpuTexture>>,
+    no_dirt: wgpu::TextureView,
 }
 
 impl BloomTargets {
@@ -132,15 +148,25 @@ impl BloomTargets {
                 usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
                 mapped_at_creation: false,
             }),
+            dirt: None,
+            no_dirt: dirt::black(device),
         }
+    }
+
+    /// The lens dirt the composite reads: this frame's texture, else black.
+    pub(crate) fn dirt_view(&self) -> &wgpu::TextureView {
+        self.dirt.as_ref().map_or(&self.no_dirt, |t| &t.view)
     }
 }
 
-/// Bright pass (scene -> `a`), then the blur (`a` -> `b`), when the view blooms.
+/// Bright pass (scene -> `a`), then the blur (`a` -> `b`), when the view blooms,
+/// with the lens dirt its volume names for the composite.
 fn run(r: &Renderer, view: &mut RenderView, cx: &PassCx) {
     let Some(vc) = cx.effect.volume().filter(|_| blooms(&cx.effect)) else {
+        view.post_fx.bloom.dirt = None;
         return;
     };
+    view.post_fx.bloom.dirt = r.lens_dirt(vc);
     let (device, queue) = (&r.device, &r.queue);
     let (pfx, passes) = (&view.post_fx, &r.post_passes.bloom);
     let t = &pfx.bloom;
