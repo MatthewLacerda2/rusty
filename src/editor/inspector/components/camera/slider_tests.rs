@@ -13,7 +13,7 @@ fn drawn(ev: f32) -> (bool, f32) {
     let mut world = World::new();
     let id = world.spawn("Camera".to_string());
     let mut vc = default_post_processing();
-    vc.auto_exposure.compensation = ev;
+    vc.exposure.automatic.compensation = ev;
     world.set_post_processing(id, Some(vc));
     let ctx = egui::Context::default();
     let mut changed = false;
@@ -32,7 +32,8 @@ fn drawn(ev: f32) -> (bool, f32) {
     let after = world
         .post_processing(id)
         .unwrap()
-        .auto_exposure
+        .exposure
+        .automatic
         .compensation;
     (changed, after)
 }

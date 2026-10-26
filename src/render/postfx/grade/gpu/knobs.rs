@@ -36,10 +36,9 @@ fn ramp() -> Vec<f32> {
 }
 
 fn volume(tonemap: Tonemap) -> PostProcessingComponent {
-    PostProcessingComponent {
-        tonemap,
-        ..default_post_processing()
-    }
+    let mut vc = default_post_processing();
+    vc.tonemapping.mode = tonemap;
+    vc
 }
 
 #[test]

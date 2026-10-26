@@ -63,7 +63,7 @@ fn scene(effects: &[&str]) -> Scene {
     let mut scene = wall_scene(2.0, [0.5, 0.5, 0.5]);
     let id = scene.world.ids_with_post_processing()[0];
     let mut vc = scene.world.post_processing_mut(id).unwrap();
-    vc.custom_effects = effects.iter().map(|s| s.to_string()).collect();
+    vc.custom_effects.names = effects.iter().map(|s| s.to_string()).collect();
     drop(vc);
     scene
 }

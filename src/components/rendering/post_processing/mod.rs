@@ -1,288 +1,77 @@
-//! src/components/rendering/post_processing/ — Post-process component
+//! src/components/rendering/post_processing/ — the post-processing volume, Unity's
+//! Volume with its overrides: one settings struct per post effect (#1467), each in
+//! its own file (grading effects under `grading/`, lens effects under `lens/`), plus
+//! the volume's lighting settings (`lighting`), which are no post effect.
 //!
-//! bloom/exposure/grading/lens/SSR settings. Unity: post-process volume. Moved verbatim from
-//! the former `core/scene.rs`, then extended (phase-3) so the renderer's post-FX
-//! chain (color correction, bloom, motion blur, real SSR) actually reads them.
-
-use std::collections::BTreeMap;
+//! A new effect adds its file, its `mod` line and one field below. The other layers
+//! find it by that field's name (`render::postfx::effects`, whose completeness test
+//! checks every layer has its part).
 
 use serde::{Deserialize, Serialize};
 
+// sorted: one module per effect (or family of effects); none reads another
+mod bloom;
+mod custom_effects;
 mod depth_of_field;
 mod exposure;
 mod grading;
 mod lens;
-mod tonemap;
+mod lighting;
+mod ssr;
 
+// sorted: each module's settings, re-exported by name
+pub use bloom::Bloom;
+pub use custom_effects::CustomEffects;
 pub use depth_of_field::{DepthOfField, DofMode};
-pub use exposure::{AutoExposure, ExposureMode};
-pub use grading::{ColorWheel, LiftGammaGain, Wheel, WhiteBalance};
+pub use exposure::{AutoExposure, Exposure, ExposureMode};
+pub use grading::{
+    ColorAdjustments, ColorLookup, ColorWheel, LiftGammaGain, Tonemap, Tonemapping, Wheel,
+    WhiteBalance,
+};
 pub use lens::{ChromaticAberration, FilmGrain, Vignette};
-pub use tonemap::Tonemap;
+pub use lighting::{ShadowSettings, SsaoSettings};
+pub use ssr::Ssr;
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+/// A post-processing volume. Every field defaults when a file leaves it out, so a
+/// scene names only what it sets, each effect to its own default (the Add Component
+/// menu's, `scene::authoring::default_post_processing`).
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
 pub struct PostProcessingComponent {
+    /// Whether the volume applies at all: a camera whose volume is off runs neutral.
+    #[serde(default = "on")]
     pub active: bool,
-    pub bloom_active: bool,
-    pub bloom_intensity: f32,
-    pub bloom_threshold: f32,
-    /// A pre-grade HDR scale, in EV: the one colour knob outside the grading LUT.
-    /// The exposure itself in `Fixed` mode; unused in `Automatic` (#1444).
-    pub exposure: f32,
-    /// Fixed or automatic exposure (#1444); `Fixed` when absent.
-    #[serde(default)]
-    pub exposure_mode: ExposureMode,
-    /// The automatic mode's limits, speeds and histogram window (#1444); the engine
-    /// defaults when absent.
-    #[serde(default)]
-    pub auto_exposure: AutoExposure,
-    pub contrast: f32,
-    pub saturation: f32,
-    /// The white point (#1440); neutral when absent.
-    #[serde(default)]
-    pub white_balance: WhiteBalance,
-    /// Lift / Gamma / Gain (#1440); neutral when absent.
-    #[serde(default)]
-    pub lift_gamma_gain: LiftGammaGain,
-    /// Rotates every hue by this many degrees, `-180..=180` (#1440); `0` when absent.
-    #[serde(default)]
-    pub hue_shift: f32,
-    /// Color Lookup (#1441): the user LUT file (a `.cube`, or a Unity strip
-    /// `.png`), applied last, on the display colour; none when absent.
-    #[serde(default)]
-    pub lut: Option<String>,
-    /// How much of [`lut`](Self::lut) applies, `0..=1`; `1` when absent.
-    #[serde(default = "full_contribution")]
-    pub lut_contribution: f32,
-    /// Vignette (#1439); off when absent.
-    #[serde(default)]
-    pub vignette: Vignette,
-    /// Chromatic Aberration (#1439); off when absent.
-    #[serde(default)]
+    // sorted: one field per post effect, named as every layer names the effect
+    pub bloom: Bloom,
     pub chromatic_aberration: ChromaticAberration,
-    /// Film Grain (#1439); off when absent.
-    #[serde(default)]
-    pub film_grain: FilmGrain,
-    /// Depth of field (#1445); off when absent.
-    #[serde(default)]
+    pub color_adjustments: ColorAdjustments,
+    pub color_lookup: ColorLookup,
+    pub custom_effects: CustomEffects,
     pub depth_of_field: DepthOfField,
-    pub ssr_active: bool,
-    pub ssr_quality: String, // "Low", "Medium", "High", "Ultra"
-    pub ssr_temporal_upsampling: bool,
-    /// Tonemap operator; ACES when the file names none.
-    #[serde(default)]
-    pub tonemap: Tonemap,
-    /// Display-gamma *tweak* around the neutral `1.0` (#415): the final image is
-    /// `c^(1/gamma)` in linear space, then the sRGB render target does the real
-    /// linear→display encode. `> 1` brightens midtones, `< 1` darkens them.
-    /// Saved as `display_gamma`; neutral when absent.
-    #[serde(rename = "display_gamma", default = "default_gamma")]
-    pub gamma: f32,
-    /// Directional-shadow cascades and reach (#435); the engine defaults when absent.
-    #[serde(default)]
+    pub exposure: Exposure,
+    pub film_grain: FilmGrain,
+    pub lift_gamma_gain: LiftGammaGain,
+    pub ssr: Ssr,
+    pub tonemapping: Tonemapping,
+    pub vignette: Vignette,
+    pub white_balance: WhiteBalance,
+
+    /// Directional-shadow cascades and reach (#435).
     pub shadows: ShadowSettings,
-    /// Screen-space ambient occlusion (#436); the engine defaults (on) when absent.
-    #[serde(default)]
+    /// Screen-space ambient occlusion (#436), on by default.
     pub ssao: SsaoSettings,
-    /// Authored postfx modules (`Shader.Bake` with `pass = "postfx"`, #397), run in
-    /// this order after tonemapping and before FXAA. Each is a module *name*, the
-    /// file the renderer loads from the authored-shader workspace. Empty when absent.
-    #[serde(default)]
-    pub custom_effects: Vec<String>,
-    /// Runtime params of the authored effects (#671), by the name a script set them
-    /// under (`"damage_vignette.intensity"` → `[0.7]`): Unity's volume-profile
-    /// overrides, without the blending. Every effect in `custom_effects` whose layout
-    /// resolves a name draws with its value; the rest keep their baked defaults.
-    /// Empty when absent.
-    #[serde(default)]
-    pub post_params: BTreeMap<String, Vec<f32>>,
 }
 
-fn full_contribution() -> f32 {
-    1.0
+impl PostProcessingComponent {
+    /// The fields that are no post effect: the volume's own switch and its lighting
+    /// settings. Every other field is one effect's settings.
+    pub const NOT_EFFECTS: [&'static str; 3] = ["active", "shadows", "ssao"];
 }
 
-/// How the sun's cascaded shadow map covers the view (#435) — HDRP's Shadows volume
-/// override: how many cascades split the view, and how far from the camera shadows
-/// reach. Without an active volume the renderer uses [`ShadowSettings::default`].
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(default)]
-pub struct ShadowSettings {
-    /// Cascades the view is split into, `1..=4`. More cascades keep near shadows
-    /// sharp over a longer reach, at one more depth pass each.
-    pub cascades: u32,
-    /// Distance from the camera, in world units, past which nothing casts or receives
-    /// a sun shadow (they fade out over its last tenth).
-    pub distance: f32,
-}
-
-impl ShadowSettings {
-    /// The cascade-count range the shadow map supports.
-    pub const MAX_CASCADES: u32 = 4;
-    /// The shortest shadow reach a write accepts.
-    pub const MIN_DISTANCE: f32 = 1.0;
-}
-
-impl Default for ShadowSettings {
-    /// Four cascades over 100 m: the whole of a large room or a street-scale outdoor
-    /// space shadowed, with the first cascade a few metres deep for first-person
-    /// contact shadows. Unity's High tier is 4 cascades over 150 m; 100 m spends the
-    /// same four maps on less ground, since a shooter's fights are closer than that.
-    fn default() -> Self {
-        Self {
-            cascades: Self::MAX_CASCADES,
-            distance: 100.0,
-        }
-    }
-}
-
-/// Screen-space ambient occlusion (#436) — HDRP's Ambient Occlusion volume override.
-/// Darkens only the ambient/indirect light where geometry crowds a point (a crate's
-/// foot on the floor, a room's corners), never direct light. The quality tier decides
-/// the resolution and sample count; these are the look.
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(default)]
-pub struct SsaoSettings {
-    /// Whether the AO passes run at all. Off costs nothing.
-    pub active: bool,
-    /// World-space reach of the occlusion search: how far from a surface another
-    /// surface still shades it.
-    pub radius: f32,
-    /// How strongly occlusion darkens the ambient term; `0` is none, `1` the
-    /// physically-plausible amount, above `1` exaggerated.
-    pub intensity: f32,
-}
-
-impl SsaoSettings {
-    /// The shortest radius a write accepts.
-    pub const MIN_RADIUS: f32 = 0.01;
-    /// The strongest intensity a write accepts.
-    pub const MAX_INTENSITY: f32 = 4.0;
-}
-
-impl Default for SsaoSettings {
-    /// On, half a metre, plain strength: the contact and corner shading an interior
-    /// needs, without the dark halo a wider radius paints around a character.
-    fn default() -> Self {
-        Self {
-            active: true,
-            radius: 0.5,
-            intensity: 1.0,
-        }
-    }
-}
-
-fn default_gamma() -> f32 {
-    1.0
+/// A loaded volume that leaves `active` out applies.
+fn on() -> bool {
+    true
 }
 
 #[cfg(test)]
-mod tests {
-    use super::PostProcessingComponent;
-
-    const BODY: &str = r#""active": true, "bloom_active": false, "bloom_intensity": 1.0,
-        "bloom_threshold": 1.0, "exposure": 0.0, "contrast": 1.0, "saturation": 1.0,
-        "ssr_active": false, "ssr_quality": "Low", "ssr_temporal_upsampling": false"#;
-
-    fn load(extra: &str) -> PostProcessingComponent {
-        serde_json::from_str(&format!("{{{BODY}{extra}}}")).unwrap()
-    }
-
-    #[test]
-    fn exposure_mode_is_fixed_when_absent_and_auto_exposure_round_trips() {
-        let vc = load("");
-        assert_eq!(vc.exposure_mode, super::ExposureMode::Fixed);
-        assert_eq!(vc.auto_exposure, super::AutoExposure::default());
-        let vc = load(r#", "exposure_mode": "Automatic", "auto_exposure": {"max_ev": 3.0}"#);
-        let back: PostProcessingComponent =
-            serde_json::from_str(&serde_json::to_string(&vc).unwrap()).unwrap();
-        assert_eq!(back.exposure_mode, super::ExposureMode::Automatic);
-        assert_eq!(
-            (back.auto_exposure.max_ev, back.auto_exposure.min_ev),
-            (3.0, -6.0)
-        );
-    }
-
-    #[test]
-    fn depth_of_field_is_off_when_absent_and_round_trips() {
-        assert_eq!(load("").depth_of_field, super::DepthOfField::default());
-        let vc = load(r#", "depth_of_field": {"mode": "Bokeh", "aperture": 1.4}"#);
-        let back: PostProcessingComponent =
-            serde_json::from_str(&serde_json::to_string(&vc).unwrap()).unwrap();
-        let dof = back.depth_of_field;
-        assert_eq!((dof.mode, dof.aperture), (super::DofMode::Bokeh, 1.4));
-        assert_eq!(dof.focus_distance, 10.0, "an absent knob keeps its default");
-    }
-
-    #[test]
-    fn display_gamma_loads_and_absence_is_neutral() {
-        assert_eq!(load(r#", "display_gamma": 1.3"#).gamma, 1.3);
-        assert_eq!(load("").gamma, 1.0);
-    }
-
-    #[test]
-    fn a_scene_without_shadow_settings_loads_the_defaults() {
-        assert_eq!(load("").shadows, super::ShadowSettings::default());
-        let vc = load(r#", "shadows": { "cascades": 2 }"#);
-        assert_eq!((vc.shadows.cascades, vc.shadows.distance), (2, 100.0));
-    }
-
-    #[test]
-    fn a_scene_without_ssao_settings_loads_the_defaults() {
-        assert_eq!(load("").ssao, super::SsaoSettings::default());
-        let vc = load(r#", "ssao": { "radius": 1.5 }"#);
-        assert_eq!(
-            (vc.ssao.active, vc.ssao.radius, vc.ssao.intensity),
-            (true, 1.5, 1.0)
-        );
-    }
-
-    #[test]
-    fn custom_effects_default_empty_and_round_trip_in_order() {
-        assert!(load("").custom_effects.is_empty());
-        let vc = load(r#", "custom_effects": ["crt", "vignette_red"]"#);
-        let back: PostProcessingComponent =
-            serde_json::from_str(&serde_json::to_string(&vc).unwrap()).unwrap();
-        assert_eq!(back.custom_effects, ["crt", "vignette_red"]);
-    }
-
-    #[test]
-    fn post_params_default_empty_and_round_trip() {
-        assert!(load("").post_params.is_empty());
-        let vc = load(r#", "post_params": {"damage_vignette.intensity": [0.7]}"#);
-        let back: PostProcessingComponent =
-            serde_json::from_str(&serde_json::to_string(&vc).unwrap()).unwrap();
-        assert_eq!(back.post_params["damage_vignette.intensity"], [0.7]);
-    }
-
-    #[test]
-    fn grading_knobs_load_neutral_when_absent_and_round_trip() {
-        let vc = load("");
-        assert!(vc.white_balance.is_neutral() && vc.hue_shift == 0.0);
-        assert_eq!(
-            (vc.lut, vc.lut_contribution),
-            (None, 1.0),
-            "no Color Lookup"
-        );
-        assert_eq!(vc.lift_gamma_gain, super::LiftGammaGain::default());
-        let vc = load(r#", "hue_shift": 30.0, "lift_gamma_gain": {"gain": {"offset": 0.5}}"#);
-        let back: PostProcessingComponent =
-            serde_json::from_str(&serde_json::to_string(&vc).unwrap()).unwrap();
-        assert_eq!(back.hue_shift, 30.0);
-        assert_eq!(
-            back.lift_gamma_gain.gain.color, [1.0; 3],
-            "an absent colour is white"
-        );
-        assert_eq!(back.lift_gamma_gain.gain.offset, 0.5);
-    }
-
-    #[test]
-    fn a_saved_component_round_trips_under_display_gamma() {
-        let mut vc = load("");
-        vc.gamma = 1.25;
-        let json = serde_json::to_string(&vc).unwrap();
-        assert!(json.contains(r#""display_gamma":1.25"#), "{json}");
-        let back: PostProcessingComponent = serde_json::from_str(&json).unwrap();
-        assert_eq!(back.gamma, 1.25);
-    }
-}
+mod tests;

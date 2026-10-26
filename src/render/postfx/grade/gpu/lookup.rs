@@ -57,9 +57,9 @@ fn gpu_an_identity_lut_is_byte_identical_and_a_swap_swaps_red_and_blue() {
 #[test]
 fn no_contribution_names_no_lookup() {
     let mut vc = default_post_processing();
-    vc.lut = Some("assets/luts/warm.cube".into());
+    vc.color_lookup.lut = Some("assets/luts/warm.cube".into());
     assert!(Lookup::of(Some(&vc)).is_some());
-    vc.lut_contribution = 0.0;
+    vc.color_lookup.contribution = 0.0;
     assert_eq!(
         Lookup::of(Some(&vc)),
         None,

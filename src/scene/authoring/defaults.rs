@@ -13,7 +13,7 @@ use crate::components::Playback;
 use crate::scene::{
     AnimatorComponent, CameraComponent, ClearFlags, ColliderComponent, ColliderShape,
     CollisionDetection, LightComponent, LightType, MaterialAsset, MaterialComponent,
-    NavMeshAgentComponent, PostProcessingComponent, RigidBodyComponent, Scene, Tonemap,
+    NavMeshAgentComponent, PostProcessingComponent, RigidBodyComponent, Scene,
 };
 
 /// Construct a `LightComponent` with the standard cone defaults. Shared by the
@@ -177,32 +177,7 @@ pub fn default_camera() -> CameraComponent {
 pub fn default_post_processing() -> PostProcessingComponent {
     PostProcessingComponent {
         active: true,
-        bloom_active: true,
-        bloom_intensity: 1.0,
-        bloom_threshold: 0.8,
-        exposure: 0.0,
-        exposure_mode: Default::default(),
-        auto_exposure: Default::default(),
-        contrast: 1.0,
-        saturation: 1.0,
-        white_balance: Default::default(),
-        lift_gamma_gain: Default::default(),
-        hue_shift: 0.0,
-        lut: None,
-        lut_contribution: 1.0,
-        vignette: Default::default(),
-        chromatic_aberration: Default::default(),
-        film_grain: Default::default(),
-        depth_of_field: Default::default(),
-        ssr_active: true,
-        ssr_quality: "High".to_string(),
-        ssr_temporal_upsampling: true,
-        tonemap: Tonemap::Aces,
-        gamma: 1.0,
-        shadows: Default::default(),
-        ssao: Default::default(),
-        custom_effects: Vec::new(),
-        post_params: Default::default(),
+        ..Default::default()
     }
 }
 

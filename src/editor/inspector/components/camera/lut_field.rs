@@ -31,7 +31,7 @@ pub(super) fn draw(
     vc: &PostProcessingComponent,
     is_dirty: &mut bool,
 ) {
-    let saved = vc.lut.clone().unwrap_or_default();
+    let saved = vc.color_lookup.lut.clone().unwrap_or_default();
     let draft = ui.data(|d| d.get_temp::<Draft>(key()));
     let mut text = match draft {
         Some(d) if d.entity == id => d.text,
@@ -82,7 +82,7 @@ pub fn commit_abandoned(ctx: &egui::Context, scene: &mut Scene) -> bool {
     let saved = scene
         .world
         .post_processing(draft.entity)
-        .and_then(|vc| vc.lut.clone());
+        .and_then(|vc| vc.color_lookup.lut.clone());
     saved.unwrap_or_default() != draft.text && commit(&mut scene.world, draft.entity, draft.text)
 }
 

@@ -34,7 +34,7 @@ pub(super) fn register_custom_effects<'scope>(
         table,
         "GetCustomEffects",
         scope.create_function(|lua, ()| {
-            let names = with_vc(scene, |vc| vc.custom_effects.clone()).unwrap_or_default();
+            let names = with_vc(scene, |vc| vc.custom_effects.names.clone()).unwrap_or_default();
             lua.create_sequence_from(names)
         }),
     )

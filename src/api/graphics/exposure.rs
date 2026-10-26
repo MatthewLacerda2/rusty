@@ -31,7 +31,7 @@ pub(super) fn register_exposure<'scope>(
     put(
         table,
         "GetExposure",
-        scope.create_function(|_, ()| Ok(with_vc(scene, |vc| vc.exposure).unwrap_or(0.0))),
+        scope.create_function(|_, ()| Ok(with_vc(scene, |vc| vc.exposure.fixed_ev).unwrap_or(0.0))),
     )?;
     put(
         table,
@@ -47,7 +47,7 @@ pub(super) fn register_exposure<'scope>(
         table,
         "GetExposureMode",
         scope.create_function(|_, ()| {
-            let mode = with_vc(scene, |vc| vc.exposure_mode).unwrap_or_default();
+            let mode = with_vc(scene, |vc| vc.exposure.mode).unwrap_or_default();
             Ok(mode.name().to_string())
         }),
     )?;
@@ -61,7 +61,7 @@ fn register_auto_exposure<'scope>(
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
-    let auto = move || with_vc(scene, |vc| vc.auto_exposure).unwrap_or_default();
+    let auto = move || with_vc(scene, |vc| vc.exposure.automatic).unwrap_or_default();
     put(
         table,
         "SetExposureLimits",
@@ -99,7 +99,7 @@ fn register_adaptation<'scope>(
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
-    let auto = move || with_vc(scene, |vc| vc.auto_exposure).unwrap_or_default();
+    let auto = move || with_vc(scene, |vc| vc.exposure.automatic).unwrap_or_default();
     put(
         table,
         "SetAdaptationSpeed",

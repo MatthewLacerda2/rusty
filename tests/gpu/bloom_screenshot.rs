@@ -44,7 +44,7 @@ pub(crate) fn scene(bloom: bool) -> Scene {
     emissive_box(&mut scene, "Glow", Vec3::ZERO, Vec3::ONE, 8.0);
     let post = scene.add_entity("Post".to_string());
     let mut vc = default_post_processing();
-    (vc.bloom_active, vc.ssr_active) = (bloom, false);
+    (vc.bloom.active, vc.ssr.active) = (bloom, false);
     scene.world.set_post_processing(post, Some(vc));
     // A volume rides on its camera (#1434): that camera is the view's.
     scene

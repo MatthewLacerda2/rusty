@@ -50,27 +50,27 @@ pub fn set_active(vc: &mut PostProcessingComponent, active: bool) {
 
 /// Set whether bloom is active.
 pub fn set_bloom_active(vc: &mut PostProcessingComponent, active: bool) {
-    vc.bloom_active = active;
+    vc.bloom.active = active;
 }
 
 /// Set the bloom intensity, clamped to `≥ 0`.
 pub fn set_bloom_intensity(vc: &mut PostProcessingComponent, value: f32) {
-    vc.bloom_intensity = non_negative(value);
+    vc.bloom.intensity = non_negative(value);
 }
 
 /// Set the bloom threshold, clamped to `≥ 0`.
 pub fn set_bloom_threshold(vc: &mut PostProcessingComponent, value: f32) {
-    vc.bloom_threshold = non_negative(value);
+    vc.bloom.threshold = non_negative(value);
 }
 
 /// Set the exposure (EV).
 pub fn set_exposure(vc: &mut PostProcessingComponent, value: f32) {
-    vc.exposure = finite_or(value, vc.exposure);
+    vc.exposure.fixed_ev = finite_or(value, vc.exposure.fixed_ev);
 }
 
 /// Set where the exposure comes from (#1444): the fixed `exposure`, or metered.
 pub fn set_exposure_mode(vc: &mut PostProcessingComponent, mode: ExposureMode) {
-    vc.exposure_mode = mode;
+    vc.exposure.mode = mode;
 }
 
 /// Set the automatic exposure's limits (#1444), each clamped to
@@ -78,47 +78,47 @@ pub fn set_exposure_mode(vc: &mut PostProcessingComponent, mode: ExposureMode) {
 pub fn set_exposure_limits(vc: &mut PostProcessingComponent, min_ev: f32, max_ev: f32) {
     let r = AutoExposure::EV_RANGE;
     let min_ev = clamped(min_ev, -r, r);
-    vc.auto_exposure.min_ev = min_ev;
-    vc.auto_exposure.max_ev = clamped(max_ev, min_ev, r);
+    vc.exposure.automatic.min_ev = min_ev;
+    vc.exposure.automatic.max_ev = clamped(max_ev, min_ev, r);
 }
 
 /// Set the automatic exposure's compensation in EV (#1444), clamped to
 /// `±AutoExposure::EV_RANGE`.
 pub fn set_exposure_compensation(vc: &mut PostProcessingComponent, ev: f32) {
     let r = AutoExposure::EV_RANGE;
-    vc.auto_exposure.compensation = clamped(ev, -r, r);
+    vc.exposure.automatic.compensation = clamped(ev, -r, r);
 }
 
 /// Set how fast the automatic exposure rises and falls (#1444), in EV per second,
 /// each clamped to `0..=AutoExposure::MAX_SPEED`.
 pub fn set_adaptation_speed(vc: &mut PostProcessingComponent, up: f32, down: f32) {
     let max = AutoExposure::MAX_SPEED;
-    vc.auto_exposure.speed_up = clamped(up, 0.0, max);
-    vc.auto_exposure.speed_down = clamped(down, 0.0, max);
+    vc.exposure.automatic.speed_up = clamped(up, 0.0, max);
+    vc.exposure.automatic.speed_down = clamped(down, 0.0, max);
 }
 
 /// Set the histogram window the meter averages (#1444): `low` clamped to
 /// `0..=100`, `high` to `low..=100`.
 pub fn set_histogram_percent(vc: &mut PostProcessingComponent, low: f32, high: f32) {
     let low = clamped(low, 0.0, 100.0);
-    vc.auto_exposure.low_percent = low;
-    vc.auto_exposure.high_percent = clamped(high, low, 100.0);
+    vc.exposure.automatic.low_percent = low;
+    vc.exposure.automatic.high_percent = clamped(high, low, 100.0);
 }
 
 /// Set the contrast.
 pub fn set_contrast(vc: &mut PostProcessingComponent, value: f32) {
-    vc.contrast = finite_or(value, vc.contrast);
+    vc.color_adjustments.contrast = finite_or(value, vc.color_adjustments.contrast);
 }
 
 /// Set the saturation.
 pub fn set_saturation(vc: &mut PostProcessingComponent, value: f32) {
-    vc.saturation = finite_or(value, vc.saturation);
+    vc.color_adjustments.saturation = finite_or(value, vc.color_adjustments.saturation);
 }
 
 /// Set the display-gamma tweak (neutral `1.0`), clamped to `≥ 0.01` (avoids a
 /// divide-by-zero in the shader's `c^(1/gamma)`).
 pub fn set_gamma(vc: &mut PostProcessingComponent, value: f32) {
-    vc.gamma = at_least(value, 0.01);
+    vc.tonemapping.display_gamma = at_least(value, 0.01);
 }
 
 /// Set the white balance (#1440): `temperature` and `tint`, each clamped to
@@ -142,39 +142,39 @@ pub fn set_wheel(vc: &mut PostProcessingComponent, which: Wheel, color: [f32; 3]
 
 /// Set the hue shift in degrees (#1440), clamped to `-180..=180`.
 pub fn set_hue_shift(vc: &mut PostProcessingComponent, degrees: f32) {
-    vc.hue_shift = clamped(degrees, -180.0, 180.0);
+    vc.color_adjustments.hue_shift = clamped(degrees, -180.0, 180.0);
 }
 
 /// Set the Color Lookup's LUT file (#1441) as a [`stored`] path; `None` or a blank
 /// one clears it. The renderer logs once and grades neutral when it is missing or
 /// malformed.
 pub fn set_lut(vc: &mut PostProcessingComponent, path: Option<String>) {
-    vc.lut = path.map(|p| stored(&p)).filter(|p| !p.is_empty());
+    vc.color_lookup.lut = path.map(|p| stored(&p)).filter(|p| !p.is_empty());
 }
 
 /// Set how much of the Color Lookup applies (#1441), clamped to `0..=1`.
 pub fn set_lut_contribution(vc: &mut PostProcessingComponent, value: f32) {
-    vc.lut_contribution = unit(value);
+    vc.color_lookup.contribution = unit(value);
 }
 
 /// Set the tonemap operator (typed — string parsing stays in the API adapter).
 pub fn set_tonemap(vc: &mut PostProcessingComponent, tonemap: Tonemap) {
-    vc.tonemap = tonemap;
+    vc.tonemapping.mode = tonemap;
 }
 
 /// Set whether SSR is active.
 pub fn set_ssr_active(vc: &mut PostProcessingComponent, active: bool) {
-    vc.ssr_active = active;
+    vc.ssr.active = active;
 }
 
 /// Set the SSR quality preset name (`"Low"`/`"Medium"`/`"High"`/`"Ultra"`).
 pub fn set_ssr_quality(vc: &mut PostProcessingComponent, quality: String) {
-    vc.ssr_quality = quality;
+    vc.ssr.quality = quality;
 }
 
 /// Set whether SSR temporal upsampling is on.
 pub fn set_ssr_temporal_upsampling(vc: &mut PostProcessingComponent, on: bool) {
-    vc.ssr_temporal_upsampling = on;
+    vc.ssr.temporal_upsampling = on;
 }
 
 /// Set how many shadow cascades split the view, clamped to `1..=4`.
@@ -217,7 +217,7 @@ pub fn set_custom_effects(
             "invalid post-FX effect name {bad:?}: want a baked module name, not a path"
         ));
     }
-    vc.custom_effects = names;
+    vc.custom_effects.names = names;
     Ok(())
 }
 
@@ -231,7 +231,7 @@ pub fn set_post_param(
     name: &str,
     value: Vec<f32>,
 ) -> Result<(), String> {
-    set_post_param_with(vc, &PostChain::load(&vc.custom_effects), name, value)
+    set_post_param_with(vc, &PostChain::load(&vc.custom_effects.names), name, value)
 }
 
 /// [`set_post_param`] against an already-read `chain` of the volume's effects — a
@@ -242,13 +242,13 @@ pub fn set_post_param_with(
     name: &str,
     value: Vec<f32>,
 ) -> Result<(), String> {
-    chain.set(&mut vc.post_params, name, finite_values(value)?)
+    chain.set(&mut vc.custom_effects.params, name, finite_values(value)?)
 }
 
 /// The value runtime param `name` of the volume's effects draws with: the stored one,
 /// else the effect's baked default. Strict like [`set_post_param`].
 pub fn post_param(vc: &PostProcessingComponent, name: &str) -> Result<Vec<f32>, String> {
-    post_param_with(vc, &PostChain::load(&vc.custom_effects), name)
+    post_param_with(vc, &PostChain::load(&vc.custom_effects.names), name)
 }
 
 /// [`post_param`] against an already-read `chain`.
@@ -257,7 +257,7 @@ pub fn post_param_with(
     chain: &PostChain,
     name: &str,
 ) -> Result<Vec<f32>, String> {
-    chain.get(&vc.post_params, name)
+    chain.get(&vc.custom_effects.params, name)
 }
 
 /// A bare module file stem: non-empty, no path separator, not hidden or `..`.

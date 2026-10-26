@@ -17,16 +17,10 @@ use rusty::scene::Scene;
 fn scene_with_volume() -> Rc<RefCell<Scene>> {
     let mut scene = Scene::new();
     let id = scene.add_entity("PostFx".to_string());
-    scene.world.set_post_processing(
-        id,
-        Some(PostProcessingComponent {
-            bloom_active: false,
-            ssr_active: false,
-            ssr_quality: "Low".to_string(),
-            ssr_temporal_upsampling: false,
-            ..default_post_processing()
-        }),
-    );
+    let mut vc: PostProcessingComponent = default_post_processing();
+    (vc.bloom.active, vc.ssr.active, vc.ssr.temporal_upsampling) = (false, false, false);
+    vc.ssr.quality = "Low".to_string();
+    scene.world.set_post_processing(id, Some(vc));
     scene.world.set_camera(
         id,
         Some(CameraComponent {
@@ -67,11 +61,11 @@ fn bloom_and_color_round_trip() {
         let s = scene.borrow();
         let id = s.entity_ids()[0];
         let vc = s.world.post_processing(id).unwrap().clone();
-        assert!(vc.bloom_active);
-        assert_eq!(vc.bloom_intensity, 3.5);
-        assert_eq!(vc.exposure, 1.25);
-        assert_eq!(vc.gamma, 2.0);
-        assert_eq!(vc.tonemap, Tonemap::Reinhard);
+        assert!(vc.bloom.active);
+        assert_eq!(vc.bloom.intensity, 3.5);
+        assert_eq!(vc.exposure.fixed_ev, 1.25);
+        assert_eq!(vc.tonemapping.display_gamma, 2.0);
+        assert_eq!(vc.tonemapping.mode, Tonemap::Reinhard);
 
         let read: bool = lua.load("return Graphics.GetBloomActive()").eval().unwrap();
         assert!(read);

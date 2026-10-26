@@ -21,10 +21,16 @@ use rusty::scene::{MeshComponent, PostProcessingComponent, Scene};
 
 fn vc(bloom: bool) -> PostProcessingComponent {
     PostProcessingComponent {
-        bloom_active: bloom,
-        bloom_threshold: 0.6,
-        ssr_active: false,
-        ssr_temporal_upsampling: false,
+        bloom: rusty::components::Bloom {
+            active: bloom,
+            threshold: 0.6,
+            ..Default::default()
+        },
+        ssr: rusty::components::Ssr {
+            active: false,
+            temporal_upsampling: false,
+            ..Default::default()
+        },
         ..rusty::scene::authoring::default_post_processing()
     }
 }

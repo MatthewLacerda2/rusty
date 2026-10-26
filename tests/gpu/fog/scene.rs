@@ -51,13 +51,20 @@ pub fn wall_scene(distance: f32, color: [f32; 3]) -> Scene {
 
 fn neutral_volume() -> PostProcessingComponent {
     PostProcessingComponent {
-        bloom_active: false,
-        bloom_intensity: 0.0,
-        bloom_threshold: 1.0,
-        ssr_active: false,
-        ssr_quality: "Low".to_string(),
-        ssr_temporal_upsampling: false,
-        tonemap: Tonemap::None,
+        bloom: rusty::components::Bloom {
+            active: false,
+            intensity: 0.0,
+            threshold: 1.0,
+        },
+        ssr: rusty::components::Ssr {
+            active: false,
+            quality: "Low".to_string(),
+            temporal_upsampling: false,
+        },
+        tonemapping: rusty::components::Tonemapping {
+            mode: Tonemap::None,
+            ..Default::default()
+        },
         // Neutral means no AO either: the fog tests read exact surface colours.
         ssao: rusty::components::SsaoSettings {
             active: false,

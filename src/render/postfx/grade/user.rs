@@ -26,11 +26,11 @@ impl<'a> Lookup<'a> {
     /// The lookup `volume` names, if it names a file and any of it applies: at a
     /// contribution of `0` nothing is read, uploaded or logged.
     pub fn of(volume: Option<&'a PostProcessingComponent>) -> Option<Self> {
-        let vc = volume.filter(|vc| vc.lut_contribution > 0.0)?;
-        let path = vc.lut.as_deref().filter(|p| !p.is_empty())?;
+        let vc = volume.filter(|vc| vc.color_lookup.contribution > 0.0)?;
+        let path = vc.color_lookup.lut.as_deref().filter(|p| !p.is_empty())?;
         Some(Self {
             path,
-            contribution: vc.lut_contribution,
+            contribution: vc.color_lookup.contribution,
         })
     }
 }

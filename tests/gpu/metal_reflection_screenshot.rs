@@ -38,8 +38,8 @@ fn scene(ssr: bool) -> Scene {
     if ssr {
         let volume = create_entity(&mut scene, "Volume", None);
         let mut vc = default_post_processing();
-        vc.bloom_active = false;
-        vc.ssr_active = true;
+        vc.bloom.active = false;
+        vc.ssr.active = true;
         scene.world.set_post_processing(volume, Some(vc));
         // A volume rides on its camera (#1434): that camera is the view's.
         scene

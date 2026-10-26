@@ -29,8 +29,8 @@ fn yard(with_crate: bool, ssao: bool) -> Scene {
     }
     let volume = create_entity(&mut scene, "Volume", None);
     let mut vc = default_post_processing();
-    vc.bloom_active = false;
-    vc.ssr_active = false;
+    vc.bloom.active = false;
+    vc.ssr.active = false;
     vc.ssao.active = ssao;
     scene.world.set_post_processing(volume, Some(vc));
     // A volume rides on its camera (#1434): that camera is the view's.

@@ -8,11 +8,16 @@ fn scene_with_vc() -> (Scene, u32) {
     let mut scene = Scene::new();
     let id = scene.add_entity("Volume".to_string());
     let c = PostProcessingComponent {
-        bloom_active: false,
-        bloom_threshold: 1.0,
-        ssr_active: false,
-        ssr_quality: "Medium".to_string(),
-        ssr_temporal_upsampling: false,
+        bloom: crate::components::Bloom {
+            active: false,
+            threshold: 1.0,
+            ..Default::default()
+        },
+        ssr: crate::components::Ssr {
+            active: false,
+            quality: "Medium".to_string(),
+            temporal_upsampling: false,
+        },
         ..crate::scene::authoring::default_post_processing()
     };
     scene.world.set_post_processing(id, Some(c));
@@ -37,17 +42,16 @@ fn ops_write_through_with_clamps() {
     set_white_balance(&mut e, 250.0, f32::NAN);
     set_wheel(&mut e, Wheel::Gain, [2.0, 0.5, -1.0], -3.0);
     set_hue_shift(&mut e, 400.0);
-    set_exposure_limits(&mut e, 3.0, -20.0);
-    set_exposure_compensation(&mut e, f32::INFINITY);
-    set_adaptation_speed(&mut e, -1.0, 1e9);
-    set_histogram_percent(&mut e, 120.0, 50.0);
     let vc = &*e;
-    assert_eq!(vc.bloom_intensity, 0.0);
-    assert_eq!(vc.bloom_threshold, 0.0);
-    assert_eq!(vc.gamma, 0.01, "gamma clamps to its floor");
-    assert_eq!(vc.tonemap, Tonemap::Reinhard);
-    assert_eq!(vc.ssr_quality, "High");
-    assert!(vc.ssr_temporal_upsampling);
+    assert_eq!(vc.bloom.intensity, 0.0);
+    assert_eq!(vc.bloom.threshold, 0.0);
+    assert_eq!(
+        vc.tonemapping.display_gamma, 0.01,
+        "gamma clamps to its floor"
+    );
+    assert_eq!(vc.tonemapping.mode, Tonemap::Reinhard);
+    assert_eq!(vc.ssr.quality, "High");
+    assert!(vc.ssr.temporal_upsampling);
     assert_eq!(vc.shadows.cascades, 4, "cascades clamp to the map's layers");
     assert_eq!(
         vc.shadows.distance, 1.0,
@@ -64,8 +68,18 @@ fn ops_write_through_with_clamps() {
     );
     let gain = vc.lift_gamma_gain.gain;
     assert_eq!((gain.color, gain.offset), ([1.0, 0.5, 0.0], -1.0));
-    assert_eq!(vc.hue_shift, 180.0);
-    let ae = vc.auto_exposure;
+    assert_eq!(vc.color_adjustments.hue_shift, 180.0);
+}
+
+#[test]
+fn exposure_ops_hold_their_ranges() {
+    let (mut scene, id) = scene_with_vc();
+    let mut e = scene.world.post_processing_mut(id).unwrap();
+    set_exposure_limits(&mut e, 3.0, -20.0);
+    set_exposure_compensation(&mut e, f32::INFINITY);
+    set_adaptation_speed(&mut e, -1.0, 1e9);
+    set_histogram_percent(&mut e, 120.0, 50.0);
+    let ae = e.exposure.automatic;
     assert_eq!((ae.min_ev, ae.max_ev), (3.0, 3.0), "max floors at min");
     assert_eq!(ae.compensation, 0.0, "an infinite compensation is refused");
     assert_eq!((ae.speed_up, ae.speed_down), (0.0, 100.0));
@@ -77,10 +91,18 @@ fn lut_path_has_one_spelling_and_blank_clears() {
     let (mut scene, id) = scene_with_vc();
     let mut e = scene.world.post_processing_mut(id).unwrap();
     set_lut(&mut e, Some(" ./luts\\a.cube ".into()));
-    assert_eq!(e.lut.as_deref(), Some("luts/a.cube"), "one spelling");
+    assert_eq!(
+        e.color_lookup.lut.as_deref(),
+        Some("luts/a.cube"),
+        "one spelling"
+    );
     set_lut(&mut e, Some("  ".into()));
     set_lut_contribution(&mut e, 4.0);
-    assert_eq!((&e.lut, e.lut_contribution), (&None, 1.0), "blank clears");
+    assert_eq!(
+        (&e.color_lookup.lut, e.color_lookup.contribution),
+        (&None, 1.0),
+        "blank clears"
+    );
 }
 
 #[test]
@@ -93,7 +115,7 @@ fn custom_effects_keep_order_and_refuse_paths() {
         assert!(err.contains(&format!("{bad:?}")), "{err}");
     }
     assert_eq!(
-        e.custom_effects,
+        e.custom_effects.names,
         ["crt", "grain"],
         "a refused write changes nothing"
     );

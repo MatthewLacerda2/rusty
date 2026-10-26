@@ -73,12 +73,17 @@ impl GradeParams {
             lift: lift.extend(0.0).to_array(),
             inv_gamma: inv_gamma.extend(0.0).to_array(),
             gain: gain.extend(0.0).to_array(),
-            hue: [bounded(vc.hue_shift, 180.0) / 360.0, 0.0, 0.0, 0.0],
+            hue: [
+                bounded(vc.color_adjustments.hue_shift, 180.0) / 360.0,
+                0.0,
+                0.0,
+                0.0,
+            ],
             tone: [
-                vc.tonemap.to_index() as f32,
-                vc.contrast,
-                vc.saturation,
-                vc.gamma.max(0.01),
+                vc.tonemapping.mode.to_index() as f32,
+                vc.color_adjustments.contrast,
+                vc.color_adjustments.saturation,
+                vc.tonemapping.display_gamma.max(0.01),
             ],
             ..Self::NEUTRAL
         }

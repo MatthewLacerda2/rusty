@@ -64,15 +64,15 @@ fn draw_bloom(
 ) {
     ui.add_space(3.0);
     ui.label("Bloom");
-    let mut bloom_active = vc.bloom_active;
+    let mut bloom_active = vc.bloom.active;
     if ui.checkbox(&mut bloom_active, "  Bloom Active").changed() {
         if let Some(mut c) = world.post_processing_mut(id) {
             vc_ops::set_bloom_active(&mut c, bloom_active);
         }
         *is_dirty = true;
     }
-    if vc.bloom_active {
-        let mut intensity = vc.bloom_intensity;
+    if vc.bloom.active {
+        let mut intensity = vc.bloom.intensity;
         ui.horizontal(|ui| {
             ui.label("    Intensity:");
             if ui
@@ -85,7 +85,7 @@ fn draw_bloom(
                 *is_dirty = true;
             }
         });
-        let mut threshold = vc.bloom_threshold;
+        let mut threshold = vc.bloom.threshold;
         ui.horizontal(|ui| {
             ui.label("    Threshold:");
             if ui
@@ -138,11 +138,11 @@ fn draw_color_correction(
     ui.add_space(3.0);
     ui.label("Color Correction");
     super::exposure::draw_exposure(ui, world, id, vc, is_dirty);
-    *is_dirty |= slider_row(ui, (&mut *world, id), "  Contrast:", vc.contrast, 0.0..=2.0, vc_ops::set_contrast);
-    *is_dirty |= slider_row(ui, (&mut *world, id), "  Saturation:", vc.saturation, 0.0..=2.0, vc_ops::set_saturation);
+    *is_dirty |= slider_row(ui, (&mut *world, id), "  Contrast:", vc.color_adjustments.contrast, 0.0..=2.0, vc_ops::set_contrast);
+    *is_dirty |= slider_row(ui, (&mut *world, id), "  Saturation:", vc.color_adjustments.saturation, 0.0..=2.0, vc_ops::set_saturation);
     super::grading::draw_grading(ui, world, id, vc, is_dirty);
     draw_tonemap(ui, world, id, vc, is_dirty);
-    *is_dirty |= slider_row(ui, (&mut *world, id), "  Display Gamma:", vc.gamma, 0.5..=2.0, vc_ops::set_gamma);
+    *is_dirty |= slider_row(ui, (&mut *world, id), "  Display Gamma:", vc.tonemapping.display_gamma, 0.5..=2.0, vc_ops::set_gamma);
     super::grading::draw_color_lookup(ui, world, id, vc, is_dirty);
 }
 
@@ -154,7 +154,7 @@ fn draw_tonemap(
     vc: &PostProcessingComponent,
     is_dirty: &mut bool,
 ) {
-    let mut tonemap = vc.tonemap;
+    let mut tonemap = vc.tonemapping.mode;
     ui.horizontal(|ui| {
         ui.label("  Tonemap:");
         egui::ComboBox::from_id_salt("tonemap")
@@ -185,15 +185,15 @@ fn draw_ssr(
 ) {
     ui.add_space(3.0);
     ui.label("Screen Space Reflections (SSR)");
-    let mut ssr_active = vc.ssr_active;
+    let mut ssr_active = vc.ssr.active;
     if ui.checkbox(&mut ssr_active, "  SSR Active").changed() {
         if let Some(mut c) = world.post_processing_mut(id) {
             vc_ops::set_ssr_active(&mut c, ssr_active);
         }
         *is_dirty = true;
     }
-    if vc.ssr_active {
-        let mut quality = vc.ssr_quality.clone();
+    if vc.ssr.active {
+        let mut quality = vc.ssr.quality.clone();
         ui.horizontal(|ui| {
             ui.label("    Quality:");
             egui::ComboBox::from_label("")
@@ -212,7 +212,7 @@ fn draw_ssr(
                     }
                 });
         });
-        let mut upsampling = vc.ssr_temporal_upsampling;
+        let mut upsampling = vc.ssr.temporal_upsampling;
         if ui
             .checkbox(&mut upsampling, "    Temporal Upsampling")
             .changed()

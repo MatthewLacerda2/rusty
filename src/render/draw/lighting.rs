@@ -90,17 +90,17 @@ pub(crate) fn apply_ssr_settings(lighting_uniform: &mut LightingUniform, scene: 
             .world
             .post_processing(id)
             .expect("id came from ids_with_post_processing");
-        if vc.ssr_active {
+        if vc.ssr.active {
             ssr_active = 1.0;
         }
-        ssr_quality = match vc.ssr_quality.as_str() {
+        ssr_quality = match vc.ssr.quality.as_str() {
             "Low" => 0.0,
             "Medium" => 1.0,
             "High" => 2.0,
             "Ultra" => 3.0,
             _ => 2.0,
         };
-        if vc.ssr_temporal_upsampling {
+        if vc.ssr.temporal_upsampling {
             ssr_temporal = 1.0;
         }
     }

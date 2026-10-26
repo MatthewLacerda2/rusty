@@ -34,7 +34,7 @@ pub(super) fn draw_grading(
     let row = (&mut *world, id);
     *is_dirty |= slider_row(ui, row, "    Tint:", wb.tint, -r..=r, set_tint);
     draw_wheels(ui, world, id, vc, is_dirty);
-    let (row, hue) = ((world, id), vc.hue_shift);
+    let (row, hue) = ((world, id), vc.color_adjustments.hue_shift);
     *is_dirty |= slider_row(
         ui,
         row,
@@ -84,7 +84,7 @@ pub(super) fn draw_color_lookup(
 ) {
     ui.label("  Color Lookup");
     super::lut_field::draw(ui, world, id, vc, is_dirty);
-    let k = vc.lut_contribution;
+    let k = vc.color_lookup.contribution;
     let set = vc_ops::set_lut_contribution;
     *is_dirty |= slider_row(ui, (world, id), "    Contribution:", k, 0.0..=1.0, set);
 }

@@ -54,9 +54,9 @@ fn metal_scene(ssr: bool) -> Scene {
     if ssr {
         let volume = create_entity(&mut scene, "Volume", None);
         let mut vc = default_post_processing();
-        vc.bloom_active = false;
-        vc.ssr_active = true;
-        vc.ssr_quality = "High".to_string();
+        vc.bloom.active = false;
+        vc.ssr.active = true;
+        vc.ssr.quality = "High".to_string();
         scene.world.set_post_processing(volume, Some(vc));
         // A volume rides on its camera (#1434): that camera is the view's.
         scene

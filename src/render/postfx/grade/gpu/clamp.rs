@@ -3,17 +3,15 @@
 //! whichever tonemapper runs.
 
 use super::{chain, W};
-use crate::components::{PostProcessingComponent, Tonemap, Wheel};
+use crate::components::{Tonemap, Wheel};
 use crate::render::postfx::grade::GradeParams;
 use crate::scene::authoring::default_post_processing;
 use crate::scene::authoring::rendering::post_processing as ops;
 
 /// A volume with `tonemap` and the `which` wheel set to `color` and `offset`.
 fn wheel(tonemap: Tonemap, which: Wheel, color: [f32; 3], offset: f32) -> GradeParams {
-    let mut vc = PostProcessingComponent {
-        tonemap,
-        ..default_post_processing()
-    };
+    let mut vc = default_post_processing();
+    vc.tonemapping.mode = tonemap;
     ops::set_wheel(&mut vc, which, color, offset);
     GradeParams::from_volume(Some(&vc))
 }

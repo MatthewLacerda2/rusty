@@ -20,7 +20,7 @@ pub(super) fn draw_custom_effects(
 ) {
     ui.add_space(3.0);
     ui.label("Custom Effects (after tonemap, in order)");
-    let mut names = vc.custom_effects.clone();
+    let mut names = vc.custom_effects.names.clone();
     let mut edited = list_rows(ui, &mut names);
 
     // The pending name lives in egui memory, keyed by entity, until it is added.

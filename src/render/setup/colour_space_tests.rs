@@ -39,9 +39,9 @@ fn mid_grey_scene() -> Scene {
     );
     let mut vc = crate::scene::authoring::defaults::default_post_processing();
     vc.active = true;
-    vc.bloom_active = false;
-    vc.ssr_active = false;
-    vc.tonemap = Tonemap::None;
+    vc.bloom.active = false;
+    vc.ssr.active = false;
+    vc.tonemapping.mode = Tonemap::None;
     scene.world.set_post_processing(id, Some(vc));
     // A volume rides on its camera (#1434): that camera is the view's.
     scene
@@ -102,5 +102,5 @@ fn every_final_target_format_is_srgb() {
 #[test]
 fn a_new_volume_is_display_gamma_neutral() {
     let vc: PostProcessingComponent = crate::scene::authoring::defaults::default_post_processing();
-    assert_eq!(vc.gamma, 1.0);
+    assert_eq!(vc.tonemapping.display_gamma, 1.0);
 }

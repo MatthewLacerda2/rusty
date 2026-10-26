@@ -77,14 +77,14 @@ fn a_grey_wheel_tints_nothing_and_its_offset_moves_every_channel() {
 fn knobs_a_file_left_out_of_range_bake_as_the_ops_would_clamp_them() {
     let mut wild = default_post_processing();
     wild.white_balance.temperature = 300.0;
-    wild.hue_shift = 400.0;
+    wild.color_adjustments.hue_shift = 400.0;
     wild.lift_gamma_gain.gain = ColorWheel {
         color: [2.0, 0.5, -1.0],
         offset: 5.0,
     };
     let mut held = default_post_processing();
     held.white_balance.temperature = WhiteBalance::RANGE;
-    held.hue_shift = 180.0;
+    held.color_adjustments.hue_shift = 180.0;
     held.lift_gamma_gain.gain = ColorWheel {
         color: [1.0, 0.5, 0.0],
         offset: 1.0,

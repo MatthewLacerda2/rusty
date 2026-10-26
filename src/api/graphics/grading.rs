@@ -49,7 +49,9 @@ pub(super) fn register_grading<'scope>(
     put(
         table,
         "GetHueShift",
-        scope.create_function(|_, ()| Ok(with_vc(scene, |vc| vc.hue_shift).unwrap_or(0.0))),
+        scope.create_function(|_, ()| {
+            Ok(with_vc(scene, |vc| vc.color_adjustments.hue_shift).unwrap_or(0.0))
+        }),
     )?;
     register_color_lookup(scope, table, scene)
 }
@@ -72,7 +74,9 @@ fn register_color_lookup<'scope>(
     put(
         table,
         "GetColorLookup",
-        scope.create_function(|_, ()| Ok(with_vc(scene, |vc| vc.lut.clone()).flatten())),
+        scope.create_function(|_, ()| {
+            Ok(with_vc(scene, |vc| vc.color_lookup.lut.clone()).flatten())
+        }),
     )?;
     put(
         table,
@@ -85,7 +89,9 @@ fn register_color_lookup<'scope>(
     put(
         table,
         "GetColorLookupContribution",
-        scope.create_function(|_, ()| Ok(with_vc(scene, |vc| vc.lut_contribution).unwrap_or(1.0))),
+        scope.create_function(|_, ()| {
+            Ok(with_vc(scene, |vc| vc.color_lookup.contribution).unwrap_or(1.0))
+        }),
     )
 }
 

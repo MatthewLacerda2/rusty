@@ -14,10 +14,19 @@ use rusty::scene::{MeshComponent, PostProcessingComponent, Scene};
 
 fn vc(exposure: f32) -> PostProcessingComponent {
     PostProcessingComponent {
-        bloom_threshold: 0.6,
-        exposure,
-        ssr_active: false,
-        ssr_temporal_upsampling: false,
+        bloom: rusty::components::Bloom {
+            threshold: 0.6,
+            ..Default::default()
+        },
+        exposure: rusty::components::Exposure {
+            fixed_ev: exposure,
+            ..Default::default()
+        },
+        ssr: rusty::components::Ssr {
+            active: false,
+            temporal_upsampling: false,
+            ..Default::default()
+        },
         ..rusty::scene::authoring::default_post_processing()
     }
 }

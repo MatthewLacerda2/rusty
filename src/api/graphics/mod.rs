@@ -105,7 +105,7 @@ fn register_bloom<'scope>(
     put(
         table,
         "GetBloomActive",
-        scope.create_function(|_, ()| Ok(with_vc(scene, |vc| vc.bloom_active).unwrap_or(false))),
+        scope.create_function(|_, ()| Ok(with_vc(scene, |vc| vc.bloom.active).unwrap_or(false))),
     )?;
 
     put(
@@ -119,7 +119,7 @@ fn register_bloom<'scope>(
     put(
         table,
         "GetBloomIntensity",
-        scope.create_function(|_, ()| Ok(with_vc(scene, |vc| vc.bloom_intensity).unwrap_or(0.0))),
+        scope.create_function(|_, ()| Ok(with_vc(scene, |vc| vc.bloom.intensity).unwrap_or(0.0))),
     )?;
 
     put(
@@ -133,7 +133,7 @@ fn register_bloom<'scope>(
     put(
         table,
         "GetBloomThreshold",
-        scope.create_function(|_, ()| Ok(with_vc(scene, |vc| vc.bloom_threshold).unwrap_or(0.0))),
+        scope.create_function(|_, ()| Ok(with_vc(scene, |vc| vc.bloom.threshold).unwrap_or(0.0))),
     )
 }
 
@@ -154,7 +154,9 @@ fn register_contrast<'scope>(
     put(
         table,
         "GetContrast",
-        scope.create_function(|_, ()| Ok(with_vc(scene, |vc| vc.contrast).unwrap_or(1.0))),
+        scope.create_function(|_, ()| {
+            Ok(with_vc(scene, |vc| vc.color_adjustments.contrast).unwrap_or(1.0))
+        }),
     )
 }
 
@@ -175,7 +177,9 @@ fn register_saturation_gamma<'scope>(
     put(
         table,
         "GetSaturation",
-        scope.create_function(|_, ()| Ok(with_vc(scene, |vc| vc.saturation).unwrap_or(1.0))),
+        scope.create_function(|_, ()| {
+            Ok(with_vc(scene, |vc| vc.color_adjustments.saturation).unwrap_or(1.0))
+        }),
     )?;
 
     put(
@@ -189,7 +193,9 @@ fn register_saturation_gamma<'scope>(
     put(
         table,
         "GetGamma",
-        scope.create_function(|_, ()| Ok(with_vc(scene, |vc| vc.gamma).unwrap_or(1.0))),
+        scope.create_function(|_, ()| {
+            Ok(with_vc(scene, |vc| vc.tonemapping.display_gamma).unwrap_or(1.0))
+        }),
     )
 }
 
@@ -213,7 +219,7 @@ fn register_tonemap<'scope>(
         table,
         "GetTonemap",
         scope.create_function(|_, ()| {
-            Ok(with_vc(scene, |vc| vc.tonemap)
+            Ok(with_vc(scene, |vc| vc.tonemapping.mode)
                 .unwrap_or_default()
                 .name()
                 .to_string())
@@ -238,7 +244,7 @@ fn register_ssr<'scope>(
     put(
         table,
         "GetSsrActive",
-        scope.create_function(|_, ()| Ok(with_vc(scene, |vc| vc.ssr_active).unwrap_or(false))),
+        scope.create_function(|_, ()| Ok(with_vc(scene, |vc| vc.ssr.active).unwrap_or(false))),
     )?;
 
     put(
@@ -253,7 +259,7 @@ fn register_ssr<'scope>(
         table,
         "GetSsrQuality",
         scope.create_function(|_, ()| {
-            Ok(with_vc(scene, |vc| vc.ssr_quality.clone()).unwrap_or_default())
+            Ok(with_vc(scene, |vc| vc.ssr.quality.clone()).unwrap_or_default())
         }),
     )
 }

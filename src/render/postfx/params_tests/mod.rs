@@ -62,14 +62,28 @@ fn fxaa(scene: &Scene, camera: Option<u32>) -> bool {
 
 fn vc() -> PostProcessingComponent {
     PostProcessingComponent {
-        bloom_intensity: 2.0,
-        bloom_threshold: 0.7,
-        exposure: 1.5,
-        contrast: 1.2,
-        saturation: 0.8,
-        ssr_temporal_upsampling: false,
-        tonemap: Tonemap::Reinhard,
-        gamma: 1.3,
+        bloom: crate::components::Bloom {
+            intensity: 2.0,
+            threshold: 0.7,
+            ..Default::default()
+        },
+        exposure: crate::components::Exposure {
+            fixed_ev: 1.5,
+            ..Default::default()
+        },
+        color_adjustments: crate::components::ColorAdjustments {
+            contrast: 1.2,
+            saturation: 0.8,
+            ..Default::default()
+        },
+        ssr: crate::components::Ssr {
+            temporal_upsampling: false,
+            ..Default::default()
+        },
+        tonemapping: crate::components::Tonemapping {
+            mode: Tonemap::Reinhard,
+            display_gamma: 1.3,
+        },
         ..crate::scene::authoring::default_post_processing()
     }
 }
@@ -123,7 +137,7 @@ fn high_preset_enables_real_ssr_and_motion_blur() {
 #[test]
 fn custom_effects_come_from_the_cameras_active_volume_only() {
     let mut v = vc();
-    v.custom_effects = vec!["crt".into(), "grain".into()];
+    v.custom_effects.names = vec!["crt".into(), "grain".into()];
     let (scene, id) = scene_with_vc(v.clone(), None);
     assert_eq!(custom(&scene, Some(id)), ["crt", "grain"]);
     assert!(custom(&scene, None).is_empty());
@@ -151,7 +165,7 @@ fn inactive_volume_and_no_camera_are_neutral_passthrough() {
 fn each_view_reads_its_own_camera_whatever_the_entity_order() {
     let mut scene = Scene::new();
     let mut grey = vc();
-    grey.saturation = 0.0;
+    grey.color_adjustments.saturation = 0.0;
     let no_fxaa = CameraComponent {
         fxaa_active: false,
         ..cam()

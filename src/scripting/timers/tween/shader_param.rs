@@ -165,7 +165,7 @@ fn post_source(scene: &Scene, id: u32, name: &str) -> Result<Source, String> {
     if let Some(knob) = vc_ops::dof_knob(name) {
         return Ok(Source::Knob(knob));
     }
-    Ok(Source::Post(PostChain::load(&vc.custom_effects)))
+    Ok(Source::Post(PostChain::load(&vc.custom_effects.names)))
 }
 
 /// A param value (1–4 numbers) as a tween's `Vec4`.

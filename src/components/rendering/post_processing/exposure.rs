@@ -9,7 +9,7 @@ crate::core::named_enum! {
     /// editor lists them (the default first); the names are Unity HDRP's.
     #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
     pub enum ExposureMode {
-        /// The volume's `exposure` EV, as authored.
+        /// The volume's `fixed_ev`, as authored.
         #[default]
         Fixed = "Fixed",
         /// Metered every frame from the view's luminance histogram, and eased
@@ -19,8 +19,8 @@ crate::core::named_enum! {
 }
 
 /// The knobs of [`ExposureMode::Automatic`]. Every EV here is the exposure the
-/// composite applies (the image is scaled by `2^ev`), the unit of the volume's fixed
-/// `exposure`: a dark room meters a positive EV, daylight a negative one.
+/// composite applies (the image is scaled by `2^ev`), the unit of
+/// [`Exposure::fixed_ev`]: a dark room meters a positive EV, daylight a negative one.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct AutoExposure {
@@ -67,4 +67,18 @@ impl Default for AutoExposure {
             high_percent: 90.0,
         }
     }
+}
+
+/// Unity HDRP's *Exposure* override (#1444): where the composite's pre-grade
+/// exposure comes from, the fixed EV and the automatic mode's knobs.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Exposure {
+    /// Fixed or automatic; `Fixed` by default.
+    pub mode: ExposureMode,
+    /// The exposure in `Fixed` mode, in EV (the image is scaled by `2^ev`); unused in
+    /// `Automatic`.
+    pub fixed_ev: f32,
+    /// The automatic mode's limits, speeds and histogram window.
+    pub automatic: AutoExposure,
 }

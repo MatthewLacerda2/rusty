@@ -21,11 +21,11 @@ pub(super) fn draw_exposure(
     is_dirty: &mut bool,
 ) {
     draw_mode(ui, world, id, vc, is_dirty);
-    if vc.exposure_mode == ExposureMode::Fixed {
-        *is_dirty |= slider_row(ui, (&mut *world, id), "  Exposure (EV):", vc.exposure, -4.0..=4.0, vc_ops::set_exposure);
+    if vc.exposure.mode == ExposureMode::Fixed {
+        *is_dirty |= slider_row(ui, (&mut *world, id), "  Exposure (EV):", vc.exposure.fixed_ev, -4.0..=4.0, vc_ops::set_exposure);
         return;
     }
-    let (ae, r) = (vc.auto_exposure, AutoExposure::EV_RANGE);
+    let (ae, r) = (vc.exposure.automatic, AutoExposure::EV_RANGE);
     *is_dirty |= slider_row(ui, (&mut *world, id), "    Min EV:", ae.min_ev, -r..=r, set_min_ev);
     *is_dirty |= slider_row(ui, (&mut *world, id), "    Max EV:", ae.max_ev, -r..=r, set_max_ev);
     *is_dirty |= slider_row(ui, (&mut *world, id), "    Compensation:", ae.compensation, -r..=r, vc_ops::set_exposure_compensation);
@@ -43,7 +43,7 @@ fn draw_mode(
     vc: &PostProcessingComponent,
     is_dirty: &mut bool,
 ) {
-    let mut mode = vc.exposure_mode;
+    let mut mode = vc.exposure.mode;
     ui.horizontal(|ui| {
         ui.label("  Exposure:");
         egui::ComboBox::from_id_salt("exposure_mode")
@@ -67,25 +67,25 @@ fn draw_mode(
 // One half of each pair the ops set together, the other half kept.
 
 fn set_min_ev(vc: &mut PostProcessingComponent, v: f32) {
-    vc_ops::set_exposure_limits(vc, v, vc.auto_exposure.max_ev);
+    vc_ops::set_exposure_limits(vc, v, vc.exposure.automatic.max_ev);
 }
 
 fn set_max_ev(vc: &mut PostProcessingComponent, v: f32) {
-    vc_ops::set_exposure_limits(vc, vc.auto_exposure.min_ev, v);
+    vc_ops::set_exposure_limits(vc, vc.exposure.automatic.min_ev, v);
 }
 
 fn set_speed_up(vc: &mut PostProcessingComponent, v: f32) {
-    vc_ops::set_adaptation_speed(vc, v, vc.auto_exposure.speed_down);
+    vc_ops::set_adaptation_speed(vc, v, vc.exposure.automatic.speed_down);
 }
 
 fn set_speed_down(vc: &mut PostProcessingComponent, v: f32) {
-    vc_ops::set_adaptation_speed(vc, vc.auto_exposure.speed_up, v);
+    vc_ops::set_adaptation_speed(vc, vc.exposure.automatic.speed_up, v);
 }
 
 fn set_low(vc: &mut PostProcessingComponent, v: f32) {
-    vc_ops::set_histogram_percent(vc, v, vc.auto_exposure.high_percent);
+    vc_ops::set_histogram_percent(vc, v, vc.exposure.automatic.high_percent);
 }
 
 fn set_high(vc: &mut PostProcessingComponent, v: f32) {
-    vc_ops::set_histogram_percent(vc, vc.auto_exposure.low_percent, v);
+    vc_ops::set_histogram_percent(vc, vc.exposure.automatic.low_percent, v);
 }

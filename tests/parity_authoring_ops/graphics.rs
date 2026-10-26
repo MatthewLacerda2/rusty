@@ -16,18 +16,12 @@ use rusty::scene::Scene;
 fn scene_with_volume_and_cam() -> (Rc<RefCell<Scene>>, u32) {
     let mut scene = Scene::new();
     let id = scene.add_entity("PostFx".to_string());
-    scene.world.set_post_processing(
-        id,
-        Some(PostProcessingComponent {
-            bloom_active: false,
-            bloom_threshold: 1.0,
-            ssr_active: false,
-            ssr_quality: "Low".to_string(),
-            ssr_temporal_upsampling: false,
-            gamma: 2.2,
-            ..rusty::scene::authoring::default_post_processing()
-        }),
-    );
+    let mut vc: PostProcessingComponent = rusty::scene::authoring::default_post_processing();
+    (vc.bloom.active, vc.bloom.threshold) = (false, 1.0);
+    (vc.ssr.active, vc.ssr.temporal_upsampling) = (false, false);
+    vc.ssr.quality = "Low".to_string();
+    vc.tonemapping.display_gamma = 2.2;
+    scene.world.set_post_processing(id, Some(vc));
     scene.world.set_camera(
         id,
         Some(CameraComponent {
@@ -130,8 +124,8 @@ fn graphics_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Error
     let ovc = os.world.post_processing(op_id).unwrap().clone();
     // Every field, through `Debug`: the two paths must leave identical components.
     assert_eq!(format!("{lvc:?}"), format!("{ovc:?}"));
-    assert_eq!(lvc.bloom_intensity, 0.0, "single-sourced clamp");
-    assert_eq!(lvc.gamma, 0.01, "single-sourced clamp");
+    assert_eq!(lvc.bloom.intensity, 0.0, "single-sourced clamp");
+    assert_eq!(lvc.tonemapping.display_gamma, 0.01, "single-sourced clamp");
     let lcam = ls.world.camera(lua_id).unwrap().clone();
     let ocam = os.world.camera(op_id).unwrap().clone();
     assert_eq!(format!("{lcam:?}"), format!("{ocam:?}"));

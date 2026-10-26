@@ -96,18 +96,23 @@ pub(crate) fn build_post_params(
         return (params, false);
     };
 
-    let bloom = effect_runs(graphics, GraphicsOption::Bloom, vc.bloom_active);
-    params.color = [vc.exposure, vc.contrast, vc.saturation, vc.gamma.max(0.01)];
+    let bloom = effect_runs(graphics, GraphicsOption::Bloom, vc.bloom.active);
+    params.color = [
+        vc.exposure.fixed_ev,
+        vc.color_adjustments.contrast,
+        vc.color_adjustments.saturation,
+        vc.tonemapping.display_gamma.max(0.01),
+    ];
     params.bloom = [
-        vc.bloom_intensity,
-        vc.bloom_threshold,
-        vc.tonemap.to_index() as f32,
+        vc.bloom.intensity,
+        vc.bloom.threshold,
+        vc.tonemapping.mode.to_index() as f32,
         if bloom { 1.0 } else { 0.0 },
     ];
 
     // SSR mode: 0 off, 2 = real screen-space (High tier only). Low/Medium keep
     // the forward shader's cubemap reflection, so post-FX SSR stays off there.
-    let ssr_mode = if effect_runs(graphics, GraphicsOption::Ssr, vc.ssr_active) {
+    let ssr_mode = if effect_runs(graphics, GraphicsOption::Ssr, vc.ssr.active) {
         2.0
     } else {
         0.0
@@ -156,8 +161,8 @@ fn pack_lens(params: &mut PostParams, vc: &PostProcessingComponent, graphics: Gr
 /// The player has no option for it: the exposure is the developer's look.
 pub(crate) fn auto_exposure<'a>(post: PostSource<'a>) -> Option<&'a AutoExposure> {
     post.volume
-        .filter(|vc| vc.exposure_mode == ExposureMode::Automatic)
-        .map(|vc| &vc.auto_exposure)
+        .filter(|vc| vc.exposure.mode == ExposureMode::Automatic)
+        .map(|vc| &vc.exposure.automatic)
 }
 
 /// The motion blur `post`'s camera runs this frame (#1436), for a view `height`
@@ -222,8 +227,10 @@ pub(crate) fn post_passes<'a>(
     PostPasses {
         bloom,
         fxaa: fxaa_enabled(post, graphics),
-        custom: post.volume.map_or(&[], |vc| &vc.custom_effects),
-        post_params: post.volume.map_or(&NO_POST_PARAMS, |vc| &vc.post_params),
+        custom: post.volume.map_or(&[], |vc| &vc.custom_effects.names),
+        post_params: post
+            .volume
+            .map_or(&NO_POST_PARAMS, |vc| &vc.custom_effects.params),
     }
 }
 

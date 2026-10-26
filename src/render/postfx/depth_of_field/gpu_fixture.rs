@@ -53,8 +53,14 @@ pub(super) fn scene(dof: DepthOfField) -> (Scene, u32) {
     let cam = scene.add_entity("Camera".to_string());
     scene.world.set_camera(cam, Some(Default::default()));
     let volume = PostProcessingComponent {
-        bloom_active: false,
-        ssr_active: false,
+        bloom: crate::components::Bloom {
+            active: false,
+            ..Default::default()
+        },
+        ssr: crate::components::Ssr {
+            active: false,
+            ..Default::default()
+        },
         ssao: SsaoSettings {
             active: false,
             ..Default::default()

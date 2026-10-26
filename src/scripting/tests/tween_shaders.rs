@@ -93,7 +93,7 @@ fn a_graphics_tween_fades_the_volumes_post_param() {
     let effect = Baked::new("postfx", "damage_vignette", "post");
     let (mut m, id) = rig("tween_post", &counted(""));
     let mut vc = defaults::default_post_processing();
-    vc.custom_effects = vec![effect.0.clone()];
+    vc.custom_effects.names = vec![effect.0.clone()];
     m.cells
         .scene
         .borrow_mut()
