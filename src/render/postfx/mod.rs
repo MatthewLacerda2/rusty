@@ -74,6 +74,19 @@ impl Default for PostParams {
     }
 }
 
+impl PostParams {
+    /// Keep only the display transform (a render texture with post-FX off): the
+    /// neutral grade, and no bloom, SSR, auto exposure or lens effects (#1439).
+    pub(crate) fn tonemap_only(&mut self) {
+        let neutral = Self::default();
+        self.color = neutral.color;
+        self.bloom = neutral.bloom;
+        self.flags = neutral.flags;
+        self.vignette = neutral.vignette;
+        self.lens = neutral.lens;
+    }
+}
+
 /// A colour texture + its default view, kept together for the ping-pong buffers.
 pub struct PfxTarget {
     pub texture: wgpu::Texture,

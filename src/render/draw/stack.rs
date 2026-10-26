@@ -13,7 +13,6 @@ use crate::render::postfx::grade::{GradeParams, Lookup};
 use crate::render::postfx::params::{
     auto_exposure, blur_params, build_post_params, post_passes, PostSource,
 };
-use crate::render::postfx::PostParams;
 use crate::render::{RenderView, Renderer};
 use crate::scene::{Camera, Scene};
 
@@ -124,12 +123,8 @@ impl Renderer {
         );
         let mut passes = post_passes(ctx.stack.post, bloom_enabled, graphics);
         if !post.full {
-            // Display transform only: the neutral grade, no bloom/SSR/blur/FXAA and
-            // no authored effects.
-            let neutral = PostParams::default();
-            post_params.color = neutral.color;
-            post_params.bloom = neutral.bloom;
-            post_params.flags = neutral.flags;
+            // Display transform only: no FXAA and no authored effects either.
+            post_params.tonemap_only();
             (passes.bloom, passes.fxaa) = (false, false);
             passes.custom = &[];
         }

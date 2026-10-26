@@ -27,7 +27,6 @@ pub(crate) mod uniforms;
 mod mesh_id_tests;
 
 #[cfg(test)]
-#[path = "uniform_layout_tests.rs"]
 mod uniform_layout_tests;
 
 #[cfg(test)]

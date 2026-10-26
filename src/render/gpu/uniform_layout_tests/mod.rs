@@ -1,4 +1,4 @@
-//! Pins the Rust uniform mirrors to `common.wgsl` byte-for-byte (#398, #434): each
+//! Pins the Rust uniform mirrors to their WGSL structs byte-for-byte (#398, #434): each
 //! WGSL struct is composed through the engine's own naga_oil path and each member's
 //! offset, plus the total size, is compared against the Rust mirror. A reordered
 //! field or a lost pad fails here, not as garbage on the GPU.
@@ -12,16 +12,19 @@ use crate::render::ibl::reflection_probes::ReflectionProbeUniform;
 use crate::render::passes::shadows::atlas::ShadowTile;
 use crate::shadergen::compose;
 
-const PROBE: &str =
-    "#import common::{CameraUniforms, Decal, LightingUniforms, LocalLight, ShadowTile}\n\
+mod postfx;
+
+const PROBE: &str = "#import postfx::params::PostParams\n\
+#import common::{CameraUniforms, Decal, LightingUniforms, LocalLight, ShadowTile}\n\
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;\n\
 @group(0) @binding(1) var<uniform> lighting: LightingUniforms;\n\
 @group(0) @binding(7) var<storage, read> lights: array<LocalLight>;\n\
 @group(0) @binding(8) var<storage, read> tiles: array<ShadowTile>;\n\
 @group(0) @binding(10) var<storage, read> decals: array<Decal>;\n\
+@group(1) @binding(0) var<uniform> post: PostParams;\n\
 @fragment fn fs_main() -> @location(0) vec4<f32> {\n\
     return vec4<f32>(camera.time + lighting.ssr_active + lights[0].range + tiles[0].params.x\n\
-        + decals[0].fade.x);\n\
+        + decals[0].fade.x + post.lens.x);\n\
 }\n";
 
 /// `(member offset by name, struct size)` of the WGSL struct named `name`.
