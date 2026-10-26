@@ -114,6 +114,10 @@ a coder real time.
   *For a human* heading for the operator to delete.
 - **`git status --short --ignored` lists nothing you wrote** before readying: a
   `.gitignore` pattern can silently keep a source file out of a commit.
+- **Rebase onto `main`, never merge `main` into your branch.** The merge queue
+  rebases every branch before it merges it, and a rebase replays the commits from
+  before a merge commit, so conflicts the merge resolved come back and the PR is
+  handed back (2026-10-26, PR #1458).
 - **Rebase once, last.** After a rebase over unrelated merges, `cargo check`, the
   size gate and your own tests are enough; the whole gate list again is not.
 - **Blessings come from the container's Mesa, not CI's.** A capture or snapshot
