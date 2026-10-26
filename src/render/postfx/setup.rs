@@ -8,6 +8,7 @@ use crate::render::gpu::layout_entries::{
 use crate::render::gpu::shaders::ShaderRegistry;
 
 use super::custom::CustomChain;
+use super::grade::GradeLut;
 use super::{PfxTarget, PostFx, PostParams, HDR_FORMAT};
 
 /// The chain's built-in pipelines, named rather than positional — a tuple of
@@ -38,6 +39,7 @@ impl PostFx {
         let (full_size, bloom_size, scene_hdr, bloom_a, bloom_b, ldr) =
             Self::create_targets(device, width, height, bloom_divisor, output_format);
         let custom = CustomChain::new(device, &io_layout, output_format, full_size);
+        let grade = GradeLut::new(device);
 
         Self {
             bright_pipeline: pipelines.bright,
@@ -45,6 +47,7 @@ impl PostFx {
             composite_pipeline: pipelines.composite,
             fxaa_pipeline: pipelines.fxaa,
             copy_pipeline: pipelines.copy,
+            grade,
             custom,
             io_layout,
             params_buffer,
@@ -225,6 +228,8 @@ impl PostFx {
                 texture_entry(5, wgpu::TextureViewDimension::D2),
                 // The skybox's own sampler: the panorama wraps at its seam (#995).
                 sampler_entry(6),
+                // The grading LUT (#1440), sampled with the linear-clamp sampler.
+                texture_entry(7, wgpu::TextureViewDimension::D3),
             ],
         })
     }

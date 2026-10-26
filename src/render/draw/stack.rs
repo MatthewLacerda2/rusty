@@ -8,6 +8,7 @@ use super::camera::{CameraCtx, StackShared, CAMERA_PASSES};
 use crate::render::gpu::uniforms::FogUniform;
 use crate::render::motion::{self, HistoryKey};
 use crate::render::passes::ssao::SsaoPlan;
+use crate::render::postfx::grade::GradeParams;
 use crate::render::postfx::params::{build_post_params, post_passes, PostSource};
 use crate::render::postfx::PostParams;
 use crate::render::{RenderView, Renderer};
@@ -94,6 +95,15 @@ impl Renderer {
             camera_pos: ctx.cam.position.to_array(),
             full: ctx.stack.full_post_fx,
         };
+
+        // The grade + tonemap (#1440): rebaked only when this view's inputs changed.
+        let grade = match post.full {
+            true => GradeParams::from_volume(ctx.stack.post.volume),
+            false => GradeParams::NEUTRAL,
+        };
+        let gpu = (&self.device, &self.queue);
+        let baked = view.post_fx.grade.prepare(gpu, &self.grade_bake, &grade);
+        self.frame_counters.grade_lut_bakes += u32::from(baked);
 
         let (mut post_params, bloom_enabled) = build_post_params(
             scene,

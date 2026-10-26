@@ -222,6 +222,8 @@ pub struct Renderer {
     pub(crate) prepass_pipeline: wgpu::RenderPipeline,
     /// The SSAO occlusion + blur passes and their no-AO fallback (#436).
     pub(crate) ssao: passes::ssao::SsaoRenderer,
+    /// The grading-LUT bake every view's table is written through (#1440).
+    pub(crate) grade_bake: postfx::grade::GradeBake,
 
     /// Active scalability tier; gates which post-FX passes run + buffer sizes. Shared
     /// across views — each view's post-FX chain (owned by its [`RenderView`]) sizes its

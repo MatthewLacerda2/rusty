@@ -153,6 +153,7 @@ impl Renderer {
             billboards,
             ui,
             ssao,
+            grade_bake,
             quality,
         } = gpu;
         let draw_buffers =
@@ -186,6 +187,7 @@ impl Renderer {
             outline: forward.outline,
             prepass_pipeline: forward.prepass_pipeline,
             ssao,
+            grade_bake,
             skybox_renderer: forward.skybox_renderer,
             camera_lighting_layout,
             entity_bones_layout,

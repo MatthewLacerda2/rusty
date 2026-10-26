@@ -111,6 +111,7 @@ end
 | `particles_drawn` | particles the renderer drew — sprite instances plus mesh particles, summed over the camera stack (#440). Their draws are in `draw_calls`: one per merged sprite batch, one per instanced run of mesh particles |
 | `render_texture_draws` | cameras drawn into render textures this frame (#430) — their geometry is already in `draw_calls` / `triangles`; a camera skipped (unreferenced, or between its `update_every` frames) is not counted |
 | `velocity_passes` | opaque scene passes that wrote a motion-vector buffer (#1435): one per stacked camera of each view whose base camera runs motion blur; `0` when none does, and always on the Low tier |
+| `grade_lut_bakes` | views whose colour-grading LUT was rebaked this frame (#1440): a grading knob or the tonemap changed, or the view is new; `0` on every frame the grade holds |
 | `ui_mask_passes` / `ui_blur_passes` | UI `Mask` coverage textures rendered (#428) / fullscreen passes of the UI backdrop blur, its composite included — `0` with no backdrop visible (#426) |
 | `renderer_ms` | CPU ms `Renderer::render` took to record the frame |
 | `gpu_ms` | GPU ms the frame's render passes kept the GPU busy (#835): the sum of `gpu_passes` below. **Only where the adapter has timestamp queries** (Metal, most Vulkan GPUs; not lavapipe) — elsewhere the key is absent, never `0` |

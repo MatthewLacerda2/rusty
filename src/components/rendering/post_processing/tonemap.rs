@@ -21,7 +21,7 @@ crate::core::named_enum! {
 
 impl Tonemap {
     /// Stable index handed to the shader as a `u32`.
-    pub fn to_index(self) -> u32 {
+    pub const fn to_index(self) -> u32 {
         match self {
             Tonemap::None => 0,
             Tonemap::Reinhard => 1,

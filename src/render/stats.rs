@@ -103,6 +103,9 @@ pub struct RenderCounters {
     /// Opaque scene passes that wrote a velocity target (#1435): one per camera of
     /// each view running motion blur, `0` when none does (or the tier is Low).
     pub velocity_passes: u32,
+    /// Views whose grading LUT was rebaked this frame (#1440): a grading knob or
+    /// the tonemap changed, or the view is new. `0` on every frame the grade holds.
+    pub grade_lut_bakes: u32,
 }
 
 impl RenderCounters {
@@ -138,6 +141,7 @@ impl RenderCounters {
             ("particles_drawn", self.particles_drawn.into()),
             ("render_texture_draws", self.render_texture_draws.into()),
             ("velocity_passes", self.velocity_passes.into()),
+            ("grade_lut_bakes", self.grade_lut_bakes.into()),
         ]
     }
 
