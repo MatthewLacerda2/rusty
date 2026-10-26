@@ -49,3 +49,39 @@ fn a_partial_settings_table_keeps_the_fields_it_leaves_out() {
         (false, 0.0, 0.25)
     );
 }
+
+/// `value` at `path` inside `json`, a lane (`center.x`) indexing its array.
+fn put(json: &mut serde_json::Value, path: &str, value: f32) {
+    let slot = path.split('.').fold(json, |at, key| {
+        let lane = ["x", "y", "z", "w"].iter().position(|l| *l == key);
+        match (lane, at.is_array()) {
+            (Some(i), true) => &mut at[i],
+            _ => &mut at[key],
+        }
+    });
+    *slot = value.into();
+}
+
+#[test]
+fn a_load_holds_every_knob_through_the_knobs_own_setter() {
+    // A knob whose setter the row's body skips would load out of range, or held by
+    // another clamp than the slider's and the tween's.
+    for effect in EFFECTS {
+        for k in effect.knobs {
+            for value in [1.0e6, -1.0e6] {
+                let path = format!("{}.{}", effect.name, k.field);
+                let mut json = serde_json::to_value(default_post_processing()).unwrap();
+                put(&mut json, &path, value);
+                let mut scene = Scene::new();
+                let id = scene.add_entity("Volume".to_string());
+                let loaded = serde_json::from_value(json).unwrap();
+                scene.world.set_post_processing(id, Some(loaded));
+                crate::scene::authoring::fields::hold_entity(&mut scene.world, id);
+                let mut expected = default_post_processing();
+                (k.set)(&mut expected, value);
+                let held = (k.get)(&scene.world.post_processing(id).unwrap());
+                assert_eq!(held, (k.get)(&expected), "{path} = {value}");
+            }
+        }
+    }
+}
