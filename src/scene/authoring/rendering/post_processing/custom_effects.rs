@@ -78,8 +78,10 @@ fn is_module_name(name: &str) -> bool {
     !name.is_empty() && !name.starts_with('.') && !name.contains(['/', '\\'])
 }
 
-/// What a write of `custom_effects` names: the list, and the params it gives.
+/// What a write of `custom_effects` names: the list, and the params it gives. Any
+/// other key is an error, as in every other effect's table.
 #[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 struct Written {
     names: Option<Vec<String>>,
     #[serde(default)]
@@ -109,7 +111,7 @@ pub const EFFECT: Effect = Effect {
         "its op reads every effect's baked sidecar and warns on an unbaked one",
         Field {
             name: "custom_effects",
-            access: Access::Op(write),
+            access: Access::Merge(write),
             unheld: None,
         }
     ),

@@ -27,6 +27,9 @@ pub enum Access<C: 'static> {
     Op(Write<C>),
     /// Written with the other fields of its group, by one op (`group!`).
     Group(Group<C>),
+    /// An object written key by key (a post effect's settings, `effect!`): `Set`
+    /// skips its unchanged leaves, not the whole object (`value::changed`).
+    Merge(Write<C>),
     /// Readable only; the text says why, or which verb writes it.
     ReadOnly(&'static str),
 }
@@ -144,17 +147,15 @@ macro_rules! part {
 }
 
 /// A post effect's settings object (#1467): `$name` is both the serialized field and
-/// the component's field, decoded as `$t` **over the current value**, so a table
-/// naming only some of the effect's fields (`{ bloom = { intensity = 2 } }`) keeps
-/// the rest. Then `$body`, which writes each part through its op.
+/// the component's field, read as `$t` **over the current value** (`value::merged`),
+/// so `{ bloom = { intensity = 2 } }` keeps the rest and a misspelt key is an error.
+/// Then `$body`, which writes each part through its op.
 macro_rules! effect {
     ($name:ident, |$c:ident, $v:ident: $t:ty| $body:expr) => {
         $crate::scene::authoring::fields::table::Field {
             name: stringify!($name),
-            access: $crate::scene::authoring::fields::table::Access::Op(|$c, json| {
-                let held = serde_json::to_value(&$c.$name).map_err(|e| e.to_string())?;
-                let json = $crate::scene::authoring::fields::value::over(held, json);
-                let $v: $t = $crate::scene::authoring::fields::value::decode(json)?;
+            access: $crate::scene::authoring::fields::table::Access::Merge(|$c, json| {
+                let $v: $t = $crate::scene::authoring::fields::value::merged(&$c.$name, json)?;
                 $body;
                 Ok(())
             }),
@@ -293,7 +294,7 @@ fn fields<C: Inspect>() -> Vec<FieldInfo> {
                 debug_assert!(g.names.contains(&f.name), "{} not in its group", f.name);
                 (f.name, None)
             }
-            Access::Op(_) => (f.name, None),
+            Access::Op(_) | Access::Merge(_) => (f.name, None),
         })
         .collect()
 }

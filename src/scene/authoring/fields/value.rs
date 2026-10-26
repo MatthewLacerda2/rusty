@@ -6,8 +6,8 @@
 //! `api::component::value`'s.
 
 use serde::de::DeserializeOwned;
-use serde::{Deserialize, Deserializer};
-use serde_json::Value;
+use serde::{Deserialize, Deserializer, Serialize};
+use serde_json::{Map, Value};
 
 /// Decode a field's value as `T` (enum names in any case, `core::naming::variant_case::decode`). An
 /// empty Lua table crosses as `{}`, so when that fails it is read again with every
@@ -38,6 +38,58 @@ pub fn over(held: Value, written: Value) -> Value {
         }
         (_, written) => written,
     }
+}
+
+/// `written` laid over `held` ([`over`]) and read back as `T`: what an object field
+/// written key by key holds after the write. A key `T` has no field for, at any
+/// depth, is an error naming it and the fields there (`{ intensty = 2 }`), as an
+/// unknown top-level field is: serde would drop it without a word.
+pub fn merged<T: Serialize + DeserializeOwned>(held: &T, written: Value) -> Result<T, String> {
+    let to_json = |v: &T| serde_json::to_value(v).map_err(|e| e.to_string());
+    let value: T = decode(over(to_json(held)?, written.clone()))?;
+    match unknown(&written, &to_json(&value)?) {
+        Some(e) => Err(e),
+        None => Ok(value),
+    }
+}
+
+/// The first key of `written` that `read` (the value it decoded to) lost, through
+/// nested objects; a map keeps every key it is given, so only a struct loses one.
+fn unknown(written: &Value, read: &Value) -> Option<String> {
+    let (Value::Object(w), Value::Object(r)) = (written, read) else {
+        return None;
+    };
+    w.iter().find_map(|(key, value)| match r.get(key) {
+        None => {
+            let names: Vec<&str> = r.keys().map(String::as_str).collect();
+            Some(format!(
+                "unknown field '{key}' (fields: {})",
+                names.join(", ")
+            ))
+        }
+        Some(below) => unknown(value, below).map(|e| format!("{key}.{e}")),
+    })
+}
+
+/// What of `written` changes an object field that holds `held`, leaf by leaf: a
+/// leaf the [`same`] as `held`'s, or as `got`'s (what `Get` returned, when the
+/// table came from it), is dropped; `None` when nothing is left. So a table from
+/// `Get` with one leaf edited writes that leaf only, not the others it read, which
+/// a tween may have moved since.
+pub fn changed(written: &Value, held: &Value, got: Option<&Value>) -> Option<Value> {
+    if let (Value::Object(w), Value::Object(h)) = (written, held) {
+        let kept: Map<String, Value> = w
+            .iter()
+            .filter_map(|(key, value)| {
+                let held = h.get(key).unwrap_or(&Value::Null);
+                let got = got.map(|g| g.get(key).unwrap_or(&Value::Null));
+                Some((key.clone(), changed(value, held, got)?))
+            })
+            .collect();
+        return (!kept.is_empty()).then_some(Value::Object(kept));
+    }
+    let unchanged = same(written, held) || got.is_some_and(|g| same(written, g));
+    (!unchanged).then(|| written.clone())
 }
 
 /// Replace every empty object in `value` with an empty list; whether any was.
