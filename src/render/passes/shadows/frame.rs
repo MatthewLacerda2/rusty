@@ -17,19 +17,21 @@ impl Renderer {
     /// Fit the cascades to `camera` (at `aspect`), plan the atlas for the lights it
     /// sees, upload the frame's local lights with their tiles, and render the shadow
     /// maps — the dynamic casters at the LOD levels `lod` (the base camera's) shows
-    /// (#472).
+    /// (#472). `settings` are the screen's base camera's volume's (#1434), the
+    /// defaults without one.
     pub(crate) fn run_shadow_passes(
         &mut self,
         scene: &Scene,
         camera: &Camera,
         aspect: f32,
+        settings: &ShadowSettings,
         lod: &LodSelection,
     ) {
         let fitted = cascades::fit(
             camera,
             aspect,
             sun_direction(scene, self.static_capture),
-            &shadow_settings(scene),
+            settings,
             ShadowRenderer::CASCADE_SIZE,
         );
         let uniform = CascadeUniform::new(&fitted, camera.position, camera.forward());
@@ -105,21 +107,6 @@ fn sun_direction(scene: &Scene, capture: bool) -> Vec3 {
     dir
 }
 
-/// The first active visual-correction volume's shadow settings — the one
-/// `Graphics.*Shadow*` writes — or the engine defaults without one.
-fn shadow_settings(scene: &Scene) -> ShadowSettings {
-    scene
-        .world
-        .ids_with_visual_correction()
-        .into_iter()
-        .filter(|&id| scene.world.is_active_in_hierarchy(id))
-        .find_map(|id| {
-            let vc = scene.world.visual_correction(id)?;
-            vc.active.then_some(vc.shadows)
-        })
-        .unwrap_or_default()
-}
-
 #[cfg(test)]
-#[path = "sun_tests.rs"]
-mod sun_tests;
+#[path = "frame_tests.rs"]
+mod frame_tests;

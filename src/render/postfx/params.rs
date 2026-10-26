@@ -4,28 +4,65 @@
 //! This is the bridge from the editor's "dead knobs" to the GPU: every field the
 //! inspector exposes ends up packed here and read by `postfx.wgsl`.
 //!
-//! **Whose settings.** Every function takes the view's post-FX camera, the base of
-//! its camera stack (`render::ScreenStack::base_id`, or a render-texture camera's own
-//! entity), the way Unity URP post-processes a camera stack once, with the base
-//! camera's settings. A camera without an active volume is neutral; `None` (no scene
-//! camera) is too. `Graphics.*` still edits the scene's *first* active camera and
-//! volume, the script-facing `Camera.main` shortcut.
+//! **Whose settings.** A view post-processes with its base camera, the way Unity URP
+//! post-processes a camera stack once, with the base camera's settings: the screen
+//! stack's `scene::camera::main_camera` (also the camera `Graphics.*` edits), or a
+//! render-texture camera's own entity. The stack borrows that camera's components
+//! once, as a [`PostSource`], and every function here reads them through it. A
+//! camera without an active volume is neutral; a view with no camera is too.
+
+use std::collections::BTreeMap;
 
 use glam::Mat4;
 
 use super::{PostParams, PostPasses};
-use crate::components::VisualCorrectionComponent;
+use crate::components::{CameraComponent, VisualCorrectionComponent};
 use crate::core::settings::quality::QualityPreset;
+use crate::scene::camera::camera_volume;
 use crate::scene::Scene;
 
-/// Pack `camera`'s visual-correction volume and camera settings into a `PostParams`
+/// The components one view post-processes with, borrowed once per view (#1434).
+#[derive(Clone, Copy, Default)]
+pub(crate) struct PostSource<'a> {
+    /// The base camera's component: motion blur and FXAA.
+    pub camera: Option<&'a CameraComponent>,
+    /// Its visual-correction volume, when active: grade, bloom, SSR, SSAO, shadows
+    /// and the authored effects. `None` runs them neutral.
+    pub volume: Option<&'a VisualCorrectionComponent>,
+}
+
+/// The base camera `id`'s components, borrowed for a view: the guards the caller
+/// keeps alive while it draws, and [`PostSource`] reads through them.
+pub(crate) fn borrow_post_source(scene: &Scene, id: Option<u32>) -> PostGuards<'_> {
+    PostGuards {
+        camera: id.and_then(|id| scene.world.camera(id)),
+        volume: id.and_then(|id| camera_volume(scene, id)),
+    }
+}
+
+/// The component guards behind a [`PostSource`].
+pub(crate) struct PostGuards<'w> {
+    camera: Option<crate::ecs::CompRef<'w, CameraComponent>>,
+    volume: Option<crate::ecs::CompRef<'w, VisualCorrectionComponent>>,
+}
+
+impl PostGuards<'_> {
+    pub(crate) fn source(&self) -> PostSource<'_> {
+        PostSource {
+            camera: self.camera.as_deref(),
+            volume: self.volume.as_deref(),
+        }
+    }
+}
+
+/// Pack `post`'s visual-correction volume and camera settings into a `PostParams`
 /// for `postfx.wgsl`. Returns the params plus whether the bloom passes should run
 /// this frame.
 ///
 /// `prev_view_proj` is last frame's view-projection (camera motion-blur velocity).
-pub fn build_post_params(
+pub(crate) fn build_post_params(
     scene: &Scene,
-    camera: Option<u32>,
+    post: PostSource,
     quality: QualityPreset,
     view_proj: Mat4,
     prev_view_proj: Mat4,
@@ -44,7 +81,7 @@ pub fn build_post_params(
         ],
         ..Default::default()
     };
-    let Some((id, vc)) = camera.and_then(|id| Some((id, active_volume(scene, id)?))) else {
+    let Some(vc) = post.volume else {
         return (params, false);
     };
 
@@ -65,10 +102,14 @@ pub fn build_post_params(
     };
 
     // Motion blur is gated by the camera component AND the preset.
-    let (mb_active, mb_samples) = match scene.world.camera(id).as_deref() {
-        Some(cam) if cam.motion_blur_active && quality.motion_blur() => {
-            (1.0, cam.motion_blur_samples.clamp(2, 32) as f32)
-        }
+    let samples =
+        CameraComponent::MIN_MOTION_BLUR_SAMPLES..=CameraComponent::MAX_MOTION_BLUR_SAMPLES;
+    let (mb_active, mb_samples) = match post.camera {
+        Some(cam) if cam.motion_blur_active && quality.motion_blur() => (
+            1.0,
+            cam.motion_blur_samples
+                .clamp(*samples.start(), *samples.end()) as f32,
+        ),
         _ => (0.0, 0.0),
     };
     params.flags = [ssr_mode, mb_active, 1.0, 0.0];
@@ -76,28 +117,21 @@ pub fn build_post_params(
     (params, vc.bloom_active)
 }
 
-/// The optional passes this frame runs for `camera`: bloom (decided by
-/// [`build_post_params`]), FXAA, and its volume's authored effects.
-pub fn post_passes(scene: &Scene, camera: Option<u32>, bloom: bool) -> PostPasses {
-    let vc = camera.and_then(|id| active_volume(scene, id));
+/// No authored-effect params: a view without a volume.
+static NO_POST_PARAMS: BTreeMap<String, Vec<f32>> = BTreeMap::new();
+
+/// The optional passes this frame runs for `post`: bloom (decided by
+/// [`build_post_params`]), FXAA, and its volume's authored effects, borrowed.
+pub(crate) fn post_passes<'a>(post: PostSource<'a>, bloom: bool) -> PostPasses<'a> {
     PostPasses {
         bloom,
-        fxaa: fxaa_enabled(scene, camera),
-        custom: vc
-            .as_ref()
-            .map(|vc| vc.custom_effects.clone())
-            .unwrap_or_default(),
-        post_params: vc.map(|vc| vc.post_params).unwrap_or_default(),
+        fxaa: fxaa_enabled(post),
+        custom: post.volume.map_or(&[], |vc| &vc.custom_effects),
+        post_params: post.volume.map_or(&NO_POST_PARAMS, |vc| &vc.post_params),
     }
 }
 
-/// `id`'s visual-correction volume, when the entity is active and so is the volume.
-pub(crate) fn active_volume(scene: &Scene, id: u32) -> Option<VisualCorrectionComponent> {
-    let vc = scene.world.visual_correction(id)?;
-    (scene.world.is_active_in_hierarchy(id) && vc.active).then(|| vc.clone())
-}
-
-/// Whether the FXAA pass runs this frame for `camera` (#360).
+/// Whether the FXAA pass runs this frame for `post`'s camera (#360).
 ///
 /// Deliberately *not* tied to the volume [`build_post_params`] reads: FXAA lives on
 /// the camera, so tying it to the volume would make anti-aliasing depend on the
@@ -108,10 +142,8 @@ pub(crate) fn active_volume(scene: &Scene, id: u32) -> Option<VisualCorrectionCo
 ///
 /// Unlike motion blur this is not gated by [`QualityPreset`] — FXAA runs on every
 /// tier, Low included, where it is precisely the cheap anti-aliasing an iGPU wants.
-pub fn fxaa_enabled(scene: &Scene, camera: Option<u32>) -> bool {
-    camera
-        .and_then(|id| scene.world.camera(id).map(|c| c.fxaa_active))
-        .unwrap_or(true)
+pub(crate) fn fxaa_enabled(post: PostSource) -> bool {
+    post.camera.is_none_or(|c| c.fxaa_active)
 }
 
 #[cfg(test)]

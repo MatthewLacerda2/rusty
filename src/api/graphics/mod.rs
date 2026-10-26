@@ -3,11 +3,12 @@
 //! Live get/set over the engine's EXISTING post-FX and quality knobs, so a script
 //! can drive its own settings logic in Lua. Two backing stores:
 //!
-//! * Per-volume render state — the first active `VisualCorrectionComponent`
+//! * Per-volume render state — the main camera's `VisualCorrectionComponent`
 //!   (bloom, exposure/contrast/saturation/gamma, tonemap, SSR), registered here,
-//!   plus the first active `CameraComponent`'s knobs (motion blur, FXAA) in the
-//!   `camera` submodule: the `Camera.main` shortcut. `build_post_params` rebuilds each
-//!   view's GPU uniform from its base camera's components EVERY frame (#1434), so a
+//!   plus its `CameraComponent` knobs (motion blur, FXAA) in the `camera` submodule.
+//!   The main camera is the screen stack's base (`scene::camera::main_camera`, Unity's
+//!   `Camera.main`, #1434), the camera whose components `build_post_params` packs into
+//!   the screen's GPU uniform EVERY frame, so a
 //!   write here takes effect next frame for free — no GPU pipeline is touched from script.
 //!   The same volume carries the sun's shadow cascades (`shadows`, #435), which the
 //!   shadow pass re-fits from every frame, its ambient occlusion (`ssao`, #436) and

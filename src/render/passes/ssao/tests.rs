@@ -21,10 +21,11 @@ fn scene_with(edit: impl FnOnce(&mut crate::components::VisualCorrectionComponen
     scene
 }
 
-/// The plan for the scene's first entity's camera, as the stack asks for it.
+/// The plan for the scene's main camera's volume, as the screen stack asks for it.
 fn plan(scene: &Scene, quality: QualityPreset) -> Option<SsaoPlan> {
-    let camera = scene.world.ids_with_camera().first().copied();
-    SsaoPlan::for_camera(scene, camera, quality)
+    let main = crate::scene::camera::main_camera(scene);
+    let volume = main.and_then(|id| crate::scene::camera::camera_volume(scene, id));
+    SsaoPlan::for_volume(volume.as_deref(), quality)
 }
 
 #[test]

@@ -27,9 +27,9 @@ pub(crate) use targets::SsaoTargets;
 
 use glam::{Mat4, Vec3};
 
-use crate::components::SsaoSettings;
+use crate::components::{SsaoSettings, VisualCorrectionComponent};
 use crate::core::settings::quality::{QualityPreset, SsaoTier};
-use crate::scene::{Camera, Scene};
+use crate::scene::Camera;
 
 /// The occlusion and blur targets' format: one unorm channel is all AO needs.
 pub(crate) const AO_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::R8Unorm;
@@ -67,16 +67,15 @@ pub(crate) struct SsaoPlan {
 }
 
 impl SsaoPlan {
-    /// The plan for the view whose post-FX camera is `camera` (#1434), at `quality`:
-    /// that camera's active volume with AO on, on a tier that runs it. `None` —
-    /// nothing runs — otherwise.
-    pub(crate) fn for_camera(
-        scene: &Scene,
-        camera: Option<u32>,
+    /// The plan for a view whose base camera's volume is `volume` (#1434), at
+    /// `quality`: that volume with AO on, on a tier that runs it. `None` — nothing
+    /// runs — otherwise.
+    pub(crate) fn for_volume(
+        volume: Option<&VisualCorrectionComponent>,
         quality: QualityPreset,
     ) -> Option<Self> {
         let tier = quality.ssao()?;
-        let settings = crate::render::postfx::params::active_volume(scene, camera?)?.ssao;
+        let settings = volume?.ssao;
         (settings.active && settings.intensity > 0.0).then_some(Self { settings, tier })
     }
 }

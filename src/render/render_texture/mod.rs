@@ -29,6 +29,7 @@ pub use slots::RenderTextures;
 use crate::asset::MapRef;
 pub(crate) use crate::components::is_render_texture;
 use crate::render::draw::stack::StackPass;
+use crate::render::postfx::params::borrow_post_source;
 use crate::render::{RenderView, Renderer, TextureCamera};
 use crate::scene::Scene;
 
@@ -91,9 +92,10 @@ impl Renderer {
             let Some(target) = slot.view.color_target_view() else {
                 continue;
             };
+            let guards = borrow_post_source(scene, Some(cam.id));
             let pass = StackPass {
                 stack: std::slice::from_ref(&cam.camera),
-                post_camera: Some(cam.id),
+                post: guards.source(),
                 output: &target,
                 editor_mode: false,
                 full_post_fx: cam.target.post_fx,

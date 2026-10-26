@@ -24,7 +24,18 @@ fn add(
 
 fn params(scene: &Scene, camera: Option<u32>, quality: QualityPreset) -> (PostParams, bool) {
     let id = Mat4::IDENTITY;
-    build_post_params(scene, camera, quality, id, id, [1.0; 3])
+    let post = borrow_post_source(scene, camera);
+    build_post_params(scene, post.source(), quality, id, id, [1.0; 3])
+}
+
+fn custom(scene: &Scene, camera: Option<u32>) -> Vec<String> {
+    post_passes(borrow_post_source(scene, camera).source(), false)
+        .custom
+        .to_vec()
+}
+
+fn fxaa(scene: &Scene, camera: Option<u32>) -> bool {
+    fxaa_enabled(borrow_post_source(scene, camera).source())
 }
 
 fn vc() -> VisualCorrectionComponent {
@@ -93,14 +104,11 @@ fn custom_effects_come_from_the_cameras_active_volume_only() {
     let mut v = vc();
     v.custom_effects = vec!["crt".into(), "grain".into()];
     let (scene, id) = scene_with_vc(v.clone(), None);
-    assert_eq!(
-        post_passes(&scene, Some(id), false).custom,
-        ["crt", "grain"]
-    );
-    assert!(post_passes(&scene, None, false).custom.is_empty());
+    assert_eq!(custom(&scene, Some(id)), ["crt", "grain"]);
+    assert!(custom(&scene, None).is_empty());
     v.active = false;
     let (scene, id) = scene_with_vc(v, None);
-    assert!(post_passes(&scene, Some(id), false).custom.is_empty());
+    assert!(custom(&scene, Some(id)).is_empty());
 }
 
 #[test]
@@ -139,15 +147,12 @@ fn each_view_reads_its_own_camera_whatever_the_entity_order() {
         params(&scene, Some(first), QualityPreset::High).0.color[2],
         0.8
     );
-    assert!(!fxaa_enabled(&scene, Some(main)));
-    assert!(fxaa_enabled(&scene, Some(first)));
+    assert!(!fxaa(&scene, Some(main)));
+    assert!(fxaa(&scene, Some(first)));
     // A camera with no volume is neutral even though others have one.
     assert_eq!(
         params(&scene, Some(bare), QualityPreset::High).0.color,
         [0.0, 1.0, 1.0, 1.0]
     );
-    assert!(
-        fxaa_enabled(&scene, None),
-        "no camera: FXAA stays default-on"
-    );
+    assert!(fxaa(&scene, None), "no camera: FXAA stays default-on");
 }

@@ -56,6 +56,8 @@ fn scene_running(effect: &str) -> RefCell<Scene> {
     let mut vc = defaults::default_visual_correction();
     vc.custom_effects = vec![effect.to_owned()];
     scene.world.set_visual_correction(id, Some(vc));
+    // `Graphics.*` edits the main camera's volume (#1434).
+    scene.world.set_camera(id, Some(defaults::default_camera()));
     RefCell::new(scene)
 }
 

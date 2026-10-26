@@ -1,25 +1,27 @@
 ## `Graphics`
 
 Live control over the engine's **existing** post-FX and quality knobs, so a script
-can drive its own settings logic. The per-volume getters/setters target the first
-**active** `VisualCorrectionComponent` (color/bloom/SSR/shadows/SSAO/custom effects and their params) and the first **active**
-`CameraComponent` (motion blur, FXAA) in the scene: the "main camera" shortcut, like
-Unity's `Camera.main`. A write takes effect next frame.
-Getters return a neutral default when no active volume/camera exists.
+can drive its own settings logic. The per-volume getters/setters target the **main
+camera**, Unity's `Camera.main`: the base of the screen stack, the lowest
+`render_order` active camera that renders to the screen (a render-texture camera never
+is). Its `VisualCorrectionComponent` (color/bloom/SSR/shadows/SSAO/custom effects and
+their params) and its `CameraComponent` (motion blur, FXAA) are what the window shows,
+so a write takes effect there next frame. Getters return a neutral default when there
+is no screen camera, or its volume is missing or inactive; setters are then no-ops.
 The editor's Camera card edits the same two motion-blur fields (a "Motion Blur"
 checkbox and a "Samples" slider, `2..=32`) through the same ops. A new camera starts
 with motion blur on at 32 samples.
 
 **Post-FX is per view** (#1434), Unity URP's camera-stack rule: each view runs it once,
 with the settings of **its base camera**, that camera entity's own `CameraComponent`
-and `VisualCorrectionComponent`. The window and the Game view use the base of the
-screen stack (its lowest `render_order` camera); overlay cameras stacked on it add no
-post-FX of their own. A render-texture camera uses its own. The Scene view's free
-camera has no entity, so it previews the screen stack's base camera. A camera with no
-active volume runs neutral (no grade, bloom or custom effects; FXAA still follows its
-`fxaa_active`). So a `Graphics.*` write changes a view only when the camera or volume
-it edits is that view's base camera's; a different camera's settings (a security
-monitor's grade) are set on that camera entity, in the inspector or the scene file.
+and `VisualCorrectionComponent`. The window and the Game view use the main camera;
+overlay cameras stacked on it add no post-FX of their own. A render-texture camera
+uses its own. The Scene view's free camera has no entity, so it previews the main
+camera. A camera with no active volume runs neutral (no grade, bloom or custom
+effects; FXAA still follows its `fxaa_active`), so a scene whose only volume sits on
+a render-texture camera shows a neutral window and Scene view. `Graphics.*` writes
+reach the window only; another camera's settings (a security monitor's grade) are
+set on that camera entity, in the inspector or the scene file.
 
 | Function | Signature | Returns |
 |---|---|---|
@@ -61,10 +63,11 @@ lifts the midtones, `< 1` darkens them.
 distance**, is split into `1`–`4` slices, each with its own shadow map fitted to it
 and following the camera, so the first few metres get the sharpest shadow and a
 caster anywhere in a level still casts. Past the distance shadows fade out over its
-last tenth. Both knobs live on the active visual-correction volume (the Inspector's
-**Shadows** section edits the same fields) and are saved with the scene, so an
-indoor level can spend its cascades on 40 m and an outdoor one on 150 m; with no
-active volume the defaults above apply. Each cascade costs one more depth pass for
+last tenth. Both knobs live on the main camera's visual-correction volume (the
+Inspector's **Shadows** section edits the same fields; #1434) and are saved with the
+scene, so an indoor level can spend its cascades on 40 m and an outdoor one on 150 m;
+without an active volume on the main camera the defaults above apply. The cascades
+follow the screen, and render-texture cameras sample the same maps. Each cascade costs one more depth pass for
 the moving casters (static casters are re-drawn only when a cascade moves, #355).
 
 **Fog** (#437) is a **scene setting**, not a volume knob: it is saved with the
