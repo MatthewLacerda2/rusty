@@ -36,7 +36,7 @@ fn summary(ctx: &egui::Context, path: &str) -> String {
     let text = match crate::asset::lut::load(Path::new(path)) {
         Ok(lut) => {
             let [lo, hi] = lut.domain;
-            format!("Size: {0}³  Domain: {lo:?} – {hi:?}", lut.size)
+            format!("Table: {0}³  Domain: {lo:?} – {hi:?}", lut.size)
         }
         Err(e) => format!("Refused: {e}"),
     };
