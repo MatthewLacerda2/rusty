@@ -48,7 +48,7 @@ fn run(scene: &RefCell<Scene>, script: &str) {
         Lua::new(),
         RefCell::new(GraphicsSettings::from(QualityPreset::High)),
     );
-    let app = std::cell::RefCell::default();
+    let app = RefCell::default();
     lua.scope(|s| {
         rusty::api::graphics::register(&lua, s, scene, &quality, &app).unwrap();
         lua.load(script).exec()

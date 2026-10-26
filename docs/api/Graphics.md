@@ -51,6 +51,10 @@ set on that camera entity, in the inspector or the scene file.
 | `Graphics.GetMotionBlurSamples` / `SetMotionBlurSamples` | `()` / `(n)` | `number` (clamped 2–32; the clamp is in the shared authoring op) |
 | `Graphics.GetFxaaActive` / `SetFxaaActive` | `()` / `(bool)` | `bool` (**default `true`**) |
 | `Graphics.GetQuality` / `SetQuality` | `()` / `(name)` | `"Low"` / `"Medium"` / `"High"` |
+| `Graphics.GetOption` / `SetOption` | `(name)` / `(name, bool)` | `bool`: the player's graphics option (see *Player options*; **default `true`**) |
+| `Graphics.ResetOptions` | `()` | nothing; every option back to the project's default |
+| `Graphics.GetOptionNames` | `()` | array of every option name, in menu order |
+| `Graphics.GetDefaultOption` / `SetDefaultOption` | `(name)` / `(name, bool)` | `bool`: the project's default for an option |
 | `Graphics.GetShadowCascades` / `SetShadowCascades` | `()` / `(n)` | `number` (clamped 1–4, **default `4`**) |
 | `Graphics.GetShadowDistance` / `SetShadowDistance` | `()` / `(units)` | `number` (world units, clamped ≥ 1, **default `100`**) |
 | `Graphics.GetFogMode` / `SetFogMode` | `()` / `(name)` | `"Off"` / `"Linear"` / `"Exponential"` / `"ExponentialSquared"` (**default `"Off"`**; names are case-insensitive) |
@@ -199,7 +203,7 @@ end
 tonemapped image just before it reaches the screen. It is **on by default** — a
 scene saved before the knob existed loads with it on, and so does a scene with no
 camera component at all, which is why `GetFxaaActive` returns `true` rather than
-`false` when there is no active camera. It is *not* gated by the quality preset:
+`false` when there is no active camera. It is *not* gated by the quality preset (the player's `fxaa` option can turn it off):
 it runs on every tier including Low, where a cheap fullscreen pass is exactly the
 anti-aliasing an integrated GPU wants. Turning it off restores raw, stair-stepped
 edges — useful for a pixel-art look, or for diffing screenshots.
@@ -211,8 +215,50 @@ resource cell that the platform layer reads each frame and hands to the renderer
 which reallocates its bloom buffers when the tier actually changes. Unrecognized
 tonemap/quality names are ignored (the current value is kept).
 
+### Player options
+
+The **player graphics options** (#1438) are what an options menu's "Motion blur:
+off" writes. They **gate** effects rather than set them: an effect runs for a view
+only when its camera has it on **and** the player's option allows it **and** the
+quality tier runs it. So the developer's authored look stays on each camera, and the
+player's choice holds for every camera and every scene, including ones loaded later.
+An option can only turn an effect off; it never turns on what a camera left off.
+
+| Option | Gates |
+|---|---|
+| `motion_blur` | the camera's motion blur (also off on Low) |
+| `fxaa` | the camera's FXAA |
+| `bloom` | the camera's volume's bloom |
+| `ssr` | the volume's screen-space reflections (High only) |
+| `ssao` | the volume's ambient occlusion (off on Low) |
+
+Names are snake_case; an unknown name raises an error listing the valid ones.
+`SetOption` takes effect next frame and is **persisted** through `Storage`
+(`graphics.options`, beside `graphics.quality`) at the Stop / quit boundary, so the
+choice sticks across relaunches.
+
+**Project defaults.** What a fresh install starts with is the game's, set once for
+the whole project: `SetDefaultOption`, or the checkboxes under **File → Build
+Settings → Player graphics defaults**, which write the same value into
+`project.rusty` (`"graphics_options"`; see [`Application.md`](Application.md)). At
+startup the saved player options are read over these defaults, so an option the
+player never touched follows the project. `ResetOptions` is the menu's "Restore
+defaults". A game that doesn't want players choosing simply leaves the switch out
+of its menu: every option defaults to allowed.
+
+```lua
+-- An options menu: one toggle per switch, and a "Restore defaults" button.
+for _, name in ipairs(Graphics.GetOptionNames()) do
+  local on = Graphics.GetOption(name)
+  -- draw a toggle labelled `name`, showing `on`; when the player flips it:
+  -- Graphics.SetOption(name, not on)
+end
+-- on "Restore defaults":
+Graphics.ResetOptions()
+```
+
 **Determinism.** Every `Graphics` write is **one-way** into render-only state: the
-post-FX volume and the preset cell are read by the render layer, never by
+post-FX volume and the preset and options cell are read by the render layer, never by
 `FixedUpdate`. Toggling these knobs therefore cannot change how the deterministic
 sim evolves, and a headless replay stays bit-for-bit stable regardless of them.
 

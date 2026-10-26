@@ -15,7 +15,7 @@ fn fog_api_and_shared_op_converge_without_a_volume() -> Result<(), Box<dyn std::
     // Scene fog is scene-level: a bare scene (no post-processing volume) takes it.
     let lua_scene = Rc::new(RefCell::new(Scene::new()));
     let quality = Rc::new(RefCell::new(GraphicsSettings::from(QualityPreset::High)));
-    let app = std::cell::RefCell::default();
+    let app = RefCell::default();
     let lua = Lua::new();
     let read: (String, f32, f32, f32, f32) = lua.scope(|s| {
         rusty::api::graphics::register(&lua, s, &lua_scene, &quality, &app).unwrap();

@@ -48,7 +48,7 @@ fn bloom_and_color_round_trip() {
     let lua = Lua::new();
     let scene = scene_with_volume();
     let quality = Rc::new(RefCell::new(GraphicsSettings::from(QualityPreset::Medium)));
-    let app = std::cell::RefCell::default();
+    let app = RefCell::default();
 
     lua.scope(|scope| {
         rusty::api::graphics::register(&lua, scope, &scene, &quality, &app).unwrap();
@@ -87,7 +87,7 @@ fn motion_blur_samples_are_clamped() {
     let lua = Lua::new();
     let scene = scene_with_volume();
     let quality = Rc::new(RefCell::new(GraphicsSettings::from(QualityPreset::Medium)));
-    let app = std::cell::RefCell::default();
+    let app = RefCell::default();
 
     lua.scope(|scope| {
         rusty::api::graphics::register(&lua, scope, &scene, &quality, &app).unwrap();
@@ -109,7 +109,7 @@ fn quality_preset_round_trips_through_cell() {
     let lua = Lua::new();
     let scene = scene_with_volume();
     let quality = Rc::new(RefCell::new(GraphicsSettings::from(QualityPreset::Medium)));
-    let app = std::cell::RefCell::default();
+    let app = RefCell::default();
 
     lua.scope(|scope| {
         rusty::api::graphics::register(&lua, scope, &scene, &quality, &app).unwrap();
@@ -131,7 +131,7 @@ fn getters_return_defaults_with_no_active_volume() {
     let lua = Lua::new();
     let scene = Rc::new(RefCell::new(Scene::new()));
     let quality = Rc::new(RefCell::new(GraphicsSettings::from(QualityPreset::Low)));
-    let app = std::cell::RefCell::default();
+    let app = RefCell::default();
 
     lua.scope(|scope| {
         rusty::api::graphics::register(&lua, scope, &scene, &quality, &app).unwrap();

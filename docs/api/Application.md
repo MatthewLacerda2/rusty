@@ -34,5 +34,14 @@ never written back, so a setter only changes the running value. Saved `Video`
 settings (a player's own fullscreen choice) win over `SetWindowMode`, which is only
 the first-launch default.
 
+**Graphics option defaults** live in the same file, under `"graphics_options"`: an
+object of option name → `bool` (`{ "motion_blur": false }`), every option it omits
+allowed. They are what a fresh install's player graphics options start as, and the
+same editor/player split applies: `Graphics.SetDefaultOption` and the Build
+Settings window's **Player graphics defaults** checkboxes write the file in the
+editor, and only the running value elsewhere. A player's saved choice
+(`Graphics.SetOption`) wins over them; see [`Graphics.md`](Graphics.md), *Player
+options*.
+
 **Determinism.** `Quit` is a one-way request read by the platform layer after the
 tick; the build settings are read at boot. Neither is read by `FixedUpdate`.

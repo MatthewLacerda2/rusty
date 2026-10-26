@@ -36,6 +36,7 @@ mod entity_arg_api;
 mod gamepad_api;
 mod graphics_api;
 mod graphics_main_camera;
+mod graphics_options;
 mod hitboxes;
 mod ik;
 mod input_api;

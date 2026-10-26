@@ -93,7 +93,7 @@ fn graphics_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Error
     let (lua_scene, lua_id) = scene_with_volume_and_cam();
     let (op_scene, op_id) = scene_with_volume_and_cam();
     let quality = Rc::new(RefCell::new(GraphicsSettings::from(QualityPreset::High)));
-    let app = std::cell::RefCell::default();
+    let app = RefCell::default();
 
     let lua = Lua::new();
     lua.scope(|s| {

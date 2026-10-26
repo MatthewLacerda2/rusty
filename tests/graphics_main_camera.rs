@@ -30,7 +30,7 @@ fn camera(scene: &mut Scene, name: &str, target: Option<RenderTarget>) -> u32 {
 fn run(scene: &Rc<RefCell<Scene>>, script: &str) {
     let lua = Lua::new();
     let quality = Rc::new(RefCell::new(GraphicsSettings::from(QualityPreset::Medium)));
-    let app = std::cell::RefCell::default();
+    let app = RefCell::default();
     lua.scope(|scope| {
         rusty::api::graphics::register(&lua, scope, scene, &quality, &app).unwrap();
         lua.load(script).exec()

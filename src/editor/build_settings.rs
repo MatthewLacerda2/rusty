@@ -3,11 +3,16 @@
 //! Edits a draft of the project's [`BuildSettings`] (startup scene, product name,
 //! window mode) and writes it to the project's tracked `project.rusty` on Save.
 //! The API twin is the `Application` namespace's setters — one operation, two callers.
+//!
+//! Below them, the project's default player graphics options (#1438): one checkbox
+//! per option, each written to `project.rusty` the moment it changes through
+//! `Application::set_default_option`, the op `Graphics.SetDefaultOption` calls.
 
 use egui_phosphor::regular as icon;
 
 use crate::core::application::{Application, BuildSettings, WindowMode};
 use crate::core::project::PROJECT_FILE;
+use crate::core::settings::graphics_options::GraphicsOption;
 use crate::editor::EditorUi;
 use crate::scripting::ConsoleLogs;
 
@@ -37,6 +42,8 @@ pub fn draw(
             fields(ui, draft, current_scene.as_deref());
             ui.separator();
             save = ui.button(format!("{}  Save", icon::FLOPPY_DISK)).clicked();
+            ui.separator();
+            graphics_defaults(ui, app, console);
         });
     if save {
         match app.set_build(draft.clone()) {
@@ -76,4 +83,19 @@ fn fields(ui: &mut egui::Ui, draft: &mut BuildSettings, current_scene: Option<&s
             });
             ui.end_row();
         });
+}
+
+/// The project's default player graphics options: what a fresh install's options
+/// menu starts with. Each change is written at once (no draft), like the API's.
+fn graphics_defaults(ui: &mut egui::Ui, app: &mut Application, console: &mut ConsoleLogs) {
+    ui.label("Player graphics defaults");
+    let defaults = app.graphics_defaults();
+    for option in GraphicsOption::ALL {
+        let mut on = defaults.allows(option);
+        if ui.checkbox(&mut on, option.name()).changed() {
+            if let Err(err) = app.set_default_option(option, on) {
+                console.error(err);
+            }
+        }
+    }
 }
