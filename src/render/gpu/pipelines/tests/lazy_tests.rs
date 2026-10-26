@@ -77,10 +77,14 @@ fn gpu_warm_pipelines_builds_every_lazy_pipeline() {
         return;
     };
     let every = renderer.lazy_pipelines(true);
-    // transparent + the motion-vector forward and 2 sky (#1435) + 2 particle +
-    // 2 ribbon + one world canvas per blend mode + 2 mirrored shadow + the data-mip
-    // one + 4 editor (line, the outline's mask, dilation and edge).
-    assert_eq!(every.len(), 1 + 3 + 2 + 2 + UiBlend::ALL.len() + 2 + 1 + 4);
+    // transparent + the motion-vector forward and 2 sky (#1435) + the motion blur's
+    // 2 tile passes and gather (#1436) + 2 particle + 2 ribbon + one world canvas per
+    // blend mode + 2 mirrored shadow + the data-mip one + 4 editor (line, the
+    // outline's mask, dilation and edge).
+    assert_eq!(
+        every.len(),
+        1 + 3 + 3 + 2 + 2 + UiBlend::ALL.len() + 2 + 1 + 4
+    );
     assert!(every.iter().all(|p| !p.is_built()), "headless stays lazy");
 
     renderer.warm_pipelines(false);
