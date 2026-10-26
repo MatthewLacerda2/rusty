@@ -227,4 +227,4 @@ mod completeness;
 #[cfg(test)]
 mod pack_tests;
 #[cfg(test)]
-mod probe_gpu_tests;
+mod tests;
