@@ -61,7 +61,7 @@ end
   name = "warm_grade",      -- baked file becomes <name>.wgsl, registered by this name
   blocks = {                -- applied in order; each transforms the running color
     { id = "tint", params = { color = {1.0, 0.85, 0.6} } },
-    { id = "scanline", params = { count = 240, strength = 0.3 } },
+    { id = "sharpen", params = { amount = 0.4 } },
     { id = "scanline" },    -- params optional; each block has sane defaults
   },
 }

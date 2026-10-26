@@ -11,7 +11,6 @@ use crate::scene::authoring::rendering::post_processing as vc_ops;
 use crate::scene::PostProcessingComponent;
 
 /// The three effects, in the order the composite runs them.
-#[rustfmt::skip]
 pub(super) fn draw_lens(
     ui: &mut egui::Ui,
     world: &mut crate::ecs::World,
@@ -22,22 +21,78 @@ pub(super) fn draw_lens(
     ui.add_space(3.0);
     ui.label("Lens Effects");
     let ca = vc.chromatic_aberration;
-    toggle(ui, (&mut *world, id), "  Chromatic Aberration", ca.active, vc_ops::set_chromatic_aberration_active, is_dirty);
+    toggle(
+        ui,
+        (&mut *world, id),
+        "  Chromatic Aberration",
+        ca.active,
+        vc_ops::set_chromatic_aberration_active,
+        is_dirty,
+    );
     if ca.active {
-        *is_dirty |= slider_row(ui, (&mut *world, id), "    Intensity:", ca.intensity, 0.0..=1.0, vc_ops::set_chromatic_aberration_intensity);
+        *is_dirty |= slider_row(
+            ui,
+            (&mut *world, id),
+            "    Intensity:",
+            ca.intensity,
+            0.0..=1.0,
+            vc_ops::set_chromatic_aberration_intensity,
+        );
     }
     let v = vc.vignette;
-    toggle(ui, (&mut *world, id), "  Vignette", v.active, vc_ops::set_vignette_active, is_dirty);
+    toggle(
+        ui,
+        (&mut *world, id),
+        "  Vignette",
+        v.active,
+        vc_ops::set_vignette_active,
+        is_dirty,
+    );
     if v.active {
-        *is_dirty |= slider_row(ui, (&mut *world, id), "    Intensity:", v.intensity, 0.0..=1.0, vc_ops::set_vignette_intensity);
-        *is_dirty |= slider_row(ui, (&mut *world, id), "    Smoothness:", v.smoothness, Vignette::MIN_SMOOTHNESS..=1.0, vc_ops::set_vignette_smoothness);
+        *is_dirty |= slider_row(
+            ui,
+            (&mut *world, id),
+            "    Intensity:",
+            v.intensity,
+            0.0..=1.0,
+            vc_ops::set_vignette_intensity,
+        );
+        *is_dirty |= slider_row(
+            ui,
+            (&mut *world, id),
+            "    Smoothness:",
+            v.smoothness,
+            Vignette::MIN_SMOOTHNESS..=1.0,
+            vc_ops::set_vignette_smoothness,
+        );
         draw_vignette_look(ui, world, id, v, is_dirty);
     }
     let grain = vc.film_grain;
-    toggle(ui, (&mut *world, id), "  Film Grain", grain.active, vc_ops::set_film_grain_active, is_dirty);
+    toggle(
+        ui,
+        (&mut *world, id),
+        "  Film Grain",
+        grain.active,
+        vc_ops::set_film_grain_active,
+        is_dirty,
+    );
     if grain.active {
-        *is_dirty |= slider_row(ui, (&mut *world, id), "    Intensity:", grain.intensity, 0.0..=1.0, vc_ops::set_film_grain_intensity);
-        *is_dirty |= slider_row(ui, (&mut *world, id), "    Response:", grain.response, 0.0..=1.0, vc_ops::set_film_grain_response);
+        *is_dirty |= slider_row(
+            ui,
+            (&mut *world, id),
+            "    Intensity:",
+            grain.intensity,
+            0.0..=1.0,
+            vc_ops::set_film_grain_intensity,
+        );
+        *is_dirty |= slider_row(
+            ui,
+            (&mut *world, id),
+            "    Response:",
+            grain.response,
+            0.0..=1.0,
+            vc_ops::set_film_grain_response,
+        );
     }
 }
 
@@ -60,7 +115,6 @@ fn toggle(
 
 /// The vignette's colour and centre (one row per axis: two sliders overflow the
 /// inspector's width).
-#[rustfmt::skip]
 fn draw_vignette_look(
     ui: &mut egui::Ui,
     world: &mut crate::ecs::World,
@@ -81,7 +135,14 @@ fn draw_vignette_look(
         *is_dirty = true;
     }
     let [x, y] = v.center;
-    *is_dirty |= slider_row(ui, (&mut *world, id), "    Center X:", x, 0.0..=1.0, set_center_x);
+    *is_dirty |= slider_row(
+        ui,
+        (&mut *world, id),
+        "    Center X:",
+        x,
+        0.0..=1.0,
+        set_center_x,
+    );
     *is_dirty |= slider_row(ui, (world, id), "    Center Y:", y, 0.0..=1.0, set_center_y);
 }
 

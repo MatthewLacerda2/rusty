@@ -79,3 +79,27 @@ fn radial_blur_smears_a_hard_edge() {
     );
     cleanup(name);
 }
+
+/// An authored effect reads the game clock through the scaffold (#398): a pulsing
+/// `damage_vignette` paints different corners half a pulse apart, and the same
+/// corners at the same time.
+#[test]
+fn an_authored_effect_reads_game_time() {
+    let name = "t398_damage_pulse";
+    let block = r#"{"id":"damage_vignette","params":{"color":[1,0,0],"intensity":1,"pulse_speed":3.14159}}"#;
+    bake(name, block);
+    let mut host = CaptureHost::new();
+    let at = |host: &mut CaptureHost, time: f32, tag: &str| {
+        let mut scene = with_effects(wall_scene(2.0, [0.5, 0.5, 0.5]), &[name]);
+        scene.shader_time = time;
+        shot(host, &scene, tag)
+    };
+    let Some(a) = at(&mut host, 0.0, "pfx398_pulse_a") else {
+        return;
+    };
+    let b = at(&mut host, 1.0, "pfx398_pulse_b").unwrap();
+    assert_ne!(a.get_pixel(0, 0), b.get_pixel(0, 0), "the pulse moved");
+    let again = at(&mut host, 0.0, "pfx398_pulse_a2").unwrap();
+    assert_eq!(a, again, "the same game time paints the same pulse");
+    cleanup(name);
+}
