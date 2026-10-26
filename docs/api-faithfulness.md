@@ -329,7 +329,7 @@ fields (incl. the spatial fields stored for #213) round-trip through `SceneData`
 | `SetExposure` / `SetContrast` / `SetSaturation` / `SetGamma` | ✅ | renderer — same post-FX uniform (`tests/graphics/api.rs`) |
 | `SetTonemap` | ✅ | renderer — post-FX operator; unknown names ignored |
 | `SetSsrActive` / `SetSsrQuality` | ✅ | renderer — SSR pass (gated by High preset) |
-| `SetMotionBlurActive` / `SetMotionBlurSamples` | ✅ | renderer — `render/postfx_params.rs` motion-blur params (samples clamped 2..32) |
+| `SetMotionBlurActive` / `SetMotionBlurSamples` / `SetMotionBlurIntensity` / `SetMotionBlurMaxLength` | ✅ | renderer — `postfx::params::blur_params` builds `BlurParams` each frame (samples clamped 2..32, intensity 0..1, clamp 0..0.2; `render/postfx/motion_blur/params_tests.rs`) |
 | `SetQuality` | ✅ | renderer — `shell::settings::apply_graphics` hands the shared cell to `Renderer::apply_graphics` each frame; persisted at Stop / quit |
 | `SetOption` | ✅ | renderer — the same cell; `postfx::params::effect_runs` ANDs it into bloom / SSR / SSAO / motion blur / FXAA (`render/postfx/params_tests.rs`); saved to `Storage` at Stop / quit |
 | `ResetOptions` | ✅ | renderer — the same cell, back to the project defaults, choices forgotten (`tests/graphics/options.rs`) |

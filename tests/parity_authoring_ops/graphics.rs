@@ -64,6 +64,8 @@ fn apply_graphics_ops(scene: &Rc<RefCell<Scene>>, id: u32) {
     let mut cam = sc.world.camera_mut(id).unwrap();
     camera_ops::set_motion_blur_active(&mut cam, true);
     camera_ops::set_motion_blur_samples(&mut cam, 16);
+    camera_ops::set_motion_blur_intensity(&mut cam, 2.0); // clamped to 1
+    camera_ops::set_motion_blur_max_length(&mut cam, 0.1);
     camera_ops::set_fxaa_active(&mut cam, false);
 }
 
@@ -88,6 +90,8 @@ Graphics.SetCustomEffects({"crt", "hurt"})
 assert(not pcall(Graphics.SetCustomEffects, {"../x"}) and #Graphics.GetCustomEffects() == 2)
 Graphics.SetMotionBlurActive(true)
 Graphics.SetMotionBlurSamples(16)
+Graphics.SetMotionBlurIntensity(2.0)
+Graphics.SetMotionBlurMaxLength(0.1)
 Graphics.SetFxaaActive(false)
 "#;
 
@@ -132,6 +136,8 @@ fn graphics_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Error
     let ocam = os.world.camera(op_id).unwrap().clone();
     assert_eq!(lcam.motion_blur_active, ocam.motion_blur_active);
     assert_eq!(lcam.motion_blur_samples, ocam.motion_blur_samples);
+    assert_eq!(lcam.motion_blur_intensity, ocam.motion_blur_intensity);
+    assert_eq!(lcam.motion_blur_max_length, ocam.motion_blur_max_length);
     assert_eq!(lcam.fxaa_active, ocam.fxaa_active);
     assert!(
         !lcam.fxaa_active,

@@ -15,10 +15,10 @@
 //! held to them where the view camera copies its lens (`scene::camera::held_lens`,
 //! #1359).
 //! The component's motion-blur fields ARE also written from `Graphics.*`
-//! (`SetMotionBlurActive` / `SetMotionBlurSamples`); those route through
-//! [`set_motion_blur_active`] / [`set_motion_blur_samples`] here, so the card and the
-//! `Graphics` binding share one write. The sample clamp (`2..=32`) lives in
-//! [`set_motion_blur_samples`], so the card, scripts and the renderer agree.
+//! (`SetMotionBlurActive` / `Samples` / `Intensity` / `MaxLength`); those route
+//! through the `set_motion_blur_*` ops here, so the card and the `Graphics` binding
+//! share one write. Each clamp (samples `2..=32`, intensity `0..=1`, clamp
+//! `0..=0.2`) lives in its op, so the card, scripts and the renderer agree.
 //!
 //! Pure.
 
@@ -93,6 +93,19 @@ pub fn set_motion_blur_samples(c: &mut CameraComponent, samples: u32) {
         CameraComponent::MIN_MOTION_BLUR_SAMPLES,
         CameraComponent::MAX_MOTION_BLUR_SAMPLES,
     );
+}
+
+/// Set the camera's motion-blur intensity (#1436, the shutter fraction), clamped to
+/// `0..=MAX_MOTION_BLUR_INTENSITY`. A NaN takes 0.
+pub fn set_motion_blur_intensity(c: &mut CameraComponent, intensity: f32) {
+    c.motion_blur_intensity = saturated(intensity, 0.0, CameraComponent::MAX_MOTION_BLUR_INTENSITY);
+}
+
+/// Set the camera's longest motion-blur streak (#1436, a fraction of the view's
+/// height), clamped to `0..=MAX_MOTION_BLUR_MAX_LENGTH`. A NaN takes 0.
+pub fn set_motion_blur_max_length(c: &mut CameraComponent, max_length: f32) {
+    c.motion_blur_max_length =
+        saturated(max_length, 0.0, CameraComponent::MAX_MOTION_BLUR_MAX_LENGTH);
 }
 
 /// Set the camera's FXAA flag — the anti-aliasing pass at the end of the post-FX
@@ -204,6 +217,8 @@ mod tests {
         set_clear_flags(&mut e, ClearFlags::DepthOnly);
         set_motion_blur_active(&mut e, true);
         set_motion_blur_samples(&mut e, 16);
+        set_motion_blur_intensity(&mut e, 0.75);
+        set_motion_blur_max_length(&mut e, 0.1);
         set_fxaa_active(&mut e, false);
         let c = &*e;
         assert_eq!(c.fov, 90.0);
@@ -214,6 +229,8 @@ mod tests {
         assert_eq!(c.clear_flags, ClearFlags::DepthOnly);
         assert!(c.motion_blur_active);
         assert_eq!(c.motion_blur_samples, 16);
+        assert_eq!(c.motion_blur_intensity, 0.75);
+        assert_eq!(c.motion_blur_max_length, 0.1);
         assert!(!c.fxaa_active, "the op must be able to turn FXAA off");
     }
 
@@ -225,5 +242,23 @@ mod tests {
         assert_eq!(e.motion_blur_samples, 32);
         set_motion_blur_samples(&mut e, 0);
         assert_eq!(e.motion_blur_samples, 2);
+    }
+
+    #[test]
+    fn motion_blur_intensity_and_clamp_hold_their_ranges() {
+        let (mut scene, id) = scene_with_camera();
+        let mut e = scene.world.camera_mut(id).unwrap();
+        set_motion_blur_intensity(&mut e, 3.0);
+        set_motion_blur_max_length(&mut e, 1.0);
+        assert_eq!(
+            (e.motion_blur_intensity, e.motion_blur_max_length),
+            (1.0, 0.2)
+        );
+        set_motion_blur_intensity(&mut e, f32::NAN);
+        set_motion_blur_max_length(&mut e, -1.0);
+        assert_eq!(
+            (e.motion_blur_intensity, e.motion_blur_max_length),
+            (0.0, 0.0)
+        );
     }
 }

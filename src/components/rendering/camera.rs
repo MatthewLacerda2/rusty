@@ -61,6 +61,14 @@ pub struct CameraComponent {
     pub clear_flags: ClearFlags,
     pub motion_blur_active: bool,
     pub motion_blur_samples: u32,
+    /// Motion blur's *Intensity* (#1436, Unity's): the shutter fraction, how much of
+    /// a frame's motion one frame smears. `0.5` is a 180° shutter.
+    #[serde(default = "default_motion_blur_intensity")]
+    pub motion_blur_intensity: f32,
+    /// Motion blur's *Clamp* (#1436, Unity's): the longest streak, as a fraction of
+    /// the view's height, so a fast flick never smears the whole screen.
+    #[serde(default = "default_motion_blur_max_length")]
+    pub motion_blur_max_length: f32,
     /// Run the FXAA pass at the end of the post-FX chain (#360). Defaults to `true`
     /// (see `default_fxaa_active`) — the same default-on posture as motion blur,
     /// because both are cheap whole-image effects a game wants unless it says
@@ -84,6 +92,23 @@ impl CameraComponent {
     pub const MIN_MOTION_BLUR_SAMPLES: u32 = 2;
     /// Most motion-blur taps the renderer draws; the default camera uses it.
     pub const MAX_MOTION_BLUR_SAMPLES: u32 = 32;
+    /// The motion-blur intensity a camera starts with: a 180° shutter.
+    pub const DEFAULT_MOTION_BLUR_INTENSITY: f32 = 0.5;
+    /// The highest motion-blur intensity: the shutter open the whole frame.
+    pub const MAX_MOTION_BLUR_INTENSITY: f32 = 1.0;
+    /// The longest motion-blur streak a camera starts with, as a fraction of the
+    /// view's height.
+    pub const DEFAULT_MOTION_BLUR_MAX_LENGTH: f32 = 0.05;
+    /// The highest motion-blur clamp (Unity's upper bound, 0.2).
+    pub const MAX_MOTION_BLUR_MAX_LENGTH: f32 = 0.2;
+}
+
+fn default_motion_blur_intensity() -> f32 {
+    CameraComponent::DEFAULT_MOTION_BLUR_INTENSITY
+}
+
+fn default_motion_blur_max_length() -> f32 {
+    CameraComponent::DEFAULT_MOTION_BLUR_MAX_LENGTH
 }
 
 /// Default vertical field of view, in degrees.
@@ -107,6 +132,8 @@ impl Default for CameraComponent {
             clear_flags: default_clear_flags(),
             motion_blur_active: false,
             motion_blur_samples: 0,
+            motion_blur_intensity: default_motion_blur_intensity(),
+            motion_blur_max_length: default_motion_blur_max_length(),
             fxaa_active: default_fxaa_active(),
             projection: Projection::Perspective,
             target_texture: None,

@@ -1,6 +1,6 @@
 //! Render textures (#430): which are worth drawing, and when.
 
-use super::slots::is_due;
+use super::slots::{frames_since, is_due};
 use super::*;
 use crate::components::{ImageComponent, MaterialAsset, MaterialComponent};
 
@@ -23,6 +23,14 @@ fn update_every_spaces_the_draws() {
     assert!(is_due(Some(8), 12, 4));
     // 0 reads as every frame, never as "never".
     assert!(is_due(Some(8), 9, 0));
+}
+
+#[test]
+fn a_draw_spans_the_frames_since_the_last() {
+    // A first draw has no history: one frame. Every 4th frame: four.
+    assert_eq!(frames_since(None, 7), 1);
+    assert_eq!(frames_since(Some(8), 12), 4);
+    assert_eq!(frames_since(Some(8), 8), 1, "never 0");
 }
 
 #[test]

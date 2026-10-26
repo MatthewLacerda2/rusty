@@ -47,6 +47,9 @@ struct CameraUniforms {
     // This camera's view-projection last frame (#1435), what motion vectors reproject
     // through; equal to `view_proj` on a camera's first frame and after a cut.
     prev_view_proj: mat4x4<f32>,
+    // x: this camera's index in its stack, bottom to top (#1436), what the velocity
+    // target's `.a` carries so motion blur orders a higher camera in front; yzw unused.
+    stack: vec4<f32>,
 };
 
 // The post-process chain's uniform (group 0, binding 0 of every post pass, built-in
@@ -57,15 +60,12 @@ struct PostParams {
     color: vec4<f32>,
     // x: bloom_intensity, y: bloom_threshold, z: tonemap index, w: bloom_enabled
     bloom: vec4<f32>,
-    // x: blur direction (0=horizontal,1=vertical), y: texel_x, z: texel_y, w: motion_blur_samples
+    // x: blur direction (0=horizontal,1=vertical), y: texel_x, z: texel_y, w: unused
     misc: vec4<f32>,
-    // x: ssr_mode (0 off, 1 cubemap, 2 screen-space), y: motion_blur_active,
-    // z: motion_blur_scale, w: unused
+    // x: ssr_mode (0 off, 1 cubemap, 2 screen-space), yzw: unused
     flags: vec4<f32>,
     // current inverse view-projection (reconstruct world pos from depth)
     inv_view_proj: mat4x4<f32>,
-    // previous view-projection (camera motion blur velocity)
-    prev_view_proj: mat4x4<f32>,
     // current view-projection (SSR ray marching to clip space)
     view_proj: mat4x4<f32>,
     // xyz: camera world position, w: the sim's game time in seconds (#398) — the

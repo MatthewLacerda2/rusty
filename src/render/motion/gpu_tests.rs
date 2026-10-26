@@ -4,8 +4,9 @@
 use glam::Vec3;
 
 use super::gpu_fixture::{
-    cube, eye, pixel_centre, project, render, renderer, scene, unproject, view, H, W,
+    cube, eye, pixel, pixel_centre, project, render, renderer, scene, unproject, view, H, W,
 };
+use super::SKY_DISTANCE;
 
 #[test]
 fn gpu_a_cube_moving_past_a_still_camera_writes_velocity_on_its_pixels_only() {
@@ -34,6 +35,10 @@ fn gpu_a_cube_moving_past_a_still_camera_writes_velocity_on_its_pixels_only() {
     // The sky behind it, and the camera, did not move.
     assert!(moved.at(1, 1).length() < 1e-4, "{}", moved.at(1, 1));
     assert!(moved.at(W - 2, H - 2).length() < 1e-4);
+    // Beside the motion, each pixel's distance from the camera (#1436).
+    let (x, y) = pixel(project(&cam, face));
+    assert!((moved.distance(x, y) - face.length()).abs() < 0.05);
+    assert_eq!(moved.distance(1, 1), SKY_DISTANCE as f32, "the sky is far");
 }
 
 #[test]
@@ -95,4 +100,32 @@ fn gpu_the_player_option_off_writes_no_velocity_target() {
         "the player turned motion blur off (#1438): no velocity pass"
     );
     assert_eq!(r.frame_counters.velocity_passes, 0);
+}
+
+#[test]
+fn gpu_a_surface_behind_the_camera_last_frame_writes_no_motion() {
+    let Some(mut r) = renderer() else { return };
+    let mut view = view(&r);
+    let (mut scene, _) = scene(true);
+    // A long slab sliding forward past the player's shoulder, drawn both frames:
+    // the part of its side now 2 m ahead was 4 m behind the camera last frame, with
+    // no place on screen to move from (#1436).
+    let id = cube(&mut scene, Vec3::new(1.0, 0.0, 1.0));
+    scene.world.transform_mut(id).unwrap().scale = Vec3::new(1.0, 1.0, 10.0);
+    let cam = eye(0.0);
+    render(&mut r, &mut view, &scene, &cam).unwrap();
+    scene.world.transform_mut(id).unwrap().position = Vec3::new(1.0, 0.0, -5.0);
+    let ahead = render(&mut r, &mut view, &scene, &cam).unwrap();
+    let side = Vec3::new(0.5, 0.0, -2.0);
+    let (x, y) = pixel(project(&cam, side));
+    let got = ahead.at(x, y);
+    eprintln!("[motion] from behind the camera: {got}");
+    assert!(
+        got.length() < 1e-4,
+        "no streak from behind the camera: {got}"
+    );
+    assert!(
+        (ahead.distance(x, y) - side.length()).abs() < 0.1,
+        "the slab drew"
+    );
 }

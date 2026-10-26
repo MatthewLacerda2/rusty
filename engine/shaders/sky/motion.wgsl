@@ -6,11 +6,21 @@
 #import common::CameraUniforms
 
 // A sky pass's outputs: the colour, and the velocity a motion-vector view's second
-// target keeps; a view without one ignores location 1.
+// target keeps (`sky_targets`); a view without one ignores location 1.
 struct SkyTargets {
     @location(0) color: vec4<f32>,
-    @location(1) velocity: vec2<f32>,
+    @location(1) velocity: vec4<f32>,
 };
+
+// The sky's view distance in the velocity target (#1436): a half float's largest
+// value, as far as anything gets. Mirrors `render::motion::SKY_DISTANCE`.
+const SKY_DISTANCE: f32 = 65504.0;
+
+// What a sky pass writes for `color` seen along `dir`: its colour, and its motion
+// beside its distance, the sky's.
+fn sky_targets(camera: CameraUniforms, color: vec4<f32>, dir: vec3<f32>) -> SkyTargets {
+    return SkyTargets(color, vec4<f32>(sky_velocity(camera, dir), SKY_DISTANCE, 0.0));
+}
 
 // The sky's motion vector along view direction `dir` (#1435): a point at infinity
 // moves with the camera's rotation alone, so it reprojects as a direction (w = 0)

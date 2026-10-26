@@ -1,13 +1,15 @@
 //! src/editor/inspector/components/camera/ — the Camera inspector card (this
 //! `mod.rs`) plus the Post Processing card (`post_processing`, with its colour
-//! grade in `grading` and its custom effects list in `custom_effects`), split apart to stay under the size cap. Both
-//! cards live on the same camera entity.
+//! grade in `grading` and its custom effects list in `custom_effects`), split apart
+//! to stay under the size cap. Both cards live on the same camera entity. The Camera
+//! card's motion-blur widgets are `motion_blur`.
 
 use crate::editor::widgets::DragRange;
 use egui_phosphor::regular as icon;
 
 mod custom_effects;
 mod grading;
+mod motion_blur;
 mod post_processing;
 mod target;
 
@@ -35,7 +37,7 @@ pub fn draw_camera(
         draw_projection(ui, world, id, &cam, is_dirty);
         draw_culling_mask(ui, world, id, cam.culling_mask, named_layers, is_dirty);
         draw_stacking(ui, world, id, cam.render_order, cam.clear_flags, is_dirty);
-        draw_motion_blur(ui, world, id, &cam, is_dirty);
+        motion_blur::draw_motion_blur(ui, world, id, &cam, is_dirty);
         draw_fxaa(ui, world, id, cam.fxaa_active, is_dirty);
         target::draw_target(ui, world, id, &cam, is_dirty);
     });
@@ -45,37 +47,6 @@ pub fn draw_camera(
         authoring::remove_with_cascade(world, id, ComponentKind::Camera);
         *is_dirty = true;
     }
-}
-
-/// The motion-blur toggle and its sample-count slider (#1433). Writes go through the
-/// shared ops, so this card and `Graphics.SetMotionBlur*` are one path; the op owns
-/// the sample clamp.
-fn draw_motion_blur(
-    ui: &mut egui::Ui,
-    world: &mut crate::ecs::World,
-    id: u32,
-    cam: &crate::scene::CameraComponent,
-    is_dirty: &mut bool,
-) {
-    let mut on = cam.motion_blur_active;
-    if ui.checkbox(&mut on, "Motion Blur").changed() {
-        if let Some(mut c) = world.camera_mut(id) {
-            camera_ops::set_motion_blur_active(&mut c, on);
-        }
-        *is_dirty = true;
-    }
-    let mut samples = cam.motion_blur_samples;
-    ui.horizontal(|ui| {
-        ui.label("Samples:");
-        let range = crate::scene::CameraComponent::MIN_MOTION_BLUR_SAMPLES
-            ..=crate::scene::CameraComponent::MAX_MOTION_BLUR_SAMPLES;
-        if ui.add(egui::Slider::new(&mut samples, range)).changed() {
-            if let Some(mut c) = world.camera_mut(id) {
-                camera_ops::set_motion_blur_samples(&mut c, samples);
-            }
-            *is_dirty = true;
-        }
-    });
 }
 
 /// The FXAA toggle (#360): a real checkbox, because FXAA is an effect a shot might
