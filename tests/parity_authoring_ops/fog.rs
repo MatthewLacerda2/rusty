@@ -6,6 +6,7 @@ use std::rc::Rc;
 use glam::Vec3;
 use mlua::Lua;
 use rusty::core::settings::quality::QualityPreset;
+use rusty::core::settings::GraphicsSettings;
 use rusty::scene::authoring::fog as fog_ops;
 use rusty::scene::{FogMode, Scene};
 
@@ -13,10 +14,11 @@ use rusty::scene::{FogMode, Scene};
 fn fog_api_and_shared_op_converge_without_a_volume() -> Result<(), Box<dyn std::error::Error>> {
     // Scene fog is scene-level: a bare scene (no post-processing volume) takes it.
     let lua_scene = Rc::new(RefCell::new(Scene::new()));
-    let quality = Rc::new(RefCell::new(QualityPreset::High));
+    let quality = Rc::new(RefCell::new(GraphicsSettings::from(QualityPreset::High)));
+    let app = std::cell::RefCell::default();
     let lua = Lua::new();
     let read: (String, f32, f32, f32, f32) = lua.scope(|s| {
-        rusty::api::graphics::register(&lua, s, &lua_scene, &quality).unwrap();
+        rusty::api::graphics::register(&lua, s, &lua_scene, &quality, &app).unwrap();
         lua.load(
             r#"
             Graphics.SetFogMode("ExponentialSquared")

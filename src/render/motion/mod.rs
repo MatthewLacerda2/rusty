@@ -22,14 +22,15 @@
 //! following Unity.
 //!
 //! **Cost.** The target exists and the velocity pipelines run only while a view runs
-//! motion blur ([`wanted`]: the camera has it on and the quality tier allows it). On
-//! any other frame the forward pass draws exactly as before, and the target is freed.
+//! motion blur ([`wanted`]: the camera has it on, the player's option allows it and
+//! the quality tier runs it, #1438). On any other frame the forward pass draws
+//! exactly as before, and the target is freed.
 
 mod history;
 
 pub(crate) use history::{track, HistoryKey, MotionHistory};
 
-use crate::core::settings::quality::QualityPreset;
+use crate::core::settings::GraphicsSettings;
 use crate::render::postfx::params::{motion_blur_enabled, PostSource};
 use crate::render::postfx::PfxTarget;
 use crate::render::PixelSize;
@@ -39,8 +40,8 @@ pub(crate) const VELOCITY_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rg1
 
 /// Whether a view writes motion vectors this frame: only when it will run motion blur,
 /// the one consumer (#1436). `full` is the stack's `full_post_fx`.
-pub(crate) fn wanted(post: PostSource, quality: QualityPreset, full: bool) -> bool {
-    full && motion_blur_enabled(post, quality)
+pub(crate) fn wanted(post: PostSource, graphics: GraphicsSettings, full: bool) -> bool {
+    full && motion_blur_enabled(post, graphics)
 }
 
 /// One view's motion vectors: the velocity target (while active) and its history.

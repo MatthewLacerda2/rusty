@@ -41,9 +41,10 @@ impl Drop for Baked {
 
 /// Run `script` against the `Graphics` namespace, returning its error if any.
 fn run(scene: &RefCell<Scene>, script: &str) -> Result<(), String> {
-    let (lua, quality) = (Lua::new(), RefCell::new(QualityPreset::High));
+    let (lua, graphics) = (Lua::new(), RefCell::new(QualityPreset::High.into()));
+    let app = RefCell::default();
     lua.scope(|s| {
-        super::super::register(&lua, s, scene, &quality).unwrap();
+        super::super::register(&lua, s, scene, &graphics, &app).unwrap();
         lua.load(script).exec()
     })
     .map_err(|e| e.to_string())

@@ -2,6 +2,8 @@
 
 use super::*;
 use crate::components::{CameraComponent, PostProcessingComponent, Tonemap};
+use crate::core::settings::graphics_options::{GraphicsOption, GraphicsOptions};
+use crate::core::settings::quality::QualityPreset;
 use crate::scene::Scene;
 
 /// One entity carrying `vc` (and `cam`), and its id.
@@ -25,17 +27,24 @@ fn add(
 fn params(scene: &Scene, camera: Option<u32>, quality: QualityPreset) -> (PostParams, bool) {
     let id = Mat4::IDENTITY;
     let post = borrow_post_source(scene, camera);
-    build_post_params(scene, post.source(), quality, id, id, [1.0; 3])
+    build_post_params(scene, post.source(), quality.into(), id, id, [1.0; 3])
 }
 
 fn custom(scene: &Scene, camera: Option<u32>) -> Vec<String> {
-    post_passes(borrow_post_source(scene, camera).source(), false)
-        .custom
-        .to_vec()
+    post_passes(
+        borrow_post_source(scene, camera).source(),
+        false,
+        Default::default(),
+    )
+    .custom
+    .to_vec()
 }
 
 fn fxaa(scene: &Scene, camera: Option<u32>) -> bool {
-    fxaa_enabled(borrow_post_source(scene, camera).source())
+    fxaa_enabled(
+        borrow_post_source(scene, camera).source(),
+        Default::default(),
+    )
 }
 
 fn vc() -> PostProcessingComponent {
@@ -155,4 +164,56 @@ fn each_view_reads_its_own_camera_whatever_the_entity_order() {
         [0.0, 1.0, 1.0, 1.0]
     );
     assert!(fxaa(&scene, None), "no camera: FXAA stays default-on");
+}
+
+/// High tier with the player's `option` forbidden.
+fn forbidding(option: GraphicsOption) -> GraphicsSettings {
+    let mut options = GraphicsOptions::default();
+    options.set(option, false);
+    GraphicsSettings {
+        quality: QualityPreset::High,
+        options,
+    }
+}
+
+/// #1438: a player option off turns its effect off for a camera that has it on;
+/// allowed, the camera's choice stands.
+#[test]
+fn a_player_option_off_gates_the_cameras_effect() {
+    let (scene, id) = scene_with_vc(vc(), Some(cam()));
+    let id_m = Mat4::IDENTITY;
+    let run = |g: GraphicsSettings| {
+        let post = borrow_post_source(&scene, Some(id));
+        build_post_params(&scene, post.source(), g, id_m, id_m, [1.0; 3])
+    };
+    let (p, _) = run(forbidding(GraphicsOption::MotionBlur));
+    assert_eq!((p.flags[1], p.misc[3]), (0.0, 0.0), "motion blur off");
+    assert_eq!(p.flags[0], 2.0, "SSR untouched");
+    let (p, bloom) = run(QualityPreset::High.into());
+    assert_eq!(p.flags[1], 1.0, "allowed: the camera's motion blur runs");
+    assert!(bloom);
+    let (p, bloom) = run(forbidding(GraphicsOption::Bloom));
+    assert!(!bloom && p.bloom[3] == 0.0, "bloom off");
+    assert_eq!(
+        run(forbidding(GraphicsOption::Ssr)).0.flags[0],
+        0.0,
+        "ssr off"
+    );
+    let source = borrow_post_source(&scene, Some(id));
+    assert!(!fxaa_enabled(
+        source.source(),
+        forbidding(GraphicsOption::Fxaa)
+    ));
+}
+
+/// An option allows; it never turns on what the camera or the tier left off.
+#[test]
+fn effect_runs_needs_camera_option_and_tier() {
+    let all = GraphicsSettings::from(QualityPreset::High);
+    assert!(effect_runs(all, GraphicsOption::Ssr, true));
+    assert!(!effect_runs(all, GraphicsOption::Ssr, false), "camera off");
+    let medium = GraphicsSettings::from(QualityPreset::Medium);
+    assert!(!effect_runs(medium, GraphicsOption::Ssr, true), "tier off");
+    let off = forbidding(GraphicsOption::Ssr);
+    assert!(!effect_runs(off, GraphicsOption::Ssr, true), "option off");
 }

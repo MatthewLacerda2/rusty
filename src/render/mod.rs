@@ -227,6 +227,9 @@ pub struct Renderer {
     /// across views — each view's post-FX chain (owned by its [`RenderView`]) sizes its
     /// bloom buffers from this tier's divisor.
     pub quality: crate::core::settings::quality::QualityPreset,
+    /// The player's graphics options (#1438): which effects the player allows,
+    /// ANDed with each camera's and the tier's choice (`postfx::params::effect_runs`).
+    pub graphics_options: crate::core::settings::graphics_options::GraphicsOptions,
     /// Present modes the surface advertises, captured at construction. Used to
     /// decide whether vsync can be turned off (`Immediate`) without a wgpu panic;
     /// the headless path has no real swapchain so it only ever lists `Fifo`.

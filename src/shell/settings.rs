@@ -7,8 +7,9 @@
 //! surface + winit window. It owns three boundaries:
 //!
 //! * **Load + apply at startup** ([`load`]) — read the persisted `video` blob and
-//!   the `graphics.quality` tier from `Storage` (a boundary read, like the scene),
-//!   seed the shared cells, and apply them to the renderer/window so the app boots
+//!   the `graphics.quality` tier and the `graphics.options` player graphics options
+//!   (over the project's defaults, #1438) from `Storage` (a boundary read, like the
+//!   scene), seed the shared cells, and apply them to the renderer/window so the app boots
 //!   at the saved resolution / vsync / fullscreen / tier, and the audio maestro in
 //!   the saved speaker mode (#546).
 //! * **Apply per frame** ([`apply_pending`]) — read the cells a script (or the
@@ -24,8 +25,10 @@
 use super::Shell;
 use crate::app::GameWorld;
 use crate::audio::SpeakerMode;
+use crate::core::settings::graphics_options::GraphicsOptions;
 use crate::core::settings::quality::QualityPreset;
 use crate::core::settings::video::{VideoSettings, VIDEO_NAMESPACE};
+use crate::core::settings::GraphicsSettings;
 use crate::core::storage::Storage;
 
 /// `Storage` namespace + key the quality tier persists under (shares the
@@ -40,6 +43,8 @@ const QUALITY_KEY: &str = "quality";
 /// default tier.
 pub fn load(shell: &mut Shell, game: &GameWorld, defaults: VideoSettings) {
     let (video, quality) = read(&game.resources.storage.borrow(), defaults);
+    let project = game.resources.application.borrow().graphics_defaults();
+    let options = GraphicsOptions::load(&game.resources.storage.borrow(), project);
     let speaker_mode = SpeakerMode::load(&game.resources.storage.borrow());
     game.resources
         .audio
@@ -48,10 +53,11 @@ pub fn load(shell: &mut Shell, game: &GameWorld, defaults: VideoSettings) {
 
     // Seed the shared cells so the next script read sees the persisted values.
     *game.script_manager().video_cell().borrow_mut() = video;
-    *game.script_manager().quality_cell().borrow_mut() = quality;
+    *game.script_manager().graphics_cell().borrow_mut() = GraphicsSettings { quality, options };
 
     apply_video(shell, video, &VideoSettings::default());
     shell.renderer.set_quality(quality);
+    shell.renderer.graphics_options = options;
     shell.applied_video = video;
 }
 
@@ -122,7 +128,9 @@ fn apply_video(shell: &mut Shell, next: VideoSettings, previous: &VideoSettings)
 pub fn persist(shell: &Shell, game: &GameWorld) {
     let video = *game.script_manager().video_cell().borrow();
     let quality = shell.renderer.quality;
+    let options = game.script_manager().graphics_cell().borrow().options;
     let mut storage = game.resources.storage.borrow_mut();
+    options.store(&mut storage);
     game.resources
         .audio
         .borrow()

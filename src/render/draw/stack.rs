@@ -55,7 +55,7 @@ impl Renderer {
         // Motion vectors (#1435): last frame's cameras, and the velocity target when
         // this view runs motion blur. A view shading with its own forward pipeline
         // (the Inspector's shader preview) writes none.
-        let velocity = motion::wanted(pass.post, self.quality, pass.full_post_fx)
+        let velocity = motion::wanted(pass.post, self.graphics(), pass.full_post_fx)
             && !view.has_forward_override();
         let key = HistoryKey::new(scene, pass.base_id);
         let size = view.size();
@@ -68,7 +68,7 @@ impl Renderer {
             view_projs,
             prev_view_projs,
             fog: FogUniform::from_settings(&scene.fog),
-            ssao: SsaoPlan::for_volume(pass.post.volume, self.quality),
+            ssao: SsaoPlan::for_volume(pass.post.volume, self.graphics()),
         };
         for idx in 0..pass.stack.len() {
             let mut ctx = CameraCtx::new(scene, &pass, &shared, idx);
@@ -95,12 +95,12 @@ impl Renderer {
         let (mut post_params, bloom_enabled) = build_post_params(
             scene,
             ctx.stack.post,
-            self.quality,
+            self.graphics(),
             post.view_proj,
             post.prev_view_proj,
             post.camera_pos,
         );
-        let mut passes = post_passes(ctx.stack.post, bloom_enabled);
+        let mut passes = post_passes(ctx.stack.post, bloom_enabled, self.graphics());
         if !post.full {
             // Display transform only: the neutral grade, no bloom/SSR/blur/FXAA and
             // no authored effects.

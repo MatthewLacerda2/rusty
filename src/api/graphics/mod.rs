@@ -18,6 +18,8 @@
 //! * The global `QualityPreset` resource (Low/Medium/High), gating SSR + motion
 //!   blur. A plain value get/set (`register_quality`, in `state`); the platform layer
 //!   reads the shared cell each frame and hands it to `renderer.set_quality`.
+//! * The player's graphics options (`options`, #1438) in the same cell, which gate
+//!   every camera's effects, and the project's defaults for them on `Application`.
 //!
 //! Every write is ONE-WAY into render-only state: it never feeds back into
 //! `FixedUpdate`, so toggling these knobs can't change the deterministic sim. The
@@ -29,6 +31,7 @@ use std::cell::RefCell;
 mod camera;
 mod effects;
 mod fog;
+mod options;
 mod shadows;
 mod ssao;
 mod state;
@@ -38,7 +41,8 @@ use mlua::Lua;
 use self::state::{register_quality, with_vc, with_vc_mut};
 use super::{put, Reg};
 use crate::components::Tonemap;
-use crate::core::settings::quality::QualityPreset;
+use crate::core::application::Application;
+use crate::core::settings::GraphicsSettings;
 use crate::scene::authoring::rendering::post_processing as vc_ops;
 use crate::scene::Scene;
 
@@ -47,7 +51,8 @@ pub fn register<'scope>(
     lua: &Lua,
     scope: &'scope mlua::Scope<'scope, '_>,
     scene: &'scope RefCell<Scene>,
-    quality: &'scope RefCell<QualityPreset>,
+    graphics: &'scope RefCell<GraphicsSettings>,
+    app: &'scope RefCell<Application>,
 ) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
@@ -58,7 +63,8 @@ pub fn register<'scope>(
     register_ssr(scope, &table, scene)?;
     camera::register_motion_blur(scope, &table, scene)?;
     camera::register_fxaa(scope, &table, scene)?;
-    register_quality(scope, &table, quality)?;
+    register_quality(scope, &table, graphics)?;
+    options::register_options(scope, &table, graphics, app)?;
     shadows::register_shadows(scope, &table, scene)?;
     fog::register_fog(scope, &table, scene)?;
     ssao::register_ssao(scope, &table, scene)?;

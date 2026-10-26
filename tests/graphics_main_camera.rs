@@ -8,6 +8,7 @@ use std::rc::Rc;
 use mlua::Lua;
 use rusty::components::{CameraComponent, RenderTarget};
 use rusty::core::settings::quality::QualityPreset;
+use rusty::core::settings::GraphicsSettings;
 use rusty::scene::authoring::default_post_processing;
 use rusty::scene::camera::main_camera;
 use rusty::scene::Scene;
@@ -28,9 +29,10 @@ fn camera(scene: &mut Scene, name: &str, target: Option<RenderTarget>) -> u32 {
 
 fn run(scene: &Rc<RefCell<Scene>>, script: &str) {
     let lua = Lua::new();
-    let quality = Rc::new(RefCell::new(QualityPreset::Medium));
+    let quality = Rc::new(RefCell::new(GraphicsSettings::from(QualityPreset::Medium)));
+    let app = std::cell::RefCell::default();
     lua.scope(|scope| {
-        rusty::api::graphics::register(&lua, scope, scene, &quality).unwrap();
+        rusty::api::graphics::register(&lua, scope, scene, &quality, &app).unwrap();
         lua.load(script).exec()
     })
     .unwrap();

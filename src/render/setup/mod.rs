@@ -215,6 +215,7 @@ impl Renderer {
             scene_depth_layout: billboards.scene_depth_layout,
             ui_renderer: ui,
             quality,
+            graphics_options: Default::default(),
             gpu_meshes: HashMap::new(),
             gpu_textures: HashMap::new(),
             texture_kinds: Default::default(),

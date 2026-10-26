@@ -36,6 +36,26 @@ fn bound_instance_writes_through_on_every_setter() {
     let _ = std::fs::remove_file(&path);
 }
 
+/// A default graphics option writes `project.rusty` when bound and keeps the build
+/// settings beside it; reopening reads it back (#1438).
+#[test]
+fn a_default_graphics_option_writes_through_the_bound_file() {
+    use crate::core::settings::graphics_options::GraphicsOption;
+    let path = temp_path("graphics");
+    let mut app = Application::new();
+    app.open(&path).unwrap();
+    app.update(|b| b.product_name = "Neon".into()).unwrap();
+    app.set_default_option(GraphicsOption::MotionBlur, false)
+        .unwrap();
+    let mut reopened = Application::new();
+    reopened.open(&path).unwrap();
+    assert!(!reopened
+        .graphics_defaults()
+        .allows(GraphicsOption::MotionBlur));
+    assert_eq!(reopened.build().product_name, "Neon");
+    let _ = std::fs::remove_file(&path);
+}
+
 #[test]
 fn saving_the_settings_keeps_the_recorded_engine() {
     let path = temp_path("engine");

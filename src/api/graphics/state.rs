@@ -10,6 +10,7 @@ use std::cell::RefCell;
 use super::super::{put, Reg};
 use crate::components::{CameraComponent, PostProcessingComponent};
 use crate::core::settings::quality::QualityPreset;
+use crate::core::settings::GraphicsSettings;
 use crate::scene::camera::{camera_volume, main_camera};
 use crate::scene::Scene;
 
@@ -19,19 +20,19 @@ use crate::scene::Scene;
 pub(super) fn register_quality<'scope>(
     scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
-    quality: &'scope RefCell<QualityPreset>,
+    graphics: &'scope RefCell<GraphicsSettings>,
 ) -> Reg {
     put(
         table,
         "GetQuality",
-        scope.create_function(|_, ()| Ok(quality.borrow().name().to_string())),
+        scope.create_function(|_, ()| Ok(graphics.borrow().quality.name().to_string())),
     )?;
     put(
         table,
         "SetQuality",
         scope.create_function(|_, name: String| {
             if let Some(p) = QualityPreset::parse(&name) {
-                *quality.borrow_mut() = p;
+                graphics.borrow_mut().quality = p;
             }
             Ok(())
         }),

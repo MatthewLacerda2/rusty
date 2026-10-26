@@ -4,6 +4,7 @@
 //! settings changing *after* the renderer exists.
 
 use crate::core::settings::quality::QualityPreset;
+use crate::core::settings::GraphicsSettings;
 use crate::render::{PixelSize, Renderer};
 
 impl Renderer {
@@ -12,6 +13,14 @@ impl Renderer {
     /// tier is all that happens here (#355).
     pub fn set_quality(&mut self, preset: QualityPreset) {
         self.quality = preset;
+    }
+
+    /// The tier and the player's options together: what gates each view's post-FX.
+    pub(crate) fn graphics(&self) -> GraphicsSettings {
+        GraphicsSettings {
+            quality: self.quality,
+            options: self.graphics_options,
+        }
     }
 
     /// Whether the surface can turn vsync OFF — i.e. advertises `Immediate`. `Fifo`

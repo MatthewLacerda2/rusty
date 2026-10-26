@@ -10,6 +10,7 @@ use std::rc::Rc;
 use mlua::Lua;
 use rusty::components::{CameraComponent, PostProcessingComponent, Tonemap};
 use rusty::core::settings::quality::QualityPreset;
+use rusty::core::settings::GraphicsSettings;
 use rusty::scene::authoring::default_post_processing;
 use rusty::scene::Scene;
 
@@ -46,10 +47,11 @@ fn scene_with_volume() -> Rc<RefCell<Scene>> {
 fn bloom_and_color_round_trip() {
     let lua = Lua::new();
     let scene = scene_with_volume();
-    let quality = Rc::new(RefCell::new(QualityPreset::Medium));
+    let quality = Rc::new(RefCell::new(GraphicsSettings::from(QualityPreset::Medium)));
+    let app = std::cell::RefCell::default();
 
     lua.scope(|scope| {
-        rusty::api::graphics::register(&lua, scope, &scene, &quality).unwrap();
+        rusty::api::graphics::register(&lua, scope, &scene, &quality, &app).unwrap();
         lua.load(
             r#"
             Graphics.SetBloomActive(true)
@@ -84,10 +86,11 @@ fn bloom_and_color_round_trip() {
 fn motion_blur_samples_are_clamped() {
     let lua = Lua::new();
     let scene = scene_with_volume();
-    let quality = Rc::new(RefCell::new(QualityPreset::Medium));
+    let quality = Rc::new(RefCell::new(GraphicsSettings::from(QualityPreset::Medium)));
+    let app = std::cell::RefCell::default();
 
     lua.scope(|scope| {
-        rusty::api::graphics::register(&lua, scope, &scene, &quality).unwrap();
+        rusty::api::graphics::register(&lua, scope, &scene, &quality, &app).unwrap();
         lua.load("Graphics.SetMotionBlurActive(true); Graphics.SetMotionBlurSamples(99)")
             .exec()
             .unwrap();
@@ -105,18 +108,19 @@ fn motion_blur_samples_are_clamped() {
 fn quality_preset_round_trips_through_cell() {
     let lua = Lua::new();
     let scene = scene_with_volume();
-    let quality = Rc::new(RefCell::new(QualityPreset::Medium));
+    let quality = Rc::new(RefCell::new(GraphicsSettings::from(QualityPreset::Medium)));
+    let app = std::cell::RefCell::default();
 
     lua.scope(|scope| {
-        rusty::api::graphics::register(&lua, scope, &scene, &quality).unwrap();
+        rusty::api::graphics::register(&lua, scope, &scene, &quality, &app).unwrap();
         lua.load("Graphics.SetQuality(\"High\")").exec().unwrap();
-        assert_eq!(*quality.borrow(), QualityPreset::High);
+        assert_eq!(quality.borrow().quality, QualityPreset::High);
         let name: String = lua.load("return Graphics.GetQuality()").eval().unwrap();
         assert_eq!(name, "High");
 
         // An unknown tier name is ignored — the current value is kept.
         lua.load("Graphics.SetQuality(\"Ultra\")").exec().unwrap();
-        assert_eq!(*quality.borrow(), QualityPreset::High);
+        assert_eq!(quality.borrow().quality, QualityPreset::High);
         Ok(())
     })
     .unwrap();
@@ -126,10 +130,11 @@ fn quality_preset_round_trips_through_cell() {
 fn getters_return_defaults_with_no_active_volume() {
     let lua = Lua::new();
     let scene = Rc::new(RefCell::new(Scene::new()));
-    let quality = Rc::new(RefCell::new(QualityPreset::Low));
+    let quality = Rc::new(RefCell::new(GraphicsSettings::from(QualityPreset::Low)));
+    let app = std::cell::RefCell::default();
 
     lua.scope(|scope| {
-        rusty::api::graphics::register(&lua, scope, &scene, &quality).unwrap();
+        rusty::api::graphics::register(&lua, scope, &scene, &quality, &app).unwrap();
         let bloom: bool = lua.load("return Graphics.GetBloomActive()").eval().unwrap();
         assert!(!bloom);
         let gamma: f32 = lua.load("return Graphics.GetGamma()").eval().unwrap();
