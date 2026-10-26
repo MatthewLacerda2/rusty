@@ -1,6 +1,7 @@
 //! The composite and the grading bake, assembled from [`POST_EFFECTS`] (#1467): each is
 //! a fixed skeleton calling the effects' functions in their stage order, with each
-//! function's slots of one params array. The source is composed through the same
+//! function's slots of one params array and, for the composite, the textures it
+//! declares, bound in group 1 (`effects::textures`, #1473). The source is composed through the same
 //! `shadergen::compose` path as every engine shader, after the effects' modules are
 //! registered ([`register_modules`]), so a broken module fails at startup, naming
 //! itself.
@@ -8,6 +9,7 @@
 use std::fmt::Write as _;
 
 use super::layout::span;
+use super::textures::{composite_textures, GROUP};
 use super::{composite_layout, grade_layout, Phase, Placed, POST_EFFECTS};
 use crate::render::gpu::shaders::ShaderRegistry;
 
@@ -52,6 +54,7 @@ fn imports<F>(placed: &[Placed<F>]) -> String {
 }
 
 /// `c = <module>::<function>(c, <extra>fx[i], …);`, the call of one placed function.
+/// `extra` ends in `, ` when it isn't empty.
 fn call(
     module: &str,
     function: &str,
@@ -77,15 +80,21 @@ pub(crate) fn composite_source() -> String {
     let layout = composite_layout();
     let len = span(layout, |c| c.slots);
     let calls = |phase: Phase| -> String {
-        layout
-            .iter()
-            .filter(|p| p.function.phase == phase)
-            .map(|p| {
+        let (mut out, mut next) = (String::new(), 0);
+        for p in layout {
+            let f = p.function;
+            // A function's textures are the next ones bound, in run order.
+            let mut extra = String::from("f, ");
+            for t in &composite_textures()[next..next + f.textures.len()] {
+                let _ = write!(extra, "{}, ", t.wgsl_name());
+            }
+            next += f.textures.len();
+            if f.phase == phase {
                 let module = module_of(p.effect);
-                let f = p.function;
-                call(module, f.function, "f, ", "fx", p.offset, f.slots)
-            })
-            .collect()
+                out += &call(module, f.function, &extra, "fx", p.offset, f.slots);
+            }
+        }
+        out
     };
     format!(
         "// The post-FX composite, assembled by `render::postfx::effects::assemble` (#1467).
@@ -96,7 +105,7 @@ pub(crate) fn composite_source() -> String {
 {imports}
 // Every composite function's params, at the slots `effects::composite_layout` gave it.
 @group(0) @binding(9) var<uniform> fx: array<vec4<f32>, {len}>;
-
+{declarations}
 struct VsOut {{
     @builtin(position) pos: vec4<f32>,
     @location(0) uv: vec2<f32>,
@@ -121,9 +130,23 @@ fn fs_composite(in: VsOut) -> @location(0) vec4<f32> {{
 }}
 ",
         imports = imports(layout),
+        declarations = declarations(),
         hdr = calls(Phase::Hdr),
         display = calls(Phase::Display),
     )
+}
+
+/// The effects' own textures, one binding of group 1 each, in run order.
+fn declarations() -> String {
+    let mut out = String::new();
+    for (binding, t) in composite_textures().iter().enumerate() {
+        let name = t.wgsl_name();
+        let _ = writeln!(
+            out,
+            "@group({GROUP}) @binding({binding}) var {name}: texture_2d<f32>;"
+        );
+    }
+    out
 }
 
 /// The bake's WGSL: `cs_bake`, one invocation per texel of the 32³ table, storing

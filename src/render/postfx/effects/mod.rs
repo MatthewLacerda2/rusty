@@ -7,12 +7,14 @@
 //! - **composite functions** ([`Composite`]): WGSL functions of its module
 //!   (`engine/shaders/postfx/effects/<effect>.wgsl`) the composite calls on the HDR
 //!   colour before the grade ([`Phase::Hdr`]) or on the display colour after it
-//!   ([`Phase::Display`]). The composite is assembled from them ([`assemble`]);
+//!   ([`Phase::Display`]). The composite is assembled from them ([`assemble`]). A
+//!   function may read textures of its effect's own ([`CompositeTexture`]), which
+//!   the registry binds ([`textures`], #1473);
 //! - **grade functions** ([`Grade`]): functions the grading bake runs on each texel of
 //!   the view's LUT, in order;
 //! - a **pass** ([`Pass`]): its own GPU work, on the HDR scene before the composite
 //!   ([`Pass::Scene`]: depth of field, motion blur, the exposure meter, bloom's
-//!   bright pass, the lens flare's add) or on the LDR image after it ([`Pass::Ldr`]: the authored effects,
+//!   bright pass, the lens flare) or on the LDR image after it ([`Pass::Ldr`]: the authored effects,
 //!   FXAA).
 //!
 //! **Params without a shared struct.** Each function packs its own vec4 slots; the
@@ -31,6 +33,7 @@ pub(crate) mod assemble;
 mod layout;
 mod passes;
 mod targets;
+pub(crate) mod textures;
 
 // sorted: one module per effect (or family of effects); none reads another
 pub(crate) mod bloom;
@@ -52,6 +55,7 @@ pub(crate) use layout::{
 };
 pub(crate) use passes::Passes;
 pub(crate) use targets::Targets;
+pub(crate) use textures::CompositeTexture;
 
 use grading::{color_adjustments, color_lookup, lift_gamma_gain, tonemapping, white_balance};
 use lens::{chromatic_aberration, film_grain, vignette};
@@ -122,7 +126,8 @@ pub(crate) enum Phase {
 }
 
 /// A WGSL function the composite calls: `fn <function>(c: vec3<f32>, f: Frag,
-/// <one vec4 per slot>) -> vec3<f32>` in the effect's module.
+/// <one texture_2d<f32> per texture>, <one vec4 per slot>) -> vec3<f32>` in the
+/// effect's module.
 pub(crate) struct Composite {
     pub phase: Phase,
     /// Within the phase, lower first.
@@ -130,6 +135,8 @@ pub(crate) struct Composite {
     pub function: &'static str,
     /// How many vec4 params it reads.
     pub slots: usize,
+    /// The textures of its own it reads, passed to it in this order.
+    pub textures: &'static [CompositeTexture],
     /// Its params for this frame, written into its `slots` slots. An effect that
     /// doesn't run packs what its function skips on, so it draws as if absent.
     pub pack: fn(&EffectCx, &mut [[f32; 4]]),

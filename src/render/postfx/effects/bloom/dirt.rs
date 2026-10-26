@@ -3,8 +3,9 @@
 //! smudge only shows where bright light reaches it. The texture is loaded into
 //! bloom's own cache ([`DirtCache`]) before the frame's passes, whenever a volume
 //! names one, even at a dirt intensity of `0`, so tweening it up never decodes on
-//! that frame; the bloom pass then picks the view's, and the composite binds it
-//! (binding 10), or a black texel when there is none. An `rt:` dirt is a render
+//! that frame; the bloom pass then picks the view's, and the composite binds it as
+//! bloom's composite texture (#1473), or the registry's black texel when there is
+//! none. An `rt:` dirt is a render
 //! texture, which the frame draws because a volume names it.
 
 use std::rc::Rc;
@@ -53,24 +54,4 @@ pub(crate) fn render_textures(scene: &Scene) -> Vec<String> {
         .filter_map(|id| world.post_processing(id)?.bloom.dirt_texture.clone())
         .filter(|path| is_render_texture(path))
         .collect()
-}
-
-/// The 1×1 black texture bound while a view has no dirt (wgpu zero-fills a new
-/// texture): the composite's add of `bloom × dirt` is then exactly nothing.
-pub(crate) fn black(device: &wgpu::Device) -> wgpu::TextureView {
-    let texture = device.create_texture(&wgpu::TextureDescriptor {
-        label: Some("Bloom No Dirt"),
-        size: wgpu::Extent3d {
-            width: 1,
-            height: 1,
-            depth_or_array_layers: 1,
-        },
-        mip_level_count: 1,
-        sample_count: 1,
-        dimension: wgpu::TextureDimension::D2,
-        format: wgpu::TextureFormat::Rgba8Unorm,
-        usage: wgpu::TextureUsages::TEXTURE_BINDING,
-        view_formats: &[],
-    });
-    texture.create_view(&Default::default())
 }

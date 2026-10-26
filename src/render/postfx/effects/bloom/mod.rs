@@ -3,7 +3,8 @@
 //! `postfx/bloom.wgsl`), and the composite's add of the blurred result on the HDR
 //! image (`postfx/effects/bloom.wgsl`). The bright pass reads the scene after depth of field
 //! and motion blur, so a moving highlight blooms along its streak, as in URP and HDRP
-//! (#1436). The add lights the lens dirt too (`dirt`, #1442).
+//! (#1436). The add lights the lens dirt too (`dirt`, #1442), a composite texture of
+//! bloom's own (#1473).
 
 mod cache;
 pub(crate) mod dirt;
@@ -12,7 +13,7 @@ mod dirt_tests;
 
 use std::rc::Rc;
 
-use super::{Composite, EffectCx, Owner, Pass, PassCx, Phase, PostEffect};
+use super::{Composite, CompositeTexture, EffectCx, Owner, Pass, PassCx, Phase, PostEffect};
 use crate::core::settings::graphics_options::GraphicsOption;
 use crate::render::gpu::bind_entry as entry;
 use crate::render::gpu::fullscreen::Fullscreen;
@@ -34,6 +35,10 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
         order: 30,
         function: "hdr",
         slots: 1,
+        textures: &[CompositeTexture {
+            name: "dirt",
+            view: |pfx| pfx.bloom.dirt_view(),
+        }],
         pack,
     }],
     grade: &[],
@@ -129,14 +134,14 @@ impl BloomPasses {
 
 /// One view's bloom ping-pong buffers, at the bloom divisor's reduced resolution: the
 /// bright pass writes `a`, the blur `b`, which the composite adds (binding 3); and
-/// the lens dirt it lights (binding 10), picked by the bloom pass each frame.
+/// the lens dirt it lights (bloom's composite texture), picked by the bloom pass
+/// each frame.
 pub(crate) struct BloomTargets {
     pub(crate) a: PfxTarget,
     pub(crate) b: PfxTarget,
     pub(crate) size: (u32, u32),
     params: wgpu::Buffer,
     dirt: Option<Rc<GpuTexture>>,
-    no_dirt: wgpu::TextureView,
 }
 
 impl BloomTargets {
@@ -154,13 +159,13 @@ impl BloomTargets {
                 mapped_at_creation: false,
             }),
             dirt: None,
-            no_dirt: dirt::black(device),
         }
     }
 
-    /// The lens dirt the composite reads: this frame's texture, else black.
-    pub(crate) fn dirt_view(&self) -> &wgpu::TextureView {
-        self.dirt.as_ref().map_or(&self.no_dirt, |t| &t.view)
+    /// The lens dirt the composite reads this frame, if any (the registry binds
+    /// black without one).
+    pub(crate) fn dirt_view(&self) -> Option<&wgpu::TextureView> {
+        self.dirt.as_ref().map(|t| &t.view)
     }
 }
 
