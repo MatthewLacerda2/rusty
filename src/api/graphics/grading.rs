@@ -1,6 +1,7 @@
 //! `Graphics.{Get,Set}WhiteBalance`, `{Get,Set}{Lift,Gamma,Gain}Wheel` and
-//! `{Get,Set}HueShift` (#1440): the colour grade on the active post-processing
-//! volume, through the same `authoring::rendering::post_processing` ops the
+//! `{Get,Set}HueShift` (#1440), and `{Get,Set}ColorLookup` /
+//! `{Get,Set}ColorLookupContribution` (#1441): the colour grade on the active
+//! post-processing volume, through the same `authoring::rendering::post_processing` ops the
 //! Inspector card calls. The renderer bakes them into the view's grading LUT.
 
 use std::cell::RefCell;
@@ -49,6 +50,42 @@ pub(super) fn register_grading<'scope>(
         table,
         "GetHueShift",
         scope.create_function(|_, ()| Ok(with_vc(scene, |vc| vc.hue_shift).unwrap_or(0.0))),
+    )?;
+    register_color_lookup(scope, table, scene)
+}
+
+/// `SetColorLookup(path | nil)` / `GetColorLookup() -> path | nil`, and the
+/// contribution (`1` without an active volume, as a new one starts).
+fn register_color_lookup<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
+    table: &mlua::Table,
+    scene: &'scope RefCell<Scene>,
+) -> Reg {
+    put(
+        table,
+        "SetColorLookup",
+        scope.create_function(|_, path: Option<String>| {
+            with_vc_mut(scene, |e| vc_ops::set_lut(e, path));
+            Ok(())
+        }),
+    )?;
+    put(
+        table,
+        "GetColorLookup",
+        scope.create_function(|_, ()| Ok(with_vc(scene, |vc| vc.lut.clone()).flatten())),
+    )?;
+    put(
+        table,
+        "SetColorLookupContribution",
+        scope.create_function(|_, value: f32| {
+            with_vc_mut(scene, |e| vc_ops::set_lut_contribution(e, value));
+            Ok(())
+        }),
+    )?;
+    put(
+        table,
+        "GetColorLookupContribution",
+        scope.create_function(|_, ()| Ok(with_vc(scene, |vc| vc.lut_contribution).unwrap_or(1.0))),
     )
 }
 

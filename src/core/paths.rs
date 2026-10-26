@@ -87,6 +87,17 @@ pub fn to_slash(path: &Path) -> String {
     path.to_string_lossy().replace('\\', "/")
 }
 
+/// `path` as a stored asset path is kept, so one file is one key: trimmed,
+/// [`to_slash`]ed, and without a leading `./` (`./assets\\a.cube` →
+/// `assets/a.cube`).
+pub fn stored(path: &str) -> String {
+    let mut slashed = to_slash(Path::new(path.trim()));
+    while let Some(rest) = slashed.strip_prefix("./") {
+        slashed = rest.trim_start_matches('/').to_string();
+    }
+    slashed
+}
+
 /// `path`'s extension, lowercased; empty when it has none (#994). The one place
 /// a file's kind is read from its name, so `.LUA` and `.lua` are the same file kind
 /// everywhere.

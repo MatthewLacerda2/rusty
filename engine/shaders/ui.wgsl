@@ -37,6 +37,7 @@
 // stops (`color`, `stop1..3` at `stop_t`) swept linearly or radially over the rect.
 
 #import common::{Fog, fog_factor}
+#import color::srgb::{decode_srgb, encode_srgb}
 
 // Must match `render::ui::text::sdf::SPREAD` (a unit test checks it).
 const SPREAD: f32 = 12.0;
@@ -136,20 +137,6 @@ fn vs_main(in: VertexIn) -> VertexOut {
 fn vs_world(in: VertexIn) -> VertexOut {
     let world = world_ui.to_world * vec4<f32>(in.pos, 0.0, 1.0);
     return pass_through(in, world_ui.view_proj * world, world.xyz);
-}
-
-// sRGB → linear transfer (IEC 61966-2-1), per channel.
-fn decode_srgb(c: vec3<f32>) -> vec3<f32> {
-    let lo = c / 12.92;
-    let hi = pow((max(c, vec3<f32>(0.0)) + 0.055) / 1.055, vec3<f32>(2.4));
-    return select(hi, lo, c <= vec3<f32>(0.04045));
-}
-
-// Linear → sRGB transfer (IEC 61966-2-1), per channel.
-fn encode_srgb(c: vec3<f32>) -> vec3<f32> {
-    let lo = c * 12.92;
-    let hi = 1.055 * pow(max(c, vec3<f32>(0.0)), vec3<f32>(1.0 / 2.4)) - 0.055;
-    return select(hi, lo, c <= vec3<f32>(0.0031308));
 }
 
 // A straight-alpha colour at `coverage`, premultiplied.

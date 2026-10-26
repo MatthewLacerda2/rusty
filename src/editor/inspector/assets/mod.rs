@@ -1,5 +1,6 @@
 pub mod audio;
 pub mod image;
+mod lut;
 mod metadata;
 pub mod model;
 mod nav_areas;
@@ -9,7 +10,7 @@ pub mod script;
 pub mod shader;
 
 use super::preview;
-use crate::asset::{IMAGE_EXTENSIONS, MODEL_EXTENSIONS};
+use crate::asset::{IMAGE_EXTENSIONS, LUT_EXTENSIONS, MODEL_EXTENSIONS};
 use crate::editor::EditorUi;
 use crate::navigation::NavigationGraph;
 use crate::scene::{Scene, PREFAB_EXTENSION, SCENE_EXTENSION};
@@ -41,6 +42,10 @@ pub fn draw_inspector(
     match extension.as_str() {
         e if IMAGE_EXTENSIONS.contains(&e) => {
             image::draw(ui, editor, scene, path);
+        }
+        // After images: a strip `.png` keeps the image card (#1441).
+        e if LUT_EXTENSIONS.contains(&e) => {
+            lut::draw(ui, path);
         }
         "wav" | "mp3" | "ogg" => {
             audio::draw(ui, path);

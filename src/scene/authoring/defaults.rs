@@ -186,6 +186,8 @@ pub fn default_post_processing() -> PostProcessingComponent {
         white_balance: Default::default(),
         lift_gamma_gain: Default::default(),
         hue_shift: 0.0,
+        lut: None,
+        lut_contribution: 1.0,
         ssr_active: true,
         ssr_quality: "High".to_string(),
         ssr_temporal_upsampling: true,

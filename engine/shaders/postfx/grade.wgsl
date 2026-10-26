@@ -28,6 +28,10 @@ struct Grade {
     // x: tonemap index (0 none, 1 Reinhard, 2 ACES), y: contrast, z: saturation,
     // w: display gamma
     tone: vec4<f32>,
+    // xyz: the user LUT's input range start, w: its contribution (0: none, #1441)
+    lookup_min: vec4<f32>,
+    // xyz: the user LUT's input range end
+    lookup_max: vec4<f32>,
 };
 
 // The table's log encoding: t = log2(1 + 64x) / LOG_SPAN, a LogC-shaped curve

@@ -1,6 +1,7 @@
 //! The colour-grading rows of the Post Processing card's Color Correction section
-//! (#1440): white balance, the Lift / Gamma / Gain wheels and the hue shift. Split
-//! out of `post_processing` to keep it under the size cap.
+//! (#1440): white balance, the Lift / Gamma / Gain wheels and the hue shift, and
+//! the Color Lookup (#1441). Split out of `post_processing` to keep it under the
+//! size cap.
 //!
 //! A THIN client (#287): each widget reads the snapshot and writes through the
 //! shared `authoring::rendering::post_processing` op `Graphics.*` calls too.
@@ -70,6 +71,22 @@ fn draw_wheels(
             *is_dirty = true;
         }
     }
+}
+
+/// The Color Lookup: the LUT file ([`lut_field`](super::lut_field)) and its
+/// contribution.
+pub(super) fn draw_color_lookup(
+    ui: &mut egui::Ui,
+    world: &mut crate::ecs::World,
+    id: u32,
+    vc: &PostProcessingComponent,
+    is_dirty: &mut bool,
+) {
+    ui.label("  Color Lookup");
+    super::lut_field::draw(ui, world, id, vc, is_dirty);
+    let k = vc.lut_contribution;
+    let set = vc_ops::set_lut_contribution;
+    *is_dirty |= slider_row(ui, (world, id), "    Contribution:", k, 0.0..=1.0, set);
 }
 
 fn set_temperature(c: &mut PostProcessingComponent, temperature: f32) {

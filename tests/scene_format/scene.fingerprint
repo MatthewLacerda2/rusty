@@ -484,6 +484,9 @@ scene.entities[].post_processing.lift_gamma_gain.gamma.offset: f32
 scene.entities[].post_processing.lift_gamma_gain.lift.color: tuple(3)
 scene.entities[].post_processing.lift_gamma_gain.lift.color[]: f32
 scene.entities[].post_processing.lift_gamma_gain.lift.offset: f32
+scene.entities[].post_processing.lut: option
+scene.entities[].post_processing.lut: string
+scene.entities[].post_processing.lut_contribution: f32
 scene.entities[].post_processing.post_params: map
 scene.entities[].post_processing.post_params{key}: string
 scene.entities[].post_processing.post_params{}: seq

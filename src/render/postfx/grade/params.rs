@@ -8,9 +8,9 @@ use glam::{Mat3, Vec3};
 use crate::components::{LiftGammaGain, PostProcessingComponent, Tonemap, Wheel, WhiteBalance};
 use crate::core::color::luminance;
 
-/// CPU mirror of `Grade` in `postfx/grade.wgsl`. A later input (a user LUT, #1441)
-/// joins as a new field here and in the shader; the dirty check compares the bytes,
-/// so it is covered with no further change.
+/// CPU mirror of `Grade` in `postfx/grade.wgsl`. A new input joins as a new field
+/// here and in the shader; the dirty check compares the bytes, so it is covered
+/// with no further change.
 #[repr(C)]
 #[derive(Copy, Clone, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct GradeParams {
@@ -26,6 +26,11 @@ pub struct GradeParams {
     pub hue: [f32; 4],
     /// x: tonemap index, y: contrast, z: saturation, w: display gamma.
     pub tone: [f32; 4],
+    /// The user LUT's input range start (xyz); w: its contribution, `0` when no
+    /// LUT applies (#1441).
+    pub lookup_min: [f32; 4],
+    /// The user LUT's input range end (xyz); w unused.
+    pub lookup_max: [f32; 4],
 }
 
 impl GradeParams {
@@ -38,6 +43,8 @@ impl GradeParams {
         gain: [1.0, 1.0, 1.0, 0.0],
         hue: [0.0; 4],
         tone: [Tonemap::None.to_index() as f32, 1.0, 1.0, 1.0],
+        lookup_min: [0.0; 4],
+        lookup_max: [1.0, 1.0, 1.0, 0.0],
     };
 
     /// The bake inputs of `volume` (`None`: [`GradeParams::NEUTRAL`]).
@@ -73,6 +80,22 @@ impl GradeParams {
                 vc.saturation,
                 vc.gamma.max(0.01),
             ],
+            ..Self::NEUTRAL
+        }
+    }
+
+    /// These inputs with a user LUT spanning `domain` applied at `contribution`,
+    /// held to `0..=1` (a NaN applies none).
+    pub fn with_lookup(self, domain: [[f32; 3]; 2], contribution: f32) -> Self {
+        let k = if contribution.is_nan() {
+            0.0
+        } else {
+            contribution.clamp(0.0, 1.0)
+        };
+        Self {
+            lookup_min: Vec3::from_array(domain[0]).extend(k).to_array(),
+            lookup_max: Vec3::from_array(domain[1]).extend(0.0).to_array(),
+            ..self
         }
     }
 }

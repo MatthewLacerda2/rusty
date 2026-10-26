@@ -43,6 +43,13 @@ pub struct PostProcessingComponent {
     /// Rotates every hue by this many degrees, `-180..=180` (#1440); `0` when absent.
     #[serde(default)]
     pub hue_shift: f32,
+    /// Color Lookup (#1441): the user LUT file (a `.cube`, or a Unity strip
+    /// `.png`), applied last, on the display colour; none when absent.
+    #[serde(default)]
+    pub lut: Option<String>,
+    /// How much of [`lut`](Self::lut) applies, `0..=1`; `1` when absent.
+    #[serde(default = "full_contribution")]
+    pub lut_contribution: f32,
     pub ssr_active: bool,
     pub ssr_quality: String, // "Low", "Medium", "High", "Ultra"
     pub ssr_temporal_upsampling: bool,
@@ -73,6 +80,10 @@ pub struct PostProcessingComponent {
     /// Empty when absent.
     #[serde(default)]
     pub post_params: BTreeMap<String, Vec<f32>>,
+}
+
+fn full_contribution() -> f32 {
+    1.0
 }
 
 /// How the sun's cascaded shadow map covers the view (#435) — HDRP's Shadows volume
@@ -221,6 +232,11 @@ mod tests {
     fn grading_knobs_load_neutral_when_absent_and_round_trip() {
         let vc = load("");
         assert!(vc.white_balance.is_neutral() && vc.hue_shift == 0.0);
+        assert_eq!(
+            (vc.lut, vc.lut_contribution),
+            (None, 1.0),
+            "no Color Lookup"
+        );
         assert_eq!(vc.lift_gamma_gain, super::LiftGammaGain::default());
         let vc = load(r#", "hue_shift": 30.0, "lift_gamma_gain": {"gain": {"offset": 0.5}}"#);
         let back: PostProcessingComponent =

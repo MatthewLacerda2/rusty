@@ -55,6 +55,8 @@ fn apply_graphics_ops(scene: &Rc<RefCell<Scene>>, id: u32) {
         vc_ops::set_exposure_mode(&mut vc, ExposureMode::Automatic);
         vc_ops::set_exposure_limits(&mut vc, -2.0, 30.0); // max clamped to 10
         vc_ops::set_adaptation_speed(&mut vc, 2.0, -1.0); // down clamped to 0
+        vc_ops::set_lut(&mut vc, Some("assets/warm.cube".into()));
+        vc_ops::set_lut_contribution(&mut vc, 7.0); // clamped to 1
         vc_ops::set_ssr_active(&mut vc, true);
         vc_ops::set_ssr_quality(&mut vc, "High".to_string());
         vc_ops::set_shadow_cascades(&mut vc, 9); // clamped to 4
@@ -82,6 +84,8 @@ Graphics.SetHueShift(45)
 Graphics.SetExposureMode("Automatic")
 Graphics.SetExposureLimits(-2, 30)
 Graphics.SetAdaptationSpeed(2, -1)
+Graphics.SetColorLookup("assets/warm.cube")
+Graphics.SetColorLookupContribution(7)
 Graphics.SetSsrActive(true)
 Graphics.SetSsrQuality("High")
 Graphics.SetShadowCascades(9)
@@ -122,28 +126,23 @@ fn graphics_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Error
     let ovc = os.world.post_processing(op_id).unwrap().clone();
     assert_eq!(lvc.bloom_active, ovc.bloom_active);
     assert_eq!(lvc.bloom_intensity, ovc.bloom_intensity);
-    assert_eq!(lvc.gamma, ovc.gamma);
-    assert_eq!(lvc.tonemap, ovc.tonemap);
-    assert_eq!(lvc.white_balance, ovc.white_balance);
-    assert_eq!(lvc.lift_gamma_gain, ovc.lift_gamma_gain);
-    assert_eq!(lvc.hue_shift, ovc.hue_shift);
-    let exposure = |vc: &PostProcessingComponent| (vc.exposure_mode, vc.auto_exposure);
-    assert_eq!(exposure(&lvc), exposure(&ovc));
-    assert_eq!(lvc.ssr_active, ovc.ssr_active);
-    assert_eq!(lvc.ssr_quality, ovc.ssr_quality);
-    assert_eq!(lvc.shadows, ovc.shadows);
-    assert_eq!(lvc.ssao, ovc.ssao);
+    let grade = |vc: &PostProcessingComponent| {
+        let wheels = (vc.white_balance, vc.lift_gamma_gain, vc.hue_shift);
+        let exposure = (vc.exposure_mode, vc.auto_exposure);
+        let display = (vc.tonemap, vc.gamma, vc.lut.clone(), vc.lut_contribution);
+        (wheels, exposure, display)
+    };
+    assert_eq!(grade(&lvc), grade(&ovc));
+    let ssr = |vc: &PostProcessingComponent| (vc.ssr_active, vc.ssr_quality.clone());
+    assert_eq!(ssr(&lvc), ssr(&ovc));
+    assert_eq!((&lvc.shadows, &lvc.ssao), (&ovc.shadows, &ovc.ssao));
     assert_eq!(lvc.custom_effects, ovc.custom_effects);
     assert_eq!(lvc.bloom_intensity, 0.0, "single-sourced clamp");
     assert_eq!(lvc.gamma, 0.01, "single-sourced clamp");
     let lcam = ls.world.camera(lua_id).unwrap().clone();
     let ocam = os.world.camera(op_id).unwrap().clone();
-    assert_eq!(lcam.motion_blur_active, ocam.motion_blur_active);
-    assert_eq!(lcam.motion_blur_samples, ocam.motion_blur_samples);
-    assert_eq!(lcam.fxaa_active, ocam.fxaa_active);
-    assert!(
-        !lcam.fxaa_active,
-        "both paths turned the default-on knob off"
-    );
+    let cam = |c: &CameraComponent| (c.motion_blur_active, c.motion_blur_samples, c.fxaa_active);
+    assert_eq!(cam(&lcam), cam(&ocam));
+    assert!(!lcam.fxaa_active, "both paths turned fxaa off");
     Ok(())
 }

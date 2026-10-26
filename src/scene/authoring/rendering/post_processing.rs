@@ -3,7 +3,8 @@
 //! The ONE place the engine knows how to mutate an entity's first-class
 //! `PostProcessingComponent` field by field: the master `active` flag, bloom
 //! (active / intensity / threshold), color grading (exposure / contrast / saturation
-//! / gamma / tonemap, and #1440's white balance / Lift Gamma Gain / hue shift), SSR (active / quality / temporal upsampling), shadows and SSAO
+//! / gamma / tonemap, #1440's white balance / Lift Gamma Gain / hue shift, and
+//! #1441's Color Lookup), SSR (active / quality / temporal upsampling), shadows and SSAO
 //! (active / radius / intensity, #436), the authored post-FX list (#397) and its
 //! runtime params (#671), including the
 //! validation each write owns (the `≥ 0` clamps on bloom intensity/threshold, the
@@ -20,6 +21,7 @@ use crate::components::{
     AutoExposure, ExposureMode, PostProcessingComponent, ShadowSettings, SsaoSettings, Tonemap,
     Wheel, WhiteBalance,
 };
+use crate::core::paths::stored;
 use crate::scene::authoring::sanitize::{
     at_least, clamped, finite_array_or, finite_or, finite_values, non_negative, unit,
 };
@@ -125,6 +127,18 @@ pub fn set_wheel(vc: &mut PostProcessingComponent, which: Wheel, color: [f32; 3]
 /// Set the hue shift in degrees (#1440), clamped to `-180..=180`.
 pub fn set_hue_shift(vc: &mut PostProcessingComponent, degrees: f32) {
     vc.hue_shift = clamped(degrees, -180.0, 180.0);
+}
+
+/// Set the Color Lookup's LUT file (#1441) as a [`stored`] path; `None` or a blank
+/// one clears it. The renderer logs once and grades neutral when it is missing or
+/// malformed.
+pub fn set_lut(vc: &mut PostProcessingComponent, path: Option<String>) {
+    vc.lut = path.map(|p| stored(&p)).filter(|p| !p.is_empty());
+}
+
+/// Set how much of the Color Lookup applies (#1441), clamped to `0..=1`.
+pub fn set_lut_contribution(vc: &mut PostProcessingComponent, value: f32) {
+    vc.lut_contribution = unit(value);
 }
 
 /// Set the tonemap operator (typed — string parsing stays in the API adapter).

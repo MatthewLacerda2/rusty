@@ -86,6 +86,8 @@ inspect! {
             }
         }),
         op!("hue_shift", vc::set_hue_shift),
+        op!("lut", vc::set_lut),
+        op!("lut_contribution", vc::set_lut_contribution),
         op!("ssr_active", vc::set_ssr_active),
         op!("ssr_quality", vc::set_ssr_quality),
         op!("ssr_temporal_upsampling", vc::set_ssr_temporal_upsampling),

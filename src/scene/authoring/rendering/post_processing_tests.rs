@@ -73,6 +73,17 @@ fn ops_write_through_with_clamps() {
 }
 
 #[test]
+fn lut_path_has_one_spelling_and_blank_clears() {
+    let (mut scene, id) = scene_with_vc();
+    let mut e = scene.world.post_processing_mut(id).unwrap();
+    set_lut(&mut e, Some(" ./luts\\a.cube ".into()));
+    assert_eq!(e.lut.as_deref(), Some("luts/a.cube"), "one spelling");
+    set_lut(&mut e, Some("  ".into()));
+    set_lut_contribution(&mut e, 4.0);
+    assert_eq!((&e.lut, e.lut_contribution), (&None, 1.0), "blank clears");
+}
+
+#[test]
 fn custom_effects_keep_order_and_refuse_paths() {
     let (mut scene, id) = scene_with_vc();
     let mut e = scene.world.post_processing_mut(id).unwrap();
