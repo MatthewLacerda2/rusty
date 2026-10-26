@@ -107,19 +107,23 @@ pub(super) fn engine() -> Layers {
             .map(|o| o.name().into())
             .collect(),
         docs: TEST_ONLY_DOCS.iter().fold(docs, |all, doc| all + doc),
-        textures: composite_textures()
-            .iter()
-            .map(|t| TextureUse {
-                effect: t.effect.name.into(),
-                name: t.wgsl_name(),
-                call: assemble::call_head(assemble::module_of(t.effect), t.function.function),
-                position: PlacedTexture::of(t.function)
-                    .position(|u| std::ptr::eq(u, t))
-                    .expect("its own function's"),
-            })
-            .collect(),
+        textures: texture_uses(),
         composite: assemble::composite_source(),
     }
+}
+
+/// Every declared composite texture, as the composite should use it.
+fn texture_uses() -> Vec<TextureUse> {
+    (composite_textures().iter())
+        .map(|t| TextureUse {
+            effect: t.effect.name.into(),
+            name: t.wgsl_name(),
+            call: assemble::call_head(assemble::module_of(t.effect), t.function.function),
+            position: PlacedTexture::of(t.function)
+                .position(|u| std::ptr::eq(u, t))
+                .expect("its own function's"),
+        })
+        .collect()
 }
 
 #[cfg(feature = "editor")]
