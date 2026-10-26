@@ -79,6 +79,13 @@ pub struct CameraComponent {
     pub target_texture: Option<RenderTarget>,
 }
 
+impl CameraComponent {
+    /// Fewest motion-blur taps the renderer draws.
+    pub const MIN_MOTION_BLUR_SAMPLES: u32 = 2;
+    /// Most motion-blur taps the renderer draws; the default camera uses it.
+    pub const MAX_MOTION_BLUR_SAMPLES: u32 = 32;
+}
+
 /// Default vertical field of view, in degrees.
 pub const DEFAULT_FOV: f32 = 45.0;
 /// Default near/far clip planes — the free-fly editor camera's clip range, and the

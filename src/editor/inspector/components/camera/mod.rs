@@ -13,7 +13,6 @@ mod visual_correction;
 pub use visual_correction::draw_visual_correction;
 
 use crate::editor::inspector::components::card::component_card;
-use crate::editor::theme;
 use crate::scene::authoring::{self, rendering::camera as camera_ops, ComponentKind};
 use crate::scene::ClearFlags;
 
@@ -29,32 +28,13 @@ pub fn draw_camera(
     let Some(cam) = world.camera(id).map(|c| c.clone()) else {
         return;
     };
-    // Force high-quality motion blur by default under the hood, via the shared ops
-    // (so the editor and `Graphics.*` write these through one path).
-    if !cam.motion_blur_active {
-        if let Some(mut c) = world.camera_mut(id) {
-            camera_ops::set_motion_blur_active(&mut c, true);
-        }
-    }
-    if cam.motion_blur_samples != 64 {
-        if let Some(mut c) = world.camera_mut(id) {
-            camera_ops::set_motion_blur_samples(&mut c, 64);
-        }
-    }
-
     let mut remove = false;
     component_card(ui, icon::VIDEO_CAMERA, "Camera", Some(&mut remove), |ui| {
         target::draw_projection_mode(ui, world, id, &cam, is_dirty);
         draw_projection(ui, world, id, &cam, is_dirty);
         draw_culling_mask(ui, world, id, cam.culling_mask, named_layers, is_dirty);
         draw_stacking(ui, world, id, cam.render_order, cam.clear_flags, is_dirty);
-        ui.colored_label(
-            theme::from_ui(ui).accent,
-            format!(
-                "{}  Intrinsic Motion Blur (Active | 64 Samples)",
-                icon::CHECK_CIRCLE
-            ),
-        );
+        draw_motion_blur(ui, world, id, &cam, is_dirty);
         draw_fxaa(ui, world, id, cam.fxaa_active, is_dirty);
         target::draw_target(ui, world, id, &cam, is_dirty);
     });
@@ -66,11 +46,41 @@ pub fn draw_camera(
     }
 }
 
-/// The FXAA toggle (#360). Unlike the motion-blur line above — which the card forces
-/// to a fixed high-quality mode — this is a real checkbox, because FXAA is the one
-/// effect a shot might genuinely want off (a pixel-art look, or a screenshot being
-/// diffed for raw edges). Writes through the shared op, so this and
-/// `Graphics.SetFxaaActive` are one path.
+/// The motion-blur toggle and its sample-count slider (#1433). Writes go through the
+/// shared ops, so this card and `Graphics.SetMotionBlur*` are one path; the op owns
+/// the sample clamp.
+fn draw_motion_blur(
+    ui: &mut egui::Ui,
+    world: &mut crate::ecs::World,
+    id: u32,
+    cam: &crate::scene::CameraComponent,
+    is_dirty: &mut bool,
+) {
+    let mut on = cam.motion_blur_active;
+    if ui.checkbox(&mut on, "Motion Blur").changed() {
+        if let Some(mut c) = world.camera_mut(id) {
+            camera_ops::set_motion_blur_active(&mut c, on);
+        }
+        *is_dirty = true;
+    }
+    let mut samples = cam.motion_blur_samples;
+    ui.horizontal(|ui| {
+        ui.label("Samples:");
+        let range = crate::scene::CameraComponent::MIN_MOTION_BLUR_SAMPLES
+            ..=crate::scene::CameraComponent::MAX_MOTION_BLUR_SAMPLES;
+        if ui.add(egui::Slider::new(&mut samples, range)).changed() {
+            if let Some(mut c) = world.camera_mut(id) {
+                camera_ops::set_motion_blur_samples(&mut c, samples);
+            }
+            *is_dirty = true;
+        }
+    });
+}
+
+/// The FXAA toggle (#360): a real checkbox, because FXAA is an effect a shot might
+/// genuinely want off (a pixel-art look, or a screenshot being diffed for raw
+/// edges). Writes through the shared op, so this and `Graphics.SetFxaaActive` are
+/// one path.
 fn draw_fxaa(
     ui: &mut egui::Ui,
     world: &mut crate::ecs::World,
