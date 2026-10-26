@@ -30,6 +30,9 @@ IMAGE = re.compile(r"\.(?:png|jpe?g|hdr|exr|ktx2)$", re.IGNORECASE)
 IMAGES_ALLOWED = {
     # The application icon, every size the platforms ask for.
     "engine/icon/": "the engine's icon",
+    # Default textures every build ships and a component names by default (#1442's
+    # lens dirt), made by a checked-in generator whose test holds the file to it.
+    "engine/textures/": "the engine's default textures",
     # Test inputs a loader or importer reads (a texture, an HDR sky).
     "tests/fixtures/": "test fixtures",
 }
