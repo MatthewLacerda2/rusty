@@ -48,3 +48,39 @@ fn a_camera_effect_needs_its_camera_field_and_an_option_its_name() {
         "{problems}"
     );
 }
+
+#[test]
+fn a_volume_effect_needs_its_field_its_row_and_its_option_row() {
+    let mut l = engine();
+    l.settings.retain(|n| n != "bloom");
+    l.ops.retain(|(n, _)| n != "vignette");
+    l.docs = l.docs.replace("| `film_grain` |", "");
+    let problems = check(&l).join("\n");
+    for needle in [
+        "`bloom` has no field on PostProcessingComponent",
+        "`vignette` has no row in authoring's EFFECTS",
+        "`film_grain` has no row in the docs' Player options table",
+    ] {
+        assert!(
+            problems.contains(needle),
+            "not flagged: {needle}\n{problems}"
+        );
+    }
+}
+
+#[test]
+fn a_section_or_doc_marker_for_no_effect_is_flagged() {
+    let mut l = engine();
+    l.sections.push("lens_flare".into());
+    l.docs.push_str("\n<!-- effect: lens_dirt -->\n");
+    let problems = check(&l).join("\n");
+    for needle in [
+        "the Inspector's sections lists `lens_flare`",
+        "docs/api/Graphics.md lists `lens_dirt`",
+    ] {
+        assert!(
+            problems.contains(needle),
+            "not flagged: {needle}\n{problems}"
+        );
+    }
+}

@@ -164,18 +164,29 @@ fn missing(l: &Layers, name: &str, owner: Owner, option: Option<&str>) -> Vec<&'
     lacks
 }
 
-/// An effect a layer lists that the renderer doesn't.
+/// An effect a layer lists that the renderer doesn't. The volume's lighting
+/// settings (`shadows`, `ssao`: `PostProcessingComponent::NOT_EFFECTS`) have their
+/// own sections and are no effect.
 fn unknown(l: &Layers) -> Vec<String> {
     let rendered: Vec<String> = l.render.iter().map(|(n, ..)| n.clone()).collect();
     let ops = l.ops.iter().map(|(n, _)| n.clone()).collect();
+    let marked = l
+        .docs
+        .split("<!-- effect: ")
+        .skip(1)
+        .filter_map(|rest| Some(rest.split_once(" -->")?.0.to_string()))
+        .collect();
     let listed = [
         ("PostProcessingComponent", l.settings.clone()),
         ("authoring's EFFECTS", ops),
         ("REGISTRARS", l.api.clone()),
+        ("the Inspector's sections", l.sections.clone()),
+        ("docs/api/Graphics.md", marked),
     ];
+    let lighting = |n: &String| PostProcessingComponent::NOT_EFFECTS.contains(&n.as_str());
     let mut problems = Vec::new();
     for (layer, names) in listed {
-        for name in names.iter().filter(|n| !has(&rendered, n)) {
+        for name in names.iter().filter(|n| !has(&rendered, n) && !lighting(n)) {
             problems.push(format!(
                 "{layer} lists `{name}`, which render::postfx::effects lacks"
             ));
