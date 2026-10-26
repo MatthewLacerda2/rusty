@@ -1,5 +1,6 @@
 //! Builds the per-frame `PostParams` from one view's camera (#1434): its
-//! `CameraComponent` and `PostProcessingComponent`, gated by the quality preset.
+//! `CameraComponent` and `PostProcessingComponent`, gated by the quality preset and
+//! the player's graphics options through [`effect_runs`] (#1438).
 //!
 //! This is the bridge from the editor's "dead knobs" to the GPU: every field the
 //! inspector exposes ends up packed here and read by `postfx.wgsl`.
@@ -17,7 +18,8 @@ use glam::Mat4;
 
 use super::{PostParams, PostPasses};
 use crate::components::{CameraComponent, PostProcessingComponent};
-use crate::core::settings::quality::QualityPreset;
+use crate::core::settings::graphics_options::GraphicsOption;
+use crate::core::settings::GraphicsSettings;
 use crate::scene::camera::camera_volume;
 use crate::scene::Scene;
 
@@ -55,6 +57,13 @@ impl PostGuards<'_> {
     }
 }
 
+/// Does `effect` run for a view whose camera has it `on` (#1438)? Only when the
+/// camera has it on **and** the player's option allows it **and** the quality tier
+/// runs it. The one place that decides it: every gated pass asks here.
+pub(crate) fn effect_runs(graphics: GraphicsSettings, effect: GraphicsOption, on: bool) -> bool {
+    on && graphics.options.allows(effect) && graphics.quality.allows(effect)
+}
+
 /// Pack `post`'s post-processing volume and camera settings into a `PostParams`
 /// for `postfx.wgsl`. Returns the params plus whether the bloom passes should run
 /// this frame.
@@ -63,7 +72,7 @@ impl PostGuards<'_> {
 pub(crate) fn build_post_params(
     scene: &Scene,
     post: PostSource,
-    quality: QualityPreset,
+    graphics: GraphicsSettings,
     view_proj: Mat4,
     prev_view_proj: Mat4,
     camera_pos: [f32; 3],
@@ -85,27 +94,27 @@ pub(crate) fn build_post_params(
         return (params, false);
     };
 
+    let bloom = effect_runs(graphics, GraphicsOption::Bloom, vc.bloom_active);
     params.color = [vc.exposure, vc.contrast, vc.saturation, vc.gamma.max(0.01)];
     params.bloom = [
         vc.bloom_intensity,
         vc.bloom_threshold,
         vc.tonemap.to_index() as f32,
-        if vc.bloom_active { 1.0 } else { 0.0 },
+        if bloom { 1.0 } else { 0.0 },
     ];
 
     // SSR mode: 0 off, 2 = real screen-space (High tier only). Low/Medium keep
     // the forward shader's cubemap reflection, so post-FX SSR stays off there.
-    let ssr_mode = if vc.ssr_active && quality.screen_space_ssr() {
+    let ssr_mode = if effect_runs(graphics, GraphicsOption::Ssr, vc.ssr_active) {
         2.0
     } else {
         0.0
     };
 
-    // Motion blur is gated by the camera component AND the preset.
     let samples =
         CameraComponent::MIN_MOTION_BLUR_SAMPLES..=CameraComponent::MAX_MOTION_BLUR_SAMPLES;
     let (mb_active, mb_samples) = match post.camera {
-        Some(cam) if motion_blur_enabled(post, quality) => (
+        Some(cam) if motion_blur_enabled(post, graphics) => (
             1.0,
             cam.motion_blur_samples
                 .clamp(*samples.start(), *samples.end()) as f32,
@@ -114,14 +123,17 @@ pub(crate) fn build_post_params(
     };
     params.flags = [ssr_mode, mb_active, 1.0, 0.0];
     params.misc[3] = mb_samples;
-    (params, vc.bloom_active)
+    (params, bloom)
 }
 
-/// Whether `post`'s camera runs motion blur: its component has it on and the preset
-/// allows it. The velocity target is written exactly when this holds (#1435).
-pub(crate) fn motion_blur_enabled(post: PostSource, quality: QualityPreset) -> bool {
-    post.camera
-        .is_some_and(|cam| cam.motion_blur_active && quality.motion_blur())
+/// Whether `post`'s camera runs motion blur, through [`effect_runs`]: its component
+/// has it on, the player's option allows it and the tier runs it. The velocity
+/// target is written exactly when this holds (#1435), so a player who turned motion
+/// blur off pays for no velocity pass.
+pub(crate) fn motion_blur_enabled(post: PostSource, graphics: GraphicsSettings) -> bool {
+    post.camera.is_some_and(|cam| {
+        effect_runs(graphics, GraphicsOption::MotionBlur, cam.motion_blur_active)
+    })
 }
 
 /// No authored-effect params: a view without a volume.
@@ -129,10 +141,14 @@ static NO_POST_PARAMS: BTreeMap<String, Vec<f32>> = BTreeMap::new();
 
 /// The optional passes this frame runs for `post`: bloom (decided by
 /// [`build_post_params`]), FXAA, and its volume's authored effects, borrowed.
-pub(crate) fn post_passes<'a>(post: PostSource<'a>, bloom: bool) -> PostPasses<'a> {
+pub(crate) fn post_passes<'a>(
+    post: PostSource<'a>,
+    bloom: bool,
+    graphics: GraphicsSettings,
+) -> PostPasses<'a> {
     PostPasses {
         bloom,
-        fxaa: fxaa_enabled(post),
+        fxaa: fxaa_enabled(post, graphics),
         custom: post.volume.map_or(&[], |vc| &vc.custom_effects),
         post_params: post.volume.map_or(&NO_POST_PARAMS, |vc| &vc.post_params),
     }
@@ -147,10 +163,12 @@ pub(crate) fn post_passes<'a>(post: PostSource<'a>, bloom: bool) -> PostPasses<'
 /// No camera component at all gets `true`: default-on means a scene that has never
 /// heard of the knob is still anti-aliased.
 ///
-/// Unlike motion blur this is not gated by [`QualityPreset`] — FXAA runs on every
-/// tier, Low included, where it is precisely the cheap anti-aliasing an iGPU wants.
-pub(crate) fn fxaa_enabled(post: PostSource) -> bool {
-    post.camera.is_none_or(|c| c.fxaa_active)
+/// Unlike motion blur no quality tier turns it off — FXAA runs on every tier, Low
+/// included, where it is precisely the cheap anti-aliasing an iGPU wants; the
+/// player's `fxaa` option can.
+pub(crate) fn fxaa_enabled(post: PostSource, graphics: GraphicsSettings) -> bool {
+    let on = post.camera.is_none_or(|c| c.fxaa_active);
+    effect_runs(graphics, GraphicsOption::Fxaa, on)
 }
 
 #[cfg(test)]

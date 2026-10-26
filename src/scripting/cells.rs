@@ -9,8 +9,8 @@ use std::rc::Rc;
 use crate::audio::AudioMaestro;
 use crate::core::application::Application;
 use crate::core::frame_stats::FrameStats;
-use crate::core::settings::quality::QualityPreset;
 use crate::core::settings::video::VideoSettings;
+use crate::core::settings::GraphicsSettings;
 use crate::core::storage::Storage;
 use crate::physics::PhysicsWorld;
 use crate::ui::{EventSystem, ScreenSize};
@@ -62,10 +62,11 @@ impl ScriptManager {
         self.cells.storage = storage;
     }
 
-    /// Handle to the shared quality-preset cell, so the platform layer can read a
-    /// script-driven tier change and apply it to the renderer.
-    pub fn quality_cell(&self) -> Rc<RefCell<QualityPreset>> {
-        Rc::clone(&self.cells.quality)
+    /// Handle to the shared graphics cell (quality tier + player options, #1438),
+    /// so the platform layer can read a script-driven change and apply it to the
+    /// renderer.
+    pub fn graphics_cell(&self) -> Rc<RefCell<GraphicsSettings>> {
+        Rc::clone(&self.cells.graphics)
     }
 
     /// Handle to the shared video-settings cell, so the platform layer can read a

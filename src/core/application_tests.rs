@@ -20,10 +20,10 @@ fn default_startup_scene_is_the_seeded_scene() {
 #[test]
 fn missing_file_reads_as_defaults() {
     let path = temp_path("absent");
-    assert_eq!(
-        BuildSettings::read(&path).unwrap(),
-        BuildSettings::default()
-    );
+    assert_eq!(ProjectFile::read(&path).unwrap(), None);
+    let mut app = Application::new();
+    app.open(&path).unwrap();
+    assert_eq!(app.build(), &BuildSettings::default());
 }
 
 #[test]
@@ -32,7 +32,37 @@ fn bound_instance_writes_through_on_every_setter() {
     let mut app = Application::new();
     app.open(&path).unwrap();
     app.update(|b| b.product_name = "Neon".into()).unwrap();
-    assert_eq!(BuildSettings::read(&path).unwrap().product_name, "Neon");
+    let file = ProjectFile::read(&path).unwrap().unwrap();
+    assert_eq!(file.build.product_name, "Neon");
+    let _ = std::fs::remove_file(&path);
+}
+
+/// A default graphics option writes `project.rusty` when bound and keeps the build
+/// settings beside it; reopening reads it back (#1438).
+#[test]
+fn a_default_graphics_option_writes_through_the_bound_file() {
+    use crate::core::settings::graphics_options::{GraphicsOption, GraphicsOptions};
+    let path = temp_path("graphics");
+    let mut app = Application::new();
+    app.open(&path).unwrap();
+    app.update(|b| b.product_name = "Neon".into()).unwrap();
+    let mut live = GraphicsOptions::default();
+    live.choose(GraphicsOption::Bloom, false);
+    app.set_default_option(GraphicsOption::MotionBlur, false, &mut live)
+        .unwrap();
+    assert!(
+        !live.allows(GraphicsOption::MotionBlur),
+        "unchosen: follows"
+    );
+    app.set_default_option(GraphicsOption::Bloom, true, &mut live)
+        .unwrap();
+    assert!(!live.allows(GraphicsOption::Bloom), "chosen: the player's");
+    let mut reopened = Application::new();
+    reopened.open(&path).unwrap();
+    assert!(!reopened
+        .graphics_defaults()
+        .allows(GraphicsOption::MotionBlur));
+    assert_eq!(reopened.build().product_name, "Neon");
     let _ = std::fs::remove_file(&path);
 }
 

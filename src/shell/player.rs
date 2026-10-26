@@ -10,6 +10,7 @@ use super::frame::Host;
 use super::{boot, Frontend, Launch, Shell};
 use crate::app::GameWorld;
 use crate::core::application::{BuildSettings, WindowMode};
+use crate::core::settings::graphics_options::GraphicsOptions;
 use crate::core::settings::video::VideoSettings;
 use crate::render::RenderView;
 
@@ -30,10 +31,9 @@ impl Frontend for PlayerFrontend {
         frame: &wgpu::Texture,
         target: &wgpu::TextureView,
     ) {
-        // `Graphics.SetQuality` reaches the renderer here — there is no editor dropdown
-        // to reconcile with (`set_quality` guards the bloom realloc).
-        let quality = *game.script_manager().quality_cell().borrow();
-        shell.renderer.set_quality(quality);
+        // `Graphics.SetQuality` / `SetOption` reach the renderer here — there is no
+        // editor dropdown to reconcile with.
+        super::settings::apply_graphics(shell, game);
 
         let device = &shell.renderer.device;
         let (width, height) = (shell.renderer.config.width, shell.renderer.config.height);
@@ -79,9 +79,10 @@ pub fn video_defaults(build: &BuildSettings) -> VideoSettings {
     }
 }
 
-/// Boot the standalone player on the open project's `build` settings
-/// (`core::project::Opened::build`) and run until the game quits or the window closes.
-pub fn launch(build: BuildSettings) {
+/// Boot the standalone player on the open project's `build` settings and default
+/// `graphics` options (`core::project::Opened`) and run until the game quits or the
+/// window closes.
+pub fn launch(build: BuildSettings, graphics: GraphicsOptions) {
     boot::seed_project_workspace();
     println!(
         "[Player] Starting {} ({})...",
@@ -89,12 +90,13 @@ pub fn launch(build: BuildSettings) {
     );
 
     let mut game = boot::load_game(&build.startup_scene);
-    // Unbound: a shipped game reads its build settings but never rewrites them.
-    let _ = game
-        .resources
-        .application
-        .borrow_mut()
-        .set_build(build.clone());
+    // Unbound: a shipped game reads its build settings but never rewrites them. The
+    // graphics defaults are what a first launch's options fall back to (#1438).
+    {
+        let mut app = game.resources.application.borrow_mut();
+        let _ = app.set_build(build.clone());
+        let _ = app.set_graphics_defaults(graphics);
+    }
     game.boot_standalone();
 
     let launch = Launch {

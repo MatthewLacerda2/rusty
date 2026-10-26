@@ -17,8 +17,8 @@ use crate::core::application::Application;
 use crate::core::frame_stats::FrameStats;
 use crate::core::input::InputState;
 use crate::core::random::Random;
-use crate::core::settings::quality::QualityPreset;
 use crate::core::settings::video::VideoSettings;
+use crate::core::settings::GraphicsSettings;
 use crate::core::storage::Storage;
 use crate::navigation::NavigationGraph;
 use crate::physics::PhysicsWorld;
@@ -45,10 +45,10 @@ pub struct ApiCells {
     /// boundaries. Injected by `Resources` via [`ScriptManager::set_storage`];
     /// defaults to an empty, pathless store (harness/tests never touch disk).
     pub(super) storage: Rc<RefCell<Storage>>,
-    /// Global post-FX scalability tier (`Graphics.Get/SetQuality`). Shared with
-    /// the platform layer, which reads it each frame and hands it to
-    /// `renderer.set_quality`; defaults to `Medium` (harness/tests need no GPU).
-    pub(super) quality: Rc<RefCell<QualityPreset>>,
+    /// Global post-FX tier and player options (`Graphics.Get/SetQuality`,
+    /// `Graphics.Get/SetOption`, #1438). Shared with the platform layer, which reads
+    /// it each frame and hands it to the renderer; defaults to `Medium`, all allowed.
+    pub(super) graphics: Rc<RefCell<GraphicsSettings>>,
     /// Runtime video settings (`Video.*`: resolution / vsync / fullscreen). Shared
     /// with the platform layer, which reads it each frame and reconfigures the
     /// surface + window; defaults to the windowed boot settings (harness needs no
@@ -104,7 +104,7 @@ impl ApiCells {
             physics: Rc::default(),
             console,
             storage: Rc::default(),
-            quality: Rc::default(),
+            graphics: Rc::default(),
             video: Rc::default(),
             scene_path: Rc::default(),
             audio: Rc::default(),
@@ -128,7 +128,7 @@ impl ApiCells {
             physics: &self.physics,
             console: &self.console,
             storage: &self.storage,
-            quality: &self.quality,
+            graphics: &self.graphics,
             video: &self.video,
             scene_path: &self.scene_path,
             audio: &self.audio,

@@ -4,7 +4,8 @@
 //! `ProjectVersion.txt` plus Player Settings in one:
 //!
 //! ```json
-//! { "engine_commit": "<git commit>", "engine_order": 1318, "build": { … } }
+//! { "engine_commit": "<git commit>", "engine_order": 1318, "build": { … },
+//!   "graphics_options": { "motion_blur": true, … } }
 //! ```
 //!
 //! * **`engine_commit`** — the engine build the project was last opened with, so a
@@ -16,6 +17,8 @@
 //!   from an older one (#1319); absent when the engine couldn't count (a shallow
 //!   clone).
 //! * **`build`** — the [`BuildSettings`].
+//! * **`graphics_options`** — the player graphics options a fresh install starts
+//!   with ([`GraphicsOptions`], #1438); a player's saved choice wins over them.
 
 use std::path::Path;
 
@@ -24,6 +27,7 @@ use serde::{Deserialize, Serialize};
 use super::engine::commit::{engine_commit, engine_order, UNKNOWN_COMMIT};
 use super::engine::{base, EngineCheck};
 use crate::core::application::BuildSettings;
+use crate::core::settings::graphics_options::GraphicsOptions;
 
 /// The project file, at the project root.
 pub const PROJECT_FILE: &str = "project.rusty";
@@ -42,6 +46,8 @@ pub struct ProjectFile {
     pub engine_order: Option<u64>,
     /// The project's build settings.
     pub build: BuildSettings,
+    /// The project's default player graphics options (all allowed by default).
+    pub graphics_options: GraphicsOptions,
 }
 
 impl Default for ProjectFile {
@@ -50,6 +56,7 @@ impl Default for ProjectFile {
             engine_commit: engine_commit().to_string(),
             engine_order: engine_order(),
             build: BuildSettings::default(),
+            graphics_options: GraphicsOptions::default(),
         }
     }
 }

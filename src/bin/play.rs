@@ -52,7 +52,13 @@ fn main() {
     };
     let scene = scene.unwrap_or_else(|| opened.build.startup_scene.clone());
 
-    match scenario::run(&scenario_path, &out_dir, &scene, opened.build) {
+    match scenario::run(
+        &scenario_path,
+        &out_dir,
+        &scene,
+        opened.build,
+        opened.graphics_options,
+    ) {
         Ok(report) => {
             println!(
                 "play: wrote {} (passed: {})",

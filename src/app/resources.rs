@@ -185,6 +185,13 @@ impl Resources {
         }
     }
 
+    /// Write the shared graphics cell (tier + the player's options, #1438) into the
+    /// store, for the Stop and quit flushes to put on disk.
+    pub fn store_graphics(&self) {
+        let graphics = *self.script_manager.graphics_cell().borrow();
+        graphics.store(&mut self.storage.borrow_mut());
+    }
+
     /// Flush the persistent store at a boundary (Stop / quit), logging any failure
     /// to the console. A no-op when the store is pathless (harness/tests).
     pub fn flush_storage(&self) {

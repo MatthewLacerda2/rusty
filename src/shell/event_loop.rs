@@ -142,8 +142,10 @@ where
     /// Quit boundary: persist the store however the loop is exiting (window close,
     /// `Application.Quit`). A no-op when the store is pathless.
     fn exiting(&mut self, _: &ActiveEventLoop) {
-        if let Some((shell, _)) = self.running.as_ref() {
-            settings::persist(shell, &self.game);
+        // Only once `settings::load` seeded the cells: before it they hold the
+        // defaults, which would overwrite the player's saved settings.
+        if self.running.is_some() {
+            settings::persist(&self.game);
         }
         self.game.resources.flush_storage();
     }

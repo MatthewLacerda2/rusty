@@ -72,16 +72,18 @@ pub fn capture_world_into(
     width: u32,
     height: u32,
 ) -> Result<bool, String> {
-    share_ui_textures(host, world, width, height);
+    share_world(host, world, width, height);
     let scene = world.scene().borrow();
     capture_into(host, &scene, &world.camera().borrow(), path, width, height)
 }
 
-/// Hand `world`'s texture-size table to `host`'s renderer (#1221), so a capture
-/// draws the UI exactly as the sim laid it out.
-pub fn share_ui_textures(host: &mut CaptureHost, world: &GameWorld, width: u32, height: u32) {
+/// Hand `world`'s texture-size table (#1221) and its graphics cell — the quality
+/// tier and the player's options (#1438) — to `host`'s renderer, so a capture draws
+/// the UI as the sim laid it out and the effects `Graphics.GetOption` says run.
+pub fn share_world(host: &mut CaptureHost, world: &GameWorld, width: u32, height: u32) {
     if let Some(renderer) = host.renderer(width, height) {
         let textures = world.resources.screen.borrow().textures().clone();
         renderer.set_ui_textures(textures);
+        renderer.apply_graphics(*world.script_manager().graphics_cell().borrow());
     }
 }

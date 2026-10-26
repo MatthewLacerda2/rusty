@@ -9,6 +9,7 @@ use super::{fixture_project, Harness};
 use crate::app::GameWorld;
 use crate::core::application::BuildSettings;
 use crate::core::input::InputState;
+use crate::core::settings::graphics_options::GraphicsOptions;
 use crate::navigation::NavigationGraph;
 use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;
@@ -54,6 +55,7 @@ impl Harness {
         out_dir: impl AsRef<Path>,
         scene_path: &str,
         build: BuildSettings,
+        graphics: GraphicsOptions,
     ) -> Result<Self, String> {
         crate::scene::seed_default_scripts();
         crate::scene::seed_default_scene();
@@ -70,7 +72,12 @@ impl Harness {
             let world = harness.world.borrow();
             *world.script_manager().scene_path_cell().borrow_mut() = Some(scene_path.into());
             // Unbound, as in the player: a run reads the build settings, never writes them.
-            let _ = world.resources.application.borrow_mut().set_build(build);
+            let mut app = world.resources.application.borrow_mut();
+            let _ = app.set_build(build);
+            let _ = app.set_graphics_defaults(graphics);
+            // No saved player options in a harness (its store is pathless): the
+            // project's defaults are what it plays with (#1438).
+            world.script_manager().graphics_cell().borrow_mut().options = graphics;
         }
         Ok(harness)
     }

@@ -93,8 +93,8 @@ use crate::core::application::Application;
 use crate::core::frame_stats::FrameStats;
 use crate::core::input::InputState;
 use crate::core::random::Random;
-use crate::core::settings::quality::QualityPreset;
 use crate::core::settings::video::VideoSettings;
+use crate::core::settings::GraphicsSettings;
 use crate::core::storage::Storage;
 use crate::navigation::NavigationGraph;
 use crate::physics::PhysicsWorld;
@@ -122,9 +122,9 @@ pub struct ApiScopedCtx<'scope> {
     pub physics: &'scope RefCell<Option<PhysicsWorld>>,
     pub console: &'scope RefCell<ConsoleLogs>,
     pub storage: &'scope RefCell<Storage>,
-    /// Global post-FX scalability tier, shared with the platform layer so a
-    /// `Graphics.SetQuality` write reaches `renderer.set_quality`.
-    pub quality: &'scope RefCell<QualityPreset>,
+    /// Post-FX tier + player options, shared with the platform layer so a
+    /// `Graphics.SetQuality`/`SetOption` write reaches the renderer (#1438).
+    pub graphics: &'scope RefCell<GraphicsSettings>,
     /// Runtime video settings (resolution / vsync / fullscreen), shared with the
     /// platform layer so a `Video.*` write reaches the surface + window.
     pub video: &'scope RefCell<VideoSettings>,
@@ -203,7 +203,7 @@ pub fn register<'scope>(
     canvas::register(lua, scope, ctx.scene, ctx.screen, ctx.video)?;
     character_controller::register(lua, scope, ctx.scene, ctx.physics)?;
     decals::register(lua, scope, ctx.scene)?;
-    graphics::register(lua, scope, ctx.scene, ctx.quality)?;
+    graphics::register(lua, scope, ctx.scene, ctx.graphics, ctx.application)?;
     input::register_readable(lua, scope, ctx.input)?;
     input::register_writable(lua, scope, ctx.input)?;
     joint::register(lua, scope, ctx.scene)?;

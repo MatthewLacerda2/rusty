@@ -9,6 +9,9 @@
 //!   ([`PROJECT_FILE`](crate::core::project::PROJECT_FILE), #853, under `"build"`), so
 //!   they travel with the project in git instead of with a developer's local save. The editor edits them (File → Build Settings) and scripts
 //!   through the `Application` namespace — one surface, per the parity rule.
+//! * **The project's graphics option defaults** — what a fresh install's player
+//!   graphics options start as (#1438), in the same file under `"graphics_options"`.
+//!   `Graphics.SetDefaultOption` and the Build Settings window edit them, the same way.
 //! * **The quit request** — `Application.Quit()` only *records* that the game asked to
 //!   quit. What that means is the host's call: the player closes the window, the editor
 //!   stops Play (Unity ignores `Quit` in the editor), and the headless harness ends the
@@ -32,11 +35,12 @@
 //! ([`Opened::build`](crate::core::project::Opened::build)) into an unbound instance,
 //! so a shipped game can never rewrite its own build settings.
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
 use crate::core::project::ProjectFile;
+use crate::core::settings::graphics_options::{GraphicsOption, GraphicsOptions};
 
 /// The startup scene when none is configured: the seeded demo scene. Kept equal to
 /// `scene::DEFAULT_SCENE_PATH` (a unit test pins it) without `core` importing `scene`.
@@ -80,19 +84,13 @@ impl Default for BuildSettings {
     }
 }
 
-impl BuildSettings {
-    /// Read the settings from the project file at `path`. A missing file yields the
-    /// defaults; an unreadable or malformed one is an error.
-    pub fn read(path: &Path) -> Result<Self, String> {
-        Ok(ProjectFile::read(path)?.unwrap_or_default().build)
-    }
-}
-
 /// The `Application` resource: the project's build settings plus the game's pending
 /// quit request. One per World, shared by the script runtime and the platform layer.
 #[derive(Default)]
 pub struct Application {
     build: BuildSettings,
+    /// The project's default player graphics options (#1438).
+    graphics_defaults: GraphicsOptions,
     /// `Some` once bound to a file via [`Application::open`]: setters then write it.
     path: Option<PathBuf>,
     quit_requested: bool,
@@ -115,9 +113,10 @@ impl Application {
     /// the settings back into it.
     pub fn open(&mut self, path: impl Into<PathBuf>) -> Result<(), String> {
         let path = path.into();
-        let read = BuildSettings::read(&path);
+        let read = ProjectFile::read(&path);
         self.path = Some(path);
-        self.build = read?;
+        let file = read?.unwrap_or_default();
+        (self.build, self.graphics_defaults) = (file.build, file.graphics_options);
         Ok(())
     }
 
@@ -138,6 +137,32 @@ impl Application {
         self.save()
     }
 
+    /// The project's default player graphics options.
+    pub fn graphics_defaults(&self) -> GraphicsOptions {
+        self.graphics_defaults
+    }
+
+    /// Replace the default graphics options, writing the bound file (if any) once.
+    pub fn set_graphics_defaults(&mut self, defaults: GraphicsOptions) -> Result<(), String> {
+        self.graphics_defaults = defaults;
+        self.save()
+    }
+
+    /// Set one default graphics option (`Graphics.SetDefaultOption`, the Build
+    /// Settings window: one op), writing the bound file (if any). The `live`
+    /// options follow it wherever the player hasn't chosen, so the editor previews
+    /// what a fresh install sees.
+    pub fn set_default_option(
+        &mut self,
+        option: GraphicsOption,
+        on: bool,
+        live: &mut GraphicsOptions,
+    ) -> Result<(), String> {
+        self.graphics_defaults.set(option, on);
+        live.rebase(self.graphics_defaults);
+        self.save()
+    }
+
     /// Write the settings into the bound project file, keeping the rest of it. A
     /// no-op when unbound.
     fn save(&self) -> Result<(), String> {
@@ -149,6 +174,7 @@ impl Application {
         }
         let mut file = ProjectFile::read(path)?.unwrap_or_default();
         file.build = self.build.clone();
+        file.graphics_options = self.graphics_defaults;
         file.write(path)
     }
 

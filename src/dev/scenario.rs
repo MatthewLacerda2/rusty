@@ -28,6 +28,7 @@ use std::rc::Rc;
 use super::harness::Harness;
 use crate::api;
 use crate::core::application::BuildSettings;
+use crate::core::settings::graphics_options::GraphicsOptions;
 
 /// Default enemy brain used by the default scene when running scenarios.
 const DEFAULT_BOT_SCRIPT: &str = crate::scene::default_scene::BOT_SCRIPT;
@@ -40,14 +41,16 @@ pub struct RunReport {
 
 /// Load and run `scenario_path` headlessly, writing results into `out_dir`, on the
 /// open project (`core::project`), playing `scene` (project-relative) under the
-/// project's `build` settings: a scenario play-tests the game being built.
+/// project's `build` settings and default `graphics` options: a scenario play-tests
+/// the game being built.
 pub fn run(
     scenario_path: &Path,
     out_dir: &Path,
     scene: &str,
     build: BuildSettings,
+    graphics: GraphicsOptions,
 ) -> Result<RunReport, String> {
-    let harness = Harness::in_user_workspace(out_dir, scene, build)?;
+    let harness = Harness::in_user_workspace(out_dir, scene, build, graphics)?;
     run_in(harness, scenario_path)
 }
 

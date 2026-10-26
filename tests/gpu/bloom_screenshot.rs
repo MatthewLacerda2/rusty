@@ -36,7 +36,7 @@ fn emissive_box(scene: &mut Scene, name: &str, pos: Vec3, size: Vec3, emissive: 
 
 /// A small, very bright box in front of a black wall that hides the sky, with
 /// bloom on or off.
-fn scene(bloom: bool) -> Scene {
+pub(crate) fn scene(bloom: bool) -> Scene {
     let mut scene = Scene::new();
     scene.ambient_intensity = 0.0;
     let wall = Vec3::new(40.0, 40.0, 0.2);

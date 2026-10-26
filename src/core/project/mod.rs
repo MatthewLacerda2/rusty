@@ -41,6 +41,7 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::core::application::BuildSettings;
+use crate::core::settings::graphics_options::GraphicsOptions;
 
 pub use agent::{CLAUDE_FILE, MCP_FILE};
 #[cfg(test)]
@@ -127,6 +128,8 @@ pub struct Opened {
     /// The project's build settings, as `project.rusty` holds them (the defaults
     /// when it has none): what the player and `play` boot (the startup scene).
     pub build: BuildSettings,
+    /// The project's default player graphics options (#1438), from the same file.
+    pub graphics_options: GraphicsOptions,
 }
 
 /// Open the project at `dir`: create its skeleton, check
@@ -199,12 +202,12 @@ pub(crate) fn prepare(dir: &Path, access: Access) -> Result<(Opened, Vec<String>
             (engine, file, Vec::new())
         }
     };
-    let build = file.build;
     Ok((
         Opened {
             root,
             engine,
-            build,
+            build: file.build,
+            graphics_options: file.graphics_options,
         },
         lines,
     ))

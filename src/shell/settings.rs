@@ -7,15 +7,17 @@
 //! surface + winit window. It owns three boundaries:
 //!
 //! * **Load + apply at startup** ([`load`]) — read the persisted `video` blob and
-//!   the `graphics.quality` tier from `Storage` (a boundary read, like the scene),
-//!   seed the shared cells, and apply them to the renderer/window so the app boots
+//!   the `graphics.quality` tier and the `graphics.options` player graphics options
+//!   (over the project's defaults, #1438) from `Storage` (a boundary read, like the
+//!   scene), seed the shared cells, and apply them to the renderer/window so the app boots
 //!   at the saved resolution / vsync / fullscreen / tier, and the audio maestro in
 //!   the saved speaker mode (#546).
 //! * **Apply per frame** ([`apply_pending`]) — read the cells a script (or the
 //!   editor) may have written this frame and reconfigure the surface (resolution /
 //!   present mode) + window (fullscreen) only for what actually changed.
 //! * **Persist at a boundary** ([`persist`]) — write the live settings back into
-//!   `Storage`; the existing `flush_storage` on Stop / quit pushes them to disk.
+//!   `Storage` at quit (the graphics settings at Stop too); the existing
+//!   `flush_storage` on Stop / quit pushes them to disk.
 //!
 //! Everything here is a ONE-WAY write into render-only state, never read by
 //! `FixedUpdate`, so the deterministic sim is unaffected (the shell and `render` are
@@ -24,23 +26,24 @@
 use super::Shell;
 use crate::app::GameWorld;
 use crate::audio::SpeakerMode;
-use crate::core::settings::quality::QualityPreset;
 use crate::core::settings::video::{VideoSettings, VIDEO_NAMESPACE};
-use crate::core::storage::Storage;
-
-/// `Storage` namespace + key the quality tier persists under (shares the
-/// `Graphics` post-FX category, key `quality`).
-const QUALITY_NAMESPACE: &str = "graphics";
-const QUALITY_KEY: &str = "quality";
+use crate::core::settings::GraphicsSettings;
 
 /// Read persisted settings from `Storage` and apply them to the renderer, window,
 /// and the shared script cells, so the app boots at the saved resolution / vsync /
-/// fullscreen / quality tier. Missing video settings fall back to `defaults` (the
-/// player's first launch honours the build's window mode); a missing tier keeps the
-/// default tier.
+/// fullscreen / quality tier / player graphics options. Missing video settings fall
+/// back to `defaults` (the player's first launch honours the build's window mode); a
+/// missing tier keeps the default tier, a missing option the project's default.
 pub fn load(shell: &mut Shell, game: &GameWorld, defaults: VideoSettings) {
-    let (video, quality) = read(&game.resources.storage.borrow(), defaults);
-    let speaker_mode = SpeakerMode::load(&game.resources.storage.borrow());
+    let storage = game.resources.storage.borrow();
+    let video = storage
+        .get_namespace(VIDEO_NAMESPACE)
+        .map(|blob| VideoSettings::from_json(&blob))
+        .unwrap_or(defaults);
+    let project = game.resources.application.borrow().graphics_defaults();
+    let graphics = GraphicsSettings::load(&storage, project);
+    let speaker_mode = SpeakerMode::load(&storage);
+    drop(storage);
     game.resources
         .audio
         .borrow_mut()
@@ -48,25 +51,18 @@ pub fn load(shell: &mut Shell, game: &GameWorld, defaults: VideoSettings) {
 
     // Seed the shared cells so the next script read sees the persisted values.
     *game.script_manager().video_cell().borrow_mut() = video;
-    *game.script_manager().quality_cell().borrow_mut() = quality;
+    *game.script_manager().graphics_cell().borrow_mut() = graphics;
 
     apply_video(shell, video, &VideoSettings::default());
-    shell.renderer.set_quality(quality);
+    apply_graphics(shell, game);
     shell.applied_video = video;
 }
 
-/// Read `(video, quality)` from the store; video falls back to `defaults`, the tier
-/// to its default.
-fn read(storage: &Storage, defaults: VideoSettings) -> (VideoSettings, QualityPreset) {
-    let video = storage
-        .get_namespace(VIDEO_NAMESPACE)
-        .map(|blob| VideoSettings::from_json(&blob))
-        .unwrap_or(defaults);
-    let quality = storage
-        .get(QUALITY_NAMESPACE, QUALITY_KEY)
-        .and_then(|v| v.as_str().and_then(QualityPreset::parse))
-        .unwrap_or_default();
-    (video, quality)
+/// Hand the shared graphics cell (tier + player options) to the renderer: the one
+/// place either frontend does it, every frame, and [`load`] at boot (#1438).
+pub fn apply_graphics(shell: &mut Shell, game: &GameWorld) {
+    let graphics = *game.script_manager().graphics_cell().borrow();
+    shell.renderer.apply_graphics(graphics);
 }
 
 /// Apply any video-settings change a script wrote into the shared cell this frame.
@@ -117,11 +113,12 @@ fn apply_video(shell: &mut Shell, next: VideoSettings, previous: &VideoSettings)
     }
 }
 
-/// Write the live settings back into `Storage`. The existing `flush_storage` (Stop
-/// / quit boundary) persists them to disk; this only updates the in-memory map.
-pub fn persist(shell: &Shell, game: &GameWorld) {
+/// Write the live settings back into `Storage` at quit. The graphics settings are
+/// also written at Stop (`Resources::store_graphics`); the existing `flush_storage`
+/// persists them all to disk; this only updates the in-memory map.
+pub fn persist(game: &GameWorld) {
+    game.resources.store_graphics();
     let video = *game.script_manager().video_cell().borrow();
-    let quality = shell.renderer.quality;
     let mut storage = game.resources.storage.borrow_mut();
     game.resources
         .audio
@@ -129,9 +126,4 @@ pub fn persist(shell: &Shell, game: &GameWorld) {
         .speaker_mode()
         .store(&mut storage);
     storage.set_namespace(VIDEO_NAMESPACE, video.to_json());
-    storage.set(
-        QUALITY_NAMESPACE,
-        QUALITY_KEY,
-        serde_json::Value::String(quality.name().to_string()),
-    );
 }

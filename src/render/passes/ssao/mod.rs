@@ -28,7 +28,10 @@ pub(crate) use targets::SsaoTargets;
 use glam::{Mat4, Vec3};
 
 use crate::components::{PostProcessingComponent, SsaoSettings};
-use crate::core::settings::quality::{QualityPreset, SsaoTier};
+use crate::core::settings::graphics_options::GraphicsOption;
+use crate::core::settings::quality::SsaoTier;
+use crate::core::settings::GraphicsSettings;
+use crate::render::postfx::params::effect_runs;
 use crate::scene::Camera;
 
 /// The occlusion and blur targets' format: one unorm channel is all AO needs.
@@ -67,16 +70,22 @@ pub(crate) struct SsaoPlan {
 }
 
 impl SsaoPlan {
-    /// The plan for a view whose base camera's volume is `volume` (#1434), at
-    /// `quality`: that volume with AO on, on a tier that runs it. `None` — nothing
+    /// The plan for a view whose base camera's volume is `volume` (#1434), under
+    /// `graphics`: that volume with AO on, on a tier that runs it and with the
+    /// player's `ssao` option allowing it (`effect_runs`, #1438). `None` — nothing
     /// runs — otherwise.
     pub(crate) fn for_volume(
         volume: Option<&PostProcessingComponent>,
-        quality: QualityPreset,
+        graphics: GraphicsSettings,
     ) -> Option<Self> {
-        let tier = quality.ssao()?;
         let settings = volume?.ssao;
-        (settings.active && settings.intensity > 0.0).then_some(Self { settings, tier })
+        let on = settings.active && settings.intensity > 0.0;
+        if !effect_runs(graphics, GraphicsOption::Ssao, on) {
+            return None;
+        }
+        // `effect_runs` decided the tier runs AO; the tier only supplies its cost.
+        let tier = graphics.quality.ssao()?;
+        Some(Self { settings, tier })
     }
 }
 

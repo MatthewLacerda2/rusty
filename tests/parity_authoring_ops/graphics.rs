@@ -6,6 +6,7 @@ use std::rc::Rc;
 use mlua::Lua;
 use rusty::components::{CameraComponent, PostProcessingComponent, Tonemap};
 use rusty::core::settings::quality::QualityPreset;
+use rusty::core::settings::GraphicsSettings;
 use rusty::scene::authoring::{
     rendering::camera as camera_ops, rendering::post_processing as vc_ops,
 };
@@ -91,11 +92,12 @@ fn graphics_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Error
     // scene and the ops against a second cloned scene, then compare the components.
     let (lua_scene, lua_id) = scene_with_volume_and_cam();
     let (op_scene, op_id) = scene_with_volume_and_cam();
-    let quality = Rc::new(RefCell::new(QualityPreset::High));
+    let quality = Rc::new(RefCell::new(GraphicsSettings::from(QualityPreset::High)));
+    let app = RefCell::default();
 
     let lua = Lua::new();
     lua.scope(|s| {
-        rusty::api::graphics::register(&lua, s, &lua_scene, &quality).unwrap();
+        rusty::api::graphics::register(&lua, s, &lua_scene, &quality, &app).unwrap();
         lua.load(GRAPHICS_SCRIPT).exec().unwrap();
         Ok(())
     })?;

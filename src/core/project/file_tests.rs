@@ -4,6 +4,7 @@
 use super::*;
 use crate::core::application::{WindowMode, DEFAULT_STARTUP_SCENE};
 use crate::core::project::{pin_engine, Verdict};
+use crate::core::settings::graphics_options::GraphicsOption;
 
 fn fresh(name: &str) -> std::path::PathBuf {
     let dir = crate::test_temp::dir().join("project_file").join(name);
@@ -45,6 +46,11 @@ fn every_build_field_roundtrips() {
             startup_scene: "assets/scenes/menu.scene".into(),
             product_name: "Neon".into(),
             window_mode: WindowMode::Fullscreen,
+        },
+        graphics_options: {
+            let mut options = GraphicsOptions::default();
+            options.set(GraphicsOption::MotionBlur, false);
+            options
         },
         ..ProjectFile::default()
     };

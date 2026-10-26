@@ -32,7 +32,7 @@ of two ways:
 This is the runtime half of the four-axis completeness mindset (see
 `docs/linting.md`): the completeness gate proves a component *exists* on all four
 axes; this catalog proves each setter's write is *observed*. Prefer a real test
-over a doc claim — `tests/graphics_api.rs`, `tests/time_scale.rs`, and the
+over a doc claim — `tests/graphics/api.rs`, `tests/time_scale.rs`, and the
 per-module unit tests (e.g. `api/light.rs`) are the pattern.
 
 ## Catalog
@@ -326,11 +326,14 @@ fields (incl. the spatial fields stored for #213) round-trip through `SceneData`
 | Setter | Status | Read-site |
 |---|---|---|
 | `SetBloomActive` / `SetBloomIntensity` / `SetBloomThreshold` | ✅ | renderer — `build_post_params` rebuilds the post-FX uniform each frame |
-| `SetExposure` / `SetContrast` / `SetSaturation` / `SetGamma` | ✅ | renderer — same post-FX uniform (`tests/graphics_api.rs`) |
+| `SetExposure` / `SetContrast` / `SetSaturation` / `SetGamma` | ✅ | renderer — same post-FX uniform (`tests/graphics/api.rs`) |
 | `SetTonemap` | ✅ | renderer — post-FX operator; unknown names ignored |
 | `SetSsrActive` / `SetSsrQuality` | ✅ | renderer — SSR pass (gated by High preset) |
 | `SetMotionBlurActive` / `SetMotionBlurSamples` | ✅ | renderer — `render/postfx_params.rs` motion-blur params (samples clamped 2..32) |
-| `SetQuality` | ✅ | renderer — platform layer hands the shared cell to `renderer.set_quality` |
+| `SetQuality` | ✅ | renderer — `shell::settings::apply_graphics` hands the shared cell to `Renderer::apply_graphics` each frame; persisted at Stop / quit |
+| `SetOption` | ✅ | renderer — the same cell; `postfx::params::effect_runs` ANDs it into bloom / SSR / SSAO / motion blur / FXAA (`render/postfx/params_tests.rs`); saved to `Storage` at Stop / quit |
+| `ResetOptions` | ✅ | renderer — the same cell, back to the project defaults, choices forgotten (`tests/graphics/options.rs`) |
+| `SetDefaultOption` | ✅ | round-trip — `project.rusty`'s `graphics_options` in the editor (`core/application_tests.rs`); renderer — the live options the player hasn't set follow it |
 
 ### `Video` — over the shared `VideoSettings`
 

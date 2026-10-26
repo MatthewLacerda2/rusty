@@ -25,7 +25,7 @@ fn scene_with(edit: impl FnOnce(&mut crate::components::PostProcessingComponent)
 fn plan(scene: &Scene, quality: QualityPreset) -> Option<SsaoPlan> {
     let main = crate::scene::camera::main_camera(scene);
     let volume = main.and_then(|id| crate::scene::camera::camera_volume(scene, id));
-    SsaoPlan::for_volume(volume.as_deref(), quality)
+    SsaoPlan::for_volume(volume.as_deref(), quality.into())
 }
 
 #[test]
@@ -67,4 +67,20 @@ fn the_uniform_carries_the_look_and_the_tier() {
     assert_eq!(u.camera_fwd, [0.0, 0.0, -1.0, 0.0], "forward is normalized");
     let round_trip = Mat4::from_cols_array(&u.inv_view_proj) * view_proj;
     assert!(round_trip.abs_diff_eq(Mat4::IDENTITY, 1e-4));
+}
+
+/// #1438: the player's `ssao` option off skips the pass even on High.
+#[test]
+fn the_player_option_off_skips_ssao() {
+    use crate::core::settings::graphics_options::{GraphicsOption, GraphicsOptions};
+    let scene = scene_with(|_| {});
+    let mut options = GraphicsOptions::default();
+    options.set(GraphicsOption::Ssao, false);
+    let graphics = crate::core::settings::GraphicsSettings {
+        quality: QualityPreset::High,
+        options,
+    };
+    let main = crate::scene::camera::main_camera(&scene);
+    let volume = main.and_then(|id| crate::scene::camera::camera_volume(&scene, id));
+    assert_eq!(SsaoPlan::for_volume(volume.as_deref(), graphics), None);
 }
