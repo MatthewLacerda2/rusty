@@ -1,4 +1,4 @@
-//! Stack order before distance (#1436): a `DepthOnly` gun camera's gun is in front
+//! Stack order before depth (#1436): a `DepthOnly` gun camera's gun is in front
 //! of the world even where the world is nearer to its own camera than the gun is to
 //! the gun camera, the player standing against a wall.
 

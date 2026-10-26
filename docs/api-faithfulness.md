@@ -330,8 +330,9 @@ fields (incl. the spatial fields stored for #213) round-trip through `SceneData`
 | `SetTonemap` | ✅ | renderer — post-FX operator; unknown names ignored |
 | `SetSsrActive` / `SetSsrQuality` | ✅ | renderer — SSR pass (gated by High preset) |
 | `SetMotionBlurActive` / `SetMotionBlurSamples` / `SetMotionBlurIntensity` / `SetMotionBlurMaxLength` | ✅ | renderer — `postfx::params::blur_params` builds `BlurParams` each frame (samples clamped 2..32, intensity 0..1, clamp 0..0.2; `render/postfx/motion_blur/params_tests.rs`) |
+| `SetDepthOfFieldMode` / `SetDepthOfField{GaussianStart,GaussianEnd,GaussianMaxRadius,FocusDistance,Aperture,FocalLength}` | ✅ | renderer — `postfx::params::dof_params` builds `DofParams` each frame (`render/postfx/depth_of_field/params_tests.rs`, the lavapipe tests beside it); clamps in the shared op (`tests/parity_authoring_ops/depth_of_field.rs`) |
 | `SetQuality` | ✅ | renderer — `shell::settings::apply_graphics` hands the shared cell to `Renderer::apply_graphics` each frame; persisted at Stop / quit |
-| `SetOption` | ✅ | renderer — the same cell; `postfx::params::effect_runs` ANDs it into bloom / SSR / SSAO / motion blur / FXAA (`render/postfx/params_tests.rs`); saved to `Storage` at Stop / quit |
+| `SetOption` | ✅ | renderer — the same cell; `postfx::params::effect_runs` ANDs it into bloom / SSR / SSAO / motion blur / depth of field / FXAA (`render/postfx/params_tests.rs`); saved to `Storage` at Stop / quit |
 | `ResetOptions` | ✅ | renderer — the same cell, back to the project defaults, choices forgotten (`tests/graphics/options.rs`) |
 | `SetDefaultOption` | ✅ | round-trip — `project.rusty`'s `graphics_options` in the editor (`core/application_tests.rs`); renderer — the live options the player hasn't set follow it |
 

@@ -475,6 +475,13 @@ scene.entities[].post_processing.chromatic_aberration.intensity: f32
 scene.entities[].post_processing.contrast: f32
 scene.entities[].post_processing.custom_effects: seq
 scene.entities[].post_processing.custom_effects[]: string
+scene.entities[].post_processing.depth_of_field.aperture: f32
+scene.entities[].post_processing.depth_of_field.focal_length: f32
+scene.entities[].post_processing.depth_of_field.focus_distance: f32
+scene.entities[].post_processing.depth_of_field.gaussian_end: f32
+scene.entities[].post_processing.depth_of_field.gaussian_max_radius: f32
+scene.entities[].post_processing.depth_of_field.gaussian_start: f32
+scene.entities[].post_processing.depth_of_field.mode: enum Off|Gaussian|Bokeh
 scene.entities[].post_processing.display_gamma: f32
 scene.entities[].post_processing.exposure: f32
 scene.entities[].post_processing.exposure_mode: enum Fixed|Automatic

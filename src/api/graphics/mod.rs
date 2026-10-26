@@ -7,7 +7,8 @@
 //!   (bloom, contrast/saturation/gamma, tonemap, SSR), registered here, its exposure
 //!   and auto-exposure (`exposure`, #1444),
 //!   its colour grade (white balance, Lift / Gamma / Gain, hue shift; `grading`)
-//!   and its lens effects (vignette, chromatic aberration, film grain; `lens`, #1439),
+//!   its lens effects (vignette, chromatic aberration, film grain; `lens`, #1439)
+//!   and its depth of field (`depth_of_field`, #1445),
 //!   plus its `CameraComponent` knobs (motion blur, FXAA) in the `camera` submodule.
 //!   The main camera is the screen stack's base (`scene::camera::main_camera`, Unity's
 //!   `Camera.main`, #1434), the camera whose components `build_post_params` packs into
@@ -32,6 +33,7 @@
 use std::cell::RefCell;
 
 mod camera;
+mod depth_of_field;
 mod effects;
 mod exposure;
 mod fog;
@@ -69,6 +71,7 @@ pub fn register<'scope>(
     register_tonemap(scope, &table, scene)?;
     grading::register_grading(scope, &table, scene)?;
     lens::register_lens(scope, &table, scene)?;
+    depth_of_field::register_depth_of_field(scope, &table, scene)?;
     register_ssr(scope, &table, scene)?;
     camera::register_motion_blur(scope, &table, scene)?;
     camera::register_fxaa(scope, &table, scene)?;

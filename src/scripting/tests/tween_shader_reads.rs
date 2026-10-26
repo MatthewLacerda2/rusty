@@ -1,7 +1,8 @@
 //! Shader-param tweens (#661) without `from`: the start value is read through the
 //! setter's getter (the override, else the material's, else the baked default),
 //! a UI tween stops once its graphic switches shader, and a wrong-arity target
-//! names the path it was given. Pins the survivors of #661's mutation run.
+//! names the path it was given. Pins the survivors of #661's mutation run. A
+//! volume's depth-of-field knob tweens the same way (#1445).
 
 use super::timers::{counted, rig, tick};
 use super::tween_shaders::{eval, Baked};
@@ -58,4 +59,33 @@ fn a_wrong_arity_target_names_the_path() {
             .unwrap_err();
         assert!(err.contains(&format!("`{path}` takes")), "{err}");
     }
+}
+
+#[test]
+fn a_graphics_tween_racks_the_depth_of_field_focus() {
+    let (mut m, id) = rig("tween_dof", &counted(""));
+    let vc = crate::scene::authoring::default_post_processing();
+    let camera = crate::components::CameraComponent::default();
+    let mut scene = m.cells.scene.borrow_mut();
+    scene.world.set_post_processing(id, Some(vc));
+    scene.world.set_camera(id, Some(camera));
+    drop(scene);
+    tick(&mut m, 1);
+    // A built-in knob (#1445), read from the volume: 10 m, Unity's default.
+    m.eval(&format!(
+        "Tween.To({id}, 'Graphics.depth_of_field.focus_distance', 2, 2 / 60)"
+    ))
+    .unwrap();
+    // Started between ticks: the next tick is its own (the one-tick rule).
+    tick(&mut m, 2);
+    let get = "Graphics.GetDepthOfFieldFocusDistance()";
+    assert_eq!(eval(&m, get), "6", "halfway from 10 to 2");
+    tick(&mut m, 1);
+    assert_eq!(eval(&m, get), "2");
+    let err = m
+        .eval(&format!(
+            "Tween.To({id}, 'Graphics.depth_of_field.mode', 1, 1)"
+        ))
+        .unwrap_err();
+    assert!(err.contains("tween property"), "{err}");
 }

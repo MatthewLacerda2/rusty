@@ -152,8 +152,8 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 // A view that runs motion blur draws its opaque solids through these instead: the
 // same surface colour at location 0, and at location 1 (the `Rgba16Float` velocity
 // target) how far the fragment moved on screen since last frame, in NDC, through its
-// own last-frame pose and this camera's last-frame view-projection, then how far it
-// lies from this camera and which camera of the stack drew it (#1436: motion blur's
+// own last-frame pose and this camera's last-frame view-projection, then its depth
+// along this camera's view axis and which camera of the stack drew it (#1436: motion blur's
 // depth order, kept per camera). Every field of
 // `VertexOutput`, then the two clip positions the velocity is the difference of.
 struct VelocityVertex {
@@ -196,8 +196,10 @@ fn fs_velocity(in: VelocityVertex) -> VelocityTargets {
     if (in.clip_prev.w > 1e-4) {
         velocity = in.clip_now.xy / in.clip_now.w - in.clip_prev.xy / in.clip_prev.w;
     }
-    let distance = length(in.world_position - camera.camera_pos);
-    return VelocityTargets(surface_color(v), vec4<f32>(velocity, distance, camera.stack.x));
+    // Depth along this camera's view axis, not the straight-line distance: a plane
+    // facing the camera has one depth, so depth of field focuses on a plane (#1445).
+    let depth = dot(camera.clusters.view_z.xyz, in.world_position) + camera.clusters.view_z.w;
+    return VelocityTargets(surface_color(v), vec4<f32>(velocity, depth, camera.stack.x));
 }
 
 // The lit surface colour `fs_main` writes: an authored surface variant splices its

@@ -6,7 +6,8 @@
 //! / gamma / tonemap, #1440's white balance / Lift Gamma Gain / hue shift, and
 //! #1441's Color Lookup), SSR (active / quality / temporal upsampling), shadows and SSAO
 //! (active / radius / intensity, #436), the authored post-FX list (#397) and its
-//! runtime params (#671), and the lens effects (#1439, in `lens`), including the
+//! runtime params (#671), the lens effects (#1439, in `lens`) and the depth of field
+//! (#1445, in `depth_of_field`), including the
 //! validation each write owns (the `≥ 0` clamps on bloom intensity/threshold, the
 //! `≥ 0.01` clamp on gamma).
 //!
@@ -33,6 +34,13 @@ pub use lens::{
     set_chromatic_aberration_active, set_chromatic_aberration_intensity, set_film_grain_active,
     set_film_grain_intensity, set_film_grain_response, set_vignette_active, set_vignette_center,
     set_vignette_color, set_vignette_intensity, set_vignette_smoothness,
+};
+
+mod depth_of_field;
+
+pub use depth_of_field::{
+    dof_knob, set_dof_aperture, set_dof_focal_length, set_dof_focus_distance, set_dof_gaussian_end,
+    set_dof_gaussian_max_radius, set_dof_gaussian_start, set_dof_mode, DofKnob, DOF_KNOBS,
 };
 
 /// Set the master post-processing `active` flag.

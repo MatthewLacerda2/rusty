@@ -41,6 +41,7 @@ pub fn draw_post_processing(
             }
             draw_bloom(ui, world, id, &vc, is_dirty);
             draw_color_correction(ui, world, id, &vc, is_dirty);
+            super::depth_of_field::draw_depth_of_field(ui, world, id, &vc, is_dirty);
             draw_ssr(ui, world, id, &vc, is_dirty);
             super::lighting::draw_shadows(ui, world, id, &vc, is_dirty);
             super::lighting::draw_ssao(ui, world, id, &vc, is_dirty);

@@ -35,9 +35,10 @@ fn gpu_a_cube_moving_past_a_still_camera_writes_velocity_on_its_pixels_only() {
     // The sky behind it, and the camera, did not move.
     assert!(moved.at(1, 1).length() < 1e-4, "{}", moved.at(1, 1));
     assert!(moved.at(W - 2, H - 2).length() < 1e-4);
-    // Beside the motion, each pixel's distance from the camera (#1436).
+    // Beside the motion, each pixel's depth along the camera's view axis (#1436,
+    // #1445): the camera looks down -Z from the origin.
     let (x, y) = pixel(project(&cam, face));
-    assert!((moved.distance(x, y) - face.length()).abs() < 0.05);
+    assert!((moved.distance(x, y) - -face.z).abs() < 0.02);
     assert_eq!(moved.distance(1, 1), SKY_DISTANCE as f32, "the sky is far");
 }
 
@@ -125,7 +126,7 @@ fn gpu_a_surface_behind_the_camera_last_frame_writes_no_motion() {
         "no streak from behind the camera: {got}"
     );
     assert!(
-        (ahead.distance(x, y) - side.length()).abs() < 0.1,
+        (ahead.distance(x, y) - -side.z).abs() < 0.05,
         "the slab drew"
     );
 }

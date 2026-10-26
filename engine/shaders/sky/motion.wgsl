@@ -12,12 +12,12 @@ struct SkyTargets {
     @location(1) velocity: vec4<f32>,
 };
 
-// The sky's view distance in the velocity target (#1436): a half float's largest
+// The sky's view depth in the velocity target (#1436): a half float's largest
 // value, as far as anything gets. Mirrors `render::motion::SKY_DISTANCE`.
 const SKY_DISTANCE: f32 = 65504.0;
 
 // What a sky pass writes for `color` seen along `dir`: its colour, and its motion
-// beside its distance, the sky's.
+// beside its depth, the sky's.
 fn sky_targets(camera: CameraUniforms, color: vec4<f32>, dir: vec3<f32>) -> SkyTargets {
     return SkyTargets(color, vec4<f32>(sky_velocity(camera, dir), SKY_DISTANCE, 0.0));
 }

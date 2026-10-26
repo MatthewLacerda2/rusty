@@ -170,18 +170,23 @@ impl PostFx {
         Self::fullscreen(encoder, composite, &[&bg], ctx.output);
     }
 
-    /// The scene the composite reads: this frame's motion-blurred image when the
-    /// blur ran (#1436), else the HDR scene itself.
+    /// The scene the composite reads: motion-blurred (#1436), else focused.
     fn scene_color(&self) -> &wgpu::TextureView {
-        scene_of(self.blur.as_ref(), &self.scene_hdr)
+        scene_of(self.blur.as_ref(), self.dof.as_ref(), &self.scene_hdr)
+    }
+
+    /// The scene motion blur reads: this frame's depth of field when it ran (#1445),
+    /// else the HDR scene itself. Depth of field runs first, Unity's order.
+    pub(crate) fn focused_color(&self) -> &wgpu::TextureView {
+        scene_of(None, self.dof.as_ref(), &self.scene_hdr)
     }
 
     /// The exposure meter and [`PostFx::scene_color`] at once, so the meter reads
-    /// the image after motion blur (#1444, #1436) without a borrow clash.
+    /// the image after depth of field and motion blur (#1444) without a borrow clash.
     pub(crate) fn exposure_and_scene(
         &mut self,
     ) -> (&mut super::exposure::ExposureMeter, &wgpu::TextureView) {
-        let scene = scene_of(self.blur.as_ref(), &self.scene_hdr);
+        let scene = scene_of(self.blur.as_ref(), self.dof.as_ref(), &self.scene_hdr);
         (&mut self.exposure, scene)
     }
 
@@ -284,10 +289,12 @@ pub(super) type Timed<'a> = (
     Option<wgpu::RenderPassTimestampWrites<'a>>,
 );
 
-/// The motion-blurred image when `blur` ran this frame, else the HDR scene.
+/// The motion-blurred image when `blur` ran, else the focused one when `dof` did.
 fn scene_of<'a>(
     blur: Option<&'a super::motion_blur::BlurTargets>,
+    dof: Option<&'a super::depth_of_field::DofTargets>,
     scene_hdr: &'a PfxTarget,
 ) -> &'a wgpu::TextureView {
-    blur.map_or(&scene_hdr.view, |b| &b.blurred.view)
+    let focused = dof.map_or(&scene_hdr.view, |d| &d.focused.view);
+    blur.map_or(focused, |b| &b.blurred.view)
 }

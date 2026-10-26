@@ -14,7 +14,8 @@ use crate::render::gpu::shaders::ShaderRegistry;
 use crate::render::ibl::reflection_probes::ProbeArray;
 use crate::render::passes::outline::OutlinePasses;
 use crate::render::postfx::{
-    exposure::ExposurePasses, grade::GradeBake, motion_blur::MotionBlurPasses, HDR_FORMAT,
+    depth_of_field::DofPasses, exposure::ExposurePasses, grade::GradeBake,
+    motion_blur::MotionBlurPasses, HDR_FORMAT,
 };
 use crate::render::setup::textures::{create_textures, Textures};
 use crate::render::{ibl::skybox, passes::shadows, passes::ssao};
@@ -84,6 +85,7 @@ pub(crate) struct GpuResources {
     pub grade_bake: GradeBake,
     pub exposure_passes: ExposurePasses,
     pub motion_blur: MotionBlurPasses,
+    pub depth_of_field: DofPasses,
     pub quality: QualityPreset,
 }
 
@@ -142,6 +144,7 @@ impl GpuResources {
             grade_bake: GradeBake::new(device, &mut registry),
             exposure_passes: ExposurePasses::new(device, &mut registry),
             motion_blur: MotionBlurPasses::new(device, &mut registry),
+            depth_of_field: DofPasses::new(device, &mut registry),
             quality: QualityPreset::default(),
         }
     }
@@ -158,6 +161,7 @@ fn create_billboard_passes(
     registry: &mut ShaderRegistry,
 ) -> BillboardPasses {
     use crate::render::passes::particles::{ParticleRenderer, SharedLayouts};
+    use crate::render::passes::ribbons::RibbonRenderer;
     let scene_depth_layout = bind_layouts::create_scene_depth_layout(device);
     let layouts = SharedLayouts {
         texture: texture_layout,
@@ -166,12 +170,7 @@ fn create_billboard_passes(
     };
     BillboardPasses {
         particle_renderer: ParticleRenderer::new(device, layouts, registry),
-        ribbon_renderer: crate::render::passes::ribbons::RibbonRenderer::new(
-            device,
-            queue,
-            texture_layout,
-            registry,
-        ),
+        ribbon_renderer: RibbonRenderer::new(device, queue, texture_layout, registry),
         scene_depth_layout,
     }
 }

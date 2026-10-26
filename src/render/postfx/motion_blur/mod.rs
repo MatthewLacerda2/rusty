@@ -7,11 +7,11 @@
 //! tile is two short loops; **NeighborMax** spreads each tile's to its 3×3
 //! neighbourhood (so the blur reaches past a moving silhouette onto what is behind
 //! it); the **gather** blurs every pixel along its neighbourhood's streak, weighting
-//! each tap by its distance from the camera and by the tap's own streak. Its output,
+//! each tap by its depth from the camera and by the tap's own streak. Its output,
 //! the blurred HDR scene, is what bloom and the composite read
 //! ([`super::PostFx::scene_color`]). A viewmodel's gun writes ~0 velocity and lies
 //! nearer than the world, so the world's streaks never smear over it and it stays
-//! sharp. The distance comes from the velocity target (each camera writes its own),
+//! sharp. The depth comes from the velocity target (each camera writes its own),
 //! not the depth buffer, which a `DepthOnly` overlay has cleared by now.
 //!
 //! **One path.** Camera motion is already in the velocity target (the sky carries
@@ -26,6 +26,7 @@ mod params;
 
 pub(crate) use params::BlurParams;
 
+use crate::render::gpu::bind_entry as entry;
 use crate::render::gpu::fullscreen::Fullscreen;
 use crate::render::gpu::layout_entries::{texture_entry, uniform_entry};
 use crate::render::gpu::pipelines::LazyPipeline;
@@ -189,7 +190,7 @@ impl PostFx {
                 layout: &passes.layout,
                 entries: &[
                     entry(0, targets.params.as_entire_binding()),
-                    entry(1, wgpu::BindingResource::TextureView(&self.scene_hdr.view)),
+                    entry(1, wgpu::BindingResource::TextureView(self.focused_color())),
                     entry(2, wgpu::BindingResource::TextureView(velocity)),
                     entry(3, wgpu::BindingResource::TextureView(input)),
                 ],
@@ -212,10 +213,6 @@ impl PostFx {
         }
         queue.submit(std::iter::once(encoder.finish()));
     }
-}
-
-fn entry(binding: u32, resource: wgpu::BindingResource<'_>) -> wgpu::BindGroupEntry<'_> {
-    wgpu::BindGroupEntry { binding, resource }
 }
 
 #[cfg(test)]

@@ -49,6 +49,8 @@ crate::core::named_enum! {
         ChromaticAberration = "chromatic_aberration",
         /// The volume's film grain (#1439).
         FilmGrain = "film_grain",
+        /// The volume's depth of field (#1445; off on the Low tier).
+        DepthOfField = "depth_of_field",
     }
 }
 

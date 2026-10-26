@@ -77,7 +77,7 @@ mod tests {
     use crate::shadergen::compose;
     use crate::shadergen::validate::validate;
 
-    const SHIPPED: [&str; 12] = [
+    const SHIPPED: [&str; 13] = [
         "shader.wgsl",
         "outline/mask.wgsl",
         "outline/edge.wgsl",
@@ -89,6 +89,7 @@ mod tests {
         "postfx/lut_bake.wgsl",
         "postfx/exposure.wgsl",
         "postfx/motion_blur.wgsl",
+        "postfx/depth_of_field.wgsl",
         "ui.wgsl",
     ];
 

@@ -1,6 +1,6 @@
 //! What the motion-vector GPU tests (#1435) share: a renderer on a tier that runs
 //! motion blur, a scene whose base camera has it on, and the velocity target read
-//! back as NDC vectors beside each pixel's view distance (#1436).
+//! back as NDC vectors beside each pixel's view depth (#1436).
 
 use glam::{Quat, Vec2, Vec3, Vec3Swizzles};
 
@@ -53,7 +53,7 @@ pub(crate) fn eye(yaw: f32) -> Camera {
 }
 
 /// One velocity target, row-major from the top-left: each texel's NDC motion (xy)
-/// and view distance (z).
+/// and view depth (z).
 pub(crate) struct Velocity(Vec<Vec3>);
 
 impl Velocity {
