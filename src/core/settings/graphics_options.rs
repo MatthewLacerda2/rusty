@@ -44,6 +44,8 @@ crate::core::named_enum! {
         FilmGrain = "film_grain",
         /// FXAA anti-aliasing.
         Fxaa = "fxaa",
+        /// The volume's lens flare (#1443; off on the Low tier, and only while bloom runs).
+        LensFlare = "lens_flare",
         /// Camera motion blur (also off on the Low tier).
         MotionBlur = "motion_blur",
         /// Screen-space ambient occlusion (off on the Low tier).

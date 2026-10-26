@@ -29,6 +29,7 @@ pub mod exposure;
 pub mod grading;
 mod knob;
 pub mod lens;
+pub mod lens_flare;
 pub mod ssr;
 pub mod volume;
 
@@ -51,6 +52,7 @@ pub const EFFECTS: &[Effect] = &[
     dummy::EFFECT,
     exposure::EFFECT,
     film_grain::EFFECT,
+    lens_flare::EFFECT,
     lift_gamma_gain::EFFECT,
     ssr::EFFECT,
     tonemapping::EFFECT,
