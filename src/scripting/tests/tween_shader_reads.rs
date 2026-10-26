@@ -89,3 +89,25 @@ fn a_graphics_tween_racks_the_depth_of_field_focus() {
         .unwrap_err();
     assert!(err.contains("tween property"), "{err}");
 }
+
+#[test]
+fn every_effect_knob_tweens_by_its_path() {
+    let (mut m, id) = rig("tween_knobs", &counted(""));
+    let vc = crate::scene::authoring::default_post_processing();
+    let mut scene = m.cells.scene.borrow_mut();
+    scene.world.set_post_processing(id, Some(vc));
+    scene.world.set_camera(id, Some(Default::default()));
+    drop(scene);
+    tick(&mut m, 1);
+    // The lens strengths (#1439's lost tweens) and a nested knob (#1467).
+    m.eval(&format!(
+        "Tween.To({id}, 'Graphics.vignette.intensity', 0.9, 2 / 60) \
+         Tween.To({id}, 'Graphics.exposure.automatic.compensation', 2, 2 / 60)"
+    ))
+    .unwrap();
+    tick(&mut m, 3);
+    let scene = m.cells.scene.borrow();
+    let vc = scene.world.post_processing(id).unwrap();
+    assert_eq!(vc.vignette.intensity, 0.9);
+    assert_eq!(vc.exposure.automatic.compensation, 2.0);
+}

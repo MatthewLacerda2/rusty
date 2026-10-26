@@ -2,21 +2,18 @@
 //! `Transform`, `Mesh`, `Material`, `Light`, `Camera`, `PostProcessing` and
 //! `LODGroup`.
 
-use super::super::table::{group, inspect, op, part, ro, unheld, with, Group};
+use super::super::table::{group, inspect, op, part, ro, with, Group};
 use super::super::value::Mask;
 use super::NO_OP;
 use crate::components::rendering::camera::RenderTarget;
 use crate::components::{
-    Bloom, CameraComponent, ChromaticAberration, ColorAdjustments, ColorLookup, CustomEffects,
-    DepthOfField, Exposure, FilmGrain, LiftGammaGain, LightComponent, LodGroupComponent, LodLevel,
-    MaterialComponent, MeshComponent, PostProcessingComponent, ShadowSettings, SsaoSettings, Ssr,
-    Tonemapping, TransformComponent, Vignette, Wheel, WhiteBalance,
+    CameraComponent, LightComponent, LodGroupComponent, LodLevel, MaterialComponent, MeshComponent,
+    PostProcessingComponent, TransformComponent,
 };
 use crate::scene::authoring::{
     rendering::camera, rendering::light, rendering::lod_group as lod,
     rendering::post_processing as vc,
 };
-use crate::shadergen::post_params::PostChain;
 
 const CONES: Group<LightComponent> =
     group!(|l, inner_cone: f32, outer_cone: f32| light::set_cones(l, inner_cone, outer_cone));
@@ -63,90 +60,7 @@ inspect! {
         op!("projection", camera::set_projection),
         with!("target_texture", |c, v: Option<RenderTarget>| set_target(c, v)),
     ];
-    PostProcessingComponent => post_processing, post_processing_mut, &[
-        op!("active", vc::set_active),
-        with!("bloom", |c, v: Bloom| {
-            vc::set_bloom_active(c, v.active);
-            vc::set_bloom_intensity(c, v.intensity);
-            vc::set_bloom_threshold(c, v.threshold);
-        }),
-        with!("chromatic_aberration", |c, v: ChromaticAberration| {
-            vc::set_chromatic_aberration_active(c, v.active);
-            vc::set_chromatic_aberration_intensity(c, v.intensity);
-        }),
-        with!("color_adjustments", |c, v: ColorAdjustments| {
-            vc::set_contrast(c, v.contrast);
-            vc::set_saturation(c, v.saturation);
-            vc::set_hue_shift(c, v.hue_shift);
-        }),
-        with!("color_lookup", |c, v: ColorLookup| {
-            vc::set_lut(c, v.lut);
-            vc::set_lut_contribution(c, v.contribution);
-        }),
-        unheld!(
-            "its op reads every effect's baked sidecar and warns on an unbaked one",
-            with!("custom_effects", |c, v: CustomEffects| {
-                vc::set_custom_effects(c, v.names)?;
-                let chain = PostChain::load(&c.custom_effects.names);
-                for (name, value) in v.params {
-                    vc::set_post_param_with(c, &chain, &name, value)?;
-                }
-            })
-        ),
-        with!("depth_of_field", |c, v: DepthOfField| {
-            vc::set_dof_mode(c, v.mode);
-            for knob in vc::DOF_KNOBS {
-                (knob.set)(c, (knob.get)(&v));
-            }
-        }),
-        with!("exposure", |c, v: Exposure| {
-            vc::set_exposure(c, v.fixed_ev);
-            vc::set_exposure_mode(c, v.mode);
-            let a = v.automatic;
-            vc::set_exposure_limits(c, a.min_ev, a.max_ev);
-            vc::set_exposure_compensation(c, a.compensation);
-            vc::set_adaptation_speed(c, a.speed_up, a.speed_down);
-            vc::set_histogram_percent(c, a.low_percent, a.high_percent);
-        }),
-        with!("film_grain", |c, v: FilmGrain| {
-            vc::set_film_grain_active(c, v.active);
-            vc::set_film_grain_intensity(c, v.intensity);
-            vc::set_film_grain_response(c, v.response);
-        }),
-        with!("lift_gamma_gain", |c, v: LiftGammaGain| {
-            for w in Wheel::ALL {
-                vc::set_wheel(c, w, v.wheel(w).color, v.wheel(w).offset);
-            }
-        }),
-        with!("ssr", |c, v: Ssr| {
-            vc::set_ssr_active(c, v.active);
-            vc::set_ssr_quality(c, v.quality);
-            vc::set_ssr_temporal_upsampling(c, v.temporal_upsampling);
-        }),
-        with!("tonemapping", |c, v: Tonemapping| {
-            vc::set_tonemap(c, v.mode);
-            vc::set_gamma(c, v.display_gamma);
-        }),
-        with!("vignette", |c, v: Vignette| {
-            vc::set_vignette_active(c, v.active);
-            vc::set_vignette_intensity(c, v.intensity);
-            vc::set_vignette_smoothness(c, v.smoothness);
-            vc::set_vignette_color(c, v.color);
-            vc::set_vignette_center(c, v.center);
-        }),
-        with!("white_balance", |c, v: WhiteBalance| {
-            vc::set_white_balance(c, v.temperature, v.tint);
-        }),
-        with!("shadows", |c, v: ShadowSettings| {
-            vc::set_shadow_cascades(c, v.cascades);
-            vc::set_shadow_distance(c, v.distance);
-        }),
-        with!("ssao", |c, v: SsaoSettings| {
-            vc::set_ssao_active(c, v.active);
-            vc::set_ssao_radius(c, v.radius);
-            vc::set_ssao_intensity(c, v.intensity);
-        }),
-    ];
+    PostProcessingComponent => post_processing, post_processing_mut, &vc::FIELDS;
     LodGroupComponent => lod_group, lod_group_mut, &[
         with!("levels", |g, v: Vec<LodLevel>| set_levels(g, v)),
         op!("size", lod::set_size),

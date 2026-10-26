@@ -91,6 +91,6 @@ fn commit(world: &mut crate::ecs::World, id: u32, text: String) -> bool {
     let Some(mut c) = world.post_processing_mut(id) else {
         return false;
     };
-    vc_ops::set_lut(&mut c, Some(text));
+    vc_ops::grading::color_lookup::set_lut(&mut c, Some(text));
     true
 }

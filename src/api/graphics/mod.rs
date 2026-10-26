@@ -38,6 +38,7 @@ mod effects;
 mod exposure;
 mod fog;
 mod grading;
+mod knobs;
 mod lens;
 mod options;
 mod shadows;
@@ -98,7 +99,7 @@ fn register_bloom<'scope>(
         table,
         "SetBloomActive",
         scope.create_function(|_, active: bool| {
-            with_vc_mut(scene, |e| vc_ops::set_bloom_active(e, active));
+            with_vc_mut(scene, |e| vc_ops::bloom::set_active(e, active));
             Ok(())
         }),
     )?;
@@ -112,7 +113,7 @@ fn register_bloom<'scope>(
         table,
         "SetBloomIntensity",
         scope.create_function(|_, v: f32| {
-            with_vc_mut(scene, |e| vc_ops::set_bloom_intensity(e, v));
+            with_vc_mut(scene, |e| vc_ops::bloom::set_intensity(e, v));
             Ok(())
         }),
     )?;
@@ -126,7 +127,7 @@ fn register_bloom<'scope>(
         table,
         "SetBloomThreshold",
         scope.create_function(|_, v: f32| {
-            with_vc_mut(scene, |e| vc_ops::set_bloom_threshold(e, v));
+            with_vc_mut(scene, |e| vc_ops::bloom::set_threshold(e, v));
             Ok(())
         }),
     )?;
@@ -147,7 +148,9 @@ fn register_contrast<'scope>(
         table,
         "SetContrast",
         scope.create_function(|_, v: f32| {
-            with_vc_mut(scene, |e| vc_ops::set_contrast(e, v));
+            with_vc_mut(scene, |e| {
+                vc_ops::grading::color_adjustments::set_contrast(e, v)
+            });
             Ok(())
         }),
     )?;
@@ -170,7 +173,9 @@ fn register_saturation_gamma<'scope>(
         table,
         "SetSaturation",
         scope.create_function(|_, v: f32| {
-            with_vc_mut(scene, |e| vc_ops::set_saturation(e, v));
+            with_vc_mut(scene, |e| {
+                vc_ops::grading::color_adjustments::set_saturation(e, v)
+            });
             Ok(())
         }),
     )?;
@@ -186,7 +191,9 @@ fn register_saturation_gamma<'scope>(
         table,
         "SetGamma",
         scope.create_function(|_, v: f32| {
-            with_vc_mut(scene, |e| vc_ops::set_gamma(e, v));
+            with_vc_mut(scene, |e| {
+                vc_ops::grading::tonemapping::set_display_gamma(e, v)
+            });
             Ok(())
         }),
     )?;
@@ -210,7 +217,7 @@ fn register_tonemap<'scope>(
         "SetTonemap",
         scope.create_function(|_, name: String| {
             if let Some(tm) = Tonemap::parse(&name) {
-                with_vc_mut(scene, |e| vc_ops::set_tonemap(e, tm));
+                with_vc_mut(scene, |e| vc_ops::grading::tonemapping::set_mode(e, tm));
             }
             Ok(())
         }),
@@ -237,7 +244,7 @@ fn register_ssr<'scope>(
         table,
         "SetSsrActive",
         scope.create_function(|_, active: bool| {
-            with_vc_mut(scene, |e| vc_ops::set_ssr_active(e, active));
+            with_vc_mut(scene, |e| vc_ops::ssr::set_active(e, active));
             Ok(())
         }),
     )?;
@@ -251,7 +258,7 @@ fn register_ssr<'scope>(
         table,
         "SetSsrQuality",
         scope.create_function(|_, q: String| {
-            with_vc_mut(scene, |e| vc_ops::set_ssr_quality(e, q.clone()));
+            with_vc_mut(scene, |e| vc_ops::ssr::set_quality(e, q.clone()));
             Ok(())
         }),
     )?;

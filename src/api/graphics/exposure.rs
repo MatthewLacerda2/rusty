@@ -24,7 +24,7 @@ pub(super) fn register_exposure<'scope>(
         table,
         "SetExposure",
         scope.create_function(|_, v: f32| {
-            with_vc_mut(scene, |e| vc_ops::set_exposure(e, v));
+            with_vc_mut(scene, |e| vc_ops::exposure::set_fixed_ev(e, v));
             Ok(())
         }),
     )?;
@@ -38,7 +38,7 @@ pub(super) fn register_exposure<'scope>(
         "SetExposureMode",
         scope.create_function(|_, name: String| {
             if let Some(mode) = ExposureMode::parse(&name) {
-                with_vc_mut(scene, |e| vc_ops::set_exposure_mode(e, mode));
+                with_vc_mut(scene, |e| vc_ops::exposure::set_mode(e, mode));
             }
             Ok(())
         }),
@@ -66,7 +66,7 @@ fn register_auto_exposure<'scope>(
         table,
         "SetExposureLimits",
         scope.create_function(|_, (min, max): (f32, f32)| {
-            with_vc_mut(scene, |e| vc_ops::set_exposure_limits(e, min, max));
+            with_vc_mut(scene, |e| vc_ops::exposure::set_limits(e, min, max));
             Ok(())
         }),
     )?;
@@ -82,7 +82,7 @@ fn register_auto_exposure<'scope>(
         table,
         "SetExposureCompensation",
         scope.create_function(|_, ev: f32| {
-            with_vc_mut(scene, |e| vc_ops::set_exposure_compensation(e, ev));
+            with_vc_mut(scene, |e| vc_ops::exposure::set_compensation(e, ev));
             Ok(())
         }),
     )?;
@@ -104,7 +104,9 @@ fn register_adaptation<'scope>(
         table,
         "SetAdaptationSpeed",
         scope.create_function(|_, (up, down): (f32, f32)| {
-            with_vc_mut(scene, |e| vc_ops::set_adaptation_speed(e, up, down));
+            with_vc_mut(scene, |e| {
+                vc_ops::exposure::set_adaptation_speed(e, up, down)
+            });
             Ok(())
         }),
     )?;
@@ -120,7 +122,9 @@ fn register_adaptation<'scope>(
         table,
         "SetHistogramPercent",
         scope.create_function(|_, (low, high): (f32, f32)| {
-            with_vc_mut(scene, |e| vc_ops::set_histogram_percent(e, low, high));
+            with_vc_mut(scene, |e| {
+                vc_ops::exposure::set_histogram_percent(e, low, high)
+            });
             Ok(())
         }),
     )?;

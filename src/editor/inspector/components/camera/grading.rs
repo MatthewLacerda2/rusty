@@ -41,7 +41,7 @@ pub(super) fn draw_grading(
         "  Hue Shift:",
         hue,
         -180.0..=180.0,
-        vc_ops::set_hue_shift,
+        vc_ops::grading::color_adjustments::set_hue_shift,
     );
 }
 
@@ -66,7 +66,12 @@ fn draw_wheels(
             .inner;
         if changed {
             if let Some(mut c) = world.post_processing_mut(id) {
-                vc_ops::set_wheel(&mut c, which, wheel.color, wheel.offset);
+                vc_ops::grading::lift_gamma_gain::set_wheel(
+                    &mut c,
+                    which,
+                    wheel.color,
+                    wheel.offset,
+                );
             }
             *is_dirty = true;
         }
@@ -85,16 +90,16 @@ pub(super) fn draw_color_lookup(
     ui.label("  Color Lookup");
     super::lut_field::draw(ui, world, id, vc, is_dirty);
     let k = vc.color_lookup.contribution;
-    let set = vc_ops::set_lut_contribution;
+    let set = vc_ops::grading::color_lookup::set_contribution;
     *is_dirty |= slider_row(ui, (world, id), "    Contribution:", k, 0.0..=1.0, set);
 }
 
 fn set_temperature(c: &mut PostProcessingComponent, temperature: f32) {
     let tint = c.white_balance.tint;
-    vc_ops::set_white_balance(c, temperature, tint);
+    vc_ops::grading::white_balance::set(c, temperature, tint);
 }
 
 fn set_tint(c: &mut PostProcessingComponent, tint: f32) {
     let temperature = c.white_balance.temperature;
-    vc_ops::set_white_balance(c, temperature, tint);
+    vc_ops::grading::white_balance::set(c, temperature, tint);
 }

@@ -79,12 +79,12 @@ fn gpu_white_balance_lift_and_gain_move_the_image_as_named() {
     let mut vc = volume(Tonemap::None);
     let neutral = c.run(&row, 0.0, &GradeParams::from_volume(Some(&vc)));
 
-    ops::set_white_balance(&mut vc, 50.0, 0.0);
+    ops::grading::white_balance::set(&mut vc, 50.0, 0.0);
     let warm = grey(&c.run(&row, 0.0, &GradeParams::from_volume(Some(&vc))));
     assert!(warm.x > warm.z + 5.0, "+50 warms the grey card: {warm}");
 
     let mut vc = volume(Tonemap::None);
-    ops::set_wheel(&mut vc, Wheel::Lift, [1.0; 3], 0.1);
+    ops::grading::lift_gamma_gain::set_wheel(&mut vc, Wheel::Lift, [1.0; 3], 0.1);
     let lifted = c.run(&row, 0.0, &GradeParams::from_volume(Some(&vc)));
     assert!(
         lifted[0][1] > neutral[0][1] + 40,
@@ -92,7 +92,7 @@ fn gpu_white_balance_lift_and_gain_move_the_image_as_named() {
     );
 
     let mut vc = volume(Tonemap::None);
-    ops::set_wheel(&mut vc, Wheel::Gain, [1.0; 3], -0.5);
+    ops::grading::lift_gamma_gain::set_wheel(&mut vc, Wheel::Gain, [1.0; 3], -0.5);
     let gained = c.run(&row, 0.0, &GradeParams::from_volume(Some(&vc)));
     let (bright, dark) = (f32::from(neutral[9][1]), f32::from(gained[9][1]));
     // Half the gain halves the linear whites: 0.6 → 0.3.
@@ -104,7 +104,7 @@ fn gpu_white_balance_lift_and_gain_move_the_image_as_named() {
 
     let mut vc = volume(Tonemap::None);
     row[1] = [0.5, 0.05, 0.05];
-    ops::set_hue_shift(&mut vc, 120.0);
+    ops::grading::color_adjustments::set_hue_shift(&mut vc, 120.0);
     let shifted = grey(&c.run(&row, 0.0, &GradeParams::from_volume(Some(&vc))));
     assert!(
         shifted.y > shifted.x,
@@ -133,7 +133,10 @@ fn gpu_a_still_grade_is_baked_once_and_a_changed_knob_bakes_again() {
     };
     assert_eq!(frame(&mut r, &scene), 1, "a new view bakes its table");
     assert_eq!(frame(&mut r, &scene), 0, "a still grade does not");
-    ops::set_hue_shift(&mut scene.world.post_processing_mut(id).unwrap(), 30.0);
+    ops::grading::color_adjustments::set_hue_shift(
+        &mut scene.world.post_processing_mut(id).unwrap(),
+        30.0,
+    );
     assert_eq!(frame(&mut r, &scene), 1, "a changed knob bakes it again");
     assert_eq!(frame(&mut r, &scene), 0);
 }

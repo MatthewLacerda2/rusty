@@ -39,7 +39,7 @@ fn draw_aberration(
         (&mut *world, id),
         "  Chromatic Aberration",
         ca.active,
-        vc_ops::set_chromatic_aberration_active,
+        vc_ops::lens::chromatic_aberration::set_active,
         is_dirty,
     );
     if ca.active {
@@ -49,7 +49,7 @@ fn draw_aberration(
             "    Intensity:",
             ca.intensity,
             0.0..=1.0,
-            vc_ops::set_chromatic_aberration_intensity,
+            vc_ops::lens::chromatic_aberration::set_intensity,
         );
     }
 }
@@ -68,7 +68,7 @@ fn draw_vignette(
         (&mut *world, id),
         "  Vignette",
         v.active,
-        vc_ops::set_vignette_active,
+        vc_ops::lens::vignette::set_active,
         is_dirty,
     );
     if v.active {
@@ -78,7 +78,7 @@ fn draw_vignette(
             "    Intensity:",
             v.intensity,
             0.0..=1.0,
-            vc_ops::set_vignette_intensity,
+            vc_ops::lens::vignette::set_intensity,
         );
         *is_dirty |= slider_row(
             ui,
@@ -86,7 +86,7 @@ fn draw_vignette(
             "    Smoothness:",
             v.smoothness,
             Vignette::MIN_SMOOTHNESS..=1.0,
-            vc_ops::set_vignette_smoothness,
+            vc_ops::lens::vignette::set_smoothness,
         );
         draw_vignette_look(ui, world, id, v, is_dirty);
     }
@@ -106,7 +106,7 @@ fn draw_grain(
         (&mut *world, id),
         "  Film Grain",
         grain.active,
-        vc_ops::set_film_grain_active,
+        vc_ops::lens::film_grain::set_active,
         is_dirty,
     );
     if grain.active {
@@ -116,7 +116,7 @@ fn draw_grain(
             "    Intensity:",
             grain.intensity,
             0.0..=1.0,
-            vc_ops::set_film_grain_intensity,
+            vc_ops::lens::film_grain::set_intensity,
         );
         *is_dirty |= slider_row(
             ui,
@@ -124,7 +124,7 @@ fn draw_grain(
             "    Response:",
             grain.response,
             0.0..=1.0,
-            vc_ops::set_film_grain_response,
+            vc_ops::lens::film_grain::set_response,
         );
     }
 }
@@ -163,7 +163,7 @@ fn draw_vignette_look(
         .inner;
     if changed {
         if let Some(mut c) = world.post_processing_mut(id) {
-            vc_ops::set_vignette_color(&mut c, v.color);
+            vc_ops::lens::vignette::set_color(&mut c, v.color);
         }
         *is_dirty = true;
     }
@@ -182,9 +182,9 @@ fn draw_vignette_look(
 // One axis of the centre, the other kept.
 
 fn set_center_x(vc: &mut PostProcessingComponent, x: f32) {
-    vc_ops::set_vignette_center(vc, [x, vc.vignette.center[1]]);
+    vc_ops::lens::vignette::set_center(vc, [x, vc.vignette.center[1]]);
 }
 
 fn set_center_y(vc: &mut PostProcessingComponent, y: f32) {
-    vc_ops::set_vignette_center(vc, [vc.vignette.center[0], y]);
+    vc_ops::lens::vignette::set_center(vc, [vc.vignette.center[0], y]);
 }

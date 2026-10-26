@@ -25,19 +25,19 @@ struct Knob<T> {
 const FLAGS: &[Knob<bool>] = &[
     Knob {
         name: "VignetteActive",
-        set: vc_ops::set_vignette_active,
+        set: vc_ops::lens::vignette::set_active,
         get: |vc| vc.vignette.active,
         default: false,
     },
     Knob {
         name: "ChromaticAberrationActive",
-        set: vc_ops::set_chromatic_aberration_active,
+        set: vc_ops::lens::chromatic_aberration::set_active,
         get: |vc| vc.chromatic_aberration.active,
         default: false,
     },
     Knob {
         name: "FilmGrainActive",
-        set: vc_ops::set_film_grain_active,
+        set: vc_ops::lens::film_grain::set_active,
         get: |vc| vc.film_grain.active,
         default: false,
     },
@@ -47,31 +47,31 @@ const FLAGS: &[Knob<bool>] = &[
 const NUMBERS: &[Knob<f32>] = &[
     Knob {
         name: "VignetteIntensity",
-        set: vc_ops::set_vignette_intensity,
+        set: vc_ops::lens::vignette::set_intensity,
         get: |vc| vc.vignette.intensity,
         default: VIGNETTE.intensity,
     },
     Knob {
         name: "VignetteSmoothness",
-        set: vc_ops::set_vignette_smoothness,
+        set: vc_ops::lens::vignette::set_smoothness,
         get: |vc| vc.vignette.smoothness,
         default: VIGNETTE.smoothness,
     },
     Knob {
         name: "ChromaticAberrationIntensity",
-        set: vc_ops::set_chromatic_aberration_intensity,
+        set: vc_ops::lens::chromatic_aberration::set_intensity,
         get: |vc| vc.chromatic_aberration.intensity,
         default: ChromaticAberration::DEFAULT.intensity,
     },
     Knob {
         name: "FilmGrainIntensity",
-        set: vc_ops::set_film_grain_intensity,
+        set: vc_ops::lens::film_grain::set_intensity,
         get: |vc| vc.film_grain.intensity,
         default: FilmGrain::DEFAULT.intensity,
     },
     Knob {
         name: "FilmGrainResponse",
-        set: vc_ops::set_film_grain_response,
+        set: vc_ops::lens::film_grain::set_response,
         get: |vc| vc.film_grain.response,
         default: FilmGrain::DEFAULT.response,
     },
@@ -131,7 +131,7 @@ fn register_vignette_vectors<'scope>(
         table,
         "SetVignetteColor",
         scope.create_function(|_, (r, g, b): (f32, f32, f32)| {
-            with_vc_mut(scene, |e| vc_ops::set_vignette_color(e, [r, g, b]));
+            with_vc_mut(scene, |e| vc_ops::lens::vignette::set_color(e, [r, g, b]));
             Ok(())
         }),
     )?;
@@ -147,7 +147,7 @@ fn register_vignette_vectors<'scope>(
         table,
         "SetVignetteCenter",
         scope.create_function(|_, (x, y): (f32, f32)| {
-            with_vc_mut(scene, |e| vc_ops::set_vignette_center(e, [x, y]));
+            with_vc_mut(scene, |e| vc_ops::lens::vignette::set_center(e, [x, y]));
             Ok(())
         }),
     )?;

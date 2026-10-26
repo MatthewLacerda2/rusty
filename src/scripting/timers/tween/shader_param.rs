@@ -10,8 +10,9 @@
 //! and `Graphics.SetPostParam`, so a name is checked and a value coerced in one
 //! place.
 //!
-//! A volume's built-in depth-of-field knobs tween the same way (#1445):
-//! `"Graphics.depth_of_field.focus_distance"`, one number, through the knob's op.
+//! A volume's built-in effect knobs tween the same way (#1445, #1467):
+//! `"Graphics.<effect>.<knob>"` (`"Graphics.depth_of_field.focus_distance"`,
+//! `"Graphics.bloom.intensity"`), one number, through the knob's op.
 
 use glam::Vec4;
 
@@ -44,9 +45,9 @@ enum Source {
     Ui { shader: String, layout: ParamLayout },
     /// The effects of the entity's post-processing volume (#671).
     Post(PostChain),
-    /// A built-in knob of the volume, `depth_of_field.<knob>` (#1445): one number,
-    /// through the knob's op, as `Graphics.Set<knob>` writes it.
-    Knob(&'static vc_ops::DofKnob),
+    /// A built-in knob of the volume, `<effect>.<knob>` (#1445, #1467): one number,
+    /// through the knob's op, as the Inspector and `Graphics.*` write it.
+    Knob(&'static vc_ops::Knob),
 }
 
 impl ShaderParam {
@@ -101,9 +102,9 @@ impl ShaderParam {
                 ui_shader::param(&slot, layout, &self.name)
             }
             Source::Post(chain) => {
-                vc_ops::post_param_with(&*w.post_processing(id)?, chain, &self.name)
+                vc_ops::custom_effects::param_with(&*w.post_processing(id)?, chain, &self.name)
             }
-            Source::Knob(knob) => Ok(vec![(knob.get)(&w.post_processing(id)?.depth_of_field)]),
+            Source::Knob(knob) => Ok(vec![(knob.get)(&*w.post_processing(id)?)]),
         };
         value.ok().map(|v| lanes(&v))
     }
@@ -128,7 +129,7 @@ impl ShaderParam {
                 written
             }
             Source::Post(chain) => scene.world.post_processing_mut(id).is_some_and(|mut vc| {
-                vc_ops::set_post_param_with(&mut vc, chain, &self.name, value).is_ok()
+                vc_ops::custom_effects::set_param_with(&mut vc, chain, &self.name, value).is_ok()
             }),
             Source::Knob(knob) => scene
                 .world
@@ -162,7 +163,7 @@ fn post_source(scene: &Scene, id: u32, name: &str) -> Result<Source, String> {
         .world
         .post_processing(id)
         .ok_or_else(|| format!("entity {id} has no post-processing volume"))?;
-    if let Some(knob) = vc_ops::dof_knob(name) {
+    if let Some(knob) = vc_ops::knob(name) {
         return Ok(Source::Knob(knob));
     }
     Ok(Source::Post(PostChain::load(&vc.custom_effects.names)))

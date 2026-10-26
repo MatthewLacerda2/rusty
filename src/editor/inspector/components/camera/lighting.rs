@@ -27,7 +27,7 @@ pub(super) fn draw_shadows(
             .changed()
         {
             if let Some(mut c) = world.post_processing_mut(id) {
-                vc_ops::set_shadow_cascades(&mut c, cascades);
+                vc_ops::lighting::set_shadow_cascades(&mut c, cascades);
             }
             *is_dirty = true;
         }
@@ -38,7 +38,7 @@ pub(super) fn draw_shadows(
         let drag = egui::DragValue::new(&mut distance).speed(1.0).suffix(" m");
         if ui.add(drag).changed() {
             if let Some(mut c) = world.post_processing_mut(id) {
-                vc_ops::set_shadow_distance(&mut c, distance);
+                vc_ops::lighting::set_shadow_distance(&mut c, distance);
             }
             *is_dirty = true;
         }
@@ -58,7 +58,7 @@ pub(super) fn draw_ssao(
     let mut active = vc.ssao.active;
     if ui.checkbox(&mut active, "  SSAO Active").changed() {
         if let Some(mut c) = world.post_processing_mut(id) {
-            vc_ops::set_ssao_active(&mut c, active);
+            vc_ops::lighting::set_ssao_active(&mut c, active);
         }
         *is_dirty = true;
     }
@@ -71,7 +71,7 @@ pub(super) fn draw_ssao(
             "    Radius:",
             r,
             0.05..=3.0,
-            vc_ops::set_ssao_radius,
+            vc_ops::lighting::set_ssao_radius,
         );
         *is_dirty |= slider_row(
             ui,
@@ -79,7 +79,7 @@ pub(super) fn draw_ssao(
             "    Intensity:",
             i,
             0.0..=max,
-            vc_ops::set_ssao_intensity,
+            vc_ops::lighting::set_ssao_intensity,
         );
     }
 }

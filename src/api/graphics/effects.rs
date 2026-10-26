@@ -26,7 +26,9 @@ pub(super) fn register_custom_effects<'scope>(
         "SetCustomEffects",
         scope.create_function(|_, names: Vec<String>| {
             let mut result = Ok(());
-            with_vc_mut(scene, |e| result = vc_ops::set_custom_effects(e, names));
+            with_vc_mut(scene, |e| {
+                result = vc_ops::custom_effects::set_names(e, names)
+            });
             result.map_err(mlua::Error::RuntimeError)
         }),
     )?;
@@ -54,7 +56,9 @@ pub(super) fn register_post_params<'scope>(
         scope.create_function(|_, (name, value): (String, Value)| {
             let value = floats(value)?;
             let mut result = Err("SetPostParam: no active post-processing volume".to_owned());
-            with_vc_mut(scene, |e| result = vc_ops::set_post_param(e, &name, value));
+            with_vc_mut(scene, |e| {
+                result = vc_ops::custom_effects::set_param(e, &name, value)
+            });
             result.map_err(mlua::Error::RuntimeError)
         }),
     )?;
@@ -62,7 +66,7 @@ pub(super) fn register_post_params<'scope>(
         table,
         "GetPostParam",
         scope.create_function(|lua, name: String| {
-            let v = with_vc(scene, |vc| vc_ops::post_param(vc, &name))
+            let v = with_vc(scene, |vc| vc_ops::custom_effects::param(vc, &name))
                 .unwrap_or_else(|| catalog_default(&name))
                 .map_err(mlua::Error::RuntimeError)?;
             match v[..] {

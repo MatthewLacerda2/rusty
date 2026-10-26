@@ -12,7 +12,7 @@ use crate::scene::authoring::rendering::post_processing as ops;
 fn wheel(tonemap: Tonemap, which: Wheel, color: [f32; 3], offset: f32) -> GradeParams {
     let mut vc = default_post_processing();
     vc.tonemapping.mode = tonemap;
-    ops::set_wheel(&mut vc, which, color, offset);
+    ops::grading::lift_gamma_gain::set_wheel(&mut vc, which, color, offset);
     GradeParams::from_volume(Some(&vc))
 }
 

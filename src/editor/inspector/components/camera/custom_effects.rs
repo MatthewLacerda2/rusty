@@ -38,7 +38,7 @@ pub(super) fn draw_custom_effects(
     if edited {
         let result = world
             .post_processing_mut(id)
-            .map(|mut c| vc_ops::set_custom_effects(&mut c, names));
+            .map(|mut c| vc_ops::custom_effects::set_names(&mut c, names));
         match result {
             Some(Err(e)) => log::warn!("[Editor] {e}"),
             Some(Ok(())) => *is_dirty = true,

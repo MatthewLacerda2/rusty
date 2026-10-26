@@ -67,7 +67,7 @@ fn draw_bloom(
     let mut bloom_active = vc.bloom.active;
     if ui.checkbox(&mut bloom_active, "  Bloom Active").changed() {
         if let Some(mut c) = world.post_processing_mut(id) {
-            vc_ops::set_bloom_active(&mut c, bloom_active);
+            vc_ops::bloom::set_active(&mut c, bloom_active);
         }
         *is_dirty = true;
     }
@@ -80,7 +80,7 @@ fn draw_bloom(
                 .changed()
             {
                 if let Some(mut c) = world.post_processing_mut(id) {
-                    vc_ops::set_bloom_intensity(&mut c, intensity);
+                    vc_ops::bloom::set_intensity(&mut c, intensity);
                 }
                 *is_dirty = true;
             }
@@ -93,7 +93,7 @@ fn draw_bloom(
                 .changed()
             {
                 if let Some(mut c) = world.post_processing_mut(id) {
-                    vc_ops::set_bloom_threshold(&mut c, threshold);
+                    vc_ops::bloom::set_threshold(&mut c, threshold);
                 }
                 *is_dirty = true;
             }
@@ -138,11 +138,11 @@ fn draw_color_correction(
     ui.add_space(3.0);
     ui.label("Color Correction");
     super::exposure::draw_exposure(ui, world, id, vc, is_dirty);
-    *is_dirty |= slider_row(ui, (&mut *world, id), "  Contrast:", vc.color_adjustments.contrast, 0.0..=2.0, vc_ops::set_contrast);
-    *is_dirty |= slider_row(ui, (&mut *world, id), "  Saturation:", vc.color_adjustments.saturation, 0.0..=2.0, vc_ops::set_saturation);
+    *is_dirty |= slider_row(ui, (&mut *world, id), "  Contrast:", vc.color_adjustments.contrast, 0.0..=2.0, vc_ops::grading::color_adjustments::set_contrast);
+    *is_dirty |= slider_row(ui, (&mut *world, id), "  Saturation:", vc.color_adjustments.saturation, 0.0..=2.0, vc_ops::grading::color_adjustments::set_saturation);
     super::grading::draw_grading(ui, world, id, vc, is_dirty);
     draw_tonemap(ui, world, id, vc, is_dirty);
-    *is_dirty |= slider_row(ui, (&mut *world, id), "  Display Gamma:", vc.tonemapping.display_gamma, 0.5..=2.0, vc_ops::set_gamma);
+    *is_dirty |= slider_row(ui, (&mut *world, id), "  Display Gamma:", vc.tonemapping.display_gamma, 0.5..=2.0, vc_ops::grading::tonemapping::set_display_gamma);
     super::grading::draw_color_lookup(ui, world, id, vc, is_dirty);
 }
 
@@ -166,7 +166,7 @@ fn draw_tonemap(
                         .changed()
                     {
                         if let Some(mut c) = world.post_processing_mut(id) {
-                            vc_ops::set_tonemap(&mut c, tonemap);
+                            vc_ops::grading::tonemapping::set_mode(&mut c, tonemap);
                         }
                         *is_dirty = true;
                     }
@@ -188,7 +188,7 @@ fn draw_ssr(
     let mut ssr_active = vc.ssr.active;
     if ui.checkbox(&mut ssr_active, "  SSR Active").changed() {
         if let Some(mut c) = world.post_processing_mut(id) {
-            vc_ops::set_ssr_active(&mut c, ssr_active);
+            vc_ops::ssr::set_active(&mut c, ssr_active);
         }
         *is_dirty = true;
     }
@@ -205,7 +205,7 @@ fn draw_ssr(
                             .changed()
                         {
                             if let Some(mut c) = world.post_processing_mut(id) {
-                                vc_ops::set_ssr_quality(&mut c, quality.clone());
+                                vc_ops::ssr::set_quality(&mut c, quality.clone());
                             }
                             *is_dirty = true;
                         }
@@ -218,7 +218,7 @@ fn draw_ssr(
             .changed()
         {
             if let Some(mut c) = world.post_processing_mut(id) {
-                vc_ops::set_ssr_temporal_upsampling(&mut c, upsampling);
+                vc_ops::ssr::set_temporal_upsampling(&mut c, upsampling);
             }
             *is_dirty = true;
         }

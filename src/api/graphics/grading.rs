@@ -23,7 +23,9 @@ pub(super) fn register_grading<'scope>(
         table,
         "SetWhiteBalance",
         scope.create_function(|_, (temperature, tint): (f32, f32)| {
-            with_vc_mut(scene, |e| vc_ops::set_white_balance(e, temperature, tint));
+            with_vc_mut(scene, |e| {
+                vc_ops::grading::white_balance::set(e, temperature, tint)
+            });
             Ok(())
         }),
     )?;
@@ -42,7 +44,9 @@ pub(super) fn register_grading<'scope>(
         table,
         "SetHueShift",
         scope.create_function(|_, degrees: f32| {
-            with_vc_mut(scene, |e| vc_ops::set_hue_shift(e, degrees));
+            with_vc_mut(scene, |e| {
+                vc_ops::grading::color_adjustments::set_hue_shift(e, degrees)
+            });
             Ok(())
         }),
     )?;
@@ -67,7 +71,7 @@ fn register_color_lookup<'scope>(
         table,
         "SetColorLookup",
         scope.create_function(|_, path: Option<String>| {
-            with_vc_mut(scene, |e| vc_ops::set_lut(e, path));
+            with_vc_mut(scene, |e| vc_ops::grading::color_lookup::set_lut(e, path));
             Ok(())
         }),
     )?;
@@ -82,7 +86,9 @@ fn register_color_lookup<'scope>(
         table,
         "SetColorLookupContribution",
         scope.create_function(|_, value: f32| {
-            with_vc_mut(scene, |e| vc_ops::set_lut_contribution(e, value));
+            with_vc_mut(scene, |e| {
+                vc_ops::grading::color_lookup::set_contribution(e, value)
+            });
             Ok(())
         }),
     )?;
@@ -107,7 +113,9 @@ fn register_wheel<'scope>(
         table,
         &format!("Set{name}Wheel"),
         scope.create_function(move |_, (r, g, b, offset): (f32, f32, f32, f32)| {
-            with_vc_mut(scene, |e| vc_ops::set_wheel(e, which, [r, g, b], offset));
+            with_vc_mut(scene, |e| {
+                vc_ops::grading::lift_gamma_gain::set_wheel(e, which, [r, g, b], offset)
+            });
             Ok(())
         }),
     )?;

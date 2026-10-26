@@ -25,6 +25,21 @@ pub fn decode<T: DeserializeOwned>(json: Value) -> Result<T, String> {
     }
 }
 
+/// `written` laid over `held`: an object's keys replace `held`'s one by one, deeply,
+/// so a partial table changes only what it names; anything else replaces it whole.
+pub fn over(held: Value, written: Value) -> Value {
+    match (held, written) {
+        (Value::Object(mut base), Value::Object(top)) => {
+            for (key, value) in top {
+                let below = base.remove(&key).unwrap_or(Value::Null);
+                base.insert(key, over(below, value));
+            }
+            Value::Object(base)
+        }
+        (_, written) => written,
+    }
+}
+
 /// Replace every empty object in `value` with an empty list; whether any was.
 fn empty_tables_as_lists(value: &mut Value) -> bool {
     match value {

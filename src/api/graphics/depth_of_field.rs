@@ -28,7 +28,7 @@ pub(super) fn register_depth_of_field<'scope>(
                     DofMode::names()
                 ))
             })?;
-            with_vc_mut(scene, |e| vc_ops::set_dof_mode(e, mode));
+            with_vc_mut(scene, |e| vc_ops::depth_of_field::set_mode(e, mode));
             Ok(())
         }),
     )?;
@@ -40,25 +40,7 @@ pub(super) fn register_depth_of_field<'scope>(
             Ok(mode.name().to_string())
         }),
     )?;
-    for knob in vc_ops::DOF_KNOBS {
-        put(
-            table,
-            &format!("Set{}", knob.api),
-            scope.create_function(move |_, value: f32| {
-                with_vc_mut(scene, |e| (knob.set)(e, value));
-                Ok(())
-            }),
-        )?;
-        put(
-            table,
-            &format!("Get{}", knob.api),
-            scope.create_function(move |_, ()| {
-                let dof = with_vc(scene, |vc| vc.depth_of_field).unwrap_or_default();
-                Ok((knob.get)(&dof))
-            }),
-        )?;
-    }
-    Ok(())
+    super::knobs::register(scope, table, scene, vc_ops::depth_of_field::EFFECT.knobs)
 }
 
 #[cfg(test)]
@@ -69,12 +51,12 @@ mod tests {
     #[test]
     fn every_knob_reads_the_field_its_op_writes() {
         let mut vc = crate::scene::authoring::default_post_processing();
-        for (i, knob) in vc_ops::DOF_KNOBS.iter().enumerate() {
+        for (i, knob) in vc_ops::depth_of_field::EFFECT.knobs.iter().enumerate() {
             // Values inside every knob's range, distinct per knob, rising so the
             // Gaussian end never sits below its start.
             let value = 1.0 + i as f32 * 0.1;
             (knob.set)(&mut vc, value);
-            assert_eq!((knob.get)(&vc.depth_of_field), value, "{}", knob.field);
+            assert_eq!((knob.get)(&vc), value, "{}", knob.field);
         }
         assert_ne!(vc.depth_of_field, DepthOfField::default());
     }

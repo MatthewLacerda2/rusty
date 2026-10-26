@@ -25,7 +25,7 @@ fn drawn(ev: f32) -> (bool, f32) {
             "Compensation:",
             ev,
             -r / 2.0..=r / 2.0,
-            vc_ops::set_exposure_compensation,
+            vc_ops::exposure::set_compensation,
         );
     });
     out.textures_delta.clear();
