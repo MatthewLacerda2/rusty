@@ -57,7 +57,9 @@ impl Chain {
             },
             self.pfx.scene_hdr.texture.size(),
         );
-        self.pfx.grade.prepare(device, queue, grade);
+        self.pfx
+            .grade
+            .prepare((device, queue), &self.r.grade_bake, grade);
         let depth = texture(device, DEPTH_FORMAT, wgpu::TextureUsages::empty());
         let sky = texture(device, HDR_FORMAT, wgpu::TextureUsages::empty());
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor::default());
@@ -119,15 +121,4 @@ fn f16(v: f32) -> u16 {
     let exp = ((bits >> 23) & 0xff) as i32 - 127 + 15;
     assert!((1..31).contains(&exp), "{v} is outside half range");
     ((exp as u32) << 10 | ((bits >> 13) & 0x3ff)) as u16
-}
-
-/// Linear `c` encoded as the sRGB target does, in 8-bit levels.
-pub(super) fn srgb8(c: f32) -> f32 {
-    let c = c.clamp(0.0, 1.0);
-    let e = if c <= 0.003_130_8 {
-        12.92 * c
-    } else {
-        1.055 * c.powf(1.0 / 2.4) - 0.055
-    };
-    e * 255.0
 }

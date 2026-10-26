@@ -39,7 +39,7 @@ impl PostFx {
         let (full_size, bloom_size, scene_hdr, bloom_a, bloom_b, ldr) =
             Self::create_targets(device, width, height, bloom_divisor, output_format);
         let custom = CustomChain::new(device, &io_layout, output_format, full_size);
-        let grade = GradeLut::new(device, registry);
+        let grade = GradeLut::new(device);
 
         Self {
             bright_pipeline: pipelines.bright,

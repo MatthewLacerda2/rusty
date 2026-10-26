@@ -101,7 +101,7 @@ fn draw_bloom(
 
 /// A labelled slider row that routes its write through a shared vc op (#287).
 /// Returns whether the value changed; `cx` is the (world, entity-id) pair.
-fn slider_row(
+pub(super) fn slider_row(
     ui: &mut egui::Ui,
     cx: (&mut crate::ecs::World, u32),
     label: &str,

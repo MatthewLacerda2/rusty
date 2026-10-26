@@ -1,6 +1,7 @@
 // engine/shaders/postfx/lut_bake.wgsl — bakes the grading LUT (#1440): one
 // invocation per texel of the 32³ table, each storing `grade` of the HDR colour the
-// texel's LogC code decodes to. Runs only when a grading knob or the tonemap
+// texel's log code decodes to (`grade::decode`, log2(1 + 64x) scaled so black and
+// display white fall on texels). Runs only when a grading knob or the tonemap
 // changes (`GradeLut::prepare`).
 
 #import postfx::grade::{Grade, LUT_SIZE, grade_texel}

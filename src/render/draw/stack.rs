@@ -101,10 +101,8 @@ impl Renderer {
             true => GradeParams::from_volume(ctx.stack.post.volume),
             false => GradeParams::NEUTRAL,
         };
-        let baked = view
-            .post_fx
-            .grade
-            .prepare(&self.device, &self.queue, &grade);
+        let gpu = (&self.device, &self.queue);
+        let baked = view.post_fx.grade.prepare(gpu, &self.grade_bake, &grade);
         self.frame_counters.grade_lut_bakes += u32::from(baked);
 
         let (mut post_params, bloom_enabled) = build_post_params(

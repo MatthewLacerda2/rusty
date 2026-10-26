@@ -20,7 +20,7 @@ use crate::components::{
     PostProcessingComponent, ShadowSettings, SsaoSettings, Tonemap, Wheel, WhiteBalance,
 };
 use crate::scene::authoring::sanitize::{
-    at_least, clamped, finite_array_or, finite_or, finite_values, non_negative,
+    at_least, clamped, finite_array_or, finite_or, finite_values, non_negative, unit,
 };
 use crate::shadergen::post_params::PostChain;
 
@@ -80,7 +80,7 @@ pub fn set_white_balance(vc: &mut PostProcessingComponent, temperature: f32, tin
 /// offset, clamped to `-1..=1`.
 pub fn set_wheel(vc: &mut PostProcessingComponent, which: Wheel, color: [f32; 3], offset: f32) {
     let wheel = vc.lift_gamma_gain.wheel_mut(which);
-    wheel.color = finite_array_or(color, wheel.color).map(|c| c.clamp(0.0, 1.0));
+    wheel.color = finite_array_or(color, wheel.color).map(unit);
     wheel.offset = clamped(offset, -1.0, 1.0);
 }
 

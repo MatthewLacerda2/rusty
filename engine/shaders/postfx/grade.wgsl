@@ -54,6 +54,7 @@ fn lut_coord(c: vec3<f32>) -> vec3<f32> {
     return t * ((LUT_SIZE - 1.0) / LUT_SIZE) + 0.5 / LUT_SIZE;
 }
 
+// Rec. 709 luminance. Mirrors `core::color::luminance`, the weights Unity uses.
 fn luminance(c: vec3<f32>) -> f32 {
     return dot(c, vec3<f32>(0.2126, 0.7152, 0.0722));
 }
@@ -116,8 +117,12 @@ fn grade(c_in: vec3<f32>, g: Grade) -> vec3<f32> {
     }
     c = c * g.gain.xyz + g.lift.xyz;
     c = sign(c) * pow(abs(c), g.inv_gamma.xyz);
+    // Into what the scene target holds (0 to f16's largest): a negative lift would
+    // reach the tonemappers, which turn it grey (ACES) or tinted (Reinhard), and a
+    // gamma near 0 makes highlights infinite, which they turn into NaN.
+    c = clamp(c, vec3<f32>(0.0), vec3<f32>(65504.0));
     if (g.hue.x != 0.0) {
-        let hsv = rgb_to_hsv(max(c, vec3<f32>(0.0)));
+        let hsv = rgb_to_hsv(c);
         c = hsv_to_rgb(vec3<f32>(fract(hsv.x + g.hue.x), hsv.yz));
     }
     c = tonemap(c, u32(g.tone.x));

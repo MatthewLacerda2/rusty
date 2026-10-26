@@ -4,9 +4,10 @@
 
 use glam::Vec3;
 
-use super::gpu_fixture::{chain, srgb8, W};
+use super::gpu_fixture::{chain, W};
 use super::GradeParams;
 use crate::components::{PostProcessingComponent, Tonemap, Wheel};
+use crate::core::color::linear_to_srgb;
 use crate::render::{RenderView, OFFSCREEN_FORMAT};
 use crate::scene::authoring::default_post_processing;
 use crate::scene::authoring::rendering::post_processing as ops;
@@ -53,7 +54,9 @@ fn gpu_neutral_knobs_through_the_lut_match_the_analytic_tonemap() {
             let worst = ramp
                 .iter()
                 .zip(&out)
-                .map(|(&x, px)| (srgb8(analytic(x, ev, tonemap)) - f32::from(px[0])).abs())
+                .map(|(&x, px)| {
+                    (255.0 * linear_to_srgb(analytic(x, ev, tonemap)) - f32::from(px[0])).abs()
+                })
                 .fold(0.0, f32::max);
             eprintln!("[grade] {tonemap:?} at {ev} EV: worst {worst:.2} levels");
             // Black and display white sit on texels: only the curve between rounds.
@@ -95,7 +98,7 @@ fn gpu_white_balance_lift_and_gain_move_the_image_as_named() {
     let (bright, dark) = (f32::from(neutral[9][1]), f32::from(gained[9][1]));
     // Half the gain halves the linear whites: 0.6 → 0.3.
     assert!(
-        (dark - srgb8(0.3)).abs() <= 2.0,
+        (dark - 255.0 * linear_to_srgb(0.3)).abs() <= 2.0,
         "gain scales the whites: {bright} → {dark}"
     );
     assert_eq!((neutral[0][1], gained[0][1]), (0, 0), "black stays black");

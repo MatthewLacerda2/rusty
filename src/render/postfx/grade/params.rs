@@ -5,7 +5,8 @@
 
 use glam::{Mat3, Vec3};
 
-use crate::components::{LiftGammaGain, PostProcessingComponent, Tonemap, WhiteBalance};
+use crate::components::{LiftGammaGain, PostProcessingComponent, Tonemap, Wheel, WhiteBalance};
+use crate::core::color::luminance;
 
 /// CPU mirror of `Grade` in `postfx/grade.wgsl`. A later input (a user LUT, #1441)
 /// joins as a new field here and in the shader; the dirty check compares the bytes,
@@ -44,19 +45,28 @@ impl GradeParams {
         let Some(vc) = volume else {
             return Self::NEUTRAL;
         };
-        let wb = white_balance(vc.white_balance);
-        let (lift, inv_gamma, gain) = lift_gamma_gain(&vc.lift_gamma_gain);
-        let on = if vc.white_balance.is_neutral() {
-            0.0
-        } else {
-            1.0
+        // A loaded file bypasses the ops' clamps (serde writes the fields directly),
+        // so the knobs are held to the ops' ranges again here.
+        let r = WhiteBalance::RANGE;
+        let balance = WhiteBalance {
+            temperature: bounded(vc.white_balance.temperature, r),
+            tint: bounded(vc.white_balance.tint, r),
         };
+        let mut lgg = vc.lift_gamma_gain;
+        for which in Wheel::ALL {
+            let w = lgg.wheel_mut(which);
+            w.color = w.color.map(|c| bounded(c - 0.5, 0.5) + 0.5);
+            w.offset = bounded(w.offset, 1.0);
+        }
+        let wb = white_balance(balance);
+        let (lift, inv_gamma, gain) = lift_gamma_gain(&lgg);
+        let on = if balance.is_neutral() { 0.0 } else { 1.0 };
         Self {
             white_balance: wb.extend(on).to_array(),
             lift: lift.extend(0.0).to_array(),
             inv_gamma: inv_gamma.extend(0.0).to_array(),
             gain: gain.extend(0.0).to_array(),
-            hue: [vc.hue_shift / 360.0, 0.0, 0.0, 0.0],
+            hue: [bounded(vc.hue_shift, 180.0) / 360.0, 0.0, 0.0, 0.0],
             tone: [
                 vc.tonemap.to_index() as f32,
                 vc.contrast,
@@ -67,9 +77,13 @@ impl GradeParams {
     }
 }
 
-/// Rec. 709 luminance, Unity's `ColorUtils.Luminance` weights.
-fn luminance(c: Vec3) -> f32 {
-    c.dot(Vec3::new(0.212_672_9, 0.715_152_2, 0.072_175))
+/// `v` clamped to `-reach..=reach`, an infinity saturating; `0` (neutral) when NaN.
+fn bounded(v: f32, reach: f32) -> f32 {
+    if v.is_nan() {
+        0.0
+    } else {
+        v.clamp(-reach, reach)
+    }
 }
 
 /// Unity's `ColorUtils.ColorBalanceToLMSCoeffs`: the per-channel LMS scale that moves
@@ -100,7 +114,8 @@ fn xy_to_lms(x: f32, y: f32) -> Vec3 {
 
 /// Unity's `ColorUtils.PrepareLiftGammaGain`: each wheel's colour minus its own
 /// luminance (so a grey wheel tints nothing) plus its offset. Returns `(lift,
-/// 1 / gamma, gain)`; gamma and gain are centred on `1`.
+/// 1 / gamma, gain)`; gamma and gain are centred on `1`. The luminance is
+/// `core::color`'s Rec. 709, Unity's weights, which `postfx/grade.wgsl` mirrors.
 pub(super) fn lift_gamma_gain(lgg: &LiftGammaGain) -> (Vec3, Vec3, Vec3) {
     let centred = |w: &crate::components::ColorWheel| {
         let c = Vec3::from_array(w.color);

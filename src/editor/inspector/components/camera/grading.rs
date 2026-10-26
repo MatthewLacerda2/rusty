@@ -5,6 +5,7 @@
 //! A THIN client (#287): each widget reads the snapshot and writes through the
 //! shared `authoring::rendering::post_processing` op `Graphics.*` calls too.
 
+use super::post_processing::slider_row;
 use crate::components::{Wheel, WhiteBalance};
 use crate::scene::authoring::rendering::post_processing as vc_ops;
 use crate::scene::PostProcessingComponent;
@@ -17,23 +18,31 @@ pub(super) fn draw_grading(
     vc: &PostProcessingComponent,
     is_dirty: &mut bool,
 ) {
-    let mut write = |f: &dyn Fn(&mut PostProcessingComponent)| {
-        if let Some(mut c) = world.post_processing_mut(id) {
-            f(&mut c);
-        }
-        *is_dirty = true;
-    };
     let r = WhiteBalance::RANGE;
-    let WhiteBalance {
-        mut temperature,
-        mut tint,
-    } = vc.white_balance;
+    let wb = vc.white_balance;
     ui.label("  White Balance");
-    let t = slider(ui, "    Temperature:", &mut temperature, -r..=r);
-    let n = slider(ui, "    Tint:", &mut tint, -r..=r);
-    if t || n {
-        write(&|c| vc_ops::set_white_balance(c, temperature, tint));
-    }
+    *is_dirty |= slider_row(
+        ui,
+        (&mut *world, id),
+        "    Temperature:",
+        wb.temperature,
+        -r..=r,
+        |c, t| {
+            let tint = c.white_balance.tint;
+            vc_ops::set_white_balance(c, t, tint);
+        },
+    );
+    *is_dirty |= slider_row(
+        ui,
+        (&mut *world, id),
+        "    Tint:",
+        wb.tint,
+        -r..=r,
+        |c, n| {
+            let temperature = c.white_balance.temperature;
+            vc_ops::set_white_balance(c, temperature, n);
+        },
+    );
     ui.label("  Lift / Gamma / Gain");
     for which in Wheel::ALL {
         let mut wheel = *vc.lift_gamma_gain.wheel(which);
@@ -46,25 +55,19 @@ pub(super) fn draw_grading(
             })
             .inner;
         if changed {
-            write(&|c| vc_ops::set_wheel(c, which, wheel.color, wheel.offset));
+            if let Some(mut c) = world.post_processing_mut(id) {
+                vc_ops::set_wheel(&mut c, which, wheel.color, wheel.offset);
+            }
+            *is_dirty = true;
         }
     }
-    let mut hue = vc.hue_shift;
-    if slider(ui, "  Hue Shift:", &mut hue, -180.0..=180.0) {
-        write(&|c| vc_ops::set_hue_shift(c, hue));
-    }
-}
-
-/// A labelled slider; whether it changed.
-fn slider(
-    ui: &mut egui::Ui,
-    label: &str,
-    value: &mut f32,
-    range: std::ops::RangeInclusive<f32>,
-) -> bool {
-    ui.horizontal(|ui| {
-        ui.label(label);
-        ui.add(egui::Slider::new(value, range)).changed()
-    })
-    .inner
+    let hue = vc.hue_shift;
+    *is_dirty |= slider_row(
+        ui,
+        (&mut *world, id),
+        "  Hue Shift:",
+        hue,
+        -180.0..=180.0,
+        vc_ops::set_hue_shift,
+    );
 }
