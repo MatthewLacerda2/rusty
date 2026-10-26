@@ -1,9 +1,8 @@
 //! The lens dirt's file (#1442) and the engine's own dirt texture, which is this
 //! generator's output: `RUSTY_BLESS_LENS_DIRT=1` writes it again.
 
-use super::dirt::file;
+use super::cache::file;
 use crate::components::rendering::post_processing::DEFAULT_DIRT_TEXTURE;
-use crate::components::PostProcessingComponent;
 
 const SIDE: u32 = 256;
 
@@ -49,27 +48,15 @@ fn the_engine_dirt_texture_is_the_generator_output() {
     let shipped = image::open(&path)
         .expect("engine/textures/lens_dirt.png")
         .to_rgba8();
-    assert!(shipped == made, "re-bless with RUSTY_BLESS_LENS_DIRT=1");
-}
-
-fn volume(texture: Option<&str>, intensity: f32) -> PostProcessingComponent {
-    let mut vc = PostProcessingComponent::default();
-    vc.bloom.dirt_texture = texture.map(str::to_string);
-    vc.bloom.dirt_intensity = intensity;
-    vc
+    assert_eq!(shipped.dimensions(), made.dimensions());
+    // ±1 per channel: `f32::exp` may differ by an ulp between glibc and Apple's libm.
+    let near = (shipped.as_raw().iter().zip(made.as_raw())).all(|(a, b)| a.abs_diff(*b) <= 1);
+    assert!(near, "re-bless with RUSTY_BLESS_LENS_DIRT=1");
 }
 
 #[test]
 fn the_default_dirt_reads_from_the_engine_folder_and_a_path_as_it_is() {
-    let engine = file(&volume(Some(DEFAULT_DIRT_TEXTURE), 1.0)).unwrap();
     let want = crate::core::project::engine_path("textures/lens_dirt.png");
-    assert_eq!(engine.as_str(), want);
-    let own = file(&volume(Some("assets/dirt.png"), 1.0)).unwrap();
-    assert_eq!(own.as_str(), "assets/dirt.png");
-}
-
-#[test]
-fn no_texture_or_no_intensity_reads_nothing() {
-    assert!(file(&volume(None, 1.0)).is_none());
-    assert!(file(&volume(Some("assets/dirt.png"), 0.0)).is_none());
+    assert_eq!(file(DEFAULT_DIRT_TEXTURE).as_str(), want);
+    assert_eq!(file("assets/dirt.png").as_str(), "assets/dirt.png");
 }

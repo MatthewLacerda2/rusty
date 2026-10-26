@@ -22,7 +22,7 @@
 @group(0) @binding(7) var t_lut: texture_3d<f32>;
 // The view's adapted exposure (#1444): x is the EV, metered by `postfx/exposure.wgsl`.
 @group(0) @binding(8) var<uniform> adapted: vec4<f32>;
-// Bloom's lens dirt (#1442), stretched over the screen; black while there is none.
+// Bloom's lens dirt (#1442), cropped to cover the screen; black while there is none.
 // Binding 9 is the composite's effect slots (`effects::assemble`).
 @group(0) @binding(10) var t_dirt: texture_2d<f32>;
 

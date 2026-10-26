@@ -267,13 +267,18 @@ the **intensity**, before the exposure. It reads the scene after depth of field 
 motion blur, so a moving highlight blooms along its streak. The player's `bloom`
 option gates it. A new volume starts with bloom on at intensity `1`, threshold `0.8`.
 
-**Lens dirt** (#1442) is Unity's *Dirt Texture* / *Dirt Intensity*: an image stretched
-over the screen that the bloom lights, so smudges on the lens show only where bright
-light reaches them (`bloom × dirt × dirt intensity`, added with the bloom). It needs
-both a **dirt texture** and a **dirt intensity** above `0`, and shows nothing while
-bloom is off. `engine/textures/lens_dirt.png` names the engine's own neutral smudges,
-for a game with no art of its own; a missing or unreadable file is logged once and
-draws no dirt. A new volume starts with no dirt texture and a dirt intensity of `0`.
+**Lens dirt** (#1442) is Unity's *Dirt Texture* / *Dirt Intensity*: an image that
+the bloom lights, so smudges on the lens show only where bright light reaches them
+(`bloom × intensity × dirt × dirt intensity`, added with the bloom, as Unity adds it:
+fading the bloom's intensity fades the smudges too). The image covers the screen
+without stretching, centred, its overflow cropped, as Unity places it. It needs both
+a **dirt texture** and a **dirt intensity** above `0`, and shows nothing while bloom
+is off. The texture is loaded whenever a volume names one, even at a dirt intensity of
+`0`, so tweening the intensity up never loads it mid-effect. `engine/textures/lens_dirt.png`
+names the engine's own neutral smudges, for a game with no art of its own; an
+`rt:<name>` render texture works too. A missing or unreadable file is logged once and
+draws no dirt (a missing one is picked up when it appears, an unreadable one when it
+is written again). A new volume starts with no dirt texture and a dirt intensity of `0`.
 Tween paths: `Graphics.bloom.intensity`, `Graphics.bloom.threshold`,
 `Graphics.bloom.dirt_intensity`.
 

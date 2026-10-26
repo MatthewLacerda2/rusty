@@ -5,7 +5,8 @@
 //! and motion blur, so a moving highlight blooms along its streak, as in URP and HDRP
 //! (#1436). The add lights the lens dirt too (`dirt`, #1442).
 
-mod dirt;
+mod cache;
+pub(crate) mod dirt;
 #[cfg(test)]
 mod dirt_tests;
 
@@ -45,18 +46,19 @@ fn blooms(cx: &EffectCx) -> bool {
         .is_some_and(|vc| cx.runs(EFFECT.gate, vc.bloom.active))
 }
 
-/// x: the intensity, y: the dirt intensity (`0` without a dirt texture, the
-/// composite then skips the dirt), w: `1` while bloom runs (the composite skips the
-/// add otherwise).
+/// x: the intensity, y: the dirt's, scaled by the intensity as Unity's `UberPost`
+/// scales it (`0` without a dirt texture: the composite then skips the dirt), w:
+/// `1` while bloom runs (the composite skips the add otherwise).
 fn pack(cx: &EffectCx, slots: &mut [[f32; 4]]) {
     let Some(vc) = cx.volume() else { return };
     let on = if blooms(cx) { 1.0 } else { 0.0 };
-    let dirt = if dirt::file(vc).is_some() {
-        vc.bloom.dirt_intensity
+    let b = &vc.bloom;
+    let dirt = if b.dirt_texture.is_some() {
+        b.intensity * b.dirt_intensity
     } else {
         0.0
     };
-    slots[0] = [vc.bloom.intensity, dirt, 0.0, on];
+    slots[0] = [b.intensity, dirt, 0.0, on];
 }
 
 /// CPU mirror of `BloomParams` in `postfx/bloom.wgsl`.
@@ -67,11 +69,13 @@ struct BloomParams {
     knobs: [f32; 4],
 }
 
-/// The bright pass and the blur, shared by every view.
+/// The bright pass and the blur, shared by every view, and the lens dirt textures
+/// the volumes name.
 pub(crate) struct BloomPasses {
     layout: wgpu::BindGroupLayout,
     bright: LazyPipeline,
     blur: LazyPipeline,
+    pub(crate) dirt: cache::DirtCache,
 }
 
 impl BloomPasses {
@@ -113,6 +117,7 @@ impl BloomPasses {
             bright: pass("fs_bright"),
             blur: pass("fs_blur"),
             layout,
+            dirt: cache::DirtCache::default(),
         }
     }
 

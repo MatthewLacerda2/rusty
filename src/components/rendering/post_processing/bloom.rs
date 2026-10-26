@@ -19,8 +19,8 @@ pub struct Bloom {
     /// The luminance above which a pixel blooms, `≥ 0`.
     pub threshold: f32,
     /// The lens dirt texture, a project-relative path (or
-    /// [`DEFAULT_DIRT_TEXTURE`]), stretched over the screen and lit by the bloom;
-    /// none by default.
+    /// [`DEFAULT_DIRT_TEXTURE`] or an `rt:` render texture), cropped to cover the
+    /// screen and lit by the bloom; none by default.
     pub dirt_texture: Option<String>,
     /// How much of the bloom the dirt adds back, `≥ 0`.
     pub dirt_intensity: f32,
