@@ -144,7 +144,8 @@ fn batch_solids(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
     let motion = &mut view.post_fx.motion;
     let history = motion.active().then_some(&mut motion.history);
     let (scene, cam) = (ctx.scene, ctx.cam);
-    ctx.solids = r.precreate_solid_resources(scene, cam, &ctx.frustum, &ctx.lod, outline, history);
+    ctx.solids =
+        r.precreate_solid_resources(scene, cam, &ctx.frustum, &ctx.lod, (outline, history));
 }
 
 fn scene_pass(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {

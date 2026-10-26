@@ -78,9 +78,9 @@ impl Renderer {
     }
 
     /// Collect this camera's visible solids (skipping the LOD levels `lod` hides), batch repeated mesh + material pairs into
-    /// instanced draws (#470), and upload the camera's packed draw data. With
-    /// `outline` (an editor camera), the solids the selection outline rings are
-    /// marked, so it draws from their draws (#1175). With `history` (a view writing
+    /// instanced draws (#470), and upload the camera's packed draw data. `marks`:
+    /// with `outline` (an editor camera), the solids the selection outline rings are
+    /// marked, so it draws from their draws (#1175); with `history` (a view writing
     /// motion vectors, #1435), each solid also carries its last-frame pose.
     pub(crate) fn precreate_solid_resources(
         &mut self,
@@ -88,8 +88,7 @@ impl Renderer {
         cam: &crate::scene::Camera,
         frustum: &Frustum,
         lod: &LodSelection,
-        outline: bool,
-        mut history: Option<&mut MotionHistory>,
+        (outline, mut history): (bool, Option<&mut MotionHistory>),
     ) -> SolidResources {
         let (cam_pos, cam_fwd) = (cam.position, cam.forward());
         let (mut opaque, mut transparent, mut joints) = (Vec::new(), Vec::new(), Vec::new());
