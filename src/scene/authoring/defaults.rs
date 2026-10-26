@@ -175,10 +175,7 @@ pub fn default_camera() -> CameraComponent {
 /// it auto-adds a `Camera` if missing — post-processing is inert without a camera
 /// to process, so the dependency is enforced rather than left to chance.
 pub fn default_post_processing() -> PostProcessingComponent {
-    PostProcessingComponent {
-        active: true,
-        ..Default::default()
-    }
+    PostProcessingComponent::default()
 }
 
 #[cfg(test)]

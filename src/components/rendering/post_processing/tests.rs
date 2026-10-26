@@ -15,11 +15,11 @@ fn round_trip(vc: &PostProcessingComponent) -> PostProcessingComponent {
 fn an_empty_volume_loads_active_with_every_effect_at_its_default() {
     let vc = load("{}");
     assert!(vc.active, "a volume applies unless it says otherwise");
-    let defaults = PostProcessingComponent {
-        active: true,
-        ..Default::default()
-    };
-    assert_eq!(vc, defaults);
+    assert_eq!(
+        vc,
+        PostProcessingComponent::default(),
+        "`{{}}` is the default"
+    );
 }
 
 #[test]

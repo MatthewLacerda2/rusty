@@ -414,9 +414,9 @@ function Update()
 end
 ```
 
-- **Where they live.** On the active volume (`post_params`, saved with the scene
-  like its other knobs), Unity's volume-profile overrides without the blending. A
-  set is a uniform write the next frame packs — never a re-bake.
+- **Where they live.** On the active volume (`custom_effects.params`, saved with
+  the scene like its other knobs), Unity's volume-profile overrides without the
+  blending. A set is a uniform write the next frame packs — never a re-bake.
 - **Names** are `"<block>.<param>"`, or `"<block>.<index>.<param>"` (the block's
   position in its recipe, required when it appears more than once) — the scheme
   `Material.SetShaderParam` uses. One name addresses the **whole list**: every

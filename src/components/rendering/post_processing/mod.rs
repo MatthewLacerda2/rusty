@@ -37,7 +37,7 @@ pub use ssr::Ssr;
 /// A post-processing volume. Every field defaults when a file leaves it out, so a
 /// scene names only what it sets, each effect to its own default (the Add Component
 /// menu's, `scene::authoring::default_post_processing`).
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct PostProcessingComponent {
     /// Whether the volume applies at all: a camera whose volume is off runs neutral.
@@ -64,6 +64,32 @@ pub struct PostProcessingComponent {
     pub shadows: ShadowSettings,
     /// Screen-space ambient occlusion (#436), on by default.
     pub ssao: SsaoSettings,
+}
+
+impl Default for PostProcessingComponent {
+    /// Applies, every effect at its own default: what `{}` loads as.
+    fn default() -> Self {
+        Self {
+            active: on(),
+            bloom: Default::default(),
+            chromatic_aberration: Default::default(),
+            color_adjustments: Default::default(),
+            color_lookup: Default::default(),
+            custom_effects: Default::default(),
+            depth_of_field: Default::default(),
+            #[cfg(test)]
+            dummy: Default::default(),
+            exposure: Default::default(),
+            film_grain: Default::default(),
+            lift_gamma_gain: Default::default(),
+            ssr: Default::default(),
+            tonemapping: Default::default(),
+            vignette: Default::default(),
+            white_balance: Default::default(),
+            shadows: Default::default(),
+            ssao: Default::default(),
+        }
+    }
 }
 
 impl PostProcessingComponent {
