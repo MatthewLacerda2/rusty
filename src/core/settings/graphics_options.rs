@@ -47,7 +47,7 @@ crate::core::named_enum! {
 }
 
 /// `Storage` key the player's options persist under, in the graphics namespace
-/// ([`GRAPHICS_NAMESPACE`](super::GRAPHICS_NAMESPACE)) beside the quality tier.
+/// ([`GRAPHICS_NAMESPACE`]) beside the quality tier.
 pub const OPTIONS_KEY: &str = "options";
 
 /// One switch per [`GraphicsOption`], every one allowed by default, and which of them
