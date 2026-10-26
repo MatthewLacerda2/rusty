@@ -10,8 +10,10 @@ pub(super) type Error = (usize, String);
 
 /// The table `text` holds.
 pub(super) fn parse(text: &str) -> Result<Lut, Error> {
-    let mut size: Option<(usize, u32)> = None;
-    let mut domain = [[0.0; 3], [1.0; 3]];
+    let mut header = Header {
+        size: None,
+        domain: [[0.0; 3], [1.0; 3]],
+    };
     let mut texels = Vec::new();
     let mut last = 0;
     for (i, raw) in text.lines().enumerate() {
@@ -20,53 +22,69 @@ pub(super) fn parse(text: &str) -> Result<Lut, Error> {
         if line.is_empty() || line.starts_with('#') {
             continue;
         }
-        let mut words = line.split_whitespace();
-        let first = words.next().unwrap_or_default();
-        if first.starts_with(|c: char| c.is_ascii_alphabetic()) {
+        if line.starts_with(|c: char| c.is_ascii_alphabetic()) {
             if !texels.is_empty() {
-                return Err((n, format!("`{first}` after the table starts")));
+                return Err((n, format!("`{line}` after the table starts")));
             }
-            match first {
-                "LUT_3D_SIZE" => size = Some((n, side(n, words)?)),
-                "LUT_1D_SIZE" => return Err((n, "a 1D LUT; only 3D LUTs are read".into())),
-                "DOMAIN_MIN" => domain[0] = numbers(n, words)?,
-                "DOMAIN_MAX" => domain[1] = numbers(n, words)?,
-                "LUT_3D_INPUT_RANGE" => {
-                    let [lo, hi]: [f32; 2] = numbers(n, words)?;
-                    domain = [[lo; 3], [hi; 3]];
-                }
-                _ => {}
-            }
+            header.keyword(n, line)?;
             continue;
         }
-        let Some((_, side)) = size else {
+        let Some((_, side)) = header.size else {
             return Err((n, "a table entry before LUT_3D_SIZE".into()));
         };
         if texels.len() == (side as usize).pow(3) {
-            return Err((n, format!("more than the {}³ entries", side)));
+            return Err((n, format!("more than the {side}³ entries")));
         }
         let [r, g, b] = numbers(n, line.split_whitespace())?;
         texels.push([r, g, b, 1.0]);
     }
-    let Some((at, side)) = size else {
-        return Err((last.max(1), "no LUT_3D_SIZE".into()));
-    };
-    let needs = (side as usize).pow(3);
-    if texels.len() != needs {
-        let found = texels.len();
-        return Err((
-            at,
-            format!("LUT_3D_SIZE {side} needs {needs} entries, found {found}"),
-        ));
+    header.finish(texels, last.max(1))
+}
+
+/// What the keyword lines said: the size (with its line) and the domain.
+struct Header {
+    size: Option<(usize, u32)>,
+    domain: [[f32; 3]; 2],
+}
+
+impl Header {
+    /// Read keyword line `n`.
+    fn keyword(&mut self, n: usize, line: &str) -> Result<(), Error> {
+        let mut words = line.split_whitespace();
+        match words.next().unwrap_or_default() {
+            "LUT_3D_SIZE" => self.size = Some((n, side(n, words)?)),
+            "LUT_1D_SIZE" => return Err((n, "a 1D LUT; only 3D LUTs are read".into())),
+            "DOMAIN_MIN" => self.domain[0] = numbers(n, words)?,
+            "DOMAIN_MAX" => self.domain[1] = numbers(n, words)?,
+            "LUT_3D_INPUT_RANGE" => {
+                let [lo, hi]: [f32; 2] = numbers(n, words)?;
+                self.domain = [[lo; 3], [hi; 3]];
+            }
+            _ => {}
+        }
+        Ok(())
     }
-    if (0..3).any(|c| domain[1][c] <= domain[0][c]) {
-        return Err((at, "DOMAIN_MAX must be above DOMAIN_MIN".into()));
+
+    /// The table, once every line is read (`last` the file's last line).
+    fn finish(self, texels: Vec<[f32; 4]>, last: usize) -> Result<Lut, Error> {
+        let Some((at, side)) = self.size else {
+            return Err((last, "no LUT_3D_SIZE".into()));
+        };
+        let (needs, found) = ((side as usize).pow(3), texels.len());
+        if found != needs {
+            let why = format!("LUT_3D_SIZE {side} needs {needs} entries, found {found}");
+            return Err((at, why));
+        }
+        let domain = self.domain;
+        if (0..3).any(|c| domain[1][c] <= domain[0][c]) {
+            return Err((at, "DOMAIN_MAX must be above DOMAIN_MIN".into()));
+        }
+        Ok(Lut {
+            size: side,
+            domain,
+            texels,
+        })
     }
-    Ok(Lut {
-        size: side,
-        domain,
-        texels,
-    })
 }
 
 /// `LUT_3D_SIZE`'s value, within what the importer reads.

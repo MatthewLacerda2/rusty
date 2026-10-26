@@ -97,3 +97,23 @@ fn load_names_the_file_and_line() {
     assert_eq!(load(&ok).unwrap().size, Lut::MIN_SIZE);
     assert!(load(&dir.join("x.tga")).is_err());
 }
+
+#[test]
+fn a_strip_png_loads_as_its_table() {
+    let n = 16u32;
+    let level = |i: u32| (i * 17) as u8;
+    let strip = image::RgbaImage::from_fn(n * n, n, |x, y| {
+        image::Rgba([level(x % n), level(n - 1 - y), level(x / n), 255])
+    });
+    let path = crate::test_temp::dir().join("neutral.png");
+    strip.save(&path).unwrap();
+    let lut = load(&path).unwrap();
+    let id = cube::parse(&identity_cube(n)).unwrap();
+    assert_eq!(lut.size, n);
+    for (a, b) in lut.texels.iter().zip(&id.texels) {
+        assert!(
+            a.iter().zip(b).all(|(a, b)| (a - b).abs() < 1e-6),
+            "{a:?} vs {b:?}"
+        );
+    }
+}

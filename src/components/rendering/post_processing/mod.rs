@@ -232,6 +232,11 @@ mod tests {
     fn grading_knobs_load_neutral_when_absent_and_round_trip() {
         let vc = load("");
         assert!(vc.white_balance.is_neutral() && vc.hue_shift == 0.0);
+        assert_eq!(
+            (vc.lut, vc.lut_contribution),
+            (None, 1.0),
+            "no Color Lookup"
+        );
         assert_eq!(vc.lift_gamma_gain, super::LiftGammaGain::default());
         let vc = load(r#", "hue_shift": 30.0, "lift_gamma_gain": {"gain": {"offset": 0.5}}"#);
         let back: PostProcessingComponent =

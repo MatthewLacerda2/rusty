@@ -98,3 +98,17 @@ fn knobs_a_file_left_out_of_range_bake_as_the_ops_would_clamp_them() {
         "NaN is neutral"
     );
 }
+
+#[test]
+fn a_lookup_is_off_until_one_is_applied_and_holds_its_contribution_to_unit() {
+    let vc = default_post_processing();
+    let graded = GradeParams::from_volume(Some(&vc));
+    assert_eq!(graded.lookup_min[3], 0.0, "no LUT applies by default");
+    let domain = [[0.0; 3], [2.0; 3]];
+    let applied = graded.with_lookup(domain, 3.0);
+    assert_eq!(
+        (applied.lookup_min, applied.lookup_max[0]),
+        ([0.0, 0.0, 0.0, 1.0], 2.0)
+    );
+    assert_eq!(graded.with_lookup(domain, f32::NAN).lookup_min[3], 0.0);
+}
