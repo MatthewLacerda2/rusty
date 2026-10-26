@@ -42,6 +42,43 @@ Before building a layout or pipeline by hand, use what #939 extracted:
   `Renderer::lazy_pipelines` (`render::setup::warm`), so `warm_pipelines` builds it
   when a windowed renderer starts: a game never compiles one mid-frame.
 
+## Adding a post effect
+A post effect is a module in every layer (#1467): it adds its own files and **one
+row per registry** (each folder's `mod` list counts as one), and edits no shared
+struct, shader body or list position. Group a family (`grading/`, `lens/`) the same way
+in every layer. The test-only `dummy` effect is the worked example: grep `dummy` for
+every file and row.
+- **Settings** — `components/rendering/post_processing/<effect>.rs` (serde, `Default`,
+  the clamp constants) and one field on `PostProcessingComponent`. A camera effect keeps
+  its knobs on `CameraComponent`, named `<effect>_…`.
+- **Ops** — `scene/authoring/rendering/post_processing/<effect>.rs`: its ops, its
+  `Effect` (its field-table row through `effect!`, and its `Knob`s, which give the
+  Inspector's sliders, `Graphics.Get/Set<api>` pairs and the `Graphics.<effect>.<knob>`
+  tween paths) and its row in `EFFECTS`.
+- **API** — `api/graphics/effects/<effect>.rs`, a `register` (knobs through
+  `knobs::register`), and its row in `REGISTRARS`.
+- **Inspector** — `editor/inspector/components/camera/post_processing/<effect>.rs`, a
+  `Section` with its display `order` and `group`, and its row in `SECTIONS`
+  (`CAMERA_SECTIONS` for a camera effect).
+- **Render** — `render/postfx/effects/<effect>.rs` (or a folder) and its row in
+  `POST_EFFECTS`: composite functions (`Phase::Hdr` before the grade, `Phase::Display`
+  after it), grade functions (the LUT bake) and/or a pass (`Pass::Scene` before the
+  composite, `Pass::Ldr` after it), **each placed by the order it declares**. Its WGSL
+  is a module at `engine/shaders/postfx/effects/<effect>.wgsl` with
+  `#define_import_path postfx::effects::<effect>`: a function takes the colour, the
+  `Frag` (composite only) and one `vec4` per slot it declares, reads the chain's
+  bindings from `postfx::frame`, and leaves the colour as it was when its slots say it
+  is off. Its `pack` writes only its own slots. A pass with pipelines of its own adds
+  them to `effects::Passes` (and lazy ones to its `lazy_pipelines`); a per-view target
+  goes on `PostFx`.
+- **Option** — a player-facing effect adds its `GraphicsOption` row, named as the
+  effect, and gates through `EffectCx::runs`.
+- **Docs** — a `<!-- effect: <name> -->` section in `docs/api/Graphics.md` naming each
+  tween path, its rows in the sorted function table, and its *Player options* row.
+- **The gate** — `render::postfx::effects::completeness` fails when any layer lacks the
+  effect's part. Pixels of every other effect stay byte-identical: no other offset or
+  struct moved.
+
 ## GPU tests
 - **The name says it renders**: in-crate tests are named `gpu_*`, integration tests
   live under `tests/gpu/`. nextest's `gpu` group selects them by name, and a test that

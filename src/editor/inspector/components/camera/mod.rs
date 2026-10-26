@@ -8,7 +8,7 @@ use crate::editor::widgets::DragRange;
 use egui_phosphor::regular as icon;
 
 mod motion_blur;
-mod post_processing;
+pub(crate) mod post_processing;
 mod target;
 
 pub use post_processing::{commit_abandoned_lut, draw_post_processing};

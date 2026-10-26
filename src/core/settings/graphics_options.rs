@@ -33,24 +33,25 @@ crate::core::named_enum! {
     /// One player-facing effect switch, named as `Graphics.SetOption` spells it.
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
     pub enum GraphicsOption {
-        /// Camera motion blur (also off on the Low tier).
-        MotionBlur = "motion_blur",
-        /// FXAA anti-aliasing.
-        Fxaa = "fxaa",
+        // sorted: one row per player-facing effect; menus list them in this order
         /// Bloom.
         Bloom = "bloom",
-        /// Screen-space reflections (High tier only).
-        Ssr = "ssr",
-        /// Screen-space ambient occlusion (off on the Low tier).
-        Ssao = "ssao",
-        /// The volume's vignette (#1439).
-        Vignette = "vignette",
         /// The volume's chromatic aberration (#1439).
         ChromaticAberration = "chromatic_aberration",
-        /// The volume's film grain (#1439).
-        FilmGrain = "film_grain",
         /// The volume's depth of field (#1445; off on the Low tier).
         DepthOfField = "depth_of_field",
+        /// The volume's film grain (#1439).
+        FilmGrain = "film_grain",
+        /// FXAA anti-aliasing.
+        Fxaa = "fxaa",
+        /// Camera motion blur (also off on the Low tier).
+        MotionBlur = "motion_blur",
+        /// Screen-space ambient occlusion (off on the Low tier).
+        Ssao = "ssao",
+        /// Screen-space reflections (High tier only).
+        Ssr = "ssr",
+        /// The volume's vignette (#1439).
+        Vignette = "vignette",
     }
 }
 

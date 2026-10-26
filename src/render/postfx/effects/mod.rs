@@ -215,6 +215,8 @@ pub(crate) struct PassCx<'a> {
 }
 
 #[cfg(test)]
+mod completeness;
+#[cfg(test)]
 mod pack_tests;
 #[cfg(test)]
 mod tests;

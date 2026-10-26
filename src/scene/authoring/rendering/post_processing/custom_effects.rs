@@ -2,9 +2,14 @@
 //! their runtime params. No knobs: a param is tweened as `Graphics.<block.param>`,
 //! through the chain's layouts.
 
+use std::collections::BTreeMap;
+
+use serde::Deserialize;
+
 use super::Effect;
-use crate::components::{CustomEffects, PostProcessingComponent};
-use crate::scene::authoring::fields::table::{effect, unheld};
+use crate::components::PostProcessingComponent;
+use crate::scene::authoring::fields::table::{unheld, Access, Field};
+use crate::scene::authoring::fields::value::decode;
 use crate::scene::authoring::sanitize::finite_values;
 use crate::shadergen::post_params::PostChain;
 
@@ -73,17 +78,40 @@ fn is_module_name(name: &str) -> bool {
     !name.is_empty() && !name.starts_with('.') && !name.contains(['/', '\\'])
 }
 
+/// What a write of `custom_effects` names: the list, and the params it gives.
+#[derive(Deserialize)]
+struct Written {
+    names: Option<Vec<String>>,
+    #[serde(default)]
+    params: BTreeMap<String, Vec<f32>>,
+}
+
+/// The list when given, then each given param that differs from the held one,
+/// checked against the (new) list's layouts. A param handed back unchanged is not
+/// checked again, so a `Get` table with a new list writes no stale param.
+fn write(vc: &mut PostProcessingComponent, json: serde_json::Value) -> Result<(), String> {
+    let written: Written = decode(json)?;
+    if let Some(names) = written.names {
+        set_names(vc, names)?;
+    }
+    let chain = chain(vc);
+    for (name, value) in written.params {
+        if vc.custom_effects.params.get(&name) != Some(&value) {
+            set_param_with(vc, &chain, &name, value)?;
+        }
+    }
+    Ok(())
+}
+
 pub const EFFECT: Effect = Effect {
     name: "custom_effects",
     field: unheld!(
         "its op reads every effect's baked sidecar and warns on an unbaked one",
-        effect!(custom_effects, |c, v: CustomEffects| {
-            set_names(c, v.names)?;
-            let chain = chain(c);
-            for (name, value) in v.params {
-                set_param_with(c, &chain, &name, value)?;
-            }
-        })
+        Field {
+            name: "custom_effects",
+            access: Access::Op(write),
+            unheld: None,
+        }
     ),
     knobs: &[],
 };

@@ -12,7 +12,7 @@ use crate::scene::authoring::default_post_processing;
 use crate::scene::authoring::rendering::post_processing as ops;
 use crate::scene::{Camera, Scene};
 
-/// The composite's grade before the LUT (`postfx.wgsl` at #1438): exposure, then
+/// The composite's grade before the LUT (as it was at #1438): exposure, then
 /// the tonemap, at neutral contrast, saturation and gamma.
 fn analytic(x: f32, ev: f32, tonemap: Tonemap) -> f32 {
     let h = x * ev.exp2();
