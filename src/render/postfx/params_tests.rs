@@ -1,11 +1,11 @@
 //! `build_post_params` and friends: one view's camera settings into `PostParams`.
 
 use super::*;
-use crate::components::{CameraComponent, Tonemap, VisualCorrectionComponent};
+use crate::components::{CameraComponent, PostProcessingComponent, Tonemap};
 use crate::scene::Scene;
 
 /// One entity carrying `vc` (and `cam`), and its id.
-fn scene_with_vc(vc: VisualCorrectionComponent, cam: Option<CameraComponent>) -> (Scene, u32) {
+fn scene_with_vc(vc: PostProcessingComponent, cam: Option<CameraComponent>) -> (Scene, u32) {
     let mut scene = Scene::new();
     let id = add(&mut scene, Some(vc), cam);
     (scene, id)
@@ -13,11 +13,11 @@ fn scene_with_vc(vc: VisualCorrectionComponent, cam: Option<CameraComponent>) ->
 
 fn add(
     scene: &mut Scene,
-    vc: Option<VisualCorrectionComponent>,
+    vc: Option<PostProcessingComponent>,
     cam: Option<CameraComponent>,
 ) -> u32 {
     let id = scene.add_entity("PostFx".to_string());
-    scene.world.set_visual_correction(id, vc);
+    scene.world.set_post_processing(id, vc);
     scene.world.set_camera(id, cam);
     id
 }
@@ -38,8 +38,8 @@ fn fxaa(scene: &Scene, camera: Option<u32>) -> bool {
     fxaa_enabled(borrow_post_source(scene, camera).source())
 }
 
-fn vc() -> VisualCorrectionComponent {
-    VisualCorrectionComponent {
+fn vc() -> PostProcessingComponent {
+    PostProcessingComponent {
         bloom_intensity: 2.0,
         bloom_threshold: 0.7,
         exposure: 1.5,
@@ -48,7 +48,7 @@ fn vc() -> VisualCorrectionComponent {
         ssr_temporal_upsampling: false,
         tonemap: Tonemap::Reinhard,
         gamma: 1.3,
-        ..crate::scene::authoring::default_visual_correction()
+        ..crate::scene::authoring::default_post_processing()
     }
 }
 

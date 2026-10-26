@@ -4,7 +4,7 @@ Live control over the engine's **existing** post-FX and quality knobs, so a scri
 can drive its own settings logic. The per-volume getters/setters target the **main
 camera**, Unity's `Camera.main`: the base of the screen stack, the lowest
 `render_order` active camera that renders to the screen (a render-texture camera never
-is). Its `VisualCorrectionComponent` (color/bloom/SSR/shadows/SSAO/custom effects and
+is). Its `PostProcessingComponent` (color/bloom/SSR/shadows/SSAO/custom effects and
 their params) and its `CameraComponent` (motion blur, FXAA) are what the window shows,
 so a write takes effect there next frame. Getters return a neutral default when there
 is no screen camera, or its volume is missing or inactive; setters are then no-ops.
@@ -14,7 +14,7 @@ with motion blur on at 32 samples.
 
 **Post-FX is per view** (#1434), Unity URP's camera-stack rule: each view runs it once,
 with the settings of **its base camera**, that camera entity's own `CameraComponent`
-and `VisualCorrectionComponent`. The window and the Game view use the main camera;
+and `PostProcessingComponent`. The window and the Game view use the main camera;
 overlay cameras stacked on it add no post-FX of their own. A render-texture camera
 uses its own. The Scene view's free camera has no entity, so it previews the main
 camera. A camera with no active volume runs neutral (no grade, bloom or custom
@@ -63,7 +63,7 @@ lifts the midtones, `< 1` darkens them.
 distance**, is split into `1`–`4` slices, each with its own shadow map fitted to it
 and following the camera, so the first few metres get the sharpest shadow and a
 caster anywhere in a level still casts. Past the distance shadows fade out over its
-last tenth. Both knobs live on the main camera's visual-correction volume (the
+last tenth. Both knobs live on the main camera's post-processing component (the
 Inspector's **Shadows** section edits the same fields; #1434) and are saved with the
 scene, so an indoor level can spend its cascades on 40 m and an outdoor one on 150 m;
 without an active volume on the main camera the defaults above apply. The cascades
@@ -72,7 +72,7 @@ the moving casters (static casters are re-drawn only when a cascade moves, #355)
 
 **Fog** (#437) is a **scene setting**, not a volume knob: it is saved with the
 scene, edited in the Inspector's **Scene Settings → Fog** section (the same fields),
-and the `Fog*` functions work whether or not the scene has a visual-correction
+and the `Fog*` functions work whether or not the scene has a post-processing
 volume. One shared shader function applies it to **every world-space pass** —
 opaque and transparent surfaces, unlit surfaces, alpha-blended and additive
 particles — and decals are part of the surface they mark (#638), so smoke and
@@ -101,7 +101,7 @@ spotlight, so a lit wall stays lit; it is computed before the forward pass, not 
 the finished image, so fog (applied after lighting) fogs the occluded colour rather
 than AO darkening the fog. **Radius** is how far (world units) another surface can be and
 still shade a point; **intensity** is the strength (`0` none, `1` natural, up to `4`
-exaggerated). The knobs live on the visual-correction volume (the Inspector's
+exaggerated). The knobs live on the post-processing component (the Inspector's
 **Ambient Occlusion** section edits the same fields) and are saved with the scene;
 scenes saved before the knob existed load with it on. Each view runs its base
 camera's AO, like the rest of its post-FX (*Post-FX is per view*, above); a camera

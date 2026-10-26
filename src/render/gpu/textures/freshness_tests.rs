@@ -33,10 +33,10 @@ pub(super) fn emissive_scene(map: &str) -> Scene {
         ..MaterialAsset::default()
     };
     scene.materials.insert("glow".to_string(), asset);
-    let mut vc = crate::scene::authoring::defaults::default_visual_correction();
+    let mut vc = crate::scene::authoring::defaults::default_post_processing();
     (vc.active, vc.bloom_active, vc.ssr_active) = (true, false, false);
     vc.tonemap = Tonemap::None;
-    scene.world.set_visual_correction(id, Some(vc));
+    scene.world.set_post_processing(id, Some(vc));
     // A volume rides on its camera (#1434): that camera is the view's.
     scene
         .world

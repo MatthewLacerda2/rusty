@@ -1,5 +1,5 @@
 //! Integration coverage for the `Graphics` scripting namespace (issue #87): the
-//! per-volume post-FX getters/setters write the active `VisualCorrectionComponent`
+//! per-volume post-FX getters/setters write the active `PostProcessingComponent`
 //! / `CameraComponent`, and the global quality preset round-trips through the
 //! shared resource cell. These are render-only, one-way writes — they never feed
 //! `FixedUpdate` — so the test only asserts the surface, not sim evolution.
@@ -8,22 +8,22 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use mlua::Lua;
-use rusty::components::{CameraComponent, Tonemap, VisualCorrectionComponent};
+use rusty::components::{CameraComponent, PostProcessingComponent, Tonemap};
 use rusty::core::settings::quality::QualityPreset;
-use rusty::scene::authoring::default_visual_correction;
+use rusty::scene::authoring::default_post_processing;
 use rusty::scene::Scene;
 
 fn scene_with_volume() -> Rc<RefCell<Scene>> {
     let mut scene = Scene::new();
     let id = scene.add_entity("PostFx".to_string());
-    scene.world.set_visual_correction(
+    scene.world.set_post_processing(
         id,
-        Some(VisualCorrectionComponent {
+        Some(PostProcessingComponent {
             bloom_active: false,
             ssr_active: false,
             ssr_quality: "Low".to_string(),
             ssr_temporal_upsampling: false,
-            ..default_visual_correction()
+            ..default_post_processing()
         }),
     );
     scene.world.set_camera(
@@ -64,7 +64,7 @@ fn bloom_and_color_round_trip() {
 
         let s = scene.borrow();
         let id = s.entity_ids()[0];
-        let vc = s.world.visual_correction(id).unwrap().clone();
+        let vc = s.world.post_processing(id).unwrap().clone();
         assert!(vc.bloom_active);
         assert_eq!(vc.bloom_intensity, 3.5);
         assert_eq!(vc.exposure, 1.25);

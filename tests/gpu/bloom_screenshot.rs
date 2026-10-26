@@ -10,7 +10,7 @@ use crate::gpu::mean_brightness;
 use glam::Vec3;
 use rusty::components::{MaterialAsset, MaterialComponent};
 use rusty::dev::screenshot::capture;
-use rusty::scene::authoring::defaults::default_visual_correction;
+use rusty::scene::authoring::defaults::default_post_processing;
 use rusty::scene::{Camera, MeshComponent, Scene};
 
 /// A unit box scaled to `size` at `pos`, lit only by its own `emissive` term.
@@ -43,9 +43,9 @@ fn scene(bloom: bool) -> Scene {
     emissive_box(&mut scene, "Wall", Vec3::new(0.0, 0.0, -3.0), wall, 0.0);
     emissive_box(&mut scene, "Glow", Vec3::ZERO, Vec3::ONE, 8.0);
     let post = scene.add_entity("Post".to_string());
-    let mut vc = default_visual_correction();
+    let mut vc = default_post_processing();
     (vc.bloom_active, vc.ssr_active) = (bloom, false);
-    scene.world.set_visual_correction(post, Some(vc));
+    scene.world.set_post_processing(post, Some(vc));
     // A volume rides on its camera (#1434): that camera is the view's.
     scene
         .world

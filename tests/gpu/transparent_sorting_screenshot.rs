@@ -17,15 +17,15 @@ use glam::Vec3;
 use rusty::components::{MaterialAsset, MaterialComponent, RenderMode};
 use rusty::dev::screenshot::capture;
 use rusty::scene::Camera;
-use rusty::scene::{MeshComponent, Scene, VisualCorrectionComponent};
+use rusty::scene::{MeshComponent, PostProcessingComponent, Scene};
 
-fn vc() -> VisualCorrectionComponent {
-    VisualCorrectionComponent {
+fn vc() -> PostProcessingComponent {
+    PostProcessingComponent {
         bloom_active: false,
         bloom_threshold: 0.6,
         ssr_active: false,
         ssr_temporal_upsampling: false,
-        ..rusty::scene::authoring::default_visual_correction()
+        ..rusty::scene::authoring::default_post_processing()
     }
 }
 
@@ -63,7 +63,7 @@ fn scene(near_first: bool) -> Scene {
     scene.ambient_intensity = 0.0;
     // One volume, on the view's camera (#1434).
     let volume = scene.add_entity("Volume".to_string());
-    scene.world.set_visual_correction(volume, Some(vc()));
+    scene.world.set_post_processing(volume, Some(vc()));
     let camera = rusty::components::CameraComponent::default();
     scene.world.set_camera(volume, Some(camera));
     if near_first {

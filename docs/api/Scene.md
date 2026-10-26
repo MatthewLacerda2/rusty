@@ -72,7 +72,7 @@ case-insensitive: `Light`, `Animator`, `Collider`, `RigidBody`,
 `Texture` (alias `Material`), `NavMeshAgent`, `NavMeshObstacle` (alias
 `NavObstacle`), `OffMeshLink` (alias `NavMeshLink`), `NavMeshModifierVolume` (alias
 `NavModifier`), `Camera`, `Particles`,
-`VisualCorrection`, `Audio` (alias `AudioSource`), `AudioReverbZone` (alias
+`PostProcessing`, `Audio` (alias `AudioSource`), `AudioReverbZone` (alias
 `ReverbZone`), `Canvas`, `RectTransform`,
 `Image`, `CanvasGroup`, `RectMask` (alias `RectMask2D`), `Mask`,
 `BackdropFilter` (alias `Backdrop`), `Text` (alias
@@ -102,15 +102,15 @@ every surface (editor Add menu, this API, and scene load):
 
 - **Adding** a dependent auto-adds its requirement with defaults if missing, so
   `AddComponent` never fails on a missing dependency — `Scene.AddComponent(id,
-  "VisualCorrection")` on a camera-less entity also attaches a `Camera`.
+  "PostProcessing")` on a camera-less entity also attaches a `Camera`.
 - **Removing** a required component cascades to the dependents that require it —
-  `Scene.RemoveComponent(id, "Camera")` also removes the entity's `VisualCorrection`.
+  `Scene.RemoveComponent(id, "Camera")` also removes the entity's `PostProcessing`.
 - **Loading** a scene validates the same rule: a hand-edited document with a
   dependent but no requirement gets the requirement auto-added (with a console
   warning), so the loaded scene always satisfies the rule.
 
-The declared dependencies are **`VisualCorrection` requires `Camera`** (a
-color/bloom/SSR correction stack is inert without a camera to correct) and
+The declared dependencies are **`PostProcessing` requires `Camera`** (a
+color/bloom/SSR post-processing stack is inert without a camera to process) and
 **`Image`, `Text`, `Shape`, `RectMask`, `Mask`, `BackdropFilter`, `Selectable`,
 `LayoutGroup` and `LayoutElement` require `RectTransform`** (a graphic fills, a mask clips to, and a layout arranges
 a rect — Unity's `Graphic`, `RectMask2D`, `Mask` and layout components declare the same),

@@ -22,7 +22,7 @@ use glam::Vec3;
 use rusty::components::{MaterialAsset, MaterialComponent};
 use rusty::dev::screenshot::capture;
 use rusty::scene::Camera;
-use rusty::scene::{MeshComponent, Scene, VisualCorrectionComponent};
+use rusty::scene::{MeshComponent, PostProcessingComponent, Scene};
 
 /// 2x2 black RGBA PNG. Metallic reads the BLUE channel (glTF convention), so
 /// `.b = 0` drives metallic to zero.
@@ -34,13 +34,13 @@ fn write_black_png(path: &std::path::Path) {
     img.save(path).expect("write metallic png");
 }
 
-fn vc() -> VisualCorrectionComponent {
-    VisualCorrectionComponent {
+fn vc() -> PostProcessingComponent {
+    PostProcessingComponent {
         bloom_active: false,
         bloom_threshold: 0.6,
         ssr_active: false,
         ssr_temporal_upsampling: false,
-        ..rusty::scene::authoring::default_visual_correction()
+        ..rusty::scene::authoring::default_post_processing()
     }
 }
 
@@ -59,7 +59,7 @@ fn scene(metallic: f32, metallic_map: Option<String>) -> Scene {
     scene
         .world
         .set_material(id, Some(MaterialComponent::new("mat".to_string())));
-    scene.world.set_visual_correction(id, Some(vc()));
+    scene.world.set_post_processing(id, Some(vc()));
     // A volume rides on its camera (#1434): that camera is the view's.
     scene
         .world

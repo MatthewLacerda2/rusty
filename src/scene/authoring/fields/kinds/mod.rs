@@ -43,11 +43,7 @@ pub const KINDS: &[Kind] = &[
     ),
     kind::<CameraComponent>("Camera", Some(K::Camera), "camera"),
     kind::<ParticleEmitterComponent>("Particles", Some(K::Particles), "particles"),
-    kind::<VisualCorrectionComponent>(
-        "VisualCorrection",
-        Some(K::VisualCorrection),
-        "visual_correction",
-    ),
+    kind::<PostProcessingComponent>("PostProcessing", Some(K::PostProcessing), "post_processing"),
     kind::<AudioSourceComponent>("AudioSource", Some(K::Audio), "audio"),
     kind::<ReverbZoneComponent>("AudioReverbZone", Some(K::ReverbZone), "reverb_zone"),
     kind::<CanvasComponent>("Canvas", Some(K::Canvas), "canvas"),

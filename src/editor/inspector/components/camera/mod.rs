@@ -1,5 +1,5 @@
 //! src/editor/inspector/components/camera/ — the Camera inspector card (this
-//! `mod.rs`) plus the Visual Correction card (`visual_correction`, with its custom
+//! `mod.rs`) plus the Post Processing card (`post_processing`, with its custom
 //! effects list in `custom_effects`), split apart to stay under the size cap. Both
 //! cards live on the same camera entity.
 
@@ -7,10 +7,10 @@ use crate::editor::widgets::DragRange;
 use egui_phosphor::regular as icon;
 
 mod custom_effects;
+mod post_processing;
 mod target;
-mod visual_correction;
 
-pub use visual_correction::draw_visual_correction;
+pub use post_processing::draw_post_processing;
 
 use crate::editor::inspector::components::card::component_card;
 use crate::scene::authoring::{self, rendering::camera as camera_ops, ComponentKind};
@@ -39,7 +39,7 @@ pub fn draw_camera(
         target::draw_target(ui, world, id, &cam, is_dirty);
     });
     if remove {
-        // Cascade to camera-dependent components (VisualCorrection) from the
+        // Cascade to camera-dependent components (PostProcessing) from the
         // declaration (#359), not a hand-written pair of clears.
         authoring::remove_with_cascade(world, id, ComponentKind::Camera);
         *is_dirty = true;

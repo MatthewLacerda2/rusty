@@ -630,7 +630,7 @@ An axis can be satisfied in two ways:
   `WAIVERS` table in `tools/lint/src/components/waivers.rs` as `(component, axis, rationale)`
   rows: `mesh add_menu`/`mesh api` (mesh is content-grid/glTF-driven),
   `collider api` + `rigidbody api` (→ `Physics`), `nav_agent api`
-  (→ `NavMeshAgent`), `visual_correction api` (→ `Graphics`).
+  (→ `NavMeshAgent`), `post_processing api` (→ `Graphics`).
 
 **`WAIVERS`** is for axes we have decided not to implement standalone, never for an
 axis not closed yet: that one fails until it is. A row that no longer waives anything

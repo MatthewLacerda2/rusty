@@ -216,7 +216,7 @@ impl World {
             offmesh_link: self.offmesh_link(id).map(|c| (*c).clone()),
             nav_modifier: self.nav_modifier(id).map(|c| (*c).clone()),
             camera: self.camera(id).map(|c| (*c).clone()),
-            visual_correction: self.visual_correction(id).map(|c| (*c).clone()),
+            post_processing: self.post_processing(id).map(|c| (*c).clone()),
             particles: self.particles(id).map(|c| (*c).clone()),
             audio: self.audio(id).map(|c| (*c).clone()),
             reverb_zone: self.reverb_zone(id).map(|c| (*c).clone()),

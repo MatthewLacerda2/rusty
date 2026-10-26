@@ -13,7 +13,7 @@
 use glam::Vec4;
 
 use crate::scene::authoring::{
-    material, rendering::visual_correction as vc_ops, ui::shader as ui_shader,
+    material, rendering::post_processing as vc_ops, ui::shader as ui_shader,
 };
 use crate::scene::Scene;
 use crate::shadergen::params::ParamLayout;
@@ -94,7 +94,7 @@ impl ShaderParam {
                 ui_shader::param(&slot, layout, &self.name)
             }
             Source::Post(chain) => {
-                vc_ops::post_param_with(&*w.visual_correction(id)?, chain, &self.name)
+                vc_ops::post_param_with(&*w.post_processing(id)?, chain, &self.name)
             }
         };
         value.ok().map(|v| lanes(&v))
@@ -119,7 +119,7 @@ impl ShaderParam {
                 });
                 written
             }
-            Source::Post(chain) => scene.world.visual_correction_mut(id).is_some_and(|mut vc| {
+            Source::Post(chain) => scene.world.post_processing_mut(id).is_some_and(|mut vc| {
                 vc_ops::set_post_param_with(&mut vc, chain, &self.name, value).is_ok()
             }),
         }
@@ -146,7 +146,7 @@ fn ui_source(scene: &Scene, id: u32) -> Result<Source, String> {
 fn post_source(scene: &Scene, id: u32) -> Result<Source, String> {
     let vc = scene
         .world
-        .visual_correction(id)
+        .post_processing(id)
         .ok_or_else(|| format!("entity {id} has no post-processing volume"))?;
     Ok(Source::Post(PostChain::load(&vc.custom_effects)))
 }

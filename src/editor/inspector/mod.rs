@@ -92,7 +92,7 @@ fn draw_entity_inspector(
     if world.contains(selected_id) {
         // Reconcile declared component dependencies (#359): drop any component whose
         // requirement was cleared out from under it (e.g. a Camera removed via its
-        // card, orphaning a VisualCorrection). Declaration-driven, not hand-written.
+        // card, orphaning a PostProcessing). Declaration-driven, not hand-written.
         crate::scene::authoring::reconcile_requirements(world, selected_id);
 
         draw_object_header(
@@ -232,7 +232,7 @@ fn draw_components(
     gameplay::draw_navigation(ui, world, id, &mut editor.is_dirty);
 
     camera::draw_camera(ui, world, id, named_layers, &mut editor.is_dirty);
-    camera::draw_visual_correction(ui, world, id, &mut editor.is_dirty);
+    camera::draw_post_processing(ui, world, id, &mut editor.is_dirty);
 
     particles::draw(ui, world, id, &mut editor.is_dirty);
     ribbons::draw_trail(ui, world, id, &mut editor.is_dirty);

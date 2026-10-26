@@ -45,10 +45,10 @@ pub(super) const WAIVERS: &[(&str, &str, &str)] = &[
          (the field is `nav_agent`, the namespace is the Unity name `NavMeshAgent`).",
     ),
     (
-        "visual_correction",
+        "post_processing",
         "api",
         "Served by the `Graphics` namespace, which drives the active \
-         VisualCorrectionComponent's bloom/SSR/tonemap/exposure knobs (render-only \
+         PostProcessingComponent's bloom/SSR/tonemap/exposure knobs (render-only \
          state). A per-component namespace would duplicate that surface.",
     ),
 ];

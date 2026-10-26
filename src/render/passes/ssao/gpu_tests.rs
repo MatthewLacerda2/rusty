@@ -5,18 +5,18 @@ use glam::Vec3;
 
 use crate::core::settings::quality::QualityPreset;
 use crate::render::{RenderView, Renderer, OFFSCREEN_FORMAT};
-use crate::scene::authoring::{create_entity, default_visual_correction, Primitive};
+use crate::scene::authoring::{create_entity, default_post_processing, Primitive};
 use crate::scene::{Camera, Scene};
 
-/// A crate under a visual-correction volume with AO `on`.
+/// A crate under a post-processing volume with AO `on`.
 fn crate_scene(on: bool) -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
     create_entity(&mut scene, "Crate", Some(Primitive::Box));
     let volume = create_entity(&mut scene, "Volume", None);
-    let mut vc = default_visual_correction();
+    let mut vc = default_post_processing();
     vc.ssao.active = on;
-    scene.world.set_visual_correction(volume, Some(vc));
+    scene.world.set_post_processing(volume, Some(vc));
     // A volume rides on its camera (#1434): that camera is the view's.
     scene
         .world

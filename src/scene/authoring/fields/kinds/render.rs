@@ -1,5 +1,5 @@
 //! src/scene/authoring/fields/kinds/render.rs — the rendering components' field tables:
-//! `Transform`, `Mesh`, `Material`, `Light`, `Camera`, `VisualCorrection` and
+//! `Transform`, `Mesh`, `Material`, `Light`, `Camera`, `PostProcessing` and
 //! `LODGroup`.
 
 use std::collections::BTreeMap;
@@ -10,11 +10,11 @@ use super::NO_OP;
 use crate::components::rendering::camera::RenderTarget;
 use crate::components::{
     CameraComponent, LightComponent, LodGroupComponent, LodLevel, MaterialComponent, MeshComponent,
-    ShadowSettings, SsaoSettings, TransformComponent, VisualCorrectionComponent,
+    PostProcessingComponent, ShadowSettings, SsaoSettings, TransformComponent,
 };
 use crate::scene::authoring::{
     rendering::camera, rendering::light, rendering::lod_group as lod,
-    rendering::visual_correction as vc,
+    rendering::post_processing as vc,
 };
 use crate::shadergen::post_params::PostChain;
 
@@ -61,7 +61,7 @@ inspect! {
         op!("projection", camera::set_projection),
         with!("target_texture", |c, v: Option<RenderTarget>| set_target(c, v)),
     ];
-    VisualCorrectionComponent => visual_correction, visual_correction_mut, &[
+    PostProcessingComponent => post_processing, post_processing_mut, &[
         op!("active", vc::set_active),
         op!("bloom_active", vc::set_bloom_active),
         op!("bloom_intensity", vc::set_bloom_intensity),

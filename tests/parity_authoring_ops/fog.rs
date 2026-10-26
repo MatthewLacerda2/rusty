@@ -11,7 +11,7 @@ use rusty::scene::{FogMode, Scene};
 
 #[test]
 fn fog_api_and_shared_op_converge_without_a_volume() -> Result<(), Box<dyn std::error::Error>> {
-    // Scene fog is scene-level: a bare scene (no visual-correction volume) takes it.
+    // Scene fog is scene-level: a bare scene (no post-processing volume) takes it.
     let lua_scene = Rc::new(RefCell::new(Scene::new()));
     let quality = Rc::new(RefCell::new(QualityPreset::High));
     let lua = Lua::new();

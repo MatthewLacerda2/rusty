@@ -10,15 +10,15 @@ use crate::temp::file as tmp;
 use glam::Vec3;
 use rusty::dev::screenshot::capture;
 use rusty::scene::Camera;
-use rusty::scene::{MeshComponent, Scene, VisualCorrectionComponent};
+use rusty::scene::{MeshComponent, PostProcessingComponent, Scene};
 
-fn vc(exposure: f32) -> VisualCorrectionComponent {
-    VisualCorrectionComponent {
+fn vc(exposure: f32) -> PostProcessingComponent {
+    PostProcessingComponent {
         bloom_threshold: 0.6,
         exposure,
         ssr_active: false,
         ssr_temporal_upsampling: false,
-        ..rusty::scene::authoring::default_visual_correction()
+        ..rusty::scene::authoring::default_post_processing()
     }
 }
 
@@ -30,7 +30,7 @@ fn scene_with_exposure(exposure: f32) -> Scene {
     scene
         .world
         .set_mesh(id, Some(MeshComponent::new("Box", vertices, indices)));
-    scene.world.set_visual_correction(id, Some(vc(exposure)));
+    scene.world.set_post_processing(id, Some(vc(exposure)));
     // A volume rides on its camera (#1434): that camera is the view's.
     scene
         .world

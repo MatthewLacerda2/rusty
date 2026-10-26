@@ -1,6 +1,6 @@
 //! `Graphics.{Get,Set}CustomEffects` (#397): the ordered authored post-FX modules the
-//! active visual-correction volume runs, through the same
-//! `authoring::rendering::visual_correction` op the Inspector's list calls — and
+//! active post-processing volume runs, through the same
+//! `authoring::rendering::post_processing` op the Inspector's list calls — and
 //! `Graphics.{Get,Set}PostParam` (#671), those modules' runtime params.
 
 use std::cell::RefCell;
@@ -10,7 +10,7 @@ use mlua::{IntoLua, Value};
 use super::super::material::shader::params::floats;
 use super::super::{put, Reg};
 use super::state::{with_vc, with_vc_mut};
-use crate::scene::authoring::rendering::visual_correction as vc_ops;
+use crate::scene::authoring::rendering::post_processing as vc_ops;
 use crate::scene::Scene;
 use crate::shadergen::post_params::catalog_default;
 

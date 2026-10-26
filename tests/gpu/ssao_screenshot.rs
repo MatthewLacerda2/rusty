@@ -4,7 +4,7 @@
 
 use glam::Vec3;
 use rusty::dev::screenshot::capture;
-use rusty::scene::authoring::{create_entity, default_visual_correction, Primitive};
+use rusty::scene::authoring::{create_entity, default_post_processing, Primitive};
 use rusty::scene::{Camera, Scene};
 
 /// A floor slab, optionally with a crate standing on it, lit by ambient light alone
@@ -28,11 +28,11 @@ fn yard(with_crate: bool, ssao: bool) -> Scene {
         t.scale = scale;
     }
     let volume = create_entity(&mut scene, "Volume", None);
-    let mut vc = default_visual_correction();
+    let mut vc = default_post_processing();
     vc.bloom_active = false;
     vc.ssr_active = false;
     vc.ssao.active = ssao;
-    scene.world.set_visual_correction(volume, Some(vc));
+    scene.world.set_post_processing(volume, Some(vc));
     // A volume rides on its camera (#1434): that camera is the view's.
     scene
         .world

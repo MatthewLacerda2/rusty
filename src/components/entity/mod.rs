@@ -17,9 +17,9 @@ use super::{
     AnimatorComponent, AudioSourceComponent, CameraComponent, CanvasComponent,
     CanvasGroupComponent, ColliderComponent, ImageComponent, LayoutElementComponent,
     LayoutGroupComponent, LightComponent, MaterialAsset, MaterialComponent, MeshComponent,
-    NavMeshAgentComponent, ParticleEmitterComponent, RectMaskComponent, RectTransformComponent,
-    RigidBodyComponent, ScriptComponent, SelectableComponent, TextComponent, TransformComponent,
-    VisualCorrectionComponent,
+    NavMeshAgentComponent, ParticleEmitterComponent, PostProcessingComponent, RectMaskComponent,
+    RectTransformComponent, RigidBodyComponent, ScriptComponent, SelectableComponent,
+    TextComponent, TransformComponent,
 };
 use super::{
     BackdropFilterComponent, MaskComponent, NavMeshObstacleComponent, OffMeshLinkComponent,
@@ -104,7 +104,7 @@ pub struct Entity {
     #[serde(default)]
     pub nav_modifier: Option<NavMeshModifierVolumeComponent>,
     pub camera: Option<CameraComponent>,
-    pub visual_correction: Option<VisualCorrectionComponent>,
+    pub post_processing: Option<PostProcessingComponent>,
     #[serde(default)]
     pub particles: Option<ParticleEmitterComponent>,
     /// Per-entity 2D audio emitter (#212).
@@ -210,7 +210,7 @@ impl Entity {
             offmesh_link: None,
             nav_modifier: None,
             camera: None,
-            visual_correction: None,
+            post_processing: None,
             particles: None,
             audio: None,
             reverb_zone: None,

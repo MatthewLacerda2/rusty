@@ -92,13 +92,13 @@ fn a_ui_tween_runs_on_unscaled_time() {
 fn a_graphics_tween_fades_the_volumes_post_param() {
     let effect = Baked::new("postfx", "damage_vignette", "post");
     let (mut m, id) = rig("tween_post", &counted(""));
-    let mut vc = defaults::default_visual_correction();
+    let mut vc = defaults::default_post_processing();
     vc.custom_effects = vec![effect.0.clone()];
     m.cells
         .scene
         .borrow_mut()
         .world
-        .set_visual_correction(id, Some(vc));
+        .set_post_processing(id, Some(vc));
     // `Graphics.*` edits the main camera's volume (#1434).
     let camera = crate::components::CameraComponent::default();
     m.cells

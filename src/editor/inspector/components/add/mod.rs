@@ -84,9 +84,9 @@ const ENTRIES: &[(ComponentKind, &str, &str)] = &[
     (ComponentKind::Trail, icon::WIND, "Trail Renderer"),
     (ComponentKind::Line, icon::LINE_SEGMENTS, "Line Renderer"),
     (
-        ComponentKind::VisualCorrection,
+        ComponentKind::PostProcessing,
         "",
-        "Visual Correction Component",
+        "Post Processing Component",
     ),
     (ComponentKind::LodGroup, icon::STACK_SIMPLE, "LOD Group"),
     (ComponentKind::Audio, icon::SPEAKER_HIGH, "Audio Source"),

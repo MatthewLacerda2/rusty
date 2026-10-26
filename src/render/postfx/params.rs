@@ -1,5 +1,5 @@
 //! Builds the per-frame `PostParams` from one view's camera (#1434): its
-//! `CameraComponent` and `VisualCorrectionComponent`, gated by the quality preset.
+//! `CameraComponent` and `PostProcessingComponent`, gated by the quality preset.
 //!
 //! This is the bridge from the editor's "dead knobs" to the GPU: every field the
 //! inspector exposes ends up packed here and read by `postfx.wgsl`.
@@ -16,7 +16,7 @@ use std::collections::BTreeMap;
 use glam::Mat4;
 
 use super::{PostParams, PostPasses};
-use crate::components::{CameraComponent, VisualCorrectionComponent};
+use crate::components::{CameraComponent, PostProcessingComponent};
 use crate::core::settings::quality::QualityPreset;
 use crate::scene::camera::camera_volume;
 use crate::scene::Scene;
@@ -26,9 +26,9 @@ use crate::scene::Scene;
 pub(crate) struct PostSource<'a> {
     /// The base camera's component: motion blur and FXAA.
     pub camera: Option<&'a CameraComponent>,
-    /// Its visual-correction volume, when active: grade, bloom, SSR, SSAO, shadows
+    /// Its post-processing volume, when active: grade, bloom, SSR, SSAO, shadows
     /// and the authored effects. `None` runs them neutral.
-    pub volume: Option<&'a VisualCorrectionComponent>,
+    pub volume: Option<&'a PostProcessingComponent>,
 }
 
 /// The base camera `id`'s components, borrowed for a view: the guards the caller
@@ -43,7 +43,7 @@ pub(crate) fn borrow_post_source(scene: &Scene, id: Option<u32>) -> PostGuards<'
 /// The component guards behind a [`PostSource`].
 pub(crate) struct PostGuards<'w> {
     camera: Option<crate::ecs::CompRef<'w, CameraComponent>>,
-    volume: Option<crate::ecs::CompRef<'w, VisualCorrectionComponent>>,
+    volume: Option<crate::ecs::CompRef<'w, PostProcessingComponent>>,
 }
 
 impl PostGuards<'_> {
@@ -55,7 +55,7 @@ impl PostGuards<'_> {
     }
 }
 
-/// Pack `post`'s visual-correction volume and camera settings into a `PostParams`
+/// Pack `post`'s post-processing volume and camera settings into a `PostParams`
 /// for `postfx.wgsl`. Returns the params plus whether the bloom passes should run
 /// this frame.
 ///
@@ -135,7 +135,7 @@ pub(crate) fn post_passes<'a>(post: PostSource<'a>, bloom: bool) -> PostPasses<'
 ///
 /// Deliberately *not* tied to the volume [`build_post_params`] reads: FXAA lives on
 /// the camera, so tying it to the volume would make anti-aliasing depend on the
-/// camera carrying a `VisualCorrection` — the opposite of a default-on effect.
+/// camera carrying a `PostProcessing` — the opposite of a default-on effect.
 ///
 /// No camera component at all gets `true`: default-on means a scene that has never
 /// heard of the knob is still anti-aliased.

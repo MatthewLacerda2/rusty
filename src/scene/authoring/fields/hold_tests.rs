@@ -77,16 +77,13 @@ fn out_of_range_values_are_held_on_load() {
     let (scene, id) = load_pushed(true);
     assert_eq!(scene.world.audio(id).unwrap().volume, 1.0);
     assert_eq!(scene.world.canvas_group(id).unwrap().alpha, 1.0);
-    let vc = scene.world.visual_correction(id).unwrap();
+    let vc = scene.world.post_processing(id).unwrap();
     assert_eq!(vc.ssao.intensity, SsaoSettings::MAX_INTENSITY);
     assert_eq!(vc.shadows.cascades, ShadowSettings::MAX_CASCADES);
     let (scene, id) = load_pushed(false);
     assert_eq!(scene.world.audio(id).unwrap().volume, 0.0);
     assert_eq!(scene.world.audio(id).unwrap().final_distance, 0.0);
-    assert_eq!(
-        scene.world.visual_correction(id).unwrap().shadows.cascades,
-        1
-    );
+    assert_eq!(scene.world.post_processing(id).unwrap().shadows.cascades, 1);
 }
 
 /// A file already in range loads exactly as saved, over and over: no op's side

@@ -16,7 +16,7 @@ use rusty::dev::screenshot::capture;
 use rusty::scene::Camera;
 use rusty::scene::{MeshComponent, Scene};
 
-/// A lit box plus a camera carrying the FXAA knob. No `VisualCorrection` volume at
+/// A lit box plus a camera carrying the FXAA knob. No `PostProcessing` volume at
 /// all, which is itself part of the point: FXAA is read off the camera, so it must
 /// work in a scene that has never heard of the post-FX volume.
 fn scene_with_fxaa(on: bool) -> Scene {
