@@ -1,5 +1,5 @@
 //! Per-frame execution of the post-process chain: bright-pass, a 2D gaussian
-//! blur, the composite (tonemap + grade), the authored effects (#397), then FXAA —
+//! blur, the composite (exposure, then the grading LUT `grade` baked), the authored effects (#397), then FXAA —
 //! or a plain copy — that writes the finished image to the target.
 
 use super::custom::{CustomChain, Effect};
@@ -185,7 +185,7 @@ impl PostFx {
     }
 
     /// Build a bind group: params + color(1) + sampler(2) + bloom(3) + depth(4) +
-    /// skybox(5) + its sampler(6). `color` is the texture the pass reads, `bloom` an
+    /// skybox(5) + its sampler(6) + the grading LUT(7). `color` is the texture the pass reads, `bloom` an
     /// aux texture.
     fn io_bind_group(
         &self,
@@ -226,6 +226,10 @@ impl PostFx {
                 wgpu::BindGroupEntry {
                     binding: 6,
                     resource: wgpu::BindingResource::Sampler(skybox_sampler),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 7,
+                    resource: wgpu::BindingResource::TextureView(&self.grade.view),
                 },
             ],
         })

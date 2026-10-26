@@ -72,6 +72,11 @@ set on that camera entity, in the inspector or the scene file.
 | `Graphics.GetSaturation` / `SetSaturation` | `()` / `(value)` | `number` |
 | `Graphics.GetGamma` / `SetGamma` | `()` / `(value)` | `number` (display-gamma tweak, **neutral `1.0`**, clamped ≥ 0.01) |
 | `Graphics.GetTonemap` / `SetTonemap` | `()` / `(name)` | `"None"` / `"Reinhard"` / `"ACES"` (Unity's name; names are case-insensitive) |
+| `Graphics.GetWhiteBalance` / `SetWhiteBalance` | `()` / `(temperature, tint)` | `temperature, tint` (each clamped −100–100, **neutral `0, 0`**; see *Colour grading*) |
+| `Graphics.GetLiftWheel` / `SetLiftWheel` | `()` / `(r, g, b, offset)` | `r, g, b, offset`: the Lift wheel (colour each clamped 0–1, offset −1–1, **neutral `1, 1, 1, 0`**) |
+| `Graphics.GetGammaWheel` / `SetGammaWheel` | `()` / `(r, g, b, offset)` | `r, g, b, offset`: the Gamma wheel, as the Lift wheel. Not `GetGamma`, the display-gamma tweak |
+| `Graphics.GetGainWheel` / `SetGainWheel` | `()` / `(r, g, b, offset)` | `r, g, b, offset`: the Gain wheel, as the Lift wheel |
+| `Graphics.GetHueShift` / `SetHueShift` | `()` / `(degrees)` | `number` (clamped −180–180, **neutral `0`**) |
 | `Graphics.GetSsrActive` / `SetSsrActive` | `()` / `(bool)` | `bool` |
 | `Graphics.GetSsrQuality` / `SetSsrQuality` | `()` / `(name)` | `string` |
 | `Graphics.GetMotionBlurActive` / `SetMotionBlurActive` | `()` / `(bool)` | `bool` |
@@ -103,6 +108,21 @@ set on that camera entity, in the inspector or the scene file.
 (window, Game view, and headless screenshot alike) is sRGB and encodes linear →
 display in hardware, exactly once (#415). `1.0` leaves the image untouched; `> 1`
 lifts the midtones, `< 1` darkens them.
+
+**Colour grading** (#1440) is Unity URP's: **white balance** (temperature warms
+towards yellow or cools towards blue, tint pushes towards magenta or green),
+**Lift / Gamma / Gain** (three trackballs moving the blacks, the midtones and the
+whites: the colour's hue tints that range, a grey colour tints nothing, and the
+offset brightens or darkens it), a **hue shift** rotating every hue, and contrast
+and saturation. Exposure stays a plain HDR scale ahead of all of it. White balance,
+Lift / Gamma / Gain and the hue shift act on the scene's linear HDR colour, before
+the tonemap; contrast, saturation and the display gamma act on the tonemapped
+colour. The renderer bakes the whole grade and the tonemap into a 32³ lookup table
+per view and grades each pixel with one fetch from it; the table is rebaked only on
+a frame where one of those knobs or the tonemap changed, which `Debug.Stats()`
+counts as `grade_lut_bakes`. Each view grades with its base camera's volume, like
+the rest of its post-FX. The Inspector's **Color Correction** section edits the
+same fields, and they are saved with the scene.
 
 **Sun shadows** are cascaded (#435): the camera's view, out to the **shadow
 distance**, is split into `1`–`4` slices, each with its own shadow map fitted to it

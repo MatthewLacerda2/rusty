@@ -3,7 +3,9 @@
 //! the player's graphics options through [`effect_runs`] (#1438).
 //!
 //! This is the bridge from the editor's "dead knobs" to the GPU: every field the
-//! inspector exposes ends up packed here and read by `postfx.wgsl`.
+//! inspector exposes ends up packed here and read by `postfx.wgsl`, except the
+//! grade (white balance, Lift / Gamma / Gain, hue, contrast, saturation, gamma and
+//! the tonemap), which `postfx::grade::GradeParams` packs for the LUT bake (#1440).
 //!
 //! **Whose settings.** A view post-processes with its base camera, the way Unity URP
 //! post-processes a camera stack once, with the base camera's settings: the screen

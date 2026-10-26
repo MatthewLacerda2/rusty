@@ -55,7 +55,8 @@ struct CameraUniforms {
 // The post-process chain's uniform (group 0, binding 0 of every post pass, built-in
 // and authored). Mirrors the Rust `PostParams`.
 struct PostParams {
-    // x: exposure (EV), y: contrast, z: saturation, w: gamma
+    // x: exposure (EV), y: contrast, z: saturation, w: gamma. Only x is read by
+    // the composite: the rest reach it baked into the grading LUT (#1440).
     color: vec4<f32>,
     // x: bloom_intensity, y: bloom_threshold, z: tonemap index, w: bloom_enabled
     bloom: vec4<f32>,

@@ -101,7 +101,7 @@ fn draw_bloom(
 
 /// A labelled slider row that routes its write through a shared vc op (#287).
 /// Returns whether the value changed; `cx` is the (world, entity-id) pair.
-fn slider_row(
+pub(super) fn slider_row(
     ui: &mut egui::Ui,
     cx: (&mut crate::ecs::World, u32),
     label: &str,
@@ -122,7 +122,8 @@ fn slider_row(
     .inner
 }
 
-/// The Color Correction section (exposure, contrast, saturation, tonemap, gamma).
+/// The Color Correction section (exposure, contrast, saturation, the grade, tonemap,
+/// gamma).
 #[rustfmt::skip]
 fn draw_color_correction(
     ui: &mut egui::Ui,
@@ -136,8 +137,9 @@ fn draw_color_correction(
     *is_dirty |= slider_row(ui, (&mut *world, id), "  Exposure (EV):", vc.exposure, -4.0..=4.0, vc_ops::set_exposure);
     *is_dirty |= slider_row(ui, (&mut *world, id), "  Contrast:", vc.contrast, 0.0..=2.0, vc_ops::set_contrast);
     *is_dirty |= slider_row(ui, (&mut *world, id), "  Saturation:", vc.saturation, 0.0..=2.0, vc_ops::set_saturation);
+    super::grading::draw_grading(ui, world, id, vc, is_dirty);
     draw_tonemap(ui, world, id, vc, is_dirty);
-    *is_dirty |= slider_row(ui, (&mut *world, id), "  Gamma:", vc.gamma, 0.5..=2.0, vc_ops::set_gamma);
+    *is_dirty |= slider_row(ui, (&mut *world, id), "  Display Gamma:", vc.gamma, 0.5..=2.0, vc_ops::set_gamma);
 }
 
 /// The tonemap-operator selector, reading the snapshot and routing through the op.

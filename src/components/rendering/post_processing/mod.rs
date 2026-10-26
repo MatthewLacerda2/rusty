@@ -8,8 +8,10 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
+mod grading;
 mod tonemap;
 
+pub use grading::{ColorWheel, LiftGammaGain, Wheel, WhiteBalance};
 pub use tonemap::Tonemap;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -18,9 +20,19 @@ pub struct PostProcessingComponent {
     pub bloom_active: bool,
     pub bloom_intensity: f32,
     pub bloom_threshold: f32,
+    /// A pre-grade HDR scale, in EV: the one colour knob outside the grading LUT.
     pub exposure: f32,
     pub contrast: f32,
     pub saturation: f32,
+    /// The white point (#1440); neutral when absent.
+    #[serde(default)]
+    pub white_balance: WhiteBalance,
+    /// Lift / Gamma / Gain (#1440); neutral when absent.
+    #[serde(default)]
+    pub lift_gamma_gain: LiftGammaGain,
+    /// Rotates every hue by this many degrees, `-180..=180` (#1440); `0` when absent.
+    #[serde(default)]
+    pub hue_shift: f32,
     pub ssr_active: bool,
     pub ssr_quality: String, // "Low", "Medium", "High", "Ultra"
     pub ssr_temporal_upsampling: bool,
@@ -178,6 +190,22 @@ mod tests {
         let back: PostProcessingComponent =
             serde_json::from_str(&serde_json::to_string(&vc).unwrap()).unwrap();
         assert_eq!(back.post_params["damage_vignette.intensity"], [0.7]);
+    }
+
+    #[test]
+    fn grading_knobs_load_neutral_when_absent_and_round_trip() {
+        let vc = load("");
+        assert!(vc.white_balance.is_neutral() && vc.hue_shift == 0.0);
+        assert_eq!(vc.lift_gamma_gain, super::LiftGammaGain::default());
+        let vc = load(r#", "hue_shift": 30.0, "lift_gamma_gain": {"gain": {"offset": 0.5}}"#);
+        let back: PostProcessingComponent =
+            serde_json::from_str(&serde_json::to_string(&vc).unwrap()).unwrap();
+        assert_eq!(back.hue_shift, 30.0);
+        assert_eq!(
+            back.lift_gamma_gain.gain.color, [1.0; 3],
+            "an absent colour is white"
+        );
+        assert_eq!(back.lift_gamma_gain.gain.offset, 0.5);
     }
 
     #[test]

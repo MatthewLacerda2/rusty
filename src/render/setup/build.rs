@@ -17,7 +17,7 @@ use crate::render::gpu::pipelines;
 use crate::render::gpu::shaders::ShaderRegistry;
 use crate::render::ibl::reflection_probes::ProbeArray;
 use crate::render::passes::outline::OutlinePasses;
-use crate::render::postfx::{motion_blur::MotionBlurPasses, HDR_FORMAT};
+use crate::render::postfx::{grade::GradeBake, motion_blur::MotionBlurPasses, HDR_FORMAT};
 use crate::render::setup::textures::{create_textures, Textures};
 use crate::render::{ibl::skybox, passes::shadows, passes::ssao};
 use crate::render::{CameraUniform, GpuTexture, LightingUniform};
@@ -83,6 +83,7 @@ pub(crate) struct GpuResources {
     pub ui: crate::render::ui::UiRenderer,
     /// The SSAO passes (#436).
     pub ssao: ssao::SsaoRenderer,
+    pub grade_bake: GradeBake,
     pub motion_blur: crate::render::postfx::motion_blur::MotionBlurPasses,
     pub quality: QualityPreset,
 }
@@ -139,6 +140,7 @@ impl GpuResources {
             billboards,
             ui,
             ssao,
+            grade_bake: GradeBake::new(device, &mut registry),
             motion_blur: MotionBlurPasses::new(device, &mut registry),
             quality: QualityPreset::default(),
         }

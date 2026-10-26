@@ -9,8 +9,9 @@ use super::super::value::Mask;
 use super::NO_OP;
 use crate::components::rendering::camera::RenderTarget;
 use crate::components::{
-    CameraComponent, LightComponent, LodGroupComponent, LodLevel, MaterialComponent, MeshComponent,
-    PostProcessingComponent, ShadowSettings, SsaoSettings, TransformComponent,
+    CameraComponent, LiftGammaGain, LightComponent, LodGroupComponent, LodLevel, MaterialComponent,
+    MeshComponent, PostProcessingComponent, ShadowSettings, SsaoSettings, TransformComponent,
+    Wheel, WhiteBalance,
 };
 use crate::scene::authoring::{
     rendering::camera, rendering::light, rendering::lod_group as lod,
@@ -71,6 +72,15 @@ inspect! {
         op!("exposure", vc::set_exposure),
         op!("contrast", vc::set_contrast),
         op!("saturation", vc::set_saturation),
+        with!("white_balance", |c, v: WhiteBalance| {
+            vc::set_white_balance(c, v.temperature, v.tint);
+        }),
+        with!("lift_gamma_gain", |c, v: LiftGammaGain| {
+            for w in Wheel::ALL {
+                vc::set_wheel(c, w, v.wheel(w).color, v.wheel(w).offset);
+            }
+        }),
+        op!("hue_shift", vc::set_hue_shift),
         op!("ssr_active", vc::set_ssr_active),
         op!("ssr_quality", vc::set_ssr_quality),
         op!("ssr_temporal_upsampling", vc::set_ssr_temporal_upsampling),

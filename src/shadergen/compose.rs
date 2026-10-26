@@ -28,6 +28,7 @@ pub const MODULES: &[&str] = &[
     "sky/motion.wgsl",
     "forward/bindings.wgsl",
     "forward/lighting.wgsl",
+    "postfx/grade.wgsl",
 ];
 
 /// Build a composer pre-loaded with [`MODULES`] under `base`: `common.wgsl` as the
