@@ -13,7 +13,7 @@
 //! effects run) — the history a feedback effect (#402) reads. Bindings 0, 4, 5 and 6 are the post params, depth,
 //! skybox and the skybox's sampler, as for every other post pass. Group 1 is the effect's own **runtime-param
 //! uniform** (#671, `shadergen::params::POSTFX_UNIFORM_DECL`): packed every frame from
-//! the volume's `post_params` against the module's baked layout, so a script changing
+//! the volume's `custom_effects.params` against the module's baked layout, so a script changing
 //! a value costs one buffer write — never a re-bake or a pipeline rebuild.
 //!
 //! Modules are compiled once per name and cached; a shader file written anywhere in
