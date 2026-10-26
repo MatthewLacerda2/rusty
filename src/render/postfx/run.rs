@@ -7,9 +7,10 @@ use super::{PfxTarget, PostFx, PostFxContext, PostParams, PostPasses};
 use crate::render::timing::GpuPass;
 
 impl PostFx {
-    /// Run the full chain. `depth_view` is the scene depth (for SSR + motion blur),
-    /// `skybox` the panorama SSR falls back to, `output` the final swapchain/screenshot
-    /// view. `passes` says which optional passes run this frame.
+    /// Run the full chain. `depth_view` is the scene depth, for SSR and authored
+    /// effects (motion blur has already run, over the velocity target's own
+    /// distances), `skybox` the panorama SSR falls back to, `output` the final
+    /// swapchain/screenshot view. `passes` says which optional passes run this frame.
     pub fn run(
         &mut self,
         device: &wgpu::Device,

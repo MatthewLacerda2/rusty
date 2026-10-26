@@ -10,7 +10,7 @@ use crate::render::motion::gpu_fixture::{cube, eye, pixel, project, renderer, vi
 use crate::scene::{ClearFlags, Scene};
 
 /// Give `id` a flat `colour` material, so the enemy and the wall tell apart.
-fn paint(scene: &mut Scene, id: u32, name: &str, colour: [f32; 3]) {
+pub(super) fn paint(scene: &mut Scene, id: u32, name: &str, colour: [f32; 3]) {
     let asset = MaterialAsset {
         base_color: colour,
         roughness: 1.0,
@@ -22,7 +22,7 @@ fn paint(scene: &mut Scene, id: u32, name: &str, colour: [f32; 3]) {
 }
 
 /// The layer the gun is drawn on, and only by the gun camera.
-const VIEWMODEL: u8 = 1;
+pub(super) const VIEWMODEL: u8 = 1;
 
 /// A still wall 8.5 m out, an enemy cube 4.5 m out at `enemy_x`, and, with
 /// `overlay`, a `DepthOnly` gun camera drawing only the viewmodel layer, whose gun

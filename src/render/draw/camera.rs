@@ -112,6 +112,7 @@ impl<'a> CameraCtx<'a> {
                 fog: shared.fog,
                 clusters: clusters.uniform(),
                 prev_view_proj: shared.prev_view_projs[idx].to_cols_array(),
+                stack: [idx as f32, 0.0, 0.0, 0.0],
             },
             clusters,
             solids: SolidResources::default(),

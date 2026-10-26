@@ -50,3 +50,11 @@ fn the_sky_distance_is_one_number_in_rust_and_wgsl() {
         "sky/motion.wgsl should declare `{line}`"
     );
 }
+
+#[test]
+fn velocities_over_several_frames_shrink_the_shutter_not_the_clamp() {
+    let one = BlurParams::new(&camera(), 1080);
+    let four = one.per_frames(4);
+    assert_eq!(four.shape, [0.125, 54.0, 16.0, 32.0]);
+    assert_eq!(one.per_frames(0), one, "0 frames reads as one");
+}

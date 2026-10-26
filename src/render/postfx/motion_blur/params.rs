@@ -36,6 +36,14 @@ impl BlurParams {
         }
     }
 
+    /// The params for velocities that span `frames` frames (a render texture drawn
+    /// every N frames, #1436): the shutter shrinks by as much, so the streak is one
+    /// frame's. The clamp, and so the tile size, stay.
+    pub(crate) fn per_frames(mut self, frames: u32) -> Self {
+        self.shape[0] /= frames.max(1) as f32;
+        self
+    }
+
     /// The tile size in pixels.
     pub(crate) fn tile(&self) -> u32 {
         self.shape[3] as u32

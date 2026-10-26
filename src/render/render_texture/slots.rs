@@ -40,6 +40,14 @@ impl Slot {
     }
 }
 
+/// How many frames of motion a draw on `frame` spans (#1436): the frames since the
+/// slot last drew (`update_every` once it runs steadily), 1 for its first draw. The
+/// slot's motion history is a draw old, so its velocities span that many frames.
+pub(super) fn frames_since(drawn_on: Option<u64>, frame: u64) -> u32 {
+    let gap = drawn_on.map_or(1, |f| frame.saturating_sub(f).max(1));
+    u32::try_from(gap).unwrap_or(u32::MAX)
+}
+
 /// See [`Slot::is_due`]; `every` below 1 means every frame.
 pub(super) fn is_due(drawn_on: Option<u64>, frame: u64, every: u32) -> bool {
     drawn_on.is_none_or(|f| frame.saturating_sub(f) >= u64::from(every.max(1)))

@@ -15,10 +15,12 @@
 // scene. A pixel whose neighbourhood barely moves is copied unchanged, so a still
 // frame is pixel-identical to motion blur off.
 //
-// Units. The velocity target holds `ndc_now - ndc_prev` in `.xy` and, in `.z`, how
-// far the surface lies from the camera that drew it: each camera of a stack writes
-// its own, so the order holds under a `DepthOnly` overlay that cleared the depth
-// buffer. A *streak* is that motion in pixels, scaled by the shutter (`intensity`)
+// Units. The velocity target holds `ndc_now - ndc_prev` in `.xy`, in `.z` how far
+// the surface lies from the camera that drew it, and in `.w` that camera's index in
+// its stack (0 the base, the sky and clear 0 too). A higher camera is in front
+// whatever the distances say: a gun 0.6 m from its camera stays over a wall 0.35 m
+// from the world camera. Within one camera, the nearer surface is in front. So the
+// order holds under a `DepthOnly` overlay that cleared the depth buffer. A *streak* is that motion in pixels, scaled by the shutter (`intensity`)
 // and clamped to the longest streak the camera allows; a tap reaches half a streak
 // either side of its pixel.
 
@@ -44,10 +46,21 @@ fn vs_fullscreen(@builtin(vertex_index) vid: u32) -> @builtin(position) vec4<f32
     return fullscreen::triangle(vid);
 }
 
-// Pixel `p`'s streak: its motion in pixels over the open shutter, clamped.
+// Whether both components are finite: an infinity or NaN has every exponent bit
+// set. Checked on the bits, since a shader compiler may fold away a NaN compare.
+fn finite(v: vec2<f32>) -> bool {
+    let exponent = bitcast<vec2<u32>>(v) & vec2<u32>(0x7f800000u);
+    return all(exponent != vec2<u32>(0x7f800000u));
+}
+
+// Pixel `p`'s streak: its motion in pixels over the open shutter, clamped. A
+// non-finite motion is none, so no `inf` or NaN reaches the blur or bloom.
 fn streak(p: vec2<i32>) -> vec2<f32> {
     let dims = vec2<f32>(textureDimensions(t_velocity));
     let ndc = textureLoad(t_velocity, p, 0).xy;
+    if (!finite(ndc)) {
+        return vec2<f32>(0.0);
+    }
     // NDC spans 2 units across the view, and its y points up where pixels count down.
     let v = ndc * vec2<f32>(0.5 * dims.x, -0.5 * dims.y) * blur.shape.x;
     let len = length(v);
@@ -104,9 +117,21 @@ fn fs_neighbor_max(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32> 
     return vec4<f32>(best, 0.0, 0.0);
 }
 
-// How far from its camera the surface at pixel `p` lies.
-fn view_distance(p: vec2<i32>) -> f32 {
-    return textureLoad(t_velocity, p, 0).z;
+// Where the surface at pixel `p` lies: its camera's index in the stack (x) and its
+// distance from that camera (y).
+fn depth_key(p: vec2<i32>) -> vec2<f32> {
+    let texel = textureLoad(t_velocity, p, 0);
+    return vec2<f32>(texel.w, texel.z);
+}
+
+// How much of a tap with key `tap` lies behind the centre's `center`: a lower camera
+// is wholly behind and a higher one wholly in front; on one camera, distances within
+// `SOFT_DISTANCE` blend and further apart the nearer one wins.
+fn behind(center: vec2<f32>, tap: vec2<f32>) -> f32 {
+    if (tap.x != center.x) {
+        return select(0.0, 1.0, tap.x < center.x);
+    }
+    return clamp(0.5 + (tap.y - center.y) / SOFT_DISTANCE, 0.0, 1.0);
 }
 
 // Interleaved gradient noise (Jimenez 2014) in [0, 1): a fixed per-pixel offset for
@@ -135,7 +160,7 @@ fn fs_gather(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32> {
 
     let dims = vec2<i32>(textureDimensions(t_color));
     let center_radius = 0.5 * length(streak(p));
-    let center_distance = view_distance(p);
+    let center_key = depth_key(p);
     let n = i32(blur.shape.z);
     let offset = jitter(pos.xy);
     var sum = vec3<f32>(0.0);
@@ -146,14 +171,11 @@ fn fs_gather(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32> {
         let step = neighborhood * 0.5 * t;
         let q = clamp(p + vec2<i32>(round(step)), vec2<i32>(0), dims - 1);
         let dist = length(step);
-        // Behind: the tap is further than this pixel; in front: nearer.
-        let gap = view_distance(q) - center_distance;
-        let behind = clamp(0.5 + gap / SOFT_DISTANCE, 0.0, 1.0);
-        let in_front = 1.0 - behind;
         // A tap behind shows through only as far as this pixel's own streak reaches;
         // one in front smears over it as far as the tap's streak reaches.
+        let back = behind(center_key, depth_key(q));
         let tap_radius = 0.5 * length(streak(q));
-        let w = behind * reach(center_radius, dist) + in_front * reach(tap_radius, dist);
+        let w = back * reach(center_radius, dist) + (1.0 - back) * reach(tap_radius, dist);
         sum += textureLoad(t_color, q, 0).rgb * w;
         total += w;
     }

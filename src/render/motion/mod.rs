@@ -3,15 +3,18 @@
 //! A view that runs motion blur gets a **velocity target**: an `Rgba16Float` texture
 //! at full view resolution that the opaque forward pass writes as its second colour
 //! attachment. Each pixel holds how far the surface under it moved on screen since
-//! last frame, `ndc_now.xy - ndc_prev.xy`, and in `.b` how far that surface lies from
-//! the camera that drew it (#1436; the sky and an unwritten pixel: [`SKY_DISTANCE`]).
+//! last frame, `ndc_now.xy - ndc_prev.xy`, in `.b` how far that surface lies from
+//! the camera that drew it (#1436; the sky and an unwritten pixel: [`SKY_DISTANCE`]),
+//! and in `.a` that camera's index in the stack (0 the base, the sky and clear 0).
 //! The motion is through the drawing camera's last-frame
 //! view-projection and the drawn entity's last-frame world matrix and joint palette
 //! ([`MotionHistory`]). So an enemy sprinting past a still camera blurs, and a
 //! viewmodel camera's gun, which moves with its camera, writes ~0 (each camera in a
 //! stack writes with its own matrices and its own distance; the nearest camera wins,
-//! as its colour does). So motion blur orders world against world from the distance,
-//! even under a `DepthOnly` overlay camera that cleared the depth buffer.
+//! as its colour does). So motion blur puts a higher camera in front, then orders
+//! world against world from the distance, even under a `DepthOnly` overlay camera
+//! that cleared the depth buffer. A surface behind the camera last frame writes no
+//! motion.
 //! The sky writes the camera's rotation alone (`sky::motion::sky_velocity`).
 //!
 //! **What writes it.** Opaque and cutout solids (mesh particles among them, camera
@@ -40,14 +43,15 @@ use crate::render::postfx::PfxTarget;
 use crate::render::PixelSize;
 
 /// The velocity target's format: NDC motion (rg, half floats), the view distance (b,
-/// world units) and nothing (a).
+/// world units) and the drawing camera's index in its stack (a, 0 the base).
 pub(crate) const VELOCITY_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba16Float;
 
 /// The view distance of the sky and of a pixel nothing wrote: a half float's largest
 /// value. `SKY_DISTANCE` in `engine/shaders/sky/motion.wgsl` mirrors it.
 pub(crate) const SKY_DISTANCE: f64 = 65504.0;
 
-/// What the velocity target clears to: no motion, as far as the sky.
+/// What the velocity target clears to: no motion, as far as the sky, on the base
+/// camera.
 pub(crate) const CLEAR: wgpu::Color = wgpu::Color {
     r: 0.0,
     g: 0.0,

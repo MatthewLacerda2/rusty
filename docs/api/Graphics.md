@@ -41,9 +41,15 @@ pixel-identical to motion blur off, and a frame with no motion history (the firs
 cut) blurs nothing. Like FXAA it is the camera's: it runs without a post-processing
 volume. The editor's Scene view never blurs and writes no velocity, as Unity's
 doesn't; the Game view and the player do. Depth ordering holds under a `DepthOnly`
-overlay camera: each camera writes its own surfaces' distance beside their motion, so
-an enemy passing a wall smears over the wall at full strength while a viewmodel
-camera's gun stays sharp. Bloom reads the blurred image, as in URP and HDRP. Its cost is `Debug.Stats().gpu_passes.motion_blur`.
+overlay camera: each camera writes which camera of the stack drew a surface and its
+distance from that camera beside its motion. A higher camera is in front whatever the
+distances say, so a viewmodel camera's gun stays sharp even against a wall nearer to
+the world camera than the gun is to its own; within one camera the nearer surface is
+in front, so an enemy passing a wall smears over the wall at full strength. A surface
+that was behind the camera last frame (a projectile past the player's head) writes no
+motion. A render-texture camera drawn every N frames (`update_every`) blurs one
+frame's worth of motion, not N. Bloom reads the blurred image, as in URP and HDRP. Its
+cost is `Debug.Stats().gpu_passes.motion_blur`.
 
 **Post-FX is per view** (#1434), Unity URP's camera-stack rule: each view runs it once,
 with the settings of **its base camera**, that camera entity's own `CameraComponent`

@@ -47,6 +47,9 @@ struct CameraUniforms {
     // This camera's view-projection last frame (#1435), what motion vectors reproject
     // through; equal to `view_proj` on a camera's first frame and after a cut.
     prev_view_proj: mat4x4<f32>,
+    // x: this camera's index in its stack, bottom to top (#1436), what the velocity
+    // target's `.a` carries so motion blur orders a higher camera in front; yzw unused.
+    stack: vec4<f32>,
 };
 
 // The post-process chain's uniform (group 0, binding 0 of every post pass, built-in

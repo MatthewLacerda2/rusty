@@ -33,6 +33,9 @@ pub(crate) struct StackPass<'a> {
     /// Run `post`'s grading, bloom, SSR, motion blur and FXAA. Off, the image is
     /// only brought from HDR to display (a render texture's `post_fx = false`).
     pub full_post_fx: bool,
+    /// How many frames of motion this draw's velocities span: 1 for the screen, a
+    /// render texture's `update_every` (#1436), so its blur is one frame's shutter.
+    pub motion_frames: u32,
 }
 
 impl Renderer {
@@ -101,7 +104,9 @@ impl Renderer {
         // velocity was, so the editor's Scene view never blurs.
         let stack = ctx.stack;
         let blurs = motion::wanted(stack.post, graphics, stack.full_post_fx, stack.editor_mode);
-        let blur = blur_params(stack.post, graphics, view.size().height).filter(|_| blurs);
+        let blur = blur_params(stack.post, graphics, view.size().height)
+            .filter(|_| blurs)
+            .map(|b| b.per_frames(stack.motion_frames));
         let gpu = (&self.device, &self.queue);
         view.post_fx
             .run_motion_blur(gpu, &self.motion_blur, blur, &self.gpu_timer);
