@@ -14,6 +14,8 @@ use crate::scene::Scene;
 mod bloom;
 mod custom_effects;
 mod depth_of_field;
+#[cfg(test)]
+mod dummy;
 mod exposure;
 mod fxaa;
 mod grading;
@@ -38,6 +40,8 @@ pub(crate) const REGISTRARS: &[(&str, Registrar)] = &[
     ("color_lookup", color_lookup::register),
     ("custom_effects", custom_effects::register),
     ("depth_of_field", depth_of_field::register),
+    #[cfg(test)]
+    ("dummy", dummy::register),
     ("exposure", exposure::register),
     ("film_grain", film_grain::register),
     ("fxaa", fxaa::register),

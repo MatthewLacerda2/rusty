@@ -37,7 +37,10 @@ pub(super) struct Layers {
 }
 
 /// The test-only effects' sections, which no shipped doc holds.
-const TEST_ONLY_DOCS: &[&str] = &[];
+const TEST_ONLY_DOCS: &[&str] = &[
+    // sorted: one row per test-only effect
+    super::dummy::DOC,
+];
 
 /// The layers as the engine has them.
 pub(super) fn engine() -> Layers {

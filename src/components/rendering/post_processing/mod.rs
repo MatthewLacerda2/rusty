@@ -13,6 +13,8 @@ use serde::{Deserialize, Serialize};
 mod bloom;
 mod custom_effects;
 mod depth_of_field;
+#[cfg(test)]
+pub mod dummy;
 mod exposure;
 mod grading;
 mod lens;
@@ -48,6 +50,8 @@ pub struct PostProcessingComponent {
     pub color_lookup: ColorLookup,
     pub custom_effects: CustomEffects,
     pub depth_of_field: DepthOfField,
+    #[cfg(test)]
+    pub dummy: dummy::Dummy,
     pub exposure: Exposure,
     pub film_grain: FilmGrain,
     pub lift_gamma_gain: LiftGammaGain,

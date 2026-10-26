@@ -19,6 +19,8 @@ use crate::scene::PostProcessingComponent;
 mod bloom;
 mod custom_effects;
 mod depth_of_field;
+#[cfg(test)]
+mod dummy;
 mod exposure;
 mod grading;
 mod lens;
@@ -63,6 +65,8 @@ pub(crate) const SECTIONS: &[Section] = &[
     color_lookup::SECTION,
     custom_effects::SECTION,
     depth_of_field::SECTION,
+    #[cfg(test)]
+    dummy::SECTION,
     exposure::SECTION,
     film_grain::SECTION,
     lift_gamma_gain::SECTION,
