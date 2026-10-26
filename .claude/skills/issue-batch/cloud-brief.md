@@ -114,6 +114,12 @@ a coder real time.
   *For a human* heading for the operator to delete.
 - **`git status --short --ignored` lists nothing you wrote** before readying: a
   `.gitignore` pattern can silently keep a source file out of a commit.
+- **A refused force-push has one fallback.** The container's permission check
+  sometimes refuses `git push --force-with-lease` even when the brief authorises it
+  (four times on 2026-10-26). Don't work around it: push the same commits to
+  `<branch>-v2` (no force), open a ready PR with the old one's description headed
+  "Supersedes #N (<why>; a force-push was refused)", and comment on #N. The
+  orchestrator closes #N.
 - **Rebase onto `main`, never merge `main` into your branch.** The merge queue
   rebases every branch before it merges it, and a rebase replays the commits from
   before a merge commit, so conflicts the merge resolved come back and the PR is
