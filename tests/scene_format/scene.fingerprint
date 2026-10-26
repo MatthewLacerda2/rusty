@@ -461,6 +461,9 @@ scene.entities[].particles.texture: string
 scene.entities[].particles: option
 scene.entities[].post_processing.active: bool
 scene.entities[].post_processing.bloom.active: bool
+scene.entities[].post_processing.bloom.dirt_intensity: f32
+scene.entities[].post_processing.bloom.dirt_texture: option
+scene.entities[].post_processing.bloom.dirt_texture: string
 scene.entities[].post_processing.bloom.intensity: f32
 scene.entities[].post_processing.bloom.threshold: f32
 scene.entities[].post_processing.chromatic_aberration.active: bool

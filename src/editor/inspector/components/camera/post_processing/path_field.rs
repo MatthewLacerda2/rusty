@@ -112,7 +112,7 @@ pub fn commit_abandoned(ctx: &egui::Context, scene: &mut Scene) -> bool {
         let saved = scene
             .world
             .post_processing(draft.entity)
-            .and_then(|vc| (field.get)(&*vc));
+            .and_then(|vc| (field.get)(&vc));
         if saved.unwrap_or_default() != draft.text {
             changed |= commit(&mut scene.world, draft.entity, field, draft.text);
         }
