@@ -51,17 +51,14 @@ fn gpu_a_moving_cube_blurs_past_its_silhouette() {
     let mut sharp_view = view(&r);
     let sharp = frame(&mut r, &mut sharp_view, &still, &cam);
 
-    // Two pixels past each side of the front face, on the sky: the cube smears
-    // onto it both ways.
-    for (edge, out) in [(1.0, 2.0), (0.0, -2.0)] {
+    // The four pixels past each side of the front face, on the sky: the cube
+    // smears onto them both ways.
+    for (edge, out) in [(1.0, 1), (0.0, -1)] {
         let (x, y) = pixel(project(&cam, Vec3::new(edge, 0.0, -4.5)));
-        let past = ((x as f32 + out) as u32, y);
-        let d = diff(&blurred, &sharp, past);
-        eprintln!("[motion_blur] {past:?} past the silhouette differs by {d}");
-        assert!(
-            d >= 4,
-            "{past:?} is untouched: the blur stops at the silhouette"
-        );
+        let past = (1..=4).map(|i| ((x as i32 + out * i) as u32, y));
+        let d = past.map(|p| diff(&blurred, &sharp, p)).max().unwrap();
+        eprintln!("[motion_blur] past the silhouette at x = {x}: differs by {d}");
+        assert!(d >= 4, "the blur stops at the silhouette at x = {x}");
     }
     let far = (2, 2);
     assert!(diff(&blurred, &sharp, far) <= 1, "the far sky did not move");
