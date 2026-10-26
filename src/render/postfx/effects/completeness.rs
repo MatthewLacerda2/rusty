@@ -7,9 +7,11 @@
 //! `Graphics.*` registrar, its Inspector section, its section in
 //! `docs/api/Graphics.md` (`<!-- effect: <name> -->`) naming every knob's tween
 //! path, and, when it is player-facing, its `GraphicsOption` named after it with a
-//! row in the doc's *Player options* table.
+//! row in the doc's *Player options* table. Each composite texture it declares is
+//! bound in the assembled composite and passed to its own function, at its place (#1473).
 
-use super::{Owner, POST_EFFECTS};
+use super::textures::{composite_textures, PlacedTexture, GROUP};
+use super::{assemble, Owner, POST_EFFECTS};
 use crate::components::PostProcessingComponent;
 use crate::core::settings::graphics_options::GraphicsOption;
 use crate::scene::authoring::fields;
@@ -34,6 +36,23 @@ pub(super) struct Layers {
     pub options: Vec<String>,
     /// `docs/api/Graphics.md` (and the test-only effects' own sections).
     pub docs: String,
+    /// The composite textures the effects declare, in binding order.
+    pub textures: Vec<TextureUse>,
+    /// The assembled composite's WGSL.
+    pub composite: String,
+}
+
+/// One declared composite texture, as the gate expects the composite to use it.
+#[derive(Clone)]
+pub(super) struct TextureUse {
+    pub effect: String,
+    /// Its name in the composite.
+    pub name: String,
+    /// The start of its function's call, up to the argument after `c`
+    /// (`assemble::call_head`).
+    pub call: String,
+    /// Its place among the textures that call passes.
+    pub position: usize,
 }
 
 /// The test-only effects' sections, which no shipped doc holds.
@@ -88,7 +107,23 @@ pub(super) fn engine() -> Layers {
             .map(|o| o.name().into())
             .collect(),
         docs: TEST_ONLY_DOCS.iter().fold(docs, |all, doc| all + doc),
+        textures: texture_uses(),
+        composite: assemble::composite_source(),
     }
+}
+
+/// Every declared composite texture, as the composite should use it.
+fn texture_uses() -> Vec<TextureUse> {
+    (composite_textures().iter())
+        .map(|t| TextureUse {
+            effect: t.effect.name.into(),
+            name: t.wgsl_name(),
+            call: assemble::call_head(assemble::module_of(t.effect), t.function.function),
+            position: PlacedTexture::of(t.function)
+                .position(|u| std::ptr::eq(u, t))
+                .expect("its own function's"),
+        })
+        .collect()
 }
 
 #[cfg(feature = "editor")]
@@ -134,6 +169,35 @@ pub(super) fn check(l: &Layers) -> Vec<String> {
         }
     }
     problems.extend(unknown(l));
+    problems.extend(unbound(l));
+    problems
+}
+
+/// Each declared composite texture its binding in group 1 lacks, or its own
+/// function's call doesn't pass at its place (after `c, f`).
+fn unbound(l: &Layers) -> Vec<String> {
+    let mut problems = Vec::new();
+    for (binding, t) in l.textures.iter().enumerate() {
+        let (effect, name) = (&t.effect, &t.name);
+        let declared = format!("@group({GROUP}) @binding({binding}) var {name}: texture_2d<f32>;");
+        if !l.composite.contains(&declared) {
+            problems.push(format!(
+                "`{effect}`'s composite texture `{name}` is not bound at group {GROUP}, binding {binding}"
+            ));
+        }
+        let passed = (l.composite.lines()).any(|line| {
+            let Some(args) = line.strip_prefix(&t.call) else {
+                return false;
+            };
+            let args = args.trim_end_matches(");");
+            args.split(", ").nth(1 + t.position) == Some(name.as_str())
+        });
+        if !passed {
+            problems.push(format!(
+                "`{effect}`'s composite texture `{name}` is not passed to its function at its place"
+            ));
+        }
+    }
     problems
 }
 

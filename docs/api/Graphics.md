@@ -110,8 +110,8 @@ the volume (motion blur and FXAA on the camera, as Unity keeps them), its ops, i
 `Graphics.*` functions, its Inspector section, its render functions or pass, and its
 section below. They run in this order: depth of field, motion blur, the exposure
 meter, bloom's bright pass and the lens flare over the HDR scene; then the composite, which runs
-chromatic aberration, screen-space reflections, bloom's add and the exposure on the
-HDR colour, then the grading LUT (white balance, Lift / Gamma / Gain, the color
+chromatic aberration, screen-space reflections, bloom's add, the lens flare's add and the
+exposure on the HDR colour, then the grading LUT (white balance, Lift / Gamma / Gain, the color
 adjustments, the tonemapper, the display gamma and the Color Lookup, baked into one
 table), then the vignette and film grain on the display colour; then the custom
 effects and FXAA. An effect that is off (or at a zero strength) costs nothing and
@@ -301,8 +301,10 @@ tint, so a light left of the centre ghosts on the right), a **halo** ring around
 centre, lit most by what is near it, and optional horizontal **streaks**, the
 anamorphic lens's, the same share of the screen at every resolution. The whole is multiplied by the `tint` and the `intensity`, its red
 and blue split by its own `chromatic_aberration`. It renders at half bloom's
-resolution (a quarter of the view's) and is added onto the HDR scene after bloom's
-bright pass, so the exposure and the grade apply to it and it never blooms itself.
+resolution (a quarter of the view's) and the composite adds it right after bloom's
+add, as URP's uber pass does: the exposure and the grade apply to it, and it never
+blooms itself, is never reflected by screen-space reflections, nor split by the
+volume's chromatic aberration.
 **It runs only while bloom runs**, since it reads bloom's chain: bloom off, or the
 player's `bloom` option off, means no flare. It is off on the Low tier, and the
 player's `lens_flare` option gates it. A new volume starts with it off; once on, four

@@ -20,6 +20,7 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
         order: 40,
         function: "hdr",
         slots: 1,
+        textures: &[],
         pack,
     }],
     grade: &[],

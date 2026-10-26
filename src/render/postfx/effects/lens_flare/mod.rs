@@ -2,16 +2,16 @@
 //! bloom's, built from bloom's blurred bright pass, so every bright pixel flares
 //! with no per-light authoring (`postfx/lens_flare.wgsl`). It draws ghosts mirrored
 //! through the screen centre, a halo ring and anamorphic streaks at half the bloom
-//! buffer's size (a quarter of the view's), then adds them onto the HDR scene the
-//! composite reads, so they go through the exposure and the grade like the scene.
+//! buffer's size (a quarter of the view's). The composite adds them after bloom's add
+//! (`postfx/effects/lens_flare.wgsl`), reading the flare as its composite texture
+//! (#1473), so they go through the exposure and the grade like the scene, as URP's
+//! uber pass adds its flare with bloom, and SSR never reflects them.
 //!
 //! It runs only while bloom runs, since it reads bloom's chain, and is off on Low.
-//! The flare is added in the scene rather than in the composite because the
-//! composite has no binding of an effect's own: adding one would change the
-//! chain's shared bind-group layout. With no bright pixel the flare is exactly zero,
-//! so the add leaves the scene byte-identical.
+//! While it doesn't run its target is dropped and the composite reads black; with
+//! no bright pixel the flare is exactly zero: either way the add changes nothing.
 
-use super::{bloom, EffectCx, Owner, Pass, PassCx, PostEffect};
+use super::{bloom, Composite, CompositeTexture, EffectCx, Owner, Pass, PassCx, Phase, PostEffect};
 use crate::components::rendering::post_processing::LensFlare;
 use crate::core::settings::graphics_options::GraphicsOption;
 use crate::core::settings::quality::QualityPreset;
@@ -32,11 +32,29 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
         option: Some(GraphicsOption::LensFlare),
         tiers: |q| q != QualityPreset::Low,
     },
-    module: None,
-    composite: &[],
+    module: Some("postfx/effects/lens_flare.wgsl"),
+    composite: &[Composite {
+        phase: Phase::Hdr,
+        // After bloom's add (30), before the exposure (40).
+        order: 35,
+        function: "hdr",
+        slots: 1,
+        textures: &[CompositeTexture {
+            name: "image",
+            view: |pfx| pfx.targets.get::<FlareTargets>().map(|t| &t.flare.view),
+        }],
+        pack,
+    }],
     grade: &[],
     pass: Some(Pass::Scene { order: 50, run }),
 };
+
+/// w: `1` while the view flares, so the composite skips the fetch otherwise (the
+/// aspect doesn't decide whether it flares).
+fn pack(cx: &EffectCx, slots: &mut [[f32; 4]]) {
+    let on = flare_params(cx, 1.0).is_some();
+    slots[0] = [0.0, 0.0, 0.0, if on { 1.0 } else { 0.0 }];
+}
 
 /// The flare `cx`'s volume draws this frame: only while bloom runs, whose chain it
 /// reads, and while some part of it can add light (`None` costs no target and no
@@ -91,11 +109,10 @@ pub(crate) struct FlareParams {
     frame: [f32; 4],
 }
 
-/// The flare pass and the add, shared by every view.
+/// The flare pass, shared by every view.
 pub(crate) struct FlarePasses {
     layout: wgpu::BindGroupLayout,
     flare: LazyPipeline,
-    add: LazyPipeline,
 }
 
 impl FlarePasses {
@@ -114,51 +131,29 @@ impl FlarePasses {
             bind_group_layouts: &[Some(&layout)],
             immediate_size: 0,
         });
-        let pass = |fs: &'static str, blend: wgpu::BlendState| {
-            let (shader, layout) = (shader.clone(), pipeline_layout.clone());
-            LazyPipeline::new(device, move |device| {
-                let label = format!("Lens Flare {fs}");
-                let target = wgpu::ColorTargetState {
-                    format: HDR_FORMAT,
-                    blend: Some(blend),
-                    write_mask: wgpu::ColorWrites::ALL,
-                };
-                Fullscreen {
-                    label: &label,
-                    shader: &shader,
-                    layout: &layout,
-                    vs: "vs_fullscreen",
-                    fs,
-                }
-                .colour(device, &[Some(target)])
-            })
-        };
-        Self {
-            flare: pass("fs_flare", wgpu::BlendState::REPLACE),
-            add: pass("fs_add", ADD),
-            layout,
-        }
+        let flare = LazyPipeline::new(device, move |device| {
+            let target = wgpu::ColorTargetState {
+                format: HDR_FORMAT,
+                blend: Some(wgpu::BlendState::REPLACE),
+                write_mask: wgpu::ColorWrites::ALL,
+            };
+            Fullscreen {
+                label: "Lens Flare fs_flare",
+                shader: &shader,
+                layout: &pipeline_layout,
+                vs: "vs_fullscreen",
+                fs: "fs_flare",
+            }
+            .colour(device, &[Some(target)])
+        });
+        Self { flare, layout }
     }
 
-    /// The pipelines, for warming (`Renderer::lazy_pipelines`).
-    pub(crate) fn lazy_pipelines(&self) -> [&LazyPipeline; 2] {
-        [&self.flare, &self.add]
+    /// The pipeline, for warming (`Renderer::lazy_pipelines`).
+    pub(crate) fn lazy_pipelines(&self) -> [&LazyPipeline; 1] {
+        [&self.flare]
     }
 }
-
-/// The add onto the scene: its colour plus the flare's, its alpha kept.
-const ADD: wgpu::BlendState = wgpu::BlendState {
-    color: wgpu::BlendComponent {
-        src_factor: wgpu::BlendFactor::One,
-        dst_factor: wgpu::BlendFactor::One,
-        operation: wgpu::BlendOperation::Add,
-    },
-    alpha: wgpu::BlendComponent {
-        src_factor: wgpu::BlendFactor::Zero,
-        dst_factor: wgpu::BlendFactor::One,
-        operation: wgpu::BlendOperation::Add,
-    },
-};
 
 /// One view's flare target, half the bloom buffer's size, and its params. Held only
 /// while the view flares.
@@ -191,8 +186,8 @@ pub(crate) fn flare_size((w, h): (u32, u32)) -> (u32, u32) {
     ((w / 2).max(1), (h / 2).max(1))
 }
 
-/// The flare (bloom's blur -> its target), then the add onto the scene, when the
-/// view flares; its target dropped when it doesn't.
+/// The flare (bloom's blur -> its target), which the composite adds, when the view
+/// flares; its target dropped when it doesn't.
 fn run(r: &Renderer, view: &mut RenderView, cx: &PassCx) {
     let pfx = &mut view.post_fx;
     let bloom = pfx.bloom.size;
@@ -210,70 +205,26 @@ fn run(r: &Renderer, view: &mut RenderView, cx: &PassCx) {
     let t = pfx.targets.get::<FlareTargets>().expect("made above");
     queue.write_buffer(&t.params, 0, bytemuck::bytes_of(&params));
     let passes = &r.post_passes.lens_flare;
-    let group = |input: &wgpu::TextureView| {
-        device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("Lens Flare Bind Group"),
-            layout: &passes.layout,
-            entries: &[
-                entry(0, t.params.as_entire_binding()),
-                entry(1, wgpu::BindingResource::TextureView(input)),
-                entry(2, wgpu::BindingResource::Sampler(&pfx.sampler)),
-            ],
-        })
-    };
+    let group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        label: Some("Lens Flare Bind Group"),
+        layout: &passes.layout,
+        entries: &[
+            entry(0, t.params.as_entire_binding()),
+            entry(1, wgpu::BindingResource::TextureView(&pfx.bloom.b.view)),
+            entry(2, wgpu::BindingResource::Sampler(&pfx.sampler)),
+        ],
+    });
     let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
         label: Some("Lens Flare Encoder"),
     });
     let flare = (passes.flare.get(), r.gpu_timer.writes(GpuPass::LensFlare));
-    PostFx::fullscreen(
-        &mut encoder,
-        flare,
-        &[&group(&pfx.bloom.b.view)],
-        &t.flare.view,
-    );
-    let writes = r.gpu_timer.writes(GpuPass::LensFlare);
-    let add_group = group(&t.flare.view);
-    add(
-        &mut encoder,
-        (passes.add.get(), writes),
-        &add_group,
-        pfx.scene_color(),
-    );
+    PostFx::fullscreen(&mut encoder, flare, &[&group], &t.flare.view);
     queue.submit(std::iter::once(encoder.finish()));
-}
-
-/// Draw `pipeline` over `scene`, keeping what it holds: the flare's add.
-fn add(
-    encoder: &mut wgpu::CommandEncoder,
-    (pipeline, timestamp_writes): (
-        &wgpu::RenderPipeline,
-        Option<wgpu::RenderPassTimestampWrites>,
-    ),
-    group: &wgpu::BindGroup,
-    scene: &wgpu::TextureView,
-) {
-    let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-        multiview_mask: None,
-        label: Some("Lens Flare Add"),
-        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-            depth_slice: None,
-            view: scene,
-            resolve_target: None,
-            ops: wgpu::Operations {
-                load: wgpu::LoadOp::Load,
-                store: wgpu::StoreOp::Store,
-            },
-        })],
-        depth_stencil_attachment: None,
-        timestamp_writes,
-        occlusion_query_set: None,
-    });
-    pass.set_pipeline(pipeline);
-    pass.set_bind_group(0, group, &[]);
-    pass.draw(0..3, 0..1);
 }
 
 #[cfg(test)]
 mod gpu_tests;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod texture_gpu_tests;

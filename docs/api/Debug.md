@@ -134,7 +134,7 @@ each kind's passes summed, under names that never change so two reports diff:
 | `particles` | particle systems |
 | `depth_of_field` | depth of field (#1445): its circle-of-confusion, prefilter, blur and composite passes |
 | `motion_blur` | per-object motion blur (#1436): its TileMax and NeighborMax tile passes and the gather |
-| `lens_flare` | the screen-space lens flare (#1443): its flare pass and the add onto the scene |
+| `lens_flare` | the screen-space lens flare (#1443): its flare pass (the composite adds it, under `post_fx`) |
 | `post_fx` | bloom, the composite, authored effects, FXAA |
 | `outline` | the editor's selection outline (its mask, dilation and ring) and the gizmos drawn over it after post-FX: grid, collider boxes, axis arrows, probes (editor only) |
 | `ui` | world and screen UI, Mask textures and the backdrop blur |

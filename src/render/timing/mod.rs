@@ -64,8 +64,8 @@ crate::core::named_enum! {
         DepthOfField = "depth_of_field",
         /// Per-object motion blur (#1436): its three tile passes and the gather.
         MotionBlur = "motion_blur",
-        /// The screen-space lens flare (#1443): its flare pass and the add onto the
-        /// scene.
+        /// The screen-space lens flare (#1443): its flare pass (the composite adds
+        /// it, timed under `post_fx`).
         LensFlare = "lens_flare",
         /// The post-FX chain: bloom, composite, authored effects, FXAA.
         PostFx = "post_fx",

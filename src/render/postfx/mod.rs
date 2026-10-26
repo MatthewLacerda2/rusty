@@ -70,6 +70,8 @@ pub struct PostFx {
     /// previous-frame history.
     pub custom: effects::custom_effects::CustomChain,
     pub io_layout: wgpu::BindGroupLayout,
+    /// The composite's group 1, the effects' own textures (#1473).
+    pub(crate) effect_textures: effects::textures::CompositeTextures,
 
     pub params_buffer: wgpu::Buffer,
     /// The composite's effect slots (binding 9), packed every frame.

@@ -1,6 +1,6 @@
 //! Resource construction for the post-process chain: bind-group layout, the
-//! composite (assembled from the effects, `effects::assemble`), FXAA and copy
-//! pipelines, the params and effect-slot buffers, sampler, and the render targets.
+//! composite (assembled from the effects, `effects::assemble`, with the effects'
+//! textures in a group of their own, `effects::textures`), FXAA and copy pipelines, the params and effect-slot buffers, sampler, and the render targets.
 
 use crate::render::gpu::fullscreen::Fullscreen;
 use crate::render::gpu::layout_entries::{
@@ -11,6 +11,7 @@ use crate::render::gpu::shaders::ShaderRegistry;
 use super::effects::bloom::BloomTargets;
 use super::effects::custom_effects::CustomChain;
 use super::effects::exposure::ExposureMeter;
+use super::effects::textures::CompositeTextures;
 use super::effects::{assemble, composite_slots_len};
 use super::grade::GradeLut;
 use super::{PfxTarget, PostFx, PostParams, HDR_FORMAT};
@@ -35,7 +36,9 @@ impl PostFx {
         registry: &mut ShaderRegistry,
     ) -> Self {
         let io_layout = Self::create_io_layout(device);
-        let pipelines = Self::create_pipelines(device, &io_layout, output_format, registry);
+        let effect_textures = CompositeTextures::new(device);
+        let layouts = (&io_layout, &effect_textures.layout);
+        let pipelines = Self::create_pipelines(device, layouts, output_format, registry);
         let (params_buffer, fx_buffer, sampler) = Self::create_params_and_sampler(device);
 
         let (full_size, scene_hdr, ldr) =
@@ -53,6 +56,7 @@ impl PostFx {
             exposure,
             custom,
             io_layout,
+            effect_textures,
             params_buffer,
             fx_buffer,
             sampler,
@@ -66,10 +70,11 @@ impl PostFx {
         }
     }
 
-    /// Build the built-in fullscreen passes (the assembled composite, FXAA, copy).
+    /// Build the built-in fullscreen passes (the assembled composite, FXAA, copy):
+    /// each reads the io group, the composite the effects' textures too.
     fn create_pipelines(
         device: &wgpu::Device,
-        io_layout: &wgpu::BindGroupLayout,
+        (io_layout, textures): (&wgpu::BindGroupLayout, &wgpu::BindGroupLayout),
         output_format: wgpu::TextureFormat,
         registry: &mut ShaderRegistry,
     ) -> Pipelines {
@@ -79,22 +84,27 @@ impl PostFx {
         let fxaa = registry.load(device, "postfx/fxaa.wgsl", "PostFX FXAA Shader");
         let copy = registry.load(device, "postfx/copy.wgsl", "PostFX Copy Shader");
 
-        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("PostFX Pipeline Layout"),
-            bind_group_layouts: &[Some(io_layout)],
-            immediate_size: 0,
-        });
+        let pipeline_layout = |label, groups: &[Option<&wgpu::BindGroupLayout>]| {
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some(label),
+                bind_group_layouts: groups,
+                immediate_size: 0,
+            })
+        };
+        let io = pipeline_layout("PostFX Pipeline Layout", &[Some(io_layout)]);
+        let groups = [Some(io_layout), Some(textures)];
+        let with_textures = pipeline_layout("PostFX Composite Pipeline Layout", &groups);
         // Each writes LDR: the composite into `ldr` (or straight to the output when
         // nothing follows it), FXAA and the copy always into the output.
-        let pass = |shader: &wgpu::ShaderModule, fs: &str| {
+        let pass = |shader: &wgpu::ShaderModule, fs: &str, layout: &wgpu::PipelineLayout| {
             let entries = ("vs_fullscreen", fs);
-            Self::fullscreen_pipeline(device, shader, &pipeline_layout, entries, output_format)
+            Self::fullscreen_pipeline(device, shader, layout, entries, output_format)
         };
 
         Pipelines {
-            composite: pass(&composite, "fs_composite"),
-            fxaa: pass(&fxaa, "fs_fxaa"),
-            copy: pass(&copy, "fs_copy"),
+            composite: pass(&composite, "fs_composite", &with_textures),
+            fxaa: pass(&fxaa, "fs_fxaa", &io),
+            copy: pass(&copy, "fs_copy", &io),
         }
     }
 
@@ -233,10 +243,9 @@ impl PostFx {
                 texture_entry(7, wgpu::TextureViewDimension::D3),
                 // The adapted exposure (#1444), read in Automatic.
                 uniform_entry(8, wgpu::ShaderStages::FRAGMENT),
-                // The composite's effect slots (#1467).
+                // The composite's effect slots (#1467). An effect's own textures
+                // are the composite's group 1 (`effects::textures`, #1473).
                 uniform_entry(9, wgpu::ShaderStages::FRAGMENT),
-                // Bloom's lens dirt (#1442).
-                texture_entry(10, wgpu::TextureViewDimension::D2),
             ],
         })
     }

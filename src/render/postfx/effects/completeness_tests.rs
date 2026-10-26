@@ -1,7 +1,7 @@
 //! The completeness gate's must-pass case (the engine as it is) and must-flag cases
 //! (each part removed in turn).
 
-use super::{check, engine};
+use super::{check, engine, TextureUse};
 
 #[test]
 fn every_effect_has_every_part_in_every_layer() {
@@ -81,6 +81,61 @@ fn a_section_or_doc_marker_for_no_effect_is_flagged() {
         assert!(
             problems.contains(needle),
             "not flagged: {needle}\n{problems}"
+        );
+    }
+}
+
+#[test]
+fn a_composite_texture_not_bound_or_not_passed_is_flagged() {
+    let mut l = engine();
+    assert!(
+        (l.textures.iter()).any(|t| t.effect == "dummy" && t.name == "dummy_probe"),
+        "the dummy declares a composite texture"
+    );
+    l.composite = (l.composite.lines())
+        .filter(|line| !line.contains("var dummy_probe"))
+        .map(|line| line.replace(", bloom_dirt", ""))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let problems = check(&l).join("\n");
+    for needle in [
+        "`dummy`'s composite texture `dummy_probe` is not bound at group 1",
+        "`bloom`'s composite texture `bloom_dirt` is not passed to its function",
+    ] {
+        assert!(
+            problems.contains(needle),
+            "not flagged: {needle}\n{problems}"
+        );
+    }
+}
+
+#[test]
+fn a_composite_texture_passed_to_another_call_or_out_of_place_is_flagged() {
+    let mut l = engine();
+    let swap = |line: &str| match line.starts_with("    c = ") {
+        true => (line
+            .replace("bloom_dirt", "@")
+            .replace("dummy_probe", "bloom_dirt"))
+        .replace('@', "dummy_probe"),
+        false => line.to_string(),
+    };
+    l.composite = l.composite.lines().map(swap).collect::<Vec<_>>().join("\n");
+    // Two textures of one function, passed in the wrong order.
+    for (position, name) in ["twin_a", "twin_b"].into_iter().enumerate() {
+        l.textures.push(TextureUse {
+            effect: "twin".into(),
+            name: name.into(),
+            call: "    c = twin::hdr(c, ".into(),
+            position,
+        });
+    }
+    l.composite += "\n    c = twin::hdr(c, f, twin_b, twin_a);";
+    let problems = check(&l).join("\n");
+    for name in ["bloom_dirt", "dummy_probe", "twin_a", "twin_b"] {
+        let needle = format!("composite texture `{name}` is not passed to its function");
+        assert!(
+            problems.contains(&needle),
+            "not flagged: {name}\n{problems}"
         );
     }
 }

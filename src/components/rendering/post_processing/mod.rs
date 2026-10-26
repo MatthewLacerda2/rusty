@@ -74,6 +74,9 @@ impl Default for PostProcessingComponent {
     fn default() -> Self {
         Self {
             active: on(),
+            shadows: Default::default(),
+            ssao: Default::default(),
+            // sorted: one line per post effect, as the struct lists its fields
             bloom: Default::default(),
             chromatic_aberration: Default::default(),
             color_adjustments: Default::default(),
@@ -90,8 +93,6 @@ impl Default for PostProcessingComponent {
             tonemapping: Default::default(),
             vignette: Default::default(),
             white_balance: Default::default(),
-            shadows: Default::default(),
-            ssao: Default::default(),
         }
     }
 }

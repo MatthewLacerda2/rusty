@@ -3,16 +3,17 @@
 // image, and the lens dirt it lights (#1442), as Unity's `UberPost` adds them:
 // `bloom *= intensity; color += bloom; color += dirt * dirt_intensity * bloom`.
 // Slot 0: x intensity, y intensity × dirt intensity (`0`: no dirt), w `1` while
-// bloom runs.
+// bloom runs. `dirt` is bloom's composite texture (#1473): the volume's dirt,
+// black while there is none.
 
 #define_import_path postfx::effects::bloom
 
-#import postfx::frame::{Frag, t_bloom, t_depth, t_dirt, s_color}
+#import postfx::frame::{Frag, t_bloom, t_depth, s_color}
 
 // `uv` on the dirt, cropped to cover the view without stretching it, centred, as
 // Unity's `_LensDirt_Params` scale and offset it: the axis the dirt is longer on
 // than the view is cut at both ends.
-fn dirt_uv(uv: vec2<f32>) -> vec2<f32> {
+fn dirt_uv(t_dirt: texture_2d<f32>, uv: vec2<f32>) -> vec2<f32> {
     let dirt = vec2<f32>(textureDimensions(t_dirt));
     let view = vec2<f32>(textureDimensions(t_depth));
     let dirt_ratio = dirt.x / dirt.y;
@@ -26,13 +27,13 @@ fn dirt_uv(uv: vec2<f32>) -> vec2<f32> {
     return uv * scale + (1.0 - scale) * 0.5;
 }
 
-fn hdr(c: vec3<f32>, f: Frag, p: vec4<f32>) -> vec3<f32> {
+fn hdr(c: vec3<f32>, f: Frag, dirt: texture_2d<f32>, p: vec4<f32>) -> vec3<f32> {
     var out = c;
     if (p.w > 0.5) {
         let bloom = textureSample(t_bloom, s_color, f.uv).rgb;
         out += bloom * p.x;
         if (p.y > 0.0) {
-            out += bloom * textureSample(t_dirt, s_color, dirt_uv(f.uv)).rgb * p.y;
+            out += bloom * textureSample(dirt, s_color, dirt_uv(dirt, f.uv)).rgb * p.y;
         }
     }
     return out;

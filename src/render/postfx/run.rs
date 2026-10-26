@@ -39,17 +39,11 @@ impl PostFx {
         // When an LDR pass follows the composite it lands in the LDR target for that
         // pass to sample; otherwise it writes the output directly, so the plain path
         // is byte-for-byte what the chain produced before those existed.
-        let composite_bg = self.io_bind_group(
-            device,
-            self.scene_color(),
-            &self.bloom.b.view,
-            ctx.depth_view,
-            ctx.skybox,
-        );
+        let [io, textures] = self.composite_groups(device, &ctx);
         let followed = !ldr.is_empty();
         let composite_target = if followed { &self.ldr.view } else { ctx.output };
         let composite = (&self.composite_pipeline, ctx.timer.writes(GpuPass::PostFx));
-        Self::fullscreen(&mut encoder, composite, &[&composite_bg], composite_target);
+        Self::fullscreen(&mut encoder, composite, &[&io, &textures], composite_target);
 
         let mut finish = None;
         for run in ldr {
@@ -90,20 +84,26 @@ impl PostFx {
         encoder: &mut wgpu::CommandEncoder,
         ctx: PostFxContext<'_>,
     ) {
-        let bg = self.io_bind_group(
+        let [io, textures] = self.composite_groups(device, &ctx);
+        // The UI's backdrop source, so its time is the UI's.
+        let composite = (&self.composite_pipeline, ctx.timer.writes(GpuPass::Ui));
+        Self::fullscreen(encoder, composite, &[&io, &textures], ctx.output);
+    }
+
+    /// The composite's groups: the chain's io group over this frame's scene, and the
+    /// effects' own textures (#1473).
+    fn composite_groups(&self, device: &wgpu::Device, ctx: &PostFxContext) -> [wgpu::BindGroup; 2] {
+        let io = self.io_bind_group(
             device,
             self.scene_color(),
             &self.bloom.b.view,
             ctx.depth_view,
             ctx.skybox,
         );
-        // The UI's backdrop source, so its time is the UI's.
-        let composite = (&self.composite_pipeline, ctx.timer.writes(GpuPass::Ui));
-        Self::fullscreen(encoder, composite, &[&bg], ctx.output);
+        [io, self.effect_textures.bind_group(device, self)]
     }
 
     /// The scene the composite and bloom read: motion-blurred (#1436), else focused.
-    /// The lens flare's pass adds into it (#1443), after bloom's bright pass read it.
     pub(crate) fn scene_color(&self) -> &wgpu::TextureView {
         scene_of(self.targets.get(), self.targets.get(), &self.scene_hdr)
     }
@@ -131,7 +131,7 @@ impl PostFx {
 
     /// Build a bind group: params + color(1) + sampler(2) + bloom(3) + depth(4) +
     /// skybox(5) + its sampler(6) + the grading LUT(7) + the adapted exposure(8) + the
-    /// effect slots(9) + bloom's lens dirt(10). `color` is the texture the pass reads, `bloom` an aux texture.
+    /// effect slots(9). `color` is the texture the pass reads, `bloom` an aux texture.
     pub(crate) fn io_bind_group(
         &self,
         device: &wgpu::Device,
@@ -183,10 +183,6 @@ impl PostFx {
                 wgpu::BindGroupEntry {
                     binding: 9,
                     resource: self.fx_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 10,
-                    resource: wgpu::BindingResource::TextureView(self.bloom.dirt_view()),
                 },
             ],
         })
