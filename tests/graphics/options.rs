@@ -97,7 +97,10 @@ fn an_unknown_name_is_an_error_listing_the_valid_ones() {
         ] {
             let err = lua.load(call).exec().unwrap_err().to_string();
             assert!(err.contains("unknown option 'warp'"), "{call}: {err}");
-            assert!(err.contains("fxaa, motion_blur"), "{call}: {err}");
+            assert!(
+                err.contains("fxaa, lens_flare, motion_blur"),
+                "{call}: {err}"
+            );
         }
     });
 }

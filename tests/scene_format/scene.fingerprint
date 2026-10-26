@@ -496,6 +496,15 @@ scene.entities[].post_processing.exposure.mode: enum Fixed|Automatic
 scene.entities[].post_processing.film_grain.active: bool
 scene.entities[].post_processing.film_grain.intensity: f32
 scene.entities[].post_processing.film_grain.response: f32
+scene.entities[].post_processing.lens_flare.active: bool
+scene.entities[].post_processing.lens_flare.chromatic_aberration: f32
+scene.entities[].post_processing.lens_flare.ghost_count: u32
+scene.entities[].post_processing.lens_flare.ghost_intensity: f32
+scene.entities[].post_processing.lens_flare.halo_intensity: f32
+scene.entities[].post_processing.lens_flare.intensity: f32
+scene.entities[].post_processing.lens_flare.streak_intensity: f32
+scene.entities[].post_processing.lens_flare.tint: tuple(3)
+scene.entities[].post_processing.lens_flare.tint[]: f32
 scene.entities[].post_processing.lift_gamma_gain.gain.color: tuple(3)
 scene.entities[].post_processing.lift_gamma_gain.gain.color[]: f32
 scene.entities[].post_processing.lift_gamma_gain.gain.offset: f32
