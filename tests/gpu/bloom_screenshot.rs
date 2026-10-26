@@ -46,6 +46,10 @@ fn scene(bloom: bool) -> Scene {
     let mut vc = default_visual_correction();
     (vc.bloom_active, vc.ssr_active) = (bloom, false);
     scene.world.set_visual_correction(post, Some(vc));
+    // A volume rides on its camera (#1434): that camera is the view's.
+    scene
+        .world
+        .set_camera(post, Some(rusty::components::CameraComponent::default()));
     scene
 }
 

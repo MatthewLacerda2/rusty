@@ -44,6 +44,10 @@ pub fn wall_scene(distance: f32, color: [f32; 3]) -> Scene {
     scene
         .world
         .set_visual_correction(id, Some(neutral_volume()));
+    // A volume rides on its camera (#1434): that camera is the view's.
+    scene
+        .world
+        .set_camera(id, Some(rusty::components::CameraComponent::default()));
     scene
 }
 

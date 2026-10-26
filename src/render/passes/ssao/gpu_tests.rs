@@ -17,6 +17,10 @@ fn crate_scene(on: bool) -> Scene {
     let mut vc = default_visual_correction();
     vc.ssao.active = on;
     scene.world.set_visual_correction(volume, Some(vc));
+    // A volume rides on its camera (#1434): that camera is the view's.
+    scene
+        .world
+        .set_camera(volume, Some(crate::components::CameraComponent::default()));
     scene
 }
 

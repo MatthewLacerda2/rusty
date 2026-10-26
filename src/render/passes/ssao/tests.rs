@@ -14,6 +14,10 @@ fn scene_with(edit: impl FnOnce(&mut crate::components::VisualCorrectionComponen
     let mut vc = default_visual_correction();
     edit(&mut vc);
     scene.world.set_visual_correction(id, Some(vc));
+    // A volume rides on its camera (#1434): that camera is the view's.
+    scene
+        .world
+        .set_camera(id, Some(crate::components::CameraComponent::default()));
     scene
 }
 

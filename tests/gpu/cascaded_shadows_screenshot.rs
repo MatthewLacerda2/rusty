@@ -36,6 +36,10 @@ fn yard(shadow_distance: f32) -> Scene {
     vc.exposure = -2.0;
     vc.bloom_active = false;
     scene.world.set_visual_correction(volume, Some(vc));
+    // A volume rides on its camera (#1434): that camera is the view's.
+    scene
+        .world
+        .set_camera(volume, Some(rusty::components::CameraComponent::default()));
     scene
 }
 

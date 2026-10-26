@@ -43,6 +43,10 @@ fn mid_grey_scene() -> Scene {
     vc.ssr_active = false;
     vc.tonemap = Tonemap::None;
     scene.world.set_visual_correction(id, Some(vc));
+    // A volume rides on its camera (#1434): that camera is the view's.
+    scene
+        .world
+        .set_camera(id, Some(crate::components::CameraComponent::default()));
     scene
 }
 
