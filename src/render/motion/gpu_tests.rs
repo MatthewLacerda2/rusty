@@ -4,8 +4,9 @@
 use glam::Vec3;
 
 use super::gpu_fixture::{
-    cube, eye, pixel_centre, project, render, renderer, scene, unproject, view, H, W,
+    cube, eye, pixel, pixel_centre, project, render, renderer, scene, unproject, view, H, W,
 };
+use super::SKY_DISTANCE;
 
 #[test]
 fn gpu_a_cube_moving_past_a_still_camera_writes_velocity_on_its_pixels_only() {
@@ -34,6 +35,10 @@ fn gpu_a_cube_moving_past_a_still_camera_writes_velocity_on_its_pixels_only() {
     // The sky behind it, and the camera, did not move.
     assert!(moved.at(1, 1).length() < 1e-4, "{}", moved.at(1, 1));
     assert!(moved.at(W - 2, H - 2).length() < 1e-4);
+    // Beside the motion, each pixel's distance from the camera (#1436).
+    let (x, y) = pixel(project(&cam, face));
+    assert!((moved.distance(x, y) - face.length()).abs() < 0.05);
+    assert_eq!(moved.distance(1, 1), SKY_DISTANCE as f32, "the sky is far");
 }
 
 #[test]

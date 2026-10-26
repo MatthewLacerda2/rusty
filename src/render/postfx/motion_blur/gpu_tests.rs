@@ -10,21 +10,26 @@ use crate::render::{readback, RenderView, Renderer};
 use crate::scene::{Camera, ClearFlags, Scene};
 
 /// Render `scene` through `cam` into `view` and read the finished frame (RGBA8).
-fn frame(r: &mut Renderer, view: &mut RenderView, scene: &Scene, cam: &Camera) -> Vec<u8> {
+pub(super) fn frame(
+    r: &mut Renderer,
+    view: &mut RenderView,
+    scene: &Scene,
+    cam: &Camera,
+) -> Vec<u8> {
     let out = view.color_target_view().unwrap();
     r.render(view, scene, cam, &out, false);
     readback::read_texture_rgba8(&r.device, &r.queue, view.color_target().unwrap(), W, H)
 }
 
 /// The largest per-channel difference between two frames at pixel `(x, y)`.
-fn diff(a: &[u8], b: &[u8], (x, y): (u32, u32)) -> u8 {
+pub(super) fn diff(a: &[u8], b: &[u8], (x, y): (u32, u32)) -> u8 {
     let i = ((y * W + x) * 4) as usize;
     (0..3).map(|c| a[i + c].abs_diff(b[i + c])).max().unwrap()
 }
 
 /// A scene whose camera blurs (`blur`) with the longest streaks it allows: the
 /// shutter open the whole frame, the clamp at its widest (9.6 px of 48).
-fn streaky(blur: bool) -> (Scene, u32) {
+pub(super) fn streaky(blur: bool) -> (Scene, u32) {
     let (mut scene, cam) = scene(blur);
     let mut c = scene.world.camera_mut(cam).unwrap();
     c.motion_blur_intensity = 1.0;

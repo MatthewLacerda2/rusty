@@ -1,8 +1,6 @@
 //! What one view's motion blur draws with (#1436), from its base camera: the
-//! `BlurParams` uniform `postfx/motion_blur.wgsl` reads, and the tile size its two
-//! tile passes work at. Pure, so the arithmetic is tested without an adapter.
-
-use glam::Mat4;
+//! `BlurParams` uniform `postfx/motion_blur.wgsl` reads, and the tile size its tile
+//! passes work at. Pure, so the arithmetic is tested without an adapter.
 
 use crate::components::CameraComponent;
 
@@ -12,15 +10,11 @@ use crate::components::CameraComponent;
 pub(crate) struct BlurParams {
     /// intensity (shutter fraction), longest streak (px), samples, tile size (px)
     pub shape: [f32; 4],
-    /// The inverse projection's z and w rows at `(0, 0, d, 1)`: a depth sample `d`
-    /// lies `-(x·d + y) / (z·d + w)` in front of the camera.
-    pub depth: [f32; 4],
 }
 
 impl BlurParams {
-    /// The params for `cam`'s motion blur over a view `height` pixels tall, whose
-    /// depth was drawn through `projection`.
-    pub(crate) fn new(cam: &CameraComponent, height: u32, projection: Mat4) -> Self {
+    /// The params for `cam`'s motion blur over a view `height` pixels tall.
+    pub(crate) fn new(cam: &CameraComponent, height: u32) -> Self {
         let samples = cam.motion_blur_samples.clamp(
             CameraComponent::MIN_MOTION_BLUR_SAMPLES,
             CameraComponent::MAX_MOTION_BLUR_SAMPLES,
@@ -32,7 +26,6 @@ impl BlurParams {
             .motion_blur_max_length
             .clamp(0.0, CameraComponent::MAX_MOTION_BLUR_MAX_LENGTH);
         let longest = max_length * height as f32;
-        let inv = projection.inverse();
         Self {
             shape: [
                 intensity,
@@ -40,7 +33,6 @@ impl BlurParams {
                 samples as f32,
                 tile_size(longest) as f32,
             ],
-            depth: [inv.z_axis.z, inv.w_axis.z, inv.z_axis.w, inv.w_axis.w],
         }
     }
 

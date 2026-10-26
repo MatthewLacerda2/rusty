@@ -59,6 +59,7 @@ impl Renderer {
             pass.post,
             self.graphics(pass.editor_mode),
             pass.full_post_fx,
+            pass.editor_mode,
         ) && !view.has_forward_override();
         let key = HistoryKey::new(scene, pass.base_id);
         let size = view.size();
@@ -96,15 +97,14 @@ impl Renderer {
         let graphics = self.graphics(ctx.stack.editor_mode);
 
         // Per-object motion blur (#1436), over the velocity target the stack wrote:
-        // the composite below then reads the blurred scene.
-        let base = &ctx.stack.stack[0];
-        let projection = base.projection_matrix(ctx.aspect);
-        let height = view.size().height;
-        let blur = blur_params(ctx.stack.post, graphics, height, projection);
+        // bloom and the composite below then read the blurred scene. Gated as the
+        // velocity was, so the editor's Scene view never blurs.
+        let stack = ctx.stack;
+        let blurs = motion::wanted(stack.post, graphics, stack.full_post_fx, stack.editor_mode);
+        let blur = blur_params(stack.post, graphics, view.size().height).filter(|_| blurs);
         let gpu = (&self.device, &self.queue);
-        let depth = &view.depth_view;
         view.post_fx
-            .run_motion_blur(gpu, &self.motion_blur, depth, blur, &self.gpu_timer);
+            .run_motion_blur(gpu, &self.motion_blur, blur, &self.gpu_timer);
 
         let (mut post_params, bloom_enabled) = build_post_params(
             scene,

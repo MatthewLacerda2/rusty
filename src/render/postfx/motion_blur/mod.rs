@@ -2,19 +2,22 @@
 //! reconstruction filter over a view's velocity target (#1435), in
 //! `postfx/motion_blur.wgsl`.
 //!
-//! Three fullscreen passes, before the composite: **TileMax** keeps each tile's
-//! longest streak, **NeighborMax** spreads each tile's to its 3×3 neighbourhood (so
-//! the blur reaches past a moving silhouette onto what is behind it), and the
-//! **gather** blurs every pixel along its neighbourhood's streak, weighting each tap
-//! by depth and by the tap's own streak. Its output, the blurred HDR scene, is what
-//! the composite reads ([`super::PostFx::scene_color`]). A viewmodel's gun writes
-//! ~0 velocity and sits in front of the world, so the world's streaks never smear
-//! over it and it stays sharp.
+//! Four fullscreen passes, before bloom and the composite: **TileMax** keeps each
+//! tile's longest streak, in two steps (each tile row's, then the tile's) so a big
+//! tile is two short loops; **NeighborMax** spreads each tile's to its 3×3
+//! neighbourhood (so the blur reaches past a moving silhouette onto what is behind
+//! it); the **gather** blurs every pixel along its neighbourhood's streak, weighting
+//! each tap by its distance from the camera and by the tap's own streak. Its output,
+//! the blurred HDR scene, is what bloom and the composite read
+//! ([`super::PostFx::scene_color`]). A viewmodel's gun writes ~0 velocity and lies
+//! nearer than the world, so the world's streaks never smear over it and it stays
+//! sharp. The distance comes from the velocity target (each camera writes its own),
+//! not the depth buffer, which a `DepthOnly` overlay has cleared by now.
 //!
 //! **One path.** Camera motion is already in the velocity target (the sky carries
 //! the camera's rotation), so there is no separate camera-only blur. A view with no
 //! velocity target this frame (motion blur off, the Low tier, the player's option, a
-//! shader preview) blurs nothing and holds no blur targets.
+//! shader preview, the editor's Scene view) blurs nothing and holds no blur targets.
 //!
 //! The pipelines are the renderer's ([`MotionBlurPasses`], built on first use and
 //! warmed with the rest); the targets are each view's ([`BlurTargets`]).
@@ -24,17 +27,20 @@ mod params;
 pub(crate) use params::BlurParams;
 
 use crate::render::gpu::fullscreen::Fullscreen;
-use crate::render::gpu::layout_entries::{depth_entry, texture_entry, uniform_entry};
+use crate::render::gpu::layout_entries::{texture_entry, uniform_entry};
 use crate::render::gpu::pipelines::LazyPipeline;
 use crate::render::gpu::shaders::ShaderRegistry;
-use crate::render::motion::VELOCITY_FORMAT;
 use crate::render::postfx::{PfxTarget, PostFx, HDR_FORMAT};
 use crate::render::timing::{GpuPass, GpuTimer};
+
+/// The tile textures' format: a streak in pixels.
+const TILE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rg16Float;
 
 /// The motion-blur pipelines, shared by every view.
 pub(crate) struct MotionBlurPasses {
     layout: wgpu::BindGroupLayout,
-    tile_max: LazyPipeline,
+    tile_max_x: LazyPipeline,
+    tile_max_y: LazyPipeline,
     neighbor_max: LazyPipeline,
     gather: LazyPipeline,
 }
@@ -49,7 +55,6 @@ impl MotionBlurPasses {
                 texture_entry(1, wgpu::TextureViewDimension::D2),
                 texture_entry(2, wgpu::TextureViewDimension::D2),
                 texture_entry(3, wgpu::TextureViewDimension::D2),
-                depth_entry(4, wgpu::TextureViewDimension::D2),
             ],
         });
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -77,44 +82,63 @@ impl MotionBlurPasses {
             })
         };
         Self {
-            tile_max: pass("fs_tile_max", VELOCITY_FORMAT),
-            neighbor_max: pass("fs_neighbor_max", VELOCITY_FORMAT),
+            tile_max_x: pass("fs_tile_max_x", TILE_FORMAT),
+            tile_max_y: pass("fs_tile_max_y", TILE_FORMAT),
+            neighbor_max: pass("fs_neighbor_max", TILE_FORMAT),
             gather: pass("fs_gather", HDR_FORMAT),
             layout,
         }
     }
 
     /// The pipelines, for warming (`Renderer::lazy_pipelines`).
-    pub(crate) fn lazy_pipelines(&self) -> [&LazyPipeline; 3] {
-        [&self.tile_max, &self.neighbor_max, &self.gather]
+    pub(crate) fn lazy_pipelines(&self) -> [&LazyPipeline; 4] {
+        [
+            &self.tile_max_x,
+            &self.tile_max_y,
+            &self.neighbor_max,
+            &self.gather,
+        ]
     }
 }
 
-/// One view's motion-blur targets: the two tile textures, the blurred scene and
-/// the params uniform. Held only while the view blurs.
+/// One view's motion-blur targets: the blurred scene and the params uniform, kept
+/// while the view's size holds, and the tile textures, kept while the tile size
+/// does too (a clamp ramp rebuilds only those). Held only while the view blurs.
 pub(crate) struct BlurTargets {
-    /// The full size and tile size these were made for.
-    key: ((u32, u32), u32),
-    tile_max: PfxTarget,
-    neighbor_max: PfxTarget,
-    /// The blurred HDR scene the composite reads.
+    /// The full size these were made for.
+    size: (u32, u32),
+    /// The blurred HDR scene bloom and the composite read.
     pub(crate) blurred: PfxTarget,
     params: wgpu::Buffer,
+    tiles: TileTargets,
+}
+
+/// The tile textures at one tile size: TileMax's half-way rows (tile columns by
+/// pixel rows), TileMax and NeighborMax.
+struct TileTargets {
+    tile: u32,
+    rows: PfxTarget,
+    tile_max: PfxTarget,
+    neighbor_max: PfxTarget,
+}
+
+impl TileTargets {
+    fn new(device: &wgpu::Device, (w, h): (u32, u32), tile: u32) -> Self {
+        let (tw, th) = (params::tiles(w, tile), params::tiles(h, tile));
+        let target = |w, h, label| PostFx::target(device, w, h, label, TILE_FORMAT);
+        Self {
+            tile,
+            rows: target(tw, h, "Motion Blur TileMax Rows"),
+            tile_max: target(tw, th, "Motion Blur TileMax"),
+            neighbor_max: target(tw, th, "Motion Blur NeighborMax"),
+        }
+    }
 }
 
 impl BlurTargets {
     fn new(device: &wgpu::Device, (w, h): (u32, u32), tile: u32) -> Self {
-        let (tw, th) = (params::tiles(w, tile), params::tiles(h, tile));
         Self {
-            key: ((w, h), tile),
-            tile_max: PostFx::target(device, tw, th, "Motion Blur TileMax", VELOCITY_FORMAT),
-            neighbor_max: PostFx::target(
-                device,
-                tw,
-                th,
-                "Motion Blur NeighborMax",
-                VELOCITY_FORMAT,
-            ),
+            size: (w, h),
             blurred: PostFx::target(device, w, h, "Motion Blur Scene", HDR_FORMAT),
             params: device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some("Motion Blur Params"),
@@ -122,6 +146,20 @@ impl BlurTargets {
                 usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
                 mapped_at_creation: false,
             }),
+            tiles: TileTargets::new(device, (w, h), tile),
+        }
+    }
+
+    /// Fit these to a view of `size` at `tile`: remade at another size, only the
+    /// tiles remade at another tile size.
+    fn fit(slot: &mut Option<Self>, device: &wgpu::Device, size: (u32, u32), tile: u32) {
+        match slot {
+            Some(t) if t.size == size => {
+                if t.tiles.tile != tile {
+                    t.tiles = TileTargets::new(device, size, tile);
+                }
+            }
+            _ => *slot = Some(Self::new(device, size, tile)),
         }
     }
 }
@@ -129,12 +167,11 @@ impl BlurTargets {
 impl PostFx {
     /// Blur this frame's scene with `params`, or drop the blur targets when `params`
     /// is `None` or the view wrote no velocity this frame. Afterwards
-    /// [`PostFx::scene_color`] is the image the composite reads.
+    /// [`PostFx::scene_color`] is the image bloom and the composite read.
     pub(crate) fn run_motion_blur(
         &mut self,
         (device, queue): (&wgpu::Device, &wgpu::Queue),
         passes: &MotionBlurPasses,
-        depth: &wgpu::TextureView,
         params: Option<BlurParams>,
         timer: &GpuTimer,
     ) {
@@ -142,13 +179,11 @@ impl PostFx {
             self.blur = None;
             return;
         };
-        let key = (self.full_size, params.tile());
-        if self.blur.as_ref().is_none_or(|t| t.key != key) {
-            self.blur = Some(BlurTargets::new(device, key.0, key.1));
-        }
-        let targets = self.blur.as_ref().expect("allocated above");
+        BlurTargets::fit(&mut self.blur, device, self.full_size, params.tile());
+        let targets = self.blur.as_ref().expect("fitted above");
+        let tiles = &targets.tiles;
         queue.write_buffer(&targets.params, 0, bytemuck::bytes_of(&params));
-        let group = |tiles: &wgpu::TextureView| {
+        let group = |input: &wgpu::TextureView| {
             device.create_bind_group(&wgpu::BindGroupDescriptor {
                 label: Some("Motion Blur Bind Group"),
                 layout: &passes.layout,
@@ -156,35 +191,24 @@ impl PostFx {
                     entry(0, targets.params.as_entire_binding()),
                     entry(1, wgpu::BindingResource::TextureView(&self.scene_hdr.view)),
                     entry(2, wgpu::BindingResource::TextureView(velocity)),
-                    entry(3, wgpu::BindingResource::TextureView(tiles)),
-                    entry(4, wgpu::BindingResource::TextureView(depth)),
+                    entry(3, wgpu::BindingResource::TextureView(input)),
                 ],
             })
         };
-        // Each pass binds as its tiles a texture it does not write.
+        // Each pass reads the one before it as its tiles (binding 3); the first
+        // reads none, and binds a texture it does not write.
         let steps = [
-            (
-                &passes.tile_max,
-                group(&targets.neighbor_max.view),
-                &targets.tile_max,
-            ),
-            (
-                &passes.neighbor_max,
-                group(&targets.tile_max.view),
-                &targets.neighbor_max,
-            ),
-            (
-                &passes.gather,
-                group(&targets.neighbor_max.view),
-                &targets.blurred,
-            ),
+            (&passes.tile_max_x, &tiles.neighbor_max, &tiles.rows),
+            (&passes.tile_max_y, &tiles.rows, &tiles.tile_max),
+            (&passes.neighbor_max, &tiles.tile_max, &tiles.neighbor_max),
+            (&passes.gather, &tiles.neighbor_max, &targets.blurred),
         ];
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("Motion Blur Encoder"),
         });
-        for (pipeline, bind_group, target) in &steps {
+        for (pipeline, input, target) in steps {
             let timed = (pipeline.get(), timer.writes(GpuPass::MotionBlur));
-            Self::fullscreen(&mut encoder, timed, &[bind_group], &target.view);
+            Self::fullscreen(&mut encoder, timed, &[&group(&input.view)], &target.view);
         }
         queue.submit(std::iter::once(encoder.finish()));
     }
@@ -196,3 +220,6 @@ fn entry(binding: u32, resource: wgpu::BindingResource<'_>) -> wgpu::BindGroupEn
 
 #[cfg(test)]
 mod gpu_tests;
+
+#[cfg(test)]
+mod overlay_gpu_tests;

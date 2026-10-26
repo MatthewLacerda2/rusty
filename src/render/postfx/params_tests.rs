@@ -38,7 +38,7 @@ fn params(scene: &Scene, camera: Option<u32>, quality: QualityPreset) -> (PostPa
 /// The motion blur `camera` runs under `graphics`, as its sample count.
 fn blur(scene: &Scene, camera: Option<u32>, graphics: GraphicsSettings) -> Option<f32> {
     let post = borrow_post_source(scene, camera);
-    blur_params(post.source(), graphics, 100, Mat4::IDENTITY).map(|b| b.shape[2])
+    blur_params(post.source(), graphics, 100).map(|b| b.shape[2])
 }
 
 fn custom(scene: &Scene, camera: Option<u32>) -> Vec<String> {

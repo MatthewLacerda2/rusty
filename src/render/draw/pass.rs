@@ -5,6 +5,7 @@ use crate::render::draw::batch::DrawBatch;
 use crate::render::gpu::draw_buffers::DrawBuffers;
 use crate::render::gpu::global_group::GlobalGroup;
 use crate::render::gpu::pipelines::surface::SolidPass;
+use crate::render::motion;
 use crate::render::passes::ssao::SsaoFrame;
 use crate::render::timing::GpuPass;
 use crate::render::{RenderView, Renderer};
@@ -54,9 +55,10 @@ pub(crate) struct ScenePassFrame {
 }
 
 /// The scene pass's colour attachments: the HDR target, and a motion-blurred view's
-/// velocity target (#1435). Both clear where the camera clears colour (the backdrop,
-/// "no motion") and keep the layer below where a `DepthOnly` camera composites over
-/// it (#93), so the nearest camera's velocity wins as its colour does.
+/// velocity target (#1435). Both clear where the camera clears colour (the backdrop;
+/// no motion, as far as the sky) and keep the layer below where a `DepthOnly` camera
+/// composites over it (#93), so the nearest camera's velocity and distance win as its
+/// colour does.
 fn scene_targets(
     view: &RenderView,
     clear: PassClear,
@@ -79,7 +81,7 @@ fn scene_targets(
         clear.color.unwrap_or(BACKDROP),
     );
     let velocity = view.post_fx.motion.target_view();
-    let velocity = velocity.map(|v| attachment(v, wgpu::Color::TRANSPARENT));
+    let velocity = velocity.map(|v| attachment(v, motion::CLEAR));
     std::iter::once(colour).chain(velocity).collect()
 }
 

@@ -1,13 +1,17 @@
 //! src/render/motion/mod.rs — per-object motion vectors (#1435).
 //!
-//! A view that runs motion blur gets a **velocity target**: an `Rg16Float` texture at
-//! full view resolution that the opaque forward pass writes as its second colour
+//! A view that runs motion blur gets a **velocity target**: an `Rgba16Float` texture
+//! at full view resolution that the opaque forward pass writes as its second colour
 //! attachment. Each pixel holds how far the surface under it moved on screen since
-//! last frame, `ndc_now.xy - ndc_prev.xy`: through the drawing camera's last-frame
+//! last frame, `ndc_now.xy - ndc_prev.xy`, and in `.b` how far that surface lies from
+//! the camera that drew it (#1436; the sky and an unwritten pixel: [`SKY_DISTANCE`]).
+//! The motion is through the drawing camera's last-frame
 //! view-projection and the drawn entity's last-frame world matrix and joint palette
 //! ([`MotionHistory`]). So an enemy sprinting past a still camera blurs, and a
 //! viewmodel camera's gun, which moves with its camera, writes ~0 (each camera in a
-//! stack writes with its own matrices; the nearest camera wins, as its colour does).
+//! stack writes with its own matrices and its own distance; the nearest camera wins,
+//! as its colour does). So motion blur orders world against world from the distance,
+//! even under a `DepthOnly` overlay camera that cleared the depth buffer.
 //! The sky writes the camera's rotation alone (`sky::motion::sky_velocity`).
 //!
 //! **What writes it.** Opaque and cutout solids (mesh particles among them, camera
@@ -22,8 +26,8 @@
 //! following Unity.
 //!
 //! **Cost.** The target exists and the velocity pipelines run only while a view runs
-//! motion blur ([`wanted`]: the camera has it on, the player's option allows it and
-//! the quality tier runs it, #1438). On any other frame the forward pass draws
+//! motion blur ([`wanted`]: the camera has it on, the player's option allows it, the
+//! quality tier runs it, #1438, and it is not the editor's Scene view). On any other frame the forward pass draws
 //! exactly as before, and the target is freed.
 
 mod history;
@@ -35,13 +39,33 @@ use crate::render::postfx::params::{motion_blur_enabled, PostSource};
 use crate::render::postfx::PfxTarget;
 use crate::render::PixelSize;
 
-/// The velocity target's format: two half floats, NDC units.
-pub(crate) const VELOCITY_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rg16Float;
+/// The velocity target's format: NDC motion (rg, half floats), the view distance (b,
+/// world units) and nothing (a).
+pub(crate) const VELOCITY_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba16Float;
+
+/// The view distance of the sky and of a pixel nothing wrote: a half float's largest
+/// value. `SKY_DISTANCE` in `engine/shaders/sky/motion.wgsl` mirrors it.
+pub(crate) const SKY_DISTANCE: f64 = 65504.0;
+
+/// What the velocity target clears to: no motion, as far as the sky.
+pub(crate) const CLEAR: wgpu::Color = wgpu::Color {
+    r: 0.0,
+    g: 0.0,
+    b: SKY_DISTANCE,
+    a: 0.0,
+};
 
 /// Whether a view writes motion vectors this frame: only when it will run motion blur,
-/// the one consumer (#1436). `full` is the stack's `full_post_fx`.
-pub(crate) fn wanted(post: PostSource, graphics: GraphicsSettings, full: bool) -> bool {
-    full && motion_blur_enabled(post, graphics)
+/// the one consumer (#1436). `full` is the stack's `full_post_fx`; `scene_view` its
+/// `editor_mode`, the editor's Scene view, which never blurs (nor does Unity's), so
+/// flying the editor camera writes no velocity.
+pub(crate) fn wanted(
+    post: PostSource,
+    graphics: GraphicsSettings,
+    full: bool,
+    scene_view: bool,
+) -> bool {
+    full && !scene_view && motion_blur_enabled(post, graphics)
 }
 
 /// One view's motion vectors: the velocity target (while active) and its history.

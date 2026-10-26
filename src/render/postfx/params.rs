@@ -112,18 +112,17 @@ pub(crate) fn build_post_params(
 }
 
 /// The motion blur `post`'s camera runs this frame (#1436), for a view `height`
-/// pixels tall drawn through `projection`; `None` when [`motion_blur_enabled`]
-/// does not hold. Like FXAA it lives on the camera, so it needs no volume.
+/// pixels tall; `None` when [`motion_blur_enabled`] does not hold. Like FXAA it
+/// lives on the camera, so it needs no volume.
 pub(crate) fn blur_params(
     post: PostSource,
     graphics: GraphicsSettings,
     height: u32,
-    projection: Mat4,
 ) -> Option<BlurParams> {
     let cam = post
         .camera
         .filter(|_| motion_blur_enabled(post, graphics))?;
-    Some(BlurParams::new(cam, height, projection))
+    Some(BlurParams::new(cam, height))
 }
 
 /// Whether `post`'s camera runs motion blur, through [`effect_runs`]: its component

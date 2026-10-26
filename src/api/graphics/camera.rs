@@ -12,12 +12,12 @@ use std::cell::RefCell;
 
 use super::state::{with_cam, with_cam_mut};
 use crate::api::{put, Reg};
-use crate::components::CameraComponent;
 use crate::scene::authoring::rendering::camera as camera_ops;
 use crate::scene::Scene;
 
 /// Camera motion blur: active, sample count, intensity and clamp (#1436) over the
-/// main camera's component.
+/// main camera's component. Without a screen camera nothing blurs, so every getter
+/// reports "off": `false` and `0`, never a new camera's defaults.
 pub(super) fn register_motion_blur<'scope>(
     scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
@@ -56,8 +56,7 @@ pub(super) fn register_motion_blur<'scope>(
 }
 
 /// Motion blur's intensity (the shutter fraction) and clamp (the longest streak, a
-/// fraction of the view's height), #1436. Without a screen camera the getters return
-/// a new camera's defaults.
+/// fraction of the view's height), #1436.
 fn register_motion_blur_shape<'scope>(
     scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
@@ -75,8 +74,7 @@ fn register_motion_blur_shape<'scope>(
         table,
         "GetMotionBlurIntensity",
         scope.create_function(|_, ()| {
-            let default = CameraComponent::DEFAULT_MOTION_BLUR_INTENSITY;
-            Ok(with_cam(scene, |c| c.motion_blur_intensity).unwrap_or(default))
+            Ok(with_cam(scene, |c| c.motion_blur_intensity).unwrap_or(0.0))
         }),
     )?;
     put(
@@ -91,8 +89,7 @@ fn register_motion_blur_shape<'scope>(
         table,
         "GetMotionBlurMaxLength",
         scope.create_function(|_, ()| {
-            let default = CameraComponent::DEFAULT_MOTION_BLUR_MAX_LENGTH;
-            Ok(with_cam(scene, |c| c.motion_blur_max_length).unwrap_or(default))
+            Ok(with_cam(scene, |c| c.motion_blur_max_length).unwrap_or(0.0))
         }),
     )
 }

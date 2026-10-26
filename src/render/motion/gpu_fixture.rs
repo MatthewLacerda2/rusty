@@ -1,8 +1,8 @@
 //! What the motion-vector GPU tests (#1435) share: a renderer on a tier that runs
 //! motion blur, a scene whose base camera has it on, and the velocity target read
-//! back as NDC vectors.
+//! back as NDC vectors beside each pixel's view distance (#1436).
 
-use glam::{Quat, Vec2, Vec3};
+use glam::{Quat, Vec2, Vec3, Vec3Swizzles};
 
 use crate::components::CameraComponent;
 use crate::core::settings::quality::QualityPreset;
@@ -52,13 +52,19 @@ pub(crate) fn eye(yaw: f32) -> Camera {
     Camera::new(Vec3::ZERO, -90.0 + yaw, 0.0)
 }
 
-/// One velocity target, as NDC vectors, row-major from the top-left.
-pub(crate) struct Velocity(Vec<Vec2>);
+/// One velocity target, row-major from the top-left: each texel's NDC motion (xy)
+/// and view distance (z).
+pub(crate) struct Velocity(Vec<Vec3>);
 
 impl Velocity {
     /// The velocity at pixel `(x, y)`.
     pub(crate) fn at(&self, x: u32, y: u32) -> Vec2 {
-        self.0[(y * W + x) as usize]
+        self.0[(y * W + x) as usize].xy()
+    }
+
+    /// How far from its camera the surface at pixel `(x, y)` lies.
+    pub(crate) fn distance(&self, x: u32, y: u32) -> f32 {
+        self.0[(y * W + x) as usize].z
     }
 
     /// The velocity at the pixel holding NDC point `ndc`.
@@ -83,15 +89,15 @@ pub(crate) fn render(
     let out = view.color_target_view().unwrap();
     r.render(view, scene, cam, &out, false);
     let target = view.post_fx.motion.active_target()?;
-    let bytes = readback::read_texture_bytes(&r.device, &r.queue, &target.texture, (W, H), 4);
+    let bytes = readback::read_texture_bytes(&r.device, &r.queue, &target.texture, (W, H), 8);
     let half = |b: &[u8]| f16_to_f32(u16::from_le_bytes([b[0], b[1]]));
     let texels = bytes
-        .chunks(4)
-        .map(|t| Vec2::new(half(&t[..2]), half(&t[2..])));
+        .chunks(8)
+        .map(|t| Vec3::new(half(&t[..2]), half(&t[2..4]), half(&t[4..6])));
     Some(Velocity(texels.collect()))
 }
 
-/// An IEEE half float's value (normals, subnormals and zero: what velocity holds).
+/// An IEEE half float's value (normals, subnormals and zero: what the target holds).
 fn f16_to_f32(bits: u16) -> f32 {
     let sign = if bits & 0x8000 != 0 { -1.0 } else { 1.0 };
     let exp = i32::from((bits >> 10) & 0x1f);

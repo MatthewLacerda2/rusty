@@ -60,7 +60,7 @@ crate::core::named_enum! {
         Ribbons = "ribbons",
         /// Particle systems.
         Particles = "particles",
-        /// Per-object motion blur (#1436): its two tile passes and the gather.
+        /// Per-object motion blur (#1436): its three tile passes and the gather.
         MotionBlur = "motion_blur",
         /// The post-FX chain: bloom, composite, authored effects, FXAA.
         PostFx = "post_fx",

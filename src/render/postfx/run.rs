@@ -112,8 +112,10 @@ impl PostFx {
         src
     }
 
-    /// Bright-pass (scene HDR -> bloom_a), then a 2D gaussian blur (a -> b),
-    /// leaving the blurred bloom in bloom_b for the composite to add.
+    /// Bright-pass (scene -> bloom_a), then a 2D gaussian blur (a -> b), leaving the
+    /// blurred bloom in bloom_b for the composite to add. The scene is
+    /// [`PostFx::scene_color`], so a moving highlight blooms along its streak: motion
+    /// blur runs before bloom, as in URP and HDRP (#1436).
     fn run_bloom(
         &self,
         device: &wgpu::Device,
@@ -126,7 +128,7 @@ impl PostFx {
         // texture / color-target usage conflict.
         let bright_bg = self.io_bind_group(
             device,
-            &self.scene_hdr.view,
+            self.scene_color(),
             &self.scene_hdr.view,
             depth_view,
             skybox,

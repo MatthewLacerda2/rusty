@@ -11,7 +11,8 @@ is no screen camera, or its volume is missing or inactive; setters are then no-o
 The editor's Camera card edits the same four motion-blur fields (a "Motion Blur"
 checkbox and "Samples" `2..=32`, "Intensity" `0..=1` and "Clamp" `0..=0.2` sliders)
 through the same ops. A new camera starts with motion blur on at 32 samples, intensity
-`0.5` and clamp `0.05`.
+`0.5` and clamp `0.05`. With no screen camera nothing blurs, and the four motion-blur
+getters say so: `false`, `0`, `0` and `0`.
 
 **Motion vectors** (#1435). A view whose base camera runs motion blur (it is on, and
 the tier is Medium or High) also writes a per-pixel velocity buffer from its opaque
@@ -38,7 +39,11 @@ of the view's height), so a fast flick never smears the whole screen. **Samples*
 how many taps each pixel reads along it. A frame where nothing moved is
 pixel-identical to motion blur off, and a frame with no motion history (the first, a
 cut) blurs nothing. Like FXAA it is the camera's: it runs without a post-processing
-volume. Its cost is `Debug.Stats().gpu_passes.motion_blur`.
+volume. The editor's Scene view never blurs and writes no velocity, as Unity's
+doesn't; the Game view and the player do. Depth ordering holds under a `DepthOnly`
+overlay camera: each camera writes its own surfaces' distance beside their motion, so
+an enemy passing a wall smears over the wall at full strength while a viewmodel
+camera's gun stays sharp. Bloom reads the blurred image, as in URP and HDRP. Its cost is `Debug.Stats().gpu_passes.motion_blur`.
 
 **Post-FX is per view** (#1434), Unity URP's camera-stack rule: each view runs it once,
 with the settings of **its base camera**, that camera entity's own `CameraComponent`

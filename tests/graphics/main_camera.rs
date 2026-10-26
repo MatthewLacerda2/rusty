@@ -78,7 +78,10 @@ fn without_a_screen_camera_getters_are_neutral_and_setters_no_ops() {
     run(
         &scene,
         "Graphics.SetSaturation(0.25)
-         assert(Graphics.GetSaturation() == 1.0 and Graphics.GetFxaaActive())",
+         assert(Graphics.GetSaturation() == 1.0 and Graphics.GetFxaaActive())
+         -- Nothing blurs, and the whole motion-blur group says so (#1436).
+         assert(not Graphics.GetMotionBlurActive() and Graphics.GetMotionBlurSamples() == 0)
+         assert(Graphics.GetMotionBlurIntensity() == 0 and Graphics.GetMotionBlurMaxLength() == 0)",
     );
     assert_eq!(
         scene

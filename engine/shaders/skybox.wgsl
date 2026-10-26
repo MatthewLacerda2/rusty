@@ -1,5 +1,5 @@
 #import common::{CameraUniforms, VertexInput, equirect_uv, sky_fog}
-#import sky::motion::{SkyTargets, sky_velocity}
+#import sky::motion::{SkyTargets, sky_targets}
 
 @group(0) @binding(0)
 var<uniform> camera: CameraUniforms;
@@ -38,5 +38,5 @@ fn fs_main(in: VertexOutput) -> SkyTargets {
     // Blend toward the scene fog at the horizon (#437) so fogged geometry doesn't
     // silhouette against a clear sky.
     let color = vec4<f32>(sky_fog(camera.fog, sky.rgb, dir, camera.camera_pos), sky.a);
-    return SkyTargets(color, sky_velocity(camera, dir));
+    return sky_targets(camera, color, dir);
 }

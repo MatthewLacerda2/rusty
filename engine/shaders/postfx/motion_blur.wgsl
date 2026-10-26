@@ -1,19 +1,26 @@
 // engine/shaders/postfx/motion_blur.wgsl — per-object motion blur (#1436): the
 // reconstruction filter of McGuire et al. 2012 ("A Reconstruction Filter for
 // Plausible Motion Blur"), weighted as Jimenez refined it (CoD: Advanced Warfare,
-// 2014). Three fullscreen passes over the view's velocity target (#1435):
-//   fs_tile_max     — one texel per tile: the tile's longest streak
+// 2014). Four fullscreen passes over the view's velocity target (#1435):
+//   fs_tile_max_x   — one texel per tile column and pixel row: the longest streak of
+//                     the tile's row of pixels
+//   fs_tile_max_y   — one texel per tile: the longest of the tile's rows, so the
+//                     tile's longest streak in two loops of `tile` taps, not one of
+//                     `tile²` (a 216 px tile is 46k taps)
 //   fs_neighbor_max — one texel per tile: the longest streak of its 3×3 tiles, so a
 //                     moving silhouette's blur reaches the background beside it
 //   fs_gather       — per pixel, `samples` taps along that neighbourhood streak,
-//                     weighted by depth and by each tap's own streak
+//                     weighted by distance and by each tap's own streak
 // The gather writes the blurred HDR image the composite then reads instead of the
 // scene. A pixel whose neighbourhood barely moves is copied unchanged, so a still
 // frame is pixel-identical to motion blur off.
 //
-// Units. The velocity target holds `ndc_now - ndc_prev`. A *streak* is that motion
-// in pixels, scaled by the shutter (`intensity`) and clamped to the longest streak
-// the camera allows; a tap reaches half a streak either side of its pixel.
+// Units. The velocity target holds `ndc_now - ndc_prev` in `.xy` and, in `.z`, how
+// far the surface lies from the camera that drew it: each camera of a stack writes
+// its own, so the order holds under a `DepthOnly` overlay that cleared the depth
+// buffer. A *streak* is that motion in pixels, scaled by the shutter (`intensity`)
+// and clamped to the longest streak the camera allows; a tap reaches half a streak
+// either side of its pixel.
 
 #import fullscreen
 
@@ -21,20 +28,16 @@ struct BlurParams {
     // x: intensity (shutter fraction), y: longest streak in pixels, z: samples,
     // w: tile size in pixels
     shape: vec4<f32>,
-    // The inverse projection's z and w rows at (0, 0, d, 1): a depth sample `d`
-    // lies `-(x·d + y) / (z·d + w)` in front of the camera.
-    depth: vec4<f32>,
 };
 
 @group(0) @binding(0) var<uniform> blur: BlurParams;
 @group(0) @binding(1) var t_color: texture_2d<f32>;
 @group(0) @binding(2) var t_velocity: texture_2d<f32>;
 @group(0) @binding(3) var t_tiles: texture_2d<f32>;
-@group(0) @binding(4) var t_depth: texture_depth_2d;
 
-// Depths within this many world units of each other blend half in front, half
+// Distances within this many world units of each other blend half in front, half
 // behind; further apart, the nearer one wins outright.
-const SOFT_DEPTH: f32 = 0.1;
+const SOFT_DISTANCE: f32 = 0.1;
 
 @vertex
 fn vs_fullscreen(@builtin(vertex_index) vid: u32) -> @builtin(position) vec4<f32> {
@@ -59,17 +62,30 @@ fn longer(a: vec2<f32>, b: vec2<f32>) -> vec2<f32> {
     return select(a, b, dot(b, b) > dot(a, a));
 }
 
+// TileMax, first half: the longest streak of one pixel row across one tile.
 @fragment
-fn fs_tile_max(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32> {
+fn fs_tile_max_x(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32> {
     let tile = i32(blur.shape.w);
-    let dims = vec2<i32>(textureDimensions(t_velocity));
-    let origin = vec2<i32>(pos.xy) * tile;
-    let end = min(origin + vec2<i32>(tile), dims);
+    let y = i32(pos.y);
+    let start = i32(pos.x) * tile;
+    let end = min(start + tile, i32(textureDimensions(t_velocity).x));
     var best = vec2<f32>(0.0);
-    for (var y = origin.y; y < end.y; y = y + 1) {
-        for (var x = origin.x; x < end.x; x = x + 1) {
-            best = longer(best, streak(vec2<i32>(x, y)));
-        }
+    for (var x = start; x < end; x = x + 1) {
+        best = longer(best, streak(vec2<i32>(x, y)));
+    }
+    return vec4<f32>(best, 0.0, 0.0);
+}
+
+// TileMax, second half: the longest of a tile's rows, from `fs_tile_max_x`.
+@fragment
+fn fs_tile_max_y(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32> {
+    let tile = i32(blur.shape.w);
+    let x = i32(pos.x);
+    let start = i32(pos.y) * tile;
+    let end = min(start + tile, i32(textureDimensions(t_tiles).y));
+    var best = vec2<f32>(0.0);
+    for (var y = start; y < end; y = y + 1) {
+        best = longer(best, textureLoad(t_tiles, vec2<i32>(x, y), 0).xy);
     }
     return vec4<f32>(best, 0.0, 0.0);
 }
@@ -88,11 +104,9 @@ fn fs_neighbor_max(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32> 
     return vec4<f32>(best, 0.0, 0.0);
 }
 
-// How far in front of the camera the surface at pixel `p` lies.
-fn view_depth(p: vec2<i32>) -> f32 {
-    let d = textureLoad(t_depth, p, 0);
-    let k = blur.depth;
-    return -(k.x * d + k.y) / (k.z * d + k.w);
+// How far from its camera the surface at pixel `p` lies.
+fn view_distance(p: vec2<i32>) -> f32 {
+    return textureLoad(t_velocity, p, 0).z;
 }
 
 // Interleaved gradient noise (Jimenez 2014) in [0, 1): a fixed per-pixel offset for
@@ -121,7 +135,7 @@ fn fs_gather(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32> {
 
     let dims = vec2<i32>(textureDimensions(t_color));
     let center_radius = 0.5 * length(streak(p));
-    let center_depth = view_depth(p);
+    let center_distance = view_distance(p);
     let n = i32(blur.shape.z);
     let offset = jitter(pos.xy);
     var sum = vec3<f32>(0.0);
@@ -133,7 +147,8 @@ fn fs_gather(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32> {
         let q = clamp(p + vec2<i32>(round(step)), vec2<i32>(0), dims - 1);
         let dist = length(step);
         // Behind: the tap is further than this pixel; in front: nearer.
-        let behind = clamp(0.5 + (view_depth(q) - center_depth) / SOFT_DEPTH, 0.0, 1.0);
+        let gap = view_distance(q) - center_distance;
+        let behind = clamp(0.5 + gap / SOFT_DISTANCE, 0.0, 1.0);
         let in_front = 1.0 - behind;
         // A tap behind shows through only as far as this pixel's own streak reaches;
         // one in front smears over it as far as the tap's streak reaches.
