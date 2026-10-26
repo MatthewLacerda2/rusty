@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import functools
 import os
+import signal
 import subprocess
 import sys
 import time
@@ -54,7 +55,7 @@ def effects(root: str, forwarded: list[str], argv: list[str]) -> argparse.Namesp
         stop_requested=lambda: world.consume(stop),
         update=lambda: update(root),
         restart_needed=lambda: bool(freshness.changed(code, functools.partial(world.merge_tree_git, root))),
-        restart=lambda: os.execv(sys.executable, [sys.executable, sys.argv[0], *argv]),
+        restart=lambda: os.execve(sys.executable, [sys.executable, sys.argv[0], *argv], {**os.environ, detach.RESTARTED: "1"}),
         watch=lambda: watch(root, ["--root", root, *forwarded]),
         sleep=time.sleep,
         say=lambda line: print(line, flush=True),
@@ -95,22 +96,46 @@ def main(argv: list[str] | None = None) -> int:
                 [sys.executable, sys.argv[0], *(a for a in argv if a != "--detach")],
                 stdout=out, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, start_new_session=True,
             )
-        failed = detach.confirm(child, common_dir(root) / supervisor.LOCK, log)
-        if failed:
-            print(failed, file=sys.stderr)
-            return child.returncode or 1
-        print(f"queue-daemon: supervisor started, PID {child.pid}; log {log}; stop with `make queue-stop`.")
+        exited, note = detach.confirm(child, common_dir(root) / supervisor.LOCK, log)
+        if exited is not None:
+            print(note, file=sys.stderr)
+            return exited or 1
+        print(note or f"queue-daemon: supervisor started, PID {child.pid}; log {log}; stop with `make queue-stop`.")
         return 0
+    return supervised(root, forwarded, argv, restarted=os.environ.pop(detach.RESTARTED, None) is not None)
+
+
+def _terminated(signum, frame):
+    """`kill <pid>` ends the supervisor through its `finally`, which unlocks the
+    worktree; Python's default for SIGTERM skips it (#1450)."""
+    signal.signal(signal.SIGTERM, signal.SIG_DFL)  # a second kill is not caught
+    raise SystemExit(128 + signum)
+
+
+def supervised(root: str, forwarded: list[str], argv: list[str], restarted: bool) -> int:
+    """Hold the supervisor lock and supervise. Only a fresh start clears a stale
+    stop: a `restarted` one keeps it for [`supervisor.run`] to obey ([`detach`])."""
+    say = functools.partial(print, flush=True)
+
+    def gone() -> str | None:
+        return None if os.path.isdir(root) else root
+    if gone():  # removed while it re-executed itself: no git call can find the lock
+        return supervisor.vanished(root, say)
     common = common_dir(root)
     held, holder = lock.hold(common / supervisor.LOCK)
     if held is None:
-        print(f"queue-daemon: another supervisor runs (PID {holder}); one at a time.", flush=True)
+        say(f"queue-daemon: another supervisor runs (PID {holder}); one at a time.")
         return lock.LOCKED_STATUS
-    with held:
-        for note in (detach.clear_stale_stop(common), tenancy.claim(root, os.getpid())):
+
+    def begin() -> argparse.Namespace:
+        for note in (None if restarted else detach.clear_stale_stop(common), tenancy.claim(root, os.getpid())):
             if note:
-                print(note, flush=True)
+                say(note)
+        return effects(root, forwarded, argv)
+    previous = signal.signal(signal.SIGTERM, _terminated)
+    with held:
         try:
-            return supervisor.supervise(effects(root, forwarded, argv))
+            return supervisor.supervise(begin, gone, say)
         finally:
             tenancy.release(root, os.getpid())
+            signal.signal(signal.SIGTERM, previous)

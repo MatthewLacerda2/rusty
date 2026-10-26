@@ -95,7 +95,7 @@ def run(fx) -> int:
     failures = 0
     while True:
         if fx.gone():
-            return _gone(fx)
+            return vanished(fx.gone(), fx.say)
         if fx.stop_requested():
             fx.say("supervisor: a stop was requested; not starting the watch again.")
             return ending.STOPPED_STATUS
@@ -117,7 +117,7 @@ def run(fx) -> int:
         waited = 0.0
         while waited < delay:
             if fx.gone():
-                return _gone(fx)
+                return vanished(fx.gone(), fx.say)
             if fx.stop_requested():
                 fx.say("supervisor: a stop was requested; not starting the watch again.")
                 return ending.STOPPED_STATUS
@@ -125,18 +125,24 @@ def run(fx) -> int:
             waited += STEP_SECONDS
 
 
-def _gone(fx) -> int:
-    fx.say(f"supervisor: worktree {fx.gone()} is gone; stopped.")
+def vanished(path: str, say) -> int:
+    """Say the worktree at `path` is gone, and end with [`GONE_STATUS`]."""
+    say(f"supervisor: worktree {path} is gone; stopped.")
     return GONE_STATUS
 
 
-def supervise(fx) -> int:
-    """[`run`], ending with a line and a status rather than a traceback: a git
-    call in a worktree removed between two checks raises `FileNotFoundError`."""
+def supervise(begin, gone, say) -> int:
+    """[`run`] the effects `begin()` returns, ending with a line and a status
+    rather than a traceback: a git call in a worktree removed between two
+    checks raises `FileNotFoundError`. `begin` (locking the worktree, clearing
+    a stale stop, noting the supervisor's code) runs inside the same `try`, so
+    a worktree that vanished across a restart ends the same way (#1450, review
+    of PR #1451); `gone` and `say` stand in for the effects that never came."""
     try:
+        fx = begin()
         return run(fx)
     except Exception as err:  # noqa: BLE001 -- the point: one line, not a traceback
-        if fx.gone():
-            return _gone(fx)
-        fx.say(f"supervisor: crashed: {type(err).__name__}: {err}; stopped.")
+        if gone():
+            return vanished(gone(), say)
+        say(f"supervisor: crashed: {type(err).__name__}: {err}; stopped.")
         return CRASHED_STATUS

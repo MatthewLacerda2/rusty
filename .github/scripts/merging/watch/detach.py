@@ -9,11 +9,22 @@ orchestrator believed a queue ran for about 20 minutes while none did.
 So a supervisor that holds its lock clears a stop request no live watch could
 be the target of ([`clear_stale_stop`]), and `--detach` reports "started" only
 once its child still holds the supervisor lock a few seconds in ([`confirm`]).
+
+The review of PR #1451 found two ways those could go wrong. A supervisor whose
+own code changed re-executes itself, and its flock does not survive the
+`exec`: had the restarted process cleared the stop file too, a `make
+queue-stop` written while it updated would be deleted and the queue would keep
+merging. So only a fresh start clears one; a restart carries [`RESTARTED`] in
+its environment, which nobody types. And a probe that took a shared flock on
+the supervisor's lock could make the child's own exclusive, non-blocking take
+fail (it would exit 4); [`confirm`] reads the PID the holder wrote instead,
+and polls for the whole window rather than looking once at its end.
 """
 
 from __future__ import annotations
 
 import subprocess
+import time
 from pathlib import Path
 
 from merging.watch import ending, lock
@@ -25,6 +36,12 @@ CONFIRM_SECONDS = 5
 
 # How many of the log's last lines a failed start prints.
 TAIL_LINES = 20
+
+# How often [`confirm`] looks at its child.
+POLL_SECONDS = 0.1
+
+# Set in the environment of a supervisor re-executing itself (never typed).
+RESTARTED = "MERGE_QUEUE_SUPERVISOR_RESTARTED"
 
 CLEARED = "queue-daemon: removed a stop request left for a supervisor that is gone."
 
@@ -50,14 +67,21 @@ def tail(log: Path, lines: int = TAIL_LINES) -> list[str]:
         return []
 
 
-def confirm(child: subprocess.Popen, held: Path, log: Path, seconds: float = CONFIRM_SECONDS) -> str | None:
-    """Why the detached supervisor `child` is not running after `seconds`, or
-    `None` when it still runs and holds the lock at `held`."""
-    try:
-        status = child.wait(timeout=seconds)
-    except subprocess.TimeoutExpired:
-        status = None
-    if status is None and lock.holder(held) == str(child.pid):
-        return None
-    how = f"exited {status}" if status is not None else f"does not hold {held}"
-    return "\n".join([f"queue-daemon: the supervisor (PID {child.pid}) {how}; the end of {log}:", *tail(log)])
+def confirm(child: subprocess.Popen, held: Path, log: Path, seconds: float = CONFIRM_SECONDS) -> tuple[int | None, str | None]:
+    """Watch the detached supervisor `child` for `seconds`: `(status, why)` when
+    it exited, `(None, None)` when it runs and was seen holding the lock at
+    `held`, and `(None, note)` when it runs but was never seen holding it (not
+    a failure: it may be slow to start). Reads the PID the holder writes, and
+    never takes the lock itself."""
+    deadline, seen = time.monotonic() + seconds, False
+    while True:
+        status = child.poll()
+        if status is not None:
+            return status, "\n".join([f"queue-daemon: the supervisor (PID {child.pid}) exited {status}; the end of {log}:", *tail(log)])
+        seen = seen or lock.written(held) == str(child.pid)
+        if time.monotonic() >= deadline:
+            break
+        time.sleep(POLL_SECONDS)
+    if seen:
+        return None, None
+    return None, f"queue-daemon: the supervisor (PID {child.pid}) runs but was not seen holding {held}; unconfirmed, see {log}."

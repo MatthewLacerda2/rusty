@@ -155,9 +155,11 @@ queue's own code changed, #967) at once, the machine or GitHub failing with a
 backoff, five times in a row at most. It locks its worktree (`git worktree lock`,
 reason `merge-queue supervisor pid <pid>`) so `make reclaim` leaves it alone; a
 lock left by a dead supervisor shows in `reclaim` as stale, with its PID (#1450).
-`make queue-daemon` prints "supervisor started" only once the child still holds its
-lock a few seconds in; otherwise it prints the log's last lines and exits non-zero.
-A stop request left for a supervisor that is gone is removed at the next start.
+`make queue-daemon` prints "supervisor started" only once the child was seen holding
+its lock and still runs a few seconds in; a child that exited prints the log's last
+lines and exits non-zero, and one never seen holding it says *unconfirmed*. A stop
+request left for a supervisor that is gone is removed at a fresh start (not when the
+supervisor restarts itself on a change to its own code, which keeps it).
 The supervisor's own endings are status 7 (`supervisor: worktree <path> is gone;
 stopped.`) and 8 (`supervisor: crashed: <error>; stopped.`). Put a `Monitor` on `tail -F
 .git/merge-queue/queue.log | grep --line-buffered -E 'HANDED BACK|supervisor:.*stopped'` and on new issue comments matching `Standing down` (a coder that stops says so on its issue, not on a PR),

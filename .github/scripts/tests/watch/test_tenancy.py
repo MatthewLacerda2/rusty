@@ -69,18 +69,22 @@ def gone_after(fx, watches: int):
     return fx
 
 
+def supervise(fx) -> int:
+    return sv.supervise(lambda: fx, lambda: fx.gone(), fx.say)
+
+
 class Gone(unittest.TestCase):
     def test_a_worktree_removed_mid_wait_ends_it_with_its_line(self):
         fx, said, calls = fake([(0, "no open pull request is left.")])
         fx = gone_after(fx, 1)
-        self.assertEqual(sv.supervise(fx), sv.GONE_STATUS)
+        self.assertEqual(supervise(fx), sv.GONE_STATUS)
         self.assertEqual(said[-1], "supervisor: worktree /w/queue is gone; stopped.")
         self.assertLess(calls["slept"], sv.PAUSE_SECONDS)
 
     def test_a_present_worktree_keeps_it_running(self):
         fx, said, calls = fake([(0, "no open pull request is left."), (6, "")])
         fx = gone_after(fx, 99)
-        self.assertEqual(sv.supervise(fx), 6)
+        self.assertEqual(supervise(fx), 6)
         self.assertEqual(calls["slept"], sv.PAUSE_SECONDS)
 
     def test_git_failing_in_a_removed_worktree_is_the_gone_line_not_a_traceback(self):
@@ -91,14 +95,22 @@ class Gone(unittest.TestCase):
             state["gone"] = "/w/queue"
             raise FileNotFoundError(2, "No such file or directory", "/w/queue")
         fx.update, fx.gone = update, lambda: state["gone"]
-        self.assertEqual(sv.supervise(fx), sv.GONE_STATUS)
+        self.assertEqual(supervise(fx), sv.GONE_STATUS)
         self.assertIn("is gone; stopped.", said[-1])
+
+    def test_a_worktree_gone_before_the_effects_exist_is_the_gone_line(self):
+        said = []
+
+        def begin():  # a restart into a removed worktree: the lock's git call fails first
+            raise FileNotFoundError(2, "No such file or directory", "/w/queue")
+        self.assertEqual(sv.supervise(begin, lambda: "/w/queue", said.append), sv.GONE_STATUS)
+        self.assertEqual(said, ["supervisor: worktree /w/queue is gone; stopped."])
 
     def test_anything_else_unexpected_is_one_crashed_line(self):
         fx, said, _ = fake([])
         fx.gone = lambda: None
         fx.update = lambda: {}["missing"]
-        self.assertEqual(sv.supervise(fx), sv.CRASHED_STATUS)
+        self.assertEqual(supervise(fx), sv.CRASHED_STATUS)
         self.assertEqual(said[-1], "supervisor: crashed: KeyError: 'missing'; stopped.")
 
     def test_release_after_a_real_removal_does_nothing(self):

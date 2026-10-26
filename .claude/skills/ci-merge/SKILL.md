@@ -197,7 +197,10 @@ worktree (~2.5–4.5 GB of `target/` each) and its branch once nobody is standin
   it refuses to move, **7** when its worktree is gone (`supervisor: worktree <path>
   is gone; stopped.`) and **8** when something unexpected was raised (`supervisor:
   crashed: <error>; stopped.`). `make queue-daemon` exits non-zero, printing the
-  log's tail, when the supervisor it started is not running a few seconds in.
+  log's tail, when the supervisor it started exits in its first few seconds; one
+  still running but never seen holding its lock is reported as *unconfirmed*
+  (exit 0): read `queue.log` before trusting it. Stop a supervisor with `make
+  queue-stop`, or `kill <pid>` (its worktree lock is released either way).
 - By hand, the same loop is: rebase in the branch's worktree, `cargo check`
   both feature sets and `make size`, push with `--force-with-lease`, wait,
   `make mergeable PR=N`, squash-merge. Prefer the queue.

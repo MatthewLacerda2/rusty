@@ -56,5 +56,15 @@ def holder(path: Path) -> str | None:
     return None
 
 
+def written(path: Path) -> str | None:
+    """The PID last written into the lock at `path`, without taking it: a probe
+    that flocks, even shared, can make a holder's non-blocking take fail
+    (#1450). Says who took it last, not that it still holds it."""
+    try:
+        return path.read_text().strip() or None
+    except FileNotFoundError:
+        return None
+
+
 def refused(path: Path, pid: str) -> str:
     return f"another watch holds {path} (PID {pid}); one watch at a time. Stop it first, or leave it running."

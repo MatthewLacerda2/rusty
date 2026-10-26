@@ -10,6 +10,7 @@ from __future__ import annotations
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -58,6 +59,13 @@ print("holding", flush=True); time.sleep(30)
 """
 
 
+def holding(log: Path, seconds: float = 20) -> None:
+    """Wait for the child's "holding" line, so a test does not race its start."""
+    deadline = time.monotonic() + seconds
+    while "holding" not in log.read_text() and time.monotonic() < deadline:
+        time.sleep(0.05)
+
+
 class Confirm(unittest.TestCase):
     def start(self, tmp: str, code: str, *args: str) -> subprocess.Popen:
         log = open(Path(tmp, "queue.log"), "a")
@@ -70,7 +78,8 @@ class Confirm(unittest.TestCase):
     def test_a_child_that_exits_at_once_is_reported_with_the_log(self):
         with tempfile.TemporaryDirectory() as tmp:
             child = self.start(tmp, "print('supervisor: a stop was requested'); raise SystemExit(6)")
-            failed = detach.confirm(child, Path(tmp, "x.lock"), Path(tmp, "queue.log"), seconds=5)
+            status, failed = detach.confirm(child, Path(tmp, "x.lock"), Path(tmp, "queue.log"), seconds=5)
+            self.assertEqual(status, 6)
             self.assertIn(f"(PID {child.pid}) exited 6", failed)
             self.assertIn("supervisor: a stop was requested", failed)
 
@@ -78,13 +87,28 @@ class Confirm(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             held = Path(tmp, "x.lock")
             child = self.start(tmp, HOLDS, str(held))
-            self.assertIsNone(detach.confirm(child, held, Path(tmp, "queue.log"), seconds=1.5))
+            holding(Path(tmp, "queue.log"))
+            self.assertEqual(detach.confirm(child, held, Path(tmp, "queue.log"), seconds=0.3), (None, None))
+            self.assertEqual(child.poll(), None)  # the probe took no lock that could end it
 
     def test_a_running_child_without_the_lock_is_not_confirmed(self):
         with tempfile.TemporaryDirectory() as tmp:
             child = self.start(tmp, "import time; time.sleep(30)")
-            failed = detach.confirm(child, Path(tmp, "x.lock"), Path(tmp, "queue.log"), seconds=0.3)
-            self.assertIn("does not hold", failed)
+            status, note = detach.confirm(child, Path(tmp, "x.lock"), Path(tmp, "queue.log"), seconds=0.3)
+            self.assertIsNone(status)  # running, so not a failure
+            self.assertIn("unconfirmed", note)
+
+    def test_a_child_that_takes_the_lock_late_in_the_window_is_confirmed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            held = Path(tmp, "x.lock")
+            child = self.start(tmp, "import time; time.sleep(0.5)\n" + HOLDS, str(held))
+            self.assertEqual(detach.confirm(child, held, Path(tmp, "queue.log"), seconds=3), (None, None))
+
+    def test_a_child_that_holds_then_exits_inside_the_window_is_reported(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            held = Path(tmp, "x.lock")
+            child = self.start(tmp, HOLDS.replace("time.sleep(30)", "raise SystemExit(6)"), str(held))
+            self.assertEqual(detach.confirm(child, held, Path(tmp, "queue.log"), seconds=10)[0], 6)
 
 
 if __name__ == "__main__":
