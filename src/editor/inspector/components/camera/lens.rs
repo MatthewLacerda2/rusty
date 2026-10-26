@@ -20,6 +20,19 @@ pub(super) fn draw_lens(
 ) {
     ui.add_space(3.0);
     ui.label("Lens Effects");
+    draw_aberration(ui, world, id, vc, is_dirty);
+    draw_vignette(ui, world, id, vc, is_dirty);
+    draw_grain(ui, world, id, vc, is_dirty);
+}
+
+/// Chromatic Aberration: on/off and intensity.
+fn draw_aberration(
+    ui: &mut egui::Ui,
+    world: &mut crate::ecs::World,
+    id: u32,
+    vc: &PostProcessingComponent,
+    is_dirty: &mut bool,
+) {
     let ca = vc.chromatic_aberration;
     toggle(
         ui,
@@ -39,6 +52,16 @@ pub(super) fn draw_lens(
             vc_ops::set_chromatic_aberration_intensity,
         );
     }
+}
+
+/// Vignette: on/off, intensity, smoothness, colour and centre.
+fn draw_vignette(
+    ui: &mut egui::Ui,
+    world: &mut crate::ecs::World,
+    id: u32,
+    vc: &PostProcessingComponent,
+    is_dirty: &mut bool,
+) {
     let v = vc.vignette;
     toggle(
         ui,
@@ -67,6 +90,16 @@ pub(super) fn draw_lens(
         );
         draw_vignette_look(ui, world, id, v, is_dirty);
     }
+}
+
+/// Film Grain: on/off, intensity and response.
+fn draw_grain(
+    ui: &mut egui::Ui,
+    world: &mut crate::ecs::World,
+    id: u32,
+    vc: &PostProcessingComponent,
+    is_dirty: &mut bool,
+) {
     let grain = vc.film_grain;
     toggle(
         ui,
