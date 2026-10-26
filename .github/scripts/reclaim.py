@@ -37,6 +37,15 @@ call. A lock whose reason names a supervisor PID that is no longer running is
 still protected, but named as stale with that PID, so a dead supervisor's lock
 shows up instead of keeping the worktree forever without a word.
 
+The merge queue rebases a branch before it merges it, so a local branch's
+commits are never an ancestor of the PR's recorded head, and the remote branch
+is deleted on merge (#1453: PR #1449's `session-start-fresh-main` and PR
+#1452's `rebrief-one-session` both stayed PROTECTED as "on no remote" until
+removed by hand). For a merged PR the unpushed commits are therefore excused
+when their content is already in `origin/main`: `git merge-tree --write-tree
+origin/main HEAD` yields `origin/main`'s own tree. That needs git >= 2.38;
+older, reclaim keeps the stricter ancestor rule and says so.
+
 `--dry-run` decides and prints the same, and deletes nothing.
 """
 
@@ -153,6 +162,7 @@ class Machine:
 
     def __init__(self, runner=subprocess.run):
         self.runner = runner
+        self.old_git = False  # git < 2.38 has no `merge-tree --write-tree`: noted once in main
 
     def run(self, *argv: str, cwd: Path | None = None) -> subprocess.CompletedProcess:
         return self.runner(list(argv), capture_output=True, text=True, check=False, cwd=cwd)
@@ -165,6 +175,19 @@ class Machine:
 
     def is_ancestor(self, cwd: Path, commit: str, of: str) -> bool:
         return self.run("git", "-C", str(cwd), "merge-base", "--is-ancestor", commit, of).returncode == 0
+
+    def merged_into_main(self, cwd: Path) -> bool:
+        """Is HEAD's content already in `origin/main` (a rebase or squash can't hide it)?"""
+        words = self.run("git", "--version").stdout.split()
+        version = words[-1].split(".") if words else []
+        if tuple(int(n) if n.isdigit() else 0 for n in version[:2]) < (2, 38):
+            self.old_git = True
+            return False
+        merged = self.run("git", "-C", str(cwd), "merge-tree", "--write-tree", "origin/main", "HEAD")
+        if merged.returncode != 0:  # a conflict: HEAD holds something main doesn't
+            return False
+        main_tree = self.run("git", "-C", str(cwd), "rev-parse", "origin/main^{tree}")
+        return bool(merged.stdout.strip()) and merged.stdout.split()[0] == main_tree.stdout.strip()
 
     def pulls(self, branch: str) -> list[dict] | None:
         """`branch`'s pull requests in any state, over REST (#970); `None` if unknown."""
@@ -215,7 +238,8 @@ class Machine:
         # commits locally; they are safe when the PR's head already holds them.
         heads = [p["headRefOid"] for p in pulls or [] if p.get("headRefOid")]
         if stray and not any(self.is_ancestor(wt.path, wt.head, h) for h in heads):
-            facts.unpushed = stray
+            if "MERGED" not in (facts.prs or []) or not self.merged_into_main(wt.path):
+                facts.unpushed = stray
         return facts
 
     def alive(self, pid: int) -> bool:
@@ -278,6 +302,9 @@ def main(argv: list[str], machine: Machine | None = None, here: Path | None = No
     if not dry:
         machine.git(main_checkout, "worktree", "prune")
     after = machine.free(main_checkout)
+    if machine.old_git:
+        print("reclaim: note: git < 2.38 cannot check content against origin/main; "
+              "merged branches rebased by the queue stay PROTECTED")
     verb = "would remove" if dry else "removed"
     print(f"reclaim: {verb} {removed} of {len(worktrees)} worktree(s); "
           f"free disk {gib(before)} -> {gib(after)}")
