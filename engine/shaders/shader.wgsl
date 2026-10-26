@@ -1,7 +1,7 @@
 #import common::{DecalSurface, NO_SHADOW, PI, VertexInput, apply_fog, blend_joints, cluster_index, local_light_radiance, local_shadow_tile, sample_local_shadow}
 // Every forward binding but `shadow` (the cascades, read only by `calculate_shadow`;
 // `fs_main` names its result `shadow`), so a surface variant's blocks can read any.
-#import forward::bindings::{bones, camera, cluster_lights, cluster_ranges, decals, entity, instances, lighting, local_lights, s_decal, s_diffuse, s_emissive, s_lightmaps, s_metallic, s_normal, s_refl_cube, s_roughness, s_shadow, s_skybox, shadow_tiles, t_ao, t_decal_color, t_decal_data, t_diffuse, t_emissive, t_lightmap_dirs, t_lightmaps, t_metallic, t_normal, t_refl_cube, t_roughness, t_shadow, t_shadow_atlas, t_skybox, vertex_to_world}
+#import forward::bindings::{bones, camera, cluster_lights, cluster_ranges, decals, entity, instances, lighting, local_lights, s_decal, s_diffuse, s_emissive, s_lightmaps, s_metallic, s_normal, s_refl_cube, s_roughness, s_shadow, s_skybox, shadow_tiles, t_ao, t_decal_color, t_decal_data, t_diffuse, t_emissive, t_lightmap_dirs, t_lightmaps, t_metallic, t_normal, t_refl_cube, t_roughness, t_shadow, t_shadow_atlas, t_skybox, vertex_to_world, vertex_to_world_prev}
 #import forward::lighting::{FresnelSchlick, LIGHTMAP_RGBM_RANGE, ambient_occlusion, calculate_pbr, calculate_shadow, decode_lightmap_direction, environment_reflection, eval_sh, fold_decals, lightmap_direction_rebalance}
 
 // The forward pass (and its SSAO prepass and shadow-cascade entry points). Its
@@ -23,6 +23,11 @@ struct VertexOutput {
 
 @vertex
 fn vs_main(model: VertexInput, @builtin(instance_index) instance: u32) -> VertexOutput {
+    return forward_vertex(model, instance);
+}
+
+// The forward vertex stage, shared by `vs_main` and the motion-vector `vs_velocity`.
+fn forward_vertex(model: VertexInput, instance: u32) -> VertexOutput {
     var out: VertexOutput;
     // Skin, then the draw's and the instance's transforms (`vertex_to_world`).
     let to_world = vertex_to_world(model, instance);
@@ -140,6 +145,56 @@ fn fs_gizmo(in: VertexOutput) -> @location(0) vec4<f32> {
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
+    return surface_color(in);
+}
+
+// ---- Motion vectors (#1435) ----
+// A view that runs motion blur draws its opaque solids through these instead: the
+// same surface colour at location 0, and at location 1 (the `Rg16Float` velocity
+// target) how far the fragment moved on screen since last frame, in NDC, through its
+// own last-frame pose and this camera's last-frame view-projection. Every field of
+// `VertexOutput`, then the two clip positions the velocity is the difference of.
+struct VelocityVertex {
+    @builtin(position) clip_position: vec4<f32>,
+    @location(0) world_position: vec3<f32>,
+    @location(1) world_normal: vec3<f32>,
+    @location(2) tex_coords: vec2<f32>,
+    @location(3) world_tangent: vec4<f32>,
+    @location(4) @interpolate(flat) instance: u32,
+    @location(5) lightmap_uv: vec2<f32>,
+    @location(6) clip_now: vec4<f32>,
+    @location(7) clip_prev: vec4<f32>,
+};
+
+struct VelocityTargets {
+    @location(0) color: vec4<f32>,
+    @location(1) velocity: vec2<f32>,
+};
+
+@vertex
+fn vs_velocity(model: VertexInput, @builtin(instance_index) instance: u32) -> VelocityVertex {
+    let v = forward_vertex(model, instance);
+    let prev_world = vertex_to_world_prev(model, instance) * vec4<f32>(model.position, 1.0);
+    return VelocityVertex(
+        v.clip_position, v.world_position, v.world_normal, v.tex_coords,
+        v.world_tangent, v.instance, v.lightmap_uv,
+        v.clip_position, camera.prev_view_proj * prev_world,
+    );
+}
+
+@fragment
+fn fs_velocity(in: VelocityVertex) -> VelocityTargets {
+    let v = VertexOutput(
+        in.clip_position, in.world_position, in.world_normal, in.tex_coords,
+        in.world_tangent, in.instance, in.lightmap_uv,
+    );
+    let velocity = in.clip_now.xy / in.clip_now.w - in.clip_prev.xy / in.clip_prev.w;
+    return VelocityTargets(surface_color(v), velocity);
+}
+
+// The lit surface colour `fs_main` writes: an authored surface variant splices its
+// blocks in here (`shadergen::assemble`), so both colour entry points carry them.
+fn surface_color(in: VertexOutput) -> vec4<f32> {
     var base_color: vec4<f32>;
     if (entity.use_texture == 1u) {
         base_color = textureSample(t_diffuse, s_diffuse, in.tex_coords) * entity.color_tint;

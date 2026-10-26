@@ -25,6 +25,7 @@ pub const MODULES: &[&str] = &[
     "sky/noise.wgsl",
     "lighting/reflection_probe.wgsl",
     "common.wgsl",
+    "sky/motion.wgsl",
     "forward/bindings.wgsl",
     "forward/lighting.wgsl",
 ];

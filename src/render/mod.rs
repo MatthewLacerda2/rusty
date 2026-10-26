@@ -11,6 +11,7 @@ pub(crate) mod decals;
 mod draw;
 mod frustum;
 pub(crate) mod lod;
+pub(crate) mod motion;
 mod preview;
 pub mod readback;
 pub(crate) mod render_texture;
@@ -130,6 +131,8 @@ pub struct Renderer {
 
     // Pipelines
     render_pipeline: wgpu::RenderPipeline,
+    /// The forward pipeline writing a view's velocity target too (#1435).
+    velocity_pipeline: gpu::pipelines::LazyPipeline,
     /// Alpha-blended translucent solids (#242); depth write off, drawn back-to-front
     /// in the transparent pass after opaque. Built on first use, like the three
     /// editor-only pipelines below (#985).

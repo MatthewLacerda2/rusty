@@ -6,6 +6,7 @@
 
 use super::camera::{CameraCtx, StackShared, CAMERA_PASSES};
 use crate::render::gpu::uniforms::FogUniform;
+use crate::render::motion::{self, HistoryKey};
 use crate::render::passes::ssao::SsaoPlan;
 use crate::render::postfx::params::{build_post_params, post_passes, PostSource};
 use crate::render::postfx::PostParams;
@@ -16,6 +17,9 @@ use crate::scene::{Camera, Scene};
 pub(crate) struct StackPass<'a> {
     /// The cameras, bottom to top; the first clears and drives post-FX history.
     pub stack: &'a [Camera],
+    /// The base camera's entity (`None`: the editor's free camera, or no scene
+    /// camera); another one than last frame's is a camera cut (#1435).
+    pub base_id: Option<u32>,
     /// The camera and volume settings that drive this view's post-FX and SSAO: the
     /// stack's base camera's (#1434, Unity URP's rule), borrowed once per view.
     pub post: PostSource<'a>,
@@ -33,10 +37,30 @@ impl Renderer {
     /// camera runs the [`CAMERA_PASSES`] table in order.
     pub(crate) fn draw_stack(&mut self, view: &mut RenderView, scene: &Scene, pass: StackPass) {
         let aspect = view.aspect();
+        let view_projs: Vec<_> = pass
+            .stack
+            .iter()
+            .map(|c| c.build_view_projection(aspect))
+            .collect();
+        // Motion vectors (#1435): last frame's cameras, and the velocity target when
+        // this view runs motion blur. A view shading with its own forward pipeline
+        // (the Inspector's shader preview) writes none.
+        let velocity = motion::wanted(pass.post, self.quality, pass.full_post_fx)
+            && !view.has_forward_override();
+        let key = HistoryKey {
+            scene: scene.id(),
+            base: pass.base_id,
+            cameras: pass.stack.len(),
+        };
+        let size = view.size();
+        let prev_view_projs =
+            view.post_fx
+                .motion
+                .begin(&self.device, size, key, velocity, &view_projs);
         let shared = StackShared {
             aspect,
-            // The base (first) camera drives the shared post-FX history / motion vectors.
-            base_view_proj: pass.stack[0].build_view_projection(aspect),
+            view_projs,
+            prev_view_projs,
             fog: FogUniform::from_settings(&scene.fog),
             ssao: SsaoPlan::for_volume(pass.post.volume, self.quality),
         };
@@ -46,6 +70,7 @@ impl Renderer {
                 stage(self, view, &mut ctx);
             }
         }
+        view.post_fx.motion.history.end();
     }
 
     /// Run the post-process chain (color correction, bloom, motion blur, SSR) over the
@@ -56,6 +81,7 @@ impl Renderer {
         let (scene, output) = (ctx.scene, ctx.stack.output);
         let post = PostFrame {
             view_proj: ctx.base_view_proj,
+            prev_view_proj: ctx.base_prev_view_proj,
             camera_pos: ctx.cam.position.to_array(),
             full: ctx.stack.full_post_fx,
         };
@@ -65,7 +91,7 @@ impl Renderer {
             ctx.stack.post,
             self.quality,
             post.view_proj,
-            view.post_fx.prev_view_proj,
+            post.prev_view_proj,
             post.camera_pos,
         );
         let mut passes = post_passes(ctx.stack.post, bloom_enabled);
@@ -82,7 +108,6 @@ impl Renderer {
         }
         post_params.misc[1] = 1.0 / view.post_fx.bloom_size.0 as f32;
         post_params.misc[2] = 1.0 / view.post_fx.bloom_size.1 as f32;
-        view.post_fx.prev_view_proj = post.view_proj;
 
         let sky = self.sky_panorama();
         let ctx = PostFxContext {
@@ -99,6 +124,7 @@ impl Renderer {
 /// The per-stack inputs of [`Renderer::run_post_fx`].
 struct PostFrame {
     view_proj: glam::Mat4,
+    prev_view_proj: glam::Mat4,
     camera_pos: [f32; 3],
     full: bool,
 }

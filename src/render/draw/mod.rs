@@ -103,6 +103,7 @@ impl Renderer {
         self.prepare_ui(view, scene, &stack[0], editor_mode);
         let pass = StackPass {
             stack: &stack,
+            base_id: screen.base_id,
             post,
             output,
             editor_mode,

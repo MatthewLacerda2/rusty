@@ -105,7 +105,7 @@ pub(crate) fn build_post_params(
     let samples =
         CameraComponent::MIN_MOTION_BLUR_SAMPLES..=CameraComponent::MAX_MOTION_BLUR_SAMPLES;
     let (mb_active, mb_samples) = match post.camera {
-        Some(cam) if cam.motion_blur_active && quality.motion_blur() => (
+        Some(cam) if motion_blur_enabled(post, quality) => (
             1.0,
             cam.motion_blur_samples
                 .clamp(*samples.start(), *samples.end()) as f32,
@@ -115,6 +115,13 @@ pub(crate) fn build_post_params(
     params.flags = [ssr_mode, mb_active, 1.0, 0.0];
     params.misc[3] = mb_samples;
     (params, vc.bloom_active)
+}
+
+/// Whether `post`'s camera runs motion blur: its component has it on and the preset
+/// allows it. The velocity target is written exactly when this holds (#1435).
+pub(crate) fn motion_blur_enabled(post: PostSource, quality: QualityPreset) -> bool {
+    post.camera
+        .is_some_and(|cam| cam.motion_blur_active && quality.motion_blur())
 }
 
 /// No authored-effect params: a view without a volume.

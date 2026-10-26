@@ -17,8 +17,15 @@ pub(super) struct PipelineSpec {
     pub blend: wgpu::BlendState,
     pub depth_write_enabled: bool,
     pub depth_compare: wgpu::CompareFunction,
-    /// The fragment entry point: `fs_main`, or the gizmos' unfogged `fs_gizmo`.
+    /// The vertex entry point: `vs_main`, or the motion-vector `vs_velocity` (#1435).
+    pub vertex: &'static str,
+    /// The fragment entry point: `fs_main`, the gizmos' unfogged `fs_gizmo`, or the
+    /// motion-vector `fs_velocity`.
     pub fragment: &'static str,
+    /// The velocity target's write mask when the pipeline draws into a view's
+    /// velocity target too (#1435), as its second colour target; `None` draws colour
+    /// alone.
+    pub velocity: Option<wgpu::ColorWrites>,
 }
 
 impl PipelineSpec {
@@ -33,7 +40,9 @@ impl PipelineSpec {
             blend: wgpu::BlendState::REPLACE,
             depth_write_enabled: true,
             depth_compare: wgpu::CompareFunction::Less,
+            vertex: "vs_main",
             fragment: "fs_main",
+            velocity: None,
         }
     }
 }
@@ -42,6 +51,26 @@ impl PipelineSpec {
 /// render inside-out if needed.
 pub(super) fn forward_spec() -> PipelineSpec {
     PipelineSpec::opaque("Forward Lit Pipeline")
+}
+
+/// The opaque pass of a view writing motion vectors (#1435): colour and velocity
+/// from the shader's `vs_velocity` / `fs_velocity`. A module without them (an
+/// authored variant baked before #1435) keeps its `fs_main` colour and leaves the
+/// velocity target untouched under it (`velocity_entries == false`).
+pub(super) fn velocity_spec(velocity_entries: bool) -> PipelineSpec {
+    let opaque = PipelineSpec::opaque("Forward Velocity Pipeline");
+    match velocity_entries {
+        true => PipelineSpec {
+            vertex: "vs_velocity",
+            fragment: "fs_velocity",
+            velocity: Some(wgpu::ColorWrites::ALL),
+            ..opaque
+        },
+        false => PipelineSpec {
+            velocity: Some(wgpu::ColorWrites::empty()),
+            ..opaque
+        },
+    }
 }
 
 /// Transparent pass (#242): same shader/layout as the forward pass but alpha-blended
@@ -69,9 +98,19 @@ pub(super) fn line_spec() -> PipelineSpec {
     }
 }
 
+/// The velocity target of a pipeline that writes motion vectors (#1435), under
+/// `write_mask`. It is never blended: the nearest surface's motion wins.
+pub(crate) fn velocity_target(write_mask: wgpu::ColorWrites) -> wgpu::ColorTargetState {
+    wgpu::ColorTargetState {
+        format: crate::render::motion::VELOCITY_FORMAT,
+        blend: None,
+        write_mask,
+    }
+}
+
 /// Create one forward-pass render pipeline from a [`PipelineSpec`]. The pipelines
-/// share the same vertex layout, vertex entry point and depth format; only the
-/// spec's fixed-function knobs and fragment entry point differ.
+/// share the same vertex layout and depth format; only the spec's fixed-function
+/// knobs, entry points and velocity target differ.
 pub(super) fn make_pipeline(
     device: &wgpu::Device,
     shader: &wgpu::ShaderModule,
@@ -84,7 +123,7 @@ pub(super) fn make_pipeline(
         layout: Some(layout),
         vertex: wgpu::VertexState {
             module: shader,
-            entry_point: Some("vs_main"),
+            entry_point: Some(spec.vertex),
             compilation_options: Default::default(),
             buffers: &[Some(vertex_layout())],
         },
@@ -92,11 +131,14 @@ pub(super) fn make_pipeline(
             module: shader,
             entry_point: Some(spec.fragment),
             compilation_options: Default::default(),
-            targets: &[Some(wgpu::ColorTargetState {
-                format,
-                blend: Some(spec.blend),
-                write_mask: wgpu::ColorWrites::ALL,
-            })],
+            targets: &[
+                Some(wgpu::ColorTargetState {
+                    format,
+                    blend: Some(spec.blend),
+                    write_mask: wgpu::ColorWrites::ALL,
+                }),
+                spec.velocity.map(velocity_target),
+            ][..1 + usize::from(spec.velocity.is_some())],
         }),
         primitive: wgpu::PrimitiveState {
             topology: spec.topology,

@@ -99,6 +99,8 @@ pub(crate) fn solid_instance(
         reflection_probe: 0,
         lightmap_st: lightmap.map_or([0.0; 4], |l| l.scale_offset),
         sh,
+        // No history until `motion::track` gives it one (#1435).
+        ..InstanceData::IDENTITY
     }
 }
 

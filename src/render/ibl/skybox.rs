@@ -1,91 +1,48 @@
 use crate::render::gpu::mesh::vertex_layout;
+use crate::render::gpu::pipelines::{velocity_target, LazyPipeline};
 use crate::render::gpu::shaders::ShaderRegistry;
 use crate::render::gpu::DEPTH_FORMAT;
 use crate::render::GpuTexture;
 use wgpu::util::DeviceExt;
 
-pub struct SkyboxRenderer {
-    /// Panorama pipeline: samples a bound 2D equirectangular texture (group 1).
-    pipeline: wgpu::RenderPipeline,
-    /// Procedural fallback pipeline: a sky->horizon->ground gradient derived from the
-    /// ambient term, drawn when no panorama is bound (#256). Needs only group 0.
-    gradient_pipeline: wgpu::RenderPipeline,
-    vertex_buffer: wgpu::Buffer,
-    index_buffer: wgpu::Buffer,
-    num_indices: u32,
+/// One sky shader and its layout: what its pipelines, with and without the velocity
+/// target, are built from.
+struct SkyKind {
+    label: &'static str,
+    shader: wgpu::ShaderModule,
+    layout: wgpu::PipelineLayout,
 }
 
-impl SkyboxRenderer {
-    pub fn new(
+impl SkyKind {
+    /// An interior-facing, depth-test-only far-plane box pipeline from the shader's
+    /// `vs_main`/`fs_main`, depth writes off; with `velocity`, into a view's velocity
+    /// target too (#1435).
+    fn pipeline(
+        &self,
         device: &wgpu::Device,
-        texture_layout: &wgpu::BindGroupLayout,
-        camera_lighting_layout: &wgpu::BindGroupLayout,
-        texture_format: wgpu::TextureFormat,
-        registry: &mut ShaderRegistry,
-    ) -> Self {
-        let pipeline = Self::create_pipeline(
-            device,
-            texture_layout,
-            camera_lighting_layout,
-            texture_format,
-            registry,
-        );
-        let gradient_pipeline = Self::create_gradient_pipeline(
-            device,
-            camera_lighting_layout,
-            texture_format,
-            registry,
-        );
-        let (vertex_buffer, index_buffer, num_indices) = Self::create_box_buffers(device);
-
-        Self {
-            pipeline,
-            gradient_pipeline,
-            vertex_buffer,
-            index_buffer,
-            num_indices,
-        }
-    }
-
-    /// Build an interior-facing, depth-test-only box pipeline from `shader`'s
-    /// `vs_main`/`fs_main`, against `bind_group_layouts`. Shared by the panorama and
-    /// procedural-gradient skybox variants — both draw the same far-plane box with
-    /// depth writes off, differing only in shader and bind groups.
-    fn create_box_pipeline(
-        device: &wgpu::Device,
-        label: &str,
-        shader: &wgpu::ShaderModule,
-        bind_group_layouts: &[&wgpu::BindGroupLayout],
-        texture_format: wgpu::TextureFormat,
+        format: wgpu::TextureFormat,
+        velocity: bool,
     ) -> wgpu::RenderPipeline {
-        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some(label),
-            bind_group_layouts: &bind_group_layouts
-                .iter()
-                .copied()
-                .map(Some)
-                .collect::<Vec<_>>(),
-            immediate_size: 0,
+        let colour = Some(wgpu::ColorTargetState {
+            format,
+            blend: Some(wgpu::BlendState::REPLACE),
+            write_mask: wgpu::ColorWrites::ALL,
         });
-
+        let targets = [colour, Some(velocity_target(wgpu::ColorWrites::ALL))];
         device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some(label),
-            layout: Some(&pipeline_layout),
+            label: Some(self.label),
+            layout: Some(&self.layout),
             vertex: wgpu::VertexState {
-                module: shader,
+                module: &self.shader,
                 entry_point: Some("vs_main"),
                 compilation_options: Default::default(),
                 buffers: &[Some(vertex_layout())],
             },
             fragment: Some(wgpu::FragmentState {
-                module: shader,
+                module: &self.shader,
                 entry_point: Some("fs_main"),
                 compilation_options: Default::default(),
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: texture_format,
-                    blend: Some(wgpu::BlendState::REPLACE),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
+                targets: &targets[..1 + usize::from(velocity)],
             }),
             primitive: wgpu::PrimitiveState {
                 topology: wgpu::PrimitiveTopology::TriangleList,
@@ -105,42 +62,81 @@ impl SkyboxRenderer {
             cache: None,
         })
     }
+}
 
-    /// Build the interior-facing, depth-test-only panorama skybox pipeline.
-    fn create_pipeline(
+/// A sky pipeline layout over `groups`.
+fn box_layout(
+    device: &wgpu::Device,
+    label: &str,
+    groups: &[&wgpu::BindGroupLayout],
+) -> wgpu::PipelineLayout {
+    device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+        label: Some(label),
+        bind_group_layouts: &groups.iter().copied().map(Some).collect::<Vec<_>>(),
+        immediate_size: 0,
+    })
+}
+
+pub struct SkyboxRenderer {
+    /// Panorama pipeline: samples a bound 2D equirectangular texture (group 1).
+    pipeline: wgpu::RenderPipeline,
+    /// Procedural fallback pipeline: a sky->horizon->ground gradient derived from the
+    /// ambient term, drawn when no panorama is bound (#256). Needs only group 0.
+    gradient_pipeline: wgpu::RenderPipeline,
+    /// The same two writing a motion-blurred view's velocity target too (#1435): the
+    /// sky moves with the camera's rotation. Built the first time such a view draws.
+    velocity: [LazyPipeline; 2],
+    vertex_buffer: wgpu::Buffer,
+    index_buffer: wgpu::Buffer,
+    num_indices: u32,
+}
+
+impl SkyboxRenderer {
+    pub fn new(
         device: &wgpu::Device,
         texture_layout: &wgpu::BindGroupLayout,
         camera_lighting_layout: &wgpu::BindGroupLayout,
         texture_format: wgpu::TextureFormat,
         registry: &mut ShaderRegistry,
-    ) -> wgpu::RenderPipeline {
-        let shader = registry.load(device, "skybox.wgsl", "Skybox Shader");
-        Self::create_box_pipeline(
-            device,
-            "Skybox Pipeline",
-            &shader,
-            &[camera_lighting_layout, texture_layout],
-            texture_format,
-        )
+    ) -> Self {
+        // The panorama reads camera + lighting and its texture; the procedural
+        // gradient (#256) reads camera + ambient from group 0 only.
+        let panorama = SkyKind {
+            label: "Skybox Pipeline",
+            shader: registry.load(device, "skybox.wgsl", "Skybox Shader"),
+            layout: box_layout(
+                device,
+                "Skybox Pipeline",
+                &[camera_lighting_layout, texture_layout],
+            ),
+        };
+        let gradient = SkyKind {
+            label: "Sky Gradient Pipeline",
+            shader: registry.load(device, "sky_gradient.wgsl", "Sky Gradient Shader"),
+            layout: box_layout(device, "Sky Gradient Pipeline", &[camera_lighting_layout]),
+        };
+        let pipeline = panorama.pipeline(device, texture_format, false);
+        let gradient_pipeline = gradient.pipeline(device, texture_format, false);
+        let velocity = [panorama, gradient].map(|kind| {
+            LazyPipeline::new(device, move |device| {
+                kind.pipeline(device, texture_format, true)
+            })
+        });
+        let (vertex_buffer, index_buffer, num_indices) = Self::create_box_buffers(device);
+
+        Self {
+            pipeline,
+            gradient_pipeline,
+            velocity,
+            vertex_buffer,
+            index_buffer,
+            num_indices,
+        }
     }
 
-    /// Build the procedural-gradient fallback pipeline (#256). It reads camera +
-    /// ambient from group 0 only (no texture), so its layout is just the
-    /// camera/lighting group.
-    fn create_gradient_pipeline(
-        device: &wgpu::Device,
-        camera_lighting_layout: &wgpu::BindGroupLayout,
-        texture_format: wgpu::TextureFormat,
-        registry: &mut ShaderRegistry,
-    ) -> wgpu::RenderPipeline {
-        let shader = registry.load(device, "sky_gradient.wgsl", "Sky Gradient Shader");
-        Self::create_box_pipeline(
-            device,
-            "Sky Gradient Pipeline",
-            &shader,
-            &[camera_lighting_layout],
-            texture_format,
-        )
+    /// The pipelines built on first draw (`Renderer::lazy_pipelines`).
+    pub(crate) fn lazy_pipelines(&self) -> impl Iterator<Item = &LazyPipeline> {
+        self.velocity.iter()
     }
 
     /// Generate the unit box vertex/index buffers the skybox is drawn with.
@@ -159,13 +155,19 @@ impl SkyboxRenderer {
         (vertex_buffer, index_buffer, indices.len() as u32)
     }
 
+    /// Draw the panorama sky; with `velocity`, into the pass's velocity target too.
     pub fn draw<'a>(
         &'a self,
         render_pass: &mut wgpu::RenderPass<'a>,
         camera_lighting_bind_group: &'a wgpu::BindGroup,
         skybox_texture: &'a GpuTexture,
+        velocity: bool,
     ) {
-        render_pass.set_pipeline(&self.pipeline);
+        let pipeline = match velocity {
+            true => self.velocity[0].get(),
+            false => &self.pipeline,
+        };
+        render_pass.set_pipeline(pipeline);
         render_pass.set_bind_group(0, camera_lighting_bind_group, &[]);
         render_pass.set_bind_group(1, &skybox_texture.bind_group, &[]);
         self.draw_box(render_pass);
@@ -177,8 +179,13 @@ impl SkyboxRenderer {
         &'a self,
         render_pass: &mut wgpu::RenderPass<'a>,
         camera_lighting_bind_group: &'a wgpu::BindGroup,
+        velocity: bool,
     ) {
-        render_pass.set_pipeline(&self.gradient_pipeline);
+        let pipeline = match velocity {
+            true => self.velocity[1].get(),
+            false => &self.gradient_pipeline,
+        };
+        render_pass.set_pipeline(pipeline);
         render_pass.set_bind_group(0, camera_lighting_bind_group, &[]);
         self.draw_box(render_pass);
     }

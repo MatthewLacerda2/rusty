@@ -19,7 +19,7 @@ fn forward_draws(r: &mut Renderer, scene: &Scene, centre: Vec3) -> FrameDraws {
     let cam = Camera::new(centre + Vec3::Z * 3.0, -90.0, 0.0);
     let frustum = Frustum::from_view_proj(cam.build_view_projection(1.0));
     let lod = LodSelection::for_camera(scene, &cam);
-    r.precreate_solid_resources(scene, &cam, &frustum, &lod, true)
+    r.precreate_solid_resources(scene, &cam, &frustum, &lod, true, None)
         .draws
 }
 

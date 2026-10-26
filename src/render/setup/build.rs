@@ -50,6 +50,7 @@ pub(crate) struct ShadowSystem {
 /// the HDR offscreen target.
 pub(crate) struct ForwardPasses {
     pub render_pipeline: wgpu::RenderPipeline,
+    pub velocity_pipeline: pipelines::LazyPipeline,
     pub transparent_pipeline: pipelines::LazyPipeline,
     pub line_pipeline: pipelines::LazyPipeline,
     /// The selection outline's mask and edge pipelines (#1175).
@@ -284,6 +285,7 @@ fn create_forward_passes(
 
     ForwardPasses {
         render_pipeline: pl.forward,
+        velocity_pipeline: pl.velocity,
         transparent_pipeline: pl.transparent,
         line_pipeline: pl.line,
         outline: OutlinePasses::new(device, registry, &pl.layout, output_format),

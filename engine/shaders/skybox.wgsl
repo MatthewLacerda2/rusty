@@ -1,4 +1,5 @@
 #import common::{CameraUniforms, VertexInput, equirect_uv, sky_fog}
+#import sky::motion::{SkyTargets, sky_velocity}
 
 @group(0) @binding(0)
 var<uniform> camera: CameraUniforms;
@@ -28,7 +29,7 @@ var t_skybox: texture_2d<f32>;
 var s_skybox: sampler;
 
 @fragment
-fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
+fn fs_main(in: VertexOutput) -> SkyTargets {
     let dir = normalize(in.view_dir);
     // Level 0: the panorama shares its cached upload, mips and all, with any
     // material using the file, and `equirect_uv`'s atan2 seam would make the
@@ -36,5 +37,6 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let sky = textureSampleLevel(t_skybox, s_skybox, equirect_uv(dir), 0.0);
     // Blend toward the scene fog at the horizon (#437) so fogged geometry doesn't
     // silhouette against a clear sky.
-    return vec4<f32>(sky_fog(camera.fog, sky.rgb, dir, camera.camera_pos), sky.a);
+    let color = vec4<f32>(sky_fog(camera.fog, sky.rgb, dir, camera.camera_pos), sky.a);
+    return SkyTargets(color, sky_velocity(camera, dir));
 }

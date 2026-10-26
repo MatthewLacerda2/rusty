@@ -16,6 +16,9 @@ pub(crate) struct CameraUniform {
     pub fog: FogUniform,
     /// This camera's light-cluster grid (#434): how a point finds its cluster.
     pub clusters: ClusterUniform,
+    /// This camera's view-projection last frame (#1435), what the velocity target
+    /// reprojects through; `view_proj` itself on its first frame and after a cut.
+    pub prev_view_proj: [f32; 16],
 }
 
 /// How a world point finds its light cluster (#434), mirroring `Clusters` in
@@ -168,6 +171,8 @@ impl EntityUniform {
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub(crate) struct InstanceData {
     pub model_matrix: [f32; 16],
+    // Last frame's world matrix (#1435), read only when `motion == 1`.
+    pub prev_model_matrix: [f32; 16],
     // When `use_sh == 1`, the shader reconstructs ambient irradiance from these 9 L2
     // SH coefficients — the probe field interpolated at this entity's position on the
     // CPU — instead of the flat hemispherical ambient term. Each coefficient is an RGB
@@ -184,6 +189,12 @@ pub(crate) struct InstanceData {
     // (the sky). Picked per object at its world-bounds centre (#1206).
     pub reflection_probe: u32,
     pub lightmap_st: [f32; 4],
+    // Motion vectors (#1435): where last frame's joint palette starts in the joint
+    // array, and 1 when it and `prev_model_matrix` hold last frame's pose; 0 moves
+    // the instance with the camera alone (no history, a mesh particle).
+    pub prev_bone_base: u32,
+    pub motion: u32,
+    pub _motion_pad: [u32; 2],
     pub sh: [[f32; 4]; 9],
 }
 
@@ -192,11 +203,15 @@ impl InstanceData {
     /// a one-element array of it and carry their transform in the per-draw uniform.
     pub(crate) const IDENTITY: Self = Self {
         model_matrix: glam::Mat4::IDENTITY.to_cols_array(),
+        prev_model_matrix: glam::Mat4::IDENTITY.to_cols_array(),
         use_sh: 0,
         lightmap_page: 0,
         lightmap_directional: 0,
         reflection_probe: 0,
         lightmap_st: [0.0; 4],
+        prev_bone_base: 0,
+        motion: 0,
+        _motion_pad: [0; 2],
         sh: [[0.0; 4]; 9],
     };
 }

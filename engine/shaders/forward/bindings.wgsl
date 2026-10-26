@@ -43,6 +43,8 @@ struct EntityUniforms {
 // per-draw `EntityUniforms`, so texture sampling never depends on an instance value.
 struct InstanceData {
     model_matrix: mat4x4<f32>,
+    // Last frame's world matrix, read only when `motion == 1` (#1435).
+    prev_model_matrix: mat4x4<f32>,
     use_sh: u32,
     // Baked lightmap (#438): atlas page + 1 (0 for none), and the scale/offset from
     // the mesh's lightmap UV into that page.
@@ -53,6 +55,13 @@ struct InstanceData {
     // (the sky). Picked per object at its world-bounds centre (#1206).
     reflection_probe: u32,
     lightmap_st: vec4<f32>,
+    // Motion vectors (#1435): where last frame's joint palette starts in `bones`, and
+    // 1 when `prev_model_matrix` and it hold last frame's pose. 0 (no history: a first
+    // draw, a camera cut, a mesh particle) moves the vertex with the camera only.
+    prev_bone_base: u32,
+    motion: u32,
+    motion_pad_a: u32,
+    motion_pad_b: u32,
     sh: array<vec4<f32>, 9>,
 };
 
@@ -131,6 +140,21 @@ fn vertex_to_world(model: VertexInput, instance: u32) -> mat4x4<f32> {
         model.joint_weights,
     );
     return entity.model_matrix * instances[instance].model_matrix * bone_transform;
+}
+
+// Where `model`'s vertex was in world space last frame (#1435): last frame's palette
+// under last frame's world matrix, or this frame's placement when the instance has no
+// history, so it moves with the camera alone.
+fn vertex_to_world_prev(model: VertexInput, instance: u32) -> mat4x4<f32> {
+    if (instances[instance].motion == 0u) {
+        return vertex_to_world(model, instance);
+    }
+    let joints = model.joint_indices + vec4<u32>(instances[instance].prev_bone_base);
+    let bone_transform = blend_joints(
+        bones[joints.x], bones[joints.y], bones[joints.z], bones[joints.w],
+        model.joint_weights,
+    );
+    return entity.model_matrix * instances[instance].prev_model_matrix * bone_transform;
 }
 
 // The material maps, each with its own sampler (#1323): wrap and filter are the
