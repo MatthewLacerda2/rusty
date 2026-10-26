@@ -71,11 +71,11 @@ fn a_volume_effect_needs_its_field_its_row_and_its_option_row() {
 #[test]
 fn a_section_or_doc_marker_for_no_effect_is_flagged() {
     let mut l = engine();
-    l.sections.push("lens_flare".into());
+    l.sections.push("warp_drive".into());
     l.docs.push_str("\n<!-- effect: lens_dirt -->\n");
     let problems = check(&l).join("\n");
     for needle in [
-        "the Inspector's sections lists `lens_flare`",
+        "the Inspector's sections lists `warp_drive`",
         "docs/api/Graphics.md lists `lens_dirt`",
     ] {
         assert!(

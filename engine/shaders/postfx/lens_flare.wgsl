@@ -34,6 +34,12 @@ fn vs_fullscreen(@builtin(vertex_index) vid: u32) -> VsOut {
     return out;
 }
 
+// What a strength of `1` adds of the bright pass: a real lens's ghosts reflect a
+// few percent of the light, the streaks' taps spread it over ~8 weights' worth.
+const GHOST_WEIGHT: f32 = 0.08;
+const HALO_WEIGHT: f32 = 0.1;
+const STREAK_WEIGHT: f32 = 0.03;
+
 // Ghost `i`'s scale through the centre: `1` mirrors a source exactly, smaller
 // ghosts sit nearer the centre. A function: naga forbids dynamic indexing of a
 // function-local array.
@@ -93,7 +99,7 @@ fn fs_flare(in: VsOut) -> @location(0) vec4<f32> {
             break;
         }
         let at = vec2<f32>(0.5) + to_centre / ghost_scale(i);
-        out += split(at, to_centre, ca) * ghost_tint(i) * window(at) * params.strengths.x;
+        out += split(at, to_centre, ca) * ghost_tint(i) * window(at) * GHOST_WEIGHT * params.strengths.x;
     }
 
     // Halo: a ring around the centre, lit by what lies a fixed (round) distance
@@ -103,7 +109,8 @@ fn fs_flare(in: VsOut) -> @location(0) vec4<f32> {
     if (params.strengths.y > 0.0 && dot(towards, towards) > 0.0) {
         let at = in.uv + normalize(towards) * 0.45 / aspect;
         let near = 1.0 - min(length((at - vec2<f32>(0.5)) * aspect) / 0.75, 1.0);
-        out += split(at, to_centre, ca) * pow(near, 4.0) * window(at) * params.strengths.y;
+        let lit = split(at, to_centre, ca) * pow(near, 4.0) * window(at);
+        out += lit * HALO_WEIGHT * params.strengths.y;
     }
 
     // Streaks: a long horizontal smear of each bright pixel, the anamorphic lens's.
@@ -115,7 +122,7 @@ fn fs_flare(in: VsOut) -> @location(0) vec4<f32> {
             let w = exp(-abs(f32(j)) / 4.0);
             streak += textureSampleLevel(t_color, s_color, at, 0.0).rgb * w * window(at);
         }
-        out += streak * 0.15 * params.strengths.z;
+        out += streak * STREAK_WEIGHT * params.strengths.z;
     }
 
     return vec4<f32>(out * params.tint.rgb, 0.0);
