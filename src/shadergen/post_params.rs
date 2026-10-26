@@ -3,7 +3,7 @@
 //!
 //! A postfx module's runtime params are laid out exactly like a surface shader's
 //! ([`ParamLayout`], its `<name>.params.json` sidecar), but the values live on the
-//! active volume (`PostProcessingComponent::post_params`), not on a material, and a
+//! active volume (`PostProcessingComponent::custom_effects.params`), not on a material, and a
 //! volume runs a *chain* of modules. So one name addresses the whole chain: it is
 //! checked against each effect's layout in run order, and every effect whose layout
 //! resolves it draws with the stored value (the renderer packs each effect's uniform

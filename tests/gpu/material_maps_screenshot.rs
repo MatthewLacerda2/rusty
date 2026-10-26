@@ -36,10 +36,16 @@ fn write_black_png(path: &std::path::Path) {
 
 fn vc() -> PostProcessingComponent {
     PostProcessingComponent {
-        bloom_active: false,
-        bloom_threshold: 0.6,
-        ssr_active: false,
-        ssr_temporal_upsampling: false,
+        bloom: rusty::components::Bloom {
+            active: false,
+            threshold: 0.6,
+            ..Default::default()
+        },
+        ssr: rusty::components::Ssr {
+            active: false,
+            temporal_upsampling: false,
+            ..Default::default()
+        },
         ..rusty::scene::authoring::default_post_processing()
     }
 }

@@ -13,10 +13,9 @@ use rusty::scene::{Camera, MeshComponent, Scene};
 use super::super::render_texture_scene::{pip_scene, screen_camera, SIZE};
 
 fn graded(saturation: f32) -> PostProcessingComponent {
-    PostProcessingComponent {
-        saturation,
-        ..default_post_processing()
-    }
+    let mut vc = default_post_processing();
+    vc.color_adjustments.saturation = saturation;
+    vc
 }
 
 /// The PiP scene with the screen's own camera carrying a grey grade and the

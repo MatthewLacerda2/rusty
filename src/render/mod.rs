@@ -133,10 +133,9 @@ pub struct Renderer {
     render_pipeline: wgpu::RenderPipeline,
     /// The forward pipeline writing a view's velocity target too (#1435).
     velocity_pipeline: gpu::pipelines::LazyPipeline,
-    /// The per-object motion blur's tile and gather passes (#1436).
-    motion_blur: postfx::motion_blur::MotionBlurPasses,
-    /// The depth of field's passes (#1445).
-    depth_of_field: postfx::depth_of_field::DofPasses,
+    /// The post effects' shared pipelines (#1467): bloom, depth of field (#1445), the
+    /// exposure meter (#1444) and motion blur (#1436).
+    pub(crate) post_passes: postfx::effects::Passes,
     /// Alpha-blended translucent solids (#242); depth write off, drawn back-to-front
     /// in the transparent pass after opaque. Built on first use, like the three
     /// editor-only pipelines below (#985).
@@ -228,8 +227,6 @@ pub struct Renderer {
     pub(crate) ssao: passes::ssao::SsaoRenderer,
     /// The grading-LUT bake every view's table is written through (#1440).
     pub(crate) grade_bake: postfx::grade::GradeBake,
-    /// The automatic-exposure passes every view's meter runs through (#1444).
-    pub(crate) exposure_passes: postfx::exposure::ExposurePasses,
 
     /// Active scalability tier; gates which post-FX passes run + buffer sizes. Shared
     /// across views — each view's post-FX chain (owned by its [`RenderView`]) sizes its

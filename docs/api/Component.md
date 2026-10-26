@@ -44,8 +44,8 @@ live particles, a trail's points) is not a field and never appears.
   same way when it loads, every field with a number in it (a struct's too, like
   `ssao.intensity`): a hand-edited `mass: 5000` reads back `1000`, though the file
   keeps what it says until the next Save. A UI `shader`'s params and a
-  `PostProcessing`'s `post_params` are left as read, since checking them reads
-  the baked shaders from disk.
+  `PostProcessing`'s `custom_effects` (the authored effects and their params) are
+  left as read, since checking them reads the baked shaders from disk.
 - **A field no op writes is read-only.** `Component.Fields` says so
   (`writable = false`, and `read_only` says why or names the verb that writes it,
   such as `Transform.SetLocalPosition` or `Animator.SetFloat`); `Set` on it is an
@@ -72,7 +72,11 @@ live particles, a trail's points) is not a field and never appears.
   name) nothing is written. The order matters where one op resets another: an
   `AudioReverbZone`'s `params` are written before its `preset`, so a preset that
   changes in the same call wins (it loads its own params).
-- **Param maps insert, they don't replace.** A `PostProcessing`'s `post_params`
+- **A settings object keeps what a table leaves out.** A `PostProcessing`'s effects
+  are one object each (`bloom`, `vignette`, `exposure`, …, #1467): `{ bloom = {
+  intensity = 2 } }` changes the intensity and keeps the bloom's switch and threshold.
+- **Param maps insert, they don't replace.** A `PostProcessing`'s
+  `custom_effects.params`
   and a UI graphic's `shader.params` write each key given; a key removed from the
   table keeps its value. Renaming a UI `shader` drops the old shader's params, and
   the ones still in a `Get` table at their old values are not carried over.

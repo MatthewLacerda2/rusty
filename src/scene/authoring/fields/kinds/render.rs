@@ -2,23 +2,18 @@
 //! `Transform`, `Mesh`, `Material`, `Light`, `Camera`, `PostProcessing` and
 //! `LODGroup`.
 
-use std::collections::BTreeMap;
-
-use super::super::table::{group, inspect, op, part, ro, unheld, with, Group};
+use super::super::table::{group, inspect, op, part, ro, with, Group};
 use super::super::value::Mask;
 use super::NO_OP;
 use crate::components::rendering::camera::RenderTarget;
 use crate::components::{
-    AutoExposure, CameraComponent, ChromaticAberration, DepthOfField, FilmGrain, LiftGammaGain,
-    LightComponent, LodGroupComponent, LodLevel, MaterialComponent, MeshComponent,
-    PostProcessingComponent, ShadowSettings, SsaoSettings, TransformComponent, Vignette, Wheel,
-    WhiteBalance,
+    CameraComponent, LightComponent, LodGroupComponent, LodLevel, MaterialComponent, MeshComponent,
+    PostProcessingComponent, TransformComponent,
 };
 use crate::scene::authoring::{
     rendering::camera, rendering::light, rendering::lod_group as lod,
     rendering::post_processing as vc,
 };
-use crate::shadergen::post_params::PostChain;
 
 const CONES: Group<LightComponent> =
     group!(|l, inner_cone: f32, outer_cone: f32| light::set_cones(l, inner_cone, outer_cone));
@@ -65,79 +60,7 @@ inspect! {
         op!("projection", camera::set_projection),
         with!("target_texture", |c, v: Option<RenderTarget>| set_target(c, v)),
     ];
-    PostProcessingComponent => post_processing, post_processing_mut, &[
-        op!("active", vc::set_active),
-        op!("bloom_active", vc::set_bloom_active),
-        op!("bloom_intensity", vc::set_bloom_intensity),
-        op!("bloom_threshold", vc::set_bloom_threshold),
-        op!("exposure", vc::set_exposure),
-        op!("exposure_mode", vc::set_exposure_mode),
-        with!("auto_exposure", |c, v: AutoExposure| {
-            vc::set_exposure_limits(c, v.min_ev, v.max_ev);
-            vc::set_exposure_compensation(c, v.compensation);
-            vc::set_adaptation_speed(c, v.speed_up, v.speed_down);
-            vc::set_histogram_percent(c, v.low_percent, v.high_percent);
-        }),
-        op!("contrast", vc::set_contrast),
-        op!("saturation", vc::set_saturation),
-        with!("white_balance", |c, v: WhiteBalance| {
-            vc::set_white_balance(c, v.temperature, v.tint);
-        }),
-        with!("lift_gamma_gain", |c, v: LiftGammaGain| {
-            for w in Wheel::ALL {
-                vc::set_wheel(c, w, v.wheel(w).color, v.wheel(w).offset);
-            }
-        }),
-        op!("hue_shift", vc::set_hue_shift),
-        op!("lut", vc::set_lut),
-        op!("lut_contribution", vc::set_lut_contribution),
-        with!("vignette", |c, v: Vignette| {
-            vc::set_vignette_active(c, v.active);
-            vc::set_vignette_intensity(c, v.intensity);
-            vc::set_vignette_smoothness(c, v.smoothness);
-            vc::set_vignette_color(c, v.color);
-            vc::set_vignette_center(c, v.center);
-        }),
-        with!("chromatic_aberration", |c, v: ChromaticAberration| {
-            vc::set_chromatic_aberration_active(c, v.active);
-            vc::set_chromatic_aberration_intensity(c, v.intensity);
-        }),
-        with!("film_grain", |c, v: FilmGrain| {
-            vc::set_film_grain_active(c, v.active);
-            vc::set_film_grain_intensity(c, v.intensity);
-            vc::set_film_grain_response(c, v.response);
-        }),
-        with!("depth_of_field", |c, v: DepthOfField| {
-            vc::set_dof_mode(c, v.mode);
-            for knob in vc::DOF_KNOBS {
-                (knob.set)(c, (knob.get)(&v));
-            }
-        }),
-        op!("ssr_active", vc::set_ssr_active),
-        op!("ssr_quality", vc::set_ssr_quality),
-        op!("ssr_temporal_upsampling", vc::set_ssr_temporal_upsampling),
-        op!("tonemap", vc::set_tonemap),
-        op!("display_gamma", vc::set_gamma),
-        with!("shadows", |c, v: ShadowSettings| {
-            vc::set_shadow_cascades(c, v.cascades);
-            vc::set_shadow_distance(c, v.distance);
-        }),
-        with!("ssao", |c, v: SsaoSettings| {
-            vc::set_ssao_active(c, v.active);
-            vc::set_ssao_radius(c, v.radius);
-            vc::set_ssao_intensity(c, v.intensity);
-        }),
-        with!("custom_effects", |c, v: Vec<String>| vc::set_custom_effects(c, v)?),
-        unheld!(
-            "its op reads every effect's baked sidecar and warns on an unbaked one",
-            with!("post_params", |c, v: BTreeMap<String, Vec<f32>>| {
-                let chain = PostChain::load(&c.custom_effects);
-                for (name, value) in v {
-                    vc::set_post_param_with(c, &chain, &name, value)?;
-                }
-            })
-        ),
-    ];
+    PostProcessingComponent => post_processing, post_processing_mut, &vc::FIELDS;
     LodGroupComponent => lod_group, lod_group_mut, &[
         with!("levels", |g, v: Vec<LodLevel>| set_levels(g, v)),
         op!("size", lod::set_size),

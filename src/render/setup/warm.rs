@@ -22,8 +22,7 @@ impl Renderer {
     /// or the windowed renderer compiles it mid-frame.
     pub(crate) fn lazy_pipelines(&self, editor_overlays: bool) -> Vec<&LazyPipeline> {
         let mut all = vec![&self.transparent_pipeline, &self.velocity_pipeline];
-        all.extend(self.motion_blur.lazy_pipelines());
-        all.extend(self.depth_of_field.lazy_pipelines());
+        all.extend(self.post_passes.lazy_pipelines());
         all.extend(self.skybox_renderer.lazy_pipelines());
         all.extend(self.particle_renderer.lazy_pipelines());
         all.extend(self.ribbon_renderer.lazy_pipelines());

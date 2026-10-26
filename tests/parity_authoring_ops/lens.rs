@@ -33,16 +33,16 @@ Graphics.SetFilmGrainResponse(5)
 "#;
 
 fn apply_ops(vc: &mut PostProcessingComponent) {
-    vc_ops::set_vignette_active(vc, true);
-    vc_ops::set_vignette_intensity(vc, 2.0);
-    vc_ops::set_vignette_smoothness(vc, 0.5);
-    vc_ops::set_vignette_color(vc, [0.2, 0.1, 9.0]);
-    vc_ops::set_vignette_center(vc, [-1.0, 0.4]);
-    vc_ops::set_chromatic_aberration_active(vc, true);
-    vc_ops::set_chromatic_aberration_intensity(vc, 0.7);
-    vc_ops::set_film_grain_active(vc, true);
-    vc_ops::set_film_grain_intensity(vc, 0.6);
-    vc_ops::set_film_grain_response(vc, 5.0);
+    vc_ops::lens::vignette::set_active(vc, true);
+    vc_ops::lens::vignette::set_intensity(vc, 2.0);
+    vc_ops::lens::vignette::set_smoothness(vc, 0.5);
+    vc_ops::lens::vignette::set_color(vc, [0.2, 0.1, 9.0]);
+    vc_ops::lens::vignette::set_center(vc, [-1.0, 0.4]);
+    vc_ops::lens::chromatic_aberration::set_active(vc, true);
+    vc_ops::lens::chromatic_aberration::set_intensity(vc, 0.7);
+    vc_ops::lens::film_grain::set_active(vc, true);
+    vc_ops::lens::film_grain::set_intensity(vc, 0.6);
+    vc_ops::lens::film_grain::set_response(vc, 5.0);
 }
 
 #[test]

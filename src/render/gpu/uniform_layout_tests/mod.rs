@@ -24,7 +24,7 @@ const PROBE: &str = "#import postfx::params::PostParams\n\
 @group(1) @binding(0) var<uniform> post: PostParams;\n\
 @fragment fn fs_main() -> @location(0) vec4<f32> {\n\
     return vec4<f32>(camera.time + lighting.ssr_active + lights[0].range + tiles[0].params.x\n\
-        + decals[0].fade.x + post.lens.x);\n\
+        + decals[0].fade.x + post.camera_pos.x);\n\
 }\n";
 
 /// `(member offset by name, struct size)` of the WGSL struct named `name`.

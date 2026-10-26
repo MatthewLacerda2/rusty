@@ -10,6 +10,7 @@ mod console;
 mod coroutines;
 mod destroy_order;
 mod destroy_subtree;
+mod effect_writes;
 mod files;
 mod held_from;
 mod hook_errors;

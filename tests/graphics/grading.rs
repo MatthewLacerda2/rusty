@@ -89,8 +89,11 @@ fn the_color_lookup_round_trips_clears_and_clamps() {
     "#,
     );
     let vc = scene.world.post_processing(id).unwrap();
-    assert_eq!(vc.lut.as_deref(), Some("assets/luts/strip.png"));
-    assert_eq!(vc.lut_contribution, 0.5);
+    assert_eq!(
+        vc.color_lookup.lut.as_deref(),
+        Some("assets/luts/strip.png")
+    );
+    assert_eq!(vc.color_lookup.contribution, 0.5);
     run(
         Scene::new(),
         r#"

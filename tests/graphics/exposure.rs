@@ -59,8 +59,8 @@ fn exposure_knobs_round_trip_and_clamp() {
     "#,
     );
     let vc = scene.world.post_processing(id).unwrap().clone();
-    assert_eq!(vc.exposure_mode, ExposureMode::Automatic);
-    assert_eq!(vc.auto_exposure.compensation, 1.5);
+    assert_eq!(vc.exposure.mode, ExposureMode::Automatic);
+    assert_eq!(vc.exposure.automatic.compensation, 1.5);
 }
 
 #[test]

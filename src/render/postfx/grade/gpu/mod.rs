@@ -8,12 +8,14 @@ mod clamp;
 mod knobs;
 mod lookup;
 
-use std::collections::BTreeMap;
-
+use crate::components::{CameraComponent, ExposureMode, PostProcessingComponent};
+use crate::core::settings::graphics_options::{GraphicsOption, GraphicsOptions};
+use crate::core::settings::GraphicsSettings;
 use crate::render::gpu::shaders::ShaderRegistry;
 use crate::render::gpu::DEPTH_FORMAT;
-use crate::render::postfx::grade::{GradeParams, Lookup};
-use crate::render::postfx::{PostFx, PostFxContext, PostParams, PostPasses, HDR_FORMAT};
+use crate::render::postfx::effects::EffectCx;
+use crate::render::postfx::params::PostSource;
+use crate::render::postfx::{PostFx, PostFxContext, PostParams, HDR_FORMAT};
 use crate::render::timing::GpuTimer;
 use crate::render::{readback, Renderer, OFFSCREEN_FORMAT};
 
@@ -36,33 +38,28 @@ pub(in crate::render::postfx) fn chain() -> Option<Chain> {
     Some(Chain { r, pfx, out })
 }
 
+/// A volume exposing the image by `ev` in `mode` (its grade is not what a run bakes:
+/// [`Chain::run`] bakes the grade it is given).
+pub(in crate::render::postfx) fn exposure(ev: f32, mode: ExposureMode) -> PostProcessingComponent {
+    let mut vc = crate::scene::authoring::default_post_processing();
+    (vc.exposure.fixed_ev, vc.exposure.mode) = (ev, mode);
+    vc
+}
+
 impl Chain {
-    /// Grade `row` (one scene-linear HDR colour per pixel) at `exposure` EV under
-    /// `grade`, returning each pixel's 8-bit sRGB output.
+    /// Grade `row` (one scene-linear HDR colour per pixel) at `ev` EV under `grade`'s
+    /// volume (`None`: neutral, no tonemap), returning each pixel's 8-bit sRGB output.
     pub(in crate::render::postfx) fn run(
         &mut self,
         row: &[[f32; 3]],
-        exposure: f32,
-        grade: &GradeParams,
-    ) -> Vec<[u8; 4]> {
-        self.run_with(row, exposure, grade, None)
-    }
-
-    /// [`run`](Self::run), with `lookup`'s user LUT over the grade (#1441).
-    pub(in crate::render::postfx) fn run_with(
-        &mut self,
-        row: &[[f32; 3]],
-        exposure: f32,
-        grade: &GradeParams,
-        lookup: Option<Lookup>,
+        ev: f32,
+        grade: Option<&PostProcessingComponent>,
     ) -> Vec<[u8; 4]> {
         self.write_row(row);
         let (device, queue) = (&self.r.device, &self.r.queue);
         let bake = &mut self.r.grade_bake;
-        self.pfx.grade.prepare((device, queue), bake, grade, lookup);
-        let mut params = PostParams::default();
-        params.color[0] = exposure;
-        self.composite(params)
+        self.pfx.grade.prepare((device, queue), bake, grade);
+        self.composite(&exposure(ev, ExposureMode::Fixed))
     }
 
     /// Make `row` (one scene-linear HDR colour per pixel) the scene the chain reads.
@@ -85,9 +82,12 @@ impl Chain {
         );
     }
 
-    /// Run the chain over the scene with `params`, returning each pixel's 8-bit
-    /// sRGB output.
-    pub(in crate::render::postfx) fn composite(&mut self, params: PostParams) -> Vec<[u8; 4]> {
+    /// Run the composite over the scene with `vc`'s exposure and the LUT the last
+    /// run baked, every other effect off, returning each pixel's 8-bit sRGB output.
+    pub(in crate::render::postfx) fn composite(
+        &mut self,
+        vc: &PostProcessingComponent,
+    ) -> Vec<[u8; 4]> {
         let (device, queue) = (&self.r.device, &self.r.queue);
         let depth = texture(device, DEPTH_FORMAT, wgpu::TextureUsages::empty());
         let sky = texture(device, HDR_FORMAT, wgpu::TextureUsages::empty());
@@ -101,14 +101,27 @@ impl Chain {
             output: &out,
             timer: &timer,
         };
-        let none = BTreeMap::new();
-        let passes = PostPasses {
-            bloom: false,
-            fxaa: false,
-            custom: &[],
-            post_params: &none,
+        let camera = CameraComponent {
+            fxaa_active: false,
+            ..Default::default()
         };
-        self.pfx.run(device, queue, ctx, params, passes);
+        let mut options = GraphicsOptions::default();
+        for option in GraphicsOption::ALL {
+            options.set(option, false);
+        }
+        let cx = EffectCx {
+            post: PostSource {
+                camera: Some(&camera),
+                volume: Some(vc),
+            },
+            graphics: GraphicsSettings {
+                options,
+                ..Default::default()
+            },
+            full: true,
+        };
+        self.pfx
+            .run((device, queue), ctx, &cx, PostParams::default());
         let bytes = readback::read_texture_rgba8(device, queue, &self.out, W, 1);
         bytes.chunks(4).map(|p| [p[0], p[1], p[2], p[3]]).collect()
     }

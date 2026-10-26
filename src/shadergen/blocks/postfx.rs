@@ -8,7 +8,7 @@
 //! `t_color`/`s_color` bindings, an `fs_main` that samples the scene then folds
 //! every block) so a baked postfx module has the self-contained fullscreen shape
 //! the engine's postfx contract expects — it reads group(0) binding(0..2) just
-//! like `postfx.wgsl`'s prefilter passes.
+//! like the engine's composite (`render::postfx::effects::assemble`).
 //!
 //! Most effects are per-pixel color grades that need only the sampled color + uv,
 //! plus `game_time()` (#398) for animation (tint, scanline, grayscale, posterize,

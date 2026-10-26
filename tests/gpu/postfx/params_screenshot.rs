@@ -30,7 +30,12 @@ fn scene() -> RefCell<Scene> {
     .expect("bake");
     let mut scene = wall_scene(2.0, [0.5, 0.5, 0.5]);
     let id = scene.world.ids_with_post_processing()[0];
-    scene.world.post_processing_mut(id).unwrap().custom_effects = vec![NAME.into()];
+    scene
+        .world
+        .post_processing_mut(id)
+        .unwrap()
+        .custom_effects
+        .names = vec![NAME.into()];
     RefCell::new(scene)
 }
 

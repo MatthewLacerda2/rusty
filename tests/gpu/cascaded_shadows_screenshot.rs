@@ -33,8 +33,8 @@ fn yard(shadow_distance: f32) -> Scene {
     let mut vc = default_post_processing();
     vc.shadows.distance = shadow_distance;
     // Dimmed and bloom-free, so the lit ground is not clipped white and a shadow reads.
-    vc.exposure = -2.0;
-    vc.bloom_active = false;
+    vc.exposure.fixed_ev = -2.0;
+    vc.bloom.active = false;
     scene.world.set_post_processing(volume, Some(vc));
     // A volume rides on its camera (#1434): that camera is the view's.
     scene

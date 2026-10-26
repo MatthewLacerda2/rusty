@@ -4,7 +4,7 @@
 use serde_json::{Map, Value};
 
 use super::table::{Access, Inspect, Values};
-use super::value::same;
+use super::value::{changed, same};
 use crate::ecs::World;
 
 /// Which keys of a change table `Set` skips as unchanged.
@@ -23,16 +23,22 @@ pub enum Skip<'a> {
 }
 
 impl Skip<'_> {
-    fn skips(&self, key: &str, value: &Value, held: &Value) -> bool {
+    /// What of `value`, written to `key` of a component that serializes to `held`,
+    /// runs its op: all of it, or `None` when it is unchanged. A [`Access::Merge`]
+    /// field is weighed leaf by leaf (`value::changed`), so only its edited leaves run.
+    fn changed(&self, merge: bool, key: &str, value: &Value, held: &Value) -> Option<Value> {
         let held = held.get(key).unwrap_or(&Value::Null);
-        match self {
-            Skip::Held => same(value, held),
-            Skip::SinceGet(got) => {
-                same(value, got.get(key).unwrap_or(&Value::Null)) || same(value, held)
-            }
+        let got = match self {
+            Skip::Held => None,
+            Skip::SinceGet(got) => Some(got.get(key).unwrap_or(&Value::Null)),
             #[cfg(test)]
-            Skip::Nothing => false,
+            Skip::Nothing => return Some(value.clone()),
+        };
+        if merge {
+            return changed(value, held, got);
         }
+        let unchanged = same(value, held) || got.is_some_and(|g| same(value, g));
+        (!unchanged).then(|| value.clone())
     }
 }
 
@@ -77,10 +83,14 @@ fn apply<C: Inspect>(
     skip: Skip,
 ) -> Result<(), String> {
     let held = serialized(draft)?;
+    let merges = |key: &str| {
+        C::FIELDS
+            .iter()
+            .any(|f| f.name == key && matches!(f.access, Access::Merge(_)))
+    };
     let changed: Map<String, Value> = changes
         .iter()
-        .filter(|(k, v)| !skip.skips(k, v, &held))
-        .map(|(k, v)| (k.clone(), v.clone()))
+        .filter_map(|(k, v)| Some((k.clone(), skip.changed(merges(k), k, v, &held)?)))
         .collect();
     run_ops(draft, &changed, &mut |name, e| Err(named(name, e)))
 }
@@ -102,7 +112,7 @@ pub(super) fn run_ops<C: Inspect>(
             Access::ReadOnly(why) if named.is_some() => {
                 return Err(format!("field '{}' is read-only: {why}", field.name));
             }
-            Access::Op(op) => match named {
+            Access::Op(op) | Access::Merge(op) => match named {
                 Some(value) => op(c, value.clone()),
                 None => continue,
             },

@@ -1,32 +1,21 @@
 //! src/editor/inspector/components/camera/ — the Camera inspector card (this
-//! `mod.rs`) plus the Post Processing card (`post_processing`, with its colour
-//! grade in `grading`, its LUT path field in `lut_field`, its depth of field in
-//! `depth_of_field` and its custom effects list in `custom_effects`), split apart to
-//! stay under the size cap. Both cards live on the same camera entity. The Camera card's motion-blur widgets are `motion_blur`.
+//! `mod.rs`) plus the Post Processing card (`post_processing`, one section per post
+//! effect). Both cards live on the same camera entity. The Camera card draws the
+//! camera effects' sections (`CAMERA_SECTIONS`: motion blur in `motion_blur`,
+//! FXAA here).
 
 use crate::editor::widgets::DragRange;
 use egui_phosphor::regular as icon;
 
-mod custom_effects;
-mod depth_of_field;
-mod exposure;
-mod grading;
-mod lens;
-mod lighting;
-mod lut_field;
 mod motion_blur;
-mod post_processing;
+pub(crate) mod post_processing;
 mod target;
 
-#[cfg(test)]
-mod slider_tests;
-
-pub use lut_field::commit_abandoned as commit_abandoned_lut;
-pub use post_processing::draw_post_processing;
+pub use post_processing::{commit_abandoned_lut, draw_post_processing};
 
 use crate::editor::inspector::components::card::component_card;
 use crate::scene::authoring::{self, rendering::camera as camera_ops, ComponentKind};
-use crate::scene::ClearFlags;
+use crate::scene::{CameraComponent, ClearFlags};
 
 /// Camera Component panel. `named_layers` are the `(index, label)` slots offered in
 /// the culling-mask checklist (layer 0 + named user slots).
@@ -46,8 +35,11 @@ pub fn draw_camera(
         draw_projection(ui, world, id, &cam, is_dirty);
         draw_culling_mask(ui, world, id, cam.culling_mask, named_layers, is_dirty);
         draw_stacking(ui, world, id, cam.render_order, cam.clear_flags, is_dirty);
-        motion_blur::draw_motion_blur(ui, world, id, &cam, is_dirty);
-        draw_fxaa(ui, world, id, cam.fxaa_active, is_dirty);
+        for section in camera_effects() {
+            ui.push_id(section.effect, |ui| {
+                (section.draw)(ui, world, id, &cam, is_dirty)
+            });
+        }
         target::draw_target(ui, world, id, &cam, is_dirty);
     });
     if remove {
@@ -58,6 +50,38 @@ pub fn draw_camera(
     }
 }
 
+/// One camera effect's section of the Camera card (#1467): motion blur and FXAA,
+/// whose settings live on the camera, not on a volume.
+pub(crate) struct CameraSection {
+    /// The effect, as `render::postfx::effects` names it.
+    pub effect: &'static str,
+    /// Where it sits among the camera effects: lower first.
+    pub order: u16,
+    pub draw: fn(&mut egui::Ui, &mut crate::ecs::World, u32, &CameraComponent, &mut bool),
+}
+
+/// The camera effects' sections, by effect.
+pub(crate) const CAMERA_SECTIONS: &[CameraSection] = &[
+    // sorted: one row per camera effect; the card orders them by `order`
+    CameraSection {
+        effect: "fxaa",
+        order: 2,
+        draw: draw_fxaa,
+    },
+    CameraSection {
+        effect: "motion_blur",
+        order: 1,
+        draw: motion_blur::draw_motion_blur,
+    },
+];
+
+/// [`CAMERA_SECTIONS`] in the card's order.
+fn camera_effects() -> Vec<&'static CameraSection> {
+    let mut sections: Vec<&CameraSection> = CAMERA_SECTIONS.iter().collect();
+    sections.sort_by_key(|s| s.order);
+    sections
+}
+
 /// The FXAA toggle (#360): a real checkbox, because FXAA is an effect a shot might
 /// genuinely want off (a pixel-art look, or a screenshot being diffed for raw
 /// edges). Writes through the shared op, so this and `Graphics.SetFxaaActive` are
@@ -66,10 +90,10 @@ fn draw_fxaa(
     ui: &mut egui::Ui,
     world: &mut crate::ecs::World,
     id: u32,
-    active: bool,
+    cam: &CameraComponent,
     is_dirty: &mut bool,
 ) {
-    let mut on = active;
+    let mut on = cam.fxaa_active;
     if ui.checkbox(&mut on, "FXAA (Anti-Aliasing)").changed() {
         if let Some(mut c) = world.camera_mut(id) {
             camera_ops::set_fxaa_active(&mut c, on);

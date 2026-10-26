@@ -16,18 +16,12 @@ use rusty::scene::Scene;
 fn scene_with_volume_and_cam() -> (Rc<RefCell<Scene>>, u32) {
     let mut scene = Scene::new();
     let id = scene.add_entity("PostFx".to_string());
-    scene.world.set_post_processing(
-        id,
-        Some(PostProcessingComponent {
-            bloom_active: false,
-            bloom_threshold: 1.0,
-            ssr_active: false,
-            ssr_quality: "Low".to_string(),
-            ssr_temporal_upsampling: false,
-            gamma: 2.2,
-            ..rusty::scene::authoring::default_post_processing()
-        }),
-    );
+    let mut vc: PostProcessingComponent = rusty::scene::authoring::default_post_processing();
+    (vc.bloom.active, vc.bloom.threshold) = (false, 1.0);
+    (vc.ssr.active, vc.ssr.temporal_upsampling) = (false, false);
+    vc.ssr.quality = "Low".to_string();
+    vc.tonemapping.display_gamma = 2.2;
+    scene.world.set_post_processing(id, Some(vc));
     scene.world.set_camera(
         id,
         Some(CameraComponent {
@@ -45,26 +39,26 @@ fn apply_graphics_ops(scene: &Rc<RefCell<Scene>>, id: u32) {
     let mut sc = scene.borrow_mut();
     {
         let mut vc = sc.world.post_processing_mut(id).unwrap();
-        vc_ops::set_bloom_active(&mut vc, true);
-        vc_ops::set_bloom_intensity(&mut vc, -3.0); // clamped to 0
-        vc_ops::set_gamma(&mut vc, -5.0); // clamped to 0.01
-        vc_ops::set_tonemap(&mut vc, Tonemap::Reinhard);
-        vc_ops::set_white_balance(&mut vc, 40.0, 300.0); // tint clamped to 100
-        vc_ops::set_wheel(&mut vc, Wheel::Gain, [0.5, 1.0, 1.0], 0.2);
-        vc_ops::set_hue_shift(&mut vc, 45.0);
-        vc_ops::set_exposure_mode(&mut vc, ExposureMode::Automatic);
-        vc_ops::set_exposure_limits(&mut vc, -2.0, 30.0); // max clamped to 10
-        vc_ops::set_adaptation_speed(&mut vc, 2.0, -1.0); // down clamped to 0
-        vc_ops::set_lut(&mut vc, Some("assets/warm.cube".into()));
-        vc_ops::set_lut_contribution(&mut vc, 7.0); // clamped to 1
-        vc_ops::set_ssr_active(&mut vc, true);
-        vc_ops::set_ssr_quality(&mut vc, "High".to_string());
-        vc_ops::set_shadow_cascades(&mut vc, 9); // clamped to 4
-        vc_ops::set_shadow_distance(&mut vc, 60.0);
-        vc_ops::set_ssao_radius(&mut vc, -1.0); // clamped to 0.01
-        vc_ops::set_ssao_intensity(&mut vc, 9.0); // clamped to 4
-        vc_ops::set_ssao_active(&mut vc, false);
-        vc_ops::set_custom_effects(&mut vc, vec!["crt".into(), "hurt".into()]).unwrap();
+        vc_ops::bloom::set_active(&mut vc, true);
+        vc_ops::bloom::set_intensity(&mut vc, -3.0); // clamped to 0
+        vc_ops::grading::tonemapping::set_display_gamma(&mut vc, -5.0); // clamped to 0.01
+        vc_ops::grading::tonemapping::set_mode(&mut vc, Tonemap::Reinhard);
+        vc_ops::grading::white_balance::set(&mut vc, 40.0, 300.0); // tint clamped to 100
+        vc_ops::grading::lift_gamma_gain::set_wheel(&mut vc, Wheel::Gain, [0.5, 1.0, 1.0], 0.2);
+        vc_ops::grading::color_adjustments::set_hue_shift(&mut vc, 45.0);
+        vc_ops::exposure::set_mode(&mut vc, ExposureMode::Automatic);
+        vc_ops::exposure::set_limits(&mut vc, -2.0, 30.0); // max clamped to 10
+        vc_ops::exposure::set_adaptation_speed(&mut vc, 2.0, -1.0); // down clamped to 0
+        vc_ops::grading::color_lookup::set_lut(&mut vc, Some("assets/warm.cube".into()));
+        vc_ops::grading::color_lookup::set_contribution(&mut vc, 7.0); // clamped to 1
+        vc_ops::ssr::set_active(&mut vc, true);
+        vc_ops::ssr::set_quality(&mut vc, "High".to_string());
+        vc_ops::volume::set_shadow_cascades(&mut vc, 9); // clamped to 4
+        vc_ops::volume::set_shadow_distance(&mut vc, 60.0);
+        vc_ops::volume::set_ssao_radius(&mut vc, -1.0); // clamped to 0.01
+        vc_ops::volume::set_ssao_intensity(&mut vc, 9.0); // clamped to 4
+        vc_ops::volume::set_ssao_active(&mut vc, false);
+        vc_ops::custom_effects::set_names(&mut vc, vec!["crt".into(), "hurt".into()]).unwrap();
     }
     let mut cam = sc.world.camera_mut(id).unwrap();
     camera_ops::set_motion_blur_active(&mut cam, true);
@@ -130,8 +124,8 @@ fn graphics_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Error
     let ovc = os.world.post_processing(op_id).unwrap().clone();
     // Every field, through `Debug`: the two paths must leave identical components.
     assert_eq!(format!("{lvc:?}"), format!("{ovc:?}"));
-    assert_eq!(lvc.bloom_intensity, 0.0, "single-sourced clamp");
-    assert_eq!(lvc.gamma, 0.01, "single-sourced clamp");
+    assert_eq!(lvc.bloom.intensity, 0.0, "single-sourced clamp");
+    assert_eq!(lvc.tonemapping.display_gamma, 0.01, "single-sourced clamp");
     let lcam = ls.world.camera(lua_id).unwrap().clone();
     let ocam = os.world.camera(op_id).unwrap().clone();
     assert_eq!(format!("{lcam:?}"), format!("{ocam:?}"));

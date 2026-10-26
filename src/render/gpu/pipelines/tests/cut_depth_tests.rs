@@ -114,7 +114,7 @@ fn gpu_a_dissolved_crate_leaves_no_ambient_occlusion() {
         block(&mut scene, floor.0, floor.1, None);
         let volume = create_entity(&mut scene, "Volume", None);
         let mut vc = default_post_processing();
-        (vc.bloom_active, vc.ssr_active, vc.ssao.active) = (false, false, true);
+        (vc.bloom.active, vc.ssr.active, vc.ssao.active) = (false, false, true);
         scene.world.set_post_processing(volume, Some(vc));
         // A volume rides on its camera (#1434): that camera is the view's.
         scene

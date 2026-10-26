@@ -31,7 +31,7 @@ use crate::components::{PostProcessingComponent, SsaoSettings};
 use crate::core::settings::graphics_options::GraphicsOption;
 use crate::core::settings::quality::SsaoTier;
 use crate::core::settings::GraphicsSettings;
-use crate::render::postfx::params::effect_runs;
+use crate::render::postfx::params::{effect_runs, Gate};
 use crate::scene::Camera;
 
 /// The occlusion and blur targets' format: one unorm channel is all AO needs.
@@ -61,6 +61,13 @@ pub(crate) struct SsaoUniform {
     params: [f32; 4],
 }
 
+/// What gates SSAO besides the volume's switch: the player's `ssao` option, and
+/// every tier but Low (`QualityPreset::ssao`).
+const GATE: Gate = Gate {
+    option: Some(GraphicsOption::Ssao),
+    tiers: |q| q.ssao().is_some(),
+};
+
 /// What this frame's SSAO does, when it runs at all: the active volume's look and
 /// the quality tier's cost.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -80,7 +87,7 @@ impl SsaoPlan {
     ) -> Option<Self> {
         let settings = volume?.ssao;
         let on = settings.active && settings.intensity > 0.0;
-        if !effect_runs(graphics, GraphicsOption::Ssao, on) {
+        if !effect_runs(graphics, GATE, on) {
             return None;
         }
         // `effect_runs` decided the tier runs AO; the tier only supplies its cost.

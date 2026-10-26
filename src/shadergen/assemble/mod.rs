@@ -190,8 +190,8 @@ fn assemble_postfx(recipe: &ShaderRecipe, resolved: &[Instance], layout: &ParamL
 }
 
 /// The fixed postfx scaffolding: scene-color bindings and the fullscreen-triangle
-/// vertex stage (the `fullscreen` module's triangle, imported as `postfx.wgsl` does),
-/// matching `postfx.wgsl`'s fullscreen contract
+/// vertex stage (the `fullscreen` module's triangle, imported as the engine's
+/// composite does), matching the post chain's fullscreen contract
 /// (group(0) binding 0 = the post params, 1 = the colour so far, 2 = its sampler).
 /// `game_time()` is the sim's game time (#398), the surface blocks' `camera.time`.
 /// `source_tap(uv)` and `source_texel()` let a sampling block (#402) read this

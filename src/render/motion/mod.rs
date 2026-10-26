@@ -41,7 +41,10 @@ mod history;
 pub(crate) use history::{track, HistoryKey, MotionHistory};
 
 use crate::core::settings::GraphicsSettings;
-use crate::render::postfx::params::{dof_enabled, motion_blur_enabled, PostSource};
+use crate::render::postfx::effects::{
+    depth_of_field::dof_enabled, motion_blur::motion_blur_enabled,
+};
+use crate::render::postfx::params::PostSource;
 use crate::render::postfx::PfxTarget;
 use crate::render::PixelSize;
 

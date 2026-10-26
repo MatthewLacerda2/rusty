@@ -22,11 +22,14 @@ use crate::scene::authoring::ComponentKind;
 pub type Write<C> = fn(&mut C, Value) -> Result<(), String>;
 
 /// How a field may be reached from `Component.Set`.
-pub enum Access<C> {
+pub enum Access<C: 'static> {
     /// Written by the inspector's op (decode the value, then call it).
     Op(Write<C>),
     /// Written with the other fields of its group, by one op (`group!`).
     Group(Group<C>),
+    /// An object written key by key (a post effect's settings, `effect!`): `Set`
+    /// skips its unchanged leaves, not the whole object (`value::changed`).
+    Merge(Write<C>),
     /// Readable only; the text says why, or which verb writes it.
     ReadOnly(&'static str),
 }
@@ -35,10 +38,31 @@ pub enum Access<C> {
 /// naming any of them calls it once, with each field's new value or, when not
 /// named, its current one. So an op that clamps one half against the other sees
 /// both halves as they are meant to end up.
-pub struct Group<C> {
+pub struct Group<C: 'static> {
     pub names: &'static [&'static str],
     pub write: fn(&mut C, &Values) -> Result<(), String>,
 }
+
+// Copy by hand: a derive would ask `C: Copy` of the component, which only the fn
+// pointers and static slices inside need not be.
+impl<C> Clone for Group<C> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+impl<C> Copy for Group<C> {}
+impl<C> Clone for Access<C> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+impl<C> Copy for Access<C> {}
+impl<C> Clone for Field<C> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+impl<C> Copy for Field<C> {}
 
 /// What a group's op reads its fields from: the changes, else the component.
 pub struct Values<'a> {
@@ -55,8 +79,10 @@ impl Values<'_> {
     }
 }
 
-/// One serialized field of a component, by its serialized name.
-pub struct Field<C> {
+/// One serialized field of a component, by its serialized name. `Copy`, so a table
+/// can be assembled in a `const` from rows other modules declare (the post effects',
+/// `rendering::post_processing::FIELDS`).
+pub struct Field<C: 'static> {
     pub name: &'static str,
     pub access: Access<C>,
     /// Why a scene or prefab load leaves this field as read instead of running its
@@ -120,6 +146,24 @@ macro_rules! part {
     };
 }
 
+/// A post effect's settings object (#1467): `$name` is both the serialized field and
+/// the component's field, read as `$t` **over the current value** (`value::merged`),
+/// so `{ bloom = { intensity = 2 } }` keeps the rest and a misspelt key is an error.
+/// Then `$body`, which writes each part through its op.
+macro_rules! effect {
+    ($name:ident, |$c:ident, $v:ident: $t:ty| $body:expr) => {
+        $crate::scene::authoring::fields::table::Field {
+            name: stringify!($name),
+            access: $crate::scene::authoring::fields::table::Access::Merge(|$c, json| {
+                let $v: $t = $crate::scene::authoring::fields::value::merged(&$c.$name, json)?;
+                $body;
+                Ok(())
+            }),
+            unheld: None,
+        }
+    };
+}
+
 /// A read-only field and why it is read-only.
 macro_rules! ro {
     ($name:literal, $why:expr) => {
@@ -142,7 +186,7 @@ macro_rules! unheld {
     };
 }
 
-pub(super) use {group, op, part, ro, unheld, with};
+pub(in crate::scene::authoring) use {effect, group, op, part, ro, unheld, with};
 
 /// A first-class component the table covers: its fields, and how to reach it on
 /// an entity.
@@ -250,7 +294,7 @@ fn fields<C: Inspect>() -> Vec<FieldInfo> {
                 debug_assert!(g.names.contains(&f.name), "{} not in its group", f.name);
                 (f.name, None)
             }
-            Access::Op(_) => (f.name, None),
+            Access::Op(_) | Access::Merge(_) => (f.name, None),
         })
         .collect()
 }

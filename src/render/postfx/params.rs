@@ -1,11 +1,7 @@
-//! Builds the per-frame `PostParams` from one view's camera (#1434): its
-//! `CameraComponent` and `PostProcessingComponent`, gated by the quality preset and
-//! the player's graphics options through [`effect_runs`] (#1438).
-//!
-//! This is the bridge from the editor's "dead knobs" to the GPU: every field the
-//! inspector exposes ends up packed here and read by `postfx.wgsl`, except the
-//! grade (white balance, Lift / Gamma / Gain, hue, contrast, saturation, gamma and
-//! the tonemap), which `postfx::grade::GradeParams` packs for the LUT bake (#1440).
+//! Whose settings a view post-processes with (#1434), and the one gate every
+//! effect asks ([`effect_runs`], #1438): its camera's choice, the player's option and
+//! the quality tier. Each effect packs its own params from them
+//! (`postfx::effects`, #1467); [`frame_params`] is what every post pass shares.
 //!
 //! **Whose settings.** A view post-processes with its base camera, the way Unity URP
 //! post-processes a camera stack once, with the base camera's settings: the screen
@@ -14,17 +10,12 @@
 //! once, as a [`PostSource`], and every function here reads them through it. A
 //! camera without an active volume is neutral; a view with no camera is too.
 
-use std::collections::BTreeMap;
-
 use glam::Mat4;
 
-use super::depth_of_field::DofParams;
-use super::motion_blur::BlurParams;
-use super::{PostParams, PostPasses};
-use crate::components::{
-    AutoExposure, CameraComponent, DofMode, ExposureMode, PostProcessingComponent, Vignette,
-};
+use super::PostParams;
+use crate::components::{CameraComponent, PostProcessingComponent};
 use crate::core::settings::graphics_options::GraphicsOption;
+use crate::core::settings::quality::QualityPreset;
 use crate::core::settings::GraphicsSettings;
 use crate::scene::camera::camera_volume;
 use crate::scene::Scene;
@@ -63,187 +54,59 @@ impl PostGuards<'_> {
     }
 }
 
-/// Does `effect` run for a view whose camera has it `on` (#1438)? Only when the
-/// camera has it on **and** the player's option allows it **and** the quality tier
-/// runs it. The one place that decides it: every gated pass asks here.
-pub(crate) fn effect_runs(graphics: GraphicsSettings, effect: GraphicsOption, on: bool) -> bool {
-    on && graphics.options.allows(effect) && graphics.quality.allows(effect)
+/// What gates an effect besides its own switch, declared with the effect (#1438,
+/// #1467): the player option, when it is player-facing, and the tiers it runs on.
+/// So a new effect's tier rule is its own line, not an arm of a shared `match`.
+#[derive(Clone, Copy)]
+pub(crate) struct Gate {
+    pub option: Option<GraphicsOption>,
+    pub tiers: fn(QualityPreset) -> bool,
 }
 
-/// Pack `post`'s post-processing volume into a `PostParams` for `postfx.wgsl`.
-/// Returns the params plus whether the bloom passes should run this frame. Motion
-/// blur, the camera's, is [`blur_params`].
-pub(crate) fn build_post_params(
-    scene: &Scene,
-    post: PostSource,
-    graphics: GraphicsSettings,
-    view_proj: Mat4,
-    camera_pos: [f32; 3],
-) -> (PostParams, bool) {
-    let mut params = PostParams {
+impl Gate {
+    /// An effect no option gates, on every tier.
+    pub(crate) const NONE: Gate = Gate {
+        option: None,
+        tiers: every_tier,
+    };
+
+    /// `option` gates it, on every tier.
+    pub(crate) const fn option(option: GraphicsOption) -> Gate {
+        Gate {
+            option: Some(option),
+            tiers: every_tier,
+        }
+    }
+}
+
+/// Every tier runs it: a few taps each, the cheap effects an iGPU keeps.
+pub(crate) fn every_tier(_: QualityPreset) -> bool {
+    true
+}
+
+/// Does an effect gated by `gate` run for a view whose camera has it `on` (#1438)?
+/// Only when the camera has it on **and** the player's option allows it **and** the
+/// quality tier runs it. The one place that decides it: every gated pass asks here.
+pub(crate) fn effect_runs(graphics: GraphicsSettings, gate: Gate, on: bool) -> bool {
+    on && gate.option.is_none_or(|o| graphics.options.allows(o)) && (gate.tiers)(graphics.quality)
+}
+
+/// The frame every post pass shares: the view-projection both ways, the camera's
+/// position and the game time (#398), the clock the scene's shaders read as
+/// `camera.time`.
+pub(crate) fn frame_params(scene: &Scene, view_proj: Mat4, camera_pos: [f32; 3]) -> PostParams {
+    PostParams {
         view_proj: view_proj.to_cols_array(),
         inv_view_proj: view_proj.inverse().to_cols_array(),
-        // w: game time (#398), the clock the scene's shaders read as `camera.time`.
         camera_pos: [
             camera_pos[0],
             camera_pos[1],
             camera_pos[2],
             scene.shader_time,
         ],
-        ..Default::default()
-    };
-    let Some(vc) = post.volume else {
-        return (params, false);
-    };
-
-    let bloom = effect_runs(graphics, GraphicsOption::Bloom, vc.bloom_active);
-    params.color = [vc.exposure, vc.contrast, vc.saturation, vc.gamma.max(0.01)];
-    params.bloom = [
-        vc.bloom_intensity,
-        vc.bloom_threshold,
-        vc.tonemap.to_index() as f32,
-        if bloom { 1.0 } else { 0.0 },
-    ];
-
-    // SSR mode: 0 off, 2 = real screen-space (High tier only). Low/Medium keep
-    // the forward shader's cubemap reflection, so post-FX SSR stays off there.
-    let ssr_mode = if effect_runs(graphics, GraphicsOption::Ssr, vc.ssr_active) {
-        2.0
-    } else {
-        0.0
-    };
-    let auto = if auto_exposure(post).is_some() {
-        1.0
-    } else {
-        0.0
-    };
-    params.flags = [ssr_mode, 0.0, 0.0, auto];
-    pack_lens(&mut params, vc, graphics);
-    (params, bloom)
-}
-
-/// The lens effects (#1439) into `params`, each through [`effect_runs`]. One that
-/// doesn't run packs a zero intensity, which the composite skips entirely, so an
-/// effect turned off renders exactly as before it existed. Every knob is clamped to
-/// its range here, since a loaded file bypasses the ops' clamps: a zero smoothness
-/// would make the vignette's `pow(0, 0)` a NaN.
-fn pack_lens(params: &mut PostParams, vc: &PostProcessingComponent, graphics: GraphicsSettings) {
-    let strength = |option, on: bool, intensity: f32| {
-        if effect_runs(graphics, option, on) {
-            intensity.clamp(0.0, 1.0)
-        } else {
-            0.0
-        }
-    };
-    let (v, ca, grain) = (&vc.vignette, &vc.chromatic_aberration, &vc.film_grain);
-    params.vignette = [
-        strength(GraphicsOption::Vignette, v.active, v.intensity),
-        v.smoothness.clamp(Vignette::MIN_SMOOTHNESS, 1.0),
-        v.center[0],
-        v.center[1],
-    ];
-    let [r, g, b] = v.color.map(|c| c.clamp(0.0, 1.0));
-    params.vignette_color = [r, g, b, 0.0];
-    params.lens = [
-        strength(GraphicsOption::ChromaticAberration, ca.active, ca.intensity),
-        strength(GraphicsOption::FilmGrain, grain.active, grain.intensity),
-        grain.response.clamp(0.0, 1.0),
-        0.0,
-    ];
-}
-
-/// `post`'s automatic-exposure knobs, when its volume meters the exposure (#1444).
-/// The player has no option for it: the exposure is the developer's look.
-pub(crate) fn auto_exposure<'a>(post: PostSource<'a>) -> Option<&'a AutoExposure> {
-    post.volume
-        .filter(|vc| vc.exposure_mode == ExposureMode::Automatic)
-        .map(|vc| &vc.auto_exposure)
-}
-
-/// The motion blur `post`'s camera runs this frame (#1436), for a view `height`
-/// pixels tall; `None` when [`motion_blur_enabled`] does not hold. Like FXAA it
-/// lives on the camera, so it needs no volume.
-pub(crate) fn blur_params(
-    post: PostSource,
-    graphics: GraphicsSettings,
-    height: u32,
-) -> Option<BlurParams> {
-    let cam = post
-        .camera
-        .filter(|_| motion_blur_enabled(post, graphics))?;
-    Some(BlurParams::new(cam, height))
-}
-
-/// Whether `post`'s camera runs motion blur, through [`effect_runs`]: its component
-/// has it on, the player's option allows it and the tier runs it. The velocity
-/// target is written when this or depth of field holds (`motion::target_wanted`,
-/// #1435, #1445), so a player who turned both off pays for no velocity pass.
-pub(crate) fn motion_blur_enabled(post: PostSource, graphics: GraphicsSettings) -> bool {
-    post.camera.is_some_and(|cam| {
-        effect_runs(graphics, GraphicsOption::MotionBlur, cam.motion_blur_active)
-    })
-}
-
-/// The depth of field `post`'s volume runs this frame (#1445), for a view `height`
-/// pixels tall at the tier's working resolution; `None` when [`dof_enabled`] does
-/// not hold.
-pub(crate) fn dof_params(
-    post: PostSource,
-    graphics: GraphicsSettings,
-    height: u32,
-) -> Option<DofParams> {
-    let dof = &post
-        .volume
-        .filter(|_| dof_enabled(post, graphics))?
-        .depth_of_field;
-    DofParams::new(dof, height, graphics.quality.depth_of_field()?)
-}
-
-/// Whether `post`'s volume runs depth of field, through [`effect_runs`]: its mode is
-/// not `Off`, the player's option allows it and the tier runs it (not Low). The
-/// velocity target, whose depths it reads, is written when this holds too.
-pub(crate) fn dof_enabled(post: PostSource, graphics: GraphicsSettings) -> bool {
-    let on = post
-        .volume
-        .is_some_and(|vc| vc.depth_of_field.mode != DofMode::Off);
-    effect_runs(graphics, GraphicsOption::DepthOfField, on)
-}
-
-/// No authored-effect params: a view without a volume.
-static NO_POST_PARAMS: BTreeMap<String, Vec<f32>> = BTreeMap::new();
-
-/// The optional passes this frame runs for `post`: bloom (decided by
-/// [`build_post_params`]), FXAA, and its volume's authored effects, borrowed.
-pub(crate) fn post_passes<'a>(
-    post: PostSource<'a>,
-    bloom: bool,
-    graphics: GraphicsSettings,
-) -> PostPasses<'a> {
-    PostPasses {
-        bloom,
-        fxaa: fxaa_enabled(post, graphics),
-        custom: post.volume.map_or(&[], |vc| &vc.custom_effects),
-        post_params: post.volume.map_or(&NO_POST_PARAMS, |vc| &vc.post_params),
     }
 }
 
-/// Whether the FXAA pass runs this frame for `post`'s camera (#360).
-///
-/// Deliberately *not* tied to the volume [`build_post_params`] reads: FXAA lives on
-/// the camera, so tying it to the volume would make anti-aliasing depend on the
-/// camera carrying a `PostProcessing` — the opposite of a default-on effect.
-///
-/// No camera component at all gets `true`: default-on means a scene that has never
-/// heard of the knob is still anti-aliased.
-///
-/// Unlike motion blur no quality tier turns it off — FXAA runs on every tier, Low
-/// included, where it is precisely the cheap anti-aliasing an iGPU wants; the
-/// player's `fxaa` option can.
-pub(crate) fn fxaa_enabled(post: PostSource, graphics: GraphicsSettings) -> bool {
-    let on = post.camera.is_none_or(|c| c.fxaa_active);
-    effect_runs(graphics, GraphicsOption::Fxaa, on)
-}
-
 #[cfg(test)]
-#[path = "params_tests/mod.rs"]
+#[path = "params_tests.rs"]
 mod tests;

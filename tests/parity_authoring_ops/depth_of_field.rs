@@ -30,13 +30,13 @@ Graphics.SetDepthOfFieldFocalLength(500)
 "#;
 
 fn apply_ops(vc: &mut PostProcessingComponent) {
-    vc_ops::set_dof_mode(vc, DofMode::Bokeh);
-    vc_ops::set_dof_gaussian_start(vc, 50.0);
-    vc_ops::set_dof_gaussian_end(vc, 20.0);
-    vc_ops::set_dof_gaussian_max_radius(vc, 9.0);
-    vc_ops::set_dof_focus_distance(vc, -1.0);
-    vc_ops::set_dof_aperture(vc, 1.8);
-    vc_ops::set_dof_focal_length(vc, 500.0);
+    vc_ops::depth_of_field::set_mode(vc, DofMode::Bokeh);
+    vc_ops::depth_of_field::set_gaussian_start(vc, 50.0);
+    vc_ops::depth_of_field::set_gaussian_end(vc, 20.0);
+    vc_ops::depth_of_field::set_gaussian_max_radius(vc, 9.0);
+    vc_ops::depth_of_field::set_focus_distance(vc, -1.0);
+    vc_ops::depth_of_field::set_aperture(vc, 1.8);
+    vc_ops::depth_of_field::set_focal_length(vc, 500.0);
 }
 
 #[test]

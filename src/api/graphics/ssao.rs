@@ -23,7 +23,7 @@ pub(super) fn register_ssao<'scope>(
         table,
         "SetSsaoActive",
         scope.create_function(|_, on: bool| {
-            with_vc_mut(scene, |e| vc_ops::set_ssao_active(e, on));
+            with_vc_mut(scene, |e| vc_ops::volume::set_ssao_active(e, on));
             Ok(())
         }),
     )?;
@@ -36,7 +36,7 @@ pub(super) fn register_ssao<'scope>(
         table,
         "SetSsaoRadius",
         scope.create_function(|_, radius: f32| {
-            with_vc_mut(scene, |e| vc_ops::set_ssao_radius(e, radius));
+            with_vc_mut(scene, |e| vc_ops::volume::set_ssao_radius(e, radius));
             Ok(())
         }),
     )?;
@@ -51,7 +51,7 @@ pub(super) fn register_ssao<'scope>(
         table,
         "SetSsaoIntensity",
         scope.create_function(|_, intensity: f32| {
-            with_vc_mut(scene, |e| vc_ops::set_ssao_intensity(e, intensity));
+            with_vc_mut(scene, |e| vc_ops::volume::set_ssao_intensity(e, intensity));
             Ok(())
         }),
     )?;

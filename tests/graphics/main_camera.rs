@@ -56,7 +56,13 @@ fn a_render_texture_camera_created_first_does_not_take_the_screens_writes() {
     );
 
     let s = scene.borrow();
-    let saturation = |id| s.world.post_processing(id).unwrap().saturation;
+    let saturation = |id| {
+        s.world
+            .post_processing(id)
+            .unwrap()
+            .color_adjustments
+            .saturation
+    };
     let fxaa = |id| s.world.camera(id).unwrap().fxaa_active;
     assert_eq!((saturation(main), fxaa(main)), (0.25, false));
     assert_eq!(
@@ -89,6 +95,7 @@ fn without_a_screen_camera_getters_are_neutral_and_setters_no_ops() {
             .world
             .post_processing(monitor)
             .unwrap()
+            .color_adjustments
             .saturation,
         1.0
     );
