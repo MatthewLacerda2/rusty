@@ -53,25 +53,20 @@ fn imports<F>(placed: &[Placed<F>]) -> String {
     out
 }
 
-/// `c = <module>::<function>(c, <extra>fx[i], …);`, the call of one placed function.
-/// `extra` ends in `, ` when it isn't empty.
+/// `c = <module>::<function>(c, <args>, <array>[i], …);`, the call of one placed
+/// function: `args` before its slots.
 fn call(
     module: &str,
     function: &str,
-    extra: &str,
+    mut args: Vec<String>,
     array: &str,
     offset: usize,
     slots: usize,
 ) -> String {
     let short = import_path(module);
     let short = short.rsplit("::").next().unwrap_or_default();
-    let args: Vec<String> = (offset..offset + slots)
-        .map(|i| format!("{array}[{i}]"))
-        .collect();
-    format!(
-        "    c = {short}::{function}(c, {extra}{});\n",
-        args.join(", ")
-    )
+    args.extend((offset..offset + slots).map(|i| format!("{array}[{i}]")));
+    format!("    c = {short}::{function}(c, {});\n", args.join(", "))
 }
 
 /// The composite's WGSL: the fullscreen vertex stage, `fs_composite` (the scene,
@@ -84,14 +79,13 @@ pub(crate) fn composite_source() -> String {
         for p in layout {
             let f = p.function;
             // A function's textures are the next ones bound, in run order.
-            let mut extra = String::from("f, ");
-            for t in &composite_textures()[next..next + f.textures.len()] {
-                let _ = write!(extra, "{}, ", t.wgsl_name());
-            }
+            let bound = &composite_textures()[next..next + f.textures.len()];
             next += f.textures.len();
             if f.phase == phase {
+                let mut args = vec!["f".to_string()];
+                args.extend(bound.iter().map(|t| t.wgsl_name()));
                 let module = module_of(p.effect);
-                out += &call(module, f.function, &extra, "fx", p.offset, f.slots);
+                out += &call(module, f.function, args, "fx", p.offset, f.slots);
             }
         }
         out
@@ -159,7 +153,7 @@ pub(crate) fn bake_source() -> String {
         .map(|p| {
             let module = module_of(p.effect);
             let g = p.function;
-            call(module, g.function, "", "g", p.offset, g.slots)
+            call(module, g.function, Vec::new(), "g", p.offset, g.slots)
         })
         .collect();
     format!(

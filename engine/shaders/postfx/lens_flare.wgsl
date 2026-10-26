@@ -1,9 +1,9 @@
-// engine/shaders/postfx/lens_flare.wgsl — the screen-space lens flare's two passes
+// engine/shaders/postfx/lens_flare.wgsl — the screen-space lens flare's pass
 // (`render::postfx::effects::lens_flare`, #1443), Unity URP's *Screen Space Lens
 // Flare*: `fs_flare` builds the ghosts, the halo and the streaks from bloom's blurred
-// bright pass at a quarter of the view's size or less; `fs_add` adds the result onto
-// the HDR scene before the composite. Without a bright pixel every tap reads zero, so
-// the add leaves the scene as it was.
+// bright pass at a quarter of the view's size or less, which the composite adds
+// (`postfx/effects/lens_flare.wgsl`, #1473). Without a bright pixel every tap reads
+// zero, so the add leaves the image as it was.
 
 #import fullscreen
 
@@ -133,10 +133,4 @@ fn fs_flare(in: VsOut) -> @location(0) vec4<f32> {
     }
 
     return vec4<f32>(out * params.tint.rgb, 0.0);
-}
-
-// The flare, upsampled onto the scene by the additive blend.
-@fragment
-fn fs_add(in: VsOut) -> @location(0) vec4<f32> {
-    return vec4<f32>(textureSampleLevel(t_color, s_color, in.uv, 0.0).rgb, 0.0);
 }
