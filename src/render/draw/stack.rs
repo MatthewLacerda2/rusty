@@ -55,8 +55,11 @@ impl Renderer {
         // Motion vectors (#1435): last frame's cameras, and the velocity target when
         // this view runs motion blur. A view shading with its own forward pipeline
         // (the Inspector's shader preview) writes none.
-        let velocity = motion::wanted(pass.post, self.graphics(), pass.full_post_fx)
-            && !view.has_forward_override();
+        let velocity = motion::wanted(
+            pass.post,
+            self.graphics(pass.editor_mode),
+            pass.full_post_fx,
+        ) && !view.has_forward_override();
         let key = HistoryKey::new(scene, pass.base_id);
         let size = view.size();
         let prev_view_projs =

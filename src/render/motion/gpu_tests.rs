@@ -81,3 +81,18 @@ fn gpu_no_motion_blur_writes_no_velocity_target() {
     );
     assert_eq!(r.frame_counters.velocity_passes, 0);
 }
+
+#[test]
+fn gpu_the_player_option_off_writes_no_velocity_target() {
+    use crate::core::settings::graphics_options::GraphicsOption;
+    let Some(mut r) = renderer() else { return };
+    let mut view = view(&r);
+    let (mut scene, _) = scene(true);
+    cube(&mut scene, Vec3::new(0.0, 0.0, -5.0));
+    r.graphics_options.set(GraphicsOption::MotionBlur, false);
+    assert!(
+        render(&mut r, &mut view, &scene, &eye(0.0)).is_none(),
+        "the player turned motion blur off (#1438): no velocity pass"
+    );
+    assert_eq!(r.frame_counters.velocity_passes, 0);
+}

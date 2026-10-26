@@ -126,7 +126,11 @@ fn velocity_is_written_only_where_motion_blur_runs() {
         !wanted(post(&cam), QualityPreset::High.into(), false),
         "no full post-FX"
     );
-    assert!(!wanted(PostSource::default(), QualityPreset::High.into(), true));
+    assert!(!wanted(
+        PostSource::default(),
+        QualityPreset::High.into(),
+        true
+    ));
     let mut off = GraphicsSettings::from(QualityPreset::High);
     off.options.set(GraphicsOption::MotionBlur, false);
     assert!(!wanted(post(&cam), off, true), "the player turned it off");
