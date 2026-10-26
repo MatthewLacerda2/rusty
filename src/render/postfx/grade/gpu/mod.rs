@@ -37,7 +37,7 @@ pub(in crate::render::postfx) fn chain() -> Option<Chain> {
 impl Chain {
     /// Grade `row` (one scene-linear HDR colour per pixel) at `exposure` EV under
     /// `grade`, returning each pixel's 8-bit sRGB output.
-    pub(super) fn run(
+    pub(in crate::render::postfx) fn run(
         &mut self,
         row: &[[f32; 3]],
         exposure: f32,

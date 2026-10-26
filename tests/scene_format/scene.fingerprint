@@ -458,6 +458,13 @@ scene.entities[].particles.texture: option
 scene.entities[].particles.texture: string
 scene.entities[].particles: option
 scene.entities[].post_processing.active: bool
+scene.entities[].post_processing.auto_exposure.compensation: f32
+scene.entities[].post_processing.auto_exposure.high_percent: f32
+scene.entities[].post_processing.auto_exposure.low_percent: f32
+scene.entities[].post_processing.auto_exposure.max_ev: f32
+scene.entities[].post_processing.auto_exposure.min_ev: f32
+scene.entities[].post_processing.auto_exposure.speed_down: f32
+scene.entities[].post_processing.auto_exposure.speed_up: f32
 scene.entities[].post_processing.bloom_active: bool
 scene.entities[].post_processing.bloom_intensity: f32
 scene.entities[].post_processing.bloom_threshold: f32
@@ -466,6 +473,7 @@ scene.entities[].post_processing.custom_effects: seq
 scene.entities[].post_processing.custom_effects[]: string
 scene.entities[].post_processing.display_gamma: f32
 scene.entities[].post_processing.exposure: f32
+scene.entities[].post_processing.exposure_mode: enum Fixed|Automatic
 scene.entities[].post_processing.hue_shift: f32
 scene.entities[].post_processing.lift_gamma_gain.gain.color: tuple(3)
 scene.entities[].post_processing.lift_gamma_gain.gain.color[]: f32

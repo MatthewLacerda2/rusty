@@ -263,3 +263,6 @@ impl crate::render::RenderView {
 
 #[cfg(test)]
 mod gpu_tests;
+
+#[cfg(test)]
+mod stack_gpu_tests;
