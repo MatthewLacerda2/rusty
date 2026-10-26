@@ -176,8 +176,8 @@ pub(crate) fn blur_params(
 
 /// Whether `post`'s camera runs motion blur, through [`effect_runs`]: its component
 /// has it on, the player's option allows it and the tier runs it. The velocity
-/// target is written exactly when this holds (#1435), so a player who turned motion
-/// blur off pays for no velocity pass.
+/// target is written when this or depth of field holds (`motion::target_wanted`,
+/// #1435, #1445), so a player who turned both off pays for no velocity pass.
 pub(crate) fn motion_blur_enabled(post: PostSource, graphics: GraphicsSettings) -> bool {
     post.camera.is_some_and(|cam| {
         effect_runs(graphics, GraphicsOption::MotionBlur, cam.motion_blur_active)

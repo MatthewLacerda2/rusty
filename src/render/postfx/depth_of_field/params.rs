@@ -9,11 +9,19 @@ use crate::components::{DepthOfField, DofMode};
 pub(crate) const GAUSSIAN_RADIUS: f32 = 1.0 / 90.0;
 
 /// The largest Bokeh circle of confusion, as a fraction of the view's height: 27 px
-/// of radius at 1080p. A wide-open telephoto clamps here. The gather's three rings
-/// spread over each pixel's own CoC, so a small blur is covered densely; at this
-/// radius they sit 9 px apart (at 1080p, High) and the tent smooths between them, so
-/// a larger one would show its rings.
+/// of radius at 1080p, 36 at 1440p, 54 at 4K. A wide-open telephoto clamps here,
+/// and never past [`BOKEH_MAX_RINGS`] ring spacings (56 px), which only a view
+/// taller than 4K reaches. The gather spreads its rings over each pixel's own reach,
+/// at least three and never further apart than [`BOKEH_RING_SPACING`]: at the
+/// largest circle 4 rings (80 taps) at 1080p, 5 at 1440p and 7 (224 taps) at 4K.
 pub(crate) const MAX_BOKEH_RADIUS: f32 = 1.0 / 40.0;
+
+/// The most full-resolution pixels between two rings of the Bokeh gather: the tent
+/// smooths a gap this wide, where a wider one shows copies of a highlight.
+pub(crate) const BOKEH_RING_SPACING: f32 = 8.0;
+
+/// The most rings a Bokeh gather takes, which caps its circle at this many spacings.
+pub(crate) const BOKEH_MAX_RINGS: f32 = 7.0;
 
 /// The sensor height the Bokeh lens images onto, in metres: a 35 mm full frame's,
 /// Unity's physical camera default.
@@ -27,8 +35,9 @@ pub(crate) struct DofParams {
     /// pixels, the working-resolution divisor, and Bokeh's tile size in working pixels
     /// (0 for Gaussian, which has no tiles)
     pub shape: [f32; 4],
-    /// Gaussian: start and end distance (m). Bokeh: focus distance (m) and the
-    /// circle of confusion, in pixels, of a point at infinity. Then unused.
+    /// Gaussian: start and end distance (m), then unused. Bokeh: focus distance (m),
+    /// the circle of confusion, in pixels, of a point at infinity, the most working
+    /// pixels between two rings of the gather, then unused.
     pub focus: [f32; 4],
 }
 
@@ -47,8 +56,9 @@ impl DofParams {
             }
             DofMode::Bokeh => {
                 let infinity = bokeh_infinity(dof, h);
-                let focus = [dof.focus_distance, infinity, 0.0, 0.0];
-                (2.0, MAX_BOKEH_RADIUS * h, focus)
+                let spacing = BOKEH_RING_SPACING / divisor;
+                let focus = [dof.focus_distance, infinity, spacing, 0.0];
+                (2.0, max_bokeh_radius(h), focus)
             }
         };
         // A tile spans the largest working CoC, so a 3×3 of tiles holds every reach.
@@ -86,6 +96,11 @@ impl DofParams {
         }
         (b * (1.0 - a / depth.max(1e-4))).clamp(-max, max)
     }
+}
+
+/// The largest Bokeh circle of confusion, in pixels, over a view `height` tall.
+pub(crate) fn max_bokeh_radius(height: f32) -> f32 {
+    (MAX_BOKEH_RADIUS * height).min(BOKEH_MAX_RINGS * BOKEH_RING_SPACING)
 }
 
 /// The circle of confusion's radius, in pixels of a view `height` tall, of a point

@@ -270,3 +270,6 @@ mod overlay_gpu_tests;
 
 #[cfg(test)]
 mod lens_gpu_tests;
+
+#[cfg(test)]
+mod tile_gpu_tests;

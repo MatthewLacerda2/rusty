@@ -157,7 +157,8 @@ impl Renderer {
 
     /// Per-object motion blur (#1436), over the velocity target the stack wrote:
     /// bloom, the exposure meter and the composite then read the blurred scene.
-    /// Gated as the velocity was, so the editor's Scene view never blurs.
+    /// Gated by [`motion::wanted`], so the editor's Scene view never blurs and a view
+    /// that wrote velocity only for depth of field runs no motion blur.
     fn blur_scene(&self, view: &mut RenderView, stack: &StackPass) {
         let graphics = self.graphics(stack.editor_mode);
         let blurs = motion::wanted(stack.post, graphics, stack.full_post_fx, stack.editor_mode);

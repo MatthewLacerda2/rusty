@@ -119,7 +119,7 @@ impl MotionVectors {
     }
 
     /// The velocity attachment this frame's opaque passes write, or `None` when the
-    /// view runs no motion blur.
+    /// view runs neither motion blur nor depth of field ([`target_wanted`]).
     pub(crate) fn target_view(&self) -> Option<&wgpu::TextureView> {
         self.active_target().map(|t| &t.view)
     }

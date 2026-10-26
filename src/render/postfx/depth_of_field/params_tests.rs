@@ -71,3 +71,21 @@ fn bokeh_tiles_span_the_largest_working_blur_and_gaussian_has_none() {
     let gaussian = DofParams::new(&dof(DofMode::Gaussian), 1080, 1).unwrap();
     assert_eq!(gaussian.tile(), 0);
 }
+
+#[test]
+fn bokeh_rings_stay_close_at_every_resolution_and_the_circle_caps_past_4k() {
+    for (height, divisor) in [(1080, 1), (1440, 1), (2160, 1), (2160, 2), (4320, 1)] {
+        let p = DofParams::new(&dof(DofMode::Bokeh), height, divisor).unwrap();
+        let (max, spacing) = (p.shape[1] / divisor as f32, p.focus[2]);
+        // The shader's ring count: a ring per spacing, at least three.
+        let rings = (max / spacing).ceil().max(3.0);
+        assert!(rings <= BOKEH_MAX_RINGS, "{height}p: {rings} rings");
+        assert!(
+            max / rings <= spacing,
+            "{height}p: rings {} apart",
+            max / rings
+        );
+    }
+    assert_eq!(max_bokeh_radius(2160.0), 54.0, "4K keeps its whole circle");
+    assert_eq!(max_bokeh_radius(4320.0), 56.0, "taller views cap");
+}

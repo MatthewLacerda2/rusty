@@ -15,11 +15,12 @@
 //   Bokeh:    fs_tile_max, fs_neighbor_max — per tile, how far the near field around
 //                  it reaches (its largest near CoC, then the 3×3 tiles' largest), so
 //                  a pixel knows how wide to gather; then
-//             fs_bokeh — a disc gather in rings scaled to the pixel's own reach (its
-//                  CoC, or the near blur that spreads over it), splitting the far field (a tap
-//                  reaches only as far as both its and the pixel's CoC allow) from
-//                  the near field (a tap reaches as far as its own CoC, so a
-//                  near blur spreads over what is in focus behind it), then fs_tent,
+//             fs_bokeh — two disc gathers, each in rings scaled to its own reach and
+//                  never further apart than the ring spacing: the far field over the
+//                  pixel's own CoC (a tap reaches only as far as both its and the
+//                  pixel's CoC allow), the near field over the tiles' near reach (a
+//                  tap reaches as far as its own CoC, so a near blur spreads over
+//                  what is in focus behind it), then fs_tent,
 //                  a 3×3 tent that smooths the rings among texels of like CoC
 //   fs_composite — full resolution: the sharp scene blended towards the blur by the
 //                  pixel's own CoC, and for Bokeh by the near field's coverage too.
@@ -35,7 +36,7 @@ struct DofParams {
     // least the largest working CoC, so a 3×3 of tiles holds every tap's reach)
     shape: vec4<f32>,
     // Gaussian: x start, y end (m). Bokeh: x focus distance (m), y the CoC of a point
-    // at infinity (px).
+    // at infinity (px), z the most working pixels between two rings of the gather.
     focus: vec4<f32>,
 };
 
@@ -52,10 +53,10 @@ struct DofParams {
 @group(0) @binding(5) var t_work: texture_2d<f32>;
 
 const TAU: f32 = 6.28318530718;
-// The Bokeh disc's rings: ring k holds 8k taps, 48 around the centre. They spread
-// over each pixel's own reach, so a small blur is covered as densely as a large one;
-// at the largest radius the rings sit a third of it apart, and the tent smooths them.
-const RINGS: i32 = 3;
+// The fewest rings a Bokeh disc takes: ring k holds 8k taps, so 48 around the
+// centre. A disc wider than this many ring spacings (`focus.z`) takes more rings, so
+// they never sit further apart than that; the tent smooths between them.
+const MIN_RINGS: i32 = 3;
 // How many working pixels a tap's reach fades over at its edge.
 const MARGIN: f32 = 1.0;
 
@@ -207,45 +208,63 @@ fn reach(radius: f32, dist: f32) -> f32 {
     return clamp((radius - dist + MARGIN) / MARGIN, 0.0, 1.0);
 }
 
+// Tap `i` of `count` on ring `ring` of `rings`, spread over a disc of `radius`
+// working pixels: on the texel it lands on, never between two, since a bilinear tap
+// would mix a sharp texel's colour into its neighbour's blur (a halo). Its weight
+// fades with that texel's own distance, so the disc still grows smoothly.
+fn ring_tap(ring: i32, i: i32, rings: i32, radius: f32) -> vec2<f32> {
+    let count = ring * 8;
+    // Odd rings turn half a step, so the rings' taps don't line up in spokes.
+    let turn = 0.5 * f32(ring & 1);
+    let angle = TAU * (f32(i) + turn) / f32(count);
+    return round(vec2<f32>(cos(angle), sin(angle)) * radius * f32(ring) / f32(rings));
+}
+
+// How many rings a disc of `radius` working pixels takes: one per `focus.z` (the
+// ring spacing), and never fewer than MIN_RINGS, so a small blur is covered densely.
+fn rings_for(radius: f32) -> i32 {
+    return max(MIN_RINGS, i32(ceil(radius / dof.focus.z)));
+}
+
 @fragment
 fn fs_bokeh(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32> {
     let p = vec2<i32>(pos.xy);
     let center = textureLoad(t_color, p, 0);
-    // The pixel's own reach: its far blur, or the near blur around it, whichever is
-    // wider. In focus with nothing near, there is nothing to gather.
-    let near = textureLoad(t_blur, p / i32(dof.shape.w), 0).r;
-    let radius = min(max(center.a, near), working_radius());
-    if (radius < 0.25) {
-        return vec4<f32>(center.rgb, 0.0);
-    }
     let last = vec2<i32>(textureDimensions(t_color)) - 1;
+    // Two discs. The far field spreads over the pixel's own CoC; the near field over
+    // the reach of the near blur in the tiles around it. Each gets rings of its own,
+    // so a background beside a strongly blurred foreground is still gathered densely.
+    let far = min(max(center.a, 0.0), working_radius());
+    let near = min(textureLoad(t_blur, p / i32(dof.shape.w), 0).r, working_radius());
     var bg = vec4<f32>(center.rgb, 1.0);
+    if (far >= 0.25) {
+        let rings = rings_for(far);
+        for (var ring = 1; ring <= rings; ring = ring + 1) {
+            for (var i = 0; i < ring * 8; i = i + 1) {
+                let offset = ring_tap(ring, i, rings, far);
+                let tap = textureLoad(t_color, clamp(p + vec2<i32>(offset), vec2<i32>(0), last), 0);
+                // As far as the nearer of the two reaches, so an in-focus tap never
+                // spreads and an in-focus pixel takes no background.
+                let w = reach(max(min(center.a, tap.a), 0.0), length(offset));
+                bg += vec4<f32>(tap.rgb, 1.0) * w;
+            }
+        }
+    }
     var fg = vec4<f32>(0.0);
     var taps = 1.0;
-    for (var ring = 1; ring <= RINGS; ring = ring + 1) {
-        let count = ring * 8;
-        // Odd rings turn half a step, so the rings' taps don't line up in spokes.
-        let turn = 0.5 * f32(ring & 1);
-        for (var i = 0; i < count; i = i + 1) {
-            let angle = TAU * (f32(i) + turn) / f32(count);
-            let ideal = vec2<f32>(cos(angle), sin(angle)) * radius * f32(ring) / f32(RINGS);
-            // On the texel it lands on, never between two: a bilinear tap would mix a
-            // sharp texel's colour into its neighbour's blur (a halo). Its weight
-            // fades with that texel's own distance, so the disc still grows smoothly.
-            let offset = round(ideal);
-            let dist = length(offset);
-            let q = clamp(p + vec2<i32>(offset), vec2<i32>(0), last);
-            let tap = textureLoad(t_color, q, 0);
-            // Far field: as far as the nearer of the two reaches, so an in-focus
-            // tap never spreads and an in-focus pixel takes no background.
-            let bg_w = reach(max(min(center.a, tap.a), 0.0), dist);
-            // Near field: as far as the tap's own reach, over anything; a CoC under
-            // a full-resolution pixel is in focus (eased in, as the composite's far
-            // blend is, so racking focus never steps).
-            let fg_w = reach(-tap.a, dist) * smoothstep(0.5, 1.5, -tap.a * dof.shape.z);
-            bg += vec4<f32>(tap.rgb, 1.0) * bg_w;
-            fg += vec4<f32>(tap.rgb, 1.0) * fg_w;
-            taps += 1.0;
+    if (near >= 0.25) {
+        let rings = rings_for(near);
+        for (var ring = 1; ring <= rings; ring = ring + 1) {
+            for (var i = 0; i < ring * 8; i = i + 1) {
+                let offset = ring_tap(ring, i, rings, near);
+                let tap = textureLoad(t_color, clamp(p + vec2<i32>(offset), vec2<i32>(0), last), 0);
+                // As far as the tap's own reach, over anything; a CoC under a
+                // full-resolution pixel is in focus (eased in, as the composite's far
+                // blend is, so racking focus never steps).
+                let w = reach(-tap.a, length(offset)) * smoothstep(0.5, 1.5, -tap.a * dof.shape.z);
+                fg += vec4<f32>(tap.rgb, 1.0) * w;
+                taps += 1.0;
+            }
         }
     }
     let fg_rgb = fg.rgb / max(fg.a, 1e-4);
