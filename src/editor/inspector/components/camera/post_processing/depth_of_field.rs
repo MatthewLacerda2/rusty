@@ -1,19 +1,21 @@
 //! The Post Processing card's Depth of Field section (#1445): the mode, then the
-//! running mode's knobs. Split out of `post_processing` to keep it under the size
-//! cap.
-//!
-//! A THIN client (#287): each widget reads the snapshot and writes through the
-//! shared `authoring::rendering::post_processing` op `Graphics.*` calls too; the
-//! knobs through `DOF_KNOBS`, the table the `Graphics.*` functions and the tween
-//! paths are made from, so the three reach the same knobs.
+//! running mode's knobs, through the effect's knob table, the one the `Graphics.*`
+//! functions and the tween paths are made from, so the three reach the same knobs.
 
-use super::post_processing::slider_row;
+use super::{slider_row, Section};
 use crate::components::{DepthOfField, DofMode};
 use crate::scene::authoring::rendering::post_processing::{self as vc_ops, Knob};
 use crate::scene::PostProcessingComponent;
 
+pub(super) const SECTION: Section = Section {
+    effect: "depth_of_field",
+    group: None,
+    order: 30,
+    draw,
+};
+
 /// The mode selector and its knobs.
-pub(super) fn draw_depth_of_field(
+fn draw(
     ui: &mut egui::Ui,
     world: &mut crate::ecs::World,
     id: u32,
@@ -54,13 +56,12 @@ pub(super) fn draw_depth_of_field(
     }
 }
 
-/// The depth of field's knob at `field`, one this card names.
+/// The depth of field's knob at `field`.
 fn knob(field: &str) -> &'static Knob {
-    let knob = vc_ops::depth_of_field::EFFECT.knob(field);
-    knob.unwrap_or_else(|| panic!("no depth-of-field knob `{field}`"))
+    super::knob(vc_ops::depth_of_field::EFFECT.knobs, field)
 }
 
-/// One knob's row: its label, its `DOF_KNOBS` field and the slider's range.
+/// One knob's row: its label, its knob's field and the slider's range.
 type Row = (&'static str, &'static str, (f32, f32));
 
 const GAUSSIAN: &[Row] = &[
@@ -105,6 +106,6 @@ mod tests {
             knob(field);
         }
         let all = vc_ops::depth_of_field::EFFECT.knobs.iter().map(|k| k.field);
-        assert!(all.eq(fields.iter().copied()), "rows follow DOF_KNOBS");
+        assert!(all.eq(fields.iter().copied()), "rows follow the knob table");
     }
 }

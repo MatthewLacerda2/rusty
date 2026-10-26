@@ -2,16 +2,24 @@
 //! ordered list of authored post-FX modules — add by name, reorder, remove.
 //!
 //! A thin client (#287): every edit builds the new list and writes it through
-//! `authoring::rendering::post_processing::set_custom_effects`, the op `Graphics.SetCustomEffects`
-//! calls, so a name the op refuses is refused here too.
+//! `authoring::rendering::post_processing::custom_effects::set_names`, the op
+//! `Graphics.SetCustomEffects` calls, so a name the op refuses is refused here too.
 
 use egui_phosphor::regular as icon;
 
+use super::Section;
 use crate::scene::authoring::rendering::post_processing as vc_ops;
 use crate::scene::PostProcessingComponent;
 
+pub(super) const SECTION: Section = Section {
+    effect: "custom_effects",
+    group: None,
+    order: 70,
+    draw,
+};
+
 /// Draw the list and the add row; writes the edited list back through the op.
-pub(super) fn draw_custom_effects(
+fn draw(
     ui: &mut egui::Ui,
     world: &mut crate::ecs::World,
     id: u32,

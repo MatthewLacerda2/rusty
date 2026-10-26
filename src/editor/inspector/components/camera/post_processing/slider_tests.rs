@@ -19,7 +19,7 @@ fn drawn(ev: f32) -> (bool, f32) {
     let mut changed = false;
     let mut out = ctx.run_ui(Default::default(), |ui| {
         let r = AutoExposure::EV_RANGE;
-        changed = super::post_processing::slider_row(
+        changed = super::slider_row(
             ui,
             (&mut world, id),
             "Compensation:",

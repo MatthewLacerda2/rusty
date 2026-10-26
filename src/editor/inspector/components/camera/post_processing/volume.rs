@@ -1,15 +1,29 @@
-//! The lighting sections of the Post Processing card: Shadows (#435) and Ambient
-//! Occlusion (#436). Split out of `post_processing` to keep it under the size cap.
+//! The volume's lighting sections of the Post Processing card: Shadows (#435) and
+//! Ambient Occlusion (#436), no post effects but drawn among them.
 //!
 //! A THIN client (#287): each widget reads the snapshot and writes through the
 //! shared `authoring::rendering::post_processing` op `Graphics.*` calls too.
 
-use super::post_processing::slider_row;
+use super::{slider_row, Section};
 use crate::scene::authoring::rendering::post_processing as vc_ops;
 use crate::scene::PostProcessingComponent;
 
+pub(super) const SHADOWS: Section = Section {
+    effect: "shadows",
+    group: None,
+    order: 50,
+    draw: draw_shadows,
+};
+
+pub(super) const SSAO: Section = Section {
+    effect: "ssao",
+    group: None,
+    order: 51,
+    draw: draw_ssao,
+};
+
 /// The Shadows section: the sun's cascade count and reach (#435).
-pub(super) fn draw_shadows(
+fn draw_shadows(
     ui: &mut egui::Ui,
     world: &mut crate::ecs::World,
     id: u32,
@@ -46,7 +60,7 @@ pub(super) fn draw_shadows(
 }
 
 /// The Ambient Occlusion section (#436): on/off, radius and strength.
-pub(super) fn draw_ssao(
+fn draw_ssao(
     ui: &mut egui::Ui,
     world: &mut crate::ecs::World,
     id: u32,
