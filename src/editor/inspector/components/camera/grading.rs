@@ -28,16 +28,18 @@ pub(super) fn draw_grading(
         mut temperature,
         mut tint,
     } = vc.white_balance;
-    let t = slider(ui, "  Temperature:", &mut temperature, -r..=r);
-    let n = slider(ui, "  Tint:", &mut tint, -r..=r);
+    ui.label("  White Balance");
+    let t = slider(ui, "    Temperature:", &mut temperature, -r..=r);
+    let n = slider(ui, "    Tint:", &mut tint, -r..=r);
     if t || n {
         write(&|c| vc_ops::set_white_balance(c, temperature, tint));
     }
+    ui.label("  Lift / Gamma / Gain");
     for which in Wheel::ALL {
         let mut wheel = *vc.lift_gamma_gain.wheel(which);
         let changed = ui
             .horizontal(|ui| {
-                ui.label(format!("  {}:", which.name()));
+                ui.label(format!("    {}:", which.name()));
                 let colour = ui.color_edit_button_rgb(&mut wheel.color).changed();
                 let offset = egui::Slider::new(&mut wheel.offset, -1.0..=1.0);
                 colour | ui.add(offset).changed()

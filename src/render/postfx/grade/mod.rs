@@ -37,22 +37,7 @@ impl GradeLut {
     const GROUP: u32 = 4;
 
     pub fn new(device: &wgpu::Device, registry: &mut ShaderRegistry) -> Self {
-        let size = wgpu::Extent3d {
-            width: Self::SIZE,
-            height: Self::SIZE,
-            depth_or_array_layers: Self::SIZE,
-        };
-        let texture = device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("Grading LUT"),
-            size,
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D3,
-            format: wgpu::TextureFormat::Rgba16Float,
-            usage: wgpu::TextureUsages::STORAGE_BINDING | wgpu::TextureUsages::TEXTURE_BINDING,
-            view_formats: &[],
-        });
-        let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let view = Self::table(device);
         let module = registry.load(device, "postfx/lut_bake.wgsl", "Grading LUT Bake");
         let pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
             label: Some("Grading LUT Bake"),
@@ -90,6 +75,25 @@ impl GradeLut {
             baked: None,
             bakes: 0,
         }
+    }
+
+    /// The empty 32³ table, written by the bake and sampled by the composite.
+    fn table(device: &wgpu::Device) -> wgpu::TextureView {
+        let texture = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("Grading LUT"),
+            size: wgpu::Extent3d {
+                width: Self::SIZE,
+                height: Self::SIZE,
+                depth_or_array_layers: Self::SIZE,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D3,
+            format: wgpu::TextureFormat::Rgba16Float,
+            usage: wgpu::TextureUsages::STORAGE_BINDING | wgpu::TextureUsages::TEXTURE_BINDING,
+            view_formats: &[],
+        });
+        texture.create_view(&wgpu::TextureViewDescriptor::default())
     }
 
     /// Make the table hold `params`' grade, baking it only when they differ from

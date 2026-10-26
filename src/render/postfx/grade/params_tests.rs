@@ -48,10 +48,12 @@ fn a_positive_temperature_scales_long_wavelengths_over_short() {
 
 #[test]
 fn a_grey_wheel_tints_nothing_and_its_offset_moves_every_channel() {
-    let mut lgg = LiftGammaGain::default();
-    lgg.lift = ColorWheel {
-        color: [0.5; 3],
-        offset: 0.2,
+    let mut lgg = LiftGammaGain {
+        lift: ColorWheel {
+            color: [0.5; 3],
+            offset: 0.2,
+        },
+        ..Default::default()
     };
     lgg.gain.offset = 0.5;
     lgg.gamma.offset = 1.0;

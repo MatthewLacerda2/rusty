@@ -3,10 +3,10 @@
 //
 // `lut_bake.wgsl` evaluates `grade` once per texel of a 32³ table whenever a grading
 // knob or the tonemap changes; the composite (`postfx.wgsl`) then grades every pixel
-// with one fetch at `lut_coord`. The table is indexed by Unity's LogC encoding, so
-// its 32 steps per channel span HDR from just below 0 to about 55, densest in the
-// darks where the eye needs them. Unity URP and Unreal build their HDR grading LUT
-// the same way.
+// with one fetch at `lut_coord`. The table is indexed by a log encoding (`encode`),
+// so its 32 steps per channel span HDR from 0 to about 50, densest in the darks
+// where the eye needs them. Unity URP and Unreal build their HDR grading LUT the
+// same way.
 
 #define_import_path postfx::grade
 
@@ -30,31 +30,27 @@ struct Grade {
     tone: vec4<f32>,
 };
 
-// Unity's LogC constants (ARRI LogC, EI 800).
-const LOGC_CUT: f32 = 0.011361;
-const LOGC_A: f32 = 5.555556;
-const LOGC_B: f32 = 0.047996;
-const LOGC_C: f32 = 0.244161;
-const LOGC_D: f32 = 0.386036;
-const LOGC_E: f32 = 5.301883;
-const LOGC_F: f32 = 0.092819;
-// log2(10) and its inverse: WGSL has no log10 or exp10.
-const LOG2_10: f32 = 3.3219281;
-const LOG10_2: f32 = 0.30103;
+// The table's log encoding: t = log2(1 + 64x) / LOG_SPAN, a LogC-shaped curve
+// (linear-ish in the darks, logarithmic above) whose span is chosen so black
+// (t = 0) and display white (t = 16/31) fall exactly on texels. Unity's LogC puts
+// neither on one, and interpolating across a texel there lifts black by a level and
+// pulls an untonemapped 1.0 down by seven. The table reaches x ≈ 50.8 (t = 1);
+// brighter colour reads the top texel.
+const LOG_SCALE: f32 = 64.0;
+// log2(1 + 64) · 31 / 16: places x = 1 on texel 16 of 0..31.
+const LOG_SPAN: f32 = 11.668338;
 
-fn linear_to_logc(x: vec3<f32>) -> vec3<f32> {
-    let curve = LOGC_C * log2(max(LOGC_A * x + LOGC_B, vec3<f32>(1e-6))) * LOG10_2 + LOGC_D;
-    return select(LOGC_E * x + LOGC_F, curve, x > vec3<f32>(LOGC_CUT));
+fn encode(x: vec3<f32>) -> vec3<f32> {
+    return log2(1.0 + LOG_SCALE * max(x, vec3<f32>(0.0))) / LOG_SPAN;
 }
 
-fn logc_to_linear(t: vec3<f32>) -> vec3<f32> {
-    let curve = (exp2((t - LOGC_D) / LOGC_C * LOG2_10) - LOGC_B) / LOGC_A;
-    return select((t - LOGC_F) / LOGC_E, curve, t > vec3<f32>(LOGC_E * LOGC_CUT + LOGC_F));
+fn decode(t: vec3<f32>) -> vec3<f32> {
+    return (exp2(t * LOG_SPAN) - 1.0) / LOG_SCALE;
 }
 
-// The LUT coordinate of HDR colour `c`: its LogC code, mapped onto texel centres.
+// The LUT coordinate of HDR colour `c`: its log code, mapped onto texel centres.
 fn lut_coord(c: vec3<f32>) -> vec3<f32> {
-    let t = clamp(linear_to_logc(c), vec3<f32>(0.0), vec3<f32>(1.0));
+    let t = clamp(encode(c), vec3<f32>(0.0), vec3<f32>(1.0));
     return t * ((LUT_SIZE - 1.0) / LUT_SIZE) + 0.5 / LUT_SIZE;
 }
 
@@ -133,7 +129,7 @@ fn grade(c_in: vec3<f32>, g: Grade) -> vec3<f32> {
     return pow(c, vec3<f32>(1.0 / max(g.tone.w, 0.01)));
 }
 
-// The grade of LUT texel `id`, the colour its LogC code decodes to.
+// The grade of LUT texel `id`, the colour its log code decodes to.
 fn grade_texel(id: vec3<u32>, g: Grade) -> vec3<f32> {
-    return grade(logc_to_linear(vec3<f32>(id) / (LUT_SIZE - 1.0)), g);
+    return grade(decode(vec3<f32>(id) / (LUT_SIZE - 1.0)), g);
 }

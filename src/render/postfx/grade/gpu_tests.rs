@@ -56,14 +56,15 @@ fn gpu_neutral_knobs_through_the_lut_match_the_analytic_tonemap() {
                 .map(|(&x, px)| (srgb8(analytic(x, ev, tonemap)) - f32::from(px[0])).abs())
                 .fold(0.0, f32::max);
             eprintln!("[grade] {tonemap:?} at {ev} EV: worst {worst:.2} levels");
-            // `None`'s clamp at 1 is a kink the 32 steps interpolate across.
-            let allowed = if tonemap == Tonemap::None { 6.0 } else { 3.0 };
-            assert!(
-                worst <= allowed,
-                "{tonemap:?} at {ev} EV is {worst} levels off"
-            );
+            // Black and display white sit on texels: only the curve between rounds.
+            assert!(worst <= 2.0, "{tonemap:?} at {ev} EV is {worst} levels off");
         }
     }
+    // A view without a volume shows display white and black exactly.
+    let mut row = vec![[1.0f32, 0.0, 0.0]; W as usize];
+    row[1] = [4.0, 0.0, 0.0];
+    let out = c.run(&row, 0.0, &GradeParams::NEUTRAL);
+    assert_eq!((out[0], out[1]), ([255, 0, 0, 255], [255, 0, 0, 255]));
 }
 
 #[test]
@@ -97,7 +98,7 @@ fn gpu_white_balance_lift_and_gain_move_the_image_as_named() {
         (dark - srgb8(0.3)).abs() <= 2.0,
         "gain scales the whites: {bright} → {dark}"
     );
-    assert!(gained[0][1] <= neutral[0][1], "and leaves black black");
+    assert_eq!((neutral[0][1], gained[0][1]), (0, 0), "black stays black");
 
     let mut vc = volume(Tonemap::None);
     row[1] = [0.5, 0.05, 0.05];

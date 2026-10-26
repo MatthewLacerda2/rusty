@@ -139,7 +139,7 @@ fn draw_color_correction(
     *is_dirty |= slider_row(ui, (&mut *world, id), "  Saturation:", vc.saturation, 0.0..=2.0, vc_ops::set_saturation);
     super::grading::draw_grading(ui, world, id, vc, is_dirty);
     draw_tonemap(ui, world, id, vc, is_dirty);
-    *is_dirty |= slider_row(ui, (&mut *world, id), "  Gamma:", vc.gamma, 0.5..=2.0, vc_ops::set_gamma);
+    *is_dirty |= slider_row(ui, (&mut *world, id), "  Display Gamma:", vc.gamma, 0.5..=2.0, vc_ops::set_gamma);
 }
 
 /// The tonemap-operator selector, reading the snapshot and routing through the op.
