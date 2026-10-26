@@ -4,6 +4,19 @@
 use crate::components::RenderTarget;
 use crate::scene::{camera_for_entity, Camera, Scene};
 
+/// The screen's camera stack for one frame, and the entity whose settings post-FX
+/// reads (#1434).
+pub struct ScreenStack {
+    /// The cameras, bottom to top; never empty.
+    pub cameras: Vec<Camera>,
+    /// The stack's base camera entity: the lowest `render_order` active screen camera.
+    /// Its `CameraComponent` and `VisualCorrectionComponent` drive the view's post-FX,
+    /// Unity URP's camera-stack rule; overlay cameras add no post-FX of their own. The
+    /// edit-mode free camera has no entity, so the Scene view previews the Game view's
+    /// base camera. `None` when the scene has no active screen camera.
+    pub base_id: Option<u32>,
+}
+
 /// Build the ordered camera stack the renderer composites for a frame (#93).
 ///
 /// In play mode the scene's active screen [`CameraComponent`](crate::scene::CameraComponent)
@@ -19,31 +32,34 @@ use crate::scene::{camera_for_entity, Camera, Scene};
 ///
 /// In edit mode (or when no active camera component exists) the free-fly `base`
 /// camera is the single pass, preserving the editor viewport behavior.
-pub fn build_camera_stack(base: &Camera, scene: &Scene, is_playing: bool) -> Vec<Camera> {
-    if !is_playing {
-        return vec![base.clone()];
-    }
-    let mut stack: Vec<(i32, u32)> = active_cameras(scene)
+pub fn build_camera_stack(base: &Camera, scene: &Scene, is_playing: bool) -> ScreenStack {
+    let mut ids: Vec<(i32, u32)> = active_cameras(scene)
         .filter(|(_, target)| target.is_none())
         .map(|(id, _)| (order_of(scene, id), id))
         .collect();
     // Stable sort keeps authoring order among cameras sharing a render_order.
-    stack.sort_by_key(|(order, _)| *order);
-    let mut cams: Vec<Camera> = stack
-        .iter()
-        .filter_map(|&(_, id)| camera_for_entity(base, scene, id))
-        .collect();
-    match cams.first_mut() {
+    ids.sort_by_key(|(order, _)| *order);
+    let base_id = ids.first().map(|&(_, id)| id);
+    let mut cameras: Vec<Camera> = match is_playing {
+        true => ids
+            .iter()
+            .filter_map(|&(_, id)| camera_for_entity(base, scene, id))
+            .collect(),
+        false => Vec::new(),
+    };
+    match cameras.first_mut() {
         Some(first) => {
-            (first.position, first.yaw, first.pitch) = (base.position, base.yaw, base.pitch);
-            cams
+            (first.position, first.yaw, first.pitch) = (base.position, base.yaw, base.pitch)
         }
-        None => vec![base.clone()],
+        None => cameras.push(base.clone()),
     }
+    ScreenStack { cameras, base_id }
 }
 
 /// One camera that draws into a render texture this frame (#430).
 pub struct TextureCamera {
+    /// The camera's entity: its own settings drive this view's post-FX (#1434).
+    pub id: u32,
     pub camera: Camera,
     pub target: RenderTarget,
 }
@@ -58,6 +74,7 @@ pub fn texture_cameras(base: &Camera, scene: &Scene) -> Vec<TextureCamera> {
             Some((
                 order_of(scene, id),
                 TextureCamera {
+                    id,
                     camera,
                     target: target?,
                 },

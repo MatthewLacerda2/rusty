@@ -1,12 +1,13 @@
 //! src/render/draw/stack.rs — one camera stack drawn into one view: each camera runs
 //! the per-camera pass list (`camera::CAMERA_PASSES`, #636), whose last stage
-//! post-processes the composited HDR target once, on the last camera. The screen stack and every render-texture camera (#430)
+//! post-processes the composited HDR target once, on the last camera, with the stack's
+//! base camera's settings (#1434). The screen stack and every render-texture camera (#430)
 //! draw through here, so a picture-in-picture is the same frame as the screen's.
 
 use super::camera::{CameraCtx, StackShared, CAMERA_PASSES};
 use crate::render::gpu::uniforms::FogUniform;
 use crate::render::passes::ssao::SsaoPlan;
-use crate::render::postfx::params::build_post_params;
+use crate::render::postfx::params::{build_post_params, post_passes};
 use crate::render::postfx::PostParams;
 use crate::render::{RenderView, Renderer};
 use crate::scene::{Camera, Scene};
@@ -15,10 +16,13 @@ use crate::scene::{Camera, Scene};
 pub(crate) struct StackPass<'a> {
     /// The cameras, bottom to top; the first clears and drives post-FX history.
     pub stack: &'a [Camera],
+    /// The entity whose camera and volume settings drive this view's post-FX: the
+    /// stack's base camera (#1434, Unity URP's rule). `None` runs neutral post-FX.
+    pub post_camera: Option<u32>,
     /// Where post-FX writes the finished image.
     pub output: &'a wgpu::TextureView,
     pub editor_mode: bool,
-    /// Run the scene's grading, bloom, SSR, motion blur and FXAA. Off, the image is
+    /// Run `post_camera`'s grading, bloom, SSR, motion blur and FXAA. Off, the image is
     /// only brought from HDR to display (a render texture's `post_fx = false`).
     pub full_post_fx: bool,
 }
@@ -58,12 +62,13 @@ impl Renderer {
 
         let (mut post_params, bloom_enabled) = build_post_params(
             scene,
+            ctx.stack.post_camera,
             self.quality,
             post.view_proj,
             view.post_fx.prev_view_proj,
             post.camera_pos,
         );
-        let mut passes = crate::render::postfx::params::post_passes(scene, bloom_enabled);
+        let mut passes = post_passes(scene, ctx.stack.post_camera, bloom_enabled);
         if !post.full {
             // Display transform only: the neutral grade, no bloom/SSR/blur/FXAA and
             // no authored effects.

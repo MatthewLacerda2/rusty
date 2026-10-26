@@ -84,7 +84,8 @@ impl Renderer {
         self.prepare_frame(view, scene, camera);
 
         // The ordered camera stack (one entry in edit mode / when no scene camera).
-        let stack = build_camera_stack(camera, scene, !editor_mode);
+        let screen = build_camera_stack(camera, scene, !editor_mode);
+        let stack = screen.cameras;
         // The sun's cascades follow the base camera; every stacked camera — and every
         // render-texture camera (#430) — samples them. So do the dynamic casters' LOD
         // levels (#472): a shadow shows the level its caster shows in the main view.
@@ -96,6 +97,7 @@ impl Renderer {
         self.prepare_ui(view, scene, &stack[0], editor_mode);
         let pass = StackPass {
             stack: &stack,
+            post_camera: screen.base_id,
             output,
             editor_mode,
             full_post_fx: true,

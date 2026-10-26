@@ -93,6 +93,7 @@ impl Renderer {
             };
             let pass = StackPass {
                 stack: std::slice::from_ref(&cam.camera),
+                post_camera: Some(cam.id),
                 output: &target,
                 editor_mode: false,
                 full_post_fx: cam.target.post_fx,

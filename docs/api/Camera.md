@@ -72,6 +72,10 @@ a UI `Image` (`Image.SetTexture(id, "rt:minimap")`) or a material map
   and headless screenshots do.
 - The texture is display-referred (8-bit sRGB, like a screen): post-FX is where HDR
   is resolved, so `SetTargetPostFx(id, false)` still tonemaps.
+- **Post-FX settings are the camera's own** (#1434): a texture camera grades, blooms
+  and anti-aliases with its entity's `VisualCorrection` and FXAA, not the screen's,
+  and with no volume of its own it is neutral. The screen uses its base camera's
+  (`Graphics.md`, *Post-FX is per view*); stacked overlay cameras add none.
 - A camera rendering from its own transform applies to **stacked screen cameras**
   too: every camera after the base one (the lowest `render_order`, whose pose the
   view camera supplies) renders from its own entity — parent a viewmodel camera to

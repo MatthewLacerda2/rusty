@@ -35,7 +35,7 @@ use passes::{particles, shadows};
 use std::collections::HashMap;
 use std::rc::Rc;
 
-pub use camera::{build_camera_stack, texture_cameras, TextureCamera};
+pub use camera::{build_camera_stack, texture_cameras, ScreenStack, TextureCamera};
 pub use frustum::{Frustum, SkinBounds};
 pub use ibl::cubemap_capture::{CubemapCapture, CubemapFace};
 pub use ibl::probe::bake::{project_cubemap, DEFAULT_BAKE_RESOLUTION};

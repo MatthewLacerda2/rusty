@@ -3,12 +3,23 @@
 Live control over the engine's **existing** post-FX and quality knobs, so a script
 can drive its own settings logic. The per-volume getters/setters target the first
 **active** `VisualCorrectionComponent` (color/bloom/SSR/shadows/SSAO/custom effects and their params) and the first **active**
-`CameraComponent` (motion blur) in the scene — the same volume `build_post_params`
-packs into the GPU uniform each frame, so a write here takes effect next frame.
+`CameraComponent` (motion blur, FXAA) in the scene: the "main camera" shortcut, like
+Unity's `Camera.main`. A write takes effect next frame.
 Getters return a neutral default when no active volume/camera exists.
 The editor's Camera card edits the same two motion-blur fields (a "Motion Blur"
 checkbox and a "Samples" slider, `2..=32`) through the same ops. A new camera starts
 with motion blur on at 32 samples.
+
+**Post-FX is per view** (#1434), Unity URP's camera-stack rule: each view runs it once,
+with the settings of **its base camera**, that camera entity's own `CameraComponent`
+and `VisualCorrectionComponent`. The window and the Game view use the base of the
+screen stack (its lowest `render_order` camera); overlay cameras stacked on it add no
+post-FX of their own. A render-texture camera uses its own. The Scene view's free
+camera has no entity, so it previews the screen stack's base camera. A camera with no
+active volume runs neutral (no grade, bloom or custom effects; FXAA still follows its
+`fxaa_active`). So a `Graphics.*` write changes a view only when the camera or volume
+it edits is that view's base camera's; a different camera's settings (a security
+monitor's grade) are set on that camera entity, in the inspector or the scene file.
 
 | Function | Signature | Returns |
 |---|---|---|
