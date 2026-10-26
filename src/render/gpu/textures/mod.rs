@@ -122,15 +122,22 @@ impl Renderer {
             return Rc::clone(&self.default_texture);
         }
 
-        let Some(img) = open(map) else {
+        let Some(tex) = self.upload_map(map, kind) else {
             self.texture_freshness.miss(path_str);
             return Rc::clone(&self.default_texture);
         };
-        let import = import_settings(map);
-        let tex = self.upload_image_texture(path_str, &img, &import, kind);
         self.texture_kinds.uploaded(path_str, kind);
         self.gpu_textures.insert(map.clone(), Rc::clone(&tex));
         tex
+    }
+
+    /// Decode the image `map` names and upload it, uncached, with the mips and
+    /// sampler its import settings ask for; `None` when it cannot be read. A cache
+    /// with its own keys (bloom's lens dirt, #1442) loads through this.
+    pub(crate) fn upload_map(&self, map: &MapRef, kind: TextureKind) -> Option<Rc<GpuTexture>> {
+        let img = open(map)?;
+        let import = import_settings(map);
+        Some(self.upload_image_texture(map.as_str(), &img, &import, kind))
     }
 
     /// Uploads a decoded image holding `kind`, with the mips and the sampler its

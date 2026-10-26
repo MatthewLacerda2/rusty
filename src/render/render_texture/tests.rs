@@ -68,9 +68,17 @@ fn referenced_textures_come_from_active_images_and_material_maps() {
         ..Default::default()
     };
     scene.materials.insert("screen".to_string(), asset);
+    // And a volume's lens dirt (#1442).
+    let volume = scene.add_entity("Volume".to_string());
+    let mut vc = crate::components::PostProcessingComponent::default();
+    vc.bloom.dirt_texture = Some("rt:smudge".into());
+    scene.world.set_post_processing(volume, Some(vc));
 
     let shown = referenced_render_textures(&scene);
     let mut shown: Vec<_> = shown.into_iter().collect();
     shown.sort();
-    assert_eq!(shown, ["rt:minimap", "rt:scanner", "rt:security"]);
+    assert_eq!(
+        shown,
+        ["rt:minimap", "rt:scanner", "rt:security", "rt:smudge"]
+    );
 }
