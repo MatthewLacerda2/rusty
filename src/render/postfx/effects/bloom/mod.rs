@@ -12,6 +12,7 @@ use crate::render::gpu::fullscreen::Fullscreen;
 use crate::render::gpu::layout_entries::{sampler_entry, texture_entry, uniform_entry};
 use crate::render::gpu::pipelines::LazyPipeline;
 use crate::render::gpu::shaders::ShaderRegistry;
+use crate::render::postfx::params::Gate;
 use crate::render::postfx::{PfxTarget, PostFx, HDR_FORMAT};
 use crate::render::timing::GpuPass;
 use crate::render::{RenderView, Renderer};
@@ -19,7 +20,7 @@ use crate::render::{RenderView, Renderer};
 pub(crate) const EFFECT: PostEffect = PostEffect {
     name: "bloom",
     owner: Owner::Volume,
-    option: Some(GraphicsOption::Bloom),
+    gate: Gate::option(GraphicsOption::Bloom),
     module: Some("postfx/effects/bloom.wgsl"),
     composite: &[Composite {
         phase: Phase::Hdr,
@@ -35,7 +36,7 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
 /// Whether `cx`'s volume blooms this frame.
 fn blooms(cx: &EffectCx) -> bool {
     cx.volume()
-        .is_some_and(|vc| cx.runs(GraphicsOption::Bloom, vc.bloom.active))
+        .is_some_and(|vc| cx.runs(EFFECT.gate, vc.bloom.active))
 }
 
 /// x: the intensity, w: `1` while bloom runs (the composite skips the add otherwise).

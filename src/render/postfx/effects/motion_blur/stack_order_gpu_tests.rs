@@ -43,7 +43,7 @@ fn gpu_the_gun_stays_over_a_wall_nearer_to_its_own_camera() {
     let mut v = view(&r);
     frame(&mut r, &mut v, &scene, &eye(0.0));
     let blurred = frame(&mut r, &mut v, &scene, &eye(8.0));
-    assert!(v.post_fx.blur.is_some(), "the blur ran");
+    assert!(v.post_fx.holds_blur(), "the blur ran");
     scene = against_a_wall(false);
     let mut v = view(&r);
     let sharp = frame(&mut r, &mut v, &scene, &eye(8.0));

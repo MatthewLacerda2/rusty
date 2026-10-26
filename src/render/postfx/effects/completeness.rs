@@ -56,7 +56,13 @@ pub(super) fn engine() -> Layers {
     Layers {
         render: POST_EFFECTS
             .iter()
-            .map(|e| (e.name.into(), e.owner, e.option.map(|o| o.name().into())))
+            .map(|e| {
+                (
+                    e.name.into(),
+                    e.owner,
+                    e.gate.option.map(|o| o.name().into()),
+                )
+            })
             .collect(),
         settings: fields_of("PostProcessing")
             .into_iter()

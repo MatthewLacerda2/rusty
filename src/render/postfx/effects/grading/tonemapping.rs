@@ -3,11 +3,12 @@
 
 use super::super::{Grade, GradeCx, Owner, PostEffect};
 use crate::components::Tonemap;
+use crate::render::postfx::params::Gate;
 
 pub(crate) const EFFECT: PostEffect = PostEffect {
     name: "tonemapping",
     owner: Owner::Volume,
-    option: None,
+    gate: Gate::NONE,
     module: Some("postfx/effects/tonemapping.wgsl"),
     composite: &[],
     grade: &[

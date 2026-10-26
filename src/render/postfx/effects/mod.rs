@@ -21,16 +21,16 @@
 //! and grows no shared struct.
 
 use crate::components::PostProcessingComponent;
-use crate::core::settings::graphics_options::GraphicsOption;
 use crate::core::settings::GraphicsSettings;
 use crate::render::draw::stack::StackPass;
-use crate::render::postfx::params::{effect_runs, PostSource};
+use crate::render::postfx::params::{effect_runs, Gate, PostSource};
 use crate::render::{RenderView, Renderer};
 use crate::scene::Scene;
 
 pub(crate) mod assemble;
 mod layout;
 mod passes;
+mod targets;
 
 // sorted: one module per effect (or family of effects); none reads another
 pub(crate) mod bloom;
@@ -50,6 +50,7 @@ pub(crate) use layout::{
     grade_slots_len, ldr_passes, scene_passes, Placed,
 };
 pub(crate) use passes::Passes;
+pub(crate) use targets::Targets;
 
 use grading::{color_adjustments, color_lookup, lift_gamma_gain, tonemapping, white_balance};
 use lens::{chromatic_aberration, film_grain, vignette};
@@ -89,15 +90,9 @@ pub(crate) struct PostEffect {
         )
     )]
     pub owner: Owner,
-    /// The player option that gates it, when it is player-facing (#1438).
-    #[cfg_attr(
-        not(test),
-        expect(
-            dead_code,
-            reason = "the completeness test reads it, to check each layer"
-        )
-    )]
-    pub option: Option<GraphicsOption>,
+    /// The player option that gates it, when it is player-facing (#1438), and the
+    /// quality tiers it runs on: its own rule, asked through [`EffectCx::runs`].
+    pub gate: Gate,
     /// Its WGSL module, under `engine/shaders`, when it has composite or grade
     /// functions. Its import path is the file's path (`postfx::effects::vignette`).
     pub module: Option<&'static str>,
@@ -195,9 +190,9 @@ impl<'a> EffectCx<'a> {
         self.post.volume.filter(|_| self.full)
     }
 
-    /// Whether an effect the settings have `on` runs, gated by `option`.
-    pub(crate) fn runs(&self, option: GraphicsOption, on: bool) -> bool {
-        self.full && effect_runs(self.graphics, option, on)
+    /// Whether an effect the settings have `on` runs, gated by its `gate`.
+    pub(crate) fn runs(&self, gate: Gate, on: bool) -> bool {
+        self.full && effect_runs(self.graphics, gate, on)
     }
 }
 

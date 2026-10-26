@@ -8,13 +8,17 @@ use super::DofParams;
 use crate::components::DofMode;
 use crate::core::settings::graphics_options::GraphicsOption;
 use crate::core::settings::GraphicsSettings;
+use crate::render::postfx::params::Gate;
 use crate::render::postfx::params::{effect_runs, PostSource};
 use crate::render::{RenderView, Renderer};
 
 pub(crate) const EFFECT: PostEffect = PostEffect {
     name: "depth_of_field",
     owner: Owner::Volume,
-    option: Some(GraphicsOption::DepthOfField),
+    gate: Gate {
+        option: Some(GraphicsOption::DepthOfField),
+        tiers: |q| q.depth_of_field().is_some(),
+    },
     module: None,
     composite: &[],
     grade: &[],
@@ -51,5 +55,5 @@ pub(crate) fn dof_enabled(post: PostSource, graphics: GraphicsSettings) -> bool 
     let on = post
         .volume
         .is_some_and(|vc| vc.depth_of_field.mode != DofMode::Off);
-    effect_runs(graphics, GraphicsOption::DepthOfField, on)
+    effect_runs(graphics, EFFECT.gate, on)
 }

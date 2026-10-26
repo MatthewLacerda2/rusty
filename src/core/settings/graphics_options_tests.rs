@@ -1,7 +1,6 @@
 use serde_json::json;
 
 use super::*;
-use crate::core::settings::quality::QualityPreset;
 
 fn temp_path(name: &str) -> std::path::PathBuf {
     let path = crate::test_temp::dir().join(format!(
@@ -114,18 +113,6 @@ fn serde_spells_the_options_by_name() {
         serde_json::from_str::<GraphicsOptions>(&text).unwrap(),
         options
     );
-}
-
-#[test]
-fn the_tier_allows_what_its_passes_run() {
-    use GraphicsOption::*;
-    assert!(!QualityPreset::Low.allows(MotionBlur));
-    assert!(!QualityPreset::Low.allows(Ssao));
-    assert!(!QualityPreset::Medium.allows(Ssr));
-    assert!(QualityPreset::High.allows(Ssr));
-    for tier in QualityPreset::ALL {
-        assert!(tier.allows(Fxaa) && tier.allows(Bloom), "{tier}");
-    }
 }
 
 /// `project.rusty` reports what it ignores (logged as a warning); a save does not.

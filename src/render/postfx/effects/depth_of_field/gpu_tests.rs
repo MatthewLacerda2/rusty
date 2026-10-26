@@ -80,7 +80,7 @@ fn gpu_mode_off_is_identical_to_no_depth_of_field_and_frees_its_targets() {
     let (mut s, cam) = scene(bokeh(2.0));
     let mut v = view(&r);
     let focused = frame(&mut r, &mut v, &s);
-    assert!(v.post_fx.dof.is_some(), "the depth of field ran");
+    assert!(v.post_fx.holds_dof(), "the depth of field ran");
     assert_ne!(focused, untouched);
 
     s.world
@@ -93,7 +93,7 @@ fn gpu_mode_off_is_identical_to_no_depth_of_field_and_frees_its_targets() {
         off == untouched,
         "mode Off draws exactly what no depth of field does"
     );
-    assert!(v.post_fx.dof.is_none(), "Off holds no targets");
+    assert!(!v.post_fx.holds_dof(), "Off holds no targets");
     let velocity = v.post_fx.motion.active_target();
     assert!(velocity.is_none(), "nor writes the velocity target for it");
 }
@@ -105,5 +105,5 @@ fn gpu_the_low_tier_runs_no_depth_of_field() {
     };
     let mut v = view(&r);
     frame(&mut r, &mut v, &scene(bokeh(2.0)).0);
-    assert!(v.post_fx.dof.is_none(), "Low turns depth of field off");
+    assert!(!v.post_fx.holds_dof(), "Low turns depth of field off");
 }

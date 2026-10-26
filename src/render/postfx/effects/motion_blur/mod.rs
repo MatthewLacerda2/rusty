@@ -28,6 +28,7 @@ mod params;
 pub(crate) use effect::{motion_blur_enabled, EFFECT};
 pub(crate) use params::BlurParams;
 
+use super::Targets;
 use crate::render::gpu::bind_entry as entry;
 use crate::render::gpu::fullscreen::Fullscreen;
 use crate::render::gpu::layout_entries::{texture_entry, uniform_entry};
@@ -155,14 +156,12 @@ impl BlurTargets {
 
     /// Fit these to a view of `size` at `tile`: remade at another size, only the
     /// tiles remade at another tile size.
-    fn fit(slot: &mut Option<Self>, device: &wgpu::Device, size: (u32, u32), tile: u32) {
-        match slot {
-            Some(t) if t.size == size => {
-                if t.tiles.tile != tile {
-                    t.tiles = TileTargets::new(device, size, tile);
-                }
-            }
-            _ => *slot = Some(Self::new(device, size, tile)),
+    fn fit(targets: &mut Targets, device: &wgpu::Device, size: (u32, u32), tile: u32) {
+        let t = targets.get_or(|| Self::new(device, size, tile));
+        if t.size != size {
+            *t = Self::new(device, size, tile);
+        } else if t.tiles.tile != tile {
+            t.tiles = TileTargets::new(device, size, tile);
         }
     }
 }
@@ -179,11 +178,11 @@ impl PostFx {
         timer: &GpuTimer,
     ) {
         let Some((params, velocity)) = params.zip(self.motion.target_view()) else {
-            self.blur = None;
+            self.targets.remove::<BlurTargets>();
             return;
         };
-        BlurTargets::fit(&mut self.blur, device, self.full_size, params.tile());
-        let targets = self.blur.as_ref().expect("fitted above");
+        BlurTargets::fit(&mut self.targets, device, self.full_size, params.tile());
+        let targets = self.targets.get::<BlurTargets>().expect("fitted above");
         let tiles = &targets.tiles;
         queue.write_buffer(&targets.params, 0, bytemuck::bytes_of(&params));
         let group = |input: &wgpu::TextureView| {
@@ -225,3 +224,11 @@ mod overlay_gpu_tests;
 
 #[cfg(test)]
 mod stack_order_gpu_tests;
+
+#[cfg(test)]
+impl PostFx {
+    /// Whether the view holds motion blur's targets (it ran this frame).
+    pub(crate) fn holds_blur(&self) -> bool {
+        self.targets.get::<BlurTargets>().is_some()
+    }
+}

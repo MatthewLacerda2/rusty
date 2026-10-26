@@ -98,10 +98,9 @@ pub struct PostFx {
     /// The view's motion vectors (#1435): the velocity target the opaque pass writes
     /// while motion blur runs, and last frame's cameras and poses.
     pub(crate) motion: crate::render::motion::MotionVectors,
-    /// The motion blur's tile and blurred-scene targets (#1436), while it runs.
-    pub(crate) blur: Option<effects::motion_blur::BlurTargets>,
-    /// The depth of field's targets (#1445), while it runs.
-    pub(crate) dof: Option<effects::depth_of_field::DofTargets>,
+    /// Each effect's own targets while it runs (#1467): depth of field's (#1445),
+    /// motion blur's tiles and blurred scene (#1436), one slot per effect.
+    pub(crate) targets: effects::Targets,
 }
 
 /// HDR scene colour format — float so bright pixels survive for bloom/tonemap.

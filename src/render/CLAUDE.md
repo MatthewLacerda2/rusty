@@ -49,8 +49,10 @@ struct, shader body or list position. Group a family (`grading/`, `lens/`) the s
 in every layer. The test-only `dummy` effect is the worked example: grep `dummy` for
 every file and row.
 - **Settings** — `components/rendering/post_processing/<effect>.rs` (serde, `Default`,
-  the clamp constants) and one field on `PostProcessingComponent`. A camera effect keeps
-  its knobs on `CameraComponent`, named `<effect>_…`.
+  the clamp constants) and one field on `PostProcessingComponent`, plus its line in
+  that struct's `Default` (the compiler asks for it: the volume applies by default, so
+  the impl is written out). A camera effect keeps its knobs on `CameraComponent`,
+  named `<effect>_…`.
 - **Ops** — `scene/authoring/rendering/post_processing/<effect>.rs`: its ops, its
   `Effect` (its field-table row through `effect!`, and its `Knob`s, which give the
   Inspector's sliders, `Graphics.Get/Set<api>` pairs and the `Graphics.<effect>.<knob>`
@@ -69,13 +71,18 @@ every file and row.
   `Frag` (composite only) and one `vec4` per slot it declares, reads the chain's
   bindings from `postfx::frame`, and leaves the colour as it was when its slots say it
   is off. Its `pack` writes only its own slots. A pass with pipelines of its own adds
-  them to `effects::Passes` (and lazy ones to its `lazy_pipelines`); a per-view target
-  goes on `PostFx`.
+  them to `effects::Passes` (and lazy ones to its `lazy_pipelines`). Its per-view
+  targets are its own type in `PostFx::targets` (`effects::Targets`: `get_or` while
+  it runs, `remove` when it doesn't; a resize drops every slot), never a `PostFx`
+  field.
+- **Gate** — its `PostEffect::gate`: the player option, when it is player-facing,
+  and the quality tiers it runs on (`tiers`, a `fn(QualityPreset) -> bool`). It asks
+  through `EffectCx::runs(EFFECT.gate, on)`; no shared `match` names it.
 - **Option** — a player-facing effect adds its `GraphicsOption` row, named as the
-  effect, and gates through `EffectCx::runs`.
+  effect.
 - **Docs** — a `<!-- effect: <name> -->` section in `docs/api/Graphics.md` naming each
   tween path, its rows in the sorted function table, and its *Player options* row.
-- **The gate** — `render::postfx::effects::completeness` fails when any layer lacks the
+- **Completeness** — `render::postfx::effects::completeness` fails when any layer lacks the
   effect's part. Pixels of every other effect stay byte-identical: no other offset or
   struct moved.
 

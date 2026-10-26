@@ -49,7 +49,7 @@ fn gpu_a_moving_cube_blurs_past_its_silhouette() {
     let to = Vec3::new(0.5, 0.0, -5.0);
     moving.world.transform_mut(id).unwrap().position = to;
     let blurred = frame(&mut r, &mut blurred_view, &moving, &cam);
-    assert!(blurred_view.post_fx.blur.is_some(), "the blur ran");
+    assert!(blurred_view.post_fx.holds_blur(), "the blur ran");
 
     let (mut still, _) = streaky(false);
     cube(&mut still, to);
@@ -78,13 +78,13 @@ fn gpu_a_still_frame_is_identical_to_motion_blur_off() {
     let mut on_view = view(&r);
     frame(&mut r, &mut on_view, &on, &cam);
     let blurred = frame(&mut r, &mut on_view, &on, &cam);
-    assert!(on_view.post_fx.blur.is_some(), "the blur ran");
+    assert!(on_view.post_fx.holds_blur(), "the blur ran");
 
     let (mut off, _) = streaky(false);
     cube(&mut off, Vec3::new(0.0, 0.0, -5.0));
     let mut off_view = view(&r);
     let sharp = frame(&mut r, &mut off_view, &off, &cam);
-    assert!(off_view.post_fx.blur.is_none(), "no blur, no targets");
+    assert!(!off_view.post_fx.holds_blur(), "no blur, no targets");
     assert!(blurred == sharp, "a still frame must be pixel-identical");
 }
 

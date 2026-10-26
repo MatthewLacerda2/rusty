@@ -102,13 +102,13 @@ impl PostFx {
 
     /// The scene the composite and bloom read: motion-blurred (#1436), else focused.
     pub(crate) fn scene_color(&self) -> &wgpu::TextureView {
-        scene_of(self.blur.as_ref(), self.dof.as_ref(), &self.scene_hdr)
+        scene_of(self.targets.get(), self.targets.get(), &self.scene_hdr)
     }
 
     /// The scene motion blur reads: this frame's depth of field when it ran (#1445),
     /// else the HDR scene itself. Depth of field runs first, Unity's order.
     pub(crate) fn focused_color(&self) -> &wgpu::TextureView {
-        scene_of(None, self.dof.as_ref(), &self.scene_hdr)
+        scene_of(None, self.targets.get(), &self.scene_hdr)
     }
 
     /// The exposure meter and [`PostFx::scene_color`] at once, so the meter reads
@@ -116,7 +116,7 @@ impl PostFx {
     pub(crate) fn exposure_and_scene(
         &mut self,
     ) -> (&mut effects::exposure::ExposureMeter, &wgpu::TextureView) {
-        let scene = scene_of(self.blur.as_ref(), self.dof.as_ref(), &self.scene_hdr);
+        let scene = scene_of(self.targets.get(), self.targets.get(), &self.scene_hdr);
         (&mut self.exposure, scene)
     }
 

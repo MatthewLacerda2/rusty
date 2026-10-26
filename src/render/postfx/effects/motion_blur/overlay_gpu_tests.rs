@@ -62,7 +62,7 @@ fn blurred(overlay: bool) -> Option<Vec<u8>> {
     frame(&mut r, &mut v, &scene, &cam);
     scene.world.transform_mut(enemy).unwrap().position = Vec3::new(0.5, 0.0, -5.0);
     let out = frame(&mut r, &mut v, &scene, &cam);
-    assert!(v.post_fx.blur.is_some(), "the blur ran");
+    assert!(v.post_fx.holds_blur(), "the blur ran");
     Some(out)
 }
 

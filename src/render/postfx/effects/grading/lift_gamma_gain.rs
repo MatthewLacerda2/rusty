@@ -1,6 +1,7 @@
 //! Lift / Gamma / Gain (#1440): the bake's second function, after white balance,
 //! with the clamp into what the scene target holds.
 
+use crate::render::postfx::params::Gate;
 use glam::Vec3;
 
 use super::super::{Grade, GradeCx, Owner, PostEffect};
@@ -11,7 +12,7 @@ use crate::core::color::luminance;
 pub(crate) const EFFECT: PostEffect = PostEffect {
     name: "lift_gamma_gain",
     owner: Owner::Volume,
-    option: None,
+    gate: Gate::NONE,
     module: Some("postfx/effects/lift_gamma_gain.wgsl"),
     composite: &[],
     grade: &[Grade {

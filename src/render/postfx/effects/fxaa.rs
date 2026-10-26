@@ -4,13 +4,14 @@
 use super::{EffectCx, LdrRun, Owner, Pass, PostEffect};
 use crate::core::settings::graphics_options::GraphicsOption;
 use crate::core::settings::GraphicsSettings;
+use crate::render::postfx::params::Gate;
 use crate::render::postfx::params::{effect_runs, PostSource};
 use crate::render::postfx::PostFx;
 
 pub(crate) const EFFECT: PostEffect = PostEffect {
     name: "fxaa",
     owner: Owner::Camera,
-    option: Some(GraphicsOption::Fxaa),
+    gate: Gate::option(GraphicsOption::Fxaa),
     module: None,
     composite: &[],
     grade: &[],
@@ -39,5 +40,5 @@ fn prepare(_: &mut PostFx, _: &wgpu::Device, cx: &EffectCx) -> bool {
 /// player's `fxaa` option can.
 pub(crate) fn fxaa_enabled(post: PostSource, graphics: GraphicsSettings) -> bool {
     let on = post.camera.is_none_or(|c| c.fxaa_active);
-    effect_runs(graphics, GraphicsOption::Fxaa, on)
+    effect_runs(graphics, EFFECT.gate, on)
 }

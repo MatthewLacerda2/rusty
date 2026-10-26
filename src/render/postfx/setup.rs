@@ -62,8 +62,7 @@ impl PostFx {
             full_size,
             output_format,
             motion: Default::default(),
-            blur: None,
-            dof: None,
+            targets: Default::default(),
         }
     }
 
@@ -141,8 +140,8 @@ impl PostFx {
         // exposure snaps (#1444).
         self.motion.reset();
         self.exposure.cut();
-        self.blur = None;
-        self.dof = None;
+        // Every effect's own targets refit at the new size the next frame it runs.
+        self.targets.clear();
     }
 
     fn create_targets(

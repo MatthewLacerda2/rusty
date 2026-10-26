@@ -3,11 +3,12 @@
 
 use super::super::{Grade, GradeCx, Owner, PostEffect};
 use super::bounded;
+use crate::render::postfx::params::Gate;
 
 pub(crate) const EFFECT: PostEffect = PostEffect {
     name: "color_adjustments",
     owner: Owner::Volume,
-    option: None,
+    gate: Gate::NONE,
     module: Some("postfx/effects/color_adjustments.wgsl"),
     composite: &[],
     grade: &[

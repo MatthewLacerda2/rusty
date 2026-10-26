@@ -220,14 +220,15 @@ impl PostFx {
         timer: &GpuTimer,
     ) {
         let Some((params, velocity)) = params.zip(self.motion.target_view()) else {
-            self.dof = None;
+            self.targets.remove::<DofTargets>();
             return;
         };
         let key = (self.full_size, params.divisor(), params.tile());
-        if self.dof.as_ref().is_none_or(|t| t.key != key) {
-            self.dof = Some(DofTargets::new(device, key));
+        let fitted = self.targets.get_or(|| DofTargets::new(device, key));
+        if fitted.key != key {
+            *fitted = DofTargets::new(device, key);
         }
-        let t = self.dof.as_ref().expect("fitted above");
+        let t = self.targets.get::<DofTargets>().expect("fitted above");
         queue.write_buffer(&t.params, 0, bytemuck::bytes_of(&params));
         let group = |[input, coc, blur, work]: [&wgpu::TextureView; 4]| {
             let view = |v| wgpu::BindingResource::TextureView(v);
@@ -275,3 +276,11 @@ mod lens_gpu_tests;
 
 #[cfg(test)]
 mod tile_gpu_tests;
+
+#[cfg(test)]
+impl PostFx {
+    /// Whether the view holds depth of field's targets (it ran this frame).
+    pub(crate) fn holds_dof(&self) -> bool {
+        self.targets.get::<DofTargets>().is_some()
+    }
+}

@@ -3,11 +3,12 @@
 use super::super::{Composite, EffectCx, Owner, Phase, PostEffect};
 use crate::components::Vignette;
 use crate::core::settings::graphics_options::GraphicsOption;
+use crate::render::postfx::params::Gate;
 
 pub(crate) const EFFECT: PostEffect = PostEffect {
     name: "vignette",
     owner: Owner::Volume,
-    option: Some(GraphicsOption::Vignette),
+    gate: Gate::option(GraphicsOption::Vignette),
     module: Some("postfx/effects/vignette.wgsl"),
     composite: &[Composite {
         phase: Phase::Display,
@@ -26,7 +27,7 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
 fn pack(cx: &EffectCx, slots: &mut [[f32; 4]]) {
     let Some(vc) = cx.volume() else { return };
     let v = &vc.vignette;
-    let intensity = if cx.runs(GraphicsOption::Vignette, v.active) {
+    let intensity = if cx.runs(EFFECT.gate, v.active) {
         v.intensity.clamp(0.0, 1.0)
     } else {
         0.0

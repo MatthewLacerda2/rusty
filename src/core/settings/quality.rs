@@ -5,8 +5,6 @@
 //! passes run and how large the bloom buffers are. Plain data with its per-tier
 //! decisions, no GPU types — the render layer maps it onto its passes (#494).
 
-use super::graphics_options::GraphicsOption;
-
 crate::core::named_enum! {
     /// Scalability tier. Gates SSR, motion blur and SSAO, and the bloom buffer size.
     #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
@@ -56,23 +54,6 @@ impl QualityPreset {
             QualityPreset::Low => None,
             QualityPreset::Medium => Some(2),
             QualityPreset::High => Some(1),
-        }
-    }
-
-    /// Whether this tier runs `option` at all (#1438): SSR on High only, motion blur,
-    /// SSAO and depth of field off on Low; FXAA, bloom and the lens effects (a few
-    /// taps each, #1439) on every tier.
-    pub fn allows(self, option: GraphicsOption) -> bool {
-        match option {
-            GraphicsOption::MotionBlur => self.motion_blur(),
-            GraphicsOption::Ssr => self.screen_space_ssr(),
-            GraphicsOption::Ssao => self.ssao().is_some(),
-            GraphicsOption::DepthOfField => self.depth_of_field().is_some(),
-            GraphicsOption::Fxaa
-            | GraphicsOption::Bloom
-            | GraphicsOption::Vignette
-            | GraphicsOption::ChromaticAberration
-            | GraphicsOption::FilmGrain => true,
         }
     }
 

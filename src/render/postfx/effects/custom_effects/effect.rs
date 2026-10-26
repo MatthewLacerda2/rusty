@@ -2,6 +2,7 @@
 //! composite and before FXAA, each effect one fullscreen pass ping-ponging between the
 //! chain's two LDR targets, the result kept as next frame's history.
 
+use crate::render::postfx::params::Gate;
 use std::collections::BTreeMap;
 
 use super::super::{EffectCx, Gpu, LdrRun, Owner, Pass, PostEffect};
@@ -12,7 +13,7 @@ use crate::render::timing::GpuPass;
 pub(crate) const EFFECT: PostEffect = PostEffect {
     name: "custom_effects",
     owner: Owner::Volume,
-    option: None,
+    gate: Gate::NONE,
     module: None,
     composite: &[],
     grade: &[],

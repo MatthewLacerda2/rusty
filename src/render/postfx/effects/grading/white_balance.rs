@@ -1,5 +1,6 @@
 //! White balance (#1440): the bake's first function, Unity's LMS white-point scale.
 
+use crate::render::postfx::params::Gate;
 use glam::{Mat3, Vec3};
 
 use super::super::{Grade, GradeCx, Owner, PostEffect};
@@ -9,7 +10,7 @@ use crate::components::WhiteBalance;
 pub(crate) const EFFECT: PostEffect = PostEffect {
     name: "white_balance",
     owner: Owner::Volume,
-    option: None,
+    gate: Gate::NONE,
     module: Some("postfx/effects/white_balance.wgsl"),
     composite: &[],
     grade: &[Grade {

@@ -5,6 +5,7 @@ use super::super::{Composite, EffectCx, Owner, Pass, PassCx, Phase, PostEffect};
 use super::ExposureParams;
 use crate::components::{AutoExposure, ExposureMode};
 use crate::render::motion::HistoryKey;
+use crate::render::postfx::params::Gate;
 use crate::render::postfx::params::PostSource;
 use crate::render::{RenderView, Renderer};
 
@@ -12,7 +13,7 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
     name: "exposure",
     owner: Owner::Volume,
     // The player has no option for it: the exposure is the developer's look.
-    option: None,
+    gate: Gate::NONE,
     module: Some("postfx/effects/exposure.wgsl"),
     composite: &[Composite {
         phase: Phase::Hdr,
