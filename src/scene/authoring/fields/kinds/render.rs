@@ -57,6 +57,8 @@ inspect! {
         op!("clear_flags", camera::set_clear_flags),
         op!("motion_blur_active", camera::set_motion_blur_active),
         op!("motion_blur_samples", camera::set_motion_blur_samples),
+        op!("motion_blur_intensity", camera::set_motion_blur_intensity),
+        op!("motion_blur_max_length", camera::set_motion_blur_max_length),
         op!("fxaa_active", camera::set_fxaa_active),
         op!("projection", camera::set_projection),
         with!("target_texture", |c, v: Option<RenderTarget>| set_target(c, v)),

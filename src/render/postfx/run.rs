@@ -35,7 +35,8 @@ impl PostFx {
             self.run_bloom(device, &mut encoder, &ctx);
         }
 
-        // Composite reads scene HDR + bloom_b (final blur result) + depth + skybox.
+        // Composite reads the scene (motion-blurred when it ran, #1436) + bloom_b
+        // (final blur result) + depth + skybox.
         // When anything follows it (FXAA, authored effects) it lands in the LDR target
         // for that pass to sample; otherwise it writes the output directly, so the
         // plain path is byte-for-byte what the chain produced before those existed.
@@ -43,7 +44,7 @@ impl PostFx {
         CustomChain::write_params(queue, &effects, post_params);
         let composite_bg = self.io_bind_group(
             device,
-            &self.scene_hdr.view,
+            self.scene_color(),
             &self.bloom_b.view,
             ctx.depth_view,
             ctx.skybox,
@@ -156,7 +157,7 @@ impl PostFx {
     ) {
         let bg = self.io_bind_group(
             device,
-            &self.scene_hdr.view,
+            self.scene_color(),
             &self.bloom_b.view,
             ctx.depth_view,
             ctx.skybox,
@@ -164,6 +165,14 @@ impl PostFx {
         // The UI's backdrop source, so its time is the UI's.
         let composite = (&self.composite_pipeline, ctx.timer.writes(GpuPass::Ui));
         Self::fullscreen(encoder, composite, &[&bg], ctx.output);
+    }
+
+    /// The scene the composite reads: this frame's motion-blurred image when the
+    /// blur ran (#1436), else the HDR scene itself.
+    fn scene_color(&self) -> &wgpu::TextureView {
+        self.blur
+            .as_ref()
+            .map_or(&self.scene_hdr.view, |b| &b.blurred.view)
     }
 
     /// The format the chain writes its output in (what [`PostFx::composite_into`]
@@ -221,7 +230,7 @@ impl PostFx {
 
     /// One fullscreen triangle into `target`, `groups` bound from group 0 up, with
     /// the pass's timestamp writes (#835).
-    fn fullscreen(
+    pub(super) fn fullscreen(
         encoder: &mut wgpu::CommandEncoder,
         (pipeline, timestamp_writes): Timed<'_>,
         groups: &[&wgpu::BindGroup],
@@ -252,7 +261,7 @@ impl PostFx {
 }
 
 /// A pass's pipeline and its timestamp writes.
-type Timed<'a> = (
+pub(super) type Timed<'a> = (
     &'a wgpu::RenderPipeline,
     Option<wgpu::RenderPassTimestampWrites<'a>>,
 );

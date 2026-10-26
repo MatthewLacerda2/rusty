@@ -153,6 +153,7 @@ impl Renderer {
             billboards,
             ui,
             ssao,
+            motion_blur,
             quality,
         } = gpu;
         let draw_buffers =
@@ -181,6 +182,7 @@ impl Renderer {
             present_modes,
             render_pipeline: forward.render_pipeline,
             velocity_pipeline: forward.velocity_pipeline,
+            motion_blur,
             transparent_pipeline: forward.transparent_pipeline,
             line_pipeline: forward.line_pipeline,
             outline: forward.outline,

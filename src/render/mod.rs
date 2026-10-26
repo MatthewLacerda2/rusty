@@ -133,6 +133,8 @@ pub struct Renderer {
     render_pipeline: wgpu::RenderPipeline,
     /// The forward pipeline writing a view's velocity target too (#1435).
     velocity_pipeline: gpu::pipelines::LazyPipeline,
+    /// The per-object motion blur's tile and gather passes (#1436).
+    motion_blur: postfx::motion_blur::MotionBlurPasses,
     /// Alpha-blended translucent solids (#242); depth write off, drawn back-to-front
     /// in the transparent pass after opaque. Built on first use, like the three
     /// editor-only pipelines below (#985).

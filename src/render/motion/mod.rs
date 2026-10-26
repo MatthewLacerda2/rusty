@@ -127,7 +127,7 @@ mod tests;
 mod cut_tests;
 
 #[cfg(test)]
-mod gpu_fixture;
+pub(crate) mod gpu_fixture;
 
 #[cfg(test)]
 mod gpu_tests;
