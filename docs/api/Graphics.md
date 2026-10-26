@@ -40,7 +40,7 @@ set on that camera entity, in the inspector or the scene file.
 | `Graphics.GetBloomActive` / `SetBloomActive` | `()` / `(bool)` | `bool` |
 | `Graphics.GetBloomIntensity` / `SetBloomIntensity` | `()` / `(value)` | `number` (≥ 0) |
 | `Graphics.GetBloomThreshold` / `SetBloomThreshold` | `()` / `(value)` | `number` (≥ 0) |
-| `Graphics.GetExposure` / `SetExposure` | `()` / `(ev)` | `number` (EV): the fixed exposure; in `Automatic`, the getter returns the screen's **adapted** EV (see *Automatic exposure*) |
+| `Graphics.GetExposure` / `SetExposure` | `()` / `(ev)` | `number` (EV): the configured exposure, in both modes (the adapted EV in `Automatic` is the dev-only `Debug.GetAdaptedExposure`; see *Automatic exposure*) |
 | `Graphics.GetExposureMode` / `SetExposureMode` | `()` / `(name)` | `"Fixed"` / `"Automatic"` (**default `"Fixed"`**; names are case-insensitive) |
 | `Graphics.GetExposureLimits` / `SetExposureLimits` | `()` / `(min_ev, max_ev)` | `min_ev, max_ev` (each clamped −10–10, `max_ev` ≥ `min_ev`; **default `-6, 6`**) |
 | `Graphics.GetExposureCompensation` / `SetExposureCompensation` | `()` / `(ev)` | `number` (clamped −10–10, **default `0`**) |
@@ -117,10 +117,11 @@ snaps to the metered value every frame, so the editor shows the settled exposure
 Play it snaps on a cut (the first frame, a scene load, Play or Stop, a switch of the main
 camera, a resize). Each view meters itself: a render-texture camera adapts to its own
 picture, never the window's. The exposure is applied before the grading LUT, like the
-fixed one. `Graphics.GetExposure` returns the screen's adapted EV, read back from the
-GPU a frame or so late (exactly, in a headless capture); before an automatic frame has
-rendered it returns the fixed `exposure`. It is a display value, like a HUD's: another
-GPU may meter a hair differently, so gameplay never branches on it. There is no player
+fixed one. `Graphics.GetExposure` returns the configured `exposure` in both modes,
+never the adapted one: scripts run in the deterministic sim, and the adapted EV is read
+back from the GPU (another GPU may meter a hair differently). An agent checking
+adaptation reads it with the dev-only `Debug.GetAdaptedExposure()`, a frame or so late
+(exactly, in a headless capture). There is no player
 option for it; the exposure is the developer's look. The Inspector's **Color
 Correction** section edits the same fields, and they are saved with the scene. A new
 volume starts `Fixed`.

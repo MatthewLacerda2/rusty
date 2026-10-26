@@ -70,7 +70,7 @@ fn draw_field(
                 .horizontal(|ui| {
                     ui.label(&field.name);
                     match field.range {
-                        Some((lo, hi)) => ui.add(egui::Slider::new(&mut v, lo..=hi)),
+                        Some((lo, hi)) => ui.add(crate::editor::widgets::slider(&mut v, lo..=hi)),
                         None => ui.add(egui::DragValue::new(&mut v).speed(0.05)),
                     }
                 })

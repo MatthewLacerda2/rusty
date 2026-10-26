@@ -17,12 +17,13 @@
 
 mod params;
 
-pub use params::{Clock, ExposureParams};
+pub use params::{Clock, ExposureParams, Step};
 
 use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::Arc;
 
 use crate::render::gpu::shaders::ShaderRegistry;
+use crate::render::motion::HistoryKey;
 
 /// Histogram bins. Mirrors `BINS` in `postfx/exposure.wgsl`, and equals the
 /// histogram pass's workgroup size (8 × 8), one bin per invocation.
@@ -108,9 +109,11 @@ pub struct ExposureMeter {
     state: wgpu::Buffer,
     staging: wgpu::Buffer,
     mapping: Arc<AtomicU8>,
+    /// The read in flight began before a cut: its value is dropped, not taken.
+    stale: bool,
     readout: Option<f32>,
     /// When the view last adapted; the passes are told how far to move from it.
-    pub clock: Clock,
+    clock: Clock,
 }
 
 impl ExposureMeter {
@@ -144,9 +147,32 @@ impl ExposureMeter {
                 U::MAP_READ | U::COPY_DST,
             ),
             mapping: Arc::new(AtomicU8::new(IDLE)),
+            stale: false,
             readout: None,
             clock: Clock::default(),
         }
+    }
+
+    /// How far this frame adapts ([`Clock::step`]). A cut also forgets the readout.
+    pub(crate) fn step(&mut self, key: HistoryKey, editor: bool, time: f32) -> Step {
+        let step = self.clock.step(key, editor, time);
+        if step.cut {
+            self.forget();
+        }
+        step
+    }
+
+    /// Cut the clock (a resize, a frame the view did not meter): the next metered
+    /// frame snaps, and nothing read back before it is reported.
+    pub fn cut(&mut self) {
+        self.clock.cut();
+        self.forget();
+    }
+
+    /// Drop the readout, and the read in flight when it lands.
+    fn forget(&mut self) {
+        self.readout = None;
+        self.stale = self.mapping.load(Ordering::Acquire) != IDLE;
     }
 
     /// The adapted state the composite reads (binding 8): `x` is the EV.
@@ -228,8 +254,11 @@ impl ExposureMeter {
         }
         if let Ok(view) = self.staging.slice(..).get_mapped_range() {
             let state: &[f32] = bytemuck::cast_slice(&view);
-            self.readout = Some(state[0]);
+            if !self.stale {
+                self.readout = Some(state[0]);
+            }
         }
+        self.stale = false;
         self.staging.unmap();
         self.mapping.store(IDLE, Ordering::Release);
     }

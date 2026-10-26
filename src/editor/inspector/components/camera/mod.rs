@@ -12,6 +12,9 @@ mod grading;
 mod post_processing;
 mod target;
 
+#[cfg(test)]
+mod slider_tests;
+
 pub use post_processing::draw_post_processing;
 
 use crate::editor::inspector::components::card::component_card;
@@ -70,7 +73,10 @@ fn draw_motion_blur(
         ui.label("Samples:");
         let range = crate::scene::CameraComponent::MIN_MOTION_BLUR_SAMPLES
             ..=crate::scene::CameraComponent::MAX_MOTION_BLUR_SAMPLES;
-        if ui.add(egui::Slider::new(&mut samples, range)).changed() {
+        if ui
+            .add(crate::editor::widgets::slider(&mut samples, range))
+            .changed()
+        {
             if let Some(mut c) = world.camera_mut(id) {
                 camera_ops::set_motion_blur_samples(&mut c, samples);
             }
@@ -112,7 +118,7 @@ fn draw_projection(
     ui.horizontal(|ui| {
         ui.label("FOV:");
         if ui
-            .add(egui::Slider::new(
+            .add(crate::editor::widgets::slider(
                 &mut fov,
                 camera_ops::MIN_FOV..=camera_ops::MAX_FOV,
             ))

@@ -56,7 +56,7 @@ pub fn draw(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, is_dirty:
 fn drag(ui: &mut egui::Ui, label: &str, v: &mut f32, range: std::ops::RangeInclusive<f32>) -> bool {
     ui.horizontal(|ui| {
         ui.label(label);
-        ui.add(egui::Slider::new(v, range)).changed()
+        ui.add(crate::editor::widgets::slider(v, range)).changed()
     })
     .inner
 }

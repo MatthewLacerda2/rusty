@@ -97,9 +97,10 @@ impl EditorFrontend {
         ));
         renderer.render(view, &scene, &camera, &target_view, scene_tab);
         drop(scene);
+        // The game view is the screen: `Debug.GetAdaptedExposure` reads its adapted
+        // exposure (#1444).
+        #[cfg(feature = "dev")]
         if !scene_tab {
-            // The game view is the screen: `Graphics.GetExposure` reads its adapted
-            // exposure (#1444).
             game.scene().borrow_mut().screen_exposure = view.exposure_readout();
         }
         rebind_egui_texture(

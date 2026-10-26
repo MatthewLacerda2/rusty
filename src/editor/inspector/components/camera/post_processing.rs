@@ -74,7 +74,7 @@ fn draw_bloom(
         ui.horizontal(|ui| {
             ui.label("    Intensity:");
             if ui
-                .add(egui::Slider::new(&mut intensity, 0.0..=5.0))
+                .add(crate::editor::widgets::slider(&mut intensity, 0.0..=5.0))
                 .changed()
             {
                 if let Some(mut c) = world.post_processing_mut(id) {
@@ -87,7 +87,7 @@ fn draw_bloom(
         ui.horizontal(|ui| {
             ui.label("    Threshold:");
             if ui
-                .add(egui::Slider::new(&mut threshold, 0.0..=1.0))
+                .add(crate::editor::widgets::slider(&mut threshold, 0.0..=1.0))
                 .changed()
             {
                 if let Some(mut c) = world.post_processing_mut(id) {
@@ -111,7 +111,9 @@ pub(super) fn slider_row(
 ) -> bool {
     ui.horizontal(|ui| {
         ui.label(label);
-        let changed = ui.add(egui::Slider::new(&mut value, range)).changed();
+        let changed = ui
+            .add(crate::editor::widgets::slider(&mut value, range))
+            .changed();
         if changed {
             if let Some(mut c) = cx.0.post_processing_mut(cx.1) {
                 op(&mut c, value);
@@ -235,7 +237,10 @@ fn draw_shadows(
     let max = crate::components::ShadowSettings::MAX_CASCADES;
     ui.horizontal(|ui| {
         ui.label("  Cascades:");
-        if ui.add(egui::Slider::new(&mut cascades, 1..=max)).changed() {
+        if ui
+            .add(crate::editor::widgets::slider(&mut cascades, 1..=max))
+            .changed()
+        {
             if let Some(mut c) = world.post_processing_mut(id) {
                 vc_ops::set_shadow_cascades(&mut c, cascades);
             }

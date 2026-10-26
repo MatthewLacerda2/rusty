@@ -15,16 +15,21 @@ fn key(scene: &Scene, playing: bool) -> HistoryKey {
 const SNAP: Step = Step {
     dt: 0.0,
     snap: true,
+    cut: true,
 };
 
 #[test]
 fn play_eases_by_game_time_and_a_pause_holds() {
     let scene = Scene::new();
     let mut clock = Clock::default();
-    assert_eq!(clock.step(key(&scene, true), 1.0), SNAP, "first frame");
-    let step = clock.step(key(&scene, true), 1.25);
+    assert_eq!(
+        clock.step(key(&scene, true), false, 1.0),
+        SNAP,
+        "first frame"
+    );
+    let step = clock.step(key(&scene, true), false, 1.25);
     assert_eq!((step.dt, step.snap), (0.25, false));
-    let paused = clock.step(key(&scene, true), 1.25);
+    let paused = clock.step(key(&scene, true), false, 1.25);
     assert_eq!((paused.dt, paused.snap), (0.0, false), "time scale 0");
 }
 
@@ -32,14 +37,45 @@ fn play_eases_by_game_time_and_a_pause_holds() {
 fn edit_mode_cuts_and_time_running_back_snap() {
     let (scene, other) = (Scene::new(), Scene::new());
     let mut clock = Clock::default();
-    clock.step(key(&scene, true), 2.0);
-    assert_eq!(clock.step(key(&scene, true), 1.0), SNAP, "time ran back");
-    assert_eq!(clock.step(key(&other, true), 1.5), SNAP, "a scene load");
-    assert_eq!(clock.step(key(&other, false), 0.0), SNAP, "Stop");
-    assert_eq!(clock.step(key(&other, false), 0.0), SNAP, "outside Play");
-    clock.step(key(&other, true), 3.0);
+    clock.step(key(&scene, true), false, 2.0);
+    assert_eq!(
+        clock.step(key(&scene, true), false, 1.0),
+        SNAP,
+        "time ran back"
+    );
+    assert_eq!(
+        clock.step(key(&other, true), false, 1.5),
+        SNAP,
+        "a scene load"
+    );
+    assert_eq!(clock.step(key(&other, false), false, 0.0), SNAP, "Stop");
+    let held = clock.step(key(&other, false), false, 0.0);
+    assert_eq!(
+        (held.snap, held.cut),
+        (true, false),
+        "outside Play: a snap, no cut"
+    );
+    clock.step(key(&other, true), false, 3.0);
     clock.cut();
-    assert_eq!(clock.step(key(&other, true), 3.5), SNAP, "a resize");
+    assert_eq!(clock.step(key(&other, true), false, 3.5), SNAP, "a resize");
+}
+
+#[test]
+fn swapping_the_editor_tabs_is_a_cut() {
+    let scene = Scene::new();
+    let mut clock = Clock::default();
+    clock.step(key(&scene, true), false, 1.0);
+    assert!(!clock.step(key(&scene, true), false, 1.1).cut);
+    assert_eq!(
+        clock.step(key(&scene, true), true, 1.2),
+        SNAP,
+        "Game → Scene"
+    );
+    assert_eq!(
+        clock.step(key(&scene, true), false, 1.3),
+        SNAP,
+        "Scene → Game"
+    );
 }
 
 #[test]

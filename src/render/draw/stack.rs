@@ -152,10 +152,11 @@ impl Renderer {
     fn meter_exposure(&self, view: &mut RenderView, ctx: &CameraCtx, full: bool) {
         let meter = &mut view.post_fx.exposure;
         let Some(ae) = auto_exposure(ctx.stack.post).filter(|_| full) else {
-            return meter.clock.cut();
+            return meter.cut();
         };
         let key = HistoryKey::new(ctx.scene, ctx.stack.base_id);
-        let params = ExposureParams::new(ae, meter.clock.step(key, ctx.scene.shader_time));
+        let step = meter.step(key, ctx.stack.editor_mode, ctx.scene.shader_time);
+        let params = ExposureParams::new(ae, step);
         let gpu = (&self.device, &self.queue);
         meter.run(
             gpu,

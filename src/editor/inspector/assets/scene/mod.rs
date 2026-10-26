@@ -66,23 +66,37 @@ fn draw_navmesh(ui: &mut egui::Ui, scene: &mut Scene, nav: &mut NavigationGraph)
                 let s = &mut scene.nav_settings;
                 let mut changed = false;
                 changed |= ui
-                    .add(egui::Slider::new(&mut s.agent_radius, 0.0..=5.0).text("Agent Radius"))
+                    .add(
+                        crate::editor::widgets::slider(&mut s.agent_radius, 0.0..=5.0)
+                            .text("Agent Radius"),
+                    )
                     .on_hover_text("Erodes the walkable surface inward by this radius on bake")
                     .changed();
                 changed |= ui
-                    .add(egui::Slider::new(&mut s.agent_height, 0.0..=5.0).text("Agent Height"))
+                    .add(
+                        crate::editor::widgets::slider(&mut s.agent_height, 0.0..=5.0)
+                            .text("Agent Height"),
+                    )
                     .on_hover_text("Drops floors with less open space above them than this height")
                     .changed();
                 changed |= ui
-                    .add(egui::Slider::new(&mut s.max_slope, 0.0..=4.0).text("Max Slope"))
+                    .add(
+                        crate::editor::widgets::slider(&mut s.max_slope, 0.0..=4.0)
+                            .text("Max Slope"),
+                    )
                     .on_hover_text("Max walkable grade (rise per unit travelled)")
                     .changed();
                 changed |= ui
-                    .add(egui::Slider::new(&mut s.max_step, 0.0..=4.0).text("Max Step"))
+                    .add(
+                        crate::editor::widgets::slider(&mut s.max_step, 0.0..=4.0).text("Max Step"),
+                    )
                     .on_hover_text("Max step height between adjacent floors (stairs, curbs)")
                     .changed();
                 changed |= ui
-                    .add(egui::Slider::new(&mut s.grid_spacing, 0.25..=4.0).text("Grid Spacing"))
+                    .add(
+                        crate::editor::widgets::slider(&mut s.grid_spacing, 0.25..=4.0)
+                            .text("Grid Spacing"),
+                    )
                     .on_hover_text("Cell size; smaller = finer grid (re-shapes the grid)")
                     .changed();
                 changed |= draw_link_generation(ui, s);
@@ -130,7 +144,7 @@ fn draw_link_generation(ui: &mut egui::Ui, s: &mut crate::navigation::NavMeshSet
     let mut changed = false;
     for (value, range, label, hint) in rows {
         changed |= ui
-            .add(egui::Slider::new(value, range).text(label))
+            .add(crate::editor::widgets::slider(value, range).text(label))
             .on_hover_text(hint)
             .changed();
     }

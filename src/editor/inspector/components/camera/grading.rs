@@ -59,7 +59,7 @@ fn draw_wheels(
             .horizontal(|ui| {
                 ui.label(format!("    {}:", which.name()));
                 let colour = ui.color_edit_button_rgb(&mut wheel.color).changed();
-                let offset = egui::Slider::new(&mut wheel.offset, -1.0..=1.0);
+                let offset = crate::editor::widgets::slider(&mut wheel.offset, -1.0..=1.0);
                 colour | ui.add(offset).changed()
             })
             .inner;

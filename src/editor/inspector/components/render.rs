@@ -91,7 +91,7 @@ pub fn draw_light(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, is_
         ui.horizontal(|ui| {
             ui.label("Intensity:");
             if ui
-                .add(egui::Slider::new(&mut intensity, 0.0..=20.0))
+                .add(crate::editor::widgets::slider(&mut intensity, 0.0..=20.0))
                 .changed()
             {
                 if let Some(mut l) = world.light_mut(id) {
@@ -125,7 +125,10 @@ fn draw_local_light(
     let mut range = light.range;
     ui.horizontal(|ui| {
         ui.label("Distance:");
-        if ui.add(egui::Slider::new(&mut range, 0.1..=100.0)).changed() {
+        if ui
+            .add(crate::editor::widgets::slider(&mut range, 0.1..=100.0))
+            .changed()
+        {
             if let Some(mut l) = world.light_mut(id) {
                 light_ops::set_range(&mut l, range);
             }
@@ -213,7 +216,7 @@ fn draw_spot_cones(
     ui.horizontal(|ui| {
         ui.label("FOV (Outer Cone):");
         if ui
-            .add(egui::Slider::new(&mut outer, 0.1..=90.0).suffix("°"))
+            .add(crate::editor::widgets::slider(&mut outer, 0.1..=90.0).suffix("°"))
             .changed()
         {
             // Outer shrank below inner ⇒ pull inner down with it (op enforces it).
@@ -227,7 +230,7 @@ fn draw_spot_cones(
     ui.horizontal(|ui| {
         ui.label("Inner Cone:");
         if ui
-            .add(egui::Slider::new(&mut inner, 0.0..=90.0).suffix("°"))
+            .add(crate::editor::widgets::slider(&mut inner, 0.0..=90.0).suffix("°"))
             .changed()
         {
             // Inner grew past outer ⇒ raise outer to match (mirrors the old card).

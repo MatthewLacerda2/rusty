@@ -28,9 +28,9 @@ pub(super) fn draw_exposure(
     let (ae, r) = (vc.auto_exposure, AutoExposure::EV_RANGE);
     *is_dirty |= slider_row(ui, (&mut *world, id), "    Min EV:", ae.min_ev, -r..=r, set_min_ev);
     *is_dirty |= slider_row(ui, (&mut *world, id), "    Max EV:", ae.max_ev, -r..=r, set_max_ev);
-    *is_dirty |= slider_row(ui, (&mut *world, id), "    Compensation:", ae.compensation, -4.0..=4.0, vc_ops::set_exposure_compensation);
-    *is_dirty |= slider_row(ui, (&mut *world, id), "    Speed Up (EV/s):", ae.speed_up, 0.0..=10.0, set_speed_up);
-    *is_dirty |= slider_row(ui, (&mut *world, id), "    Speed Down (EV/s):", ae.speed_down, 0.0..=10.0, set_speed_down);
+    *is_dirty |= slider_row(ui, (&mut *world, id), "    Compensation:", ae.compensation, -r..=r, vc_ops::set_exposure_compensation);
+    *is_dirty |= slider_row(ui, (&mut *world, id), "    Speed Up (EV/s):", ae.speed_up, 0.0..=AutoExposure::MAX_SPEED, set_speed_up);
+    *is_dirty |= slider_row(ui, (&mut *world, id), "    Speed Down (EV/s):", ae.speed_down, 0.0..=AutoExposure::MAX_SPEED, set_speed_down);
     *is_dirty |= slider_row(ui, (&mut *world, id), "    Low Percent:", ae.low_percent, 0.0..=100.0, set_low);
     *is_dirty |= slider_row(ui, (&mut *world, id), "    High Percent:", ae.high_percent, 0.0..=100.0, set_high);
 }

@@ -34,10 +34,15 @@ fn meter(chain: &mut Chain, ae: &AutoExposure, step: Step) -> f32 {
 const SNAP: Step = Step {
     dt: 0.0,
     snap: true,
+    cut: true,
 };
 
 fn tick(dt: f32) -> Step {
-    Step { dt, snap: false }
+    Step {
+        dt,
+        snap: false,
+        cut: false,
+    }
 }
 
 fn near(a: f32, b: f32) -> bool {
@@ -84,6 +89,19 @@ fn gpu_a_cut_snaps_and_darkening_runs_at_its_own_speed() {
     let ev = meter(&mut c, &ae, tick(0.25));
     assert!(near(ev, DARK_TARGET - 0.25 * ae.speed_down), "{ev}");
     assert!(near(meter(&mut c, &ae, SNAP), BRIGHT_TARGET), "a cut snaps");
+
+    // A cut forgets the readout, and the read in flight across it.
+    let Chain { r, pfx, .. } = &mut c;
+    let params = ExposureParams::new(&ae, SNAP);
+    pfx.exposure.run(
+        (&r.device, &r.queue),
+        &r.exposure_passes,
+        &pfx.scene_hdr.view,
+        &params,
+    );
+    pfx.exposure.cut();
+    pfx.exposure.settle(&r.device);
+    assert_eq!(pfx.exposure.readout(), None);
 }
 
 #[test]

@@ -48,7 +48,7 @@ impl Harness {
         }
     }
 
-    /// Hand the frame's adapted exposure to scripts (`Graphics.GetExposure`, #1444).
+    /// Hand the frame's adapted exposure to `Debug.GetAdaptedExposure` (#1444).
     fn publish_exposure(&self) {
         let world = self.world.borrow();
         world.scene().borrow_mut().screen_exposure = self.capture.exposure;

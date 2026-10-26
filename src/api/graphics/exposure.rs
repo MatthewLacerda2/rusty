@@ -7,12 +7,14 @@ use std::cell::RefCell;
 
 use super::super::{put, Reg};
 use super::state::{with_vc, with_vc_mut};
-use crate::components::{ExposureMode, PostProcessingComponent};
+use crate::components::ExposureMode;
 use crate::scene::authoring::rendering::post_processing as vc_ops;
 use crate::scene::Scene;
 
 /// The exposure and its mode. Without an active volume the getters report what a
-/// new volume starts with.
+/// new volume starts with. `GetExposure` is the configured EV in both modes, never
+/// the adapted one: scripts run in the sim, and the adapted EV is a GPU readback
+/// (the dev-only `Debug.GetAdaptedExposure` reads that).
 pub(super) fn register_exposure<'scope>(
     scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
@@ -29,10 +31,7 @@ pub(super) fn register_exposure<'scope>(
     put(
         table,
         "GetExposure",
-        scope.create_function(|_, ()| {
-            let readout = scene.borrow().screen_exposure;
-            Ok(with_vc(scene, |vc| applied_exposure(vc, readout)).unwrap_or(0.0))
-        }),
+        scope.create_function(|_, ()| Ok(with_vc(scene, |vc| vc.exposure).unwrap_or(0.0))),
     )?;
     put(
         table,
@@ -54,15 +53,6 @@ pub(super) fn register_exposure<'scope>(
     )?;
     register_auto_exposure(scope, table, scene)?;
     register_adaptation(scope, table, scene)
-}
-
-/// The exposure `vc` applies: its fixed EV, or in `Automatic` the screen's adapted
-/// EV once a frame has metered it (`readout`, `Scene::screen_exposure`).
-fn applied_exposure(vc: &PostProcessingComponent, readout: Option<f32>) -> f32 {
-    match vc.exposure_mode {
-        ExposureMode::Fixed => vc.exposure,
-        ExposureMode::Automatic => readout.unwrap_or(vc.exposure),
-    }
 }
 
 /// The automatic mode's limits and compensation.

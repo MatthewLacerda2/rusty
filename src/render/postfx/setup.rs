@@ -133,7 +133,7 @@ impl PostFx {
         // A resize is a cut (#1435): no smear from last frame's framing, and the
         // exposure snaps (#1444).
         self.motion.reset();
-        self.exposure.clock.cut();
+        self.exposure.cut();
     }
 
     fn create_targets(

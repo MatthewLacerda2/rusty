@@ -26,3 +26,16 @@ fn an_allow_with_a_reason_excuses_it() {
     let found = check("src/editor/a.rs", src);
     assert!(crate::rules::allowed(src, found[0].line, RULE));
 }
+
+#[test]
+fn flags_a_bare_slider_and_passes_the_helper() {
+    let src = "ui.add(egui::Slider::new(&mut v, 0.0..=1.0));\n";
+    let found: Vec<_> = check("src/editor/a.rs", src)
+        .iter()
+        .map(|f| f.line)
+        .collect();
+    assert_eq!(found, [1]);
+    let helper = "ui.add(widgets::slider(&mut v, 0.0..=1.0));\n";
+    assert!(check("src/editor/a.rs", helper).is_empty());
+    assert!(check("src/render/a.rs", src).is_empty());
+}

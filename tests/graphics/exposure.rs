@@ -1,6 +1,6 @@
 //! `Graphics.*` exposure (#1444): the mode and the automatic knobs write the main
-//! camera's volume, clamped, and `GetExposure` reads the screen's adapted EV in
-//! `Automatic`, the fixed one otherwise.
+//! camera's volume, clamped, and `GetExposure` reads the configured EV in both
+//! modes, never the screen's adapted one (a GPU readback is no sim input).
 
 use std::cell::RefCell;
 
@@ -64,25 +64,22 @@ fn exposure_knobs_round_trip_and_clamp() {
 }
 
 #[test]
-fn get_exposure_reads_the_adapted_ev_only_in_automatic() {
-    let (mut scene, _) = with_volume();
-    scene.screen_exposure = Some(2.5);
+fn get_exposure_reads_the_configured_ev_in_both_modes() {
+    let (scene, _) = with_volume();
+    // A published adapted EV (dev builds carry one) must not leak into the getter.
+    #[cfg(feature = "dev")]
+    let scene = {
+        let mut scene = scene;
+        scene.screen_exposure = Some(2.5);
+        scene
+    };
     run(
         scene,
         r#"
         Graphics.SetExposure(-1)
         assert(Graphics.GetExposure() == -1, "Fixed reads the fixed EV")
         Graphics.SetExposureMode("Automatic")
-        assert(Graphics.GetExposure() == 2.5, "Automatic reads the screen's")
-    "#,
-    );
-    let (scene, _) = with_volume();
-    run(
-        scene,
-        r#"
-        Graphics.SetExposure(0.75)
-        Graphics.SetExposureMode("Automatic")
-        assert(Graphics.GetExposure() == 0.75, "nothing metered yet")
+        assert(Graphics.GetExposure() == -1, "Automatic never reads the adapted EV")
     "#,
     );
 }

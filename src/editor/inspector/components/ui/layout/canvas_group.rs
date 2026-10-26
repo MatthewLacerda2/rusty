@@ -21,7 +21,8 @@ pub fn draw(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, is_dirty:
         let a = ui
             .horizontal(|ui| {
                 ui.label("Alpha:");
-                ui.add(egui::Slider::new(&mut alpha, 0.0..=1.0)).changed()
+                ui.add(crate::editor::widgets::slider(&mut alpha, 0.0..=1.0))
+                    .changed()
             })
             .inner;
         let i = ui.checkbox(&mut interactable, "Interactable").changed();

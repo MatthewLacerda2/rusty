@@ -1,6 +1,7 @@
 // engine/shaders/postfx/exposure.wgsl — automatic exposure (#1444), Unity HDRP's
 // *Automatic Histogram*: two compute passes over one view's HDR scene, run each
-// frame its volume is in Automatic mode (`postfx::exposure::AutoExposure::prepare`).
+// frame its volume is in Automatic mode (`ExposureMeter::run` in
+// `src/render/postfx/exposure/mod.rs`, with pipelines from `ExposurePasses`).
 //
 //   cs_histogram — a GRID × GRID sample of the scene, each sample's luminance binned
 //                  by log2 into BINS bins spanning [MIN_LOG, MIN_LOG + LOG_RANGE)
@@ -14,7 +15,7 @@
 
 #import postfx::grade::luminance
 
-// Mirrors `AutoExposure::BINS` / `GRID` in `postfx/exposure/mod.rs`.
+// Mirrors the `BINS` / `GRID` consts in `src/render/postfx/exposure/mod.rs`.
 const BINS: u32 = 64u;
 const GRID: u32 = 64u;
 // The log2-luminance span the histogram meters: 2^-10 to 2^10.
@@ -105,7 +106,7 @@ fn cs_reduce(@builtin(local_invocation_index) li: u32) {
         }
         below += n;
     }
-    let avg = select(at_lo, sum / max(weight, 1.0), weight > 0.0);
+    let avg = select(at_lo, sum / weight, weight > 0.0);
     let target_ev = clamp(log2(KEY) - avg + params.limits.z, params.limits.x, params.limits.y);
 
     var ev = target_ev;

@@ -21,6 +21,18 @@ impl DragRange for egui::DragValue<'_> {
     }
 }
 
+/// An `egui::Slider` over `range` that never rewrites a value it did not edit.
+///
+/// egui's default `SliderClamping::Always` clamps the value a slider *shows*, the
+/// slider twin of `DragValue::range` above: a value a scene or script set past the
+/// slider's reach would be rewritten just by selecting the entity (#1444). Clamping
+/// `Edits` bounds only what the user drags or types. Every editor slider is made
+/// here; `make rules` (`drag-range`) flags a bare `Slider::new(`.
+pub fn slider<N: Numeric>(value: &mut N, range: RangeInclusive<N>) -> egui::Slider<'_> {
+    // lint: allow(drag-range) the one place that builds a slider, with clamping on edits only
+    egui::Slider::new(value, range).clamping(egui::SliderClamping::Edits)
+}
+
 #[cfg(test)]
 #[path = "widgets_tests.rs"]
 mod tests;

@@ -127,7 +127,9 @@ pub struct Scene {
     /// exposure's adapted value, read back from the GPU a frame or so late and
     /// written by the frontend that renders the screen. `None` before an automatic
     /// view has rendered. A display value, like a HUD's: never serialized, and never
-    /// a sim input, since another GPU can meter it a hair differently.
+    /// a sim input, since another GPU can meter it a hair differently: only the
+    /// dev-only `Debug.GetAdaptedExposure` reads it.
+    #[cfg(feature = "dev")]
     pub screen_exposure: Option<f32>,
     /// Per-entity runtime shader-param overrides (#670). Runtime-only, never serialized.
     pub shader_overrides: crate::scene::shader_overrides::ShaderOverrides,
@@ -168,6 +170,7 @@ impl Default for Scene {
             persistent: std::collections::BTreeSet::new(),
             shader_time: 0.0,
             ui_time: 0.0,
+            #[cfg(feature = "dev")]
             screen_exposure: None,
             shader_overrides: Default::default(),
             meshes_read_at: 0,
