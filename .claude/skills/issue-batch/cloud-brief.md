@@ -74,6 +74,11 @@ nothing to wait for.
   to rebase and not to fix your own red CI: a red or conflicting ready PR comes
   back to the orchestrator as a hand-back, and it briefs a fix. Anything you
   notice after readying goes in a comment on the issue.
+- **Readying ends you for good.** A later draft flip, a review comment or a PR
+  comment pointing at a new `Brief` is not yours to act on: the orchestrator
+  launches a fresh session for every re-brief. On 2026-10-26 a readied session
+  followed a review comment to the new `Brief` while the fresh one did the same,
+  and one force-push overwrote the other.
 
 ## The container
 

@@ -126,7 +126,7 @@ session: it is subscribed to the PR, not the issue. In the 2026-10-22 batch,
 sessions woke on the draft flip, read only the PR, found no instruction and
 stood down, by design (`cloud-brief.md`: once ready, the branch is the
 queue's). That looked like "half never wake", and it is also why they never
-race the fresh session. So never put the re-brief on the PR: every session
+race the fresh session. So never put the re-brief, or a pointer to it, on the PR: every session
 subscribed to it would act on it, and a PR re-briefed twice has two. **Take the
 `queue` label off when you re-brief**, and put it back only after reading the
 fix. A re-briefed PR that keeps the label is merged as soon as its coder readies
