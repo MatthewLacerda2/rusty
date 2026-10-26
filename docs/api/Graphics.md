@@ -6,6 +6,9 @@ can drive its own settings logic. The per-volume getters/setters target the firs
 `CameraComponent` (motion blur) in the scene — the same volume `build_post_params`
 packs into the GPU uniform each frame, so a write here takes effect next frame.
 Getters return a neutral default when no active volume/camera exists.
+The editor's Camera card edits the same two motion-blur fields (a "Motion Blur"
+checkbox and a "Samples" slider, `2..=32`) through the same ops. A new camera starts
+with motion blur on at 32 samples.
 
 | Function | Signature | Returns |
 |---|---|---|
@@ -20,7 +23,7 @@ Getters return a neutral default when no active volume/camera exists.
 | `Graphics.GetSsrActive` / `SetSsrActive` | `()` / `(bool)` | `bool` |
 | `Graphics.GetSsrQuality` / `SetSsrQuality` | `()` / `(name)` | `string` |
 | `Graphics.GetMotionBlurActive` / `SetMotionBlurActive` | `()` / `(bool)` | `bool` |
-| `Graphics.GetMotionBlurSamples` / `SetMotionBlurSamples` | `()` / `(n)` | `number` (clamped 2–32) |
+| `Graphics.GetMotionBlurSamples` / `SetMotionBlurSamples` | `()` / `(n)` | `number` (clamped 2–32; the clamp is in the shared authoring op) |
 | `Graphics.GetFxaaActive` / `SetFxaaActive` | `()` / `(bool)` | `bool` (**default `true`**) |
 | `Graphics.GetQuality` / `SetQuality` | `()` / `(name)` | `"Low"` / `"Medium"` / `"High"` |
 | `Graphics.GetShadowCascades` / `SetShadowCascades` | `()` / `(n)` | `number` (clamped 1–4, **default `4`**) |

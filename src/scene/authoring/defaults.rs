@@ -161,7 +161,7 @@ pub fn default_camera() -> CameraComponent {
         render_order: 0,
         clear_flags: ClearFlags::Skybox,
         motion_blur_active: true,
-        motion_blur_samples: 64,
+        motion_blur_samples: crate::components::CameraComponent::MAX_MOTION_BLUR_SAMPLES,
         fxaa_active: true,
         projection: Default::default(),
         target_texture: None,

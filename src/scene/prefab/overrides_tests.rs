@@ -18,7 +18,7 @@ fn camera() -> CameraComponent {
         fov: 75.0,
         far: 100.0,
         motion_blur_active: true,
-        motion_blur_samples: 64,
+        motion_blur_samples: 32,
         fxaa_active: false,
         ..CameraComponent::default()
     }

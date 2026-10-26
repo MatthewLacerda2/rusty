@@ -41,11 +41,7 @@ pub(super) fn register_motion_blur<'scope>(
         table,
         "SetMotionBlurSamples",
         scope.create_function(|_, n: u32| {
-            // `2..=32` is an API-input clamp the editor card doesn't apply (it forces
-            // 64), so it stays here; the op is a plain set, keeping both identical.
-            with_cam_mut(scene, |e| {
-                camera_ops::set_motion_blur_samples(e, n.clamp(2, 32))
-            });
+            with_cam_mut(scene, |e| camera_ops::set_motion_blur_samples(e, n));
             Ok(())
         }),
     )?;

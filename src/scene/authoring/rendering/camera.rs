@@ -17,10 +17,8 @@
 //! The component's motion-blur fields ARE also written from `Graphics.*`
 //! (`SetMotionBlurActive` / `SetMotionBlurSamples`); those route through
 //! [`set_motion_blur_active`] / [`set_motion_blur_samples`] here, so the card and the
-//! `Graphics` binding share one write. The `Graphics` sample clamp (`2..=32`) stays in
-//! that adapter — it is an API-input bound the editor card deliberately does not apply
-//! (the card forces a fixed 64-sample high-quality mode), so the ops are plain sets to
-//! keep both behaviours byte-identical.
+//! `Graphics` binding share one write. The sample clamp (`2..=32`) lives in
+//! [`set_motion_blur_samples`], so the card, scripts and the renderer agree.
 //!
 //! Pure.
 
@@ -88,9 +86,13 @@ pub fn set_motion_blur_active(c: &mut CameraComponent, active: bool) {
     c.motion_blur_active = active;
 }
 
-/// Set the camera's motion-blur sample count (no clamp — callers bound their input).
+/// Set the camera's motion-blur sample count, clamped to the range the renderer
+/// honours (`MIN_MOTION_BLUR_SAMPLES..=MAX_MOTION_BLUR_SAMPLES`).
 pub fn set_motion_blur_samples(c: &mut CameraComponent, samples: u32) {
-    c.motion_blur_samples = samples;
+    c.motion_blur_samples = samples.clamp(
+        CameraComponent::MIN_MOTION_BLUR_SAMPLES,
+        CameraComponent::MAX_MOTION_BLUR_SAMPLES,
+    );
 }
 
 /// Set the camera's FXAA flag — the anti-aliasing pass at the end of the post-FX
@@ -201,7 +203,7 @@ mod tests {
         set_render_order(&mut e, 3);
         set_clear_flags(&mut e, ClearFlags::DepthOnly);
         set_motion_blur_active(&mut e, true);
-        set_motion_blur_samples(&mut e, 64);
+        set_motion_blur_samples(&mut e, 16);
         set_fxaa_active(&mut e, false);
         let c = &*e;
         assert_eq!(c.fov, 90.0);
@@ -211,7 +213,17 @@ mod tests {
         assert_eq!(c.render_order, 3);
         assert_eq!(c.clear_flags, ClearFlags::DepthOnly);
         assert!(c.motion_blur_active);
-        assert_eq!(c.motion_blur_samples, 64);
+        assert_eq!(c.motion_blur_samples, 16);
         assert!(!c.fxaa_active, "the op must be able to turn FXAA off");
+    }
+
+    #[test]
+    fn motion_blur_samples_clamp_to_the_renderer_range() {
+        let (mut scene, id) = scene_with_camera();
+        let mut e = scene.world.camera_mut(id).unwrap();
+        set_motion_blur_samples(&mut e, 64);
+        assert_eq!(e.motion_blur_samples, 32);
+        set_motion_blur_samples(&mut e, 0);
+        assert_eq!(e.motion_blur_samples, 2);
     }
 }
