@@ -18,6 +18,7 @@ pub mod dummy;
 mod exposure;
 mod grading;
 mod lens;
+mod lens_flare;
 mod lighting;
 mod ssr;
 
@@ -31,6 +32,7 @@ pub use grading::{
     WhiteBalance,
 };
 pub use lens::{ChromaticAberration, FilmGrain, Vignette};
+pub use lens_flare::LensFlare;
 pub use lighting::{ShadowSettings, SsaoSettings};
 pub use ssr::Ssr;
 
@@ -54,6 +56,7 @@ pub struct PostProcessingComponent {
     pub dummy: dummy::Dummy,
     pub exposure: Exposure,
     pub film_grain: FilmGrain,
+    pub lens_flare: LensFlare,
     pub lift_gamma_gain: LiftGammaGain,
     pub ssr: Ssr,
     pub tonemapping: Tonemapping,
@@ -81,6 +84,7 @@ impl Default for PostProcessingComponent {
             dummy: Default::default(),
             exposure: Default::default(),
             film_grain: Default::default(),
+            lens_flare: Default::default(),
             lift_gamma_gain: Default::default(),
             ssr: Default::default(),
             tonemapping: Default::default(),

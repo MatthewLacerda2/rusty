@@ -50,6 +50,7 @@ fn pass_names_are_stable_and_unique() {
             "particles",
             "depth_of_field",
             "motion_blur",
+            "lens_flare",
             "post_fx",
             "outline",
             "ui"

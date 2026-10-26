@@ -21,6 +21,7 @@ mod fxaa;
 mod grading;
 mod knobs;
 mod lens;
+mod lens_flare;
 mod motion_blur;
 mod ssr;
 
@@ -45,6 +46,7 @@ pub(crate) const REGISTRARS: &[(&str, Registrar)] = &[
     ("exposure", exposure::register),
     ("film_grain", film_grain::register),
     ("fxaa", fxaa::register),
+    ("lens_flare", lens_flare::register),
     ("lift_gamma_gain", lift_gamma_gain::register),
     ("motion_blur", motion_blur::register),
     ("ssr", ssr::register),

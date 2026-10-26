@@ -12,7 +12,7 @@
 //!   the view's LUT, in order;
 //! - a **pass** ([`Pass`]): its own GPU work, on the HDR scene before the composite
 //!   ([`Pass::Scene`]: depth of field, motion blur, the exposure meter, bloom's
-//!   bright pass) or on the LDR image after it ([`Pass::Ldr`]: the authored effects,
+//!   bright pass, the lens flare's add) or on the LDR image after it ([`Pass::Ldr`]: the authored effects,
 //!   FXAA).
 //!
 //! **Params without a shared struct.** Each function packs its own vec4 slots; the
@@ -42,6 +42,7 @@ pub(crate) mod exposure;
 pub(crate) mod fxaa;
 pub(crate) mod grading;
 pub(crate) mod lens;
+pub(crate) mod lens_flare;
 pub(crate) mod motion_blur;
 pub(crate) mod ssr;
 
@@ -69,6 +70,7 @@ pub(crate) const POST_EFFECTS: &[PostEffect] = &[
     exposure::EFFECT,
     film_grain::EFFECT,
     fxaa::EFFECT,
+    lens_flare::EFFECT,
     lift_gamma_gain::EFFECT,
     motion_blur::EFFECT,
     ssr::EFFECT,

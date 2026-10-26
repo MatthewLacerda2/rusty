@@ -24,6 +24,7 @@ mod dummy;
 mod exposure;
 mod grading;
 mod lens;
+mod lens_flare;
 mod ssr;
 mod volume;
 
@@ -69,6 +70,7 @@ pub(crate) const SECTIONS: &[Section] = &[
     dummy::SECTION,
     exposure::SECTION,
     film_grain::SECTION,
+    lens_flare::SECTION,
     lift_gamma_gain::SECTION,
     ssr::SECTION,
     tonemapping::SECTION,

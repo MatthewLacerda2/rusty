@@ -67,6 +67,14 @@ set on that camera entity, in the inspector or the scene file.
 | `Graphics.GetGammaWheel` / `SetGammaWheel` | `()` / `(r, g, b, offset)` | `r, g, b, offset`: the Gamma wheel, as the Lift wheel. Not `GetGamma`, the display-gamma tweak |
 | `Graphics.GetHistogramPercent` / `SetHistogramPercent` | `()` / `(low, high)` | `low, high` (clamped 0–100, `high` ≥ `low`; **default `10, 90`**) |
 | `Graphics.GetHueShift` / `SetHueShift` | `()` / `(degrees)` | `number` (clamped −180–180, **neutral `0`**) |
+| `Graphics.GetLensFlareActive` / `SetLensFlareActive` | `()` / `(bool)` | `bool` (**default `false`**; runs only while bloom does; see *Lens flare*) |
+| `Graphics.GetLensFlareChromaticAberration` / `SetLensFlareChromaticAberration` | `()` / `(value)` | `number` (how far the flare's red and blue split, clamped 0–1, **default `0.5`**) |
+| `Graphics.GetLensFlareGhostCount` / `SetLensFlareGhostCount` | `()` / `(n)` | `number` (ghosts per bright pixel, clamped 0–8, **default `4`**) |
+| `Graphics.GetLensFlareGhostIntensity` / `SetLensFlareGhostIntensity` | `()` / `(value)` | `number` (clamped ≥ 0, **default `1`**) |
+| `Graphics.GetLensFlareHaloIntensity` / `SetLensFlareHaloIntensity` | `()` / `(value)` | `number` (clamped ≥ 0, **default `0.5`**) |
+| `Graphics.GetLensFlareIntensity` / `SetLensFlareIntensity` | `()` / `(value)` | `number` (the whole flare's strength, clamped ≥ 0, **default `1`**) |
+| `Graphics.GetLensFlareStreakIntensity` / `SetLensFlareStreakIntensity` | `()` / `(value)` | `number` (horizontal streaks, clamped ≥ 0, **default `0`** = none) |
+| `Graphics.GetLensFlareTint` / `SetLensFlareTint` | `()` / `(r, g, b)` | `r, g, b` (linear, each clamped 0–1, **default white**) |
 | `Graphics.GetLiftWheel` / `SetLiftWheel` | `()` / `(r, g, b, offset)` | `r, g, b, offset`: the Lift wheel (colour each clamped 0–1, offset −1–1, **neutral `1, 1, 1, 0`**) |
 | `Graphics.GetMotionBlurActive` / `SetMotionBlurActive` | `()` / `(bool)` | `bool` |
 | `Graphics.GetMotionBlurIntensity` / `SetMotionBlurIntensity` | `()` / `(value)` | `number`: Unity's *Intensity*, the shutter fraction (clamped 0–1, **default `0.5`**, a 180° shutter) |
@@ -99,7 +107,7 @@ Each post effect is one module in every layer of the engine (#1467): its setting
 the volume (motion blur and FXAA on the camera, as Unity keeps them), its ops, its
 `Graphics.*` functions, its Inspector section, its render functions or pass, and its
 section below. They run in this order: depth of field, motion blur, the exposure
-meter and bloom's bright pass over the HDR scene; then the composite, which runs
+meter, bloom's bright pass and the lens flare over the HDR scene; then the composite, which runs
 chromatic aberration, screen-space reflections, bloom's add and the exposure on the
 HDR colour, then the grading LUT (white balance, Lift / Gamma / Gain, the color
 adjustments, the tonemapper, the display gamma and the Color Lookup, baked into one
@@ -265,6 +273,29 @@ the **intensity**, before the exposure. It reads the scene after depth of field 
 motion blur, so a moving highlight blooms along its streak. The player's `bloom`
 option gates it. A new volume starts with bloom on at intensity `1`, threshold `0.8`.
 Tween paths: `Graphics.bloom.intensity`, `Graphics.bloom.threshold`.
+
+<!-- effect: lens_flare -->
+#### Lens flare
+
+**Lens flare** (#1443) is Unity URP's *Screen Space Lens Flare*: built from bloom's
+blurred bright pass, so **every** bright pixel (the sun, a muzzle flash, a fire)
+flares with no per-light authoring. Each bright pixel throws **ghosts** mirrored
+through the screen centre (`ghost_count` of them, each at its own scale and lens
+tint, so a light left of the centre ghosts on the right), a **halo** ring around the
+centre, lit most by what is near it, and optional horizontal **streaks**, the
+anamorphic lens's, the same share of the screen at every resolution. The whole is multiplied by the `tint` and the `intensity`, its red
+and blue split by its own `chromatic_aberration`. It renders at half bloom's
+resolution (a quarter of the view's) and is added onto the HDR scene after bloom's
+bright pass, so the exposure and the grade apply to it and it never blooms itself.
+**It runs only while bloom runs**, since it reads bloom's chain: bloom off, or the
+player's `bloom` option off, means no flare. It is off on the Low tier, and the
+player's `lens_flare` option gates it. A new volume starts with it off; once on, four
+ghosts, a halo at `0.5` and no streaks. A frame with nothing above bloom's threshold
+is byte-identical with it on and off, and a flare that can add nothing (no ghosts,
+halo or streaks, or a black tint) costs no pass. Its GPU time is
+`Debug.Stats().gpu_passes.lens_flare`. Tween paths: `Graphics.lens_flare.intensity`,
+`Graphics.lens_flare.ghost_intensity`, `Graphics.lens_flare.halo_intensity`,
+`Graphics.lens_flare.streak_intensity`, `Graphics.lens_flare.chromatic_aberration`.
 
 #### Colour grading
 
@@ -505,7 +536,7 @@ prepass inside `draw_calls` / `triangles`; see `Debug`). `SetSsaoActive(false)` 
 or intensity `0` — skips every one of those passes.
 
 The global **quality preset** gates the heavier passes (SSR is High-tier only;
-motion blur, SSAO and depth of field are off on Low, SSAO and depth of field are
+motion blur, SSAO, depth of field and the lens flare are off on Low, SSAO and depth of field are
 half-resolution on Medium; FXAA runs on all of them). `SetQuality` writes a shared
 resource cell that the platform layer reads each frame and hands to the renderer,
 which reallocates its bloom buffers when the tier actually changes. Unrecognized
@@ -528,6 +559,7 @@ An option can only turn an effect off; it never turns on what a camera left off.
 | `depth_of_field` | the volume's depth of field (off on Low) |
 | `film_grain` | the volume's film grain |
 | `fxaa` | the camera's FXAA |
+| `lens_flare` | the volume's lens flare (off on Low; only while bloom runs) |
 | `motion_blur` | the camera's motion blur (also off on Low) |
 | `ssao` | the volume's ambient occlusion (off on Low) |
 | `ssr` | the volume's screen-space reflections (High only) |
