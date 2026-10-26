@@ -62,3 +62,8 @@ coder *changing* it must know.
   GitHub failed), 4 (another watch holds the lock), 5 (relaunch), and a last line
   `watch: resume: <command>`. The skills and the orchestrator read them, so a change
   to one updates `ci-merge` in the same pull request.
+- **The supervisor** (`queue-daemon.py`, #908) adds two statuses of its own, 7 (its
+  worktree is gone) and 8 (it crashed), each one `supervisor: … stopped.` line, never
+  a traceback (#1450). It holds `git worktree lock` on its worktree for its life
+  (`merging/watch/tenancy.py`), which `reclaim.py` reads back: keep the reason's
+  format (`merge-queue supervisor pid <pid>`) and `tenancy.pid_of` in step.

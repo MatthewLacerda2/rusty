@@ -11,7 +11,7 @@ import time
 from pathlib import Path
 
 from merging.queue import gitio, world
-from merging.watch import ending, freshness, lock, supervisor
+from merging.watch import detach, ending, freshness, lock, supervisor, tenancy
 
 
 def common_dir(root: str) -> Path:
@@ -48,8 +48,10 @@ def effects(root: str, forwarded: list[str], argv: list[str]) -> argparse.Namesp
     """What [`supervisor.run`] does to the world. Called once, at start: that is
     when the supervisor's own code is noted ([`freshness.launched`])."""
     code = freshness.launched(freshness.running(), world.git_at)
+    stop = common_dir(root) / ending.STOP_FILE  # found once: the main checkout's, it outlives `root`
     return argparse.Namespace(
-        stop_requested=lambda: world.consume(common_dir(root) / ending.STOP_FILE),
+        gone=lambda: None if os.path.isdir(root) else root,
+        stop_requested=lambda: world.consume(stop),
         update=lambda: update(root),
         restart_needed=lambda: bool(freshness.changed(code, functools.partial(world.merge_tree_git, root))),
         restart=lambda: os.execv(sys.executable, [sys.executable, sys.argv[0], *argv]),
@@ -93,11 +95,22 @@ def main(argv: list[str] | None = None) -> int:
                 [sys.executable, sys.argv[0], *(a for a in argv if a != "--detach")],
                 stdout=out, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, start_new_session=True,
             )
+        failed = detach.confirm(child, common_dir(root) / supervisor.LOCK, log)
+        if failed:
+            print(failed, file=sys.stderr)
+            return child.returncode or 1
         print(f"queue-daemon: supervisor started, PID {child.pid}; log {log}; stop with `make queue-stop`.")
         return 0
-    held, holder = lock.hold(common_dir(root) / supervisor.LOCK)
+    common = common_dir(root)
+    held, holder = lock.hold(common / supervisor.LOCK)
     if held is None:
         print(f"queue-daemon: another supervisor runs (PID {holder}); one at a time.", flush=True)
         return lock.LOCKED_STATUS
     with held:
-        return supervisor.run(effects(root, forwarded, argv))
+        for note in (detach.clear_stale_stop(common), tenancy.claim(root, os.getpid())):
+            if note:
+                print(note, flush=True)
+        try:
+            return supervisor.supervise(effects(root, forwarded, argv))
+        finally:
+            tenancy.release(root, os.getpid())

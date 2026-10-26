@@ -40,5 +40,21 @@ def hold(path: Path):
     return handle, None
 
 
+def holder(path: Path) -> str | None:
+    """The PID written in the lock at `path` while a live process holds it, or
+    `None` when nothing does. Reads only: it never writes the file (#1450)."""
+    try:
+        handle = open(path)
+    except FileNotFoundError:
+        return None
+    with handle:
+        try:
+            fcntl.flock(handle, fcntl.LOCK_SH | fcntl.LOCK_NB)
+        except BlockingIOError:
+            return handle.read().strip() or "unknown"
+        fcntl.flock(handle, fcntl.LOCK_UN)
+    return None
+
+
 def refused(path: Path, pid: str) -> str:
     return f"another watch holds {path} (PID {pid}); one watch at a time. Stop it first, or leave it running."
