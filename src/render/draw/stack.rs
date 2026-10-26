@@ -103,17 +103,7 @@ impl Renderer {
         };
         let graphics = self.graphics(ctx.stack.editor_mode);
 
-        // Per-object motion blur (#1436), over the velocity target the stack wrote:
-        // bloom and the composite below then read the blurred scene. Gated as the
-        // velocity was, so the editor's Scene view never blurs.
-        let stack = ctx.stack;
-        let blurs = motion::wanted(stack.post, graphics, stack.full_post_fx, stack.editor_mode);
-        let blur = blur_params(stack.post, graphics, view.size().height)
-            .filter(|_| blurs)
-            .map(|b| b.per_frames(stack.motion_frames));
-        let gpu = (&self.device, &self.queue);
-        view.post_fx
-            .run_motion_blur(gpu, &self.motion_blur, blur, &self.gpu_timer);
+        self.blur_scene(view, ctx.stack);
 
         // The grade + tonemap and the Color Lookup (#1440, #1441): rebaked only when
         // this view's inputs changed.
@@ -155,6 +145,20 @@ impl Renderer {
         };
         view.post_fx
             .run(&self.device, &self.queue, ctx, post_params, passes);
+    }
+
+    /// Per-object motion blur (#1436), over the velocity target the stack wrote:
+    /// bloom, the exposure meter and the composite then read the blurred scene.
+    /// Gated as the velocity was, so the editor's Scene view never blurs.
+    fn blur_scene(&self, view: &mut RenderView, stack: &StackPass) {
+        let graphics = self.graphics(stack.editor_mode);
+        let blurs = motion::wanted(stack.post, graphics, stack.full_post_fx, stack.editor_mode);
+        let blur = blur_params(stack.post, graphics, view.size().height)
+            .filter(|_| blurs)
+            .map(|b| b.per_frames(stack.motion_frames));
+        let gpu = (&self.device, &self.queue);
+        view.post_fx
+            .run_motion_blur(gpu, &self.motion_blur, blur, &self.gpu_timer);
     }
 
     /// Automatic exposure (#1444): meter this view's scene, after motion blur (#1436), and adapt, on the GPU, when
