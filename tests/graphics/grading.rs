@@ -1,6 +1,6 @@
 //! `Graphics.*` colour grading (#1440): white balance, the Lift / Gamma / Gain
 //! wheels and the hue shift write the main camera's volume, clamped, read back what
-//! they wrote, and read neutral without a volume.
+//! they wrote, and read neutral without a volume; so does the Color Lookup (#1441).
 
 use std::cell::RefCell;
 
@@ -62,6 +62,40 @@ fn without_a_volume_the_getters_read_neutral() {
         assert(Graphics.GetHueShift() == 0)
         local r, g, b, o = Graphics.GetLiftWheel()
         assert(r == 1 and o == 0)
+    "#,
+    );
+}
+
+#[test]
+fn the_color_lookup_round_trips_clears_and_clamps() {
+    let mut scene = Scene::new();
+    let id = scene.add_entity("Camera".to_string());
+    scene.world.set_camera(id, Some(CameraComponent::default()));
+    scene
+        .world
+        .set_post_processing(id, Some(default_post_processing()));
+    let scene = run(
+        scene,
+        r#"
+        assert(Graphics.GetColorLookup() == nil and Graphics.GetColorLookupContribution() == 1)
+        Graphics.SetColorLookup("assets/luts/warm.cube")
+        Graphics.SetColorLookupContribution(-2)
+        assert(Graphics.GetColorLookup() == "assets/luts/warm.cube")
+        assert(Graphics.GetColorLookupContribution() == 0, "clamped to 0")
+        Graphics.SetColorLookup("")
+        assert(Graphics.GetColorLookup() == nil, "an empty path clears it")
+        Graphics.SetColorLookup("assets/luts/strip.png")
+        Graphics.SetColorLookupContribution(0.5)
+    "#,
+    );
+    let vc = scene.world.post_processing(id).unwrap();
+    assert_eq!(vc.lut.as_deref(), Some("assets/luts/strip.png"));
+    assert_eq!(vc.lut_contribution, 0.5);
+    run(
+        Scene::new(),
+        r#"
+        Graphics.SetColorLookup("x.cube")
+        assert(Graphics.GetColorLookup() == nil and Graphics.GetColorLookupContribution() == 1)
     "#,
     );
 }
