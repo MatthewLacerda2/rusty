@@ -5,8 +5,5 @@
 pub(super) mod color_adjustments;
 pub(super) mod color_lookup;
 pub(super) mod lift_gamma_gain;
-mod lut_field;
 pub(super) mod tonemapping;
 pub(super) mod white_balance;
-
-pub use lut_field::commit_abandoned as commit_abandoned_lut;

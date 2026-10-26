@@ -22,7 +22,7 @@ mod lighting;
 mod ssr;
 
 // sorted: each module's settings, re-exported by name
-pub use bloom::Bloom;
+pub use bloom::{Bloom, DEFAULT_DIRT_TEXTURE};
 pub use custom_effects::CustomEffects;
 pub use depth_of_field::{DepthOfField, DofMode};
 pub use exposure::{AutoExposure, Exposure, ExposureMode};

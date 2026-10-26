@@ -235,6 +235,8 @@ impl PostFx {
                 uniform_entry(8, wgpu::ShaderStages::FRAGMENT),
                 // The composite's effect slots (#1467).
                 uniform_entry(9, wgpu::ShaderStages::FRAGMENT),
+                // Bloom's lens dirt (#1442).
+                texture_entry(10, wgpu::TextureViewDimension::D2),
             ],
         })
     }

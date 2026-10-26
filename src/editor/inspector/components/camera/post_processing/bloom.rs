@@ -1,5 +1,7 @@
-//! The Bloom section: the switch and, while on, its two knobs.
+//! The Bloom section: the switch and, while on, its knobs and the lens dirt
+//! texture (#1442).
 
+use super::path_field::{self, DIRT};
 use super::{knob, knob_row, toggle, Section};
 use crate::scene::authoring::rendering::post_processing::bloom;
 use crate::scene::PostProcessingComponent;
@@ -34,10 +36,12 @@ fn draw(
         let rows = [
             ("    Intensity:", "intensity", 5.0),
             ("    Threshold:", "threshold", 1.0),
+            ("    Dirt Intensity:", "dirt_intensity", 10.0),
         ];
         for (label, field, max) in rows {
             let row = (label, knob(knobs, field));
             *is_dirty |= knob_row(ui, (&mut *world, id), row, vc, 0.0..=max);
         }
+        path_field::draw(ui, (world, id), &DIRT, vc, is_dirty);
     }
 }

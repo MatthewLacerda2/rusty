@@ -11,7 +11,7 @@ mod motion_blur;
 pub(crate) mod post_processing;
 mod target;
 
-pub use post_processing::{commit_abandoned_lut, draw_post_processing};
+pub use post_processing::{commit_abandoned_paths, draw_post_processing};
 
 use crate::editor::inspector::components::card::component_card;
 use crate::scene::authoring::{self, rendering::camera as camera_ops, ComponentKind};

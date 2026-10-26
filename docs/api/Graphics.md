@@ -31,6 +31,8 @@ set on that camera entity, in the inspector or the scene file.
 |---|---|---|
 | `Graphics.GetAdaptationSpeed` / `SetAdaptationSpeed` | `()` / `(up, down)` | `up, down` in EV per second (each clamped 0–100; **default `1, 3`**) |
 | `Graphics.GetBloomActive` / `SetBloomActive` | `()` / `(bool)` | `bool` |
+| `Graphics.GetBloomDirtIntensity` / `SetBloomDirtIntensity` | `()` / `(value)` | `number` (≥ 0, **default `0`**; see *Bloom*) |
+| `Graphics.GetBloomDirtTexture` / `SetBloomDirtTexture` | `()` / `(path)` | `string` or `nil`: the lens dirt image (`nil` or `""` clears it; see *Bloom*) |
 | `Graphics.GetBloomIntensity` / `SetBloomIntensity` | `()` / `(value)` | `number` (≥ 0) |
 | `Graphics.GetBloomThreshold` / `SetBloomThreshold` | `()` / `(value)` | `number` (≥ 0) |
 | `Graphics.GetChromaticAberrationActive` / `SetChromaticAberrationActive` | `()` / `(bool)` | `bool` (**default `false`**) |
@@ -264,7 +266,16 @@ half the view's resolution (a quarter on Low), and the composite adds it back ti
 the **intensity**, before the exposure. It reads the scene after depth of field and
 motion blur, so a moving highlight blooms along its streak. The player's `bloom`
 option gates it. A new volume starts with bloom on at intensity `1`, threshold `0.8`.
-Tween paths: `Graphics.bloom.intensity`, `Graphics.bloom.threshold`.
+
+**Lens dirt** (#1442) is Unity's *Dirt Texture* / *Dirt Intensity*: an image stretched
+over the screen that the bloom lights, so smudges on the lens show only where bright
+light reaches them (`bloom × dirt × dirt intensity`, added with the bloom). It needs
+both a **dirt texture** and a **dirt intensity** above `0`, and shows nothing while
+bloom is off. `engine/textures/lens_dirt.png` names the engine's own neutral smudges,
+for a game with no art of its own; a missing or unreadable file is logged once and
+draws no dirt. A new volume starts with no dirt texture and a dirt intensity of `0`.
+Tween paths: `Graphics.bloom.intensity`, `Graphics.bloom.threshold`,
+`Graphics.bloom.dirt_intensity`.
 
 #### Colour grading
 
