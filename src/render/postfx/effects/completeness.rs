@@ -7,9 +7,11 @@
 //! `Graphics.*` registrar, its Inspector section, its section in
 //! `docs/api/Graphics.md` (`<!-- effect: <name> -->`) naming every knob's tween
 //! path, and, when it is player-facing, its `GraphicsOption` named after it with a
-//! row in the doc's *Player options* table.
+//! row in the doc's *Player options* table. Each composite texture it declares is
+//! bound in the assembled composite and passed to its function (#1473).
 
-use super::{Owner, POST_EFFECTS};
+use super::textures::{composite_textures, GROUP};
+use super::{assemble, Owner, POST_EFFECTS};
 use crate::components::PostProcessingComponent;
 use crate::core::settings::graphics_options::GraphicsOption;
 use crate::scene::authoring::fields;
@@ -34,6 +36,10 @@ pub(super) struct Layers {
     pub options: Vec<String>,
     /// `docs/api/Graphics.md` (and the test-only effects' own sections).
     pub docs: String,
+    /// The composite textures the effects declare: effect, name in the composite.
+    pub textures: Vec<(String, String)>,
+    /// The assembled composite's WGSL.
+    pub composite: String,
 }
 
 /// The test-only effects' sections, which no shipped doc holds.
@@ -88,6 +94,11 @@ pub(super) fn engine() -> Layers {
             .map(|o| o.name().into())
             .collect(),
         docs: TEST_ONLY_DOCS.iter().fold(docs, |all, doc| all + doc),
+        textures: composite_textures()
+            .iter()
+            .map(|t| (t.effect.name.into(), t.wgsl_name()))
+            .collect(),
+        composite: assemble::composite_source(),
     }
 }
 
@@ -134,6 +145,34 @@ pub(super) fn check(l: &Layers) -> Vec<String> {
         }
     }
     problems.extend(unknown(l));
+    problems.extend(unbound(l));
+    problems
+}
+
+/// Each declared composite texture its binding in group 1 lacks, or its function's
+/// call doesn't pass.
+fn unbound(l: &Layers) -> Vec<String> {
+    let mut problems = Vec::new();
+    for (binding, (effect, name)) in l.textures.iter().enumerate() {
+        let declared = format!("@group({GROUP}) @binding({binding}) var {name}: texture_2d<f32>;");
+        if !l.composite.contains(&declared) {
+            problems.push(format!(
+                "`{effect}`'s composite texture `{name}` is not bound at group {GROUP}, binding {binding}"
+            ));
+        }
+        // A call reads `    c = <module>::<function>(c, f, <textures>, <slots>);`.
+        let passed = (l.composite.lines()).any(|line| {
+            line.starts_with("    c = ")
+                && [",", ")"]
+                    .iter()
+                    .any(|end| line.contains(&format!(", {name}{end}")))
+        });
+        if !passed {
+            problems.push(format!(
+                "`{effect}`'s composite texture `{name}` is not passed to its function"
+            ));
+        }
+    }
     problems
 }
 

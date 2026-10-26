@@ -10,13 +10,13 @@ use crate::render::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
 use crate::scene::authoring::{create_entity, default_post_processing, Primitive};
 use crate::scene::{Camera, Scene};
 
-const W: u32 = 128;
-const H: u32 = 96;
+pub(super) const W: u32 = 128;
+pub(super) const H: u32 = 96;
 
 /// A black wall filling the view and a small box lit by its own `emissive`, a
 /// quarter of the width left of the centre; the camera's volume blooms, and
 /// flares when `flare` holds.
-fn scene(emissive: f32, flare: bool) -> Scene {
+pub(super) fn scene(emissive: f32, flare: bool) -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
     scene.ambient_intensity = 0.0;
@@ -53,11 +53,11 @@ fn glowing(scene: &mut Scene, name: &str, at: Vec3, emissive: f32) -> u32 {
     id
 }
 
-fn eye() -> Camera {
+pub(super) fn eye() -> Camera {
     Camera::new(Vec3::ZERO, -90.0, 0.0)
 }
 
-fn renderer(tier: QualityPreset) -> Option<Renderer> {
+pub(super) fn renderer(tier: QualityPreset) -> Option<Renderer> {
     let mut r = crate::render::test_gpu::headless_or_skip(W, H)?;
     r.quality = tier;
     Some(r)

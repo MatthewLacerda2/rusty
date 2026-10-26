@@ -84,3 +84,29 @@ fn a_section_or_doc_marker_for_no_effect_is_flagged() {
         );
     }
 }
+
+#[test]
+fn a_composite_texture_not_bound_or_not_passed_is_flagged() {
+    let mut l = engine();
+    assert!(
+        l.textures
+            .iter()
+            .any(|(e, n)| e == "dummy" && n == "dummy_probe"),
+        "the dummy declares a composite texture"
+    );
+    l.composite = (l.composite.lines())
+        .filter(|line| !line.contains("var dummy_probe"))
+        .map(|line| line.replace(", bloom_dirt", ""))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let problems = check(&l).join("\n");
+    for needle in [
+        "`dummy`'s composite texture `dummy_probe` is not bound at group 1",
+        "`bloom`'s composite texture `bloom_dirt` is not passed to its function",
+    ] {
+        assert!(
+            problems.contains(needle),
+            "not flagged: {needle}\n{problems}"
+        );
+    }
+}

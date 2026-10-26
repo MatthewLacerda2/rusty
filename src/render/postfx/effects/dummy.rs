@@ -1,9 +1,13 @@
 //! The test-only dummy effect (#1467): a scene pass that draws nothing, its doc
-//! section, which no shipped doc holds, and the two things an effect declares for
-//! itself: the tiers it runs on (its [`Gate`]) and its own per-view state (a slot of
-//! [`Targets`]), so neither `QualityPreset` nor `PostFx` names it.
+//! section, which no shipped doc holds, and the things an effect declares for
+//! itself: the tiers it runs on (its [`Gate`]), its own per-view state (a slot of
+//! [`Targets`]) and a composite function reading a texture of its own (a
+//! [`CompositeTexture`], #1473), so neither `QualityPreset`, `PostFx` nor the
+//! composite's shared bindings name it.
 
-use super::{EffectCx, Owner, Pass, PassCx, PostEffect, Targets};
+use super::{
+    Composite, CompositeTexture, EffectCx, Owner, Pass, PassCx, Phase, PostEffect, Targets,
+};
 use crate::core::settings::quality::QualityPreset;
 use crate::render::postfx::params::Gate;
 use crate::render::{RenderView, Renderer};
@@ -15,8 +19,19 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
         option: None,
         tiers: |q| q == QualityPreset::High,
     },
-    module: None,
-    composite: &[],
+    module: Some("postfx/effects/dummy.wgsl"),
+    composite: &[Composite {
+        phase: Phase::Hdr,
+        order: 90,
+        function: "hdr",
+        slots: 0,
+        // Never provided: the registry binds its black texel.
+        textures: &[CompositeTexture {
+            name: "probe",
+            view: |_| None,
+        }],
+        pack: |_, _| {},
+    }],
     grade: &[],
     pass: Some(Pass::Scene { order: 90, run }),
 };

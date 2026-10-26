@@ -219,3 +219,5 @@ fn run(r: &Renderer, view: &mut RenderView, cx: &PassCx) {
 mod gpu_tests;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod texture_gpu_tests;

@@ -68,13 +68,22 @@ every file and row.
   composite, `Pass::Ldr` after it), **each placed by the order it declares**. Its WGSL
   is a module at `engine/shaders/postfx/effects/<effect>.wgsl` with
   `#define_import_path postfx::effects::<effect>`: a function takes the colour, the
-  `Frag` (composite only) and one `vec4` per slot it declares, reads the chain's
-  bindings from `postfx::frame`, and leaves the colour as it was when its slots say it
-  is off. Its `pack` writes only its own slots. A pass with pipelines of its own adds
-  them to `effects::Passes` (and lazy ones to its `lazy_pipelines`). Its per-view
-  targets are its own type in `PostFx::targets` (`effects::Targets`: `get_or` while
-  it runs, `remove` when it doesn't; a resize drops every slot), never a `PostFx`
-  field.
+  `Frag` (composite only), one `texture_2d<f32>` per composite texture and one `vec4`
+  per slot it declares, reads the chain's bindings from `postfx::frame`, and leaves
+  the colour as it was when its slots say it is off. Its `pack` writes only its own
+  slots. A pass with pipelines of its own adds them to `effects::Passes` (and lazy
+  ones to its `lazy_pipelines`). Its per-view targets are its own type in
+  `PostFx::targets` (`effects::Targets`: `get_or` while it runs, `remove` when it
+  doesn't; a resize drops every slot), never a `PostFx` field.
+- **Composite textures** — a composite function that reads a texture of its effect's
+  own (a target its pass drew, a texture it picked) declares it in its `textures`
+  ([`CompositeTexture`](postfx/effects/textures.rs): a name and a `view` fn of the
+  `PostFx`). The registry binds it in the composite's group 1 and passes it to the
+  function (`effects::textures`, #1473), so no effect edits `postfx/frame.wgsl`, the
+  io layout or `PostFx::run`. A `view` of `None` binds one shared black texel, so the
+  function must draw nothing when it reads black (bloom's dirt, the lens flare). It
+  samples with the chain's own samplers (`s_color`, `s_skybox`). The `dummy`
+  declares one, never provided.
 - **Gate** — its `PostEffect::gate`: the player option, when it is player-facing,
   and the quality tiers it runs on (`tiers`, a `fn(QualityPreset) -> bool`). It asks
   through `EffectCx::runs(EFFECT.gate, on)`; no shared `match` names it.
@@ -83,7 +92,7 @@ every file and row.
 - **Docs** — a `<!-- effect: <name> -->` section in `docs/api/Graphics.md` naming each
   tween path, its rows in the sorted function table, and its *Player options* row.
 - **Completeness** — `render::postfx::effects::completeness` fails when any layer lacks the
-  effect's part. Pixels of every other effect stay byte-identical: no other offset or
+  effect's part, or a composite texture it declares isn't bound and passed. Pixels of every other effect stay byte-identical: no other offset or
   struct moved.
 
 ## GPU tests
