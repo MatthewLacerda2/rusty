@@ -30,20 +30,28 @@ fn effect_runs_needs_camera_option_and_tier() {
     assert!(!effect_runs(off, ssr, true), "option off");
 }
 
-/// Each effect declares the tiers it runs on: SSR on High only, motion blur and
-/// depth of field off on Low, FXAA and bloom on every tier.
+/// Each effect declares the tiers it runs on: SSR on High only, motion blur off on
+/// Low, depth of field and SSAO off on Low, and FXAA, bloom and the lens effects on
+/// every tier.
 #[test]
 fn each_effect_runs_on_the_tiers_it_declares() {
+    use crate::render::postfx::effects::lens::{chromatic_aberration, film_grain, vignette};
     use crate::render::postfx::effects::{bloom, depth_of_field, fxaa, motion_blur, ssr};
     use QualityPreset::*;
     let runs = |gate: Gate, tier| effect_runs(GraphicsSettings::from(tier), gate, true);
     assert!(!runs(motion_blur::EFFECT.gate, Low) && runs(motion_blur::EFFECT.gate, Medium));
-    assert!(!runs(depth_of_field::EFFECT.gate, Low));
     assert!(!runs(ssr::EFFECT.gate, Medium) && runs(ssr::EFFECT.gate, High));
+    let dof = depth_of_field::EFFECT.gate;
+    assert!(!runs(dof, Low) && runs(dof, Medium) && runs(dof, High));
     for tier in QualityPreset::ALL {
-        assert!(
-            runs(fxaa::EFFECT.gate, tier) && runs(bloom::EFFECT.gate, tier),
-            "{tier}"
-        );
+        let every = [
+            fxaa::EFFECT.gate,
+            bloom::EFFECT.gate,
+            vignette::EFFECT.gate,
+            chromatic_aberration::EFFECT.gate,
+            film_grain::EFFECT.gate,
+        ];
+        assert!(every.into_iter().all(|g| runs(g, tier)), "{tier}");
     }
+    assert!(Low.ssao().is_none() && Medium.ssao().is_some() && High.ssao().is_some());
 }

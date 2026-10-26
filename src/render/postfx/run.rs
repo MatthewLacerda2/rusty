@@ -25,9 +25,11 @@ impl PostFx {
         queue.write_buffer(&self.fx_buffer, 0, bytemuck::cast_slice(&slots));
         let ldr: Vec<&LdrRun> = effects::ldr_passes()
             .iter()
-            .filter_map(|pass| match pass {
-                Pass::Ldr { prepare, run, .. } => prepare(self, device, cx).then_some(run),
-                Pass::Scene { .. } => None,
+            .filter_map(|pass| {
+                let Pass::Ldr { prepare, run, .. } = pass else {
+                    return None;
+                };
+                prepare(self, device, cx).then_some(run)
             })
             .collect();
 

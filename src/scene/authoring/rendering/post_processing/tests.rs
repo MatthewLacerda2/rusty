@@ -85,3 +85,31 @@ fn a_load_holds_every_knob_through_the_knobs_own_setter() {
         }
     }
 }
+
+/// The volume's `ssao` and `shadows` objects merge like an effect's (#1469): a
+/// partial write keeps the other fields, and a misspelt key is an error.
+#[test]
+fn ssao_and_shadows_merge_and_refuse_unknown_keys() {
+    let mut scene = Scene::new();
+    let id = scene.add_entity("Volume".to_string());
+    let mut vc = default_post_processing();
+    (vc.ssao.active, vc.ssao.radius) = (false, 0.75);
+    (vc.shadows.cascades, vc.shadows.distance) = (2, 40.0);
+    scene.world.set_post_processing(id, Some(vc));
+    let kind = find("PostProcessing").unwrap();
+    let mut write = |json: serde_json::Value| {
+        let changes = json.as_object().unwrap().clone();
+        (kind.write)(&mut scene.world, id, &changes, Skip::Held)
+    };
+    assert!(
+        write(serde_json::json!({"ssao": {"intensity": 2.0}, "shadows": {"distance": 90.0}}))
+            .unwrap()
+    );
+    assert!(write(serde_json::json!({"ssao": {"intensty": 3.0}})).is_err());
+    let vc = scene.world.post_processing(id).unwrap();
+    assert_eq!(
+        (vc.ssao.active, vc.ssao.radius, vc.ssao.intensity),
+        (false, 0.75, 2.0)
+    );
+    assert_eq!((vc.shadows.cascades, vc.shadows.distance), (2, 90.0));
+}
