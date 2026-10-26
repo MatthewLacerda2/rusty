@@ -8,9 +8,11 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
+mod exposure;
 mod grading;
 mod tonemap;
 
+pub use exposure::{AutoExposure, ExposureMode};
 pub use grading::{ColorWheel, LiftGammaGain, Wheel, WhiteBalance};
 pub use tonemap::Tonemap;
 
@@ -21,7 +23,15 @@ pub struct PostProcessingComponent {
     pub bloom_intensity: f32,
     pub bloom_threshold: f32,
     /// A pre-grade HDR scale, in EV: the one colour knob outside the grading LUT.
+    /// The exposure itself in `Fixed` mode; unused in `Automatic` (#1444).
     pub exposure: f32,
+    /// Fixed or automatic exposure (#1444); `Fixed` when absent.
+    #[serde(default)]
+    pub exposure_mode: ExposureMode,
+    /// The automatic mode's limits, speeds and histogram window (#1444); the engine
+    /// defaults when absent.
+    #[serde(default)]
+    pub auto_exposure: AutoExposure,
     pub contrast: f32,
     pub saturation: f32,
     /// The white point (#1440); neutral when absent.
@@ -149,6 +159,21 @@ mod tests {
 
     fn load(extra: &str) -> PostProcessingComponent {
         serde_json::from_str(&format!("{{{BODY}{extra}}}")).unwrap()
+    }
+
+    #[test]
+    fn exposure_mode_is_fixed_when_absent_and_auto_exposure_round_trips() {
+        let vc = load("");
+        assert_eq!(vc.exposure_mode, super::ExposureMode::Fixed);
+        assert_eq!(vc.auto_exposure, super::AutoExposure::default());
+        let vc = load(r#", "exposure_mode": "Automatic", "auto_exposure": {"max_ev": 3.0}"#);
+        let back: PostProcessingComponent =
+            serde_json::from_str(&serde_json::to_string(&vc).unwrap()).unwrap();
+        assert_eq!(back.exposure_mode, super::ExposureMode::Automatic);
+        assert_eq!(
+            (back.auto_exposure.max_ev, back.auto_exposure.min_ev),
+            (3.0, -6.0)
+        );
     }
 
     #[test]

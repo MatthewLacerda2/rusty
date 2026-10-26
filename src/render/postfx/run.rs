@@ -173,7 +173,7 @@ impl PostFx {
     }
 
     /// Build a bind group: params + color(1) + sampler(2) + bloom(3) + depth(4) +
-    /// skybox(5) + its sampler(6) + the grading LUT(7). `color` is the texture the pass reads, `bloom` an
+    /// skybox(5) + its sampler(6) + the grading LUT(7) + the adapted exposure(8). `color` is the texture the pass reads, `bloom` an
     /// aux texture.
     fn io_bind_group(
         &self,
@@ -218,6 +218,10 @@ impl PostFx {
                 wgpu::BindGroupEntry {
                     binding: 7,
                     resource: wgpu::BindingResource::TextureView(&self.grade.view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 8,
+                    resource: self.exposure.state().as_entire_binding(),
                 },
             ],
         })

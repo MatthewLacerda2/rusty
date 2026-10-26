@@ -19,7 +19,7 @@ use std::collections::BTreeMap;
 use glam::Mat4;
 
 use super::{PostParams, PostPasses};
-use crate::components::{CameraComponent, PostProcessingComponent};
+use crate::components::{AutoExposure, CameraComponent, ExposureMode, PostProcessingComponent};
 use crate::core::settings::graphics_options::GraphicsOption;
 use crate::core::settings::GraphicsSettings;
 use crate::scene::camera::camera_volume;
@@ -123,9 +123,22 @@ pub(crate) fn build_post_params(
         ),
         _ => (0.0, 0.0),
     };
-    params.flags = [ssr_mode, mb_active, 1.0, 0.0];
+    let auto = if auto_exposure(post).is_some() {
+        1.0
+    } else {
+        0.0
+    };
+    params.flags = [ssr_mode, mb_active, 1.0, auto];
     params.misc[3] = mb_samples;
     (params, bloom)
+}
+
+/// `post`'s automatic-exposure knobs, when its volume meters the exposure (#1444).
+/// The player has no option for it: the exposure is the developer's look.
+pub(crate) fn auto_exposure<'a>(post: PostSource<'a>) -> Option<&'a AutoExposure> {
+    post.volume
+        .filter(|vc| vc.exposure_mode == ExposureMode::Automatic)
+        .map(|vc| &vc.auto_exposure)
 }
 
 /// Whether `post`'s camera runs motion blur, through [`effect_runs`]: its component

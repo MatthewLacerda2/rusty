@@ -4,7 +4,8 @@
 //! can drive its own settings logic in Lua. Two backing stores:
 //!
 //! * Per-volume render state — the main camera's `PostProcessingComponent`
-//!   (bloom, exposure/contrast/saturation/gamma, tonemap, SSR), registered here,
+//!   (bloom, contrast/saturation/gamma, tonemap, SSR), registered here, its exposure
+//!   and auto-exposure (`exposure`, #1444),
 //!   and its colour grade (white balance, Lift / Gamma / Gain, hue shift; `grading`),
 //!   plus its `CameraComponent` knobs (motion blur, FXAA) in the `camera` submodule.
 //!   The main camera is the screen stack's base (`scene::camera::main_camera`, Unity's
@@ -31,6 +32,7 @@ use std::cell::RefCell;
 
 mod camera;
 mod effects;
+mod exposure;
 mod fog;
 mod grading;
 mod options;
@@ -59,7 +61,8 @@ pub fn register<'scope>(
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
     register_bloom(scope, &table, scene)?;
-    register_exposure_contrast(scope, &table, scene)?;
+    exposure::register_exposure(scope, &table, scene)?;
+    register_contrast(scope, &table, scene)?;
     register_saturation_gamma(scope, &table, scene)?;
     register_tonemap(scope, &table, scene)?;
     grading::register_grading(scope, &table, scene)?;
@@ -128,26 +131,12 @@ fn register_bloom<'scope>(
     )
 }
 
-/// Color grading: `Set`/`Get` for exposure and contrast.
-fn register_exposure_contrast<'scope>(
+/// Color grading: `Set`/`Get` for contrast.
+fn register_contrast<'scope>(
     scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
-    put(
-        table,
-        "SetExposure",
-        scope.create_function(|_, v: f32| {
-            with_vc_mut(scene, |e| vc_ops::set_exposure(e, v));
-            Ok(())
-        }),
-    )?;
-    put(
-        table,
-        "GetExposure",
-        scope.create_function(|_, ()| Ok(with_vc(scene, |vc| vc.exposure).unwrap_or(0.0))),
-    )?;
-
     put(
         table,
         "SetContrast",

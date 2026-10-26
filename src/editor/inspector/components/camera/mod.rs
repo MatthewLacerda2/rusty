@@ -7,6 +7,7 @@ use crate::editor::widgets::DragRange;
 use egui_phosphor::regular as icon;
 
 mod custom_effects;
+mod exposure;
 mod grading;
 mod post_processing;
 mod target;

@@ -67,6 +67,9 @@ impl Frontend for PlayerFrontend {
         let textures = std::rc::Rc::clone(game.resources.screen.borrow().textures());
         shell.renderer.set_ui_textures(textures);
         shell.renderer.render(view, &scene, &camera, target, false);
+        drop(scene);
+        // `Graphics.GetExposure` reads the screen's adapted exposure (#1444).
+        game.scene().borrow_mut().screen_exposure = view.exposure_readout();
     }
 }
 

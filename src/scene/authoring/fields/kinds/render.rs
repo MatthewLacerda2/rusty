@@ -9,9 +9,9 @@ use super::super::value::Mask;
 use super::NO_OP;
 use crate::components::rendering::camera::RenderTarget;
 use crate::components::{
-    CameraComponent, LiftGammaGain, LightComponent, LodGroupComponent, LodLevel, MaterialComponent,
-    MeshComponent, PostProcessingComponent, ShadowSettings, SsaoSettings, TransformComponent,
-    Wheel, WhiteBalance,
+    AutoExposure, CameraComponent, LiftGammaGain, LightComponent, LodGroupComponent, LodLevel,
+    MaterialComponent, MeshComponent, PostProcessingComponent, ShadowSettings, SsaoSettings,
+    TransformComponent, Wheel, WhiteBalance,
 };
 use crate::scene::authoring::{
     rendering::camera, rendering::light, rendering::lod_group as lod,
@@ -68,6 +68,13 @@ inspect! {
         op!("bloom_intensity", vc::set_bloom_intensity),
         op!("bloom_threshold", vc::set_bloom_threshold),
         op!("exposure", vc::set_exposure),
+        op!("exposure_mode", vc::set_exposure_mode),
+        with!("auto_exposure", |c, v: AutoExposure| {
+            vc::set_exposure_limits(c, v.min_ev, v.max_ev);
+            vc::set_exposure_compensation(c, v.compensation);
+            vc::set_adaptation_speed(c, v.speed_up, v.speed_down);
+            vc::set_histogram_percent(c, v.low_percent, v.high_percent);
+        }),
         op!("contrast", vc::set_contrast),
         op!("saturation", vc::set_saturation),
         with!("white_balance", |c, v: WhiteBalance| {

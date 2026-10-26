@@ -122,7 +122,7 @@ pub(super) fn slider_row(
     .inner
 }
 
-/// The Color Correction section (exposure, contrast, saturation, the grade, tonemap,
+/// The Color Correction section (exposure and auto-exposure, contrast, saturation, the grade, tonemap,
 /// gamma).
 #[rustfmt::skip]
 fn draw_color_correction(
@@ -134,7 +134,7 @@ fn draw_color_correction(
 ) {
     ui.add_space(3.0);
     ui.label("Color Correction");
-    *is_dirty |= slider_row(ui, (&mut *world, id), "  Exposure (EV):", vc.exposure, -4.0..=4.0, vc_ops::set_exposure);
+    super::exposure::draw_exposure(ui, world, id, vc, is_dirty);
     *is_dirty |= slider_row(ui, (&mut *world, id), "  Contrast:", vc.contrast, 0.0..=2.0, vc_ops::set_contrast);
     *is_dirty |= slider_row(ui, (&mut *world, id), "  Saturation:", vc.saturation, 0.0..=2.0, vc_ops::set_saturation);
     super::grading::draw_grading(ui, world, id, vc, is_dirty);

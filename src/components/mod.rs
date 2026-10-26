@@ -58,8 +58,8 @@ pub use rendering::camera::{
 pub use rendering::light::{LightComponent, LightMode, LightType};
 pub use rendering::lod_group::{LodGroupComponent, LodLevel};
 pub use rendering::post_processing::{
-    ColorWheel, LiftGammaGain, PostProcessingComponent, ShadowSettings, SsaoSettings, Tonemap,
-    Wheel, WhiteBalance,
+    AutoExposure, ColorWheel, ExposureMode, LiftGammaGain, PostProcessingComponent, ShadowSettings,
+    SsaoSettings, Tonemap, Wheel, WhiteBalance,
 };
 pub use ribbon::{LineComponent, RibbonStyle, TextureMode, TrailComponent};
 pub use script::{ScriptComponent, ScriptFieldValue};

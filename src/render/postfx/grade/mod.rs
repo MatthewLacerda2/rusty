@@ -144,4 +144,4 @@ fn same(a: &GradeParams, b: &GradeParams) -> bool {
 }
 
 #[cfg(test)]
-mod gpu;
+pub(in crate::render::postfx) mod gpu;

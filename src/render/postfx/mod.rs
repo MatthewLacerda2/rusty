@@ -11,6 +11,7 @@
 //! ~30fps (Low: no SSR/motion-blur, half-size bloom).
 
 mod custom;
+pub(crate) mod exposure;
 pub(crate) mod grade;
 mod inputs;
 pub(crate) mod params;
@@ -32,7 +33,8 @@ pub struct PostParams {
     pub bloom: [f32; 4],
     /// blur direction, texel_x, texel_y, motion_blur_samples
     pub misc: [f32; 4],
-    /// ssr_mode, motion_blur_active, motion_blur_scale, unused
+    /// ssr_mode, motion_blur_active, motion_blur_scale, auto exposure (1: the
+    /// composite applies the view's adapted EV instead of `color.x`, #1444)
     pub flags: [f32; 4],
     pub inv_view_proj: [f32; 16],
     pub prev_view_proj: [f32; 16],
@@ -81,6 +83,8 @@ pub struct PostFx {
     pub copy_pipeline: wgpu::RenderPipeline,
     /// The grade + tonemap, baked into a 3D LUT the composite samples (#1440).
     pub grade: grade::GradeLut,
+    /// The view's automatic-exposure meter and its adapted EV (#1444).
+    pub exposure: exposure::ExposureMeter,
     /// Authored post-FX effects (#397): their module cache, second LDR target and
     /// previous-frame history.
     pub custom: custom::CustomChain,

@@ -8,6 +8,7 @@ use crate::render::gpu::layout_entries::{
 use crate::render::gpu::shaders::ShaderRegistry;
 
 use super::custom::CustomChain;
+use super::exposure::ExposureMeter;
 use super::grade::GradeLut;
 use super::{PfxTarget, PostFx, PostParams, HDR_FORMAT};
 
@@ -40,6 +41,7 @@ impl PostFx {
             Self::create_targets(device, width, height, bloom_divisor, output_format);
         let custom = CustomChain::new(device, &io_layout, output_format, full_size);
         let grade = GradeLut::new(device);
+        let exposure = ExposureMeter::new(device);
 
         Self {
             bright_pipeline: pipelines.bright,
@@ -48,6 +50,7 @@ impl PostFx {
             fxaa_pipeline: pipelines.fxaa,
             copy_pipeline: pipelines.copy,
             grade,
+            exposure,
             custom,
             io_layout,
             params_buffer,
@@ -127,8 +130,10 @@ impl PostFx {
         self.bloom_b = bloom_b;
         self.ldr = ldr;
         self.custom.resize(device, full_size.0, full_size.1);
-        // A resize is a cut (#1435): no smear from last frame's framing.
+        // A resize is a cut (#1435): no smear from last frame's framing, and the
+        // exposure snaps (#1444).
         self.motion.reset();
+        self.exposure.clock.cut();
     }
 
     fn create_targets(
@@ -230,6 +235,8 @@ impl PostFx {
                 sampler_entry(6),
                 // The grading LUT (#1440), sampled with the linear-clamp sampler.
                 texture_entry(7, wgpu::TextureViewDimension::D3),
+                // The adapted exposure (#1444), read when `flags.w` says Automatic.
+                uniform_entry(8, wgpu::ShaderStages::FRAGMENT),
             ],
         })
     }

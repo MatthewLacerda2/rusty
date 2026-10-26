@@ -85,6 +85,9 @@ pub struct CaptureHost {
     /// What the last [`draw`](Self::draw) cost — what a harness screenshot folds
     /// into the frame stats (#433).
     pub last_frame: Option<RenderedFrame>,
+    /// The automatic exposure the last [`draw`](Self::draw) applied, read back exactly
+    /// (#1444): what the harness publishes as `Scene::screen_exposure`.
+    pub exposure: Option<f32>,
 }
 
 impl CaptureHost {
@@ -157,12 +160,14 @@ impl CaptureHost {
         renderer.render(view, scene, camera, &target, false);
         let cpu_ms = start.elapsed().as_secs_f64() * 1000.0;
         renderer.wait_idle();
+        let exposure = view.settled_exposure(&renderer.device);
         let frame = RenderedFrame {
             counters: renderer.frame_counters,
             cpu_ms,
             gpu: renderer.take_gpu_times(),
         };
         self.last_frame = Some(frame.clone());
+        self.exposure = exposure;
         Ok(Some(frame))
     }
 

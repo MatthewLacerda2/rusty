@@ -224,6 +224,8 @@ pub struct Renderer {
     pub(crate) ssao: passes::ssao::SsaoRenderer,
     /// The grading-LUT bake every view's table is written through (#1440).
     pub(crate) grade_bake: postfx::grade::GradeBake,
+    /// The automatic-exposure passes every view's meter runs through (#1444).
+    pub(crate) exposure_passes: postfx::exposure::ExposurePasses,
 
     /// Active scalability tier; gates which post-FX passes run + buffer sizes. Shared
     /// across views — each view's post-FX chain (owned by its [`RenderView`]) sizes its
