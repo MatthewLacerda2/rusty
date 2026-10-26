@@ -92,7 +92,7 @@ pub fn post_passes(scene: &Scene, camera: Option<u32>, bloom: bool) -> PostPasse
 }
 
 /// `id`'s visual-correction volume, when the entity is active and so is the volume.
-fn active_volume(scene: &Scene, id: u32) -> Option<VisualCorrectionComponent> {
+pub(crate) fn active_volume(scene: &Scene, id: u32) -> Option<VisualCorrectionComponent> {
     let vc = scene.world.visual_correction(id)?;
     (scene.world.is_active_in_hierarchy(id) && vc.active).then(|| vc.clone())
 }

@@ -67,19 +67,16 @@ pub(crate) struct SsaoPlan {
 }
 
 impl SsaoPlan {
-    /// The plan for `scene` at `quality`: the first active visual-correction volume
-    /// with AO on, on a tier that runs it. `None` — nothing runs — otherwise.
-    pub(crate) fn for_scene(scene: &Scene, quality: QualityPreset) -> Option<Self> {
+    /// The plan for the view whose post-FX camera is `camera` (#1434), at `quality`:
+    /// that camera's active volume with AO on, on a tier that runs it. `None` —
+    /// nothing runs — otherwise.
+    pub(crate) fn for_camera(
+        scene: &Scene,
+        camera: Option<u32>,
+        quality: QualityPreset,
+    ) -> Option<Self> {
         let tier = quality.ssao()?;
-        let settings = scene
-            .world
-            .ids_with_visual_correction()
-            .into_iter()
-            .filter(|&id| scene.world.is_active_in_hierarchy(id))
-            .find_map(|id| {
-                let vc = scene.world.visual_correction(id)?;
-                vc.active.then_some(vc.ssao)
-            })?;
+        let settings = crate::render::postfx::params::active_volume(scene, camera?)?.ssao;
         (settings.active && settings.intensity > 0.0).then_some(Self { settings, tier })
     }
 }

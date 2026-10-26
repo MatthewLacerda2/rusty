@@ -98,10 +98,11 @@ spotlight, so a lit wall stays lit; it is computed before the forward pass, not 
 the finished image, so fog (applied after lighting) fogs the occluded colour rather
 than AO darkening the fog. **Radius** is how far (world units) another surface can be and
 still shade a point; **intensity** is the strength (`0` none, `1` natural, up to `4`
-exaggerated). The knobs live on the active visual-correction volume (the Inspector's
+exaggerated). The knobs live on the visual-correction volume (the Inspector's
 **Ambient Occlusion** section edits the same fields) and are saved with the scene;
-scenes saved before the knob existed load with it on. Without an active volume AO
-does not run.
+scenes saved before the knob existed load with it on. Each view runs its base
+camera's AO, like the rest of its post-FX (*Post-FX is per view*, above); a camera
+without an active volume runs none.
 
 Its cost is gated by the quality preset: **off on Low**; on **Medium** 8 samples
 per texel at half resolution; on **High** 16 at full resolution. Either way each

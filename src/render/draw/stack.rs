@@ -38,7 +38,7 @@ impl Renderer {
             // The base (first) camera drives the shared post-FX history / motion vectors.
             base_view_proj: pass.stack[0].build_view_projection(aspect),
             fog: FogUniform::from_settings(&scene.fog),
-            ssao: SsaoPlan::for_scene(scene, self.quality),
+            ssao: SsaoPlan::for_camera(scene, pass.post_camera, self.quality),
         };
         for idx in 0..pass.stack.len() {
             let mut ctx = CameraCtx::new(scene, &pass, &shared, idx);

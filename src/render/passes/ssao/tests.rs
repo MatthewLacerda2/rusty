@@ -21,32 +21,29 @@ fn scene_with(edit: impl FnOnce(&mut crate::components::VisualCorrectionComponen
     scene
 }
 
+/// The plan for the scene's first entity's camera, as the stack asks for it.
+fn plan(scene: &Scene, quality: QualityPreset) -> Option<SsaoPlan> {
+    let camera = scene.world.ids_with_camera().first().copied();
+    SsaoPlan::for_camera(scene, camera, quality)
+}
+
 #[test]
 fn a_default_volume_runs_ssao_on_medium_and_high_only() {
     let scene = scene_with(|_| {});
-    assert_eq!(SsaoPlan::for_scene(&scene, QualityPreset::Low), None);
-    let medium = SsaoPlan::for_scene(&scene, QualityPreset::Medium).expect("on");
+    assert_eq!(plan(&scene, QualityPreset::Low), None);
+    let medium = plan(&scene, QualityPreset::Medium).expect("on");
     assert_eq!(medium.tier, QualityPreset::Medium.ssao().unwrap());
-    assert!(SsaoPlan::for_scene(&scene, QualityPreset::High).is_some());
+    assert!(plan(&scene, QualityPreset::High).is_some());
 }
 
 #[test]
 fn nothing_runs_without_an_active_volume_or_with_ao_off() {
     let high = QualityPreset::High;
-    assert_eq!(SsaoPlan::for_scene(&Scene::new(), high), None);
-    assert_eq!(
-        SsaoPlan::for_scene(&scene_with(|vc| vc.active = false), high),
-        None
-    );
-    assert_eq!(
-        SsaoPlan::for_scene(&scene_with(|vc| vc.ssao.active = false), high),
-        None
-    );
+    assert_eq!(plan(&Scene::new(), high), None);
+    assert_eq!(plan(&scene_with(|vc| vc.active = false), high), None);
+    assert_eq!(plan(&scene_with(|vc| vc.ssao.active = false), high), None);
     // Zero intensity is invisible, so it costs nothing either.
-    assert_eq!(
-        SsaoPlan::for_scene(&scene_with(|vc| vc.ssao.intensity = 0.0), high),
-        None
-    );
+    assert_eq!(plan(&scene_with(|vc| vc.ssao.intensity = 0.0), high), None);
 }
 
 #[test]
@@ -55,7 +52,7 @@ fn the_uniform_carries_the_look_and_the_tier() {
         vc.ssao.radius = 0.75;
         vc.ssao.intensity = 2.0;
     });
-    let plan = SsaoPlan::for_scene(&scene, QualityPreset::Medium).unwrap();
+    let plan = plan(&scene, QualityPreset::Medium).unwrap();
     let view_proj = directx::perspective(1.0, 1.5, 0.1, 100.0);
     let frame = SsaoFrame {
         plan,
