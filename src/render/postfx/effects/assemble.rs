@@ -9,7 +9,7 @@
 use std::fmt::Write as _;
 
 use super::layout::span;
-use super::textures::{composite_textures, GROUP};
+use super::textures::{composite_textures, PlacedTexture, GROUP};
 use super::{composite_layout, grade_layout, Phase, Placed, POST_EFFECTS};
 use crate::render::gpu::shaders::ShaderRegistry;
 
@@ -27,7 +27,7 @@ pub(crate) fn register_modules(registry: &mut ShaderRegistry) {
 
 /// The module `effect`'s functions live in. Panics on an effect that declares
 /// functions but no module: a registry mistake, caught by the first composite.
-fn module_of(effect: &super::PostEffect) -> &'static str {
+pub(super) fn module_of(effect: &super::PostEffect) -> &'static str {
     let name = effect.name;
     effect
         .module
@@ -63,10 +63,16 @@ fn call(
     offset: usize,
     slots: usize,
 ) -> String {
+    args.extend((offset..offset + slots).map(|i| format!("{array}[{i}]")));
+    format!("{}{});\n", call_head(module, function), args.join(", "))
+}
+
+/// The start of a call of `function` in the module at `module`, up to its first
+/// argument after `c`: `    c = <module>::<function>(c, `.
+pub(super) fn call_head(module: &str, function: &str) -> String {
     let short = import_path(module);
     let short = short.rsplit("::").next().unwrap_or_default();
-    args.extend((offset..offset + slots).map(|i| format!("{array}[{i}]")));
-    format!("    c = {short}::{function}(c, {});\n", args.join(", "))
+    format!("    c = {short}::{function}(c, ")
 }
 
 /// The composite's WGSL: the fullscreen vertex stage, `fs_composite` (the scene,
@@ -75,15 +81,12 @@ pub(crate) fn composite_source() -> String {
     let layout = composite_layout();
     let len = span(layout, |c| c.slots);
     let calls = |phase: Phase| -> String {
-        let (mut out, mut next) = (String::new(), 0);
+        let mut out = String::new();
         for p in layout {
             let f = p.function;
-            // A function's textures are the next ones bound, in run order.
-            let bound = &composite_textures()[next..next + f.textures.len()];
-            next += f.textures.len();
             if f.phase == phase {
                 let mut args = vec!["f".to_string()];
-                args.extend(bound.iter().map(|t| t.wgsl_name()));
+                args.extend(PlacedTexture::of(f).map(|t| t.wgsl_name()));
                 let module = module_of(p.effect);
                 out += &call(module, f.function, args, "fx", p.offset, f.slots);
             }

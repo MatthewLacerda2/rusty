@@ -9,7 +9,7 @@
 
 use std::sync::LazyLock;
 
-use super::{composite_layout, PostEffect};
+use super::{composite_layout, Composite, PostEffect};
 use crate::render::gpu::bind_entry as entry;
 use crate::render::gpu::layout_entries::texture_entry;
 use crate::render::postfx::PostFx;
@@ -27,10 +27,17 @@ pub(crate) struct CompositeTexture {
 /// One declared texture in its place: its binding in group 1 is its index.
 pub(crate) struct PlacedTexture {
     pub effect: &'static PostEffect,
+    /// The function that reads it.
+    pub function: &'static Composite,
     pub texture: &'static CompositeTexture,
 }
 
 impl PlacedTexture {
+    /// The textures `function` reads, in the order it takes them.
+    pub(crate) fn of(function: &Composite) -> impl Iterator<Item = &'static PlacedTexture> + '_ {
+        (composite_textures().iter()).filter(move |t| std::ptr::eq(t.function, function))
+    }
+
     /// Its name in the assembled composite.
     pub(crate) fn wgsl_name(&self) -> String {
         format!("{}_{}", self.effect.name, self.texture.name)
@@ -48,6 +55,7 @@ pub(crate) fn composite_textures() -> &'static [PlacedTexture] {
             .flat_map(|p| {
                 (p.function.textures.iter()).map(|texture| PlacedTexture {
                     effect: p.effect,
+                    function: p.function,
                     texture,
                 })
             })

@@ -81,8 +81,9 @@ every file and row.
   `PostFx`). The registry binds it in the composite's group 1 and passes it to the
   function (`effects::textures`, #1473), so no effect edits `postfx/frame.wgsl`, the
   io layout or `PostFx::run`. A `view` of `None` binds one shared black texel, so the
-  function must draw nothing when it reads black (bloom's dirt, the lens flare). It
-  samples with the chain's own samplers (`s_color`, `s_skybox`). The `dummy`
+  function must draw nothing when it reads black (bloom's dirt, the lens flare), and
+  an effect that is off skips the fetch on a slot's on flag, as bloom and the flare
+  do (`p.w`), so it costs nothing per pixel. It samples with the chain's own samplers (`s_color`, `s_skybox`). The `dummy`
   declares one, never provided.
 - **Gate** — its `PostEffect::gate`: the player option, when it is player-facing,
   and the quality tiers it runs on (`tiers`, a `fn(QualityPreset) -> bool`). It asks
@@ -92,7 +93,7 @@ every file and row.
 - **Docs** — a `<!-- effect: <name> -->` section in `docs/api/Graphics.md` naming each
   tween path, its rows in the sorted function table, and its *Player options* row.
 - **Completeness** — `render::postfx::effects::completeness` fails when any layer lacks the
-  effect's part, or a composite texture it declares isn't bound and passed. Pixels of every other effect stay byte-identical: no other offset or
+  effect's part, or a composite texture it declares isn't bound and passed at its place in its own function's call. Pixels of every other effect stay byte-identical: no other offset or
   struct moved.
 
 ## GPU tests

@@ -38,16 +38,23 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
         // After bloom's add (30), before the exposure (40).
         order: 35,
         function: "hdr",
-        slots: 0,
+        slots: 1,
         textures: &[CompositeTexture {
             name: "image",
             view: |pfx| pfx.targets.get::<FlareTargets>().map(|t| &t.flare.view),
         }],
-        pack: |_, _| {},
+        pack,
     }],
     grade: &[],
     pass: Some(Pass::Scene { order: 50, run }),
 };
+
+/// w: `1` while the view flares, so the composite skips the fetch otherwise (the
+/// aspect doesn't decide whether it flares).
+fn pack(cx: &EffectCx, slots: &mut [[f32; 4]]) {
+    let on = flare_params(cx, 1.0).is_some();
+    slots[0] = [0.0, 0.0, 0.0, if on { 1.0 } else { 0.0 }];
+}
 
 /// The flare `cx`'s volume draws this frame: only while bloom runs, whose chain it
 /// reads, and while some part of it can add light (`None` costs no target and no
