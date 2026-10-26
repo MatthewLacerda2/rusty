@@ -98,3 +98,24 @@ fn custom_effects_keep_order_and_refuse_paths() {
         "a refused write changes nothing"
     );
 }
+
+#[test]
+fn lens_ops_clamp_and_refuse_non_finite_vectors() {
+    let (mut scene, id) = scene_with_vc();
+    let mut e = scene.world.post_processing_mut(id).unwrap();
+    set_vignette_intensity(&mut e, 4.0);
+    set_vignette_smoothness(&mut e, -1.0);
+    set_vignette_color(&mut e, [0.5, f32::NAN, 0.0]);
+    set_vignette_center(&mut e, [2.0, -1.0]);
+    set_chromatic_aberration_intensity(&mut e, f32::INFINITY);
+    set_film_grain_intensity(&mut e, -2.0);
+    set_film_grain_response(&mut e, 0.25);
+    assert_eq!((e.vignette.intensity, e.vignette.smoothness), (1.0, 0.01));
+    assert_eq!(
+        e.vignette.color, [0.0; 3],
+        "a NaN colour keeps the current one"
+    );
+    assert_eq!(e.vignette.center, [1.0, 0.0]);
+    assert_eq!(e.chromatic_aberration.intensity, 0.0, "infinity is refused");
+    assert_eq!((e.film_grain.intensity, e.film_grain.response), (0.0, 0.25));
+}

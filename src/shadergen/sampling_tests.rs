@@ -30,17 +30,16 @@ fn sampling_blocks_chain_after_grades() {
     // A sampling block reads the module input, so it composes anywhere in a chain.
     let ids = [
         "tint",
-        "chromatic_aberration",
         "sharpen",
         "radial_blur",
-        "film_grain",
+        "scanline",
         "damage_vignette",
     ];
     let wgsl = assemble(&recipe(PassKind::Postfx, &ids), "").unwrap();
     validate(ENGINE_SHADERS, &wgsl).expect("a mixed chain composes");
-    assert!(wgsl.contains(
-        "pfx_chromatic_aberration(pfx_tint(color, uv, tint_0_color), uv, shader_params.v[0].x)"
-    ));
+    assert!(
+        wgsl.contains("pfx_sharpen(pfx_tint(color, uv, tint_0_color), uv, shader_params.v[0].x)")
+    );
 }
 
 #[test]

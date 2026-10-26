@@ -11,21 +11,23 @@
 //! like `postfx.wgsl`'s prefilter passes.
 //!
 //! Most effects are per-pixel color grades that need only the sampled color + uv,
-//! plus `game_time()` (#398) for animation (tint, vignette, scanline, grayscale,
-//! posterize, film grain, damage vignette). **Sampling blocks** (#402: chromatic
-//! aberration, sharpen, radial blur) also tap the module's input at offsets through
+//! plus `game_time()` (#398) for animation (tint, scanline, grayscale, posterize,
+//! damage vignette). **Sampling blocks** (#402: sharpen, radial blur) also tap the module's input at offsets through
 //! the scaffold's `source_tap(uv)` / `source_texel()`. They read the module's
 //! *input* — the colour the chain handed this module — not the running colour of
 //! the blocks before them, and add the offset taps' **difference** from the
 //! centre tap to the running colour. As the first block that is exactly the
-//! re-sampled effect; later in the chain it layers the same fringe or detail over
+//! re-sampled effect; later in the chain it layers the same detail over
 //! whatever the earlier blocks graded. No new bindings, no new render targets.
 //!
 //! The chain runs authored modules **after tonemapping** (#397), on display-referred
 //! colour in `[0, 1]`. Exposure, saturation and contrast were blocks here too; they
 //! were removed because the volume already owns those knobs (`Graphics.SetExposure`
-//! and friends, applied in HDR where they belong), so this catalog holds only looks
-//! the built-in grade can't make.
+//! and friends, applied in HDR where they belong), and so were vignette, film grain
+//! and chromatic aberration when the volume took those over (#1439,
+//! `Graphics.SetVignette*` and friends); this catalog holds only looks the built-in
+//! post stack can't make. `damage_vignette` stays: it is a gameplay overlay (a
+//! tinted hurt edge a script drives), not the lens vignette.
 //!
 //! Params marked `runtime` (the strengths and the damage colour, #671) are read from
 //! the module's param uniform instead of a baked `const`, so a script drives them
@@ -57,29 +59,6 @@ pub const BLOCKS: &[Block] = &[
         params: &[],
         helper: "fn pfx_grayscale(c: vec3<f32>, uv: vec2<f32>) -> vec3<f32> {\n    let l = dot(c, vec3<f32>(0.2126, 0.7152, 0.0722));\n    return vec3<f32>(l);\n}",
         call: "pfx_grayscale({prev}, uv{args})",
-        textures: &[],
-        stage: Stage::Color,
-        cut: None,
-    },
-    Block {
-        id: "vignette",
-        desc: "Darken toward the screen edges; strength and radius tune the falloff.",
-        params: &[
-            Param {
-                name: "strength",
-                default: 0.5,
-                arity: 1,
-                runtime: true,
-            },
-            Param {
-                name: "radius",
-                default: 0.75,
-                arity: 1,
-                runtime: false,
-            },
-        ],
-        helper: "fn pfx_vignette(c: vec3<f32>, uv: vec2<f32>, strength: f32, radius: f32) -> vec3<f32> {\n    let d = distance(uv, vec2<f32>(0.5));\n    let v = smoothstep(radius, radius * 0.5, d);\n    return c * mix(1.0, v, strength);\n}",
-        call: "pfx_vignette({prev}, uv{args})",
         textures: &[],
         stage: Stage::Color,
         cut: None,
@@ -123,21 +102,6 @@ pub const BLOCKS: &[Block] = &[
         cut: None,
     },
     Block {
-        id: "film_grain",
-        desc: "Per-pixel noise that changes every frame (hashed from pixel and game time).",
-        params: &[Param {
-            name: "strength",
-            default: 0.06,
-            arity: 1,
-            runtime: true,
-        }],
-        helper: "fn pfx_film_grain(c: vec3<f32>, uv: vec2<f32>, strength: f32) -> vec3<f32> {\n    let px = vec2<u32>(uv / source_texel());\n    var h = (px.x * 73856093u) ^ (px.y * 19349663u) ^ (bitcast<u32>(game_time()) * 83492791u);\n    h = (h ^ (h >> 16u)) * 2246822519u;\n    h = (h ^ (h >> 13u)) * 3266489917u;\n    h = h ^ (h >> 16u);\n    let n = f32(h) / 4294967295.0 - 0.5;\n    return max(c + vec3<f32>(n * strength), vec3<f32>(0.0));\n}",
-        call: "pfx_film_grain({prev}, uv{args})",
-        textures: &[],
-        stage: Stage::Color,
-        cut: None,
-    },
-    Block {
         id: "damage_vignette",
         desc: "Edge vignette blended toward a color (set it, e.g. red); pulses at pulse_speed.",
         params: &[
@@ -162,21 +126,6 @@ pub const BLOCKS: &[Block] = &[
         ],
         helper: "fn pfx_damage_vignette(c: vec3<f32>, uv: vec2<f32>, color: vec3<f32>, intensity: f32, pulse_speed: f32) -> vec3<f32> {\n    let edge = smoothstep(0.25, 0.75, distance(uv, vec2<f32>(0.5)));\n    let pulse = 0.75 + 0.25 * cos(game_time() * pulse_speed);\n    return mix(c, color, clamp(edge * intensity * pulse, 0.0, 1.0));\n}",
         call: "pfx_damage_vignette({prev}, uv{args})",
-        textures: &[],
-        stage: Stage::Color,
-        cut: None,
-    },
-    Block {
-        id: "chromatic_aberration",
-        desc: "Split R and B radially from the screen centre (samples the input).",
-        params: &[Param {
-            name: "strength",
-            default: 0.01,
-            arity: 1,
-            runtime: true,
-        }],
-        helper: "fn pfx_chromatic_aberration(c: vec3<f32>, uv: vec2<f32>, strength: f32) -> vec3<f32> {\n    let off = (uv - vec2<f32>(0.5)) * strength;\n    let base = source_tap(uv);\n    let r = source_tap(uv + off).r - base.r;\n    let b = source_tap(uv - off).b - base.b;\n    return max(c + vec3<f32>(r, 0.0, b), vec3<f32>(0.0));\n}",
-        call: "pfx_chromatic_aberration({prev}, uv{args})",
         textures: &[],
         stage: Stage::Color,
         cut: None,

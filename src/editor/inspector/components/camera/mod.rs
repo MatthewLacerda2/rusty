@@ -10,6 +10,8 @@ use egui_phosphor::regular as icon;
 mod custom_effects;
 mod exposure;
 mod grading;
+mod lens;
+mod lighting;
 mod lut_field;
 mod motion_blur;
 mod post_processing;

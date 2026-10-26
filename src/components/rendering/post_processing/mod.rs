@@ -1,6 +1,6 @@
 //! src/components/rendering/post_processing/ — Post-process component
 //!
-//! bloom/exposure/SSR settings. Unity: post-process volume. Moved verbatim from
+//! bloom/exposure/grading/lens/SSR settings. Unity: post-process volume. Moved verbatim from
 //! the former `core/scene.rs`, then extended (phase-3) so the renderer's post-FX
 //! chain (color correction, bloom, motion blur, real SSR) actually reads them.
 
@@ -10,10 +10,12 @@ use serde::{Deserialize, Serialize};
 
 mod exposure;
 mod grading;
+mod lens;
 mod tonemap;
 
 pub use exposure::{AutoExposure, ExposureMode};
 pub use grading::{ColorWheel, LiftGammaGain, Wheel, WhiteBalance};
+pub use lens::{ChromaticAberration, FilmGrain, Vignette};
 pub use tonemap::Tonemap;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -50,6 +52,15 @@ pub struct PostProcessingComponent {
     /// How much of [`lut`](Self::lut) applies, `0..=1`; `1` when absent.
     #[serde(default = "full_contribution")]
     pub lut_contribution: f32,
+    /// Vignette (#1439); off when absent.
+    #[serde(default)]
+    pub vignette: Vignette,
+    /// Chromatic Aberration (#1439); off when absent.
+    #[serde(default)]
+    pub chromatic_aberration: ChromaticAberration,
+    /// Film Grain (#1439); off when absent.
+    #[serde(default)]
+    pub film_grain: FilmGrain,
     pub ssr_active: bool,
     pub ssr_quality: String, // "Low", "Medium", "High", "Ultra"
     pub ssr_temporal_upsampling: bool,

@@ -84,6 +84,16 @@ set on that camera entity, in the inspector or the scene file.
 | `Graphics.GetHueShift` / `SetHueShift` | `()` / `(degrees)` | `number` (clamped −180–180, **neutral `0`**) |
 | `Graphics.GetColorLookup` / `SetColorLookup` | `()` / `(path)` | `string` or `nil`: the user LUT file (a `.cube`, or a Unity strip `.png`; `nil` or `""` clears it; see *Color Lookup*) |
 | `Graphics.GetColorLookupContribution` / `SetColorLookupContribution` | `()` / `(value)` | `number` (how much of the LUT applies, clamped 0–1, **default `1`**) |
+| `Graphics.GetVignetteActive` / `SetVignetteActive` | `()` / `(bool)` | `bool` (**default `false`**; see *Lens effects*) |
+| `Graphics.GetVignetteIntensity` / `SetVignetteIntensity` | `()` / `(value)` | `number` (clamped 0–1, **default `0.3`**) |
+| `Graphics.GetVignetteSmoothness` / `SetVignetteSmoothness` | `()` / `(value)` | `number` (falloff softness, clamped 0.01–1, **default `0.2`**) |
+| `Graphics.GetVignetteColor` / `SetVignetteColor` | `()` / `(r, g, b)` | `r, g, b` (linear, each clamped 0–1, **default black**) |
+| `Graphics.GetVignetteCenter` / `SetVignetteCenter` | `()` / `(x, y)` | `x, y` (screen uv, `0, 0` top-left, each clamped 0–1, **default `0.5, 0.5`**) |
+| `Graphics.GetChromaticAberrationActive` / `SetChromaticAberrationActive` | `()` / `(bool)` | `bool` (**default `false`**) |
+| `Graphics.GetChromaticAberrationIntensity` / `SetChromaticAberrationIntensity` | `()` / `(value)` | `number` (clamped 0–1, **default `0.3`**) |
+| `Graphics.GetFilmGrainActive` / `SetFilmGrainActive` | `()` / `(bool)` | `bool` (**default `false`**) |
+| `Graphics.GetFilmGrainIntensity` / `SetFilmGrainIntensity` | `()` / `(value)` | `number` (clamped 0–1, **default `0.3`**) |
+| `Graphics.GetFilmGrainResponse` / `SetFilmGrainResponse` | `()` / `(value)` | `number` (how much the grain fades in bright areas, clamped 0–1, **default `0.8`**) |
 | `Graphics.GetSsrActive` / `SetSsrActive` | `()` / `(bool)` | `bool` |
 | `Graphics.GetSsrQuality` / `SetSsrQuality` | `()` / `(name)` | `string` |
 | `Graphics.GetMotionBlurActive` / `SetMotionBlurActive` | `()` / `(bool)` | `bool` |
@@ -183,6 +193,22 @@ once, naming the file (and, for a `.cube`, the line), and grades as if none were
 set. The Inspector's **Color Lookup** rows, at the end of **Color Correction**, edit
 the same fields; the path is written when its field loses focus.
 
+**Lens effects** (#1439) are Unity's **Vignette**, **Chromatic Aberration** and
+**Film Grain** overrides, built into the volume (they were authored `Shader.Bake`
+blocks before). Each is off until its `active` flag is set; its strengths then start
+at a visible `0.3` (Unity's start at `0`). They run inside the composite, in Unity's
+order: **chromatic aberration** splits green and blue outwards along the radius from
+the screen centre, three taps on the HDR image before the grade, growing with the
+squared distance so the centre stays clean; the **vignette** fades the graded image
+towards its `color` with the distance from its `center`; **film grain** is last,
+before the custom effects and FXAA: per-pixel noise scaling the colour, faded in the
+highlights by `response`. The grain is seeded by the pixel and the game clock
+(`Scene` shader time), so a capture at a given tick is reproducible and an
+edit-mode capture (time `0`) is stable. An effect off (or at intensity `0`) costs
+nothing and leaves the image byte-identical. The player's `vignette`,
+`chromatic_aberration` and `film_grain` options gate them (*Player options*), and
+the Inspector's **Lens Effects** section edits the same fields.
+
 **Sun shadows** are cascaded (#435): the camera's view, out to the **shadow
 distance**, is split into `1`–`4` slices, each with its own shadow map fitted to it
 and following the camera, so the first few metres get the sharpest shadow and a
@@ -245,9 +271,9 @@ scanlines on a menu camera.
 
 ```lua no-run
 Shader.Bake({ pass = "postfx", name = "hurt",
-  blocks = { { id = "vignette", params = { strength = 0.8, radius = 0.6 } },
+  blocks = { { id = "damage_vignette", params = { color = {0.8, 0.0, 0.0} } },
              { id = "tint", params = { color = {1.0, 0.6, 0.6} } } } })
-Graphics.SetCustomEffects({ "hurt" })   -- next frame: vignetted, reddened
+Graphics.SetCustomEffects({ "hurt" })   -- next frame: red-edged, reddened
 Graphics.SetCustomEffects({})           -- off again
 ```
 
@@ -339,6 +365,9 @@ An option can only turn an effect off; it never turns on what a camera left off.
 | `bloom` | the camera's volume's bloom |
 | `ssr` | the volume's screen-space reflections (High only) |
 | `ssao` | the volume's ambient occlusion (off on Low) |
+| `vignette` | the volume's vignette |
+| `chromatic_aberration` | the volume's chromatic aberration |
+| `film_grain` | the volume's film grain |
 
 Names are snake_case; an unknown name raises an error listing the valid ones.
 `SetOption` takes effect next frame and is **persisted** through `Storage`

@@ -6,7 +6,8 @@
 //! * Per-volume render state — the main camera's `PostProcessingComponent`
 //!   (bloom, contrast/saturation/gamma, tonemap, SSR), registered here, its exposure
 //!   and auto-exposure (`exposure`, #1444),
-//!   and its colour grade (white balance, Lift / Gamma / Gain, hue shift; `grading`),
+//!   its colour grade (white balance, Lift / Gamma / Gain, hue shift; `grading`)
+//!   and its lens effects (vignette, chromatic aberration, film grain; `lens`, #1439),
 //!   plus its `CameraComponent` knobs (motion blur, FXAA) in the `camera` submodule.
 //!   The main camera is the screen stack's base (`scene::camera::main_camera`, Unity's
 //!   `Camera.main`, #1434), the camera whose components `build_post_params` packs into
@@ -35,6 +36,7 @@ mod effects;
 mod exposure;
 mod fog;
 mod grading;
+mod lens;
 mod options;
 mod shadows;
 mod ssao;
@@ -66,6 +68,7 @@ pub fn register<'scope>(
     register_saturation_gamma(scope, &table, scene)?;
     register_tonemap(scope, &table, scene)?;
     grading::register_grading(scope, &table, scene)?;
+    lens::register_lens(scope, &table, scene)?;
     register_ssr(scope, &table, scene)?;
     camera::register_motion_blur(scope, &table, scene)?;
     camera::register_fxaa(scope, &table, scene)?;

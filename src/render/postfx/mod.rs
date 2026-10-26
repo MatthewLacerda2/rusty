@@ -23,7 +23,7 @@ pub use inputs::{PostFxContext, PostPasses};
 
 use glam::Mat4;
 
-/// CPU-side mirror of the `PostParams` uniform in `postfx.wgsl`.
+/// CPU-side mirror of the `PostParams` uniform in `postfx/params.wgsl`.
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct PostParams {
@@ -42,6 +42,13 @@ pub struct PostParams {
     /// camera world position (xyz) + the sim's game time (w, #398) — authored
     /// postfx effects read it as `game_time()`
     pub camera_pos: [f32; 4],
+    /// The vignette (#1439): intensity (`0`: off), smoothness, centre uv.
+    pub vignette: [f32; 4],
+    /// The vignette's colour (rgb); w unused.
+    pub vignette_color: [f32; 4],
+    /// Chromatic aberration intensity (`0`: off), film grain intensity (`0`: off),
+    /// film grain response; w unused (#1439).
+    pub lens: [f32; 4],
 }
 
 impl Default for PostParams {
@@ -60,7 +67,23 @@ impl Default for PostParams {
             inv_view_proj: id,
             view_proj: id,
             camera_pos: [0.0; 4],
+            vignette: [0.0; 4],
+            vignette_color: [0.0; 4],
+            lens: [0.0; 4],
         }
+    }
+}
+
+impl PostParams {
+    /// Keep only the display transform (a render texture with post-FX off): the
+    /// neutral grade, and no bloom, SSR, auto exposure or lens effects (#1439).
+    pub(crate) fn tonemap_only(&mut self) {
+        let neutral = Self::default();
+        self.color = neutral.color;
+        self.bloom = neutral.bloom;
+        self.flags = neutral.flags;
+        self.vignette = neutral.vignette;
+        self.lens = neutral.lens;
     }
 }
 

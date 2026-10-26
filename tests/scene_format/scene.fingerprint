@@ -470,12 +470,17 @@ scene.entities[].post_processing.auto_exposure.speed_up: f32
 scene.entities[].post_processing.bloom_active: bool
 scene.entities[].post_processing.bloom_intensity: f32
 scene.entities[].post_processing.bloom_threshold: f32
+scene.entities[].post_processing.chromatic_aberration.active: bool
+scene.entities[].post_processing.chromatic_aberration.intensity: f32
 scene.entities[].post_processing.contrast: f32
 scene.entities[].post_processing.custom_effects: seq
 scene.entities[].post_processing.custom_effects[]: string
 scene.entities[].post_processing.display_gamma: f32
 scene.entities[].post_processing.exposure: f32
 scene.entities[].post_processing.exposure_mode: enum Fixed|Automatic
+scene.entities[].post_processing.film_grain.active: bool
+scene.entities[].post_processing.film_grain.intensity: f32
+scene.entities[].post_processing.film_grain.response: f32
 scene.entities[].post_processing.hue_shift: f32
 scene.entities[].post_processing.lift_gamma_gain.gain.color: tuple(3)
 scene.entities[].post_processing.lift_gamma_gain.gain.color[]: f32
@@ -503,6 +508,13 @@ scene.entities[].post_processing.ssr_active: bool
 scene.entities[].post_processing.ssr_quality: string
 scene.entities[].post_processing.ssr_temporal_upsampling: bool
 scene.entities[].post_processing.tonemap: enum Aces|Reinhard|None
+scene.entities[].post_processing.vignette.active: bool
+scene.entities[].post_processing.vignette.center: tuple(2)
+scene.entities[].post_processing.vignette.center[]: f32
+scene.entities[].post_processing.vignette.color: tuple(3)
+scene.entities[].post_processing.vignette.color[]: f32
+scene.entities[].post_processing.vignette.intensity: f32
+scene.entities[].post_processing.vignette.smoothness: f32
 scene.entities[].post_processing.white_balance.temperature: f32
 scene.entities[].post_processing.white_balance.tint: f32
 scene.entities[].post_processing: option

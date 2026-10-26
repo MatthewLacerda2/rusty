@@ -64,7 +64,7 @@ pub enum ParamValue {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct BlockSel {
-    /// The block id, e.g. `"toon_ramp"` (surface) or `"vignette"` (postfx). Must
+    /// The block id, e.g. `"toon_ramp"` (surface) or `"scanline"` (postfx). Must
     /// exist in the catalog for the recipe's `pass`.
     pub id: String,
     /// Block parameters by name. A `BTreeMap` so serialization + the assembled

@@ -1,4 +1,4 @@
-//! src/scene/authoring/rendering/post_processing.rs — Shared post-processing ops.
+//! src/scene/authoring/rendering/post_processing/ — Shared post-processing ops.
 //!
 //! The ONE place the engine knows how to mutate an entity's first-class
 //! `PostProcessingComponent` field by field: the master `active` flag, bloom
@@ -6,7 +6,7 @@
 //! / gamma / tonemap, #1440's white balance / Lift Gamma Gain / hue shift, and
 //! #1441's Color Lookup), SSR (active / quality / temporal upsampling), shadows and SSAO
 //! (active / radius / intensity, #436), the authored post-FX list (#397) and its
-//! runtime params (#671), including the
+//! runtime params (#671), and the lens effects (#1439, in `lens`), including the
 //! validation each write owns (the `≥ 0` clamps on bloom intensity/threshold, the
 //! `≥ 0.01` clamp on gamma).
 //!
@@ -26,6 +26,14 @@ use crate::scene::authoring::sanitize::{
     at_least, clamped, finite_array_or, finite_or, finite_values, non_negative, unit,
 };
 use crate::shadergen::post_params::PostChain;
+
+mod lens;
+
+pub use lens::{
+    set_chromatic_aberration_active, set_chromatic_aberration_intensity, set_film_grain_active,
+    set_film_grain_intensity, set_film_grain_response, set_vignette_active, set_vignette_center,
+    set_vignette_color, set_vignette_intensity, set_vignette_smoothness,
+};
 
 /// Set the master post-processing `active` flag.
 pub fn set_active(vc: &mut PostProcessingComponent, active: bool) {
@@ -250,5 +258,4 @@ fn is_module_name(name: &str) -> bool {
 }
 
 #[cfg(test)]
-#[path = "post_processing_tests.rs"]
 mod tests;

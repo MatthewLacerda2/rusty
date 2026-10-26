@@ -198,7 +198,7 @@ fn assemble_postfx(recipe: &ShaderRecipe, resolved: &[Instance], layout: &ParamL
 /// module's input at an offset and step by whole pixels; `textureSampleLevel` keeps
 /// a tap legal wherever a helper is called (no derivative uniformity rule).
 const POSTFX_SCAFFOLD: &str = r#"
-#import common::{PostParams}
+#import postfx::params::PostParams
 #import fullscreen
 
 @group(0) @binding(0) var<uniform> params: PostParams;

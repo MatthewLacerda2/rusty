@@ -61,7 +61,7 @@ end
   name = "warm_grade",      -- baked file becomes <name>.wgsl, registered by this name
   blocks = {                -- applied in order; each transforms the running color
     { id = "tint", params = { color = {1.0, 0.85, 0.6} } },
-    { id = "vignette", params = { strength = 0.6, radius = 0.8 } },
+    { id = "sharpen", params = { amount = 0.4 } },
     { id = "scanline" },    -- params optional; each block has sane defaults
   },
 }
@@ -188,23 +188,21 @@ into the lit color; postfx blocks grade the sampled scene color.
   #437), applied after the blocks; `height_fog` is a per-material *look* layered
   under it (a glowing floor mist on one material), not a substitute for scene fog.
 - **Postfx** (fullscreen grades over the tonemapped color, `[0, 1]`): `tint
-  {color}`; `grayscale`; `vignette {strength, radius}`; `scanline {count,
-  strength}`; `posterize {levels}`. Animated by game time: `film_grain
-  {strength = 0.06}` (per-pixel noise, new every frame while time runs; frozen at
-  time 0 in edit mode); `damage_vignette {color = 1, intensity = 0.5, pulse_speed
+  {color}`; `grayscale`; `scanline {count, strength}`; `posterize {levels}`.
+  Animated by game time: `damage_vignette {color = 1, intensity = 0.5, pulse_speed
   = 0}` (edges blend toward `color` — set it, e.g. `{0.8, 0, 0}` for damage red;
   `pulse_speed` is radians per game second, 0 holds it steady). Sampling:
-  `chromatic_aberration {strength = 0.01}` (R and B split radially from the
-  centre, `strength` as a fraction of the distance to it); `sharpen {amount =
-  0.5}` (5-tap unsharp mask); `radial_blur {strength = 0.05, center = 0.5}`
-  (8 taps toward `center` in uv — speed/impact streaks). Params marked `*` are
-  **runtime**, driven per frame on the volume with `Graphics.SetPostParam` (see
-  below): `vignette.strength*`, `scanline.strength*`, `film_grain.strength*`,
-  `damage_vignette.color*` and `.intensity*`, `chromatic_aberration.strength*`,
-  `sharpen.amount*`, `radial_blur.strength*`; the rest are baked. Exposure, saturation and contrast are **not**
-  blocks: the volume already grades them in HDR (`Graphics.SetExposure`,
+  `sharpen {amount = 0.5}` (5-tap unsharp mask); `radial_blur {strength = 0.05,
+  center = 0.5}` (8 taps toward `center` in uv — speed/impact streaks). Params
+  marked `*` are **runtime**, driven per frame on the volume with
+  `Graphics.SetPostParam` (see below): `scanline.strength*`,
+  `damage_vignette.color*` and `.intensity*`, `sharpen.amount*`,
+  `radial_blur.strength*`; the rest are baked. Exposure, saturation and contrast
+  are **not** blocks: the volume already grades them in HDR (`Graphics.SetExposure`,
   `SetSaturation`, `SetContrast`), so a recipe naming them is refused as an unknown
-  block (#397).
+  block (#397). Nor are `vignette`, `film_grain` and `chromatic_aberration`: they
+  are the volume's **lens effects** now (`Graphics.SetVignette*`,
+  `SetFilmGrain*`, `SetChromaticAberration*`; `Graphics.md`, #1439).
 
 ### The `ui` pass
 

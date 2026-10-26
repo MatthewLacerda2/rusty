@@ -49,13 +49,18 @@ impl QualityPreset {
     }
 
     /// Whether this tier runs `option` at all (#1438): SSR on High only, motion blur
-    /// and SSAO off on Low, FXAA and bloom on every tier.
+    /// and SSAO off on Low; FXAA, bloom and the lens effects (a few taps each, #1439)
+    /// on every tier.
     pub fn allows(self, option: GraphicsOption) -> bool {
         match option {
             GraphicsOption::MotionBlur => self.motion_blur(),
             GraphicsOption::Ssr => self.screen_space_ssr(),
             GraphicsOption::Ssao => self.ssao().is_some(),
-            GraphicsOption::Fxaa | GraphicsOption::Bloom => true,
+            GraphicsOption::Fxaa
+            | GraphicsOption::Bloom
+            | GraphicsOption::Vignette
+            | GraphicsOption::ChromaticAberration
+            | GraphicsOption::FilmGrain => true,
         }
     }
 

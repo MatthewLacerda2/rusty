@@ -20,7 +20,9 @@ use glam::Mat4;
 
 use super::motion_blur::BlurParams;
 use super::{PostParams, PostPasses};
-use crate::components::{AutoExposure, CameraComponent, ExposureMode, PostProcessingComponent};
+use crate::components::{
+    AutoExposure, CameraComponent, ExposureMode, PostProcessingComponent, Vignette,
+};
 use crate::core::settings::graphics_options::GraphicsOption;
 use crate::core::settings::GraphicsSettings;
 use crate::scene::camera::camera_volume;
@@ -115,7 +117,38 @@ pub(crate) fn build_post_params(
         0.0
     };
     params.flags = [ssr_mode, 0.0, 0.0, auto];
+    pack_lens(&mut params, vc, graphics);
     (params, bloom)
+}
+
+/// The lens effects (#1439) into `params`, each through [`effect_runs`]. One that
+/// doesn't run packs a zero intensity, which the composite skips entirely, so an
+/// effect turned off renders exactly as before it existed. Every knob is clamped to
+/// its range here, since a loaded file bypasses the ops' clamps: a zero smoothness
+/// would make the vignette's `pow(0, 0)` a NaN.
+fn pack_lens(params: &mut PostParams, vc: &PostProcessingComponent, graphics: GraphicsSettings) {
+    let strength = |option, on: bool, intensity: f32| {
+        if effect_runs(graphics, option, on) {
+            intensity.clamp(0.0, 1.0)
+        } else {
+            0.0
+        }
+    };
+    let (v, ca, grain) = (&vc.vignette, &vc.chromatic_aberration, &vc.film_grain);
+    params.vignette = [
+        strength(GraphicsOption::Vignette, v.active, v.intensity),
+        v.smoothness.clamp(Vignette::MIN_SMOOTHNESS, 1.0),
+        v.center[0],
+        v.center[1],
+    ];
+    let [r, g, b] = v.color.map(|c| c.clamp(0.0, 1.0));
+    params.vignette_color = [r, g, b, 0.0];
+    params.lens = [
+        strength(GraphicsOption::ChromaticAberration, ca.active, ca.intensity),
+        strength(GraphicsOption::FilmGrain, grain.active, grain.intensity),
+        grain.response.clamp(0.0, 1.0),
+        0.0,
+    ];
 }
 
 /// `post`'s automatic-exposure knobs, when its volume meters the exposure (#1444).
@@ -186,5 +219,5 @@ pub(crate) fn fxaa_enabled(post: PostSource, graphics: GraphicsSettings) -> bool
 }
 
 #[cfg(test)]
-#[path = "params_tests.rs"]
+#[path = "params_tests/mod.rs"]
 mod tests;

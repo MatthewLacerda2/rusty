@@ -1,7 +1,7 @@
-//! Sampling and animated postfx blocks (#402), pixel-tested on lavapipe:
-//! `chromatic_aberration` splits a hard white/black edge into coloured fringes, and
-//! `film_grain` paints different noise at two game times (and the same noise at
-//! the same time — the effect is a pure function of pixel and clock).
+//! Sampling postfx blocks (#402), pixel-tested on lavapipe: `radial_blur` taps the
+//! module's input at offsets, smearing a hard white/black edge into greys. (The
+//! lens effects these tests once covered as blocks are the volume's now, #1439:
+//! `lens_screenshot`.)
 
 use glam::Vec3;
 use rusty::components::{MaterialAsset, MaterialComponent};
@@ -34,7 +34,7 @@ fn with_effects(mut scene: Scene, effects: &[&str]) -> Scene {
 }
 
 /// A black backdrop with a white wall in front whose left edge sits right of the
-/// screen centre, so the radial aberration offset there is non-zero.
+/// screen centre, so the radial blur offset there is non-zero.
 fn edge_scene(effects: &[&str]) -> Scene {
     let mut scene = wall_scene(3.0, [0.0, 0.0, 0.0]);
     let back = scene.world.ids_with_mesh()[0];
@@ -55,57 +55,51 @@ fn edge_scene(effects: &[&str]) -> Scene {
     with_effects(scene, effects)
 }
 
-/// Whether the middle row holds a red fringe pixel and a yellow fringe pixel.
-fn fringes(img: &image::RgbImage) -> (bool, bool) {
+/// How many middle-row pixels are neither black nor white: the smeared edge.
+fn greys(img: &image::RgbImage) -> usize {
     let y = img.height() / 2;
-    let row: Vec<[u8; 3]> = (0..img.width()).map(|x| img.get_pixel(x, y).0).collect();
-    let red = row.iter().any(|&[r, g, b]| r > 150 && g < 60 && b < 60);
-    let yellow = row.iter().any(|&[r, g, b]| r > 150 && g > 150 && b < 60);
-    (red, yellow)
+    (0..img.width())
+        .filter(|&x| (40..215).contains(&img.get_pixel(x, y).0[1]))
+        .count()
 }
 
 #[test]
-fn chromatic_aberration_splits_a_hard_edge_into_fringes() {
-    let name = "t402_aberration";
-    bake(
-        name,
-        r#"{"id":"chromatic_aberration","params":{"strength":0.3}}"#,
-    );
+fn radial_blur_smears_a_hard_edge() {
+    let name = "t402_radial_blur";
+    bake(name, r#"{"id":"radial_blur","params":{"strength":0.3}}"#);
     let mut host = CaptureHost::new();
     let Some(plain) = shot(&mut host, &edge_scene(&[]), "pfx402_edge_plain") else {
         return;
     };
-    assert_eq!(
-        fringes(&plain),
-        (false, false),
-        "the plain edge has no fringes"
+    let blurred = shot(&mut host, &edge_scene(&[name]), "pfx402_edge_blur").unwrap();
+    let (before, after) = (greys(&plain), greys(&blurred));
+    assert!(
+        after >= before + 3,
+        "{before} grey pixels before, {after} after"
     );
-    let split = shot(&mut host, &edge_scene(&[name]), "pfx402_edge_split").unwrap();
-    assert_eq!(fringes(&split), (true, true), "red and yellow fringes");
     cleanup(name);
 }
 
+/// An authored effect reads the game clock through the scaffold (#398): a pulsing
+/// `damage_vignette` paints different corners half a pulse apart, and the same
+/// corners at the same time.
 #[test]
-fn film_grain_changes_with_game_time() {
-    let name = "t402_grain";
-    bake(name, r#"{"id":"film_grain","params":{"strength":0.5}}"#);
+fn an_authored_effect_reads_game_time() {
+    let name = "t398_damage_pulse";
+    let block = r#"{"id":"damage_vignette","params":{"color":[1,0,0],"intensity":1,"pulse_speed":3.14159}}"#;
+    bake(name, block);
     let mut host = CaptureHost::new();
     let at = |host: &mut CaptureHost, time: f32, tag: &str| {
         let mut scene = with_effects(wall_scene(2.0, [0.5, 0.5, 0.5]), &[name]);
         scene.shader_time = time;
         shot(host, &scene, tag)
     };
-    let Some(a) = at(&mut host, 1.0, "pfx402_grain_a") else {
+    let Some(a) = at(&mut host, 0.0, "pfx398_pulse_a") else {
         return;
     };
-    let b = at(&mut host, 2.0, "pfx402_grain_b").unwrap();
-    let again = at(&mut host, 1.0, "pfx402_grain_a2").unwrap();
-    let differing = a.pixels().zip(b.pixels()).filter(|(p, q)| p != q).count();
-    let total = (a.width() * a.height()) as usize;
-    assert!(
-        differing > total / 2,
-        "only {differing}/{total} pixels changed"
-    );
-    assert_eq!(a, again, "the same game time paints the same grain");
+    let b = at(&mut host, 1.0, "pfx398_pulse_b").unwrap();
+    assert_ne!(a.get_pixel(0, 0), b.get_pixel(0, 0), "the pulse moved");
+    let again = at(&mut host, 0.0, "pfx398_pulse_a2").unwrap();
+    assert_eq!(a, again, "the same game time paints the same pulse");
     cleanup(name);
 }

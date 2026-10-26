@@ -6,6 +6,8 @@ use crate::core::settings::graphics_options::{GraphicsOption, GraphicsOptions};
 use crate::core::settings::quality::QualityPreset;
 use crate::scene::Scene;
 
+mod lens;
+
 /// One entity carrying `vc` (and `cam`), and its id.
 fn scene_with_vc(vc: PostProcessingComponent, cam: Option<CameraComponent>) -> (Scene, u32) {
     let mut scene = Scene::new();
