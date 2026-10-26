@@ -4,7 +4,8 @@
 //! `Debug.SnapshotEntity` (#180), the headless `Debug.Preview` asset shot (#353) and its
 //! named-material twin `Debug.PreviewMaterial` (#404),
 //! the frame stats `Debug.Stats` (#433), and the audio reads `Debug.AudioEvents` /
-//! `Debug.AudioVoices` (`audio.rs`, #1247) — the agent's observation channels:
+//! `Debug.AudioVoices` (`audio.rs`, #1247), and the GPU readback
+//! `Debug.GetAdaptedExposure` (#1444) — the agent's observation channels:
 //! structured, visual, performance and aural. Registered
 //! only in dev builds — stripped from the shipped game, like Unity `Debug.*` under
 //! `[Conditional]`: it lives in `dev`, which installs it onto the surface (#737).
@@ -30,6 +31,7 @@ pub fn register<'scope>(
     register_preview(lua, &table)?;
     register_preview_material(scope, &table, ctx.scene)?;
     register_stats(scope, &table, ctx.stats)?;
+    register_adapted_exposure(scope, &table, ctx.scene)?;
     audio::register(scope, &table, ctx)?;
 
     lua.globals().set("Debug", table).map_err(|e| e.to_string())
@@ -79,6 +81,22 @@ fn register_stats<'scope>(
         table,
         "Stats",
         scope.create_function(move |lua, ()| crate::dev::stats::to_lua(lua, &stats.borrow())),
+    )
+}
+
+/// `Debug.GetAdaptedExposure()` — the automatic exposure the screen last applied, in
+/// EV, read back from the GPU (#1444); `nil` before an `Automatic` frame has metered.
+/// Dev-only on purpose: a GPU readback is no sim input, so gameplay's
+/// `Graphics.GetExposure` returns the configured EV instead.
+fn register_adapted_exposure<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
+    table: &Table,
+    scene: &'scope std::cell::RefCell<crate::scene::Scene>,
+) -> Reg {
+    put(
+        table,
+        "GetAdaptedExposure",
+        scope.create_function(move |_, ()| Ok(scene.borrow().screen_exposure)),
     )
 }
 
@@ -213,3 +231,7 @@ fn register_snapshot<'scope>(
         }),
     )
 }
+
+#[cfg(test)]
+#[path = "exposure_tests.rs"]
+mod exposure_tests;

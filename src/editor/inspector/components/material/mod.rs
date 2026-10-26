@@ -207,7 +207,7 @@ fn draw_material_transparency(
 fn factor_slider(ui: &mut egui::Ui, label: &str, mut value: f32) -> Option<f32> {
     ui.horizontal(|ui| {
         ui.label(label);
-        ui.add(egui::Slider::new(&mut value, FACTOR_RANGE))
+        ui.add(crate::editor::widgets::slider(&mut value, FACTOR_RANGE))
             .changed()
     })
     .inner

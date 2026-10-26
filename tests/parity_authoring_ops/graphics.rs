@@ -4,7 +4,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use mlua::Lua;
-use rusty::components::{CameraComponent, PostProcessingComponent, Tonemap, Wheel};
+use rusty::components::{CameraComponent, ExposureMode, PostProcessingComponent, Tonemap, Wheel};
 use rusty::core::settings::quality::QualityPreset;
 use rusty::core::settings::GraphicsSettings;
 use rusty::scene::authoring::{
@@ -52,6 +52,9 @@ fn apply_graphics_ops(scene: &Rc<RefCell<Scene>>, id: u32) {
         vc_ops::set_white_balance(&mut vc, 40.0, 300.0); // tint clamped to 100
         vc_ops::set_wheel(&mut vc, Wheel::Gain, [0.5, 1.0, 1.0], 0.2);
         vc_ops::set_hue_shift(&mut vc, 45.0);
+        vc_ops::set_exposure_mode(&mut vc, ExposureMode::Automatic);
+        vc_ops::set_exposure_limits(&mut vc, -2.0, 30.0); // max clamped to 10
+        vc_ops::set_adaptation_speed(&mut vc, 2.0, -1.0); // down clamped to 0
         vc_ops::set_ssr_active(&mut vc, true);
         vc_ops::set_ssr_quality(&mut vc, "High".to_string());
         vc_ops::set_shadow_cascades(&mut vc, 9); // clamped to 4
@@ -76,6 +79,9 @@ Graphics.SetTonemap("reinhard")
 Graphics.SetWhiteBalance(40, 300)
 Graphics.SetGainWheel(0.5, 1, 1, 0.2)
 Graphics.SetHueShift(45)
+Graphics.SetExposureMode("Automatic")
+Graphics.SetExposureLimits(-2, 30)
+Graphics.SetAdaptationSpeed(2, -1)
 Graphics.SetSsrActive(true)
 Graphics.SetSsrQuality("High")
 Graphics.SetShadowCascades(9)
@@ -121,6 +127,8 @@ fn graphics_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Error
     assert_eq!(lvc.white_balance, ovc.white_balance);
     assert_eq!(lvc.lift_gamma_gain, ovc.lift_gamma_gain);
     assert_eq!(lvc.hue_shift, ovc.hue_shift);
+    let exposure = |vc: &PostProcessingComponent| (vc.exposure_mode, vc.auto_exposure);
+    assert_eq!(exposure(&lvc), exposure(&ovc));
     assert_eq!(lvc.ssr_active, ovc.ssr_active);
     assert_eq!(lvc.ssr_quality, ovc.ssr_quality);
     assert_eq!(lvc.shadows, ovc.shadows);

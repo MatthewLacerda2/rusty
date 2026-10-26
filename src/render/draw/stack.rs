@@ -8,8 +8,9 @@ use super::camera::{CameraCtx, StackShared, CAMERA_PASSES};
 use crate::render::gpu::uniforms::FogUniform;
 use crate::render::motion::{self, HistoryKey};
 use crate::render::passes::ssao::SsaoPlan;
+use crate::render::postfx::exposure::ExposureParams;
 use crate::render::postfx::grade::GradeParams;
-use crate::render::postfx::params::{build_post_params, post_passes, PostSource};
+use crate::render::postfx::params::{auto_exposure, build_post_params, post_passes, PostSource};
 use crate::render::postfx::PostParams;
 use crate::render::{RenderView, Renderer};
 use crate::scene::{Camera, Scene};
@@ -105,6 +106,8 @@ impl Renderer {
         let baked = view.post_fx.grade.prepare(gpu, &self.grade_bake, &grade);
         self.frame_counters.grade_lut_bakes += u32::from(baked);
 
+        self.meter_exposure(view, ctx, post.full);
+
         let (mut post_params, bloom_enabled) = build_post_params(
             scene,
             ctx.stack.post,
@@ -141,6 +144,26 @@ impl Renderer {
         };
         view.post_fx
             .run(&self.device, &self.queue, ctx, post_params, passes);
+    }
+
+    /// Automatic exposure (#1444): meter this view's scene and adapt, on the GPU, when
+    /// its volume is `Automatic` and the stack runs full post-FX; otherwise the next
+    /// metered frame snaps.
+    fn meter_exposure(&self, view: &mut RenderView, ctx: &CameraCtx, full: bool) {
+        let meter = &mut view.post_fx.exposure;
+        let Some(ae) = auto_exposure(ctx.stack.post).filter(|_| full) else {
+            return meter.cut();
+        };
+        let key = HistoryKey::new(ctx.scene, ctx.stack.base_id);
+        let step = meter.step(key, ctx.stack.editor_mode, ctx.scene.shader_time);
+        let params = ExposureParams::new(ae, step);
+        let gpu = (&self.device, &self.queue);
+        meter.run(
+            gpu,
+            &self.exposure_passes,
+            &view.post_fx.scene_hdr.view,
+            &params,
+        );
     }
 }
 

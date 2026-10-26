@@ -17,7 +17,8 @@
 //! Pure.
 
 use crate::components::{
-    PostProcessingComponent, ShadowSettings, SsaoSettings, Tonemap, Wheel, WhiteBalance,
+    AutoExposure, ExposureMode, PostProcessingComponent, ShadowSettings, SsaoSettings, Tonemap,
+    Wheel, WhiteBalance,
 };
 use crate::scene::authoring::sanitize::{
     at_least, clamped, finite_array_or, finite_or, finite_values, non_negative, unit,
@@ -47,6 +48,43 @@ pub fn set_bloom_threshold(vc: &mut PostProcessingComponent, value: f32) {
 /// Set the exposure (EV).
 pub fn set_exposure(vc: &mut PostProcessingComponent, value: f32) {
     vc.exposure = finite_or(value, vc.exposure);
+}
+
+/// Set where the exposure comes from (#1444): the fixed `exposure`, or metered.
+pub fn set_exposure_mode(vc: &mut PostProcessingComponent, mode: ExposureMode) {
+    vc.exposure_mode = mode;
+}
+
+/// Set the automatic exposure's limits (#1444), each clamped to
+/// `±AutoExposure::EV_RANGE`; `max_ev` is floored at `min_ev`.
+pub fn set_exposure_limits(vc: &mut PostProcessingComponent, min_ev: f32, max_ev: f32) {
+    let r = AutoExposure::EV_RANGE;
+    let min_ev = clamped(min_ev, -r, r);
+    vc.auto_exposure.min_ev = min_ev;
+    vc.auto_exposure.max_ev = clamped(max_ev, min_ev, r);
+}
+
+/// Set the automatic exposure's compensation in EV (#1444), clamped to
+/// `±AutoExposure::EV_RANGE`.
+pub fn set_exposure_compensation(vc: &mut PostProcessingComponent, ev: f32) {
+    let r = AutoExposure::EV_RANGE;
+    vc.auto_exposure.compensation = clamped(ev, -r, r);
+}
+
+/// Set how fast the automatic exposure rises and falls (#1444), in EV per second,
+/// each clamped to `0..=AutoExposure::MAX_SPEED`.
+pub fn set_adaptation_speed(vc: &mut PostProcessingComponent, up: f32, down: f32) {
+    let max = AutoExposure::MAX_SPEED;
+    vc.auto_exposure.speed_up = clamped(up, 0.0, max);
+    vc.auto_exposure.speed_down = clamped(down, 0.0, max);
+}
+
+/// Set the histogram window the meter averages (#1444): `low` clamped to
+/// `0..=100`, `high` to `low..=100`.
+pub fn set_histogram_percent(vc: &mut PostProcessingComponent, low: f32, high: f32) {
+    let low = clamped(low, 0.0, 100.0);
+    vc.auto_exposure.low_percent = low;
+    vc.auto_exposure.high_percent = clamped(high, low, 100.0);
 }
 
 /// Set the contrast.
@@ -198,83 +236,5 @@ fn is_module_name(name: &str) -> bool {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::components::PostProcessingComponent;
-    use crate::scene::Scene;
-
-    fn scene_with_vc() -> (Scene, u32) {
-        let mut scene = Scene::new();
-        let id = scene.add_entity("Volume".to_string());
-        let c = PostProcessingComponent {
-            bloom_active: false,
-            bloom_threshold: 1.0,
-            ssr_active: false,
-            ssr_quality: "Medium".to_string(),
-            ssr_temporal_upsampling: false,
-            ..crate::scene::authoring::default_post_processing()
-        };
-        scene.world.set_post_processing(id, Some(c));
-        (scene, id)
-    }
-
-    #[test]
-    fn ops_write_through_with_clamps() {
-        let (mut scene, id) = scene_with_vc();
-        let mut e = scene.world.post_processing_mut(id).unwrap();
-        set_bloom_intensity(&mut e, -3.0);
-        set_bloom_threshold(&mut e, -1.0);
-        set_gamma(&mut e, -5.0);
-        set_tonemap(&mut e, Tonemap::Reinhard);
-        set_ssr_quality(&mut e, "High".to_string());
-        set_ssr_temporal_upsampling(&mut e, true);
-        set_shadow_cascades(&mut e, 9);
-        set_shadow_distance(&mut e, -4.0);
-        set_ssao_active(&mut e, false);
-        set_ssao_radius(&mut e, -1.0);
-        set_ssao_intensity(&mut e, 9.0);
-        set_white_balance(&mut e, 250.0, f32::NAN);
-        set_wheel(&mut e, Wheel::Gain, [2.0, 0.5, -1.0], -3.0);
-        set_hue_shift(&mut e, 400.0);
-        let vc = &*e;
-        assert_eq!(vc.bloom_intensity, 0.0);
-        assert_eq!(vc.bloom_threshold, 0.0);
-        assert_eq!(vc.gamma, 0.01, "gamma clamps to its floor");
-        assert_eq!(vc.tonemap, Tonemap::Reinhard);
-        assert_eq!(vc.ssr_quality, "High");
-        assert!(vc.ssr_temporal_upsampling);
-        assert_eq!(vc.shadows.cascades, 4, "cascades clamp to the map's layers");
-        assert_eq!(
-            vc.shadows.distance, 1.0,
-            "shadow distance clamps to its floor"
-        );
-        assert!(!vc.ssao.active);
-        assert_eq!(vc.ssao.radius, 0.01, "radius clamps to its floor");
-        assert_eq!(vc.ssao.intensity, 4.0, "intensity clamps to its ceiling");
-        let wb = vc.white_balance;
-        assert_eq!(
-            (wb.temperature, wb.tint),
-            (100.0, 0.0),
-            "NaN tint is neutral"
-        );
-        let gain = vc.lift_gamma_gain.gain;
-        assert_eq!((gain.color, gain.offset), ([1.0, 0.5, 0.0], -1.0));
-        assert_eq!(vc.hue_shift, 180.0);
-    }
-
-    #[test]
-    fn custom_effects_keep_order_and_refuse_paths() {
-        let (mut scene, id) = scene_with_vc();
-        let mut e = scene.world.post_processing_mut(id).unwrap();
-        set_custom_effects(&mut e, vec!["crt".into(), "grain".into()]).unwrap();
-        for bad in ["", "../etc", "a/b", "a\\b", ".hidden"] {
-            let err = set_custom_effects(&mut e, vec!["ok".into(), bad.into()]).unwrap_err();
-            assert!(err.contains(&format!("{bad:?}")), "{err}");
-        }
-        assert_eq!(
-            e.custom_effects,
-            ["crt", "grain"],
-            "a refused write changes nothing"
-        );
-    }
-}
+#[path = "post_processing_tests.rs"]
+mod tests;

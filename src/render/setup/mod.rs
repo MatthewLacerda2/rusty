@@ -154,6 +154,7 @@ impl Renderer {
             ui,
             ssao,
             grade_bake,
+            exposure_passes,
             quality,
         } = gpu;
         let draw_buffers =
@@ -188,6 +189,7 @@ impl Renderer {
             prepass_pipeline: forward.prepass_pipeline,
             ssao,
             grade_bake,
+            exposure_passes,
             skybox_renderer: forward.skybox_renderer,
             camera_lighting_layout,
             entity_bones_layout,

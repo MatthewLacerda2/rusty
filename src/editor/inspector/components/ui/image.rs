@@ -92,8 +92,11 @@ fn draw_fill(ui: &mut egui::Ui, edit: &mut ImageComponent) -> bool {
     changed |= ui
         .horizontal(|ui| {
             ui.label("Fill Amount:");
-            ui.add(egui::Slider::new(&mut edit.fill_amount, 0.0..=1.0))
-                .changed()
+            ui.add(crate::editor::widgets::slider(
+                &mut edit.fill_amount,
+                0.0..=1.0,
+            ))
+            .changed()
         })
         .inner;
     if edit.fill_method == FillMethod::Radial360 {

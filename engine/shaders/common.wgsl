@@ -60,7 +60,7 @@ struct PostParams {
     // x: blur direction (0=horizontal,1=vertical), y: texel_x, z: texel_y, w: motion_blur_samples
     misc: vec4<f32>,
     // x: ssr_mode (0 off, 1 cubemap, 2 screen-space), y: motion_blur_active,
-    // z: motion_blur_scale, w: unused
+    // z: motion_blur_scale, w: auto exposure (1: the composite applies the adapted EV)
     flags: vec4<f32>,
     // current inverse view-projection (reconstruct world pos from depth)
     inv_view_proj: mat4x4<f32>,

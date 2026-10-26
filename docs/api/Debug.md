@@ -15,6 +15,7 @@ because the namespace is absent.
 | `Debug.PreviewMaterial` | `(name, out_png [, opts])` | the written path, or `nil` if the machine has no GPU |
 | `Debug.Stats` | `()` | a **table**: the frame stats — timings and counters (below) |
 | `Debug.AudioEvents` | `([after_seq])` | an **array** of the audio event log's entries whose `seq` is greater than `after_seq` (default `0`, all), oldest first, **and** the oldest `seq` the log still holds (below) |
+| `Debug.GetAdaptedExposure` | `()` | `number` (EV): the automatic exposure the screen last applied, read back from the GPU a frame or so late (exactly, in a headless capture); `nil` before an `Automatic` frame has metered (#1444; see `Graphics.md`, *Automatic exposure*) |
 | `Debug.AudioVoices` | `()` | an **array**: one roster row per entity carrying an `AudioSource` (below) |
 
 ### The preview — eyes on an authored asset (#353)

@@ -1,5 +1,5 @@
-//! The grading LUT's GPU tests (`knobs`, `clamp`, #1440) and what they share: the
-//! post-FX chain alone, fed a synthetic HDR row. The scene target is written
+//! The grading LUT's GPU tests (`knobs`, `clamp`, #1440) and what they share with
+//! the exposure meter's (#1444): the post-FX chain alone, fed a synthetic HDR row. The scene target is written
 //! directly, so a test chooses the exact HDR colour each pixel's grade starts from,
 //! and reads the display colour the composite wrote.
 
@@ -16,17 +16,17 @@ use crate::render::timing::GpuTimer;
 use crate::render::{readback, Renderer, OFFSCREEN_FORMAT};
 
 /// Pixels in the row: one per input colour.
-pub(super) const W: u32 = 64;
+pub(in crate::render::postfx) const W: u32 = 64;
 
-pub(super) struct Chain {
-    pub(super) r: Renderer,
-    pub(super) pfx: PostFx,
+pub(in crate::render::postfx) struct Chain {
+    pub(in crate::render::postfx) r: Renderer,
+    pub(in crate::render::postfx) pfx: PostFx,
     out: wgpu::Texture,
 }
 
 /// The chain on a headless renderer, writing the sRGB format a window does, or
 /// `None` without an adapter.
-pub(super) fn chain() -> Option<Chain> {
+pub(in crate::render::postfx) fn chain() -> Option<Chain> {
     let r = crate::render::test_gpu::headless_or_skip(W, 1)?;
     let mut registry = ShaderRegistry::new("engine/shaders");
     let pfx = PostFx::new(&r.device, W, 1, OFFSCREEN_FORMAT, 2, &mut registry);
@@ -37,20 +37,30 @@ pub(super) fn chain() -> Option<Chain> {
 impl Chain {
     /// Grade `row` (one scene-linear HDR colour per pixel) at `exposure` EV under
     /// `grade`, returning each pixel's 8-bit sRGB output.
-    pub(super) fn run(
+    pub(in crate::render::postfx) fn run(
         &mut self,
         row: &[[f32; 3]],
         exposure: f32,
         grade: &GradeParams,
     ) -> Vec<[u8; 4]> {
+        self.write_row(row);
+        self.pfx
+            .grade
+            .prepare((&self.r.device, &self.r.queue), &self.r.grade_bake, grade);
+        let mut params = PostParams::default();
+        params.color[0] = exposure;
+        self.composite(params)
+    }
+
+    /// Make `row` (one scene-linear HDR colour per pixel) the scene the chain reads.
+    pub(in crate::render::postfx) fn write_row(&mut self, row: &[[f32; 3]]) {
         assert_eq!(row.len(), W as usize);
-        let (device, queue) = (&self.r.device, &self.r.queue);
         let texels: Vec<u16> = row
             .iter()
             .flat_map(|c| [c[0], c[1], c[2], 1.0])
             .map(f16)
             .collect();
-        queue.write_texture(
+        self.r.queue.write_texture(
             self.pfx.scene_hdr.texture.as_image_copy(),
             bytemuck::cast_slice(&texels),
             wgpu::TexelCopyBufferLayout {
@@ -60,9 +70,12 @@ impl Chain {
             },
             self.pfx.scene_hdr.texture.size(),
         );
-        self.pfx
-            .grade
-            .prepare((device, queue), &self.r.grade_bake, grade);
+    }
+
+    /// Run the chain over the scene with `params`, returning each pixel's 8-bit
+    /// sRGB output.
+    pub(in crate::render::postfx) fn composite(&mut self, params: PostParams) -> Vec<[u8; 4]> {
+        let (device, queue) = (&self.r.device, &self.r.queue);
         let depth = texture(device, DEPTH_FORMAT, wgpu::TextureUsages::empty());
         let sky = texture(device, HDR_FORMAT, wgpu::TextureUsages::empty());
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor::default());
@@ -75,8 +88,6 @@ impl Chain {
             output: &out,
             timer: &timer,
         };
-        let mut params = PostParams::default();
-        params.color[0] = exposure;
         let none = BTreeMap::new();
         let passes = PostPasses {
             bloom: false,

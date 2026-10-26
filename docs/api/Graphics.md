@@ -40,7 +40,12 @@ set on that camera entity, in the inspector or the scene file.
 | `Graphics.GetBloomActive` / `SetBloomActive` | `()` / `(bool)` | `bool` |
 | `Graphics.GetBloomIntensity` / `SetBloomIntensity` | `()` / `(value)` | `number` (≥ 0) |
 | `Graphics.GetBloomThreshold` / `SetBloomThreshold` | `()` / `(value)` | `number` (≥ 0) |
-| `Graphics.GetExposure` / `SetExposure` | `()` / `(ev)` | `number` (EV) |
+| `Graphics.GetExposure` / `SetExposure` | `()` / `(ev)` | `number` (EV): the configured exposure, in both modes (the adapted EV in `Automatic` is the dev-only `Debug.GetAdaptedExposure`; see *Automatic exposure*) |
+| `Graphics.GetExposureMode` / `SetExposureMode` | `()` / `(name)` | `"Fixed"` / `"Automatic"` (**default `"Fixed"`**; names are case-insensitive) |
+| `Graphics.GetExposureLimits` / `SetExposureLimits` | `()` / `(min_ev, max_ev)` | `min_ev, max_ev` (each clamped −10–10, `max_ev` ≥ `min_ev`; **default `-6, 6`**) |
+| `Graphics.GetExposureCompensation` / `SetExposureCompensation` | `()` / `(ev)` | `number` (clamped −10–10, **default `0`**) |
+| `Graphics.GetAdaptationSpeed` / `SetAdaptationSpeed` | `()` / `(up, down)` | `up, down` in EV per second (each clamped 0–100; **default `1, 3`**) |
+| `Graphics.GetHistogramPercent` / `SetHistogramPercent` | `()` / `(low, high)` | `low, high` (clamped 0–100, `high` ≥ `low`; **default `10, 90`**) |
 | `Graphics.GetContrast` / `SetContrast` | `()` / `(value)` | `number` |
 | `Graphics.GetSaturation` / `SetSaturation` | `()` / `(value)` | `number` |
 | `Graphics.GetGamma` / `SetGamma` | `()` / `(value)` | `number` (display-gamma tweak, **neutral `1.0`**, clamped ≥ 0.01) |
@@ -94,6 +99,32 @@ a frame where one of those knobs or the tonemap changed, which `Debug.Stats()`
 counts as `grade_lut_bakes`. Each view grades with its base camera's volume, like
 the rest of its post-FX. The Inspector's **Color Correction** section edits the
 same fields, and they are saved with the scene.
+
+**Automatic exposure** (#1444) is Unity HDRP's *Automatic Histogram*: eye
+adaptation, so stepping from a dark corridor into daylight blinds you for a moment and
+a dark room becomes readable once you're in it. With the mode `"Automatic"`, each frame
+the renderer meters its view's HDR scene into a 64-bin log-luminance histogram (a fixed
+64 × 64 sample, on the GPU), averages the bins between the **low** and **high
+percentiles** (the darkest and brightest pixels ignored), and computes the exposure
+that brings that average to middle grey, plus the **compensation**, held to the
+**limits**. The applied exposure eases towards it at **speed up** EV per second while
+rising (the image brightening: into the dark) and **speed down** while falling (into
+light). Every EV is the unit of the fixed `exposure` (the image is scaled by `2^ev`), so
+a dark room meters a positive EV, daylight a negative one, and the limits bound the
+exposure itself. Adaptation runs on **game time**: a paused game (`Time.timeScale = 0`)
+holds its exposure, and a headless capture at tick N is reproducible. Outside Play it
+snaps to the metered value every frame, so the editor shows the settled exposure; in
+Play it snaps on a cut (the first frame, a scene load, Play or Stop, a switch of the main
+camera, a resize). Each view meters itself: a render-texture camera adapts to its own
+picture, never the window's. The exposure is applied before the grading LUT, like the
+fixed one. `Graphics.GetExposure` returns the configured `exposure` in both modes,
+never the adapted one: scripts run in the deterministic sim, and the adapted EV is read
+back from the GPU (another GPU may meter a hair differently). An agent checking
+adaptation reads it with the dev-only `Debug.GetAdaptedExposure()`, a frame or so late
+(exactly, in a headless capture). There is no player
+option for it; the exposure is the developer's look. The Inspector's **Color
+Correction** section edits the same fields, and they are saved with the scene. A new
+volume starts `Fixed`.
 
 **Sun shadows** are cascaded (#435): the camera's view, out to the **shadow
 distance**, is split into `1`–`4` slices, each with its own shadow map fitted to it

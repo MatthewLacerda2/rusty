@@ -27,6 +27,8 @@
 @group(0) @binding(6) var s_skybox: sampler;
 // The view's grading LUT (#1440): grade + tonemap, indexed by `lut_coord`.
 @group(0) @binding(7) var t_lut: texture_3d<f32>;
+// The view's adapted exposure (#1444): x is the EV, metered by `postfx/exposure.wgsl`.
+@group(0) @binding(8) var<uniform> adapted: vec4<f32>;
 
 struct VsOut {
     @builtin(position) pos: vec4<f32>,
@@ -185,8 +187,9 @@ fn fs_composite(in: VsOut) -> @location(0) vec4<f32> {
         hdr += textureSample(t_bloom, s_color, in.uv).rgb * params.bloom.x;
     }
 
-    // 4. Exposure, the one colour knob outside the LUT: a pre-grade HDR scale.
-    hdr *= exp2(params.color.x);
+    // 4. Exposure, the one colour knob outside the LUT: a pre-grade HDR scale, the
+    //    volume's fixed EV or, in Automatic, the adapted one (#1444).
+    hdr *= exp2(select(params.color.x, adapted.x, params.flags.w > 0.5));
 
     // 5. Grade + tonemap (HDR -> display): one trilinear fetch of the LUT.
     hdr = textureSampleLevel(t_lut, s_color, lut_coord(hdr), 0.0).rgb;

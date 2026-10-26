@@ -123,6 +123,14 @@ pub struct Scene {
     /// it keeps running at time scale 0, so a paused menu still animates. Written by
     /// the tick; `0` outside Play. Never serialized.
     pub ui_time: f32,
+    /// The exposure the screen's view applied last, in EV (#1444): its automatic
+    /// exposure's adapted value, read back from the GPU a frame or so late and
+    /// written by the frontend that renders the screen. `None` before an automatic
+    /// view has rendered. A display value, like a HUD's: never serialized, and never
+    /// a sim input, since another GPU can meter it a hair differently: only the
+    /// dev-only `Debug.GetAdaptedExposure` reads it.
+    #[cfg(feature = "dev")]
+    pub screen_exposure: Option<f32>,
     /// Per-entity runtime shader-param overrides (#670). Runtime-only, never serialized.
     pub shader_overrides: crate::scene::shader_overrides::ShaderOverrides,
     /// The write-log generation (`core::fs::written`) when the meshes were last read
@@ -162,6 +170,8 @@ impl Default for Scene {
             persistent: std::collections::BTreeSet::new(),
             shader_time: 0.0,
             ui_time: 0.0,
+            #[cfg(feature = "dev")]
+            screen_exposure: None,
             shader_overrides: Default::default(),
             meshes_read_at: 0,
             meshes_reimported: BTreeMap::new(),

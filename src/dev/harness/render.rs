@@ -27,6 +27,7 @@ impl Harness {
         );
         if let (Ok(true), Some(frame)) = (&result, self.capture.last_frame.take()) {
             record_render(&mut self.stats.borrow_mut(), &frame);
+            self.publish_exposure();
         }
         match result {
             Ok(true) => {
@@ -45,6 +46,12 @@ impl Harness {
                 false
             }
         }
+    }
+
+    /// Hand the frame's adapted exposure to `Debug.GetAdaptedExposure` (#1444).
+    fn publish_exposure(&self) {
+        let world = self.world.borrow();
+        world.scene().borrow_mut().screen_exposure = self.capture.exposure;
     }
 
     /// The renderer the harness draws with (built on first use at the screenshot
@@ -72,6 +79,7 @@ impl Harness {
             Ok(frame) => {
                 let frame = frame?;
                 record_render(&mut self.stats.borrow_mut(), &frame);
+                self.publish_exposure();
                 Some(frame)
             }
             Err(e) => {

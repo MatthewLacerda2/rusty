@@ -52,8 +52,9 @@ pub fn draw(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene) {
 
     // 3. Ambient Light Intensity
     ui.label("Ambient Intensity:");
-    let response =
-        ui.add(egui::Slider::new(&mut scene.ambient_intensity, 0.0..=5.0).text("intensity"));
+    let response = ui.add(
+        crate::editor::widgets::slider(&mut scene.ambient_intensity, 0.0..=5.0).text("intensity"),
+    );
     if response.changed() {
         editor.is_dirty = true;
     }
@@ -204,7 +205,7 @@ fn draw_fog_sliders(ui: &mut egui::Ui, fog: &mut FogSettings, f: &FogSettings) -
     let mut changed = false;
     for (label, mut value, range, op) in sliders {
         if ui
-            .add(egui::Slider::new(&mut value, range).text(label))
+            .add(crate::editor::widgets::slider(&mut value, range).text(label))
             .changed()
         {
             op(fog, value);

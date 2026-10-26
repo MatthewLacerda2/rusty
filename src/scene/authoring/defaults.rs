@@ -179,6 +179,8 @@ pub fn default_post_processing() -> PostProcessingComponent {
         bloom_intensity: 1.0,
         bloom_threshold: 0.8,
         exposure: 0.0,
+        exposure_mode: Default::default(),
+        auto_exposure: Default::default(),
         contrast: 1.0,
         saturation: 1.0,
         white_balance: Default::default(),

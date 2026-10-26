@@ -70,7 +70,8 @@ fn draw_scaler(
     let edited = ui
         .horizontal(|ui| {
             ui.label("Match (width ↔ height):");
-            ui.add(egui::Slider::new(&mut m, 0.0..=1.0)).changed()
+            ui.add(crate::editor::widgets::slider(&mut m, 0.0..=1.0))
+                .changed()
         })
         .inner;
     if edited {
@@ -122,7 +123,8 @@ fn draw_placement(
             let edited = ui
                 .horizontal(|ui| {
                     ui.label("Sway:");
-                    ui.add(egui::Slider::new(&mut sway, 0.0..=1.0)).changed()
+                    ui.add(crate::editor::widgets::slider(&mut sway, 0.0..=1.0))
+                        .changed()
                 })
                 .inner;
             if edited {
