@@ -124,8 +124,7 @@ pub(super) fn slider_row(
     .inner
 }
 
-/// The Color Correction section (exposure and auto-exposure, contrast, saturation, the
-/// grade, tonemap, gamma, Color Lookup).
+/// The Color Correction section (exposure, contrast, saturation, grade, tonemap, gamma, LUT).
 #[rustfmt::skip]
 fn draw_color_correction(
     ui: &mut egui::Ui,

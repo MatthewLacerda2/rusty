@@ -143,9 +143,6 @@ fn graphics_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Error
     let ocam = os.world.camera(op_id).unwrap().clone();
     let cam = |c: &CameraComponent| (c.motion_blur_active, c.motion_blur_samples, c.fxaa_active);
     assert_eq!(cam(&lcam), cam(&ocam));
-    assert!(
-        !lcam.fxaa_active,
-        "both paths turned the default-on knob off"
-    );
+    assert!(!lcam.fxaa_active, "both paths turned fxaa off");
     Ok(())
 }
