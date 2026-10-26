@@ -24,7 +24,7 @@ impl PostFx {
         let slots = effects::composite_slots(cx);
         queue.write_buffer(&self.fx_buffer, 0, bytemuck::cast_slice(&slots));
         let ldr: Vec<&LdrRun> = effects::ldr_passes()
-            .into_iter()
+            .iter()
             .filter_map(|pass| match pass {
                 Pass::Ldr { prepare, run, .. } => prepare(self, device, cx).then_some(run),
                 Pass::Scene { .. } => None,

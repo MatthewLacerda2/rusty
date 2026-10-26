@@ -75,7 +75,7 @@ fn call(
 /// the HDR functions, the grading LUT, the display functions) and `fs_copy`.
 pub(crate) fn composite_source() -> String {
     let layout = composite_layout();
-    let len = span(&layout, |c| c.slots);
+    let len = span(layout, |c| c.slots);
     let calls = |phase: Phase| -> String {
         layout
             .iter()
@@ -120,7 +120,7 @@ fn fs_composite(in: VsOut) -> @location(0) vec4<f32> {{
 {display}    return vec4<f32>(c, 1.0);
 }}
 ",
-        imports = imports(&layout),
+        imports = imports(layout),
         hdr = calls(Phase::Hdr),
         display = calls(Phase::Display),
     )
@@ -130,7 +130,7 @@ fn fs_composite(in: VsOut) -> @location(0) vec4<f32> {{
 /// the grade functions' result for the HDR colour the texel's log code decodes to.
 pub(crate) fn bake_source() -> String {
     let layout = grade_layout();
-    let len = span(&layout, |g| g.slots);
+    let len = span(layout, |g| g.slots);
     let calls: String = layout
         .iter()
         .map(|p| {
@@ -157,6 +157,6 @@ fn cs_bake(@builtin(global_invocation_id) id: vec3<u32>) {{
 {calls}    textureStore(lut, id, vec4<f32>(c, 1.0));
 }}
 ",
-        imports = imports(&layout),
+        imports = imports(layout),
     )
 }
