@@ -19,6 +19,12 @@ dies at two hours), runs the watch, reads how it ended, and decides
   bounded number of times in a row, then give up.
 - **stop requested** (6) or **another watch holds the lock** (4): end.
 
+It ends with its own statuses too ([`supervise`], #1450): **its worktree is
+gone** (7), say `make reclaim` removed it mid-wait; or **it crashed** (8), any
+exception the loop did not expect, logged as one `supervisor: crashed:` line
+instead of a traceback. Both lines end `stopped.`, the word the orchestrator's
+`Monitor` greps for.
+
 Before every launch it moves its checkout to `origin/main` (refusing one with
 uncommitted changes), so the watch always runs `main`'s code; when the
 supervisor's own code changed with it, it re-executes itself first. A graceful
@@ -48,6 +54,12 @@ LOG = "merge-queue/queue.log"
 
 AGAIN, GIVE_UP = "again", "give up"
 
+# Its own exit statuses, past the watch's (#1450): the worktree it runs in was
+# removed, or something it did not expect was raised.
+GONE_STATUS = 7
+
+CRASHED_STATUS = 8
+
 
 def next_step(status: int, ended: str, failures: int) -> tuple[str, float, str]:
     """What to do after a watch exited with `status`, its `watch ended:` text
@@ -73,7 +85,8 @@ def next_step(status: int, ended: str, failures: int) -> tuple[str, float, str]:
 def run(fx) -> int:
     """Supervise until told to stop or there is nothing sensible to retry.
 
-    `fx` carries the effects: `stop_requested()` (and removes the file),
+    `fx` carries the effects: `gone()` (the worktree's path once it no longer
+    exists, else `None`), `stop_requested()` (and removes the file),
     `update()` (the checkout onto `origin/main`; why not, or `None`),
     `restart_needed()` (the supervisor's own code changed), `restart()`
     (re-executes; does not return), `watch()` (one watch, its output passed
@@ -81,6 +94,8 @@ def run(fx) -> int:
     """
     failures = 0
     while True:
+        if fx.gone():
+            return vanished(fx.gone(), fx.say)
         if fx.stop_requested():
             fx.say("supervisor: a stop was requested; not starting the watch again.")
             return ending.STOPPED_STATUS
@@ -101,8 +116,33 @@ def run(fx) -> int:
         fx.say(f"supervisor: the watch exited {status}: {why}; starting it again in {delay / 60:g} minute(s).")
         waited = 0.0
         while waited < delay:
+            if fx.gone():
+                return vanished(fx.gone(), fx.say)
             if fx.stop_requested():
                 fx.say("supervisor: a stop was requested; not starting the watch again.")
                 return ending.STOPPED_STATUS
             fx.sleep(min(STEP_SECONDS, delay - waited))
             waited += STEP_SECONDS
+
+
+def vanished(path: str, say) -> int:
+    """Say the worktree at `path` is gone, and end with [`GONE_STATUS`]."""
+    say(f"supervisor: worktree {path} is gone; stopped.")
+    return GONE_STATUS
+
+
+def supervise(begin, gone, say) -> int:
+    """[`run`] the effects `begin()` returns, ending with a line and a status
+    rather than a traceback: a git call in a worktree removed between two
+    checks raises `FileNotFoundError`. `begin` (locking the worktree, clearing
+    a stale stop, noting the supervisor's code) runs inside the same `try`, so
+    a worktree that vanished across a restart ends the same way (#1450, review
+    of PR #1451); `gone` and `say` stand in for the effects that never came."""
+    try:
+        fx = begin()
+        return run(fx)
+    except Exception as err:  # noqa: BLE001 -- the point: one line, not a traceback
+        if gone():
+            return vanished(gone(), say)
+        say(f"supervisor: crashed: {type(err).__name__}: {err}; stopped.")
+        return CRASHED_STATUS

@@ -30,6 +30,13 @@ branch rule and is never reclaimed, while its `target/` keeps its GBs (#982).
 It is never touched either, only named: `OUTSIDE: <path> (<branch>, <target/>)`,
 so the disk nobody would get back at least shows up.
 
+The merge-queue supervisor locks its worktree for as long as it lives (#1450):
+on 2026-10-25 reclaim removed `queue/` while the supervisor slept between
+watches, nothing standing in it, and the supervisor died on its next `git`
+call. A lock whose reason names a supervisor PID that is no longer running is
+still protected, but named as stale with that PID, so a dead supervisor's lock
+shows up instead of keeping the worktree forever without a word.
+
 `--dry-run` decides and prints the same, and deletes nothing.
 """
 
@@ -45,6 +52,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import ghrest
+from merging.watch import tenancy
 
 USAGE = "usage: reclaim.py [--dry-run]"
 
@@ -67,6 +75,7 @@ class Facts:
     unpushed: int = 0
     current: bool = False
     busy: list[int] | None = field(default_factory=list)  # pids standing in it; None: unknown
+    stale: int | None = None  # a lock left by a merge-queue supervisor that no longer runs: its pid
 
 
 def parse_worktrees(porcelain: str) -> list[Worktree]:
@@ -115,6 +124,9 @@ def verdict(wt: Worktree, facts: Facts) -> tuple[str, str]:
     if facts.busy:
         pids = ", ".join(map(str, facts.busy))
         return "protect", f"{why}, but a running process stands in it (pid {pids})"
+    if wt.locked is not None and facts.stale is not None:
+        return "protect", (f"{why}, but locked by merge-queue supervisor pid {facts.stale}, which is not running:"
+                           f" a stale lock; `git worktree unlock {wt.path}` to let reclaim remove it")
     if wt.locked is not None:
         return "protect", f"{why}, but locked ({wt.locked or 'no reason given'})"
     if facts.dirty:
@@ -190,6 +202,9 @@ class Machine:
         facts = Facts(current=inside(here, wt.path))
         facts.busy = None if cwds is None else [pid for pid, cwd in cwds if inside(cwd, wt.path)]
         facts.dirty = bool(self.git(wt.path, "status", "--porcelain"))
+        owner = tenancy.pid_of(wt.locked)
+        if owner is not None and not self.alive(owner):
+            facts.stale = owner
         if wt.branch is None:
             facts.on_main = self.is_ancestor(wt.path, wt.head, "origin/main")
             return facts
@@ -202,6 +217,9 @@ class Machine:
         if stray and not any(self.is_ancestor(wt.path, wt.head, h) for h in heads):
             facts.unpushed = stray
         return facts
+
+    def alive(self, pid: int) -> bool:
+        return tenancy.alive(pid)
 
     def target_size(self, wt: Path) -> int | None:
         target = wt / "target"

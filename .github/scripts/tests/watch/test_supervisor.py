@@ -51,7 +51,7 @@ def fake(exits, stop_at=None, refused=None, restart=False):
     def restarted():
         raise SystemExit("restarted")
     fx = argparse.Namespace(
-        stop_requested=stop_requested, update=lambda: refused, restart_needed=lambda: restart, restart=restarted,
+        gone=lambda: None, stop_requested=stop_requested, update=lambda: refused, restart_needed=lambda: restart, restart=restarted,
         watch=watch, sleep=sleep, say=said.append,
     )
     return fx, said, calls
