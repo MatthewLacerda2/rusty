@@ -211,7 +211,7 @@ fn apply(scene: &mut Scene, mut data: SceneData, hold: bool) {
 
     // Validate declared component dependencies on load (#359): a hand-edited or
     // drifted scene carrying a dependent component without its requirement (e.g. a
-    // camera-less VisualCorrection) gets the requirement auto-added — the same rule
+    // camera-less PostProcessing) gets the requirement auto-added — the same rule
     // `add` uses — so the scene loads instead of silently violating it.
     for id in scene.world.ids().to_vec() {
         for (dependent, requirement) in

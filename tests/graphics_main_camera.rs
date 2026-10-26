@@ -8,7 +8,7 @@ use std::rc::Rc;
 use mlua::Lua;
 use rusty::components::{CameraComponent, RenderTarget};
 use rusty::core::settings::quality::QualityPreset;
-use rusty::scene::authoring::default_visual_correction;
+use rusty::scene::authoring::default_post_processing;
 use rusty::scene::camera::main_camera;
 use rusty::scene::Scene;
 
@@ -22,7 +22,7 @@ fn camera(scene: &mut Scene, name: &str, target: Option<RenderTarget>) -> u32 {
     scene.world.set_camera(id, Some(comp));
     scene
         .world
-        .set_visual_correction(id, Some(default_visual_correction()));
+        .set_post_processing(id, Some(default_post_processing()));
     id
 }
 
@@ -54,7 +54,7 @@ fn a_render_texture_camera_created_first_does_not_take_the_screens_writes() {
     );
 
     let s = scene.borrow();
-    let saturation = |id| s.world.visual_correction(id).unwrap().saturation;
+    let saturation = |id| s.world.post_processing(id).unwrap().saturation;
     let fxaa = |id| s.world.camera(id).unwrap().fxaa_active;
     assert_eq!((saturation(main), fxaa(main)), (0.25, false));
     assert_eq!(
@@ -82,7 +82,7 @@ fn without_a_screen_camera_getters_are_neutral_and_setters_no_ops() {
         scene
             .borrow()
             .world
-            .visual_correction(monitor)
+            .post_processing(monitor)
             .unwrap()
             .saturation,
         1.0

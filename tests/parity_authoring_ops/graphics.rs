@@ -1,13 +1,13 @@
-//! `Graphics.*` bindings vs `authoring::{rendering::visual_correction, rendering::camera}`.
+//! `Graphics.*` bindings vs `authoring::{rendering::post_processing, rendering::camera}`.
 
 use std::cell::RefCell;
 use std::rc::Rc;
 
 use mlua::Lua;
-use rusty::components::{CameraComponent, Tonemap, VisualCorrectionComponent};
+use rusty::components::{CameraComponent, PostProcessingComponent, Tonemap};
 use rusty::core::settings::quality::QualityPreset;
 use rusty::scene::authoring::{
-    rendering::camera as camera_ops, rendering::visual_correction as vc_ops,
+    rendering::camera as camera_ops, rendering::post_processing as vc_ops,
 };
 use rusty::scene::Scene;
 
@@ -15,16 +15,16 @@ use rusty::scene::Scene;
 fn scene_with_volume_and_cam() -> (Rc<RefCell<Scene>>, u32) {
     let mut scene = Scene::new();
     let id = scene.add_entity("PostFx".to_string());
-    scene.world.set_visual_correction(
+    scene.world.set_post_processing(
         id,
-        Some(VisualCorrectionComponent {
+        Some(PostProcessingComponent {
             bloom_active: false,
             bloom_threshold: 1.0,
             ssr_active: false,
             ssr_quality: "Low".to_string(),
             ssr_temporal_upsampling: false,
             gamma: 2.2,
-            ..rusty::scene::authoring::default_visual_correction()
+            ..rusty::scene::authoring::default_post_processing()
         }),
     );
     scene.world.set_camera(
@@ -43,7 +43,7 @@ fn scene_with_volume_and_cam() -> (Rc<RefCell<Scene>>, u32) {
 fn apply_graphics_ops(scene: &Rc<RefCell<Scene>>, id: u32) {
     let mut sc = scene.borrow_mut();
     {
-        let mut vc = sc.world.visual_correction_mut(id).unwrap();
+        let mut vc = sc.world.post_processing_mut(id).unwrap();
         vc_ops::set_bloom_active(&mut vc, true);
         vc_ops::set_bloom_intensity(&mut vc, -3.0); // clamped to 0
         vc_ops::set_gamma(&mut vc, -5.0); // clamped to 0.01
@@ -86,7 +86,7 @@ Graphics.SetFxaaActive(false)
 
 #[test]
 fn graphics_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Error>> {
-    // `Graphics.*` drives the active entity's visual-correction + camera-motion-blur
+    // `Graphics.*` drives the active entity's post-processing + camera-motion-blur
     // through the SAME ops the editor cards call. We run the bindings against one
     // scene and the ops against a second cloned scene, then compare the components.
     let (lua_scene, lua_id) = scene_with_volume_and_cam();
@@ -104,8 +104,8 @@ fn graphics_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Error
 
     let ls = lua_scene.borrow();
     let os = op_scene.borrow();
-    let lvc = ls.world.visual_correction(lua_id).unwrap().clone();
-    let ovc = os.world.visual_correction(op_id).unwrap().clone();
+    let lvc = ls.world.post_processing(lua_id).unwrap().clone();
+    let ovc = os.world.post_processing(op_id).unwrap().clone();
     assert_eq!(lvc.bloom_active, ovc.bloom_active);
     assert_eq!(lvc.bloom_intensity, ovc.bloom_intensity);
     assert_eq!(lvc.gamma, ovc.gamma);

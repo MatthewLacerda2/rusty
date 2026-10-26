@@ -13,7 +13,7 @@ use crate::components::Playback;
 use crate::scene::{
     AnimatorComponent, CameraComponent, ClearFlags, ColliderComponent, ColliderShape,
     CollisionDetection, LightComponent, LightType, MaterialAsset, MaterialComponent,
-    NavMeshAgentComponent, RigidBodyComponent, Scene, Tonemap, VisualCorrectionComponent,
+    NavMeshAgentComponent, PostProcessingComponent, RigidBodyComponent, Scene, Tonemap,
 };
 
 /// Construct a `LightComponent` with the standard cone defaults. Shared by the
@@ -168,12 +168,12 @@ pub fn default_camera() -> CameraComponent {
     }
 }
 
-/// Default `VisualCorrectionComponent` (the Add-Component menu's values).
-/// `VisualCorrection` declares `requires(Camera)` (#359), so every surface that adds
+/// Default `PostProcessingComponent` (the Add-Component menu's values).
+/// `PostProcessing` declares `requires(Camera)` (#359), so every surface that adds
 /// it auto-adds a `Camera` if missing — a correction stack is inert without a camera
 /// to correct, so the dependency is enforced rather than left to chance.
-pub fn default_visual_correction() -> VisualCorrectionComponent {
-    VisualCorrectionComponent {
+pub fn default_post_processing() -> PostProcessingComponent {
+    PostProcessingComponent {
         active: true,
         bloom_active: true,
         bloom_intensity: 1.0,

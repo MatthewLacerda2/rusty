@@ -27,12 +27,9 @@ fn cleanup(name: &str) {
 }
 
 fn with_effects(mut scene: Scene, effects: &[&str]) -> Scene {
-    let id = scene.world.ids_with_visual_correction()[0];
-    scene
-        .world
-        .visual_correction_mut(id)
-        .unwrap()
-        .custom_effects = effects.iter().map(|s| s.to_string()).collect();
+    let id = scene.world.ids_with_post_processing()[0];
+    scene.world.post_processing_mut(id).unwrap().custom_effects =
+        effects.iter().map(|s| s.to_string()).collect();
     scene
 }
 

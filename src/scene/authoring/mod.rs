@@ -41,7 +41,7 @@ use crate::scene::{LightComponent, LightType, MeshComponent, Scene};
 // only to keep this module under the size cap.
 pub use crate::scene::authoring::defaults::{
     attach_default_material, default_animator, default_camera, default_collider, default_light,
-    default_material, default_nav_agent, default_rigidbody, default_visual_correction,
+    default_material, default_nav_agent, default_post_processing, default_rigidbody,
     material_asset_from_import,
 };
 pub use crate::scene::authoring::script::add_script;

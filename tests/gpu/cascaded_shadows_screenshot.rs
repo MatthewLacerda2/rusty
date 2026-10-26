@@ -5,7 +5,7 @@
 
 use glam::{Quat, Vec3};
 use rusty::dev::screenshot::capture;
-use rusty::scene::authoring::{create_entity, default_visual_correction, Primitive};
+use rusty::scene::authoring::{create_entity, default_post_processing, Primitive};
 use rusty::scene::{Camera, Scene};
 
 const FAR_OUT: Vec3 = Vec3::new(100.0, 0.0, -40.0);
@@ -30,12 +30,12 @@ fn yard(shadow_distance: f32) -> Scene {
         t.scale = scale;
     }
     let volume = create_entity(&mut scene, "Volume", None);
-    let mut vc = default_visual_correction();
+    let mut vc = default_post_processing();
     vc.shadows.distance = shadow_distance;
     // Dimmed and bloom-free, so the lit ground is not clipped white and a shadow reads.
     vc.exposure = -2.0;
     vc.bloom_active = false;
-    scene.world.set_visual_correction(volume, Some(vc));
+    scene.world.set_post_processing(volume, Some(vc));
     // A volume rides on its camera (#1434): that camera is the view's.
     scene
         .world

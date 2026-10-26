@@ -4,18 +4,18 @@
 
 use crate::temp::dir;
 use glam::Vec3;
-use rusty::components::{CameraComponent, RenderTarget, VisualCorrectionComponent};
+use rusty::components::{CameraComponent, PostProcessingComponent, RenderTarget};
 use rusty::dev::capture::CaptureHost;
 use rusty::dev::screenshot::{capture, capture_into};
-use rusty::scene::authoring::default_visual_correction;
+use rusty::scene::authoring::default_post_processing;
 use rusty::scene::{Camera, MeshComponent, Scene};
 
 use super::super::render_texture_scene::{pip_scene, screen_camera, SIZE};
 
-fn graded(saturation: f32) -> VisualCorrectionComponent {
-    VisualCorrectionComponent {
+fn graded(saturation: f32) -> PostProcessingComponent {
+    PostProcessingComponent {
         saturation,
-        ..default_visual_correction()
+        ..default_post_processing()
     }
 }
 
@@ -34,7 +34,7 @@ fn grey_window_colour_pip(main_first: bool) -> Scene {
         scene.world.set_camera(id, Some(comp));
         scene
             .world
-            .set_visual_correction(id, Some(graded(saturation)));
+            .set_post_processing(id, Some(graded(saturation)));
         // Identity rotation: looks down -Z, at the box (the screen's pose is the base).
         scene.world.transform_mut(id).expect("transform").position = Vec3::new(0.0, 0.0, 6.0);
     };

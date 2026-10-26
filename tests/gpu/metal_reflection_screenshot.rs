@@ -14,11 +14,11 @@ use rusty::components::{MaterialAsset, MaterialComponent};
 use rusty::core::settings::quality::QualityPreset;
 use rusty::dev::capture::CaptureHost;
 use rusty::dev::screenshot::capture_into;
-use rusty::scene::authoring::{create_entity, default_visual_correction, Primitive};
+use rusty::scene::authoring::{create_entity, default_post_processing, Primitive};
 use rusty::scene::{Camera, Scene};
 
 /// A polished white metal sphere (metallic 1.0, roughness 0.2), no lights, a blue sky;
-/// with `ssr`, a VisualCorrection volume turns SSR on.
+/// with `ssr`, a PostProcessing volume turns SSR on.
 fn scene(ssr: bool) -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
@@ -37,10 +37,10 @@ fn scene(ssr: bool) -> Scene {
     scene.materials.insert("metal".to_string(), metal);
     if ssr {
         let volume = create_entity(&mut scene, "Volume", None);
-        let mut vc = default_visual_correction();
+        let mut vc = default_post_processing();
         vc.bloom_active = false;
         vc.ssr_active = true;
-        scene.world.set_visual_correction(volume, Some(vc));
+        scene.world.set_post_processing(volume, Some(vc));
         // A volume rides on its camera (#1434): that camera is the view's.
         scene
             .world
@@ -88,7 +88,7 @@ fn assert_reflects_sky(label: &str, ssr: bool) {
 }
 
 #[test]
-fn metal_reflects_the_procedural_sky_without_visual_correction() {
+fn metal_reflects_the_procedural_sky_without_post_processing() {
     assert_reflects_sky("no_vc", false);
 }
 

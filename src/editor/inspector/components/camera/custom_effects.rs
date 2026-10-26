@@ -1,21 +1,21 @@
-//! The Custom Effects section of the Visual Correction card (#397): the volume's
+//! The Custom Effects section of the Post Processing card (#397): the volume's
 //! ordered list of authored post-FX modules — add by name, reorder, remove.
 //!
 //! A thin client (#287): every edit builds the new list and writes it through
-//! `authoring::rendering::visual_correction::set_custom_effects`, the op `Graphics.SetCustomEffects`
+//! `authoring::rendering::post_processing::set_custom_effects`, the op `Graphics.SetCustomEffects`
 //! calls, so a name the op refuses is refused here too.
 
 use egui_phosphor::regular as icon;
 
-use crate::scene::authoring::rendering::visual_correction as vc_ops;
-use crate::scene::VisualCorrectionComponent;
+use crate::scene::authoring::rendering::post_processing as vc_ops;
+use crate::scene::PostProcessingComponent;
 
 /// Draw the list and the add row; writes the edited list back through the op.
 pub(super) fn draw_custom_effects(
     ui: &mut egui::Ui,
     world: &mut crate::ecs::World,
     id: u32,
-    vc: &VisualCorrectionComponent,
+    vc: &PostProcessingComponent,
     is_dirty: &mut bool,
 ) {
     ui.add_space(3.0);
@@ -37,7 +37,7 @@ pub(super) fn draw_custom_effects(
 
     if edited {
         let result = world
-            .visual_correction_mut(id)
+            .post_processing_mut(id)
             .map(|mut c| vc_ops::set_custom_effects(&mut c, names));
         match result {
             Some(Err(e)) => log::warn!("[Editor] {e}"),

@@ -75,7 +75,7 @@ pub(in crate::ecs) fn build_bundle(mut entity: Entity, seq: u64) -> hecs::Entity
         entity.offmesh_link,
         entity.nav_modifier,
         entity.camera,
-        entity.visual_correction,
+        entity.post_processing,
         entity.particles,
         entity.audio,
         entity.reverb_zone,

@@ -3,7 +3,7 @@
 //! Live get/set over the engine's EXISTING post-FX and quality knobs, so a script
 //! can drive its own settings logic in Lua. Two backing stores:
 //!
-//! * Per-volume render state — the main camera's `VisualCorrectionComponent`
+//! * Per-volume render state — the main camera's `PostProcessingComponent`
 //!   (bloom, exposure/contrast/saturation/gamma, tonemap, SSR), registered here,
 //!   plus its `CameraComponent` knobs (motion blur, FXAA) in the `camera` submodule.
 //!   The main camera is the screen stack's base (`scene::camera::main_camera`, Unity's
@@ -22,7 +22,7 @@
 //! Every write is ONE-WAY into render-only state: it never feeds back into
 //! `FixedUpdate`, so toggling these knobs can't change the deterministic sim. The
 //! per-volume setters route through the shared `authoring::{rendering::camera,
-//! visual_correction}` ops the editor cards use, so panel and binding never drift.
+//! post_processing}` ops the editor cards use, so panel and binding never drift.
 
 use std::cell::RefCell;
 
@@ -39,7 +39,7 @@ use self::state::{register_quality, with_vc, with_vc_mut};
 use super::{put, Reg};
 use crate::components::Tonemap;
 use crate::core::settings::quality::QualityPreset;
-use crate::scene::authoring::rendering::visual_correction as vc_ops;
+use crate::scene::authoring::rendering::post_processing as vc_ops;
 use crate::scene::Scene;
 
 /// Register the `Graphics` namespace onto `lua`.
@@ -70,7 +70,7 @@ pub fn register<'scope>(
         .map_err(|e| e.to_string())
 }
 
-/// Bloom: active / intensity / threshold over the active visual-correction volume.
+/// Bloom: active / intensity / threshold over the active post-processing volume.
 fn register_bloom<'scope>(
     scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,

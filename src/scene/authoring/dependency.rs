@@ -1,7 +1,7 @@
 //! src/scene/authoring/dependency.rs — Component dependency mechanism (#359).
 //!
 //! rusty's `RequireComponent` (Unity's `[RequireComponent(typeof(T))]`), promoted
-//! from the hand-rolled Camera↔VisualCorrection one-off into a declared rule enforced
+//! from the hand-rolled Camera↔PostProcessing one-off into a declared rule enforced
 //! everywhere. [`ComponentKind::requires`] is the single declaration; the verbs here
 //! are the single enforcement path the editor Add menu, the
 //! `Scene.AddComponent`/`RemoveComponent` API, and scene load all route through, so no
@@ -37,7 +37,7 @@ use crate::ecs::World;
 use crate::scene::authoring::components::ComponentKind;
 use crate::scene::authoring::defaults::{
     default_animator, default_camera, default_collider, default_light, default_material,
-    default_nav_agent, default_rigidbody, default_visual_correction,
+    default_nav_agent, default_post_processing, default_rigidbody,
 };
 use crate::scene::{AudioSourceComponent, MaterialComponent, ParticleEmitterComponent};
 
@@ -56,7 +56,7 @@ pub fn has_kind(world: &World, id: u32, kind: ComponentKind) -> bool {
         ComponentKind::NavMeshModifierVolume => world.has_nav_modifier(id),
         ComponentKind::Camera => world.has_camera(id),
         ComponentKind::Particles => world.has_particles(id),
-        ComponentKind::VisualCorrection => world.has_visual_correction(id),
+        ComponentKind::PostProcessing => world.has_post_processing(id),
         ComponentKind::Audio => world.has_audio(id),
         ComponentKind::ReverbZone => world.has_reverb_zone(id),
         ComponentKind::Canvas => world.has_canvas(id),
@@ -101,8 +101,8 @@ pub(crate) fn set_default(world: &mut World, id: u32, kind: ComponentKind) -> bo
         ComponentKind::Particles => {
             world.set_particles(id, Some(ParticleEmitterComponent::default()))
         }
-        ComponentKind::VisualCorrection => {
-            world.set_visual_correction(id, Some(default_visual_correction()))
+        ComponentKind::PostProcessing => {
+            world.set_post_processing(id, Some(default_post_processing()))
         }
         ComponentKind::Audio => world.set_audio(id, Some(AudioSourceComponent::default())),
         ComponentKind::ReverbZone => {
@@ -177,7 +177,7 @@ pub(crate) fn clear_one(world: &mut World, id: u32, kind: ComponentKind) -> bool
         ComponentKind::NavMeshModifierVolume => world.set_nav_modifier(id, None),
         ComponentKind::Camera => world.set_camera(id, None),
         ComponentKind::Particles => world.set_particles(id, None),
-        ComponentKind::VisualCorrection => world.set_visual_correction(id, None),
+        ComponentKind::PostProcessing => world.set_post_processing(id, None),
         ComponentKind::Audio => world.set_audio(id, None),
         ComponentKind::ReverbZone => world.set_reverb_zone(id, None),
         ComponentKind::Canvas => world.set_canvas(id, None),
@@ -234,7 +234,7 @@ pub fn add_with_requirements(world: &mut World, id: u32, kind: ComponentKind) ->
 }
 
 /// Remove `kind` and cascade to every dependent that requires it, recursively — the
-/// shipped Camera→VisualCorrection cascade, now driven by [`ComponentKind::requires`].
+/// shipped Camera→PostProcessing cascade, now driven by [`ComponentKind::requires`].
 /// Returns `false` when the entity is missing.
 pub fn remove_with_cascade(world: &mut World, id: u32, kind: ComponentKind) -> bool {
     for &dependent in ComponentKind::ALL {
@@ -248,7 +248,7 @@ pub fn remove_with_cascade(world: &mut World, id: u32, kind: ComponentKind) -> b
 /// Drop any component on `id` whose declared requirements are unmet, repeating until
 /// stable (removing a dependent can orphan its own dependents). The editor's per-frame
 /// safety net — the reactive form of the remove cascade, catching drift the add/remove
-/// verbs didn't produce (a Camera cleared out from under a VisualCorrection by another
+/// verbs didn't produce (a Camera cleared out from under a PostProcessing by another
 /// card). Returns `true` if it removed anything.
 pub fn reconcile_requirements(world: &mut World, id: u32) -> bool {
     let mut changed = false;

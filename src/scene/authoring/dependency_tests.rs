@@ -41,9 +41,9 @@ fn add_auto_satisfies_requirement() {
     assert!(add_with_requirements(
         &mut scene.world,
         id,
-        ComponentKind::VisualCorrection
+        ComponentKind::PostProcessing
     ));
-    assert!(scene.world.has_visual_correction(id));
+    assert!(scene.world.has_post_processing(id));
     assert!(scene.world.has_camera(id), "requirement auto-added");
 }
 
@@ -51,25 +51,25 @@ fn add_auto_satisfies_requirement() {
 fn remove_cascades_to_dependents() {
     let mut scene = Scene::new();
     let id = create_entity(&mut scene, "FX", None);
-    add_with_requirements(&mut scene.world, id, ComponentKind::VisualCorrection);
+    add_with_requirements(&mut scene.world, id, ComponentKind::PostProcessing);
     assert!(remove_with_cascade(
         &mut scene.world,
         id,
         ComponentKind::Camera
     ));
     assert!(!scene.world.has_camera(id));
-    assert!(!scene.world.has_visual_correction(id), "dependent cascaded");
+    assert!(!scene.world.has_post_processing(id), "dependent cascaded");
 }
 
 #[test]
 fn reconcile_drops_orphaned_dependent() {
     let mut scene = Scene::new();
     let id = create_entity(&mut scene, "FX", None);
-    add_with_requirements(&mut scene.world, id, ComponentKind::VisualCorrection);
+    add_with_requirements(&mut scene.world, id, ComponentKind::PostProcessing);
     // Clear the requirement out from under the dependent (as another card might).
     scene.world.set_camera(id, None);
     assert!(reconcile_requirements(&mut scene.world, id));
-    assert!(!scene.world.has_visual_correction(id));
+    assert!(!scene.world.has_post_processing(id));
 }
 
 #[test]
@@ -79,11 +79,11 @@ fn enforce_on_load_auto_adds_missing_requirement() {
     // Simulate a hand-edited scene: a dependent with no requirement.
     scene
         .world
-        .set_visual_correction(id, Some(default_visual_correction()));
+        .set_post_processing(id, Some(default_post_processing()));
     let added = enforce_requirements(&mut scene.world, id);
     assert_eq!(
         added,
-        vec![(ComponentKind::VisualCorrection, ComponentKind::Camera)]
+        vec![(ComponentKind::PostProcessing, ComponentKind::Camera)]
     );
     assert!(scene.world.has_camera(id));
     // Idempotent: a second pass finds nothing to add.

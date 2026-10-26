@@ -2,7 +2,7 @@
 //! stack, `Graphics.*`, the Game view and the view camera's lens sync, so a
 //! render-texture camera never stands in for the screen's.
 
-use crate::components::{RenderTarget, VisualCorrectionComponent};
+use crate::components::{PostProcessingComponent, RenderTarget};
 use crate::ecs::CompRef;
 use crate::scene::Scene;
 
@@ -39,9 +39,9 @@ pub fn main_camera(scene: &Scene) -> Option<u32> {
     screen_cameras(scene).first().copied()
 }
 
-/// `id`'s visual-correction volume, when the entity is active in the hierarchy and
+/// `id`'s post-processing volume, when the entity is active in the hierarchy and
 /// the volume is active: the settings a view whose camera is `id` runs.
-pub fn camera_volume(scene: &Scene, id: u32) -> Option<CompRef<'_, VisualCorrectionComponent>> {
-    let vc = scene.world.visual_correction(id)?;
+pub fn camera_volume(scene: &Scene, id: u32) -> Option<CompRef<'_, PostProcessingComponent>> {
+    let vc = scene.world.post_processing(id)?;
     (scene.world.is_active_in_hierarchy(id) && vc.active).then_some(vc)
 }

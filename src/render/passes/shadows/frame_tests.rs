@@ -8,7 +8,7 @@ use glam::{Quat, Vec3};
 use super::sun_direction;
 use crate::components::{CameraComponent, LightMode, RenderTarget};
 use crate::render::{RenderView, OFFSCREEN_FORMAT};
-use crate::scene::authoring::{create_entity, default_visual_correction, Primitive};
+use crate::scene::authoring::{create_entity, default_post_processing, Primitive};
 use crate::scene::{Camera, Scene};
 
 fn default_sun() -> Vec3 {
@@ -49,9 +49,9 @@ fn the_shadow_sun_follows_only_a_live_directional_light() {
 /// A camera entity whose volume asks for `cascades` shadow cascades.
 fn camera_with_cascades(scene: &mut Scene, cascades: u32, target: Option<RenderTarget>) {
     let id = create_entity(scene, "Camera", None);
-    let mut vc = default_visual_correction();
+    let mut vc = default_post_processing();
     vc.shadows.cascades = cascades;
-    scene.world.set_visual_correction(id, Some(vc));
+    scene.world.set_post_processing(id, Some(vc));
     let camera = CameraComponent {
         target_texture: target,
         ..CameraComponent::default()

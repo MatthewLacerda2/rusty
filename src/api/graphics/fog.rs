@@ -1,6 +1,6 @@
 //! `Graphics.{Get,Set}Fog*` (#437): the scene's distance + height fog, through the
 //! same `authoring::fog` ops the Scene Settings panel calls. Fog is scene-level, not
-//! per-volume, so these work whether or not the scene has a visual-correction volume.
+//! per-volume, so these work whether or not the scene has a post-processing volume.
 
 use std::cell::RefCell;
 

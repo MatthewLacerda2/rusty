@@ -61,8 +61,8 @@ struct VsOut { @builtin(position) pos: vec4<f32>, @location(0) uv: vec2<f32> };
 /// A grey wall whose volume runs `effects`.
 fn scene(effects: &[&str]) -> Scene {
     let mut scene = wall_scene(2.0, [0.5, 0.5, 0.5]);
-    let id = scene.world.ids_with_visual_correction()[0];
-    let mut vc = scene.world.visual_correction_mut(id).unwrap();
+    let id = scene.world.ids_with_post_processing()[0];
+    let mut vc = scene.world.post_processing_mut(id).unwrap();
     vc.custom_effects = effects.iter().map(|s| s.to_string()).collect();
     drop(vc);
     scene
@@ -98,7 +98,7 @@ fn listed_effects_reach_the_image_and_broken_ones_are_skipped() {
 fn the_fxaa_off_path_still_lands_the_effects() {
     bake_green("t397_green_nofxaa");
     let mut scene = scene(&["t397_green_nofxaa"]);
-    let id = scene.world.ids_with_visual_correction()[0];
+    let id = scene.world.ids_with_post_processing()[0];
     scene.world.set_camera(
         id,
         Some(CameraComponent {

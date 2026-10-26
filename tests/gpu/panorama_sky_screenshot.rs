@@ -15,7 +15,7 @@ use rusty::components::{MaterialAsset, MaterialComponent};
 use rusty::core::settings::quality::QualityPreset;
 use rusty::dev::capture::CaptureHost;
 use rusty::dev::screenshot::capture_into;
-use rusty::scene::authoring::{create_entity, default_visual_correction, Primitive};
+use rusty::scene::authoring::{create_entity, default_post_processing, Primitive};
 use rusty::scene::{Camera, Scene};
 
 /// Write the two-tone panorama into the test's temp dir and return its path.
@@ -53,11 +53,11 @@ fn metal_scene(ssr: bool) -> Scene {
     scene.materials.insert("metal".to_string(), metal);
     if ssr {
         let volume = create_entity(&mut scene, "Volume", None);
-        let mut vc = default_visual_correction();
+        let mut vc = default_post_processing();
         vc.bloom_active = false;
         vc.ssr_active = true;
         vc.ssr_quality = "High".to_string();
-        scene.world.set_visual_correction(volume, Some(vc));
+        scene.world.set_post_processing(volume, Some(vc));
         // A volume rides on its camera (#1434): that camera is the view's.
         scene
             .world

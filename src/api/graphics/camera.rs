@@ -1,8 +1,8 @@
 //! src/api/graphics/camera.rs — the `Graphics` knobs that live on the **camera**
-//! rather than on a visual-correction volume: motion blur and FXAA.
+//! rather than on a post-processing volume: motion blur and FXAA.
 //!
 //! Split out of `mod.rs` when it crossed the size cap, along the seam the namespace
-//! already had — the volume knobs read `VisualCorrectionComponent`, these read
+//! already had — the volume knobs read `PostProcessingComponent`, these read
 //! `CameraComponent`, and the two groups share nothing but the `Graphics` table.
 //!
 //! Both route through the shared `authoring::rendering::camera` ops the editor's Camera card

@@ -17,7 +17,7 @@ use glam::Vec3;
 use rusty::components::{MaterialAsset, MaterialComponent};
 use rusty::dev::screenshot::capture;
 use rusty::scene::Camera;
-use rusty::scene::{MeshComponent, Scene, VisualCorrectionComponent};
+use rusty::scene::{MeshComponent, PostProcessingComponent, Scene};
 
 /// Write a 2x2 solid-RGB PNG (alpha 255).
 fn write_png(path: &std::path::Path, rgb: [u8; 3]) {
@@ -28,13 +28,13 @@ fn write_png(path: &std::path::Path, rgb: [u8; 3]) {
     img.save(path).expect("write png");
 }
 
-fn vc() -> VisualCorrectionComponent {
-    VisualCorrectionComponent {
+fn vc() -> PostProcessingComponent {
+    PostProcessingComponent {
         bloom_active: false,
         bloom_threshold: 0.6,
         ssr_active: false,
         ssr_temporal_upsampling: false,
-        ..rusty::scene::authoring::default_visual_correction()
+        ..rusty::scene::authoring::default_post_processing()
     }
 }
 
@@ -49,7 +49,7 @@ pub(super) fn scene(material: MaterialAsset) -> Scene {
     let mat = MaterialComponent::new("mat".to_string());
     s.world.set_mesh(id, Some(mesh));
     s.world.set_material(id, Some(mat));
-    s.world.set_visual_correction(id, Some(vc()));
+    s.world.set_post_processing(id, Some(vc()));
     // A volume rides on its camera (#1434): that camera is the view's.
     s.world
         .set_camera(id, Some(rusty::components::CameraComponent::default()));

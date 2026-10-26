@@ -1,7 +1,7 @@
-//! src/scene/authoring/rendering/visual_correction.rs — Shared visual-correction ops.
+//! src/scene/authoring/rendering/post_processing.rs — Shared post-processing ops.
 //!
 //! The ONE place the engine knows how to mutate an entity's first-class
-//! `VisualCorrectionComponent` field by field: the master `active` flag, bloom
+//! `PostProcessingComponent` field by field: the master `active` flag, bloom
 //! (active / intensity / threshold), color grading (exposure / contrast / saturation
 //! / gamma / tonemap), SSR (active / quality / temporal upsampling), shadows and SSAO
 //! (active / radius / intensity, #436), the authored post-FX list (#397) and its
@@ -9,102 +9,102 @@
 //! validation each write owns (the `≥ 0` clamps on bloom intensity/threshold, the
 //! `≥ 0.01` clamp on gamma).
 //!
-//! BOTH the editor's Visual Correction card and the Lua `Graphics.*` setters route
+//! BOTH the editor's Post Processing card and the Lua `Graphics.*` setters route
 //! through these, so the egui panel and the binding share one write + one clamp
 //! (#287). The `Graphics` adapter still parses the tonemap/quality strings into the
 //! typed values these ops take.
 //!
 //! Pure.
 
-use crate::components::{ShadowSettings, SsaoSettings, Tonemap, VisualCorrectionComponent};
+use crate::components::{PostProcessingComponent, ShadowSettings, SsaoSettings, Tonemap};
 use crate::scene::authoring::sanitize::{
     at_least, clamped, finite_or, finite_values, non_negative,
 };
 use crate::shadergen::post_params::PostChain;
 
-/// Set the master visual-correction `active` flag.
-pub fn set_active(vc: &mut VisualCorrectionComponent, active: bool) {
+/// Set the master post-processing `active` flag.
+pub fn set_active(vc: &mut PostProcessingComponent, active: bool) {
     vc.active = active;
 }
 
 /// Set whether bloom is active.
-pub fn set_bloom_active(vc: &mut VisualCorrectionComponent, active: bool) {
+pub fn set_bloom_active(vc: &mut PostProcessingComponent, active: bool) {
     vc.bloom_active = active;
 }
 
 /// Set the bloom intensity, clamped to `≥ 0`.
-pub fn set_bloom_intensity(vc: &mut VisualCorrectionComponent, value: f32) {
+pub fn set_bloom_intensity(vc: &mut PostProcessingComponent, value: f32) {
     vc.bloom_intensity = non_negative(value);
 }
 
 /// Set the bloom threshold, clamped to `≥ 0`.
-pub fn set_bloom_threshold(vc: &mut VisualCorrectionComponent, value: f32) {
+pub fn set_bloom_threshold(vc: &mut PostProcessingComponent, value: f32) {
     vc.bloom_threshold = non_negative(value);
 }
 
 /// Set the exposure (EV).
-pub fn set_exposure(vc: &mut VisualCorrectionComponent, value: f32) {
+pub fn set_exposure(vc: &mut PostProcessingComponent, value: f32) {
     vc.exposure = finite_or(value, vc.exposure);
 }
 
 /// Set the contrast.
-pub fn set_contrast(vc: &mut VisualCorrectionComponent, value: f32) {
+pub fn set_contrast(vc: &mut PostProcessingComponent, value: f32) {
     vc.contrast = finite_or(value, vc.contrast);
 }
 
 /// Set the saturation.
-pub fn set_saturation(vc: &mut VisualCorrectionComponent, value: f32) {
+pub fn set_saturation(vc: &mut PostProcessingComponent, value: f32) {
     vc.saturation = finite_or(value, vc.saturation);
 }
 
 /// Set the display-gamma tweak (neutral `1.0`), clamped to `≥ 0.01` (avoids a
 /// divide-by-zero in the shader's `c^(1/gamma)`).
-pub fn set_gamma(vc: &mut VisualCorrectionComponent, value: f32) {
+pub fn set_gamma(vc: &mut PostProcessingComponent, value: f32) {
     vc.gamma = at_least(value, 0.01);
 }
 
 /// Set the tonemap operator (typed — string parsing stays in the API adapter).
-pub fn set_tonemap(vc: &mut VisualCorrectionComponent, tonemap: Tonemap) {
+pub fn set_tonemap(vc: &mut PostProcessingComponent, tonemap: Tonemap) {
     vc.tonemap = tonemap;
 }
 
 /// Set whether SSR is active.
-pub fn set_ssr_active(vc: &mut VisualCorrectionComponent, active: bool) {
+pub fn set_ssr_active(vc: &mut PostProcessingComponent, active: bool) {
     vc.ssr_active = active;
 }
 
 /// Set the SSR quality preset name (`"Low"`/`"Medium"`/`"High"`/`"Ultra"`).
-pub fn set_ssr_quality(vc: &mut VisualCorrectionComponent, quality: String) {
+pub fn set_ssr_quality(vc: &mut PostProcessingComponent, quality: String) {
     vc.ssr_quality = quality;
 }
 
 /// Set whether SSR temporal upsampling is on.
-pub fn set_ssr_temporal_upsampling(vc: &mut VisualCorrectionComponent, on: bool) {
+pub fn set_ssr_temporal_upsampling(vc: &mut PostProcessingComponent, on: bool) {
     vc.ssr_temporal_upsampling = on;
 }
 
 /// Set how many shadow cascades split the view, clamped to `1..=4`.
-pub fn set_shadow_cascades(vc: &mut VisualCorrectionComponent, count: u32) {
+pub fn set_shadow_cascades(vc: &mut PostProcessingComponent, count: u32) {
     vc.shadows.cascades = count.clamp(1, ShadowSettings::MAX_CASCADES);
 }
 
 /// Set how far from the camera sun shadows reach, clamped to `≥ 1` world unit.
-pub fn set_shadow_distance(vc: &mut VisualCorrectionComponent, distance: f32) {
+pub fn set_shadow_distance(vc: &mut PostProcessingComponent, distance: f32) {
     vc.shadows.distance = at_least(distance, ShadowSettings::MIN_DISTANCE);
 }
 
 /// Set whether screen-space ambient occlusion runs (#436).
-pub fn set_ssao_active(vc: &mut VisualCorrectionComponent, active: bool) {
+pub fn set_ssao_active(vc: &mut PostProcessingComponent, active: bool) {
     vc.ssao.active = active;
 }
 
 /// Set the AO search radius in world units, clamped to `≥ 0.01`.
-pub fn set_ssao_radius(vc: &mut VisualCorrectionComponent, radius: f32) {
+pub fn set_ssao_radius(vc: &mut PostProcessingComponent, radius: f32) {
     vc.ssao.radius = at_least(radius, SsaoSettings::MIN_RADIUS);
 }
 
 /// Set the AO strength, clamped to `0..=4`.
-pub fn set_ssao_intensity(vc: &mut VisualCorrectionComponent, intensity: f32) {
+pub fn set_ssao_intensity(vc: &mut PostProcessingComponent, intensity: f32) {
     vc.ssao.intensity = clamped(intensity, 0.0, SsaoSettings::MAX_INTENSITY);
 }
 
@@ -115,7 +115,7 @@ pub fn set_ssao_intensity(vc: &mut VisualCorrectionComponent, intensity: f32) {
 /// separator, a leading `.`) is refused by name and nothing is written; a module
 /// that simply isn't baked yet is accepted — the renderer skips it until it is.
 pub fn set_custom_effects(
-    vc: &mut VisualCorrectionComponent,
+    vc: &mut PostProcessingComponent,
     names: Vec<String>,
 ) -> Result<(), String> {
     if let Some(bad) = names.iter().find(|n| !is_module_name(n)) {
@@ -133,7 +133,7 @@ pub fn set_custom_effects(
 /// written. One number broadcasts to every lane. A buffer write for the renderer,
 /// never a re-bake.
 pub fn set_post_param(
-    vc: &mut VisualCorrectionComponent,
+    vc: &mut PostProcessingComponent,
     name: &str,
     value: Vec<f32>,
 ) -> Result<(), String> {
@@ -143,7 +143,7 @@ pub fn set_post_param(
 /// [`set_post_param`] against an already-read `chain` of the volume's effects — a
 /// tween (#661) resolves it once at start instead of reading sidecars every tick.
 pub fn set_post_param_with(
-    vc: &mut VisualCorrectionComponent,
+    vc: &mut PostProcessingComponent,
     chain: &PostChain,
     name: &str,
     value: Vec<f32>,
@@ -153,13 +153,13 @@ pub fn set_post_param_with(
 
 /// The value runtime param `name` of the volume's effects draws with: the stored one,
 /// else the effect's baked default. Strict like [`set_post_param`].
-pub fn post_param(vc: &VisualCorrectionComponent, name: &str) -> Result<Vec<f32>, String> {
+pub fn post_param(vc: &PostProcessingComponent, name: &str) -> Result<Vec<f32>, String> {
     post_param_with(vc, &PostChain::load(&vc.custom_effects), name)
 }
 
 /// [`post_param`] against an already-read `chain`.
 pub fn post_param_with(
-    vc: &VisualCorrectionComponent,
+    vc: &PostProcessingComponent,
     chain: &PostChain,
     name: &str,
 ) -> Result<Vec<f32>, String> {
@@ -174,28 +174,28 @@ fn is_module_name(name: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::components::VisualCorrectionComponent;
+    use crate::components::PostProcessingComponent;
     use crate::scene::Scene;
 
     fn scene_with_vc() -> (Scene, u32) {
         let mut scene = Scene::new();
         let id = scene.add_entity("Volume".to_string());
-        let c = VisualCorrectionComponent {
+        let c = PostProcessingComponent {
             bloom_active: false,
             bloom_threshold: 1.0,
             ssr_active: false,
             ssr_quality: "Medium".to_string(),
             ssr_temporal_upsampling: false,
-            ..crate::scene::authoring::default_visual_correction()
+            ..crate::scene::authoring::default_post_processing()
         };
-        scene.world.set_visual_correction(id, Some(c));
+        scene.world.set_post_processing(id, Some(c));
         (scene, id)
     }
 
     #[test]
     fn ops_write_through_with_clamps() {
         let (mut scene, id) = scene_with_vc();
-        let mut e = scene.world.visual_correction_mut(id).unwrap();
+        let mut e = scene.world.post_processing_mut(id).unwrap();
         set_bloom_intensity(&mut e, -3.0);
         set_bloom_threshold(&mut e, -1.0);
         set_gamma(&mut e, -5.0);
@@ -227,7 +227,7 @@ mod tests {
     #[test]
     fn custom_effects_keep_order_and_refuse_paths() {
         let (mut scene, id) = scene_with_vc();
-        let mut e = scene.world.visual_correction_mut(id).unwrap();
+        let mut e = scene.world.post_processing_mut(id).unwrap();
         set_custom_effects(&mut e, vec!["crt".into(), "grain".into()]).unwrap();
         for bad in ["", "../etc", "a/b", "a\\b", ".hidden"] {
             let err = set_custom_effects(&mut e, vec!["ok".into(), bad.into()]).unwrap_err();

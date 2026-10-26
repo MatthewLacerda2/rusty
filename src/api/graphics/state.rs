@@ -8,7 +8,7 @@
 use std::cell::RefCell;
 
 use super::super::{put, Reg};
-use crate::components::{CameraComponent, VisualCorrectionComponent};
+use crate::components::{CameraComponent, PostProcessingComponent};
 use crate::core::settings::quality::QualityPreset;
 use crate::scene::camera::{camera_volume, main_camera};
 use crate::scene::Scene;
@@ -38,7 +38,7 @@ pub(super) fn register_quality<'scope>(
     )
 }
 
-/// The main camera, when its visual-correction volume is active: the volume the
+/// The main camera, when its post-processing volume is active: the volume the
 /// screen's post-FX reads.
 fn active_vc_id(scene: &Scene) -> Option<u32> {
     main_camera(scene).filter(|&id| camera_volume(scene, id).is_some())
@@ -49,25 +49,25 @@ fn active_cam_id(scene: &Scene) -> Option<u32> {
     main_camera(scene)
 }
 
-/// Run `f` on the main camera's active visual-correction volume, returning its result.
+/// Run `f` on the main camera's active post-processing volume, returning its result.
 pub(super) fn with_vc<R>(
     scene: &RefCell<Scene>,
-    f: impl FnOnce(&VisualCorrectionComponent) -> R,
+    f: impl FnOnce(&PostProcessingComponent) -> R,
 ) -> Option<R> {
     let scene = scene.borrow();
     let id = active_vc_id(&scene)?;
-    scene.world.visual_correction(id).map(|vc| f(&vc))
+    scene.world.post_processing(id).map(|vc| f(&vc))
 }
 
-/// Mutate the main camera's active visual-correction volume (no-op without one).
+/// Mutate the main camera's active post-processing volume (no-op without one).
 /// The caller routes the write through a shared
-/// `authoring::rendering::visual_correction::*` op (#287).
-pub(super) fn with_vc_mut(scene: &RefCell<Scene>, f: impl FnOnce(&mut VisualCorrectionComponent)) {
+/// `authoring::rendering::post_processing::*` op (#287).
+pub(super) fn with_vc_mut(scene: &RefCell<Scene>, f: impl FnOnce(&mut PostProcessingComponent)) {
     let mut scene = scene.borrow_mut();
     let Some(id) = active_vc_id(&scene) else {
         return;
     };
-    let guard = scene.world.visual_correction_mut(id);
+    let guard = scene.world.post_processing_mut(id);
     if let Some(mut vc) = guard {
         f(&mut vc);
     }

@@ -17,15 +17,15 @@ use glam::Vec3;
 use rusty::components::{MaterialAsset, MaterialComponent};
 use rusty::dev::screenshot::capture;
 use rusty::scene::Camera;
-use rusty::scene::{MeshComponent, Scene, VisualCorrectionComponent};
+use rusty::scene::{MeshComponent, PostProcessingComponent, Scene};
 
-fn vc(bloom: bool) -> VisualCorrectionComponent {
-    VisualCorrectionComponent {
+fn vc(bloom: bool) -> PostProcessingComponent {
+    PostProcessingComponent {
         bloom_active: bloom,
         bloom_threshold: 0.6,
         ssr_active: false,
         ssr_temporal_upsampling: false,
-        ..rusty::scene::authoring::default_visual_correction()
+        ..rusty::scene::authoring::default_post_processing()
     }
 }
 
@@ -43,7 +43,7 @@ fn scene(emissive: [f32; 3], bloom: bool) -> Scene {
     scene
         .world
         .set_material(id, Some(MaterialComponent::new("mat".to_string())));
-    scene.world.set_visual_correction(id, Some(vc(bloom)));
+    scene.world.set_post_processing(id, Some(vc(bloom)));
     // A volume rides on its camera (#1434): that camera is the view's.
     scene
         .world

@@ -1,10 +1,10 @@
-//! src/editor/inspector/components/camera/visual_correction.rs — the Visual
+//! src/editor/inspector/components/camera/post_processing.rs — the Visual
 //! Correction inspector card. Split out of the Camera card module to stay under the
 //! size cap; the two share the camera entity (removing the Camera also drops its
-//! Visual Correction volume).
+//! Post Processing volume).
 //!
 //! A THIN client (#287): each widget reads the field from a snapshot and routes its
-//! write through the shared `authoring::rendering::visual_correction::*` op (which the
+//! write through the shared `authoring::rendering::post_processing::*` op (which the
 //! `Graphics.*` Lua surface calls too), never mutating the component directly.
 
 use crate::editor::inspector::components::card::remove_component;
@@ -12,32 +12,29 @@ use crate::scene::authoring::ComponentKind;
 use egui_phosphor::regular as icon;
 
 use crate::editor::inspector::components::card::component_card;
-use crate::scene::authoring::rendering::visual_correction as vc_ops;
-use crate::scene::{Tonemap, VisualCorrectionComponent};
+use crate::scene::authoring::rendering::post_processing as vc_ops;
+use crate::scene::{PostProcessingComponent, Tonemap};
 
-/// Visual Correction Component panel.
-pub fn draw_visual_correction(
+/// Post Processing Component panel.
+pub fn draw_post_processing(
     ui: &mut egui::Ui,
     world: &mut crate::ecs::World,
     id: u32,
     is_dirty: &mut bool,
 ) {
-    let Some(vc) = world.visual_correction(id).map(|vc| vc.clone()) else {
+    let Some(vc) = world.post_processing(id).map(|vc| vc.clone()) else {
         return;
     };
     let mut remove = false;
     component_card(
         ui,
         icon::SPARKLE,
-        "Visual Correction",
+        "Post Processing",
         Some(&mut remove),
         |ui| {
             let mut active = vc.active;
-            if ui
-                .checkbox(&mut active, "Enable Visual Correction")
-                .changed()
-            {
-                if let Some(mut c) = world.visual_correction_mut(id) {
+            if ui.checkbox(&mut active, "Enable Post Processing").changed() {
+                if let Some(mut c) = world.post_processing_mut(id) {
                     vc_ops::set_active(&mut c, active);
                 }
                 *is_dirty = true;
@@ -51,23 +48,23 @@ pub fn draw_visual_correction(
         },
     );
     if remove {
-        remove_component(world, id, ComponentKind::VisualCorrection, is_dirty);
+        remove_component(world, id, ComponentKind::PostProcessing, is_dirty);
     }
 }
 
-/// The Bloom section of the Visual Correction card.
+/// The Bloom section of the Post Processing card.
 fn draw_bloom(
     ui: &mut egui::Ui,
     world: &mut crate::ecs::World,
     id: u32,
-    vc: &VisualCorrectionComponent,
+    vc: &PostProcessingComponent,
     is_dirty: &mut bool,
 ) {
     ui.add_space(3.0);
     ui.label("Bloom");
     let mut bloom_active = vc.bloom_active;
     if ui.checkbox(&mut bloom_active, "  Bloom Active").changed() {
-        if let Some(mut c) = world.visual_correction_mut(id) {
+        if let Some(mut c) = world.post_processing_mut(id) {
             vc_ops::set_bloom_active(&mut c, bloom_active);
         }
         *is_dirty = true;
@@ -80,7 +77,7 @@ fn draw_bloom(
                 .add(egui::Slider::new(&mut intensity, 0.0..=5.0))
                 .changed()
             {
-                if let Some(mut c) = world.visual_correction_mut(id) {
+                if let Some(mut c) = world.post_processing_mut(id) {
                     vc_ops::set_bloom_intensity(&mut c, intensity);
                 }
                 *is_dirty = true;
@@ -93,7 +90,7 @@ fn draw_bloom(
                 .add(egui::Slider::new(&mut threshold, 0.0..=1.0))
                 .changed()
             {
-                if let Some(mut c) = world.visual_correction_mut(id) {
+                if let Some(mut c) = world.post_processing_mut(id) {
                     vc_ops::set_bloom_threshold(&mut c, threshold);
                 }
                 *is_dirty = true;
@@ -110,13 +107,13 @@ fn slider_row(
     label: &str,
     mut value: f32,
     range: std::ops::RangeInclusive<f32>,
-    op: fn(&mut VisualCorrectionComponent, f32),
+    op: fn(&mut PostProcessingComponent, f32),
 ) -> bool {
     ui.horizontal(|ui| {
         ui.label(label);
         let changed = ui.add(egui::Slider::new(&mut value, range)).changed();
         if changed {
-            if let Some(mut c) = cx.0.visual_correction_mut(cx.1) {
+            if let Some(mut c) = cx.0.post_processing_mut(cx.1) {
                 op(&mut c, value);
             }
         }
@@ -131,7 +128,7 @@ fn draw_color_correction(
     ui: &mut egui::Ui,
     world: &mut crate::ecs::World,
     id: u32,
-    vc: &VisualCorrectionComponent,
+    vc: &PostProcessingComponent,
     is_dirty: &mut bool,
 ) {
     ui.add_space(3.0);
@@ -148,7 +145,7 @@ fn draw_tonemap(
     ui: &mut egui::Ui,
     world: &mut crate::ecs::World,
     id: u32,
-    vc: &VisualCorrectionComponent,
+    vc: &PostProcessingComponent,
     is_dirty: &mut bool,
 ) {
     let mut tonemap = vc.tonemap;
@@ -162,7 +159,7 @@ fn draw_tonemap(
                         .selectable_value(&mut tonemap, value, value.name())
                         .changed()
                     {
-                        if let Some(mut c) = world.visual_correction_mut(id) {
+                        if let Some(mut c) = world.post_processing_mut(id) {
                             vc_ops::set_tonemap(&mut c, tonemap);
                         }
                         *is_dirty = true;
@@ -172,19 +169,19 @@ fn draw_tonemap(
     });
 }
 
-/// The Screen Space Reflections (SSR) section of the Visual Correction card.
+/// The Screen Space Reflections (SSR) section of the Post Processing card.
 fn draw_ssr(
     ui: &mut egui::Ui,
     world: &mut crate::ecs::World,
     id: u32,
-    vc: &VisualCorrectionComponent,
+    vc: &PostProcessingComponent,
     is_dirty: &mut bool,
 ) {
     ui.add_space(3.0);
     ui.label("Screen Space Reflections (SSR)");
     let mut ssr_active = vc.ssr_active;
     if ui.checkbox(&mut ssr_active, "  SSR Active").changed() {
-        if let Some(mut c) = world.visual_correction_mut(id) {
+        if let Some(mut c) = world.post_processing_mut(id) {
             vc_ops::set_ssr_active(&mut c, ssr_active);
         }
         *is_dirty = true;
@@ -201,7 +198,7 @@ fn draw_ssr(
                             .selectable_value(&mut quality, q.to_string(), q)
                             .changed()
                         {
-                            if let Some(mut c) = world.visual_correction_mut(id) {
+                            if let Some(mut c) = world.post_processing_mut(id) {
                                 vc_ops::set_ssr_quality(&mut c, quality.clone());
                             }
                             *is_dirty = true;
@@ -214,7 +211,7 @@ fn draw_ssr(
             .checkbox(&mut upsampling, "    Temporal Upsampling")
             .changed()
         {
-            if let Some(mut c) = world.visual_correction_mut(id) {
+            if let Some(mut c) = world.post_processing_mut(id) {
                 vc_ops::set_ssr_temporal_upsampling(&mut c, upsampling);
             }
             *is_dirty = true;
@@ -227,7 +224,7 @@ fn draw_shadows(
     ui: &mut egui::Ui,
     world: &mut crate::ecs::World,
     id: u32,
-    vc: &VisualCorrectionComponent,
+    vc: &PostProcessingComponent,
     is_dirty: &mut bool,
 ) {
     ui.add_space(3.0);
@@ -237,7 +234,7 @@ fn draw_shadows(
     ui.horizontal(|ui| {
         ui.label("  Cascades:");
         if ui.add(egui::Slider::new(&mut cascades, 1..=max)).changed() {
-            if let Some(mut c) = world.visual_correction_mut(id) {
+            if let Some(mut c) = world.post_processing_mut(id) {
                 vc_ops::set_shadow_cascades(&mut c, cascades);
             }
             *is_dirty = true;
@@ -248,7 +245,7 @@ fn draw_shadows(
         ui.label("  Distance:");
         let drag = egui::DragValue::new(&mut distance).speed(1.0).suffix(" m");
         if ui.add(drag).changed() {
-            if let Some(mut c) = world.visual_correction_mut(id) {
+            if let Some(mut c) = world.post_processing_mut(id) {
                 vc_ops::set_shadow_distance(&mut c, distance);
             }
             *is_dirty = true;
@@ -261,14 +258,14 @@ fn draw_ssao(
     ui: &mut egui::Ui,
     world: &mut crate::ecs::World,
     id: u32,
-    vc: &VisualCorrectionComponent,
+    vc: &PostProcessingComponent,
     is_dirty: &mut bool,
 ) {
     ui.add_space(3.0);
     ui.label("Ambient Occlusion (SSAO)");
     let mut active = vc.ssao.active;
     if ui.checkbox(&mut active, "  SSAO Active").changed() {
-        if let Some(mut c) = world.visual_correction_mut(id) {
+        if let Some(mut c) = world.post_processing_mut(id) {
             vc_ops::set_ssao_active(&mut c, active);
         }
         *is_dirty = true;

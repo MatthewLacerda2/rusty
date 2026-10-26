@@ -1,4 +1,4 @@
-//! src/components/rendering/visual_correction/ — Post-process component
+//! src/components/rendering/post_processing/ — Post-process component
 //!
 //! bloom/exposure/SSR settings. Unity: post-process volume. Moved verbatim from
 //! the former `core/scene.rs`, then extended (phase-3) so the renderer's post-FX
@@ -13,7 +13,7 @@ mod tonemap;
 pub use tonemap::Tonemap;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct VisualCorrectionComponent {
+pub struct PostProcessingComponent {
     pub active: bool,
     pub bloom_active: bool,
     pub bloom_intensity: f32,
@@ -129,13 +129,13 @@ fn default_gamma() -> f32 {
 
 #[cfg(test)]
 mod tests {
-    use super::VisualCorrectionComponent;
+    use super::PostProcessingComponent;
 
     const BODY: &str = r#""active": true, "bloom_active": false, "bloom_intensity": 1.0,
         "bloom_threshold": 1.0, "exposure": 0.0, "contrast": 1.0, "saturation": 1.0,
         "ssr_active": false, "ssr_quality": "Low", "ssr_temporal_upsampling": false"#;
 
-    fn load(extra: &str) -> VisualCorrectionComponent {
+    fn load(extra: &str) -> PostProcessingComponent {
         serde_json::from_str(&format!("{{{BODY}{extra}}}")).unwrap()
     }
 
@@ -166,7 +166,7 @@ mod tests {
     fn custom_effects_default_empty_and_round_trip_in_order() {
         assert!(load("").custom_effects.is_empty());
         let vc = load(r#", "custom_effects": ["crt", "vignette_red"]"#);
-        let back: VisualCorrectionComponent =
+        let back: PostProcessingComponent =
             serde_json::from_str(&serde_json::to_string(&vc).unwrap()).unwrap();
         assert_eq!(back.custom_effects, ["crt", "vignette_red"]);
     }
@@ -175,7 +175,7 @@ mod tests {
     fn post_params_default_empty_and_round_trip() {
         assert!(load("").post_params.is_empty());
         let vc = load(r#", "post_params": {"damage_vignette.intensity": [0.7]}"#);
-        let back: VisualCorrectionComponent =
+        let back: PostProcessingComponent =
             serde_json::from_str(&serde_json::to_string(&vc).unwrap()).unwrap();
         assert_eq!(back.post_params["damage_vignette.intensity"], [0.7]);
     }
@@ -186,7 +186,7 @@ mod tests {
         vc.gamma = 1.25;
         let json = serde_json::to_string(&vc).unwrap();
         assert!(json.contains(r#""display_gamma":1.25"#), "{json}");
-        let back: VisualCorrectionComponent = serde_json::from_str(&json).unwrap();
+        let back: PostProcessingComponent = serde_json::from_str(&json).unwrap();
         assert_eq!(back.gamma, 1.25);
     }
 }

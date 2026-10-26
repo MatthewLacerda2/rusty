@@ -10,7 +10,7 @@ use super::mask_tests::Dissolve;
 use super::params_tests::lua;
 use crate::core::settings::quality::QualityPreset;
 use crate::render::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
-use crate::scene::authoring::{create_entity, default_visual_correction, material, Primitive};
+use crate::scene::authoring::{create_entity, default_post_processing, material, Primitive};
 use crate::scene::{Camera, Scene};
 
 /// Fine enough for SSAO to resolve a crate's contact shadow.
@@ -113,9 +113,9 @@ fn gpu_a_dissolved_crate_leaves_no_ambient_occlusion() {
         let floor = (Vec3::new(0.0, -0.5, 0.0), Vec3::new(20.0, 1.0, 20.0));
         block(&mut scene, floor.0, floor.1, None);
         let volume = create_entity(&mut scene, "Volume", None);
-        let mut vc = default_visual_correction();
+        let mut vc = default_post_processing();
         (vc.bloom_active, vc.ssr_active, vc.ssao.active) = (false, false, true);
-        scene.world.set_visual_correction(volume, Some(vc));
+        scene.world.set_post_processing(volume, Some(vc));
         // A volume rides on its camera (#1434): that camera is the view's.
         scene
             .world

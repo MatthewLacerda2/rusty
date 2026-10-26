@@ -12,7 +12,7 @@ pub struct ScreenStack {
     pub cameras: Vec<Camera>,
     /// The stack's base camera entity, `scene::camera::main_camera`: the lowest
     /// `render_order` active screen camera, the one `Graphics.*` edits.
-    /// Its `CameraComponent` and `VisualCorrectionComponent` drive the view's post-FX,
+    /// Its `CameraComponent` and `PostProcessingComponent` drive the view's post-FX,
     /// Unity URP's camera-stack rule; overlay cameras add no post-FX of their own. The
     /// edit-mode free camera has no entity, so the Scene view previews the Game view's
     /// base camera. `None` when the scene has no active screen camera.

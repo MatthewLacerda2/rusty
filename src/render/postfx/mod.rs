@@ -3,7 +3,7 @@
 //!
 //! The scene no longer renders straight to the swapchain. It renders into an HDR
 //! offscreen target; this module then runs a fullscreen post-FX chain
-//! (`postfx.wgsl`) that finally reads the `VisualCorrectionComponent` /
+//! (`postfx.wgsl`) that finally reads the `PostProcessingComponent` /
 //! `CameraComponent` knobs and writes the corrected image to the real target.
 //!
 //! [`QualityPreset`](crate::core::settings::quality::QualityPreset) (sim-side) gates which
@@ -46,9 +46,9 @@ impl Default for PostParams {
         Self {
             // Neutral pass-through: exposure 0, contrast 1, saturation 1, gamma 1,
             // no tonemap, no bloom/SSR/motion-blur. A scene with no *active*
-            // visual-correction volume therefore looks exactly as it did before
+            // post-processing volume therefore looks exactly as it did before
             // the post-FX chain was introduced. The knobs only bite once a
-            // VisualCorrectionComponent is active (see postfx_params.rs).
+            // PostProcessingComponent is active (see postfx_params.rs).
             color: [0.0, 1.0, 1.0, 1.0],
             bloom: [1.0, 0.8, 0.0, 0.0],
             misc: [0.0, 0.0, 0.0, 0.0],

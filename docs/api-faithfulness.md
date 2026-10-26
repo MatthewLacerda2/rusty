@@ -321,7 +321,7 @@ fields (incl. the spatial fields stored for #213) round-trip through `SceneData`
 |---|---|---|
 | `SetLayer` | ✅ | renderer + sim — `draw_resources` culling mask (#92) and `physics/shape/build.rs::interaction_groups` collision groups (#91); round-trips |
 
-### `Graphics` — over the active `VisualCorrectionComponent` / `CameraComponent` / `QualityPreset`
+### `Graphics` — over the active `PostProcessingComponent` / `CameraComponent` / `QualityPreset`
 
 | Setter | Status | Read-site |
 |---|---|---|

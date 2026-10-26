@@ -51,7 +51,7 @@ component_kinds! {
         NavMeshModifierVolume,
         Camera,
         Particles,
-        VisualCorrection,
+        PostProcessing,
         Audio,
         ReverbZone,
         Canvas,
@@ -79,7 +79,7 @@ impl ComponentKind {
     /// (Unity's `[RequireComponent(typeof(T))]`). The single declaration every
     /// add/remove/load surface consults: adding a kind auto-adds these if missing,
     /// removing one of these cascades to the dependents that declare it. Flat
-    /// `kind → [kinds]`: `VisualCorrection → Camera` (a correction stack is inert
+    /// `kind → [kinds]`: `PostProcessing → Camera` (a correction stack is inert
     /// without a camera to correct), and the UI graphic and clip need a rect to fill
     /// or clip to, a Selectable a rect to be hit in, and the layout pair a rect to
     /// arrange or size (`Image` / `Text` / `Shape` / `RectMask` / `Mask` /
@@ -90,7 +90,7 @@ impl ComponentKind {
     /// everywhere by construction.
     pub fn requires(self) -> &'static [ComponentKind] {
         match self {
-            ComponentKind::VisualCorrection => &[ComponentKind::Camera],
+            ComponentKind::PostProcessing => &[ComponentKind::Camera],
             ComponentKind::Image
             | ComponentKind::Text
             | ComponentKind::Shape
@@ -120,7 +120,7 @@ impl ComponentKind {
             "navmeshmodifiervolume" | "navmodifier" => Some(Self::NavMeshModifierVolume),
             "camera" => Some(Self::Camera),
             "particles" | "particlesystem" => Some(Self::Particles),
-            "visualcorrection" => Some(Self::VisualCorrection),
+            "postprocessing" => Some(Self::PostProcessing),
             "audio" | "audiosource" => Some(Self::Audio),
             "reverbzone" | "audioreverbzone" => Some(Self::ReverbZone),
             "canvas" => Some(Self::Canvas),
@@ -162,7 +162,7 @@ pub fn add_component(scene: &mut Scene, id: u32, kind: ComponentKind) -> bool {
 
 /// Detach a first-class component of `kind` from entity `id`, cascading to every
 /// dependent that requires it (e.g. removing `Camera` drops the camera-only
-/// `VisualCorrection` stack) — driven by [`ComponentKind::requires`], not hand-written
+/// `PostProcessing` stack) — driven by [`ComponentKind::requires`], not hand-written
 /// here. Returns `false` if the entity does not exist (clearing an absent component is
 /// otherwise a no-op success).
 pub fn remove_component(scene: &mut Scene, id: u32, kind: ComponentKind) -> bool {
@@ -183,13 +183,13 @@ mod tests {
         assert!(remove_component(&mut scene, id, ComponentKind::Light));
         assert!(!scene.world.has_light(id));
 
-        // Adding VisualCorrection auto-adds its required Camera (RequireComponent).
-        add_component(&mut scene, id, ComponentKind::VisualCorrection);
-        assert!(scene.world.has_visual_correction(id) && scene.world.has_camera(id));
+        // Adding PostProcessing auto-adds its required Camera (RequireComponent).
+        add_component(&mut scene, id, ComponentKind::PostProcessing);
+        assert!(scene.world.has_post_processing(id) && scene.world.has_camera(id));
 
-        // Removing Camera cascades to VisualCorrection (editor parity).
+        // Removing Camera cascades to PostProcessing (editor parity).
         remove_component(&mut scene, id, ComponentKind::Camera);
-        assert!(!scene.world.has_camera(id) && !scene.world.has_visual_correction(id));
+        assert!(!scene.world.has_camera(id) && !scene.world.has_post_processing(id));
 
         assert!(!add_component(&mut scene, 9999, ComponentKind::Light));
     }

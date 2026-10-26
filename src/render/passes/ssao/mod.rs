@@ -27,7 +27,7 @@ pub(crate) use targets::SsaoTargets;
 
 use glam::{Mat4, Vec3};
 
-use crate::components::{SsaoSettings, VisualCorrectionComponent};
+use crate::components::{PostProcessingComponent, SsaoSettings};
 use crate::core::settings::quality::{QualityPreset, SsaoTier};
 use crate::scene::Camera;
 
@@ -71,7 +71,7 @@ impl SsaoPlan {
     /// `quality`: that volume with AO on, on a tier that runs it. `None` — nothing
     /// runs — otherwise.
     pub(crate) fn for_volume(
-        volume: Option<&VisualCorrectionComponent>,
+        volume: Option<&PostProcessingComponent>,
         quality: QualityPreset,
     ) -> Option<Self> {
         let tier = quality.ssao()?;

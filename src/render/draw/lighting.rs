@@ -1,5 +1,5 @@
 //! Construction of the per-frame `LightingUniform` from a scene's lights and SSR
-//! (Visual Correction) settings. Free builders split out of `draw.rs` to keep each
+//! (Post Processing) settings. Free builders split out of `draw.rs` to keep each
 //! file under the size cap; `Renderer::build_lighting_uniform` orchestrates them
 //! (behavior unchanged).
 
@@ -77,19 +77,19 @@ pub(crate) fn apply_scene_lights(
     lighting_uniform.num_dir_lights = dirs.len() as u32;
 }
 
-/// Fold active Visual Correction (SSR) components into the uniform; last one wins.
+/// Fold active Post Processing (SSR) components into the uniform; last one wins.
 pub(crate) fn apply_ssr_settings(lighting_uniform: &mut LightingUniform, scene: &Scene) {
     let mut ssr_active = 0.0;
     let mut ssr_quality = 2.0; // High default
     let mut ssr_temporal = 0.0;
-    for id in scene.world.ids_with_visual_correction() {
+    for id in scene.world.ids_with_post_processing() {
         if !scene.world.is_active_in_hierarchy(id) {
             continue;
         }
         let vc = scene
             .world
-            .visual_correction(id)
-            .expect("id came from ids_with_visual_correction");
+            .post_processing(id)
+            .expect("id came from ids_with_post_processing");
         if vc.ssr_active {
             ssr_active = 1.0;
         }

@@ -6,7 +6,7 @@ use glam::Vec3;
 
 use crate::components::{MaterialAsset, MaterialComponent, Tonemap};
 use crate::render::{readback, RenderView, OFFSCREEN_FORMAT};
-use crate::scene::{Camera, MeshComponent, Scene, VisualCorrectionComponent};
+use crate::scene::{Camera, MeshComponent, PostProcessingComponent, Scene};
 
 /// What the window surface typically picks (`surface_config` takes the first sRGB
 /// format; BGRA is what Vulkan and Metal list first).
@@ -37,12 +37,12 @@ fn mid_grey_scene() -> Scene {
             ..MaterialAsset::default()
         },
     );
-    let mut vc = crate::scene::authoring::defaults::default_visual_correction();
+    let mut vc = crate::scene::authoring::defaults::default_post_processing();
     vc.active = true;
     vc.bloom_active = false;
     vc.ssr_active = false;
     vc.tonemap = Tonemap::None;
-    scene.world.set_visual_correction(id, Some(vc));
+    scene.world.set_post_processing(id, Some(vc));
     // A volume rides on its camera (#1434): that camera is the view's.
     scene
         .world
@@ -101,7 +101,6 @@ fn every_final_target_format_is_srgb() {
 /// A neutral volume (the defaults a new one is created with) leaves the image alone.
 #[test]
 fn a_new_volume_is_display_gamma_neutral() {
-    let vc: VisualCorrectionComponent =
-        crate::scene::authoring::defaults::default_visual_correction();
+    let vc: PostProcessingComponent = crate::scene::authoring::defaults::default_post_processing();
     assert_eq!(vc.gamma, 1.0);
 }

@@ -9,7 +9,7 @@ use glam::Vec3;
 use rusty::components::{MaterialAsset, MaterialComponent, Tonemap};
 use rusty::dev::capture::CaptureHost;
 use rusty::dev::screenshot::capture_into;
-use rusty::scene::{Camera, MeshComponent, Scene, VisualCorrectionComponent};
+use rusty::scene::{Camera, MeshComponent, PostProcessingComponent, Scene};
 
 /// The camera: at `z = 5`, looking down −Z.
 pub fn camera() -> Camera {
@@ -41,9 +41,7 @@ pub fn wall_scene(distance: f32, color: [f32; 3]) -> Scene {
             ..MaterialAsset::default()
         },
     );
-    scene
-        .world
-        .set_visual_correction(id, Some(neutral_volume()));
+    scene.world.set_post_processing(id, Some(neutral_volume()));
     // A volume rides on its camera (#1434): that camera is the view's.
     scene
         .world
@@ -51,8 +49,8 @@ pub fn wall_scene(distance: f32, color: [f32; 3]) -> Scene {
     scene
 }
 
-fn neutral_volume() -> VisualCorrectionComponent {
-    VisualCorrectionComponent {
+fn neutral_volume() -> PostProcessingComponent {
+    PostProcessingComponent {
         bloom_active: false,
         bloom_intensity: 0.0,
         bloom_threshold: 1.0,
@@ -65,7 +63,7 @@ fn neutral_volume() -> VisualCorrectionComponent {
             active: false,
             ..Default::default()
         },
-        ..rusty::scene::authoring::default_visual_correction()
+        ..rusty::scene::authoring::default_post_processing()
     }
 }
 

@@ -5,15 +5,15 @@ use glam::{Mat4, Vec3};
 
 use super::{SsaoFrame, SsaoPlan};
 use crate::core::settings::quality::QualityPreset;
-use crate::scene::authoring::default_visual_correction;
+use crate::scene::authoring::default_post_processing;
 use crate::scene::Scene;
 
-fn scene_with(edit: impl FnOnce(&mut crate::components::VisualCorrectionComponent)) -> Scene {
+fn scene_with(edit: impl FnOnce(&mut crate::components::PostProcessingComponent)) -> Scene {
     let mut scene = Scene::new();
     let id = scene.add_entity("Volume".to_string());
-    let mut vc = default_visual_correction();
+    let mut vc = default_post_processing();
     edit(&mut vc);
-    scene.world.set_visual_correction(id, Some(vc));
+    scene.world.set_post_processing(id, Some(vc));
     // A volume rides on its camera (#1434): that camera is the view's.
     scene
         .world

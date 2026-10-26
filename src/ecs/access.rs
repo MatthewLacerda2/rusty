@@ -27,8 +27,8 @@ use crate::components::{
     AnimatorComponent, AudioSourceComponent, CameraComponent, CanvasComponent,
     CanvasGroupComponent, ImageComponent, LayoutElementComponent, LayoutGroupComponent,
     LightComponent, MaterialComponent, MeshComponent, NavMeshAgentComponent,
-    ParticleEmitterComponent, PrefabLink, RectMaskComponent, RectTransformComponent,
-    RigidBodyComponent, SelectableComponent, TextComponent, VisualCorrectionComponent,
+    ParticleEmitterComponent, PostProcessingComponent, PrefabLink, RectMaskComponent,
+    RectTransformComponent, RigidBodyComponent, SelectableComponent, TextComponent,
 };
 use crate::components::{
     BackdropFilterComponent, MaskComponent, NavMeshObstacleComponent, OffMeshLinkComponent,
@@ -135,7 +135,7 @@ optional_component_accessors! {
     OffMeshLinkComponent => offmesh_link, offmesh_link_mut, has_offmesh_link, set_offmesh_link, take_offmesh_link, ids_with_offmesh_link;
     NavMeshModifierVolumeComponent => nav_modifier, nav_modifier_mut, has_nav_modifier, set_nav_modifier, take_nav_modifier, ids_with_nav_modifier;
     CameraComponent => camera, camera_mut, has_camera, set_camera, take_camera, ids_with_camera;
-    VisualCorrectionComponent => visual_correction, visual_correction_mut, has_visual_correction, set_visual_correction, take_visual_correction, ids_with_visual_correction;
+    PostProcessingComponent => post_processing, post_processing_mut, has_post_processing, set_post_processing, take_post_processing, ids_with_post_processing;
     ParticleEmitterComponent => particles, particles_mut, has_particles, set_particles, take_particles, ids_with_particles;
     AudioSourceComponent => audio, audio_mut, has_audio, set_audio, take_audio, ids_with_audio;
     ReverbZoneComponent => reverb_zone, reverb_zone_mut, has_reverb_zone, set_reverb_zone, take_reverb_zone, ids_with_reverb_zone;

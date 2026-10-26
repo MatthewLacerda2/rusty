@@ -16,7 +16,7 @@ every field added later, with nothing new to bind.
 case, aliases too), plus `Transform` and `Mesh`. Each answers to one name first:
 `Transform`, `Mesh`, `Light`, `Animator`, `Collider`, `RigidBody`, `Material`,
 `NavMeshAgent`, `NavMeshObstacle`, `OffMeshLink`, `NavMeshModifierVolume`,
-`Camera`, `Particles`, `VisualCorrection`, `AudioSource`, `AudioReverbZone`,
+`Camera`, `Particles`, `PostProcessing`, `AudioSource`, `AudioReverbZone`,
 `Canvas`, `RectTransform`, `Image`, `CanvasGroup`, `RectMask`, `Mask`,
 `BackdropFilter`, `Text`, `Selectable`, `LayoutGroup`, `LayoutElement`, `Joint`,
 `CharacterController`, `LODGroup`, `Trail`, `Line`, `Shape`. Scripts are not a
@@ -44,7 +44,7 @@ live particles, a trail's points) is not a field and never appears.
   same way when it loads, every field with a number in it (a struct's too, like
   `ssao.intensity`): a hand-edited `mass: 5000` reads back `1000`, though the file
   keeps what it says until the next Save. A UI `shader`'s params and a
-  `VisualCorrection`'s `post_params` are left as read, since checking them reads
+  `PostProcessing`'s `post_params` are left as read, since checking them reads
   the baked shaders from disk.
 - **A field no op writes is read-only.** `Component.Fields` says so
   (`writable = false`, and `read_only` says why or names the verb that writes it,
@@ -72,7 +72,7 @@ live particles, a trail's points) is not a field and never appears.
   name) nothing is written. The order matters where one op resets another: an
   `AudioReverbZone`'s `params` are written before its `preset`, so a preset that
   changes in the same call wins (it loads its own params).
-- **Param maps insert, they don't replace.** A `VisualCorrection`'s `post_params`
+- **Param maps insert, they don't replace.** A `PostProcessing`'s `post_params`
   and a UI graphic's `shader.params` write each key given; a key removed from the
   table keeps its value. Renaming a UI `shader` drops the old shader's params, and
   the ones still in a `Get` table at their old values are not carried over.

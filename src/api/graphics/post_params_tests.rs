@@ -53,9 +53,9 @@ fn run(scene: &RefCell<Scene>, script: &str) -> Result<(), String> {
 fn scene_running(effect: &str) -> RefCell<Scene> {
     let mut scene = Scene::new();
     let id = scene.add_entity("Volume".into());
-    let mut vc = defaults::default_visual_correction();
+    let mut vc = defaults::default_post_processing();
     vc.custom_effects = vec![effect.to_owned()];
-    scene.world.set_visual_correction(id, Some(vc));
+    scene.world.set_post_processing(id, Some(vc));
     // `Graphics.*` edits the main camera's volume (#1434).
     scene.world.set_camera(id, Some(defaults::default_camera()));
     RefCell::new(scene)
@@ -75,8 +75,8 @@ fn values_land_on_the_volume_and_read_back() {
     )
     .unwrap();
     let scene = scene.borrow();
-    let id = scene.world.ids_with_visual_correction()[0];
-    let vc = scene.world.visual_correction(id).unwrap();
+    let id = scene.world.ids_with_post_processing()[0];
+    let vc = scene.world.post_processing(id).unwrap();
     assert_eq!(vc.post_params["damage_vignette.intensity"], [0.75]);
     assert_eq!(vc.post_params["damage_vignette.0.color"], [1.0, 0.0, 0.0]);
 }

@@ -4,7 +4,7 @@
 //! renderer to every world-space pass (opaque, transparent, particles, decals, and
 //! the sky's horizon) through one shared WGSL function (`common.wgsl::apply_fog`).
 //! It sits beside the skybox and ambient scalars rather than on the
-//! visual-correction volume: fog is the scene's atmosphere, it must hold with no
+//! post-processing volume: fog is the scene's atmosphere, it must hold with no
 //! volume in the scene, and the sky it blends into is scene-level too.
 //!
 //! Pure data. Every write goes through `scene::authoring::fog`, the one place its
