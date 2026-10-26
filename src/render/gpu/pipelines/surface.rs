@@ -2,30 +2,28 @@
 //! shader draws with (#396): Unity's Material → Shader.
 //!
 //! A material names a surface shader (`MaterialAsset::shader`, e.g. `"enemy_toon"`);
-//! the module is `<name>.wgsl` in the authored workspace (`assets/shaders`,
-//! where `Shader.Bake` writes), else the engine set (`engine/shaders`). A surface
+//! the module is `<name>.wgsl` in the authored workspace (`assets/shaders`, where
+//! `Shader.Bake` writes), else the engine set (`engine/shaders`). A surface
 //! variant keeps the forward contract by construction (#272: same `VertexInput`, bind
 //! groups and entry points), so only the shader module differs: its pipelines reuse
-//! the forward pipeline layout, and a variant is two pipelines — opaque and
-//! transparent. A variant's runtime params (#399) ride the material's group-2 param
-//! uniform; the slot keeps the variant's [`ParamLayout`] (its `<name>.params.json`)
-//! so the material cache can pack a material's values into it.
+//! the forward pipeline layout: opaque, transparent, and the opaque one writing motion
+//! vectors (#1435). Its runtime params (#399) ride the material's group-2 param
+//! uniform; the slot keeps its [`ParamLayout`] (`<name>.params.json`) to pack them.
 //!
 //! **Pipeline ids.** Every draw carries a `usize` pipeline id: [`STANDARD`] (0) is the
 //! renderer's own forward/transparent pair; `n > 0` is cache slot `n - 1`. The id is
 //! the first field of the batch key, so opaque draws sort into one run per shader.
 //!
 //! **Lazy, fail-safe.** A slot is built the first frame a material names it. A module
-//! that is missing, fails to compose, lacks `vs_main`/`fs_main` (a postfx module), or
-//! fails wgpu validation is logged **once** and draws with the standard pipeline —
-//! a bad shader never crashes a frame.
+//! that is missing, fails to compose, lacks `vs_main`/`fs_main` (a postfx module) or
+//! `vs_velocity`/`fs_velocity` (#1435), or fails validation is logged **once** and
+//! draws with the standard pipeline.
 //!
 //! **Hot reload.** [`SurfaceShaders::refresh`] drains the write log
 //! (`core::fs::written`) once per render: a slot whose module or params file was
 //! written — re-baked (`Shader.Bake` notes it), appeared, edited or removed outside the
 //! engine (the editor's file watch notes those, #1327) — goes stale, and the next draw
-//! that names it rebuilds. The agent's bake → look → iterate loop works in a live
-//! session, and costs nothing on a frame nothing was written.
+//! that names it rebuilds: bake → look → iterate in a live session, free otherwise.
 //!
 //! **Depth passes.** A variant's `vs_main` is the forward one verbatim, so one whose
 //! blocks only restyle colour rides the standard SSAO prepass (#436) and shadow
@@ -34,8 +32,8 @@
 //! cut, reading the same runtime params and mask, so a dissolved fragment casts no
 //! shadow and fills no SSAO depth. Only those variants pay for a depth fragment.
 
-use std::collections::HashMap;
-use std::path::Path;
+use std::{collections::HashMap, path::Path};
+use wgpu::naga::ShaderStage;
 
 use crate::core::fs::written::{written_since, Stale};
 use crate::core::paths::native;
@@ -48,8 +46,9 @@ pub(crate) const STANDARD: usize = 0;
 
 /// One authored surface shader's pipelines.
 pub(crate) struct SurfacePipelines {
-    /// Opaque/cutout solids (the forward spec).
+    /// Opaque/cutout solids, and the same into a view's velocity target (#1435).
     pub forward: wgpu::RenderPipeline,
+    pub velocity: super::LazyPipeline,
     /// Alpha-blended solids (the transparent spec).
     pub transparent: wgpu::RenderPipeline,
     /// The depth passes of a variant whose blocks cut fragments (#648); `None` draws
@@ -74,6 +73,8 @@ pub(crate) enum SolidPass<'a> {
     Prepass(&'a wgpu::RenderPipeline),
     /// Opaque solids; the standard pipeline is the view's (the preview may swap it).
     Opaque(&'a wgpu::RenderPipeline),
+    /// Opaque solids writing motion vectors too (#1435).
+    Velocity(&'a super::LazyPipeline),
     /// Alpha-blended solids; the standard pipeline is built only if a batch uses it.
     Transparent(&'a super::LazyPipeline),
 }
@@ -182,6 +183,7 @@ impl SurfaceShaders {
         match pass {
             SolidPass::Prepass(standard) => self.cut(id).map_or(standard, |c| &c.prepass),
             SolidPass::Opaque(standard) => variant.map_or(standard, |v| &v.forward),
+            SolidPass::Velocity(lazy) => variant.map_or_else(|| lazy.get(), |v| v.velocity.get()),
             SolidPass::Transparent(lazy) => variant.map_or_else(|| lazy.get(), |v| &v.transparent),
         }
     }
@@ -254,15 +256,14 @@ impl SurfaceShaders {
                 .iter()
                 .any(|e| e.name == entry && e.stage == stage)
         };
-        for (entry, stage) in [
-            ("vs_main", wgpu::naga::ShaderStage::Vertex),
-            ("fs_main", wgpu::naga::ShaderStage::Fragment),
-        ] {
+        let (vertex, fragment) = (ShaderStage::Vertex, ShaderStage::Fragment);
+        let colour = [("vs_main", vertex), ("fs_main", fragment)];
+        let motion = [("vs_velocity", vertex), ("fs_velocity", fragment)]; // #1435
+        for (entry, stage) in colour.into_iter().chain(motion) {
             if !has(entry, stage) {
                 return Err(format!("not a surface shader (no {entry})"));
             }
         }
-        let fragment = wgpu::naga::ShaderStage::Fragment;
         let cuts = has(CUT_PREPASS, fragment) && has(CUT_SHADOW, fragment);
         let scope = device.push_error_scope(wgpu::ErrorFilter::Validation);
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {

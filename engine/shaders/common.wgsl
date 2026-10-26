@@ -44,6 +44,9 @@ struct CameraUniforms {
     fog: Fog,
     // This camera's light-cluster grid (#434).
     clusters: Clusters,
+    // This camera's view-projection last frame (#1435), what motion vectors reproject
+    // through; equal to `view_proj` on a camera's first frame and after a cut.
+    prev_view_proj: mat4x4<f32>,
 };
 
 // The post-process chain's uniform (group 0, binding 0 of every post pass, built-in

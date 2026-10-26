@@ -9,9 +9,10 @@
 //! - **surface** — the canonical forward shader (`shader.wgsl`, passed in as
 //!   `surface_base`) is the base; its standard `vs_main` + PBR lighting are kept
 //!   verbatim and the chosen blocks are folded into the final color just before
-//!   `fs_main` returns. So a surface variant binds against the forward pipeline
-//!   unchanged (same `VertexInput`, bind groups, and entry points), varying only
-//!   the fragment look — exactly the contract.
+//!   `surface_color` returns, which both colour entry points call (`fs_main`, and the
+//!   motion-vector `fs_velocity`, #1435). So a surface variant binds against the
+//!   forward pipeline unchanged (same `VertexInput`, bind groups, and entry points),
+//!   varying only the fragment look — exactly the contract.
 //! - **postfx** — a self-contained fullscreen module: the scene-color bindings,
 //!   the fullscreen-triangle `vs_fullscreen`, and an `fs_main` that samples the
 //!   tonemapped color then folds the chosen blocks. This matches the fullscreen-fragment
@@ -48,7 +49,7 @@ use super::textures;
 pub use depth::{CUT_PREPASS, CUT_SHADOW};
 
 /// The marker in the surface base shader where the assembler folds the block
-/// chain into the final color. The forward shader's `fs_main` computes
+/// chain into the final color. The forward shader's `surface_color` computes
 /// `lighting_color`; the assembler rewrites the final write to apply the blocks
 /// to it. We splice by replacing the exact final-return line, which applies the
 /// scene fog (#437) last — so an authored look is fogged like every other surface.

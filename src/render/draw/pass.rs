@@ -53,6 +53,36 @@ pub(crate) struct ScenePassFrame {
     pub ssao: Option<SsaoFrame>,
 }
 
+/// The scene pass's colour attachments: the HDR target, and a motion-blurred view's
+/// velocity target (#1435). Both clear where the camera clears colour (the backdrop,
+/// "no motion") and keep the layer below where a `DepthOnly` camera composites over
+/// it (#93), so the nearest camera's velocity wins as its colour does.
+fn scene_targets(
+    view: &RenderView,
+    clear: PassClear,
+) -> Vec<Option<wgpu::RenderPassColorAttachment<'_>>> {
+    let attachment = |view, clear_to| {
+        Some(wgpu::RenderPassColorAttachment {
+            depth_slice: None,
+            view,
+            resolve_target: None,
+            ops: wgpu::Operations {
+                load: clear
+                    .color
+                    .map_or(wgpu::LoadOp::Load, |_| wgpu::LoadOp::Clear(clear_to)),
+                store: wgpu::StoreOp::Store,
+            },
+        })
+    };
+    let colour = attachment(
+        &view.post_fx.scene_hdr.view,
+        clear.color.unwrap_or(BACKDROP),
+    );
+    let velocity = view.post_fx.motion.target_view();
+    let velocity = velocity.map(|v| attachment(v, wgpu::Color::TRANSPARENT));
+    std::iter::once(colour).chain(velocity).collect()
+}
+
 impl Renderer {
     pub(crate) fn execute_scene_pass(
         &mut self,
@@ -75,6 +105,8 @@ impl Renderer {
         }
         // B. Main scene pass. The editor's gizmos draw after post-FX (`draw_handles`).
         self.record_scene_pass(view, &mut encoder, &frame, solid_batches);
+        let velocity = view.post_fx.motion.target_view().is_some();
+        self.frame_counters.velocity_passes += u32::from(velocity);
 
         // 6. Submit the scene pass (it filled the HDR target + depth). Particles +
         // post-FX run from the per-camera loop in `draw`.
@@ -90,20 +122,12 @@ impl Renderer {
         solid_batches: &[DrawBatch],
     ) {
         let clear = frame.clear;
+        let velocity = view.post_fx.motion.target_view();
+        let targets = scene_targets(view, clear);
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             multiview_mask: None,
             label: Some("Scene Render Pass"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                depth_slice: None,
-                // Scene draws into the HDR offscreen target (post-FX composites later).
-                // A `DepthOnly` camera loads existing color; others clear backdrop (#93).
-                view: &view.post_fx.scene_hdr.view,
-                resolve_target: None,
-                ops: wgpu::Operations {
-                    load: clear.color.map_or(wgpu::LoadOp::Load, wgpu::LoadOp::Clear),
-                    store: wgpu::StoreOp::Store,
-                },
-            })],
+            color_attachments: &targets,
             depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
                 view: &view.depth_view,
                 // Every camera clears depth so its geometry sorts independently of the
@@ -119,11 +143,14 @@ impl Renderer {
         });
 
         // Set global bindings
-        let forward = view.forward_pipeline(&self.render_pipeline);
+        let solid_pass = match velocity {
+            Some(_) => SolidPass::Velocity(&self.velocity_pipeline),
+            None => SolidPass::Opaque(view.forward_pipeline(&self.render_pipeline)),
+        };
         render_pass.set_bind_group(0, &self.global_bind_group, &[]);
         render_pass.set_bind_group(3, self.scene_group3(view, frame.ssao.is_some()), &[]);
         // Solid entities (each batch binds its shader's pipeline).
-        self.draw_batches(&mut render_pass, solid_batches, SolidPass::Opaque(forward));
+        self.draw_batches(&mut render_pass, solid_batches, solid_pass);
 
         // Render Skybox last (optimization). Only a Skybox camera paints it — a
         // DepthOnly/SolidColor overlay must not overwrite the world below it. With a
@@ -132,14 +159,11 @@ impl Renderer {
         // backdrop, so an empty scene reads as a lit environment (Unity's default-
         // skybox fallback). Both paint only the far-plane pixels no geometry covered.
         if clear.flags == ClearFlags::Skybox {
+            let (sky, globals) = (&self.skybox_renderer, &self.global_bind_group);
+            let moving = velocity.is_some();
             match &self.skybox_texture {
-                Some(skybox_tex) => {
-                    self.skybox_renderer
-                        .draw(&mut render_pass, &self.global_bind_group, skybox_tex)
-                }
-                None => self
-                    .skybox_renderer
-                    .draw_gradient(&mut render_pass, &self.global_bind_group),
+                Some(skybox_tex) => sky.draw(&mut render_pass, globals, skybox_tex, moving),
+                None => sky.draw_gradient(&mut render_pass, globals, moving),
             }
         }
     }

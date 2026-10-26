@@ -180,6 +180,7 @@ impl Renderer {
             config,
             present_modes,
             render_pipeline: forward.render_pipeline,
+            velocity_pipeline: forward.velocity_pipeline,
             transparent_pipeline: forward.transparent_pipeline,
             line_pipeline: forward.line_pipeline,
             outline: forward.outline,

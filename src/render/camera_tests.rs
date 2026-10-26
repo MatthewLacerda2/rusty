@@ -114,7 +114,7 @@ fn base_id_is_the_lowest_order_screen_camera_in_either_mode() {
     let mut scene = Scene::new();
     // Created first but stacked on top: not the base.
     let overlay = cam_component(1, u32::MAX, ClearFlags::DepthOnly);
-    add_camera(&mut scene, "Overlay", overlay, Vec3::ZERO);
+    let overlay = add_camera(&mut scene, "Overlay", overlay, Vec3::ZERO);
     let mut rt = cam_component(-5, u32::MAX, ClearFlags::Skybox);
     rt.target_texture = Some(RenderTarget::new("pip", 64, 64));
     let pip = add_camera(&mut scene, "Pip", rt, Vec3::ZERO);
@@ -126,6 +126,9 @@ fn base_id_is_the_lowest_order_screen_camera_in_either_mode() {
             Some(world)
         );
     }
+    let entities = |playing| build_camera_stack(&base, &scene, playing).entities;
+    assert_eq!(entities(true), [Some(world), Some(overlay)]);
+    assert_eq!(entities(false), [None], "the free camera has no entity");
     assert_eq!(texture_cameras(&base, &scene)[0].id, pip);
     assert_eq!(build_camera_stack(&base, &Scene::new(), true).base_id, None);
 }

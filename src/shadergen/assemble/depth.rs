@@ -4,7 +4,7 @@
 //! A block that `discard`s (`dissolve`) cuts the colour pass; the shadow cascades and
 //! the SSAO prepass draw the same mesh through their own fragment stages, which would
 //! otherwise keep every fragment. So a recipe holding a cutting block gets two more
-//! entry points: [`CUT_PREPASS`] and [`CUT_SHADOW`] open like `fs_main` (the UV chain
+//! entry points: [`CUT_PREPASS`] and [`CUT_SHADOW`] open like `surface_color` (the UV chain
 //! moves `in`'s UVs, `uv`), run each cutting instance's [`Block::cut`] with the same
 //! args as its colour call, then the base's own clip for that pass (`prepass_clip`,
 //! `shadow_clip` — the cutout test). A recipe with no cutting block gets neither, and

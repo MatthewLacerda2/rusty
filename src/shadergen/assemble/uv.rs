@@ -2,7 +2,7 @@
 //!
 //! A [`Stage::Uv`] block moves the surface's UVs before anything samples them. WGSL
 //! function parameters are immutable, so when a recipe holds one the forward base's
-//! `fs_main(in: …)` is renamed to take `in_raw` and opens with a mutable copy whose
+//! `surface_color(in: …)` is renamed to take `in_raw` and opens with a mutable copy whose
 //! `tex_coords` the UV chain rewrites. The rest of the body reads `in` unchanged, so
 //! every map lookup and every color block sees the moved UVs. A recipe with no UV
 //! block leaves the base untouched. A cutting variant's depth entry points (#648)
@@ -12,20 +12,21 @@ use super::emit::{chain, Instance};
 use crate::shadergen::blocks::Stage;
 use crate::shadergen::params::ParamLayout;
 
-/// The forward base's fragment entry point, exactly as `shader.wgsl` declares it.
-const FS_MAIN: &str = "fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {";
+/// The forward base's surface colour function, exactly as `shader.wgsl` declares it:
+/// both colour entry points (`fs_main`, the motion-vector `fs_velocity`, #1435) call it.
+const SURFACE_COLOR: &str = "fn surface_color(in: VertexOutput) -> vec4<f32> {";
 
-/// Splice the UV chain into `body`'s `fs_main`, or return it as-is when no
+/// Splice the UV chain into `body`'s `surface_color`, or return it as-is when no
 /// instance is a UV block. Errors when the base lacks the expected signature.
 pub fn splice(body: &str, instances: &[Instance], layout: &ParamLayout) -> Result<String, String> {
     let Some(moved) = moved_in(instances, layout) else {
         return Ok(body.to_string());
     };
-    if !body.contains(FS_MAIN) {
-        return Err("surface base shader is missing the expected fs_main signature".into());
+    if !body.contains(SURFACE_COLOR) {
+        return Err("surface base shader is missing the expected surface_color signature".into());
     }
-    let opened = format!("fn fs_main(in_raw: VertexOutput) -> @location(0) vec4<f32> {{\n{moved}");
-    Ok(body.replacen(FS_MAIN, &opened, 1))
+    let opened = format!("fn surface_color(in_raw: VertexOutput) -> vec4<f32> {{\n{moved}");
+    Ok(body.replacen(SURFACE_COLOR, &opened, 1))
 }
 
 /// The statements that open an entry point taking `in_raw`: `in`, a mutable copy

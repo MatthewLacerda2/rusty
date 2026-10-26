@@ -106,8 +106,9 @@ pub struct PostFx {
     /// kept so `resize` can reallocate `ldr` to match.
     output_format: wgpu::TextureFormat,
 
-    /// Previous-frame view-projection, for camera motion blur velocity.
-    pub prev_view_proj: Mat4,
+    /// The view's motion vectors (#1435): the velocity target the opaque pass writes
+    /// while motion blur runs, and last frame's cameras and poses.
+    pub(crate) motion: crate::render::motion::MotionVectors,
 }
 
 /// HDR scene colour format — float so bright pixels survive for bloom/tonemap.

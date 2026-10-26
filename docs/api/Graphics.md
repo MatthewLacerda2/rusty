@@ -12,6 +12,18 @@ The editor's Camera card edits the same two motion-blur fields (a "Motion Blur"
 checkbox and a "Samples" slider, `2..=32`) through the same ops. A new camera starts
 with motion blur on at 32 samples.
 
+**Motion vectors** (#1435). A view whose base camera runs motion blur (it is on, and
+the tier is Medium or High) also writes a per-pixel velocity buffer from its opaque
+pass: each solid's motion since last frame, through its own last-frame transform and
+skin, so an enemy running past a still camera moves in it and a viewmodel camera's
+gun, turning with its camera, does not. Mesh particles ride the opaque pass and write
+the camera's motion alone; transparent surfaces, sprite particles, ribbons, decals and
+UI write none; the sky writes the camera's rotation. A first draw, a scene load, Play
+or Stop, a switch of the main camera or a resize has no last frame, so nothing smears
+across a cut; neither does a camera newly in the stack (a weapon switch's viewmodel
+camera). No other frame pays for it; `Debug.Stats().velocity_passes` counts the passes
+that wrote it. Motion blur reading it is #1436.
+
 **Post-FX is per view** (#1434), Unity URP's camera-stack rule: each view runs it once,
 with the settings of **its base camera**, that camera entity's own `CameraComponent`
 and `PostProcessingComponent`. The window and the Game view use the main camera;

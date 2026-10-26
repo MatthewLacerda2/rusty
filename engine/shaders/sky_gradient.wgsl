@@ -13,6 +13,7 @@
 // and the lighting always agree (no second source of colour to drift out of sync).
 
 #import common::{CameraUniforms, VertexInput, procedural_sky, sky_fog}
+#import sky::motion::{SkyTargets, sky_velocity}
 
 @group(0) @binding(0)
 var<uniform> camera: CameraUniforms;
@@ -48,12 +49,13 @@ fn vs_main(model: VertexInput) -> VertexOutput {
 }
 
 @fragment
-fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
+fn fs_main(in: VertexOutput) -> SkyTargets {
     let dir = normalize(in.view_dir);
     // Sky tint from the SAME ambient term the surface shader reads; the gradient and
     // clouds live in `common::procedural_sky`, which the forward pass reflects (#718).
     let color = procedural_sky(lighting.ambient.color, dir);
 
     // Blend toward the scene fog at the horizon (#437), as the panorama sky does.
-    return vec4<f32>(sky_fog(camera.fog, color, dir, camera.camera_pos), 1.0);
+    let fogged = vec4<f32>(sky_fog(camera.fog, color, dir, camera.camera_pos), 1.0);
+    return SkyTargets(fogged, sky_velocity(camera, dir));
 }

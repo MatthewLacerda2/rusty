@@ -100,6 +100,9 @@ pub struct RenderCounters {
     /// `draw_calls` / `triangles`; a camera skipped (unreferenced, or between its
     /// `update_every` frames) is not counted.
     pub render_texture_draws: u32,
+    /// Opaque scene passes that wrote a velocity target (#1435): one per camera of
+    /// each view running motion blur, `0` when none does (or the tier is Low).
+    pub velocity_passes: u32,
 }
 
 impl RenderCounters {
@@ -134,6 +137,7 @@ impl RenderCounters {
             ("ssao_samples", self.ssao_samples),
             ("particles_drawn", self.particles_drawn.into()),
             ("render_texture_draws", self.render_texture_draws.into()),
+            ("velocity_passes", self.velocity_passes.into()),
         ]
     }
 

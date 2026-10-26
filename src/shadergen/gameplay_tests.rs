@@ -44,12 +44,12 @@ fn gameplay_blocks_compose_in_one_chain_with_the_mask_blocks() {
 #[test]
 fn uv_scroll_moves_the_uvs_before_any_map_is_sampled() {
     let wgsl = surface(&["toon_ramp", "uv_scroll"]);
-    let opened = "fn fs_main(in_raw: VertexOutput) -> @location(0) vec4<f32> {\n    var in = in_raw;\n    in.tex_coords = uv_uv_scroll(in.tex_coords, in, uv_scroll_1_speed);";
+    let opened = "fn surface_color(in_raw: VertexOutput) -> vec4<f32> {\n    var in = in_raw;\n    in.tex_coords = uv_uv_scroll(in.tex_coords, in, uv_scroll_1_speed);";
     assert!(wgsl.contains(opened), "{wgsl}");
     let at = wgsl.find(opened).unwrap();
     assert!(
-        !wgsl[..at].contains("fn fs_main"),
-        "only the entry point is opened"
+        !wgsl[at + 1..].contains("fn surface_color"),
+        "only the surface colour function is opened"
     );
     assert!(wgsl[at..].contains("textureSample(t_diffuse, s_diffuse, in.tex_coords)"));
     // A UV block never joins the color chain.
@@ -58,10 +58,10 @@ fn uv_scroll_moves_the_uvs_before_any_map_is_sampled() {
 }
 
 #[test]
-fn without_a_uv_block_fs_main_is_untouched() {
+fn without_a_uv_block_surface_color_is_untouched() {
     let wgsl = surface(&["pulse_glow", "hologram"]);
     assert!(!wgsl.contains("in_raw"));
-    assert!(wgsl.contains("fn fs_main(in: VertexOutput)"));
+    assert!(wgsl.contains("fn surface_color(in: VertexOutput)"));
 }
 
 #[test]

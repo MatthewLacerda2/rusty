@@ -56,7 +56,7 @@ impl PostFx {
             bloom_size,
             full_size,
             output_format,
-            prev_view_proj: glam::Mat4::IDENTITY,
+            motion: Default::default(),
         }
     }
 
@@ -124,6 +124,8 @@ impl PostFx {
         self.bloom_b = bloom_b;
         self.ldr = ldr;
         self.custom.resize(device, full_size.0, full_size.1);
+        // A resize is a cut (#1435): no smear from last frame's framing.
+        self.motion.reset();
     }
 
     fn create_targets(

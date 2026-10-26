@@ -10,6 +10,9 @@ use crate::scene::{camera_for_entity, Camera, Scene};
 pub struct ScreenStack {
     /// The cameras, bottom to top; never empty.
     pub cameras: Vec<Camera>,
+    /// Each camera's entity, beside `cameras` (`None`: the edit-mode free camera).
+    /// Motion vectors keep a camera's last frame by it (#1435).
+    pub entities: Vec<Option<u32>>,
     /// The stack's base camera entity, `scene::camera::main_camera`: the lowest
     /// `render_order` active screen camera, the one `Graphics.*` edits.
     /// Its `CameraComponent` and `PostProcessingComponent` drive the view's post-FX,
@@ -37,20 +40,25 @@ pub struct ScreenStack {
 pub fn build_camera_stack(base: &Camera, scene: &Scene, is_playing: bool) -> ScreenStack {
     let ids = screen_cameras(scene);
     let base_id = ids.first().copied();
-    let mut cameras: Vec<Camera> = match is_playing {
+    let mut stack: Vec<(Option<u32>, Camera)> = match is_playing {
         true => ids
             .iter()
-            .filter_map(|&id| camera_for_entity(base, scene, id))
+            .filter_map(|&id| Some((Some(id), camera_for_entity(base, scene, id)?)))
             .collect(),
         false => Vec::new(),
     };
-    match cameras.first_mut() {
-        Some(first) => {
+    match stack.first_mut() {
+        Some((_, first)) => {
             (first.position, first.yaw, first.pitch) = (base.position, base.yaw, base.pitch)
         }
-        None => cameras.push(base.clone()),
+        None => stack.push((None, base.clone())),
     }
-    ScreenStack { cameras, base_id }
+    let (entities, cameras) = stack.into_iter().unzip();
+    ScreenStack {
+        cameras,
+        entities,
+        base_id,
+    }
 }
 
 /// One camera that draws into a render texture this frame (#430).

@@ -55,8 +55,10 @@ pub(crate) struct CameraCtx<'a> {
     pub is_last: bool,
     pub aspect: f32,
     pub view_proj: glam::Mat4,
-    /// The stack's base (first) camera's view-projection, for post-FX history.
+    /// The stack's base (first) camera's view-projection, and its last frame's
+    /// (#1435), for post-FX's camera motion.
     pub base_view_proj: glam::Mat4,
+    pub base_prev_view_proj: glam::Mat4,
     /// World-space frustum, for culling off-screen entities (#330).
     pub frustum: Frustum,
     /// This camera's light-cluster grid (#434).
@@ -75,7 +77,9 @@ pub(crate) struct CameraCtx<'a> {
 /// The per-stack values every camera's context reads.
 pub(crate) struct StackShared {
     pub aspect: f32,
-    pub base_view_proj: glam::Mat4,
+    /// Each camera's view-projection, bottom to top, and its last frame's (#1435).
+    pub view_projs: Vec<glam::Mat4>,
+    pub prev_view_projs: Vec<glam::Mat4>,
     pub fog: FogUniform,
     pub ssao: Option<SsaoPlan>,
 }
@@ -88,7 +92,7 @@ impl<'a> CameraCtx<'a> {
         idx: usize,
     ) -> Self {
         let cam = &stack.stack[idx];
-        let view_proj = cam.build_view_projection(shared.aspect);
+        let view_proj = shared.view_projs[idx];
         let clusters = ClusterGrid::new(cam, shared.aspect);
         Self {
             scene,
@@ -98,7 +102,8 @@ impl<'a> CameraCtx<'a> {
             is_last: idx + 1 == stack.stack.len(),
             aspect: shared.aspect,
             view_proj,
-            base_view_proj: shared.base_view_proj,
+            base_view_proj: shared.view_projs[0],
+            base_prev_view_proj: shared.prev_view_projs[0],
             frustum: Frustum::from_view_proj(view_proj),
             fog: shared.fog,
             ssao: shared.ssao,
@@ -109,6 +114,7 @@ impl<'a> CameraCtx<'a> {
                 time: scene.shader_time,
                 fog: shared.fog,
                 clusters: clusters.uniform(),
+                prev_view_proj: shared.prev_view_projs[idx].to_cols_array(),
             },
             clusters,
             solids: SolidResources::default(),
@@ -132,9 +138,14 @@ fn bin_clusters(r: &mut Renderer, _: &mut RenderView, ctx: &mut CameraCtx) {
 
 /// This camera's solids (the culling mask differs per camera) as instanced draws
 /// (#470), split opaque/cutout vs transparent (#242).
-fn batch_solids(r: &mut Renderer, _: &mut RenderView, ctx: &mut CameraCtx) {
+/// A view writing motion vectors gives each solid its last-frame pose (#1435).
+fn batch_solids(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
     let outline = ctx.stack.editor_mode;
-    ctx.solids = r.precreate_solid_resources(ctx.scene, ctx.cam, &ctx.frustum, &ctx.lod, outline);
+    let motion = &mut view.post_fx.motion;
+    let history = motion.active().then_some(&mut motion.history);
+    let (scene, cam) = (ctx.scene, ctx.cam);
+    ctx.solids =
+        r.precreate_solid_resources(scene, cam, &ctx.frustum, &ctx.lod, (outline, history));
 }
 
 fn scene_pass(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {

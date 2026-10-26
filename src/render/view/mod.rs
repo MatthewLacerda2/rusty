@@ -89,6 +89,11 @@ impl RenderView {
         self.forward_override.as_ref().unwrap_or(shared)
     }
 
+    /// Whether this view draws its solids with a pipeline of its own.
+    pub(crate) fn has_forward_override(&self) -> bool {
+        self.forward_override.is_some()
+    }
+
     /// Draw this view's solids with `pipeline` instead of the shared forward pipeline.
     /// Pass `None` to go back to the shared one.
     pub fn set_forward_override(&mut self, pipeline: Option<wgpu::RenderPipeline>) {

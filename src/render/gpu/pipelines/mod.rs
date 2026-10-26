@@ -11,7 +11,11 @@ pub(crate) mod winding;
 
 pub(crate) use lazy::LazyPipeline;
 
-use specs::{forward_spec, line_spec, make_pipeline, transparent_spec, PipelineSpec};
+use specs::{
+    forward_spec, line_spec, make_pipeline, transparent_spec, velocity_spec, PipelineSpec,
+};
+
+pub(crate) use specs::velocity_target;
 
 /// The forward-target pipelines, all sharing one shader + vertex layout. The ones a
 /// frame may not draw (translucents, debug lines) are built on first use (#985); the
@@ -19,6 +23,9 @@ use specs::{forward_spec, line_spec, make_pipeline, transparent_spec, PipelineSp
 pub(crate) struct ForwardPipelines {
     /// Opaque/cutout solids: REPLACE, depth write on.
     pub forward: wgpu::RenderPipeline,
+    /// The same, writing the view's velocity target too (#1435): built the first
+    /// time a view runs motion blur.
+    pub velocity: LazyPipeline,
     /// Alpha-blended translucent solids (#242): ALPHA_BLENDING, depth write off.
     pub transparent: LazyPipeline,
     /// The editor's line gizmos (grid, collider boxes, axis arrows, probes), drawn
@@ -64,6 +71,7 @@ pub(crate) fn create_pipelines(
     };
     ForwardPipelines {
         forward: make_pipeline(device, shader, format, &render_layout, &forward_spec()),
+        velocity: lazy(&render_layout, format, velocity_spec()),
         transparent: lazy(&render_layout, format, transparent_spec()),
         line: lazy(&line_layout, output_format, line_spec()),
         prepass: make_prepass(device, shader, &render_layout, "fs_prepass"),
@@ -72,9 +80,10 @@ pub(crate) fn create_pipelines(
 }
 
 /// An authored surface variant's opaque + transparent pipelines (#396): the forward
-/// and transparent specs over `shader`, through the forward pipeline layout — and,
-/// when its blocks `cut`, its depth pipelines (#648): the prepass through the same
-/// layout, the shadow cascades through the shadow pass's clip layout.
+/// and transparent specs over `shader`, through the forward pipeline layout; its
+/// velocity one (#1435), built on first use — and, when its blocks `cut`, its depth
+/// pipelines (#648): the prepass through the same layout, the shadow cascades through
+/// the shadow pass's clip layout.
 pub(crate) fn surface_pipelines(
     device: &wgpu::Device,
     shader: &wgpu::ShaderModule,
@@ -84,8 +93,13 @@ pub(crate) fn surface_pipelines(
 ) -> surface::SurfacePipelines {
     use crate::render::passes::shadows::depth_pipeline;
     use crate::shadergen::assemble::{CUT_PREPASS, CUT_SHADOW};
+    let (lazy_shader, lazy_layout) = (shader.clone(), layout.clone());
     surface::SurfacePipelines {
         forward: make_pipeline(device, shader, format, layout, &forward_spec()),
+        velocity: LazyPipeline::new(device, move |device| {
+            let spec = velocity_spec();
+            make_pipeline(device, &lazy_shader, format, &lazy_layout, &spec)
+        }),
         transparent: make_pipeline(device, shader, format, layout, &transparent_spec()),
         cut: cut.then(|| surface::CutPipelines {
             prepass: make_prepass(device, shader, layout, CUT_PREPASS),

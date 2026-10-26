@@ -10,6 +10,7 @@ use super::materials::entity_params;
 use crate::components::MaterialAsset;
 use crate::render::gpu::draw_buffers::{group1, push_palette, FrameUpload, JointMatrix};
 use crate::render::lod::LodSelection;
+use crate::render::motion::{track, MotionHistory};
 use crate::render::passes::outline::{outlined, OutlineBounds};
 use crate::render::{Frustum, MeshId, Renderer};
 use crate::scene::Scene;
@@ -77,16 +78,17 @@ impl Renderer {
     }
 
     /// Collect this camera's visible solids (skipping the LOD levels `lod` hides), batch repeated mesh + material pairs into
-    /// instanced draws (#470), and upload the camera's packed draw data. With
-    /// `outline` (an editor camera), the solids the selection outline rings are
-    /// marked, so it draws from their draws (#1175).
+    /// instanced draws (#470), and upload the camera's packed draw data. `marks`:
+    /// with `outline` (an editor camera), the solids the selection outline rings are
+    /// marked, so it draws from their draws (#1175); with `history` (a view writing
+    /// motion vectors, #1435), each solid also carries its last-frame pose.
     pub(crate) fn precreate_solid_resources(
         &mut self,
         scene: &Scene,
         cam: &crate::scene::Camera,
         frustum: &Frustum,
         lod: &LodSelection,
-        outline: bool,
+        (outline, mut history): (bool, Option<&mut MotionHistory>),
     ) -> SolidResources {
         let (cam_pos, cam_fwd) = (cam.position, cam.forward());
         let (mut opaque, mut transparent, mut joints) = (Vec::new(), Vec::new(), Vec::new());
@@ -122,7 +124,8 @@ impl Renderer {
                 culled += 1;
                 continue;
             }
-            let items = self.solid_draw_items(scene, id, bounds, &mut joints);
+            let motion = history.as_deref_mut();
+            let items = self.solid_draw_items(scene, id, bounds, &mut joints, motion);
             visible += u32::from(!items.is_empty());
             for (mut item, world_pos, is_transparent) in items {
                 item.outline = ringed.contains(&id);
@@ -189,6 +192,7 @@ impl Renderer {
     /// appended to `joints` once, and its uniform's `bone_base` points at it — so it is
     /// a draw of its own. `bounds` are its world bounds when known
     /// ([`Self::world_bounds`]); its reflection probe is picked at their centre.
+    /// With `history`, its instance carries its last-frame pose (#1435).
     /// Empty if its mesh is not resident on the GPU yet.
     fn solid_draw_items(
         &mut self,
@@ -196,6 +200,7 @@ impl Renderer {
         id: u32,
         bounds: Option<(glam::Vec3, glam::Vec3)>,
         joints: &mut Vec<JointMatrix>,
+        history: Option<&mut MotionHistory>,
     ) -> Vec<(DrawItem, glam::Vec3, bool)> {
         let Some(mesh) = scene.world.mesh(id) else {
             return Vec::new();
@@ -223,7 +228,12 @@ impl Renderer {
         // else the bind pose (#79). Primitives/static meshes leave it empty and bind
         // the shared identity joint at element 0. The base lives in the uniform, so
         // two skinned entities never share a batch.
-        let bone_base = push_palette(joints, mesh.active_palette());
+        let palette = mesh.active_palette();
+        let bone_base = push_palette(joints, palette);
+        if let Some(history) = history.filter(|_| has_opaque_run(scene, id, &runs)) {
+            let pose = (model_matrix, palette);
+            track(history, id, pose, bone_base, joints, &mut instance);
+        }
         let mut items = Vec::with_capacity(runs.len());
         for (slot, indices) in runs {
             let entry = scene.material_entry_at(id, slot);
@@ -266,4 +276,14 @@ impl Renderer {
             [entity_buf, bones_buf, self.draw_buffers.identity_instance()],
         )
     }
+}
+
+/// Whether any of entity `id`'s material runs draws in the opaque pass: only those
+/// write velocity, so an all-transparent entity keeps no motion pose (#1435).
+fn has_opaque_run(scene: &Scene, id: u32, runs: &[(usize, std::ops::Range<u32>)]) -> bool {
+    runs.iter().any(|&(slot, _)| {
+        !scene
+            .material_entry_at(id, slot)
+            .is_some_and(|(_, m)| m.is_transparent())
+    })
 }
