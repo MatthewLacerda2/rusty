@@ -100,6 +100,13 @@ set on that camera entity, in the inspector or the scene file.
 | `Graphics.GetMotionBlurSamples` / `SetMotionBlurSamples` | `()` / `(n)` | `number` (clamped 2–32; the clamp is in the shared authoring op) |
 | `Graphics.GetMotionBlurIntensity` / `SetMotionBlurIntensity` | `()` / `(value)` | `number`: Unity's *Intensity*, the shutter fraction (clamped 0–1, **default `0.5`**, a 180° shutter) |
 | `Graphics.GetMotionBlurMaxLength` / `SetMotionBlurMaxLength` | `()` / `(value)` | `number`: Unity's *Clamp*, the longest streak as a fraction of the view's height (clamped 0–0.2, **default `0.05`**) |
+| `Graphics.GetDepthOfFieldMode` / `SetDepthOfFieldMode` | `()` / `(name)` | `"Off"` / `"Gaussian"` / `"Bokeh"` (**default `"Off"`**; names are case-insensitive, an unknown one raises an error listing them; see *Depth of field*) |
+| `Graphics.GetDepthOfFieldGaussianStart` / `SetDepthOfFieldGaussianStart` | `()` / `(metres)` | `number`: where the Gaussian blur starts (clamped ≥ 0, pushes the end out with it; **default `10`**) |
+| `Graphics.GetDepthOfFieldGaussianEnd` / `SetDepthOfFieldGaussianEnd` | `()` / `(metres)` | `number`: where it is full (clamped ≥ the start; **default `30`**) |
+| `Graphics.GetDepthOfFieldGaussianMaxRadius` / `SetDepthOfFieldGaussianMaxRadius` | `()` / `(value)` | `number`: the full blur's width (clamped 0.5–1.5, **default `1`**) |
+| `Graphics.GetDepthOfFieldFocusDistance` / `SetDepthOfFieldFocusDistance` | `()` / `(metres)` | `number`: Bokeh's distance in focus (clamped ≥ 0.1, **default `10`**) |
+| `Graphics.GetDepthOfFieldAperture` / `SetDepthOfFieldAperture` | `()` / `(f_stop)` | `number`: Bokeh's f-stop, lower blurs more (clamped 1–32, **default `5.6`**) |
+| `Graphics.GetDepthOfFieldFocalLength` / `SetDepthOfFieldFocalLength` | `()` / `(mm)` | `number`: Bokeh's focal length, longer blurs more (clamped 1–300, **default `50`**) |
 | `Graphics.GetFxaaActive` / `SetFxaaActive` | `()` / `(bool)` | `bool` (**default `true`**) |
 | `Graphics.GetQuality` / `SetQuality` | `()` / `(name)` | `"Low"` / `"Medium"` / `"High"` |
 | `Graphics.GetOption` / `SetOption` | `(name)` / `(name, bool)` | `bool`: the player's graphics option (see *Player options*; **default `true`**) |
@@ -219,6 +226,28 @@ scene, so an indoor level can spend its cascades on 40 m and an outdoor one on 1
 without an active volume on the main camera the defaults above apply. The cascades
 follow the screen, and render-texture cameras sample the same maps. Each cascade costs one more depth pass for
 the moving casters (static casters are re-drawn only when a cascade moves, #355).
+
+**Depth of field** (#1445) is Unity URP's override, in its two modes. **Gaussian**
+blurs only the background: nothing nearer than the **start**, ramping to the full
+**max radius** (`1` is 12 px at 1080p) at the **end**; cheap, for menus and
+cutscenes. **Bokeh** is a lens: a thin-lens circle of confusion from the **focus
+distance**, the **aperture** (f-stop) and the **focal length** on a 35 mm sensor, so
+both what lies nearer and what lies beyond the focus blur, with round bokeh, up to a
+radius of 1/40 of the view's height. Near blur spreads over what is in focus behind
+it; far blur never bleeds over a sharp foreground. Aiming down sights is a tween of
+the focus: `Tween.To(camera, "Graphics.depth_of_field.focus_distance", 1.5, 0.2)`
+(every numeric knob tweens as `"Graphics.depth_of_field.<knob>"`, the knob's field
+name; see [`Tween.md`](Tween.md)). It runs first in the chain, on the HDR scene,
+before motion blur, bloom and the grade (Unity's order). Each pixel's blur comes from
+its distance to **the camera that drew it**, so a viewmodel on a `DepthOnly` overlay
+camera (a gun 0.6 m from its camera) stays sharp while the world focuses far: an
+overlay camera's pixels are outside the world's focus. The quality tier sets its cost:
+off on **Low**, blurred at half resolution on **Medium**, full on **High**; the
+player's `depth_of_field` option turns it off, and the editor's Scene view never runs
+it. While it runs the view writes the velocity target its distances come from, as for
+motion blur; mode `Off` costs nothing and draws exactly what no depth of field does.
+The Inspector's **Depth of Field** section edits the same fields, and they are saved
+with the scene. `Debug.Stats().gpu_passes.depth_of_field` times it.
 
 **Fog** (#437) is a **scene setting**, not a volume knob: it is saved with the
 scene, edited in the Inspector's **Scene Settings → Fog** section (the same fields),
@@ -343,8 +372,8 @@ anti-aliasing an integrated GPU wants. Turning it off restores raw, stair-steppe
 edges — useful for a pixel-art look, or for diffing screenshots.
 
 The global **quality preset** gates the heavier passes (SSR is High-tier only;
-motion blur and SSAO are off on Low, SSAO is half-resolution on Medium; FXAA runs
-on all of them). `SetQuality` writes a shared
+motion blur, SSAO and depth of field are off on Low, SSAO and depth of field are
+half-resolution on Medium; FXAA runs on all of them). `SetQuality` writes a shared
 resource cell that the platform layer reads each frame and hands to the renderer,
 which reallocates its bloom buffers when the tier actually changes. Unrecognized
 tonemap/quality names are ignored (the current value is kept).
@@ -368,6 +397,7 @@ An option can only turn an effect off; it never turns on what a camera left off.
 | `vignette` | the volume's vignette |
 | `chromatic_aberration` | the volume's chromatic aberration |
 | `film_grain` | the volume's film grain |
+| `depth_of_field` | the volume's depth of field (off on Low) |
 
 Names are snake_case; an unknown name raises an error listing the valid ones.
 `SetOption` takes effect next frame and is **persisted** through `Storage`

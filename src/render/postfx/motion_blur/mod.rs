@@ -189,7 +189,7 @@ impl PostFx {
                 layout: &passes.layout,
                 entries: &[
                     entry(0, targets.params.as_entire_binding()),
-                    entry(1, wgpu::BindingResource::TextureView(&self.scene_hdr.view)),
+                    entry(1, wgpu::BindingResource::TextureView(self.focused_color())),
                     entry(2, wgpu::BindingResource::TextureView(velocity)),
                     entry(3, wgpu::BindingResource::TextureView(input)),
                 ],

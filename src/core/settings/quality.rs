@@ -48,14 +48,26 @@ impl QualityPreset {
         }
     }
 
-    /// Whether this tier runs `option` at all (#1438): SSR on High only, motion blur
-    /// and SSAO off on Low; FXAA, bloom and the lens effects (a few taps each, #1439)
-    /// on every tier.
+    /// The divisor of the depth of field's working resolution on this tier (#1445),
+    /// or `None` where it is off: Low skips it, Medium blurs at half resolution,
+    /// High at full.
+    pub fn depth_of_field(self) -> Option<u32> {
+        match self {
+            QualityPreset::Low => None,
+            QualityPreset::Medium => Some(2),
+            QualityPreset::High => Some(1),
+        }
+    }
+
+    /// Whether this tier runs `option` at all (#1438): SSR on High only, motion blur,
+    /// SSAO and depth of field off on Low; FXAA, bloom and the lens effects (a few
+    /// taps each, #1439) on every tier.
     pub fn allows(self, option: GraphicsOption) -> bool {
         match option {
             GraphicsOption::MotionBlur => self.motion_blur(),
             GraphicsOption::Ssr => self.screen_space_ssr(),
             GraphicsOption::Ssao => self.ssao().is_some(),
+            GraphicsOption::DepthOfField => self.depth_of_field().is_some(),
             GraphicsOption::Fxaa
             | GraphicsOption::Bloom
             | GraphicsOption::Vignette

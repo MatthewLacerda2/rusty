@@ -156,6 +156,7 @@ impl Renderer {
             grade_bake,
             exposure_passes,
             motion_blur,
+            depth_of_field,
             quality,
         } = gpu;
         let draw_buffers =
@@ -185,6 +186,7 @@ impl Renderer {
             render_pipeline: forward.render_pipeline,
             velocity_pipeline: forward.velocity_pipeline,
             motion_blur,
+            depth_of_field,
             transparent_pipeline: forward.transparent_pipeline,
             line_pipeline: forward.line_pipeline,
             outline: forward.outline,

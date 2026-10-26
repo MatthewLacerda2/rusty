@@ -60,6 +60,8 @@ crate::core::named_enum! {
         Ribbons = "ribbons",
         /// Particle systems.
         Particles = "particles",
+        /// Depth of field (#1445): its CoC, prefilter, blur and composite passes.
+        DepthOfField = "depth_of_field",
         /// Per-object motion blur (#1436): its three tile passes and the gather.
         MotionBlur = "motion_blur",
         /// The post-FX chain: bloom, composite, authored effects, FXAA.

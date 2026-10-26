@@ -9,9 +9,10 @@ use super::super::value::Mask;
 use super::NO_OP;
 use crate::components::rendering::camera::RenderTarget;
 use crate::components::{
-    AutoExposure, CameraComponent, ChromaticAberration, FilmGrain, LiftGammaGain, LightComponent,
-    LodGroupComponent, LodLevel, MaterialComponent, MeshComponent, PostProcessingComponent,
-    ShadowSettings, SsaoSettings, TransformComponent, Vignette, Wheel, WhiteBalance,
+    AutoExposure, CameraComponent, ChromaticAberration, DepthOfField, FilmGrain, LiftGammaGain,
+    LightComponent, LodGroupComponent, LodLevel, MaterialComponent, MeshComponent,
+    PostProcessingComponent, ShadowSettings, SsaoSettings, TransformComponent, Vignette, Wheel,
+    WhiteBalance,
 };
 use crate::scene::authoring::{
     rendering::camera, rendering::light, rendering::lod_group as lod,
@@ -105,6 +106,12 @@ inspect! {
             vc::set_film_grain_active(c, v.active);
             vc::set_film_grain_intensity(c, v.intensity);
             vc::set_film_grain_response(c, v.response);
+        }),
+        with!("depth_of_field", |c, v: DepthOfField| {
+            vc::set_dof_mode(c, v.mode);
+            for knob in vc::DOF_KNOBS {
+                (knob.set)(c, (knob.get)(&v));
+            }
         }),
         op!("ssr_active", vc::set_ssr_active),
         op!("ssr_quality", vc::set_ssr_quality),

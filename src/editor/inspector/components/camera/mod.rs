@@ -1,13 +1,14 @@
 //! src/editor/inspector/components/camera/ — the Camera inspector card (this
 //! `mod.rs`) plus the Post Processing card (`post_processing`, with its colour
-//! grade in `grading`, its LUT path field in `lut_field` and its custom effects list
-//! in `custom_effects`), split apart to stay under the size cap. Both cards live on the
-//! same camera entity. The Camera card's motion-blur widgets are `motion_blur`.
+//! grade in `grading`, its LUT path field in `lut_field`, its depth of field in
+//! `depth_of_field` and its custom effects list in `custom_effects`), split apart to
+//! stay under the size cap. Both cards live on the same camera entity. The Camera card's motion-blur widgets are `motion_blur`.
 
 use crate::editor::widgets::DragRange;
 use egui_phosphor::regular as icon;
 
 mod custom_effects;
+mod depth_of_field;
 mod exposure;
 mod grading;
 mod lens;

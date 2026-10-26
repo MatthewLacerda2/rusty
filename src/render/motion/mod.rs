@@ -1,6 +1,6 @@
 //! src/render/motion/mod.rs — per-object motion vectors (#1435).
 //!
-//! A view that runs motion blur gets a **velocity target**: an `Rgba16Float` texture
+//! A view that runs motion blur or depth of field gets a **velocity target**: an `Rgba16Float` texture
 //! at full view resolution that the opaque forward pass writes as its second colour
 //! attachment. Each pixel holds how far the surface under it moved on screen since
 //! last frame, `ndc_now.xy - ndc_prev.xy`, in `.b` how far that surface lies from
@@ -30,7 +30,8 @@
 //!
 //! **Cost.** The target exists and the velocity pipelines run only while a view runs
 //! motion blur ([`wanted`]: the camera has it on, the player's option allows it, the
-//! quality tier runs it, #1438, and it is not the editor's Scene view). On any other frame the forward pass draws
+//! quality tier runs it, #1438, and it is not the editor's Scene view) or depth of
+//! field, which reads its distances ([`target_wanted`], #1445). On any other frame the forward pass draws
 //! exactly as before, and the target is freed.
 
 mod history;
@@ -38,7 +39,7 @@ mod history;
 pub(crate) use history::{track, HistoryKey, MotionHistory};
 
 use crate::core::settings::GraphicsSettings;
-use crate::render::postfx::params::{motion_blur_enabled, PostSource};
+use crate::render::postfx::params::{dof_enabled, motion_blur_enabled, PostSource};
 use crate::render::postfx::PfxTarget;
 use crate::render::PixelSize;
 
@@ -59,10 +60,9 @@ pub(crate) const CLEAR: wgpu::Color = wgpu::Color {
     a: 0.0,
 };
 
-/// Whether a view writes motion vectors this frame: only when it will run motion blur,
-/// the one consumer (#1436). `full` is the stack's `full_post_fx`; `scene_view` its
-/// `editor_mode`, the editor's Scene view, which never blurs (nor does Unity's), so
-/// flying the editor camera writes no velocity.
+/// Whether a view runs motion blur this frame (#1436). `full` is the stack's
+/// `full_post_fx`; `scene_view` its `editor_mode`, the editor's Scene view, which
+/// never blurs (nor does Unity's).
 pub(crate) fn wanted(
     post: PostSource,
     graphics: GraphicsSettings,
@@ -70,6 +70,20 @@ pub(crate) fn wanted(
     scene_view: bool,
 ) -> bool {
     full && !scene_view && motion_blur_enabled(post, graphics)
+}
+
+/// Whether a view writes the velocity target this frame: when it runs motion blur
+/// ([`wanted`]) or depth of field (#1445), its two readers, the second for each
+/// pixel's own camera's distance (the motion may then be read by no one). Gated
+/// alike, so the Scene view and a display-only render texture write none.
+pub(crate) fn target_wanted(
+    post: PostSource,
+    graphics: GraphicsSettings,
+    full: bool,
+    scene_view: bool,
+) -> bool {
+    let dof = full && !scene_view && dof_enabled(post, graphics);
+    dof || wanted(post, graphics, full, scene_view)
 }
 
 /// One view's motion vectors: the velocity target (while active) and its history.

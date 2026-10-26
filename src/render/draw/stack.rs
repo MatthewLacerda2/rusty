@@ -11,7 +11,7 @@ use crate::render::passes::ssao::SsaoPlan;
 use crate::render::postfx::exposure::ExposureParams;
 use crate::render::postfx::grade::{GradeParams, Lookup};
 use crate::render::postfx::params::{
-    auto_exposure, blur_params, build_post_params, post_passes, PostSource,
+    auto_exposure, blur_params, build_post_params, dof_params, post_passes, PostSource,
 };
 use crate::render::{RenderView, Renderer};
 use crate::scene::{Camera, Scene};
@@ -59,9 +59,9 @@ impl Renderer {
             .zip(view_projs.iter().copied())
             .collect();
         // Motion vectors (#1435): last frame's cameras, and the velocity target when
-        // this view runs motion blur. A view shading with its own forward pipeline
-        // (the Inspector's shader preview) writes none.
-        let velocity = motion::wanted(
+        // this view runs motion blur or depth of field (#1445). A view shading with
+        // its own forward pipeline (the Inspector's shader preview) writes none.
+        let velocity = motion::target_wanted(
             pass.post,
             self.graphics(pass.editor_mode),
             pass.full_post_fx,
@@ -102,6 +102,7 @@ impl Renderer {
         };
         let graphics = self.graphics(ctx.stack.editor_mode);
 
+        self.focus_scene(view, ctx.stack);
         self.blur_scene(view, ctx.stack);
 
         // The grade + tonemap and the Color Lookup (#1440, #1441): rebaked only when
@@ -140,6 +141,18 @@ impl Renderer {
         };
         view.post_fx
             .run(&self.device, &self.queue, ctx, post_params, passes);
+    }
+
+    /// Depth of field (#1445), first in the chain, over the distances the velocity
+    /// target holds: motion blur then reads the focused scene. A display-only render
+    /// texture, the Scene view and a view with no target (a shader preview) skip it.
+    fn focus_scene(&self, view: &mut RenderView, stack: &StackPass) {
+        let graphics = self.graphics(stack.editor_mode);
+        let runs = stack.full_post_fx && !stack.editor_mode;
+        let params = dof_params(stack.post, graphics, view.size().height).filter(|_| runs);
+        let gpu = (&self.device, &self.queue);
+        view.post_fx
+            .run_depth_of_field(gpu, &self.depth_of_field, params, &self.gpu_timer);
     }
 
     /// Per-object motion blur (#1436), over the velocity target the stack wrote:

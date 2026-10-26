@@ -18,10 +18,11 @@ use std::collections::BTreeMap;
 
 use glam::Mat4;
 
+use super::depth_of_field::DofParams;
 use super::motion_blur::BlurParams;
 use super::{PostParams, PostPasses};
 use crate::components::{
-    AutoExposure, CameraComponent, ExposureMode, PostProcessingComponent, Vignette,
+    AutoExposure, CameraComponent, DofMode, ExposureMode, PostProcessingComponent, Vignette,
 };
 use crate::core::settings::graphics_options::GraphicsOption;
 use crate::core::settings::GraphicsSettings;
@@ -181,6 +182,31 @@ pub(crate) fn motion_blur_enabled(post: PostSource, graphics: GraphicsSettings) 
     post.camera.is_some_and(|cam| {
         effect_runs(graphics, GraphicsOption::MotionBlur, cam.motion_blur_active)
     })
+}
+
+/// The depth of field `post`'s volume runs this frame (#1445), for a view `height`
+/// pixels tall at the tier's working resolution; `None` when [`dof_enabled`] does
+/// not hold.
+pub(crate) fn dof_params(
+    post: PostSource,
+    graphics: GraphicsSettings,
+    height: u32,
+) -> Option<DofParams> {
+    let dof = &post
+        .volume
+        .filter(|_| dof_enabled(post, graphics))?
+        .depth_of_field;
+    DofParams::new(dof, height, graphics.quality.depth_of_field()?)
+}
+
+/// Whether `post`'s volume runs depth of field, through [`effect_runs`]: its mode is
+/// not `Off`, the player's option allows it and the tier runs it (not Low). The
+/// velocity target, whose distances it reads, is written when this holds too.
+pub(crate) fn dof_enabled(post: PostSource, graphics: GraphicsSettings) -> bool {
+    let on = post
+        .volume
+        .is_some_and(|vc| vc.depth_of_field.mode != DofMode::Off);
+    effect_runs(graphics, GraphicsOption::DepthOfField, on)
 }
 
 /// No authored-effect params: a view without a volume.

@@ -1,5 +1,6 @@
-//! src/render/postfx/mod.rs — Post-process chain (color correction, bloom,
-//! per-object motion blur (`motion_blur`), real SSR) + quality presets.
+//! src/render/postfx/mod.rs — Post-process chain (depth of field
+//! (`depth_of_field`), per-object motion blur (`motion_blur`), color correction,
+//! bloom, real SSR) + quality presets.
 //!
 //! The scene no longer renders straight to the swapchain. It renders into an HDR
 //! offscreen target; this module then runs a fullscreen post-FX chain
@@ -11,6 +12,7 @@
 //! ~30fps (Low: no SSR/motion-blur, half-size bloom).
 
 mod custom;
+pub(crate) mod depth_of_field;
 pub(crate) mod exposure;
 pub(crate) mod grade;
 mod inputs;
@@ -141,6 +143,8 @@ pub struct PostFx {
     pub(crate) motion: crate::render::motion::MotionVectors,
     /// The motion blur's tile and blurred-scene targets (#1436), while it runs.
     pub(crate) blur: Option<motion_blur::BlurTargets>,
+    /// The depth of field's targets (#1445), while it runs.
+    pub(crate) dof: Option<depth_of_field::DofTargets>,
 }
 
 /// HDR scene colour format — float so bright pixels survive for bloom/tonemap.

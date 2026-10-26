@@ -8,11 +8,13 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
+mod depth_of_field;
 mod exposure;
 mod grading;
 mod lens;
 mod tonemap;
 
+pub use depth_of_field::{DepthOfField, DofMode};
 pub use exposure::{AutoExposure, ExposureMode};
 pub use grading::{ColorWheel, LiftGammaGain, Wheel, WhiteBalance};
 pub use lens::{ChromaticAberration, FilmGrain, Vignette};
@@ -61,6 +63,9 @@ pub struct PostProcessingComponent {
     /// Film Grain (#1439); off when absent.
     #[serde(default)]
     pub film_grain: FilmGrain,
+    /// Depth of field (#1445); off when absent.
+    #[serde(default)]
+    pub depth_of_field: DepthOfField,
     pub ssr_active: bool,
     pub ssr_quality: String, // "Low", "Medium", "High", "Ultra"
     pub ssr_temporal_upsampling: bool,
@@ -196,6 +201,17 @@ mod tests {
             (back.auto_exposure.max_ev, back.auto_exposure.min_ev),
             (3.0, -6.0)
         );
+    }
+
+    #[test]
+    fn depth_of_field_is_off_when_absent_and_round_trips() {
+        assert_eq!(load("").depth_of_field, super::DepthOfField::default());
+        let vc = load(r#", "depth_of_field": {"mode": "Bokeh", "aperture": 1.4}"#);
+        let back: PostProcessingComponent =
+            serde_json::from_str(&serde_json::to_string(&vc).unwrap()).unwrap();
+        let dof = back.depth_of_field;
+        assert_eq!((dof.mode, dof.aperture), (super::DofMode::Bokeh, 1.4));
+        assert_eq!(dof.focus_distance, 10.0, "an absent knob keeps its default");
     }
 
     #[test]

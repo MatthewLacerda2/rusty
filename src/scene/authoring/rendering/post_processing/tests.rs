@@ -119,3 +119,24 @@ fn lens_ops_clamp_and_refuse_non_finite_vectors() {
     assert_eq!(e.chromatic_aberration.intensity, 0.0, "infinity is refused");
     assert_eq!((e.film_grain.intensity, e.film_grain.response), (0.0, 0.25));
 }
+
+#[test]
+fn dof_ops_clamp_and_keep_the_gaussian_ramp_ordered() {
+    let (mut scene, id) = scene_with_vc();
+    let mut e = scene.world.post_processing_mut(id).unwrap();
+    set_dof_gaussian_end(&mut e, 5.0);
+    assert_eq!(e.depth_of_field.gaussian_end, 10.0, "past the start");
+    set_dof_gaussian_start(&mut e, 40.0);
+    assert_eq!(e.depth_of_field.gaussian_end, 40.0, "follows the start");
+    set_dof_gaussian_max_radius(&mut e, 9.0);
+    set_dof_aperture(&mut e, f32::NAN);
+    set_dof_focal_length(&mut e, 1000.0);
+    set_dof_focus_distance(&mut e, -3.0);
+    let d = e.depth_of_field;
+    assert_eq!((d.gaussian_max_radius, d.aperture), (1.5, 1.0));
+    assert_eq!((d.focal_length, d.focus_distance), (300.0, 0.1));
+    let knob = dof_knob("depth_of_field.focus_distance").unwrap();
+    (knob.set)(&mut e, 2.5);
+    assert_eq!((knob.get)(&e.depth_of_field), 2.5);
+    assert!(dof_knob("depth_of_field.mode").is_none(), "numbers only");
+}

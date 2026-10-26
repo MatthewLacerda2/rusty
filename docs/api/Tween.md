@@ -41,6 +41,12 @@ a value as wide as the param (a number, or `{…}` of 2–4):
 | `"UI.<name>"`, e.g. `"UI.dissolve.amount"` | every graphic of `id` drawn with its ui shader | `UI.SetShaderParam(id, name, v)` |
 | `"Graphics.<name>"`, e.g. `"Graphics.damage_vignette.intensity"` | the post-processing volume **on entity `id`** | `Graphics.SetPostParam(name, v)` on that volume |
 
+A post-processing volume's **depth-of-field** knobs (#1445) tween under the same
+word, by their field name: `"Graphics.depth_of_field.focus_distance"` (and
+`gaussian_start`, `gaussian_end`, `gaussian_max_radius`, `aperture`,
+`focal_length`), one number each, the same as `Graphics.SetDepthOfField<Knob>` on that
+volume. The mode does not tween.
+
 The shader's layout is resolved once, at `Tween.To`: a param the shader bakes, a
 typo, an entity with no material / graphic / volume, or no shader named yet is an
 error there (listing the runtime params), never a silent no-op. Each step writes

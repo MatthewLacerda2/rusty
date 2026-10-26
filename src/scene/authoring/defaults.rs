@@ -193,6 +193,7 @@ pub fn default_post_processing() -> PostProcessingComponent {
         vignette: Default::default(),
         chromatic_aberration: Default::default(),
         film_grain: Default::default(),
+        depth_of_field: Default::default(),
         ssr_active: true,
         ssr_quality: "High".to_string(),
         ssr_temporal_upsampling: true,

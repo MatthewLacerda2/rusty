@@ -48,6 +48,7 @@ fn pass_names_are_stable_and_unique() {
             "transparent",
             "ribbons",
             "particles",
+            "depth_of_field",
             "motion_blur",
             "post_fx",
             "outline",
