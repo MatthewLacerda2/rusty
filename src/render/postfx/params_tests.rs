@@ -25,9 +25,20 @@ fn add(
 }
 
 fn params(scene: &Scene, camera: Option<u32>, quality: QualityPreset) -> (PostParams, bool) {
-    let id = Mat4::IDENTITY;
     let post = borrow_post_source(scene, camera);
-    build_post_params(scene, post.source(), quality.into(), id, id, [1.0; 3])
+    build_post_params(
+        scene,
+        post.source(),
+        quality.into(),
+        Mat4::IDENTITY,
+        [1.0; 3],
+    )
+}
+
+/// The motion blur `camera` runs under `graphics`, as its sample count.
+fn blur(scene: &Scene, camera: Option<u32>, graphics: GraphicsSettings) -> Option<f32> {
+    let post = borrow_post_source(scene, camera);
+    blur_params(post.source(), graphics, 100).map(|b| b.shape[2])
 }
 
 fn custom(scene: &Scene, camera: Option<u32>) -> Vec<String> {
@@ -95,8 +106,7 @@ fn low_preset_disables_ssr_and_motion_blur() {
     let (scene, id) = scene_with_vc(vc(), Some(cam()));
     let (p, _) = params(&scene, Some(id), QualityPreset::Low);
     assert_eq!(p.flags[0], 0.0, "ssr off on Low");
-    assert_eq!(p.flags[1], 0.0, "motion blur off on Low");
-    assert_eq!(p.misc[3], 0.0, "no motion-blur samples on Low");
+    assert_eq!(blur(&scene, Some(id), QualityPreset::Low.into()), None);
 }
 
 #[test]
@@ -104,8 +114,8 @@ fn high_preset_enables_real_ssr_and_motion_blur() {
     let (scene, id) = scene_with_vc(vc(), Some(cam()));
     let (p, _) = params(&scene, Some(id), QualityPreset::High);
     assert_eq!(p.flags[0], 2.0, "real screen-space SSR on High");
-    assert_eq!(p.flags[1], 1.0, "motion blur on on High");
-    assert_eq!(p.misc[3], 16.0, "motion-blur samples passed through");
+    let samples = blur(&scene, Some(id), QualityPreset::High.into());
+    assert_eq!(samples, Some(16.0), "motion-blur samples passed through");
 }
 
 #[test]
@@ -181,17 +191,16 @@ fn forbidding(option: GraphicsOption) -> GraphicsSettings {
 #[test]
 fn a_player_option_off_gates_the_cameras_effect() {
     let (scene, id) = scene_with_vc(vc(), Some(cam()));
-    let id_m = Mat4::IDENTITY;
     let run = |g: GraphicsSettings| {
         let post = borrow_post_source(&scene, Some(id));
-        build_post_params(&scene, post.source(), g, id_m, id_m, [1.0; 3])
+        build_post_params(&scene, post.source(), g, Mat4::IDENTITY, [1.0; 3])
     };
-    let (p, _) = run(forbidding(GraphicsOption::MotionBlur));
-    assert_eq!((p.flags[1], p.misc[3]), (0.0, 0.0), "motion blur off");
-    assert_eq!(p.flags[0], 2.0, "SSR untouched");
-    let (p, bloom) = run(QualityPreset::High.into());
-    assert_eq!(p.flags[1], 1.0, "allowed: the camera's motion blur runs");
-    assert!(bloom);
+    let off = forbidding(GraphicsOption::MotionBlur);
+    assert_eq!(blur(&scene, Some(id), off), None, "motion blur off");
+    assert_eq!(run(off).0.flags[0], 2.0, "SSR untouched");
+    let on = blur(&scene, Some(id), QualityPreset::High.into());
+    assert!(on.is_some(), "allowed: the camera's motion blur runs");
+    assert!(run(QualityPreset::High.into()).1);
     let (p, bloom) = run(forbidding(GraphicsOption::Bloom));
     assert!(!bloom && p.bloom[3] == 0.0, "bloom off");
     assert_eq!(
@@ -216,4 +225,15 @@ fn effect_runs_needs_camera_option_and_tier() {
     assert!(!effect_runs(medium, GraphicsOption::Ssr, true), "tier off");
     let off = forbidding(GraphicsOption::Ssr);
     assert!(!effect_runs(off, GraphicsOption::Ssr, true), "option off");
+}
+
+/// #1436: motion blur is the camera's, like FXAA: it runs without a volume.
+#[test]
+fn motion_blur_needs_no_volume() {
+    let mut scene = Scene::new();
+    let id = add(&mut scene, None, Some(cam()));
+    assert_eq!(
+        blur(&scene, Some(id), QualityPreset::High.into()),
+        Some(16.0)
+    );
 }

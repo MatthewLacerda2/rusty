@@ -69,6 +69,8 @@ fn apply_graphics_ops(scene: &Rc<RefCell<Scene>>, id: u32) {
     let mut cam = sc.world.camera_mut(id).unwrap();
     camera_ops::set_motion_blur_active(&mut cam, true);
     camera_ops::set_motion_blur_samples(&mut cam, 16);
+    camera_ops::set_motion_blur_intensity(&mut cam, 2.0); // clamped to 1
+    camera_ops::set_motion_blur_max_length(&mut cam, 0.1);
     camera_ops::set_fxaa_active(&mut cam, false);
 }
 
@@ -98,6 +100,8 @@ Graphics.SetCustomEffects({"crt", "hurt"})
 assert(not pcall(Graphics.SetCustomEffects, {"../x"}) and #Graphics.GetCustomEffects() == 2)
 Graphics.SetMotionBlurActive(true)
 Graphics.SetMotionBlurSamples(16)
+Graphics.SetMotionBlurIntensity(2.0)
+Graphics.SetMotionBlurMaxLength(0.1)
 Graphics.SetFxaaActive(false)
 "#;
 
@@ -124,25 +128,16 @@ fn graphics_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Error
     let os = op_scene.borrow();
     let lvc = ls.world.post_processing(lua_id).unwrap().clone();
     let ovc = os.world.post_processing(op_id).unwrap().clone();
-    assert_eq!(lvc.bloom_active, ovc.bloom_active);
-    assert_eq!(lvc.bloom_intensity, ovc.bloom_intensity);
-    let grade = |vc: &PostProcessingComponent| {
-        let wheels = (vc.white_balance, vc.lift_gamma_gain, vc.hue_shift);
-        let exposure = (vc.exposure_mode, vc.auto_exposure);
-        let display = (vc.tonemap, vc.gamma, vc.lut.clone(), vc.lut_contribution);
-        (wheels, exposure, display)
-    };
-    assert_eq!(grade(&lvc), grade(&ovc));
-    let ssr = |vc: &PostProcessingComponent| (vc.ssr_active, vc.ssr_quality.clone());
-    assert_eq!(ssr(&lvc), ssr(&ovc));
-    assert_eq!((&lvc.shadows, &lvc.ssao), (&ovc.shadows, &ovc.ssao));
-    assert_eq!(lvc.custom_effects, ovc.custom_effects);
+    // Every field, through `Debug`: the two paths must leave identical components.
+    assert_eq!(format!("{lvc:?}"), format!("{ovc:?}"));
     assert_eq!(lvc.bloom_intensity, 0.0, "single-sourced clamp");
     assert_eq!(lvc.gamma, 0.01, "single-sourced clamp");
     let lcam = ls.world.camera(lua_id).unwrap().clone();
     let ocam = os.world.camera(op_id).unwrap().clone();
-    let cam = |c: &CameraComponent| (c.motion_blur_active, c.motion_blur_samples, c.fxaa_active);
-    assert_eq!(cam(&lcam), cam(&ocam));
-    assert!(!lcam.fxaa_active, "both paths turned fxaa off");
+    assert_eq!(format!("{lcam:?}"), format!("{ocam:?}"));
+    assert!(
+        !lcam.fxaa_active,
+        "both paths turned the default-on knob off"
+    );
     Ok(())
 }

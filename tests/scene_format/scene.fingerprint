@@ -98,6 +98,8 @@ scene.entities[].camera.far: f32
 scene.entities[].camera.fov: f32
 scene.entities[].camera.fxaa_active: bool
 scene.entities[].camera.motion_blur_active: bool
+scene.entities[].camera.motion_blur_intensity: f32
+scene.entities[].camera.motion_blur_max_length: f32
 scene.entities[].camera.motion_blur_samples: u32
 scene.entities[].camera.near: f32
 scene.entities[].camera.projection: enum Perspective|Orthographic

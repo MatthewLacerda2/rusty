@@ -117,25 +117,34 @@ fn velocity_is_written_only_where_motion_blur_runs() {
         motion_blur_active: true,
         ..CameraComponent::default()
     };
-    assert!(wanted(post(&cam), QualityPreset::Medium.into(), true));
+    assert!(wanted(
+        post(&cam),
+        QualityPreset::Medium.into(),
+        true,
+        false
+    ));
     assert!(
-        !wanted(post(&cam), QualityPreset::Low.into(), true),
+        !wanted(post(&cam), QualityPreset::Low.into(), true, false),
         "Low pays nothing"
     );
     assert!(
-        !wanted(post(&cam), QualityPreset::High.into(), false),
+        !wanted(post(&cam), QualityPreset::High.into(), false, false),
         "no full post-FX"
     );
-    assert!(!wanted(
-        PostSource::default(),
-        QualityPreset::High.into(),
-        true
-    ));
+    let high = GraphicsSettings::from(QualityPreset::High);
+    assert!(!wanted(PostSource::default(), high, true, false));
+    assert!(
+        !wanted(post(&cam), high, true, true),
+        "the Scene view never blurs"
+    );
     let mut off = GraphicsSettings::from(QualityPreset::High);
     off.options.set(GraphicsOption::MotionBlur, false);
-    assert!(!wanted(post(&cam), off, true), "the player turned it off");
+    assert!(
+        !wanted(post(&cam), off, true, false),
+        "the player turned it off"
+    );
     cam.motion_blur_active = false;
-    assert!(!wanted(post(&cam), QualityPreset::High.into(), true));
+    assert!(!wanted(post(&cam), QualityPreset::High.into(), true, false));
 }
 
 #[test]

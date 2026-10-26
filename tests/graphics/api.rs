@@ -83,7 +83,7 @@ fn bloom_and_color_round_trip() {
 }
 
 #[test]
-fn motion_blur_samples_are_clamped() {
+fn motion_blur_knobs_are_clamped() {
     let lua = Lua::new();
     let scene = scene_with_volume();
     let quality = Rc::new(RefCell::new(GraphicsSettings::from(QualityPreset::Medium)));
@@ -91,14 +91,18 @@ fn motion_blur_samples_are_clamped() {
 
     lua.scope(|scope| {
         rusty::api::graphics::register(&lua, scope, &scene, &quality, &app).unwrap();
-        lua.load("Graphics.SetMotionBlurActive(true); Graphics.SetMotionBlurSamples(99)")
-            .exec()
-            .unwrap();
+        let set = "Graphics.SetMotionBlurActive(true); Graphics.SetMotionBlurSamples(99); \
+            Graphics.SetMotionBlurIntensity(-1); Graphics.SetMotionBlurMaxLength(5)";
+        lua.load(set).exec().unwrap();
         let s = scene.borrow();
         let id = s.entity_ids()[0];
         let cam = s.world.camera(id).unwrap().clone();
         assert!(cam.motion_blur_active);
         assert_eq!(cam.motion_blur_samples, 32, "clamped into 2..=32");
+        assert_eq!(
+            (cam.motion_blur_intensity, cam.motion_blur_max_length),
+            (0.0, 0.2)
+        );
         Ok(())
     })
     .unwrap();

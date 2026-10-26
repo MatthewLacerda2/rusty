@@ -3,12 +3,13 @@
 // Four entry points share one fullscreen-triangle vertex stage:
 //   fs_bright    — bright-pass threshold (bloom prefilter)
 //   fs_blur      — separable gaussian blur (direction from uniform)
-//   fs_composite — bloom add + SSR + motion blur + exposure, then the grading LUT
+//   fs_composite — bloom add + SSR + exposure, then the grading LUT, over the scene
+//                  (already motion-blurred by `postfx/motion_blur.wgsl` when it runs)
 //   fs_fxaa      — luma-based edge anti-aliasing; the last pass of all (#360)
 //
-// The composite is the one place the UI knobs (exposure, bloom, motion blur, SSR)
-// finally take effect; the grade and the tonemap reach it baked into the grading
-// LUT (`postfx/grade.wgsl`, #1440).
+// The composite is the one place the UI knobs (exposure, bloom, SSR) finally take
+// effect; the grade and the tonemap reach it baked into the grading LUT
+// (`postfx/grade.wgsl`, #1440).
 
 // `PostParams` lives in `common.wgsl` so authored postfx effects (#397) can bind it
 // too (binding 0) — they read the game time from it (#398).
@@ -135,42 +136,13 @@ fn sky_reflection(r: vec3<f32>) -> vec3<f32> {
     return textureSampleLevel(t_skybox, s_skybox, equirect_uv(r), 0.0).rgb;
 }
 
-// Camera motion blur: blur along the screen-space velocity of the pixel between
-// the previous and current view-projection. Driven by motion_blur_samples.
-fn motion_blur(uv: vec2<f32>, world_pos: vec3<f32>) -> vec3<f32> {
-    let prev_clip = params.prev_view_proj * vec4<f32>(world_pos, 1.0);
-    if (prev_clip.w <= 0.0) {
-        return textureSample(t_color, s_color, uv).rgb;
-    }
-    let prev_ndc = prev_clip.xy / prev_clip.w;
-    let prev_uv = vec2<f32>(prev_ndc.x * 0.5 + 0.5, 1.0 - (prev_ndc.y * 0.5 + 0.5));
-    let velocity = (uv - prev_uv) * params.flags.z;
-    let samples = i32(params.misc.w);
-    var color = vec3<f32>(0.0);
-    var total = 0.0;
-    for (var i = 0; i < samples; i = i + 1) {
-        let t = f32(i) / max(f32(samples - 1), 1.0) - 0.5;
-        let suv = clamp(uv + velocity * t, vec2<f32>(0.0), vec2<f32>(1.0));
-        // Explicit-LOD sample: dynamic sample count makes this a varying-iteration
-        // loop, where a gradient (implicit-LOD) instruction fails under D3D12/FXC.
-        color += textureSampleLevel(t_color, s_color, suv, 0.0).rgb;
-        total += 1.0;
-    }
-    return color / max(total, 1.0);
-}
-
 @fragment
 fn fs_composite(in: VsOut) -> @location(0) vec4<f32> {
-    var hdr: vec3<f32>;
     let depth = load_depth(in.uv);
     let world_pos = world_from_depth(in.uv, depth);
 
-    // 1. Motion blur (samples the HDR scene along camera velocity).
-    if (params.flags.y > 0.5 && params.misc.w > 1.5 && depth < 1.0) {
-        hdr = motion_blur(in.uv, world_pos);
-    } else {
-        hdr = textureSample(t_color, s_color, in.uv).rgb;
-    }
+    // 1. The scene, motion-blurred upstream when the view runs it (#1436).
+    var hdr = textureSample(t_color, s_color, in.uv).rgb;
 
     // 2. Real screen-space reflections (High tier only; Low/Medium rely on the
     //    forward shader's cubemap reflection). Additive, grazing-weighted.

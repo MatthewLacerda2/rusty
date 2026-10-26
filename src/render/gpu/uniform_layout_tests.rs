@@ -70,11 +70,12 @@ fn camera_uniform_matches_wgsl_layout() {
         ("fog", offset_of!(CameraUniform, fog)),
         ("clusters", offset_of!(CameraUniform, clusters)),
         ("prev_view_proj", offset_of!(CameraUniform, prev_view_proj)),
+        ("stack", offset_of!(CameraUniform, stack)),
     ];
     assert_layout("CameraUniforms", &pairs, size_of::<CameraUniform>());
     // `time` rides in the vec3 pad (#398); the cluster block adds 48 bytes (#434),
-    // last frame's matrix 64 (#1435).
-    assert_eq!(size_of::<CameraUniform>(), 240);
+    // last frame's matrix 64 (#1435), the stack index 16 (#1436).
+    assert_eq!(size_of::<CameraUniform>(), 256);
 }
 
 #[test]

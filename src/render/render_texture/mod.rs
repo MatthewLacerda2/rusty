@@ -24,6 +24,7 @@ mod slots;
 use std::collections::HashSet;
 use std::rc::Rc;
 
+use slots::frames_since;
 pub use slots::RenderTextures;
 
 use crate::asset::MapRef;
@@ -92,6 +93,7 @@ impl Renderer {
             let Some(target) = slot.view.color_target_view() else {
                 continue;
             };
+            let motion_frames = frames_since(slot.drawn_on, frame);
             let guards = borrow_post_source(scene, Some(cam.id));
             let pass = StackPass {
                 stack: std::slice::from_ref(&cam.camera),
@@ -101,6 +103,7 @@ impl Renderer {
                 output: &target,
                 editor_mode: false,
                 full_post_fx: cam.target.post_fx,
+                motion_frames,
             };
             self.draw_stack(&mut slot.view, scene, pass);
             self.copy_to_front(&slot.view, &slot.front.texture);

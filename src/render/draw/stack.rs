@@ -10,7 +10,9 @@ use crate::render::motion::{self, HistoryKey};
 use crate::render::passes::ssao::SsaoPlan;
 use crate::render::postfx::exposure::ExposureParams;
 use crate::render::postfx::grade::{GradeParams, Lookup};
-use crate::render::postfx::params::{auto_exposure, build_post_params, post_passes, PostSource};
+use crate::render::postfx::params::{
+    auto_exposure, blur_params, build_post_params, post_passes, PostSource,
+};
 use crate::render::postfx::PostParams;
 use crate::render::{RenderView, Renderer};
 use crate::scene::{Camera, Scene};
@@ -35,6 +37,9 @@ pub(crate) struct StackPass<'a> {
     /// Run `post`'s grading, bloom, SSR, motion blur and FXAA. Off, the image is
     /// only brought from HDR to display (a render texture's `post_fx = false`).
     pub full_post_fx: bool,
+    /// How many frames of motion this draw's velocities span: 1 for the screen, a
+    /// render texture's `update_every` (#1436), so its blur is one frame's shutter.
+    pub motion_frames: u32,
 }
 
 impl Renderer {
@@ -61,6 +66,7 @@ impl Renderer {
             pass.post,
             self.graphics(pass.editor_mode),
             pass.full_post_fx,
+            pass.editor_mode,
         ) && !view.has_forward_override();
         let key = HistoryKey::new(scene, pass.base_id);
         let size = view.size();
@@ -92,10 +98,12 @@ impl Renderer {
         let (scene, output) = (ctx.scene, ctx.stack.output);
         let post = PostFrame {
             view_proj: ctx.base_view_proj,
-            prev_view_proj: ctx.base_prev_view_proj,
             camera_pos: ctx.cam.position.to_array(),
             full: ctx.stack.full_post_fx,
         };
+        let graphics = self.graphics(ctx.stack.editor_mode);
+
+        self.blur_scene(view, ctx.stack);
 
         // The grade + tonemap and the Color Lookup (#1440, #1441): rebaked only when
         // this view's inputs changed.
@@ -110,16 +118,11 @@ impl Renderer {
         let (mut post_params, bloom_enabled) = build_post_params(
             scene,
             ctx.stack.post,
-            self.graphics(ctx.stack.editor_mode),
+            graphics,
             post.view_proj,
-            post.prev_view_proj,
             post.camera_pos,
         );
-        let mut passes = post_passes(
-            ctx.stack.post,
-            bloom_enabled,
-            self.graphics(ctx.stack.editor_mode),
-        );
+        let mut passes = post_passes(ctx.stack.post, bloom_enabled, graphics);
         if !post.full {
             // Display transform only: the neutral grade, no bloom/SSR/blur/FXAA and
             // no authored effects.
@@ -127,7 +130,6 @@ impl Renderer {
             post_params.color = neutral.color;
             post_params.bloom = neutral.bloom;
             post_params.flags = neutral.flags;
-            post_params.misc[3] = neutral.misc[3];
             (passes.bloom, passes.fxaa) = (false, false);
             passes.custom = &[];
         }
@@ -145,11 +147,25 @@ impl Renderer {
             .run(&self.device, &self.queue, ctx, post_params, passes);
     }
 
-    /// Automatic exposure (#1444): meter this view's scene and adapt, on the GPU, when
+    /// Per-object motion blur (#1436), over the velocity target the stack wrote:
+    /// bloom, the exposure meter and the composite then read the blurred scene.
+    /// Gated as the velocity was, so the editor's Scene view never blurs.
+    fn blur_scene(&self, view: &mut RenderView, stack: &StackPass) {
+        let graphics = self.graphics(stack.editor_mode);
+        let blurs = motion::wanted(stack.post, graphics, stack.full_post_fx, stack.editor_mode);
+        let blur = blur_params(stack.post, graphics, view.size().height)
+            .filter(|_| blurs)
+            .map(|b| b.per_frames(stack.motion_frames));
+        let gpu = (&self.device, &self.queue);
+        view.post_fx
+            .run_motion_blur(gpu, &self.motion_blur, blur, &self.gpu_timer);
+    }
+
+    /// Automatic exposure (#1444): meter this view's scene, after motion blur (#1436), and adapt, on the GPU, when
     /// its volume is `Automatic` and the stack runs full post-FX; otherwise the next
     /// metered frame snaps.
     fn meter_exposure(&self, view: &mut RenderView, ctx: &CameraCtx, full: bool) {
-        let meter = &mut view.post_fx.exposure;
+        let (meter, scene) = view.post_fx.exposure_and_scene();
         let Some(ae) = auto_exposure(ctx.stack.post).filter(|_| full) else {
             return meter.cut();
         };
@@ -157,19 +173,13 @@ impl Renderer {
         let step = meter.step(key, ctx.stack.editor_mode, ctx.scene.shader_time);
         let params = ExposureParams::new(ae, step);
         let gpu = (&self.device, &self.queue);
-        meter.run(
-            gpu,
-            &self.exposure_passes,
-            &view.post_fx.scene_hdr.view,
-            &params,
-        );
+        meter.run(gpu, &self.exposure_passes, scene, &params);
     }
 }
 
 /// The per-stack inputs of [`Renderer::run_post_fx`].
 struct PostFrame {
     view_proj: glam::Mat4,
-    prev_view_proj: glam::Mat4,
     camera_pos: [f32; 3],
     full: bool,
 }

@@ -132,6 +132,7 @@ each kind's passes summed, under names that never change so two reports diff:
 | `transparent` | translucent solids |
 | `ribbons` | trails and lines |
 | `particles` | particle systems |
+| `motion_blur` | per-object motion blur (#1436): its TileMax and NeighborMax tile passes and the gather |
 | `post_fx` | bloom, the composite, authored effects, FXAA |
 | `outline` | the editor's selection outline (its mask, dilation and ring) and the gizmos drawn over it after post-FX: grid, collider boxes, axis arrows, probes (editor only) |
 | `ui` | world and screen UI, Mask textures and the backdrop blur |
