@@ -170,7 +170,10 @@ code first, then:
    became of it: fixed (with the commit), dropped (in a word), sent to the user,
    or filed as an issue when it lies outside the branch and passes *Issues are
    for what matters*. No findings is said too. It is the record that the review
-   happened.
+   happened. It reports, it never instructs: "sent back to the coder", never "fix
+   in this branch" or where the new `Brief` is. A readied session still
+   subscribed to the PR reads an instruction there as work, and races the fresh
+   session (2026-10-26, #1447).
    **Before filing a pre-existing finding, class it** (`issue-batch`, *Filing a
    bug*): look for earlier cases of its kind; a case is filed with `Kind: case —
    searched <terms>`, a symptom gets the fix that scales as a root issue, with
