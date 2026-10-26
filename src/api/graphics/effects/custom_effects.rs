@@ -7,16 +7,26 @@ use std::cell::RefCell;
 
 use mlua::{IntoLua, Value};
 
-use super::super::material::shader::params::floats;
-use super::super::{put, Reg};
-use super::state::{with_vc, with_vc_mut};
+use super::super::super::material::shader::params::floats;
+use super::super::super::{put, Reg};
+use super::super::state::{with_vc, with_vc_mut};
 use crate::scene::authoring::rendering::post_processing as vc_ops;
 use crate::scene::Scene;
 use crate::shadergen::post_params::catalog_default;
 
+/// The list and its params.
+pub(super) fn register<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
+    table: &mlua::Table,
+    scene: &'scope RefCell<Scene>,
+) -> Reg {
+    register_names(scope, table, scene)?;
+    register_params(scope, table, scene)
+}
+
 /// `SetCustomEffects({names})` replaces the list (an invalid name is a Lua error and
 /// nothing changes); `GetCustomEffects()` returns it, empty without an active volume.
-pub(super) fn register_custom_effects<'scope>(
+fn register_names<'scope>(
     scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
@@ -45,7 +55,7 @@ pub(super) fn register_custom_effects<'scope>(
 /// `SetPostParam(name, value)` sets a runtime param of the active volume's effects
 /// (strict: an unknown or baked name, a wrong arity, or no active volume is a Lua
 /// error); `GetPostParam(name)` reads it back, or the catalog default with no volume.
-pub(super) fn register_post_params<'scope>(
+fn register_params<'scope>(
     scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
@@ -78,5 +88,5 @@ pub(super) fn register_post_params<'scope>(
 }
 
 #[cfg(test)]
-#[path = "post_params_tests.rs"]
+#[path = "custom_effects_tests.rs"]
 mod post_params_tests;

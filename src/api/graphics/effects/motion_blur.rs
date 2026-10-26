@@ -1,16 +1,10 @@
-//! src/api/graphics/camera.rs — the `Graphics` knobs that live on the **camera**
-//! rather than on a post-processing volume: motion blur and FXAA.
-//!
-//! Split out of `mod.rs` when it crossed the size cap, along the seam the namespace
-//! already had — the volume knobs read `PostProcessingComponent`, these read
-//! `CameraComponent`, and the two groups share nothing but the `Graphics` table.
-//!
-//! Both route through the shared `authoring::rendering::camera` ops the editor's Camera card
-//! calls, so the panel and the binding are one write path (#287).
+//! `Graphics.{Get,Set}MotionBlur*` (#1436): a **camera** effect, its knobs on the
+//! main camera's `CameraComponent` (Unity's camera property), not on a volume,
+//! through the `authoring::rendering::camera` ops the Camera card calls (#287).
 
 use std::cell::RefCell;
 
-use super::state::{with_cam, with_cam_mut};
+use super::super::state::{with_cam, with_cam_mut};
 use crate::api::{put, Reg};
 use crate::scene::authoring::rendering::camera as camera_ops;
 use crate::scene::Scene;
@@ -18,7 +12,7 @@ use crate::scene::Scene;
 /// Camera motion blur: active, sample count, intensity and clamp (#1436) over the
 /// main camera's component. Without a screen camera nothing blurs, so every getter
 /// reports "off": `false` and `0`, never a new camera's defaults.
-pub(super) fn register_motion_blur<'scope>(
+pub(super) fn register<'scope>(
     scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
@@ -52,12 +46,12 @@ pub(super) fn register_motion_blur<'scope>(
         "GetMotionBlurSamples",
         scope.create_function(|_, ()| Ok(with_cam(scene, |c| c.motion_blur_samples).unwrap_or(0))),
     )?;
-    register_motion_blur_shape(scope, table, scene)
+    register_shape(scope, table, scene)
 }
 
 /// Motion blur's intensity (the shutter fraction) and clamp (the longest streak, a
 /// fraction of the view's height), #1436.
-fn register_motion_blur_shape<'scope>(
+fn register_shape<'scope>(
     scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
@@ -91,30 +85,5 @@ fn register_motion_blur_shape<'scope>(
         scope.create_function(|_, ()| {
             Ok(with_cam(scene, |c| c.motion_blur_max_length).unwrap_or(0.0))
         }),
-    )
-}
-
-/// FXAA: the anti-aliasing pass at the end of the post-FX chain (#360), over the
-/// main camera's component — the same write path the editor's Camera card uses.
-pub(super) fn register_fxaa<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
-    put(
-        table,
-        "SetFxaaActive",
-        scope.create_function(|_, active: bool| {
-            with_cam_mut(scene, |e| camera_ops::set_fxaa_active(e, active));
-            Ok(())
-        }),
-    )?;
-    put(
-        table,
-        "GetFxaaActive",
-        // `true` without a screen camera, matching what the renderer does for a view
-        // with no camera (`postfx::params::fxaa_enabled` with `None`): the getter must
-        // not claim FXAA is off while the frame is being anti-aliased.
-        scope.create_function(|_, ()| Ok(with_cam(scene, |c| c.fxaa_active).unwrap_or(true))),
     )
 }

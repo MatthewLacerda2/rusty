@@ -1,10 +1,15 @@
-//! The volume's lighting settings' ops (#435, #436): the sun's shadow cascades and
-//! reach, and screen-space ambient occlusion. No post effects, so no knobs: their
-//! rows sit beside the effects' in [`super::FIELDS`].
+//! The volume's own settings' ops: its master switch, the sun's shadow cascades and
+//! reach (#435) and screen-space ambient occlusion (#436). No post effects, so no
+//! knobs: their rows sit before the effects' in [`super::FIELDS`].
 
 use crate::components::{PostProcessingComponent, ShadowSettings, SsaoSettings};
 use crate::scene::authoring::fields::table::{op, with, Field};
 use crate::scene::authoring::sanitize::{at_least, clamped};
+
+/// Set the master post-processing `active` flag.
+pub fn set_active(vc: &mut PostProcessingComponent, active: bool) {
+    vc.active = active;
+}
 
 /// Set how many shadow cascades split the view, clamped to `1..=4`.
 pub fn set_shadow_cascades(vc: &mut PostProcessingComponent, count: u32) {
@@ -34,7 +39,7 @@ pub fn set_ssao_intensity(vc: &mut PostProcessingComponent, intensity: f32) {
 /// The field-table rows of the volume's own settings: its switch, its shadows and
 /// its ambient occlusion.
 pub const FIELDS: [Field<PostProcessingComponent>; 3] = [
-    op!("active", super::set_active),
+    op!("active", set_active),
     with!("shadows", |c, v: ShadowSettings| {
         set_shadow_cascades(c, v.cascades);
         set_shadow_distance(c, v.distance);

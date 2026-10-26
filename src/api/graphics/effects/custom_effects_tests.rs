@@ -44,7 +44,7 @@ fn run(scene: &RefCell<Scene>, script: &str) -> Result<(), String> {
     let (lua, graphics) = (Lua::new(), RefCell::new(QualityPreset::High.into()));
     let app = RefCell::default();
     lua.scope(|s| {
-        super::super::register(&lua, s, scene, &graphics, &app).unwrap();
+        crate::api::graphics::register(&lua, s, scene, &graphics, &app).unwrap();
         lua.load(script).exec()
     })
     .map_err(|e| e.to_string())

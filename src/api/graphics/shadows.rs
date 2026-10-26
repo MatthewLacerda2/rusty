@@ -22,7 +22,7 @@ pub(super) fn register_shadows<'scope>(
         table,
         "SetShadowCascades",
         scope.create_function(|_, count: u32| {
-            with_vc_mut(scene, |e| vc_ops::lighting::set_shadow_cascades(e, count));
+            with_vc_mut(scene, |e| vc_ops::volume::set_shadow_cascades(e, count));
             Ok(())
         }),
     )?;
@@ -37,9 +37,7 @@ pub(super) fn register_shadows<'scope>(
         table,
         "SetShadowDistance",
         scope.create_function(|_, distance: f32| {
-            with_vc_mut(scene, |e| {
-                vc_ops::lighting::set_shadow_distance(e, distance)
-            });
+            with_vc_mut(scene, |e| vc_ops::volume::set_shadow_distance(e, distance));
             Ok(())
         }),
     )?;

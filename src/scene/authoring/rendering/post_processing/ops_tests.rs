@@ -35,11 +35,11 @@ fn ops_write_through_with_clamps() {
     grading::tonemapping::set_mode(&mut e, Tonemap::Reinhard);
     ssr::set_quality(&mut e, "High".to_string());
     ssr::set_temporal_upsampling(&mut e, true);
-    lighting::set_shadow_cascades(&mut e, 9);
-    lighting::set_shadow_distance(&mut e, -4.0);
-    lighting::set_ssao_active(&mut e, false);
-    lighting::set_ssao_radius(&mut e, -1.0);
-    lighting::set_ssao_intensity(&mut e, 9.0);
+    volume::set_shadow_cascades(&mut e, 9);
+    volume::set_shadow_distance(&mut e, -4.0);
+    volume::set_ssao_active(&mut e, false);
+    volume::set_ssao_radius(&mut e, -1.0);
+    volume::set_ssao_intensity(&mut e, 9.0);
     grading::white_balance::set(&mut e, 250.0, f32::NAN);
     grading::lift_gamma_gain::set_wheel(&mut e, Wheel::Gain, [2.0, 0.5, -1.0], -3.0);
     grading::color_adjustments::set_hue_shift(&mut e, 400.0);

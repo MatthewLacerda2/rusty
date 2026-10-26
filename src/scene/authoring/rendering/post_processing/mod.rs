@@ -1,6 +1,6 @@
 //! src/scene/authoring/rendering/post_processing/ — the post-processing volume's
 //! ops, one module per post effect (#1467; the grading and lens effects in their
-//! own folders) plus the volume's lighting settings (`lighting`).
+//! own folders) plus the volume's own settings (`volume`).
 //!
 //! The ONE place the engine knows how to mutate a `PostProcessingComponent` field by
 //! field, with the validation each write owns. The editor's Post Processing card,
@@ -27,8 +27,8 @@ pub mod exposure;
 pub mod grading;
 mod knob;
 pub mod lens;
-pub mod lighting;
 pub mod ssr;
+pub mod volume;
 
 pub use knob::{Effect, Knob};
 
@@ -55,15 +55,15 @@ pub const EFFECTS: &[Effect] = &[
 ];
 
 /// How many rows the volume's field table has.
-const ROWS: usize = lighting::FIELDS.len() + EFFECTS.len();
+const ROWS: usize = volume::FIELDS.len() + EFFECTS.len();
 
 /// The volume's field table (`scene::authoring::fields`): its own settings, then
 /// every effect's row, in [`EFFECTS`]' order.
 pub const FIELDS: [Field<PostProcessingComponent>; ROWS] = {
-    let mut rows = [lighting::FIELDS[0]; ROWS];
+    let mut rows = [volume::FIELDS[0]; ROWS];
     let mut i = 0;
-    while i < lighting::FIELDS.len() {
-        rows[i] = lighting::FIELDS[i];
+    while i < volume::FIELDS.len() {
+        rows[i] = volume::FIELDS[i];
         i += 1;
     }
     let mut e = 0;
@@ -84,11 +84,6 @@ pub fn effect(name: &str) -> Option<&'static Effect> {
 pub fn knob(path: &str) -> Option<&'static Knob> {
     let (name, field) = path.split_once('.')?;
     effect(name)?.knob(field)
-}
-
-/// Set the master post-processing `active` flag.
-pub fn set_active(vc: &mut PostProcessingComponent, active: bool) {
-    vc.active = active;
 }
 
 #[cfg(test)]

@@ -1,19 +1,19 @@
 //! `Graphics.{Get,Set}DepthOfFieldMode` and one `{Get,Set}DepthOfField<knob>` pair
 //! per numeric knob (#1445), on the active post-processing volume, through the same
 //! `authoring::rendering::post_processing` ops the Inspector card calls. The knobs
-//! come from `DOF_KNOBS`, the table the tween paths read too.
+//! come from its knob table, the one the tween paths read too.
 
 use std::cell::RefCell;
 
-use super::super::{put, Reg};
-use super::state::{with_vc, with_vc_mut};
+use super::super::super::{put, Reg};
+use super::super::state::{with_vc, with_vc_mut};
 use crate::components::DofMode;
 use crate::scene::authoring::rendering::post_processing as vc_ops;
 use crate::scene::Scene;
 
 /// The mode and every knob. Without an active volume the getters report what a new
 /// volume starts with.
-pub(super) fn register_depth_of_field<'scope>(
+pub(super) fn register<'scope>(
     scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,

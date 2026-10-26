@@ -19,7 +19,7 @@ agent can read exactly what failed.
 | Dependency locks | cargo-deny (`deny.toml`) | **hard gate**: every git dependency is pinned by `rev` (`required-git-spec`); `nalgebra` only through the physics stack and no `cgmath` — glam is the one math crate (#975) |
 | Directory size | `tools/lint -- --rules` (`dir-size`) | **hard gate**: no directory under `src/` holds more than 12 source files directly in it (tests and its `mod.rs` aside); cluster by responsibility into subfolders, or a flat registry of one file per public unit says so with an inline `// lint: allow(dir-size) <why>` in its `mod.rs` (`src/api/`). The ≲10 aim prints as a signal (#1367) |
 | Docs name what exists | `make docrefs` (`.github/scripts/docrefs.py`) | **hard gate**: every `src/`, `tests/`, `tools/`, `docs/` or `.github/` path in a tracked `*.md`'s inline code is tracked, every `` `make <verb>` `` is a target, and CLAUDE.md's namespaces each have a `docs/api/` page; placeholders pass, anything else takes `<!-- docrefs: allow <why> -->`. Runs on Markdown-only PRs too (#973) |
-| Editor↔API parity per op | `tools/lint -- --rules` (`api-parity`) | **hard gate**: every `scene::authoring::<module>::set_*` op a non-test line of `src/editor/` names is also named from `src/api/` — a named setter's call or an `op!`/`with!`/`group!` row of `api::component`'s tables — so anything the inspector writes, Lua can; an editor-only op takes `// lint: allow(api-parity) <why>` at its `fn`, and an allow on an op Lua reaches or no inspector names is stale and fails (#1368) |
+| Editor↔API parity per op | `tools/lint -- --rules` (`api-parity`) | **hard gate**: every `scene::authoring::<module>::set_*` op a non-test line of `src/editor/` names is also named from `src/api/` — a named setter's call or an `op!`/`with!`/`group!` row of `api::component`'s tables, or a post effect's own row or knob table (#1467) — so anything the inspector writes, Lua can; an editor-only op takes `// lint: allow(api-parity) <why>` at its `fn`, and an allow on an op Lua reaches or no inspector names is stale and fails (#1368) |
 | Editor↔shared-op parity | `tools/lint -- --parity` | every first-class component's inspector card routes its mutations through a shared `scene::authoring` op (never direct field writes through the #344 accessor guard) |
 | Entity ids from Lua | `tools/lint -- --rules` (`entity-arg`) | **hard gate**: in `src/api/`, a Lua callback never takes an entity (`id`, `…_id`, `parent`, `child`, `target`, `entity`, `body`, `canvas`) as a bare `u32` or `Option<u32>`: it takes `api::entity_arg::EntityArg`, so a `nil` id reads as a missing entity and fails a write with the verb's name (#1383) |
 | File length | `tools/lint` | <= 300 lines: every line of a `.rs` file, the lines of code of a `.py`, `.lua` or `.wgsl` one (docstrings, comments and blank lines free, #926, #1015); nothing grandfathered |
@@ -210,7 +210,11 @@ new flag, gate, CI step or baseline.
   op: every `authoring::<module>::set_*` op a non-test line of `src/editor/` names
   must be named from `src/api/` too, by a named setter (`Physics.SetMass`) or by
   `api::component`'s field tables (`op!("mass", rb::set_mass)`, which `Component.Set`
-  dispatches through), so editor and Lua share one validation. Ops are matched by
+  dispatches through), so editor and Lua share one validation. A post effect's
+  field-table row and knob table sit beside its ops, in its own module under
+  `scene::authoring::rendering::post_processing` (#1467), so there an op the module
+  calls by its bare name (`set_intensity(c, v.intensity)`) counts as reached too.
+  Ops are matched by
   path: each file's `use crate::scene::authoring::…` trees give its aliases
   (`rigidbody as rb`, `{self as ops, …}`, `nav::{agent, …}`, a setter imported by
   name and called bare), so the finding names `nav::agent::set_speed` however a file

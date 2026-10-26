@@ -5,34 +5,22 @@
 
 use std::cell::RefCell;
 
-use super::super::{put, Reg};
-use super::state::{with_vc, with_vc_mut};
+use super::super::super::{put, Reg};
+use super::super::state::{with_vc, with_vc_mut};
 use crate::components::ExposureMode;
 use crate::scene::authoring::rendering::post_processing as vc_ops;
 use crate::scene::Scene;
 
-/// The exposure and its mode. Without an active volume the getters report what a
-/// new volume starts with. `GetExposure` is the configured EV in both modes, never
+/// The mode, the automatic mode's paired knobs, and the knobs on their own (the
+/// fixed EV and the compensation). Without an active volume the getters report what
+/// a new volume starts with. `GetExposure` is the configured EV in both modes, never
 /// the adapted one: scripts run in the sim, and the adapted EV is a GPU readback
 /// (the dev-only `Debug.GetAdaptedExposure` reads that).
-pub(super) fn register_exposure<'scope>(
+pub(super) fn register<'scope>(
     scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
-    put(
-        table,
-        "SetExposure",
-        scope.create_function(|_, v: f32| {
-            with_vc_mut(scene, |e| vc_ops::exposure::set_fixed_ev(e, v));
-            Ok(())
-        }),
-    )?;
-    put(
-        table,
-        "GetExposure",
-        scope.create_function(|_, ()| Ok(with_vc(scene, |vc| vc.exposure.fixed_ev).unwrap_or(0.0))),
-    )?;
     put(
         table,
         "SetExposureMode",
@@ -51,12 +39,13 @@ pub(super) fn register_exposure<'scope>(
             Ok(mode.name().to_string())
         }),
     )?;
-    register_auto_exposure(scope, table, scene)?;
-    register_adaptation(scope, table, scene)
+    register_limits(scope, table, scene)?;
+    register_adaptation(scope, table, scene)?;
+    super::knobs::register(scope, table, scene, vc_ops::exposure::EFFECT.knobs)
 }
 
-/// The automatic mode's limits and compensation.
-fn register_auto_exposure<'scope>(
+/// The automatic mode's limits.
+fn register_limits<'scope>(
     scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
@@ -77,19 +66,6 @@ fn register_auto_exposure<'scope>(
             let a = auto();
             Ok((a.min_ev, a.max_ev))
         }),
-    )?;
-    put(
-        table,
-        "SetExposureCompensation",
-        scope.create_function(|_, ev: f32| {
-            with_vc_mut(scene, |e| vc_ops::exposure::set_compensation(e, ev));
-            Ok(())
-        }),
-    )?;
-    put(
-        table,
-        "GetExposureCompensation",
-        scope.create_function(move |_, ()| Ok(auto().compensation)),
     )
 }
 

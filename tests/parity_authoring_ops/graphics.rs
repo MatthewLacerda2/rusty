@@ -53,11 +53,11 @@ fn apply_graphics_ops(scene: &Rc<RefCell<Scene>>, id: u32) {
         vc_ops::grading::color_lookup::set_contribution(&mut vc, 7.0); // clamped to 1
         vc_ops::ssr::set_active(&mut vc, true);
         vc_ops::ssr::set_quality(&mut vc, "High".to_string());
-        vc_ops::lighting::set_shadow_cascades(&mut vc, 9); // clamped to 4
-        vc_ops::lighting::set_shadow_distance(&mut vc, 60.0);
-        vc_ops::lighting::set_ssao_radius(&mut vc, -1.0); // clamped to 0.01
-        vc_ops::lighting::set_ssao_intensity(&mut vc, 9.0); // clamped to 4
-        vc_ops::lighting::set_ssao_active(&mut vc, false);
+        vc_ops::volume::set_shadow_cascades(&mut vc, 9); // clamped to 4
+        vc_ops::volume::set_shadow_distance(&mut vc, 60.0);
+        vc_ops::volume::set_ssao_radius(&mut vc, -1.0); // clamped to 0.01
+        vc_ops::volume::set_ssao_intensity(&mut vc, 9.0); // clamped to 4
+        vc_ops::volume::set_ssao_active(&mut vc, false);
         vc_ops::custom_effects::set_names(&mut vc, vec!["crt".into(), "hurt".into()]).unwrap();
     }
     let mut cam = sc.world.camera_mut(id).unwrap();

@@ -35,7 +35,7 @@ pub fn draw_post_processing(
             let mut active = vc.active;
             if ui.checkbox(&mut active, "Enable Post Processing").changed() {
                 if let Some(mut c) = world.post_processing_mut(id) {
-                    vc_ops::set_active(&mut c, active);
+                    vc_ops::volume::set_active(&mut c, active);
                 }
                 *is_dirty = true;
             }
