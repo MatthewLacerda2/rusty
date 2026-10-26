@@ -250,7 +250,9 @@ impl GameWorld {
 
     fn exit_play(&mut self) {
         // Stop is a storage boundary: persist any play-mode writes (PlayerPrefs-style
-        // save data survives even though the scene snapshot is discarded below).
+        // save data survives even though the scene snapshot is discarded below), and
+        // so are the graphics settings an options menu changed during Play.
+        self.resources.store_graphics();
         self.resources.flush_storage();
         self.resources.script_manager.shutdown();
         self.resources.play_frame = 0;

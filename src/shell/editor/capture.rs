@@ -212,8 +212,7 @@ fn draw_ui(
     interaction.size
 }
 
-/// Render the scene into a target the viewport's size and bind it as its egui texture —
-/// `shell::editor`'s `render_viewport_scene`, against the capture host.
+/// `shell::editor`'s `render_viewport_scene` against the capture host: draw, then bind.
 fn render_viewport(
     host: &mut CaptureHost,
     egui_renderer: &mut egui_wgpu::Renderer,
@@ -238,6 +237,7 @@ fn render_viewport(
     view.ui.screen_in_editor = scene_tab && ui.ui_overlay;
     let camera = super::viewport::viewport_camera(ui, game, &scene, ui.viewport_tab);
     renderer.set_ui_textures(Rc::clone(&ui.ui_textures));
+    renderer.apply_graphics(*game.script_manager().graphics_cell().borrow());
     renderer.render(view, &scene, &camera, &target, scene_tab);
     super::viewport::rebind_egui_texture(egui_renderer, &renderer.device, texture_id, view);
 }

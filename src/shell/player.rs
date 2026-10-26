@@ -32,10 +32,8 @@ impl Frontend for PlayerFrontend {
         target: &wgpu::TextureView,
     ) {
         // `Graphics.SetQuality` / `SetOption` reach the renderer here — there is no
-        // editor dropdown to reconcile with (`set_quality` guards the bloom realloc).
-        let graphics = *game.script_manager().graphics_cell().borrow();
-        shell.renderer.set_quality(graphics.quality);
-        shell.renderer.graphics_options = graphics.options;
+        // editor dropdown to reconcile with.
+        super::settings::apply_graphics(shell, game);
 
         let device = &shell.renderer.device;
         let (width, height) = (shell.renderer.config.width, shell.renderer.config.height);

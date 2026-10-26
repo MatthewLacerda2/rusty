@@ -57,10 +57,16 @@ fn reset_options_returns_to_the_project_defaults() {
             .load("return Graphics.GetOption('bloom')")
             .eval()
             .unwrap();
-        assert!(live, "a default is not the player's live choice");
-        lua.load("Graphics.SetOption('fxaa', false); Graphics.ResetOptions()")
+        assert!(!live, "an option the player never set follows its default");
+        lua.load("Graphics.SetOption('fxaa', false); Graphics.SetDefaultOption('fxaa', true)")
             .exec()
             .unwrap();
+        let fxaa: bool = lua
+            .load("return Graphics.GetOption('fxaa')")
+            .eval()
+            .unwrap();
+        assert!(!fxaa, "a default never overrides the player's choice");
+        lua.load("Graphics.ResetOptions()").exec().unwrap();
         let mut expected = GraphicsOptions::default();
         expected.set(GraphicsOption::Bloom, false);
         assert_eq!(graphics.borrow().options, expected);

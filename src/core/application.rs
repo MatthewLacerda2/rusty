@@ -35,7 +35,7 @@
 //! ([`Opened::build`](crate::core::project::Opened::build)) into an unbound instance,
 //! so a shipped game can never rewrite its own build settings.
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
@@ -81,14 +81,6 @@ impl Default for BuildSettings {
             product_name: DEFAULT_PRODUCT_NAME.to_string(),
             window_mode: WindowMode::default(),
         }
-    }
-}
-
-impl BuildSettings {
-    /// Read the settings from the project file at `path`. A missing file yields the
-    /// defaults; an unreadable or malformed one is an error.
-    pub fn read(path: &Path) -> Result<Self, String> {
-        Ok(ProjectFile::read(path)?.unwrap_or_default().build)
     }
 }
 
@@ -157,9 +149,17 @@ impl Application {
     }
 
     /// Set one default graphics option (`Graphics.SetDefaultOption`, the Build
-    /// Settings window), writing the bound file (if any).
-    pub fn set_default_option(&mut self, option: GraphicsOption, on: bool) -> Result<(), String> {
+    /// Settings window: one op), writing the bound file (if any). The `live`
+    /// options follow it wherever the player hasn't chosen, so the editor previews
+    /// what a fresh install sees.
+    pub fn set_default_option(
+        &mut self,
+        option: GraphicsOption,
+        on: bool,
+        live: &mut GraphicsOptions,
+    ) -> Result<(), String> {
         self.graphics_defaults.set(option, on);
+        live.rebase(self.graphics_defaults);
         self.save()
     }
 

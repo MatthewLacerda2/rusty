@@ -6,13 +6,14 @@
 //!
 //! Below them, the project's default player graphics options (#1438): one checkbox
 //! per option, each written to `project.rusty` the moment it changes through
-//! `Application::set_default_option`, the op `Graphics.SetDefaultOption` calls.
+//! `Application::set_default_option`, the op `Graphics.SetDefaultOption` calls; the
+//! live options follow it where the player hasn't chosen, to preview a fresh install.
 
 use egui_phosphor::regular as icon;
 
 use crate::core::application::{Application, BuildSettings, WindowMode};
 use crate::core::project::PROJECT_FILE;
-use crate::core::settings::graphics_options::GraphicsOption;
+use crate::core::settings::graphics_options::{GraphicsOption, GraphicsOptions};
 use crate::editor::EditorUi;
 use crate::scripting::ConsoleLogs;
 
@@ -22,6 +23,7 @@ pub fn draw(
     editor: &mut EditorUi,
     ctx: &egui::Context,
     app: &mut Application,
+    live: &mut GraphicsOptions,
     console: &mut ConsoleLogs,
 ) {
     if !editor.show_build_settings {
@@ -43,7 +45,7 @@ pub fn draw(
             ui.separator();
             save = ui.button(format!("{}  Save", icon::FLOPPY_DISK)).clicked();
             ui.separator();
-            graphics_defaults(ui, app, console);
+            graphics_defaults(ui, app, live, console);
         });
     if save {
         match app.set_build(draft.clone()) {
@@ -86,14 +88,20 @@ fn fields(ui: &mut egui::Ui, draft: &mut BuildSettings, current_scene: Option<&s
 }
 
 /// The project's default player graphics options: what a fresh install's options
-/// menu starts with. Each change is written at once (no draft), like the API's.
-fn graphics_defaults(ui: &mut egui::Ui, app: &mut Application, console: &mut ConsoleLogs) {
+/// menu starts with. Each change is written at once (no draft), like the API's, and
+/// reaches the `live` options wherever the player hasn't set them.
+fn graphics_defaults(
+    ui: &mut egui::Ui,
+    app: &mut Application,
+    live: &mut GraphicsOptions,
+    console: &mut ConsoleLogs,
+) {
     ui.label("Player graphics defaults");
     let defaults = app.graphics_defaults();
     for option in GraphicsOption::ALL {
         let mut on = defaults.allows(option);
         if ui.checkbox(&mut on, option.name()).changed() {
-            if let Err(err) = app.set_default_option(option, on) {
+            if let Err(err) = app.set_default_option(option, on, live) {
                 console.error(err);
             }
         }

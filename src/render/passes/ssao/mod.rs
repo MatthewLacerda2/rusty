@@ -78,10 +78,14 @@ impl SsaoPlan {
         volume: Option<&PostProcessingComponent>,
         graphics: GraphicsSettings,
     ) -> Option<Self> {
-        let tier = graphics.quality.ssao()?;
         let settings = volume?.ssao;
         let on = settings.active && settings.intensity > 0.0;
-        effect_runs(graphics, GraphicsOption::Ssao, on).then_some(Self { settings, tier })
+        if !effect_runs(graphics, GraphicsOption::Ssao, on) {
+            return None;
+        }
+        // `effect_runs` decided the tier runs AO; the tier only supplies its cost.
+        let tier = graphics.quality.ssao()?;
+        Some(Self { settings, tier })
     }
 }
 

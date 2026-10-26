@@ -15,11 +15,23 @@ impl Renderer {
         self.quality = preset;
     }
 
-    /// The tier and the player's options together: what gates each view's post-FX.
-    pub(crate) fn graphics(&self) -> GraphicsSettings {
+    /// Adopt the tier and the player's options the shared cell carries (#1438).
+    pub fn apply_graphics(&mut self, graphics: GraphicsSettings) {
+        self.set_quality(graphics.quality);
+        self.graphics_options = graphics.options;
+    }
+
+    /// What gates a view's post-FX: the tier, and the player's options except in
+    /// the editor's Scene view (`editor_mode`), which ignores them as Unity's Scene
+    /// view ignores PlayerPrefs. The Game view and the player honour all three.
+    pub(crate) fn graphics(&self, editor_mode: bool) -> GraphicsSettings {
+        let options = match editor_mode {
+            true => Default::default(),
+            false => self.graphics_options,
+        };
         GraphicsSettings {
             quality: self.quality,
-            options: self.graphics_options,
+            options,
         }
     }
 

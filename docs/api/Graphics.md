@@ -234,16 +234,24 @@ An option can only turn an effect off; it never turns on what a camera left off.
 
 Names are snake_case; an unknown name raises an error listing the valid ones.
 `SetOption` takes effect next frame and is **persisted** through `Storage`
-(`graphics.options`, beside `graphics.quality`) at the Stop / quit boundary, so the
-choice sticks across relaunches.
+(`graphics.options`, beside `graphics.quality`) at the Stop and quit boundaries, so
+the choice sticks across relaunches. Only the options the player set are saved
+(Unity's PlayerPrefs), so the rest keep following the project defaults, even a
+default a later version of the game changes.
+
+The editor's **Scene view** ignores the player options, as Unity's Scene view ignores
+PlayerPrefs: it gates on the camera and the tier only. The Game view, the player and
+every headless capture (a `play` scenario's screenshot, an MCP capture) honour all
+three, so a shot shows what `GetOption` says.
 
 **Project defaults.** What a fresh install starts with is the game's, set once for
 the whole project: `SetDefaultOption`, or the checkboxes under **File → Build
 Settings → Player graphics defaults**, which write the same value into
 `project.rusty` (`"graphics_options"`; see [`Application.md`](Application.md)). At
 startup the saved player options are read over these defaults, so an option the
-player never touched follows the project. `ResetOptions` is the menu's "Restore
-defaults". A game that doesn't want players choosing simply leaves the switch out
+player never touched follows the project, and changing a default applies at once to
+every option the player hasn't set (in the editor, a preview of a fresh install).
+`ResetOptions` is the menu's "Restore defaults": it forgets the player's choices. A game that doesn't want players choosing simply leaves the switch out
 of its menu: every option defaults to allowed.
 
 ```lua
@@ -264,5 +272,6 @@ sim evolves, and a headless replay stays bit-for-bit stable regardless of them.
 
 The quality preset and the `Video` settings below are **persisted** through
 `Storage` (the `graphics.quality` key and the `video` namespace): the windowed app
-reads them at startup and writes them back at the Stop / quit boundary, so the app
-relaunches at the last-chosen tier and video settings.
+reads them at startup and writes them back, the tier at the Stop and quit
+boundaries and the video settings at quit, so the app relaunches at the
+last-chosen tier and video settings.

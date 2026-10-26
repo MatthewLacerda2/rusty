@@ -41,7 +41,8 @@ same editor/player split applies: `Graphics.SetDefaultOption` and the Build
 Settings window's **Player graphics defaults** checkboxes write the file in the
 editor, and only the running value elsewhere. A player's saved choice
 (`Graphics.SetOption`) wins over them; see [`Graphics.md`](Graphics.md), *Player
-options*.
+options*. An unknown option name or a non-`bool` value is ignored with a warning in
+the console, since the file is the developer's to fix.
 
 **Determinism.** `Quit` is a one-way request read by the platform layer after the
 tick; the build settings are read at boot. Neither is read by `FixedUpdate`.

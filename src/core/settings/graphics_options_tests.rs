@@ -23,8 +23,8 @@ fn every_option_defaults_to_allowed() {
 fn options_round_trip_through_storage_on_disk() {
     let path = temp_path("round_trip");
     let mut options = GraphicsOptions::default();
-    options.set(GraphicsOption::MotionBlur, false);
-    options.set(GraphicsOption::Ssao, false);
+    options.choose(GraphicsOption::MotionBlur, false);
+    options.choose(GraphicsOption::Ssao, false);
 
     let mut storage = Storage::new();
     storage.open(&path).unwrap();
@@ -38,6 +38,39 @@ fn options_round_trip_through_storage_on_disk() {
         options
     );
     let _ = std::fs::remove_file(&path);
+}
+
+/// Only what the player set is saved (Unity's PlayerPrefs), so a project default
+/// changed after the first launch still reaches every option they never touched.
+#[test]
+fn a_changed_project_default_reaches_what_the_player_never_set() {
+    let mut options = GraphicsOptions::default();
+    options.choose(GraphicsOption::Fxaa, false);
+    let mut storage = Storage::new();
+    options.store(&mut storage);
+    let saved = storage.get(GRAPHICS_NAMESPACE, OPTIONS_KEY).unwrap();
+    assert_eq!(saved, json!({ "fxaa": false }), "only the choice is saved");
+
+    let mut project = GraphicsOptions::default();
+    project.set(GraphicsOption::MotionBlur, false);
+    project.set(GraphicsOption::Fxaa, true);
+    let read = GraphicsOptions::load(&storage, project);
+    assert!(
+        !read.allows(GraphicsOption::MotionBlur),
+        "new default applies"
+    );
+    assert!(
+        !read.allows(GraphicsOption::Fxaa),
+        "the player's choice wins"
+    );
+
+    let mut reset = read;
+    reset.reset(project);
+    reset.store(&mut storage);
+    assert_eq!(
+        storage.get(GRAPHICS_NAMESPACE, OPTIONS_KEY),
+        Some(json!({}))
+    );
 }
 
 #[test]
@@ -93,4 +126,19 @@ fn the_tier_allows_what_its_passes_run() {
     for tier in QualityPreset::ALL {
         assert!(tier.allows(Fxaa) && tier.allows(Bloom), "{tier}");
     }
+}
+
+/// `project.rusty` reports what it ignores (logged as a warning); a save does not.
+#[test]
+fn the_project_spelling_names_each_entry_it_ignores() {
+    let blob = json!({ "bloom": false, "warp_drive": false, "ssr": "no" });
+    let (read, ignored) = GraphicsOptions::read_json(&blob, GraphicsOptions::default(), false);
+    assert!(!read.allows(GraphicsOption::Bloom));
+    assert_eq!(ignored.len(), 2, "{ignored:?}");
+    assert!(ignored
+        .iter()
+        .any(|l| l.contains("unknown option 'warp_drive'")));
+    assert!(ignored
+        .iter()
+        .any(|l| l.contains("'ssr' is \"no\", not a bool")));
 }

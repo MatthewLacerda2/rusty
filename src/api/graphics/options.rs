@@ -2,10 +2,12 @@
 //!
 //! `Get/SetOption` read and write the player's live choice in the shared graphics
 //! cell, which the renderer reads next frame and the shell persists to `Storage`
-//! (`graphics.options`) at quit; `ResetOptions` puts back the project's defaults.
+//! (`graphics.options`, only what the player set) at Stop and quit; `ResetOptions`
+//! puts back the project's defaults and forgets the choices.
 //! `Get/SetDefaultOption` are those defaults, on the `Application` resource: in the
 //! editor a setter writes `project.rusty`, as the Build Settings window does; in the
-//! player and the harness the value changes in memory only. Render-only either way.
+//! player and the harness the value changes in memory only. Either way, every
+//! option the player hasn't set follows the new default. Render-only.
 
 use std::cell::RefCell;
 
@@ -45,7 +47,7 @@ pub(super) fn register_options<'scope>(
         "SetOption",
         scope.create_function(|_, (name, on): (String, bool)| {
             let option = option("SetOption", &name)?;
-            graphics.borrow_mut().options.set(option, on);
+            graphics.borrow_mut().options.choose(option, on);
             Ok(())
         }),
     )?;
@@ -53,7 +55,8 @@ pub(super) fn register_options<'scope>(
         table,
         "ResetOptions",
         scope.create_function(|_, ()| {
-            graphics.borrow_mut().options = app.borrow().graphics_defaults();
+            let defaults = app.borrow().graphics_defaults();
+            graphics.borrow_mut().options.reset(defaults);
             Ok(())
         }),
     )?;
@@ -75,8 +78,9 @@ pub(super) fn register_options<'scope>(
         "SetDefaultOption",
         scope.create_function(|_, (name, on): (String, bool)| {
             let option = option("SetDefaultOption", &name)?;
+            let live = &mut graphics.borrow_mut().options;
             app.borrow_mut()
-                .set_default_option(option, on)
+                .set_default_option(option, on, live)
                 .map_err(mlua::Error::RuntimeError)
         }),
     )

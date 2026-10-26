@@ -132,6 +132,7 @@ impl EditorFrontend {
             &mut self.editor_ui,
             &self.egui_ctx,
             &mut game.resources.application.borrow_mut(),
+            &mut game.script_manager().graphics_cell().borrow_mut().options,
             &mut game.resources.console.borrow_mut(),
         );
         if self.editor_ui.is_dirty {
@@ -145,8 +146,8 @@ impl EditorFrontend {
 
     /// The editor dropdown and `Graphics.SetQuality` (script) feed one shared cell:
     /// reflect a script-driven change back into the dropdown, push the editor's choice
-    /// into the cell, then hand the result to the renderer (`set_quality` guards the
-    /// bloom realloc), with the player's graphics options beside it (#1438).
+    /// into the cell, then hand the cell to the renderer (`settings::apply_graphics`),
+    /// with the player's graphics options beside the tier (#1438).
     fn sync_quality(&mut self, shell: &mut Shell, game: &GameWorld) {
         let cell = game.script_manager().graphics_cell();
         let scripted = cell.borrow().quality;
@@ -156,8 +157,7 @@ impl EditorFrontend {
             self.editor_ui.quality_preset = scripted;
         }
         cell.borrow_mut().quality = self.editor_ui.quality_preset;
-        shell.renderer.set_quality(self.editor_ui.quality_preset);
-        shell.renderer.graphics_options = cell.borrow().options;
+        super::settings::apply_graphics(shell, game);
     }
 
     /// Apply a speaker mode picked in Config, then mirror the maestro's mode (which
