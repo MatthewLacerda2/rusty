@@ -3,7 +3,7 @@
 //! The ONE place the engine knows how to mutate an entity's first-class
 //! `PostProcessingComponent` field by field: the master `active` flag, bloom
 //! (active / intensity / threshold), color grading (exposure / contrast / saturation
-//! / gamma / tonemap), SSR (active / quality / temporal upsampling), shadows and SSAO
+//! / gamma / tonemap, and #1440's white balance / Lift Gamma Gain / hue shift), SSR (active / quality / temporal upsampling), shadows and SSAO
 //! (active / radius / intensity, #436), the authored post-FX list (#397) and its
 //! runtime params (#671), including the
 //! validation each write owns (the `≥ 0` clamps on bloom intensity/threshold, the
@@ -16,9 +16,11 @@
 //!
 //! Pure.
 
-use crate::components::{PostProcessingComponent, ShadowSettings, SsaoSettings, Tonemap};
+use crate::components::{
+    PostProcessingComponent, ShadowSettings, SsaoSettings, Tonemap, Wheel, WhiteBalance,
+};
 use crate::scene::authoring::sanitize::{
-    at_least, clamped, finite_or, finite_values, non_negative,
+    at_least, clamped, finite_array_or, finite_or, finite_values, non_negative,
 };
 use crate::shadergen::post_params::PostChain;
 
@@ -61,6 +63,30 @@ pub fn set_saturation(vc: &mut PostProcessingComponent, value: f32) {
 /// divide-by-zero in the shader's `c^(1/gamma)`).
 pub fn set_gamma(vc: &mut PostProcessingComponent, value: f32) {
     vc.gamma = at_least(value, 0.01);
+}
+
+/// Set the white balance (#1440): `temperature` and `tint`, each clamped to
+/// `-100..=100`.
+pub fn set_white_balance(vc: &mut PostProcessingComponent, temperature: f32, tint: f32) {
+    let r = WhiteBalance::RANGE;
+    vc.white_balance = WhiteBalance {
+        temperature: clamped(temperature, -r, r),
+        tint: clamped(tint, -r, r),
+    };
+}
+
+/// Set one Lift / Gamma / Gain wheel (#1440): its colour, each channel clamped to
+/// `0..=1` (a colour with a NaN or infinite channel keeps the current one), and its
+/// offset, clamped to `-1..=1`.
+pub fn set_wheel(vc: &mut PostProcessingComponent, which: Wheel, color: [f32; 3], offset: f32) {
+    let wheel = vc.lift_gamma_gain.wheel_mut(which);
+    wheel.color = finite_array_or(color, wheel.color).map(|c| c.clamp(0.0, 1.0));
+    wheel.offset = clamped(offset, -1.0, 1.0);
+}
+
+/// Set the hue shift in degrees (#1440), clamped to `-180..=180`.
+pub fn set_hue_shift(vc: &mut PostProcessingComponent, degrees: f32) {
+    vc.hue_shift = clamped(degrees, -180.0, 180.0);
 }
 
 /// Set the tonemap operator (typed — string parsing stays in the API adapter).
@@ -207,6 +233,9 @@ mod tests {
         set_ssao_active(&mut e, false);
         set_ssao_radius(&mut e, -1.0);
         set_ssao_intensity(&mut e, 9.0);
+        set_white_balance(&mut e, 250.0, f32::NAN);
+        set_wheel(&mut e, Wheel::Gain, [2.0, 0.5, -1.0], -3.0);
+        set_hue_shift(&mut e, 400.0);
         let vc = &*e;
         assert_eq!(vc.bloom_intensity, 0.0);
         assert_eq!(vc.bloom_threshold, 0.0);
@@ -222,6 +251,15 @@ mod tests {
         assert!(!vc.ssao.active);
         assert_eq!(vc.ssao.radius, 0.01, "radius clamps to its floor");
         assert_eq!(vc.ssao.intensity, 4.0, "intensity clamps to its ceiling");
+        let wb = vc.white_balance;
+        assert_eq!(
+            (wb.temperature, wb.tint),
+            (100.0, 0.0),
+            "NaN tint is neutral"
+        );
+        let gain = vc.lift_gamma_gain.gain;
+        assert_eq!((gain.color, gain.offset), ([1.0, 0.5, 0.0], -1.0));
+        assert_eq!(vc.hue_shift, 180.0);
     }
 
     #[test]

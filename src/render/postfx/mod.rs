@@ -11,6 +11,7 @@
 //! ~30fps (Low: no SSR/motion-blur, half-size bloom).
 
 mod custom;
+pub(crate) mod grade;
 mod inputs;
 pub(crate) mod params;
 mod run;
@@ -24,7 +25,8 @@ use glam::Mat4;
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct PostParams {
-    /// exposure (EV), contrast, saturation, gamma
+    /// exposure (EV), contrast, saturation, gamma. The composite reads only the
+    /// exposure: the rest reach it baked into the grading LUT (#1440).
     pub color: [f32; 4],
     /// bloom_intensity, bloom_threshold, tonemap index, bloom_enabled
     pub bloom: [f32; 4],
@@ -77,6 +79,8 @@ pub struct PostFx {
     /// Plain copy, landing the authored-effect chain's result in the output when
     /// FXAA is off (#397).
     pub copy_pipeline: wgpu::RenderPipeline,
+    /// The grade + tonemap, baked into a 3D LUT the composite samples (#1440).
+    pub grade: grade::GradeLut,
     /// Authored post-FX effects (#397): their module cache, second LDR target and
     /// previous-frame history.
     pub custom: custom::CustomChain,

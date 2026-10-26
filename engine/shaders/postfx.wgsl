@@ -3,16 +3,18 @@
 // Four entry points share one fullscreen-triangle vertex stage:
 //   fs_bright    — bright-pass threshold (bloom prefilter)
 //   fs_blur      — separable gaussian blur (direction from uniform)
-//   fs_composite — bloom add + SSR + motion blur + color correction + tonemap
+//   fs_composite — bloom add + SSR + motion blur + exposure, then the grading LUT
 //   fs_fxaa      — luma-based edge anti-aliasing; the last pass of all (#360)
 //
-// The composite is the one place the UI knobs (exposure/contrast/saturation/
-// bloom/motion-blur/SSR) finally take effect.
+// The composite is the one place the UI knobs (exposure, bloom, motion blur, SSR)
+// finally take effect; the grade and the tonemap reach it baked into the grading
+// LUT (`postfx/grade.wgsl`, #1440).
 
 // `PostParams` lives in `common.wgsl` so authored postfx effects (#397) can bind it
 // too (binding 0) — they read the game time from it (#398).
 #import common::{PostParams, equirect_uv}
 #import fullscreen
+#import postfx::grade::{luminance, lut_coord}
 
 @group(0) @binding(0) var<uniform> params: PostParams;
 @group(0) @binding(1) var t_color: texture_2d<f32>;
@@ -23,6 +25,8 @@
 // The panorama's own sampler (wrapping), not `s_color`'s clamp: the SSR fallback's
 // seam at φ = ±π must wrap as the skybox pass's does (#995).
 @group(0) @binding(6) var s_skybox: sampler;
+// The view's grading LUT (#1440): grade + tonemap, indexed by `lut_coord`.
+@group(0) @binding(7) var t_lut: texture_3d<f32>;
 
 struct VsOut {
     @builtin(position) pos: vec4<f32>,
@@ -36,10 +40,6 @@ fn vs_fullscreen(@builtin(vertex_index) vid: u32) -> VsOut {
     out.uv = fullscreen::uv(vid);
     out.pos = fullscreen::triangle_down(vid);
     return out;
-}
-
-fn luminance(c: vec3<f32>) -> f32 {
-    return dot(c, vec3<f32>(0.2126, 0.7152, 0.0722));
 }
 
 // Point-load the depth target at a [0,1] uv (depth textures can't be sampled
@@ -157,20 +157,6 @@ fn motion_blur(uv: vec2<f32>, world_pos: vec3<f32>) -> vec3<f32> {
     return color / max(total, 1.0);
 }
 
-fn aces(x: vec3<f32>) -> vec3<f32> {
-    let a = 2.51; let b = 0.03; let c = 2.43; let d = 0.59; let e = 0.14;
-    return clamp((x * (a * x + b)) / (x * (c * x + d) + e), vec3<f32>(0.0), vec3<f32>(1.0));
-}
-
-fn tonemap(c: vec3<f32>, mode: u32) -> vec3<f32> {
-    if (mode == 1u) {
-        return c / (c + vec3<f32>(1.0));
-    } else if (mode == 2u) {
-        return aces(c);
-    }
-    return clamp(c, vec3<f32>(0.0), vec3<f32>(1.0));
-}
-
 @fragment
 fn fs_composite(in: VsOut) -> @location(0) vec4<f32> {
     var hdr: vec3<f32>;
@@ -199,24 +185,11 @@ fn fs_composite(in: VsOut) -> @location(0) vec4<f32> {
         hdr += textureSample(t_bloom, s_color, in.uv).rgb * params.bloom.x;
     }
 
-    // 4. Exposure.
+    // 4. Exposure, the one colour knob outside the LUT: a pre-grade HDR scale.
     hdr *= exp2(params.color.x);
 
-    // 5. Tonemap (HDR -> LDR).
-    hdr = tonemap(hdr, u32(params.bloom.z));
-
-    // 6. Contrast (around 0.5 midpoint).
-    hdr = (hdr - vec3<f32>(0.5)) * params.color.y + vec3<f32>(0.5);
-
-    // 7. Saturation.
-    let l = luminance(hdr);
-    hdr = mix(vec3<f32>(l), hdr, params.color.z);
-
-    // 8. Display-gamma tweak (neutral 1.0). NOT the output encode: every target
-    //    this pass writes is sRGB, and the hardware does linear -> sRGB on write
-    //    (#415). Encoding here too would double it.
-    hdr = clamp(hdr, vec3<f32>(0.0), vec3<f32>(1.0));
-    hdr = pow(hdr, vec3<f32>(1.0 / max(params.color.w, 0.01)));
+    // 5. Grade + tonemap (HDR -> display): one trilinear fetch of the LUT.
+    hdr = textureSampleLevel(t_lut, s_color, lut_coord(hdr), 0.0).rgb;
 
     return vec4<f32>(hdr, 1.0);
 }
