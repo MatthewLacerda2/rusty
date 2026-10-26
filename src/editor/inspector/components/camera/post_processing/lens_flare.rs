@@ -32,7 +32,29 @@ fn draw(
     if !on {
         return;
     }
+    ghost_count(ui, (&mut *world, id), vc, is_dirty);
     let knobs = lens_flare::EFFECT.knobs;
+    let rows = [
+        ("    Intensity:", "intensity", 5.0),
+        ("    Ghost Intensity:", "ghost_intensity", 5.0),
+        ("    Halo Intensity:", "halo_intensity", 5.0),
+        ("    Streak Intensity:", "streak_intensity", 5.0),
+        ("    Chromatic Aberration:", "chromatic_aberration", 1.0),
+    ];
+    for (label, field, max) in rows {
+        let row = (label, knob(knobs, field));
+        *is_dirty |= knob_row(ui, (&mut *world, id), row, vc, 0.0..=max);
+    }
+    tint(ui, (world, id), vc, is_dirty);
+}
+
+/// The ghost count's slider, a whole number.
+fn ghost_count(
+    ui: &mut egui::Ui,
+    (world, id): (&mut crate::ecs::World, u32),
+    vc: &PostProcessingComponent,
+    is_dirty: &mut bool,
+) {
     let mut count = vc.lens_flare.ghost_count;
     let changed = ui
         .horizontal(|ui| {
@@ -48,17 +70,15 @@ fn draw(
         }
         *is_dirty = true;
     }
-    let rows = [
-        ("    Intensity:", "intensity", 5.0),
-        ("    Ghost Intensity:", "ghost_intensity", 5.0),
-        ("    Halo Intensity:", "halo_intensity", 5.0),
-        ("    Streak Intensity:", "streak_intensity", 5.0),
-        ("    Chromatic Aberration:", "chromatic_aberration", 1.0),
-    ];
-    for (label, field, max) in rows {
-        let row = (label, knob(knobs, field));
-        *is_dirty |= knob_row(ui, (&mut *world, id), row, vc, 0.0..=max);
-    }
+}
+
+/// The tint's colour button.
+fn tint(
+    ui: &mut egui::Ui,
+    (world, id): (&mut crate::ecs::World, u32),
+    vc: &PostProcessingComponent,
+    is_dirty: &mut bool,
+) {
     let mut tint = vc.lens_flare.tint;
     let changed = ui
         .horizontal(|ui| {

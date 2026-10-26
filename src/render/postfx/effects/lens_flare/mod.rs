@@ -43,10 +43,12 @@ pub(crate) fn flare_params(cx: &EffectCx, texel: [f32; 2], aspect: f32) -> Optio
     let vc = cx.volume()?;
     let (b, f) = (&vc.bloom, &vc.lens_flare);
     let blooms = cx.runs(bloom::EFFECT.gate, b.active);
-    if !blooms || !cx.runs(EFFECT.gate, f.active) || !(f.intensity > 0.0) {
+    // `max` takes a NaN from a hand-edited file to zero, which draws nothing.
+    let intensity = f.intensity.max(0.0);
+    if !blooms || !cx.runs(EFFECT.gate, f.active) || intensity == 0.0 {
         return None;
     }
-    let [r, g, bl] = f.tint.map(|c| c.clamp(0.0, 1.0) * f.intensity);
+    let [r, g, bl] = f.tint.map(|c| c.clamp(0.0, 1.0) * intensity);
     let count = f.ghost_count.min(LENS_FLARE_MAX_GHOSTS) as f32;
     let ca = f.chromatic_aberration.clamp(0.0, 1.0);
     let strength = |s: f32| s.max(0.0);
