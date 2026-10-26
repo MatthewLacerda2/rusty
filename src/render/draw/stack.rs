@@ -1,12 +1,13 @@
 //! src/render/draw/stack.rs — one camera stack drawn into one view: each camera runs
 //! the per-camera pass list (`camera::CAMERA_PASSES`, #636), whose last stage
-//! post-processes the composited HDR target once, on the last camera. The screen stack and every render-texture camera (#430)
+//! post-processes the composited HDR target once, on the last camera, with the stack's
+//! base camera's settings (#1434). The screen stack and every render-texture camera (#430)
 //! draw through here, so a picture-in-picture is the same frame as the screen's.
 
 use super::camera::{CameraCtx, StackShared, CAMERA_PASSES};
 use crate::render::gpu::uniforms::FogUniform;
 use crate::render::passes::ssao::SsaoPlan;
-use crate::render::postfx::params::build_post_params;
+use crate::render::postfx::params::{build_post_params, post_passes, PostSource};
 use crate::render::postfx::PostParams;
 use crate::render::{RenderView, Renderer};
 use crate::scene::{Camera, Scene};
@@ -15,10 +16,13 @@ use crate::scene::{Camera, Scene};
 pub(crate) struct StackPass<'a> {
     /// The cameras, bottom to top; the first clears and drives post-FX history.
     pub stack: &'a [Camera],
+    /// The camera and volume settings that drive this view's post-FX and SSAO: the
+    /// stack's base camera's (#1434, Unity URP's rule), borrowed once per view.
+    pub post: PostSource<'a>,
     /// Where post-FX writes the finished image.
     pub output: &'a wgpu::TextureView,
     pub editor_mode: bool,
-    /// Run the scene's grading, bloom, SSR, motion blur and FXAA. Off, the image is
+    /// Run `post`'s grading, bloom, SSR, motion blur and FXAA. Off, the image is
     /// only brought from HDR to display (a render texture's `post_fx = false`).
     pub full_post_fx: bool,
 }
@@ -34,7 +38,7 @@ impl Renderer {
             // The base (first) camera drives the shared post-FX history / motion vectors.
             base_view_proj: pass.stack[0].build_view_projection(aspect),
             fog: FogUniform::from_settings(&scene.fog),
-            ssao: SsaoPlan::for_scene(scene, self.quality),
+            ssao: SsaoPlan::for_volume(pass.post.volume, self.quality),
         };
         for idx in 0..pass.stack.len() {
             let mut ctx = CameraCtx::new(scene, &pass, &shared, idx);
@@ -58,12 +62,13 @@ impl Renderer {
 
         let (mut post_params, bloom_enabled) = build_post_params(
             scene,
+            ctx.stack.post,
             self.quality,
             post.view_proj,
             view.post_fx.prev_view_proj,
             post.camera_pos,
         );
-        let mut passes = crate::render::postfx::params::post_passes(scene, bloom_enabled);
+        let mut passes = post_passes(ctx.stack.post, bloom_enabled);
         if !post.full {
             // Display transform only: the neutral grade, no bloom/SSR/blur/FXAA and
             // no authored effects.
@@ -73,7 +78,7 @@ impl Renderer {
             post_params.flags = neutral.flags;
             post_params.misc[3] = neutral.misc[3];
             (passes.bloom, passes.fxaa) = (false, false);
-            passes.custom.clear();
+            passes.custom = &[];
         }
         post_params.misc[1] = 1.0 / view.post_fx.bloom_size.0 as f32;
         post_params.misc[2] = 1.0 / view.post_fx.bloom_size.1 as f32;

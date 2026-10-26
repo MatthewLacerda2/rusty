@@ -58,6 +58,10 @@ fn metal_scene(ssr: bool) -> Scene {
         vc.ssr_active = true;
         vc.ssr_quality = "High".to_string();
         scene.world.set_visual_correction(volume, Some(vc));
+        // A volume rides on its camera (#1434): that camera is the view's.
+        scene
+            .world
+            .set_camera(volume, Some(rusty::components::CameraComponent::default()));
     }
     scene
 }

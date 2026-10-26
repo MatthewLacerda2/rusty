@@ -1,25 +1,68 @@
-//! Builds the per-frame `PostParams` from the scene's active
-//! `VisualCorrectionComponent` + `CameraComponent`, gated by the quality preset.
+//! Builds the per-frame `PostParams` from one view's camera (#1434): its
+//! `CameraComponent` and `VisualCorrectionComponent`, gated by the quality preset.
 //!
 //! This is the bridge from the editor's "dead knobs" to the GPU: every field the
 //! inspector exposes ends up packed here and read by `postfx.wgsl`.
+//!
+//! **Whose settings.** A view post-processes with its base camera, the way Unity URP
+//! post-processes a camera stack once, with the base camera's settings: the screen
+//! stack's `scene::camera::main_camera` (also the camera `Graphics.*` edits), or a
+//! render-texture camera's own entity. The stack borrows that camera's components
+//! once, as a [`PostSource`], and every function here reads them through it. A
+//! camera without an active volume is neutral; a view with no camera is too.
 
 use std::collections::BTreeMap;
 
 use glam::Mat4;
 
 use super::{PostParams, PostPasses};
-use crate::components::VisualCorrectionComponent;
+use crate::components::{CameraComponent, VisualCorrectionComponent};
 use crate::core::settings::quality::QualityPreset;
+use crate::scene::camera::camera_volume;
 use crate::scene::Scene;
 
-/// Scan `scene` for the first active visual-correction volume and matching camera
-/// settings, and pack them into a `PostParams` for `postfx.wgsl`. Returns the
-/// params plus whether the bloom passes should run this frame.
+/// The components one view post-processes with, borrowed once per view (#1434).
+#[derive(Clone, Copy, Default)]
+pub(crate) struct PostSource<'a> {
+    /// The base camera's component: motion blur and FXAA.
+    pub camera: Option<&'a CameraComponent>,
+    /// Its visual-correction volume, when active: grade, bloom, SSR, SSAO, shadows
+    /// and the authored effects. `None` runs them neutral.
+    pub volume: Option<&'a VisualCorrectionComponent>,
+}
+
+/// The base camera `id`'s components, borrowed for a view: the guards the caller
+/// keeps alive while it draws, and [`PostSource`] reads through them.
+pub(crate) fn borrow_post_source(scene: &Scene, id: Option<u32>) -> PostGuards<'_> {
+    PostGuards {
+        camera: id.and_then(|id| scene.world.camera(id)),
+        volume: id.and_then(|id| camera_volume(scene, id)),
+    }
+}
+
+/// The component guards behind a [`PostSource`].
+pub(crate) struct PostGuards<'w> {
+    camera: Option<crate::ecs::CompRef<'w, CameraComponent>>,
+    volume: Option<crate::ecs::CompRef<'w, VisualCorrectionComponent>>,
+}
+
+impl PostGuards<'_> {
+    pub(crate) fn source(&self) -> PostSource<'_> {
+        PostSource {
+            camera: self.camera.as_deref(),
+            volume: self.volume.as_deref(),
+        }
+    }
+}
+
+/// Pack `post`'s visual-correction volume and camera settings into a `PostParams`
+/// for `postfx.wgsl`. Returns the params plus whether the bloom passes should run
+/// this frame.
 ///
 /// `prev_view_proj` is last frame's view-projection (camera motion-blur velocity).
-pub fn build_post_params(
+pub(crate) fn build_post_params(
     scene: &Scene,
+    post: PostSource,
     quality: QualityPreset,
     view_proj: Mat4,
     prev_view_proj: Mat4,
@@ -38,238 +81,71 @@ pub fn build_post_params(
         ],
         ..Default::default()
     };
+    let Some(vc) = post.volume else {
+        return (params, false);
+    };
 
-    let mut bloom_enabled = false;
+    params.color = [vc.exposure, vc.contrast, vc.saturation, vc.gamma.max(0.01)];
+    params.bloom = [
+        vc.bloom_intensity,
+        vc.bloom_threshold,
+        vc.tonemap.to_index() as f32,
+        if vc.bloom_active { 1.0 } else { 0.0 },
+    ];
 
-    for id in scene.world.ids_with_visual_correction() {
-        if !scene.world.is_active_in_hierarchy(id) {
-            continue;
-        }
-        let vc = scene
-            .world
-            .visual_correction(id)
-            .expect("id came from ids_with_visual_correction");
-        if !vc.active {
-            continue;
-        }
+    // SSR mode: 0 off, 2 = real screen-space (High tier only). Low/Medium keep
+    // the forward shader's cubemap reflection, so post-FX SSR stays off there.
+    let ssr_mode = if vc.ssr_active && quality.screen_space_ssr() {
+        2.0
+    } else {
+        0.0
+    };
 
-        params.color = [vc.exposure, vc.contrast, vc.saturation, vc.gamma.max(0.01)];
-        let bloom_on = vc.bloom_active;
-        params.bloom = [
-            vc.bloom_intensity,
-            vc.bloom_threshold,
-            vc.tonemap.to_index() as f32,
-            if bloom_on { 1.0 } else { 0.0 },
-        ];
-        bloom_enabled = bloom_on;
-
-        // SSR mode: 0 off, 2 = real screen-space (High tier only). Low/Medium keep
-        // the forward shader's cubemap reflection, so post-FX SSR stays off there.
-        let ssr_mode = if vc.ssr_active && quality.screen_space_ssr() {
-            2.0
-        } else {
-            0.0
-        };
-
-        // Motion blur is gated by the camera component AND the preset.
-        let cam = scene.world.camera(id);
-        let (mb_active, mb_samples) = match cam.as_deref() {
-            Some(cam) if cam.motion_blur_active && quality.motion_blur() => {
-                (1.0, cam.motion_blur_samples.clamp(2, 32) as f32)
-            }
-            _ => (0.0, 0.0),
-        };
-        params.flags = [ssr_mode, mb_active, 1.0, 0.0];
-        params.misc[3] = mb_samples;
-        break;
-    }
-
-    (params, bloom_enabled)
+    // Motion blur is gated by the camera component AND the preset.
+    let samples =
+        CameraComponent::MIN_MOTION_BLUR_SAMPLES..=CameraComponent::MAX_MOTION_BLUR_SAMPLES;
+    let (mb_active, mb_samples) = match post.camera {
+        Some(cam) if cam.motion_blur_active && quality.motion_blur() => (
+            1.0,
+            cam.motion_blur_samples
+                .clamp(*samples.start(), *samples.end()) as f32,
+        ),
+        _ => (0.0, 0.0),
+    };
+    params.flags = [ssr_mode, mb_active, 1.0, 0.0];
+    params.misc[3] = mb_samples;
+    (params, vc.bloom_active)
 }
 
-/// The optional passes this frame runs: bloom (decided by [`build_post_params`]),
-/// FXAA, and the active volume's authored effects.
-pub fn post_passes(scene: &Scene, bloom: bool) -> PostPasses {
+/// No authored-effect params: a view without a volume.
+static NO_POST_PARAMS: BTreeMap<String, Vec<f32>> = BTreeMap::new();
+
+/// The optional passes this frame runs for `post`: bloom (decided by
+/// [`build_post_params`]), FXAA, and its volume's authored effects, borrowed.
+pub(crate) fn post_passes<'a>(post: PostSource<'a>, bloom: bool) -> PostPasses<'a> {
     PostPasses {
         bloom,
-        fxaa: fxaa_enabled(scene),
-        custom: custom_effects(scene),
-        post_params: post_param_values(scene),
+        fxaa: fxaa_enabled(post),
+        custom: post.volume.map_or(&[], |vc| &vc.custom_effects),
+        post_params: post.volume.map_or(&NO_POST_PARAMS, |vc| &vc.post_params),
     }
 }
 
-/// The authored post-FX modules of the first active volume (#397) — the same volume
-/// [`build_post_params`] reads — in the order they run. None without a volume.
-pub fn custom_effects(scene: &Scene) -> Vec<String> {
-    with_active_volume(scene, |vc| vc.custom_effects.clone()).unwrap_or_default()
-}
-
-/// The runtime params of those effects (#671), from the same volume. Empty without one.
-fn post_param_values(scene: &Scene) -> BTreeMap<String, Vec<f32>> {
-    with_active_volume(scene, |vc| vc.post_params.clone()).unwrap_or_default()
-}
-
-/// `f` over the first active visual-correction volume of an active entity.
-fn with_active_volume<R>(scene: &Scene, f: impl Fn(&VisualCorrectionComponent) -> R) -> Option<R> {
-    scene
-        .world
-        .ids_with_visual_correction()
-        .into_iter()
-        .filter(|&id| scene.world.is_active_in_hierarchy(id))
-        .find_map(|id| {
-            let vc = scene.world.visual_correction(id)?;
-            vc.active.then(|| f(&vc))
-        })
-}
-
-/// Whether the FXAA pass runs this frame (#360).
+/// Whether the FXAA pass runs this frame for `post`'s camera (#360).
 ///
-/// Deliberately *not* folded into [`build_post_params`]: that walks visual-correction
-/// volumes, and FXAA lives on the camera, so tying it to that loop would make
-/// anti-aliasing depend on the scene having a `VisualCorrection` volume — the opposite
-/// of a default-on effect. It reads the first active camera component instead, the
-/// same selector the `Graphics.*` bindings use.
+/// Deliberately *not* tied to the volume [`build_post_params`] reads: FXAA lives on
+/// the camera, so tying it to the volume would make anti-aliasing depend on the
+/// camera carrying a `VisualCorrection` — the opposite of a default-on effect.
 ///
-/// A scene with no camera component at all gets `true`: default-on means a scene that
-/// has never heard of the knob is still anti-aliased.
+/// No camera component at all gets `true`: default-on means a scene that has never
+/// heard of the knob is still anti-aliased.
 ///
 /// Unlike motion blur this is not gated by [`QualityPreset`] — FXAA runs on every
 /// tier, Low included, where it is precisely the cheap anti-aliasing an iGPU wants.
-pub fn fxaa_enabled(scene: &Scene) -> bool {
-    scene
-        .world
-        .ids_with_camera()
-        .into_iter()
-        .find(|&id| {
-            scene.world.is_active_in_hierarchy(id)
-                && scene.world.camera(id).is_some_and(|c| c.active)
-        })
-        .and_then(|id| scene.world.camera(id).map(|c| c.fxaa_active))
-        .unwrap_or(true)
+pub(crate) fn fxaa_enabled(post: PostSource) -> bool {
+    post.camera.is_none_or(|c| c.fxaa_active)
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::components::{CameraComponent, Tonemap, VisualCorrectionComponent};
-    use crate::scene::Scene;
-
-    fn scene_with_vc(vc: VisualCorrectionComponent, cam: Option<CameraComponent>) -> Scene {
-        let mut scene = Scene::new();
-        let id = scene.add_entity("PostFx".to_string());
-        scene.world.set_visual_correction(id, Some(vc));
-        scene.world.set_camera(id, cam);
-        scene
-    }
-
-    fn vc() -> VisualCorrectionComponent {
-        VisualCorrectionComponent {
-            bloom_intensity: 2.0,
-            bloom_threshold: 0.7,
-            exposure: 1.5,
-            contrast: 1.2,
-            saturation: 0.8,
-            ssr_temporal_upsampling: false,
-            tonemap: Tonemap::Reinhard,
-            gamma: 1.3,
-            ..crate::scene::authoring::default_visual_correction()
-        }
-    }
-
-    fn cam() -> CameraComponent {
-        CameraComponent {
-            far: 100.0,
-            motion_blur_active: true,
-            motion_blur_samples: 16,
-            ..CameraComponent::default()
-        }
-    }
-
-    #[test]
-    fn color_knobs_flow_into_params() {
-        let scene = scene_with_vc(vc(), None);
-        let (p, bloom) = build_post_params(
-            &scene,
-            QualityPreset::Medium,
-            Mat4::IDENTITY,
-            Mat4::IDENTITY,
-            [0.0; 3],
-        );
-        assert_eq!(p.color, [1.5, 1.2, 0.8, 1.3]);
-        assert_eq!(p.bloom[0], 2.0); // intensity
-        assert_eq!(p.bloom[1], 0.7); // threshold
-        assert_eq!(p.bloom[2], Tonemap::Reinhard.to_index() as f32);
-        assert_eq!(p.bloom[3], 1.0); // bloom enabled
-        assert!(bloom);
-    }
-
-    #[test]
-    fn game_time_rides_in_camera_pos_w() {
-        let mut scene = scene_with_vc(vc(), None);
-        scene.shader_time = 2.5;
-        let id = Mat4::IDENTITY;
-        let (p, _) = build_post_params(&scene, QualityPreset::Medium, id, id, [1.0; 3]);
-        assert_eq!(p.camera_pos, [1.0, 1.0, 1.0, 2.5]);
-    }
-
-    #[test]
-    fn low_preset_disables_ssr_and_motion_blur() {
-        let scene = scene_with_vc(vc(), Some(cam()));
-        let (p, _) = build_post_params(
-            &scene,
-            QualityPreset::Low,
-            Mat4::IDENTITY,
-            Mat4::IDENTITY,
-            [0.0; 3],
-        );
-        assert_eq!(p.flags[0], 0.0, "ssr off on Low");
-        assert_eq!(p.flags[1], 0.0, "motion blur off on Low");
-        assert_eq!(p.misc[3], 0.0, "no motion-blur samples on Low");
-    }
-
-    #[test]
-    fn high_preset_enables_real_ssr_and_motion_blur() {
-        let scene = scene_with_vc(vc(), Some(cam()));
-        let (p, _) = build_post_params(
-            &scene,
-            QualityPreset::High,
-            Mat4::IDENTITY,
-            Mat4::IDENTITY,
-            [0.0; 3],
-        );
-        assert_eq!(p.flags[0], 2.0, "real screen-space SSR on High");
-        assert_eq!(p.flags[1], 1.0, "motion blur on on High");
-        assert_eq!(p.misc[3], 16.0, "motion-blur samples passed through");
-    }
-
-    #[test]
-    fn custom_effects_come_from_the_active_volume_only() {
-        let mut v = vc();
-        v.custom_effects = vec!["crt".into(), "grain".into()];
-        assert_eq!(
-            custom_effects(&scene_with_vc(v.clone(), None)),
-            ["crt", "grain"]
-        );
-        v.active = false;
-        assert!(custom_effects(&scene_with_vc(v, None)).is_empty());
-        assert!(custom_effects(&Scene::new()).is_empty());
-    }
-
-    #[test]
-    fn inactive_volume_is_neutral_passthrough() {
-        let mut v = vc();
-        v.active = false;
-        let scene = scene_with_vc(v, None);
-        let (p, bloom) = build_post_params(
-            &scene,
-            QualityPreset::High,
-            Mat4::IDENTITY,
-            Mat4::IDENTITY,
-            [0.0; 3],
-        );
-        // Defaults: exposure 0, contrast/sat 1, gamma 1, no tonemap/bloom.
-        assert_eq!(p.color, [0.0, 1.0, 1.0, 1.0]);
-        assert_eq!(p.bloom[3], 0.0);
-        assert!(!bloom);
-    }
-}
+#[path = "params_tests.rs"]
+mod tests;

@@ -116,6 +116,10 @@ fn gpu_a_dissolved_crate_leaves_no_ambient_occlusion() {
         let mut vc = default_visual_correction();
         (vc.bloom_active, vc.ssr_active, vc.ssao.active) = (false, false, true);
         scene.world.set_visual_correction(volume, Some(vc));
+        // A volume rides on its camera (#1434): that camera is the view's.
+        scene
+            .world
+            .set_camera(volume, Some(crate::components::CameraComponent::default()));
         let crate_id =
             with_crate.then(|| block(&mut scene, Vec3::Y, Vec3::splat(2.0), Some(&d.shader)));
         (RefCell::new(scene), crate_id)

@@ -33,6 +33,10 @@ fn yard(with_crate: bool, ssao: bool) -> Scene {
     vc.ssr_active = false;
     vc.ssao.active = ssao;
     scene.world.set_visual_correction(volume, Some(vc));
+    // A volume rides on its camera (#1434): that camera is the view's.
+    scene
+        .world
+        .set_camera(volume, Some(rusty::components::CameraComponent::default()));
     scene
 }
 

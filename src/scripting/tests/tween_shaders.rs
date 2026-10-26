@@ -99,6 +99,13 @@ fn a_graphics_tween_fades_the_volumes_post_param() {
         .borrow_mut()
         .world
         .set_visual_correction(id, Some(vc));
+    // `Graphics.*` edits the main camera's volume (#1434).
+    let camera = crate::components::CameraComponent::default();
+    m.cells
+        .scene
+        .borrow_mut()
+        .world
+        .set_camera(id, Some(camera));
     tick(&mut m, 1);
     m.eval(&format!(
         "Tween.To({id}, 'Graphics.damage_vignette.intensity', 0, 2 / 60, {{ from = 1 }})"

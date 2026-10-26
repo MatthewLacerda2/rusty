@@ -1,7 +1,8 @@
 //! src/api/graphics/state.rs — backing-store accessors for the `Graphics` namespace.
 //!
-//! Locate the first **active** post-FX volume / camera in the scene and read or
-//! mutate it, plus the small string<->enum conversions the Lua surface speaks in.
+//! Locate the screen's camera, `scene::camera::main_camera` (Unity's `Camera.main`,
+//! the base of the screen stack, #1434), and its post-FX volume, and read or mutate
+//! them, plus the small string<->enum conversions the Lua surface speaks in.
 //! These are the only places `Graphics.*` reaches into render-only component state.
 
 use std::cell::RefCell;
@@ -9,6 +10,7 @@ use std::cell::RefCell;
 use super::super::{put, Reg};
 use crate::components::{CameraComponent, VisualCorrectionComponent};
 use crate::core::settings::quality::QualityPreset;
+use crate::scene::camera::{camera_volume, main_camera};
 use crate::scene::Scene;
 
 /// Global quality preset value get/set over the shared resource cell. Lives here (not
@@ -36,29 +38,18 @@ pub(super) fn register_quality<'scope>(
     )
 }
 
-/// The first *active* entity whose visual-correction volume is itself active.
+/// The main camera, when its visual-correction volume is active: the volume the
+/// screen's post-FX reads.
 fn active_vc_id(scene: &Scene) -> Option<u32> {
-    scene
-        .world
-        .ids_with_visual_correction()
-        .into_iter()
-        .find(|&id| {
-            scene.world.is_active_in_hierarchy(id)
-                && scene
-                    .world
-                    .visual_correction(id)
-                    .is_some_and(|vc| vc.active)
-        })
+    main_camera(scene).filter(|&id| camera_volume(scene, id).is_some())
 }
 
-/// The first *active* entity whose camera component is itself active.
+/// The main camera: the screen stack's base.
 fn active_cam_id(scene: &Scene) -> Option<u32> {
-    scene.world.ids_with_camera().into_iter().find(|&id| {
-        scene.world.is_active_in_hierarchy(id) && scene.world.camera(id).is_some_and(|c| c.active)
-    })
+    main_camera(scene)
 }
 
-/// Run `f` on the first active visual-correction volume, returning its result.
+/// Run `f` on the main camera's active visual-correction volume, returning its result.
 pub(super) fn with_vc<R>(
     scene: &RefCell<Scene>,
     f: impl FnOnce(&VisualCorrectionComponent) -> R,
@@ -68,7 +59,7 @@ pub(super) fn with_vc<R>(
     scene.world.visual_correction(id).map(|vc| f(&vc))
 }
 
-/// Mutate the first active visual-correction volume (no-op when there is none).
+/// Mutate the main camera's active visual-correction volume (no-op without one).
 /// The caller routes the write through a shared
 /// `authoring::rendering::visual_correction::*` op (#287).
 pub(super) fn with_vc_mut(scene: &RefCell<Scene>, f: impl FnOnce(&mut VisualCorrectionComponent)) {
@@ -82,7 +73,7 @@ pub(super) fn with_vc_mut(scene: &RefCell<Scene>, f: impl FnOnce(&mut VisualCorr
     }
 }
 
-/// Run `f` on the first active camera component, returning its result.
+/// Run `f` on the main camera's component, returning its result.
 pub(super) fn with_cam<R>(
     scene: &RefCell<Scene>,
     f: impl FnOnce(&CameraComponent) -> R,
@@ -92,7 +83,7 @@ pub(super) fn with_cam<R>(
     scene.world.camera(id).map(|c| f(&c))
 }
 
-/// Mutate the first active camera component (no-op when there is none). The
+/// Mutate the main camera's component (no-op without a screen camera). The
 /// caller routes the write through a shared `authoring::rendering::camera::*` op (#287).
 pub(super) fn with_cam_mut(scene: &RefCell<Scene>, f: impl FnOnce(&mut CameraComponent)) {
     let mut scene = scene.borrow_mut();

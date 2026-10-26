@@ -44,6 +44,10 @@ fn scene(emissive: [f32; 3], bloom: bool) -> Scene {
         .world
         .set_material(id, Some(MaterialComponent::new("mat".to_string())));
     scene.world.set_visual_correction(id, Some(vc(bloom)));
+    // A volume rides on its camera (#1434): that camera is the view's.
+    scene
+        .world
+        .set_camera(id, Some(rusty::components::CameraComponent::default()));
     scene.materials.insert(
         "mat".to_string(),
         MaterialAsset {

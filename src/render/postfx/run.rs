@@ -16,7 +16,7 @@ impl PostFx {
         queue: &wgpu::Queue,
         ctx: PostFxContext<'_>,
         params: PostParams,
-        passes: PostPasses,
+        passes: PostPasses<'_>,
     ) {
         let PostPasses {
             bloom: bloom_enabled,
@@ -25,7 +25,7 @@ impl PostFx {
             post_params,
         } = passes;
         queue.write_buffer(&self.params_buffer, 0, bytemuck::bytes_of(&params));
-        self.custom.prepare(device, &custom);
+        self.custom.prepare(device, custom);
 
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("PostFX Encoder"),
@@ -39,8 +39,8 @@ impl PostFx {
         // When anything follows it (FXAA, authored effects) it lands in the LDR target
         // for that pass to sample; otherwise it writes the output directly, so the
         // plain path is byte-for-byte what the chain produced before those existed.
-        let effects = self.custom.loaded(&custom);
-        CustomChain::write_params(queue, &effects, &post_params);
+        let effects = self.custom.loaded(custom);
+        CustomChain::write_params(queue, &effects, post_params);
         let composite_bg = self.io_bind_group(
             device,
             &self.scene_hdr.view,

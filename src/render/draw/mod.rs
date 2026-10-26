@@ -19,6 +19,7 @@ use self::stack::StackPass;
 use crate::asset::MapRef;
 use crate::render::gpu::textures::TextureKind;
 use crate::render::lod::LodSelection;
+use crate::render::postfx::params::borrow_post_source;
 use crate::render::{build_camera_stack, texture_cameras, GpuTexture, RenderView, Renderer};
 use crate::scene::{Camera, Scene};
 
@@ -84,18 +85,25 @@ impl Renderer {
         self.prepare_frame(view, scene, camera);
 
         // The ordered camera stack (one entry in edit mode / when no scene camera).
-        let stack = build_camera_stack(camera, scene, !editor_mode);
+        let screen = build_camera_stack(camera, scene, !editor_mode);
+        let stack = screen.cameras;
+        // The screen's base camera's components, borrowed once for its post-FX,
+        // SSAO and the sun's shadows (#1434).
+        let guards = borrow_post_source(scene, screen.base_id);
+        let post = guards.source();
+        let shadows = post.volume.map(|vc| vc.shadows).unwrap_or_default();
         // The sun's cascades follow the base camera; every stacked camera — and every
         // render-texture camera (#430) — samples them. So do the dynamic casters' LOD
         // levels (#472): a shadow shows the level its caster shows in the main view.
         let base_lod = LodSelection::for_camera(scene, &stack[0]);
-        self.run_shadow_passes(scene, &stack[0], view.aspect(), &base_lod);
+        self.run_shadow_passes(scene, &stack[0], view.aspect(), &shadows, &base_lod);
         self.draw_render_textures(view, scene, &textures);
         // Lay out and mesh the UI through the base camera (#418, #429): world
         // canvases draw inside each camera's pass below, screen canvases after it.
         self.prepare_ui(view, scene, &stack[0], editor_mode);
         let pass = StackPass {
             stack: &stack,
+            post,
             output,
             editor_mode,
             full_post_fx: true,

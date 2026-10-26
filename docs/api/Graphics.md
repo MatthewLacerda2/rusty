@@ -1,14 +1,27 @@
 ## `Graphics`
 
 Live control over the engine's **existing** post-FX and quality knobs, so a script
-can drive its own settings logic. The per-volume getters/setters target the first
-**active** `VisualCorrectionComponent` (color/bloom/SSR/shadows/SSAO/custom effects and their params) and the first **active**
-`CameraComponent` (motion blur) in the scene — the same volume `build_post_params`
-packs into the GPU uniform each frame, so a write here takes effect next frame.
-Getters return a neutral default when no active volume/camera exists.
+can drive its own settings logic. The per-volume getters/setters target the **main
+camera**, Unity's `Camera.main`: the base of the screen stack, the lowest
+`render_order` active camera that renders to the screen (a render-texture camera never
+is). Its `VisualCorrectionComponent` (color/bloom/SSR/shadows/SSAO/custom effects and
+their params) and its `CameraComponent` (motion blur, FXAA) are what the window shows,
+so a write takes effect there next frame. Getters return a neutral default when there
+is no screen camera, or its volume is missing or inactive; setters are then no-ops.
 The editor's Camera card edits the same two motion-blur fields (a "Motion Blur"
 checkbox and a "Samples" slider, `2..=32`) through the same ops. A new camera starts
 with motion blur on at 32 samples.
+
+**Post-FX is per view** (#1434), Unity URP's camera-stack rule: each view runs it once,
+with the settings of **its base camera**, that camera entity's own `CameraComponent`
+and `VisualCorrectionComponent`. The window and the Game view use the main camera;
+overlay cameras stacked on it add no post-FX of their own. A render-texture camera
+uses its own. The Scene view's free camera has no entity, so it previews the main
+camera. A camera with no active volume runs neutral (no grade, bloom or custom
+effects; FXAA still follows its `fxaa_active`), so a scene whose only volume sits on
+a render-texture camera shows a neutral window and Scene view. `Graphics.*` writes
+reach the window only; another camera's settings (a security monitor's grade) are
+set on that camera entity, in the inspector or the scene file.
 
 | Function | Signature | Returns |
 |---|---|---|
@@ -50,10 +63,11 @@ lifts the midtones, `< 1` darkens them.
 distance**, is split into `1`–`4` slices, each with its own shadow map fitted to it
 and following the camera, so the first few metres get the sharpest shadow and a
 caster anywhere in a level still casts. Past the distance shadows fade out over its
-last tenth. Both knobs live on the active visual-correction volume (the Inspector's
-**Shadows** section edits the same fields) and are saved with the scene, so an
-indoor level can spend its cascades on 40 m and an outdoor one on 150 m; with no
-active volume the defaults above apply. Each cascade costs one more depth pass for
+last tenth. Both knobs live on the main camera's visual-correction volume (the
+Inspector's **Shadows** section edits the same fields; #1434) and are saved with the
+scene, so an indoor level can spend its cascades on 40 m and an outdoor one on 150 m;
+without an active volume on the main camera the defaults above apply. The cascades
+follow the screen, and render-texture cameras sample the same maps. Each cascade costs one more depth pass for
 the moving casters (static casters are re-drawn only when a cascade moves, #355).
 
 **Fog** (#437) is a **scene setting**, not a volume knob: it is saved with the
@@ -87,10 +101,11 @@ spotlight, so a lit wall stays lit; it is computed before the forward pass, not 
 the finished image, so fog (applied after lighting) fogs the occluded colour rather
 than AO darkening the fog. **Radius** is how far (world units) another surface can be and
 still shade a point; **intensity** is the strength (`0` none, `1` natural, up to `4`
-exaggerated). The knobs live on the active visual-correction volume (the Inspector's
+exaggerated). The knobs live on the visual-correction volume (the Inspector's
 **Ambient Occlusion** section edits the same fields) and are saved with the scene;
-scenes saved before the knob existed load with it on. Without an active volume AO
-does not run.
+scenes saved before the knob existed load with it on. Each view runs its base
+camera's AO, like the rest of its post-FX (*Post-FX is per view*, above); a camera
+without an active volume runs none.
 
 Its cost is gated by the quality preset: **off on Low**; on **Medium** 8 samples
 per texel at half resolution; on **High** 16 at full resolution. Either way each

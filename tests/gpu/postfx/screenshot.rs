@@ -31,6 +31,10 @@ fn scene_with_exposure(exposure: f32) -> Scene {
         .world
         .set_mesh(id, Some(MeshComponent::new("Box", vertices, indices)));
     scene.world.set_visual_correction(id, Some(vc(exposure)));
+    // A volume rides on its camera (#1434): that camera is the view's.
+    scene
+        .world
+        .set_camera(id, Some(rusty::components::CameraComponent::default()));
     scene
 }
 

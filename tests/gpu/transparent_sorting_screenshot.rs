@@ -41,7 +41,6 @@ fn add_quad(scene: &mut Scene, name: &str, z: f32, color: [f32; 3], alpha: f32) 
     scene
         .world
         .set_material(id, Some(MaterialComponent::new(name.to_string())));
-    scene.world.set_visual_correction(id, Some(vc()));
     scene.materials.insert(
         name.to_string(),
         MaterialAsset {
@@ -62,6 +61,11 @@ const GREEN: [f32; 3] = [0.0, 1.0, 0.0];
 fn scene(near_first: bool) -> Scene {
     let mut scene = Scene::new();
     scene.ambient_intensity = 0.0;
+    // One volume, on the view's camera (#1434).
+    let volume = scene.add_entity("Volume".to_string());
+    scene.world.set_visual_correction(volume, Some(vc()));
+    let camera = rusty::components::CameraComponent::default();
+    scene.world.set_camera(volume, Some(camera));
     if near_first {
         add_quad(&mut scene, "near", 2.0, GREEN, 0.6);
         add_quad(&mut scene, "far", 0.0, RED, 0.6);

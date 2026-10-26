@@ -8,9 +8,11 @@ use glam::camera::rh::proj::directx;
 use glam::{Mat4, Vec3};
 
 mod lens;
+mod main;
 mod projection;
 
 pub use lens::{held_fov, held_lens, Lens, MAX_LENS_EXTENT};
+pub use main::{active_cameras, camera_volume, main_camera, render_order, screen_cameras};
 pub use projection::ScreenPoint;
 
 use crate::components::Projection;
@@ -111,30 +113,19 @@ impl Camera {
 
 /// Reconcile the render camera's lens (fov/near/far) and culling mask with the
 /// scene's active `CameraComponent` (#92). In the editor viewport the free-fly
-/// camera owns its lens and renders every layer; in play mode the first active
-/// camera component (by `render_order`) is authoritative, falling back to defaults
+/// camera owns its lens and renders every layer; in play mode the [`main_camera`]
+/// (the screen stack's base) is authoritative, falling back to defaults
 /// when none exists. This drives the API/particle camera and edit-mode rendering;
 /// the multi-camera stack itself is built by the renderer
 /// (`render::build_camera_stack`).
 pub fn sync_lens_from_scene(camera: &mut Camera, scene: &Scene, is_playing: bool) {
     // `World::camera` yields a `CompRef` guard, so copy the lens values out while
     // the guard is alive rather than returning a borrow.
-    let mut lens = None;
-    if is_playing {
-        let mut best_order = i32::MAX;
-        for id in scene.world.ids_with_camera() {
-            let c = scene
-                .world
-                .camera(id)
-                .expect("id came from ids_with_camera");
-            // A render-texture camera (#430) is not the screen's camera.
-            let screen = c.active && c.target_texture.is_none();
-            if scene.world.is_active_in_hierarchy(id) && screen && c.render_order <= best_order {
-                best_order = c.render_order;
-                lens = Some((held_lens(&c), c.culling_mask));
-            }
-        }
-    }
+    let lens = is_playing
+        .then(|| main_camera(scene))
+        .flatten()
+        .and_then(|id| scene.world.camera(id))
+        .map(|c| (held_lens(&c), c.culling_mask));
 
     let had_scene_lens = std::mem::replace(&mut camera.scene_lens, lens.is_some());
     match lens {
@@ -157,32 +148,16 @@ pub fn sync_lens_from_scene(camera: &mut Camera, scene: &Scene, is_playing: bool
     }
 }
 
-/// Build a [`Camera`] positioned at the scene's active `CameraComponent` entity — the
+/// Build a [`Camera`] positioned at the scene's [`main_camera`] entity — the
 /// player's-eye view the editor's **Game** tab shows while authoring (#183). Position
 /// and orientation come from the camera entity's world transform (so the Game tab
 /// tracks where the gameplay camera actually sits, not the free-fly cam), and the lens
 /// from its component. Falls back to `base` (the free-fly camera) when no active camera
 /// entity exists, so the tab still renders something sensible.
 pub fn game_camera_from_scene(base: &Camera, scene: &Scene) -> Camera {
-    let mut best_order = i32::MAX;
-    let mut chosen: Option<Camera> = None;
-    for id in scene.world.ids_with_camera() {
-        let order = match scene.world.camera(id) {
-            Some(c)
-                if scene.world.is_active_in_hierarchy(id)
-                    && c.active
-                    && c.target_texture.is_none() =>
-            {
-                c.render_order
-            }
-            _ => continue,
-        };
-        if order <= best_order {
-            best_order = order;
-            chosen = camera_for_entity(base, scene, id);
-        }
-    }
-    chosen.unwrap_or_else(|| base.clone())
+    main_camera(scene)
+        .and_then(|id| camera_for_entity(base, scene, id))
+        .unwrap_or_else(|| base.clone())
 }
 
 /// The render [`Camera`] a `CameraComponent` entity sees through: its world

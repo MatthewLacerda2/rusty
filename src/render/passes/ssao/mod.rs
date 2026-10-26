@@ -27,9 +27,9 @@ pub(crate) use targets::SsaoTargets;
 
 use glam::{Mat4, Vec3};
 
-use crate::components::SsaoSettings;
+use crate::components::{SsaoSettings, VisualCorrectionComponent};
 use crate::core::settings::quality::{QualityPreset, SsaoTier};
-use crate::scene::{Camera, Scene};
+use crate::scene::Camera;
 
 /// The occlusion and blur targets' format: one unorm channel is all AO needs.
 pub(crate) const AO_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::R8Unorm;
@@ -67,19 +67,15 @@ pub(crate) struct SsaoPlan {
 }
 
 impl SsaoPlan {
-    /// The plan for `scene` at `quality`: the first active visual-correction volume
-    /// with AO on, on a tier that runs it. `None` — nothing runs — otherwise.
-    pub(crate) fn for_scene(scene: &Scene, quality: QualityPreset) -> Option<Self> {
+    /// The plan for a view whose base camera's volume is `volume` (#1434), at
+    /// `quality`: that volume with AO on, on a tier that runs it. `None` — nothing
+    /// runs — otherwise.
+    pub(crate) fn for_volume(
+        volume: Option<&VisualCorrectionComponent>,
+        quality: QualityPreset,
+    ) -> Option<Self> {
         let tier = quality.ssao()?;
-        let settings = scene
-            .world
-            .ids_with_visual_correction()
-            .into_iter()
-            .filter(|&id| scene.world.is_active_in_hierarchy(id))
-            .find_map(|id| {
-                let vc = scene.world.visual_correction(id)?;
-                vc.active.then_some(vc.ssao)
-            })?;
+        let settings = volume?.ssao;
         (settings.active && settings.intensity > 0.0).then_some(Self { settings, tier })
     }
 }

@@ -15,7 +15,7 @@ use crate::api::{put, Reg};
 use crate::scene::authoring::rendering::camera as camera_ops;
 use crate::scene::Scene;
 
-/// Camera motion blur: active + sample count over the active camera component.
+/// Camera motion blur: active + sample count over the main camera's component.
 pub(super) fn register_motion_blur<'scope>(
     scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
@@ -53,7 +53,7 @@ pub(super) fn register_motion_blur<'scope>(
 }
 
 /// FXAA: the anti-aliasing pass at the end of the post-FX chain (#360), over the
-/// active camera component — the same write path the editor's Camera card uses.
+/// main camera's component — the same write path the editor's Camera card uses.
 pub(super) fn register_fxaa<'scope>(
     scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
@@ -70,9 +70,9 @@ pub(super) fn register_fxaa<'scope>(
     put(
         table,
         "GetFxaaActive",
-        // `true` with no active camera, matching what the renderer actually does in
-        // that case (`postfx::params::fxaa_enabled`) — the getter must not claim FXAA
-        // is off while the frame is being anti-aliased.
+        // `true` without a screen camera, matching what the renderer does for a view
+        // with no camera (`postfx::params::fxaa_enabled` with `None`): the getter must
+        // not claim FXAA is off while the frame is being anti-aliased.
         scope.create_function(|_, ()| Ok(with_cam(scene, |c| c.fxaa_active).unwrap_or(true))),
     )
 }

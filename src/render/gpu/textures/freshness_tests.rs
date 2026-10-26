@@ -37,6 +37,10 @@ pub(super) fn emissive_scene(map: &str) -> Scene {
     (vc.active, vc.bloom_active, vc.ssr_active) = (true, false, false);
     vc.tonemap = Tonemap::None;
     scene.world.set_visual_correction(id, Some(vc));
+    // A volume rides on its camera (#1434): that camera is the view's.
+    scene
+        .world
+        .set_camera(id, Some(crate::components::CameraComponent::default()));
     scene
 }
 

@@ -50,6 +50,9 @@ pub(super) fn scene(material: MaterialAsset) -> Scene {
     s.world.set_mesh(id, Some(mesh));
     s.world.set_material(id, Some(mat));
     s.world.set_visual_correction(id, Some(vc()));
+    // A volume rides on its camera (#1434): that camera is the view's.
+    s.world
+        .set_camera(id, Some(rusty::components::CameraComponent::default()));
     s.materials.insert("mat".to_string(), material);
     s
 }
