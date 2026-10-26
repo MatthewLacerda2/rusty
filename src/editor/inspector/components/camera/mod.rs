@@ -1,7 +1,7 @@
 //! src/editor/inspector/components/camera/ — the Camera inspector card (this
 //! `mod.rs`) plus the Post Processing card (`post_processing`, one section per post
 //! effect). Both cards live on the same camera entity. The Camera card draws the
-//! camera effects' sections ([`CAMERA_SECTIONS`]: motion blur in `motion_blur`,
+//! camera effects' sections (`CAMERA_SECTIONS`: motion blur in `motion_blur`,
 //! FXAA here).
 
 use crate::editor::widgets::DragRange;

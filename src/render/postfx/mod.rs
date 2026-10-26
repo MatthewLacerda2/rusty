@@ -25,7 +25,7 @@ use glam::Mat4;
 
 /// CPU-side mirror of the `PostParams` uniform in `postfx/params.wgsl`: the frame
 /// every post pass shares. Each effect's own numbers are its slots of the
-/// composite's effect array ([`effects::composite_slots`], #1467).
+/// composite's effect array (`effects::composite_slots`, #1467).
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct PostParams {
