@@ -100,13 +100,9 @@ impl Renderer {
         // The grade + tonemap and the Color Lookup (#1440, #1441): rebaked only when
         // this view's inputs changed.
         let volume = ctx.stack.post.volume.filter(|_| post.full);
-        let grade = GradeParams::from_volume(volume);
-        let gpu = (&self.device, &self.queue);
-        let lookup = Lookup::of(volume);
-        let baked = view
-            .post_fx
-            .grade
-            .prepare(gpu, &mut self.grade_bake, &grade, lookup);
+        let (grade, lookup) = (GradeParams::from_volume(volume), Lookup::of(volume));
+        let (gpu, bake) = ((&self.device, &self.queue), &mut self.grade_bake);
+        let baked = view.post_fx.grade.prepare(gpu, bake, &grade, lookup);
         self.frame_counters.grade_lut_bakes += u32::from(baked);
 
         self.meter_exposure(view, ctx, post.full);
