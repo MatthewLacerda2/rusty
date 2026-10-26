@@ -110,7 +110,7 @@ every surface (editor Add menu, this API, and scene load):
   warning), so the loaded scene always satisfies the rule.
 
 The declared dependencies are **`PostProcessing` requires `Camera`** (a
-color/bloom/SSR correction stack is inert without a camera to correct) and
+color/bloom/SSR post-processing stack is inert without a camera to process) and
 **`Image`, `Text`, `Shape`, `RectMask`, `Mask`, `BackdropFilter`, `Selectable`,
 `LayoutGroup` and `LayoutElement` require `RectTransform`** (a graphic fills, a mask clips to, and a layout arranges
 a rect — Unity's `Graphic`, `RectMask2D`, `Mask` and layout components declare the same),

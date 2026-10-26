@@ -1,5 +1,5 @@
-//! src/editor/inspector/components/camera/post_processing.rs — the Visual
-//! Correction inspector card. Split out of the Camera card module to stay under the
+//! src/editor/inspector/components/camera/post_processing.rs — the Post
+//! Processing inspector card. Split out of the Camera card module to stay under the
 //! size cap; the two share the camera entity (removing the Camera also drops its
 //! Post Processing volume).
 //!

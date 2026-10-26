@@ -170,8 +170,8 @@ pub fn default_camera() -> CameraComponent {
 
 /// Default `PostProcessingComponent` (the Add-Component menu's values).
 /// `PostProcessing` declares `requires(Camera)` (#359), so every surface that adds
-/// it auto-adds a `Camera` if missing — a correction stack is inert without a camera
-/// to correct, so the dependency is enforced rather than left to chance.
+/// it auto-adds a `Camera` if missing — post-processing is inert without a camera
+/// to process, so the dependency is enforced rather than left to chance.
 pub fn default_post_processing() -> PostProcessingComponent {
     PostProcessingComponent {
         active: true,

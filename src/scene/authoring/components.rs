@@ -79,8 +79,8 @@ impl ComponentKind {
     /// (Unity's `[RequireComponent(typeof(T))]`). The single declaration every
     /// add/remove/load surface consults: adding a kind auto-adds these if missing,
     /// removing one of these cascades to the dependents that declare it. Flat
-    /// `kind → [kinds]`: `PostProcessing → Camera` (a correction stack is inert
-    /// without a camera to correct), and the UI graphic and clip need a rect to fill
+    /// `kind → [kinds]`: `PostProcessing → Camera` (post-processing is inert
+    /// without a camera to process), and the UI graphic and clip need a rect to fill
     /// or clip to, a Selectable a rect to be hit in, and the layout pair a rect to
     /// arrange or size (`Image` / `Text` / `Shape` / `RectMask` / `Mask` /
     /// `BackdropFilter` / `Selectable` / `LayoutGroup` / `LayoutElement →
