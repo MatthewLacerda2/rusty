@@ -1,22 +1,20 @@
-//! The view's colour-grading LUT (#1440): white balance, Lift / Gamma / Gain, hue
-//! shift, the tonemapper, contrast, saturation and the display-gamma tweak, baked
-//! into one 32³ `Rgba16Float` table the composite reads with a single fetch, the
-//! way Unity URP and Unreal apply a grade.
+//! The view's colour-grading LUT (#1440): the grading effects (white balance, Lift /
+//! Gamma / Gain, the color adjustments, the tonemapper, the display-gamma tweak and the
+//! Color Lookup, `effects::grading`) baked into one 32³ `Rgba16Float` table the
+//! composite reads with a single fetch, the way Unity URP and Unreal apply a grade.
 //!
-//! The table is rebaked by a compute pass (`postfx/lut_bake.wgsl`) only when its
-//! inputs change: [`GradeLut::prepare`] compares this frame's [`GradeParams`] with
-//! the ones it last baked, so a still grade costs a frame nothing but the fetch.
-//! Each `PostFx`, so each view, owns one table: two views with different grades
-//! never rebake each other's. The bake pipeline ([`GradeBake`]) is the renderer's,
-//! built once for all of them, with the user LUTs volumes name (`user`, #1441):
-//! one of those is folded into the bake last, so it costs a pixel nothing.
+//! The table is rebaked by a compute pass, assembled from the effects' grade functions
+//! (`effects::assemble::bake_source`), only when its inputs change:
+//! [`GradeLut::prepare`] compares this frame's packed slots with the ones it last
+//! baked, so a still grade costs a frame nothing but the fetch. Each `PostFx`, so each
+//! view, owns one table: two views with different grades never rebake each other's.
+//! The bake pipeline ([`GradeBake`]) is the renderer's, built once for all of them,
+//! with the user LUTs volumes name (`effects::grading::color_lookup`, #1441): one of
+//! those is folded into the bake last, so it costs a pixel nothing.
 
-mod params;
-mod user;
-
-pub use params::GradeParams;
-pub use user::{Lookup, UserLuts};
-
+use super::effects::grading::color_lookup::{self, Lookup, UserLuts};
+use super::effects::{assemble, grade_slots, grade_slots_len, GradeCx};
+use crate::components::PostProcessingComponent;
 use crate::render::gpu::shaders::ShaderRegistry;
 
 /// The bake's compute pipeline: built once, on the `Renderer`, and shared by every
@@ -31,7 +29,9 @@ pub struct GradeBake {
 
 impl GradeBake {
     pub fn new(device: &wgpu::Device, registry: &mut ShaderRegistry) -> Self {
-        let module = registry.load(device, "postfx/lut_bake.wgsl", "Grading LUT Bake");
+        assemble::register_modules(registry);
+        let source = assemble::bake_source();
+        let module = registry.load_source(device, &source, assemble::BAKE);
         let pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
             label: Some("Grading LUT Bake"),
             layout: None,
@@ -43,7 +43,7 @@ impl GradeBake {
         Self {
             pipeline,
             luts: UserLuts::default(),
-            neutral: user::neutral(device),
+            neutral: color_lookup::neutral(device),
         }
     }
 }
@@ -58,9 +58,9 @@ pub struct GradeLut {
     /// Made against the bake pipeline's layout, for the user LUT whose id it holds
     /// (`0`: none), and made again when that changes.
     bind_group: Option<(u64, wgpu::BindGroup)>,
-    /// The inputs the table holds now, with the user LUT's id; `None` before the
-    /// first bake.
-    baked: Option<(GradeParams, u64)>,
+    /// The packed slots the table holds now, with the user LUT's id; `None` before
+    /// the first bake.
+    baked: Option<(Vec<[f32; 4]>, u64)>,
 }
 
 impl GradeLut {
@@ -72,7 +72,7 @@ impl GradeLut {
     pub fn new(device: &wgpu::Device) -> Self {
         let params_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("Grading LUT Params"),
-            size: std::mem::size_of::<GradeParams>() as u64,
+            size: (grade_slots_len() * std::mem::size_of::<[f32; 4]>()) as u64,
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
@@ -103,40 +103,48 @@ impl GradeLut {
         texture.create_view(&wgpu::TextureViewDescriptor::default())
     }
 
-    /// Make the table hold `params`' grade, then `lookup`'s LUT (when it loads),
-    /// through `bake`, baking only when they differ from what it holds: a changed
-    /// knob, contribution, file or re-read file. Returns whether it baked.
+    /// Make the table hold `volume`'s grade (`None`: neutral, no tonemap), then its
+    /// Color Lookup when that loads, through `bake`, baking only when they differ
+    /// from what it holds: a changed knob, contribution, file or re-read file.
+    /// Returns whether it baked.
     pub fn prepare(
         &mut self,
         (device, queue): (&wgpu::Device, &wgpu::Queue),
         bake: &mut GradeBake,
-        params: &GradeParams,
-        lookup: Option<Lookup>,
+        volume: Option<&PostProcessingComponent>,
     ) -> bool {
+        let lookup = Lookup::of(volume);
         let user = lookup.and_then(|l| Some((bake.luts.get(device, queue, l.path)?, l)));
-        let (params, view, id) = match user {
-            Some((lut, l)) => (
-                params.with_lookup(lut.domain, l.contribution),
-                &lut.view,
-                lut.id,
+        let (cx, view, id) = match user {
+            Some((lut, l)) => {
+                let lookup = Some((lut.domain, l.contribution));
+                (GradeCx { volume, lookup }, &lut.view, lut.id)
+            }
+            None => (
+                GradeCx {
+                    volume,
+                    lookup: None,
+                },
+                &bake.neutral,
+                0,
             ),
-            None => (*params, &bake.neutral, 0),
         };
+        let slots = grade_slots(&cx);
         if self
             .baked
             .as_ref()
-            .is_some_and(|(b, i)| same(b, &params) && *i == id)
+            .is_some_and(|(b, i)| same(b, &slots) && *i == id)
         {
             return false;
         }
-        queue.write_buffer(&self.params_buffer, 0, bytemuck::bytes_of(&params));
+        queue.write_buffer(&self.params_buffer, 0, bytemuck::cast_slice(&slots));
         let group = match self.bind_group.take() {
             Some((i, group)) if i == id => group,
             _ => self.bind_group(device, &bake.pipeline, view),
         };
         Self::dispatch((device, queue), &bake.pipeline, &group);
         self.bind_group = Some((id, group));
-        self.baked = Some((params, id));
+        self.baked = Some((slots, id));
         true
     }
 
@@ -192,8 +200,8 @@ impl GradeLut {
 
 /// Byte equality: a NaN knob compares equal to itself, so it never forces a rebake
 /// every frame.
-fn same(a: &GradeParams, b: &GradeParams) -> bool {
-    bytemuck::bytes_of(a) == bytemuck::bytes_of(b)
+fn same(a: &[[f32; 4]], b: &[[f32; 4]]) -> bool {
+    bytemuck::cast_slice::<_, u8>(a) == bytemuck::cast_slice::<_, u8>(b)
 }
 
 #[cfg(test)]

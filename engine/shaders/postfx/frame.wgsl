@@ -1,0 +1,52 @@
+// engine/shaders/postfx/frame.wgsl — what the composite's effects read besides their
+// own slots (#1467): the chain's bindings and the fragment being composited. The
+// composite (`render::postfx::effects::composite`, generated) and every effect module
+// (`postfx/effects/*.wgsl`) import it, so an effect reads the scene, depth, sky, the
+// grading LUT or the adapted exposure without the composite passing them along.
+
+#define_import_path postfx::frame
+
+#import postfx::params::PostParams
+
+@group(0) @binding(0) var<uniform> params: PostParams;
+@group(0) @binding(1) var t_color: texture_2d<f32>;
+@group(0) @binding(2) var s_color: sampler;
+@group(0) @binding(3) var t_bloom: texture_2d<f32>;
+@group(0) @binding(4) var t_depth: texture_depth_2d;
+@group(0) @binding(5) var t_skybox: texture_2d<f32>;
+// The panorama's own sampler (wrapping), not `s_color`'s clamp: the SSR fallback's
+// seam at φ = ±π must wrap as the skybox pass's does (#995).
+@group(0) @binding(6) var s_skybox: sampler;
+// The view's grading LUT (#1440): grade + tonemap, indexed by `lut_coord`.
+@group(0) @binding(7) var t_lut: texture_3d<f32>;
+// The view's adapted exposure (#1444): x is the EV, metered by `postfx/exposure.wgsl`.
+@group(0) @binding(8) var<uniform> adapted: vec4<f32>;
+
+// The fragment the composite is drawing: its uv, pixel position, depth and the world
+// position under it.
+struct Frag {
+    uv: vec2<f32>,
+    pos: vec2<f32>,
+    depth: f32,
+    world_pos: vec3<f32>,
+};
+
+// Point-load the depth target at a [0,1] uv (depth textures can't be sampled
+// with a filtering sampler, so we convert uv -> integer texel and load).
+fn load_depth(uv: vec2<f32>) -> f32 {
+    let dim = vec2<f32>(textureDimensions(t_depth));
+    let coord = vec2<i32>(clamp(uv, vec2<f32>(0.0), vec2<f32>(1.0)) * dim);
+    return textureLoad(t_depth, coord, 0);
+}
+
+fn world_from_depth(uv: vec2<f32>, depth: f32) -> vec3<f32> {
+    let ndc = vec4<f32>(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0, depth, 1.0);
+    let world = params.inv_view_proj * ndc;
+    return world.xyz / world.w;
+}
+
+// The fragment at `uv`, pixel `pos`.
+fn fragment(uv: vec2<f32>, pos: vec2<f32>) -> Frag {
+    let depth = load_depth(uv);
+    return Frag(uv, pos, depth, world_from_depth(uv, depth));
+}

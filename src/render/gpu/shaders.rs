@@ -22,6 +22,8 @@ use crate::shadergen::compose;
 pub struct ShaderRegistry {
     composer: Composer,
     base: String,
+    /// The modules [`add_module`](Self::add_module) registered beyond `compose::MODULES`.
+    added: Vec<String>,
 }
 
 impl ShaderRegistry {
@@ -37,7 +39,49 @@ impl ShaderRegistry {
         let base = base.into();
         let composer =
             compose::composer_with_common(&base).unwrap_or_else(|e| panic!("ShaderRegistry: {e}"));
-        Self { composer, base }
+        Self {
+            composer,
+            base,
+            added: Vec::new(),
+        }
+    }
+
+    /// Register the composable module `<base>/<module>` (named by its
+    /// `#define_import_path`), once: the post effects' modules, which the composite and
+    /// the grading bake are assembled from (#1467).
+    ///
+    /// # Panics
+    /// On a missing or broken module, as [`load`](Self::load) does.
+    pub fn add_module(&mut self, module: &str) {
+        if self.added.iter().any(|m| m == module) {
+            return;
+        }
+        compose::add_module(&mut self.composer, &self.base, module)
+            .unwrap_or_else(|e| panic!("ShaderRegistry: {e}"));
+        self.added.push(module.to_string());
+    }
+
+    /// Compose `source` (labelled `name` in errors) into a validated naga module.
+    ///
+    /// # Panics
+    /// On a shader error, as [`load`](Self::load) does.
+    pub fn compose_source(&mut self, source: &str, name: &str) -> compose::Module {
+        compose::compose(&mut self.composer, source, name)
+            .unwrap_or_else(|e| panic!("ShaderRegistry: {name} failed to compose: {e}"))
+    }
+
+    /// [`load`](Self::load) for a source assembled in code rather than read from disk.
+    pub fn load_source(
+        &mut self,
+        device: &wgpu::Device,
+        source: &str,
+        name: &str,
+    ) -> wgpu::ShaderModule {
+        let naga_module = self.compose_source(source, name);
+        device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some(name),
+            source: wgpu::ShaderSource::Naga(std::borrow::Cow::Owned(naga_module)),
+        })
     }
 
     /// Resolve `<base>/<name>` through [`compose::compose`] (handling any
@@ -77,7 +121,7 @@ mod tests {
     use crate::shadergen::compose;
     use crate::shadergen::validate::validate;
 
-    const SHIPPED: [&str; 13] = [
+    const SHIPPED: [&str; 14] = [
         "shader.wgsl",
         "outline/mask.wgsl",
         "outline/edge.wgsl",
@@ -85,8 +129,9 @@ mod tests {
         "sky_gradient.wgsl",
         "particles.wgsl",
         "ribbons.wgsl",
-        "postfx.wgsl",
-        "postfx/lut_bake.wgsl",
+        "postfx/bloom.wgsl",
+        "postfx/copy.wgsl",
+        "postfx/fxaa.wgsl",
         "postfx/exposure.wgsl",
         "postfx/motion_blur.wgsl",
         "postfx/depth_of_field.wgsl",

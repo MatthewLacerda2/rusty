@@ -7,7 +7,6 @@ use glam::Vec3;
 use super::{chain, W};
 use crate::components::{PostProcessingComponent, Tonemap, Wheel};
 use crate::core::color::linear_to_srgb;
-use crate::render::postfx::grade::GradeParams;
 use crate::render::{RenderView, OFFSCREEN_FORMAT};
 use crate::scene::authoring::default_post_processing;
 use crate::scene::authoring::rendering::post_processing as ops;
@@ -48,8 +47,8 @@ fn gpu_neutral_knobs_through_the_lut_match_the_analytic_tonemap() {
     let row: Vec<[f32; 3]> = ramp.iter().map(|&x| [x; 3]).collect();
     for tonemap in [Tonemap::Aces, Tonemap::Reinhard, Tonemap::None] {
         for ev in [0.0, 1.5] {
-            let grade = GradeParams::from_volume(Some(&volume(tonemap)));
-            let out = c.run(&row, ev, &grade);
+            let grade = volume(tonemap);
+            let out = c.run(&row, ev, Some(&grade));
             let worst = ramp
                 .iter()
                 .zip(&out)
@@ -65,7 +64,7 @@ fn gpu_neutral_knobs_through_the_lut_match_the_analytic_tonemap() {
     // A view without a volume shows display white and black exactly.
     let mut row = vec![[1.0f32, 0.0, 0.0]; W as usize];
     row[1] = [4.0, 0.0, 0.0];
-    let out = c.run(&row, 0.0, &GradeParams::NEUTRAL);
+    let out = c.run(&row, 0.0, None);
     assert_eq!((out[0], out[1]), ([255, 0, 0, 255], [255, 0, 0, 255]));
 }
 
@@ -77,15 +76,15 @@ fn gpu_white_balance_lift_and_gain_move_the_image_as_named() {
     let mut row = vec![[0.6f32; 3]; W as usize];
     (row[0], row[1]) = ([0.0; 3], [0.18; 3]);
     let mut vc = volume(Tonemap::None);
-    let neutral = c.run(&row, 0.0, &GradeParams::from_volume(Some(&vc)));
+    let neutral = c.run(&row, 0.0, Some(&vc));
 
     ops::grading::white_balance::set(&mut vc, 50.0, 0.0);
-    let warm = grey(&c.run(&row, 0.0, &GradeParams::from_volume(Some(&vc))));
+    let warm = grey(&c.run(&row, 0.0, Some(&vc)));
     assert!(warm.x > warm.z + 5.0, "+50 warms the grey card: {warm}");
 
     let mut vc = volume(Tonemap::None);
     ops::grading::lift_gamma_gain::set_wheel(&mut vc, Wheel::Lift, [1.0; 3], 0.1);
-    let lifted = c.run(&row, 0.0, &GradeParams::from_volume(Some(&vc)));
+    let lifted = c.run(&row, 0.0, Some(&vc));
     assert!(
         lifted[0][1] > neutral[0][1] + 40,
         "lift raises the blacks: {lifted:?}"
@@ -93,7 +92,7 @@ fn gpu_white_balance_lift_and_gain_move_the_image_as_named() {
 
     let mut vc = volume(Tonemap::None);
     ops::grading::lift_gamma_gain::set_wheel(&mut vc, Wheel::Gain, [1.0; 3], -0.5);
-    let gained = c.run(&row, 0.0, &GradeParams::from_volume(Some(&vc)));
+    let gained = c.run(&row, 0.0, Some(&vc));
     let (bright, dark) = (f32::from(neutral[9][1]), f32::from(gained[9][1]));
     // Half the gain halves the linear whites: 0.6 → 0.3.
     assert!(
@@ -105,7 +104,7 @@ fn gpu_white_balance_lift_and_gain_move_the_image_as_named() {
     let mut vc = volume(Tonemap::None);
     row[1] = [0.5, 0.05, 0.05];
     ops::grading::color_adjustments::set_hue_shift(&mut vc, 120.0);
-    let shifted = grey(&c.run(&row, 0.0, &GradeParams::from_volume(Some(&vc))));
+    let shifted = grey(&c.run(&row, 0.0, Some(&vc)));
     assert!(
         shifted.y > shifted.x,
         "a third of a turn takes red to green: {shifted}"

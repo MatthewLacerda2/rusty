@@ -1,5 +1,6 @@
-//! Resource construction for the post-process chain: bind-group layout, the five
-//! fullscreen pipelines, the params buffer, sampler, and the render targets.
+//! Resource construction for the post-process chain: bind-group layout, the
+//! composite (assembled from the effects, `effects::assemble`), FXAA and copy
+//! pipelines, the params and effect-slot buffers, sampler, and the render targets.
 
 use crate::render::gpu::fullscreen::Fullscreen;
 use crate::render::gpu::layout_entries::{
@@ -7,16 +8,16 @@ use crate::render::gpu::layout_entries::{
 };
 use crate::render::gpu::shaders::ShaderRegistry;
 
-use super::custom::CustomChain;
-use super::exposure::ExposureMeter;
+use super::effects::bloom::BloomTargets;
+use super::effects::custom_effects::CustomChain;
+use super::effects::exposure::ExposureMeter;
+use super::effects::{assemble, composite_slots_len};
 use super::grade::GradeLut;
 use super::{PfxTarget, PostFx, PostParams, HDR_FORMAT};
 
 /// The chain's built-in pipelines, named rather than positional — a tuple of
 /// `RenderPipeline` is one chance per pass to wire the wrong one to the wrong pass.
 struct Pipelines {
-    bright: wgpu::RenderPipeline,
-    blur: wgpu::RenderPipeline,
     composite: wgpu::RenderPipeline,
     fxaa: wgpu::RenderPipeline,
     copy: wgpu::RenderPipeline,
@@ -35,17 +36,16 @@ impl PostFx {
     ) -> Self {
         let io_layout = Self::create_io_layout(device);
         let pipelines = Self::create_pipelines(device, &io_layout, output_format, registry);
-        let (params_buffer, sampler) = Self::create_params_and_sampler(device);
+        let (params_buffer, fx_buffer, sampler) = Self::create_params_and_sampler(device);
 
-        let (full_size, bloom_size, scene_hdr, bloom_a, bloom_b, ldr) =
-            Self::create_targets(device, width, height, bloom_divisor, output_format);
+        let (full_size, scene_hdr, ldr) =
+            Self::create_targets(device, width, height, output_format);
+        let bloom = BloomTargets::new(device, full_size, bloom_divisor);
         let custom = CustomChain::new(device, &io_layout, output_format, full_size);
         let grade = GradeLut::new(device);
         let exposure = ExposureMeter::new(device);
 
         Self {
-            bright_pipeline: pipelines.bright,
-            blur_pipeline: pipelines.blur,
             composite_pipeline: pipelines.composite,
             fxaa_pipeline: pipelines.fxaa,
             copy_pipeline: pipelines.copy,
@@ -54,12 +54,11 @@ impl PostFx {
             custom,
             io_layout,
             params_buffer,
+            fx_buffer,
             sampler,
             scene_hdr,
-            bloom_a,
-            bloom_b,
+            bloom,
             ldr,
-            bloom_size,
             full_size,
             output_format,
             motion: Default::default(),
@@ -68,45 +67,53 @@ impl PostFx {
         }
     }
 
-    /// Build the built-in fullscreen passes (bright extract, blur, composite, FXAA,
-    /// copy).
+    /// Build the built-in fullscreen passes (the assembled composite, FXAA, copy).
     fn create_pipelines(
         device: &wgpu::Device,
         io_layout: &wgpu::BindGroupLayout,
         output_format: wgpu::TextureFormat,
         registry: &mut ShaderRegistry,
     ) -> Pipelines {
-        let shader = registry.load(device, "postfx.wgsl", "PostFX Shader");
+        assemble::register_modules(registry);
+        let composite =
+            registry.load_source(device, &assemble::composite_source(), assemble::COMPOSITE);
+        let fxaa = registry.load(device, "postfx/fxaa.wgsl", "PostFX FXAA Shader");
+        let copy = registry.load(device, "postfx/copy.wgsl", "PostFX Copy Shader");
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("PostFX Pipeline Layout"),
             bind_group_layouts: &[Some(io_layout)],
             immediate_size: 0,
         });
-        let pass = |fs: &str, format| {
+        // Each writes LDR: the composite into `ldr` (or straight to the output when
+        // nothing follows it), FXAA and the copy always into the output.
+        let pass = |shader: &wgpu::ShaderModule, fs: &str| {
             let entries = ("vs_fullscreen", fs);
-            Self::fullscreen_pipeline(device, &shader, &pipeline_layout, entries, format)
+            Self::fullscreen_pipeline(device, shader, &pipeline_layout, entries, output_format)
         };
 
         Pipelines {
-            bright: pass("fs_bright", HDR_FORMAT),
-            blur: pass("fs_blur", HDR_FORMAT),
-            // The rest write LDR: the composite into `ldr` (or straight to the output
-            // when nothing follows it), FXAA and the copy always into the output.
-            composite: pass("fs_composite", output_format),
-            fxaa: pass("fs_fxaa", output_format),
-            copy: pass("fs_copy", output_format),
+            composite: pass(&composite, "fs_composite"),
+            fxaa: pass(&fxaa, "fs_fxaa"),
+            copy: pass(&copy, "fs_copy"),
         }
     }
 
-    /// Create the params uniform buffer and the linear-clamp sampler.
-    fn create_params_and_sampler(device: &wgpu::Device) -> (wgpu::Buffer, wgpu::Sampler) {
-        let params_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("PostFX Params"),
-            size: std::mem::size_of::<PostParams>() as u64,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
+    /// Create the params and effect-slot uniform buffers and the linear-clamp sampler.
+    fn create_params_and_sampler(
+        device: &wgpu::Device,
+    ) -> (wgpu::Buffer, wgpu::Buffer, wgpu::Sampler) {
+        let uniform = |label, size| {
+            device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some(label),
+                size,
+                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            })
+        };
+        let params_buffer = uniform("PostFX Params", std::mem::size_of::<PostParams>() as u64);
+        let slots = composite_slots_len() * std::mem::size_of::<[f32; 4]>();
+        let fx_buffer = uniform("PostFX Effect Slots", slots as u64);
 
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
             label: Some("PostFX Sampler"),
@@ -118,18 +125,16 @@ impl PostFx {
             ..Default::default()
         });
 
-        (params_buffer, sampler)
+        (params_buffer, fx_buffer, sampler)
     }
 
     /// (Re)allocate the HDR + bloom + LDR targets for a new framebuffer size.
     pub fn resize(&mut self, device: &wgpu::Device, width: u32, height: u32, bloom_divisor: u32) {
-        let (full_size, bloom_size, scene_hdr, bloom_a, bloom_b, ldr) =
-            Self::create_targets(device, width, height, bloom_divisor, self.output_format);
+        let (full_size, scene_hdr, ldr) =
+            Self::create_targets(device, width, height, self.output_format);
         self.full_size = full_size;
-        self.bloom_size = bloom_size;
         self.scene_hdr = scene_hdr;
-        self.bloom_a = bloom_a;
-        self.bloom_b = bloom_b;
+        self.bloom = BloomTargets::new(device, full_size, bloom_divisor);
         self.ldr = ldr;
         self.custom.resize(device, full_size.0, full_size.1);
         // A resize is a cut (#1435): no smear from last frame's framing, and the
@@ -144,30 +149,18 @@ impl PostFx {
         device: &wgpu::Device,
         width: u32,
         height: u32,
-        bloom_divisor: u32,
         output_format: wgpu::TextureFormat,
-    ) -> (
-        (u32, u32),
-        (u32, u32),
-        PfxTarget,
-        PfxTarget,
-        PfxTarget,
-        PfxTarget,
-    ) {
+    ) -> ((u32, u32), PfxTarget, PfxTarget) {
         let w = width.max(1);
         let h = height.max(1);
-        let bw = (w / bloom_divisor).max(1);
-        let bh = (h / bloom_divisor).max(1);
         let scene_hdr = Self::target(device, w, h, "PostFX Scene HDR", HDR_FORMAT);
-        let bloom_a = Self::target(device, bw, bh, "PostFX Bloom A", HDR_FORMAT);
-        let bloom_b = Self::target(device, bw, bh, "PostFX Bloom B", HDR_FORMAT);
         // Full resolution and in the *output* format: FXAA samples the finished frame
         // exactly as it would have been presented.
         let ldr = Self::target(device, w, h, "PostFX LDR", output_format);
-        ((w, h), (bw, bh), scene_hdr, bloom_a, bloom_b, ldr)
+        ((w, h), scene_hdr, ldr)
     }
 
-    pub(super) fn target(
+    pub(crate) fn target(
         device: &wgpu::Device,
         width: u32,
         height: u32,
@@ -199,7 +192,7 @@ impl PostFx {
 
     /// A fullscreen-triangle pass: `(vs, fs)` entry points of `shader`, writing one
     /// `format` target with no blending.
-    pub(super) fn fullscreen_pipeline(
+    pub(crate) fn fullscreen_pipeline(
         device: &wgpu::Device,
         shader: &wgpu::ShaderModule,
         layout: &wgpu::PipelineLayout,
@@ -239,8 +232,10 @@ impl PostFx {
                 sampler_entry(6),
                 // The grading LUT (#1440), sampled with the linear-clamp sampler.
                 texture_entry(7, wgpu::TextureViewDimension::D3),
-                // The adapted exposure (#1444), read when `flags.w` says Automatic.
+                // The adapted exposure (#1444), read in Automatic.
                 uniform_entry(8, wgpu::ShaderStages::FRAGMENT),
+                // The composite's effect slots (#1467).
+                uniform_entry(9, wgpu::ShaderStages::FRAGMENT),
             ],
         })
     }

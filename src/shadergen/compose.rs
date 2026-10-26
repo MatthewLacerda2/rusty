@@ -30,8 +30,8 @@ pub const MODULES: &[&str] = &[
     "forward/bindings.wgsl",
     "forward/lighting.wgsl",
     "postfx/params.wgsl",
+    "postfx/frame.wgsl",
     "postfx/grade.wgsl",
-    "postfx/lens.wgsl",
 ];
 
 /// Build a composer pre-loaded with [`MODULES`] under `base`: `common.wgsl` as the
@@ -60,6 +60,28 @@ pub fn composer_with_common(base: &str) -> Result<Composer, String> {
             .map_err(|e| format!("{module} failed to compose: {e:?}"))?;
     }
     Ok(composer)
+}
+
+/// Register the composable module at `<base>/<module>` (named by its
+/// `#define_import_path`) into `composer`, beside [`MODULES`]: the post effects' modules
+/// (#1467), which `render` registers from its effect list before composing the
+/// composite and the grading bake it assembles from them.
+pub fn add_module(composer: &mut Composer, base: &str, module: &str) -> Result<(), String> {
+    let path = format!("{base}/{module}");
+    let source = std::fs::read_to_string(&path).map_err(|e| format!("cannot read {path}: {e}"))?;
+    add_source(composer, module, &source)
+}
+
+/// [`add_module`] from `source` already read: `module` only labels errors.
+pub fn add_source(composer: &mut Composer, module: &str, source: &str) -> Result<(), String> {
+    composer
+        .add_composable_module(ComposableModuleDescriptor {
+            source,
+            file_path: module,
+            ..Default::default()
+        })
+        .map(|_| ())
+        .map_err(|e| format!("{module} failed to compose: {e:?}"))
 }
 
 /// Compose a WGSL `source` against the composer's `common` module into a validated

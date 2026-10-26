@@ -6,9 +6,10 @@ use std::path::Path;
 
 use super::{chain, Chain, W};
 use crate::asset::lut::tests::{cube_of, identity_cube};
+use crate::components::PostProcessingComponent;
 use crate::core::fs::written::contract::{follows_rebakes, Bake};
 use crate::core::fs::written::write;
-use crate::render::postfx::grade::{GradeParams, Lookup};
+use crate::render::postfx::effects::grading::color_lookup::Lookup;
 use crate::scene::authoring::default_post_processing;
 
 /// A colour card: black, white, greys and saturated colours, in scene-linear HDR.
@@ -21,8 +22,12 @@ fn card() -> Vec<[f32; 3]> {
         .collect()
 }
 
-fn lookup(path: &str, contribution: f32) -> Option<Lookup<'_>> {
-    Some(Lookup { path, contribution })
+/// The default volume with the Color Lookup `path` at `contribution`.
+fn lookup(path: &str, contribution: f32) -> PostProcessingComponent {
+    let mut vc = default_post_processing();
+    vc.color_lookup.lut = Some(path.to_string());
+    vc.color_lookup.contribution = contribution;
+    vc
 }
 
 #[test]
@@ -32,12 +37,12 @@ fn gpu_an_identity_lut_is_byte_identical_and_a_swap_swaps_red_and_blue() {
     let (id, swap) = (dir.join("id.cube"), dir.join("swap.cube"));
     std::fs::write(&id, identity_cube(17)).unwrap();
     std::fs::write(&swap, cube_of(17, |[r, g, b]| [b, g, r])).unwrap();
-    let grade = GradeParams::from_volume(Some(&default_post_processing()));
+    let grade = default_post_processing();
     let row = card();
-    let plain = c.run(&row, 0.0, &grade);
+    let plain = c.run(&row, 0.0, Some(&grade));
     let (id, swap) = (id.to_string_lossy(), swap.to_string_lossy());
-    assert_eq!(c.run_with(&row, 0.0, &grade, lookup(&id, 1.0)), plain);
-    let swapped = c.run_with(&row, 0.0, &grade, lookup(&swap, 1.0));
+    assert_eq!(c.run(&row, 0.0, Some(&lookup(&id, 1.0))), plain);
+    let swapped = c.run(&row, 0.0, Some(&lookup(&swap, 1.0)));
     for (p, s) in plain.iter().zip(&swapped) {
         let off = [
             p[2].abs_diff(s[0]),
@@ -51,7 +56,7 @@ fn gpu_an_identity_lut_is_byte_identical_and_a_swap_swaps_red_and_blue() {
         "the card has colour"
     );
     // No contribution is no LUT.
-    assert_eq!(c.run_with(&row, 0.0, &grade, lookup(&swap, 0.0)), plain);
+    assert_eq!(c.run(&row, 0.0, Some(&lookup(&swap, 0.0))), plain);
 }
 
 #[test]
@@ -75,14 +80,14 @@ fn gpu_a_malformed_or_missing_lut_grades_neutral() {
     let mut text = identity_cube(4);
     text.truncate(text.trim_end().rfind('\n').unwrap());
     std::fs::write(&bad, text).unwrap();
-    let grade = GradeParams::from_volume(Some(&default_post_processing()));
+    let grade = default_post_processing();
     let row = card();
-    let plain = c.run(&row, 0.0, &grade);
+    let plain = c.run(&row, 0.0, Some(&grade));
     let bad = bad.to_string_lossy();
-    assert_eq!(c.run_with(&row, 0.0, &grade, lookup(&bad, 1.0)), plain);
+    assert_eq!(c.run(&row, 0.0, Some(&lookup(&bad, 1.0))), plain);
     let missing = dir.join("absent.cube");
     let missing = missing.to_string_lossy();
-    assert_eq!(c.run_with(&row, 0.0, &grade, lookup(&missing, 1.0)), plain);
+    assert_eq!(c.run(&row, 0.0, Some(&lookup(&missing, 1.0))), plain);
 }
 
 #[test]
@@ -93,10 +98,9 @@ fn gpu_the_bake_follows_the_contribution_the_path_and_the_file() {
     std::fs::write(&a, identity_cube(2)).unwrap();
     std::fs::write(&b, identity_cube(2)).unwrap();
     let (a, b) = (a.to_string_lossy(), b.to_string_lossy());
-    let grade = GradeParams::NEUTRAL;
-    let bake = |c: &mut Chain, l| {
+    let bake = |c: &mut Chain, vc: PostProcessingComponent| {
         let gpu = (&c.r.device, &c.r.queue);
-        c.pfx.grade.prepare(gpu, &mut c.r.grade_bake, &grade, l)
+        c.pfx.grade.prepare(gpu, &mut c.r.grade_bake, Some(&vc))
     };
     assert!(bake(&mut c, lookup(&a, 1.0)), "the first bake");
     assert!(!bake(&mut c, lookup(&a, 1.0)), "a still lookup bakes once");
@@ -110,7 +114,10 @@ fn gpu_the_bake_follows_the_contribution_the_path_and_the_file() {
     );
     c.r.grade_bake.luts.refresh();
     assert!(bake(&mut c, lookup(&b, 0.5)), "the file written over");
-    assert!(bake(&mut c, None), "the lookup cleared");
+    assert!(
+        bake(&mut c, default_post_processing()),
+        "the lookup cleared"
+    );
 }
 
 #[test]

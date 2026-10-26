@@ -8,11 +8,8 @@ use super::camera::{CameraCtx, StackShared, CAMERA_PASSES};
 use crate::render::gpu::uniforms::FogUniform;
 use crate::render::motion::{self, HistoryKey};
 use crate::render::passes::ssao::SsaoPlan;
-use crate::render::postfx::exposure::ExposureParams;
-use crate::render::postfx::grade::{GradeParams, Lookup};
-use crate::render::postfx::params::{
-    auto_exposure, blur_params, build_post_params, dof_params, post_passes, PostSource,
-};
+use crate::render::postfx::effects::{self, EffectCx, PassCx};
+use crate::render::postfx::params::{frame_params, PostSource};
 use crate::render::{RenderView, Renderer};
 use crate::scene::{Camera, Scene};
 
@@ -89,106 +86,43 @@ impl Renderer {
         view.post_fx.motion.history.end();
     }
 
-    /// Run the post-process chain (color correction, bloom, motion blur, SSR) over the
-    /// view's composited HDR target, writing the corrected image to `output`.
+    /// Run the post-process chain over the view's composited HDR target: every
+    /// effect's scene pass in order (depth of field, motion blur, the exposure meter,
+    /// bloom), the grading LUT's bake when its inputs changed, then the composite and
+    /// the LDR passes, writing the corrected image to `output`.
     pub(super) fn run_post_fx(&mut self, view: &mut RenderView, ctx: &CameraCtx) {
         use crate::render::postfx::PostFxContext;
 
-        let (scene, output) = (ctx.scene, ctx.stack.output);
-        let post = PostFrame {
-            view_proj: ctx.base_view_proj,
-            camera_pos: ctx.cam.position.to_array(),
-            full: ctx.stack.full_post_fx,
+        let (scene, stack) = (ctx.scene, ctx.stack);
+        let effect = EffectCx {
+            post: stack.post,
+            graphics: self.graphics(stack.editor_mode),
+            full: stack.full_post_fx,
         };
-        let graphics = self.graphics(ctx.stack.editor_mode);
-
-        self.focus_scene(view, ctx.stack);
-        self.blur_scene(view, ctx.stack);
+        let pass = PassCx {
+            scene,
+            stack,
+            effect,
+        };
+        for run in effects::scene_passes() {
+            run(self, view, &pass);
+        }
 
         // The grade + tonemap and the Color Lookup (#1440, #1441): rebaked only when
         // this view's inputs changed.
-        let volume = ctx.stack.post.volume.filter(|_| post.full);
-        let (grade, lookup) = (GradeParams::from_volume(volume), Lookup::of(volume));
         let (gpu, bake) = ((&self.device, &self.queue), &mut self.grade_bake);
-        let baked = view.post_fx.grade.prepare(gpu, bake, &grade, lookup);
+        let baked = view.post_fx.grade.prepare(gpu, bake, effect.volume());
         self.frame_counters.grade_lut_bakes += u32::from(baked);
 
-        self.meter_exposure(view, ctx, post.full);
-
-        let (mut post_params, bloom_enabled) = build_post_params(
-            scene,
-            ctx.stack.post,
-            graphics,
-            post.view_proj,
-            post.camera_pos,
-        );
-        let mut passes = post_passes(ctx.stack.post, bloom_enabled, graphics);
-        if !post.full {
-            // Display transform only: no FXAA and no authored effects either.
-            post_params.tonemap_only();
-            (passes.bloom, passes.fxaa) = (false, false);
-            passes.custom = &[];
-        }
-        post_params.misc[1] = 1.0 / view.post_fx.bloom_size.0 as f32;
-        post_params.misc[2] = 1.0 / view.post_fx.bloom_size.1 as f32;
-
+        let params = frame_params(scene, ctx.base_view_proj, ctx.cam.position.to_array());
         let sky = self.sky_panorama();
-        let ctx = PostFxContext {
+        let chain = PostFxContext {
             depth_view: &view.depth_view,
             skybox: (&sky.view, &sky.sampler),
-            output,
+            output: stack.output,
             timer: &self.gpu_timer,
         };
         view.post_fx
-            .run(&self.device, &self.queue, ctx, post_params, passes);
+            .run((&self.device, &self.queue), chain, &effect, params);
     }
-
-    /// Depth of field (#1445), first in the chain, over the view depths the velocity
-    /// target holds: motion blur then reads the focused scene. A display-only render
-    /// texture, the Scene view and a view with no target (a shader preview) skip it.
-    fn focus_scene(&self, view: &mut RenderView, stack: &StackPass) {
-        let graphics = self.graphics(stack.editor_mode);
-        let runs = stack.full_post_fx && !stack.editor_mode;
-        let params = dof_params(stack.post, graphics, view.size().height).filter(|_| runs);
-        let gpu = (&self.device, &self.queue);
-        view.post_fx
-            .run_depth_of_field(gpu, &self.depth_of_field, params, &self.gpu_timer);
-    }
-
-    /// Per-object motion blur (#1436), over the velocity target the stack wrote:
-    /// bloom, the exposure meter and the composite then read the blurred scene.
-    /// Gated by [`motion::wanted`], so the editor's Scene view never blurs and a view
-    /// that wrote velocity only for depth of field runs no motion blur.
-    fn blur_scene(&self, view: &mut RenderView, stack: &StackPass) {
-        let graphics = self.graphics(stack.editor_mode);
-        let blurs = motion::wanted(stack.post, graphics, stack.full_post_fx, stack.editor_mode);
-        let blur = blur_params(stack.post, graphics, view.size().height)
-            .filter(|_| blurs)
-            .map(|b| b.per_frames(stack.motion_frames));
-        let gpu = (&self.device, &self.queue);
-        view.post_fx
-            .run_motion_blur(gpu, &self.motion_blur, blur, &self.gpu_timer);
-    }
-
-    /// Automatic exposure (#1444): meter this view's scene, after motion blur (#1436), and adapt, on the GPU, when
-    /// its volume is `Automatic` and the stack runs full post-FX; otherwise the next
-    /// metered frame snaps.
-    fn meter_exposure(&self, view: &mut RenderView, ctx: &CameraCtx, full: bool) {
-        let (meter, scene) = view.post_fx.exposure_and_scene();
-        let Some(ae) = auto_exposure(ctx.stack.post).filter(|_| full) else {
-            return meter.cut();
-        };
-        let key = HistoryKey::new(ctx.scene, ctx.stack.base_id);
-        let step = meter.step(key, ctx.stack.editor_mode, ctx.scene.shader_time);
-        let params = ExposureParams::new(ae, step);
-        let gpu = (&self.device, &self.queue);
-        meter.run(gpu, &self.exposure_passes, scene, &params);
-    }
-}
-
-/// The per-stack inputs of [`Renderer::run_post_fx`].
-struct PostFrame {
-    view_proj: glam::Mat4,
-    camera_pos: [f32; 3],
-    full: bool,
 }

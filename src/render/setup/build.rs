@@ -13,10 +13,7 @@ use crate::render::gpu::pipelines;
 use crate::render::gpu::shaders::ShaderRegistry;
 use crate::render::ibl::reflection_probes::ProbeArray;
 use crate::render::passes::outline::OutlinePasses;
-use crate::render::postfx::{
-    depth_of_field::DofPasses, exposure::ExposurePasses, grade::GradeBake,
-    motion_blur::MotionBlurPasses, HDR_FORMAT,
-};
+use crate::render::postfx::{effects::Passes, grade::GradeBake, HDR_FORMAT};
 use crate::render::setup::textures::{create_textures, Textures};
 use crate::render::{ibl::skybox, passes::shadows, passes::ssao};
 use crate::render::{CameraUniform, GpuTexture, LightingUniform};
@@ -83,9 +80,7 @@ pub(crate) struct GpuResources {
     /// The SSAO passes (#436).
     pub ssao: ssao::SsaoRenderer,
     pub grade_bake: GradeBake,
-    pub exposure_passes: ExposurePasses,
-    pub motion_blur: MotionBlurPasses,
-    pub depth_of_field: DofPasses,
+    pub post_passes: Passes,
     pub quality: QualityPreset,
 }
 
@@ -142,9 +137,7 @@ impl GpuResources {
             ui,
             ssao,
             grade_bake: GradeBake::new(device, &mut registry),
-            exposure_passes: ExposurePasses::new(device, &mut registry),
-            motion_blur: MotionBlurPasses::new(device, &mut registry),
-            depth_of_field: DofPasses::new(device, &mut registry),
+            post_passes: Passes::new(device, &mut registry),
             quality: QualityPreset::default(),
         }
     }

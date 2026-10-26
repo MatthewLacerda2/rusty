@@ -1,74 +1,73 @@
-//! Per-frame execution of the post-process chain: bright-pass, a 2D gaussian
-//! blur, the composite (exposure, then the grading LUT `grade` baked), the authored effects (#397), then FXAA —
-//! or a plain copy — that writes the finished image to the target.
+//! Per-frame execution of the post-process chain after the effects' scene passes:
+//! the composite (assembled from the effects' functions around the grading LUT
+//! `grade` baked), the LDR passes (the authored effects, #397, then FXAA — or a
+//! plain copy) that write the finished image to the target.
 
-use super::custom::{CustomChain, Effect};
-use super::{PfxTarget, PostFx, PostFxContext, PostParams, PostPasses};
+use super::effects::{self, EffectCx, Gpu, LdrRun, Pass};
+use super::{PfxTarget, PostFx, PostFxContext, PostParams};
 use crate::render::timing::GpuPass;
 
 impl PostFx {
-    /// Run the full chain. `depth_view` is the scene depth, for SSR and authored
-    /// effects (motion blur has already run, over the velocity target's own
-    /// distances), `skybox` the panorama SSR falls back to, `output` the final
-    /// swapchain/screenshot view. `passes` says which optional passes run this frame.
-    pub fn run(
+    /// Run the chain after the effects' scene passes: the composite, then the LDR
+    /// passes that run for `cx` (the authored effects in place, FXAA finishing), or
+    /// a plain copy when only in-place ones ran. `params` is the frame: `ctx.output`
+    /// the final swapchain/screenshot view.
+    pub(crate) fn run(
         &mut self,
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
+        gpu: Gpu,
         ctx: PostFxContext<'_>,
+        cx: &EffectCx,
         params: PostParams,
-        passes: PostPasses<'_>,
     ) {
-        let PostPasses {
-            bloom: bloom_enabled,
-            fxaa: fxaa_enabled,
-            custom,
-            post_params,
-        } = passes;
+        let (device, queue) = gpu;
         queue.write_buffer(&self.params_buffer, 0, bytemuck::bytes_of(&params));
-        self.custom.prepare(device, custom);
+        let slots = effects::composite_slots(cx);
+        queue.write_buffer(&self.fx_buffer, 0, bytemuck::cast_slice(&slots));
+        let ldr: Vec<&LdrRun> = effects::ldr_passes()
+            .into_iter()
+            .filter_map(|pass| match pass {
+                Pass::Ldr { prepare, run, .. } => prepare(self, device, cx).then_some(run),
+                Pass::Scene { .. } => None,
+            })
+            .collect();
 
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("PostFX Encoder"),
         });
-
-        if bloom_enabled {
-            self.run_bloom(device, &mut encoder, &ctx);
-        }
-
-        // Composite reads the scene (motion-blurred when it ran, #1436) + bloom_b
-        // (final blur result) + depth + skybox.
-        // When anything follows it (FXAA, authored effects) it lands in the LDR target
-        // for that pass to sample; otherwise it writes the output directly, so the
-        // plain path is byte-for-byte what the chain produced before those existed.
-        let effects = self.custom.loaded(custom);
-        CustomChain::write_params(queue, &effects, post_params);
+        // When an LDR pass follows the composite it lands in the LDR target for that
+        // pass to sample; otherwise it writes the output directly, so the plain path
+        // is byte-for-byte what the chain produced before those existed.
         let composite_bg = self.io_bind_group(
             device,
             self.scene_color(),
-            &self.bloom_b.view,
+            &self.bloom.b.view,
             ctx.depth_view,
             ctx.skybox,
         );
-        let followed = fxaa_enabled || !effects.is_empty();
+        let followed = !ldr.is_empty();
         let composite_target = if followed { &self.ldr.view } else { ctx.output };
         let composite = (&self.composite_pipeline, ctx.timer.writes(GpuPass::PostFx));
         Self::fullscreen(&mut encoder, composite, &[&composite_bg], composite_target);
-        let finished = self.run_custom(device, &mut encoder, &ctx, &effects);
 
-        // FXAA: tonemapped LDR in, anti-aliased output out. The aux/depth/skybox
-        // bindings are unused by the pass but must satisfy the shared IO layout.
-        // Without FXAA, authored effects still need their result copied out.
-        let last = match (fxaa_enabled, effects.is_empty()) {
-            (true, _) => Some(&self.fxaa_pipeline),
-            (false, false) => Some(&self.copy_pipeline),
-            (false, true) => None,
+        let mut finish = None;
+        for run in ldr {
+            match run {
+                LdrRun::InPlace(run) => run(self, gpu, &mut encoder, &ctx, cx),
+                LdrRun::Finish(pipeline) => finish = Some(*pipeline),
+            }
+        }
+        // The finishing pass, or the copy that lands the in-place passes' result.
+        // The aux/depth/skybox bindings are unused by either but must satisfy the
+        // shared IO layout.
+        let last = match finish {
+            Some(pipeline) => Some(pipeline(self)),
+            None => followed.then_some(&self.copy_pipeline),
         };
         if let Some(pipeline) = last {
             let bg = self.io_bind_group(
                 device,
-                &finished.view,
-                &self.bloom_b.view,
+                &self.ldr.view,
+                &self.bloom.b.view,
                 ctx.depth_view,
                 ctx.skybox,
             );
@@ -77,75 +76,6 @@ impl PostFx {
         }
 
         queue.submit(std::iter::once(encoder.finish()));
-    }
-
-    /// Run the authored effects (#397) over the composite in `ldr`, ping-ponging with
-    /// the second LDR target, and keep the result as next frame's history. Returns the
-    /// target holding the result (`ldr` itself when there are no effects).
-    fn run_custom<'s>(
-        &'s self,
-        device: &wgpu::Device,
-        encoder: &mut wgpu::CommandEncoder,
-        ctx: &PostFxContext<'_>,
-        effects: &[&Effect],
-    ) -> &'s PfxTarget {
-        let (mut src, mut dst) = (&self.ldr, &self.custom.ldr_b);
-        if effects.is_empty() {
-            return src;
-        }
-        for effect in effects {
-            let bg = self.io_bind_group(
-                device,
-                &src.view,
-                &self.custom.history.view,
-                ctx.depth_view,
-                ctx.skybox,
-            );
-            let pass = (&effect.pipeline, ctx.timer.writes(GpuPass::PostFx));
-            Self::fullscreen(encoder, pass, &[&bg, &effect.params], &dst.view);
-            (src, dst) = (dst, src);
-        }
-        encoder.copy_texture_to_texture(
-            src.texture.as_image_copy(),
-            self.custom.history.texture.as_image_copy(),
-            src.texture.size(),
-        );
-        src
-    }
-
-    /// Bright-pass (scene -> bloom_a), then a 2D gaussian blur (a -> b), leaving the
-    /// blurred bloom in bloom_b for the composite to add. The scene is
-    /// [`PostFx::scene_color`], so a moving highlight blooms along its streak: motion
-    /// blur runs before bloom, as in URP and HDRP (#1436).
-    fn run_bloom(
-        &self,
-        device: &wgpu::Device,
-        encoder: &mut wgpu::CommandEncoder,
-        ctx: &PostFxContext<'_>,
-    ) {
-        let (depth_view, skybox) = (ctx.depth_view, ctx.skybox);
-        // The aux "bloom" binding (slot 3) is unused by the bright/blur passes, so
-        // it points at scene_hdr (never a render target here) to avoid a sampled-
-        // texture / color-target usage conflict.
-        let bright_bg = self.io_bind_group(
-            device,
-            self.scene_color(),
-            &self.scene_hdr.view,
-            depth_view,
-            skybox,
-        );
-        let bright = (&self.bright_pipeline, ctx.timer.writes(GpuPass::PostFx));
-        Self::fullscreen(encoder, bright, &[&bright_bg], &self.bloom_a.view);
-
-        let blur_bg = self.io_bind_group(
-            device,
-            &self.bloom_a.view,
-            &self.scene_hdr.view,
-            depth_view,
-            skybox,
-        );
-        let blur = (&self.blur_pipeline, ctx.timer.writes(GpuPass::PostFx));
-        Self::fullscreen(encoder, blur, &[&blur_bg], &self.bloom_b.view);
     }
 
     /// Composite this frame's scene once more into `ctx.output` — graded,
@@ -161,7 +91,7 @@ impl PostFx {
         let bg = self.io_bind_group(
             device,
             self.scene_color(),
-            &self.bloom_b.view,
+            &self.bloom.b.view,
             ctx.depth_view,
             ctx.skybox,
         );
@@ -170,8 +100,8 @@ impl PostFx {
         Self::fullscreen(encoder, composite, &[&bg], ctx.output);
     }
 
-    /// The scene the composite reads: motion-blurred (#1436), else focused.
-    fn scene_color(&self) -> &wgpu::TextureView {
+    /// The scene the composite and bloom read: motion-blurred (#1436), else focused.
+    pub(crate) fn scene_color(&self) -> &wgpu::TextureView {
         scene_of(self.blur.as_ref(), self.dof.as_ref(), &self.scene_hdr)
     }
 
@@ -185,7 +115,7 @@ impl PostFx {
     /// the image after depth of field and motion blur (#1444) without a borrow clash.
     pub(crate) fn exposure_and_scene(
         &mut self,
-    ) -> (&mut super::exposure::ExposureMeter, &wgpu::TextureView) {
+    ) -> (&mut effects::exposure::ExposureMeter, &wgpu::TextureView) {
         let scene = scene_of(self.blur.as_ref(), self.dof.as_ref(), &self.scene_hdr);
         (&mut self.exposure, scene)
     }
@@ -197,9 +127,9 @@ impl PostFx {
     }
 
     /// Build a bind group: params + color(1) + sampler(2) + bloom(3) + depth(4) +
-    /// skybox(5) + its sampler(6) + the grading LUT(7) + the adapted exposure(8). `color` is the texture the pass reads, `bloom` an
-    /// aux texture.
-    fn io_bind_group(
+    /// skybox(5) + its sampler(6) + the grading LUT(7) + the adapted exposure(8) + the
+    /// effect slots(9). `color` is the texture the pass reads, `bloom` an aux texture.
+    pub(crate) fn io_bind_group(
         &self,
         device: &wgpu::Device,
         color: &wgpu::TextureView,
@@ -247,13 +177,17 @@ impl PostFx {
                     binding: 8,
                     resource: self.exposure.state().as_entire_binding(),
                 },
+                wgpu::BindGroupEntry {
+                    binding: 9,
+                    resource: self.fx_buffer.as_entire_binding(),
+                },
             ],
         })
     }
 
     /// One fullscreen triangle into `target`, `groups` bound from group 0 up, with
     /// the pass's timestamp writes (#835).
-    pub(super) fn fullscreen(
+    pub(crate) fn fullscreen(
         encoder: &mut wgpu::CommandEncoder,
         (pipeline, timestamp_writes): Timed<'_>,
         groups: &[&wgpu::BindGroup],
@@ -284,15 +218,15 @@ impl PostFx {
 }
 
 /// A pass's pipeline and its timestamp writes.
-pub(super) type Timed<'a> = (
+pub(crate) type Timed<'a> = (
     &'a wgpu::RenderPipeline,
     Option<wgpu::RenderPassTimestampWrites<'a>>,
 );
 
 /// The motion-blurred image when `blur` ran, else the focused one when `dof` did.
 fn scene_of<'a>(
-    blur: Option<&'a super::motion_blur::BlurTargets>,
-    dof: Option<&'a super::depth_of_field::DofTargets>,
+    blur: Option<&'a effects::motion_blur::BlurTargets>,
+    dof: Option<&'a effects::depth_of_field::DofTargets>,
     scene_hdr: &'a PfxTarget,
 ) -> &'a wgpu::TextureView {
     let focused = dof.map_or(&scene_hdr.view, |d| &d.focused.view);
