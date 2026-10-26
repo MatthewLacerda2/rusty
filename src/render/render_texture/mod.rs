@@ -139,7 +139,7 @@ impl Renderer {
 }
 
 /// Every `"rt:<name>"` path an active UI `Image` or an active entity's material
-/// maps (and extra shader texture slots, #400) reference this frame — the textures
+/// maps (and extra shader texture slots, #400) or a volume's lens dirt reference this frame — the textures
 /// worth drawing.
 pub(crate) fn referenced_render_textures(scene: &Scene) -> HashSet<String> {
     let images = scene
@@ -152,8 +152,11 @@ pub(crate) fn referenced_render_textures(scene: &Scene) -> HashSet<String> {
         crate::render::draw::material_map_paths(scene, |id| scene.world.is_active_in_hierarchy(id))
             .into_iter()
             .map(|(path, _)| path);
+    // Bloom's lens dirt can be one too (#1442).
+    let dirt = crate::render::postfx::effects::bloom::dirt::render_textures(scene);
     images
         .chain(maps)
+        .chain(dirt.into_iter().map(Into::into))
         .filter(|path| is_render_texture(path.as_str()))
         .map(|path| path.to_string())
         .collect()

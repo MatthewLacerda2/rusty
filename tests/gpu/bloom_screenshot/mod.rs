@@ -76,3 +76,5 @@ fn bloom_spreads_a_bright_surface_onto_its_surroundings() {
         "bloom must brighten the frame (off={off:.3}, on={on:.3})"
     );
 }
+
+mod lens_dirt;
