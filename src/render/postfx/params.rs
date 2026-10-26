@@ -201,7 +201,7 @@ pub(crate) fn dof_params(
 
 /// Whether `post`'s volume runs depth of field, through [`effect_runs`]: its mode is
 /// not `Off`, the player's option allows it and the tier runs it (not Low). The
-/// velocity target, whose distances it reads, is written when this holds too.
+/// velocity target, whose depths it reads, is written when this holds too.
 pub(crate) fn dof_enabled(post: PostSource, graphics: GraphicsSettings) -> bool {
     let on = post
         .volume

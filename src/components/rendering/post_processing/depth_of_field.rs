@@ -29,7 +29,8 @@ pub struct DepthOfField {
     pub mode: DofMode,
     /// Gaussian: the distance from the camera, in metres, where the blur starts.
     pub gaussian_start: f32,
-    /// Gaussian: where the blur reaches its full radius (`≥ gaussian_start`).
+    /// Gaussian: where the blur reaches its full radius; nearer than
+    /// `gaussian_start`, it is drawn at the start (an instant edge).
     pub gaussian_end: f32,
     /// Gaussian: how wide the full blur is, `0.5..=1.5` (Unity's range).
     pub gaussian_max_radius: f32,
@@ -53,6 +54,9 @@ impl DepthOfField {
     pub const MAX_FOCAL_LENGTH: f32 = 300.0;
     /// The nearest focus distance a write accepts, in metres.
     pub const MIN_FOCUS_DISTANCE: f32 = 0.1;
+    /// The farthest focus distance, in metres: where `+inf` (focus at infinity)
+    /// lands, past any level.
+    pub const MAX_FOCUS_DISTANCE: f32 = 10_000.0;
 }
 
 impl Default for DepthOfField {

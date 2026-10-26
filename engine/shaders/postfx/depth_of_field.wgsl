@@ -1,16 +1,22 @@
 // engine/shaders/postfx/depth_of_field.wgsl — depth of field (#1445), Unity URP's
 // two modes. Fullscreen passes over the HDR scene, before motion blur:
 //   fs_coc       — full resolution: each pixel's signed circle of confusion (CoC), in
-//                  pixels of radius, from its distance to the camera that drew it
-//                  (the velocity target's `.z`, #1436). Negative is nearer than the
+//                  pixels of radius, from its depth along the view axis of the camera
+//                  that drew it (the velocity target's `.z`, #1436): the focus is a
+//                  plane, as in Unity, not a sphere. Negative is nearer than the
 //                  focus, positive beyond it. A pixel an overlay camera drew (`.w`,
 //                  its index in the stack, above 0: a viewmodel) has none.
 //   fs_prefilter — working resolution (half on Medium, full on High): the colour,
-//                  averaged, and the CoC with the larger magnitude, in working pixels
+//                  averaged, and the CoC with the larger magnitude, in working pixels.
+//                  The tent and the composite read this reduced CoC (`t_work`).
 //   Gaussian: fs_gauss_h, fs_gauss_v — a separable Gaussian, each tap weighted by
 //                  its own CoC, so a sharp foreground never bleeds into the blurred
 //                  background behind it
-//   Bokeh:    fs_bokeh — a disc gather in rings, splitting the far field (a tap
+//   Bokeh:    fs_tile_max, fs_neighbor_max — per tile, how far the near field around
+//                  it reaches (its largest near CoC, then the 3×3 tiles' largest), so
+//                  a pixel knows how wide to gather; then
+//             fs_bokeh — a disc gather in rings scaled to the pixel's own reach (its
+//                  CoC, or the near blur that spreads over it), splitting the far field (a tap
 //                  reaches only as far as both its and the pixel's CoC allow) from
 //                  the near field (a tap reaches as far as its own CoC, so a
 //                  near blur spreads over what is in focus behind it), then fs_tent,
@@ -25,7 +31,8 @@
 
 struct DofParams {
     // x: mode (1 Gaussian, 2 Bokeh), y: the largest CoC in full-resolution pixels,
-    // z: the working-resolution divisor
+    // z: the working-resolution divisor, w: Bokeh's tile size in working pixels (at
+    // least the largest working CoC, so a 3×3 of tiles holds every tap's reach)
     shape: vec4<f32>,
     // Gaussian: x start, y end (m). Bokeh: x focus distance (m), y the CoC of a point
     // at infinity (px).
@@ -38,11 +45,16 @@ struct DofParams {
 @group(0) @binding(2) var t_velocity: texture_2d<f32>;
 // The full-resolution CoC (`.r`).
 @group(0) @binding(3) var t_coc: texture_2d<f32>;
-// The working-resolution blur the composite blends in.
+// The working-resolution blur the composite blends in; for fs_bokeh, the tiles'
+// near reach (fs_neighbor_max's output).
 @group(0) @binding(4) var t_blur: texture_2d<f32>;
+// The prefiltered working image: colour, and the CoC in working pixels (`.a`).
+@group(0) @binding(5) var t_work: texture_2d<f32>;
 
 const TAU: f32 = 6.28318530718;
-// The Bokeh disc's rings: ring k holds 8k taps, 48 around the centre.
+// The Bokeh disc's rings: ring k holds 8k taps, 48 around the centre. They spread
+// over each pixel's own reach, so a small blur is covered as densely as a large one;
+// at the largest radius the rings sit a third of it apart, and the tent smooths them.
 const RINGS: i32 = 3;
 // How many working pixels a tap's reach fades over at its edge.
 const MARGIN: f32 = 1.0;
@@ -56,15 +68,15 @@ fn is_gaussian() -> bool {
     return dof.shape.x < 1.5;
 }
 
-// The CoC, in full-resolution pixels, of a surface `distance` metres from its
-// camera. `DofParams::coc` in `render::postfx::depth_of_field::params` mirrors it.
-fn coc_of(distance: f32) -> f32 {
+// The CoC, in full-resolution pixels, of a surface `depth` metres along its camera's
+// view axis. `DofParams::coc` in `render::postfx::depth_of_field::params` mirrors it.
+fn coc_of(depth: f32) -> f32 {
     let max_coc = dof.shape.y;
     if (is_gaussian()) {
         let span = max(dof.focus.y - dof.focus.x, 1e-4);
-        return clamp((distance - dof.focus.x) / span, 0.0, 1.0) * max_coc;
+        return clamp((depth - dof.focus.x) / span, 0.0, 1.0) * max_coc;
     }
-    return clamp(dof.focus.y * (1.0 - dof.focus.x / max(distance, 1e-4)), -max_coc, max_coc);
+    return clamp(dof.focus.y * (1.0 - dof.focus.x / max(depth, 1e-4)), -max_coc, max_coc);
 }
 
 // Whether pixel `p` was drawn by an overlay camera: a higher one in the stack.
@@ -118,6 +130,42 @@ fn fs_prefilter(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32> {
     return vec4<f32>(sum.rgb / sum.a, coc / dof.shape.z);
 }
 
+// The CoC of prefiltered texel `q`, in full-resolution pixels.
+fn work_coc(q: vec2<i32>) -> f32 {
+    return textureLoad(t_work, q, 0).a * dof.shape.z;
+}
+
+// One texel per tile: how far its pixels' near blur reaches, in working pixels.
+@fragment
+fn fs_tile_max(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32> {
+    let tile = i32(dof.shape.w);
+    let base = vec2<i32>(pos.xy) * tile;
+    let last = vec2<i32>(textureDimensions(t_work)) - 1;
+    var reach = 0.0;
+    for (var y = 0; y < tile; y = y + 1) {
+        for (var x = 0; x < tile; x = x + 1) {
+            reach = max(reach, -textureLoad(t_work, min(base + vec2<i32>(x, y), last), 0).a);
+        }
+    }
+    return vec4<f32>(reach, 0.0, 0.0, 0.0);
+}
+
+// One texel per tile: the largest near reach of its 3×3 tiles, every near blur that
+// can spread onto it.
+@fragment
+fn fs_neighbor_max(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32> {
+    let p = vec2<i32>(pos.xy);
+    let last = vec2<i32>(textureDimensions(t_color)) - 1;
+    var reach = 0.0;
+    for (var y = -1; y <= 1; y = y + 1) {
+        for (var x = -1; x <= 1; x = x + 1) {
+            let q = clamp(p + vec2<i32>(x, y), vec2<i32>(0), last);
+            reach = max(reach, textureLoad(t_color, q, 0).r);
+        }
+    }
+    return vec4<f32>(reach, 0.0, 0.0, 0.0);
+}
+
 // The largest CoC in working pixels.
 fn working_radius() -> f32 {
     return dof.shape.y / dof.shape.z;
@@ -162,9 +210,15 @@ fn reach(radius: f32, dist: f32) -> f32 {
 @fragment
 fn fs_bokeh(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32> {
     let p = vec2<i32>(pos.xy);
-    let last = vec2<i32>(textureDimensions(t_color)) - 1;
     let center = textureLoad(t_color, p, 0);
-    let radius = working_radius();
+    // The pixel's own reach: its far blur, or the near blur around it, whichever is
+    // wider. In focus with nothing near, there is nothing to gather.
+    let near = textureLoad(t_blur, p / i32(dof.shape.w), 0).r;
+    let radius = min(max(center.a, near), working_radius());
+    if (radius < 0.25) {
+        return vec4<f32>(center.rgb, 0.0);
+    }
+    let last = vec2<i32>(textureDimensions(t_color)) - 1;
     var bg = vec4<f32>(center.rgb, 1.0);
     var fg = vec4<f32>(0.0);
     var taps = 1.0;
@@ -174,8 +228,11 @@ fn fs_bokeh(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32> {
         let turn = 0.5 * f32(ring & 1);
         for (var i = 0; i < count; i = i + 1) {
             let angle = TAU * (f32(i) + turn) / f32(count);
-            let offset = round(vec2<f32>(cos(angle), sin(angle)) * radius * f32(ring) / f32(RINGS));
-            // The tap's own distance, on the pixel it lands on.
+            let ideal = vec2<f32>(cos(angle), sin(angle)) * radius * f32(ring) / f32(RINGS);
+            // On the texel it lands on, never between two: a bilinear tap would mix a
+            // sharp texel's colour into its neighbour's blur (a halo). Its weight
+            // fades with that texel's own distance, so the disc still grows smoothly.
+            let offset = round(ideal);
             let dist = length(offset);
             let q = clamp(p + vec2<i32>(offset), vec2<i32>(0), last);
             let tap = textureLoad(t_color, q, 0);
@@ -183,8 +240,9 @@ fn fs_bokeh(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32> {
             // tap never spreads and an in-focus pixel takes no background.
             let bg_w = reach(max(min(center.a, tap.a), 0.0), dist);
             // Near field: as far as the tap's own reach, over anything; a CoC under
-            // a pixel is in focus.
-            let fg_w = reach(-tap.a, dist) * step(1.0, -tap.a);
+            // a full-resolution pixel is in focus (eased in, as the composite's far
+            // blend is, so racking focus never steps).
+            let fg_w = reach(-tap.a, dist) * smoothstep(0.5, 1.5, -tap.a * dof.shape.z);
             bg += vec4<f32>(tap.rgb, 1.0) * bg_w;
             fg += vec4<f32>(tap.rgb, 1.0) * fg_w;
             taps += 1.0;
@@ -201,13 +259,13 @@ fn fs_bokeh(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32> {
 fn fs_tent(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32> {
     let p = vec2<i32>(pos.xy);
     let last = vec2<i32>(textureDimensions(t_color)) - 1;
-    let coc = block_coc(p);
+    let coc = work_coc(p);
     var sum = vec4<f32>(0.0);
     var total = 0.0;
     for (var y = -1; y <= 1; y = y + 1) {
         for (var x = -1; x <= 1; x = x + 1) {
             let q = clamp(p + vec2<i32>(x, y), vec2<i32>(0), last);
-            let w = f32((2 - abs(x)) * (2 - abs(y))) * agreement(block_coc(q), coc);
+            let w = f32((2 - abs(x)) * (2 - abs(y))) * agreement(work_coc(q), coc);
             sum += textureLoad(t_color, q, 0) * w;
             total += w;
         }
@@ -243,7 +301,7 @@ fn upsampled(at: vec2<f32>, coc: f32) -> vec4<f32> {
         for (var x = 0; x < 2; x = x + 1) {
             let q = clamp(base + vec2<i32>(x, y), vec2<i32>(0), last);
             let bilinear = mix(1.0 - t.x, t.x, f32(x)) * mix(1.0 - t.y, t.y, f32(y));
-            let w = bilinear * agreement(block_coc(q), coc);
+            let w = bilinear * agreement(work_coc(q), coc);
             sum += textureLoad(t_blur, q, 0) * w;
             total += w;
         }

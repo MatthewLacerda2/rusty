@@ -143,7 +143,7 @@ impl Renderer {
             .run(&self.device, &self.queue, ctx, post_params, passes);
     }
 
-    /// Depth of field (#1445), first in the chain, over the distances the velocity
+    /// Depth of field (#1445), first in the chain, over the view depths the velocity
     /// target holds: motion blur then reads the focused scene. A display-only render
     /// texture, the Scene view and a view with no target (a shader preview) skip it.
     fn focus_scene(&self, view: &mut RenderView, stack: &StackPass) {

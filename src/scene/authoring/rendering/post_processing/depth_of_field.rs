@@ -5,24 +5,23 @@
 //! so none can reach a knob the others can't.
 
 use crate::components::{DepthOfField, DofMode, PostProcessingComponent};
-use crate::scene::authoring::sanitize::{at_least, clamped, non_negative};
+use crate::scene::authoring::sanitize::{clamped, non_negative, saturated};
 
 /// Set which depth of field runs.
 pub fn set_dof_mode(vc: &mut PostProcessingComponent, mode: DofMode) {
     vc.depth_of_field.mode = mode;
 }
 
-/// Set where the Gaussian blur starts, `≥ 0` metres; the end follows it out.
+/// Set where the Gaussian blur starts, `≥ 0` metres. Start and end are stored apart,
+/// as Unity's are: an end left nearer than the start is drawn at the start (an
+/// instant edge), and a tween of the start out and back leaves the authored end alone.
 pub fn set_dof_gaussian_start(vc: &mut PostProcessingComponent, metres: f32) {
-    let dof = &mut vc.depth_of_field;
-    dof.gaussian_start = non_negative(metres);
-    dof.gaussian_end = dof.gaussian_end.max(dof.gaussian_start);
+    vc.depth_of_field.gaussian_start = non_negative(metres);
 }
 
-/// Set where the Gaussian blur is full, floored at its start.
+/// Set where the Gaussian blur is full, `≥ 0` metres, independent of the start.
 pub fn set_dof_gaussian_end(vc: &mut PostProcessingComponent, metres: f32) {
-    let dof = &mut vc.depth_of_field;
-    dof.gaussian_end = at_least(metres, dof.gaussian_start);
+    vc.depth_of_field.gaussian_end = non_negative(metres);
 }
 
 /// Set the Gaussian blur's full radius, clamped to `0.5..=1.5`.
@@ -31,9 +30,14 @@ pub fn set_dof_gaussian_max_radius(vc: &mut PostProcessingComponent, radius: f32
     vc.depth_of_field.gaussian_max_radius = clamped(radius, lo, hi);
 }
 
-/// Set the Bokeh focus distance, at least `0.1` metres.
+/// Set the Bokeh focus distance, clamped to `0.1..=10000` metres; `math.huge` is
+/// focus at infinity, the farthest.
 pub fn set_dof_focus_distance(vc: &mut PostProcessingComponent, metres: f32) {
-    vc.depth_of_field.focus_distance = at_least(metres, DepthOfField::MIN_FOCUS_DISTANCE);
+    let (lo, hi) = (
+        DepthOfField::MIN_FOCUS_DISTANCE,
+        DepthOfField::MAX_FOCUS_DISTANCE,
+    );
+    vc.depth_of_field.focus_distance = saturated(metres, lo, hi);
 }
 
 /// Set the Bokeh f-stop, clamped to `1..=32`.

@@ -1,6 +1,6 @@
 //! Depth order under a `DepthOnly` overlay camera (#1436), the standard FPS stack:
 //! the overlay clears the depth buffer before the blur runs, so the blur orders
-//! world against world from the distance each camera writes beside its velocity.
+//! world against world from the depth each camera writes beside its velocity.
 
 use glam::Vec3;
 

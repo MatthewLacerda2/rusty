@@ -8,6 +8,15 @@
 /// own format in `passes::shadows`.
 pub(crate) const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
 
+/// One bind-group entry: `resource` at `binding`. The passes that build their groups
+/// entry by entry (depth of field, motion blur) share it.
+pub(crate) fn bind_entry(
+    binding: u32,
+    resource: wgpu::BindingResource<'_>,
+) -> wgpu::BindGroupEntry<'_> {
+    wgpu::BindGroupEntry { binding, resource }
+}
+
 pub(crate) mod bind_layouts;
 pub(crate) mod draw_buffers;
 pub(crate) mod fullscreen;

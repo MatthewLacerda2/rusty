@@ -9,8 +9,10 @@ use crate::components::{DepthOfField, DofMode};
 pub(crate) const GAUSSIAN_RADIUS: f32 = 1.0 / 90.0;
 
 /// The largest Bokeh circle of confusion, as a fraction of the view's height: 27 px
-/// of radius at 1080p. A wide-open telephoto clamps here; the gather's taps spread
-/// over this radius, so a larger one would leave gaps between them.
+/// of radius at 1080p. A wide-open telephoto clamps here. The gather's three rings
+/// spread over each pixel's own CoC, so a small blur is covered densely; at this
+/// radius they sit 9 px apart (at 1080p, High) and the tent smooths between them, so
+/// a larger one would show its rings.
 pub(crate) const MAX_BOKEH_RADIUS: f32 = 1.0 / 40.0;
 
 /// The sensor height the Bokeh lens images onto, in metres: a 35 mm full frame's,
@@ -22,7 +24,8 @@ pub(crate) const SENSOR_HEIGHT: f32 = 0.024;
 #[derive(Copy, Clone, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub(crate) struct DofParams {
     /// mode (1 Gaussian, 2 Bokeh), the largest circle of confusion in full-resolution
-    /// pixels, the working-resolution divisor, unused
+    /// pixels, the working-resolution divisor, and Bokeh's tile size in working pixels
+    /// (0 for Gaussian, which has no tiles)
     pub shape: [f32; 4],
     /// Gaussian: start and end distance (m). Bokeh: focus distance (m) and the
     /// circle of confusion, in pixels, of a point at infinity. Then unused.
@@ -34,6 +37,7 @@ impl DofParams {
     /// `1 / divisor` resolution; `None` when its mode is `Off`.
     pub(crate) fn new(dof: &DepthOfField, height: u32, divisor: u32) -> Option<Self> {
         let h = height as f32;
+        let divisor = divisor.max(1) as f32;
         let (mode, max, focus) = match dof.mode {
             DofMode::Off => return None,
             DofMode::Gaussian => {
@@ -47,8 +51,14 @@ impl DofParams {
                 (2.0, MAX_BOKEH_RADIUS * h, focus)
             }
         };
+        // A tile spans the largest working CoC, so a 3×3 of tiles holds every reach.
+        let tile = if mode > 1.5 {
+            (max / divisor).ceil().max(1.0)
+        } else {
+            0.0
+        };
         Some(Self {
-            shape: [mode, max, divisor.max(1) as f32, 0.0],
+            shape: [mode, max, divisor, tile],
             focus,
         })
     }
@@ -58,24 +68,29 @@ impl DofParams {
         self.shape[2] as u32
     }
 
+    /// Bokeh's tile size in working pixels; 0 for Gaussian.
+    pub(crate) fn tile(&self) -> u32 {
+        self.shape[3] as u32
+    }
+
     /// The signed circle of confusion, in full-resolution pixels of radius, of a
-    /// surface `distance` metres from its camera: negative nearer than the focus,
+    /// surface `depth` metres along its camera's view axis: negative nearer than the focus,
     /// positive beyond it, clamped to the largest. The shader's `coc_of`, for tests.
     #[cfg(test)]
-    pub(crate) fn coc(&self, distance: f32) -> f32 {
+    pub(crate) fn coc(&self, depth: f32) -> f32 {
         let max = self.shape[1];
         let [a, b, ..] = self.focus;
         if self.shape[0] < 1.5 {
-            let ramp = ((distance - a) / (b - a).max(1e-4)).clamp(0.0, 1.0);
+            let ramp = ((depth - a) / (b - a).max(1e-4)).clamp(0.0, 1.0);
             return ramp * max;
         }
-        (b * (1.0 - a / distance.max(1e-4))).clamp(-max, max)
+        (b * (1.0 - a / depth.max(1e-4))).clamp(-max, max)
     }
 }
 
 /// The circle of confusion's radius, in pixels of a view `height` tall, of a point
 /// at infinity through `dof`'s lens: the thin-lens blur `f² / (N (F − f))` on the
-/// sensor, scaled to the view. A point at distance `d` blurs by this times
+/// sensor, scaled to the view. A point at depth `d` blurs by this times
 /// `1 − F / d`.
 fn bokeh_infinity(dof: &DepthOfField, height: f32) -> f32 {
     let f = dof.focal_length / 1000.0;

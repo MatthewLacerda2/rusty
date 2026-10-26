@@ -56,6 +56,9 @@ fn depth_of_field_api_and_shared_op_converge() {
     let got = dof(&lua_scene.borrow(), id);
     assert_eq!(got, dof(&op_scene, op_id));
     assert_eq!(got.mode, DofMode::Bokeh, "names are case-insensitive");
-    assert_eq!(got.gaussian_end, 50.0, "single-sourced floor at the start");
+    assert_eq!(
+        got.gaussian_end, 20.0,
+        "the end is independent of the start"
+    );
     assert_eq!((got.focus_distance, got.focal_length), (0.1, 300.0));
 }

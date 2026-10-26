@@ -15,10 +15,10 @@
 // scene. A pixel whose neighbourhood barely moves is copied unchanged, so a still
 // frame is pixel-identical to motion blur off.
 //
-// Units. The velocity target holds `ndc_now - ndc_prev` in `.xy`, in `.z` how far
-// the surface lies from the camera that drew it, and in `.w` that camera's index in
+// Units. The velocity target holds `ndc_now - ndc_prev` in `.xy`, in `.z` the
+// surface's depth along the view axis of the camera that drew it, and in `.w` that camera's index in
 // its stack (0 the base, the sky and clear 0 too). A higher camera is in front
-// whatever the distances say: a gun 0.6 m from its camera stays over a wall 0.35 m
+// whatever the depths say: a gun 0.6 m from its camera stays over a wall 0.35 m
 // from the world camera. Within one camera, the nearer surface is in front. So the
 // order holds under a `DepthOnly` overlay that cleared the depth buffer. A *streak* is that motion in pixels, scaled by the shutter (`intensity`)
 // and clamped to the longest streak the camera allows; a tap reaches half a streak
@@ -118,14 +118,14 @@ fn fs_neighbor_max(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32> 
 }
 
 // Where the surface at pixel `p` lies: its camera's index in the stack (x) and its
-// distance from that camera (y).
+// depth along that camera's view axis (y).
 fn depth_key(p: vec2<i32>) -> vec2<f32> {
     let texel = textureLoad(t_velocity, p, 0);
     return vec2<f32>(texel.w, texel.z);
 }
 
 // How much of a tap with key `tap` lies behind the centre's `center`: a lower camera
-// is wholly behind and a higher one wholly in front; on one camera, distances within
+// is wholly behind and a higher one wholly in front; on one camera, depths within
 // `SOFT_DISTANCE` blend and further apart the nearer one wins.
 fn behind(center: vec2<f32>, tap: vec2<f32>) -> f32 {
     if (tap.x != center.x) {

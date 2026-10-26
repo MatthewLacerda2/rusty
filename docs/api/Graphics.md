@@ -42,8 +42,8 @@ cut) blurs nothing. Like FXAA it is the camera's: it runs without a post-process
 volume. The editor's Scene view never blurs and writes no velocity, as Unity's
 doesn't; the Game view and the player do. Depth ordering holds under a `DepthOnly`
 overlay camera: each camera writes which camera of the stack drew a surface and its
-distance from that camera beside its motion. A higher camera is in front whatever the
-distances say, so a viewmodel camera's gun stays sharp even against a wall nearer to
+depth along that camera's view axis beside its motion. A higher camera is in front whatever the
+depths say, so a viewmodel camera's gun stays sharp even against a wall nearer to
 the world camera than the gun is to its own; within one camera the nearer surface is
 in front, so an enemy passing a wall smears over the wall at full strength. A surface
 that was behind the camera last frame (a projectile past the player's head) writes no
@@ -101,10 +101,10 @@ set on that camera entity, in the inspector or the scene file.
 | `Graphics.GetMotionBlurIntensity` / `SetMotionBlurIntensity` | `()` / `(value)` | `number`: Unity's *Intensity*, the shutter fraction (clamped 0–1, **default `0.5`**, a 180° shutter) |
 | `Graphics.GetMotionBlurMaxLength` / `SetMotionBlurMaxLength` | `()` / `(value)` | `number`: Unity's *Clamp*, the longest streak as a fraction of the view's height (clamped 0–0.2, **default `0.05`**) |
 | `Graphics.GetDepthOfFieldMode` / `SetDepthOfFieldMode` | `()` / `(name)` | `"Off"` / `"Gaussian"` / `"Bokeh"` (**default `"Off"`**; names are case-insensitive, an unknown one raises an error listing them; see *Depth of field*) |
-| `Graphics.GetDepthOfFieldGaussianStart` / `SetDepthOfFieldGaussianStart` | `()` / `(metres)` | `number`: where the Gaussian blur starts (clamped ≥ 0, pushes the end out with it; **default `10`**) |
-| `Graphics.GetDepthOfFieldGaussianEnd` / `SetDepthOfFieldGaussianEnd` | `()` / `(metres)` | `number`: where it is full (clamped ≥ the start; **default `30`**) |
+| `Graphics.GetDepthOfFieldGaussianStart` / `SetDepthOfFieldGaussianStart` | `()` / `(metres)` | `number`: where the Gaussian blur starts (clamped ≥ 0, independent of the end, as in Unity; **default `10`**) |
+| `Graphics.GetDepthOfFieldGaussianEnd` / `SetDepthOfFieldGaussianEnd` | `()` / `(metres)` | `number`: where it is full (clamped ≥ 0; an end nearer than the start is drawn at the start, an instant edge; **default `30`**) |
 | `Graphics.GetDepthOfFieldGaussianMaxRadius` / `SetDepthOfFieldGaussianMaxRadius` | `()` / `(value)` | `number`: the full blur's width (clamped 0.5–1.5, **default `1`**) |
-| `Graphics.GetDepthOfFieldFocusDistance` / `SetDepthOfFieldFocusDistance` | `()` / `(metres)` | `number`: Bokeh's distance in focus (clamped ≥ 0.1, **default `10`**) |
+| `Graphics.GetDepthOfFieldFocusDistance` / `SetDepthOfFieldFocusDistance` | `()` / `(metres)` | `number`: Bokeh's distance in focus, along the view axis (clamped to `0.1`–`10000`; `math.huge` is focus at infinity; **default `10`**) |
 | `Graphics.GetDepthOfFieldAperture` / `SetDepthOfFieldAperture` | `()` / `(f_stop)` | `number`: Bokeh's f-stop, lower blurs more (clamped 1–32, **default `5.6`**) |
 | `Graphics.GetDepthOfFieldFocalLength` / `SetDepthOfFieldFocalLength` | `()` / `(mm)` | `number`: Bokeh's focal length, longer blurs more (clamped 1–300, **default `50`**) |
 | `Graphics.GetFxaaActive` / `SetFxaaActive` | `()` / `(bool)` | `bool` (**default `true`**) |
@@ -239,12 +239,16 @@ the focus: `Tween.To(camera, "Graphics.depth_of_field.focus_distance", 1.5, 0.2)
 (every numeric knob tweens as `"Graphics.depth_of_field.<knob>"`, the knob's field
 name; see [`Tween.md`](Tween.md)). It runs first in the chain, on the HDR scene,
 before motion blur, bloom and the grade (Unity's order). Each pixel's blur comes from
-its distance to **the camera that drew it**, so a viewmodel on a `DepthOnly` overlay
-camera (a gun 0.6 m from its camera) stays sharp while the world focuses far: an
-overlay camera's pixels are outside the world's focus. The quality tier sets its cost:
+its depth along the view axis of **the camera that drew it** (so the focus is a plane,
+as in Unity: a wall at the focus distance is sharp to its corners), and a viewmodel on
+a `DepthOnly` overlay camera (a gun 0.6 m from its camera) stays sharp while the world
+focuses far: an overlay camera's pixels are outside the world's focus. Only opaque
+and cutout surfaces write that depth: a transparent viewmodel pixel (a muzzle flash,
+scope glass) takes the blur of what lies behind it, while opaque viewmodel meshes
+stay sharp. The quality tier sets its cost:
 off on **Low**, blurred at half resolution on **Medium**, full on **High**; the
 player's `depth_of_field` option turns it off, and the editor's Scene view never runs
-it. While it runs the view writes the velocity target its distances come from, as for
+it. While it runs the view writes the velocity target its depths come from, as for
 motion blur; mode `Off` costs nothing and draws exactly what no depth of field does.
 The Inspector's **Depth of Field** section edits the same fields, and they are saved
 with the scene. `Debug.Stats().gpu_passes.depth_of_field` times it.

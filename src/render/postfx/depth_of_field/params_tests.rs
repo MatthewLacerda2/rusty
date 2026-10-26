@@ -59,3 +59,15 @@ fn bokeh_blurs_both_sides_of_the_focus_and_grows_with_the_lens() {
     assert_eq!(wide.coc(1e9), max, "clamped to the largest circle");
     assert_eq!(wide.coc(0.2), -max);
 }
+
+#[test]
+fn bokeh_tiles_span_the_largest_working_blur_and_gaussian_has_none() {
+    // 27 px at 1080p, 13.5 working px at half resolution: 14 px tiles, so a 3×3 of
+    // them holds every tap's reach.
+    let half = DofParams::new(&dof(DofMode::Bokeh), 1080, 2).unwrap();
+    assert_eq!(half.tile(), 14);
+    let full = DofParams::new(&dof(DofMode::Bokeh), 1080, 1).unwrap();
+    assert_eq!(full.tile(), 27);
+    let gaussian = DofParams::new(&dof(DofMode::Gaussian), 1080, 1).unwrap();
+    assert_eq!(gaussian.tile(), 0);
+}
