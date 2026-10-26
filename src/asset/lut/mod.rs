@@ -20,9 +20,7 @@ mod strip;
 
 use std::path::Path;
 
-use super::ImportError;
-#[cfg(doc)]
-use super::LUT_EXTENSIONS;
+use super::{ImportError, LUT_EXTENSIONS};
 use crate::core::paths;
 
 /// A 3D colour lookup: `size³` RGBA texels (alpha `1`), red fastest, then green,
@@ -50,27 +48,33 @@ impl Lut {
     }
 }
 
-/// Read the colour lookup at `path`, by its extension ([`LUT_EXTENSIONS`]). The
-/// error names the file, and for a `.cube` the line.
+/// Read the colour lookup at `path`, by its extension: one [`LUT_EXTENSIONS`]
+/// names, a `.cube` read as text and any other as a strip image. The error names
+/// the file, and for a `.cube` the line.
 pub fn load(path: &Path) -> Result<Lut, ImportError> {
     let named = |why: String| ImportError::Parse(format!("{}{why}", path.display()));
-    match paths::extension(path).as_str() {
-        "cube" => {
-            let text = std::fs::read_to_string(path).map_err(|e| named(format!(": {e}")))?;
-            cube::parse(&text).map_err(|(line, why)| named(format!(":{line}: {why}")))
-        }
-        "png" => {
-            let image = image::open(path).map_err(|e| named(format!(": {e}")))?;
-            let rgba = image.to_rgba8();
-            strip::from_rgba8(rgba.width(), rgba.height(), rgba.as_raw())
-                .map_err(|why| named(format!(": {why}")))
-        }
-        ext => Err(ImportError::UnsupportedFormat(format!(
-            "{}: .{ext} is not a colour lookup (.cube, or a strip .png)",
-            path.display()
-        ))),
+    let ext = paths::extension(path);
+    if !LUT_EXTENSIONS.contains(&ext.as_str()) {
+        return Err(ImportError::UnsupportedFormat(format!(
+            "{}: .{ext} is not a colour lookup (.{})",
+            path.display(),
+            LUT_EXTENSIONS.join(", .")
+        )));
     }
+    if ext == CUBE {
+        // Lossily: a `TITLE` in Latin-1 must not refuse the table.
+        let bytes = std::fs::read(path).map_err(|e| named(format!(": {e}")))?;
+        let text = String::from_utf8_lossy(&bytes);
+        return cube::parse(&text).map_err(|(line, why)| named(format!(":{line}: {why}")));
+    }
+    let image = image::open(path).map_err(|e| named(format!(": {e}")))?;
+    let rgba = image.to_rgba8();
+    strip::from_rgba8(rgba.width(), rgba.height(), rgba.as_raw())
+        .map_err(|why| named(format!(": {why}")))
 }
+
+/// The one [`LUT_EXTENSIONS`] entry read as text; every other is a strip image.
+const CUBE: &str = "cube";
 
 #[cfg(test)]
 pub(crate) mod tests;

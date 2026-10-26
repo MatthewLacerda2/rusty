@@ -127,6 +127,8 @@ impl Renderer {
     fn upload_scene_assets(&mut self, scene: &Scene) {
         // Re-baked or newly present texture files drop their stale uploads (#689).
         self.refresh_textures();
+        // And the Color Lookups the views' grading bakes read (#1441).
+        self.grade_bake.luts.refresh();
         self.upload_scene_meshes(scene);
         self.surface_shaders.refresh();
         // An entity whose last shader-param override was cleared draws with its

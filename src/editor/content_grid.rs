@@ -6,7 +6,7 @@ use std::path::Path;
 
 use egui_phosphor::regular as icon;
 
-use crate::asset::{IMAGE_EXTENSIONS, MODEL_EXTENSIONS};
+use crate::asset::{IMAGE_EXTENSIONS, LUT_EXTENSIONS, MODEL_EXTENSIONS};
 use crate::core::paths;
 use crate::editor::content_browser::{file_name, ROOT};
 use crate::editor::theme::Theme;
@@ -212,6 +212,8 @@ fn draw_tile(ui: &mut egui::Ui, t: Theme, tile: &Tile) -> egui::Response {
 fn type_glyph(ext: &str) -> &'static str {
     match ext {
         e if IMAGE_EXTENSIONS.contains(&e) => icon::IMAGE,
+        // After images, so a strip `.png` stays an image (#1441).
+        e if LUT_EXTENSIONS.contains(&e) => icon::SWATCHES,
         "wav" | "mp3" | "ogg" => icon::MUSIC_NOTES,
         SCENE_EXTENSION => icon::FILM_SLATE,
         PREFAB_EXTENSION => icon::PACKAGE,

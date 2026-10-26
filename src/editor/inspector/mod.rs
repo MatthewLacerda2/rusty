@@ -28,6 +28,8 @@ pub fn draw(
 ) {
     #[cfg(feature = "dev")]
     assets::scene::bake::poll(editor, ui.ctx(), scene, console, nav);
+    // A Color Lookup path typed and left by selecting something else (#1441).
+    editor.is_dirty |= camera::commit_abandoned_lut(ui.ctx(), scene);
     let t = editor.theme;
     if !editor.inspector_open {
         draw_collapsed(ui, t, &mut editor.inspector_open);

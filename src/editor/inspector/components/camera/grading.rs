@@ -73,9 +73,8 @@ fn draw_wheels(
     }
 }
 
-/// The Color Lookup: the LUT file and its contribution. The path is written when
-/// the field loses focus (Enter or a click away), not per keystroke, so the
-/// renderer never tries, and logs, every half-typed path.
+/// The Color Lookup: the LUT file ([`lut_field`](super::lut_field)) and its
+/// contribution.
 pub(super) fn draw_color_lookup(
     ui: &mut egui::Ui,
     world: &mut crate::ecs::World,
@@ -84,29 +83,7 @@ pub(super) fn draw_color_lookup(
     is_dirty: &mut bool,
 ) {
     ui.label("  Color Lookup");
-    let key = egui::Id::new(("color_lookup", id));
-    let saved = vc.lut.clone().unwrap_or_default();
-    let mut text = ui
-        .data_mut(|d| d.get_temp::<String>(key))
-        .unwrap_or(saved.clone());
-    let field = ui
-        .horizontal(|ui| {
-            ui.label("    LUT:");
-            ui.text_edit_singleline(&mut text)
-                .on_hover_text("A .cube, or a Unity strip .png (256×16, 1024×32)")
-        })
-        .inner;
-    if field.has_focus() {
-        ui.data_mut(|d| d.insert_temp(key, text));
-    } else {
-        ui.data_mut(|d| d.remove::<String>(key));
-        if field.lost_focus() && text != saved {
-            if let Some(mut c) = world.post_processing_mut(id) {
-                vc_ops::set_lut(&mut c, Some(text));
-            }
-            *is_dirty = true;
-        }
-    }
+    super::lut_field::draw(ui, world, id, vc, is_dirty);
     let k = vc.lut_contribution;
     let set = vc_ops::set_lut_contribution;
     *is_dirty |= slider_row(ui, (world, id), "    Contribution:", k, 0.0..=1.0, set);

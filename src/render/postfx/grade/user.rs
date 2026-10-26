@@ -23,9 +23,10 @@ pub struct Lookup<'a> {
 }
 
 impl<'a> Lookup<'a> {
-    /// The lookup `volume` names, if it names a file.
+    /// The lookup `volume` names, if it names a file and any of it applies: at a
+    /// contribution of `0` nothing is read, uploaded or logged.
     pub fn of(volume: Option<&'a PostProcessingComponent>) -> Option<Self> {
-        let vc = volume?;
+        let vc = volume.filter(|vc| vc.lut_contribution > 0.0)?;
         let path = vc.lut.as_deref().filter(|p| !p.is_empty())?;
         Some(Self {
             path,
@@ -52,14 +53,14 @@ pub struct UserLuts {
 
 impl UserLuts {
     /// The upload of the LUT at `path`, reading it on first use or after it was
-    /// written; `None` (logged once) when it is missing or malformed.
+    /// written ([`refresh`](Self::refresh)); `None` (logged once) when it is
+    /// missing or malformed.
     pub fn get(
         &mut self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         path: &str,
     ) -> Option<&UserLut> {
-        self.refresh();
         if !self.loaded.contains_key(path) {
             let upload = match lut::load(std::path::Path::new(path)) {
                 Ok(lut) => {
@@ -79,8 +80,9 @@ impl UserLuts {
         self.loaded.get(path)?.as_ref()
     }
 
-    /// Drop what was written, or has appeared, since the last look.
-    fn refresh(&mut self) {
+    /// Drop what was written, or has appeared, since the last look. Called once
+    /// per frame, before any view's bake, like `Renderer::refresh_textures`.
+    pub fn refresh(&mut self) {
         let changes = self
             .freshness
             .poll_with(|p| std::path::Path::new(p).exists());

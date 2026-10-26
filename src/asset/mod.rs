@@ -95,9 +95,10 @@ pub const MODEL_EXTENSIONS: &[&str] = &["gltf", "glb", "obj", "fbx", "blend"];
 /// renderer's `image` decoders are built with (`Cargo.toml`'s `image` features).
 pub const IMAGE_EXTENSIONS: &[&str] = &["png", "tga", "jpg", "jpeg"];
 
-/// The files a colour lookup is read from, lowercase (#1441, [`lut::load`]). A
-/// `.png` is one only when it is a strip (`N² × N` pixels); any other is refused,
-/// naming its size.
+/// The files a colour lookup is read from, lowercase (#1441): the list
+/// [`lut::load`] dispatches on, and the editor's content grid and inspector read.
+/// A `.png` is one only when it is a strip (`N² × N` pixels); any other is
+/// refused, naming its size.
 pub const LUT_EXTENSIONS: &[&str] = &["cube", "png"];
 
 /// True if `path` looks like a source 3D asset this importer can read

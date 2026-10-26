@@ -88,6 +88,14 @@ fn the_verbatim_prefix_is_stripped_so_a_slash_join_reads_on_windows() {
 }
 
 #[test]
+fn stored_trims_slashes_and_drops_a_leading_dot() {
+    assert_eq!(stored(" ./assets\\luts/a.cube \n"), "assets/luts/a.cube");
+    assert_eq!(stored(".//./a.cube"), "a.cube");
+    assert_eq!(stored("/abs/a.cube"), "/abs/a.cube");
+    assert_eq!(stored("../a.cube"), "../a.cube");
+}
+
+#[test]
 fn to_slash_turns_every_backslash_into_a_slash() {
     assert_eq!(
         // lint: allow(slash-join) a mixed spelling on purpose: the input under test

@@ -41,10 +41,12 @@ fn ops_write_through_with_clamps() {
     set_exposure_compensation(&mut e, f32::INFINITY);
     set_adaptation_speed(&mut e, -1.0, 1e9);
     set_histogram_percent(&mut e, 120.0, 50.0);
-    set_lut(&mut e, Some(String::new()));
+    set_lut(&mut e, Some(" ./luts\\a.cube ".into()));
+    assert_eq!(e.lut.as_deref(), Some("luts/a.cube"), "one spelling");
+    set_lut(&mut e, Some("  ".into()));
     set_lut_contribution(&mut e, 4.0);
     let vc = &*e;
-    assert_eq!((&vc.lut, vc.lut_contribution), (&None, 1.0), "\"\" clears");
+    assert_eq!((&vc.lut, vc.lut_contribution), (&None, 1.0), "blank clears");
     assert_eq!(vc.bloom_intensity, 0.0);
     assert_eq!(vc.bloom_threshold, 0.0);
     assert_eq!(vc.gamma, 0.01, "gamma clamps to its floor");

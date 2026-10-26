@@ -111,6 +111,7 @@ impl Theme {
     pub fn asset_color(&self, ext: &str) -> Color32 {
         match ext {
             e if crate::asset::IMAGE_EXTENSIONS.contains(&e) => self.accent,
+            e if crate::asset::LUT_EXTENSIONS.contains(&e) => self.accent,
             "wav" | "mp3" | "ogg" => self.teal,
             crate::scene::SCENE_EXTENSION => self.warning,
             "lua" => self.text_primary,

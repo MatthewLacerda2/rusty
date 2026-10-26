@@ -142,9 +142,12 @@ formats are read:
   `N × N` side by side, `N² × N` pixels (`256×16`, `1024×32`), blue by slice, red
   to the right and green upwards (the bottom row is green `0`).
 
-Put the file anywhere in the project (`assets/luts/` is a good home) and name it by
-its project-relative path, as a texture is named: `Graphics.SetColorLookup(
-"assets/luts/warm.cube")`. The renderer folds it into the view's grading LUT, so it
+Put the file under the project's **`assets/`** (`assets/luts/` is a good home) and
+name it by its project-relative path, as a texture is named: `Graphics.SetColorLookup(
+"assets/luts/warm.cube")`. Only there is it reloaded when an outside tool saves over
+it (the editor watches `assets/`) and copied into an exported game; a file elsewhere
+loads, but neither follows. The path is stored as written with `/` separators and
+no leading `./`, so one file is one entry. The renderer folds it into the view's grading LUT, so it
 costs a pixel nothing, and rebakes when the path, the contribution or the file
 changes (a file saved over is read again). A missing or malformed LUT is logged
 once, naming the file (and, for a `.cube`, the line), and grades as if none were

@@ -21,6 +21,7 @@ use crate::components::{
     AutoExposure, ExposureMode, PostProcessingComponent, ShadowSettings, SsaoSettings, Tonemap,
     Wheel, WhiteBalance,
 };
+use crate::core::paths::stored;
 use crate::scene::authoring::sanitize::{
     at_least, clamped, finite_array_or, finite_or, finite_values, non_negative, unit,
 };
@@ -128,11 +129,11 @@ pub fn set_hue_shift(vc: &mut PostProcessingComponent, degrees: f32) {
     vc.hue_shift = clamped(degrees, -180.0, 180.0);
 }
 
-/// Set the Color Lookup's LUT file (#1441); `None` or an empty path clears it. The
-/// file is read by the renderer, which logs once and grades neutral when it is
-/// missing or malformed.
+/// Set the Color Lookup's LUT file (#1441) as a [`stored`] path; `None` or a blank
+/// one clears it. The renderer logs once and grades neutral when it is missing or
+/// malformed.
 pub fn set_lut(vc: &mut PostProcessingComponent, path: Option<String>) {
-    vc.lut = path.filter(|p| !p.is_empty());
+    vc.lut = path.map(|p| stored(&p)).filter(|p| !p.is_empty());
 }
 
 /// Set how much of the Color Lookup applies (#1441), clamped to `0..=1`.

@@ -2,7 +2,9 @@
 //! byte-identical, a channel-swap LUT swaps red and blue, a malformed one grades
 //! neutral, and the bake follows the path, the contribution and the file.
 
-use super::{chain, W};
+use std::path::Path;
+
+use super::{chain, Chain, W};
 use crate::asset::lut::tests::{cube_of, identity_cube};
 use crate::core::fs::written::contract::{follows_rebakes, Bake};
 use crate::core::fs::written::write;
@@ -53,6 +55,19 @@ fn gpu_an_identity_lut_is_byte_identical_and_a_swap_swaps_red_and_blue() {
 }
 
 #[test]
+fn no_contribution_names_no_lookup() {
+    let mut vc = default_post_processing();
+    vc.lut = Some("assets/luts/warm.cube".into());
+    assert!(Lookup::of(Some(&vc)).is_some());
+    vc.lut_contribution = 0.0;
+    assert_eq!(
+        Lookup::of(Some(&vc)),
+        None,
+        "nothing read, uploaded or logged"
+    );
+}
+
+#[test]
 fn gpu_a_malformed_or_missing_lut_grades_neutral() {
     let Some(mut c) = chain() else { return };
     let dir = crate::test_temp::dir();
@@ -79,26 +94,23 @@ fn gpu_the_bake_follows_the_contribution_the_path_and_the_file() {
     std::fs::write(&b, identity_cube(2)).unwrap();
     let (a, b) = (a.to_string_lossy(), b.to_string_lossy());
     let grade = GradeParams::NEUTRAL;
-    let (device, queue) = (&c.r.device, &c.r.queue);
-    let mut bake = |l| {
-        c.pfx
-            .grade
-            .prepare((device, queue), &mut c.r.grade_bake, &grade, l)
+    let bake = |c: &mut Chain, l| {
+        let gpu = (&c.r.device, &c.r.queue);
+        c.pfx.grade.prepare(gpu, &mut c.r.grade_bake, &grade, l)
     };
-    assert!(bake(lookup(&a, 1.0)), "the first bake");
-    assert!(!bake(lookup(&a, 1.0)), "a still lookup bakes once");
-    assert!(bake(lookup(&a, 0.5)), "the contribution");
+    assert!(bake(&mut c, lookup(&a, 1.0)), "the first bake");
+    assert!(!bake(&mut c, lookup(&a, 1.0)), "a still lookup bakes once");
+    assert!(bake(&mut c, lookup(&a, 0.5)), "the contribution");
+    let other = bake(&mut c, lookup(&b, 0.5));
+    assert!(other, "another file of the same size and domain");
+    write(Path::new(b.as_ref()), identity_cube(3).as_bytes()).unwrap();
     assert!(
-        bake(lookup(&b, 0.5)),
-        "another file of the same size and domain"
+        !bake(&mut c, lookup(&b, 0.5)),
+        "read again next frame, not mid-frame"
     );
-    write(
-        std::path::Path::new(b.as_ref()),
-        identity_cube(3).as_bytes(),
-    )
-    .unwrap();
-    assert!(bake(lookup(&b, 0.5)), "the file written over");
-    assert!(bake(None), "the lookup cleared");
+    c.r.grade_bake.luts.refresh();
+    assert!(bake(&mut c, lookup(&b, 0.5)), "the file written over");
+    assert!(bake(&mut c, None), "the lookup cleared");
 }
 
 #[test]
@@ -113,10 +125,11 @@ fn gpu_the_lut_cache_follows_rebakes() {
         &path.to_string_lossy(),
         |p, bake| {
             let text = format!("DOMAIN_MAX {0} {0} {0}\n", domain(bake)) + &identity_cube(2);
-            write(std::path::Path::new(p), text.as_bytes()).unwrap();
+            write(Path::new(p), text.as_bytes()).unwrap();
         },
         |p| {
             let luts = &mut c.r.grade_bake.luts;
+            luts.refresh();
             luts.get(&c.r.device, &c.r.queue, p).map(|l| l.domain[1][0])
         },
         |max, bake| *max == Some(domain(bake)),

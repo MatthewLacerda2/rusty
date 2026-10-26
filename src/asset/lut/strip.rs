@@ -7,8 +7,9 @@ use super::Lut;
 
 /// The table an 8-bit RGBA strip of `width × height` holds.
 pub(super) fn from_rgba8(width: u32, height: u32, rgba: &[u8]) -> Result<Lut, String> {
+    // `fits` first: past it, `n * n` cannot overflow (a 1×70000 image).
     let n = height;
-    if width != n * n || !Lut::fits(n) {
+    if !Lut::fits(n) || width != n * n {
         let (lo, hi) = (Lut::MIN_SIZE, Lut::MAX_SIZE);
         return Err(format!(
             "{width}×{height} is not a LUT strip (N²×N, N {lo}–{hi}: 256×16, 1024×32)"

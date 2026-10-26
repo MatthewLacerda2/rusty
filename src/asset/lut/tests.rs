@@ -64,7 +64,9 @@ fn malformed_lines_are_refused_with_their_line() {
     assert_eq!(bad("LUT_3D_SIZE 1\n").0, 1, "under MIN_SIZE");
     assert!(bad("# nothing\n").1.contains("no LUT_3D_SIZE"));
     let flipped = "DOMAIN_MIN 1 1 1\nDOMAIN_MAX 0 0 0\n".to_string() + &identity_cube(2);
-    assert!(bad(&flipped).1.contains("DOMAIN_MAX"));
+    assert_eq!(bad(&flipped).0, 2, "at DOMAIN_MAX's line");
+    let flipped = "\nDOMAIN_MIN 2 2 2\n".to_string() + &identity_cube(2);
+    assert_eq!(bad(&flipped).0, 2, "at DOMAIN_MIN's line");
     let late = identity_cube(2) + "TITLE \"late\"\n";
     assert!(bad(&late).1.contains("after the table"));
 }
@@ -83,6 +85,17 @@ fn a_strip_reads_blue_by_slice_and_green_upwards() {
     assert!(strip::from_rgba8(300, 20, &rgba)
         .unwrap_err()
         .contains("300×20"));
+    let tall = strip::from_rgba8(1, 70_000, &rgba).unwrap_err();
+    assert!(tall.contains("not a LUT strip"), "no overflow: {tall}");
+}
+
+#[test]
+fn a_bom_and_a_latin1_title_still_read() {
+    let path = crate::test_temp::dir().join("latin1.cube");
+    let mut bytes = b"\xEF\xBB\xBFTITLE \"caf\xE9\"\n".to_vec();
+    bytes.extend(identity_cube(2).bytes());
+    std::fs::write(&path, bytes).unwrap();
+    assert_eq!(load(&path).unwrap().size, 2);
 }
 
 #[test]
@@ -96,6 +109,20 @@ fn load_names_the_file_and_line() {
     std::fs::write(&ok, identity_cube(2)).unwrap();
     assert_eq!(load(&ok).unwrap().size, Lut::MIN_SIZE);
     assert!(load(&dir.join("x.tga")).is_err());
+}
+
+#[test]
+fn every_listed_extension_loads_and_no_other() {
+    let dir = crate::test_temp::dir();
+    for ext in crate::asset::LUT_EXTENSIONS.iter().chain(&["tga", "3dl"]) {
+        let path = dir.join(format!("lut.{ext}"));
+        match *ext {
+            "cube" | "tga" | "3dl" => std::fs::write(&path, identity_cube(2)).unwrap(),
+            _ => image::RgbaImage::new(4, 2).save(&path).unwrap(),
+        }
+        let listed = crate::asset::LUT_EXTENSIONS.contains(ext);
+        assert_eq!(load(&path).is_ok(), listed, ".{ext}: {:?}", load(&path));
+    }
 }
 
 #[test]

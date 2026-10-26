@@ -1,7 +1,8 @@
 //! Adobe's Cube LUT format (Cube LUT Specification 1.0): keyword lines, then the
 //! table, one `r g b` line per texel, red fastest. `#` starts a comment line, blank
 //! lines are skipped, and a keyword the spec does not name (a vendor's own) is
-//! ignored, as Resolve and Photoshop ignore each other's.
+//! ignored, as Resolve and Photoshop ignore each other's. A leading UTF-8 byte-order
+//! mark (Windows tools write one) is skipped.
 
 use super::Lut;
 
@@ -10,9 +11,11 @@ pub(super) type Error = (usize, String);
 
 /// The table `text` holds.
 pub(super) fn parse(text: &str) -> Result<Lut, Error> {
+    let text = text.strip_prefix('\u{feff}').unwrap_or(text);
     let mut header = Header {
         size: None,
         domain: [[0.0; 3], [1.0; 3]],
+        domain_lines: [0; 2],
     };
     let mut texels = Vec::new();
     let mut last = 0;
@@ -41,10 +44,12 @@ pub(super) fn parse(text: &str) -> Result<Lut, Error> {
     header.finish(texels, last.max(1))
 }
 
-/// What the keyword lines said: the size (with its line) and the domain.
+/// What the keyword lines said: the size (with its line) and the domain (with the
+/// lines that set its min and max; `0` for the default).
 struct Header {
     size: Option<(usize, u32)>,
     domain: [[f32; 3]; 2],
+    domain_lines: [usize; 2],
 }
 
 impl Header {
@@ -54,11 +59,11 @@ impl Header {
         match words.next().unwrap_or_default() {
             "LUT_3D_SIZE" => self.size = Some((n, side(n, words)?)),
             "LUT_1D_SIZE" => return Err((n, "a 1D LUT; only 3D LUTs are read".into())),
-            "DOMAIN_MIN" => self.domain[0] = numbers(n, words)?,
-            "DOMAIN_MAX" => self.domain[1] = numbers(n, words)?,
+            "DOMAIN_MIN" => (self.domain[0], self.domain_lines[0]) = (numbers(n, words)?, n),
+            "DOMAIN_MAX" => (self.domain[1], self.domain_lines[1]) = (numbers(n, words)?, n),
             "LUT_3D_INPUT_RANGE" => {
                 let [lo, hi]: [f32; 2] = numbers(n, words)?;
-                self.domain = [[lo; 3], [hi; 3]];
+                (self.domain, self.domain_lines) = ([[lo; 3], [hi; 3]], [n; 2]);
             }
             _ => {}
         }
@@ -77,7 +82,10 @@ impl Header {
         }
         let domain = self.domain;
         if (0..3).any(|c| domain[1][c] <= domain[0][c]) {
-            return Err((at, "DOMAIN_MAX must be above DOMAIN_MIN".into()));
+            // At the line that flipped it: the max's when one was given, else the min's.
+            let [min, max] = self.domain_lines;
+            let line = if max > 0 { max } else { min };
+            return Err((line, "DOMAIN_MAX must be above DOMAIN_MIN".into()));
         }
         Ok(Lut {
             size: side,

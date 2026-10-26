@@ -1,6 +1,6 @@
 //! src/editor/inspector/components/camera/ — the Camera inspector card (this
 //! `mod.rs`) plus the Post Processing card (`post_processing`, with its colour
-//! grade in `grading` and its custom effects list in `custom_effects`), split apart to stay under the size cap. Both
+//! grade in `grading`, its LUT path field in `lut_field` and its custom effects list in `custom_effects`), split apart to stay under the size cap. Both
 //! cards live on the same camera entity.
 
 use crate::editor::widgets::DragRange;
@@ -9,12 +9,14 @@ use egui_phosphor::regular as icon;
 mod custom_effects;
 mod exposure;
 mod grading;
+mod lut_field;
 mod post_processing;
 mod target;
 
 #[cfg(test)]
 mod slider_tests;
 
+pub use lut_field::commit_abandoned as commit_abandoned_lut;
 pub use post_processing::draw_post_processing;
 
 use crate::editor::inspector::components::card::component_card;
