@@ -106,19 +106,7 @@ impl Renderer {
         let baked = view.post_fx.grade.prepare(gpu, &self.grade_bake, &grade);
         self.frame_counters.grade_lut_bakes += u32::from(baked);
 
-        // Automatic exposure (#1444): meter this view's scene and adapt, on the GPU.
-        match auto_exposure(ctx.stack.post).filter(|_| post.full) {
-            Some(ae) => {
-                let key = HistoryKey::new(scene, ctx.stack.base_id);
-                let step = view.post_fx.exposure.clock.step(key, scene.shader_time);
-                let params = ExposureParams::new(ae, step);
-                let hdr = &view.post_fx.scene_hdr.view;
-                view.post_fx
-                    .exposure
-                    .run(gpu, &self.exposure_passes, hdr, &params);
-            }
-            None => view.post_fx.exposure.clock.cut(),
-        }
+        self.meter_exposure(view, ctx, post.full);
 
         let (mut post_params, bloom_enabled) = build_post_params(
             scene,
@@ -156,6 +144,25 @@ impl Renderer {
         };
         view.post_fx
             .run(&self.device, &self.queue, ctx, post_params, passes);
+    }
+
+    /// Automatic exposure (#1444): meter this view's scene and adapt, on the GPU, when
+    /// its volume is `Automatic` and the stack runs full post-FX; otherwise the next
+    /// metered frame snaps.
+    fn meter_exposure(&self, view: &mut RenderView, ctx: &CameraCtx, full: bool) {
+        let meter = &mut view.post_fx.exposure;
+        let Some(ae) = auto_exposure(ctx.stack.post).filter(|_| full) else {
+            return meter.clock.cut();
+        };
+        let key = HistoryKey::new(ctx.scene, ctx.stack.base_id);
+        let params = ExposureParams::new(ae, meter.clock.step(key, ctx.scene.shader_time));
+        let gpu = (&self.device, &self.queue);
+        meter.run(
+            gpu,
+            &self.exposure_passes,
+            &view.post_fx.scene_hdr.view,
+            &params,
+        );
     }
 }
 

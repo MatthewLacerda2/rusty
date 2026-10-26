@@ -253,7 +253,7 @@ impl crate::render::RenderView {
         self.post_fx.exposure.readout()
     }
 
-    /// [`RenderView::exposure_readout`] after waiting for the read in flight: exact
+    /// [`Self::exposure_readout`] after waiting for the read in flight: exact
     /// for the frame just drawn, for a headless capture that has already waited.
     pub fn settled_exposure(&mut self, device: &wgpu::Device) -> Option<f32> {
         self.post_fx.exposure.settle(device);

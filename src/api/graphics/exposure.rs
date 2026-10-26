@@ -52,7 +52,8 @@ pub(super) fn register_exposure<'scope>(
             Ok(mode.name().to_string())
         }),
     )?;
-    register_auto_exposure(scope, table, scene)
+    register_auto_exposure(scope, table, scene)?;
+    register_adaptation(scope, table, scene)
 }
 
 /// The exposure `vc` applies: its fixed EV, or in `Automatic` the screen's adapted
@@ -64,7 +65,7 @@ fn applied_exposure(vc: &PostProcessingComponent, readout: Option<f32>) -> f32 {
     }
 }
 
-/// The automatic mode's knobs, each pair set and read together.
+/// The automatic mode's limits and compensation.
 fn register_auto_exposure<'scope>(
     scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
@@ -99,7 +100,16 @@ fn register_auto_exposure<'scope>(
         table,
         "GetExposureCompensation",
         scope.create_function(move |_, ()| Ok(auto().compensation)),
-    )?;
+    )
+}
+
+/// The automatic mode's adaptation speeds and histogram window.
+fn register_adaptation<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
+    table: &mlua::Table,
+    scene: &'scope RefCell<Scene>,
+) -> Reg {
+    let auto = move || with_vc(scene, |vc| vc.auto_exposure).unwrap_or_default();
     put(
         table,
         "SetAdaptationSpeed",
