@@ -13,7 +13,7 @@ struct FlareParams {
     tint: vec4<f32>,
     // x: ghosts, y: halo, z: streaks, w: the chromatic aberration
     strengths: vec4<f32>,
-    // xy: the bloom chain's texel size, z: the view's aspect (width / height), w: unused
+    // x: the view's aspect (width / height), yzw: unused
     frame: vec4<f32>,
 };
 
@@ -33,6 +33,14 @@ fn vs_fullscreen(@builtin(vertex_index) vid: u32) -> VsOut {
     out.pos = fullscreen::triangle_down(vid);
     return out;
 }
+
+// The most ghosts a flare draws: Rust's `LensFlare::MAX_GHOSTS`, which a test holds
+// equal to this and to the cases of `ghost_scale` and `ghost_tint`.
+const MAX_GHOSTS: i32 = 8;
+
+// One streak tap's step, a fraction of the screen's width, so a streak spans the
+// same share of the screen at every resolution.
+const STREAK_STEP: f32 = 0.008;
 
 // What a strength of `1` adds of the bright pass: a real lens's ghosts reflect a
 // few percent of the light, the streaks' taps spread it over ~8 weights' worth.
@@ -94,7 +102,7 @@ fn fs_flare(in: VsOut) -> @location(0) vec4<f32> {
 
     // Ghosts: the image mirrored through the centre at each ghost's scale.
     let count = i32(params.tint.w);
-    for (var i = 0; i < 8; i = i + 1) {
+    for (var i = 0; i < MAX_GHOSTS; i = i + 1) {
         if (i >= count) {
             break;
         }
@@ -104,7 +112,7 @@ fn fs_flare(in: VsOut) -> @location(0) vec4<f32> {
 
     // Halo: a ring around the centre, lit by what lies a fixed (round) distance
     // towards the centre, strongest for sources near it.
-    let aspect = vec2<f32>(params.frame.z, 1.0);
+    let aspect = vec2<f32>(params.frame.x, 1.0);
     let towards = to_centre * aspect;
     if (params.strengths.y > 0.0 && dot(towards, towards) > 0.0) {
         let at = in.uv + normalize(towards) * 0.45 / aspect;
@@ -116,9 +124,8 @@ fn fs_flare(in: VsOut) -> @location(0) vec4<f32> {
     // Streaks: a long horizontal smear of each bright pixel, the anamorphic lens's.
     if (params.strengths.z > 0.0) {
         var streak = vec3<f32>(0.0);
-        let step = params.frame.x * 4.0;
         for (var j = -12; j <= 12; j = j + 1) {
-            let at = in.uv + vec2<f32>(f32(j) * step, 0.0);
+            let at = in.uv + vec2<f32>(f32(j) * STREAK_STEP, 0.0);
             let w = exp(-abs(f32(j)) / 4.0);
             streak += textureSampleLevel(t_color, s_color, at, 0.0).rgb * w * window(at);
         }

@@ -1,7 +1,7 @@
-//! Bloom: a scene pass, last before the composite (the bright-pass threshold, then a
-//! 2D gaussian blur, at the bloom divisor's reduced resolution, `postfx/bloom.wgsl`),
-//! and the composite's add of the blurred result on the HDR image
-//! (`postfx/effects/bloom.wgsl`). The bright pass reads the scene after depth of field
+//! Bloom: a scene pass, before the lens flare's, which reads its chain (the bright-pass
+//! threshold, then a 2D gaussian blur, at the bloom divisor's reduced resolution,
+//! `postfx/bloom.wgsl`), and the composite's add of the blurred result on the HDR
+//! image (`postfx/effects/bloom.wgsl`). The bright pass reads the scene after depth of field
 //! and motion blur, so a moving highlight blooms along its streak, as in URP and HDRP
 //! (#1436).
 

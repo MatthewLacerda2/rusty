@@ -11,6 +11,7 @@ mod depth_of_field;
 mod fog;
 mod graphics;
 mod lens;
+mod lens_flare;
 mod light;
 mod nav_agent;
 mod particles;

@@ -103,6 +103,7 @@ impl PostFx {
     }
 
     /// The scene the composite and bloom read: motion-blurred (#1436), else focused.
+    /// The lens flare's pass adds into it (#1443), after bloom's bright pass read it.
     pub(crate) fn scene_color(&self) -> &wgpu::TextureView {
         scene_of(self.targets.get(), self.targets.get(), &self.scene_hdr)
     }

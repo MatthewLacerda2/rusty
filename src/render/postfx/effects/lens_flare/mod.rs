@@ -12,6 +12,7 @@
 //! so the add leaves the scene byte-identical.
 
 use super::{bloom, EffectCx, Owner, Pass, PassCx, PostEffect};
+use crate::components::rendering::post_processing::LensFlare;
 use crate::core::settings::graphics_options::GraphicsOption;
 use crate::core::settings::quality::QualityPreset;
 use crate::render::gpu::bind_entry as entry;
@@ -38,35 +39,45 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
 };
 
 /// The flare `cx`'s volume draws this frame: only while bloom runs, whose chain it
-/// reads, and at a non-zero strength.
-pub(crate) fn flare_params(cx: &EffectCx, texel: [f32; 2], aspect: f32) -> Option<FlareParams> {
+/// reads, and while some part of it can add light (`None` costs no target and no
+/// pass).
+pub(crate) fn flare_params(cx: &EffectCx, aspect: f32) -> Option<FlareParams> {
     let vc = cx.volume()?;
     let (b, f) = (&vc.bloom, &vc.lens_flare);
     let blooms = cx.runs(bloom::EFFECT.gate, b.active);
-    // `max` takes a NaN from a hand-edited file to zero, which draws nothing.
-    let intensity = f.intensity.max(0.0);
-    if !blooms || !cx.runs(EFFECT.gate, f.active) || intensity == 0.0 {
+    if !blooms || !cx.runs(EFFECT.gate, f.active) {
         return None;
     }
-    let [r, g, bl] = f.tint.map(|c| c.clamp(0.0, 1.0) * intensity);
-    let count = f.ghost_count.min(LENS_FLARE_MAX_GHOSTS) as f32;
-    let ca = f.chromatic_aberration.clamp(0.0, 1.0);
+    // `max` takes a NaN from a hand-edited file to zero, which draws nothing.
     let strength = |s: f32| s.max(0.0);
+    let intensity = strength(f.intensity);
+    let tint = f.tint.map(|c| c.clamp(0.0, 1.0) * intensity);
+    let count = f.ghost_count.min(LensFlare::MAX_GHOSTS);
+    let ghosts = if count == 0 {
+        0.0
+    } else {
+        strength(f.ghost_intensity)
+    };
+    let parts = [
+        ghosts,
+        strength(f.halo_intensity),
+        strength(f.streak_intensity),
+    ];
+    if tint == [0.0; 3] || parts == [0.0; 3] {
+        return None;
+    }
+    let [r, g, bl] = tint;
     Some(FlareParams {
-        tint: [r, g, bl, count],
+        tint: [r, g, bl, count as f32],
         strengths: [
-            strength(f.ghost_intensity),
-            strength(f.halo_intensity),
-            strength(f.streak_intensity),
-            ca,
+            parts[0],
+            parts[1],
+            parts[2],
+            f.chromatic_aberration.clamp(0.0, 1.0),
         ],
-        frame: [texel[0], texel[1], aspect, 0.0],
+        frame: [aspect, 0.0, 0.0, 0.0],
     })
 }
-
-/// The shader's ghost loop's bound: a loaded file bypasses the op's clamp.
-const LENS_FLARE_MAX_GHOSTS: u32 =
-    crate::components::rendering::post_processing::LensFlare::MAX_GHOSTS;
 
 /// CPU mirror of `FlareParams` in `postfx/lens_flare.wgsl`.
 #[repr(C)]
@@ -76,7 +87,7 @@ pub(crate) struct FlareParams {
     tint: [f32; 4],
     /// The ghosts', the halo's and the streaks' strengths, and the aberration.
     strengths: [f32; 4],
-    /// The bloom chain's texel size, the view's aspect, unused.
+    /// x: the view's aspect, the rest unused.
     frame: [f32; 4],
 }
 
@@ -185,9 +196,8 @@ pub(crate) fn flare_size((w, h): (u32, u32)) -> (u32, u32) {
 fn run(r: &Renderer, view: &mut RenderView, cx: &PassCx) {
     let pfx = &mut view.post_fx;
     let bloom = pfx.bloom.size;
-    let texel = [1.0 / bloom.0 as f32, 1.0 / bloom.1 as f32];
     let aspect = pfx.full_size.0 as f32 / pfx.full_size.1.max(1) as f32;
-    let Some(params) = flare_params(&cx.effect, texel, aspect) else {
+    let Some(params) = flare_params(&cx.effect, aspect) else {
         pfx.targets.remove::<FlareTargets>();
         return;
     };
@@ -214,14 +224,14 @@ fn run(r: &Renderer, view: &mut RenderView, cx: &PassCx) {
     let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
         label: Some("Lens Flare Encoder"),
     });
-    let flare = (passes.flare.get(), r.gpu_timer.writes(GpuPass::PostFx));
+    let flare = (passes.flare.get(), r.gpu_timer.writes(GpuPass::LensFlare));
     PostFx::fullscreen(
         &mut encoder,
         flare,
         &[&group(&pfx.bloom.b.view)],
         &t.flare.view,
     );
-    let writes = r.gpu_timer.writes(GpuPass::PostFx);
+    let writes = r.gpu_timer.writes(GpuPass::LensFlare);
     let add_group = group(&t.flare.view);
     add(
         &mut encoder,

@@ -283,7 +283,7 @@ flares with no per-light authoring. Each bright pixel throws **ghosts** mirrored
 through the screen centre (`ghost_count` of them, each at its own scale and lens
 tint, so a light left of the centre ghosts on the right), a **halo** ring around the
 centre, lit most by what is near it, and optional horizontal **streaks**, the
-anamorphic lens's. The whole is multiplied by the `tint` and the `intensity`, its red
+anamorphic lens's, the same share of the screen at every resolution. The whole is multiplied by the `tint` and the `intensity`, its red
 and blue split by its own `chromatic_aberration`. It renders at half bloom's
 resolution (a quarter of the view's) and is added onto the HDR scene after bloom's
 bright pass, so the exposure and the grade apply to it and it never blooms itself.
@@ -291,7 +291,9 @@ bright pass, so the exposure and the grade apply to it and it never blooms itsel
 player's `bloom` option off, means no flare. It is off on the Low tier, and the
 player's `lens_flare` option gates it. A new volume starts with it off; once on, four
 ghosts, a halo at `0.5` and no streaks. A frame with nothing above bloom's threshold
-is byte-identical with it on and off. Tween paths: `Graphics.lens_flare.intensity`,
+is byte-identical with it on and off, and a flare that can add nothing (no ghosts,
+halo or streaks, or a black tint) costs no pass. Its GPU time is
+`Debug.Stats().gpu_passes.lens_flare`. Tween paths: `Graphics.lens_flare.intensity`,
 `Graphics.lens_flare.ghost_intensity`, `Graphics.lens_flare.halo_intensity`,
 `Graphics.lens_flare.streak_intensity`, `Graphics.lens_flare.chromatic_aberration`.
 

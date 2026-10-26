@@ -88,7 +88,7 @@ impl Renderer {
 
     /// Run the post-process chain over the view's composited HDR target: every
     /// effect's scene pass in order (depth of field, motion blur, the exposure meter,
-    /// bloom), the grading LUT's bake when its inputs changed, then the composite and
+    /// bloom, the lens flare), the grading LUT's bake when its inputs changed, then the composite and
     /// the LDR passes, writing the corrected image to `output`.
     pub(super) fn run_post_fx(&mut self, view: &mut RenderView, ctx: &CameraCtx) {
         use crate::render::postfx::PostFxContext;
