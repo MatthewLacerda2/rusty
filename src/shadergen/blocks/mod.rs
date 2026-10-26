@@ -163,7 +163,7 @@ mod tests {
                 .is_some_and(|p| p.runtime)
         };
         assert!(live("damage_vignette", "intensity"));
-        assert!(live("chromatic_aberration", "strength"));
+        assert!(live("sharpen", "amount"));
         assert!(live("radial_blur", "strength"));
         assert!(!live("posterize", "levels"), "structural params stay baked");
     }
@@ -206,8 +206,12 @@ mod tests {
     #[test]
     fn find_resolves_known_blocks_and_rejects_unknown() {
         assert!(find(PassKind::Surface, "toon_ramp").is_some());
-        assert!(find(PassKind::Postfx, "vignette").is_some());
-        assert!(find(PassKind::Surface, "vignette").is_none());
+        assert!(find(PassKind::Postfx, "scanline").is_some());
+        assert!(find(PassKind::Surface, "scanline").is_none());
+        // #1439: the volume owns these now, so a recipe naming one is refused.
+        for owned in ["vignette", "film_grain", "chromatic_aberration"] {
+            assert!(find(PassKind::Postfx, owned).is_none(), "{owned}");
+        }
         assert!(find(PassKind::Postfx, "definitely_not_a_block").is_none());
         assert!(find(PassKind::Ui, "glitch_slices").is_some());
         assert!(find(PassKind::Postfx, "glitch_slices").is_none());

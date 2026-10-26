@@ -115,7 +115,35 @@ pub(crate) fn build_post_params(
         0.0
     };
     params.flags = [ssr_mode, 0.0, 0.0, auto];
+    pack_lens(&mut params, vc, graphics);
     (params, bloom)
+}
+
+/// The lens effects (#1439) into `params`, each through [`effect_runs`]. One that
+/// doesn't run packs a zero intensity, which the composite skips entirely, so an
+/// effect turned off renders exactly as before it existed.
+fn pack_lens(params: &mut PostParams, vc: &PostProcessingComponent, graphics: GraphicsSettings) {
+    let strength = |option, on: bool, intensity: f32| {
+        if effect_runs(graphics, option, on) {
+            intensity
+        } else {
+            0.0
+        }
+    };
+    let (v, ca, grain) = (&vc.vignette, &vc.chromatic_aberration, &vc.film_grain);
+    params.vignette = [
+        strength(GraphicsOption::Vignette, v.active, v.intensity),
+        v.smoothness,
+        v.center[0],
+        v.center[1],
+    ];
+    params.vignette_color = [v.color[0], v.color[1], v.color[2], 0.0];
+    params.lens = [
+        strength(GraphicsOption::ChromaticAberration, ca.active, ca.intensity),
+        strength(GraphicsOption::FilmGrain, grain.active, grain.intensity),
+        grain.response,
+        0.0,
+    ];
 }
 
 /// `post`'s automatic-exposure knobs, when its volume meters the exposure (#1444).

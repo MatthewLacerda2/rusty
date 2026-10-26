@@ -162,22 +162,22 @@ mod tests {
         let (id, name, default, arity, runtime): (String, String, f32, usize, bool) = lua
             .load(
                 r#"for _, b in ipairs(Shader.Blocks("postfx")) do
-                     if b.id == "vignette" then
-                       local p = b.params[1]
+                     if b.id == "scanline" then
+                       local p = b.params[2]
                        return b.id, p.name, p.default, p.arity, p.runtime
                      end
                    end"#,
             )
             .eval()
             .unwrap();
-        let block = crate::shadergen::blocks::find(PassKind::Postfx, "vignette").unwrap();
+        let block = crate::shadergen::blocks::find(PassKind::Postfx, "scanline").unwrap();
         assert_eq!(
             (id.as_str(), name.as_str()),
-            ("vignette", block.params[0].name)
+            ("scanline", block.params[1].name)
         );
         assert_eq!(
             (default, arity, runtime),
-            (block.params[0].default, 1, true)
+            (block.params[1].default, 1, true)
         );
     }
 

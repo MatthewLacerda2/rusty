@@ -237,3 +237,36 @@ fn motion_blur_needs_no_volume() {
         Some(16.0)
     );
 }
+
+/// #1439: each lens effect packs its knobs when on, and a zero intensity (which the
+/// composite skips) when off or forbidden by the player.
+#[test]
+fn lens_effects_pack_when_on_and_zero_when_off_or_forbidden() {
+    let mut on = vc();
+    on.vignette.active = true;
+    on.vignette.center = [0.25, 0.75];
+    on.chromatic_aberration.active = true;
+    on.film_grain.active = true;
+    let (scene, id) = scene_with_vc(on, Some(cam()));
+    let (p, _) = params(&scene, Some(id), QualityPreset::Low);
+    assert_eq!(p.vignette, [0.3, 0.2, 0.25, 0.75]);
+    assert_eq!(p.lens, [0.3, 0.3, 0.8, 0.0]);
+    let id_m = Mat4::IDENTITY;
+    let post = borrow_post_source(&scene, Some(id));
+    for (option, slot) in [
+        (GraphicsOption::Vignette, 0),
+        (GraphicsOption::ChromaticAberration, 1),
+        (GraphicsOption::FilmGrain, 2),
+    ] {
+        let (p, _) = build_post_params(&scene, post.source(), forbidding(option), id_m, [1.0; 3]);
+        let intensity = [p.vignette[0], p.lens[0], p.lens[1]];
+        assert_eq!(intensity[slot], 0.0, "{option:?} forbidden");
+    }
+    let (scene, id) = scene_with_vc(vc(), Some(cam()));
+    let (p, _) = params(&scene, Some(id), QualityPreset::High);
+    assert_eq!(
+        (p.vignette[0], p.lens[0], p.lens[1]),
+        (0.0, 0.0, 0.0),
+        "off by default"
+    );
+}

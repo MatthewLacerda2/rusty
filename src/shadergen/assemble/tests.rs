@@ -71,7 +71,7 @@ fn assembly_is_deterministic() {
         name: "t".into(),
         blocks: vec![
             BlockSel {
-                id: "vignette".into(),
+                id: "grayscale".into(),
                 params: BTreeMap::new(),
             },
             BlockSel {

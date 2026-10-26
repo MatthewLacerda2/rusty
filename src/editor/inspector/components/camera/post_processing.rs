@@ -44,6 +44,7 @@ pub fn draw_post_processing(
             draw_ssr(ui, world, id, &vc, is_dirty);
             draw_shadows(ui, world, id, &vc, is_dirty);
             draw_ssao(ui, world, id, &vc, is_dirty);
+            super::lens::draw_lens(ui, world, id, &vc, is_dirty);
             super::custom_effects::draw_custom_effects(ui, world, id, &vc, is_dirty);
         },
     );
@@ -261,6 +262,7 @@ fn draw_shadows(
 }
 
 /// The Ambient Occlusion section (#436): on/off, radius and strength.
+#[rustfmt::skip]
 fn draw_ssao(
     ui: &mut egui::Ui,
     world: &mut crate::ecs::World,
@@ -278,23 +280,8 @@ fn draw_ssao(
         *is_dirty = true;
     }
     if vc.ssao.active {
-        let (r, i) = (vc.ssao.radius, vc.ssao.intensity);
-        let max = crate::components::SsaoSettings::MAX_INTENSITY;
-        *is_dirty |= slider_row(
-            ui,
-            (&mut *world, id),
-            "    Radius:",
-            r,
-            0.05..=3.0,
-            vc_ops::set_ssao_radius,
-        );
-        *is_dirty |= slider_row(
-            ui,
-            (&mut *world, id),
-            "    Intensity:",
-            i,
-            0.0..=max,
-            vc_ops::set_ssao_intensity,
-        );
+        let (r, i, max) = (vc.ssao.radius, vc.ssao.intensity, crate::components::SsaoSettings::MAX_INTENSITY);
+        *is_dirty |= slider_row(ui, (&mut *world, id), "    Radius:", r, 0.05..=3.0, vc_ops::set_ssao_radius);
+        *is_dirty |= slider_row(ui, (&mut *world, id), "    Intensity:", i, 0.0..=max, vc_ops::set_ssao_intensity);
     }
 }

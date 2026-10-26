@@ -9,9 +9,9 @@ use super::super::value::Mask;
 use super::NO_OP;
 use crate::components::rendering::camera::RenderTarget;
 use crate::components::{
-    AutoExposure, CameraComponent, LiftGammaGain, LightComponent, LodGroupComponent, LodLevel,
-    MaterialComponent, MeshComponent, PostProcessingComponent, ShadowSettings, SsaoSettings,
-    TransformComponent, Wheel, WhiteBalance,
+    AutoExposure, CameraComponent, ChromaticAberration, FilmGrain, LiftGammaGain, LightComponent,
+    LodGroupComponent, LodLevel, MaterialComponent, MeshComponent, PostProcessingComponent,
+    ShadowSettings, SsaoSettings, TransformComponent, Vignette, Wheel, WhiteBalance,
 };
 use crate::scene::authoring::{
     rendering::camera, rendering::light, rendering::lod_group as lod,
@@ -90,6 +90,22 @@ inspect! {
         op!("hue_shift", vc::set_hue_shift),
         op!("lut", vc::set_lut),
         op!("lut_contribution", vc::set_lut_contribution),
+        with!("vignette", |c, v: Vignette| {
+            vc::set_vignette_active(c, v.active);
+            vc::set_vignette_intensity(c, v.intensity);
+            vc::set_vignette_smoothness(c, v.smoothness);
+            vc::set_vignette_color(c, v.color);
+            vc::set_vignette_center(c, v.center);
+        }),
+        with!("chromatic_aberration", |c, v: ChromaticAberration| {
+            vc::set_chromatic_aberration_active(c, v.active);
+            vc::set_chromatic_aberration_intensity(c, v.intensity);
+        }),
+        with!("film_grain", |c, v: FilmGrain| {
+            vc::set_film_grain_active(c, v.active);
+            vc::set_film_grain_intensity(c, v.intensity);
+            vc::set_film_grain_response(c, v.response);
+        }),
         op!("ssr_active", vc::set_ssr_active),
         op!("ssr_quality", vc::set_ssr_quality),
         op!("ssr_temporal_upsampling", vc::set_ssr_temporal_upsampling),

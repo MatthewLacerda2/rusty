@@ -130,7 +130,7 @@ mod tests {
     fn a_name_resolves_in_any_effect_of_the_chain() {
         let chain = PostChain::from_layouts(vec![
             layout(&["grayscale"]),
-            layout(&["damage_vignette", "film_grain"]),
+            layout(&["damage_vignette", "scanline"]),
         ]);
         let mut values = BTreeMap::new();
         assert_eq!(

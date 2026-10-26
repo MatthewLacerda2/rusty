@@ -9,6 +9,7 @@
 mod animator;
 mod fog;
 mod graphics;
+mod lens;
 mod light;
 mod nav_agent;
 mod particles;

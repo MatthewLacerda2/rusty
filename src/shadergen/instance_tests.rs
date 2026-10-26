@@ -43,7 +43,7 @@ fn a_repeated_block_keeps_per_instance_params_and_one_helper() {
                 "tint",
                 &[("color", ParamValue::Vector(vec![1.0, 0.5, 0.25]))],
             ),
-            sel("vignette", &[]),
+            sel("grayscale", &[]),
             sel("tint", &[("color", ParamValue::Scalar(0.5))]),
         ],
     );
@@ -51,7 +51,7 @@ fn a_repeated_block_keeps_per_instance_params_and_one_helper() {
     assert!(wgsl.contains("const tint_0_color: vec3<f32> = vec3<f32>(1.0, 0.5, 0.25);"));
     assert!(wgsl.contains("const tint_2_color: vec3<f32> = vec3<f32>(0.5, 0.5, 0.5);"));
     assert_eq!(wgsl.matches("fn pfx_tint(").count(), 1, "{wgsl}");
-    assert!(wgsl.contains("pfx_tint(pfx_vignette(pfx_tint(color, uv, tint_0_color)"));
+    assert!(wgsl.contains("pfx_tint(pfx_grayscale(pfx_tint(color, uv, tint_0_color)"));
     validate(ENGINE_SHADERS, &wgsl).expect("repeated block composes");
     assert_eq!(wgsl, assemble_real(&r).unwrap(), "deterministic");
 }
@@ -73,14 +73,14 @@ fn every_catalogued_block_twice_composes() {
 fn an_undeclared_param_names_the_block_key_and_declared_params() {
     let r = recipe(
         PassKind::Postfx,
-        vec![sel("vignette", &[("strenght", ParamValue::Scalar(1.0))])],
+        vec![sel("scanline", &[("strenght", ParamValue::Scalar(1.0))])],
     );
     let err = assemble(&r, "").unwrap_err();
     for part in [
-        "\"vignette\"",
+        "\"scanline\"",
         "blocks[0]",
         "\"strenght\"",
-        "strength, radius",
+        "count, strength",
     ] {
         assert!(err.contains(part), "missing {part}: {err}");
     }

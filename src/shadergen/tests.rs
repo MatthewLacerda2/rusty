@@ -40,7 +40,7 @@ fn baked_postfx_variant_composes_through_naga_oil() {
         name: "warm_grade".into(),
         blocks: vec![
             block("tint", tint),
-            block("vignette", BTreeMap::new()),
+            block("grayscale", BTreeMap::new()),
             block("scanline", BTreeMap::new()),
         ],
     };
@@ -109,7 +109,7 @@ fn same_recipe_assembles_byte_identical_wgsl() {
         pass: PassKind::Postfx,
         name: "det".into(),
         blocks: vec![
-            block("vignette", BTreeMap::new()),
+            block("grayscale", BTreeMap::new()),
             block("posterize", BTreeMap::new()),
         ],
     };

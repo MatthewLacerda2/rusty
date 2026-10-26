@@ -13,7 +13,7 @@
 //!   name = "warm_grade",        -- baked file becomes <name>.wgsl
 //!   blocks = {
 //!     { id = "tint", params = { color = {1.0, 0.8, 0.6} } },
-//!     { id = "vignette", params = { strength = 0.6 } },
+//!     { id = "scanline", params = { strength = 0.6 } },
 //!   },
 //! }
 //! ```
@@ -49,7 +49,7 @@ mod tests {
                   pass = "postfx", name = "warm",
                   blocks = {
                     { id = "tint", params = { color = {1.0, 0.8, 0.6} } },
-                    { id = "vignette" },
+                    { id = "grayscale" },
                   },
                 }
             "#,

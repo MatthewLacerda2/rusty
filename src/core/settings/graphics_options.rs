@@ -43,6 +43,12 @@ crate::core::named_enum! {
         Ssr = "ssr",
         /// Screen-space ambient occlusion (off on the Low tier).
         Ssao = "ssao",
+        /// The volume's vignette (#1439).
+        Vignette = "vignette",
+        /// The volume's chromatic aberration (#1439).
+        ChromaticAberration = "chromatic_aberration",
+        /// The volume's film grain (#1439).
+        FilmGrain = "film_grain",
     }
 }
 

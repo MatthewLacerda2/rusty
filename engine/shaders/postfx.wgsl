@@ -3,19 +3,22 @@
 // Four entry points share one fullscreen-triangle vertex stage:
 //   fs_bright    — bright-pass threshold (bloom prefilter)
 //   fs_blur      — separable gaussian blur (direction from uniform)
-//   fs_composite — bloom add + SSR + exposure, then the grading LUT, over the scene
-//                  (already motion-blurred by `postfx/motion_blur.wgsl` when it runs)
+//   fs_composite — chromatic aberration + SSR + bloom add + exposure, then the
+//                  grading LUT, the vignette and film grain (`postfx/lens.wgsl`), over
+//                  the scene (already motion-blurred by `postfx/motion_blur.wgsl`)
 //   fs_fxaa      — luma-based edge anti-aliasing; the last pass of all (#360)
 //
 // The composite is the one place the UI knobs (exposure, bloom, SSR) finally take
 // effect; the grade and the tonemap reach it baked into the grading LUT
 // (`postfx/grade.wgsl`, #1440).
 
-// `PostParams` lives in `common.wgsl` so authored postfx effects (#397) can bind it
-// too (binding 0) — they read the game time from it (#398).
-#import common::{PostParams, equirect_uv}
+// `PostParams` is its own module so authored postfx effects (#397) can bind it too
+// (binding 0) — they read the game time from it (#398).
+#import common::equirect_uv
+#import postfx::params::PostParams
 #import fullscreen
 #import postfx::grade::{luminance, lut_coord}
+#import postfx::lens
 
 @group(0) @binding(0) var<uniform> params: PostParams;
 @group(0) @binding(1) var t_color: texture_2d<f32>;
@@ -143,6 +146,11 @@ fn fs_composite(in: VsOut) -> @location(0) vec4<f32> {
 
     // 1. The scene, motion-blurred upstream when the view runs it (#1436).
     var hdr = textureSample(t_color, s_color, in.uv).rgb;
+    // Chromatic aberration (#1439): its fringe, from the (blurred) HDR input before
+    // the grade; it reuses this centre tap.
+    if (params.lens.x > 0.0) {
+        hdr += lens::fringe(t_color, s_color, in.uv, params.lens.x, hdr);
+    }
 
     // 2. Real screen-space reflections (High tier only; Low/Medium rely on the
     //    forward shader's cubemap reflection). Additive, grazing-weighted.
@@ -166,7 +174,8 @@ fn fs_composite(in: VsOut) -> @location(0) vec4<f32> {
     // 5. Grade + tonemap (HDR -> display): one trilinear fetch of the LUT.
     hdr = textureSampleLevel(t_lut, s_color, lut_coord(hdr), 0.0).rgb;
 
-    return vec4<f32>(hdr, 1.0);
+    // 6. The vignette and film grain, on the graded colour (#1439).
+    return vec4<f32>(lens::after_grade(hdr, in.uv, in.pos.xy, params), 1.0);
 }
 
 // ---------------------------------------------------------------------------
