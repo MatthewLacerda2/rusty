@@ -1,7 +1,10 @@
-//! The post-FX chain alone, fed a synthetic HDR row (#1440): what the grading-LUT
-//! GPU tests share. The scene target is written directly, so a test chooses the
-//! exact HDR colour each pixel's grade starts from, and reads the display colour the
-//! composite wrote.
+//! The grading LUT's GPU tests (`knobs`, `clamp`, #1440) and what they share: the
+//! post-FX chain alone, fed a synthetic HDR row. The scene target is written
+//! directly, so a test chooses the exact HDR colour each pixel's grade starts from,
+//! and reads the display colour the composite wrote.
+
+mod clamp;
+mod knobs;
 
 use std::collections::BTreeMap;
 

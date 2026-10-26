@@ -21,28 +21,37 @@ pub(super) fn draw_grading(
     let r = WhiteBalance::RANGE;
     let wb = vc.white_balance;
     ui.label("  White Balance");
+    let row = (&mut *world, id);
     *is_dirty |= slider_row(
         ui,
-        (&mut *world, id),
+        row,
         "    Temperature:",
         wb.temperature,
         -r..=r,
-        |c, t| {
-            let tint = c.white_balance.tint;
-            vc_ops::set_white_balance(c, t, tint);
-        },
+        set_temperature,
     );
+    let row = (&mut *world, id);
+    *is_dirty |= slider_row(ui, row, "    Tint:", wb.tint, -r..=r, set_tint);
+    draw_wheels(ui, world, id, vc, is_dirty);
+    let (row, hue) = ((world, id), vc.hue_shift);
     *is_dirty |= slider_row(
         ui,
-        (&mut *world, id),
-        "    Tint:",
-        wb.tint,
-        -r..=r,
-        |c, n| {
-            let temperature = c.white_balance.temperature;
-            vc_ops::set_white_balance(c, temperature, n);
-        },
+        row,
+        "  Hue Shift:",
+        hue,
+        -180.0..=180.0,
+        vc_ops::set_hue_shift,
     );
+}
+
+/// The Lift / Gamma / Gain wheels: a colour and an offset each.
+fn draw_wheels(
+    ui: &mut egui::Ui,
+    world: &mut crate::ecs::World,
+    id: u32,
+    vc: &PostProcessingComponent,
+    is_dirty: &mut bool,
+) {
     ui.label("  Lift / Gamma / Gain");
     for which in Wheel::ALL {
         let mut wheel = *vc.lift_gamma_gain.wheel(which);
@@ -61,13 +70,14 @@ pub(super) fn draw_grading(
             *is_dirty = true;
         }
     }
-    let hue = vc.hue_shift;
-    *is_dirty |= slider_row(
-        ui,
-        (&mut *world, id),
-        "  Hue Shift:",
-        hue,
-        -180.0..=180.0,
-        vc_ops::set_hue_shift,
-    );
+}
+
+fn set_temperature(c: &mut PostProcessingComponent, temperature: f32) {
+    let tint = c.white_balance.tint;
+    vc_ops::set_white_balance(c, temperature, tint);
+}
+
+fn set_tint(c: &mut PostProcessingComponent, tint: f32) {
+    let temperature = c.white_balance.temperature;
+    vc_ops::set_white_balance(c, temperature, tint);
 }

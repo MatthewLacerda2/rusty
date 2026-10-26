@@ -144,8 +144,4 @@ fn same(a: &GradeParams, b: &GradeParams) -> bool {
 }
 
 #[cfg(test)]
-mod gpu_clamp_tests;
-#[cfg(test)]
-mod gpu_fixture;
-#[cfg(test)]
-mod gpu_tests;
+mod gpu;

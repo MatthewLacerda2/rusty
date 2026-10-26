@@ -4,10 +4,10 @@
 
 use glam::Vec3;
 
-use super::gpu_fixture::{chain, W};
-use super::GradeParams;
+use super::{chain, W};
 use crate::components::{PostProcessingComponent, Tonemap, Wheel};
 use crate::core::color::linear_to_srgb;
+use crate::render::postfx::grade::GradeParams;
 use crate::render::{RenderView, OFFSCREEN_FORMAT};
 use crate::scene::authoring::default_post_processing;
 use crate::scene::authoring::rendering::post_processing as ops;

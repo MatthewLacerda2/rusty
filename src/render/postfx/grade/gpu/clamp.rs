@@ -2,9 +2,9 @@
 //! colour below zero or to infinity leave black black and highlights white,
 //! whichever tonemapper runs.
 
-use super::gpu_fixture::{chain, W};
-use super::GradeParams;
+use super::{chain, W};
 use crate::components::{PostProcessingComponent, Tonemap, Wheel};
+use crate::render::postfx::grade::GradeParams;
 use crate::scene::authoring::default_post_processing;
 use crate::scene::authoring::rendering::post_processing as ops;
 
