@@ -1,16 +1,18 @@
-//! The grading LUT's GPU tests (`knobs`, `clamp`, #1440) and what they share with
-//! the exposure meter's (#1444): the post-FX chain alone, fed a synthetic HDR row. The scene target is written
+//! The grading LUT's GPU tests (`knobs`, `clamp`, #1440; `lookup`, #1441) and what they
+//! share with the exposure meter's (#1444): the post-FX chain alone, fed a synthetic HDR
+//! row. The scene target is written
 //! directly, so a test chooses the exact HDR colour each pixel's grade starts from,
 //! and reads the display colour the composite wrote.
 
 mod clamp;
 mod knobs;
+mod lookup;
 
 use std::collections::BTreeMap;
 
 use crate::render::gpu::shaders::ShaderRegistry;
 use crate::render::gpu::DEPTH_FORMAT;
-use crate::render::postfx::grade::GradeParams;
+use crate::render::postfx::grade::{GradeParams, Lookup};
 use crate::render::postfx::{PostFx, PostFxContext, PostParams, PostPasses, HDR_FORMAT};
 use crate::render::timing::GpuTimer;
 use crate::render::{readback, Renderer, OFFSCREEN_FORMAT};
@@ -43,10 +45,21 @@ impl Chain {
         exposure: f32,
         grade: &GradeParams,
     ) -> Vec<[u8; 4]> {
+        self.run_with(row, exposure, grade, None)
+    }
+
+    /// [`run`](Self::run), with `lookup`'s user LUT over the grade (#1441).
+    pub(in crate::render::postfx) fn run_with(
+        &mut self,
+        row: &[[f32; 3]],
+        exposure: f32,
+        grade: &GradeParams,
+        lookup: Option<Lookup>,
+    ) -> Vec<[u8; 4]> {
         self.write_row(row);
-        self.pfx
-            .grade
-            .prepare((&self.r.device, &self.r.queue), &self.r.grade_bake, grade);
+        let (device, queue) = (&self.r.device, &self.r.queue);
+        let bake = &mut self.r.grade_bake;
+        self.pfx.grade.prepare((device, queue), bake, grade, lookup);
         let mut params = PostParams::default();
         params.color[0] = exposure;
         self.composite(params)

@@ -124,8 +124,8 @@ pub(super) fn slider_row(
     .inner
 }
 
-/// The Color Correction section (exposure and auto-exposure, contrast, saturation, the grade, tonemap,
-/// gamma).
+/// The Color Correction section (exposure and auto-exposure, contrast, saturation, the
+/// grade, tonemap, gamma, Color Lookup).
 #[rustfmt::skip]
 fn draw_color_correction(
     ui: &mut egui::Ui,
@@ -142,6 +142,7 @@ fn draw_color_correction(
     super::grading::draw_grading(ui, world, id, vc, is_dirty);
     draw_tonemap(ui, world, id, vc, is_dirty);
     *is_dirty |= slider_row(ui, (&mut *world, id), "  Display Gamma:", vc.gamma, 0.5..=2.0, vc_ops::set_gamma);
+    super::grading::draw_color_lookup(ui, world, id, vc, is_dirty);
 }
 
 /// The tonemap-operator selector, reading the snapshot and routing through the op.

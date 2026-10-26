@@ -55,6 +55,8 @@ set on that camera entity, in the inspector or the scene file.
 | `Graphics.GetGammaWheel` / `SetGammaWheel` | `()` / `(r, g, b, offset)` | `r, g, b, offset`: the Gamma wheel, as the Lift wheel. Not `GetGamma`, the display-gamma tweak |
 | `Graphics.GetGainWheel` / `SetGainWheel` | `()` / `(r, g, b, offset)` | `r, g, b, offset`: the Gain wheel, as the Lift wheel |
 | `Graphics.GetHueShift` / `SetHueShift` | `()` / `(degrees)` | `number` (clamped −180–180, **neutral `0`**) |
+| `Graphics.GetColorLookup` / `SetColorLookup` | `()` / `(path)` | `string` or `nil`: the user LUT file (a `.cube`, or a Unity strip `.png`; `nil` or `""` clears it; see *Color Lookup*) |
+| `Graphics.GetColorLookupContribution` / `SetColorLookupContribution` | `()` / `(value)` | `number` (how much of the LUT applies, clamped 0–1, **default `1`**) |
 | `Graphics.GetSsrActive` / `SetSsrActive` | `()` / `(bool)` | `bool` |
 | `Graphics.GetSsrQuality` / `SetSsrQuality` | `()` / `(name)` | `string` |
 | `Graphics.GetMotionBlurActive` / `SetMotionBlurActive` | `()` / `(bool)` | `bool` |
@@ -125,6 +127,29 @@ adaptation reads it with the dev-only `Debug.GetAdaptedExposure()`, a frame or s
 option for it; the exposure is the developer's look. The Inspector's **Color
 Correction** section edits the same fields, and they are saved with the scene. A new
 volume starts `Fixed`.
+
+**Color Lookup** (#1441) is Unity's override of that name: a LUT a colourist
+graded in Photoshop, DaVinci Resolve or Affinity and exported, applied last, on the
+display colour after the tonemap and the rest of the grade, sRGB-encoded (as URP
+applies it), and blended in by its **contribution** (`0` none, `1` all of it). Two
+formats are read:
+
+- **`.cube`** (Adobe's Cube LUT format, what Resolve and Photoshop export): a 3D
+  table, `LUT_3D_SIZE` from `2` to `65` (`33` and `65` are Resolve's), with its
+  `DOMAIN_MIN` / `DOMAIN_MAX` (or Resolve's `LUT_3D_INPUT_RANGE`), `#` comment lines
+  and `TITLE`. A 1D LUT is refused.
+- **A strip `.png`**, Unity's 2D layout, common in asset packs: `N` slices of
+  `N × N` side by side, `N² × N` pixels (`256×16`, `1024×32`), blue by slice, red
+  to the right and green upwards (the bottom row is green `0`).
+
+Put the file anywhere in the project (`assets/luts/` is a good home) and name it by
+its project-relative path, as a texture is named: `Graphics.SetColorLookup(
+"assets/luts/warm.cube")`. The renderer folds it into the view's grading LUT, so it
+costs a pixel nothing, and rebakes when the path, the contribution or the file
+changes (a file saved over is read again). A missing or malformed LUT is logged
+once, naming the file (and, for a `.cube`, the line), and grades as if none were
+set. The Inspector's **Color Lookup** rows, at the end of **Color Correction**, edit
+the same fields; the path is written when its field loses focus.
 
 **Sun shadows** are cascaded (#435): the camera's view, out to the **shadow
 distance**, is split into `1`–`4` slices, each with its own shadow map fitted to it

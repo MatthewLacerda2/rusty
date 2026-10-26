@@ -9,7 +9,7 @@ use crate::render::gpu::uniforms::FogUniform;
 use crate::render::motion::{self, HistoryKey};
 use crate::render::passes::ssao::SsaoPlan;
 use crate::render::postfx::exposure::ExposureParams;
-use crate::render::postfx::grade::GradeParams;
+use crate::render::postfx::grade::{GradeParams, Lookup};
 use crate::render::postfx::params::{auto_exposure, build_post_params, post_passes, PostSource};
 use crate::render::postfx::PostParams;
 use crate::render::{RenderView, Renderer};
@@ -97,13 +97,16 @@ impl Renderer {
             full: ctx.stack.full_post_fx,
         };
 
-        // The grade + tonemap (#1440): rebaked only when this view's inputs changed.
-        let grade = match post.full {
-            true => GradeParams::from_volume(ctx.stack.post.volume),
-            false => GradeParams::NEUTRAL,
-        };
+        // The grade + tonemap and the Color Lookup (#1440, #1441): rebaked only when
+        // this view's inputs changed.
+        let volume = ctx.stack.post.volume.filter(|_| post.full);
+        let grade = GradeParams::from_volume(volume);
         let gpu = (&self.device, &self.queue);
-        let baked = view.post_fx.grade.prepare(gpu, &self.grade_bake, &grade);
+        let lookup = Lookup::of(volume);
+        let baked = view
+            .post_fx
+            .grade
+            .prepare(gpu, &mut self.grade_bake, &grade, lookup);
         self.frame_counters.grade_lut_bakes += u32::from(baked);
 
         self.meter_exposure(view, ctx, post.full);

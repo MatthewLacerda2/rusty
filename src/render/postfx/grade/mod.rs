@@ -8,18 +8,25 @@
 //! the ones it last baked, so a still grade costs a frame nothing but the fetch.
 //! Each `PostFx`, so each view, owns one table: two views with different grades
 //! never rebake each other's. The bake pipeline ([`GradeBake`]) is the renderer's,
-//! built once for all of them.
+//! built once for all of them, with the user LUTs volumes name (`user`, #1441):
+//! one of those is folded into the bake last, so it costs a pixel nothing.
 
 mod params;
+mod user;
 
 pub use params::GradeParams;
+pub use user::{Lookup, UserLuts};
 
 use crate::render::gpu::shaders::ShaderRegistry;
 
 /// The bake's compute pipeline: built once, on the `Renderer`, and shared by every
 /// view's [`GradeLut`], so a new view or render-texture slot compiles no shader.
+/// It keeps the user LUTs too, so two views naming one file upload it once.
 pub struct GradeBake {
     pipeline: wgpu::ComputePipeline,
+    pub luts: UserLuts,
+    /// Bound in a user LUT's place while none applies.
+    neutral: wgpu::TextureView,
 }
 
 impl GradeBake {
@@ -33,7 +40,11 @@ impl GradeBake {
             compilation_options: Default::default(),
             cache: None,
         });
-        Self { pipeline }
+        Self {
+            pipeline,
+            luts: UserLuts::default(),
+            neutral: user::neutral(device),
+        }
     }
 }
 
@@ -44,10 +55,12 @@ pub struct GradeLut {
     /// texture alive.
     pub view: wgpu::TextureView,
     params_buffer: wgpu::Buffer,
-    /// Made on the first bake, against the bake pipeline's layout.
-    bind_group: Option<wgpu::BindGroup>,
-    /// The inputs the table holds now; `None` before the first bake.
-    baked: Option<GradeParams>,
+    /// Made against the bake pipeline's layout, for the user LUT whose id it holds
+    /// (`0`: none), and made again when that changes.
+    bind_group: Option<(u64, wgpu::BindGroup)>,
+    /// The inputs the table holds now, with the user LUT's id; `None` before the
+    /// first bake.
+    baked: Option<(GradeParams, u64)>,
 }
 
 impl GradeLut {
@@ -90,20 +103,36 @@ impl GradeLut {
         texture.create_view(&wgpu::TextureViewDescriptor::default())
     }
 
-    /// Make the table hold `params`' grade through `bake`, baking it only when they
-    /// differ from the ones it holds. Returns whether it baked.
+    /// Make the table hold `params`' grade, then `lookup`'s LUT (when it loads),
+    /// through `bake`, baking only when they differ from what it holds: a changed
+    /// knob, contribution, file or re-read file. Returns whether it baked.
     pub fn prepare(
         &mut self,
         (device, queue): (&wgpu::Device, &wgpu::Queue),
-        bake: &GradeBake,
+        bake: &mut GradeBake,
         params: &GradeParams,
+        lookup: Option<Lookup>,
     ) -> bool {
-        if self.baked.as_ref().is_some_and(|b| same(b, params)) {
+        let user = lookup.and_then(|l| Some((bake.luts.get(device, queue, l.path)?, l)));
+        let (params, view, id) = match user {
+            Some((lut, l)) => (
+                params.with_lookup(lut.domain, l.contribution),
+                &lut.view,
+                lut.id,
+            ),
+            None => (*params, &bake.neutral, 0),
+        };
+        if self
+            .baked
+            .as_ref()
+            .is_some_and(|(b, i)| same(b, &params) && *i == id)
+        {
             return false;
         }
-        queue.write_buffer(&self.params_buffer, 0, bytemuck::bytes_of(params));
-        let bind_group = self.bind_group.get_or_insert_with(|| {
-            device.create_bind_group(&wgpu::BindGroupDescriptor {
+        queue.write_buffer(&self.params_buffer, 0, bytemuck::bytes_of(&params));
+        let group = match self.bind_group.take() {
+            Some((i, group)) if i == id => group,
+            _ => device.create_bind_group(&wgpu::BindGroupDescriptor {
                 label: Some("Grading LUT Bake"),
                 layout: &bake.pipeline.get_bind_group_layout(0),
                 entries: &[
@@ -115,9 +144,13 @@ impl GradeLut {
                         binding: 1,
                         resource: wgpu::BindingResource::TextureView(&self.view),
                     },
+                    wgpu::BindGroupEntry {
+                        binding: 2,
+                        resource: wgpu::BindingResource::TextureView(view),
+                    },
                 ],
-            })
-        });
+            }),
+        };
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("Grading LUT Bake"),
         });
@@ -127,12 +160,13 @@ impl GradeLut {
                 timestamp_writes: None,
             });
             pass.set_pipeline(&bake.pipeline);
-            pass.set_bind_group(0, &*bind_group, &[]);
+            pass.set_bind_group(0, &group, &[]);
             let groups = Self::SIZE.div_ceil(Self::GROUP);
             pass.dispatch_workgroups(groups, groups, groups);
         }
         queue.submit(std::iter::once(encoder.finish()));
-        self.baked = Some(*params);
+        self.bind_group = Some((id, group));
+        self.baked = Some((params, id));
         true
     }
 }

@@ -54,9 +54,16 @@ pub const LAYERS: &[Layer] = &[
     // The data the sim runs on.
     sim("core", &[]).uses(&["rustc_hash"]),
     sim("time", &[]),
-    // Decoding is the asset pipeline's: models, and clips through symphonia (#545);
-    // only `audio` plays them.
-    sim("asset", &["core"]).uses(&["bevy_mikktspace", "gltf", "symphonia", "tobj", "ufbx"]),
+    // Decoding is the asset pipeline's: models, clips through symphonia (#545; only
+    // `audio` plays them) and colour lookups through `image` (#1441).
+    sim("asset", &["core"]).uses(&[
+        "bevy_mikktspace",
+        "gltf",
+        "image",
+        "symphonia",
+        "tobj",
+        "ufbx",
+    ]),
     sim("procgen", &["core"]).uses(&["image"]),
     // Shader authoring; GPU-free composition lives here so `render` imports it (#722).
     sim("shadergen", &["core"]).uses(&["naga", "naga_oil"]),

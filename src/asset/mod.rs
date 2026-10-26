@@ -31,6 +31,7 @@ pub mod flat_normals;
 pub mod gltf;
 pub mod lightmap_uv;
 pub mod lod;
+pub mod lut;
 pub mod manifest;
 pub mod material_range;
 pub mod mesh_data;
@@ -46,6 +47,7 @@ pub use animation_graph::{
 };
 pub use convert::texture_ref::MapRef;
 pub use lightmap_uv::LightmapUvSettings;
+pub use lut::Lut;
 pub use manifest::{build_manifest, AssetEntry, AssetManifest, SubObjectEntry};
 pub use material_range::MaterialRange;
 pub use mesh_data::{ImportedAsset, JointTransform, MaterialData, MeshVertex, SkinData, SubMesh};
@@ -92,6 +94,11 @@ pub const MODEL_EXTENSIONS: &[&str] = &["gltf", "glb", "obj", "fbx", "blend"];
 /// The image formats a texture is decoded from, lowercase (#994): what the
 /// renderer's `image` decoders are built with (`Cargo.toml`'s `image` features).
 pub const IMAGE_EXTENSIONS: &[&str] = &["png", "tga", "jpg", "jpeg"];
+
+/// The files a colour lookup is read from, lowercase (#1441, [`lut::load`]). A
+/// `.png` is one only when it is a strip (`N² × N` pixels); any other is refused,
+/// naming its size.
+pub const LUT_EXTENSIONS: &[&str] = &["cube", "png"];
 
 /// True if `path` looks like a source 3D asset this importer can read
 /// ([`MODEL_EXTENSIONS`]). Case-insensitive.
