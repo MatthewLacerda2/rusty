@@ -3,7 +3,7 @@
 //! Surface blocks vary the **fragment look** of the forward pass while keeping the
 //! standard `vs_main` + the full PBR lighting verbatim (so the assembled module
 //! binds against the forward pipeline unchanged — same `VertexInput`, same
-//! `LightingUniforms`/`EntityUniforms`/group(2) maps, same `vs_main`/`fs_main`).
+//! `LightingUniforms`/`EntityUniforms`/group(2) maps, same entry points).
 //! Each block's `helper` is a pure function
 //! `fn srf_<id>(c: vec3<f32>, in: VertexOutput, <params…>) -> vec3<f32>` that
 //! transforms the lit color; the assembler folds the chosen blocks (in recipe order) after the
@@ -21,7 +21,7 @@
 //! own sampler `s_mask` (the texture's wrap and filter, #1323).
 //!
 //! A [`Stage::Uv`] block (`uv_scroll`, #401) is the exception to "transform the lit
-//! color": it rewrites `in.tex_coords` at the top of `fs_main`, before any map is
+//! color": it rewrites `in.tex_coords` at the top of `surface_color`, before any map is
 //! sampled, so every lookup — and every later color block reading `in.tex_coords` —
 //! sees the moved UVs.
 

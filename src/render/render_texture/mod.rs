@@ -95,6 +95,7 @@ impl Renderer {
             let guards = borrow_post_source(scene, Some(cam.id));
             let pass = StackPass {
                 stack: std::slice::from_ref(&cam.camera),
+                entities: &[Some(cam.id)],
                 base_id: Some(cam.id),
                 post: guards.source(),
                 output: &target,

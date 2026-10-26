@@ -6,24 +6,39 @@
 //! frame's poses replace last frame's when the stack ends ([`MotionHistory::end`]).
 //! An entity not drawn this frame (culled, hidden) has no pose next frame. Entity ids
 //! are per scene, so the history is per view and starts over when the scene, the base
-//! camera or the stack's size changes ([`HistoryKey`]).
+//! camera or the play state changes ([`HistoryKey`]). Each camera's matrix is kept by
+//! its entity, not its place in the stack, so a camera swapped in at the same place
+//! (a weapon switch's viewmodel camera) starts with no last frame.
 
 use glam::Mat4;
 use std::collections::HashMap;
 
 use crate::render::gpu::draw_buffers::{push_palette, JointMatrix};
 use crate::render::InstanceData;
-use crate::scene::SceneId;
+use crate::scene::{Scene, SceneId};
 
 /// What a view's history is valid for; any change is a cut.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct HistoryKey {
     pub scene: SceneId,
-    /// The stack's base camera entity (`None`: the editor's free camera, a view with
-    /// no scene camera). Another one is a camera switch.
+    /// The stack's base camera entity (`None` when the scene has no active screen
+    /// camera). Another one is a camera switch.
     pub base: Option<u32>,
-    /// How many cameras the stack holds.
-    pub cameras: usize,
+    /// Whether the scene is in Play. Play and Stop are cuts, as Unity's scene reload
+    /// is: Stop restores the edit scene under the same id, and its first frame must
+    /// not reproject from the last Play pose.
+    pub playing: bool,
+}
+
+impl HistoryKey {
+    /// The key of a view drawing `scene` from base camera `base`.
+    pub(crate) fn new(scene: &Scene, base: Option<u32>) -> Self {
+        Self {
+            scene: scene.id(),
+            base,
+            playing: scene.is_playing(),
+        }
+    }
 }
 
 /// One entity's pose as drawn: its world matrix and its joint palette (empty when
@@ -37,27 +52,30 @@ pub(crate) struct Pose {
 #[derive(Default)]
 pub(crate) struct MotionHistory {
     key: Option<HistoryKey>,
-    cameras: Vec<Mat4>,
+    /// Each stacked camera's view-projection last frame, by entity (`None`: a camera
+    /// with no entity, the editor's free camera).
+    cameras: HashMap<Option<u32>, Mat4>,
     prev: HashMap<u32, Pose>,
     next: HashMap<u32, Pose>,
 }
 
 impl MotionHistory {
-    /// Open a frame of `key`'s stack, whose cameras draw through `view_projs`: a
-    /// changed key forgets everything first. Returns each camera's last-frame matrix,
-    /// its current one where it has none, and keeps the current ones for next frame.
-    pub(crate) fn begin(&mut self, key: HistoryKey, view_projs: &[Mat4]) -> Vec<Mat4> {
+    /// Open a frame of `key`'s stack, whose cameras (entity, view-projection) are
+    /// `cameras`: a changed key forgets everything first. Returns each camera's
+    /// last-frame matrix, its current one where it has none, and keeps the current
+    /// ones for next frame.
+    pub(crate) fn begin(&mut self, key: HistoryKey, cameras: &[(Option<u32>, Mat4)]) -> Vec<Mat4> {
         if self.key != Some(key) {
             self.clear();
             self.key = Some(key);
         }
         self.next.clear();
-        let prev = view_projs
+        let prev = cameras
             .iter()
-            .enumerate()
-            .map(|(i, now)| self.cameras.get(i).copied().unwrap_or(*now))
+            .map(|(id, now)| self.cameras.get(id).copied().unwrap_or(*now))
             .collect();
-        self.cameras = view_projs.to_vec();
+        self.cameras.clear();
+        self.cameras.extend(cameras.iter().copied());
         prev
     }
 
@@ -75,9 +93,10 @@ impl MotionHistory {
         self.next.insert(id, pose);
     }
 
-    /// Close the frame: its poses become last frame's.
+    /// Close the frame: its poses become last frame's. The old map is kept, to be
+    /// cleared and refilled next frame without allocating.
     pub(crate) fn end(&mut self) {
-        self.prev = std::mem::take(&mut self.next);
+        std::mem::swap(&mut self.prev, &mut self.next);
     }
 
     /// Forget every pose and camera: the next frame is a cut.

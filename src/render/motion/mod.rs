@@ -8,17 +8,18 @@
 //! ([`MotionHistory`]). So an enemy sprinting past a still camera blurs, and a
 //! viewmodel camera's gun, which moves with its camera, writes ~0 (each camera in a
 //! stack writes with its own matrices; the nearest camera wins, as its colour does).
-//! The sky writes the camera's rotation alone (`common::sky_velocity`).
+//! The sky writes the camera's rotation alone (`sky::motion::sky_velocity`).
 //!
 //! **What writes it.** Opaque and cutout solids (mesh particles among them, camera
 //! motion only) and the sky. Transparent surfaces, sprite particles, ribbons, decals
 //! and UI do not, as in Unity.
 //!
 //! **No history, no object motion.** An entity drawn for the first time, and every
-//! entity after a cut (a scene load, a camera switch, a resize, [`MotionVectors::reset`]),
-//! moves with the camera only, and a camera with no history (its first frame, a cut)
-//! uses its current matrix as last frame's: no one-frame smear. There is no distance
-//! heuristic for a teleport, following Unity.
+//! entity after a cut (a scene load, Play or Stop, a camera switch, a resize,
+//! [`MotionVectors::reset`]), moves with the camera only, and a camera with no history
+//! (its first frame, a cut, a camera entity new to the stack) uses its current matrix
+//! as last frame's: no one-frame smear. There is no distance heuristic for a teleport,
+//! following Unity.
 //!
 //! **Cost.** The target exists and the velocity pipelines run only while a view runs
 //! motion blur ([`wanted`]: the camera has it on and the quality tier allows it). On
@@ -53,14 +54,15 @@ pub(crate) struct MotionVectors {
 impl MotionVectors {
     /// Start a frame: allocate (or free) the target for `active`, and open the
     /// history for `key`. Returns last frame's view-projection of each camera in
-    /// `view_projs` (bottom to top), its current one where it has none.
+    /// `cameras` (entity, view-projection; bottom to top), its current one where it
+    /// has none.
     pub(crate) fn begin(
         &mut self,
         device: &wgpu::Device,
         size: PixelSize,
         key: HistoryKey,
         active: bool,
-        view_projs: &[glam::Mat4],
+        cameras: &[(Option<u32>, glam::Mat4)],
     ) -> Vec<glam::Mat4> {
         self.active = active;
         if !active {
@@ -68,7 +70,7 @@ impl MotionVectors {
         } else if self.target.as_ref().is_none_or(|(_, s)| *s != size) {
             self.target = Some((create_target(device, size), size));
         }
-        self.history.begin(key, view_projs)
+        self.history.begin(key, cameras)
     }
 
     /// The velocity attachment this frame's opaque passes write, or `None` when the
@@ -119,6 +121,9 @@ fn create_target(device: &wgpu::Device, size: PixelSize) -> PfxTarget {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod cut_tests;
 
 #[cfg(test)]
 mod gpu_fixture;

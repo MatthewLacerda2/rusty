@@ -2,8 +2,8 @@
 //! shader draws with (#396): Unity's Material → Shader.
 //!
 //! A material names a surface shader (`MaterialAsset::shader`, e.g. `"enemy_toon"`);
-//! the module is `<name>.wgsl` in the authored workspace (`assets/shaders`,
-//! where `Shader.Bake` writes), else the engine set (`engine/shaders`). A surface
+//! the module is `<name>.wgsl` in the authored workspace (`assets/shaders`, where
+//! `Shader.Bake` writes), else the engine set (`engine/shaders`). A surface
 //! variant keeps the forward contract by construction (#272: same `VertexInput`, bind
 //! groups and entry points), so only the shader module differs: its pipelines reuse
 //! the forward pipeline layout: opaque, transparent, and the opaque one writing motion
@@ -15,8 +15,9 @@
 //! the first field of the batch key, so opaque draws sort into one run per shader.
 //!
 //! **Lazy, fail-safe.** A slot is built the first frame a material names it. A module
-//! that is missing, fails to compose, lacks `vs_main`/`fs_main` (a postfx module), or
-//! fails validation is logged **once** and draws with the standard pipeline.
+//! that is missing, fails to compose, lacks `vs_main`/`fs_main` (a postfx module) or
+//! `vs_velocity`/`fs_velocity` (#1435), or fails validation is logged **once** and
+//! draws with the standard pipeline.
 //!
 //! **Hot reload.** [`SurfaceShaders::refresh`] drains the write log
 //! (`core::fs::written`) once per render: a slot whose module or params file was
@@ -45,8 +46,7 @@ pub(crate) const STANDARD: usize = 0;
 
 /// One authored surface shader's pipelines.
 pub(crate) struct SurfacePipelines {
-    /// Opaque/cutout solids (the forward spec), and the same into a view's velocity
-    /// target too (#1435), built the first time a motion-blurred view draws it.
+    /// Opaque/cutout solids, and the same into a view's velocity target (#1435).
     pub forward: wgpu::RenderPipeline,
     pub velocity: super::LazyPipeline,
     /// Alpha-blended solids (the transparent spec).
@@ -257,21 +257,21 @@ impl SurfaceShaders {
                 .any(|e| e.name == entry && e.stage == stage)
         };
         let (vertex, fragment) = (ShaderStage::Vertex, ShaderStage::Fragment);
-        for (entry, stage) in [("vs_main", vertex), ("fs_main", fragment)] {
+        let colour = [("vs_main", vertex), ("fs_main", fragment)];
+        let motion = [("vs_velocity", vertex), ("fs_velocity", fragment)]; // #1435
+        for (entry, stage) in colour.into_iter().chain(motion) {
             if !has(entry, stage) {
                 return Err(format!("not a surface shader (no {entry})"));
             }
         }
         let cuts = has(CUT_PREPASS, fragment) && has(CUT_SHADOW, fragment);
-        let velocity = has("vs_velocity", vertex) && has("fs_velocity", fragment);
         let scope = device.push_error_scope(wgpu::ErrorFilter::Validation);
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Surface Variant Shader"),
             source: wgpu::ShaderSource::Naga(std::borrow::Cow::Owned(module)),
         });
         let layouts = [&self.layout, &self.shadow_layout];
-        let entries = [cuts, velocity];
-        let pipelines = super::surface_pipelines(device, &shader, self.format, layouts, entries);
+        let pipelines = super::surface_pipelines(device, &shader, self.format, layouts, cuts);
         match pollster::block_on(scope.pop()) {
             Some(e) => Err(e.to_string()),
             None => Ok(pipelines),

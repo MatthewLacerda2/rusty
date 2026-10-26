@@ -71,7 +71,7 @@ pub(crate) fn create_pipelines(
     };
     ForwardPipelines {
         forward: make_pipeline(device, shader, format, &render_layout, &forward_spec()),
-        velocity: lazy(&render_layout, format, velocity_spec(true)),
+        velocity: lazy(&render_layout, format, velocity_spec()),
         transparent: lazy(&render_layout, format, transparent_spec()),
         line: lazy(&line_layout, output_format, line_spec()),
         prepass: make_prepass(device, shader, &render_layout, "fs_prepass"),
@@ -81,16 +81,15 @@ pub(crate) fn create_pipelines(
 
 /// An authored surface variant's opaque + transparent pipelines (#396): the forward
 /// and transparent specs over `shader`, through the forward pipeline layout; its
-/// velocity one (#1435), built on first use, from its `vs_velocity` / `fs_velocity`
-/// when it has them (`velocity`) — and,
-/// when its blocks `cut`, its depth pipelines (#648): the prepass through the same
-/// layout, the shadow cascades through the shadow pass's clip layout.
+/// velocity one (#1435), built on first use — and, when its blocks `cut`, its depth
+/// pipelines (#648): the prepass through the same layout, the shadow cascades through
+/// the shadow pass's clip layout.
 pub(crate) fn surface_pipelines(
     device: &wgpu::Device,
     shader: &wgpu::ShaderModule,
     format: wgpu::TextureFormat,
     [layout, shadow_layout]: [&wgpu::PipelineLayout; 2],
-    [cut, velocity]: [bool; 2],
+    cut: bool,
 ) -> surface::SurfacePipelines {
     use crate::render::passes::shadows::depth_pipeline;
     use crate::shadergen::assemble::{CUT_PREPASS, CUT_SHADOW};
@@ -98,7 +97,7 @@ pub(crate) fn surface_pipelines(
     surface::SurfacePipelines {
         forward: make_pipeline(device, shader, format, layout, &forward_spec()),
         velocity: LazyPipeline::new(device, move |device| {
-            let spec = velocity_spec(velocity);
+            let spec = velocity_spec();
             make_pipeline(device, &lazy_shader, format, &lazy_layout, &spec)
         }),
         transparent: make_pipeline(device, shader, format, layout, &transparent_spec()),

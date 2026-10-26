@@ -17,8 +17,12 @@ use crate::scene::{Camera, Scene};
 pub(crate) struct StackPass<'a> {
     /// The cameras, bottom to top; the first clears and drives post-FX history.
     pub stack: &'a [Camera],
-    /// The base camera's entity (`None`: the editor's free camera, or no scene
-    /// camera); another one than last frame's is a camera cut (#1435).
+    /// Each camera's entity, beside `stack` (`None`: the editor's free camera); a
+    /// camera's motion-vector history is kept by it (#1435).
+    pub entities: &'a [Option<u32>],
+    /// The base camera's entity, `scene::camera::main_camera` in either mode (`None`
+    /// when the scene has no screen camera); another one than last frame's is a
+    /// camera cut (#1435).
     pub base_id: Option<u32>,
     /// The camera and volume settings that drive this view's post-FX and SSAO: the
     /// stack's base camera's (#1434, Unity URP's rule), borrowed once per view.
@@ -42,21 +46,23 @@ impl Renderer {
             .iter()
             .map(|c| c.build_view_projection(aspect))
             .collect();
+        let cameras: Vec<_> = pass
+            .entities
+            .iter()
+            .copied()
+            .zip(view_projs.iter().copied())
+            .collect();
         // Motion vectors (#1435): last frame's cameras, and the velocity target when
         // this view runs motion blur. A view shading with its own forward pipeline
         // (the Inspector's shader preview) writes none.
         let velocity = motion::wanted(pass.post, self.quality, pass.full_post_fx)
             && !view.has_forward_override();
-        let key = HistoryKey {
-            scene: scene.id(),
-            base: pass.base_id,
-            cameras: pass.stack.len(),
-        };
+        let key = HistoryKey::new(scene, pass.base_id);
         let size = view.size();
         let prev_view_projs =
             view.post_fx
                 .motion
-                .begin(&self.device, size, key, velocity, &view_projs);
+                .begin(&self.device, size, key, velocity, &cameras);
         let shared = StackShared {
             aspect,
             view_projs,

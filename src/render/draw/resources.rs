@@ -230,7 +230,13 @@ impl Renderer {
         // two skinned entities never share a batch.
         let palette = mesh.active_palette();
         let bone_base = push_palette(joints, palette);
-        if let Some(history) = history {
+        // Only an opaque draw writes velocity: an all-transparent entity keeps no pose.
+        let opaque = |slot| {
+            !scene
+                .material_entry_at(id, slot)
+                .is_some_and(|(_, m)| m.is_transparent())
+        };
+        if let Some(history) = history.filter(|_| runs.iter().any(|&(slot, _)| opaque(slot))) {
             let pose = (model_matrix, palette);
             track(history, id, pose, bone_base, joints, &mut instance);
         }

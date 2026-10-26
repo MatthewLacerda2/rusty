@@ -54,22 +54,13 @@ pub(super) fn forward_spec() -> PipelineSpec {
 }
 
 /// The opaque pass of a view writing motion vectors (#1435): colour and velocity
-/// from the shader's `vs_velocity` / `fs_velocity`. A module without them (an
-/// authored variant baked before #1435) keeps its `fs_main` colour and leaves the
-/// velocity target untouched under it (`velocity_entries == false`).
-pub(super) fn velocity_spec(velocity_entries: bool) -> PipelineSpec {
-    let opaque = PipelineSpec::opaque("Forward Velocity Pipeline");
-    match velocity_entries {
-        true => PipelineSpec {
-            vertex: "vs_velocity",
-            fragment: "fs_velocity",
-            velocity: Some(wgpu::ColorWrites::ALL),
-            ..opaque
-        },
-        false => PipelineSpec {
-            velocity: Some(wgpu::ColorWrites::empty()),
-            ..opaque
-        },
+/// from the shader's `vs_velocity` / `fs_velocity`, which every surface module has.
+pub(super) fn velocity_spec() -> PipelineSpec {
+    PipelineSpec {
+        vertex: "vs_velocity",
+        fragment: "fs_velocity",
+        velocity: Some(wgpu::ColorWrites::ALL),
+        ..PipelineSpec::opaque("Forward Velocity Pipeline")
     }
 }
 
