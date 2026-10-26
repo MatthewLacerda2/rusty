@@ -8,9 +8,11 @@ is). Its `PostProcessingComponent` (color/bloom/SSR/shadows/SSAO/custom effects 
 their params) and its `CameraComponent` (motion blur, FXAA) are what the window shows,
 so a write takes effect there next frame. Getters return a neutral default when there
 is no screen camera, or its volume is missing or inactive; setters are then no-ops.
-The editor's Camera card edits the same two motion-blur fields (a "Motion Blur"
-checkbox and a "Samples" slider, `2..=32`) through the same ops. A new camera starts
-with motion blur on at 32 samples.
+The editor's Camera card edits the same four motion-blur fields (a "Motion Blur"
+checkbox and "Samples" `2..=32`, "Intensity" `0..=1` and "Clamp" `0..=0.2` sliders)
+through the same ops. A new camera starts with motion blur on at 32 samples, intensity
+`0.5` and clamp `0.05`. With no screen camera nothing blurs, and the four motion-blur
+getters say so: `false`, `0`, `0` and `0`.
 
 **Motion vectors** (#1435). A view whose base camera runs motion blur (it is on, and
 the tier is Medium or High) also writes a per-pixel velocity buffer from its opaque
@@ -22,7 +24,32 @@ UI write none; the sky writes the camera's rotation. A first draw, a scene load,
 or Stop, a switch of the main camera or a resize has no last frame, so nothing smears
 across a cut; neither does a camera newly in the stack (a weapon switch's viewmodel
 camera). No other frame pays for it; `Debug.Stats().velocity_passes` counts the passes
-that wrote it. Motion blur reading it is #1436.
+that wrote it.
+
+**Per-object motion blur** (#1436) reads that buffer, so what blurs is what moved on
+screen: an enemy running past a still camera, a swing, a ragdoll, and the world under
+a turning camera, while a viewmodel camera's gun stays sharp. It is the
+reconstruction filter shooters use (McGuire 2012, as refined for CoD: Advanced
+Warfare): each pixel blurs along the longest motion near it, nearer surfaces smear
+over farther ones and never the reverse, so a moving silhouette's blur reaches past
+its edge onto the background behind it. A pixel's *streak* is its motion over one
+frame times the camera's **intensity** (Unity's *Intensity*: the shutter fraction,
+`0.5` a 180° shutter), at most the camera's **clamp** long (Unity's *Clamp*: a fraction
+of the view's height), so a fast flick never smears the whole screen. **Samples** is
+how many taps each pixel reads along it. A frame where nothing moved is
+pixel-identical to motion blur off, and a frame with no motion history (the first, a
+cut) blurs nothing. Like FXAA it is the camera's: it runs without a post-processing
+volume. The editor's Scene view never blurs and writes no velocity, as Unity's
+doesn't; the Game view and the player do. Depth ordering holds under a `DepthOnly`
+overlay camera: each camera writes which camera of the stack drew a surface and its
+distance from that camera beside its motion. A higher camera is in front whatever the
+distances say, so a viewmodel camera's gun stays sharp even against a wall nearer to
+the world camera than the gun is to its own; within one camera the nearer surface is
+in front, so an enemy passing a wall smears over the wall at full strength. A surface
+that was behind the camera last frame (a projectile past the player's head) writes no
+motion. A render-texture camera drawn every N frames (`update_every`) blurs one
+frame's worth of motion, not N. Bloom reads the blurred image, as in URP and HDRP. Its
+cost is `Debug.Stats().gpu_passes.motion_blur`.
 
 **Post-FX is per view** (#1434), Unity URP's camera-stack rule: each view runs it once,
 with the settings of **its base camera**, that camera entity's own `CameraComponent`
@@ -61,6 +88,8 @@ set on that camera entity, in the inspector or the scene file.
 | `Graphics.GetSsrQuality` / `SetSsrQuality` | `()` / `(name)` | `string` |
 | `Graphics.GetMotionBlurActive` / `SetMotionBlurActive` | `()` / `(bool)` | `bool` |
 | `Graphics.GetMotionBlurSamples` / `SetMotionBlurSamples` | `()` / `(n)` | `number` (clamped 2–32; the clamp is in the shared authoring op) |
+| `Graphics.GetMotionBlurIntensity` / `SetMotionBlurIntensity` | `()` / `(value)` | `number`: Unity's *Intensity*, the shutter fraction (clamped 0–1, **default `0.5`**, a 180° shutter) |
+| `Graphics.GetMotionBlurMaxLength` / `SetMotionBlurMaxLength` | `()` / `(value)` | `number`: Unity's *Clamp*, the longest streak as a fraction of the view's height (clamped 0–0.2, **default `0.05`**) |
 | `Graphics.GetFxaaActive` / `SetFxaaActive` | `()` / `(bool)` | `bool` (**default `true`**) |
 | `Graphics.GetQuality` / `SetQuality` | `()` / `(name)` | `"Low"` / `"Medium"` / `"High"` |
 | `Graphics.GetOption` / `SetOption` | `(name)` / `(name, bool)` | `bool`: the player's graphics option (see *Player options*; **default `true`**) |

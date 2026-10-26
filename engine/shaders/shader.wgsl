@@ -150,9 +150,11 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
 // ---- Motion vectors (#1435) ----
 // A view that runs motion blur draws its opaque solids through these instead: the
-// same surface colour at location 0, and at location 1 (the `Rg16Float` velocity
+// same surface colour at location 0, and at location 1 (the `Rgba16Float` velocity
 // target) how far the fragment moved on screen since last frame, in NDC, through its
-// own last-frame pose and this camera's last-frame view-projection. Every field of
+// own last-frame pose and this camera's last-frame view-projection, then how far it
+// lies from this camera and which camera of the stack drew it (#1436: motion blur's
+// depth order, kept per camera). Every field of
 // `VertexOutput`, then the two clip positions the velocity is the difference of.
 struct VelocityVertex {
     @builtin(position) clip_position: vec4<f32>,
@@ -168,7 +170,7 @@ struct VelocityVertex {
 
 struct VelocityTargets {
     @location(0) color: vec4<f32>,
-    @location(1) velocity: vec2<f32>,
+    @location(1) velocity: vec4<f32>,
 };
 
 @vertex
@@ -188,8 +190,14 @@ fn fs_velocity(in: VelocityVertex) -> VelocityTargets {
         in.clip_position, in.world_position, in.world_normal, in.tex_coords,
         in.world_tangent, in.instance, in.lightmap_uv,
     );
-    let velocity = in.clip_now.xy / in.clip_now.w - in.clip_prev.xy / in.clip_prev.w;
-    return VelocityTargets(surface_color(v), velocity);
+    // A surface behind the camera last frame (a projectile past the player's head)
+    // had no place on screen to move from: it writes no motion, not a huge streak.
+    var velocity = vec2<f32>(0.0);
+    if (in.clip_prev.w > 1e-4) {
+        velocity = in.clip_now.xy / in.clip_now.w - in.clip_prev.xy / in.clip_prev.w;
+    }
+    let distance = length(in.world_position - camera.camera_pos);
+    return VelocityTargets(surface_color(v), vec4<f32>(velocity, distance, camera.stack.x));
 }
 
 // The lit surface colour `fs_main` writes: an authored surface variant splices its

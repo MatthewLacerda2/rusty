@@ -1,11 +1,7 @@
-//! GPU-resource construction for [`Renderer`], split out of `setup.rs`.
-//!
-//! Each builder here returns a small *cohesive* group of related GPU resources —
-//! the global camera/lighting bindings, the shadow system, the forward passes, the
-//! billboard passes — rather than one flat struct that mirrors every `Renderer`
-//! field verbatim. `Renderer::from_parts` (in `setup.rs`) destructures these groups
-//! straight into the assembled renderer, so the seams follow real boundaries (what
-//! depends on what) instead of a pass-through layer (#211). Behavior is unchanged.
+//! GPU-resource construction for [`Renderer`]. Each builder returns one cohesive
+//! group (the camera/lighting bindings, the shadow system, the forward passes, the
+//! billboard passes), and `Renderer::from_parts` (`render::setup`) destructures the
+//! groups into the renderer, so the seams follow what depends on what (#211).
 
 use crate::core::settings::quality::QualityPreset;
 use crate::render::clusters::ClusterBuffers;
@@ -17,7 +13,9 @@ use crate::render::gpu::pipelines;
 use crate::render::gpu::shaders::ShaderRegistry;
 use crate::render::ibl::reflection_probes::ProbeArray;
 use crate::render::passes::outline::OutlinePasses;
-use crate::render::postfx::{exposure::ExposurePasses, grade::GradeBake, HDR_FORMAT};
+use crate::render::postfx::{
+    exposure::ExposurePasses, grade::GradeBake, motion_blur::MotionBlurPasses, HDR_FORMAT,
+};
 use crate::render::setup::textures::{create_textures, Textures};
 use crate::render::{ibl::skybox, passes::shadows, passes::ssao};
 use crate::render::{CameraUniform, GpuTexture, LightingUniform};
@@ -85,6 +83,7 @@ pub(crate) struct GpuResources {
     pub ssao: ssao::SsaoRenderer,
     pub grade_bake: GradeBake,
     pub exposure_passes: ExposurePasses,
+    pub motion_blur: MotionBlurPasses,
     pub quality: QualityPreset,
 }
 
@@ -142,6 +141,7 @@ impl GpuResources {
             ssao,
             grade_bake: GradeBake::new(device, &mut registry),
             exposure_passes: ExposurePasses::new(device, &mut registry),
+            motion_blur: MotionBlurPasses::new(device, &mut registry),
             quality: QualityPreset::default(),
         }
     }

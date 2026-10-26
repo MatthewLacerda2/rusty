@@ -109,6 +109,7 @@ impl Renderer {
             output,
             editor_mode,
             full_post_fx: true,
+            motion_frames: 1,
         };
         self.draw_stack(view, scene, pass);
 

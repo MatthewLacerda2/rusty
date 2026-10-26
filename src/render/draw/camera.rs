@@ -55,10 +55,8 @@ pub(crate) struct CameraCtx<'a> {
     pub is_last: bool,
     pub aspect: f32,
     pub view_proj: glam::Mat4,
-    /// The stack's base (first) camera's view-projection, and its last frame's
-    /// (#1435), for post-FX's camera motion.
+    /// The stack's base (first) camera's view-projection, for post-FX.
     pub base_view_proj: glam::Mat4,
-    pub base_prev_view_proj: glam::Mat4,
     /// World-space frustum, for culling off-screen entities (#330).
     pub frustum: Frustum,
     /// This camera's light-cluster grid (#434).
@@ -103,7 +101,6 @@ impl<'a> CameraCtx<'a> {
             aspect: shared.aspect,
             view_proj,
             base_view_proj: shared.view_projs[0],
-            base_prev_view_proj: shared.prev_view_projs[0],
             frustum: Frustum::from_view_proj(view_proj),
             fog: shared.fog,
             ssao: shared.ssao,
@@ -115,6 +112,7 @@ impl<'a> CameraCtx<'a> {
                 fog: shared.fog,
                 clusters: clusters.uniform(),
                 prev_view_proj: shared.prev_view_projs[idx].to_cols_array(),
+                stack: [idx as f32, 0.0, 0.0, 0.0],
             },
             clusters,
             solids: SolidResources::default(),

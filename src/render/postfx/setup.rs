@@ -63,6 +63,7 @@ impl PostFx {
             full_size,
             output_format,
             motion: Default::default(),
+            blur: None,
         }
     }
 
@@ -134,6 +135,7 @@ impl PostFx {
         // exposure snaps (#1444).
         self.motion.reset();
         self.exposure.cut();
+        self.blur = None;
     }
 
     fn create_targets(

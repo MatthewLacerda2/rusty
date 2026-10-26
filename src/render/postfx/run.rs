@@ -7,9 +7,10 @@ use super::{PfxTarget, PostFx, PostFxContext, PostParams, PostPasses};
 use crate::render::timing::GpuPass;
 
 impl PostFx {
-    /// Run the full chain. `depth_view` is the scene depth (for SSR + motion blur),
-    /// `skybox` the panorama SSR falls back to, `output` the final swapchain/screenshot
-    /// view. `passes` says which optional passes run this frame.
+    /// Run the full chain. `depth_view` is the scene depth, for SSR and authored
+    /// effects (motion blur has already run, over the velocity target's own
+    /// distances), `skybox` the panorama SSR falls back to, `output` the final
+    /// swapchain/screenshot view. `passes` says which optional passes run this frame.
     pub fn run(
         &mut self,
         device: &wgpu::Device,
@@ -35,7 +36,8 @@ impl PostFx {
             self.run_bloom(device, &mut encoder, &ctx);
         }
 
-        // Composite reads scene HDR + bloom_b (final blur result) + depth + skybox.
+        // Composite reads the scene (motion-blurred when it ran, #1436) + bloom_b
+        // (final blur result) + depth + skybox.
         // When anything follows it (FXAA, authored effects) it lands in the LDR target
         // for that pass to sample; otherwise it writes the output directly, so the
         // plain path is byte-for-byte what the chain produced before those existed.
@@ -43,7 +45,7 @@ impl PostFx {
         CustomChain::write_params(queue, &effects, post_params);
         let composite_bg = self.io_bind_group(
             device,
-            &self.scene_hdr.view,
+            self.scene_color(),
             &self.bloom_b.view,
             ctx.depth_view,
             ctx.skybox,
@@ -111,8 +113,10 @@ impl PostFx {
         src
     }
 
-    /// Bright-pass (scene HDR -> bloom_a), then a 2D gaussian blur (a -> b),
-    /// leaving the blurred bloom in bloom_b for the composite to add.
+    /// Bright-pass (scene -> bloom_a), then a 2D gaussian blur (a -> b), leaving the
+    /// blurred bloom in bloom_b for the composite to add. The scene is
+    /// [`PostFx::scene_color`], so a moving highlight blooms along its streak: motion
+    /// blur runs before bloom, as in URP and HDRP (#1436).
     fn run_bloom(
         &self,
         device: &wgpu::Device,
@@ -125,7 +129,7 @@ impl PostFx {
         // texture / color-target usage conflict.
         let bright_bg = self.io_bind_group(
             device,
-            &self.scene_hdr.view,
+            self.scene_color(),
             &self.scene_hdr.view,
             depth_view,
             skybox,
@@ -156,7 +160,7 @@ impl PostFx {
     ) {
         let bg = self.io_bind_group(
             device,
-            &self.scene_hdr.view,
+            self.scene_color(),
             &self.bloom_b.view,
             ctx.depth_view,
             ctx.skybox,
@@ -164,6 +168,21 @@ impl PostFx {
         // The UI's backdrop source, so its time is the UI's.
         let composite = (&self.composite_pipeline, ctx.timer.writes(GpuPass::Ui));
         Self::fullscreen(encoder, composite, &[&bg], ctx.output);
+    }
+
+    /// The scene the composite reads: this frame's motion-blurred image when the
+    /// blur ran (#1436), else the HDR scene itself.
+    fn scene_color(&self) -> &wgpu::TextureView {
+        scene_of(self.blur.as_ref(), &self.scene_hdr)
+    }
+
+    /// The exposure meter and [`PostFx::scene_color`] at once, so the meter reads
+    /// the image after motion blur (#1444, #1436) without a borrow clash.
+    pub(crate) fn exposure_and_scene(
+        &mut self,
+    ) -> (&mut super::exposure::ExposureMeter, &wgpu::TextureView) {
+        let scene = scene_of(self.blur.as_ref(), &self.scene_hdr);
+        (&mut self.exposure, scene)
     }
 
     /// The format the chain writes its output in (what [`PostFx::composite_into`]
@@ -229,7 +248,7 @@ impl PostFx {
 
     /// One fullscreen triangle into `target`, `groups` bound from group 0 up, with
     /// the pass's timestamp writes (#835).
-    fn fullscreen(
+    pub(super) fn fullscreen(
         encoder: &mut wgpu::CommandEncoder,
         (pipeline, timestamp_writes): Timed<'_>,
         groups: &[&wgpu::BindGroup],
@@ -260,7 +279,15 @@ impl PostFx {
 }
 
 /// A pass's pipeline and its timestamp writes.
-type Timed<'a> = (
+pub(super) type Timed<'a> = (
     &'a wgpu::RenderPipeline,
     Option<wgpu::RenderPassTimestampWrites<'a>>,
 );
+
+/// The motion-blurred image when `blur` ran this frame, else the HDR scene.
+fn scene_of<'a>(
+    blur: Option<&'a super::motion_blur::BlurTargets>,
+    scene_hdr: &'a PfxTarget,
+) -> &'a wgpu::TextureView {
+    blur.map_or(&scene_hdr.view, |b| &b.blurred.view)
+}

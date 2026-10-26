@@ -19,6 +19,9 @@ pub(crate) struct CameraUniform {
     /// This camera's view-projection last frame (#1435), what the velocity target
     /// reprojects through; `view_proj` itself on its first frame and after a cut.
     pub prev_view_proj: [f32; 16],
+    /// `x`: this camera's index in its stack, bottom to top (#1436): the velocity
+    /// target's `.a`, so motion blur orders a higher camera in front. `yzw` unused.
+    pub stack: [f32; 4],
 }
 
 /// How a world point finds its light cluster (#434), mirroring `Clusters` in

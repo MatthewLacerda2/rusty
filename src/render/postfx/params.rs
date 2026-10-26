@@ -18,6 +18,7 @@ use std::collections::BTreeMap;
 
 use glam::Mat4;
 
+use super::motion_blur::BlurParams;
 use super::{PostParams, PostPasses};
 use crate::components::{AutoExposure, CameraComponent, ExposureMode, PostProcessingComponent};
 use crate::core::settings::graphics_options::GraphicsOption;
@@ -66,23 +67,19 @@ pub(crate) fn effect_runs(graphics: GraphicsSettings, effect: GraphicsOption, on
     on && graphics.options.allows(effect) && graphics.quality.allows(effect)
 }
 
-/// Pack `post`'s post-processing volume and camera settings into a `PostParams`
-/// for `postfx.wgsl`. Returns the params plus whether the bloom passes should run
-/// this frame.
-///
-/// `prev_view_proj` is last frame's view-projection (camera motion-blur velocity).
+/// Pack `post`'s post-processing volume into a `PostParams` for `postfx.wgsl`.
+/// Returns the params plus whether the bloom passes should run this frame. Motion
+/// blur, the camera's, is [`blur_params`].
 pub(crate) fn build_post_params(
     scene: &Scene,
     post: PostSource,
     graphics: GraphicsSettings,
     view_proj: Mat4,
-    prev_view_proj: Mat4,
     camera_pos: [f32; 3],
 ) -> (PostParams, bool) {
     let mut params = PostParams {
         view_proj: view_proj.to_cols_array(),
         inv_view_proj: view_proj.inverse().to_cols_array(),
-        prev_view_proj: prev_view_proj.to_cols_array(),
         // w: game time (#398), the clock the scene's shaders read as `camera.time`.
         camera_pos: [
             camera_pos[0],
@@ -112,24 +109,12 @@ pub(crate) fn build_post_params(
     } else {
         0.0
     };
-
-    let samples =
-        CameraComponent::MIN_MOTION_BLUR_SAMPLES..=CameraComponent::MAX_MOTION_BLUR_SAMPLES;
-    let (mb_active, mb_samples) = match post.camera {
-        Some(cam) if motion_blur_enabled(post, graphics) => (
-            1.0,
-            cam.motion_blur_samples
-                .clamp(*samples.start(), *samples.end()) as f32,
-        ),
-        _ => (0.0, 0.0),
-    };
     let auto = if auto_exposure(post).is_some() {
         1.0
     } else {
         0.0
     };
-    params.flags = [ssr_mode, mb_active, 1.0, auto];
-    params.misc[3] = mb_samples;
+    params.flags = [ssr_mode, 0.0, 0.0, auto];
     (params, bloom)
 }
 
@@ -139,6 +124,20 @@ pub(crate) fn auto_exposure<'a>(post: PostSource<'a>) -> Option<&'a AutoExposure
     post.volume
         .filter(|vc| vc.exposure_mode == ExposureMode::Automatic)
         .map(|vc| &vc.auto_exposure)
+}
+
+/// The motion blur `post`'s camera runs this frame (#1436), for a view `height`
+/// pixels tall; `None` when [`motion_blur_enabled`] does not hold. Like FXAA it
+/// lives on the camera, so it needs no volume.
+pub(crate) fn blur_params(
+    post: PostSource,
+    graphics: GraphicsSettings,
+    height: u32,
+) -> Option<BlurParams> {
+    let cam = post
+        .camera
+        .filter(|_| motion_blur_enabled(post, graphics))?;
+    Some(BlurParams::new(cam, height))
 }
 
 /// Whether `post`'s camera runs motion blur, through [`effect_runs`]: its component
