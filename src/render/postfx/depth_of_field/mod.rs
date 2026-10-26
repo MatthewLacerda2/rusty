@@ -169,6 +169,43 @@ impl DofTargets {
     }
 }
 
+/// One pass of the chain: its pipeline, the views it binds (input, CoC, blur,
+/// work) and the target it writes.
+type Step<'a> = (&'a LazyPipeline, [&'a wgpu::TextureView; 4], &'a PfxTarget);
+
+impl DofTargets {
+    /// The passes in order. Each binds no texture it writes, and every pass after
+    /// the prefilter reads its reduced CoC from `work`; the CoC pass reads the
+    /// view depths from the velocity target and the prefilter, which writes `work`,
+    /// binds the full CoC in its place.
+    fn plan<'a>(
+        &'a self,
+        passes: &'a DofPasses,
+        scene: &'a wgpu::TextureView,
+        velocity: &'a wgpu::TextureView,
+    ) -> Vec<Step<'a>> {
+        let (coc, work, a, b) = (&self.coc.view, &self.work.view, &self.a.view, &self.b.view);
+        let mut steps: Vec<Step<'a>> = vec![
+            (&passes.coc, [scene, velocity, a, b], &self.coc),
+            (&passes.prefilter, [scene, coc, b, coc], &self.work),
+        ];
+        match &self.tiles {
+            None => {
+                steps.push((&passes.gauss_h, [work, coc, a, work], &self.b));
+                steps.push((&passes.gauss_v, [b, coc, b, work], &self.a));
+            }
+            Some((tiles, near)) => {
+                steps.push((&passes.tile_max, [work, coc, a, work], tiles));
+                steps.push((&passes.neighbor_max, [&tiles.view, coc, a, work], near));
+                steps.push((&passes.bokeh, [work, coc, &near.view, work], &self.b));
+                steps.push((&passes.tent, [b, coc, b, work], &self.a));
+            }
+        }
+        steps.push((&passes.composite, [scene, coc, a, work], &self.focused));
+        steps
+    }
+}
+
 impl PostFx {
     /// Blur this frame's scene by depth with `params`, or drop the targets when
     /// `params` is `None` or the view wrote no velocity target this frame.
@@ -190,46 +227,26 @@ impl PostFx {
         }
         let t = self.dof.as_ref().expect("fitted above");
         queue.write_buffer(&t.params, 0, bytemuck::bytes_of(&params));
-        // (pass input, CoC, blur, work): each pass binds no texture it writes, and
-        // every pass after the prefilter reads its reduced CoC from `work`.
-        let group = |input: &PfxTarget,
-                     coc: &wgpu::TextureView,
-                     blur: &PfxTarget,
-                     work: &wgpu::TextureView| {
+        let group = |[input, coc, blur, work]: [&wgpu::TextureView; 4]| {
             let view = |v| wgpu::BindingResource::TextureView(v);
             device.create_bind_group(&wgpu::BindGroupDescriptor {
                 label: Some("DoF Bind Group"),
                 layout: &passes.layout,
                 entries: &[
                     entry(0, t.params.as_entire_binding()),
-                    entry(1, view(&input.view)),
+                    entry(1, view(input)),
                     entry(2, view(velocity)),
                     entry(3, view(coc)),
-                    entry(4, view(&blur.view)),
+                    entry(4, view(blur)),
                     entry(5, view(work)),
                 ],
             })
         };
-        let (scene, coc) = (&self.scene_hdr, &t.coc.view);
-        // The prefilter writes `work`, so its own group binds the full CoC there.
-        let mut steps = vec![
-            (&passes.coc, group(scene, velocity, &t.a, &t.b.view), &t.coc),
-            (&passes.prefilter, group(scene, coc, &t.b, coc), &t.work),
-        ];
-        let work = &t.work.view;
-        match &t.tiles {
-            None => {
-                steps.push((&passes.gauss_h, group(&t.work, coc, &t.a, work), &t.b));
-                steps.push((&passes.gauss_v, group(&t.b, coc, &t.b, work), &t.a));
-            }
-            Some((tiles, near)) => {
-                steps.push((&passes.tile_max, group(&t.work, coc, &t.a, work), tiles));
-                steps.push((&passes.neighbor_max, group(tiles, coc, &t.a, work), near));
-                steps.push((&passes.bokeh, group(&t.work, coc, near, work), &t.b));
-                steps.push((&passes.tent, group(&t.b, coc, &t.b, work), &t.a));
-            }
-        }
-        steps.push((&passes.composite, group(scene, coc, &t.a, work), &t.focused));
+        let steps: Vec<_> = t
+            .plan(passes, &self.scene_hdr.view, velocity)
+            .into_iter()
+            .map(|(pipeline, views, target)| (pipeline, group(views), target))
+            .collect();
 
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("DoF Encoder"),
