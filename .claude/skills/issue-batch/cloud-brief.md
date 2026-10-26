@@ -163,7 +163,10 @@ Beyond what changed, why, the effect and the decisions:
 
 ## Protocol
 
-- Branch as the prompt names it, off the latest `origin/main`.
+- Branch as the prompt names it, off the latest `origin/main`. The container's clone
+  can be a stale snapshot; the session-start hook fetches GitHub's `main` (its
+  `session-start: main` line). If that line says FAIL, `git fetch origin main` before
+  you branch.
 - Open a **draft** PR on the first commit. Title carries `(#N)`. Body: what
   changed / why / effect / decisions, `Closes #N` (one line per issue), and it ends
   with `🤖 Generated with [Claude Code](https://claude.com/claude-code)`.

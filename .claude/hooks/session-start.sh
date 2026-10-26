@@ -80,6 +80,19 @@ apt_libs() {
     echo "system libraries and lavapipe"
 }
 
+fresh_main() {
+    # The container's clone can be a cached snapshot: on 2026-10-26 both coders
+    # of a batch branched off an `origin/main` 61 commits stale. Fetch GitHub's
+    # main, and fast-forward a clean checkout that has no commits of its own, so
+    # `origin/main` and the working tree are today's. A resumed branch with work
+    # on it is left alone; the line says how far behind its base is.
+    git fetch --quiet origin main || { echo "run: git fetch origin main"; return 1; }
+    if git diff --quiet HEAD && git merge-base --is-ancestor HEAD origin/main; then
+        git merge --ff-only --quiet origin/main || return 1
+    fi
+    echo "origin/main $(git rev-parse --short origin/main); HEAD $(git rev-list --count HEAD..origin/main) behind"
+}
+
 fetch() {
     # Warm the crate cache so build, clippy and test start compiling at once.
     cargo fetch --quiet && echo "crate cache warm"
@@ -120,6 +133,7 @@ deny() {
 
 step path path
 case ":$PATH:" in *":$BIN:"*) ;; *) PATH="$BIN:$PATH" ;; esac  # for the steps below too
+step main fresh_main
 step toolchain toolchain
 step apt-libs apt_libs
 step fetch fetch
