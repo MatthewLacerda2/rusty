@@ -9,11 +9,11 @@ difference is *why* it exists: rusty is made to be **driven by a coding agent**,
 you build the game from your IDE (Claude Code, ideally) instead of clicking around an
 editor — and a lot faster.
 
-rusty is, in most ways, a **subset of Unity** — the traditional engine features you need
-to build a game, and not the long tail you don't — but with **full Claude support**:
-Claude (and Claude Code) can create scenes, edit GameObjects and assets, and even
-playtest, all through one API. Developers drive the engine by talking to Claude rather
-than writing code by hand.
+rusty aims to match **Unity** in quality and capability, built a piece at a time as
+the work needs it — so today it has the traditional engine features a game needs, and
+grows toward the rest — but with **full Claude support** from the start: the agent can
+create and edit the whole game (scenes, GameObjects, assets, playtests, builds) through
+one API, and the developer only says what they want done.
 
 The north star is a game on par with **F.E.A.R.** (2005) or **Trepang2** — visceral
 first-person combat carried by reactive enemy AI. The engine is "done enough" when an

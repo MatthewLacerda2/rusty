@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """`docrefs.py` — the paths, make verbs and namespaces the docs name exist (#973).
 
-rusty's docs are what agents drive it by (CLAUDE.md, *Unity is the reference*), and
+rusty's docs are what agents drive it by (CLAUDE.md, *Unity is the bar*), and
 a path that no longer exists sends the next agent searching. Nothing noticed when a
 move left one behind: the audit (#933) found ten in one pass. This scans every
 tracked `*.md` outside fenced code blocks for inline code that names
