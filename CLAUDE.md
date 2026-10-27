@@ -417,7 +417,10 @@ only its adapter (Lua → zimmer document, file writes, patch-path resolution).
   from. What keeps rusty smaller *today* is the order, not a cap: a piece is built when
   the work needs it, by the priority in *Issues, labels & priority*, and a Unity
   capability is never turned down as "something no game needs" (only deferred, or
-  ruled out by the north star: multiplayer, networking, online services). The twist is
+  ruled out by the north star: multiplayer, networking, online services). Nor is a gap
+  filed just because Unity has it: a missing capability becomes an issue when the work
+  needs it (*Issues are for what matters*), never as a backlog of Unity's feature list.
+  The twist is
   that our API exists to be driven by **Claude Code**, not hand-written: developers won't
   write or even read the engine's code. As long as the docs stay current, Claude can tell
   the developer how anything is done — so keeping documentation truthful is load-bearing,
