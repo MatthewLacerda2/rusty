@@ -6,10 +6,11 @@ project's own `CLAUDE.md`). The `rusty` MCP serves it as `rusty://game-guide.md`
 read from the engine checkout, so it always matches the engine you drive.
 Paths below that start with `docs/` are in that checkout.
 
-## The model: Unity's, as a subset
+## The model: Unity's
 
-- **Unity is the reference.** rusty copies Unity's runtime model and implements the
-  subset a game needs. When something is unclear, do what Unity does.
+- **Unity is the reference.** rusty copies Unity's runtime model and grows toward
+  everything Unity has, a piece at a time, so a Unity feature may not exist yet:
+  `docs/api/` is what exists today. When something is unclear, do what Unity does.
 - A **GameObject** is a `Transform` plus any mix of the engine's components (`Mesh`,
   `Collider`, `Rigidbody`, `Camera`, `Light`, `Animator`, `NavMeshAgent`, …) and a
   place in the parent/child hierarchy. An empty one is a pivot or a marker.

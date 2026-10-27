@@ -14,16 +14,23 @@ user to understand how you came up to a conclusion or if it's blocking you in so
 (or if invalidates one of your options).
 
 ## North star
-The bar rusty aims for is a game on par with **Trepang2** —
+The bar rusty aims for is a game on par with **F.E.A.R.** (2005) or **Trepang2** —
 visceral first-person combat carried by reactive enemy AI. That is the quality target
 every decision serves: the engine is "good enough" when an agent could build a shooter
 of that caliber on it. Keep this goal in mind when weighing features, architecture, and
 craft — it is the reason the gates below are strict.
 
+The engine behind that game matches **Unity** in quality and capability: everything
+Unity gives a developer, rusty has to give too (the operator, 2026-10-27). What Unity
+lacks, rusty has from the start: **the agent can create and edit the whole game, and
+the developer only says what they want done** (*Conventions that matter*). It gets
+there one piece at a time. A capability is built when the work needs it, in the
+priority order below, and not before: we are not trying to one-shot a game engine.
+
 The second yardstick is an **offline CS:GO**: bots, bomb/defuse rounds, a buy menu and
 HUD, raycast gunplay with spread, recoil and wallbangs, grenades (smoke, flash, HE,
-molotov), and multi-floor maps with jump spots, drops and ladders. Trepang2 stays the
-quality bar; CS:GO is the tight, mechanical bar beside it. Both are **single-player and
+molotov), and multi-floor maps with jump spots, drops and ladders. F.E.A.R. and
+Trepang2 stay the quality bar; CS:GO is the tight, mechanical bar beside it. Both are **single-player and
 offline: no multiplayer, no networking, no online services — ever.** Netcode and
 replication never qualify as foundation work. That rules out the *game* being online,
 not the engine calling third-party APIs: tooling that reaches an external service
@@ -194,6 +201,9 @@ is wrong.
   the project follows goes into this file, a skill or a doc: cloud coders and other
   machines never see a local memory, so a rule kept only there is a rule they break.
   A project rule found in memory is moved into the repo and pruned from memory.
+- **What the repository keeps is written in English** (the operator, 2026-10-27): every
+  `CLAUDE.md`, skill, doc, issue, PR, commit and code comment, whatever language the
+  operator chats in. The chat follows the operator's language; the repository does not.
 - **Gates vs. signals — block on correctness, inform on quality.** Keep the bar high
   *without* stalling the agents. A check that proves **correctness** — build, test, clippy,
   the determinism guard, the size gate — is a **hard gate**: green-to-merge, no exceptions. A
@@ -401,9 +411,16 @@ only its adapter (Lua → zimmer document, file writes, patch-path resolution).
   re-make its files, and still bumps when a converter's output changes (a test holds
   it: `asset::convert::fingerprint`, #1286). When games
   exist, the operator revisits this rule.
-- **Unity is the reference; rusty is a deliberate subset.** Use Unity Engine as the
-  yardstick for what rusty *must* be capable of. Unity is exhaustive, so we implement
-  only the subset a game actually needs — never feature-for-feature parity. The twist is
+- **Unity is the bar; rusty reaches it as needed** (the operator, 2026-10-27). Unity
+  Engine is the measure of what rusty must be capable of, in quality and in capability:
+  everything it gives a developer is the destination, never a menu to pick a subset
+  from. What keeps rusty smaller *today* is the order, not a cap: a piece is built when
+  the work needs it, by the priority in *Issues, labels & priority*, and a Unity
+  capability is never turned down as "something no game needs" (only deferred, or
+  ruled out by the north star: multiplayer, networking, online services). Nor is a gap
+  filed just because Unity has it: a missing capability becomes an issue when the work
+  needs it (*Issues are for what matters*), never as a backlog of Unity's feature list.
+  The twist is
   that our API exists to be driven by **Claude Code**, not hand-written: developers won't
   write or even read the engine's code. As long as the docs stay current, Claude can tell
   the developer how anything is done — so keeping documentation truthful is load-bearing,
@@ -413,14 +430,15 @@ only its adapter (Lua → zimmer document, file writes, patch-path resolution).
   hits a call its issue never foresaw (a default, an edge-case behaviour, how an API
   takes its arguments, which side wins when the editor and the disk disagree). Do what
   Unity does and say so in the issue or PR; most of it is well figured out. It does not
-  override a decision already made, and it does not bring in what rusty deliberately
-  leaves out.
-- **Our engine must give support for the agentic AI to do anything a game dev can do**
-  (the operator, 2026-10-24). rusty is built for an agent-driven workflow in the
-  *Claude Code + Blender-MCP* style. The agent can do anything a game developer does,
-  both in the editor (create entities, place and configure components, instantiate
-  assets, save scenes) and around it (author and import assets, play-test, build),
-  **except pure UI chrome** (collapsing a card, resizing a panel). Every user-facing
+  override a decision already made, and it does not bring in what the north star rules
+  out (multiplayer, networking, online services).
+- **The agent builds the game; the developer directs** (the operator, 2026-10-24,
+  restated 2026-10-27). rusty is built for an agent-driven workflow in the
+  *Claude Code + Blender-MCP* style: the agent can create and edit the whole game, and
+  the developer only says what they want done. So the agent can do anything a game
+  developer does, both in the editor (create entities, place and configure components,
+  instantiate assets, save scenes) and around it (author and import assets, play-test,
+  build), **except pure UI chrome** (collapsing a card, resizing a panel). Every user-facing
   editor capability has an API equivalent, and a dev task the agent can't do yet is a
   gap to file.
 - **Keep the API doc in lockstep.** When you add or change an API function, update
