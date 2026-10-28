@@ -9,6 +9,7 @@ use super::{fixture_project, Harness};
 use crate::app::GameWorld;
 use crate::core::application::BuildSettings;
 use crate::core::input::InputState;
+use crate::core::settings::decals::DecalLimits;
 use crate::core::settings::graphics_options::GraphicsOptions;
 use crate::navigation::NavigationGraph;
 use crate::scene::Scene;
@@ -56,6 +57,7 @@ impl Harness {
         scene_path: &str,
         build: BuildSettings,
         graphics: GraphicsOptions,
+        decals: DecalLimits,
     ) -> Result<Self, String> {
         crate::scene::seed_default_scripts();
         crate::scene::seed_default_scene();
@@ -75,6 +77,7 @@ impl Harness {
             let mut app = world.resources.application.borrow_mut();
             let _ = app.set_build(build);
             let _ = app.set_graphics_defaults(graphics);
+            app.set_decal_limits(decals);
             // No saved player options in a harness (its store is pathless): the
             // project's defaults are what it plays with (#1438).
             world.script_manager().graphics_cell().borrow_mut().options = graphics;

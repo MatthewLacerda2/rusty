@@ -8,8 +8,9 @@ So a decal is lit, shadowed and occluded exactly like the wall it lands on: bloo
 goes dark in a dark corridor, a wet patch catches the flashlight's highlight, a
 bullet hole's rim catches the muzzle flash. Spawn it from the hit point and surface
 normal the cast already returns, and pass the entity it hit as the `owner` so the
-mark moves with it. The registry is a bounded FIFO (256): past the cap the oldest
-decal fades out rather than vanishing.
+mark moves with it. Decals are budgeted per owner (256 each), in the world (1024)
+and in total (4096): past a budget the oldest decal of that budget fades out
+rather than vanishing.
 
 ```lua no-run
 local hit, id, dist, px, py, pz, nx, ny, nz = Physics.Raycast(ox,oy,oz, dx,dy,dz, self_id)
@@ -22,6 +23,8 @@ if hit then Decals.Spawn(px, py, pz, nx, ny, nz, { owner = id }) end
 | `Decals.Remove` | `(id, [fade])` | `true` if a live decal had that id |
 | `Decals.Count` | `()` | live decal count, including any still fading out |
 | `Decals.Clear` | `()` | — (drops every live decal) |
+| `Decals.SetLimits` | `({ per_owner =, world =, total = })`, any subset | — (lowering one fades the oldest excess) |
+| `Decals.GetLimits` | `()` | `{ per_owner, world, total }`, the budgets in force |
 
 **Positional form.** `size` (default `0.5`) is the stamp's width/height in world
 units; `texture` is the albedo path (default: none, a solid square of the tint);
@@ -62,11 +65,30 @@ Decals.Spawn(px, py, pz, nx, ny, nz, { material = "blood", size = 1.2, rotation 
   every decal identically. Decals age only in Play.
 - **`Decals.Remove(id, [fade])`** removes one decal now, or fades it out over
   `fade` seconds. Ids are never reused, so a stale id simply returns `false`.
-- **The cap.** At most 256 decals are whole at once. Each new decal past that
-  starts the oldest whole one fading out over 0.5 s; a fading decal no longer
-  counts against the cap. Only if more than 64 are fading at once (above 128
-  stamps a second, sustained) is the oldest dropped outright, so the frame never
-  holds more than 320.
+- **The budgets.** Every decal counts against one bucket: its **owner** (each
+  entity has its own, and a bone is its own owner), or the **world** for a decal
+  stamped without one. So shooting the floor for a minute never erases the marks
+  on a crate across the room.
+
+  | Budget | Default | `project.rusty` key | Counts |
+  |---|---|---|---|
+  | per owner | 256 | `max_per_owner` | whole decals owned by one entity |
+  | world | 1024 | `max_world` | whole decals with no owner |
+  | total | 4096 | `max_total` | every whole decal in the scene (a performance ceiling) |
+
+  A new decal past its bucket's budget starts the **oldest decal of that bucket**
+  fading out over 0.5 s; past the total, the oldest whole decal in the scene fades.
+  A fading decal no longer counts against any budget. Only if more than 64 are
+  fading at once (above 128 evictions a second, sustained) is the oldest fading
+  one dropped outright, so the frame never holds more than the total plus 64.
+  Splitting into buckets never changes the blend order: newest still lands on top.
+- **Setting the budgets.** A game sets its own in `project.rusty`:
+  `"decals": { "max_per_owner": 256, "max_world": 1024, "max_total": 4096 }` (any
+  key left out keeps its default). Entering Play applies them; an edit to the file
+  is picked up by the next Play. `Decals.SetLimits{ world = 512 }` changes them for
+  the rest of this Play (a key left out keeps its value, an unknown key is an
+  error), and lowering one fades the oldest excess out at once.
+  `Decals.GetLimits()` reads what is in force.
 
 ```lua no-run
 -- blood that dries off a moving enemy's arm after 20 s

@@ -84,8 +84,8 @@ pub struct Scene {
     /// Runtime box-projector decals (bullet holes, scorch, blood splats). These are
     /// ephemeral *visual* state spawned from raycast hits, NOT serialized scene
     /// data — the decal renderer reads them each frame and projects them onto the
-    /// surfaces they overlap. Bounded FIFO (the oldest fades out past `MAX_DECALS`);
-    /// aged on the fixed tick (#639).
+    /// surfaces they overlap. Bounded per owner, world and total (the oldest of a
+    /// bucket fades out past its budget, #1517); aged on the fixed tick (#639).
     pub decals: crate::scene::decal::DecalSet,
     /// Scene-level light-probe dataset (#240): probe POSITIONS + grid layout live in
     /// the scene document; their baked L2 SH irradiance lives in the

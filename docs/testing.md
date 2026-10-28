@@ -431,7 +431,7 @@ it to measure the default again.
   walk cycle and hitboxes) walking the navmesh with a Lua brain each (patrol + a
   line-of-sight raycast per tick, `bench/enemy.lua`); 32 realtime point and spot
   lights, 8 flickering like muzzle flashes (`bench/flicker.lua`) and 6 casting
-  shadows; a full decal registry (256); four smoke columns; the sun's shadows. The
+  shadows; 256 decals; four smoke columns; the sun's shadows. The
   Player stands 3 m in from its spawn, so the camera looks down the whole yard.
 - **the run** — 60 warm-up frames, then 600 measured ones, each stepped and rendered
   at 1280x720 (`Harness.LoadStress{…}` then `Harness.Bench(600)`).

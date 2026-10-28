@@ -5,7 +5,8 @@
 //!
 //! ```json
 //! { "engine_commit": "<git commit>", "engine_order": 1318, "build": { … },
-//!   "graphics_options": { "motion_blur": true, … } }
+//!   "graphics_options": { "motion_blur": true, … },
+//!   "decals": { "max_per_owner": 256, "max_world": 1024, "max_total": 4096 } }
 //! ```
 //!
 //! * **`engine_commit`** — the engine build the project was last opened with, so a
@@ -19,6 +20,8 @@
 //! * **`build`** — the [`BuildSettings`].
 //! * **`graphics_options`** — the player graphics options a fresh install starts
 //!   with ([`GraphicsOptions`], #1438); a player's saved choice wins over them.
+//! * **`decals`** — the game's decal budgets ([`DecalLimits`], #1517), applied to
+//!   the scene on entering Play.
 
 use std::path::Path;
 
@@ -27,6 +30,7 @@ use serde::{Deserialize, Serialize};
 use super::engine::commit::{engine_commit, engine_order, UNKNOWN_COMMIT};
 use super::engine::{base, EngineCheck};
 use crate::core::application::BuildSettings;
+use crate::core::settings::decals::DecalLimits;
 use crate::core::settings::graphics_options::GraphicsOptions;
 
 /// The project file, at the project root.
@@ -48,6 +52,8 @@ pub struct ProjectFile {
     pub build: BuildSettings,
     /// The project's default player graphics options (all allowed by default).
     pub graphics_options: GraphicsOptions,
+    /// The game's decal budgets.
+    pub decals: DecalLimits,
 }
 
 impl Default for ProjectFile {
@@ -57,6 +63,7 @@ impl Default for ProjectFile {
             engine_order: engine_order(),
             build: BuildSettings::default(),
             graphics_options: GraphicsOptions::default(),
+            decals: DecalLimits::default(),
         }
     }
 }

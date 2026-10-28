@@ -1,8 +1,8 @@
 //! The shooter-shaped worst case `make bench` measures (#835), loaded onto the
 //! default fy_pool_day yard (#747) by `Harness.LoadStress`: skinned, animated
 //! soldiers walking the navmesh with a Lua brain each; realtime point and spot
-//! lights, some flickering like muzzle flashes and some casting shadows; a full
-//! decal registry; a few particle systems. Pure placement — no RNG, no I/O — so
+//! lights, some flickering like muzzle flashes and some casting shadows;
+//! 256 decals; a few particle systems. Pure placement — no RNG, no I/O — so
 //! the scene is the same every run and two runs on one machine compare.
 
 use glam::{Quat, Vec3};
@@ -29,7 +29,7 @@ pub struct StressSpec {
     /// How many lights, from the first, cast shadows: half point lights (six
     /// atlas tiles each), half spots (one).
     pub shadowed: u32,
-    /// Decals stamped; the registry keeps at most `MAX_DECALS`.
+    /// Decals stamped, all unowned: the world budget (`DecalLimits`) caps what stays.
     pub decals: u32,
     pub particle_systems: u32,
     /// Each soldier's Lua brain, relative to the workspace.
