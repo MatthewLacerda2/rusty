@@ -72,10 +72,24 @@ pub fn register<'scope>(
         }),
     )?;
 
+    register_registry(&table, scope, scene)?;
+
+    lua.globals()
+        .set("Decals", table)
+        .map_err(|e| e.to_string())
+}
+
+/// The functions over the live decals onto `table`: `Remove`, `Count`, `Clear`, and
+/// the budgets' `SetLimits` and `GetLimits` (#1517).
+fn register_registry<'scope>(
+    table: &mlua::Table,
+    scope: &'scope mlua::Scope<'scope, '_>,
+    scene: &'scope RefCell<Scene>,
+) -> Reg {
     // Decals.Remove(id, [fade]) — remove one decal now, or fade it out over `fade`
     // seconds. Returns whether a live decal had that id.
     put(
-        &table,
+        table,
         "Remove",
         scope.create_function(|_, (decal, fade): (u32, Option<f32>)| {
             Ok(scene.borrow_mut().decals.remove(decal, fade.unwrap_or(0.0)))
@@ -84,16 +98,26 @@ pub fn register<'scope>(
 
     // Decals.Count() — number of live decals, counting any still fading out.
     put(
-        &table,
+        table,
         "Count",
         scope.create_function(|_, ()| Ok(scene.borrow().decals.len() as u32)),
+    )?;
+
+    // Decals.Clear() — drop every live decal (e.g. on level reset).
+    put(
+        table,
+        "Clear",
+        scope.create_function(|_, ()| {
+            scene.borrow_mut().clear_decals();
+            Ok(())
+        }),
     )?;
 
     // Decals.SetLimits{ per_owner =, world =, total = } — change the budgets for the
     // rest of this Play; a key left out keeps its value. Lowering one fades the
     // oldest excess out at once.
     put(
-        &table,
+        table,
         "SetLimits",
         scope.create_function(|_, opts: mlua::Table| {
             let mut scene = scene.borrow_mut();
@@ -105,7 +129,7 @@ pub fn register<'scope>(
 
     // Decals.GetLimits() — the budgets in force, as { per_owner, world, total }.
     put(
-        &table,
+        table,
         "GetLimits",
         scope.create_function(|lua, ()| {
             let limits = scene.borrow().decals.limits();
@@ -115,21 +139,7 @@ pub fn register<'scope>(
             out.set("total", limits.max_total)?;
             Ok(out)
         }),
-    )?;
-
-    // Decals.Clear() — drop every live decal (e.g. on level reset).
-    put(
-        &table,
-        "Clear",
-        scope.create_function(|_, ()| {
-            scene.borrow_mut().clear_decals();
-            Ok(())
-        }),
-    )?;
-
-    lua.globals()
-        .set("Decals", table)
-        .map_err(|e| e.to_string())
+    )
 }
 
 /// The keys `Decals.SetLimits` takes.

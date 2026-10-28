@@ -439,7 +439,8 @@ it to measure the default again.
   `renderer_ms` (CPU time recording the frame), `gpu_ms` and `gpu.<pass>` (GPU time
   at a fixed reference clock, below), `gpu_raw_ms` (GPU time as measured) and
   `gpu_clock_pct` (the clock it ran at, % of the reference), `draw_calls`,
-  `triangles`, `culled_entities`, `lights_dropped`, `lights_culled`, and the systems
+  `triangles`, `culled_entities`, `lights_dropped`, `lights_culled`,
+  `decals_visible`, `decal_cluster_refs`, and the systems
   `update_scripts`, `tick_nav`, `step_physics`, `animate`. Every GPU pass prints
   every run (0 when it did not run), so the rows are stable.
 - **before and after** — the report is kept in `out/bench/bench.json` (and
