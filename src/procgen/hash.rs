@@ -80,7 +80,9 @@ mod tests {
 
     #[test]
     fn node_seed_zero_is_the_recipe_seed_and_others_differ() {
-        assert_eq!(node_seed(42, 0), 42);
+        for r in [0, 42, u64::MAX] {
+            assert_eq!(node_seed(r, 0), r);
+        }
         assert_ne!(node_seed(42, 1), 42);
         assert_ne!(node_seed(42, 1), node_seed(42, 2));
     }

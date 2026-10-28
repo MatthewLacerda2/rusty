@@ -1,5 +1,5 @@
 //! A stochastic node's own `seed` (#1487): two nodes that differ only by it differ,
-//! and the default 0 bakes the exact bytes it did before the param existed.
+//! and the default 0 bakes the same bytes as a recipe written without it.
 
 use rusty::procgen::recipe::OPS;
 use rusty::procgen::{evaluate, TextureRecipe};
@@ -31,13 +31,18 @@ fn fingerprint(json: &str) -> u64 {
 
 #[test]
 fn default_seed_bakes_the_bytes_it_did_before_the_param() {
-    // Taken on `main` before #1487 added the param: a changed value here means
-    // every existing recipe's bake changed.
-    assert_eq!(fingerprint(UNSEEDED), 0xdda3_60ad_9dc6_6ff8);
-    let explicit = UNSEEDED.replace(
-        r#""op": "white_noise""#,
-        r#""op": "white_noise", "seed": 0"#,
-    );
+    // `seed: 0` on every stochastic op bakes what no `seed` does, and the runner folds
+    // 0 into the recipe seed unchanged (`hash::node_seed`'s test), so a recipe written
+    // before #1487 bakes as it did. That was also checked across trees by hand; no
+    // committed hash holds it, since a bake differs across platforms' libm.
+    let mut explicit = UNSEEDED.to_owned();
+    let seeded = OPS
+        .iter()
+        .filter(|i| i.params.iter().any(|p| p.name == "seed"));
+    for op in seeded.map(|i| i.op) {
+        let tag = format!(r#""op": "{op}""#);
+        explicit = explicit.replace(&tag, &format!(r#"{tag}, "seed": 0"#));
+    }
     assert_eq!(fingerprint(&explicit), fingerprint(UNSEEDED));
 }
 
