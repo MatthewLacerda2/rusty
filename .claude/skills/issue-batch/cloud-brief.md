@@ -70,8 +70,9 @@ nothing to wait for.
   PR that you dispatched it. The report lands as a comment on your PR when it
   finishes (#912); the orchestrator reads it there and launches a follow-up
   only for survivors in code this branch wrote. One run per branch: a later
-  dispatch on the same branch cancels the earlier run, and closing or merging
-  the PR cancels whatever is left (#1530), so dispatch once, when you ready.
+  dispatch on the same branch cancels the earlier run, and an unmerged close
+  of the PR cancels what is left (a merged PR's run finishes and reports,
+  #1530), so dispatch once, when you ready.
 - **Once ready, the branch is the merge queue's. Never push to it again**, not
   to rebase and not to fix your own red CI: a red or conflicting ready PR comes
   back to the orchestrator as a hand-back, and it briefs a fix. Anything you

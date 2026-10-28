@@ -26,10 +26,11 @@
 # survivors" from "no answer", and the run's conclusion is what it reads.
 # Survivors are a result and never turn it red.
 #
-# When the branch has an open pull request, the report is also posted on it,
-# as one comment each later run edits in place (#912): a cloud coder ends at
-# ready and is gone before its run finishes, and the pull request is where the
-# orchestrator and the reviewer look.
+# When the branch has an open or merged pull request, the report is also
+# posted on it, as one comment each later run edits in place (#912): a cloud
+# coder ends at ready and is gone before its run finishes, the queue has often
+# merged the branch by then, and the pull request is where the orchestrator
+# and the reviewer look.
 #
 # A `workflow_dispatch` workflow can be dispatched only once the file is on
 # the default branch; `--ref` then picks the code it runs against.
@@ -58,8 +59,8 @@ permissions:
 # the merge queue's `ci` runs queued for 45 minutes. A newer dispatch on the
 # same ref cancels the older run. The group is a literal string, not
 # `${{ github.workflow }}`, because `mutants-cancel.yml` joins the same group
-# when the branch's pull request closes, and that is what stops a run that
-# would outlive its branch. `ci.yml` and `lint.yml` use groups of their own
+# when the branch's pull request closes unmerged, and that is what stops a run
+# whose report nobody would read. A merged branch's run finishes and reports. `ci.yml` and `lint.yml` use groups of their own
 # (`ci-…`, `lint-…`), so nothing here can cancel a gating run.
 #
 # Concurrency cannot rank runs: GitHub has no priority between workflows on
