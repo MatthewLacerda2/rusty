@@ -54,8 +54,9 @@ impl Scene {
     /// `survivors` across unchanged: same ids, same components, same order among
     /// themselves, appended after the incoming entities. A survivor whose parent does
     /// not survive becomes a root. The materials survivors reference come along
-    /// unless the incoming library already defines that name. Decals and queued
-    /// destroys of the outgoing scene are dropped, and the scene takes a fresh
+    /// unless the incoming library already defines that name. Persistent decals
+    /// come along (#1518, `scene::decal::persist`); the rest, and queued destroys
+    /// of the outgoing scene, are dropped, and the scene takes a fresh
     /// runtime identity — it is a different scene now.
     pub fn swap_in(
         &mut self,
@@ -76,6 +77,7 @@ impl Scene {
             .filter_map(|key| Some((key.clone(), self.materials.get(key)?.clone())))
             .collect();
 
+        let decals = self.take_persistent_decals(survivors);
         make_room(&mut data, survivors);
         apply_scene_data(self, data);
         for mut entity in carried {
@@ -92,7 +94,7 @@ impl Scene {
         }
         self.persistent.retain(|id| survivors.contains(id));
         self.pending_destroy.retain(|id| survivors.contains(id));
-        self.decals.clear();
+        self.land_persistent_decals(decals);
         self.renew_id();
         crate::scene::lighting::io::load_lighting_sidecar(self, path)
     }

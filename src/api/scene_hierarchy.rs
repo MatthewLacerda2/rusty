@@ -49,17 +49,7 @@ pub fn register<'scope>(
         scope.create_function(move |_, id: EntityArg| Ok(scene.borrow().world.children(id.read())));
     put(table, "GetChildren", f)?;
     let f = scope.create_function(move |_, (id, path): (EntityArg, String)| {
-        let world = &scene.borrow().world;
-        let mut at = Some(id.read()).filter(|&id| world.contains(id));
-        for segment in path.split('/').filter(|s| !s.is_empty()) {
-            at = at.and_then(|p| {
-                world
-                    .children(p)
-                    .into_iter()
-                    .find(|&c| world.name(c).is_some_and(|n| *n == segment))
-            });
-        }
-        Ok(at)
+        Ok(scene.borrow().world.find_child(id.read(), &path))
     });
     put(table, "FindChild", f)?;
     let f = scope.create_function(move |_, (id, on): (EntityArg, bool)| {

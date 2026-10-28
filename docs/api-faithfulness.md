@@ -314,7 +314,9 @@ fields (incl. the spatial fields stored for #213) round-trip through `SceneData`
 |---|---|---|
 | `Spawn` | ✅ | renderer — `render/decals/gpu.rs` uploads each decal and loads its maps into the decal atlas; the clusters bin it and `fs_main` folds it into the surface's material (#638); its `owner` / `lifetime` / `fade` (#639) are read by `Scene::decal_pose` each frame and aged by `app/systems/decals.rs::tick_decals` on the fixed tick |
 | `Remove` | ✅ | sim + renderer — drops the decal (or retires it to fade out) from `Scene.decals`, which the upload reads (`tests/decals/lifecycle_api.rs`) |
-| `Clear` | ✅ | renderer — empties the uploaded set |
+| `Spawn`'s `persist` opt (#1518) | ✅ | sim — `Scene::swap_in` (`scene/runtime/load.rs`) carries the decals `Decal::persist` marks across `Scene.Load` through `scene/decal/persist.rs` (`take_persistent_decals` / `land_persistent_decals`); `scene::decal::persist::tests` |
+| `Clear` | ✅ | renderer — empties the uploaded set; `{ persistent = false }` keeps the `persist` ones (`Scene::clear_decals`, `tests/decals/persist_api.rs`) |
+| `SetLimits` (#1517) | ✅ | sim — `DecalSet::set_limits` holds the ring to the budgets, and every spawn's eviction reads them in `DecalSet::insert` (`scene/decal/registry.rs`); `GetLimits` reads them back, Stop restores the project's (`app/game.rs::apply_project_decal_limits`; `tests/decals/limits_api.rs`) |
 
 ### `Layers` — over `Entity.layer`
 

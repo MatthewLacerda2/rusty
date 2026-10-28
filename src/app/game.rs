@@ -278,7 +278,7 @@ impl GameWorld {
     /// Hold the scene's decals to the project's budgets (#1517): on entering Play,
     /// on Stop (Unity reverts play-mode changes) and when the editor opens.
     pub fn apply_project_decal_limits(&self) {
-        let limits = self.resources.application.borrow().decal_limits();
+        let limits = self.resources.application.borrow_mut().decal_limits();
         self.world.scene.borrow_mut().decals.set_limits(limits);
     }
 }

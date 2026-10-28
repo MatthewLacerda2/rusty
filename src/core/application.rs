@@ -96,6 +96,9 @@ pub struct Application {
     graphics_defaults: GraphicsOptions,
     /// The project's decal budgets (#1517) as last read or set.
     decal_limits: DecalLimits,
+    /// The bound file's text the budgets were last parsed from, good or bad: the
+    /// same text again is not re-parsed, so its warnings are not repeated.
+    decals_read_from: Option<String>,
     /// `Some` once bound to a file via [`Application::open`]: setters then write it.
     path: Option<PathBuf>,
     quit_requested: bool,
@@ -118,29 +121,53 @@ impl Application {
     /// the settings back into it.
     pub fn open(&mut self, path: impl Into<PathBuf>) -> Result<(), String> {
         let path = path.into();
-        let read = ProjectFile::read(&path);
+        // Read once and parse that text, so the text kept for `decal_limits` is the
+        // one the budgets came from.
+        let read = match std::fs::read_to_string(&path) {
+            Ok(text) => Ok(Some(text)),
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(None),
+            Err(err) => Err(format!("Failed to read {}: {err}", path.display())),
+        };
         self.path = Some(path);
-        let file = read?.unwrap_or_default();
+        let text = read?;
+        let file = match &text {
+            Some(text) => ProjectFile::from_json(text)?,
+            None => ProjectFile::default(),
+        };
         (self.build, self.graphics_defaults) = (file.build, file.graphics_options);
         self.decal_limits = file.decals;
+        self.decals_read_from = text;
         Ok(())
     }
 
     /// The project's decal budgets, which entering and leaving Play apply to the
     /// scene. Bound, the file as it stands now, so an edit to `project.rusty` (by
     /// hand or by the agent) reaches the next Play; unbound, the ones
-    /// [`set_decal_limits`] gave. A bound file that can't be read keeps the last
-    /// ones read, and says so.
+    /// [`set_decal_limits`] gave. A bound file that can't be read or parsed keeps
+    /// the last good read, and says so once per content.
     ///
     /// [`set_decal_limits`]: Self::set_decal_limits
-    pub fn decal_limits(&self) -> DecalLimits {
+    pub fn decal_limits(&mut self) -> DecalLimits {
         let Some(path) = &self.path else {
             return self.decal_limits;
         };
-        let why = match ProjectFile::read(path) {
-            Ok(Some(file)) => return file.decals,
-            Ok(None) => format!("{} is missing", path.display()),
-            Err(err) => err,
+        let why = match std::fs::read_to_string(path) {
+            Ok(text) if self.decals_read_from.as_ref() == Some(&text) => return self.decal_limits,
+            Ok(text) => {
+                let parsed = ProjectFile::from_json(&text);
+                self.decals_read_from = Some(text);
+                match parsed {
+                    Ok(file) => {
+                        self.decal_limits = file.decals;
+                        return self.decal_limits;
+                    }
+                    Err(err) => err,
+                }
+            }
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+                format!("{} is missing", path.display())
+            }
+            Err(err) => format!("Failed to read {}: {err}", path.display()),
         };
         log::warn!("[Project] decals: {why}; keeping the budgets last read");
         self.decal_limits

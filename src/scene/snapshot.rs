@@ -20,6 +20,9 @@ pub struct SceneSnapshot {
     /// lives in the sidecar on disk), but an in-memory snapshot must preserve it so
     /// exiting Play doesn't blank out probe-driven ambient (#240).
     probes: crate::scene::lighting::probe::ProbeVolume,
+    /// The edit-mode decals (#1518): runtime state `SceneData` does not carry, put
+    /// back on Stop so the ones stamped in edit mode survive Play and Play's don't.
+    decals: crate::scene::decal::DecalSet,
 }
 
 impl SceneSnapshot {
@@ -29,13 +32,17 @@ impl SceneSnapshot {
         Self {
             data: to_scene_data(scene),
             probes: scene.probes.clone(),
+            decals: scene.decals.clone(),
         }
     }
 
-    /// Restore the snapshot into `scene`, discarding any play-mode mutations.
+    /// Restore the snapshot into `scene`, discarding any play-mode mutations: the
+    /// decals go back to the edit-mode ones, dropping every one Play stamped,
+    /// persistent ones too (#1518), as Unity's play-mode revert does.
     /// Consumes the snapshot since a snapshot is single-use per Play session.
     pub fn restore(self, scene: &mut Scene) {
         apply_world_data(scene, self.data);
+        scene.decals.restore(self.decals);
         // Re-apply the baked SH the document-level apply dropped (it only carries
         // probe positions). Positions are identical, so this overwrites cleanly.
         scene.probes = self.probes;

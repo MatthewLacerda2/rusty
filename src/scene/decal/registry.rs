@@ -85,13 +85,24 @@ impl DecalSet {
         }
     }
 
-    /// Add `decal` under a fresh id, making room per the budgets: only its bucket
-    /// and the total can be over. Returns its id.
+    /// Add `decal` under a fresh id, making room per the budgets. Returns its id.
     fn push(&mut self, mut decal: Decal) -> u32 {
         self.next_id += 1;
         decal.id = self.next_id;
+        self.insert(decal);
+        self.next_id
+    }
+
+    /// Append `decal` as it stands (id, age, fade), newest in the blend order, making
+    /// room per the budgets: only its bucket and the total can be over. A spawn and
+    /// a load's carried decals (#1518) both come in here.
+    pub(super) fn insert(&mut self, decal: Decal) {
         let bucket = decal.bucket();
-        self.counts.add(bucket);
+        if decal.retiring {
+            self.counts.evicting += usize::from(decal.evicted);
+        } else {
+            self.counts.add(bucket);
+        }
         self.ring.push_back(decal);
         while self.counts.whole(bucket) > self.budget(bucket)
             && self.evict_oldest(|d| d.bucket() == bucket)
@@ -102,7 +113,6 @@ impl DecalSet {
             let gone = self.ring.remove(at.expect("counted")).expect("in range");
             self.counts.forget(&gone);
         }
-        self.next_id
     }
 
     /// Start the oldest whole decal `pick` accepts on the [`EVICTION_FADE`], as a
@@ -139,11 +149,30 @@ impl DecalSet {
         true
     }
 
-    /// Drop every decal (a level reset, a scene load). Ids keep counting, and the
-    /// budgets stay.
-    pub fn clear(&mut self) {
-        self.ring.clear();
+    /// Take every decal out, oldest first. Ids keep counting, and the budgets stay.
+    pub(super) fn drain(&mut self) -> VecDeque<Decal> {
         self.counts = Counts::default();
+        std::mem::take(&mut self.ring)
+    }
+
+    /// Keep only the decals `keep` accepts, in their order; the rest are dropped.
+    fn retain(&mut self, keep: impl Fn(&Decal) -> bool) {
+        let counts = &mut self.counts;
+        self.ring.retain(|d| {
+            let kept = keep(d);
+            if !kept {
+                counts.forget(d);
+            }
+            kept
+        });
+    }
+
+    /// Put back the decals `saved` held (Stop's snapshot restore, #1518), as they
+    /// were. The budgets in force stay, and ids keep counting past every one handed
+    /// out since, so none is reused.
+    pub fn restore(&mut self, saved: DecalSet) {
+        let next_id = self.next_id.max(saved.next_id);
+        (self.ring, self.counts, self.next_id) = (saved.ring, saved.counts, next_id);
     }
 
     /// Age every decal by `dt` sim seconds, then drop the ones whose lifetime ran
@@ -152,14 +181,7 @@ impl DecalSet {
         for decal in &mut self.ring {
             decal.age += dt;
         }
-        let counts = &mut self.counts;
-        self.ring.retain(|d| {
-            let keep = !d.expired() && d.owner.is_none_or(|o| exists(o.entity));
-            if !keep {
-                counts.forget(d);
-            }
-            keep
-        });
+        self.retain(|d| !d.expired() && d.owner.is_none_or(|o| exists(o.entity)));
     }
 }
 
@@ -187,9 +209,10 @@ impl Scene {
         Some(self.decals.push(decal))
     }
 
-    /// Drop every live decal (e.g. on level reset).
-    pub fn clear_decals(&mut self) {
-        self.decals.clear();
+    /// Drop every live decal (e.g. on level reset), or with `keep_persistent` every
+    /// one but the [`Decal::persist`] ones.
+    pub fn clear_decals(&mut self, keep_persistent: bool) {
+        self.decals.retain(|d| keep_persistent && d.persist);
     }
 }
 
