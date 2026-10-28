@@ -52,6 +52,24 @@ on:
 permissions:
   contents: read
 
+# One run per branch (#1530). A coder dispatches a scoped run when it readies,
+# and a re-briefed coder again when it readies again; without this every older
+# run kept its runner for its full course, and on 2026-10-28 ten at once left
+# the merge queue's `ci` runs queued for 45 minutes. A newer dispatch on the
+# same ref cancels the older run. The group is a literal string, not
+# `${{ github.workflow }}`, because `mutants-cancel.yml` joins the same group
+# when the branch's pull request closes, and that is what stops a run that
+# would outlive its branch. `ci.yml` and `lint.yml` use groups of their own
+# (`ci-…`, `lint-…`), so nothing here can cancel a gating run.
+#
+# Concurrency cannot rank runs: GitHub has no priority between workflows on
+# hosted runners, and one group for every branch would keep a single pending
+# run and silently cancel the other requests. So mutation is held to one run
+# per open branch, not to fewer runners than CI needs.
+concurrency:
+  group: mutants-on-request-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   mutants:
     runs-on: ubuntu-latest
