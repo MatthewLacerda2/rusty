@@ -19,6 +19,7 @@
 //! - [`bake`] — buffer → PNG with per-slot glTF encoding/packing.
 //! - `bake_set` — a recipe's named `outputs` → one PNG per slot, one evaluation (#403).
 //! - [`ops`] — the op-set grouped by category, plus the per-node dispatcher.
+//! - [`bands`] — row bands run in parallel; byte-identical at any band count (#1490).
 //! - [`hash`] — dependency-free deterministic value hashing for stochastic ops.
 //! - [`image_buf`] — the linear-RGBA buffer the runner works in (wrapping domain).
 
@@ -28,6 +29,7 @@
 
 pub mod bake;
 mod bake_set;
+pub mod bands;
 pub mod hash;
 pub mod image_buf;
 pub mod ops;
@@ -36,6 +38,7 @@ pub mod runner;
 
 pub use bake::Slot;
 pub use bake_set::bake_set;
+pub use bands::with_bands;
 pub use image_buf::Image;
 pub use recipe::TextureRecipe;
 pub use runner::{evaluate, RunError};

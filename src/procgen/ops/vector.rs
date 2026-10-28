@@ -91,16 +91,14 @@ pub fn bump_to_normal(img: &Image, strength: f32) -> Image {
 /// Combine up to three single-channel inputs into one RGB image (alpha 1). Each input
 /// contributes its red channel to one output channel; missing inputs contribute 0.
 pub fn combine_rgb(inputs: &[&Image], resolution: u32) -> Image {
-    let mut out = Image::new(resolution);
-    let n = out.pixels().len();
-    let mut buf = vec![[0.0f32, 0.0, 0.0, 1.0]; n];
-    for (c, src) in inputs.iter().take(3).enumerate() {
-        let sp = src.pixels();
-        for (i, b) in buf.iter_mut().enumerate() {
-            b[c] = sp[i][0];
+    let mut out = Image::filled(resolution, [0.0, 0.0, 0.0, 1.0]);
+    out.for_each_row(|y, row| {
+        for (c, src) in inputs.iter().take(3).enumerate() {
+            for (p, s) in row.iter_mut().zip(src.row(y)) {
+                p[c] = s[0];
+            }
         }
-    }
-    out.pixels_mut().copy_from_slice(&buf);
+    });
     out
 }
 

@@ -24,7 +24,7 @@ use super::super::recipe::{
 };
 
 /// A generator's per-point function over the unit domain.
-pub type Sampler = Box<dyn Fn(f32, f32) -> Rgba>;
+pub type Sampler = Box<dyn Fn(f32, f32) -> Rgba + Send + Sync>;
 
 /// Pack a scalar `v` into an opaque grayscale pixel.
 #[inline]
