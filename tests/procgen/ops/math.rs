@@ -1,12 +1,12 @@
 //! Per-op correctness: converter/math, vector/normal, and filter ops (#270). The
-//! generator + color ops are covered in `ops.rs`. Each op is exercised through
+//! generator + color ops are covered in `basic.rs`. Each op is exercised through
 //! the public runner (`evaluate`) so the test pins observable pixel behaviour.
 
 use rusty::procgen::recipe::{
     Blur, BumpToNormal, Checker, Clamp, Gradient, GradientKind, MapRange, OpKind,
 };
 
-use super::{constant, node, run};
+use super::super::{constant, node, run};
 
 #[test]
 fn clamp_bounds_each_channel() {
