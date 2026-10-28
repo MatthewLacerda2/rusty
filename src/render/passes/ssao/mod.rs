@@ -3,7 +3,9 @@
 //! Probes light a room from a few points; they cannot darken the foot of a crate or
 //! the corner of a corridor. SSAO does, per pixel, from depth — and only the
 //! ambient/indirect light, never the sun or a lamp, so it has to be known *before*
-//! the forward shader adds those up. Each camera therefore runs, when AO is on:
+//! the forward shader adds those up. Each camera therefore runs, when AO is on
+//! (except a `DepthOnly` camera stacked on another, a viewmodel, which runs none
+//! of it and samples no AO, as URP's overlay cameras: `draw::camera::is_overlay`):
 //!
 //! 1. a **depth prepass** of its solids (the forward vertex stage, depth only);
 //! 2. the **occlusion** pass (`ssao.wgsl` `fs_ao`) at the tier's resolution;
@@ -13,7 +15,7 @@
 //! ambient and environment-reflection terms. With AO off none of this runs, and
 //! group 3 carries a 1x1 white texture instead.
 //!
-//! Cost, per camera: one more depth-only draw of every visible solid, plus
+//! Cost, per camera that runs it: one more depth-only draw of every visible solid, plus
 //! `samples` depth taps per occlusion texel (Medium: 8 at half resolution — a
 //! quarter of the pixels; High: 16 at full) and 25 per pixel for the blur. The frame
 //! stats count both (`draw_calls`/`triangles` include the prepass; `ssao_samples`

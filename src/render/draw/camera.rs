@@ -13,7 +13,9 @@
 //! Three stages are not every camera's: `post_fx` runs only on the stack's last
 //! camera (it composites the whole stack) and returns early on the others, and the
 //! editor's `outline` and `handles` follow it there, onto the finished image, in
-//! Unity's order: scene, post-FX, outline, handles, then the UI (#1224).
+//! Unity's order: scene, post-FX, outline, handles, then the UI (#1224). An
+//! overlay camera ([`is_overlay`], a viewmodel) runs every stage but skips the
+//! base camera's screen-space work: no decals in its clusters, no SSAO (#1497).
 
 use super::pass::{PassClear, ScenePassFrame};
 use super::resources::SolidResources;
@@ -53,6 +55,8 @@ pub(crate) struct CameraCtx<'a> {
     /// This camera's place in the stack: the first clears, the last runs post-FX.
     pub is_first: bool,
     pub is_last: bool,
+    /// A `DepthOnly` camera stacked on another (a viewmodel): see [`is_overlay`].
+    pub overlay: bool,
     pub aspect: f32,
     pub view_proj: glam::Mat4,
     /// The stack's base (first) camera's view-projection, for post-FX.
@@ -62,6 +66,7 @@ pub(crate) struct CameraCtx<'a> {
     /// This camera's light-cluster grid (#434).
     pub clusters: ClusterGrid,
     pub fog: FogUniform,
+    /// The stack's SSAO, or `None` on an overlay camera, which samples no AO.
     pub ssao: Option<SsaoPlan>,
     /// The LOD level each entity shows to this camera (#472).
     pub lod: LodSelection,
@@ -92,18 +97,20 @@ impl<'a> CameraCtx<'a> {
         let cam = &stack.stack[idx];
         let view_proj = shared.view_projs[idx];
         let clusters = ClusterGrid::new(cam, shared.aspect);
+        let overlay = is_overlay(idx == 0, cam.clear_flags);
         Self {
             scene,
             cam,
             stack,
             is_first: idx == 0,
             is_last: idx + 1 == stack.stack.len(),
+            overlay,
             aspect: shared.aspect,
             view_proj,
             base_view_proj: shared.view_projs[0],
             frustum: Frustum::from_view_proj(view_proj),
             fog: shared.fog,
-            ssao: shared.ssao,
+            ssao: shared.ssao.filter(|_| !overlay),
             lod: LodSelection::for_camera(scene, cam),
             uniform: CameraUniform {
                 view_proj: view_proj.to_cols_array(),
@@ -121,17 +128,24 @@ impl<'a> CameraCtx<'a> {
     }
 }
 
+/// Whether a camera is an overlay: `DepthOnly` and stacked on another (a viewmodel,
+/// a HUD camera). An overlay draws over its base camera's image and shares its
+/// screen-space work: it bins no decals and runs no SSAO of its own (#1497, Unity
+/// URP's rule: SSAO is a base-camera renderer feature).
+pub(crate) fn is_overlay(is_first: bool, clear_flags: ClearFlags) -> bool {
+    !is_first && clear_flags == ClearFlags::DepthOnly
+}
+
 fn upload_camera(r: &mut Renderer, _: &mut RenderView, ctx: &mut CameraCtx) {
     r.queue
         .write_buffer(&r.camera_buffer, 0, bytemuck::bytes_of(&ctx.uniform));
 }
 
 /// Bin the frame's point and spot lights (#434) and its decals (#638) into this
-/// camera's clusters. A `DepthOnly` camera stacked on another (a viewmodel, an
-/// overlay) bins no decals: world decals never land on the viewmodel.
+/// camera's clusters. An overlay camera ([`is_overlay`]) bins no decals: world
+/// decals never land on the viewmodel.
 fn bin_clusters(r: &mut Renderer, _: &mut RenderView, ctx: &mut CameraCtx) {
-    let overlay = !ctx.is_first && ctx.cam.clear_flags == ClearFlags::DepthOnly;
-    r.bin_clusters(&ctx.clusters, !overlay);
+    r.bin_clusters(&ctx.clusters, !ctx.overlay);
 }
 
 /// This camera's solids (the culling mask differs per camera) as instanced draws

@@ -85,7 +85,9 @@ a UI `Image` (`Image.SetTexture(id, "rt:minimap")`) or a material map
 `render_order` 0 and `"Skybox"`; the gun's camera draws after it with
 `"DepthOnly"`, which keeps the world's colour and clears only depth, so the gun
 never clips into a wall. Give the gun's layer to the viewmodel camera alone
-(`Layers`, culling masks), and the viewmodel its own narrow lens.
+(`Layers`, culling masks), and the viewmodel its own narrow lens. As in URP, a
+stacked `"DepthOnly"` camera is an overlay: it runs no SSAO of its own and bins no
+decals, so what it draws gets neither (`Graphics.md`, *SSAO*).
 
 ```lua with=viewmodelCam:Camera
 Camera.SetRenderOrder(viewmodelCam, 1)

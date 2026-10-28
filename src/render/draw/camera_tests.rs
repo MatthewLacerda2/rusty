@@ -57,3 +57,15 @@ fn stage_names_are_unique() {
     names.dedup();
     assert_eq!(names.len(), CAMERA_PASSES.len());
 }
+
+#[test]
+fn only_a_stacked_depth_only_camera_is_an_overlay() {
+    use super::is_overlay;
+    use crate::scene::ClearFlags;
+    // The viewmodel: stacked, clearing depth alone (#1497).
+    assert!(is_overlay(false, ClearFlags::DepthOnly));
+    // A base camera is never one, whatever it clears; nor is a stacked one that clears colour.
+    assert!(!is_overlay(true, ClearFlags::DepthOnly));
+    assert!(!is_overlay(false, ClearFlags::Skybox));
+    assert!(!is_overlay(false, ClearFlags::SolidColor));
+}

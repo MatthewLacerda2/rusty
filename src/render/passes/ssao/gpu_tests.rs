@@ -6,7 +6,7 @@ use glam::Vec3;
 use crate::core::settings::quality::QualityPreset;
 use crate::render::{RenderView, Renderer, OFFSCREEN_FORMAT};
 use crate::scene::authoring::{create_entity, default_post_processing, Primitive};
-use crate::scene::{Camera, Scene};
+use crate::scene::{Camera, ClearFlags, Scene};
 
 /// A crate under a post-processing volume with AO `on`.
 fn crate_scene(on: bool) -> Scene {
@@ -65,4 +65,33 @@ fn gpu_each_tier_traces_what_it_promises() {
         lit_draws > unlit_draws,
         "the prepass is counted: {lit_draws} vs {unlit_draws}"
     );
+}
+
+/// `crate_scene(true)` with a second camera stacked on the first, clearing `clear`.
+fn stacked(clear: ClearFlags) -> Scene {
+    let mut scene = crate_scene(true);
+    let camera = scene.add_entity("Stacked".to_string());
+    let lens = crate::components::CameraComponent {
+        render_order: 1,
+        clear_flags: clear,
+        ..Default::default()
+    };
+    scene.world.set_camera(camera, Some(lens));
+    scene
+}
+
+#[test]
+fn gpu_a_depth_only_overlay_runs_no_ssao_of_its_own() {
+    let Some(mut r) = crate::render::test_gpu::headless_or_skip(48, 32) else {
+        return;
+    };
+    let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, 48, 32, 2);
+    let high = QualityPreset::High;
+    let one = cost(&mut r, &mut view, &crate_scene(true), high).0;
+    // A viewmodel camera (#1497): the stack records SSAO once, for its base camera.
+    let overlay = cost(&mut r, &mut view, &stacked(ClearFlags::DepthOnly), high).0;
+    assert_eq!(overlay, one, "the overlay traced its own AO");
+    // A stacked camera that clears colour is no overlay: it still runs its own.
+    let opaque = cost(&mut r, &mut view, &stacked(ClearFlags::Skybox), high).0;
+    assert_eq!(opaque, 2 * one, "the second camera of the stack ran");
 }
