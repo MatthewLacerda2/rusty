@@ -11,7 +11,11 @@ says a signal only earns its keep where the agent acts on it.
 - **One comment per pull request, kept current.** The comment opens with
   [`MARKER`]; a later run on the same branch edits that comment instead of
   stacking another, so the pull request shows the latest answer once.
-- **No open pull request, no comment.** A by-hand run on `main` or a scratch
+- **An open pull request first, else a merged one** ([`target`]). The queue
+  usually merges a branch before its run finishes, and the report still
+  belongs on it (#1530). A pull request closed unmerged gets nothing: its run
+  is cancelled by `mutants-cancel.yml`, and nobody reads it.
+- **No such pull request, no comment.** A by-hand run on `main` or a scratch
   branch has nowhere to post, and that is not an error.
 - **Never longer than GitHub takes.** A comment holds [`LIMIT`] characters; a
   longer report is cut at a line and points to the run, which has all of it.
@@ -61,6 +65,17 @@ def ours(comments: list[dict]) -> int | None:
     return None
 
 
+def target(prs: list[dict]) -> int | None:
+    """The pull request to post on: an open one, else the latest merged one."""
+    for pr in prs:
+        if pr.get("state") == "open":
+            return pr["number"]
+    merged = [pr for pr in prs if pr.get("merged_at")]
+    if merged:
+        return max(merged, key=lambda pr: pr["merged_at"])["number"]
+    return None
+
+
 def gh(*args: str, stdin: str | None = None) -> str:
     done = subprocess.run(["gh", *args], input=stdin, capture_output=True, text=True, check=False)
     if done.returncode != 0:
@@ -77,11 +92,11 @@ def main(argv: list[str]) -> int:
     args = parser.parse_args(argv)
 
     owner = args.repo.split("/")[0]
-    prs = json.loads(gh("api", f"repos/{args.repo}/pulls?state=open&head={owner}:{args.branch}"))
-    if not prs:
-        print(f"mutants-pr-comment: no open pull request from {args.branch}; nothing to post")
+    prs = json.loads(gh("api", f"repos/{args.repo}/pulls?state=all&head={owner}:{args.branch}"))
+    number = target(prs)
+    if number is None:
+        print(f"mutants-pr-comment: no open or merged pull request from {args.branch}; nothing to post")
         return 0
-    number = prs[0]["number"]
     lines = gh("api", "--paginate", f"repos/{args.repo}/issues/{number}/comments",
                "--jq", ".[] | {id: .id, user: .user.login, body: .body}")
     existing = ours([json.loads(line) for line in lines.splitlines() if line.strip()])

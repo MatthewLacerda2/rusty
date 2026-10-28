@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""The on-request report lands on the pull request once, and always fits (#912)."""
+"""The on-request report lands on the pull request once, and always fits (#912).
+
+It lands on a merged pull request too, never on one closed unmerged (#1530).
+"""
 
 from __future__ import annotations
 
@@ -52,6 +55,22 @@ class Ours(unittest.TestCase):
     def test_a_human_quoting_the_marker_is_never_edited(self) -> None:
         quoted = [{"id": 4, "user": "someone", "body": comment.MARKER + "\nquoted"}]
         self.assertIsNone(comment.ours(quoted))
+
+
+class Target(unittest.TestCase):
+    def test_an_open_pull_request_wins(self) -> None:
+        prs = [{"number": 1, "state": "closed", "merged_at": "2026-10-28T10:00:00Z"},
+               {"number": 2, "state": "open", "merged_at": None}]
+        self.assertEqual(comment.target(prs), 2)
+
+    def test_else_the_latest_merged_one(self) -> None:
+        prs = [{"number": 1, "state": "closed", "merged_at": "2026-10-27T10:00:00Z"},
+               {"number": 3, "state": "closed", "merged_at": "2026-10-28T10:00:00Z"}]
+        self.assertEqual(comment.target(prs), 3)
+
+    def test_closed_unmerged_or_none_gets_nothing(self) -> None:
+        self.assertIsNone(comment.target([{"number": 4, "state": "closed", "merged_at": None}]))
+        self.assertIsNone(comment.target([]))
 
 
 if __name__ == "__main__":
