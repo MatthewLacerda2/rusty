@@ -80,7 +80,9 @@ watch keeps merging the rest** (#751): it prints one line,
 head is remembered (under the checkout's git directory) and passed over, by
 this watch and later ones, until it moves — pushing a fix is the whole of
 re-queueing it. **A new run attempt on that head counts as moving** (#869): `gh
-run rerun --failed ID` re-queues it, no push, no relaunch. **A hand-back no push
+run rerun --failed ID` re-queues it, no push, no relaunch. A hand-back for a
+run that only waited too long (runners busy) and then went green has no failed
+job: re-run one cheap job, `gh run rerun --job <deny's id>`, to make the attempt. **A hand-back no push
 fixes waits for what does** (#1279). One for what the description or labels
 claim (a missing `Closes #N`, a stray keyword, a wrong number, an issue-less code
 change) says "no push needed", and the watch takes it again once the pull

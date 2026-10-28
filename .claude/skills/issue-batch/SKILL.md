@@ -111,7 +111,12 @@ round:
 - "a path can't hold `::`" is false on Linux and macOS.
 
 So, before writing a brief:
-- before citing Unity, check that rusty has the machinery that makes Unity's way safe;
+- before citing Unity, check that rusty has the machinery that makes Unity's way safe,
+  and read Unity's source for the claim (a URP shader or C# file): #1479's brief got
+  URP's contrast space wrong, and its coder "corrected" it to a second wrong one;
+- a brief that offers alternatives names the invariant each must keep: #1486's
+  "fix the doc, or walk every node" was met by reordering bakes and losing #1485's
+  freeing;
 - when a decision removes data or a capability, grep its consumers;
 - verify any claim about a platform or a tool in one command.
 - write "Builds on PR #N merged" only after `gh pr view N --json state` says
@@ -129,8 +134,9 @@ Issue(s): #N. Your brief is the newest comment on it that starts with `Brief`.
 ```
 
 A re-brief (a rebase, a fix, a new sibling) is a new `Brief` comment on the
-issue, with "force-push authorised" when it works a pushed branch, and the PR
-turned back to draft. **Then `RemoteTrigger run` the coder's own routine right
+issue that says **add commits on top, rebase only if the PR conflicts** (the
+queue rebases at merge; a voluntary rebase's force-push was refused twice on
+2026-10-28 and cost a `-v2` PR each), and the PR turned back to draft. **Then `RemoteTrigger run` the coder's own routine right
 away.** Its prompt already points at the newest `Brief`. Don't wait for the old
 session: it is subscribed to the PR, not the issue. In the 2026-10-22 batch,
 sessions woke on the draft flip, read only the PR, found no instruction and
