@@ -65,9 +65,11 @@ pub(super) fn velocity_spec() -> PipelineSpec {
 }
 
 /// The opaque pass over a primed depth (#1499), Unity URP's *Depth Priming*: the
-/// SSAO prepass already wrote these solids' depth, so the pass tests it `LessEqual`
-/// and writes none, and the fragment shader runs once per visible pixel. With no
-/// depth write, a GPU tests depth before a shader that discards (a cutout) too.
+/// SSAO prepass already wrote these solids' depth, so the pass tests it and writes
+/// none, and the fragment shader runs once per visible pixel. With no depth write, a
+/// GPU tests depth before a shader that discards (a cutout) too. URP tests `Equal`;
+/// with the vertex position `@invariant`, `LessEqual` passes the same fragments, and
+/// still draws one a driver rounds a step nearer than its prepass depth.
 pub(super) fn primed_spec() -> PipelineSpec {
     primed(PipelineSpec::opaque("Forward Primed Pipeline"))
 }
