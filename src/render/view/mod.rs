@@ -192,6 +192,9 @@ impl RenderView {
         if (self.size, self.scene_size, self.bloom_divisor) == (size, scene, bloom_divisor) {
             return;
         }
+        // A scale change alone keeps the output: a consumer may already hold a view of
+        // its colour target for this render.
+        let output_changed = self.size != size;
         (self.size, self.scene_size, self.bloom_divisor) = (size, scene, bloom_divisor);
         let (depth_texture, depth_view) = create_depth(device, scene.width, scene.height);
         self.depth_texture = depth_texture;
@@ -201,7 +204,7 @@ impl RenderView {
         let (w, h) = (scene.width, scene.height);
         self.post_fx.resize(device, w, h, bloom_divisor);
         self.upscale_source = scale::upscale_source(device, self.format, size, scene);
-        if self.color_target.is_some() {
+        if output_changed && self.color_target.is_some() {
             let (w, h) = (size.width, size.height);
             let (target, ui_format) = create_color_target(device, self.format, w, h);
             (self.color_target, self.ui_format) = (Some(target), Some(ui_format));
