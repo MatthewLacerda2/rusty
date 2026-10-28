@@ -3,7 +3,9 @@
 //! op whose params used to be in pixels (`blur`, `bump_to_normal`) or that resampled
 //! nearest-neighbour (`mapping`) is exercised.
 
-use rusty::procgen::recipe::{Node, NoiseKind, OpKind};
+use rusty::procgen::recipe::{
+    Blur, BumpToNormal, Cavity, Checker, Curvature, Mapping, Node, Noise, NoiseKind, OpKind,
+};
 use rusty::procgen::Image;
 
 use super::node;
@@ -53,27 +55,27 @@ pub fn assert_resolution_independent(label: &str, nodes: &[Node], tolerance: f32
 fn perlin(scale: f32) -> Node {
     node(
         "n",
-        OpKind::Noise {
+        OpKind::Noise(Noise {
             kind: NoiseKind::Perlin,
             scale,
             octaves: 1,
             lacunarity: 2.0,
             gain: 0.5,
-        },
+        }),
         &[],
     )
 }
 
 #[test]
 fn blur_radius_is_a_fraction_of_the_tile() {
-    let checker = OpKind::Checker {
+    let checker = OpKind::Checker(Checker {
         tiles: 4,
         color_a: [0.0; 4],
         color_b: [1.0; 4],
-    };
+    });
     let nodes = [
         node("k", checker, &[]),
-        node("b", OpKind::Blur { radius: 0.03 }, &["k"]),
+        node("b", OpKind::Blur(Blur { radius: 0.03 }), &["k"]),
     ];
     assert_resolution_independent("blur", &nodes, 0.02);
 }
@@ -82,7 +84,11 @@ fn blur_radius_is_a_fraction_of_the_tile() {
 fn bump_to_normal_strength_is_a_slope_in_tile_units() {
     let nodes = [
         perlin(4.0),
-        node("b", OpKind::BumpToNormal { strength: 0.3 }, &["n"]),
+        node(
+            "b",
+            OpKind::BumpToNormal(BumpToNormal { strength: 0.3 }),
+            &["n"],
+        ),
     ];
     assert_resolution_independent("bump_to_normal", &nodes, 0.02);
 }
@@ -90,12 +96,12 @@ fn bump_to_normal_strength_is_a_slope_in_tile_units() {
 #[test]
 fn mapping_resamples_bilinearly() {
     for tiling in [true, false] {
-        let map = OpKind::Mapping {
+        let map = OpKind::Mapping(Mapping {
             scale: [1.7, 1.3],
             rotation: 0.1,
             translation: [0.2, 0.0],
             tiling,
-        };
+        });
         let nodes = [perlin(3.0), node("m", map, &["n"])];
         assert_resolution_independent(&format!("mapping tiling={tiling}"), &nodes, 0.01);
     }
@@ -104,11 +110,11 @@ fn mapping_resamples_bilinearly() {
 #[test]
 fn height_op_radii_are_in_tile_units() {
     let ops = [
-        OpKind::Cavity { radius: 0.04 },
-        OpKind::Curvature {
+        OpKind::Cavity(Cavity { radius: 0.04 }),
+        OpKind::Curvature(Curvature {
             radius: 0.03,
             strength: 3.0,
-        },
+        }),
     ];
     for op in ops {
         let label = format!("{op:?}");

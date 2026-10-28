@@ -3,7 +3,7 @@
 use serde_json::{json, Value};
 
 use super::*;
-use crate::procgen::recipe::OpKind;
+use crate::procgen::recipe::{sample_op, OpKind};
 
 /// The tags serde lists when `json` names an unknown one — its "unknown variant"
 /// message spells them as `` `a` ``, `` `a` or `b` `` or `` one of `a`, `b`, … ``.
@@ -19,19 +19,6 @@ fn expected_tags(json: Value) -> Vec<String> {
         .collect()
 }
 
-/// A valid value for a required param of type `p.ty`.
-fn sample(p: &OpParam) -> Value {
-    match p.ty {
-        "number" | "integer" => json!(2),
-        "bool" => json!(true),
-        "color" => json!([0.0, 0.0, 0.0, 1.0]),
-        "vec2" => json!([1.0, 1.0]),
-        "enum" => json!(p.values[0]),
-        "stops" => json!([{ "pos": 0.0, "color": [0.0, 0.0, 0.0, 1.0] }]),
-        other => panic!("{}: unknown param type {other}", p.name),
-    }
-}
-
 fn lit(l: Lit) -> Value {
     match l {
         Lit::Number(n) => json!(n),
@@ -43,14 +30,7 @@ fn lit(l: Lit) -> Value {
 
 /// The op built from only its required params, serialized back by serde.
 fn round_trip(info: &OpInfo) -> serde_json::Map<String, Value> {
-    let mut doc = serde_json::Map::new();
-    doc.insert("op".into(), json!(info.op));
-    for p in info.params.iter().filter(|p| p.default.is_none()) {
-        doc.insert(p.name.into(), sample(p));
-    }
-    let op: OpKind = serde_json::from_value(Value::Object(doc))
-        .unwrap_or_else(|e| panic!("{}: required params don't parse: {e}", info.op));
-    let Value::Object(out) = serde_json::to_value(op).unwrap() else {
+    let Value::Object(out) = serde_json::to_value(sample_op(info)).unwrap() else {
         unreachable!()
     };
     out
@@ -106,5 +86,14 @@ fn every_enum_param_lists_exactly_the_accepted_values() {
             listed.sort();
             assert_eq!(listed, accepted, "{}.{}", info.op, p.name);
         }
+    }
+}
+
+#[test]
+fn every_op_kind_tag_is_the_one_serde_writes() {
+    for info in OPS {
+        let op = sample_op(info);
+        assert_eq!(op.tag(), info.op);
+        assert_eq!(op.info().op, info.op);
     }
 }

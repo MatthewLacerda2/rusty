@@ -7,7 +7,7 @@ mod resolution;
 mod seams;
 mod weathering;
 
-use rusty::procgen::recipe::{Node, OpKind, TextureRecipe};
+use rusty::procgen::recipe::{Constant, Node, OpKind, TextureRecipe};
 use rusty::procgen::{evaluate, Image};
 
 /// Node `id` running `op` over the nodes named in `inputs`.
@@ -21,7 +21,7 @@ pub fn node(id: &str, op: OpKind, inputs: &[&str]) -> Node {
 
 /// A flat-colour node.
 pub fn constant(id: &str, c: [f32; 4]) -> Node {
-    node(id, OpKind::Constant { color: c }, &[])
+    node(id, OpKind::Constant(Constant { color: c }), &[])
 }
 
 /// Evaluate `nodes` at `resolution` with `seed`; the last node is the output.

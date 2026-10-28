@@ -3,9 +3,13 @@
 //! serde can tell which params an [`OpKind`] takes but not their defaults, types or
 //! input arity, so this static table carries that metadata for `Texture.Ops()` —
 //! the agent asks the engine what it supports instead of trusting docs that can lag.
+//! The arity is also the runner's: a node wired with fewer or more inputs than its
+//! op's [`Arity`] is refused before anything evaluates (#1485).
 //! `catalog_tests.rs` keeps it honest against the enum: every variant has an entry,
 //! every entry's params are exactly the variant's serde fields, and every default
 //! here is the one serde fills in.
+
+use super::arity::{arity, Arity, ONE, SOURCE};
 
 /// A param's literal default value, as the agent would write it in a recipe.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -28,14 +32,13 @@ pub struct OpParam {
     pub default: Option<Lit>,
 }
 
-/// One op: its `op` tag, menu category, how many inputs it consumes at most (`mix`'s
-/// third, the mask, is optional), and its params.
+/// One op: its `op` tag, menu category, the inputs it accepts, and its params.
 #[derive(Clone, Copy, Debug)]
 pub struct OpInfo {
     pub op: &'static str,
     /// `generator` | `color` | `vector` | `math` | `filter`.
     pub category: &'static str,
-    pub inputs: u8,
+    pub inputs: Arity,
     pub params: &'static [OpParam],
 }
 
@@ -69,7 +72,7 @@ const fn choice(name: &'static str, values: &'static [&'static str]) -> OpParam 
 const fn op(
     op: &'static str,
     category: &'static str,
-    inputs: u8,
+    inputs: Arity,
     params: &'static [OpParam],
 ) -> OpInfo {
     OpInfo {
@@ -95,11 +98,11 @@ const MATH: &[&str] = &[
 
 /// Every op, in the order `docs/api/Texture.md` lists them.
 pub const OPS: &[OpInfo] = &[
-    op("constant", "generator", 0, &[req("color", "color")]),
+    op("constant", "generator", SOURCE, &[req("color", "color")]),
     op(
         "noise",
         "generator",
-        0,
+        SOURCE,
         &[
             choice("kind", &["perlin", "fbm", "ridged", "turbulence"]),
             req("scale", "number"),
@@ -111,7 +114,7 @@ pub const OPS: &[OpInfo] = &[
     op(
         "voronoi",
         "generator",
-        0,
+        SOURCE,
         &[
             req("scale", "number"),
             OpParam {
@@ -124,13 +127,13 @@ pub const OPS: &[OpInfo] = &[
     op(
         "gradient",
         "generator",
-        0,
+        SOURCE,
         &[choice("kind", &["linear", "linear_tiling", "radial"])],
     ),
     op(
         "wave",
         "generator",
-        0,
+        SOURCE,
         &[
             choice("kind", &["bands", "rings"]),
             req("frequency", "number"),
@@ -139,7 +142,7 @@ pub const OPS: &[OpInfo] = &[
     op(
         "brick",
         "generator",
-        0,
+        SOURCE,
         &[
             req("rows", "number"),
             req("cols", "number"),
@@ -153,7 +156,7 @@ pub const OPS: &[OpInfo] = &[
     op(
         "shape",
         "generator",
-        0,
+        SOURCE,
         &[
             choice("kind", &["circle", "rect", "rounded_rect", "line"]),
             req("size", "vec2"),
@@ -164,46 +167,46 @@ pub const OPS: &[OpInfo] = &[
     op(
         "checker",
         "generator",
-        0,
+        SOURCE,
         &[
             req("tiles", "integer"),
             req("color_a", "color"),
             req("color_b", "color"),
         ],
     ),
-    op("white_noise", "generator", 0, &[]),
-    op("color_ramp", "color", 1, &[req("stops", "stops")]),
+    op("white_noise", "generator", SOURCE, &[]),
+    op("color_ramp", "color", ONE, &[req("stops", "stops")]),
     op(
         "mix",
         "color",
-        3,
+        arity(2, 3),
         &[
             choice("mode", BLEND),
             opt("factor", "number", Lit::Number(1.0)),
         ],
     ),
-    op("invert", "color", 1, &[]),
+    op("invert", "color", ONE, &[]),
     op(
         "bright_contrast",
         "color",
-        1,
+        ONE,
         &[req("bright", "number"), req("contrast", "number")],
     ),
     op(
         "hue_sat_value",
         "color",
-        1,
+        ONE,
         &[
             req("hue", "number"),
             req("sat", "number"),
             req("value", "number"),
         ],
     ),
-    op("gamma", "color", 1, &[req("gamma", "number")]),
+    op("gamma", "color", ONE, &[req("gamma", "number")]),
     op(
         "mapping",
         "vector",
-        1,
+        ONE,
         &[
             req("scale", "vec2"),
             req("rotation", "number"),
@@ -211,13 +214,18 @@ pub const OPS: &[OpInfo] = &[
             opt("tiling", "bool", Lit::Bool(true)),
         ],
     ),
-    op("bump_to_normal", "vector", 1, &[req("strength", "number")]),
-    op("combine_rgb", "vector", 3, &[]),
-    op("separate_rgb", "vector", 1, &[req("channel", "integer")]),
+    op(
+        "bump_to_normal",
+        "vector",
+        ONE,
+        &[req("strength", "number")],
+    ),
+    op("combine_rgb", "vector", arity(1, 3), &[]),
+    op("separate_rgb", "vector", ONE, &[req("channel", "integer")]),
     op(
         "tile",
         "vector",
-        1,
+        ONE,
         &[
             req("count", "number"),
             opt("jitter", "number", Lit::Number(0.0)),
@@ -225,17 +233,17 @@ pub const OPS: &[OpInfo] = &[
             opt("scale_jitter", "number", Lit::Number(0.0)),
         ],
     ),
-    op("warp", "vector", 2, &[req("strength", "number")]),
+    op("warp", "vector", arity(2, 2), &[req("strength", "number")]),
     op(
         "math",
         "math",
-        1,
+        ONE,
         &[choice("func", MATH), req("value", "number")],
     ),
     op(
         "map_range",
         "math",
-        1,
+        ONE,
         &[
             req("from_min", "number"),
             req("from_max", "number"),
@@ -246,16 +254,16 @@ pub const OPS: &[OpInfo] = &[
     op(
         "clamp",
         "math",
-        1,
+        ONE,
         &[req("min", "number"), req("max", "number")],
     ),
-    op("rgb_to_bw", "math", 1, &[]),
-    op("blur", "filter", 1, &[req("radius", "number")]),
-    op("cavity", "filter", 1, &[req("radius", "number")]),
+    op("rgb_to_bw", "math", ONE, &[]),
+    op("blur", "filter", ONE, &[req("radius", "number")]),
+    op("cavity", "filter", ONE, &[req("radius", "number")]),
     op(
         "curvature",
         "filter",
-        1,
+        ONE,
         &[
             req("radius", "number"),
             opt("strength", "number", Lit::Number(1.0)),

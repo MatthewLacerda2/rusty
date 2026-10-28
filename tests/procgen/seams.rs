@@ -3,7 +3,10 @@
 //! biggest jump between two neighbouring pixels inside the tile. Params deliberately
 //! include fractional counts, the values that used to open a seam.
 
-use rusty::procgen::recipe::{GradientKind, Node, NoiseKind, OpKind};
+use rusty::procgen::recipe::{
+    Brick, Cavity, Curvature, Gradient, GradientKind, Mapping, Node, Noise, NoiseKind, OpKind,
+    Voronoi, Wave,
+};
 use rusty::procgen::recipe::{NoiseKind::*, VoronoiOutput::*, WaveKind};
 use rusty::procgen::Image;
 
@@ -56,33 +59,36 @@ fn generators() -> Vec<(String, OpKind)> {
         for kind in [Perlin, Fbm, Ridged, Turbulence] {
             ops.push((
                 format!("noise {kind:?} {s}"),
-                OpKind::Noise {
+                OpKind::Noise(Noise {
                     kind,
                     scale: s,
                     octaves: 3,
                     lacunarity: s,
                     gain: 0.5,
-                },
+                }),
             ));
         }
         for output in [Distance, F2, Edges] {
             let randomness = s / 8.0;
-            let op = OpKind::Voronoi {
+            let op = OpKind::Voronoi(Voronoi {
                 scale: s,
                 output,
                 randomness,
-            };
+            });
             ops.push((format!("voronoi {output:?} {s}"), op));
         }
         for kind in [WaveKind::Bands, WaveKind::Rings] {
             ops.push((
                 format!("wave {kind:?} {s}"),
-                OpKind::Wave { kind, frequency: s },
+                OpKind::Wave(Wave { kind, frequency: s }),
             ));
         }
     }
     for kind in [GradientKind::Radial, GradientKind::LinearTiling] {
-        ops.push((format!("gradient {kind:?}"), OpKind::Gradient { kind }));
+        ops.push((
+            format!("gradient {kind:?}"),
+            OpKind::Gradient(Gradient { kind }),
+        ));
     }
     ops
 }
@@ -97,19 +103,19 @@ fn every_generator_bakes_without_a_seam() {
 #[test]
 fn mapping_keeps_a_seamless_input_seamless() {
     for (scale, rotation) in [([1.5, 2.3], 0.0), ([1.0, 1.0], 0.1), ([2.0, 0.7], 0.3)] {
-        let src = OpKind::Noise {
+        let src = OpKind::Noise(Noise {
             kind: NoiseKind::Perlin,
             scale: 3.0,
             octaves: 1,
             lacunarity: 2.0,
             gain: 0.5,
-        };
-        let map = OpKind::Mapping {
+        });
+        let map = OpKind::Mapping(Mapping {
             scale,
             rotation,
             translation: [0.13, 0.4],
             tiling: true,
-        };
+        });
         let img = bake(vec![node("n", src, &[]), node("m", map, &["n"])]);
         assert_seamless(&format!("mapping {scale:?} {rotation}"), &img);
     }
@@ -117,17 +123,17 @@ fn mapping_keeps_a_seamless_input_seamless() {
 
 #[test]
 fn height_ops_keep_a_seamless_height_seamless() {
-    let height = OpKind::Brick {
+    let height = OpKind::Brick(Brick {
         rows: 6.0,
         cols: 3.0,
         mortar: 0.08,
         output: rusty::procgen::recipe::BrickOutput::Mask,
-    };
-    let curvature = OpKind::Curvature {
+    });
+    let curvature = OpKind::Curvature(Curvature {
         radius: 0.03,
         strength: 2.0,
-    };
-    for op in [OpKind::Cavity { radius: 0.05 }, curvature] {
+    });
+    for op in [OpKind::Cavity(Cavity { radius: 0.05 }), curvature] {
         let label = format!("{op:?}");
         let img = bake(vec![node("h", height.clone(), &[]), node("m", op, &["h"])]);
         assert_seamless(&label, &img);

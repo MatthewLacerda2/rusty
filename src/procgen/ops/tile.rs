@@ -9,6 +9,7 @@
 
 use super::super::hash;
 use super::super::image_buf::{Image, Rgba};
+use super::super::recipe::Tile;
 use super::generators::count;
 
 /// The hash channels a cell's offset x/y, rotation and scale draw from (clear of
@@ -26,6 +27,11 @@ pub struct Jitter {
 }
 
 impl Jitter {
+    /// The `tile` op's three jitter params.
+    pub fn of(p: &Tile) -> Self {
+        Self::new(p.jitter, p.rotation_jitter, p.scale_jitter)
+    }
+
     pub fn new(offset: f32, rotation: f32, scale: f32) -> Self {
         Self {
             offset: offset.clamp(0.0, 1.0),

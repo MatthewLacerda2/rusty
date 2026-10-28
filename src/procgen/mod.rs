@@ -50,7 +50,7 @@ pub fn bake_recipe(recipe: &TextureRecipe, slot: Slot, path: &str) -> Result<Str
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::procgen::recipe::{Node, OpKind};
+    use crate::procgen::recipe::{Checker, Node, Noise, OpKind};
 
     /// A simple checker recipe used by several spine-level tests.
     fn checker_recipe(resolution: u32, seed: u64) -> TextureRecipe {
@@ -58,11 +58,11 @@ mod tests {
             resolution,
             vec![Node {
                 id: "c".into(),
-                op: OpKind::Checker {
+                op: OpKind::Checker(Checker {
                     tiles: 4,
                     color_a: [0.0, 0.0, 0.0, 1.0],
                     color_b: [1.0, 1.0, 1.0, 1.0],
-                },
+                }),
                 inputs: vec![],
             }],
         )
@@ -78,13 +78,13 @@ mod tests {
             64,
             vec![Node {
                 id: "n".into(),
-                op: OpKind::Noise {
+                op: OpKind::Noise(Noise {
                     kind: recipe::NoiseKind::Fbm,
                     scale: 8.0,
                     octaves: 4,
                     lacunarity: 2.0,
                     gain: 0.5,
-                },
+                }),
                 inputs: vec![],
             }],
         )

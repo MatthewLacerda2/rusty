@@ -4,7 +4,7 @@
 
 use crate::temp::path as tmp;
 use rusty::procgen::bake::{encode, Slot};
-use rusty::procgen::recipe::{Node, NoiseKind, OpKind, TextureRecipe};
+use rusty::procgen::recipe::{Constant, Node, Noise, NoiseKind, OpKind, TextureRecipe};
 use rusty::procgen::{bake_recipe, evaluate};
 
 fn noise_recipe(resolution: u32, seed: u64) -> TextureRecipe {
@@ -12,13 +12,13 @@ fn noise_recipe(resolution: u32, seed: u64) -> TextureRecipe {
         resolution,
         vec![Node {
             id: "n".into(),
-            op: OpKind::Noise {
+            op: OpKind::Noise(Noise {
                 kind: NoiseKind::Perlin,
                 scale: 8.0,
                 octaves: 1,
                 lacunarity: 2.0,
                 gain: 0.5,
-            },
+            }),
             inputs: vec![],
         }],
     )
@@ -87,9 +87,9 @@ fn metallic_roughness_packs_metallic_b_roughness_g() {
         4,
         vec![Node {
             id: "c".into(),
-            op: OpKind::Constant {
+            op: OpKind::Constant(Constant {
                 color: [1.0, 0.5, 0.0, 1.0], // R=metallic=1, G=roughness=0.5
-            },
+            }),
             inputs: vec![],
         }],
     );

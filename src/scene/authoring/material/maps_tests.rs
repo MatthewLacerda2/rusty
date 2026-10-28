@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use super::*;
 use crate::asset::MapRef;
 use crate::core::paths::to_slash;
-use crate::procgen::recipe::{Node, OpKind};
+use crate::procgen::recipe::{Checker, Node, OpKind};
 use crate::procgen::TextureRecipe;
 
 /// A checker recipe with named `outputs` (slot → the one node, `c`).
@@ -14,11 +14,11 @@ fn recipe(resolution: u32, slots: &[&str]) -> TextureRecipe {
         resolution,
         vec![Node {
             id: "c".into(),
-            op: OpKind::Checker {
+            op: OpKind::Checker(Checker {
                 tiles: 2,
                 color_a: [0.0, 0.0, 0.0, 1.0],
                 color_b: [1.0, 1.0, 1.0, 1.0],
-            },
+            }),
             inputs: vec![],
         }],
     );

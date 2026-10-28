@@ -8,11 +8,11 @@ fn sample_recipe() -> TextureRecipe {
         vec![
             Node {
                 id: "n0".into(),
-                op: OpKind::Checker {
+                op: OpKind::Checker(Checker {
                     tiles: 4,
                     color_a: [0.0, 0.0, 0.0, 1.0],
                     color_b: [1.0, 1.0, 1.0, 1.0],
-                },
+                }),
                 inputs: vec![],
             },
             Node {
@@ -37,7 +37,7 @@ fn voronoi_output_defaults_to_distance_when_absent() {
     let json = r#"{ "id": "v", "op": "voronoi", "scale": 8.0 }"#;
     let node: Node = serde_json::from_str(json).expect("parse");
     match node.op {
-        OpKind::Voronoi { output, .. } => assert_eq!(output, VoronoiOutput::Distance),
+        OpKind::Voronoi(Voronoi { output, .. }) => assert_eq!(output, VoronoiOutput::Distance),
         other => panic!("wrong op: {other:?}"),
     }
 }

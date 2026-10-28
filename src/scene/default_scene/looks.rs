@@ -8,7 +8,7 @@
 
 use std::collections::BTreeMap;
 
-use crate::procgen::recipe::{Node, OpKind};
+use crate::procgen::recipe::{Checker, Node, OpKind};
 use crate::procgen::TextureRecipe;
 use crate::scene::authoring::material::{self as mat, MaterialLibrary};
 use crate::scene::{MaterialAsset, RenderMode};
@@ -39,11 +39,11 @@ pub const SHADER_NAME: &str = "default_rim";
 pub fn checker_recipe() -> TextureRecipe {
     let checker = Node {
         id: "checker".into(),
-        op: OpKind::Checker {
+        op: OpKind::Checker(Checker {
             tiles: 16,
             color_a: [0.82, 0.82, 0.82, 1.0],
             color_b: [0.48, 0.48, 0.48, 1.0],
-        },
+        }),
         inputs: vec![],
     };
     let mut recipe = TextureRecipe::new(512, vec![checker]);
