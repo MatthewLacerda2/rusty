@@ -36,6 +36,7 @@ fn a_nil_id_reads_as_a_missing_entity() {
         eval("return Light.GetIntensity(99999)")
     );
     assert_eq!(eval("return Scene.IsActive(nil)"), "false");
+    assert_eq!(eval("return Scene.IsStatic(nil)"), "false");
 }
 
 #[test]
@@ -44,6 +45,7 @@ fn a_nil_id_on_a_write_is_an_error_naming_the_verb() {
     let err = |line: &str| game.script_manager().eval(line).expect_err("raises");
     for (line, verb) in [
         ("Scene.SetActive(nil, true)", "Scene.SetActive"),
+        ("Scene.SetStatic(nil, true)", "Scene.SetStatic"),
         (
             "Transform.SetPosition(nil, 1, 2, 3)",
             "Transform.SetPosition",

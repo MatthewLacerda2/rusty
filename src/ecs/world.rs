@@ -43,6 +43,8 @@ pub struct World {
     pub(super) bounds: BoundsQueue,
     /// Every entity's `activeInHierarchy`, kept (`ecs::activity`).
     pub(super) activity: ActivityStore,
+    /// Bumped whenever the set of static entities may have changed (`World::static_revision`).
+    pub(super) static_revision: u64,
 }
 
 impl Default for World {
@@ -62,6 +64,7 @@ impl World {
             world_space: WorldStore::default(),
             bounds: BoundsQueue::default(),
             activity: ActivityStore::default(),
+            static_revision: 0,
         }
     }
 
@@ -110,6 +113,7 @@ impl World {
     /// Drop the rows of `ids`, whose references `World::despawn_all` cleared first.
     pub(super) fn remove_rows(&mut self, ids: &std::collections::BTreeSet<u32>) {
         for &id in ids {
+            self.static_revision += u64::from(self.is_static(id));
             self.world_space.forget(id);
             if let Some(handle) = self.handles.remove(id) {
                 let _ = self.inner.despawn(handle);
@@ -255,14 +259,13 @@ impl World {
         Some(f(a, b))
     }
 
-    /// Spawn a brand-new hecs entity carrying every column of `entity` at
-    /// once — a single archetype placement via `EntityBuilder`, instead of N
-    /// sequential `insert_one` calls that would each re-migrate the entity
-    /// through its own archetype (O(k) placement, not O(k²) migration).
+    /// Spawn a hecs entity carrying every column of `entity` in one archetype placement
+    /// (`EntityBuilder`, O(k)), not N `insert_one` re-migrations (O(k²)).
     fn place(&mut self, entity: Entity) {
         let id = entity.id;
         let seq = self.next_seq;
         self.next_seq += 1;
+        self.static_revision += u64::from(entity.is_static);
         let mut builder = build_bundle(entity, seq);
         let handle = self.inner.spawn(builder.build());
         self.handles.insert(id, handle);
@@ -270,11 +273,9 @@ impl World {
         self.moved(id); // a carried document (a re-rooted load survivor) brings a stale box
     }
 
-    /// Decompose an `Entity` document and overwrite a LIVE entity's whole
-    /// column set with it in one placement (despawn + respawn under the same
-    /// stable id) — `replace_entity`'s bridge. Despawning first guarantees no
-    /// column absent from the new document survives stale. Returns `false`
-    /// when the entity does not exist.
+    /// Overwrite a LIVE entity's whole column set with an `Entity` document in one
+    /// placement (despawn + respawn under the same id, so no absent column survives
+    /// stale) — `replace_entity`'s bridge. `false` when the entity does not exist.
     pub(in crate::ecs) fn overwrite(&mut self, entity: Entity) -> bool {
         let id = entity.id;
         let Some(old_handle) = self.handles.get(id) else {
@@ -293,6 +294,7 @@ impl World {
         self.handles.insert(id, new_handle);
         self.moved(id);
         self.invalidate_caches(); // its transform, parent and flag may all differ
+        self.static_revision += 1;
         true
     }
 }

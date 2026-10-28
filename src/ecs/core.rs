@@ -71,6 +71,12 @@ impl World {
         if std::mem::replace(&mut core.active, active) != active {
             drop(core);
             self.activity.invalidate_all();
+            // The shadow sweeps skip inactive entities, so a static one going dark or
+            // lit changes the static caster set. A toggle with no static in its subtree
+            // (a muzzle flash, a pickup) leaves the static bakes alone.
+            if self.self_and_descendants(id).any(|e| self.is_static(e)) {
+                self.static_revision += 1;
+            }
         }
         true
     }
@@ -79,10 +85,26 @@ impl World {
         self.component::<Core>(id).is_some_and(|c| c.is_static)
     }
 
+    /// Unity's `GameObject.isStatic`, but live: physics, the shadow sweeps and probe
+    /// lighting read it every frame. A change bumps [`World::static_revision`].
     pub fn set_static(&mut self, id: u32, is_static: bool) -> bool {
-        self.component_mut::<Core>(id)
-            .map(|mut c| c.is_static = is_static)
-            .is_some()
+        let Some(mut core) = self.component_mut::<Core>(id) else {
+            return false;
+        };
+        if std::mem::replace(&mut core.is_static, is_static) != is_static {
+            drop(core);
+            self.static_revision += 1;
+        }
+        true
+    }
+
+    /// Moves whenever the set of static entities may have changed: a flag flipped, a
+    /// static entity (or an ancestor of one) activated or deactivated, a static entity
+    /// placed or removed, a row overwritten, the World cleared. Whoever
+    /// made the change (the inspector, a script in Play, a load), a cache of static
+    /// geometry keyed on it (the renderer's static shadow bakes) goes stale (#1496).
+    pub fn static_revision(&self) -> u64 {
+        self.static_revision
     }
 
     /// The entity's layer index (`0`, the default layer, for a dead id).

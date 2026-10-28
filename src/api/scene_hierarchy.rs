@@ -1,10 +1,11 @@
-//! src/api/scene_hierarchy.rs — the `Scene` namespace's hierarchy reads (#422).
+//! src/api/scene_hierarchy.rs — the `Scene` namespace's hierarchy reads (#422) and an
+//! entity's own flags (active, static).
 //!
 //! Registered onto the SAME `Scene` table as `api::scene`. Unity's `transform.parent`,
 //! `transform.GetChild` / `childCount`, `transform.Find` and `GetComponent<T>()` for
 //! script components — what a widget script needs to reach its own parts (a
 //! slider's handle, a toggle's checkmark) without storing ids that a prefab stamp
-//! would invalidate:
+//! would invalidate — and the GameObject's `SetActive` and Static flags:
 //!
 //!   - `GetParent(id)` — the parent's id, or `nil`.
 //!   - `GetChildren(id)` — the child ids in hierarchy order (an empty array for none).
@@ -16,13 +17,17 @@
 //!     ancestor are active, the rule every system follows (#1363). A pooled
 //!     object comes back with `SetActive(id, true)`; `Deactivate` is the old
 //!     one-way soft delete.
+//!   - `SetStatic(id, bool)` / `IsStatic(id)` — the inspector's Static checkbox
+//!     (`World::set_static`, #1496). Live, unlike Unity's editor-only `isStatic`:
+//!     physics, the static shadow bake and probe lighting follow it next frame; the
+//!     navmesh and lightmap at their next bake.
 //!   - `GetScript(id, name)` — entity `id`'s live script instance named `name` (the
 //!     file stem, `"button"`), the very table its callbacks run on; `nil` outside
 //!     play or when it has none.
 //!
 //! A `nil` id (a failed `FindEntityByName`) reads as a missing entity, as every
 //! read's does (`api::entity_arg`): `GetParent`, `FindChild` and `GetScript` answer
-//! `nil`, `GetChildren` an empty array and `IsActive` `false`.
+//! `nil`, `GetChildren` an empty array and `IsActive` / `IsStatic` `false`.
 
 use std::cell::RefCell;
 
@@ -71,6 +76,14 @@ pub fn register<'scope>(
         Ok(scene.borrow().world.is_active_in_hierarchy(id.read()))
     });
     put(table, "IsActiveInHierarchy", f)?;
+    let f = scope.create_function(move |_, (id, on): (EntityArg, bool)| {
+        let id = id.live("Scene", "SetStatic")?;
+        Ok(scene.borrow_mut().world.set_static(id, on))
+    });
+    put(table, "SetStatic", f)?;
+    let f = scope
+        .create_function(move |_, id: EntityArg| Ok(scene.borrow().world.is_static(id.read())));
+    put(table, "IsStatic", f)?;
     let f = scope.create_function(|lua, (id, name): (EntityArg, String)| {
         instances::find(lua, id.read(), &name)
     });

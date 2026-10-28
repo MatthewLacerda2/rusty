@@ -22,7 +22,7 @@ mod uniform;
 use crate::render::gpu::pipelines::surface::SurfaceShaders;
 use crate::render::gpu::pipelines::LazyPipeline;
 use crate::render::CameraUniform;
-use crate::scene::SceneId;
+use crate::scene::{Scene, SceneId};
 use atlas::ShadowAtlas;
 use cascades::{Cascade, MAX_CASCADES};
 use casters::CasterBuffer;
@@ -58,14 +58,14 @@ pub struct ShadowRenderer {
     /// This frame's cascades, fitted to the camera by [`Self::update_cascades`].
     pub(crate) cascades: Vec<Cascade>,
 
-    /// Per cascade: which scene's static casters are baked into that layer, and under
-    /// which light volume — `None` when it holds nothing usable (#355).
+    /// Per cascade: which scene's statics are baked into that layer ([`StaticsKey`]),
+    /// and under which light volume — `None` when it holds nothing usable (#355).
     ///
     /// Naming the scene keeps two scenes rendered in one frame (the editor viewport
     /// and the Inspector preview) from sampling each other's statics; naming the
     /// light volume re-bakes a cascade exactly when it moved (the camera crossed its
     /// snap grid, or the sun turned) and never otherwise.
-    static_cache: [Option<(SceneId, Mat4)>; MAX_CASCADES],
+    static_cache: [Option<(StaticsKey, Mat4)>; MAX_CASCADES],
 
     global_bind_group: wgpu::BindGroup,
     global_layout: wgpu::BindGroupLayout,
@@ -83,6 +83,17 @@ pub struct ShadowRenderer {
     pub(crate) instancing: bool,
     /// The point and spot lights' shadow atlas (#468).
     pub(crate) atlas: ShadowAtlas,
+}
+
+/// Which scene's static casters a bake holds, and at which of its
+/// [`World::static_revision`](crate::ecs::World::static_revision)s: a Static flag
+/// flipped, or a static entity spawned or despawned, re-bakes them on the next frame
+/// whoever made the change — the inspector, a script in Play, a load (#1496).
+pub(crate) type StaticsKey = (SceneId, u64);
+
+/// `scene`'s [`StaticsKey`] now.
+pub(crate) fn statics_key(scene: &Scene) -> StaticsKey {
+    (scene.id(), scene.world.static_revision())
 }
 
 impl ShadowRenderer {
@@ -188,14 +199,16 @@ impl ShadowRenderer {
         [plain, clipped]
     }
 
-    /// Whether some cascade's static bake is not `scene`'s: it holds another scene's
-    /// statics, or nothing at all.
+    /// Whether some cascade's static bake is not `scene`'s as it stands: it holds
+    /// another scene's statics, an older [`StaticsKey`] revision of this one's, or
+    /// nothing at all.
     #[cfg(test)]
-    pub fn needs_static_bake(&self, scene: SceneId) -> bool {
+    pub fn needs_static_bake(&self, scene: &Scene) -> bool {
+        let key = statics_key(scene);
         let count = self.cascades.len().max(1);
         self.static_cache[..count]
             .iter()
-            .any(|baked| baked.map(|(s, _)| s) != Some(scene))
+            .any(|baked| baked.map(|(k, _)| k) != Some(key))
     }
 
     /// Drop every static bake — the cascades' and the atlas tiles' (#694) — so the

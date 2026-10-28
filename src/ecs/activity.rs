@@ -128,9 +128,11 @@ impl World {
         self.activity.invalidate_all();
     }
 
-    /// Every cached world matrix and activity answer forgotten (a `clear`).
-    pub(in crate::ecs) fn reset_caches(&self) {
+    /// Every cached world matrix and activity answer forgotten (a `clear`), and every
+    /// static-geometry cache outside the World told so (`World::static_revision`).
+    pub(in crate::ecs) fn reset_caches(&mut self) {
         self.world_space.reset();
         self.activity.reset();
+        self.static_revision += 1;
     }
 }
