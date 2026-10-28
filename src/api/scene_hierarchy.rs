@@ -16,13 +16,16 @@
 //!     ancestor are active, the rule every system follows (#1363). A pooled
 //!     object comes back with `SetActive(id, true)`; `Deactivate` is the old
 //!     one-way soft delete.
+//!   - `SetStatic(id, bool)` / `IsStatic(id)` — Unity's `GameObject.isStatic`: the
+//!     inspector's Static checkbox (`World::set_static`), what the navmesh and the
+//!     lightmap bakes read as level geometry (#1496).
 //!   - `GetScript(id, name)` — entity `id`'s live script instance named `name` (the
 //!     file stem, `"button"`), the very table its callbacks run on; `nil` outside
 //!     play or when it has none.
 //!
 //! A `nil` id (a failed `FindEntityByName`) reads as a missing entity, as every
 //! read's does (`api::entity_arg`): `GetParent`, `FindChild` and `GetScript` answer
-//! `nil`, `GetChildren` an empty array and `IsActive` `false`.
+//! `nil`, `GetChildren` an empty array and `IsActive` / `IsStatic` `false`.
 
 use std::cell::RefCell;
 
@@ -71,6 +74,14 @@ pub fn register<'scope>(
         Ok(scene.borrow().world.is_active_in_hierarchy(id.read()))
     });
     put(table, "IsActiveInHierarchy", f)?;
+    let f = scope.create_function(move |_, (id, on): (EntityArg, bool)| {
+        let id = id.live("Scene", "SetStatic")?;
+        Ok(scene.borrow_mut().world.set_static(id, on))
+    });
+    put(table, "SetStatic", f)?;
+    let f = scope
+        .create_function(move |_, id: EntityArg| Ok(scene.borrow().world.is_static(id.read())));
+    put(table, "IsStatic", f)?;
     let f = scope.create_function(|lua, (id, name): (EntityArg, String)| {
         instances::find(lua, id.read(), &name)
     });
