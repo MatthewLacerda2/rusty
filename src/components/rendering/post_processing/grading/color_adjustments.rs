@@ -1,7 +1,6 @@
 //! Color Adjustments, Unity URP's override of that name: contrast, saturation and
-//! the hue shift (#1440). The renderer bakes them into the view's grading LUT: the
-//! hue shift on the scene-linear colour before the tonemap, contrast and saturation
-//! on the tonemapped one.
+//! the hue shift (#1440). The renderer bakes them into the view's grading LUT, all on
+//! the scene-linear colour before the tonemap, as URP does (#1479).
 
 use serde::{Deserialize, Serialize};
 
@@ -9,7 +8,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct ColorAdjustments {
-    /// Spreads the tonemapped colour away from mid grey (`> 1`) or towards it.
+    /// Spreads the colour away from mid grey (`> 1`) or towards it, in log space.
     pub contrast: f32,
     /// `0` is greyscale, `1` neutral, above `1` more saturated.
     pub saturation: f32,

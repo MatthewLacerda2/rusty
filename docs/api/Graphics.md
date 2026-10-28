@@ -322,10 +322,10 @@ towards yellow or cools towards blue, tint pushes towards magenta or green),
 **Lift / Gamma / Gain** (three trackballs moving the blacks, the midtones and the
 whites: the colour's hue tints that range, a grey colour tints nothing, and the
 offset brightens or darkens it), a **hue shift** rotating every hue, and contrast
-and saturation. Exposure stays a plain HDR scale ahead of all of it. White balance,
-Lift / Gamma / Gain and the hue shift act on the scene's linear HDR colour, before
-the tonemap; contrast, saturation and the display gamma act on the tonemapped
-colour. The renderer bakes the whole grade and the tonemap into a 32³ lookup table
+and saturation. Exposure stays a plain HDR scale ahead of all of it. Everything but
+the display gamma acts on the scene's linear HDR colour, before the tonemap, in
+URP's order: white balance, contrast, Lift / Gamma / Gain, the hue shift,
+saturation; the display gamma acts on the tonemapped colour. The renderer bakes the whole grade and the tonemap into a 32³ lookup table
 per view and grades each pixel with one fetch from it; the table is rebaked only on
 a frame where one of those knobs or the tonemap changed, which `Debug.Stats()`
 counts as `grade_lut_bakes`. Each view grades with its base camera's volume, like
@@ -347,8 +347,11 @@ The offsets tween: `Graphics.lift_gamma_gain.lift.offset`, `Graphics.lift_gamma_
 <!-- effect: color_adjustments -->
 #### Color adjustments
 
-Contrast and saturation (neutral `1`) on the tonemapped colour, and the hue shift
-(`-180`–`180` degrees, neutral `0`) before the tonemap: Unity's *Color Adjustments*.
+Contrast and saturation (neutral `1`) and the hue shift (`-180`–`180` degrees,
+neutral `0`), all before the tonemap: Unity's *Color Adjustments*. Contrast works as
+URP's does, in log (LogC) space around mid-grey, so a moderate boost (`1.1`–`1.2`)
+deepens the shadows without clipping dark surfaces to black, and contrast below `1`
+flattens towards mid-grey rather than washing black out to a light grey.
 Tween paths: `Graphics.color_adjustments.contrast`, `Graphics.color_adjustments.saturation`, `Graphics.color_adjustments.hue_shift`.
 
 <!-- effect: tonemapping -->

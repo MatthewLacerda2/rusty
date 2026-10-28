@@ -1,10 +1,11 @@
-//! The grading LUT's GPU tests (`knobs`, `clamp`, #1440; `lookup`, #1441) and what they
-//! share with the exposure meter's (#1444): the post-FX chain alone, fed a synthetic HDR
-//! row. The scene target is written
+//! The grading LUT's GPU tests (`knobs`, `clamp`, #1440; `lookup`, #1441; `contrast`,
+//! #1479) and what they share with the exposure meter's (#1444): the post-FX chain
+//! alone, fed a synthetic HDR row. The scene target is written
 //! directly, so a test chooses the exact HDR colour each pixel's grade starts from,
 //! and reads the display colour the composite wrote.
 
 mod clamp;
+mod contrast;
 mod knobs;
 mod lookup;
 
