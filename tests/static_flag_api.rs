@@ -55,6 +55,11 @@ fn set_static_writes_the_flag_the_inspector_writes() {
         "true"
     );
     assert!(!scene.borrow().world.is_static(id));
+    assert_ne!(
+        revision(),
+        flipped,
+        "true -> false stales them too (a ghost shadow)"
+    );
     assert_eq!(eval("return Scene.SetStatic(99999, true)"), "false");
     assert_eq!(eval("return Scene.IsStatic(99999)"), "false");
 }

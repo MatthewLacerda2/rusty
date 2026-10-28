@@ -73,11 +73,11 @@ fn gpu_two_views_two_scenes_never_clobber_each_other() {
     renderer.render(&mut wide, &scene_a, &cam, &out_a, false);
     assert_eq!(renderer.material_group_count(), 1);
     assert!(
-        !renderer.shadow_renderer.needs_static_bake(scene_a.id()),
+        !renderer.shadow_renderer.needs_static_bake(&scene_a),
         "scene A's statics are baked after its render"
     );
     assert!(
-        renderer.shadow_renderer.needs_static_bake(scene_b.id()),
+        renderer.shadow_renderer.needs_static_bake(&scene_b),
         "but scene B must bake its own rather than inherit A's"
     );
 
@@ -96,8 +96,8 @@ fn gpu_two_views_two_scenes_never_clobber_each_other() {
     );
 
     // Static shadows: the map now holds B's statics, so A must re-bake.
-    assert!(!renderer.shadow_renderer.needs_static_bake(scene_b.id()));
-    assert!(renderer.shadow_renderer.needs_static_bake(scene_a.id()));
+    assert!(!renderer.shadow_renderer.needs_static_bake(&scene_b));
+    assert!(renderer.shadow_renderer.needs_static_bake(&scene_a));
 
     // A second frame settles rather than thrashing: same sizes, same slot count.
     let out_a = wide.color_target_view().unwrap();

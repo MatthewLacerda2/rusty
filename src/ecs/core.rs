@@ -71,6 +71,12 @@ impl World {
         if std::mem::replace(&mut core.active, active) != active {
             drop(core);
             self.activity.invalidate_all();
+            // The shadow sweeps skip inactive entities, so a static one going dark or
+            // lit changes the static caster set. A toggle with no static in its subtree
+            // (a muzzle flash, a pickup) leaves the static bakes alone.
+            if self.self_and_descendants(id).any(|e| self.is_static(e)) {
+                self.static_revision += 1;
+            }
         }
         true
     }
@@ -93,7 +99,8 @@ impl World {
     }
 
     /// Moves whenever the set of static entities may have changed: a flag flipped, a
-    /// static entity placed or removed, a row overwritten, the World cleared. Whoever
+    /// static entity (or an ancestor of one) activated or deactivated, a static entity
+    /// placed or removed, a row overwritten, the World cleared. Whoever
     /// made the change (the inspector, a script in Play, a load), a cache of static
     /// geometry keyed on it (the renderer's static shadow bakes) goes stale (#1496).
     pub fn static_revision(&self) -> u64 {
