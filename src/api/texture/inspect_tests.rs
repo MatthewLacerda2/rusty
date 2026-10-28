@@ -26,7 +26,8 @@ fn channel(stats: &Table, node: &str, field: &str, c: usize) -> f32 {
 
 #[test]
 fn a_constant_is_its_colour_with_no_spread() {
-    let stats: Table = lua()
+    let lua = lua();
+    let stats: Table = lua
         .load(format!("return Texture.Stats({RECIPE}, 32)"))
         .eval()
         .unwrap();
@@ -40,7 +41,8 @@ fn a_constant_is_its_colour_with_no_spread() {
 
 #[test]
 fn a_four_octave_fbm_sits_in_the_middle_third() {
-    let stats: Table = lua()
+    let lua = lua();
+    let stats: Table = lua
         .load(format!("return Texture.Stats({RECIPE}, 256)"))
         .eval()
         .unwrap();
