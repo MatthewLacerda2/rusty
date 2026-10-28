@@ -6,8 +6,6 @@
 
 pub mod bottom_panel;
 pub mod build_settings;
-mod content_browser;
-mod content_grid;
 #[cfg(feature = "dev")]
 mod dev_state;
 pub mod header;
@@ -51,14 +49,10 @@ pub struct EditorUi {
     /// File ▸ Open/New, saving to a scene asset, `Scene.Load` and `Scene.Save(path)`
     /// all change it, and nothing reconciles two copies.
     scene_path: Rc<RefCell<Option<String>>>,
-    pub current_dir: String,
     pub is_dirty: bool,
 
     // Custom asset inspector properties
     pub asset_script_content: String,
-    pub active_bottom_tab: String,
-    /// Content-browser name filter (the search bar above the tile grid).
-    pub asset_search: String,
 
     /// Whether the About dialog (File-bar → About) is currently open.
     pub show_about: bool,
@@ -138,12 +132,9 @@ impl EditorUi {
             selected_entity_id: None,
             selected_asset_path: None,
             scene_path,
-            current_dir: crate::editor::content_browser::ROOT.to_string(),
             is_dirty: true,
 
             asset_script_content: String::new(),
-            active_bottom_tab: "assets".to_string(),
-            asset_search: String::new(),
             show_about: false,
             show_build_settings: false,
             build_settings_draft: None,
@@ -247,8 +238,8 @@ impl EditorUi {
             hierarchy::draw(self, ui, scene);
             // 3. RIGHT PANEL: Properties Inspector
             inspector::draw(self, ui, scene, console, nav);
-            // 4. BOTTOM PANEL: Folder Explorer & Console Logs
-            bottom_panel::draw(self, ui, scene, console);
+            // 4. BOTTOM PANEL: Console
+            bottom_panel::draw(self, ui, console);
         }
 
         // 5. CENTRAL VIEWPORT: the Scene/Game tabbed scene image. Drawn last so it

@@ -1,17 +1,11 @@
 use egui_phosphor::regular as icon;
 
 use crate::editor::theme::chrome;
-use crate::editor::{content_browser, EditorUi};
-use crate::scene::Scene;
+use crate::editor::EditorUi;
 use crate::scripting::{ConsoleLogs, LogLevel};
 
-/// BOTTOM PANEL: Folder Explorer & Console Logs
-pub fn draw(
-    editor: &mut EditorUi,
-    ui: &mut egui::Ui,
-    scene: &mut Scene,
-    console: &mut ConsoleLogs,
-) {
+/// BOTTOM PANEL: the Console (log buffer, plus the Lua REPL in dev builds).
+pub fn draw(editor: &mut EditorUi, ui: &mut egui::Ui, console: &mut ConsoleLogs) {
     let t = editor.theme;
     if !editor.bottom_open {
         draw_collapsed(ui, t, &mut editor.bottom_open);
@@ -26,43 +20,27 @@ pub fn draw(
             draw_tab_header(editor, console, ui);
             chrome::hairline(ui, &t);
 
-            if editor.active_bottom_tab == "assets" {
-                content_browser::draw(editor, scene, console, ui);
-            } else if editor.active_bottom_tab == "console" {
-                draw_console(console, ui);
-                #[cfg(feature = "dev")]
-                draw_repl_input(editor, ui);
-            }
+            draw_console(console, ui);
+            #[cfg(feature = "dev")]
+            draw_repl_input(editor, ui);
         });
 }
 
-/// The tab header bar: the Content/Console selectors plus the right-aligned
-/// collapse caret and the per-tab utility button (Clear logs / jump to Root).
+/// The header: the Console title plus the right-aligned collapse caret and Clear.
 fn draw_tab_header(editor: &mut EditorUi, console: &mut ConsoleLogs, ui: &mut egui::Ui) {
     let t = editor.theme;
     ui.horizontal(|ui| {
-        let tabs = [
-            ("assets", format!("{}  Content", icon::FOLDERS)),
-            ("console", format!("{}  Console", icon::TERMINAL_WINDOW)),
-        ];
-        for (key, label) in tabs {
-            let selected = editor.active_bottom_tab == key;
-            if chrome::tab(ui, &t, selected, &label).clicked() {
-                editor.active_bottom_tab = key.to_string();
-            }
-        }
+        ui.label(
+            egui::RichText::new(format!("{}  Console", icon::TERMINAL_WINDOW))
+                .color(t.text_primary),
+        );
 
-        // Align the collapse caret and dynamic tab utility button on the right
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             if chrome::icon_button(ui, icon::CARET_DOWN, "Collapse").clicked() {
                 editor.bottom_open = false;
             }
-            if editor.active_bottom_tab == "console" {
-                if ui.button(format!("{}  Clear", icon::TRASH)).clicked() {
-                    console.messages.clear();
-                }
-            } else if ui.button(format!("{}  Root", icon::HOUSE)).clicked() {
-                editor.current_dir = crate::editor::content_browser::ROOT.to_string();
+            if ui.button(format!("{}  Clear", icon::TRASH)).clicked() {
+                console.messages.clear();
             }
         });
     });
@@ -82,7 +60,7 @@ fn draw_collapsed(ui: &mut egui::Ui, t: crate::editor::theme::Theme, open: &mut 
                 }
                 ui.colored_label(
                     t.text_secondary,
-                    format!("{}  Content / Console", icon::FOLDERS),
+                    format!("{}  Console", icon::TERMINAL_WINDOW),
                 );
             });
         });

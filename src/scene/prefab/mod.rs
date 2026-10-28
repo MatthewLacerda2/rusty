@@ -32,7 +32,7 @@ use crate::scene::serialize::rehydrate_entity_mesh;
 use crate::scene::Scene;
 
 /// The one standardised prefab file extension (JSON inside) — a distinct extension
-/// from `.scene` so the inspector dispatch and content browser recognise it cleanly.
+/// from `.scene` so the inspector dispatch recognises it cleanly.
 pub const PREFAB_EXTENSION: &str = "prefab";
 
 /// True if `path` looks like a prefab file (`.prefab`).
