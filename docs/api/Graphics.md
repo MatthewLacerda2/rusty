@@ -544,11 +544,13 @@ exaggerated). The knobs live on the post-processing component (the Inspector's
 **Ambient Occlusion** section edits the same fields) and are saved with the scene;
 scenes saved before the knob existed load with it on. Each view runs its base
 camera's AO, like the rest of its post-FX (*Post-FX is per view*, above); a camera
-without an active volume runs none.
+without an active volume runs none. A `DepthOnly` camera stacked on another (a
+viewmodel) runs none of its own and its solids take no occlusion, as with Unity URP's
+overlay cameras (#1497): a gun shading itself is not worth a full-screen pass.
 
 Its cost is gated by the quality preset: **off on Low**; on **Medium** 8 samples
 per texel at half resolution; on **High** 16 at full resolution. Either way each
-camera also draws its visible solids once more, depth only (a prepass), and runs a
+camera that runs it also draws its visible solids once more, depth only (a prepass), and runs a
 25-tap blur at full resolution. The frame stats report it (`ssao_samples`, and the
 prepass inside `draw_calls` / `triangles`; see `Debug`). `SetSsaoActive(false)` —
 or intensity `0` — skips every one of those passes.
