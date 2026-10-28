@@ -65,24 +65,25 @@ mod tests {
     fn ops_describes_every_op_with_typed_params_and_defaults() {
         let lua = Lua::new();
         super::super::register(&lua).unwrap();
-        let (count, category, inputs, octaves, required, kinds): (
+        let (count, category, inputs, octaves, required, kinds, mix_min, mix_max): (
             usize,
             String,
             u8,
             u32,
             bool,
             String,
+            u8,
+            u8,
         ) = lua
             .load(
-                r#"local ops = Texture.Ops()
-                   for _, o in ipairs(ops) do
-                     if o.op == "noise" then
-                       local by = {}
-                       for _, p in ipairs(o.params) do by[p.name] = p end
-                       return #ops, o.category, o.max_inputs, by.octaves.default,
-                         by.scale.required, table.concat(by.kind.values, "|")
-                     end
-                   end"#,
+                r#"local ops, by_op = Texture.Ops(), {}
+                   for _, o in ipairs(ops) do by_op[o.op] = o end
+                   local o, mix = by_op.noise, by_op.mix
+                   local by = {}
+                   for _, p in ipairs(o.params) do by[p.name] = p end
+                   return #ops, o.category, o.max_inputs, by.octaves.default,
+                     by.scale.required, table.concat(by.kind.values, "|"),
+                     mix.min_inputs, mix.max_inputs"#,
             )
             .eval()
             .unwrap();
@@ -91,6 +92,11 @@ mod tests {
         assert_eq!(
             (octaves, required, kinds.as_str()),
             (1, true, "perlin|fbm|ridged|turbulence")
+        );
+        assert_eq!(
+            (mix_min, mix_max),
+            (2, 3),
+            "min_inputs and max_inputs both reach Lua"
         );
     }
 }
