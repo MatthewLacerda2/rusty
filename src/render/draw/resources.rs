@@ -125,13 +125,11 @@ impl Renderer {
                 continue;
             }
             let motion = history.as_deref_mut();
-            let items = self.solid_draw_items(scene, id, bounds, &mut joints, motion);
+            let eye = (cam_pos, cam_fwd);
+            let items = self.solid_draw_items(scene, id, (bounds, eye), &mut joints, motion);
             visible += u32::from(!items.is_empty());
-            // The opaque order's anchor is the bounds' centre, as Unity's (#1499).
-            let centre = |origin| bounds.map_or(origin, |(min, max)| (min + max) * 0.5);
             for (mut item, world_pos, is_transparent) in items {
                 item.outline = ringed.contains(&id);
-                item.depth = view_depth(centre(world_pos), cam_pos, cam_fwd);
                 if is_transparent {
                     transparent.push((item, view_depth(world_pos, cam_pos, cam_fwd)));
                 } else {
@@ -194,14 +192,15 @@ impl Renderer {
     /// anchor) and whether its material is Transparent. A skinned mesh's palette is
     /// appended to `joints` once, and its uniform's `bone_base` points at it — so it is
     /// a draw of its own. `bounds` are its world bounds when known
-    /// ([`Self::world_bounds`]); its reflection probe is picked at their centre.
+    /// ([`Self::world_bounds`]); its reflection probe is picked at their centre, and
+    /// its view depth, from the camera `eye` (position, forward), is taken there.
     /// With `history`, its instance carries its last-frame pose (#1435).
     /// Empty if its mesh is not resident on the GPU yet.
     fn solid_draw_items(
         &mut self,
         scene: &Scene,
         id: u32,
-        bounds: Option<(glam::Vec3, glam::Vec3)>,
+        (bounds, eye): (Option<(glam::Vec3, glam::Vec3)>, (glam::Vec3, glam::Vec3)),
         joints: &mut Vec<JointMatrix>,
         history: Option<&mut MotionHistory>,
     ) -> Vec<(DrawItem, glam::Vec3, bool)> {
@@ -223,7 +222,8 @@ impl Renderer {
             &self.lightmaps,
         );
         // Like Unity, the reflection probe is picked per object, at the centre of its
-        // world bounds (its origin when they are unknown), #1206.
+        // world bounds (its origin when they are unknown), #1206, and the opaque pass
+        // orders it by that centre's view depth (#1499).
         let centre = bounds.map_or(origin, |(min, max)| (min + max) * 0.5);
         instance.reflection_probe = self.reflection_probes.probe_for(centre);
 
@@ -256,7 +256,7 @@ impl Renderer {
             let item = DrawItem {
                 key,
                 instance,
-                depth: 0.0, // the caller's: it knows the camera
+                depth: view_depth(centre, eye.0, eye.1),
                 outline: false,
             };
             items.push((item, origin, transparent));
