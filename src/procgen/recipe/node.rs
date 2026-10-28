@@ -156,6 +156,15 @@ mod tests {
     }
 
     #[test]
+    fn a_wrong_input_count_is_refused_at_parse_time() {
+        let short = parse(r#"{ "id": "m", "op": "mix", "mode": "add", "inputs": ["a"] }"#);
+        let err = short.unwrap_err();
+        assert!(err.contains("\"m\"") && err.contains("1 given"), "{err}");
+        let surplus = parse(r#"{ "id": "i", "op": "invert", "inputs": ["a", "b"] }"#);
+        assert!(surplus.unwrap_err().contains("2 given"));
+    }
+
+    #[test]
     fn a_misspelled_ramp_stop_key_is_refused() {
         let json =
             r#"{ "id": "r", "op": "color_ramp", "stops": [{ "pos": 0, "colour": [0,0,0,1] }] }"#;

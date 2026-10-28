@@ -64,6 +64,24 @@ mod tests {
     }
 
     #[test]
+    fn a_node_missing_an_input_is_refused_naming_it() {
+        let lua = Lua::new();
+        let table: Value = lua
+            .load(
+                r#"return { resolution = 8, nodes = {
+                     { id = "w", op = "white_noise" },
+                     { id = "warped", op = "warp", strength = 1, inputs = {"w"} } } }"#,
+            )
+            .eval()
+            .unwrap();
+        let err = parse_recipe(&table).unwrap_err();
+        assert!(
+            err.contains("\"warped\"") && err.contains("1 given"),
+            "{err}"
+        );
+    }
+
+    #[test]
     fn reports_unknown_op_tag() {
         let lua = Lua::new();
         let table: Value = lua
