@@ -13,7 +13,9 @@ This walks the git worktrees of the **main checkout** under
 - a branch is finished when its pull request is MERGED or CLOSED (squash
   merges leave nothing in `origin/main`'s ancestry, so GitHub decides, not
   git); an OPEN one, or none at all, keeps it;
-- a detached HEAD is finished when it is an ancestor of `origin/main`.
+- a detached HEAD is finished when it is an ancestor of `origin/main`, or
+  when it is a commit of a MERGED or CLOSED pull request and of no OPEN one
+  (below).
 
 A finished worktree is still **never** removed when it has uncommitted
 changes, commits on no remote (and not in its PR's head), a lock (a live
@@ -52,6 +54,24 @@ tip commit (#1482: 39 dead branches after the Post Processing batch, most of
 them reviewers' `prNNNN`; `reclaim_branches.py` has the story). `main` and a
 branch any worktree has checked out are never deleted.
 
+`independent-review` dispatches each reviewer with the `Agent` tool's worktree
+isolation, and the harness names that worktree's branch itself:
+`worktree-agent-<id>`, at the commit it started from (#1510). The reviewer then
+checks the PR out detached, so after a squash merge reclaim kept both forever:
+the branch as "no pull request", the worktree as "detached, not on
+origin/main" (PRs #1503 and #1504, 2026-10-28, each left one of each). So a
+`worktree-agent-*` branch no worktree holds and whose tip is on `origin/main`
+is deleted, having nothing of its own; with commits of its own it is judged
+like any branch. Only that prefix: any other branch at an `origin/main` commit
+is a fresh one and stays. A detached worktree whose HEAD is any commit of a
+MERGED or CLOSED pull request (asked by commit, as `judge_branch` does) is
+finished too; an OPEN one holding that commit keeps it. Any commit, not only
+the head: a reviewer's checkout sits at the commit it reviewed, and when the
+review sends fixes back the PR's head moves on (PR #1503: reviewed at
+`daa7e46`, merged from `789c9d9`). The lock and the
+process check still protect a running reviewer: the harness locks its
+worktree (`claude agent agent-<id> (pid …)`).
+
 `--dry-run` decides and prints the same, and deletes nothing.
 """
 
@@ -71,6 +91,7 @@ import reclaim_branches as branches
 from merging.watch import tenancy
 
 USAGE = "usage: reclaim.py [--dry-run]"
+AGENT_BRANCH = "worktree-agent-"  # the harness's name for an `Agent` worktree's branch (#1510)
 
 
 @dataclass
@@ -116,6 +137,13 @@ def finished(wt: Worktree, facts: Facts) -> tuple[bool, str]:
     if wt.branch is None:
         if facts.on_main:
             return True, "detached at a commit on origin/main"
+        if facts.prs is None:
+            return False, "detached, not on origin/main, and GitHub did not answer for its pull request"
+        if "OPEN" in facts.prs:
+            return False, "detached at a commit of an open pull request"
+        for state in ("MERGED", "CLOSED"):
+            if state in facts.prs:
+                return True, f"detached at a commit of a {state.lower()} pull request"
         return False, "detached, not on origin/main"
     if facts.prs is None:
         return False, "GitHub did not answer for its pull request"
@@ -158,10 +186,15 @@ def judge_branch(machine: Machine, main: Path, branch: str, tip: str) -> tuple[s
     Its pull request is found by name, else by tip commit, which is how a
     reviewer's `pr1316` finds PR #1316. A tip already on `origin/main` is not
     asked by commit: GitHub would answer with whichever PR merged that commit,
-    and a fresh branch off `main` would read as finished.
+    and a fresh branch off `main` would read as finished. The one exception is
+    the harness's `worktree-agent-*` branch (#1510): on `origin/main` it holds
+    nothing of its own.
     """
+    on_main = machine.is_ancestor(main, tip, "origin/main")
+    if branch.startswith(AGENT_BRANCH) and on_main:
+        return "remove", "an agent worktree's branch; nothing of its own"
     pulls = machine.pulls(branch)
-    if pulls == [] and not machine.is_ancestor(main, tip, "origin/main"):
+    if pulls == [] and not on_main:
         pulls = machine.pulls_of(tip)
     return verdict(Worktree(main, tip, branch), machine.work(Facts(), main, branch, tip, pulls))
 
@@ -258,6 +291,9 @@ class Machine:
             facts.stale = owner
         if wt.branch is None:
             facts.on_main = self.is_ancestor(wt.path, wt.head, "origin/main")
+            if not facts.on_main:  # a reviewer's checkout of a PR (#1510): any PR holding the commit counts
+                pulls = self.pulls_of(wt.head)
+                facts.prs = None if pulls is None else [p["state"] for p in pulls]
             return facts
         return self.work(facts, wt.path, wt.branch, wt.head, self.pulls(wt.branch))
 

@@ -18,6 +18,11 @@ is judged by the same rules (`reclaim.judge_branch`): finished when its pull
 request, found by name or by tip commit, is MERGED or CLOSED; never deleted
 with commits on no remote that its PR's head and `origin/main` don't hold.
 `main` and any branch a worktree has checked out are never touched.
+
+A reviewer's `worktree-agent-<id>`, the branch the harness gives an `Agent`
+worktree, is deleted when its tip is on `origin/main` (#1510,
+`reclaim.judge_branch`): the reviewer checked its PR out detached, so the
+branch holds nothing. No other name gets that rule.
 """
 
 from __future__ import annotations
