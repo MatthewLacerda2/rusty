@@ -74,7 +74,7 @@ fn slide(src: &[Rgba], r: i64, inv: f64, out: &mut [Rgba]) {
         for c in 0..4 {
             acc[c] += enter[c] as f64 - leave[c] as f64;
         }
-        let large = leave.iter().any(|v| !(v.abs() <= LARGE));
+        let large = leave.iter().any(|v| v.is_nan() || v.abs() > LARGE);
         if large || acc.iter().any(|a| !a.is_finite()) {
             acc = window(x + 1);
         }
