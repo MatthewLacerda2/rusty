@@ -29,7 +29,7 @@ fn shooting_the_floor_keeps_the_crate_mark() {
          return Decals.Count(), Decals.Remove(mark)"
     );
     let (count, removed): (u32, bool) = eval(&scene, &script).unwrap();
-    assert_eq!(count, 259, "256 whole floor marks, one fading, the crate's");
+    assert_eq!(count, 258, "257 floor marks (one fading) and the crate's");
     assert!(removed, "the crate's mark was never evicted");
 }
 
