@@ -44,7 +44,7 @@ fn copies_of_one_mesh_and_material_become_one_draw() {
         .map(|b| (b.key.mesh.0.as_str(), b.instances.clone()))
         .collect();
     assert_eq!(runs, [("Barrel", 0..1), ("Box", 1..4)]);
-    // Stable within a run: the boxes keep their scene order.
+    // Stable within a run: at one depth, the boxes keep their scene order.
     assert_eq!(tags(&draws), [1.0, 0.0, 2.0, 3.0]);
 }
 

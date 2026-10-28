@@ -42,6 +42,9 @@ fn a_run_draws_at_its_nearest_instance_and_stays_one_draw() {
     let draws = FrameDraws::build(opaque, Vec::new(), true);
     assert_eq!(meshes(&draws), ["Crate", "Wall"]);
     assert_eq!(draws.opaque[0].instances.len(), 3);
+    // Inside the run, the copies are nearest first too.
+    let tags: Vec<_> = draws.instances.iter().map(|i| i.model_matrix[12]).collect();
+    assert_eq!(tags, [3.0, 0.0, 2.0, 1.0]);
     // Uniform slots follow the draw order, so `uniforms()` still lines up.
     let slots: Vec<_> = draws.opaque.iter().map(|b| b.uniform_slot).collect();
     assert_eq!(slots, [0, 1]);

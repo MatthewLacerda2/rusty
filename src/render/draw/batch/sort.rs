@@ -44,11 +44,12 @@ pub(crate) fn depth_bucket(depth: f32) -> i32 {
 }
 
 /// Order opaque `items` for instancing and early depth rejection (#470, #1499):
-/// grouped into runs of equal keys, so each run is one draw, then the runs nearest
-/// first by their nearest item's [`depth_bucket`]. Stable throughout: runs in one
-/// bucket keep their key order, and copies inside a run their given order.
+/// grouped into runs of equal keys, so each run is one draw, its copies nearest
+/// first (an instanced draw rasterizes in instance order), then the runs nearest
+/// first by their nearest item's [`depth_bucket`]. Stable: runs in one bucket keep
+/// their key order.
 pub(crate) fn front_to_back(mut items: Vec<DrawItem>) -> Vec<DrawItem> {
-    items.sort_by(|a, b| a.key.cmp(&b.key));
+    items.sort_by(|a, b| a.key.cmp(&b.key).then(a.depth.total_cmp(&b.depth)));
     let mut runs: Vec<(i32, Range<usize>)> = Vec::new();
     for (i, item) in items.iter().enumerate() {
         let bucket = depth_bucket(item.depth);
