@@ -114,8 +114,8 @@ every file and row.
 - **Bless by name, and look.** Re-bless a capture or snapshot by its test name, never
   all at once, and open every PNG you bless. A blessing from a container's Mesa may
   differ from what CI renders: say so in the pull request.
-- **A pixel change is stated with before and after.** The pull request shows the
-  capture on `main` and on the branch (`make editor-capture` for the editor, as
-  `docs/testing.md` § *Editor captures* says), and no PNG stays on the branch that
-  merges. A refactor that claims no pixel change proves it by comparison.
+- **A pixel change is looked at, before and after** (#1483). The coder renders it on
+  `main` and on the branch, opens both, and the pull request says what it saw in a
+  `Looked at` line; no PNG goes to GitHub (`docs/testing.md` § *Looking at a
+  change*). A refactor that claims no pixel change proves it by comparison.
 - No pixel goldens of the editor: fonts and anti-aliasing differ across adapters.

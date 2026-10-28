@@ -139,11 +139,19 @@ a coder real time.
   along with `cargo-nextest` and `cargo-deny` (#826). If its log
   (`session-start: <step> FAIL`) shows a step failed, do what that line says
   before trusting a green run: without the driver, GPU tests skip silently.
-- **An editor-visible PR attaches captures.** If the branch changes what the editor
-  draws (a panel, an inspector card, the theme), run `make editor-capture` on `main`
-  and on the branch (`ARGS="--select <entity>"` to open its inspector) and show both
-  in the PR description, the way `docs/testing.md` § Editor captures says. Never
-  leave a PNG on the branch that merges.
+- **A branch that changes what is drawn renders it and looks** (#1483): the
+  renderer, `engine/shaders/`, materials, post effects, lighting, UI, editor
+  panels. Render a primitive scene that shows the change before (on `main`) and
+  after (on the branch): the feature off and on, and its knobs at the extremes
+  where those are part of the issue. Open every image with `Read`, and fix what
+  is plainly wrong (a black frame, a mirrored flare, a square bokeh) before
+  readying. The PR carries your word, not the pictures: a `Looked at` line
+  (below), and **no PNG on GitHub**, not committed, attached or hosted. Images
+  stay in your scratchpad, named with the issue number, and die with the
+  session. How to render a pair in one command, and the trap that renders an
+  effect as a no-op: `docs/testing.md`, *Looking at a change*. The editor is
+  rendered with `make editor-capture` (`ARGS="--select <entity>"` opens an
+  inspector), the same way.
 - `make gates` (foreground, split as *The container* says) before readying.
 - **Windows runs only when asked** (#1395): a branch that touches paths, separators,
   process spawning or other platform code dispatches `gh workflow run windows.yml --ref
@@ -164,6 +172,11 @@ Beyond what changed, why, the effect and the decisions:
 - **A `Gates` line:** what ran green, on which head commit, and what didn't run
   and why (no real GPU, a human check). After your own rebase it is re-run or
   marked stale; a rebase the merge queue pushes later dates it for you (#968).
+- **A `Looked at` line** on a branch that changes what is drawn (above): for
+  each before/after pair, the scene, what was rendered and what you saw, in one
+  or two sentences. Say what you did *not* check (motion, Metal, cost, taste):
+  those stay under *For a human*. Your look catches broken; the operator judges
+  good. The independent review treats a missing line as a finding.
 - **A `For a human` heading** for what only the operator can check (a real
   window, speakers, a repository setting, a branch to delete), each one a
   `- [ ]` item. The heading must *start* with "For a human": `make checks`
