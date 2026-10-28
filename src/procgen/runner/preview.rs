@@ -13,7 +13,7 @@
 
 use image::{ImageBuffer, Rgba};
 
-use super::{evaluate_each, RunError};
+use super::evaluate_each;
 use crate::core::color::linear_to_srgb;
 use crate::procgen::image_buf::Image;
 use crate::procgen::recipe::TextureRecipe;
@@ -24,15 +24,27 @@ pub struct Sheet {
     pub columns: u32,
 }
 
-/// Render every node of `recipe` to a `size`²-tile contact sheet.
-pub fn sheet(recipe: &TextureRecipe, size: u32) -> Result<Sheet, RunError> {
+/// Render every node of `recipe` to a `size`²-tile contact sheet. A `size` above
+/// the recipe's resolution is refused: a tile larger than the image adds nothing,
+/// and an unbounded one could not be allocated.
+pub fn sheet(recipe: &TextureRecipe, size: u32) -> Result<Sheet, String> {
     let size = size.max(1);
-    let mut tiles: Vec<Option<Vec<[u8; 3]>>> = recipe.nodes.iter().map(|_| None).collect();
-    evaluate_each(recipe, |i, img| tiles[i] = Some(thumbnail(img, size)))?;
-    let n = tiles.len() as u32;
+    if size > recipe.resolution {
+        return Err(format!(
+            "size {size} is larger than the recipe's resolution {}",
+            recipe.resolution
+        ));
+    }
+    let n = recipe.nodes.len() as u32;
     let columns = (1..=n).find(|c| c * c >= n).unwrap_or(1);
     let rows = n.div_ceil(columns);
-    let mut pixels = ImageBuffer::from_pixel(columns * size, rows * size, Rgba([0, 0, 0, 255]));
+    let too_big = || format!("a {columns}×{rows} sheet of {size}² tiles is too large");
+    let width = columns.checked_mul(size).ok_or_else(too_big)?;
+    let height = rows.checked_mul(size).ok_or_else(too_big)?;
+    let mut tiles: Vec<Option<Vec<[u8; 3]>>> = recipe.nodes.iter().map(|_| None).collect();
+    evaluate_each(recipe, |i, img| tiles[i] = Some(thumbnail(img, size)))
+        .map_err(|e| e.to_string())?;
+    let mut pixels = ImageBuffer::from_pixel(width, height, Rgba([0, 0, 0, 255]));
     for (k, tile) in tiles.into_iter().enumerate() {
         let tile = tile.expect("evaluate_each visits every node");
         let (ox, oy) = ((k as u32 % columns) * size, (k as u32 / columns) * size);
@@ -47,7 +59,7 @@ pub fn sheet(recipe: &TextureRecipe, size: u32) -> Result<Sheet, RunError> {
 /// Render `recipe`'s contact sheet and write it as a PNG at `path`, noting the
 /// write like a bake does (#689). Returns the grid's column count.
 pub fn write_preview(recipe: &TextureRecipe, path: &str, size: u32) -> Result<u32, String> {
-    let sheet = sheet(recipe, size).map_err(|e| e.to_string())?;
+    let sheet = sheet(recipe, size)?;
     sheet.pixels.save(path).map_err(|e| e.to_string())?;
     crate::core::fs::written::note_written(path);
     Ok(sheet.columns)

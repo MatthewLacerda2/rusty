@@ -89,7 +89,7 @@ pub fn register(lua: &Lua) -> Reg {
         "Preview",
         lua.create_function(|lua, (recipe, path, size): (Value, String, Option<u32>)| {
             let recipe = parse_recipe(&recipe).map_err(mlua::Error::RuntimeError)?;
-            inspect::preview_table(lua, &recipe, &path, size.unwrap_or(inspect::PREVIEW_SIZE))
+            inspect::preview_table(lua, &recipe, &path, size)
         }),
     )?;
 

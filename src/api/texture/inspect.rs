@@ -8,7 +8,8 @@ use crate::procgen::runner::preview::write_preview;
 use crate::procgen::runner::stats::{stats, NodeStats};
 use crate::procgen::TextureRecipe;
 
-/// The tile edge `Texture.Preview` uses when none is given.
+/// The tile edge `Texture.Preview` uses when none is given, or the recipe's
+/// resolution when that is smaller.
 pub const PREVIEW_SIZE: u32 = 128;
 
 /// `{ [node_id] = { min, max, mean, std, p1, p99 } }`, each an `{r, g, b, a}`
@@ -50,9 +51,11 @@ pub fn preview_table(
     lua: &Lua,
     recipe: &TextureRecipe,
     path: &str,
-    size: u32,
+    size: Option<u32>,
 ) -> mlua::Result<Table> {
-    let columns = write_preview(recipe, path, size).map_err(mlua::Error::RuntimeError)?;
+    let size = size.unwrap_or(PREVIEW_SIZE.min(recipe.resolution));
+    let columns = write_preview(recipe, path, size)
+        .map_err(|e| mlua::Error::RuntimeError(format!("Texture.Preview: {e}")))?;
     let t = lua.create_table()?;
     t.set("path", path)?;
     t.set("columns", columns)?;

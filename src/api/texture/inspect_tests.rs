@@ -77,3 +77,28 @@ fn preview_writes_one_tile_per_node_in_node_order() {
     assert!(columns * rows >= 3 && columns * (rows - 1) < 3);
     std::fs::remove_file(path).ok();
 }
+
+#[test]
+fn preview_refuses_a_tile_larger_than_the_recipe() {
+    let lua = lua();
+    let path = crate::test_temp::dir().join("huge.png");
+    lua.globals().set("OUT", path.to_str().unwrap()).unwrap();
+    let script = format!(
+        "local r = {RECIPE}; r.resolution = 32; return Texture.Preview(r, OUT, 4000000000)"
+    );
+    let err = lua.load(script).exec().unwrap_err().to_string();
+    assert!(err.contains("Texture.Preview: size 4000000000"), "{err}");
+    assert!(!path.exists(), "nothing written");
+}
+
+#[test]
+fn preview_defaults_to_the_recipe_resolution_when_it_is_under_128() {
+    let lua = lua();
+    let path = crate::test_temp::dir().join("small.png");
+    lua.globals().set("OUT", path.to_str().unwrap()).unwrap();
+    let script = format!("local r = {RECIPE}; r.resolution = 8; return Texture.Preview(r, OUT)");
+    lua.load(script).exec().unwrap();
+    let (w, _) = image::GenericImageView::dimensions(&image::open(&path).unwrap());
+    assert_eq!(w, 16, "2 columns of 8² tiles");
+    std::fs::remove_file(path).ok();
+}
