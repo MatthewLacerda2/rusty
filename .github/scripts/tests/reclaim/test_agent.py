@@ -14,7 +14,7 @@ MAIN = Path("/repo")
 ON_MAIN = {"aaaa"}
 # commit: the pull requests GitHub says hold it, as (state, head)
 BY_COMMIT = {"m1": [("MERGED", "m1")], "o1": [("OPEN", "o1")], "x1": [("MERGED", "y1")],
-             "own": [], "aaaa": [("MERGED", "aaaa")]}
+             "both": [("MERGED", "y1"), ("OPEN", "z1")], "own": [], "aaaa": [("MERGED", "aaaa")]}
 
 
 def machine() -> reclaim.Machine:
@@ -52,7 +52,10 @@ class Deletes(unittest.TestCase):
                          ("remove", "an agent worktree's branch; nothing of its own"))
 
     def test_a_detached_checkout_of_a_merged_pr_s_head(self):
-        self.assertEqual(detached("m1"), ("remove", "detached at a merged pull request's head"))
+        self.assertEqual(detached("m1"), ("remove", "detached at a commit of a merged pull request"))
+
+    def test_a_reviewed_commit_the_merged_pr_s_head_moved_past(self):
+        self.assertEqual(detached("x1"), ("remove", "detached at a commit of a merged pull request"))
 
 
 class Keeps(unittest.TestCase):
@@ -63,10 +66,10 @@ class Keeps(unittest.TestCase):
         self.assertEqual(branch("fresh", "aaaa"), ("keep", "no pull request"))
 
     def test_a_detached_checkout_of_an_open_pr_s_head(self):
-        self.assertEqual(detached("o1"), ("keep", "detached at an open pull request's head"))
+        self.assertEqual(detached("o1"), ("keep", "detached at a commit of an open pull request"))
 
-    def test_a_commit_that_is_not_the_merged_pr_s_head(self):
-        self.assertEqual(detached("x1"), ("keep", "detached, not on origin/main"))
+    def test_a_commit_in_both_a_merged_and_an_open_pr(self):
+        self.assertEqual(detached("both"), ("keep", "detached at a commit of an open pull request"))
 
     def test_a_locked_one(self):
         action, why = detached("m1", locked="claude agent agent-x (pid 9)")

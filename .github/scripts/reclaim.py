@@ -14,7 +14,8 @@ This walks the git worktrees of the **main checkout** under
   merges leave nothing in `origin/main`'s ancestry, so GitHub decides, not
   git); an OPEN one, or none at all, keeps it;
 - a detached HEAD is finished when it is an ancestor of `origin/main`, or
-  when it is the head commit of a MERGED or CLOSED pull request (below).
+  when it is a commit of a MERGED or CLOSED pull request and of no OPEN one
+  (below).
 
 A finished worktree is still **never** removed when it has uncommitted
 changes, commits on no remote (and not in its PR's head), a lock (a live
@@ -62,9 +63,12 @@ origin/main" (PRs #1503 and #1504, 2026-10-28, each left one of each). So a
 `worktree-agent-*` branch no worktree holds and whose tip is on `origin/main`
 is deleted, having nothing of its own; with commits of its own it is judged
 like any branch. Only that prefix: any other branch at an `origin/main` commit
-is a fresh one and stays. A detached worktree whose HEAD is the head commit of
-a MERGED or CLOSED pull request (asked by commit, as `judge_branch` does) is
-finished too; an OPEN one sharing that head keeps it. The lock and the
+is a fresh one and stays. A detached worktree whose HEAD is any commit of a
+MERGED or CLOSED pull request (asked by commit, as `judge_branch` does) is
+finished too; an OPEN one holding that commit keeps it. Any commit, not only
+the head: a reviewer's checkout sits at the commit it reviewed, and when the
+review sends fixes back the PR's head moves on (PR #1503: reviewed at
+`daa7e46`, merged from `789c9d9`). The lock and the
 process check still protect a running reviewer: the harness locks its
 worktree (`claude agent agent-<id> (pid …)`).
 
@@ -136,10 +140,10 @@ def finished(wt: Worktree, facts: Facts) -> tuple[bool, str]:
         if facts.prs is None:
             return False, "detached, not on origin/main, and GitHub did not answer for its pull request"
         if "OPEN" in facts.prs:
-            return False, "detached at an open pull request's head"
+            return False, "detached at a commit of an open pull request"
         for state in ("MERGED", "CLOSED"):
             if state in facts.prs:
-                return True, f"detached at a {state.lower()} pull request's head"
+                return True, f"detached at a commit of a {state.lower()} pull request"
         return False, "detached, not on origin/main"
     if facts.prs is None:
         return False, "GitHub did not answer for its pull request"
@@ -287,9 +291,9 @@ class Machine:
             facts.stale = owner
         if wt.branch is None:
             facts.on_main = self.is_ancestor(wt.path, wt.head, "origin/main")
-            if not facts.on_main:  # a reviewer's checkout of a PR (#1510): only that PR's own head counts
+            if not facts.on_main:  # a reviewer's checkout of a PR (#1510): any PR holding the commit counts
                 pulls = self.pulls_of(wt.head)
-                facts.prs = None if pulls is None else [p["state"] for p in pulls if p.get("headRefOid") == wt.head]
+                facts.prs = None if pulls is None else [p["state"] for p in pulls]
             return facts
         return self.work(facts, wt.path, wt.branch, wt.head, self.pulls(wt.branch))
 
