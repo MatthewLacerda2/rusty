@@ -134,6 +134,13 @@ Paste every list whose trigger the PR hits.
   order modules `register`; what a hot-reload, Play/Stop snapshot or scene load
   does to its state; GPU resources freed and rebuilt on resize; work per frame
   that should be per change; Unity's behaviour where the issue was silent.
+- **What is drawn** (the renderer, `engine/shaders/`, materials, post effects,
+  lighting, UI, editor panels): the PR description carries a `Looked at` line
+  (`issue-batch/cloud-brief.md`, #1483) naming the scene, what was rendered
+  before and after and what was seen. You do not build, so you do not
+  re-render: check only that the line is there and covers what the diff
+  changes. A missing line, or one that skips a change the diff makes visible,
+  is a finding.
 - **API surface**: `docs/api/` matches what the code does, not only what exists;
   errors a script can trigger reach the console instead of a panic; argument
   shapes match the namespace's siblings; the editor can do the same thing.

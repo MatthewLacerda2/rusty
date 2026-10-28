@@ -343,15 +343,50 @@ painted with `egui_wgpu` and read back. A fixed size, a 1× scale, a fixed frame
 and a synthetic clock make it **deterministic**: the same scene and options give the same
 bytes on the same machine. What it cannot show: hover states, open menus and popups.
 
-**An editor-visible PR attaches captures** — before (on `main`) and after, of the panel
-it changes. Commit the PNGs on a throwaway commit, link them by that commit's SHA, and
-remove them in the next commit (as #725 did), so none lands on `main`; `.gitignore`
-already ignores `editor-capture*.png` at the root.
+**An editor-visible branch captures before (on `main`) and after** of the panel it
+changes, and its coder looks at both and says what it saw in the PR; no PNG goes to
+GitHub (*Looking at a change*, below). `.gitignore` ignores `editor-capture*.png` at
+the root, but a capture belongs in the session's scratchpad.
 
 The smoke test (`tests/gpu/editor_capture.rs`) checks that the default scene captures,
 the image is not blank and the hierarchy, viewport and inspector sit where the editor
 puts them. **No pixel goldens** of the editor: fonts and anti-aliasing differ across
 platforms and adapters, so a golden would break on every one but the machine that made it.
+
+## Looking at a change (#1483)
+Pixel asserts read numbers off a frame and throw the frame away: a black frame or a
+flare mirrored the wrong way can pass all of them. So a branch that changes what is
+drawn (the renderer, `engine/shaders/`, materials, post effects, lighting, UI, editor
+panels) is also **looked at**: its coder renders a primitive scene before (on `main`)
+and after (on the branch), the feature off and on and at the extremes of the knobs the
+issue is about, opens every image (an agent's `Read` shows a PNG), and fixes what is
+plainly wrong. The PR carries a **`Looked at`** line saying what scene, what was
+rendered and what was seen, and what was not checked (motion, Metal, cost, taste:
+those stay *For a human*). It carries no image: none is committed, attached or hosted.
+The images are scratch files, named with the issue number, kept outside the checkout.
+The rule and the PR line: `.claude/skills/issue-batch/cloud-brief.md`.
+
+A pair is one command: a short scenario run by `play` on the fixture project, with
+**absolute** screenshot paths (a relative one lands inside the project):
+
+```lua
+-- look_1234.lua, in the scratchpad. The fixture's camera has no post volume, and
+-- with none every Graphics.* setter is a no-op: add one, or "on" renders as "off".
+Scene.AddComponent(Scene.FindEntityByName("Player"), "PostProcessing")
+Harness.Step(2)
+Harness.Screenshot("/abs/scratch/1234_off.png")
+Graphics.SetChromaticAberrationActive(true)
+Graphics.SetChromaticAberrationIntensity(1)
+Harness.Step(1)                          -- a write shows on the next frame
+Harness.Screenshot("/abs/scratch/1234_on.png")
+```
+
+```sh
+cargo run --features dev --bin play -- --project tests/fixtures/project look_1234.lua <out_dir>
+```
+
+Log the getter after a set (`Harness.Log(tostring(Graphics.Get…()))`) when the two
+images look alike: an effect that did not run and one that runs invisibly look the same.
 
 ## Performance budgets (frame stats, #433)
 A scenario can assert on performance the same way it asserts on behaviour. The harness
