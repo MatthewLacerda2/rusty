@@ -12,6 +12,8 @@
 //! * **The project's graphics option defaults** — what a fresh install's player
 //!   graphics options start as (#1438), in the same file under `"graphics_options"`.
 //!   `Graphics.SetDefaultOption` and the Build Settings window edit them, the same way.
+//! * **The project's decal budgets** (#1517), under `"decals"`: read, never written
+//!   here, so an edit to the file is what the next Play applies (and Stop restores).
 //! * **The quit request** — `Application.Quit()` only *records* that the game asked to
 //!   quit. What that means is the host's call: the player closes the window, the editor
 //!   stops Play (Unity ignores `Quit` in the editor), and the headless harness ends the
@@ -40,6 +42,7 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 
 use crate::core::project::ProjectFile;
+use crate::core::settings::decals::DecalLimits;
 use crate::core::settings::graphics_options::{GraphicsOption, GraphicsOptions};
 
 /// The startup scene when none is configured: the seeded demo scene. Kept equal to
@@ -91,6 +94,8 @@ pub struct Application {
     build: BuildSettings,
     /// The project's default player graphics options (#1438).
     graphics_defaults: GraphicsOptions,
+    /// The project's decal budgets (#1517) as last read or set.
+    decal_limits: DecalLimits,
     /// `Some` once bound to a file via [`Application::open`]: setters then write it.
     path: Option<PathBuf>,
     quit_requested: bool,
@@ -117,7 +122,34 @@ impl Application {
         self.path = Some(path);
         let file = read?.unwrap_or_default();
         (self.build, self.graphics_defaults) = (file.build, file.graphics_options);
+        self.decal_limits = file.decals;
         Ok(())
+    }
+
+    /// The project's decal budgets, which entering and leaving Play apply to the
+    /// scene. Bound, the file as it stands now, so an edit to `project.rusty` (by
+    /// hand or by the agent) reaches the next Play; unbound, the ones
+    /// [`set_decal_limits`] gave. A bound file that can't be read keeps the last
+    /// ones read, and says so.
+    ///
+    /// [`set_decal_limits`]: Self::set_decal_limits
+    pub fn decal_limits(&self) -> DecalLimits {
+        let Some(path) = &self.path else {
+            return self.decal_limits;
+        };
+        let why = match ProjectFile::read(path) {
+            Ok(Some(file)) => return file.decals,
+            Ok(None) => format!("{} is missing", path.display()),
+            Err(err) => err,
+        };
+        log::warn!("[Project] decals: {why}; keeping the budgets last read");
+        self.decal_limits
+    }
+
+    /// The decal budgets an unbound run plays with (the player, the harness: what
+    /// opening the project read).
+    pub fn set_decal_limits(&mut self, limits: DecalLimits) {
+        self.decal_limits = limits;
     }
 
     /// The current build settings.

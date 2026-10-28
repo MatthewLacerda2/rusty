@@ -1,33 +1,49 @@
-//! The scene's decals (#639): a spawn-ordered ring with a cap that fades the oldest
-//! out instead of popping it, per-decal handles, and the fixed-tick ageing.
+//! The scene's decals (#639): a spawn-ordered ring with per-bucket budgets (#1517)
+//! that fade the oldest out instead of popping it, per-decal handles, and the
+//! fixed-tick ageing.
+//!
+//! **Buckets.** Every decal counts against one bucket, keyed by [`Decal::bucket`]:
+//! its owner entity (a bone is its own owner), or the world for an unowned one.
+//! Each owner keeps [`DecalLimits::max_per_owner`] whole decals, the world
+//! [`DecalLimits::max_world`], and the scene [`DecalLimits::max_total`] across all
+//! of them. Running counts (`counts::Counts`) follow every add, fade and drop, so
+//! a spawn checks only its own bucket and the total. Eviction is decided in
+//! [`DecalSet::push`] (a spawn) and [`DecalSet::set_limits`] (a lowered budget):
+//! past a budget the oldest whole decal *of that bucket* starts the
+//! [`EVICTION_FADE`], and past the total the oldest whole one in the scene does.
+//! The ring itself stays in global spawn order whatever the buckets, so the blend
+//! order never changes.
 
 use std::collections::VecDeque;
 use std::ops::Deref;
 
 use glam::Vec3;
 
+use super::counts::Counts;
 use super::{Decal, DecalOwner, DecalSpec};
+use crate::core::settings::decals::DecalLimits;
 use crate::scene::Scene;
-
-/// Decals that stay whole at once. Bullet holes and scorch accumulate; past this
-/// many, the oldest starts fading out ([`EVICTION_FADE`]) for each new one.
-pub const MAX_DECALS: usize = 256;
 
 /// Seconds an evicted decal takes to fade out, so the cap never pops a mark in view.
 pub const EVICTION_FADE: f32 = 0.5;
 
-/// Room past [`MAX_DECALS`] for decals still fading out. Only when that fills too
-/// (more than `EVICTION_HEADROOM / EVICTION_FADE` = 128 stamps a second, sustained)
-/// is the oldest dropped outright, so the frame's decal count stays bounded.
+/// Decals a stream of spawns may have fading out at once ([`Decal::evicted`]).
+/// Only past that (more than `EVICTION_HEADROOM / EVICTION_FADE` = 128 evictions a
+/// second, sustained) is the oldest one a spawn evicted dropped outright. A fade a
+/// script asks for and one a lowered limit starts are not counted: those run their
+/// course, since nothing repeats them every frame.
 pub const EVICTION_HEADROOM: usize = 64;
 
-/// The scene's live decals, oldest first (the order they blend in). Reads go
-/// through [`Deref`] to the ring; every write is a method, so the cap holds.
+/// The scene's live decals, oldest first (the order they blend in), and the budgets
+/// they are held to. Reads go through [`Deref`] to the ring; every write is a
+/// method, so the budgets and the counts hold.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct DecalSet {
     ring: VecDeque<Decal>,
     /// The next handle; never reset, so a stale id can never name a newer decal.
     next_id: u32,
+    limits: DecalLimits,
+    counts: Counts,
 }
 
 impl Deref for DecalSet {
@@ -38,21 +54,75 @@ impl Deref for DecalSet {
 }
 
 impl DecalSet {
-    /// Add `decal` under a fresh id, making room per the cap. Returns its id.
-    fn push(&mut self, mut decal: Decal) -> u32 {
-        let whole = self.ring.iter().filter(|d| !d.retiring).count();
-        if whole >= MAX_DECALS {
-            if let Some(oldest) = self.ring.iter_mut().find(|d| !d.retiring) {
-                oldest.retire(EVICTION_FADE);
+    /// The budgets the decals are held to.
+    pub fn limits(&self) -> DecalLimits {
+        self.limits
+    }
+
+    /// The whole decals `bucket` may keep.
+    fn budget(&self, bucket: Option<u32>) -> u32 {
+        bucket.map_or(self.limits.max_world, |_| self.limits.max_per_owner)
+    }
+
+    /// Hold the decals to `limits` from now on; a lowered budget fades the oldest
+    /// excess of each bucket out at once, then the oldest in the scene past the
+    /// total. Every decal it touches fades: none is dropped.
+    pub fn set_limits(&mut self, limits: DecalLimits) {
+        self.limits = limits;
+        for at in 0..self.ring.len() {
+            let d = &self.ring[at];
+            if !d.retiring && self.counts.whole(d.bucket()) > self.budget(d.bucket()) {
+                self.fade_at(at, EVICTION_FADE, false);
             }
         }
-        while self.ring.len() >= MAX_DECALS + EVICTION_HEADROOM {
-            self.ring.pop_front();
+        for at in 0..self.ring.len() {
+            if self.counts.total <= limits.max_total {
+                break;
+            }
+            if !self.ring[at].retiring {
+                self.fade_at(at, EVICTION_FADE, false);
+            }
         }
+    }
+
+    /// Add `decal` under a fresh id, making room per the budgets: only its bucket
+    /// and the total can be over. Returns its id.
+    fn push(&mut self, mut decal: Decal) -> u32 {
         self.next_id += 1;
         decal.id = self.next_id;
+        let bucket = decal.bucket();
+        self.counts.add(bucket);
         self.ring.push_back(decal);
+        while self.counts.whole(bucket) > self.budget(bucket)
+            && self.evict_oldest(|d| d.bucket() == bucket)
+        {}
+        while self.counts.total > self.limits.max_total && self.evict_oldest(|_| true) {}
+        while self.counts.evicting > EVICTION_HEADROOM {
+            let at = self.ring.iter().position(|d| d.evicted);
+            let gone = self.ring.remove(at.expect("counted")).expect("in range");
+            self.counts.forget(&gone);
+        }
         self.next_id
+    }
+
+    /// Start the oldest whole decal `pick` accepts on the [`EVICTION_FADE`], as a
+    /// spawn's eviction. `false` when there is none.
+    fn evict_oldest(&mut self, pick: impl Fn(&Decal) -> bool) -> bool {
+        let at = self.ring.iter().position(|d| !d.retiring && pick(d));
+        at.inspect(|&at| self.fade_at(at, EVICTION_FADE, true))
+            .is_some()
+    }
+
+    /// Fade the decal at `at` out over `seconds`; the first fade takes it off its
+    /// budgets, and `evicted` marks a spawn's eviction ([`Decal::evicted`]).
+    fn fade_at(&mut self, at: usize, seconds: f32, evicted: bool) {
+        let d = &mut self.ring[at];
+        if !d.retiring {
+            self.counts.sub(d.bucket());
+            d.evicted = evicted;
+            self.counts.evicting += usize::from(evicted);
+        }
+        d.retire(seconds);
     }
 
     /// Remove decal `id` now, or fade it out over `fade` seconds when `fade > 0`.
@@ -62,16 +132,18 @@ impl DecalSet {
             return false;
         };
         if fade > 0.0 {
-            self.ring[at].retire(fade);
-        } else {
-            self.ring.remove(at);
+            self.fade_at(at, fade, false);
+        } else if let Some(gone) = self.ring.remove(at) {
+            self.counts.forget(&gone);
         }
         true
     }
 
-    /// Drop every decal (a level reset, a scene load). Ids keep counting.
+    /// Drop every decal (a level reset, a scene load). Ids keep counting, and the
+    /// budgets stay.
     pub fn clear(&mut self) {
         self.ring.clear();
+        self.counts = Counts::default();
     }
 
     /// Age every decal by `dt` sim seconds, then drop the ones whose lifetime ran
@@ -80,8 +152,14 @@ impl DecalSet {
         for decal in &mut self.ring {
             decal.age += dt;
         }
-        self.ring
-            .retain(|d| !d.expired() && d.owner.is_none_or(|o| exists(o.entity)));
+        let counts = &mut self.counts;
+        self.ring.retain(|d| {
+            let keep = !d.expired() && d.owner.is_none_or(|o| exists(o.entity));
+            if !keep {
+                counts.forget(d);
+            }
+            keep
+        });
     }
 }
 
@@ -118,3 +196,11 @@ impl Scene {
 #[cfg(test)]
 #[path = "registry_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "budget_tests.rs"]
+mod budget_tests;
+
+#[cfg(test)]
+#[path = "headroom_tests.rs"]
+mod headroom_tests;

@@ -10,6 +10,7 @@ use super::frame::Host;
 use super::{boot, Frontend, Launch, Shell};
 use crate::app::GameWorld;
 use crate::core::application::{BuildSettings, WindowMode};
+use crate::core::settings::decals::DecalLimits;
 use crate::core::settings::graphics_options::GraphicsOptions;
 use crate::core::settings::video::VideoSettings;
 use crate::render::RenderView;
@@ -88,7 +89,7 @@ pub fn video_defaults(build: &BuildSettings) -> VideoSettings {
 /// Boot the standalone player on the open project's `build` settings and default
 /// `graphics` options (`core::project::Opened`) and run until the game quits or the
 /// window closes.
-pub fn launch(build: BuildSettings, graphics: GraphicsOptions) {
+pub fn launch(build: BuildSettings, graphics: GraphicsOptions, decals: DecalLimits) {
     boot::seed_project_workspace();
     println!(
         "[Player] Starting {} ({})...",
@@ -102,6 +103,7 @@ pub fn launch(build: BuildSettings, graphics: GraphicsOptions) {
         let mut app = game.resources.application.borrow_mut();
         let _ = app.set_build(build.clone());
         let _ = app.set_graphics_defaults(graphics);
+        app.set_decal_limits(decals);
     }
     game.boot_standalone();
 

@@ -4,12 +4,13 @@
 //! (`render::decals`, #638) bins each box into the light clusters, and the forward
 //! shader folds the decal into the material inputs of every surface point inside
 //! the box before that surface is lit. This module is the sim-side half — the
-//! record `Scene::spawn_decal` stores from a raycast hit and its FIFO cap. Plain glam
+//! record `Scene::spawn_decal` stores from a raycast hit and its budgets. Plain glam
 //! data, no GPU types (#494). Decals are ephemeral scene state (not an `Entity`
 //! component), so they stay off the `--components` gate.
 //!
 //! **Order.** Decals blend in spawn order (FIFO): a newer decal lands over an older
-//! one where they overlap, and the cap evicts the oldest first.
+//! one where they overlap, and a budget evicts the oldest of its bucket first
+//! (#1517: per owner, the world, and the scene's total; [`DecalSet`]).
 //!
 //! **Lifecycle (#639).** A decal may stick to an *owner* entity (its box is kept in
 //! the owner's space and follows it), may have a lifetime with a fade-out, and has
@@ -20,11 +21,12 @@ use crate::asset::MapRef;
 use glam::camera::rh::view::look_to_mat4;
 use glam::{Mat4, Quat, Vec3};
 
+mod counts;
 mod pose;
 mod registry;
 
 pub use pose::DecalPose;
-pub use registry::{DecalSet, EVICTION_FADE, EVICTION_HEADROOM, MAX_DECALS};
+pub use registry::{DecalSet, EVICTION_FADE, EVICTION_HEADROOM};
 
 /// How a decal is stamped, beyond where: everything `Decals.Spawn` takes after the
 /// hit point and normal. [`Default`] is the positional form's defaults.
@@ -97,9 +99,13 @@ pub struct Decal {
     pub lifetime: Option<f32>,
     /// Seconds of fade-out that end at `lifetime`.
     pub fade: f32,
-    /// Fading out early (evicted by the cap or removed with a fade): no longer
-    /// counted against [`MAX_DECALS`].
+    /// Fading out early (evicted by a budget or removed with a fade): no longer
+    /// counted against any budget ([`DecalSet`]).
     pub retiring: bool,
+    /// Fading because a spawn pushed its bucket or the total past a budget: the
+    /// fades [`EVICTION_HEADROOM`] bounds. A fade a script asked for, or one a
+    /// lowered limit started, is not.
+    pub evicted: bool,
 }
 
 /// What an owned decal sticks to: the entity, and the box (the unit cube's
@@ -111,6 +117,12 @@ pub struct DecalOwner {
 }
 
 impl Decal {
+    /// The budget bucket it counts against (#1517): its owner entity, or `None`
+    /// for the world. A decal stamped on a zero-scale owner is unowned, so world.
+    pub fn bucket(&self) -> Option<u32> {
+        self.owner.map(|o| o.entity)
+    }
+
     /// Build a decal at a surface hit. `point` is the world hit position, `normal`
     /// the (outward) surface normal; `spec` sizes, spins and dresses the stamp. The
     /// box straddles the surface and is oriented so its local −Z aims into the
@@ -145,6 +157,7 @@ impl Decal {
             lifetime: spec.lifetime.map(|l| l.max(0.0)),
             fade: spec.fade.max(0.0),
             retiring: false,
+            evicted: false,
         }
     }
 

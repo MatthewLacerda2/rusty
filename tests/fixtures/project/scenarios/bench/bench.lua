@@ -8,7 +8,7 @@
 -- Loads the worst case a shooter level asks of the engine onto the default yard
 -- (fy_pool_day): 50 skinned, animated soldiers walking the navmesh with a Lua brain
 -- each, 32 realtime lights (8 flickering like muzzle flashes, 6 casting shadows),
--- a full decal registry and four smoke columns. Then it warms up and
+-- 256 decals and four smoke columns. Then it warms up and
 -- measures FRAMES frames, each stepped and rendered at 1280x720, and prints the
 -- report with its change against the last run (kept in out/bench/bench.json).
 --
@@ -27,7 +27,7 @@ local spawned = Harness.LoadStress{
 }
 Harness.Expect(spawned.enemies == 50, "50 soldiers spawned")
 Harness.Expect(spawned.lights == 32, "32 realtime lights spawned")
-Harness.Expect(spawned.decals == 256, "the decal registry is full")
+Harness.Expect(spawned.decals == 256, "256 decals stamped")
 
 -- Warm up rendering too, so first-use costs (pipelines, uploads, the static
 -- shadow bake) stay out of the measured frames.

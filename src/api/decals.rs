@@ -5,7 +5,9 @@
 //! normal — exactly the pair `Physics.Raycast` already hands a
 //! script — so decals stay decoupled from gameplay: the engine never decides
 //! *when* to mark a surface, the script does. `Spawn` returns the decal's id, which
-//! `Remove` takes (#639); `Clear` wipes them all (level reset).
+//! `Remove` takes (#639); `Clear` wipes them all (level reset). `SetLimits` /
+//! `GetLimits` change and read the budgets (#1517) until Stop, which puts the
+//! project's back.
 //!
 //! A decal is a projected *volume*, not a particle: gibs/blood spray are the
 //! separate GPU particle system (`Particles`), triggered on the same hit.
@@ -17,6 +19,7 @@ use mlua::{Lua, Variadic};
 
 use super::{put, Reg};
 use crate::asset::MapRef;
+use crate::core::settings::decals::DecalLimits;
 use crate::scene::decal::DecalSpec;
 use crate::scene::Scene;
 
@@ -70,10 +73,24 @@ pub fn register<'scope>(
         }),
     )?;
 
+    register_registry(&table, scope, scene)?;
+
+    lua.globals()
+        .set("Decals", table)
+        .map_err(|e| e.to_string())
+}
+
+/// The functions over the live decals onto `table`: `Remove`, `Count`, `Clear`, and
+/// the budgets' `SetLimits` and `GetLimits` (#1517).
+fn register_registry<'scope>(
+    table: &mlua::Table,
+    scope: &'scope mlua::Scope<'scope, '_>,
+    scene: &'scope RefCell<Scene>,
+) -> Reg {
     // Decals.Remove(id, [fade]) — remove one decal now, or fade it out over `fade`
     // seconds. Returns whether a live decal had that id.
     put(
-        &table,
+        table,
         "Remove",
         scope.create_function(|_, (decal, fade): (u32, Option<f32>)| {
             Ok(scene.borrow_mut().decals.remove(decal, fade.unwrap_or(0.0)))
@@ -82,14 +99,14 @@ pub fn register<'scope>(
 
     // Decals.Count() — number of live decals, counting any still fading out.
     put(
-        &table,
+        table,
         "Count",
         scope.create_function(|_, ()| Ok(scene.borrow().decals.len() as u32)),
     )?;
 
     // Decals.Clear() — drop every live decal (e.g. on level reset).
     put(
-        &table,
+        table,
         "Clear",
         scope.create_function(|_, ()| {
             scene.borrow_mut().clear_decals();
@@ -97,9 +114,61 @@ pub fn register<'scope>(
         }),
     )?;
 
-    lua.globals()
-        .set("Decals", table)
-        .map_err(|e| e.to_string())
+    // Decals.SetLimits{ per_owner =, world =, total = } — change the budgets for the
+    // rest of this Play; a key left out keeps its value. Lowering one fades the
+    // oldest excess out at once.
+    put(
+        table,
+        "SetLimits",
+        scope.create_function(|_, opts: mlua::Table| {
+            let mut scene = scene.borrow_mut();
+            let limits = limits_from(&opts, scene.decals.limits())?;
+            scene.decals.set_limits(limits);
+            Ok(())
+        }),
+    )?;
+
+    // Decals.GetLimits() — the budgets in force, as { per_owner, world, total }.
+    put(
+        table,
+        "GetLimits",
+        scope.create_function(|lua, ()| {
+            let limits = scene.borrow().decals.limits();
+            let out = lua.create_table()?;
+            out.set("per_owner", limits.max_per_owner)?;
+            out.set("world", limits.max_world)?;
+            out.set("total", limits.max_total)?;
+            Ok(out)
+        }),
+    )
+}
+
+/// The keys `Decals.SetLimits` takes.
+const LIMITS: [&str; 3] = ["per_owner", "world", "total"];
+
+/// `opts` over `limits`: each key it names replaces that budget. An unknown key is
+/// an error naming the valid ones.
+fn limits_from(opts: &mlua::Table, mut limits: DecalLimits) -> mlua::Result<DecalLimits> {
+    for pair in opts.pairs::<String, mlua::Value>() {
+        let (key, _) = pair?;
+        if !LIMITS.contains(&key.as_str()) {
+            return Err(mlua::Error::RuntimeError(format!(
+                "Decals.SetLimits: unknown limit {key:?}; expected one of {}",
+                LIMITS.join(", ")
+            )));
+        }
+    }
+    let fields = [
+        (LIMITS[0], &mut limits.max_per_owner),
+        (LIMITS[1], &mut limits.max_world),
+        (LIMITS[2], &mut limits.max_total),
+    ];
+    for (key, field) in fields {
+        if let Some(value) = opts.get::<Option<u32>>(key)? {
+            *field = value;
+        }
+    }
+    Ok(limits)
 }
 
 /// The 6 required floats: the hit point and the surface normal.

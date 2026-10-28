@@ -70,18 +70,22 @@ fn fifo_eviction_caps_the_live_list() {
 
     lua.scope(|scope| {
         rusty::api::decals::register(&lua, scope, &scene).unwrap();
-        // Spawn well past the cap (256 today), each at x = i so survivors are
+        // Spawn well past the world budget (1024 by default), each at x = i so survivors are
         // identifiable. The exact cap is the renderer's business; the API contract
         // under test is "bounded, oldest evicted first".
-        lua.load("for i = 1, 400 do Decals.Spawn(i, 0, 0, 0, 1, 0) end")
+        lua.load("for i = 1, 1200 do Decals.Spawn(i, 0, 0, 0, 1, 0) end")
             .exec()
             .unwrap();
 
         let n: u32 = lua.load("return Decals.Count()").eval().unwrap();
-        assert!(n < 400, "the live list is bounded");
-        // FIFO: with n survivors of 400, the first remaining is the (400 - n + 1)th.
+        assert!(n < 1200, "the live list is bounded");
+        // FIFO: with n survivors of 1200, the first remaining is the (1200 - n + 1)th.
         let first_x = scene.borrow().decals[0].position.x;
-        assert_eq!(first_x, (400 - n + 1) as f32, "oldest decals evicted first");
+        assert_eq!(
+            first_x,
+            (1200 - n + 1) as f32,
+            "oldest decals evicted first"
+        );
         Ok(())
     })
     .unwrap();

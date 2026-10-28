@@ -28,6 +28,7 @@ use std::rc::Rc;
 use super::harness::Harness;
 use crate::api;
 use crate::core::application::BuildSettings;
+use crate::core::settings::decals::DecalLimits;
 use crate::core::settings::graphics_options::GraphicsOptions;
 
 /// Default enemy brain used by the default scene when running scenarios.
@@ -41,7 +42,7 @@ pub struct RunReport {
 
 /// Load and run `scenario_path` headlessly, writing results into `out_dir`, on the
 /// open project (`core::project`), playing `scene` (project-relative) under the
-/// project's `build` settings and default `graphics` options: a scenario play-tests
+/// project's `build` settings, default `graphics` options and `decals` budgets: a scenario play-tests
 /// the game being built.
 pub fn run(
     scenario_path: &Path,
@@ -49,8 +50,9 @@ pub fn run(
     scene: &str,
     build: BuildSettings,
     graphics: GraphicsOptions,
+    decals: DecalLimits,
 ) -> Result<RunReport, String> {
-    let harness = Harness::in_user_workspace(out_dir, scene, build, graphics)?;
+    let harness = Harness::in_user_workspace(out_dir, scene, build, graphics, decals)?;
     run_in(harness, scenario_path)
 }
 

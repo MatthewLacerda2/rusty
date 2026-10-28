@@ -1,8 +1,9 @@
-//! The decal registry (#639): handles, the fading cap, owners and the fixed tick.
+//! The decal registry (#639): handles, owners and the fixed tick. The budgets:
+//! `budget_tests.rs`.
 
 use glam::{Quat, Vec3};
 
-use super::{EVICTION_FADE, EVICTION_HEADROOM, MAX_DECALS};
+use crate::core::settings::decals::DecalLimits;
 use crate::scene::decal::DecalSpec;
 use crate::scene::Scene;
 
@@ -22,36 +23,6 @@ fn ids_are_unique_and_survive_a_clear() {
     assert!(!s.decals.remove(a, 0.0), "a cleared id names nothing");
     assert!(s.decals.remove(b, 0.0));
     assert!(s.decals.is_empty());
-}
-
-#[test]
-fn past_the_cap_the_oldest_fades_out_instead_of_popping() {
-    let mut s = Scene::new();
-    for i in 0..=MAX_DECALS {
-        spawn_at(&mut s, i as f32);
-    }
-    assert_eq!(s.decals.len(), MAX_DECALS + 1, "nothing popped");
-    let oldest = &s.decals[0];
-    assert!(
-        oldest.retiring && oldest.opacity() == 1.0,
-        "fading, still whole"
-    );
-    assert!(!s.decals[1].retiring);
-    s.decals.tick(EVICTION_FADE * 0.5, |_| true);
-    assert!((s.decals[0].opacity() - 0.5).abs() < 1e-5);
-    s.decals.tick(EVICTION_FADE * 0.5, |_| true);
-    assert_eq!(s.decals.len(), MAX_DECALS, "faded out, then dropped");
-    assert_eq!(s.decals[0].position.x, 1.0);
-}
-
-#[test]
-fn the_headroom_bounds_the_total_when_fades_cannot_keep_up() {
-    let mut s = Scene::new();
-    for i in 0..MAX_DECALS + EVICTION_HEADROOM + 10 {
-        spawn_at(&mut s, i as f32);
-    }
-    assert_eq!(s.decals.len(), MAX_DECALS + EVICTION_HEADROOM);
-    assert_eq!(s.decals.iter().filter(|d| !d.retiring).count(), MAX_DECALS);
 }
 
 #[test]
@@ -103,7 +74,11 @@ fn a_dead_owner_stamps_nothing() {
 fn the_same_spawns_and_steps_give_the_same_decals() {
     let run = || {
         let mut s = Scene::new();
-        for i in 0..MAX_DECALS + 40 {
+        s.decals.set_limits(DecalLimits {
+            max_world: 24,
+            ..DecalLimits::default()
+        });
+        for i in 0..64 {
             let spec = DecalSpec {
                 lifetime: Some(0.5 + (i % 7) as f32 * 0.25),
                 fade: 0.2,

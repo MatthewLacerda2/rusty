@@ -41,6 +41,7 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::core::application::BuildSettings;
+use crate::core::settings::decals::DecalLimits;
 use crate::core::settings::graphics_options::GraphicsOptions;
 
 pub use agent::{CLAUDE_FILE, MCP_FILE};
@@ -130,6 +131,8 @@ pub struct Opened {
     pub build: BuildSettings,
     /// The project's default player graphics options (#1438), from the same file.
     pub graphics_options: GraphicsOptions,
+    /// The game's decal budgets (#1517), from the same file.
+    pub decals: DecalLimits,
 }
 
 /// Open the project at `dir`: create its skeleton, check
@@ -208,6 +211,7 @@ pub(crate) fn prepare(dir: &Path, access: Access) -> Result<(Opened, Vec<String>
             engine,
             build: file.build,
             graphics_options: file.graphics_options,
+            decals: file.decals,
         },
         lines,
     ))

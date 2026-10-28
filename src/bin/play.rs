@@ -58,6 +58,7 @@ fn main() {
         &scene,
         opened.build,
         opened.graphics_options,
+        opened.decals,
     ) {
         Ok(report) => {
             println!(

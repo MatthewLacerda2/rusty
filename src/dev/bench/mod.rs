@@ -37,13 +37,15 @@ use crate::core::frame_stats::FrameStats;
 use crate::render::{ClockProbe, GpuPass};
 
 /// The render counters a bench row reports, in order.
-const COUNTERS: [&str; 6] = [
+const COUNTERS: [&str; 8] = [
     "draw_calls",
     "triangles",
     "lights_dropped",
     "cluster_lights_dropped",
     "culled_entities",
     "lights_culled",
+    "decals_visible",
+    "decal_cluster_refs",
 ];
 /// The systems a bench row reports, in order: the sim's heavy hitters.
 const SYSTEMS: [&str; 4] = ["update_scripts", "tick_nav", "step_physics", "animate"];

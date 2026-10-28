@@ -431,7 +431,7 @@ it to measure the default again.
   walk cycle and hitboxes) walking the navmesh with a Lua brain each (patrol + a
   line-of-sight raycast per tick, `bench/enemy.lua`); 32 realtime point and spot
   lights, 8 flickering like muzzle flashes (`bench/flicker.lua`) and 6 casting
-  shadows; a full decal registry (256); four smoke columns; the sun's shadows. The
+  shadows; 256 decals; four smoke columns; the sun's shadows. The
   Player stands 3 m in from its spawn, so the camera looks down the whole yard.
 - **the run** — 60 warm-up frames, then 600 measured ones, each stepped and rendered
   at 1280x720 (`Harness.LoadStress{…}` then `Harness.Bench(600)`).
@@ -439,7 +439,8 @@ it to measure the default again.
   `renderer_ms` (CPU time recording the frame), `gpu_ms` and `gpu.<pass>` (GPU time
   at a fixed reference clock, below), `gpu_raw_ms` (GPU time as measured) and
   `gpu_clock_pct` (the clock it ran at, % of the reference), `draw_calls`,
-  `triangles`, `culled_entities`, `lights_dropped`, `lights_culled`, and the systems
+  `triangles`, `culled_entities`, `lights_dropped`, `lights_culled`,
+  `decals_visible`, `decal_cluster_refs`, and the systems
   `update_scripts`, `tick_nav`, `step_physics`, `animate`. Every GPU pass prints
   every run (0 when it did not run), so the rows are stable.
 - **before and after** — the report is kept in `out/bench/bench.json` (and
