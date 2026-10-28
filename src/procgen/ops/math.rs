@@ -1,35 +1,58 @@
-//! src/procgen/ops/math.rs — converter / math ops (one input).
+//! src/procgen/ops/math.rs — converter / math ops (one input; `math` takes two).
 //!
-//! Scalar transforms applied per channel: arithmetic against a constant, range
-//! remap, clamp, and the RGB→luminance collapse. All pixel→pixel, run through
-//! [`Image::map_in_place`].
+//! Scalar transforms applied per channel: arithmetic against a constant or a second
+//! image, range remap, clamp, and the RGB→luminance collapse. All pixel→pixel, run
+//! through [`Image::map_in_place`] (or [`Image::for_each_row`] with a second image).
 
 use super::super::image_buf::{Image, Rgba};
 use super::super::recipe::MathOp;
 
-/// Apply a scalar [`MathOp`] against the constant `value`, per RGB channel; alpha is
-/// left untouched.
-pub fn math(mut img: Image, op: MathOp, value: f32) -> Image {
-    let apply = |c: f32| match op {
-        MathOp::Add => c + value,
-        MathOp::Subtract => c - value,
-        MathOp::Multiply => c * value,
+/// Apply a [`MathOp`] per RGB channel; alpha is left untouched. The right-hand side
+/// is `rhs`'s matching channel per pixel when it is wired, else the constant `value`.
+pub fn math(mut img: Image, rhs: Option<&Image>, op: MathOp, value: f32) -> Image {
+    let Some(rhs) = rhs else {
+        img.map_in_place(|p| {
+            let f = |c| apply(op, c, value);
+            [f(p[0]), f(p[1]), f(p[2]), p[3]]
+        });
+        return img;
+    };
+    let w = img.resolution() as usize;
+    img.for_each_row(|y, row| {
+        for (x, p) in row.iter_mut().enumerate() {
+            let q = rhs.pixels()[y * w + x];
+            *p = [
+                apply(op, p[0], q[0]),
+                apply(op, p[1], q[1]),
+                apply(op, p[2], q[2]),
+                p[3],
+            ];
+        }
+    });
+    img
+}
+
+/// `c op v` for one channel. Division by zero gives 0, a negative base to `power` or
+/// `sqrt` reads as 0.
+fn apply(op: MathOp, c: f32, v: f32) -> f32 {
+    match op {
+        MathOp::Add => c + v,
+        MathOp::Subtract => c - v,
+        MathOp::Multiply => c * v,
         MathOp::Divide => {
-            if value.abs() < 1e-9 {
+            if v.abs() < 1e-9 {
                 0.0
             } else {
-                c / value
+                c / v
             }
         }
-        MathOp::Power => c.max(0.0).powf(value),
-        MathOp::Min => c.min(value),
-        MathOp::Max => c.max(value),
+        MathOp::Power => c.max(0.0).powf(v),
+        MathOp::Min => c.min(v),
+        MathOp::Max => c.max(v),
         MathOp::Abs => c.abs(),
         MathOp::Fract => c.rem_euclid(1.0),
         MathOp::Sqrt => c.max(0.0).sqrt(),
-    };
-    img.map_in_place(|p| [apply(p[0]), apply(p[1]), apply(p[2]), p[3]]);
-    img
+    }
 }
 
 /// Remap each RGB channel from `[from_min, from_max]` to `[to_min, to_max]`

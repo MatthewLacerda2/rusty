@@ -16,6 +16,12 @@ pub enum BlendMode {
     Overlay,
     Subtract,
     Difference,
+    /// Per-channel max of a and b.
+    Lighten,
+    /// Per-channel min of a and b.
+    Darken,
+    /// a / b; a channel of b at 0 leaves a.
+    Divide,
 }
 
 /// A scalar math operation for [`super::OpKind::Math`].
@@ -32,6 +38,14 @@ pub enum MathOp {
     Abs,
     Fract,
     Sqrt,
+}
+
+impl MathOp {
+    /// `abs`, `fract` and `sqrt` take no right-hand side, so a `math` node using one
+    /// accepts a single input (#1487).
+    pub fn is_unary(self) -> bool {
+        matches!(self, MathOp::Abs | MathOp::Fract | MathOp::Sqrt)
+    }
 }
 
 /// Which kind of noise [`super::OpKind::Noise`] produces.

@@ -18,6 +18,7 @@
 
 mod arity;
 mod catalog;
+pub mod color;
 mod kinds;
 mod node;
 pub mod params;
@@ -42,6 +43,7 @@ use serde::{Deserialize, Serialize};
 #[serde(deny_unknown_fields)]
 pub struct RampStop {
     pub pos: f32,
+    #[serde(deserialize_with = "color::color")]
     pub color: [f32; 4],
 }
 
@@ -60,8 +62,7 @@ pub enum OpKind {
     Brick(Brick),
     Shape(Shape),
     Checker(Checker),
-    /// Per-pixel uniform white noise (grayscale), seeded by the recipe seed.
-    WhiteNoise,
+    WhiteNoise(WhiteNoise),
 
     // ---- Color ----
     ColorRamp(ColorRamp),
@@ -71,6 +72,9 @@ pub enum OpKind {
     BrightContrast(BrightContrast),
     HueSatValue(HueSatValue),
     Gamma(Gamma),
+    /// Stretch RGB so the input's minimum maps to 0 and its maximum to 1, one range
+    /// across R, G and B (hue kept); alpha untouched, a flat input unchanged.
+    AutoLevels,
 
     // ---- Vector / normal ----
     Mapping(Mapping),

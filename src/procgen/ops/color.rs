@@ -29,6 +29,25 @@ pub fn gamma(mut img: Image, g: f32) -> Image {
     img
 }
 
+/// Stretch RGB so the input's darkest channel value maps to 0 and its brightest to 1:
+/// one range across R, G and B, so a colour keeps its hue (Substance's Auto Levels).
+/// Alpha is untouched; a flat input (no range to stretch) passes through unchanged.
+pub fn auto_levels(mut img: Image) -> Image {
+    let (lo, hi) = img
+        .pixels()
+        .iter()
+        .flat_map(|p| &p[..3])
+        .fold((f32::INFINITY, f32::NEG_INFINITY), |(lo, hi), &c| {
+            (lo.min(c), hi.max(c))
+        });
+    let span = hi - lo;
+    if span.is_finite() && span > 1e-6 {
+        let f = |c: f32| (c - lo) / span;
+        img.map_in_place(|p| [f(p[0]), f(p[1]), f(p[2]), p[3]]);
+    }
+    img
+}
+
 /// Brightness offset, then contrast scaled about mid-gray (0.5).
 pub fn bright_contrast(mut img: Image, bright: f32, contrast: f32) -> Image {
     let adj = |c: f32| (c + bright - 0.5) * contrast + 0.5;
@@ -118,6 +137,10 @@ fn blend_pixel(a: Rgba, b: Rgba, mode: BlendMode, factor: f32) -> Rgba {
             BlendMode::Screen => 1.0 - (1.0 - a[c]) * (1.0 - b[c]),
             BlendMode::Difference => (a[c] - b[c]).abs(),
             BlendMode::Overlay => overlay(a[c], b[c]),
+            BlendMode::Lighten => a[c].max(b[c]),
+            BlendMode::Darken => a[c].min(b[c]),
+            BlendMode::Divide if b[c].abs() < 1e-9 => a[c],
+            BlendMode::Divide => a[c] / b[c],
         };
         out[c] = lerp(a[c], combined, f);
     }

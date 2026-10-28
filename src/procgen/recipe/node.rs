@@ -27,13 +27,18 @@ impl Node {
     /// Refuse an `inputs` list its op does not accept: a missing input would bake a
     /// black or flat map, a surplus one would be silently ignored.
     pub fn check_arity(&self) -> Result<(), ArityError> {
-        let accepts = self.op.info().inputs;
+        let accepts = self.op.arity();
         if accepts.accepts(self.inputs.len()) {
             return Ok(());
         }
+        let func = match &self.op {
+            OpKind::Math(p) => serde_json::to_value(p.func).ok(),
+            _ => None,
+        };
         Err(ArityError {
             node: self.id.clone(),
             op: self.op.tag(),
+            func: func.and_then(|f| f.as_str().map(str::to_string)),
             given: self.inputs.len(),
             accepts,
         })
@@ -45,6 +50,8 @@ impl Node {
 pub struct ArityError {
     pub node: String,
     pub op: &'static str,
+    /// The `math` func, whose arity narrows the op's (a unary func takes one input).
+    pub func: Option<String>,
     pub given: usize,
     pub accepts: Arity,
 }
@@ -54,13 +61,18 @@ impl std::fmt::Display for ArityError {
         let Self {
             node,
             op,
+            func,
             given,
             accepts,
         } = self;
         let noun = if accepts.max == 1 { "input" } else { "inputs" };
+        let func = func
+            .as_ref()
+            .map(|f| format!(", func {f:?}"))
+            .unwrap_or_default();
         write!(
             f,
-            "node {node:?} (op {op:?}) takes {accepts} {noun}, but {given} given"
+            "node {node:?} (op {op:?}{func}) takes {accepts} {noun}, but {given} given"
         )
     }
 }
@@ -162,6 +174,25 @@ mod tests {
         assert!(err.contains("\"m\"") && err.contains("1 given"), "{err}");
         let surplus = parse(r#"{ "id": "i", "op": "invert", "inputs": ["a", "b"] }"#);
         assert!(surplus.unwrap_err().contains("2 given"));
+    }
+
+    #[test]
+    fn a_unary_math_func_refuses_a_second_input() {
+        let math = |func: &str, inputs: &str| {
+            parse(&format!(
+                r#"{{ "id": "m", "op": "math", "func": "{func}", "inputs": [{inputs}] }}"#
+            ))
+        };
+        for func in ["abs", "fract", "sqrt"] {
+            let err = math(func, r#""a", "b""#).unwrap_err();
+            assert!(
+                err.contains("\"m\"") && err.contains(&format!("func \"{func}\"")),
+                "{err}"
+            );
+            assert!(err.contains("takes 1 input, but 2 given"), "{err}");
+            assert!(math(func, r#""a""#).is_ok(), "{func}");
+        }
+        assert!(math("max", r#""a", "b""#).is_ok());
     }
 
     #[test]

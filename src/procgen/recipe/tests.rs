@@ -28,7 +28,7 @@ fn sample_recipe() -> TextureRecipe {
 
 #[test]
 fn op_tag_is_snake_case() {
-    let json = serde_json::to_string(&OpKind::WhiteNoise).unwrap();
+    let json = serde_json::to_string(&OpKind::WhiteNoise(WhiteNoise::default())).unwrap();
     assert!(json.contains("\"white_noise\""), "got {json}");
 }
 

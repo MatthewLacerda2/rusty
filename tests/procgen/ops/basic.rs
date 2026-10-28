@@ -1,10 +1,10 @@
 //! Per-op correctness: generators + color ops (#270). The math/vector/filter ops are
-//! covered in `ops_math.rs`. Each op is exercised through the public runner
+//! covered in `math.rs`. Each op is exercised through the public runner
 //! (`evaluate`) on a tiny recipe, so the test pins observable pixel behaviour.
 
 use rusty::procgen::recipe::{BlendMode, Checker, Gradient, GradientKind, Mix, OpKind};
 
-use super::{constant, node, run};
+use super::super::{constant, node, run};
 
 #[test]
 fn constant_fills_a_flat_color() {

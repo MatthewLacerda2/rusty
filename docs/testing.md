@@ -60,6 +60,10 @@ things follow:
   test file.
 - The sim must stay deterministic (fixed timestep, seeded RNG, no wall-clock in the
   tick) so harness/scenario tests are reproducible.
+- A bake (a procgen texture, a capture) is byte-identical **on one machine**, not
+  across architectures: `f32` transcendentals come from each platform's libm, so
+  macOS aarch64 and Linux x86_64 differ in the last bits (#1487). A test compares two
+  bakes made on the same machine, never a bake against a committed hash or pixel bytes.
 - CI (`.github/workflows/ci.yml`) and `make test` run the engine suite with
   **cargo-nextest** plus `cargo test --doc`, both feature sets; the lint xtask keeps
   plain `cargo test`. See *The test runner* below.

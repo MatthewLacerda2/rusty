@@ -33,6 +33,7 @@ fn bricks() -> Node {
         cols: 2.0,
         mortar: 0.1,
         output: rusty::procgen::recipe::BrickOutput::Mask,
+        seed: 0,
     });
     node("h", op, &[])
 }
@@ -118,6 +119,7 @@ fn weathering_bakes_byte_identically_per_seed() {
         octaves: 3,
         lacunarity: 2.0,
         gain: 0.5,
+        seed: 0,
     });
     let nodes = vec![
         node("n", noise, &[]),

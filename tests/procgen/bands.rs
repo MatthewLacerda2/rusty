@@ -4,7 +4,8 @@
 use rusty::procgen::{evaluate, with_bands, TextureRecipe};
 
 /// The *worn, grimy painted metal* example (docs/api/Texture.md) plus a blur,
-/// warp, tile, mapping, bump and the channel ops, so every banded path runs.
+/// warp, tile, mapping, bump, the channel ops, two-image math and auto levels, so
+/// every banded path runs.
 const RECIPE: &str = r#"{
   "resolution": 100, "seed": 4,
   "nodes": [
@@ -26,7 +27,11 @@ const RECIPE: &str = r#"{
     { "id": "n", "op": "bump_to_normal", "strength": 0.4, "inputs": ["turned"] },
     { "id": "rgb", "op": "combine_rgb", "inputs": ["cav", "n", "soft"] },
     { "id": "hsv", "op": "hue_sat_value", "hue": 0.1, "sat": 0.8, "value": 1.1, "inputs": ["rgb"] },
-    { "id": "out", "op": "mix", "mode": "overlay", "inputs": ["worn", "hsv"] }
+    { "id": "lit", "op": "mix", "mode": "overlay", "inputs": ["worn", "hsv"] },
+    { "id": "top", "op": "math", "func": "max", "value": 0, "inputs": ["lit", "chips"] },
+    { "id": "lev", "op": "auto_levels", "inputs": ["top"] },
+    { "id": "lt", "op": "mix", "mode": "lighten", "inputs": ["lev", "cav"] },
+    { "id": "out", "op": "mix", "mode": "divide", "factor": 0.3, "inputs": ["lt", "soft"] }
   ],
   "output": "out"
 }"#;

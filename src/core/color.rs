@@ -1,5 +1,5 @@
 //! src/core/color.rs — the colour maths more than one module needs (#939): the sRGB
-//! transfer pair and Rec. 709 luminance. Kept in `core` because `procgen`, `scene`,
+//! transfer pair, Rec. 709 luminance and `#rrggbb` hex parsing. Kept in `core` because `procgen`, `scene`,
 //! `render` and `dev` all reach it. The shaders keep their own WGSL copies.
 
 /// Inverse-sRGB transfer (IEC 61966-2-1) for one 8-bit channel, to linear `[0, 1]`.
@@ -33,6 +33,22 @@ pub fn luminance(rgb: impl Into<[f32; 3]>) -> f32 {
     0.2126 * r + 0.7152 * g + 0.0722 * b
 }
 
+/// The bytes of `"#rrggbb"` / `"#rrggbbaa"`: RGB, and alpha when written. Every digit
+/// must be a hex digit, since `u8::from_str_radix` alone also takes a sign (`"+f"`).
+pub fn hex_bytes(hex: &str) -> Option<([u8; 3], Option<u8>)> {
+    let digits = hex.strip_prefix('#')?;
+    if !matches!(digits.len(), 6 | 8) || !digits.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return None;
+    }
+    let byte = |i: usize| u8::from_str_radix(&digits[2 * i..2 * i + 2], 16).ok();
+    let alpha = if digits.len() == 8 {
+        Some(byte(3)?)
+    } else {
+        None
+    };
+    Some(([byte(0)?, byte(1)?, byte(2)?], alpha))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -55,5 +71,26 @@ mod tests {
     fn luminance_weighs_green_most() {
         assert!((luminance([1.0, 1.0, 1.0]) - 1.0).abs() < 1e-6);
         assert!(luminance([0.0, 1.0, 0.0]) > luminance([1.0, 0.0, 1.0]));
+    }
+
+    #[test]
+    fn hex_bytes_reads_rgb_and_optional_alpha() {
+        assert_eq!(hex_bytes("#ff8000"), Some(([255, 128, 0], None)));
+        assert_eq!(hex_bytes("#0000ff80"), Some(([0, 0, 255], Some(128))));
+    }
+
+    #[test]
+    fn hex_bytes_refuses_signs_and_non_digits() {
+        for bad in [
+            "ff8000",
+            "#ff800",
+            "#ff800g",
+            "#+f+f+f",
+            "#-f0000",
+            "#ééé",
+            "#ff8000ff00",
+        ] {
+            assert_eq!(hex_bytes(bad), None, "{bad}");
+        }
     }
 }
