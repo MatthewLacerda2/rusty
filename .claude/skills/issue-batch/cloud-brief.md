@@ -129,6 +129,8 @@ a coder real time.
   handed back (2026-10-26, PR #1458).
 - **Rebase once, last.** After a rebase over unrelated merges, `cargo check`, the
   size gate and your own tests are enough; the whole gate list again is not.
+  **On a re-brief of a pushed branch, don't rebase at all**: add commits on top,
+  and rebase only if GitHub shows the PR conflicting. The queue rebases at merge.
 - **Blessings come from the container's Mesa, not CI's.** A capture or snapshot
   blessed here may differ from what CI renders: bless nothing from a container
   without saying so in the PR.
@@ -156,6 +158,12 @@ a coder real time.
   rendered with `make editor-capture` (`ARGS="--select <entity>"` opens an
   inspector), the same way.
 - `make gates` (foreground, split as *The container* says) before readying.
+- **Prove the macOS leg on the draft** when a test asserts bytes or rests on driver
+  behaviour (a pixel-identical frame, a bake's exact bits, depth invariance):
+  `gh workflow run ci.yml --ref <branch>`, quoted in the PR. Lavapipe and x86_64
+  passed and macOS failed twice on 2026-10-28 (#1515's Metal frames, #1525;
+  #1520's aarch64 bake bits). Never commit a golden hash taken on one platform
+  (`docs/testing.md`).
 - **Windows runs only when asked** (#1395): a branch that touches paths, separators,
   process spawning or other platform code dispatches `gh workflow run windows.yml --ref
   <branch>` and quotes the run in its PR. Nothing else runs Windows on a PR.
