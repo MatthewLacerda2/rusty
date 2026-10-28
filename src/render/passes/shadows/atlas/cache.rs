@@ -1,32 +1,33 @@
 //! Which atlas tiles still hold their static casters (#694), the atlas's version of
 //! the cascades' `static_cache` (#355). Pure CPU.
 //!
-//! A tile is keyed by its scene and the whole [`Tile`] — view-projection, origin and
+//! A tile is keyed by its scene's [`StaticsKey`] and the whole [`Tile`] — view-projection, origin and
 //! size — so it re-bakes exactly when its light moved or turned, the plan gave it
-//! another place or size, or another scene drew over it, and never otherwise.
+//! another place or size, another scene drew over it, or the scene's statics changed,
+//! and never otherwise.
 //! Baked tiles never overlap: baking one forgets every entry it drew over, so an
 //! entry still listed is still in the static atlas, even when its light skipped a
 //! frame (left the view, or lost its room) and came back.
 
 use super::Tile;
-use crate::scene::SceneId;
+use crate::render::passes::shadows::StaticsKey;
 
 /// The tiles whose static casters the static atlas holds.
 #[derive(Debug, Default)]
 pub(super) struct StaticTiles {
-    baked: Vec<(SceneId, Tile)>,
+    baked: Vec<(StaticsKey, Tile)>,
 }
 
 impl StaticTiles {
     /// Indices of `tiles` whose statics for `scene` are not in the static atlas.
-    pub(super) fn stale(&self, scene: SceneId, tiles: &[Tile]) -> Vec<usize> {
+    pub(super) fn stale(&self, scene: StaticsKey, tiles: &[Tile]) -> Vec<usize> {
         (0..tiles.len())
             .filter(|&i| !self.baked.contains(&(scene, tiles[i])))
             .collect()
     }
 
     /// Record that `scene`'s `rebaked` tiles were baked, forgetting what they drew over.
-    pub(super) fn commit(&mut self, scene: SceneId, rebaked: impl IntoIterator<Item = Tile>) {
+    pub(super) fn commit(&mut self, scene: StaticsKey, rebaked: impl IntoIterator<Item = Tile>) {
         for tile in rebaked {
             self.baked.retain(|(_, old)| !overlaps(old, &tile));
             self.baked.push((scene, tile));

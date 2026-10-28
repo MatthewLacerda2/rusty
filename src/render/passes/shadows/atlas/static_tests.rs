@@ -1,7 +1,7 @@
 //! The atlas's static-caster cache on the GPU (#694): a still frame re-bakes no tile
 //! and draws no static caster, and its atlas is bit-identical to a forced full
-//! redraw — also with a dynamic caster moving through a cached tile. Skips with no
-//! adapter.
+//! redraw — also with a dynamic caster moving through a cached tile. A Static flag
+//! flipped re-bakes on its own (#1496). Skips with no adapter.
 
 use glam::Vec3;
 
@@ -119,4 +119,31 @@ fn gpu_a_dynamic_caster_moves_through_a_cached_tile() {
         moved == redrawn,
         "cached statics + moved caster equal a full redraw"
     );
+}
+
+#[test]
+fn gpu_a_static_flag_flip_rebakes_with_no_one_invalidating() {
+    let Some(mut r) = crate::render::test_gpu::headless_or_skip(RES, RES) else {
+        return;
+    };
+    let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, RES, RES, 2);
+    let mut scene = lamp_room();
+    let crate_id = block(
+        &mut scene,
+        Vec3::new(-1.0, 1.0, 0.0),
+        Vec3::splat(0.4),
+        false,
+    );
+    frame(&mut r, &mut view, &scene);
+    scene.world.set_static(crate_id, true); // a script in Play: no editor dirty flag
+    frame(&mut r, &mut view, &scene);
+    assert_eq!(bake(&r), (0, 7), "the flip re-bakes every tile");
+    let key = super::super::statics_key(&scene);
+    let baked: Vec<_> = r.shadow_renderer.static_cache.iter().flatten().collect();
+    assert!(
+        !baked.is_empty() && baked.iter().all(|(k, _)| *k == key),
+        "cascades too"
+    );
+    frame(&mut r, &mut view, &scene);
+    assert_eq!(bake(&r), (7, 0), "and then holds");
 }
