@@ -48,7 +48,7 @@ pub fn default_animator() -> AnimatorComponent {
             current_clip: "Idle".to_string(),
             ..Default::default()
         },
-        speed: 2.0,
+        speed: 1.0,
         is_playing: true,
         ..Default::default()
     }

@@ -26,6 +26,21 @@ fn set_speed_writes_the_component_multiplier() {
 }
 
 #[test]
+fn add_component_starts_at_authored_speed() {
+    let scene = RefCell::new(Scene::new());
+    let id = scene.borrow_mut().add_entity("Rig".to_string());
+    let path = RefCell::new(None);
+    let lua = Lua::new();
+    lua.scope(|s| {
+        rusty::api::scene::register(&lua, s, &scene, &path).unwrap();
+        lua.load(format!("Scene.AddComponent({id}, 'Animator')"))
+            .exec()
+    })
+    .unwrap();
+    assert_eq!(run(&scene, &format!("Animator.GetSpeed({id})")), "1.0");
+}
+
+#[test]
 fn speed_survives_play_and_crossfade() {
     let (scene, id) = scene_with_animator();
     run(&scene, &format!("Animator.SetSpeed({id}, 3)"));
