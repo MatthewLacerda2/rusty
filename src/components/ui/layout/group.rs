@@ -15,7 +15,7 @@ use crate::components::ui::TextAlignment;
 
 crate::core::named_enum! {
     /// Which arrangement a group makes.
-    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
     pub enum LayoutKind {
         /// One row, left to right.
         #[default]
@@ -29,7 +29,7 @@ crate::core::named_enum! {
 
 crate::core::named_enum! {
     /// How a grid picks its column / row count.
-    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
     pub enum LayoutConstraint {
         /// As many columns (or rows) as fit the rect.
         #[default]
@@ -43,7 +43,7 @@ crate::core::named_enum! {
 
 crate::core::named_enum! {
     /// The grid corner the first child sits in.
-    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
     pub enum LayoutCorner {
         #[default]
         UpperLeft = "UpperLeft",

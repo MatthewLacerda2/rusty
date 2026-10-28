@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 
 crate::core::named_enum! {
     /// What a content fitter sizes one axis to.
-    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
     pub enum LayoutAxisFit {
         /// Leave the RectTransform's size alone.
         #[default]

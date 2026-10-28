@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 crate::core::named_enum! {
     /// What kind of light it is. Its names are the editor's, the API's and the scene
     /// snapshot's: Unity's (`LightType.Spot`, #997).
-    #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+    #[derive(Clone, Copy, Debug, PartialEq)]
     pub enum LightType {
         Ambient = "Ambient",
         Directional = "Directional",
@@ -30,7 +30,7 @@ crate::core::named_enum! {
     ///   surfaces get it from their lightmap, dynamic objects from the light probes (whose
     ///   bake adds its direct light). It costs nothing at runtime and casts no realtime
     ///   shadow.
-    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
     pub enum LightMode {
         Realtime = "Realtime",
         #[default]

@@ -26,7 +26,7 @@ use crate::components::{EntityRefs, RefVisit};
 
 crate::core::named_enum! {
     /// How a Selectable shows its state. See the module docs.
-    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
     pub enum SelectableTransition {
         /// No visual change.
         None = "None",
@@ -40,7 +40,7 @@ crate::core::named_enum! {
 
 crate::core::named_enum! {
     /// How keyboard focus moves away from a Selectable.
-    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
     pub enum NavigationMode {
         /// Never focused by navigation (the pointer can still use it).
         None = "None",

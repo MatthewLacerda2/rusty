@@ -21,7 +21,7 @@ use serde::{Deserialize, Serialize};
 
 crate::core::named_enum! {
     /// The obstacle's shape (Unity's `NavMeshObstacleShape`).
-    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
     pub enum ObstacleShape {
         #[default]
         Box = "Box",

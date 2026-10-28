@@ -53,7 +53,7 @@ crate::core::named_enum! {
     /// How the player's window opens on a first launch. A player who later changes
     /// `Video.SetFullscreen` keeps that choice (it persists through `Storage`); this is
     /// only the default before any such choice exists.
-    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
     pub enum WindowMode {
         #[default]
         Windowed = "Windowed",

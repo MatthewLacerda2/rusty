@@ -14,7 +14,7 @@ crate::core::named_enum! {
     /// (Unity: `PhysicMaterialCombine`). When the two colliders disagree, the mode
     /// later in this list wins — `Average < Minimum < Multiply < Maximum`, Unity's
     /// priority and rapier's `CoefficientCombineRule` order alike.
-    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
     pub enum CombineMode {
         /// `(a + b) / 2`. The default.
         #[default]

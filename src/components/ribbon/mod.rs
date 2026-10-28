@@ -26,7 +26,7 @@ use crate::core::curve::{Curve, Gradient};
 
 crate::core::named_enum! {
     /// How the texture's `u` coordinate runs along the ribbon.
-    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
     pub enum TextureMode {
         /// One copy of the texture stretched over the whole length.
         #[default]

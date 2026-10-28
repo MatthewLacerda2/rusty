@@ -6,7 +6,7 @@
 //! ```ignore
 //! crate::core::named_enum! {
 //!     /// How a joint constrains its bodies.
-//!     #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+//!     #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 //!     pub enum JointKind {
 //!         #[default]
 //!         Fixed = "Fixed",
@@ -24,10 +24,12 @@
 //! enum that match ignoring case fail the build ([`unique`]), so `parse` is never
 //! ambiguous.
 //!
-//! The enum must be `Copy` (`name` takes `self`). Its serde derive is its own: a
-//! stored file holds serde's spelling, read exactly, and a Lua table reaches it
-//! through `api::lua_json::decode`, which reads every variant name in any case
-//! (#1216). Hand-writing the trio instead is the `named-enum` lint finding.
+//! The enum must be `Copy` (`name` takes `self`) and must not derive serde: the
+//! macro writes `Serialize` and `Deserialize` too, so a stored file (a scene, a
+//! prefab, a settings file) holds `name()` and is read through `parse()`, in any
+//! case and with the aliases, the same names scripts, the inspector and the docs
+//! use (#1478). A tag serde cannot read is reported as serde's own unknown variant,
+//! listing the names. Hand-writing the trio instead is the `named-enum` lint finding.
 
 /// See the module docs.
 macro_rules! named_enum {
@@ -86,6 +88,55 @@ macro_rules! named_enum {
                 f.write_str(self.name())
             }
         }
+
+        // A stored file holds `name()` and is read through `parse()` (#1478).
+        const _: () = {
+            use ::serde::de::{self, EnumAccess, VariantAccess};
+
+            const NAMES: &[&str] = &[$($name),+];
+
+            impl ::serde::Serialize for $Name {
+                fn serialize<S: ::serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+                    let index = Self::ALL.iter().position(|v| v == self).unwrap_or(0);
+                    s.serialize_unit_variant(stringify!($Name), index as u32, self.name())
+                }
+            }
+
+            /// The variant a stored name picks, read as serde's enum tag.
+            struct Tag($Name);
+
+            impl<'de> ::serde::Deserialize<'de> for Tag {
+                fn deserialize<D: ::serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+                    d.deserialize_identifier(Visitor)
+                }
+            }
+
+            struct Visitor;
+
+            impl<'de> de::Visitor<'de> for Visitor {
+                type Value = Tag;
+
+                fn expecting(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+                    write!(f, "one of {}", $Name::names())
+                }
+
+                fn visit_str<E: de::Error>(self, name: &str) -> Result<Tag, E> {
+                    $Name::parse(name).map(Tag).ok_or_else(|| E::unknown_variant(name, NAMES))
+                }
+
+                fn visit_enum<A: EnumAccess<'de>>(self, data: A) -> Result<Tag, A::Error> {
+                    let (tag, rest) = data.variant::<Tag>()?;
+                    rest.unit_variant()?;
+                    Ok(tag)
+                }
+            }
+
+            impl<'de> ::serde::Deserialize<'de> for $Name {
+                fn deserialize<D: ::serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+                    Ok(d.deserialize_enum(stringify!($Name), NAMES, Visitor)?.0)
+                }
+            }
+        };
     };
 }
 

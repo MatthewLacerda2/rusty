@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 crate::core::named_enum! {
     /// Which depth of field runs. Declared in the order the editor lists them (the
     /// default first); the names are Unity's.
-    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
     pub enum DofMode {
         /// No depth of field: no pass runs.
         #[default]

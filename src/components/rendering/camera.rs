@@ -17,7 +17,7 @@ crate::core::named_enum! {
     /// [`CameraComponent::render_order`] and applies each pass's clear behavior in
     /// turn, so later cameras composite over earlier ones (#93). Scripts also accept
     /// Unity's `CameraClearFlags` spellings, `"Color"` and `"Depth"`.
-    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
     pub enum ClearFlags {
         /// Clear color to the skybox/backdrop and clear depth — a world/base camera.
         #[default]

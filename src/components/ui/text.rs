@@ -20,7 +20,7 @@ use super::shader::UiShader;
 
 crate::core::named_enum! {
     /// Where the text block sits in its rect — Unity's nine `TextAnchor`s.
-    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
     pub enum TextAlignment {
         #[default]
         TopLeft = "TopLeft",
@@ -46,7 +46,7 @@ impl TextAlignment {
 
 crate::core::named_enum! {
     /// What happens to text that does not fit its rect.
-    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
     pub enum TextOverflow {
         /// Draw it anyway, spilling past the rect.
         #[default]

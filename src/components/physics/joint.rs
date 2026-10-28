@@ -32,7 +32,7 @@ use crate::components::{EntityRefs, RefVisit};
 
 crate::core::named_enum! {
     /// Which rotations a joint leaves free. See the module docs.
-    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
     pub enum JointKind {
         /// No relative motion at all.
         #[default]

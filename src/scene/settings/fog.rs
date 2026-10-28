@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 
 crate::core::named_enum! {
     /// How fog thickens with distance from the camera.
-    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
     pub enum FogMode {
         /// No fog — the default.
         #[default]

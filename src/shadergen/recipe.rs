@@ -24,8 +24,7 @@ crate::core::named_enum! {
     ///
     /// Its name is the lowercase tag used in error messages and the block catalog
     /// lookup, the same spelling serde stores.
-    #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-    #[serde(rename_all = "snake_case")]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
     pub enum PassKind {
         /// Forward/surface pass: the standard `vs_main` vertex stage + lighting from
         /// `shader.wgsl`, with the fragment look varied by the chosen surface blocks.

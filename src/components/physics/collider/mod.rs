@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 
 crate::core::named_enum! {
     /// The local axis a capsule's length runs along (Unity: `CapsuleCollider.direction`).
-    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
     pub enum CapsuleAxis {
         X = "X",
         #[default]

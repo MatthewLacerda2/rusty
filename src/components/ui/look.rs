@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 
 crate::core::named_enum! {
     /// How a graphic composites onto the frame. See the module docs.
-    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
     pub enum UiBlend {
         /// Ordinary alpha blending ("over").
         #[default]
@@ -33,7 +33,7 @@ crate::core::named_enum! {
 crate::core::named_enum! {
     /// How a gradient sweeps across the rect. Scripts may write the name in any case
     /// (`api::lua_json::decode`, #1216); a stored file holds `"Linear"`/`"Radial"`.
-    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
     pub enum GradientKind {
         /// Along a direction at `angle` degrees, corner to corner.
         #[default]

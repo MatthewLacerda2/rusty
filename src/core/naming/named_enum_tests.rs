@@ -57,3 +57,22 @@ fn parse_reads_aliases_and_refuses_anything_else() {
         assert_eq!(Probe::parse(unknown), None, "{unknown:?}");
     }
 }
+
+#[test]
+fn a_stored_file_holds_the_declared_name() {
+    let stored: Vec<_> = Probe::ALL.map(|p| serde_json::to_value(p).unwrap()).into();
+    assert_eq!(stored, ["Plain", "home_theater", "Custom"]);
+}
+
+#[test]
+fn a_stored_name_reads_in_any_case_and_through_its_aliases() {
+    let read = |s: &str| serde_json::from_value::<Probe>(serde_json::json!(s));
+    for p in Probe::ALL {
+        assert_eq!(read(p.name()).unwrap(), p);
+        assert_eq!(read(&p.name().to_ascii_uppercase()).unwrap(), p);
+    }
+    assert_eq!(read("hand set").unwrap(), Probe::Aliased);
+    let error = read("Renamed").unwrap_err().to_string();
+    assert!(error.contains("unknown variant `Renamed`"), "{error}");
+    assert!(error.contains("`home_theater`"), "lists the names: {error}");
+}

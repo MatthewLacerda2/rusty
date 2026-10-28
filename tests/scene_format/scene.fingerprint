@@ -252,7 +252,7 @@ scene.entities[].light.color: tuple(3)
 scene.entities[].light.color[]: f32
 scene.entities[].light.inner_cone: f32
 scene.entities[].light.intensity: f32
-scene.entities[].light.light_type: enum Ambient|Directional|Point|Spotlight
+scene.entities[].light.light_type: enum Ambient|Directional|Point|Spot
 scene.entities[].light.mode: enum Realtime|Mixed|Baked
 scene.entities[].light.outer_cone: f32
 scene.entities[].light.range: f32
@@ -427,7 +427,7 @@ scene.entities[].particles.render.material: option
 scene.entities[].particles.render.material: string
 scene.entities[].particles.render.mesh: option
 scene.entities[].particles.render.mesh: string
-scene.entities[].particles.render.mode: enum Billboard|Stretched|Horizontal|Vertical|Mesh
+scene.entities[].particles.render.mode: enum billboard|stretched|horizontal|vertical|mesh
 scene.entities[].particles.render.soft_distance: f32
 scene.entities[].particles.render.speed_scale: f32
 scene.entities[].particles.rotation: any
@@ -526,7 +526,7 @@ scene.entities[].post_processing.ssr.active: bool
 scene.entities[].post_processing.ssr.quality: string
 scene.entities[].post_processing.ssr.temporal_upsampling: bool
 scene.entities[].post_processing.tonemapping.display_gamma: f32
-scene.entities[].post_processing.tonemapping.mode: enum Aces|Reinhard|None
+scene.entities[].post_processing.tonemapping.mode: enum ACES|Reinhard|None
 scene.entities[].post_processing.vignette.active: bool
 scene.entities[].post_processing.vignette.center: tuple(2)
 scene.entities[].post_processing.vignette.center[]: f32
