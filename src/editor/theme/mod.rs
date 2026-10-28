@@ -107,7 +107,7 @@ impl Theme {
     }
 
     /// Accent color for an asset of the given (lowercased) file extension, used by
-    /// the content browser to color-badge tiles by type.
+    /// to color-badge assets by type.
     pub fn asset_color(&self, ext: &str) -> Color32 {
         match ext {
             e if crate::asset::IMAGE_EXTENSIONS.contains(&e) => self.accent,

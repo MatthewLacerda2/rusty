@@ -75,7 +75,7 @@ pub fn draw_node(
 /// `scene::save_prefab` verb (the same path `Scene.SavePrefab` takes). The folder is
 /// created on demand; the entity name is sanitised into a filesystem-safe stem.
 fn save_as_prefab(scene: &Scene, entity_id: u32, name: &str) {
-    let dir = std::path::Path::new(crate::editor::content_browser::ROOT).join("prefabs");
+    let dir = std::path::Path::new(crate::core::project::ASSETS_DIR).join("prefabs");
     std::fs::create_dir_all(&dir).ok();
     let stem: String = name
         .chars()

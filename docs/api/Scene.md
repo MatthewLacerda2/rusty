@@ -239,7 +239,7 @@ one name and never drift.
   importable model sub-object reference (`path::sub_object`, the `reference` field
   `Assets.Manifest()` hands back), placed at `(x, y, z)` (the origin when omitted) and
   named `name` (the sub-object id when omitted). This is the API equivalent of dragging
-  a glTF from the content browser into the scene: it runs the importer to build the
+  a glTF into the scene from Unity's Project window: it runs the importer to build the
   mesh, applies the sub-object's glTF material (deduped into the shared library, or the
   engine default when the glTF names none), and syncs a mesh collider when the asset's
   `.meta` sidecar records one. Returns the new entity's id; errors (without spawning)

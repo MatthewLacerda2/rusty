@@ -1,6 +1,6 @@
 //! src/scene/asset_instance/ — Instantiate one imported sub-object (#182).
 //!
-//! The "drag a glTF from the content browser into the scene" verb, given an API
+//! The "drag a glTF from Unity's Project window into the scene" verb, given an API
 //! equivalent: spawn ONE entity from a path-based asset reference
 //! (`path::sub_object`), carrying the importer-built mesh, its resolved material
 //! (or the engine default), and a synced collider when the sidecar asks for one.

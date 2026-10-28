@@ -257,7 +257,7 @@ impl SubMesh {
 
 /// The full result of importing one source file: every addressable sub-mesh plus
 /// the shared material table. This is the pure-data product the scene layer and
-/// the Content Browser both consume.
+/// the editor both consume.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct ImportedAsset {
     pub sub_meshes: Vec<SubMesh>,

@@ -171,11 +171,11 @@ fn sub_object_row(
     let mut convex = colliders.get(id).map(|k| k.is_convex()).unwrap_or(false);
 
     ui.horizontal(|ui| {
-        ui.label(format!(
-            "• {}::{}",
-            crate::editor::content_browser::file_name(path),
-            id
-        ));
+        let file = std::path::Path::new(path)
+            .file_name()
+            .and_then(|s| s.to_str())
+            .unwrap_or(path);
+        ui.label(format!("• {file}::{id}"));
         ui.checkbox(&mut generate, "Mesh Collider");
         if generate {
             egui::ComboBox::from_id_salt(format!("mesh_collider_kind_{id}"))

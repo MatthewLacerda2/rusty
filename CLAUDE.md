@@ -441,6 +441,13 @@ only its adapter (Lua → zimmer document, file writes, patch-path resolution).
   build), **except pure UI chrome** (collapsing a card, resizing a panel). Every user-facing
   editor capability has an API equivalent, and a dev task the agent can't do yet is a
   gap to file.
+- **The editor's clickable UI is a subset of Unity's** (the operator, 2026-10-27).
+  By hand the operator looks at the scene hierarchy, changes values in the inspector
+  and plays the game; app settings, the engine and the game go through Claude, and
+  files are browsed in the OS file manager or by asking Claude. Unity stays the
+  yardstick for *features*, not for how many of them get a panel: chrome that only
+  serves hand authoring (a file browser, a node-graph view) is not built, and existing
+  chrome of that kind is removed.
 - **Keep the API doc in lockstep.** When you add or change an API function, update
   its namespace's page in `docs/api/` (`docs/api/<Namespace>.md`) in the *same* change. That doc is the API reference the agent
   reads to drive the engine, so it must never lag the bindings. This is no longer just
