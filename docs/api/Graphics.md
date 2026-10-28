@@ -577,14 +577,17 @@ the pixel count. The finished, post-processed image is then upscaled (bilinear, 
 URP's *Auto* filter outside FSR) to the surface **before the UI**, which stays at
 native resolution and sharp. Below `1` the scene looks softer; above `1` it
 supersamples. On a 2× Retina surface `0.5` renders at the 1× pixel count:
-`Video.SetResolution` sizes the window, not the render, and cannot do that.
+`Video.SetResolution` sizes the window (or, fullscreen, the whole framebuffer, UI
+included), and cannot do that. Each side is capped at the device's largest texture
+(`max_texture_dimension_2d`, 8192 px on most GPUs), so `2` on a 5K screen renders
+8192 px wide rather than failing.
 
 Range `0.1`–`2` (URP's), **default `1`**, which renders exactly as without it (no
 upscale pass). Like the tier it is a player setting: it writes the same shared cell,
 applies the next frame in the standalone player and the editor's Game view, and is
 **persisted** through `Storage` (`graphics.render_scale`) at the Stop and quit
 boundaries. Screen sizes stay the surface's: `UI.GetScreenSize`, the UI's layout and
-`Camera.ScreenToWorld` speak surface pixels whatever the scale. The editor's **Scene
+`Camera.ScreenToWorldRay` speak surface pixels whatever the scale. The editor's **Scene
 view** ignores it, as Unity's Scene view does; so do render textures, which keep
 their own size.
 

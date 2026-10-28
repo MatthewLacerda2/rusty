@@ -17,13 +17,15 @@ toggles the winit window (borderless). Vsync off requests the surface's `Immedia
 present mode; if the backend doesn't support it, vsync stays on and `GetVsync`
 reports the true state.
 
-**`SetResolution` sizes the window, not the render.** Windowed, it asks the OS to
-resize the window (in the editor, the editor's window), and the surface keeps the
-display's backing scale: on a 2× Retina display it still has two pixels per point,
-and the scene draws at every one of them. To
-render the 3D scene at fewer pixels than the surface, set
+**`SetResolution` sizes the window or the framebuffer, never the scene alone.**
+Windowed, it asks the OS to resize the window (in the editor, the editor's window),
+and the surface keeps the display's backing scale: on a 2× Retina display it still
+has two pixels per point, and the scene draws at every one of them. Fullscreen, the
+window cannot resize, so it reconfigures the surface to `w × h`: the frame does
+render fewer pixels, but the UI with it, so the HUD softens as much as the scene. To
+render the 3D scene at fewer pixels and keep the HUD native, set
 [`Graphics.SetRenderScale`](Graphics.md) (Unity's *Render Scale*): `0.5` on a 2×
-surface renders at the 1× pixel count, and the UI stays sharp.
+surface renders the scene at the 1× pixel count, and the UI stays sharp.
 
 Settings persist through the `video` `Storage` namespace
 (loaded at startup, flushed on Stop / quit), so the app relaunches as last set. In

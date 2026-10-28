@@ -3,6 +3,7 @@
 //! Always the output's size, never the scene's scaled one (#1498).
 
 use super::RenderView;
+use crate::core::settings::render_scale::RenderScale;
 
 impl RenderView {
     /// An owned view of the offscreen colour target, or `None` for a targetless view.
@@ -60,27 +61,22 @@ impl RenderView {
     }
 
     /// Create the offscreen view in `slot` if absent, else resize it in place — so a
-    /// consumer keeps one view across frames and only reallocates when the panel size
-    /// or quality tier changes.
-    pub fn ensure_offscreen(
-        slot: &mut Option<RenderView>,
+    /// consumer keeps one view across frames and only reallocates when the panel size,
+    /// the render scale (#1498) or the quality tier changes. The scale is set before
+    /// the resize, so a frame that changes both size and scale allocates once.
+    pub fn ensure_offscreen<'a>(
+        slot: &'a mut Option<RenderView>,
         device: &wgpu::Device,
         format: wgpu::TextureFormat,
-        width: u32,
-        height: u32,
+        (width, height): (u32, u32),
+        render_scale: RenderScale,
         bloom_divisor: u32,
-    ) {
-        match slot {
-            Some(view) => view.resize(device, width, height, bloom_divisor),
-            None => {
-                *slot = Some(RenderView::offscreen(
-                    device,
-                    format,
-                    width,
-                    height,
-                    bloom_divisor,
-                ))
-            }
-        }
+    ) -> &'a mut RenderView {
+        let view = slot.get_or_insert_with(|| {
+            RenderView::offscreen(device, format, width, height, bloom_divisor)
+        });
+        view.set_render_scale(render_scale);
+        view.resize(device, width, height, bloom_divisor);
+        view
     }
 }

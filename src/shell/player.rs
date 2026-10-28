@@ -55,7 +55,7 @@ impl Frontend for PlayerFrontend {
             )),
         };
         // The screen renders its scene at the player's render scale (#1498).
-        view.set_render_scale(shell.renderer.render_scale);
+        view.set_render_scale(shell.renderer.graphics(false).render_scale);
         view.resize(device, width, height, bloom);
 
         // The view is targetless (it renders straight onto the swapchain), so hand it

@@ -188,7 +188,8 @@ impl RenderView {
     /// the size-dependent textures are reallocated.
     pub fn resize(&mut self, device: &wgpu::Device, width: u32, height: u32, bloom_divisor: u32) {
         let size = PixelSize::new(width.max(1), height.max(1));
-        let scene = scale::scene_size(self.render_scale, size);
+        let max_side = device.limits().max_texture_dimension_2d;
+        let scene = scale::scene_size(self.render_scale, size, max_side);
         if (self.size, self.scene_size, self.bloom_divisor) == (size, scene, bloom_divisor) {
             return;
         }

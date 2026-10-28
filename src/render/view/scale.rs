@@ -35,9 +35,12 @@ impl RenderView {
     }
 }
 
-/// `output` at `scale`, each side rounded and at least 1.
-pub(super) fn scene_size(scale: RenderScale, output: PixelSize) -> PixelSize {
-    PixelSize::new(scale.apply(output.width), scale.apply(output.height))
+/// `output` at `scale`, each side rounded, at least 1 and at most `max_side` (the
+/// device's `max_texture_dimension_2d`): a 5K screen at scale 2 would ask for a texture
+/// wider than the device allows, and a script must not be able to crash the engine.
+pub(super) fn scene_size(scale: RenderScale, output: PixelSize, max_side: u32) -> PixelSize {
+    let side = |px| scale.apply(px).min(max_side.max(1));
+    PixelSize::new(side(output.width), side(output.height))
 }
 
 /// The upscale source for a view whose scene is `scene` and output `output`, in the
