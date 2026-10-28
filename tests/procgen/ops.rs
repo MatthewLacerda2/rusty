@@ -2,7 +2,7 @@
 //! covered in `ops_math.rs`. Each op is exercised through the public runner
 //! (`evaluate`) on a tiny recipe, so the test pins observable pixel behaviour.
 
-use rusty::procgen::recipe::{BlendMode, GradientKind, OpKind};
+use rusty::procgen::recipe::{BlendMode, Checker, Gradient, GradientKind, Mix, OpKind};
 
 use super::{constant, node, run};
 
@@ -18,11 +18,11 @@ fn checker_alternates_neighbouring_tiles() {
     let img = run(
         vec![node(
             "k",
-            OpKind::Checker {
+            OpKind::Checker(Checker {
                 tiles: 2,
                 color_a: [0.0, 0.0, 0.0, 1.0],
                 color_b: [1.0, 1.0, 1.0, 1.0],
-            },
+            }),
             &[],
         )],
         "k",
@@ -36,9 +36,9 @@ fn linear_gradient_ramps_left_to_right() {
     let img = run(
         vec![node(
             "g",
-            OpKind::Gradient {
+            OpKind::Gradient(Gradient {
                 kind: GradientKind::Linear,
-            },
+            }),
             &[],
         )],
         "g",
@@ -73,10 +73,10 @@ fn mix_add_combines_inputs() {
             constant("b", [0.5, 0.5, 0.5, 1.0]),
             node(
                 "m",
-                OpKind::Mix {
+                OpKind::Mix(Mix {
                     mode: BlendMode::Add,
                     factor: 1.0,
-                },
+                }),
                 &["a", "b"],
             ),
         ],
@@ -94,10 +94,10 @@ fn mix_multiply_combines_inputs() {
             constant("b", [0.5, 0.5, 0.5, 1.0]),
             node(
                 "m",
-                OpKind::Mix {
+                OpKind::Mix(Mix {
                     mode: BlendMode::Multiply,
                     factor: 1.0,
-                },
+                }),
                 &["a", "b"],
             ),
         ],

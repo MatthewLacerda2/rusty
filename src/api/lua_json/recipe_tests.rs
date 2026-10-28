@@ -7,7 +7,7 @@ use std::collections::BTreeMap;
 use mlua::{Lua, Value};
 
 use super::*;
-use crate::procgen::recipe::{Node, OpKind};
+use crate::procgen::recipe::{Checker, Node, OpKind};
 use crate::procgen::TextureRecipe;
 use crate::shadergen::recipe::{BlockSel, ParamValue, PassKind, ShaderRecipe};
 
@@ -22,11 +22,11 @@ fn texture() -> TextureRecipe {
         op,
         inputs: inputs.iter().map(|s| s.to_string()).collect(),
     };
-    let checker = OpKind::Checker {
+    let checker = OpKind::Checker(Checker {
         tiles: 4,
         color_a: [0.0, 0.0, 0.0, 1.0],
         color_b: [1.0, 1.0, 1.0, 1.0],
-    };
+    });
     TextureRecipe::new(
         64,
         vec![

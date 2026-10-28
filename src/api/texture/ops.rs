@@ -7,7 +7,7 @@ use mlua::{Lua, Table, Value};
 
 use crate::procgen::recipe::{Lit, OpInfo, OpParam, OPS};
 
-/// `{ {op, category, inputs, params = { {name, type, default, required, values?} } }, … }`.
+/// `{ {op, category, min_inputs, max_inputs, params = { {name, type, default, required, values?} } }, … }`.
 pub fn ops_table(lua: &Lua) -> mlua::Result<Table> {
     lua.create_sequence_from(
         OPS.iter()
@@ -20,7 +20,8 @@ fn op_table(lua: &Lua, info: &OpInfo) -> mlua::Result<Table> {
     let t = lua.create_table()?;
     t.set("op", info.op)?;
     t.set("category", info.category)?;
-    t.set("inputs", info.inputs)?;
+    t.set("min_inputs", info.inputs.min)?;
+    t.set("max_inputs", info.inputs.max)?;
     let params = info
         .params
         .iter()
@@ -78,7 +79,7 @@ mod tests {
                      if o.op == "noise" then
                        local by = {}
                        for _, p in ipairs(o.params) do by[p.name] = p end
-                       return #ops, o.category, o.inputs, by.octaves.default,
+                       return #ops, o.category, o.max_inputs, by.octaves.default,
                          by.scale.required, table.concat(by.kind.values, "|")
                      end
                    end"#,

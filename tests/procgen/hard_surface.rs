@@ -2,40 +2,40 @@
 //! keep the two procgen promises (seamless, resolution-independent) and bake
 //! byte-identically for a seed. The generators' seams are swept in `procgen_seams`.
 
-use rusty::procgen::recipe::{BrickOutput, Node, OpKind, ShapeKind};
+use rusty::procgen::recipe::{Brick, BrickOutput, Node, OpKind, Shape, ShapeKind, Tile};
 
 use crate::procgen::bake_seeded;
 use crate::procgen::resolution::assert_resolution_independent;
 use crate::procgen::seams::{assert_seamless, bake, node};
 
 fn shape(kind: ShapeKind, softness: f32) -> Node {
-    let op = OpKind::Shape {
+    let op = OpKind::Shape(Shape {
         kind,
         size: [0.7, 0.5],
         roundness: 0.4,
         softness,
-    };
+    });
     node("s", op, &[])
 }
 
 /// Rivets: a soft circle scattered over a jittered grid.
 fn rivets(jitter: f32, rotation_jitter: f32, scale_jitter: f32) -> Vec<Node> {
-    let tile = OpKind::Tile {
+    let tile = OpKind::Tile(Tile {
         count: 5.0,
         jitter,
         rotation_jitter,
         scale_jitter,
-    };
+    });
     vec![shape(ShapeKind::Circle, 0.1), node("t", tile, &["s"])]
 }
 
 fn brick(output: BrickOutput) -> Vec<Node> {
-    let op = OpKind::Brick {
+    let op = OpKind::Brick(Brick {
         rows: 6.0,
         cols: 3.0,
         mortar: 0.08,
         output,
-    };
+    });
     vec![node("b", op, &[])]
 }
 
@@ -43,21 +43,21 @@ fn brick(output: BrickOutput) -> Vec<Node> {
 fn hard_surface() -> Vec<(String, OpKind)> {
     let mut ops = Vec::new();
     for output in [BrickOutput::Mask, BrickOutput::Random, BrickOutput::Bevel] {
-        let op = OpKind::Brick {
+        let op = OpKind::Brick(Brick {
             rows: 5.0,
             cols: 2.6,
             mortar: 0.1,
             output,
-        };
+        });
         ops.push((format!("brick {output:?}"), op));
     }
     for kind in [ShapeKind::Circle, ShapeKind::RoundedRect, ShapeKind::Line] {
-        let op = OpKind::Shape {
+        let op = OpKind::Shape(Shape {
             kind,
             size: [1.3, 0.4],
             roundness: 0.5,
             softness: 0.1,
-        };
+        });
         ops.push((format!("shape {kind:?}"), op));
     }
     ops
@@ -85,18 +85,18 @@ fn tile_scatter_stays_seamless_at_every_jitter() {
 #[test]
 fn tile_of_a_rect_panel_has_no_gaps_at_the_cell_borders() {
     // A full-cell rect, untouched by jitter, tiles into one flat white sheet.
-    let op = OpKind::Shape {
+    let op = OpKind::Shape(Shape {
         kind: ShapeKind::Rect,
         size: [1.0, 1.0],
         roundness: 0.0,
         softness: 0.0,
-    };
-    let tile = OpKind::Tile {
+    });
+    let tile = OpKind::Tile(Tile {
         count: 3.0,
         jitter: 0.0,
         rotation_jitter: 0.0,
         scale_jitter: 0.0,
-    };
+    });
     let img = bake(vec![node("s", op, &[]), node("t", tile, &["s"])]);
     assert!(img.pixels().iter().all(|p| p[0] == 1.0));
 }

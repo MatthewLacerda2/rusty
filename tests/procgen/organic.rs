@@ -2,20 +2,20 @@
 //! keep the two procgen promises (seamless, resolution-independent) and bake
 //! byte-identically for a seed. The generators' seams are swept in `procgen_seams`.
 
-use rusty::procgen::recipe::{Node, NoiseKind, OpKind, VoronoiOutput};
+use rusty::procgen::recipe::{Node, Noise, NoiseKind, OpKind, Voronoi, VoronoiOutput, Warp};
 
 use crate::procgen::bake_seeded;
 use crate::procgen::resolution::assert_resolution_independent;
 use crate::procgen::seams::{assert_seamless, bake, node};
 
 fn noise(id: &str, kind: NoiseKind, scale: f32) -> Node {
-    let op = OpKind::Noise {
+    let op = OpKind::Noise(Noise {
         kind,
         scale,
         octaves: 3,
         lacunarity: 2.0,
         gain: 0.5,
-    };
+    });
     node(id, op, &[])
 }
 
@@ -26,7 +26,7 @@ fn warped(strength: f32) -> Vec<Node> {
         noise("dx", NoiseKind::Fbm, 3.0),
         noise("dy", NoiseKind::Fbm, 5.0),
         node("d", OpKind::CombineRgb, &["dx", "dy", "dx"]),
-        node("out", OpKind::Warp { strength }, &["a", "d"]),
+        node("out", OpKind::Warp(Warp { strength }), &["a", "d"]),
     ]
 }
 
@@ -45,11 +45,11 @@ fn warp_strength_is_in_tile_units() {
 #[test]
 fn organic_ops_bake_byte_identically_per_seed() {
     let voronoi = |output| {
-        let op = OpKind::Voronoi {
+        let op = OpKind::Voronoi(Voronoi {
             scale: 6.0,
             output,
             randomness: 0.7,
-        };
+        });
         vec![node("v", op, &[])]
     };
     let recipes = [

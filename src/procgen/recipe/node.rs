@@ -10,7 +10,7 @@ use serde::de::Error as _;
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 
-use super::OpKind;
+use super::{Arity, OpKind};
 
 /// One node in the recipe DAG: a stable `id`, the op to run, and the `id`s of the
 /// input nodes feeding it (in order).
@@ -21,6 +21,48 @@ pub struct Node {
     pub op: OpKind,
     #[serde(default)]
     pub inputs: Vec<String>,
+}
+
+impl Node {
+    /// Refuse an `inputs` list its op does not accept: a missing input would bake a
+    /// black or flat map, a surplus one would be silently ignored.
+    pub fn check_arity(&self) -> Result<(), ArityError> {
+        let accepts = self.op.info().inputs;
+        if accepts.accepts(self.inputs.len()) {
+            return Ok(());
+        }
+        Err(ArityError {
+            node: self.id.clone(),
+            op: self.op.tag(),
+            given: self.inputs.len(),
+            accepts,
+        })
+    }
+}
+
+/// A node wired with more or fewer inputs than its op accepts.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ArityError {
+    pub node: String,
+    pub op: &'static str,
+    pub given: usize,
+    pub accepts: Arity,
+}
+
+impl std::fmt::Display for ArityError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let Self {
+            node,
+            op,
+            given,
+            accepts,
+        } = self;
+        let noun = if accepts.max == 1 { "input" } else { "inputs" };
+        write!(
+            f,
+            "node {node:?} (op {op:?}) takes {accepts} {noun}, but {given} given"
+        )
+    }
 }
 
 /// The lenient derive the strict [`Node`] deserializer starts from.
@@ -46,6 +88,7 @@ impl<'de> Deserialize<'de> for Node {
         if let Some(key) = unknown_key(&given, &known) {
             return Err(D::Error::custom(unknown_key_message(&node.id, &known, key)));
         }
+        node.check_arity().map_err(D::Error::custom)?;
         Ok(node)
     }
 }

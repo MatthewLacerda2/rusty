@@ -4,7 +4,23 @@
 
 use super::*;
 use crate::procgen::recipe::ShapeKind::*;
-use crate::procgen::recipe::{BrickOutput, NoiseKind, VoronoiOutput};
+use crate::procgen::recipe::{BrickOutput, Gradient, NoiseKind, OpKind, VoronoiOutput, Wave};
+
+/// The sampler [`super::super::eval_node`] paints for the generator `op`.
+fn sampler(op: &OpKind, resolution: u32, seed: u64) -> Sampler {
+    match op {
+        OpKind::Constant(p) => constant(p),
+        OpKind::Noise(p) => noise(p, seed),
+        OpKind::Voronoi(p) => voronoi(p, seed),
+        OpKind::Gradient(p) => gradient(p.kind),
+        OpKind::Wave(p) => wave(p.kind, p.frequency),
+        OpKind::Brick(p) => brick(p, seed),
+        OpKind::Shape(p) => shape(p),
+        OpKind::Checker(p) => checker(p),
+        OpKind::WhiteNoise => white_noise(resolution, seed),
+        other => panic!("{other:?} is not a generator"),
+    }
+}
 
 /// A spread of sample points, deterministic and off every lattice line.
 fn points() -> impl Iterator<Item = (f32, f32)> {
@@ -30,13 +46,13 @@ fn lattice_ops() -> Vec<OpKind> {
             NoiseKind::Ridged,
             NoiseKind::Turbulence,
         ] {
-            ops.push(OpKind::Noise {
+            ops.push(OpKind::Noise(Noise {
                 kind,
                 scale: s,
                 octaves: 3,
                 lacunarity: s,
                 gain: 0.6,
-            });
+            }));
         }
         for output in [
             VoronoiOutput::Distance,
@@ -44,26 +60,26 @@ fn lattice_ops() -> Vec<OpKind> {
             VoronoiOutput::F2,
             VoronoiOutput::Edges,
         ] {
-            ops.push(OpKind::Voronoi {
+            ops.push(OpKind::Voronoi(Voronoi {
                 scale: s,
                 output,
                 randomness: s / 8.0,
-            });
+            }));
         }
-        ops.push(OpKind::Wave {
+        ops.push(OpKind::Wave(Wave {
             kind: WaveKind::Bands,
             frequency: s,
-        });
+        }));
         ops.extend(hard_surface_ops(s));
-        ops.push(OpKind::Checker {
+        ops.push(OpKind::Checker(Checker {
             tiles: s as u32,
             color_a: [0.0; 4],
             color_b: [1.0; 4],
-        });
+        }));
     }
-    ops.push(OpKind::Gradient {
+    ops.push(OpKind::Gradient(Gradient {
         kind: GradientKind::LinearTiling,
-    });
+    }));
     ops
 }
 
@@ -72,21 +88,21 @@ fn hard_surface_ops(s: f32) -> Vec<OpKind> {
     let mut ops = Vec::new();
     for output in [BrickOutput::Mask, BrickOutput::Random, BrickOutput::Bevel] {
         let (rows, cols, mortar) = (s, s + 0.7, 0.05);
-        ops.push(OpKind::Brick {
+        ops.push(OpKind::Brick(Brick {
             rows,
             cols,
             mortar,
             output,
-        });
+        }));
     }
     for kind in [Circle, Rect, RoundedRect, Line] {
         let (size, roundness, softness) = ([s / 6.0, 0.3], 0.5, s / 20.0);
-        ops.push(OpKind::Shape {
+        ops.push(OpKind::Shape(Shape {
             kind,
             size,
             roundness,
             softness,
-        });
+        }));
     }
     ops
 }
@@ -94,7 +110,7 @@ fn hard_surface_ops(s: f32) -> Vec<OpKind> {
 #[test]
 fn lattice_generators_repeat_every_whole_tile() {
     for op in lattice_ops() {
-        let f = sampler(&op, 64, 9).expect("generator");
+        let f = sampler(&op, 64, 9);
         for (u, v) in points() {
             let here = f(u, v);
             for (du, dv) in [(1.0, 0.0), (0.0, 1.0), (1.0, 1.0)] {
@@ -111,16 +127,16 @@ fn lattice_generators_repeat_every_whole_tile() {
 #[test]
 fn radial_generators_meet_the_edge_continuously() {
     let radial = [
-        OpKind::Gradient {
+        OpKind::Gradient(Gradient {
             kind: GradientKind::Radial,
-        },
-        OpKind::Wave {
+        }),
+        OpKind::Wave(Wave {
             kind: WaveKind::Rings,
             frequency: 3.4,
-        },
+        }),
     ];
     for op in radial {
-        let f = sampler(&op, 64, 0).expect("generator");
+        let f = sampler(&op, 64, 0);
         for (t, _) in points() {
             let (lo, hi) = (1e-4, 1.0 - 1e-4);
             assert!(close(f(lo, t), f(hi, t)), "{op:?} left/right edge at v={t}");
@@ -136,31 +152,26 @@ fn counts_round_to_whole_periods_and_brick_rows_to_even() {
     assert_eq!(count(0.2), 1.0);
     // An odd checker rounds up to even: 3 tiles paint as 4.
     let k = sampler(
-        &OpKind::Checker {
+        &OpKind::Checker(Checker {
             tiles: 3,
             color_a: [0.0; 4],
             color_b: [1.0; 4],
-        },
+        }),
         8,
         0,
     );
-    assert_eq!(
-        k.unwrap()(0.3, 0.1)[0],
-        1.0,
-        "u = 0.3 is square 1 of 4, not 0 of 3"
-    );
+    assert_eq!(k(0.3, 0.1)[0], 1.0, "u = 0.3 is square 1 of 4, not 0 of 3");
     // 3 rows round to 4, so the half-brick offset alternation closes at the wrap.
     let f = sampler(
-        &OpKind::Brick {
+        &OpKind::Brick(Brick {
             rows: 3.0,
             cols: 2.0,
             mortar: 0.1,
             output: BrickOutput::Mask,
-        },
+        }),
         64,
         0,
-    )
-    .unwrap();
+    );
     // v = 0.3 is row 1 of 4 (odd, offset half a brick); with 3 rows it'd be row 0.
     assert_eq!(f(0.5, 0.3)[0], 1.0);
     assert_eq!(f(0.76, 0.2)[0], 1.0, "row 0 is not offset");
@@ -170,13 +181,12 @@ fn counts_round_to_whole_periods_and_brick_rows_to_even() {
 #[test]
 fn linear_tiling_gradient_is_a_triangle() {
     let f = sampler(
-        &OpKind::Gradient {
+        &OpKind::Gradient(Gradient {
             kind: GradientKind::LinearTiling,
-        },
+        }),
         8,
         0,
-    )
-    .unwrap();
+    );
     assert_eq!(f(0.0, 0.3)[0], 0.0);
     assert_eq!(f(0.5, 0.3)[0], 1.0);
     assert!((f(0.25, 0.3)[0] - 0.5).abs() < 1e-6);
@@ -184,12 +194,12 @@ fn linear_tiling_gradient_is_a_triangle() {
 }
 
 fn grid_voronoi(output: VoronoiOutput) -> Sampler {
-    let op = OpKind::Voronoi {
+    let op = OpKind::Voronoi(Voronoi {
         scale: 4.0,
         output,
         randomness: 0.0,
-    };
-    sampler(&op, 64, 5).expect("generator")
+    });
+    sampler(&op, 64, 5)
 }
 
 #[test]
@@ -214,14 +224,14 @@ fn voronoi_edges_are_dark_on_cell_borders_and_bright_at_centres() {
 #[test]
 fn ridged_and_turbulence_span_the_unit_range() {
     for kind in [NoiseKind::Ridged, NoiseKind::Turbulence] {
-        let op = OpKind::Noise {
+        let op = OpKind::Noise(Noise {
             kind,
             scale: 4.0,
             octaves: 4,
             lacunarity: 2.0,
             gain: 0.5,
-        };
-        let f = sampler(&op, 64, 1).expect("generator");
+        });
+        let f = sampler(&op, 64, 1);
         let values: Vec<f32> = points().map(|(u, v)| f(u, v)[0]).collect();
         let (lo, hi) = values
             .iter()

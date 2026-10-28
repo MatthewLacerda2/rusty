@@ -2,7 +2,9 @@
 //! generator + color ops are covered in `ops.rs`. Each op is exercised through
 //! the public runner (`evaluate`) so the test pins observable pixel behaviour.
 
-use rusty::procgen::recipe::{GradientKind, OpKind};
+use rusty::procgen::recipe::{
+    Blur, BumpToNormal, Checker, Clamp, Gradient, GradientKind, MapRange, OpKind,
+};
 
 use super::{constant, node, run};
 
@@ -11,7 +13,7 @@ fn clamp_bounds_each_channel() {
     let img = run(
         vec![
             constant("c", [2.0, -1.0, 0.5, 1.0]),
-            node("cl", OpKind::Clamp { min: 0.0, max: 1.0 }, &["c"]),
+            node("cl", OpKind::Clamp(Clamp { min: 0.0, max: 1.0 }), &["c"]),
         ],
         "cl",
         2,
@@ -27,12 +29,12 @@ fn map_range_remaps_channels() {
             constant("c", [0.5, 0.5, 0.5, 1.0]),
             node(
                 "mr",
-                OpKind::MapRange {
+                OpKind::MapRange(MapRange {
                     from_min: 0.0,
                     from_max: 1.0,
                     to_min: 0.0,
                     to_max: 10.0,
-                },
+                }),
                 &["c"],
             ),
         ],
@@ -67,12 +69,16 @@ fn bump_to_normal_tilts_toward_a_rising_height() {
         vec![
             node(
                 "g",
-                OpKind::Gradient {
+                OpKind::Gradient(Gradient {
                     kind: GradientKind::Linear,
-                },
+                }),
                 &[],
             ),
-            node("n", OpKind::BumpToNormal { strength: 4.0 }, &["g"]),
+            node(
+                "n",
+                OpKind::BumpToNormal(BumpToNormal { strength: 4.0 }),
+                &["g"],
+            ),
         ],
         "n",
         32,
@@ -95,14 +101,14 @@ fn blur_spreads_a_hard_edge_into_a_gradient() {
         vec![
             node(
                 "k",
-                OpKind::Checker {
+                OpKind::Checker(Checker {
                     tiles: 2,
                     color_a: [0.0, 0.0, 0.0, 1.0],
                     color_b: [1.0, 1.0, 1.0, 1.0],
-                },
+                }),
                 &[],
             ),
-            node("b", OpKind::Blur { radius: 0.125 }, &["k"]),
+            node("b", OpKind::Blur(Blur { radius: 0.125 }), &["k"]),
         ],
         "b",
         8,
