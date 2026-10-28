@@ -12,7 +12,8 @@ pub(crate) mod winding;
 pub(crate) use lazy::LazyPipeline;
 
 use specs::{
-    forward_spec, line_spec, make_pipeline, transparent_spec, velocity_spec, PipelineSpec,
+    forward_spec, line_spec, make_pipeline, primed_spec, primed_velocity_spec, transparent_spec,
+    velocity_spec, PipelineSpec,
 };
 
 pub(crate) use specs::velocity_target;
@@ -33,6 +34,8 @@ pub(crate) struct ForwardPipelines {
     pub line: LazyPipeline,
     /// The SSAO depth prepass (#436): the forward vertex stage, no colour target.
     pub prepass: wgpu::RenderPipeline,
+    /// The opaque and velocity ones over a primed depth (#1499).
+    pub primed: PrimedPipelines,
     /// Their layout, groups 0–3, which the selection mask (#1175) draws through too.
     pub layout: wgpu::PipelineLayout,
 }
@@ -63,25 +66,21 @@ pub(crate) fn create_pipelines(
         material_layout,
         shadow_layout,
     );
-    let lazy = |layout: &wgpu::PipelineLayout, format, spec: PipelineSpec| {
-        let (shader, layout) = (shader.clone(), layout.clone());
-        LazyPipeline::new(device, move |device| {
-            make_pipeline(device, &shader, format, &layout, &spec)
-        })
-    };
+    let lazy = |layout, format, spec| lazy_pipeline(device, shader, format, layout, spec);
     ForwardPipelines {
         forward: make_pipeline(device, shader, format, &render_layout, &forward_spec()),
         velocity: lazy(&render_layout, format, velocity_spec()),
         transparent: lazy(&render_layout, format, transparent_spec()),
         line: lazy(&line_layout, output_format, line_spec()),
         prepass: make_prepass(device, shader, &render_layout, "fs_prepass"),
+        primed: PrimedPipelines::new(device, shader, format, &render_layout),
         layout: render_layout,
     }
 }
 
 /// An authored surface variant's opaque + transparent pipelines (#396): the forward
 /// and transparent specs over `shader`, through the forward pipeline layout; its
-/// velocity one (#1435), built on first use — and, when its blocks `cut`, its depth
+/// velocity and primed ones (#1435, #1499), built on first use — and, when its blocks `cut`, its depth
 /// pipelines (#648): the prepass through the same layout, the shadow cascades through
 /// the shadow pass's clip layout.
 pub(crate) fn surface_pipelines(
@@ -93,13 +92,10 @@ pub(crate) fn surface_pipelines(
 ) -> surface::SurfacePipelines {
     use crate::render::passes::shadows::depth_pipeline;
     use crate::shadergen::assemble::{CUT_PREPASS, CUT_SHADOW};
-    let (lazy_shader, lazy_layout) = (shader.clone(), layout.clone());
     surface::SurfacePipelines {
         forward: make_pipeline(device, shader, format, layout, &forward_spec()),
-        velocity: LazyPipeline::new(device, move |device| {
-            let spec = velocity_spec();
-            make_pipeline(device, &lazy_shader, format, &lazy_layout, &spec)
-        }),
+        velocity: lazy_pipeline(device, shader, format, layout, velocity_spec()),
+        primed: PrimedPipelines::new(device, shader, format, layout),
         transparent: make_pipeline(device, shader, format, layout, &transparent_spec()),
         cut: cut.then(|| surface::CutPipelines {
             prepass: make_prepass(device, shader, layout, CUT_PREPASS),
@@ -107,6 +103,44 @@ pub(crate) fn surface_pipelines(
             mirrored_shadow: depth_pipeline(device, shader, shadow_layout, Some(CUT_SHADOW), true),
         }),
     }
+}
+
+/// The opaque pipelines over a primed depth (#1499): the SSAO prepass wrote the lit
+/// solids' depth, so these test it `LessEqual` and write none. Built the first time
+/// a view primes, since a view with AO off never does.
+pub(crate) struct PrimedPipelines {
+    pub forward: LazyPipeline,
+    /// Writing motion vectors too (#1435).
+    pub velocity: LazyPipeline,
+}
+
+impl PrimedPipelines {
+    /// `shader`'s primed pipelines into `format` through `layout`, not yet built.
+    fn new(
+        device: &wgpu::Device,
+        shader: &wgpu::ShaderModule,
+        format: wgpu::TextureFormat,
+        layout: &wgpu::PipelineLayout,
+    ) -> Self {
+        Self {
+            forward: lazy_pipeline(device, shader, format, layout, primed_spec()),
+            velocity: lazy_pipeline(device, shader, format, layout, primed_velocity_spec()),
+        }
+    }
+}
+
+/// `spec`'s pipeline over `shader`, built on its first draw (#985).
+fn lazy_pipeline(
+    device: &wgpu::Device,
+    shader: &wgpu::ShaderModule,
+    format: wgpu::TextureFormat,
+    layout: &wgpu::PipelineLayout,
+    spec: PipelineSpec,
+) -> LazyPipeline {
+    let (shader, layout) = (shader.clone(), layout.clone());
+    LazyPipeline::new(device, move |device| {
+        make_pipeline(device, &shader, format, &layout, &spec)
+    })
 }
 
 /// The forward passes' pipeline layout — groups 0–3 — for a surface variant (#396).

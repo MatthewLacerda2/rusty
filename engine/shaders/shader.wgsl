@@ -8,7 +8,10 @@
 // resources are `forward/bindings.wgsl`, its lighting helpers `forward/lighting.wgsl`.
 
 struct VertexOutput {
-    @builtin(position) clip_position: vec4<f32>,
+    // Invariant, so the SSAO prepass, the opaque pass, its motion-vector twin and a
+    // surface variant compute bit-identical depth from the same inputs: a primed
+    // forward pass tests the prepass's depth `LessEqual` (#1499).
+    @invariant @builtin(position) clip_position: vec4<f32>,
     @location(0) world_position: vec3<f32>,
     @location(1) world_normal: vec3<f32>,
     @location(2) tex_coords: vec2<f32>,
@@ -157,7 +160,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 // depth order, kept per camera). Every field of
 // `VertexOutput`, then the two clip positions the velocity is the difference of.
 struct VelocityVertex {
-    @builtin(position) clip_position: vec4<f32>,
+    @invariant @builtin(position) clip_position: vec4<f32>,
     @location(0) world_position: vec3<f32>,
     @location(1) world_normal: vec3<f32>,
     @location(2) tex_coords: vec2<f32>,

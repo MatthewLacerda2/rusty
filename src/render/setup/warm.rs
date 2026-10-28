@@ -9,7 +9,7 @@ use crate::render::gpu::pipelines::LazyPipeline;
 use crate::render::Renderer;
 
 impl Renderer {
-    /// Build every lazy pipeline now: the translucent, motion-vector (#1435), motion-blur (#1436), depth-of-field (#1445), particle, ribbon, world-canvas,
+    /// Build every lazy pipeline now: the translucent, motion-vector (#1435), primed (#1499), motion-blur (#1436), depth-of-field (#1445), particle, ribbon, world-canvas,
     /// mirrored-shadow and data-mip ones always, the debug-line and selection-outline (mask and edge) ones only
     /// with `editor_overlays` (a shipped game draws neither).
     pub(crate) fn warm_pipelines(&self, editor_overlays: bool) {
@@ -22,6 +22,10 @@ impl Renderer {
     /// or the windowed renderer compiles it mid-frame.
     pub(crate) fn lazy_pipelines(&self, editor_overlays: bool) -> Vec<&LazyPipeline> {
         let mut all = vec![&self.transparent_pipeline, &self.velocity_pipeline];
+        all.extend([
+            &self.primed_pipelines.forward,
+            &self.primed_pipelines.velocity,
+        ]);
         all.extend(self.post_passes.lazy_pipelines());
         all.extend(self.skybox_renderer.lazy_pipelines());
         all.extend(self.particle_renderer.lazy_pipelines());

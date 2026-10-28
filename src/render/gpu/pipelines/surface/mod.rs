@@ -32,6 +32,8 @@
 //! cut, reading the same runtime params and mask, so a dissolved fragment casts no
 //! shadow and fills no SSAO depth. Only those variants pay for a depth fragment.
 
+mod pass;
+
 use std::{collections::HashMap, path::Path};
 use wgpu::naga::ShaderStage;
 
@@ -44,11 +46,15 @@ use crate::shadergen::{compose, engine_shader_dir, DEFAULT_OUT_DIR};
 /// The pipeline id of the renderer's standard forward shader.
 pub(crate) const STANDARD: usize = 0;
 
+pub(crate) use pass::SolidPass;
+
 /// One authored surface shader's pipelines.
 pub(crate) struct SurfacePipelines {
     /// Opaque/cutout solids, and the same into a view's velocity target (#1435).
     pub forward: wgpu::RenderPipeline,
     pub velocity: super::LazyPipeline,
+    /// The same two over a primed depth (#1499), built the first time a view primes.
+    pub primed: super::PrimedPipelines,
     /// Alpha-blended solids (the transparent spec).
     pub transparent: wgpu::RenderPipeline,
     /// The depth passes of a variant whose blocks cut fragments (#648); `None` draws
@@ -63,20 +69,6 @@ pub(crate) struct CutPipelines {
     pub prepass: wgpu::RenderPipeline,
     pub shadow: wgpu::RenderPipeline,
     pub mirrored_shadow: wgpu::RenderPipeline,
-}
-
-/// Which solids pass a batch is drawn in, carrying that pass's standard pipeline, so
-/// [`SurfaceShaders::pick`] can swap in a material's surface variant (#396).
-#[derive(Clone, Copy)]
-pub(crate) enum SolidPass<'a> {
-    /// The SSAO depth prepass; the standard pipeline unless a variant cuts (#648).
-    Prepass(&'a wgpu::RenderPipeline),
-    /// Opaque solids; the standard pipeline is the view's (the preview may swap it).
-    Opaque(&'a wgpu::RenderPipeline),
-    /// Opaque solids writing motion vectors too (#1435).
-    Velocity(&'a super::LazyPipeline),
-    /// Alpha-blended solids; the standard pipeline is built only if a batch uses it.
-    Transparent(&'a super::LazyPipeline),
 }
 
 struct Slot {
@@ -177,17 +169,6 @@ impl SurfaceShaders {
         self.slots.get(id.checked_sub(1)?)?.pipelines.as_ref()
     }
 
-    /// What pipeline `id` draws with in `pass`: its variant's, else the standard one.
-    pub(crate) fn pick<'a>(&'a self, pass: SolidPass<'a>, id: usize) -> &'a wgpu::RenderPipeline {
-        let variant = self.get(id);
-        match pass {
-            SolidPass::Prepass(standard) => self.cut(id).map_or(standard, |c| &c.prepass),
-            SolidPass::Opaque(standard) => variant.map_or(standard, |v| &v.forward),
-            SolidPass::Velocity(lazy) => variant.map_or_else(|| lazy.get(), |v| v.velocity.get()),
-            SolidPass::Transparent(lazy) => variant.map_or_else(|| lazy.get(), |v| &v.transparent),
-        }
-    }
-
     /// The depth pipelines of pipeline `id`, if its variant cuts fragments (#648).
     pub(crate) fn cut(&self, id: usize) -> Option<&CutPipelines> {
         self.get(id)?.cut.as_ref()
@@ -280,21 +261,25 @@ impl SurfaceShaders {
 }
 
 #[cfg(test)]
-#[path = "tests/surface_tests.rs"]
+#[path = "../tests/surface_tests.rs"]
 mod surface_tests;
 
 #[cfg(test)]
-#[path = "tests/params_tests.rs"]
+#[path = "../tests/params_tests.rs"]
 mod params_tests;
 
 #[cfg(test)]
-#[path = "tests/mask_tests.rs"]
+#[path = "../tests/mask_tests.rs"]
 pub(crate) mod mask_tests;
 
 #[cfg(test)]
-#[path = "tests/gameplay_blocks_tests.rs"]
+#[path = "../tests/gameplay_blocks_tests.rs"]
 mod gameplay_blocks_tests;
 
 #[cfg(test)]
-#[path = "tests/cut_depth_tests.rs"]
+#[path = "../tests/cut_depth_tests.rs"]
 pub(crate) mod cut_depth_tests;
+
+#[cfg(test)]
+#[path = "../tests/priming_tests.rs"]
+mod priming_tests;
