@@ -1,6 +1,6 @@
 //! The decal budgets through the `Decals` API (#1517): per owner, so one owner's
 //! marks never evict another's; `SetLimits` / `GetLimits`; and entering Play
-//! applying the project's budgets.
+//! applying the project's budgets, which Stop restores.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -68,7 +68,7 @@ fn an_unknown_limit_is_an_error_naming_the_valid_ones() {
 }
 
 #[test]
-fn entering_play_applies_the_project_budgets() {
+fn entering_play_applies_the_project_budgets_and_stop_restores_them() {
     let scene = Rc::new(RefCell::new(Scene::new()));
     let mut game = crate::play::playing(Rc::clone(&scene), 20.0);
     let project = DecalLimits {
@@ -82,4 +82,16 @@ fn entering_play_applies_the_project_budgets() {
         .set_decal_limits(project);
     game.tick(1.0 / 60.0); // enter Play
     assert_eq!(scene.borrow().decals.limits(), project);
+    let in_play = DecalLimits {
+        max_world: 1,
+        ..project
+    };
+    scene.borrow_mut().decals.set_limits(in_play); // a `Decals.SetLimits`
+    game.set_playing(false);
+    game.tick(1.0 / 60.0); // Stop
+    assert_eq!(
+        scene.borrow().decals.limits(),
+        project,
+        "Play's change ends"
+    );
 }

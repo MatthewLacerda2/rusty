@@ -21,6 +21,7 @@ use crate::asset::MapRef;
 use glam::camera::rh::view::look_to_mat4;
 use glam::{Mat4, Quat, Vec3};
 
+mod counts;
 mod pose;
 mod registry;
 
@@ -101,6 +102,10 @@ pub struct Decal {
     /// Fading out early (evicted by a budget or removed with a fade): no longer
     /// counted against any budget ([`DecalSet`]).
     pub retiring: bool,
+    /// Fading because a spawn pushed its bucket or the total past a budget: the
+    /// fades [`EVICTION_HEADROOM`] bounds. A fade a script asked for, or one a
+    /// lowered limit started, is not.
+    pub evicted: bool,
 }
 
 /// What an owned decal sticks to: the entity, and the box (the unit cube's
@@ -152,6 +157,7 @@ impl Decal {
             lifetime: spec.lifetime.map(|l| l.max(0.0)),
             fade: spec.fade.max(0.0),
             retiring: false,
+            evicted: false,
         }
     }
 

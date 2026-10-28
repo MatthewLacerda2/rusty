@@ -6,7 +6,8 @@
 //! script — so decals stay decoupled from gameplay: the engine never decides
 //! *when* to mark a surface, the script does. `Spawn` returns the decal's id, which
 //! `Remove` takes (#639); `Clear` wipes them all (level reset). `SetLimits` /
-//! `GetLimits` change and read the budgets (#1517) for the rest of this Play.
+//! `GetLimits` change and read the budgets (#1517) until Stop, which puts the
+//! project's back.
 //!
 //! A decal is a projected *volume*, not a particle: gibs/blood spray are the
 //! separate GPU particle system (`Particles`), triggered on the same hit.

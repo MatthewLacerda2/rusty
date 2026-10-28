@@ -24,7 +24,7 @@ if hit then Decals.Spawn(px, py, pz, nx, ny, nz, { owner = id }) end
 | `Decals.Count` | `()` | live decal count, including any still fading out |
 | `Decals.Clear` | `()` | — (drops every live decal) |
 | `Decals.SetLimits` | `({ per_owner =, world =, total = })`, any subset | — (lowering one fades the oldest excess) |
-| `Decals.GetLimits` | `()` | `{ per_owner, world, total }`, the budgets in force |
+| `Decals.GetLimits` | `()` | `{ per_owner, world, total }`, the budgets in force (`project.rusty` spells them `max_per_owner`, `max_world`, `max_total`) |
 
 **Positional form.** `size` (default `0.5`) is the stamp's width/height in world
 units; `texture` is the albedo path (default: none, a solid square of the tint);
@@ -78,17 +78,25 @@ Decals.Spawn(px, py, pz, nx, ny, nz, { material = "blood", size = 1.2, rotation 
 
   A new decal past its bucket's budget starts the **oldest decal of that bucket**
   fading out over 0.5 s; past the total, the oldest whole decal in the scene fades.
-  A fading decal no longer counts against any budget. Only if more than 64 are
-  fading at once (above 128 evictions a second, sustained) is the oldest fading
-  one dropped outright, so the frame never holds more than the total plus 64.
-  Splitting into buckets never changes the blend order: newest still lands on top.
+  A fading decal no longer counts against any budget. Only if more than 64 decals
+  that spawns evicted are fading at once (above 128 evictions a second, sustained)
+  is the oldest of them dropped outright, so a stream of spawns never holds the
+  frame above the total plus 64. A fade a script asks for (`Decals.Remove(id,
+  fade)`) and one a lowered limit starts are never cut short: every decal they
+  touch fades out in full, however many. Splitting into buckets never changes the
+  blend order: newest still lands on top.
 - **Setting the budgets.** A game sets its own in `project.rusty`:
   `"decals": { "max_per_owner": 256, "max_world": 1024, "max_total": 4096 }` (any
-  key left out keeps its default). Entering Play applies them; an edit to the file
-  is picked up by the next Play. `Decals.SetLimits{ world = 512 }` changes them for
-  the rest of this Play (a key left out keeps its value, an unknown key is an
-  error), and lowering one fades the oldest excess out at once.
-  `Decals.GetLimits()` reads what is in force.
+  key left out keeps its default). Edit mode runs on them, entering Play applies
+  them, and an edit to the file is picked up by the next Play. An unknown key or a
+  value that is not a whole number is skipped with a console warning, and so is a
+  file that can't be read, which keeps the budgets last read.
+  `Decals.SetLimits{ world = 512 }` changes them until Stop, which puts the
+  project's back, as Unity reverts play-mode changes (a key left out keeps its
+  value, an unknown key is an error), and lowering one fades the oldest excess out
+  at once. `Decals.GetLimits()` reads what is in force; note that it and
+  `SetLimits` spell the keys `per_owner`, `world`, `total`, while the file spells
+  them `max_per_owner`, `max_world`, `max_total`.
 
 ```lua no-run
 -- blood that dries off a moving enemy's arm after 20 s

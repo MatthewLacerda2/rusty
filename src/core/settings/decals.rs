@@ -7,14 +7,21 @@
 //!
 //! The project's values live in the tracked `project.rusty` under `"decals"`
 //! (`core::project::ProjectFile`) and are applied to the scene on entering Play;
-//! `Decals.SetLimits` changes the running game's until the next Play.
+//! `Decals.SetLimits` changes the running game's until Stop.
 
+use serde::de::Deserializer;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
-/// The decal budgets. Every field is `#[serde(default)]`, so a partial
-/// `"decals"` block keeps the defaults for what it omits.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(default)]
+use crate::core::project::PROJECT_FILE;
+
+/// The `project.rusty` keys, in the order a warning lists them.
+const KEYS: &str = "max_per_owner, max_world, max_total";
+
+/// The decal budgets. A partial `"decals"` block keeps the defaults for what it
+/// omits; an unknown key or a value that is not a whole number is skipped with a
+/// warning ([`DecalLimits::read_json`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub struct DecalLimits {
     /// Whole decals one owner entity keeps.
     pub max_per_owner: u32,
@@ -33,3 +40,47 @@ impl Default for DecalLimits {
         }
     }
 }
+
+impl DecalLimits {
+    /// The budgets `blob` spells, over the defaults, and a line for each part of it
+    /// that was skipped (an unknown key, a value that is not a whole number).
+    pub fn read_json(blob: &Value) -> (Self, Vec<String>) {
+        let mut limits = Self::default();
+        let Some(map) = blob.as_object() else {
+            return (limits, vec![format!("expected an object, found {blob}")]);
+        };
+        let mut ignored = Vec::new();
+        for (key, value) in map {
+            let slot = match key.as_str() {
+                "max_per_owner" => &mut limits.max_per_owner,
+                "max_world" => &mut limits.max_world,
+                "max_total" => &mut limits.max_total,
+                _ => {
+                    ignored.push(format!("unknown key '{key}' (one of {KEYS})"));
+                    continue;
+                }
+            };
+            match value.as_u64().and_then(|n| u32::try_from(n).ok()) {
+                Some(n) => *slot = n,
+                None => ignored.push(format!("'{key}' is {value}, not a whole number")),
+            }
+        }
+        (limits, ignored)
+    }
+}
+
+impl<'de> Deserialize<'de> for DecalLimits {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let (limits, ignored) = Self::read_json(&Value::deserialize(deserializer)?);
+        // A typo is the developer's to fix, so say so, as `graphics_options` does
+        // (a logged warning reaches the console and the MCP).
+        for line in ignored {
+            log::warn!("[Project] {PROJECT_FILE} decals: {line}");
+        }
+        Ok(limits)
+    }
+}
+
+#[cfg(test)]
+#[path = "decals_tests.rs"]
+mod tests;

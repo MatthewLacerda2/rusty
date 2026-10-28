@@ -8,7 +8,7 @@ use crate::core::settings::decals::DecalLimits;
 use crate::scene::decal::DecalSpec;
 use crate::scene::Scene;
 
-fn limits(max_per_owner: u32, max_world: u32, max_total: u32) -> DecalLimits {
+pub(super) fn limits(max_per_owner: u32, max_world: u32, max_total: u32) -> DecalLimits {
     DecalLimits {
         max_per_owner,
         max_world,
@@ -16,7 +16,7 @@ fn limits(max_per_owner: u32, max_world: u32, max_total: u32) -> DecalLimits {
     }
 }
 
-fn stamp(s: &mut Scene, owner: Option<u32>, x: f32) -> u32 {
+pub(super) fn stamp(s: &mut Scene, owner: Option<u32>, x: f32) -> u32 {
     let spec = DecalSpec {
         owner,
         ..DecalSpec::default()
@@ -25,7 +25,7 @@ fn stamp(s: &mut Scene, owner: Option<u32>, x: f32) -> u32 {
         .unwrap()
 }
 
-fn whole(s: &Scene) -> Vec<u32> {
+pub(super) fn whole(s: &Scene) -> Vec<u32> {
     s.decals
         .iter()
         .filter(|d| !d.retiring)

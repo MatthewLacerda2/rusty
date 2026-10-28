@@ -13,7 +13,7 @@
 //!   graphics options start as (#1438), in the same file under `"graphics_options"`.
 //!   `Graphics.SetDefaultOption` and the Build Settings window edit them, the same way.
 //! * **The project's decal budgets** (#1517), under `"decals"`: read, never written
-//!   here, so an edit to the file is what the next Play applies.
+//!   here, so an edit to the file is what the next Play applies (and Stop restores).
 //! * **The quit request** — `Application.Quit()` only *records* that the game asked to
 //!   quit. What that means is the host's call: the player closes the window, the editor
 //!   stops Play (Unity ignores `Quit` in the editor), and the headless harness ends the
@@ -126,19 +126,24 @@ impl Application {
         Ok(())
     }
 
-    /// The project's decal budgets, which entering Play applies to the scene. Bound,
-    /// the file as it stands now, so an edit to `project.rusty` (by hand or by the
-    /// agent) reaches the next Play; unbound, the ones [`set_decal_limits`] gave.
+    /// The project's decal budgets, which entering and leaving Play apply to the
+    /// scene. Bound, the file as it stands now, so an edit to `project.rusty` (by
+    /// hand or by the agent) reaches the next Play; unbound, the ones
+    /// [`set_decal_limits`] gave. A bound file that can't be read keeps the last
+    /// ones read, and says so.
     ///
     /// [`set_decal_limits`]: Self::set_decal_limits
     pub fn decal_limits(&self) -> DecalLimits {
         let Some(path) = &self.path else {
             return self.decal_limits;
         };
-        match ProjectFile::read(path) {
-            Ok(Some(file)) => file.decals,
-            _ => self.decal_limits,
-        }
+        let why = match ProjectFile::read(path) {
+            Ok(Some(file)) => return file.decals,
+            Ok(None) => format!("{} is missing", path.display()),
+            Err(err) => err,
+        };
+        log::warn!("[Project] decals: {why}; keeping the budgets last read");
+        self.decal_limits
     }
 
     /// The decal budgets an unbound run plays with (the player, the harness: what

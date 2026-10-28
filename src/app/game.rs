@@ -224,13 +224,8 @@ impl GameWorld {
             self.resources.edit_snapshot = Some(SceneSnapshot::capture(&self.world.scene.borrow()));
             self.capture_play_origin();
         }
-        // The project's decal budgets (#1517): a `Decals.SetLimits` lasts one Play.
-        let decal_limits = self.resources.application.borrow().decal_limits();
-        {
-            let mut scene = self.world.scene.borrow_mut();
-            scene.decals.set_limits(decal_limits);
-            scene.set_playing(true); // the one play state (#1302)
-        }
+        self.apply_project_decal_limits();
+        self.world.scene.borrow_mut().set_playing(true); // the one play state (#1302)
         self.resources
             .console
             .borrow_mut()
@@ -276,7 +271,15 @@ impl GameWorld {
                 .bake(&self.world.scene.borrow());
         }
         self.restore_play_origin();
+        self.apply_project_decal_limits(); // a `SetLimits` made in Play ends with it
         self.restore_edit_runtime(); // after the restore: it binds the edit scene (#1339)
+    }
+
+    /// Hold the scene's decals to the project's budgets (#1517): on entering Play,
+    /// on Stop (Unity reverts play-mode changes) and when the editor opens.
+    pub fn apply_project_decal_limits(&self) {
+        let limits = self.resources.application.borrow().decal_limits();
+        self.world.scene.borrow_mut().decals.set_limits(limits);
     }
 }
 
