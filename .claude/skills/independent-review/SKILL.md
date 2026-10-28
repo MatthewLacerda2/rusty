@@ -110,7 +110,10 @@ skill reviews the checkout's own local diff, which is not this PR: if what it
 reviewed is not `gh pr diff <n>`, discard its findings and review that diff
 yourself. You run in your own worktree: check out or fetch what you need
 there, never in the main checkout (the repository root), which
-other agents share. You are read-only: no edits, commits, pushes or comments,
+other agents share. Read the PR **detached**, with no local branch name:
+`git fetch origin pull/<n>/head && git checkout --detach FETCH_HEAD`. A named
+branch (`pr<n>`, `pr<n>-review`) outlives your worktree in the shared
+repository. You are read-only: no edits, commits, pushes or comments,
 and no builds.
 
 Look especially for: <the steering lists for the PR's nature, pasted whole>.
@@ -202,3 +205,9 @@ links the fix.
 - Letting `code-review` run without the PR number: it then reviews the
   checkout's local diff, some other change entirely.
 - Labelling `queue` before the `Independent review` comment exists.
+- A reviewer that checks the PR out into a named branch (`pr1316`,
+  `pr1403rev`, …): the worktree goes, the branch stays in the shared
+  repository. The Post Processing batch (#1446, 2026-10-26) ended with 39 local
+  branches, most of them reviewers', and sweeping them by hand was refused as
+  irreversible (#1482). The prompt says to read it detached; `make reclaim`
+  deletes the ones that slip through.

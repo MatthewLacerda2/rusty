@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""`reclaim.py [--dry-run]` — free the disk finished branches left behind (#913).
+"""`reclaim.py [--dry-run]` — free the disk and branches finished work left behind (#913).
 
 Every branch gets its own worktree under `.claude/worktrees/`, and each one
 compiles into its own `target/` (several GB). `issue-batch` says to remove a
@@ -46,6 +46,12 @@ when their content is already in `origin/main`: `git merge-tree --write-tree
 origin/main HEAD` yields `origin/main`'s own tree. That needs git >= 2.38;
 older, reclaim keeps the stricter ancestor rule and says so.
 
+A removed worktree's branch is deleted with it, and every local branch no
+worktree holds is judged the same way, its pull request found by name or by
+tip commit (#1482: 39 dead branches after the Post Processing batch, most of
+them reviewers' `prNNNN`; `reclaim_branches.py` has the story). `main` and a
+branch any worktree has checked out are never deleted.
+
 `--dry-run` decides and prints the same, and deletes nothing.
 """
 
@@ -61,6 +67,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import ghrest
+import reclaim_branches as branches
 from merging.watch import tenancy
 
 USAGE = "usage: reclaim.py [--dry-run]"
@@ -145,6 +152,20 @@ def verdict(wt: Worktree, facts: Facts) -> tuple[str, str]:
     return "remove", why
 
 
+def judge_branch(machine: Machine, main: Path, branch: str, tip: str) -> tuple[str, str]:
+    """A branch no worktree holds, judged like a worktree's (#1482).
+
+    Its pull request is found by name, else by tip commit, which is how a
+    reviewer's `pr1316` finds PR #1316. A tip already on `origin/main` is not
+    asked by commit: GitHub would answer with whichever PR merged that commit,
+    and a fresh branch off `main` would read as finished.
+    """
+    pulls = machine.pulls(branch)
+    if pulls == [] and not machine.is_ancestor(main, tip, "origin/main"):
+        pulls = machine.pulls_of(tip)
+    return verdict(Worktree(main, tip, branch), machine.work(Facts(), main, branch, tip, pulls))
+
+
 def inside(path: Path, tree: Path) -> bool:
     return path == tree or tree in path.parents
 
@@ -176,14 +197,14 @@ class Machine:
     def is_ancestor(self, cwd: Path, commit: str, of: str) -> bool:
         return self.run("git", "-C", str(cwd), "merge-base", "--is-ancestor", commit, of).returncode == 0
 
-    def merged_into_main(self, cwd: Path) -> bool:
-        """Is HEAD's content already in `origin/main` (a rebase or squash can't hide it)?"""
+    def merged_into_main(self, cwd: Path, rev: str = "HEAD") -> bool:
+        """Is `rev`'s content already in `origin/main` (a rebase or squash can't hide it)?"""
         words = self.run("git", "--version").stdout.split()
         version = words[-1].split(".") if words else []
         if tuple(int(n) if n.isdigit() else 0 for n in version[:2]) < (2, 38):
             self.old_git = True
             return False
-        merged = self.run("git", "-C", str(cwd), "merge-tree", "--write-tree", "origin/main", "HEAD")
+        merged = self.run("git", "-C", str(cwd), "merge-tree", "--write-tree", "origin/main", rev)
         if merged.returncode != 0:  # a conflict: HEAD holds something main doesn't
             return False
         main_tree = self.run("git", "-C", str(cwd), "rev-parse", "origin/main^{tree}")
@@ -194,8 +215,15 @@ class Machine:
         repo = ghrest.slug_of(self.run("git", "remote", "get-url", "origin").stdout)
         if repo is None:
             return None
-        owner = repo.split("/")[0]
-        done = self.run("gh", "api", f"repos/{repo}/pulls?state=all&head={owner}:{branch}&per_page=100")
+        return self.rest(f"repos/{repo}/pulls?state=all&head={repo.split('/')[0]}:{branch}&per_page=100")
+
+    def pulls_of(self, commit: str) -> list[dict] | None:
+        """The pull requests holding `commit` (#1482: a reviewer's `pr1316` is no PR's head ref)."""
+        repo = ghrest.slug_of(self.run("git", "remote", "get-url", "origin").stdout)
+        return None if repo is None else self.rest(f"repos/{repo}/commits/{commit}/pulls?per_page=100")
+
+    def rest(self, path: str) -> list[dict] | None:
+        done = self.run("gh", "api", path)
         return [ghrest.pull(p) for p in json.loads(done.stdout or "[]")] if done.returncode == 0 else None
 
     def cwds(self) -> list[tuple[int, Path]] | None:
@@ -231,14 +259,17 @@ class Machine:
         if wt.branch is None:
             facts.on_main = self.is_ancestor(wt.path, wt.head, "origin/main")
             return facts
-        pulls = self.pulls(wt.branch)
+        return self.work(facts, wt.path, wt.branch, wt.head, self.pulls(wt.branch))
+
+    def work(self, facts: Facts, cwd: Path, branch: str, head: str, pulls: list[dict] | None) -> Facts:
+        """`branch`'s pull request states, and its commits that nothing but this checkout holds."""
         facts.prs = None if pulls is None else [p["state"] for p in pulls]
-        stray = int(self.git(wt.path, "rev-list", "--count", "HEAD", "--not", "--remotes"))
+        stray = int(self.git(cwd, "rev-list", "--count", head, "--not", "--remotes"))
         # A merged PR's branch is often deleted on the remote, which strands its
         # commits locally; they are safe when the PR's head already holds them.
         heads = [p["headRefOid"] for p in pulls or [] if p.get("headRefOid")]
-        if stray and not any(self.is_ancestor(wt.path, wt.head, h) for h in heads):
-            if "MERGED" not in (facts.prs or []) or not self.merged_into_main(wt.path):
+        if stray and not any(self.is_ancestor(cwd, head, h) for h in heads):
+            if "MERGED" not in (facts.prs or []) or not self.merged_into_main(cwd, head):
                 facts.unpushed = stray
         return facts
 
@@ -258,6 +289,11 @@ class Machine:
     def remove(self, main: Path, wt: Path) -> None:
         shutil.rmtree(wt / "target", ignore_errors=True)
         self.git(main, "worktree", "remove", str(wt))
+
+    def delete_branch(self, main: Path, branch: str) -> str | None:
+        """`git branch -D`; the error when git refused, so one branch can't stop the run."""
+        done = self.run("git", "-C", str(main), "branch", "-D", branch)
+        return done.stderr.strip() or "failed" if done.returncode != 0 else None
 
 
 def shown_target(machine: Machine, wt: Path) -> str:
@@ -282,7 +318,7 @@ def main(argv: list[str], machine: Machine | None = None, here: Path | None = No
     worktrees = [wt for wt in listed if root in wt.path.parents]
     outside = [wt for wt in listed if root not in wt.path.parents and wt.path != main_checkout]
     cwds = machine.cwds()
-    removed = 0
+    removed, deleted = 0, 0
     for wt in worktrees:
         action, why = verdict(wt, machine.facts(wt, here, cwds))
         name = f"{wt.path.name} ({describe(wt)})"
@@ -291,9 +327,14 @@ def main(argv: list[str], machine: Machine | None = None, here: Path | None = No
                 machine.remove(main_checkout, wt.path)
             removed += 1
             print(f"{'would remove' if dry else 'removed'}: {name}: {why}")
+            if wt.branch is not None and wt.branch != "main":
+                deleted += branches.delete(machine, main_checkout, wt.branch, "its worktree was removed", dry)
         else:
             label = "PROTECTED" if action == "protect" else "kept"
             print(f"{label}: {name}: {why}; {shown_target(machine, wt.path)}")
+
+    held = {wt.branch for wt in listed if wt.branch is not None}
+    deleted += branches.visit(machine, main_checkout, held, dry, judge_branch)
 
     for wt in outside:
         print(f"OUTSIDE: {wt.path} ({describe(wt)}, {shown_target(machine, wt.path)}): "
@@ -306,7 +347,7 @@ def main(argv: list[str], machine: Machine | None = None, here: Path | None = No
         print("reclaim: note: git < 2.38 cannot check content against origin/main; "
               "merged branches rebased by the queue stay PROTECTED")
     verb = "would remove" if dry else "removed"
-    print(f"reclaim: {verb} {removed} of {len(worktrees)} worktree(s); "
+    print(f"reclaim: {verb} {removed} of {len(worktrees)} worktree(s) and {deleted} branch(es); "
           f"free disk {gib(before)} -> {gib(after)}")
     return 0
 

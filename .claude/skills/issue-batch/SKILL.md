@@ -197,8 +197,8 @@ Per pull request:
    `pre-push` hook (`make resolved`) catches a resolution rustfmt rejects. A
    resolution that needs a compile to trust (a split, a dispatcher, system
    order, `Cargo.lock`) goes to a fresh routine.
-3. **After a merge:** `make reclaim` (removes merged worktrees, refuses unpushed
-   work), then re-read the board.
+3. **After a merge:** `make reclaim` (removes merged worktrees and deletes
+   finished local branches, refuses unpushed work), then re-read the board.
 
 ## Starting, and re-reading the board
 
@@ -309,10 +309,9 @@ whose ground moved (never changing a `planning` issue's scope).
 The batch is done when the main checkout runs what merged, once nothing is
 compiling:
 
-1. `make reclaim` for what is left. Delete a local branch only when
-   `gh pr view N --json state` says `MERGED` (`git branch --merged` cannot see a
-   squash) or it has no commits beyond `main`; other unmerged work is the user's
-   to delete.
+1. `make reclaim` for what is left. It deletes the finished local branches too,
+   reviewers' `prNNNN` included (#1482), and names each branch it keeps with
+   its reason; a kept branch with unmerged work is the user's to delete.
 2. `git pull --ff-only` on `main`.
 3. `cargo build --features dev --bin session-mcp --bin rusty` in the main
    checkout, so local MCP clients drive the new engine (`docs/mcp.md`) and the app
