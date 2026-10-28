@@ -65,7 +65,7 @@ impl Renderer {
             pass.editor_mode,
         ) && !view.has_forward_override();
         let key = HistoryKey::new(scene, pass.base_id);
-        let size = view.size();
+        let size = view.scene_size();
         let prev_view_projs =
             view.post_fx
                 .motion

@@ -45,10 +45,7 @@ impl Frontend for PlayerFrontend {
             .borrow_mut()
             .set_game_view(width, height);
         let view = match &mut self.view {
-            Some(view) => {
-                view.resize(device, width, height, bloom);
-                view
-            }
+            Some(view) => view,
             slot @ None => slot.insert(RenderView::targetless(
                 device,
                 shell.renderer.config.format,
@@ -57,6 +54,9 @@ impl Frontend for PlayerFrontend {
                 bloom,
             )),
         };
+        // The screen renders its scene at the player's render scale (#1498).
+        view.set_render_scale(shell.renderer.graphics(false).render_scale);
+        view.resize(device, width, height, bloom);
 
         // The view is targetless (it renders straight onto the swapchain), so hand it
         // the frame to draw the in-game UI on (#418).

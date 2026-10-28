@@ -14,10 +14,19 @@
 //! the offscreen colour target it renders into. Consumers own their views (the
 //! headless screenshot / cubemap capture build a throwaway one), and the render entry
 //! point takes the view, so a view's resize guard checks its *own* size.
+//!
+//! A view has two sizes (#1498): its **output** ([`RenderView::size`]: the colour
+//! target, the UI, the projection's aspect) and its **scene** size
+//! ([`RenderView::scene_size`]: depth, the SSAO prepass, motion vectors, every post-FX
+//! target), the output at the view's [`RenderScale`]. They differ only on a scaled
+//! screen view, whose post-processed scene is upscaled to the output before the UI.
 
+use crate::core::settings::render_scale::RenderScale;
 use crate::render::gpu::shaders::ShaderRegistry;
 use crate::render::postfx::PostFx;
 
+mod output;
+mod scale;
 mod size;
 mod targets;
 pub use size::PixelSize;
@@ -26,7 +35,15 @@ use targets::{create_color_target, create_depth};
 /// Per-view render targets + post-FX chain. See the module docs for why this is owned
 /// per view rather than shared on the `Renderer`.
 pub struct RenderView {
+    /// The output's size: the colour target, the UI and the projection's aspect.
     size: PixelSize,
+    /// The scene targets' size: `size` at `render_scale` (#1498).
+    scene_size: PixelSize,
+    /// What `scene_size` is of `size`; native until a screen view's consumer sets it.
+    render_scale: RenderScale,
+    /// The post-processed scene at `scene_size`, upscaled to the output before the UI;
+    /// `None` while the two sizes are equal, so a native view draws as it always did.
+    upscale_source: Option<wgpu::Texture>,
     /// Colour format this view composites into (the swapchain format for the editor
     /// viewport/preview, the offscreen format for screenshots) — its post-FX composite
     /// pipeline and owned colour target are built against it.
@@ -133,8 +150,7 @@ impl RenderView {
         bloom_divisor: u32,
         owns_target: bool,
     ) -> Self {
-        let width = width.max(1);
-        let height = height.max(1);
+        let (width, height) = (width.max(1), height.max(1));
         // A throwaway registry compiles this view's post-FX module. Views are created
         // rarely (once per consumer, not per frame), so the compile cost is one-time.
         let mut registry = ShaderRegistry::new(crate::shadergen::engine_shader_dir());
@@ -144,6 +160,9 @@ impl RenderView {
         let (color_target, ui_format) = target.unzip();
         Self {
             size: PixelSize::new(width, height),
+            scene_size: PixelSize::new(width, height),
+            render_scale: RenderScale::NATIVE,
+            upscale_source: None,
             format,
             bloom_divisor,
             depth_texture,
@@ -162,29 +181,33 @@ impl RenderView {
         }
     }
 
-    /// Re-size this view's targets to `width` x `height` at `bloom_divisor`, but only
-    /// when something actually changed — a cheap no-op otherwise, so the resize guard
-    /// checks *this view's* own size instead of a shared one. The post-FX *pipelines*
-    /// are never rebuilt; only the size-dependent textures are reallocated.
+    /// Re-size this view's output to `width` x `height` and its scene targets to that
+    /// at its render scale, at `bloom_divisor`, but only when something actually
+    /// changed — a cheap no-op otherwise, so the resize guard checks *this view's* own
+    /// size instead of a shared one. The post-FX *pipelines* are never rebuilt; only
+    /// the size-dependent textures are reallocated.
     pub fn resize(&mut self, device: &wgpu::Device, width: u32, height: u32, bloom_divisor: u32) {
-        let width = width.max(1);
-        let height = height.max(1);
-        if self.size.width == width
-            && self.size.height == height
-            && self.bloom_divisor == bloom_divisor
-        {
+        let size = PixelSize::new(width.max(1), height.max(1));
+        let max_side = device.limits().max_texture_dimension_2d;
+        let scene = scale::scene_size(self.render_scale, size, max_side);
+        if (self.size, self.scene_size, self.bloom_divisor) == (size, scene, bloom_divisor) {
             return;
         }
-        self.size = PixelSize::new(width, height);
-        self.bloom_divisor = bloom_divisor;
-        let (depth_texture, depth_view) = create_depth(device, width, height);
+        // A scale change alone keeps the output: a consumer may already hold a view of
+        // its colour target for this render.
+        let output_changed = self.size != size;
+        (self.size, self.scene_size, self.bloom_divisor) = (size, scene, bloom_divisor);
+        let (depth_texture, depth_view) = create_depth(device, scene.width, scene.height);
         self.depth_texture = depth_texture;
         self.depth_view = depth_view;
         // The cached scene-depth bind group references the freed depth view.
         self.scene_depth_bind_group = None;
-        self.post_fx.resize(device, width, height, bloom_divisor);
-        if self.color_target.is_some() {
-            let (target, ui_format) = create_color_target(device, self.format, width, height);
+        let (w, h) = (scene.width, scene.height);
+        self.post_fx.resize(device, w, h, bloom_divisor);
+        self.upscale_source = scale::upscale_source(device, self.format, size, scene);
+        if output_changed && self.color_target.is_some() {
+            let (w, h) = (size.width, size.height);
+            let (target, ui_format) = create_color_target(device, self.format, w, h);
             (self.color_target, self.ui_format) = (Some(target), Some(ui_format));
         }
     }
@@ -200,93 +223,21 @@ impl RenderView {
         self.pixel_scale
     }
 
-    /// This view's pixel size — drives the projection aspect and the target sizes.
+    /// This view's output size: its colour target's, the UI's, the projection aspect's.
     pub fn size(&self) -> PixelSize {
         self.size
     }
 
-    /// The projection aspect ratio (`width / height`) for this view.
+    /// The size of this view's scene targets (depth, SSAO, motion vectors, post-FX):
+    /// [`Self::size`] at its render scale (#1498). What a scene pass sizes by.
+    pub fn scene_size(&self) -> PixelSize {
+        self.scene_size
+    }
+
+    /// The projection aspect ratio (`width / height`) of the output, which the scaled
+    /// scene is stretched back to.
     pub fn aspect(&self) -> f32 {
         self.size.width as f32 / self.size.height.max(1) as f32
-    }
-
-    /// An owned view of the offscreen colour target, or `None` for a targetless view.
-    /// `wgpu::TextureView` is a refcounted handle, so the returned view doesn't borrow
-    /// `self` — the front-end can pass it back to `render` as the output and register
-    /// it with egui in the same frame.
-    pub fn color_target_view(&self) -> Option<wgpu::TextureView> {
-        self.color_target
-            .as_ref()
-            .map(|t| t.create_view(&wgpu::TextureViewDescriptor::default()))
-    }
-
-    /// The owned colour target seen in display space — its non-sRGB twin, which holds
-    /// the display-encoded bytes — for a sampler that expects those rather than linear
-    /// values: egui's (#333). A device without view-format support gets the plain view
-    /// (the image then shows darker, as the UI pass's fallback blends off).
-    pub fn display_view(&self) -> Option<wgpu::TextureView> {
-        let target = self.color_target.as_ref()?;
-        Some(target.create_view(&wgpu::TextureViewDescriptor {
-            format: self.ui_format,
-            ..Default::default()
-        }))
-    }
-
-    /// Have the next render draw the in-game UI through `output` (a view of the
-    /// frame the caller passes to `render`, and its format) — for a targetless view
-    /// that presents, like the standalone player's swapchain (#418). Views owning a
-    /// target need not: the UI draws onto their own target. A targetless view left
-    /// without one (the cubemap capture) never draws UI.
-    pub fn set_ui_output(&mut self, output: Option<(wgpu::TextureView, wgpu::TextureFormat)>) {
-        self.ui_output = output;
-    }
-
-    /// The view + format the UI pass draws through this render (#418): the owned
-    /// target's display-space alias (see `targets::create_color_target`), else the
-    /// caller's [`RenderView::set_ui_output`], taken so a stale frame is never reused.
-    pub(crate) fn take_ui_target(&mut self) -> Option<(wgpu::TextureView, wgpu::TextureFormat)> {
-        let Some(target) = self.color_target.as_ref() else {
-            return self.ui_output.take();
-        };
-        let format = self.ui_format?;
-        let view = target.create_view(&wgpu::TextureViewDescriptor {
-            format: Some(format),
-            ..Default::default()
-        });
-        Some((view, format))
-    }
-
-    /// The offscreen colour target itself, or `None` for a targetless view. Borrowed
-    /// rather than cloned because the copy-back path ([`crate::render::readback`]) needs
-    /// the `Texture`, not a view of it — that is what lets a capture read back the very
-    /// target it just drew instead of allocating a second one beside it.
-    pub fn color_target(&self) -> Option<&wgpu::Texture> {
-        self.color_target.as_ref()
-    }
-
-    /// Create the offscreen view in `slot` if absent, else resize it in place — so a
-    /// consumer keeps one view across frames and only reallocates when the panel size
-    /// or quality tier changes.
-    pub fn ensure_offscreen(
-        slot: &mut Option<RenderView>,
-        device: &wgpu::Device,
-        format: wgpu::TextureFormat,
-        width: u32,
-        height: u32,
-        bloom_divisor: u32,
-    ) {
-        match slot {
-            Some(view) => view.resize(device, width, height, bloom_divisor),
-            None => {
-                *slot = Some(RenderView::offscreen(
-                    device,
-                    format,
-                    width,
-                    height,
-                    bloom_divisor,
-                ))
-            }
-        }
     }
 }
 

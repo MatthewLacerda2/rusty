@@ -26,6 +26,7 @@ fn effect_runs_needs_camera_option_and_tier() {
     let off = GraphicsSettings {
         quality: QualityPreset::High,
         options,
+        ..Default::default()
     };
     assert!(!effect_runs(off, ssr, true), "option off");
 }

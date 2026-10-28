@@ -1,7 +1,8 @@
 //! src/editor/viewport.rs — the Unity-style Scene/Game viewport panel (#183).
 //!
-//! The 3D scene is rendered to an offscreen texture (`Renderer::viewport_view`) and
-//! shown here inside an `egui::Image` in the central panel, with two tabs over it:
+//! The 3D scene is rendered to an offscreen texture (one per tab, the editor
+//! frontend's `viewport_views`) and shown here inside an `egui::Image` in the central
+//! panel, with two tabs over it:
 //! **Scene** (the editor's own camera, [`scene_camera`], navigated with Unity's
 //! controls by [`scene_nav`] — plus click-to-select and the move gizmo) and **Game**
 //! (the active `CameraComponent`'s view — what the player sees). The panel

@@ -67,20 +67,19 @@ impl EditorFrontend {
         };
         // The UI lays out on the game view's pixel size (#417) — a sim input.
         game.resources.screen.borrow_mut().set_game_view(px, py);
-        // Create-or-resize this viewport's own view. A view's resize guard checks its
-        // own size, so it never fights the preview view (#355).
+        let scene_tab = interaction.tab == ViewportTab::Scene;
+        // Create-or-resize this tab's own view. A view's resize guard checks its own
+        // size, so it never fights the other tab's or the preview's (#355). The Game
+        // view is the screen: its scene renders at the render scale (#1498).
         let renderer = &mut shell.renderer;
-        RenderView::ensure_offscreen(
-            &mut self.viewport_view,
+        let view = RenderView::ensure_offscreen(
+            &mut self.viewport_views[usize::from(!scene_tab)],
             &renderer.device,
             renderer.config.format,
-            px,
-            py,
+            (px, py),
+            renderer.graphics(scene_tab).render_scale,
             renderer.quality.bloom_divisor(),
         );
-        let Some(view) = self.viewport_view.as_mut() else {
-            return;
-        };
         // `wgpu::TextureView` is a refcounted handle, so this owned view doesn't
         // borrow `view` and `render` can take it as the output.
         let Some(target_view) = view.color_target_view() else {
@@ -88,7 +87,6 @@ impl EditorFrontend {
         };
 
         let scene = game.scene().borrow();
-        let scene_tab = interaction.tab == ViewportTab::Scene;
         view.ui.screen_in_editor = scene_tab && self.editor_ui.ui_overlay;
         view.set_pixel_scale(pixels_per_point);
         let camera = viewport_camera(&self.editor_ui, game, &scene, interaction.tab);
@@ -124,17 +122,15 @@ impl EditorFrontend {
             return;
         };
         let renderer = &mut shell.renderer;
-        RenderView::ensure_offscreen(
+        // A preview is not the screen: it renders natively (#1498).
+        let view = RenderView::ensure_offscreen(
             &mut self.preview_view,
             &renderer.device,
             renderer.config.format,
-            px,
-            py,
+            (px, py),
+            Default::default(),
             renderer.quality.bloom_divisor(),
         );
-        let Some(view) = self.preview_view.as_mut() else {
-            return;
-        };
         let Some(target_view) = view.color_target_view() else {
             return;
         };

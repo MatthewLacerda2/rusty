@@ -3,8 +3,7 @@
 //! [`screenshot`](crate::dev::screenshot) shows what the *game* looks like; this shows what
 //! the *editor* looks like — the egui panels around the scene viewport — with no window,
 //! on lavapipe. It exists so an agent that changes the editor can attach before/after
-//! captures to its PR and the operator can review the change from a phone (#725 did
-//! this with a scratch example; this is that path, supported).
+//! captures to its PR and the operator can review the change from a phone (#725).
 //!
 //! **The same frame the editor draws, minus the window.** Each frame runs
 //! [`EditorUi::draw`] exactly as the [`EditorFrontend`](super::EditorFrontend) does,
@@ -12,12 +11,11 @@
 //! screenshot's [`CaptureHost`]), rebinds that target as the viewport's egui texture,
 //! and on the last frame paints egui into an offscreen target and reads it back.
 //!
-//! **Deterministic by construction:** a fixed size, a fixed pixel scale (1×), a fixed
-//! frame count and a synthetic egui clock. Several frames are needed because egui loads
-//! fonts registered in one frame on the *next*, and sizes some panels from the frame
-//! before; [`DEFAULT_FRAMES`] covers both. The clock steps a whole second a frame,
-//! longer than any egui animation (a window's fade-in, #333), so the painted frame
-//! shows the settled UI a user sees. The sim is never stepped.
+//! **Deterministic by construction:** a fixed size, pixel scale (1×) and frame count,
+//! and a synthetic egui clock. egui loads fonts on the frame after registering them and
+//! sizes some panels from the frame before; [`DEFAULT_FRAMES`] covers both. The clock
+//! steps a second a frame, past any egui animation (a fade-in, #333), so the painted
+//! frame shows the settled UI. The sim is never stepped.
 //!
 //! No adapter → `Ok(false)`, the same skip contract as every headless capture.
 
@@ -93,11 +91,9 @@ pub fn default_world() -> GameWorld {
     )
 }
 
-/// Capture the editor over `game`'s scene to a PNG at `path`.
-///
-/// `Ok(true)` when written, `Ok(false)` when the box has no GPU/software adapter, `Err`
-/// for a `select` name the scene doesn't hold, a `select_asset` path that doesn't
-/// exist, both selections at once, or an I/O / encode failure.
+/// Capture the editor over `game`'s scene to a PNG at `path`: `Ok(false)` on a box with
+/// no GPU/software adapter, `Err` for a `select` name the scene doesn't hold, a missing
+/// `select_asset` path, both selections at once, or an I/O / encode failure.
 pub fn capture(
     game: &GameWorld,
     path: impl AsRef<Path>,
@@ -140,8 +136,7 @@ pub fn capture_into(
                 egui_renderer.update_texture(&renderer.device, &renderer.queue, *id, delta);
             }
         }
-        // Handled: egui asserts every delta is consumed. Frees are moot for one shot.
-        out.textures_delta.clear();
+        out.textures_delta.clear(); // egui asserts every delta is consumed
     }
     let output = output.expect("at least one frame");
     let renderer = host.renderer(width, height).expect("probed above");
@@ -226,18 +221,23 @@ fn render_viewport(
         return;
     }
     game.resources.screen.borrow_mut().set_game_view(px, py);
-    let Some((renderer, view)) = host.frame(px, py) else {
+    let scene_tab = ui.viewport_tab == ViewportTab::Scene;
+    // The settings first: the Game view's scene renders at the render scale (#1498).
+    let Some(renderer) = host.renderer(px, py) else {
+        return;
+    };
+    renderer.apply_graphics(*game.script_manager().graphics_cell().borrow());
+    let scale = renderer.graphics(scene_tab).render_scale;
+    let Some((renderer, view)) = host.frame(px, py, scale) else {
         return;
     };
     let Some(target) = view.color_target_view() else {
         return;
     };
     let scene = game.scene().borrow();
-    let scene_tab = ui.viewport_tab == ViewportTab::Scene;
     view.ui.screen_in_editor = scene_tab && ui.ui_overlay;
     let camera = super::viewport::viewport_camera(ui, game, &scene, ui.viewport_tab);
     renderer.set_ui_textures(Rc::clone(&ui.ui_textures));
-    renderer.apply_graphics(*game.script_manager().graphics_cell().borrow());
     renderer.render(view, &scene, &camera, &target, scene_tab);
     super::viewport::rebind_egui_texture(egui_renderer, &renderer.device, texture_id, view);
 }

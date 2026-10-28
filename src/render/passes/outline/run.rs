@@ -33,7 +33,7 @@ impl Renderer {
         if solids.draws.outline.is_empty() {
             return;
         }
-        let size = view.size();
+        let size = view.scene_size();
         let radius = OUTLINE_PX * view.pixel_scale();
         let pad = radius.ceil() as u32 + 1;
         let Some([x, y, w, h]) = bounds.screen_rect(view_proj, (size.width, size.height), pad)

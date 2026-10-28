@@ -91,7 +91,7 @@ fn a_mesh_particle_draws_its_mesh_and_counts_as_a_particle() {
         return;
     };
     assert!(is_red(px), "the sphere shows its emissive material: {px:?}");
-    let (renderer, _) = host.frame(64, 64).expect("adapter exists");
+    let renderer = host.renderer(64, 64).expect("adapter exists");
     let counters = renderer.frame_counters;
     assert_eq!(counters.particles_drawn, 1, "{counters:?}");
     // The wall is the only entity; the sphere is a particle, not an entity.

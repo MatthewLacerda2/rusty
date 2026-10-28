@@ -44,9 +44,12 @@ pub struct EditorFrontend {
     /// panel (#183). Registered lazily on the first frame a target exists, then
     /// rebound to the resized view each frame so the `egui::Image` reference stays valid.
     viewport_texture_id: Option<egui::TextureId>,
-    /// The viewport's per-view render state (its own target, depth, post-FX); never
-    /// shared with the preview view (#355). `None` until the viewport has rendered once.
-    viewport_view: Option<RenderView>,
+    /// The viewport's per-view render state (its own target, depth, post-FX), one per
+    /// tab, `[Scene, Game]`, as Unity keeps the two views apart: the Game view renders
+    /// at the render scale and the Scene view natively (#1498), so a shared one would
+    /// reallocate and reset its auto-exposure on every tab switch. Never shared with
+    /// the preview view (#355). `None` until that tab has rendered once.
+    viewport_views: [Option<RenderView>; 2],
     /// The Inspector Preview tab's texture id (#352) — same contract as the viewport's.
     preview_texture_id: Option<egui::TextureId>,
     /// The Inspector preview's own render state, independent of the viewport's (#355).
@@ -94,7 +97,7 @@ impl EditorFrontend {
             egui_renderer,
             editor_ui,
             viewport_texture_id: None,
-            viewport_view: None,
+            viewport_views: [None, None],
             preview_texture_id: None,
             preview_view: None,
             game_focused: false,

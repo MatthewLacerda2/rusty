@@ -33,6 +33,7 @@
 
 use std::path::Path;
 
+use crate::core::settings::render_scale::RenderScale;
 use crate::render::{
     gpu_required, readback, GpuTimes, RenderCounters, RenderView, Renderer, OFFSCREEN_FORMAT,
     REQUIRE_GPU_ENV,
@@ -96,27 +97,33 @@ impl CaptureHost {
         Self::default()
     }
 
-    /// The renderer and a view sized to `width` x `height`, building either on first
-    /// use and reusing both afterwards.
+    /// The renderer and a view sized to `width` x `height` with its scene at
+    /// `render_scale` (#1498; native for anything but the screen), building either on
+    /// first use and reusing both afterwards.
     ///
     /// `None` means this machine has no GPU or software adapter: **skip, don't fail**.
     /// Callers turn that into their own graceful outcome (`Ok(false)`), matching the
     /// contract every headless path in the engine already has.
-    pub fn frame(&mut self, width: u32, height: u32) -> Option<(&mut Renderer, &mut RenderView)> {
+    pub fn frame(
+        &mut self,
+        width: u32,
+        height: u32,
+        render_scale: RenderScale,
+    ) -> Option<(&mut Renderer, &mut RenderView)> {
         let (width, height) = (width.max(1), height.max(1));
         self.renderer(width, height)?;
         let renderer = self.renderer.as_mut()?;
         // Create-or-resize, the same guard the editor viewport uses: a repeat shot at
-        // the same size is a no-op rather than a reallocation.
-        RenderView::ensure_offscreen(
+        // the same size and scale is a no-op rather than a reallocation.
+        let view = RenderView::ensure_offscreen(
             &mut self.view,
             &renderer.device,
             OFFSCREEN_FORMAT,
-            width,
-            height,
+            (width, height),
+            render_scale,
             renderer.quality.bloom_divisor(),
         );
-        Some((renderer, self.view.as_mut()?))
+        Some((renderer, view))
     }
 
     /// Just the renderer, built on first use (at `width` x `height`) and never resizing
@@ -147,7 +154,12 @@ impl CaptureHost {
         width: u32,
         height: u32,
     ) -> Result<Option<RenderedFrame>, String> {
-        let Some((renderer, view)) = self.frame(width, height) else {
+        // A capture of the screen renders at its render scale (#1498), read as the
+        // player and the Game view read it.
+        let scale = self
+            .renderer(width, height)
+            .map(|r| r.graphics(false).render_scale);
+        let Some((renderer, view)) = self.frame(width, height, scale.unwrap_or_default()) else {
             no_adapter("draw a capture")?;
             return Ok(None);
         };

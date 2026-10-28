@@ -120,7 +120,7 @@ fn capture_subject_into(
     let scene = preview::build_preview_scene(options.mesh, subject);
     let resolution = options.clamped_resolution();
 
-    let Some((renderer, view)) = host.frame(resolution, resolution) else {
+    let Some((renderer, view)) = host.frame(resolution, resolution, Default::default()) else {
         super::capture::no_adapter(&format!("preview {label}"))?;
         return Ok(false);
     };
