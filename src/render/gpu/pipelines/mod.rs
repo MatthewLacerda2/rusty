@@ -184,8 +184,8 @@ fn create_pipeline_layouts(
 }
 
 /// The SSAO depth prepass (#436): the solids' depth alone, through the forward vertex
-/// stage (skinning, instancing) and `fragment` — `fs_prepass` (cutout clip, unlit
-/// skip), or a cutting variant's `fs_prepass_cut` (#648). Same layout as the forward
+/// stage (skinning, instancing) and `fragment` — `fs_prepass` (cutout clip), or the
+/// `fs_prepass_cut` of a variant that cuts or moves its UVs (#648, #1499). Same layout as the forward
 /// pass, so it records with the same bind groups.
 fn make_prepass(
     device: &wgpu::Device,

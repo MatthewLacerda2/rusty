@@ -274,7 +274,8 @@ Material.SetShader(enemy, "enemy_toon")   -- or `shader = "enemy_toon"` in a rec
 - Every entity sharing the material draws with the shader, opaque and transparent
   alike. Its shadow and SSAO depth match the standard shader's, except where a
   block cuts fragments (`dissolve`): those are cut from the shadow and the SSAO
-  depth too (#648).
+  depth too (#648). A block that moves the UVs (`uv_scroll`) moves them there too,
+  so a Cutout material clips its shadow and depth where its colour shows (#1499).
 - The module is compiled the first frame a material uses it. A name that is not
   there, a module that fails to compile, or a `postfx` module logs one warning and
   **renders with the standard shader** — a bad shader never crashes the game. A

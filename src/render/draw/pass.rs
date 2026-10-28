@@ -240,8 +240,11 @@ impl Renderer {
             let Some(gpu_mesh) = self.gpu_meshes.get(&batch.key.mesh) else {
                 continue;
             };
-            // Unlit solids are not in the prepass, so they write their own depth.
-            let primed = solid_pass.primed() && batch.key.uniform().is_lit != 0;
+            let in_prepass = batch.key.in_prepass();
+            if solid_pass.is_prepass() && !in_prepass {
+                continue;
+            }
+            let primed = solid_pass.primed() && in_prepass;
             let pipeline = (batch.key.pipeline, primed);
             if bound != Some(pipeline) {
                 let shaders = &self.surface_shaders;

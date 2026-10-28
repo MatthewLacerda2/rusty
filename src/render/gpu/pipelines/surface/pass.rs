@@ -10,11 +10,12 @@ use super::SurfaceShaders;
 ///
 /// The opaque passes carry the standard primed pipelines when the view's depth is
 /// primed (#1499): the SSAO prepass already wrote every lit solid's depth, so those
-/// draw through a pipeline that tests it and writes none. Unlit solids are not in the
-/// prepass (they cast no occlusion), so they keep the depth-writing pipeline.
+/// draw through a pipeline that tests it and writes none. A batch the prepass leaves
+/// out (`BatchKey::in_prepass`: an unlit solid) keeps the depth-writing pipeline.
 #[derive(Clone, Copy)]
 pub(crate) enum SolidPass<'a> {
-    /// The SSAO depth prepass; the standard pipeline unless a variant cuts (#648).
+    /// The SSAO depth prepass; the standard pipeline unless a variant cuts or moves
+    /// its UVs (#648, #1499).
     Prepass(&'a wgpu::RenderPipeline),
     /// Opaque solids; the standard pipeline is the view's (the preview may swap it).
     Opaque(&'a wgpu::RenderPipeline, Option<&'a PrimedPipelines>),
@@ -25,6 +26,14 @@ pub(crate) enum SolidPass<'a> {
 }
 
 impl SolidPass<'_> {
+    /// Whether this is the SSAO prepass, which draws only the batches
+    /// [`BatchKey::in_prepass`] admits.
+    ///
+    /// [`BatchKey::in_prepass`]: crate::render::draw::batch::BatchKey::in_prepass
+    pub(crate) fn is_prepass(self) -> bool {
+        matches!(self, Self::Prepass(_))
+    }
+
     /// Whether this pass draws over a primed depth (#1499).
     pub(crate) fn primed(self) -> bool {
         matches!(self, Self::Opaque(_, Some(_)) | Self::Velocity(_, Some(_)))

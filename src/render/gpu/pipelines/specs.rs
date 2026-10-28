@@ -69,7 +69,9 @@ pub(super) fn velocity_spec() -> PipelineSpec {
 /// none, and the fragment shader runs once per visible pixel. With no depth write, a
 /// GPU tests depth before a shader that discards (a cutout) too. URP tests `Equal`;
 /// with the vertex position `@invariant`, `LessEqual` passes the same fragments, and
-/// still draws one a driver rounds a step nearer than its prepass depth.
+/// still draws one a driver rounds a step nearer than its prepass depth. Two lit
+/// surfaces at bit-identical depth both pass, so the one drawn last wins, as under
+/// URP's `Equal`, where the unprimed pass's `Less` kept the first.
 pub(super) fn primed_spec() -> PipelineSpec {
     primed(PipelineSpec::opaque("Forward Primed Pipeline"))
 }

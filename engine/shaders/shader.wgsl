@@ -52,15 +52,17 @@ fn forward_vertex(model: VertexInput, instance: u32) -> VertexOutput {
 }
 
 // The SSAO depth prepass (#436): depth only, so it writes no colour. Cutout texels
-// are clipped as `fs_main` clips them, and unlit draws (gizmos, grids) are skipped:
-// neither should cast occlusion. A surface variant whose blocks cut fragments
-// (`dissolve`) adds `fs_prepass_cut`, which runs its cuts and then this (#648).
+// are clipped as `fs_main` clips them, so they cast no occlusion. Unlit draws (gizmos,
+// a light's own mesh) never reach it: `BatchKey::in_prepass` leaves them out on the
+// CPU, the one rule depth priming reads too (#1499). A surface variant whose blocks
+// cut fragments or move the UVs adds `fs_prepass_cut`, which opens like
+// `surface_color`, runs its cuts and then this (#648).
 fn prepass_clip(in: VertexOutput) {
     var alpha = entity.color_tint.a;
     if (entity.use_texture == 1u) {
         alpha *= textureSample(t_diffuse, s_diffuse, in.tex_coords).a;
     }
-    if (entity.is_lit == 0u || (entity.use_cutout == 1u && alpha < entity.alpha_cutoff)) {
+    if (entity.use_cutout == 1u && alpha < entity.alpha_cutoff) {
         discard;
     }
 }

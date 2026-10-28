@@ -5,7 +5,7 @@
 //! `surface_color(in: …)` is renamed to take `in_raw` and opens with a mutable copy whose
 //! `tex_coords` the UV chain rewrites. The rest of the body reads `in` unchanged, so
 //! every map lookup and every color block sees the moved UVs. A recipe with no UV
-//! block leaves the base untouched. A cutting variant's depth entry points (#648)
+//! block leaves the base untouched. A variant's depth entry points (#648, #1499)
 //! open the same way, so their cut samples the mask where the colour pass does.
 
 use super::emit::{chain, Instance};

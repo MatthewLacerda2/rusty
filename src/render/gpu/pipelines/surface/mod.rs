@@ -27,10 +27,12 @@
 //!
 //! **Depth passes.** A variant's `vs_main` is the forward one verbatim, so one whose
 //! blocks only restyle colour rides the standard SSAO prepass (#436) and shadow
-//! pipelines. One whose blocks `discard` (`dissolve`, #400) also builds
-//! [`CutPipelines`] from its own `fs_prepass_cut` / `fs_shadow_cut` (#648): the same
-//! cut, reading the same runtime params and mask, so a dissolved fragment casts no
-//! shadow and fills no SSAO depth. Only those variants pay for a depth fragment.
+//! pipelines. One whose blocks `discard` (`dissolve`, #400) or move the UVs
+//! (`uv_scroll`, #1499) also builds [`CutPipelines`] from its own `fs_prepass_cut` /
+//! `fs_shadow_cut` (#648): the same cut and UVs, reading the same runtime params and
+//! mask, so a dissolved fragment casts no shadow and fills no SSAO depth, and a
+//! scrolled Cutout texel clips where it shows. Only those variants pay for a depth
+//! fragment.
 
 mod pass;
 
@@ -57,12 +59,12 @@ pub(crate) struct SurfacePipelines {
     pub primed: super::PrimedPipelines,
     /// Alpha-blended solids (the transparent spec).
     pub transparent: wgpu::RenderPipeline,
-    /// The depth passes of a variant whose blocks cut fragments (#648); `None` draws
-    /// its depth with the standard pipelines.
+    /// The depth passes of a variant whose blocks cut fragments or move the UVs (#648,
+    /// #1499); `None` draws its depth with the standard pipelines.
     pub cut: Option<CutPipelines>,
 }
 
-/// A cutting variant's depth-only pipelines (#648); the shadow ones go through the
+/// The depth-only pipelines of a variant that cuts or moves its UVs (#648); the shadow ones go through the
 /// shadow pass's clip layout, `mirrored_shadow` with the winding flipped (#1134).
 pub(crate) struct CutPipelines {
     /// The SSAO prepass, through the forward layout.
@@ -169,7 +171,8 @@ impl SurfaceShaders {
         self.slots.get(id.checked_sub(1)?)?.pipelines.as_ref()
     }
 
-    /// The depth pipelines of pipeline `id`, if its variant cuts fragments (#648).
+    /// The depth pipelines of pipeline `id`, if its variant cuts fragments or moves
+    /// its UVs (#648, #1499).
     pub(crate) fn cut(&self, id: usize) -> Option<&CutPipelines> {
         self.get(id)?.cut.as_ref()
     }
@@ -283,3 +286,7 @@ pub(crate) mod cut_depth_tests;
 #[cfg(test)]
 #[path = "../tests/priming_tests.rs"]
 mod priming_tests;
+
+#[cfg(test)]
+#[path = "../tests/priming_scroll_tests.rs"]
+mod priming_scroll_tests;

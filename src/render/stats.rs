@@ -104,7 +104,8 @@ pub struct RenderCounters {
     /// each view running motion blur, `0` when none does (or the tier is Low).
     pub velocity_passes: u32,
     /// Opaque scene passes primed with their SSAO prepass's depth (#1499): one per
-    /// camera that ran SSAO, `0` with AO off.
+    /// camera that ran SSAO, `0` with AO off. A camera shading with a forward
+    /// override of its own (the shader preview) is never primed.
     pub primed_passes: u32,
     /// Views whose grading LUT was rebaked this frame (#1440): a grading knob or
     /// the tonemap changed, or the view is new. `0` on every frame the grade holds.

@@ -47,6 +47,16 @@ impl BatchKey {
     pub(crate) fn uniform(&self) -> EntityUniform {
         bytemuck::pod_read_unaligned(bytemuck::cast_slice(&self.uniform))
     }
+
+    /// Whether the SSAO depth prepass draws this batch, so its depth is in the prepass
+    /// (#436): the one rule the prepass and depth priming (#1499) both read. Unlit
+    /// solids (gizmos, a light's own mesh) cast no occlusion, so they are left out,
+    /// and over a primed depth they write their own. Which fragments a drawn batch
+    /// keeps is its shader's: `fs_prepass` / `fs_prepass_cut` clip Cutout texels, cut
+    /// and move the UVs as `fs_main` does (`shadergen::assemble::depth`).
+    pub(crate) fn in_prepass(&self) -> bool {
+        self.uniform().is_lit != 0
+    }
 }
 
 /// One visible solid, ready to batch.
