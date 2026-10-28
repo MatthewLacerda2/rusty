@@ -66,9 +66,8 @@ pub fn register(lua: &Lua) -> Reg {
         "BakeSet",
         lua.create_function(|lua, (recipe, prefix): (Value, String)| {
             let recipe = parse_recipe(&recipe).map_err(mlua::Error::RuntimeError)?;
-            let sources = sources(&recipe)?;
-            let paths = bake_set(&recipe, &sources, &prefix).map_err(mlua::Error::RuntimeError)?;
-            lua.create_table_from(paths)
+            let paths = bake_set(&recipe, &sources(&recipe)?, &prefix);
+            lua.create_table_from(paths.map_err(mlua::Error::RuntimeError)?)
         }),
     )?;
 

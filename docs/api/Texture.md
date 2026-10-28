@@ -37,7 +37,12 @@ lists the valid ones — a typo like `"basecolour"` never silently bakes linear 
 | `roughness` | linear | — |
 | `metallic` | linear | — |
 | `metallic_roughness` / `orm` | linear | **metallic → B, roughness → G**, R = 0 (glTF's packed metallic-roughness map) |
-| `data` | linear | — (height/masks/anything raw; the explicit way to get unencoded output) |
+| `data` | linear, **16-bit** | — (height/masks/anything raw; the explicit way to get unencoded output) |
+
+Every slot bakes 8 bits per channel except `data`, which bakes a **16-bit** PNG
+(#1491): a height field used as displacement or a terrain heightmap keeps 65536
+levels instead of terracing into 256 steps. The renderer loads it as a material map
+like any other PNG.
 
 `orm` is only another name for the glTF metallic-roughness packing, not an
 occlusion-roughness-metallic map: rusty's material has no occlusion map, so nothing
@@ -181,7 +186,7 @@ list below is a summary of it. Each entry has the `op` tag, its `category`
 (`min_inputs` to `max_inputs`; a node outside that range is an error), and its
 `params`. Each param has a
 `name`, a `type` (`number` | `integer` | `bool` | `color` | `vec2` |
-`enum` | `stops`), `required`, a `default` when it has one (absent when required),
+`enum` | `stops` | `path`, a project-relative file path), `required`, a `default` when it has one (absent when required),
 and for an `enum` the accepted `values`. Units and rounding are the ones *Tiling*
 and *Units* below describe. A unit test holds the catalog to the recipe parser, so
 it can't name an op or param the parser doesn't take, or a default it doesn't apply.
@@ -229,7 +234,8 @@ end  -- rows number nil / cols number nil / mortar number 0.05
   caps — turn it with `mapping {rotation = 0.25}`; `roundness` 0–1 rounds a
   `rounded_rect`'s corners; `softness > 0` ramps the edge from 0 to 1 that far inside,
   a bevel profile for `bump_to_normal`); `checker {tiles, color_a, color_b}`;
-  `white_noise {seed=0}`.
+  `white_noise {seed=0}`; `image {path, encoding="srgb"|"linear"}` (an image file,
+  see *Image files* below).
 - **Color** (1 input; `mix` takes 2 or 3): `color_ramp {stops}`; `mix {mode,
   factor=1}` with `mode` ∈
   `mix/add/multiply/screen/overlay/subtract/difference/lighten/darken/divide` —
@@ -275,6 +281,39 @@ end  -- rows number nil / cols number nil / mortar number 0.05
   below in concave grooves — grime; `map_range` it into a hard mask). Both read the
   input's red as height and wrap, so the masks tile.
 
+### Image files — `image`
+
+`{ op = "image", path = "textures/crate.png", encoding = "srgb" }` starts a graph from
+an existing map, like Blender's *Image Texture* node: a texture extracted from an
+imported model, a provider-generated image, an earlier bake, a hand-made mask or logo
+— to recolour, weather, turn into a normal map, or use as a mask.
+
+- `path` is taken from the **project root**, as `require` takes its scripts. A file
+  outside the project is read, but warns once per file in the console: it is an
+  input the seed doesn't cover, and may be missing on another machine.
+- `encoding = "srgb"` (the default, a colour image) decodes RGB from sRGB to linear;
+  `"linear"` (a mask, a height, a normal map) reads every channel as stored. Alpha is
+  always as stored. 16-bit files keep their precision.
+- The file is resampled **bilinearly, wrapped**, to the recipe's `resolution`, so the
+  recipe stays resolution-independent. A file already at `resolution` reads back
+  texel for texel.
+- Its **tiling is the file's own**: a photo that doesn't tile keeps its seam (the
+  wrap joins its right edge to its left). Every other op still wraps, so a seamless
+  source stays seamless through the graph.
+- Any format the importer reads: png, jpeg, tga.
+- A file that can't be read or decoded is an **error** naming the node and the path,
+  never a black canvas. Every verb reads the files when it runs (`Texture.Bake`,
+  `BakeSet`, `Stats`, `Preview`, and a material's maps via `Material.DefineAsset` /
+  `Material.Rebake`), so a rebake picks up an edited source.
+
+```lua no-run
+Texture.Bake({ resolution = 512, nodes = {
+  { id = "logo", op = "image", path = "textures/logo.png", encoding = "linear" },
+  { id = "h", op = "blur", radius = 0.004, inputs = { "logo" } },
+  { id = "n", op = "bump_to_normal", strength = 0.3, inputs = { "h" } } },
+}, "textures/logo_n.png", "normal")
+```
+
 ### Tiling
 
 Every periodic param is a **count of repeats per tile**, rounded at evaluation (the
@@ -298,6 +337,7 @@ the one generator that does **not** tile — it has a hard edge at the wrap; use
 a mask, or use `linear_tiling` (0→1→0) for a seamless ramp. `gradient radial` and
 `wave rings` meet the edge mirror-symmetrically: continuous across the seam, and so
 does `shape` (a shape larger than the tile is clipped at the edge, symmetrically).
+`image` tiles exactly as well as its file does.
 
 ### Units
 
