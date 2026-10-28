@@ -20,6 +20,8 @@ wall-clock or unseeded RNG).
 | `Texture.Bake` | `(recipe, path, slot)` | the written `path` |
 | `Texture.BakeSet` | `(recipe, prefix)` | `{ [slot] = path, … }` — one PNG per entry of the recipe's `outputs` |
 | `Texture.ToJson` | `(recipe)` | the recipe's canonical JSON string |
+| `Texture.Stats` | `(recipe, [resolution])` | `{ [node_id] = { min, max, mean, std, p1, p99 }, … }` for **every** node, each field an `{r, g, b, a}` array |
+| `Texture.Preview` | `(recipe, path, [size = 128])` | `{ path, columns, order = { node ids } }` — a PNG contact sheet of every node |
 | `Texture.Ops` | `()` | the op catalog: `{ {op, category, min_inputs, max_inputs, params = { {name, type, default, required, values} } }, … }` |
 
 `recipe` is a table **or** its serialized JSON string (from `Texture.ToJson`, or a
@@ -116,6 +118,58 @@ everywhere in a recipe — on the recipe itself, on a node, on a ramp stop: `{ o
 "noise", scael = 8 }` is refused with a message naming `scael` and the params `noise`
 takes, rather than baking with the default scale. The runner evaluates the DAG
 in dependency order in linear `[f32]` RGBA, then the bake encodes/packs per `slot`.
+
+### Checking a recipe — `Texture.Stats` and `Texture.Preview`
+
+You never see a recipe's intermediate maps, so **read them before you tune them**.
+Both verbs evaluate the whole recipe once, every node (not only the ones the output
+reads), and take each node's numbers or thumbnail as it finishes, so they cost one
+bake and hold no more images than a bake does.
+
+`Texture.Stats(recipe, [resolution])` returns, per node id, the per-channel `min`,
+`max`, `mean`, `std` (population) and the exact 1st/99th percentiles `p1`/`p99`
+(nearest rank: all but the outer 2% of pixels lie between them). Each is an
+`{r, g, b, a}` array of linear values, as the runner works in them, before any
+slot's encoding. `resolution` overrides the recipe's for speed: params are in tile
+units (*Units*, below), so the numbers barely move between 128² and 2048².
+
+**Read `Stats` before setting `color_ramp` stops or `map_range` bounds.** A noise
+does not span 0–1: fBM is normalised by its total amplitude, so it clusters around
+0.5, and the more octaves the tighter (at `lacunarity` 2, `gain` 0.5):
+
+| `octaves` | `p1` – `p99` | `std` |
+|---|---|---|
+| 1 | 0.27 – 0.72 | 0.106 |
+| 4 | 0.35 – 0.64 | 0.065 |
+| 8 | 0.36 – 0.64 | 0.062 |
+
+A ramp with stops at 0 and 1 over a 4-octave fBM lands nearly every pixel near its
+middle colour: a flat, washed-out map. Put the stops at the input's `p1` and `p99`,
+or stretch it first with `map_range { from_min = p1, from_max = p99, to_min = 0,
+to_max = 1 }`.
+
+```lua
+local s = Texture.Stats({ resolution = 1024, nodes = {
+  { id = "n", op = "noise", kind = "fbm", scale = 8, octaves = 4 } } }, 256)
+print(s.n.p1[1], s.n.p99[1])  -- red channel: about 0.35, 0.64
+```
+
+`Texture.Preview(recipe, path, [size = 128])` writes one PNG at `path`: every node's
+image shrunk to a `size`² tile (a box filter in linear), in the recipe's node order,
+left to right then top to bottom, in a near-square grid of `columns` columns (unused
+cells of the last row are black). No text is drawn: tile `k` (from 1) is
+`order[k]`, so open the PNG and match tiles to ids. Every tile is **sRGB-encoded**,
+data included, the way Blender's node previews show everything through the view
+transform: a 0.5 mask shows as 188, not 128. Alpha is not shown.
+`size` defaults to 128, or the recipe's resolution when that is smaller; a `size`
+above the resolution is an error, since a tile larger than the image adds nothing.
+Both verbs refuse a recipe whose `output` or `outputs` names a missing node, as the
+bakes do.
+
+```lua no-run
+local p = Texture.Preview(recipe, "out/preview.png", 96)
+-- p = { path = "out/preview.png", columns = 3, order = { "h", "paint", … } }
+```
 
 ### The op-set (curated "Blender-lite")
 

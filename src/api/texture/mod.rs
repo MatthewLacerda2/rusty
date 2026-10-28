@@ -16,6 +16,10 @@
 //!   (#403). Returns a table canonical slot → path.
 //! - `Texture.ToJson(recipe)` — serialize a recipe to its canonical JSON for
 //!   saving / diffing.
+//! - `Texture.Stats(recipe, [resolution])` — every node's min / max / mean / std /
+//!   p1 / p99 per channel, from one evaluation (#1486).
+//! - `Texture.Preview(recipe, path, [size])` — a PNG contact sheet of every node's
+//!   image, with the grid's column count and node order (#1486).
 //! - `Texture.Ops()` — the op catalog: each op's tag, category, input count and
 //!   params with their types and defaults (#411), so the agent discovers the op-set
 //!   from the engine rather than the docs.
@@ -30,6 +34,7 @@
 //! registers as a plain static namespace, like `Assets`.
 
 mod from_lua;
+mod inspect;
 mod ops;
 
 use mlua::{Lua, Value};
@@ -72,6 +77,24 @@ pub fn register(lua: &Lua) -> Reg {
 
     put(
         &table,
+        "Stats",
+        lua.create_function(|lua, (recipe, resolution): (Value, Option<u32>)| {
+            let recipe = parse_recipe(&recipe).map_err(mlua::Error::RuntimeError)?;
+            inspect::stats_table(lua, recipe, resolution)
+        }),
+    )?;
+
+    put(
+        &table,
+        "Preview",
+        lua.create_function(|lua, (recipe, path, size): (Value, String, Option<u32>)| {
+            let recipe = parse_recipe(&recipe).map_err(mlua::Error::RuntimeError)?;
+            inspect::preview_table(lua, &recipe, &path, size)
+        }),
+    )?;
+
+    put(
+        &table,
         "Ops",
         lua.create_function(|lua, ()| ops::ops_table(lua)),
     )?;
@@ -89,6 +112,8 @@ fn bake(recipe: &TextureRecipe, path: &str, slot: &str) -> mlua::Result<String> 
 
 #[cfg(test)]
 mod bake_set_tests;
+#[cfg(test)]
+mod inspect_tests;
 #[cfg(test)]
 mod tests {
     use mlua::Lua;

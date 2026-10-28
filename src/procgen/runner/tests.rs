@@ -3,7 +3,7 @@
 use super::*;
 use crate::procgen::recipe::{Constant, Mix, Node, OpKind};
 
-fn node(id: &str, op: OpKind, inputs: &[&str]) -> Node {
+pub(super) fn node(id: &str, op: OpKind, inputs: &[&str]) -> Node {
     Node {
         id: id.into(),
         op,
@@ -11,7 +11,7 @@ fn node(id: &str, op: OpKind, inputs: &[&str]) -> Node {
     }
 }
 
-fn constant(id: &str, v: f32) -> Node {
+pub(super) fn constant(id: &str, v: f32) -> Node {
     let color = [v, v, v, 1.0];
     node(id, OpKind::Constant(Constant { color }), &[])
 }
@@ -56,6 +56,12 @@ fn a_short_or_surplus_input_list_is_refused_naming_the_node() {
 }
 
 #[test]
+fn a_duplicate_id_is_refused_by_name() {
+    let recipe = TextureRecipe::new(8, vec![constant("a", 0.1), constant("a", 0.2)]);
+    assert_eq!(evaluate(&recipe), Err(RunError::DuplicateId("a".into())));
+}
+
+#[test]
 fn cycle_is_detected() {
     let recipe = TextureRecipe::new(
         8,
@@ -77,7 +83,7 @@ fn empty_and_bad_resolution_error() {
 }
 
 /// A constant followed by `len` inverts, each reading the one before.
-fn chain(len: usize) -> TextureRecipe {
+pub(super) fn chain(len: usize) -> TextureRecipe {
     let mut nodes = vec![constant("n0", 0.25)];
     for i in 1..=len {
         let prev = format!("n{}", i - 1);
@@ -89,10 +95,9 @@ fn chain(len: usize) -> TextureRecipe {
 #[test]
 fn a_long_chain_holds_a_constant_number_of_images() {
     let peak = |len| {
-        run(
-            &chain(len),
-            &plan(&chain(len), &[&format!("n{len}")]).unwrap(),
-        )
+        let target = format!("n{len}");
+        let plan = plan(&chain(len), &[&target], Scope::Needed).unwrap();
+        run(&chain(len), &plan, &mut |_, _| {})
     };
     let (short, long) = (peak(4), peak(64));
     assert_eq!(short.peak_live, 2, "an input and its consumer");
