@@ -1,5 +1,5 @@
 //! The grading LUT's GPU tests (`knobs`, `clamp`, #1440; `lookup`, #1441; `contrast`,
-//! #1479) and what they share with the exposure meter's (#1444): the post-FX chain
+//! `saturation`, #1479) and what they share with the exposure meter's (#1444): the post-FX chain
 //! alone, fed a synthetic HDR row. The scene target is written
 //! directly, so a test chooses the exact HDR colour each pixel's grade starts from,
 //! and reads the display colour the composite wrote.
@@ -8,6 +8,7 @@ mod clamp;
 mod contrast;
 mod knobs;
 mod lookup;
+mod saturation;
 
 use crate::components::{CameraComponent, ExposureMode, PostProcessingComponent};
 use crate::core::settings::graphics_options::{GraphicsOption, GraphicsOptions};
@@ -150,6 +151,16 @@ fn texture(
             | wgpu::TextureUsages::RENDER_ATTACHMENT,
         view_formats: &[],
     })
+}
+
+/// `v` as the chain stores it: [`f16`] read back as an `f32`.
+fn f16_value(v: f32) -> f32 {
+    if v == 0.0 {
+        return 0.0;
+    }
+    let h = u32::from(f16(v));
+    let (exp, mantissa) = ((h >> 10) as i32 - 15, (h & 0x3ff) as f32 / 1024.0);
+    (1.0 + mantissa) * (exp as f32).exp2()
 }
 
 /// `v` as an IEEE half float, for the zero and positive normal values the tests

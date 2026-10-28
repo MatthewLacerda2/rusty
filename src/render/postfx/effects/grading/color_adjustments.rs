@@ -4,7 +4,7 @@
 
 use super::super::{Grade, GradeCx, Owner, PostEffect};
 use super::bounded;
-use crate::components::ColorAdjustments;
+use crate::components::{ColorAdjustments, Tonemap};
 use crate::render::postfx::params::Gate;
 
 pub(crate) const EFFECT: PostEffect = PostEffect {
@@ -41,9 +41,17 @@ fn adjustments(cx: &GradeCx) -> ColorAdjustments {
     cx.volume.map(|vc| vc.color_adjustments).unwrap_or_default()
 }
 
-/// x: contrast; neutral `1`.
+/// `v` held to `0..=MAX` as the ops hold it; NaN neutral (`1`).
+fn unit_range(v: f32) -> f32 {
+    1.0 + bounded(v - 1.0, ColorAdjustments::MAX - 1.0)
+}
+
+/// x: contrast; neutral `1`. y: the tonemapper's index, which picks the log space
+/// (ACEScc under ACES, LogC otherwise), as URP's does.
 fn pack_contrast(cx: &GradeCx, slots: &mut [[f32; 4]]) {
-    slots[0][0] = adjustments(cx).contrast;
+    let mode = cx.volume.map_or(Tonemap::None, |vc| vc.tonemapping.mode);
+    slots[0][0] = unit_range(adjustments(cx).contrast);
+    slots[0][1] = mode.to_index() as f32;
 }
 
 /// x: the hue shift in turns (`0` skips it).
@@ -53,5 +61,5 @@ fn pack_hue(cx: &GradeCx, slots: &mut [[f32; 4]]) {
 
 /// x: saturation; neutral `1`.
 fn pack_saturation(cx: &GradeCx, slots: &mut [[f32; 4]]) {
-    slots[0][0] = adjustments(cx).saturation;
+    slots[0][0] = unit_range(adjustments(cx).saturation);
 }

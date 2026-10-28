@@ -347,9 +347,10 @@ The offsets tween: `Graphics.lift_gamma_gain.lift.offset`, `Graphics.lift_gamma_
 <!-- effect: color_adjustments -->
 #### Color adjustments
 
-Contrast and saturation (neutral `1`) and the hue shift (`-180`–`180` degrees,
-neutral `0`), all before the tonemap: Unity's *Color Adjustments*. Contrast works as
-URP's does, in log (LogC) space around mid-grey, so a moderate boost (`1.1`–`1.2`)
+Contrast and saturation (`0`–`2`, neutral `1`: Unity's `-100`–`100`) and the hue
+shift (`-180`–`180` degrees, neutral `0`), all before the tonemap: Unity's *Color
+Adjustments*. Contrast works as URP's does, in log space around the 0.18 grey card
+(ACEScc under the ACES tonemapper, LogC under the others), so a moderate boost (`1.1`–`1.2`)
 deepens the shadows without clipping dark surfaces to black, and contrast below `1`
 flattens towards mid-grey rather than washing black out to a light grey.
 Tween paths: `Graphics.color_adjustments.contrast`, `Graphics.color_adjustments.saturation`, `Graphics.color_adjustments.hue_shift`.
