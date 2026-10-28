@@ -260,7 +260,7 @@ checks: ## Unticked human checks from PRs merged since then. make checks SINCE=1
 # unpushed commits or a lock, which it names. Prints the rest's target/ sizes and
 # free disk before and after; a linked worktree outside .claude/worktrees/ is
 # named OUTSIDE, never touched (#982). ARGS=--dry-run lists without deleting.
-reclaim: ## Remove merged worktrees (and their target/), report disk. ARGS=--dry-run lists only
+reclaim: ## Remove merged worktrees (and their target/) and finished local branches, report disk. ARGS=--dry-run lists only
 	@python3 .github/scripts/reclaim.py $(ARGS)
 
 # ---- signals (#750) ---------------------------------------------------------
