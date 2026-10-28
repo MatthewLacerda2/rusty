@@ -72,6 +72,22 @@ review sends fixes back the PR's head moves on (PR #1503: reviewed at
 process check still protect a running reviewer: the harness locks its
 worktree (`claude agent agent-<id> (pid …)`).
 
+That PR-by-commit rule missed the common case (#1538): GitHub lists the pull
+requests of a commit not on the default branch only while they are OPEN, and
+the queue rebases every branch before merging it, so a reviewed head never
+reaches `main`. On 2026-10-28, after the batch merged, `make reclaim` kept 14
+`agent-*` worktrees as "detached, not on origin/main" and the reviewers'
+`pr1514`/`pr1531` branches as "no pull request" (PR #1509's reviewed head
+`7f254256` answers `[]`). So a reviewer's checkout is judged by what it
+holds, not which PR it came from: a worktree under `.claude/worktrees/agent-*`,
+and a `pr<digits>…` or `worktree-agent-*` branch, whose HEAD (or tip) is a
+commit GitHub has (`repos/{repo}/commits/<sha>` answers 200) holds nothing
+of its own and is finished, its commits counted as pushed. The lock, a
+process, a dirty tree (untracked files included) and the worktree reclaim
+runs from still protect it, an OPEN pull request holding the commit still
+keeps it, and GitHub not answering keeps it and says so. Every other name
+keeps the rules above.
+
 `--dry-run` decides and prints the same, and deletes nothing.
 """
 
@@ -80,6 +96,7 @@ from __future__ import annotations
 import contextlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -92,6 +109,7 @@ from merging.watch import tenancy
 
 USAGE = "usage: reclaim.py [--dry-run]"
 AGENT_BRANCH = "worktree-agent-"  # the harness's name for an `Agent` worktree's branch (#1510)
+REVIEWER_BRANCH = re.compile(rf"pr\d|{AGENT_BRANCH}")  # a reviewer's `pr1514…`, the harness's own (#1538)
 
 
 @dataclass
@@ -113,6 +131,8 @@ class Facts:
     current: bool = False
     busy: list[int] | None = field(default_factory=list)  # pids standing in it; None: unknown
     stale: int | None = None  # a lock left by a merge-queue supervisor that no longer runs: its pid
+    reviewer: bool = False  # a reviewer's checkout: judged by what it holds (#1538)
+    on_github: bool | None = False  # GitHub has its HEAD commit; None: GitHub didn't answer
 
 
 def parse_worktrees(porcelain: str) -> list[Worktree]:
@@ -134,6 +154,18 @@ def parse_worktrees(porcelain: str) -> list[Worktree]:
 
 def finished(wt: Worktree, facts: Facts) -> tuple[bool, str]:
     """Is this worktree's work over, and why (or why not)."""
+    done, why = by_pull_request(wt, facts)
+    if done or not facts.reviewer or facts.prs is None or "OPEN" in facts.prs:
+        return done, why
+    if facts.on_github is None:
+        return False, f"{why}, and GitHub did not answer whether it has the commit"
+    if facts.on_github:
+        return True, "a reviewer's checkout at a commit GitHub has"
+    return False, why
+
+
+def by_pull_request(wt: Worktree, facts: Facts) -> tuple[bool, str]:
+    """`finished` by the pull requests and `origin/main` alone (#913, #1510)."""
     if wt.branch is None:
         if facts.on_main:
             return True, "detached at a commit on origin/main"
@@ -196,7 +228,13 @@ def judge_branch(machine: Machine, main: Path, branch: str, tip: str) -> tuple[s
     pulls = machine.pulls(branch)
     if pulls == [] and not on_main:
         pulls = machine.pulls_of(tip)
-    return verdict(Worktree(main, tip, branch), machine.work(Facts(), main, branch, tip, pulls))
+    facts = Facts(reviewer=bool(REVIEWER_BRANCH.match(branch)))
+    return verdict(Worktree(main, tip, branch), machine.work(facts, main, branch, tip, pulls))
+
+
+def reviewer_tree(wt: Worktree) -> bool:
+    """The `Agent` tool's isolation: `.claude/worktrees/agent-<id>` (#1538)."""
+    return wt.path.name.startswith("agent-") and wt.path.parent.parts[-2:] == (".claude", "worktrees")
 
 
 def inside(path: Path, tree: Path) -> bool:
@@ -255,6 +293,16 @@ class Machine:
         repo = ghrest.slug_of(self.run("git", "remote", "get-url", "origin").stdout)
         return None if repo is None else self.rest(f"repos/{repo}/commits/{commit}/pulls?per_page=100")
 
+    def has_commit(self, commit: str) -> bool | None:
+        """Does GitHub have `commit`? It answers 422 (or 404) for one it doesn't; `None` if unknown."""
+        repo = ghrest.slug_of(self.run("git", "remote", "get-url", "origin").stdout)
+        if repo is None:
+            return None
+        done = self.run("gh", "api", f"repos/{repo}/commits/{commit}", "--jq", ".sha")
+        if done.returncode == 0:
+            return True
+        return False if any(f"HTTP {code}" in done.stderr for code in (404, 422)) else None
+
     def rest(self, path: str) -> list[dict] | None:
         done = self.run("gh", "api", path)
         return [ghrest.pull(p) for p in json.loads(done.stdout or "[]")] if done.returncode == 0 else None
@@ -283,7 +331,7 @@ class Machine:
         return found
 
     def facts(self, wt: Worktree, here: Path, cwds: list[tuple[int, Path]] | None) -> Facts:
-        facts = Facts(current=inside(here, wt.path))
+        facts = Facts(current=inside(here, wt.path), reviewer=reviewer_tree(wt))
         facts.busy = None if cwds is None else [pid for pid, cwd in cwds if inside(cwd, wt.path)]
         facts.dirty = bool(self.git(wt.path, "status", "--porcelain"))
         owner = tenancy.pid_of(wt.locked)
@@ -294,12 +342,18 @@ class Machine:
             if not facts.on_main:  # a reviewer's checkout of a PR (#1510): any PR holding the commit counts
                 pulls = self.pulls_of(wt.head)
                 facts.prs = None if pulls is None else [p["state"] for p in pulls]
+                if facts.reviewer:
+                    facts.on_github = self.has_commit(wt.head)
             return facts
         return self.work(facts, wt.path, wt.branch, wt.head, self.pulls(wt.branch))
 
     def work(self, facts: Facts, cwd: Path, branch: str, head: str, pulls: list[dict] | None) -> Facts:
         """`branch`'s pull request states, and its commits that nothing but this checkout holds."""
         facts.prs = None if pulls is None else [p["state"] for p in pulls]
+        if facts.reviewer:  # its commits are on GitHub, if not in any ref fetched here (#1538)
+            facts.on_github = self.has_commit(head)
+            if facts.on_github:
+                return facts
         stray = int(self.git(cwd, "rev-list", "--count", head, "--not", "--remotes"))
         # A merged PR's branch is often deleted on the remote, which strands its
         # commits locally; they are safe when the PR's head already holds them.
