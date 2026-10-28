@@ -6,7 +6,7 @@ use glam::Mat4;
 
 use super::super::casters::{CasterFrame, Sweep};
 use super::super::sweeps::depth_pass;
-use super::super::ShadowRenderer;
+use super::super::{statics_key, ShadowRenderer};
 use super::Tile;
 use crate::render::lod::LodSelection;
 
@@ -53,7 +53,7 @@ impl ShadowRenderer {
         frame: &CasterFrame,
         tiles: &[Tile],
     ) -> AtlasBake {
-        let scene = frame.scene.id();
+        let scene = statics_key(frame.scene);
         let stale = self.atlas.static_tiles.stale(scene, tiles);
         let bake = AtlasBake {
             cached: (tiles.len() - stale.len()) as u32,

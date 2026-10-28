@@ -6,7 +6,7 @@ use glam::Mat4;
 
 use super::cascades::Cascade;
 use super::casters::{CasterFrame, Sweep};
-use super::ShadowRenderer;
+use super::{statics_key, ShadowRenderer};
 use crate::render::lod::LodSelection;
 use crate::render::timing::GpuPass;
 
@@ -21,7 +21,8 @@ impl ShadowRenderer {
         lod: &LodSelection,
     ) {
         let scene = frame.scene;
-        let key = |c: &Cascade| Some((scene.id(), c.light_space));
+        let statics = statics_key(scene);
+        let key = |c: &Cascade| Some((statics, c.light_space));
         let stale: Vec<usize> = (0..self.cascades.len())
             .filter(|&i| self.static_cache[i] != key(&self.cascades[i]))
             .collect();
