@@ -86,6 +86,7 @@ set on that camera entity, in the inspector or the scene file.
 | `Graphics.GetOptionNames` | `()` | array of every option name, alphabetical (a menu's order) |
 | `Graphics.GetPostParam` / `SetPostParam` | `(name)` / `(name, value)` | a custom effect's runtime param: `number`, or an array for a vector param (the effect's baked default until set; the block's catalog default with no active volume, where a set raises an error) |
 | `Graphics.GetQuality` / `SetQuality` | `()` / `(name)` | `"Low"` / `"Medium"` / `"High"` |
+| `Graphics.GetRenderScale` / `SetRenderScale` | `()` / `(scale)` | `number`: the scene's resolution as a factor of the surface's (clamped 0.1–2, **default `1`**; see *Render scale*) |
 | `Graphics.GetSaturation` / `SetSaturation` | `()` / `(value)` | `number` |
 | `Graphics.GetShadowCascades` / `SetShadowCascades` | `()` / `(n)` | `number` (clamped 1–4, **default `4`**) |
 | `Graphics.GetShadowDistance` / `SetShadowDistance` | `()` / `(units)` | `number` (world units, clamped ≥ 1, **default `100`**) |
@@ -565,6 +566,27 @@ half-resolution on Medium; FXAA runs on all of them). `SetQuality` writes a shar
 resource cell that the platform layer reads each frame and hands to the renderer,
 which reallocates its bloom buffers when the tier actually changes. Unrecognized
 tonemap/quality names are ignored (the current value is kept).
+
+### Render scale
+
+`SetRenderScale(s)` (#1498) is Unity URP's *Render Scale*: the screen's camera stack
+renders the 3D scene at `s` times the surface's resolution, each side rounded (at
+least 1 pixel). Every scene target is that size: colour, depth, the SSAO prepass,
+motion vectors and the post-FX targets, so the cost of the fill-bound passes follows
+the pixel count. The finished, post-processed image is then upscaled (bilinear, as
+URP's *Auto* filter outside FSR) to the surface **before the UI**, which stays at
+native resolution and sharp. Below `1` the scene looks softer; above `1` it
+supersamples. On a 2× Retina surface `0.5` renders at the 1× pixel count:
+`Video.SetResolution` sizes the window, not the render, and cannot do that.
+
+Range `0.1`–`2` (URP's), **default `1`**, which renders exactly as without it (no
+upscale pass). Like the tier it is a player setting: it writes the same shared cell,
+applies the next frame in the standalone player and the editor's Game view, and is
+**persisted** through `Storage` (`graphics.render_scale`) at the Stop and quit
+boundaries. Screen sizes stay the surface's: `UI.GetScreenSize`, the UI's layout and
+`Camera.ScreenToWorld` speak surface pixels whatever the scale. The editor's **Scene
+view** ignores it, as Unity's Scene view does; so do render textures, which keep
+their own size.
 
 ### Player options
 

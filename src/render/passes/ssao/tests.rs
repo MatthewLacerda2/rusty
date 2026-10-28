@@ -79,6 +79,7 @@ fn the_player_option_off_skips_ssao() {
     let graphics = crate::core::settings::GraphicsSettings {
         quality: QualityPreset::High,
         options,
+        ..Default::default()
     };
     let main = crate::scene::camera::main_camera(&scene);
     let volume = main.and_then(|id| crate::scene::camera::camera_volume(&scene, id));

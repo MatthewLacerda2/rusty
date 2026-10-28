@@ -17,7 +17,7 @@ impl Renderer {
         frame: &SsaoFrame,
         solids: &[DrawBatch],
     ) {
-        let size = view.size();
+        let size = view.scene_size();
         let divisor = frame.plan.tier.divisor;
         if !view
             .ssao

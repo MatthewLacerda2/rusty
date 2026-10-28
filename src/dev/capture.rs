@@ -116,7 +116,10 @@ impl CaptureHost {
             height,
             renderer.quality.bloom_divisor(),
         );
-        Some((renderer, self.view.as_mut()?))
+        // Native unless the caller is drawing the screen ([`Self::draw`] sets it).
+        let view = self.view.as_mut()?;
+        view.set_render_scale(Default::default());
+        Some((renderer, view))
     }
 
     /// Just the renderer, built on first use (at `width` x `height`) and never resizing
@@ -154,6 +157,8 @@ impl CaptureHost {
         let target = view
             .color_target_view()
             .ok_or_else(|| "capture view owns no colour target".to_string())?;
+        // A capture of the screen renders at its render scale (#1498).
+        view.set_render_scale(renderer.render_scale);
         // The editor's exact render path (editor_mode = false: no gizmos/grid),
         // timed for the frame stats: the dev layer may read the clock.
         let start = std::time::Instant::now();

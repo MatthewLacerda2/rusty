@@ -15,23 +15,30 @@ impl Renderer {
         self.quality = preset;
     }
 
-    /// Adopt the tier and the player's options the shared cell carries (#1438).
+    /// Adopt the tier, the player's options (#1438) and the render scale (#1498) the
+    /// shared cell carries.
     pub fn apply_graphics(&mut self, graphics: GraphicsSettings) {
         self.set_quality(graphics.quality);
         self.graphics_options = graphics.options;
+        self.render_scale = graphics.render_scale;
     }
 
-    /// What gates a view's post-FX: the tier, and the player's options except in
-    /// the editor's Scene view (`editor_mode`), which ignores them as Unity's Scene
-    /// view ignores PlayerPrefs. The Game view and the player honour all three.
+    /// What gates a view's post-FX: the tier, and the player's options and render
+    /// scale except in the editor's Scene view (`editor_mode`), which ignores them as
+    /// Unity's Scene view ignores PlayerPrefs and the URP asset's render scale. The
+    /// Game view and the player honour all of them.
     pub(crate) fn graphics(&self, editor_mode: bool) -> GraphicsSettings {
-        let options = match editor_mode {
-            true => Default::default(),
-            false => self.graphics_options,
+        let player = match editor_mode {
+            true => GraphicsSettings::default(),
+            false => GraphicsSettings {
+                options: self.graphics_options,
+                render_scale: self.render_scale,
+                ..Default::default()
+            },
         };
         GraphicsSettings {
             quality: self.quality,
-            options,
+            ..player
         }
     }
 

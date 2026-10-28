@@ -91,6 +91,8 @@ impl EditorFrontend {
         let scene_tab = interaction.tab == ViewportTab::Scene;
         view.ui.screen_in_editor = scene_tab && self.editor_ui.ui_overlay;
         view.set_pixel_scale(pixels_per_point);
+        // The Game view is the screen: its scene renders at the render scale (#1498).
+        view.set_render_scale(renderer.graphics(scene_tab).render_scale);
         let camera = viewport_camera(&self.editor_ui, game, &scene, interaction.tab);
         renderer.set_ui_textures(std::rc::Rc::clone(
             game.resources.screen.borrow().textures(),

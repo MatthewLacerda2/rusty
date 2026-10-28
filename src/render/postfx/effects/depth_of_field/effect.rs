@@ -31,7 +31,7 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
 fn focus(r: &Renderer, view: &mut RenderView, cx: &PassCx) {
     let runs = cx.effect.full && !cx.stack.editor_mode;
     let (post, graphics) = (cx.effect.post, cx.effect.graphics);
-    let params = dof_params(post, graphics, view.size().height).filter(|_| runs);
+    let params = dof_params(post, graphics, view.scene_size().height).filter(|_| runs);
     let gpu = (&r.device, &r.queue);
     let passes = &r.post_passes.depth_of_field;
     view.post_fx

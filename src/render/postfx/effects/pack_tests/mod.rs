@@ -190,6 +190,7 @@ fn forbidding(option: GraphicsOption) -> GraphicsSettings {
     GraphicsSettings {
         quality: QualityPreset::High,
         options,
+        ..Default::default()
     }
 }
 

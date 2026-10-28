@@ -235,13 +235,14 @@ pub struct Renderer {
     /// The grading-LUT bake every view's table is written through (#1440).
     pub(crate) grade_bake: postfx::grade::GradeBake,
 
-    /// Active scalability tier; gates which post-FX passes run + buffer sizes. Shared
-    /// across views — each view's post-FX chain (owned by its [`RenderView`]) sizes its
-    /// bloom buffers from this tier's divisor.
+    /// Active scalability tier; gates which post-FX passes run, and each view's
+    /// post-FX chain (owned by its [`RenderView`]) sizes its bloom buffers from it.
     pub quality: crate::core::settings::quality::QualityPreset,
     /// The player's graphics options (#1438): which effects the player allows,
     /// ANDed with each camera's and the tier's choice (`postfx::params::effect_runs`).
     pub graphics_options: crate::core::settings::graphics_options::GraphicsOptions,
+    /// The screen's render scale (#1498); see [`RenderView::set_render_scale`].
+    pub render_scale: crate::core::settings::render_scale::RenderScale,
     /// Present modes the surface advertises, captured at construction. Used to
     /// decide whether vsync can be turned off (`Immediate`) without a wgpu panic;
     /// the headless path has no real swapchain so it only ever lists `Fifo`.

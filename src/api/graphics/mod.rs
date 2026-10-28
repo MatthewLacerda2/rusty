@@ -16,7 +16,8 @@
 //!   volume; the renderer packs it into every pass's camera globals each frame.
 //! * The global `QualityPreset` resource (Low/Medium/High), gating SSR + motion
 //!   blur. A plain value get/set (`register_quality`, in `state`); the platform layer
-//!   reads the shared cell each frame and hands it to `renderer.set_quality`.
+//!   reads the shared cell each frame and hands it to `renderer.set_quality`. The
+//!   scene's render scale (#1498) is a value in the same cell, beside it.
 //! * The player's graphics options (`options`, #1438) in the same cell, which gate
 //!   every camera's effects, and the project's defaults for them on `Application`.
 //!

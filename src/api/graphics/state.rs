@@ -10,11 +10,12 @@ use std::cell::RefCell;
 use super::super::{put, Reg};
 use crate::components::{CameraComponent, PostProcessingComponent};
 use crate::core::settings::quality::QualityPreset;
+use crate::core::settings::render_scale::RenderScale;
 use crate::core::settings::GraphicsSettings;
 use crate::scene::camera::{camera_volume, main_camera};
 use crate::scene::Scene;
 
-/// Global quality preset value get/set over the shared resource cell. Lives here (not
+/// Global quality preset and render scale get/set over the shared resource cell. Lives here (not
 /// `mod.rs`) to keep that file under the size cap; reaches `QualityPreset::name`/`QualityPreset::parse`
 /// directly.
 pub(super) fn register_quality<'scope>(
@@ -34,6 +35,20 @@ pub(super) fn register_quality<'scope>(
             if let Some(p) = QualityPreset::parse(&name) {
                 graphics.borrow_mut().quality = p;
             }
+            Ok(())
+        }),
+    )?;
+    // The scene's render scale (#1498), in the same cell: clamped to URP's range.
+    put(
+        table,
+        "GetRenderScale",
+        scope.create_function(|_, ()| Ok(graphics.borrow().render_scale.get())),
+    )?;
+    put(
+        table,
+        "SetRenderScale",
+        scope.create_function(|_, scale: f32| {
+            graphics.borrow_mut().render_scale = RenderScale::new(scale);
             Ok(())
         }),
     )

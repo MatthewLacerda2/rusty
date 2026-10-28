@@ -3,8 +3,9 @@
 //! unprimed pass, with motion vectors on or off. The scene holds every case the
 //! prepass draws differently from the forward pass: walls given back to front, an
 //! unlit solid (absent from the prepass) half hidden behind a lit one, and a
-//! half-dissolved surface variant (a cut, #648) in front. On Metal nothing primes,
-//! so there it checks only that. Skips with no adapter.
+//! half-dissolved surface variant (a cut, #648) in front, and a render scale below 1
+//! (#1498), whose prepass and view depth are both the scaled size. On Metal nothing
+//! primes, so there it checks only that. Skips with no adapter.
 
 use std::cell::RefCell;
 
@@ -14,6 +15,7 @@ use super::cut_depth_tests::dissolve;
 use super::mask_tests::Dissolve;
 use crate::components::{CameraComponent, MaterialAsset, MaterialComponent};
 use crate::core::settings::quality::QualityPreset;
+use crate::core::settings::render_scale::RenderScale;
 use crate::render::{readback, RenderCounters, RenderView, Renderer, OFFSCREEN_FORMAT};
 use crate::scene::authoring::Primitive;
 use crate::scene::authoring::{create_entity, default_light, default_post_processing, material};
@@ -90,10 +92,11 @@ fn walls(d: &Dissolve, blur: bool) -> (RefCell<Scene>, u32) {
     (RefCell::new(scene), cut)
 }
 
-/// One frame of `scene`, primed or not: its pixels and counters.
-fn frame(r: &mut Renderer, scene: &Scene, primed: bool) -> (Vec<u8>, RenderCounters) {
+/// One frame of `scene` at render scale `scale`, primed or not: pixels and counters.
+fn frame(r: &mut Renderer, scene: &Scene, primed: bool, scale: f32) -> (Vec<u8>, RenderCounters) {
     r.depth_priming = primed;
     let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, W, H, 2);
+    view.set_render_scale(RenderScale::new(scale));
     let out = view.color_target_view().unwrap();
     let cam = Camera::new(Vec3::new(0.0, 1.5, 3.0), -90.0, -5.0);
     r.render(&mut view, scene, &cam, &out, false);
@@ -114,11 +117,11 @@ fn gpu_a_primed_forward_pass_draws_the_unprimed_frame() {
         return;
     };
     r.set_quality(QualityPreset::High);
-    for blur in [false, true] {
+    for (blur, scale) in [(false, 1.0), (true, 1.0), (true, 0.5)] {
         let (scene, cut) = walls(&d, blur);
         dissolve(&scene, cut, &d, 0.5);
-        let (plain, before) = frame(&mut r, &scene.borrow(), false);
-        let (primed, after) = frame(&mut r, &scene.borrow(), true);
+        let (plain, before) = frame(&mut r, &scene.borrow(), false, scale);
+        let (primed, after) = frame(&mut r, &scene.borrow(), true, scale);
         assert_eq!(before.primed_passes, 0);
         assert_eq!(after.velocity_passes, u32::from(blur));
         // Metal never primes (`priming`), and there two unprimed frames already
@@ -134,6 +137,10 @@ fn gpu_a_primed_forward_pass_draws_the_unprimed_frame() {
             .chunks(4)
             .zip(primed.chunks(4))
             .filter(|(a, b)| a != b);
-        assert_eq!(differing.count(), 0, "priming changed pixels (blur {blur})");
+        assert_eq!(
+            differing.count(),
+            0,
+            "priming changed pixels ({blur}, {scale})"
+        );
     }
 }

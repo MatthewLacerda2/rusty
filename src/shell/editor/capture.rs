@@ -3,8 +3,7 @@
 //! [`screenshot`](crate::dev::screenshot) shows what the *game* looks like; this shows what
 //! the *editor* looks like — the egui panels around the scene viewport — with no window,
 //! on lavapipe. It exists so an agent that changes the editor can attach before/after
-//! captures to its PR and the operator can review the change from a phone (#725 did
-//! this with a scratch example; this is that path, supported).
+//! captures to its PR and the operator can review the change from a phone (#725).
 //!
 //! **The same frame the editor draws, minus the window.** Each frame runs
 //! [`EditorUi::draw`] exactly as the [`EditorFrontend`](super::EditorFrontend) does,
@@ -238,6 +237,7 @@ fn render_viewport(
     let camera = super::viewport::viewport_camera(ui, game, &scene, ui.viewport_tab);
     renderer.set_ui_textures(Rc::clone(&ui.ui_textures));
     renderer.apply_graphics(*game.script_manager().graphics_cell().borrow());
+    view.set_render_scale(renderer.graphics(scene_tab).render_scale);
     renderer.render(view, &scene, &camera, &target, scene_tab);
     super::viewport::rebind_egui_texture(egui_renderer, &renderer.device, texture_id, view);
 }
