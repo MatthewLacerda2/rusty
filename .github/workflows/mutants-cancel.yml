@@ -12,7 +12,9 @@ name: mutants-cancel
 # on merge would kill almost every report before it landed, and the
 # orchestrator triages survivors from it (`ci-merge`). `mutants-pr-comment.py`
 # posts it on the merged PR. The job is gated with `if:`, and a skipped job
-# never joins its concurrency group, so a merge cancels nothing.
+# never joins its concurrency group, so a merge cancels nothing. The same `if:`
+# skips a fork's pull request: its head branch may share a name with one here,
+# and closing it must not cancel this repository's run.
 #
 # Concurrency instead of the REST cancel endpoint: it needs no token at all
 # (`permissions: {}`) and can only touch the one group it names. `ci.yml` and
@@ -36,7 +38,7 @@ jobs:
   cancel:
     runs-on: ubuntu-24.04
     timeout-minutes: 2
-    if: github.event.pull_request.merged == false
+    if: github.event.pull_request.merged == false && github.event.pull_request.head.repo.full_name == github.repository
     concurrency:
       group: mutants-on-request-refs/heads/${{ github.head_ref }}
       cancel-in-progress: true

@@ -60,15 +60,21 @@ permissions:
 # same ref cancels the older run. The group is a literal string, not
 # `${{ github.workflow }}`, because `mutants-cancel.yml` joins the same group
 # when the branch's pull request closes unmerged, and that is what stops a run
-# whose report nobody would read. A merged branch's run finishes and reports. `ci.yml` and `lint.yml` use groups of their own
-# (`ci-…`, `lint-…`), so nothing here can cancel a gating run.
+# whose report nobody would read. A merged branch's run finishes and reports.
+# `ci.yml` and `lint.yml` use groups of their own (`ci-…`, `lint-…`), so
+# nothing here can cancel a gating run.
+#
+# On `main` each run is its own group (its run id): once a branch has merged
+# and been deleted, the orchestrator re-asks narrower scopes there (`ci-merge`,
+# *Triaging a survivor*), and those requests are separate questions, not
+# replacements, so one must not cancel another.
 #
 # Concurrency cannot rank runs: GitHub has no priority between workflows on
 # hosted runners, and one group for every branch would keep a single pending
 # run and silently cancel the other requests. So mutation is held to one run
 # per open branch, not to fewer runners than CI needs.
 concurrency:
-  group: mutants-on-request-${{ github.ref }}
+  group: mutants-on-request-${{ github.ref == 'refs/heads/main' && github.run_id || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -177,8 +183,10 @@ jobs:
           # (a cloud session reads the job log through its GitHub tools).
           cat report/report.md report/survivors.diff
 
-      # The same report on the branch's open pull request, one comment edited
-      # in place by each later run; no open pull request, no comment (#912).
+      # The same report on the branch's open pull request, or its merged one
+      # when the queue merged it first, one comment edited in place by each
+      # later run; a branch with neither (a run on `main`, a scratch branch, a
+      # PR closed unmerged) gets no comment (#912, #1530).
       # `continue-on-error`: a comment that could not be posted is a lost
       # delivery, not a lost measurement, and survivors never turn this run
       # red, so neither may this. The report is still in the summary and log.
