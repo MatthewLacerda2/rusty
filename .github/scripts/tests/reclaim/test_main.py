@@ -44,6 +44,8 @@ class Main(unittest.TestCase):
         self.assertIn("PROTECTED: queue (detached q111", out)
         self.assertIn("(pid 42)", out)
         self.assertNotIn("would remove: merged-too", out)
+        self.assertEqual(machine.deleted, [])
+        self.assertIn("would delete branch: 1-merged: its worktree was removed", out)
 
     def test_a_worktree_outside_the_root_is_named_never_removed(self):
         machine, out = run()
@@ -59,7 +61,9 @@ class Main(unittest.TestCase):
         machine, out = run()
         self.assertEqual(machine.removed, ["merged"])
         self.assertIn(["git", "-C", str(MAIN), "worktree", "prune"], machine.calls)
-        self.assertIn("reclaim: removed 1 of 5 worktree(s); free disk 10.0 GiB -> 10.0 GiB", out)
+        self.assertEqual(machine.deleted, ["1-merged"])
+        self.assertIn("deleted branch: 1-merged: its worktree was removed", out)
+        self.assertIn("reclaim: removed 1 of 5 worktree(s) and 1 branch(es); free disk 10.0 GiB -> 10.0 GiB", out)
 
     def test_unknown_argument_is_refused(self):
         with self.assertRaises(SystemExit):

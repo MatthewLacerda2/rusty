@@ -75,14 +75,19 @@ class FakeMachine(reclaim.Machine):
     def __init__(self):
         super().__init__(self.answer)
         self.removed: list[str] = []
+        self.deleted: list[str] = []
         self.calls: list[list[str]] = []
 
     def answer(self, argv, **_):
         self.calls.append(argv)
         out, code = "", 0
-        if argv[0] == "gh":
+        if argv[0] == "gh" and "head=o:" in argv[2]:
             branch = argv[2].split("head=o:")[1].split("&")[0]
             out = json.dumps([rest_pull(PRS[branch], "x")] if branch in PRS else [])
+        elif argv[0] == "gh":
+            out = "[]"
+        elif "for-each-ref" in argv:
+            out = "main aaaa\n1-merged m111\n2-open o111\nworktree-agent aaaa"
         elif argv[1:3] == ["remote", "get-url"]:
             out = "https://github.com/o/r.git"
         elif "--git-common-dir" in argv:
@@ -108,6 +113,9 @@ class FakeMachine(reclaim.Machine):
 
     def remove(self, main, wt):
         self.removed.append(wt.name)
+
+    def delete_branch(self, main, branch):
+        self.deleted.append(branch)
 
 
 def run(*argv: str) -> tuple[FakeMachine, str]:
