@@ -124,6 +124,9 @@ fn gpu_a_scrolling_cutout_primes_to_the_unprimed_frame() {
         "the variant built its depth"
     );
     let primed = frame(&mut r, &scene, true);
+    if !r.priming_recommended {
+        return; // Metal never primes, and doesn't redraw byte for byte (`walls_tests`).
+    }
     let differing = plain
         .chunks(4)
         .zip(primed.chunks(4))

@@ -4,7 +4,7 @@
 //! prepass draws differently from the forward pass: walls given back to front, an
 //! unlit solid (absent from the prepass) half hidden behind a lit one, and a
 //! half-dissolved surface variant (a cut, #648) in front. On Metal nothing primes,
-//! so there the frames match trivially. Skips with no adapter.
+//! so there it checks only that. Skips with no adapter.
 
 use std::cell::RefCell;
 
@@ -120,10 +120,14 @@ fn gpu_a_primed_forward_pass_draws_the_unprimed_frame() {
         let (plain, before) = frame(&mut r, &scene.borrow(), false);
         let (primed, after) = frame(&mut r, &scene.borrow(), true);
         assert_eq!(before.primed_passes, 0);
-        // The AO camera primes, except on Metal, which never does (`priming`).
-        let primes = u32::from(r.priming_recommended);
-        assert_eq!(after.primed_passes, primes, "the AO camera primes");
         assert_eq!(after.velocity_passes, u32::from(blur));
+        // Metal never primes (`priming`), and there two unprimed frames already
+        // differ by a level on a few edge pixels (CI, 2026-10-28): nothing to compare.
+        if !r.priming_recommended {
+            assert_eq!(after.primed_passes, 0, "Metal doesn't prime");
+            continue;
+        }
+        assert_eq!(after.primed_passes, 1, "the AO camera primes");
         let distinct: std::collections::HashSet<_> = plain.chunks(4).collect();
         assert!(distinct.len() > 8, "the frame shows the walls");
         let differing = plain
