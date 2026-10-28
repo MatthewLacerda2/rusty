@@ -22,6 +22,7 @@
 //! - [`bands`] — row bands run in parallel; byte-identical at any band count (#1490).
 //! - [`hash`] — dependency-free deterministic value hashing for stochastic ops.
 //! - [`image_buf`] — the linear-RGBA buffer the runner works in (wrapping domain).
+//! - `source` — the decoded files `image` nodes read, handed in by the caller (#1491).
 
 // Panic-free sim (#195, #962): bare `.unwrap()` is denied in every sim module (use `?`
 // or a documented `.expect(...)`); test code is exempt via clippy.toml. See docs/linting.md.
@@ -35,18 +36,26 @@ pub mod image_buf;
 pub mod ops;
 pub mod recipe;
 pub mod runner;
+mod source;
 
 pub use bake::Slot;
 pub use bake_set::bake_set;
 pub use bands::with_bands;
 pub use image_buf::Image;
 pub use recipe::TextureRecipe;
-pub use runner::{evaluate, RunError};
+pub use runner::{evaluate, evaluate_with, RunError};
+pub use source::{Source, Sources};
 
-/// Evaluate `recipe` and bake it to a `.png` at `path` for the named `slot`. The
-/// one-call front door the API surface drives: recipe → buffer → encoded PNG.
-pub fn bake_recipe(recipe: &TextureRecipe, slot: Slot, path: &str) -> Result<String, String> {
-    let img = evaluate(recipe).map_err(|e| e.to_string())?;
+/// Evaluate `recipe` over `sources` and bake it to a `.png` at `path` for the named
+/// `slot`. The one-call front door the API surface drives: recipe → buffer → encoded
+/// PNG.
+pub fn bake_recipe(
+    recipe: &TextureRecipe,
+    sources: &Sources,
+    slot: Slot,
+    path: &str,
+) -> Result<String, String> {
+    let img = evaluate_with(recipe, sources).map_err(|e| e.to_string())?;
     bake::bake_to_png(&img, slot, path)
 }
 
@@ -93,8 +102,8 @@ mod tests {
             }],
         )
         .with_seed(1234);
-        bake_recipe(&recipe, Slot::Data, a.to_str().unwrap()).unwrap();
-        bake_recipe(&recipe, Slot::Data, b.to_str().unwrap()).unwrap();
+        bake_recipe(&recipe, &Sources::new(), Slot::Data, a.to_str().unwrap()).unwrap();
+        bake_recipe(&recipe, &Sources::new(), Slot::Data, b.to_str().unwrap()).unwrap();
         let ba = std::fs::read(&a).unwrap();
         let bb = std::fs::read(&b).unwrap();
         assert_eq!(ba, bb, "same recipe+seed must bake byte-identical PNG");

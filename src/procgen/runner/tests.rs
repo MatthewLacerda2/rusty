@@ -100,7 +100,7 @@ fn a_long_chain_holds_a_constant_number_of_images() {
     let peak = |len| {
         let target = format!("n{len}");
         let plan = plan(&chain(len), &[&target], Scope::Needed).unwrap();
-        run(&chain(len), &plan, &mut |_, _| {})
+        run(&chain(len), &Sources::new(), &plan, &mut |_, _| {})
     };
     let (short, long) = (peak(4), peak(64));
     assert_eq!(short.peak_live, 2, "an input and its consumer");
@@ -125,7 +125,7 @@ fn targets_are_kept_and_a_shared_input_is_freed_once() {
         node("y", OpKind::Invert, &["x"]),
     ];
     let recipe = TextureRecipe::new(4, nodes);
-    let out = evaluate_many(&recipe, &["y", "a", "a"]).unwrap();
+    let out = evaluate_many(&recipe, &Sources::new(), &["y", "a", "a"]).unwrap();
     let red: Vec<f32> = out.iter().map(|img| img.pixels()[0][0]).collect();
     assert_eq!(red, [0.5, 0.25, 0.25]);
 }

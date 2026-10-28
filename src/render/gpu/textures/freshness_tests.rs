@@ -45,7 +45,7 @@ pub(super) fn emissive_scene(map: &str) -> Scene {
 }
 
 /// Render one frame and read back the centre pixel's RGB.
-fn centre(renderer: &mut Renderer, scene: &Scene) -> [u8; 3] {
+pub(super) fn centre(renderer: &mut Renderer, scene: &Scene) -> [u8; 3] {
     let mut view = RenderView::offscreen(&renderer.device, OFFSCREEN_FORMAT, 16, 16, 2);
     let out = view.color_target_view().unwrap();
     let cam = Camera::new(Vec3::new(0.0, 0.0, 12.0), -90.0, 0.0);

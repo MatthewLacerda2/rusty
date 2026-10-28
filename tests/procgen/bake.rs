@@ -5,7 +5,7 @@
 use crate::temp::path as tmp;
 use rusty::procgen::bake::{encode, Slot};
 use rusty::procgen::recipe::{Constant, Node, Noise, NoiseKind, OpKind, TextureRecipe};
-use rusty::procgen::{bake_recipe, evaluate};
+use rusty::procgen::{bake_recipe, evaluate, Sources};
 
 fn noise_recipe(resolution: u32, seed: u64) -> TextureRecipe {
     TextureRecipe::new(
@@ -31,8 +31,8 @@ fn same_recipe_and_seed_bakes_byte_identical_png() {
     let recipe = noise_recipe(128, 4242);
     let a = tmp("rusty_bake_det_a.png");
     let b = tmp("rusty_bake_det_b.png");
-    bake_recipe(&recipe, Slot::BaseColor, &a).unwrap();
-    bake_recipe(&recipe, Slot::BaseColor, &b).unwrap();
+    bake_recipe(&recipe, &Sources::new(), Slot::BaseColor, &a).unwrap();
+    bake_recipe(&recipe, &Sources::new(), Slot::BaseColor, &b).unwrap();
     assert_eq!(std::fs::read(&a).unwrap(), std::fs::read(&b).unwrap());
     std::fs::remove_file(a).ok();
     std::fs::remove_file(b).ok();
@@ -42,7 +42,7 @@ fn same_recipe_and_seed_bakes_byte_identical_png() {
 fn baked_png_is_loadable_at_the_requested_resolution() {
     let recipe = noise_recipe(64, 1);
     let path = tmp("rusty_bake_loadable.png");
-    bake_recipe(&recipe, Slot::Normal, &path).unwrap();
+    bake_recipe(&recipe, &Sources::new(), Slot::Normal, &path).unwrap();
     // The same decode path the renderer's `load_texture` takes.
     let img = image::open(&path).expect("baked PNG decodes");
     assert_eq!(image::GenericImageView::dimensions(&img), (64, 64));
@@ -111,8 +111,8 @@ fn loaded_recipe_re_bakes_identically() {
     let back: TextureRecipe = rusty::api::recipe_from_json_str(&json).unwrap();
     let from_recipe = tmp("rusty_bake_roundtrip_a.png");
     let from_json = tmp("rusty_bake_roundtrip_b.png");
-    bake_recipe(&recipe, Slot::Data, &from_recipe).unwrap();
-    bake_recipe(&back, Slot::Data, &from_json).unwrap();
+    bake_recipe(&recipe, &Sources::new(), Slot::Data, &from_recipe).unwrap();
+    bake_recipe(&back, &Sources::new(), Slot::Data, &from_json).unwrap();
     assert_eq!(
         std::fs::read(&from_recipe).unwrap(),
         std::fs::read(&from_json).unwrap()

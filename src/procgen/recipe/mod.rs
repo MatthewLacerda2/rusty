@@ -21,18 +21,20 @@ mod catalog;
 pub mod color;
 mod kinds;
 mod node;
+mod op_info;
 pub mod params;
 #[cfg(test)]
 mod sample;
 mod tag;
 
 pub use arity::Arity;
-pub use catalog::{Lit, OpInfo, OpParam, OPS};
+pub use catalog::OPS;
 pub use kinds::*;
 pub use node::{ArityError, Node};
+pub use op_info::{Lit, OpInfo, OpParam};
 pub use params::*;
 #[cfg(test)]
-pub(crate) use sample::sample_op;
+pub(crate) use sample::{sample_op, SAMPLE_PATH};
 
 use std::collections::BTreeMap;
 
@@ -63,6 +65,7 @@ pub enum OpKind {
     Shape(Shape),
     Checker(Checker),
     WhiteNoise(WhiteNoise),
+    Image(ImageTexture),
 
     // ---- Color ----
     ColorRamp(ColorRamp),
@@ -146,6 +149,20 @@ impl TextureRecipe {
     pub fn with_output(mut self, id: impl Into<String>) -> Self {
         self.output = Some(id.into());
         self
+    }
+
+    /// Every file path an `image` node reads (#1491), each once, in node order: the
+    /// files a caller decodes into [`crate::procgen::Sources`] before evaluating.
+    pub fn image_paths(&self) -> Vec<&str> {
+        let mut paths: Vec<&str> = Vec::new();
+        for node in &self.nodes {
+            if let OpKind::Image(p) = &node.op {
+                if !paths.contains(&p.path.as_str()) {
+                    paths.push(&p.path);
+                }
+            }
+        }
+        paths
     }
 
     /// Serialize to pretty JSON — the on-disk recipe form.

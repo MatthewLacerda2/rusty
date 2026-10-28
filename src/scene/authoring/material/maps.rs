@@ -10,6 +10,8 @@
 //! where the field is empty**: a path the author set by hand wins over the bake. A
 //! rebake writes to the same paths, so the fields it filled before already point at
 //! them, and a hand-set path stays put — one rule serves define and rebake alike.
+//! A recipe's `image` nodes read their files from the project root on every bake
+//! ([`super::load_sources`], #1491), so a rebake picks up an edited source.
 
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -40,7 +42,9 @@ pub fn bake_maps(asset: &mut MaterialAsset, name: &str, dir: &Path) -> Result<()
     // `/`-spelled, `dir` included, not `Path::join`: the paths land in the scene file,
     // which must read the same on every platform (Windows accepts `/` too).
     let prefix = format!("{}/{name}", to_slash(dir).trim_end_matches('/'));
-    let baked = bake_set(recipe, &prefix).map_err(|e| format!("material {name:?} maps: {e}"))?;
+    let in_error = |e: String| format!("material {name:?} maps: {e}");
+    let sources = super::load_sources(recipe, &crate::core::project::root()).map_err(in_error)?;
+    let baked = bake_set(recipe, &sources, &prefix).map_err(in_error)?;
     fill_empty_maps(asset, &baked);
     Ok(())
 }

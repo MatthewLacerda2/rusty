@@ -127,3 +127,15 @@ pub enum ShapeKind {
     /// A horizontal stroke with round caps: `size` is its length and thickness.
     Line,
 }
+
+/// How an `image` op reads its file's channels (#1491), Blender's Image Texture
+/// colour space.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ImageEncoding {
+    /// Colour: RGB decoded from sRGB to linear, alpha as is.
+    #[default]
+    Srgb,
+    /// Data (a mask, a height, a normal map): every channel as stored.
+    Linear,
+}

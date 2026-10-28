@@ -4,6 +4,10 @@ use serde_json::{json, Value};
 
 use super::{OpInfo, OpKind, OpParam};
 
+/// The file a sampled `path` param names; tests that evaluate a sampled `image` op
+/// hand procgen a source under this key.
+pub const SAMPLE_PATH: &str = "textures/sample.png";
+
 /// A valid value for a required param of type `p.ty`.
 fn sample(p: &OpParam) -> Value {
     match p.ty {
@@ -12,6 +16,7 @@ fn sample(p: &OpParam) -> Value {
         "color" => json!([0.0, 0.0, 0.0, 1.0]),
         "vec2" => json!([1.0, 1.0]),
         "enum" => json!(p.values[0]),
+        "path" => json!(SAMPLE_PATH),
         "stops" => json!([{ "pos": 0.0, "color": [0.0, 0.0, 0.0, 1.0] }]),
         other => panic!("{}: unknown param type {other}", p.name),
     }

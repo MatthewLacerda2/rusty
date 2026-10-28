@@ -24,6 +24,10 @@
 //!   params with their types and defaults (#411), so the agent discovers the op-set
 //!   from the engine rather than the docs.
 //!
+//! A recipe's `image` nodes read their files from the project root before any verb
+//! evaluates it (`scene::authoring::material::load_sources`, #1491): procgen itself
+//! reads no files.
+//!
 //! A `recipe` is a Lua table **or** its JSON string (the on-disk form, #410), so a
 //! saved recipe re-bakes through the same verb without a round-trip through Lua.
 //!
@@ -40,7 +44,8 @@ mod ops;
 use mlua::{Lua, Value};
 
 use super::{put, Reg};
-use crate::procgen::{bake_recipe, bake_set, Slot, TextureRecipe};
+use crate::procgen::{bake_recipe, bake_set, Slot, Sources, TextureRecipe};
+use crate::scene::authoring::material::load_sources;
 use from_lua::parse_recipe;
 
 /// Register the `Texture` namespace onto `lua`.
@@ -61,7 +66,8 @@ pub fn register(lua: &Lua) -> Reg {
         "BakeSet",
         lua.create_function(|lua, (recipe, prefix): (Value, String)| {
             let recipe = parse_recipe(&recipe).map_err(mlua::Error::RuntimeError)?;
-            let paths = bake_set(&recipe, &prefix).map_err(mlua::Error::RuntimeError)?;
+            let sources = sources(&recipe)?;
+            let paths = bake_set(&recipe, &sources, &prefix).map_err(mlua::Error::RuntimeError)?;
             lua.create_table_from(paths)
         }),
     )?;
@@ -107,11 +113,18 @@ pub fn register(lua: &Lua) -> Reg {
 /// Evaluate + bake a parsed recipe for the named slot, surfacing any error to Lua.
 fn bake(recipe: &TextureRecipe, path: &str, slot: &str) -> mlua::Result<String> {
     let slot = Slot::parse(slot).map_err(mlua::Error::RuntimeError)?;
-    bake_recipe(recipe, slot, path).map_err(mlua::Error::RuntimeError)
+    bake_recipe(recipe, &sources(recipe)?, slot, path).map_err(mlua::Error::RuntimeError)
+}
+
+/// The decoded files `recipe`'s `image` nodes read, from the project root.
+fn sources(recipe: &TextureRecipe) -> mlua::Result<Sources> {
+    load_sources(recipe, &crate::core::project::root()).map_err(mlua::Error::RuntimeError)
 }
 
 #[cfg(test)]
 mod bake_set_tests;
+#[cfg(test)]
+mod image_tests;
 #[cfg(test)]
 mod inspect_tests;
 #[cfg(test)]

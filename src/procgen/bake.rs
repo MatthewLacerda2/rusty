@@ -1,7 +1,9 @@
 //! src/procgen/bake.rs — encode an evaluated buffer to a PNG for a material slot.
 //!
-//! The runner produces a linear `[f32; 4]` buffer; the bake turns it into an 8-bit
-//! RGBA `.png` the renderer's `load_texture` already consumes. The crucial step is
+//! The runner produces a linear `[f32; 4]` buffer; the bake turns it into an RGBA
+//! `.png` the renderer's `load_texture` already consumes: 8 bits per channel for
+//! every slot but `data`, which bakes 16 (#1491) so a height field used as
+//! displacement or a terrain heightmap doesn't terrace into 256 steps. The crucial step is
 //! **per-slot encoding**, so a baked map drops straight into a glTF material slot
 //! with the right color space and channel layout:
 //!
@@ -134,7 +136,8 @@ fn to_u8(v: f32) -> u8 {
 }
 
 /// Encode `img` for `slot` into an 8-bit RGBA [`ImageBuffer`] — the in-memory PNG
-/// pixels, before writing. Exposed so tests can assert bytes without disk I/O.
+/// pixels, before writing, for every slot but [`Slot::Data`], which bakes through
+/// [`encode_data`]. Exposed so tests can assert bytes without disk I/O.
 pub fn encode(img: &Image, slot: Slot) -> ImageBuffer<Rgba<u8>, Vec<u8>> {
     let res = img.resolution();
     let mut buf = ImageBuffer::new(res, res);
@@ -146,12 +149,27 @@ pub fn encode(img: &Image, slot: Slot) -> ImageBuffer<Rgba<u8>, Vec<u8>> {
     buf
 }
 
+/// Encode `img` as a [`Slot::Data`] map: 16-bit linear RGBA, each channel clamped
+/// to `[0, 1]` and rounded to the nearest of 65536 steps.
+pub fn encode_data(img: &Image) -> ImageBuffer<Rgba<u16>, Vec<u16>> {
+    let res = img.resolution();
+    let raw = img
+        .pixels()
+        .iter()
+        .flat_map(|p| p.map(|c| (c.clamp(0.0, 1.0) * 65535.0 + 0.5) as u16))
+        .collect();
+    ImageBuffer::from_raw(res, res, raw).expect("one RGBA texel per pixel")
+}
+
 /// Bake `img` to a `.png` at `path`, encoded for `slot`, and note the write in
 /// [`crate::core::fs::written`] so a renderer that already drew the old file re-reads
 /// it (#689). Returns the path.
 pub fn bake_to_png(img: &Image, slot: Slot, path: &str) -> Result<String, String> {
-    let buf = encode(img, slot);
-    buf.save(path).map_err(|e| e.to_string())?;
+    match slot {
+        Slot::Data => encode_data(img).save(path),
+        _ => encode(img, slot).save(path),
+    }
+    .map_err(|e| e.to_string())?;
     crate::core::fs::written::note_written(path);
     Ok(path.to_string())
 }
@@ -201,6 +219,39 @@ mod tests {
         assert_eq!(px[2], 255, "metallic -> B");
         assert_eq!(px[1], to_u8(0.25), "roughness -> G");
         assert_eq!(px[0], 0, "R cleared in the pack");
+    }
+
+    #[test]
+    fn a_data_ramp_round_trips_at_16_bit_precision() {
+        // A 0..1 ramp across 256² pixels: 65536 distinct values, past what 8 bits hold.
+        let res = 256;
+        let n = (res * res) as f32;
+        let mut img = Image::new(res);
+        for (i, p) in img.pixels_mut().iter_mut().enumerate() {
+            *p = [i as f32 / (n - 1.0); 4];
+        }
+        let path = crate::test_temp::dir().join("rusty_bake_data_ramp_1491.png");
+        bake_to_png(&img, Slot::Data, path.to_str().unwrap()).unwrap();
+        let back = image::open(&path).unwrap();
+        assert_eq!(back.color(), image::ColorType::Rgba16, "data bakes 16-bit");
+        let back = back.to_rgba16();
+        for (p, q) in img.pixels().iter().zip(back.pixels()) {
+            let read = f32::from(q.0[0]) / 65535.0;
+            assert!(
+                (read - p[0]).abs() <= 0.5 / 65535.0 + 1e-7,
+                "{} vs {read}",
+                p[0]
+            );
+        }
+        std::fs::remove_file(path).ok();
+    }
+
+    #[test]
+    fn colour_slots_stay_8_bit() {
+        let path = crate::test_temp::dir().join("rusty_bake_colour_8bit_1491.png");
+        bake_to_png(&Image::new(2), Slot::BaseColor, path.to_str().unwrap()).unwrap();
+        assert_eq!(image::open(&path).unwrap().color(), image::ColorType::Rgba8);
+        std::fs::remove_file(path).ok();
     }
 
     #[test]

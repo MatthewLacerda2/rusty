@@ -38,6 +38,7 @@ fn sample(ty: &str) -> Json {
         "color" => json!([0.0, 0.0, 0.0, 1.0]),
         "vec2" => json!([1.0, 1.0]),
         "bool" => json!(true),
+        "path" => json!("textures/sample.png"),
         "stops" => json!([{ "pos": 0.0, "color": [0.0, 0.0, 0.0, 1.0] }]),
         _ => json!(2),
     }
