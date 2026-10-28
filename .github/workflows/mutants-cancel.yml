@@ -1,0 +1,39 @@
+name: mutants-cancel
+# A mutation run never outlives its branch's pull request (#1530).
+#
+# When a pull request closes, merged or not, this one no-op job joins the
+# concurrency group of `mutants-on-request.yml` for the PR's head branch, with
+# `cancel-in-progress`, so GitHub cancels that branch's running or pending
+# mutation run. On 2026-10-28 three runs on already merged branches still held
+# runners hours later, while the merge queue's `ci` waited.
+#
+# Concurrency instead of the REST cancel endpoint: it needs no token at all
+# (`permissions: {}`) and can only touch the one group it names. `ci.yml` and
+# `lint.yml` group as `ci-…` and `lint-…`, so no gating run can be cancelled by
+# this. The group string must stay equal to the one in `mutants-on-request.yml`
+# for `refs/heads/<branch>`; `.github/scripts/tests/mutants/test_concurrency.py`
+# holds the two together.
+#
+# `pull_request: closed` fires for every same-repository pull request, a cloud
+# coder's included: those are opened and merged with the operator's token or the
+# Claude app's, and only events caused by a workflow's own `GITHUB_TOKEN` start
+# no workflow. A merge never waits on this: `mergeable.py` reads only `ci` and
+# `lint`, and the job runs only after the pull request is closed.
+on:
+  pull_request:
+    types: [closed]
+
+permissions: {}
+
+jobs:
+  cancel:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    concurrency:
+      group: mutants-on-request-refs/heads/${{ github.head_ref }}
+      cancel-in-progress: true
+    steps:
+      - name: Stop the branch's mutation run
+        env:
+          BRANCH: ${{ github.head_ref }}
+        run: echo "Any mutation run on $BRANCH was cancelled by joining its concurrency group."
