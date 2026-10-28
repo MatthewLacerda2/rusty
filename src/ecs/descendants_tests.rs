@@ -48,24 +48,20 @@ fn dead_ids_are_skipped() {
 }
 
 #[test]
-fn a_hierarchy_path_reads_back_to_its_entity() {
+fn a_hierarchy_path_reads_back_to_its_entity_among_same_names() {
     let mut w = World::new();
-    let [arena, a, b, dup] = ["Arena", "Crate", "Crate", "Arena"].map(|n| w.spawn(n.into()));
-    for (child, parent) in [(a, arena), (b, arena)] {
-        w.set_parent_id(child, Some(parent));
-        w.add_child(parent, child);
+    let arena = w.spawn("Arena".into());
+    let crates = [0; 5].map(|_| w.spawn("Crate".into()));
+    let slash = w.spawn("a/b".into());
+    for child in crates.into_iter().chain([slash]) {
+        w.set_parent_id(child, Some(arena));
+        w.add_child(arena, child);
     }
-    assert_eq!(w.path_of(b).as_deref(), Some("Arena/Crate"));
-    assert_eq!(
-        w.find_path("Arena/Crate"),
-        Some(a),
-        "first of duplicate names"
-    );
-    assert_eq!(
-        w.find_path("Arena"),
-        Some(arena),
-        "the first root, not {dup}"
-    );
-    assert_eq!(w.find_child(arena, "Crate"), Some(a));
-    assert_eq!((w.find_path("Arena/Barrel"), w.path_of(99)), (None, None));
+    let dup = w.spawn("Arena".into());
+    for id in crates.into_iter().chain([arena, slash, dup]) {
+        let path = w.path_of(id).unwrap();
+        assert_eq!(w.find_path(&path), Some(id), "{path:?}");
+    }
+    assert_eq!(w.find_child(arena, "Crate"), Some(crates[0]));
+    assert_eq!(w.path_of(99), None);
 }

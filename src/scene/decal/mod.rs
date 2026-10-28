@@ -19,7 +19,8 @@
 //!
 //! **Persistence (#1518).** A load drops every decal but the [`Decal::persist`]
 //! ones, which `Scene::swap_in` carries across (`persist.rs`). Nothing is saved to
-//! disk, and Stop's snapshot restore drops them all.
+//! disk, and Stop's snapshot restore puts back the edit-mode decals, dropping every
+//! one Play stamped.
 
 use crate::asset::MapRef;
 use glam::camera::rh::view::look_to_mat4;

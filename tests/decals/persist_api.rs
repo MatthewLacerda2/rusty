@@ -1,5 +1,5 @@
 //! Persistent decals through the `Decals` API (#1518): the `persist` opt, `Clear`
-//! keeping the trail, and Stop dropping it anyway. What a load carries is
+//! keeping the trail, and Stop reverting to the edit-mode decals anyway. What a load carries is
 //! `scene::decal::persist`'s tests.
 
 use std::cell::RefCell;
@@ -42,20 +42,48 @@ fn an_unknown_clear_option_is_an_error() {
 }
 
 #[test]
-fn stop_drops_persistent_decals_with_the_rest() {
+fn persist_and_persistent_take_a_boolean_only() {
+    let scene = RefCell::new(Scene::new());
+    for script in [
+        "Decals.Spawn(0,0,0, 0,1,0, { persist = \"false\" })",
+        "Decals.Spawn(0,0,0, 0,1,0, { persist = 0 })",
+        "Decals.Clear({ persistent = \"false\" })",
+    ] {
+        let err = eval::<()>(&scene, script).unwrap_err().to_string();
+        assert!(err.contains("must be true or false"), "{script}: {err}");
+    }
+    assert_eq!(scene.borrow().decals.len(), 0, "nothing stamped");
+}
+
+#[test]
+fn stop_puts_back_the_edit_mode_decals_and_drops_plays() {
     let scene = Rc::new(RefCell::new(Scene::new()));
+    let wall = scene.borrow_mut().add_entity("Wall".into());
+    let graffiti: u32 = eval(
+        &scene,
+        &format!("return Decals.Spawn(0,0,0, 0,1,0, {{ owner = {wall} }})"),
+    )
+    .unwrap();
     let mut game = crate::play::playing(Rc::clone(&scene), 20.0);
     game.tick(1.0 / 60.0); // enter Play
-    eval::<u32>(
+    let hole: u32 = eval(
         &scene,
         "return Decals.Spawn(0,0,0, 0,1,0, { persist = true })",
     )
     .unwrap();
-    assert_eq!(scene.borrow().decals.len(), 1);
+    assert_eq!(scene.borrow().decals.len(), 2);
     game.set_playing(false);
     game.tick(1.0 / 60.0); // Stop
-    assert!(
-        scene.borrow().decals.is_empty(),
-        "the snapshot restore clears"
+    let s = scene.borrow();
+    let kept: Vec<_> = s
+        .decals
+        .iter()
+        .map(|d| (d.id, d.owner.map(|o| o.entity)))
+        .collect();
+    assert_eq!(
+        kept,
+        [(graffiti, Some(wall))],
+        "the edit decal, on its owner"
     );
+    assert!(hole > graffiti);
 }

@@ -103,3 +103,17 @@ fn a_new_scene_keeps_the_decal_budgets() {
     s.clear(); // File > New Scene
     assert_eq!(s.decals.limits(), limits, "the project's, not the engine's");
 }
+
+#[test]
+fn a_restore_puts_the_saved_decals_back_and_keeps_ids_counting() {
+    let mut s = Scene::new();
+    let edit = spawn_at(&mut s, 0.0);
+    let saved = s.decals.clone();
+    let play = spawn_at(&mut s, 1.0);
+    s.decals.restore(saved);
+    assert_eq!(s.decals.iter().map(|d| d.id).collect::<Vec<_>>(), [edit]);
+    assert!(
+        spawn_at(&mut s, 2.0) > play,
+        "no id handed out in Play is reused"
+    );
+}

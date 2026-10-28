@@ -161,7 +161,20 @@ fn clear_keeps_persistent(opts: Option<&mlua::Table>) -> mlua::Result<bool> {
             )));
         }
     }
-    Ok(opts.get::<Option<bool>>("persistent")? == Some(false))
+    Ok(opt_bool(opts, "Decals.Clear", "persistent")? == Some(false))
+}
+
+/// The boolean at `key`, if set. Only `true` or `false` is one: Lua's truthiness
+/// would read `"false"` or `0` as true, so anything else is an error naming `key`.
+fn opt_bool(opts: &mlua::Table, func: &str, key: &str) -> mlua::Result<Option<bool>> {
+    match opts.get::<mlua::Value>(key)? {
+        mlua::Value::Nil => Ok(None),
+        mlua::Value::Boolean(b) => Ok(Some(b)),
+        other => Err(mlua::Error::RuntimeError(format!(
+            "{func}: {key} must be true or false, not a {}",
+            other.type_name()
+        ))),
+    }
 }
 
 /// The keys `Decals.SetLimits` takes.
@@ -255,7 +268,7 @@ fn spec_from_opts(opts: &mlua::Table) -> mlua::Result<DecalSpec> {
         owner: opts.get("owner")?,
         lifetime: opts.get("lifetime")?,
         fade: opts.get::<Option<f32>>("fade")?.unwrap_or(0.0),
-        persist: opts.get::<Option<bool>>("persist")?.unwrap_or(false),
+        persist: opt_bool(opts, "Decals.Spawn", "persist")?.unwrap_or(false),
     })
 }
 

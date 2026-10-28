@@ -82,7 +82,7 @@ fn a_left_behind_owner_is_found_again_by_its_path() {
     let local = s.decals[0].owner.unwrap().local;
 
     reload(&mut s, 7.0);
-    let incoming = s.world.find_path("Arena/Crate").unwrap();
+    let incoming = s.world.find_by_name("Crate").unwrap();
     assert_ne!(incoming, crate_, "the incoming crate made room for Player");
     let owner = s.decals[0].owner.unwrap();
     assert_eq!((owner.entity, owner.local), (incoming, local));
@@ -108,7 +108,7 @@ fn a_carried_decal_counts_against_its_budgets() {
     let (_, crate_) = arena(&mut s, 0.0);
     spawn(&mut s, Some(crate_), true);
     reload(&mut s, 0.0);
-    let incoming = s.world.find_path("Arena/Crate").unwrap();
+    let incoming = s.world.find_by_name("Crate").unwrap();
     let limits = s.decals.limits();
     s.decals
         .set_limits(crate::core::settings::decals::DecalLimits {

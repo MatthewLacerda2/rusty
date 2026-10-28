@@ -22,7 +22,7 @@ if hit then Decals.Spawn(px, py, pz, nx, ny, nz, { owner = id }) end
 | `Decals.Spawn` | `(x,y,z, nx,ny,nz, [size], [texture], [rotation_deg], [r,g,b,a])` or `(x,y,z, nx,ny,nz, opts)` | the decal's id |
 | `Decals.Remove` | `(id, [fade])` | `true` if a live decal had that id |
 | `Decals.Count` | `()` | live decal count, including any still fading out |
-| `Decals.Clear` | `([{ persistent = false }])` | — (drops every live decal; with `persistent = false`, all but the persistent ones) |
+| `Decals.Clear` | `([{ persistent = false }])` | — (drops every live decal; with `persistent = false`, all but the persistent ones; `persistent` must be a boolean) |
 | `Decals.SetLimits` | `({ per_owner =, world =, total = })`, any subset | — (lowering one fades the oldest excess) |
 | `Decals.GetLimits` | `()` | `{ per_owner, world, total }`, the budgets in force (`project.rusty` spells them `max_per_owner`, `max_world`, `max_total`) |
 
@@ -38,7 +38,8 @@ only**.
 (degrees), `color` (`{r, g, b, a}`), `texture`, and **`material`** — the name of a
 library material (`Material.DefineAsset`) the decal stamps — plus the lifecycle
 keys `owner`, `lifetime`, `fade` and `persist` (below). An unknown key, a material that does
-not exist, or an `owner` entity that does not exist is an error and stamps nothing.
+not exist, an `owner` entity that does not exist, or a `persist` that is not `true`
+or `false` is an error and stamps nothing.
 
 ```lua no-run
 Material.DefineAsset("blood", {
@@ -70,17 +71,18 @@ Decals.Spawn(px, py, pz, nx, ny, nz, { material = "blood", size = 1.2, rotation 
   order: everything spawned after the load lands over it. Where it lands:
   - **an owner that survives** (`Scene.DontDestroyOnLoad`): it stays on it;
   - **an owner that does not**: it is re-attached, in the same place on the owner,
-    to the incoming entity at the owner's **hierarchy path** (`"Arena/Crate_1"`,
-    root first, as `Scene.FindChild` spells paths below an entity, the first child
-    of each name), so a mark on a crate comes back on the crate at the crate's
-    reset position. A bone owner works the same way, by the path to its bone. When
-    no entity has that path in the new scene (another level, a spawned enemy, or a
-    name with a `/` in it) the decal is dropped;
+    to the incoming entity at the owner's **place in the hierarchy**: the same
+    names from the root down, and among siblings of the same name the same one in
+    order (the third `Crate` under `Arena` comes back on the third), so a mark on a
+    crate comes back on that crate at its reset position. A bone owner works the
+    same way, by its bone's place. When the new scene has no entity there (another
+    level, a spawned enemy) the decal is dropped;
   - **no owner**: it stays where it is in world space.
 
   Carried decals count against their budgets again, oldest first, a re-attached one
   against its new owner's. Persistence is for `Scene.Load` within a run only: it is
-  not saved to disk, and Stop drops every decal (the edit scene is restored).
+  not saved to disk, and Stop puts back the decals the scene had in edit mode,
+  dropping every one Play stamped, as Unity reverts play-mode changes.
   `Decals.Clear()` drops the persistent ones too (game over, back to the menu);
   `Decals.Clear({ persistent = false })` drops only the rest.
 - **`Decals.Remove(id, [fade])`** removes one decal now, or fades it out over

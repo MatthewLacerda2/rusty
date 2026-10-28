@@ -121,15 +121,22 @@ impl Application {
     /// the settings back into it.
     pub fn open(&mut self, path: impl Into<PathBuf>) -> Result<(), String> {
         let path = path.into();
-        let read = ProjectFile::read(&path);
+        // Read once and parse that text, so the text kept for `decal_limits` is the
+        // one the budgets came from.
+        let read = match std::fs::read_to_string(&path) {
+            Ok(text) => Ok(Some(text)),
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(None),
+            Err(err) => Err(format!("Failed to read {}: {err}", path.display())),
+        };
         self.path = Some(path);
-        let file = read?.unwrap_or_default();
+        let text = read?;
+        let file = match &text {
+            Some(text) => ProjectFile::from_json(text)?,
+            None => ProjectFile::default(),
+        };
         (self.build, self.graphics_defaults) = (file.build, file.graphics_options);
         self.decal_limits = file.decals;
-        self.decals_read_from = self
-            .path
-            .as_ref()
-            .and_then(|p| std::fs::read_to_string(p).ok());
+        self.decals_read_from = text;
         Ok(())
     }
 

@@ -42,7 +42,7 @@ pub mod world;
 mod world_space;
 
 pub use access::{CompMut, CompRef};
-pub use descendants::Descendants;
+pub use descendants::{Descendants, HierarchyPath};
 pub use world::World;
 pub use world_space::{ColliderMut, TransformMut};
 
