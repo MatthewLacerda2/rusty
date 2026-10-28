@@ -36,6 +36,8 @@ mod despawn_tests;
 mod handles;
 #[cfg(test)]
 mod query_tests;
+#[cfg(test)]
+mod static_revision_tests;
 pub mod world;
 mod world_space;
 

@@ -199,14 +199,16 @@ impl ShadowRenderer {
         [plain, clipped]
     }
 
-    /// Whether some cascade's static bake is not `scene`'s: it holds another scene's
-    /// statics, or nothing at all.
+    /// Whether some cascade's static bake is not `scene`'s as it stands: it holds
+    /// another scene's statics, an older [`StaticsKey`] revision of this one's, or
+    /// nothing at all.
     #[cfg(test)]
-    pub fn needs_static_bake(&self, scene: SceneId) -> bool {
+    pub fn needs_static_bake(&self, scene: &Scene) -> bool {
+        let key = statics_key(scene);
         let count = self.cascades.len().max(1);
         self.static_cache[..count]
             .iter()
-            .any(|baked| baked.map(|((s, _), _)| s) != Some(scene))
+            .any(|baked| baked.map(|(k, _)| k) != Some(key))
     }
 
     /// Drop every static bake — the cascades' and the atlas tiles' (#694) — so the
