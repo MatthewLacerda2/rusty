@@ -1,4 +1,5 @@
-//! src/procgen/recipe/tag.rs — an [`OpKind`]'s `op` tag and its catalog entry.
+//! src/procgen/recipe/tag.rs — an [`OpKind`]'s `op` tag, its catalog entry and its
+//! node seed.
 //!
 //! The tag is the string serde writes as `op`; `catalog_tests.rs` holds the two
 //! equal for every op, so [`OpKind::info`] always finds its row in [`OPS`].
@@ -17,13 +18,14 @@ impl OpKind {
             OpKind::Brick(_) => "brick",
             OpKind::Shape(_) => "shape",
             OpKind::Checker(_) => "checker",
-            OpKind::WhiteNoise => "white_noise",
+            OpKind::WhiteNoise(_) => "white_noise",
             OpKind::ColorRamp(_) => "color_ramp",
             OpKind::Mix(_) => "mix",
             OpKind::Invert => "invert",
             OpKind::BrightContrast(_) => "bright_contrast",
             OpKind::HueSatValue(_) => "hue_sat_value",
             OpKind::Gamma(_) => "gamma",
+            OpKind::AutoLevels => "auto_levels",
             OpKind::Mapping(_) => "mapping",
             OpKind::BumpToNormal(_) => "bump_to_normal",
             OpKind::CombineRgb => "combine_rgb",
@@ -37,6 +39,19 @@ impl OpKind {
             OpKind::Blur(_) => "blur",
             OpKind::Cavity(_) => "cavity",
             OpKind::Curvature(_) => "curvature",
+        }
+    }
+
+    /// The node's own `seed` param (#1487), folded into the recipe seed by the
+    /// runner; 0 for an op that draws no randomness.
+    pub fn seed(&self) -> u32 {
+        match self {
+            OpKind::Noise(p) => p.seed,
+            OpKind::Voronoi(p) => p.seed,
+            OpKind::Brick(p) => p.seed,
+            OpKind::WhiteNoise(p) => p.seed,
+            OpKind::Tile(p) => p.seed,
+            _ => 0,
         }
     }
 

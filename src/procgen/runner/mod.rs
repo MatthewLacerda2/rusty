@@ -22,6 +22,7 @@ mod plan;
 pub mod preview;
 pub mod stats;
 
+use super::hash::node_seed;
 use super::image_buf::Image;
 use super::ops::eval_node;
 use super::recipe::{ArityError, TextureRecipe};
@@ -115,7 +116,9 @@ fn run(recipe: &TextureRecipe, plan: &Plan, on_node: &mut dyn FnMut(usize, &Imag
             .iter()
             .map(|&j| slots[j].as_ref().expect("plan orders inputs first"))
             .collect();
-        let out = eval_node(&recipe.nodes[i].op, &inputs, recipe.resolution, recipe.seed);
+        let op = &recipe.nodes[i].op;
+        let seed = node_seed(recipe.seed, op.seed());
+        let out = eval_node(op, &inputs, recipe.resolution, seed);
         on_node(i, &out);
         slots[i] = Some(out);
         live += 1;

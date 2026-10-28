@@ -7,6 +7,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use super::color;
 use super::{
     BlendMode, BrickOutput, GradientKind, MathOp, NoiseKind, RampStop, ShapeKind, VoronoiOutput,
     WaveKind,
@@ -14,11 +15,14 @@ use super::{
 
 // ---- Generators (no inputs) ----
 // Periodic params (`scale`, `frequency`, `rows`/`cols`, `tiles`) are whole counts of
-// periods per tile: fractional values round at evaluation (#392).
+// periods per tile: fractional values round at evaluation (#392). A stochastic op's
+// `seed` (default 0) is folded into the recipe seed (`hash::node_seed`), so two
+// otherwise identical nodes differ by seed alone (#1487); 0 keeps the recipe seed.
 
 /// A flat color fill.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Constant {
+    #[serde(deserialize_with = "color::color")]
     pub color: [f32; 4],
 }
 
@@ -36,6 +40,8 @@ pub struct Noise {
     pub lacunarity: f32,
     #[serde(default = "half")]
     pub gain: f32,
+    #[serde(default)]
+    pub seed: u32,
 }
 
 /// Voronoi / Worley cellular pattern; `randomness` jitters each cell's point (0 = a
@@ -47,6 +53,8 @@ pub struct Voronoi {
     pub output: VoronoiOutput,
     #[serde(default = "one_f32")]
     pub randomness: f32,
+    #[serde(default)]
+    pub seed: u32,
 }
 
 /// Linear or radial gradient ramp (grayscale).
@@ -73,6 +81,8 @@ pub struct Brick {
     pub mortar: f32,
     #[serde(default)]
     pub output: BrickOutput,
+    #[serde(default)]
+    pub seed: u32,
 }
 
 /// One centred shape per tile as a mask (1 inside, 0 outside). `size` is its
@@ -92,8 +102,17 @@ pub struct Shape {
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Checker {
     pub tiles: u32,
+    #[serde(deserialize_with = "color::color_a")]
     pub color_a: [f32; 4],
+    #[serde(deserialize_with = "color::color_b")]
     pub color_b: [f32; 4],
+}
+
+/// Per-pixel uniform white noise (grayscale).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct WhiteNoise {
+    #[serde(default)]
+    pub seed: u32,
 }
 
 // ---- Color ----
@@ -176,6 +195,8 @@ pub struct Tile {
     pub rotation_jitter: f32,
     #[serde(default)]
     pub scale_jitter: f32,
+    #[serde(default)]
+    pub seed: u32,
 }
 
 /// Domain warp: sample input A displaced by input B's R/G, centred on 0.5 and scaled
@@ -187,7 +208,9 @@ pub struct Warp {
 
 // ---- Converter / math ----
 
-/// Per-channel scalar math, RHS is the constant `value`.
+/// Per-channel math. The right-hand side is the constant `value`, or, when a second
+/// input is wired, that input's matching channel per pixel (`value` is then ignored,
+/// Blender's Math with both sockets linked).
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Math {
     pub func: MathOp,

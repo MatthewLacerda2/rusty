@@ -4,7 +4,9 @@
 
 use super::*;
 use crate::procgen::recipe::ShapeKind::*;
-use crate::procgen::recipe::{BrickOutput, Gradient, NoiseKind, OpKind, VoronoiOutput, Wave};
+use crate::procgen::recipe::{
+    BrickOutput, Gradient, NoiseKind, OpKind, VoronoiOutput, Wave, WhiteNoise,
+};
 
 /// The sampler [`super::super::eval_node`] paints for the generator `op`.
 fn sampler(op: &OpKind, resolution: u32, seed: u64) -> Sampler {
@@ -17,7 +19,7 @@ fn sampler(op: &OpKind, resolution: u32, seed: u64) -> Sampler {
         OpKind::Brick(p) => brick(p, seed),
         OpKind::Shape(p) => shape(p),
         OpKind::Checker(p) => checker(p),
-        OpKind::WhiteNoise => white_noise(resolution, seed),
+        OpKind::WhiteNoise(_) => white_noise(resolution, seed),
         other => panic!("{other:?} is not a generator"),
     }
 }
@@ -38,7 +40,7 @@ fn close(a: Rgba, b: Rgba) -> bool {
 
 /// Every generator whose pattern is a whole-tile lattice, over fractional params.
 fn lattice_ops() -> Vec<OpKind> {
-    let mut ops = vec![OpKind::WhiteNoise];
+    let mut ops = vec![OpKind::WhiteNoise(WhiteNoise::default())];
     for s in [0.4, 1.0, 2.5, 4.5, 5.5, 7.3] {
         for kind in [
             NoiseKind::Perlin,
@@ -52,6 +54,7 @@ fn lattice_ops() -> Vec<OpKind> {
                 octaves: 3,
                 lacunarity: s,
                 gain: 0.6,
+                seed: 0,
             }));
         }
         for output in [
@@ -64,6 +67,7 @@ fn lattice_ops() -> Vec<OpKind> {
                 scale: s,
                 output,
                 randomness: s / 8.0,
+                seed: 0,
             }));
         }
         ops.push(OpKind::Wave(Wave {
@@ -93,6 +97,7 @@ fn hard_surface_ops(s: f32) -> Vec<OpKind> {
             cols,
             mortar,
             output,
+            seed: 0,
         }));
     }
     for kind in [Circle, Rect, RoundedRect, Line] {
@@ -168,6 +173,7 @@ fn counts_round_to_whole_periods_and_brick_rows_to_even() {
             cols: 2.0,
             mortar: 0.1,
             output: BrickOutput::Mask,
+            seed: 0,
         }),
         64,
         0,
@@ -198,6 +204,7 @@ fn grid_voronoi(output: VoronoiOutput) -> Sampler {
         scale: 4.0,
         output,
         randomness: 0.0,
+        seed: 0,
     });
     sampler(&op, 64, 5)
 }
@@ -230,6 +237,7 @@ fn ridged_and_turbulence_span_the_unit_range() {
             octaves: 4,
             lacunarity: 2.0,
             gain: 0.5,
+            seed: 0,
         });
         let f = sampler(&op, 64, 1);
         let values: Vec<f32> = points().map(|(u, v)| f(u, v)[0]).collect();

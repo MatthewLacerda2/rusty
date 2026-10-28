@@ -65,6 +65,7 @@ fn generators() -> Vec<(String, OpKind)> {
                     octaves: 3,
                     lacunarity: s,
                     gain: 0.5,
+                    seed: 0,
                 }),
             ));
         }
@@ -74,6 +75,7 @@ fn generators() -> Vec<(String, OpKind)> {
                 scale: s,
                 output,
                 randomness,
+                seed: 0,
             });
             ops.push((format!("voronoi {output:?} {s}"), op));
         }
@@ -109,6 +111,7 @@ fn mapping_keeps_a_seamless_input_seamless() {
             octaves: 1,
             lacunarity: 2.0,
             gain: 0.5,
+            seed: 0,
         });
         let map = OpKind::Mapping(Mapping {
             scale,
@@ -128,6 +131,7 @@ fn height_ops_keep_a_seamless_height_seamless() {
         cols: 3.0,
         mortar: 0.08,
         output: rusty::procgen::recipe::BrickOutput::Mask,
+        seed: 0,
     });
     let curvature = OpKind::Curvature(Curvature {
         radius: 0.03,

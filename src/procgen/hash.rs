@@ -20,6 +20,14 @@ fn mix64(mut z: u64) -> u64 {
     z ^ (z >> 31)
 }
 
+/// The seed a node's stochastic op draws from: the recipe seed with the node's own
+/// `seed` param folded in (#1487). `mix64(0) == 0`, so a node seed of 0 returns the
+/// recipe seed untouched and a recipe without node seeds bakes as it always did.
+#[inline]
+pub fn node_seed(recipe: u64, node: u32) -> u64 {
+    recipe ^ mix64(u64::from(node).wrapping_mul(0xd1b5_4a32_d192_ed03))
+}
+
 /// Hash a 2-D integer lattice cell `(x, y)` under `seed` to a `u32`. The two axes
 /// and the seed are folded into one 64-bit word with distinct odd primes so that
 /// `(x, y)` and `(y, x)` (and different seeds) decorrelate.
@@ -68,6 +76,13 @@ mod tests {
         assert_ne!(hash2(3, 7, 42), hash2(7, 3, 42));
         assert_ne!(hash2(3, 7, 42), hash2(3, 7, 43));
         assert_ne!(hash3(3, 7, 0, 42), hash3(3, 7, 1, 42));
+    }
+
+    #[test]
+    fn node_seed_zero_is_the_recipe_seed_and_others_differ() {
+        assert_eq!(node_seed(42, 0), 42);
+        assert_ne!(node_seed(42, 1), 42);
+        assert_ne!(node_seed(42, 1), node_seed(42, 2));
     }
 
     #[test]

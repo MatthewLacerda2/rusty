@@ -61,6 +61,7 @@ fn perlin(scale: f32) -> Node {
             octaves: 1,
             lacunarity: 2.0,
             gain: 0.5,
+            seed: 0,
         }),
         &[],
     )

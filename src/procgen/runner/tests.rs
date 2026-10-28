@@ -1,7 +1,7 @@
 //! Unit tests for the op-runner (`runner/mod.rs`, `runner/plan.rs`).
 
 use super::*;
-use crate::procgen::recipe::{Constant, Mix, Node, OpKind};
+use crate::procgen::recipe::{Constant, Mix, Node, OpKind, WhiteNoise};
 
 pub(super) fn node(id: &str, op: OpKind, inputs: &[&str]) -> Node {
     Node {
@@ -78,7 +78,10 @@ fn cycle_is_detected() {
 fn empty_and_bad_resolution_error() {
     let empty = TextureRecipe::new(8, vec![]);
     assert_eq!(evaluate(&empty), Err(RunError::Empty));
-    let bad = TextureRecipe::new(0, vec![node("c", OpKind::WhiteNoise, &[])]);
+    let bad = TextureRecipe::new(
+        0,
+        vec![node("c", OpKind::WhiteNoise(WhiteNoise::default()), &[])],
+    );
     assert_eq!(evaluate(&bad), Err(RunError::BadResolution));
 }
 

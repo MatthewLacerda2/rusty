@@ -5,14 +5,14 @@
 use std::panic::{catch_unwind, AssertUnwindSafe};
 
 use super::*;
-use crate::procgen::recipe::{sample_op, OPS};
+use crate::procgen::recipe::{sample_op, WhiteNoise, OPS};
 
 const RES: u32 = 8;
 
 /// `n` distinct white-noise images.
 fn images(n: usize) -> Vec<Image> {
     (0..n as u64)
-        .map(|seed| eval_node(&OpKind::WhiteNoise, &[], RES, seed))
+        .map(|seed| eval_node(&OpKind::WhiteNoise(WhiteNoise::default()), &[], RES, seed))
         .collect()
 }
 
@@ -44,7 +44,7 @@ fn every_optional_input_is_read() {
         let mut inputs = images(usize::from(info.inputs.max));
         let before = eval(&op, &inputs);
         let last = inputs.len() - 1;
-        inputs[last] = eval_node(&OpKind::WhiteNoise, &[], RES, 99);
+        inputs[last] = eval_node(&OpKind::WhiteNoise(WhiteNoise::default()), &[], RES, 99);
         assert_ne!(
             before,
             eval(&op, &inputs),

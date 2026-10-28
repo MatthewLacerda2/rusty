@@ -16,6 +16,12 @@ pub enum BlendMode {
     Overlay,
     Subtract,
     Difference,
+    /// Per-channel max of a and b.
+    Lighten,
+    /// Per-channel min of a and b.
+    Darken,
+    /// a / b; a channel of b at 0 leaves a.
+    Divide,
 }
 
 /// A scalar math operation for [`super::OpKind::Math`].

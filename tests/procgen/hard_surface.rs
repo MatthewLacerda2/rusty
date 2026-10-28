@@ -25,6 +25,7 @@ fn rivets(jitter: f32, rotation_jitter: f32, scale_jitter: f32) -> Vec<Node> {
         jitter,
         rotation_jitter,
         scale_jitter,
+        seed: 0,
     });
     vec![shape(ShapeKind::Circle, 0.1), node("t", tile, &["s"])]
 }
@@ -35,6 +36,7 @@ fn brick(output: BrickOutput) -> Vec<Node> {
         cols: 3.0,
         mortar: 0.08,
         output,
+        seed: 0,
     });
     vec![node("b", op, &[])]
 }
@@ -48,6 +50,7 @@ fn hard_surface() -> Vec<(String, OpKind)> {
             cols: 2.6,
             mortar: 0.1,
             output,
+            seed: 0,
         });
         ops.push((format!("brick {output:?}"), op));
     }
@@ -96,6 +99,7 @@ fn tile_of_a_rect_panel_has_no_gaps_at_the_cell_borders() {
         jitter: 0.0,
         rotation_jitter: 0.0,
         scale_jitter: 0.0,
+        seed: 0,
     });
     let img = bake(vec![node("s", op, &[]), node("t", tile, &["s"])]);
     assert!(img.pixels().iter().all(|p| p[0] == 1.0));

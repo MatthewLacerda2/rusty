@@ -180,11 +180,25 @@ list below is a summary of it. Each entry has the `op` tag, its `category`
 (`generator` | `color` | `vector` | `math` | `filter`), how many inputs it accepts
 (`min_inputs` to `max_inputs`; a node outside that range is an error), and its
 `params`. Each param has a
-`name`, a `type` (`number` | `integer` | `bool` | `color` (RGBA array) | `vec2` |
+`name`, a `type` (`number` | `integer` | `bool` | `color` | `vec2` |
 `enum` | `stops`), `required`, a `default` when it has one (absent when required),
 and for an `enum` the accepted `values`. Units and rounding are the ones *Tiling*
 and *Units* below describe. A unit test holds the catalog to the recipe parser, so
 it can't name an op or param the parser doesn't take, or a default it doesn't apply.
+
+**Colours.** A `color` param (and a ramp stop's `color`) takes either a **linear**
+RGBA array, `{0.5, 0.5, 0.5, 1}`, or an **sRGB** hex string, `"#808080"` /
+`"#808080ff"`, decoded to linear when the recipe is parsed (alpha stays linear), like
+Blender's hex field. They are not the same colour: the array `{0.5, 0.5, 0.5, 1}` bakes
+to 188/255, a light grey, while `"#808080"` is linear ≈ 0.216 and bakes back to 128 —
+so a colour picked from a reference goes in as hex. `Texture.ToJson` writes every colour
+as its linear array. A malformed hex is an error naming the param.
+
+**Seeds.** Every stochastic op (`noise`, `voronoi`, `brick`, `white_noise`, `tile`)
+takes an optional integer `seed` (default 0), folded into the recipe `seed`. Two nodes
+that differ only in `seed` give independent patterns — the warp's X and Y noises, dirt
+and chips at the same scale — and 0 keeps the recipe seed, so a recipe without node
+seeds bakes as it always did.
 
 ```lua
 for _, o in ipairs(Texture.Ops()) do
@@ -195,15 +209,16 @@ end  -- rows number nil / cols number nil / mortar number 0.05
 ```
 
 - **Generators** (no inputs): `constant {color}`; `noise
-  {kind="perlin"|"fbm"|"ridged"|"turbulence", scale, octaves=1, lacunarity=2, gain=0.5}`
+  {kind="perlin"|"fbm"|"ridged"|"turbulence", scale, octaves=1, lacunarity=2, gain=0.5,
+  seed=0}`
   (`ridged` is `1 − |n|` squared — rock veins, scratches; `turbulence` is `|n|` —
   smoke, grime; the fBM family stacks `octaves`, each `lacunarity`× the frequency and
   `gain`× the amplitude of the last; `perlin` is one octave); `voronoi {scale,
-  output="distance"|"cells"|"f2"|"edges", randomness=1}` (`f2` is the distance to the
+  output="distance"|"cells"|"f2"|"edges", randomness=1, seed=0}` (`f2` is the distance to the
   second-nearest point, `edges` is F2 − F1 — ~0 on cell borders: cracks, dried mud,
   cobble outlines; `randomness` 0 is a regular grid, 1 full jitter); `gradient
   {kind="linear"|"linear_tiling"|"radial"}`; `wave {kind="bands"|"rings", frequency}`;
-  `brick {rows, cols, mortar=0.05, output="mask"|"random"|"bevel"}` (`mortar` is the
+  `brick {rows, cols, mortar=0.05, output="mask"|"random"|"bevel", seed=0}` (`mortar` is the
   gap as a fraction of one brick, reading 0 in every output; `mask` is 1 on brick
   faces, `random` a seeded value per brick — feed a `color_ramp` for per-brick colour
   or roughness variation — and `bevel` a ramp from 0 at the mortar to 1 on the brick's
@@ -214,14 +229,24 @@ end  -- rows number nil / cols number nil / mortar number 0.05
   caps — turn it with `mapping {rotation = 0.25}`; `roundness` 0–1 rounds a
   `rounded_rect`'s corners; `softness > 0` ramps the edge from 0 to 1 that far inside,
   a bevel profile for `bump_to_normal`); `checker {tiles, color_a, color_b}`;
-  `white_noise`.
+  `white_noise {seed=0}`.
 - **Color** (1 input; `mix` takes 2 or 3): `color_ramp {stops}`; `mix {mode,
-  factor=1}` with `mode` ∈ `mix/add/multiply/screen/overlay/subtract/difference` —
+  factor=1}` with `mode` ∈
+  `mix/add/multiply/screen/overlay/subtract/difference/lighten/darken/divide` —
   inputs `{a, b, mask}`: the result is `a` blended toward `mode(a, b)` by `factor`,
   and an optional third input `mask` makes that per pixel (`factor × mask.red`; black
-  keeps `a`, white takes the full blend); `invert`;
-  `bright_contrast {bright, contrast}`; `hue_sat_value {hue, sat, value}`; `gamma
-  {gamma}`.
+  keeps `a`, white takes the full blend). `lighten` is the per-channel max and `darken`
+  the min — the way to combine height fields (rivets over a panel, stones over mortar),
+  where `add` overshoots; `divide` is `a / b`, and a channel of `b` at 0 leaves `a`;
+  `invert`; `bright_contrast {bright, contrast}` (contrast pivots at linear 0.5, like
+  Blender's node: right for data maps, but that is a light grey on screen, so for a
+  colour map use hex ramp stops or `auto_levels` → `color_ramp`); `hue_sat_value {hue,
+  sat, value}`; `gamma {gamma}`; `auto_levels` (stretches RGB so the input's minimum
+  maps to 0 and its maximum to 1 — one range across R, G and B, so a colour keeps its
+  hue, like Substance's Auto Levels; alpha untouched, a flat input unchanged). Noise
+  uses only part of the range (a 4-octave fBM spans about 0.35–0.64), so a ramp fed
+  straight from it shows only its middle; `auto_levels` before the `color_ramp` uses
+  the whole ramp, whatever the input's spread.
 - **Vector / normal**: `mapping {scale=[x,y], rotation, translation=[x,y],
   tiling=true}` (bilinear, wrapped resample; `rotation` in turns); `bump_to_normal
   {strength}` (height → tangent-space normal); `combine_rgb` (1 to 3 grayscale
@@ -230,14 +255,16 @@ end  -- rows number nil / cols number nil / mortar number 0.05
   tile units; feed input 2 a `combine_rgb` of two different noises — a grayscale one has
   R = G and only pushes along the diagonal); `tile {count, jitter=0, rotation_jitter=0,
   scale_jitter=0}` (1 input: stamps the input once per cell of a `count`×`count` grid;
-  each cell is seeded from the recipe `seed` with an offset of up to ±`jitter`/2 cells,
+  each cell is seeded from the recipe and node `seed` with an offset of up to ±`jitter`/2 cells,
   a turn of up to ±`rotation_jitter`/2 turns and a scale in `1 ± scale_jitter/2`, each
   jitter clamped to 0–1. The input is read as **one stamp** — the unit square, nothing
   outside it — so give it empty margins (a `shape` smaller than the tile); a stamp
   pushed over its cell's border is drawn into the neighbour cell, and overlapping
   stamps keep the brighter value per channel. Rivets are `shape circle` → `tile`).
-- **Converter / math**: `math {func, value}` with `func` ∈
-  `add/subtract/multiply/divide/power/min/max/abs/fract/sqrt`; `map_range {from_min,
+- **Converter / math**: `math {func, value}` (1 or 2 inputs) with `func` ∈
+  `add/subtract/multiply/divide/power/min/max/abs/fract/sqrt` — the right-hand side
+  is `value`, or with a second input wired, that input's matching channel per pixel
+  (`value` is then ignored, Blender's Math with both sockets linked); `map_range {from_min,
   from_max, to_min, to_max}`; `clamp {min, max}`; `rgb_to_bw`.
 - **Filter**: `blur {radius}` (separable box blur; wraps, so it stays tiling);
   `cavity {radius}` (height → `1 − max(blur(h) − h, 0)`: white on flat and raised

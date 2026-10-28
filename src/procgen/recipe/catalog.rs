@@ -25,7 +25,8 @@ pub enum Lit {
 #[derive(Clone, Copy, Debug)]
 pub struct OpParam {
     pub name: &'static str,
-    /// `number` | `integer` | `bool` | `color` (RGBA array) | `vec2` | `enum` | `stops`.
+    /// `number` | `integer` | `bool` | `color` (a linear RGBA array, or an sRGB
+    /// `"#rrggbb"` / `"#rrggbbaa"` string) | `vec2` | `enum` | `stops`.
     pub ty: &'static str,
     /// The accepted tags for an `enum` param; empty otherwise.
     pub values: &'static [&'static str],
@@ -91,10 +92,16 @@ const BLEND: &[&str] = &[
     "overlay",
     "subtract",
     "difference",
+    "lighten",
+    "darken",
+    "divide",
 ];
 const MATH: &[&str] = &[
     "add", "subtract", "multiply", "divide", "power", "min", "max", "abs", "fract", "sqrt",
 ];
+
+/// A stochastic op's own seed, folded into the recipe seed (#1487).
+const SEED: OpParam = opt("seed", "integer", Lit::Integer(0));
 
 /// Every op, in the order `docs/api/Texture.md` lists them.
 pub const OPS: &[OpInfo] = &[
@@ -109,6 +116,7 @@ pub const OPS: &[OpInfo] = &[
             opt("octaves", "integer", Lit::Integer(1)),
             opt("lacunarity", "number", Lit::Number(2.0)),
             opt("gain", "number", Lit::Number(0.5)),
+            SEED,
         ],
     ),
     op(
@@ -122,6 +130,7 @@ pub const OPS: &[OpInfo] = &[
                 ..choice("output", &["distance", "cells", "f2", "edges"])
             },
             opt("randomness", "number", Lit::Number(1.0)),
+            SEED,
         ],
     ),
     op(
@@ -151,6 +160,7 @@ pub const OPS: &[OpInfo] = &[
                 default: Some(Lit::Text("mask")),
                 ..choice("output", &["mask", "random", "bevel"])
             },
+            SEED,
         ],
     ),
     op(
@@ -174,7 +184,7 @@ pub const OPS: &[OpInfo] = &[
             req("color_b", "color"),
         ],
     ),
-    op("white_noise", "generator", SOURCE, &[]),
+    op("white_noise", "generator", SOURCE, &[SEED]),
     op("color_ramp", "color", ONE, &[req("stops", "stops")]),
     op(
         "mix",
@@ -203,6 +213,7 @@ pub const OPS: &[OpInfo] = &[
         ],
     ),
     op("gamma", "color", ONE, &[req("gamma", "number")]),
+    op("auto_levels", "color", ONE, &[]),
     op(
         "mapping",
         "vector",
@@ -231,13 +242,14 @@ pub const OPS: &[OpInfo] = &[
             opt("jitter", "number", Lit::Number(0.0)),
             opt("rotation_jitter", "number", Lit::Number(0.0)),
             opt("scale_jitter", "number", Lit::Number(0.0)),
+            SEED,
         ],
     ),
     op("warp", "vector", arity(2, 2), &[req("strength", "number")]),
     op(
         "math",
         "math",
-        ONE,
+        arity(1, 2),
         &[choice("func", MATH), req("value", "number")],
     ),
     op(
