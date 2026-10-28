@@ -22,7 +22,7 @@ if hit then Decals.Spawn(px, py, pz, nx, ny, nz, { owner = id }) end
 | `Decals.Spawn` | `(x,y,z, nx,ny,nz, [size], [texture], [rotation_deg], [r,g,b,a])` or `(x,y,z, nx,ny,nz, opts)` | the decal's id |
 | `Decals.Remove` | `(id, [fade])` | `true` if a live decal had that id |
 | `Decals.Count` | `()` | live decal count, including any still fading out |
-| `Decals.Clear` | `()` | — (drops every live decal) |
+| `Decals.Clear` | `([{ persistent = false }])` | — (drops every live decal; with `persistent = false`, all but the persistent ones) |
 | `Decals.SetLimits` | `({ per_owner =, world =, total = })`, any subset | — (lowering one fades the oldest excess) |
 | `Decals.GetLimits` | `()` | `{ per_owner, world, total }`, the budgets in force (`project.rusty` spells them `max_per_owner`, `max_world`, `max_total`) |
 
@@ -37,7 +37,7 @@ only**.
 `size`, `depth` (how far the box reaches, centred on the hit), `rotation`
 (degrees), `color` (`{r, g, b, a}`), `texture`, and **`material`** — the name of a
 library material (`Material.DefineAsset`) the decal stamps — plus the lifecycle
-keys `owner`, `lifetime` and `fade` (below). An unknown key, a material that does
+keys `owner`, `lifetime`, `fade` and `persist` (below). An unknown key, a material that does
 not exist, or an `owner` entity that does not exist is an error and stamps nothing.
 
 ```lua no-run
@@ -63,6 +63,26 @@ Decals.Spawn(px, py, pz, nx, ny, nz, { material = "blood", size = 1.2, rotation 
   lifetime, so blood dries away and scorch cools instead of popping. Age is game
   time on the fixed tick: it slows with `Time.SetTimeScale` and stops at scale `0`, and a replay ages
   every decal identically. Decals age only in Play.
+- **`persist = true`** keeps the decal across `Scene.Load` (#1518), for a trail of
+  destruction that outlives a level reset (`Scene.Load(Scene.GetActivePath())`).
+  Without it a decal goes away with its scene. A persistent decal keeps its id,
+  its age and what is left of its `lifetime` and `fade`, and its place in the blend
+  order: everything spawned after the load lands over it. Where it lands:
+  - **an owner that survives** (`Scene.DontDestroyOnLoad`): it stays on it;
+  - **an owner that does not**: it is re-attached, in the same place on the owner,
+    to the incoming entity at the owner's **hierarchy path** (`"Arena/Crate_1"`,
+    root first, as `Scene.FindChild` spells paths below an entity, the first child
+    of each name), so a mark on a crate comes back on the crate at the crate's
+    reset position. A bone owner works the same way, by the path to its bone. When
+    no entity has that path in the new scene (another level, a spawned enemy, or a
+    name with a `/` in it) the decal is dropped;
+  - **no owner**: it stays where it is in world space.
+
+  Carried decals count against their budgets again, oldest first, a re-attached one
+  against its new owner's. Persistence is for `Scene.Load` within a run only: it is
+  not saved to disk, and Stop drops every decal (the edit scene is restored).
+  `Decals.Clear()` drops the persistent ones too (game over, back to the menu);
+  `Decals.Clear({ persistent = false })` drops only the rest.
 - **`Decals.Remove(id, [fade])`** removes one decal now, or fades it out over
   `fade` seconds. Ids are never reused, so a stale id simply returns `false`.
 - **The budgets.** Every decal counts against one bucket: its **owner** (each
@@ -90,7 +110,8 @@ Decals.Spawn(px, py, pz, nx, ny, nz, { material = "blood", size = 1.2, rotation 
   key left out keeps its default). Edit mode runs on them, entering Play applies
   them, and an edit to the file is picked up by the next Play. An unknown key or a
   value that is not a whole number is skipped with a console warning, and so is a
-  file that can't be read, which keeps the budgets last read.
+  file that can't be read or parsed, which keeps the budgets of the last good read.
+  A warning is given once per edit of the file, not again on every Play and Stop.
   `Decals.SetLimits{ world = 512 }` changes them until Stop, which puts the
   project's back, as Unity reverts play-mode changes (a key left out keeps its
   value, an unknown key is an error), and lowering one fades the oldest excess out

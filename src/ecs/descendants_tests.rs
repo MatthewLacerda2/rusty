@@ -46,3 +46,26 @@ fn dead_ids_are_skipped() {
     assert_eq!(walk(&w, a), vec![a]);
     assert!(walk(&w, gone).is_empty());
 }
+
+#[test]
+fn a_hierarchy_path_reads_back_to_its_entity() {
+    let mut w = World::new();
+    let [arena, a, b, dup] = ["Arena", "Crate", "Crate", "Arena"].map(|n| w.spawn(n.into()));
+    for (child, parent) in [(a, arena), (b, arena)] {
+        w.set_parent_id(child, Some(parent));
+        w.add_child(parent, child);
+    }
+    assert_eq!(w.path_of(b).as_deref(), Some("Arena/Crate"));
+    assert_eq!(
+        w.find_path("Arena/Crate"),
+        Some(a),
+        "first of duplicate names"
+    );
+    assert_eq!(
+        w.find_path("Arena"),
+        Some(arena),
+        "the first root, not {dup}"
+    );
+    assert_eq!(w.find_child(arena, "Crate"), Some(a));
+    assert_eq!((w.find_path("Arena/Barrel"), w.path_of(99)), (None, None));
+}

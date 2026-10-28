@@ -85,13 +85,24 @@ impl DecalSet {
         }
     }
 
-    /// Add `decal` under a fresh id, making room per the budgets: only its bucket
-    /// and the total can be over. Returns its id.
+    /// Add `decal` under a fresh id, making room per the budgets. Returns its id.
     fn push(&mut self, mut decal: Decal) -> u32 {
         self.next_id += 1;
         decal.id = self.next_id;
+        self.insert(decal);
+        self.next_id
+    }
+
+    /// Append `decal` as it stands (id, age, fade), newest in the blend order, making
+    /// room per the budgets: only its bucket and the total can be over. A spawn and
+    /// a load's carried decals (#1518) both come in here.
+    pub(super) fn insert(&mut self, decal: Decal) {
         let bucket = decal.bucket();
-        self.counts.add(bucket);
+        if decal.retiring {
+            self.counts.evicting += usize::from(decal.evicted);
+        } else {
+            self.counts.add(bucket);
+        }
         self.ring.push_back(decal);
         while self.counts.whole(bucket) > self.budget(bucket)
             && self.evict_oldest(|d| d.bucket() == bucket)
@@ -102,7 +113,6 @@ impl DecalSet {
             let gone = self.ring.remove(at.expect("counted")).expect("in range");
             self.counts.forget(&gone);
         }
-        self.next_id
     }
 
     /// Start the oldest whole decal `pick` accepts on the [`EVICTION_FADE`], as a
@@ -142,8 +152,13 @@ impl DecalSet {
     /// Drop every decal (a level reset, a scene load). Ids keep counting, and the
     /// budgets stay.
     pub fn clear(&mut self) {
-        self.ring.clear();
+        self.drain();
+    }
+
+    /// Take every decal out, oldest first, as [`DecalSet::clear`] leaves the set.
+    pub(super) fn drain(&mut self) -> VecDeque<Decal> {
         self.counts = Counts::default();
+        std::mem::take(&mut self.ring)
     }
 
     /// Age every decal by `dt` sim seconds, then drop the ones whose lifetime ran
@@ -187,9 +202,13 @@ impl Scene {
         Some(self.decals.push(decal))
     }
 
-    /// Drop every live decal (e.g. on level reset).
-    pub fn clear_decals(&mut self) {
-        self.decals.clear();
+    /// Drop every live decal (e.g. on level reset), or with `keep_persistent` every
+    /// one but the [`Decal::persist`] ones.
+    pub fn clear_decals(&mut self, keep_persistent: bool) {
+        let gone = self.decals.drain();
+        for decal in gone.into_iter().filter(|d| keep_persistent && d.persist) {
+            self.decals.insert(decal);
+        }
     }
 }
 

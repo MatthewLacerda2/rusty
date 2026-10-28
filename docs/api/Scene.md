@@ -182,6 +182,10 @@ scene — additive loading is not supported.
   new scene defines one of the same name. Physics state (velocities) restarts
   from the survivor's transform, since the physics world is rebuilt. The mark
   lasts until the entity is destroyed or play stops; it is an error in edit mode.
+- **Decals** go away with the scene, except those spawned with `persist = true`
+  (`Decals.md`, #1518): those stay on a surviving owner, are re-attached by
+  hierarchy path to the incoming entity where their owner was left behind, or
+  stay put in world space, keeping their id and age.
 - **Edit mode:** `Scene.Load` is the API face of the editor's File ▸ Open — the
   scene loads immediately (no callbacks: no scripts run in edit mode) and becomes
   the current scene file that `Scene.Save()` writes back to. If the scene document

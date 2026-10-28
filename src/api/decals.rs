@@ -5,7 +5,8 @@
 //! normal — exactly the pair `Physics.Raycast` already hands a
 //! script — so decals stay decoupled from gameplay: the engine never decides
 //! *when* to mark a surface, the script does. `Spawn` returns the decal's id, which
-//! `Remove` takes (#639); `Clear` wipes them all (level reset). `SetLimits` /
+//! `Remove` takes (#639); `Clear` wipes them all (game over), or all but the
+//! persistent ones (#1518). `SetLimits` /
 //! `GetLimits` change and read the budgets (#1517) until Stop, which puts the
 //! project's back.
 //!
@@ -45,7 +46,8 @@ pub fn register<'scope>(
     // The box depth tracks `size` so the projector reaches through typical geometry.
     // The `opts` table form takes the same values by name plus `depth`, the decal
     // `material` (#638), and its lifecycle (#639): the `owner` entity it sticks to,
-    // its `lifetime` and its `fade`. Either form returns the decal's id.
+    // its `lifetime`, its `fade`, and `persist` to keep it across `Scene.Load`
+    // (#1518). Either form returns the decal's id.
     put(
         &table,
         "Spawn",
@@ -104,12 +106,14 @@ fn register_registry<'scope>(
         scope.create_function(|_, ()| Ok(scene.borrow().decals.len() as u32)),
     )?;
 
-    // Decals.Clear() — drop every live decal (e.g. on level reset).
+    // Decals.Clear([{ persistent = false }]) — drop every live decal (game over),
+    // or with `persistent = false` only the ones not kept across `Scene.Load`.
     put(
         table,
         "Clear",
-        scope.create_function(|_, ()| {
-            scene.borrow_mut().clear_decals();
+        scope.create_function(|_, opts: Option<mlua::Table>| {
+            let keep = clear_keeps_persistent(opts.as_ref())?;
+            scene.borrow_mut().clear_decals(keep);
             Ok(())
         }),
     )?;
@@ -141,6 +145,23 @@ fn register_registry<'scope>(
             Ok(out)
         }),
     )
+}
+
+/// Whether `Decals.Clear(opts)` keeps the persistent decals: only when `opts` says
+/// `persistent = false`. An unknown key is an error.
+fn clear_keeps_persistent(opts: Option<&mlua::Table>) -> mlua::Result<bool> {
+    let Some(opts) = opts else {
+        return Ok(false);
+    };
+    for pair in opts.pairs::<String, mlua::Value>() {
+        let (key, _) = pair?;
+        if key != "persistent" {
+            return Err(mlua::Error::RuntimeError(format!(
+                "Decals.Clear: unknown option {key:?}; expected persistent"
+            )));
+        }
+    }
+    Ok(opts.get::<Option<bool>>("persistent")? == Some(false))
 }
 
 /// The keys `Decals.SetLimits` takes.
@@ -199,12 +220,13 @@ fn spec_from_positional(args: &[mlua::Value]) -> DecalSpec {
 }
 
 /// The keys an `opts` table may hold.
-const OPTS: [&str; 9] = [
+const OPTS: [&str; 10] = [
     "size", "depth", "rotation", "color", "texture", "material", "owner", "lifetime", "fade",
+    "persist",
 ];
 
 /// The `opts` table form: the positional values by name, plus `depth`, the decal
-/// `material` and the lifecycle (`owner`, `lifetime`, `fade`). An unknown key is an
+/// `material` and the lifecycle (`owner`, `lifetime`, `fade`, `persist`). An unknown key is an
 /// error naming the valid ones.
 fn spec_from_opts(opts: &mlua::Table) -> mlua::Result<DecalSpec> {
     for pair in opts.pairs::<String, mlua::Value>() {
@@ -233,6 +255,7 @@ fn spec_from_opts(opts: &mlua::Table) -> mlua::Result<DecalSpec> {
         owner: opts.get("owner")?,
         lifetime: opts.get("lifetime")?,
         fade: opts.get::<Option<f32>>("fade")?.unwrap_or(0.0),
+        persist: opts.get::<Option<bool>>("persist")?.unwrap_or(false),
     })
 }
 

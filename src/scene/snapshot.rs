@@ -32,10 +32,12 @@ impl SceneSnapshot {
         }
     }
 
-    /// Restore the snapshot into `scene`, discarding any play-mode mutations.
+    /// Restore the snapshot into `scene`, discarding any play-mode mutations, the
+    /// decals Play stamped among them, persistent ones too (#1518).
     /// Consumes the snapshot since a snapshot is single-use per Play session.
     pub fn restore(self, scene: &mut Scene) {
         apply_world_data(scene, self.data);
+        scene.clear_decals(false);
         // Re-apply the baked SH the document-level apply dropped (it only carries
         // probe positions). Positions are identical, so this overwrites cleanly.
         scene.probes = self.probes;

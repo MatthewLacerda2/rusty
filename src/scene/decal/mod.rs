@@ -16,12 +16,17 @@
 //! the owner's space and follows it), may have a lifetime with a fade-out, and has
 //! an id a script can remove it by. Ageing runs on the fixed sim tick
 //! ([`DecalSet::tick`]), never the wall clock; the registry is [`DecalSet`].
+//!
+//! **Persistence (#1518).** A load drops every decal but the [`Decal::persist`]
+//! ones, which `Scene::swap_in` carries across (`persist.rs`). Nothing is saved to
+//! disk, and Stop's snapshot restore drops them all.
 
 use crate::asset::MapRef;
 use glam::camera::rh::view::look_to_mat4;
 use glam::{Mat4, Quat, Vec3};
 
 mod counts;
+mod persist;
 mod pose;
 mod registry;
 
@@ -52,6 +57,8 @@ pub struct DecalSpec {
     pub lifetime: Option<f32>,
     /// Seconds over which it fades out at the end of its `lifetime`.
     pub fade: f32,
+    /// Kept across `Scene.Load` (#1518): see [`Decal::persist`].
+    pub persist: bool,
 }
 
 impl Default for DecalSpec {
@@ -66,6 +73,7 @@ impl Default for DecalSpec {
             owner: None,
             lifetime: None,
             fade: 0.0,
+            persist: false,
         }
     }
 }
@@ -106,6 +114,10 @@ pub struct Decal {
     /// fades [`EVICTION_HEADROOM`] bounds. A fade a script asked for, or one a
     /// lowered limit started, is not.
     pub evicted: bool,
+    /// Survives `Scene.Load` (#1518) with its id, age and place in the blend order:
+    /// on its owner if that survives, else re-attached to the incoming entity at
+    /// the owner's hierarchy path (dropped when there is none), or in world space.
+    pub persist: bool,
 }
 
 /// What an owned decal sticks to: the entity, and the box (the unit cube's
@@ -158,6 +170,7 @@ impl Decal {
             fade: spec.fade.max(0.0),
             retiring: false,
             evicted: false,
+            persist: spec.persist,
         }
     }
 

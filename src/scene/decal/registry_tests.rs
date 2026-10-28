@@ -17,7 +17,7 @@ fn spawn_at(scene: &mut Scene, x: f32) -> u32 {
 fn ids_are_unique_and_survive_a_clear() {
     let mut s = Scene::new();
     let a = spawn_at(&mut s, 0.0);
-    s.clear_decals();
+    s.clear_decals(false);
     let b = spawn_at(&mut s, 0.0);
     assert!(a != 0 && b != a, "{a} {b}");
     assert!(!s.decals.remove(a, 0.0), "a cleared id names nothing");
@@ -90,4 +90,16 @@ fn the_same_spawns_and_steps_give_the_same_decals() {
         s.decals.clone()
     };
     assert_eq!(run(), run());
+}
+
+#[test]
+fn a_new_scene_keeps_the_decal_budgets() {
+    let mut s = Scene::new();
+    let limits = DecalLimits {
+        max_world: 3,
+        ..DecalLimits::default()
+    };
+    s.decals.set_limits(limits);
+    s.clear(); // File > New Scene
+    assert_eq!(s.decals.limits(), limits, "the project's, not the engine's");
 }

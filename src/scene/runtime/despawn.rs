@@ -37,12 +37,14 @@ impl Scene {
         self.playing = playing;
     }
 
-    /// Replace this scene with an empty one in place, keeping its play state
-    /// (File ▸ New, Reset Scene): the scene is new, the session is not.
+    /// Replace this scene with an empty one in place, keeping its play state and
+    /// its decal budgets (File ▸ New, Reset Scene): the scene is new, the session
+    /// (and the project's budgets it applied) is not.
     pub fn clear(&mut self) {
-        let playing = self.playing;
+        let (playing, limits) = (self.playing, self.decals.limits());
         *self = Scene::new();
         self.playing = playing;
+        self.decals.set_limits(limits);
     }
 
     /// Remove entity `id` and everything under it ([`Scene::destroy_set`]), as

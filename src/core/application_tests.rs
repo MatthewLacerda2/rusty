@@ -114,3 +114,25 @@ fn the_heading_falls_back_to_the_host_request() {
     app.request_play(false);
     assert!(!app.play_heading(), "a script's request wins until taken");
 }
+
+#[test]
+fn a_broken_project_file_keeps_the_last_good_decal_budgets() {
+    let path = temp_path("decals");
+    let budgets = |world: u32| format!("{{ \"decals\": {{ \"max_world\": {world} }} }}");
+    std::fs::write(&path, budgets(5)).unwrap();
+    let mut app = Application::new();
+    app.open(&path).unwrap();
+    std::fs::write(&path, budgets(9)).unwrap();
+    assert_eq!(
+        app.decal_limits().max_world,
+        9,
+        "an edit reaches the next Play"
+    );
+    std::fs::write(&path, "{ not json").unwrap();
+    assert_eq!(
+        app.decal_limits().max_world,
+        9,
+        "the last good read, not the open's"
+    );
+    let _ = std::fs::remove_file(&path);
+}
