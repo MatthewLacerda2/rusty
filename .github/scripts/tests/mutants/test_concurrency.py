@@ -2,8 +2,9 @@
 """A mutation run is one per branch and dies with its pull request (#1530).
 
 `mutants-on-request.yml` groups its runs by ref and cancels the older one;
-`mutants-cancel.yml` joins that same group when a pull request closes, which is
-the only thing that stops a run on a merged branch. The two group strings live
+`mutants-cancel.yml` joins that same group when a pull request closes unmerged,
+which is the only thing that stops a run on an abandoned branch. A merged
+branch's run is never cancelled: its report is what the orchestrator triages. The two group strings live
 in two files, so these tests hold them equal, and keep both apart from the
 gating workflows' groups so neither can ever cancel a `ci` or `lint` run.
 """
@@ -57,6 +58,13 @@ class Concurrency(unittest.TestCase):
         self.assertEqual(re.findall(r"^  (\w+):", on, re.M), ["pull_request"])
         self.assertIn("types: [closed]", on)
         self.assertIn("\npermissions: {}\n", text)
+
+    def test_only_an_unmerged_close_cancels(self):
+        # A skipped job never joins its concurrency group, so the `if:` is the
+        # whole guard that keeps a merge from cancelling the report.
+        text = (WORKFLOWS / "mutants-cancel.yml").read_text()
+        job = text[text.index("\n  cancel:\n"):text.index("\n    concurrency:") + 1]
+        self.assertIn("\n    if: github.event.pull_request.merged == false\n", job)
 
     def test_no_gating_group_can_be_reached(self):
         # The gating groups start with the workflow's name (`ci-`, `lint-`).
