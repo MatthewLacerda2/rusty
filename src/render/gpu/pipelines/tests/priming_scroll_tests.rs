@@ -91,6 +91,8 @@ fn scene(s: &Scroll) -> Scene {
     let mut vc = default_post_processing();
     vc.ssao.active = true;
     scene.world.set_post_processing(volume, Some(vc));
+    let lens = crate::components::CameraComponent::default();
+    scene.world.set_camera(volume, Some(lens));
     scene
 }
 
