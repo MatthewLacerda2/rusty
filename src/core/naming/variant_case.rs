@@ -2,7 +2,8 @@
 //!
 //! Every hand-written name setter (`Light.SetType`, `Graphics.SetTonemap`, …) reads
 //! its name in any case; a recipe or a UI look reaches its enums through serde
-//! instead, whose derive matches a variant name exactly. [`decode`] closes the gap
+//! instead, whose derive matches a variant name exactly (a `named_enum!` writes its
+//! own serde, which already reads any case, #1478). [`decode`] closes the gap
 //! for every type at once, without touching any of them — zimmer's patch and song
 //! enums included, which rusty cannot annotate:
 //!

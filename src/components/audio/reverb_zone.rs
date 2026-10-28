@@ -54,7 +54,7 @@ impl ReverbParams {
 crate::core::named_enum! {
     /// A named starting point for a zone's params (Unity's `AudioReverbPreset`, cut
     /// down to the rooms a shooter needs).
-    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
     pub enum ReverbPreset {
         /// Dry: a zone that cancels the reverb around it.
         Off = "Off",

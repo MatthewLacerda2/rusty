@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 crate::core::named_enum! {
     /// How a rigid body's contacts are resolved each tick (Unity:
     /// `Rigidbody.collisionDetectionMode`, reduced to the two modes a game needs).
-    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
     pub enum CollisionDetection {
         /// Overlap is tested at the tick's poses; a fast dynamic body is still swept
         /// against *static* geometry (rapier does that for every fast body). Cheap;

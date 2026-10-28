@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 crate::core::named_enum! {
     /// Where the composite's pre-grade exposure comes from. Declared in the order the
     /// editor lists them (the default first); the names are Unity HDRP's.
-    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
     pub enum ExposureMode {
         /// The volume's `fixed_ev`, as authored.
         #[default]

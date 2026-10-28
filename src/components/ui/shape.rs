@@ -28,7 +28,7 @@ use super::shader::UiShader;
 
 crate::core::named_enum! {
     /// The primitive a Shape draws. See the module docs.
-    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
     pub enum ShapeKind {
         /// The rect, corners rounded or chamfered by `radius`.
         #[default]
@@ -44,7 +44,7 @@ crate::core::named_enum! {
 
 crate::core::named_enum! {
     /// What a `Rect`'s per-corner `radius` does to its corners.
-    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
     pub enum ShapeCorner {
         /// Quarter-circle corners of `radius`.
         #[default]

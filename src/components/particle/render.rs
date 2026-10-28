@@ -11,7 +11,7 @@ use super::runtime::Particle;
 
 crate::core::named_enum! {
     /// The shape each particle is drawn as.
-    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
     pub enum ParticleRenderMode {
         /// A quad that always faces the camera (smoke, fire, muzzle flash).
         #[default]

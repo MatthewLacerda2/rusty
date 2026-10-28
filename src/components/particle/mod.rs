@@ -50,7 +50,7 @@ pub enum EmitMode {
 
 crate::core::named_enum! {
     /// GPU blend used when drawing the sprites.
-    #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
     pub enum ParticleBlend {
         /// Standard src-alpha blending (smoke).
         Alpha = "Alpha",

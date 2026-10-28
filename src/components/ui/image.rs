@@ -25,7 +25,7 @@ use super::shader::UiShader;
 
 crate::core::named_enum! {
     /// How the texture maps onto the rect. See the module docs.
-    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
     pub enum ImageType {
         /// Stretched over the whole rect.
         #[default]
@@ -41,7 +41,7 @@ crate::core::named_enum! {
 
 crate::core::named_enum! {
     /// The shape a `Filled` image sweeps.
-    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
     pub enum FillMethod {
         /// A bar filling left↔right.
         #[default]
@@ -56,7 +56,7 @@ crate::core::named_enum! {
 crate::core::named_enum! {
     /// Where a fill starts. `Horizontal` uses `Left` / `Right`, `Vertical` uses
     /// `Bottom` / `Top`, `Radial360` any of the four (the edge its sweep starts at).
-    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
     pub enum FillOrigin {
         #[default]
         Left = "Left",

@@ -45,7 +45,7 @@ crate::core::named_enum! {
     /// How a material's surface is composited — Unity's "Rendering Mode" (#242). Plain
     /// serde data, mirroring [`ParticleBlend`](super::ParticleBlend) as prior art for a
     /// blend selector. `Opaque` is the default and the fast path.
-    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
     pub enum RenderMode {
         /// Fully opaque (`REPLACE`, depth write on). The default; rides the solids pass.
         #[default]

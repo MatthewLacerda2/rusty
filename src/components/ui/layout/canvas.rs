@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 
 crate::core::named_enum! {
     /// Where a canvas draws (Unity's `RenderMode`).
-    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
     pub enum CanvasRenderMode {
         /// Drawn on top of the finished frame, in screen space — HUDs and menus.
         #[default]

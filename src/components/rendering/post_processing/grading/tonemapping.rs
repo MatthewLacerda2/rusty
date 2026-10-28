@@ -9,7 +9,7 @@ crate::core::named_enum! {
     /// Tonemapping operator applied as the final color-correction step. Declared in
     /// the order the editor lists them (the default first); the names are Unity's
     /// (`TonemappingMode.ACES`, #997).
-    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
     pub enum Tonemap {
         /// Filmic ACES fit — the default, richer contrast in highlights.
         #[default]

@@ -34,7 +34,7 @@ fn a_paired_op_sees_both_new_values() {
     let (_, out) = run::<(f32, f32, f32, f32)>(
         |_, _| {},
         r#"
-        Component.Set(id, "Light", { light_type = "Spotlight", inner_cone = 70, outer_cone = 80 })
+        Component.Set(id, "Light", { light_type = "Spot", inner_cone = 70, outer_cone = 80 })
         Component.Set(id, "Text", { auto_size_min = 80, auto_size_max = 100 })
         local l, t = Component.Get(id, "Light"), Component.Get(id, "Text")
         return l.inner_cone, l.outer_cone, t.auto_size_min, t.auto_size_max
