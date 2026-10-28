@@ -237,7 +237,7 @@ end  -- rows number nil / cols number nil / mortar number 0.05
   and an optional third input `mask` makes that per pixel (`factor × mask.red`; black
   keeps `a`, white takes the full blend). `lighten` is the per-channel max and `darken`
   the min — the way to combine height fields (rivets over a panel, stones over mortar),
-  where `add` overshoots; `divide` is `a / b`, and a channel of `b` at 0 leaves `a`;
+  where `add` overshoots; `divide` is `a / b`, and a channel of `b` at (near) 0 leaves `a`;
   `invert`; `bright_contrast {bright, contrast}` (contrast pivots at linear 0.5, like
   Blender's node: right for data maps, but that is a light grey on screen, so for a
   colour map use hex ramp stops or `auto_levels` → `color_ramp`); `hue_sat_value {hue,
@@ -254,17 +254,18 @@ end  -- rows number nil / cols number nil / mortar number 0.05
   {channel=0..3}`; `warp {strength}` (2 inputs: samples input 1 displaced by input 2's R/G, centred on 0.5 so mid-grey moves nothing; `strength` is in
   tile units; feed input 2 a `combine_rgb` of two different noises — a grayscale one has
   R = G and only pushes along the diagonal); `tile {count, jitter=0, rotation_jitter=0,
-  scale_jitter=0}` (1 input: stamps the input once per cell of a `count`×`count` grid;
+  scale_jitter=0, seed=0}` (1 input: stamps the input once per cell of a `count`×`count` grid;
   each cell is seeded from the recipe and node `seed` with an offset of up to ±`jitter`/2 cells,
   a turn of up to ±`rotation_jitter`/2 turns and a scale in `1 ± scale_jitter/2`, each
   jitter clamped to 0–1. The input is read as **one stamp** — the unit square, nothing
   outside it — so give it empty margins (a `shape` smaller than the tile); a stamp
   pushed over its cell's border is drawn into the neighbour cell, and overlapping
   stamps keep the brighter value per channel. Rivets are `shape circle` → `tile`).
-- **Converter / math**: `math {func, value}` (1 or 2 inputs) with `func` ∈
+- **Converter / math**: `math {func, value=0.5}` (1 or 2 inputs) with `func` ∈
   `add/subtract/multiply/divide/power/min/max/abs/fract/sqrt` — the right-hand side
   is `value`, or with a second input wired, that input's matching channel per pixel
-  (`value` is then ignored, Blender's Math with both sockets linked); `map_range {from_min,
+  (`value` is then ignored, Blender's Math with both sockets linked). `abs`, `fract`
+  and `sqrt` have no right-hand side, so they take exactly 1 input; `map_range {from_min,
   from_max, to_min, to_max}`; `clamp {min, max}`; `rgb_to_bw`.
 - **Filter**: `blur {radius}` (separable box blur; wraps, so it stays tiling);
   `cavity {radius}` (height → `1 − max(blur(h) − h, 0)`: white on flat and raised

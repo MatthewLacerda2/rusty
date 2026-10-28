@@ -1,6 +1,7 @@
 //! A stochastic node's own `seed` (#1487): two nodes that differ only by it differ,
 //! and the default 0 bakes the exact bytes it did before the param existed.
 
+use rusty::procgen::recipe::OPS;
 use rusty::procgen::{evaluate, TextureRecipe};
 
 /// One node of every stochastic op, each written without a `seed`.
@@ -42,8 +43,12 @@ fn default_seed_bakes_the_bytes_it_did_before_the_param() {
 
 #[test]
 fn every_stochastic_op_changes_with_its_seed() {
-    for op in ["noise", "voronoi", "brick", "white_noise", "tile"] {
+    let seeded = OPS
+        .iter()
+        .filter(|i| i.params.iter().any(|p| p.name == "seed"));
+    for op in seeded.map(|i| i.op) {
         let tag = format!(r#""op": "{op}""#);
+        assert!(UNSEEDED.contains(&tag), "add a {op} node to UNSEEDED");
         let reseeded = UNSEEDED.replace(&tag, &format!(r#"{tag}, "seed": 5"#));
         assert_ne!(fingerprint(&reseeded), fingerprint(UNSEEDED), "{op}");
     }

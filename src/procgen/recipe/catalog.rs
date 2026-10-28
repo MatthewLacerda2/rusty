@@ -250,7 +250,10 @@ pub const OPS: &[OpInfo] = &[
         "math",
         "math",
         arity(1, 2),
-        &[choice("func", MATH), req("value", "number")],
+        &[
+            choice("func", MATH),
+            opt("value", "number", Lit::Number(0.5)),
+        ],
     ),
     op(
         "map_range",

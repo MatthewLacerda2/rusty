@@ -40,6 +40,14 @@ pub enum MathOp {
     Sqrt,
 }
 
+impl MathOp {
+    /// `abs`, `fract` and `sqrt` take no right-hand side, so a `math` node using one
+    /// accepts a single input (#1487).
+    pub fn is_unary(self) -> bool {
+        matches!(self, MathOp::Abs | MathOp::Fract | MathOp::Sqrt)
+    }
+}
+
 /// Which kind of noise [`super::OpKind::Noise`] produces.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

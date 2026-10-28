@@ -210,10 +210,12 @@ pub struct Warp {
 
 /// Per-channel math. The right-hand side is the constant `value`, or, when a second
 /// input is wired, that input's matching channel per pixel (`value` is then ignored,
-/// Blender's Math with both sockets linked).
+/// Blender's Math with both sockets linked). `value` defaults to 0.5, Blender's
+/// socket default, so a wired second input needs no dummy `value`.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Math {
     pub func: MathOp,
+    #[serde(default = "half")]
     pub value: f32,
 }
 

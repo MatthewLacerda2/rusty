@@ -1,10 +1,11 @@
-//! src/procgen/recipe/tag.rs — an [`OpKind`]'s `op` tag, its catalog entry and its
-//! node seed.
+//! src/procgen/recipe/tag.rs — an [`OpKind`]'s `op` tag, its catalog entry, its
+//! node seed and the inputs it accepts.
 //!
 //! The tag is the string serde writes as `op`; `catalog_tests.rs` holds the two
 //! equal for every op, so [`OpKind::info`] always finds its row in [`OPS`].
 
-use super::{OpInfo, OpKind, OPS};
+use super::arity::ONE;
+use super::{Arity, OpInfo, OpKind, OPS};
 
 impl OpKind {
     /// The op's recipe tag (`"noise"`, `"mix"`, …), as serde writes it.
@@ -52,6 +53,15 @@ impl OpKind {
             OpKind::WhiteNoise(p) => p.seed,
             OpKind::Tile(p) => p.seed,
             _ => 0,
+        }
+    }
+
+    /// The inputs this node accepts: its [`OPS`] row's, narrowed to one for a unary
+    /// `math` func, which has no right-hand side to read a second input into.
+    pub fn arity(&self) -> Arity {
+        match self {
+            OpKind::Math(p) if p.func.is_unary() => ONE,
+            _ => self.info().inputs,
         }
     }
 

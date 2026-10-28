@@ -97,3 +97,38 @@ fn every_op_kind_tag_is_the_one_serde_writes() {
         assert_eq!(op.info().op, info.op);
     }
 }
+
+/// `info`'s op with param `name` set to `value`, parsed by serde.
+fn with_param(info: &OpInfo, name: &str, value: Value) -> Result<OpKind, serde_json::Error> {
+    let mut doc = round_trip(info);
+    doc.insert(name.into(), value);
+    serde_json::from_value(Value::Object(doc))
+}
+
+#[test]
+fn every_seed_param_reaches_the_runner() {
+    // `OpKind::seed` has a `_ => 0` arm, so the compiler won't flag a new stochastic
+    // op missing from it: this does (#1487).
+    for info in OPS
+        .iter()
+        .filter(|i| i.params.iter().any(|p| p.name == "seed"))
+    {
+        let op = with_param(info, "seed", json!(7)).unwrap();
+        assert_eq!(op.seed(), 7, "{}.seed never reaches OpKind::seed", info.op);
+    }
+}
+
+#[test]
+fn every_color_param_takes_srgb_hex() {
+    for info in OPS {
+        for p in info.params {
+            let hex = match p.ty {
+                "color" => json!("#000000"),
+                "stops" => json!([{ "pos": 0.0, "color": "#000000" }]),
+                _ => continue,
+            };
+            let parsed = with_param(info, p.name, hex);
+            assert!(parsed.is_ok(), "{}.{}: {parsed:?}", info.op, p.name);
+        }
+    }
+}

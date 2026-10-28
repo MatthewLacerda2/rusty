@@ -139,7 +139,7 @@ fn blend_pixel(a: Rgba, b: Rgba, mode: BlendMode, factor: f32) -> Rgba {
             BlendMode::Overlay => overlay(a[c], b[c]),
             BlendMode::Lighten => a[c].max(b[c]),
             BlendMode::Darken => a[c].min(b[c]),
-            BlendMode::Divide if b[c] == 0.0 => a[c],
+            BlendMode::Divide if b[c].abs() < 1e-9 => a[c],
             BlendMode::Divide => a[c] / b[c],
         };
         out[c] = lerp(a[c], combined, f);

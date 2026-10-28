@@ -105,22 +105,9 @@ fn pop_count(n: &mut u32) -> bool {
 
 /// `#rrggbb` (keeping `alpha`) or `#rrggbbaa` → display-space RGBA in `[0, 1]`.
 fn parse_hex(hex: &str, alpha: f32) -> Option<Vec4> {
-    let digits = hex.strip_prefix('#')?;
-    if !matches!(digits.len(), 6 | 8) || !digits.is_ascii() {
-        return None;
-    }
-    let byte = |i: usize| u8::from_str_radix(&digits[i..i + 2], 16).ok();
-    let a = if digits.len() == 8 {
-        f32::from(byte(6)?) / 255.0
-    } else {
-        alpha
-    };
-    Some(Vec4::new(
-        f32::from(byte(0)?) / 255.0,
-        f32::from(byte(2)?) / 255.0,
-        f32::from(byte(4)?) / 255.0,
-        a,
-    ))
+    let ([r, g, b], a) = crate::core::color::hex_bytes(hex)?;
+    let unit = |c: u8| f32::from(c) / 255.0;
+    Some(Vec4::new(unit(r), unit(g), unit(b), a.map_or(alpha, unit)))
 }
 
 #[cfg(test)]
@@ -166,5 +153,6 @@ mod tests {
         );
         assert_eq!(parse_hex("00ff00", 1.0), None);
         assert_eq!(parse_hex("#zzzzzz", 1.0), None);
+        assert_eq!(parse_hex("#+f+f+f", 1.0), None);
     }
 }

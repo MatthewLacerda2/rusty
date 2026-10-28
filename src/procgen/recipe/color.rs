@@ -10,7 +10,7 @@ use serde::de::Error as _;
 use serde::{Deserialize, Deserializer};
 use serde_json::Value;
 
-use crate::core::color::srgb_to_linear;
+use crate::core::color::{hex_bytes, srgb_to_linear};
 
 /// `color` on `constant` and on a ramp stop.
 pub fn color<'de, D: Deserializer<'de>>(d: D) -> Result<[f32; 4], D::Error> {
@@ -44,17 +44,12 @@ fn named<'de, D: Deserializer<'de>>(d: D, name: &str) -> Result<[f32; 4], D::Err
 
 /// Decode `"#rrggbb"` / `"#rrggbbaa"`: RGB sRGB → linear, alpha as written / 255.
 pub fn from_hex(hex: &str) -> Option<[f32; 4]> {
-    let digits = hex.strip_prefix('#')?;
-    if !matches!(digits.len(), 6 | 8) || !digits.is_ascii() {
-        return None;
-    }
-    let byte = |i: usize| u8::from_str_radix(&digits[2 * i..2 * i + 2], 16).ok();
-    let alpha = if digits.len() == 8 { byte(3)? } else { 255 };
+    let ([r, g, b], alpha) = hex_bytes(hex)?;
     Some([
-        srgb_to_linear(byte(0)?),
-        srgb_to_linear(byte(1)?),
-        srgb_to_linear(byte(2)?),
-        f32::from(alpha) / 255.0,
+        srgb_to_linear(r),
+        srgb_to_linear(g),
+        srgb_to_linear(b),
+        f32::from(alpha.unwrap_or(255)) / 255.0,
     ])
 }
 
@@ -77,7 +72,14 @@ mod tests {
 
     #[test]
     fn malformed_hex_is_refused() {
-        for bad in ["808080", "#80808", "#80808g", "#8080808080", "#ééé"] {
+        for bad in [
+            "808080",
+            "#80808",
+            "#80808g",
+            "#8080808080",
+            "#ééé",
+            "#+f+f+f",
+        ] {
             assert_eq!(from_hex(bad), None, "{bad}");
         }
     }
