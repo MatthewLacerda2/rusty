@@ -19,6 +19,8 @@ it behaves identically to the editor and uses the same default values.
 | `Scene.SetActive` | `(id, active)` | `true` if an entity existed at `id` — Unity's `SetActive`; its callbacks follow the edge (`OnEnable` / `OnDisable`) |
 | `Scene.IsActive` | `(id)` | Unity's `activeSelf`: the entity's own `active` flag (`false` for a missing or `nil` id; an inactive ancestor still hides it) |
 | `Scene.IsActiveInHierarchy` | `(id)` | Unity's `activeInHierarchy`: `true` when the entity and every ancestor are active (`false` for a missing or `nil` id) — what decides whether it draws, simulates and ticks |
+| `Scene.SetStatic` | `(id, static)` | `true` if an entity existed at `id` — Unity's `GameObject.isStatic`, the inspector's **Static** checkbox: marks level geometry the navmesh and lightmap bakes treat as fixed |
+| `Scene.IsStatic` | `(id)` | the entity's `is_static` flag (`false` for a missing or `nil` id) |
 | `Scene.GetParent` | `(id)` | the parent's `id`, or `nil` (also for a `nil` id) |
 | `Scene.GetChildren` | `(id)` | array of child ids, in hierarchy order (empty for a `nil` id) |
 | `Scene.FindChild` | `(id, path)` | the descendant at name path `path` (`"Viewport/Content"`), or `nil` (also for a `nil` id) |
