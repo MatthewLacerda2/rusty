@@ -88,28 +88,56 @@ impl Image {
         })
     }
 
+    /// Row `y` of the image, left to right.
+    #[inline]
+    pub fn row(&self, y: usize) -> &[Rgba] {
+        let w = self.resolution as usize;
+        &self.pixels[y * w..(y + 1) * w]
+    }
+
+    /// Call `f(y, row)` on every row, the rows split into bands run in parallel
+    /// ([`super::bands`]). Byte-identical to a serial loop as long as `f` writes
+    /// `row` from its inputs and `y` alone — the shape of every op.
+    pub fn for_each_row(&mut self, f: impl Fn(usize, &mut [Rgba]) + Sync) {
+        super::bands::for_each_row(&mut self.pixels, self.resolution as usize, f);
+    }
+
     /// Apply `f(u, v) -> Rgba` over the unit domain, where `u`/`v` are pixel-center
     /// coordinates in `[0, 1)`. This is the generator entry point: an op that has no
     /// inputs paints itself by sampling its parametric function per pixel.
-    pub fn fill_uv(resolution: u32, mut f: impl FnMut(f32, f32) -> Rgba) -> Self {
+    pub fn fill_uv(resolution: u32, f: impl Fn(f32, f32) -> Rgba + Sync) -> Self {
         let mut img = Image::new(resolution);
         let res = resolution as f32;
-        for y in 0..resolution {
+        img.for_each_row(|y, row| {
             let v = (y as f32 + 0.5) / res;
-            for x in 0..resolution {
-                let u = (x as f32 + 0.5) / res;
-                img.pixels[(y * resolution + x) as usize] = f(u, v);
+            for (x, p) in row.iter_mut().enumerate() {
+                *p = f((x as f32 + 0.5) / res, v);
             }
-        }
+        });
         img
     }
 
     /// Map every pixel through `f` in place — the workhorse for per-pixel color/math
     /// ops that need no neighbourhood.
-    pub fn map_in_place(&mut self, mut f: impl FnMut(Rgba) -> Rgba) {
-        for p in &mut self.pixels {
-            *p = f(*p);
-        }
+    pub fn map_in_place(&mut self, f: impl Fn(Rgba) -> Rgba + Sync) {
+        self.for_each_row(|_, row| {
+            for p in row {
+                *p = f(*p);
+            }
+        });
+    }
+
+    /// The image mirrored about its diagonal: pixel `(x, y)` moves to `(y, x)`. Lets
+    /// a column pass run as a row pass, so it bands like every other op.
+    pub fn transposed(&self) -> Image {
+        let w = self.resolution as usize;
+        let mut out = Image::new(self.resolution);
+        out.for_each_row(|y, row| {
+            for (x, p) in row.iter_mut().enumerate() {
+                *p = self.pixels[x * w + y];
+            }
+        });
+        out
     }
 }
 
@@ -157,5 +185,16 @@ mod tests {
         // x=0 center is 0.25, x=1 center is 0.75 (res 2).
         assert_eq!(img.pixels()[0][0], 0.25);
         assert_eq!(img.pixels()[1][0], 0.75);
+    }
+
+    #[test]
+    fn transposed_swaps_x_and_y() {
+        let img = Image::fill_uv(3, |u, v| [u, v, 0.0, 1.0]);
+        let t = img.transposed();
+        for (x, y) in [(0, 1), (2, 0), (1, 2)] {
+            let (p, q) = (img.get_wrapped(x, y), t.get_wrapped(y, x));
+            assert_eq!((p[0], p[1]), (q[0], q[1]));
+        }
+        assert_eq!(t.transposed(), img);
     }
 }

@@ -2,7 +2,8 @@
 //!
 //! These map pixel→pixel (no neighbourhood), so they run through
 //! [`Image::map_in_place`] — except [`mix`], which combines two equal-sized inputs
-//! (optionally through a third, the per-pixel mask).
+//! (optionally through a third, the per-pixel mask) row by row
+//! ([`Image::for_each_row`]). Both band rows across threads (#1490).
 //! All work in unclamped linear float; the bake clamps once at the end.
 
 use super::super::image_buf::{Image, Rgba};
@@ -92,11 +93,14 @@ pub fn hue_sat_value(mut img: Image, hue: f32, sat: f32, value: f32) -> Image {
 /// `mask` are sampled positionally.
 pub fn mix(a: Image, b: &Image, mask: Option<&Image>, mode: BlendMode, factor: f32) -> Image {
     let mut out = a;
-    let bp = b.pixels();
-    for (i, p) in out.pixels_mut().iter_mut().enumerate() {
-        let f = mask.map_or(factor, |m| factor * m.pixels()[i][0]);
-        *p = blend_pixel(*p, bp[i], mode, f);
-    }
+    let w = out.resolution() as usize;
+    out.for_each_row(|y, row| {
+        for (x, p) in row.iter_mut().enumerate() {
+            let i = y * w + x;
+            let f = mask.map_or(factor, |m| factor * m.pixels()[i][0]);
+            *p = blend_pixel(*p, b.pixels()[i], mode, f);
+        }
+    });
     out
 }
 
