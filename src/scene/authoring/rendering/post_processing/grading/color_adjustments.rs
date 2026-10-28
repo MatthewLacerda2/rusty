@@ -5,16 +5,18 @@ use crate::components::{ColorAdjustments, PostProcessingComponent};
 use crate::scene::authoring::fields::table::effect;
 use crate::scene::authoring::sanitize::{clamped, finite_or};
 
-/// Set the contrast (a non-finite value keeps the current one).
+/// Set the contrast, clamped to `0..=2` (Unity's `-100..=100`); a non-finite value
+/// keeps the current one.
 pub fn set_contrast(vc: &mut PostProcessingComponent, value: f32) {
     let a = &mut vc.color_adjustments;
-    a.contrast = finite_or(value, a.contrast);
+    a.contrast = finite_or(value, a.contrast).clamp(0.0, ColorAdjustments::MAX);
 }
 
-/// Set the saturation (a non-finite value keeps the current one).
+/// Set the saturation, clamped to `0..=2` (Unity's `-100..=100`); a non-finite value
+/// keeps the current one.
 pub fn set_saturation(vc: &mut PostProcessingComponent, value: f32) {
     let a = &mut vc.color_adjustments;
-    a.saturation = finite_or(value, a.saturation);
+    a.saturation = finite_or(value, a.saturation).clamp(0.0, ColorAdjustments::MAX);
 }
 
 /// Set the hue shift in degrees, clamped to `-180..=180`.

@@ -40,7 +40,12 @@ fn neutral_knobs_bake_the_identity_grade_with_the_volumes_tonemap() {
     assert!(close(Vec3::from_slice(&lgg[1][..3]), Vec3::ONE));
     assert!(close(Vec3::from_slice(&lgg[2][..3]), Vec3::ONE));
     let adjust = packed(v, None, "color_adjustments");
-    assert_eq!(adjust, [[0.0; 4], [1.0, 1.0, 0.0, 0.0]]);
+    let aces = Tonemap::Aces.to_index() as f32;
+    assert_eq!(
+        adjust,
+        [[1.0, aces, 0.0, 0.0], [0.0; 4], [1.0, 0.0, 0.0, 0.0]],
+        "contrast (in ACES's log space), hue, saturation"
+    );
     let tone = packed(v, None, "tonemapping");
     assert_eq!(
         tone,
@@ -74,6 +79,10 @@ fn knobs_a_file_left_out_of_range_bake_as_the_ops_would_clamp_them() {
     let mut wild = default_post_processing();
     wild.white_balance.temperature = 300.0;
     wild.color_adjustments.hue_shift = 400.0;
+    (
+        wild.color_adjustments.contrast,
+        wild.color_adjustments.saturation,
+    ) = (10.0, -3.0);
     wild.lift_gamma_gain.gain = ColorWheel {
         color: [2.0, 0.5, -1.0],
         offset: 5.0,
@@ -81,6 +90,10 @@ fn knobs_a_file_left_out_of_range_bake_as_the_ops_would_clamp_them() {
     let mut held = default_post_processing();
     held.white_balance.temperature = WhiteBalance::RANGE;
     held.color_adjustments.hue_shift = 180.0;
+    (
+        held.color_adjustments.contrast,
+        held.color_adjustments.saturation,
+    ) = (2.0, 0.0);
     held.lift_gamma_gain.gain = ColorWheel {
         color: [1.0, 0.5, 0.0],
         offset: 1.0,
@@ -93,6 +106,10 @@ fn knobs_a_file_left_out_of_range_bake_as_the_ops_would_clamp_them() {
     };
     assert_eq!(bake(&wild), bake(&held));
     wild.white_balance.tint = f32::NAN;
+    (
+        wild.color_adjustments.contrast,
+        held.color_adjustments.contrast,
+    ) = (f32::NAN, 1.0);
     assert_eq!(bake(&wild), bake(&held), "NaN is neutral");
 }
 

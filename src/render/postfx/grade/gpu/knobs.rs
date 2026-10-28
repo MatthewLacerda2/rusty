@@ -14,7 +14,7 @@ use crate::scene::{Camera, Scene};
 
 /// The composite's grade before the LUT (as it was at #1438): exposure, then
 /// the tonemap, at neutral contrast, saturation and gamma.
-fn analytic(x: f32, ev: f32, tonemap: Tonemap) -> f32 {
+pub(super) fn analytic(x: f32, ev: f32, tonemap: Tonemap) -> f32 {
     let h = x * ev.exp2();
     let aces = (h * (2.51 * h + 0.03)) / (h * (2.43 * h + 0.59) + 0.14);
     match tonemap {

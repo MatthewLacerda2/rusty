@@ -1,8 +1,9 @@
 //! The colour grade (#1440, #1441): the effects the grading bake runs, in their
 //! order, on each texel of the view's LUT, so the composite grades a pixel with one
-//! fetch. White balance, Lift / Gamma / Gain and the hue shift act on the
-//! scene-linear colour, before the tonemap; contrast, saturation and the display
-//! gamma on the tonemapped colour; the Color Lookup last, on the display colour.
+//! fetch. White balance, contrast, Lift / Gamma / Gain, the hue shift and saturation
+//! act on the scene-linear colour, before the tonemap, in URP's order (#1479); the
+//! display gamma on the tonemapped colour; the Color Lookup last, on the display
+//! colour.
 //!
 //! Each packs from the view's volume, holding its knobs to the ops' ranges again
 //! (a loaded file bypasses the ops, serde writing the fields directly), and packs the
