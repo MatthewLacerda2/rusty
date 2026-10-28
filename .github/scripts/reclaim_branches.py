@@ -23,6 +23,11 @@ A reviewer's `worktree-agent-<id>`, the branch the harness gives an `Agent`
 worktree, is deleted when its tip is on `origin/main` (#1510,
 `reclaim.judge_branch`): the reviewer checked its PR out detached, so the
 branch holds nothing. No other name gets that rule.
+
+A reviewer's `pr<digits>…` or `worktree-agent-*` branch whose tip is a commit
+GitHub has is deleted too, PR or not (#1538): after the queue rebases and
+merges the PR, GitHub lists no pull request for the reviewed commit, so
+`pr1514` and `pr1531` stayed as "no pull request". `reclaim.finished` has it.
 """
 
 from __future__ import annotations

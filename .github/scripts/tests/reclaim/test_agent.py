@@ -15,12 +15,15 @@ ON_MAIN = {"aaaa"}
 # commit: the pull requests GitHub says hold it, as (state, head)
 BY_COMMIT = {"m1": [("MERGED", "m1")], "o1": [("OPEN", "o1")], "x1": [("MERGED", "y1")],
              "both": [("MERGED", "y1"), ("OPEN", "z1")], "own": [], "aaaa": [("MERGED", "aaaa")]}
+GITHUB = {"aaaa", "m1", "o1", "x1", "both"}  # "own" was never pushed
 
 
 def machine() -> reclaim.Machine:
     def answer(argv, **_):
-        out, code = "", 0
-        if argv[0] == "gh" and "commits/" in argv[2]:
+        out, code, err = "", 0, ""
+        if argv[0] == "gh" and "commits/" in argv[2] and "/pulls" not in argv[2]:  # GitHub has it? (#1538)
+            code, err = (0, "") if argv[2].split("commits/")[1] in GITHUB else (1, "No commit found (HTTP 422)")
+        elif argv[0] == "gh" and "commits/" in argv[2]:
             out = json.dumps([rest_pull(*pr) for pr in BY_COMMIT[argv[2].split("commits/")[1].split("/")[0]]])
         elif argv[0] == "gh":
             out = "[]"
@@ -32,7 +35,7 @@ def machine() -> reclaim.Machine:
             out = "0" if argv[5] in ON_MAIN else "1"
         elif "merge-tree" in argv or "--version" in argv:
             code = 1
-        return subprocess.CompletedProcess(argv, code, out, "")
+        return subprocess.CompletedProcess(argv, code, out, err)
     return reclaim.Machine(answer)
 
 
