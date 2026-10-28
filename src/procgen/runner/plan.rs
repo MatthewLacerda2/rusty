@@ -5,7 +5,7 @@
 use crate::core::collections::Map;
 
 use super::RunError;
-use crate::procgen::recipe::TextureRecipe;
+use crate::procgen::recipe::{Node, TextureRecipe};
 
 /// The nodes to evaluate and how they connect, as indices into `recipe.nodes`.
 pub(super) struct Plan {
@@ -34,23 +34,7 @@ pub(super) fn plan(recipe: &TextureRecipe, targets: &[&str]) -> Result<Plan, Run
         .enumerate()
         .map(|(i, n)| (n.id.as_str(), i))
         .collect();
-    let inputs = recipe
-        .nodes
-        .iter()
-        .map(|node| {
-            node.check_arity().map_err(RunError::Arity)?;
-            let index = |input: &String| {
-                by_id
-                    .get(input.as_str())
-                    .copied()
-                    .ok_or_else(|| RunError::UnknownInput {
-                        node: node.id.clone(),
-                        input: input.clone(),
-                    })
-            };
-            node.inputs.iter().map(index).collect()
-        })
-        .collect::<Result<Vec<Vec<usize>>, _>>()?;
+    let inputs = wire(recipe, &by_id)?;
     let targets = targets
         .iter()
         .map(|id| {
@@ -62,10 +46,8 @@ pub(super) fn plan(recipe: &TextureRecipe, targets: &[&str]) -> Result<Plan, Run
         .collect::<Result<Vec<usize>, _>>()?;
     let order = Order::new(recipe, &inputs).visit_all(&targets)?;
     let mut uses = vec![0; recipe.nodes.len()];
-    for &i in &order {
-        for &j in &inputs[i] {
-            uses[j] += 1;
-        }
+    for j in order.iter().flat_map(|&i| &inputs[i]) {
+        uses[*j] += 1;
     }
     Ok(Plan {
         order,
@@ -73,6 +55,24 @@ pub(super) fn plan(recipe: &TextureRecipe, targets: &[&str]) -> Result<Plan, Run
         uses,
         targets,
     })
+}
+
+/// Every node's inputs as indices, after checking its arity and that each id exists.
+fn wire(recipe: &TextureRecipe, by_id: &Map<&str, usize>) -> Result<Vec<Vec<usize>>, RunError> {
+    let wire_node = |node: &Node| {
+        node.check_arity().map_err(RunError::Arity)?;
+        let index = |input: &String| {
+            by_id
+                .get(input.as_str())
+                .copied()
+                .ok_or_else(|| RunError::UnknownInput {
+                    node: node.id.clone(),
+                    input: input.clone(),
+                })
+        };
+        node.inputs.iter().map(index).collect()
+    };
+    recipe.nodes.iter().map(wire_node).collect()
 }
 
 /// DFS visit state for cycle detection.

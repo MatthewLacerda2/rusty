@@ -1,6 +1,6 @@
 //! src/procgen/runner — the op-runner: evaluate a recipe DAG to its output images.
 //!
-//! Two steps. [`plan`] checks the whole recipe before anything runs (resolution,
+//! Two steps. `plan` checks the whole recipe before anything runs (resolution,
 //! every node's input [`Arity`](super::recipe::Arity), every id it names, no cycle)
 //! and orders the nodes the targets need, counting each one's consumers. Then the
 //! plan runs: each node's op through [`super::ops::eval_node`] with its inputs'

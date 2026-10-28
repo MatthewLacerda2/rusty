@@ -20,7 +20,7 @@ wall-clock or unseeded RNG).
 | `Texture.Bake` | `(recipe, path, slot)` | the written `path` |
 | `Texture.BakeSet` | `(recipe, prefix)` | `{ [slot] = path, … }` — one PNG per entry of the recipe's `outputs` |
 | `Texture.ToJson` | `(recipe)` | the recipe's canonical JSON string |
-| `Texture.Ops` | `()` | the op catalog: `{ {op, category, inputs, params = { {name, type, default, required, values} } }, … }` |
+| `Texture.Ops` | `()` | the op catalog: `{ {op, category, min_inputs, max_inputs, params = { {name, type, default, required, values} } }, … }` |
 
 `recipe` is a table **or** its serialized JSON string (from `Texture.ToJson`, or a
 saved `.json`) — both forms decode alike, with the same errors. `slot` names the target map and selects the **glTF encoding** applied on the
@@ -34,8 +34,12 @@ lists the valid ones — a typo like `"basecolour"` never silently bakes linear 
 | `normal` | linear | tangent-space (use a `bump_to_normal` op) |
 | `roughness` | linear | — |
 | `metallic` | linear | — |
-| `metallic_roughness` / `orm` | linear | **metallic → B, roughness → G** (one-shot packed MR) |
+| `metallic_roughness` / `orm` | linear | **metallic → B, roughness → G**, R = 0 (glTF's packed metallic-roughness map) |
 | `data` | linear | — (height/masks/anything raw; the explicit way to get unencoded output) |
+
+`orm` is only another name for the glTF metallic-roughness packing, not an
+occlusion-roughness-metallic map: rusty's material has no occlusion map, so nothing
+is written to R.
 
 The returned `path` drops straight into a material slot, e.g.
 `Material.SetTexture(id, Texture.Bake(recipe, "out/albedo.png", "base_color"))`.
@@ -103,7 +107,11 @@ node id is an error and nothing is baked. `outputs` is optional and ignored by
 ```
 
 Each node has a stable `id`, an `op` tag, the op's params as sibling fields, and an
-optional `inputs` array of upstream node ids (in order). **Unknown keys are errors**
+`inputs` array of upstream node ids (in order; omit it on a generator). A node's
+`inputs` must hold as many ids as its op accepts (`Texture.Ops()`' `min_inputs` to
+`max_inputs`): a short or surplus list is refused before anything bakes, naming the
+node — `node "mr" (op "mix") takes 2 to 3 inputs, but 1 given` — so a dangling wire
+never bakes a silently black or flat map. **Unknown keys are errors**
 everywhere in a recipe — on the recipe itself, on a node, on a ramp stop: `{ op =
 "noise", scael = 8 }` is refused with a message naming `scael` and the params `noise`
 takes, rather than baking with the default scale. The runner evaluates the DAG
@@ -115,8 +123,9 @@ Grouped like Blender's node menus; `op` is the tag string in each node.
 
 **Ask the engine, not this page.** `Texture.Ops()` returns the live catalog — the
 list below is a summary of it. Each entry has the `op` tag, its `category`
-(`generator` | `color` | `vector` | `math` | `filter`), how many `inputs` it consumes
-(a missing input reads as a black canvas), and its `params`. Each param has a
+(`generator` | `color` | `vector` | `math` | `filter`), how many inputs it accepts
+(`min_inputs` to `max_inputs`; a node outside that range is an error), and its
+`params`. Each param has a
 `name`, a `type` (`number` | `integer` | `bool` | `color` (RGBA array) | `vec2` |
 `enum` | `stops`), `required`, a `default` when it has one (absent when required),
 and for an `enum` the accepted `values`. Units and rounding are the ones *Tiling*
@@ -161,9 +170,9 @@ end  -- rows number nil / cols number nil / mortar number 0.05
   {gamma}`.
 - **Vector / normal**: `mapping {scale=[x,y], rotation, translation=[x,y],
   tiling=true}` (bilinear, wrapped resample; `rotation` in turns); `bump_to_normal
-  {strength}` (height → tangent-space normal); `combine_rgb` (three grayscale inputs →
-  RGB); `separate_rgb {channel=0..3}`; `warp {strength}` (2 inputs: samples input 1
-  displaced by input 2's R/G, centred on 0.5 so mid-grey moves nothing; `strength` is in
+  {strength}` (height → tangent-space normal); `combine_rgb` (1 to 3 grayscale
+  inputs → R, G, B; a channel without an input reads 0); `separate_rgb
+  {channel=0..3}`; `warp {strength}` (2 inputs: samples input 1 displaced by input 2's R/G, centred on 0.5 so mid-grey moves nothing; `strength` is in
   tile units; feed input 2 a `combine_rgb` of two different noises — a grayscale one has
   R = G and only pushes along the diagonal); `tile {count, jitter=0, rotation_jitter=0,
   scale_jitter=0}` (1 input: stamps the input once per cell of a `count`×`count` grid;
