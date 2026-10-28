@@ -33,7 +33,10 @@ fn inverted(encoding: ImageEncoding) -> TextureRecipe {
 
 fn sources() -> Sources {
     let mut sources = Sources::new();
-    sources.insert("textures/swatch.png", Source::decode(&swatch()).unwrap());
+    sources.insert(
+        "textures/swatch.png",
+        Source::decode("textures/swatch.png", &swatch()).unwrap(),
+    );
     sources
 }
 

@@ -25,6 +25,27 @@ pub fn bake_set(
     sources: &Sources,
     prefix: &str,
 ) -> Result<BTreeMap<String, String>, String> {
+    let slots = set_slots(recipe)?;
+    let targets: Vec<&str> = slots.values().map(|(_, node)| *node).collect();
+    let images = evaluate_many(recipe, sources, &targets).map_err(|e| e.to_string())?;
+
+    let mut written = BTreeMap::new();
+    for ((name, (slot, _)), img) in slots.iter().zip(&images) {
+        let path = bake_to_png(img, *slot, &format!("{prefix}_{name}.png"))?;
+        written.insert(name.to_string(), path);
+    }
+    Ok(written)
+}
+
+/// Check `recipe.outputs` the way [`bake_set`] does, before anything is read or
+/// written: a caller runs it ahead of loading the recipe's image files, so a recipe
+/// with no `outputs` is reported as that, not as a file it couldn't read.
+pub fn check_set(recipe: &TextureRecipe) -> Result<(), String> {
+    set_slots(recipe).map(|_| ())
+}
+
+/// `recipe.outputs` by canonical slot name: each slot and the node it bakes.
+fn set_slots(recipe: &TextureRecipe) -> Result<BTreeMap<&'static str, (Slot, &str)>, String> {
     if recipe.outputs.is_empty() {
         return Err(
             "recipe has no `outputs`; give it e.g. outputs = { base_color = \"<node id>\" } \
@@ -42,13 +63,5 @@ pub fn bake_set(
             ));
         }
     }
-    let targets: Vec<&str> = slots.values().map(|(_, node)| *node).collect();
-    let images = evaluate_many(recipe, sources, &targets).map_err(|e| e.to_string())?;
-
-    let mut written = BTreeMap::new();
-    for ((name, (slot, _)), img) in slots.iter().zip(&images) {
-        let path = bake_to_png(img, *slot, &format!("{prefix}_{name}.png"))?;
-        written.insert(name.to_string(), path);
-    }
-    Ok(written)
+    Ok(slots)
 }

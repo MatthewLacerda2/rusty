@@ -41,8 +41,10 @@ lists the valid ones — a typo like `"basecolour"` never silently bakes linear 
 
 Every slot bakes 8 bits per channel except `data`, which bakes a **16-bit** PNG
 (#1491): a height field used as displacement or a terrain heightmap keeps 65536
-levels instead of terracing into 256 steps. The renderer loads it as a material map
-like any other PNG.
+levels instead of terracing into 256 steps. The 16 bits are the file's: the renderer
+loads it as a material map like any other PNG, but samples every map at 8 bits per
+channel today, so the extra precision serves what reads the file itself (an
+`image` node, a terrain or displacement bake), not what the GPU draws.
 
 `orm` is only another name for the glTF metallic-roughness packing, not an
 occlusion-roughness-metallic map: rusty's material has no occlusion map, so nothing
@@ -293,7 +295,8 @@ imported model, a provider-generated image, an earlier bake, a hand-made mask or
   input the seed doesn't cover, and may be missing on another machine.
 - `encoding = "srgb"` (the default, a colour image) decodes RGB from sRGB to linear;
   `"linear"` (a mask, a height, a normal map) reads every channel as stored. Alpha is
-  always as stored. 16-bit files keep their precision.
+  always as stored. 16-bit files keep their precision. png, jpeg and tga are read;
+  the format comes from the file's extension.
 - The file is resampled **bilinearly, wrapped**, to the recipe's `resolution`, so the
   recipe stays resolution-independent. A file already at `resolution` reads back
   texel for texel.

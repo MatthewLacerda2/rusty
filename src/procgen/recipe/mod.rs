@@ -151,14 +151,16 @@ impl TextureRecipe {
         self
     }
 
-    /// Every file path an `image` node reads (#1491), each once, in node order: the
-    /// files a caller decodes into [`crate::procgen::Sources`] before evaluating.
-    pub fn image_paths(&self) -> Vec<&str> {
-        let mut paths: Vec<&str> = Vec::new();
+    /// Every file path an `image` node reads (#1491), each once, in node order,
+    /// with the id of the first node that names it: the files a caller decodes
+    /// into [`crate::procgen::Sources`] before evaluating, and the node an error
+    /// about one names.
+    pub fn image_paths(&self) -> Vec<(&str, &str)> {
+        let mut paths: Vec<(&str, &str)> = Vec::new();
         for node in &self.nodes {
             if let OpKind::Image(p) = &node.op {
-                if !paths.contains(&p.path.as_str()) {
-                    paths.push(&p.path);
+                if !paths.iter().any(|&(_, seen)| seen == p.path) {
+                    paths.push((&node.id, &p.path));
                 }
             }
         }

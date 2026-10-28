@@ -25,7 +25,7 @@ pub mod stats;
 use super::hash::node_seed;
 use super::image_buf::Image;
 use super::ops::eval_node;
-use super::recipe::{ArityError, OpKind, TextureRecipe};
+use super::recipe::{ArityError, TextureRecipe};
 use super::source::Sources;
 use plan::{plan, Plan, Scope};
 
@@ -115,20 +115,27 @@ pub fn evaluate_each(
     Ok(())
 }
 
+/// Run every structural check on `recipe` (resolution, ids, arity, inputs, the
+/// declared outputs, cycles) without evaluating it. A caller runs it before it
+/// reads the recipe's image files, so a broken recipe is reported as itself.
+pub fn validate(recipe: &TextureRecipe) -> Result<(), RunError> {
+    plan(recipe, &[], Scope::Every).map(|_| ())
+}
+
 /// Refuse a recipe with an `image` node whose file `sources` lacks, before anything
 /// evaluates: a missing file is an error naming it, never a black canvas (#1485).
 fn check_sources(recipe: &TextureRecipe, sources: &Sources) -> Result<(), RunError> {
-    for node in &recipe.nodes {
-        if let OpKind::Image(p) = &node.op {
-            if sources.get(&p.path).is_none() {
-                return Err(RunError::MissingSource {
-                    node: node.id.clone(),
-                    path: p.path.clone(),
-                });
-            }
-        }
+    match recipe
+        .image_paths()
+        .into_iter()
+        .find(|&(_, path)| sources.get(path).is_none())
+    {
+        Some((node, path)) => Err(RunError::MissingSource {
+            node: node.into(),
+            path: path.into(),
+        }),
+        None => Ok(()),
     }
-    Ok(())
 }
 
 /// A finished run: the target images, and the most images it held at once.

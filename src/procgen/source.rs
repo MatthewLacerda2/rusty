@@ -24,9 +24,15 @@ pub struct Source {
 
 impl Source {
     /// Decode an encoded image (any format the `image` crate reads: png, jpeg,
-    /// tga, …) from its bytes.
-    pub fn decode(bytes: &[u8]) -> Result<Source, String> {
-        let decoded = image::load_from_memory(bytes).map_err(|e| e.to_string())?;
+    /// tga, …) from its bytes. The format comes from `path`'s extension when it
+    /// names one, since TGA has no magic bytes to guess from; otherwise from the
+    /// bytes.
+    pub fn decode(path: &str, bytes: &[u8]) -> Result<Source, String> {
+        let decoded = match image::ImageFormat::from_path(path) {
+            Ok(format) => image::load_from_memory_with_format(bytes, format),
+            Err(_) => image::load_from_memory(bytes),
+        }
+        .map_err(|e| e.to_string())?;
         let rgba = decoded.to_rgba32f();
         let (width, height) = rgba.dimensions();
         let texels = rgba.pixels().map(|p| p.0).collect();
@@ -102,7 +108,7 @@ mod tests {
         png.put_pixel(1, 0, image::Rgba([1, 32768, 65535, 65535]));
         let mut bytes = std::io::Cursor::new(Vec::new());
         png.write_to(&mut bytes, image::ImageFormat::Png).unwrap();
-        let source = Source::decode(bytes.get_ref()).unwrap();
+        let source = Source::decode("ramp.png", bytes.get_ref()).unwrap();
         assert_eq!(source.size(), (2, 1));
         let [r, g, b, a] = source.texels()[1];
         assert_eq!((r, g, b, a), (1.0 / 65535.0, 32768.0 / 65535.0, 1.0, 1.0));
@@ -110,6 +116,21 @@ mod tests {
 
     #[test]
     fn bytes_that_are_no_image_are_an_error() {
-        assert!(Source::decode(b"not a png").is_err());
+        assert!(Source::decode("x.png", b"not a png").is_err());
+        assert!(Source::decode("x", b"not a png").is_err());
+    }
+
+    #[test]
+    fn a_tga_decodes_by_its_extension() {
+        // TGA has no magic bytes: guessing from the bytes alone fails (#1491 review).
+        let mut tga = image::RgbaImage::new(2, 1);
+        tga.put_pixel(0, 0, image::Rgba([255, 0, 0, 255]));
+        let mut bytes = std::io::Cursor::new(Vec::new());
+        tga.write_to(&mut bytes, image::ImageFormat::Tga).unwrap();
+        let source = Source::decode("textures/crate.TGA", bytes.get_ref()).unwrap();
+        assert_eq!(
+            source.texels(),
+            [[1.0, 0.0, 0.0, 1.0], [0.0, 0.0, 0.0, 0.0]]
+        );
     }
 }

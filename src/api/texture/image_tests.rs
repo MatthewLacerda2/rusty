@@ -72,3 +72,17 @@ fn a_missing_image_file_fails_the_bake_naming_node_and_path() {
         "{err}"
     );
 }
+
+#[test]
+fn bake_set_without_outputs_says_so_before_reading_files() {
+    let lua = lua_with_source();
+    let err = lua
+        .load(
+            r#"return Texture.BakeSet({ resolution = 4, nodes = {
+                { id = "photo", op = "image", path = "textures/no_such_1491.png" } } }, OUT)"#,
+        )
+        .exec()
+        .unwrap_err()
+        .to_string();
+    assert!(err.contains("no `outputs`"), "{err}");
+}

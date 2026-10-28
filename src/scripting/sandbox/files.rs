@@ -51,31 +51,20 @@ impl Access {
         Some(code)
     }
 
-    /// Warn, once per file, when the existing file at `path` is outside the project.
-    /// `inside` compares std-canonical paths on both sides, so a non-UTF-8 path
-    /// can't lose its verbatim prefix on one side only; the printed path is
-    /// prefix-free and `/`-separated (#1106).
+    /// Warn, once per file, when the existing file at `path` is outside the project
+    /// ([`paths::outside_root`]).
     fn check(&self, path: &Path, how: &str) {
-        let real = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
-        let root = if self.workspace.as_os_str().is_empty() {
-            Path::new(".")
-        } else {
-            &self.workspace
+        let Some(real) = paths::outside_root(path, &self.workspace) else {
+            return;
         };
-        let inside = root.canonicalize().is_ok_and(|root| real.starts_with(root));
-        if !inside && self.warned.borrow_mut().insert(real.clone()) {
+        let shown = paths::shown(&real);
+        if self.warned.borrow_mut().insert(real) {
             self.console.borrow_mut().warn(format!(
-                "[Lua] {how} read {}, outside the project: the game now depends on a file \
-                 that may not exist on another machine, and the seed does not cover it",
-                shown_path(&real)
+                "[Lua] {how} read {shown}, outside the project: the game now depends on a \
+                 file that may not exist on another machine, and the seed does not cover it"
             ));
         }
     }
-}
-
-/// `real` as the console prints it: no `\\?\` verbatim prefix, `/`-separated.
-fn shown_path(real: &Path) -> String {
-    to_slash(&paths::canonicalize(real).unwrap_or_else(|_| real.to_path_buf()))
 }
 
 /// Install the project-aware `require` searchers and the `dofile` / `loadfile`

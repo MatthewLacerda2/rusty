@@ -14,51 +14,35 @@ use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
-use crate::core::paths::{canonicalize, native, to_slash};
-use crate::procgen::recipe::OpKind;
+use crate::core::paths::{native, outside_root, shown};
 use crate::procgen::{Source, Sources, TextureRecipe};
 
 /// The outside files already warned about, process-wide: the warning is once per file.
 static WARNED: Mutex<BTreeSet<PathBuf>> = Mutex::new(BTreeSet::new());
 
 /// Read and decode every file `recipe`'s `image` nodes name, each path taken from
-/// `root` (the open project's, [`crate::core::project::root`]).
+/// `root` (the open project's, [`crate::core::project::root`]). The recipe's
+/// structure is checked first ([`crate::procgen::validate`]), so a cycle or an
+/// unknown input is reported as itself, before any file is read.
 pub fn load_sources(recipe: &TextureRecipe, root: &Path) -> Result<Sources, String> {
+    crate::procgen::validate(recipe).map_err(|e| e.to_string())?;
     let mut sources = Sources::new();
-    for node in &recipe.nodes {
-        let OpKind::Image(p) = &node.op else {
-            continue;
-        };
-        if sources.get(&p.path).is_some() {
-            continue;
-        }
-        let file = root.join(native(&p.path));
+    for (node, path) in recipe.image_paths() {
+        let file = root.join(native(path));
         let source = std::fs::read(&file)
             .map_err(|e| e.to_string())
-            .and_then(|bytes| Source::decode(&bytes))
-            .map_err(|e| format!("image node '{}' can't read {:?}: {e}", node.id, p.path))?;
-        if let Some(outside) = outside(&file, root) {
-            warn_once(outside, &p.path);
+            .and_then(|bytes| Source::decode(path, &bytes))
+            .map_err(|e| format!("image node '{node}' can't read {path:?}: {e}"))?;
+        if let Some(outside) = outside_root(&file, root) {
+            warn_once(outside, path);
         }
-        sources.insert(p.path.clone(), source);
+        sources.insert(path, source);
     }
     Ok(sources)
 }
 
-/// `file`'s real path when it lies outside `root`, `None` inside it.
-fn outside(file: &Path, root: &Path) -> Option<PathBuf> {
-    let real = canonicalize(file).unwrap_or_else(|_| file.to_path_buf());
-    let root = if root.as_os_str().is_empty() {
-        Path::new(".")
-    } else {
-        root
-    };
-    let inside = canonicalize(root).is_ok_and(|root| real.starts_with(root));
-    (!inside).then_some(real)
-}
-
 fn warn_once(real: PathBuf, written: &str) {
-    let shown = to_slash(&real);
+    let shown = shown(&real);
     let first = WARNED.lock().map_or(true, |mut warned| warned.insert(real));
     if first {
         log::warn!(

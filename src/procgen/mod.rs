@@ -39,11 +39,11 @@ pub mod runner;
 mod source;
 
 pub use bake::Slot;
-pub use bake_set::bake_set;
+pub use bake_set::{bake_set, check_set};
 pub use bands::with_bands;
 pub use image_buf::Image;
 pub use recipe::TextureRecipe;
-pub use runner::{evaluate, evaluate_with, RunError};
+pub use runner::{evaluate, evaluate_with, validate, RunError};
 pub use source::{Source, Sources};
 
 /// Evaluate `recipe` over `sources` and bake it to a `.png` at `path` for the named

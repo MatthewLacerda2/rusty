@@ -72,7 +72,8 @@ pub fn register<'scope>(
         scope.create_function(|_, (name, resolution): (String, Option<u32>)| {
             let mut scene = scene.borrow_mut();
             let dir = &native(mat_ops::MAPS_DIR);
-            mat_ops::rebake_maps(&mut scene.materials, &name, resolution, dir)
+            let root = crate::core::project::root();
+            mat_ops::rebake_maps(&mut scene.materials, &name, resolution, &root, dir)
                 .map_err(mlua::Error::RuntimeError)
         }),
     )?;
@@ -95,7 +96,8 @@ fn define(
     mut asset: MaterialAsset,
     validated: Validated,
 ) -> Result<(), String> {
-    mat_ops::bake_maps(&mut asset, name, &native(mat_ops::MAPS_DIR))?;
+    let root = crate::core::project::root();
+    mat_ops::bake_maps(&mut asset, name, &root, &native(mat_ops::MAPS_DIR))?;
     let mut scene = scene.borrow_mut();
     let materials = &mut scene.materials;
     let (metallic, roughness) = (asset.metallic, asset.roughness);

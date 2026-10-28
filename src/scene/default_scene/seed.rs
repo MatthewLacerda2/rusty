@@ -46,7 +46,8 @@ fn seed_checker(dir: &Path) -> Result<(), String> {
         maps_recipe: Some(checker_recipe()),
         ..MaterialAsset::default()
     };
-    bake_maps(&mut floor, FLOOR, &staging.0)?;
+    // The checker reads no image files, so the root it would read them from is moot.
+    bake_maps(&mut floor, FLOOR, &crate::core::project::root(), &staging.0)?;
     staging.publish(&[&file])
 }
 

@@ -1,7 +1,7 @@
 //! Tests for reading a recipe's image files (#1491).
 
 use super::*;
-use crate::procgen::recipe::{ImageEncoding, ImageTexture, Node};
+use crate::procgen::recipe::{ImageEncoding, ImageTexture, Node, OpKind};
 
 fn image_recipe(path: &str) -> TextureRecipe {
     let op = OpKind::Image(ImageTexture {
@@ -32,7 +32,7 @@ fn a_path_is_read_from_the_root() {
         .get("textures/red.png")
         .expect("loaded under its path");
     assert_eq!(source.texels()[0], [1.0, 0.0, 0.0, 1.0]);
-    assert!(outside(&root.join("textures").join("red.png"), &root).is_none());
+    assert!(outside_root(&root.join("textures").join("red.png"), &root).is_none());
 }
 
 #[test]
@@ -53,7 +53,19 @@ fn a_file_beside_the_root_is_outside_it() {
     std::fs::create_dir_all(&root).unwrap();
     let file = base.join("shared.png");
     write_png(&file);
-    assert!(outside(&file, &root).is_some());
+    assert!(outside_root(&file, &root).is_some());
     // Read all the same: outside is allowed, it only warns.
     assert!(load_sources(&image_recipe("../shared.png"), &root).is_ok());
+}
+
+#[test]
+fn a_broken_recipe_is_reported_before_any_file_is_read() {
+    let mut recipe = image_recipe("textures/no_such_1491.png");
+    recipe.nodes.push(Node {
+        id: "inv".into(),
+        op: OpKind::Invert,
+        inputs: vec!["nowhere".into()],
+    });
+    let err = load_sources(&recipe, Path::new("")).unwrap_err();
+    assert!(err.contains("unknown input 'nowhere'"), "{err}");
 }

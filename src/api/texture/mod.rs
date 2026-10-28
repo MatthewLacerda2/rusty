@@ -44,7 +44,7 @@ mod ops;
 use mlua::{Lua, Value};
 
 use super::{put, Reg};
-use crate::procgen::{bake_recipe, bake_set, Slot, Sources, TextureRecipe};
+use crate::procgen::{bake_recipe, bake_set, check_set, Slot, Sources, TextureRecipe};
 use crate::scene::authoring::material::load_sources;
 use from_lua::parse_recipe;
 
@@ -66,6 +66,7 @@ pub fn register(lua: &Lua) -> Reg {
         "BakeSet",
         lua.create_function(|lua, (recipe, prefix): (Value, String)| {
             let recipe = parse_recipe(&recipe).map_err(mlua::Error::RuntimeError)?;
+            check_set(&recipe).map_err(mlua::Error::RuntimeError)?;
             let paths = bake_set(&recipe, &sources(&recipe)?, &prefix);
             lua.create_table_from(paths.map_err(mlua::Error::RuntimeError)?)
         }),

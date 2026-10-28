@@ -19,7 +19,7 @@ use std::path::Path;
 use super::MaterialLibrary;
 use crate::asset::MapRef;
 use crate::core::paths::to_slash;
-use crate::procgen::{bake_set, Slot};
+use crate::procgen::{bake_set, check_set, Slot};
 use crate::scene::MaterialAsset;
 
 /// Where `Material.DefineAsset` / `Material.Rebake` write baked maps: the project's
@@ -27,9 +27,16 @@ use crate::scene::MaterialAsset;
 pub const MAPS_DIR: &str = crate::core::project::TEXTURES_DIR;
 
 /// Bake `asset`'s maps recipe (named `name`) into `dir` and fill its empty map
-/// fields with the written paths. A material with no recipe is left as is. On
-/// error nothing is filled, and the recipe is checked before any file is written.
-pub fn bake_maps(asset: &mut MaterialAsset, name: &str, dir: &Path) -> Result<(), String> {
+/// fields with the written paths, its `image` nodes reading their files from
+/// `root` (the open project's, [`crate::core::project::root`]). A material with no
+/// recipe is left as is. On error nothing is filled, and the recipe is checked
+/// before any file is read or written.
+pub fn bake_maps(
+    asset: &mut MaterialAsset,
+    name: &str,
+    root: &Path,
+    dir: &Path,
+) -> Result<(), String> {
     let Some(recipe) = &asset.maps_recipe else {
         return Ok(());
     };
@@ -38,12 +45,13 @@ pub fn bake_maps(asset: &mut MaterialAsset, name: &str, dir: &Path) -> Result<()
             "material name {name:?} can't name its baked maps; use a plain name like \"rusty_panel\""
         ));
     }
+    let in_error = |e: String| format!("material {name:?} maps: {e}");
+    check_set(recipe).map_err(in_error)?;
+    let sources = super::load_sources(recipe, root).map_err(in_error)?;
     std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     // `/`-spelled, `dir` included, not `Path::join`: the paths land in the scene file,
     // which must read the same on every platform (Windows accepts `/` too).
     let prefix = format!("{}/{name}", to_slash(dir).trim_end_matches('/'));
-    let in_error = |e: String| format!("material {name:?} maps: {e}");
-    let sources = super::load_sources(recipe, &crate::core::project::root()).map_err(in_error)?;
     let baked = bake_set(recipe, &sources, &prefix).map_err(in_error)?;
     fill_empty_maps(asset, &baked);
     Ok(())
@@ -52,11 +60,12 @@ pub fn bake_maps(asset: &mut MaterialAsset, name: &str, dir: &Path) -> Result<()
 /// Re-bake material `key` from its stored recipe, optionally at a new `resolution`
 /// (which the recipe keeps, so the next rebake uses it too). Unity's way of iterating
 /// a texture's import size: author at 256, ship at 2048. The library is unchanged
-/// when the bake fails.
+/// when the bake fails. `root` and `dir` are [`bake_maps`]'s.
 pub fn rebake_maps(
     materials: &mut MaterialLibrary,
     key: &str,
     resolution: Option<u32>,
+    root: &Path,
     dir: &Path,
 ) -> Result<(), String> {
     let mut asset = materials
@@ -69,7 +78,7 @@ pub fn rebake_maps(
     if let Some(resolution) = resolution {
         recipe.resolution = resolution;
     }
-    bake_maps(&mut asset, key, dir)?;
+    bake_maps(&mut asset, key, root, dir)?;
     materials.insert(key.to_string(), asset);
     Ok(())
 }
