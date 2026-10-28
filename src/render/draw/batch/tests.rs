@@ -20,6 +20,7 @@ pub(super) fn item(mesh: &str, bone_base: u32, tint: f32, tag: f32) -> DrawItem 
             uniform,
         },
         instance,
+        depth: 0.0,
         outline: false,
     }
 }

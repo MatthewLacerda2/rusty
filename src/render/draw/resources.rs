@@ -127,8 +127,11 @@ impl Renderer {
             let motion = history.as_deref_mut();
             let items = self.solid_draw_items(scene, id, bounds, &mut joints, motion);
             visible += u32::from(!items.is_empty());
+            // The opaque order's anchor is the bounds' centre, as Unity's (#1499).
+            let centre = |origin| bounds.map_or(origin, |(min, max)| (min + max) * 0.5);
             for (mut item, world_pos, is_transparent) in items {
                 item.outline = ringed.contains(&id);
+                item.depth = view_depth(centre(world_pos), cam_pos, cam_fwd);
                 if is_transparent {
                     transparent.push((item, view_depth(world_pos, cam_pos, cam_fwd)));
                 } else {
@@ -253,6 +256,7 @@ impl Renderer {
             let item = DrawItem {
                 key,
                 instance,
+                depth: 0.0, // the caller's: it knows the camera
                 outline: false,
             };
             items.push((item, origin, transparent));

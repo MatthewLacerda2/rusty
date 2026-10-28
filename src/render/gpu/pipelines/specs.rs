@@ -64,6 +64,31 @@ pub(super) fn velocity_spec() -> PipelineSpec {
     }
 }
 
+/// The opaque pass over a primed depth (#1499), Unity URP's *Depth Priming*: the
+/// SSAO prepass already wrote these solids' depth, so the pass tests it `LessEqual`
+/// and writes none, and the fragment shader runs once per visible pixel. With no
+/// depth write, a GPU tests depth before a shader that discards (a cutout) too.
+pub(super) fn primed_spec() -> PipelineSpec {
+    primed(PipelineSpec::opaque("Forward Primed Pipeline"))
+}
+
+/// [`velocity_spec`] over a primed depth (#1499), as [`primed_spec`] is.
+pub(super) fn primed_velocity_spec() -> PipelineSpec {
+    PipelineSpec {
+        label: "Forward Primed Velocity Pipeline",
+        ..primed(velocity_spec())
+    }
+}
+
+/// `spec` testing a primed depth (#1499): `LessEqual`, no depth write.
+fn primed(spec: PipelineSpec) -> PipelineSpec {
+    PipelineSpec {
+        depth_write_enabled: false,
+        depth_compare: wgpu::CompareFunction::LessEqual,
+        ..spec
+    }
+}
+
 /// Transparent pass (#242): same shader/layout as the forward pass but alpha-blended
 /// and depth-WRITE-off (still depth-TESTED against opaque) so overlapping translucent
 /// surfaces all blend rather than z-cull each other. Drawn back-to-front after opaque.

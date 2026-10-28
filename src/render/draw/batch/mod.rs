@@ -6,7 +6,9 @@
 //! run — and packs every instance into one array in draw order, so the whole camera's
 //! per-entity data is one buffer upload.
 //!
-//! Opaque items are sorted by key first, so every copy of a prop lands in one run.
+//! Opaque items are sorted by key first, so every copy of a prop lands in one run,
+//! then the runs are ordered roughly front to back ([`sort::front_to_back`], #1499),
+//! so nearer solids fill the depth buffer before farther ones are shaded.
 //! Transparent items are not: their back-to-front order is what makes blending
 //! correct, so only *consecutive* equal keys merge there — "where order allows".
 //! The selection outline (#1175) is recorded here too: an item marked `outline` gets
@@ -51,6 +53,9 @@ impl BatchKey {
 pub(crate) struct DrawItem {
     pub key: BatchKey,
     pub instance: InstanceData,
+    /// Its view depth (the centre of its world bounds along the camera's forward
+    /// axis): the opaque pass's front-to-back key (#1499).
+    pub depth: f32,
     /// Whether the selection outline rings this solid (#1175): it is then drawn a
     /// second time, from this same draw, into the selection mask.
     pub outline: bool,
@@ -101,7 +106,7 @@ pub(crate) struct FrameDraws {
 }
 
 impl FrameDraws {
-    /// Batch `opaque` (sorted by key) and `transparent` (order kept — the caller sorted
+    /// Batch `opaque` (sorted by key, its runs nearest first) and `transparent` (order kept — the caller sorted
     /// it back-to-front). With `instancing` off every item is its own draw, in the
     /// order given: the pre-#470 path, kept for equivalence tests and measurement.
     pub(crate) fn build(
@@ -110,8 +115,7 @@ impl FrameDraws {
         instancing: bool,
     ) -> Self {
         if instancing {
-            // Stable, so copies of one prop keep their scene order inside the run.
-            opaque.sort_by(|a, b| a.key.cmp(&b.key));
+            opaque = sort::front_to_back(opaque);
         }
         let mut out = Self::default();
         out.opaque = out.push_runs(opaque, instancing, 0);
@@ -191,3 +195,6 @@ mod instancing_tests;
 
 #[cfg(test)]
 mod outline_tests;
+
+#[cfg(test)]
+mod order_tests;
