@@ -83,10 +83,12 @@ impl Renderer {
                         reflection_probe: self.reflection_probes.probe_for(p.position),
                         ..InstanceData::IDENTITY
                     },
+                    depth: view_depth(p.position, cam.position, cam.forward()),
                     outline: false,
                 };
                 if glass {
-                    transparent.push((item, view_depth(p.position, cam.position, cam.forward())));
+                    let depth = item.depth;
+                    transparent.push((item, depth));
                 } else {
                     opaque.push(item);
                 }

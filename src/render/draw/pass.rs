@@ -5,6 +5,7 @@ use crate::render::draw::batch::DrawBatch;
 use crate::render::gpu::draw_buffers::DrawBuffers;
 use crate::render::gpu::global_group::GlobalGroup;
 use crate::render::gpu::pipelines::surface::SolidPass;
+use crate::render::gpu::pipelines::PrimedPipelines;
 use crate::render::motion;
 use crate::render::passes::ssao::SsaoFrame;
 use crate::render::timing::GpuPass;
@@ -109,6 +110,7 @@ impl Renderer {
         self.record_scene_pass(view, &mut encoder, &frame, solid_batches);
         let velocity = view.post_fx.motion.target_view().is_some();
         self.frame_counters.velocity_passes += u32::from(velocity);
+        self.frame_counters.primed_passes += u32::from(self.primes(view, &frame));
 
         // 6. Submit the scene pass (it filled the HDR target + depth). Particles +
         // post-FX run from the per-camera loop in `draw`.
@@ -125,6 +127,7 @@ impl Renderer {
     ) {
         let clear = frame.clear;
         let velocity = view.post_fx.motion.target_view();
+        let primed = self.prime_depth(view, encoder, frame);
         let targets = scene_targets(view, clear);
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             multiview_mask: None,
@@ -133,9 +136,13 @@ impl Renderer {
             depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
                 view: &view.depth_view,
                 // Every camera clears depth so its geometry sorts independently of the
-                // layer below — a viewmodel never clips through walls.
+                // layer below — a viewmodel never clips through walls. A primed one
+                // starts from its own prepass's depth instead (#1499).
                 depth_ops: Some(wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(1.0),
+                    load: match primed {
+                        Some(_) => wgpu::LoadOp::Load,
+                        None => wgpu::LoadOp::Clear(1.0),
+                    },
                     store: wgpu::StoreOp::Store,
                 }),
                 stencil_ops: None,
@@ -146,8 +153,8 @@ impl Renderer {
 
         // Set global bindings
         let solid_pass = match velocity {
-            Some(_) => SolidPass::Velocity(&self.velocity_pipeline),
-            None => SolidPass::Opaque(view.forward_pipeline(&self.render_pipeline)),
+            Some(_) => SolidPass::Velocity(&self.velocity_pipeline, primed),
+            None => SolidPass::Opaque(view.forward_pipeline(&self.render_pipeline), primed),
         };
         render_pass.set_bind_group(0, &self.global_bind_group, &[]);
         render_pass.set_bind_group(3, self.scene_group3(view, frame.ssao.is_some()), &[]);
@@ -168,6 +175,31 @@ impl Renderer {
                 None => sky.draw_gradient(&mut render_pass, globals, moving),
             }
         }
+    }
+
+    /// Depth priming (#1499), Unity URP's *Auto* mode: when this camera ran the SSAO
+    /// prepass, copy its depth into the view's, so the forward pass starts from it and
+    /// shades each lit pixel once. The prepass is the forward vertex stage at the
+    /// view's size and format, clipping cutouts as `fs_main` does. A view shading with
+    /// a pipeline of its own (the shader preview) is not primed: its override has no
+    /// primed twin, and nor is any view on Metal (`pipelines::priming`). `Some` carries the pipelines the primed pass draws lit solids with.
+    fn prime_depth(
+        &self,
+        view: &RenderView,
+        encoder: &mut wgpu::CommandEncoder,
+        frame: &ScenePassFrame,
+    ) -> Option<&PrimedPipelines> {
+        let prepass = view.ssao.as_ref().filter(|_| self.primes(view, frame))?;
+        let (from, to) = (prepass.depth_texture(), &view.depth_texture);
+        encoder.copy_texture_to_texture(from.as_image_copy(), to.as_image_copy(), from.size());
+        Some(&self.primed_pipelines)
+    }
+
+    /// Whether this camera's forward pass is primed ([`Self::prime_depth`]).
+    fn primes(&self, view: &RenderView, frame: &ScenePassFrame) -> bool {
+        let prepass = frame.ssao.is_some() && view.ssao.is_some();
+        let on = self.depth_priming && self.priming_recommended;
+        on && prepass && !view.has_forward_override()
     }
 
     /// Rebuild the group-0 bind group, but only when something it names changed — the
@@ -209,9 +241,16 @@ impl Renderer {
             let Some(gpu_mesh) = self.gpu_meshes.get(&batch.key.mesh) else {
                 continue;
             };
-            if bound != Some(batch.key.pipeline) {
-                render_pass.set_pipeline(self.surface_shaders.pick(solid_pass, batch.key.pipeline));
-                bound = Some(batch.key.pipeline);
+            let in_prepass = batch.key.in_prepass();
+            if solid_pass.is_prepass() && !in_prepass {
+                continue;
+            }
+            let primed = solid_pass.primed() && in_prepass;
+            let pipeline = (batch.key.pipeline, primed);
+            if bound != Some(pipeline) {
+                let shaders = &self.surface_shaders;
+                render_pass.set_pipeline(shaders.pick(solid_pass, pipeline.0, primed));
+                bound = Some(pipeline);
             }
             let offsets = DrawBuffers::offsets(batch.uniform_slot);
             render_pass.set_vertex_buffer(0, gpu_mesh.vertex_buffer.slice(..));

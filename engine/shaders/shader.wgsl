@@ -8,7 +8,10 @@
 // resources are `forward/bindings.wgsl`, its lighting helpers `forward/lighting.wgsl`.
 
 struct VertexOutput {
-    @builtin(position) clip_position: vec4<f32>,
+    // Invariant, so the SSAO prepass, the opaque pass, its motion-vector twin and a
+    // surface variant compute bit-identical depth from the same inputs: a primed
+    // forward pass tests the prepass's depth `LessEqual` (#1499).
+    @invariant @builtin(position) clip_position: vec4<f32>,
     @location(0) world_position: vec3<f32>,
     @location(1) world_normal: vec3<f32>,
     @location(2) tex_coords: vec2<f32>,
@@ -49,15 +52,17 @@ fn forward_vertex(model: VertexInput, instance: u32) -> VertexOutput {
 }
 
 // The SSAO depth prepass (#436): depth only, so it writes no colour. Cutout texels
-// are clipped as `fs_main` clips them, and unlit draws (gizmos, grids) are skipped:
-// neither should cast occlusion. A surface variant whose blocks cut fragments
-// (`dissolve`) adds `fs_prepass_cut`, which runs its cuts and then this (#648).
+// are clipped as `fs_main` clips them, so they cast no occlusion. Unlit draws (gizmos,
+// a light's own mesh) never reach it: `BatchKey::in_prepass` leaves them out on the
+// CPU, the one rule depth priming reads too (#1499). A surface variant whose blocks
+// cut fragments or move the UVs adds `fs_prepass_cut`, which opens like
+// `surface_color`, runs its cuts and then this (#648).
 fn prepass_clip(in: VertexOutput) {
     var alpha = entity.color_tint.a;
     if (entity.use_texture == 1u) {
         alpha *= textureSample(t_diffuse, s_diffuse, in.tex_coords).a;
     }
-    if (entity.is_lit == 0u || (entity.use_cutout == 1u && alpha < entity.alpha_cutoff)) {
+    if (entity.use_cutout == 1u && alpha < entity.alpha_cutoff) {
         discard;
     }
 }
@@ -157,7 +162,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 // depth order, kept per camera). Every field of
 // `VertexOutput`, then the two clip positions the velocity is the difference of.
 struct VelocityVertex {
-    @builtin(position) clip_position: vec4<f32>,
+    @invariant @builtin(position) clip_position: vec4<f32>,
     @location(0) world_position: vec3<f32>,
     @location(1) world_normal: vec3<f32>,
     @location(2) tex_coords: vec2<f32>,

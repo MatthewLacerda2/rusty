@@ -24,9 +24,10 @@
 //! declare that slot's binding — once, however many blocks read it; a variant with
 //! no such block declares none.
 //!
-//! A surface block that cuts fragments (`dissolve`) also gives the variant depth-only
-//! entry points, [`CUT_PREPASS`] and [`CUT_SHADOW`], so the SSAO prepass and the
-//! shadow cascades drop what the colour pass drops (#648, `depth`).
+//! A surface block that cuts fragments (`dissolve`) or moves the UVs (`uv_scroll`)
+//! also gives the variant depth-only entry points, [`CUT_PREPASS`] and [`CUT_SHADOW`],
+//! so the SSAO prepass and the shadow cascades drop what the colour pass drops (#648,
+//! #1499, `depth`).
 //!
 //! Each block instance contributes its params (as per-instance WGSL `const`s) and a
 //! call spliced into the chain; each distinct block contributes its helper once —

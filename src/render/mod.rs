@@ -133,6 +133,8 @@ pub struct Renderer {
     render_pipeline: wgpu::RenderPipeline,
     /// The forward pipeline writing a view's velocity target too (#1435).
     velocity_pipeline: gpu::pipelines::LazyPipeline,
+    /// The opaque ones over a view's primed depth (#1499).
+    primed_pipelines: gpu::pipelines::PrimedPipelines,
     /// The post effects' shared pipelines (#1467): bloom, depth of field (#1445), the
     /// exposure meter (#1444) and motion blur (#1436).
     pub(crate) post_passes: postfx::effects::Passes,
@@ -173,6 +175,11 @@ pub struct Renderer {
     /// Group repeated mesh + material pairs into instanced draws (#470). Always on in
     /// the engine; tests turn it off to compare against one-draw-per-entity.
     pub(crate) instancing: bool,
+    /// Reuse the SSAO prepass's depth in the forward pass (#1499). Always on in the
+    /// engine; tests turn it off to compare against the unprimed pass.
+    pub(crate) depth_priming: bool,
+    /// Whether the adapter's backend primes at all (`pipelines::priming`): not Metal.
+    pub(crate) priming_recommended: bool,
 
     // Asset cache keyed by mesh-asset identity (#127): identical geometry shared
     // across entities resolves to one buffer pair, not one per entity.

@@ -47,6 +47,7 @@ pub(crate) struct ShadowSystem {
 pub(crate) struct ForwardPasses {
     pub render_pipeline: wgpu::RenderPipeline,
     pub velocity_pipeline: pipelines::LazyPipeline,
+    pub primed_pipelines: pipelines::PrimedPipelines,
     pub transparent_pipeline: pipelines::LazyPipeline,
     pub line_pipeline: pipelines::LazyPipeline,
     /// The selection outline's mask and edge pipelines (#1175).
@@ -282,6 +283,7 @@ fn create_forward_passes(
     ForwardPasses {
         render_pipeline: pl.forward,
         velocity_pipeline: pl.velocity,
+        primed_pipelines: pl.primed,
         transparent_pipeline: pl.transparent,
         line_pipeline: pl.line,
         outline: OutlinePasses::new(device, registry, &pl.layout, output_format),

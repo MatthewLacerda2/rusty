@@ -16,7 +16,7 @@ pub(crate) struct SsaoTargets {
     /// The raw occlusion target's size (the view's, divided).
     pub(super) raw_size: (u32, u32),
     /// The depth, raw and blurred textures the views below look into.
-    _textures: [wgpu::Texture; 3],
+    textures: [wgpu::Texture; 3],
     pub(super) depth: wgpu::TextureView,
     pub(super) raw: wgpu::TextureView,
     pub(super) ao: wgpu::TextureView,
@@ -31,6 +31,11 @@ impl SsaoTargets {
     /// Are these the targets for a `width` x `height` view at `divisor`?
     pub(super) fn matches(&self, width: u32, height: u32, divisor: u32) -> bool {
         self.key == (width, height, divisor)
+    }
+
+    /// The prepass depth, which a primed forward pass starts from (#1499).
+    pub(crate) fn depth_texture(&self) -> &wgpu::Texture {
+        &self.textures[0]
     }
 
     pub(super) fn new(r: &Renderer, width: u32, height: u32, divisor: u32) -> Self {
@@ -58,7 +63,7 @@ impl SsaoTargets {
                 &r.shadow_renderer,
                 &ao,
             ),
-            _textures: [depth_tex, raw_tex, ao_tex],
+            textures: [depth_tex, raw_tex, ao_tex],
             depth,
             raw,
             ao,
@@ -67,7 +72,8 @@ impl SsaoTargets {
     }
 }
 
-/// A render target the SSAO passes also sample, and its default view.
+/// A render target the SSAO passes also sample, and its default view. Copyable, so
+/// the forward pass can be primed with the prepass depth (#1499).
 fn target(
     device: &wgpu::Device,
     label: &str,
@@ -85,7 +91,9 @@ fn target(
         sample_count: 1,
         dimension: wgpu::TextureDimension::D2,
         format,
-        usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+        usage: wgpu::TextureUsages::RENDER_ATTACHMENT
+            | wgpu::TextureUsages::TEXTURE_BINDING
+            | wgpu::TextureUsages::COPY_SRC,
         view_formats: &[],
     });
     let view = texture.create_view(&wgpu::TextureViewDescriptor::default());

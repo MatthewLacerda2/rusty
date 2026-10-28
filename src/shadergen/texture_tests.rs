@@ -72,3 +72,16 @@ fn a_scrolled_cut_moves_its_uvs_in_the_depth_passes_too() {
     assert_eq!(wgsl.matches(opened).count(), 2, "{wgsl}");
     validate(ENGINE_SHADERS, &wgsl).expect("scrolled cut composes");
 }
+
+/// A UV-stage block alone still gets depth entry points (#1499): the shared ones
+/// would clip a Cutout texture at the raw UVs while `fs_main` clips at the moved ones.
+#[test]
+fn a_uv_move_without_a_cut_gets_depth_entry_points_too() {
+    use super::assemble::{CUT_PREPASS, CUT_SHADOW};
+    let wgsl = surface(&["uv_scroll"]);
+    assert!(!wgsl.contains("_ = srf_"), "no cut to run: {wgsl}");
+    let entries = validate(ENGINE_SHADERS, &wgsl).expect("moved depth entries compose");
+    for entry in [CUT_PREPASS, CUT_SHADOW] {
+        assert!(entries.iter().any(|e| e == entry), "{entry}: {entries:?}");
+    }
+}

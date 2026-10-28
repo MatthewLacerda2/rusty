@@ -34,7 +34,7 @@ pub struct RenderView {
     /// The quality tier's bloom-buffer divisor currently applied to `post_fx`; a change
     /// (a live quality switch) triggers a re-size the next frame.
     bloom_divisor: u32,
-    depth_texture: wgpu::Texture,
+    pub(crate) depth_texture: wgpu::Texture,
     pub(crate) depth_view: wgpu::TextureView,
     /// Post-process chain (bloom, colour correction, motion blur, SSR) + its temporal
     /// history. Per view, so one view's previous frame is never another's motion-blur
