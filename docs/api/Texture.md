@@ -161,6 +161,10 @@ cells of the last row are black). No text is drawn: tile `k` (from 1) is
 `order[k]`, so open the PNG and match tiles to ids. Every tile is **sRGB-encoded**,
 data included, the way Blender's node previews show everything through the view
 transform: a 0.5 mask shows as 188, not 128. Alpha is not shown.
+`size` defaults to 128, or the recipe's resolution when that is smaller; a `size`
+above the resolution is an error, since a tile larger than the image adds nothing.
+Both verbs refuse a recipe whose `output` or `outputs` names a missing node, as the
+bakes do.
 
 ```lua no-run
 local p = Texture.Preview(recipe, "out/preview.png", 96)
