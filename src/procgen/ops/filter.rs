@@ -31,8 +31,9 @@ pub fn blur(img: &Image, radius: u32) -> Image {
     if radius == 0 {
         return img.clone();
     }
-    let horizontal = blur_rows(img, radius as i64);
-    blur_rows(&horizontal.transposed(), radius as i64).transposed()
+    // Drop the row pass before the column pass: at most four images live at once.
+    let t = blur_rows(img, radius as i64).transposed();
+    blur_rows(&t, radius as i64).transposed()
 }
 
 /// Box-average every row of `src` over a wrapped `(2r+1)` window.
@@ -43,25 +44,40 @@ fn blur_rows(src: &Image, r: i64) -> Image {
     out
 }
 
+/// A dropped pixel past this magnitude re-sums the window, so its rounding residue
+/// doesn't linger in the running sum. Texture values sit near `[0, 1]`, so it never
+/// fires on a real recipe; while every pixel stays under it, the residue in an output
+/// pixel is below `n × LARGE × ε₆₄` (≈ 5e-10 at a 4096-pixel row).
+const LARGE: f32 = 1e3;
+
 /// One row's sliding box average: the window's sum is built once, then each step
 /// adds the pixel entering on the right and drops the one leaving on the left. The
-/// sum is `f64` so a long row's adds and drops don't drift.
+/// sum is `f64` so a long row's adds and drops don't drift. A non-finite sum (an
+/// `inf` dropped leaves `inf − inf = NaN`) or a dropped [`LARGE`] pixel re-sums the
+/// next window instead, so a bad pixel only reaches its own window, as a per-pixel
+/// re-sum would.
 fn slide(src: &[Rgba], r: i64, inv: f64, out: &mut [Rgba]) {
     let n = src.len() as i64;
     let at = |i: i64| src[i.rem_euclid(n) as usize];
-    let mut acc = [0.0f64; 4];
-    let step = |acc: &mut [f64; 4], p: Rgba, sign: f64| {
-        for c in 0..4 {
-            acc[c] += sign * p[c] as f64;
+    let window = |centre: i64| {
+        let mut acc = [0.0f64; 4];
+        for k in centre - r..=centre + r {
+            let p = at(k);
+            (0..4).for_each(|c| acc[c] += p[c] as f64);
         }
+        acc
     };
-    for k in -r..=r {
-        step(&mut acc, at(k), 1.0);
-    }
+    let mut acc = window(0);
     for (x, o) in (0..n).zip(out.iter_mut()) {
         *o = acc.map(|a| (a * inv) as f32);
-        step(&mut acc, at(x + r + 1), 1.0);
-        step(&mut acc, at(x - r), -1.0);
+        let (enter, leave) = (at(x + r + 1), at(x - r));
+        for c in 0..4 {
+            acc[c] += enter[c] as f64 - leave[c] as f64;
+        }
+        let large = leave.iter().any(|v| !(v.abs() <= LARGE));
+        if large || acc.iter().any(|a| !a.is_finite()) {
+            acc = window(x + 1);
+        }
     }
 }
 
@@ -152,5 +168,40 @@ mod tests {
     fn a_flat_image_blurs_to_itself_exactly() {
         let img = Image::filled(16, [0.25, 0.5, 0.75, 1.0]);
         assert_eq!(blur(&img, 5), img);
+    }
+
+    /// A 32² mid-grey image with one `bad` pixel at (10, 20), blurred at radius 2.
+    fn blur_around(bad: f32) -> Image {
+        let mut img = Image::filled(32, [0.5; 4]);
+        img.pixels_mut()[20 * 32 + 10] = [bad; 4];
+        blur(&img, 2)
+    }
+
+    /// Whether `(x, y)` lies in the (2r+1)² window around (10, 20), r = 2.
+    fn near(x: usize, y: usize) -> bool {
+        x.abs_diff(10) <= 2 && y.abs_diff(20) <= 2
+    }
+
+    #[test]
+    fn an_infinite_pixel_reaches_only_its_window() {
+        let out = blur_around(f32::INFINITY);
+        for (i, p) in out.pixels().iter().enumerate() {
+            let (x, y) = (i % 32, i / 32);
+            match near(x, y) {
+                true => assert!(p[0].is_infinite(), "({x}, {y}): {p:?}"),
+                false => assert!((p[0] - 0.5).abs() < 1e-6, "({x}, {y}): {p:?}"),
+            }
+        }
+    }
+
+    #[test]
+    fn a_huge_pixel_leaves_no_residue_once_dropped() {
+        let out = blur_around(1e20);
+        for (i, p) in out.pixels().iter().enumerate() {
+            let (x, y) = (i % 32, i / 32);
+            if !near(x, y) {
+                assert!((p[0] - 0.5).abs() < 1e-6, "({x}, {y}): {p:?}");
+            }
+        }
     }
 }
