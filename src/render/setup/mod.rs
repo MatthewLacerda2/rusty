@@ -175,6 +175,8 @@ impl Renderer {
                 .clip_layout(&device, &textures.material_layout),
             crate::render::postfx::HDR_FORMAT,
         );
+        // Depth priming follows the adapter's backend (#1499): never on Metal.
+        let backend = device.adapter_info().backend;
         Self {
             device,
             queue,
@@ -211,6 +213,7 @@ impl Renderer {
             surface_shaders,
             instancing: true,
             depth_priming: true,
+            priming_recommended: crate::render::gpu::pipelines::priming::recommended(backend),
             shadow_layout: shadows.layout,
             shadow_renderer: shadows.renderer,
             shadow_uniform_buffer: shadows.uniform_buffer,

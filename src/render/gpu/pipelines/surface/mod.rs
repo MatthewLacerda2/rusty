@@ -284,9 +284,9 @@ mod gameplay_blocks_tests;
 pub(crate) mod cut_depth_tests;
 
 #[cfg(test)]
-#[path = "../tests/priming_tests.rs"]
+#[path = "../tests/priming/walls_tests.rs"]
 mod priming_tests;
 
 #[cfg(test)]
-#[path = "../tests/priming_scroll_tests.rs"]
+#[path = "../tests/priming/scroll_tests.rs"]
 mod priming_scroll_tests;

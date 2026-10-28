@@ -182,7 +182,7 @@ impl Renderer {
     /// shades each lit pixel once. The prepass is the forward vertex stage at the
     /// view's size and format, clipping cutouts as `fs_main` does. A view shading with
     /// a pipeline of its own (the shader preview) is not primed: its override has no
-    /// primed twin. `Some` carries the pipelines the primed pass draws lit solids with.
+    /// primed twin, and nor is any view on Metal (`pipelines::priming`). `Some` carries the pipelines the primed pass draws lit solids with.
     fn prime_depth(
         &self,
         view: &RenderView,
@@ -198,7 +198,8 @@ impl Renderer {
     /// Whether this camera's forward pass is primed ([`Self::prime_depth`]).
     fn primes(&self, view: &RenderView, frame: &ScenePassFrame) -> bool {
         let prepass = frame.ssao.is_some() && view.ssao.is_some();
-        self.depth_priming && prepass && !view.has_forward_override()
+        let on = self.depth_priming && self.priming_recommended;
+        on && prepass && !view.has_forward_override()
     }
 
     /// Rebuild the group-0 bind group, but only when something it names changed — the

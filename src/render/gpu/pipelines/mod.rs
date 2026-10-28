@@ -5,6 +5,7 @@ use crate::render::gpu::mesh::vertex_layout;
 use crate::render::gpu::DEPTH_FORMAT;
 
 mod lazy;
+pub(crate) mod priming;
 mod specs;
 pub(crate) mod surface;
 pub(crate) mod winding;
@@ -229,3 +230,7 @@ mod scrolled_cut_tests;
 #[cfg(test)]
 #[path = "tests/lazy_tests.rs"]
 mod lazy_tests;
+
+#[cfg(test)]
+#[path = "tests/priming/backend_tests.rs"]
+mod priming_backend_tests;

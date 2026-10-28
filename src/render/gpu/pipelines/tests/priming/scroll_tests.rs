@@ -103,7 +103,8 @@ fn frame(r: &mut Renderer, scene: &Scene, primed: bool) -> Vec<u8> {
     let out = view.color_target_view().unwrap();
     let cam = Camera::new(Vec3::new(0.0, 0.0, 2.0), -90.0, 0.0);
     r.render(&mut view, scene, &cam, &out, false);
-    assert_eq!(r.frame_counters.primed_passes, u32::from(primed));
+    let primes = primed && r.priming_recommended;
+    assert_eq!(r.frame_counters.primed_passes, u32::from(primes));
     let target = view.color_target().unwrap();
     readback::read_texture_rgba8(&r.device, &r.queue, target, RES, RES)
 }

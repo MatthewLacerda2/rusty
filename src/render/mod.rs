@@ -178,6 +178,8 @@ pub struct Renderer {
     /// Reuse the SSAO prepass's depth in the forward pass (#1499). Always on in the
     /// engine; tests turn it off to compare against the unprimed pass.
     pub(crate) depth_priming: bool,
+    /// Whether the adapter's backend primes at all (`pipelines::priming`): not Metal.
+    pub(crate) priming_recommended: bool,
 
     // Asset cache keyed by mesh-asset identity (#127): identical geometry shared
     // across entities resolves to one buffer pair, not one per entity.
