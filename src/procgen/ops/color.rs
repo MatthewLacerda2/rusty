@@ -279,3 +279,7 @@ mod tests {
         assert_eq!(at(2e-6), 1.0);
     }
 }
+
+#[cfg(test)]
+#[path = "color_tests.rs"]
+mod field_tests;
