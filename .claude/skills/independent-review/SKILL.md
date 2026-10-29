@@ -78,10 +78,8 @@ And on demand: when the user asks for a PR to be reviewed, open or merged
 ### Level
 
 `code-review` takes an effort level; rusty uses only **`medium`** and **`high`**
-(operator, 2026-10-19). **The reviewer picks it, not the dispatcher:** it reads
-`gh pr diff` first and sees what the PR really touches, where the dispatcher
-only knows what the brief meant it to touch. The rule it applies follows what a
-miss would cost, not the size of the diff:
+(operator, 2026-10-19). The rule follows what a miss would cost, not the size of
+the diff:
 
 - **`high`** when the diff touches a stored format (scene, prefab, save, asset
   cache), determinism, the scripting sandbox (what a script may reach), or the
@@ -89,9 +87,16 @@ miss would cost, not the size of the diff:
   the sandbox, or a queue that merges the wrong thing for every PR behind it.
 - **`medium`** for everything else.
 
-The rule goes into the prompt whole, and the reviewer names the level it chose
-and why at the top of its answer. Called without one, `code-review` reuses
-whatever level was typed last in the session, so a level is always passed.
+**`make review-level PR=<n>` applies it** (#1569): it prints `high` or `medium`
+on its first line, then the paths that decided it, read from the PR's own files
+on GitHub (what the PR really touches, not what its brief meant it to) against
+the table in `.github/scripts/dispatch/review_level.py`. Pass both into the
+prompt. A path table cannot see everything (a stored format changed through a
+component's serde fields, say), so the reviewer may raise `medium` to `high`,
+and says why; it never lowers it. The reviewer names the level it ran at, and
+why, at the top of its answer. Called without one, `code-review` reuses whatever
+level was typed last in the session, so a level is always passed. A path that
+should call for `high` and does not is a row missing from the table: add it.
 
 ### Prompt template
 
@@ -101,11 +106,14 @@ Review PR #<n> of MatthewLacerda2/rusty. It closes issue #<i>: read it with
 Read the root CLAUDE.md and any CLAUDE.md in a directory the PR touches first:
 they hold the conventions the code must follow.
 
-First read `gh pr diff <n>` and pick the effort level: `high` if the diff
-touches a stored format (scene, prefab, save, asset cache), determinism, the
-scripting sandbox (what a script may reach) or the merge path; `medium`
-otherwise. Then run the `code-review` skill on PR #<n> (pass the PR number in
-its arguments) at that level, without `--comment` and without `--fix`. Called without it, the
+The effort level is `<level>`, from `make review-level PR=<n>`:
+<its output after the first line, pasted whole>
+Read `gh pr diff <n>` first. If it touches a stored format (scene, prefab, save,
+asset cache), determinism, the scripting sandbox (what a script may reach) or
+the merge path where the paths above did not catch it, raise `medium` to `high`
+and say why; never lower it. Then run the `code-review` skill on PR #<n> (pass
+the PR number in its arguments) at that level, without `--comment` and without
+`--fix`. Called without it, the
 skill reviews the checkout's own local diff, which is not this PR: if what it
 reviewed is not `gh pr diff <n>`, discard its findings and review that diff
 yourself. You run in your own worktree: check out or fetch what you need
@@ -118,7 +126,7 @@ and no builds.
 
 Look especially for: <the steering lists for the PR's nature, pasted whole>.
 
-Start your answer with the level you chose and why, in one line. Then answer
+Start your answer with the level you ran at and why, in one line. Then answer
 with one entry per finding: path and symbol, the defect in one sentence,
 a concrete failure scenario (inputs or state → wrong result or crash), and
 whether it must be fixed before merge. Verify each one against the code before
@@ -208,7 +216,8 @@ links the fix.
 - Pasting the `Brief` or a summary "to save it time"; it then reviews the
   summary, not the code.
 - Letting the reviewer push its own fixes. It reports; the coder fixes.
-- Picking the level for the reviewer, or leaving the rule out of the prompt.
+- Picking the level by eye instead of `make review-level`, or leaving its paths
+  and the raise-to-`high` rule out of the prompt.
 - Letting `code-review` run without the PR number: it then reviews the
   checkout's local diff, some other change entirely.
 - Labelling `queue` before the `Independent review` comment exists.

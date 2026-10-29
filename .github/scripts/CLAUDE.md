@@ -1,8 +1,9 @@
 # CLAUDE.md — the merge and batch tooling
 
 This file loads when you work under `.github/scripts/`: the Python behind `make queue`,
-`make mergeable`, `make blockers`, `make reclaim`, `make checks`, `make board` and
-`make mutants-remote`, and the CI helpers beside them. The root `CLAUDE.md` keeps the
+`make mergeable`, `make blockers`, `make reclaim`, `make checks`, `make board`,
+`make coder`, `make review-level` and `make mutants-remote`, and the CI helpers
+beside them. The root `CLAUDE.md` keeps the
 project-wide rules (merging is serialized, gates vs. signals, issues and labels); the
 `ci-merge` and `issue-batch` skills say how to *run* this tooling. This file is what a
 coder *changing* it must know.
@@ -17,6 +18,11 @@ coder *changing* it must know.
   lands; `merging/watch/` is `--watch`'s loop (order, aging, hand-backs, the lock, how
   it ends). `mergeable.py` and `merge-queue.py` are only the command lines. A new
   concern is a new module, not a longer one.
+- **`.github/scripts/dispatch/` is the batch's dispatch steps** (#1569): the brief
+  and its model, the coder's routine, the routines API, the review level.
+  `coder.py` and `review-level.py` are only the command lines. The routines API
+  is reached through `claude mcp serve` (`dispatch/remote.py` says why), never
+  with a token a script reads: the claude.ai login stays inside `claude`.
 - **GitHub over REST, so the scripts run in cloud sessions.** There GraphQL answers
   403, and `gh pr view/list`, `gh issue list` and `gh repo view` with `--json` are
   GraphQL. New calls go through `gh api repos/{owner}/{repo}/…`, paging with an
@@ -31,7 +37,7 @@ coder *changing* it must know.
 ## Gates on this code
 - **`make scripts` is a hard gate** (in `make gates` and `lint.yml`): `unittest` over
   `.github/scripts/tests/`. Tests are grouped there by area — `verdict/`, `queue/`,
-  `watch/`, `reclaim/`, `board/`, `checks/`, `mutants/` — each a package; a new area
+  `watch/`, `reclaim/`, `board/`, `checks/`, `mutants/`, `dispatch/` — each a package; a new area
   gets its own folder. A test never reaches GitHub or pushes: it fakes `gh` and `git` the way
   `.github/scripts/tests/watch/fakes.py` and the `fixtures.py` files do.
 - **The size gate measures `.py`** (#926): 300 lines of code, 150 for a file under a
