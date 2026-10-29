@@ -6,6 +6,7 @@ import unittest
 from datetime import datetime, timedelta, timezone
 
 from dispatch import routine
+from tests import SCRIPTS
 
 NOW = datetime(2026, 10, 29, 14, 3, 41, tzinfo=timezone.utc)
 
@@ -74,6 +75,10 @@ class Body(unittest.TestCase):
         self.assertNotIn("cron_expression", self.body)
         self.assertEqual(self.body["name"], "rusty #42 A title")
         self.assertTrue(self.body["enabled"])
+
+    def test_the_skill_quotes_the_prompt_the_script_writes(self):
+        skill = (SCRIPTS.parent.parent / ".claude/skills/issue-batch/SKILL.md").read_text()
+        self.assertIn(routine.PROMPT.format(number="N"), skill, "issue-batch's routine prompt drifted")
 
     def test_each_launch_gets_its_own_event_id(self):
         one = routine.body(42, "t", "m", "e", "o/r", NOW)["job_config"]["ccr"]["events"][0]["data"]["uuid"]

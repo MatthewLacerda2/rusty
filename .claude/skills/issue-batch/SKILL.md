@@ -71,18 +71,29 @@ build half the cores (`CARGO_BUILD_JOBS`) when another may overlap it. Never run
 `cloud-brief.md`, and puts its issue number in every scratch filename: siblings
 share the scratchpad.
 
-**Launching a cloud coder.** A one-off routine via `RemoteTrigger` (the `schedule`
-skill has the body shape):
+**Launching a cloud coder: post the `Brief`, then `make coder ISSUE=N`** (#1569).
+It reads the newest `Brief` comment on #N, takes the model from its `Model:` line,
+and creates the one-off routine that starts the cloud session a minute or two
+later; it prints the routine's link, where its run links the session. Running it
+again for the same issue is the re-brief launch: a new routine with the same
+prompt, which reads the newest `Brief`. `ARGS=--dry-run` prints the routine and
+creates nothing. Never assemble a `RemoteTrigger` body by hand; what the script
+keeps, and why (`.github/scripts/dispatch/routine.py` has the detail):
 
 - **Environment: `anthropic_cloud`**, never a `bridge` one (`archlinux:…` is this
   machine). That choice is what makes it remote. Not the `Agent` tool's
-  `isolation: "remote"`, which fell back to a local worktree here (#504).
-- `run_once_at` computed, never typed: `date -u -d '+2 min' +%Y-%m-%dT%H:%M:00Z`
-  (`-v+2M` on macOS). The API refuses a time already past.
-- **The model** from the brief's `Model:` line (*Which model*), never the
-  example body's default.
-- **`allowed_tools`** includes `ToolSearch`; the GitHub MCP tools load through it
-  without being listed.
+  `isolation: "remote"`, which fell back to a local worktree here (#504). The API
+  cannot list environments, so the script takes the one the newest `rusty #…`
+  routine ran in; `RUSTY_CLOUD_ENV` names it on an account with none yet.
+- **The model** from the brief's `Model:` line (*Which model*): a brief without
+  one naming Opus or Sonnet is refused, and so are a closed issue, a `planning`
+  or `human` one, and a brief by someone who cannot push.
+- `run_once_at` computed, `allowed_tools` with `ToolSearch` (the GitHub MCP tools
+  load through it without being listed), and the fixed prompt below.
+- It calls `RemoteTrigger` through `claude mcp serve`, so it needs the `claude`
+  CLI signed in to claude.ai, as this machine is; the token never leaves
+  `claude`. `claude --cloud` cannot do it: it starts a session only from an
+  interactive terminal, and an orchestrator's shell has none.
 
 **The brief is a comment on the issue** (#910), first line `Brief`. The prompt is
 echoed back about three times by `RemoteTrigger`, so it stays a fixed pointer, and
@@ -126,7 +137,7 @@ So, before writing a brief:
 - file an issue first and cite the number it got, never the one you expect: two
   briefs named the wrong issue in one batch.
 
-The routine prompt:
+The routine prompt, which `make coder` writes (`dispatch/routine.py`'s `PROMPT`):
 
 ```text
 Read `.claude/skills/issue-batch/cloud-brief.md` and follow it.
