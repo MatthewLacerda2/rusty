@@ -118,7 +118,7 @@ fn literal(p: &Param, value: Option<&ParamValue>) -> String {
     let lanes = match value {
         Some(ParamValue::Vector(v)) => v.clone(),
         Some(ParamValue::Scalar(s)) => vec![*s; p.arity],
-        None => vec![p.default; p.arity],
+        None => p.defaults(),
     };
     let parts: Vec<String> = lanes.iter().map(|v| fmt_f32(*v)).collect();
     if p.arity == 1 {

@@ -13,8 +13,10 @@ use glam::Vec3;
 
 mod capsule;
 mod cylinder;
+mod plane;
 pub use capsule::generate_capsule;
 pub use cylinder::generate_cylinder;
+pub use plane::{generate_plane, generate_plane_grid, MAX_PLANE_SUBDIVISIONS};
 
 /// Generates a 3D box centered at the origin
 pub fn generate_box(width: f32, height: f32, depth: f32) -> (Vec<Vertex>, Vec<u32>) {
@@ -149,30 +151,6 @@ pub fn generate_sphere(radius: f32, rings: u32, sectors: u32) -> (Vec<Vertex>, V
     }
 
     fill_tangents_unwrapped(vertices, indices)
-}
-
-/// Generates a flat quad aligned on the XZ plane
-pub fn generate_plane(width: f32, depth: f32) -> (Vec<Vertex>, Vec<u32>) {
-    let w = width / 2.0;
-    let d = depth / 2.0;
-
-    let norm = Vec3::new(0.0, 1.0, 0.0);
-
-    let vertices = vec![
-        Vertex::new(Vec3::new(-w, 0.0, -d), norm, [0.0, 0.0]),
-        Vertex::new(Vec3::new(w, 0.0, -d), norm, [1.0, 0.0]),
-        Vertex::new(Vec3::new(w, 0.0, d), norm, [1.0, 1.0]),
-        Vertex::new(Vec3::new(-w, 0.0, d), norm, [0.0, 1.0]),
-    ];
-    // One quad over [0, 1]²: its texture UV is already a lightmap unwrap (#438).
-    let vertices = vertices
-        .into_iter()
-        .map(|v| v.with_lightmap_uv(v.tex_coords))
-        .collect();
-
-    let indices = vec![0, 2, 1, 0, 3, 2];
-
-    fill_tangents(vertices, indices)
 }
 
 /// [`fill_tangents`] after a generated lightmap UV (#831), the unwrap Generate

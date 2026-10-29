@@ -11,7 +11,7 @@ use crate::components::{
     PostProcessingComponent, TransformComponent,
 };
 use crate::scene::authoring::{
-    rendering::camera, rendering::light, rendering::lod_group as lod,
+    rendering::camera, rendering::light, rendering::lod_group as lod, rendering::mesh,
     rendering::post_processing as vc,
 };
 
@@ -29,6 +29,7 @@ inspect! {
     MeshComponent => mesh, mesh_mut, &[
         ro!("primitive_type", MESH),
         ro!("asset_ref", MESH),
+        with!("subdivisions", |m, n: u32| mesh::set_subdivisions(m, n)?),
         ro!("skeleton", MESH),
     ];
     MaterialComponent => material, material_mut, &[

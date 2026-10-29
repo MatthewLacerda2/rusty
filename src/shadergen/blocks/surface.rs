@@ -1,7 +1,7 @@
 //! src/shadergen/blocks/surface.rs — the surface building-block family (#272).
 //!
-//! Surface blocks vary the **fragment look** of the forward pass while keeping the
-//! standard `vs_main` + the full PBR lighting verbatim (so the assembled module
+//! Surface blocks vary the **look** of the forward pass while keeping the full PBR
+//! lighting verbatim (so the assembled module
 //! binds against the forward pipeline unchanged — same `VertexInput`, same
 //! `LightingUniforms`/`EntityUniforms`/group(2) maps, same entry points).
 //! Each block's `helper` is a pure function
@@ -24,6 +24,10 @@
 //! color": it rewrites `in.tex_coords` at the top of `surface_color`, before any map is
 //! sampled, so every lookup — and every later color block reading `in.tex_coords` —
 //! sees the moved UVs.
+//!
+//! A [`Stage::Vertex`] block (`vertex_waves`, #1524) moves the vertex instead: the
+//! world position, normal and tangent the base's `surface_vertex` hook hands it, in
+//! every vertex stage, at the game time that stage draws at (`time`).
 
 use super::{Block, Param, Stage};
 
@@ -205,6 +209,23 @@ pub const BLOCKS: &[Block] = &[
         call: "srf_hologram({prev}, in{args})",
         textures: &[],
         stage: Stage::Color,
+        cut: None,
+    },
+    Block {
+        id: "vertex_waves",
+        desc: "Move the surface in gentle swells over game time (water, #1524): a sum of `count` (1-8) waves in world XZ, each turned and shortened off the first, displaced along the normal with analytic normals. `steepness` 0 is round sine swells, higher pinches Gerstner crests. World space, so neighbouring meshes join; needs vertices to move (a subdivided Plane).",
+        params: &[
+            Param::live("amplitude", 0.03, 1),
+            Param::baked("wavelength", 2.0, 1),
+            Param::baked("speed", 0.5, 1),
+            Param::baked("direction", 1.0, 2).with_lanes(&[1.0, 0.3]),
+            Param::baked("count", 3.0, 1),
+            Param::baked("steepness", 0.0, 1),
+        ],
+        helper: "fn vtx_vertex_waves(v: SurfaceVertex, time: f32, amplitude: f32, wavelength: f32, speed: f32, direction: vec2<f32>, count: f32, steepness: f32) -> SurfaceVertex {\n    let n = normalize(v.normal);\n    let d0 = select(normalize(direction), vec2<f32>(1.0, 0.0), dot(direction, direction) < 1e-8);\n    var h = 0.0;\n    var grad = vec2<f32>(0.0);\n    var side = vec2<f32>(0.0);\n    var lift = 0.0;\n    let waves = u32(clamp(count, 1.0, 8.0));\n    for (var i = 0u; i < waves; i = i + 1u) {\n        let fi = f32(i);\n        let turn = 0.65 * fi * select(1.0, -1.0, (i & 1u) == 1u);\n        let d = vec2<f32>(d0.x * cos(turn) - d0.y * sin(turn), d0.x * sin(turn) + d0.y * cos(turn));\n        let scale = pow(0.62, fi);\n        let k = 6.2831853 / max(wavelength * scale, 0.001);\n        let a = amplitude * scale;\n        let theta = k * (dot(d, v.position.xz) - speed * sqrt(scale) * time);\n        h += a * sin(theta);\n        grad += d * (k * a * cos(theta));\n        side += d * (steepness * a * cos(theta));\n        lift += steepness * k * a * sin(theta);\n    }\n    let g = vec3<f32>(grad.x, 0.0, grad.y);\n    let s = vec3<f32>(side.x, 0.0, side.y);\n    let position = v.position + n * h + (s - n * dot(n, s));\n    let normal = normalize(n * (1.0 - lift) - (g - n * dot(n, g)));\n    let tangent = normalize(v.tangent - normal * dot(normal, v.tangent));\n    return SurfaceVertex(position, normal, tangent);\n}",
+        call: "vtx_vertex_waves({prev}, time{args})",
+        textures: &[],
+        stage: Stage::Vertex,
         cut: None,
     },
 ];

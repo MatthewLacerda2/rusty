@@ -8,8 +8,9 @@
 //!
 //! Three families, one per [`PassKind`]:
 //! - **surface** (`surface`) — vary the *fragment look* of the forward pass; the
-//!   standard `vs_main` + lighting are kept verbatim and each block transforms the
-//!   shaded color (toon ramp, fresnel rim, emissive pulse, UV-scroll tint, …).
+//!   standard lighting is kept verbatim and each block transforms the shaded color
+//!   (toon ramp, fresnel rim, emissive pulse, UV-scroll tint, …), moves the UVs, or
+//!   moves the vertices (`vertex_waves`, #1524).
 //! - **postfx** (`postfx`) — fullscreen effects over the tonemapped scene color (tint,
 //!   vignette, scanline, grayscale, …) — the self-contained family.
 //! - **ui** (`ui`, #427) — restyle one UI graphic's premultiplied colour (scanlines,
@@ -47,6 +48,9 @@ pub struct Param {
     /// graphic the same way (#427), and a postfx param per post-processing volume
     /// (#671, `Graphics.SetPostParam`).
     pub runtime: bool,
+    /// Per-lane defaults for a vector param whose lanes differ (`vertex_waves`'
+    /// `direction`, `{1, 0.3}`); empty broadcasts [`Param::default`].
+    pub lanes: &'static [f32],
 }
 
 impl Param {
@@ -57,6 +61,7 @@ impl Param {
             default,
             arity,
             runtime: false,
+            lanes: &[],
         }
     }
 
@@ -67,6 +72,20 @@ impl Param {
             default,
             arity,
             runtime: true,
+            lanes: &[],
+        }
+    }
+
+    /// This param with per-lane defaults, one per lane of its arity.
+    pub const fn with_lanes(self, lanes: &'static [f32]) -> Self {
+        Self { lanes, ..self }
+    }
+
+    /// The default value, one number per lane.
+    pub fn defaults(&self) -> Vec<f32> {
+        match self.lanes.is_empty() {
+            true => vec![self.default; self.arity],
+            false => self.lanes.to_vec(),
         }
     }
 }
@@ -81,6 +100,12 @@ pub enum Stage {
     /// helper is `fn uv_<id>(uv: vec2<f32>, in: VertexOutput, <params…>) -> vec2<f32>`
     /// and its `call` wraps `{prev}`, the incoming UV. Surface only.
     Uv,
+    /// Moves the vertex itself (#1524): its world position, normal and tangent, in
+    /// every vertex stage that draws the mesh (forward, motion vectors, shadows). Its
+    /// helper is `fn vtx_<id>(v: SurfaceVertex, time: f32, <params…>) -> SurfaceVertex`
+    /// and its `call` wraps `{prev}` and passes `time`, the game time the stage draws
+    /// at (last frame's for the motion vectors). Surface only.
+    Vertex,
 }
 
 /// A curated building block: an `id`, its declared params, and the two WGSL
@@ -155,6 +180,17 @@ mod tests {
     }
 
     #[test]
+    fn per_lane_defaults_fill_their_arity() {
+        for pass in PassKind::ALL {
+            for b in catalog(pass) {
+                for p in b.params {
+                    assert_eq!(p.defaults().len(), p.arity, "{}.{}", b.id, p.name);
+                }
+            }
+        }
+    }
+
+    #[test]
     fn postfx_strengths_are_runtime() {
         // #671: the amount a script fades (a hurt vignette following health) is live.
         let live = |id, name| {
@@ -169,13 +205,13 @@ mod tests {
     }
 
     #[test]
-    fn uv_stage_blocks_are_surface_only() {
+    fn uv_and_vertex_stage_blocks_are_surface_only() {
         for pass in [PassKind::Postfx, PassKind::Ui] {
             assert!(catalog(pass).iter().all(|b| b.stage == Stage::Color));
         }
-        assert!(catalog(PassKind::Surface)
-            .iter()
-            .any(|b| b.stage == Stage::Uv));
+        for stage in [Stage::Uv, Stage::Vertex] {
+            assert!(catalog(PassKind::Surface).iter().any(|b| b.stage == stage));
+        }
     }
 
     #[test]

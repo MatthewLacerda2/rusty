@@ -41,12 +41,7 @@ pub const BLOCKS: &[Block] = &[
     Block {
         id: "tint",
         desc: "Multiply the color by an RGB tint.",
-        params: &[Param {
-            name: "color",
-            default: 1.0,
-            arity: 3,
-            runtime: false,
-        }],
+        params: &[Param::baked("color", 1.0, 3)],
         helper: "fn pfx_tint(c: vec3<f32>, uv: vec2<f32>, color: vec3<f32>) -> vec3<f32> {\n    return c * color;\n}",
         call: "pfx_tint({prev}, uv{args})",
         textures: &[],
@@ -67,18 +62,8 @@ pub const BLOCKS: &[Block] = &[
         id: "scanline",
         desc: "CRT-style horizontal scanlines; count and strength tune the look.",
         params: &[
-            Param {
-                name: "count",
-                default: 240.0,
-                arity: 1,
-                runtime: false,
-            },
-            Param {
-                name: "strength",
-                default: 0.2,
-                arity: 1,
-                runtime: true,
-            },
+            Param::baked("count", 240.0, 1),
+            Param::live("strength", 0.2, 1),
         ],
         helper: "fn pfx_scanline(c: vec3<f32>, uv: vec2<f32>, count: f32, strength: f32) -> vec3<f32> {\n    let s = sin(uv.y * count * 3.14159265);\n    let line = 1.0 - strength * (0.5 - 0.5 * s);\n    return c * line;\n}",
         call: "pfx_scanline({prev}, uv{args})",
@@ -89,12 +74,7 @@ pub const BLOCKS: &[Block] = &[
     Block {
         id: "posterize",
         desc: "Quantize the color into N bands per channel (retro / cel look).",
-        params: &[Param {
-            name: "levels",
-            default: 6.0,
-            arity: 1,
-            runtime: false,
-        }],
+        params: &[Param::baked("levels", 6.0, 1)],
         helper: "fn pfx_posterize(c: vec3<f32>, uv: vec2<f32>, levels: f32) -> vec3<f32> {\n    let n = max(levels, 1.0);\n    return floor(c * n + 0.5) / n;\n}",
         call: "pfx_posterize({prev}, uv{args})",
         textures: &[],
@@ -105,24 +85,9 @@ pub const BLOCKS: &[Block] = &[
         id: "damage_vignette",
         desc: "Edge vignette blended toward a color (set it, e.g. red); pulses at pulse_speed.",
         params: &[
-            Param {
-                name: "color",
-                default: 1.0,
-                arity: 3,
-            runtime: true,
-            },
-            Param {
-                name: "intensity",
-                default: 0.5,
-                arity: 1,
-            runtime: true,
-            },
-            Param {
-                name: "pulse_speed",
-                default: 0.0,
-                arity: 1,
-            runtime: false,
-            },
+            Param::live("color", 1.0, 3),
+            Param::live("intensity", 0.5, 1),
+            Param::baked("pulse_speed", 0.0, 1),
         ],
         helper: "fn pfx_damage_vignette(c: vec3<f32>, uv: vec2<f32>, color: vec3<f32>, intensity: f32, pulse_speed: f32) -> vec3<f32> {\n    let edge = smoothstep(0.25, 0.75, distance(uv, vec2<f32>(0.5)));\n    let pulse = 0.75 + 0.25 * cos(game_time() * pulse_speed);\n    return mix(c, color, clamp(edge * intensity * pulse, 0.0, 1.0));\n}",
         call: "pfx_damage_vignette({prev}, uv{args})",
@@ -133,12 +98,7 @@ pub const BLOCKS: &[Block] = &[
     Block {
         id: "sharpen",
         desc: "Unsharp mask: add the input's 5-tap high-pass detail, scaled by amount.",
-        params: &[Param {
-            name: "amount",
-            default: 0.5,
-            arity: 1,
-            runtime: true,
-        }],
+        params: &[Param::live("amount", 0.5, 1)],
         helper: "fn pfx_sharpen(c: vec3<f32>, uv: vec2<f32>, amount: f32) -> vec3<f32> {\n    let t = source_texel();\n    let ring = source_tap(uv + vec2<f32>(t.x, 0.0)) + source_tap(uv - vec2<f32>(t.x, 0.0)) + source_tap(uv + vec2<f32>(0.0, t.y)) + source_tap(uv - vec2<f32>(0.0, t.y));\n    let detail = source_tap(uv) - ring * 0.25;\n    return max(c + detail * amount, vec3<f32>(0.0));\n}",
         call: "pfx_sharpen({prev}, uv{args})",
         textures: &[],
@@ -149,18 +109,8 @@ pub const BLOCKS: &[Block] = &[
         id: "radial_blur",
         desc: "Blur toward a centre point (speed / impact); strength is the streak length.",
         params: &[
-            Param {
-                name: "strength",
-                default: 0.05,
-                arity: 1,
-            runtime: true,
-            },
-            Param {
-                name: "center",
-                default: 0.5,
-                arity: 2,
-            runtime: false,
-            },
+            Param::live("strength", 0.05, 1),
+            Param::baked("center", 0.5, 2),
         ],
         helper: "fn pfx_radial_blur(c: vec3<f32>, uv: vec2<f32>, strength: f32, center: vec2<f32>) -> vec3<f32> {\n    let dir = (center - uv) * strength / 8.0;\n    var sum = vec3<f32>(0.0);\n    for (var i = 0; i < 8; i = i + 1) {\n        sum = sum + source_tap(uv + dir * f32(i));\n    }\n    return max(c + sum / 8.0 - source_tap(uv), vec3<f32>(0.0));\n}",
         call: "pfx_radial_blur({prev}, uv{args})",
