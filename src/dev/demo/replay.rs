@@ -145,59 +145,68 @@ pub fn prepare(world: &mut GameWorld, demo: Demo) -> Result<(), String> {
     Ok(())
 }
 
+impl Replayer {
+    /// Before the tick: its host acts again, and its Game view size.
+    fn before_tick(&mut self, world: &mut GameWorld) {
+        self.tick = self.ticks.next();
+        let Some(tick) = &mut self.tick else {
+            return;
+        };
+        let (t, acts, size) = (tick.t, std::mem::take(&mut tick.host), tick.size);
+        for act in acts {
+            self.act(world, t, act);
+        }
+        if let Some((width, height)) = size {
+            world
+                .resources
+                .screen
+                .borrow_mut()
+                .set_game_view(width, height);
+        }
+    }
+
+    /// After the tick: its digest compared, when the demo stored one.
+    fn after_tick(&mut self, world: &GameWorld) {
+        let Some(tick) = self.tick.take() else {
+            return;
+        };
+        self.verdict.ticks = tick.t + 1;
+        let Some(expected) = tick.digest else {
+            return;
+        };
+        self.verdict.checked += 1;
+        if self.verdict.diverged.is_some() {
+            return;
+        }
+        let actual = super::digest::of(world);
+        if actual == expected {
+            self.verdict.matched = Some(tick.t);
+            return;
+        }
+        let divergence = Divergence {
+            tick: tick.t,
+            matched: self.verdict.matched,
+            expected,
+            actual,
+        };
+        world
+            .console()
+            .borrow_mut()
+            .error(format!("[Demo] {divergence}"));
+        self.verdict.diverged = Some(divergence);
+    }
+}
+
 impl TickTap for Replayer {
     fn at(&mut self, point: TapPoint, world: &mut GameWorld) {
         match point {
-            TapPoint::BeforeTick => {
-                self.tick = self.ticks.next();
-                let Some(tick) = &mut self.tick else {
-                    return;
-                };
-                let (t, acts, size) = (tick.t, std::mem::take(&mut tick.host), tick.size);
-                for act in acts {
-                    self.act(world, t, act);
-                }
-                if let Some((width, height)) = size {
-                    world
-                        .resources
-                        .screen
-                        .borrow_mut()
-                        .set_game_view(width, height);
-                }
-            }
+            TapPoint::BeforeTick => self.before_tick(world),
             TapPoint::BeforeInput => {
                 if let Some(tick) = &self.tick {
                     world.input().borrow_mut().set_frame(&tick.input);
                 }
             }
-            TapPoint::AfterTick => {
-                let Some(tick) = self.tick.take() else {
-                    return;
-                };
-                self.verdict.ticks = tick.t + 1;
-                let Some(expected) = tick.digest else {
-                    return;
-                };
-                self.verdict.checked += 1;
-                let actual = super::digest::of(world);
-                if actual == expected {
-                    if self.verdict.diverged.is_none() {
-                        self.verdict.matched = Some(tick.t);
-                    }
-                } else if self.verdict.diverged.is_none() {
-                    let divergence = Divergence {
-                        tick: tick.t,
-                        matched: self.verdict.matched,
-                        expected,
-                        actual,
-                    };
-                    world
-                        .console()
-                        .borrow_mut()
-                        .error(format!("[Demo] {divergence}"));
-                    self.verdict.diverged = Some(divergence);
-                }
-            }
+            TapPoint::AfterTick => self.after_tick(world),
             TapPoint::Transition(_) => {}
         }
     }

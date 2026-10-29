@@ -76,6 +76,11 @@ fn main() {
         (None, Some(path)) => scenario::run(path, &out_dir, &scene, opened.settings, size),
         (None, None) => Err(USAGE.to_string()),
     };
+    report(ran);
+}
+
+/// Print where the run wrote its results, and exit non-zero unless it passed.
+fn report(ran: Result<scenario::RunReport, String>) {
     match ran {
         Ok(report) => {
             println!(

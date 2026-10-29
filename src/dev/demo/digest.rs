@@ -13,7 +13,7 @@ pub const EVERY: u64 = 120;
 
 /// Whether the tick `t` (from the one that entered Play) ends with a digest.
 pub fn due(t: u64) -> bool {
-    (t + 1) % EVERY == 0
+    (t + 1).is_multiple_of(EVERY)
 }
 
 /// The world's state as one hex string.

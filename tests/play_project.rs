@@ -10,7 +10,7 @@ use serde_json::Value;
 
 /// A project whose startup scene holds one entity, `Arena`, with a second scene
 /// beside it holding `Other`.
-fn game() -> PathBuf {
+pub fn game() -> PathBuf {
     let root = crate::temp::dir().join("game");
     let scenes = root.join("assets").join("scenes");
     std::fs::create_dir_all(&scenes).unwrap();
@@ -27,7 +27,7 @@ fn game() -> PathBuf {
 
 /// `play --project <game> [extra…]` on a scenario that steps a few ticks, and its
 /// `results.json` when it wrote one.
-fn play(game: &Path, extra: &[&str]) -> (Output, Option<Value>) {
+pub fn play(game: &Path, extra: &[&str]) -> (Output, Option<Value>) {
     let dir = crate::temp::dir().join("run");
     std::fs::create_dir_all(&dir).unwrap();
     let scenario = dir.join("scenario.lua");

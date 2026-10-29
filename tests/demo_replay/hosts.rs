@@ -40,6 +40,10 @@ fn an_act_a_demo_cannot_carry_taints_it_from_its_tick() {
     "#;
     let demo = Demo::read(&record(&dir, code)).unwrap();
     let verdict = replay(&dir, demo, |_| {});
-    assert_eq!(verdict.taints.len(), 1, "{verdict:?}");
-    assert_eq!(verdict.taints[0].0, 5, "from the tick after the act");
+    let (t, what) = verdict.taints.last().unwrap();
+    assert_eq!(*t, 5, "from the tick after the act");
+    assert!(
+        what.contains("FindEntityByName was passed a function"),
+        "{what}"
+    );
 }

@@ -94,7 +94,7 @@ them through Play), so they never reach a Play session.
 digest of the world (the snapshot an agent reads, plus where `Random` stands);
 the replay compares each and reports the first that differs, with the last tick
 that still matched. A demo recorded on another engine commit warns and replays
-anyway. An hour of steady mouse-look writes a few MB; idle ticks write nothing.
+anyway. An hour of steady mouse-look writes about 10 MB; idle ticks write nothing.
 
 ## Rules
 - Test and fixture files are capped at **150 lines** by the size gate

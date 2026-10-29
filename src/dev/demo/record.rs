@@ -60,7 +60,7 @@ impl Recorder {
             let end = end_line(session.t);
             let wrote = writeln!(session.out, "{end}").and_then(|()| session.out.flush());
             if let Err(err) = wrote {
-                log::warn!("demo {}: {err}", session.path.display());
+                log::warn!("[Demo] {}: {err}", session.path.display());
             }
         }
     }
@@ -92,6 +92,7 @@ impl Recorder {
             storage: world.resources.storage.borrow().data(),
             size: world.resources.screen.borrow().game_view(),
         };
+        // lint: allow(asset-write) a demo, read by `play --demo`, never by a path-keyed cache
         let opened = File::create(&path).map(BufWriter::new).and_then(|mut out| {
             let header = serde_json::to_string(&header)?;
             writeln!(out, "{header}").map(|()| out)
@@ -109,7 +110,7 @@ impl Recorder {
                     entry: Entry::default(),
                 });
             }
-            Err(err) => log::warn!("demo {}: {err}", path.display()),
+            Err(err) => log::warn!("[Demo] {}: {err}", path.display()),
         }
     }
 }
@@ -173,7 +174,7 @@ impl TickTap for Recorder {
                     return;
                 };
                 if let Err(err) = session.end_tick(world) {
-                    log::warn!("demo {}: {err}", session.path.display());
+                    log::warn!("[Demo] {}: {err}", session.path.display());
                     self.session = None;
                 }
             }

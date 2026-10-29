@@ -29,7 +29,7 @@ impl Destination {
             Self::Folder(_) if keep == 0 => None,
             Self::Folder(dir) => {
                 if let Err(err) = std::fs::create_dir_all(dir) {
-                    log::warn!("demos: cannot create {}: {err}", dir.display());
+                    log::warn!("[Demo] cannot create {}: {err}", dir.display());
                     return None;
                 }
                 prune(dir, keep - 1);
