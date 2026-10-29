@@ -7,7 +7,7 @@
 // it is, how it is posed, or which LOD it shows. `outline/edge.wgsl` rings it.
 
 #import common::VertexInput
-#import forward::bindings::{camera, entity, s_diffuse, t_diffuse, vertex_to_world}
+#import forward::bindings::{camera, entity, normal_to_world, s_diffuse, t_diffuse, vertex_to_world}
 #import forward::mapping
 
 struct MaskVertex {
@@ -26,7 +26,7 @@ fn vs_mask(model: VertexInput, @builtin(instance_index) instance: u32) -> MaskVe
     out.clip_position = camera.view_proj * world;
     out.tex_coords = model.tex_coords;
     out.world_position = world.xyz;
-    out.world_normal = (to_world * vec4<f32>(model.normal, 0.0)).xyz;
+    out.world_normal = normal_to_world(to_world, model.normal);
     return out;
 }
 
