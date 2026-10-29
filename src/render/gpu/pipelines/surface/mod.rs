@@ -16,7 +16,7 @@
 //!
 //! **Lazy, fail-safe.** A slot is built the first frame a material names it. A module
 //! that is missing, fails to compose, lacks `vs_main`/`fs_main` (a postfx module) or
-//! `vs_velocity`/`fs_velocity` (#1435), or fails validation is logged **once** and
+//! `vs_velocity`/`fs_velocity`/`fs_velocity_ssr` (#1435, #1526), or fails validation is logged **once** and
 //! draws with the standard pipeline.
 //!
 //! **Hot reload.** [`SurfaceShaders::refresh`] drains the write log
@@ -55,7 +55,7 @@ pub(crate) use pass::SolidPass;
 pub(crate) struct SurfacePipelines {
     /// Opaque/cutout solids, and the same into a view's velocity target (#1435).
     pub forward: wgpu::RenderPipeline,
-    pub velocity: super::LazyPipeline,
+    pub velocity: super::VelocityPipelines,
     /// The same two over a primed depth (#1499), built the first time a view primes.
     pub primed: super::PrimedPipelines,
     /// Alpha-blended solids (the transparent spec).
@@ -244,7 +244,11 @@ impl SurfaceShaders {
         };
         let (vertex, fragment) = (ShaderStage::Vertex, ShaderStage::Fragment);
         let colour = [("vs_main", vertex), ("fs_main", fragment)];
-        let motion = [("vs_velocity", vertex), ("fs_velocity", fragment)]; // #1435
+        let motion = [
+            ("vs_velocity", vertex),
+            ("fs_velocity", fragment),     // #1435
+            ("fs_velocity_ssr", fragment), // #1526
+        ];
         for (entry, stage) in colour.into_iter().chain(motion) {
             if !has(entry, stage) {
                 return Err(format!("not a surface shader (no {entry})"));

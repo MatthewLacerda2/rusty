@@ -15,8 +15,10 @@
 @group(0) @binding(3) var t_bloom: texture_2d<f32>;
 @group(0) @binding(4) var t_depth: texture_depth_2d;
 @group(0) @binding(5) var t_skybox: texture_2d<f32>;
-// The panorama's own sampler (wrapping), not `s_color`'s clamp: the SSR fallback's
-// seam at φ = ±π must wrap as the skybox pass's does (#995).
+// The panorama's own sampler (wrapping), not `s_color`'s clamp: its seam at φ = ±π
+// must wrap as the skybox pass's does (#995). No built-in effect reads the panorama
+// since SSR stopped sampling the sky (#1526); without one it is the missing-texture
+// checker, never light.
 @group(0) @binding(6) var s_skybox: sampler;
 // The view's grading LUT (#1440): grade + tonemap, indexed by `lut_coord`.
 @group(0) @binding(7) var t_lut: texture_3d<f32>;

@@ -3,7 +3,7 @@
 //! with a pass of its own adds its pipelines here, and its lazy ones to
 //! [`Passes::lazy_pipelines`] (`Renderer::lazy_pipelines` warms them).
 
-use super::{bloom, depth_of_field, exposure, lens_flare, motion_blur};
+use super::{bloom, depth_of_field, exposure, lens_flare, motion_blur, ssr};
 use crate::render::gpu::pipelines::LazyPipeline;
 use crate::render::gpu::shaders::ShaderRegistry;
 
@@ -15,6 +15,7 @@ pub(crate) struct Passes {
     pub exposure: exposure::ExposurePasses,
     pub lens_flare: lens_flare::FlarePasses,
     pub motion_blur: motion_blur::MotionBlurPasses,
+    pub ssr: ssr::SsrPasses,
 }
 
 impl Passes {
@@ -25,6 +26,7 @@ impl Passes {
             exposure: exposure::ExposurePasses::new(device, registry),
             lens_flare: lens_flare::FlarePasses::new(device, registry),
             motion_blur: motion_blur::MotionBlurPasses::new(device, registry),
+            ssr: ssr::SsrPasses::new(device, registry),
         }
     }
 
@@ -35,6 +37,7 @@ impl Passes {
         all.extend(self.depth_of_field.lazy_pipelines());
         all.extend(self.lens_flare.lazy_pipelines());
         all.extend(self.motion_blur.lazy_pipelines());
+        all.extend(self.ssr.lazy_pipelines());
         all
     }
 }

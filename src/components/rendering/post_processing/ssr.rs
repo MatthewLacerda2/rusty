@@ -1,5 +1,7 @@
-//! Screen-space reflections, Unity HDRP's *Screen Space Reflection* override: run in
-//! the composite on the High tier only.
+//! Screen-space reflections, Unity HDRP's *Screen Space Reflection* override: a scene
+//! pass right after the base camera's opaque pass, ahead of the translucents and every
+//! post effect, on the High tier only. The quality sets the ray march: its step
+//! count and reach (`render::postfx::effects::ssr::march`).
 
 use serde::{Deserialize, Serialize};
 
@@ -10,7 +12,6 @@ pub struct Ssr {
     pub active: bool,
     /// `"Low"`, `"Medium"`, `"High"` or `"Ultra"`.
     pub quality: String,
-    pub temporal_upsampling: bool,
 }
 
 impl Default for Ssr {
@@ -18,7 +19,6 @@ impl Default for Ssr {
         Self {
             active: true,
             quality: "High".to_string(),
-            temporal_upsampling: true,
         }
     }
 }

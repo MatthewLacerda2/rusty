@@ -13,7 +13,8 @@ use crate::shadergen::blocks::Stage;
 use crate::shadergen::params::ParamLayout;
 
 /// The forward base's surface colour function, exactly as `shader.wgsl` declares it:
-/// both colour entry points (`fs_main`, the motion-vector `fs_velocity`, #1435) call it.
+/// every colour entry point (`fs_main`, the motion-vector `fs_velocity`, #1435, and
+/// `fs_velocity_ssr`, #1526) calls it.
 const SURFACE_COLOR: &str = "fn surface_color(in: VertexOutput) -> vec4<f32> {";
 
 /// Splice the UV chain into `body`'s `surface_color`, or return it as-is when no

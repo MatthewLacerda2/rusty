@@ -1,5 +1,4 @@
-//! The Screen Space Reflections section: the switch and, while on, the quality and
-//! temporal upsampling.
+//! The Screen Space Reflections section: the switch and, while on, the quality.
 
 use super::{toggle, Section};
 use crate::scene::authoring::rendering::post_processing::ssr;
@@ -52,14 +51,4 @@ fn draw(
                 }
             });
     });
-    let upsampling = vc.ssr.temporal_upsampling;
-    let set = ssr::set_temporal_upsampling;
-    toggle(
-        ui,
-        (world, id),
-        "    Temporal Upsampling",
-        upsampling,
-        set,
-        is_dirty,
-    );
 }
