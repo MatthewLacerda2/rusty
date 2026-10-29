@@ -10,13 +10,15 @@ crate::core::named_enum! {
         /// Casts from its front faces, as every mesh did before the switch.
         #[default]
         On = "On",
-        /// Casts nothing, realtime or baked: water, glass, a muzzle flash.
+        /// Casts nothing, realtime or baked: water, glass, a muzzle flash. The bake
+        /// still sees it (it bounces and emits) and lightmaps it.
         Off = "Off",
         /// Casts from both faces (culling off in the shadow pass): a single-sided
         /// card or plane that must shadow whichever way it faces the light.
         TwoSided = "TwoSided",
-        /// Casts as `On` but is drawn by no camera: an invisible stand-in that only
-        /// throws a shadow (a first-person body, a low-poly shadow proxy).
+        /// Casts as `On` but is drawn by no camera and seen by no bake (no bounce,
+        /// no emission, no lightmap): an invisible stand-in that only throws a
+        /// shadow (a first-person body, a low-poly shadow proxy).
         ShadowsOnly = "ShadowsOnly",
     }
 }
@@ -27,7 +29,8 @@ impl ShadowCasting {
         self != Self::Off
     }
 
-    /// Whether a camera draws the mesh.
+    /// Whether a camera draws the mesh (and the bake sees it, picking and outlines
+    /// find it).
     pub fn is_visible(self) -> bool {
         self != Self::ShadowsOnly
     }

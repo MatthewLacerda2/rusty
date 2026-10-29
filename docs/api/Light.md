@@ -67,12 +67,24 @@ Mesh card and saved with the scene and its prefabs.
 | `cast_shadows` | What it does |
 |---|---|
 | `"On"` *(default)* | casts from its front faces |
-| `"Off"` | casts nothing: not in the cascades, the atlas, their static bakes, or the lightmap bake (still lit, still lightmapped) |
+| `"Off"` | casts nothing: not in the cascades, the atlas, or their static bakes, and blocks no baked light |
 | `"TwoSided"` | casts from both faces: a one-sided card or `Plane` shadows whichever way it faces the light |
 | `"ShadowsOnly"` | casts as `"On"`, but no camera draws it: an invisible shadow stand-in |
 
 Every shadow path reads it on its next frame, a static mesh's cached shadow bake
 included. How a mesh *receives* shadows is not a switch yet.
+
+The bakes (the lightmap and the light probes, [`Lighting`](Lighting.md)) follow one
+rule, Unity's: *casting* decides whether a mesh blocks light, *being seen* decides
+whether it bounces, emits and is lightmapped.
+
+- `"Off"` never blocks light (a ray toward a light passes through it), but it is
+  still seen: it bounces its colour, its emission still lights the scene, and it is
+  lightmapped. An `Off` glowing sign still lights the wall beside it.
+- `"ShadowsOnly"` blocks light, but nothing sees it: it bounces nothing, emits
+  nothing, gets no lightmap and is left out of the probe captures.
+- The editor picks and outlines by what is drawn: clicking a `"ShadowsOnly"` mesh in
+  the viewport selects nothing, and selecting it in the hierarchy draws no outline.
 
 **Mode** is Unity's Light Mode and decides what the bakes (`Lighting.BakeLightmaps`
 for static surfaces, the light-probe bake for dynamic objects) do with the light, and

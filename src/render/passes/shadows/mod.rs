@@ -104,14 +104,17 @@ pub(crate) fn statics_key(scene: &Scene) -> StaticsKey {
     )
 }
 
-/// A digest of every static mesh's `cast_shadows` that isn't `On`, by entity, in
-/// scene order: it moves when one changes, which no revision tracks (#1571).
+/// A digest of every static mesh's `cast_shadows` that changes its shadow (`Off`,
+/// `TwoSided`), by entity, in scene order: it moves when one changes, which no
+/// revision tracks (#1571). `ShadowsOnly` casts exactly as `On`, so switching
+/// between them keeps the bake.
 fn casting_key(scene: &Scene) -> u64 {
     let world = &scene.world;
     let mut key = 0u64;
     for id in world.ids_with_mesh() {
         let mode = world.mesh(id).map_or(ShadowCasting::On, |m| m.cast_shadows);
-        if !mode.is_on() && world.is_static(id) {
+        let reshapes = !mode.casts() || mode == ShadowCasting::TwoSided;
+        if reshapes && world.is_static(id) {
             let mixed = (u64::from(id) << 2) | mode as u64;
             key = key.wrapping_mul(0x100_0000_01b3).wrapping_add(mixed + 1);
         }

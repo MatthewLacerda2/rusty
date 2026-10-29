@@ -1,9 +1,12 @@
 //! The per-cascade static-bake cache (#355, #435), on the GPU: a still camera re-draws
 //! no static caster, a nudge inside the snap grid re-draws none either, and a real
-//! move re-bakes the cascades it shifted. Skips when no adapter is present.
+//! move re-bakes the cascades it shifted. Skips when no adapter is present. The bake's
+//! key moves only with a casting mode that changes the shadow (#1571).
 
 use glam::Vec3;
 
+use super::statics_key;
+use crate::components::ShadowCasting;
 use crate::render::{RenderView, Renderer, OFFSCREEN_FORMAT};
 use crate::scene::authoring::{create_entity, Primitive};
 use crate::scene::{Camera, Scene};
@@ -55,4 +58,22 @@ fn gpu_static_casters_are_baked_once_per_cascade_position() {
         shadow_draws(&mut r, &mut view, &scene, moved) > 0,
         "a moved cascade re-bakes"
     );
+}
+
+#[test]
+fn only_a_mode_that_changes_the_shadow_moves_the_bake_key() {
+    let mut scene = static_yard();
+    let crate_id = scene.world.find_by_name("Crate").expect("the crate");
+    let mut key_as = |mode| {
+        scene.world.mesh_mut(crate_id).unwrap().cast_shadows = mode;
+        statics_key(&scene)
+    };
+    let on = key_as(ShadowCasting::On);
+    assert_eq!(
+        key_as(ShadowCasting::ShadowsOnly),
+        on,
+        "casts exactly as On"
+    );
+    assert_ne!(key_as(ShadowCasting::Off), on);
+    assert_ne!(key_as(ShadowCasting::TwoSided), on);
 }

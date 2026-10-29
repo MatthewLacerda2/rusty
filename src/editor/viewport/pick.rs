@@ -46,7 +46,8 @@ pub fn local_to_ndc(local_x: f32, local_y: f32, width: f32, height: f32) -> Opti
     Some((ndc_x, ndc_y))
 }
 
-/// Nearest entity hit by `ray`, picking against each active entity's mesh world AABB.
+/// Nearest entity hit by `ray`, picking against each active, drawn entity's mesh world
+/// AABB.
 /// Returns the entity id and the ray time-of-impact, or `None` when the ray misses
 /// every entity (the caller treats a miss as a deselect). Reused for both edit and
 /// play mode — it needs no rapier world, only the scene's geometry.
@@ -57,6 +58,10 @@ pub fn pick_entity(scene: &Scene, ray: Ray) -> Option<(u32, f32)> {
             continue;
         }
         let mesh = scene.world.mesh(id).expect("id came from ids_with_mesh");
+        // Unity picks by what is drawn: a `ShadowsOnly` mesh is seen by no camera.
+        if !mesh.cast_shadows.is_visible() {
+            continue;
+        }
         let world = scene.world.local_to_world(id);
         let Some((min, max)) = mesh.world_aabb(world) else {
             continue;
@@ -99,6 +104,7 @@ pub fn entity_world_position(scene: &Scene, entity_id: u32) -> Option<Vec3> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::components::ShadowCasting;
     use crate::scene::authoring::{self, Primitive};
     use crate::scene::Scene;
 
@@ -121,6 +127,15 @@ mod tests {
         let ray = ray_from_ndc(&camera, 1.0, 0.0, 0.0);
         let hit = pick_entity(&scene, ray);
         assert_eq!(hit.map(|(id, _)| id), Some(id));
+    }
+
+    #[test]
+    fn a_shadows_only_mesh_is_not_picked() {
+        let mut scene = Scene::new();
+        let id = authoring::create_entity(&mut scene, "Box", Some(Primitive::Box));
+        scene.world.mesh_mut(id).unwrap().cast_shadows = ShadowCasting::ShadowsOnly;
+        let camera = Camera::new(Vec3::new(0.0, 0.0, 5.0), -90.0, 0.0);
+        assert!(pick_entity(&scene, ray_from_ndc(&camera, 1.0, 0.0, 0.0)).is_none());
     }
 
     #[test]

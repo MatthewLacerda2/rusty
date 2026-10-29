@@ -8,12 +8,15 @@ use glam::{Vec2, Vec3};
 
 use crate::asset::MapRef;
 use crate::components::mesh::{clip_runs, material_runs};
-use crate::components::{LightType, MaterialAsset, MeshComponent};
+use crate::components::{LightType, MaterialAsset, MeshComponent, ShadowCasting};
 use crate::core::collections::Map;
 use crate::scene::Scene;
 
 /// One static mesh in world space. Its occluding runs block and bounce light; the
 /// ones with a usable lightmap UV also receive a lightmap, over every drawn run.
+/// `cast_shadows` narrows that, as Unity bakes it (#1571): an `Off` mesh is still
+/// seen by bounce rays (it bounces and emits) but blocks no light; a `ShadowsOnly`
+/// one blocks light but is seen by nothing and gets no lightmap.
 #[derive(Clone, Debug, Default)]
 pub struct BakeMesh {
     /// The entity the lightmap belongs to.
@@ -27,6 +30,8 @@ pub struct BakeMesh {
     pub indices: Vec<u32>,
     /// How `indices` splits into material runs, in order (#1290).
     pub runs: Vec<BakeRun>,
+    /// The mesh's *Cast Shadows* mode (#1571).
+    pub cast_shadows: ShadowCasting,
 }
 
 /// One material run of a [`BakeMesh`]: the indices up to `end` (from the previous
@@ -39,8 +44,8 @@ pub struct BakeRun {
     /// Emitted radiance, as the forward shader adds it (a Transparent material's
     /// scaled by its alpha, as it blends).
     pub emissive: Vec3,
-    /// Whether the run blocks and bounces light (it is in the bake's BVH). A
-    /// Transparent run does not, but still receives its share of the entity's
+    /// Whether the run blocks and bounces light (it is in the bake's BVH), as far
+    /// as the mesh's `cast_shadows` lets it. A Transparent run does neither, but still receives its share of the entity's
     /// lightmap, which the renderer samples for it too.
     pub occludes: bool,
 }
@@ -96,8 +101,8 @@ pub struct BakeScene {
 
 impl BakeScene {
     /// Flatten `scene`: the drawn runs of every active static mesh that is not a light
-    /// gizmo, each with its own material (#1290) — none occluding when the mesh casts
-    /// no shadows (#1571) — the active `Mixed` / `Baked` lights,
+    /// gizmo, each with its own material (#1290) and the mesh's *Cast Shadows*
+    /// (#1571), the active `Mixed` / `Baked` lights,
     /// and the ambient sky. `map_average` turns a texture path into its average linear
     /// colour (`None` when it cannot be read); it is asked once per path.
     pub fn gather(scene: &Scene, map_average: &dyn Fn(&MapRef) -> Option<Vec3>) -> Self {
@@ -117,14 +122,9 @@ impl BakeScene {
             if mesh.is_skinned() {
                 continue;
             }
-            let (indices, mut runs) = drawn_runs(scene, id, &mesh, &map_average);
+            let (indices, runs) = drawn_runs(scene, id, &mesh, &map_average);
             if indices.is_empty() {
                 continue;
-            }
-            // A mesh that casts no shadow blocks no baked light either (#1571); it
-            // still receives its lightmap.
-            if !mesh.cast_shadows.casts() {
-                runs.iter_mut().for_each(|run| run.occludes = false);
             }
             let matrix = scene.world.local_to_world(id);
             let normal_matrix = matrix.inverse().transpose();
@@ -146,6 +146,7 @@ impl BakeScene {
                 lightmap_uvs: mesh.vertices.iter().map(|v| v.lightmap_uv.into()).collect(),
                 indices,
                 runs,
+                cast_shadows: mesh.cast_shadows,
             });
         }
         out.gather_lights(scene);

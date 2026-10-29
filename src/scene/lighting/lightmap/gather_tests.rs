@@ -95,13 +95,12 @@ fn gather_takes_static_meshes_and_baked_in_lights_only() {
     );
 }
 
-/// A static mesh set to cast no shadows (#1571) is still lightmapped, but blocks no
-/// baked light: none of its runs occludes.
+/// The gather carries each static mesh's *Cast Shadows* (#1571) to the bake, which
+/// decides who sees and who blocks (`casting_tests`); every opaque run occludes.
 #[test]
-fn a_mesh_casting_no_shadows_receives_but_never_occludes() {
+fn the_gather_carries_each_mesh_cast_shadows() {
     let mut scene = Scene::new();
-    let mut casts = Vec::new();
-    for mode in [ShadowCasting::On, ShadowCasting::Off] {
+    for mode in ShadowCasting::ALL {
         let id = scene.add_entity(mode.name().to_string());
         let mesh = primitive_mesh_component(Primitive::Box).expect("a Box");
         let mesh = MeshComponent {
@@ -110,15 +109,14 @@ fn a_mesh_casting_no_shadows_receives_but_never_occludes() {
         };
         scene.world.set_mesh(id, Some(mesh));
         scene.world.set_static(id, true);
-        casts.push(mode.casts());
     }
     let gathered = BakeScene::gather(&scene, &|_| None);
-    let occludes: Vec<bool> = gathered
+    let modes: Vec<ShadowCasting> = gathered.meshes.iter().map(|m| m.cast_shadows).collect();
+    assert_eq!(modes, ShadowCasting::ALL);
+    assert!(gathered
         .meshes
         .iter()
-        .map(|m| m.runs.iter().all(|r| r.occludes))
-        .collect();
-    assert_eq!(occludes, casts);
+        .all(|m| m.runs.iter().all(|r| r.occludes)));
 }
 
 #[test]
