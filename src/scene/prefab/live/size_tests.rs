@@ -28,7 +28,7 @@ fn an_ik_constraint_added_where_the_source_has_none_survives_play_and_reload() {
     let back = save_and_load(&scene);
     for scene in [&scene, &back] {
         let ik = scene.world.animator(child).unwrap().ik.clone();
-        assert_eq!(ik, [look.clone()]);
+        assert_eq!(ik, std::slice::from_ref(&look));
         assert_eq!(list_instance_overrides(scene, root).unwrap(), listed);
     }
 }
