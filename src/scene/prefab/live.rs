@@ -10,7 +10,15 @@
 //! is now: a source changed since would turn every leaf the instance never touched
 //! into an override, and the instance would stop tracking the source. So the live
 //! set is stored on the link ([`sync_overrides`]) before a propagation re-reads the
-//! source, and a save writes it ([`write_overrides`]).
+//! source, and a save or a Play snapshot writes it ([`write_overrides`]).
+//!
+//! A stored override the source can no longer hold (its path is in neither the
+//! entity nor its baseline) is *unused*, and kept, as Unity keeps one: it is listed,
+//! saved and re-applied until it is reverted, so a source that gets the field back
+//! picks the edit up again.
+//!
+//! An entity with no baseline (loaded while its source file was missing) has only
+//! its stored overrides: an edit made then is not tracked until the source is back.
 //!
 //! The root's position and rotation belong to the instance, never the source (Unity
 //! does the same): propagation keeps them and they are never an override.
@@ -20,7 +28,7 @@ use std::sync::Arc;
 
 use serde_json::Value;
 
-use crate::components::Entity;
+use crate::components::{Entity, TransformComponent};
 use crate::ecs::World;
 use crate::scene::prefab::overrides::{diff_leaves, leaves};
 
@@ -31,7 +39,15 @@ pub fn live_overrides(entity: &Entity) -> BTreeMap<String, Value> {
         return BTreeMap::new();
     };
     let mut out = match &link.baseline {
-        Some(base) => diff_leaves(&leaves(entity), base),
+        Some(base) => {
+            let now = leaves(entity);
+            let mut out = diff_leaves(&now, base);
+            let unused = |path: &String| !now.contains_key(path) && !base.contains_key(path);
+            for (path, leaf) in link.overrides.iter().filter(|(p, _)| unused(p)) {
+                out.entry(path.clone()).or_insert_with(|| leaf.clone());
+            }
+            out
+        }
         None => link.overrides.clone(),
     };
     if link.local_id == 0 {
@@ -43,7 +59,7 @@ pub fn live_overrides(entity: &Entity) -> BTreeMap<String, Value> {
 /// The live overrides of entity `id` ([`live_overrides`]).
 pub fn entity_overrides(world: &World, id: u32) -> BTreeMap<String, Value> {
     world
-        .entity_document(id)
+        .reference_document(id)
         .map(|e| live_overrides(&e))
         .unwrap_or_default()
 }
@@ -73,7 +89,7 @@ pub fn write_overrides(entities: &mut [Entity]) {
 /// its source exactly.
 pub fn take_baselines(world: &mut World, ids: impl IntoIterator<Item = u32>) {
     for id in ids {
-        let Some(doc) = world.entity_document(id) else {
+        let Some(doc) = world.reference_document(id) else {
             continue;
         };
         if let Some(mut link) = world.prefab_link_mut(id) {
@@ -83,12 +99,13 @@ pub fn take_baselines(world: &mut World, ids: impl IntoIterator<Item = u32>) {
 }
 
 /// `entity` (a propagation's rebuild) with the root's position and rotation put back
-/// from `live`, the instance as it was: the root's placement is never the source's.
-pub fn keep_root_placement(entity: &mut Entity, live: Option<&Entity>) {
+/// from `live`, the instance's transform as it was: the root's placement is never the
+/// source's.
+pub fn keep_root_placement(entity: &mut Entity, live: Option<&TransformComponent>) {
     let is_root = entity.prefab_link.as_ref().is_some_and(|l| l.local_id == 0);
     if let (true, Some(live)) = (is_root, live) {
-        entity.transform.position = live.transform.position;
-        entity.transform.rotation = live.transform.rotation;
+        entity.transform.position = live.position;
+        entity.transform.rotation = live.rotation;
     }
 }
 
@@ -99,6 +116,9 @@ fn is_root_placement(path: &str) -> bool {
         .any(|p| path == *p || path.starts_with(&format!("{p}/")))
 }
 
+#[cfg(test)]
+#[path = "live_source_tests.rs"]
+mod live_source_tests;
 #[cfg(test)]
 #[path = "live_tests.rs"]
 mod live_tests;

@@ -48,16 +48,16 @@ pub struct PrefabLink {
     /// The corresponding source entity's LOCAL id (0-based; root = 0). This is the
     /// stable correlation key against `PrefabData::entities`, order-independent.
     pub local_id: u32,
-    /// This entity's per-instance overrides: a generic field diff against a
-    /// fresh copy of the source entity, as `json-pointer-path -> value` (e.g.
-    /// `"/transform/position/0" -> 5.0`). It auto-covers every present/future
-    /// first-class component with no per-component code, and covers component
-    /// add/remove too (a `None`↔`Some` is just a diff at that component's path).
-    /// Propagation rebuilds the entity from the fresh source baseline, then re-applies
-    /// these paths on top, so non-overridden fields track the source while overridden
-    /// ones are preserved. While [`Self::baseline`] is set this map is only what the
-    /// last propagation applied; `scene::prefab::live::live_overrides` is the current
-    /// set, and a save writes it here. `#[serde(default)]` so a link with none loads.
+    /// This entity's per-instance overrides as last stored: its generic field diff
+    /// against [`Self::baseline`], as `json-pointer-path -> value` (e.g.
+    /// `"/transform/position/0" -> 5.0`), plus any unused one the source can no
+    /// longer hold. It auto-covers every first-class component with no
+    /// per-component code, and component add/remove too (a `None`↔`Some` is a diff
+    /// at that component's path). Propagation rebuilds the entity from the source,
+    /// then re-applies these paths on top, so non-overridden fields track the source
+    /// while overridden ones are preserved. The current set is
+    /// `scene::prefab::live::live_overrides`; it is stored here before a propagation,
+    /// a save and a Play snapshot. `#[serde(default)]` so a link with none loads.
     #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
     pub overrides: BTreeMap<String, serde_json::Value>,
     /// The source as this entity last took it (#1527): its masked leaves as the stamp

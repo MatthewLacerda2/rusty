@@ -31,7 +31,7 @@ fn write_prefab(tag: &str, child_scale: f32) -> String {
 }
 
 /// A linked instance of a fresh prefab: (scene, root, child, source path).
-fn linked(tag: &str) -> (Scene, u32, u32, String) {
+pub(super) fn linked(tag: &str) -> (Scene, u32, u32, String) {
     let path = write_prefab(tag, 1.0);
     let mut scene = Scene::new();
     let root = load_and_instantiate_linked(&mut scene, &path, None).unwrap();
@@ -40,7 +40,7 @@ fn linked(tag: &str) -> (Scene, u32, u32, String) {
 }
 
 /// `scene` saved to JSON and loaded back, as a scene file is.
-fn save_and_load(scene: &Scene) -> Scene {
+pub(super) fn save_and_load(scene: &Scene) -> Scene {
     let json = serde_json::to_string(&to_scene_data(scene)).unwrap();
     let mut back = Scene::new();
     apply_scene_data(&mut back, serde_json::from_str::<SceneData>(&json).unwrap());
