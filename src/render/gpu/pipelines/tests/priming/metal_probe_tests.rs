@@ -127,8 +127,11 @@ fn gpu_metal_probe_two_frames() {
         } else {
             (0..3).map(|_| frame(&mut r, &s, None)).collect()
         };
+        let h = frames[0]
+            .iter()
+            .fold(0u64, |h, b| h.wrapping_mul(1099511628211) ^ u64::from(*b));
         report += &format!(
-            "{name}: 1v2 {} | 2v3 {}\n",
+            "{name} #{h:x}: 1v2 {} | 2v3 {}\n",
             diff(&frames[0], &frames[1]),
             diff(&frames[1], &frames[2])
         );
