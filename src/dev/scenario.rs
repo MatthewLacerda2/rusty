@@ -4,7 +4,7 @@
 //! harness through the SAME observe/act surface an agent uses. The loop is:
 //!
 //!   1. write   `scenarios/<name>.lua` in the game project
-//!   2. run     `cargo run --bin play --features dev -- --project <dir> [--scene <path>] <scenario> <out_dir>`
+//!   2. run     `cargo run --bin play --features dev -- --project <dir> [--scene <path>] [--size WxH] <scenario> <out_dir>`
 //!   3. read    `<out_dir>/results.json` + `console.log`
 //!
 //! It plays the project's startup scene, or the `--scene` named. Example scenario
@@ -40,14 +40,19 @@ pub struct RunReport {
 
 /// Load and run `scenario_path` headlessly, writing results into `out_dir`, on the
 /// open project (`core::project`), playing `scene` (project-relative) under the
-/// project's `settings`: a scenario play-tests the game being built.
+/// project's `settings`: a scenario play-tests the game being built. `size`, when
+/// given, is the run's render size (`play --size`, `Harness::set_size`).
 pub fn run(
     scenario_path: &Path,
     out_dir: &Path,
     scene: &str,
     settings: ProjectSettings,
+    size: Option<(u32, u32)>,
 ) -> Result<RunReport, String> {
-    let harness = Harness::in_user_workspace(out_dir, scene, settings)?;
+    let mut harness = Harness::in_user_workspace(out_dir, scene, settings)?;
+    if let Some((width, height)) = size {
+        harness.set_size(width, height);
+    }
     run_in(harness, scenario_path)
 }
 

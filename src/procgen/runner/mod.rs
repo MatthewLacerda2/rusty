@@ -27,7 +27,7 @@ use super::hash::node_seed;
 use super::image_buf::Image;
 use super::ops::eval_linked;
 use super::ops::field::Links;
-use super::recipe::{ArityError, TextureRecipe};
+use super::recipe::{Fault, NodeError, TextureRecipe};
 use super::source::Sources;
 use plan::{plan, Plan, Scope};
 
@@ -40,23 +40,11 @@ pub enum RunError {
     DuplicateId(String),
     /// The recipe has neither a `resolution` above 0 nor a `size`.
     BadResolution,
-    /// A node is wired with fewer or more inputs than its op accepts.
-    Arity(ArityError),
-    /// A node referenced an input id that no node defines.
-    UnknownInput { node: String, input: String },
-    /// A node's param links to an id that no node defines (#1494).
-    UnknownLink {
-        node: String,
-        param: String,
-        link: String,
-    },
+    /// One node is wrong (its arity, an input or link id no node defines, a cycle
+    /// through it, its image file missing), named by its id and op (#1575).
+    Node(NodeError),
     /// The named output node is not in the recipe.
     UnknownOutput(String),
-    /// The graph contains a cycle (not a DAG).
-    Cycle(String),
-    /// An `image` node's file was not handed in (#1491): the caller could not read
-    /// it, or never loaded it.
-    MissingSource { node: String, path: String },
 }
 
 impl std::fmt::Display for RunError {
@@ -65,18 +53,8 @@ impl std::fmt::Display for RunError {
             RunError::Empty => write!(f, "recipe has no nodes"),
             RunError::DuplicateId(id) => write!(f, "two nodes share the id '{id}'"),
             RunError::BadResolution => write!(f, "recipe needs a resolution > 0 or a size"),
-            RunError::Arity(e) => e.fmt(f),
-            RunError::UnknownInput { node, input } => {
-                write!(f, "node '{node}' references unknown input '{input}'")
-            }
-            RunError::UnknownLink { node, param, link } => {
-                write!(f, "node '{node}' links {param} to unknown node '{link}'")
-            }
+            RunError::Node(e) => e.fmt(f),
             RunError::UnknownOutput(id) => write!(f, "output node '{id}' not found"),
-            RunError::Cycle(id) => write!(f, "recipe DAG has a cycle at node '{id}'"),
-            RunError::MissingSource { node, path } => {
-                write!(f, "image node '{node}' has no image loaded for '{path}'")
-            }
         }
     }
 }
@@ -141,10 +119,11 @@ fn check_sources(recipe: &TextureRecipe, sources: &Sources) -> Result<(), RunErr
         .into_iter()
         .find(|&(_, path)| sources.get(path).is_none())
     {
-        Some((node, path)) => Err(RunError::MissingSource {
+        Some((node, path)) => Err(RunError::Node(NodeError {
             node: node.into(),
-            path: path.into(),
-        }),
+            op: "image".into(),
+            fault: Fault::MissingSource(path.into()),
+        })),
         None => Ok(()),
     }
 }
