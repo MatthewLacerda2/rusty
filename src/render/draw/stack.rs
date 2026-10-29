@@ -118,7 +118,9 @@ impl Renderer {
         self.frame_counters.grade_lut_bakes += u32::from(baked);
 
         let panorama = self.skybox_texture.is_some();
-        let eye = ctx.cam.position.to_array();
+        // The base camera's eye, as its view-projection is: SSR rebuilds positions
+        // from both, and the last camera of a stack is an overlay's (#1526).
+        let eye = stack.stack[0].position.to_array();
         let params = frame_params(scene, ctx.base_view_proj, eye, panorama);
         let sky = self.sky_panorama();
         let chain = PostFxContext {
