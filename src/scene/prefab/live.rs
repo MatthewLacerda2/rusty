@@ -12,10 +12,14 @@
 //! set is stored on the link ([`sync_overrides`]) before a propagation re-reads the
 //! source, and a save or a Play snapshot writes it ([`write_overrides`]).
 //!
-//! A stored override the source can no longer hold (its path is in neither the
-//! entity nor its baseline) is *unused*, and kept, as Unity keeps one: it is listed,
-//! saved and re-applied until it is reverted, so a source that gets the field back
-//! picks the edit up again.
+//! The live diff *is* the override set: a stored override it no longer contains is
+//! gone, so an edit the author undid (a component removed and re-added, an enum
+//! switched back) never comes back. So an override on a component the source has
+//! since removed is dropped; Unity keeps it as an "unused override", rusty doesn't.
+//!
+//! A document the World writes (a save, a Play snapshot) carries the overrides and
+//! no baseline: its load or restore rebuilds one from the source, or, when the
+//! source is missing, leaves it without.
 //!
 //! An entity with no baseline (loaded while its source file was missing) has only
 //! its stored overrides: an edit made then is not tracked until the source is back.
@@ -30,7 +34,7 @@ use serde_json::Value;
 
 use crate::components::{Entity, TransformComponent};
 use crate::ecs::World;
-use crate::scene::prefab::overrides::{diff_leaves, leaves};
+use crate::scene::prefab::diff::{diff, leaves, Leaves};
 
 /// `entity`'s overrides now: its diff against its baseline, or the stored set when it
 /// has none yet (a loaded instance whose source was missing). Empty when unlinked.
@@ -39,15 +43,7 @@ pub fn live_overrides(entity: &Entity) -> BTreeMap<String, Value> {
         return BTreeMap::new();
     };
     let mut out = match &link.baseline {
-        Some(base) => {
-            let now = leaves(entity);
-            let mut out = diff_leaves(&now, base);
-            let unused = |path: &String| !now.contains_key(path) && !base.contains_key(path);
-            for (path, leaf) in link.overrides.iter().filter(|(p, _)| unused(p)) {
-                out.entry(path.clone()).or_insert_with(|| leaf.clone());
-            }
-            out
-        }
+        Some(base) => diff(entity, base),
         None => link.overrides.clone(),
     };
     if link.local_id == 0 {
@@ -75,12 +71,43 @@ pub fn sync_overrides(world: &mut World, ids: &[u32]) {
     }
 }
 
-/// Write every linked document's live overrides onto its link (a save, a snapshot).
+/// Write every linked document's live overrides onto its link and drop its baseline
+/// (a save, a snapshot): what comes back propagates a fresh one, or has none while
+/// its source is missing, so a stale one (naming bones a Stop respawns) never
+/// outlives the World that took it.
 pub fn write_overrides(entities: &mut [Entity]) {
     for entity in entities {
         let overrides = live_overrides(entity);
         if let Some(link) = entity.prefab_link.as_mut() {
             link.overrides = overrides;
+            link.baseline = None;
+        }
+    }
+}
+
+/// Move entity `id`'s baseline by what a model re-import changed on it, `before`
+/// being its leaves before: a refit mesh collider is the model's, not an edit, so it
+/// is neither an override nor applied to the source; every other leaf keeps its
+/// override.
+pub fn shift_baseline(world: &mut World, id: u32, before: &Leaves) {
+    let Some(after) = world.reference_document(id).map(|doc| leaves(&doc)) else {
+        return;
+    };
+    let Some(mut link) = world.prefab_link_mut(id) else {
+        return;
+    };
+    let Some(base) = link.baseline.as_mut().map(Arc::make_mut) else {
+        return;
+    };
+    for path in before.keys().chain(after.keys()) {
+        match (before.get(path), after.get(path)) {
+            (a, b) if a == b => {}
+            (_, Some(now)) => {
+                base.insert(path.clone(), now.clone());
+            }
+            (_, None) => {
+                base.remove(path);
+            }
         }
     }
 }
@@ -117,8 +144,14 @@ fn is_root_placement(path: &str) -> bool {
 }
 
 #[cfg(test)]
+#[path = "live_component_tests.rs"]
+mod live_component_tests;
+#[cfg(test)]
 #[path = "live_source_tests.rs"]
 mod live_source_tests;
 #[cfg(test)]
 #[path = "live_tests.rs"]
 mod live_tests;
+#[cfg(test)]
+#[path = "live_undo_tests.rs"]
+mod live_undo_tests;

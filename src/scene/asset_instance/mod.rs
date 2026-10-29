@@ -225,6 +225,8 @@ pub fn set_model_scale_factor(scene: &mut Scene, path: &str, scale: f32) -> Resu
 }
 
 #[cfg(test)]
+mod prefab_scale_tests;
+#[cfg(test)]
 mod scale_tests;
 
 #[cfg(test)]

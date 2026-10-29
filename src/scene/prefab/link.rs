@@ -21,9 +21,10 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use crate::components::{Entity, EntityRefs};
+use crate::scene::prefab::diff::leaves;
 use crate::scene::prefab::instance::instance_members;
 use crate::scene::prefab::live::{entity_overrides, keep_root_placement, sync_overrides};
-use crate::scene::prefab::overrides::{apply_overrides, leaves};
+use crate::scene::prefab::overrides::apply_overrides;
 use crate::scene::prefab::read_prefab_file;
 use crate::scene::serialize::rehydrate_entity_mesh;
 use crate::scene::{instantiate_prefab, PrefabData, Scene};

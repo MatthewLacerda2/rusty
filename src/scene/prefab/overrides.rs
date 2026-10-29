@@ -1,135 +1,20 @@
-//! src/scene/prefab/overrides.rs — the generic per-instance override diff (#216).
+//! src/scene/prefab/overrides.rs — applying a per-instance override map (#216).
 //!
-//! A linked prefab instance's divergence from its source is a GENERIC field diff,
-//! not a typed-per-component struct: a flat map of `json-pointer-path -> value` for
-//! every leaf where the instance differs from its *baseline*, the source as it last
-//! took it (`live.rs`, #1527). It covers every first-class component with **no
-//! per-component code**, and component add/remove too: a `None`↔`Some` is a leaf.
-//!
-//! The two verbs are symmetric: [`diff_leaves`] (the instance's [`leaves`] against
-//! its baseline's) yields the override map, and [`apply_overrides`] (a fresh source
-//! entity + override map) rebuilds the instance. Propagation is "rebuild from the
-//! source, then re-apply the map on top"; nothing diffs against the source as it
-//! is now, which would make every leaf it changed an override.
-//!
-//! Leaves are compared on the entity's serde JSON form with the volatile/identity
-//! fields masked out (see `STRIPPED_KEYS`), so ids, parenting, rehydrated GPU
-//! geometry, and the link itself never count as overrides.
+//! A linked prefab instance's divergence from its source is a GENERIC field diff
+//! (`diff.rs`): a flat map of `json-pointer-path -> value` against its *baseline*,
+//! the source as it last took it (`live.rs`, #1527), with **no per-component code**.
+//! [`apply_overrides`] is its inverse: a fresh source entity plus the map rebuilds
+//! the instance. Propagation is "rebuild from the source, then re-apply the map on
+//! top"; nothing diffs against the source as it is now, which would make every leaf
+//! it changed an override.
 
 use std::collections::BTreeMap;
 
 use serde_json::Value;
 
-use crate::components::{escape_token, Entity};
-
-/// Top-level entity keys that must never be diffed/overridden: identity + structure
-/// the propagation already owns (ids/parenting are remapped per instance), the
-/// rehydrated-on-load mesh geometry (stored only as a reference; re-derived, so it
-/// would otherwise show as a giant spurious diff), the staged-material slot, and the
-/// link itself (an instance's link is set by the stamper, not copied from source).
-const STRIPPED_KEYS: &[&str] = &[
-    "id",
-    "parent_id",
-    "children",
-    "prefab_link",
-    "pending_material",
-];
-
-/// Mesh sub-keys that are rehydrated from the reference on load (the heavy GPU
-/// buffers + transient dirty flag). The reference fields (`primitive_type`,
-/// `asset_ref`) and authored rig stay, so a *changed mesh reference* is still a
-/// diff, but raw vertex soup is not.
-const STRIPPED_MESH_KEYS: &[&str] = &[
-    "vertices",
-    "indices",
-    "bind_palette",
-    "skin",
-    "clips",
-    "pose_palette",
-    "is_dirty",
-];
-
-/// Lists overridden whole, as one leaf, rather than per element: an entity's material
-/// slots follow its mesh's runs (#1285), so an override may add or lengthen the list,
-/// which per-element leaves cannot (the apply never grows an array).
-const WHOLE_LISTS: &[&str] = &["/material/materials"];
-
-/// The serde JSON of `entity` with the volatile/identity keys masked out, so the
-/// diff sees only authored component data.
-fn maskable_json(entity: &Entity) -> Value {
-    let mut value = serde_json::to_value(entity).unwrap_or(Value::Null);
-    if let Some(obj) = value.as_object_mut() {
-        for key in STRIPPED_KEYS {
-            obj.remove(*key);
-        }
-        if let Some(Value::Object(mesh)) = obj.get_mut("mesh") {
-            for key in STRIPPED_MESH_KEYS {
-                mesh.remove(*key);
-            }
-        }
-    }
-    value
-}
-
-/// Flatten a JSON value into `out` as RFC-6901 json-pointer leaves. Objects and
-/// arrays recurse (arrays index by position, but a [`WHOLE_LISTS`] list is one
-/// leaf); every scalar — and `null` — is a leaf,
-/// so a present↔absent component (`Some`↔`None`, i.e. object↔`null`) is captured.
-fn flatten(prefix: &str, value: &Value, out: &mut BTreeMap<String, Value>) {
-    match value {
-        Value::Object(map) if !map.is_empty() => {
-            for (k, v) in map {
-                flatten(&format!("{prefix}/{}", escape_token(k)), v, out);
-            }
-        }
-        Value::Array(items) if !items.is_empty() && !WHOLE_LISTS.contains(&prefix) => {
-            for (i, v) in items.iter().enumerate() {
-                flatten(&format!("{prefix}/{i}"), v, out);
-            }
-        }
-        // A scalar, an empty object, or an empty array is a leaf in its own right.
-        leaf => {
-            out.insert(prefix.to_string(), leaf.clone());
-        }
-    }
-}
-
-/// `entity`'s authored data as json-pointer leaves, identity and geometry masked:
-/// the form a baseline is kept in and an override map is diffed from.
-pub fn leaves(entity: &Entity) -> BTreeMap<String, Value> {
-    let mut out = BTreeMap::new();
-    flatten("", &maskable_json(entity), &mut out);
-    out
-}
-
-/// [`diff_leaves`] of two whole entities, for the round-trip tests.
+use crate::components::Entity;
 #[cfg(test)]
-pub fn diff_entity(instance: &Entity, baseline: &Entity) -> BTreeMap<String, Value> {
-    diff_leaves(&leaves(instance), &leaves(baseline))
-}
-
-/// The override map for leaves `inst` against `base`: every leaf whose value differs
-/// (a changed scalar, an added leaf, or a removed leaf surfaced as `null`). Both
-/// sides are masked by [`leaves`], so identity/geometry never leak in.
-pub fn diff_leaves(
-    inst: &BTreeMap<String, Value>,
-    base: &BTreeMap<String, Value>,
-) -> BTreeMap<String, Value> {
-    let mut diff = BTreeMap::new();
-    for (path, inst_val) in inst {
-        if base.get(path) != Some(inst_val) {
-            diff.insert(path.clone(), inst_val.clone());
-        }
-    }
-    // A leaf present in the baseline but gone from the instance (e.g. a removed
-    // component, or a shortened array) is an override to `null`.
-    for path in base.keys() {
-        if !inst.contains_key(path) {
-            diff.insert(path.clone(), Value::Null);
-        }
-    }
-    diff
-}
+use crate::scene::prefab::diff::diff_entity;
 
 /// Apply an override map onto `baseline` in place, leaf by leaf: set each path's
 /// leaf on the entity's JSON form, then deserialize back. Identity/structure/geometry
@@ -286,7 +171,7 @@ fn place(cursor: &mut Value, token: &str, leaf: Value) {
     }
 }
 
-/// Inverse of [`escape_token`] (RFC 6901: `~1` -> `/`, `~0` -> `~`, in that order).
+/// Inverse of [`escape_token`](crate::components::escape_token) (RFC 6901: `~1` -> `/`, `~0` -> `~`, in that order).
 fn unescape(token: &str) -> String {
     token.replace("~1", "/").replace("~0", "~")
 }

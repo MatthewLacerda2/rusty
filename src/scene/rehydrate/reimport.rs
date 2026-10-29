@@ -13,6 +13,8 @@ use super::{install, RehydratedMesh};
 use crate::asset::{self, AssetRef, ImportedAsset, SubMesh};
 use crate::components::{ColliderComponent, ColliderShape};
 use crate::core::fs::written::Stale;
+use crate::scene::prefab::diff::leaves;
+use crate::scene::prefab::live::shift_baseline;
 use crate::scene::Scene;
 
 /// What a re-import does with a skinned mesh (one skinned before or after it).
@@ -77,7 +79,13 @@ fn reimport_where(scene: &mut Scene, rig: Rig, mut names: impl FnMut(&str) -> bo
         let sub = asset
             .as_ref()
             .and_then(|a| a.sub_mesh(&reference.sub_object));
+        // A linked prefab entity's refit is the model's, never an override (#1527).
+        let linked = scene.world.prefab_link(id).is_some();
+        let before = linked.then(|| scene.world.reference_document(id)).flatten();
         if sub.is_some_and(|sub| reimport_entity_mesh(scene, id, sub, rig)) {
+            if let Some(before) = before {
+                shift_baseline(&mut scene.world, id, &leaves(&before));
+            }
             rebuilt.push(id);
         }
     }

@@ -277,8 +277,10 @@ scene load, exactly like a primitive's `primitive_type` — no GPU buffers are i
 A linked instance's divergence from the source is a **generic field diff** — a map of
 `json-pointer-path → value` for each field where the instance differs from the source
 as the instance last took it (when it was stamped, loaded or reimported). This
-auto-covers every present and future component (and component add/remove — a
-`None`↔`Some` is just a diff at that path) with no per-component code.
+auto-covers every present and future component with no per-component code. A
+**component added** to an instance is one override holding its whole value (as Unity's
+*added component*), so a Light, a Collider or a script added to an instance child keeps
+all its values; a **removed** one is one `nil` at its path (e.g. `"1:/camera"`).
 
 As in Unity, **an edit to an instance is an override the moment it is made**, whatever
 made it: the gizmo, the Inspector, a Lua setter such as `Transform.SetPosition`, the
@@ -289,9 +291,11 @@ The instance **root's position and rotation are always the instance's own**: the
 come from the source and are never overrides. A source applied to during Play reaches
 the edit-mode instances on Stop, each keeping its own edits.
 
-An override the source can no longer hold (the field was removed from the prefab) is
-**unused** and kept, as in Unity: it is still listed, saved and re-applied, until it is
-reverted. While an instance's source file is **missing** (it was loaded without one),
+The overrides are exactly the instance's current diff: an edit the author undoes (a
+component removed and re-added, a collider shape switched back, an added component
+removed) leaves no override behind. So an override on a component or field the source
+has **removed** is dropped; Unity keeps it as an "unused override", rusty doesn't.
+While an instance's source file is **missing** (it was loaded without one),
 the instance keeps the overrides it was saved with, but an edit made meanwhile is not
 tracked as an override until the source is back: the edit stays in the scene, and the
 source, once it returns, overwrites it on the next load or reimport.
