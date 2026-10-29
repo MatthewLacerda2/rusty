@@ -132,7 +132,9 @@ each kind's passes summed, under names that never change so two reports diff:
 |---|---|
 | `sky_reflection` | the sky's reflection cube (#1553): the capture and GGX prefilter of the panorama or the procedural sky, on the frames the sky changed (counted in `sky_reflection_bakes`) |
 | `shadows` | the sun's cascades (static bake + dynamic casters) and the point/spot shadow atlas |
-| `ssao` | the SSAO depth prepass, occlusion and blur |
+| `ssao_prepass` | the SSAO depth prepass (#1578): every visible solid's depth into the view's depth target, which a primed forward pass starts from |
+| `ssao` | the SSAO occlusion pass, at its quality's resolution |
+| `ssao_blur` | the SSAO blur at the occlusion's resolution, and the depth-aware upsample to full resolution when that is lower |
 | `forward` | the opaque scene pass: solids, decals folded in, skybox — every camera's, render-texture cameras included |
 | `ssr` | screen-space reflections (#1526): the march over the base camera's opaque image (High tier only); the copy of that image it reads is recorded before the timed pass, so it isn't counted |
 | `transparent` | translucent solids |

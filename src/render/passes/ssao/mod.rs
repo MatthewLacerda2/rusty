@@ -7,9 +7,13 @@
 //! (except a `DepthOnly` camera stacked on another, a viewmodel, which runs none
 //! of it and samples no AO, as URP's overlay cameras: `draw::camera::is_overlay`):
 //!
-//! 1. a **depth prepass** of its solids (the forward vertex stage, depth only);
+//! 1. a **depth prepass** of its solids (the forward vertex stage, depth only) into
+//!    the view's own depth target, which a primed forward pass then starts from
+//!    (#1499): one prepass, shared;
 //! 2. the **occlusion** pass (`ssao.wgsl` `fs_ao`) at its quality's resolution;
-//! 3. a depth-aware **blur** that upsamples to full resolution (`fs_blur`);
+//! 3. a depth-aware **blur** at that same resolution (`fs_blur`);
+//! 4. below full resolution, one depth-aware (bilateral) **upsample** to it
+//!    (`fs_upsample`), HDRP's shape (#1578);
 //!
 //! and the forward pass reads the result at its group 3 (`t_ao`) to scale its
 //! ambient and environment-reflection terms. With AO off none of this runs, and
@@ -17,10 +21,12 @@
 //!
 //! Cost, per camera that runs it: one more depth-only draw of every visible solid, plus
 //! `samples` depth taps per occlusion texel (the seeded Medium preset's Medium
-//! level: 8 at half resolution — a quarter of the pixels) and 25 per pixel for the
-//! blur. The frame
-//! stats count both (`draw_calls`/`triangles` include the prepass; `ssao_samples`
-//! the occlusion taps).
+//! level: 8 at half resolution — a quarter of the pixels), 25 per occlusion texel
+//! for the blur and 4 per pixel for the upsample, so all but the upsample scale
+//! with the resolution divisor. The frame stats count the draws
+//! (`draw_calls`/`triangles` include the prepass) and the occlusion taps
+//! (`ssao_samples`); `Debug.Stats().gpu_passes` times the prepass (`ssao_prepass`),
+//! the occlusion (`ssao`) and the blur with its upsample (`ssao_blur`) apart.
 
 mod run;
 mod setup;
@@ -34,18 +40,56 @@ use crate::components::{PostProcessingComponent, SsaoSettings};
 use crate::core::settings::graphics_options::GraphicsOption;
 use crate::core::settings::quality::{SsaoQuality, MAX_RESOLUTION_DIVISOR};
 use crate::core::settings::GraphicsSettings;
+use crate::render::gpu::pipelines::LazyPipeline;
 use crate::render::postfx::params::{effect_runs, Gate};
+use crate::render::timing::GpuPass;
 use crate::scene::Camera;
 
-/// The occlusion and blur targets' format: one unorm channel is all AO needs.
+/// The occlusion, blur and upsample targets' format: one unorm channel is all AO needs.
 pub(crate) const AO_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::R8Unorm;
 
-/// The renderer-wide half of SSAO: its two fullscreen pipelines, their layout, and
-/// the white texture the forward pass reads where no AO ran. The size-dependent
-/// targets are per view ([`SsaoTargets`]).
+/// One of SSAO's fullscreen passes, in the order a frame records them.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Stage {
+    Occlusion,
+    Blur,
+    Upsample,
+}
+
+impl Stage {
+    const ALL: [Self; 3] = [Self::Occlusion, Self::Blur, Self::Upsample];
+
+    fn label(self) -> &'static str {
+        match self {
+            Self::Occlusion => "SSAO Pass",
+            Self::Blur => "SSAO Blur Pass",
+            Self::Upsample => "SSAO Upsample Pass",
+        }
+    }
+
+    /// Its fragment entry point in `ssao.wgsl`.
+    fn entry(self) -> &'static str {
+        match self {
+            Self::Occlusion => "fs_ao",
+            Self::Blur => "fs_blur",
+            Self::Upsample => "fs_upsample",
+        }
+    }
+
+    /// The `gpu_passes` entry it is timed under: the upsample rides with the blur.
+    fn timed(self) -> GpuPass {
+        match self {
+            Self::Occlusion => GpuPass::Ssao,
+            Self::Blur | Self::Upsample => GpuPass::SsaoBlur,
+        }
+    }
+}
+
+/// The renderer-wide half of SSAO: its fullscreen pipelines (one per [`Stage`]),
+/// their layout, and the white texture the forward pass reads where no AO ran. The
+/// size-dependent targets are per view ([`SsaoTargets`]).
 pub(crate) struct SsaoRenderer {
-    ao_pipeline: wgpu::RenderPipeline,
-    blur_pipeline: wgpu::RenderPipeline,
+    pipelines: [LazyPipeline; 3],
     layout: wgpu::BindGroupLayout,
     _no_ao_texture: wgpu::Texture,
     /// 1x1 white: "unoccluded", bound wherever the AO pass did not run.
@@ -122,7 +166,7 @@ impl SsaoFrame {
         }
     }
 
-    /// The uniform the occlusion and blur passes read.
+    /// The uniform every SSAO stage reads.
     pub(crate) fn uniform(&self) -> SsaoUniform {
         let s = self.plan.settings;
         SsaoUniform {
