@@ -64,6 +64,11 @@ things follow:
   across architectures: `f32` transcendentals come from each platform's libm, so
   macOS aarch64 and Linux x86_64 differ in the last bits (#1487). A test compares two
   bakes made on the same machine, never a bake against a committed hash or pixel bytes.
+- Two renders of the same scene with the same renderer are byte-identical on **every**
+  adapter, Metal included, so a GPU test compares them exactly, with no tolerance.
+  When Metal disagrees with itself (a level on a few silhouette pixels), a shader is
+  reading something undefined: #1525 was SSR taking `dpdx`/`dpdy` inside a per-pixel
+  branch, which lavapipe hides and Metal does not.
 - CI (`.github/workflows/ci.yml`) and `make test` run the engine suite with
   **cargo-nextest** plus `cargo test --doc`, both feature sets; the lint xtask keeps
   plain `cargo test`. See *The test runner* below.

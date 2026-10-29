@@ -5,7 +5,7 @@
 //! unlit solid (absent from the prepass) half hidden behind a lit one, and a
 //! half-dissolved surface variant (a cut, #648) in front, and a render scale below 1
 //! (#1498), whose prepass and view depth are both the scaled size. On Metal nothing
-//! primes, so there it checks only that. Skips with no adapter.
+//! primes, so there it checks that two unprimed frames match. Skips with no adapter.
 
 use std::cell::RefCell;
 
@@ -124,13 +124,10 @@ fn gpu_a_primed_forward_pass_draws_the_unprimed_frame() {
         let (primed, after) = frame(&mut r, &scene.borrow(), true, scale);
         assert_eq!(before.primed_passes, 0);
         assert_eq!(after.velocity_passes, u32::from(blur));
-        // Metal never primes (`priming`), and there two unprimed frames already
-        // differ by a level on a few edge pixels (CI, 2026-10-28): nothing to compare.
-        if !r.priming_recommended {
-            assert_eq!(after.primed_passes, 0, "Metal doesn't prime");
-            continue;
-        }
-        assert_eq!(after.primed_passes, 1, "the AO camera primes");
+        // Metal never primes (`priming`): there the second frame is unprimed too, and
+        // the two still match byte for byte (#1525).
+        let primes = u32::from(r.priming_recommended);
+        assert_eq!(after.primed_passes, primes, "AO primes where it can");
         let distinct: std::collections::HashSet<_> = plain.chunks(4).collect();
         assert!(distinct.len() > 8, "the frame shows the walls");
         let differing = plain

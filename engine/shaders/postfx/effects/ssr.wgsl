@@ -48,9 +48,13 @@ fn sky_reflection(r: vec3<f32>) -> vec3<f32> {
 
 // Additive, grazing-weighted.
 fn hdr(c: vec3<f32>, f: Frag, p: vec4<f32>) -> vec3<f32> {
+    // The derivatives are taken before the branch, in uniform control flow: inside
+    // it a quad's neighbour on the sky (or with SSR off) is outside the branch, its
+    // `world_pos` undefined there, and Metal's normal then changed frame to frame
+    // on silhouette pixels (#1525).
+    let n = normal_from_depth(f.uv, f.world_pos);
     var out = c;
     if (p.x > 1.5 && f.depth < 1.0) {
-        let n = normal_from_depth(f.uv, f.world_pos);
         let refl = screen_space_reflection(f.uv, f.world_pos, n);
         let v = normalize(params.camera_pos.xyz - f.world_pos);
         let fresnel = pow(1.0 - max(dot(n, v), 0.0), 3.0);
