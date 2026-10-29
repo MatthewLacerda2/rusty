@@ -7,7 +7,7 @@ import functools
 import subprocess
 import time
 
-from merging.queue import checks, dependabot, gitio, landing, outcomes, pulls, rebase, stamping, waiting
+from merging.queue import checks, dependabot, gitio, landing, outcomes, pulls, refusal, stamping, update, waiting
 from merging.verdict import carried, closing, decide, github, protocol
 from merging.watch import handbacks
 
@@ -17,9 +17,9 @@ def dry(repo: str, pull: dict, fresh: str, notes: list[str]) -> tuple[int, str, 
     number, head = pull["number"], pull["headRefOid"]
     if notes:
         # Dependabot's branch, behind `main` ([`dependabot.bot_head`]), or a head `main`
-        # passed only by Markdown ([`rebase.advance`]): the note says what happens.
+        # passed only by Markdown ([`update.advance`]): the note says what happens.
         moved, notes = notes[0].rstrip("."), notes[1:]
-    elif rebase.push_needed(head, fresh):
+    elif update.push_needed(head, fresh):
         moved = f"would push {fresh[:7]} once it passes the local checks, then wait for CI on it"
     else:
         moved = "already on `main`; nothing to push"
@@ -27,6 +27,16 @@ def dry(repo: str, pull: dict, fresh: str, notes: list[str]) -> tuple[int, str, 
     ok, lines = decide.judge(pull, runs, jobs, github.paths(pull))
     outcomes.say(f"#{number}: {moved}.", *notes, f"today's head {head[:7]}: {'mergeable' if ok else 'not mergeable'} — {lines[0]}", *lines[1:])
     return number, outcomes.DRY, f"{moved}; head {head[:7]} is {'mergeable' if ok else 'not mergeable'}."
+
+
+def squash_message(fresh: str, root: str) -> str:
+    """The squash commit's body: a bullet per commit the branch made, oldest first,
+    its merges of `main` left out, so `main` carries no `Merge remote-tracking
+    branch` bullets (#1568). Empty when git cannot say."""
+    done = gitio.git("log", "--no-merges", "--reverse", "--format=%s", f"origin/main..{fresh}", cwd=root)
+    if done.returncode != 0:
+        return ""
+    return "\n".join(f"* {line.strip()}" for line in done.stdout.splitlines() if line.strip())
 
 
 def take(repo: str, number: int, opts: argparse.Namespace, tick=None) -> tuple[int, str, str]:
@@ -59,24 +69,29 @@ def take(repo: str, number: int, opts: argparse.Namespace, tick=None) -> tuple[i
         outcomes.say(f"#{number} ({branch}): Dependabot's branch; it rebases itself.")
         fresh, notes = dependabot.bot_head(number, head, opts.root, opts)
     else:
-        outcomes.say(f"#{number} ({branch}): rebasing {head[:7]} onto origin/main.")
+        outcomes.say(f"#{number} ({branch}): merging origin/main into {head[:7]}.")
         check = None
         if checks.needs_check(pull, opts):
             check = functools.partial(checks.verify, target=checks.target_dir(opts))
-        fresh, notes = rebase.advance(branch, head, opts.root, push=not opts.dry_run, check=check)
+        fresh, notes = update.advance(branch, head, opts.root, push=not opts.dry_run, check=check)
     if fresh is None:
+        # Moved since the take began: the watch takes its new head afresh
+        # (#1568); named pull requests are never retaken, so there it is not merged.
+        moved = notes[0] == refusal.MOVED
+        if moved and not opts.watch:
+            notes, moved = [refusal.MOVED_NAMED, *notes[1:]], False
         outcomes.say(f"#{number}: {notes[0]}", *notes[1:])
-        return number, outcomes.HANDED_BACK, notes[0]
+        return number, outcomes.NOT_READY if moved else outcomes.HANDED_BACK, notes[0]
     if opts.dry_run:
         return dry(repo, pull, fresh, notes)
 
-    if rebase.push_needed(head, fresh):
+    if update.push_needed(head, fresh):
         outcomes.say(f"#{number}: now at {fresh[:7]}; waiting for CI.")
         stamping.stamp(repo, pull, fresh, opts.root)
     else:
         outcomes.say(f"#{number}: {notes[0] if notes else 'already on `main`; the run on record is a run on it.'}")
 
-    # A bot's rebase wait came out of the same `--deadline`; a rebase from
+    # A bot's rebase wait came out of the same `--deadline`; a merge from
     # here is local work, and its CI wait gets the whole deadline as before.
     spent = time.monotonic() - began if pulls.is_bot(pull) else 0.0
     state, lines = waiting.wait_for(repo, number, fresh, head, dependabot.left(opts.deadline, spent), opts.poll, tick)
@@ -90,7 +105,8 @@ def take(repo: str, number: int, opts: argparse.Namespace, tick=None) -> tuple[i
     # verdict makes GitHub refuse.
     done = subprocess.run(
         ["gh", "api", "--method", "PUT", f"repos/{repo}/pulls/{number}/merge",
-         "-f", "merge_method=squash", "-f", f"sha={fresh}", "-f", f"commit_title={pulls.subject(pull)}"],
+         "-f", "merge_method=squash", "-f", f"sha={fresh}", "-f", f"commit_title={pulls.subject(pull)}",
+         "-f", f"commit_message={squash_message(fresh, opts.root)}"],
         capture_output=True, text=True, check=False,
     )
     if done.returncode != 0:

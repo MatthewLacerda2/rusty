@@ -1,18 +1,19 @@
-"""The local checks a rebased head passes before it is pushed ([`verify`], #571).
+"""The local checks an updated head passes before it is pushed ([`verify`], #571).
 
-## A clean rebase is not a compiling one
+## A clean merge is not a compiling one
 
 A merge ahead can change a signature the branch still calls, and no textual
 merge sees it. On 2026-09-30 #542 removed a `Renderer::render` argument that
 #538's new tests still passed; the rebase was clean and CI went red ten
 minutes later — a queue round spent on a compile error (#571). A rebase of
-#563 onto #558 and #564 pushed a file to 308 of 300 lines the same night. So
-before pushing a rebase that moved the head, [`verify`] runs [`LOCAL_CHECKS`]
-in the rebased tree: `cargo check --locked --all-targets` with `dev` and with
+#563 onto #558 and #564 pushed a file to 308 of 300 lines the same night. The queue
+merges `main` in now (#1568), and a clean merge is no safer. So before pushing
+an update that moved the head, [`verify`] runs [`LOCAL_CHECKS`] in the updated
+tree: `cargo check --locked --all-targets` with `dev` and with
 `--no-default-features`, then the size gate — a minute or two on a warm
 target, against ten for the CI round it saves. A failure hands the branch
 back unpushed: a head known to be broken is never pushed to find out again.
-Skipped for a Markdown-only branch (nothing compiles differently), a rebase
+Skipped for a Markdown-only branch (nothing compiles differently), an update
 that moved nothing, Dependabot, and `--no-check`.
 
 Those builds land in **one target directory owned by the queue**
@@ -52,7 +53,7 @@ from merging.queue import stopping
 from merging.verdict import changes, github
 
 
-# What a rebased tree must pass before it is pushed ([`verify`], #571),
+# What an updated tree must pass before it is pushed ([`verify`], #571),
 # cheapest first. Each mirrors a gate CI blocks on.
 LOCAL_CHECKS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("cargo check (dev)", ("cargo", "check", "--locked", "--all-targets", "--features", "dev")),
@@ -80,7 +81,7 @@ QUEUE_ROOT = "a worktree under .claude/worktrees/"
 
 
 def verify(work: str, target: str, runner=subprocess.run) -> list[str]:
-    """Run [`LOCAL_CHECKS`] in the rebased tree `work`; why not to push, or `[]`.
+    """Run [`LOCAL_CHECKS`] in the updated tree `work`; why not to push, or `[]`.
 
     Stops at the first failure and quotes its tail. A failure that is the
     machine's ([`ENVIRONMENT`]) raises [`stopping.Stopped`] instead. `runner` is
@@ -102,9 +103,9 @@ def verify(work: str, target: str, runner=subprocess.run) -> list[str]:
                     f" Free space, or run it from {QUEUE_ROOT} (never the scratchpad), then queue them again.",
                 ])
             return [
-                f"the rebased head fails {name}; not pushed.",
+                f"the updated head fails {name}; not pushed.",
                 *said[-OUTPUT_TAIL:],
-                "The rebase was textually clean, so a merge ahead changed"
+                "The merge was textually clean, so a merge ahead changed"
                 " something this branch relies on. Handed back: fix it on the"
                 " branch, then queue it again.",
             ]
@@ -165,5 +166,5 @@ def target_dir(opts: argparse.Namespace) -> str:
 
 
 def needs_check(pull: dict, opts: argparse.Namespace) -> bool:
-    """Whether [`verify`] runs for this pull request's rebase."""
+    """Whether [`verify`] runs for this pull request's update."""
     return not (opts.no_check or opts.dry_run or changes.markdown_only(github.paths(pull)))

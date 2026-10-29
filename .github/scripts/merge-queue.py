@@ -3,7 +3,7 @@
 
 Invoked, never a service: it runs when somebody types `make queue`, on the pull
 requests they name, in the order they name them. `--dry-run` does every read
-and the local rebase, and writes nothing to GitHub. `--watch` (#664) names
+and the local merge of `main`, and writes nothing to GitHub. `--watch` (#664) names
 none: it takes each ready pull request labelled `queue`, the go-ahead the
 orchestrator adds after reading the diff (#925), the one conflicting with the
 fewest others in line first, then by label priority (#753),

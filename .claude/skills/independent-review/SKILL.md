@@ -40,7 +40,7 @@ does **work the engine does itself**:
 
 **No review** for what is standard, mechanical, or proved by a gate alone:
 documentation; the editor's UI and egui (the work `issue-batch` gives Sonnet,
-*Which model*); a mechanical rebase; a size-cap split; a new lint rule whose
+*Which model*); a mechanical merge of `main`; a size-cap split; a new lint rule whose
 issue already names its flag and pass cases; adopting a cargo crate the way its
 docs say, without reinventing anything; Dependabot bumps. When a PR is both, the
 trigger wins.

@@ -34,15 +34,16 @@ Before writing code, read the issue body for "Blocked by" and check each blocker
 ## Read first
 
 `CLAUDE.md`, your issue(s), your brief, and `.claude/skills/ci-merge/SKILL.md`.
-**Your brief is the newest comment on your issue whose first line is `Brief`**
-(#910): your branch name, what to build on, the siblings whose files to stay
-out of, and decisions already made. A later `Brief` supersedes an earlier one.
+**Your brief is the comment your prompt names** (#910; pinned by URL since
+PR #1572, so a comment posted after it is not what you follow): your branch
+name, what to build on, the siblings whose files to stay out of, and decisions
+already made. A re-brief is a new `Brief` and a new session with its own prompt.
 It may name more to read.
 
 ## Your job ends at "ready"
 
 A coder's session ends when its pull request is **ready**. Everything after that
-(waiting on CI, rebasing, merging, reading a mutation report) belongs to the
+(waiting on CI, updating the branch, merging, reading a mutation report) belongs to the
 orchestrator and the merge queue (#823). There is no check-in to schedule and
 nothing to wait for.
 
@@ -74,14 +75,15 @@ nothing to wait for.
   of the PR cancels what is left (a merged PR's run finishes and reports,
   #1530), so dispatch once, when you ready.
 - **Once ready, the branch is the merge queue's. Never push to it again**, not
-  to rebase and not to fix your own red CI: a red or conflicting ready PR comes
+  to update it from `main` and not to fix your own red CI: a red or conflicting ready PR comes
   back to the orchestrator as a hand-back, and it briefs a fix. Anything you
   notice after readying goes in a comment on the issue.
 - **Readying ends you for good.** A later draft flip, a review comment or a PR
   comment pointing at a new `Brief` is not yours to act on: the orchestrator
   launches a fresh session for every re-brief. On 2026-10-26 a readied session
   followed a review comment to the new `Brief` while the fresh one did the same,
-  and one force-push overwrote the other.
+  and one force-push overwrote the other (a plain push, #1568, is refused
+  instead, but the rule stands).
 
 ## The container
 
@@ -117,20 +119,25 @@ a coder real time.
   *For a human* heading for the operator to delete.
 - **`git status --short --ignored` lists nothing you wrote** before readying: a
   `.gitignore` pattern can silently keep a source file out of a commit.
-- **A refused force-push has one fallback.** The container's permission check
-  sometimes refuses `git push --force-with-lease` even when the brief authorises it
-  (four times on 2026-10-26). Don't work around it: push the same commits to
-  `<branch>-v2` (no force), open a ready PR with the old one's description headed
-  "Supersedes #N (<why>; a force-push was refused)", and comment on #N. The
-  orchestrator closes #N.
-- **Rebase onto `main`, never merge `main` into your branch.** The merge queue
-  rebases every branch before it merges it, and a rebase replays the commits from
-  before a merge commit, so conflicts the merge resolved come back and the PR is
-  handed back (2026-10-26, PR #1458).
-- **Rebase once, last.** After a rebase over unrelated merges, `cargo check`, the
-  size gate and your own tests are enough; the whole gate list again is not.
-  **On a re-brief of a pushed branch, don't rebase at all**: add commits on top,
-  and rebase only if GitHub shows the PR conflicting. The queue rebases at merge.
+- **Merge `main` in, never rebase a pushed branch** (#1568). A rebase rewrites
+  commits, so its push must be forced, and the container's permission check
+  refused that force-push again and again (four times on 2026-10-26, more on
+  2026-10-28), each refusal a superseding PR with its own CI run. `git merge
+  origin/main` rewrites nothing, pushes as a plain fast-forward, and resolves a
+  conflict once. PRs are squash-merged, so the merge commit never reaches
+  `main`, and the queue itself merges `main` in now: the PR #1458 trap (a
+  queue rebase replaying conflicts a merge had resolved) is gone. Rebasing
+  local commits that were never pushed is fine.
+- **A refused push has one fallback**, and with no force-push it should no
+  longer happen (the queue's own push keeps a lease on the head it took, as a
+  compare-and-swap; that is the daemon's, never yours): don't work around it; push the same commits to `<branch>-v2`,
+  open a ready PR with the old one's description headed "Supersedes #N (<why>;
+  a push was refused)", and comment on #N. The orchestrator closes #N.
+- **Update once, last.** After merging `main` in over unrelated merges, `cargo
+  check`, the size gate and your own tests are enough; the whole gate list again
+  is not. **On a re-brief of a pushed branch, don't update at all**: add commits
+  on top, and merge `origin/main` in only if GitHub shows the PR conflicting.
+  The queue merges `main` in at merge time.
 - **Blessings come from the container's Mesa, not CI's.** A capture or snapshot
   blessed here may differ from what CI renders: bless nothing from a container
   without saying so in the PR.
@@ -181,8 +188,9 @@ a coder real time.
 Beyond what changed, why, the effect and the decisions:
 
 - **A `Gates` line:** what ran green, on which head commit, and what didn't run
-  and why (no real GPU, a human check). After your own rebase it is re-run or
-  marked stale; a rebase the merge queue pushes later dates it for you (#968).
+  and why (no real GPU, a human check). After your own update from `main` it is
+  re-run or marked stale; an update the merge queue pushes later dates it for
+  you (#968).
 - **A `Looked at` line** on a branch that changes what is drawn (above): for
   each before/after pair, the scene, what was rendered and what you saw, in one
   or two sentences. Say what you did *not* check (motion, Metal, cost, taste):
@@ -217,7 +225,7 @@ Beyond what changed, why, the effect and the decisions:
   as, e.g. `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>` (a Sonnet
   coder names Sonnet; the brief's `Model:` line says which, *Which model*).
 - Push often: a dead container takes its uncommitted work with it.
-- Green gates and a rebased branch → mark the PR **ready for review**, and end.
+- Green gates and a branch that holds the latest `main` → mark the PR **ready for review**, and end.
 - **Do NOT merge, and do not review your own PR.** The independent review is the
   orchestrator's (`independent-review`): it dispatches a reviewer that never saw
   your reasoning, which one you spawn cannot be. A brief that says the PR "gets an

@@ -1,6 +1,6 @@
 ---
 name: ci-merge
-description: Take a finished branch through to merged — the gates, CI, verifying a run happened on the head commit, rebasing, and triaging the mutation and coverage signals. Use when a branch is ready, when a pull request has gone red, when a mutation report needs triage, or when merging anything into `main`.
+description: Take a finished branch through to merged — the gates, CI, verifying a run happened on the head commit, updating a branch from `main` and its conflicts, and triaging the mutation and coverage signals. Use when a branch is ready, when a pull request has gone red, when a mutation report needs triage, or when merging anything into `main`.
 ---
 
 # Getting a branch merged
@@ -35,7 +35,7 @@ only the `--features dev` run sees them.
 **The commit hook is not a substitute.** `.githooks/pre-commit` runs formatting
 and the size gate only — no clippy, rustdoc, tests or dev feature set — and only
 once `make setup` (or the cloud session-start hook) has pointed
-`core.hooksPath` at it. `git rebase --continue` skips it; `.githooks/pre-push`
+`core.hooksPath` at it. `git rebase --continue` and `git commit --no-verify` skip it; `.githooks/pre-push`
 (#1096) runs rustfmt on both crates, `tools/lint` included, as a push of `HEAD`
 leaves (`make resolved` runs the same check by hand). Assume nothing heavy was caught for you.
 
@@ -64,7 +64,7 @@ label or not — **the one that textually
 conflicts with the fewest others in line first** (#753: `git merge-tree
 --write-tree` per pair of ready heads, no checkout). Reordering cannot make a
 conflict go away, but it decides how many hand-backs a set costs: the broad pull
-request lands last and takes the one rebase. A tie goes to the label —
+request lands last and takes the one conflicted update. A tie goes to the label —
 infrastructure → architecture → bug → foundation → feature, read from the pull
 request's labels and the issues it closes, a `bug` touching only tooling
 (`.github/`, `.githooks/`, `tools/`, `.config/`, `.claude/`, `Makefile`,
@@ -98,7 +98,7 @@ status says what to do: **0** nothing to read, **1** something was handed back
 (grep the output for `HANDED BACK`), **3** the machine or GitHub failed and
 nothing is known about the branches; the most urgent wins. A transient `gh`
 failure (a TLS timeout, a reset, a 502) is retried for about a minute first, so
-only a GitHub that stays down ends a watch, and then with **3** (#847). The queue's own `git fetch` and force-push retry the same way, keeping the lease on the head the take began from (#875): a git SSL timeout is a **3**, never a hand-back. It composes with every flag below; a
+only a GitHub that stays down ends a watch, and then with **3** (#847). The queue's own `git fetch` and push retry the same way, each retry the same plain push (#875, #1568): a git SSL timeout is a **3**, never a hand-back. It composes with every flag below; a
 batch runs `ARGS="--watch --no-check --for 70"`. **`--for MINUTES`** (#697) is
 the watch's own deadline: once it passes, the watch takes no new pull request,
 finishes the one in hand (merged or handed back) and exits with a last
@@ -130,25 +130,39 @@ pull requests instead, in the order given. Either way, the loop is one pull
 request at a time — so no agent sits through a ten-minute run holding a
 worktree open:
 
-1. Rebase onto the latest `origin/main`, in a throwaway detached worktree it
-   creates and removes (never one an agent is standing in).
-2. Compile-check the rebased tree before pushing it (#571): `cargo check
+1. Merge the latest `origin/main` into the branch (`git merge --no-edit`, never
+   a rebase, #1568), in a throwaway detached worktree it creates and removes
+   (never one an agent is standing in).
+2. Compile-check the updated tree before pushing it (#571): `cargo check
    --locked --all-targets` with `dev` and with `--no-default-features`, then
    the size gate, building into the queue's own `target/merge-queue`. A clean
-   textual rebase still breaks when a merge ahead changed a signature. Skipped
+   textual merge still breaks when a merge ahead changed a signature. Skipped
    for a Markdown-only branch, Dependabot, and `ARGS=--no-check`.
-3. Push with `--force-with-lease` against the head it started from — both
-   skipped when the rebase moved nothing, because the run on record is then a
-   run on this exact commit.
-4. Wait for the runs **on the rebased head** to exist and conclude.
+3. Push it as a fast-forward leased on the head the take began from
+   (`--force-with-lease=refs/heads/<branch>:<head>`, a compare-and-swap: the
+   queue's own push is the one deliberate lease in the normal flow) — both
+   skipped when the merge moved nothing (the branch already held `main`),
+   because the run on record is then a run on this exact commit. The lease is
+   the guard: a plain push would accept a branch reset backwards or deleted
+   mid-take (an author dropping a leaked secret) and squash the dropped commit
+   into `main`. If anything pushed, reset or deleted the branch since the take
+   began, the push is refused. Under `--watch` the branch is then taken again on
+   its new head (`not ready — its branch moved during the take`); named pull
+   requests are never retaken, so there it is reported *not merged* and counts
+   as a hand-back in the exit status. A refusal whose remote head could not be
+   read is a plain hand-back, never "moved". Only this push refusal is retaken:
+   a push that lands during the CI wait (step 4) is a hand-back.
+4. Wait for the runs **on the updated head** to exist and conclude.
 5. Ask `make mergeable`'s judgement of that head — see the next section.
 6. Squash-merge with the house-style title (`Title (#issue) (#pr)`; the queue
-   adds each closed issue the title lacks, #966) and
+   adds each closed issue the title lacks, #966), a body of one bullet per
+   commit the branch made with its merges of `main` left out (so `main` reads
+   no `Merge remote-tracking branch` lines), and
    `--match-head-commit`, so a push after the verdict makes GitHub refuse.
 
 It **hands back** — names why, skips that entry and carries on, named pull
 requests and `--watch` alike — on a
-conflict (naming the paths; it never resolves one), a rebased head that fails
+conflict (naming the paths; it never resolves one), an updated head that fails
 the local check (never pushed), a red run, a run that never
 appears, a head somebody else moved, a draft, a description that claims what it
 may not (next section; checked before any push), or a merge GitHub refused. A 502 on
@@ -173,10 +187,10 @@ a merge (`make gates` before readying is the author's job), it never reads the m
 worktree and deletes no branch** — the summary lists the merged ones. Remove each
 worktree (~2.5–4.5 GB of `target/` each) and its branch once nobody is standing in it.
 
-- `ARGS=--dry-run` reads everything and computes the rebase locally, but pushes,
-  comments and merges nothing — use it to see what a queue *would* do.
-  `ARGS=--no-merge` does the real rebase and wait, and stops at green.
-- **Dependabot branches are never force-pushed** — Dependabot stops maintaining a
+- `ARGS=--dry-run` reads everything and computes the merge of `main` locally, but
+  pushes, comments and merges nothing — use it to see what a queue *would* do.
+  `ARGS=--no-merge` does the real update and wait, and stops at green.
+- **The queue never pushes to a Dependabot branch** — Dependabot stops maintaining a
   branch someone else pushed to, and it rebases (and cancels its own runs) by
   itself. The queue comments `@dependabot rebase` when one is behind, waits for a
   head on `main`'s tip, and judges that, all inside one `--deadline` (#825).
@@ -203,9 +217,13 @@ worktree (~2.5–4.5 GB of `target/` each) and its branch once nobody is standin
   still running but never seen holding its lock is reported as *unconfirmed*
   (exit 0): read `queue.log` before trusting it. Stop a supervisor with `make
   queue-stop`, or `kill <pid>` (its worktree lock is released either way).
-- By hand, the same loop is: rebase in the branch's worktree, `cargo check`
-  both feature sets and `make size`, push with `--force-with-lease`, wait,
-  `make mergeable PR=N`, squash-merge. Prefer the queue.
+- By hand, the same loop is: `git merge origin/main` in the branch's worktree,
+  `cargo check` both feature sets and `make size`, a plain `git push`, wait,
+  `make mergeable PR=N`, squash-merge. Prefer the queue. Never rebase a pushed
+  PR branch: a rewrite needs a force-push, which permission checks refuse
+  (#1568). `--force-with-lease` is kept for the rare branch that must be
+  rewritten (a secret committed by mistake) and for the queue's own leased
+  push (step 3); never anyone else's push in the normal flow.
 
 Merging is serialized because rusty is **one compiled crate**: two branches can
 each be green alone and break `main` together. A rename, a changed signature, a
@@ -314,7 +332,7 @@ genuinely unfinished, blocked, or handed over — including the hand-back after 
 attempts at the same failure, which does go to draft, with the reason in the
 description.
 
-## Rebasing
+## Updating a branch from `main`, and its conflicts
 
 Expect conflicts wherever every feature appends in an order that matters:
 `Entity`'s `Option<…Component>` fields, `ComponentKind`'s variant list,
@@ -333,33 +351,34 @@ per-frame system order is defined. Merging it by textual proximity silently
 reorders the schedule.
 
 Mechanical resolutions (a `mod` list, an import) are fine to do directly. The
-`pre-push` hook runs rustfmt on both crates before the force-push leaves
+`pre-push` hook runs rustfmt on both crates before the push leaves
 (#1096); with hooks not set up, run `make resolved` first. It is rustfmt only: a lost `#[cfg(test)]` or a file pushed past its cap still waits for CI. Hand a
-rebase back to the branch's author when resolving it needs to know *why* the code
+conflict back to the branch's author when resolving it needs to know *why* the code
 is shaped as it is — a new variant that should join a documented grouping, two
 prose paragraphs that need ordering, a signature that has grown a parameter, a
 system whose stage placement was argued for.
 
 **A `Cargo.lock` conflict is never hand-merged** (#824). Two lockfiles merged
 hunk by hunk can resolve to a dependency graph neither side ever built. The
-procedure, mid-rebase: take `main`'s lockfile (`git checkout --ours Cargo.lock`;
-during a rebase *ours* is the upstream side), let cargo re-add the branch's own
+procedure, mid-merge of `origin/main` into the branch: take `main`'s lockfile
+(`git checkout --theirs Cargo.lock`; during a merge *theirs* is `main` and *ours*
+the branch, the opposite of a rebase), let cargo re-add the branch's own
 edges with `cargo update -p <only the crates this branch moves>` (never a blanket
 `cargo update`, which drags every other crate forward too), then `cargo check
---locked --all-targets` and `make deny` before pushing. A rebase that touched
+--locked --all-targets` and `make deny` before pushing. An update that touched
 `Cargo.lock` is one whose resolution needs a compile, so under `--no-check` it
 goes back to a coder, never a quick orchestrator fix. On 2026-10-04 the wgpu
-upgrade (#333, PR #767) was handed back three times on `Cargo.lock`; each rebase
+upgrade (#333, PR #767) was handed back three times on `Cargo.lock`; each
 coder resolved it by exactly these steps, which until then lived only in their
 briefs.
 
-After a rebase, re-check any claim the branch made **about the base it measured
+After an update from `main`, re-check any claim the branch made **about the base it measured
 against** — the "Gates" paragraph in the description, a survivor count, a coverage
 number, a byte-identical-bake proof. A measurement taken against an older `main`
 is stale, and citing it is worse than not having run it. **The queue dates the
-Gates line itself** (#968): each rebase it pushes appends (or replaces) one line
-in the description, `rebased by the queue onto <main>; local gates not re-run;
-CI judged <head>`, so a reader knows which commit the claim measured.
+Gates line itself** (#968): each update it pushes appends (or replaces) one line
+in the description, `updated by the queue to main at <main>; local gates not
+re-run; CI judged <head>`, so a reader knows which commit the claim measured.
 
 ## The same-commit obligations
 
@@ -492,7 +511,7 @@ trigger overlap beginning and ending on the same tick. Each of those is a real g
 until measured otherwise.
 
 Two caveats that are the reason this is not a gate: `--in-diff` line matching can
-drift after a rebase, and a mutant that induces a slow loop times out and reports
+drift after an update from `main`, and a mutant that induces a slow loop times out and reports
 as a survivor. Neither should redden CI, and neither should stop a merge.
 
 ### The coverage floors

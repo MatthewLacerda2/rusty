@@ -9,7 +9,7 @@ import subprocess
 import time
 from unittest import mock
 
-from merging.queue import gitio, polling, rebase
+from merging.queue import gitio, polling, update
 from tests.verdict import fixtures
 from tests.verdict.fixtures import CODE, built
 
@@ -36,9 +36,9 @@ def completed(code: int, stderr: str = "") -> subprocess.CompletedProcess:
     return subprocess.CompletedProcess([], code, "", stderr)
 
 
-# [`rebase.advance`]'s push, with `git` faked (#875, #1108).
+# [`update.advance`]'s push, with `git` faked (#875, #1108).
 SHA, FRESH = "a" * 40, "1" * 40
-STALE = " ! [rejected]        b -> b (stale info)\nerror: failed to push some refs"
+NON_FF = " ! [rejected]        HEAD -> b (fetch first)\nerror: failed to push some refs"
 
 
 def done(code: int, stderr: str = "", stdout: str = "") -> subprocess.CompletedProcess:
@@ -46,7 +46,7 @@ def done(code: int, stderr: str = "", stdout: str = "") -> subprocess.CompletedP
 
 
 def advancing(pushes, remote_head=FRESH, calls=None):
-    """[`rebase.advance`] of branch `b` from [`SHA`], rebased to [`FRESH`].
+    """[`update.advance`] of branch `b` from [`SHA`], updated to [`FRESH`].
 
     Each push answers with the next of `pushes`; `ls-remote` names
     `remote_head` (nothing when `None`). Every git call is appended to `calls`.
@@ -64,6 +64,6 @@ def advancing(pushes, remote_head=FRESH, calls=None):
         return done(0)
 
     with mock.patch.object(gitio, "git", side_effect=git), \
-            mock.patch.object(rebase, "main_moved_by_docs", return_value=False), \
+            mock.patch.object(update, "main_moved_by_docs", return_value=False), \
             mock.patch.object(time, "sleep"):
-        return rebase.advance("b", SHA, ".", push=True)
+        return update.advance("b", SHA, ".", push=True)
