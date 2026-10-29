@@ -8,30 +8,42 @@ use std::path::{Path, PathBuf};
 use std::sync::mpsc::{channel, Sender};
 use std::sync::Mutex;
 
-use super::{cache, cache_file, encode, fit, format_of, shrink, TextureKind};
-use crate::asset::{convert, is_image_path, sidecar};
+use super::encode::{self, Cores};
+use super::{cache, cache_file, fit, format_of, open, reader, shrink, TextureKind};
+use crate::asset::convert::{self, Seen};
+use crate::asset::{is_image_path, sidecar};
 use crate::core::fs::written::Stale;
+use crate::core::hash::fnv1a64;
 
-/// Make the compressed cache of the image at `source` current, encoding it when it
-/// is missing or stale. Returns whether it encoded; `false` too when the image is
-/// left uncompressed (see the module doc), which is found from its header without
-/// decoding it. `progress` follows the image's name in the console line.
+/// Make the compressed cache of the image at `source` current, encoding it on
+/// every core when it is missing or stale. Returns whether it encoded; `false` too
+/// when the image is left uncompressed (see the module doc), which is found from
+/// its header without decoding it. `progress` follows the image's name in the
+/// console line.
 pub fn refresh(source: &Path, progress: &str) -> Result<bool, String> {
+    refresh_on(source, progress, Cores::All)
+}
+
+/// [`refresh`] on `cores`. Whether the cache is current costs a `stat` of the
+/// source (its digest is remembered by length and mtime, `convert::source_digest`)
+/// and a read of the cache's head; only an encode reads either whole.
+fn refresh_on(source: &Path, progress: &str, cores: Cores) -> Result<bool, String> {
     let settings = sidecar::texture(source);
     if format_of(&settings).is_none() {
         return Ok(false);
     }
     let named = |e: &dyn std::fmt::Display| format!("{}: {e}", source.display());
     let out = cache_file(source)?;
-    let bytes = std::fs::read(source).map_err(|e| named(&e))?;
-    let stamp = cache::stamp(&bytes, &settings);
-    if cache::read(&out, stamp).is_some() {
+    let digest = match convert::source_digest(source) {
+        Seen::Read(digest) => digest,
+        Seen::Absent => return Err(named(&"no such file")),
+        Seen::Unreadable => return Err(named(&"cannot be read")),
+    };
+    if cache::is_current(&out, cache::stamp(digest, &settings)) {
         return Ok(false);
     }
-    let (w, h) = image::ImageReader::new(std::io::Cursor::new(&bytes))
-        .with_guessed_format()
-        .map_err(|e| named(&e))?
-        .into_dimensions()
+    let (w, h) = open(source)
+        .and_then(|r| r.into_dimensions())
         .map_err(|e| named(&e))?;
     let (w, h) = shrink::fitted_size(w, h, settings.max_size);
     if w % 4 != 0 || h % 4 != 0 {
@@ -41,16 +53,20 @@ pub fn refresh(source: &Path, progress: &str) -> Result<bool, String> {
         std::fs::create_dir_all(dir).map_err(|e| named(&e))?;
     }
     // Held until this returns; checked again under it, since whoever held it
-    // may have just made this cache.
+    // may have just made this cache. The stamp is made from the bytes encoded.
     let _lock = convert::lock_cache(&out);
-    if cache::read(&out, stamp).is_some() {
+    let bytes = std::fs::read(source).map_err(|e| named(&e))?;
+    let stamp = cache::stamp(fnv1a64(&bytes), &settings);
+    if cache::is_current(&out, stamp) {
         return Ok(false);
     }
     log::info!("[Import] compressing {}{progress}", source.display());
-    let image = image::load_from_memory(&bytes).map_err(|e| named(&e))?;
+    let image = reader(source, std::io::Cursor::new(&bytes))
+        .and_then(|r| r.decode())
+        .map_err(|e| named(&e))?;
     let kind = TextureKind::of_type(settings.texture_type);
     let fitted = fit(image, settings.max_size, kind);
-    let Some(made) = encode::encode(&fitted, &settings) else {
+    let Some(made) = encode::encode(&fitted, &settings, cores) else {
         return Ok(false);
     };
     cache::write(&out, stamp, &made).map_err(|e| named(&e))?;
@@ -70,32 +86,42 @@ pub fn images(root: &Path) -> Vec<PathBuf> {
     found
 }
 
+/// What a [`refresh_all`] did: how many images it encoded, and each one it could
+/// not, with why.
+#[derive(Debug, Default, PartialEq)]
+pub struct Refreshed {
+    pub encoded: usize,
+    pub failed: Vec<(PathBuf, String)>,
+}
+
 /// [`refresh`] every image under `root`, in order, on this thread: what Play waits
 /// for before it starts, as it waits for models (`convert::refresh_sources`), and
 /// what an export runs before it copies the caches. Each one re-made is noted in
-/// `core::fs::written`, so a renderer holding it uncompressed swaps it. Returns how
-/// many it encoded; a failure is warned of, the rest still run, and the failures
-/// are the `Err`, one per line. `Assets.Refresh` runs it on request.
-pub fn refresh_all(root: &Path) -> Result<usize, String> {
+/// `core::fs::written`, so a renderer holding it uncompressed swaps it. An image
+/// that fails is warned of and the rest still run: it draws (and ships)
+/// uncompressed, as Unity builds with an import error logged. `Assets.Refresh`
+/// runs it on request. Nothing while imports are refused (Play,
+/// `convert::conversion_allowed`).
+pub fn refresh_all(root: &Path) -> Refreshed {
+    let mut done = Refreshed::default();
+    if !convert::conversion_allowed() {
+        return done;
+    }
     let images = images(root);
-    let (mut encoded, mut failed) = (0, Vec::new());
     for (i, image) in images.iter().enumerate() {
         match refresh(image, &format!(" ({} of {} images)", i + 1, images.len())) {
             Ok(true) => {
                 crate::core::fs::written::note_written(&image.to_string_lossy());
-                encoded += 1;
+                done.encoded += 1;
             }
             Ok(false) => {}
             Err(e) => {
-                log::warn!("[Import] {e}");
-                failed.push(e);
+                log::warn!("[Import] {e}; it stays uncompressed");
+                done.failed.push((image.clone(), e));
             }
         }
     }
-    match failed.is_empty() {
-        true => Ok(encoded),
-        false => Err(failed.join("\n")),
-    }
+    done
 }
 
 /// [`queue`] every image under `root` that `changed` names, or whose sidecar it
@@ -114,8 +140,8 @@ pub fn queue_changed(root: &Path, changed: &Stale) {
 /// The worker's inbox, started by the first [`queue`].
 static WORKER: Mutex<Option<Sender<PathBuf>>> = Mutex::new(None);
 
-/// [`refresh`] each of `sources` on a worker thread, in order, so the editor stays
-/// responsive while it encodes; each one re-made is noted in `core::fs::written`,
+/// [`refresh`] each of `sources` on a worker thread, in order, on half the cores,
+/// so the editor stays responsive while it encodes; each one re-made is noted in `core::fs::written`,
 /// so the renderer swaps its uncompressed upload for it. Nothing is queued while
 /// imports are refused (Play, `convert::conversion_allowed`): Play's own refresh
 /// ran before it, and a change seen during it is queued after Stop.
@@ -142,7 +168,7 @@ fn start() -> Sender<PathBuf> {
         .name("texture-import".into())
         .spawn(move || {
             for source in sent {
-                match refresh(&source, "") {
+                match refresh_on(&source, "", Cores::Half) {
                     Ok(true) => {
                         let path = source.to_string_lossy();
                         crate::core::fs::written::note_written(&path);

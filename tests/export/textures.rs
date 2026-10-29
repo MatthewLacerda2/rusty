@@ -1,5 +1,6 @@
 //! A model whose texture lies outside `assets/` fails the export, naming it; an
-//! image's compressed copy ships, and the player never re-makes it (#1574).
+//! image's compressed copy ships, and the player never re-makes it; an image that
+//! does not decode ships uncompressed, never failing the export (#1574).
 
 use super::{export, fixture, play, project, tree, CACHE};
 
@@ -9,11 +10,17 @@ fn an_images_compressed_copy_ships_and_the_player_writes_none() {
     let textures = game.join("assets").join("textures");
     std::fs::create_dir_all(&textures).unwrap();
     std::fs::copy(fixture("textured_bricks.png"), textures.join("bricks.png")).unwrap();
+    std::fs::write(textures.join("broken.png"), b"not a png").unwrap();
     let out = crate::temp::dir().join("out");
-    assert!(export(&game, &out).status.success());
+    let exported = export(&game, &out);
+    assert!(exported.status.success(), "{exported:?}");
     let shipped = tree(&out);
     let cached = format!("{CACHE}/assets/textures/bricks.png.bctex");
     assert!(shipped.contains_key(&cached), "{:?}", shipped.keys());
+    assert!(
+        shipped.contains_key("assets/textures/broken.png"),
+        "as it is"
+    );
     let (ran, _) = play(&out, &[]);
     assert!(ran.status.success());
     // The player's first launch seeds the starter content (an image among it);

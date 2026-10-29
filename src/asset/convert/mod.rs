@@ -78,7 +78,7 @@ mod texture_file;
 pub mod texture_ref;
 
 pub use converter::{converter_for, Converted, Converter, Skip, CONVERTERS};
-pub use depends::{Dependency, Seen};
+pub use depends::{digest as source_digest, Dependency, Seen};
 pub use gate::{
     conversion_allowed, convert_held, convertible_sources, mark_standalone, refresh_changed,
     refresh_sources, PlayHold,

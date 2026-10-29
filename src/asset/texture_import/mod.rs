@@ -43,12 +43,17 @@ mod encode;
 mod refresh;
 mod shrink;
 
+use std::fs::File;
+use std::io::{BufRead, BufReader, Seek};
 use std::path::{Path, PathBuf};
 
+use image::ImageReader;
+
 pub use encode::{full_chain_len, BlockFormat, Compressed};
-pub use refresh::{images, queue, queue_changed, refresh, refresh_all};
+pub use refresh::{images, queue, queue_changed, refresh, refresh_all, Refreshed};
 pub use shrink::fit;
 
+use super::convert::{source_digest, Seen};
 use super::sidecar::{Compression, TextureSettings, TextureType};
 
 /// Bumped whenever `encode` would write different blocks for the same input,
@@ -137,7 +142,8 @@ pub enum Texels {
 /// The image at `source` for a slot holding `kind`: its current compressed cache
 /// when `compress` (the caller checked the GPU and [`fits`]) and there is one,
 /// else decoded and fitted for `kind`. Never encodes: a missing or stale cache
-/// is made by [`refresh`]. One read of the file serves both. `None` when it
+/// is made by [`refresh`]. Whether the cache is current costs a `stat` of the
+/// source once its digest is known (`convert::source_digest`). `None` when it
 /// cannot be read.
 pub fn load(
     source: &Path,
@@ -145,17 +151,15 @@ pub fn load(
     kind: TextureKind,
     compress: bool,
 ) -> Option<Loaded> {
-    let bytes = std::fs::read(source).ok()?;
     let cached = compress && format_of(settings).is_some();
-    if let Some(blocks) = cached.then(|| current(source, &bytes, settings)).flatten() {
-        let reader = image::ImageReader::new(std::io::Cursor::new(&bytes));
-        let source_size = reader.with_guessed_format().ok()?.into_dimensions().ok()?;
+    if let Some(blocks) = cached.then(|| current(source, settings)).flatten() {
+        let source_size = open(source).ok()?.into_dimensions().ok()?;
         return Some(Loaded {
             texels: Texels::Blocks(blocks),
             source_size,
         });
     }
-    let image = image::load_from_memory(&bytes).ok()?;
+    let image = open(source).ok()?.decode().ok()?;
     let source_size = (image.width(), image.height());
     Some(Loaded {
         texels: Texels::Image(fit(image, settings.max_size, kind)),
@@ -163,9 +167,27 @@ pub fn load(
     })
 }
 
-/// The cache of the image at `source`, holding `bytes`, when it is current.
-fn current(source: &Path, bytes: &[u8], settings: &TextureSettings) -> Option<Compressed> {
-    cache::read(&cache_file(source).ok()?, cache::stamp(bytes, settings))
+/// The cache of the image at `source`, when it is current.
+fn current(source: &Path, settings: &TextureSettings) -> Option<Compressed> {
+    let Seen::Read(digest) = source_digest(source) else {
+        return None;
+    };
+    cache::read(&cache_file(source).ok()?, cache::stamp(digest, settings))
+}
+
+/// A reader of the image `read` holds, in the format `source`'s extension names,
+/// as `image::open` chooses (a TGA has no signature to guess it by); guessed from
+/// its bytes when the extension names none.
+fn reader<R: BufRead + Seek>(source: &Path, read: R) -> image::ImageResult<ImageReader<R>> {
+    match image::ImageFormat::from_path(source) {
+        Ok(format) => Ok(ImageReader::with_format(read, format)),
+        Err(_) => Ok(ImageReader::new(read).with_guessed_format()?),
+    }
+}
+
+/// A [`reader`] of the image file at `source`.
+fn open(source: &Path) -> image::ImageResult<ImageReader<BufReader<File>>> {
+    reader(source, BufReader::new(File::open(source)?))
 }
 
 /// Where the import cache keeps the image at `source`'s compressed copy.
@@ -178,5 +200,7 @@ pub const CACHE_SUFFIX: &str = ".bctex";
 
 #[cfg(test)]
 mod cache_tests;
+#[cfg(test)]
+mod load_tests;
 #[cfg(test)]
 mod tests;

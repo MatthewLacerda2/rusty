@@ -24,7 +24,7 @@ one by its source path still works.
 |---|---|---|
 | `Assets.Manifest` | `()` | array of asset tables (see shape below) |
 | `Assets.List` | `()` | alias for `Assets.Manifest` |
-| `Assets.Refresh` | `()` | `{ converted = { wavPath, ... }, skipped = { { path, reason }, ... }, compressed }` — imports what arrived (below) |
+| `Assets.Refresh` | `()` | `{ converted = { wavPath, ... }, skipped = { { path, reason }, ... }, compressed, failed = { path, ... } }` — imports what arrived (below); an error during Play |
 | `Assets.GetLightmapUVSettings` | `(path)` | `{ generate, hardAngle, packMargin }` — a model's Generate Lightmap UVs setting (below) |
 | `Assets.SetLightmapUVSettings` | `(path, { generate?, hardAngle?, packMargin? })` | how many of the scene's meshes it re-imported |
 | `Assets.GetModelImportSettings` | `(path)` | `{ scaleFactor }` — a model's Scale Factor (below) |
@@ -64,9 +64,11 @@ boot and whenever its window regains focus, logging each conversion to the conso
 call it yourself after writing or copying an `.mp3` into the project.
 
 It also makes every image's compressed copy current (see `compression`, below) and
-returns how many it made in `compressed`; one that fails is warned of in the
-console. It waits for them, on any build: the way to compress textures from a
-script, a session or the `play` harness, which otherwise never encodes.
+returns how many it made in `compressed`; each image that fails (it does not decode,
+say) is warned of in the console, listed in `failed` by path, and draws
+uncompressed. It waits for them, on any build: the way to compress textures from a
+script or a session in edit mode. During Play it raises an error and imports
+nothing, as a model's conversion waits for Stop.
 
 An MP3 is left in place, and listed in `skipped` with the reason, when its `.wav`
 sibling already exists (a refresh never overwrites a file) or when it does not decode
@@ -186,9 +188,11 @@ clamped sampler.
   its settings change or the project opens (the console says each one); entering
   Play waits for any still stale, as it waits for models; an export makes and ships
   them. The standalone player and the `play` harness never encode on their own:
-  they play from the copies the editor, an export or `Assets.Refresh()` made. Until its copy is made, a texture draws
+  they play from the copies the editor, an export or `Assets.Refresh()` (in edit
+  mode) made. An image that fails to import is warned of and draws, and ships,
+  uncompressed. Until its copy is made, a texture draws
   uncompressed. Encoding BC7 is slow, a few seconds for a 2048² map spread over
-  every core, so a project's first import of many large maps takes minutes, once. An
+  every core (half of them in the editor's background, so it stays responsive), so a project's first import of many large maps takes minutes, once. An
   image whose (fitted) sides are not multiples of 4 is uploaded uncompressed, as
   Unity leaves it; a downscale to `maxSize` rounds its sides to multiples of 4. On a
   GPU without BC compression every texture uploads uncompressed, with one console

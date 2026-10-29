@@ -16,13 +16,12 @@ use crate::core::hash::fnv1a64;
 
 const MAGIC: &[u8; 4] = b"RBCT";
 
-/// A digest of everything the blocks depend on: the source's bytes, the settings
-/// that shape them (not wrap or filter, which only the sampler reads) and the
-/// encoder's version.
-pub(super) fn stamp(source: &[u8], settings: &TextureSettings) -> u64 {
+/// A digest of everything the blocks depend on: the source's bytes (`source`,
+/// their `fnv1a64`), the settings that shape them (not wrap or filter, which only
+/// the sampler reads) and the encoder's version.
+pub(super) fn stamp(source: u64, settings: &TextureSettings) -> u64 {
     let made_by = format!(
-        "{:016x} v{ENCODER_VERSION} {} {} {} {}",
-        fnv1a64(source),
+        "{source:016x} v{ENCODER_VERSION} {} {} {} {}",
         settings.texture_type.name(),
         settings.compression.name(),
         settings.max_size,
@@ -31,19 +30,56 @@ pub(super) fn stamp(source: &[u8], settings: &TextureSettings) -> u64 {
     fnv1a64(made_by.as_bytes())
 }
 
-/// The texture cached at `path`, when it was made with `stamp`.
-pub(super) fn read(path: &Path, stamp: u64) -> Option<Compressed> {
-    let bytes = std::fs::read(path).ok()?;
-    let mut r = Reader(&bytes);
+/// What a cache's head holds: its format, base size and level count.
+type Head = (BlockFormat, u32, u32, u32);
+
+/// The head of a cache made with `stamp`, when it is well formed.
+fn head(r: &mut Reader<'_>, stamp: u64) -> Option<Head> {
     if r.take(4)? != MAGIC || r.u64()? != stamp {
         return None;
     }
     let format = *BlockFormat::ALL.get(usize::from(r.take(1)?[0]))?;
     let (width, height, count) = (r.u32()?, r.u32()?, r.u32()?);
     let whole = width > 0 && height > 0 && width % 4 == 0 && height % 4 == 0;
-    if !whole || count == 0 || count > full_chain_len(width, height) {
-        return None;
-    }
+    let fits = count > 0 && count <= full_chain_len(width, height);
+    (whole && fits).then_some((format, width, height, count))
+}
+
+/// The bytes of a cache's head: magic, stamp, format, width, height, count.
+const HEAD_LEN: usize = 4 + 8 + 1 + 4 * 3;
+
+/// Whether the cache at `path` was made with `stamp` and [`read`] would take it,
+/// found from its head, each level's length and the file's size, never its blocks:
+/// what a refresh asks of every image on each Play.
+pub(super) fn is_current(path: &Path, stamp: u64) -> bool {
+    use std::io::{Read, Seek, SeekFrom};
+    let current = || -> Option<bool> {
+        let mut file = std::fs::File::open(path).ok()?;
+        let mut bytes = [0; HEAD_LEN];
+        file.read_exact(&mut bytes).ok()?;
+        let (format, width, height, count) = head(&mut Reader(&bytes), stamp)?;
+        let mut at = HEAD_LEN as u64;
+        for mip in 0..count {
+            let mut len = [0; 4];
+            file.read_exact(&mut len).ok()?;
+            let side = |s: u32| (s >> mip).max(1);
+            let want = format.level_bytes(side(width), side(height));
+            if u32::from_le_bytes(len) as usize != want {
+                return None;
+            }
+            at += 4 + want as u64;
+            file.seek(SeekFrom::Start(at)).ok()?;
+        }
+        Some(file.metadata().ok()?.len() == at)
+    };
+    current() == Some(true)
+}
+
+/// The texture cached at `path`, when it was made with `stamp`.
+pub(super) fn read(path: &Path, stamp: u64) -> Option<Compressed> {
+    let bytes = std::fs::read(path).ok()?;
+    let mut r = Reader(&bytes);
+    let (format, width, height, count) = head(&mut r, stamp)?;
     let mut levels = Vec::with_capacity(count as usize);
     for mip in 0..count {
         let len = r.u32()? as usize;

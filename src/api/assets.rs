@@ -55,13 +55,7 @@ pub fn register(lua: &Lua) -> Reg {
     put(
         &table,
         "Refresh",
-        lua.create_function(|lua, ()| {
-            let t = refresh_table(lua, &refresh(Path::new(ASSET_ROOT)))?;
-            // A failure is warned of in the console as it runs.
-            let images = crate::asset::texture_import::refresh_all(Path::new(ASSET_ROOT));
-            t.raw_set("compressed", images.unwrap_or_default())?;
-            Ok(t)
-        }),
+        lua.create_function(|lua, ()| refresh_all(lua)),
     )?;
 
     put(
@@ -208,8 +202,28 @@ fn manifest_table(lua: &Lua) -> mlua::Result<Table> {
     Ok(assets)
 }
 
+/// `Assets.Refresh()`: every import brought up to date, audio and images, and
+/// what it did ([`refresh_table`]). Refused during Play, as a model's conversion
+/// is (`convert::conversion_allowed`): imports wait for Stop.
+fn refresh_all(lua: &Lua) -> mlua::Result<Table> {
+    if !crate::asset::convert::conversion_allowed() {
+        return Err(runtime("Assets.Refresh: imports are refused during Play"));
+    }
+    let root = Path::new(ASSET_ROOT);
+    let t = refresh_table(lua, &refresh(root))?;
+    // Each failure was warned of in the console as it ran.
+    let images = crate::asset::texture_import::refresh_all(root);
+    t.raw_set("compressed", images.encoded)?;
+    let failed = lua.create_table()?;
+    for (i, (image, _)) in images.failed.iter().enumerate() {
+        failed.raw_set(i + 1, to_slash(image))?;
+    }
+    t.raw_set("failed", failed)?;
+    Ok(t)
+}
+
 /// `{ converted = { wavPath, ... }, skipped = { { path, reason }, ... } }`; the
-/// caller adds `compressed`.
+/// caller adds `compressed` and `failed`.
 fn refresh_table(lua: &Lua, report: &Refresh) -> mlua::Result<Table> {
     let converted = lua.create_table()?;
     for (i, (_, wav)) in report.converted.iter().enumerate() {

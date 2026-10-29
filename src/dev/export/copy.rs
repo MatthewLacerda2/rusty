@@ -122,15 +122,14 @@ pub(super) fn texture_caches(
 ) -> Result<(), String> {
     for image in images {
         let cache = cache_path_as(root, image, CACHE_SUFFIX);
-        let _lock = lock_cache(&cache);
-        if cache.is_file() {
-            file(
-                root,
-                cache.strip_prefix(root).unwrap_or(&cache),
-                out,
-                written,
-            )?;
+        // Looked for before the lock, whose folder an image never compressed
+        // lacks: a lock that cannot be taken warns once per process, falsely.
+        if !cache.is_file() {
+            continue;
         }
+        let _lock = lock_cache(&cache);
+        let rel = cache.strip_prefix(root).unwrap_or(&cache);
+        file(root, rel, out, written)?;
     }
     Ok(())
 }

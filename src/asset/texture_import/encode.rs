@@ -2,8 +2,9 @@
 //! with `block_compression`'s CPU encoders (a pure-Rust port of Intel's ISPC
 //! texture compressor). No BC1: its encoder (and `texpresso`'s) collapses a block
 //! of two colours whose channels move against each other (red beside blue) to
-//! their average, one flat grey; BC7 keeps both. The bands of block rows encode on every core: the blocks
-//! are the same whichever thread wrote them.
+//! their average, one flat grey; BC7 keeps both. The bands of block rows encode on
+//! the [`Cores`] the caller gives: the blocks are the same whichever thread wrote
+//! them.
 
 use block_compression::{encode::compress_rgba8, BC7Settings, CompressionVariant};
 use image::{DynamicImage, RgbaImage};
@@ -59,7 +60,11 @@ pub fn full_chain_len(width: u32, height: u32) -> u32 {
 /// `image` (already fitted) compressed with `settings`, every level its
 /// *Generate Mip Maps* asks for; `None` when it is left uncompressed (*Compression*
 /// `None`, or a side that is not a multiple of 4).
-pub(super) fn encode(image: &DynamicImage, settings: &TextureSettings) -> Option<Compressed> {
+pub(super) fn encode(
+    image: &DynamicImage,
+    settings: &TextureSettings,
+    cores: Cores,
+) -> Option<Compressed> {
     let (width, height) = (image.width(), image.height());
     if width % 4 != 0 || height % 4 != 0 {
         return None;
@@ -72,11 +77,13 @@ pub(super) fn encode(image: &DynamicImage, settings: &TextureSettings) -> Option
         true => full_chain_len(width, height),
         false => 1,
     };
-    let mut levels = vec![compress(&base, variant, format)];
+    let threads = cores.threads();
+    let mut levels = vec![compress(&base, variant, format, threads)];
     let mut working = to_working(&base, kind);
     for _ in 1..count {
         working = half(&working);
-        levels.push(compress(&to_bytes(&working, kind), variant, format));
+        let level = to_bytes(&working, kind);
+        levels.push(compress(&level, variant, format, threads));
     }
     Some(Compressed {
         format,
@@ -112,8 +119,34 @@ fn variant(
     }
 }
 
-/// `level`'s blocks, its edge texels repeated out to whole blocks.
-fn compress(level: &RgbaImage, variant: CompressionVariant, format: BlockFormat) -> Vec<u8> {
+/// How many cores an encode spreads over.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Cores {
+    /// Every one: what Play and an export wait for.
+    All,
+    /// Half, at least one: the editor's background worker, so the editor stays
+    /// responsive while it encodes.
+    Half,
+}
+
+impl Cores {
+    fn threads(self) -> usize {
+        let all = std::thread::available_parallelism().map_or(1, |n| n.get());
+        match self {
+            Self::All => all,
+            Self::Half => (all / 2).max(1),
+        }
+    }
+}
+
+/// `level`'s blocks, its edge texels repeated out to whole blocks, its bands of
+/// block rows spread over `threads`.
+fn compress(
+    level: &RgbaImage,
+    variant: CompressionVariant,
+    format: BlockFormat,
+    threads: usize,
+) -> Vec<u8> {
     let (w, h) = (
         level.width().div_ceil(4) * 4,
         level.height().div_ceil(4) * 4,
@@ -124,7 +157,6 @@ fn compress(level: &RgbaImage, variant: CompressionVariant, format: BlockFormat)
     let mut blocks = vec![0; format.level_bytes(w, h)];
     let row_bytes = format.level_bytes(w, 4);
     let block_rows = (h / 4) as usize;
-    let threads = std::thread::available_parallelism().map_or(1, |n| n.get());
     let band = block_rows.div_ceil(threads).max(1);
     let texel_row = (w * 4) as usize;
     std::thread::scope(|scope| {

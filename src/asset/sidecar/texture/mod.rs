@@ -108,9 +108,11 @@ pub fn set_texture(source: &Path, settings: TextureSettings) -> Result<(), Impor
 /// The image at `source`, just assigned to a material's normal slot, set to
 /// [`TextureType::NormalMap`] when it is still `Default`, and said so: Unity's
 /// *Fix now*, done for the agent (#1574). Only an image on disk, and only while
-/// imports may change (never in Play, `convert::conversion_allowed`).
+/// imports may change (never in Play, `convert::conversion_allowed`). A texture a
+/// converted model's cache holds is left alone: those are never compressed.
 pub fn fit_normal_slot(source: &Path) {
-    if !crate::asset::convert::conversion_allowed() || !source.is_file() {
+    use crate::asset::convert::{conversion_allowed, is_import_cache};
+    if !conversion_allowed() || is_import_cache(source) || !source.is_file() {
         return;
     }
     let settings = texture(source);

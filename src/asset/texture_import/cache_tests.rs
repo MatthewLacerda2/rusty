@@ -114,8 +114,12 @@ fn refresh_all_makes_every_image_under_a_folder() {
     }
     std::fs::write(dir.join("notes.txt"), "not an image").unwrap();
     assert_eq!(images(&dir), [a, b]);
-    assert_eq!(refresh_all(&dir), Ok(2));
-    assert_eq!(refresh_all(&dir), Ok(0));
-    std::fs::write(dir.join("broken.png"), b"not a png").unwrap();
-    assert!(refresh_all(&dir).unwrap_err().contains("broken.png"));
+    assert_eq!(refresh_all(&dir).encoded, 2);
+    assert_eq!(refresh_all(&dir), Refreshed::default());
+    let broken = dir.join("broken.png");
+    std::fs::write(&broken, b"not a png").unwrap();
+    let done = refresh_all(&dir);
+    assert_eq!(done.encoded, 0);
+    assert_eq!(done.failed.len(), 1);
+    assert_eq!(done.failed[0].0, broken);
 }

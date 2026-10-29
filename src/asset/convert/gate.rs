@@ -139,7 +139,7 @@ pub fn refresh_sources(root: &Path) -> usize {
     // Each failure was warned of as it ran. A standalone game compresses none, as
     // Unity's player imports nothing: it plays from what its export shipped.
     if !is_standalone() {
-        let _ = crate::asset::texture_import::refresh_all(root);
+        crate::asset::texture_import::refresh_all(root);
     }
     sources.len()
 }

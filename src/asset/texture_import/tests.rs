@@ -1,7 +1,7 @@
 use block_compression::{decode::decompress_blocks_as_rgba8, BC7Settings, CompressionVariant};
 use image::{DynamicImage, Rgba, RgbaImage};
 
-use super::encode::encode;
+use super::encode::{encode, Cores};
 use super::shrink::fitted_size;
 use super::*;
 
@@ -36,12 +36,12 @@ fn each_texture_type_compresses_to_its_format_whatever_the_texels() {
     ];
     for (texture_type, want) in cases {
         assert_eq!(format_of(&typed(texture_type)), Some(want));
-        let made = encode(&image, &typed(texture_type)).unwrap();
+        let made = encode(&image, &typed(texture_type), Cores::All).unwrap();
         assert_eq!(made.format, want, "{texture_type:?}");
     }
     let none = settings(Compression::None);
     assert_eq!(format_of(&none), None);
-    assert!(encode(&image, &none).is_none());
+    assert!(encode(&image, &none, Cores::All).is_none());
 }
 
 #[test]
@@ -63,7 +63,7 @@ fn a_block_of_two_contrasting_colours_keeps_both() {
         false => Rgba([30, 30, 220, 255]),
     });
     let image = DynamicImage::ImageRgba8(block.clone());
-    let made = encode(&image, &settings(Compression::Normal)).unwrap();
+    let made = encode(&image, &settings(Compression::Normal), Cores::All).unwrap();
     let mut decoded = vec![0; 64];
     let bc7 = CompressionVariant::BC7(BC7Settings::opaque_very_fast());
     decompress_blocks_as_rgba8(bc7, 4, 4, &made.levels[0], &mut decoded);
@@ -79,7 +79,7 @@ fn a_block_of_two_contrasting_colours_keeps_both() {
 #[test]
 fn a_chain_has_every_level_in_whole_blocks_and_odd_sides_are_left_uncompressed() {
     let image = DynamicImage::ImageRgba8(gradient(64, 16, 255));
-    let made = encode(&image, &settings(Compression::Normal)).unwrap();
+    let made = encode(&image, &settings(Compression::Normal), Cores::All).unwrap();
     assert_eq!((made.width, made.height, made.levels.len()), (64, 16, 7));
     for (i, level) in made.levels.iter().enumerate() {
         let (w, h) = ((64 >> i).max(1), (16 >> i).max(1));
@@ -89,16 +89,19 @@ fn a_chain_has_every_level_in_whole_blocks_and_odd_sides_are_left_uncompressed()
         generate_mipmaps: false,
         ..settings(Compression::Normal)
     };
-    assert_eq!(encode(&image, &no_mips).unwrap().levels.len(), 1);
+    assert_eq!(
+        encode(&image, &no_mips, Cores::All).unwrap().levels.len(),
+        1
+    );
     let odd = DynamicImage::ImageRgba8(gradient(30, 16, 255));
-    assert!(encode(&odd, &settings(Compression::Normal)).is_none());
+    assert!(encode(&odd, &settings(Compression::Normal), Cores::All).is_none());
 }
 
 #[test]
 fn the_blocks_decode_close_to_the_source() {
     let source = gradient(32, 32, 200);
     let image = DynamicImage::ImageRgba8(source.clone());
-    let made = encode(&image, &settings(Compression::HighQuality)).unwrap();
+    let made = encode(&image, &settings(Compression::HighQuality), Cores::All).unwrap();
     assert_eq!(made.format, BlockFormat::Bc7);
     let mut decoded = vec![0; 32 * 32 * 4];
     let bc7 = CompressionVariant::BC7(BC7Settings::alpha_fast());

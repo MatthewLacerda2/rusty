@@ -59,7 +59,9 @@ pub fn export(out: &Path) -> Result<Exported, String> {
     for source in &sources {
         cached_gltf(source).map_err(|e| format!("{}: {e}", source.display()))?;
     }
-    crate::asset::texture_import::refresh_all(Path::new(ASSETS_DIR))?;
+    // An image that fails is warned of and ships uncompressed, as Unity builds
+    // with an import error logged.
+    crate::asset::texture_import::refresh_all(Path::new(ASSETS_DIR));
     let existed = out.is_dir();
     let written = copy_runtime_files(Path::new("."), &sources, &out).and_then(|files| {
         create_skeleton(&out)?;
