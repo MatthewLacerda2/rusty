@@ -24,7 +24,6 @@ fn vc(exposure: f32) -> PostProcessingComponent {
         },
         ssr: rusty::components::Ssr {
             active: false,
-            temporal_upsampling: false,
             ..Default::default()
         },
         ..rusty::scene::authoring::default_post_processing()

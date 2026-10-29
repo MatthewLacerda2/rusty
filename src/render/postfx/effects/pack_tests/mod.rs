@@ -74,7 +74,7 @@ fn vc() -> PostProcessingComponent {
     let mut vc = crate::scene::authoring::default_post_processing();
     (vc.bloom.intensity, vc.bloom.threshold) = (2.0, 0.7);
     vc.exposure.fixed_ev = 1.5;
-    vc.ssr.temporal_upsampling = false;
+    vc.ssr.quality = "Low".to_string();
     vc.tonemapping.mode = Tonemap::Reinhard;
     vc
 }
@@ -122,8 +122,12 @@ fn low_preset_disables_ssr_and_motion_blur() {
 #[test]
 fn high_preset_enables_real_ssr_and_motion_blur() {
     let (scene, id) = scene_with_vc(vc(), Some(cam()));
-    let ssr = packed(&scene, Some(id), high(), "ssr")[0][0];
-    assert_eq!(ssr, 2.0, "real screen-space SSR on High");
+    let ssr = packed(&scene, Some(id), high(), "ssr")[0];
+    assert_eq!(
+        ssr,
+        [2.0, 16.0, 0.5, 0.0],
+        "SSR on High, marching as its Low quality"
+    );
     let samples = blur(&scene, Some(id), high());
     assert_eq!(samples, Some(16.0), "motion-blur samples passed through");
 }

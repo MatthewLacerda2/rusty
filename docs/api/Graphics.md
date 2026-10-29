@@ -258,13 +258,18 @@ player's `chromatic_aberration` option gates it. Tween paths: `Graphics.chromati
 <!-- effect: ssr -->
 #### Screen-space reflections
 
-**SSR** marches each surface pixel's reflected ray against the depth buffer and adds
-what it hits (the sky where it hits nothing), weighted towards grazing angles, on the
-HDR image before bloom. The real screen-space pass runs on the **High** tier only; on
-Low and Medium the forward shader's cubemap reflection stands in, its quality and
-temporal upsampling taken from the same settings. The player's `ssr` option gates it.
-A new volume starts with SSR on at `"High"` quality. No tween paths: its settings are
-a switch and a name.
+**SSR** marches each smooth surface pixel's reflected ray against the scene and, where
+it hits something on screen, puts that in place of the sky the surface was reflecting,
+on the HDR image before bloom. Only smooth surfaces reflect: none below a smoothness
+of 0.8 (roughness 0.2), all of it from 0.9, weighted by the material's Fresnel (its
+metallic and base colour) at the shading normal. Pixels another camera of the stack
+drew (a `DepthOnly` viewmodel camera) get none. With no skybox panorama the sky it
+replaces is the procedural one the sky pass draws. The real screen-space pass runs on
+the **High** tier only; on every tier the forward shader reflects the sky or a
+reflection probe. The **quality** (`"Low"`, `"Medium"`, `"High"`, `"Ultra"`) sets the
+march: 16, 32, 64 or 128 steps, reaching 8, 12, 16 or 25.6 m, so Low is the cheapest.
+The player's `ssr` option gates it. A new volume starts with SSR on at `"High"`
+quality. No tween paths: its settings are a switch and a name.
 
 <!-- effect: bloom -->
 #### Bloom

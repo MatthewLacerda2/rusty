@@ -6,8 +6,9 @@
 
 use super::camera::{CameraCtx, StackShared, CAMERA_PASSES};
 use crate::render::gpu::uniforms::FogUniform;
-use crate::render::motion::{self, HistoryKey};
+use crate::render::motion::{self, HistoryKey, Velocity};
 use crate::render::passes::ssao::SsaoPlan;
+use crate::render::postfx::effects::ssr::{ssr_enabled, surface};
 use crate::render::postfx::effects::{self, EffectCx, PassCx};
 use crate::render::postfx::params::{frame_params, PostSource};
 use crate::render::{RenderView, Renderer};
@@ -56,16 +57,23 @@ impl Renderer {
             .zip(view_projs.iter().copied())
             .collect();
         // Motion vectors (#1435): last frame's cameras, and the velocity target when
-        // this view runs motion blur or depth of field (#1445). A view shading with
-        // its own forward pipeline (the Inspector's shader preview) writes none.
-        let velocity = motion::target_wanted(
-            pass.post,
-            self.graphics(pass.editor_mode),
-            pass.full_post_fx,
-            pass.editor_mode,
-        ) && !view.has_forward_override();
+        // this view runs motion blur, depth of field (#1445) or SSR, which reads its
+        // depths and cameras beside its own surface target (#1526). A view shading
+        // with its own forward pipeline (the Inspector's shader preview) writes none.
+        let graphics = self.graphics(pass.editor_mode);
+        let own_pipeline = view.has_forward_override();
+        let ssr = ssr_enabled(pass.post, graphics, pass.full_post_fx) && !own_pipeline;
+        let moving =
+            motion::target_wanted(pass.post, graphics, pass.full_post_fx, pass.editor_mode)
+                && !own_pipeline;
+        let velocity = match (moving, ssr) {
+            (true, _) => Velocity::Motion,
+            (false, true) => Velocity::Depths,
+            (false, false) => Velocity::Off,
+        };
         let key = HistoryKey::new(scene, pass.base_id);
         let size = view.scene_size();
+        surface::begin(&mut view.post_fx.targets, &self.device, size, ssr);
         let prev_view_projs =
             view.post_fx
                 .motion
@@ -116,7 +124,10 @@ impl Renderer {
         let baked = view.post_fx.grade.prepare(gpu, bake, effect.volume());
         self.frame_counters.grade_lut_bakes += u32::from(baked);
 
-        let params = frame_params(scene, ctx.base_view_proj, ctx.cam.position.to_array());
+        // The base camera's eye, as its view-projection is: SSR rebuilds positions
+        // from both, and the last camera of a stack is an overlay's (#1526).
+        let eye = stack.stack[0].position.to_array();
+        let params = frame_params(scene, ctx.base_view_proj, eye);
         let sky = self.sky_panorama();
         let chain = PostFxContext {
             depth_view: &view.depth_view,

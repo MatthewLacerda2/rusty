@@ -23,7 +23,7 @@ const PROBE: &str = "#import postfx::params::PostParams\n\
 @group(0) @binding(10) var<storage, read> decals: array<Decal>;\n\
 @group(1) @binding(0) var<uniform> post: PostParams;\n\
 @fragment fn fs_main() -> @location(0) vec4<f32> {\n\
-    return vec4<f32>(camera.time + lighting.ssr_active + lights[0].range + tiles[0].params.x\n\
+    return vec4<f32>(camera.time + lighting.sky_textured + lights[0].range + tiles[0].params.x\n\
         + decals[0].fade.x + post.camera_pos.x);\n\
 }\n";
 
@@ -88,10 +88,6 @@ fn lighting_uniform_matches_wgsl_layout() {
         (
             "num_dir_lights",
             offset_of!(LightingUniform, num_dir_lights),
-        ),
-        (
-            "ssr_temporal_upsampling",
-            offset_of!(LightingUniform, ssr_temporal_upsampling),
         ),
         ("sky_textured", offset_of!(LightingUniform, sky_textured)),
         ("refl_probes", offset_of!(LightingUniform, refl_probes)),
