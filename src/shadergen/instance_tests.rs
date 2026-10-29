@@ -98,3 +98,13 @@ fn a_param_of_the_wrong_arity_is_refused() {
         assert!(err.contains(want), "{err}");
     }
 }
+
+#[test]
+fn a_surface_variant_keeps_the_forward_environment_brdf() {
+    // A baked surface keeps the PBR lighting verbatim (docs/api/Shader.md), so it
+    // inherits URP's environment BRDF (#1543), not the old `1 - roughness` scale.
+    let wgsl = assemble_real(&recipe(PassKind::Surface, vec![sel("desaturate", &[])])).unwrap();
+    assert!(wgsl.contains("/ (alpha * alpha + 1.0)"), "{wgsl}");
+    assert!(!wgsl.contains("reflection_scale"), "{wgsl}");
+    validate(ENGINE_SHADERS, &wgsl).expect("the surface variant composes");
+}
