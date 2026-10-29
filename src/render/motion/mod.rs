@@ -1,6 +1,6 @@
 //! src/render/motion/mod.rs — per-object motion vectors (#1435).
 //!
-//! A view that runs motion blur or depth of field gets a **velocity target**: an `Rgba16Float` texture
+//! A view that runs motion blur, depth of field or SSR gets a **velocity target**: an `Rgba16Float` texture
 //! at full view resolution that the opaque forward pass writes as its second colour
 //! attachment. Each pixel holds how far the surface under it moved on screen since
 //! last frame, `ndc_now.xy - ndc_prev.xy`, in `.b` that surface's depth along the
@@ -32,9 +32,11 @@
 //!
 //! **Cost.** The target exists and the velocity pipelines run only while a view runs
 //! motion blur ([`wanted`]: the camera has it on, the player's option allows it, the
-//! quality tier runs it, #1438, and it is not the editor's Scene view) or depth of
-//! field, which reads its depths ([`target_wanted`], #1445). On any other frame the forward pass draws
-//! exactly as before, and the target is freed.
+//! quality tier runs it, #1438, and it is not the editor's Scene view), depth of
+//! field, which reads its depths ([`target_wanted`], #1445), or SSR, which reads its
+//! depths and cameras (#1526, `draw::stack`). SSR alone records no entity poses
+//! ([`Velocity::Depths`]). On any other frame the forward pass draws exactly as
+//! before, and the target is freed.
 
 mod history;
 
@@ -77,10 +79,11 @@ pub(crate) fn wanted(
     full && !scene_view && motion_blur_enabled(post, graphics)
 }
 
-/// Whether a view writes the velocity target this frame: when it runs motion blur
-/// ([`wanted`]) or depth of field (#1445), its two readers, the second for each
-/// pixel's depth from its own camera (the motion may then be read by no one). Gated
-/// alike, so the Scene view and a display-only render texture write none.
+/// Whether a view writes the velocity target with its motion this frame: when it runs
+/// motion blur ([`wanted`]) or depth of field (#1445), the second for each pixel's
+/// depth from its own camera (the motion may then be read by no one). Gated alike, so
+/// the Scene view and a display-only render texture write none. SSR reads the target
+/// too, for depths and cameras alone ([`Velocity::Depths`], #1526, `draw::stack`).
 pub(crate) fn target_wanted(
     post: PostSource,
     graphics: GraphicsSettings,
@@ -96,11 +99,23 @@ pub(crate) fn target_wanted(
 pub(crate) struct MotionVectors {
     target: Option<(PfxTarget, PixelSize)>,
     pub(crate) history: MotionHistory,
-    active: bool,
+    recording: bool,
+}
+
+/// What a view's velocity target is for this frame (`MotionVectors::begin`).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) enum Velocity {
+    /// No target: nothing reads it.
+    Off,
+    /// A target of depths and cameras, but no entity poses: only SSR reads it
+    /// (#1526), so its motion may be the camera's alone.
+    Depths,
+    /// A target with each entity's motion: motion blur or depth of field reads it.
+    Motion,
 }
 
 impl MotionVectors {
-    /// Start a frame: allocate (or free) the target for `active`, and open the
+    /// Start a frame: allocate (or free) the target for `velocity`, and open the
     /// history for `key`. Returns last frame's view-projection of each camera in
     /// `cameras` (entity, view-projection; bottom to top), its current one where it
     /// has none.
@@ -109,11 +124,11 @@ impl MotionVectors {
         device: &wgpu::Device,
         size: PixelSize,
         key: HistoryKey,
-        active: bool,
+        velocity: Velocity,
         cameras: &[(Option<u32>, glam::Mat4)],
     ) -> Vec<glam::Mat4> {
-        self.active = active;
-        if !active {
+        self.recording = velocity == Velocity::Motion;
+        if velocity == Velocity::Off {
             self.target = None;
         } else if self.target.as_ref().is_none_or(|(_, s)| *s != size) {
             self.target = Some((create_target(device, size), size));
@@ -121,20 +136,20 @@ impl MotionVectors {
         self.history.begin(key, cameras)
     }
 
-    /// The velocity attachment this frame's opaque passes write, or `None` when the
-    /// view runs neither motion blur nor depth of field ([`target_wanted`]).
+    /// The velocity attachment this frame's opaque passes write, or `None` when no
+    /// effect of the view reads it ([`target_wanted`], or SSR).
     pub(crate) fn target_view(&self) -> Option<&wgpu::TextureView> {
         self.active_target().map(|t| &t.view)
     }
 
-    /// The velocity texture written this frame, if any (readback, and #1436's blur).
+    /// The velocity texture written this frame, if any (readback, #1436's blur, SSR).
     pub(crate) fn active_target(&self) -> Option<&PfxTarget> {
-        self.target.as_ref().filter(|_| self.active).map(|(t, _)| t)
+        self.target.as_ref().map(|(t, _)| t)
     }
 
-    /// Whether this frame records entity poses.
+    /// Whether this frame records entity poses: only when an effect reads motion.
     pub(crate) fn active(&self) -> bool {
-        self.active
+        self.recording
     }
 
     /// Forget every pose and camera matrix: the next frame moves with the camera only
