@@ -9,10 +9,12 @@
 //! runs ([`surface`]): the shading normal, the weight a hit gets and the environment
 //! reflection it replaces. So only a smooth surface reflects, and a hit swaps the sky
 //! or probe reflection for what is on screen (never adding to it). The volume's
-//! `quality` sets the march ([`march`], #1521, #1522).
+//! `quality` sets the march ([`march`], #1521, #1522). A transparent surface that
+//! opts in traces its own reflection in the transparent pass ([`transparent`], #1570).
 
 pub(crate) mod pass;
 pub(crate) mod surface;
+pub(crate) mod transparent;
 
 use super::{Owner, PostEffect};
 use crate::components::Ssr;

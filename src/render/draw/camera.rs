@@ -92,6 +92,9 @@ pub(crate) struct StackShared {
     pub prev_time: f32,
     pub fog: FogUniform,
     pub ssao: Option<SsaoPlan>,
+    /// The base camera's transparent SSR march (#1570), `[steps, step]`; zero when
+    /// the view runs no SSR.
+    pub ssr_march: [f32; 2],
 }
 
 impl<'a> CameraCtx<'a> {
@@ -105,6 +108,8 @@ impl<'a> CameraCtx<'a> {
         let view_proj = shared.view_projs[idx];
         let clusters = ClusterGrid::new(cam, shared.aspect);
         let overlay = is_overlay(idx == 0, cam.clear_flags);
+        // SSR is the base camera's alone: an overlay or stacked camera traces none.
+        let march = if idx == 0 { shared.ssr_march } else { [0.0; 2] };
         Self {
             scene,
             cam,
@@ -126,7 +131,7 @@ impl<'a> CameraCtx<'a> {
                 fog: shared.fog,
                 clusters: clusters.uniform(),
                 prev_view_proj: shared.prev_view_projs[idx].to_cols_array(),
-                stack: [idx as f32, shared.prev_time, 0.0, 0.0],
+                stack: [idx as f32, shared.prev_time, march[0], march[1]],
                 inv_view_proj: view_proj.inverse().to_cols_array(),
             },
             clusters,
@@ -194,9 +199,11 @@ fn ssr(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
 }
 
 /// Unity's *Opaque Texture* (#1523): this camera's colour and depth, after SSR, for
-/// the translucents that refract or absorb; skipped when none of them does.
+/// the translucents that refract or absorb, or trace SSR (#1570); skipped when none
+/// of them does.
 fn opaque_copy(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
-    r.copy_opaque(view, &ctx.solids.draws.transparent);
+    let traces = ctx.uniform.stack[2] > 0.0;
+    r.copy_opaque(view, &ctx.solids.draws.transparent, traces);
 }
 
 /// Translucent solids (#242), back-to-front over the opaque ones.

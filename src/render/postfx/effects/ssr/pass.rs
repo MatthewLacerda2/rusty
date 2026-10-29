@@ -11,7 +11,6 @@
 use glam::{Mat4, Vec3};
 
 use super::surface;
-use crate::components::Ssr;
 use crate::core::settings::quality::SsrQuality;
 use crate::render::gpu::bind_entry as entry;
 use crate::render::gpu::fullscreen::{color_pass, Fullscreen};
@@ -36,10 +35,7 @@ impl SsrParams {
     /// The base camera's frame, marching as `m` says, within the march's range (a
     /// preset in `project.rusty` is never clamped on the way in).
     pub(crate) fn new(view_proj: Mat4, eye: Vec3, m: SsrQuality) -> Self {
-        let steps = m.steps.clamp(1, Ssr::MAX_STEPS);
-        let step = m
-            .step_length
-            .clamp(Ssr::MIN_STEP_LENGTH, Ssr::MAX_STEP_LENGTH);
+        let (steps, step) = super::transparent::clamped(m);
         Self {
             inv_view_proj: view_proj.inverse().to_cols_array(),
             view_proj: view_proj.to_cols_array(),

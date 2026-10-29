@@ -3,12 +3,15 @@
 // transparent surface the alpha its blend mode reads and, when it refracts or
 // absorbs, what is behind it), and thin translucency's back-lit light. Every colour
 // entry point returns through `composite`; an opaque surface leaves it exactly as
-// `apply_fog` would, at alpha 1.
+// `apply_fog` would, at alpha 1. A transparent surface may also trace screen-space
+// reflections (`reflect_ssr`, #1570).
 
 #define_import_path forward::transparent
 
 #import forward::bindings::{camera, entity, s_opaque, t_opaque}
 #import common::{PI, fog_factor}
+#import lighting::ssr_march
+#import lighting::ssr_surface
 
 // `lit` fogged, with the alpha the pipeline blends with. Preserve specular (URP's
 // `_ALPHAPREMULTIPLY_ON`) already multiplied the diffuse by `alpha` and blends
@@ -39,6 +42,28 @@ fn composite(lit: vec3<f32>, alpha: f32, env_brdf: vec3<f32>, world: vec3<f32>, 
         return vec4<f32>(color, opacity);
     }
     return vec4<f32>(color + (1.0 - opacity) * behind(world, N, pixel), 1.0);
+}
+
+// HDRP's *Receive SSR Transparent* (#1570): the environment reflection `reflection`
+// (step 5's probe or sky term, added under `weight`) with what the reflected ray `R`
+// from `world` hits on screen in its place, as the SSR pass does for an opaque pixel
+// (`reflection + (weight × hit − reflection) × fade`), faded by the same smoothness
+// and screen-edge rules. The ray marches the opaque copy, the camera's opaque image
+// after SSR with each pixel's eye distance, from the surface's own depth and normal,
+// so it needs no prepass; a miss keeps the probe. Only a material with `receive_ssr`
+// on a camera that marches (`camera.stack.z`, the base camera of a view running SSR)
+// traces: both are uniform, so every other surface returns at once. `N` is the
+// shading normal, `roughness` the perceptual roughness.
+fn reflect_ssr(reflection: vec3<f32>, weight: vec3<f32>, world: vec3<f32>, N: vec3<f32>, R: vec3<f32>, roughness: f32) -> vec3<f32> {
+    if (entity.receive_ssr == 0u || camera.stack.z < 1.0) {
+        return reflection;
+    }
+    let f = ssr_march::Frame(camera.view_proj, camera.camera_pos, vec3<f32>(0.0), vec4<f32>(0.0, 0.0, 0.0, 1.0));
+    // Off the side the ray leaves from: both faces are drawn.
+    let origin = world + faceForward(N, -R, N) * 0.02;
+    let hit = ssr_march::trace(f, t_opaque, t_opaque, s_opaque, origin, R, i32(camera.stack.z), camera.stack.w);
+    let k = hit.w * ssr_surface::smoothness_fade(roughness);
+    return reflection + (weight * hit.rgb - reflection) * k;
 }
 
 // The diffuse light a thin translucent surface lets through from a light behind it

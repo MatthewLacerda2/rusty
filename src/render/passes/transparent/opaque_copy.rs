@@ -4,7 +4,8 @@
 //! reflected floor) by `opaque_copy.wgsl`. One texture, so the forward pass stays
 //! inside wgpu's 16 sampled textures per stage. The transparent pass reads it
 //! through its group 3. Made only on a camera whose visible translucents ask for it
-//! (a material that refracts or absorbs, `MaterialAsset::reads_opaque`) and counted
+//! (a material that refracts or absorbs, `MaterialAsset::reads_opaque`, or traces
+//! SSR, `postfx::effects::ssr::transparent`) and counted
 //! in `Debug.Stats().opaque_copies`; every other pass binds a 1x1 stand-in.
 //!
 //! The copy is the view's own state in `PostFx::targets`, like SSR's source copy,
@@ -105,19 +106,26 @@ pub(crate) struct OpaqueCopy {
     pub(crate) group: Option<wgpu::BindGroup>,
 }
 
-/// Whether any of a camera's translucent `batches` reads the opaque copy.
-pub(crate) fn wanted(batches: &[DrawBatch]) -> bool {
-    batches
-        .iter()
-        .any(|b| b.key.uniform().surface.uses_opaque == 1)
+/// Whether any of a camera's translucent `batches` reads the opaque copy: one that
+/// refracts or absorbs, or traces SSR (#1570) on a camera that marches (`traces`).
+pub(crate) fn wanted(batches: &[DrawBatch], traces: bool) -> bool {
+    batches.iter().any(|b| {
+        let s = b.key.uniform().surface;
+        s.uses_opaque == 1 || (traces && s.receive_ssr == 1)
+    })
 }
 
 impl Renderer {
     /// Copy this camera's opaque colour and eye distances when its `translucents`
-    /// read them, and build the group 3 its transparent pass binds; else leave the
-    /// view's copy unbound for this camera.
-    pub(crate) fn copy_opaque(&mut self, view: &mut RenderView, translucents: &[DrawBatch]) {
-        if !wanted(translucents) {
+    /// read them (`traces`: the camera marches SSR, [`wanted`]), and build the group
+    /// 3 its transparent pass binds; else leave the view's copy unbound for this camera.
+    pub(crate) fn copy_opaque(
+        &mut self,
+        view: &mut RenderView,
+        translucents: &[DrawBatch],
+        traces: bool,
+    ) {
+        if !wanted(translucents, traces) {
             if let Some(copy) = view.post_fx.targets.get_mut::<OpaqueCopy>() {
                 copy.group = None;
             }

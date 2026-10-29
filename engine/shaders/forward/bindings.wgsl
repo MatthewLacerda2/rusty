@@ -52,6 +52,12 @@ struct EntityUniforms {
     absorption: vec4<f32>,
     // Thin translucency: rgb colour * amount, w the amount.
     transmission: vec4<f32>,
+    // 1 when the surface traces screen-space reflections (#1570) where the camera
+    // marches (`camera.stack.z`).
+    receive_ssr: u32,
+    surface_pad_a: u32,
+    surface_pad_b: u32,
+    surface_pad_c: u32,
     // Where the maps are read (#1573), mirroring `MappingUniform`
     // (src/render/gpu/uniforms.rs) byte-for-byte: xy the tiling, zw the offset.
     uv_st: vec4<f32>,

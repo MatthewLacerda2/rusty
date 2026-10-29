@@ -1,6 +1,6 @@
 //! The transparent-surface fields of a material (#1523): URP Lit's blending and
-//! shadow toggles and HDRP Lit's refraction, absorption, depth postpass and thin
-//! translucency, as one table.
+//! shadow toggles and HDRP Lit's refraction, absorption, depth postpass, transparent
+//! SSR and thin translucency, as one table.
 //!
 //! Each [`SurfaceField`] row is the field's one write and its validation, its name
 //! in a recipe and a scene file (`key`), and its `Material.Set<api>` /
@@ -259,6 +259,15 @@ pub static SURFACE_FIELDS: &[SurfaceField] = &[
         shown: transparent,
         get: |m| SurfaceValue::Bool(m.depth_postpass),
         put: |m, v| m.depth_postpass = boolean(v),
+    },
+    SurfaceField {
+        key: "receive_ssr",
+        api: "ReceiveSsr",
+        label: "Receive SSR",
+        kind: SurfaceKind::Toggle,
+        shown: transparent,
+        get: |m| SurfaceValue::Bool(m.receive_ssr),
+        put: |m, v| m.receive_ssr = boolean(v),
     },
     SurfaceField {
         key: "transmission",
