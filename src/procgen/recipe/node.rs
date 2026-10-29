@@ -6,6 +6,7 @@
 //! author wrote that it does not produce is refused by name. The op's own serde
 //! derive stays the single source of which params exist. A link on a param the
 //! catalog doesn't mark `socket` is refused first, naming the ones that take one.
+//! Every refusal is a [`NodeError`], which names the node's id and op (#1575).
 
 use serde::de::Error as _;
 use serde::{Deserialize, Deserializer, Serialize};
@@ -27,7 +28,7 @@ pub struct Node {
 impl Node {
     /// Refuse an `inputs` list its op does not accept: a missing input would bake a
     /// black or flat map, a surplus one would be silently ignored.
-    pub fn check_arity(&self) -> Result<(), ArityError> {
+    pub fn check_arity(&self) -> Result<(), NodeError> {
         let accepts = self.op.arity();
         if accepts.accepts(self.inputs.len()) {
             return Ok(());
@@ -36,45 +37,80 @@ impl Node {
             OpKind::Math(p) => serde_json::to_value(p.func).ok(),
             _ => None,
         };
-        Err(ArityError {
-            node: self.id.clone(),
-            op: self.op.tag(),
+        Err(self.error(Fault::Arity {
             func: func.and_then(|f| f.as_str().map(str::to_string)),
             given: self.inputs.len(),
             accepts,
-        })
+        }))
+    }
+
+    /// `fault`, named by this node's id and op.
+    pub fn error(&self, fault: Fault) -> NodeError {
+        NodeError {
+            node: self.id.clone(),
+            op: self.op.tag().to_string(),
+            fault,
+        }
     }
 }
 
-/// A node wired with more or fewer inputs than its op accepts.
+/// Something wrong with one node, named by its id and op, as
+/// `node "m" (mapping): unknown key "scael"; …`. Every recipe error about a node,
+/// from parsing it or from wiring it into the graph, is one of these (#1575), so
+/// the prefix is written here once, never per op or per check.
 #[derive(Clone, Debug, PartialEq)]
-pub struct ArityError {
+pub struct NodeError {
     pub node: String,
-    pub op: &'static str,
-    /// The `math` func, whose arity narrows the op's (a unary func takes one input).
-    pub func: Option<String>,
-    pub given: usize,
-    pub accepts: Arity,
+    /// The op's tag, or what the author wrote for it when that names no op.
+    pub op: String,
+    pub fault: Fault,
 }
 
-impl std::fmt::Display for ArityError {
+/// What is wrong with a [`NodeError`]'s node.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Fault {
+    /// The node did not parse: a missing or mistyped param, an unknown key or op.
+    Parse(String),
+    /// Wired with more or fewer inputs than its op accepts.
+    Arity {
+        /// The `math` func, whose arity narrows the op's (a unary func takes one input).
+        func: Option<String>,
+        given: usize,
+        accepts: Arity,
+    },
+    /// An input id no node defines.
+    UnknownInput(String),
+    /// A param linked to an id no node defines (#1494).
+    UnknownLink { param: String, link: String },
+    /// The node is on a cycle (the graph is not a DAG).
+    Cycle,
+    /// An `image` node whose file was not handed in (#1491).
+    MissingSource(String),
+}
+
+impl std::fmt::Display for NodeError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let Self {
-            node,
-            op,
-            func,
-            given,
-            accepts,
-        } = self;
-        let noun = if accepts.max == 1 { "input" } else { "inputs" };
-        let func = func
-            .as_ref()
-            .map(|f| format!(", func {f:?}"))
-            .unwrap_or_default();
-        write!(
-            f,
-            "node {node:?} (op {op:?}{func}) takes {accepts} {noun}, but {given} given"
-        )
+        write!(f, "node {:?} ({}): ", self.node, self.op)?;
+        match &self.fault {
+            Fault::Parse(message) => f.write_str(message),
+            Fault::Arity {
+                func,
+                given,
+                accepts,
+            } => {
+                let noun = if accepts.max == 1 { "input" } else { "inputs" };
+                if let Some(func) = func {
+                    write!(f, "func {func:?} ")?;
+                }
+                write!(f, "takes {accepts} {noun}, but {given} given")
+            }
+            Fault::UnknownInput(input) => write!(f, "references unknown input {input:?}"),
+            Fault::UnknownLink { param, link } => {
+                write!(f, "links {param} to unknown node {link:?}")
+            }
+            Fault::Cycle => f.write_str("is on a cycle"),
+            Fault::MissingSource(path) => write!(f, "has no image loaded for {path:?}"),
+        }
     }
 }
 
@@ -91,26 +127,37 @@ struct RawNode {
 impl<'de> Deserialize<'de> for Node {
     fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
         let given = Value::deserialize(d)?;
-        if let Some(message) = refused_link(&given) {
-            return Err(D::Error::custom(message));
-        }
-        let raw: RawNode = serde_json::from_value(given.clone()).map_err(D::Error::custom)?;
-        let node = Node {
-            id: raw.id,
-            op: raw.op,
-            inputs: raw.inputs,
-        };
-        let known = serde_json::to_value(&node.op).map_err(D::Error::custom)?;
-        if let Some(key) = unknown_key(&given, &known) {
-            return Err(D::Error::custom(unknown_key_message(&node.id, &known, key)));
-        }
-        node.check_arity().map_err(D::Error::custom)?;
-        Ok(node)
+        parse(&given).map_err(D::Error::custom)
     }
 }
 
+/// `given` as a [`Node`], every refusal named by the node's id and op as written.
+fn parse(given: &Value) -> Result<Node, NodeError> {
+    let written = |key: &str| given.get(key).and_then(Value::as_str).unwrap_or("?");
+    let at = |message: String| NodeError {
+        node: written("id").to_string(),
+        op: written("op").to_string(),
+        fault: Fault::Parse(message),
+    };
+    if let Some(message) = refused_link(given) {
+        return Err(at(message));
+    }
+    let raw: RawNode = serde_json::from_value(given.clone()).map_err(|e| at(e.to_string()))?;
+    let node = Node {
+        id: raw.id,
+        op: raw.op,
+        inputs: raw.inputs,
+    };
+    let known = serde_json::to_value(&node.op).map_err(|e| at(e.to_string()))?;
+    if let Some(key) = unknown_key(given, &known) {
+        return Err(at(unknown_key_message(&known, key)));
+    }
+    node.check_arity()?;
+    Ok(node)
+}
+
 /// A link on a param that takes none (#1494), named with the params of its op that
-/// do: "node "n" (op "noise"): param "scale" takes no link; noise links gain". Only
+/// do: "param "scale" takes no link; noise links gain". Only
 /// a link is an object among a param's values, so any object counts as one.
 fn refused_link(given: &Value) -> Option<String> {
     let node = given.as_object()?;
@@ -130,10 +177,7 @@ fn refused_link(given: &Value) -> Option<String> {
         true => format!("{op} takes no links"),
         false => format!("{op} links {}", sockets.join(", ")),
     };
-    let id = node.get("id").and_then(Value::as_str).unwrap_or("?");
-    Some(format!(
-        "node {id:?} (op {op:?}): param {key:?} takes no link; {links}"
-    ))
+    Some(format!("param {key:?} takes no link; {links}"))
 }
 
 /// The first key in `given` that is neither a node field nor produced by the op.
@@ -145,8 +189,8 @@ fn unknown_key<'a>(given: &'a Value, known: &Value) -> Option<&'a str> {
         .find(|k| !matches!(*k, "id" | "inputs") && known.get(k).is_none())
 }
 
-/// "node "n0" (op "noise"): unknown key "scael"; noise takes kind, octaves, scale".
-fn unknown_key_message(id: &str, known: &Value, key: &str) -> String {
+/// "unknown key "scael"; noise takes kind, octaves, scale".
+fn unknown_key_message(known: &Value, key: &str) -> String {
     let op = known.get("op").and_then(Value::as_str).unwrap_or("?");
     let params: Vec<&str> = known
         .as_object()
@@ -162,90 +206,9 @@ fn unknown_key_message(id: &str, known: &Value, key: &str) -> String {
     } else {
         params.join(", ")
     };
-    format!(
-        "node {id:?} (op {op:?}): unknown key {key:?}; {op} takes {takes} (besides id, op, inputs)"
-    )
+    format!("unknown key {key:?}; {op} takes {takes} (besides id, op, inputs)")
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn parse(json: &str) -> Result<Node, String> {
-        serde_json::from_str(json).map_err(|e| e.to_string())
-    }
-
-    #[test]
-    fn a_misspelled_op_param_is_refused_by_name() {
-        let err = parse(r#"{ "id": "n", "op": "noise", "kind": "fbm", "scale": 8, "scael": 8 }"#)
-            .unwrap_err();
-        assert!(err.contains("\"scael\""), "{err}");
-        assert!(err.contains("scale") && err.contains("octaves"), "{err}");
-    }
-
-    #[test]
-    fn a_param_on_a_paramless_op_is_refused() {
-        let err = parse(r#"{ "id": "n", "op": "invert", "amount": 1 }"#).unwrap_err();
-        assert!(
-            err.contains("\"amount\"") && err.contains("no params"),
-            "{err}"
-        );
-    }
-
-    #[test]
-    fn known_keys_and_omitted_defaults_still_parse() {
-        let node = parse(r#"{ "id": "v", "op": "voronoi", "scale": 4, "inputs": [] }"#);
-        assert!(node.is_ok(), "{node:?}");
-    }
-
-    #[test]
-    fn a_wrong_input_count_is_refused_at_parse_time() {
-        let short = parse(r#"{ "id": "m", "op": "mix", "mode": "add", "inputs": ["a"] }"#);
-        let err = short.unwrap_err();
-        assert!(err.contains("\"m\"") && err.contains("1 given"), "{err}");
-        let surplus = parse(r#"{ "id": "i", "op": "invert", "inputs": ["a", "b"] }"#);
-        assert!(surplus.unwrap_err().contains("2 given"));
-    }
-
-    #[test]
-    fn a_unary_math_func_refuses_a_second_input() {
-        let math = |func: &str, inputs: &str| {
-            parse(&format!(
-                r#"{{ "id": "m", "op": "math", "func": "{func}", "inputs": [{inputs}] }}"#
-            ))
-        };
-        for func in ["abs", "fract", "sqrt"] {
-            let err = math(func, r#""a", "b""#).unwrap_err();
-            assert!(
-                err.contains("\"m\"") && err.contains(&format!("func \"{func}\"")),
-                "{err}"
-            );
-            assert!(err.contains("takes 1 input, but 2 given"), "{err}");
-            assert!(math(func, r#""a""#).is_ok(), "{func}");
-        }
-        assert!(math("max", r#""a", "b""#).is_ok());
-    }
-
-    #[test]
-    fn a_link_on_a_param_that_takes_none_names_the_ones_that_do() {
-        let link = r#"{ "node": "m" }"#;
-        let noise = format!(r#"{{ "id": "n", "op": "noise", "kind": "fbm", "scale": {link} }}"#);
-        let err = parse(&noise).unwrap_err();
-        assert!(
-            err.contains("\"scale\" takes no link; noise links gain"),
-            "{err}"
-        );
-        let mix = format!(r#"{{ "id": "x", "op": "mix", "mode": "add", "factor": {link} }}"#);
-        assert!(parse(&mix).unwrap_err().contains("mix takes no links"));
-        let warp =
-            format!(r#"{{ "id": "w", "op": "warp", "strength": {link}, "inputs": ["a", "b"] }}"#);
-        assert!(parse(&warp).is_ok());
-    }
-
-    #[test]
-    fn a_misspelled_ramp_stop_key_is_refused() {
-        let json =
-            r#"{ "id": "r", "op": "color_ramp", "stops": [{ "pos": 0, "colour": [0,0,0,1] }] }"#;
-        assert!(parse(json).unwrap_err().contains("colour"));
-    }
-}
+#[path = "node_tests.rs"]
+mod tests;

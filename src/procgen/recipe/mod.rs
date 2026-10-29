@@ -32,7 +32,7 @@ mod tag;
 pub use arity::Arity;
 pub use catalog::OPS;
 pub use kinds::*;
-pub use node::{ArityError, Node};
+pub use node::{Fault, Node, NodeError};
 pub use op_info::{Lit, OpInfo, OpParam};
 pub use param::{Link, Param};
 pub use params::*;
