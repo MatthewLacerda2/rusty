@@ -126,7 +126,8 @@ impl GameWorld {
     /// Advance the simulation by `dt` seconds. Returns any play-state transition so
     /// the caller can handle platform-only concerns (cursor grab/visibility). Every
     /// tick reads the UI's texture sizes after the transition, before the schedule in
-    /// Play and in the edit frame outside it, so no loop that ticks can skip them.
+    /// Play and in the edit frame outside it, so no loop that ticks can skip them,
+    /// and ends by pushing the audio mix and advancing the output `dt`.
     pub fn tick(&mut self, dt: f32) -> PlayTransition {
         let transition = self.handle_transition();
         // Publish input written since the last tick as this tick's edges (#416).
@@ -151,6 +152,7 @@ impl GameWorld {
         }
         self.sync_render_camera();
         self.sync_shader_time();
+        self.push_audio(dt);
         transition
     }
 

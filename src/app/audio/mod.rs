@@ -41,6 +41,16 @@ pub(super) fn register(app: &mut App) {
     app.add_system(Stage::LateUpdate, resolve_reverb);
 }
 
+impl super::GameWorld {
+    /// Push this tick's mix for every live voice and advance the output `seconds`:
+    /// an offline mixer renders them and a running capture takes them (#1579).
+    pub fn push_audio(&self, seconds: f32) {
+        let res = &self.resources;
+        let (scene, time) = (&self.world.scene, &res.time);
+        crate::api::audio::push_frame(scene, &res.audio, time, &res.camera, seconds.into());
+    }
+}
+
 /// Blend the reverb zones around the active camera onto the reverb bus (#469).
 /// Zones are summed in entity-id order, so two runs blend bit-identically.
 fn resolve_reverb(world: &mut World, res: &mut Resources) {

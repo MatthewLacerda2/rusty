@@ -60,7 +60,7 @@ fn the_frame_mix_pans_a_source_to_the_listeners_left() {
     assert!(game.resources.audio.borrow().is_source_playing(id));
     let right = game.resources.camera.borrow().right();
     place_camera(&game, right * 3.0);
-    apply_mix(&game, 0.0);
+    apply_mix(&game);
     let voice = rec.borrow().last_voice();
     let applied = rec.borrow().current(voice).unwrap();
     assert!(applied.pan < -0.9, "got {applied:?}");
@@ -71,7 +71,7 @@ fn the_frame_mix_pans_a_source_to_the_listeners_left() {
 fn the_frame_mix_matches_the_spatial_read_back() {
     let (game, id, rec) = playing_speaker();
     place_camera(&game, Vec3::new(2.0, 0.0, 5.0));
-    apply_mix(&game, 0.0);
+    apply_mix(&game);
     let (src, pos) = crate::api::audio::emitter(&game.scene().borrow(), id).unwrap();
     let listener = crate::api::audio::listener(&game.resources.camera);
     let read = game
@@ -88,13 +88,13 @@ fn the_frame_mix_matches_the_spatial_read_back() {
 fn the_frame_mix_follows_time_scale_and_pause() {
     let (game, id, _rec) = playing_speaker();
     game.time().borrow_mut().set_time_scale(0.25);
-    apply_mix(&game, 0.0);
+    apply_mix(&game);
     let audio = || game.resources.audio.borrow().voice_mix(id).unwrap();
     assert_eq!(audio().speed, 0.25);
     game.time().borrow_mut().pause();
-    apply_mix(&game, 0.0);
+    apply_mix(&game);
     assert!(audio().paused);
     game.time().borrow_mut().resume();
-    apply_mix(&game, 0.0);
+    apply_mix(&game);
     assert!(!audio().paused);
 }

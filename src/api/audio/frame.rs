@@ -4,8 +4,8 @@
 //! and the clock state (`Time.timeScale`, `Time.Pause`) and the resulting mix is
 //! handed to the backend: distance rolloff, pan and time scaling reach the output.
 //! Then the output is told how much time went by, so an offline mixer renders it and
-//! a running capture takes it (`audio::capture`). The windowed shell calls this once
-//! a frame and the headless harness once a tick, so a scenario's capture hears the
+//! a running capture takes it (`audio::capture`). `GameWorld::push_audio` calls it at
+//! the end of every tick, whoever drives the sim, so a scenario's capture hears the
 //! same mix the speakers would. It uses the same listener and emitter lookups as
 //! `Audio.GetSpatial`, so what the agent reads back is what plays.
 

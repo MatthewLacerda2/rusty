@@ -21,6 +21,8 @@ pub struct WavStream {
     file: BufWriter<File>,
     /// Interleaved samples written so far.
     samples: u64,
+    /// The header is written (or the file given up on): nothing more to do.
+    finished: bool,
 }
 
 impl WavStream {
@@ -29,10 +31,14 @@ impl WavStream {
         if let Some(dir) = path.parent().filter(|d| !d.as_os_str().is_empty()) {
             std::fs::create_dir_all(dir)?;
         }
-        // lint: allow(asset-write) streamed; `Recorder::finish` notes the write once whole
+        // lint: allow(asset-write) streamed; `AudioMaestro::stop_capture` notes the write once whole
         let mut file = BufWriter::new(File::create(path)?);
         file.write_all(&[0; HEADER_LEN])?;
-        Ok(Self { file, samples: 0 })
+        Ok(Self {
+            file,
+            samples: 0,
+            finished: false,
+        })
     }
 
     /// Append interleaved stereo samples.
@@ -44,13 +50,27 @@ impl WavStream {
         Ok(())
     }
 
-    /// Write the header for `rate` over the placeholder and close the file.
-    pub fn finish(mut self, rate: u32) -> io::Result<()> {
+    /// Write the header for `rate` over the placeholder and flush the file.
+    pub fn finish(&mut self, rate: u32) -> io::Result<()> {
+        self.finished = true;
+        // The RIFF size field holds `36 + data_len`, so that sum must fit too.
         let data_len = u32::try_from(self.samples * 4)
-            .map_err(|_| io::Error::other("capture longer than a WAV can hold (4 GiB)"))?;
+            .ok()
+            .filter(|len| len.checked_add(36).is_some())
+            .ok_or_else(|| io::Error::other("capture longer than a WAV can hold (4 GiB)"))?;
         self.file.seek(SeekFrom::Start(0))?;
         self.file.write_all(&header(rate, data_len))?;
         self.file.flush()
+    }
+
+    /// Whether [`finish`](Self::finish) ran (or the file was abandoned).
+    pub fn is_finished(&self) -> bool {
+        self.finished
+    }
+
+    /// Give up on the file: no header will be written over its placeholder.
+    pub fn abandon(&mut self) {
+        self.finished = true;
     }
 }
 

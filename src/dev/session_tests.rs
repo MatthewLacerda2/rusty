@@ -152,3 +152,22 @@ fn engine_warnings_ride_along_with_the_reply() {
         .iter()
         .any(|(m, _)| m == "[Test] session: an asset was skipped"));
 }
+
+#[test]
+fn a_capture_in_the_session_hears_the_steps_it_ran() {
+    // The session ticks through `paused_frame`, not the harness: the tick itself
+    // clocks the offline mixer, so the capture holds the stepped time (#1579).
+    let mut s = session();
+    let path = crate::test_temp::dir().join("rusty_session_capture.wav");
+    let at = crate::core::paths::to_slash(&path);
+    s.command(&format!("Audio.StartCapture('{at}')")).unwrap();
+    s.command("Time.Pause()").unwrap();
+    s.command("Time.Step(120)").unwrap();
+    s.command("Audio.StopCapture()").unwrap();
+    let bytes = std::fs::read(&path).unwrap();
+    assert_eq!(
+        bytes.len(),
+        44 + 2 * 48_000 * 8,
+        "two seconds of float stereo"
+    );
+}

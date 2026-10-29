@@ -63,10 +63,6 @@ pub fn tick_unless_quit(world: &mut GameWorld) -> bool {
         return false;
     }
     world.tick(FIXED_DT);
-    // The mix the speakers would get this tick, so a capture hears it (#1579).
-    let res = &world.resources;
-    let (scene, time) = (world.scene(), world.time());
-    crate::api::audio::push_frame(scene, &res.audio, time, &res.camera, FIXED_DT.into());
     // Engine warnings join the console, so a scenario's `console.log` carries them.
     crate::logging::forward(world.console());
     true

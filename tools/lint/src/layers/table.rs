@@ -126,6 +126,7 @@ pub const LAYERS: &[Layer] = &[
     sim(
         "app",
         &[
+            "api",
             "asset",
             "audio",
             "components",

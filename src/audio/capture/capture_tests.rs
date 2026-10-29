@@ -76,3 +76,27 @@ fn a_silent_capture_is_a_valid_empty_file_at_the_offline_rate() {
     maestro.stop_capture().unwrap();
     assert_eq!(std::fs::read(&out).unwrap(), wav::header(RATE, 0));
 }
+
+#[test]
+fn a_refused_start_leaves_the_run_as_it_was() {
+    let blocker = tone("rusty_capture_not_a_dir.wav", 1);
+    let mut maestro = AudioMaestro::default();
+    let refused = maestro.start_capture(&blocker.join("out.wav"));
+    assert!(refused.unwrap_err().contains("cannot write"));
+    assert!(
+        maestro.backend.tap().is_none(),
+        "the run did not go offline"
+    );
+    assert!(maestro.capture_path().is_none());
+}
+
+#[test]
+fn a_capture_never_stopped_is_still_a_readable_wav() {
+    let out = crate::test_temp::dir().join("rusty_capture_dropped.wav");
+    let mut maestro = AudioMaestro::default();
+    maestro.start_capture(&out).unwrap();
+    maestro.advance_output(0.01);
+    drop(maestro);
+    let heard = decode_file(&out.to_string_lossy()).unwrap();
+    assert_eq!(heard.samples().len(), 2 * 480, "10 ms at 48 kHz, stereo");
+}

@@ -215,7 +215,11 @@ stepped once per frame in `LateUpdate`: a blend keeps running through slow-mo an
 state is a function of sim time, so `Audio.GetGroupState` reads back the same values
 on the headless harness (no device) as in the editor. A duck's trigger is "a voice is
 live": on the harness one-shots end at once (nothing plays), so only entity sources
-trigger a duck there.
+trigger a duck there. **A [capture](#capturing-the-mix) changes that:** once one
+starts, the harness mixes for real and a one-shot stays live until it finishes
+sounding, so it triggers its ducks too. `Audio.GetGroupState(...).duck` can then read
+differently in a run recorded with `--record-audio` (or after `Harness.RecordAudio`)
+than in the same run unrecorded.
 
 **Stop** discards play-mode mixer changes (groups created, settings, snapshots,
 ducks), as it does the scene's. The device applies group changes with a 10 ms ramp,
@@ -273,11 +277,18 @@ scale stays readable, at the device's rate in the windowed editor. With no devic
 scenario, a box with no sound card) the engine mixes **offline at 48 kHz**, in step
 with the engine's time: a scenario's capture is a pure function of the run, and two
 runs of one scenario write byte-identical files. Going offline restarts every
-`AudioSource` that was playing from its first sample; after that the run keeps the
-real mixer, so a one-shot stays live (in `Debug.AudioVoices`) until it finishes
-sounding. One capture runs at a time. In a scenario, `Harness.RecordAudio` /
+`AudioSource` that was playing from its first sample (one whose clip cannot be
+decoded is dropped with a warning); after that the run keeps the real mixer, so a
+one-shot stays live until it finishes sounding, and the ducks it triggers apply
+([*Time and determinism*](#mixer-groups-snapshots-and-ducking): a recorded run's
+`duck` can differ from an unrecorded one's). One capture runs at a time. In a scenario, `Harness.RecordAudio` /
 `Harness.StopAudio` and `play --record-audio <path>` do the same with the file under
 the run's output folder (`docs/testing.md`).
+
+In the windowed editor the device's thread hands each block over without ever
+waiting on the engine; a block the engine had no room for (a frame stalled for
+seconds) is dropped, and `StopCapture` logs how many frames were lost. A capture
+left running when the editor quits or a run fails is still closed as a readable WAV.
 
 ```lua no-run
 Audio.StartCapture("captures/door.wav")
