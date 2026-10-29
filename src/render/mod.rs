@@ -30,7 +30,7 @@ pub mod ui;
 
 // Moved submodules pulled back under short names so this module's body keeps
 // naming them directly (grouped by subfolder — see the convention in CLAUDE.md).
-use ibl::{cubemap, reflection_probes, skybox};
+use ibl::{cubemap, reflection_probes, sky_cube, skybox};
 use passes::{particles, shadows};
 
 use crate::components::MeshRevision;
@@ -200,6 +200,8 @@ pub struct Renderer {
     /// The reflection probes the frame shades with (#1206): the nearest baked probes'
     /// cubes in one cube array at group-0 binding 4, and the slot each draw reads.
     reflection_probes: reflection_probes::ProbeArray,
+    /// The sky's prefiltered reflection cubes at group-0 binding 2 (#1553).
+    sky_reflection: sky_cube::SkyReflection,
     /// Decoded cubemaps by path — the content cache the probe array copies from (#355).
     /// Which probes are resident is per-scene state and legitimately flips when two
     /// scenes with different probes render in one frame; without this, each flip

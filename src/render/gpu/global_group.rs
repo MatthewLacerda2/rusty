@@ -10,6 +10,7 @@ use crate::render::decals::DecalBuffers;
 pub(crate) struct GlobalGroup<'a> {
     pub camera: &'a wgpu::Buffer,
     pub lighting: &'a wgpu::Buffer,
+    /// The sky's reflection cube and its sampler (#1553).
     pub skybox: (&'a wgpu::TextureView, &'a wgpu::Sampler),
     pub cube: (&'a wgpu::TextureView, &'a wgpu::Sampler),
     pub clusters: &'a ClusterBuffers,

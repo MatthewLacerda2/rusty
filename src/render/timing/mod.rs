@@ -48,6 +48,9 @@ crate::core::named_enum! {
     /// passes join a kind, or add one here (and to `docs/api/Debug.md`).
     #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub enum GpuPass {
+        /// The sky's reflection cube (#1553): its capture and prefilter, on the
+        /// frames the sky changed.
+        SkyReflection = "sky_reflection",
         /// The sun's cascades and the point/spot shadow atlas.
         Shadows = "shadows",
         /// The SSAO depth prepass, occlusion and blur.
@@ -179,6 +182,29 @@ impl GpuTimer {
     /// The `timestamp_writes` for one render pass of kind `pass`; `None` when the
     /// timer is disabled, no frame is open, or the frame ran out of query pairs.
     pub(crate) fn writes(&self, pass: GpuPass) -> Option<wgpu::RenderPassTimestampWrites<'_>> {
+        let (query_set, pair) = self.pair(pass)?;
+        Some(wgpu::RenderPassTimestampWrites {
+            query_set,
+            beginning_of_pass_write_index: Some(pair * 2),
+            end_of_pass_write_index: Some(pair * 2 + 1),
+        })
+    }
+
+    /// [`Self::writes`] for a compute pass.
+    pub(crate) fn compute_writes(
+        &self,
+        pass: GpuPass,
+    ) -> Option<wgpu::ComputePassTimestampWrites<'_>> {
+        let (query_set, pair) = self.pair(pass)?;
+        Some(wgpu::ComputePassTimestampWrites {
+            query_set,
+            beginning_of_pass_write_index: Some(pair * 2),
+            end_of_pass_write_index: Some(pair * 2 + 1),
+        })
+    }
+
+    /// The next query pair, taken for one pass of kind `pass`.
+    fn pair(&self, pass: GpuPass) -> Option<(&wgpu::QuerySet, u32)> {
         let q = self.queries.as_ref().filter(|q| q.open.get())?;
         let mut frame = q.frame.borrow_mut();
         let pair = frame.len() as u32;
@@ -189,11 +215,7 @@ impl GpuTimer {
             return None;
         }
         frame.push(pass);
-        Some(wgpu::RenderPassTimestampWrites {
-            query_set: &q.set,
-            beginning_of_pass_write_index: Some(pair * 2),
-            end_of_pass_write_index: Some(pair * 2 + 1),
-        })
+        Some((&q.set, pair))
     }
 
     /// Close the frame: resolve its queries into a free readback buffer and start

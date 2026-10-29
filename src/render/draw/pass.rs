@@ -210,13 +210,13 @@ impl Renderer {
             return;
         }
         self.global_bind_group_dirty = false;
-        let sky = self.sky_panorama();
+        let sky = &self.sky_reflection;
         // The resident reflection probes' cube array at binding 4 (#1206).
         let cube = &self.reflection_probes;
         self.global_bind_group = GlobalGroup {
             camera: &self.camera_buffer,
             lighting: &self.lighting_buffer,
-            skybox: (&sky.view, &sky.sampler),
+            skybox: (sky.view(self.skybox_texture.as_deref()), &sky.sampler),
             cube: (&cube.view, &cube.sampler),
             clusters: &self.clusters,
             decals: &self.decals,

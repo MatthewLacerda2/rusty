@@ -385,7 +385,7 @@ const PI: f32 = 3.14159265359;
 
 // Where direction `dir` lands on an equirectangular panorama: longitude to u (the
 // seam at φ = ±π, along -x), polar angle from +y to v. ONE function, three callers
-// (the skybox pass, the forward pass's reflection and post-FX's SSR fallback), so
+// (the skybox pass, the sky reflection cube's bake and post-FX's SSR fallback), so
 // what a surface reflects is the sky on screen. `y` is clamped: a normalised vector
 // can round past 1, and `acos` of that is NaN.
 fn equirect_uv(dir: vec3<f32>) -> vec2<f32> {
@@ -398,9 +398,12 @@ fn equirect_uv(dir: vec3<f32>) -> vec2<f32> {
 // The colour of the procedural sky along `dir`, before fog: a ground -> horizon ->
 // sky gradient tinted from `sky_color` (the scene's ambient colour) plus a cheap,
 // static cloud layer. ONE function, two callers: the sky pass draws it when no
-// panorama is bound (`sky_gradient.wgsl`), and the forward pass reflects it in the
-// same case (#718), so a metal surface mirrors the sky that is actually on screen.
-// Its clouds are `sky_fbm` (`sky/noise.wgsl`).
+// panorama is bound (`sky_gradient.wgsl`), and the sky reflection cube bakes it for
+// the forward pass to reflect in the same case (#718, #1553), so a metal surface
+// mirrors the sky that is actually on screen. It must stay **affine in
+// `sky_color`** (`a * sky_color + b`, `a` one scalar per direction): the cube bakes
+// the two terms once and applies the tint per sample (`sky/prefilter.wgsl`). Its
+// clouds are `sky_fbm` (`sky/noise.wgsl`).
 
 fn procedural_sky(sky_color: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
     // Ground is the darker quarter of the sky tint, exactly as the forward pass's

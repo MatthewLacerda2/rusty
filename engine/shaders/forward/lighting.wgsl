@@ -4,7 +4,7 @@
 
 #define_import_path forward::lighting
 
-#import common::{DecalSurface, PI, apply_decal, equirect_uv, procedural_sky}
+#import common::{DecalSurface, PI, apply_decal}
 #import lighting::reflection_probe::parallax_correct
 #import forward::bindings::{camera, cluster_lights, cluster_ranges, decals, instances, lighting, s_decal, s_refl_cube, s_shadow, s_skybox, shadow, t_ao, t_decal_color, t_decal_data, t_refl_cube, t_shadow, t_skybox}
 
@@ -231,12 +231,11 @@ fn eval_sh(N: vec3<f32>, instance: u32) -> vec3<f32> {
 
 // The environment a surface reflects along the mirror direction `R` (#244, #718). With
 // a reflection probe (`probe` is its resident index plus one, picked per object,
-// #1206), the
-// direction is parallax-corrected against that probe's box and its baked, prefiltered
-// cube is sampled (roughness selects the mip within its chain, #245). Without one, the
-// skybox panorama; and with neither, the same procedural sky the sky pass draws (#256),
-// so the reflection matches what is on screen. (Roughness blurs only the baked cube;
-// the 2D skies stay sharp until #245 prefilters them.)
+// #1206), the direction is parallax-corrected against that probe's box and its baked,
+// prefiltered cube is sampled (roughness selects the mip within its chain, #245).
+// Without one, the sky's cube (#1553), prefiltered the same way, so a rough metal
+// reflects a blurred sky: the panorama, or the procedural sky's terms tinted with the
+// ambient colour the sky pass draws it with (#256).
 fn environment_reflection(world_pos: vec3<f32>, raw_r: vec3<f32>, roughness: f32, probe: u32) -> vec3<f32> {
     let R = normalize(raw_r);
     if (probe > 0u) {
@@ -245,10 +244,10 @@ fn environment_reflection(world_pos: vec3<f32>, raw_r: vec3<f32>, roughness: f32
         let lod = p.mip_base + roughness * (p.mip_count - 1.0);
         return textureSampleLevel(t_refl_cube, s_refl_cube, corrected, p.layer, lod).rgb;
     }
+    let lod = roughness * f32(textureNumLevels(t_skybox) - 1u);
+    let sky = textureSampleLevel(t_skybox, s_skybox, R, lod);
     if (lighting.sky_textured > 0.5) {
-        // The equirectangular panorama, mapped (and read at level 0, past the
-        // atan2 seam's derivatives) as the skybox pass does (#1322).
-        return textureSampleLevel(t_skybox, s_skybox, equirect_uv(R), 0.0).rgb;
+        return sky.rgb;
     }
-    return procedural_sky(lighting.ambient.color, R);
+    return sky.rgb + lighting.ambient.color * sky.a;
 }

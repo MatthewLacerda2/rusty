@@ -66,6 +66,7 @@ mod render_texture_screenshot;
 mod ribbons_screenshot;
 mod skinned_shadows_screenshot;
 mod skinning_joint_cap;
+mod sky_reflection_screenshot;
 mod ssao_screenshot;
 mod transparent_sorting_screenshot;
 mod ui;

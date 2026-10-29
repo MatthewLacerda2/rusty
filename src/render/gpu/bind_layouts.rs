@@ -6,7 +6,8 @@ use super::layout_entries::{
     depth_entry, dynamic_uniform_entry, sampler_entry, storage_entry, texture_entry, uniform_entry,
 };
 
-/// Group 0: Camera (0), Lighting (1), Skybox Texture (2), Skybox Sampler (3), Reflection
+/// Group 0: Camera (0), Lighting (1), the sky's reflection cube (2) and its sampler (3,
+/// #1553), Reflection
 /// Probe Cube Array (4), Reflection Probe Sampler (5), the light clusters (#434): the
 /// frame's point/spot lights (7), each cluster's light and decal ranges (8) and the
 /// index list (9), and the decals (#638): their records (10), the decal atlas's
@@ -14,16 +15,17 @@ use super::layout_entries::{
 /// with their sampler (15, #438) and direction pages (16, #810). Binding 6 is the shadow module's (see `shader.wgsl`).
 /// The cube array holds the resident probes' baked, prefiltered cubemaps, one per layer
 /// (#245, #1206); a draw's instance names its probe, and the shader samples that layer
-/// (parallax-corrected, roughness->mip), or the 2D skybox when it has none.
+/// (parallax-corrected, roughness->mip), or the sky's cube when it has none.
 pub(crate) fn create_camera_lighting_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
-    use wgpu::TextureViewDimension::{CubeArray, D2Array, D2};
+    use wgpu::TextureViewDimension::{Cube, CubeArray, D2Array};
     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: Some("Camera, Lighting, Skybox & Reflection Layout"),
         entries: &[
             uniform_entry(0, wgpu::ShaderStages::VERTEX_FRAGMENT),
             // Vertex-visible too: lit particles shade per vertex (#440).
             uniform_entry(1, wgpu::ShaderStages::VERTEX_FRAGMENT),
-            texture_entry(2, D2),
+            // The sky's prefiltered reflection cube (#1553).
+            texture_entry(2, Cube),
             sampler_entry(3),
             texture_entry(4, CubeArray),
             sampler_entry(5),
