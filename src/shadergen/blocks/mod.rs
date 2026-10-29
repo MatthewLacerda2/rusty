@@ -144,6 +144,29 @@ pub struct Block {
     /// depth. `None` for a block that only restyles colour, and always for postfx and
     /// ui (a ui block fades to transparent; the UI pass has no depth passes).
     pub cut: Option<&'static str>,
+    /// What the block does to the environment reflection in the lit colour, which the
+    /// forward pass records for SSR to replace (#1526). Every block says, so a new one
+    /// can't leave SSR painting a reflection its colour no longer holds. Postfx and ui
+    /// blocks colour no lit surface: they write [`Reflection::Kept`].
+    pub reflection: Reflection,
+}
+
+/// How a surface colour block changes the reflection SSR replaces (#1526). The
+/// forward pass records the environment reflection it added and the weight an SSR
+/// hit gets (`lighting/ssr_surface.wgsl`); a block folded in after it must scale them
+/// as it scales the colour, or SSR subtracts a reflection the pixel no longer holds.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Reflection {
+    /// The block adds light of its own (a rim, a glow) or moves the UVs before any
+    /// lighting: the reflection is still all there.
+    Kept,
+    /// The block scales the colour per channel, linearly (a tint, a `mix` toward a
+    /// colour by an amount): this `vec3<f32>` expression, with `in` in scope and
+    /// `{args}` filled as [`Block::call`]'s, is the factor. The record scales by it.
+    Scaled(&'static str),
+    /// The block is not a per-channel scale of the colour (a toon ramp, a desaturate
+    /// mixing the channels): the pixel gets no SSR.
+    Dropped,
 }
 
 /// The catalog of blocks valid for `pass`, in stable order.
@@ -222,6 +245,21 @@ mod tests {
         for b in catalog(PassKind::Surface) {
             if let Some(cut) = b.cut {
                 let name = cut.split('(').next().unwrap();
+                assert!(b.helper.contains(&format!("fn {name}(")), "{}", b.id);
+            }
+        }
+    }
+
+    #[test]
+    fn only_lit_surface_blocks_change_the_reflection_and_scale_through_their_helpers() {
+        for pass in [PassKind::Postfx, PassKind::Ui] {
+            assert!(catalog(pass)
+                .iter()
+                .all(|b| b.reflection == Reflection::Kept));
+        }
+        for b in catalog(PassKind::Surface) {
+            if let Reflection::Scaled(factor) = b.reflection {
+                let name = factor.split('(').next().unwrap();
                 assert!(b.helper.contains(&format!("fn {name}(")), "{}", b.id);
             }
         }

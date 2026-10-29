@@ -1,8 +1,10 @@
 //! What each effect packs for one view's camera (#1434, #1467): its composite slots
-//! from the volume and the camera, gated by the tier and the player's options.
+//! from the volume and the camera, gated by the tier and the player's options, and
+//! the march SSR's pass runs (#1526).
 
 use super::fxaa::fxaa_enabled;
 use super::motion_blur::effect::blur_params;
+use super::ssr::{march, ssr_enabled};
 use super::{composite_layout, composite_slots, EffectCx};
 use crate::components::{CameraComponent, PostProcessingComponent, Tonemap};
 use crate::core::settings::graphics_options::{GraphicsOption, GraphicsOptions};
@@ -63,6 +65,14 @@ fn blur(scene: &Scene, camera: Option<u32>, graphics: GraphicsSettings) -> Optio
     blur_params(post.source(), graphics, 100).map(|b| b.shape[2])
 }
 
+/// The march steps SSR runs for `camera` under `graphics`, if it runs.
+fn ssr(scene: &Scene, camera: Option<u32>, graphics: GraphicsSettings) -> Option<u32> {
+    let guards = borrow_post_source(scene, camera);
+    let post = guards.source();
+    let vc = post.volume.filter(|_| ssr_enabled(post, graphics, true))?;
+    Some(march(&vc.ssr.quality).steps)
+}
+
 fn fxaa(scene: &Scene, camera: Option<u32>) -> bool {
     fxaa_enabled(
         borrow_post_source(scene, camera).source(),
@@ -74,7 +84,7 @@ fn vc() -> PostProcessingComponent {
     let mut vc = crate::scene::authoring::default_post_processing();
     (vc.bloom.intensity, vc.bloom.threshold) = (2.0, 0.7);
     vc.exposure.fixed_ev = 1.5;
-    vc.ssr.temporal_upsampling = false;
+    vc.ssr.quality = "Low".to_string();
     vc.tonemapping.mode = Tonemap::Reinhard;
     vc
 }
@@ -111,19 +121,18 @@ fn the_volumes_knobs_reach_their_effects_slots() {
 fn low_preset_disables_ssr_and_motion_blur() {
     let (scene, id) = scene_with_vc(vc(), Some(cam()));
     let low = QualityPreset::Low.into();
-    assert_eq!(
-        packed(&scene, Some(id), low, "ssr")[0][0],
-        0.0,
-        "ssr off on Low"
-    );
+    assert_eq!(ssr(&scene, Some(id), low), None, "ssr off on Low");
     assert_eq!(blur(&scene, Some(id), low), None);
 }
 
 #[test]
 fn high_preset_enables_real_ssr_and_motion_blur() {
     let (scene, id) = scene_with_vc(vc(), Some(cam()));
-    let ssr = packed(&scene, Some(id), high(), "ssr")[0][0];
-    assert_eq!(ssr, 2.0, "real screen-space SSR on High");
+    assert_eq!(
+        ssr(&scene, Some(id), high()),
+        Some(16),
+        "SSR on High, marching as its Low quality"
+    );
     let samples = blur(&scene, Some(id), high());
     assert_eq!(samples, Some(16.0), "motion-blur samples passed through");
 }
@@ -201,19 +210,15 @@ fn a_player_option_off_gates_the_cameras_effect() {
     let (scene, id) = scene_with_vc(vc(), Some(cam()));
     let off = forbidding(GraphicsOption::MotionBlur);
     assert_eq!(blur(&scene, Some(id), off), None, "motion blur off");
-    assert_eq!(
-        packed(&scene, Some(id), off, "ssr")[0][0],
-        2.0,
-        "SSR untouched"
-    );
+    assert!(ssr(&scene, Some(id), off).is_some(), "SSR untouched");
     assert!(blur(&scene, Some(id), high()).is_some(), "allowed: it runs");
     let bloom = |g| packed(&scene, Some(id), g, "bloom")[0][3];
     assert_eq!(
         (bloom(high()), bloom(forbidding(GraphicsOption::Bloom))),
         (1.0, 0.0)
     );
-    let ssr = packed(&scene, Some(id), forbidding(GraphicsOption::Ssr), "ssr");
-    assert_eq!(ssr[0][0], 0.0, "ssr off");
+    let forbidden = ssr(&scene, Some(id), forbidding(GraphicsOption::Ssr));
+    assert_eq!(forbidden, None, "ssr off");
     let source = borrow_post_source(&scene, Some(id));
     assert!(!fxaa_enabled(
         source.source(),

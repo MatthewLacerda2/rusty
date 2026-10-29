@@ -17,7 +17,6 @@ fn scene_with_vc() -> (Scene, u32) {
         ssr: crate::components::Ssr {
             active: false,
             quality: "Medium".to_string(),
-            temporal_upsampling: false,
         },
         ..crate::scene::authoring::default_post_processing()
     };
@@ -34,7 +33,6 @@ fn ops_write_through_with_clamps() {
     grading::tonemapping::set_display_gamma(&mut e, -5.0);
     grading::tonemapping::set_mode(&mut e, Tonemap::Reinhard);
     ssr::set_quality(&mut e, "High".to_string());
-    ssr::set_temporal_upsampling(&mut e, true);
     volume::set_shadow_cascades(&mut e, 9);
     volume::set_shadow_distance(&mut e, -4.0);
     volume::set_ssao_active(&mut e, false);
@@ -52,7 +50,6 @@ fn ops_write_through_with_clamps() {
     );
     assert_eq!(vc.tonemapping.mode, Tonemap::Reinhard);
     assert_eq!(vc.ssr.quality, "High");
-    assert!(vc.ssr.temporal_upsampling);
     assert_eq!(vc.shadows.cascades, 4, "cascades clamp to the map's layers");
     assert_eq!(
         vc.shadows.distance, 1.0,

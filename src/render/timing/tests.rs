@@ -46,6 +46,7 @@ fn pass_names_are_stable_and_unique() {
             "shadows",
             "ssao",
             "forward",
+            "ssr",
             "transparent",
             "ribbons",
             "particles",

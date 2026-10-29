@@ -61,7 +61,6 @@ fn neutral_volume() -> PostProcessingComponent {
         ssr: rusty::components::Ssr {
             active: false,
             quality: "Low".to_string(),
-            temporal_upsampling: false,
         },
         tonemapping: rusty::components::Tonemapping {
             mode: Tonemap::None,
