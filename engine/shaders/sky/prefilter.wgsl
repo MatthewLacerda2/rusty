@@ -19,11 +19,10 @@
 
 #import common::{PI, equirect_uv, procedural_sky}
 
-// Mirrors `SAMPLE_COUNT` in `render::ibl::reflection_prefilter`.
-const SAMPLE_COUNT: u32 = 128u;
-
 struct Params {
-    // x: roughness, y: face size in texels, z: 1 for the panorama (0: procedural).
+    // x: roughness, y: face size in texels, z: 1 for the panorama (0: procedural),
+    // w: the importance sample count, `render::ibl::reflection_prefilter`'s
+    // `SAMPLE_COUNT`, so a probe and the sky blur rough metal alike.
     p: vec4<f32>,
 };
 
@@ -62,6 +61,21 @@ fn source(dir: vec3<f32>, lod: f32) -> vec4<f32> {
     return procedural_terms(dir);
 }
 
+// The panorama's average texel solid angle at its base mip.
+fn panorama_texel() -> f32 {
+    let dims = vec2<f32>(textureDimensions(t_panorama, 0));
+    return 4.0 * PI / (dims.x * dims.y);
+}
+
+// The panorama mip whose texel covers what one texel of a `size`² cube face does
+// (≈ 4π / (6·size²)), so the mirror mip reads the sky prefiltered to its own
+// resolution and thin bright detail doesn't alias into the face.
+fn mirror_lod(size: f32) -> f32 {
+    let cube_texel = 4.0 * PI / (6.0 * size * size);
+    let last = f32(textureNumLevels(t_panorama) - 1u);
+    return clamp(0.5 * log2(cube_texel / panorama_texel()), 0.0, last);
+}
+
 fn radical_inverse_vdc(bits: u32) -> f32 {
     return f32(reverseBits(bits)) * 2.3283064e-10;
 }
@@ -77,14 +91,13 @@ fn convolve(n: vec3<f32>, roughness: f32) -> vec4<f32> {
     let bitangent = cross(n, tangent);
     let a = roughness * roughness;
     let a2 = a * a;
-    // The panorama's average texel solid angle at its base mip.
-    let dims = vec2<f32>(textureDimensions(t_panorama, 0));
-    let texel = 4.0 * PI / (dims.x * dims.y);
+    let texel = panorama_texel();
     let last = f32(textureNumLevels(t_panorama) - 1u);
+    let samples = u32(params.p.w);
     var color = vec4<f32>(0.0);
     var weight = 0.0;
-    for (var i = 0u; i < SAMPLE_COUNT; i = i + 1u) {
-        let xi = hammersley(i, SAMPLE_COUNT);
+    for (var i = 0u; i < samples; i = i + 1u) {
+        let xi = hammersley(i, samples);
         let phi = 2.0 * PI * xi.x;
         let cos_theta = sqrt((1.0 - xi.y) / (1.0 + (a2 - 1.0) * xi.y));
         let sin_theta = sqrt(max(1.0 - cos_theta * cos_theta, 0.0));
@@ -94,7 +107,7 @@ fn convolve(n: vec3<f32>, roughness: f32) -> vec4<f32> {
         if (ndotl > 0.0) {
             // GGX D at this half-vector; with N = V its pdf over L is D / 4.
             let d = (a2 / (PI * pow(cos_theta * cos_theta * (a2 - 1.0) + 1.0, 2.0)));
-            let sample_angle = 4.0 / (f32(SAMPLE_COUNT) * max(d, 1e-4));
+            let sample_angle = 4.0 / (f32(samples) * max(d, 1e-4));
             let lod = clamp(0.5 * log2(sample_angle / texel) + 1.0, 0.0, last);
             color += source(l, lod) * ndotl;
             weight += ndotl;
@@ -117,7 +130,7 @@ fn cs_prefilter(@builtin(global_invocation_id) id: vec3<u32>) {
     let roughness = params.p.x;
     var out: vec4<f32>;
     if (roughness <= 0.0) {
-        out = source(n, 0.0);
+        out = source(n, mirror_lod(f32(size)));
     } else {
         out = convolve(n, roughness);
     }

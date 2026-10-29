@@ -3,6 +3,7 @@
 
 use super::SKY_FACE;
 use crate::render::gpu::shaders::ShaderRegistry;
+use crate::render::ibl::reflection_prefilter;
 use crate::render::timing::{GpuPass, GpuTimer};
 use crate::render::GpuTexture;
 
@@ -11,9 +12,19 @@ const FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba16Float;
 /// The shader's workgroup edge (`@workgroup_size(8, 8, 1)`).
 const GROUP: u32 = 8;
 
-/// A full mip chain down to 1×1, as a probe's prefiltered cube has.
+/// A full mip chain down to 1×1: a probe's prefiltered chain at the sky's face size.
 pub(super) fn mip_count() -> u32 {
-    SKY_FACE.ilog2() + 1
+    reflection_prefilter::mip_count(SKY_FACE)
+}
+
+/// Mip `level`'s shader params: its roughness (`reflection_prefilter`'s
+/// `level / (mips - 1)`), face size, source (1: the panorama) and the probe
+/// prefilter's sample count.
+pub(super) fn params(level: u32, textured: bool) -> [f32; 4] {
+    let roughness = level as f32 / (mip_count() - 1) as f32;
+    let size = (SKY_FACE >> level).max(1) as f32;
+    let samples = reflection_prefilter::SAMPLE_COUNT as f32;
+    [roughness, size, f32::from(u8::from(textured)), samples]
 }
 
 /// One sky cube: the texture, its `Cube` view (what group 0 binds) and one
@@ -136,12 +147,10 @@ impl Filter {
             Some(p) => (&p.view, &p.sampler),
             None => (&self.black, &self.sampler),
         };
-        let textured = f32::from(u8::from(panorama.is_some()));
-        let last = (mip_count() - 1) as f32;
         let groups: Vec<_> = (0..mip_count())
             .map(|level| {
                 let size = (SKY_FACE >> level).max(1);
-                let params = [level as f32 / last, size as f32, textured, 0.0];
+                let params = params(level, panorama.is_some());
                 let buffer = &self.params[level as usize];
                 queue.write_buffer(buffer, 0, bytemuck::cast_slice(&params));
                 let group = self.group(

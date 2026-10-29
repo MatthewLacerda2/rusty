@@ -25,8 +25,9 @@ use crate::render::{CubemapCapture, CubemapFace};
 
 /// Number of importance samples per output texel for the rough mips. A few hundred taps
 /// gives a smooth lobe at the small cubemap sizes a probe uses; raising it trades bake
-/// time for less sampling noise.
-const SAMPLE_COUNT: u32 = 128;
+/// time for less sampling noise. The sky cube's GPU prefilter (`ibl::sky_cube`) takes
+/// the same count, so probe-lit and sky-lit rough metal blur alike.
+pub(crate) const SAMPLE_COUNT: u32 = 128;
 
 /// A prefiltered cubemap: a chain of mips, each six LDR RGBA8 faces. `mips[0]` is the
 /// sharp base (roughness 0); each later mip halves the edge length and raises roughness.
@@ -72,8 +73,9 @@ pub fn validate_layout(cube: &PrefilteredCubemap) -> bool {
 }
 
 /// Mip count for a base edge length: a full chain down to 1×1 (`log2(size) + 1`), so the
-/// roughest mip is a single texel — the fully-diffuse limit of the lobe.
-fn mip_count(base_size: u32) -> u32 {
+/// roughest mip is a single texel — the fully-diffuse limit of the lobe. The sky cube's
+/// chain (`ibl::sky_cube`) is this one at its own face size.
+pub(crate) fn mip_count(base_size: u32) -> u32 {
     32 - base_size.max(1).leading_zeros()
 }
 
