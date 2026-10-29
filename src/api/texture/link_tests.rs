@@ -40,7 +40,7 @@ fn a_link_on_a_whole_count_is_refused_naming_the_params_that_link() {
 fn a_link_to_an_unknown_node_is_refused() {
     let err = bake_err(r#"strength = { node = "nope" }"#, "");
     assert!(
-        err.contains("node 'w' links strength to unknown node 'nope'"),
+        err.contains(r#"node "w" (warp): links strength to unknown node "nope""#),
         "{err}"
     );
 }

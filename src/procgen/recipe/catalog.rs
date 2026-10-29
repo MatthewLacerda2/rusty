@@ -178,9 +178,9 @@ pub const OPS: &[OpInfo] = &[
         "vector",
         ONE,
         &[
-            req("scale", "vec2"),
-            req("rotation", "number"),
-            req("translation", "vec2"),
+            opt("scale", "vec2", Lit::Vec2([1.0, 1.0])),
+            opt("rotation", "number", Lit::Number(0.0)),
+            opt("translation", "vec2", Lit::Vec2([0.0, 0.0])),
             opt("tiling", "bool", Lit::Bool(true)),
         ],
     ),

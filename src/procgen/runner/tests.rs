@@ -35,10 +35,11 @@ fn evaluates_in_dependency_order() {
 #[test]
 fn missing_input_is_reported() {
     let recipe = TextureRecipe::new(8, vec![node("inv", OpKind::Invert, &["ghost"])]);
-    assert!(matches!(
-        evaluate(&recipe),
-        Err(RunError::UnknownInput { .. })
-    ));
+    let err = evaluate(&recipe).unwrap_err();
+    assert_eq!(
+        err.to_string(),
+        r#"node "inv" (invert): references unknown input "ghost""#
+    );
 }
 
 #[test]
@@ -50,8 +51,11 @@ fn a_short_or_surplus_input_list_is_refused_naming_the_node() {
     for (op, inputs) in [(mix, &["a"][..]), (OpKind::Invert, &["a", "a"][..])] {
         let recipe = TextureRecipe::new(8, vec![constant("a", 0.5), node("bad", op, inputs)]);
         let err = evaluate(&recipe).unwrap_err();
-        assert!(matches!(err, RunError::Arity(_)), "{err:?}");
-        assert!(err.to_string().contains("\"bad\""), "{err}");
+        let RunError::Node(e) = &err else {
+            panic!("{err:?}")
+        };
+        assert!(matches!(e.fault, Fault::Arity { .. }), "{err:?}");
+        assert!(err.to_string().starts_with("node \"bad\" ("), "{err}");
     }
 }
 
@@ -71,7 +75,11 @@ fn cycle_is_detected() {
         ],
     )
     .with_output("a");
-    assert!(matches!(evaluate(&recipe), Err(RunError::Cycle(_))));
+    let err = evaluate(&recipe).unwrap_err();
+    assert!(
+        matches!(&err, RunError::Node(e) if e.fault == Fault::Cycle),
+        "{err:?}"
+    );
 }
 
 #[test]
