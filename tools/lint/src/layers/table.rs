@@ -206,7 +206,6 @@ pub const LAYERS: &[Layer] = &[
     platform(
         "shell",
         &[
-            "api",
             "app",
             "asset",
             "audio",
