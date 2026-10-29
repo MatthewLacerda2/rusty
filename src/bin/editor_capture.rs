@@ -27,6 +27,7 @@
 use std::process::exit;
 
 use rusty::core::project::Access;
+use rusty::core::settings::video::parse_size;
 use rusty::dev::session::Session;
 use rusty::editor::ViewportTab;
 use rusty::shell::editor::capture::{self, EditorCaptureOptions};
@@ -93,12 +94,7 @@ fn parse(args: &[String]) -> Result<Parsed, String> {
             "--frame" => opts.frame_selected = true,
             "--play" => opts.playing = true,
             "--game" => opts.tab = ViewportTab::Game,
-            "--size" => {
-                let size = value()?;
-                let (w, h) = size.split_once('x').ok_or(format!("bad --size {size}"))?;
-                let num = |s: &str| s.parse().map_err(|_| format!("bad --size {size}"));
-                (opts.width, opts.height) = (num(w)?, num(h)?);
-            }
+            "--size" => (opts.width, opts.height) = parse_size(&value()?)?,
             other => return Err(format!("unknown argument {other}")),
         }
     }
