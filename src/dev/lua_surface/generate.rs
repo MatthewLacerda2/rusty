@@ -8,6 +8,7 @@ use mlua::{Lua, Table};
 use super::super::bake::generate_lighting::generate_lighting;
 use crate::api::{global_table, put, ApiScopedCtx, Reg};
 use crate::scene::lighting::lightmap::BakeSettings;
+use crate::scene::lighting::settings::ReflectionSettings;
 
 /// The knobs a script may override, each optional; `None` keeps `base`'s.
 #[derive(Default)]
@@ -82,8 +83,7 @@ pub(super) fn register<'scope>(
             out.set("bounces", s.bounces)?;
             out.set("seed", s.seed)?;
             out.set("directional", s.directional)?;
-            out.set("reflectionResolution", r.resolution)?;
-            out.set("reflectionBudgetMB", r.budget_mb)?;
+            put_reflections(&out, &r)?;
             Ok(out)
         }),
     )?;
@@ -95,17 +95,24 @@ pub(super) fn register<'scope>(
             let mut scene = scene.borrow_mut();
             let s = &mut scene.lighting_settings.lightmaps;
             *s = overrides.apply(*s);
-            let r = &mut scene.lighting_settings.reflections;
-            r.resolution = t
-                .get::<Option<u32>>("reflectionResolution")?
-                .unwrap_or(r.resolution);
-            r.budget_mb = t
-                .get::<Option<u32>>("reflectionBudgetMB")?
-                .unwrap_or(r.budget_mb);
-            r.clamp();
-            Ok(())
+            set_reflections(&t, &mut scene.lighting_settings.reflections)
         }),
     )
+}
+
+/// The reflection probes' defaults, as `GetSettings` returns them (#1584).
+fn put_reflections(out: &Table, r: &ReflectionSettings) -> mlua::Result<()> {
+    out.set("reflectionResolution", r.resolution)?;
+    out.set("reflectionBudgetMB", r.budget_mb)
+}
+
+/// The reflection defaults `t` names written into `r`, then clamped.
+fn set_reflections(t: &Table, r: &mut ReflectionSettings) -> mlua::Result<()> {
+    let get = |key: &str| t.get::<Option<u32>>(key);
+    r.resolution = get("reflectionResolution")?.unwrap_or(r.resolution);
+    r.budget_mb = get("reflectionBudgetMB")?.unwrap_or(r.budget_mb);
+    r.clamp();
+    Ok(())
 }
 
 #[cfg(test)]
