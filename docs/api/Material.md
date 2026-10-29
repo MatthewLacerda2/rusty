@@ -54,8 +54,8 @@ conversion wrote into the import cache is a reference (#1072).
 Where a material reads its maps (#1573) follows Unity: URP/HDRP Lit's **Tiling** and
 **Offset**, and HDRP Lit's **Base UV Mapping**. They apply to every main map at once
 (base colour, metallic, roughness, normal, emissive); there is no per-map tiling.
-Each is a field of the material, with a `Set` and a `Get`, saved with it (omitted
-from the scene file while it holds its default), taken by `DefineAsset` by the key
+Each is a field of the material, with a `Set` and a `Get`, saved with it (written
+to the scene file even at its default), taken by `DefineAsset` by the key
 in brackets, and shown in the Inspector's Material card under the maps.
 
 | Function | Signature |

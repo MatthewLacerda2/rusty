@@ -329,8 +329,8 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
 
     // glTF metallic-roughness packs metallic in BLUE, roughness in GREEN. Each scalar
     // multiplies its map channel when the flag is set, else acts alone (#202).
-    let surface_metallic = clamp(entity.metallic * select(1.0, mapping::sample(t_metallic, s_metallic, maps).b, entity.use_metallic_map == 1u), 0.0, 1.0);
-    let surface_roughness = clamp(entity.roughness * select(1.0, mapping::sample(t_roughness, s_roughness, maps).g, entity.use_roughness_map == 1u), 0.04, 1.0);
+    let surface_metallic = clamp(entity.metallic * mapping::sample_if(entity.use_metallic_map, t_metallic, s_metallic, maps).b, 0.0, 1.0);
+    let surface_roughness = clamp(entity.roughness * mapping::sample_if(entity.use_roughness_map, t_roughness, s_roughness, maps).g, 0.04, 1.0);
 
     // 0. Surface decals (#638): this cluster's decals change the material inputs
     // before any light is summed, so a decal is lit, shadowed and occluded like the

@@ -29,7 +29,9 @@ use std::ops::RangeInclusive;
 
 pub use crate::components::material::entity_material_key;
 
-pub use coordinates::COORDINATE_FIELDS;
+pub use coordinates::{
+    BLEND_SHARPNESS_RANGE, COORDINATE_FIELDS, MAP_COORD_RANGE, WORLD_SIZE_RANGE,
+};
 pub use maps::{bake_maps, rebake_maps, MAPS_DIR};
 pub use shader_params::{
     clear_entity_shader_param, entity_shader_param, entity_shader_param_with,

@@ -134,6 +134,17 @@ fn map_coordinates_pack_as_scale_offset_mode_and_repeats_per_metre() {
         (m.uv_mapping, m.world_scale, m.blend_sharpness),
         (2, 0.5, 8.0)
     );
+    let wild = MaterialAsset {
+        world_size: 0.0,
+        blend_sharpness: 200.0,
+        ..tiled
+    };
+    let m = material_uniform(true, Some(&wild)).mapping;
+    assert_eq!(
+        (m.world_scale, m.blend_sharpness),
+        (100.0, 64.0),
+        "clamped to the rows"
+    );
     let plain = material_uniform(true, None).mapping;
     assert_eq!((plain.uv_st, plain.uv_mapping), ([1.0, 1.0, 0.0, 0.0], 0));
 }

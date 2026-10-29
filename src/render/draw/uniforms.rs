@@ -4,12 +4,15 @@
 //! Split out of `draw_resources` to keep that file under the size cap; behaviour
 //! unchanged. Free functions (no GPU state), called from `sync_solid_resource`.
 
+use std::ops::RangeInclusive;
+
 use glam::Mat4;
 
 use crate::components::{MaterialAsset, RefractionModel, RenderMode};
 use crate::render::gpu::lightmaps::Lightmaps;
 use crate::render::gpu::uniforms::{MappingUniform, SurfaceUniform};
 use crate::render::{EntityUniform, InstanceData};
+use crate::scene::authoring::material::{BLEND_SHARPNESS_RANGE, MAP_COORD_RANGE, WORLD_SIZE_RANGE};
 use crate::scene::Scene;
 
 /// Compute the per-draw uniform (tint, lit flag, PBR params, cutout) for a solid
@@ -82,14 +85,17 @@ pub(crate) fn material_uniform(lit: bool, material: Option<&MaterialAsset>) -> E
 
 /// Where material `c` reads its maps (#1573): its tiling and offset as one
 /// scale/offset, its mapping by index, and its world size as repeats per metre.
+/// Each value is clamped to its authoring row's range, since a hand-written scene
+/// skips the row's own clamp and a sharpness past it overflows the shader's blend.
 pub(crate) fn mapping_uniform(c: &MaterialAsset) -> MappingUniform {
-    let [sx, sy] = c.tiling;
-    let [ox, oy] = c.offset;
+    let within = |v: f32, r: &RangeInclusive<f32>| v.clamp(*r.start(), *r.end());
+    let [sx, sy] = c.tiling.map(|v| within(v, &MAP_COORD_RANGE));
+    let [ox, oy] = c.offset.map(|v| within(v, &MAP_COORD_RANGE));
     MappingUniform {
         uv_st: [sx, sy, ox, oy],
         uv_mapping: c.uv_mapping as u32,
-        world_scale: 1.0 / c.world_size.max(1e-3),
-        blend_sharpness: c.blend_sharpness.max(1.0),
+        world_scale: 1.0 / within(c.world_size, &WORLD_SIZE_RANGE),
+        blend_sharpness: within(c.blend_sharpness, &BLEND_SHARPNESS_RANGE),
         _pad: 0,
     }
 }

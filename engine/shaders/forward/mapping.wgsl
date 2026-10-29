@@ -31,17 +31,24 @@ fn tile(uv: vec2<f32>) -> vec2<f32> {
 }
 
 // The coordinates at a point with mesh UV `uv`, world `position` and geometric
-// world `normal`. The projections follow Ben Golus's "Normal Mapping for a
-// Triplanar Shader" (zy, xz, xy), which `sample_normal`'s whiteout blend expects.
+// world `normal`. UV0 does no projection maths; Planar projects once (along Y).
+// Triplanar's projections follow Ben Golus's "Normal Mapping for a Triplanar
+// Shader" (zy, xz, xy), which `sample_normal`'s whiteout blend expects.
 fn coords(uv: vec2<f32>, position: vec3<f32>, normal: vec3<f32>) -> MapCoords {
-    let p = position * entity.world_scale;
     var c: MapCoords;
-    c.x = tile(p.zy);
-    c.y = tile(p.xz);
-    c.z = tile(p.xy);
-    c.uv = select(c.y, tile(uv), entity.uv_mapping == UV0);
-    let w = pow(max(abs(normal), vec3<f32>(1e-4)), vec3<f32>(entity.blend_sharpness));
-    c.weights = w / (w.x + w.y + w.z);
+    if (entity.uv_mapping == UV0) {
+        c.uv = tile(uv);
+        return c;
+    }
+    let p = position * entity.world_scale;
+    c.uv = tile(p.xz);
+    if (entity.uv_mapping == TRIPLANAR) {
+        c.x = tile(p.zy);
+        c.y = c.uv;
+        c.z = tile(p.xy);
+        let w = pow(max(abs(normal), vec3<f32>(1e-4)), vec3<f32>(entity.blend_sharpness));
+        c.weights = w / max(w.x + w.y + w.z, 1e-4);
+    }
     return c;
 }
 
@@ -53,6 +60,15 @@ fn sample(t: texture_2d<f32>, s: sampler, c: MapCoords) -> vec4<f32> {
     return textureSample(t, s, c.x) * c.weights.x
         + textureSample(t, s, c.y) * c.weights.y
         + textureSample(t, s, c.z) * c.weights.z;
+}
+
+// Map `t` at `c` when `on` (a per-draw `use_*_map` flag) is 1, else white: a
+// material without the map never fetches it.
+fn sample_if(on: u32, t: texture_2d<f32>, s: sampler, c: MapCoords) -> vec4<f32> {
+    if (on != 1u) {
+        return vec4<f32>(1.0);
+    }
+    return sample(t, s, c);
 }
 
 // The world-space shading normal from tangent-space normal map `t` at `c`, over
