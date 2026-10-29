@@ -5,8 +5,9 @@
 use glam::Vec3;
 
 use super::fixture::H;
-use super::fixture::{frame, pixel, renderer, rgb, tuned, Surface, MIRROR, RED, REFLECTING};
-use crate::core::color::srgb_to_linear;
+use super::fixture::{
+    frame, linear, pixel, renderer, rgb, tuned, Surface, MIRROR, RED, REFLECTING,
+};
 use crate::render::ibl::ktx2_encode::encode_cubemap;
 use crate::render::ibl::reflection_prefilter::PrefilteredCubemap;
 use crate::scene::{FogMode, Scene};
@@ -24,11 +25,6 @@ fn glowing(on: bool, floor: Surface, glow: [f32; 3], ssao: bool) -> Scene {
     scene.materials.get_mut("cube").unwrap().emissive = glow;
     scene.ambient_color = Vec3::splat(0.2);
     scene
-}
-
-/// Pixel `p`'s linear RGB.
-fn linear(frame: &[u8], p: (u32, u32)) -> [f32; 3] {
-    rgb(frame, p).map(|c| srgb_to_linear(c as u8))
 }
 
 /// How much of its green the mirror floor keeps around `z` in front of a glowing red
