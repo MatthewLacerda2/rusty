@@ -7,12 +7,14 @@
 //!
 //! Three shapes, one per pass:
 //! - **surface** — the canonical forward shader (`shader.wgsl`, passed in as
-//!   `surface_base`) is the base; its standard `vs_main` + PBR lighting are kept
-//!   verbatim and the chosen blocks are folded into the final color just before
+//!   `surface_base`) is the base; its PBR lighting is kept verbatim and the chosen
+//!   colour blocks are folded into the final color just before
 //!   `surface_color` returns, which both colour entry points call (`fs_main`, and the
 //!   motion-vector `fs_velocity`, #1435). So a surface variant binds against the
 //!   forward pipeline unchanged (same `VertexInput`, bind groups, and entry points),
-//!   varying only the fragment look — exactly the contract.
+//!   varying only the fragment look — exactly the contract. A vertex-stage block
+//!   (`vertex_waves`, #1524) replaces the base's identity `surface_vertex` hook, which
+//!   every vertex stage calls (`vertex`).
 //! - **postfx** — a self-contained fullscreen module: the scene-color bindings,
 //!   the fullscreen-triangle `vs_fullscreen`, and an `fs_main` that samples the
 //!   tonemapped color then folds the chosen blocks. This matches the fullscreen-fragment
@@ -24,10 +26,10 @@
 //! declare that slot's binding — once, however many blocks read it; a variant with
 //! no such block declares none.
 //!
-//! A surface block that cuts fragments (`dissolve`) or moves the UVs (`uv_scroll`)
-//! also gives the variant depth-only entry points, [`CUT_PREPASS`] and [`CUT_SHADOW`],
-//! so the SSAO prepass and the shadow cascades drop what the colour pass drops (#648,
-//! #1499, `depth`).
+//! A surface block that cuts fragments (`dissolve`), moves the UVs (`uv_scroll`) or
+//! moves the vertices (`vertex_waves`) also gives the variant depth-only entry points,
+//! [`CUT_PREPASS`] and [`CUT_SHADOW`], so the SSAO prepass and the shadow cascades
+//! draw what the colour pass draws (#648, #1499, #1524, `depth`).
 //!
 //! Each block instance contributes its params (as per-instance WGSL `const`s) and a
 //! call spliced into the chain; each distinct block contributes its helper once —
@@ -37,6 +39,7 @@ mod depth;
 mod emit;
 pub(crate) mod ui;
 mod uv;
+mod vertex;
 
 use std::fmt::Write as _;
 
@@ -133,13 +136,14 @@ fn assemble_surface(
 
     let header = format!(
         "// {name}.wgsl — authored surface variant (#272), assembled from {n} block(s).\n\
-         // Base: the forward/surface pass; standard vs_main + lighting kept verbatim,\n\
-         // the fragment look varied by the blocks folded into the final color.\n",
+         // Base: the forward/surface pass; lighting kept verbatim, the look varied by\n\
+         // the blocks folded into the final color, the UVs or the vertex hook.\n",
         name = recipe.name,
         n = resolved.len()
     );
 
     let body = uv::splice(&base.replace(SURFACE_RETURN, &new_return), resolved, layout)?;
+    let body = vertex::splice(&body, resolved, layout)?;
     let (imports, body) = hoist_imports(&body);
     let depth = depth::entry_points(resolved, layout);
     Ok(format!("{header}{imports}{additions}\n{body}{depth}"))

@@ -85,3 +85,5 @@ mod tests;
 mod texture_tests;
 #[cfg(test)]
 mod ui_tests;
+#[cfg(test)]
+mod vertex_tests;

@@ -163,8 +163,9 @@ fn global_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
         entries: &[
             dynamic_uniform_entry(LIGHT_BINDING, wgpu::ShaderStages::VERTEX, 64),
             // The forward `camera` slot, holding only the game time: a cutting
-            // variant's UV chain reads `camera.time` (#648).
-            uniform_entry(TIME_BINDING, wgpu::ShaderStages::FRAGMENT),
+            // variant's UV chain reads `camera.time` (#648), and `vs_shadow` moves
+            // the caster with a variant's vertex blocks at it (#1524).
+            uniform_entry(TIME_BINDING, wgpu::ShaderStages::VERTEX_FRAGMENT),
         ],
     })
 }

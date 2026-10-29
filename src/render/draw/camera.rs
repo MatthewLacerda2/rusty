@@ -83,6 +83,8 @@ pub(crate) struct StackShared {
     /// Each camera's view-projection, bottom to top, and its last frame's (#1435).
     pub view_projs: Vec<glam::Mat4>,
     pub prev_view_projs: Vec<glam::Mat4>,
+    /// The game time the view drew at last frame (#1524), the shader time without one.
+    pub prev_time: f32,
     pub fog: FogUniform,
     pub ssao: Option<SsaoPlan>,
 }
@@ -119,7 +121,7 @@ impl<'a> CameraCtx<'a> {
                 fog: shared.fog,
                 clusters: clusters.uniform(),
                 prev_view_proj: shared.prev_view_projs[idx].to_cols_array(),
-                stack: [idx as f32, 0.0, 0.0, 0.0],
+                stack: [idx as f32, shared.prev_time, 0.0, 0.0],
             },
             clusters,
             solids: SolidResources::default(),

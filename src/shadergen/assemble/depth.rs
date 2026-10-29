@@ -1,5 +1,5 @@
 //! src/shadergen/assemble/depth.rs — the depth entry points of a surface variant that
-//! cuts fragments or moves its UVs (#648, #1499).
+//! cuts fragments or moves its UVs or vertices (#648, #1499, #1524).
 //!
 //! A block that `discard`s (`dissolve`) cuts the colour pass; the shadow cascades and
 //! the SSAO prepass draw the same mesh through their own fragment stages, which would
@@ -9,9 +9,12 @@
 //! [`CUT_PREPASS`] and [`CUT_SHADOW`] open like `surface_color` (the UV chain moves
 //! `in`'s UVs, `uv`), run each cutting instance's [`Block::cut`] with the same args as
 //! its colour call, then the base's own clip for that pass (`prepass_clip`,
-//! `shadow_clip` — the cutout test). A recipe that neither cuts nor moves its UVs gets
-//! neither, and its variant keeps the shared depth pipelines. A primed forward pass
-//! (#1499) relies on this: the prepass depth must be the depth `fs_main` keeps.
+//! `shadow_clip` — the cutout test). A vertex block (#1524) gets them too, with no cut
+//! of its own: the shared depth pipelines run the standard vertex stage, so only the
+//! variant's own move the vertex as `vs_main` does. A recipe that neither cuts nor
+//! moves its UVs or vertices gets neither, and its variant keeps the shared depth
+//! pipelines. A primed forward pass (#1499) relies on this: the prepass depth must be
+//! the depth `fs_main` keeps.
 //!
 //! [`Block::cut`]: crate::shadergen::blocks::Block::cut
 
@@ -19,6 +22,7 @@ use std::fmt::Write as _;
 
 use super::emit::{cuts, Instance};
 use super::uv::moved_in;
+use super::vertex;
 use crate::shadergen::params::ParamLayout;
 
 /// The SSAO prepass entry point of a surface variant that cuts fragments.
@@ -27,12 +31,12 @@ pub const CUT_PREPASS: &str = "fs_prepass_cut";
 pub const CUT_SHADOW: &str = "fs_shadow_cut";
 
 /// The depth entry points for `instances`, or nothing when none of them cuts or
-/// moves the UVs.
+/// moves the UVs or the vertices.
 pub fn entry_points(instances: &[Instance], layout: &ParamLayout) -> String {
     let cuts = cuts(instances, layout);
     let (param, opening) = match moved_in(instances, layout) {
         Some(moved) => ("in_raw", moved),
-        None if cuts.is_empty() => return String::new(),
+        None if cuts.is_empty() && !vertex::moves(instances) => return String::new(),
         None => ("in", String::new()),
     };
     let body: String = cuts.iter().map(|c| format!("    _ = {c};\n")).collect();
