@@ -8,10 +8,11 @@ mod depth_postpass;
 mod preserve_specular;
 mod receive_shadows;
 mod refraction;
+mod stray_terms;
 mod textures;
 mod translucency;
 
-pub use textures::{checker, ripples};
+pub use textures::{checker, half_alpha, ripples};
 
 use glam::{Quat, Vec3};
 use rusty::components::{MaterialAsset, MaterialComponent, RenderMode};

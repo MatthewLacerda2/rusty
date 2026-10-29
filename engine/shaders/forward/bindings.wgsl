@@ -48,7 +48,7 @@ struct EntityUniforms {
     // 1 when the surface composites over the opaque copy itself.
     uses_opaque: u32,
     depth_postpass: u32,
-    // Absorption per metre (rgb).
+    // Absorption per metre (rgb); w the depth it absorbs over against the sky.
     absorption: vec4<f32>,
     // Thin translucency: rgb colour * amount, w the amount.
     transmission: vec4<f32>,

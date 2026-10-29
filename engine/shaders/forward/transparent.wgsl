@@ -65,7 +65,8 @@ const SKY_DISTANCE: f32 = 60000.0;
 // Beer-Lambert `exp(-absorption * distance)`, over the distance from the surface to
 // the opaque surface behind it along the view (the copy's eye distance less the
 // surface's), so shallow water stays clear and deep water takes the transmittance
-// colour; seen against the sky it absorbs over `thickness`.
+// colour; seen against the sky it absorbs over the material's `thickness`
+// (`absorption.w`), whatever its refraction model.
 fn behind(world: vec3<f32>, N: vec3<f32>, pixel: vec2<f32>) -> vec3<f32> {
     let size = vec2<f32>(textureDimensions(t_opaque));
     let eye_to_surface = distance(camera.camera_pos, world);
@@ -87,7 +88,7 @@ fn behind(world: vec3<f32>, N: vec3<f32>, pixel: vec2<f32>) -> vec3<f32> {
     let scene = textureSampleLevel(t_opaque, s_opaque, uv, 0.0);
     var depth = max(scene.a - eye_to_surface, 0.0);
     if (scene.a >= SKY_DISTANCE) {
-        depth = entity.thickness;
+        depth = entity.absorption.w;
     }
     return scene.rgb * exp(-entity.absorption.rgb * depth);
 }

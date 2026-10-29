@@ -75,14 +75,16 @@ pub(crate) fn material_uniform(lit: bool, material: Option<&MaterialAsset>) -> E
         alpha_cutoff,
         bone_base: 0,
         receive_decals,
-        surface: surface_uniform(material),
+        surface: surface_uniform(lit, material),
     }
 }
 
 /// The transparent-surface terms of `material` (#1523). Blending and preserve
 /// specular apply to a `Transparent` material alone; a draw with no material
-/// receives shadows.
-pub(crate) fn surface_uniform(material: Option<&MaterialAsset>) -> SurfaceUniform {
+/// receives shadows. An unlit draw (`lit` false: a light's own mesh) returns its
+/// colour before any lighting, so it neither premultiplies nor reads the opaque
+/// copy: it blends straight, as before #1523.
+pub(crate) fn surface_uniform(lit: bool, material: Option<&MaterialAsset>) -> SurfaceUniform {
     let Some(m) = material else {
         return SurfaceUniform {
             receive_shadows: 1,
@@ -90,15 +92,16 @@ pub(crate) fn surface_uniform(material: Option<&MaterialAsset>) -> SurfaceUnifor
         };
     };
     let glass = m.is_transparent();
-    let reads_opaque = m.reads_opaque();
+    let reads_opaque = lit && m.reads_opaque();
     let (refraction_model, thickness) = match m.refraction_model {
         RefractionModel::None => (0, 0.0),
         RefractionModel::Planar => (1, m.thickness),
         RefractionModel::Thin => (2, REFRACTION_THIN_DISTANCE),
     };
     SurfaceUniform {
-        blend_mode: m.blend_mode as u32,
-        premultiply_diffuse: u32::from(glass && preserves_specular(m)),
+        // A leftover blend mode on an Opaque or Cutout material blends nothing.
+        blend_mode: if glass { m.blend_mode as u32 } else { 0 },
+        premultiply_diffuse: u32::from(lit && glass && preserves_specular(m)),
         receive_shadows: u32::from(m.receive_shadows),
         refraction_model: if reads_opaque { refraction_model } else { 0 },
         ior: m.ior,
@@ -106,7 +109,7 @@ pub(crate) fn surface_uniform(material: Option<&MaterialAsset>) -> SurfaceUnifor
         uses_opaque: u32::from(reads_opaque),
         depth_postpass: u32::from(glass && m.depth_postpass),
         transmission: transmission(m.transmission_color, m.transmission),
-        absorption: absorption(m.transmittance_color, m.absorption_distance),
+        absorption: absorption(m.transmittance_color, m.absorption_distance, m.thickness),
     }
 }
 
@@ -120,10 +123,12 @@ const REFRACTION_THIN_DISTANCE: f32 = 0.005;
 
 /// The absorption coefficient per metre that leaves `color` after `distance`
 /// metres, HDRP's `TransmittanceColorAtDistanceToAbsorption`:
-/// `-ln(color) / distance`, with its epsilon on both.
-fn absorption(color: [f32; 3], distance: f32) -> [f32; 4] {
+/// `-ln(color) / distance`, with its epsilon on both. The fourth lane is the
+/// surface's `thickness`, the depth it absorbs over where the sky is behind it, as
+/// HDRP's thickness drives its absorption.
+fn absorption(color: [f32; 3], distance: f32, thickness: f32) -> [f32; 4] {
     let k = |c: f32| -(c + 1e-4).ln().min(0.0) / distance.max(1e-4);
-    [k(color[0]), k(color[1]), k(color[2]), 0.0]
+    [k(color[0]), k(color[1]), k(color[2]), thickness]
 }
 
 /// Whether URP's *Preserve Specular Lighting* is in effect for `m`: on, and under a

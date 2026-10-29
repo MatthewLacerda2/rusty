@@ -180,7 +180,8 @@ pub(crate) struct SurfaceUniform {
     /// 1 when the surface writes its depth after drawing.
     pub depth_postpass: u32,
     /// The absorption coefficient per metre, rgb (HDRP's
-    /// `TransmittanceColorAtDistanceToAbsorption`); `w` unused.
+    /// `TransmittanceColorAtDistanceToAbsorption`); `w` the material's thickness,
+    /// the depth it absorbs over where the sky is behind it.
     pub absorption: [f32; 4],
     /// Thin translucency: rgb the transmission colour times its amount, `w` the
     /// amount (0: none).

@@ -211,7 +211,13 @@ pub static SURFACE_FIELDS: &[SurfaceField] = &[
         api: "Thickness",
         label: "Thickness",
         kind: SurfaceKind::Number(0.0..=10.0),
-        shown: |m| m.is_transparent() && m.refraction_model == RefractionModel::Planar,
+        // A Planar slab's depth, and the depth an absorbing surface absorbs over
+        // against the sky.
+        shown: |m| {
+            m.is_transparent()
+                && (m.refraction_model == RefractionModel::Planar
+                    || m.transmittance_color != [1.0; 3])
+        },
         get: |m| SurfaceValue::Number(m.thickness),
         put: |m, v| m.thickness = number(v),
     },

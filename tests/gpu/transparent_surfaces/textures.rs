@@ -25,6 +25,14 @@ pub fn ripples(name: &str, waves: f32) -> String {
     save(name, img)
 }
 
+/// A flat mid-grey PNG at half alpha, written once under `name`; returns its path.
+pub fn half_alpha(name: &str) -> String {
+    save(
+        name,
+        image::RgbaImage::from_pixel(8, 8, image::Rgba([160, 160, 160, 128])),
+    )
+}
+
 fn save(name: &str, img: image::RgbaImage) -> String {
     let path = crate::temp::dir().join(format!("rusty_1523_{name}.png"));
     img.save(&path).expect("write the texture");
