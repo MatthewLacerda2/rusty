@@ -341,7 +341,9 @@ number.
 - `blur.radius`, `distance.radius`: read at each pixel. A blur's radius varies
   smoothly: sharp where the link is dark, soft where it is bright, each pixel
   averaging its own window in constant time whatever its width. A Gaussian is still
-  three passes;
+  three passes, and spreads as far as the same radius as a number. A linked box is
+  not rounded to a whole pixel as a number's box is (a rounded radius would step
+  visibly across the map), so it matches the number only at whole-pixel radii;
 - `tile.jitter`, `tile.rotation_jitter`, `tile.scale_jitter`, `voronoi.randomness`:
   read **once per cell**, at the cell's centre, wrapped, so each cell keeps one
   stamp or one point and the result still tiles;
