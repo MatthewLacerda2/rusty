@@ -59,6 +59,7 @@ pub type MaterialLibrary = BTreeMap<String, MaterialAsset>;
 /// asset's own fields are still validated by routing each value through the per-field
 /// `set_*` ops (the API does this), so the clamps stay single-sourced.
 pub fn define_asset(materials: &mut MaterialLibrary, name: &str, asset: MaterialAsset) {
+    fit_normal_slot(asset.normal_map.as_ref());
     materials.insert(name.to_string(), asset);
 }
 
@@ -142,10 +143,21 @@ pub fn set_roughness_map(materials: &mut MaterialLibrary, key: &str, path: Optio
     }
 }
 
-/// Set (or, with `None`, clear) the normal map path.
+/// Set (or, with `None`, clear) the normal map path. An image still of Texture
+/// Type `Default` becomes a `NormalMap` (`sidecar::fit_normal_slot`, #1574).
 pub fn set_normal_map(materials: &mut MaterialLibrary, key: &str, path: Option<String>) {
     if let Some(m) = materials.get_mut(key) {
         m.normal_map = path.map(MapRef::from);
+        fit_normal_slot(m.normal_map.as_ref());
+    }
+}
+
+/// [`crate::asset::sidecar::fit_normal_slot`] for the image a normal slot names:
+/// every way a material gets a normal map goes through it (this op, a material
+/// document, a maps recipe).
+pub fn fit_normal_slot(map: Option<&MapRef>) {
+    if let Some(file) = map.and_then(MapRef::file) {
+        crate::asset::sidecar::fit_normal_slot(&file);
     }
 }
 

@@ -1,12 +1,20 @@
 use block_compression::{decode::decompress_blocks_as_rgba8, BC7Settings, CompressionVariant};
 use image::{DynamicImage, Rgba, RgbaImage};
 
-use super::encode::{encode, format_for};
+use super::encode::encode;
+use super::shrink::fitted_size;
 use super::*;
 
 fn settings(compression: Compression) -> TextureSettings {
     TextureSettings {
         compression,
+        ..Default::default()
+    }
+}
+
+fn typed(texture_type: TextureType) -> TextureSettings {
+    TextureSettings {
+        texture_type,
         ..Default::default()
     }
 }
@@ -19,21 +27,30 @@ fn gradient(w: u32, h: u32, alpha: u8) -> RgbaImage {
 }
 
 #[test]
-fn each_kind_compresses_to_its_format() {
-    let (opaque, clear) = (gradient(8, 8, 255), gradient(8, 8, 100));
-    let grey = RgbaImage::from_fn(8, 8, |x, _| {
-        Rgba([x as u8 * 30, x as u8 * 30, x as u8 * 30, 9])
-    });
+fn each_texture_type_compresses_to_its_format_whatever_the_texels() {
+    let image = DynamicImage::ImageRgba8(gradient(8, 8, 100));
     let cases = [
-        (&opaque, TextureKind::Colour, BlockFormat::Bc7),
-        (&clear, TextureKind::Data, BlockFormat::Bc7),
-        (&opaque, TextureKind::Normal, BlockFormat::Bc5),
-        (&grey, TextureKind::Mask, BlockFormat::Bc4),
-        (&opaque, TextureKind::Mask, BlockFormat::Bc7),
-        (&grey, TextureKind::Data, BlockFormat::Bc7),
+        (TextureType::Default, BlockFormat::Bc7),
+        (TextureType::NormalMap, BlockFormat::Bc5),
+        (TextureType::SingleChannel, BlockFormat::Bc4),
     ];
-    for (texels, kind, want) in cases {
-        assert_eq!(format_for(texels, kind), want, "{kind:?}");
+    for (texture_type, want) in cases {
+        assert_eq!(format_of(&typed(texture_type)), Some(want));
+        let made = encode(&image, &typed(texture_type)).unwrap();
+        assert_eq!(made.format, want, "{texture_type:?}");
+    }
+    let none = settings(Compression::None);
+    assert_eq!(format_of(&none), None);
+    assert!(encode(&image, &none).is_none());
+}
+
+#[test]
+fn a_type_fits_only_the_slots_that_read_all_its_channels() {
+    use TextureKind::*;
+    for kind in [Colour, Data, Normal, Mask] {
+        assert!(fits(TextureType::Default, kind));
+        assert_eq!(fits(TextureType::NormalMap, kind), kind == Normal);
+        assert_eq!(fits(TextureType::SingleChannel, kind), kind == Mask);
     }
 }
 
@@ -46,7 +63,7 @@ fn a_block_of_two_contrasting_colours_keeps_both() {
         false => Rgba([30, 30, 220, 255]),
     });
     let image = DynamicImage::ImageRgba8(block.clone());
-    let made = encode(&image, &settings(Compression::Normal), TextureKind::Colour).unwrap();
+    let made = encode(&image, &settings(Compression::Normal)).unwrap();
     let mut decoded = vec![0; 64];
     let bc7 = CompressionVariant::BC7(BC7Settings::opaque_very_fast());
     decompress_blocks_as_rgba8(bc7, 4, 4, &made.levels[0], &mut decoded);
@@ -62,7 +79,7 @@ fn a_block_of_two_contrasting_colours_keeps_both() {
 #[test]
 fn a_chain_has_every_level_in_whole_blocks_and_odd_sides_are_left_uncompressed() {
     let image = DynamicImage::ImageRgba8(gradient(64, 16, 255));
-    let made = encode(&image, &settings(Compression::Normal), TextureKind::Colour).unwrap();
+    let made = encode(&image, &settings(Compression::Normal)).unwrap();
     assert_eq!((made.width, made.height, made.levels.len()), (64, 16, 7));
     for (i, level) in made.levels.iter().enumerate() {
         let (w, h) = ((64 >> i).max(1), (16 >> i).max(1));
@@ -72,27 +89,16 @@ fn a_chain_has_every_level_in_whole_blocks_and_odd_sides_are_left_uncompressed()
         generate_mipmaps: false,
         ..settings(Compression::Normal)
     };
-    assert_eq!(
-        encode(&image, &no_mips, TextureKind::Data)
-            .unwrap()
-            .levels
-            .len(),
-        1
-    );
+    assert_eq!(encode(&image, &no_mips).unwrap().levels.len(), 1);
     let odd = DynamicImage::ImageRgba8(gradient(30, 16, 255));
-    assert!(encode(&odd, &settings(Compression::Normal), TextureKind::Colour).is_none());
+    assert!(encode(&odd, &settings(Compression::Normal)).is_none());
 }
 
 #[test]
 fn the_blocks_decode_close_to_the_source() {
     let source = gradient(32, 32, 200);
     let image = DynamicImage::ImageRgba8(source.clone());
-    let made = encode(
-        &image,
-        &settings(Compression::HighQuality),
-        TextureKind::Colour,
-    )
-    .unwrap();
+    let made = encode(&image, &settings(Compression::HighQuality)).unwrap();
     assert_eq!(made.format, BlockFormat::Bc7);
     let mut decoded = vec![0; 32 * 32 * 4];
     let bc7 = CompressionVariant::BC7(BC7Settings::alpha_fast());
@@ -110,7 +116,7 @@ fn the_blocks_decode_close_to_the_source() {
 fn fit_keeps_the_aspect_and_colour_averages_in_linear_light() {
     let wide = DynamicImage::ImageRgba8(gradient(300, 100, 255));
     let fitted = fit(wide.clone(), 128, TextureKind::Data);
-    assert_eq!((fitted.width(), fitted.height()), (128, 42));
+    assert_eq!((fitted.width(), fitted.height()), (128, 44), "rounded to 4");
     assert_eq!(
         fit(wide, 512, TextureKind::Data).width(),
         300,
@@ -130,5 +136,16 @@ fn fit_keeps_the_aspect_and_colour_averages_in_linear_light() {
         data.get_pixel(5, 5)[0].abs_diff(128) <= 2,
         "{:?}",
         data.get_pixel(5, 5)
+    );
+}
+
+#[test]
+fn a_downscaled_side_stays_a_multiple_of_4() {
+    assert_eq!(fitted_size(4096, 2732, 2048), (2048, 1368));
+    assert_eq!(fitted_size(8192, 4, 32), (32, 4), "at least one block");
+    assert_eq!(
+        fitted_size(30, 18, 64),
+        (30, 18),
+        "an image that fits is kept"
     );
 }

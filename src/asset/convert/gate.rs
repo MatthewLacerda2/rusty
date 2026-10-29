@@ -114,8 +114,10 @@ pub fn conversion_allowed() -> bool {
 
 /// Bring every converted source under `root` up to date, as Unity refreshes its
 /// asset database before Play: a model only a script spawns has a cache to play
-/// from. A source whose conversion fails is warned of and skipped. Returns how
-/// many sources were looked at; none while conversion is refused.
+/// from. Every image's compressed copy too (`texture_import::refresh_all`,
+/// #1574), so Play draws none uncompressed for want of one. A source whose
+/// conversion fails is warned of and skipped. Returns how many model sources were
+/// looked at; none while conversion is refused.
 pub fn refresh_sources(root: &Path) -> usize {
     if !conversion_allowed() {
         return 0;
@@ -126,6 +128,8 @@ pub fn refresh_sources(root: &Path) -> usize {
             log::warn!("[Asset] {}: {e}", source.display());
         }
     }
+    // Each failure was warned of as it ran.
+    let _ = crate::asset::texture_import::refresh_all(root);
     sources.len()
 }
 
@@ -149,12 +153,16 @@ pub fn convertible_sources(root: &Path) -> Vec<PathBuf> {
 /// changes again.
 /// Convert every source under `root` that `changed` names, or whose cached
 /// conversion read a file `changed` names. Returns how many it converted; a failure
-/// is warned of, as an import's is. A no-op while conversion is off.
+/// is warned of, as an import's is. An image `changed` names, or whose sidecar it
+/// names, is queued for its compressed copy (`texture_import::queue`, #1574), off
+/// this thread. A no-op while conversion is off.
 pub fn refresh_changed(root: &Path, changed: Vec<String>) -> usize {
     if !conversion_allowed() {
         return 0;
     }
-    let touched = touched(root, &Stale::new(changed));
+    let changed = Stale::new(changed);
+    queue_images(root, &changed);
+    let touched = touched(root, &changed);
     let mut converted = 0;
     for source in touched {
         match cached_gltf(&source) {
@@ -163,6 +171,19 @@ pub fn refresh_changed(root: &Path, changed: Vec<String>) -> usize {
         }
     }
     converted
+}
+
+/// Queue every image under `root` that `changed` names, or whose sidecar it names.
+fn queue_images(root: &Path, changed: &Stale) {
+    if changed.is_empty() {
+        return;
+    }
+    let names = |path: &Path| changed.matches(&path.to_string_lossy());
+    let images = crate::asset::texture_import::images(root);
+    let changed_images = images
+        .into_iter()
+        .filter(|image| names(image) || names(&crate::asset::sidecar::meta_path(image)));
+    crate::asset::texture_import::queue(changed_images.collect());
 }
 
 /// The sources under `root` a note in `changed` touches, sorted.

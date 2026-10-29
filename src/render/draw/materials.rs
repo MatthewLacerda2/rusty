@@ -78,7 +78,7 @@ impl Renderer {
             return i;
         }
         let maps = std::array::from_fn(|i| {
-            let map = self.resolve_map(paths[i].as_ref());
+            let map = self.resolve_map(paths[i].as_ref(), map_kind(i));
             // An extra slot with no texture of its own is a neutral white mask,
             // not the checker a missing map shows (#400).
             match i >= 5 && Rc::ptr_eq(&map, &self.default_texture) {
@@ -90,17 +90,13 @@ impl Renderer {
         self.materials.insert(key, group)
     }
 
-    /// Resolve a material map path to a resident GPU texture, falling back to the
-    /// default texture when the path is absent or not yet uploaded.
-    fn resolve_map(&self, path: Option<&MapRef>) -> Rc<GpuTexture> {
-        match path {
-            Some(p) => self
-                .gpu_textures
-                .get(p)
-                .cloned()
-                .unwrap_or_else(|| Rc::clone(&self.default_texture)),
-            None => Rc::clone(&self.default_texture),
-        }
+    /// Resolve a material map path to a resident GPU texture for a slot holding
+    /// `kind` (its uncompressed copy where the slot cannot read the upload's
+    /// format, #1574), falling back to the default texture when the path is
+    /// absent or not yet uploaded.
+    fn resolve_map(&self, path: Option<&MapRef>, kind: TextureKind) -> Rc<GpuTexture> {
+        path.and_then(|p| self.texture_for(p, kind))
+            .unwrap_or_else(|| Rc::clone(&self.default_texture))
     }
 
     /// Entity `id`'s solid uniform for `material`
@@ -243,9 +239,9 @@ pub(crate) fn material_maps(
         .filter_map(|(i, path)| Some((path?, map_kind(i))))
 }
 
-/// What the map at `index` holds, which decides how its mips average (#1322) and
-/// what it compresses to (#1574): metallic and roughness are masks, the normal map
-/// a normal map, the shader texture slots data.
+/// What the map at `index` holds, which decides how an uncompressed upload's mips
+/// average (#1322) and which compressed formats it can read (#1574): metallic and
+/// roughness are masks, the normal map a normal map, the shader texture slots data.
 fn map_kind(index: usize) -> TextureKind {
     match index {
         1 | 2 => TextureKind::Mask,

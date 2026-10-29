@@ -1,4 +1,4 @@
-use crate::asset::sidecar::{self, Compression, FilterMode, WrapMode, MAX_SIZES};
+use crate::asset::sidecar::{self, Compression, FilterMode, TextureType, WrapMode, MAX_SIZES};
 use crate::editor::EditorUi;
 use crate::scene::{MaterialComponent, Scene};
 use egui_phosphor::regular as icon;
@@ -29,7 +29,8 @@ pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, path: &
 }
 
 /// Texture import settings (#1323): wrap mode, filter mode, mipmap generation,
-/// compression and max size (#1574), kept in the image's `.meta` sidecar. An edit goes through the setter
+/// texture type, compression and max size (#1574), kept in the image's `.meta`
+/// sidecar. An edit goes through the setter
 /// `Assets.SetTextureImportSettings` uses, so the renderer re-uploads the texture.
 fn draw_import_settings(ui: &mut egui::Ui, path: &str) {
     ui.heading("Texture Import Settings");
@@ -59,6 +60,16 @@ fn draw_import_settings(ui: &mut egui::Ui, path: &str) {
             });
     });
     ui.checkbox(&mut s.generate_mipmaps, "Generate Mipmaps");
+    ui.horizontal(|ui| {
+        ui.label("Texture Type:");
+        egui::ComboBox::from_id_salt("ImgTextureType")
+            .selected_text(s.texture_type.name())
+            .show_ui(ui, |ui| {
+                for t in TextureType::ALL {
+                    ui.selectable_value(&mut s.texture_type, t, t.name());
+                }
+            });
+    });
     ui.horizontal(|ui| {
         ui.label("Max Size:");
         egui::ComboBox::from_id_salt("ImgMaxSize")

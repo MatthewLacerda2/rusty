@@ -104,6 +104,9 @@ pub struct GpuTexture {
     /// clamped (`render::ui`, #1397).
     pub filter: crate::asset::sidecar::FilterMode,
     pub bind_group: wgpu::BindGroup,
+    /// The source image's size, before *Max Size* (#1574): what UI geometry
+    /// measures in, as Unity keeps a sprite's borders in source pixels.
+    pub source_size: (u32, u32),
 }
 
 pub struct Renderer {
@@ -172,6 +175,9 @@ pub struct Renderer {
     // across entities resolves to one buffer pair, not one per entity.
     pub gpu_meshes: HashMap<MeshId, GpuMesh>,
     pub gpu_textures: HashMap<crate::asset::MapRef, Rc<GpuTexture>>,
+    /// An uncompressed copy of a cached upload whose block format a slot cannot
+    /// read (a BC5 normal map drawn as albedo, #1574), by the same key.
+    pub(crate) texture_fallbacks: HashMap<crate::asset::MapRef, Rc<GpuTexture>>,
     /// Which cached uploads went stale: re-written files and failed loads (#689).
     /// What each cached upload's mips were built for (#1416).
     pub(crate) texture_kinds: crate::render::gpu::textures::kind_watch::KindWatch,

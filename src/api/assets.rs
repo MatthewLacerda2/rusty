@@ -14,8 +14,8 @@
 //! `Assets.GetModelImportSettings` / `SetModelImportSettings` (#1398) read and write
 //! a model's Scale Factor, the inspector's drag.
 //! `Assets.GetTextureImportSettings` / `SetTextureImportSettings` (#1323) read and
-//! write an image's wrap, filter, mipmap, compression and max-size settings
-//! (#1574), the image inspector's card.
+//! write an image's wrap, filter, mipmap, texture type, compression and max-size
+//! settings (#1574), the image inspector's card.
 
 use std::cell::RefCell;
 use std::path::Path;
@@ -24,7 +24,9 @@ use mlua::{Lua, Table};
 
 use super::{global_table, put, Reg};
 use crate::asset::audio::{refresh, Refresh};
-use crate::asset::sidecar::{parse_max_size, Compression, FilterMode, TextureSettings, WrapMode};
+use crate::asset::sidecar::{
+    parse_max_size, Compression, FilterMode, TextureSettings, TextureType, WrapMode,
+};
 use crate::asset::{build_manifest, AssetEntry, SubObjectEntry};
 use crate::asset::{sidecar, LightmapUvSettings};
 use crate::core::paths::to_slash;
@@ -150,12 +152,13 @@ fn model_import_table(lua: &Lua, path: &str) -> mlua::Result<Table> {
     Ok(t)
 }
 
-/// `{ wrapMode, filterMode, generateMipmaps, compression, maxSize }`.
+/// `{ wrapMode, filterMode, generateMipmaps, textureType, compression, maxSize }`.
 fn texture_table(lua: &Lua, s: &TextureSettings) -> mlua::Result<Table> {
     let t = lua.create_table()?;
     t.raw_set("wrapMode", s.wrap_mode.name())?;
     t.raw_set("filterMode", s.filter_mode.name())?;
     t.raw_set("generateMipmaps", s.generate_mipmaps)?;
+    t.raw_set("textureType", s.texture_type.name())?;
     t.raw_set("compression", s.compression.name())?;
     t.raw_set("maxSize", s.max_size)?;
     Ok(t)
@@ -172,6 +175,9 @@ fn texture_settings(mut s: TextureSettings, t: &Table) -> mlua::Result<TextureSe
     }
     let mipmaps = t.get::<Option<bool>>("generateMipmaps")?;
     s.generate_mipmaps = mipmaps.unwrap_or(s.generate_mipmaps);
+    if let Some(name) = t.get::<Option<String>>("textureType")? {
+        s.texture_type = TextureType::parse(&name).map_err(runtime)?;
+    }
     if let Some(name) = t.get::<Option<String>>("compression")? {
         s.compression = Compression::parse(&name).map_err(runtime)?;
     }

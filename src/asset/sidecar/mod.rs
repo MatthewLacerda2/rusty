@@ -16,8 +16,8 @@ use std::path::{Path, PathBuf};
 mod texture;
 
 pub use texture::{
-    parse_max_size, set_texture, texture, Compression, FilterMode, TextureSettings, WrapMode,
-    DEFAULT_MAX_SIZE, MAX_SIZES,
+    fit_normal_slot, parse_max_size, set_texture, texture, Compression, FilterMode,
+    TextureSettings, TextureType, WrapMode, DEFAULT_MAX_SIZE, MAX_SIZES,
 };
 
 use super::lightmap_uv::LightmapUvSettings;

@@ -1,8 +1,10 @@
 //! Warns when a texture is used as two kinds (#1416): colour and data, say.
 //!
-//! A texture keeps one mip chain and one compressed format, built for the
-//! [`TextureKind`] of its first use (#1322, #1574). A file later requested as
-//! another kind is averaged (or compressed) wrongly for that use, and which use wins depends on load order. Unity keeps one setting per
+//! A texture keeps one mip chain, averaged for the [`TextureKind`] of its first
+//! use (#1322). A file later requested as another kind reads mips averaged wrongly
+//! for that use, and which use wins depends on load order. (Its compressed format
+//! follows its Texture Type instead, and a slot that cannot read it gets an
+//! uncompressed copy, #1574.) Unity keeps one setting per
 //! texture and warns on a mismatch; this does the same, once per file. Both the
 //! material texture cache and the decal atlas hold one.
 
@@ -34,8 +36,8 @@ impl KindWatch {
         }
         log::warn!(
             "[Render] {path} is used as {} by an earlier {user} load and as {} now; it keeps one \
-             upload (mip chain and compression), built for the first use, so the other \
-             reads it wrongly",
+             upload's mip chain, built for the first use, so the other reads its mips \
+             averaged wrongly",
             first.name(),
             kind.name(),
         );

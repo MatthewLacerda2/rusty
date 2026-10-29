@@ -1,6 +1,7 @@
-//! A material map uploads block-compressed (#1574): the format follows its slot,
-//! every mip comes from the import cache, and it draws what its uncompressed
-//! twin draws. On a GPU without BC every one falls back to RGBA8.
+//! A material map uploads block-compressed (#1574): the format follows its Texture
+//! Type, every mip comes from the import cache, it draws what its uncompressed twin
+//! draws, and a slot its type cannot serve reads an uncompressed copy. On a GPU
+//! without BC every one falls back to RGBA8.
 
 use std::path::Path;
 
@@ -9,18 +10,26 @@ use image::{Rgba, RgbaImage};
 use super::compressed::{gpu_bytes, FEATURE};
 use super::freshness_tests::{centre, emissive_scene, temp_png};
 use super::TextureKind;
-use crate::asset::sidecar::{set_texture, Compression, TextureSettings};
+use crate::asset::sidecar::{set_texture, Compression, TextureSettings, TextureType};
+use crate::asset::texture_import::refresh;
 use crate::asset::MapRef;
 use crate::components::MaterialAsset;
 use crate::render::Renderer;
 use wgpu::TextureFormat as F;
 
-/// A 16² PNG of `texel` everywhere at a fresh path named `name`.
-fn flat(name: &str, texel: [u8; 4]) -> String {
+/// A 16² PNG of `texel` everywhere at a fresh path named `name`, of
+/// `texture_type`, its compressed copy imported.
+fn flat(name: &str, texel: [u8; 4], texture_type: TextureType) -> String {
     let path = temp_png(name);
     RgbaImage::from_pixel(16, 16, Rgba(texel))
         .save(&path)
         .unwrap();
+    let settings = TextureSettings {
+        texture_type,
+        ..Default::default()
+    };
+    set_texture(Path::new(&path), settings).unwrap();
+    refresh(Path::new(&path), "").unwrap();
     path
 }
 
@@ -31,24 +40,26 @@ fn format(renderer: &Renderer, path: &str, kind: TextureKind) -> F {
 }
 
 #[test]
-fn gpu_each_slot_uploads_in_its_block_format_with_every_mip() {
+fn gpu_each_type_uploads_in_its_block_format_where_its_slot_reads_it() {
     let Some(renderer) = crate::render::test_gpu::headless_or_skip(16, 16) else {
         return;
     };
-    let colour = flat("bc_colour", [200, 100, 50, 255]);
-    let clear = flat("bc_clear", [200, 100, 50, 128]);
-    let grey = flat("bc_grey", [90, 90, 90, 255]);
+    let colour = flat("bc_colour", [200, 100, 50, 128], TextureType::Default);
+    let normal = flat("bc_normal", [128, 128, 255, 255], TextureType::NormalMap);
+    let grey = flat("bc_grey", [90, 90, 90, 255], TextureType::SingleChannel);
     let bc = renderer.device.features().contains(FEATURE);
     let cases = [
         (&colour, TextureKind::Colour, F::Bc7RgbaUnormSrgb),
-        (&clear, TextureKind::Colour, F::Bc7RgbaUnormSrgb),
-        (&colour, TextureKind::Normal, F::Bc5RgUnorm),
-        (&grey, TextureKind::Mask, F::Bc4RUnorm),
         (&colour, TextureKind::Mask, F::Bc7RgbaUnormSrgb),
+        (&normal, TextureKind::Normal, F::Bc5RgUnorm),
+        (&grey, TextureKind::Mask, F::Bc4RUnorm),
+        // A slot the type cannot serve uploads uncompressed.
+        (&normal, TextureKind::Colour, F::Rgba8UnormSrgb),
+        (&grey, TextureKind::Data, F::Rgba8UnormSrgb),
     ];
     for (path, kind, want) in cases {
         let want = if bc { want } else { F::Rgba8UnormSrgb };
-        assert_eq!(format(&renderer, path, kind), want, "{kind:?}");
+        assert_eq!(format(&renderer, path, kind), want, "{path} as {kind:?}");
     }
     let none = TextureSettings {
         compression: Compression::None,
@@ -71,8 +82,8 @@ fn gpu_a_compressed_map_draws_like_its_uncompressed_twin() {
         return;
     };
     let texel = [40, 200, 120, 255];
-    let packed = flat("bc_drawn", texel);
-    let raw = flat("bc_drawn_raw", texel);
+    let packed = flat("bc_drawn", texel, TextureType::Default);
+    let raw = flat("bc_drawn_raw", texel, TextureType::Default);
     let none = TextureSettings {
         compression: Compression::None,
         ..Default::default()
@@ -88,12 +99,18 @@ fn gpu_a_compressed_map_draws_like_its_uncompressed_twin() {
     );
 }
 
+/// A one-channel map first loaded as a mask (BC4), then drawn as emissive colour,
+/// draws its grey, not BC4's red alone (#1574's review, finding 2).
 #[test]
-fn gpu_a_one_channel_roughness_map_reads_its_red_channel() {
+fn gpu_a_one_channel_map_reads_red_as_a_mask_and_grey_as_colour() {
     let Some(mut renderer) = crate::render::test_gpu::headless_or_skip(16, 16) else {
         return;
     };
-    let grey = flat("bc_roughness", [180, 180, 180, 255]);
+    let grey = flat(
+        "bc_roughness",
+        [180, 180, 180, 255],
+        TextureType::SingleChannel,
+    );
     let map = MapRef::from(grey.as_str());
     renderer.load_texture_as(&map, TextureKind::Mask);
     let material = MaterialAsset {
@@ -105,4 +122,7 @@ fn gpu_a_one_channel_roughness_map_reads_its_red_channel() {
     let bc = renderer.device.features().contains(FEATURE);
     assert_eq!(uniform.use_roughness_map, if bc { 2 } else { 1 });
     assert_eq!(uniform.use_metallic_map, 0, "no metallic map");
+    let drawn = centre(&mut renderer, &emissive_scene(&grey));
+    let spread = drawn.iter().max().unwrap() - drawn.iter().min().unwrap();
+    assert!(drawn[0] > 100 && spread <= 4, "grey, not red: {drawn:?}");
 }

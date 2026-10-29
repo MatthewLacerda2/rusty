@@ -29,8 +29,8 @@ one by its source path still works.
 | `Assets.SetLightmapUVSettings` | `(path, { generate?, hardAngle?, packMargin? })` | how many of the scene's meshes it re-imported |
 | `Assets.GetModelImportSettings` | `(path)` | `{ scaleFactor }` — a model's Scale Factor (below) |
 | `Assets.SetModelImportSettings` | `(path, { scaleFactor? })` | how many of the scene's meshes it re-imported |
-| `Assets.GetTextureImportSettings` | `(path)` | `{ wrapMode, filterMode, generateMipmaps, compression, maxSize }` — an image's import settings (below) |
-| `Assets.SetTextureImportSettings` | `(path, { wrapMode?, filterMode?, generateMipmaps?, compression?, maxSize? })` | nothing |
+| `Assets.GetTextureImportSettings` | `(path)` | `{ wrapMode, filterMode, generateMipmaps, textureType, compression, maxSize }` — an image's import settings (below) |
+| `Assets.SetTextureImportSettings` | `(path, { wrapMode?, filterMode?, generateMipmaps?, textureType?, compression?, maxSize? })` | nothing |
 
 Returned shape (Lua, 1-indexed arrays):
 
@@ -153,35 +153,46 @@ clamped sampler.
 - `generateMipmaps` — upload a full mip chain (on by default, as in Unity). Off, only
   the full-size image is uploaded, so a tiled surface far away shimmers.
 
+- `textureType` — what the texels hold (#1574), Unity's *Texture Type*; it picks the
+  compressed format, so the import can make it before anything draws:
+
+  | type | format | for |
+  |---|---|---|
+  | `"Default"` | BC7 (a byte a texel), alpha kept, mips averaged in linear light | colour, packed data (glTF's occlusion-roughness-metallic) |
+  | `"NormalMap"` | BC5 (a byte a texel): x and y; the shader rebuilds z | tangent-space normal maps |
+  | `"SingleChannel"` | BC4 (half a byte): red only | roughness, metallic, masks |
+
+  Assigning a `"Default"` image to a material's normal slot (`Material.SetNormalMap`,
+  a material document, a maps recipe, the inspector) sets it to `"NormalMap"` and
+  says so in the console, Unity's *Fix now* done for you; never during Play. A
+  `"Default"` texture is sampled as sRGB colour in a colour slot and raw in a data
+  slot. A texture drawn in a slot its type cannot serve (a normal map as albedo, a
+  single-channel map as colour) is uploaded uncompressed for that use, with one
+  console warning, so it never loses a channel.
 - `compression` — how it is block-compressed on the GPU (#1574), Unity's
   *Compression*: `"None"` (RGBA8, four bytes a texel), `"Normal"` (the default) or
-  `"HighQuality"`. The format follows the slot that first uses the texture, at either
-  level:
-
-  | slot | format |
-  |---|---|
-  | albedo, emissive, UI, particles, shader slots | BC7 (a byte a texel), alpha kept |
-  | normal map | BC5 (a byte a texel): x and y; the shader rebuilds z |
-  | metallic or roughness map whose image is greyscale | BC4 (half a byte): one channel |
-
-  `"HighQuality"` encodes BC7 slower and closer to the source. Unity's `Normal` picks
-  BC1 (half a byte) for an opaque colour map; rusty does not, because the pure-Rust
-  BC1 encoders flatten a block of two contrasting colours (red beside blue) to one.
-  A metallic or roughness map holding different channels (glTF's packed
-  occlusion-roughness-metallic) is compressed as colour is, keeping each channel.
-  Colour stays sRGB. The blocks and every mip are made once, at import, into the
-  project's import cache (`assets/generated/imported/<path>.<kind>.bctex`), and made
-  again only when the image, its compression, its max size, its mipmaps or the
-  encoder change; a game ships the cache. Encoding BC7 is slow, a few seconds for a
-  2048² map spread over every core (Play included: the first draw of a map waits for
-  it), so a project's first import of many large maps takes minutes, once. An image whose (fitted) sides are not
-  multiples of 4 is uploaded uncompressed, as Unity leaves it. On a GPU without BC
-  compression every texture uploads uncompressed, with one console warning.
-  `Debug.Stats().texture_bytes` is what the textures take on the GPU.
+  `"HighQuality"`, which encodes BC7 slower and closer to the source. Unity's
+  `Normal` picks BC1 (half a byte) for an opaque colour map; rusty does not, because
+  the pure-Rust BC1 encoders flatten a block of two contrasting colours (red beside
+  blue) to one. The blocks and every mip are made at import, never at a draw, into
+  the project's import cache (`assets/generated/imported/<path>.bctex`), and made
+  again only when the image, its type, compression, max size or mipmaps, or the
+  encoder change. The editor makes them in the background when an image is added,
+  its settings change or the project opens (the console says each one); entering
+  Play waits for any still stale, as it waits for models; an export makes and ships
+  them, so a shipped game never encodes. Until its copy is made, a texture draws
+  uncompressed. Encoding BC7 is slow, a few seconds for a 2048² map spread over
+  every core, so a project's first import of many large maps takes minutes, once. An
+  image whose (fitted) sides are not multiples of 4 is uploaded uncompressed, as
+  Unity leaves it; a downscale to `maxSize` rounds its sides to multiples of 4. On a
+  GPU without BC compression every texture uploads uncompressed, with one console
+  warning. `Debug.Stats().texture_bytes` is what the textures take on the GPU.
 - `maxSize` — the longest side it is uploaded at (#1574), Unity's *Max Size*: one of
   32, 64, 128, 256, 512, 1024, 2048 (the default), 4096 or 8192. A larger image is
   downscaled at import, its aspect kept (colour in linear light); the file on disk
-  is never changed. Another number is an error naming the list.
+  is never changed. A UI image still measures its slices and tiling in the source
+  image's pixels. Another number is an error naming the list; a sidecar holding one
+  is warned of once and read as 2048.
 
 `SetTextureImportSettings` changes only the keys it is given, writes the sidecar (a
 file with none gets one), and the texture is re-uploaded with the new settings on the
@@ -192,5 +203,6 @@ error naming the known ones. A texture extracted from a converted model
 ```lua no-run
 Assets.SetTextureImportSettings("project/textures/pixel_font.png", { filterMode = "Point", compression = "None" })
 Assets.SetTextureImportSettings("project/textures/floor_albedo.png", { compression = "HighQuality", maxSize = 1024 })
+Assets.SetTextureImportSettings("project/textures/floor_rough.png", { textureType = "SingleChannel" })
 print(Assets.GetTextureImportSettings("project/textures/pixel_font.png").wrapMode)  -- Repeat
 ```

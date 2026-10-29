@@ -56,19 +56,17 @@ pub fn full_chain_len(width: u32, height: u32) -> u32 {
     32 - width.max(height).max(1).leading_zeros()
 }
 
-/// `image` (already fitted) as `kind` compressed with `settings`, every level its
-/// *Generate Mip Maps* asks for; `None` when a side is not a multiple of 4.
-pub(super) fn encode(
-    image: &DynamicImage,
-    settings: &TextureSettings,
-    kind: TextureKind,
-) -> Option<Compressed> {
+/// `image` (already fitted) compressed with `settings`, every level its
+/// *Generate Mip Maps* asks for; `None` when it is left uncompressed (*Compression*
+/// `None`, or a side that is not a multiple of 4).
+pub(super) fn encode(image: &DynamicImage, settings: &TextureSettings) -> Option<Compressed> {
     let (width, height) = (image.width(), image.height());
     if width % 4 != 0 || height % 4 != 0 {
         return None;
     }
+    let format = super::format_of(settings)?;
+    let kind = TextureKind::of_type(settings.texture_type);
     let base = image.to_rgba8();
-    let format = format_for(&base, kind);
     let variant = variant(format, settings.compression, &base);
     let count = match settings.generate_mipmaps {
         true => full_chain_len(width, height),
@@ -86,16 +84,6 @@ pub(super) fn encode(
         height,
         levels,
     })
-}
-
-/// The format a `kind` image holding `texels` compresses to (the module doc's table).
-pub(super) fn format_for(texels: &RgbaImage, kind: TextureKind) -> BlockFormat {
-    let grey = || texels.pixels().all(|p| p[0] == p[1] && p[1] == p[2]);
-    match kind {
-        TextureKind::Normal => BlockFormat::Bc5,
-        TextureKind::Mask if grey() => BlockFormat::Bc4,
-        _ => BlockFormat::Bc7,
-    }
 }
 
 /// The encoder for `format` on `texels`. BC7's profiles are chosen for import

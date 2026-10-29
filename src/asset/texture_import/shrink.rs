@@ -10,20 +10,33 @@ use super::TextureKind;
 use crate::core::color::{linear_to_srgb, srgb_to_linear};
 
 /// `image` downscaled, its aspect kept, until its longer side is at most
-/// `max_size` (Unity's *Max Size*); unchanged when it already fits.
+/// `max_size` (Unity's *Max Size*); unchanged when it already fits. Averaged in
+/// linear light for colour.
 pub fn fit(image: DynamicImage, max_size: u32, kind: TextureKind) -> DynamicImage {
-    let (width, height) = (image.width(), image.height());
-    let longer = width.max(height);
-    if longer <= max_size {
+    let (w, h) = fitted_size(image.width(), image.height(), max_size);
+    if (w, h) == (image.width(), image.height()) {
         return image;
     }
-    let scale = |side: u32| ((u64::from(side) * u64::from(max_size)) / u64::from(longer)).max(1);
-    let (w, h) = (scale(width) as u32, scale(height) as u32);
     let working = to_working(&image.to_rgba8(), kind);
     DynamicImage::ImageRgba8(to_bytes(
         &resize(&working, w, h, FilterType::Triangle),
         kind,
     ))
+}
+
+/// The size a `width`×`height` image is fitted to ([`fit`]). A downscaled side
+/// is rounded to a multiple of 4, at least 4, so it stays compressible: a
+/// 4096×2732 image at 2048 is 2048×1368, not 2048×1366.
+pub(super) fn fitted_size(width: u32, height: u32, max_size: u32) -> (u32, u32) {
+    let longer = width.max(height);
+    if longer <= max_size {
+        return (width, height);
+    }
+    let scale = |side: u32| {
+        let exact = u64::from(side) * u64::from(max_size) / u64::from(longer);
+        ((exact + 2) / 4 * 4).max(4) as u32
+    };
+    (scale(width), scale(height))
 }
 
 /// The next mip level of `level`: half its size on each side, at least 1.

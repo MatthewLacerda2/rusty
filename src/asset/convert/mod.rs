@@ -83,6 +83,7 @@ pub use gate::{
     conversion_allowed, convert_held, convertible_sources, mark_standalone, refresh_changed,
     refresh_sources, PlayHold,
 };
+pub use lock::hold as lock_cache;
 pub use shipped::{cached_without_source, served_from_cache, with_cache_files};
 pub use stage::{textures_dirs, Staging};
 
@@ -123,7 +124,7 @@ pub fn cache_location(path: &Path) -> Result<PathBuf, ImportError> {
 pub fn cache_location_as(path: &Path, suffix: &str) -> Result<PathBuf, ImportError> {
     let root = Path::new(".");
     Ok(match project_relative(root, path)? {
-        Some(rel) => with_suffix(&cache_root(root).join(rel), suffix),
+        Some(rel) => cache_path_as(root, &rel, suffix),
         None => temp_path(path, suffix),
     })
 }
@@ -181,7 +182,13 @@ pub fn refresh(converter: &Converter, source: &Path, out: &Path) -> Result<(), I
 /// whole of `rel` under [`IMPORT_CACHE_DIR`], plus `.glb`. Nothing is stripped or
 /// re-encoded, so distinct sources never share a cache (#1167).
 pub fn cache_path(root: &Path, rel: &Path) -> PathBuf {
-    with_suffix(&cache_root(root).join(rel), ".glb")
+    cache_path_as(root, rel, ".glb")
+}
+
+/// [`cache_path`] for a file named as the source plus `suffix` (a compressed
+/// texture's `.bctex`, #1574).
+pub fn cache_path_as(root: &Path, rel: &Path, suffix: &str) -> PathBuf {
+    with_suffix(&cache_root(root).join(rel), suffix)
 }
 
 /// The import cache folder of the project at `root`.

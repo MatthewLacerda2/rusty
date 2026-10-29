@@ -1,6 +1,8 @@
 //! A compressed texture in the import cache: a small binary file (`.bctex`)
 //! holding the blocks of every level, headed by the [`stamp`] of what made it.
-//! A file whose stamp differs, or that does not parse, is a miss.
+//! A file whose stamp differs, that does not parse, or whose levels do not have
+//! the sizes its format and base size give, is a miss, never an upload of the
+//! wrong length.
 //!
 //! Layout, little-endian: `RBCT`, the stamp (u64), the format (u8, its index in
 //! [`BlockFormat::ALL`]), width, height and level count (u32 each), then each
@@ -8,23 +10,23 @@
 
 use std::path::Path;
 
-use super::encode::{BlockFormat, Compressed};
-use super::{TextureKind, TextureSettings, ENCODER_VERSION};
+use super::encode::{full_chain_len, BlockFormat, Compressed};
+use super::{TextureSettings, ENCODER_VERSION};
 use crate::core::hash::fnv1a64;
 
 const MAGIC: &[u8; 4] = b"RBCT";
 
 /// A digest of everything the blocks depend on: the source's bytes, the settings
-/// that shape them (not wrap or filter, which only the sampler reads), the kind
-/// and the encoder's version.
-pub(super) fn stamp(source: &[u8], settings: &TextureSettings, kind: TextureKind) -> u64 {
+/// that shape them (not wrap or filter, which only the sampler reads) and the
+/// encoder's version.
+pub(super) fn stamp(source: &[u8], settings: &TextureSettings) -> u64 {
     let made_by = format!(
         "{:016x} v{ENCODER_VERSION} {} {} {} {}",
         fnv1a64(source),
+        settings.texture_type.name(),
         settings.compression.name(),
         settings.max_size,
         settings.generate_mipmaps,
-        kind.name(),
     );
     fnv1a64(made_by.as_bytes())
 }
@@ -38,9 +40,17 @@ pub(super) fn read(path: &Path, stamp: u64) -> Option<Compressed> {
     }
     let format = *BlockFormat::ALL.get(usize::from(r.take(1)?[0]))?;
     let (width, height, count) = (r.u32()?, r.u32()?, r.u32()?);
-    let mut levels = Vec::with_capacity(count.min(32) as usize);
-    for _ in 0..count {
+    let whole = width > 0 && height > 0 && width % 4 == 0 && height % 4 == 0;
+    if !whole || count == 0 || count > full_chain_len(width, height) {
+        return None;
+    }
+    let mut levels = Vec::with_capacity(count as usize);
+    for mip in 0..count {
         let len = r.u32()? as usize;
+        let side = |s: u32| (s >> mip).max(1);
+        if len != format.level_bytes(side(width), side(height)) {
+            return None;
+        }
         levels.push(r.take(len)?.to_vec());
     }
     r.0.is_empty().then_some(Compressed {

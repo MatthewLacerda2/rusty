@@ -1,9 +1,13 @@
 //! The copy half of an export: a project's files into the output, in sorted order,
-//! convertible sources left out, each import cache copied under its lock.
+//! convertible sources left out, each import cache copied under its lock (a
+//! model's, and an image's compressed copy, #1574).
 
 use std::path::{Path, PathBuf};
 
-use crate::asset::convert::{cache_path, converter_for, with_cache_files, IMPORT_CACHE_DIR};
+use crate::asset::convert::{
+    cache_path, cache_path_as, converter_for, lock_cache, with_cache_files, IMPORT_CACHE_DIR,
+};
+use crate::asset::texture_import::CACHE_SUFFIX;
 use crate::core::paths;
 
 /// Copy the file `rel` of the project at `root` to the same place under `out`,
@@ -105,4 +109,28 @@ pub(super) fn caches(
         }
     }
     Ok(glbs)
+}
+
+/// Copy the compressed copy (`.bctex`, #1574) of each image in `images`
+/// (project-relative) that has one, under its lock, so the exported game never
+/// encodes. An image left uncompressed has none, and uploads as it is.
+pub(super) fn texture_caches(
+    root: &Path,
+    images: &[PathBuf],
+    out: &Path,
+    written: &mut Vec<String>,
+) -> Result<(), String> {
+    for image in images {
+        let cache = cache_path_as(root, image, CACHE_SUFFIX);
+        let _lock = lock_cache(&cache);
+        if cache.is_file() {
+            file(
+                root,
+                cache.strip_prefix(root).unwrap_or(&cache),
+                out,
+                written,
+            )?;
+        }
+    }
+    Ok(())
 }

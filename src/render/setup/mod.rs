@@ -233,6 +233,7 @@ impl Renderer {
             render_scale: Default::default(),
             gpu_meshes: HashMap::new(),
             gpu_textures: HashMap::new(),
+            texture_fallbacks: HashMap::new(),
             texture_kinds: Default::default(),
             texture_freshness: crate::core::fs::freshness::Freshness::new(),
             grid_vertex_buffer: None,
