@@ -191,3 +191,7 @@ mod ssao_tests;
 #[cfg(test)]
 #[path = "gpu_tests.rs"]
 mod ssao_gpu_tests;
+
+#[cfg(test)]
+#[path = "gpu_upsample_tests.rs"]
+mod ssao_gpu_upsample_tests;
