@@ -7,7 +7,9 @@
 //! and `{"rifle", ammo=30}` stays one mixed table. A table met twice is copied
 //! once (shared and cyclic tables keep their shape). Metatables are not copied;
 //! a function, userdata or thread cannot cross and is an error, and so is a table
-//! nested deeper than [`MAX_DEPTH`] (an error, not a stack overflow).
+//! nested deeper than [`MAX_DEPTH`] (an error, not a stack overflow). The same
+//! copy carries a proxied call's arguments and returns (`script_ref`, #1580): an
+//! entity id is an integer, so it crosses as one.
 
 use std::collections::BTreeMap;
 
@@ -48,7 +50,7 @@ impl Copier<'_> {
             other => {
                 return Err(mlua::Error::RuntimeError(format!(
                     "a {} cannot cross between the scenario VM and the gameplay VM; \
-                     call gameplay code by stepping the world",
+                     pass plain data (numbers, strings, booleans, tables, entity ids)",
                     other.type_name()
                 )))
             }

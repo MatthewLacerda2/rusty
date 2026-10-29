@@ -23,8 +23,13 @@ things follow:
 - `Scene.GetScript(id, name)` answers a live **handle** on the gameplay instance,
   not the table itself: `pc.vy` reads the field now, `pc.marker = {…}` writes it,
   both by value, copied Lua to Lua: integer keys, mixed tables, integers vs
-  floats and `math.huge`/NaN all keep their type; a function field raises an
-  error, and no gameplay metamethod runs. Each read is a **copy**, so assign a
+  floats and `math.huge`/NaN all keep their type, and no gameplay metamethod
+  runs. A function field reads as a proxy that **calls** the game script's
+  function in the gameplay VM, at the current tick (#1580): `pc:Refill(30)` (the
+  instance is `self`) or `pc.Add(2, 3)`, with arguments and returns copied the
+  same way (a function or userdata argument is an error), and a game script
+  error raised as the scenario's, with its traceback. That is how a test reaches
+  a state (refill, give a weapon, start wave N) without playing there. Each read is a **copy**, so assign a
   whole field through the handle: `pc.marker.hits = 5` changes the scenario's
   copy only, while `local m = pc.marker; m.hits = 5; pc.marker = m` writes it.
   Fields are read raw, so one the instance inherits through its metatable (a
