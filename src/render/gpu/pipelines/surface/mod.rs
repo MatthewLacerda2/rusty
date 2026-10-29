@@ -290,3 +290,7 @@ mod priming_tests;
 #[cfg(test)]
 #[path = "../tests/priming/scroll_tests.rs"]
 mod priming_scroll_tests;
+
+#[cfg(test)]
+#[path = "../tests/priming/metal_probe_tests.rs"]
+mod metal_probe_tests;

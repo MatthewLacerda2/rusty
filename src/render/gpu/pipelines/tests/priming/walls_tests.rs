@@ -43,7 +43,7 @@ fn block(scene: &mut Scene, position: Vec3, scale: Vec3, rgb: [f32; 3]) -> u32 {
 
 /// Layered walls under an AO volume whose camera has motion blur `blur`, and the
 /// dissolving wall in front, drawn by `d`'s shader.
-fn walls(d: &Dissolve, blur: bool) -> (RefCell<Scene>, u32) {
+pub(super) fn walls(d: &Dissolve, blur: bool) -> (RefCell<Scene>, u32) {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
     let sun = create_entity(&mut scene, "Sun", Some(Primitive::DirectionalLight));
