@@ -588,9 +588,13 @@ overlay cameras (#1497): a gun shading itself is not worth a full-screen pass.
 Its **quality** sets its cost (see *Quality presets*): the seeded presets' `Medium`
 level traces 8 samples per texel at half resolution on the `Medium` preset, 16 at
 full on `High` and 6 at half on `Low`; `Custom` traces the `samples` knob at the
-`resolution_divisor` knob's resolution. No preset turns it off. Each camera that runs it also draws its visible solids once more, depth only (a prepass), and runs a
-25-tap blur at full resolution. The frame stats report it (`ssao_samples`, and the
-prepass inside `draw_calls` / `triangles`; see `Debug`). `SetSsaoActive(false)` —
+`resolution_divisor` knob's resolution. No preset turns it off. Each camera that runs it also draws its visible solids once more, depth only (a prepass into the
+view's own depth, which the forward pass starts from where depth priming runs), runs a
+25-tap depth-aware blur at the occlusion's resolution, and below full resolution one
+depth-aware upsample to it (4 taps a pixel), as HDRP does (#1578): everything but the
+prepass and the upsample scales with the divisor. The frame stats report it
+(`ssao_samples`, the prepass inside `draw_calls` / `triangles`, and GPU time as
+`ssao_prepass`, `ssao` and `ssao_blur`; see `Debug`). `SetSsaoActive(false)` —
 or intensity `0` — skips every one of those passes.
 
 ### Quality presets
@@ -650,7 +654,7 @@ seeded `Medium` preset's values.
 
 `SetRenderScale(s)` (#1498) is Unity URP's *Render Scale*: the screen's camera stack
 renders the 3D scene at `s` times the surface's resolution, each side rounded (at
-least 1 pixel). Every scene target is that size: colour, depth, the SSAO prepass,
+least 1 pixel). Every scene target is that size: colour, depth (which the SSAO prepass fills),
 motion vectors and the post-FX targets, so the cost of the fill-bound passes follows
 the pixel count. The finished, post-processed image is then upscaled (bilinear, as
 URP's *Auto* filter outside FSR) to the surface **before the UI**, which stays at

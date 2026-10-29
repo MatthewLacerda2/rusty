@@ -91,6 +91,10 @@ pub struct Harness {
     /// builds one, on its first shot, and none at all if it never takes one. The budget
     /// slot it holds is released when the harness is dropped.
     capture: super::capture::CaptureHost,
+    /// The run's render size, as a Game view resolution (#1583): what `Screenshot`,
+    /// `Render` and `Bench` draw at unless a shot names its own. 1280x720 until
+    /// [`set_size`](Self::set_size) (`play --size`).
+    size: (u32, u32),
     /// The run's frame stats, filled by the timing probe and the screenshots.
     pub stats: Rc<RefCell<FrameStats>>,
     /// Refuses provider calls for the run's whole life, before its first step

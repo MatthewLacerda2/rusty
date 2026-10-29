@@ -151,12 +151,20 @@ fn register_harness_stats(lua: &Lua, harness: &Shared, t: &mlua::Table) -> LuaRe
 
 /// Screenshot / AttachPlayerBot — side-effecting harness actions.
 fn register_harness_actions(lua: &Lua, harness: &Shared, t: &mlua::Table) -> LuaResult<()> {
-    // Screenshot(path) -> bool. Renders the current scene/camera offscreen to a
-    // PNG. Returns false (no error) when no GPU/software adapter is available.
+    // Screenshot(path [, { width =, height = }]) -> bool. Renders the current
+    // scene/camera offscreen to a PNG, at the run's size or the one given (#1583).
+    // Returns false (no error) when no GPU/software adapter is available.
     let h = Rc::clone(harness);
     t.set(
         "Screenshot",
-        lua.create_function(move |_, path: String| Ok(h.borrow_mut().screenshot(path)))?,
+        lua.create_function(move |_, (path, size): (String, Option<mlua::Table>)| {
+            let mut h = h.borrow_mut();
+            let size = match size {
+                Some(size) => shot_size(&size)?,
+                None => h.size(),
+            };
+            Ok(h.screenshot_at(path, size))
+        })?,
     )?;
 
     // Render() -> bool. Draws the current frame offscreen, writing nothing, so its
@@ -180,4 +188,21 @@ fn register_harness_actions(lua: &Lua, harness: &Shared, t: &mlua::Table) -> Lua
             Ok(attached)
         })?,
     )
+}
+
+/// A `Screenshot`'s `{ width =, height = }`: both whole pixels, 1 to
+/// `video::MAX_SIDE`, as `play --size` takes them.
+fn shot_size(size: &mlua::Table) -> LuaResult<(u32, u32)> {
+    use crate::core::settings::video::MAX_SIDE;
+    let side = |key: &str| -> LuaResult<u32> {
+        let value: Option<i64> = size.get(key)?;
+        value
+            .and_then(|n| u32::try_from(n).ok())
+            .filter(|n| (1..=MAX_SIDE).contains(n))
+            .ok_or_else(|| {
+                let msg = format!("Harness.Screenshot: {key} must be a whole 1..={MAX_SIDE}");
+                mlua::Error::RuntimeError(msg)
+            })
+    };
+    Ok((side("width")?, side("height")?))
 }

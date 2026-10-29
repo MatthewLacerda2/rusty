@@ -4,7 +4,7 @@
 //! harness through the SAME observe/act surface an agent uses. The loop is:
 //!
 //!   1. write   `scenarios/<name>.lua` in the game project
-//!   2. run     `cargo run --bin play --features dev -- --project <dir> [--scene <path>] <scenario> <out_dir>`
+//!   2. run     `cargo run --bin play --features dev -- --project <dir> [--scene <path>] [--size WxH] <scenario> <out_dir>`
 //!   3. read    `<out_dir>/results.json` + `console.log`
 //!
 //! It plays the project's startup scene, or the `--scene` named. Example scenario
@@ -38,19 +38,32 @@ pub struct RunReport {
     pub passed: bool,
 }
 
+/// How `play` sets a run up beyond the scene: what its command line asked for.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Run<'a> {
+    /// The run's render size (`play --size`, `Harness::set_size`).
+    pub size: Option<(u32, u32)>,
+    /// Capture the whole run's final audio mix to this WAV (`play --record-audio`,
+    /// #1579).
+    pub record_audio: Option<&'a Path>,
+}
+
 /// Load and run `scenario_path` headlessly, writing results into `out_dir`, on the
 /// open project (`core::project`), playing `scene` (project-relative) under the
-/// project's `settings`: a scenario play-tests the game being built. With
-/// `record_audio`, the whole run's final mix is captured to that WAV (#1579).
+/// project's `settings`: a scenario play-tests the game being built, as `run` sets
+/// it up.
 pub fn run(
     scenario_path: &Path,
     out_dir: &Path,
     scene: &str,
     settings: ProjectSettings,
-    record_audio: Option<&Path>,
+    run: Run<'_>,
 ) -> Result<RunReport, String> {
     let mut harness = Harness::in_user_workspace(out_dir, scene, settings)?;
-    if let Some(path) = record_audio {
+    if let Some((width, height)) = run.size {
+        harness.set_size(width, height);
+    }
+    if let Some(path) = run.record_audio {
         harness.record_audio(Some(path))?;
     }
     run_in(harness, scenario_path)

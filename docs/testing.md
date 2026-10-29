@@ -92,6 +92,14 @@ offline changes: `docs/api/Audio.md`, *Capturing the mix*.
   engine's demo scene in memory instead, the fixture the engine's own tests use. Test code
   that names `in_user_workspace` or `scenario::run(` fails `make rules`
   (`test-user-workspace`, #980).
+- **A run renders at a Game view size** (#1583): 1280x720 unless `play --size
+  <W>x<H>` names another (`--size 2940x1388` for a Retina view). Every
+  `Harness.Screenshot`, `Render` and `Bench` frame draws at it, with its targets, post
+  effects and UI sized to it, and the sim lays its UI out on it as a window that size
+  would. One shot can name its own size, as Unity's
+  `ScreenCapture.CaptureScreenshot(path, superSize)` does:
+  `Harness.Screenshot(path, { width = 2940, height = 1388 })`; the run keeps its size.
+  Each side is a whole 1 to 8192 (`video::MAX_SIDE`), else an error.
 - **The test-fixture project** is `tests/fixtures/project/` (#829): the committed
   scenarios, the bot-player script and its `project.rusty`, opened like any other
   project — `cargo run --bin play --features dev -- --project tests/fixtures/project

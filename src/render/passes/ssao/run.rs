@@ -1,7 +1,7 @@
-//! Recording one camera's SSAO: the depth prepass, the occlusion pass and the blur,
-//! ahead of the forward pass in the same encoder.
+//! Recording one camera's SSAO: the depth prepass, the occlusion pass, the blur and
+//! the upsample, ahead of the forward pass in the same encoder.
 
-use super::{SsaoFrame, SsaoTargets};
+use super::{SsaoFrame, SsaoTargets, Stage};
 use crate::render::draw::batch::DrawBatch;
 use crate::render::gpu::pipelines::surface::SolidPass;
 use crate::render::timing::GpuPass;
@@ -24,17 +24,21 @@ impl Renderer {
             .as_ref()
             .is_some_and(|t| t.matches(size.width, size.height, divisor))
         {
-            view.ssao = Some(SsaoTargets::new(self, size.width, size.height, divisor));
+            let full = (size.width, size.height);
+            view.ssao = Some(SsaoTargets::new(self, &view.depth_view, full, divisor));
         }
         let targets = view.ssao.as_ref().expect("allocated above");
         self.queue
             .write_buffer(&targets.uniform, 0, bytemuck::bytes_of(&frame.uniform()));
-        self.record_prepass(encoder, &targets.depth, solids);
-        let timer = &self.gpu_timer;
+        self.record_prepass(encoder, &view.depth_view, solids);
+        let (ssao, timer) = (&self.ssao, &self.gpu_timer);
         let ao = (&targets.ao_group, &targets.raw);
-        self.ssao.fullscreen(encoder, false, ao, timer);
-        let blur = (&targets.blur_group, &targets.ao);
-        self.ssao.fullscreen(encoder, true, blur, timer);
+        ssao.fullscreen(encoder, Stage::Occlusion, ao, timer);
+        let blur = (&targets.blur_group, targets.blur_target());
+        ssao.fullscreen(encoder, Stage::Blur, blur, timer);
+        if let Some(group) = &targets.upsample_group {
+            ssao.fullscreen(encoder, Stage::Upsample, (group, &targets.ao), timer);
+        }
 
         let (w, h) = targets.raw_size;
         let c = &mut self.frame_counters;
@@ -60,7 +64,8 @@ impl Renderer {
         }
     }
 
-    /// The solids' depth alone into `depth`, through the forward vertex stage.
+    /// The solids' depth alone into `depth` (the view's, #1578), through the forward
+    /// vertex stage. A primed forward pass loads it; any other clears it.
     fn record_prepass(
         &self,
         encoder: &mut wgpu::CommandEncoder,
@@ -79,7 +84,7 @@ impl Renderer {
                 }),
                 stencil_ops: None,
             }),
-            timestamp_writes: self.gpu_timer.writes(GpuPass::Ssao),
+            timestamp_writes: self.gpu_timer.writes(GpuPass::SsaoPrepass),
             occlusion_query_set: None,
         });
         pass.set_bind_group(0, &self.global_bind_group, &[]);

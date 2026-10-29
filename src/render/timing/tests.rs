@@ -44,7 +44,9 @@ fn pass_names_are_stable_and_unique() {
         [
             "sky_reflection",
             "shadows",
+            "ssao_prepass",
             "ssao",
+            "ssao_blur",
             "forward",
             "ssr",
             "transparent",
