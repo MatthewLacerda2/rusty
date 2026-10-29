@@ -23,6 +23,7 @@ mod extent;
 mod kinds;
 mod node;
 mod op_info;
+mod param;
 pub mod params;
 #[cfg(test)]
 mod sample;
@@ -33,6 +34,7 @@ pub use catalog::OPS;
 pub use kinds::*;
 pub use node::{ArityError, Node};
 pub use op_info::{Lit, OpInfo, OpParam};
+pub use param::{Link, Param};
 pub use params::*;
 #[cfg(test)]
 pub(crate) use sample::{sample_op, SAMPLE_PATH};

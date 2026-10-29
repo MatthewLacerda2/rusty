@@ -3,6 +3,7 @@
 //! whole tile away, for fractional params too (they round to whole counts).
 
 use super::*;
+use crate::procgen::ops::field::Links;
 use crate::procgen::recipe::ShapeKind::*;
 use crate::procgen::recipe::VoronoiMetric::*;
 use crate::procgen::recipe::{
@@ -10,15 +11,16 @@ use crate::procgen::recipe::{
 };
 
 /// The sampler [`super::super::eval_node`] paints for the generator `op`.
-fn sampler(op: &OpKind, resolution: u32, seed: u64) -> Sampler {
+fn sampler(op: &OpKind, resolution: u32, seed: u64) -> Sampler<'_> {
+    let f = |p: &crate::procgen::recipe::Param| Links::default().field(p);
     match op {
         OpKind::Constant(p) => constant(p),
-        OpKind::Noise(p) => noise(p, seed),
-        OpKind::Voronoi(p) => voronoi(p, seed),
+        OpKind::Noise(p) => noise(p, f(&p.gain), seed),
+        OpKind::Voronoi(p) => voronoi(p, f(&p.randomness), seed),
         OpKind::Gradient(p) => gradient(p.kind),
         OpKind::Wave(p) => wave(p.kind, p.frequency),
         OpKind::Brick(p) => brick(p, seed),
-        OpKind::Shape(p) => shape(p),
+        OpKind::Shape(p) => shape(p, f(&p.softness)),
         OpKind::Checker(p) => checker(p),
         OpKind::WhiteNoise(_) => white_noise(resolution.into(), seed),
         other => panic!("{other:?} is not a generator"),
@@ -54,7 +56,7 @@ fn lattice_ops() -> Vec<OpKind> {
                 scale: s,
                 octaves: 3,
                 lacunarity: s,
-                gain: 0.6,
+                gain: 0.6.into(),
                 seed: 0,
             }));
         }
@@ -69,7 +71,7 @@ fn lattice_ops() -> Vec<OpKind> {
                     scale: s,
                     output,
                     metric,
-                    randomness: s / 8.0,
+                    randomness: (s / 8.0).into(),
                     seed: 0,
                 }));
             }
@@ -110,7 +112,7 @@ fn hard_surface_ops(s: f32) -> Vec<OpKind> {
             kind,
             size,
             roundness,
-            softness,
+            softness: softness.into(),
         }));
     }
     ops
@@ -203,15 +205,8 @@ fn linear_tiling_gradient_is_a_triangle() {
     assert!((f(0.75, 0.3)[0] - 0.5).abs() < 1e-6);
 }
 
-fn grid_voronoi(output: VoronoiOutput) -> Sampler {
-    let op = OpKind::Voronoi(Voronoi {
-        scale: 4.0,
-        output,
-        metric: Euclidean,
-        randomness: 0.0,
-        seed: 0,
-    });
-    sampler(&op, 64, 5)
+fn grid_voronoi(output: VoronoiOutput) -> Sampler<'static> {
+    voronoi::sampler(4.0, output, Euclidean, Field::Const(0.0), 5)
 }
 
 #[test]
@@ -241,7 +236,7 @@ fn ridged_and_turbulence_span_the_unit_range() {
             scale: 4.0,
             octaves: 4,
             lacunarity: 2.0,
-            gain: 0.5,
+            gain: 0.5.into(),
             seed: 0,
         });
         let f = sampler(&op, 64, 1);

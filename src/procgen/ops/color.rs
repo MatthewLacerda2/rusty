@@ -3,11 +3,13 @@
 //! These map pixel→pixel (no neighbourhood), so they run through
 //! [`Image::map_in_place`] — except [`mix`], which combines two equal-sized inputs
 //! (optionally through a third, the per-pixel mask) row by row
-//! ([`Image::for_each_row`]). Both band rows across threads (#1490).
+//! ([`Image::for_each_row`]). Both band rows across threads (#1490). The grading
+//! amounts are [`Field`]s, read per pixel, so a link can vary them (#1494).
 //! All work in unclamped linear float; the bake clamps once at the end.
 
 use super::super::image_buf::{Image, Rgba};
 use super::super::recipe::{BlendMode, RampInterpolation, RampStop};
+use super::field::Field;
 
 /// Invert RGB (`1 - c`); alpha is left as-is.
 pub fn invert(mut img: Image) -> Image {
@@ -16,9 +18,9 @@ pub fn invert(mut img: Image) -> Image {
 }
 
 /// Per-channel gamma (`c^gamma`) on RGB; alpha untouched.
-pub fn gamma(mut img: Image, g: f32) -> Image {
-    let g = g.max(1e-4);
-    img.map_in_place(|p| {
+pub fn gamma(mut img: Image, g: Field) -> Image {
+    img.map_indexed(|i, p| {
+        let g = g.at(i).max(1e-4);
         [
             p[0].max(0.0).powf(g),
             p[1].max(0.0).powf(g),
@@ -49,9 +51,12 @@ pub fn auto_levels(mut img: Image) -> Image {
 }
 
 /// Brightness offset, then contrast scaled about mid-gray (0.5).
-pub fn bright_contrast(mut img: Image, bright: f32, contrast: f32) -> Image {
-    let adj = |c: f32| (c + bright - 0.5) * contrast + 0.5;
-    img.map_in_place(|p| [adj(p[0]), adj(p[1]), adj(p[2]), p[3]]);
+pub fn bright_contrast(mut img: Image, bright: Field, contrast: Field) -> Image {
+    img.map_indexed(|i, p| {
+        let (bright, contrast) = (bright.at(i), contrast.at(i));
+        let adj = |c: f32| (c + bright - 0.5) * contrast + 0.5;
+        [adj(p[0]), adj(p[1]), adj(p[2]), p[3]]
+    });
     img
 }
 
@@ -105,12 +110,12 @@ fn sample_ramp(sorted: &[RampStop], interpolation: RampInterpolation, t: f32) ->
 }
 
 /// Hue rotate (turns), saturation scale, value scale — via RGB→HSV→RGB.
-pub fn hue_sat_value(mut img: Image, hue: f32, sat: f32, value: f32) -> Image {
-    img.map_in_place(|p| {
+pub fn hue_sat_value(mut img: Image, hue: Field, sat: Field, value: Field) -> Image {
+    img.map_indexed(|i, p| {
         let (mut h, mut s, mut v) = rgb_to_hsv(p[0], p[1], p[2]);
-        h = (h + hue).rem_euclid(1.0);
-        s = (s * sat).clamp(0.0, 1.0);
-        v *= value;
+        h = (h + hue.at(i)).rem_euclid(1.0);
+        s = (s * sat.at(i)).clamp(0.0, 1.0);
+        v *= value.at(i);
         let (r, g, b) = hsv_to_rgb(h, s, v);
         [r, g, b, p[3]]
     });

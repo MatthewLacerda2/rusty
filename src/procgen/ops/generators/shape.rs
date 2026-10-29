@@ -4,12 +4,19 @@
 //! centre and meets itself at the wrap.
 
 use super::{gray, Sampler};
+use crate::procgen::ops::field::Field;
 use crate::procgen::recipe::ShapeKind;
 
 /// The shape sampler. `size` is width/height in tiles; `roundness` (clamped to
 /// `[0, 1]`) is a `rounded_rect`'s corner radius as a fraction of its half short
-/// side; `softness` > 0 ramps the mask from 0 at the edge to 1 that far inside.
-pub fn sampler(kind: ShapeKind, size: [f32; 2], roundness: f32, softness: f32) -> Sampler {
+/// side; `softness` > 0 ramps the mask from 0 at the edge to 1 that far inside,
+/// read at each pixel (#1494).
+pub fn sampler(
+    kind: ShapeKind,
+    size: [f32; 2],
+    roundness: f32,
+    softness: Field<'_>,
+) -> Sampler<'_> {
     let half = size.map(|s| s.abs() * 0.5);
     let round = roundness.clamp(0.0, 1.0) * half[0].min(half[1]);
     Box::new(move |u, v| {
@@ -23,7 +30,7 @@ pub fn sampler(kind: ShapeKind, size: [f32; 2], roundness: f32, softness: f32) -
             ShapeKind::RoundedRect => rect(p, half, round),
             ShapeKind::Line => line(p, half),
         };
-        gray(coverage(d, softness))
+        gray(coverage(d, softness.at_pixel(u, v)))
     })
 }
 
@@ -69,7 +76,7 @@ mod tests {
     use super::*;
 
     fn at(kind: ShapeKind, size: [f32; 2], softness: f32, u: f32, v: f32) -> f32 {
-        sampler(kind, size, 0.5, softness)(u, v)[0]
+        sampler(kind, size, 0.5, Field::Const(softness))(u, v)[0]
     }
 
     #[test]

@@ -6,6 +6,7 @@ use std::f32::consts::TAU;
 use super::super::recipe::BlurKind;
 use super::*;
 use crate::procgen::hash;
+use field::Field;
 
 /// 64 across, 16 down: a pixel down is four pixels across in tile units.
 const WIDE: Size = Size::new(64, 16);
@@ -40,7 +41,7 @@ fn bump_to_normal_slopes_in_one_unit_on_both_axes() {
     let sinc = |n: f32| (TAU / n).sin() / (TAU / n);
     let (a, b, strength) = (0.05, 0.03, 1.0);
     let img = Image::fill_uv(WIDE, |u, v| gray(a * (TAU * u).sin() + b * (TAU * v).sin()));
-    let out = vector::bump_to_normal(&img, strength);
+    let out = vector::bump_to_normal(&img, Field::Const(strength));
     for (i, p) in out.pixels().iter().enumerate() {
         let (x, y) = (i % 64, i / 64);
         let (u, v) = ((x as f32 + 0.5) / 64.0, (y as f32 + 0.5) / 16.0);
@@ -55,8 +56,8 @@ fn bump_to_normal_slopes_in_one_unit_on_both_axes() {
     let step_x = Image::fill_uv(WIDE, |u, _| gray(if u < 0.5 { 0.0 } else { 0.1 }));
     let step_y = Image::fill_uv(WIDE, |_, v| gray(if v < 0.5 { 0.0 } else { 0.1 }));
     let (nx, ny) = (
-        vector::bump_to_normal(&step_x, 1.0),
-        vector::bump_to_normal(&step_y, 1.0),
+        vector::bump_to_normal(&step_x, Field::Const(1.0)),
+        vector::bump_to_normal(&step_y, Field::Const(1.0)),
     );
     assert!((nx.get_wrapped(32, 3)[0] - ny.get_wrapped(5, 8)[1]).abs() < 1e-6);
 }
@@ -74,7 +75,7 @@ fn distance_is_measured_in_tile_units_on_each_axis() {
     // A band across (rows 4..12): the nearest outside rows are 3 and 12, each a
     // sixteenth of the tile per row, the edge half a row short.
     let rows = Image::fill_uv(WIDE, |_, v| gray(f32::from((0.25..0.75).contains(&v))));
-    let out = distance::distance(&rows, radius);
+    let out = distance::distance(&rows, Field::Const(radius));
     for y in 0..16i64 {
         let want = match y {
             4..12 => expected((y - 3).min(12 - y) as f32 / 16.0, 0.5 / 16.0, radius),
@@ -84,7 +85,7 @@ fn distance_is_measured_in_tile_units_on_each_axis() {
     }
     // The same band of the tile down (columns 16..48), a sixty-fourth per column.
     let cols = Image::fill_uv(WIDE, |u, _| gray(f32::from((0.25..0.75).contains(&u))));
-    let out = distance::distance(&cols, radius);
+    let out = distance::distance(&cols, Field::Const(radius));
     for x in 0..64i64 {
         let want = match x {
             16..48 => expected((x - 15).min(48 - x) as f32 / 64.0, 0.5 / 64.0, radius),
@@ -101,7 +102,7 @@ fn the_distance_edge_is_half_a_pixel_of_its_own_axis() {
     let img = Image::fill_uv(WIDE, |u, v| {
         gray(f32::from((u * 64.0) as i64 != 10 || (v * 16.0) as i64 != 8))
     });
-    let out = distance::distance(&img, 1.0);
+    let out = distance::distance(&img, Field::Const(1.0));
     assert!((out.get_wrapped(10, 7)[0] - 0.5 / 16.0).abs() < 1e-6);
     assert!((out.get_wrapped(11, 8)[0] - 0.5 / 64.0).abs() < 1e-6);
     assert_eq!(out.get_wrapped(10, 8)[0], 0.0);

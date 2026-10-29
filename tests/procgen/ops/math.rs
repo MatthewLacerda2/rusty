@@ -76,7 +76,9 @@ fn bump_to_normal_tilts_toward_a_rising_height() {
             ),
             node(
                 "n",
-                OpKind::BumpToNormal(BumpToNormal { strength: 4.0 }),
+                OpKind::BumpToNormal(BumpToNormal {
+                    strength: 4.0.into(),
+                }),
                 &["g"],
             ),
         ],
@@ -111,7 +113,7 @@ fn blur_spreads_a_hard_edge_into_a_gradient() {
             node(
                 "b",
                 OpKind::Blur(Blur {
-                    radius: 0.125,
+                    radius: 0.125.into(),
                     kind: BlurKind::Box,
                 }),
                 &["k"],

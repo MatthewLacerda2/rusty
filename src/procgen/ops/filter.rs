@@ -18,6 +18,11 @@
 
 use super::super::image_buf::{Image, Rgba, Size};
 use super::super::recipe::BlurKind;
+use super::field::Field;
+
+mod varying;
+
+pub use varying::blur_varying;
 
 /// A blur radius given as a fraction of the tile, in pixels along an axis of
 /// `pixels`: `radius * pixels`, at most half the tile (a wider window just wraps
@@ -188,7 +193,7 @@ pub fn cavity(img: &Image, radius: (f32, f32)) -> Image {
 /// wrapped samples `radius` (a tile fraction) away — a discrete Laplacian at that
 /// scale. Above mid-grey is convex (raised edges: wear), below is concave (grime).
 /// Bilinear taps keep sub-pixel radii smooth, so it holds across resolutions.
-pub fn curvature(img: &Image, radius: f32, strength: f32) -> Image {
+pub fn curvature(img: &Image, radius: f32, strength: Field) -> Image {
     let h = |u: f32, v: f32| img.sample_bilinear_wrapped(u, v)[0];
     let diag = radius * std::f32::consts::FRAC_1_SQRT_2;
     let ring = [
@@ -203,7 +208,7 @@ pub fn curvature(img: &Image, radius: f32, strength: f32) -> Image {
     ];
     Image::fill_uv(img.size(), |u, v| {
         let mean = ring.iter().map(|(du, dv)| h(u + du, v + dv)).sum::<f32>() / 8.0;
-        let c = 0.5 + strength * (h(u, v) - mean);
+        let c = 0.5 + strength.at_pixel(u, v) * (h(u, v) - mean);
         [c, c, c, 1.0]
     })
 }

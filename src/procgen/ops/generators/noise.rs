@@ -7,6 +7,7 @@
 
 use super::{count, gray, Sampler};
 use crate::procgen::hash;
+use crate::procgen::ops::field::Field;
 use crate::procgen::recipe::NoiseKind;
 
 /// 2-D Perlin with unit gradients peaks at `√½`; this maps `|n|` onto `[0, 1]`.
@@ -32,15 +33,21 @@ impl Octaves {
     }
 }
 
-/// The sampler for a [`NoiseKind`] at `scale` lattice cells per tile. `perlin` is a
+/// The sampler for a [`NoiseKind`] at `scale` lattice cells per tile, its octaves
+/// `(count, lacunarity, gain)`, the gain read at each pixel (#1494). `perlin` is a
 /// single octave whatever `octaves` says.
-pub fn sampler(kind: NoiseKind, scale: f32, octaves: Octaves, seed: u64) -> Sampler {
+pub fn sampler(
+    kind: NoiseKind,
+    scale: f32,
+    (octave_count, lacunarity, gain): (u32, f32, Field<'_>),
+    seed: u64,
+) -> Sampler<'_> {
     let base = count(scale);
-    let octaves = match kind {
-        NoiseKind::Perlin => Octaves::new(1, 2.0, 0.5),
-        _ => octaves,
-    };
     Box::new(move |u, v| {
+        let octaves = match kind {
+            NoiseKind::Perlin => Octaves::new(1, 2.0, 0.5),
+            _ => Octaves::new(octave_count, lacunarity, gain.at_pixel(u, v)),
+        };
         let n = match kind {
             NoiseKind::Perlin | NoiseKind::Fbm => sum(u, v, base, octaves, seed, |n| n) * 0.5 + 0.5,
             NoiseKind::Ridged => sum(u, v, base, octaves, seed, |n| {

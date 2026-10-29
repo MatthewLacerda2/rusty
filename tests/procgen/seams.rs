@@ -65,7 +65,7 @@ pub fn generators() -> Vec<(String, OpKind)> {
                     scale: s,
                     octaves: 3,
                     lacunarity: s,
-                    gain: 0.5,
+                    gain: 0.5.into(),
                     seed: 0,
                 }),
             ));
@@ -76,7 +76,7 @@ pub fn generators() -> Vec<(String, OpKind)> {
                 scale: s,
                 output,
                 metric: VoronoiMetric::Euclidean,
-                randomness,
+                randomness: randomness.into(),
                 seed: 0,
             });
             ops.push((format!("voronoi {output:?} {s}"), op));
@@ -112,7 +112,7 @@ fn mapping_keeps_a_seamless_input_seamless() {
             scale: 3.0,
             octaves: 1,
             lacunarity: 2.0,
-            gain: 0.5,
+            gain: 0.5.into(),
             seed: 0,
         });
         let map = OpKind::Mapping(Mapping {
@@ -137,7 +137,7 @@ fn height_ops_keep_a_seamless_height_seamless() {
     });
     let curvature = OpKind::Curvature(Curvature {
         radius: 0.03,
-        strength: 2.0,
+        strength: 2.0.into(),
     });
     for op in [OpKind::Cavity(Cavity { radius: 0.05 }), curvature] {
         let label = format!("{op:?}");

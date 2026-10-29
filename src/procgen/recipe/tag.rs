@@ -1,11 +1,11 @@
 //! src/procgen/recipe/tag.rs — an [`OpKind`]'s `op` tag, its catalog entry, its
-//! node seed and the inputs it accepts.
+//! node seed, the inputs it accepts and the params a link may drive.
 //!
 //! The tag is the string serde writes as `op`; `catalog_tests.rs` holds the two
 //! equal for every op, so [`OpKind::info`] always finds its row in [`OPS`].
 
 use super::arity::ONE;
-use super::{Arity, OpInfo, OpKind, OPS};
+use super::{Arity, Link, OpInfo, OpKind, Param, OPS};
 
 impl OpKind {
     /// The op's recipe tag (`"noise"`, `"mix"`, …), as serde writes it.
@@ -57,6 +57,41 @@ impl OpKind {
             OpKind::Tile(p) => p.seed,
             _ => 0,
         }
+    }
+
+    /// The node's socketable params with their names (#1494): the ones its
+    /// catalog row marks `socket`, which a link may drive.
+    pub fn sockets(&self) -> Vec<(&'static str, &Param)> {
+        match self {
+            OpKind::Noise(p) => vec![("gain", &p.gain)],
+            OpKind::Voronoi(p) => vec![("randomness", &p.randomness)],
+            OpKind::Shape(p) => vec![("softness", &p.softness)],
+            OpKind::BrightContrast(p) => vec![("bright", &p.bright), ("contrast", &p.contrast)],
+            OpKind::HueSatValue(p) => {
+                vec![("hue", &p.hue), ("sat", &p.sat), ("value", &p.value)]
+            }
+            OpKind::Gamma(p) => vec![("gamma", &p.gamma)],
+            OpKind::BumpToNormal(p) => vec![("strength", &p.strength)],
+            OpKind::Tile(p) => vec![
+                ("jitter", &p.jitter),
+                ("rotation_jitter", &p.rotation_jitter),
+                ("scale_jitter", &p.scale_jitter),
+            ],
+            OpKind::Warp(p) => vec![("strength", &p.strength)],
+            OpKind::NormalBlend(p) => vec![("strength", &p.strength)],
+            OpKind::Blur(p) => vec![("radius", &p.radius)],
+            OpKind::Curvature(p) => vec![("strength", &p.strength)],
+            OpKind::Distance(p) => vec![("radius", &p.radius)],
+            _ => Vec::new(),
+        }
+    }
+
+    /// The node's links, each with the param it drives, in [`Self::sockets`] order.
+    pub fn links(&self) -> Vec<(&'static str, &Link)> {
+        let sockets = self.sockets().into_iter();
+        sockets
+            .filter_map(|(name, p)| Some((name, p.link()?)))
+            .collect()
     }
 
     /// The inputs this node accepts: its [`OPS`] row's, narrowed to one for a unary

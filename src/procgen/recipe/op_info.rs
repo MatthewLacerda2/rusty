@@ -25,6 +25,10 @@ pub struct OpParam {
     /// The accepted tags for an `enum` param; empty otherwise.
     pub values: &'static [&'static str],
     pub default: Option<Lit>,
+    /// Whether the param takes a link to another node as well as a number (#1494):
+    /// the curated, amount-like ones, never a whole count, an enum, a colour or a
+    /// size ([`super::Param`]).
+    pub socket: bool,
 }
 
 /// One op: its `op` tag, menu category, the inputs it accepts, and its params.
@@ -43,6 +47,7 @@ pub(super) const fn req(name: &'static str, ty: &'static str) -> OpParam {
         ty,
         values: &[],
         default: None,
+        socket: false,
     }
 }
 
@@ -52,7 +57,13 @@ pub(super) const fn opt(name: &'static str, ty: &'static str, default: Lit) -> O
         ty,
         values: &[],
         default: Some(default),
+        socket: false,
     }
+}
+
+/// `p`, made socketable: it takes a link as well as a number.
+pub(super) const fn socket(p: OpParam) -> OpParam {
+    OpParam { socket: true, ..p }
 }
 
 pub(super) const fn choice(name: &'static str, values: &'static [&'static str]) -> OpParam {
@@ -61,6 +72,7 @@ pub(super) const fn choice(name: &'static str, values: &'static [&'static str]) 
         ty: "enum",
         values,
         default: None,
+        socket: false,
     }
 }
 

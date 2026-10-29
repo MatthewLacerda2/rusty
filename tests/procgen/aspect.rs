@@ -28,16 +28,20 @@ fn recipes() -> Vec<(String, Vec<Node>)> {
     });
     let after = [
         OpKind::Blur(Blur {
-            radius: 0.02,
+            radius: 0.02.into(),
             kind: BlurKind::Gaussian,
         }),
         OpKind::Cavity(Cavity { radius: 0.03 }),
         OpKind::Curvature(Curvature {
             radius: 0.02,
-            strength: 2.0,
+            strength: 2.0.into(),
         }),
-        OpKind::Distance(Distance { radius: 0.05 }),
-        OpKind::BumpToNormal(BumpToNormal { strength: 0.5 }),
+        OpKind::Distance(Distance {
+            radius: 0.05.into(),
+        }),
+        OpKind::BumpToNormal(BumpToNormal {
+            strength: 0.5.into(),
+        }),
     ];
     for op in after {
         let label = format!("{op:?}");

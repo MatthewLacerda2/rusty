@@ -95,7 +95,7 @@ mod tests {
                     scale: 8.0,
                     octaves: 4,
                     lacunarity: 2.0,
-                    gain: 0.5,
+                    gain: 0.5.into(),
                     seed: 0,
                 }),
                 inputs: vec![],
