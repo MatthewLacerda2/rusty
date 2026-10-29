@@ -8,7 +8,7 @@ use super::select::outline_targets;
 use super::tests::{frame, outline_stats, RES};
 use crate::asset::{JointTransform, SkinData};
 use crate::components::mesh::primitives::generate_sphere;
-use crate::components::{LodGroupComponent, LodLevel, MeshComponent};
+use crate::components::{LodGroupComponent, LodLevel, MeshComponent, ShadowCasting};
 use crate::render::lod::LodSelection;
 use crate::scene::authoring::{create_entity, Primitive};
 use crate::scene::{Camera, Scene};
@@ -114,4 +114,13 @@ fn a_lod_selection_outlines_the_level_the_camera_shows() {
     let finest = LodSelection::finest(&scene);
     assert_eq!(outline_targets(&scene, hat, &finest), vec![lod0]);
     assert_eq!(outline_targets(&scene, lod0, &finest), vec![lod0]);
+}
+
+#[test]
+fn a_shadows_only_selection_rings_nothing() {
+    let (mut scene, [_, _, body, _]) = lod_switched();
+    let lod = LodSelection::for_camera(&scene, &Camera::new(Vec3::Z * 3.0, -90.0, 0.0));
+    assert_eq!(outline_targets(&scene, body, &lod), vec![body]);
+    scene.world.mesh_mut(body).unwrap().cast_shadows = ShadowCasting::ShadowsOnly;
+    assert_eq!(outline_targets(&scene, body, &lod), Vec::<u32>::new());
 }

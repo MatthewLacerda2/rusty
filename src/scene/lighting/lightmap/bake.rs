@@ -104,8 +104,9 @@ pub struct Lightmap {
     pub directions: Vec<Vec3>,
 }
 
-/// Bake every mesh in `scene` that has a usable lightmap UV. Meshes without one still
-/// occlude and bounce light; they just get no lightmap.
+/// Bake every mesh in `scene` that has a usable lightmap UV and a camera sees (a
+/// `ShadowsOnly` one gets none, #1571). Meshes without one still occlude and bounce
+/// light; they just get no lightmap.
 pub fn bake(scene: &BakeScene, settings: &BakeSettings) -> Vec<Lightmap> {
     // A progress nobody holds is never cancelled, so this always runs to the end.
     bake_with_progress(scene, settings, &BakeProgress::default()).unwrap_or_default()
@@ -128,6 +129,7 @@ pub fn bake_with_progress(
         .meshes
         .iter()
         .enumerate()
+        .filter(|(_, mesh)| mesh.cast_shadows.is_visible())
         .filter_map(|(index, mesh)| {
             let size = lightmap_size(mesh, settings.texels_per_unit, max)?;
             Some((index, size, rasterize(mesh, size)))
@@ -207,16 +209,19 @@ fn dominant(indirect: Vec3, indirect_dir: Vec3, light: &TexelLight) -> Vec3 {
 }
 
 /// Every mesh's occluding triangles, for the BVH: a Transparent run lets light
-/// through and bounces none (#1290).
+/// through and bounces none (#1290). The mesh's *Cast Shadows* says who meets the
+/// rest (#1571): bounce rays see all but a `ShadowsOnly` mesh's, shadow rays stop at
+/// all but an `Off` one's.
 pub(super) fn triangles(scene: &BakeScene) -> Vec<Tri> {
     let mut tris = Vec::new();
     for (m, mesh) in scene.meshes.iter().enumerate() {
+        let (seen, blocks) = (mesh.cast_shadows.is_visible(), mesh.cast_shadows.casts());
         for (k, t) in mesh.indices.chunks_exact(3).enumerate() {
             if !mesh.run_at((k * 3) as u32).occludes {
                 continue;
             }
             let [a, b, c] = [t[0], t[1], t[2]].map(|i| mesh.positions[i as usize]);
-            tris.push(Tri::new(a, b, c, m as u32, (k * 3) as u32));
+            tris.push(Tri::new(a, b, c, m as u32, (k * 3) as u32).with(seen, blocks));
         }
     }
     tris

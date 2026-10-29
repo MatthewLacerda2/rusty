@@ -7,7 +7,7 @@ use egui_phosphor::regular as icon;
 
 use self::components::context::gather_context;
 use self::components::{
-    add, audio, camera, gameplay, lod_group, material, particles, prefab, render, ribbons,
+    add, audio, camera, gameplay, lod_group, material, mesh, particles, prefab, render, ribbons,
     settings, transform, ui as ui_cards,
 };
 use self::pending::PendingEdits;
@@ -223,7 +223,7 @@ fn draw_components(
     pending: &mut PendingEdits,
 ) {
     let skin_tool = &mut pending.skin_tool;
-    render::draw_mesh(ui, world, id, &mut editor.is_dirty, skin_tool);
+    mesh::draw_mesh(ui, world, id, &mut editor.is_dirty, skin_tool);
     material::draw_material_card(ui, editor, world, id, materials);
     render::draw_light(ui, world, id, &mut editor.is_dirty);
     lod_group::draw_lod_group(ui, world, id, &mut editor.is_dirty);

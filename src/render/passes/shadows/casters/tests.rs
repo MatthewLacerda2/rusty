@@ -1,4 +1,5 @@
 use super::*;
+use crate::render::gpu::pipelines::winding::is_mirrored;
 use glam::{Mat4, Vec3};
 
 fn at(x: f32, bone_base: u32) -> CasterData {
@@ -8,7 +9,7 @@ fn at(x: f32, bone_base: u32) -> CasterData {
 /// A plain caster key of mesh `m`, drawing indices `0..n`.
 fn mesh(m: &str, n: u32) -> CasterKey {
     CasterKey {
-        mirrored: false,
+        facing: Facing::Front,
         clip: None,
         mesh: MeshId(m.to_string()),
         indices: (0..n).into(),
@@ -84,7 +85,7 @@ fn a_mirrored_caster_draws_apart_from_unmirrored_copies() {
     let twice = Mat4::from_scale(Vec3::new(-1.0, -1.0, 1.0));
     assert!(!is_mirrored(twice), "two flips are a turn");
     let mirrored = CasterKey {
-        mirrored: true,
+        facing: Facing::Mirrored,
         ..mesh("Box", 36)
     };
     let casters = vec![
@@ -93,19 +94,19 @@ fn a_mirrored_caster_draws_apart_from_unmirrored_copies() {
         (mirrored, at(2.0, 0)),
     ];
     let (_, batches) = batch_casters(casters, true);
-    let runs: Vec<_> = batches
-        .iter()
-        .map(|b| (b.key.mirrored, b.counts()))
-        .collect();
-    assert_eq!(runs, [(false, (36, 1)), (true, (36, 2))]);
+    let runs: Vec<_> = batches.iter().map(|b| (b.key.facing, b.counts())).collect();
+    assert_eq!(
+        runs,
+        [(Facing::Front, (36, 1)), (Facing::Mirrored, (36, 2))]
+    );
 }
 
 /// Mirroring sorts before the clip's material, so one clip pipeline's plain and
 /// mirrored versions each bind once, not once per material.
 #[test]
 fn mirrored_runs_sort_before_the_clip_material() {
-    let key = |mirrored, material| CasterKey {
-        mirrored,
+    let key = |mirrored: bool, material| CasterKey {
+        facing: [Facing::Front, Facing::Mirrored][usize::from(mirrored)],
         clip: Some(Clip {
             pipeline: 1,
             material,
@@ -118,7 +119,27 @@ fn mirrored_runs_sort_before_the_clip_material() {
     let (_, batches) = batch_casters(casters, true);
     let order: Vec<_> = batches
         .iter()
-        .map(|b| (b.key.mirrored, b.key.clip.unwrap().material))
+        .map(|b| (b.key.facing, b.key.clip.unwrap().material))
         .collect();
-    assert_eq!(order, [(false, 3), (false, 4), (true, 3), (true, 4)]);
+    let (f, m) = (Facing::Front, Facing::Mirrored);
+    assert_eq!(order, [(f, 3), (f, 4), (m, 3), (m, 4)]);
+}
+
+/// A two-sided caster (#1571) culls nothing, so it draws apart from its mesh's
+/// one-sided copies, mirrored or not: winding no longer matters to it.
+#[test]
+fn a_two_sided_caster_draws_apart_whatever_its_winding() {
+    let flip = Mat4::from_scale(Vec3::new(-1.0, 1.0, 1.0));
+    assert_eq!(Facing::of(flip, true), Facing::Both);
+    assert_eq!(Facing::of(Mat4::IDENTITY, true), Facing::Both);
+    assert_eq!(Facing::of(flip, false), Facing::Mirrored);
+    assert_eq!(Facing::Both.cull_mode(), None);
+    let both = CasterKey {
+        facing: Facing::Both,
+        ..mesh("Card", 6)
+    };
+    let casters = vec![(both, at(0.0, 0)), (mesh("Card", 6), at(1.0, 0))];
+    let (_, batches) = batch_casters(casters, true);
+    let facings: Vec<_> = batches.iter().map(|b| b.key.facing).collect();
+    assert_eq!(facings, [Facing::Front, Facing::Both]);
 }

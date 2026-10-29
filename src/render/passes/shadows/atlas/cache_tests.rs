@@ -19,7 +19,7 @@ fn tile(origin: [u32; 2], size: u32, eye: Vec3) -> Tile {
 
 #[test]
 fn a_baked_tile_stays_fresh_until_its_light_or_place_changes() {
-    let scene = (SceneId::next(), 0);
+    let scene = (SceneId::next(), 0, 0);
     let home = tile([0, 0], 256, Vec3::X);
     let mut cache = StaticTiles::default();
     assert_eq!(cache.stale(scene, &[home]), [0], "nothing baked yet");
@@ -31,7 +31,7 @@ fn a_baked_tile_stays_fresh_until_its_light_or_place_changes() {
     let shrunk = tile([0, 0], 128, Vec3::X);
     assert_eq!(cache.stale(scene, &[moved, shifted, shrunk]), [0, 1, 2]);
     assert_eq!(
-        cache.stale((SceneId::next(), 0), &[home]),
+        cache.stale((SceneId::next(), 0, 0), &[home]),
         [0],
         "another scene"
     );
@@ -39,7 +39,7 @@ fn a_baked_tile_stays_fresh_until_its_light_or_place_changes() {
 
 #[test]
 fn a_bake_forgets_only_the_tiles_it_drew_over() {
-    let scene = (SceneId::next(), 0);
+    let scene = (SceneId::next(), 0, 0);
     let left = tile([0, 0], 256, Vec3::X);
     let right = tile([256, 0], 256, Vec3::Z);
     let mut cache = StaticTiles::default();

@@ -102,8 +102,11 @@ pub(crate) fn surface_pipelines(
     [layout, shadow_layout]: [&wgpu::PipelineLayout; 2],
     cut: bool,
 ) -> surface::SurfacePipelines {
-    use crate::render::passes::shadows::depth_pipeline;
+    use crate::render::passes::shadows::{depth_pipeline, lazy_depth_pipeline};
     use crate::shadergen::assemble::{CUT_PREPASS, CUT_SHADOW};
+    use winding::Facing;
+    let shadow = |facing| depth_pipeline(device, shader, shadow_layout, Some(CUT_SHADOW), facing);
+    let lazy = |f| lazy_depth_pipeline(device, shader, shadow_layout, Some(CUT_SHADOW), f);
     surface::SurfacePipelines {
         forward: make_pipeline(device, shader, format, layout, &forward_spec()),
         velocity: VelocityPipelines::new(|surface| {
@@ -116,8 +119,9 @@ pub(crate) fn surface_pipelines(
         depth_postpass: DepthPostpassPipelines::new(device, shader, layout),
         cut: cut.then(|| surface::CutPipelines {
             prepass: make_prepass(device, shader, layout, CUT_PREPASS),
-            shadow: depth_pipeline(device, shader, shadow_layout, Some(CUT_SHADOW), false),
-            mirrored_shadow: depth_pipeline(device, shader, shadow_layout, Some(CUT_SHADOW), true),
+            shadow: shadow(Facing::Front),
+            mirrored_shadow: shadow(Facing::Mirrored),
+            two_sided_shadow: lazy(Facing::Both),
         }),
     }
 }
