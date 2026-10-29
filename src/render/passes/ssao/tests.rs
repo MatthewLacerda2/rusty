@@ -113,3 +113,13 @@ fn the_player_option_off_skips_ssao() {
     let volume = main.and_then(|id| crate::scene::camera::camera_volume(&scene, id));
     assert_eq!(SsaoPlan::for_volume(volume.as_deref(), graphics), None);
 }
+
+/// #1578: the blur is timed apart from the occlusion, and the upsample with the blur
+/// it finishes (the prepass has its own entry too: `timing::tests`).
+#[test]
+fn each_stage_is_timed_under_its_own_entry() {
+    use super::Stage;
+    use crate::render::timing::GpuPass;
+    let timed = Stage::ALL.map(Stage::timed);
+    assert_eq!(timed, [GpuPass::Ssao, GpuPass::SsaoBlur, GpuPass::SsaoBlur]);
+}
