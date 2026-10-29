@@ -1,6 +1,4 @@
 use super::Application;
-use crate::core::settings::quality::QualityPresets;
-
 fn temp_path(name: &str) -> std::path::PathBuf {
     let file = format!("rusty_quality_{}_{name}.json", std::process::id());
     let path = crate::test_temp::dir().join(file);
@@ -33,10 +31,8 @@ fn presets_round_trip_through_the_bound_file() {
     let path = temp_path("presets");
     let mut app = Application::new();
     app.open(&path).unwrap();
-    let presets = QualityPresets::default();
     let patch = serde_json::json!({ "ui_blur_divisor": 8 });
-    app.set_quality_preset(presets.edited("Ultra", &patch).unwrap())
-        .unwrap();
+    app.edit_quality_preset("Ultra", &patch).unwrap();
     app.remove_quality_preset("Low").unwrap();
     app.select_quality("Ultra").unwrap();
     let mut reopened = Application::new();

@@ -224,7 +224,7 @@ impl GameWorld {
             self.resources.edit_snapshot = Some(SceneSnapshot::capture(&self.world.scene.borrow()));
             self.capture_play_origin();
         }
-        self.apply_project_decal_limits();
+        self.apply_project_settings();
         self.world.scene.borrow_mut().set_playing(true); // the one play state (#1302)
         self.resources
             .console
@@ -271,15 +271,20 @@ impl GameWorld {
                 .bake(&self.world.scene.borrow());
         }
         self.restore_play_origin();
-        self.apply_project_decal_limits(); // a `SetLimits` made in Play ends with it
+        self.apply_project_settings(); // a `SetLimits` made in Play ends with it
         self.restore_edit_runtime(); // after the restore: it binds the edit scene (#1339)
     }
 
-    /// Hold the scene's decals to the project's budgets (#1517): on entering Play,
-    /// on Stop (Unity reverts play-mode changes) and when the editor opens.
-    pub fn apply_project_decal_limits(&self) {
-        let limits = self.resources.application.borrow_mut().decal_limits();
+    /// Run on the project file as it stands (#1517, #1522): hold the scene's decals
+    /// to its budgets and render with its quality presets' running values. On
+    /// entering Play, on Stop (Unity reverts play-mode changes) and when the editor
+    /// opens, so a hand edit to `project.rusty` reaches the next Play.
+    pub fn apply_project_settings(&self) {
+        let mut app = self.resources.application.borrow_mut();
+        let limits = app.decal_limits();
         self.world.scene.borrow_mut().decals.set_limits(limits);
+        let graphics = self.resources.script_manager.graphics_cell();
+        graphics.borrow_mut().quality = app.quality_values();
     }
 }
 

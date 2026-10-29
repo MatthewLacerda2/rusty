@@ -45,6 +45,7 @@ set on that camera entity, in the inspector or the scene file.
 | `Graphics.GetContrast` / `SetContrast` | `()` / `(value)` | `number` |
 | `Graphics.GetCustomEffects` / `SetCustomEffects` | `()` / `({names})` | array of baked postfx module names, in run order (**default empty**; empty with no active volume) |
 | `Graphics.GetDefaultOption` / `SetDefaultOption` | `(name)` / `(name, bool)` | `bool`: the project's default for an option |
+| `Graphics.GetDefaultQuality` / `SetDefaultQuality` | `()` / `(name \| nil)` | `string` or `nil`: the preset a player with no saved choice gets (`project.rusty`'s `"default"`; `nil` selects the middle one; an unknown name raises an error listing them; see *Quality presets*) |
 | `Graphics.GetDepthOfFieldAperture` / `SetDepthOfFieldAperture` | `()` / `(f_stop)` | `number`: Bokeh's f-stop, lower blurs more (clamped 1–32, **default `5.6`**) |
 | `Graphics.GetDepthOfFieldFocalLength` / `SetDepthOfFieldFocalLength` | `()` / `(mm)` | `number`: Bokeh's focal length, longer blurs more (clamped 1–300, **default `50`**) |
 | `Graphics.GetDepthOfFieldFocusDistance` / `SetDepthOfFieldFocusDistance` | `()` / `(metres)` | `number`: Bokeh's distance in focus, along the view axis (clamped to `0.1`–`10000`; `math.huge` is focus at infinity; **default `10`**) |
@@ -116,7 +117,7 @@ set on that camera entity, in the inspector or the scene file.
 | `Graphics.QualityPresets` | `()` | array of the project's presets, in order, each `{ name, ssao, ssr, ... }` with every value it holds (see *Quality presets*) |
 | `Graphics.RemoveQualityPreset` | `(name)` | nothing; removes the project's preset of that name (an unknown one raises an error listing them) |
 | `Graphics.ResetOptions` | `()` | nothing; every option back to the project's default |
-| `Graphics.SetQualityPreset` | `(name, values)` | nothing; writes `values` (any part of a preset's, as `QualityPresets` lists them) over the preset of that name, or adds it over the engine's values (a key a preset has not raises an error) |
+| `Graphics.SetQualityPreset` | `(name, values)` | nothing; writes `values` (any part of a preset's, as `QualityPresets` lists them, `name` included when it is this one's) over the preset of that name, or adds it over the engine's values (a key a preset has not, or another `name`, raises an error) |
 
 ### Post effects
 
@@ -607,7 +608,8 @@ while it is `Custom`.
 The presets are **the game's**, as Unity's Project Settings → Quality levels are:
 `project.rusty` holds them under `"quality"`, in order, each a name and every
 effect's values at the three levels, plus the one a player with no saved choice
-gets (`"default"`; without one, the middle preset):
+gets (`"default"`, which `GetDefaultQuality` / `SetDefaultQuality` read and write;
+without one, the middle preset):
 
 ```json
 "quality": { "default": "Medium", "presets": [
@@ -621,12 +623,22 @@ A new project is seeded with `Low`, `Medium` and `High` (`Medium` first); the ga
 edit, rename, add to or delete them, in the file or through `SetQualityPreset` /
 `RemoveQualityPreset`, which write the file in the editor (in the player and the
 harness they change the running game only). `QualityPresets()` lists them with every
-value; `SetQualityPreset(name, values)` writes only the values it names:
+value; `SetQualityPreset(name, values)` writes only the values it names, and takes a
+listed preset back whole:
 
 ```lua
 Graphics.SetQualityPreset("Ultra", { ssao = { high = { samples = 48 } } })
 Graphics.SetQuality("Ultra")   -- the player's menu entry
+local p = Graphics.QualityPresets()[1]
+p.ssao.low.samples = 5
+Graphics.SetQualityPreset(p.name, p)
 ```
+
+A preset in the file may name only some values, as `SetQualityPreset` may: the rest
+are the seeded `Medium` preset's (a key a preset doesn't have is refused when the
+file loads). The editor re-reads the presets from `project.rusty` at each Play and
+before each write, so a hand edit to the file reaches the next Play, and a save
+made from the editor (a build setting, another preset) keeps it.
 
 `SetQuality(name)` selects one (the editor's **Config** menu lists them too); the
 running preset's values reach the renderer next frame, and bloom reallocates its

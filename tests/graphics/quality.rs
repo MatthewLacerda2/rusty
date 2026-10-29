@@ -77,3 +77,51 @@ fn presets_are_listed_and_authored() {
         assert!(gone.is_err(), "an unknown preset is refused");
     });
 }
+
+/// A listed preset edits back in whole (its `name` key included), but not under
+/// another preset's name.
+#[test]
+fn a_listed_preset_round_trips_into_set_quality_preset() {
+    with_graphics(|lua, _, app| {
+        lua.load(
+            "local p = Graphics.QualityPresets()[1]
+             p.ssao.low.samples = 5
+             Graphics.SetQualityPreset(p.name, p)",
+        )
+        .exec()
+        .unwrap();
+        let low = app.borrow().quality_presets().get("Low").unwrap().values;
+        assert_eq!(low.ssao.low.samples, 5);
+        assert_eq!(low.ssr, seeded("Low").ssr, "the rest is unchanged");
+        let renamed = lua
+            .load("Graphics.SetQualityPreset('High', Graphics.QualityPresets()[1])")
+            .exec();
+        assert!(renamed.unwrap_err().to_string().contains("'High'"));
+    });
+}
+
+/// `SetDefaultQuality` names the preset a first launch gets; `nil` clears it (the
+/// middle one), and an unknown name is refused.
+#[test]
+fn the_default_preset_is_read_and_written() {
+    with_graphics(|lua, _, app| {
+        let get = || {
+            lua.load("return Graphics.GetDefaultQuality()")
+                .eval::<Option<String>>()
+        };
+        assert_eq!(get().unwrap().as_deref(), Some("Medium"));
+        lua.load("Graphics.SetDefaultQuality('high')")
+            .exec()
+            .unwrap();
+        assert_eq!(get().unwrap().as_deref(), Some("High"));
+        assert_eq!(
+            app.borrow().quality(),
+            Some("High"),
+            "no choice: the default runs"
+        );
+        lua.load("Graphics.SetDefaultQuality(nil)").exec().unwrap();
+        assert_eq!(get().unwrap(), None);
+        let err = lua.load("Graphics.SetDefaultQuality('Ultra')").exec();
+        assert!(err.unwrap_err().to_string().contains("Low, Medium, High"));
+    });
+}

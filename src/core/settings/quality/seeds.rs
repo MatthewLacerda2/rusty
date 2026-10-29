@@ -1,7 +1,8 @@
 //! The presets a new project is seeded with (#1522): `Low`, `Medium` and `High`,
 //! each a bundle of every effect's three levels. `Medium`'s `Medium` level is the
 //! old Medium tier's numbers and `High`'s the old High tier's, so a volume at its
-//! default level costs what it did.
+//! default level costs what it did (motion blur's 32 taps are the old default
+//! camera's).
 
 use super::{levels, QualityValues, SsaoQuality, SsrQuality};
 
@@ -39,7 +40,8 @@ pub(super) fn medium() -> QualityValues {
         ssr: levels(march(16, 0.5), march(32, 0.375), march(64, 0.25)),
         bloom_resolution_divisor: levels(4, 2, 2),
         depth_of_field_resolution_divisor: levels(2, 2, 1),
-        motion_blur_samples: levels(8, 16, 32),
+        // 32 at `Medium`: what the default camera ran before presets (#1522).
+        motion_blur_samples: levels(16, 32, 32),
         ui_blur_divisor: 2,
     }
 }

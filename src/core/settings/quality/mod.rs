@@ -16,6 +16,7 @@
 
 use serde::{Deserialize, Serialize};
 
+mod partial;
 mod presets;
 mod seeds;
 
@@ -80,16 +81,23 @@ pub struct SsrQuality {
     pub step_length: f32,
 }
 
-/// Every per-effect quality value one preset holds.
+/// Every per-effect quality value one preset holds. A value a preset leaves out,
+/// whole or in part, is the seeded `Medium` preset's (`partial`).
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
 pub struct QualityValues {
+    #[serde(deserialize_with = "partial::ssao")]
     pub ssao: Levels<SsaoQuality>,
+    #[serde(deserialize_with = "partial::ssr")]
     pub ssr: Levels<SsrQuality>,
     /// Bloom's buffer is the view's size divided by this.
+    #[serde(deserialize_with = "partial::bloom")]
     pub bloom_resolution_divisor: Levels<u32>,
     /// Depth of field blurs at the view's size divided by this (#1445).
+    #[serde(deserialize_with = "partial::depth_of_field")]
     pub depth_of_field_resolution_divisor: Levels<u32>,
     /// Motion blur's taps per pixel (#1436).
+    #[serde(deserialize_with = "partial::motion_blur")]
     pub motion_blur_samples: Levels<u32>,
     /// The UI backdrop blur's working-resolution divisor (#426), a power of two. The
     /// UI has no volume, so it takes one value, not three levels.

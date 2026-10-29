@@ -2,7 +2,8 @@
 //!
 //! `GetQuality` / `SetQuality` select a preset by name (refused, with the list,
 //! when the project has none of that name); `QualityPresets` lists them with their
-//! values; `SetQualityPreset` / `RemoveQualityPreset` author them. The presets live
+//! values; `SetQualityPreset` / `RemoveQualityPreset` author them, and
+//! `GetDefaultQuality` / `SetDefaultQuality` the one a first launch selects. The presets live
 //! on the `Application` resource, which writes `project.rusty` in the editor (in the
 //! player and the harness they change in memory only), and every write puts the
 //! running preset's values into the shared graphics cell the renderer reads next
@@ -53,7 +54,27 @@ pub(super) fn register_quality<'scope>(
     put(
         table,
         "QualityPresets",
-        scope.create_function(|lua, ()| lua.to_value(&app.borrow().quality_presets().presets)),
+        scope.create_function(|lua, ()| {
+            let mut app = app.borrow_mut();
+            app.reread();
+            lua.to_value(&app.quality_presets().presets)
+        }),
+    )?;
+    put(
+        table,
+        "GetDefaultQuality",
+        scope.create_function(|_, ()| Ok(app.borrow_mut().default_quality())),
+    )?;
+    put(
+        table,
+        "SetDefaultQuality",
+        scope.create_function(|_, name: Option<String>| {
+            let mut app = app.borrow_mut();
+            app.set_default_quality(name.as_deref())
+                .map_err(|e| refused("SetDefaultQuality", e))?;
+            sync(graphics, &app);
+            Ok(())
+        }),
     )?;
     register_authoring(scope, table, graphics, app)
 }
@@ -72,9 +93,7 @@ fn register_authoring<'scope>(
         scope.create_function(|lua, (name, values): (String, mlua::Value)| {
             let patch: serde_json::Value = lua.from_value(values)?;
             let mut app = app.borrow_mut();
-            let preset = app.quality_presets().edited(&name, &patch);
-            let preset = preset.map_err(|e| refused("SetQualityPreset", e))?;
-            app.set_quality_preset(preset)
+            app.edit_quality_preset(&name, &patch)
                 .map_err(|e| refused("SetQualityPreset", e))?;
             sync(graphics, &app);
             Ok(())

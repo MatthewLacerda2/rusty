@@ -96,3 +96,28 @@ fn an_edit_writes_only_what_it_names() {
     let fresh = presets.edited("Ultra", &serde_json::json!({})).unwrap();
     assert_eq!(fresh.values, QualityValues::default());
 }
+
+/// A preset that names only some values loads, the rest the seeded `Medium`'s; a
+/// file without `"default"` selects the middle preset.
+#[test]
+fn a_partial_preset_loads_over_the_seeded_medium_values() {
+    let text = r#"{ "presets": [
+        { "name": "Low" },
+        { "name": "Ultra", "ssao": { "high": { "samples": 48 } } },
+        { "name": "High" } ] }"#;
+    let presets: QualityPresets = serde_json::from_str(text).unwrap();
+    assert_eq!(presets.default, None);
+    assert_eq!(presets.initial().unwrap().name, "Ultra", "the middle one");
+    let ultra = presets.get("Ultra").unwrap().values;
+    let medium = QualityValues::default();
+    assert_eq!(ultra.ssao.high.samples, 48);
+    assert_eq!(
+        ultra.ssao.high.resolution_divisor,
+        medium.ssao.high.resolution_divisor
+    );
+    assert_eq!(ultra.ssao.low, medium.ssao.low);
+    assert_eq!(ultra.ssr, medium.ssr);
+    let typo = r#"{ "presets": [ { "name": "X", "ssao": { "hihg": {} } } ] }"#;
+    let err = serde_json::from_str::<QualityPresets>(typo).unwrap_err();
+    assert!(err.to_string().contains("ssao.hihg"), "{err}");
+}

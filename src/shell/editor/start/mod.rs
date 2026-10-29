@@ -74,7 +74,7 @@ fn prepare(
     if let Err(err) = bound {
         game.console().borrow_mut().error(err);
     }
-    game.apply_project_decal_limits(); // edit mode runs on them too (#1517)
+    game.apply_project_settings(); // edit mode runs on them too (#1517)
     if let Some(warning) = opened.engine.warning() {
         game.console()
             .borrow_mut()

@@ -16,6 +16,9 @@
 //!   player selected (persisted in `Storage`, not the file): `quality`.
 //! * **The project's decal budgets** (#1517), under `"decals"`: read, never written
 //!   here, so an edit to the file is what the next Play applies (and Stop restores).
+//!   They and the quality presets are re-read from the bound file at each Play and
+//!   before each write (`reread`), so a hand edit reaches the running editor and a
+//!   save never erases it.
 //! * **The quit request** — `Application.Quit()` only *records* that the game asked to
 //!   quit. What that means is the host's call: the player closes the window, the editor
 //!   stops Play (Unity ignores `Quit` in the editor), and the headless harness ends the
@@ -48,8 +51,8 @@ use crate::core::settings::decals::DecalLimits;
 use crate::core::settings::graphics_options::{GraphicsOption, GraphicsOptions};
 use crate::core::settings::quality::QualityPresets;
 
-mod decals;
 mod quality;
+mod reread;
 
 /// The startup scene when none is configured: the seeded demo scene. Kept equal to
 /// `scene::DEFAULT_SCENE_PATH` (a unit test pins it) without `core` importing `scene`.
@@ -107,9 +110,9 @@ pub struct Application {
     quality_selected: Option<String>,
     /// The project's decal budgets (#1517) as last read or set.
     decal_limits: DecalLimits,
-    /// The bound file's text the budgets were last parsed from, good or bad: the
-    /// same text again is not re-parsed, so its warnings are not repeated.
-    decals_read_from: Option<String>,
+    /// The bound file's text the budgets and presets were last parsed from, good or
+    /// bad: the same text again is not re-parsed, so its warnings are not repeated.
+    read_from: Option<String>,
     /// `Some` once bound to a file via [`Application::open`]: setters then write it.
     path: Option<PathBuf>,
     quit_requested: bool,
@@ -132,8 +135,8 @@ impl Application {
     /// the settings back into it.
     pub fn open(&mut self, path: impl Into<PathBuf>) -> Result<(), String> {
         let path = path.into();
-        // Read once and parse that text, so the text kept for `decal_limits` is the
-        // one the budgets came from.
+        // Read once and parse that text, so the text kept for `reread` is the one
+        // the budgets and presets came from.
         let read = match std::fs::read_to_string(&path) {
             Ok(text) => Ok(Some(text)),
             Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(None),
@@ -148,7 +151,7 @@ impl Application {
         (self.build, self.graphics_defaults) = (file.build, file.graphics_options);
         self.quality = file.quality;
         self.decal_limits = file.decals;
-        self.decals_read_from = text;
+        self.read_from = text;
         Ok(())
     }
 
@@ -205,8 +208,11 @@ impl Application {
     }
 
     /// Write the settings into the bound project file, keeping the rest of it. A
-    /// no-op when unbound.
-    fn save(&self) -> Result<(), String> {
+    /// no-op when unbound. The presets written are the ones [`reread`](Self::reread)
+    /// just took from the file (a preset edit rereads before it edits), so a save
+    /// never writes back presets from before a hand edit.
+    fn save(&mut self) -> Result<(), String> {
+        self.reread();
         let Some(path) = &self.path else {
             return Ok(());
         };

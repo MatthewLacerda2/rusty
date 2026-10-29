@@ -3,20 +3,15 @@
 //! build settings; the choice is the player's, persisted in `Storage` by the host
 //! (`core::settings::store_quality`), never in the file.
 
+use serde_json::Value;
+
 use super::Application;
-use crate::core::settings::quality::{QualityPreset, QualityPresets, QualityValues};
+use crate::core::settings::quality::{QualityPresets, QualityValues};
 
 impl Application {
-    /// The project's quality presets.
+    /// The project's quality presets, as last read ([`reread`](Self::reread)).
     pub fn quality_presets(&self) -> &QualityPresets {
         &self.quality
-    }
-
-    /// Replace the presets (an unbound run: what opening the project read), writing
-    /// the bound file (if any) once.
-    pub fn set_quality_presets(&mut self, presets: QualityPresets) -> Result<(), String> {
-        self.quality = presets;
-        self.save()
     }
 
     /// The name of the preset that runs: the player's choice while it exists, else
@@ -54,8 +49,12 @@ impl Application {
         self.quality_selected = saved;
     }
 
-    /// Add `preset`, or replace the one of its name, writing the bound file.
-    pub fn set_quality_preset(&mut self, preset: QualityPreset) -> Result<(), String> {
+    /// Write `patch` (any part of a preset's values) over the preset called `name`,
+    /// or over the engine's values for a new one, as the bound file holds it now,
+    /// and write the file (`Graphics.SetQualityPreset`).
+    pub fn edit_quality_preset(&mut self, name: &str, patch: &Value) -> Result<(), String> {
+        self.reread();
+        let preset = self.quality.edited(name, patch)?;
         self.quality.set(preset);
         self.save()
     }
@@ -63,9 +62,33 @@ impl Application {
     /// Remove the preset called `name`, writing the bound file; a name no preset
     /// has is refused with the list. Removing the running one runs the initial one.
     pub fn remove_quality_preset(&mut self, name: &str) -> Result<(), String> {
+        self.reread();
         if !self.quality.remove(name) {
             return Err(self.quality.unknown(name));
         }
+        self.save()
+    }
+
+    /// The preset a player with no saved choice gets, as the file names it
+    /// (`"default"`); `None` selects the middle one.
+    pub fn default_quality(&mut self) -> Option<String> {
+        self.reread();
+        self.quality.default.clone()
+    }
+
+    /// Name the preset a player with no saved choice gets (`None`: the middle
+    /// one), writing the bound file; a name no preset has is refused with the list.
+    pub fn set_default_quality(&mut self, name: Option<&str>) -> Result<(), String> {
+        self.reread();
+        let named = match name {
+            Some(name) => Some(
+                self.quality
+                    .get(name)
+                    .ok_or_else(|| self.quality.unknown(name))?,
+            ),
+            None => None,
+        };
+        self.quality.default = named.map(|p| p.name.clone());
         self.save()
     }
 }

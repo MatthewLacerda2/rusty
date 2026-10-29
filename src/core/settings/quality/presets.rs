@@ -5,7 +5,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use super::{seeds, QualityValues};
+use super::{partial, seeds, QualityValues};
 
 /// One named preset: what a player's Low / Medium / High menu entry selects.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -20,8 +20,9 @@ pub struct QualityPreset {
 #[serde(default)]
 pub struct QualityPresets {
     /// The preset a player with no saved choice gets; `None` (or a name no preset
-    /// has) selects the middle one.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    /// has) selects the middle one. A file that leaves it out reads as `None`, not
+    /// as the seeded `Medium`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub default: Option<String>,
     pub presets: Vec<QualityPreset>,
 }
@@ -97,11 +98,20 @@ impl QualityPresets {
     /// The preset `name` becomes when `patch` (a JSON object shaped like
     /// [`QualityValues`], any part of it) is written over it: over the preset of
     /// that name, else over the engine's own values for a new one. A key the values
-    /// don't have, or a value of the wrong shape, is refused.
+    /// don't have, or a value of the wrong shape, is refused. A `name` key may come
+    /// along (what [`QualityPresets`]' listing holds, so a listed preset edits back
+    /// in), but only `name` itself.
     pub fn edited(&self, name: &str, patch: &Value) -> Result<QualityPreset, String> {
+        let mut patch = patch.clone();
+        let named = patch.as_object_mut().and_then(|o| o.remove("name"));
+        if let Some(named) =
+            named.filter(|n| !n.as_str().is_some_and(|n| n.eq_ignore_ascii_case(name)))
+        {
+            return Err(format!("the values are named {named}, not '{name}'"));
+        }
         let base = self.get(name).map(|p| p.values).unwrap_or_default();
         let mut merged = serde_json::to_value(base).map_err(|e| e.to_string())?;
-        merge(&mut merged, patch, "")?;
+        partial::merge(&mut merged, &patch, "")?;
         let values = serde_json::from_value(merged).map_err(|e| e.to_string())?;
         Ok(QualityPreset {
             name: name.to_string(),
@@ -116,20 +126,4 @@ impl QualityPresets {
             self.names().join(", ")
         )
     }
-}
-
-/// Write `patch` over `base` key by key, `path` naming where for a refusal.
-fn merge(base: &mut Value, patch: &Value, path: &str) -> Result<(), String> {
-    let (Value::Object(base), Value::Object(patch)) = (&mut *base, patch) else {
-        *base = patch.clone();
-        return Ok(());
-    };
-    for (key, value) in patch {
-        let at = format!("{path}{key}");
-        let slot = base
-            .get_mut(key)
-            .ok_or_else(|| format!("a quality preset has no '{at}'"))?;
-        merge(slot, value, &format!("{at}."))?;
-    }
-    Ok(())
 }
