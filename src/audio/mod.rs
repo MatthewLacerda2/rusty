@@ -11,7 +11,8 @@
 //! ducking, stepped by sim time; every group sends into one reverb bus that reverb
 //! zones tune from the listener's position (`reverb/`, #469). The speaker mode (#546, `speaker.rs`) shapes the
 //! output for the listening setup: per voice here, on the summed signal at the
-//! device's output stage.
+//! device's output stage. A capture (`capture/`, #1579) writes the final mix to a WAV,
+//! rendering it offline in step with the sim when there is no device.
 //!
 //! Layering: the maestro and the backend trait live here so both the windowed app
 //! and the (device-free) harness can construct a maestro. The real kira device
@@ -26,6 +27,7 @@
 #![deny(clippy::unwrap_used)]
 
 pub mod backend;
+pub mod capture;
 pub mod device;
 pub mod introspection;
 pub mod maestro;

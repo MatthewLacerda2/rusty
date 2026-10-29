@@ -40,14 +40,19 @@ pub struct RunReport {
 
 /// Load and run `scenario_path` headlessly, writing results into `out_dir`, on the
 /// open project (`core::project`), playing `scene` (project-relative) under the
-/// project's `settings`: a scenario play-tests the game being built.
+/// project's `settings`: a scenario play-tests the game being built. With
+/// `record_audio`, the whole run's final mix is captured to that WAV (#1579).
 pub fn run(
     scenario_path: &Path,
     out_dir: &Path,
     scene: &str,
     settings: ProjectSettings,
+    record_audio: Option<&Path>,
 ) -> Result<RunReport, String> {
-    let harness = Harness::in_user_workspace(out_dir, scene, settings)?;
+    let mut harness = Harness::in_user_workspace(out_dir, scene, settings)?;
+    if let Some(path) = record_audio {
+        harness.record_audio(Some(path))?;
+    }
     run_in(harness, scenario_path)
 }
 

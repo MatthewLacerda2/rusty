@@ -207,7 +207,7 @@ fn run_frame<F: Frontend>(
     if let Some(clipboard) = shell.clipboard.as_mut() {
         input::clipboard::apply_request(clipboard, &mut game.input().borrow_mut());
     }
-    audio::apply_mix(game);
+    audio::apply_mix(game, f64::from(delta_time));
     frontend.on_play_transition(game, transition);
     shell.cursor.sync(frontend.cursor(game), &shell.window);
 

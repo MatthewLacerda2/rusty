@@ -27,16 +27,50 @@
 use mlua::{Lua, Table};
 
 use crate::audio::device::decode::decode_file;
-use zimmer::level::{Layer, Profile, Profiler, Span};
+use zimmer::level::{Cut, Layer, Profile, Profiler, Span};
+
+/// The most sections a `sections` grid may cut a clip into.
+pub const MAX_SECTIONS: f64 = 10_000.0;
 
 /// Measure the clip at `path` over the PCM the engine's decoder produces for it —
 /// any format `ClipCache` plays (`.wav`, `.ogg`, `.mp3`). A file carries no
-/// arrangement, so its sections fall on zimmer's fixed grid.
-pub fn measure_file(path: &str) -> Result<Profile, String> {
+/// arrangement, so its sections fall on a fixed grid: every `grid` seconds when
+/// given (`Sound.Level`'s `sections`, #1579), else zimmer's own.
+pub fn measure_file(path: &str, grid: Option<f64>) -> Result<Profile, String> {
     let clip = decode_file(path).map_err(|e| format!("cannot decode '{path}': {e}"))?;
-    let mut profiler = Profiler::new(usize::from(clip.channels()), clip.sample_rate());
+    let (channels, rate) = (usize::from(clip.channels()), clip.sample_rate());
+    let seconds = clip.samples().len() as f64 / (channels.max(1) as f64 * f64::from(rate));
+    let cuts = match grid {
+        Some(every) => grid_cuts(every, seconds)?,
+        None => Vec::new(),
+    };
+    let mut profiler = Profiler::sectioned(channels, rate, cuts);
     profiler.feed(clip.samples());
-    Ok(profiler.finish())
+    let mut profile = profiler.finish();
+    // A grid row is unlabelled, like zimmer's own grid; the cuts only carried a name
+    // because a `Cut` must.
+    profile.sections.iter_mut().for_each(|s| s.label = None);
+    Ok(profile)
+}
+
+/// Cuts every `every` seconds across a clip `seconds` long, the last at or past its end.
+fn grid_cuts(every: f64, seconds: f64) -> Result<Vec<Cut>, String> {
+    if !(every.is_finite() && every > 0.0) {
+        return Err(format!(
+            "sections must be a positive number of seconds, not {every}"
+        ));
+    }
+    let count = (seconds / every).ceil();
+    if count > MAX_SECTIONS {
+        return Err(format!(
+            "sections of {every}s cut this clip into over {MAX_SECTIONS} rows"
+        ));
+    }
+    let cut = |k: u32| Cut {
+        label: String::new(),
+        end_seconds: f64::from(k) * every,
+    };
+    Ok((1..=count as u32).map(cut).collect())
 }
 
 /// A whole report: the clip's row, its `sections`, and its `tracks`.

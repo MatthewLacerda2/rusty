@@ -53,6 +53,16 @@ things follow:
   are refused for the whole run, before its first `Harness.Step` too (CLAUDE.md,
   *Provider calls are authoring, never gameplay*).
 
+**Hearing a run** (#1579). `Harness.RecordAudio([path])` starts recording the
+game's final audio mix to a 48 kHz float WAV (`audio.wav` by default; a relative
+`path` is under the run's output folder) and returns its path; `Harness.StopAudio()`
+closes it and returns the path again, and `play --record-audio <path>` records the
+whole run. The harness mixes offline, one fixed tick at a time, so the capture
+needs no sound card and two runs of one scenario write byte-identical files; a
+capture still running when the scenario ends is closed with the results. Measure it
+with `Sound.Level(path, { sections = seconds })`. What a capture taps and what going
+offline changes: `docs/api/Audio.md`, *Capturing the mix*.
+
 ## Rules
 - Test and fixture files are capped at **150 lines** by the size gate
   (`tools/lint`), except a `<x>_tests.rs` sibling of `<x>.rs` (or of a `<x>/`

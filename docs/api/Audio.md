@@ -29,7 +29,8 @@ voice; on the **headless harness the audio backend is a no-op**, so playback mak
 sound but every action is still recorded in the maestro's introspection log (so a
 play-test can assert *what* played, *where*, and *by whom* — one-shots included).
 Dev builds read it back with `Debug.AudioEvents` and the live per-source roster with
-`Debug.AudioVoices` (see `Debug.md`).
+`Debug.AudioVoices` (see `Debug.md`), and record what reached the output with a
+[capture](#capturing-the-mix).
 
 | Function | Signature | Returns |
 |---|---|---|
@@ -251,4 +252,35 @@ the groups'.
 Audio.SetGroupReverbSend("SFX", 0.6)   -- gunshots ring in tunnels too
 local r = Audio.GetReverbState()
 print(r.decay_time, r.wet, r.zones)    -- e.g. 2.8  0.55  1 inside "B Tunnels"
+```
+
+### Capturing the mix
+
+**The agent cannot hear**, and the event log says only *which* sounds played and
+*when*. A capture writes the **final mix** to a WAV — every voice after gain, pan,
+occlusion, its group's volume and filters, the reverb bus and the
+[speaker mode](#speaker-mode)'s compressor and limiter, exactly what the device gets —
+so "the sound gets choppy when I walk into the next room" becomes a file
+[`Sound.Level`](Sound.md#how-loud-it-came-out-378) measures, before and after a fix.
+
+| Function | Signature | Returns |
+|---|---|---|
+| `Audio.StartCapture` *(dev-only)* | `(path)` | — starts recording the final mix to a WAV at `path` (relative to the project); a capture already running, or a file that cannot be created, is an error |
+| `Audio.StopCapture` *(dev-only)* | `()` | `string` — stops the capture and closes the file, returning its path; nothing running is an error |
+
+The file is **32-bit float stereo**, so nothing is quantised and a peak past full
+scale stays readable, at the device's rate in the windowed editor. With no device (a
+scenario, a box with no sound card) the engine mixes **offline at 48 kHz**, in step
+with the engine's time: a scenario's capture is a pure function of the run, and two
+runs of one scenario write byte-identical files. Going offline restarts every
+`AudioSource` that was playing from its first sample; after that the run keeps the
+real mixer, so a one-shot stays live (in `Debug.AudioVoices`) until it finishes
+sounding. One capture runs at a time. In a scenario, `Harness.RecordAudio` /
+`Harness.StopAudio` and `play --record-audio <path>` do the same with the file under
+the run's output folder (`docs/testing.md`).
+
+```lua no-run
+Audio.StartCapture("captures/door.wav")
+-- … walk through the door …
+local level = Sound.Level(Audio.StopCapture(), { sections = 0.25 })
 ```

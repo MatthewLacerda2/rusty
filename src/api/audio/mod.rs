@@ -19,11 +19,14 @@ use std::cell::RefCell;
 
 use mlua::Lua;
 
+mod frame;
 mod groups;
 mod occlusion;
 mod reverb;
 mod snapshots;
 mod volume;
+
+pub use frame::push_frame;
 
 use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;

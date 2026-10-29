@@ -20,7 +20,7 @@ use super::level::{band_table, measure_file};
 /// Measure the clips at `a` and `b` and report how `a` differs from `b`.
 pub fn diff(lua: &Lua, a: &str, b: &str) -> mlua::Result<Table> {
     let whole = |path: &str| {
-        measure_file(path)
+        measure_file(path, None)
             .map(|profile| profile.whole)
             .map_err(mlua::Error::RuntimeError)
     };
