@@ -9,7 +9,8 @@ every Play), so the two things that are tables *of* the gameplay VM reach it
 by value: `Scene.GetScript` answers a live handle whose fields read and write
 as plain data (each read a copy: assign a whole field, since a nested edit
 changes the copy only; an inherited field reads `nil`; no `==`, `#` or
-`pairs` on the handle), and a callback a scenario hands `Timer` or `Tween` is refused,
+`pairs` on the handle) and whose functions, called, run in the gameplay VM
+(`ref:Refill(30)`, arguments and returns copied the same way), and a callback a scenario hands `Timer` or `Tween` is refused,
 since the gameplay tick would never run it. A scenario's world enters Play on
 its first `Harness.Step`, so a timer, tween or `Random.SetSeed` before that is
 refused (Play would wipe it). A scenario is a test, so the
