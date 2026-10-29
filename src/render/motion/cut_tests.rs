@@ -1,5 +1,6 @@
 //! What counts as a cut in the motion-vector history (#1435), adapter-free: Play and
-//! Stop, and a camera swapped in at another's place in the stack.
+//! Stop, and a camera swapped in at another's place in the stack; and the game time
+//! the history hands the vertex stage (#1524).
 
 use glam::{Mat4, Vec3};
 
@@ -50,4 +51,24 @@ fn a_camera_swapped_in_at_the_same_place_has_no_last_frame() {
     h.end();
     let prev = h.begin(k, &[(Some(1), at(3.0)), (Some(3), at(31.0))]);
     assert_eq!(prev, [at(2.0), at(30.0)]);
+}
+
+#[test]
+fn game_time_is_last_frames_and_a_cut_forgets_it() {
+    let (k, mut h) = (
+        super::tests::key(Scene::new().id(), Some(1)),
+        MotionHistory::default(),
+    );
+    let mut frame = |key, now: f32| {
+        h.begin(key, &one(at(0.0)));
+        let prev = h.game_time(now);
+        h.end();
+        prev
+    };
+    assert_eq!(frame(k, 2.5), 2.5, "no last frame: this frame's time");
+    assert_eq!(frame(k, 3.25), 2.5);
+    assert_eq!(frame(k, 4.0), 3.25);
+    let cut = super::tests::key(Scene::new().id(), Some(1));
+    assert_eq!(frame(cut, 7.0), 7.0, "a new scene is a cut");
+    assert_eq!(frame(cut, 7.5), 7.0);
 }
