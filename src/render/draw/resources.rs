@@ -99,7 +99,9 @@ impl Renderer {
             Vec::new()
         };
         for id in scene.world.ids_with_mesh() {
-            if !scene.world.is_active_in_hierarchy(id) {
+            // An inactive mesh, or a shadows-only one: it casts, no camera draws it (#1571).
+            let mode = scene.world.mesh(id).map(|m| m.cast_shadows);
+            if !scene.world.is_active_in_hierarchy(id) || mode.is_some_and(|m| !m.is_visible()) {
                 continue;
             }
             // During a static-cubemap capture, gather only static geometry — dynamic

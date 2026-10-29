@@ -4,7 +4,7 @@
 
 crate::core::named_enum! {
     /// How a mesh takes part in shadows — Unity's *Cast Shadows*. `On` is the
-    /// default and is never written to a file.
+    /// default, and what a file without the field reads.
     #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub enum ShadowCasting {
         /// Casts from its front faces, as every mesh did before the switch.
@@ -32,7 +32,7 @@ impl ShadowCasting {
         self != Self::ShadowsOnly
     }
 
-    /// Whether the default, which a file leaves out.
+    /// Whether the default.
     pub fn is_on(&self) -> bool {
         *self == Self::On
     }

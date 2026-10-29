@@ -1,5 +1,5 @@
-//! src/render/gpu/pipelines/surface.rs — the pipelines a material's authored surface
-//! shader draws with (#396): Unity's Material → Shader.
+//! The pipelines a material's authored surface shader draws with (#396): Unity's
+//! Material → Shader.
 //!
 //! A material names a surface shader (`MaterialAsset::shader`, e.g. `"enemy_toon"`);
 //! the module is `<name>.wgsl` in the authored workspace (`assets/shaders`, where
@@ -62,19 +62,19 @@ pub(crate) struct SurfacePipelines {
     pub transparent: super::TransparentPipelines,
     /// Its translucents' depth postpass (#1523), built on first draw.
     pub depth_postpass: super::DepthPostpassPipelines,
-    /// The depth passes of a variant whose blocks cut fragments or move the UVs or the
-    /// vertices (#648, #1499, #1524); `None` draws its depth with the standard pipelines.
+    /// Its depth passes when its blocks cut or move (#648); `None` uses the standard ones.
     pub cut: Option<CutPipelines>,
 }
 
-/// The depth-only pipelines of a variant that cuts, moves its UVs or moves its
-/// vertices (#648, #1499, #1524); the shadow ones go through the shadow pass's clip
-/// layout, `mirrored_shadow` with the winding flipped (#1134).
+/// The depth-only pipelines of a variant that cuts, moves its UVs or its vertices
+/// (#648, #1499, #1524); the shadow ones through the shadow pass's clip layout, one
+/// per [`Facing`](super::winding::Facing) (#1134; the two-sided one lazy, #1571).
 pub(crate) struct CutPipelines {
     /// The SSAO prepass, through the forward layout.
     pub prepass: wgpu::RenderPipeline,
     pub shadow: wgpu::RenderPipeline,
     pub mirrored_shadow: wgpu::RenderPipeline,
+    pub two_sided_shadow: super::LazyPipeline,
 }
 
 struct Slot {

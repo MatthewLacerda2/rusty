@@ -291,6 +291,7 @@ scene.entities[].material.materials[]: string
 scene.entities[].material: option
 scene.entities[].mesh.asset_ref: option
 scene.entities[].mesh.asset_ref: string
+scene.entities[].mesh.cast_shadows: enum On|Off|TwoSided|ShadowsOnly
 scene.entities[].mesh.primitive_type: string
 scene.entities[].mesh.skeleton.bodies: map
 scene.entities[].mesh.skeleton.bodies{key}: string

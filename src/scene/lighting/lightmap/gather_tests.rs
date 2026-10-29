@@ -5,7 +5,7 @@ use glam::{Vec2, Vec3};
 
 use super::tests::{floor, mean, settings};
 use super::*;
-use crate::components::{LightComponent, LightMode};
+use crate::components::{LightComponent, LightMode, MeshComponent, ShadowCasting};
 use crate::scene::authoring::{primitive_mesh_component, Primitive};
 use crate::scene::Scene;
 
@@ -93,6 +93,32 @@ fn gather_takes_static_meshes_and_baked_in_lights_only() {
         lightmap_size(&gathered.meshes[0], 4.0, 64).is_some(),
         "a Box has UV2"
     );
+}
+
+/// A static mesh set to cast no shadows (#1571) is still lightmapped, but blocks no
+/// baked light: none of its runs occludes.
+#[test]
+fn a_mesh_casting_no_shadows_receives_but_never_occludes() {
+    let mut scene = Scene::new();
+    let mut casts = Vec::new();
+    for mode in [ShadowCasting::On, ShadowCasting::Off] {
+        let id = scene.add_entity(mode.name().to_string());
+        let mesh = primitive_mesh_component(Primitive::Box).expect("a Box");
+        let mesh = MeshComponent {
+            cast_shadows: mode,
+            ..mesh
+        };
+        scene.world.set_mesh(id, Some(mesh));
+        scene.world.set_static(id, true);
+        casts.push(mode.casts());
+    }
+    let gathered = BakeScene::gather(&scene, &|_| None);
+    let occludes: Vec<bool> = gathered
+        .meshes
+        .iter()
+        .map(|m| m.runs.iter().all(|r| r.occludes))
+        .collect();
+    assert_eq!(occludes, casts);
 }
 
 #[test]

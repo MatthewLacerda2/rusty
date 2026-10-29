@@ -96,7 +96,8 @@ pub struct BakeScene {
 
 impl BakeScene {
     /// Flatten `scene`: the drawn runs of every active static mesh that is not a light
-    /// gizmo, each with its own material (#1290), the active `Mixed` / `Baked` lights,
+    /// gizmo, each with its own material (#1290) — none occluding when the mesh casts
+    /// no shadows (#1571) — the active `Mixed` / `Baked` lights,
     /// and the ambient sky. `map_average` turns a texture path into its average linear
     /// colour (`None` when it cannot be read); it is asked once per path.
     pub fn gather(scene: &Scene, map_average: &dyn Fn(&MapRef) -> Option<Vec3>) -> Self {
@@ -116,9 +117,14 @@ impl BakeScene {
             if mesh.is_skinned() {
                 continue;
             }
-            let (indices, runs) = drawn_runs(scene, id, &mesh, &map_average);
+            let (indices, mut runs) = drawn_runs(scene, id, &mesh, &map_average);
             if indices.is_empty() {
                 continue;
+            }
+            // A mesh that casts no shadow blocks no baked light either (#1571); it
+            // still receives its lightmap.
+            if !mesh.cast_shadows.casts() {
+                runs.iter_mut().for_each(|run| run.occludes = false);
             }
             let matrix = scene.world.local_to_world(id);
             let normal_matrix = matrix.inverse().transpose();

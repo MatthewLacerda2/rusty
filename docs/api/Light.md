@@ -56,6 +56,24 @@ into the atlas as it does into the cascades: cutout and dissolving materials cli
 their shadow, skinned meshes cast in their animated pose. Lit particles are not
 shadowed.
 
+### Cast Shadows
+
+Each mesh says whether and how it casts, Unity's *Cast Shadows*
+(`MeshRenderer.shadowCastingMode`): the Mesh component's `cast_shadows` field,
+written with `Component.Set(id, "Mesh", { cast_shadows = "Off" })`
+([`Component`](Component.md)), read with `Component.Get`, shown in the Inspector's
+Mesh card and saved with the scene and its prefabs.
+
+| `cast_shadows` | What it does |
+|---|---|
+| `"On"` *(default)* | casts from its front faces |
+| `"Off"` | casts nothing: not in the cascades, the atlas, their static bakes, or the lightmap bake (still lit, still lightmapped) |
+| `"TwoSided"` | casts from both faces: a one-sided card or `Plane` shadows whichever way it faces the light |
+| `"ShadowsOnly"` | casts as `"On"`, but no camera draws it: an invisible shadow stand-in |
+
+Every shadow path reads it on its next frame, a static mesh's cached shadow bake
+included. How a mesh *receives* shadows is not a switch yet.
+
 **Mode** is Unity's Light Mode and decides what the bakes (`Lighting.BakeLightmaps`
 for static surfaces, the light-probe bake for dynamic objects) do with the light, and
 whether it is drawn live:

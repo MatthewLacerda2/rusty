@@ -65,9 +65,9 @@ pub struct MeshComponent {
     /// the vertices to move. Every other mesh keeps 1; saved only when it isn't 1.
     #[serde(default = "one", skip_serializing_if = "is_one")]
     pub subdivisions: u32,
-    /// Whether and how it casts shadows (#1571): Unity's *Cast Shadows*. Saved only
-    /// when it isn't `On`.
-    #[serde(default, skip_serializing_if = "ShadowCasting::is_on")]
+    /// Whether and how it casts shadows (#1571): Unity's *Cast Shadows*. Always
+    /// written, so `Component.Get` reads `On` too; a file without it reads `On`.
+    #[serde(default)]
     pub cast_shadows: ShadowCasting,
     #[serde(skip)]
     pub vertices: Vec<Vertex>,
