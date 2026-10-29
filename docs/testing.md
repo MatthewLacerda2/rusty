@@ -27,7 +27,8 @@ things follow:
   runs. A function field reads as a proxy that **calls** the game script's
   function in the gameplay VM, at the current tick (#1580): `pc:Refill(30)` (the
   instance is `self`) or `pc.Add(2, 3)`, with arguments and returns copied the
-  same way (a function or userdata argument is an error), and a game script
+  same way (a function or userdata argument is an error; one returned is an
+  error raised after the call ran, so its side effects stand), and a game script
   error raised as the scenario's, with its traceback. That is how a test reaches
   a state (refill, give a weapon, start wave N) without playing there. Each read is a **copy**, so assign a
   whole field through the handle: `pc.marker.hits = 5` changes the scenario's

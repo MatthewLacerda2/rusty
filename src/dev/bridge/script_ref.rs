@@ -13,7 +13,8 @@
 //! method: `ref.Refill(30)` with plain arguments, `ref:Refill(30)` with the
 //! instance itself as `self`. It runs at the current tick, between the
 //! scenario's steps, inside an API scope like a lifecycle hook's; arguments and
-//! returns are copied, so a function or userdata on either side is an error, and a
+//! returns are copied, so a function or userdata on either side is an error (a
+//! return that cannot cross fails after the call ran: its side effects stand), and a
 //! game script error comes back as the scenario's, with its traceback. The call is
 //! part of the scenario's own script, so a run stays a pure function of (seed,
 //! scenario).
@@ -31,7 +32,7 @@ use mlua::{
     UserData, UserDataMethods, Value,
 };
 
-use super::copy::copy;
+use super::copy::{copy, Copier};
 use crate::app::GameWorld;
 
 /// A scenario's handle on one live script instance (see the module doc).
@@ -79,8 +80,15 @@ impl ScriptRef {
         args: MultiValue,
         lua: &Lua,
     ) -> LuaResult<MultiValue> {
+        let context = |what: String| {
+            mlua::Error::RuntimeError(format!(
+                "script '{}' on entity {}: {key} {what}",
+                self.name, self.id
+            ))
+        };
         self.with(true, |glua, t| {
             let func: Function = glua.registry_value(func)?;
+            let mut into_game = Copier::new(glua);
             let mut crossed = MultiValue::new();
             for (i, arg) in args.iter().enumerate() {
                 let is_self = i == 0
@@ -88,16 +96,22 @@ impl ScriptRef {
                 crossed.push_back(if is_self {
                     Value::Table(t.clone())
                 } else {
-                    copy(arg, glua)?
+                    into_game.value(arg)?
                 });
             }
-            let returns = func.call::<MultiValue>(crossed).map_err(|e| {
-                mlua::Error::RuntimeError(format!(
-                    "script '{}' on entity {}: {key} failed: {e}",
-                    self.name, self.id
-                ))
-            })?;
-            returns.iter().map(|v| copy(v, lua)).collect()
+            let returns = func
+                .call::<MultiValue>(crossed)
+                .map_err(|e| context(format!("failed: {e}")))?;
+            let mut into_scenario = Copier::new(lua);
+            returns
+                .iter()
+                .map(|v| into_scenario.value(v))
+                .collect::<LuaResult<_>>()
+                .map_err(|e| {
+                    context(format!(
+                        "returned a value that cannot cross back; the call itself ran ({e})"
+                    ))
+                })
         })
     }
 }

@@ -8,8 +8,10 @@
 //! once (shared and cyclic tables keep their shape). Metatables are not copied;
 //! a function, userdata or thread cannot cross and is an error, and so is a table
 //! nested deeper than [`MAX_DEPTH`] (an error, not a stack overflow). The same
-//! copy carries a proxied call's arguments and returns (`script_ref`, #1580): an
-//! entity id is an integer, so it crosses as one.
+//! copy carries a proxied call's arguments and returns (`script_ref`, #1580), one
+//! [`Copier`] for all of a call's arguments and one for all its returns, so a
+//! table passed twice arrives as one table: an entity id is an integer, so it
+//! crosses as one.
 
 use std::collections::BTreeMap;
 
@@ -22,15 +24,12 @@ pub const MAX_DEPTH: usize = 200;
 
 /// `value`, rebuilt in `into` (see the module doc).
 pub fn copy(value: &Value, into: &Lua) -> LuaResult<Value> {
-    Copier {
-        into,
-        seen: BTreeMap::new(),
-        depth: 0,
-    }
-    .value(value)
+    Copier::new(into).value(value)
 }
 
-struct Copier<'a> {
+/// One copy into `into` that may span several values: a table met in any of
+/// them is copied once.
+pub struct Copier<'a> {
     into: &'a Lua,
     /// Source tables already copied, by address, so each is copied once.
     seen: BTreeMap<usize, Table>,
@@ -38,8 +37,16 @@ struct Copier<'a> {
     depth: usize,
 }
 
-impl Copier<'_> {
-    fn value(&mut self, value: &Value) -> LuaResult<Value> {
+impl<'a> Copier<'a> {
+    pub fn new(into: &'a Lua) -> Self {
+        Self {
+            into,
+            seen: BTreeMap::new(),
+            depth: 0,
+        }
+    }
+
+    pub fn value(&mut self, value: &Value) -> LuaResult<Value> {
         Ok(match value {
             Value::Nil => Value::Nil,
             Value::Boolean(b) => Value::Boolean(*b),
@@ -49,8 +56,9 @@ impl Copier<'_> {
             Value::Table(t) => Value::Table(self.table(t)?),
             other => {
                 return Err(mlua::Error::RuntimeError(format!(
-                    "a {} cannot cross between the scenario VM and the gameplay VM; \
-                     pass plain data (numbers, strings, booleans, tables, entity ids)",
+                    "a {} (or a table holding one) cannot cross between the scenario VM and \
+                     the gameplay VM: only plain data does (numbers, strings, booleans, \
+                     tables of those, entity ids)",
                     other.type_name()
                 )))
             }
