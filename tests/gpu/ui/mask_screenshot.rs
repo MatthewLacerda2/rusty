@@ -23,8 +23,10 @@ fn black_canvas() -> (Scene, u32) {
     (scene, root)
 }
 
+/// Red-dominant, not pure: the red box's plastic reflects a little sky at an angle
+/// (#1543; green 54 on lavapipe, 58 on Metal), while the half-sky rim stays out.
 fn is_red(p: [u8; 3]) -> bool {
-    p[0] > 150 && p[1] < 60 && p[2] < 60
+    p[0] > 150 && p[0] > p[1].max(p[2]).saturating_add(150)
 }
 
 #[test]
