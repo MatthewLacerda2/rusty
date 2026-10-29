@@ -9,11 +9,16 @@
 //! *state*; the draw pass reads it. The sim never touches the GPU — that
 //! decoupling is what keeps headless play deterministic.
 //!
+//! A `Local` emitter's particles are carried with it (`components::particle`'s
+//! `space`): at the head of its tick, on every spawn, and once more by
+//! [`carry_local_particles`] after `LateUpdate` and the bone pass, so a gun moved
+//! there draws with its flash still on it this frame.
+//!
 //! Determinism: all randomness comes from each emitter's seeded stream (reset from
 //! `seed` on the first tick of a Play session) and emitters run in entity order,
 //! so a fixed-timestep replay is bit-for-bit identical.
 
-use glam::Vec3;
+use glam::{Mat4, Vec3};
 
 use crate::app::resources::Resources;
 use crate::app::world::World;
@@ -40,7 +45,7 @@ pub(in crate::app) fn tick_particles(world: &mut World, res: &mut Resources) {
                 continue;
             }
             // World space, as `render::passes::particles::draw` reads it (#1196).
-            let origin = scene.world.world_position(id);
+            let origin = scene.world.local_to_world(id);
             scene
                 .world
                 .take_particles(id)
@@ -62,6 +67,22 @@ pub(in crate::app) fn tick_particles(world: &mut World, res: &mut Resources) {
     dispatch_sub_emitters(world, &events);
 }
 
+/// Bring every active `Local` emitter's live particles to where its entity stands
+/// now: the scripts' `LateUpdate` and the bone pass run after the tick, and what
+/// they move is what draws.
+pub(in crate::app) fn carry_local_particles(world: &mut World, _res: &mut Resources) {
+    let mut scene = world.scene.borrow_mut();
+    for id in scene.world.ids_with_particles() {
+        if !scene.world.is_active_in_hierarchy(id) {
+            continue;
+        }
+        let frame = scene.world.local_to_world(id);
+        if let Some(mut emitter) = scene.world.particles_mut(id) {
+            emitter.carry_to(frame);
+        }
+    }
+}
+
 /// Fire each queued sub-emitter: the target emits its `burst_count` at the
 /// event's position. A target whose entity is gone, inactive or has no emitter is
 /// skipped. The new particles first move on the next tick.
@@ -74,9 +95,10 @@ fn dispatch_sub_emitters(world: &mut World, events: &[SubEmitEvent]) {
         if !scene.world.contains(e.target) || !scene.world.is_active_in_hierarchy(e.target) {
             continue;
         }
+        let frame = scene.world.local_to_world(e.target);
         if let Some(mut target) = scene.world.particles_mut(e.target) {
             let count = target.burst_count;
-            target.emit_sub(e.position, e.velocity, count);
+            target.emit_sub(frame, e.position, e.velocity, count);
         }
     }
 }
@@ -84,11 +106,12 @@ fn dispatch_sub_emitters(world: &mut World, events: &[SubEmitEvent]) {
 /// Run one emitter's spawn + integrate + collide + age pipeline for this frame.
 fn simulate_emitter(
     emitter: &mut ParticleEmitterComponent,
-    origin: Vec3,
+    origin: Mat4,
     dt: f32,
     physics: &Physics,
 ) {
     emitter.ensure_initialized();
+    emitter.carry_to(origin);
 
     if emitter.active {
         emit(emitter, origin, dt);
@@ -98,7 +121,7 @@ fn simulate_emitter(
 
 /// Spawn new particles for this frame per the emit mode (continuous rate or a
 /// one/looping burst), honouring the max-particle cap.
-fn emit(emitter: &mut ParticleEmitterComponent, origin: Vec3, dt: f32) {
+fn emit(emitter: &mut ParticleEmitterComponent, origin: Mat4, dt: f32) {
     let to_spawn = match emitter.emit_mode {
         EmitMode::Continuous => {
             emitter.runtime.spawn_accum += emitter.rate * dt;

@@ -4,12 +4,14 @@
 //! one-off emissions (`Emit`/`Burst`), gate the emitter (`SetActive`), retune the
 //! continuous rate (`SetRate`), reshape it per shot (`SetShape`, `SetDirection`,
 //! the start ranges, `SetColor`, `SetSubEmitter` — #439), choose how it is drawn
-//! (`SetRenderMode`, `SetFlipbook`, `SetSoft`, `SetLit`, … — #440, in `render`), and
+//! (`SetRenderMode`, `SetFlipbook`, `SetSoft`, `SetLit`, … — #440, in `render`), pick
+//! the simulation space (`SetSimulationSpace` — #1529, in `space`), and
 //! read/clear the live state. Emission goes
 //! through the component's own seeded spawn path (`emit_at`), so a scripted burst
 //! stays bit-for-bit reproducible alongside the sim's own emission.
 
 mod render;
+mod space;
 
 use std::cell::RefCell;
 
@@ -36,6 +38,7 @@ pub fn register<'scope>(
     register_start(scope, &table, scene)?;
     register_state(scope, &table, scene)?;
     render::register(scope, &table, scene)?;
+    space::register(scope, &table, scene)?;
 
     lua.globals()
         .set("Particles", table)
@@ -56,7 +59,7 @@ fn register_emission<'scope>(
         scope.create_function(|_, (id, count): (EntityArg, u32)| {
             let id = id.live("Particles", "Emit")?;
             let mut scene = scene.borrow_mut();
-            let origin = scene.world.world_position(id);
+            let origin = scene.world.local_to_world(id);
             let spawned = scene
                 .world
                 .particles_mut(id)
@@ -73,7 +76,7 @@ fn register_emission<'scope>(
         scope.create_function(|_, id: EntityArg| {
             let id = id.live("Particles", "Burst")?;
             let mut scene = scene.borrow_mut();
-            let origin = scene.world.world_position(id);
+            let origin = scene.world.local_to_world(id);
             let spawned = scene.world.particles_mut(id).map(|mut p| {
                 let burst = p.burst_count;
                 p.emit_at(origin, burst)

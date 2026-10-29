@@ -443,6 +443,7 @@ scene.entities[].particles.shape<Cone>.angle: f32
 scene.entities[].particles.shape<Cone>.radius: f32
 scene.entities[].particles.shape<Hemisphere>.radius: f32
 scene.entities[].particles.shape<Sphere>.radius: f32
+scene.entities[].particles.simulation_space: enum World|Local
 scene.entities[].particles.size: any
 scene.entities[].particles.size_over_life.keys: seq
 scene.entities[].particles.size_over_life.keys[].t: f32

@@ -1,7 +1,7 @@
 //! src/editor/inspector/components/particles/ — the Particle System inspector card.
 //!
 //! Edits every serde-persisted field of `ParticleEmitterComponent`: emission mode,
-//! blend, collision response, the rate/burst/cap counts, the shape and per-particle
+//! simulation space, blend, collision response, the rate/burst/cap counts, the shape and per-particle
 //! motion, the start ranges (`start.rs`), the over-life curves and gradient and
 //! the sub-emitters (`over_life.rs`), how the particles are drawn (`render.rs`),
 //! restitution, and the deterministic seed. The live particle count (transient runtime) is shown
@@ -21,6 +21,7 @@ use crate::scene::authoring::ComponentKind;
 use egui_phosphor::regular as icon;
 use widgets::{clamped, combo, drag_u32};
 
+use crate::components::SimulationSpace;
 use crate::editor::inspector::components::card::component_card;
 use crate::scene::authoring::particles as particle_ops;
 use crate::scene::{CollisionResponse, EmitMode, ParticleEmitterComponent};
@@ -78,7 +79,8 @@ pub fn draw(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, is_dirty:
     }
 }
 
-/// Emission controls: mode, looping, rate, burst count and particle cap.
+/// Emission controls: mode, looping, simulation space, rate, burst count and
+/// particle cap.
 fn draw_emission(ui: &mut egui::Ui, cx: &mut Cx<'_>, p: &ParticleEmitterComponent) -> bool {
     let mut changed = false;
     let mut mode = p.emit_mode;
@@ -97,6 +99,12 @@ fn draw_emission(ui: &mut egui::Ui, cx: &mut Cx<'_>, p: &ParticleEmitterComponen
     let mut looping = p.looping;
     if ui.checkbox(&mut looping, "Looping").changed() {
         apply(cx, |c| particle_ops::set_looping(c, looping));
+        changed = true;
+    }
+    let mut space = p.simulation_space;
+    let spaces = SimulationSpace::ALL.map(|s| (s, s.name()));
+    if combo(ui, "Simulation Space", &mut space, &spaces) {
+        apply(cx, |c| particle_ops::set_simulation_space(c, space));
         changed = true;
     }
     let mut rate = p.rate;

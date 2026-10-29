@@ -24,12 +24,14 @@
 mod render;
 mod runtime;
 mod shape;
+mod space;
 mod spawn;
 mod sub_emitter;
 
 pub use render::{Flipbook, ParticleRender, ParticleRenderMode};
 pub use runtime::{EmitterRuntime, Particle, SubEmitEvent};
 pub use shape::{EmitFrom, EmitShape};
+pub use space::SimulationSpace;
 pub use sub_emitter::{SubEmitTrigger, SubEmitters};
 
 use glam::Vec3;
@@ -92,6 +94,10 @@ pub struct ParticleEmitterComponent {
     /// `true` re-emits forever; `false` is one-shot (burst fires once / continuous
     /// runs until the emitter is disabled).
     pub looping: bool,
+    /// Whether live particles stay where they were born (`World`) or move, turn
+    /// and scale with the emitter (`Local`, #1529).
+    #[serde(default)]
+    pub simulation_space: SimulationSpace,
 
     /// Where particles are born and which way they launch, around `direction`.
     #[serde(default)]
@@ -103,7 +109,8 @@ pub struct ParticleEmitterComponent {
     pub lifetime: Range,
     /// Initial speed (units/second) along the shape's launch direction.
     pub speed: Range,
-    /// Shape axis / base emission direction (world space; normalised at spawn).
+    /// Shape axis / base emission direction (normalised at spawn): world space,
+    /// or the emitter's own space for a `Local` emitter.
     pub direction: Vec3,
     /// Extra random jitter on the launch direction in `[0, 1]` (0 = none).
     pub spread: f32,
@@ -168,6 +175,7 @@ impl Default for ParticleEmitterComponent {
             burst_count: 32,
             max_particles: 256,
             looping: true,
+            simulation_space: SimulationSpace::World,
             shape: EmitShape::Point,
             emit_from: EmitFrom::Volume,
             lifetime: Range::constant(1.5),

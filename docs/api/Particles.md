@@ -29,6 +29,8 @@ actually spawned (the `max_particles` cap may swallow some).
 | `Particles.SetFlipbook` | `(id, columns, rows, opts?)` | — |
 | `Particles.SetSoft` | `(id, distance)` | — (world units, clamped ≥ 0; 0 = off) |
 | `Particles.SetLit` | `(id, lit)` | — |
+| `Particles.SetSimulationSpace` | `(id, space)` | — (`"World"` or `"Local"`, any case; an unknown name is an error) |
+| `Particles.GetSimulationSpace` | `(id)` | space name, or `nil` without an emitter |
 
 **Ranges.** `SetLifetime`/`SetSpeed`/`SetSize` take `min, max`: each particle
 draws its start value uniformly between them from the emitter's seeded stream.
@@ -45,6 +47,26 @@ impact normal is one `SetDirection` call:
 Particles.SetShape(sparks, "Hemisphere", { radius = 0.05 })
 Particles.SetDirection(sparks, nx, ny, nz)
 Particles.Burst(sparks)
+```
+
+**Simulation space.** Unity's *Simulation Space*. `"World"` (the default): a
+particle, once born, stays where physics takes it, and the emitter moving leaves
+it behind (smoke, debris, a trail of sparks). `"Local"`: live particles keep
+their position, velocity and direction relative to the emitter, so they move,
+turn and scale with it and with any parent bone (a muzzle flash or jet parented
+to a gun, an exhaust on a vehicle). A local emitter also turns and scales its
+shape and `SetDirection` axis by its own transform, so `direction` is in the
+emitter's space; a world emitter keeps it in world space. Gravity always pulls
+in world space. A sub-emitter fired from a local particle spawns at that
+particle's world position. Particles are drawn, lit, sorted and collided at
+their resulting world position, so every render mode looks the same in either
+space. Unity's third option, `Custom` (relative to another entity), is not
+offered yet: the scene format has no field that references another entity by
+value.
+
+```lua no-run
+Particles.SetSimulationSpace(muzzle_flash, "Local")
+Particles.Burst(muzzle_flash) -- stays on the gun while the player turns
 ```
 
 **Sub-emitters.** `trigger` is `"birth"`, `"death"` or `"collision"`; `target` is

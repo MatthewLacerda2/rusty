@@ -1,7 +1,7 @@
 //! src/components/particle/runtime.rs — the transient play-mode state of an
 //! emitter: live particles, spawn carry, PRNG and pending sub-emitter events.
 
-use glam::Vec3;
+use glam::{Mat4, Vec3};
 
 use crate::core::random::Random;
 
@@ -79,6 +79,9 @@ pub struct EmitterRuntime {
     pub initialized: bool,
     /// Sub-emitter firings not yet dispatched.
     pub pending: Vec<SubEmitEvent>,
+    /// A `Local` emitter's world matrix its live particles were last placed
+    /// under (`space`); `None` until it first emits or is carried.
+    pub anchor: Option<Mat4>,
 }
 
 impl Default for EmitterRuntime {
@@ -90,6 +93,7 @@ impl Default for EmitterRuntime {
             burst_fired: false,
             initialized: false,
             pending: Vec::new(),
+            anchor: None,
         }
     }
 }
