@@ -241,5 +241,7 @@ pub const BLOCKS: &[Block] = &[
         textures: &[],
         stage: Stage::Vertex,
         cut: None,
+        // A vertex block never touches the colour, so the reflection stands.
+        reflection: Reflection::Kept,
     },
 ];
