@@ -6,6 +6,7 @@ use glam::Vec3;
 
 use super::fixture::H;
 use super::fixture::{frame, pixel, renderer, rgb, tuned, Surface, MIRROR, RED, REFLECTING};
+use crate::core::color::srgb_to_linear;
 use crate::render::ibl::ktx2_encode::encode_cubemap;
 use crate::render::ibl::reflection_prefilter::PrefilteredCubemap;
 use crate::scene::{FogMode, Scene};
@@ -27,42 +28,38 @@ fn glowing(on: bool, floor: Surface, glow: [f32; 3], ssao: bool) -> Scene {
 
 /// Pixel `p`'s linear RGB.
 fn linear(frame: &[u8], p: (u32, u32)) -> [f32; 3] {
-    let decode = |c: i32| {
-        let c = c as f32 / 255.0;
-        if c <= 0.04045 {
-            c / 12.92
-        } else {
-            ((c + 0.055) / 1.055).powf(2.4)
-        }
-    };
-    rgb(frame, p).map(decode)
+    rgb(frame, p).map(|c| srgb_to_linear(c as u8))
 }
 
-/// How much of its brightness the mirror floor's crease in front of a glowing red cube
-/// keeps when SSR swaps the sky it reflects for the cube, with SSAO (strong) `ssao`
-/// there. The glow is not occluded, so what SSR swaps in is the same either way.
-fn crease_kept(r: &mut crate::render::Renderer, ssao: bool) -> f32 {
-    let scene = |on| glowing(on, MIRROR, [1.0, 0.1, 0.1], ssao);
+/// How much of its green the mirror floor keeps around `z` in front of a glowing red
+/// cube when SSR swaps the grey sky it reflects for the cube (whose glow has almost no
+/// green), with SSAO (strong) `ssao`. The glow is not occluded, so what SSR swaps in
+/// is the same either way.
+fn green_kept(r: &mut crate::render::Renderer, z: f32, ssao: bool) -> f32 {
+    let scene = |on| glowing(on, MIRROR, [1.0, 0.02, 0.02], ssao);
     let (on, off) = (frame(r, &scene(true)), frame(r, &scene(false)));
-    let (x, y) = pixel(Vec3::new(0.0, 0.0, -5.4));
-    let crease: Vec<_> = (y..(y + 3).min(H))
+    let (x, y) = pixel(Vec3::new(0.0, 0.0, z));
+    let patch: Vec<_> = (y.saturating_sub(1)..(y + 2).min(H))
         .flat_map(|y| (x - 2..=x + 2).map(move |x| (x, y)))
         .collect();
-    let sum = |f: &[u8]| crease.iter().flat_map(|&p| linear(f, p)).sum::<f32>();
-    sum(&on) / sum(&off)
+    let green = |f: &[u8]| patch.iter().map(|&p| linear(f, p)[1]).sum::<f32>();
+    green(&on) / green(&off)
 }
 
 #[test]
 fn gpu_ssao_occludes_the_reflection_ssr_swaps_in_as_it_did_the_sky() {
     let Some(mut r) = renderer() else { return };
-    let (open, occluded) = (crease_kept(&mut r, false), crease_kept(&mut r, true));
-    eprintln!("[ssr] crease keeps {open} of its brightness open, {occluded} under SSAO");
+    // 0.4 m in front of the cube: SSAO occludes it, and the march hits solidly there
+    // (Metal missed the 0.1 m crease, where one step spans the gap).
+    let kept = |r: &mut _, ssao| green_kept(r, -5.1, ssao);
+    let (open, occluded) = (kept(&mut r, false), kept(&mut r, true));
+    eprintln!("[ssr] the floor keeps {open} of its green open, {occluded} under SSAO");
     // The forward pass applied the sky's reflection after `ao`, so SSR swaps it for
-    // the cube's after `ao` too: the crease keeps the same share, never going darker
-    // for being occluded. (Swapping it unoccluded kept 0.516 of 0.542, #1526.)
-    assert!(open < 0.8, "SSR shows the red cube in the crease");
+    // the cube's after `ao` too: the floor keeps the same share, never going darker
+    // for being occluded. (Swapping it unoccluded kept 0.007 of 0.039, #1526.)
+    assert!(open < 0.3, "SSR shows the red cube there");
     assert!(
-        (occluded - open).abs() <= 0.01,
+        (occluded - open).abs() <= open * 0.25,
         "SSAO scales what SSR swaps"
     );
 }
