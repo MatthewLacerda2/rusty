@@ -22,6 +22,12 @@ a `.wgsl` there too.** The root `CLAUDE.md` keeps the project-wide rules;
   move it into a module rather than pasting it (#1063 splits the forward shader this
   way).
   The fullscreen triangle is one: `#import fullscreen`, and `make rules` flags a copy (#1370).
+- **Derivatives only in uniform control flow**: `dpdx`, `dpdy`, `fwidth` and an
+  implicit-LOD `textureSample` sit before any branch on a per-pixel value, as
+  `fold_decals` and `ui.wgsl`'s `shade` do. Inside one, a quad neighbour outside the
+  branch leaves them undefined, and on Metal SSR's normal changed frame to frame (#1525).
+  No gate holds it: naga's validator skips the fragment stage's uniformity check, and
+  a text match can't tell a per-pixel branch from a uniform one.
 - `render::gpu::shaders::ShaderRegistry` reads shaders from disk at runtime, so a
   shader edit needs no Rust rebuild.
 - wgpu, naga and naga_oil upgrade as a unit (`Cargo.toml`).
