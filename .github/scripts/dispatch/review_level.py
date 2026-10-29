@@ -25,6 +25,10 @@ TABLE: dict[str, tuple[str, ...]] = {
         "src/core/storage.rs",  # Storage, the PlayerPrefs save file
         "src/asset/sidecar/",  # an asset's import settings beside it
         "src/asset/convert/",  # the import cache and its fingerprints
+        # every serde change to the scene/prefab document moves it, wherever the
+        # field lives (a component's own module): #1587 changed the format from
+        # `src/components/mesh/` and read `medium`
+        "tests/scene_format/scene.fingerprint",
     ),
     "determinism": (
         "src/core/random.rs",  # the seeded Random resource

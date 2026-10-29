@@ -60,7 +60,12 @@ result is the very table the script's callbacks run on — so an owning script r
 a widget's state and hands it callbacks (`Scene.GetScript(b, "button").on_click =
 function(id) … end`). It is `nil` outside play, and for an entity spawned this tick
 until its scripts load at the head of the next (see the spawn note in
-[`index.md`](index.md)).
+[`index.md`](index.md)). From a scenario, which runs in a VM of its own, the
+result is a handle instead: fields copied by value, and a function field a proxy
+that runs the game script's function in the gameplay VM (`GetScript(p,
+"fp_controller"):Refill(30)`, #1580; `docs/testing.md`, *What a scenario can
+call*). A call's side effects stand even when its return cannot cross back (a
+function, or a table holding one): the error says the call itself ran.
 
 **`primitive`** (optional) is one of the GameObject menu's primitives,
 case-insensitive: `Box`, `Sphere`, `Plane`, `Cylinder`, `Capsule` (meshes) or

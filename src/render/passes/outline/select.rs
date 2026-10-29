@@ -17,7 +17,7 @@ pub(crate) fn outlined(scene: &Scene, lod: &LodSelection) -> Vec<u32> {
 /// LOD2 draws rings LOD2, and a culled group rings nothing. A group's own mesh rings
 /// with its level. A shown renderer, like anything else, is outlined alone, as Unity
 /// does: selecting Hat in a `[Body, Hat]` level rings Hat. Only active, shown meshes
-/// ring.
+/// ring, and a `ShadowsOnly` one, which no camera draws, never does (#1571).
 pub(super) fn outline_targets(scene: &Scene, selected: u32, lod: &LodSelection) -> Vec<u32> {
     if !scene.world.is_active_in_hierarchy(selected) {
         return Vec::new();
@@ -36,7 +36,10 @@ pub(super) fn outline_targets(scene: &Scene, selected: u32, lod: &LodSelection) 
         let fresh = !seen.contains(&id);
         seen.push(id);
         fresh
-            && scene.world.has_mesh(id)
+            && scene
+                .world
+                .mesh(id)
+                .is_some_and(|m| m.cast_shadows.is_visible())
             && scene.world.is_active_in_hierarchy(id)
             && !lod.hides(id)
     });

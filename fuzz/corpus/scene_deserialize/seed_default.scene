@@ -25,6 +25,7 @@
         ]
       },
       "mesh": {
+        "cast_shadows": "On",
         "primitive_type": "Plane"
       },
       "material": null,
@@ -106,6 +107,7 @@
         ]
       },
       "mesh": {
+        "cast_shadows": "On",
         "primitive_type": "Cylinder"
       },
       "material": {
@@ -209,6 +211,7 @@
         ]
       },
       "mesh": {
+        "cast_shadows": "On",
         "primitive_type": "Box"
       },
       "material": null,
@@ -290,6 +293,7 @@
         ]
       },
       "mesh": {
+        "cast_shadows": "On",
         "primitive_type": "Box"
       },
       "material": null,
@@ -445,6 +449,7 @@
         ]
       },
       "mesh": {
+        "cast_shadows": "On",
         "primitive_type": "Box"
       },
       "material": null,

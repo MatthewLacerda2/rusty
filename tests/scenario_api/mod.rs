@@ -31,7 +31,7 @@ Harness.Expect(pc ~= nil, "the live instance, once Play loaded it")
 Harness.Expect(type(pc.vy) == "number", "its fields read by value")
 pc.marker = { hits = 3 }
 Harness.Expect(Scene.GetScript(player, "player_controller").marker.hits == 3, "writes land")
-Harness.Expect(not pcall(function() return pc.Update end), "a function does not cross VMs")
+Harness.Expect(type(pc.Update) == "function", "a function reads as a proxy that calls it (#1580)")
 Harness.Expect(Scene.GetScript(player, "nope") == nil, "an unknown script is nil")
 
 Transform.SetPosition(player, 3, 4, 5)
