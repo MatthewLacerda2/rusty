@@ -267,8 +267,8 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     // Non-static objects that a light probe covers
     // (`use_sh == 1`, #240) reconstruct DIRECTIONAL irradiance from their interpolated
     // SH probe; everything else falls back to the flat Hemispherical Sky-Ground
-    // gradient. All three are E / pi, so they feed the same albedo * (1 - metallic)
-    // Lambert response.
+    // gradient. All three are E / pi, so they feed the same albedo * 0.96 * (1 - metallic)
+    // Lambert response (the 4% is the dielectric's reflection, step 5).
     var ambient_irradiance: vec3<f32>;
     let lightmap_page = instances[in.instance].lightmap_page;
     if (lightmap_page > 0u) {
@@ -343,14 +343,17 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     // has no diffuse term, so without this it renders black. See `environment_reflection`.
     // Its weight is Unity URP's analytic environment BRDF (#1543; `BRDF.hlsl`
     // `EnvironmentBRDFSpecular`, `GlobalIllumination.hlsl`): roughness only picks the
-    // prefiltered mip, and `1 / (roughness^2 + 1)` is the energy a rough lobe loses,
-    // so a rough metal reads blurry, not black. `roughness` is perceptual, URP's
-    // `perceptualRoughness`; a dielectric reflects F0 = 0.04 head-on.
+    // prefiltered mip, and URP's `surfaceReduction`, `1 / (alpha^2 + 1)` with
+    // `alpha = roughness^2` (so perceptual roughness to the 4th), is the energy a rough
+    // lobe loses, so a rough metal reads blurry, not black. `roughness` is perceptual,
+    // URP's `perceptualRoughness`; a dielectric reflects F0 = 0.04 head-on. The angle is
+    // `|N.V|`: both sides are drawn and `N` is never turned toward the camera, so a
+    // visible back face would otherwise take the grazing Fresnel.
     let R = reflect(-V, N);
     let reflectivity = 0.04 + 0.96 * metallic;
     let grazing = saturate(1.0 - roughness + reflectivity);
     let alpha = roughness * roughness;
-    let fresnel = pow(1.0 - saturate(dot(N, V)), 4.0);
+    let fresnel = pow(1.0 - saturate(abs(dot(N, V))), 4.0);
     let env_brdf = mix(F0, vec3<f32>(grazing), fresnel) / (alpha * alpha + 1.0);
     lighting_color += environment_reflection(in.world_position, R, roughness, instances[in.instance].reflection_probe) * env_brdf * ao;
 

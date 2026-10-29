@@ -42,7 +42,7 @@ mod directional_lightmap_screenshot;
 #[cfg(feature = "editor")]
 mod editor_capture;
 mod emissive_factor_screenshot;
-mod environment_brdf_screenshot;
+mod environment_brdf;
 mod fog;
 mod frame_stats_render;
 mod fxaa_screenshot;
