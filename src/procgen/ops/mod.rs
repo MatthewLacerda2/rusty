@@ -101,3 +101,5 @@ pub fn eval_node(
 
 #[cfg(test)]
 mod arity_tests;
+#[cfg(test)]
+mod aspect_tests;

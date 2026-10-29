@@ -134,6 +134,8 @@ mod image_tests;
 #[cfg(test)]
 mod inspect_tests;
 #[cfg(test)]
+mod size_tests;
+#[cfg(test)]
 mod tests {
     use mlua::Lua;
 

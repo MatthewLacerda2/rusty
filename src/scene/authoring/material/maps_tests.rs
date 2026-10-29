@@ -104,6 +104,18 @@ fn rebake_at_a_new_resolution_rewrites_the_maps_and_keeps_it() {
 }
 
 #[test]
+fn rebaking_a_sized_recipe_keeps_its_aspect() {
+    let dir = dir("maps_rebake_sized");
+    let m = with_maps(recipe(0, &["base_color"]).with_size([64, 16]));
+    let mut materials = MaterialLibrary::from([("trim".into(), m)]);
+    rebake_maps(&mut materials, "trim", Some(16), &dir, &dir).unwrap();
+    let m = &materials["trim"];
+    assert_eq!(m.maps_recipe.as_ref().unwrap().size, Some([16, 4]));
+    let file = m.base_color_map.as_ref().unwrap().file().unwrap();
+    assert_eq!(image::image_dimensions(file).unwrap(), (16, 4));
+}
+
+#[test]
 fn a_failed_rebake_leaves_the_library_unchanged() {
     let dir = dir("maps_rebake_fail");
     let mut materials = MaterialLibrary::from([

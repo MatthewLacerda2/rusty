@@ -24,8 +24,9 @@ fn jump(a: [f32; 4], b: [f32; 4]) -> f32 {
 }
 
 /// (seam jump, biggest interior neighbour jump) along x (`horizontal`) or y.
-fn seam_and_interior(img: &Image, horizontal: bool) -> (f32, f32) {
-    let n = RES as i64;
+pub fn seam_and_interior(img: &Image, horizontal: bool) -> (f32, f32) {
+    let (w, h) = (img.width() as i64, img.height() as i64);
+    let (n, m) = if horizontal { (w, h) } else { (h, w) };
     let at = |i: i64, j: i64| {
         if horizontal {
             img.get_wrapped(i, j)
@@ -34,7 +35,7 @@ fn seam_and_interior(img: &Image, horizontal: bool) -> (f32, f32) {
         }
     };
     let (mut seam, mut interior) = (0.0f32, 0.0f32);
-    for j in 0..n {
+    for j in 0..m {
         seam = seam.max(jump(at(n - 1, j), at(0, j)));
         for i in 0..n - 1 {
             interior = interior.max(jump(at(i, j), at(i + 1, j)));
@@ -53,7 +54,7 @@ pub fn assert_seamless(label: &str, img: &Image) {
     }
 }
 
-fn generators() -> Vec<(String, OpKind)> {
+pub fn generators() -> Vec<(String, OpKind)> {
     let mut ops = Vec::new();
     for s in [1.0, 3.0, 4.5, 5.5, 7.3] {
         for kind in [Perlin, Fbm, Ridged, Turbulence] {

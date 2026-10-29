@@ -174,7 +174,9 @@ Material.Rebake("rusty_panel", 2048)          -- iterate at 256, ship at 2048
   the material describes itself: `GetAsset` returns it, and that JSON redefines the
   same material. The baked PNGs are a cache the recipe regenerates.
 - `Material.Rebake(name [, resolution])` re-bakes from the stored recipe to the same
-  paths; a `resolution` given is kept in the recipe for the next rebake. It is an
+  paths; a `resolution` given is kept in the recipe for the next rebake. A `maps`
+  recipe with a `size` (a non-square bake) keeps its aspect, its longer side
+  becoming `resolution` (`Texture`, *Non-square bakes*). It is an
   error when `name` is absent or has no `maps`. The next frame draws the new maps
   (#689).
 - A map key the material **already holds** is never overwritten by a bake — set by
