@@ -21,6 +21,7 @@ pub(super) fn quad(entity: u32, c: [Vec3; 4], albedo: Vec3) -> BakeMesh {
             emissive: Vec3::ZERO,
             occludes: true,
         }],
+        ..Default::default()
     }
 }
 

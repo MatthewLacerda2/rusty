@@ -33,6 +33,7 @@ inspect! {
             "rehydration holds it (mesh::hold_subdivisions), with the grid it builds",
             with!("subdivisions", |m, n: u32| mesh::set_subdivisions(m, n)?)
         ),
+        op!("cast_shadows", mesh::set_cast_shadows),
         ro!("skeleton", MESH),
     ];
     MaterialComponent => material, material_mut, &[

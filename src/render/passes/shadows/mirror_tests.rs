@@ -40,14 +40,14 @@ fn shade(r: &mut Renderer, mirrored: Option<bool>, spot: bool, cutout: bool) -> 
 }
 
 /// [`slab_yard`] without its slab: ground under a high sun.
-fn sun_yard() -> Scene {
+pub(super) fn sun_yard() -> Scene {
     let (mut scene, slab) = slab_yard(None);
     scene.world.set_active(slab, false);
     scene
 }
 
 /// Ground in the dark, under one shadowing spotlight pointing down from y = 6.
-fn spot_yard() -> Scene {
+pub(super) fn spot_yard() -> Scene {
     let mut scene = Scene::new();
     (scene.skybox_path, scene.ambient_intensity) = (String::new(), 0.0);
     let ground = create_entity(&mut scene, "Ground", Some(Primitive::Box));

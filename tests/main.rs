@@ -28,6 +28,7 @@ mod audio_api;
 mod callback_doc_drift;
 mod camera_stack_api;
 mod camera_target_api;
+mod cast_shadows;
 mod character_controller;
 mod conversion_gate;
 mod decals;

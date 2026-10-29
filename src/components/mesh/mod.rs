@@ -14,9 +14,11 @@ use std::ops::Range;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 pub mod primitives;
+mod shadow_casting;
 mod skeleton;
 mod vertex;
 
+pub use shadow_casting::ShadowCasting;
 pub use skeleton::{BoneBinding, BoneBody};
 pub use vertex::Vertex;
 
@@ -63,6 +65,10 @@ pub struct MeshComponent {
     /// the vertices to move. Every other mesh keeps 1; saved only when it isn't 1.
     #[serde(default = "one", skip_serializing_if = "is_one")]
     pub subdivisions: u32,
+    /// Whether and how it casts shadows (#1571): Unity's *Cast Shadows*. Always
+    /// written, so `Component.Get` reads `On` too; a file without it reads `On`.
+    #[serde(default)]
+    pub cast_shadows: ShadowCasting,
     #[serde(skip)]
     pub vertices: Vec<Vertex>,
     #[serde(skip)]
@@ -126,6 +132,7 @@ impl MeshComponent {
             primitive_type: primitive_type.into(),
             asset_ref: None,
             subdivisions: 1,
+            cast_shadows: ShadowCasting::On,
             vertices,
             indices,
             ranges: Vec::new(),

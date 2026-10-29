@@ -71,6 +71,7 @@ fn floor_halves(grating: bool) -> (f32, f32) {
             end: count as u32,
             ..roof.runs[0]
         }],
+        ..Default::default()
     };
     let mut meshes = vec![floor(), roof, ground];
     if grating {

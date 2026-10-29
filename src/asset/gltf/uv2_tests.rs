@@ -83,6 +83,7 @@ fn bake_input(mesh: &SubMesh) -> crate::scene::lighting::lightmap::BakeScene {
                 emissive: glam::Vec3::ZERO,
                 occludes: true,
             }],
+            ..Default::default()
         }],
         lights: Vec::new(),
         sky: glam::Vec3::ONE,

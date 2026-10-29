@@ -66,6 +66,7 @@ mod tests {
     #[test]
     fn differently_joined_runs_of_one_mesh_never_share_a_draw() {
         use super::super::{batch_casters, CasterData, CasterKey};
+        use crate::render::gpu::pipelines::winding::Facing;
         use crate::render::MeshId;
         let leaf = cutout(4);
         let runs = || vec![(0, 0..3), (1, 3..6)];
@@ -76,7 +77,7 @@ mod tests {
             .chain(b)
             .map(|(indices, clip)| {
                 let key = CasterKey {
-                    mirrored: false,
+                    facing: Facing::Front,
                     clip: clip.map(|c| c.clip),
                     mesh: MeshId("Quad".into()),
                     indices: indices.into(),

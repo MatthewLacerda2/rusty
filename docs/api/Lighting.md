@@ -98,7 +98,10 @@ scene's lighting settings (above), whose defaults are the ones listed here.
   mesh without one keeps probe / ambient lighting, and the bake logs once how many static
   meshes were left out that way: *"N static meshes have no lightmap UV — enable Generate
   Lightmap UVs"*.
-  Every static mesh still shades and bounces light onto the others. Dynamic objects keep
+  Every static mesh still shades and bounces light onto the others, as its Mesh
+  `cast_shadows` allows ([`Light`](Light.md#cast-shadows), one rule for every bake):
+  an `"Off"` mesh blocks no light but still bounces, emits and is lightmapped; a
+  `"ShadowsOnly"` one blocks light but bounces, emits and receives nothing. Dynamic objects keep
   the light probes; bake those with `Lighting.Bake()` so both read the same lights.
 - **What it bakes.** A deterministic CPU path tracer: `samples` (default `128`) paths
   per texel, `bounces` (default `3`) surfaces deep, seeded by `seed` (default `0`) — the

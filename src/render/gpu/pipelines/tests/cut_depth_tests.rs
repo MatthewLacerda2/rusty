@@ -60,16 +60,18 @@ fn frame(r: &mut Renderer, scene: &Scene, cam: &Camera) -> Vec<u8> {
     readback::read_texture_rgba8(&r.device, &r.queue, target, RES, RES)
 }
 
-/// Mean brightness of [`slab_yard`]'s ground under `x` and both slab halves at
-/// `x = ∓1.5`, looked at from beneath the slab.
+/// [`ground_at`] under both slab halves, `x = ∓1.5`.
 pub(crate) fn ground_halves(r: &mut Renderer, scene: &Scene) -> [f32; 2] {
-    [-1.5, 1.5].map(|x| {
-        // The sun leans the shadow ~0.8 units toward -Z; look where it lands.
-        let cam = Camera::new(Vec3::new(x, 1.5, -0.8), -90.0, -89.0);
-        let px = frame(r, scene, &cam);
-        let rgb = px.chunks(4).flat_map(|p| &p[..3]);
-        rgb.map(|&c| f32::from(c)).sum::<f32>() / (RES * RES * 3) as f32
-    })
+    [-1.5, 1.5].map(|x| ground_at(r, scene, x))
+}
+
+/// Mean brightness of [`slab_yard`]'s ground at `x`, looked at from beneath the slab.
+pub(crate) fn ground_at(r: &mut Renderer, scene: &Scene, x: f32) -> f32 {
+    // The sun leans the shadow ~0.8 units toward -Z; look where it lands.
+    let cam = Camera::new(Vec3::new(x, 1.5, -0.8), -90.0, -89.0);
+    let px = frame(r, scene, &cam);
+    let rgb = px.chunks(4).flat_map(|p| &p[..3]);
+    rgb.map(|&c| f32::from(c)).sum::<f32>() / (RES * RES * 3) as f32
 }
 
 #[test]

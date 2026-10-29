@@ -1,5 +1,7 @@
 //! A scenario's `Scene.GetScript` handle pins its one instance (#1384).
 
+mod calls;
+
 use std::cell::RefCell;
 use std::rc::Rc;
 
