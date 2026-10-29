@@ -113,6 +113,7 @@ end
 | `render_texture_draws` | cameras drawn into render textures this frame (#430) — their geometry is already in `draw_calls` / `triangles`; a camera skipped (unreferenced, or between its `update_every` frames) is not counted |
 | `velocity_passes` | opaque scene passes that wrote a motion-vector buffer (#1435): one per stacked camera of each view whose base camera runs motion blur; `0` when none does, and always on the Low tier |
 | `primed_passes` | opaque scene passes that started from their SSAO depth prepass (#1499): one per camera that ran SSAO, which then shades each lit pixel once; `0` with AO off, never for a camera with a forward override of its own (the shader preview), and never on Metal: Apple GPUs are tile-based and remove hidden opaque fragments themselves (Unity URP's *Auto* depth priming is off on tile-based targets too) |
+| `sky_reflection_bakes` | sky reflection cubes baked this frame (#1553): one when the scene's panorama changed, or on the first frame showing the procedural sky; `0` on every frame the sky holds (the procedural sky's tint never rebakes it) |
 | `grade_lut_bakes` | views whose colour-grading LUT was rebaked this frame (#1440): a grading knob or the tonemap changed, or the view is new; `0` on every frame the grade holds |
 | `ui_mask_passes` / `ui_blur_passes` | UI `Mask` coverage textures rendered (#428) / fullscreen passes of the UI backdrop blur, its composite included — `0` with no backdrop visible (#426) |
 | `renderer_ms` | CPU ms `Renderer::render` took to record the frame |
@@ -127,6 +128,7 @@ each kind's passes summed, under names that never change so two reports diff:
 
 | `gpu_passes` key | What it covers |
 |---|---|
+| `sky_reflection` | the sky's reflection cube (#1553): the capture and GGX prefilter of the panorama or the procedural sky, on the frames the sky changed (counted in `sky_reflection_bakes`) |
 | `shadows` | the sun's cascades (static bake + dynamic casters) and the point/spot shadow atlas |
 | `ssao` | the SSAO depth prepass, occlusion and blur |
 | `forward` | the opaque scene pass: solids, decals folded in, skybox — every camera's, render-texture cameras included |

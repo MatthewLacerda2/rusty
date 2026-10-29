@@ -57,6 +57,19 @@ pub(crate) fn read_mip_rgba8(
     read_level(device, queue, level, size, 4)
 }
 
+/// [`read_mip_rgba8`] for any single-plane colour format of `texel_bytes` bytes per
+/// texel (8 for the sky reflection cube's `Rgba16Float`, #1553).
+#[cfg(test)]
+pub(crate) fn read_mip_bytes(
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    level: (&wgpu::Texture, u32, u32),
+    size: (u32, u32),
+    texel_bytes: u32,
+) -> Vec<u8> {
+    read_level(device, queue, level, size, texel_bytes)
+}
+
 /// The texels of `size`'s top-left region of `texture`'s level `mip` in array
 /// layer `layer`, packed.
 fn read_level(

@@ -71,14 +71,17 @@ var<uniform> camera: CameraUniforms;
 @group(0) @binding(1)
 var<uniform> lighting: LightingUniforms;
 
+// The sky's reflection cube (#1553, `render::ibl::sky_cube`): the panorama, or the
+// procedural sky's two terms (rgb at tint 0, a the tint's weight), GGX-prefiltered
+// into a roughness mip chain like a probe's cube.
 @group(0) @binding(2)
-var t_skybox: texture_2d<f32>;
+var t_skybox: texture_cube<f32>;
 @group(0) @binding(3)
 var s_skybox: sampler;
 
 // The resident reflection probes' prefiltered cubemaps (#245), one per layer (#1206),
 // sampled with `textureSampleLevel` (roughness -> mip) at the layer a draw's
-// `reflection_probe` names. A draw with none samples the skybox instead.
+// `reflection_probe` names. A draw with none samples the sky's cube instead.
 @group(0) @binding(4)
 var t_refl_cube: texture_cube_array<f32>;
 @group(0) @binding(5)

@@ -239,6 +239,7 @@ impl Renderer {
             skybox_texture: None,
             skybox_path: "".to_string(),
             reflection_probes: global.reflection_probes,
+            sky_reflection: global.sky_reflection,
             cubemaps: HashMap::new(),
             static_capture: false,
             capture_probe_bounce: false,

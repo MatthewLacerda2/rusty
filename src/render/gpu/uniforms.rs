@@ -103,8 +103,8 @@ pub(crate) struct LightingUniform {
     pub ssr_active: f32,
     pub ssr_quality: f32,
     pub ssr_temporal_upsampling: f32,
-    // `sky_textured` (#718) 1.0 when a skybox panorama is bound, else the shader
-    // reflects the procedural sky. The pad keeps the probe array 16-byte aligned.
+    // `sky_textured` (#718) 1.0 when a skybox panorama is bound: the sky cube (#1553)
+    // holds its colour, else the procedural sky's terms the shader tints. The pad keeps the probe array 16-byte aligned.
     pub sky_textured: f32,
     pub _sky_pad: [f32; 3],
     // The resident reflection probes (#1206): a draw's instance names one

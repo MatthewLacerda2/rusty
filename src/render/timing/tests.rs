@@ -42,6 +42,7 @@ fn pass_names_are_stable_and_unique() {
     assert_eq!(
         names,
         [
+            "sky_reflection",
             "shadows",
             "ssao",
             "forward",
@@ -68,6 +69,7 @@ fn a_disabled_timer_hands_out_no_writes() {
     timer.begin_frame();
     assert!(timer.queries.is_none());
     assert!(timer.writes(GpuPass::Forward).is_none());
+    assert!(timer.compute_writes(GpuPass::SkyReflection).is_none());
 }
 
 /// On an adapter with timestamps (Metal, most Vulkan GPUs) a rendered frame comes

@@ -110,6 +110,9 @@ pub struct RenderCounters {
     /// Views whose grading LUT was rebaked this frame (#1440): a grading knob or
     /// the tonemap changed, or the view is new. `0` on every frame the grade holds.
     pub grade_lut_bakes: u32,
+    /// Sky reflection cubes baked this frame (#1553): a new panorama, or the first
+    /// frame showing the procedural sky. `0` on every frame the sky holds.
+    pub sky_reflection_bakes: u32,
 }
 
 impl RenderCounters {
@@ -147,6 +150,7 @@ impl RenderCounters {
             ("velocity_passes", self.velocity_passes.into()),
             ("primed_passes", self.primed_passes.into()),
             ("grade_lut_bakes", self.grade_lut_bakes.into()),
+            ("sky_reflection_bakes", self.sky_reflection_bakes.into()),
         ]
     }
 

@@ -12,11 +12,12 @@ use crate::render::gpu::lightmaps::Lightmaps;
 use crate::render::gpu::pipelines;
 use crate::render::gpu::shaders::ShaderRegistry;
 use crate::render::ibl::reflection_probes::ProbeArray;
+use crate::render::ibl::sky_cube::SkyReflection;
 use crate::render::passes::outline::OutlinePasses;
 use crate::render::postfx::{effects::Passes, grade::GradeBake, HDR_FORMAT};
 use crate::render::setup::textures::{create_textures, Textures};
 use crate::render::{ibl::skybox, passes::shadows, passes::ssao};
-use crate::render::{CameraUniform, GpuTexture, LightingUniform};
+use crate::render::{CameraUniform, LightingUniform};
 
 /// Camera + lighting uniform buffers and the group(0) bind group.
 pub(crate) struct GlobalBindings {
@@ -31,6 +32,8 @@ pub(crate) struct GlobalBindings {
     pub lightmaps: Lightmaps,
     /// The reflection-probe cube array group 0 binds (#1206).
     pub reflection_probes: ProbeArray,
+    /// The sky's reflection cubes group 0 binds (#1553).
+    pub sky_reflection: SkyReflection,
 }
 
 /// Shadow renderer, its cascade uniform buffer, and the main-pass bind group that
@@ -99,8 +102,7 @@ impl GpuResources {
         let camera_lighting_layout = bind_layouts::create_camera_lighting_layout(device);
         let entity_bones_layout = bind_layouts::create_entity_bones_layout(device);
         let textures = create_textures(device, queue, &mut registry);
-        let global =
-            create_global_bindings(device, &camera_lighting_layout, &textures.default_texture);
+        let global = create_global_bindings(device, &camera_lighting_layout, &mut registry);
         let ssao = ssao::SsaoRenderer::new(device, queue, &mut registry);
         // One module draws the solids and their shadows (#648).
         let shader = registry.load(device, "shader.wgsl", "Forward Lit Shader");
@@ -170,11 +172,11 @@ fn create_billboard_passes(
 }
 
 /// Camera + lighting uniform buffers, the light clusters and the group-0 bind group
-/// (also binds the default texture/sampler).
+/// (with the procedural sky's reflection cube, baked on the first frame).
 fn create_global_bindings(
     device: &wgpu::Device,
     camera_lighting_layout: &wgpu::BindGroupLayout,
-    default_texture: &GpuTexture,
+    registry: &mut ShaderRegistry,
 ) -> GlobalBindings {
     let camera_buffer = device.create_buffer(&wgpu::BufferDescriptor {
         label: Some("Camera Uniform Buffer"),
@@ -196,10 +198,11 @@ fn create_global_bindings(
     let clusters = ClusterBuffers::new(device);
     let decals = DecalBuffers::new(device);
     let lightmaps = Lightmaps::new(device);
+    let sky_reflection = SkyReflection::new(device, registry);
     let global_bind_group = GlobalGroup {
         camera: &camera_buffer,
         lighting: &lighting_buffer,
-        skybox: (&default_texture.view, &default_texture.sampler),
+        skybox: (sky_reflection.view(None), &sky_reflection.sampler),
         cube: (&reflection_probes.view, &reflection_probes.sampler),
         clusters: &clusters,
         decals: &decals,
@@ -215,6 +218,7 @@ fn create_global_bindings(
         decals,
         lightmaps,
         reflection_probes,
+        sky_reflection,
     }
 }
 
