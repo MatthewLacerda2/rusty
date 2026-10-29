@@ -158,6 +158,31 @@ pub(super) fn slider_row(
     .inner
 }
 
+/// [`slider_row`] for a whole-number setting (a sample or step count, a resolution
+/// divisor), written through `op`.
+pub(super) fn count_row(
+    ui: &mut egui::Ui,
+    cx: (&mut crate::ecs::World, u32),
+    label: &str,
+    mut value: u32,
+    range: std::ops::RangeInclusive<u32>,
+    op: fn(&mut PostProcessingComponent, u32),
+) -> bool {
+    ui.horizontal(|ui| {
+        ui.label(label);
+        let changed = ui
+            .add(crate::editor::widgets::slider(&mut value, range))
+            .changed();
+        if changed {
+            if let Some(mut c) = cx.0.post_processing_mut(cx.1) {
+                op(&mut c, value);
+            }
+        }
+        changed
+    })
+    .inner
+}
+
 /// [`slider_row`] for `knob`, read from `vc`.
 pub(super) fn knob_row(
     ui: &mut egui::Ui,

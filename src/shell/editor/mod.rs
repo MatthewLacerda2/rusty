@@ -89,6 +89,7 @@ impl EditorFrontend {
             shell.renderer.config.format,
             paint::EGUI_RENDERER,
         );
+        #[cfg_attr(not(feature = "dev"), expect(unused_mut, reason = "dev loads prefs"))]
         let mut editor_ui = EditorUi::new(game.script_manager().scene_path_cell());
         #[cfg(feature = "dev")]
         editor_ui.dev.load_prefs(&game.resources.storage.borrow());

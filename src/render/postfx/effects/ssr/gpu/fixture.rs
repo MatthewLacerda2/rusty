@@ -16,7 +16,7 @@ pub(super) const H: u32 = 72;
 /// 0.56 m up.
 pub(super) const REFLECTING: Vec3 = Vec3::new(0.0, 0.0, -4.0);
 
-/// A headless renderer on the High tier (the one SSR runs on), or `None`.
+/// A headless renderer, or `None`.
 pub(super) fn renderer() -> Option<Renderer> {
     crate::render::test_gpu::headless_or_skip(W, H)
 }

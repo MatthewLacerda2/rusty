@@ -16,7 +16,7 @@
 //!
 //! **One path.** Camera motion is already in the velocity target (the sky carries
 //! the camera's rotation), so there is no separate camera-only blur. A view with no
-//! velocity target this frame (motion blur off, the Low tier, the player's option, a
+//! velocity target this frame (motion blur off, the player's option, a
 //! shader preview, the editor's Scene view) blurs nothing and holds no blur targets.
 //!
 //! The pipelines are the renderer's ([`MotionBlurPasses`], built on first use and

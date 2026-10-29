@@ -1,11 +1,12 @@
 //! Screen-space reflections' ops: the switch, the quality level (#1522) and the
-//! `Custom` march, its step count and step length, each knobs.
+//! `Custom` march, its step count and its step length (a knob: a count is no
+//! tween).
 
 use super::{Effect, Knob};
 use crate::components::{PostProcessingComponent, Ssr};
 use crate::core::settings::quality::EffectQuality;
 use crate::scene::authoring::fields::table::effect;
-use crate::scene::authoring::sanitize::{clamped, count};
+use crate::scene::authoring::sanitize::clamped;
 
 /// Set whether SSR is active.
 pub fn set_active(vc: &mut PostProcessingComponent, active: bool) {
@@ -35,18 +36,10 @@ pub const EFFECT: Effect = Effect {
         set_steps(c, v.steps);
         set_step_length(c, v.step_length);
     }),
-    knobs: &[
-        Knob {
-            field: "steps",
-            api: Some("SsrSteps"),
-            get: |vc| vc.ssr.steps as f32,
-            set: |vc, v| set_steps(vc, count(v, 1, Ssr::MAX_STEPS)),
-        },
-        Knob {
-            field: "step_length",
-            api: Some("SsrStepLength"),
-            get: |vc| vc.ssr.step_length,
-            set: set_step_length,
-        },
-    ],
+    knobs: &[Knob {
+        field: "step_length",
+        api: Some("SsrStepLength"),
+        get: |vc| vc.ssr.step_length,
+        set: set_step_length,
+    }],
 };

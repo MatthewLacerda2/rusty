@@ -4,7 +4,7 @@
 use std::cell::RefCell;
 
 use super::super::super::Reg;
-use super::knobs::{register_flag, register_quality};
+use super::knobs::{register_count, register_flag, register_quality};
 use crate::scene::authoring::rendering::post_processing::ssr;
 use crate::scene::Scene;
 
@@ -28,6 +28,13 @@ pub(super) fn register<'scope>(
         "SsrQuality",
         |vc| vc.ssr.quality,
         ssr::set_quality,
+    )?;
+    register_count(
+        scope,
+        (table, scene),
+        "SsrSteps",
+        |vc| vc.ssr.steps,
+        ssr::set_steps,
     )?;
     super::knobs::register(scope, table, scene, ssr::EFFECT.knobs)
 }

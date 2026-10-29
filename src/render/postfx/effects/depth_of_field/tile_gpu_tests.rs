@@ -71,6 +71,7 @@ fn gpu_a_background_beside_a_near_blur_keeps_its_own_blur() {
     let Some(mut r) = crate::render::test_gpu::headless_or_skip(W, H) else {
         return;
     };
+    super::gpu_fixture::blur_at(&mut r, 1);
     // The far cube's left edge, on its front face.
     let face = FAR + Vec3::new(-0.75, 0.0, 0.75);
     let edge = column(face);

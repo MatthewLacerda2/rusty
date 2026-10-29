@@ -35,9 +35,8 @@ fn prepare(_: &mut PostFx, _: &wgpu::Device, cx: &EffectCx) -> bool {
 /// No camera component at all gets `true`: default-on means a scene that has never
 /// heard of the knob is still anti-aliased.
 ///
-/// Unlike motion blur no quality tier turns it off — FXAA runs on every tier, Low
-/// included, where it is precisely the cheap anti-aliasing an iGPU wants; the
-/// player's `fxaa` option can.
+/// It has no quality knob: it is precisely the cheap anti-aliasing an iGPU wants;
+/// the player's `fxaa` option can turn it off.
 pub(crate) fn fxaa_enabled(post: PostSource, graphics: GraphicsSettings) -> bool {
     let on = post.camera.is_none_or(|c| c.fxaa_active);
     effect_runs(graphics, EFFECT.gate, on)

@@ -140,3 +140,10 @@ fn a_build_that_cannot_count_or_name_itself_keeps_what_it_can() {
         "the last known record"
     );
 }
+
+/// A file `record` creates is seeded with the three quality presets (#1522).
+#[test]
+fn a_new_project_is_seeded_with_quality_presets() {
+    let (_, file, _) = record(&fresh("seeded_quality")).unwrap();
+    assert_eq!(file.quality.names(), ["Low", "Medium", "High"]);
+}

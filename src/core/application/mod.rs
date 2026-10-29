@@ -36,7 +36,7 @@
 //! instance writes the file straight away: build settings are authoring-time project
 //! config, edited rarely and deliberately, never from inside `FixedUpdate`. The player
 //! and `play` take the settings opening the project read
-//! ([`Opened::build`](crate::core::project::Opened::build)) into an unbound instance,
+//! ([`Opened::settings`](crate::core::project::Opened::settings)) into an unbound instance,
 //! so a shipped game can never rewrite its own build settings.
 
 use std::path::PathBuf;

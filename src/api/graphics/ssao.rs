@@ -6,7 +6,7 @@
 use std::cell::RefCell;
 
 use super::super::{put, Reg};
-use super::effects::knobs::register_quality;
+use super::effects::knobs::{register_count, register_quality};
 use super::state::{with_vc, with_vc_mut};
 use crate::components::SsaoSettings;
 use crate::scene::authoring::rendering::post_processing as vc_ops;
@@ -73,7 +73,6 @@ fn register_ssao_quality<'scope>(
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
-    let defaults = SsaoSettings::default();
     register_quality(
         scope,
         (table, scene),
@@ -81,35 +80,18 @@ fn register_ssao_quality<'scope>(
         |vc| vc.ssao.quality,
         vc_ops::volume::set_ssao_quality,
     )?;
-    put(
-        table,
-        "SetSsaoSamples",
-        scope.create_function(|_, n: u32| {
-            with_vc_mut(scene, |e| vc_ops::volume::set_ssao_samples(e, n));
-            Ok(())
-        }),
+    register_count(
+        scope,
+        (table, scene),
+        "SsaoSamples",
+        |vc| vc.ssao.samples,
+        vc_ops::volume::set_ssao_samples,
     )?;
-    put(
-        table,
-        "GetSsaoSamples",
-        scope.create_function(move |_, ()| {
-            Ok(with_vc(scene, |vc| vc.ssao.samples).unwrap_or(defaults.samples))
-        }),
-    )?;
-    put(
-        table,
-        "SetSsaoResolutionDivisor",
-        scope.create_function(|_, n: u32| {
-            with_vc_mut(scene, |e| vc_ops::volume::set_ssao_resolution_divisor(e, n));
-            Ok(())
-        }),
-    )?;
-    put(
-        table,
-        "GetSsaoResolutionDivisor",
-        scope.create_function(move |_, ()| {
-            let divisor = with_vc(scene, |vc| vc.ssao.resolution_divisor);
-            Ok(divisor.unwrap_or(defaults.resolution_divisor))
-        }),
+    register_count(
+        scope,
+        (table, scene),
+        "SsaoResolutionDivisor",
+        |vc| vc.ssao.resolution_divisor,
+        vc_ops::volume::set_ssao_resolution_divisor,
     )
 }

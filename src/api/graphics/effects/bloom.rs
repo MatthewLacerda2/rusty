@@ -46,5 +46,12 @@ pub(super) fn register<'scope>(
         |vc| vc.bloom.quality,
         bloom::set_quality,
     )?;
+    super::knobs::register_count(
+        scope,
+        (table, scene),
+        "BloomResolutionDivisor",
+        |vc| vc.bloom.resolution_divisor,
+        bloom::set_resolution_divisor,
+    )?;
     super::knobs::register(scope, table, scene, bloom::EFFECT.knobs)
 }

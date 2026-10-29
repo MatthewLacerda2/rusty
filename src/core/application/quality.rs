@@ -69,3 +69,7 @@ impl Application {
         self.save()
     }
 }
+
+#[cfg(test)]
+#[path = "quality_tests.rs"]
+mod tests;

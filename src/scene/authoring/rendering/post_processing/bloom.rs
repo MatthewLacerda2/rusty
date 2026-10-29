@@ -7,7 +7,7 @@ use crate::components::{Bloom, PostProcessingComponent};
 use crate::core::paths::stored;
 use crate::core::settings::quality::{EffectQuality, MAX_RESOLUTION_DIVISOR};
 use crate::scene::authoring::fields::table::effect;
-use crate::scene::authoring::sanitize::{count, non_negative};
+use crate::scene::authoring::sanitize::non_negative;
 
 /// Set whether bloom is active.
 pub fn set_active(vc: &mut PostProcessingComponent, active: bool) {
@@ -75,12 +75,6 @@ pub const EFFECT: Effect = Effect {
             api: Some("BloomDirtIntensity"),
             get: |vc| vc.bloom.dirt_intensity,
             set: set_dirt_intensity,
-        },
-        Knob {
-            field: "resolution_divisor",
-            api: Some("BloomResolutionDivisor"),
-            get: |vc| vc.bloom.resolution_divisor as f32,
-            set: |vc, v| set_resolution_divisor(vc, count(v, 1, MAX_RESOLUTION_DIVISOR)),
         },
     ],
 };

@@ -109,3 +109,30 @@ pub(in crate::api::graphics) fn register_quality<'scope>(
         }),
     )
 }
+
+/// Register `Set<name>(n)` / `Get<name>()` over a whole-number setting of the
+/// volume (a sample or step count, a resolution divisor: no tween), through its
+/// op. Without an active volume the getter reports a new volume's value.
+pub(in crate::api::graphics) fn register_count<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
+    (table, scene): (&mlua::Table, &'scope RefCell<Scene>),
+    name: &'static str,
+    get: fn(&PostProcessingComponent) -> u32,
+    set: fn(&mut PostProcessingComponent, u32),
+) -> Reg {
+    put(
+        table,
+        &format!("Set{name}"),
+        scope.create_function(move |_, n: u32| {
+            with_vc_mut(scene, |vc| set(vc, n));
+            Ok(())
+        }),
+    )?;
+    put(
+        table,
+        &format!("Get{name}"),
+        scope.create_function(move |_, ()| {
+            Ok(with_vc(scene, get).unwrap_or_else(|| get(&default_post_processing())))
+        }),
+    )
+}

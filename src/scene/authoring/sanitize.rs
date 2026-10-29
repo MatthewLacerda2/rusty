@@ -64,16 +64,6 @@ pub(super) fn saturated(v: f32, lo: f32, hi: f32) -> f32 {
     }
 }
 
-/// `v` as a whole count, rounded and clamped to `[lo, hi]`: a numeric knob (a tween,
-/// a slider) writing a sample or step count. NaN or infinite takes `lo`.
-pub(super) fn count(v: f32, lo: u32, hi: u32) -> u32 {
-    if v.is_finite() {
-        (v.round().clamp(lo as f32, hi as f32)) as u32
-    } else {
-        lo
-    }
-}
-
 /// `v` clamped to `[0, 1]`; `0.0` when `v` is NaN or infinite.
 pub(super) fn unit(v: f32) -> f32 {
     clamped(v, 0.0, 1.0)

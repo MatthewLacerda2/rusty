@@ -23,9 +23,14 @@ pub(super) const FAR: Vec3 = Vec3::new(2.4, 0.0, -12.0);
 /// every level, or `None` without an adapter.
 pub(super) fn renderer(divisor: u32) -> Option<Renderer> {
     let mut r = crate::render::test_gpu::headless_or_skip(W, H)?;
+    blur_at(&mut r, divisor);
+    Some(r)
+}
+
+/// Make `r`'s quality preset blur at `1 / divisor` resolution on every level.
+pub(super) fn blur_at(r: &mut Renderer, divisor: u32) {
     let d = &mut r.quality.depth_of_field_resolution_divisor;
     (d.low, d.medium, d.high) = (divisor, divisor, divisor);
-    Some(r)
 }
 
 pub(super) fn view(r: &Renderer) -> RenderView {

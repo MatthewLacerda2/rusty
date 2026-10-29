@@ -9,6 +9,21 @@ use crate::core::settings::quality::EffectQuality;
 use crate::scene::authoring::rendering::camera as camera_ops;
 use crate::scene::CameraComponent;
 
+/// The quality dropdown (#1522).
+fn draw_quality(
+    ui: &mut egui::Ui,
+    (world, id): (&mut crate::ecs::World, u32),
+    cam: &CameraComponent,
+    is_dirty: &mut bool,
+) {
+    if let Some(quality) = quality_row(ui, "Motion Blur Quality", cam.motion_blur_quality) {
+        if let Some(mut c) = world.camera_mut(id) {
+            camera_ops::set_motion_blur_quality(&mut c, quality);
+        }
+        *is_dirty = true;
+    }
+}
+
 /// The motion-blur toggle, its quality and its sliders.
 pub(super) fn draw_motion_blur(
     ui: &mut egui::Ui,
@@ -24,12 +39,7 @@ pub(super) fn draw_motion_blur(
         }
         *is_dirty = true;
     }
-    if let Some(quality) = quality_row(ui, "Motion Blur Quality", cam.motion_blur_quality) {
-        if let Some(mut c) = world.camera_mut(id) {
-            camera_ops::set_motion_blur_quality(&mut c, quality);
-        }
-        *is_dirty = true;
-    }
+    draw_quality(ui, (&mut *world, id), cam, is_dirty);
     let mut samples = cam.motion_blur_samples;
     let range = CameraComponent::MIN_MOTION_BLUR_SAMPLES..=CameraComponent::MAX_MOTION_BLUR_SAMPLES;
     if cam.motion_blur_quality == EffectQuality::Custom

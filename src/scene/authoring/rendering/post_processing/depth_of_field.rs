@@ -5,7 +5,7 @@ use super::{Effect, Knob};
 use crate::components::{DepthOfField, DofMode, PostProcessingComponent};
 use crate::core::settings::quality::{EffectQuality, MAX_RESOLUTION_DIVISOR};
 use crate::scene::authoring::fields::table::effect;
-use crate::scene::authoring::sanitize::{clamped, count, non_negative, saturated};
+use crate::scene::authoring::sanitize::{clamped, non_negative, saturated};
 
 /// Set which depth of field runs.
 pub fn set_mode(vc: &mut PostProcessingComponent, mode: DofMode) {
@@ -116,12 +116,6 @@ pub const EFFECT: Effect = Effect {
             api: Some("DepthOfFieldFocalLength"),
             get: |vc| vc.depth_of_field.focal_length,
             set: set_focal_length,
-        },
-        Knob {
-            field: "resolution_divisor",
-            api: Some("DepthOfFieldResolutionDivisor"),
-            get: |vc| vc.depth_of_field.resolution_divisor as f32,
-            set: |vc, v| set_resolution_divisor(vc, count(v, 1, MAX_RESOLUTION_DIVISOR)),
         },
     ],
 };

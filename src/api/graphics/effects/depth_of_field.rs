@@ -47,6 +47,13 @@ pub(super) fn register<'scope>(
         |vc| vc.depth_of_field.quality,
         vc_ops::depth_of_field::set_quality,
     )?;
+    super::knobs::register_count(
+        scope,
+        (table, scene),
+        "DepthOfFieldResolutionDivisor",
+        |vc| vc.depth_of_field.resolution_divisor,
+        vc_ops::depth_of_field::set_resolution_divisor,
+    )?;
     super::knobs::register(scope, table, scene, vc_ops::depth_of_field::EFFECT.knobs)
 }
 

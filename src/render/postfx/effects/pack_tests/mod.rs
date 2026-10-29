@@ -1,5 +1,5 @@
 //! What each effect packs for one view's camera (#1434, #1467): its composite slots
-//! from the volume and the camera, gated by the tier and the player's options, and
+//! from the volume and the camera, gated by the player's options, and
 //! the march SSR's pass runs (#1526).
 
 use super::fxaa::fxaa_enabled;

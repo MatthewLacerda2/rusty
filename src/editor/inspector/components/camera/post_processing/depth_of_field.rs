@@ -2,7 +2,7 @@
 //! running mode's knobs and its quality level (#1522), through the effect's knob table, the one the `Graphics.*`
 //! functions and the tween paths are made from, so the three reach the same knobs.
 
-use super::{quality_row, slider_row, Section};
+use super::{count_row, quality_row, slider_row, Section};
 use crate::components::{DepthOfField, DofMode};
 use crate::core::settings::quality::{EffectQuality, MAX_RESOLUTION_DIVISOR};
 use crate::scene::authoring::rendering::post_processing::{self as vc_ops, Knob};
@@ -65,12 +65,10 @@ fn draw(
         *is_dirty = true;
     }
     if dof.quality == EffectQuality::Custom {
-        let knob = knob("resolution_divisor");
-        let (label, range) = (
-            "    Resolution Divisor:",
-            1.0..=MAX_RESOLUTION_DIVISOR as f32,
-        );
-        *is_dirty |= slider_row(ui, (world, id), label, (knob.get)(vc), range, knob.set);
+        let (label, value) = ("    Resolution Divisor:", dof.resolution_divisor);
+        let range = 1..=MAX_RESOLUTION_DIVISOR;
+        let set = vc_ops::depth_of_field::set_resolution_divisor;
+        *is_dirty |= count_row(ui, (world, id), label, value, range, set);
     }
 }
 

@@ -2,7 +2,7 @@
 //! (#1442) and its quality level, with the `Custom` divisor (#1522).
 
 use super::path_field::{self, DIRT};
-use super::{knob, knob_row, quality_row, toggle, Section};
+use super::{count_row, knob, knob_row, quality_row, toggle, Section};
 use crate::core::settings::quality::{EffectQuality, MAX_RESOLUTION_DIVISOR};
 use crate::scene::authoring::rendering::post_processing::bloom;
 use crate::scene::PostProcessingComponent;
@@ -51,9 +51,9 @@ fn draw(
             *is_dirty = true;
         }
         if vc.bloom.quality == EffectQuality::Custom {
-            let row = ("    Resolution Divisor:", knob(knobs, "resolution_divisor"));
-            let range = 1.0..=MAX_RESOLUTION_DIVISOR as f32;
-            *is_dirty |= knob_row(ui, (world, id), row, vc, range);
+            let (label, value) = ("    Resolution Divisor:", vc.bloom.resolution_divisor);
+            let (range, set) = (1..=MAX_RESOLUTION_DIVISOR, bloom::set_resolution_divisor);
+            *is_dirty |= count_row(ui, (world, id), label, value, range, set);
         }
     }
 }

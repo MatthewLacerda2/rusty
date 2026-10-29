@@ -4,7 +4,7 @@
 //! A THIN client (#287): each widget reads the snapshot and writes through the
 //! shared `authoring::rendering::post_processing` op `Graphics.*` calls too.
 
-use super::{quality_row, slider_row, Section};
+use super::{count_row, quality_row, slider_row, Section};
 use crate::components::SsaoSettings;
 use crate::core::settings::quality::{EffectQuality, MAX_RESOLUTION_DIVISOR};
 use crate::scene::authoring::rendering::post_processing as vc_ops;
@@ -118,20 +118,18 @@ fn draw_ssao_quality(
     if vc.ssao.quality != EffectQuality::Custom {
         return;
     }
-    *is_dirty |= slider_row(
+    let samples = (vc.ssao.samples, 1..=SsaoSettings::MAX_SAMPLES);
+    let set = vc_ops::volume::set_ssao_samples;
+    *is_dirty |= count_row(
         ui,
         (&mut *world, id),
         "    Samples:",
-        vc.ssao.samples as f32,
-        1.0..=SsaoSettings::MAX_SAMPLES as f32,
-        |c, v| vc_ops::volume::set_ssao_samples(c, v.round() as u32),
+        samples.0,
+        samples.1,
+        set,
     );
-    *is_dirty |= slider_row(
-        ui,
-        (world, id),
-        "    Resolution Divisor:",
-        vc.ssao.resolution_divisor as f32,
-        1.0..=MAX_RESOLUTION_DIVISOR as f32,
-        |c, v| vc_ops::volume::set_ssao_resolution_divisor(c, v.round() as u32),
-    );
+    let divisor = (vc.ssao.resolution_divisor, 1..=MAX_RESOLUTION_DIVISOR);
+    let set = vc_ops::volume::set_ssao_resolution_divisor;
+    let label = "    Resolution Divisor:";
+    *is_dirty |= count_row(ui, (world, id), label, divisor.0, divisor.1, set);
 }

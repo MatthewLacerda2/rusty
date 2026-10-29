@@ -9,11 +9,12 @@ their params) and its `CameraComponent` (motion blur, FXAA) are what the window 
 so a write takes effect there next frame. With no screen camera, or its volume missing
 or inactive, setters are no-ops and getters report what a new volume starts with (an
 effect's on/off switch reads `false`: nothing runs).
-The editor's Camera card edits the same four motion-blur fields (a "Motion Blur"
-checkbox and "Samples" `2..=32`, "Intensity" `0..=1` and "Clamp" `0..=0.2` sliders)
-through the same ops. A new camera starts with motion blur on at 32 samples, intensity
-`0.5` and clamp `0.05`. With no screen camera nothing blurs, and the four motion-blur
-getters say so: `false`, `0`, `0` and `0`.
+The editor's Camera card edits the same motion-blur fields (a "Motion Blur" checkbox,
+its quality, and "Samples" `2..=32` while the quality is `Custom`, "Intensity" `0..=1`
+and "Clamp" `0..=0.2` sliders) through the same ops. A new camera starts with motion
+blur on at the `Medium` quality (32 `Custom` samples), intensity `0.5` and clamp
+`0.05`. With no screen camera nothing blurs, and the motion-blur getters say so:
+`false`, `0`, `0` and `0`.
 
 **Post-FX is per view** (#1434), Unity URP's camera-stack rule: each view runs it once,
 with the settings of **its base camera**, that camera entity's own `CameraComponent`
@@ -34,6 +35,8 @@ set on that camera entity, in the inspector or the scene file.
 | `Graphics.GetBloomDirtIntensity` / `SetBloomDirtIntensity` | `()` / `(value)` | `number` (≥ 0, **default `0`**; see *Bloom*) |
 | `Graphics.GetBloomDirtTexture` / `SetBloomDirtTexture` | `()` / `(path)` | `string` or `nil`: the lens dirt image (`nil` or `""` clears it; see *Bloom*) |
 | `Graphics.GetBloomIntensity` / `SetBloomIntensity` | `()` / `(value)` | `number` (≥ 0) |
+| `Graphics.GetBloomQuality` / `SetBloomQuality` | `()` / `(name)` | `"Low"` / `"Medium"` / `"High"` / `"Custom"`: which buffer size it runs at (**default `"Medium"`**; `"Low"` / `"Medium"` / `"High"` take the running preset's values, `"Custom"` the ones beside it; names are case-insensitive, an unknown one raises an error listing them; see *Quality presets*) |
+| `Graphics.GetBloomResolutionDivisor` / `SetBloomResolutionDivisor` | `()` / `(n)` | `number`: the `Custom` buffer is the view's size over this (clamped 1–4, **default `2`**) |
 | `Graphics.GetBloomThreshold` / `SetBloomThreshold` | `()` / `(value)` | `number` (≥ 0) |
 | `Graphics.GetChromaticAberrationActive` / `SetChromaticAberrationActive` | `()` / `(bool)` | `bool` (**default `false`**) |
 | `Graphics.GetChromaticAberrationIntensity` / `SetChromaticAberrationIntensity` | `()` / `(value)` | `number` (clamped 0–1, **default `0.3`**) |
@@ -49,6 +52,8 @@ set on that camera entity, in the inspector or the scene file.
 | `Graphics.GetDepthOfFieldGaussianMaxRadius` / `SetDepthOfFieldGaussianMaxRadius` | `()` / `(value)` | `number`: the full blur's width (clamped 0.5–1.5, **default `1`**) |
 | `Graphics.GetDepthOfFieldGaussianStart` / `SetDepthOfFieldGaussianStart` | `()` / `(metres)` | `number`: where the Gaussian blur starts (clamped ≥ 0, independent of the end, as in Unity; **default `10`**) |
 | `Graphics.GetDepthOfFieldMode` / `SetDepthOfFieldMode` | `()` / `(name)` | `"Off"` / `"Gaussian"` / `"Bokeh"` (**default `"Off"`**; names are case-insensitive, an unknown one raises an error listing them; see *Depth of field*) |
+| `Graphics.GetDepthOfFieldQuality` / `SetDepthOfFieldQuality` | `()` / `(name)` | which working resolution it blurs at (**default `"Medium"`**; `"Low"` / `"Medium"` / `"High"` take the running preset's values, `"Custom"` the ones beside it; names are case-insensitive, an unknown one raises an error listing them; see *Quality presets*) |
+| `Graphics.GetDepthOfFieldResolutionDivisor` / `SetDepthOfFieldResolutionDivisor` | `()` / `(n)` | `number`: the `Custom` blur runs at the view's size over this (clamped 1–4, **default `2`**) |
 | `Graphics.GetExposure` / `SetExposure` | `()` / `(ev)` | `number` (EV): the configured exposure, in both modes (the adapted EV in `Automatic` is the dev-only `Debug.GetAdaptedExposure`; see *Automatic exposure*) |
 | `Graphics.GetExposureCompensation` / `SetExposureCompensation` | `()` / `(ev)` | `number` (clamped −10–10, **default `0`**) |
 | `Graphics.GetExposureLimits` / `SetExposureLimits` | `()` / `(min_ev, max_ev)` | `min_ev, max_ev` (each clamped −10–10, `max_ev` ≥ `min_ev`; **default `-6, 6`**) |
@@ -81,20 +86,26 @@ set on that camera entity, in the inspector or the scene file.
 | `Graphics.GetMotionBlurActive` / `SetMotionBlurActive` | `()` / `(bool)` | `bool` |
 | `Graphics.GetMotionBlurIntensity` / `SetMotionBlurIntensity` | `()` / `(value)` | `number`: Unity's *Intensity*, the shutter fraction (clamped 0–1, **default `0.5`**, a 180° shutter) |
 | `Graphics.GetMotionBlurMaxLength` / `SetMotionBlurMaxLength` | `()` / `(value)` | `number`: Unity's *Clamp*, the longest streak as a fraction of the view's height (clamped 0–0.2, **default `0.05`**) |
-| `Graphics.GetMotionBlurSamples` / `SetMotionBlurSamples` | `()` / `(n)` | `number` (clamped 2–32; the clamp is in the shared authoring op) |
+| `Graphics.GetMotionBlurQuality` / `SetMotionBlurQuality` | `()` / `(name)` | which tap count it runs at (**default `"Medium"`**; `"Low"` / `"Medium"` / `"High"` take the running preset's values, `"Custom"` the ones beside it; names are case-insensitive, an unknown one raises an error listing them; see *Quality presets*) |
+| `Graphics.GetMotionBlurSamples` / `SetMotionBlurSamples` | `()` / `(n)` | `number`: the `Custom` taps (clamped 2–32; the clamp is in the shared authoring op) |
 | `Graphics.GetOption` / `SetOption` | `(name)` / `(name, bool)` | `bool`: the player's graphics option (see *Player options*; **default `true`**) |
 | `Graphics.GetOptionNames` | `()` | array of every option name, alphabetical (a menu's order) |
 | `Graphics.GetPostParam` / `SetPostParam` | `(name)` / `(name, value)` | a custom effect's runtime param: `number`, or an array for a vector param (the effect's baked default until set; the block's catalog default with no active volume, where a set raises an error) |
-| `Graphics.GetQuality` / `SetQuality` | `()` / `(name)` | `"Low"` / `"Medium"` / `"High"` |
+| `Graphics.GetQuality` / `SetQuality` | `()` / `(name)` | `string`: the running quality preset's name (one of the project's, case-insensitive; an unknown one raises an error listing them; `nil` when the project has none; see *Quality presets*) |
 | `Graphics.GetRenderScale` / `SetRenderScale` | `()` / `(scale)` | `number`: the scene's resolution as a factor of the surface's (clamped 0.1–2, **default `1`**; see *Render scale*) |
 | `Graphics.GetSaturation` / `SetSaturation` | `()` / `(value)` | `number` |
 | `Graphics.GetShadowCascades` / `SetShadowCascades` | `()` / `(n)` | `number` (clamped 1–4, **default `4`**) |
 | `Graphics.GetShadowDistance` / `SetShadowDistance` | `()` / `(units)` | `number` (world units, clamped ≥ 1, **default `100`**) |
 | `Graphics.GetSsaoActive` / `SetSsaoActive` | `()` / `(bool)` | `bool` (**default `true`** on a volume; `false` with no active volume) |
 | `Graphics.GetSsaoIntensity` / `SetSsaoIntensity` | `()` / `(value)` | `number` (clamped 0–4, **default `1`**) |
+| `Graphics.GetSsaoQuality` / `SetSsaoQuality` | `()` / `(name)` | which samples and resolution it runs at (**default `"Medium"`**; `"Low"` / `"Medium"` / `"High"` take the running preset's values, `"Custom"` the ones beside it; names are case-insensitive, an unknown one raises an error listing them; see *Quality presets*) |
 | `Graphics.GetSsaoRadius` / `SetSsaoRadius` | `()` / `(units)` | `number` (world units, clamped ≥ 0.01, **default `0.5`**) |
+| `Graphics.GetSsaoResolutionDivisor` / `SetSsaoResolutionDivisor` | `()` / `(n)` | `number`: the `Custom` occlusion target is the view's size over this (clamped 1–4, **default `2`**) |
+| `Graphics.GetSsaoSamples` / `SetSsaoSamples` | `()` / `(n)` | `number`: the `Custom` samples per texel (clamped 1–64, **default `8`**) |
 | `Graphics.GetSsrActive` / `SetSsrActive` | `()` / `(bool)` | `bool` |
-| `Graphics.GetSsrQuality` / `SetSsrQuality` | `()` / `(name)` | `string` |
+| `Graphics.GetSsrQuality` / `SetSsrQuality` | `()` / `(name)` | which march it runs (**default `"Medium"`**; `"Low"` / `"Medium"` / `"High"` take the running preset's values, `"Custom"` the ones beside it; names are case-insensitive, an unknown one raises an error listing them; see *Quality presets*) |
+| `Graphics.GetSsrStepLength` / `SetSsrStepLength` | `()` / `(units)` | `number`: the `Custom` march's step, world units (clamped 0.05–2, **default `0.375`**) |
+| `Graphics.GetSsrSteps` / `SetSsrSteps` | `()` / `(n)` | `number`: the `Custom` march's step count (clamped 1–256, **default `32`**) |
 | `Graphics.GetTonemap` / `SetTonemap` | `()` / `(name)` | `"None"` / `"Reinhard"` / `"ACES"` (Unity's name; names are case-insensitive) |
 | `Graphics.GetVignetteActive` / `SetVignetteActive` | `()` / `(bool)` | `bool` (**default `false`**; see *Lens effects*) |
 | `Graphics.GetVignetteCenter` / `SetVignetteCenter` | `()` / `(x, y)` | `x, y` (screen uv, `0, 0` top-left, each clamped 0–1, **default `0.5, 0.5`**) |
@@ -102,7 +113,10 @@ set on that camera entity, in the inspector or the scene file.
 | `Graphics.GetVignetteIntensity` / `SetVignetteIntensity` | `()` / `(value)` | `number` (clamped 0–1, **default `0.3`**) |
 | `Graphics.GetVignetteSmoothness` / `SetVignetteSmoothness` | `()` / `(value)` | `number` (falloff softness, clamped 0.01–1, **default `0.2`**) |
 | `Graphics.GetWhiteBalance` / `SetWhiteBalance` | `()` / `(temperature, tint)` | `temperature, tint` (each clamped −100–100, **neutral `0, 0`**; see *Colour grading*) |
+| `Graphics.QualityPresets` | `()` | array of the project's presets, in order, each `{ name, ssao, ssr, ... }` with every value it holds (see *Quality presets*) |
+| `Graphics.RemoveQualityPreset` | `(name)` | nothing; removes the project's preset of that name (an unknown one raises an error listing them) |
 | `Graphics.ResetOptions` | `()` | nothing; every option back to the project's default |
+| `Graphics.SetQualityPreset` | `(name, values)` | nothing; writes `values` (any part of a preset's, as `QualityPresets` lists them) over the preset of that name, or adds it over the engine's values (a key a preset has not raises an error) |
 
 ### Post effects
 
@@ -145,9 +159,10 @@ a `DepthOnly` overlay camera (a gun 0.6 m from its camera) stays sharp while the
 focuses far: an overlay camera's pixels are outside the world's focus. Only opaque
 and cutout surfaces write that depth: a transparent viewmodel pixel (a muzzle flash,
 scope glass) takes the blur of what lies behind it, while opaque viewmodel meshes
-stay sharp. The quality tier sets its cost:
-off on **Low**, blurred at half resolution on **Medium**, full on **High**; the
-player's `depth_of_field` option turns it off, and the editor's Scene view never runs
+stay sharp. Its **quality** sets its cost, the working resolution it blurs at (the
+seeded presets' `Medium` level: half resolution on the `Low` and `Medium` presets,
+full on `High`; `Custom` takes the `resolution_divisor` knob); no preset turns it
+off (see *Quality presets*). The player's `depth_of_field` option turns it off, and the editor's Scene view never runs
 it. While it runs the view writes the velocity target its depths come from, as for
 motion blur; mode `Off` costs nothing and draws exactly what no depth of field does.
 The Inspector's **Depth of Field** section edits the same fields, and they are saved
@@ -159,7 +174,7 @@ Tween paths: `Graphics.depth_of_field.gaussian_start`, `Graphics.depth_of_field.
 #### Motion blur
 
 **Motion vectors** (#1435). A view whose base camera runs motion blur (it is on, and
-the tier is Medium or High) also writes a per-pixel velocity buffer from its opaque
+the player's option allows it) also writes a per-pixel velocity buffer from its opaque
 pass: each solid's motion since last frame, through its own last-frame transform and
 skin, so an enemy running past a still camera moves in it and a viewmodel camera's
 gun, turning with its camera, does not. Mesh particles ride the opaque pass and write
@@ -271,19 +286,23 @@ camera (a viewmodel) draws over it and gets none. An authored surface block that
 restyles the colour scales the reflection with it (`hit_flash` at amount 1 shows
 none); one that isn't a per-channel scale of it (`toon_ramp`, `hologram`, `desaturate`)
 gets no SSR.
-`Debug.Stats().gpu_passes.ssr` times it. The real screen-space pass runs on
-the **High** tier only; on every tier the forward shader reflects the sky or a
-reflection probe. The **quality** (`"Low"`, `"Medium"`, `"High"`, `"Ultra"`) sets the
-march: 16, 32, 64 or 128 steps, reaching 8, 12, 16 or 25.6 m, so Low is the cheapest.
-The player's `ssr` option gates it. A new volume starts with SSR on at `"High"`
-quality. No tween paths: its settings are a switch and a name.
+`Debug.Stats().gpu_passes.ssr` times it. Where SSR is off the forward shader reflects
+the sky or a reflection probe. Its **quality** sets the march (see *Quality presets*):
+the seeded `Medium` preset marches 16, 32 or 64 steps at its `Low`, `Medium` and
+`High` levels, reaching 8, 12 or 16 m (the `Low` preset 16, 16 and 32; the `High`
+preset 32, 64 and 128, reaching 25.6 m), and `Custom` marches `steps` steps of
+`step_length` world units. No preset turns it off. The player's `ssr` option gates
+it. A new volume starts with SSR on at the `Medium` quality.
+Tween paths: `Graphics.ssr.step_length` (a count, as `steps`, does not tween).
 
 <!-- effect: bloom -->
 #### Bloom
 
 **Bloom** bleeds the scene's bright parts into their surroundings: a bright pass
 keeps the light above the **threshold** (by luminance), a gaussian blur spreads it at
-half the view's resolution (a quarter on Low), and the composite adds it back times
+a fraction of the view's resolution its **quality** picks (the seeded presets'
+`Medium` level: a quarter on `Low`, half on `Medium` and `High`; `Custom` takes the
+`resolution_divisor` knob; see *Quality presets*), and the composite adds it back times
 the **intensity**, before the exposure. It reads the scene after depth of field and
 motion blur, so a moving highlight blooms along its streak. The player's `bloom`
 option gates it. A new volume starts with bloom on at intensity `1`, threshold `0.8`.
@@ -319,8 +338,8 @@ add, as URP's uber pass does: the exposure and the grade apply to it, and it nev
 blooms itself, is never reflected by screen-space reflections, nor split by the
 volume's chromatic aberration.
 **It runs only while bloom runs**, since it reads bloom's chain: bloom off, or the
-player's `bloom` option off, means no flare. It is off on the Low tier, and the
-player's `lens_flare` option gates it. A new volume starts with it off; once on, four
+player's `bloom` option off, means no flare. The player's `lens_flare` option gates
+it. A new volume starts with it off; once on, four
 ghosts, a halo at `0.5` and no streaks. A frame with nothing above bloom's threshold
 is byte-identical with it on and off, and a flare that can add nothing (no ghosts,
 halo or streaks, or a black tint) costs no pass. Its GPU time is
@@ -505,9 +524,9 @@ end
 tonemapped image just before it reaches the screen. It is **on by default** — a
 scene saved before the knob existed loads with it on, and so does a scene with no
 camera component at all, which is why `GetFxaaActive` returns `true` rather than
-`false` when there is no active camera. It is *not* gated by the quality preset (the player's `fxaa` option can turn it off):
-it runs on every tier including Low, where a cheap fullscreen pass is exactly the
-anti-aliasing an integrated GPU wants. Turning it off restores raw, stair-stepped
+`false` when there is no active camera. It has no quality knob (the player's `fxaa`
+option can turn it off): a cheap fullscreen pass is exactly the anti-aliasing an
+integrated GPU wants. Turning it off restores raw, stair-stepped
 edges — useful for a pixel-art look, or for diffing screenshots.
 
 ### Lighting settings
@@ -565,19 +584,55 @@ without an active volume runs none. A `DepthOnly` camera stacked on another (a
 viewmodel) runs none of its own and its solids take no occlusion, as with Unity URP's
 overlay cameras (#1497): a gun shading itself is not worth a full-screen pass.
 
-Its cost is gated by the quality preset: **off on Low**; on **Medium** 8 samples
-per texel at half resolution; on **High** 16 at full resolution. Either way each
-camera that runs it also draws its visible solids once more, depth only (a prepass), and runs a
+Its **quality** sets its cost (see *Quality presets*): the seeded presets' `Medium`
+level traces 8 samples per texel at half resolution on the `Medium` preset, 16 at
+full on `High` and 6 at half on `Low`; `Custom` traces the `samples` knob at the
+`resolution_divisor` knob's resolution. No preset turns it off. Each camera that runs it also draws its visible solids once more, depth only (a prepass), and runs a
 25-tap blur at full resolution. The frame stats report it (`ssao_samples`, and the
 prepass inside `draw_calls` / `triangles`; see `Debug`). `SetSsaoActive(false)` —
 or intensity `0` — skips every one of those passes.
 
-The global **quality preset** gates the heavier passes (SSR is High-tier only;
-motion blur, SSAO, depth of field and the lens flare are off on Low, SSAO and depth of field are
-half-resolution on Medium; FXAA runs on all of them). `SetQuality` writes a shared
-resource cell that the platform layer reads each frame and hands to the renderer,
-which reallocates its bloom buffers when the tier actually changes. Unrecognized
-tonemap/quality names are ignored (the current value is kept).
+### Quality presets
+
+Every post effect with a cost carries a **quality** on its camera or volume (#1522),
+HDRP's model: `"Low"`, `"Medium"` or `"High"` take that effect's values from the
+**running quality preset**, its row for that level, and `"Custom"` takes the values
+authored beside it (SSAO's `samples` and `resolution_divisor`, SSR's `steps` and
+`step_length`, bloom's and depth of field's `resolution_divisor`, motion blur's
+`samples`). A new volume and camera start at `"Medium"`. A preset never turns an
+effect off: an effect a camera has on (and the player allows) runs, at the quality
+its settings say. The Inspector shows each effect's quality, and its `Custom` fields
+while it is `Custom`.
+
+The presets are **the game's**, as Unity's Project Settings → Quality levels are:
+`project.rusty` holds them under `"quality"`, in order, each a name and every
+effect's values at the three levels, plus the one a player with no saved choice
+gets (`"default"`; without one, the middle preset):
+
+```json
+"quality": { "default": "Medium", "presets": [
+  { "name": "Low", "ssao": { "low": { "samples": 4, "resolution_divisor": 2 }, … },
+    "ssr": { … }, "bloom_resolution_divisor": { "low": 4, "medium": 4, "high": 2 },
+    "depth_of_field_resolution_divisor": { … }, "motion_blur_samples": { … },
+    "ui_blur_divisor": 4 }, … ] }
+```
+
+A new project is seeded with `Low`, `Medium` and `High` (`Medium` first); the game may
+edit, rename, add to or delete them, in the file or through `SetQualityPreset` /
+`RemoveQualityPreset`, which write the file in the editor (in the player and the
+harness they change the running game only). `QualityPresets()` lists them with every
+value; `SetQualityPreset(name, values)` writes only the values it names:
+
+```lua
+Graphics.SetQualityPreset("Ultra", { ssao = { high = { samples = 48 } } })
+Graphics.SetQuality("Ultra")   -- the player's menu entry
+```
+
+`SetQuality(name)` selects one (the editor's **Config** menu lists them too); the
+running preset's values reach the renderer next frame, and bloom reallocates its
+buffers when its divisor actually changes. `ui_blur_divisor` is the UI backdrop
+blur's, which has no volume (a power of two). A project with no presets runs the
+seeded `Medium` preset's values.
 
 ### Render scale
 
@@ -595,7 +650,7 @@ included), and cannot do that. Each side is capped at the device's largest textu
 8192 px wide rather than failing.
 
 Range `0.1`–`2` (URP's), **default `1`**, which renders exactly as without it (no
-upscale pass). Like the tier it is a player setting: it writes the same shared cell,
+upscale pass). Like the quality preset it is a player setting: it writes the same shared cell,
 applies the next frame in the standalone player and the editor's Game view, and is
 **persisted** through `Storage` (`graphics.render_scale`) at the Stop and quit
 boundaries. Screen sizes stay the surface's: `UI.GetScreenSize`, the UI's layout and
@@ -607,8 +662,7 @@ their own size.
 
 The **player graphics options** (#1438) are what an options menu's "Motion blur:
 off" writes. They **gate** effects rather than set them: an effect runs for a view
-only when its camera has it on **and** the player's option allows it **and** the
-quality tier runs it. So the developer's authored look stays on each camera, and the
+only when its camera has it on **and** the player's option allows it. So the developer's authored look stays on each camera, and the
 player's choice holds for every camera and every scene, including ones loaded later.
 An option can only turn an effect off; it never turns on what a camera left off.
 
@@ -617,13 +671,13 @@ An option can only turn an effect off; it never turns on what a camera left off.
 |---|---|
 | `bloom` | the camera's volume's bloom |
 | `chromatic_aberration` | the volume's chromatic aberration |
-| `depth_of_field` | the volume's depth of field (off on Low) |
+| `depth_of_field` | the volume's depth of field |
 | `film_grain` | the volume's film grain |
 | `fxaa` | the camera's FXAA |
-| `lens_flare` | the volume's lens flare (off on Low; only while bloom runs) |
-| `motion_blur` | the camera's motion blur (also off on Low) |
-| `ssao` | the volume's ambient occlusion (off on Low) |
-| `ssr` | the volume's screen-space reflections (High only) |
+| `lens_flare` | the volume's lens flare (only while bloom runs) |
+| `motion_blur` | the camera's motion blur |
+| `ssao` | the volume's ambient occlusion |
+| `ssr` | the volume's screen-space reflections |
 | `vignette` | the volume's vignette |
 
 Names are snake_case; an unknown name raises an error listing the valid ones.
@@ -634,7 +688,7 @@ the choice sticks across relaunches. Only the options the player set are saved
 default a later version of the game changes.
 
 The editor's **Scene view** ignores the player options, as Unity's Scene view ignores
-PlayerPrefs: it gates on the camera and the tier only. The Game view, the player and
+PlayerPrefs: it gates on the camera only (the quality preset still applies). The Game view, the player and
 every headless capture (a `play` scenario's screenshot, an MCP capture) honour all
 three, so a shot shows what `GetOption` says.
 
@@ -664,8 +718,10 @@ post-FX volume and the preset and options cell are read by the render layer, nev
 `FixedUpdate`. Toggling these knobs therefore cannot change how the deterministic
 sim evolves, and a headless replay stays bit-for-bit stable regardless of them.
 
-The quality preset and the `Video` settings below are **persisted** through
-`Storage` (the `graphics.quality` key and the `video` namespace): the windowed app
-reads them at startup and writes them back, the tier at the Stop and quit
-boundaries and the video settings at quit, so the app relaunches at the
-last-chosen tier and video settings.
+The player's quality preset and the `Video` settings below are **persisted** through
+`Storage` (the `graphics.quality` key, the preset's name, and the `video`
+namespace): the windowed app reads them at startup and writes them back, the preset
+at the Stop and quit boundaries and the video settings at quit, so the app relaunches
+at the last-chosen preset and video settings. Only a preset the player chose is
+saved, so one who never chose follows the project's default; a saved name the game
+has since removed runs the default.

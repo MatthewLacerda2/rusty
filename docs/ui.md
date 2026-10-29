@@ -433,8 +433,8 @@ change of clip.
   frame — often a swapchain image, which can be neither copied nor sampled. So right
   before the overlay pass the blur **re-runs the post-FX composite** over the view's
   HDR scene colour (after the camera stack's last stage, post-FX, #636) into its
-  first level at 1/2 of the view's size (1/4 on Low — the `Graphics` quality tier's
-  bloom divisor). The backdrop is therefore the graded, tonemapped, bloomed 3D frame
+  first level at 1/2 of the view's size (1/4 on the seeded `Low` preset — the
+  running quality preset's `ui_blur_divisor`). The backdrop is therefore the graded, tonemapped, bloomed 3D frame
   — everything but FXAA and authored post-FX effects, which a blur erases anyway —
   and **not UI drawn before it**: a pause panel over the HUD shows blurred world,
   not blurred HUD. Then a **dual-filter** chain (Bjørge, SIGGRAPH 2015; `ui_blur.wgsl`)
