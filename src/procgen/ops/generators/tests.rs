@@ -20,7 +20,7 @@ fn sampler(op: &OpKind, resolution: u32, seed: u64) -> Sampler {
         OpKind::Brick(p) => brick(p, seed),
         OpKind::Shape(p) => shape(p),
         OpKind::Checker(p) => checker(p),
-        OpKind::WhiteNoise(_) => white_noise(resolution, seed),
+        OpKind::WhiteNoise(_) => white_noise(resolution.into(), seed),
         other => panic!("{other:?} is not a generator"),
     }
 }

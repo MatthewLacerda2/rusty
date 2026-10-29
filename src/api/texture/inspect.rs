@@ -8,19 +8,22 @@ use crate::procgen::runner::preview::write_preview;
 use crate::procgen::runner::stats::{stats, NodeStats};
 use crate::procgen::TextureRecipe;
 
-/// The tile edge `Texture.Preview` uses when none is given, or the recipe's
-/// resolution when that is smaller.
+/// The tile's longer side `Texture.Preview` uses when none is given, or the
+/// recipe's longer side when that is smaller.
 pub const PREVIEW_SIZE: u32 = 128;
 
 /// `{ [node_id] = { min, max, mean, std, p1, p99 } }`, each an `{r, g, b, a}`
-/// sequence, evaluated at `resolution` when given.
+/// sequence, evaluated at `resolution` when given (a `size` recipe keeps its
+/// aspect, as `Material.Rebake` does).
 pub fn stats_table(
     lua: &Lua,
     mut recipe: TextureRecipe,
     resolution: Option<u32>,
 ) -> mlua::Result<Table> {
     if let Some(r) = resolution {
-        recipe.resolution = r;
+        recipe
+            .set_resolution(r)
+            .map_err(|e| mlua::Error::RuntimeError(format!("Texture.Stats: {e}")))?;
     }
     let all = stats(&recipe, &super::sources(&recipe)?)
         .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
@@ -54,7 +57,7 @@ pub fn preview_table(
     path: &str,
     size: Option<u32>,
 ) -> mlua::Result<Table> {
-    let size = size.unwrap_or(PREVIEW_SIZE.min(recipe.resolution));
+    let size = size.unwrap_or(PREVIEW_SIZE.min(recipe.extent().longer()));
     let columns = write_preview(recipe, &super::sources(recipe)?, path, size)
         .map_err(|e| mlua::Error::RuntimeError(format!("Texture.Preview: {e}")))?;
     let t = lua.create_table()?;

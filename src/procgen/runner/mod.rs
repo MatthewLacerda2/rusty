@@ -36,7 +36,7 @@ pub enum RunError {
     Empty,
     /// Two nodes share an id.
     DuplicateId(String),
-    /// `resolution` was 0 (or otherwise unusable).
+    /// The recipe has neither a `resolution` above 0 nor a `size`.
     BadResolution,
     /// A node is wired with fewer or more inputs than its op accepts.
     Arity(ArityError),
@@ -56,7 +56,7 @@ impl std::fmt::Display for RunError {
         match self {
             RunError::Empty => write!(f, "recipe has no nodes"),
             RunError::DuplicateId(id) => write!(f, "two nodes share the id '{id}'"),
-            RunError::BadResolution => write!(f, "recipe resolution must be > 0"),
+            RunError::BadResolution => write!(f, "recipe needs a resolution > 0 or a size"),
             RunError::Arity(e) => e.fmt(f),
             RunError::UnknownInput { node, input } => {
                 write!(f, "node '{node}' references unknown input '{input}'")
@@ -166,7 +166,7 @@ fn run(
             .collect();
         let op = &recipe.nodes[i].op;
         let seed = node_seed(recipe.seed, op.seed());
-        let out = eval_node(op, &inputs, recipe.resolution, seed, sources);
+        let out = eval_node(op, &inputs, recipe.extent(), seed, sources);
         on_node(i, &out);
         slots[i] = Some(out);
         live += 1;

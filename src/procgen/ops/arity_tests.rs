@@ -8,7 +8,7 @@ use super::*;
 use crate::procgen::recipe::{sample_op, WhiteNoise, OPS, SAMPLE_PATH};
 use crate::procgen::source::{Source, Sources};
 
-const RES: u32 = 8;
+const RES: Size = Size::new(8, 8);
 
 /// A 1×1 file under the path a sampled `image` op names.
 fn sources() -> Sources {

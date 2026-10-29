@@ -17,7 +17,7 @@ pub fn math(mut img: Image, rhs: Option<&Image>, op: MathOp, value: f32) -> Imag
         });
         return img;
     };
-    let w = img.resolution() as usize;
+    let w = img.width() as usize;
     img.for_each_row(|y, row| {
         for (x, p) in row.iter_mut().enumerate() {
             let q = rhs.pixels()[y * w + x];

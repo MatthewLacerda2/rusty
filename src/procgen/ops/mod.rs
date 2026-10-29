@@ -33,12 +33,12 @@ pub mod math;
 pub mod tile;
 pub mod vector;
 
-use super::image_buf::Image;
+use super::image_buf::{Image, Size};
 use super::recipe::OpKind;
 use super::source::Sources;
 
 /// Evaluate one node's op. `inputs` are the buffers of the node's input ids in order;
-/// `resolution` comes from the recipe, and `seed` is the recipe seed with the node's
+/// `size` is the recipe's extent, and `seed` is the recipe seed with the node's
 /// own folded in ([`super::hash::node_seed`], done by the runner). `sources` holds
 /// the decoded files `image` nodes read. Returns the node's output image.
 ///
@@ -49,13 +49,13 @@ use super::source::Sources;
 pub fn eval_node(
     op: &OpKind,
     inputs: &[&Image],
-    resolution: u32,
+    size: Size,
     seed: u64,
     sources: &Sources,
 ) -> Image {
-    let paint = |sampler| Image::fill_uv(resolution, sampler);
+    let paint = |sampler| Image::fill_uv(size, sampler);
     let own = || inputs[0].clone();
-    let px = |radius| filter::pixel_radius(radius, resolution);
+    let px = |radius| filter::pixel_radii(radius, size);
     match op {
         OpKind::Constant(p) => paint(generators::constant(p)),
         OpKind::Noise(p) => paint(generators::noise(p, seed)),
@@ -65,12 +65,12 @@ pub fn eval_node(
         OpKind::Brick(p) => paint(generators::brick(p, seed)),
         OpKind::Shape(p) => paint(generators::shape(p)),
         OpKind::Checker(p) => paint(generators::checker(p)),
-        OpKind::WhiteNoise(_) => paint(generators::white_noise(resolution, seed)),
+        OpKind::WhiteNoise(_) => paint(generators::white_noise(size, seed)),
         OpKind::Image(p) => {
             let source = sources
                 .get(&p.path)
                 .expect("the runner checks every image source");
-            generators::image(source, p.encoding, resolution)
+            generators::image(source, p.encoding, size)
         }
         OpKind::ColorRamp(p) => color::color_ramp(own(), &p.stops, p.interpolation),
         OpKind::Mix(p) => color::mix(own(), inputs[1], inputs.get(2).copied(), p.mode, p.factor),
@@ -83,7 +83,7 @@ pub fn eval_node(
             vector::mapping(inputs[0], p.scale, p.rotation, p.translation, p.tiling)
         }
         OpKind::BumpToNormal(p) => vector::bump_to_normal(inputs[0], p.strength),
-        OpKind::CombineRgb => vector::combine_rgb(inputs, resolution),
+        OpKind::CombineRgb => vector::combine_rgb(inputs, size),
         OpKind::SeparateRgb(p) => vector::separate_rgb(own(), p.channel),
         OpKind::Tile(p) => tile::tile(inputs[0], p.count, tile::Jitter::of(p), seed),
         OpKind::Warp(p) => vector::warp(inputs[0], inputs[1], p.strength),

@@ -9,41 +9,57 @@
 //! stays tiling — its main use is softening a height field before
 //! [`super::vector::bump_to_normal`] and feathering masks. The column pass runs as a
 //! row pass on the transposed image, so both pass by rows and band in parallel.
+//! Each axis takes its own radius in pixels, so on a non-square image the blur
+//! reaches the same fraction of the tile both ways (#1493).
 //!
 //! [`cavity`] and [`curvature`] derive weathering masks from a height field (its red
 //! channel) the way Substance does (#408): both wrap, and both take their reach in
 //! tile units, so the masks tile and look the same at any resolution.
 
-use super::super::image_buf::{Image, Rgba};
+use super::super::image_buf::{Image, Rgba, Size};
 use super::super::recipe::BlurKind;
 
-/// A blur radius given as a fraction of the tile width, in pixels at `resolution`:
-/// `radius * resolution`, at most half the tile (a wider window just wraps back over
-/// pixels it already averaged). Negative or NaN reads as no blur.
-pub fn pixel_radius(radius: f32, resolution: u32) -> f32 {
-    let px = radius * resolution as f32;
+/// A blur radius given as a fraction of the tile, in pixels along an axis of
+/// `pixels`: `radius * pixels`, at most half the tile (a wider window just wraps
+/// back over pixels it already averaged). Negative or NaN reads as no blur.
+pub fn pixel_radius(radius: f32, pixels: u32) -> f32 {
+    let px = radius * pixels as f32;
     if px > 0.0 {
-        px.min((resolution / 2) as f32)
+        px.min((pixels / 2) as f32)
     } else {
         0.0
     }
 }
 
-/// Separable blur reaching `radius` **pixels** (see [`pixel_radius`] for the
-/// recipe's tile-fraction unit). A blur with no pass returns the input unchanged.
-pub fn blur(img: &Image, radius: f32, kind: BlurKind) -> Image {
-    let passes = passes(radius, kind);
-    let Some((&first, rest)) = passes.split_first() else {
+/// [`pixel_radius`] on each axis of `size`: `(across, down)`.
+pub fn pixel_radii(radius: f32, size: Size) -> (f32, f32) {
+    (
+        pixel_radius(radius, size.width),
+        pixel_radius(radius, size.height),
+    )
+}
+
+/// Separable blur reaching `across` pixels along rows and `down` along columns
+/// (see [`pixel_radii`] for the recipe's tile-fraction unit). A blur with no pass
+/// returns the input unchanged.
+pub fn blur(img: &Image, (across, down): (f32, f32), kind: BlurKind) -> Image {
+    let (across, down) = (passes(across, kind), passes(down, kind));
+    if across.is_empty() && down.is_empty() {
         return img.clone();
-    };
-    // Each pass replaces the last, so at most four images live at once.
-    let rows = rest
-        .iter()
-        .fold(blur_rows(img, first), |acc, &p| blur_rows(&acc, p));
-    let cols = passes
-        .iter()
-        .fold(rows.transposed(), |acc, &p| blur_rows(&acc, p));
-    cols.transposed()
+    }
+    let rows = along_rows(img, &across);
+    along_rows(&rows.transposed(), &down).transposed()
+}
+
+/// `passes` run in turn along every row of `img`. Each pass replaces the last, so at
+/// most four images live at once.
+fn along_rows(img: &Image, passes: &[Pass]) -> Image {
+    match passes.split_first() {
+        None => img.clone(),
+        Some((&first, rest)) => rest
+            .iter()
+            .fold(blur_rows(img, first), |acc, &p| blur_rows(&acc, p)),
+    }
 }
 
 /// One 1-D pass along a row.
@@ -95,7 +111,7 @@ fn box_passes(radii: impl IntoIterator<Item = i64>) -> Vec<Pass> {
 
 /// Run `pass` over every row of `src`, wrapping at the ends.
 fn blur_rows(src: &Image, pass: Pass) -> Image {
-    let mut out = Image::new(src.resolution());
+    let mut out = Image::new(src.size());
     match pass {
         Pass::Box(r) => {
             let inv = 1.0 / (2 * r + 1) as f64;
@@ -152,13 +168,13 @@ fn slide(src: &[Rgba], r: i64, inv: f64, out: &mut [Rgba]) {
     }
 }
 
-/// Cavity mask: how far each pixel sits below its `radius`-pixel neighbourhood (a
-/// Gaussian blur), `1 − max(blur(h) − h, 0)`, as grayscale. Flat and raised ground stay white;
-/// crevices go dark — multiply it into albedo for baked occlusion, or invert it for
-/// a dirt mask.
-pub fn cavity(img: &Image, radius: f32) -> Image {
+/// Cavity mask: how far each pixel sits below its neighbourhood (a Gaussian blur
+/// reaching `radius` pixels, `(across, down)`), `1 − max(blur(h) − h, 0)`, as
+/// grayscale. Flat and raised ground stay white; crevices go dark — multiply it
+/// into albedo for baked occlusion, or invert it for a dirt mask.
+pub fn cavity(img: &Image, radius: (f32, f32)) -> Image {
     let around = blur(img, radius, BlurKind::Gaussian);
-    let mut out = Image::new(img.resolution());
+    let mut out = Image::new(img.size());
     out.for_each_row(|y, row| {
         for ((p, h), b) in row.iter_mut().zip(img.row(y)).zip(around.row(y)) {
             let v = 1.0 - (b[0] - h[0]).max(0.0);
@@ -185,8 +201,7 @@ pub fn curvature(img: &Image, radius: f32, strength: f32) -> Image {
         (-diag, diag),
         (-diag, -diag),
     ];
-    let res = img.resolution();
-    Image::fill_uv(res, |u, v| {
+    Image::fill_uv(img.size(), |u, v| {
         let mean = ring.iter().map(|(du, dv)| h(u + du, v + dv)).sum::<f32>() / 8.0;
         let c = 0.5 + strength * (h(u, v) - mean);
         [c, c, c, 1.0]

@@ -18,7 +18,7 @@ fn bake(nodes: &[Node], resolution: u32) -> Image {
 
 /// Average each `k`×`k` block of `img` into one pixel.
 fn downsample(img: &Image, k: u32) -> Image {
-    let res = img.resolution() / k;
+    let res = img.width() / k;
     let mut out = Image::new(res);
     let inv = 1.0 / (k * k) as f32;
     for (i, px) in out.pixels_mut().iter_mut().enumerate() {

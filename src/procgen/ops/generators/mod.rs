@@ -23,7 +23,7 @@ mod voronoi;
 pub use image::image;
 
 use super::super::hash;
-use super::super::image_buf::Rgba;
+use super::super::image_buf::{Rgba, Size};
 use super::super::recipe::{
     Brick, Checker, Constant, GradientKind, Noise, Shape, Voronoi, WaveKind,
 };
@@ -71,14 +71,14 @@ pub fn shape(p: &Shape) -> Sampler {
     shape::sampler(p.kind, p.size, p.roundness, p.softness)
 }
 
-/// Per-pixel uniform white noise, grayscale. The pixel lattice wraps at `resolution`.
-/// `resolution` matters only here: the grain is one pixel.
-pub fn white_noise(resolution: u32, seed: u64) -> Sampler {
-    let r = resolution.max(1) as i64;
-    let res = resolution as f32;
+/// Per-pixel uniform white noise, grayscale. The pixel lattice wraps at `size`, per
+/// axis. `size` matters only here: the grain is one pixel on each axis.
+pub fn white_noise(size: Size, seed: u64) -> Sampler {
+    let (rx, ry) = (size.width.max(1) as i64, size.height.max(1) as i64);
+    let (w, h) = (size.width as f32, size.height as f32);
     Box::new(move |u, v| {
-        let x = ((u * res).floor() as i64).rem_euclid(r);
-        let y = ((v * res).floor() as i64).rem_euclid(r);
+        let x = ((u * w).floor() as i64).rem_euclid(rx);
+        let y = ((v * h).floor() as i64).rem_euclid(ry);
         gray(hash::unit2(x, y, 0, seed))
     })
 }

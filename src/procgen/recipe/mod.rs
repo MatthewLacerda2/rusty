@@ -19,6 +19,7 @@
 mod arity;
 mod catalog;
 pub mod color;
+mod extent;
 mod kinds;
 mod node;
 mod op_info;
@@ -104,13 +105,24 @@ pub enum OpKind {
     Distance(Distance),
 }
 
-/// The whole authored texture: the canvas resolution, the RNG seed (folded into
-/// every stochastic op), and the flat node list. The last node in topological order
+/// The whole authored texture: the canvas extent (`resolution` squared, or `size`),
+/// the RNG seed (folded into every stochastic op), and the flat node list. The last node in topological order
 /// that nothing else consumes is the recipe's output (or the explicit `output` id).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct TextureRecipe {
+    /// The side of a square bake. Ignored when `size` is set, so it may be left out
+    /// then (it reads 0, and is not written).
+    #[serde(default, skip_serializing_if = "is_zero")]
     pub resolution: u32,
+    /// A non-square bake's `[width, height]`, each a positive power of two, in
+    /// place of `resolution` (#1493). [`TextureRecipe::extent`] reads the two.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "extent::power_of_two_sides"
+    )]
+    pub size: Option<[u32; 2]>,
     #[serde(default)]
     pub seed: u64,
     pub nodes: Vec<Node>,
@@ -132,11 +144,18 @@ impl TextureRecipe {
     pub fn new(resolution: u32, nodes: Vec<Node>) -> Self {
         Self {
             resolution,
+            size: None,
             seed: 0,
             nodes,
             output: None,
             outputs: BTreeMap::new(),
         }
+    }
+
+    /// Bake at `[width, height]` instead of `resolution` squared.
+    pub fn with_size(mut self, size: [u32; 2]) -> Self {
+        self.size = Some(size);
+        self
     }
 
     /// Set the noise seed.
@@ -173,6 +192,11 @@ impl TextureRecipe {
     pub fn to_json(&self) -> Result<String, String> {
         serde_json::to_string_pretty(self).map_err(|e| e.to_string())
     }
+}
+
+/// Serde's `skip_serializing_if` for a `resolution` a `size` recipe leaves out.
+fn is_zero(n: &u32) -> bool {
+    *n == 0
 }
 
 #[cfg(test)]

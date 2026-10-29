@@ -86,7 +86,7 @@ pub fn tile(img: &Image, cells: f32, jitter: Jitter, seed: u64) -> Image {
     let n = count(cells);
     let per = n as i64;
     let reach = jitter.reach();
-    Image::fill_uv(img.resolution(), |u, v| {
+    Image::fill_uv(img.size(), |u, v| {
         let (px, py) = (u * n, v * n);
         let (gx, gy) = (px.floor() as i64, py.floor() as i64);
         let mut out: Rgba = [0.0, 0.0, 0.0, 1.0];
@@ -120,7 +120,7 @@ mod tests {
     fn no_jitter_repeats_the_input_exactly() {
         let src = Image::fill_uv(8, |u, v| [u, v, 0.0, 1.0]);
         let out = tile(&src, 2.0, Jitter::new(0.0, 0.0, 0.0), 1);
-        assert_eq!(out.resolution(), 8);
+        assert_eq!(out.size(), 8.into());
         for y in 0..8 {
             for x in 0..8 {
                 let expect = src.sample_bilinear_wrapped(

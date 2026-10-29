@@ -1,17 +1,17 @@
 //! The `image` generator (#1491): a decoded file resampled to the recipe's
-//! resolution.
+//! extent, each axis on its own.
 
-use super::super::super::image_buf::Image;
+use super::super::super::image_buf::{Image, Size};
 use super::super::super::recipe::ImageEncoding;
 use super::super::super::source::Source;
 use crate::core::color::gamma_to_linear;
 
 /// `source` read under `encoding` and resampled bilinearly, wrapped, to a
-/// `resolution²` image. Each output pixel centre maps to the same point of the
-/// source's unit domain, found in exact integer texel space, so a source already
-/// at `resolution` reads back texel for texel. sRGB is decoded per tap, before
+/// `size` image. Each output pixel centre maps to the same point of the source's
+/// unit domain, found in exact integer texel space per axis, so a source already
+/// at `size` reads back texel for texel. sRGB is decoded per tap, before
 /// filtering, so the blend happens in linear light and the source is never copied.
-pub fn image(source: &Source, encoding: ImageEncoding, resolution: u32) -> Image {
+pub fn image(source: &Source, encoding: ImageEncoding, size: Size) -> Image {
     let (w, h) = source.size();
     let texels = source.texels();
     let at = |x: i64, y: i64| {
@@ -27,11 +27,11 @@ pub fn image(source: &Source, encoding: ImageEncoding, resolution: u32) -> Image
             ],
         }
     };
-    let mut img = Image::new(resolution);
+    let mut img = Image::new(size);
     img.for_each_row(|py, row| {
-        let (yi, ty) = tap(py, h, resolution);
+        let (yi, ty) = tap(py, h, size.height);
         for (px, p) in row.iter_mut().enumerate() {
-            let (xi, tx) = tap(px, w, resolution);
+            let (xi, tx) = tap(px, w, size.width);
             let (p00, p10, p01, p11) = (
                 at(xi, yi),
                 at(xi + 1, yi),
@@ -48,13 +48,13 @@ pub fn image(source: &Source, encoding: ImageEncoding, resolution: u32) -> Image
     img
 }
 
-/// The source texel left of (or above) output pixel `i`'s centre, and the
-/// fraction past it. The centre sits at `(i + ½)·size/resolution − ½` texels,
-/// computed as the integer ratio `((2i + 1)·size − resolution) / (2·resolution)`,
-/// so a matching size lands on texel `i` with a fraction of exactly zero.
-fn tap(i: usize, size: u32, resolution: u32) -> (i64, f32) {
-    let num = (2 * i as i64 + 1) * size as i64 - resolution as i64;
-    let den = 2 * resolution as i64;
+/// The source texel left of (or above) output pixel `i`'s centre on one axis, and
+/// the fraction past it. The centre sits at `(i + ½)·source/out − ½` texels,
+/// computed as the integer ratio `((2i + 1)·source − out) / (2·out)`, so a
+/// matching side lands on texel `i` with a fraction of exactly zero.
+fn tap(i: usize, source: u32, out: u32) -> (i64, f32) {
+    let num = (2 * i as i64 + 1) * source as i64 - out as i64;
+    let den = 2 * out as i64;
     (num.div_euclid(den), num.rem_euclid(den) as f32 / den as f32)
 }
 
@@ -73,7 +73,7 @@ mod tests {
     #[test]
     fn a_source_at_the_recipe_resolution_reads_back_exactly() {
         let src = source(4, 4, |x, y| [x as f32 / 3.0, y as f32 / 3.0, 0.5, 1.0]);
-        let img = image(&src, ImageEncoding::Linear, 4);
+        let img = image(&src, ImageEncoding::Linear, 4.into());
         assert_eq!(img.pixels(), src.texels());
     }
 
@@ -84,14 +84,14 @@ mod tests {
         let src = source(100, 100, |x, y| {
             [x as f32 / 99.0, y as f32 / 99.0, 0.25, 1.0]
         });
-        let img = image(&src, ImageEncoding::Linear, 100);
+        let img = image(&src, ImageEncoding::Linear, 100.into());
         assert_eq!(img.pixels(), src.texels());
     }
 
     #[test]
     fn srgb_decodes_colour_and_leaves_alpha() {
         let src = source(1, 1, |_, _| [0.5, 1.0, 0.0, 0.5]);
-        let p = image(&src, ImageEncoding::Srgb, 2).pixels()[0];
+        let p = image(&src, ImageEncoding::Srgb, 2.into()).pixels()[0];
         assert_eq!(p, [gamma_to_linear(0.5), 1.0, 0.0, 0.5]);
     }
 
@@ -100,8 +100,20 @@ mod tests {
         // 2×1 black|white, upsampled to 4: the column between the white texel and
         // the wrapped black one reads their mean.
         let src = source(2, 1, |x, _| [x as f32, 0.0, 0.0, 1.0]);
-        let img = image(&src, ImageEncoding::Linear, 4);
+        let img = image(&src, ImageEncoding::Linear, 4.into());
         let row: Vec<f32> = img.row(0).iter().map(|p| p[0]).collect();
         assert_eq!(row, [0.25, 0.25, 0.75, 0.75]);
+    }
+
+    #[test]
+    fn a_non_square_extent_follows_the_source_per_axis() {
+        // A 4×2 file at a 4×2 extent reads back exactly; at 8×1 each axis
+        // resamples on its own.
+        let src = source(4, 2, |x, y| [x as f32, y as f32, 0.0, 1.0]);
+        let same = image(&src, ImageEncoding::Linear, Size::new(4, 2));
+        assert_eq!(same.pixels(), src.texels());
+        let wide = image(&src, ImageEncoding::Linear, Size::new(8, 1));
+        assert_eq!(wide.size(), Size::new(8, 1));
+        assert_eq!(wide.row(0)[2][..2], [0.75, 0.5]);
     }
 }
