@@ -73,7 +73,7 @@ def parse(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--no-merge", action="store_true", help="stop at green and hand each branch back rather than merging it")
     parser.add_argument(
         "--dry-run", action="store_true",
-        help="read everything and rebase locally, but push, comment and merge nothing; judges each head as it is today",
+        help="read everything and merge `main` in locally, but push, comment and merge nothing; judges each head as it is today",
     )
     parser.add_argument(
         "--deadline", type=float, default=DEADLINE_MINUTES, metavar="MINUTES",
@@ -85,13 +85,13 @@ def parse(argv: list[str]) -> argparse.Namespace:
     )
     parser.add_argument(
         "--no-check", action="store_true",
-        help="push a rebased head without compile-checking it first (CI still judges it)",
+        help="push an updated head without compile-checking it first (CI still judges it)",
     )
     parser.add_argument(
         "--target-dir", metavar="DIR",
         help="where the pre-push checks build (default: target/merge-queue under --root; never a worktree's own)",
     )
-    parser.add_argument("--root", default=".", metavar="DIR", help="the git checkout to rebase in (default: the current directory)")
+    parser.add_argument("--root", default=".", metavar="DIR", help="the git checkout to update in (default: the current directory)")
     opts = parser.parse_args(argv)
     if bool(opts.prs) == opts.watch:
         parser.error("name the pull requests, or pass --watch; not both, not neither")

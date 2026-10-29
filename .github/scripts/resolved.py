@@ -4,9 +4,12 @@
 The commit hook (`make pre-commit`) checks each commit as it is made, but two
 paths reach CI without it:
 
-- **`git rebase --continue` runs no pre-commit hook.** A conflict resolved by
-  hand mid-rebase is committed unchecked, and that is exactly when hand-edits
-  happen (a hand-back resolved under `make queue ARGS=--no-check`).
+- **A conflict resolved by hand can be committed unchecked.** `git rebase
+  --continue` runs no pre-commit hook, and a merge commit concluded with
+  `git commit --no-verify` skips it too; that is exactly when hand-edits
+  happen (a hand-back resolved under `make queue ARGS=--no-check`). Since #1568 a branch is updated by merging `main` in: the
+  merge commit is the pushed tip, `HEAD`, so this check reads the resolved tree
+  whichever way it was committed.
 - **`tools/lint` is its own crate.** `cargo fmt --all` from the root never
   reaches it, so before #1096 nothing local formatted it at all.
 

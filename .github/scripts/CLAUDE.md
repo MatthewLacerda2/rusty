@@ -14,8 +14,8 @@ coder *changing* it must know.
   in any cloud session.
 - **`.github/scripts/merging/` is the merge path, one responsibility per module** (#926).
   `merging/verdict/` answers "may this pull request merge?" (`make mergeable`, and the
-  queue before every merge); `merging/queue/` rebases, checks, pushes, waits and
-  lands; `merging/watch/` is `--watch`'s loop (order, aging, hand-backs, the lock, how
+  queue before every merge); `merging/queue/` merges `main` in, checks, pushes, waits
+  and lands; `merging/watch/` is `--watch`'s loop (order, aging, hand-backs, the lock, how
   it ends). `mergeable.py` and `merge-queue.py` are only the command lines. A new
   concern is a new module, not a longer one.
 - **`.github/scripts/dispatch/` is the batch's dispatch steps** (#1569): the brief

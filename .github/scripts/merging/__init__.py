@@ -4,7 +4,7 @@ Three parts, one per old script, each one responsibility per module:
 
 - [`verdict`] — `make mergeable PR=N`: did CI really run on the head commit and pass?
   Pure over plain dictionaries; [`verdict.decide.judge`] is the whole decision.
-- [`queue`] — `make queue PRS=...`: rebase, compile-check, push, wait for CI, ask the
+- [`queue`] — `make queue PRS=...`: merge `main` in, compile-check, push, wait for CI, ask the
   verdict, squash-merge, one pull request at a time.
 - [`watch`] — `make queue ARGS=--watch`: which labelled pull request goes next, and
   when the watch is done; and `make queue-daemon` ([`watch.supervisor`], #908), which

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""#968: a rebase the queue pushes dates the pull request's Gates line.
+"""#968: an update the queue pushes dates the pull request's Gates line.
 
-One line, naming the `main` it rebased onto and the head CI judges, written
-once: a second rebase replaces it. A bot's description is left alone, and a
+One line, naming the `main` it merged in and the head CI judges, written
+once: a second update replaces it. A bot's description is left alone, and a
 failure to write it never stops the take.
 """
 
@@ -23,9 +23,9 @@ BODY = "Closes #1\n\n**Gates**: all green on `79e180a`.\n"
 
 class Line(unittest.TestCase):
     def test_it_names_main_and_the_new_head(self):
-        self.assertEqual(stamping.line(MAIN, NEW), "_rebased by the queue onto `mmmmmmm`; local gates not re-run; CI judged `nnnnnnn`._")
+        self.assertEqual(stamping.line(MAIN, NEW), "_updated by the queue to `main` at `mmmmmmm`; local gates not re-run; CI judged `nnnnnnn`._")
 
-    def test_written_once_and_a_second_rebase_replaces_it(self):
+    def test_written_once_and_a_second_update_replaces_it(self):
         once = stamping.stamped(BODY, stamping.line(MAIN, NEW))
         self.assertTrue(once.startswith(BODY.rstrip()))
         self.assertEqual(stamping.stamped(once, stamping.line(MAIN, NEW)), once)
@@ -65,7 +65,7 @@ class Stamp(unittest.TestCase):
 
 
 class InTheTake(unittest.TestCase):
-    def test_a_pushed_rebase_stamps_once_and_an_unmoved_head_does_not(self):
+    def test_a_pushed_update_stamps_once_and_an_unmoved_head_does_not(self):
         taker = test_taking.Taking("test_no_merge_stops_at_green")
         with mock.patch.object(stamping, "stamp") as stamped:
             taker.take(advance=(NEW, []))

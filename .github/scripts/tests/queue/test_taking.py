@@ -12,7 +12,7 @@ import time
 import unittest
 from unittest import mock
 
-from merging.queue import cli, dependabot, gitio, landing, outcomes, pulls, rebase, taking, waiting
+from merging.queue import cli, dependabot, gitio, landing, outcomes, pulls, taking, update, waiting
 from merging.verdict import decide, github
 from tests.queue.fixtures import READY, completed
 from tests.verdict.fixtures import SHA
@@ -59,8 +59,8 @@ class Taking(unittest.TestCase):
         opts = cli.parse(["524", "--poll", "0", *argv])
         with mock.patch.object(pulls, "look", return_value=pull), \
             mock.patch.object(gitio, "git"), \
-            mock.patch.object(rebase, "advance", return_value=advance) as rebased, \
-            mock.patch.object(rebase, "on_tip", return_value=True), \
+            mock.patch.object(update, "advance", return_value=advance) as rebased, \
+            mock.patch.object(update, "on_tip", return_value=True), \
             mock.patch.object(waiting, "wait_for", return_value=(outcomes.GO, ["CI passed"])), \
             mock.patch.object(github, "evidence", return_value=([], {})), \
             mock.patch.object(decide, "judge", return_value=judged), \
@@ -122,8 +122,8 @@ class Taking(unittest.TestCase):
         bot = {**READY, "author": {"login": "app/dependabot"}}
         moved = {**bot, "headRefOid": "3" * 40}
         opts = cli.parse(["524", "--poll", "0"])
-        with mock.patch.object(rebase, "on_tip", side_effect=[False, True]), \
-            mock.patch.object(rebase, "main_moved_by_docs", return_value=False), \
+        with mock.patch.object(update, "on_tip", side_effect=[False, True]), \
+            mock.patch.object(update, "main_moved_by_docs", return_value=False), \
             mock.patch.object(pulls, "look", return_value=moved), \
             mock.patch.object(subprocess, "run", return_value=completed(0)) as called, \
             mock.patch.object(time, "sleep"), mock.patch("builtins.print"):
@@ -143,8 +143,8 @@ class Taking(unittest.TestCase):
 
     def test_dependabot_in_a_dry_run_is_not_commented_on(self):
         opts = cli.parse(["524", "--dry-run"])
-        with mock.patch.object(rebase, "on_tip", return_value=False), \
-            mock.patch.object(rebase, "main_moved_by_docs", return_value=False), \
+        with mock.patch.object(update, "on_tip", return_value=False), \
+            mock.patch.object(update, "main_moved_by_docs", return_value=False), \
             mock.patch.object(subprocess, "run") as called:
             fresh, notes = dependabot.bot_head(524, SHA, ".", opts)
         called.assert_not_called()

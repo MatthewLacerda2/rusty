@@ -16,7 +16,7 @@ import subprocess
 import time
 
 import ghrest
-from merging.queue import outcomes, pulls, rebase
+from merging.queue import outcomes, pulls, update
 
 
 BOT_REBASE = "@dependabot rebase"
@@ -32,10 +32,10 @@ def left(deadline_minutes: float, spent: float) -> float:
 def bot_head(number: int, head: str, root: str, opts: argparse.Namespace) -> tuple[str | None, list[str]]:
     """Dependabot's own rebase, waited for: a head on `main`'s tip, or why not.
 
-    Never force-pushed from here — Dependabot stops maintaining a branch
+    Never pushed to from here — Dependabot stops maintaining a branch
     somebody else pushed to. Asked once with [`BOT_REBASE`], then polled.
     """
-    if rebase.on_tip(head, root) or rebase.main_moved_by_docs(head, root):
+    if update.on_tip(head, root) or update.main_moved_by_docs(head, root):
         return head, []
     if opts.dry_run:
         return head, [f"would comment `{BOT_REBASE}` and wait for Dependabot's rebase."]
@@ -48,7 +48,7 @@ def bot_head(number: int, head: str, root: str, opts: argparse.Namespace) -> tup
     while time.monotonic() - began < opts.deadline * 60:
         time.sleep(opts.poll)
         seen = pulls.look(number).get("headRefOid", "")
-        if seen != head and rebase.on_tip(seen, root):
+        if seen != head and update.on_tip(seen, root):
             return seen, []
         outcomes.say(f"#{number}: waiting for Dependabot to rebase {head[:7]}.")
     return None, [f"Dependabot did not rebase {head[:7]} onto `main` within {opts.deadline:.0f} minutes."]

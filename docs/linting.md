@@ -123,8 +123,10 @@ round, so the gate list cannot silently lose a gate. `GATES` is `QUICK_GATES` pl
 - **Push hook:** `.githooks/pre-push` → `.github/scripts/resolved.py --hook` (#1096):
   `cargo fmt --all --check` and `tools/lint`'s rustfmt check, the pair `lint.yml`
   runs, with no build (the commit hook's own rustfmt cost). It exists because
-  `git rebase --continue` runs no commit hook, so a conflict resolved by hand would
-  otherwise reach CI unformatted. rustfmt reads the working tree, so the hook checks
+  `git rebase --continue` runs no commit hook (nor does a commit made with
+  `--no-verify`), so a conflict resolved by hand would otherwise reach CI
+  unformatted; a branch updated by merging `main` in (#1568) is checked the same
+  way, its merge commit being the pushed `HEAD`. rustfmt reads the working tree, so the hook checks
   only when a pushed tip is `HEAD` and lets any other push through; `make resolved`
   runs the same two checks on the working tree unconditionally.
   `git push --no-verify` skips it.

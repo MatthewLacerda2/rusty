@@ -15,7 +15,7 @@ import re
 import unittest
 from pathlib import Path
 
-from merging.queue import rebase
+from merging.queue import update
 from merging.verdict import changes
 
 SCRIPTS = Path(__file__).resolve().parents[1]
@@ -79,8 +79,8 @@ class DocsThatAreCode(unittest.TestCase):
     def test_the_queue_rebases_over_them(self):
         for prefix in changes.CODE_DOCS:
             with self.subTest(prefix=prefix):
-                self.assertFalse(rebase.docs_advance(f">abc\n{changes.code_doc_example(prefix)}\n"))
-        self.assertTrue(rebase.docs_advance(">abc\nREADME.md\n"))
+                self.assertFalse(update.docs_advance(f">abc\n{changes.code_doc_example(prefix)}\n"))
+        self.assertTrue(update.docs_advance(">abc\nREADME.md\n"))
 
 
 if __name__ == "__main__":

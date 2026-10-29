@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import unittest
 
-from merging.queue import outcomes, polling, rebase
+from merging.queue import outcomes, polling, update
 from tests.queue.fixtures import READY, SPENT, asked
 from tests.verdict import fixtures
 from tests.verdict.fixtures import SHA, built, drafted, run
@@ -85,9 +85,9 @@ class Polling(unittest.TestCase):
 
 
 class Rebasing(unittest.TestCase):
-    def test_a_rebase_that_moves_nothing_is_not_pushed(self):
-        self.assertFalse(rebase.push_needed(SHA, SHA))
-        self.assertTrue(rebase.push_needed(SHA, "0" * 40))
+    def test_an_update_that_moves_nothing_is_not_pushed(self):
+        self.assertFalse(update.push_needed(SHA, SHA))
+        self.assertTrue(update.push_needed(SHA, "0" * 40))
 
     def test_the_pre_push_head_is_github_lagging(self):
         state, lines = polling.head_state(SHA, "1" * 40, SHA, waited=1.0)
@@ -106,7 +106,7 @@ class Rebasing(unittest.TestCase):
         self.assertEqual(polling.head_state(SHA, SHA, SHA, 0.0)[0], outcomes.GO)
 
     def test_conflicted_paths_are_named(self):
-        named = rebase.conflicts("src/components/kind.rs\nsrc/app/registry.rs\n\n")
+        named = update.conflicts("src/components/kind.rs\nsrc/app/registry.rs\n\n")
         self.assertEqual(named, ["src/components/kind.rs", "src/app/registry.rs"])
 
 

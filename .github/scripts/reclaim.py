@@ -39,8 +39,9 @@ call. A lock whose reason names a supervisor PID that is no longer running is
 still protected, but named as stale with that PID, so a dead supervisor's lock
 shows up instead of keeping the worktree forever without a word.
 
-The merge queue rebases a branch before it merges it, so a local branch's
-commits are never an ancestor of the PR's recorded head, and the remote branch
+The merge queue rebased a branch before it merged it (until #1568; it now
+merges `main` in, but a branch rebased by hand is the same), so a local branch's
+commits were never an ancestor of the PR's recorded head, and the remote branch
 is deleted on merge (#1453: PR #1449's `session-start-fresh-main` and PR
 #1452's `rebrief-one-session` both stayed PROTECTED as "on no remote" until
 removed by hand). For a merged PR the unpushed commits are therefore excused
@@ -74,8 +75,8 @@ worktree (`claude agent agent-<id> (pid …)`).
 
 That PR-by-commit rule missed the common case (#1538): GitHub lists the pull
 requests of a commit not on the default branch only while they are OPEN, and
-the queue rebases every branch before merging it, so a reviewed head never
-reaches `main`. On 2026-10-28, after the batch merged, `make reclaim` kept 14
+the queue squash-merges every branch (and rebased it first, until #1568), so a
+reviewed head never reaches `main`. On 2026-10-28, after the batch merged, `make reclaim` kept 14
 `agent-*` worktrees as "detached, not on origin/main" and the reviewers'
 `pr1514`/`pr1531` branches as "no pull request" (PR #1509's reviewed head
 `7f254256` answers `[]`). So a reviewer's checkout is judged by what it
@@ -435,7 +436,7 @@ def main(argv: list[str], machine: Machine | None = None, here: Path | None = No
     after = machine.free(main_checkout)
     if machine.old_git:
         print("reclaim: note: git < 2.38 cannot check content against origin/main; "
-              "merged branches rebased by the queue stay PROTECTED")
+              "merged branches squashed or rebased by the queue stay PROTECTED")
     verb = "would remove" if dry else "removed"
     print(f"reclaim: {verb} {removed} of {len(worktrees)} worktree(s) and {deleted} branch(es); "
           f"free disk {gib(before)} -> {gib(after)}")

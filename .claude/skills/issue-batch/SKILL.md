@@ -13,8 +13,8 @@ This skill is how the orchestrator runs a batch on top of them.
 
 ## What runs together: file collision, not count
 
-Merging is serialized, so every branch behind another pays a rebase per merge
-ahead of it. Over separate files that is seconds of `git`; over shared code it is
+Merging is serialized, so every branch behind another pays an update (a merge of
+`main` into it) per merge ahead of it. Over separate files that is seconds of `git`; over shared code it is
 a session of conflict resolution. **Before starting a branch, ask whether it edits
 the same types as one in flight.** Spread across modules (physics, UI,
 navigation, audio, CI) at once; within one module, run one branch at a time.
@@ -148,10 +148,11 @@ Read `.claude/skills/issue-batch/cloud-brief.md` and follow it.
 Issue(s): #N. Your brief is the comment at <the brief's URL>; read it there, not the newest `Brief`.
 ```
 
-A re-brief (a rebase, a fix, a new sibling) is a new `Brief` comment on the
-issue that says **add commits on top, rebase only if the PR conflicts** (the
-queue rebases at merge; a voluntary rebase's force-push was refused twice on
-2026-10-28 and cost a `-v2` PR each), and the PR turned back to draft. **Then `RemoteTrigger run` the coder's own routine right
+A re-brief (a conflict, a fix, a new sibling) is a new `Brief` comment on the
+issue that says **add commits on top, merge `origin/main` in only if the PR
+conflicts, never rebase** (the queue merges `main` in at merge time; a rebase's
+force-push was refused twice on 2026-10-28 and cost a `-v2` PR each, #1568), so
+no brief needs to authorise a force-push, and the PR turned back to draft. **Then `RemoteTrigger run` the coder's own routine right
 away.** Its prompt already points at the newest `Brief`. Don't wait for the old
 session: it is subscribed to the PR, not the issue. In the 2026-10-22 batch,
 sessions woke on the draft flip, read only the PR, found no instruction and
@@ -282,7 +283,7 @@ The model follows the shape of the task, not the area of the code (operator,
 2026-10-19). **Sonnet when the issue already says exactly what to do and a gate
 proves it was done; Opus when the work has to decide something.**
 
-- **Sonnet:** a mechanical rebase (two rows in one table, a moved file); a doc
+- **Sonnet:** a mechanical conflict resolution (two rows in one table, a moved file); a doc
   fix the docrefs check proves; splitting an oversized file or regrouping a
   directory; a lint rule whose issue names the case to flag and the case to pass;
   the editor's egui panels, cards and inspectors.

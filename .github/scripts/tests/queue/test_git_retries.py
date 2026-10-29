@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """#875: a transient `git` failure is asked again, never a hand-back.
 
-One SSL timeout on the queue's force-push handed back a healthy branch, and the
+One SSL timeout on the queue's push handed back a healthy branch, and the
 watch then remembered it as handed back until its head moved. The queue's own
-`git` calls to GitHub now retry on `github.gh`'s backoff, the push keeps its
-lease on the head the take began from, and a network that stays down stops the
+`git` calls to GitHub now retry on `github.gh`'s backoff, every retry is the
+same plain push (never forced, #1568), and a network that stays down stops the
 queue as the machine's failure.
 """
 
@@ -14,13 +14,13 @@ import time
 import unittest
 from unittest import mock
 
-from merging.queue import gitio, outcomes, stopping
+from merging.queue import gitio, outcomes, refusal, stopping
 from merging.verdict import github
-from tests.queue.fixtures import FRESH, SHA, STALE, advancing, done
+from tests.queue.fixtures import FRESH, NON_FF, advancing, done
 
 
 SSL = "fatal: unable to access 'https://github.com/o/r/': SSL connection timeout"
-LEASE = f"--force-with-lease=refs/heads/b:{SHA}"
+PUSH = ("push", "origin", "HEAD:refs/heads/b")
 
 
 class Wording(unittest.TestCase):
@@ -34,7 +34,7 @@ class Wording(unittest.TestCase):
             self.assertTrue(gitio.git_transient(stderr), stderr)
 
     def test_refusals_are_not(self):
-        for stderr in (STALE, "fatal: couldn't find remote ref nope", "fatal: not a git repository"):
+        for stderr in (NON_FF, "fatal: couldn't find remote ref nope", "fatal: not a git repository"):
             self.assertFalse(gitio.git_transient(stderr), stderr)
 
 
@@ -52,7 +52,7 @@ class Remote(unittest.TestCase):
         self.assertEqual({c.args for c in called.call_args_list}, {("fetch", "origin", "main")})
 
     def test_a_refusal_is_returned_at_once(self):
-        result, called, slept = self.remote(done(1, STALE))
+        result, called, slept = self.remote(done(1, NON_FF))
         self.assertEqual((result.returncode, called.call_count, slept), (1, 1, []))
 
     def test_down_through_every_retry_is_unreachable(self):
@@ -61,7 +61,7 @@ class Remote(unittest.TestCase):
 
 
 class Pushing(unittest.TestCase):
-    """[`rebase.advance`]'s push through a flaky network."""
+    """[`update.advance`]'s push through a flaky network."""
 
     def advance(self, pushes, remote_head=FRESH):
         self.calls = []
@@ -70,20 +70,19 @@ class Pushing(unittest.TestCase):
     def pushes(self):
         return [c for c in self.calls if c[0] == "push"]
 
-    def test_a_push_through_blips_lands_and_keeps_its_lease(self):
+    def test_a_push_through_blips_lands_never_forced(self):
         fresh, notes = self.advance([done(128, SSL), done(128, SSL), done(0)])
         self.assertEqual((fresh, notes), (FRESH, []))
-        self.assertEqual(len(self.pushes()), 3)
-        self.assertTrue(all(LEASE in p for p in self.pushes()))
+        self.assertEqual(self.pushes(), [PUSH] * 3)
 
     def test_a_push_that_landed_before_its_reply_was_lost_is_pushed(self):
-        fresh, notes = self.advance([done(128, SSL), done(1, STALE)])
+        fresh, notes = self.advance([done(128, SSL), done(1, NON_FF)])
         self.assertEqual((fresh, notes), (FRESH, []))
 
-    def test_a_real_refusal_is_still_handed_back(self):
-        fresh, notes = self.advance([done(1, STALE)], remote_head="2" * 40)
+    def test_a_branch_moved_since_is_refused_and_named_moved(self):
+        fresh, notes = self.advance([done(1, NON_FF)], remote_head="2" * 40)
         self.assertIsNone(fresh)
-        self.assertIn("refused", notes[0])
+        self.assertEqual(notes[0], refusal.MOVED)
 
     def test_a_network_down_through_every_retry_stops_and_cleans_up(self):
         with self.assertRaises(github.Unreachable):

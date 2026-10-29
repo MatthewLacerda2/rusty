@@ -3,8 +3,10 @@
 Merging stays serialized, one branch at a time, because rusty is one compiled
 crate: two pull requests can each be green alone and break `main` together (a
 rename, a changed signature, a moved module). Nothing here proposes otherwise.
-What this automates is **who sits through the ten minutes** — rebase the
-branch, compile-check the rebased tree ([`checks.verify`]), force-push it, wait for the runs on the rebased head, ask
+What this automates is **who sits through the ten minutes** — merge `main`
+into the branch ([`update.advance`], #1568: never a rebase, so never a
+force-push), compile-check the updated tree ([`checks.verify`]), push it, wait
+for the runs on the updated head, ask
 [`verdict.decide.judge`], squash-merge, take the next one. Without it an agent sits
 through every cold CI run of a batch holding a worktree open. Ported from
 scorsese (#486); its incidents are cited as scorsese#N.
@@ -14,18 +16,18 @@ The command line, its flags and how to run it are in `merge-queue.py`.
 ## Why it does not skip a run instead
 
 scorsese#492 weighed a cheaper answer — skip the fresh run when the rebase
-"changed nothing that matters". A run's verdict is about a **tree**, and it
-carries only to the same tree; "main's delta touched no module the branch did"
-is not that, and in one crate it is almost never even true. Measured over the
+(the queue rebased then) "changed nothing that matters". A run's verdict is
+about a **tree**, and it carries only to the same tree; "main's delta touched
+no module the branch did" is not that, and in one crate it is almost never even true. Measured over the
 batch that motivated it, 23 re-runs, 0 of them on an already-tested tree. So
-the one sound skip is kept: **a rebase that moves nothing** — the branch is
-already on `main`'s tip, the run on record is a run on this exact commit
-([`rebase.push_needed`]).
+the one sound skip is kept: **an update that moves nothing** — the branch
+already contains `main`'s tip, the run on record is a run on this exact commit
+([`update.push_needed`]).
 
 **And one that could move nothing that compiles.** When every commit `main`
 gained since the branch's base touches only Markdown — [`verdict.changes.inert`],
 so never `docs/api/`, which tests parse — the head is left where
-it is: no rebase, no push, and the run on record stands ([`rebase.docs_advance`],
+it is: no merge, no push, and the run on record stands ([`update.docs_advance`],
 #587). That is not the per-module guess above: those commits cannot change a
 single compiled or tested byte, which is why CLAUDE.md lets them merge
 unserialized. On 2026-09-30 merging the Markdown-only #586 cost #584, waiting

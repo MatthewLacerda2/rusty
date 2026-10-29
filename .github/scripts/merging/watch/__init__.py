@@ -52,8 +52,8 @@ Which ready one goes first (#753): **the one that textually conflicts with the
 fewest others in line**, then CLAUDE.md's priority, then age. Reordering cannot
 make two conflicting pull requests merge cleanly (whichever lands second still
 conflicts), but it decides *how many hand-backs* a set of them costs, and each
-is a rebase session. On scorsese, 2026-10-03, one broad pull request touching
-every registry landed first and handed back three small ones, rebased one after
+is a session resolving conflicts by hand. On scorsese, 2026-10-03, one broad pull request touching
+every registry landed first and handed back three small ones, resolved one after
 another at about an hour each; small ones first would have cost one hand-back,
 on the broad one (scorsese#738). So at each pick the watch counts, for every
 ready pull request, how many of the other ready ones it conflicts with
@@ -84,7 +84,7 @@ infrastructure ([`order.tooling`], #969). Of two open pull requests editing
 `Cargo.toml` or `Cargo.lock`, drafts included, the younger waits for the older
 to merge or close ([`board.lock_waits`], #969). Dependabot goes after every one of those, whatever its
 conflicts, and its conflicts count against nobody: it rebases itself. A pull
-request whose base is not `main` is never taken: the queue rebases onto `main`.
+request whose base is not `main` is never taken: the queue merges `main` in.
 
 **A Dependabot pull request that edits `.github/workflows/` is never taken**
 ([`board.held`], #825). The actions entry in `dependabot.yml` only ever proposes

@@ -16,7 +16,7 @@ import tempfile
 import unittest
 from unittest import mock
 
-from merging.queue import cli, outcomes, pulls, rebase, taking
+from merging.queue import cli, outcomes, pulls, taking, update
 from merging.verdict import github
 from merging.watch import ending, handbacks, loop
 from tests.verdict.fixtures import READY
@@ -102,7 +102,7 @@ class Taken(unittest.TestCase):
         pull = {**READY, "state": "OPEN", "title": "t", "author": {"login": "x"}, "headRefName": "1265-x",
                 "body": "no keyword", "files": files}
         with mock.patch.object(pulls, "look", return_value=pull), mock.patch.object(github, "gh"), \
-                mock.patch.object(rebase, "advance") as rebased, mock.patch("builtins.print"):
+                mock.patch.object(update, "advance") as rebased, mock.patch("builtins.print"):
             _, state, _ = taking.take("o/r", 1, cli.parse(["1"]))
         rebased.assert_not_called()
         return state

@@ -16,7 +16,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from merging.queue import cli, dependabot, gitio, outcomes, pulls, rebase, taking, waiting
+from merging.queue import cli, dependabot, gitio, outcomes, pulls, taking, update, waiting
 from merging.watch import board, handbacks, loop, order
 
 
@@ -50,7 +50,7 @@ class OneDeadline(unittest.TestCase):
         with mock.patch.object(pulls, "look", return_value=pull), \
             mock.patch.object(gitio, "git"), \
             mock.patch.object(dependabot, "bot_head", return_value=(SHA, [])), \
-            mock.patch.object(rebase, "advance", return_value=(SHA, [])), \
+            mock.patch.object(update, "advance", return_value=(SHA, [])), \
             mock.patch.object(time, "monotonic", side_effect=lambda: next(clock)), \
             mock.patch.object(waiting, "wait_for", return_value=(outcomes.GO, ["CI passed"])) as waited, \
             mock.patch("builtins.print"):

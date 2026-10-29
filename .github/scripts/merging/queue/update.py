@@ -1,18 +1,30 @@
-"""Putting a branch on `main`'s tip, in a worktree nobody stands in ([`advance`]).
+"""Bringing a branch up to `main`'s tip, in a worktree nobody stands in ([`advance`]).
+
+## Merged in, never rebased (#1568)
+
+`origin/main` is **merged into** the branch, as GitHub's *Update branch* button
+does. No commit is rewritten, so the push is a plain fast-forward and nothing in
+the normal flow force-pushes: before this the queue rebased and force-pushed
+under a lease, and permission checks refused that push again and again
+(#1551 → #1556 → #1559 → #1560 and #1554 → #1558 on 2026-10-28, each a superseding
+pull request with its own CI run). A merge also resolves a conflict once,
+where a rebase met it once per replayed commit, and pull requests are
+squash-merged, so the branch's own history never reaches `main`.
 
 ## What it touches, and what it leaves alone
 
-The rebase happens in a **throwaway, detached worktree this script creates and
+The merge happens in a **throwaway, detached worktree this script creates and
 removes** under the system temp dir — never in a worktree somebody is working
-in. The push is
-`--force-with-lease` against the head the pull request had when its turn
-began, so a push from anywhere else refuses rather than being overwritten.
-Its `git` calls to GitHub (`fetch`, `push`) retry a network failure on
-`mergeable.gh`'s backoff with that same lease ([`gitio.remote`], #875), and one
-still failing after the last stops the queue as the machine's failure, never
-a hand-back remembered against the branch. The
-merge is `--match-head-commit`, so GitHub refuses it if the head moved after
-the verdict.
+in. **The plain push is the guard**: the merge commit's parent is the head the
+pull request had when its turn began, so if anything else pushed since, the
+push is no fast-forward and GitHub refuses it rather than lose that work. A
+refusal like that means the branch moved, not that it is broken: the take ends
+[`refusal.MOVED`] and the branch is taken again on its new head, never handed
+back. Its `git` calls to GitHub (`fetch`, `push`) retry a network failure on
+`mergeable.gh`'s backoff ([`gitio.remote`], #875), and one still failing after
+the last stops the queue as the machine's failure, never a hand-back remembered
+against the branch. The merge into `main` is `--match-head-commit`, so GitHub
+refuses it if the head moved after the verdict.
 
 A merged branch's worktree under `.claude/worktrees/` is **not** removed and
 no branch is deleted — that is 12–16 GB and a checkout somebody may be
@@ -33,18 +45,18 @@ from merging.verdict import changes
 MAIN_GAINED = ("log", "--no-renames", "--name-only", "--format=>%H", "origin/main")
 
 # What a head left alone by [`docs_advance`] reports instead of a push.
-DOCS_ONLY = "`main` moved only by Markdown; not rebased, the run on record stands (#587)"
+DOCS_ONLY = "`main` moved only by Markdown; not updated, the run on record stands (#587)"
 
 
 def conflicts(unmerged: str) -> list[str]:
-    """The paths a failed rebase left conflicted, from `--diff-filter=U`."""
+    """The paths a failed merge left conflicted, from `--diff-filter=U`."""
     return [line.strip() for line in unmerged.splitlines() if line.strip()]
 
 
 def push_needed(before: str, after: str) -> bool:
-    """Whether the rebase moved the head commit — and so whether to push.
+    """Whether the update moved the head commit — and so whether to push.
 
-    If not, the branch was already on `main`'s tip and the run on record is a
+    If not, the branch already contained `main`'s tip and the run on record is a
     run on this exact commit; pushing would buy a second cold run of it.
     """
     return before != after
@@ -54,7 +66,7 @@ def docs_advance(log: str) -> bool:
     """Whether `main` moved past the head, and only by [`verdict.changes.inert`] paths.
 
     `log` is [`MAIN_GAINED`]'s output: a `>sha` line per commit, then its paths.
-    No commit is not an advance — the rebase is a no-op either way.
+    No commit is not an advance — the merge is a no-op either way.
     """
     lines = [line.strip() for line in log.splitlines() if line.strip()]
     commits = [line for line in lines if line.startswith(">")]
@@ -64,7 +76,7 @@ def docs_advance(log: str) -> bool:
 def main_moved_by_docs(head: str, root: str) -> bool:
     """[`docs_advance`] over the commits on `origin/main` that `head` lacks.
 
-    A git failure is *no*: the queue then rebases as it always has.
+    A git failure is *no*: the queue then merges `main` in as it always does.
     """
     done = gitio.git(*MAIN_GAINED, "--not", head, cwd=root)
     return done.returncode == 0 and docs_advance(done.stdout)
@@ -79,13 +91,13 @@ def on_tip(sha: str, root: str) -> bool:
 def advance(
     branch: str, head: str, root: str, push: bool, check=None
 ) -> tuple[str | None, list[str]]:
-    """Put `branch` on `main`'s tip. Returns the new head, or why not.
+    """Merge `main`'s tip into `branch`. Returns the new head, or why not.
 
     In a detached worktree this creates and removes, never one an agent may be
-    standing in. The push goes from inside it, leased to `head`. With
-    `push=False` (the dry run) the rebase is only computed. `check`, given the
-    rebased tree's path, returns why not to push it ([`checks.verify`]); it runs only
-    when the rebase moved the head. A head `main` passed only by Markdown is
+    standing in. The push goes from inside it, a plain fast-forward from `head`.
+    With `push=False` (the dry run) the merge is only computed. `check`, given the
+    updated tree's path, returns why not to push it ([`checks.verify`]); it runs only
+    when the merge moved the head. A head `main` passed only by Markdown is
     returned as it is, with [`DOCS_ONLY`] as its note ([`docs_advance`]).
     """
     if main_moved_by_docs(head, root):
@@ -96,14 +108,14 @@ def advance(
         if made.returncode != 0:
             return None, [f"could not check {branch} out: {made.stderr.strip()}"]
         try:
-            done = gitio.git("rebase", "origin/main", cwd=work)
+            done = gitio.git("merge", "--no-edit", "origin/main", cwd=work)
             if done.returncode != 0:
                 unmerged = gitio.git("diff", "--name-only", "--diff-filter=U", cwd=work).stdout
-                gitio.git("rebase", "--abort", cwd=work)
+                gitio.git("merge", "--abort", cwd=work)
                 named = conflicts(unmerged)
                 return None, [
                     f"{branch} conflicts with `main`.",
-                    f"Conflicted: {', '.join(named)}." if named else "The rebase stopped; git did not name a path.",
+                    f"Conflicted: {', '.join(named)}." if named else "The merge stopped; git did not name a path.",
                     "Handed back unresolved: a machine that cannot say why the"
                     " code is shaped as it is does not get to pick a side.",
                 ]
@@ -113,15 +125,11 @@ def advance(
                 if broken:
                     return None, broken
             if push and push_needed(head, fresh):
-                # Every retry carries the same lease: the head this take began
-                # from, never one read back mid-retry (#875).
-                pushed = gitio.remote(
-                    "push", f"--force-with-lease=refs/heads/{branch}:{head}",
-                    "origin", f"HEAD:refs/heads/{branch}", cwd=work,
-                )
-                # A push that landed before its reply was lost is refused on the
-                # retry, its lease now stale against itself: GitHub already
-                # holds exactly this head, so it is pushed.
+                # Never forced: a branch moved since the take began is no
+                # fast-forward, and GitHub refuses it (#1568).
+                pushed = gitio.remote("push", "origin", f"HEAD:refs/heads/{branch}", cwd=work)
+                # A refusal while GitHub already holds exactly this head (a push
+                # that landed before its reply was lost, #875) is a push.
                 if pushed.returncode != 0:
                     now = gitio.remote_head(branch, work)
                     if now != fresh:

@@ -148,8 +148,11 @@ is wrong.
   failure that needs a decision you can't make), mark it a **draft** and hand it to the
   user. Because Rust is compiled, two PRs can each be green alone yet break `main`
   together (a rename, a changed signature, a moved module — no textual conflict catches
-  it). So merging **cannot be parallelized**: rebase each PR onto the latest `main` →
-  CI green on that rebased state → merge → repeat, one PR at a time. The only exception
+  it). So merging **cannot be parallelized**: bring each PR up to the latest `main` →
+  CI green on that updated state → merge → repeat, one PR at a time. A PR branch is
+  updated by **merging `main` into it, never by rebasing** (#1568): nothing is
+  rewritten, so nothing is force-pushed, and a conflict is resolved once. PRs are
+  squash-merged, so the branch's own history never reaches `main`. The only exception
   is a PR that touches **only** Markdown — CI is skipped for Markdown-only PRs, so they
   needn't be serialized and can merge freely. **Except the Markdown code reads:**
   `docs/api/` (the API-doc drift tests parse it), `docs/game-agent.md` (served by
@@ -159,8 +162,8 @@ is wrong.
 - **Coding parallelises; merging does not.** How many branches are written at once
   scales with **how separate their files are**: two branches appending to the same enum
   or registry cost more than five in separate modules, because every branch behind
-  another in the merge queue pays a rebase per merge ahead of it, and only a colliding
-  rebase is expensive. **Three kinds of agent, three limits:** **cloud coders ≈10**,
+  another in the merge queue pays an update per merge ahead of it, and only a colliding
+  update is expensive. **Three kinds of agent, three limits:** **cloud coders ≈10**,
   paced by token spend and by how many diffs one orchestrator can read, not by
   hardware (so mechanical work runs on Sonnet; `issue-batch`, *Which model*); **local coders ≤2**, because the queue merges one PR per CI run and a third
   local coder finishes nothing sooner; **read-only agents** (research, review,
@@ -183,9 +186,9 @@ is wrong.
   driver races), the display, the speakers, the operator's files or keys, or a
   measurement. The `issue-batch` skill says how to launch one.
 - **The lightest batch keeps only the merge queue local.** With the coding in cloud
-  sessions, `make queue ARGS=--no-check` skips the local compile check of each rebased
+  sessions, `make queue ARGS=--no-check` skips the local compile check of each updated
   head and lets CI judge it, so merging costs this machine `git` and GitHub calls, not a
-  build. Prefer it whenever the machine has other work. The price is that a rebase broken
+  build. Prefer it whenever the machine has other work. The price is that an update broken
   by a merge ahead (rare: a few in 126 PRs) is caught by CI a round later, not before
   the push.
 - **Dependencies (not batches).** Once an issue is written, record how it relates to the
@@ -542,8 +545,8 @@ Failures from `tools/lint` are written to `.lint/report.txt`. See **docs/linting
 - **The commit hook** (`.githooks/pre-commit`, activated once per clone by `make
   setup`) runs formatting and the size gate only, so it stays under a second; the
   push hook (`.githooks/pre-push` → `resolved.py --hook`) runs rustfmt on both crates,
-  `tools/lint` included, when a pushed tip is `HEAD`, covering the commits a
-  `git rebase --continue` made; `make resolved` runs the same check unconditionally.
+  `tools/lint` included, when a pushed tip is `HEAD`, covering a merge
+  commit whose conflict was resolved by hand; `make resolved` runs the same check unconditionally.
 - Size gate: files ≤ 300 lines, test/fixture files ≤ 150 (how a `.py` file is
   counted: `.github/scripts/CLAUDE.md`). Style is rustfmt;
   **clippy is a hard gate** (`-D warnings`: default, `dev`, and the no-editor player

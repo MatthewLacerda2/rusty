@@ -25,8 +25,8 @@ worktree, is deleted when its tip is on `origin/main` (#1510,
 branch holds nothing. No other name gets that rule.
 
 A reviewer's `pr<digits>…` or `worktree-agent-*` branch whose tip is a commit
-GitHub has is deleted too, PR or not (#1538): after the queue rebases and
-merges the PR, GitHub lists no pull request for the reviewed commit, so
+GitHub has is deleted too, PR or not (#1538): after the queue updates and
+squash-merges the PR, GitHub lists no pull request for the reviewed commit, so
 `pr1514` and `pr1531` stayed as "no pull request". `reclaim.finished` has it.
 """
 
