@@ -10,6 +10,7 @@ pub enum Lit {
     Number(f32),
     Integer(u32),
     Bool(bool),
+    Vec2([f32; 2]),
     Text(&'static str),
 }
 

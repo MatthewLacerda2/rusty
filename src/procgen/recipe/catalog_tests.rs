@@ -24,6 +24,7 @@ fn lit(l: Lit) -> Value {
         Lit::Number(n) => json!(n),
         Lit::Integer(i) => json!(i),
         Lit::Bool(b) => json!(b),
+        Lit::Vec2(v) => json!(v),
         Lit::Text(t) => json!(t),
     }
 }

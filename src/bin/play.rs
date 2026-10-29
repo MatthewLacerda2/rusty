@@ -2,14 +2,16 @@
 //!
 //! ```text
 //! Usage:
-//!   cargo run --bin play --features dev -- [--project <dir>] [--scene <path>] <scenario.lua> <out_dir>
+//!   cargo run --bin play --features dev -- [--project <dir>] [--scene <path>] [--size <W>x<H>] <scenario.lua> <out_dir>
 //! ```
 //!
 //! The scenario plays the game project at `<dir>` (default `./project`, #829); the
 //! two paths are read from where the command was run, before the project opens.
 //! The scene played is the project's startup scene (`project.rusty`'s
 //! `build.startup_scene`), as the standalone player boots, or `--scene <path>`,
-//! relative to the project like the startup scene (#1343).
+//! relative to the project like the startup scene (#1343). `--size <W>x<H>` is the
+//! run's render size, as a Game view resolution: every screenshot, post effect and
+//! UI layout is sized to it (default 1280x720, #1583).
 //!
 //! Drives `app::GameWorld::tick` at a fixed 1/60 timestep with NO window/GPU, runs
 //! the given Lua scenario, and writes <out_dir>/results.json + <out_dir>/console.log.
@@ -19,18 +21,22 @@ use std::path::{absolute, PathBuf};
 use std::process::exit;
 
 use rusty::core::project::Access;
+use rusty::core::settings::video::parse_size;
 use rusty::dev::scenario;
 
-const USAGE: &str = "usage: play [--project <dir>] [--scene <path>] <scenario.lua> <out_dir>";
+const USAGE: &str =
+    "usage: play [--project <dir>] [--scene <path>] [--size <W>x<H>] <scenario.lua> <out_dir>";
 
 fn main() {
     rusty::logging::init();
     let mut args: Vec<String> = std::env::args().skip(1).collect();
     let project = rusty::core::project::take_flag(&mut args);
     let scene = rusty::core::project::take_value(&mut args, "--scene");
-    let (project, scene) = match (project, scene) {
-        (Ok(project), Ok(scene)) => (project, scene),
-        (Err(e), _) | (_, Err(e)) => {
+    let size = rusty::core::project::take_value(&mut args, "--size")
+        .and_then(|size| size.as_deref().map(parse_size).transpose());
+    let (project, scene, size) = match (project, scene, size) {
+        (Ok(project), Ok(scene), Ok(size)) => (project, scene, size),
+        (Err(e), _, _) | (_, Err(e), _) | (_, _, Err(e)) => {
             eprintln!("play: {e}\n{USAGE}");
             exit(2);
         }
@@ -52,7 +58,7 @@ fn main() {
     };
     let scene = scene.unwrap_or_else(|| opened.settings.build.startup_scene.clone());
 
-    match scenario::run(&scenario_path, &out_dir, &scene, opened.settings) {
+    match scenario::run(&scenario_path, &out_dir, &scene, opened.settings, size) {
         Ok(report) => {
             println!(
                 "play: wrote {} (passed: {})",
