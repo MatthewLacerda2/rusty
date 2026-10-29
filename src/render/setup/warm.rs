@@ -23,6 +23,7 @@ impl Renderer {
     pub(crate) fn lazy_pipelines(&self, editor_overlays: bool) -> Vec<&LazyPipeline> {
         let mut all = vec![&self.primed_pipelines.forward];
         all.extend(self.transparent_pipelines.lazies());
+        all.extend(self.depth_postpass_pipelines.lazies());
         all.extend(self.velocity_pipeline.lazies());
         all.extend(self.primed_pipelines.velocity.lazies());
         all.extend(self.post_passes.lazy_pipelines());

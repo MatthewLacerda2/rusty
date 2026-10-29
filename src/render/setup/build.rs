@@ -45,6 +45,7 @@ pub(crate) struct ForwardPasses {
     pub velocity_pipeline: pipelines::VelocityPipelines,
     pub primed_pipelines: pipelines::PrimedPipelines,
     pub transparent_pipelines: pipelines::TransparentPipelines,
+    pub depth_postpass_pipelines: pipelines::DepthPostpassPipelines,
     pub line_pipeline: pipelines::LazyPipeline,
     /// The selection outline's mask and edge pipelines (#1175).
     pub outline: crate::render::passes::outline::OutlinePasses,
@@ -258,6 +259,7 @@ fn create_forward_passes(
         velocity_pipeline: pl.velocity,
         primed_pipelines: pl.primed,
         transparent_pipelines: pl.transparent,
+        depth_postpass_pipelines: pl.depth_postpass,
         line_pipeline: pl.line,
         outline: OutlinePasses::new(device, registry, &pl.layout, output_format),
         prepass_pipeline: pl.prepass,

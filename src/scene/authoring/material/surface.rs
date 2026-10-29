@@ -233,6 +233,15 @@ pub static SURFACE_FIELDS: &[SurfaceField] = &[
         get: |m| SurfaceValue::Number(m.absorption_distance),
         put: |m, v| m.absorption_distance = number(v),
     },
+    SurfaceField {
+        key: "depth_postpass",
+        api: "DepthPostpass",
+        label: "Depth Postpass",
+        kind: SurfaceKind::Toggle,
+        shown: transparent,
+        get: |m| SurfaceValue::Bool(m.depth_postpass),
+        put: |m, v| m.depth_postpass = boolean(v),
+    },
 ];
 
 #[cfg(test)]

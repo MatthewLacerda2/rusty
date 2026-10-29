@@ -234,6 +234,12 @@ fn velocity_targets(in: VelocityVertex) -> VelocityTargets {
         in.clip_position, in.world_position, in.world_normal, in.tex_coords,
         in.world_tangent, in.instance, in.lightmap_uv,
     );
+    return VelocityTargets(surface_color(v), velocity_texel(in));
+}
+
+// The velocity target's texel for `in`: its screen motion, its view depth and its
+// camera's place in the stack.
+fn velocity_texel(in: VelocityVertex) -> vec4<f32> {
     // A surface behind the camera last frame (a projectile past the player's head)
     // had no place on screen to move from: it writes no motion, not a huge streak.
     var velocity = vec2<f32>(0.0);
@@ -243,7 +249,22 @@ fn velocity_targets(in: VelocityVertex) -> VelocityTargets {
     // Depth along this camera's view axis, not the straight-line distance: a plane
     // facing the camera has one depth, so depth of field focuses on a plane (#1445).
     let depth = dot(camera.clusters.view_z.xyz, in.world_position) + camera.clusters.view_z.w;
-    return VelocityTargets(surface_color(v), vec4<f32>(velocity, depth, camera.stack.x));
+    return vec4<f32>(velocity, depth, camera.stack.x);
+}
+
+// ---- The transparent depth postpass (#1523) ----
+// HDRP's *Transparent Depth Postpass*: after the translucents drew, a surface that
+// asks for it writes its depth, and in a view with a velocity target its texel
+// there (location 1; the pipeline has no colour target at 0), so depth of field and
+// motion blur see the surface, not what is behind it. A view without one draws it
+// through `fs_prepass`.
+struct DepthPostpassTargets {
+    @location(1) velocity: vec4<f32>,
+};
+
+@fragment
+fn fs_depth_postpass(in: VelocityVertex) -> DepthPostpassTargets {
+    return DepthPostpassTargets(velocity_texel(in));
 }
 
 // ---- The SSR surface targets (#1526) ----

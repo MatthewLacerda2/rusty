@@ -127,6 +127,8 @@ pub struct Renderer {
     /// in the transparent pass after opaque. Built on first use, like the three
     /// editor-only pipelines below (#985).
     transparent_pipelines: gpu::pipelines::TransparentPipelines,
+    /// The translucents' depth postpass (#1523).
+    depth_postpass_pipelines: gpu::pipelines::DepthPostpassPipelines,
     line_pipeline: gpu::pipelines::LazyPipeline,
     /// The editor's selection outline (#1175).
     outline: passes::outline::OutlinePasses,

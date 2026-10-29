@@ -79,7 +79,7 @@ fn gpu_warm_pipelines_builds_every_lazy_pipeline() {
         return;
     };
     let every = renderer.lazy_pipelines(true);
-    // one transparent per blend state (#1523) + the motion-vector forward and 2 sky (#1435) + the same 3 into
+    // one transparent per blend state and the 2 depth postpass (#1523) + the motion-vector forward and 2 sky (#1435) + the same 3 into
     // the SSR surface target too (#1526) + the 2 primed forward ones (#1499) and the
     // primed SSR one + SSR's own pass + the motion blur's
     // 3 tile passes and gather (#1436) + the depth of field's 9 (#1445) + bloom's
@@ -89,6 +89,7 @@ fn gpu_warm_pipelines_builds_every_lazy_pipeline() {
     assert_eq!(
         every.len(),
         super::TransparentBlend::ALL.len()
+            + 2
             + 3
             + 3
             + 2

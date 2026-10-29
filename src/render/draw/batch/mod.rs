@@ -99,6 +99,7 @@ impl OutlineDraw {
 
 /// One draw call: `instances` of `key`'s mesh, reading the per-draw uniform in slot
 /// `uniform_slot` of the frame's packed uniforms.
+#[derive(Clone)]
 pub(crate) struct DrawBatch {
     pub key: BatchKey,
     pub uniform_slot: u32,

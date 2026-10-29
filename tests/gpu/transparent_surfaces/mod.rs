@@ -4,15 +4,19 @@
 //! an adapter.
 
 mod absorption;
+mod depth_postpass;
 mod preserve_specular;
 mod receive_shadows;
 mod refraction;
+mod textures;
+
+pub use textures::{checker, ripples};
 
 use glam::{Quat, Vec3};
 use rusty::components::{MaterialAsset, MaterialComponent, RenderMode};
 use rusty::dev::screenshot::capture;
 use rusty::scene::authoring::{create_entity, default_post_processing, Primitive};
-use rusty::scene::{Camera, Scene};
+use rusty::scene::{Camera, PostProcessingComponent, Scene};
 
 /// The capture size.
 pub const SIZE: u32 = 64;
@@ -20,6 +24,11 @@ pub const SIZE: u32 = 64;
 /// A scene with a sun at `sun_pitch` radians below the horizon and a view volume:
 /// bloom and SSR off and a fixed exposure, so a pixel is what the forward pass drew.
 pub fn stage(sun_pitch: f32) -> Scene {
+    stage_with(sun_pitch, |_| {})
+}
+
+/// [`stage`], its volume's settings changed by `tweak` first.
+pub fn stage_with(sun_pitch: f32, tweak: impl FnOnce(&mut PostProcessingComponent)) -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
     let sun = create_entity(&mut scene, "Sun", Some(Primitive::DirectionalLight));
@@ -29,6 +38,7 @@ pub fn stage(sun_pitch: f32) -> Scene {
     vc.exposure.fixed_ev = -1.0;
     vc.bloom.active = false;
     vc.ssr.active = false;
+    tweak(&mut vc);
     scene.world.set_post_processing(volume, Some(vc));
     let camera = rusty::components::CameraComponent::default();
     scene.world.set_camera(volume, Some(camera));
@@ -65,10 +75,15 @@ pub fn glass(base_color: [f32; 3], alpha: f32) -> MaterialAsset {
     }
 }
 
-/// `scene` through `cam`, or `None` without an adapter.
+/// `scene` through `cam`, [`SIZE`] square, or `None` without an adapter.
 pub fn shot(scene: &Scene, cam: &Camera, name: &str) -> Option<image::RgbImage> {
+    shot_at(scene, cam, name, SIZE)
+}
+
+/// [`shot`], `size` square.
+pub fn shot_at(scene: &Scene, cam: &Camera, name: &str, size: u32) -> Option<image::RgbImage> {
     let path = crate::temp::dir().join(format!("rusty_1523_{name}_{}.png", std::process::id()));
-    if !capture(scene, cam, &path, SIZE, SIZE).expect("capture") {
+    if !capture(scene, cam, &path, size, size).expect("capture") {
         eprintln!("[1523] no GPU/software adapter — skipping {name}");
         return None;
     }
@@ -100,34 +115,6 @@ pub fn darker(a: &image::RgbImage, b: &image::RgbImage) -> usize {
         .zip(b.pixels())
         .filter(|(a, b)| sum(b) - sum(a) > 60)
         .count()
-}
-
-/// A `tiles`×`tiles` black-and-white checker PNG (sRGB albedo), written once under
-/// `name`; returns its path.
-pub fn checker(name: &str, tiles: u32) -> String {
-    let size = tiles * 8;
-    let img = image::RgbaImage::from_fn(size, size, |x, y| {
-        let v = if (x / 8 + y / 8) % 2 == 0 { 255 } else { 20 };
-        image::Rgba([v, v, v, 255])
-    });
-    save(name, img)
-}
-
-/// A tangent-space normal map of ripples along x, `waves` across the texture.
-pub fn ripples(name: &str, waves: f32) -> String {
-    let img = image::RgbaImage::from_fn(64, 64, |x, _| {
-        let slope = (x as f32 / 64.0 * waves * std::f32::consts::TAU).sin() * 0.6;
-        let n = Vec3::new(slope, 0.0, 1.0).normalize() * 0.5 + 0.5;
-        let byte = |c: f32| (c * 255.0).round() as u8;
-        image::Rgba([byte(n.x), byte(n.y), byte(n.z), 255])
-    });
-    save(name, img)
-}
-
-fn save(name: &str, img: image::RgbaImage) -> String {
-    let path = crate::temp::dir().join(format!("rusty_1523_{name}.png"));
-    img.save(&path).expect("write the texture");
-    path.to_string_lossy().into_owned()
 }
 
 /// How many pixels differ between `a` and `b` by more than 30 summed.

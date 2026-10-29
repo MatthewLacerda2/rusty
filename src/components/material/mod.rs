@@ -141,6 +141,11 @@ pub struct MaterialAsset {
     /// *Absorption Distance* (default 1).
     #[serde(default = "default_one")]
     pub absorption_distance: f32,
+    /// HDRP's *Transparent Depth Postpass* (#1523): a `Transparent` surface writes
+    /// its depth after drawing, so depth of field, motion blur and soft particles
+    /// see it rather than what is behind it. Off by default.
+    #[serde(default)]
+    pub depth_postpass: bool,
     /// The authored surface shader this material renders with (#396): a module name
     /// resolved as `<name>.wgsl` in `assets/shaders` (where `Shader.Bake`
     /// writes), then `engine/shaders`. `None` is the standard forward shader.
@@ -199,6 +204,7 @@ impl Default for MaterialAsset {
             thickness: default_one(),
             transmittance_color: white(),
             absorption_distance: default_one(),
+            depth_postpass: false,
             shader: None,
             shader_params: BTreeMap::new(),
             shader_textures: BTreeMap::new(),

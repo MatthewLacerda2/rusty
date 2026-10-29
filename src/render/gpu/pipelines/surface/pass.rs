@@ -2,7 +2,10 @@
 //! material's surface variant (#396) or the standard one, over a primed depth or not
 //! (#1499).
 
-use super::super::{PrimedPipelines, TransparentBlend, TransparentPipelines, VelocityPipelines};
+use super::super::{
+    DepthPostpassPipelines, PrimedPipelines, TransparentBlend, TransparentPipelines,
+    VelocityPipelines,
+};
 use super::SurfaceShaders;
 
 /// Which solids pass a batch is drawn in, carrying that pass's standard pipeline, so
@@ -24,6 +27,9 @@ pub(crate) enum SolidPass<'a> {
     Velocity(&'a VelocityPipelines, Option<&'a PrimedPipelines>, bool),
     /// Blended solids; each standard pipeline is built only if a batch uses it.
     Transparent(&'a TransparentPipelines),
+    /// The translucents' depth postpass (#1523), into the view's velocity target
+    /// too when the last field holds.
+    DepthPostpass(&'a DepthPostpassPipelines, bool),
 }
 
 impl SolidPass<'_> {
@@ -71,6 +77,9 @@ impl SurfaceShaders {
             SolidPass::Transparent(standard) => {
                 variant.map_or(standard, |v| &v.transparent).get(blend)
             }
+            SolidPass::DepthPostpass(standard, velocity) => variant
+                .map_or(standard, |v| &v.depth_postpass)
+                .get(velocity),
         }
     }
 }

@@ -12,6 +12,7 @@
 //! is occluded by opaque depth without writing depth itself (overlapping translucent
 //! surfaces all blend rather than z-cull each other).
 
+mod depth_postpass;
 pub(crate) mod opaque_copy;
 
 pub(crate) use opaque_copy::{OpaqueCopyPass, OpaqueViews};

@@ -5,10 +5,10 @@
 //! the module is `<name>.wgsl` in the authored workspace (`assets/shaders`, where
 //! `Shader.Bake` writes), else the engine set (`engine/shaders`). A surface
 //! variant keeps the forward contract by construction (#272: same `VertexInput`, bind
-//! groups and entry points), so only the shader module differs: its pipelines reuse
-//! the forward pipeline layout: opaque, transparent, and the opaque one writing motion
-//! vectors (#1435). Its runtime params (#399) ride the material's group-2 param
-//! uniform; the slot keeps its [`ParamLayout`] (`<name>.params.json`) to pack them.
+//! groups and entry points), so only the module differs: its pipelines (opaque, motion
+//! (#1435), one transparent per blend and the depth postpass (#1523)) reuse the
+//! forward layout. Its runtime params (#399) ride the material's group-2 uniform, packed
+//! by the slot's [`ParamLayout`] (`<name>.params.json`).
 //!
 //! **Pipeline ids.** Every draw carries a `usize` pipeline id: [`STANDARD`] (0) is the
 //! renderer's own forward/transparent pair; `n > 0` is cache slot `n - 1`. The id is
@@ -16,8 +16,8 @@
 //!
 //! **Lazy, fail-safe.** A slot is built the first frame a material names it. A module
 //! that is missing, fails to compose, lacks `vs_main`/`fs_main` (a postfx module) or
-//! `vs_velocity`/`fs_velocity`/`fs_velocity_ssr` (#1435, #1526), or fails validation is logged **once** and
-//! draws with the standard pipeline.
+//! the motion, SSR or depth-postpass entries (#1435, #1526, #1523), or fails
+//! validation is logged **once** and draws with the standard pipeline.
 //!
 //! **Hot reload.** [`SurfaceShaders::refresh`] drains the write log
 //! (`core::fs::written`) once per render: a slot whose module or params file was
@@ -60,6 +60,8 @@ pub(crate) struct SurfacePipelines {
     pub primed: super::PrimedPipelines,
     /// Blended solids, one per blend state (#1523), built on first draw.
     pub transparent: super::TransparentPipelines,
+    /// Its translucents' depth postpass (#1523), built on first draw.
+    pub depth_postpass: super::DepthPostpassPipelines,
     /// The depth passes of a variant whose blocks cut fragments or move the UVs or the
     /// vertices (#648, #1499, #1524); `None` draws its depth with the standard pipelines.
     pub cut: Option<CutPipelines>,
@@ -246,8 +248,9 @@ impl SurfaceShaders {
         let colour = [("vs_main", vertex), ("fs_main", fragment)];
         let motion = [
             ("vs_velocity", vertex),
-            ("fs_velocity", fragment),     // #1435
-            ("fs_velocity_ssr", fragment), // #1526
+            ("fs_velocity", fragment),       // #1435
+            ("fs_velocity_ssr", fragment),   // #1526
+            ("fs_depth_postpass", fragment), // #1523
         ];
         for (entry, stage) in colour.into_iter().chain(motion) {
             if !has(entry, stage) {
@@ -290,9 +293,8 @@ mod gameplay_blocks_tests;
 pub(crate) mod cut_depth_tests;
 
 #[cfg(test)]
-#[path = "../tests/priming/walls_tests.rs"]
-mod priming_tests;
-
-#[cfg(test)]
 #[path = "../tests/priming/scroll_tests.rs"]
 mod priming_scroll_tests;
+#[cfg(test)]
+#[path = "../tests/priming/walls_tests.rs"]
+mod priming_tests;

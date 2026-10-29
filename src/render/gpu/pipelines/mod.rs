@@ -4,6 +4,7 @@
 use crate::render::gpu::mesh::vertex_layout;
 use crate::render::gpu::DEPTH_FORMAT;
 
+mod depth_postpass;
 mod lazy;
 pub(crate) mod priming;
 mod specs;
@@ -11,6 +12,7 @@ pub(crate) mod surface;
 pub(crate) mod transparent;
 pub(crate) mod winding;
 
+pub(crate) use depth_postpass::DepthPostpassPipelines;
 pub(crate) use lazy::LazyPipeline;
 pub(crate) use transparent::{TransparentBlend, TransparentPipelines};
 
@@ -32,6 +34,8 @@ pub(crate) struct ForwardPipelines {
     pub velocity: VelocityPipelines,
     /// Blended translucent solids (#242), one per blend state (#1523), depth write off.
     pub transparent: TransparentPipelines,
+    /// The translucents' depth postpass (#1523).
+    pub depth_postpass: DepthPostpassPipelines,
     /// The editor's line gizmos (grid, collider boxes, axis arrows, probes), drawn
     /// over the post-FX output (#1224), so built against the output format.
     pub line: LazyPipeline,
@@ -78,6 +82,7 @@ pub(crate) fn create_pipelines(
         transparent: TransparentPipelines::new(|blend| {
             lazy(&render_layout, format, transparent_spec(blend))
         }),
+        depth_postpass: DepthPostpassPipelines::new(device, shader, &render_layout),
         line: lazy(&line_layout, output_format, line_spec()),
         prepass: make_prepass(device, shader, &render_layout, "fs_prepass"),
         primed: PrimedPipelines::new(device, shader, format, &render_layout),
@@ -108,6 +113,7 @@ pub(crate) fn surface_pipelines(
         transparent: TransparentPipelines::new(|blend| {
             lazy_pipeline(device, shader, format, layout, transparent_spec(blend))
         }),
+        depth_postpass: DepthPostpassPipelines::new(device, shader, layout),
         cut: cut.then(|| surface::CutPipelines {
             prepass: make_prepass(device, shader, layout, CUT_PREPASS),
             shadow: depth_pipeline(device, shader, shadow_layout, Some(CUT_SHADOW), false),
