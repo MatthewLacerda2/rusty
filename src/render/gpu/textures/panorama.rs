@@ -31,13 +31,17 @@ fn panorama_sampler(device: &wgpu::Device) -> wgpu::Sampler {
 impl Renderer {
     /// Load `path` as a skybox panorama: the cached image texture (shared with any
     /// material using the same file, which keeps its repeating sampler) re-bound
-    /// with [`panorama_sampler`]. A failed load yields the default texture, likewise.
+    /// with [`panorama_sampler`], its data view the stored format's raw twin
+    /// (compressed or not, #1574). A failed load yields the default texture, likewise.
     pub(crate) fn load_panorama(&mut self, path: &str) -> Rc<GpuTexture> {
         let image = self.load_texture(&MapRef::from(path));
         Rc::new(Self::finalize_texture(
             &self.device,
             &self.texture_layout,
-            (image.texture.clone(), super::DATA_FORMAT),
+            (
+                image.texture.clone(),
+                image.texture.format().remove_srgb_suffix(),
+            ),
             (panorama_sampler(&self.device), FilterMode::Trilinear),
             Some(path),
         ))

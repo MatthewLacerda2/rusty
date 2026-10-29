@@ -155,21 +155,26 @@ clamped sampler.
 
 - `compression` — how it is block-compressed on the GPU (#1574), Unity's
   *Compression*: `"None"` (RGBA8, four bytes a texel), `"Normal"` (the default) or
-  `"HighQuality"`. The format follows the slot that first uses the texture:
+  `"HighQuality"`. The format follows the slot that first uses the texture, at either
+  level:
 
-  | slot | `"Normal"` | `"HighQuality"` |
-  |---|---|---|
-  | albedo, emissive, UI, particles, shader slots: opaque | BC1 (½ byte a texel) | BC7 (1 byte) |
-  | the same, with any alpha below 255 | BC7 | BC7 |
-  | normal map | BC5 (1 byte): x and y; the shader rebuilds z | BC5 |
-  | metallic or roughness map whose image is greyscale | BC4 (½ byte): one channel | BC4 |
+  | slot | format |
+  |---|---|
+  | albedo, emissive, UI, particles, shader slots | BC7 (a byte a texel), alpha kept |
+  | normal map | BC5 (a byte a texel): x and y; the shader rebuilds z |
+  | metallic or roughness map whose image is greyscale | BC4 (half a byte): one channel |
 
+  `"HighQuality"` encodes BC7 slower and closer to the source. Unity's `Normal` picks
+  BC1 (half a byte) for an opaque colour map; rusty does not, because the pure-Rust
+  BC1 encoders flatten a block of two contrasting colours (red beside blue) to one.
   A metallic or roughness map holding different channels (glTF's packed
   occlusion-roughness-metallic) is compressed as colour is, keeping each channel.
   Colour stays sRGB. The blocks and every mip are made once, at import, into the
   project's import cache (`assets/generated/imported/<path>.<kind>.bctex`), and made
   again only when the image, its compression, its max size, its mipmaps or the
-  encoder change; a game ships the cache. An image whose (fitted) sides are not
+  encoder change; a game ships the cache. Encoding BC7 is slow, a few seconds for a
+  2048² map spread over every core (Play included: the first draw of a map waits for
+  it), so a project's first import of many large maps takes minutes, once. An image whose (fitted) sides are not
   multiples of 4 is uploaded uncompressed, as Unity leaves it. On a GPU without BC
   compression every texture uploads uncompressed, with one console warning.
   `Debug.Stats().texture_bytes` is what the textures take on the GPU.

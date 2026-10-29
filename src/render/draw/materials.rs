@@ -103,6 +103,19 @@ impl Renderer {
         }
     }
 
+    /// Entity `id`'s solid uniform for `material`
+    /// ([`super::uniforms::solid_entity_uniform`]), its map channels set by what
+    /// is resident ([`Self::with_map_channels`]).
+    pub(crate) fn solid_uniform(
+        &self,
+        scene: &Scene,
+        id: u32,
+        material: Option<&MaterialAsset>,
+    ) -> EntityUniform {
+        let uniform = super::uniforms::solid_entity_uniform(scene, id, material);
+        self.with_map_channels(uniform, material)
+    }
+
     /// `uniform` with its metallic and roughness flags set to 2 where the map is
     /// resident as one channel (BC4, #1574): the shader then reads its red channel
     /// instead of glTF's packed blue and green.

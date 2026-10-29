@@ -3,24 +3,26 @@
 //! texture importer writes a platform format into its Library.
 //!
 //! **What it is compressed to** follows what the texels hold ([`TextureKind`],
-//! the slot's first use) and the image's *Compression* ([`Compression`]):
+//! the slot's first use), whatever the image's *Compression* ([`Compression`]):
 //!
-//! | kind | `Normal` | `HighQuality` |
-//! |---|---|---|
-//! | colour or data, opaque | BC1 | BC7 |
-//! | colour or data, with alpha | BC7 | BC7 |
-//! | normal map | BC5 (x, y; the shader rebuilds z) | BC5 |
-//! | mask (metallic, roughness) holding one channel | BC4 | BC4 |
+//! | kind | format |
+//! |---|---|
+//! | colour or data | BC7 (a byte a texel) |
+//! | normal map | BC5 (x and y, a byte a texel; the shader rebuilds z) |
+//! | mask (metallic, roughness) holding one channel | BC4 (half a byte a texel) |
+//!
+//! `HighQuality` searches BC7's modes harder than `Normal`; BC4 and BC5 encode
+//! the same at both.
 //!
 //! A mask is single-channel when its red, green and blue agree on every texel (a
 //! greyscale image); a packed one (glTF's occlusion-roughness-metallic) is data.
-//! Colour keeps its sRGB decode: BC1 and BC7 have sRGB forms, and the renderer
+//! Colour keeps its sRGB decode: BC7 has an sRGB form, and the renderer
 //! picks them as it picks `Rgba8UnormSrgb` today.
 //!
 //! **Where it lives.** In the import cache beside converted models
 //! (`convert::cache_location_as`), one file per source and kind, stamped with a
 //! digest of the source's bytes, the settings and [`ENCODER_VERSION`]; any
-//! difference re-encodes ([`cache`]). A game ships the cache, so it never
+//! difference re-encodes (`cache`). A game ships the cache, so it never
 //! encodes unless a source changed.
 //!
 //! **When it is not compressed**: *Compression* `None`, or an image whose fitted
@@ -39,7 +41,7 @@ pub use shrink::fit;
 
 use super::sidecar::{Compression, TextureSettings};
 
-/// Bumped whenever [`encode`] would write different blocks for the same input,
+/// Bumped whenever `encode` would write different blocks for the same input,
 /// so every cached texture is re-made.
 pub const ENCODER_VERSION: u32 = 1;
 

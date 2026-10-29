@@ -43,13 +43,11 @@ pub enum FilterMode {
 pub enum Compression {
     /// Uncompressed RGBA8: four bytes a texel.
     None,
-    /// BC by kind, the smaller format where one fits: BC1 for an opaque colour or
-    /// data map (half a byte a texel), BC7 with alpha, BC5 for a normal map, BC4
-    /// for a single-channel one. Unity's default.
+    /// BC by kind: BC7 for a colour or data map (a byte a texel), BC5 for a
+    /// normal map, BC4 for a single-channel one (half a byte). Unity's default.
     #[default]
     Normal,
-    /// BC7 for every colour and data map, encoded slower and closer (one byte a
-    /// texel); normal and single-channel maps as `Normal`.
+    /// The same formats, BC7 encoded slower and closer to the source.
     HighQuality,
 }
 

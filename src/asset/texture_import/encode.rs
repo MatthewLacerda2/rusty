@@ -1,6 +1,8 @@
 //! Choosing a block format and encoding an image's mip chain into it (#1574),
 //! with `block_compression`'s CPU encoders (a pure-Rust port of Intel's ISPC
-//! texture compressor). The bands of block rows encode on every core: the blocks
+//! texture compressor). No BC1: its encoder (and `texpresso`'s) collapses a block
+//! of two colours whose channels move against each other (red beside blue) to
+//! their average, one flat grey; BC7 keeps both. The bands of block rows encode on every core: the blocks
 //! are the same whichever thread wrote them.
 
 use block_compression::{encode::compress_rgba8, BC7Settings, CompressionVariant};
@@ -12,8 +14,6 @@ use super::{Compression, TextureKind, TextureSettings};
 /// A block-compressed GPU format: 4×4 texels a block.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum BlockFormat {
-    /// RGB, 8 bytes a block (half a byte a texel).
-    Bc1,
     /// One channel, 8 bytes a block.
     Bc4,
     /// Two channels, 16 bytes a block.
@@ -23,12 +23,12 @@ pub enum BlockFormat {
 }
 
 impl BlockFormat {
-    pub const ALL: [Self; 4] = [Self::Bc1, Self::Bc4, Self::Bc5, Self::Bc7];
+    pub const ALL: [Self; 3] = [Self::Bc4, Self::Bc5, Self::Bc7];
 
     /// The bytes of one 4×4 block.
     pub fn block_bytes(self) -> u32 {
         match self {
-            Self::Bc1 | Self::Bc4 => 8,
+            Self::Bc4 => 8,
             Self::Bc5 | Self::Bc7 => 16,
         }
     }
@@ -68,8 +68,8 @@ pub(super) fn encode(
         return None;
     }
     let base = image.to_rgba8();
-    let format = format_for(&base, settings.compression, kind);
-    let variant = variant(format, settings.compression);
+    let format = format_for(&base, kind);
+    let variant = variant(format, settings.compression, &base);
     let count = match settings.generate_mipmaps {
         true => full_chain_len(width, height),
         false => 1,
@@ -89,30 +89,38 @@ pub(super) fn encode(
 }
 
 /// The format a `kind` image holding `texels` compresses to (the module doc's table).
-pub(super) fn format_for(
-    texels: &RgbaImage,
-    compression: Compression,
-    kind: TextureKind,
-) -> BlockFormat {
+pub(super) fn format_for(texels: &RgbaImage, kind: TextureKind) -> BlockFormat {
     let grey = || texels.pixels().all(|p| p[0] == p[1] && p[1] == p[2]);
-    let opaque = || texels.pixels().all(|p| p[3] == 255);
     match kind {
         TextureKind::Normal => BlockFormat::Bc5,
         TextureKind::Mask if grey() => BlockFormat::Bc4,
-        _ if compression == Compression::Normal && opaque() => BlockFormat::Bc1,
         _ => BlockFormat::Bc7,
     }
 }
 
-/// The encoder for `format`: BC7 searches harder at `HighQuality`.
-fn variant(format: BlockFormat, compression: Compression) -> CompressionVariant {
+/// The encoder for `format` on `texels`. BC7's profiles are chosen for import
+/// time: on one core of the 2026 cloud container a 2048² map took 8 to 11 s at
+/// `Normal` (very fast) and 21 s at `HighQuality` (fast), the bands spread over
+/// every core. The ultra-fast profiles (2 s) are not used: like BC1 they flatten
+/// a block of two contrasting colours to one. An opaque image encodes three
+/// channels, faster and closer.
+fn variant(
+    format: BlockFormat,
+    compression: Compression,
+    texels: &RgbaImage,
+) -> CompressionVariant {
     let high = compression == Compression::HighQuality;
+    let opaque = texels.pixels().all(|p| p[3] == 255);
+    let bc7 = match (high, opaque) {
+        (false, true) => BC7Settings::opaque_very_fast(),
+        (false, false) => BC7Settings::alpha_very_fast(),
+        (true, true) => BC7Settings::opaque_fast(),
+        (true, false) => BC7Settings::alpha_fast(),
+    };
     match format {
-        BlockFormat::Bc1 => CompressionVariant::BC1,
         BlockFormat::Bc4 => CompressionVariant::BC4,
         BlockFormat::Bc5 => CompressionVariant::BC5,
-        BlockFormat::Bc7 if high => CompressionVariant::BC7(BC7Settings::alpha_basic()),
-        BlockFormat::Bc7 => CompressionVariant::BC7(BC7Settings::alpha_fast()),
+        BlockFormat::Bc7 => CompressionVariant::BC7(bc7),
     }
 }
 

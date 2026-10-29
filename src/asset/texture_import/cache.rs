@@ -7,7 +7,6 @@
 //! level's byte length (u32) and its blocks.
 
 use std::path::Path;
-use std::sync::atomic::{AtomicU32, Ordering};
 
 use super::encode::{BlockFormat, Compressed};
 use super::{TextureKind, TextureSettings, ENCODER_VERSION};
@@ -52,8 +51,8 @@ pub(super) fn read(path: &Path, stamp: u64) -> Option<Compressed> {
     })
 }
 
-/// Cache `texture` at `path` under `stamp`. Written beside it and renamed into
-/// place, so a reader in another process never finds half a file.
+/// Cache `texture` at `path` under `stamp`, atomically, so a reader in another
+/// process never finds half a file.
 pub(super) fn write(path: &Path, stamp: u64, texture: &Compressed) -> std::io::Result<()> {
     let mut out = MAGIC.to_vec();
     out.extend(stamp.to_le_bytes());
@@ -70,12 +69,8 @@ pub(super) fn write(path: &Path, stamp: u64, texture: &Compressed) -> std::io::R
     if let Some(dir) = path.parent() {
         std::fs::create_dir_all(dir)?;
     }
-    static NEXT: AtomicU32 = AtomicU32::new(0);
-    let n = NEXT.fetch_add(1, Ordering::Relaxed);
-    let mut staged = path.as_os_str().to_owned();
-    staged.push(format!(".{}-{n}.tmp", std::process::id()));
-    std::fs::write(&staged, out)?;
-    std::fs::rename(&staged, path)
+    // lint: allow(asset-write) a cache only `compressed` reads, by its stamp, never by path watch
+    crate::core::fs::write_atomic(path, &out)
 }
 
 /// Reads the cache file front to back.

@@ -19,26 +19,44 @@ fn gradient(w: u32, h: u32, alpha: u8) -> RgbaImage {
 }
 
 #[test]
-fn each_kind_compresses_to_the_format_unitys_table_names() {
-    let (normal, high) = (Compression::Normal, Compression::HighQuality);
+fn each_kind_compresses_to_its_format() {
     let (opaque, clear) = (gradient(8, 8, 255), gradient(8, 8, 100));
     let grey = RgbaImage::from_fn(8, 8, |x, _| {
-        Rgba([x as u8 * 30, x as u8 * 30, x as u8 * 30, 255])
+        Rgba([x as u8 * 30, x as u8 * 30, x as u8 * 30, 9])
     });
     let cases = [
-        (&opaque, normal, TextureKind::Colour, BlockFormat::Bc1),
-        (&clear, normal, TextureKind::Colour, BlockFormat::Bc7),
-        (&opaque, high, TextureKind::Colour, BlockFormat::Bc7),
-        (&opaque, normal, TextureKind::Data, BlockFormat::Bc1),
-        (&opaque, normal, TextureKind::Normal, BlockFormat::Bc5),
-        (&grey, high, TextureKind::Mask, BlockFormat::Bc4),
-        (&opaque, normal, TextureKind::Mask, BlockFormat::Bc1),
-        (&grey, normal, TextureKind::Data, BlockFormat::Bc1),
+        (&opaque, TextureKind::Colour, BlockFormat::Bc7),
+        (&clear, TextureKind::Data, BlockFormat::Bc7),
+        (&opaque, TextureKind::Normal, BlockFormat::Bc5),
+        (&grey, TextureKind::Mask, BlockFormat::Bc4),
+        (&opaque, TextureKind::Mask, BlockFormat::Bc7),
+        (&grey, TextureKind::Data, BlockFormat::Bc7),
     ];
-    for (texels, compression, kind, want) in cases {
-        let got = format_for(texels, compression, kind);
-        assert_eq!(got, want, "{kind:?} at {compression:?}");
+    for (texels, kind, want) in cases {
+        assert_eq!(format_for(texels, kind), want, "{kind:?}");
     }
+}
+
+/// Two contrasting colours in one block (red over blue) decode as both, not as
+/// their average: the case BC1 and BC7's ultra-fast profiles get wrong.
+#[test]
+fn a_block_of_two_contrasting_colours_keeps_both() {
+    let block = RgbaImage::from_fn(4, 4, |_, y| match y < 2 {
+        true => Rgba([220, 30, 30, 255]),
+        false => Rgba([30, 30, 220, 255]),
+    });
+    let image = DynamicImage::ImageRgba8(block.clone());
+    let made = encode(&image, &settings(Compression::Normal), TextureKind::Colour).unwrap();
+    let mut decoded = vec![0; 64];
+    let bc7 = CompressionVariant::BC7(BC7Settings::opaque_very_fast());
+    decompress_blocks_as_rgba8(bc7, 4, 4, &made.levels[0], &mut decoded);
+    let worst = block
+        .as_raw()
+        .iter()
+        .zip(&decoded)
+        .map(|(a, b)| a.abs_diff(*b))
+        .max();
+    assert!(worst.unwrap() <= 4, "off by {worst:?}: {decoded:?}");
 }
 
 #[test]
@@ -48,7 +66,7 @@ fn a_chain_has_every_level_in_whole_blocks_and_odd_sides_are_left_uncompressed()
     assert_eq!((made.width, made.height, made.levels.len()), (64, 16, 7));
     for (i, level) in made.levels.iter().enumerate() {
         let (w, h) = ((64 >> i).max(1), (16 >> i).max(1));
-        assert_eq!(level.len(), BlockFormat::Bc1.level_bytes(w, h), "level {i}");
+        assert_eq!(level.len(), BlockFormat::Bc7.level_bytes(w, h), "level {i}");
     }
     let no_mips = TextureSettings {
         generate_mipmaps: false,
@@ -77,7 +95,7 @@ fn the_blocks_decode_close_to_the_source() {
     .unwrap();
     assert_eq!(made.format, BlockFormat::Bc7);
     let mut decoded = vec![0; 32 * 32 * 4];
-    let bc7 = CompressionVariant::BC7(BC7Settings::alpha_basic());
+    let bc7 = CompressionVariant::BC7(BC7Settings::alpha_fast());
     decompress_blocks_as_rgba8(bc7, 32, 32, &made.levels[0], &mut decoded);
     let worst = source
         .as_raw()

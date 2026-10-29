@@ -122,7 +122,7 @@ rustc-hash = "2.1.2"
 rapier3d = { version = "0.36.0" }
 image = { version = "0.25.10", default-features = false, features = ["jpeg", "png", "tga"] }
 ktx2 = { version = "0.3.0" }
-# Texture compression at import (#1574): BC1/BC4/BC5/BC7 block encoders, pure Rust
+# Texture compression at import (#1574): BC4/BC5/BC7 block encoders, pure Rust
 # (a port of Intel's ISPC texture compressor). The CPU encoders only: its default
 # features add a wgpu compute path, which would tie it to our wgpu version.
 block_compression = { version = "0.11.0", default-features = false, features = ["bc15", "bc7"] }

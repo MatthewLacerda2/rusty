@@ -17,7 +17,6 @@ pub(crate) const FEATURE: wgpu::Features = wgpu::Features::TEXTURE_COMPRESSION_B
 pub(crate) fn formats(format: BlockFormat) -> (wgpu::TextureFormat, wgpu::TextureFormat) {
     use wgpu::TextureFormat as F;
     match format {
-        BlockFormat::Bc1 => (F::Bc1RgbaUnormSrgb, F::Bc1RgbaUnorm),
         BlockFormat::Bc7 => (F::Bc7RgbaUnormSrgb, F::Bc7RgbaUnorm),
         BlockFormat::Bc4 => (F::Bc4RUnorm, F::Bc4RUnorm),
         BlockFormat::Bc5 => (F::Bc5RgUnorm, F::Bc5RgUnorm),

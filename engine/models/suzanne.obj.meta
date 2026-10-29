@@ -12,6 +12,8 @@
   "texture": {
     "wrap_mode": "Repeat",
     "filter_mode": "Trilinear",
-    "generate_mipmaps": true
+    "generate_mipmaps": true,
+    "compression": "Normal",
+    "max_size": 2048
   }
 }

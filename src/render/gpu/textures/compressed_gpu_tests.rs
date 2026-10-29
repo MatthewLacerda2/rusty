@@ -40,11 +40,11 @@ fn gpu_each_slot_uploads_in_its_block_format_with_every_mip() {
     let grey = flat("bc_grey", [90, 90, 90, 255]);
     let bc = renderer.device.features().contains(FEATURE);
     let cases = [
-        (&colour, TextureKind::Colour, F::Bc1RgbaUnormSrgb),
+        (&colour, TextureKind::Colour, F::Bc7RgbaUnormSrgb),
         (&clear, TextureKind::Colour, F::Bc7RgbaUnormSrgb),
         (&colour, TextureKind::Normal, F::Bc5RgUnorm),
         (&grey, TextureKind::Mask, F::Bc4RUnorm),
-        (&colour, TextureKind::Mask, F::Bc1RgbaUnormSrgb),
+        (&colour, TextureKind::Mask, F::Bc7RgbaUnormSrgb),
     ];
     for (path, kind, want) in cases {
         let want = if bc { want } else { F::Rgba8UnormSrgb };
