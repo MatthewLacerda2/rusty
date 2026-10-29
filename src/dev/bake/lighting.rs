@@ -3,7 +3,8 @@
 //! The orchestration behind `Lighting.Bake()` (the script verb) and the probe step
 //! of the editor's Generate Lighting button (#246, #832). In ONE action it:
 //!   1. auto-places light probes (a grid through the navigable volume / static AABB)
-//!      and reflection probes (one per coarse region of the static AABB) — UNLESS that
+//!      and reflection probes (one per room of the nav surface's floor plan, else of
+//!      the static colliders', #1584) — UNLESS that
 //!      set is already manually authored, in which case its placement is left untouched;
 //!   2. runs the two existing dev bakes — the multi-bounce light-probe bake (#250, #285,
 //!      `probe_bake`) and the GGX reflection-probe bake (#252, `reflection_bake`).
@@ -19,11 +20,11 @@
 //! So a level with no probes gets a full auto-place + bake; one with hand-authored
 //! probes is a pure rebake — manual placement is never clobbered.
 //!
-//! It reads `navigation` only for the walkable extent light probes fill, handed to
-//! placement as plain bounds.
+//! It reads `navigation` only for the walkable extent light probes fill and the
+//! floor plan reflection probes are placed on, handed to placement as plain data.
 
 use crate::navigation::NavigationGraph;
-use crate::scene::lighting::placement;
+use crate::scene::lighting::placement::{self, ReflectionPlacement};
 use crate::scene::Scene;
 
 /// Tunables for the one-button bake. Defaults give a sensible mid-size-level layout;
@@ -32,18 +33,15 @@ use crate::scene::Scene;
 pub struct LightingBakeParams {
     /// Light-probe grid cell size, world units.
     pub probe_spacing: f32,
-    /// Approximate reflection-probe room edge, world units (one probe per region).
-    pub reflection_region: f32,
-    /// Per-axis cap on reflection regions, bounding the bake cost on huge levels.
-    pub reflection_cap: u32,
+    /// How reflection probes are placed: one per room, none wider than its region.
+    pub reflection: ReflectionPlacement,
 }
 
 impl Default for LightingBakeParams {
     fn default() -> Self {
         Self {
             probe_spacing: 4.0,
-            reflection_region: 12.0,
-            reflection_cap: 4,
+            reflection: ReflectionPlacement::default(),
         }
     }
 }
@@ -71,7 +69,7 @@ pub fn bake_lighting(
     params: LightingBakeParams,
 ) -> Result<LightingBakeReport, String> {
     let auto_placed_light = auto_place_light(scene, nav, params.probe_spacing);
-    let auto_placed_reflection = auto_place_reflection(scene, &params);
+    let auto_placed_reflection = auto_place_reflection(scene, nav, &params.reflection);
 
     let light_probes = scene.probes.probes.len();
     let reflection_probes = scene.reflection_probes.len();
@@ -108,12 +106,17 @@ fn auto_place_light(scene: &mut Scene, nav: Option<&NavigationGraph>, spacing: f
 
 /// Auto-place reflection probes when the set is empty; returns whether it placed. A
 /// non-empty set is left as authored (manual-vs-auto rule).
-fn auto_place_reflection(scene: &mut Scene, params: &LightingBakeParams) -> bool {
+fn auto_place_reflection(
+    scene: &mut Scene,
+    nav: Option<&NavigationGraph>,
+    params: &ReflectionPlacement,
+) -> bool {
     if !scene.reflection_probes.is_empty() {
         return false;
     }
-    let plans =
-        placement::plan_reflection_probes(scene, params.reflection_region, params.reflection_cap);
+    let radius = scene.nav_settings.agent_radius;
+    let floor = nav.and_then(|nav| nav.floor_grid(radius));
+    let plans = placement::plan_reflection_probes(scene, floor, params);
     if plans.is_empty() {
         return false;
     }

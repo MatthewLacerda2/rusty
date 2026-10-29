@@ -27,9 +27,8 @@ use crate::render::gpu::shaders::ShaderRegistry;
 use crate::render::timing::GpuTimer;
 use crate::render::GpuTexture;
 
-/// The cubes' face size: a reflection probe's bake resolution, Unity's default
-/// reflection resolution.
-pub(crate) const SKY_FACE: u32 = crate::render::ibl::reflection_bake::DEFAULT_REFLECTION_RESOLUTION;
+/// The cubes' face size: Unity's default environment-reflection resolution.
+pub(crate) const SKY_FACE: u32 = 128;
 
 /// What a frame must bake, from what the cubes hold and the sky it shows.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

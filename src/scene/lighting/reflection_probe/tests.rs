@@ -1,4 +1,5 @@
-//! Unit tests for reflection-probe selection + parallax math (no GPU).
+//! Unit tests for the reflection-probe data model, its settings and parallax math
+//! (no GPU).
 
 use super::*;
 
@@ -34,23 +35,6 @@ fn contains_inclusive() {
     assert!(probe.contains(Vec3::ZERO));
     assert!(probe.contains(Vec3::ONE)); // boundary is inclusive
     assert!(!probe.contains(Vec3::new(1.001, 0.0, 0.0)));
-}
-
-#[test]
-fn select_nearest_containing_probe() {
-    let mut set = ReflectionProbeSet::new();
-    // Two overlapping boxes covering the origin; nearest capture point wins.
-    set.add(Vec3::new(3.0, 0.0, 0.0), Vec3::splat(5.0)); // covers origin, dist 3
-    set.add(Vec3::new(1.0, 0.0, 0.0), Vec3::splat(5.0)); // covers origin, dist 1 (nearer)
-    let idx = set.select(Vec3::ZERO).map(|(i, _)| i);
-    assert_eq!(idx, Some(1));
-}
-
-#[test]
-fn select_none_outside_all_boxes() {
-    let mut set = ReflectionProbeSet::new();
-    set.add(Vec3::ZERO, Vec3::ONE);
-    assert!(set.select(Vec3::new(100.0, 0.0, 0.0)).is_none());
 }
 
 #[test]
@@ -130,4 +114,23 @@ fn box_distance_is_zero_inside_and_to_the_nearest_face_outside() {
     assert_eq!(probe.box_distance_sq(Vec3::new(0.5, -0.9, 0.0)), 0.0);
     assert_eq!(probe.box_distance_sq(Vec3::new(3.0, 0.0, 0.0)), 4.0);
     assert_eq!(probe.box_distance_sq(Vec3::new(2.0, 2.0, 0.0)), 2.0);
+}
+
+#[test]
+fn settings_clamp_to_their_ranges() {
+    let mut set = ReflectionProbeSet::new();
+    set.add(Vec3::ZERO, Vec3::ONE);
+    assert!(set.edit(0, |p| {
+        (p.resolution, p.blend_distance) = (Some(300), -2.0);
+        (p.near_clip, p.far_clip, p.intensity) = (0.0, 0.0, f32::NAN);
+        (p.box_min, p.box_max) = (Vec3::ONE, -Vec3::ONE);
+    }));
+    let p = &set.probes[0];
+    assert_eq!((p.resolution, p.blend_distance), (Some(256), 0.0));
+    assert_eq!((p.near_clip, p.far_clip), (0.01, 0.02));
+    assert_eq!(p.intensity, 1.0);
+    assert_eq!((p.box_min, p.box_max), (-Vec3::ONE, Vec3::ONE));
+    assert!(!set.edit(5, |_| {}), "no probe 5");
+    assert_eq!((clamp_resolution(1), clamp_resolution(9000)), (16, 2048));
+    assert_eq!((clamp_resolution(400), clamp_resolution(512)), (512, 512));
 }

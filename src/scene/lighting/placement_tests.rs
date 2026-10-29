@@ -1,4 +1,4 @@
-//! Tests for deterministic IBL auto-placement (#246). Sibling of `placement.rs`.
+//! Tests for deterministic IBL auto-placement (#246). Sibling of `placement/`.
 //! Placement takes walkable bounds as plain `Vec3`s (#721); how the nav graph
 //! computes them is tested in `navigation` (`walkable_tests.rs`).
 //!
@@ -9,7 +9,9 @@
 
 use glam::Vec3;
 
-use super::{plan_light_probes, plan_reflection_probes, static_scene_aabb};
+use super::{
+    plan_light_probes, plan_reflection_probes, static_scene_aabb, ReflectionPlacement, EYE_HEIGHT,
+};
 use crate::components::{ColliderComponent, ColliderShape};
 use crate::scene::Scene;
 
@@ -122,40 +124,30 @@ fn light_probe_plan_from_walkable_bounds_alone() {
 }
 
 #[test]
-fn reflection_plan_subdivides_into_regions() {
+fn one_open_room_wider_than_the_region_is_split() {
     let scene = room_scene();
-    // 20-unit XZ span / 10-unit region ≈ 2 regions per horizontal axis; 6-unit Y → 1.
-    let plans = plan_reflection_probes(&scene, 10.0, 4);
-    // 2 (x) × 1 (y, thin box) × 2 (z) = 4 regions.
-    assert_eq!(plans.len(), 4, "2×1×2 region grid over the box");
-    // Each region's box is inside the scene AABB and its centroid is its box centre.
+    // One 20 × 20 room open to the sky, region 12: 2 × 2 probes, each at eye height
+    // over the floor (the box's top, y = 3), their boxes tiling the room.
+    let plans = plan_reflection_probes(&scene, None, &placement());
+    assert_eq!(plans.len(), 4, "{plans:?}");
     let (amin, amax) = static_scene_aabb(&scene).unwrap();
     for p in &plans {
-        assert!(p.box_min.cmpge(amin - Vec3::splat(1e-4)).all());
-        assert!(p.box_max.cmple(amax + Vec3::splat(1e-4)).all());
-        assert!(((p.box_min + p.box_max) * 0.5 - p.position).length() < 1e-4);
+        assert!(p.box_min.cmpge(amin - Vec3::splat(1e-4)).all(), "{p:?}");
+        assert!(p.box_max.x <= amax.x + 1e-4 && p.box_max.z <= amax.z + 1e-4);
+        assert_eq!(p.box_min.y, 3.0, "the floor");
+        assert!((p.position.y - (3.0 + EYE_HEIGHT)).abs() < 1e-5);
+        assert!(p.box_max.y >= p.position.y, "open: up to the sky");
     }
 }
 
 #[test]
 fn reflection_plan_empty_without_static_geometry() {
     let scene = Scene::new();
-    assert!(plan_reflection_probes(&scene, 10.0, 4).is_empty());
+    assert!(plan_reflection_probes(&scene, None, &placement()).is_empty());
 }
 
-#[test]
-fn reflection_per_axis_cap_is_honoured() {
-    let mut scene = Scene::new();
-    add_static_box(
-        &mut scene,
-        "BigFloor",
-        Vec3::ZERO,
-        Vec3::new(1000.0, 4.0, 1000.0),
-    );
-    let plans = plan_reflection_probes(&scene, 5.0, 3);
-    // Cap of 3 per horizontal axis, vertical capped to min(cap,2)→1 for the thin box:
-    // 3 (x) × 1 (y) × 3 (z) = 9.
-    assert_eq!(plans.len(), 9);
+fn placement() -> ReflectionPlacement {
+    ReflectionPlacement::default()
 }
 
 #[test]
@@ -169,7 +161,7 @@ fn placement_is_deterministic() {
         plan_light_probes(&b, walkable, 4.0)
     );
     assert_eq!(
-        plan_reflection_probes(&a, 10.0, 4),
-        plan_reflection_probes(&b, 10.0, 4)
+        plan_reflection_probes(&a, None, &placement()),
+        plan_reflection_probes(&b, None, &placement())
     );
 }

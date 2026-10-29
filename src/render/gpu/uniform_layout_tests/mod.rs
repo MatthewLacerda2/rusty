@@ -116,6 +116,7 @@ fn lighting_uniform_matches_wgsl_layout() {
         ("mip_count", offset_of!(ReflectionProbeUniform, mip_count)),
         ("box_max", offset_of!(ReflectionProbeUniform, box_max)),
         ("layer", offset_of!(ReflectionProbeUniform, layer)),
+        ("params", offset_of!(ReflectionProbeUniform, params)),
     ];
     assert_layout(
         "ReflectionProbe",

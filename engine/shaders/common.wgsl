@@ -83,8 +83,8 @@ struct LightingUniforms {
     sky_textured: f32,
     _sky_pad_a: f32,
     _sky_pad_b: f32,
-    // The resident reflection probes (#1206); a draw's instance names its probe
-    // (`InstanceData.reflection_probe`, index + 1). Length is the Rust
+    // The resident reflection probes (#1206); a draw's instance names the two it
+    // blends (`InstanceData.reflection_probe`, packed indices + 1 and weights, #1584). Length is the Rust
     // `MAX_REFLECTION_PROBES`. Mirrors the Rust `LightingUniform` byte-for-byte.
     refl_probes: array<ReflectionProbe, 32>,
 };

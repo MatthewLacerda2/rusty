@@ -246,6 +246,7 @@ impl Renderer {
             cubemaps: HashMap::new(),
             static_capture: false,
             capture_probe_bounce: false,
+            capture_shadows: true,
             frame_counters: Default::default(),
             gpu_timer,
             render_texture_ids: Default::default(),

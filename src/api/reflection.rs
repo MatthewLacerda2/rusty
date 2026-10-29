@@ -9,18 +9,18 @@
 //! placement order).
 //!
 //! Editor↔API parity: every reflection-probe action a user can take in the editor —
-//! add, move, resize the parallax box, point at a cubemap, remove — has its mirror
-//! here. The cubemap bake itself is a separate later issue (#245); until then a probe
+//! add, move, resize the parallax box, point at a cubemap, edit Unity's per-probe
+//! settings (`Set`/`Get`, #1584), remove — has its mirror here. The cubemap bake itself is a separate later issue (#245); until then a probe
 //! can be placed and pointed at a not-yet-baked path, and the runtime falls back to the
 //! skybox.
 
 use std::cell::RefCell;
 
 use glam::Vec3;
-use mlua::Lua;
+use mlua::{Lua, Table};
 
 use super::{put, Reg};
-use crate::scene::Scene;
+use crate::scene::{ReflectionProbe, Scene};
 
 /// Register the `Reflection` namespace onto `lua`. `scene_path` is the saved scene file
 /// (if any) — the dev-only `Reflection.Bake()` (installed by `dev`, #737) writes its
@@ -34,6 +34,7 @@ pub fn register<'scope>(
 
     register_placement(scope, &table, scene)?;
     register_config(scope, &table, scene)?;
+    register_settings(scope, &table, scene)?;
 
     lua.globals()
         .set("Reflection", table)
@@ -131,54 +132,108 @@ fn register_config<'scope>(
     )
 }
 
-#[cfg(test)]
-mod tests {
-    use std::cell::RefCell;
-
-    use super::*;
-
-    fn empty_scene() -> RefCell<Scene> {
-        RefCell::new(Scene::default())
-    }
-
-    #[test]
-    fn add_count_remove() {
-        let scene = empty_scene();
-        let lua = Lua::new();
-        lua.scope(|scope| {
-            register(&lua, scope, &scene).unwrap();
-            lua.load("Reflection.Add(0,0,0, 5,5,5)").exec().unwrap();
-            lua.load("Reflection.Add(10,0,0, 5,5,5)").exec().unwrap();
-            let n: u32 = lua.load("return Reflection.Count()").eval().unwrap();
-            assert_eq!(n, 2);
-            lua.load("Reflection.Remove(0)").exec().unwrap();
-            let n: u32 = lua.load("return Reflection.Count()").eval().unwrap();
-            assert_eq!(n, 1);
-            Ok(())
-        })
-        .unwrap();
-    }
-
-    #[test]
-    fn set_box_and_cubemap() {
-        let scene = empty_scene();
-        let lua = Lua::new();
-        lua.scope(|scope| {
-            register(&lua, scope, &scene).unwrap();
-            lua.load("Reflection.Add(0,0,0, 1,1,1)").exec().unwrap();
-            lua.load("Reflection.SetBox(0, -3,-3,-3, 3,3,3)")
-                .exec()
-                .unwrap();
-            lua.load("Reflection.SetCubemap(0, 'room.ktx2')")
-                .exec()
-                .unwrap();
-            Ok(())
-        })
-        .unwrap();
-        let s = scene.borrow();
-        let p = &s.reflection_probes.probes[0];
-        assert_eq!(p.box_min, Vec3::splat(-3.0));
-        assert_eq!(p.box_max, Vec3::splat(3.0));
-        assert_eq!(p.cubemap_path, "room.ktx2");
-    }
+/// `Set(index, {…})` / `Get(index)`: every field of one probe (#1584), Unity's
+/// Reflection Probe settings among them.
+fn register_settings<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
+    table: &mlua::Table,
+    scene: &'scope RefCell<Scene>,
+) -> Reg {
+    put(
+        table,
+        "Set",
+        scope.create_function(|_, (index, t): (u32, Table)| {
+            let mut fields = Ok(());
+            scene
+                .borrow_mut()
+                .reflection_probes
+                .edit(index as usize, |p| fields = write_fields(p, &t));
+            fields
+        }),
+    )?;
+    put(
+        table,
+        "Get",
+        scope.create_function(|lua, index: u32| {
+            let scene = scene.borrow();
+            match scene.reflection_probes.probes.get(index as usize) {
+                Some(p) => read_fields(lua, p).map(Some),
+                None => Ok(None),
+            }
+        }),
+    )
 }
+
+/// The `{ x, y, z }` table of `v`.
+fn vec_table(lua: &Lua, v: Vec3) -> mlua::Result<Table> {
+    let t = lua.create_table()?;
+    t.set("x", v.x)?;
+    t.set("y", v.y)?;
+    t.set("z", v.z)?;
+    Ok(t)
+}
+
+/// The `{ x, y, z }` table at `key` of `t`, if it is there.
+fn vec_field(t: &Table, key: &str) -> mlua::Result<Option<Vec3>> {
+    let Some(v) = t.get::<Option<Table>>(key)? else {
+        return Ok(None);
+    };
+    Ok(Some(Vec3::new(v.get("x")?, v.get("y")?, v.get("z")?)))
+}
+
+/// Every field of `p` as `Reflection.Get` returns it.
+fn read_fields(lua: &Lua, p: &ReflectionProbe) -> mlua::Result<Table> {
+    let t = lua.create_table()?;
+    t.set("position", vec_table(lua, p.position)?)?;
+    t.set("boxMin", vec_table(lua, p.box_min)?)?;
+    t.set("boxMax", vec_table(lua, p.box_max)?)?;
+    t.set("cubemap", p.cubemap_path.as_str())?;
+    t.set("boxProjection", p.box_projection)?;
+    t.set("blendDistance", p.blend_distance)?;
+    t.set("importance", p.importance)?;
+    t.set("resolution", p.resolution)?;
+    t.set("nearClip", p.near_clip)?;
+    t.set("farClip", p.far_clip)?;
+    t.set("shadows", p.shadows)?;
+    t.set("intensity", p.intensity)?;
+    Ok(t)
+}
+
+/// Write the fields `t` names into `p`; a field it leaves out keeps its value, and
+/// `resolution = 0` goes back to the scene's default.
+fn write_fields(p: &mut ReflectionProbe, t: &Table) -> mlua::Result<()> {
+    if let Some(v) = vec_field(t, "position")? {
+        p.position = v;
+    }
+    if let Some(v) = vec_field(t, "boxMin")? {
+        p.box_min = v;
+    }
+    if let Some(v) = vec_field(t, "boxMax")? {
+        p.box_max = v;
+    }
+    if let Some(v) = t.get::<Option<String>>("cubemap")? {
+        p.cubemap_path = v;
+    }
+    if let Some(v) = t.get::<Option<u32>>("resolution")? {
+        p.resolution = (v > 0).then_some(v);
+    }
+    set(t, "boxProjection", &mut p.box_projection)?;
+    set(t, "blendDistance", &mut p.blend_distance)?;
+    set(t, "importance", &mut p.importance)?;
+    set(t, "nearClip", &mut p.near_clip)?;
+    set(t, "farClip", &mut p.far_clip)?;
+    set(t, "shadows", &mut p.shadows)?;
+    set(t, "intensity", &mut p.intensity)
+}
+
+/// Overwrite `slot` with `t[key]` when it is there.
+fn set<T: mlua::FromLua>(t: &Table, key: &str, slot: &mut T) -> mlua::Result<()> {
+    if let Some(v) = t.get::<Option<T>>(key)? {
+        *slot = v;
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+#[path = "reflection_tests.rs"]
+mod tests;

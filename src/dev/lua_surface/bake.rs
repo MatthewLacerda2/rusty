@@ -69,7 +69,7 @@ fn register_reflection<'scope>(
     )
 }
 
-/// `Lighting.Bake([probeSpacing], [reflectionRegion], [cap])`: auto-place then bake
+/// `Lighting.Bake([probeSpacing], [reflectionRegion])`: auto-place then bake
 /// both sets (#246), the probe step of the editor's Generate Lighting button (#832).
 /// `true` when at least one bake ran on the GPU; errors only when a bake's own
 /// contract fails (reflections need a saved scene path).
@@ -78,16 +78,16 @@ fn register_lighting<'scope>(
     scope: &'scope mlua::Scope<'scope, '_>,
     ctx: &ApiScopedCtx<'scope>,
 ) -> Reg {
-    type BakeArgs = (Option<f32>, Option<f32>, Option<u32>);
+    type BakeArgs = (Option<f32>, Option<f32>);
     let (scene, scene_path, nav) = (ctx.scene, ctx.scene_path, ctx.nav);
     put(
         &global_table(lua, "Lighting")?,
         "Bake",
-        scope.create_function(move |_, (spacing, region, cap): BakeArgs| {
+        scope.create_function(move |_, (spacing, region): BakeArgs| {
             let mut scene = scene.borrow_mut();
             let path = scene_path.borrow();
             let nav = nav.borrow();
-            let params = bake_params(spacing, region, cap);
+            let params = bake_params(spacing, region);
             let report =
                 lighting_bake::bake_lighting(&mut scene, path.as_deref(), Some(&nav), params)
                     .map_err(mlua::Error::external)?;
@@ -97,17 +97,11 @@ fn register_lighting<'scope>(
 }
 
 /// Build bake params from the optional Lua arguments, falling back to the defaults.
-fn bake_params(
-    spacing: Option<f32>,
-    region: Option<f32>,
-    cap: Option<u32>,
-) -> lighting_bake::LightingBakeParams {
-    let d = lighting_bake::LightingBakeParams::default();
-    lighting_bake::LightingBakeParams {
-        probe_spacing: spacing.unwrap_or(d.probe_spacing),
-        reflection_region: region.unwrap_or(d.reflection_region),
-        reflection_cap: cap.unwrap_or(d.reflection_cap),
-    }
+fn bake_params(spacing: Option<f32>, region: Option<f32>) -> lighting_bake::LightingBakeParams {
+    let mut params = lighting_bake::LightingBakeParams::default();
+    params.probe_spacing = spacing.unwrap_or(params.probe_spacing);
+    params.reflection.region = region.unwrap_or(params.reflection.region);
+    params
 }
 
 /// `Lighting.BakeLightmaps([texelsPerUnit], [samples], [bounces], [seed],

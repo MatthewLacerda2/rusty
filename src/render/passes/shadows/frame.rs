@@ -34,7 +34,9 @@ impl Renderer {
             settings,
             ShadowRenderer::CASCADE_SIZE,
         );
-        let uniform = CascadeUniform::new(&fitted, camera.position, camera.forward());
+        // A probe captured without shadows (#1584) samples no cascade.
+        let sampled: &[_] = if self.capture_shadows { &fitted } else { &[] };
+        let uniform = CascadeUniform::new(sampled, camera.position, camera.forward());
         self.queue
             .write_buffer(&self.shadow_uniform_buffer, 0, bytemuck::bytes_of(&uniform));
         self.shadow_renderer.instancing = self.instancing;
@@ -75,7 +77,10 @@ impl Renderer {
     fn plan_shadow_atlas(&mut self, camera: &Camera, aspect: f32) {
         let view_proj = camera.build_view_projection(aspect);
         let grid = ClusterGrid::new(camera, aspect);
-        let requests = clusters::shadow_requests(&grid, &self.clusters.staged());
+        let mut requests = clusters::shadow_requests(&grid, &self.clusters.staged());
+        if !self.capture_shadows {
+            requests.clear(); // a probe captured without shadows plans no tile
+        }
         let plan = atlas::plan(&requests, view_proj, camera.position);
         for &(light, first_tile) in &plan.shadows {
             self.clusters.set_shadow(light, first_tile);

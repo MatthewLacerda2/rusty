@@ -7,7 +7,8 @@
 
 // One resident reflection probe (#1206): its capture point, its parallax box, the
 // layer of the probe cube array its cube sits in (probes sharing a cube share it),
-// and where that cube's prefiltered mip chain (#245) starts. Mirrors the Rust
+// where that cube's prefiltered mip chain (#245) starts, and (#1584) its intensity
+// (`params.x`) and box-projection switch (`params.y`, 1 on). Mirrors the Rust
 // `ReflectionProbeUniform` byte-for-byte.
 struct ReflectionProbe {
     center: vec3<f32>,
@@ -16,6 +17,7 @@ struct ReflectionProbe {
     mip_count: f32,
     box_max: vec3<f32>,
     layer: u32,
+    params: vec4<f32>,
 };
 
 // Box-projected parallax correction (#244), the standard Lagarde technique. Given a

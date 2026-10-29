@@ -26,6 +26,21 @@ fn set_settings_changes_only_the_named_fields_and_clamps() {
 }
 
 #[test]
+fn reflection_settings_read_back_and_clamp() {
+    let s = session();
+    let read = "local s = Lighting.GetSettings() return s.reflectionResolution .. ' ' .. s.reflectionBudgetMB";
+    assert_eq!(s.eval(read).unwrap(), "512 128");
+    s.eval("Lighting.SetSettings{ reflectionResolution = 1000, reflectionBudgetMB = 1 }")
+        .unwrap();
+    let r = s.world().scene().borrow().lighting_settings.reflections;
+    assert_eq!(
+        (r.resolution, r.budget_mb),
+        (1024, 8),
+        "a power of two; the least budget"
+    );
+}
+
+#[test]
 fn generate_needs_a_saved_scene() {
     let err = session().eval("return Lighting.Generate()").unwrap_err();
     assert!(err.contains("save the scene"), "{err}");

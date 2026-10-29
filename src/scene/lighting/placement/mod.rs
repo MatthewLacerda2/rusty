@@ -4,7 +4,7 @@
 //! when available, the walkable extent of the baked nav surface), compute where light
 //! probes and reflection probes should sit. This is a PURE, deterministic function of
 //! the scene and those bounds —
-//! a grid + an AABB subdivision, no RNG and no wall-clock — so the same level always
+//! a grid and a floor-plan watershed, no RNG and no wall-clock — so the same level always
 //! yields the same probe layout (the determinism the headless bake relies on).
 //!
 //! The bake itself (rendering each probe → SH / prefiltered cubemap) is the render/dev
@@ -17,13 +17,26 @@
 //!     coverage) when a nav surface is baked; otherwise they fall back to the
 //!     static-geometry AABB. Taking bounds, not the graph, keeps the arrow
 //!     navigation → scene (#721).
-//!   * **Reflection probes** — one per coarse region, from an AABB subdivision of the
-//!     static bounds. Each region yields a centroid + a parallax box covering it.
+//!   * **Reflection probes** — one per room (#1584): the floor plan (the nav
+//!     surface's, handed over as data, else rasterized from the static colliders)
+//!     is cut into rooms at its doorways (`rooms.rs`), and each room gets a probe
+//!     at eye height with its box fitted to the room (`room_probes.rs`).
 //!
 //! This module is pure data + math — deterministic, sim-reachable, no RNG/clock.
 
+mod floor;
+mod room_probes;
+mod rooms;
+#[cfg(test)]
+pub(crate) mod test_level;
+
 use glam::Vec3;
 
+pub use self::floor::{FloorCell, FloorGrid};
+use self::room_probes::plan_rooms;
+pub use self::room_probes::EYE_HEIGHT;
+use self::rooms::find_rooms;
+pub use self::rooms::RoomParams;
 use crate::scene::Scene;
 
 /// A light-probe grid request: the inclusive `[min, max]` corners and the cell spacing,
@@ -35,8 +48,8 @@ pub struct ProbeGridPlan {
     pub spacing: f32,
 }
 
-/// A reflection-probe request: capture position (region centroid) plus the parallax
-/// box corners covering the region.
+/// A reflection-probe request: capture position (eye height over the room's middle)
+/// plus the parallax box corners fitted to the room.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ReflectionPlan {
     pub position: Vec3,
@@ -124,45 +137,52 @@ pub fn plan_light_probes(
     })
 }
 
-/// Per-axis region count for a span, so cells stay near `target` units across. At
-/// least one region; capped to keep the bake bounded.
-fn axis_regions(span: f32, target: f32, cap: u32) -> u32 {
-    let target = target.max(0.5);
-    ((span / target).round() as u32).clamp(1, cap)
+/// How reflection probes are placed: one per room, a room larger than `region`
+/// split into probes no wider than it.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ReflectionPlacement {
+    /// The widest a probe's box may be, world units (`reflectionRegion`).
+    pub region: f32,
+    /// The floor plan's cell when it is rasterized from the colliders.
+    pub cell: f32,
+    /// What separates two rooms.
+    pub rooms: RoomParams,
 }
 
-/// Plan reflection probes by subdividing the static AABB into a coarse `region`-sized
-/// grid of rooms, one probe per cell (centroid + the cell's box). `region` is the
-/// approximate room edge length in world units; `cap` bounds the per-axis count so a
-/// huge level can't explode the bake. Empty when the scene has no static bounds.
-pub fn plan_reflection_probes(scene: &Scene, region: f32, cap: u32) -> Vec<ReflectionPlan> {
-    let Some((min, max)) = static_scene_aabb(scene) else {
-        return Vec::new();
-    };
-    let span = (max - min).max(Vec3::splat(0.01));
-    let nx = axis_regions(span.x, region, cap);
-    // Rooms rarely stack vertically; keep the vertical split shallow.
-    let ny = axis_regions(span.y, region, cap.min(2));
-    let nz = axis_regions(span.z, region, cap);
-    let step = span / Vec3::new(nx as f32, ny as f32, nz as f32);
-    let mut plans = Vec::with_capacity((nx * ny * nz) as usize);
-    for k in 0..nz {
-        for j in 0..ny {
-            for i in 0..nx {
-                let cell = Vec3::new(i as f32, j as f32, k as f32);
-                let box_min = min + step * cell;
-                let box_max = box_min + step;
-                plans.push(ReflectionPlan {
-                    position: (box_min + box_max) * 0.5,
-                    box_min,
-                    box_max,
-                });
-            }
+impl Default for ReflectionPlacement {
+    fn default() -> Self {
+        Self {
+            region: 12.0,
+            cell: 0.5,
+            rooms: RoomParams::default(),
         }
     }
-    plans
+}
+
+/// Plan one reflection probe per room of `scene` (#1584): the rooms of `floor`, the
+/// nav surface's floor plan (`NavigationGraph::floor_grid`), or with none the plan
+/// [`FloorGrid::from_static`] rasterizes from the static colliders. Each probe's box
+/// fits its room's walls, floor and ceiling (an open room reaches the top of the
+/// static geometry), and it captures from eye height over the room's middle; see
+/// `rooms.rs` and `room_probes.rs`. Empty with nothing to stand on.
+pub fn plan_reflection_probes(
+    scene: &Scene,
+    floor: Option<FloorGrid>,
+    params: &ReflectionPlacement,
+) -> Vec<ReflectionPlan> {
+    let Some(grid) = floor.or_else(|| FloorGrid::from_static(scene, params.cell)) else {
+        return Vec::new();
+    };
+    let highest_floor = (grid.cells.iter().flatten())
+        .map(|c| c.floor)
+        .fold(f32::MIN, f32::max);
+    let sky = static_scene_aabb(scene)
+        .map_or(f32::MIN, |(_, max)| max.y)
+        .max(highest_floor + VERTICAL_HEADROOM);
+    let (room, count) = find_rooms(&grid, &params.rooms);
+    plan_rooms(&grid, &room, count, params.region, sky)
 }
 
 #[cfg(test)]
-#[path = "placement_tests.rs"]
-mod placement_tests;
+#[path = "../placement_tests.rs"]
+mod tests;

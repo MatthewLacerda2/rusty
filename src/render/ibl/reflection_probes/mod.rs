@@ -3,45 +3,53 @@
 //! texture at group-0 binding 4, and the probes themselves in
 //! `LightingUniforms.refl_probes`.
 //!
-//! Like Unity, a probe is picked per drawn object, not per camera or per pixel: the
-//! draw's instance carries the index of the probe whose box contains its
-//! world-bounds centre ([`ProbeArray::probe_for`]), and every fragment of it
-//! box-projects against that probe and samples its cube's layer. Only probes with a
-//! loaded cube are resident. A layer holds one cube *path*: probes that share a
-//! cube share its layer, each keeping its own box and centre.
+//! Like Unity's *Blend Probes*, probes are picked per drawn object, not per camera
+//! or per pixel (#1584): the draw's instance carries the two resident probes its
+//! world-bounds centre blends and their weights ([`ProbeArray::probe_for`], packed by
+//! [`pack_blend`]), and every fragment of it samples both, box-projected when the
+//! probe asks for it, and the sky for what they leave. Only probes with a loaded
+//! cube are resident. A layer holds one cube *path*: probes that share a cube share
+//! its layer, each keeping its own box and centre.
 //!
 //! **Per-frame cost.** Ordering the scene's probes by the camera's distance to their
 //! boxes is O(P log P) over P probes, then each draw tests at most
 //! [`MAX_REFLECTION_PROBES`] boxes. GPU work happens only when the set of nearest
-//! cubes changes: one texture-to-texture copy per newly resident cube (about 0.5 MB at the bake's
-//! 128-texel face), or a rebuild of the array when it cannot hold them. A scene with
-//! no baked probe (the Inspector preview, rendered every frame beside the viewport)
-//! leaves the resident cubes alone, so the next scene finds them still in place.
+//! cubes changes: one texture-to-texture copy per newly resident cube, or a rebuild
+//! of the array when it cannot hold them. A scene with no baked probe (the Inspector
+//! preview, rendered every frame beside the viewport) leaves the resident cubes
+//! alone, so the next scene finds them still in place.
 //!
-//! The array's face is the bake's [`DEFAULT_REFLECTION_RESOLUTION`], so every baked
-//! cube fits. A smaller cube shares it when it is that size halved some number of
-//! times: it lands that many mips down, and its `mip_base` tells the shader where its
-//! chain starts. A cube of any other size (a larger hand-set one included) is left out
-//! before the budget is counted, with a warning, and the objects it would cover
-//! reflect the sky (#1238). It is never uploaded either: the size is checked between
-//! decoding the file and creating its texture (#1245).
+//! **Size and budget.** The array's face is the largest resident cube's (#1584); a
+//! smaller cube lands as many mips down as it is halved, and its `mip_base` tells the
+//! shader where its chain starts, so a 128-texel cube shares an array of 512-texel
+//! ones. The resident set is held to the scene's byte budget
+//! (`LightingSettings::reflections`, counted at the array's face), filled nearest box
+//! first (`frame.rs`). A cube whose size is not a power of two up to
+//! [`MAX_FACE`] is left out with a warning, never uploaded (the size is checked
+//! between decoding the file and creating its texture, #1245), and the objects it
+//! would cover reflect the sky.
 
 mod frame;
 mod gpu;
+mod pack;
 pub(crate) mod slots;
 
 use std::rc::Rc;
 
 use glam::Vec3;
 
+pub(crate) use self::pack::pack_blend;
 use self::slots::SlotTable;
 pub(crate) use self::slots::MAX_REFLECTION_PROBES;
 use super::cubemap::CubemapTexture;
-use super::reflection_bake::DEFAULT_REFLECTION_RESOLUTION;
 use crate::scene::{ReflectionProbe, ReflectionProbeSet};
 
+/// The largest face a resident cube may have: the largest a probe bakes at.
+pub(crate) const MAX_FACE: u32 = *ReflectionProbe::RESOLUTION.end();
+
 /// One resident probe as the shader reads it: its capture point, its parallax box,
-/// its cube's array layer and where the cube's mip chain sits in it. Mirrors
+/// its cube's array layer, where the cube's mip chain sits in it, and its intensity
+/// and box-projection switch. Mirrors
 /// `ReflectionProbe` in `engine/shaders/lighting/reflection_probe.wgsl` byte-for-byte.
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Default, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
@@ -55,6 +63,8 @@ pub(crate) struct ReflectionProbeUniform {
     pub box_max: [f32; 3],
     /// The array layer (cube) its cube was copied into.
     pub layer: u32,
+    /// `x` intensity, `y` 1 when box projection is on.
+    pub params: [f32; 4],
 }
 
 /// A probe the array holds this frame: the probe, its cube, and how many mips below
@@ -105,10 +115,10 @@ impl ProbeArray {
         }
     }
 
-    /// The resident probe plus one for an object whose world bounds centre on
-    /// `centre`, or 0 when no resident probe's box contains it (it reflects the sky).
+    /// The packed blend ([`pack_blend`]) of the resident probes an object whose world
+    /// bounds centre on `centre` reflects; 0 (the sky) when none reaches it.
     pub(crate) fn probe_for(&self, centre: Vec3) -> u32 {
-        self.active.select(centre).map_or(0, |(i, _)| i as u32 + 1)
+        pack_blend(self.active.blend(centre))
     }
 
     /// Every resident probe, as `LightingUniforms.refl_probes` holds them.
@@ -116,7 +126,7 @@ impl ProbeArray {
         &self.uniforms
     }
 
-    /// The array's face size: the bake's, once any probe has been resident.
+    /// The array's face size: the largest resident cube's.
     #[cfg(test)]
     pub(crate) fn face(&self) -> u32 {
         self.face
@@ -127,18 +137,17 @@ impl ProbeArray {
         self.table.forget(&stale);
     }
 
-    /// Whether a `size`-texel cube at `path` fits the array: the bake's face halved a
-    /// whole number of times; any other cube is warned about. The cubemap cache asks
-    /// once per load of a path, before uploading it (#1245), so a cube that doesn't fit
-    /// warns once, and again after a re-bake re-reads it.
+    /// Whether a `size`-texel cube at `path` fits the array: a power of two up to
+    /// [`MAX_FACE`]; any other cube is warned about. The cubemap cache asks once per
+    /// load of a path, before uploading it (#1245), so a cube that doesn't fit warns
+    /// once, and again after a re-bake re-reads it.
     pub(in crate::render::ibl) fn admits(path: &str, size: u32) -> bool {
-        if fits(DEFAULT_REFLECTION_RESOLUTION, size) {
+        if fits(MAX_FACE, size) {
             return true;
         }
         log::warn!(
-            "[Reflection] cubemap {path} is {size} texels, not the bake's \
-             {DEFAULT_REFLECTION_RESOLUTION} halved a whole number of times; its \
-             objects reflect the sky"
+            "[Reflection] cubemap {path} is {size} texels, not a power of two up to \
+             {MAX_FACE}; its objects reflect the sky"
         );
         false
     }
@@ -206,11 +215,11 @@ impl ProbeArray {
         rebuilt
     }
 
-    /// The face size and mip count to hold `kept`: the bake's face, and the current
-    /// array's mips when they hold every cube's chain (so a scene with smaller cubes
-    /// does not reallocate), else as many as the set needs.
+    /// The face size and mip count to hold `kept`: the largest cube's face, and the
+    /// current array's mips when they hold every cube's chain (so a scene with smaller
+    /// cubes does not reallocate), else as many as the set needs.
     fn target_size(&self, kept: &[(&ReflectionProbe, &CubemapTexture)]) -> (u32, u32) {
-        let face = DEFAULT_REFLECTION_RESOLUTION;
+        let face = kept.iter().map(|(_, cube)| cube.size).max().unwrap_or(1);
         let mips = kept
             .iter()
             .map(|(_, cube)| (face / cube.size).trailing_zeros() + cube.texture.mip_level_count())
@@ -235,6 +244,12 @@ impl ProbeArray {
                 mip_count: cube.texture.mip_level_count() as f32,
                 box_max: probe.box_max.to_array(),
                 layer,
+                params: [
+                    probe.intensity,
+                    f32::from(u8::from(probe.box_projection)),
+                    0.0,
+                    0.0,
+                ],
             };
             match self.active.probes.get_mut(i) {
                 Some(resident) if resident == probe => {}
@@ -248,7 +263,7 @@ impl ProbeArray {
 /// Whether a `size`-texel cube fits an array of `face` texels: `face` halved a whole
 /// number of times.
 fn fits(face: u32, size: u32) -> bool {
-    face.is_multiple_of(size) && (face / size).is_power_of_two()
+    size > 0 && face.is_multiple_of(size) && (face / size).is_power_of_two()
 }
 
 /// The cubes of `wanted` that fit the array. Each should, being admitted before it
@@ -256,7 +271,7 @@ fn fits(face: u32, size: u32) -> bool {
 fn admitted<'a>(
     wanted: &'a [(&'a ReflectionProbe, Rc<CubemapTexture>)],
 ) -> Vec<(&'a ReflectionProbe, &'a CubemapTexture)> {
-    let face = DEFAULT_REFLECTION_RESOLUTION;
+    let face = MAX_FACE;
     debug_assert!(
         wanted.iter().all(|(_, cube)| fits(face, cube.size)),
         "every wanted cube was admitted"

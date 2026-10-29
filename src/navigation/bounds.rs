@@ -20,9 +20,10 @@
 //! for `navigation` holds.
 
 use super::NavigationGraph;
+use crate::scene::lighting::placement::{FloorCell, FloorGrid};
 pub use crate::scene::nav_settings::NavBounds;
 use crate::scene::Scene;
-use glam::Vec3;
+use glam::{Vec2, Vec3};
 
 /// Ground (world units) kept around the outermost static geometry, on top of the agent
 /// radius, when the bounds are derived rather than authored.
@@ -145,6 +146,38 @@ impl NavigationGraph {
             max = max.max(w);
         }
         (min.x <= max.x).then_some((min, max))
+    }
+
+    /// The floor plan reflection-probe placement finds rooms in (#1584): one cell per
+    /// grid cell, its lowest walkable span's floor and the underside above it, `None`
+    /// where no one stands. Handed to `scene::lighting::placement` as data, as
+    /// [`Self::walkable_aabb`] is (#721). The spans stop `agent_radius` short of the
+    /// walls, which the plan's `inset` carries. `None` when the graph is unbaked.
+    pub fn floor_grid(&self, agent_radius: f32) -> Option<FloorGrid> {
+        let baked =
+            self.width > 1 && self.height > 1 && self.max_x > self.min_x && self.max_z > self.min_z;
+        if !baked {
+            return None;
+        }
+        let cells = (0..self.height)
+            .flat_map(|gz| (0..self.width).map(move |gx| (gx, gz)))
+            .map(|(gx, gz)| {
+                let lowest = self.span_range(gx, gz).next()?;
+                let span = &self.spans[lowest];
+                Some(FloorCell {
+                    floor: span.y,
+                    ceiling: span.ceiling,
+                })
+            })
+            .collect();
+        Some(FloorGrid {
+            origin: Vec2::new(self.min_x, self.min_z),
+            cell: self.grid_spacing,
+            width: self.width as usize,
+            depth: self.height as usize,
+            cells,
+            inset: agent_radius.max(0.0),
+        })
     }
 
     /// The XZ area this graph currently covers.

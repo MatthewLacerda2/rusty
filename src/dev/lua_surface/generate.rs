@@ -1,6 +1,7 @@
 //! `Lighting.Generate()` and the scene's lighting settings (#832): the one verb
 //! behind the editor's Generate Lighting button, and `Lighting.GetSettings()` /
-//! `SetSettings{…}`, the knobs the button's card edits.
+//! `SetSettings{…}`, the knobs the button's card edits (the lightmap bake's, and the
+//! reflection probes' default resolution and memory budget, #1584).
 
 use mlua::{Lua, Table};
 
@@ -73,13 +74,16 @@ pub(super) fn register<'scope>(
         &table,
         "GetSettings",
         scope.create_function(move |lua, ()| {
-            let s = scene.borrow().lighting_settings.lightmaps;
+            let settings = scene.borrow().lighting_settings;
+            let (s, r) = (settings.lightmaps, settings.reflections);
             let out = lua.create_table()?;
             out.set("texelsPerUnit", s.texels_per_unit)?;
             out.set("samples", s.samples)?;
             out.set("bounces", s.bounces)?;
             out.set("seed", s.seed)?;
             out.set("directional", s.directional)?;
+            out.set("reflectionResolution", r.resolution)?;
+            out.set("reflectionBudgetMB", r.budget_mb)?;
             Ok(out)
         }),
     )?;
@@ -91,6 +95,14 @@ pub(super) fn register<'scope>(
             let mut scene = scene.borrow_mut();
             let s = &mut scene.lighting_settings.lightmaps;
             *s = overrides.apply(*s);
+            let r = &mut scene.lighting_settings.reflections;
+            r.resolution = t
+                .get::<Option<u32>>("reflectionResolution")?
+                .unwrap_or(r.resolution);
+            r.budget_mb = t
+                .get::<Option<u32>>("reflectionBudgetMB")?
+                .unwrap_or(r.budget_mb);
+            r.clamp();
             Ok(())
         }),
     )

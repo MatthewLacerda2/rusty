@@ -90,7 +90,25 @@ impl Renderer {
         position: Vec3,
         resolution: u32,
     ) -> CubemapCapture {
-        self.capture_static_cubemap_inner(scene, position, resolution, false)
+        self.capture_static_cubemap_inner(
+            scene,
+            position,
+            resolution,
+            false,
+            CaptureLens::default(),
+        )
+    }
+
+    /// Like [`Renderer::capture_static_cubemap`], through a reflection probe's `lens`:
+    /// its clip planes, and shadows or none (#1584).
+    pub fn capture_reflection_cubemap(
+        &mut self,
+        scene: &Scene,
+        position: Vec3,
+        resolution: u32,
+        lens: CaptureLens,
+    ) -> CubemapCapture {
+        self.capture_static_cubemap_inner(scene, position, resolution, false, lens)
     }
 
     /// Like [`Renderer::capture_static_cubemap`], but the static surfaces are *also*
@@ -104,7 +122,7 @@ impl Renderer {
         position: Vec3,
         resolution: u32,
     ) -> CubemapCapture {
-        self.capture_static_cubemap_inner(scene, position, resolution, true)
+        self.capture_static_cubemap_inner(scene, position, resolution, true, CaptureLens::default())
     }
 
     /// Shared capture spine: render the static scene into a 6-face cubemap from
@@ -116,6 +134,7 @@ impl Renderer {
         position: Vec3,
         resolution: u32,
         light_static_from_probes: bool,
+        lens: CaptureLens,
     ) -> CubemapCapture {
         let resolution = resolution.max(1);
         let target = self.make_face_target(resolution);
@@ -131,9 +150,11 @@ impl Renderer {
         let prev_bounce = self.capture_probe_bounce;
         self.static_capture = true;
         self.capture_probe_bounce = light_static_from_probes;
+        self.capture_shadows = lens.shadows;
 
         let faces = CubemapFace::ALL.map(|face| {
-            let camera = face_camera(position, face);
+            let mut camera = face_camera(position, face);
+            (camera.near, camera.far) = (lens.near, lens.far);
             self.render(&mut render_view, scene, &camera, &output, false);
             crate::render::readback::read_texture_rgba8(
                 &self.device,
@@ -146,6 +167,7 @@ impl Renderer {
 
         self.static_capture = prev_static;
         self.capture_probe_bounce = prev_bounce;
+        self.capture_shadows = true;
         CubemapCapture { resolution, faces }
     }
 
@@ -165,6 +187,27 @@ impl Renderer {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
             view_formats: &[],
         })
+    }
+}
+
+/// How a capture sees (#1584): the clip planes of its six cameras, and whether its
+/// lights cast shadows. A reflection probe sets its own; the default is the scene
+/// camera's planes, with shadows.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct CaptureLens {
+    pub near: f32,
+    pub far: f32,
+    pub shadows: bool,
+}
+
+impl Default for CaptureLens {
+    fn default() -> Self {
+        let camera = Camera::new(Vec3::ZERO, 0.0, 0.0);
+        Self {
+            near: camera.near,
+            far: camera.far,
+            shadows: true,
+        }
     }
 }
 

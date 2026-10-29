@@ -11,10 +11,11 @@ use glam::{Quat, Vec3};
 use crate::components::MaterialAsset;
 use crate::render::ibl::cube_sample::srgb_to_linear;
 use crate::render::ibl::cubemap::parse_ktx2_cubemap_mips;
-use crate::render::{CubemapFace, DEFAULT_REFLECTION_RESOLUTION};
-use crate::scene::{MeshComponent, Scene};
+use crate::render::CubemapFace;
+use crate::scene::{MeshComponent, ReflectionProbe, Scene};
 
-const RES: u32 = DEFAULT_REFLECTION_RESOLUTION;
+/// The face the tests bake at: small, so lavapipe captures it quickly.
+const RES: u32 = 128;
 
 fn box_mesh() -> MeshComponent {
     let (vertices, indices) = crate::components::mesh::primitives::generate_box(1.0, 1.0, 1.0);
@@ -88,7 +89,8 @@ fn gpu_bake_shows_room_and_mips_blur() {
         return; // No GPU/software adapter — skip, same contract as the screenshots.
     };
     let scene = colored_room();
-    let bytes = renderer.bake_reflection(&scene, Vec3::ZERO);
+    let probe = ReflectionProbe::new(Vec3::ZERO, Vec3::splat(5.0));
+    let bytes = renderer.bake_reflection(&scene, &probe, RES);
 
     let mips = parse_ktx2_cubemap_mips(&bytes).expect("baked KTX2 parses");
     assert_eq!(mips.size, RES);
@@ -131,6 +133,7 @@ fn gpu_bake_writes_file_and_sets_path() {
         return;
     };
     let mut scene = colored_room();
+    scene.lighting_settings.reflections.resolution = RES;
     scene.reflection_probes.add(Vec3::ZERO, Vec3::splat(5.0));
     let dir = crate::test_temp::dir().join(format!("rusty_refl_bake_{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
