@@ -3,9 +3,13 @@
 What `issue-batch`, *Launching a cloud coder*, had the orchestrator assemble by
 hand for every coder, built the same way every time:
 
-- **The prompt is a fixed pointer** ([`PROMPT`]). The brief is a comment on the
-  issue (#910), so a relaunch or a re-brief reads the newest one, and the
-  routine never carries the brief's text (it is echoed back about three times).
+- **The prompt is a pointer at one comment** ([`PROMPT`]). The brief is a
+  comment on the issue (#910), and the routine never carries its text (it is
+  echoed back about three times). It names the URL of the exact comment
+  `brief.read` checked, not "the newest `Brief`": the repository is public, the
+  routine fires minutes after launch (28 late on 2026-10-29), and in that window
+  anyone could post a newer comment starting with `Brief` that the coder would
+  follow with push access (PR #1572's review).
 - **`run_once_at` is computed**, a minute or two ahead: the API refuses a time
   already past, and `date -d` vs `date -v` differed between Linux and macOS.
 - **The environment is `anthropic_cloud`**, never a `bridge` one (that is this
@@ -15,8 +19,8 @@ hand for every coder, built the same way every time:
 - **`allowed_tools` includes `ToolSearch`**: the GitHub MCP tools load through
   it without being listed.
 
-A re-brief is the same launch again: a new routine with the same prompt, which
-reads the newest `Brief`. Nothing has to remember the first routine's id.
+A re-brief is the same launch again: a new routine whose prompt names the new
+`Brief`. Nothing has to remember the first routine's id.
 """
 
 from __future__ import annotations
@@ -25,7 +29,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 PROMPT = ("Read `.claude/skills/issue-batch/cloud-brief.md` and follow it.\n"
-          "Issue(s): #{number}. Your brief is the newest comment on it that starts with `Brief`.")
+          "Issue(s): #{number}. Your brief is the comment at {brief}; read it there, not the newest `Brief`.")
 
 ALLOWED_TOOLS = ["Bash", "Read", "Write", "Edit", "Glob", "Grep", "Skill", "TodoWrite", "ToolSearch", "WebFetch"]
 
@@ -63,10 +67,12 @@ def environment(routines: list[dict]) -> str | None:
     return None
 
 
-def body(number: int, title: str, model: str, environment_id: str, repository: str,
+def body(number: int, title: str, brief_url: str, model: str, environment_id: str, repository: str,
          now: datetime, event_id: str | None = None) -> dict:
-    """The `create` body for the coder of issue `number`, on `model`."""
-    prompt = PROMPT.format(number=number)
+    """The `create` body for the coder of issue `number`, on `model`, pinned to `brief_url`."""
+    if not brief_url.startswith(f"https://github.com/{repository}/issues/{number}#issuecomment-"):
+        raise ValueError(f"{brief_url!r} is not a comment on #{number}")
+    prompt = PROMPT.format(number=number, brief=brief_url)
     return {
         "name": name(number, title),
         "run_once_at": fire_time(now),

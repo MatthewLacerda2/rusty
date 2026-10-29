@@ -75,8 +75,8 @@ share the scratchpad.
 It reads the newest `Brief` comment on #N, takes the model from its `Model:` line,
 and creates the one-off routine that starts the cloud session a minute or two
 later; it prints the routine's link, where its run links the session. Running it
-again for the same issue is the re-brief launch: a new routine with the same
-prompt, which reads the newest `Brief`. `ARGS=--dry-run` prints the routine and
+again for the same issue is the re-brief launch: a new routine whose prompt names
+the new `Brief`. `ARGS=--dry-run` prints the routine and
 creates nothing. Never assemble a `RemoteTrigger` body by hand; what the script
 keeps, and why (`.github/scripts/dispatch/routine.py` has the detail):
 
@@ -89,14 +89,18 @@ keeps, and why (`.github/scripts/dispatch/routine.py` has the detail):
   one naming Opus or Sonnet is refused, and so are a closed issue, a `planning`
   or `human` one, and a brief by someone who cannot push.
 - `run_once_at` computed, `allowed_tools` with `ToolSearch` (the GitHub MCP tools
-  load through it without being listed), and the fixed prompt below.
+  load through it without being listed), and the prompt below.
+- **The prompt names the brief's URL**, the exact comment the script checked,
+  never "the newest `Brief`": the repository is public and the routine fires
+  minutes later (28 late on 2026-10-29), so a comment posted in between would
+  otherwise be what a coder with push access follows (PR #1572's review).
 - It calls `RemoteTrigger` through `claude mcp serve`, so it needs the `claude`
   CLI signed in to claude.ai, as this machine is; the token never leaves
   `claude`. `claude --cloud` cannot do it: it starts a session only from an
   interactive terminal, and an orchestrator's shell has none.
 
 **The brief is a comment on the issue** (#910), first line `Brief`. The prompt is
-echoed back about three times by `RemoteTrigger`, so it stays a fixed pointer, and
+echoed back about three times by `RemoteTrigger`, so it stays a pointer, and
 the comment is durable for a relaunch or a later reader. Standing rules for every
 coder live in [`cloud-brief.md`](cloud-brief.md); change them there, once.
 
@@ -141,7 +145,7 @@ The routine prompt, which `make coder` writes (`dispatch/routine.py`'s `PROMPT`)
 
 ```text
 Read `.claude/skills/issue-batch/cloud-brief.md` and follow it.
-Issue(s): #N. Your brief is the newest comment on it that starts with `Brief`.
+Issue(s): #N. Your brief is the comment at <the brief's URL>; read it there, not the newest `Brief`.
 ```
 
 A re-brief (a rebase, a fix, a new sibling) is a new `Brief` comment on the

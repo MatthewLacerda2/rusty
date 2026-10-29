@@ -3,11 +3,12 @@
 
 `make coder ISSUE=N` is this. It reads the newest comment on #N whose first line
 is `Brief`, takes the model from its `Model:` line, and creates a one-off
-routine that starts a cloud session on it a minute or two later, with the fixed
-prompt that points the coder at `cloud-brief.md` and its brief
+routine that starts a cloud session on it a minute or two later, with a prompt
+that points the coder at `cloud-brief.md` and at the URL of the exact comment
+checked here, so a comment posted after the launch cannot stand in for it
 (`dispatch/routine.py` has the body and why each field is what it is). Running
-it again for the same issue is the re-brief launch: the new session reads the
-newest `Brief`.
+it again for the same issue is the re-brief launch: the new routine names the
+newest `Brief` at that moment.
 
 It refuses, and starts nothing, when the issue is closed, is labelled
 `planning` or `human`, has no brief, has a brief from someone who cannot push,
@@ -86,14 +87,14 @@ def main(argv: list[str], gh=gh_json, call=remote.call, now: datetime | None = N
     try:
         found, model = brief.read(issue, comments)
         env_id = environment_id(os.environ if env is None else env, call)
-        made = routine.body(number, issue.get("title", ""), model, env_id, repository,
+        made = routine.body(number, issue.get("title", ""), found.get("html_url", ""), model, env_id, repository,
                             now or datetime.now(timezone.utc))
         if dry:
             print(json.dumps(made, indent=2))
             say(f"dry run: nothing created (brief {found.get('html_url', '')})")
             return 0
         status, answer = call({"action": "create", "body": made})
-    except brief.Refused as refused:
+    except ValueError as refused:  # brief.Refused, or a brief URL that is not this issue's
         say(f"refused: {refused}")
         return 1
     except remote.RemoteError as failed:

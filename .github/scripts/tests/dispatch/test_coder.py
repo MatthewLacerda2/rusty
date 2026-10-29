@@ -14,7 +14,10 @@ from tests import load
 coder = load("coder.py")
 NOW = datetime(2026, 10, 29, 14, 3, tzinfo=timezone.utc)
 BRIEF = {"body": "Brief\n\nBranch: `9-x`.\nModel: Sonnet.", "created_at": "2026-10-29T10:00:00Z",
-         "author_association": "OWNER", "html_url": "https://github.com/o/r/issues/9#c"}
+         "author_association": "OWNER", "html_url": "https://github.com/o/r/issues/9#issuecomment-501"}
+OLDER = {**BRIEF, "created_at": "2026-10-28T10:00:00Z", "html_url": "https://github.com/o/r/issues/9#issuecomment-400"}
+CHAT = {"body": "Thanks!", "created_at": "2026-10-29T11:00:00Z", "author_association": "NONE",
+        "html_url": "https://github.com/o/r/issues/9#issuecomment-600"}
 ROUTINES = {"data": [{"name": "rusty #8 earlier", "created_at": "2026-10-28T00:00:00Z",
                       "job_config": {"ccr": {"environment_id": "env_cloud"}}}]}
 
@@ -60,6 +63,14 @@ class Launch(unittest.TestCase):
         self.assertEqual(body["job_config"]["ccr"]["session_context"]["model"], "claude-sonnet-5-5")
         self.assertEqual(body["job_config"]["ccr"]["environment_id"], "env_cloud")
         self.assertIn("https://claude.ai/code/routines/trig_new", out)
+
+    def test_the_prompt_names_the_checked_brief_and_no_other_comment(self):
+        fake = Fake(comments=[CHAT, BRIEF, OLDER])
+        self.assertEqual(fake.run("9")[0], 0)
+        prompt = fake.created()[0]["job_config"]["ccr"]["events"][0]["data"]["message"]["content"]
+        self.assertIn(BRIEF["html_url"], prompt)
+        self.assertNotIn(OLDER["html_url"], prompt)
+        self.assertNotIn(CHAT["html_url"], prompt)
 
     def test_rusty_cloud_env_skips_the_lookup(self):
         fake = Fake()
