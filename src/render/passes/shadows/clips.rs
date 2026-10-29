@@ -6,16 +6,18 @@
 //!
 //! - a **Cutout** material (#242): its albedo's alpha below the cutoff casts nothing,
 //!   as it shows nothing — `shader.wgsl`'s `fs_shadow`;
-//! - a **surface variant whose blocks cut or move the UVs** (`dissolve`, #400;
-//!   `uv_scroll`, #1499): its `fs_shadow_cut` runs the same cut as its colour pass,
-//!   against the same runtime params and mask, and clips Cutout texels at the UVs
-//!   the colour pass samples.
+//! - a **surface variant whose blocks cut, move the UVs or move the vertices**
+//!   (`dissolve`, #400; `uv_scroll`, #1499; the vertex stage's `vertex_waves`,
+//!   #1524): its `fs_shadow_cut` runs the same cut as its colour pass, against the
+//!   same runtime params and mask, and clips Cutout texels at the UVs the colour pass
+//!   samples; its own `vs_shadow` moves the vertices as its `vs_main` does.
 //!
 //! Such a variant's cut moves at runtime (a script drives `dissolve.amount`, the game
-//! time scrolls the UVs), so its caster is drawn in the dynamic sweep even when
-//! static: the static bake is cached until its light volume moves, and would keep a
-//! stale cut. A scrolling variant that is not Cutout pays for that sweep without
-//! clipping anything: the pipeline cannot tell a move from a cut.
+//! time scrolls the UVs and swells the vertices), so its caster is drawn in the
+//! dynamic sweep even when static: the static bake is cached until its light volume
+//! moves, and would keep a stale cut or a frozen swell. A scrolling variant that is
+//! not Cutout pays for that sweep without clipping anything: the pipeline cannot tell
+//! a move from a cut.
 
 use std::collections::HashMap;
 

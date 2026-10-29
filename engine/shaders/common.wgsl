@@ -48,7 +48,9 @@ struct CameraUniforms {
     // through; equal to `view_proj` on a camera's first frame and after a cut.
     prev_view_proj: mat4x4<f32>,
     // x: this camera's index in its stack, bottom to top (#1436), what the velocity
-    // target's `.a` carries so motion blur orders a higher camera in front; yzw unused.
+    // target's `.a` carries so motion blur orders a higher camera in front. y: last
+    // frame's game time (#1524), what the motion vectors move vertex blocks with (this
+    // frame's `time` where the view has no last frame); zw unused.
     stack: vec4<f32>,
 };
 

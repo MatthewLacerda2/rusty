@@ -92,7 +92,7 @@ impl ParamLayout {
                 let default = match sel.params.get(p.name) {
                     Some(ParamValue::Vector(v)) => v.clone(),
                     Some(ParamValue::Scalar(s)) => vec![*s; p.arity],
-                    None => vec![p.default; p.arity],
+                    None => p.defaults(),
                 };
                 params.push(ParamSlot {
                     block: block.id.to_owned(),

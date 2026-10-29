@@ -57,6 +57,8 @@ pub(crate) struct MotionHistory {
     cameras: HashMap<Option<u32>, Mat4>,
     prev: HashMap<u32, Pose>,
     next: HashMap<u32, Pose>,
+    /// The game time the last frame drew at (#1524).
+    time: Option<f32>,
 }
 
 impl MotionHistory {
@@ -77,6 +79,12 @@ impl MotionHistory {
         self.cameras.clear();
         self.cameras.extend(cameras.iter().copied());
         prev
+    }
+
+    /// Last frame's game time, `now` where there was no last frame; keeps `now` for
+    /// next frame. Call after [`MotionHistory::begin`], which forgets it on a cut.
+    pub(crate) fn game_time(&mut self, now: f32) -> f32 {
+        self.time.replace(now).unwrap_or(now)
     }
 
     /// Entity `id`'s pose last frame, if it was drawn then.

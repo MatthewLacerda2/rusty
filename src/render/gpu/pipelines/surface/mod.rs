@@ -25,14 +25,15 @@
 //! engine (the editor's file watch notes those, #1327) — goes stale, and the next draw
 //! that names it rebuilds: bake → look → iterate in a live session, free otherwise.
 //!
-//! **Depth passes.** A variant's `vs_main` is the forward one verbatim, so one whose
-//! blocks only restyle colour rides the standard SSAO prepass (#436) and shadow
-//! pipelines. One whose blocks `discard` (`dissolve`, #400) or move the UVs
-//! (`uv_scroll`, #1499) also builds [`CutPipelines`] from its own `fs_prepass_cut` /
-//! `fs_shadow_cut` (#648): the same cut and UVs, reading the same runtime params and
-//! mask, so a dissolved fragment casts no shadow and fills no SSAO depth, and a
-//! scrolled Cutout texel clips where it shows. Only those variants pay for a depth
-//! fragment.
+//! **Depth passes.** A variant whose blocks only restyle colour keeps the forward
+//! vertex stage as it is, so it rides the standard SSAO prepass (#436) and shadow
+//! pipelines. One whose blocks `discard` (`dissolve`, #400), move the UVs
+//! (`uv_scroll`, #1499) or move the vertices (`vertex_waves`, #1524) also builds
+//! [`CutPipelines`] from its own `fs_prepass_cut` / `fs_shadow_cut` (#648), over its
+//! own `vs_main` / `vs_shadow`: the same cut, UVs and vertices, reading the same
+//! runtime params and mask, so a dissolved fragment casts no shadow and fills no SSAO
+//! depth, a scrolled Cutout texel clips where it shows, and a swell's shadow and depth
+//! follow it. Only those variants pay for depth pipelines of their own.
 
 mod pass;
 
@@ -59,13 +60,14 @@ pub(crate) struct SurfacePipelines {
     pub primed: super::PrimedPipelines,
     /// Alpha-blended solids (the transparent spec).
     pub transparent: wgpu::RenderPipeline,
-    /// The depth passes of a variant whose blocks cut fragments or move the UVs (#648,
-    /// #1499); `None` draws its depth with the standard pipelines.
+    /// The depth passes of a variant whose blocks cut fragments or move the UVs or the
+    /// vertices (#648, #1499, #1524); `None` draws its depth with the standard pipelines.
     pub cut: Option<CutPipelines>,
 }
 
-/// The depth-only pipelines of a variant that cuts or moves its UVs (#648); the shadow ones go through the
-/// shadow pass's clip layout, `mirrored_shadow` with the winding flipped (#1134).
+/// The depth-only pipelines of a variant that cuts, moves its UVs or moves its
+/// vertices (#648, #1499, #1524); the shadow ones go through the shadow pass's clip
+/// layout, `mirrored_shadow` with the winding flipped (#1134).
 pub(crate) struct CutPipelines {
     /// The SSAO prepass, through the forward layout.
     pub prepass: wgpu::RenderPipeline,

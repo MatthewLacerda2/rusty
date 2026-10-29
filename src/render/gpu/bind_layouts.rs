@@ -134,7 +134,8 @@ pub(crate) fn create_material_layout(device: &wgpu::Device) -> wgpu::BindGroupLa
         material_texture_entry(5),
         wgpu::BindGroupLayoutEntry {
             binding: crate::shadergen::params::PARAM_BINDING,
-            visibility: wgpu::ShaderStages::FRAGMENT,
+            // The vertex stage too: a vertex block's runtime param (#1524).
+            visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
             ty: wgpu::BindingType::Buffer {
                 ty: wgpu::BufferBindingType::Uniform,
                 has_dynamic_offset: false,

@@ -30,7 +30,7 @@ passes, bindings, or render features).
 | `Shader.Bake` | `(recipe [, out_dir])` | the written `<out_dir>/<name>.wgsl` path |
 | `Shader.Validate` | `(recipe)` | array of the composed module's entry-point names (dry-run; **writes nothing**) |
 | `Shader.ToJson` | `(recipe)` | the recipe's canonical JSON string |
-| `Shader.Blocks` | `(pass)` | the curated blocks for `pass` (`"surface"` \| `"postfx"` \| `"ui"`): `{ {id, desc, params = { {name, default, arity, runtime} }, textures = {slot…}, stage }, … }` — `stage` is `"color"` or `"uv"` |
+| `Shader.Blocks` | `(pass)` | the curated blocks for `pass` (`"surface"` \| `"postfx"` \| `"ui"`): `{ {id, desc, params = { {name, default, arity, runtime} }, textures = {slot…}, stage }, … }` — `stage` is `"color"`, `"uv"` or `"vertex"` |
 
 `recipe` is a table **or** its serialized JSON string (from `Shader.ToJson`, or a
 saved `.json`) — both forms decode alike, with the same errors. Its enum value `pass` is read in any case; a stored file holds the canonical spelling. `out_dir` defaults to `assets/shaders`. Use `Shader.Validate` to
@@ -88,11 +88,12 @@ assembles byte-identical WGSL.
 
 ### Pass kinds & the contract
 
-- **`surface`** — varies the *fragment look* of the forward/surface pass. The
-  standard `vs_main` + the full PBR lighting are kept **verbatim** (so the variant
-  binds against the forward pipeline unchanged — same `VertexInput`, the
-  `LightingUniforms`/`EntityUniforms`/group(2) material maps, and `vs_main`/`fs_main`
-  entry points); each block restyles the shaded color before the final write.
+- **`surface`** — varies the *look* of the forward/surface pass. The full PBR
+  lighting is kept **verbatim** (so the variant binds against the forward pipeline
+  unchanged — same `VertexInput`, the `LightingUniforms`/`EntityUniforms`/group(2)
+  material maps, and `vs_main`/`fs_main` entry points); each colour block restyles
+  the shaded color before the final write. The vertex stage is the standard one
+  too, unless a **vertex-stage** block (`vertex_waves`, below) moves the vertices.
   Group 1 is the instanced layout (#470): the per-draw `EntityUniforms` plus a
   per-instance `instances` array (world matrix, probe SH). A surface variant baked
   before #470 was written against the old per-entity layout — re-bake it.
@@ -172,6 +173,17 @@ into the lit color; postfx blocks grade the sampled scene color.
   normal, metallic/roughness and mask maps all move together: conveyors, flowing
   energy, water. Its place in the recipe doesn't matter; every color block sees the
   moved UVs).
+  `vertex_waves {amplitude* = 0.03, wavelength = 2, speed = 0.5, direction = {1,
+  0.3}, count = 3, steepness = 0}` (a **vertex-stage** block, #1524: gentle swells
+  that move the surface itself, water left to the wind. A sum of `count` waves (1–8)
+  in world XZ, each turned and shortened off the first so they don't line up:
+  `wavelength` and `amplitude` are the first wave's, in metres, `speed` its metres
+  per game second along `direction`. The surface moves along its normal, and its
+  lighting normal is the moved surface's own (analytic). `steepness` 0 is round sine
+  swells; toward 1 the crests pinch (Gerstner), the surface sliding toward them.
+  World space, so neighbouring meshes join without seams. It needs vertices to move:
+  a `Plane` with `subdivisions` ([`Scene.md`](Scene.md)), or a grid from Blender.
+  See *Moving the vertices* below).
   Sampling the material's **mask** texture (see *Extra textures* below):
   `dissolve {amount*, edge_width = 0.05, edge_color* = 1, tiling = 1}` (fragments
   whose mask is below `amount` are cut away, a band `edge_width` wide above it
@@ -301,9 +313,38 @@ as the colour pass. At `amount = 1` the entity is invisible, shadow and all — 
 need to hide it to finish the effect. Behind a UV-stage block (`uv_scroll`) the
 cut samples the moved UVs in every pass.
 
-Only a shader with a cutting block pays for this; every other shader keeps the
-shared depth pipelines. So without one, `uv_scroll` moves the colour pass's UVs
-only: a Cutout material's alpha-tested shadow keeps the unscrolled cut-out.
+Behind `uv_scroll` alone, a Cutout material's alpha-tested shadow and depth clip
+at the moved UVs too (#1499). Only a shader with a cutting, UV-stage or
+vertex-stage block pays for depth pipelines of its own; every other shader keeps
+the shared ones.
+
+### Moving the vertices
+
+A **vertex-stage** block (`vertex_waves`, #1524) moves each vertex's world
+position, normal and tangent in every stage that draws the mesh: the colour pass,
+the depth prepass (so SSAO and the depth the colour pass tests agree), the shadow
+casters (the shadow follows the swell) and the motion vectors, which move it again
+at last frame's game time, so moving water writes its own motion instead of
+smearing. It runs on game time, so it is still in edit mode and while paused.
+
+```lua no-run
+local pool = Scene.CreateEntity("PoolWater", "Plane")
+Component.Set(pool, "Mesh", { subdivisions = 64 })
+Shader.Bake({ pass = "surface", name = "pool_water",
+              blocks = { { id = "vertex_waves", params = { wavelength = 3, count = 4 } },
+                         { id = "uv_scroll", params = { speed = {0.02, 0.01} } } } })
+Material.SetShader(pool, "pool_water")
+Material.SetShaderParam(pool, "vertex_waves.amplitude", 0.05)   -- live, no re-bake
+```
+
+A **Static** moving surface still casts a moving shadow: a variant that moves its
+vertices is drawn in the dynamic shadow sweep every frame, as a cutting one is,
+never frozen into the cached static map. What a bake captures stays as modelled:
+the lightmap baker sees the flat mesh, and a reflection probe captures the surface
+at the moment it was baked. Frustum culling uses the mesh's bounds as modelled too,
+so keep `amplitude` small against the mesh's size (swells, not towers). A second scrolling normal-map layer
+is not a block: blocks restyle the colour, move the UVs or move the vertex, and a
+blended second normal sample is none of those.
 
 Example — bake a stylized surface variant and load it by name:
 

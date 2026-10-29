@@ -101,7 +101,7 @@ pub fn catalog_default(name: &str) -> Result<Vec<f32>, String> {
     };
     find(PassKind::Postfx, block)
         .and_then(|b| b.params.iter().find(|p| p.name == param && p.runtime))
-        .map(|p| vec![p.default; p.arity])
+        .map(|p| p.defaults())
         .ok_or_else(|| unknown_param(name, &[]))
 }
 

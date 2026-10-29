@@ -15,7 +15,7 @@ use glam::{Mat4, Vec3};
 use crate::asset::{self, MeshVertex, SubMesh};
 use crate::components::mesh::Vertex;
 use crate::components::Entity;
-use crate::scene::authoring::{primitive_geometry, Primitive};
+use crate::scene::authoring::{subdivided_geometry, Primitive};
 
 /// Convert one imported `MeshVertex` (pure data) into the renderer's `Vertex`,
 /// carrying the skin binding (`joint_indices`/`joint_weights`) through to the GPU
@@ -109,13 +109,14 @@ fn warn_once(reference: &str, error: &asset::ImportError) {
 /// Rebuild one mesh's vertex/index data + rig from its on-disk REFERENCE: a
 /// primitive from `primitive_type`, or an imported sub-mesh from `asset_ref` when
 /// the type is `"Asset"`. GPU buffers are never stored on disk, only rebuilt here.
-fn rehydrate_one(primitive_type: &str, asset_ref: &Option<String>) -> RehydratedMesh {
-    if primitive_type == "Asset" {
-        return rehydrate_asset_mesh(asset_ref);
+fn rehydrate_one(mesh: &crate::scene::MeshComponent) -> RehydratedMesh {
+    if mesh.primitive_type == "Asset" {
+        return rehydrate_asset_mesh(&mesh.asset_ref);
     }
     // Primitive geometry is owned by `scene::authoring` so a created primitive and
     // a loaded one are byte-identical.
-    match Primitive::parse(primitive_type).and_then(primitive_geometry) {
+    let primitive = Primitive::parse(&mesh.primitive_type);
+    match primitive.and_then(|p| subdivided_geometry(p, mesh.subdivisions)) {
         Some(geometry) => RehydratedMesh::primitive(geometry),
         None => RehydratedMesh::default(),
     }
@@ -128,7 +129,10 @@ fn rehydrate_one(primitive_type: &str, asset_ref: &Option<String>) -> Rehydrated
 /// changed since the save (the Scale Factor, #1398) reaches it.
 pub fn rehydrate_entity_mesh(entity: &mut Entity) {
     if let Some(mesh) = &mut entity.mesh {
-        let rebuilt = rehydrate_one(&mesh.primitive_type, &mesh.asset_ref);
+        if let Some(warning) = crate::scene::authoring::rendering::mesh::hold_subdivisions(mesh) {
+            log::warn!("[Scene] entity {}: {warning}", entity.id);
+        }
+        let rebuilt = rehydrate_one(mesh);
         install(mesh, rebuilt);
         let positions = mesh.vertices.iter().map(|v| Vec3::from_array(v.position));
         let bounds = positions.fold(None, |b: Option<(Vec3, Vec3)>, p| {

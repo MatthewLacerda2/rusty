@@ -70,10 +70,12 @@ impl Renderer {
             view.post_fx
                 .motion
                 .begin(&self.device, size, key, velocity, &cameras);
+        let prev_time = view.post_fx.motion.history.game_time(scene.shader_time);
         let shared = StackShared {
             aspect,
             view_projs,
             prev_view_projs,
+            prev_time,
             fog: FogUniform::from_settings(&scene.fog),
             ssao: SsaoPlan::for_volume(pass.post.volume, self.graphics(pass.editor_mode)),
         };

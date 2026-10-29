@@ -338,6 +338,7 @@ scene.entities[].mesh.skeleton.overrides{}.rotation: tuple(4)
 scene.entities[].mesh.skeleton.overrides{}.rotation[]: f32
 scene.entities[].mesh.skeleton.overrides{}.scale: tuple(3)
 scene.entities[].mesh.skeleton.overrides{}.scale[]: f32
+scene.entities[].mesh.subdivisions: u32
 scene.entities[].mesh: option
 scene.entities[].name: string
 scene.entities[].nav_agent.acceleration: f32

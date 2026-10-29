@@ -20,7 +20,8 @@ pub(crate) struct CameraUniform {
     /// reprojects through; `view_proj` itself on its first frame and after a cut.
     pub prev_view_proj: [f32; 16],
     /// `x`: this camera's index in its stack, bottom to top (#1436): the velocity
-    /// target's `.a`, so motion blur orders a higher camera in front. `yzw` unused.
+    /// target's `.a`, so motion blur orders a higher camera in front. `y`: last
+    /// frame's game time (#1524), for the vertex blocks' motion. `zw` unused.
     pub stack: [f32; 4],
 }
 

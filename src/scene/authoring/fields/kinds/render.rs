@@ -2,7 +2,7 @@
 //! `Transform`, `Mesh`, `Material`, `Light`, `Camera`, `PostProcessing` and
 //! `LODGroup`.
 
-use super::super::table::{group, inspect, op, part, ro, with, Group};
+use super::super::table::{group, inspect, op, part, ro, unheld, with, Group};
 use super::super::value::Mask;
 use super::NO_OP;
 use crate::components::rendering::camera::RenderTarget;
@@ -11,7 +11,7 @@ use crate::components::{
     PostProcessingComponent, TransformComponent,
 };
 use crate::scene::authoring::{
-    rendering::camera, rendering::light, rendering::lod_group as lod,
+    rendering::camera, rendering::light, rendering::lod_group as lod, rendering::mesh,
     rendering::post_processing as vc,
 };
 
@@ -29,6 +29,10 @@ inspect! {
     MeshComponent => mesh, mesh_mut, &[
         ro!("primitive_type", MESH),
         ro!("asset_ref", MESH),
+        unheld!(
+            "rehydration holds it (mesh::hold_subdivisions), with the grid it builds",
+            with!("subdivisions", |m, n: u32| mesh::set_subdivisions(m, n)?)
+        ),
         ro!("skeleton", MESH),
     ];
     MaterialComponent => material, material_mut, &[

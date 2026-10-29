@@ -14,8 +14,8 @@ use super::SurfaceShaders;
 /// out (`BatchKey::in_prepass`: an unlit solid) keeps the depth-writing pipeline.
 #[derive(Clone, Copy)]
 pub(crate) enum SolidPass<'a> {
-    /// The SSAO depth prepass; the standard pipeline unless a variant cuts or moves
-    /// its UVs (#648, #1499).
+    /// The SSAO depth prepass; the standard pipeline unless a variant cuts, moves its
+    /// UVs or moves its vertices (#648, #1499, #1524).
     Prepass(&'a wgpu::RenderPipeline),
     /// Opaque solids; the standard pipeline is the view's (the preview may swap it).
     Opaque(&'a wgpu::RenderPipeline, Option<&'a PrimedPipelines>),

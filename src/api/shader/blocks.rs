@@ -40,6 +40,7 @@ fn block_table(lua: &Lua, b: &Block) -> mlua::Result<Table> {
     let stage = match b.stage {
         Stage::Color => "color",
         Stage::Uv => "uv",
+        Stage::Vertex => "vertex",
     };
     t.set("stage", stage)?;
     Ok(t)
@@ -54,14 +55,12 @@ fn param_table(lua: &Lua, p: &Param) -> mlua::Result<Table> {
     Ok(t)
 }
 
-/// A scalar for arity 1; a vector param's broadcast default as a ready-to-paste
-/// array (`{0.5, 0.5, 0.5}`), the shape the recipe takes it in.
+/// A scalar for arity 1; a vector param's default as a ready-to-paste array
+/// (`{0.5, 0.5, 0.5}`), the shape the recipe takes it in.
 fn default(lua: &Lua, p: &Param) -> mlua::Result<Value> {
-    let d = f64::from(p.default);
     if p.arity == 1 {
-        return Ok(Value::Number(d));
+        return Ok(Value::Number(f64::from(p.default)));
     }
-    Ok(Value::Table(
-        lua.create_sequence_from(std::iter::repeat_n(d, p.arity))?,
-    ))
+    let lanes = p.defaults().into_iter().map(f64::from);
+    Ok(Value::Table(lua.create_sequence_from(lanes)?))
 }

@@ -3,8 +3,11 @@ use crate::scene::authoring::ComponentKind;
 use egui_phosphor::regular as icon;
 use glam::Vec3;
 
+use crate::components::mesh::primitives::MAX_PLANE_SUBDIVISIONS;
 use crate::editor::inspector::components::card::component_card;
+use crate::editor::widgets::DragRange;
 use crate::scene::authoring::rendering::light as light_ops;
+use crate::scene::authoring::rendering::mesh as mesh_ops;
 use crate::scene::{LightComponent, LightMode, LightType};
 
 /// The skinned-mesh tools a Mesh card button asks for, deferred because they need
@@ -31,9 +34,13 @@ pub fn draw_mesh(
         return;
     }
     let mut remove = false;
+    let mut subdivide = None;
     component_card(ui, icon::CUBE, "Mesh Filter", Some(&mut remove), |ui| {
         if let Some(mesh) = world.mesh(id) {
             ui.label(format!("Type: {} primitive", mesh.primitive_type));
+            if mesh.primitive_type == "Plane" {
+                subdivide = draw_subdivisions(ui, mesh.subdivisions);
+            }
             ui.label(format!(
                 "Geometry: {} verts | {} indices",
                 mesh.vertices.len(),
@@ -57,10 +64,38 @@ pub fn draw_mesh(
             }
         }
     });
+    if let (Some(n), Some(mut mesh)) = (subdivide, world.mesh_mut(id)) {
+        // The drag holds the range, so the op has nothing to refuse.
+        let _ = mesh_ops::set_subdivisions(&mut mesh, n);
+        *is_dirty = true;
+    }
     if remove {
         world.set_mesh(id, None);
         *is_dirty = true;
     }
+}
+
+/// A `Plane`'s quads per side (#1524): the new count once an edit finishes (a
+/// released drag or a typed value). Mid-drag the count is held in egui's memory, so
+/// the grid is rebuilt and re-uploaded once, not every frame of the drag.
+fn draw_subdivisions(ui: &mut egui::Ui, current: u32) -> Option<u32> {
+    let held = ui.id().with("mesh_subdivisions");
+    let mut n = ui.data(|d| d.get_temp::<u32>(held)).unwrap_or(current);
+    let drag = egui::DragValue::new(&mut n).ranged(1..=MAX_PLANE_SUBDIVISIONS);
+    let r = ui
+        .horizontal(|ui| {
+            ui.label("Subdivisions:")
+                .on_hover_text("Quads per side: vertices for a vertex shader to move");
+            ui.add(drag)
+        })
+        .inner;
+    if r.dragged() && !r.drag_stopped() {
+        ui.data_mut(|d| d.insert_temp(held, n));
+        return None;
+    }
+    ui.data_mut(|d| d.remove::<u32>(held));
+    let finished = r.drag_stopped() || r.changed();
+    (finished && n != current).then_some(n)
 }
 
 /// 3C. Light configuration. A THIN client (#287): every widget reads the field into

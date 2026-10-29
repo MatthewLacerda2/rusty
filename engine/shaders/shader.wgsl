@@ -35,20 +35,45 @@ fn forward_vertex(model: VertexInput, instance: u32) -> VertexOutput {
     // Skin, then the draw's and the instance's transforms (`vertex_to_world`).
     let to_world = vertex_to_world(model, instance);
     let world_pos = to_world * vec4<f32>(model.position, 1.0);
-    let world_normal = normalize((to_world * vec4<f32>(model.normal, 0.0)).xyz);
-    // Tangent rides the same transform as the normal; its `w` (handedness) passes
-    // through untouched.
-    let world_tangent = normalize((to_world * vec4<f32>(model.tangent.xyz, 0.0)).xyz);
+    // A surface variant's vertex blocks move it here (#1524), at this frame's game time.
+    let moved = surface_vertex(world_vertex(model, to_world, world_pos), camera.time);
 
-    out.world_position = world_pos.xyz;
-    out.world_normal = world_normal;
+    out.world_position = moved.position;
+    out.world_normal = moved.normal;
     out.tex_coords = model.tex_coords;
-    out.world_tangent = vec4<f32>(world_tangent, model.tangent.w);
-    out.clip_position = camera.view_proj * world_pos;
+    // The tangent's `w` (handedness) passes through untouched.
+    out.world_tangent = vec4<f32>(moved.tangent, model.tangent.w);
+    // `w` as transformed, so the identity `surface_vertex` leaves the clip position
+    // bit-identical to `view_proj * world_pos`.
+    out.clip_position = camera.view_proj * vec4<f32>(moved.position, world_pos.w);
     out.instance = instance;
     let st = instances[instance].lightmap_st;
     out.lightmap_uv = model.lightmap_uv * st.xy + st.zw;
     return out;
+}
+
+// A vertex as a surface variant's vertex blocks see it (#1524): its world position,
+// normal and tangent. `surface_vertex` is the identity here; a bake whose recipe holds
+// a vertex-stage block (`vertex_waves`) replaces its body with the blocks' chain
+// (`shadergen::assemble`). Every vertex stage that draws a mesh calls it: the forward
+// one (so the SSAO prepass too), the motion-vector one again at last frame's game time,
+// and the shadow casters', so depth, shadows and motion follow the moved surface.
+struct SurfaceVertex {
+    position: vec3<f32>,
+    normal: vec3<f32>,
+    tangent: vec3<f32>,
+};
+
+fn surface_vertex(v: SurfaceVertex, time: f32) -> SurfaceVertex {
+    return v;
+}
+
+// `model`'s vertex through `to_world` (`world_pos` already is its position): the
+// normal and the tangent ride the same transform.
+fn world_vertex(model: VertexInput, to_world: mat4x4<f32>, world_pos: vec4<f32>) -> SurfaceVertex {
+    let normal = normalize((to_world * vec4<f32>(model.normal, 0.0)).xyz);
+    let tangent = normalize((to_world * vec4<f32>(model.tangent.xyz, 0.0)).xyz);
+    return SurfaceVertex(world_pos.xyz, normal, tangent);
 }
 
 // The SSAO depth prepass (#436): depth only, so it writes no colour. Cutout texels
@@ -115,10 +140,13 @@ fn vs_shadow(model: VertexInput, @builtin(instance_index) instance: u32) -> Vert
         bones[joints.x], bones[joints.y], bones[joints.z], bones[joints.w],
         model.joint_weights,
     );
-    let world = caster.model * skin * vec4<f32>(model.position, 1.0);
+    let to_world = caster.model * skin;
+    let world = to_world * vec4<f32>(model.position, 1.0);
+    // The vertex blocks move the caster as `vs_main` moves the surface (#1524).
+    let moved = surface_vertex(world_vertex(model, to_world, world), camera.time);
     var out: VertexOutput;
-    out.clip_position = shadow_light.light_space * world;
-    out.world_position = world.xyz;
+    out.clip_position = shadow_light.light_space * vec4<f32>(moved.position, world.w);
+    out.world_position = moved.position;
     out.tex_coords = model.tex_coords;
     out.instance = instance;
     return out;
@@ -181,11 +209,15 @@ struct VelocityTargets {
 @vertex
 fn vs_velocity(model: VertexInput, @builtin(instance_index) instance: u32) -> VelocityVertex {
     let v = forward_vertex(model, instance);
-    let prev_world = vertex_to_world_prev(model, instance) * vec4<f32>(model.position, 1.0);
+    let prev_to_world = vertex_to_world_prev(model, instance);
+    let prev_world = prev_to_world * vec4<f32>(model.position, 1.0);
+    // Last frame's vertex blocks ran at last frame's game time (`stack.y`, #1524), so
+    // a surface that only moves in its vertex stage still writes its motion.
+    let prev = surface_vertex(world_vertex(model, prev_to_world, prev_world), camera.stack.y);
     return VelocityVertex(
         v.clip_position, v.world_position, v.world_normal, v.tex_coords,
         v.world_tangent, v.instance, v.lightmap_uv,
-        v.clip_position, camera.prev_view_proj * prev_world,
+        v.clip_position, camera.prev_view_proj * vec4<f32>(prev.position, prev_world.w),
     );
 }
 

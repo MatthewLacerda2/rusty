@@ -58,6 +58,11 @@ pub struct MeshComponent {
     /// the only identity stored — the `.meta` sidecar holds settings, never this.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub asset_ref: Option<String>,
+    /// A `"Plane"`'s quads per side (#1524): 1, the single quad, up to
+    /// [`primitives::MAX_PLANE_SUBDIVISIONS`]. A vertex block (`vertex_waves`) needs
+    /// the vertices to move. Every other mesh keeps 1; saved only when it isn't 1.
+    #[serde(default = "one", skip_serializing_if = "is_one")]
+    pub subdivisions: u32,
     #[serde(skip)]
     pub vertices: Vec<Vertex>,
     #[serde(skip)]
@@ -100,6 +105,14 @@ pub struct MeshComponent {
     pub revision: MeshRevision,
 }
 
+fn one() -> u32 {
+    1
+}
+
+fn is_one(n: &u32) -> bool {
+    *n == 1
+}
+
 impl MeshComponent {
     /// A static mesh: `primitive_type` (see the field) over this geometry, with no
     /// asset reference, skin or clips, and a fresh revision so every renderer uploads it.
@@ -112,6 +125,7 @@ impl MeshComponent {
         Self {
             primitive_type: primitive_type.into(),
             asset_ref: None,
+            subdivisions: 1,
             vertices,
             indices,
             ranges: Vec::new(),
