@@ -254,6 +254,7 @@ Each `<entity>` (also what `Debug.SnapshotEntity(id)` returns):
   "bounds": { "min": [x,y,z], "max": [x,y,z] },     // world-space AABB, or null
   "scripts": ["assets/scripts/foo.lua"],
   "mesh":      { "primitive_type": "Box", "asset_ref": "models/crates.glb::Barrel" },
+                                // + "subdivisions" when not 1, "cast_shadows" when not "On"
   "material":  { "color": [r,g,b], "metallic": .., "roughness": .., "texture": "..",
                  "metallic_map": null, "roughness_map": null },
   "light":     { "type": "Point", "color": [r,g,b], "intensity": .., "range": ..,

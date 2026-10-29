@@ -96,6 +96,25 @@ fn distance_is_measured_in_tile_units_on_each_axis() {
 }
 
 #[test]
+fn distance_on_a_tall_image_weighs_its_short_side_across() {
+    // 16 across, 64 down: now the step across is the long one, four rows' worth.
+    let radius = 0.25;
+    let tall = Size::new(16, 64);
+    let cols = Image::fill_uv(tall, |u, _| gray(f32::from((0.25..0.75).contains(&u))));
+    let out = distance::distance(&cols, Field::Const(radius));
+    for x in 0..16i64 {
+        let want = match x {
+            4..12 => expected((x - 3).min(12 - x) as f32 / 16.0, 0.5 / 16.0, radius),
+            _ => 0.0,
+        };
+        assert!(
+            (out.get_wrapped(x, 20)[0] - want).abs() < 1e-5,
+            "column {x}"
+        );
+    }
+}
+
+#[test]
 fn the_distance_edge_is_half_a_pixel_of_its_own_axis() {
     // All inside but pixel (10, 8): the pixel above it and the one beside it each
     // read half a pixel of the axis between them.

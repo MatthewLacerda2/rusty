@@ -46,6 +46,7 @@ pub fn soldier() -> MeshComponent {
         primitive_type: PRIMITIVE.to_string(),
         asset_ref: None,
         subdivisions: 1,
+        cast_shadows: Default::default(),
         vertices,
         indices,
         ranges: Vec::new(),

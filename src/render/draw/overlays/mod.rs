@@ -34,6 +34,7 @@ impl Renderer {
             bone_base: 0,
             receive_decals: 0,
             surface: crate::render::gpu::uniforms::SurfaceUniform::default(),
+            mapping: crate::render::gpu::uniforms::MappingUniform::default(),
         };
         let grid_buf_unif = self
             .device
@@ -111,6 +112,7 @@ impl Renderer {
             bone_base: 0,
             receive_decals: 0,
             surface: crate::render::gpu::uniforms::SurfaceUniform::default(),
+            mapping: crate::render::gpu::uniforms::MappingUniform::default(),
         };
 
         let entity_buf = self
