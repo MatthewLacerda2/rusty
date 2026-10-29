@@ -94,7 +94,8 @@ impl GameWorld {
 /// fires for the events this tick's playheads crossed; `LateUpdate` scripts set this tick's
 /// targets; `solve_ik` (#461) post-processes the final pose, skipping any bone a
 /// dynamic body carries (physics wins over IK); `follow_bones` (#464) then moves
-/// the hitbox query poses to the pose that renders.
+/// the hitbox query poses to the pose that renders; `carry_local_particles` (#1529)
+/// then moves a `Local` emitter's particles to where all of that left the emitter.
 pub(super) fn register(app: &mut App) {
     app.add_system(Stage::FixedUpdate, rebake_nav)
         .add_system(Stage::FixedUpdate, init_scripts)
@@ -113,6 +114,10 @@ pub(super) fn register(app: &mut App) {
         .add_system(Stage::FixedUpdate, late_update_scripts)
         .add_system(Stage::FixedUpdate, solve_ik)
         .add_system(Stage::FixedUpdate, follow_bones)
+        .add_system(
+            Stage::FixedUpdate,
+            super::systems::particles::carry_local_particles,
+        )
         .add_system(Stage::FixedUpdate, super::systems::trails::tick_trails)
         .add_system(Stage::FixedUpdate, apply_destroys)
         .add_system(Stage::FixedUpdate, super::systems::decals::tick_decals)

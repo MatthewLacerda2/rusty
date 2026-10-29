@@ -1,8 +1,9 @@
 //! src/components/particle/runtime.rs — the transient play-mode state of an
 //! emitter: live particles, spawn carry, PRNG and pending sub-emitter events.
 
-use glam::Vec3;
+use glam::{Quat, Vec3};
 
+use super::space::EmitterFrame;
 use crate::core::random::Random;
 
 /// One live particle. Transient runtime state — never serialized.
@@ -26,6 +27,10 @@ pub struct Particle {
     pub start_frame: u32,
     /// Unit axis a mesh particle tumbles about by `rotation` (#440; else `Y`).
     pub axis: Vec3,
+    /// The turn a `Local` emitter has given the particle (its rotation at birth,
+    /// then every turn it carried the particle through, #1529), applied on top of
+    /// the tumble. Identity for a `World` emitter.
+    pub turn: Quat,
 }
 
 impl Particle {
@@ -43,6 +48,20 @@ impl Particle {
             color,
             start_frame: 0,
             axis: Vec3::Y,
+            turn: Quat::IDENTITY,
+        }
+    }
+
+    /// A mesh particle's orientation: its tumble by `rotation` about `axis`, under
+    /// the emitter's `turn`. Exactly the tumble when `turn` is identity, so a
+    /// `World` emitter draws bit for bit as before Simulation Space.
+    pub fn orientation(&self) -> Quat {
+        let axis = self.axis.try_normalize().unwrap_or(Vec3::Y);
+        let tumble = Quat::from_axis_angle(axis, self.rotation);
+        if self.turn == Quat::IDENTITY {
+            tumble
+        } else {
+            self.turn * tumble
         }
     }
 
@@ -79,6 +98,9 @@ pub struct EmitterRuntime {
     pub initialized: bool,
     /// Sub-emitter firings not yet dispatched.
     pub pending: Vec<SubEmitEvent>,
+    /// The `Local` emitter frame its live particles were last placed under
+    /// (`space`); `None` until it first emits or is carried.
+    pub anchor: Option<EmitterFrame>,
 }
 
 impl Default for EmitterRuntime {
@@ -90,6 +112,7 @@ impl Default for EmitterRuntime {
             burst_fired: false,
             initialized: false,
             pending: Vec::new(),
+            anchor: None,
         }
     }
 }

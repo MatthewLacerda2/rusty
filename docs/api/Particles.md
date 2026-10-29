@@ -16,7 +16,7 @@ actually spawned (the `max_particles` cap may swallow some).
 | `Particles.GetCount` | `(id)` | live particle count |
 | `Particles.Clear` | `(id)` | — (despawns all live particles) |
 | `Particles.SetShape` | `(id, kind, opts?)` | `bool` (false for an unknown kind; radii and a box's size clamped ≥ 0, a cone's angle to `[0, 90]`) |
-| `Particles.SetDirection` | `(id, x, y, z)` | — (the shape's axis / launch direction) |
+| `Particles.SetDirection` | `(id, x, y, z)` | — (the shape's axis / launch direction, in the emitter's space) |
 | `Particles.SetLifetime` | `(id, min, max?)` | — (seconds, clamped ≥ 0) |
 | `Particles.SetSpeed` | `(id, min, max?)` | — (a range with a NaN or infinite end is ignored, as for every range here) |
 | `Particles.SetSize` | `(id, min, max?)` | — (start size, clamped ≥ 0) |
@@ -29,6 +29,8 @@ actually spawned (the `max_particles` cap may swallow some).
 | `Particles.SetFlipbook` | `(id, columns, rows, opts?)` | — |
 | `Particles.SetSoft` | `(id, distance)` | — (world units, clamped ≥ 0; 0 = off) |
 | `Particles.SetLit` | `(id, lit)` | — |
+| `Particles.SetSimulationSpace` | `(id, space)` | — (`"World"` or `"Local"`, any case; an unknown name is an error) |
+| `Particles.GetSimulationSpace` | `(id)` | space name, or `nil` without an emitter |
 
 **Ranges.** `SetLifetime`/`SetSpeed`/`SetSize` take `min, max`: each particle
 draws its start value uniformly between them from the emitter's seeded stream.
@@ -38,13 +40,42 @@ Omit `max` for a constant.
 `Circle` (case-insensitive). `opts` is a table: `radius` (default 1), `angle`
 (cone half-angle in degrees, default 25), `x`/`y`/`z` (box size, default 1) and
 `surface` (`true` emits from the surface / edge instead of the volume). Shapes are
-oriented by the emitter's direction, so aiming a hemisphere of sparks along an
-impact normal is one `SetDirection` call:
+oriented by the emitter's direction, in the emitter's own space (its rotation
+turns it; an unrotated emitter's direction is a world direction), so aiming a
+hemisphere of sparks on an unrotated emitter along an impact normal is one
+`SetDirection` call:
 
 ```lua no-run
 Particles.SetShape(sparks, "Hemisphere", { radius = 0.05 })
 Particles.SetDirection(sparks, nx, ny, nz)
 Particles.Burst(sparks)
+```
+
+**Simulation space.** Unity's *Simulation Space*. `"World"` (the default): a
+particle, once born, stays where physics takes it, and the emitter moving leaves
+it behind (smoke, debris, a trail of sparks). `"Local"`: live particles keep
+their position, velocity and orientation relative to the emitter, so they move,
+turn and scale with it and with any parent bone (a muzzle flash or jet parented
+to a gun, an exhaust on a vehicle); a mesh particle turns with the emitter on
+top of its own tumble. In **both** spaces the shape and `SetDirection` are in
+the emitter's own space, as Unity's Shape module is: a world-space emitter on a
+muzzle launches along the gun, then leaves its particles behind. The emitter's
+frame follows Unity's default *Local* Scaling Mode: its world position and
+rotation under its **own** scale, every parent's scale ignored, so a viewmodel
+rig at a 0.01 root scale does not shrink its flash; the emitter's own scale
+scales the shape, the launch speed and a local emitter's live particles.
+Particle size is never scaled. An emitter scaled to zero keeps its local
+particles where they were and puts them back when it is scaled up again.
+Gravity always pulls in world space. A sub-emitter fired from a local particle
+spawns at that particle's world position. Particles are drawn, lit, sorted and
+collided at their resulting world position, so every render mode looks the same
+in either space. Unity's third option, `Custom` (relative to another entity), is
+not offered yet: the scene format has no field that references another entity
+by value.
+
+```lua no-run
+Particles.SetSimulationSpace(muzzle_flash, "Local")
+Particles.Burst(muzzle_flash) -- stays on the gun while the player turns
 ```
 
 **Sub-emitters.** `trigger` is `"birth"`, `"death"` or `"collision"`; `target` is

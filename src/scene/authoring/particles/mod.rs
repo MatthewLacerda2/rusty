@@ -2,7 +2,7 @@
 //!
 //! The ONE place the engine knows how to mutate an entity's first-class
 //! `ParticleEmitterComponent` field by field: emission (`active` / `emit_mode` /
-//! `looping` / `rate` / `burst_count` / `max_particles`), rendering (`blend` /
+//! `looping` / `simulation_space` / `rate` / `burst_count` / `max_particles`), rendering (`blend` /
 //! `texture`), shape + per-particle motion (`shape` / `emit_from` / `lifetime` /
 //! `speed` / `direction` / `spread` / `gravity`), start size / rotation / colour
 //! ranges, the over-life curves and gradient, collision (`collision` /
@@ -27,7 +27,7 @@ use glam::Vec3;
 use crate::asset::MapRef;
 use crate::components::{
     CollisionResponse, EmitFrom, EmitMode, EmitShape, ParticleBlend, ParticleEmitterComponent,
-    SubEmitTrigger,
+    SimulationSpace, SubEmitTrigger,
 };
 use crate::core::curve::{ColorRange, Curve, Gradient, Range};
 use crate::scene::authoring::sanitize::{
@@ -48,6 +48,15 @@ pub fn set_emit_mode(p: &mut ParticleEmitterComponent, mode: EmitMode) {
 /// Set whether the emitter loops.
 pub fn set_looping(p: &mut ParticleEmitterComponent, looping: bool) {
     p.looping = looping;
+}
+
+/// Set the simulation space (#1529). A change forgets where the live particles
+/// were last placed, so a switch never carries them by a stale matrix.
+pub fn set_simulation_space(p: &mut ParticleEmitterComponent, space: SimulationSpace) {
+    if p.simulation_space != space {
+        p.simulation_space = space;
+        p.runtime.anchor = None;
+    }
 }
 
 /// Set the continuous emission rate, clamped to `≥ 0` (matches `Particles.SetRate`).

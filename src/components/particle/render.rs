@@ -136,7 +136,7 @@ mod tests {
             render,
             ..Default::default()
         };
-        e.emit_at(Vec3::ZERO, 8);
+        e.emit_at(crate::components::particle::EmitterFrame::IDENTITY, 8);
         e.runtime.particles
     }
 

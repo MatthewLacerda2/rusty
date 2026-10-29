@@ -8,6 +8,7 @@ use glam::Vec3;
 
 use super::runtime::{Particle, SubEmitEvent};
 use super::shape::signed;
+use super::space::EmitterFrame;
 use super::ParticleEmitterComponent;
 use crate::core::curve::Range;
 use crate::core::random::Random;
@@ -34,8 +35,10 @@ impl ParticleEmitterComponent {
 
     /// Build one particle at `origin` from the current config: shape offset and
     /// launch direction, direction jitter, then every start range, all drawn from
-    /// the seeded stream.
-    fn spawn_particle(&mut self, origin: Vec3) -> Particle {
+    /// the seeded stream. The offset and launch are in the emitter's own space,
+    /// turned and scaled into the world by its frame `frame` (`space`), whatever
+    /// the simulation space.
+    fn spawn_particle(&mut self, frame: &EmitterFrame, origin: Vec3) -> Particle {
         let axis = self.direction.normalize_or_zero();
         let rng = &mut self.runtime.rng;
         let (offset, launch) = self.shape.sample(self.emit_from, axis, rng);
@@ -72,8 +75,8 @@ impl ParticleEmitterComponent {
             Vec3::Y
         };
         Particle {
-            position: origin + offset,
-            velocity: dir * speed,
+            position: origin + frame.matrix.transform_vector3(offset),
+            velocity: frame.matrix.transform_vector3(dir * speed),
             age: 0.0,
             lifetime,
             size,
@@ -81,25 +84,42 @@ impl ParticleEmitterComponent {
             color,
             start_frame,
             axis,
+            turn: self.birth_turn(frame),
         }
     }
 
-    /// Spawn up to `count` particles at `origin`, honouring the `max_particles`
-    /// cap (spawns past the cap are dropped). Returns the number actually spawned.
-    /// Seeds the runtime on first use, and queues the birth sub-emitter per spawn.
-    pub fn emit_at(&mut self, origin: Vec3, count: u32) -> u32 {
-        self.spawn(origin, Vec3::ZERO, count, true)
+    /// Spawn up to `count` particles at the emitter, whose frame
+    /// (`ecs::World::emitter_frame`) is `frame`, honouring the `max_particles` cap (spawns past the cap are
+    /// dropped). Returns the number actually spawned. Seeds the runtime on first
+    /// use, and queues the birth sub-emitter per spawn.
+    pub fn emit_at(&mut self, frame: EmitterFrame, count: u32) -> u32 {
+        self.spawn(frame, frame.origin(), Vec3::ZERO, count, true)
     }
 
-    /// Spawn a sub-emitter burst: `count` particles at `origin`, each carrying
-    /// `inherited` velocity on top of its own. Never queues birth sub-emitters, so
-    /// two emitters naming each other cannot feed back without bound.
-    pub fn emit_sub(&mut self, origin: Vec3, inherited: Vec3, count: u32) -> u32 {
-        self.spawn(origin, inherited, count, false)
+    /// Spawn a sub-emitter burst: `count` particles at the world point `origin`,
+    /// each carrying `inherited` velocity on top of its own; `frame` is this
+    /// emitter's frame. Never queues birth sub-emitters, so two emitters
+    /// naming each other cannot feed back without bound.
+    pub fn emit_sub(
+        &mut self,
+        frame: EmitterFrame,
+        origin: Vec3,
+        inherited: Vec3,
+        count: u32,
+    ) -> u32 {
+        self.spawn(frame, origin, inherited, count, false)
     }
 
-    fn spawn(&mut self, origin: Vec3, inherited: Vec3, count: u32, births: bool) -> u32 {
+    fn spawn(
+        &mut self,
+        frame: EmitterFrame,
+        origin: Vec3,
+        inherited: Vec3,
+        count: u32,
+        births: bool,
+    ) -> u32 {
         self.ensure_initialized();
+        self.carry_to(frame);
         let cap = self.max_particles as usize;
         let birth = self.sub_emitters.birth.filter(|_| births);
         let inherit = self.sub_emitters.inherit_velocity;
@@ -108,7 +128,7 @@ impl ParticleEmitterComponent {
             if self.runtime.particles.len() >= cap {
                 break;
             }
-            let mut p = self.spawn_particle(origin);
+            let mut p = self.spawn_particle(&frame, origin);
             p.velocity += inherited;
             if let Some(target) = birth {
                 self.runtime.pending.push(SubEmitEvent {

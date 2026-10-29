@@ -55,6 +55,7 @@ inspect! {
         op!("burst_count", fx::set_burst_count),
         op!("max_particles", fx::set_max_particles),
         op!("looping", fx::set_looping),
+        op!("simulation_space", fx::set_simulation_space),
         op!("shape", fx::set_shape),
         op!("emit_from", fx::set_emit_from),
         op!("lifetime", fx::set_lifetime),
