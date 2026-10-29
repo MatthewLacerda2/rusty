@@ -291,7 +291,15 @@ MCP. There is nothing to record. The overrides save and load with the scene, sur
 Play (leaving Play restores the edit-mode world exactly), and are re-applied when the
 source changes, so a source edit still reaches every field the instance did not edit.
 The instance **root's position and rotation are always the instance's own**: they never
-come from the source and are never overrides.
+come from the source and are never overrides. A source applied to during Play reaches
+the edit-mode instances on Stop, each keeping its own edits.
+
+An override the source can no longer hold (the field was removed from the prefab) is
+**unused** and kept, as in Unity: it is still listed, saved and re-applied, until it is
+reverted. While an instance's source file is **missing** (it was loaded without one),
+the instance keeps the overrides it was saved with, but an edit made meanwhile is not
+tracked as an override until the source is back: the edit stays in the scene, and the
+source, once it returns, overwrites it on the next load or reimport.
 
 Edits flow in two directions. **On-instance** verbs keep edits local to this instance;
 the **apply-to-source** verbs push them up into the shared `.prefab` so *other* instances
@@ -314,7 +322,7 @@ Apply-to-source (the Unity "Apply → Prefab" direction):
 - **`Scene.ApplyPrefabToSource(instanceRootId)`** — write *every* override back
   into the source `.prefab` document on disk, then clear them on the instance (it now
   matches the source). Other instances of that prefab pick the change up on their next
-  scene load or `ReimportPrefab`. Returns the number of entities written.
+  scene load, `ReimportPrefab` or leaving Play. Returns the number of entities written.
 - **`Scene.ApplyPrefabFieldToSource(entityId, jsonPointer)`** — write *one* overridden
   leaf back into the source, then drop just that override and reimport so the leaf
   re-tracks the source (the instance's other overrides are untouched). `entityId` may be

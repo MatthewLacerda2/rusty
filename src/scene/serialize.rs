@@ -141,15 +141,16 @@ pub fn apply_scene_data(scene: &mut Scene, data: SceneData) {
 }
 
 /// [`apply_scene_data`] for a document the World itself wrote (a Play snapshot):
-/// its values were held when they came in, so they are not held again, and linked
-/// prefab instances do not re-read their source: the World comes back exactly as it
-/// was captured, each instance's baseline included (#1527).
+/// its values were held when they came in, so they are not held again. Linked prefab
+/// instances re-read their source and re-apply the overrides the snapshot took, so
+/// the World comes back as captured, with any change made to a source during Play
+/// (#1527).
 pub fn apply_world_data(scene: &mut Scene, data: SceneData) {
     apply(scene, data, false);
 }
 
-/// `from_disk`: the document came from a file, so its values are held and its linked
-/// instances re-read their source; a World snapshot is put back as it was.
+/// `from_disk`: the document came from a file, so its values are held; a World
+/// snapshot's already were.
 fn apply(scene: &mut Scene, mut data: SceneData, from_disk: bool) {
     rehydrate_meshes(&mut data);
     scene.meshes_read_at = crate::core::fs::written::written_since(u64::MAX).0;
@@ -208,13 +209,12 @@ fn apply(scene: &mut Scene, mut data: SceneData, from_disk: bool) {
 
     scene.update_all_colliders();
 
-    // Propagate every linked prefab instance against its source on load (#216):
-    // re-baseline from the current `.prefab`, then re-apply each instance's saved
-    // overrides on top. A missing/renamed source is skipped per instance (the
-    // instance keeps its last-saved values), so this never aborts the load.
-    if from_disk {
-        crate::scene::prefab::link::reimport_all_linked_instances(scene);
-    }
+    // Propagate every linked prefab instance against its source (#216): re-baseline
+    // from the current `.prefab`, then re-apply each instance's saved overrides on
+    // top. A Play snapshot is propagated too (#1527): its bones came back with fresh
+    // ids, and a source applied to during Play reaches the edit-mode instances. A
+    // missing/renamed source is skipped per instance, so this never aborts the load.
+    crate::scene::prefab::link::propagate_all_linked_instances(scene);
 
     // Validate declared component dependencies on load (#359): a hand-edited or
     // drifted scene carrying a dependent component without its requirement (e.g. a

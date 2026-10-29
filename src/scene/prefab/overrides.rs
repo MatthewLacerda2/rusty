@@ -1,16 +1,16 @@
-//! src/scene/prefab_overrides.rs — generic per-instance override diff (#216).
+//! src/scene/prefab/overrides.rs — the generic per-instance override diff (#216).
 //!
-//! A linked prefab instance records its divergence from the source as a GENERIC
-//! field diff, not a typed-per-component struct: a flat map of `json-pointer-path ->
-//! value` for every leaf where the instance differs from the source as it last took
-//! it (`live.rs`, #1527). It covers every first-class component with **no
+//! A linked prefab instance's divergence from its source is a GENERIC field diff,
+//! not a typed-per-component struct: a flat map of `json-pointer-path -> value` for
+//! every leaf where the instance differs from its *baseline*, the source as it last
+//! took it (`live.rs`, #1527). It covers every first-class component with **no
 //! per-component code**, and component add/remove too: a `None`↔`Some` is a leaf.
 //!
-//! The two verbs are symmetric: [`diff_entity`] (instance vs. baseline) yields the
-//! override map, and [`apply_overrides`] (baseline + override map) reproduces the
-//! instance. So `apply_overrides(baseline, diff_entity(instance, baseline))` round-
-//! trips, and propagation is "rebuild from a fresh baseline, then re-apply the
-//! recorded map on top".
+//! The two verbs are symmetric: [`diff_leaves`] (the instance's [`leaves`] against
+//! its baseline's) yields the override map, and [`apply_overrides`] (a fresh source
+//! entity + override map) rebuilds the instance. Propagation is "rebuild from the
+//! source, then re-apply the map on top"; nothing diffs against the source as it
+//! is now, which would make every leaf it changed an override.
 //!
 //! Leaves are compared on the entity's serde JSON form with the volatile/identity
 //! fields masked out (see `STRIPPED_KEYS`), so ids, parenting, rehydrated GPU
@@ -102,14 +102,15 @@ pub fn leaves(entity: &Entity) -> BTreeMap<String, Value> {
     out
 }
 
-/// The override map for `instance` against `baseline`: every flattened leaf whose
-/// value differs (a changed scalar, an added leaf, or a removed leaf surfaced as
-/// `null`). Both sides are masked first, so identity/geometry never leak in.
+/// [`diff_leaves`] of two whole entities, for the round-trip tests.
+#[cfg(test)]
 pub fn diff_entity(instance: &Entity, baseline: &Entity) -> BTreeMap<String, Value> {
     diff_leaves(&leaves(instance), &leaves(baseline))
 }
 
-/// [`diff_entity`] over leaves already taken with [`leaves`].
+/// The override map for leaves `inst` against `base`: every leaf whose value differs
+/// (a changed scalar, an added leaf, or a removed leaf surfaced as `null`). Both
+/// sides are masked by [`leaves`], so identity/geometry never leak in.
 pub fn diff_leaves(
     inst: &BTreeMap<String, Value>,
     base: &BTreeMap<String, Value>,

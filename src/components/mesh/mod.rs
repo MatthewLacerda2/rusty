@@ -138,6 +138,17 @@ impl MeshComponent {
         }
     }
 
+    /// This mesh's authored reference (`primitive_type`, `asset_ref`, the skeleton's
+    /// saved overrides) with none of its geometry, skin or clips: what a prefab
+    /// override diff reads, without cloning a whole model every frame (#1527).
+    pub fn reference_only(&self) -> Self {
+        Self {
+            asset_ref: self.asset_ref.clone(),
+            skeleton: self.skeleton.clone(),
+            ..Self::new(self.primitive_type.clone(), Vec::new(), Vec::new())
+        }
+    }
+
     /// The index runs to draw, one per material slot: `ranges`, or the whole index
     /// list as one run when it is empty.
     pub fn index_ranges(&self) -> impl Iterator<Item = Range<u32>> + '_ {

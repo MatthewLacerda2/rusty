@@ -146,11 +146,15 @@ pub fn list_instance_overrides(scene: &Scene, root_id: u32) -> Result<Vec<String
     Ok(out)
 }
 
-/// Re-import EVERY linked instance in the scene (propagation on load). An instance
-/// root is a linked entity with `local_id == 0` (the prefab root). A source whose
-/// file is missing is skipped (the instance keeps its last-loaded values), so a
+/// Propagate EVERY linked instance in the scene, re-applying the overrides each link
+/// holds: a loaded file's, or a Play snapshot's, written while its bones still had
+/// their ids (#1527). So a source changed meanwhile (on disk, or applied to during
+/// Play) reaches each instance, and every baseline is rebuilt against the live
+/// bones, which a load or a Stop respawns with fresh ids. An instance root is a
+/// linked entity with `local_id == 0` (the prefab root). A source whose file is
+/// missing is skipped (the instance keeps its values and its baseline), so a
 /// renamed/deleted `.prefab` never aborts the scene load.
-pub fn reimport_all_linked_instances(scene: &mut Scene) {
+pub fn propagate_all_linked_instances(scene: &mut Scene) {
     let roots: Vec<u32> = scene
         .world
         .ids_with_prefab_link()
@@ -158,7 +162,7 @@ pub fn reimport_all_linked_instances(scene: &mut Scene) {
         .filter(|&id| scene.world.prefab_link(id).is_some_and(|l| l.local_id == 0))
         .collect();
     for root in roots {
-        let _ = reimport_instance(scene, root);
+        let _ = propagate(scene, root);
     }
 }
 
@@ -177,12 +181,12 @@ fn rebuild_entity(scene: &mut Scene, id: u32, baselines: &BTreeMap<u32, Entity>,
     }
     let parent_id = scene.world.parent_id(id);
     let children = scene.world.children(id);
-    let live = scene.world.entity_document(id);
+    let placement = scene.world.transform(id).map(|t| (*t).clone());
     let mut rebuilt = baseline.clone();
     rebuilt.id = id;
     rebuilt.parent_id = parent_id;
     rebuilt.children = children;
-    rebuilt.prefab_link = live.as_ref().and_then(|e| e.prefab_link.clone());
+    rebuilt.prefab_link = scene.world.prefab_link(id).map(|l| (*l).clone());
     if let Some(link) = rebuilt.prefab_link.as_mut() {
         link.baseline = Some(Arc::new(leaves(baseline)));
     }
@@ -191,7 +195,7 @@ fn rebuild_entity(scene: &mut Scene, id: u32, baselines: &BTreeMap<u32, Entity>,
             apply_overrides(&mut rebuilt, &overrides);
         }
     }
-    keep_root_placement(&mut rebuilt, live.as_ref());
+    keep_root_placement(&mut rebuilt, placement.as_ref());
     rehydrate_entity_mesh(&mut rebuilt);
     scene.world.replace_entity(rebuilt);
     // The source file and the overrides are held as a scene file is (#1418).

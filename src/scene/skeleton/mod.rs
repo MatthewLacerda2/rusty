@@ -173,6 +173,8 @@ mod persist_tests;
 #[cfg(test)]
 mod prefab_refs_tests;
 #[cfg(test)]
+mod prefab_stop_tests;
+#[cfg(test)]
 mod ragdoll_refs_tests;
 #[cfg(test)]
 mod rebind_tests;
