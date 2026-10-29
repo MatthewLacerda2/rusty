@@ -22,13 +22,18 @@ class Level(unittest.TestCase):
             "scripting sandbox": "src/scripting/sandbox/files.rs",
             "merge path": ".github/workflows/ci.yml",
         }
+        cases_by_path = {"tests/scene_format/scene.fingerprint": "stored format"}
+        for path, why in cases_by_path.items():
+            with self.subTest(path):
+                self.assertEqual(review_level.level([path]), ("high", [(why, path)]))
         for why, path in cases.items():
             with self.subTest(why):
                 self.assertEqual(review_level.level(["README.md", path]), ("high", [(why, path)]))
 
     def test_everything_else_is_medium(self):
         paths = ["src/render/post/bloom.rs", "docs/api/Scene.md", ".github/scripts/board.py",
-                 "src/scene/io_helpers.rs", "src/scripting/sandboxing.rs"]
+                 "src/scene/io_helpers.rs", "src/scripting/sandboxing.rs",
+                 "tests/scene_format/trace.rs"]
         self.assertEqual(review_level.level(paths), ("medium", []))
 
     def test_a_file_entry_matches_only_itself(self):
