@@ -6,7 +6,7 @@
 use crate::core::collections::Map;
 
 use super::RunError;
-use crate::procgen::recipe::{Link, Node, TextureRecipe};
+use crate::procgen::recipe::{Fault, Link, Node, TextureRecipe};
 
 /// The nodes to evaluate and how they connect, as indices into `recipe.nodes`.
 pub(super) struct Plan {
@@ -99,25 +99,20 @@ pub(super) fn plan(
 /// nodes, counts as a consumer, and closes a cycle like one.
 fn wire(recipe: &TextureRecipe, by_id: &Map<&str, usize>) -> Result<Vec<Vec<usize>>, RunError> {
     let wire_node = |node: &Node| {
-        node.check_arity().map_err(RunError::Arity)?;
+        node.check_arity().map_err(RunError::Node)?;
         let index = |input: &String| {
             by_id
                 .get(input.as_str())
                 .copied()
-                .ok_or_else(|| RunError::UnknownInput {
-                    node: node.id.clone(),
-                    input: input.clone(),
-                })
+                .ok_or_else(|| RunError::Node(node.error(Fault::UnknownInput(input.clone()))))
         };
         let link = |(param, link): (&str, &Link)| {
-            by_id
-                .get(link.node.as_str())
-                .copied()
-                .ok_or_else(|| RunError::UnknownLink {
-                    node: node.id.clone(),
+            by_id.get(link.node.as_str()).copied().ok_or_else(|| {
+                RunError::Node(node.error(Fault::UnknownLink {
                     param: param.to_string(),
                     link: link.node.clone(),
-                })
+                }))
+            })
         };
         let inputs = node.inputs.iter().map(index);
         inputs
@@ -173,7 +168,7 @@ impl<'a> Order<'a> {
     fn visit(&mut self, i: usize) -> Result<(), RunError> {
         match self.state[i] {
             Visit::Done => return Ok(()),
-            Visit::OnStack => return Err(RunError::Cycle(self.recipe.nodes[i].id.clone())),
+            Visit::OnStack => return Err(RunError::Node(self.recipe.nodes[i].error(Fault::Cycle))),
             Visit::Unseen => {}
         }
         self.state[i] = Visit::OnStack;
