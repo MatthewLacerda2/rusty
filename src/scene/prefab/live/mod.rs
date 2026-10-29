@@ -136,6 +136,8 @@ fn is_root_placement(path: &str) -> bool {
 #[cfg(test)]
 mod component_tests;
 #[cfg(test)]
+mod list_tests;
+#[cfg(test)]
 mod source_tests;
 #[cfg(test)]
 mod tests;

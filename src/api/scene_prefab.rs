@@ -128,8 +128,8 @@ fn register_overrides<'scope>(
 /// The apply-to-source verbs (#268): write an instance's overrides BACK into the source
 /// `.prefab` on disk (so other instances pick the change up on reload/reimport), then
 /// clear them on the instance. Whole-object (`ApplyPrefabToSource(rootId)`) and per-
-/// field (`ApplyPrefabFieldToSource(entityId, jsonPointer)`) forms, plus the per-field
-/// revert (`RevertPrefabField(entityId, jsonPointer)`).
+/// field (`ApplyPrefabFieldToSource(entityId, key)`) forms, plus the per-field
+/// revert (`RevertPrefabField(entityId, key)`).
 fn register_apply_to_source<'scope>(
     scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,

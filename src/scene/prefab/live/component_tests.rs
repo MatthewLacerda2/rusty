@@ -1,6 +1,7 @@
-//! A component added to an instance is one override holding its whole value (#1527),
-//! as Unity's *added component*: a Light, a Collider or a script added to an instance
-//! child keeps its values through Play and a save/load.
+//! A component added to an instance is one *added component* holding its whole value
+//! (#1527), as Unity's; a script is a list element, a size entry plus the new
+//! element. A Light, a Collider or a script added to an instance child keeps its
+//! values through Play and a save/load.
 
 use super::tests::save_and_load;
 use crate::components::{ColliderShape, ScriptComponent, ScriptFieldValue};
@@ -47,7 +48,12 @@ fn an_added_light_collider_and_script_survive_play_and_reload() {
         ..ScriptComponent::default()
     };
     scene.world.scripts_mut(child).unwrap().push(script);
-    let whole = ["1:/collider", "1:/light", "1:/scripts"];
+    let whole = [
+        "1:+/collider",
+        "1:+/light",
+        "1:/scripts/#size",
+        "1:/scripts/0",
+    ];
     assert_eq!(list_instance_overrides(&scene, root).unwrap(), whole);
 
     play_stop(&mut scene);
@@ -83,7 +89,7 @@ fn a_second_script_on_an_instance_survives_play() {
     scene.world.scripts_mut(child).unwrap().push(second);
     assert_eq!(
         list_instance_overrides(&scene, root).unwrap(),
-        ["1:/scripts"]
+        ["1:/scripts/#size", "1:/scripts/1"]
     );
     play_stop(&mut scene);
     let paths: Vec<_> = scene
@@ -97,12 +103,15 @@ fn a_second_script_on_an_instance_survives_play() {
 }
 
 #[test]
-fn a_removed_component_is_one_null_override() {
+fn a_removed_component_is_one_removed_component() {
     let (mut scene, root, child) = bare("removed", |s, c| {
         s.world.set_light(c, Some(default_light()));
     });
     scene.world.set_light(child, None);
-    assert_eq!(list_instance_overrides(&scene, root).unwrap(), ["1:/light"]);
+    assert_eq!(
+        list_instance_overrides(&scene, root).unwrap(),
+        ["1:-/light"]
+    );
     play_stop(&mut scene);
     assert!(scene.world.light(child).is_none(), "it stays removed");
     let back = save_and_load(&scene);
