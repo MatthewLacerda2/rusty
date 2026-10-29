@@ -15,6 +15,15 @@ use crate::scene::Scene;
 const PLAY_SHORTCUT: egui::KeyboardShortcut =
     egui::KeyboardShortcut::new(egui::Modifiers::COMMAND, egui::Key::P);
 
+/// Ctrl+Shift+C (Cmd+Shift+C on macOS) shows or hides the Play-mode Developer Console,
+/// Unity's Console shortcut (#1544). Not a backtick: a game may bind that key to its
+/// own console, and during Play keys belong to the game.
+#[cfg(feature = "dev")]
+const CONSOLE_SHORTCUT: egui::KeyboardShortcut = egui::KeyboardShortcut::new(
+    egui::Modifiers::COMMAND.plus(egui::Modifiers::SHIFT),
+    egui::Key::C,
+);
+
 const ROW_HEIGHT: f32 = 26.0;
 const BUTTON: egui::Vec2 = egui::vec2(34.0, 22.0);
 
@@ -34,6 +43,45 @@ pub(super) fn draw(editor: &mut EditorUi, ui: &mut Ui, scene: &mut Scene, is_pla
     let mut center = ui.new_child(UiBuilder::new().max_rect(group).layout(layout));
     center.spacing_mut().item_spacing.x = 2.0;
     transport(editor, &mut center, scene, is_playing, &t);
+
+    #[cfg(feature = "dev")]
+    {
+        let console = Rect::from_min_size(
+            egui::pos2(group.right() + 8.0, group.top()),
+            egui::vec2(BUTTON.x, BUTTON.y),
+        );
+        let mut right = ui.new_child(UiBuilder::new().max_rect(console).layout(layout));
+        console_toggle(editor, &mut right, &t);
+    }
+}
+
+/// The Developer Console button beside Play / Stop: lit while the console shows.
+#[cfg(feature = "dev")]
+fn console_toggle(editor: &mut EditorUi, ui: &mut Ui, t: &Theme) {
+    if ui.input_mut(|i| i.consume_shortcut(&CONSOLE_SHORTCUT)) {
+        editor.dev.show_play_console = !editor.dev.show_play_console;
+    }
+    let shown = editor.dev.show_play_console;
+    let (fill, text) = if shown {
+        (t.accent, egui::Color32::WHITE)
+    } else {
+        (t.bg_hover, t.text_primary)
+    };
+    let shortcut = ui.ctx().format_shortcut(&CONSOLE_SHORTCUT);
+    let button = Button::new(RichText::new(icon::TERMINAL_WINDOW).size(14.0).color(text))
+        .fill(fill)
+        .corner_radius(CornerRadius::same(4))
+        .min_size(BUTTON);
+    let label = if shown { "Hide" } else { "Show" };
+    if ui
+        .add(button)
+        .on_hover_text(format!(
+            "{label} the Developer Console during Play ({shortcut})"
+        ))
+        .clicked()
+    {
+        editor.dev.show_play_console = !shown;
+    }
 }
 
 /// The Play / Stop pair. Play lights up in the accent while the game runs; the
