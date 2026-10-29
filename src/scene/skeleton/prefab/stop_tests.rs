@@ -1,10 +1,10 @@
 //! A linked instance's reference to a bone is no override after Play (#1527): Stop
 //! respawns the bones with fresh ids, and propagation rebuilds each baseline on them.
 
-use super::fixture::{connected, hero};
 use crate::components::JointComponent;
 use crate::scene::authoring::defaults::default_rigidbody;
 use crate::scene::prefab::{instantiate_prefab_linked, write_prefab_file};
+use crate::scene::skeleton::fixture::{connected, hero};
 use crate::scene::snapshot::SceneSnapshot;
 use crate::scene::{
     list_instance_overrides, read_prefab_file, reimport_instance, save_prefab, Scene,

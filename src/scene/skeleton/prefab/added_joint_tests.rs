@@ -2,10 +2,10 @@
 //! apply to source (#1527): its `connected_body` sits inside an *added component*,
 //! and the one ref walk remaps it like an id at a leaf.
 
-use super::fixture::{connected, hero, joint_to, reload};
 use crate::scene::authoring::defaults::default_rigidbody;
 use crate::scene::prefab::apply::apply_instance_to_source;
 use crate::scene::prefab::instantiate_prefab_linked;
+use crate::scene::skeleton::fixture::{connected, hero, joint_to, reload};
 use crate::scene::snapshot::SceneSnapshot;
 use crate::scene::{
     list_instance_overrides, read_prefab_file, reimport_instance, save_prefab, Scene,

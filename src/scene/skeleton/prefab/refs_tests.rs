@@ -1,10 +1,10 @@
 //! A linked prefab instance keeps its references to a bone, and drops one to a
 //! destroyed entity, through a save and a load and an apply-to-source (#1264).
 
-use super::fixture::{connected, hero, reload};
 use crate::components::JointComponent;
 use crate::scene::prefab::apply::apply_instance_to_source;
 use crate::scene::prefab::instantiate_prefab_linked;
+use crate::scene::skeleton::fixture::{connected, hero, reload};
 use crate::scene::{read_prefab_file, save_prefab, Scene};
 
 /// A linked instance of `Group { Hero (skinned), Rope jointed to Hero's Joint1 }`,

@@ -171,11 +171,7 @@ mod moved_bone_tests;
 #[cfg(test)]
 mod persist_tests;
 #[cfg(test)]
-mod prefab_added_joint_tests;
-#[cfg(test)]
-mod prefab_refs_tests;
-#[cfg(test)]
-mod prefab_stop_tests;
+mod prefab;
 #[cfg(test)]
 mod ragdoll_refs_tests;
 #[cfg(test)]

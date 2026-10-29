@@ -68,9 +68,9 @@ fn apply_json(value: &mut Value, overrides: &PrefabOverrides, name: &str) {
     for op in &ops {
         run(&mut all, op, &mut grown);
     }
-    let set = |p: &str| overrides.modifications.contains_key(p);
-    if fits(&finished(&all, &grown, set)) {
-        *value = finished(&all, &grown, set);
+    let all = finished(&all, &grown, |p| overrides.modifications.contains_key(p));
+    if fits(&all) {
+        *value = all;
         return;
     }
     // One at a time: an override that doesn't fit is skipped, the rest kept.

@@ -334,9 +334,8 @@ On-instance:
   overridden ones win. This is the same propagation that runs automatically on scene
   load.
 - **`Scene.ListPrefabOverrides(instanceRootId)`** — the read verb: the instance's
-  overrides as `"localId:key"` strings, sorted per entity as modifications, then added
-  components, then removed ones (e.g. `"1:/transform/position/0"`,
-  `"1:/scripts/#size"`, `"1:+/light"`, `"1:-/camera"`).
+  overrides as `"localId:key"` strings, sorted (e.g. `"1:+/light"`, `"1:-/camera"`,
+  `"1:/scripts/#size"`, `"1:/transform/position/0"`).
 
 Apply-to-source (the Unity "Apply → Prefab" direction):
 
