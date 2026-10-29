@@ -56,8 +56,9 @@ impl super::GameWorld {
     /// [`FIXED_DELTA_TIME`](crate::time::FIXED_DELTA_TIME) tick, the fixed-dt the
     /// headless harness uses, so windowed and headless stepping are frame-identical.
     /// Every queued step drains now. With none queued the sim stays frozen but a
-    /// Play/Stop still takes effect, and outside Play the edit frame runs on the
-    /// scene the transition left (a pause can outlive Stop: `Time::reset` keeps it).
+    /// Play/Stop still takes effect, outside Play the edit frame runs on the scene
+    /// the transition left (a pause can outlive Stop: `Time::reset` keeps it), and
+    /// the audio mix is pushed with no time, as a tick would have pushed it (#1579).
     /// The windowed loop runs it while paused; the headless session after every
     /// command (#1360). Returns the first tick's transition.
     pub fn paused_frame(&mut self) -> super::PlayTransition {
@@ -76,6 +77,7 @@ impl super::GameWorld {
             if !self.play_requested() {
                 self.edit_frame();
             }
+            self.push_audio(0.0);
         }
         transition
     }

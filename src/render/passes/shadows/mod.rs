@@ -19,7 +19,9 @@ mod setup;
 mod sweeps;
 mod uniform;
 
+use crate::components::ShadowCasting;
 use crate::render::gpu::pipelines::surface::SurfaceShaders;
+use crate::render::gpu::pipelines::winding::Facing;
 use crate::render::gpu::pipelines::LazyPipeline;
 use crate::render::CameraUniform;
 use crate::scene::{Scene, SceneId};
@@ -29,7 +31,7 @@ use casters::CasterBuffer;
 use clips::Clip;
 use glam::Mat4;
 
-pub(crate) use setup::depth_pipeline;
+pub(crate) use setup::{depth_pipeline, lazy_depth_pipeline};
 pub(crate) use uniform::CascadeUniform;
 
 /// Byte stride between the cascades' light-space matrices in the depth pass's uniform
@@ -52,8 +54,9 @@ pub struct ShadowRenderer {
     time_buffer: wgpu::Buffer,
     /// A Cutout material's caster, alpha-tested through its material group (#648).
     clip_pipeline: wgpu::RenderPipeline,
-    /// `pipeline` and `clip_pipeline` for mirrored casters, winding flipped (#1134).
-    mirrored: [LazyPipeline; 2],
+    /// `pipeline` and `clip_pipeline` for mirrored casters, winding flipped (#1134),
+    /// then for two-sided ones, culling nothing (#1571).
+    twins: [[LazyPipeline; 2]; 2],
     light_space_buffer: wgpu::Buffer,
     /// This frame's cascades, fitted to the camera by [`Self::update_cascades`].
     pub(crate) cascades: Vec<Cascade>,
@@ -85,15 +88,38 @@ pub struct ShadowRenderer {
     pub(crate) atlas: ShadowAtlas,
 }
 
-/// Which scene's static casters a bake holds, and at which of its
-/// [`World::static_revision`](crate::ecs::World::static_revision)s: a Static flag
-/// flipped, or a static entity spawned or despawned, re-bakes them on the next frame
+/// Which scene's static casters a bake holds, at which of its
+/// [`World::static_revision`](crate::ecs::World::static_revision)s, and with which
+/// casting modes: a Static flag flipped, a static entity spawned or despawned, or a
+/// static mesh's `cast_shadows` changed (#1571) re-bakes them on the next frame
 /// whoever made the change — the inspector, a script in Play, a load (#1496).
-pub(crate) type StaticsKey = (SceneId, u64);
+pub(crate) type StaticsKey = (SceneId, u64, u64);
 
 /// `scene`'s [`StaticsKey`] now.
 pub(crate) fn statics_key(scene: &Scene) -> StaticsKey {
-    (scene.id(), scene.world.static_revision())
+    (
+        scene.id(),
+        scene.world.static_revision(),
+        casting_key(scene),
+    )
+}
+
+/// A digest of every static mesh's `cast_shadows` that changes its shadow (`Off`,
+/// `TwoSided`), by entity, in scene order: it moves when one changes, which no
+/// revision tracks (#1571). `ShadowsOnly` casts exactly as `On`, so switching
+/// between them keeps the bake.
+fn casting_key(scene: &Scene) -> u64 {
+    let world = &scene.world;
+    let mut key = 0u64;
+    for id in world.ids_with_mesh() {
+        let mode = world.mesh(id).map_or(ShadowCasting::On, |m| m.cast_shadows);
+        let reshapes = !mode.casts() || mode == ShadowCasting::TwoSided;
+        if reshapes && world.is_static(id) {
+            let mixed = (u64::from(id) << 2) | mode as u64;
+            key = key.wrapping_mul(0x100_0000_01b3).wrapping_add(mixed + 1);
+        }
+    }
+    key
 }
 
 impl ShadowRenderer {
@@ -129,7 +155,7 @@ impl ShadowRenderer {
         let (global_layout, global_bind_group, entity_layout) =
             Self::create_pass_layouts(device, [&light_space_buffer, &time_buffer]);
         let layouts = [&global_layout, &entity_layout, material_layout];
-        let ([pipeline, clip_pipeline], mirrored) = Self::create_pipelines(device, layouts, shader);
+        let ([pipeline, clip_pipeline], twins) = Self::create_pipelines(device, layouts, shader);
         let static_casters = CasterBuffer::new(device, &entity_layout);
         let dynamic_casters = CasterBuffer::new(device, &entity_layout);
         let atlas_layouts = [&global_layout, &entity_layout];
@@ -145,7 +171,7 @@ impl ShadowRenderer {
             pipeline,
             time_buffer,
             clip_pipeline,
-            mirrored,
+            twins,
             light_space_buffer,
             cascades: Vec::new(),
             static_cache: [None; MAX_CASCADES],
@@ -173,30 +199,36 @@ impl ShadowRenderer {
 
     /// The pipeline a run of casters draws with: plain depth, the cutout clip, or a
     /// surface variant's cut (the cutout clip if that variant failed to build) — the
-    /// winding-flipped one of each for a `mirrored` run (#1134).
+    /// winding-flipped one of each for a mirrored run (#1134), the unculled one for a
+    /// two-sided run (#1571).
     fn pipeline_for<'a>(
         &'a self,
         surfaces: &'a SurfaceShaders,
         clip: Option<Clip>,
-        mirrored: bool,
+        facing: Facing,
     ) -> &'a wgpu::RenderPipeline {
-        let [plain, clipped] = &self.mirrored;
-        match (clip, mirrored) {
-            (None, false) => &self.pipeline,
-            (None, true) => plain.get(),
-            (Some(c), false) => surfaces
-                .cut(c.pipeline)
-                .map_or(&self.clip_pipeline, |cut| &cut.shadow),
-            (Some(c), true) => surfaces
-                .cut(c.pipeline)
-                .map_or_else(|| clipped.get(), |cut| &cut.mirrored_shadow),
+        let twin = |i: usize| match facing {
+            Facing::Front => None,
+            Facing::Mirrored => Some(self.twins[0][i].get()),
+            Facing::Both => Some(self.twins[1][i].get()),
+        };
+        let Some(c) = clip else {
+            return twin(0).unwrap_or(&self.pipeline);
+        };
+        match surfaces.cut(c.pipeline) {
+            Some(cut) => match facing {
+                Facing::Front => &cut.shadow,
+                Facing::Mirrored => &cut.mirrored_shadow,
+                Facing::Both => cut.two_sided_shadow.get(),
+            },
+            None => twin(1).unwrap_or(&self.clip_pipeline),
         }
     }
 
-    /// The pipelines built on first draw: the mirrored casters' (#1134, #985).
-    pub(crate) fn lazy_pipelines(&self) -> [&LazyPipeline; 2] {
-        let [plain, clipped] = &self.mirrored;
-        [plain, clipped]
+    /// The pipelines built on first draw: the mirrored and two-sided casters'
+    /// (#1134, #1571, #985).
+    pub(crate) fn lazy_pipelines(&self) -> impl Iterator<Item = &LazyPipeline> {
+        self.twins.iter().flatten()
     }
 
     /// Whether some cascade's static bake is not `scene`'s as it stands: it holds
@@ -243,6 +275,9 @@ impl ShadowRenderer {
 
 #[cfg(test)]
 mod cache_tests;
+
+#[cfg(test)]
+mod casting_tests;
 
 #[cfg(test)]
 mod cutout_tests;

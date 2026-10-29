@@ -3,21 +3,24 @@
 //! The platform-layer audio engine: the [`AudioMaestro`] resource (one per World)
 //! owns the device/mixer, enforces a single master volume, holds the live roster of
 //! entity voices, and keeps the agent-facing introspection (a play-event log + a
-//! per-source roster). Each frame the windowed shell re-resolves every live voice
-//! (3D rolloff + pan from #213, `Time.timeScale` / pause) and hands the resulting
+//! per-source roster). Every tick ends by re-resolving every live voice
+//! (3D rolloff + pan from #213, `Time.timeScale` / pause) and handing the resulting
 //! [`VoiceMix`] to the backend (`mix.rs`, #412); the real device pans each voice
 //! through `device/voice.rs`. Every voice routes through a group of the [`Mixer`]
 //! (`mixer/`, #465): buses with volume, filters and a reverb send, snapshots and
 //! ducking, stepped by sim time; every group sends into one reverb bus that reverb
 //! zones tune from the listener's position (`reverb/`, #469). The speaker mode (#546, `speaker.rs`) shapes the
 //! output for the listening setup: per voice here, on the summed signal at the
-//! device's output stage.
+//! device's output stage. A capture (`capture/`, #1579) writes the final mix to a WAV,
+//! rendering it offline in step with the sim when there is no device.
 //!
 //! Layering: the maestro and the backend trait live here so both the windowed app
 //! and the (device-free) harness can construct a maestro. The real kira device
 //! ([`KiraBackend`]) is the *only* part that touches hardware; it is injected by
-//! `shell/boot.rs` after `GameWorld::new`, so the deterministic sim/harness keep the
-//! [`NullBackend`]. Nothing here reads a wall clock or unseeded RNG.
+//! `shell/boot.rs` after `GameWorld::new`; the harness and the headless session keep
+//! the [`NullBackend`] until a capture starts, which swaps in the same mixer over an
+//! offline backend clocked by the sim's ticks. Nothing here reads a wall clock or
+//! unseeded RNG.
 //!
 //! kira is used for the output device only.
 
@@ -26,6 +29,7 @@
 #![deny(clippy::unwrap_used)]
 
 pub mod backend;
+pub mod capture;
 pub mod device;
 pub mod introspection;
 pub mod maestro;

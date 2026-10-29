@@ -190,3 +190,7 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+#[path = "field_tests.rs"]
+mod pixel_tests;

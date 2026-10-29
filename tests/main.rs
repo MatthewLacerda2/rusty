@@ -28,6 +28,7 @@ mod audio_api;
 mod callback_doc_drift;
 mod camera_stack_api;
 mod camera_target_api;
+mod cast_shadows;
 mod character_controller;
 mod conversion_gate;
 mod decals;
@@ -75,6 +76,8 @@ mod video_api;
 mod api_doc_drift;
 #[cfg(feature = "dev")]
 mod application_quit;
+#[cfg(feature = "dev")]
+mod audio_capture;
 #[cfg(feature = "dev")]
 mod bot_player_session;
 #[cfg(feature = "dev")]

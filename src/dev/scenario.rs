@@ -38,20 +38,33 @@ pub struct RunReport {
     pub passed: bool,
 }
 
+/// How `play` sets a run up beyond the scene: what its command line asked for.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Run<'a> {
+    /// The run's render size (`play --size`, `Harness::set_size`).
+    pub size: Option<(u32, u32)>,
+    /// Capture the whole run's final audio mix to this WAV (`play --record-audio`,
+    /// #1579).
+    pub record_audio: Option<&'a Path>,
+}
+
 /// Load and run `scenario_path` headlessly, writing results into `out_dir`, on the
 /// open project (`core::project`), playing `scene` (project-relative) under the
-/// project's `settings`: a scenario play-tests the game being built. `size`, when
-/// given, is the run's render size (`play --size`, `Harness::set_size`).
+/// project's `settings`: a scenario play-tests the game being built, as `run` sets
+/// it up.
 pub fn run(
     scenario_path: &Path,
     out_dir: &Path,
     scene: &str,
     settings: ProjectSettings,
-    size: Option<(u32, u32)>,
+    run: Run<'_>,
 ) -> Result<RunReport, String> {
     let mut harness = Harness::in_user_workspace(out_dir, scene, settings)?;
-    if let Some((width, height)) = size {
+    if let Some((width, height)) = run.size {
         harness.set_size(width, height);
+    }
+    if let Some(path) = run.record_audio {
+        harness.record_audio(Some(path))?;
     }
     run_in(harness, scenario_path)
 }

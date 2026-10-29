@@ -77,7 +77,7 @@ pub const BLOCKS: &[Block] = &[
             Param::live("color", 1.0, 3),
             Param::live("strength", 1.0, 1),
         ],
-        helper: "fn srf_emissive_boost(c: vec3<f32>, in: VertexOutput, color: vec3<f32>, strength: f32) -> vec3<f32> {\n    let mask = textureSample(t_emissive, s_emissive, in.tex_coords).rgb;\n    return c + color * mask * strength;\n}",
+        helper: "fn srf_emissive_boost(c: vec3<f32>, in: VertexOutput, color: vec3<f32>, strength: f32) -> vec3<f32> {\n    let maps = mapping::coords(in.tex_coords, in.world_position, normalize(in.world_normal));\n    let mask = mapping::sample(t_emissive, s_emissive, maps).rgb;\n    return c + color * mask * strength;\n}",
         call: "srf_emissive_boost({prev}, in{args})",
         textures: &[],
         stage: Stage::Color,

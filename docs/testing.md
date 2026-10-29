@@ -23,8 +23,14 @@ things follow:
 - `Scene.GetScript(id, name)` answers a live **handle** on the gameplay instance,
   not the table itself: `pc.vy` reads the field now, `pc.marker = {…}` writes it,
   both by value, copied Lua to Lua: integer keys, mixed tables, integers vs
-  floats and `math.huge`/NaN all keep their type; a function field raises an
-  error, and no gameplay metamethod runs. Each read is a **copy**, so assign a
+  floats and `math.huge`/NaN all keep their type, and no gameplay metamethod
+  runs. A function field reads as a proxy that **calls** the game script's
+  function in the gameplay VM, at the current tick (#1580): `pc:Refill(30)` (the
+  instance is `self`) or `pc.Add(2, 3)`, with arguments and returns copied the
+  same way (a function or userdata argument is an error; one returned is an
+  error raised after the call ran, so its side effects stand), and a game script
+  error raised as the scenario's, with its traceback. That is how a test reaches
+  a state (refill, give a weapon, start wave N) without playing there. Each read is a **copy**, so assign a
   whole field through the handle: `pc.marker.hits = 5` changes the scenario's
   copy only, while `local m = pc.marker; m.hits = 5; pc.marker = m` writes it.
   Fields are read raw, so one the instance inherits through its metatable (a
@@ -52,6 +58,18 @@ things follow:
 - A scenario is a test, so the paid provider verbs (`Sfx.Generate`, `Speech.*`)
   are refused for the whole run, before its first `Harness.Step` too (CLAUDE.md,
   *Provider calls are authoring, never gameplay*).
+
+**Hearing a run** (#1579). `Harness.RecordAudio([path])` starts recording the
+game's final audio mix to a 48 kHz float WAV (`audio.wav` by default; a relative
+`path` is under the run's output folder) and returns its path; `Harness.StopAudio()`
+closes it and returns the path again, and `play --record-audio <path>` records the
+whole run. The harness mixes offline, one fixed tick at a time, so the capture
+needs no sound card and two runs of one scenario write byte-identical files; a
+capture still running when the scenario ends is closed with the results. A run
+started with `--record-audio` is already capturing, so the scenario's own
+`Harness.RecordAudio()` errors (one capture at a time). Measure it
+with `Sound.Level(path, { sections = seconds })`. What a capture taps and what going
+offline changes: `docs/api/Audio.md`, *Capturing the mix*.
 
 ## Rules
 - Test and fixture files are capped at **150 lines** by the size gate

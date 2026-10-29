@@ -1,12 +1,15 @@
 // assets/shaders/ssao.wgsl — screen-space ambient occlusion (#436).
 //
-// Two fullscreen passes over the SSAO depth prepass, run before the forward pass:
-//  * `fs_ao`   — hemisphere occlusion at the tier's resolution (half on Medium, full
-//                on High), world-space, from the prepass depth alone (normals are
-//                rebuilt from neighbouring depths).
-//  * `fs_blur` — a depth-aware 5x5 blur that also upsamples to full resolution, so
-//                the forward shader reads one texel per pixel.
-// The forward shader multiplies only its ambient/indirect terms by the result.
+// Fullscreen passes over the view's depth (the SSAO prepass), run before the forward
+// pass (#1578, HDRP's shape):
+//  * `fs_ao`       — hemisphere occlusion at the quality's resolution, world-space,
+//                    from depth alone (normals are rebuilt from neighbouring depths).
+//  * `fs_blur`     — a depth-aware 5x5 blur at that same resolution.
+//  * `fs_upsample` — below full resolution, a depth-aware (bilateral) bilinear
+//                    upsample to it, so the forward shader reads one texel per pixel.
+// AO texel `t` stands for full-resolution pixel `t * step`: every pass reads that
+// pixel's depth for it. The forward shader multiplies only its ambient/indirect
+// terms by the result.
 
 #import fullscreen
 
@@ -16,7 +19,7 @@ struct SsaoParams {
     camera_pos: vec4<f32>,
     camera_fwd: vec4<f32>,
     // x radius (world units), y intensity (exponent), z sample count,
-    // w full-res pixels per AO texel (1 or 2)
+    // w full-res pixels per AO texel (the resolution divisor)
     params: vec4<f32>,
 };
 
@@ -24,7 +27,8 @@ struct SsaoParams {
 var<uniform> p: SsaoParams;
 @group(0) @binding(1)
 var t_depth: texture_depth_2d;
-// The raw occlusion `fs_blur` reads; a 1x1 placeholder while `fs_ao` runs.
+// The occlusion a stage reads: `fs_ao`'s for the blur, the blur's for the upsample;
+// a 1x1 placeholder while `fs_ao` runs.
 @group(0) @binding(2)
 var t_raw: texture_2d<f32>;
 
@@ -146,8 +150,46 @@ fn fs_ao(@builtin(position) frag: vec4<f32>) -> @location(0) vec4<f32> {
     return vec4<f32>(pow(ao, p.params.y), 0.0, 0.0, 1.0);
 }
 
+// View depth at AO texel `t`: its full-resolution pixel's (see the header).
+fn texel_depth(t: vec2<i32>, step: i32) -> f32 {
+    return view_depth(world_px(t * step));
+}
+
+// How much a tap at view depth `d` counts beside a centre at `center`: taps whose
+// depth differs by more than ~5% of the view distance fall away, so occlusion never
+// bleeds across a silhouette.
+fn depth_weight(d: f32, center: f32) -> f32 {
+    return exp(-abs(d - center) / (0.05 * max(center, 0.1)));
+}
+
 @fragment
 fn fs_blur(@builtin(position) frag: vec4<f32>) -> @location(0) vec4<f32> {
+    let step = i32(p.params.w);
+    let base = vec2<i32>(frag.xy);
+    let d = load_depth(base * step);
+    if (d >= 1.0) {
+        return vec4<f32>(1.0);
+    }
+    let center = view_depth(world_at(base * step, d));
+    let raw_max = vec2<i32>(textureDimensions(t_raw)) - 1;
+    var sum = 0.0;
+    var weight = 0.0;
+    for (var y = -2; y <= 2; y = y + 1) {
+        for (var x = -2; x <= 2; x = x + 1) {
+            let tap = clamp(base + vec2<i32>(x, y), vec2<i32>(0), raw_max);
+            let w = depth_weight(texel_depth(tap, step), center);
+            sum += textureLoad(t_raw, tap, 0).r * w;
+            weight += w;
+        }
+    }
+    return vec4<f32>(sum / max(weight, 1e-4), 0.0, 0.0, 1.0);
+}
+
+// Full resolution from the blurred AO: the four texels around the pixel, each
+// weighted bilinearly and by how close its depth is to the pixel's. Where all four
+// sit on other surfaces (a thin silhouette), the closest in depth answers alone.
+@fragment
+fn fs_upsample(@builtin(position) frag: vec4<f32>) -> @location(0) vec4<f32> {
     let step = i32(p.params.w);
     let px = vec2<i32>(frag.xy);
     let d = load_depth(px);
@@ -155,20 +197,31 @@ fn fs_blur(@builtin(position) frag: vec4<f32>) -> @location(0) vec4<f32> {
         return vec4<f32>(1.0);
     }
     let center = view_depth(world_at(px, d));
-    // Taps whose depth differs by more than ~5% of the view distance fall away, so
-    // occlusion never bleeds across a silhouette.
-    let falloff = 0.05 * max(center, 0.1);
-    let base = px / step;
+    let f = vec2<f32>(px) / f32(step);
+    let t0 = vec2<i32>(floor(f));
+    let fr = f - floor(f);
     let raw_max = vec2<i32>(textureDimensions(t_raw)) - 1;
     var sum = 0.0;
     var weight = 0.0;
-    for (var y = -2; y <= 2; y = y + 1) {
-        for (var x = -2; x <= 2; x = x + 1) {
-            let tap = clamp(base + vec2<i32>(x, y), vec2<i32>(0), raw_max);
-            let w = exp(-abs(view_depth(world_px(tap * step)) - center) / falloff);
-            sum += textureLoad(t_raw, tap, 0).r * w;
-            weight += w;
+    var nearest = 1.0;
+    var nearest_gap = 3.4e38;
+    for (var i = 0; i < 4; i = i + 1) {
+        let o = vec2<i32>(i & 1, i >> 1u);
+        let tap = min(t0 + o, raw_max);
+        let td = texel_depth(tap, step);
+        let ao = textureLoad(t_raw, tap, 0).r;
+        let bw = mix(1.0 - fr, fr, vec2<f32>(o));
+        let w = bw.x * bw.y * depth_weight(td, center);
+        sum += ao * w;
+        weight += w;
+        let gap = abs(td - center);
+        if (gap < nearest_gap) {
+            nearest_gap = gap;
+            nearest = ao;
         }
     }
-    return vec4<f32>(sum / max(weight, 1e-4), 0.0, 0.0, 1.0);
+    if (weight < 1e-3) {
+        return vec4<f32>(nearest, 0.0, 0.0, 1.0);
+    }
+    return vec4<f32>(sum / weight, 0.0, 0.0, 1.0);
 }

@@ -2,8 +2,8 @@
 //! that need `&mut Scene`, applied once the card pass is done. The navmesh is not
 //! one of them: the editor syncs it once per edit-mode frame (#992).
 
+use super::components::mesh::SkinTool;
 use super::components::prefab;
-use super::components::render::SkinTool;
 use crate::editor::EditorUi;
 use crate::scene::skeleton::{HitboxOptions, RagdollOptions};
 use crate::scene::Scene;

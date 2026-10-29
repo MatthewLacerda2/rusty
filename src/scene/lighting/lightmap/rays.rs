@@ -25,6 +25,10 @@ pub(super) struct Tri {
     pub mesh: u32,
     /// Offset of the triangle's first index in that mesh's index list.
     pub first: u32,
+    /// Whether a bounce ray can hit it ([`Rays::closest`]).
+    pub seen: bool,
+    /// Whether it stops a shadow ray ([`Rays::occluded`]).
+    pub blocks: bool,
 }
 
 impl Tri {
@@ -35,6 +39,17 @@ impl Tri {
             e2: c - a,
             mesh,
             first,
+            seen: true,
+            blocks: true,
+        }
+    }
+
+    /// The triangle with who sees it and what it blocks (#1571).
+    pub(super) fn with(self, seen: bool, blocks: bool) -> Self {
+        Tri {
+            seen,
+            blocks,
+            ..self
         }
     }
 
@@ -80,14 +95,18 @@ impl Rays {
         }
     }
 
-    /// The nearest hit along `origin + t * dir` with `t` in `[t_min, t_max)`.
+    /// The nearest triangle it can see along `origin + t * dir` with `t` in
+    /// `[t_min, t_max)`.
     pub(super) fn closest(&self, origin: Vec3, dir: Vec3, t_min: f32, t_max: f32) -> Option<Hit> {
         let mesh = self.mesh.as_ref()?;
         let ray = Ray::new(origin + dir * t_min, dir);
         let (tri, (_, weights)) = mesh.bvh().find_best(
             t_max - t_min,
             |node, best| node.cast_ray(&ray, best),
-            |i, best| hit(mesh, i, &ray, best),
+            |i, best| match self.tris[i as usize].seen {
+                true => hit(mesh, i, &ray, best),
+                false => None,
+            },
         )?;
         Some(Hit {
             tri: tri as usize,
@@ -96,7 +115,8 @@ impl Rays {
         })
     }
 
-    /// Whether anything blocks `origin + t * dir` for `t` in `[t_min, t_max)`. Stops
+    /// Whether a blocking triangle lies on `origin + t * dir` for `t` in
+    /// `[t_min, t_max)`. Stops
     /// at the first blocker rather than looking for the nearest.
     pub(super) fn occluded(&self, origin: Vec3, dir: Vec3, t_min: f32, t_max: f32) -> bool {
         let Some(mesh) = &self.mesh else {
@@ -110,7 +130,7 @@ impl Rays {
                 return TraversalAction::Prune;
             }
             if let Some(i) = node.leaf_data() {
-                if hit(mesh, i, &ray, reach).is_some() {
+                if self.tris[i as usize].blocks && hit(mesh, i, &ray, reach).is_some() {
                     blocked = true;
                     return TraversalAction::EarlyExit;
                 }

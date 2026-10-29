@@ -4,7 +4,7 @@
 //! with a linear 3D rolloff (`spatial_blend`, `initial_distance`, `final_distance`),
 //! a time-scale opt-out, the mixer group it plays through (#465) and an occlusion
 //! opt-out (#467). The windowed
-//! runtime applies all of it to the device each frame (`shell/audio.rs`).
+//! runtime applies all of it to the device every tick (`api/audio/frame.rs`).
 //!
 //! Pure authoring data — every field serde-persists. The component knows nothing
 //! about the audio device: the platform-layer `AudioMaestro` (the resource) owns

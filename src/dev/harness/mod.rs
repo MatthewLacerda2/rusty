@@ -13,7 +13,8 @@
 //! the tick), so a scenario replays identically every run.
 //!
 //! A run produces: <out_dir>/results.json + <out_dir>/console.log + <out_dir>/stats.json.
-//! The rendering verbs (`Screenshot`, `Render`) live in `render`.
+//! The rendering verbs (`Screenshot`, `Render`) live in `render`; recording the
+//! final audio mix (`RecordAudio`, `StopAudio`, #1579) in `audio`.
 //!
 //! Frame stats (#433): the harness installs the dev-layer timing probe, so every run
 //! records CPU ms per stage/system and world counters (render counters too, on the
@@ -31,6 +32,7 @@ use crate::app::GameWorld;
 use crate::core::frame_stats::FrameStats;
 use crate::scripting::{ConsoleLogs, LogLevel};
 
+pub mod audio;
 mod build;
 mod render;
 
@@ -167,8 +169,10 @@ impl Harness {
         self.expectations.iter().all(|e| e.passed)
     }
 
-    /// Flush `results.json` + `console.log` into `out_dir`. Returns the results path.
+    /// Flush `results.json` + `console.log` into `out_dir`, closing a capture left
+    /// running first. Returns the results path.
     pub fn write_results(&self) -> std::io::Result<PathBuf> {
+        self.finish_audio();
         // Warnings raised outside a tick (loading the scene, say) join the log first.
         crate::logging::forward(&self.console);
         std::fs::create_dir_all(&self.out_dir)?;

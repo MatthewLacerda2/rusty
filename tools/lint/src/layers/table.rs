@@ -128,6 +128,7 @@ pub const LAYERS: &[Layer] = &[
     sim(
         "app",
         &[
+            "api",
             "asset",
             "audio",
             "components",
@@ -207,7 +208,6 @@ pub const LAYERS: &[Layer] = &[
     platform(
         "shell",
         &[
-            "api",
             "app",
             "asset",
             "audio",

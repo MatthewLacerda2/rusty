@@ -25,8 +25,8 @@ use crate::asset::MapRef;
 use crate::editor::inspector::components::card::component_card;
 use crate::editor::inspector::preview::{self, PreviewSubject};
 use crate::editor::EditorUi;
-use crate::scene::authoring::material as mat_ops;
 use crate::scene::authoring::material::FACTOR_RANGE;
+use crate::scene::authoring::material::{self as mat_ops, COORDINATE_FIELDS, SURFACE_FIELDS};
 use crate::scene::{MaterialAsset, RenderMode};
 
 /// 3B2. Render the Material card for the entity `id`, editing the shared `MaterialAsset`
@@ -89,9 +89,10 @@ fn draw_material(
         optional_map(ui, "Use Roughness Map", materials, key, MapKind::Roughness);
         optional_map(ui, "Use Normal Map", materials, key, MapKind::Normal);
         optional_map(ui, "Use Emissive Map", materials, key, MapKind::Emissive);
+        surface::draw_fields(ui, COORDINATE_FIELDS, materials, key, is_dirty);
 
         draw_material_transparency(ui, materials, key, is_dirty);
-        surface::draw_surface_fields(ui, materials, key, is_dirty);
+        surface::draw_fields(ui, SURFACE_FIELDS, materials, key, is_dirty);
 
         // The authored surface shader (#396) — `Material.SetShader`'s twin.
         let mut shader = materials[key].shader.clone().unwrap_or_default();
