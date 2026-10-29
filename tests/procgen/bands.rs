@@ -4,8 +4,8 @@
 use rusty::procgen::{evaluate, with_bands, TextureRecipe};
 
 /// The *worn, grimy painted metal* example (docs/api/Texture.md) plus a blur,
-/// warp, tile, mapping, bump, the channel ops, two-image math and auto levels, so
-/// every banded path runs.
+/// warp, tile, mapping, bump, a distance bevel, a normal blend, the channel ops,
+/// two-image math and auto levels, so every banded path runs.
 const RECIPE: &str = r#"{
   "resolution": 100, "seed": 4,
   "nodes": [
@@ -25,7 +25,10 @@ const RECIPE: &str = r#"{
     { "id": "bent", "op": "warp", "strength": 0.1, "inputs": ["rivets", "soft"] },
     { "id": "turned", "op": "mapping", "scale": [2, 1], "rotation": 0.1, "translation": [0.1, 0], "inputs": ["bent"] },
     { "id": "n", "op": "bump_to_normal", "strength": 0.4, "inputs": ["turned"] },
-    { "id": "rgb", "op": "combine_rgb", "inputs": ["cav", "n", "soft"] },
+    { "id": "bev", "op": "distance", "radius": 0.1, "inputs": ["h"] },
+    { "id": "bn", "op": "bump_to_normal", "strength": 0.3, "inputs": ["bev"] },
+    { "id": "nb", "op": "normal_blend", "inputs": ["bn", "n"] },
+    { "id": "rgb", "op": "combine_rgb", "inputs": ["cav", "nb", "soft"] },
     { "id": "hsv", "op": "hue_sat_value", "hue": 0.1, "sat": 0.8, "value": 1.1, "inputs": ["rgb"] },
     { "id": "lit", "op": "mix", "mode": "overlay", "inputs": ["worn", "hsv"] },
     { "id": "top", "op": "math", "func": "max", "value": 0, "inputs": ["lit", "chips"] },

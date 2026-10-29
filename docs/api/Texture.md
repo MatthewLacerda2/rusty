@@ -221,9 +221,13 @@ end  -- rows number nil / cols number nil / mortar number 0.05
   (`ridged` is `1 − |n|` squared — rock veins, scratches; `turbulence` is `|n|` —
   smoke, grime; the fBM family stacks `octaves`, each `lacunarity`× the frequency and
   `gain`× the amplitude of the last; `perlin` is one octave); `voronoi {scale,
-  output="distance"|"cells"|"f2"|"edges", randomness=1, seed=0}` (`f2` is the distance to the
+  output="distance"|"cells"|"f2"|"edges", metric="euclidean"|"manhattan"|"chebyshev",
+  randomness=1, seed=0}` (`f2` is the distance to the
   second-nearest point, `edges` is F2 − F1 — ~0 on cell borders: cracks, dried mud,
-  cobble outlines; `randomness` 0 is a regular grid, 1 full jitter); `gradient
+  cobble outlines; `metric` is how distance is measured: `euclidean` gives round cells,
+  `manhattan` (`|dx| + |dy|`) diamond-cut ones, `chebyshev` (`max(|dx|, |dy|)`) blocky,
+  straight-edged ones — stones, tiles, flagstones; `randomness` 0 is a regular grid, 1
+  full jitter); `gradient
   {kind="linear"|"linear_tiling"|"radial"}`; `wave {kind="bands"|"rings", frequency}`;
   `brick {rows, cols, mortar=0.05, output="mask"|"random"|"bevel", seed=0}` (`mortar` is the
   gap as a fraction of one brick, reading 0 in every output; `mask` is 1 on brick
@@ -238,7 +242,11 @@ end  -- rows number nil / cols number nil / mortar number 0.05
   a bevel profile for `bump_to_normal`); `checker {tiles, color_a, color_b}`;
   `white_noise {seed=0}`; `image {path, encoding="srgb"|"linear"}` (an image file,
   see *Image files* below).
-- **Color** (1 input; `mix` takes 2 or 3): `color_ramp {stops}`; `mix {mode,
+- **Color** (1 input; `mix` takes 2 or 3): `color_ramp {stops,
+  interpolation="linear"|"constant"|"ease"}` (as Blender's ColorRamp: `constant` holds
+  each stop's colour from its position up to the next stop — hard bands for toon,
+  stylized and posterized looks — and `ease` is a smoothstep between stops, soft into
+  and out of each colour); `mix {mode,
   factor=1}` with `mode` ∈
   `mix/add/multiply/screen/overlay/subtract/difference/lighten/darken/divide` —
   inputs `{a, b, mask}`: the result is `a` blended toward `mode(a, b)` by `factor`,
@@ -261,7 +269,12 @@ end  -- rows number nil / cols number nil / mortar number 0.05
   inputs → R, G, B; a channel without an input reads 0); `separate_rgb
   {channel=0..3}`; `warp {strength}` (2 inputs: samples input 1 displaced by input 2's R/G, centred on 0.5 so mid-grey moves nothing; `strength` is in
   tile units; feed input 2 a `combine_rgb` of two different noises — a grayscale one has
-  R = G and only pushes along the diagonal); `tile {count, jitter=0, rotation_jitter=0,
+  R = G and only pushes along the diagonal); `normal_blend {strength=1}` (2 inputs:
+  base, detail — two normal maps, as `bump_to_normal` writes them, combined by
+  Reoriented Normal Mapping: the base is turned by the detail's tilt, so scratches over a
+  panel follow the panel's bevel. `strength` scales the detail's tilt, 0 leaving the
+  base; a flat normal on either side returns the other. Never `mix` normal maps: adding
+  or averaging their RGB flattens them); `tile {count, jitter=0, rotation_jitter=0,
   scale_jitter=0, seed=0}` (1 input: stamps the input once per cell of a `count`×`count` grid;
   each cell is seeded from the recipe and node `seed` with an offset of up to ±`jitter`/2 cells,
   a turn of up to ±`rotation_jitter`/2 turns and a scale in `1 ± scale_jitter/2`, each
@@ -275,13 +288,22 @@ end  -- rows number nil / cols number nil / mortar number 0.05
   (`value` is then ignored, Blender's Math with both sockets linked). `abs`, `fract`
   and `sqrt` have no right-hand side, so they take exactly 1 input; `map_range {from_min,
   from_max, to_min, to_max}`; `clamp {min, max}`; `rgb_to_bw`.
-- **Filter**: `blur {radius}` (separable box blur; wraps, so it stays tiling);
-  `cavity {radius}` (height → `1 − max(blur(h) − h, 0)`: white on flat and raised
+- **Filter**: `blur {radius, kind="gaussian"|"box"}` (separable; wraps, so it stays
+  tiling; `gaussian`, the default, is a round falloff reaching about `radius` (3σ), three
+  box passes that cost no more than one; `box` is a flat window and leaves square
+  artefacts on soft masks and normals);
+  `cavity {radius}` (height → `1 − max(blur(h) − h, 0)` with a Gaussian blur: white on flat and raised
   ground, dark in crevices — multiply into albedo for baked occlusion, `invert` it
   for a dirt mask); `curvature {radius, strength=1}` (height → `0.5 + strength × (h −
   mean of h on a ring radius away)`: above mid-grey on convex edges — edge wear —
   below in concave grooves — grime; `map_range` it into a hard mask). Both read the
-  input's red as height and wrap, so the masks tile.
+  input's red as height and wrap, so the masks tile. `distance {radius}` (mask → bevel:
+  the input's red above 0.5 is inside, and each inside pixel reads its distance to the
+  mask's edge divided by `radius`, clamped to 1; outside reads 0. It rounds **any**
+  mask — a Voronoi cell, a thresholded noise, a stamp — the way `shape`'s `softness`
+  and brick's `bevel` round their own; feed it to `bump_to_normal`, through a
+  `color_ramp` with `interpolation = "ease"` for a rounder profile. It wraps, so a
+  tiling mask gives a tiling bevel).
 
 ### Image files — `image`
 
@@ -348,13 +370,15 @@ Params are in **tile units**, never pixels, so the same recipe looks the same at
 and 2048² (iterate at a low `resolution`, ship at a high one):
 
 - `blur.radius` is a **fraction of the tile width** — `0.01` is 1% of the texture;
-  the pixel radius is `round(radius × resolution)`, capped at half the tile.
+  the pixel radius is `radius × resolution` (a `box` rounds it), capped at half the
+  tile. A `gaussian` under about 2 pixels barely blurs.
 - `warp.strength` is a displacement in tiles: a channel at 1.0 pushes the read
   `strength / 2` of a tile.
 - `bump_to_normal.strength` scales the slope measured in tile units (height change
   across one whole tile), not per pixel.
 - `shape.size` and `shape.softness` are in tiles (`size = [0.5, 0.5]` is half the
   tile each way); under `tile`, that is a fraction of one cell.
+- `distance.radius` is in tiles: the distance from the edge that reads 1.
 - `cavity.radius` is a tile fraction like `blur.radius`; `curvature.radius` is a
   distance in tiles, sampled bilinearly (so sub-pixel radii stay smooth).
 - `white_noise` is the exception: its grain is one pixel by definition.
@@ -419,4 +443,27 @@ Texture.Bake({
   },
   output = "out",
 }, "out/panel_albedo.png", "albedo")
+```
+
+Example — cobblestones: Chebyshev Voronoi cells (blocky, straight-edged) thresholded
+into a stone mask, each stone rounded by `distance`, and a fine grain laid over the
+stones' normals with `normal_blend`:
+
+```lua no-run
+Texture.Bake({
+  resolution = 512, seed = 2,
+  nodes = {
+    { id = "cells", op = "voronoi", scale = 6, output = "edges", metric = "chebyshev" },
+    { id = "stones", op = "map_range", from_min = 0.06, from_max = 0.1,
+      to_min = 0, to_max = 1, inputs = {"cells"} },                 -- 1 on stones, 0 in the gaps
+    { id = "bevel", op = "distance", radius = 0.04, inputs = {"stones"} },
+    { id = "round", op = "color_ramp", interpolation = "ease", inputs = {"bevel"},
+      stops = { { pos = 0, color = "#000000" }, { pos = 1, color = "#ffffff" } } },
+    { id = "n", op = "bump_to_normal", strength = 0.5, inputs = {"round"} },
+    { id = "grain", op = "noise", kind = "fbm", scale = 24, octaves = 3 },
+    { id = "gn", op = "bump_to_normal", strength = 0.1, inputs = {"grain"} },
+    { id = "out", op = "normal_blend", strength = 0.5, inputs = {"n", "gn"} },
+  },
+  output = "out",
+}, "out/cobblestone_n.png", "normal")
 ```
