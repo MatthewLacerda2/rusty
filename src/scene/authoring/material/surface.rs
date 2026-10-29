@@ -5,8 +5,9 @@
 //! Each [`SurfaceField`] row is the field's one write and its validation, its name
 //! in a recipe and a scene file (`key`), and its `Material.Set<api>` /
 //! `Material.Get<api>` pair. The Lua adapter, `Material.DefineAsset`'s recipe and
-//! the Inspector's Material card all walk [`SURFACE_FIELDS`], so a new field adds
-//! one row here and nothing to those three.
+//! the Inspector's Material card all walk [`material_fields`] (these rows, then the
+//! map coordinates' in `coordinates.rs`), so a new field adds one row and nothing to
+//! those three.
 //!
 //! Pure.
 
@@ -24,6 +25,7 @@ pub enum SurfaceValue {
     Bool(bool),
     Number(f32),
     Color([f32; 3]),
+    Vec2([f32; 2]),
 }
 
 /// What kind of value a field holds, and the widget the Inspector draws for it.
@@ -36,6 +38,8 @@ pub enum SurfaceKind {
     Number(RangeInclusive<f32>),
     /// An RGB colour, each channel clamped to `[0, 1]`.
     Color,
+    /// A pair of numbers, each clamped into this range (tiling, offset).
+    Vec2(RangeInclusive<f32>),
 }
 
 /// One transparent-surface field of [`MaterialAsset`].
@@ -52,7 +56,7 @@ pub struct SurfaceField {
     pub shown: fn(&MaterialAsset) -> bool,
     pub get: fn(&MaterialAsset) -> SurfaceValue,
     /// The write, after [`SurfaceField::check`] made `value` the right kind.
-    put: fn(&mut MaterialAsset, SurfaceValue),
+    pub(super) put: fn(&mut MaterialAsset, SurfaceValue),
 }
 
 impl SurfaceField {
@@ -74,6 +78,9 @@ impl SurfaceField {
             (SurfaceKind::Color, SurfaceValue::Color(c)) => {
                 Ok(SurfaceValue::Color(finite_array_or(c, [1.0; 3]).map(unit)))
             }
+            (SurfaceKind::Vec2(r), SurfaceValue::Vec2(v)) => Ok(SurfaceValue::Vec2(
+                v.map(|n| saturated(n, *r.start(), *r.end())),
+            )),
             _ => Err(wrong()),
         }
     }
@@ -92,15 +99,20 @@ impl SurfaceKind {
             Self::Toggle => "a boolean".into(),
             Self::Number(r) => format!("a number in [{}, {}]", r.start(), r.end()),
             Self::Color => "an {r, g, b} colour".into(),
+            Self::Vec2(r) => format!("an {{x, y}} pair, each in [{}, {}]", r.start(), r.end()),
         }
     }
 }
 
+/// Every material field the table drives: the transparent-surface rows, then the
+/// map coordinates' (#1573).
+pub fn material_fields() -> impl Iterator<Item = &'static SurfaceField> {
+    SURFACE_FIELDS.iter().chain(super::COORDINATE_FIELDS)
+}
+
 /// The row whose `key` or `api` is `name` (in any case).
 pub fn surface_field(name: &str) -> Option<&'static SurfaceField> {
-    SURFACE_FIELDS
-        .iter()
-        .find(|f| f.key.eq_ignore_ascii_case(name) || f.api.eq_ignore_ascii_case(name))
+    material_fields().find(|f| f.key.eq_ignore_ascii_case(name) || f.api.eq_ignore_ascii_case(name))
 }
 
 /// Write `value` into material `key`'s `field`, validated by the row. A missing
@@ -127,7 +139,7 @@ fn always(_: &MaterialAsset) -> bool {
 }
 
 /// A choice the row's `check` parsed, back to its variant.
-fn choice<T: Default>(value: SurfaceValue, parse: fn(&str) -> Option<T>) -> T {
+pub(super) fn choice<T: Default>(value: SurfaceValue, parse: fn(&str) -> Option<T>) -> T {
     match value {
         SurfaceValue::Text(t) => parse(&t).unwrap_or_default(),
         _ => T::default(),
@@ -140,7 +152,7 @@ fn boolean(value: SurfaceValue) -> bool {
 
 /// A number the row's `check` clamped (0 for a value of another kind, which
 /// `check` never passes).
-fn number(value: SurfaceValue) -> f32 {
+pub(super) fn number(value: SurfaceValue) -> f32 {
     match value {
         SurfaceValue::Number(n) => n,
         _ => 0.0,

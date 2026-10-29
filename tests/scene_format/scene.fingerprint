@@ -769,6 +769,7 @@ scene.materials{}.base_color[]: f32
 scene.materials{}.base_color_map: option
 scene.materials{}.base_color_map: string
 scene.materials{}.blend_mode: enum Alpha|Premultiply|Additive|Multiply
+scene.materials{}.blend_sharpness: f32
 scene.materials{}.decal.albedo: f32
 scene.materials{}.decal.angle_fade: f32
 scene.materials{}.decal.metallic: f32
@@ -799,6 +800,8 @@ scene.materials{}.metallic_map: option
 scene.materials{}.metallic_map: string
 scene.materials{}.normal_map: option
 scene.materials{}.normal_map: string
+scene.materials{}.offset: tuple(2)
+scene.materials{}.offset[]: f32
 scene.materials{}.preserve_specular: bool
 scene.materials{}.receive_decals: bool
 scene.materials{}.receive_shadows: bool
@@ -817,11 +820,15 @@ scene.materials{}.shader_textures: map
 scene.materials{}.shader_textures{key}: string
 scene.materials{}.shader_textures{}: string
 scene.materials{}.thickness: f32
+scene.materials{}.tiling: tuple(2)
+scene.materials{}.tiling[]: f32
 scene.materials{}.transmission: f32
 scene.materials{}.transmission_color: tuple(3)
 scene.materials{}.transmission_color[]: f32
 scene.materials{}.transmittance_color: tuple(3)
 scene.materials{}.transmittance_color[]: f32
+scene.materials{}.uv_mapping: enum UV0|Planar|Triplanar
+scene.materials{}.world_size: f32
 scene.nav_settings.agent_height: f32
 scene.nav_settings.agent_radius: f32
 scene.nav_settings.areas: seq
