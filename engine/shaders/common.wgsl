@@ -73,15 +73,11 @@ struct LightingUniforms {
     // Up to four suns (#434); slot 0 is the one casting the cascaded shadows.
     dir_lights: array<DirectionalLight, 4>,
     num_dir_lights: u32,
-    ssr_active: f32,
-    ssr_quality: f32,
-    ssr_temporal_upsampling: f32,
     // 1.0 when a skybox panorama is bound at binding 2 (#718); 0.0 means the sky on
     // screen is the procedural gradient, which the env reflection then reflects too.
     sky_textured: f32,
     _sky_pad_a: f32,
     _sky_pad_b: f32,
-    _sky_pad_c: f32,
     // The resident reflection probes (#1206); a draw's instance names its probe
     // (`InstanceData.reflection_probe`, index + 1). Length is the Rust
     // `MAX_REFLECTION_PROBES`. Mirrors the Rust `LightingUniform` byte-for-byte.

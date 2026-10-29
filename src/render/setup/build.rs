@@ -46,7 +46,7 @@ pub(crate) struct ShadowSystem {
 /// the HDR offscreen target.
 pub(crate) struct ForwardPasses {
     pub render_pipeline: wgpu::RenderPipeline,
-    pub velocity_pipeline: pipelines::LazyPipeline,
+    pub velocity_pipeline: pipelines::VelocityPipelines,
     pub primed_pipelines: pipelines::PrimedPipelines,
     pub transparent_pipeline: pipelines::LazyPipeline,
     pub line_pipeline: pipelines::LazyPipeline,

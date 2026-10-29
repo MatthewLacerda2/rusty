@@ -18,7 +18,7 @@ fn scene_with_volume_and_cam() -> (Rc<RefCell<Scene>>, u32) {
     let id = scene.add_entity("PostFx".to_string());
     let mut vc: PostProcessingComponent = rusty::scene::authoring::default_post_processing();
     (vc.bloom.active, vc.bloom.threshold) = (false, 1.0);
-    (vc.ssr.active, vc.ssr.temporal_upsampling) = (false, false);
+    vc.ssr.active = false;
     vc.ssr.quality = "Low".to_string();
     vc.tonemapping.display_gamma = 2.2;
     scene.world.set_post_processing(id, Some(vc));

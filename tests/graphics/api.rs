@@ -18,7 +18,7 @@ fn scene_with_volume() -> Rc<RefCell<Scene>> {
     let mut scene = Scene::new();
     let id = scene.add_entity("PostFx".to_string());
     let mut vc: PostProcessingComponent = default_post_processing();
-    (vc.bloom.active, vc.ssr.active, vc.ssr.temporal_upsampling) = (false, false, false);
+    (vc.bloom.active, vc.ssr.active) = (false, false);
     vc.ssr.quality = "Low".to_string();
     scene.world.set_post_processing(id, Some(vc));
     scene.world.set_camera(

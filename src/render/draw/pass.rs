@@ -6,8 +6,10 @@ use crate::render::gpu::draw_buffers::DrawBuffers;
 use crate::render::gpu::global_group::GlobalGroup;
 use crate::render::gpu::pipelines::surface::SolidPass;
 use crate::render::gpu::pipelines::PrimedPipelines;
+use crate::render::ibl::skybox::SkyTargets;
 use crate::render::motion;
 use crate::render::passes::ssao::SsaoFrame;
+use crate::render::postfx::effects::ssr;
 use crate::render::timing::GpuPass;
 use crate::render::{RenderView, Renderer};
 use crate::scene::ClearFlags;
@@ -55,11 +57,11 @@ pub(crate) struct ScenePassFrame {
     pub ssao: Option<SsaoFrame>,
 }
 
-/// The scene pass's colour attachments: the HDR target, and a motion-blurred view's
-/// velocity target (#1435). Both clear where the camera clears colour (the backdrop;
-/// no motion, as far as the sky) and keep the layer below where a `DepthOnly` camera
-/// composites over it (#93), so the nearest camera's velocity and distance win as its
-/// colour does.
+/// The scene pass's colour attachments: the HDR target, a motion-blurred view's
+/// velocity target (#1435), and an SSR view's surface target (#1526). All clear where
+/// the camera clears colour (the backdrop; no motion, as far as the sky; no SSR) and
+/// keep the layer below where a `DepthOnly` camera composites over it (#93), so the
+/// nearest camera's velocity and distance win as its colour does.
 fn scene_targets(
     view: &RenderView,
     clear: PassClear,
@@ -83,7 +85,11 @@ fn scene_targets(
     );
     let velocity = view.post_fx.motion.target_view();
     let velocity = velocity.map(|v| attachment(v, motion::CLEAR));
-    std::iter::once(colour).chain(velocity).collect()
+    let surface = ssr::surface::view(&view.post_fx).map(|v| attachment(v, ssr::surface::CLEAR));
+    std::iter::once(colour)
+        .chain(velocity)
+        .chain(surface)
+        .collect()
 }
 
 impl Renderer {
@@ -152,8 +158,9 @@ impl Renderer {
         });
 
         // Set global bindings
+        let surface = ssr::surface::view(&view.post_fx).is_some();
         let solid_pass = match velocity {
-            Some(_) => SolidPass::Velocity(&self.velocity_pipeline, primed),
+            Some(_) => SolidPass::Velocity(&self.velocity_pipeline, primed, surface),
             None => SolidPass::Opaque(view.forward_pipeline(&self.render_pipeline), primed),
         };
         render_pass.set_bind_group(0, &self.global_bind_group, &[]);
@@ -169,10 +176,13 @@ impl Renderer {
         // skybox fallback). Both paint only the far-plane pixels no geometry covered.
         if clear.flags == ClearFlags::Skybox {
             let (sky, globals) = (&self.skybox_renderer, &self.global_bind_group);
-            let moving = velocity.is_some();
+            let targets = SkyTargets {
+                velocity: velocity.is_some(),
+                surface,
+            };
             match &self.skybox_texture {
-                Some(skybox_tex) => sky.draw(&mut render_pass, globals, skybox_tex, moving),
-                None => sky.draw_gradient(&mut render_pass, globals, moving),
+                Some(skybox_tex) => sky.draw(&mut render_pass, globals, skybox_tex, targets),
+                None => sky.draw_gradient(&mut render_pass, globals, targets),
             }
         }
     }

@@ -2,7 +2,7 @@
 //! material's surface variant (#396) or the standard one, over a primed depth or not
 //! (#1499).
 
-use super::super::{LazyPipeline, PrimedPipelines};
+use super::super::{LazyPipeline, PrimedPipelines, VelocityPipelines};
 use super::SurfaceShaders;
 
 /// Which solids pass a batch is drawn in, carrying that pass's standard pipeline, so
@@ -19,8 +19,9 @@ pub(crate) enum SolidPass<'a> {
     Prepass(&'a wgpu::RenderPipeline),
     /// Opaque solids; the standard pipeline is the view's (the preview may swap it).
     Opaque(&'a wgpu::RenderPipeline, Option<&'a PrimedPipelines>),
-    /// Opaque solids writing motion vectors too (#1435).
-    Velocity(&'a LazyPipeline, Option<&'a PrimedPipelines>),
+    /// Opaque solids writing motion vectors too (#1435), and the SSR surface target
+    /// when the last field holds (#1526).
+    Velocity(&'a VelocityPipelines, Option<&'a PrimedPipelines>, bool),
     /// Alpha-blended solids; the standard pipeline is built only if a batch uses it.
     Transparent(&'a LazyPipeline),
 }
@@ -36,7 +37,10 @@ impl SolidPass<'_> {
 
     /// Whether this pass draws over a primed depth (#1499).
     pub(crate) fn primed(self) -> bool {
-        matches!(self, Self::Opaque(_, Some(_)) | Self::Velocity(_, Some(_)))
+        matches!(
+            self,
+            Self::Opaque(_, Some(_)) | Self::Velocity(_, Some(_), _)
+        )
     }
 }
 
@@ -57,10 +61,12 @@ impl SurfaceShaders {
                 variant.map_or(&p.forward, |v| &v.primed.forward).get()
             }
             SolidPass::Opaque(standard, _) => variant.map_or(standard, |v| &v.forward),
-            SolidPass::Velocity(_, Some(p)) if primed => {
-                variant.map_or(&p.velocity, |v| &v.primed.velocity).get()
+            SolidPass::Velocity(_, Some(p), ssr) if primed => {
+                variant.map_or(&p.velocity, |v| &v.primed.velocity).get(ssr)
             }
-            SolidPass::Velocity(lazy, _) => variant.map_or(lazy, |v| &v.velocity).get(),
+            SolidPass::Velocity(standard, _, ssr) => {
+                variant.map_or(standard, |v| &v.velocity).get(ssr)
+            }
             SolidPass::Transparent(lazy) => variant.map_or_else(|| lazy.get(), |v| &v.transparent),
         }
     }

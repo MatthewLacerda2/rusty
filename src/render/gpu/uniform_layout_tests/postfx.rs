@@ -12,6 +12,7 @@ fn post_params_match_wgsl_layout() {
         ("inv_view_proj", offset_of!(PostParams, inv_view_proj)),
         ("view_proj", offset_of!(PostParams, view_proj)),
         ("camera_pos", offset_of!(PostParams, camera_pos)),
+        ("sky", offset_of!(PostParams, sky)),
     ];
     assert_layout("PostParams", &pairs, size_of::<PostParams>());
 }
