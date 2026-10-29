@@ -102,17 +102,21 @@ fn the_frame_mix_follows_time_scale_and_pause() {
 #[test]
 fn a_paused_frame_with_no_step_still_pushes_the_mix() {
     let (mut game, id, rec) = playing_speaker();
-    let pushed = rec.borrow().mixes.len();
+    rec.borrow_mut().advances.clear();
     game.time().borrow_mut().pause();
     game.paused_frame();
-    assert_eq!(rec.borrow().mixes.len(), pushed + 1, "one push, no tick");
+    assert_eq!(rec.borrow().advances, [0.0], "one push, no time, no tick");
     assert!(game.resources.audio.borrow().voice_mix(id).unwrap().paused);
 }
 
 #[test]
-fn a_tick_pushes_the_mix_once() {
+fn a_ticking_frame_pushes_the_mix_once() {
     let (mut game, _id, rec) = playing_speaker();
-    let pushed = rec.borrow().mixes.len();
+    rec.borrow_mut().advances.clear();
     game.tick(0.02);
-    assert_eq!(rec.borrow().mixes.len(), pushed + 1);
+    game.time().borrow_mut().pause();
+    game.time().borrow_mut().request_steps(1);
+    game.paused_frame();
+    let fixed = f64::from(crate::time::FIXED_DELTA_TIME);
+    assert_eq!(rec.borrow().advances, [f64::from(0.02f32), fixed]);
 }
