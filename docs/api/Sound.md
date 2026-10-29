@@ -225,7 +225,7 @@ comparing against.
 
 | Function | Signature | Returns |
 |---|---|---|
-| `Sound.Level` | `(path)` | the level table of the clip at `path`; an error naming the path if it does not decode |
+| `Sound.Level` | `(path [, { sections = seconds }])` | the level table of the clip at `path`; an error naming the path if it does not decode. `sections` cuts the file on a grid of that many seconds instead of the 8-second one (a positive length, at most 10 000 rows; else an error) — how a [capture of the game's mix](Audio.md#capturing-the-mix) is read a moment at a time |
 
 | Field | Meaning |
 |---|---|
@@ -266,7 +266,7 @@ One number for a whole bake hides three things, and the report carries each:
 - **`sections` — when.** A song's rows are its **arrangement's** patterns, labelled
   with the pattern name, so a row reads "the second `combat` is the quiet one";
   anything without an arrangement (a one-shot, a file) is cut on an 8-second grid,
-  `label = nil`. Empty when there would be only one row — that row is the summary
+  or on the grid `Sound.Level`'s `sections` asks for, `label = nil`. Empty when there would be only one row — that row is the summary
   said twice.
 - **`bands` — muddy or thin.** A shooter's mix is a frequency-allocation problem
   before it is a level problem: a weapon and the music both owning the mids reads

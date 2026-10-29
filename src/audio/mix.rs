@@ -137,7 +137,7 @@ pub fn oneshot_source(clip: &str, rolloff: Rolloff) -> AudioSourceComponent {
 
 impl AudioMaestro {
     /// Re-resolve every live voice against `env` and hand changed mixes to the
-    /// backend — the per-frame step the windowed shell runs after the sim advances.
+    /// backend — the step every `GameWorld::tick` ends with (#1579).
     /// `lookup` gives an entity's current `AudioSource` + world position; a voice
     /// whose entity no longer has one is stopped (the destroy path's safety net,
     /// #1297). Finished one-shots are reaped.

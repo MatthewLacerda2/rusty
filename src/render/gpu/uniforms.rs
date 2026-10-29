@@ -155,6 +155,8 @@ pub(crate) struct EntityUniform {
     // How the surface composites, shadows and transmits (#1523); its fields follow
     // `receive_decals` flat in `EntityUniforms`.
     pub surface: SurfaceUniform,
+    // Where the material's maps are read (#1573); flat after `transmission`.
+    pub mapping: MappingUniform,
 }
 
 /// A draw's transparent-surface terms (#1523): blending, shadows, refraction,
@@ -186,6 +188,34 @@ pub(crate) struct SurfaceUniform {
     /// Thin translucency: rgb the transmission colour times its amount, `w` the
     /// amount (0: none).
     pub transmission: [f32; 4],
+}
+
+/// Where a draw's material maps are read (#1573), packed from its
+/// tiling, offset and UV mapping; the default is UV0 untouched, for draws with no material.
+#[repr(C)]
+#[derive(Copy, Clone, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
+pub(crate) struct MappingUniform {
+    /// `xy` the tiling, `zw` the offset (Unity's `_MainTex_ST`).
+    pub uv_st: [f32; 4],
+    /// 0 UV0, 1 planar (world XZ), 2 triplanar.
+    pub uv_mapping: u32,
+    /// Texture repeats per metre under a world mapping: `1 / world_size`.
+    pub world_scale: f32,
+    /// The power the normal is raised to before it weights the three projections.
+    pub blend_sharpness: f32,
+    pub _pad: u32,
+}
+
+impl Default for MappingUniform {
+    fn default() -> Self {
+        Self {
+            uv_st: [1.0, 1.0, 0.0, 0.0],
+            uv_mapping: 0,
+            world_scale: 1.0,
+            blend_sharpness: 4.0,
+            _pad: 0,
+        }
+    }
 }
 
 /// How many 32-bit words an [`EntityUniform`] holds.

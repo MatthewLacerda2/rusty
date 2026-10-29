@@ -115,6 +115,7 @@ fn flat_overlay_uniform(tint: [f32; 4]) -> EntityUniform {
         bone_base: 0,
         receive_decals: 0,
         surface: crate::render::gpu::uniforms::SurfaceUniform::default(),
+        mapping: crate::render::gpu::uniforms::MappingUniform::default(),
     }
 }
 

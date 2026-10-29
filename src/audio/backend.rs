@@ -17,6 +17,9 @@
 
 #[cfg(test)]
 use super::mixer::settings::LOW_PASS_OFF;
+use std::sync::Arc;
+
+use super::device::tap::Tap;
 use super::mixer::{GroupId, GroupMix};
 use super::speaker::SpeakerMode;
 use crate::components::ReverbParams;
@@ -123,6 +126,16 @@ pub trait AudioBackend {
     /// Run the reverb bus every group sends into at `params` (#469): the
     /// listener's blended reverb zones.
     fn set_reverb(&mut self, params: &ReverbParams);
+
+    /// The tap on the final mix a capture reads (#1579); `None` for a backend that
+    /// mixes nothing.
+    fn tap(&self) -> Option<Arc<Tap>> {
+        None
+    }
+
+    /// `seconds` of engine time went by: an offline mixer renders them now, a
+    /// device runs on its own clock and ignores it.
+    fn advance(&mut self, _seconds: f64) {}
 }
 
 /// The do-nothing backend: holds no device, plays no sound, but reports a voice as
