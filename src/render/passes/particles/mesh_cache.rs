@@ -90,7 +90,7 @@ impl Renderer {
                 // An entity may already have it resident (the same model or
                 // primitive); a stale spec replaces that upload with the new file.
                 if cached == Some(CachedMesh::Stale) || !self.gpu_meshes.contains_key(&id) {
-                    self.update_gpu_mesh(id.clone(), &mesh.vertices, &mesh.indices);
+                    self.update_gpu_mesh(id.clone(), mesh.revision, &mesh.vertices, &mesh.indices);
                 }
                 let loaded = !mesh.indices.is_empty() && self.gpu_meshes.contains_key(&id);
                 let entry = match loaded {

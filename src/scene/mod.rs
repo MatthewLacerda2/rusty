@@ -80,8 +80,8 @@ pub use rehydrate::model_writes;
 pub use runtime::despawn::Despawn;
 pub use scene::{
     AnimatorComponent, AudioSourceComponent, CameraComponent, ClearFlags, ColliderComponent,
-    ColliderShape, CollisionDetection, CollisionResponse, DirtyFlag, EmitMode, Entity,
-    LightComponent, LightMode, LightType, MaterialAsset, MaterialComponent, MeshComponent,
+    ColliderShape, CollisionDetection, CollisionResponse, EmitMode, Entity, LightComponent,
+    LightMode, LightType, MaterialAsset, MaterialComponent, MeshComponent, MeshRevision,
     NavMeshAgentComponent, Particle, ParticleBlend, ParticleEmitterComponent,
     PostProcessingComponent, RenderMode, RigidBodyComponent, Scene, ScriptComponent,
     ScriptFieldValue, Tonemap, TransformComponent, DEFAULT_AMBIENT_COLOR,

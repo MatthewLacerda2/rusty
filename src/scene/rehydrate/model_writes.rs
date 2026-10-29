@@ -2,10 +2,10 @@
 //!
 //! When the engine re-writes a model in place (an FBX's conversion swapped in, an
 //! `.obj` or glTF its writer noted), every entity whose `"Asset"` mesh names that
-//! file re-reads it: the CPU mesh, its mesh collider's box and, through the dirty
-//! flag, its GPU upload move together, as Unity updates every instance of a
-//! re-imported model. The renderer's particle-mesh cache follows the same log for
-//! emitters (`render::passes::particles::mesh_cache`).
+//! file re-reads it: the CPU mesh, its mesh collider's box and, through the fresh
+//! geometry revision it takes (`MeshRevision`, #1540), every renderer's GPU upload
+//! move together, as Unity updates every instance of a re-imported model. The
+//! renderer's particle-mesh cache follows the same log for emitters (`render::passes::particles::mesh_cache`).
 //!
 //! It runs on the edit frame (`app::GameWorld::edit_frame`), every frame outside
 //! Play, stepped or frozen. A model written during Play (an `.obj` or glTF writer;

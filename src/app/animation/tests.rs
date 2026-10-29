@@ -199,7 +199,6 @@ fn two_clip_mesh() -> MeshComponent {
         asset_ref: Some("model.glb::Rig".to_string()),
         skin: Some(chain_skin()),
         clips: vec![named_clip("Short", 0.75), named_clip("Long", 2.5)],
-        is_dirty: Default::default(),
         ..MeshComponent::new("Asset", Vec::new(), Vec::new())
     }
 }

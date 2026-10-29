@@ -19,7 +19,6 @@ pub fn posed_palette(skin: &SkinData, clip: &AnimationClip, time: f32) -> Vec<Ma
         bind_palette: skin.bind_palette(),
         skin: Some(skin.clone()),
         clips: vec![clip.clone()],
-        is_dirty: Default::default(),
         ..MeshComponent::new("Asset", Vec::new(), Vec::new())
     };
     scene.world.set_mesh(owner, Some(mesh));

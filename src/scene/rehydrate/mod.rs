@@ -152,7 +152,7 @@ fn install(mesh: &mut crate::scene::MeshComponent, rebuilt: RehydratedMesh) {
     mesh.clips = rebuilt.clips;
     mesh.pose_palette = Vec::new();
     mesh.skeleton.bones.clear();
-    mesh.is_dirty.set(true);
+    mesh.revision = crate::components::MeshRevision::next();
 }
 
 /// Build an `"Asset"` mesh component from a path-based reference, importing its

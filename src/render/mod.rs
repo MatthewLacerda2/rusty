@@ -33,11 +33,13 @@ pub mod ui;
 use ibl::{cubemap, reflection_probes, skybox};
 use passes::{particles, shadows};
 
+use crate::components::MeshRevision;
 use std::collections::HashMap;
 use std::rc::Rc;
 
 pub use camera::{build_camera_stack, texture_cameras, ScreenStack, TextureCamera};
 pub use frustum::{Frustum, SkinBounds};
+pub use gpu::mesh::MeshId;
 pub use ibl::cubemap_capture::{CubemapCapture, CubemapFace};
 pub use ibl::probe::bake::{project_cubemap, DEFAULT_BAKE_RESOLUTION};
 pub use ibl::probe::bounce::{BounceReport, CONVERGENCE_EPSILON, MAX_BOUNCES};
@@ -68,6 +70,9 @@ pub struct GpuMesh {
     /// Per-joint bind-pose boxes, computed at the same upload: a skinned entity's
     /// animated bound is built from them and its palette each frame (#833).
     pub skin_bounds: SkinBounds,
+    /// The geometry revision these buffers hold (#1540): a mesh carrying a newer
+    /// one is re-uploaded.
+    pub revision: MeshRevision,
 }
 
 impl GpuMesh {
@@ -82,26 +87,6 @@ impl GpuMesh {
     ) -> Vec<(usize, std::ops::Range<u32>)> {
         let runs = crate::components::mesh::clip_runs(mesh.index_ranges(), self.num_indices);
         crate::components::mesh::material_runs(runs, material.map(|m| m.materials.len()))
-    }
-}
-
-/// Stable identity for a mesh's GPU geometry, derived from its *source*
-/// (`primitive_type` + `asset_ref`) rather than the entity referencing it (#127).
-/// Many entities sharing the same primitive or imported asset therefore map to a
-/// single `MeshId` and share one vertex/index buffer pair instead of allocating
-/// N copies. The string form keeps a future runtime-mutated mesh expressible with
-/// its own unique key (e.g. by entity id) without colliding with the shared ones.
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
-pub struct MeshId(pub String);
-
-impl MeshId {
-    /// Geometry key for a mesh component: `"<primitive_type>|<asset_ref>"`.
-    pub fn from_mesh(mesh: &crate::scene::MeshComponent) -> Self {
-        MeshId(format!(
-            "{}|{}",
-            mesh.primitive_type,
-            mesh.asset_ref.as_deref().unwrap_or("")
-        ))
     }
 }
 
