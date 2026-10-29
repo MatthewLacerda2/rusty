@@ -11,7 +11,7 @@
 struct PostParams {
     // current inverse view-projection (reconstruct world pos from depth)
     inv_view_proj: mat4x4<f32>,
-    // current view-projection (SSR ray marching to clip space)
+    // current view-projection (world back to clip space)
     view_proj: mat4x4<f32>,
     // xyz: camera world position, w: the sim's game time in seconds (#398) — the
     // same clock as `CameraUniforms.time`, 0 in edit mode and previews

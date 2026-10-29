@@ -59,6 +59,14 @@ fn encode(n: vec3<f32>, roughness: f32, applied: vec3<f32>, weight: vec3<f32>, f
     return SsrTexels(vec4<f32>(weight * k, e.x), vec4<f32>(applied * k, e.y));
 }
 
+// The texels of a surface whose colour an authored block then scaled by `k` per
+// channel (`shadergen::blocks::Reflection`): the reflection in it and the weight a
+// hit gets scale alike, so SSR replaces what the colour still holds. `k` = 0: no SSR.
+fn scale(t: SsrTexels, k: vec3<f32>) -> SsrTexels {
+    let f = max(k, vec3<f32>(0.0));
+    return SsrTexels(vec4<f32>(t.weight.rgb * f, t.weight.a), vec4<f32>(t.applied.rgb * f, t.applied.a));
+}
+
 // A decoded pair.
 struct SsrSurface {
     normal: vec3<f32>,

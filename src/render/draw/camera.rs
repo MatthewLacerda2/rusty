@@ -10,7 +10,8 @@
 //! [`CameraCtx`]; a new camera-uniform field is set once, in [`CameraCtx::new`].
 //! No trait objects and no registration at runtime: a static, ordered table.
 //!
-//! Three stages are not every camera's: `post_fx` runs only on the stack's last
+//! Four stages are not every camera's: `ssr` runs only on the stack's base camera,
+//! over its opaque image (#1526); `post_fx` runs only on the stack's last
 //! camera (it composites the whole stack) and returns early on the others, and the
 //! editor's `outline` and `handles` follow it there, onto the finished image, in
 //! Unity's order: scene, post-FX, outline, handles, then the UI (#1224). An
@@ -25,6 +26,7 @@ use crate::render::gpu::uniforms::FogUniform;
 use crate::render::lod::LodSelection;
 use crate::render::passes::particles::ParticleDraws;
 use crate::render::passes::ssao::{SsaoFrame, SsaoPlan};
+use crate::render::postfx::effects::ssr;
 use crate::render::{CameraUniform, Frustum, RenderView, Renderer};
 use crate::scene::{Camera, ClearFlags, Scene};
 
@@ -38,6 +40,7 @@ pub(crate) const CAMERA_PASSES: &[(&str, CameraPass)] = &[
     ("clusters", bin_clusters),
     ("solids", batch_solids),
     ("scene", scene_pass),
+    ("ssr", ssr),
     ("transparent", transparent),
     ("world_ui", world_ui),
     ("effects", effects),
@@ -168,6 +171,20 @@ fn scene_pass(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
             .map(|plan| SsaoFrame::for_camera(plan, ctx.view_proj, ctx.cam)),
     };
     r.execute_scene_pass(view, frame, &ctx.solids.draws.opaque);
+}
+
+/// Screen-space reflections (#1526) over the base camera's opaque image, before
+/// anything blends over it or an overlay camera draws: the base camera's alone.
+fn ssr(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
+    if ctx.is_first {
+        let stack = ctx.stack;
+        let settings = (
+            stack.post,
+            r.graphics(stack.editor_mode),
+            stack.full_post_fx,
+        );
+        ssr::run(r, view, settings, (ctx.view_proj, ctx.cam.position));
+    }
 }
 
 /// Translucent solids (#242), back-to-front over the opaque ones.

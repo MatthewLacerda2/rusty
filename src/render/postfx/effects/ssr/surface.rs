@@ -52,17 +52,8 @@ pub(crate) fn target(pfx: &PostFx) -> Option<&SurfaceTarget> {
     pfx.targets.get::<SurfaceTarget>()
 }
 
-/// The weight target's view (SSR's composite texture).
-pub(crate) fn weight_view(pfx: &PostFx) -> Option<&wgpu::TextureView> {
-    target(pfx).map(|t| &t.weight.view)
-}
-
-/// The applied-reflection target's view (SSR's composite texture).
-pub(crate) fn applied_view(pfx: &PostFx) -> Option<&wgpu::TextureView> {
-    target(pfx).map(|t| &t.applied.view)
-}
-
-/// Both views, in attachment order, if the view runs SSR.
+/// Both views, in attachment order (the weight, then the applied reflection), if
+/// the view runs SSR.
 pub(crate) fn views(pfx: &PostFx) -> Option<[&wgpu::TextureView; 2]> {
     target(pfx).map(|t| [&t.weight.view, &t.applied.view])
 }

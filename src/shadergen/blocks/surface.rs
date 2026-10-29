@@ -25,7 +25,7 @@
 //! sampled, so every lookup — and every later color block reading `in.tex_coords` —
 //! sees the moved UVs.
 
-use super::{Block, Param, Stage};
+use super::{Block, Param, Reflection, Stage};
 
 /// The surface block catalog.
 pub const BLOCKS: &[Block] = &[
@@ -38,6 +38,7 @@ pub const BLOCKS: &[Block] = &[
         textures: &[],
         stage: Stage::Color,
         cut: None,
+        reflection: Reflection::Dropped,
     },
     Block {
         id: "fresnel_rim",
@@ -52,6 +53,7 @@ pub const BLOCKS: &[Block] = &[
         textures: &[],
         stage: Stage::Color,
         cut: None,
+        reflection: Reflection::Kept,
     },
     Block {
         id: "tint",
@@ -62,6 +64,7 @@ pub const BLOCKS: &[Block] = &[
         textures: &[],
         stage: Stage::Color,
         cut: None,
+        reflection: Reflection::Scaled("srf_tint(vec3<f32>(1.0), in{args})"),
     },
     Block {
         id: "emissive_boost",
@@ -75,6 +78,7 @@ pub const BLOCKS: &[Block] = &[
         textures: &[],
         stage: Stage::Color,
         cut: None,
+        reflection: Reflection::Kept,
     },
     Block {
         id: "uv_scroll_stripes",
@@ -89,16 +93,18 @@ pub const BLOCKS: &[Block] = &[
         textures: &[],
         stage: Stage::Color,
         cut: None,
+        reflection: Reflection::Scaled("srf_uv_scroll_stripes(vec3<f32>(1.0), in{args})"),
     },
     Block {
         id: "desaturate",
         desc: "Pull the lit color toward grayscale (0 = full color, 1 = gray).",
         params: &[Param::live("amount", 0.5, 1)],
-        helper: "fn srf_desaturate(c: vec3<f32>, in: VertexOutput, amount: f32) -> vec3<f32> {\n    let l = dot(c, vec3<f32>(0.2126, 0.7152, 0.0722));\n    return mix(c, vec3<f32>(l), amount);\n}",
+        helper: "fn srf_desaturate(c: vec3<f32>, in: VertexOutput, amount: f32) -> vec3<f32> {\n    let l = dot(c, vec3<f32>(0.2126, 0.7152, 0.0722));\n    return mix(c, vec3<f32>(l), amount);\n}\nfn srf_desaturate_kept(in: VertexOutput, amount: f32) -> vec3<f32> {\n    return vec3<f32>(select(0.0, 1.0, amount <= 0.0));\n}",
         call: "srf_desaturate({prev}, in{args})",
         textures: &[],
         stage: Stage::Color,
         cut: None,
+        reflection: Reflection::Scaled("srf_desaturate_kept(in{args})"),
     },
     Block {
         id: "height_fog",
@@ -108,11 +114,12 @@ pub const BLOCKS: &[Block] = &[
             Param::baked("top", 5.0, 1),
             Param::baked("bottom", 0.0, 1),
         ],
-        helper: "fn srf_height_fog(c: vec3<f32>, in: VertexOutput, color: vec3<f32>, top: f32, bottom: f32) -> vec3<f32> {\n    let t = clamp((top - in.world_position.y) / max(top - bottom, 0.001), 0.0, 1.0);\n    return mix(c, color, t);\n}",
+        helper: "fn srf_height_fog(c: vec3<f32>, in: VertexOutput, color: vec3<f32>, top: f32, bottom: f32) -> vec3<f32> {\n    let t = clamp((top - in.world_position.y) / max(top - bottom, 0.001), 0.0, 1.0);\n    return mix(c, color, t);\n}\nfn srf_height_fog_kept(in: VertexOutput, color: vec3<f32>, top: f32, bottom: f32) -> vec3<f32> {\n    return vec3<f32>(1.0 - clamp((top - in.world_position.y) / max(top - bottom, 0.001), 0.0, 1.0));\n}",
         call: "srf_height_fog({prev}, in{args})",
         textures: &[],
         stage: Stage::Color,
         cut: None,
+        reflection: Reflection::Scaled("srf_height_fog_kept(in{args})"),
     },
     Block {
         id: "hit_flash",
@@ -121,11 +128,12 @@ pub const BLOCKS: &[Block] = &[
             Param::live("color", 1.0, 3),
             Param::live("amount", 0.0, 1),
         ],
-        helper: "fn srf_hit_flash(c: vec3<f32>, in: VertexOutput, color: vec3<f32>, amount: f32) -> vec3<f32> {\n    return mix(c, color, clamp(amount, 0.0, 1.0));\n}",
+        helper: "fn srf_hit_flash(c: vec3<f32>, in: VertexOutput, color: vec3<f32>, amount: f32) -> vec3<f32> {\n    return mix(c, color, clamp(amount, 0.0, 1.0));\n}\nfn srf_hit_flash_kept(in: VertexOutput, color: vec3<f32>, amount: f32) -> vec3<f32> {\n    return vec3<f32>(1.0 - clamp(amount, 0.0, 1.0));\n}",
         call: "srf_hit_flash({prev}, in{args})",
         textures: &[],
         stage: Stage::Color,
         cut: None,
+        reflection: Reflection::Scaled("srf_hit_flash_kept(in{args})"),
     },
     Block {
         id: "dissolve",
@@ -136,11 +144,12 @@ pub const BLOCKS: &[Block] = &[
             Param::live("edge_color", 1.0, 3),
             Param::baked("tiling", 1.0, 1),
         ],
-        helper: "fn srf_dissolve_cut(in: VertexOutput, amount: f32, edge_width: f32, edge_color: vec3<f32>, tiling: f32) -> f32 {\n    let m = textureSample(t_mask, s_mask, in.tex_coords * tiling).r;\n    if (amount > 0.0 && m < amount) {\n        discard;\n    }\n    return m;\n}\nfn srf_dissolve(c: vec3<f32>, in: VertexOutput, amount: f32, edge_width: f32, edge_color: vec3<f32>, tiling: f32) -> vec3<f32> {\n    let m = srf_dissolve_cut(in, amount, edge_width, edge_color, tiling);\n    let edge = 1.0 - smoothstep(amount, amount + max(edge_width, 0.0001), m);\n    return mix(c, edge_color, select(0.0, edge, amount > 0.0));\n}",
+        helper: "fn srf_dissolve_cut(in: VertexOutput, amount: f32, edge_width: f32, edge_color: vec3<f32>, tiling: f32) -> f32 {\n    let m = textureSample(t_mask, s_mask, in.tex_coords * tiling).r;\n    if (amount > 0.0 && m < amount) {\n        discard;\n    }\n    return m;\n}\nfn srf_dissolve_edge(in: VertexOutput, amount: f32, edge_width: f32, edge_color: vec3<f32>, tiling: f32) -> f32 {\n    let m = srf_dissolve_cut(in, amount, edge_width, edge_color, tiling);\n    let edge = 1.0 - smoothstep(amount, amount + max(edge_width, 0.0001), m);\n    return select(0.0, edge, amount > 0.0);\n}\nfn srf_dissolve(c: vec3<f32>, in: VertexOutput, amount: f32, edge_width: f32, edge_color: vec3<f32>, tiling: f32) -> vec3<f32> {\n    return mix(c, edge_color, srf_dissolve_edge(in, amount, edge_width, edge_color, tiling));\n}\nfn srf_dissolve_kept(in: VertexOutput, amount: f32, edge_width: f32, edge_color: vec3<f32>, tiling: f32) -> vec3<f32> {\n    return vec3<f32>(1.0 - srf_dissolve_edge(in, amount, edge_width, edge_color, tiling));\n}",
         call: "srf_dissolve({prev}, in{args})",
         textures: &["mask"],
         stage: Stage::Color,
         cut: Some("srf_dissolve_cut(in{args})"),
+        reflection: Reflection::Scaled("srf_dissolve_kept(in{args})"),
     },
     Block {
         id: "detail_overlay",
@@ -155,6 +164,7 @@ pub const BLOCKS: &[Block] = &[
         textures: &["mask"],
         stage: Stage::Color,
         cut: None,
+        reflection: Reflection::Scaled("srf_detail_overlay(vec3<f32>(1.0), in{args})"),
     },
     Block {
         id: "pulse_glow",
@@ -169,6 +179,7 @@ pub const BLOCKS: &[Block] = &[
         textures: &[],
         stage: Stage::Color,
         cut: None,
+        reflection: Reflection::Kept,
     },
     Block {
         id: "uv_scroll",
@@ -179,6 +190,7 @@ pub const BLOCKS: &[Block] = &[
         textures: &[],
         stage: Stage::Uv,
         cut: None,
+        reflection: Reflection::Kept,
     },
     Block {
         id: "triplanar_detail",
@@ -192,6 +204,7 @@ pub const BLOCKS: &[Block] = &[
         textures: &["mask"],
         stage: Stage::Color,
         cut: None,
+        reflection: Reflection::Scaled("srf_triplanar_detail(vec3<f32>(1.0), in{args})"),
     },
     Block {
         id: "hologram",
@@ -206,5 +219,6 @@ pub const BLOCKS: &[Block] = &[
         textures: &[],
         stage: Stage::Color,
         cut: None,
+        reflection: Reflection::Dropped,
     },
 ];

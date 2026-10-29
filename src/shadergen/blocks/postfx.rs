@@ -34,7 +34,7 @@
 //! per frame on the volume with `Graphics.SetPostParam`; structural params (counts,
 //! radii, levels, pulse speed) stay baked.
 
-use super::{Block, Param, Stage};
+use super::{Block, Param, Reflection, Stage};
 
 /// The postfx block catalog.
 pub const BLOCKS: &[Block] = &[
@@ -52,6 +52,7 @@ pub const BLOCKS: &[Block] = &[
         textures: &[],
         stage: Stage::Color,
         cut: None,
+        reflection: Reflection::Kept,
     },
     Block {
         id: "grayscale",
@@ -62,6 +63,7 @@ pub const BLOCKS: &[Block] = &[
         textures: &[],
         stage: Stage::Color,
         cut: None,
+        reflection: Reflection::Kept,
     },
     Block {
         id: "scanline",
@@ -85,6 +87,7 @@ pub const BLOCKS: &[Block] = &[
         textures: &[],
         stage: Stage::Color,
         cut: None,
+        reflection: Reflection::Kept,
     },
     Block {
         id: "posterize",
@@ -100,6 +103,7 @@ pub const BLOCKS: &[Block] = &[
         textures: &[],
         stage: Stage::Color,
         cut: None,
+        reflection: Reflection::Kept,
     },
     Block {
         id: "damage_vignette",
@@ -129,6 +133,7 @@ pub const BLOCKS: &[Block] = &[
         textures: &[],
         stage: Stage::Color,
         cut: None,
+        reflection: Reflection::Kept,
     },
     Block {
         id: "sharpen",
@@ -144,6 +149,7 @@ pub const BLOCKS: &[Block] = &[
         textures: &[],
         stage: Stage::Color,
         cut: None,
+        reflection: Reflection::Kept,
     },
     Block {
         id: "radial_blur",
@@ -167,5 +173,6 @@ pub const BLOCKS: &[Block] = &[
         textures: &[],
         stage: Stage::Color,
         cut: None,
+        reflection: Reflection::Kept,
     },
 ];

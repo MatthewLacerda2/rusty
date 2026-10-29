@@ -58,7 +58,7 @@ impl Renderer {
             .collect();
         // Motion vectors (#1435): last frame's cameras, and the velocity target when
         // this view runs motion blur, depth of field (#1445) or SSR, which reads its
-        // depths and cameras beside its own surface target (#1526). A view shading
+        // depths beside its own surface targets (#1526). A view shading
         // with its own forward pipeline (the Inspector's shader preview) writes none.
         let graphics = self.graphics(pass.editor_mode);
         let own_pipeline = view.has_forward_override();
@@ -122,8 +122,9 @@ impl Renderer {
         let baked = view.post_fx.grade.prepare(gpu, bake, effect.volume());
         self.frame_counters.grade_lut_bakes += u32::from(baked);
 
-        // The base camera's eye, as its view-projection is: SSR rebuilds positions
-        // from both, and the last camera of a stack is an overlay's (#1526).
+        // The base camera's eye, as its view-projection is: an effect rebuilding
+        // world positions reads both, and the last camera of a stack is an
+        // overlay's (#1526).
         let eye = stack.stack[0].position.to_array();
         let params = frame_params(scene, ctx.base_view_proj, eye);
         let sky = self.sky_panorama();
