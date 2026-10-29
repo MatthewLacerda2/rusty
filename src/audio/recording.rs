@@ -29,6 +29,8 @@ pub struct Recording {
     pub group_mixes: Vec<(GroupId, GroupMix)>,
     /// Every reverb the bus was set to, in order.
     pub reverbs: Vec<ReverbParams>,
+    /// Every advance of the output, in seconds, in order: one per pushed frame.
+    pub advances: Vec<f64>,
 }
 
 impl Recording {
@@ -94,5 +96,8 @@ impl AudioBackend for RecordingBackend {
     }
     fn set_reverb(&mut self, params: &ReverbParams) {
         self.0.borrow_mut().reverbs.push(*params);
+    }
+    fn advance(&mut self, seconds: f64) {
+        self.0.borrow_mut().advances.push(seconds);
     }
 }

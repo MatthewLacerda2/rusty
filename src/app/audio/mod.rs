@@ -13,9 +13,11 @@
 //!
 //! This is a *bookkeeping* system: on the harness's `NullBackend` it produces no
 //! sound but still records the play events, so a headless play-test can assert that
-//! the right sources auto-started. The per-frame mix (3D rolloff, pan, time scale)
-//! is not a sim system: the windowed shell applies it after each advance
-//! (`shell/audio.rs`, #412), so no device is threaded through a deterministic stage.
+//! the right sources auto-started. The mix (3D rolloff, pan, time scale) is not a
+//! sim system: every tick ends by pushing it and clocking the output
+//! ([`GameWorld::push_audio`](super::GameWorld::push_audio), #412, #1579), and a
+//! paused frame that ran no tick pushes it with no time, so no device is threaded
+//! through a deterministic stage.
 
 mod activity;
 
@@ -39,6 +41,16 @@ pub(super) fn register(app: &mut App) {
     app.add_system(Stage::LateUpdate, advance_mixer);
     app.add_system(Stage::LateUpdate, occlude_voices);
     app.add_system(Stage::LateUpdate, resolve_reverb);
+}
+
+impl super::GameWorld {
+    /// Push this tick's mix for every live voice and advance the output `seconds`:
+    /// an offline mixer renders them and a running capture takes them (#1579).
+    pub fn push_audio(&self, seconds: f32) {
+        let res = &self.resources;
+        let (scene, time) = (&self.world.scene, &res.time);
+        crate::api::audio::push_frame(scene, &res.audio, time, &res.camera, seconds.into());
+    }
 }
 
 /// Blend the reverb zones around the active camera onto the reverb bus (#469).
@@ -156,3 +168,7 @@ mod audio_reverb_tests;
 #[cfg(test)]
 #[path = "activity_tests.rs"]
 mod audio_activity_tests;
+
+#[cfg(test)]
+#[path = "push_tests.rs"]
+mod audio_push_tests;

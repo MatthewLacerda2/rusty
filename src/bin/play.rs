@@ -2,7 +2,7 @@
 //!
 //! ```text
 //! Usage:
-//!   cargo run --bin play --features dev -- [--project <dir>] [--scene <path>] [--size <W>x<H>] <scenario.lua> <out_dir>
+//!   cargo run --bin play --features dev -- [--project <dir>] [--scene <path>] [--size <W>x<H>] [--record-audio <path>] <scenario.lua> <out_dir>
 //! ```
 //!
 //! The scenario plays the game project at `<dir>` (default `./project`, #829); the
@@ -12,6 +12,8 @@
 //! relative to the project like the startup scene (#1343). `--size <W>x<H>` is the
 //! run's render size, as a Game view resolution: every screenshot, post effect and
 //! UI layout is sized to it (default 1280x720, #1583).
+//! `--record-audio <path>` captures the whole run's final audio mix to a WAV
+//! (#1579), named from the launch directory like the other two paths.
 //!
 //! Drives `app::GameWorld::tick` at a fixed 1/60 timestep with NO window/GPU, runs
 //! the given Lua scenario, and writes <out_dir>/results.json + <out_dir>/console.log.
@@ -25,7 +27,7 @@ use rusty::core::settings::video::parse_size;
 use rusty::dev::scenario;
 
 const USAGE: &str =
-    "usage: play [--project <dir>] [--scene <path>] [--size <W>x<H>] <scenario.lua> <out_dir>";
+    "usage: play [--project <dir>] [--scene <path>] [--size <W>x<H>] [--record-audio <path>] <scenario.lua> <out_dir>";
 
 fn main() {
     rusty::logging::init();
@@ -34,9 +36,10 @@ fn main() {
     let scene = rusty::core::project::take_value(&mut args, "--scene");
     let size = rusty::core::project::take_value(&mut args, "--size")
         .and_then(|size| size.as_deref().map(parse_size).transpose());
-    let (project, scene, size) = match (project, scene, size) {
-        (Ok(project), Ok(scene), Ok(size)) => (project, scene, size),
-        (Err(e), _, _) | (_, Err(e), _) | (_, _, Err(e)) => {
+    let audio = rusty::core::project::take_value(&mut args, "--record-audio");
+    let (project, scene, size, audio) = match (project, scene, size, audio) {
+        (Ok(project), Ok(scene), Ok(size), Ok(audio)) => (project, scene, size, audio),
+        (Err(e), _, _, _) | (_, Err(e), _, _) | (_, _, Err(e), _) | (_, _, _, Err(e)) => {
             eprintln!("play: {e}\n{USAGE}");
             exit(2);
         }
@@ -45,9 +48,10 @@ fn main() {
         eprintln!("{USAGE}");
         exit(2);
     };
-    // Both are named from the launch directory; opening the project moves it.
+    // All three are named from the launch directory; opening the project moves it.
     let from_here = |p: &str| absolute(p).unwrap_or_else(|_| PathBuf::from(p));
     let (scenario_path, out_dir) = (from_here(scenario_path), from_here(out_dir));
+    let audio = audio.map(|path| from_here(&path));
     let opened = rusty::core::project::open(&rusty::core::project::locate(project), Access::Run);
     let opened = match opened {
         Ok(opened) => opened,
@@ -58,7 +62,11 @@ fn main() {
     };
     let scene = scene.unwrap_or_else(|| opened.settings.build.startup_scene.clone());
 
-    match scenario::run(&scenario_path, &out_dir, &scene, opened.settings, size) {
+    let run = scenario::Run {
+        size,
+        record_audio: audio.as_deref(),
+    };
+    match scenario::run(&scenario_path, &out_dir, &scene, opened.settings, run) {
         Ok(report) => {
             println!(
                 "play: wrote {} (passed: {})",

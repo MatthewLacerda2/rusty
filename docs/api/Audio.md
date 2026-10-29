@@ -29,7 +29,8 @@ voice; on the **headless harness the audio backend is a no-op**, so playback mak
 sound but every action is still recorded in the maestro's introspection log (so a
 play-test can assert *what* played, *where*, and *by whom* — one-shots included).
 Dev builds read it back with `Debug.AudioEvents` and the live per-source roster with
-`Debug.AudioVoices` (see `Debug.md`).
+`Debug.AudioVoices` (see `Debug.md`), and record what reached the output with a
+[capture](#capturing-the-mix).
 
 | Function | Signature | Returns |
 |---|---|---|
@@ -214,7 +215,11 @@ stepped once per frame in `LateUpdate`: a blend keeps running through slow-mo an
 state is a function of sim time, so `Audio.GetGroupState` reads back the same values
 on the headless harness (no device) as in the editor. A duck's trigger is "a voice is
 live": on the harness one-shots end at once (nothing plays), so only entity sources
-trigger a duck there.
+trigger a duck there. **A [capture](#capturing-the-mix) changes that:** once one
+starts, the harness mixes for real and a one-shot stays live until it finishes
+sounding, so it triggers its ducks too. `Audio.GetGroupState(...).duck` can then read
+differently in a run recorded with `--record-audio` (or after `Harness.RecordAudio`)
+than in the same run unrecorded.
 
 **Stop** discards play-mode mixer changes (groups created, settings, snapshots,
 ducks), as it does the scene's. The device applies group changes with a 10 ms ramp,
@@ -251,4 +256,54 @@ the groups'.
 Audio.SetGroupReverbSend("SFX", 0.6)   -- gunshots ring in tunnels too
 local r = Audio.GetReverbState()
 print(r.decay_time, r.wet, r.zones)    -- e.g. 2.8  0.55  1 inside "B Tunnels"
+```
+
+### Capturing the mix
+
+**The agent cannot hear**, and the event log says only *which* sounds played and
+*when*. A capture writes the **final mix** to a WAV — every voice after gain, pan,
+occlusion, its group's volume and filters, the reverb bus and the
+[speaker mode](#speaker-mode)'s compressor and limiter, exactly what the device gets —
+so "the sound gets choppy when I walk into the next room" becomes a file
+[`Sound.Level`](Sound.md#how-loud-it-came-out-378) measures, before and after a fix.
+
+| Function | Signature | Returns |
+|---|---|---|
+| `Audio.StartCapture` *(dev-only)* | `(path)` | — starts recording the final mix to a WAV at `path` (relative to the project); a capture already running, or a file that cannot be created, is an error |
+| `Audio.StopCapture` *(dev-only)* | `()` | `string` — stops the capture and closes the file, returning its path; nothing running is an error |
+
+The file is **32-bit float stereo**, so nothing is quantised and a peak past full
+scale stays readable, at the device's rate in the windowed editor. With no device (a
+scenario, a box with no sound card) the engine mixes **offline at 48 kHz**, in step
+with the engine's time: a scenario's capture is a pure function of the run, and two
+runs of one scenario write byte-identical files. Going offline restarts every
+`AudioSource` that was playing from its first sample (one whose clip cannot be
+decoded is dropped with a warning); after that the run keeps the real mixer, so a
+one-shot stays live until it finishes sounding, and the ducks it triggers apply
+([*Time and determinism*](#mixer-groups-snapshots-and-ducking): a recorded run's
+`duck` can differ from an unrecorded one's). One capture runs at a time. In a scenario, `Harness.RecordAudio` /
+`Harness.StopAudio` and `play --record-audio <path>` do the same with the file under
+the run's output folder (`docs/testing.md`).
+
+In the windowed editor the device's thread hands each block over without ever
+waiting on the engine; a block the engine had no room for (a frame stalled for
+seconds) is dropped, written as **silence of the same length in its place** so the
+file's timing stays true, and `StopCapture` logs how many frames were lost. A capture
+that cannot be written still closes over what reached the disk, and is the error. A
+capture left running when the editor quits or a run fails is still closed as a
+readable WAV.
+
+**A stepped capture is silent.** While the clock is paused (`Time.Pause`), a
+time-scaled source (the default, and every `PlayAt` one-shot) is held, and
+`Time.Step` advances the world without un-pausing it: the headless session
+(`session-mcp`) can only step, so a capture it takes holds the stepped length in
+zeros. The capture says so: when every tick it ran was paused, `StopCapture` (and
+`Harness.StopAudio`) warns *every tick of this capture ran paused*. To hear a run,
+record a scenario (`play --record-audio`, `Harness.RecordAudio`), which ticks
+unpaused.
+
+```lua no-run
+Audio.StartCapture("captures/door.wav")
+-- … walk through the door …
+local level = Sound.Level(Audio.StopCapture(), { sections = 0.25 })
 ```

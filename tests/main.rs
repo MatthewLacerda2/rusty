@@ -77,6 +77,8 @@ mod api_doc_drift;
 #[cfg(feature = "dev")]
 mod application_quit;
 #[cfg(feature = "dev")]
+mod audio_capture;
+#[cfg(feature = "dev")]
 mod bot_player_session;
 #[cfg(feature = "dev")]
 mod busy_replay;
