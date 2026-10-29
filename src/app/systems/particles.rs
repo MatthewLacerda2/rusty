@@ -18,12 +18,13 @@
 //! `seed` on the first tick of a Play session) and emitters run in entity order,
 //! so a fixed-timestep replay is bit-for-bit identical.
 
-use glam::{Mat4, Vec3};
+use glam::Vec3;
 
 use crate::app::resources::Resources;
 use crate::app::world::World;
 use crate::components::particle::{
-    CollisionResponse, EmitMode, Particle, ParticleEmitterComponent, SimulationSpace, SubEmitEvent,
+    CollisionResponse, EmitMode, EmitterFrame, Particle, ParticleEmitterComponent, SimulationSpace,
+    SubEmitEvent,
 };
 use crate::physics::PhysicsWorld;
 
@@ -110,7 +111,7 @@ fn dispatch_sub_emitters(world: &mut World, events: &[SubEmitEvent]) {
 /// Run one emitter's spawn + integrate + collide + age pipeline for this frame.
 fn simulate_emitter(
     emitter: &mut ParticleEmitterComponent,
-    origin: Mat4,
+    origin: EmitterFrame,
     dt: f32,
     physics: &Physics,
 ) {
@@ -125,7 +126,7 @@ fn simulate_emitter(
 
 /// Spawn new particles for this frame per the emit mode (continuous rate or a
 /// one/looping burst), honouring the max-particle cap.
-fn emit(emitter: &mut ParticleEmitterComponent, origin: Mat4, dt: f32) {
+fn emit(emitter: &mut ParticleEmitterComponent, origin: EmitterFrame, dt: f32) {
     let to_spawn = match emitter.emit_mode {
         EmitMode::Continuous => {
             emitter.runtime.spawn_accum += emitter.rate * dt;

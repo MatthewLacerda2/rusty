@@ -31,7 +31,7 @@ mod sub_emitter;
 pub use render::{Flipbook, ParticleRender, ParticleRenderMode};
 pub use runtime::{EmitterRuntime, Particle, SubEmitEvent};
 pub use shape::{EmitFrom, EmitShape};
-pub use space::SimulationSpace;
+pub use space::{EmitterFrame, SimulationSpace};
 pub use sub_emitter::{SubEmitTrigger, SubEmitters};
 
 use glam::Vec3;

@@ -23,7 +23,7 @@
 //! Unity's third option, `Custom` (relative to another entity), is left out: the
 //! scene format has no field kind that references another entity by value yet.
 
-use glam::{Mat4, Quat};
+use glam::{Mat4, Quat, Vec3};
 
 use super::ParticleEmitterComponent;
 
@@ -45,9 +45,39 @@ crate::core::named_enum! {
 /// inverse: carrying to it, and remembering it, is skipped.
 const SINGULAR: f32 = 1e-12;
 
-/// The rotation part of a non-singular emitter frame.
-fn rotation_of(frame: &Mat4) -> Quat {
-    frame.to_scale_rotation_translation().1
+/// Where an emitter stands (`ecs::World::emitter_frame`): its matrix, and the
+/// rotation that matrix was built with, kept beside it so a carry turns its
+/// particles without decomposing a matrix.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct EmitterFrame {
+    pub matrix: Mat4,
+    pub rotation: Quat,
+}
+
+impl EmitterFrame {
+    /// The world origin, unturned and unscaled.
+    pub const IDENTITY: Self = Self {
+        matrix: Mat4::IDENTITY,
+        rotation: Quat::IDENTITY,
+    };
+
+    /// The frame at `position`, turned by `rotation`, scaled by `scale`.
+    pub fn new(position: Vec3, rotation: Quat, scale: Vec3) -> Self {
+        Self {
+            matrix: Mat4::from_scale_rotation_translation(scale, rotation, position),
+            rotation,
+        }
+    }
+
+    /// Where the frame stands.
+    pub fn origin(&self) -> Vec3 {
+        self.matrix.w_axis.truncate()
+    }
+
+    /// Whether the frame has no usable inverse.
+    fn singular(&self) -> bool {
+        self.matrix.determinant().abs() <= SINGULAR
+    }
 }
 
 impl ParticleEmitterComponent {
@@ -57,15 +87,14 @@ impl ParticleEmitterComponent {
     /// rotation. A no-op for a `World` emitter, and for a near-singular `frame`
     /// (the anchor is kept, so scaling 1 → 0 → 1 brings the particles back).
     /// Idempotent for one `frame`.
-    pub fn carry_to(&mut self, frame: Mat4) {
-        if self.simulation_space != SimulationSpace::Local || frame.determinant().abs() <= SINGULAR
-        {
+    pub fn carry_to(&mut self, frame: EmitterFrame) {
+        if self.simulation_space != SimulationSpace::Local || frame.singular() {
             return;
         }
         let runtime = &mut self.runtime;
         if let Some(anchor) = runtime.anchor.filter(|a| *a != frame) {
-            let delta = frame * anchor.inverse();
-            let turn = rotation_of(&frame) * rotation_of(&anchor).inverse();
+            let delta = frame.matrix * anchor.matrix.inverse();
+            let turn = frame.rotation * anchor.rotation.inverse();
             for p in &mut runtime.particles {
                 p.position = delta.transform_point3(p.position);
                 p.velocity = delta.transform_vector3(p.velocity);
@@ -77,9 +106,9 @@ impl ParticleEmitterComponent {
 
     /// The turn a particle born under `frame` starts with: the frame's rotation
     /// for a `Local` emitter (identity for a singular one), identity for `World`.
-    pub(super) fn birth_turn(&self, frame: &Mat4) -> Quat {
-        if self.simulation_space == SimulationSpace::Local && frame.determinant().abs() > SINGULAR {
-            rotation_of(frame)
+    pub(super) fn birth_turn(&self, frame: &EmitterFrame) -> Quat {
+        if self.simulation_space == SimulationSpace::Local && !frame.singular() {
+            frame.rotation
         } else {
             Quat::IDENTITY
         }

@@ -32,6 +32,7 @@ mod write;
 
 use glam::{Mat4, Quat, Vec3};
 
+use crate::components::particle::EmitterFrame;
 use crate::components::transform::{
     local_rotation, mirror, mirrored_direction, mirrored_frame_axes,
 };
@@ -70,15 +71,11 @@ impl World {
     /// A particle emitter's frame, Unity's default *Local* Scaling Mode (#1529):
     /// `id`'s world position and rotation under its own local scale, every
     /// parent's scale ignored. Identity for a dead id.
-    pub fn emitter_frame(&self, id: u32) -> Mat4 {
+    pub fn emitter_frame(&self, id: u32) -> EmitterFrame {
         let Some(scale) = self.transform(id).map(|t| t.scale) else {
-            return Mat4::IDENTITY;
+            return EmitterFrame::IDENTITY;
         };
-        Mat4::from_scale_rotation_translation(
-            scale,
-            self.world_rotation(id),
-            self.world_position(id),
-        )
+        EmitterFrame::new(self.world_position(id), self.world_rotation(id), scale)
     }
 
     /// Where `id` stands in the world (the origin for a dead id).

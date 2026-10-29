@@ -62,7 +62,7 @@ fn a_burst_after_a_move_is_born_on_the_emitter_and_carried_once() {
     scene.borrow_mut().world.transform_mut(id).unwrap().position = to;
     lua::<()>(&scene, &format!("Particles.Burst({id})")).unwrap();
     let mut s = scene.borrow_mut();
-    let frame = s.world.local_to_world(id);
+    let frame = s.world.emitter_frame(id);
     let mut e = s.world.particles_mut(id).unwrap();
     e.carry_to(frame);
     assert_eq!(e.live_count(), 16);
