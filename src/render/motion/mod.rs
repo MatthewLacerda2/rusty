@@ -1,6 +1,6 @@
 //! src/render/motion/mod.rs — per-object motion vectors (#1435).
 //!
-//! A view that runs motion blur or depth of field gets a **velocity target**: an `Rgba16Float` texture
+//! A view that runs motion blur, depth of field or SSR gets a **velocity target**: an `Rgba16Float` texture
 //! at full view resolution that the opaque forward pass writes as its second colour
 //! attachment. Each pixel holds how far the surface under it moved on screen since
 //! last frame, `ndc_now.xy - ndc_prev.xy`, in `.b` that surface's depth along the
@@ -32,8 +32,9 @@
 //!
 //! **Cost.** The target exists and the velocity pipelines run only while a view runs
 //! motion blur ([`wanted`]: the camera has it on, the player's option allows it, the
-//! quality tier runs it, #1438, and it is not the editor's Scene view) or depth of
-//! field, which reads its depths ([`target_wanted`], #1445). On any other frame the forward pass draws
+//! quality tier runs it, #1438, and it is not the editor's Scene view), depth of
+//! field, which reads its depths ([`target_wanted`], #1445), or SSR, which reads its
+//! depths and cameras (#1526, `draw::stack`). On any other frame the forward pass draws
 //! exactly as before, and the target is freed.
 
 mod history;
