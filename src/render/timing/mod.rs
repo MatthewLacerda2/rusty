@@ -53,8 +53,12 @@ crate::core::named_enum! {
         SkyReflection = "sky_reflection",
         /// The sun's cascades and the point/spot shadow atlas.
         Shadows = "shadows",
-        /// The SSAO depth prepass, occlusion and blur.
+        /// The SSAO depth prepass (#1578), which a primed forward pass starts from.
+        SsaoPrepass = "ssao_prepass",
+        /// The SSAO occlusion pass, at its quality's resolution.
         Ssao = "ssao",
+        /// The SSAO blur at the occlusion's resolution and its upsample to full.
+        SsaoBlur = "ssao_blur",
         /// The opaque scene pass: solids, skybox.
         Forward = "forward",
         /// Screen-space reflections (#1526): the copy of the opaque image and the
