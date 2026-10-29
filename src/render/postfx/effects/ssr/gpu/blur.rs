@@ -52,6 +52,7 @@ fn gpu_motion_blur_blurs_the_reflected_scene_never_below_what_it_blurs() {
     draw(&mut r, &mut blurred_view, &blurring, &turned(0.0));
     let blurred = draw(&mut r, &mut blurred_view, &blurring, &turned(6.0));
     assert!(blurred_view.post_fx.holds_blur(), "the blur ran");
+    assert!(blurred_view.post_fx.holds_ssr(), "SSR ran");
     let mut sharp_view = view(&r);
     let sharp = draw(&mut r, &mut sharp_view, &still, &turned(6.0));
     assert!(!sharp_view.post_fx.holds_blur());
