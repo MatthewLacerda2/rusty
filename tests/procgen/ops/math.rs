@@ -3,7 +3,7 @@
 //! the public runner (`evaluate`) so the test pins observable pixel behaviour.
 
 use rusty::procgen::recipe::{
-    Blur, BumpToNormal, Checker, Clamp, Gradient, GradientKind, MapRange, OpKind,
+    Blur, BlurKind, BumpToNormal, Checker, Clamp, Gradient, GradientKind, MapRange, OpKind,
 };
 
 use super::super::{constant, node, run};
@@ -108,7 +108,14 @@ fn blur_spreads_a_hard_edge_into_a_gradient() {
                 }),
                 &[],
             ),
-            node("b", OpKind::Blur(Blur { radius: 0.125 }), &["k"]),
+            node(
+                "b",
+                OpKind::Blur(Blur {
+                    radius: 0.125,
+                    kind: BlurKind::Box,
+                }),
+                &["k"],
+            ),
         ],
         "b",
         8,

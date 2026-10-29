@@ -85,6 +85,8 @@ mod tests {
         }
         assert_ne!(node_seed(42, 1), 42);
         assert_ne!(node_seed(42, 1), node_seed(42, 2));
+        // Folded with XOR, not OR: a recipe seed with every bit set still moves.
+        assert_ne!(node_seed(u64::MAX, 1), u64::MAX);
     }
 
     #[test]

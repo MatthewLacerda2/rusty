@@ -10,12 +10,14 @@
 //!   wave, brick, shape, checker, white noise, and an image file).
 //! - [`color`] — color ramp, mix (blend modes), invert, bright/contrast, HSV, gamma,
 //!   auto levels.
-//! - [`vector`] — domain mapping, domain warp, bump→normal, combine/separate RGB;
+//! - [`vector`] — domain mapping, domain warp, bump→normal, normal blend,
+//!   combine/separate RGB;
 //!   [`tile`] — the seeded grid scatter.
 //! - [`math`] — math (against a constant or a second image), map range, clamp,
 //!   RGB→BW.
-//! - [`filter`] — neighbourhood ops: separable blur, and the height-derived masks
-//!   cavity and curvature.
+//! - [`filter`] — neighbourhood ops: separable box or Gaussian blur, and the
+//!   height-derived masks cavity and curvature; [`distance`] — a mask's distance
+//!   from its edge, a bevel for any shape.
 //!
 //! [`eval_node`] dispatches one [`OpKind`] given its inputs (already evaluated by the
 //! runner). It is the single place op semantics live, so the Lua surface, a `.json`
@@ -24,6 +26,7 @@
 //! until it is dispatched (#1485).
 
 pub mod color;
+pub mod distance;
 pub mod filter;
 pub mod generators;
 pub mod math;
@@ -69,7 +72,7 @@ pub fn eval_node(
                 .expect("the runner checks every image source");
             generators::image(source, p.encoding, resolution)
         }
-        OpKind::ColorRamp(p) => color::color_ramp(own(), &p.stops),
+        OpKind::ColorRamp(p) => color::color_ramp(own(), &p.stops, p.interpolation),
         OpKind::Mix(p) => color::mix(own(), inputs[1], inputs.get(2).copied(), p.mode, p.factor),
         OpKind::Invert => color::invert(own()),
         OpKind::BrightContrast(p) => color::bright_contrast(own(), p.bright, p.contrast),
@@ -84,13 +87,15 @@ pub fn eval_node(
         OpKind::SeparateRgb(p) => vector::separate_rgb(own(), p.channel),
         OpKind::Tile(p) => tile::tile(inputs[0], p.count, tile::Jitter::of(p), seed),
         OpKind::Warp(p) => vector::warp(inputs[0], inputs[1], p.strength),
+        OpKind::NormalBlend(p) => vector::normal_blend(inputs[0], inputs[1], p.strength),
         OpKind::Math(p) => math::math(own(), inputs.get(1).copied(), p.func, p.value),
         OpKind::MapRange(p) => math::map_range(own(), p.from_min, p.from_max, p.to_min, p.to_max),
         OpKind::Clamp(p) => math::clamp(own(), p.min, p.max),
         OpKind::RgbToBw => math::rgb_to_bw(own()),
-        OpKind::Blur(p) => filter::blur(inputs[0], px(p.radius)),
+        OpKind::Blur(p) => filter::blur(inputs[0], px(p.radius), p.kind),
         OpKind::Cavity(p) => filter::cavity(inputs[0], px(p.radius)),
         OpKind::Curvature(p) => filter::curvature(inputs[0], p.radius, p.strength),
+        OpKind::Distance(p) => distance::distance(inputs[0], p.radius),
     }
 }
 

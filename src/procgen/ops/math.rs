@@ -99,3 +99,46 @@ pub fn rgb_to_bw(mut img: Image) -> Image {
 pub fn luminance(p: Rgba) -> f32 {
     crate::core::color::luminance([p[0], p[1], p[2]])
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Every binary func on known operands, each value telling the func apart from
+    /// a swapped operator (`3 + 2` is not `3 − 2`, `3 × 2` or `3 / 2`).
+    #[test]
+    fn each_func_gives_its_result_on_known_operands() {
+        let cases = [
+            (MathOp::Add, 5.0),
+            (MathOp::Subtract, 1.0),
+            (MathOp::Multiply, 6.0),
+            (MathOp::Divide, 1.5),
+            (MathOp::Power, 9.0),
+            (MathOp::Min, 2.0),
+            (MathOp::Max, 3.0),
+        ];
+        for (op, want) in cases {
+            assert_eq!(apply(op, 3.0, 2.0), want, "{op:?}");
+        }
+        assert_eq!(apply(MathOp::Abs, -3.0, 2.0), 3.0);
+        assert_eq!(apply(MathOp::Fract, -0.25, 2.0), 0.75);
+        assert_eq!(apply(MathOp::Sqrt, 9.0, 2.0), 3.0);
+    }
+
+    #[test]
+    fn divide_is_zero_only_below_its_guard() {
+        assert_eq!(apply(MathOp::Divide, 1.0, 0.0), 0.0);
+        assert_eq!(apply(MathOp::Divide, 1.0, -1e-10), 0.0);
+        // Exactly at the guard the division runs.
+        assert_eq!(apply(MathOp::Divide, 1.0, 1e-9), 1.0 / 1e-9);
+        assert_eq!(apply(MathOp::Divide, 1.0, -4.0), -0.25);
+    }
+
+    #[test]
+    fn a_wired_rhs_is_read_per_channel() {
+        let a = Image::filled(2, [3.0, 3.0, 3.0, 0.5]);
+        let b = Image::filled(2, [2.0, 1.0, 4.0, 9.0]);
+        let out = math(a, Some(&b), MathOp::Subtract, 0.5);
+        assert_eq!(out.pixels()[3], [1.0, 2.0, -1.0, 0.5]);
+    }
+}

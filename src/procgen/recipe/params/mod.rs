@@ -8,7 +8,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::{BlendMode, MathOp, RampStop};
+use super::{BlendMode, BlurKind, MathOp, RampInterpolation, RampStop};
 
 mod generators;
 
@@ -16,10 +16,13 @@ pub use generators::*;
 
 // ---- Color ----
 
-/// Map the input's red channel through a gradient of stops.
+/// Map the input's red channel through a gradient of stops, filled between them by
+/// `interpolation` (Blender's ColorRamp).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ColorRamp {
     pub stops: Vec<RampStop>,
+    #[serde(default)]
+    pub interpolation: RampInterpolation,
 }
 
 /// Blend inputs `a`, `b` by `factor` under a [`BlendMode`]; an optional third input
@@ -98,6 +101,15 @@ pub struct Tile {
     pub seed: u32,
 }
 
+/// Reoriented Normal Mapping (#1492): lay the second input's normal map (detail)
+/// over the first's (base). `strength` scales the detail's tilt first; 0 leaves the
+/// base.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct NormalBlend {
+    #[serde(default = "one_f32")]
+    pub strength: f32,
+}
+
 /// Domain warp: sample input A displaced by input B's R/G, centred on 0.5 and scaled
 /// by `strength` in **tile units**; wrapped, so it tiles.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
@@ -136,15 +148,18 @@ pub struct Clamp {
 
 // ---- Filter ----
 
-/// A separable box blur (wraps at the edges). `radius` is a **fraction of the tile
-/// width** (`0.01` = 1%), so it looks the same at any resolution (#394).
+/// A separable blur (wraps at the edges), Gaussian by default. `radius` is the
+/// kernel's reach as a **fraction of the tile width** (`0.01` = 1%), so it looks the
+/// same at any resolution (#394).
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Blur {
     pub radius: f32,
+    #[serde(default)]
+    pub kind: BlurKind,
 }
 
-/// Height → cavity mask: `1 − max(blur(h) − h, 0)` with a `radius` blur (tile
-/// fraction, as `blur`). White on flat and raised ground, dark in crevices (#408).
+/// Height → cavity mask: `1 − max(blur(h) − h, 0)` with a `radius` Gaussian blur
+/// (tile fraction, as `blur`). White on flat and raised ground, dark in crevices (#408).
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Cavity {
     pub radius: f32,
@@ -157,6 +172,14 @@ pub struct Curvature {
     pub radius: f32,
     #[serde(default = "one_f32")]
     pub strength: f32,
+}
+
+/// Mask → bevel (#1492): red > 0.5 is inside; each inside pixel reads its distance
+/// to the mask's edge over `radius` (tile units), clamped to 1. Outside reads 0.
+/// Wraps, so a tiling mask gives a tiling bevel.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Distance {
+    pub radius: f32,
 }
 
 fn yes() -> bool {

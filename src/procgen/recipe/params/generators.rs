@@ -4,7 +4,8 @@ use serde::{Deserialize, Serialize};
 
 use super::super::color;
 use super::super::{
-    BrickOutput, GradientKind, ImageEncoding, NoiseKind, ShapeKind, VoronoiOutput, WaveKind,
+    BrickOutput, GradientKind, ImageEncoding, NoiseKind, ShapeKind, VoronoiMetric, VoronoiOutput,
+    WaveKind,
 };
 use super::{default_mortar, half, one_f32, one_u32, quarter, two};
 
@@ -40,12 +41,14 @@ pub struct Noise {
 }
 
 /// Voronoi / Worley cellular pattern; `randomness` jitters each cell's point (0 = a
-/// regular grid, 1 = anywhere in its cell).
+/// regular grid, 1 = anywhere in its cell); `metric` is how distance is measured.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Voronoi {
     pub scale: f32,
     #[serde(default)]
     pub output: VoronoiOutput,
+    #[serde(default)]
+    pub metric: VoronoiMetric,
     #[serde(default = "one_f32")]
     pub randomness: f32,
     #[serde(default)]

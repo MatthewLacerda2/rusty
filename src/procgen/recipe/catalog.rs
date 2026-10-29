@@ -57,6 +57,10 @@ pub const OPS: &[OpInfo] = &[
                 default: Some(Lit::Text("distance")),
                 ..choice("output", &["distance", "cells", "f2", "edges"])
             },
+            OpParam {
+                default: Some(Lit::Text("euclidean")),
+                ..choice("metric", &["euclidean", "manhattan", "chebyshev"])
+            },
             opt("randomness", "number", Lit::Number(1.0)),
             SEED,
         ],
@@ -125,7 +129,18 @@ pub const OPS: &[OpInfo] = &[
             },
         ],
     ),
-    op("color_ramp", "color", ONE, &[req("stops", "stops")]),
+    op(
+        "color_ramp",
+        "color",
+        ONE,
+        &[
+            req("stops", "stops"),
+            OpParam {
+                default: Some(Lit::Text("linear")),
+                ..choice("interpolation", &["linear", "constant", "ease"])
+            },
+        ],
+    ),
     op(
         "mix",
         "color",
@@ -187,6 +202,12 @@ pub const OPS: &[OpInfo] = &[
     ),
     op("warp", "vector", arity(2, 2), &[req("strength", "number")]),
     op(
+        "normal_blend",
+        "vector",
+        arity(2, 2),
+        &[opt("strength", "number", Lit::Number(1.0))],
+    ),
+    op(
         "math",
         "math",
         arity(1, 2),
@@ -213,7 +234,18 @@ pub const OPS: &[OpInfo] = &[
         &[req("min", "number"), req("max", "number")],
     ),
     op("rgb_to_bw", "math", ONE, &[]),
-    op("blur", "filter", ONE, &[req("radius", "number")]),
+    op(
+        "blur",
+        "filter",
+        ONE,
+        &[
+            req("radius", "number"),
+            OpParam {
+                default: Some(Lit::Text("gaussian")),
+                ..choice("kind", &["box", "gaussian"])
+            },
+        ],
+    ),
     op("cavity", "filter", ONE, &[req("radius", "number")]),
     op(
         "curvature",
@@ -224,6 +256,7 @@ pub const OPS: &[OpInfo] = &[
             opt("strength", "number", Lit::Number(1.0)),
         ],
     ),
+    op("distance", "filter", ONE, &[req("radius", "number")]),
 ];
 
 #[cfg(test)]

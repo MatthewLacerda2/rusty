@@ -4,7 +4,8 @@
 //! nearest-neighbour (`mapping`) is exercised.
 
 use rusty::procgen::recipe::{
-    Blur, BumpToNormal, Cavity, Checker, Curvature, Mapping, Node, Noise, NoiseKind, OpKind,
+    Blur, BlurKind, BumpToNormal, Cavity, Checker, Curvature, Mapping, Node, Noise, NoiseKind,
+    OpKind,
 };
 use rusty::procgen::Image;
 
@@ -74,11 +75,11 @@ fn blur_radius_is_a_fraction_of_the_tile() {
         color_a: [0.0; 4],
         color_b: [1.0; 4],
     });
-    let nodes = [
-        node("k", checker, &[]),
-        node("b", OpKind::Blur(Blur { radius: 0.03 }), &["k"]),
-    ];
-    assert_resolution_independent("blur", &nodes, 0.02);
+    for kind in [BlurKind::Box, BlurKind::Gaussian] {
+        let blur = OpKind::Blur(Blur { radius: 0.03, kind });
+        let nodes = [node("k", checker.clone(), &[]), node("b", blur, &["k"])];
+        assert_resolution_independent(&format!("blur {kind:?}"), &nodes, 0.02);
+    }
 }
 
 #[test]

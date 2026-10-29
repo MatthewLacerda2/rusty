@@ -88,6 +88,7 @@ pub enum OpKind {
     SeparateRgb(SeparateRgb),
     Tile(Tile),
     Warp(Warp),
+    NormalBlend(NormalBlend),
 
     // ---- Converter / math ----
     Math(Math),
@@ -100,6 +101,7 @@ pub enum OpKind {
     Blur(Blur),
     Cavity(Cavity),
     Curvature(Curvature),
+    Distance(Distance),
 }
 
 /// The whole authored texture: the canvas resolution, the RNG seed (folded into
