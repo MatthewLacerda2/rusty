@@ -33,7 +33,7 @@ fn gpu_the_copy_is_made_only_for_a_visible_surface_that_reads_it() {
     let Some(mut r) = crate::render::test_gpu::headless_or_skip(16, 16) else {
         return;
     };
-    let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, 16, 16, 2);
+    let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, 16, 16);
     let plain = MaterialAsset {
         render_mode: RenderMode::Transparent,
         alpha: 0.5,
