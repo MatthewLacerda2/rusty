@@ -32,7 +32,8 @@
 //! saved recipe re-bakes through the same verb without a round-trip through Lua.
 //!
 //! An unknown `slot`, or an unknown key anywhere in a recipe, is an error naming it
-//! (#395) — a typo never bakes a silently wrong map.
+//! (#395) — a typo never bakes a silently wrong map. So is a link (#1494) to a node
+//! that doesn't exist, one that closes a cycle, or one on a param that takes none.
 //!
 //! `Texture` borrows no engine state — it reads a recipe and writes a file — so it
 //! registers as a plain static namespace, like `Assets`.
@@ -133,6 +134,8 @@ mod bake_set_tests;
 mod image_tests;
 #[cfg(test)]
 mod inspect_tests;
+#[cfg(test)]
+mod link_tests;
 #[cfg(test)]
 mod size_tests;
 #[cfg(test)]

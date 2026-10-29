@@ -7,7 +7,7 @@ use super::super::{
     BrickOutput, GradientKind, ImageEncoding, NoiseKind, ShapeKind, VoronoiMetric, VoronoiOutput,
     WaveKind,
 };
-use super::{default_mortar, half, one_f32, one_u32, quarter, two};
+use super::{default_mortar, half_param, one_param, one_u32, quarter, two, Param};
 
 // ---- Generators (no inputs) ----
 // Periodic params (`scale`, `frequency`, `rows`/`cols`, `tiles`) are whole counts of
@@ -26,7 +26,7 @@ pub struct Constant {
 /// `ridged`, `turbulence`) sums `octaves`, each `lacunarity`× the previous frequency
 /// (rounded to a whole count, so every octave tiles) and `gain`× its amplitude;
 /// `perlin` is one octave.
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Noise {
     pub kind: NoiseKind,
     pub scale: f32,
@@ -34,23 +34,24 @@ pub struct Noise {
     pub octaves: u32,
     #[serde(default = "two")]
     pub lacunarity: f32,
-    #[serde(default = "half")]
-    pub gain: f32,
+    #[serde(default = "half_param")]
+    pub gain: Param,
     #[serde(default)]
     pub seed: u32,
 }
 
 /// Voronoi / Worley cellular pattern; `randomness` jitters each cell's point (0 = a
 /// regular grid, 1 = anywhere in its cell); `metric` is how distance is measured.
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+/// A linked `randomness` is read once per cell, at its centre.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Voronoi {
     pub scale: f32,
     #[serde(default)]
     pub output: VoronoiOutput,
     #[serde(default)]
     pub metric: VoronoiMetric,
-    #[serde(default = "one_f32")]
-    pub randomness: f32,
+    #[serde(default = "one_param")]
+    pub randomness: Param,
     #[serde(default)]
     pub seed: u32,
 }
@@ -86,14 +87,14 @@ pub struct Brick {
 /// One centred shape per tile as a mask (1 inside, 0 outside). `size` is its
 /// width/height in tile units; `roundness` (0–1) rounds a `rounded_rect`'s corners;
 /// `softness` (tile units) ramps the edge inward, a bevel profile.
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Shape {
     pub kind: ShapeKind,
     pub size: [f32; 2],
     #[serde(default = "quarter")]
     pub roundness: f32,
     #[serde(default)]
-    pub softness: f32,
+    pub softness: Param,
 }
 
 /// A 2-color checkerboard; `tiles` squares across each axis (rounded up to even).

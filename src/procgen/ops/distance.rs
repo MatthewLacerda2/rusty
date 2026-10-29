@@ -20,14 +20,16 @@
 //! edge can sit on the outside pixel's boundary along the axis it lies on.
 
 use super::super::image_buf::Image;
+use super::field::Field;
 
 /// The distance from each inside pixel (red > 0.5) to the mask's edge, over
 /// `radius` tile units, clamped to `[0, 1]`, as grayscale. The edge sits half a
 /// pixel short of the nearest outside pixel's centre, that pixel's step along the
 /// axis the offset mostly lies on, so a pixel next to the outside reads half a
 /// pixel of its own axis. Outside reads 0; a mask with no outside reads 1
-/// everywhere; a `radius` of 0 or less reads 1 everywhere inside.
-pub fn distance(img: &Image, radius: f32) -> Image {
+/// everywhere; a `radius` of 0 or less reads 1 everywhere inside. A linked
+/// `radius` is read at each pixel (#1494).
+pub fn distance(img: &Image, radius: Field) -> Image {
     let size = img.size();
     let unit = size.longer() as f64;
     // Each axis' step, in longer-side pixels: 1 on a square image.
@@ -42,8 +44,8 @@ pub fn distance(img: &Image, radius: f32) -> Image {
     let cols = transform_rows(&seed.transposed(), sy * sy).transposed();
     // Along the rows: [1] the column offset, [2] the row offset carried from the site.
     let mut out = transform_rows(&cols, sx * sx);
-    let scale = radius * unit as f32;
-    out.map_in_place(|p| {
+    out.map_indexed(|i, p| {
+        let scale = radius.at(i) * unit as f32;
         let d = p[0].sqrt();
         let (ox, oy) = (f64::from(p[1]) * sx, f64::from(p[2]) * sy);
         let step = if ox.abs() >= oy.abs() { sx } else { sy };

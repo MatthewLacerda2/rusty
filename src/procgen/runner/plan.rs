@@ -1,19 +1,20 @@
 //! Check a recipe and order the nodes its targets need (#1485). Everything that can
 //! be wrong with a recipe's wiring is refused here, before any node evaluates, so a
 //! bake either runs whole or writes nothing: every node is checked (ids, arity,
-//! inputs, cycles), not only the ones the targets reach.
+//! inputs, links, cycles), not only the ones the targets reach.
 
 use crate::core::collections::Map;
 
 use super::RunError;
-use crate::procgen::recipe::{Node, TextureRecipe};
+use crate::procgen::recipe::{Link, Node, TextureRecipe};
 
 /// The nodes to evaluate and how they connect, as indices into `recipe.nodes`.
 pub(super) struct Plan {
     /// Every node a root needs, each after its inputs, in the order a DFS from the
     /// roots (the targets, or under [`Scope::Every`] the sinks) finishes them.
     pub order: Vec<usize>,
-    /// Each node's inputs, in the node's order.
+    /// Each node's edges: its inputs in the node's order, then the nodes its params
+    /// link to (#1494), in [`crate::procgen::recipe::OpKind::links`] order.
     pub inputs: Vec<Vec<usize>>,
     /// How many input slots of planned nodes read each node: its image is dropped
     /// when this many have run.
@@ -93,7 +94,9 @@ pub(super) fn plan(
     })
 }
 
-/// Every node's inputs as indices, after checking its arity and that each id exists.
+/// Every node's edges as indices (its inputs, then its links), after checking its
+/// arity and that each id exists. A link is an edge like an input: it orders the
+/// nodes, counts as a consumer, and closes a cycle like one.
 fn wire(recipe: &TextureRecipe, by_id: &Map<&str, usize>) -> Result<Vec<Vec<usize>>, RunError> {
     let wire_node = |node: &Node| {
         node.check_arity().map_err(RunError::Arity)?;
@@ -106,7 +109,20 @@ fn wire(recipe: &TextureRecipe, by_id: &Map<&str, usize>) -> Result<Vec<Vec<usiz
                     input: input.clone(),
                 })
         };
-        node.inputs.iter().map(index).collect()
+        let link = |(param, link): (&str, &Link)| {
+            by_id
+                .get(link.node.as_str())
+                .copied()
+                .ok_or_else(|| RunError::UnknownLink {
+                    node: node.id.clone(),
+                    param: param.to_string(),
+                    link: link.node.clone(),
+                })
+        };
+        let inputs = node.inputs.iter().map(index);
+        inputs
+            .chain(node.op.links().into_iter().map(link))
+            .collect()
     };
     recipe.nodes.iter().map(wire_node).collect()
 }

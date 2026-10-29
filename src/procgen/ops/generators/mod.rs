@@ -27,9 +27,11 @@ use super::super::image_buf::{Rgba, Size};
 use super::super::recipe::{
     Brick, Checker, Constant, GradientKind, Noise, Shape, Voronoi, WaveKind,
 };
+use super::field::Field;
 
-/// A generator's per-point function over the unit domain.
-pub type Sampler = Box<dyn Fn(f32, f32) -> Rgba + Send + Sync>;
+/// A generator's per-point function over the unit domain, borrowing for `'a` the
+/// images its linked params read (#1494).
+pub type Sampler<'a> = Box<dyn Fn(f32, f32) -> Rgba + Send + Sync + 'a>;
 
 /// Pack a scalar `v` into an opaque grayscale pixel.
 #[inline]
@@ -45,35 +47,35 @@ pub fn count(x: f32) -> f32 {
 }
 
 /// A flat color fill.
-pub fn constant(p: &Constant) -> Sampler {
+pub fn constant(p: &Constant) -> Sampler<'static> {
     let color = p.color;
     Box::new(move |_, _| color)
 }
 
-/// The `noise` family: Perlin and its fBM / ridged / turbulence sums.
-pub fn noise(p: &Noise, seed: u64) -> Sampler {
-    let octaves = noise::Octaves::new(p.octaves, p.lacunarity, p.gain);
-    noise::sampler(p.kind, p.scale, octaves, seed)
+/// The `noise` family: Perlin and its fBM / ridged / turbulence sums. `gain` is the
+/// op's `gain`, read at each pixel.
+pub fn noise<'a>(p: &Noise, gain: Field<'a>, seed: u64) -> Sampler<'a> {
+    noise::sampler(p.kind, p.scale, (p.octaves, p.lacunarity, gain), seed)
 }
 
-/// The Voronoi / Worley cellular pattern.
-pub fn voronoi(p: &Voronoi, seed: u64) -> Sampler {
-    voronoi::sampler(p.scale, p.output, p.metric, p.randomness, seed)
+/// The Voronoi / Worley cellular pattern. `randomness` is the op's, read per cell.
+pub fn voronoi<'a>(p: &Voronoi, randomness: Field<'a>, seed: u64) -> Sampler<'a> {
+    voronoi::sampler(p.scale, p.output, p.metric, randomness, seed)
 }
 
 /// The running-bond brick pattern.
-pub fn brick(p: &Brick, seed: u64) -> Sampler {
+pub fn brick(p: &Brick, seed: u64) -> Sampler<'static> {
     brick::sampler(p.rows, p.cols, p.mortar, p.output, seed)
 }
 
-/// One centred shape per tile.
-pub fn shape(p: &Shape) -> Sampler {
-    shape::sampler(p.kind, p.size, p.roundness, p.softness)
+/// One centred shape per tile. `softness` is the op's, read at each pixel.
+pub fn shape<'a>(p: &Shape, softness: Field<'a>) -> Sampler<'a> {
+    shape::sampler(p.kind, p.size, p.roundness, softness)
 }
 
 /// Per-pixel uniform white noise, grayscale. The pixel lattice wraps at `size`, per
 /// axis. `size` matters only here: the grain is one pixel on each axis.
-pub fn white_noise(size: Size, seed: u64) -> Sampler {
+pub fn white_noise(size: Size, seed: u64) -> Sampler<'static> {
     let (rx, ry) = (size.width.max(1) as i64, size.height.max(1) as i64);
     let (w, h) = (size.width as f32, size.height as f32);
     Box::new(move |u, v| {
@@ -86,7 +88,7 @@ pub fn white_noise(size: Size, seed: u64) -> Sampler {
 /// Checkerboard: `tiles` squares across each axis; alternating `a`/`b`. `tiles`
 /// rounds **up to even**: an odd count would put two same-colour squares side by
 /// side at the wrap.
-pub fn checker(p: &Checker) -> Sampler {
+pub fn checker(p: &Checker) -> Sampler<'static> {
     let (a, b) = (p.color_a, p.color_b);
     let t = p.tiles.max(1).next_multiple_of(2) as f32;
     Box::new(move |u, v| {
@@ -102,7 +104,7 @@ pub fn checker(p: &Checker) -> Sampler {
 
 /// Linear ramp (left→right, the one non-tiling generator), its seamless 0→1→0
 /// triangle twin, or a radial (center→edge) ramp.
-pub fn gradient(kind: GradientKind) -> Sampler {
+pub fn gradient(kind: GradientKind) -> Sampler<'static> {
     Box::new(move |u, v| match kind {
         GradientKind::Linear => gray(u),
         GradientKind::LinearTiling => gray(1.0 - (2.0 * u.rem_euclid(1.0) - 1.0).abs()),
@@ -117,7 +119,7 @@ pub fn gradient(kind: GradientKind) -> Sampler {
 
 /// Bands (parallel) or rings (concentric): a `[0, 1]` sine with `frequency` whole
 /// cycles across the domain.
-pub fn wave(kind: WaveKind, frequency: f32) -> Sampler {
+pub fn wave(kind: WaveKind, frequency: f32) -> Sampler<'static> {
     let f = count(frequency);
     Box::new(move |u, v| {
         let phase = match kind {

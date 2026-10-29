@@ -193,7 +193,8 @@ list below is a summary of it. Each entry has the `op` tag, its `category`
 `params`. Each param has a
 `name`, a `type` (`number` | `integer` | `bool` | `color` | `vec2` |
 `enum` | `stops` | `path`, a project-relative file path), `required`, a `default` when it has one (absent when required),
-and for an `enum` the accepted `values`. Units and rounding are the ones *Tiling*
+`socket` (whether it takes a link to another node, *Linked params* below), and for an
+`enum` the accepted `values`. Units and rounding are the ones *Tiling*
 and *Units* below describe. A unit test holds the catalog to the recipe parser, so
 it can't name an op or param the parser doesn't take, or a default it doesn't apply.
 
@@ -313,6 +314,69 @@ end  -- rows number nil / cols number nil / mortar number 0.05
   top) it is a rounded, convex edge. Avoid an `ease` `color_ramp` here: it is flat at
   the rim too, so the edge reads as a pillow. It wraps, so a tiling mask gives a
   tiling bevel).
+
+### Linked params — a node drives a value
+
+Blender lets any input socket take another node. A curated set of rusty's params
+does the same: in place of a number, the param takes a **link**, and its value then
+varies across the map.
+
+```lua
+strength = { node = "damage", min = 0, max = 0.2 }  -- min + (max − min) × damage.red
+```
+
+`min` and `max` default to 0 and 1. A link reads the linked node's **red** channel,
+like every mask input; to read another channel, link a `separate_rgb` of it. The
+linked node is an edge of the graph like an input: it is evaluated first, a cycle
+through it is refused, and `Texture.Stats` and `Texture.Preview` show it like any
+node. A link to a node that doesn't exist, a cycle through a link and a link on a
+param that takes none are each refused before anything is written, the last naming
+the params of that op that do link. A link to a `constant` bakes exactly like its
+number.
+
+**The params that link** (`socket = true` in `Texture.Ops()`, the list to trust):
+
+- `warp.strength`, `bump_to_normal.strength`, `curvature.strength`,
+  `normal_blend.strength`: read at each pixel;
+- `blur.radius`, `distance.radius`: read at each pixel. A blur's radius varies
+  smoothly: sharp where the link is dark, soft where it is bright, each pixel
+  averaging its own window in constant time whatever its width. A Gaussian is still
+  three passes, and spreads as far as the same radius as a number. A linked box is
+  not rounded to a whole pixel as a number's box is (a rounded radius would step
+  visibly across the map), so it matches the number only at whole-pixel radii;
+- `tile.jitter`, `tile.rotation_jitter`, `tile.scale_jitter`, `voronoi.randomness`:
+  read **once per cell**, at the cell's centre, wrapped, so each cell keeps one
+  stamp or one point and the result still tiles;
+- `shape.softness`, `noise.gain`: read at each pixel;
+- `hue_sat_value.hue`, `.sat`, `.value`, `bright_contrast.bright`, `.contrast`,
+  `gamma.gamma`: read at each pixel.
+
+**What never links:** a whole count (`scale`, `octaves`, `lacunarity`, `rows`,
+`cols`, `tiles`, `count`, `frequency`). A count that changed from pixel to pixel
+could not stay whole, so it would open seams or cut visibly where it stepped. Nor do
+`mapping`'s params (a per-pixel translation is `warp`, and a per-pixel scale or
+rotation would break the tiling), enums, colours or `size`. `mix.factor` and
+`math.value` already take an image through an input.
+
+Disorder that grows over a damaged area: tiles laid in an ordered grid on clean
+ground and scattered where a damage mask is white. Mixing two `tile` ops by the mask
+would double the stamps along the transition; one linked `tile` keeps one stamp per
+cell.
+
+```lua
+local damaged = { resolution = 256, output = "tiles", nodes = {
+  { id = "tile",   op = "shape", kind = "rounded_rect", size = {0.9, 0.9}, softness = 0.1 },
+  { id = "damage", op = "noise", kind = "fbm", scale = 3, octaves = 4, seed = 5 },
+  { id = "edge",   op = "map_range", from_min = 0.55, from_max = 0.65, to_min = 0, to_max = 1,
+    inputs = {"damage"} },
+  { id = "mask",   op = "clamp", min = 0, max = 1, inputs = {"edge"} },
+  { id = "tiles",  op = "tile", count = 8, inputs = {"tile"},
+    jitter          = { node = "mask", max = 0.6 },
+    rotation_jitter = { node = "mask", max = 0.15 },
+    scale_jitter    = { node = "mask", max = 0.3 } },
+} }
+local stats = Texture.Stats(damaged)  -- `mask` is listed with the rest
+```
 
 ### Image files — `image`
 

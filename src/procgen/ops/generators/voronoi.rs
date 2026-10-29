@@ -3,22 +3,30 @@
 
 use super::{count, gray, Sampler};
 use crate::procgen::hash;
+use crate::procgen::ops::field::{Field, PerCell};
 use crate::procgen::recipe::{VoronoiMetric, VoronoiOutput};
 
 /// The `scale`-cells-per-tile Voronoi sampler. Each cell's feature point sits at the
 /// cell centre pushed by `randomness` (clamped to `[0, 1]`) of a full-cell jitter, so
 /// 0 is a regular grid and 1 is anywhere in the cell; `metric` measures distance.
+/// A linked `randomness` is read at each cell's centre, wrapped, so the cell keeps
+/// one point and the pattern still tiles (#1494).
 pub fn sampler(
     scale: f32,
     output: VoronoiOutput,
     metric: VoronoiMetric,
-    randomness: f32,
+    randomness: Field<'_>,
     seed: u64,
-) -> Sampler {
+) -> Sampler<'_> {
     let cells = count(scale);
     let per = cells as i64;
-    let jitter = randomness.clamp(0.0, 1.0);
     let reach = reach(output, metric);
+    let centre = move |c: i64| (c as f32 + 0.5) / cells;
+    let jitters = PerCell::new(per, &[randomness], move |cell: (i64, i64)| {
+        randomness
+            .at_uv(centre(cell.0), centre(cell.1))
+            .clamp(0.0, 1.0)
+    });
     Box::new(move |u, v| {
         let (px, py) = (u * cells, v * cells);
         let (gx, gy) = (px.floor() as i64, py.floor() as i64);
@@ -27,6 +35,7 @@ pub fn sampler(
             for dx in -reach..=reach {
                 let (cx, cy) = (gx + dx, gy + dy);
                 let cell = (cx.rem_euclid(per), cy.rem_euclid(per));
+                let jitter = jitters.get(cell);
                 let at = |ch| 0.5 + jitter * (hash::unit2(cell.0, cell.1, ch, seed) - 0.5);
                 let dist = measure(metric, cx as f32 + at(1) - px, cy as f32 + at(2) - py);
                 if dist < f1 {

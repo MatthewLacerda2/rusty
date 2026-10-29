@@ -4,13 +4,14 @@
 //! `deny_unknown_fields` does not compose with `#[serde(flatten)]` — so the check
 //! runs after parsing instead: the parsed op is serialized back, and any key the
 //! author wrote that it does not produce is refused by name. The op's own serde
-//! derive stays the single source of which params exist.
+//! derive stays the single source of which params exist. A link on a param the
+//! catalog doesn't mark `socket` is refused first, naming the ones that take one.
 
 use serde::de::Error as _;
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 
-use super::{Arity, OpKind};
+use super::{Arity, OpKind, OPS};
 
 /// One node in the recipe DAG: a stable `id`, the op to run, and the `id`s of the
 /// input nodes feeding it (in order).
@@ -90,6 +91,9 @@ struct RawNode {
 impl<'de> Deserialize<'de> for Node {
     fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
         let given = Value::deserialize(d)?;
+        if let Some(message) = refused_link(&given) {
+            return Err(D::Error::custom(message));
+        }
         let raw: RawNode = serde_json::from_value(given.clone()).map_err(D::Error::custom)?;
         let node = Node {
             id: raw.id,
@@ -103,6 +107,33 @@ impl<'de> Deserialize<'de> for Node {
         node.check_arity().map_err(D::Error::custom)?;
         Ok(node)
     }
+}
+
+/// A link on a param that takes none (#1494), named with the params of its op that
+/// do: "node "n" (op "noise"): param "scale" takes no link; noise links gain". Only
+/// a link is an object among a param's values, so any object counts as one.
+fn refused_link(given: &Value) -> Option<String> {
+    let node = given.as_object()?;
+    let op = node.get("op")?.as_str()?;
+    let info = OPS.iter().find(|info| info.op == op)?;
+    let refuses = |key: &str| info.params.iter().any(|p| p.name == key && !p.socket);
+    let (key, _) = node
+        .iter()
+        .find(|(key, value)| value.is_object() && refuses(key))?;
+    let sockets: Vec<&str> = info
+        .params
+        .iter()
+        .filter(|p| p.socket)
+        .map(|p| p.name)
+        .collect();
+    let links = match sockets.is_empty() {
+        true => format!("{op} takes no links"),
+        false => format!("{op} links {}", sockets.join(", ")),
+    };
+    let id = node.get("id").and_then(Value::as_str).unwrap_or("?");
+    Some(format!(
+        "node {id:?} (op {op:?}): param {key:?} takes no link; {links}"
+    ))
 }
 
 /// The first key in `given` that is neither a node field nor produced by the op.
@@ -193,6 +224,22 @@ mod tests {
             assert!(math(func, r#""a""#).is_ok(), "{func}");
         }
         assert!(math("max", r#""a", "b""#).is_ok());
+    }
+
+    #[test]
+    fn a_link_on_a_param_that_takes_none_names_the_ones_that_do() {
+        let link = r#"{ "node": "m" }"#;
+        let noise = format!(r#"{{ "id": "n", "op": "noise", "kind": "fbm", "scale": {link} }}"#);
+        let err = parse(&noise).unwrap_err();
+        assert!(
+            err.contains("\"scale\" takes no link; noise links gain"),
+            "{err}"
+        );
+        let mix = format!(r#"{{ "id": "x", "op": "mix", "mode": "add", "factor": {link} }}"#);
+        assert!(parse(&mix).unwrap_err().contains("mix takes no links"));
+        let warp =
+            format!(r#"{{ "id": "w", "op": "warp", "strength": {link}, "inputs": ["a", "b"] }}"#);
+        assert!(parse(&warp).is_ok());
     }
 
     #[test]

@@ -16,7 +16,7 @@ fn noise(id: &str, kind: NoiseKind, scale: f32) -> Node {
         scale,
         octaves: 3,
         lacunarity: 2.0,
-        gain: 0.5,
+        gain: 0.5.into(),
         seed: 0,
     });
     node(id, op, &[])
@@ -29,7 +29,13 @@ fn warped(strength: f32) -> Vec<Node> {
         noise("dx", NoiseKind::Fbm, 3.0),
         noise("dy", NoiseKind::Fbm, 5.0),
         node("d", OpKind::CombineRgb, &["dx", "dy", "dx"]),
-        node("out", OpKind::Warp(Warp { strength }), &["a", "d"]),
+        node(
+            "out",
+            OpKind::Warp(Warp {
+                strength: strength.into(),
+            }),
+            &["a", "d"],
+        ),
     ]
 }
 
@@ -52,7 +58,7 @@ fn organic_ops_bake_byte_identically_per_seed() {
             scale: 6.0,
             output,
             metric: VoronoiMetric::Euclidean,
-            randomness: 0.7,
+            randomness: 0.7.into(),
             seed: 0,
         });
         vec![node("v", op, &[])]

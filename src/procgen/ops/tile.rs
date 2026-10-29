@@ -1,6 +1,7 @@
 //! The `tile` scatter op (#407): stamp the input once per cell of a whole-count grid,
 //! each cell nudged, turned and scaled by values hashed from its wrapped index and
-//! the recipe seed. Rivets are `shape circle` → `tile`.
+//! the recipe seed. Rivets are `shape circle` → `tile`. A linked jitter varies by
+//! cell (#1494): an ordered grid that grows chaotic over a damage mask.
 //!
 //! The input is read as **one stamp**: the unit square, nothing outside it (no
 //! wrap), so a stamp pushed across its cell's border is drawn in the neighbour cell
@@ -10,6 +11,7 @@
 use super::super::hash;
 use super::super::image_buf::{Image, Rgba};
 use super::super::recipe::Tile;
+use super::field::{Field, Links, PerCell};
 use super::generators::count;
 
 /// The hash channels a cell's offset x/y, rotation and scale draw from (clear of
@@ -27,11 +29,6 @@ pub struct Jitter {
 }
 
 impl Jitter {
-    /// The `tile` op's three jitter params.
-    pub fn of(p: &Tile) -> Self {
-        Self::new(p.jitter, p.rotation_jitter, p.scale_jitter)
-    }
-
     pub fn new(offset: f32, rotation: f32, scale: f32) -> Self {
         Self {
             offset: offset.clamp(0.0, 1.0),
@@ -53,8 +50,54 @@ impl Jitter {
     }
 }
 
+/// The three jitter params as [`Field`]s (#1494). A linked one is read once per
+/// cell, at the cell's centre, wrapped: each cell keeps one stamp, and a cell met
+/// across the wrap is the same cell, so the result still tiles.
+#[derive(Clone, Copy, Debug)]
+pub struct Jitters<'a> {
+    pub offset: Field<'a>,
+    pub rotation: Field<'a>,
+    pub scale: Field<'a>,
+}
+
+impl<'a> Jitters<'a> {
+    /// The `tile` op's three jitter params, resolved against its `links`.
+    pub fn of(p: &Tile, links: &Links<'a>) -> Self {
+        Self {
+            offset: links.field(&p.jitter),
+            rotation: links.field(&p.rotation_jitter),
+            scale: links.field(&p.scale_jitter),
+        }
+    }
+
+    /// The same jitter everywhere.
+    pub fn uniform(offset: f32, rotation: f32, scale: f32) -> Self {
+        Self {
+            offset: Field::Const(offset),
+            rotation: Field::Const(rotation),
+            scale: Field::Const(scale),
+        }
+    }
+
+    /// The jitter of the (wrapped) cell `cell` of an `n`-cell grid.
+    fn at(&self, cell: (i64, i64), n: f32) -> Jitter {
+        let (u, v) = ((cell.0 as f32 + 0.5) / n, (cell.1 as f32 + 0.5) / n);
+        Jitter::new(
+            self.offset.at_uv(u, v),
+            self.rotation.at_uv(u, v),
+            self.scale.at_uv(u, v),
+        )
+    }
+
+    /// The reach of the widest jitter any cell takes.
+    fn reach(&self) -> i64 {
+        Jitter::new(self.offset.max(), self.rotation.max(), self.scale.max()).reach()
+    }
+}
+
 /// One cell's stamp transform: centre offset (cells), `(cos, sin)` of its turn, and
 /// `1 / scale`.
+#[derive(Clone, Copy)]
 struct Stamp {
     offset: [f32; 2],
     turn: (f32, f32),
@@ -82,10 +125,14 @@ impl Stamp {
 }
 
 /// Scatter `img` over a `count`×`count` grid (rounded to a whole count ≥ 1).
-pub fn tile(img: &Image, cells: f32, jitter: Jitter, seed: u64) -> Image {
+pub fn tile(img: &Image, cells: f32, jitter: Jitters, seed: u64) -> Image {
     let n = count(cells);
     let per = n as i64;
     let reach = jitter.reach();
+    let fields = [jitter.offset, jitter.rotation, jitter.scale];
+    let stamps = PerCell::new(per, &fields, |cell| {
+        Stamp::of(cell, jitter.at(cell, n), seed)
+    });
     Image::fill_uv(img.size(), |u, v| {
         let (px, py) = (u * n, v * n);
         let (gx, gy) = (px.floor() as i64, py.floor() as i64);
@@ -93,7 +140,8 @@ pub fn tile(img: &Image, cells: f32, jitter: Jitter, seed: u64) -> Image {
         for dy in -reach..=reach {
             for dx in -reach..=reach {
                 let (cx, cy) = (gx + dx, gy + dy);
-                let stamp = Stamp::of((cx.rem_euclid(per), cy.rem_euclid(per)), jitter, seed);
+                let cell = (cx.rem_euclid(per), cy.rem_euclid(per));
+                let stamp = stamps.get(cell);
                 let (su, sv) = stamp.local(px - cx as f32 - 0.5, py - cy as f32 - 0.5);
                 if (0.0..1.0).contains(&su) && (0.0..1.0).contains(&sv) {
                     let p = img.sample_bilinear_wrapped(su, sv);
@@ -119,7 +167,7 @@ mod tests {
     #[test]
     fn no_jitter_repeats_the_input_exactly() {
         let src = Image::fill_uv(8, |u, v| [u, v, 0.0, 1.0]);
-        let out = tile(&src, 2.0, Jitter::new(0.0, 0.0, 0.0), 1);
+        let out = tile(&src, 2.0, Jitters::uniform(0.0, 0.0, 0.0), 1);
         assert_eq!(out.size(), 8.into());
         for y in 0..8 {
             for x in 0..8 {

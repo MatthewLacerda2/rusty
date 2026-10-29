@@ -11,7 +11,13 @@ const BRICK_CHANNEL: u64 = 16;
 
 /// `cols`×`rows` bricks, every other row offset half a brick. `mortar` is the gap
 /// as a fraction of one brick, on its left and bottom sides; mortar reads 0.
-pub fn sampler(rows: f32, cols: f32, mortar: f32, output: BrickOutput, seed: u64) -> Sampler {
+pub fn sampler(
+    rows: f32,
+    cols: f32,
+    mortar: f32,
+    output: BrickOutput,
+    seed: u64,
+) -> Sampler<'static> {
     let rows = count(rows / 2.0) * 2.0;
     let cols = count(cols);
     let mortar = mortar.clamp(0.0, 1.0);
@@ -53,7 +59,7 @@ fn bevel(cx: f32, cy: f32, mortar: f32, cols: f32, rows: f32) -> f32 {
 mod tests {
     use super::*;
 
-    fn brick(output: BrickOutput, seed: u64) -> Sampler {
+    fn brick(output: BrickOutput, seed: u64) -> Sampler<'static> {
         sampler(2.0, 2.0, 0.1, output, seed)
     }
 

@@ -3,9 +3,10 @@
 //! Two steps. `plan` checks the whole recipe before anything runs (resolution,
 //! unique ids, every node's input [`Arity`](super::recipe::Arity), every id it
 //! names, no cycle anywhere) and orders the nodes the targets need, counting each
-//! one's consumers. Then the
-//! plan runs: each node's op through [`super::ops::eval_node`] with its inputs'
-//! buffers, and an image is dropped the moment its last consumer has run, so a long
+//! one's consumers. A param's link to another node (#1494) is an edge like an
+//! input. Then the
+//! plan runs: each node's op through [`super::ops::eval_linked`] with its inputs'
+//! and links' buffers, and an image is dropped the moment its last consumer has run, so a long
 //! chain holds a couple of images at once, not one per node (#1485). Working buffers
 //! are linear `[f32; 4]` RGBA and the sampling domain wraps, so results tile by
 //! construction.
@@ -24,7 +25,8 @@ pub mod stats;
 
 use super::hash::node_seed;
 use super::image_buf::Image;
-use super::ops::eval_node;
+use super::ops::eval_linked;
+use super::ops::field::Links;
 use super::recipe::{ArityError, TextureRecipe};
 use super::source::Sources;
 use plan::{plan, Plan, Scope};
@@ -42,6 +44,12 @@ pub enum RunError {
     Arity(ArityError),
     /// A node referenced an input id that no node defines.
     UnknownInput { node: String, input: String },
+    /// A node's param links to an id that no node defines (#1494).
+    UnknownLink {
+        node: String,
+        param: String,
+        link: String,
+    },
     /// The named output node is not in the recipe.
     UnknownOutput(String),
     /// The graph contains a cycle (not a DAG).
@@ -60,6 +68,9 @@ impl std::fmt::Display for RunError {
             RunError::Arity(e) => e.fmt(f),
             RunError::UnknownInput { node, input } => {
                 write!(f, "node '{node}' references unknown input '{input}'")
+            }
+            RunError::UnknownLink { node, param, link } => {
+                write!(f, "node '{node}' links {param} to unknown node '{link}'")
             }
             RunError::UnknownOutput(id) => write!(f, "output node '{id}' not found"),
             RunError::Cycle(id) => write!(f, "recipe DAG has a cycle at node '{id}'"),
@@ -160,13 +171,20 @@ fn run(
     let mut uses = plan.uses.clone();
     let (mut live, mut peak_live) = (0, 0);
     for &i in &plan.order {
-        let inputs: Vec<&Image> = plan.inputs[i]
+        let edges: Vec<&Image> = plan.inputs[i]
             .iter()
             .map(|&j| slots[j].as_ref().expect("plan orders inputs first"))
             .collect();
-        let op = &recipe.nodes[i].op;
-        let seed = node_seed(recipe.seed, op.seed());
-        let out = eval_node(op, &inputs, recipe.extent(), seed, sources);
+        let node = &recipe.nodes[i];
+        let (inputs, linked) = edges.split_at(node.inputs.len());
+        let ids = plan.inputs[i][node.inputs.len()..].iter();
+        let links = Links::new(
+            ids.map(|&j| recipe.nodes[j].id.as_str())
+                .zip(linked.iter().copied())
+                .collect(),
+        );
+        let seed = node_seed(recipe.seed, node.op.seed());
+        let out = eval_linked(&node.op, inputs, &links, recipe.extent(), seed, sources);
         on_node(i, &out);
         slots[i] = Some(out);
         live += 1;

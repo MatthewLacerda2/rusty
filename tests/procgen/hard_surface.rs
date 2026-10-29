@@ -13,7 +13,7 @@ fn shape(kind: ShapeKind, softness: f32) -> Node {
         kind,
         size: [0.7, 0.5],
         roundness: 0.4,
-        softness,
+        softness: softness.into(),
     });
     node("s", op, &[])
 }
@@ -22,9 +22,9 @@ fn shape(kind: ShapeKind, softness: f32) -> Node {
 fn rivets(jitter: f32, rotation_jitter: f32, scale_jitter: f32) -> Vec<Node> {
     let tile = OpKind::Tile(Tile {
         count: 5.0,
-        jitter,
-        rotation_jitter,
-        scale_jitter,
+        jitter: jitter.into(),
+        rotation_jitter: rotation_jitter.into(),
+        scale_jitter: scale_jitter.into(),
         seed: 0,
     });
     vec![shape(ShapeKind::Circle, 0.1), node("t", tile, &["s"])]
@@ -59,7 +59,7 @@ fn hard_surface() -> Vec<(String, OpKind)> {
             kind,
             size: [1.3, 0.4],
             roundness: 0.5,
-            softness: 0.1,
+            softness: 0.1.into(),
         });
         ops.push((format!("shape {kind:?}"), op));
     }
@@ -92,13 +92,13 @@ fn tile_of_a_rect_panel_has_no_gaps_at_the_cell_borders() {
         kind: ShapeKind::Rect,
         size: [1.0, 1.0],
         roundness: 0.0,
-        softness: 0.0,
+        softness: 0.0.into(),
     });
     let tile = OpKind::Tile(Tile {
         count: 3.0,
-        jitter: 0.0,
-        rotation_jitter: 0.0,
-        scale_jitter: 0.0,
+        jitter: 0.0.into(),
+        rotation_jitter: 0.0.into(),
+        scale_jitter: 0.0.into(),
         seed: 0,
     });
     let img = bake(vec![node("s", op, &[]), node("t", tile, &["s"])]);

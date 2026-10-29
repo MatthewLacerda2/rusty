@@ -7,10 +7,11 @@
 //! op's [`super::Arity`] is refused before anything evaluates (#1485).
 //! `catalog_tests.rs` keeps it honest against the enum: every variant has an entry,
 //! every entry's params are exactly the variant's serde fields, and every default
-//! here is the one serde fills in.
+//! here is the one serde fills in. A param marked [`socket`] takes a link to another
+//! node as well as a number (#1494); the tests hold that flag to what parses.
 
 use super::arity::{arity, ONE, SOURCE};
-use super::op_info::{choice, op, opt, req, Lit, OpInfo, OpParam};
+use super::op_info::{choice, op, opt, req, socket, Lit, OpInfo, OpParam};
 
 const BLEND: &[&str] = &[
     "mix",
@@ -43,7 +44,7 @@ pub const OPS: &[OpInfo] = &[
             req("scale", "number"),
             opt("octaves", "integer", Lit::Integer(1)),
             opt("lacunarity", "number", Lit::Number(2.0)),
-            opt("gain", "number", Lit::Number(0.5)),
+            socket(opt("gain", "number", Lit::Number(0.5))),
             SEED,
         ],
     ),
@@ -61,7 +62,7 @@ pub const OPS: &[OpInfo] = &[
                 default: Some(Lit::Text("euclidean")),
                 ..choice("metric", &["euclidean", "manhattan", "chebyshev"])
             },
-            opt("randomness", "number", Lit::Number(1.0)),
+            socket(opt("randomness", "number", Lit::Number(1.0))),
             SEED,
         ],
     ),
@@ -103,7 +104,7 @@ pub const OPS: &[OpInfo] = &[
             choice("kind", &["circle", "rect", "rounded_rect", "line"]),
             req("size", "vec2"),
             opt("roundness", "number", Lit::Number(0.25)),
-            opt("softness", "number", Lit::Number(0.0)),
+            socket(opt("softness", "number", Lit::Number(0.0))),
         ],
     ),
     op(
@@ -155,19 +156,22 @@ pub const OPS: &[OpInfo] = &[
         "bright_contrast",
         "color",
         ONE,
-        &[req("bright", "number"), req("contrast", "number")],
+        &[
+            socket(req("bright", "number")),
+            socket(req("contrast", "number")),
+        ],
     ),
     op(
         "hue_sat_value",
         "color",
         ONE,
         &[
-            req("hue", "number"),
-            req("sat", "number"),
-            req("value", "number"),
+            socket(req("hue", "number")),
+            socket(req("sat", "number")),
+            socket(req("value", "number")),
         ],
     ),
-    op("gamma", "color", ONE, &[req("gamma", "number")]),
+    op("gamma", "color", ONE, &[socket(req("gamma", "number"))]),
     op("auto_levels", "color", ONE, &[]),
     op(
         "mapping",
@@ -184,7 +188,7 @@ pub const OPS: &[OpInfo] = &[
         "bump_to_normal",
         "vector",
         ONE,
-        &[req("strength", "number")],
+        &[socket(req("strength", "number"))],
     ),
     op("combine_rgb", "vector", arity(1, 3), &[]),
     op("separate_rgb", "vector", ONE, &[req("channel", "integer")]),
@@ -194,18 +198,23 @@ pub const OPS: &[OpInfo] = &[
         ONE,
         &[
             req("count", "number"),
-            opt("jitter", "number", Lit::Number(0.0)),
-            opt("rotation_jitter", "number", Lit::Number(0.0)),
-            opt("scale_jitter", "number", Lit::Number(0.0)),
+            socket(opt("jitter", "number", Lit::Number(0.0))),
+            socket(opt("rotation_jitter", "number", Lit::Number(0.0))),
+            socket(opt("scale_jitter", "number", Lit::Number(0.0))),
             SEED,
         ],
     ),
-    op("warp", "vector", arity(2, 2), &[req("strength", "number")]),
+    op(
+        "warp",
+        "vector",
+        arity(2, 2),
+        &[socket(req("strength", "number"))],
+    ),
     op(
         "normal_blend",
         "vector",
         arity(2, 2),
-        &[opt("strength", "number", Lit::Number(1.0))],
+        &[socket(opt("strength", "number", Lit::Number(1.0)))],
     ),
     op(
         "math",
@@ -239,7 +248,7 @@ pub const OPS: &[OpInfo] = &[
         "filter",
         ONE,
         &[
-            req("radius", "number"),
+            socket(req("radius", "number")),
             OpParam {
                 default: Some(Lit::Text("gaussian")),
                 ..choice("kind", &["box", "gaussian"])
@@ -253,12 +262,20 @@ pub const OPS: &[OpInfo] = &[
         ONE,
         &[
             req("radius", "number"),
-            opt("strength", "number", Lit::Number(1.0)),
+            socket(opt("strength", "number", Lit::Number(1.0))),
         ],
     ),
-    op("distance", "filter", ONE, &[req("radius", "number")]),
+    op(
+        "distance",
+        "filter",
+        ONE,
+        &[socket(req("radius", "number"))],
+    ),
 ];
 
+#[cfg(test)]
+#[path = "socket_tests.rs"]
+mod socket_tests;
 #[cfg(test)]
 #[path = "catalog_tests.rs"]
 mod tests;

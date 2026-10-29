@@ -5,7 +5,7 @@
 
 use rusty::procgen::recipe::{
     Blur, BlurKind, BumpToNormal, Cavity, Checker, Curvature, Mapping, Node, Noise, NoiseKind,
-    OpKind,
+    OpKind, Param,
 };
 use rusty::procgen::runner::stats::node_stats;
 use rusty::procgen::Image;
@@ -62,7 +62,7 @@ fn perlin(scale: f32) -> Node {
             scale,
             octaves: 1,
             lacunarity: 2.0,
-            gain: 0.5,
+            gain: 0.5.into(),
             seed: 0,
         }),
         &[],
@@ -77,7 +77,8 @@ fn blur_radius_is_a_fraction_of_the_tile() {
         color_b: [1.0; 4],
     });
     for kind in [BlurKind::Box, BlurKind::Gaussian] {
-        let blur = OpKind::Blur(Blur { radius: 0.03, kind });
+        let radius = Param::Num(0.03);
+        let blur = OpKind::Blur(Blur { radius, kind });
         let nodes = [node("k", checker.clone(), &[]), node("b", blur, &["k"])];
         assert_resolution_independent(&format!("blur {kind:?}"), &nodes, 0.02);
     }
@@ -85,14 +86,9 @@ fn blur_radius_is_a_fraction_of_the_tile() {
 
 #[test]
 fn bump_to_normal_strength_is_a_slope_in_tile_units() {
-    let nodes = [
-        perlin(4.0),
-        node(
-            "b",
-            OpKind::BumpToNormal(BumpToNormal { strength: 0.3 }),
-            &["n"],
-        ),
-    ];
+    let strength = Param::Num(0.3);
+    let bump = OpKind::BumpToNormal(BumpToNormal { strength });
+    let nodes = [perlin(4.0), node("b", bump, &["n"])];
     assert_resolution_independent("bump_to_normal", &nodes, 0.02);
 }
 
@@ -116,7 +112,7 @@ fn height_op_radii_are_in_tile_units() {
         OpKind::Cavity(Cavity { radius: 0.04 }),
         OpKind::Curvature(Curvature {
             radius: 0.03,
-            strength: 3.0,
+            strength: 3.0.into(),
         }),
     ];
     for op in ops {

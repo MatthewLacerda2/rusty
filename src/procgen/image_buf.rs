@@ -178,6 +178,17 @@ impl Image {
         });
     }
 
+    /// [`Self::map_in_place`] with each pixel's row-major index, for an op whose
+    /// params vary per pixel (a linked [`crate::procgen::ops::field::Field`]).
+    pub fn map_indexed(&mut self, f: impl Fn(usize, Rgba) -> Rgba + Sync) {
+        let w = self.size.width as usize;
+        self.for_each_row(|y, row| {
+            for (x, p) in row.iter_mut().enumerate() {
+                *p = f(y * w + x, *p);
+            }
+        });
+    }
+
     /// The image mirrored about its diagonal: pixel `(x, y)` moves to `(y, x)`, and a
     /// `w × h` image becomes `h × w`. Lets a column pass run as a row pass, so it
     /// bands like every other op.

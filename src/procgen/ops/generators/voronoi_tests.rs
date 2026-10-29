@@ -18,7 +18,7 @@ fn each_metric_gives_its_distance_on_a_regular_grid() {
         (Chebyshev, 0.4, 0.6),
     ];
     for (metric, f1, f2) in expected {
-        let at = |output| sampler(4.0, output, metric, 0.0, 9)(u, v)[0];
+        let at = |output| sampler(4.0, output, metric, Field::Const(0.0), 9)(u, v)[0];
         assert!(
             (at(Distance) - f1).abs() < 1e-5,
             "{metric:?} F1 {}",
@@ -76,7 +76,7 @@ fn the_search_reach_finds_the_nearest_two_points_under_every_metric() {
         })
     });
     for (metric, seed, u, v) in SHORT_REACH_MISSES.into_iter().chain(sweep) {
-        let at = |output| sampler(5.0, output, metric, 1.0, seed)(u, v);
+        let at = |output| sampler(5.0, output, metric, Field::Const(1.0), seed)(u, v);
         let (b1, b2, cell) = brute_force(5, metric, seed, u * 5.0, v * 5.0);
         assert!(
             (at(Distance)[0] - b1.min(1.0)).abs() < 1e-6,

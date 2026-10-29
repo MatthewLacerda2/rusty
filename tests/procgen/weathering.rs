@@ -101,7 +101,7 @@ fn cavity_darkens_crevices_and_curvature_splits_edges_from_grooves() {
 
     let op = OpKind::Curvature(Curvature {
         radius: 0.03,
-        strength: 1.0,
+        strength: 1.0.into(),
     });
     let curv = bake(vec![bricks(), node("c", op, &["h"])]);
     let (mortar, brick) = mortar_and_brick_means(&curv, &height);
@@ -118,7 +118,7 @@ fn weathering_bakes_byte_identically_per_seed() {
         scale: 4.0,
         octaves: 3,
         lacunarity: 2.0,
-        gain: 0.5,
+        gain: 0.5.into(),
         seed: 0,
     });
     let nodes = vec![
@@ -128,7 +128,7 @@ fn weathering_bakes_byte_identically_per_seed() {
             "cur",
             OpKind::Curvature(Curvature {
                 radius: 0.02,
-                strength: 2.0,
+                strength: 2.0.into(),
             }),
             &["n"],
         ),
