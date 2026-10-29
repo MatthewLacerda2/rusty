@@ -66,8 +66,7 @@ pub fn register(lua: &Lua) -> Reg {
         "BakeSet",
         lua.create_function(|lua, (recipe, prefix): (Value, String)| {
             let recipe = parse_recipe(&recipe).map_err(mlua::Error::RuntimeError)?;
-            check_set(&recipe).map_err(mlua::Error::RuntimeError)?;
-            let paths = bake_set(&recipe, &sources(&recipe)?, &prefix);
+            let paths = bake_set(&recipe, &set_sources(&recipe)?, &prefix);
             lua.create_table_from(paths.map_err(mlua::Error::RuntimeError)?)
         }),
     )?;
@@ -114,6 +113,13 @@ pub fn register(lua: &Lua) -> Reg {
 fn bake(recipe: &TextureRecipe, path: &str, slot: &str) -> mlua::Result<String> {
     let slot = Slot::parse(slot).map_err(mlua::Error::RuntimeError)?;
     bake_recipe(recipe, &sources(recipe)?, slot, path).map_err(mlua::Error::RuntimeError)
+}
+
+/// [`sources`] for a set bake: its `outputs` are checked first, so a recipe with
+/// none says so rather than naming a file it couldn't read.
+fn set_sources(recipe: &TextureRecipe) -> mlua::Result<Sources> {
+    check_set(recipe).map_err(mlua::Error::RuntimeError)?;
+    sources(recipe)
 }
 
 /// The decoded files `recipe`'s `image` nodes read, from the project root.
