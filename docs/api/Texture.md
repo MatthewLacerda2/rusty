@@ -384,7 +384,9 @@ and 2048² (iterate at a low `resolution`, ship at a high one):
 - `warp.strength` is a displacement in tiles: a channel at 1.0 pushes the read
   `strength / 2` of a tile.
 - `bump_to_normal.strength` scales the slope measured in tile units (height change
-  across one whole tile), not per pixel.
+  across one whole tile), not per pixel. On a `size` recipe the unit is a tile of the
+  **longer** side on both axes, so the same height step between neighbouring pixels
+  slopes the same across and down, as on a mesh mapped at an even texel density.
 - `shape.size` and `shape.softness` are in tiles (`size = [0.5, 0.5]` is half the
   tile each way); under `tile`, that is a fraction of one cell.
 - `distance.radius` is in tiles: the distance from the edge that reads 1.

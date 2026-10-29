@@ -77,7 +77,9 @@ pub fn rebake_maps(
         format!("material {key:?} has no maps recipe to rebake (define it with `maps`)")
     })?;
     if let Some(resolution) = resolution {
-        recipe.set_resolution(resolution)?;
+        recipe
+            .set_resolution(resolution)
+            .map_err(|e| format!("material {key:?} maps: {e}"))?;
     }
     bake_maps(&mut asset, key, root, dir)?;
     materials.insert(key.to_string(), asset);

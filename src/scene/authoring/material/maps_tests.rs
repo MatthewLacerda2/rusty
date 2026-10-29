@@ -113,6 +113,8 @@ fn rebaking_a_sized_recipe_keeps_its_aspect() {
     assert_eq!(m.maps_recipe.as_ref().unwrap().size, Some([16, 4]));
     let file = m.base_color_map.as_ref().unwrap().file().unwrap();
     assert_eq!(image::image_dimensions(file).unwrap(), (16, 4));
+    let err = rebake_maps(&mut materials, "trim", Some(2), &dir, &dir).unwrap_err();
+    assert!(err.starts_with("material \"trim\" maps: size"), "{err}");
 }
 
 #[test]

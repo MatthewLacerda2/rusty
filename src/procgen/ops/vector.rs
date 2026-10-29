@@ -67,20 +67,23 @@ fn quarter_turn(turns: f32) -> (f32, f32) {
 }
 
 /// Bake a tangent-space normal map from `img`'s red channel as a height field. Uses
-/// central differences (wrapped, so the normals tile) converted to **tile units** —
-/// the per-pixel delta times that axis' pixel count — so `strength` means the same
-/// slope at any resolution (#394) and both ways on a non-square image (#1493). Packs the unit normal into `[0, 1]` RGB the renderer's
-/// `2*n - 1` decode expects, with B≈1 for a flat surface.
+/// central differences (wrapped, so the normals tile) converted to **tile units** of
+/// the longer side — the per-pixel delta times that side's pixel count — so
+/// `strength` means the same slope at any resolution (#394). Both axes share that
+/// unit (#1493): a trim sheet is mapped at an even texel density, so the same height
+/// step between neighbours slopes the same across and down, as Substance's Normal
+/// node does. Packs the unit normal into `[0, 1]` RGB the renderer's `2*n - 1`
+/// decode expects, with B≈1 for a flat surface.
 pub fn bump_to_normal(img: &Image, strength: f32) -> Image {
     let (w, hh) = (img.width() as f32, img.height() as f32);
     let h = |x: i64, y: i64| img.get_wrapped(x, y)[0];
-    // Central difference spans two pixels = 2/w of a tile across, 2/h down.
-    let (kx, ky) = (0.5 * w * strength, 0.5 * hh * strength);
+    // Central difference spans two pixels = 2/n of the longer side's tile.
+    let k = 0.5 * img.size().longer() as f32 * strength;
     Image::fill_uv(img.size(), |u, v| {
         let x = (u * w) as i64;
         let y = (v * hh) as i64;
-        let dx = (h(x + 1, y) - h(x - 1, y)) * kx;
-        let dy = (h(x, y + 1) - h(x, y - 1)) * ky;
+        let dx = (h(x + 1, y) - h(x - 1, y)) * k;
+        let dy = (h(x, y + 1) - h(x, y - 1)) * k;
         // Tangent-space normal of the height surface: (-dx, -dy, 1) normalized.
         let inv = 1.0 / (dx * dx + dy * dy + 1.0).sqrt();
         [
