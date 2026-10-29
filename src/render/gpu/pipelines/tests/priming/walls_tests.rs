@@ -83,6 +83,9 @@ fn walls(d: &Dissolve, blur: bool) -> (RefCell<Scene>, u32) {
     let volume = create_entity(&mut scene, "Volume", None);
     let mut vc = default_post_processing();
     vc.ssao.active = true;
+    // SSR writes the velocity target too (#1526): a blurred frame also runs the
+    // primed SSR pipelines, a still one writes no velocity.
+    vc.ssr.active = blur;
     scene.world.set_post_processing(volume, Some(vc));
     let lens = CameraComponent {
         motion_blur_active: blur,
