@@ -107,6 +107,12 @@ pub fn mark_standalone() {
     with_gate(|gate| gate.standalone = true);
 }
 
+/// Whether this thread runs a standalone game ([`mark_standalone`]): it compresses
+/// no texture (`texture_import::refresh_all`), so it never writes into its install.
+pub fn is_standalone() -> bool {
+    with_gate(|gate| gate.standalone)
+}
+
 /// Whether a stale or missing cache is converted now.
 pub fn conversion_allowed() -> bool {
     with_gate(|gate| gate.allowed())

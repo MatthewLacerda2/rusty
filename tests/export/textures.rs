@@ -16,12 +16,12 @@ fn an_images_compressed_copy_ships_and_the_player_writes_none() {
     assert!(shipped.contains_key(&cached), "{:?}", shipped.keys());
     let (ran, _) = play(&out, &[]);
     assert!(ran.status.success());
+    // The player's first launch seeds the starter content (an image among it);
+    // it compresses none of it, and leaves the shipped copy as it was.
     let after = tree(&out);
-    let changed: Vec<_> = after
-        .keys()
-        .filter(|k| shipped.get(*k) != after.get(*k))
-        .collect();
-    assert!(changed.is_empty(), "the player wrote {changed:?}");
+    assert_eq!(after.get(&cached), shipped.get(&cached));
+    let made: Vec<_> = after.keys().filter(|k| k.ends_with(".bctex")).collect();
+    assert_eq!(made, [&cached], "the player compressed nothing");
 }
 
 #[test]

@@ -36,6 +36,9 @@ pub fn refresh(source: &Path, progress: &str) -> Result<bool, String> {
     if w % 4 != 0 || h % 4 != 0 {
         return Ok(false);
     }
+    if let Some(dir) = out.parent() {
+        std::fs::create_dir_all(dir).map_err(|e| named(&e))?;
+    }
     // Held until this returns; checked again under it, since whoever held it
     // may have just made this cache.
     let _lock = convert::lock_cache(&out);
@@ -71,8 +74,13 @@ pub fn images(root: &Path) -> Vec<PathBuf> {
 /// what an export runs before it copies the caches. Each one re-made is noted in
 /// `core::fs::written`, so a renderer holding it uncompressed swaps it. Returns how
 /// many it encoded; a failure is warned of, the rest still run, and the failures
-/// are the `Err`, one per line.
+/// are the `Err`, one per line. A standalone game (`convert::is_standalone`)
+/// encodes nothing, as Unity's player imports nothing: it plays from the caches
+/// its export shipped, and an image without one uploads uncompressed.
 pub fn refresh_all(root: &Path) -> Result<usize, String> {
+    if convert::is_standalone() {
+        return Ok(0);
+    }
     let images = images(root);
     let (mut encoded, mut failed) = (0, Vec::new());
     for (i, image) in images.iter().enumerate() {

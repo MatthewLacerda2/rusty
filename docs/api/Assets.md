@@ -180,7 +180,8 @@ clamped sampler.
   encoder change. The editor makes them in the background when an image is added,
   its settings change or the project opens (the console says each one); entering
   Play waits for any still stale, as it waits for models; an export makes and ships
-  them, so a shipped game never encodes. Until its copy is made, a texture draws
+  them. The standalone player and the `play` harness never encode: they play from
+  the copies the editor or an export made. Until its copy is made, a texture draws
   uncompressed. Encoding BC7 is slow, a few seconds for a 2048² map spread over
   every core, so a project's first import of many large maps takes minutes, once. An
   image whose (fitted) sides are not multiples of 4 is uploaded uncompressed, as
