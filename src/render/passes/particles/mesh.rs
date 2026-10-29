@@ -131,3 +131,7 @@ impl Renderer {
         Some((key, glass))
     }
 }
+
+#[cfg(test)]
+#[path = "mesh_tests.rs"]
+mod tests;

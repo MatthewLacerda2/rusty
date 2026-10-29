@@ -281,3 +281,7 @@ fn style_value(s: &RibbonStyle) -> Value {
         "blend": s.blend,
     })
 }
+
+#[cfg(test)]
+#[path = "components_tests.rs"]
+mod tests;
