@@ -7,7 +7,7 @@ use serde_json::{json, Map, Value as Json};
 
 use super::*;
 use crate::components::{GradientKind, UiGradient};
-use crate::procgen::recipe::{OpInfo, OpKind, OPS};
+use crate::procgen::recipe::{OpInfo, OpKind, OPS, SAMPLE_PATH};
 use crate::procgen::TextureRecipe;
 use crate::shadergen::{PassKind, ShaderRecipe};
 
@@ -38,6 +38,7 @@ fn sample(ty: &str) -> Json {
         "color" => json!([0.0, 0.0, 0.0, 1.0]),
         "vec2" => json!([1.0, 1.0]),
         "bool" => json!(true),
+        "path" => json!(SAMPLE_PATH),
         "stops" => json!([{ "pos": 0.0, "color": [0.0, 0.0, 0.0, 1.0] }]),
         _ => json!(2),
     }

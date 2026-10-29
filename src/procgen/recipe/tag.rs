@@ -20,6 +20,7 @@ impl OpKind {
             OpKind::Shape(_) => "shape",
             OpKind::Checker(_) => "checker",
             OpKind::WhiteNoise(_) => "white_noise",
+            OpKind::Image(_) => "image",
             OpKind::ColorRamp(_) => "color_ramp",
             OpKind::Mix(_) => "mix",
             OpKind::Invert => "invert",

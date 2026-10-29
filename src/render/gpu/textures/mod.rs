@@ -248,6 +248,8 @@ fn checkerboard(side: u32, cell: u32) -> image::RgbaImage {
 }
 
 #[cfg(test)]
+mod data_map_tests;
+#[cfg(test)]
 mod formats_tests;
 #[cfg(test)]
 mod freshness_tests;

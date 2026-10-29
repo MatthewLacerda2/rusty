@@ -61,6 +61,28 @@ pub fn canonicalize(path: &Path) -> std::io::Result<PathBuf> {
     })
 }
 
+/// `file`'s real path when it lies outside `root`, `None` inside it: the one rule
+/// for "an input the project doesn't hold" (#1062), shared by the Lua VM's
+/// `require` / `dofile` and the texture generator's `image` files. An empty `root`
+/// is the working directory. Both sides are std-canonical, so a non-UTF-8 path
+/// can't lose its verbatim prefix on one side only (#1106); print the result with
+/// [`shown`].
+pub fn outside_root(file: &Path, root: &Path) -> Option<PathBuf> {
+    let real = file.canonicalize().unwrap_or_else(|_| file.to_path_buf());
+    let root = if root.as_os_str().is_empty() {
+        Path::new(".")
+    } else {
+        root
+    };
+    let inside = root.canonicalize().is_ok_and(|root| real.starts_with(root));
+    (!inside).then_some(real)
+}
+
+/// `real` as a message prints it: no `\\?\` verbatim prefix, `/`-separated.
+pub fn shown(real: &Path) -> String {
+    to_slash(&canonicalize(real).unwrap_or_else(|_| real.to_path_buf()))
+}
+
 /// `slashed`, a `/`-separated path, joined one part at a time: the platform's own
 /// spelling (#1332, #1371). `Path::join("a/b")` keeps the `/`, so on Windows
 /// `root.join("a/b")` is `root\a/b`; `root.join(native("a/b"))` is `root\a\b`,

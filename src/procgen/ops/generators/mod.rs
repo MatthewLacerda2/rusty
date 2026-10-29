@@ -11,11 +11,16 @@
 //! `gradient linear` is a one-way ramp (use `linear_tiling` for a seamless one), and
 //! the radial shapes (`gradient radial`, `wave rings`) meet the edge
 //! mirror-symmetrically — continuous across the seam, not periodic beyond it.
+//! `image` is no sampler: it resamples a decoded file, whose tiling is the file's own
+//! (#1491).
 
 mod brick;
+mod image;
 mod noise;
 mod shape;
 mod voronoi;
+
+pub use image::image;
 
 use super::super::hash;
 use super::super::image_buf::Rgba;

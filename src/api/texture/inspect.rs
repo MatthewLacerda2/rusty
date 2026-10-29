@@ -22,7 +22,8 @@ pub fn stats_table(
     if let Some(r) = resolution {
         recipe.resolution = r;
     }
-    let all = stats(&recipe).map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+    let all = stats(&recipe, &super::sources(&recipe)?)
+        .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
     let out = lua.create_table()?;
     for (node, s) in recipe.nodes.iter().zip(&all) {
         out.set(node.id.as_str(), node_table(lua, s)?)?;
@@ -54,7 +55,7 @@ pub fn preview_table(
     size: Option<u32>,
 ) -> mlua::Result<Table> {
     let size = size.unwrap_or(PREVIEW_SIZE.min(recipe.resolution));
-    let columns = write_preview(recipe, path, size)
+    let columns = write_preview(recipe, &super::sources(recipe)?, path, size)
         .map_err(|e| mlua::Error::RuntimeError(format!("Texture.Preview: {e}")))?;
     let t = lua.create_table()?;
     t.set("path", path)?;

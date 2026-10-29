@@ -1,6 +1,7 @@
 mod bake;
 mod bands;
 mod hard_surface;
+mod image_input;
 mod ops;
 mod organic;
 mod resolution;

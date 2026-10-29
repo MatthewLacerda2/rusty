@@ -4,85 +4,13 @@
 //! input arity, so this static table carries that metadata for `Texture.Ops()` —
 //! the agent asks the engine what it supports instead of trusting docs that can lag.
 //! The arity is also the runner's: a node wired with fewer or more inputs than its
-//! op's [`Arity`] is refused before anything evaluates (#1485).
+//! op's [`super::Arity`] is refused before anything evaluates (#1485).
 //! `catalog_tests.rs` keeps it honest against the enum: every variant has an entry,
 //! every entry's params are exactly the variant's serde fields, and every default
 //! here is the one serde fills in.
 
-use super::arity::{arity, Arity, ONE, SOURCE};
-
-/// A param's literal default value, as the agent would write it in a recipe.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum Lit {
-    Number(f32),
-    Integer(u32),
-    Bool(bool),
-    Text(&'static str),
-}
-
-/// One param of an op: its recipe key, value type, the allowed values when the type
-/// is `"enum"`, and its default (`None` = required).
-#[derive(Clone, Copy, Debug)]
-pub struct OpParam {
-    pub name: &'static str,
-    /// `number` | `integer` | `bool` | `color` (a linear RGBA array, or an sRGB
-    /// `"#rrggbb"` / `"#rrggbbaa"` string) | `vec2` | `enum` | `stops`.
-    pub ty: &'static str,
-    /// The accepted tags for an `enum` param; empty otherwise.
-    pub values: &'static [&'static str],
-    pub default: Option<Lit>,
-}
-
-/// One op: its `op` tag, menu category, the inputs it accepts, and its params.
-#[derive(Clone, Copy, Debug)]
-pub struct OpInfo {
-    pub op: &'static str,
-    /// `generator` | `color` | `vector` | `math` | `filter`.
-    pub category: &'static str,
-    pub inputs: Arity,
-    pub params: &'static [OpParam],
-}
-
-const fn req(name: &'static str, ty: &'static str) -> OpParam {
-    OpParam {
-        name,
-        ty,
-        values: &[],
-        default: None,
-    }
-}
-
-const fn opt(name: &'static str, ty: &'static str, default: Lit) -> OpParam {
-    OpParam {
-        name,
-        ty,
-        values: &[],
-        default: Some(default),
-    }
-}
-
-const fn choice(name: &'static str, values: &'static [&'static str]) -> OpParam {
-    OpParam {
-        name,
-        ty: "enum",
-        values,
-        default: None,
-    }
-}
-
-const fn op(
-    op: &'static str,
-    category: &'static str,
-    inputs: Arity,
-    params: &'static [OpParam],
-) -> OpInfo {
-    OpInfo {
-        op,
-        category,
-        inputs,
-        params,
-    }
-}
+use super::arity::{arity, ONE, SOURCE};
+use super::op_info::{choice, op, opt, req, Lit, OpInfo, OpParam};
 
 const BLEND: &[&str] = &[
     "mix",
@@ -185,6 +113,18 @@ pub const OPS: &[OpInfo] = &[
         ],
     ),
     op("white_noise", "generator", SOURCE, &[SEED]),
+    op(
+        "image",
+        "generator",
+        SOURCE,
+        &[
+            req("path", "path"),
+            OpParam {
+                default: Some(Lit::Text("srgb")),
+                ..choice("encoding", &["srgb", "linear"])
+            },
+        ],
+    ),
     op("color_ramp", "color", ONE, &[req("stops", "stops")]),
     op(
         "mix",

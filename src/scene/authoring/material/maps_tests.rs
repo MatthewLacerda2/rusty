@@ -51,7 +51,7 @@ fn width(map: &MapRef) -> u32 {
 fn bake_fills_each_slots_maps_and_a_packed_map_fills_both() {
     let dir = dir("maps_fill");
     let mut m = with_maps(recipe(8, &["albedo", "normal", "mr"]));
-    bake_maps(&mut m, "panel", &dir).unwrap();
+    bake_maps(&mut m, "panel", &dir, &dir).unwrap();
     let mr: MapRef = png(&dir, "panel_metallic_roughness.png").into();
     assert_eq!(
         m.base_color_map,
@@ -69,7 +69,7 @@ fn a_hand_set_map_path_wins_over_the_bake() {
     let dir = dir("maps_explicit");
     let mut m = with_maps(recipe(8, &["base_color", "normal"]));
     m.normal_map = Some("hand_made_n.png".into());
-    bake_maps(&mut m, "panel", &dir).unwrap();
+    bake_maps(&mut m, "panel", &dir, &dir).unwrap();
     assert_eq!(m.normal_map, Some("hand_made_n.png".into()));
     assert_eq!(
         m.base_color_map,
@@ -80,11 +80,11 @@ fn a_hand_set_map_path_wins_over_the_bake() {
 #[test]
 fn no_recipe_bakes_nothing_and_a_path_like_name_is_refused() {
     let mut plain = MaterialAsset::default();
-    bake_maps(&mut plain, "../x", &dir("maps_none")).unwrap();
+    bake_maps(&mut plain, "../x", Path::new(""), &dir("maps_none")).unwrap();
     assert_eq!(plain.base_color_map, None);
 
     let mut m = with_maps(recipe(8, &["base_color"]));
-    let err = bake_maps(&mut m, "a/b", &dir("maps_bad_name")).unwrap_err();
+    let err = bake_maps(&mut m, "a/b", Path::new(""), &dir("maps_bad_name")).unwrap_err();
     assert!(err.contains("\"a/b\""), "{err}");
     assert_eq!(m.base_color_map, None);
 }
@@ -94,10 +94,10 @@ fn rebake_at_a_new_resolution_rewrites_the_maps_and_keeps_it() {
     let dir = dir("maps_rebake");
     let mut materials = MaterialLibrary::new();
     let mut m = with_maps(recipe(8, &["base_color"]));
-    bake_maps(&mut m, "panel", &dir).unwrap();
+    bake_maps(&mut m, "panel", &dir, &dir).unwrap();
     materials.insert("panel".into(), m);
 
-    rebake_maps(&mut materials, "panel", Some(32), &dir).unwrap();
+    rebake_maps(&mut materials, "panel", Some(32), &dir, &dir).unwrap();
     let m = &materials["panel"];
     assert_eq!(m.maps_recipe.as_ref().unwrap().resolution, 32);
     assert_eq!(width(m.base_color_map.as_ref().unwrap()), 32);
@@ -110,16 +110,16 @@ fn a_failed_rebake_leaves_the_library_unchanged() {
         ("panel".into(), with_maps(recipe(8, &["base_color"]))),
         ("plain".into(), MaterialAsset::default()),
     ]);
-    assert!(rebake_maps(&mut materials, "panel", Some(0), &dir).is_err());
+    assert!(rebake_maps(&mut materials, "panel", Some(0), &dir, &dir).is_err());
     assert_eq!(
         materials["panel"].maps_recipe.as_ref().unwrap().resolution,
         8
     );
     assert_eq!(materials["panel"].base_color_map, None);
 
-    let err = rebake_maps(&mut materials, "plain", None, &dir).unwrap_err();
+    let err = rebake_maps(&mut materials, "plain", None, &dir, &dir).unwrap_err();
     assert!(err.contains("no maps recipe"), "{err}");
-    let err = rebake_maps(&mut materials, "nope", None, &dir).unwrap_err();
+    let err = rebake_maps(&mut materials, "nope", None, &dir, &dir).unwrap_err();
     assert!(err.contains("no material named \"nope\""), "{err}");
 }
 

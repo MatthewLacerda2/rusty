@@ -14,7 +14,7 @@
 //! moment it is made, before it can be dropped: [`stats`] and [`preview`] read a
 //! whole recipe that way without keeping its images alive (#1486).
 //!
-//! Evaluation is a pure function of `(recipe, seed)`: no wall-clock, no global RNG
+//! Evaluation is a pure function of `(recipe, seed, sources)`: no wall-clock, no global RNG
 //! (stochastic ops draw from [`super::hash`]), so the same recipe always yields the
 //! same buffer — the foundation of the byte-identical-bake guarantee.
 
@@ -26,6 +26,7 @@ use super::hash::node_seed;
 use super::image_buf::Image;
 use super::ops::eval_node;
 use super::recipe::{ArityError, TextureRecipe};
+use super::source::Sources;
 use plan::{plan, Plan, Scope};
 
 /// Why a recipe could not be evaluated.
@@ -45,6 +46,9 @@ pub enum RunError {
     UnknownOutput(String),
     /// The graph contains a cycle (not a DAG).
     Cycle(String),
+    /// An `image` node's file was not handed in (#1491): the caller could not read
+    /// it, or never loaded it.
+    MissingSource { node: String, path: String },
 }
 
 impl std::fmt::Display for RunError {
@@ -59,27 +63,41 @@ impl std::fmt::Display for RunError {
             }
             RunError::UnknownOutput(id) => write!(f, "output node '{id}' not found"),
             RunError::Cycle(id) => write!(f, "recipe DAG has a cycle at node '{id}'"),
+            RunError::MissingSource { node, path } => {
+                write!(f, "image node '{node}' has no image loaded for '{path}'")
+            }
         }
     }
 }
 
-/// Evaluate `recipe` to its output [`Image`]. The output is the explicit `output`
-/// node if set, else the last node in the list.
+/// Evaluate `recipe` to its output [`Image`]: [`evaluate_with`] and no image files,
+/// for a recipe without `image` nodes.
 pub fn evaluate(recipe: &TextureRecipe) -> Result<Image, RunError> {
+    evaluate_with(recipe, &Sources::new())
+}
+
+/// Evaluate `recipe` to its output [`Image`], its `image` nodes reading `sources`.
+/// The output is the explicit `output` node if set, else the last node in the list.
+pub fn evaluate_with(recipe: &TextureRecipe, sources: &Sources) -> Result<Image, RunError> {
     let target = match &recipe.output {
         Some(id) => id.as_str(),
         None => recipe.nodes.last().map_or("", |n| n.id.as_str()),
     };
-    Ok(evaluate_many(recipe, &[target])?.remove(0))
+    Ok(evaluate_many(recipe, sources, &[target])?.remove(0))
 }
 
 /// Evaluate several output nodes of `recipe` in one pass (#403), returning their
 /// images in the order of `targets`. Every node runs at most once, so upstream nodes
 /// the outputs share are evaluated once — and each image is byte-identical to the
 /// one [`evaluate`] gives with that node as the single `output`.
-pub fn evaluate_many(recipe: &TextureRecipe, targets: &[&str]) -> Result<Vec<Image>, RunError> {
+pub fn evaluate_many(
+    recipe: &TextureRecipe,
+    sources: &Sources,
+    targets: &[&str],
+) -> Result<Vec<Image>, RunError> {
     let plan = plan(recipe, targets, Scope::Needed)?;
-    Ok(run(recipe, &plan, &mut |_, _| {}).images)
+    check_sources(recipe, sources)?;
+    Ok(run(recipe, sources, &plan, &mut |_, _| {}).images)
 }
 
 /// Evaluate every node of `recipe`, calling `on_node(index, image)` as each one
@@ -88,11 +106,36 @@ pub fn evaluate_many(recipe: &TextureRecipe, targets: &[&str]) -> Result<Vec<Ima
 /// never held at once.
 pub fn evaluate_each(
     recipe: &TextureRecipe,
+    sources: &Sources,
     mut on_node: impl FnMut(usize, &Image),
 ) -> Result<(), RunError> {
     let plan = plan(recipe, &[], Scope::Every)?;
-    run(recipe, &plan, &mut on_node);
+    check_sources(recipe, sources)?;
+    run(recipe, sources, &plan, &mut on_node);
     Ok(())
+}
+
+/// Run every structural check on `recipe` (resolution, ids, arity, inputs, the
+/// declared outputs, cycles) without evaluating it. A caller runs it before it
+/// reads the recipe's image files, so a broken recipe is reported as itself.
+pub fn validate(recipe: &TextureRecipe) -> Result<(), RunError> {
+    plan(recipe, &[], Scope::Every).map(|_| ())
+}
+
+/// Refuse a recipe with an `image` node whose file `sources` lacks, before anything
+/// evaluates: a missing file is an error naming it, never a black canvas (#1485).
+fn check_sources(recipe: &TextureRecipe, sources: &Sources) -> Result<(), RunError> {
+    match recipe
+        .image_paths()
+        .into_iter()
+        .find(|&(_, path)| sources.get(path).is_none())
+    {
+        Some((node, path)) => Err(RunError::MissingSource {
+            node: node.into(),
+            path: path.into(),
+        }),
+        None => Ok(()),
+    }
 }
 
 /// A finished run: the target images, and the most images it held at once.
@@ -107,7 +150,12 @@ struct Run {
 
 /// Evaluate `plan`'s nodes in order, handing each image to `on_node` as it is made
 /// and dropping it once its last consumer has run, unless it is a target.
-fn run(recipe: &TextureRecipe, plan: &Plan, on_node: &mut dyn FnMut(usize, &Image)) -> Run {
+fn run(
+    recipe: &TextureRecipe,
+    sources: &Sources,
+    plan: &Plan,
+    on_node: &mut dyn FnMut(usize, &Image),
+) -> Run {
     let mut slots: Vec<Option<Image>> = recipe.nodes.iter().map(|_| None).collect();
     let mut uses = plan.uses.clone();
     let (mut live, mut peak_live) = (0, 0);
@@ -118,7 +166,7 @@ fn run(recipe: &TextureRecipe, plan: &Plan, on_node: &mut dyn FnMut(usize, &Imag
             .collect();
         let op = &recipe.nodes[i].op;
         let seed = node_seed(recipe.seed, op.seed());
-        let out = eval_node(op, &inputs, recipe.resolution, seed);
+        let out = eval_node(op, &inputs, recipe.resolution, seed, sources);
         on_node(i, &out);
         slots[i] = Some(out);
         live += 1;

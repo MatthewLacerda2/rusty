@@ -31,7 +31,10 @@ fn evaluate_each_sees_every_node_once_inputs_first() {
     )
     .with_output("inv");
     let mut seen = Vec::new();
-    evaluate_each(&recipe, |i, img| seen.push((i, img.pixels()[0][0]))).unwrap();
+    evaluate_each(&recipe, &Sources::new(), |i, img| {
+        seen.push((i, img.pixels()[0][0]))
+    })
+    .unwrap();
     assert_eq!(seen, [(1, 0.25), (0, 0.75), (2, 0.75)]);
 }
 
@@ -40,7 +43,7 @@ fn evaluate_each_holds_a_constant_number_of_images() {
     let recipe = chain(64);
     let plan = plan(&recipe, &[], Scope::Every).unwrap();
     let mut count = 0;
-    let run = run(&recipe, &plan, &mut |_, _| count += 1);
+    let run = run(&recipe, &Sources::new(), &plan, &mut |_, _| count += 1);
     assert_eq!(count, 65);
     assert_eq!(
         run.peak_live, 2,
@@ -71,7 +74,7 @@ fn leaves_listed_first_still_run_beside_their_consumer() {
     let recipe = leaves_first();
     for (scope, targets) in [(Scope::Needed, &["m9"][..]), (Scope::Every, &[][..])] {
         let plan = plan(&recipe, targets, scope).unwrap();
-        let run = run(&recipe, &plan, &mut |_, _| {});
+        let run = run(&recipe, &Sources::new(), &plan, &mut |_, _| {});
         assert_eq!(
             run.peak_live, 3,
             "two inputs and their mix, not every leaf at once"
@@ -85,7 +88,7 @@ fn evaluate_each_refuses_a_misspelled_declared_output() {
     let mut slots = out.clone();
     slots.output = None;
     slots.outputs.insert("base_color".into(), "gohst".into());
-    let err = |r: &TextureRecipe| evaluate_each(r, |_, _| {});
+    let err = |r: &TextureRecipe| evaluate_each(r, &Sources::new(), |_, _| {});
     assert_eq!(err(&out), Err(RunError::UnknownOutput("ghost".into())));
     assert_eq!(err(&slots), Err(RunError::UnknownOutput("gohst".into())));
 }

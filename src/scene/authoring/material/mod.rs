@@ -20,6 +20,7 @@
 mod maps;
 mod shader_params;
 mod slots;
+mod sources;
 
 use std::collections::BTreeMap;
 use std::ops::RangeInclusive;
@@ -33,6 +34,7 @@ pub use shader_params::{
     shader_param,
 };
 pub use slots::{keys, set_slot, slot_count};
+pub use sources::load_sources;
 
 use super::sanitize::{finite_array_or, non_negative, unit};
 use crate::asset::MapRef;

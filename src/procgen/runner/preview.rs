@@ -17,6 +17,7 @@ use super::evaluate_each;
 use crate::core::color::linear_to_srgb;
 use crate::procgen::image_buf::Image;
 use crate::procgen::recipe::TextureRecipe;
+use crate::procgen::source::Sources;
 
 /// A rendered contact sheet: the encoded pixels and the grid's column count.
 pub struct Sheet {
@@ -24,10 +25,11 @@ pub struct Sheet {
     pub columns: u32,
 }
 
-/// Render every node of `recipe` to a `size`²-tile contact sheet. A `size` above
+/// Render every node of `recipe`, its `image` nodes reading `sources`, to a
+/// `size`²-tile contact sheet. A `size` above
 /// the recipe's resolution is refused: a tile larger than the image adds nothing,
 /// and an unbounded one could not be allocated.
-pub fn sheet(recipe: &TextureRecipe, size: u32) -> Result<Sheet, String> {
+pub fn sheet(recipe: &TextureRecipe, sources: &Sources, size: u32) -> Result<Sheet, String> {
     let size = size.max(1);
     if size > recipe.resolution {
         return Err(format!(
@@ -42,8 +44,10 @@ pub fn sheet(recipe: &TextureRecipe, size: u32) -> Result<Sheet, String> {
     let width = columns.checked_mul(size).ok_or_else(too_big)?;
     let height = rows.checked_mul(size).ok_or_else(too_big)?;
     let mut tiles: Vec<Option<Vec<[u8; 3]>>> = recipe.nodes.iter().map(|_| None).collect();
-    evaluate_each(recipe, |i, img| tiles[i] = Some(thumbnail(img, size)))
-        .map_err(|e| e.to_string())?;
+    evaluate_each(recipe, sources, |i, img| {
+        tiles[i] = Some(thumbnail(img, size))
+    })
+    .map_err(|e| e.to_string())?;
     let mut pixels = ImageBuffer::from_pixel(width, height, Rgba([0, 0, 0, 255]));
     for (k, tile) in tiles.into_iter().enumerate() {
         let tile = tile.expect("evaluate_each visits every node");
@@ -58,8 +62,13 @@ pub fn sheet(recipe: &TextureRecipe, size: u32) -> Result<Sheet, String> {
 
 /// Render `recipe`'s contact sheet and write it as a PNG at `path`, noting the
 /// write like a bake does (#689). Returns the grid's column count.
-pub fn write_preview(recipe: &TextureRecipe, path: &str, size: u32) -> Result<u32, String> {
-    let sheet = sheet(recipe, size)?;
+pub fn write_preview(
+    recipe: &TextureRecipe,
+    sources: &Sources,
+    path: &str,
+    size: u32,
+) -> Result<u32, String> {
+    let sheet = sheet(recipe, sources, size)?;
     sheet.pixels.save(path).map_err(|e| e.to_string())?;
     crate::core::fs::written::note_written(path);
     Ok(sheet.columns)

@@ -5,20 +5,37 @@
 use std::panic::{catch_unwind, AssertUnwindSafe};
 
 use super::*;
-use crate::procgen::recipe::{sample_op, WhiteNoise, OPS};
+use crate::procgen::recipe::{sample_op, WhiteNoise, OPS, SAMPLE_PATH};
+use crate::procgen::source::{Source, Sources};
 
 const RES: u32 = 8;
+
+/// A 1×1 file under the path a sampled `image` op names.
+fn sources() -> Sources {
+    let mut sources = Sources::new();
+    let pixel = Source::from_texels(1, 1, vec![[0.5; 4]]).unwrap();
+    sources.insert(SAMPLE_PATH, pixel);
+    sources
+}
 
 /// `n` distinct white-noise images.
 fn images(n: usize) -> Vec<Image> {
     (0..n as u64)
-        .map(|seed| eval_node(&OpKind::WhiteNoise(WhiteNoise::default()), &[], RES, seed))
+        .map(|seed| {
+            eval_node(
+                &OpKind::WhiteNoise(WhiteNoise::default()),
+                &[],
+                RES,
+                seed,
+                &sources(),
+            )
+        })
         .collect()
 }
 
 fn eval(op: &OpKind, inputs: &[Image]) -> Image {
     let refs: Vec<&Image> = inputs.iter().collect();
-    eval_node(op, &refs, RES, 0)
+    eval_node(op, &refs, RES, 0, &sources())
 }
 
 #[test]
@@ -44,7 +61,8 @@ fn every_optional_input_is_read() {
         let mut inputs = images(usize::from(info.inputs.max));
         let before = eval(&op, &inputs);
         let last = inputs.len() - 1;
-        inputs[last] = eval_node(&OpKind::WhiteNoise(WhiteNoise::default()), &[], RES, 99);
+        let noise = OpKind::WhiteNoise(WhiteNoise::default());
+        inputs[last] = eval_node(&noise, &[], RES, 99, &sources());
         assert_ne!(
             before,
             eval(&op, &inputs),

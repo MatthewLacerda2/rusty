@@ -7,7 +7,7 @@
 //!
 //! - [`generators`] — sources with no input (constant, noise and its fBM / ridged /
 //!   turbulence family, Voronoi F1 / F2 / edges, gradient,
-//!   wave, brick, shape, checker, white noise).
+//!   wave, brick, shape, checker, white noise, and an image file).
 //! - [`color`] — color ramp, mix (blend modes), invert, bright/contrast, HSV, gamma,
 //!   auto levels.
 //! - [`vector`] — domain mapping, domain warp, bump→normal, combine/separate RGB;
@@ -32,15 +32,24 @@ pub mod vector;
 
 use super::image_buf::Image;
 use super::recipe::OpKind;
+use super::source::Sources;
 
 /// Evaluate one node's op. `inputs` are the buffers of the node's input ids in order;
 /// `resolution` comes from the recipe, and `seed` is the recipe seed with the node's
-/// own folded in ([`super::hash::node_seed`], done by the runner). Returns the node's output image.
+/// own folded in ([`super::hash::node_seed`], done by the runner). `sources` holds
+/// the decoded files `image` nodes read. Returns the node's output image.
 ///
 /// `inputs` must hold as many images as the op's [`Arity`](super::recipe::Arity)
 /// accepts: the runner refuses a miswired node before anything evaluates (#1485), so
-/// every required input is read directly, and this panics if called with fewer.
-pub fn eval_node(op: &OpKind, inputs: &[&Image], resolution: u32, seed: u64) -> Image {
+/// every required input is read directly, and this panics if called with fewer. The
+/// runner likewise refuses an `image` node whose file is not in `sources`.
+pub fn eval_node(
+    op: &OpKind,
+    inputs: &[&Image],
+    resolution: u32,
+    seed: u64,
+    sources: &Sources,
+) -> Image {
     let paint = |sampler| Image::fill_uv(resolution, sampler);
     let own = || inputs[0].clone();
     let px = |radius| filter::pixel_radius(radius, resolution);
@@ -54,6 +63,12 @@ pub fn eval_node(op: &OpKind, inputs: &[&Image], resolution: u32, seed: u64) -> 
         OpKind::Shape(p) => paint(generators::shape(p)),
         OpKind::Checker(p) => paint(generators::checker(p)),
         OpKind::WhiteNoise(_) => paint(generators::white_noise(resolution, seed)),
+        OpKind::Image(p) => {
+            let source = sources
+                .get(&p.path)
+                .expect("the runner checks every image source");
+            generators::image(source, p.encoding, resolution)
+        }
         OpKind::ColorRamp(p) => color::color_ramp(own(), &p.stops),
         OpKind::Mix(p) => color::mix(own(), inputs[1], inputs.get(2).copied(), p.mode, p.factor),
         OpKind::Invert => color::invert(own()),

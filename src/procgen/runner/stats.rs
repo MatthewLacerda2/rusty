@@ -9,6 +9,7 @@
 use super::{evaluate_each, RunError};
 use crate::procgen::image_buf::{Image, Rgba};
 use crate::procgen::recipe::TextureRecipe;
+use crate::procgen::source::Sources;
 
 /// One node's value distribution, each field per channel (R, G, B, A).
 #[derive(Clone, Debug, PartialEq)]
@@ -24,11 +25,12 @@ pub struct NodeStats {
     pub p99: Rgba,
 }
 
-/// Every node's [`NodeStats`], in `recipe.nodes` order, from one evaluation.
-pub fn stats(recipe: &TextureRecipe) -> Result<Vec<NodeStats>, RunError> {
+/// Every node's [`NodeStats`], in `recipe.nodes` order, from one evaluation over
+/// `sources`.
+pub fn stats(recipe: &TextureRecipe, sources: &Sources) -> Result<Vec<NodeStats>, RunError> {
     let mut out: Vec<Option<NodeStats>> = recipe.nodes.iter().map(|_| None).collect();
     let mut scratch = Vec::new();
-    evaluate_each(recipe, |i, img| {
+    evaluate_each(recipe, sources, |i, img| {
         out[i] = Some(node_stats(img, &mut scratch))
     })?;
     Ok(out
