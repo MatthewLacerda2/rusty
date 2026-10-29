@@ -11,6 +11,7 @@ use rusty::scene::{MeshComponent, Scene};
 /// An empty scene with no ambient light.
 pub fn dark_scene() -> Scene {
     let mut scene = Scene::new();
+    crate::gpu::black_sky(&mut scene);
     scene.ambient_intensity = 0.0;
     scene
 }
@@ -28,7 +29,7 @@ pub fn emissive_box(scene: &mut Scene, name: &str, pos: Vec3, size: Vec3, emissi
     let asset = MaterialAsset {
         base_color: [0.0, 0.0, 0.0],
         emissive,
-        // Fully rough: no sky reflection (#718), so the pixel is the emissive alone.
+        // Under `dark_scene`'s black sky nothing reflects: the pixel is the emissive alone.
         roughness: 1.0,
         ..MaterialAsset::default()
     };

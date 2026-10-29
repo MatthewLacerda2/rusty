@@ -1,7 +1,7 @@
 //! Shared fixture for the scene-fog pixel tests (#437): a flat, light-independent
 //! wall and a neutral post-FX volume, so a pixel's colour is exactly the fogged
-//! surface colour, sRGB-encoded. Zero ambient + no lights + black albedo + full
-//! roughness (no environment reflection, #718) leaves a
+//! surface colour, sRGB-encoded. Zero ambient + no lights + black albedo + a black
+//! sky (no environment reflection, #1543) leaves a
 //! surface's lit colour equal to its `emissive`; tonemap `None` and neutral grading
 //! pass it through, so a test can predict the pixel from the fog formula.
 
@@ -20,6 +20,7 @@ pub fn camera() -> Camera {
 /// the camera, plus a neutral volume. Fog is left off.
 pub fn wall_scene(distance: f32, color: [f32; 3]) -> Scene {
     let mut scene = Scene::new();
+    crate::gpu::black_sky(&mut scene);
     scene.ambient_intensity = 0.0;
     let id = scene.add_entity("Wall".to_string());
     let (vertices, indices) = rusty::components::mesh::primitives::generate_box(400.0, 400.0, 0.1);
@@ -36,7 +37,7 @@ pub fn wall_scene(distance: f32, color: [f32; 3]) -> Scene {
         MaterialAsset {
             base_color: [0.0, 0.0, 0.0],
             emissive: color,
-            // Fully rough: no sky reflection (#718), so the pixel is the emissive alone.
+            // Under the black sky nothing reflects, so the pixel is the emissive alone.
             roughness: 1.0,
             ..MaterialAsset::default()
         },

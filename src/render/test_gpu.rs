@@ -38,6 +38,19 @@ pub(crate) fn headless_or_skip(width: u32, height: u32) -> Option<Renderer> {
     pollster::block_on(Renderer::new_headless(width, height))
 }
 
+/// Give `scene` a black skybox panorama, so nothing but its own lights and emissives
+/// lights it. `ambient_intensity = 0` removes the ambient term only: the procedural
+/// sky still lights every surface through its environment reflection (#1543), as
+/// Unity's skybox does whatever its ambient multiplier says.
+#[cfg(test)]
+pub(crate) fn black_sky(scene: &mut crate::scene::Scene) {
+    let path = crate::test_temp::dir().join("black_sky.png");
+    image::RgbaImage::from_pixel(2, 1, image::Rgba([0, 0, 0, 255]))
+        .save(&path)
+        .expect("write the black sky");
+    scene.skybox_path = path.to_string_lossy().into_owned();
+}
+
 #[cfg(test)]
 mod tests {
     /// The one GPU test that refuses to skip, and only where asked to. Without it, a

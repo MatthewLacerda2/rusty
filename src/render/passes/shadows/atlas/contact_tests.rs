@@ -13,7 +13,7 @@ use crate::scene::Scene;
 /// and a shadowing `kind` light up and to its -X side, aimed past it.
 fn lamp_yard(kind: Primitive, floor: Primitive) -> Scene {
     let mut scene = Scene::new();
-    scene.skybox_path = String::new();
+    crate::render::test_gpu::black_sky(&mut scene);
     scene.ambient_intensity = 0.0;
     let mut place = |kind, position, scale| {
         let id = create_entity(&mut scene, "Shape", Some(kind));

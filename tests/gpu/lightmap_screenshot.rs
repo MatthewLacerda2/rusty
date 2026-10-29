@@ -37,6 +37,7 @@ fn add(scene: &mut Scene, primitive: Primitive, position: Vec3, scale: Vec3) -> 
 /// Floor, wall (x = 3), sphere (x = -3), and a `Mixed` 20° spot aimed at the wall.
 fn scene(ambient: f32) -> Scene {
     let mut scene = Scene::new();
+    crate::gpu::black_sky(&mut scene);
     scene.ambient_intensity = ambient;
     for (primitive, at, scale) in [
         (Primitive::Plane, Vec3::ZERO, Vec3::ONE),
@@ -98,8 +99,8 @@ fn shot(scene: &Scene, camera: &Camera, name: &str) -> Option<image::RgbImage> {
 
 #[test]
 fn a_lightmapped_floor_is_lit_where_only_bounce_reaches_it() {
-    // Down onto the floor by the wall, out of the spot's cone: only the sky's faint
-    // reflection (environment reflections are always on) shows before the bake.
+    // Down onto the floor by the wall, out of the spot's cone: under the black sky
+    // nothing lights it before the bake.
     let camera = Camera::new(Vec3::new(1.5, 2.5, 0.0), 0.0, -89.0);
     let mut lit = scene(0.0);
     let Some(before) = shot(&lit, &camera, "bounce_before") else {

@@ -2,7 +2,7 @@
 // Every forward binding but `shadow` (the cascades, read only by `calculate_shadow`;
 // `fs_main` names its result `shadow`), so a surface variant's blocks can read any.
 #import forward::bindings::{bones, camera, cluster_lights, cluster_ranges, decals, entity, instances, lighting, local_lights, s_decal, s_diffuse, s_emissive, s_lightmaps, s_metallic, s_normal, s_refl_cube, s_roughness, s_shadow, s_skybox, shadow_tiles, t_ao, t_decal_color, t_decal_data, t_diffuse, t_emissive, t_lightmap_dirs, t_lightmaps, t_metallic, t_normal, t_refl_cube, t_roughness, t_shadow, t_shadow_atlas, t_skybox, vertex_to_world, vertex_to_world_prev}
-#import forward::lighting::{FresnelSchlick, LIGHTMAP_RGBM_RANGE, ambient_occlusion, calculate_pbr, calculate_shadow, decode_lightmap_direction, environment_reflection, eval_sh, fold_decals, lightmap_direction_rebalance}
+#import forward::lighting::{LIGHTMAP_RGBM_RANGE, ambient_occlusion, calculate_pbr, calculate_shadow, decode_lightmap_direction, environment_reflection, eval_sh, fold_decals, lightmap_direction_rebalance}
 
 // The forward pass (and its SSAO prepass and shadow-cascade entry points). Its
 // resources are `forward/bindings.wgsl`, its lighting helpers `forward/lighting.wgsl`.
@@ -267,8 +267,8 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     // Non-static objects that a light probe covers
     // (`use_sh == 1`, #240) reconstruct DIRECTIONAL irradiance from their interpolated
     // SH probe; everything else falls back to the flat Hemispherical Sky-Ground
-    // gradient. All three are E / pi, so they feed the same albedo * (1 - metallic)
-    // Lambert response.
+    // gradient. All three are E / pi, so they feed the same albedo * 0.96 * (1 - metallic)
+    // Lambert response (the 4% is the dielectric's reflection, step 5).
     var ambient_irradiance: vec3<f32>;
     let lightmap_page = instances[in.instance].lightmap_page;
     if (lightmap_page > 0u) {
@@ -296,7 +296,9 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     }
     // SSAO (#436) darkens only the indirect light: ambient here, env reflection below.
     let ao = ambient_occlusion(in.clip_position.xy) * surface.occlusion;
-    var lighting_color = ambient_irradiance * albedo * (1.0 - metallic) * ao;
+    // The diffuse share is URP's `albedo * oneMinusReflectivity`: what the
+    // environment reflection (step 5) takes, a dielectric's 4%, is not diffused too.
+    var lighting_color = ambient_irradiance * albedo * (0.96 * (1.0 - metallic)) * ao;
 
     // A lightmapped surface skips `Baked` lights below: their direct light is already
     // in its lightmap (#438). Only a probe/reflection bake capture uploads them at all
@@ -339,10 +341,21 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     // Environment Reflections, the sky / reflection-probe term applies whether or not
     // the camera runs SSR, which only adds screen-space detail on top (postfx). A metal
     // has no diffuse term, so without this it renders black. See `environment_reflection`.
+    // Its weight is Unity URP's analytic environment BRDF (#1543; `BRDF.hlsl`
+    // `EnvironmentBRDFSpecular`, `GlobalIllumination.hlsl`): roughness only picks the
+    // prefiltered mip, and URP's `surfaceReduction`, `1 / (alpha^2 + 1)` with
+    // `alpha = roughness^2` (so perceptual roughness to the 4th), is the energy a rough
+    // lobe loses, so a rough metal reads blurry, not black. `roughness` is perceptual,
+    // URP's `perceptualRoughness`; a dielectric reflects F0 = 0.04 head-on. The angle is
+    // `|N.V|`: both sides are drawn and `N` is never turned toward the camera, so a
+    // visible back face would otherwise take the grazing Fresnel.
     let R = reflect(-V, N);
-    let F_refl = FresnelSchlick(max(dot(N, V), 0.0), F0);
-    let reflection_scale = (1.0 - roughness) * (metallic + (1.0 - metallic) * 0.2);
-    lighting_color += environment_reflection(in.world_position, R, roughness, instances[in.instance].reflection_probe) * F_refl * reflection_scale * ao;
+    let reflectivity = 0.04 + 0.96 * metallic;
+    let grazing = saturate(1.0 - roughness + reflectivity);
+    let alpha = roughness * roughness;
+    let fresnel = pow(1.0 - saturate(abs(dot(N, V))), 4.0);
+    let env_brdf = mix(F0, vec3<f32>(grazing), fresnel) / (alpha * alpha + 1.0);
+    lighting_color += environment_reflection(in.world_position, R, roughness, instances[in.instance].reflection_probe) * env_brdf * ao;
 
     // 6. Emissive (#222 factor, #207 map): self-illumination added on top of the lit
     // colour, independent of any light. The factor is modulated by the emissive map's

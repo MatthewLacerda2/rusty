@@ -1,5 +1,5 @@
 //! The surface-decal GPU tests' stage (#638): a floor seen straight down from 12 m,
-//! no sun and no sky texture, and helpers to stamp, light and read it back.
+//! no sun and a black sky, and helpers to stamp, light and read it back.
 
 use glam::{Vec2, Vec3};
 
@@ -21,7 +21,7 @@ pub(super) fn camera() -> Camera {
 /// `ambient` intensity and nothing else lighting it.
 pub(super) fn stage(floor: MaterialAsset, ambient: f32) -> Scene {
     let mut scene = Scene::new();
-    scene.skybox_path = String::new();
+    crate::render::test_gpu::black_sky(&mut scene);
     scene.ambient_intensity = ambient;
     let id = create_entity(&mut scene, "Floor", Some(Primitive::Plane));
     scene.world.transform_mut(id).unwrap().scale = Vec3::new(30.0, 1.0, 30.0);

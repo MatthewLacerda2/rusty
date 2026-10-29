@@ -23,6 +23,18 @@ pub fn mean(img: &image::RgbImage) -> f64 {
     sum as f64 / (img.pixels().len() * 3) as f64
 }
 
+/// Give `scene` a black skybox panorama, so only its own lights and emissives light
+/// it. `ambient_intensity = 0` removes the ambient term only: the procedural sky
+/// still lights every surface, even a fully rough one, through its environment
+/// reflection (#1543), as Unity's skybox does.
+pub fn black_sky(scene: &mut rusty::scene::Scene) {
+    let path = crate::temp::dir().join("black_sky.png");
+    image::RgbaImage::from_pixel(2, 1, image::Rgba([0, 0, 0, 255]))
+        .save(&path)
+        .expect("write the black sky");
+    scene.skybox_path = path.to_string_lossy().into_owned();
+}
+
 mod bloom_screenshot;
 mod cascaded_shadows_screenshot;
 mod custom_postfx_screenshot;
@@ -30,6 +42,7 @@ mod directional_lightmap_screenshot;
 #[cfg(feature = "editor")]
 mod editor_capture;
 mod emissive_factor_screenshot;
+mod environment_brdf;
 mod fog;
 mod frame_stats_render;
 mod fxaa_screenshot;

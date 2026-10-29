@@ -23,8 +23,12 @@ fn black_canvas() -> (Scene, u32) {
     (scene, root)
 }
 
+/// Red-dominant by a ratio, not pure: the red box's plastic reflects a little sky
+/// at an angle (#1543; red at least 4x its other channels on lavapipe and Metal),
+/// while the half-sky rim (about 2x) and the sky (about 1x) stay out.
 fn is_red(p: [u8; 3]) -> bool {
-    p[0] > 150 && p[1] < 60 && p[2] < 60
+    let rest = u16::from(p[1].max(p[2]));
+    p[0] > 150 && u16::from(p[0]) >= 3 * rest
 }
 
 #[test]

@@ -18,12 +18,12 @@ fn place(scene: &mut Scene, kind: Primitive, position: Vec3, scale: Vec3) {
     (t.position, t.scale) = (position, scale);
 }
 
-/// No sky or ambient, so a shadowed pixel reads 0; the sun `elevation` degrees up,
+/// A black sky and no ambient, so a shadowed pixel reads 0; the sun `elevation` degrees up,
 /// shining toward +X, and the floor (`floor`: a single-sided `Plane` or a closed
 /// slab) with its top at y = 0. A unit box rests on it at the origin when `boxed`.
 pub(super) fn yard(elevation: f32, floor: Primitive, boxed: bool) -> Scene {
     let mut scene = Scene::new();
-    scene.skybox_path = String::new();
+    crate::render::test_gpu::black_sky(&mut scene);
     scene.ambient_intensity = 0.0;
     let sun = create_entity(&mut scene, "Sun", Some(Primitive::DirectionalLight));
     let e = elevation.to_radians();
