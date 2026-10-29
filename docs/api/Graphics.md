@@ -167,8 +167,9 @@ the camera's motion alone; transparent surfaces, sprite particles, ribbons, deca
 UI write none; the sky writes the camera's rotation. A first draw, a scene load, Play
 or Stop, a switch of the main camera or a resize has no last frame, so nothing smears
 across a cut; neither does a camera newly in the stack (a weapon switch's viewmodel
-camera). No other frame pays for it; `Debug.Stats().velocity_passes` counts the passes
-that wrote it.
+camera). A view running depth of field or SSR writes it too (SSR reads only its depths,
+so SSR alone records no poses, #1526); no other frame pays for it.
+`Debug.Stats().velocity_passes` counts the passes that wrote it.
 
 **Per-object motion blur** (#1436) reads that buffer, so what blurs is what moved on
 screen: an enemy running past a still camera, a swing, a ragdoll, and the world under
@@ -259,12 +260,18 @@ player's `chromatic_aberration` option gates it. Tween paths: `Graphics.chromati
 #### Screen-space reflections
 
 **SSR** marches each smooth surface pixel's reflected ray against the scene and, where
-it hits something on screen, puts that in place of the sky the surface was reflecting,
-on the HDR image before bloom. Only smooth surfaces reflect: none below a smoothness
-of 0.8 (roughness 0.2), all of it from 0.9, weighted by the material's Fresnel (its
-metallic and base colour) at the shading normal. Pixels another camera of the stack
-drew (a `DepthOnly` viewmodel camera) get none. With no skybox panorama the sky it
-replaces is the procedural one the sky pass draws. The real screen-space pass runs on
+it hits something on screen, puts that in place of the sky or reflection probe the
+surface was reflecting. Only smooth surfaces reflect: none below a smoothness of 0.8
+(roughness 0.2), all of it from 0.9, weighted by the material's Fresnel (its metallic
+and base colour) at the shading normal, its SSAO and its fog. A miss keeps the sky or
+probe reflection. It runs on the base camera's opaque image, right after its opaque
+pass (HDRP's order): translucent surfaces, particles, ribbons and world canvases blend
+over the reflection, depth of field and motion blur blur it, and a `DepthOnly` overlay
+camera (a viewmodel) draws over it and gets none. An authored surface block that
+restyles the colour scales the reflection with it (`hit_flash` at amount 1 shows
+none); one that isn't a per-channel scale of it (`toon_ramp`, `hologram`, `desaturate`)
+gets no SSR.
+`Debug.Stats().gpu_passes.ssr` times it. The real screen-space pass runs on
 the **High** tier only; on every tier the forward shader reflects the sky or a
 reflection probe. The **quality** (`"Low"`, `"Medium"`, `"High"`, `"Ultra"`) sets the
 march: 16, 32, 64 or 128 steps, reaching 8, 12, 16 or 25.6 m, so Low is the cheapest.

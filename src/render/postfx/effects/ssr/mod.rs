@@ -1,21 +1,27 @@
-//! Screen-space reflections: a composite function on the HDR image (High tier only;
-//! on every tier the forward pass reflects the sky or a reflection probe, #718).
+//! Screen-space reflections (High tier only; on every tier the forward pass reflects
+//! the sky or a reflection probe, #718): a pass of its own ([`pass`]) over the base
+//! camera's opaque image, right after its opaque pass, so the translucents, the
+//! overlay cameras, depth of field and motion blur all see the reflected scene (HDRP's
+//! order). It is in no post-chain stage: `render::draw::camera`'s `ssr` stage runs it.
 //!
 //! It reads three per-view targets (#1526): the velocity target (#1435), for each
-//! pixel's depth and which camera of the stack drew it, and the two SSR surface
-//! targets the opaque pass writes while SSR runs ([`surface`]): the shading normal,
-//! the weight a hit gets and the environment reflection it replaces. So only a smooth
-//! surface reflects, a hit swaps the sky or probe reflection for what is on screen
-//! (never adding to it), and an overlay camera's pixels (a viewmodel) get none. The
-//! volume's `quality` sets the march ([`march`], #1521).
+//! pixel's depth, and the two SSR surface targets the opaque pass writes while SSR
+//! runs ([`surface`]): the shading normal, the weight a hit gets and the environment
+//! reflection it replaces. So only a smooth surface reflects, and a hit swaps the sky
+//! or probe reflection for what is on screen (never adding to it). The volume's
+//! `quality` sets the march ([`march`], #1521).
 
+pub(crate) mod pass;
 pub(crate) mod surface;
 
-use super::{Composite, CompositeTexture, EffectCx, Owner, Phase, PostEffect};
+use super::{Owner, PostEffect};
 use crate::core::settings::graphics_options::GraphicsOption;
 use crate::core::settings::quality::QualityPreset;
 use crate::core::settings::GraphicsSettings;
 use crate::render::postfx::params::{effect_runs, Gate, PostSource};
+use crate::render::{RenderView, Renderer};
+
+pub(crate) use pass::{SsrParams, SsrPasses};
 
 pub(crate) const EFFECT: PostEffect = PostEffect {
     name: "ssr",
@@ -24,28 +30,8 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
         option: Some(GraphicsOption::Ssr),
         tiers: QualityPreset::screen_space_ssr,
     },
-    module: Some("postfx/effects/ssr.wgsl"),
-    composite: &[Composite {
-        phase: Phase::Hdr,
-        order: 20,
-        function: "hdr",
-        slots: 1,
-        textures: &[
-            CompositeTexture {
-                name: "velocity",
-                view: |pfx| pfx.motion.active_target().map(|t| &t.view),
-            },
-            CompositeTexture {
-                name: "weight",
-                view: surface::weight_view,
-            },
-            CompositeTexture {
-                name: "applied",
-                view: surface::applied_view,
-            },
-        ],
-        pack,
-    }],
+    module: None,
+    composite: &[],
     grade: &[],
     pass: None,
 };
@@ -82,13 +68,22 @@ pub(crate) fn ssr_enabled(post: PostSource, graphics: GraphicsSettings, full: bo
     full && effect_runs(graphics, EFFECT.gate, on)
 }
 
-/// x: the mode, `2` (screen-space) when it runs, else `0`; y and z the [`march`].
-fn pack(cx: &EffectCx, slots: &mut [[f32; 4]]) {
-    let Some(vc) = cx.volume() else { return };
-    if ssr_enabled(cx.post, cx.graphics, cx.full) {
-        let m = march(&vc.ssr.quality);
-        slots[0] = [2.0, m.steps as f32, m.step, 0.0];
-    }
+/// Reflect the base camera's opaque image when the view runs SSR, else drop its
+/// state. `post` is the stack's base camera's settings, `full` its `full_post_fx`,
+/// and `view_proj` and `eye` the base camera's.
+pub(crate) fn run(
+    r: &Renderer,
+    view: &mut RenderView,
+    (post, graphics, full): (PostSource, GraphicsSettings, bool),
+    (view_proj, eye): (glam::Mat4, glam::Vec3),
+) {
+    let params = post
+        .volume
+        .filter(|_| ssr_enabled(post, graphics, full))
+        .map(|vc| SsrParams::new(view_proj, eye, &vc.ssr.quality));
+    let gpu = (&r.device, &r.queue);
+    view.post_fx
+        .run_ssr(gpu, &r.post_passes.ssr, params, &r.gpu_timer);
 }
 
 #[cfg(test)]

@@ -12,7 +12,7 @@
 
 use std::fmt::Write as _;
 
-use crate::shadergen::blocks::{Block, Param, Stage};
+use crate::shadergen::blocks::{Block, Param, Reflection, Stage};
 use crate::shadergen::params::ParamLayout;
 use crate::shadergen::recipe::{BlockSel, ParamValue};
 
@@ -165,6 +165,28 @@ pub fn cuts(instances: &[Instance], layout: &ParamLayout) -> Vec<String> {
         .filter_map(|(index, (block, _))| {
             let cut = block.cut?;
             Some(cut.replace("{args}", &args(block, index, layout)))
+        })
+        .collect()
+}
+
+/// The statements that scale the SSR record (`ssr_texels`, #1526) as the colour
+/// blocks scale the colour, one per colour instance whose [`Block::reflection`] is not
+/// [`Reflection::Kept`], in recipe order, with `{args}` filled as [`chain`] fills it.
+/// Empty when every block keeps the reflection.
+pub fn reflection_folds(instances: &[Instance], layout: &ParamLayout) -> Vec<String> {
+    instances
+        .iter()
+        .enumerate()
+        .filter(|(_, (block, _))| block.stage == Stage::Color)
+        .filter_map(|(index, (block, _))| {
+            let factor = match block.reflection {
+                Reflection::Kept => return None,
+                Reflection::Scaled(factor) => factor.replace("{args}", &args(block, index, layout)),
+                Reflection::Dropped => "vec3<f32>(0.0)".to_string(),
+            };
+            Some(format!(
+                "ssr_texels = ssr_surface::scale(ssr_texels, {factor});"
+            ))
         })
         .collect()
 }

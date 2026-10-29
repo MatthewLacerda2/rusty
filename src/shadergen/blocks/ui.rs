@@ -18,7 +18,7 @@
 //! Premultiplied output may carry more colour than alpha: that light **adds** to
 //! what is under the graphic (the hologram's glow does this on purpose).
 
-use super::{Block, Param, Stage};
+use super::{Block, Param, Reflection, Stage};
 
 /// The ui block catalog.
 pub const BLOCKS: &[Block] = &[
@@ -35,6 +35,7 @@ pub const BLOCKS: &[Block] = &[
         textures: &[],
         stage: Stage::Color,
         cut: None,
+        reflection: Reflection::Kept,
     },
     Block {
         id: "rgb_split",
@@ -45,6 +46,7 @@ pub const BLOCKS: &[Block] = &[
         textures: &[],
         stage: Stage::Color,
         cut: None,
+        reflection: Reflection::Kept,
     },
     Block {
         id: "glitch_slices",
@@ -60,6 +62,7 @@ pub const BLOCKS: &[Block] = &[
         textures: &[],
         stage: Stage::Color,
         cut: None,
+        reflection: Reflection::Kept,
     },
     Block {
         id: "noise_flicker",
@@ -70,6 +73,7 @@ pub const BLOCKS: &[Block] = &[
         textures: &[],
         stage: Stage::Color,
         cut: None,
+        reflection: Reflection::Kept,
     },
     Block {
         id: "hologram",
@@ -86,6 +90,7 @@ pub const BLOCKS: &[Block] = &[
         textures: &[],
         stage: Stage::Color,
         cut: None,
+        reflection: Reflection::Kept,
     },
     Block {
         id: "dissolve",
@@ -101,6 +106,7 @@ pub const BLOCKS: &[Block] = &[
         textures: &[],
         stage: Stage::Color,
         cut: None,
+        reflection: Reflection::Kept,
     },
     Block {
         id: "wipe",
@@ -115,6 +121,7 @@ pub const BLOCKS: &[Block] = &[
         textures: &[],
         stage: Stage::Color,
         cut: None,
+        reflection: Reflection::Kept,
     },
     Block {
         id: "radial_wipe",
@@ -130,5 +137,6 @@ pub const BLOCKS: &[Block] = &[
         textures: &[],
         stage: Stage::Color,
         cut: None,
+        reflection: Reflection::Kept,
     },
 ];

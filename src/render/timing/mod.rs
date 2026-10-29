@@ -54,6 +54,9 @@ crate::core::named_enum! {
         Ssao = "ssao",
         /// The opaque scene pass: solids, skybox.
         Forward = "forward",
+        /// Screen-space reflections (#1526): the copy of the opaque image and the
+        /// march over it, right after the base camera's opaque pass.
+        Ssr = "ssr",
         /// Translucent solids.
         Transparent = "transparent",
         /// Trails and lines.

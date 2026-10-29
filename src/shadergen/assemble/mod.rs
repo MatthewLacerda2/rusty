@@ -9,8 +9,10 @@
 //! - **surface** — the canonical forward shader (`shader.wgsl`, passed in as
 //!   `surface_base`) is the base; its PBR lighting is kept verbatim and the chosen
 //!   colour blocks are folded into the final color just before `surface_color`
-//!   returns, which every colour entry point calls (`fs_main`, the motion-vector
-//!   `fs_velocity`, #1435, and `fs_velocity_ssr`, #1526). So a surface variant binds against the
+//!   returns (scaling the SSR record of the reflection as they scale the colour,
+//!   `blocks::Reflection`, #1526), which every colour entry point calls (`fs_main`,
+//!   the motion-vector `fs_velocity`, #1435, and `fs_velocity_ssr`, #1526). So a
+//!   surface variant binds against the
 //!   forward pipeline unchanged (same `VertexInput`, bind groups, and entry points),
 //!   varying only the fragment look — exactly the contract. A vertex-stage block
 //!   (`vertex_waves`, #1524) replaces the base's identity `surface_vertex` hook, which
@@ -43,7 +45,7 @@ mod vertex;
 
 use std::fmt::Write as _;
 
-use emit::{chain, check_params, emit_helpers, emit_params, Instance};
+use emit::{chain, check_params, emit_helpers, emit_params, reflection_folds, Instance};
 
 use super::blocks::{find, Stage};
 use super::params::{ParamLayout, POSTFX_UNIFORM_DECL, UNIFORM_DECL};
@@ -131,8 +133,14 @@ fn assemble_surface(
     emit_params(&mut additions, resolved, layout);
     emit_helpers(&mut additions, resolved);
 
+    // The blocks restyle the colour after step 5 recorded its reflection for SSR, so
+    // the record is scaled as they scale the colour, right before it (#1526).
     let folded = chain(resolved, "lighting_color", layout, Stage::Color);
-    let new_return = SURFACE_RETURN.replace("lighting_color", &folded);
+    let mut new_return = String::new();
+    for fold in reflection_folds(resolved, layout) {
+        let _ = write!(new_return, "{fold}\n    ");
+    }
+    new_return.push_str(&SURFACE_RETURN.replace("lighting_color", &folded));
 
     let header = format!(
         "// {name}.wgsl — authored surface variant (#272), assembled from {n} block(s).\n\

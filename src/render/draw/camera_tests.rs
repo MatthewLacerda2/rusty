@@ -20,6 +20,7 @@ fn stages_run_in_the_frames_order() {
             "clusters",
             "solids",
             "scene",
+            "ssr",
             "transparent",
             "world_ui",
             "effects",
@@ -41,6 +42,9 @@ fn every_stage_reads_only_what_an_earlier_stage_wrote() {
     assert!(position("solids") < position("scene"));
     assert!(position("solids") < position("transparent"));
     assert!(position("world_ui") < position("effects"));
+    // SSR reflects the opaque image the scene pass drew, before anything blends over
+    // it (#1526, HDRP's order).
+    assert_eq!(position("ssr"), position("scene") + 1);
     // The counters read the solids and the effects' draw counts.
     assert!(position("effects") < position("count"));
     // Post-FX composites everything this camera drew into the scene (#1224): Unity's

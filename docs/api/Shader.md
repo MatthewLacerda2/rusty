@@ -104,6 +104,11 @@ assembles byte-identical WGSL.
   #1526 lacks the `fs_velocity_ssr` entry point (what a view running SSR draws with),
   so the renderer refuses it: it logs that once and draws the material with the
   standard shader until the variant is re-baked.
+  Each surface block also says how it changes the environment reflection that SSR
+  replaces (#1526): a block adding light (a rim, a glow) keeps it, one scaling the
+  colour (a tint, a `mix` toward a colour such as `hit_flash`) scales it alike, and one
+  that isn't a per-channel scale (`toon_ramp`, `hologram`, `desaturate` above 0)
+  gives its pixels no SSR. A variant baked before this change scales nothing: re-bake it.
 - **`postfx`** — a self-contained **fullscreen-triangle** fragment program over the
   **tonemapped** scene color (`vs_fullscreen` + `fs_main`), the most self-contained
   pass; each block grades the sampled color, and sampling blocks may also tap
