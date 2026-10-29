@@ -17,6 +17,7 @@
 //!
 //! Pure: no wall-clock, no RNG.
 
+mod coordinates;
 mod maps;
 mod shader_params;
 mod slots;
@@ -28,6 +29,7 @@ use std::ops::RangeInclusive;
 
 pub use crate::components::material::entity_material_key;
 
+pub use coordinates::COORDINATE_FIELDS;
 pub use maps::{bake_maps, rebake_maps, MAPS_DIR};
 pub use shader_params::{
     clear_entity_shader_param, entity_shader_param, entity_shader_param_with,
@@ -37,7 +39,8 @@ pub use shader_params::{
 pub use slots::{keys, set_slot, slot_count};
 pub use sources::load_sources;
 pub use surface::{
-    set_surface, surface_field, SurfaceField, SurfaceKind, SurfaceValue, SURFACE_FIELDS,
+    material_fields, set_surface, surface_field, SurfaceField, SurfaceKind, SurfaceValue,
+    SURFACE_FIELDS,
 };
 
 use super::sanitize::{finite_array_or, non_negative, unit};

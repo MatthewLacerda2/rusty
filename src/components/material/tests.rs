@@ -63,3 +63,22 @@ fn shader_params_and_textures_round_trip_and_are_omitted_when_empty() {
     assert!(!plain.contains("shader_params"), "{plain}");
     assert!(!plain.contains("shader_textures"), "{plain}");
 }
+
+#[test]
+fn map_coordinates_sit_flat_beside_the_material_and_are_omitted_as_defaults() {
+    let plain = serde_json::to_string(&MaterialAsset::default()).unwrap();
+    assert!(
+        !plain.contains("tiling") && !plain.contains("uv_mapping"),
+        "{plain}"
+    );
+    let json = r#"{ "tiling": [4, 2], "uv_mapping": "Triplanar", "world_size": 2 }"#;
+    let m: MaterialAsset = serde_json::from_str(json).expect("flat keys parse");
+    assert_eq!(m.coordinates.tiling, [4.0, 2.0]);
+    assert_eq!(m.coordinates.uv_mapping, UvMapping::Triplanar);
+    assert_eq!(
+        m.coordinates.blend_sharpness, 4.0,
+        "an unnamed key keeps its default"
+    );
+    let back: MaterialAsset = serde_json::from_str(&serde_json::to_string(&m).unwrap()).unwrap();
+    assert_eq!(back.coordinates, m.coordinates);
+}

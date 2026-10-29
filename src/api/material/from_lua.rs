@@ -11,6 +11,7 @@
 //!   normal_map = "n.png",
 //!   emissive = {0.0, 0.0, 0.0}, emissive_map = "e.png",
 //!   render_mode = "Cutout", alpha = 1.0, alpha_cutoff = 0.5,
+//!   tiling = {4, 4}, offset = {0, 0}, uv_mapping = "Triplanar", world_size = 2.0,
 //!   shader = "enemy_toon", shader_textures = { mask = "noise.png" },
 //!   maps = { resolution = 512, nodes = { ... }, outputs = { base_color = "albedo" } },
 //! }
@@ -33,7 +34,7 @@ use mlua::Value;
 use crate::api::lua_json::{decode, recipe_json};
 use crate::components::MaterialAsset;
 use crate::procgen::TextureRecipe;
-use crate::scene::authoring::material::{SurfaceField, SurfaceKind, SurfaceValue, SURFACE_FIELDS};
+use crate::scene::authoring::material::{material_fields, SurfaceField, SurfaceKind, SurfaceValue};
 
 /// The validation-bearing fields lifted out of the recipe so the caller applies them
 /// through the shared `set_*` ops. `None` means "not authored" — leave the asset's
@@ -53,8 +54,9 @@ pub struct Validated {
     /// The raw `shader_textures` slot → path map (#400), applied by the shared
     /// `set_shader_texture` op so an unknown slot is refused by name.
     pub shader_textures: Vec<(String, String)>,
-    /// The transparent-surface fields the recipe names (#1523), each applied by
-    /// the shared `set_surface` op, so a recipe validates as the setters do.
+    /// The table-driven fields the recipe names (the transparent surface, #1523; the
+    /// map coordinates, #1573), each applied by the shared `set_surface` op, so a
+    /// recipe validates as the setters do.
     pub surface: Vec<(&'static SurfaceField, SurfaceValue)>,
 }
 
@@ -100,7 +102,7 @@ fn asset_from_json_value(
             .remove("shader")
             .and_then(|v| v.as_str().map(str::to_string));
         validated.shader_textures = shader_textures(obj.remove("shader_textures"))?;
-        for field in SURFACE_FIELDS {
+        for field in material_fields() {
             if let Some(v) = obj.remove(field.key) {
                 validated.surface.push((field, surface_value(field, &v)?));
             }
@@ -124,10 +126,17 @@ fn surface_value(field: &SurfaceField, v: &serde_json::Value) -> Result<SurfaceV
         SurfaceKind::Color => serde_json::from_value::<[f32; 3]>(v.clone())
             .ok()
             .map(SurfaceValue::Color),
+        SurfaceKind::Vec2(_) => pair(v).map(SurfaceValue::Vec2),
     };
     value
         .ok_or_else(|| field.wrong_kind())
         .and_then(|v| field.check(v))
+}
+
+/// A recipe's `{x, y}` pair, by position or by name (`{x = 4, y = 2}`).
+fn pair(v: &serde_json::Value) -> Option<[f32; 2]> {
+    let lane = |i: usize, name: &str| v.get(i).or_else(|| v.get(name))?.as_f64();
+    Some([lane(0, "x")? as f32, lane(1, "y")? as f32])
 }
 
 /// The recipe's `shader_textures` table (`{ mask = "noise.png" }`) as slot → path

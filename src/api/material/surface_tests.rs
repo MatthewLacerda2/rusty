@@ -1,5 +1,6 @@
-//! `Material.Set<Field>` / `Get<Field>` and the recipe keys for the transparent-
-//! surface fields (#1523), through a real Lua VM.
+//! `Material.Set<Field>` / `Get<Field>` and the recipe keys for the table-driven
+//! fields (the transparent surface, #1523; the map coordinates, #1573), through a
+//! real Lua VM.
 
 use std::cell::RefCell;
 
@@ -75,5 +76,36 @@ fn a_recipe_carries_the_surface_keys_and_refuses_a_bad_one() {
     assert!(
         !scene.borrow().materials.contains_key("bad"),
         "nothing defined"
+    );
+}
+
+#[test]
+fn map_coordinates_take_pairs_by_position_or_name() {
+    let scene = RefCell::new(Scene::new());
+    let id = scene.borrow_mut().add_entity("E".into());
+    let (x, y, mode): (f32, f32, String) = eval(
+        &scene,
+        &format!(
+            r#"Material.SetTiling({id}, {{x = 4, y = 2}})
+               Material.SetOffset({id}, {{0.5, 0.25}})
+               Material.SetUvMapping({id}, "triplanar")
+               local t = Material.GetTiling({id})
+               return t[1], t[2], Material.GetUvMapping({id})"#
+        ),
+    )
+    .unwrap();
+    assert_eq!((x, y, mode.as_str()), (4.0, 2.0, "Triplanar"));
+    let err = eval::<()>(&scene, &format!("Material.SetOffset({id}, {{1}})"));
+    assert!(err.unwrap_err().to_string().contains("offset"));
+    eval::<()>(
+        &scene,
+        r#"Material.DefineAsset("floor", { tiling = {x = 8, y = 8}, offset = {1, 0},
+            uv_mapping = "Planar", world_size = 2 })"#,
+    )
+    .unwrap();
+    let c = scene.borrow().materials["floor"].coordinates.clone();
+    assert_eq!(
+        (c.tiling, c.offset, c.world_size),
+        ([8.0; 2], [1.0, 0.0], 2.0)
     );
 }

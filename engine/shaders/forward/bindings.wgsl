@@ -52,6 +52,15 @@ struct EntityUniforms {
     absorption: vec4<f32>,
     // Thin translucency: rgb colour * amount, w the amount.
     transmission: vec4<f32>,
+    // Where the maps are read (#1573), mirroring `MappingUniform`
+    // (src/render/gpu/uniforms.rs) byte-for-byte: xy the tiling, zw the offset.
+    uv_st: vec4<f32>,
+    // 0 UV0, 1 planar (world XZ), 2 triplanar (`forward/mapping.wgsl`).
+    uv_mapping: u32,
+    // Texture repeats per metre under a world mapping.
+    world_scale: f32,
+    blend_sharpness: f32,
+    mapping_pad: u32,
 };
 
 // One instance of an instanced draw (#470), indexed by `instance_index`. Mirrors

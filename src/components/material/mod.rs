@@ -8,6 +8,7 @@
 //! engine-provided per-entity type), while the data it points at is the shared asset.
 
 mod decal;
+mod mapping;
 mod surface;
 
 use std::collections::BTreeMap;
@@ -17,6 +18,7 @@ use serde::{Deserialize, Serialize};
 use crate::asset::MapRef;
 use crate::procgen::TextureRecipe;
 pub use decal::DecalBlend;
+pub use mapping::{MapCoordinates, UvMapping};
 use surface::{default_ior, default_one, white};
 pub use surface::{BlendMode, RefractionModel};
 
@@ -93,6 +95,10 @@ pub struct MaterialAsset {
     pub emissive: [f32; 3],
     #[serde(default)]
     pub emissive_map: Option<MapRef>,
+    /// Where the maps above are read (#1573): tiling, offset and a world-space
+    /// projection. Flattened: its keys sit beside these in a scene file.
+    #[serde(flatten, skip_serializing_if = "MapCoordinates::is_default")]
+    pub coordinates: MapCoordinates,
     /// Compositing mode (#242); `Opaque` when absent.
     #[serde(default)]
     pub render_mode: RenderMode,
@@ -202,6 +208,7 @@ impl Default for MaterialAsset {
             normal_map: None,
             emissive: [0.0, 0.0, 0.0],
             emissive_map: None,
+            coordinates: MapCoordinates::default(),
             render_mode: RenderMode::Opaque,
             alpha: default_alpha(),
             alpha_cutoff: default_alpha_cutoff(),

@@ -4,7 +4,7 @@
 use std::mem::{offset_of, size_of};
 
 use super::{assert_members, wgsl_struct_in};
-use crate::render::gpu::uniforms::SurfaceUniform;
+use crate::render::gpu::uniforms::{MappingUniform, SurfaceUniform};
 use crate::render::EntityUniform;
 
 const PROBE: &str = "#import forward::bindings::entity\n\
@@ -16,6 +16,8 @@ const PROBE: &str = "#import forward::bindings::entity\n\
 fn entity_uniform_matches_wgsl_layout() {
     let surface = offset_of!(EntityUniform, surface);
     let at = |field: usize| surface + field;
+    let mapping = offset_of!(EntityUniform, mapping);
+    let map = |field: usize| mapping + field;
     let pairs = [
         ("color_tint", offset_of!(EntityUniform, color_tint)),
         ("emissive", offset_of!(EntityUniform, emissive)),
@@ -42,6 +44,13 @@ fn entity_uniform_matches_wgsl_layout() {
         ),
         ("absorption", at(offset_of!(SurfaceUniform, absorption))),
         ("transmission", at(offset_of!(SurfaceUniform, transmission))),
+        ("uv_st", map(offset_of!(MappingUniform, uv_st))),
+        ("uv_mapping", map(offset_of!(MappingUniform, uv_mapping))),
+        ("world_scale", map(offset_of!(MappingUniform, world_scale))),
+        (
+            "blend_sharpness",
+            map(offset_of!(MappingUniform, blend_sharpness)),
+        ),
     ];
     let found = wgsl_struct_in(PROBE, "EntityUniforms");
     assert_members(found, "EntityUniforms", &pairs, size_of::<EntityUniform>());

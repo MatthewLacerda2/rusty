@@ -8,18 +8,25 @@
 
 #import common::VertexInput
 #import forward::bindings::{camera, entity, s_diffuse, t_diffuse, vertex_to_world}
+#import forward::mapping
 
 struct MaskVertex {
     @builtin(position) clip_position: vec4<f32>,
     @location(0) tex_coords: vec2<f32>,
+    // Where a world-mapped material reads its albedo (#1573).
+    @location(1) world_position: vec3<f32>,
+    @location(2) world_normal: vec3<f32>,
 };
 
 @vertex
 fn vs_mask(model: VertexInput, @builtin(instance_index) instance: u32) -> MaskVertex {
     var out: MaskVertex;
-    let world = vertex_to_world(model, instance) * vec4<f32>(model.position, 1.0);
+    let to_world = vertex_to_world(model, instance);
+    let world = to_world * vec4<f32>(model.position, 1.0);
     out.clip_position = camera.view_proj * world;
     out.tex_coords = model.tex_coords;
+    out.world_position = world.xyz;
+    out.world_normal = (to_world * vec4<f32>(model.normal, 0.0)).xyz;
     return out;
 }
 
@@ -31,7 +38,8 @@ fn fs_mask(in: MaskVertex) -> @location(0) vec4<f32> {
     if (entity.use_cutout == 1u) {
         var alpha = entity.color_tint.a;
         if (entity.use_texture == 1u) {
-            alpha *= textureSample(t_diffuse, s_diffuse, in.tex_coords).a;
+            let maps = mapping::coords(in.tex_coords, in.world_position, normalize(in.world_normal));
+            alpha *= mapping::sample(t_diffuse, s_diffuse, maps).a;
         }
         if (alpha < entity.alpha_cutoff) {
             discard;

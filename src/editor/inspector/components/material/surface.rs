@@ -1,23 +1,24 @@
-//! The Material card's transparent-surface rows (#1523): one widget per row of the
-//! shared `authoring::material::SURFACE_FIELDS` table that its `shown` admits (a
-//! combo box, a checkbox, a slider or a colour button, by the row's kind). Every
-//! change goes through the shared `set_surface` op `Material.Set<Field>` calls too.
+//! The Material card's table-driven rows: the map coordinates (#1573) and the
+//! transparent surface (#1523), one widget per row of a shared
+//! `authoring::material` field table that its `shown` admits (a combo box, a
+//! checkbox, a slider, a colour button or a pair of drag values, by the row's kind).
+//! Every change goes through the shared `set_surface` op `Material.Set<Field>` calls
+//! too.
 
 use std::collections::BTreeMap;
 
-use crate::scene::authoring::material::{
-    self as mat_ops, SurfaceField, SurfaceKind, SurfaceValue, SURFACE_FIELDS,
-};
+use crate::scene::authoring::material::{self as mat_ops, SurfaceField, SurfaceKind, SurfaceValue};
 use crate::scene::MaterialAsset;
 
-/// Draw every surface row material `key` shows.
-pub(super) fn draw_surface_fields(
+/// Draw every row of `fields` material `key` shows.
+pub(super) fn draw_fields(
     ui: &mut egui::Ui,
+    fields: &'static [SurfaceField],
     materials: &mut BTreeMap<String, MaterialAsset>,
     key: &str,
     is_dirty: &mut bool,
 ) {
-    for field in SURFACE_FIELDS {
+    for field in fields {
         if !(field.shown)(&materials[key]) {
             continue;
         }
@@ -63,6 +64,19 @@ fn draw_field(
                 .color_edit_button_rgb(&mut rgb)
                 .changed()
                 .then_some(SurfaceValue::Color(rgb)),
+            (SurfaceKind::Vec2(range), SurfaceValue::Vec2(mut v)) => {
+                let x = ui.add(
+                    egui::DragValue::new(&mut v[0])
+                        .speed(0.01)
+                        .range(range.clone()),
+                );
+                let y = ui.add(
+                    egui::DragValue::new(&mut v[1])
+                        .speed(0.01)
+                        .range(range.clone()),
+                );
+                (x.changed() || y.changed()).then_some(SurfaceValue::Vec2(v))
+            }
             _ => None,
         }
     })

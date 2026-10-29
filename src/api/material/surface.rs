@@ -1,6 +1,8 @@
-//! src/api/material/surface.rs — the transparent-surface fields (#1523): a
+//! src/api/material/surface.rs — the table-driven material fields: a
 //! `Material.Set<api>(id, value)` / `Material.Get<api>(id)` pair for every row of
-//! `authoring::material::SURFACE_FIELDS` (`SetBlendMode`, `GetReceiveShadows`, …).
+//! `authoring::material::material_fields` — the transparent-surface fields (#1523:
+//! `SetBlendMode`, `GetReceiveShadows`, …) and the map coordinates (#1573:
+//! `SetTiling`, `SetUvMapping`, …).
 //!
 //! A thin adapter (#287): it turns the Lua value into the row's `SurfaceValue` and
 //! hands it to the shared `set_surface` op, which owns the validation the Inspector
@@ -14,7 +16,7 @@ use mlua::{IntoLua, Value};
 use super::{put, with_material, Reg};
 use crate::api::entity_arg::EntityArg;
 use crate::scene::authoring::material::{
-    self as mat_ops, SurfaceField, SurfaceKind, SurfaceValue, SURFACE_FIELDS,
+    self as mat_ops, material_fields, SurfaceField, SurfaceKind, SurfaceValue,
 };
 use crate::scene::Scene;
 
@@ -24,7 +26,7 @@ pub fn register<'scope>(
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
-    for field in SURFACE_FIELDS {
+    for field in material_fields() {
         let set = format!("Set{}", field.api);
         let verb = set.clone();
         let f = scope.create_function(move |_, (id, value): (EntityArg, Value)| {
@@ -77,17 +79,32 @@ pub(super) fn from_lua(field: &SurfaceField, value: &Value) -> Result<SurfaceVal
                 _ => Err(wrong()),
             }
         }
+        // `{x, y}` by position, or `{x = …, y = …}`.
+        (SurfaceKind::Vec2(_), Value::Table(t)) => {
+            let lane = |i: usize, name: &str| {
+                let v = t.get::<Value>(i).ok().filter(|v| !v.is_nil());
+                v.or_else(|| t.get::<Value>(name).ok())
+                    .as_ref()
+                    .and_then(number)
+            };
+            match (lane(1, "x"), lane(2, "y")) {
+                (Some(x), Some(y)) => Ok(SurfaceValue::Vec2([x, y])),
+                _ => Err(wrong()),
+            }
+        }
         _ => Err(wrong()),
     }
 }
 
-/// A field's value back to Lua: a string, a boolean, a number or an `{r, g, b}`.
+/// A field's value back to Lua: a string, a boolean, a number, an `{r, g, b}` or
+/// an `{x, y}`.
 fn to_lua(lua: &mlua::Lua, value: SurfaceValue) -> mlua::Result<Value> {
     match value {
         SurfaceValue::Text(t) => t.into_lua(lua),
         SurfaceValue::Bool(b) => Ok(Value::Boolean(b)),
         SurfaceValue::Number(n) => Ok(Value::Number(f64::from(n))),
         SurfaceValue::Color(c) => c.into_lua(lua),
+        SurfaceValue::Vec2(v) => v.into_lua(lua),
     }
 }
 
