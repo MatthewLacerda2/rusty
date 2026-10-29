@@ -32,6 +32,7 @@ impl Renderer {
         all.extend(self.ui_renderer.lazy_pipelines());
         all.extend(self.shadow_renderer.lazy_pipelines());
         all.push(self.mip_generator.lazy_pipeline());
+        all.push(self.opaque_copy.lazy_pipeline());
         if editor_overlays {
             all.push(&self.line_pipeline);
             all.extend(self.outline.lazy_pipelines());

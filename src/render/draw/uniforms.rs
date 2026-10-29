@@ -6,7 +6,7 @@
 
 use glam::Mat4;
 
-use crate::components::{MaterialAsset, RenderMode};
+use crate::components::{MaterialAsset, RefractionModel, RenderMode};
 use crate::render::gpu::lightmaps::Lightmaps;
 use crate::render::gpu::uniforms::SurfaceUniform;
 use crate::render::{EntityUniform, InstanceData};
@@ -90,12 +90,34 @@ pub(crate) fn surface_uniform(material: Option<&MaterialAsset>) -> SurfaceUnifor
         };
     };
     let glass = m.is_transparent();
+    let reads_opaque = m.reads_opaque();
+    let (refraction_model, thickness) = match m.refraction_model {
+        RefractionModel::None => (0, 0.0),
+        RefractionModel::Planar => (1, m.thickness),
+        RefractionModel::Thin => (2, REFRACTION_THIN_DISTANCE),
+    };
     SurfaceUniform {
         blend_mode: m.blend_mode as u32,
         premultiply_diffuse: u32::from(glass && preserves_specular(m)),
         receive_shadows: u32::from(m.receive_shadows),
+        refraction_model: if reads_opaque { refraction_model } else { 0 },
+        ior: m.ior,
+        thickness,
+        uses_opaque: u32::from(reads_opaque),
+        absorption: absorption(m.transmittance_color, m.absorption_distance),
         ..SurfaceUniform::default()
     }
+}
+
+/// HDRP's thin refraction slab (`Lit.hlsl`, `REFRACTION_THIN_DISTANCE`): 5 mm.
+const REFRACTION_THIN_DISTANCE: f32 = 0.005;
+
+/// The absorption coefficient per metre that leaves `color` after `distance`
+/// metres, HDRP's `TransmittanceColorAtDistanceToAbsorption`:
+/// `-ln(color) / distance`, with its epsilon on both.
+fn absorption(color: [f32; 3], distance: f32) -> [f32; 4] {
+    let k = |c: f32| -(c + 1e-4).ln().min(0.0) / distance.max(1e-4);
+    [k(color[0]), k(color[1]), k(color[2]), 0.0]
 }
 
 /// Whether URP's *Preserve Specular Lighting* is in effect for `m`: on, and under a

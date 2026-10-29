@@ -3,8 +3,10 @@
 //! off and on, and compares pixels, so no golden is committed. Each skips without
 //! an adapter.
 
+mod absorption;
 mod preserve_specular;
 mod receive_shadows;
+mod refraction;
 
 use glam::{Quat, Vec3};
 use rusty::components::{MaterialAsset, MaterialComponent, RenderMode};
@@ -97,5 +99,42 @@ pub fn darker(a: &image::RgbImage, b: &image::RgbImage) -> usize {
     a.pixels()
         .zip(b.pixels())
         .filter(|(a, b)| sum(b) - sum(a) > 60)
+        .count()
+}
+
+/// A `tiles`×`tiles` black-and-white checker PNG (sRGB albedo), written once under
+/// `name`; returns its path.
+pub fn checker(name: &str, tiles: u32) -> String {
+    let size = tiles * 8;
+    let img = image::RgbaImage::from_fn(size, size, |x, y| {
+        let v = if (x / 8 + y / 8) % 2 == 0 { 255 } else { 20 };
+        image::Rgba([v, v, v, 255])
+    });
+    save(name, img)
+}
+
+/// A tangent-space normal map of ripples along x, `waves` across the texture.
+pub fn ripples(name: &str, waves: f32) -> String {
+    let img = image::RgbaImage::from_fn(64, 64, |x, _| {
+        let slope = (x as f32 / 64.0 * waves * std::f32::consts::TAU).sin() * 0.6;
+        let n = Vec3::new(slope, 0.0, 1.0).normalize() * 0.5 + 0.5;
+        let byte = |c: f32| (c * 255.0).round() as u8;
+        image::Rgba([byte(n.x), byte(n.y), byte(n.z), 255])
+    });
+    save(name, img)
+}
+
+fn save(name: &str, img: image::RgbaImage) -> String {
+    let path = crate::temp::dir().join(format!("rusty_1523_{name}.png"));
+    img.save(&path).expect("write the texture");
+    path.to_string_lossy().into_owned()
+}
+
+/// How many pixels differ between `a` and `b` by more than 30 summed.
+pub fn differing(a: &image::RgbImage, b: &image::RgbImage) -> usize {
+    let sum = |p: &image::Rgb<u8>| p.0.iter().map(|&c| i32::from(c)).sum::<i32>();
+    a.pixels()
+        .zip(b.pixels())
+        .filter(|(a, b)| (sum(a) - sum(b)).abs() > 30)
         .count()
 }

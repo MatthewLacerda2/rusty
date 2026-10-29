@@ -14,7 +14,7 @@ use std::ops::RangeInclusive;
 
 use super::super::sanitize::{finite_array_or, saturated, unit};
 use super::MaterialLibrary;
-use crate::components::{BlendMode, MaterialAsset};
+use crate::components::{BlendMode, MaterialAsset, RefractionModel};
 
 /// A surface field's value, as the API, a recipe and the Inspector carry it.
 #[derive(Clone, Debug, PartialEq)]
@@ -138,6 +138,27 @@ fn boolean(value: SurfaceValue) -> bool {
     matches!(value, SurfaceValue::Bool(true))
 }
 
+/// A number the row's `check` clamped (0 for a value of another kind, which
+/// `check` never passes).
+fn number(value: SurfaceValue) -> f32 {
+    match value {
+        SurfaceValue::Number(n) => n,
+        _ => 0.0,
+    }
+}
+
+/// A colour the row's `check` clamped.
+fn color(value: SurfaceValue) -> [f32; 3] {
+    match value {
+        SurfaceValue::Color(c) => c,
+        _ => [1.0; 3],
+    }
+}
+
+fn refracts(m: &MaterialAsset) -> bool {
+    m.is_transparent() && m.refraction_model != RefractionModel::None
+}
+
 /// Every transparent-surface field, in Inspector order.
 pub static SURFACE_FIELDS: &[SurfaceField] = &[
     SurfaceField {
@@ -166,6 +187,51 @@ pub static SURFACE_FIELDS: &[SurfaceField] = &[
         shown: always,
         get: |m| SurfaceValue::Bool(m.receive_shadows),
         put: |m, v| m.receive_shadows = boolean(v),
+    },
+    SurfaceField {
+        key: "refraction_model",
+        api: "RefractionModel",
+        label: "Refraction Model",
+        kind: SurfaceKind::Choice(|| RefractionModel::ALL.map(RefractionModel::name).to_vec()),
+        shown: transparent,
+        get: |m| SurfaceValue::Text(m.refraction_model.name().to_owned()),
+        put: |m, v| m.refraction_model = choice(v, RefractionModel::parse),
+    },
+    SurfaceField {
+        key: "ior",
+        api: "IndexOfRefraction",
+        label: "Index of Refraction",
+        kind: SurfaceKind::Number(1.0..=2.5),
+        shown: refracts,
+        get: |m| SurfaceValue::Number(m.ior),
+        put: |m, v| m.ior = number(v),
+    },
+    SurfaceField {
+        key: "thickness",
+        api: "Thickness",
+        label: "Thickness",
+        kind: SurfaceKind::Number(0.0..=10.0),
+        shown: |m| m.is_transparent() && m.refraction_model == RefractionModel::Planar,
+        get: |m| SurfaceValue::Number(m.thickness),
+        put: |m, v| m.thickness = number(v),
+    },
+    SurfaceField {
+        key: "transmittance_color",
+        api: "TransmittanceColor",
+        label: "Transmittance Color",
+        kind: SurfaceKind::Color,
+        shown: transparent,
+        get: |m| SurfaceValue::Color(m.transmittance_color),
+        put: |m, v| m.transmittance_color = color(v),
+    },
+    SurfaceField {
+        key: "absorption_distance",
+        api: "AbsorptionDistance",
+        label: "Absorption Distance",
+        kind: SurfaceKind::Number(0.01..=100.0),
+        shown: transparent,
+        get: |m| SurfaceValue::Number(m.absorption_distance),
+        put: |m, v| m.absorption_distance = number(v),
     },
 ];
 

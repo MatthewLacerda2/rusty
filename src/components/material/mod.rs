@@ -17,7 +17,8 @@ use serde::{Deserialize, Serialize};
 use crate::asset::MapRef;
 use crate::procgen::TextureRecipe;
 pub use decal::DecalBlend;
-pub use surface::BlendMode;
+use surface::{default_ior, default_one, white};
+pub use surface::{BlendMode, RefractionModel};
 
 fn default_base_color() -> [f32; 3] {
     [1.0, 1.0, 1.0]
@@ -119,6 +120,27 @@ pub struct MaterialAsset {
     /// shadow). On by default.
     #[serde(default = "default_true")]
     pub receive_shadows: bool,
+    /// How a `Transparent` surface bends what is behind it (#1523), HDRP's
+    /// *Refraction Model*; `None` when absent. Bends by the shading normal, its
+    /// normal map included.
+    #[serde(default)]
+    pub refraction_model: RefractionModel,
+    /// The index of refraction, HDRP's *Index of Refraction* (water 1.33, glass
+    /// 1.5, the default).
+    #[serde(default = "default_ior")]
+    pub ior: f32,
+    /// How thick a `Planar` refraction's slab is, in metres (default 1).
+    #[serde(default = "default_one")]
+    pub thickness: f32,
+    /// The colour light keeps after `absorption_distance` metres through a
+    /// `Transparent` surface (#1523), HDRP's *Transmittance Color*; white (the
+    /// default) absorbs nothing. Shallow water stays clear, deep water takes it.
+    #[serde(default = "white")]
+    pub transmittance_color: [f32; 3],
+    /// The distance at which light keeps `transmittance_color`, in metres, HDRP's
+    /// *Absorption Distance* (default 1).
+    #[serde(default = "default_one")]
+    pub absorption_distance: f32,
     /// The authored surface shader this material renders with (#396): a module name
     /// resolved as `<name>.wgsl` in `assets/shaders` (where `Shader.Bake`
     /// writes), then `engine/shaders`. `None` is the standard forward shader.
@@ -172,6 +194,11 @@ impl Default for MaterialAsset {
             blend_mode: BlendMode::Alpha,
             preserve_specular: true,
             receive_shadows: true,
+            refraction_model: RefractionModel::None,
+            ior: default_ior(),
+            thickness: default_one(),
+            transmittance_color: white(),
+            absorption_distance: default_one(),
             shader: None,
             shader_params: BTreeMap::new(),
             shader_textures: BTreeMap::new(),

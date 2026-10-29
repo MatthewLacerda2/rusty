@@ -3,6 +3,7 @@ pub(crate) mod build;
 pub(crate) mod gpu_rule;
 pub(crate) mod headless;
 pub(crate) mod resize;
+mod shadow_system;
 pub(crate) mod textures;
 mod warm;
 
@@ -218,6 +219,7 @@ impl Renderer {
             shadow_renderer: shadows.renderer,
             shadow_uniform_buffer: shadows.uniform_buffer,
             shadow_bind_group: shadows.bind_group,
+            opaque_copy: shadows.opaque_copy,
             particle_renderer: billboards.particle_renderer,
             ribbon_renderer: billboards.ribbon_renderer,
             decals: global.decals,

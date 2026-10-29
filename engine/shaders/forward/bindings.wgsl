@@ -229,3 +229,11 @@ var t_ao: texture_2d<f32>;
 var t_shadow_atlas: texture_depth_2d;
 @group(3) @binding(5)
 var<storage, read> shadow_tiles: array<ShadowTile>;
+// The camera's opaque copy (#1523, `opaque_copy.wgsl`), Unity's *Opaque Texture*
+// and *Depth Texture* in one: rgb its colour after the opaque pass and SSR, alpha
+// the distance from the eye to that surface; a 1x1 stand-in in every pass but a
+// transparent one with a surface that refracts or absorbs. Linear, clamped sampler.
+@group(3) @binding(6)
+var t_opaque: texture_2d<f32>;
+@group(3) @binding(7)
+var s_opaque: sampler;

@@ -2,6 +2,8 @@
 //! constructors split out of `pipelines.rs` to keep each file under the size cap;
 //! `pipelines` consumes these to build the pipeline layouts (behavior unchanged).
 
+use crate::render::passes::transparent::OpaqueViews;
+
 use super::layout_entries::{
     depth_entry, dynamic_uniform_entry, sampler_entry, storage_entry, texture_entry, uniform_entry,
 };
@@ -164,8 +166,9 @@ pub(crate) fn create_material_layout(device: &wgpu::Device) -> wgpu::BindGroupLa
 
 /// Main shadow bind group layout: the cascade uniform, the cascade depth array, the
 /// comparison sampler (#435), the view's ambient-occlusion texture (#436), and the
-/// point/spot shadow atlas with its tiles (#468) — the forward pass's group 3,
-/// everything it reads that a per-frame pass produced.
+/// point/spot shadow atlas with its tiles (#468), and the opaque copy a refracting
+/// or absorbing surface reads (#1523: colour and eye distance, and its sampler) — the
+/// forward pass's group 3, everything it reads that a per-frame pass produced.
 pub(crate) fn create_shadow_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
     use wgpu::TextureViewDimension::{D2Array, D2};
     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -182,19 +185,23 @@ pub(crate) fn create_shadow_layout(device: &wgpu::Device) -> wgpu::BindGroupLayo
             texture_entry(3, D2),
             depth_entry(4, D2),
             storage_entry(5, wgpu::ShaderStages::FRAGMENT),
+            texture_entry(6, D2),
+            sampler_entry(7),
         ],
     })
 }
 
 /// The forward pass's group 3 over [`create_shadow_layout`]: the cascade `uniform`,
-/// the shadow renderer's active cascade array + sampler, and `ao` — a view's SSAO
-/// result, or the 1x1 white fallback where no AO ran.
+/// the shadow renderer's active cascade array + sampler, `ao` — a view's SSAO
+/// result, or the 1x1 white fallback where no AO ran — and `opaque`, the view's
+/// opaque copy in its transparent pass or the 1x1 fallback everywhere else (#1523).
 pub(crate) fn create_shadow_bind_group(
     device: &wgpu::Device,
     layout: &wgpu::BindGroupLayout,
     uniform: &wgpu::Buffer,
     shadows: &crate::render::passes::shadows::ShadowRenderer,
     ao: &wgpu::TextureView,
+    opaque: OpaqueViews,
 ) -> wgpu::BindGroup {
     device.create_bind_group(&wgpu::BindGroupDescriptor {
         label: Some("Main Shadow Bind Group"),
@@ -223,6 +230,14 @@ pub(crate) fn create_shadow_bind_group(
             wgpu::BindGroupEntry {
                 binding: 5,
                 resource: shadows.atlas.tiles.as_entire_binding(),
+            },
+            wgpu::BindGroupEntry {
+                binding: 6,
+                resource: wgpu::BindingResource::TextureView(opaque.texture),
+            },
+            wgpu::BindGroupEntry {
+                binding: 7,
+                resource: wgpu::BindingResource::Sampler(opaque.sampler),
             },
         ],
     })

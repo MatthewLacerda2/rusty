@@ -85,7 +85,7 @@ fn gpu_warm_pipelines_builds_every_lazy_pipeline() {
     // 3 tile passes and gather (#1436) + the depth of field's 9 (#1445) + bloom's
     // bright pass and blur (#1467) + the lens flare's (#1443; the composite adds it, #1473) + 2 particle
     // + 2 ribbon + one world canvas per blend mode + 2 mirrored shadow + the data-mip
-    // one + 4 editor (line, the outline's mask, dilation and edge).
+    // one + the opaque copy (#1523) + 4 editor (line, the outline's mask, dilation and edge).
     assert_eq!(
         every.len(),
         super::TransparentBlend::ALL.len()
@@ -102,6 +102,7 @@ fn gpu_warm_pipelines_builds_every_lazy_pipeline() {
             + 2
             + UiBlend::ALL.len()
             + 2
+            + 1
             + 1
             + 4
     );

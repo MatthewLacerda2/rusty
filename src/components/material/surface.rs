@@ -1,6 +1,6 @@
 //! How a `Transparent` material composites over what is behind it (#1523): Unity
-//! URP Lit's *Blending Mode* and *Preserve Specular Lighting*, and the *Receive
-//! Shadows* toggle every surface has.
+//! URP Lit's *Blending Mode* and *Preserve Specular Lighting*, the *Receive
+//! Shadows* toggle every surface has, and HDRP Lit's refraction and absorption.
 
 crate::core::named_enum! {
     /// How a transparent surface's colour combines with the image behind it — URP
@@ -28,5 +28,47 @@ impl BlendMode {
     /// skipped for `Premultiply` and `Multiply`, as URP skips it.
     pub fn preserves_specular(self) -> bool {
         matches!(self, Self::Alpha | Self::Additive)
+    }
+}
+
+crate::core::named_enum! {
+    /// How a transparent surface bends what is behind it — HDRP Lit's *Refraction
+    /// Model* (`Refraction.hlsl`), leaving out its Sphere model.
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    pub enum RefractionModel {
+        /// No bending. The default.
+        #[default]
+        None = "None",
+        /// The surface is a slab `thickness` thick (water, a thick pane): HDRP's
+        /// *Planar* (its code's `RefractionModelBox`).
+        Planar = "Planar",
+        /// A thin shell (a bubble, a window): HDRP's *Thin*, a fixed 5 mm slab, so it
+        /// barely bends.
+        Thin = "Thin",
+    }
+}
+
+pub(super) fn default_ior() -> f32 {
+    1.5
+}
+
+pub(super) fn default_one() -> f32 {
+    1.0
+}
+
+pub(super) fn white() -> [f32; 3] {
+    [1.0; 3]
+}
+
+impl super::MaterialAsset {
+    /// Whether this material's surface reads the opaque copy (#1523): a
+    /// `Transparent` one that refracts or absorbs, under `Alpha` or `Premultiply`
+    /// (an `Additive` or `Multiply` surface adds to or tints what is behind it, so it
+    /// has nothing to bend or absorb).
+    pub fn reads_opaque(&self) -> bool {
+        let blends_over = matches!(self.blend_mode, BlendMode::Alpha | BlendMode::Premultiply);
+        let refracts = self.refraction_model != RefractionModel::None;
+        let absorbs = self.transmittance_color != white();
+        self.is_transparent() && blends_over && (refracts || absorbs)
     }
 }

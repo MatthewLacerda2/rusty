@@ -23,6 +23,9 @@ pub(crate) struct CameraUniform {
     /// target's `.a`, so motion blur orders a higher camera in front. `y`: last
     /// frame's game time (#1524), for the vertex blocks' motion. `zw` unused.
     pub stack: [f32; 4],
+    /// `view_proj`'s inverse (#1523), what refraction and absorption rebuild the
+    /// opaque depth's world point with.
+    pub inv_view_proj: [f32; 16],
 }
 
 /// How a world point finds its light cluster (#434), mirroring `Clusters` in

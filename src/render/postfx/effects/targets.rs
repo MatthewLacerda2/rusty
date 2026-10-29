@@ -18,6 +18,11 @@ impl Targets {
         self.0.iter().find_map(|s| s.downcast_ref())
     }
 
+    /// The state of type `T`, mutably, when its effect holds one.
+    pub(crate) fn get_mut<T: Any>(&mut self) -> Option<&mut T> {
+        self.0.iter_mut().find_map(|s| s.downcast_mut())
+    }
+
     /// The state of type `T`, made by `make` when absent; [`Targets::get`] after.
     pub(crate) fn get_or<T: Any + Send + Sync>(&mut self, make: impl FnOnce() -> T) -> &mut T {
         let at = match self.0.iter().position(|s| s.is::<T>()) {

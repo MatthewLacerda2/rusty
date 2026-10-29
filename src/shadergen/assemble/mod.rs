@@ -61,7 +61,7 @@ pub use depth::{CUT_PREPASS, CUT_SHADOW};
 /// scene fog (#437) and the transparent composite (#1523) last — so an authored
 /// look is fogged and blended like every other surface.
 const SURFACE_RETURN: &str =
-    "return transparent::composite(lighting_color, base_color.a, env_brdf, in.world_position);";
+    "return transparent::composite(lighting_color, base_color.a, env_brdf, in.world_position, N, in.clip_position.xy);";
 
 /// Assemble `recipe` into a complete WGSL module. `surface_base` is the pass's base
 /// shader (`bake::base_source`: the forward shader for surface, `ui.wgsl` for ui). Returns an

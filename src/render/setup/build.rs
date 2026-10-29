@@ -14,9 +14,11 @@ use crate::render::gpu::shaders::ShaderRegistry;
 use crate::render::ibl::reflection_probes::ProbeArray;
 use crate::render::ibl::sky_cube::SkyReflection;
 use crate::render::passes::outline::OutlinePasses;
+use crate::render::passes::transparent::OpaqueCopyPass;
 use crate::render::postfx::{effects::Passes, grade::GradeBake, HDR_FORMAT};
+use crate::render::setup::shadow_system::{create_shadow_system, ShadowSystem};
 use crate::render::setup::textures::{create_textures, Textures};
-use crate::render::{ibl::skybox, passes::shadows, passes::ssao};
+use crate::render::{ibl::skybox, passes::ssao};
 use crate::render::{CameraUniform, LightingUniform};
 
 /// Camera + lighting uniform buffers and the group(0) bind group.
@@ -34,15 +36,6 @@ pub(crate) struct GlobalBindings {
     pub reflection_probes: ProbeArray,
     /// The sky's reflection cubes group 0 binds (#1553).
     pub sky_reflection: SkyReflection,
-}
-
-/// Shadow renderer, its cascade uniform buffer, and the main-pass bind group that
-/// samples the active cascade array.
-pub(crate) struct ShadowSystem {
-    pub layout: wgpu::BindGroupLayout,
-    pub renderer: shadows::ShadowRenderer,
-    pub uniform_buffer: wgpu::Buffer,
-    pub bind_group: wgpu::BindGroup,
 }
 
 /// The forward-lit, line, outline and skybox passes — everything that draws into
@@ -108,7 +101,13 @@ impl GpuResources {
         let shader = registry.load(device, "shader.wgsl", "Forward Lit Shader");
         let atlas_shader = registry.load(device, "shadow_atlas.wgsl", "Shadow Atlas Shader");
         let shadow_shaders = [&shader, &atlas_shader];
-        let shadows = create_shadow_system(device, shadow_shaders, &ssao.no_ao, &textures);
+        let opaque_copy = OpaqueCopyPass::new(device, &mut registry);
+        let shadows = create_shadow_system(
+            device,
+            shadow_shaders,
+            (&ssao.no_ao, opaque_copy),
+            &textures,
+        );
         let forward = create_forward_passes(
             device,
             &shader,
@@ -219,36 +218,6 @@ fn create_global_bindings(
         lightmaps,
         reflection_probes,
         sky_reflection,
-    }
-}
-
-/// Shadow renderer (over the forward shader and the atlas's blits, `shaders`), its
-/// cascade uniform buffer, and the main-pass bind group that samples the active
-/// cascade array — with `no_ao`, the white stand-in for SSAO.
-fn create_shadow_system(
-    device: &wgpu::Device,
-    shaders: [&wgpu::ShaderModule; 2],
-    no_ao: &wgpu::TextureView,
-    textures: &Textures,
-) -> ShadowSystem {
-    let layout = bind_layouts::create_shadow_layout(device);
-    let renderer = shadows::ShadowRenderer::new(device, shaders, &textures.material_layout);
-
-    let uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-        label: Some("Shadow Uniform Buffer"),
-        size: std::mem::size_of::<shadows::CascadeUniform>() as u64,
-        usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-        mapped_at_creation: false,
-    });
-
-    let bind_group =
-        bind_layouts::create_shadow_bind_group(device, &layout, &uniform_buffer, &renderer, no_ao);
-
-    ShadowSystem {
-        layout,
-        renderer,
-        uniform_buffer,
-        bind_group,
     }
 }
 

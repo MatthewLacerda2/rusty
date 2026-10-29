@@ -451,5 +451,5 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     // 7. Scene fog (#437), last, in linear HDR before post-FX, and how a transparent
     // surface composites (#1523). Authored surface blocks fold into `lighting_color`
     // here, so they are fogged too.
-    return transparent::composite(lighting_color, base_color.a, env_brdf, in.world_position);
+    return transparent::composite(lighting_color, base_color.a, env_brdf, in.world_position, N, in.clip_position.xy);
 }

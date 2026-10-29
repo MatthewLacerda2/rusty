@@ -33,9 +33,11 @@ impl TransparentBlend {
     ];
 
     /// The state a draw's surface terms ask for (its `BlendMode` index and whether
-    /// the shader premultiplied its diffuse).
+    /// the shader premultiplied its diffuse). A surface over the opaque copy
+    /// composites what is behind it itself and writes alpha 1, which the
+    /// premultiplied state lays down whole.
     pub(crate) fn of(surface: &SurfaceUniform) -> Self {
-        let premultiplied = surface.premultiply_diffuse == 1;
+        let premultiplied = surface.premultiply_diffuse == 1 || surface.uses_opaque == 1;
         match (surface.blend_mode, premultiplied) {
             (1, _) | (0, true) => Self::Premultiplied,
             (2, false) => Self::Additive,

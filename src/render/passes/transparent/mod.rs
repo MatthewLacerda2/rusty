@@ -12,6 +12,10 @@
 //! is occluded by opaque depth without writing depth itself (overlapping translucent
 //! surfaces all blend rather than z-cull each other).
 
+pub(crate) mod opaque_copy;
+
+pub(crate) use opaque_copy::{OpaqueCopyPass, OpaqueViews};
+
 use crate::render::draw::batch::DrawBatch;
 use crate::render::gpu::pipelines::surface::SolidPass;
 use crate::render::timing::GpuPass;
@@ -57,17 +61,23 @@ impl Renderer {
                 timestamp_writes: self.gpu_timer.writes(GpuPass::Transparent),
                 occlusion_query_set: None,
             });
-            self.record_transparent(&mut pass, items);
+            self.record_transparent(&mut pass, self.transparent_group3(view), items);
         }
         self.queue.submit(std::iter::once(encoder.finish()));
     }
 
-    /// Record the back-to-front transparent draws into `pass`: the global/shadow bind
-    /// groups, then the same batch recording the opaque pass uses — each batch binding
-    /// the transparent pipeline of its material's shader (#396).
-    fn record_transparent<'a>(&'a self, pass: &mut wgpu::RenderPass<'a>, items: &'a [DrawBatch]) {
+    /// Record the back-to-front transparent draws into `pass`: the global bind group
+    /// and `group3` (the shadows, and the opaque copy when this camera made one,
+    /// #1523), then the same batch recording the opaque pass uses — each batch
+    /// binding the transparent pipeline of its material's shader (#396) and blend.
+    fn record_transparent<'a>(
+        &'a self,
+        pass: &mut wgpu::RenderPass<'a>,
+        group3: &'a wgpu::BindGroup,
+        items: &'a [DrawBatch],
+    ) {
         pass.set_bind_group(0, &self.global_bind_group, &[]);
-        pass.set_bind_group(3, &self.shadow_bind_group, &[]);
+        pass.set_bind_group(3, group3, &[]);
         self.draw_batches(
             pass,
             items,
@@ -75,3 +85,7 @@ impl Renderer {
         );
     }
 }
+
+#[cfg(test)]
+#[path = "opaque_copy_gpu_tests.rs"]
+mod opaque_copy_gpu_tests;
