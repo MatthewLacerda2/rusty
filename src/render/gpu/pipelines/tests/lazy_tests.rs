@@ -81,7 +81,8 @@ fn gpu_warm_pipelines_builds_every_lazy_pipeline() {
     let every = renderer.lazy_pipelines(true);
     // one transparent per blend state and the 2 depth postpass (#1523) + the motion-vector forward and 2 sky (#1435) + the same 3 into
     // the SSR surface target too (#1526) + the 2 primed forward ones (#1499) and the
-    // primed SSR one + SSR's own pass + the motion blur's
+    // primed SSR one + SSR's own pass + SSAO's occlusion, blur and upsample (#1578) +
+    // the motion blur's
     // 3 tile passes and gather (#1436) + the depth of field's 9 (#1445) + bloom's
     // bright pass and blur (#1467) + the lens flare's (#1443; the composite adds it, #1473) + 2 particle
     // + 2 ribbon + one world canvas per blend mode + 2 mirrored shadow + the data-mip
@@ -95,6 +96,7 @@ fn gpu_warm_pipelines_builds_every_lazy_pipeline() {
             + 2
             + 1
             + 1
+            + 3
             + 4
             + 9
             + 2
