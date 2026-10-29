@@ -56,6 +56,7 @@ fn lit(lua: &Lua, l: Lit) -> mlua::Result<Value> {
         Lit::Number(n) => Value::Number(f64::from(n)),
         Lit::Integer(i) => Value::Integer(i64::from(i)),
         Lit::Bool(b) => Value::Boolean(b),
+        Lit::Vec2(v) => Value::Table(lua.create_sequence_from(v)?),
         Lit::Text(s) => Value::String(lua.create_string(s)?),
     })
 }
