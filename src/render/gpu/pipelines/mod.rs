@@ -25,9 +25,9 @@ pub(crate) use specs::velocity_target;
 pub(crate) struct ForwardPipelines {
     /// Opaque/cutout solids: REPLACE, depth write on.
     pub forward: wgpu::RenderPipeline,
-    /// The same, writing the view's velocity target too (#1435): built the first
-    /// time a view runs motion blur.
-    pub velocity: LazyPipeline,
+    /// The same, writing the view's velocity target too (#1435), and its SSR surface
+    /// target (#1526): built the first time a view runs motion blur or SSR.
+    pub velocity: VelocityPipelines,
     /// Alpha-blended translucent solids (#242): ALPHA_BLENDING, depth write off.
     pub transparent: LazyPipeline,
     /// The editor's line gizmos (grid, collider boxes, axis arrows, probes), drawn
@@ -70,7 +70,9 @@ pub(crate) fn create_pipelines(
     let lazy = |layout, format, spec| lazy_pipeline(device, shader, format, layout, spec);
     ForwardPipelines {
         forward: make_pipeline(device, shader, format, &render_layout, &forward_spec()),
-        velocity: lazy(&render_layout, format, velocity_spec()),
+        velocity: VelocityPipelines::new(|surface| {
+            lazy(&render_layout, format, velocity_spec(surface))
+        }),
         transparent: lazy(&render_layout, format, transparent_spec()),
         line: lazy(&line_layout, output_format, line_spec()),
         prepass: make_prepass(device, shader, &render_layout, "fs_prepass"),
@@ -95,7 +97,9 @@ pub(crate) fn surface_pipelines(
     use crate::shadergen::assemble::{CUT_PREPASS, CUT_SHADOW};
     surface::SurfacePipelines {
         forward: make_pipeline(device, shader, format, layout, &forward_spec()),
-        velocity: lazy_pipeline(device, shader, format, layout, velocity_spec()),
+        velocity: VelocityPipelines::new(|surface| {
+            lazy_pipeline(device, shader, format, layout, velocity_spec(surface))
+        }),
         primed: PrimedPipelines::new(device, shader, format, layout),
         transparent: make_pipeline(device, shader, format, layout, &transparent_spec()),
         cut: cut.then(|| surface::CutPipelines {
@@ -111,8 +115,39 @@ pub(crate) fn surface_pipelines(
 /// a view primes, since a view with AO off never does.
 pub(crate) struct PrimedPipelines {
     pub forward: LazyPipeline,
-    /// Writing motion vectors too (#1435).
-    pub velocity: LazyPipeline,
+    /// Writing motion vectors too (#1435), and the SSR surface (#1526).
+    pub velocity: VelocityPipelines,
+}
+
+/// The opaque pipelines a view writing its velocity target draws with (#1435): one
+/// into the velocity target alone, one into the SSR surface target too (#1526), each
+/// built on first use.
+pub(crate) struct VelocityPipelines {
+    plain: LazyPipeline,
+    surface: LazyPipeline,
+}
+
+impl VelocityPipelines {
+    /// The pair `make(surface)` builds.
+    fn new(make: impl Fn(bool) -> LazyPipeline) -> Self {
+        Self {
+            plain: make(false),
+            surface: make(true),
+        }
+    }
+
+    /// The one for a view that writes its SSR `surface` target, or not.
+    pub(crate) fn get(&self, surface: bool) -> &wgpu::RenderPipeline {
+        match surface {
+            false => self.plain.get(),
+            true => self.surface.get(),
+        }
+    }
+
+    /// Both, for warming.
+    pub(crate) fn lazies(&self) -> [&LazyPipeline; 2] {
+        [&self.plain, &self.surface]
+    }
 }
 
 impl PrimedPipelines {
@@ -125,7 +160,15 @@ impl PrimedPipelines {
     ) -> Self {
         Self {
             forward: lazy_pipeline(device, shader, format, layout, primed_spec()),
-            velocity: lazy_pipeline(device, shader, format, layout, primed_velocity_spec()),
+            velocity: VelocityPipelines::new(|surface| {
+                lazy_pipeline(
+                    device,
+                    shader,
+                    format,
+                    layout,
+                    primed_velocity_spec(surface),
+                )
+            }),
         }
     }
 }

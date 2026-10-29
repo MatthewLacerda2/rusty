@@ -525,7 +525,6 @@ scene.entities[].post_processing.ssao.intensity: f32
 scene.entities[].post_processing.ssao.radius: f32
 scene.entities[].post_processing.ssr.active: bool
 scene.entities[].post_processing.ssr.quality: string
-scene.entities[].post_processing.ssr.temporal_upsampling: bool
 scene.entities[].post_processing.tonemapping.display_gamma: f32
 scene.entities[].post_processing.tonemapping.mode: enum ACES|Reinhard|None
 scene.entities[].post_processing.vignette.active: bool

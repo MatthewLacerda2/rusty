@@ -131,8 +131,8 @@ pub struct Renderer {
 
     // Pipelines
     render_pipeline: wgpu::RenderPipeline,
-    /// The forward pipeline writing a view's velocity target too (#1435).
-    velocity_pipeline: gpu::pipelines::LazyPipeline,
+    /// Forward pipelines also writing velocity (#1435) and SSR surface (#1526) targets.
+    velocity_pipeline: gpu::pipelines::VelocityPipelines,
     /// The opaque ones over a view's primed depth (#1499).
     primed_pipelines: gpu::pipelines::PrimedPipelines,
     /// The post effects' shared pipelines (#1467): bloom, depth of field (#1445), the

@@ -21,11 +21,9 @@ impl Renderer {
     /// Every pipeline built on first draw. A new [`LazyPipeline`] goes in this list,
     /// or the windowed renderer compiles it mid-frame.
     pub(crate) fn lazy_pipelines(&self, editor_overlays: bool) -> Vec<&LazyPipeline> {
-        let mut all = vec![&self.transparent_pipeline, &self.velocity_pipeline];
-        all.extend([
-            &self.primed_pipelines.forward,
-            &self.primed_pipelines.velocity,
-        ]);
+        let mut all = vec![&self.transparent_pipeline, &self.primed_pipelines.forward];
+        all.extend(self.velocity_pipeline.lazies());
+        all.extend(self.primed_pipelines.velocity.lazies());
         all.extend(self.post_passes.lazy_pipelines());
         all.extend(self.skybox_renderer.lazy_pipelines());
         all.extend(self.particle_renderer.lazy_pipelines());

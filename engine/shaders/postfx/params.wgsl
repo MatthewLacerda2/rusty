@@ -16,4 +16,7 @@ struct PostParams {
     // xyz: camera world position, w: the sim's game time in seconds (#398) — the
     // same clock as `CameraUniforms.time`, 0 in edit mode and previews
     camera_pos: vec4<f32>,
+    // The sky the forward pass reflects (#1542): rgb the procedural sky's tint (the
+    // frame's ambient colour, `common::procedural_sky`), w 1 when a panorama is bound
+    sky: vec4<f32>,
 };

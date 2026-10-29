@@ -2,6 +2,7 @@ use crate::render::gpu::mesh::vertex_layout;
 use crate::render::gpu::pipelines::{velocity_target, LazyPipeline};
 use crate::render::gpu::shaders::ShaderRegistry;
 use crate::render::gpu::DEPTH_FORMAT;
+use crate::render::postfx::effects::ssr::surface;
 use crate::render::GpuTexture;
 use wgpu::util::DeviceExt;
 
@@ -16,19 +17,24 @@ struct SkyKind {
 impl SkyKind {
     /// An interior-facing, depth-test-only far-plane box pipeline from the shader's
     /// `vs_main`/`fs_main`, depth writes off; with `velocity`, into a view's velocity
-    /// target too (#1435).
+    /// target too (#1435), and with `surface` its SSR surface target (#1526), which the
+    /// sky leaves as cleared: no SSR.
     fn pipeline(
         &self,
         device: &wgpu::Device,
         format: wgpu::TextureFormat,
-        velocity: bool,
+        (velocity, surface): (bool, bool),
     ) -> wgpu::RenderPipeline {
         let colour = Some(wgpu::ColorTargetState {
             format,
             blend: Some(wgpu::BlendState::REPLACE),
             write_mask: wgpu::ColorWrites::ALL,
         });
-        let targets = [colour, Some(velocity_target(wgpu::ColorWrites::ALL))];
+        let targets = [
+            colour,
+            Some(velocity_target(wgpu::ColorWrites::ALL)),
+            Some(surface::target_state(wgpu::ColorWrites::empty())),
+        ];
         device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some(self.label),
             layout: Some(&self.layout),
@@ -42,7 +48,7 @@ impl SkyKind {
                 module: &self.shader,
                 entry_point: Some("fs_main"),
                 compilation_options: Default::default(),
-                targets: &targets[..1 + usize::from(velocity)],
+                targets: &targets[..1 + usize::from(velocity) + usize::from(surface)],
             }),
             primitive: wgpu::PrimitiveState {
                 topology: wgpu::PrimitiveTopology::TriangleList,
@@ -77,6 +83,14 @@ fn box_layout(
     })
 }
 
+/// The colour targets a scene pass writes besides the HDR one: the velocity target
+/// (#1435), and with it the SSR surface target (#1526).
+#[derive(Clone, Copy)]
+pub(crate) struct SkyTargets {
+    pub velocity: bool,
+    pub surface: bool,
+}
+
 pub struct SkyboxRenderer {
     /// Panorama pipeline: samples a bound 2D equirectangular texture (group 1).
     pipeline: wgpu::RenderPipeline,
@@ -85,7 +99,8 @@ pub struct SkyboxRenderer {
     gradient_pipeline: wgpu::RenderPipeline,
     /// The same two writing a motion-blurred view's velocity target too (#1435): the
     /// sky moves with the camera's rotation. Built the first time such a view draws.
-    velocity: [LazyPipeline; 2],
+    /// The second pair also carries an SSR view's surface target (#1526).
+    velocity: [[LazyPipeline; 2]; 2],
     vertex_buffer: wgpu::Buffer,
     index_buffer: wgpu::Buffer,
     num_indices: u32,
@@ -115,11 +130,15 @@ impl SkyboxRenderer {
             shader: registry.load(device, "sky_gradient.wgsl", "Sky Gradient Shader"),
             layout: box_layout(device, "Sky Gradient Pipeline", &[camera_lighting_layout]),
         };
-        let pipeline = panorama.pipeline(device, texture_format, false);
-        let gradient_pipeline = gradient.pipeline(device, texture_format, false);
-        let velocity = [panorama, gradient].map(|kind| {
-            LazyPipeline::new(device, move |device| {
-                kind.pipeline(device, texture_format, true)
+        let pipeline = panorama.pipeline(device, texture_format, (false, false));
+        let gradient_pipeline = gradient.pipeline(device, texture_format, (false, false));
+        let kinds = std::sync::Arc::new([panorama, gradient]);
+        let velocity = [false, true].map(|surface| {
+            [0, 1].map(|kind| {
+                let kinds = kinds.clone();
+                LazyPipeline::new(device, move |device| {
+                    kinds[kind].pipeline(device, texture_format, (true, surface))
+                })
             })
         });
         let (vertex_buffer, index_buffer, num_indices) = Self::create_box_buffers(device);
@@ -136,7 +155,7 @@ impl SkyboxRenderer {
 
     /// The pipelines built on first draw (`Renderer::lazy_pipelines`).
     pub(crate) fn lazy_pipelines(&self) -> impl Iterator<Item = &LazyPipeline> {
-        self.velocity.iter()
+        self.velocity.iter().flatten()
     }
 
     /// Generate the unit box vertex/index buffers the skybox is drawn with.
@@ -155,36 +174,46 @@ impl SkyboxRenderer {
         (vertex_buffer, index_buffer, indices.len() as u32)
     }
 
-    /// Draw the panorama sky; with `velocity`, into the pass's velocity target too.
-    pub fn draw<'a>(
+    /// Draw the panorama sky into a pass with `targets`.
+    pub(crate) fn draw<'a>(
         &'a self,
         render_pass: &mut wgpu::RenderPass<'a>,
         camera_lighting_bind_group: &'a wgpu::BindGroup,
         skybox_texture: &'a GpuTexture,
-        velocity: bool,
+        targets: SkyTargets,
     ) {
-        let pipeline = match velocity {
-            true => self.velocity[0].get(),
-            false => &self.pipeline,
-        };
+        let pipeline = self.pick(&self.pipeline, 0, targets);
         render_pass.set_pipeline(pipeline);
         render_pass.set_bind_group(0, camera_lighting_bind_group, &[]);
         render_pass.set_bind_group(1, &skybox_texture.bind_group, &[]);
         self.draw_box(render_pass);
     }
 
+    /// Sky `kind`'s pipeline (0 the panorama, 1 the gradient) into `targets`;
+    /// `colour_only` when the pass writes only the HDR target.
+    fn pick<'a>(
+        &'a self,
+        colour_only: &'a wgpu::RenderPipeline,
+        kind: usize,
+        targets: SkyTargets,
+    ) -> &'a wgpu::RenderPipeline {
+        match targets {
+            SkyTargets {
+                velocity: false, ..
+            } => colour_only,
+            SkyTargets { surface, .. } => self.velocity[usize::from(surface)][kind].get(),
+        }
+    }
+
     /// Draw the procedural gradient backdrop (#256). Uses only group 0 (camera +
     /// ambient); the same far-plane box fills just the pixels no geometry covered.
-    pub fn draw_gradient<'a>(
+    pub(crate) fn draw_gradient<'a>(
         &'a self,
         render_pass: &mut wgpu::RenderPass<'a>,
         camera_lighting_bind_group: &'a wgpu::BindGroup,
-        velocity: bool,
+        targets: SkyTargets,
     ) {
-        let pipeline = match velocity {
-            true => self.velocity[1].get(),
-            false => &self.gradient_pipeline,
-        };
+        let pipeline = self.pick(&self.gradient_pipeline, 1, targets);
         render_pass.set_pipeline(pipeline);
         render_pass.set_bind_group(0, camera_lighting_bind_group, &[]);
         self.draw_box(render_pass);

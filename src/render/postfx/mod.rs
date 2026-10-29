@@ -34,6 +34,9 @@ pub struct PostParams {
     /// camera world position (xyz) + the sim's game time (w, #398) — authored
     /// postfx effects read it as `game_time()`
     pub camera_pos: [f32; 4],
+    /// The sky the forward pass reflects (#1542): the procedural sky's tint (rgb, the
+    /// frame's ambient colour) and whether a panorama is bound (w, 1 or 0).
+    pub sky: [f32; 4],
 }
 
 impl Default for PostParams {
@@ -43,6 +46,7 @@ impl Default for PostParams {
             inv_view_proj: id,
             view_proj: id,
             camera_pos: [0.0; 4],
+            sky: [0.0; 4],
         }
     }
 }
