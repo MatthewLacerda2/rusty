@@ -2,7 +2,7 @@
 //!
 //! A linked prefab instance's divergence from its source is a GENERIC field diff
 //! (`diff.rs`): a flat map of `json-pointer-path -> value` against its *baseline*,
-//! the source as it last took it (`live.rs`, #1527), with **no per-component code**.
+//! the source as it last took it (`live/`, #1527), with **no per-component code**.
 //! [`apply_overrides`] is its inverse: a fresh source entity plus the map rebuilds
 //! the instance. Propagation is "rebuild from the source, then re-apply the map on
 //! top"; nothing diffs against the source as it is now, which would make every leaf

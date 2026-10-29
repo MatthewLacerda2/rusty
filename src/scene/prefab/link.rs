@@ -87,7 +87,7 @@ fn in_instance_space(
 
 /// Re-import the source onto the instance: rebuild every entity from its fresh
 /// baseline, then re-apply its overrides, the edits made since it last took the
-/// source among them (`live.rs`, #1527). Non-overridden fields pick up the latest
+/// source among them (`live/`, #1527). Non-overridden fields pick up the latest
 /// source; overridden ones are preserved. This is the propagation step run on scene
 /// load and by the explicit reimport verb.
 pub fn reimport_instance(scene: &mut Scene, root_id: u32) -> Result<(), String> {

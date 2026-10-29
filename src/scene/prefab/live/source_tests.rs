@@ -2,7 +2,7 @@
 //! during Play reaches the edit-mode instances on Stop, and one removed during Play
 //! leaves its instances without a baseline, as a scene loaded without its source.
 
-use super::live_tests::{linked, save_and_load};
+use super::tests::{linked, save_and_load};
 use crate::scene::prefab::apply::apply_instance_to_source;
 use crate::scene::snapshot::SceneSnapshot;
 use crate::scene::{list_instance_overrides, load_and_instantiate_linked};

@@ -1,4 +1,4 @@
-//! src/scene/prefab/live.rs — an instance edit is an override the moment it is made (#1527).
+//! src/scene/prefab/live/mod.rs — an instance edit is an override the moment it is made (#1527).
 //!
 //! Every entity of a linked instance keeps the source as it last took it
 //! ([`PrefabLink::baseline`](crate::components::PrefabLink)): its leaves as the stamp or
@@ -144,14 +144,10 @@ fn is_root_placement(path: &str) -> bool {
 }
 
 #[cfg(test)]
-#[path = "live_component_tests.rs"]
-mod live_component_tests;
+mod component_tests;
 #[cfg(test)]
-#[path = "live_source_tests.rs"]
-mod live_source_tests;
+mod source_tests;
 #[cfg(test)]
-#[path = "live_tests.rs"]
-mod live_tests;
+mod tests;
 #[cfg(test)]
-#[path = "live_undo_tests.rs"]
-mod live_undo_tests;
+mod undo_tests;
