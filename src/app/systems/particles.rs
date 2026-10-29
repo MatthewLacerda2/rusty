@@ -23,7 +23,7 @@ use glam::{Mat4, Vec3};
 use crate::app::resources::Resources;
 use crate::app::world::World;
 use crate::components::particle::{
-    CollisionResponse, EmitMode, Particle, ParticleEmitterComponent, SubEmitEvent,
+    CollisionResponse, EmitMode, Particle, ParticleEmitterComponent, SimulationSpace, SubEmitEvent,
 };
 use crate::physics::PhysicsWorld;
 
@@ -45,7 +45,7 @@ pub(in crate::app) fn tick_particles(world: &mut World, res: &mut Resources) {
                 continue;
             }
             // World space, as `render::passes::particles::draw` reads it (#1196).
-            let origin = scene.world.local_to_world(id);
+            let origin = scene.world.emitter_frame(id);
             scene
                 .world
                 .take_particles(id)
@@ -73,10 +73,14 @@ pub(in crate::app) fn tick_particles(world: &mut World, res: &mut Resources) {
 pub(in crate::app) fn carry_local_particles(world: &mut World, _res: &mut Resources) {
     let mut scene = world.scene.borrow_mut();
     for id in scene.world.ids_with_particles() {
-        if !scene.world.is_active_in_hierarchy(id) {
+        let local = scene
+            .world
+            .particles(id)
+            .is_some_and(|p| p.simulation_space == SimulationSpace::Local);
+        if !local || !scene.world.is_active_in_hierarchy(id) {
             continue;
         }
-        let frame = scene.world.local_to_world(id);
+        let frame = scene.world.emitter_frame(id);
         if let Some(mut emitter) = scene.world.particles_mut(id) {
             emitter.carry_to(frame);
         }
@@ -95,7 +99,7 @@ fn dispatch_sub_emitters(world: &mut World, events: &[SubEmitEvent]) {
         if !scene.world.contains(e.target) || !scene.world.is_active_in_hierarchy(e.target) {
             continue;
         }
-        let frame = scene.world.local_to_world(e.target);
+        let frame = scene.world.emitter_frame(e.target);
         if let Some(mut target) = scene.world.particles_mut(e.target) {
             let count = target.burst_count;
             target.emit_sub(frame, e.position, e.velocity, count);

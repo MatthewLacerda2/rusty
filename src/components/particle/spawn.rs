@@ -34,8 +34,9 @@ impl ParticleEmitterComponent {
 
     /// Build one particle at `origin` from the current config: shape offset and
     /// launch direction, direction jitter, then every start range, all drawn from
-    /// the seeded stream. A `Local` emitter turns and scales the offset and launch
-    /// by its world matrix `frame` (`space`).
+    /// the seeded stream. The offset and launch are in the emitter's own space,
+    /// turned and scaled into the world by its frame `frame` (`space`), whatever
+    /// the simulation space.
     fn spawn_particle(&mut self, frame: &Mat4, origin: Vec3) -> Particle {
         let axis = self.direction.normalize_or_zero();
         let rng = &mut self.runtime.rng;
@@ -72,10 +73,9 @@ impl ParticleEmitterComponent {
         } else {
             Vec3::Y
         };
-        let (offset, velocity) = self.to_world(frame, offset, dir * speed);
         Particle {
-            position: origin + offset,
-            velocity,
+            position: origin + frame.transform_vector3(offset),
+            velocity: frame.transform_vector3(dir * speed),
             age: 0.0,
             lifetime,
             size,
@@ -83,11 +83,12 @@ impl ParticleEmitterComponent {
             color,
             start_frame,
             axis,
+            turn: self.birth_turn(frame),
         }
     }
 
-    /// Spawn up to `count` particles at the emitter, whose world matrix is
-    /// `frame`, honouring the `max_particles` cap (spawns past the cap are
+    /// Spawn up to `count` particles at the emitter, whose frame
+    /// (`ecs::World::emitter_frame`) is `frame`, honouring the `max_particles` cap (spawns past the cap are
     /// dropped). Returns the number actually spawned. Seeds the runtime on first
     /// use, and queues the birth sub-emitter per spawn.
     pub fn emit_at(&mut self, frame: Mat4, count: u32) -> u32 {
@@ -96,7 +97,7 @@ impl ParticleEmitterComponent {
 
     /// Spawn a sub-emitter burst: `count` particles at the world point `origin`,
     /// each carrying `inherited` velocity on top of its own; `frame` is this
-    /// emitter's world matrix. Never queues birth sub-emitters, so two emitters
+    /// emitter's frame. Never queues birth sub-emitters, so two emitters
     /// naming each other cannot feed back without bound.
     pub fn emit_sub(&mut self, frame: Mat4, origin: Vec3, inherited: Vec3, count: u32) -> u32 {
         self.spawn(frame, origin, inherited, count, false)

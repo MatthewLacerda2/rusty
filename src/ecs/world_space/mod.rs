@@ -67,6 +67,20 @@ impl World {
         })
     }
 
+    /// A particle emitter's frame, Unity's default *Local* Scaling Mode (#1529):
+    /// `id`'s world position and rotation under its own local scale, every
+    /// parent's scale ignored. Identity for a dead id.
+    pub fn emitter_frame(&self, id: u32) -> Mat4 {
+        let Some(scale) = self.transform(id).map(|t| t.scale) else {
+            return Mat4::IDENTITY;
+        };
+        Mat4::from_scale_rotation_translation(
+            scale,
+            self.world_rotation(id),
+            self.world_position(id),
+        )
+    }
+
     /// Where `id` stands in the world (the origin for a dead id).
     pub fn world_position(&self, id: u32) -> Vec3 {
         self.local_to_world(id).w_axis.truncate()

@@ -59,7 +59,7 @@ fn register_emission<'scope>(
         scope.create_function(|_, (id, count): (EntityArg, u32)| {
             let id = id.live("Particles", "Emit")?;
             let mut scene = scene.borrow_mut();
-            let origin = scene.world.local_to_world(id);
+            let origin = scene.world.emitter_frame(id);
             let spawned = scene
                 .world
                 .particles_mut(id)
@@ -76,7 +76,7 @@ fn register_emission<'scope>(
         scope.create_function(|_, id: EntityArg| {
             let id = id.live("Particles", "Burst")?;
             let mut scene = scene.borrow_mut();
-            let origin = scene.world.local_to_world(id);
+            let origin = scene.world.emitter_frame(id);
             let spawned = scene.world.particles_mut(id).map(|mut p| {
                 let burst = p.burst_count;
                 p.emit_at(origin, burst)

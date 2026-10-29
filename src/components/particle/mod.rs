@@ -109,8 +109,8 @@ pub struct ParticleEmitterComponent {
     pub lifetime: Range,
     /// Initial speed (units/second) along the shape's launch direction.
     pub speed: Range,
-    /// Shape axis / base emission direction (normalised at spawn): world space,
-    /// or the emitter's own space for a `Local` emitter.
+    /// Shape axis / base emission direction (normalised at spawn), in the
+    /// emitter's own space whatever the simulation space (#1529).
     pub direction: Vec3,
     /// Extra random jitter on the launch direction in `[0, 1]` (0 = none).
     pub spread: f32,

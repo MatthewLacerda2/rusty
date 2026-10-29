@@ -32,14 +32,10 @@ pub(super) fn mesh_for_spec(spec: &str) -> MeshComponent {
         .unwrap_or_else(|| asset_mesh_component(spec))
 }
 
-/// A mesh particle's world matrix: uniform `size`, tumbled `angle` about `axis`.
-pub(crate) fn mesh_particle_matrix(position: Vec3, size: f32, axis: Vec3, angle: f32) -> Mat4 {
-    let axis = axis.try_normalize().unwrap_or(Vec3::Y);
-    Mat4::from_scale_rotation_translation(
-        Vec3::splat(size),
-        Quat::from_axis_angle(axis, angle),
-        position,
-    )
+/// A mesh particle's world matrix: uniform `size`, turned by `orientation`
+/// ([`Particle::orientation`](crate::components::Particle::orientation)).
+pub(crate) fn mesh_particle_matrix(position: Vec3, size: f32, orientation: Quat) -> Mat4 {
+    Mat4::from_scale_rotation_translation(Vec3::splat(size), orientation, position)
 }
 
 impl Renderer {
@@ -70,8 +66,7 @@ impl Renderer {
                 continue;
             };
             for p in &emitter.runtime.particles {
-                let model =
-                    mesh_particle_matrix(p.position, emitter.size_of(p), p.axis, p.rotation);
+                let model = mesh_particle_matrix(p.position, emitter.size_of(p), p.orientation());
                 let (use_sh, sh) = probe_sh_at(scene, p.position);
                 let item = DrawItem {
                     key: key.clone(),

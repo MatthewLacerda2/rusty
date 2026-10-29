@@ -2,6 +2,7 @@
 //! moves, turns or scales, through the real play loop; a `World` one leaves them.
 
 mod api;
+mod frame;
 
 use std::cell::RefCell;
 use std::rc::Rc;
