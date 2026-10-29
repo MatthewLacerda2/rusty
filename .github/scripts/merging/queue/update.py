@@ -3,24 +3,30 @@
 ## Merged in, never rebased (#1568)
 
 `origin/main` is **merged into** the branch, as GitHub's *Update branch* button
-does. No commit is rewritten, so the push is a plain fast-forward and nothing in
-the normal flow force-pushes: before this the queue rebased and force-pushed
-under a lease, and permission checks refused that push again and again
-(#1551 → #1556 → #1559 → #1560 and #1554 → #1558 on 2026-10-28, each a superseding
-pull request with its own CI run). A merge also resolves a conflict once,
-where a rebase met it once per replayed commit, and pull requests are
-squash-merged, so the branch's own history never reaches `main`.
+does. No commit is rewritten, so the push is a fast-forward and nobody's
+push in the normal flow has to rewrite history: before this the queue rebased
+and force-pushed, and permission checks refused the force-pushes of coders and
+the orchestrator again and again (#1551 → #1556 → #1559 → #1560 and #1554 → #1558
+on 2026-10-28, each a superseding pull request with its own CI run). A merge
+also resolves a conflict once, where a rebase met it once per replayed commit,
+and pull requests are squash-merged, so the branch's own history never reaches
+`main`.
 
 ## What it touches, and what it leaves alone
 
 The merge happens in a **throwaway, detached worktree this script creates and
 removes** under the system temp dir — never in a worktree somebody is working
-in. **The plain push is the guard**: the merge commit's parent is the head the
-pull request had when its turn began, so if anything else pushed since, the
-push is no fast-forward and GitHub refuses it rather than lose that work. A
-refusal like that means the branch moved, not that it is broken: the take ends
-[`refusal.MOVED`] and the branch is taken again on its new head, never handed
-back. Its `git` calls to GitHub (`fetch`, `push`) retry a network failure on
+in. **The push is a compare-and-swap**: `--force-with-lease=refs/heads/<branch>:<head>`,
+where `<head>` is the head the pull request had when its turn began. The merge
+commit descends from it, so the push is a fast-forward and the lease adds only
+the expected-value check, atomically. A plain push would not do: it accepts a
+branch moved *backwards* or deleted during the take (an author dropping a
+leaked secret), since the merge commit fast-forwards from any ancestor, and the
+dropped commit would be squash-merged into `main` (#1577's independent review).
+This is the queue's own push, the one deliberate lease in the normal flow;
+coders and hand-backs push without force. A refusal because the branch moved
+means it moved, not that it is broken: the take ends [`refusal.MOVED`].
+Its `git` calls to GitHub (`fetch`, `push`) retry a network failure on
 `mergeable.gh`'s backoff ([`gitio.remote`], #875), and one still failing after
 the last stops the queue as the machine's failure, never a hand-back remembered
 against the branch. The merge into `main` is `--match-head-commit`, so GitHub
@@ -51,6 +57,11 @@ DOCS_ONLY = "`main` moved only by Markdown; not updated, the run on record stand
 def conflicts(unmerged: str) -> list[str]:
     """The paths a failed merge left conflicted, from `--diff-filter=U`."""
     return [line.strip() for line in unmerged.splitlines() if line.strip()]
+
+
+def lease(branch: str, head: str) -> str:
+    """The queue's push guard: refuse unless GitHub's `branch` is still `head`."""
+    return f"--force-with-lease=refs/heads/{branch}:{head}"
 
 
 def push_needed(before: str, after: str) -> bool:
@@ -94,7 +105,7 @@ def advance(
     """Merge `main`'s tip into `branch`. Returns the new head, or why not.
 
     In a detached worktree this creates and removes, never one an agent may be
-    standing in. The push goes from inside it, a plain fast-forward from `head`.
+    standing in. The push goes from inside it, a fast-forward leased on `head`.
     With `push=False` (the dry run) the merge is only computed. `check`, given the
     updated tree's path, returns why not to push it ([`checks.verify`]); it runs only
     when the merge moved the head. A head `main` passed only by Markdown is
@@ -108,14 +119,16 @@ def advance(
         if made.returncode != 0:
             return None, [f"could not check {branch} out: {made.stderr.strip()}"]
         try:
-            done = gitio.git("merge", "--no-edit", "origin/main", cwd=work)
+            # `--ff` (the flag form of `-c merge.ff=true`): a user's `merge.ff=false`
+            # or `only` must not turn a no-op into a merge commit or refuse the merge.
+            done = gitio.git("merge", "--ff", "--no-edit", "origin/main", cwd=work)
             if done.returncode != 0:
                 unmerged = gitio.git("diff", "--name-only", "--diff-filter=U", cwd=work).stdout
                 gitio.git("merge", "--abort", cwd=work)
                 named = conflicts(unmerged)
                 return None, [
                     f"{branch} conflicts with `main`.",
-                    f"Conflicted: {', '.join(named)}." if named else "The merge stopped; git did not name a path.",
+                    f"Conflicted: {', '.join(named)}." if named else f"The merge stopped; git did not name a path: {done.stderr.strip() or 'it said nothing'}",
                     "Handed back unresolved: a machine that cannot say why the"
                     " code is shaped as it is does not get to pick a side.",
                 ]
@@ -125,15 +138,16 @@ def advance(
                 if broken:
                     return None, broken
             if push and push_needed(head, fresh):
-                # Never forced: a branch moved since the take began is no
-                # fast-forward, and GitHub refuses it (#1568).
-                pushed = gitio.remote("push", "origin", f"HEAD:refs/heads/{branch}", cwd=work)
+                # Leased on `head`: a branch moved since the take began, forward,
+                # backward or deleted, is refused (see the module doc).
+                pushed = gitio.remote("push", lease(branch, head), "origin", f"HEAD:refs/heads/{branch}", cwd=work)
                 # A refusal while GitHub already holds exactly this head (a push
                 # that landed before its reply was lost, #875) is a push.
                 if pushed.returncode != 0:
                     now = gitio.remote_head(branch, work)
                     if now != fresh:
-                        return None, refusal.explain(branch, pushed.stderr, fresh, held=now == head)
+                        held = None if now is None else now == head
+                        return None, refusal.explain(branch, pushed.stderr, fresh, held=held)
             return fresh, []
         finally:
             gitio.git("worktree", "remove", "--force", work, cwd=root)

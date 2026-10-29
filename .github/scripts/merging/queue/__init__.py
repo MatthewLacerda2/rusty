@@ -4,8 +4,8 @@ Merging stays serialized, one branch at a time, because rusty is one compiled
 crate: two pull requests can each be green alone and break `main` together (a
 rename, a changed signature, a moved module). Nothing here proposes otherwise.
 What this automates is **who sits through the ten minutes** — merge `main`
-into the branch ([`update.advance`], #1568: never a rebase, so never a
-force-push), compile-check the updated tree ([`checks.verify`]), push it, wait
+into the branch ([`update.advance`], #1568: never a rebase, so the push is a
+fast-forward, leased on the head it took), compile-check the updated tree ([`checks.verify`]), push it, wait
 for the runs on the updated head, ask
 [`verdict.decide.judge`], squash-merge, take the next one. Without it an agent sits
 through every cold CI run of a batch holding a worktree open. Ported from

@@ -65,11 +65,15 @@ class Refusal(unittest.TestCase):
     def test_a_moved_head_is_a_moved_branch(self):
         notes = refused(NON_FF, OTHER)
         self.assertEqual(notes[0], refusal.MOVED)
-        self.assertIn("no fast-forward: ! [rejected]", notes[1])
+        self.assertIn("refused by its lease: ! [rejected]", notes[1])
         self.assertNotIn("hook", " ".join(notes))
 
-    def test_an_unreadable_head_is_a_moved_branch(self):
-        self.assertEqual(refused(NON_FF, None)[0], refusal.MOVED)
+    def test_an_unreadable_head_is_a_hand_back_never_moved(self):
+        # An expired token reading as "moved" would have the watch retake it forever.
+        notes = refused(NON_FF, None)
+        self.assertNotEqual(notes[0], refusal.MOVED)
+        self.assertIn("could not be read", notes[0])
+        self.assertIn("Handed back.", notes[1])
 
     def test_the_reason_is_one_line(self):
         for stderr in (HOOK, NO_CARGO, WORKFLOW, NON_FF):

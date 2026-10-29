@@ -1,6 +1,6 @@
 ---
 name: ci-merge
-description: Take a finished branch through to merged — the gates, CI, verifying a run happened on the head commit, rebasing, and triaging the mutation and coverage signals. Use when a branch is ready, when a pull request has gone red, when a mutation report needs triage, or when merging anything into `main`.
+description: Take a finished branch through to merged — the gates, CI, verifying a run happened on the head commit, updating a branch from `main` and its conflicts, and triaging the mutation and coverage signals. Use when a branch is ready, when a pull request has gone red, when a mutation report needs triage, or when merging anything into `main`.
 ---
 
 # Getting a branch merged
@@ -138,16 +138,26 @@ worktree open:
    the size gate, building into the queue's own `target/merge-queue`. A clean
    textual merge still breaks when a merge ahead changed a signature. Skipped
    for a Markdown-only branch, Dependabot, and `ARGS=--no-check`.
-3. Push it as a plain fast-forward, never forced — both skipped when the merge
-   moved nothing (the branch already held `main`), because the run on record is
-   then a run on this exact commit. The plain push is the guard: if anything
-   else pushed to the branch since the take began, the push is no fast-forward,
-   GitHub refuses it, and the branch is taken again on its new head (`not ready
-   — its branch moved during the take`), never handed back.
+3. Push it as a fast-forward leased on the head the take began from
+   (`--force-with-lease=refs/heads/<branch>:<head>`, a compare-and-swap: the
+   queue's own push is the one deliberate lease in the normal flow) — both
+   skipped when the merge moved nothing (the branch already held `main`),
+   because the run on record is then a run on this exact commit. The lease is
+   the guard: a plain push would accept a branch reset backwards or deleted
+   mid-take (an author dropping a leaked secret) and squash the dropped commit
+   into `main`. If anything pushed, reset or deleted the branch since the take
+   began, the push is refused. Under `--watch` the branch is then taken again on
+   its new head (`not ready — its branch moved during the take`); named pull
+   requests are never retaken, so there it is reported *not merged* and counts
+   as a hand-back in the exit status. A refusal whose remote head could not be
+   read is a plain hand-back, never "moved". Only this push refusal is retaken:
+   a push that lands during the CI wait (step 4) is a hand-back.
 4. Wait for the runs **on the updated head** to exist and conclude.
 5. Ask `make mergeable`'s judgement of that head — see the next section.
 6. Squash-merge with the house-style title (`Title (#issue) (#pr)`; the queue
-   adds each closed issue the title lacks, #966) and
+   adds each closed issue the title lacks, #966), a body of one bullet per
+   commit the branch made with its merges of `main` left out (so `main` reads
+   no `Merge remote-tracking branch` lines), and
    `--match-head-commit`, so a push after the verdict makes GitHub refuse.
 
 It **hands back** — names why, skips that entry and carries on, named pull
@@ -212,7 +222,8 @@ worktree (~2.5–4.5 GB of `target/` each) and its branch once nobody is standin
   `make mergeable PR=N`, squash-merge. Prefer the queue. Never rebase a pushed
   PR branch: a rewrite needs a force-push, which permission checks refuse
   (#1568). `--force-with-lease` is kept for the rare branch that must be
-  rewritten (a secret committed by mistake), never the normal flow.
+  rewritten (a secret committed by mistake) and for the queue's own leased
+  push (step 3); never anyone else's push in the normal flow.
 
 Merging is serialized because rusty is **one compiled crate**: two branches can
 each be green alone and break `main` together. A rename, a changed signature, a
@@ -321,7 +332,7 @@ genuinely unfinished, blocked, or handed over — including the hand-back after 
 attempts at the same failure, which does go to draft, with the reason in the
 description.
 
-## Rebasing
+## Updating a branch from `main`, and its conflicts
 
 Expect conflicts wherever every feature appends in an order that matters:
 `Entity`'s `Option<…Component>` fields, `ComponentKind`'s variant list,

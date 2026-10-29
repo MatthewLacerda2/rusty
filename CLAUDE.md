@@ -151,7 +151,8 @@ is wrong.
   it). So merging **cannot be parallelized**: bring each PR up to the latest `main` →
   CI green on that updated state → merge → repeat, one PR at a time. A PR branch is
   updated by **merging `main` into it, never by rebasing** (#1568): nothing is
-  rewritten, so nothing is force-pushed, and a conflict is resolved once. PRs are
+  rewritten, so no push rewrites history (the queue's own push only leases the head it
+  took, a compare-and-swap), and a conflict is resolved once. PRs are
   squash-merged, so the branch's own history never reaches `main`. The only exception
   is a PR that touches **only** Markdown — CI is skipped for Markdown-only PRs, so they
   needn't be serialized and can merge freely. **Except the Markdown code reads:**

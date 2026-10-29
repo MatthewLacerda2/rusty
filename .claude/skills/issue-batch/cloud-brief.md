@@ -34,15 +34,16 @@ Before writing code, read the issue body for "Blocked by" and check each blocker
 ## Read first
 
 `CLAUDE.md`, your issue(s), your brief, and `.claude/skills/ci-merge/SKILL.md`.
-**Your brief is the newest comment on your issue whose first line is `Brief`**
-(#910): your branch name, what to build on, the siblings whose files to stay
-out of, and decisions already made. A later `Brief` supersedes an earlier one.
+**Your brief is the comment your prompt names** (#910; pinned by URL since
+PR #1572, so a comment posted after it is not what you follow): your branch
+name, what to build on, the siblings whose files to stay out of, and decisions
+already made. A re-brief is a new `Brief` and a new session with its own prompt.
 It may name more to read.
 
 ## Your job ends at "ready"
 
 A coder's session ends when its pull request is **ready**. Everything after that
-(waiting on CI, rebasing, merging, reading a mutation report) belongs to the
+(waiting on CI, updating the branch, merging, reading a mutation report) belongs to the
 orchestrator and the merge queue (#823). There is no check-in to schedule and
 nothing to wait for.
 
@@ -128,7 +129,8 @@ a coder real time.
   queue rebase replaying conflicts a merge had resolved) is gone. Rebasing
   local commits that were never pushed is fine.
 - **A refused push has one fallback**, and with no force-push it should no
-  longer happen: don't work around it; push the same commits to `<branch>-v2`,
+  longer happen (the queue's own push keeps a lease on the head it took, as a
+  compare-and-swap; that is the daemon's, never yours): don't work around it; push the same commits to `<branch>-v2`,
   open a ready PR with the old one's description headed "Supersedes #N (<why>;
   a push was refused)", and comment on #N. The orchestrator closes #N.
 - **Update once, last.** After merging `main` in over unrelated merges, `cargo

@@ -39,8 +39,8 @@ def parse(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="merge-queue.py",
         description=(
-            "Rebase, push, wait for CI and squash-merge each pull request in"
-            " turn. Merging stays serialized; this only does the waiting."
+            "Merge `main` into each pull request in turn, push it, wait for CI and"
+            " squash-merge it. Merging stays serialized; this only does the waiting."
         ),
     )
     parser.add_argument("prs", metavar="PR", type=int, nargs="*", help="pull request numbers, merged in the order given")

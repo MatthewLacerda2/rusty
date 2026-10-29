@@ -4,7 +4,7 @@
 One SSL timeout on the queue's push handed back a healthy branch, and the
 watch then remembered it as handed back until its head moved. The queue's own
 `git` calls to GitHub now retry on `github.gh`'s backoff, every retry is the
-same plain push (never forced, #1568), and a network that stays down stops the
+same push on the same lease (#1568), and a network that stays down stops the
 queue as the machine's failure.
 """
 
@@ -14,13 +14,13 @@ import time
 import unittest
 from unittest import mock
 
-from merging.queue import gitio, outcomes, refusal, stopping
+from merging.queue import gitio, outcomes, refusal, stopping, update
 from merging.verdict import github
-from tests.queue.fixtures import FRESH, NON_FF, advancing, done
+from tests.queue.fixtures import FRESH, NON_FF, SHA, advancing, done
 
 
 SSL = "fatal: unable to access 'https://github.com/o/r/': SSL connection timeout"
-PUSH = ("push", "origin", "HEAD:refs/heads/b")
+PUSH = ("push", update.lease("b", SHA), "origin", "HEAD:refs/heads/b")
 
 
 class Wording(unittest.TestCase):
@@ -70,7 +70,7 @@ class Pushing(unittest.TestCase):
     def pushes(self):
         return [c for c in self.calls if c[0] == "push"]
 
-    def test_a_push_through_blips_lands_never_forced(self):
+    def test_a_push_through_blips_lands_on_the_same_lease(self):
         fresh, notes = self.advance([done(128, SSL), done(128, SSL), done(0)])
         self.assertEqual((fresh, notes), (FRESH, []))
         self.assertEqual(self.pushes(), [PUSH] * 3)

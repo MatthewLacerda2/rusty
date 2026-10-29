@@ -29,6 +29,16 @@ def dry(repo: str, pull: dict, fresh: str, notes: list[str]) -> tuple[int, str, 
     return number, outcomes.DRY, f"{moved}; head {head[:7]} is {'mergeable' if ok else 'not mergeable'}."
 
 
+def squash_message(fresh: str, root: str) -> str:
+    """The squash commit's body: a bullet per commit the branch made, oldest first,
+    its merges of `main` left out, so `main` carries no `Merge remote-tracking
+    branch` bullets (#1568). Empty when git cannot say."""
+    done = gitio.git("log", "--no-merges", "--reverse", "--format=%s", f"origin/main..{fresh}", cwd=root)
+    if done.returncode != 0:
+        return ""
+    return "\n".join(f"* {line.strip()}" for line in done.stdout.splitlines() if line.strip())
+
+
 def take(repo: str, number: int, opts: argparse.Namespace, tick=None) -> tuple[int, str, str]:
     """One pull request, from where it is to merged or handed back. `tick()`,
     when given, is called on each poll of the CI wait ([`waiting.wait_for`])."""
@@ -65,9 +75,12 @@ def take(repo: str, number: int, opts: argparse.Namespace, tick=None) -> tuple[i
             check = functools.partial(checks.verify, target=checks.target_dir(opts))
         fresh, notes = update.advance(branch, head, opts.root, push=not opts.dry_run, check=check)
     if fresh is None:
-        outcomes.say(f"#{number}: {notes[0]}", *notes[1:])
-        # Pushed to since the take began: its new head is taken afresh (#1568).
+        # Moved since the take began: the watch takes its new head afresh
+        # (#1568); named pull requests are never retaken, so there it is not merged.
         moved = notes[0] == refusal.MOVED
+        if moved and not opts.watch:
+            notes, moved = [refusal.MOVED_NAMED, *notes[1:]], False
+        outcomes.say(f"#{number}: {notes[0]}", *notes[1:])
         return number, outcomes.NOT_READY if moved else outcomes.HANDED_BACK, notes[0]
     if opts.dry_run:
         return dry(repo, pull, fresh, notes)
@@ -92,7 +105,8 @@ def take(repo: str, number: int, opts: argparse.Namespace, tick=None) -> tuple[i
     # verdict makes GitHub refuse.
     done = subprocess.run(
         ["gh", "api", "--method", "PUT", f"repos/{repo}/pulls/{number}/merge",
-         "-f", "merge_method=squash", "-f", f"sha={fresh}", "-f", f"commit_title={pulls.subject(pull)}"],
+         "-f", "merge_method=squash", "-f", f"sha={fresh}", "-f", f"commit_title={pulls.subject(pull)}",
+         "-f", f"commit_message={squash_message(fresh, opts.root)}"],
         capture_output=True, text=True, check=False,
     )
     if done.returncode != 0:

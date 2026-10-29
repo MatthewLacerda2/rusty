@@ -5,8 +5,9 @@ These drive [`update.advance`] over real repositories, a bare `origin` and a
 clone of it, so every push is a real one: a branch already holding `main` is
 left alone, a code advance is a merge commit pushed as a fast-forward, a
 conflict is handed back with its paths and nothing pushed, and a branch pushed
-to during the take is refused by GitHub's fast-forward rule (here, git's) and
-never overwritten, which [`taking.take`] reads as "not ready", not a hand-back.
+to during the take is refused by the push's lease and never overwritten, which
+[`taking.take`] reads as "not ready" under `--watch`, a hand-back when named.
+`test_update_lease` has the lease's other cases.
 """
 
 from __future__ import annotations
@@ -18,7 +19,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from merging.queue import gitio, outcomes, refusal, taking, update
+from merging.queue import cli, gitio, outcomes, refusal, taking, update
 from tests.queue.test_markdown_advance import WHO
 from tests.queue import test_taking
 
@@ -82,7 +83,9 @@ class Updating(unittest.TestCase):
             fresh, notes = update.advance("b", self.repo.head, self.repo.root, push=True)
         self.pushes = [c for c in calls if c[0] == "push"]
         self.assertNotIn("rebase", [c[0] for c in calls])
-        self.assertFalse(any("force" in a for push in self.pushes for a in push), self.pushes)
+        # The one force flag is the lease on the head the take began from.
+        for push in self.pushes:
+            self.assertEqual(push, ("push", update.lease("b", self.repo.head), "origin", "HEAD:refs/heads/b"))
         return fresh, notes
 
     def test_a_branch_already_holding_main_is_a_no_op(self):
@@ -90,14 +93,14 @@ class Updating(unittest.TestCase):
         self.assertEqual(self.pushes, [])
         self.assertEqual(self.repo.on_origin("b"), self.repo.head)
 
-    def test_a_code_advance_is_a_merge_pushed_without_force(self):
+    def test_a_code_advance_is_a_merge_pushed_as_a_leased_fast_forward(self):
         main = self.repo.commit({"src/lib.rs": "fn b() {}\n"}, "main")
         fresh, notes = self.advance()
         self.assertEqual(notes, [])
         self.assertEqual(self.repo.on_origin("b"), fresh)
         parents = self.repo.git("rev-list", "--parents", "-n", "1", fresh).split()[1:]
         self.assertEqual(parents, [self.repo.head, main])  # the branch's commit kept, not rewritten
-        self.assertEqual(self.pushes, [("push", "origin", "HEAD:refs/heads/b")])
+        self.assertEqual(len(self.pushes), 1)
 
     def test_a_conflict_is_handed_back_naming_its_paths_and_nothing_is_pushed(self):
         self.repo.commit({"src/feature.rs": "fn g() {}\n"}, "main")
@@ -120,13 +123,31 @@ class Updating(unittest.TestCase):
 
 
 class Moved(unittest.TestCase):
-    """[`taking.take`] of a branch moved mid-take: not ready, never handed back."""
+    """[`taking.take`] of a branch moved mid-take: the watch retakes it; named
+    pull requests never are, so there it is not merged and handed back."""
 
-    def test_a_moved_branch_is_not_ready_and_nothing_merges(self):
-        (_, state, why), _, called, _ = test_taking.Taking.take(self, advance=(None, [refusal.MOVED, "The push of b was no fast-forward."]))
+    MOVED = (None, [refusal.MOVED, "The push of b was refused by its lease."])
+
+    def test_under_the_watch_a_moved_branch_is_not_ready_and_nothing_merges(self):
+        real = cli.parse
+
+        def watching(argv):
+            opts = real(argv)
+            opts.watch = True
+            return opts
+
+        with mock.patch.object(cli, "parse", side_effect=watching):
+            (_, state, why), _, called, _ = test_taking.Taking.take(self, advance=self.MOVED)
         self.assertEqual((state, why), (outcomes.NOT_READY, refusal.MOVED))
         called.assert_not_called()
         self.assertEqual(taking.unready((1, state, why))[1], outcomes.NOT_READY)
+
+    def test_named_a_moved_branch_is_handed_back_not_merged_never_retaken(self):
+        (_, state, why), _, called, _ = test_taking.Taking.take(self, advance=self.MOVED)
+        self.assertEqual((state, why), (outcomes.HANDED_BACK, refusal.MOVED_NAMED))
+        self.assertIn("not merged", why)
+        self.assertNotIn("taken again", why)
+        called.assert_not_called()
 
 
 if __name__ == "__main__":

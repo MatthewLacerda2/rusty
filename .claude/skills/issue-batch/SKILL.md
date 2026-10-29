@@ -152,8 +152,8 @@ A re-brief (a conflict, a fix, a new sibling) is a new `Brief` comment on the
 issue that says **add commits on top, merge `origin/main` in only if the PR
 conflicts, never rebase** (the queue merges `main` in at merge time; a rebase's
 force-push was refused twice on 2026-10-28 and cost a `-v2` PR each, #1568), so
-no brief needs to authorise a force-push, and the PR turned back to draft. **Then `RemoteTrigger run` the coder's own routine right
-away.** Its prompt already points at the newest `Brief`. Don't wait for the old
+no brief needs to authorise a force-push, and the PR turned back to draft. **Then `make coder ISSUE=N` again
+right away**: a new routine whose prompt names the new `Brief`. Don't wait for the old
 session: it is subscribed to the PR, not the issue. In the 2026-10-22 batch,
 sessions woke on the draft flip, read only the PR, found no instruction and
 stood down, by design (`cloud-brief.md`: once ready, the branch is the
