@@ -100,6 +100,7 @@ scene.entities[].camera.fxaa_active: bool
 scene.entities[].camera.motion_blur_active: bool
 scene.entities[].camera.motion_blur_intensity: f32
 scene.entities[].camera.motion_blur_max_length: f32
+scene.entities[].camera.motion_blur_quality: enum Low|Medium|High|Custom
 scene.entities[].camera.motion_blur_samples: u32
 scene.entities[].camera.near: f32
 scene.entities[].camera.projection: enum Perspective|Orthographic
@@ -467,6 +468,8 @@ scene.entities[].post_processing.bloom.dirt_intensity: f32
 scene.entities[].post_processing.bloom.dirt_texture: option
 scene.entities[].post_processing.bloom.dirt_texture: string
 scene.entities[].post_processing.bloom.intensity: f32
+scene.entities[].post_processing.bloom.quality: enum Low|Medium|High|Custom
+scene.entities[].post_processing.bloom.resolution_divisor: u32
 scene.entities[].post_processing.bloom.threshold: f32
 scene.entities[].post_processing.chromatic_aberration.active: bool
 scene.entities[].post_processing.chromatic_aberration.intensity: f32
@@ -489,6 +492,8 @@ scene.entities[].post_processing.depth_of_field.gaussian_end: f32
 scene.entities[].post_processing.depth_of_field.gaussian_max_radius: f32
 scene.entities[].post_processing.depth_of_field.gaussian_start: f32
 scene.entities[].post_processing.depth_of_field.mode: enum Off|Gaussian|Bokeh
+scene.entities[].post_processing.depth_of_field.quality: enum Low|Medium|High|Custom
+scene.entities[].post_processing.depth_of_field.resolution_divisor: u32
 scene.entities[].post_processing.exposure.automatic.compensation: f32
 scene.entities[].post_processing.exposure.automatic.high_percent: f32
 scene.entities[].post_processing.exposure.automatic.low_percent: f32
@@ -523,9 +528,14 @@ scene.entities[].post_processing.shadows.cascades: u32
 scene.entities[].post_processing.shadows.distance: f32
 scene.entities[].post_processing.ssao.active: bool
 scene.entities[].post_processing.ssao.intensity: f32
+scene.entities[].post_processing.ssao.quality: enum Low|Medium|High|Custom
 scene.entities[].post_processing.ssao.radius: f32
+scene.entities[].post_processing.ssao.resolution_divisor: u32
+scene.entities[].post_processing.ssao.samples: u32
 scene.entities[].post_processing.ssr.active: bool
-scene.entities[].post_processing.ssr.quality: string
+scene.entities[].post_processing.ssr.quality: enum Low|Medium|High|Custom
+scene.entities[].post_processing.ssr.step_length: f32
+scene.entities[].post_processing.ssr.steps: u32
 scene.entities[].post_processing.tonemapping.display_gamma: f32
 scene.entities[].post_processing.tonemapping.mode: enum ACES|Reinhard|None
 scene.entities[].post_processing.vignette.active: bool

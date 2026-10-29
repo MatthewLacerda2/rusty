@@ -76,7 +76,7 @@ pub(super) fn centre(
     scene: &Scene,
     playing: bool,
 ) -> ([i32; 3], RenderCounters) {
-    let mut view = RenderView::offscreen(&renderer.device, OFFSCREEN_FORMAT, W, H, 2);
+    let mut view = RenderView::offscreen(&renderer.device, OFFSCREEN_FORMAT, W, H);
     let out = view.color_target_view().unwrap();
     renderer.render(&mut view, scene, &camera(), &out, !playing);
     let texture = view.color_target().unwrap();

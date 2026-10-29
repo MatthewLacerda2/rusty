@@ -62,7 +62,8 @@ impl ScriptManager {
         self.cells.storage = storage;
     }
 
-    /// Handle to the shared graphics cell (quality tier + player options, #1438),
+    /// Handle to the shared graphics cell (quality preset values + player options,
+    /// #1438, #1522),
     /// so the platform layer can read a script-driven change and apply it to the
     /// renderer.
     pub fn graphics_cell(&self) -> Rc<RefCell<GraphicsSettings>> {

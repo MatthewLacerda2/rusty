@@ -5,7 +5,7 @@ use std::rc::Rc;
 
 use mlua::Lua;
 use rusty::components::{CameraComponent, ExposureMode, PostProcessingComponent, Tonemap, Wheel};
-use rusty::core::settings::quality::QualityPreset;
+use rusty::core::settings::quality::EffectQuality;
 use rusty::core::settings::GraphicsSettings;
 use rusty::scene::authoring::{
     rendering::camera as camera_ops, rendering::post_processing as vc_ops,
@@ -19,7 +19,7 @@ fn scene_with_volume_and_cam() -> (Rc<RefCell<Scene>>, u32) {
     let mut vc: PostProcessingComponent = rusty::scene::authoring::default_post_processing();
     (vc.bloom.active, vc.bloom.threshold) = (false, 1.0);
     vc.ssr.active = false;
-    vc.ssr.quality = "Low".to_string();
+    vc.ssr.quality = EffectQuality::Low;
     vc.tonemapping.display_gamma = 2.2;
     scene.world.set_post_processing(id, Some(vc));
     scene.world.set_camera(
@@ -52,7 +52,7 @@ fn apply_graphics_ops(scene: &Rc<RefCell<Scene>>, id: u32) {
         vc_ops::grading::color_lookup::set_lut(&mut vc, Some("assets/warm.cube".into()));
         vc_ops::grading::color_lookup::set_contribution(&mut vc, 7.0); // clamped to 1
         vc_ops::ssr::set_active(&mut vc, true);
-        vc_ops::ssr::set_quality(&mut vc, "High".to_string());
+        vc_ops::ssr::set_quality(&mut vc, EffectQuality::High);
         vc_ops::volume::set_shadow_cascades(&mut vc, 9); // clamped to 4
         vc_ops::volume::set_shadow_distance(&mut vc, 60.0);
         vc_ops::volume::set_ssao_radius(&mut vc, -1.0); // clamped to 0.01
@@ -106,7 +106,7 @@ fn graphics_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Error
     // scene and the ops against a second cloned scene, then compare the components.
     let (lua_scene, lua_id) = scene_with_volume_and_cam();
     let (op_scene, op_id) = scene_with_volume_and_cam();
-    let quality = Rc::new(RefCell::new(GraphicsSettings::from(QualityPreset::High)));
+    let quality = Rc::new(RefCell::new(GraphicsSettings::default()));
     let app = RefCell::default();
 
     let lua = Lua::new();

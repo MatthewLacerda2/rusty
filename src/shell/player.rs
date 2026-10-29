@@ -10,8 +10,7 @@ use super::frame::Host;
 use super::{boot, Frontend, Launch, Shell};
 use crate::app::GameWorld;
 use crate::core::application::{BuildSettings, WindowMode};
-use crate::core::settings::decals::DecalLimits;
-use crate::core::settings::graphics_options::GraphicsOptions;
+use crate::core::project::ProjectSettings;
 use crate::core::settings::video::VideoSettings;
 use crate::render::RenderView;
 
@@ -38,7 +37,6 @@ impl Frontend for PlayerFrontend {
 
         let device = &shell.renderer.device;
         let (width, height) = (shell.renderer.config.width, shell.renderer.config.height);
-        let bloom = shell.renderer.quality.bloom_divisor();
         // The UI lays out on the game view's pixel size (#417): here, the whole window.
         game.resources
             .screen
@@ -51,12 +49,11 @@ impl Frontend for PlayerFrontend {
                 shell.renderer.config.format,
                 width,
                 height,
-                bloom,
             )),
         };
         // The screen renders its scene at the player's render scale (#1498).
         view.set_render_scale(shell.renderer.graphics(false).render_scale);
-        view.resize(device, width, height, bloom);
+        view.resize(device, width, height);
 
         // The view is targetless (it renders straight onto the swapchain), so hand it
         // the frame to draw the in-game UI on (#418).
@@ -86,10 +83,10 @@ pub fn video_defaults(build: &BuildSettings) -> VideoSettings {
     }
 }
 
-/// Boot the standalone player on the open project's `build` settings and default
-/// `graphics` options (`core::project::Opened`) and run until the game quits or the
-/// window closes.
-pub fn launch(build: BuildSettings, graphics: GraphicsOptions, decals: DecalLimits) {
+/// Boot the standalone player on the open project's settings
+/// (`core::project::Opened`) and run until the game quits or the window closes.
+pub fn launch(settings: ProjectSettings) {
+    let build = settings.build.clone();
     boot::seed_project_workspace();
     println!(
         "[Player] Starting {} ({})...",
@@ -97,14 +94,9 @@ pub fn launch(build: BuildSettings, graphics: GraphicsOptions, decals: DecalLimi
     );
 
     let mut game = boot::load_game(&build.startup_scene);
-    // Unbound: a shipped game reads its build settings but never rewrites them. The
+    // Unbound: a shipped game reads its settings but never rewrites them. The
     // graphics defaults are what a first launch's options fall back to (#1438).
-    {
-        let mut app = game.resources.application.borrow_mut();
-        let _ = app.set_build(build.clone());
-        let _ = app.set_graphics_defaults(graphics);
-        app.set_decal_limits(decals);
-    }
+    game.resources.application.borrow_mut().run_with(settings);
     game.boot_standalone();
 
     let launch = Launch {

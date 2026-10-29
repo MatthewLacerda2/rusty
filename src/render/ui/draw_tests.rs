@@ -30,7 +30,7 @@ fn gpu_a_static_hud_uploads_once_and_a_change_reuploads() {
     };
     let cam = Camera::new(Vec3::new(0.0, 0.0, 5.0), -90.0, 0.0);
     let (mut scene, bar) = hud();
-    let mut view = RenderView::offscreen(&renderer.device, OFFSCREEN_FORMAT, 32, 32, 2);
+    let mut view = RenderView::offscreen(&renderer.device, OFFSCREEN_FORMAT, 32, 32);
     let out = view.color_target_view().expect("offscreen target");
     let frame = |renderer: &mut crate::render::Renderer, view: &mut RenderView, s: &Scene| {
         renderer.render(view, s, &cam, &out, false);
@@ -62,12 +62,12 @@ fn gpu_a_static_hud_uploads_once_and_a_change_reuploads() {
     );
 
     // The Scene view (editor mode) does not draw the game's screen UI.
-    let mut scene_view = RenderView::offscreen(&renderer.device, OFFSCREEN_FORMAT, 32, 32, 2);
+    let mut scene_view = RenderView::offscreen(&renderer.device, OFFSCREEN_FORMAT, 32, 32);
     let target = scene_view.color_target_view().expect("target");
     renderer.render(&mut scene_view, &scene, &cam, &target, true);
     assert_eq!(scene_view.ui.last_drawn(), 0);
     // A targetless view (the cubemap capture's) has no frame of its own to draw on…
-    let mut capture = RenderView::targetless(&renderer.device, OFFSCREEN_FORMAT, 32, 32, 2);
+    let mut capture = RenderView::targetless(&renderer.device, OFFSCREEN_FORMAT, 32, 32);
     renderer.render(&mut capture, &scene, &cam, &target, false);
     assert_eq!(capture.ui.last_drawn(), 0);
     // …unless its caller hands it one, as the player does with its swapchain frame;
@@ -87,7 +87,7 @@ fn gpu_the_scene_view_draws_the_screen_ui_with_its_overlay_on() {
     };
     let cam = Camera::new(Vec3::new(0.0, 0.0, 5.0), -90.0, 0.0);
     let (scene, _) = hud();
-    let mut view = RenderView::offscreen(&renderer.device, OFFSCREEN_FORMAT, 32, 32, 2);
+    let mut view = RenderView::offscreen(&renderer.device, OFFSCREEN_FORMAT, 32, 32);
     let target = view.color_target_view().expect("target");
     view.ui.screen_in_editor = true;
     renderer.render(&mut view, &scene, &cam, &target, true);

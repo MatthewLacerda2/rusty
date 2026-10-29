@@ -11,7 +11,7 @@ use crate::scene::{Camera, Scene};
 
 /// Pixels of one frame dominated by red and by blue.
 fn red_blue(renderer: &mut Renderer, scene: &Scene) -> (usize, usize) {
-    let mut view = RenderView::offscreen(&renderer.device, OFFSCREEN_FORMAT, RES, RES, 2);
+    let mut view = RenderView::offscreen(&renderer.device, OFFSCREEN_FORMAT, RES, RES);
     let out = view.color_target_view().unwrap();
     let cam = Camera::new(glam::Vec3::new(0.0, 0.0, 6.0), -90.0, 0.0);
     renderer.render(&mut view, scene, &cam, &out, false);

@@ -74,7 +74,7 @@ fn gpu_a_still_frame_reuses_every_tile_bit_for_bit() {
     let Some(mut r) = crate::render::test_gpu::headless_or_skip(RES, RES) else {
         return;
     };
-    let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, RES, RES, 2);
+    let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, RES, RES);
     let scene = lamp_room();
 
     let first = frame(&mut r, &mut view, &scene);
@@ -98,7 +98,7 @@ fn gpu_a_dynamic_caster_moves_through_a_cached_tile() {
     let Some(mut r) = crate::render::test_gpu::headless_or_skip(RES, RES) else {
         return;
     };
-    let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, RES, RES, 2);
+    let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, RES, RES);
     let mut scene = lamp_room();
     let start = Vec3::new(-1.0, 1.0, 0.0);
     let crate_id = block(&mut scene, start, Vec3::splat(0.4), false);
@@ -126,7 +126,7 @@ fn gpu_a_static_flag_flip_rebakes_with_no_one_invalidating() {
     let Some(mut r) = crate::render::test_gpu::headless_or_skip(RES, RES) else {
         return;
     };
-    let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, RES, RES, 2);
+    let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, RES, RES);
     let mut scene = lamp_room();
     let crate_id = block(
         &mut scene,

@@ -78,7 +78,6 @@ impl EditorFrontend {
             renderer.config.format,
             (px, py),
             renderer.graphics(scene_tab).render_scale,
-            renderer.quality.bloom_divisor(),
         );
         // `wgpu::TextureView` is a refcounted handle, so this owned view doesn't
         // borrow `view` and `render` can take it as the output.
@@ -129,7 +128,6 @@ impl EditorFrontend {
             renderer.config.format,
             (px, py),
             Default::default(),
-            renderer.quality.bloom_divisor(),
         );
         let Some(target_view) = view.color_target_view() else {
             return;

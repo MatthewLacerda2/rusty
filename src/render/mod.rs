@@ -228,11 +228,11 @@ pub struct Renderer {
     /// The grading-LUT bake every view's table is written through (#1440).
     pub(crate) grade_bake: postfx::grade::GradeBake,
 
-    /// Active scalability tier; gates which post-FX passes run, and each view's
-    /// post-FX chain (owned by its [`RenderView`]) sizes its bloom buffers from it.
-    pub quality: crate::core::settings::quality::QualityPreset,
+    /// The running quality preset's values (#1522): what each effect's quality level
+    /// costs (`postfx::effects`, the SSAO pass, the UI backdrop blur).
+    pub quality: crate::core::settings::quality::QualityValues,
     /// The player's graphics options (#1438): which effects the player allows,
-    /// ANDed with each camera's and the tier's choice (`postfx::params::effect_runs`).
+    /// ANDed with each camera's choice (`postfx::params::effect_runs`).
     pub graphics_options: crate::core::settings::graphics_options::GraphicsOptions,
     /// The screen's render scale (#1498); see [`RenderView::set_render_scale`].
     pub render_scale: crate::core::settings::render_scale::RenderScale,

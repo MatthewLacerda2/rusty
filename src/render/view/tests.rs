@@ -31,8 +31,8 @@ fn gpu_offscreen_view_owns_a_target_targetless_does_not() {
     let Some(renderer) = crate::render::test_gpu::headless_or_skip(32, 32) else {
         return;
     };
-    let off = RenderView::offscreen(&renderer.device, OFFSCREEN_FORMAT, 32, 32, 2);
-    let none = RenderView::targetless(&renderer.device, OFFSCREEN_FORMAT, 32, 32, 2);
+    let off = RenderView::offscreen(&renderer.device, OFFSCREEN_FORMAT, 32, 32);
+    let none = RenderView::targetless(&renderer.device, OFFSCREEN_FORMAT, 32, 32);
     assert!(off.color_target_view().is_some());
     assert!(none.color_target_view().is_none());
 }
@@ -61,8 +61,8 @@ fn gpu_two_views_two_scenes_never_clobber_each_other() {
         return;
     };
 
-    let mut wide = RenderView::offscreen(&renderer.device, OFFSCREEN_FORMAT, 96, 48, 2);
-    let mut tall = RenderView::offscreen(&renderer.device, OFFSCREEN_FORMAT, 40, 80, 2);
+    let mut wide = RenderView::offscreen(&renderer.device, OFFSCREEN_FORMAT, 96, 48);
+    let mut tall = RenderView::offscreen(&renderer.device, OFFSCREEN_FORMAT, 40, 80);
     let scene_a = box_scene();
     let scene_b = box_scene();
     let cam = camera();
@@ -116,10 +116,10 @@ fn gpu_resize_tracks_the_new_size() {
     let Some(renderer) = crate::render::test_gpu::headless_or_skip(32, 32) else {
         return;
     };
-    let mut view = RenderView::offscreen(&renderer.device, OFFSCREEN_FORMAT, 32, 32, 2);
-    view.resize(&renderer.device, 50, 70, 2);
+    let mut view = RenderView::offscreen(&renderer.device, OFFSCREEN_FORMAT, 32, 32);
+    view.resize(&renderer.device, 50, 70);
     assert_eq!((view.size().width, view.size().height), (50, 70));
     // Unchanged resize: still the same size, no panic.
-    view.resize(&renderer.device, 50, 70, 2);
+    view.resize(&renderer.device, 50, 70);
     assert_eq!((view.size().width, view.size().height), (50, 70));
 }

@@ -324,21 +324,22 @@ fields (incl. the spatial fields stored for #213) round-trip through `SceneData`
 |---|---|---|
 | `SetLayer` | ✅ | renderer + sim — `draw_resources` culling mask (#92) and `physics/shape/build.rs::interaction_groups` collision groups (#91); round-trips |
 
-### `Graphics` — over the active `PostProcessingComponent` / `CameraComponent` / `QualityPreset`
+### `Graphics` — over the active `PostProcessingComponent` / `CameraComponent` / the quality presets
 
 | Setter | Status | Read-site |
 |---|---|---|
 | `SetBloomActive` / `SetBloomIntensity` / `SetBloomThreshold` | ✅ | renderer — the bloom effect (`render::postfx::effects::bloom`) packs its composite slot and runs its bright pass each frame |
 | `SetExposure` / `SetContrast` / `SetSaturation` / `SetGamma` | ✅ | renderer — the exposure's composite slot and the grading LUT's bake (`render::postfx::effects`; `tests/graphics/api.rs`) |
 | `SetTonemap` | ✅ | renderer — the tonemapping effect's grade function; unknown names ignored |
-| `SetSsrActive` / `SetSsrQuality` | ✅ | renderer — SSR pass (gated by High preset) |
+| `SetSsrActive` / `SetSsrQuality` / `SetSsr{Steps,StepLength}` | ✅ | renderer — SSR pass, marching its quality's row of the running preset or its `Custom` knobs (`render/postfx/effects/ssr/tests.rs`) |
+| `Set{Ssao,Bloom,DepthOfField,MotionBlur}Quality` and their `Custom` knobs | ✅ | renderer — each effect picks its level's row of the running preset or its `Custom` values each frame (`render/passes/ssao/tests.rs`, `gpu_tests.rs` count the samples) |
 | `SetMotionBlurActive` / `SetMotionBlurSamples` / `SetMotionBlurIntensity` / `SetMotionBlurMaxLength` | ✅ | renderer — `postfx::effects::motion_blur::effect::blur_params` builds `BlurParams` each frame (samples clamped 2..32, intensity 0..1, clamp 0..0.2; `render/postfx/effects/motion_blur/params_tests.rs`) |
 | `SetDepthOfFieldMode` / `SetDepthOfField{GaussianStart,GaussianEnd,GaussianMaxRadius,FocusDistance,Aperture,FocalLength}` | ✅ | renderer — the depth-of-field effect builds `DofParams` each frame (`render/postfx/effects/depth_of_field/params_tests.rs`, the lavapipe tests beside it); clamps in the shared op (`tests/parity_authoring_ops/depth_of_field.rs`) |
 | `SetLensFlareActive` / `SetLensFlare{Intensity,GhostCount,GhostIntensity,HaloIntensity,StreakIntensity,Tint,ChromaticAberration}` | ✅ | renderer — `postfx::effects::lens_flare::flare_params` builds `FlareParams` each frame, no pass when it can add nothing (`render/postfx/effects/lens_flare/tests.rs`, the lavapipe tests beside it); clamps in the shared op (`tests/graphics/lens_flare.rs`, `tests/parity_authoring_ops/lens_flare.rs`) |
-| `SetQuality` | ✅ | renderer — `shell::settings::apply_graphics` hands the shared cell to `Renderer::apply_graphics` each frame; persisted at Stop / quit |
+| `SetQuality` / `SetQualityPreset` / `RemoveQualityPreset` | ✅ | renderer — the running preset's values go into the shared cell, which `shell::settings::apply_graphics` hands to `Renderer::apply_graphics` each frame; the presets round-trip through `project.rusty` in the editor; the choice persisted at Stop / quit (`tests/graphics/quality.rs`) |
 | `SetOption` | ✅ | renderer — the same cell; `postfx::params::effect_runs` ANDs it into bloom / SSR / SSAO / motion blur / depth of field / lens flare / FXAA (`render/postfx/params_tests.rs`, `render/postfx/effects/pack_tests/`); saved to `Storage` at Stop / quit |
 | `ResetOptions` | ✅ | renderer — the same cell, back to the project defaults, choices forgotten (`tests/graphics/options.rs`) |
-| `SetDefaultOption` | ✅ | round-trip — `project.rusty`'s `graphics_options` in the editor (`core/application_tests.rs`); renderer — the live options the player hasn't set follow it |
+| `SetDefaultOption` | ✅ | round-trip — `project.rusty`'s `graphics_options` in the editor (`core/application/tests.rs`); renderer — the live options the player hasn't set follow it |
 
 ### `Video` — over the shared `VideoSettings`
 

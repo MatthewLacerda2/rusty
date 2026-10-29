@@ -7,7 +7,6 @@
 use glam::{Quat, Vec3};
 
 use crate::components::RenderMode;
-use crate::core::settings::quality::QualityPreset;
 use crate::render::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
 use crate::scene::authoring::{create_entity, default_post_processing, material, Primitive};
 use crate::scene::{Camera, Scene};
@@ -99,7 +98,7 @@ fn scene(s: &Scroll) -> Scene {
 /// One frame of `scene`, primed or not, as RGBA8.
 fn frame(r: &mut Renderer, scene: &Scene, primed: bool) -> Vec<u8> {
     r.depth_priming = primed;
-    let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, RES, RES, 2);
+    let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, RES, RES);
     let out = view.color_target_view().unwrap();
     let cam = Camera::new(Vec3::new(0.0, 0.0, 2.0), -90.0, 0.0);
     r.render(&mut view, scene, &cam, &out, false);
@@ -115,7 +114,6 @@ fn gpu_a_scrolling_cutout_primes_to_the_unprimed_frame() {
     let Some(mut r) = crate::render::test_gpu::headless_or_skip(RES, RES) else {
         return;
     };
-    r.set_quality(QualityPreset::High);
     let scene = scene(&s);
     let plain = frame(&mut r, &scene, false);
     let id = r.surface_shaders.pipeline_id(&r.device, Some(&s.shader));

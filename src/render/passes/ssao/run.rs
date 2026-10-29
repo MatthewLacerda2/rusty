@@ -18,7 +18,7 @@ impl Renderer {
         solids: &[DrawBatch],
     ) {
         let size = view.scene_size();
-        let divisor = frame.plan.tier.divisor;
+        let divisor = frame.plan.quality.resolution_divisor;
         if !view
             .ssao
             .as_ref()
@@ -44,7 +44,7 @@ impl Renderer {
                 .filter(|b| b.key.in_prepass())
                 .map(|b| (b.key.indices.len(), b.instances.len() as u32)),
         );
-        c.ssao_samples += u64::from(w) * u64::from(h) * u64::from(frame.plan.tier.samples);
+        c.ssao_samples += u64::from(w) * u64::from(h) * u64::from(frame.plan.quality.samples);
     }
 
     /// The forward pass's group 3 for `view`: its AO when the SSAO passes ran this

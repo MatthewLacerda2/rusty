@@ -51,7 +51,7 @@ fn prop_row(depths: &[f32], lod: bool) -> Scene {
 
 /// Render `scene` once from just behind the row; the pixels and what was submitted.
 fn render(renderer: &mut Renderer, scene: &Scene) -> (Vec<u8>, RenderCounters) {
-    let mut view = RenderView::offscreen(&renderer.device, OFFSCREEN_FORMAT, W, H, 2);
+    let mut view = RenderView::offscreen(&renderer.device, OFFSCREEN_FORMAT, W, H);
     let out = view.color_target_view().unwrap();
     let cam = Camera::new(Vec3::new(0.0, 1.5, 1.0), -90.0, -10.0);
     renderer.render(&mut view, scene, &cam, &out, false);

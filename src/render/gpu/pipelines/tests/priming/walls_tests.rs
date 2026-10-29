@@ -14,7 +14,6 @@ use glam::{Quat, Vec3};
 use super::cut_depth_tests::dissolve;
 use super::mask_tests::Dissolve;
 use crate::components::{CameraComponent, MaterialAsset, MaterialComponent};
-use crate::core::settings::quality::QualityPreset;
 use crate::core::settings::render_scale::RenderScale;
 use crate::render::{readback, RenderCounters, RenderView, Renderer, OFFSCREEN_FORMAT};
 use crate::scene::authoring::Primitive;
@@ -98,7 +97,7 @@ fn walls(d: &Dissolve, blur: bool) -> (RefCell<Scene>, u32) {
 /// One frame of `scene` at render scale `scale`, primed or not: pixels and counters.
 fn frame(r: &mut Renderer, scene: &Scene, primed: bool, scale: f32) -> (Vec<u8>, RenderCounters) {
     r.depth_priming = primed;
-    let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, W, H, 2);
+    let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, W, H);
     view.set_render_scale(RenderScale::new(scale));
     let out = view.color_target_view().unwrap();
     let cam = Camera::new(Vec3::new(0.0, 1.5, 3.0), -90.0, -5.0);
@@ -119,7 +118,6 @@ fn gpu_a_primed_forward_pass_draws_the_unprimed_frame() {
     let Some(mut r) = crate::render::test_gpu::headless_or_skip(W, H) else {
         return;
     };
-    r.set_quality(QualityPreset::High);
     for (blur, scale) in [(false, 1.0), (true, 1.0), (true, 0.5)] {
         let (scene, cut) = walls(&d, blur);
         dissolve(&scene, cut, &d, 0.5);

@@ -1,11 +1,9 @@
-//! What the motion-vector GPU tests (#1435) share: a renderer on a tier that runs
-//! motion blur, a scene whose base camera has it on, and the velocity target read
+//! What the motion-vector GPU tests (#1435) share: a renderer, a scene whose base camera has it on, and the velocity target read
 //! back as NDC vectors beside each pixel's view depth (#1436).
 
 use glam::{Quat, Vec2, Vec3, Vec3Swizzles};
 
 use crate::components::CameraComponent;
-use crate::core::settings::quality::QualityPreset;
 use crate::render::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
 use crate::scene::authoring::{create_entity, Primitive};
 use crate::scene::{Camera, Scene};
@@ -13,16 +11,14 @@ use crate::scene::{Camera, Scene};
 pub(crate) const W: u32 = 64;
 pub(crate) const H: u32 = 48;
 
-/// A headless renderer on the High tier, or `None` without an adapter.
+/// A headless renderer, or `None` without an adapter.
 pub(crate) fn renderer() -> Option<Renderer> {
-    let mut r = crate::render::test_gpu::headless_or_skip(W, H)?;
-    r.quality = QualityPreset::High;
-    Some(r)
+    crate::render::test_gpu::headless_or_skip(W, H)
 }
 
 /// A view kept across frames: its history is what the tests exercise.
 pub(crate) fn view(r: &Renderer) -> RenderView {
-    RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, W, H, 2)
+    RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, W, H)
 }
 
 /// A lit scene (procedural sky) with one camera entity, `blur` its motion blur.

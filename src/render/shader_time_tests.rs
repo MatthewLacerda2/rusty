@@ -55,7 +55,7 @@ fn glowing_box() -> Scene {
 
 fn frame_at(renderer: &mut Renderer, scene: &mut Scene, shader: &str, time: f32) -> Vec<u8> {
     scene.shader_time = time;
-    let mut view = RenderView::offscreen(&renderer.device, OFFSCREEN_FORMAT, RES, RES, 2);
+    let mut view = RenderView::offscreen(&renderer.device, OFFSCREEN_FORMAT, RES, RES);
     let out = view.color_target_view().unwrap();
     let cam = Camera::new(Vec3::new(0.0, 0.0, 12.0), -90.0, 0.0);
     renderer.render_preview_with_shader(&mut view, scene, &cam, &out, shader);

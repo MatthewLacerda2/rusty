@@ -1,7 +1,7 @@
-//! A view's SSAO targets (#436): the prepass depth, the raw occlusion at the tier's
+//! A view's SSAO targets (#436): the prepass depth, the raw occlusion at its quality's
 //! resolution, the blurred full-resolution result, and the bind groups over them.
 //! Allocated the first frame a view runs SSAO and rebuilt only when its size or the
-//! tier's divisor changes, so a view with AO off never pays for them.
+//! quality's divisor changes, so a view with AO off never pays for them.
 
 use super::{SsaoUniform, AO_FORMAT};
 use crate::render::gpu::bind_layouts::create_shadow_bind_group;

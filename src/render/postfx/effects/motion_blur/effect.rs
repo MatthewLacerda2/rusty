@@ -6,7 +6,6 @@
 use super::super::{Owner, Pass, PassCx, PostEffect};
 use super::BlurParams;
 use crate::core::settings::graphics_options::GraphicsOption;
-use crate::core::settings::quality::QualityPreset;
 use crate::core::settings::GraphicsSettings;
 use crate::render::motion;
 use crate::render::postfx::params::Gate;
@@ -16,10 +15,7 @@ use crate::render::{RenderView, Renderer};
 pub(crate) const EFFECT: PostEffect = PostEffect {
     name: "motion_blur",
     owner: Owner::Camera,
-    gate: Gate {
-        option: Some(GraphicsOption::MotionBlur),
-        tiers: QualityPreset::motion_blur,
-    },
+    gate: Gate::option(GraphicsOption::MotionBlur),
     module: None,
     composite: &[],
     grade: &[],
@@ -52,11 +48,15 @@ pub(crate) fn blur_params(
     let cam = post
         .camera
         .filter(|_| motion_blur_enabled(post, graphics))?;
-    Some(BlurParams::new(cam, height))
+    let samples = cam.motion_blur_quality.pick(
+        &graphics.quality.motion_blur_samples,
+        cam.motion_blur_samples,
+    );
+    Some(BlurParams::new(cam, samples, height))
 }
 
 /// Whether `post`'s camera runs motion blur, through [`effect_runs`]: its component
-/// has it on, the player's option allows it and the tier runs it. The velocity
+/// has it on and the player's option allows it. The velocity
 /// target is written when this or depth of field holds (`motion::target_wanted`,
 /// #1435, #1445), so a player who turned both off pays for no velocity pass.
 pub(crate) fn motion_blur_enabled(post: PostSource, graphics: GraphicsSettings) -> bool {

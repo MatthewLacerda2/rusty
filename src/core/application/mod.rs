@@ -1,4 +1,4 @@
-//! src/core/application.rs — `Application`: build settings + the quit request.
+//! src/core/application/ — `Application`: build settings + the quit request.
 //!
 //! The standalone player (#431) needs two small pieces of engine-wide state that are
 //! neither scene data nor save data:
@@ -12,8 +12,13 @@
 //! * **The project's graphics option defaults** — what a fresh install's player
 //!   graphics options start as (#1438), in the same file under `"graphics_options"`.
 //!   `Graphics.SetDefaultOption` and the Build Settings window edit them, the same way.
+//! * **The project's quality presets** (#1522), under `"quality"`, and the one the
+//!   player selected (persisted in `Storage`, not the file): `quality`.
 //! * **The project's decal budgets** (#1517), under `"decals"`: read, never written
 //!   here, so an edit to the file is what the next Play applies (and Stop restores).
+//!   They and the quality presets are re-read from the bound file at each Play and
+//!   before each write (`reread`), so a hand edit reaches the running editor and a
+//!   save never erases it.
 //! * **The quit request** — `Application.Quit()` only *records* that the game asked to
 //!   quit. What that means is the host's call: the player closes the window, the editor
 //!   stops Play (Unity ignores `Quit` in the editor), and the headless harness ends the
@@ -34,16 +39,20 @@
 //! instance writes the file straight away: build settings are authoring-time project
 //! config, edited rarely and deliberately, never from inside `FixedUpdate`. The player
 //! and `play` take the settings opening the project read
-//! ([`Opened::build`](crate::core::project::Opened::build)) into an unbound instance,
+//! ([`Opened::settings`](crate::core::project::Opened::settings)) into an unbound instance,
 //! so a shipped game can never rewrite its own build settings.
 
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-use crate::core::project::ProjectFile;
+use crate::core::project::{ProjectFile, ProjectSettings};
 use crate::core::settings::decals::DecalLimits;
 use crate::core::settings::graphics_options::{GraphicsOption, GraphicsOptions};
+use crate::core::settings::quality::QualityPresets;
+
+mod quality;
+mod reread;
 
 /// The startup scene when none is configured: the seeded demo scene. Kept equal to
 /// `scene::DEFAULT_SCENE_PATH` (a unit test pins it) without `core` importing `scene`.
@@ -94,11 +103,16 @@ pub struct Application {
     build: BuildSettings,
     /// The project's default player graphics options (#1438).
     graphics_defaults: GraphicsOptions,
+    /// The project's quality presets (#1522).
+    quality: QualityPresets,
+    /// The preset the player selected, by name; `None` (or a name no preset has
+    /// any more) runs the presets' initial one.
+    quality_selected: Option<String>,
     /// The project's decal budgets (#1517) as last read or set.
     decal_limits: DecalLimits,
-    /// The bound file's text the budgets were last parsed from, good or bad: the
-    /// same text again is not re-parsed, so its warnings are not repeated.
-    decals_read_from: Option<String>,
+    /// The bound file's text the budgets and presets were last parsed from, good or
+    /// bad: the same text again is not re-parsed, so its warnings are not repeated.
+    read_from: Option<String>,
     /// `Some` once bound to a file via [`Application::open`]: setters then write it.
     path: Option<PathBuf>,
     quit_requested: bool,
@@ -121,8 +135,8 @@ impl Application {
     /// the settings back into it.
     pub fn open(&mut self, path: impl Into<PathBuf>) -> Result<(), String> {
         let path = path.into();
-        // Read once and parse that text, so the text kept for `decal_limits` is the
-        // one the budgets came from.
+        // Read once and parse that text, so the text kept for `reread` is the one
+        // the budgets and presets came from.
         let read = match std::fs::read_to_string(&path) {
             Ok(text) => Ok(Some(text)),
             Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(None),
@@ -135,48 +149,19 @@ impl Application {
             None => ProjectFile::default(),
         };
         (self.build, self.graphics_defaults) = (file.build, file.graphics_options);
+        self.quality = file.quality;
         self.decal_limits = file.decals;
-        self.decals_read_from = text;
+        self.read_from = text;
         Ok(())
     }
 
-    /// The project's decal budgets, which entering and leaving Play apply to the
-    /// scene. Bound, the file as it stands now, so an edit to `project.rusty` (by
-    /// hand or by the agent) reaches the next Play; unbound, the ones
-    /// [`set_decal_limits`] gave. A bound file that can't be read or parsed keeps
-    /// the last good read, and says so once per content.
-    ///
-    /// [`set_decal_limits`]: Self::set_decal_limits
-    pub fn decal_limits(&mut self) -> DecalLimits {
-        let Some(path) = &self.path else {
-            return self.decal_limits;
-        };
-        let why = match std::fs::read_to_string(path) {
-            Ok(text) if self.decals_read_from.as_ref() == Some(&text) => return self.decal_limits,
-            Ok(text) => {
-                let parsed = ProjectFile::from_json(&text);
-                self.decals_read_from = Some(text);
-                match parsed {
-                    Ok(file) => {
-                        self.decal_limits = file.decals;
-                        return self.decal_limits;
-                    }
-                    Err(err) => err,
-                }
-            }
-            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
-                format!("{} is missing", path.display())
-            }
-            Err(err) => format!("Failed to read {}: {err}", path.display()),
-        };
-        log::warn!("[Project] decals: {why}; keeping the budgets last read");
-        self.decal_limits
-    }
-
-    /// The decal budgets an unbound run plays with (the player, the harness: what
-    /// opening the project read).
-    pub fn set_decal_limits(&mut self, limits: DecalLimits) {
-        self.decal_limits = limits;
+    /// Take a run's project settings, unbound (the player, the harness: what opening
+    /// the project read), so nothing is written back.
+    pub fn run_with(&mut self, settings: ProjectSettings) {
+        self.build = settings.build;
+        self.graphics_defaults = settings.graphics_options;
+        self.quality = settings.quality;
+        self.decal_limits = settings.decals;
     }
 
     /// The current build settings.
@@ -223,8 +208,11 @@ impl Application {
     }
 
     /// Write the settings into the bound project file, keeping the rest of it. A
-    /// no-op when unbound.
-    fn save(&self) -> Result<(), String> {
+    /// no-op when unbound. The presets written are the ones [`reread`](Self::reread)
+    /// just took from the file (a preset edit rereads before it edits), so a save
+    /// never writes back presets from before a hand edit.
+    fn save(&mut self) -> Result<(), String> {
+        self.reread();
         let Some(path) = &self.path else {
             return Ok(());
         };
@@ -234,6 +222,7 @@ impl Application {
         let mut file = ProjectFile::read(path)?.unwrap_or_default();
         file.build = self.build.clone();
         file.graphics_options = self.graphics_defaults;
+        file.quality = self.quality.clone();
         file.write(path)
     }
 
@@ -291,5 +280,4 @@ impl Application {
 }
 
 #[cfg(test)]
-#[path = "application_tests.rs"]
-mod application_tests;
+mod tests;

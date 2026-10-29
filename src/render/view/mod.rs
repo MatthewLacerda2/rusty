@@ -48,9 +48,6 @@ pub struct RenderView {
     /// viewport/preview, the offscreen format for screenshots) — its post-FX composite
     /// pipeline and owned colour target are built against it.
     format: wgpu::TextureFormat,
-    /// The quality tier's bloom-buffer divisor currently applied to `post_fx`; a change
-    /// (a live quality switch) triggers a re-size the next frame.
-    bloom_divisor: u32,
     pub(crate) depth_texture: wgpu::Texture,
     pub(crate) depth_view: wgpu::TextureView,
     /// Post-process chain (bloom, colour correction, motion blur, SSR) + its temporal
@@ -124,9 +121,8 @@ impl RenderView {
         format: wgpu::TextureFormat,
         width: u32,
         height: u32,
-        bloom_divisor: u32,
     ) -> Self {
-        Self::build(device, format, width, height, bloom_divisor, true)
+        Self::build(device, format, width, height, true)
     }
 
     /// A view with no owned colour target: the caller supplies the output view and
@@ -137,9 +133,8 @@ impl RenderView {
         format: wgpu::TextureFormat,
         width: u32,
         height: u32,
-        bloom_divisor: u32,
     ) -> Self {
-        Self::build(device, format, width, height, bloom_divisor, false)
+        Self::build(device, format, width, height, false)
     }
 
     fn build(
@@ -147,14 +142,13 @@ impl RenderView {
         format: wgpu::TextureFormat,
         width: u32,
         height: u32,
-        bloom_divisor: u32,
         owns_target: bool,
     ) -> Self {
         let (width, height) = (width.max(1), height.max(1));
         // A throwaway registry compiles this view's post-FX module. Views are created
         // rarely (once per consumer, not per frame), so the compile cost is one-time.
         let mut registry = ShaderRegistry::new(crate::shadergen::engine_shader_dir());
-        let post_fx = PostFx::new(device, width, height, format, bloom_divisor, &mut registry);
+        let post_fx = PostFx::new(device, width, height, format, &mut registry);
         let (depth_texture, depth_view) = create_depth(device, width, height);
         let target = owns_target.then(|| create_color_target(device, format, width, height));
         let (color_target, ui_format) = target.unzip();
@@ -164,7 +158,6 @@ impl RenderView {
             render_scale: RenderScale::NATIVE,
             upscale_source: None,
             format,
-            bloom_divisor,
             depth_texture,
             depth_view,
             post_fx,
@@ -182,28 +175,28 @@ impl RenderView {
     }
 
     /// Re-size this view's output to `width` x `height` and its scene targets to that
-    /// at its render scale, at `bloom_divisor`, but only when something actually
+    /// at its render scale, but only when something actually
     /// changed — a cheap no-op otherwise, so the resize guard checks *this view's* own
     /// size instead of a shared one. The post-FX *pipelines* are never rebuilt; only
     /// the size-dependent textures are reallocated.
-    pub fn resize(&mut self, device: &wgpu::Device, width: u32, height: u32, bloom_divisor: u32) {
+    pub fn resize(&mut self, device: &wgpu::Device, width: u32, height: u32) {
         let size = PixelSize::new(width.max(1), height.max(1));
         let max_side = device.limits().max_texture_dimension_2d;
         let scene = scale::scene_size(self.render_scale, size, max_side);
-        if (self.size, self.scene_size, self.bloom_divisor) == (size, scene, bloom_divisor) {
+        if (self.size, self.scene_size) == (size, scene) {
             return;
         }
         // A scale change alone keeps the output: a consumer may already hold a view of
         // its colour target for this render.
         let output_changed = self.size != size;
-        (self.size, self.scene_size, self.bloom_divisor) = (size, scene, bloom_divisor);
+        (self.size, self.scene_size) = (size, scene);
         let (depth_texture, depth_view) = create_depth(device, scene.width, scene.height);
         self.depth_texture = depth_texture;
         self.depth_view = depth_view;
         // The cached scene-depth bind group references the freed depth view.
         self.scene_depth_bind_group = None;
         let (w, h) = (scene.width, scene.height);
-        self.post_fx.resize(device, w, h, bloom_divisor);
+        self.post_fx.resize(device, w, h);
         self.upscale_source = scale::upscale_source(device, self.format, size, scene);
         if output_changed && self.color_target.is_some() {
             let (w, h) = (size.width, size.height);

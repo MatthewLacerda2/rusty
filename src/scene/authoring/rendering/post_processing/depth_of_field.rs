@@ -3,6 +3,7 @@
 
 use super::{Effect, Knob};
 use crate::components::{DepthOfField, DofMode, PostProcessingComponent};
+use crate::core::settings::quality::{EffectQuality, MAX_RESOLUTION_DIVISOR};
 use crate::scene::authoring::fields::table::effect;
 use crate::scene::authoring::sanitize::{clamped, non_negative, saturated};
 
@@ -54,6 +55,18 @@ pub fn set_focal_length(vc: &mut PostProcessingComponent, mm: f32) {
     vc.depth_of_field.focal_length = clamped(mm, lo, hi);
 }
 
+/// Set which working resolution the blur runs at: a level of the active quality
+/// preset, or `Custom`.
+pub fn set_quality(vc: &mut PostProcessingComponent, quality: EffectQuality) {
+    vc.depth_of_field.quality = quality;
+}
+
+/// Set the `Custom` working resolution's divisor of the view's size, clamped to
+/// `1..=4`.
+pub fn set_resolution_divisor(vc: &mut PostProcessingComponent, divisor: u32) {
+    vc.depth_of_field.resolution_divisor = divisor.clamp(1, MAX_RESOLUTION_DIVISOR);
+}
+
 pub const EFFECT: Effect = Effect {
     name: "depth_of_field",
     field: effect!(depth_of_field, |c, v: DepthOfField| {
@@ -64,6 +77,8 @@ pub const EFFECT: Effect = Effect {
         set_focus_distance(c, v.focus_distance);
         set_aperture(c, v.aperture);
         set_focal_length(c, v.focal_length);
+        set_quality(c, v.quality);
+        set_resolution_divisor(c, v.resolution_divisor);
     }),
     knobs: &[
         Knob {

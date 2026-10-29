@@ -96,8 +96,8 @@ pub(crate) struct PostEffect {
         )
     )]
     pub owner: Owner,
-    /// The player option that gates it, when it is player-facing (#1438), and the
-    /// quality tiers it runs on: its own rule, asked through [`EffectCx::runs`].
+    /// The player option that gates it, when it is player-facing (#1438): its own
+    /// rule, asked through [`EffectCx::runs`]. No quality preset gates it (#1522).
     pub gate: Gate,
     /// Its WGSL module, under `engine/shaders`, when it has composite or grade
     /// functions. Its import path is the file's path (`postfx::effects::vignette`).
@@ -184,7 +184,7 @@ pub(crate) enum LdrRun {
 pub(crate) type Gpu<'a> = (&'a wgpu::Device, &'a wgpu::Queue);
 
 /// What an effect packs from: one view's camera and volume, the player's options
-/// and the tier, and whether the view runs post-FX at all (a render texture's
+/// and the running quality preset's values, and whether the view runs post-FX at all (a render texture's
 /// `post_fx = false` brings the image to the display only).
 #[derive(Clone, Copy)]
 pub(crate) struct EffectCx<'a> {

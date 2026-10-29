@@ -88,7 +88,7 @@ pub struct RenderCounters {
     /// composite, the down chain and each blurred level's way up. `0` when no
     /// backdrop is visible.
     pub ui_blur_passes: u32,
-    /// Depth taps the SSAO occlusion pass traced (#436): its texels times the tier's
+    /// Depth taps the SSAO occlusion pass traced (#436): its texels times its quality's
     /// samples, summed over the camera stack; `0` with AO off. Its depth prepass is
     /// counted in `draw_calls` and `triangles`.
     pub ssao_samples: u64,
@@ -101,7 +101,7 @@ pub struct RenderCounters {
     /// `update_every` frames) is not counted.
     pub render_texture_draws: u32,
     /// Opaque scene passes that wrote a velocity target (#1435): one per camera of
-    /// each view running motion blur, `0` when none does (or the tier is Low).
+    /// each view running motion blur, `0` when none does.
     pub velocity_passes: u32,
     /// Opaque scene passes primed with their SSAO prepass's depth (#1499): one per
     /// camera that ran SSAO, `0` with AO off. A camera shading with a forward

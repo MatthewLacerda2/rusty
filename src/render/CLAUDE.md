@@ -91,9 +91,12 @@ every file and row.
   an effect that is off skips the fetch on a slot's on flag, as bloom and the flare
   do (`p.w`), so it costs nothing per pixel. It samples with the chain's own samplers (`s_color`, `s_skybox`). The `dummy`
   declares one, never provided.
-- **Gate** — its `PostEffect::gate`: the player option, when it is player-facing,
-  and the quality tiers it runs on (`tiers`, a `fn(QualityPreset) -> bool`). It asks
-  through `EffectCx::runs(EFFECT.gate, on)`; no shared `match` names it.
+- **Gate** — its `PostEffect::gate`: the player option, when it is player-facing.
+  It asks through `EffectCx::runs(EFFECT.gate, on)`; no shared `match` names it. No
+  quality preset gates an effect (#1522).
+- **Quality** — an effect with a cost knob carries an `EffectQuality` selector and its
+  `Custom` values on its settings, and its row in `core::settings::quality::QualityValues`
+  (three `Levels`); its render code picks with `quality.pick(&graphics.quality.<row>, custom)`.
 - **Option** — a player-facing effect adds its `GraphicsOption` row, named as the
   effect.
 - **Docs** — a `<!-- effect: <name> -->` section in `docs/api/Graphics.md` naming each

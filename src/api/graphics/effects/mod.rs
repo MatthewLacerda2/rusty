@@ -19,7 +19,7 @@ mod dummy;
 mod exposure;
 mod fxaa;
 mod grading;
-mod knobs;
+pub(super) mod knobs;
 mod lens;
 mod lens_flare;
 mod motion_blur;

@@ -31,8 +31,8 @@
 //! following Unity.
 //!
 //! **Cost.** The target exists and the velocity pipelines run only while a view runs
-//! motion blur ([`wanted`]: the camera has it on, the player's option allows it, the
-//! quality tier runs it, #1438, and it is not the editor's Scene view), depth of
+//! motion blur ([`wanted`]: the camera has it on, the player's option allows it,
+//! #1438, and it is not the editor's Scene view), depth of
 //! field, which reads its depths ([`target_wanted`], #1445), or SSR, which reads its
 //! depths (#1526, `draw::stack`). SSR alone records no entity poses
 //! ([`Velocity::Depths`]). On any other frame the forward pass draws exactly as

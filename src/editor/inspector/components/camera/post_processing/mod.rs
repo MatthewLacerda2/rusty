@@ -10,7 +10,9 @@
 
 use egui_phosphor::regular as icon;
 
+use crate::core::settings::quality::EffectQuality;
 use crate::editor::inspector::components::card::{component_card, remove_component};
+use crate::editor::inspector::components::particles::widgets::combo;
 use crate::scene::authoring::rendering::post_processing::{self as vc_ops, Knob};
 use crate::scene::authoring::ComponentKind;
 use crate::scene::PostProcessingComponent;
@@ -156,6 +158,31 @@ pub(super) fn slider_row(
     .inner
 }
 
+/// [`slider_row`] for a whole-number setting (a sample or step count, a resolution
+/// divisor), written through `op`.
+pub(super) fn count_row(
+    ui: &mut egui::Ui,
+    cx: (&mut crate::ecs::World, u32),
+    label: &str,
+    mut value: u32,
+    range: std::ops::RangeInclusive<u32>,
+    op: fn(&mut PostProcessingComponent, u32),
+) -> bool {
+    ui.horizontal(|ui| {
+        ui.label(label);
+        let changed = ui
+            .add(crate::editor::widgets::slider(&mut value, range))
+            .changed();
+        if changed {
+            if let Some(mut c) = cx.0.post_processing_mut(cx.1) {
+                op(&mut c, value);
+            }
+        }
+        changed
+    })
+    .inner
+}
+
 /// [`slider_row`] for `knob`, read from `vc`.
 pub(super) fn knob_row(
     ui: &mut egui::Ui,
@@ -182,6 +209,24 @@ pub(super) fn toggle(
         }
         *is_dirty = true;
     }
+}
+
+/// An effect's quality-level dropdown (#1522), `label` naming it (and keeping its
+/// id apart from the other effects'); the level picked this frame, if any.
+pub(in crate::editor::inspector::components::camera) fn quality_row(
+    ui: &mut egui::Ui,
+    label: &str,
+    current: EffectQuality,
+) -> Option<EffectQuality> {
+    let options = EffectQuality::ALL.map(|q| (q, q.name()));
+    let mut value = current;
+    let changed = ui
+        .horizontal(|ui| {
+            ui.add_space(12.0);
+            combo(ui, label, &mut value, &options)
+        })
+        .inner;
+    changed.then_some(value)
 }
 
 /// The knob at `field` of `knobs`, one a section names.

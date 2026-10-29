@@ -35,7 +35,7 @@ pub(in crate::render::postfx) struct Chain {
 pub(in crate::render::postfx) fn chain() -> Option<Chain> {
     let r = crate::render::test_gpu::headless_or_skip(W, 1)?;
     let mut registry = ShaderRegistry::new("engine/shaders");
-    let pfx = PostFx::new(&r.device, W, 1, OFFSCREEN_FORMAT, 2, &mut registry);
+    let pfx = PostFx::new(&r.device, W, 1, OFFSCREEN_FORMAT, &mut registry);
     let out = texture(&r.device, OFFSCREEN_FORMAT, wgpu::TextureUsages::COPY_SRC);
     Some(Chain { r, pfx, out })
 }

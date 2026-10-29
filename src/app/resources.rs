@@ -185,11 +185,15 @@ impl Resources {
         }
     }
 
-    /// Write the shared graphics cell (tier + the player's options, #1438) into the
-    /// store, for the Stop and quit flushes to put on disk.
+    /// Write the player's quality preset (#1522) and the shared graphics cell (the
+    /// player's options, #1438) into the store, for the Stop and quit flushes to
+    /// put on disk.
     pub fn store_graphics(&self) {
         let graphics = *self.script_manager.graphics_cell().borrow();
-        graphics.store(&mut self.storage.borrow_mut());
+        let mut storage = self.storage.borrow_mut();
+        graphics.store(&mut storage);
+        let app = self.application.borrow();
+        crate::core::settings::store_quality(&mut storage, app.quality_choice());
     }
 
     /// Flush the persistent store at a boundary (Stop / quit), logging any failure

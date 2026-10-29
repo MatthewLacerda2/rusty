@@ -32,7 +32,7 @@ fn box_scene(mode: RenderMode) -> Scene {
 }
 
 fn draw(renderer: &mut Renderer, scene: &Scene, editor_mode: bool) {
-    let mut view = RenderView::offscreen(&renderer.device, OFFSCREEN_FORMAT, RES, RES, 2);
+    let mut view = RenderView::offscreen(&renderer.device, OFFSCREEN_FORMAT, RES, RES);
     let out = view.color_target_view().unwrap();
     let cam = Camera::new(Vec3::new(0.0, 0.0, 6.0), -90.0, 0.0);
     renderer.render(&mut view, scene, &cam, &out, editor_mode);

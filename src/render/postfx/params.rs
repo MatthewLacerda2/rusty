@@ -1,7 +1,6 @@
 //! Whose settings a view post-processes with (#1434), and the one gate every
-//! effect asks ([`effect_runs`], #1438): its camera's choice, the player's option and
-//! the quality tier. Each effect packs its own params from them
-//! (`postfx::effects`, #1467); [`frame_params`] is what every post pass shares.
+//! effect asks ([`effect_runs`], #1438): its camera's choice and the player's
+//! option. Each effect packs its own params from them (`postfx::effects`, #1467); [`frame_params`] is what every post pass shares.
 //!
 //! **Whose settings.** A view post-processes with its base camera, the way Unity URP
 //! post-processes a camera stack once, with the base camera's settings: the screen
@@ -15,7 +14,6 @@ use glam::Mat4;
 use super::PostParams;
 use crate::components::{CameraComponent, PostProcessingComponent};
 use crate::core::settings::graphics_options::GraphicsOption;
-use crate::core::settings::quality::QualityPreset;
 use crate::core::settings::GraphicsSettings;
 use crate::scene::camera::camera_volume;
 use crate::scene::Scene;
@@ -55,40 +53,30 @@ impl PostGuards<'_> {
 }
 
 /// What gates an effect besides its own switch, declared with the effect (#1438,
-/// #1467): the player option, when it is player-facing, and the tiers it runs on.
-/// So a new effect's tier rule is its own line, not an arm of a shared `match`.
+/// #1467): the player option, when it is player-facing. No quality preset gates an
+/// effect (#1522): a preset only sets what an effect's quality knobs cost.
 #[derive(Clone, Copy)]
 pub(crate) struct Gate {
     pub option: Option<GraphicsOption>,
-    pub tiers: fn(QualityPreset) -> bool,
 }
 
 impl Gate {
-    /// An effect no option gates, on every tier.
-    pub(crate) const NONE: Gate = Gate {
-        option: None,
-        tiers: every_tier,
-    };
+    /// An effect no option gates.
+    pub(crate) const NONE: Gate = Gate { option: None };
 
-    /// `option` gates it, on every tier.
+    /// `option` gates it.
     pub(crate) const fn option(option: GraphicsOption) -> Gate {
         Gate {
             option: Some(option),
-            tiers: every_tier,
         }
     }
 }
 
-/// Every tier runs it: a few taps each, the cheap effects an iGPU keeps.
-pub(crate) fn every_tier(_: QualityPreset) -> bool {
-    true
-}
-
 /// Does an effect gated by `gate` run for a view whose camera has it `on` (#1438)?
-/// Only when the camera has it on **and** the player's option allows it **and** the
-/// quality tier runs it. The one place that decides it: every gated pass asks here.
+/// Only when the camera has it on **and** the player's option allows it. The one
+/// place that decides it: every gated pass asks here.
 pub(crate) fn effect_runs(graphics: GraphicsSettings, gate: Gate, on: bool) -> bool {
-    on && gate.option.is_none_or(|o| graphics.options.allows(o)) && (gate.tiers)(graphics.quality)
+    on && gate.option.is_none_or(|o| graphics.options.allows(o))
 }
 
 /// The frame every post pass shares: the view-projection both ways, the camera's

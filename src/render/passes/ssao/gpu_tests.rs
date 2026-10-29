@@ -1,21 +1,27 @@
-//! SSAO's cost on the GPU (#436): what each tier traces, as the frame stats report
-//! it, and that switching AO off removes all of it. Skips when no adapter is present.
+//! SSAO's cost on the GPU (#436): what each quality traces, as the frame stats
+//! report it (#1522), and that switching AO off removes all of it. Skips when no adapter is present.
 
 use glam::Vec3;
 
-use crate::core::settings::quality::QualityPreset;
+use crate::components::PostProcessingComponent;
+use crate::core::settings::quality::{EffectQuality, QualityPresets};
 use crate::render::{RenderView, Renderer, OFFSCREEN_FORMAT};
 use crate::scene::authoring::{create_entity, default_post_processing, Primitive};
 use crate::scene::{Camera, ClearFlags, Scene};
 
 /// A crate under a post-processing volume with AO `on`.
 fn crate_scene(on: bool) -> Scene {
+    crate_scene_with(|vc| vc.ssao.active = on)
+}
+
+/// A crate under a post-processing volume `edit` shaped.
+fn crate_scene_with(edit: impl FnOnce(&mut PostProcessingComponent)) -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
     create_entity(&mut scene, "Crate", Some(Primitive::Box));
     let volume = create_entity(&mut scene, "Volume", None);
     let mut vc = default_post_processing();
-    vc.ssao.active = on;
+    edit(&mut vc);
     scene.world.set_post_processing(volume, Some(vc));
     // A volume rides on its camera (#1434): that camera is the view's.
     scene
@@ -24,9 +30,9 @@ fn crate_scene(on: bool) -> Scene {
     scene
 }
 
-/// `(ssao_samples, draw_calls)` rendering `scene` at `quality`.
-fn cost(r: &mut Renderer, view: &mut RenderView, scene: &Scene, q: QualityPreset) -> (u64, u32) {
-    r.set_quality(q);
+/// `(ssao_samples, draw_calls)` rendering `scene` under the seeded `preset`.
+fn cost(r: &mut Renderer, view: &mut RenderView, scene: &Scene, preset: &str) -> (u64, u32) {
+    r.set_quality(QualityPresets::default().get(preset).unwrap().values);
     let out = view.color_target_view().unwrap();
     let cam = Camera::new(Vec3::new(0.0, 1.0, 4.0), -90.0, -10.0);
     r.render(view, scene, &cam, &out, false);
@@ -34,31 +40,30 @@ fn cost(r: &mut Renderer, view: &mut RenderView, scene: &Scene, q: QualityPreset
 }
 
 #[test]
-fn gpu_each_tier_traces_what_it_promises() {
+fn gpu_each_quality_traces_what_it_promises() {
     let Some(mut r) = crate::render::test_gpu::headless_or_skip(48, 32) else {
         return;
     };
-    let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, 48, 32, 2);
+    let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, 48, 32);
     let (on, off) = (crate_scene(true), crate_scene(false));
 
-    // Medium: 8 samples over a half-resolution target; High: 16 over full.
-    assert_eq!(
-        cost(&mut r, &mut view, &on, QualityPreset::Medium).0,
-        24 * 16 * 8
-    );
-    assert_eq!(
-        cost(&mut r, &mut view, &on, QualityPreset::High).0,
-        48 * 32 * 16
-    );
-    assert_eq!(
-        cost(&mut r, &mut view, &on, QualityPreset::Low).0,
-        0,
-        "off on Low"
-    );
+    // The volume's default `Medium` level: the Medium preset's 8 samples at half
+    // resolution, the High preset's 16 at full, the Low preset's 6 at half (no
+    // preset turns it off).
+    let traced = |r: &mut Renderer, view: &mut RenderView, preset| cost(r, view, &on, preset).0;
+    assert_eq!(traced(&mut r, &mut view, "Medium"), 24 * 16 * 8);
+    assert_eq!(traced(&mut r, &mut view, "High"), 48 * 32 * 16);
+    assert_eq!(traced(&mut r, &mut view, "Low"), 24 * 16 * 6);
+    // `Custom` traces what the volume says, whatever the preset.
+    let custom = crate_scene_with(|vc| {
+        vc.ssao.quality = EffectQuality::Custom;
+        (vc.ssao.samples, vc.ssao.resolution_divisor) = (32, 1);
+    });
+    assert_eq!(cost(&mut r, &mut view, &custom, "Low").0, 48 * 32 * 32);
 
     // Off: no occlusion taps, and the prepass's draw is gone from the count too.
-    let (lit, lit_draws) = cost(&mut r, &mut view, &on, QualityPreset::High);
-    let (unlit, unlit_draws) = cost(&mut r, &mut view, &off, QualityPreset::High);
+    let (lit, lit_draws) = cost(&mut r, &mut view, &on, "High");
+    let (unlit, unlit_draws) = cost(&mut r, &mut view, &off, "High");
     assert!(lit > 0);
     assert_eq!(unlit, 0);
     assert!(
@@ -85,8 +90,8 @@ fn gpu_a_depth_only_overlay_runs_no_ssao_of_its_own() {
     let Some(mut r) = crate::render::test_gpu::headless_or_skip(48, 32) else {
         return;
     };
-    let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, 48, 32, 2);
-    let high = QualityPreset::High;
+    let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, 48, 32);
+    let high = "High";
     let one = cost(&mut r, &mut view, &crate_scene(true), high).0;
     // A viewmodel camera (#1497): the stack records SSAO once, for its base camera.
     let overlay = cost(&mut r, &mut view, &stacked(ClearFlags::DepthOnly), high).0;

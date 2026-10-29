@@ -8,7 +8,6 @@ use glam::Vec3;
 use super::gpu_fixture::{bokeh, cube, eye, scene, FAR};
 use super::DofParams;
 use crate::components::{DepthOfField, MaterialComponent};
-use crate::core::settings::quality::QualityPreset;
 use crate::render::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
 use crate::scene::camera::DEFAULT_FOV;
 use crate::scene::Scene;
@@ -17,7 +16,7 @@ const W: u32 = 480;
 const H: u32 = 360;
 
 fn shot(r: &mut Renderer, scene: &Scene) -> Vec<u8> {
-    let mut v = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, W, H, 2);
+    let mut v = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, W, H);
     let out = v.color_target_view().unwrap();
     r.render(&mut v, scene, &eye(), &out, false);
     readback::read_texture_rgba8(&r.device, &r.queue, v.color_target().unwrap(), W, H)
@@ -53,7 +52,7 @@ fn gpu_bokeh_blur_grows_smoothly_with_the_circle_of_confusion() {
     let Some(mut r) = crate::render::test_gpu::headless_or_skip(W, H) else {
         return;
     };
-    r.quality = QualityPreset::High;
+    super::gpu_fixture::blur_at(&mut r, 1);
     let sharp = shot(&mut r, &scene(DepthOfField::default()).0);
     // The far cube's left edge, on its front face (1.5 m wide, 11.25 m out).
     let face = FAR + Vec3::new(-0.75, 0.0, 0.75);
@@ -106,7 +105,7 @@ fn gpu_a_wall_at_the_focus_distance_stays_sharp_to_its_corners() {
     let Some(mut r) = crate::render::test_gpu::headless_or_skip(W, H) else {
         return;
     };
-    r.quality = QualityPreset::High;
+    super::gpu_fixture::blur_at(&mut r, 1);
     let (off, corners) = wide_wall(DepthOfField::default());
     let off = shot(&mut r, &off);
     // 5.6 m away in a straight line, the corners sit 3 m deep, in focus.

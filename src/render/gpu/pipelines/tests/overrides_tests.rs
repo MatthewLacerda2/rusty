@@ -75,7 +75,7 @@ fn gpu_an_override_flashes_one_of_two_entities_sharing_a_material() {
 
 /// One frame's counters for `scene`.
 fn counters(renderer: &mut Renderer, scene: &Scene) -> RenderCounters {
-    let mut view = RenderView::offscreen(&renderer.device, OFFSCREEN_FORMAT, RES, RES, 2);
+    let mut view = RenderView::offscreen(&renderer.device, OFFSCREEN_FORMAT, RES, RES);
     let out = view.color_target_view().unwrap();
     let cam = Camera::new(glam::Vec3::new(2.6, 0.0, 9.0), -90.0, 0.0);
     renderer.render(&mut view, scene, &cam, &out, false);

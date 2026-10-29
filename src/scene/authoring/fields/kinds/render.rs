@@ -57,6 +57,7 @@ inspect! {
         op!("render_order", camera::set_render_order),
         op!("clear_flags", camera::set_clear_flags),
         op!("motion_blur_active", camera::set_motion_blur_active),
+        op!("motion_blur_quality", camera::set_motion_blur_quality),
         op!("motion_blur_samples", camera::set_motion_blur_samples),
         op!("motion_blur_intensity", camera::set_motion_blur_intensity),
         op!("motion_blur_max_length", camera::set_motion_blur_max_length),

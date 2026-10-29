@@ -56,13 +56,12 @@ impl Renderer {
                 rts.slots.insert(path, slot);
             }
         }
-        let bloom = self.quality.bloom_divisor();
         self.gpu_textures
             .retain(|path, _| !is_render_texture(path.as_str()));
         self.render_texture_ids.0.clear();
         for (path, slot) in &mut rts.slots {
             let (w, h) = slot.size;
-            slot.view.resize(&self.device, w, h, bloom);
+            slot.view.resize(&self.device, w, h);
             self.gpu_textures
                 .insert(MapRef::new(path.clone()), Rc::clone(&slot.front));
             self.render_texture_ids.0.insert(path.clone(), slot.id);

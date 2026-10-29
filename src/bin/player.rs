@@ -17,5 +17,5 @@ fn main() {
     rusty::logging::init();
     let mut args: Vec<String> = std::env::args().skip(1).collect();
     let opened = rusty::core::project::open_from_args(&mut args, rusty::core::project::Access::Run);
-    rusty::shell::player::launch(opened.build, opened.graphics_options, opened.decals);
+    rusty::shell::player::launch(opened.settings);
 }

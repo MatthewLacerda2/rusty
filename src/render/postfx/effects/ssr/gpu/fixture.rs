@@ -5,7 +5,6 @@
 use glam::{Vec2, Vec3};
 
 use crate::components::{MaterialAsset, MaterialComponent, PostProcessingComponent, Ssr};
-use crate::core::settings::quality::QualityPreset;
 use crate::render::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
 use crate::scene::authoring::{create_entity, default_post_processing, Primitive};
 use crate::scene::{Camera, Scene};
@@ -17,11 +16,9 @@ pub(super) const H: u32 = 72;
 /// 0.56 m up.
 pub(super) const REFLECTING: Vec3 = Vec3::new(0.0, 0.0, -4.0);
 
-/// A headless renderer on the High tier (the one SSR runs on), or `None`.
+/// A headless renderer, or `None`.
 pub(super) fn renderer() -> Option<Renderer> {
-    let mut r = crate::render::test_gpu::headless_or_skip(W, H)?;
-    r.quality = QualityPreset::High;
-    Some(r)
+    crate::render::test_gpu::headless_or_skip(W, H)
 }
 
 /// The eye: 1.5 m up, looking down -Z.
@@ -101,7 +98,7 @@ pub(super) const RED: Surface = ([1.0, 0.1, 0.1], 0.0, 1.0);
 
 /// Render `scene` through [`eye`] into a fresh view and read the frame (RGBA8).
 pub(super) fn frame(r: &mut Renderer, scene: &Scene) -> Vec<u8> {
-    let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, W, H, 2);
+    let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, W, H);
     draw(r, &mut view, scene, &eye())
 }
 

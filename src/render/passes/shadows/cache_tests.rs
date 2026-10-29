@@ -31,7 +31,7 @@ fn gpu_static_casters_are_baked_once_per_cascade_position() {
     let Some(mut r) = crate::render::test_gpu::headless_or_skip(48, 32) else {
         return;
     };
-    let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, 48, 32, 2);
+    let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, 48, 32);
     let scene = static_yard();
     let home = Vec3::new(0.0, 2.0, 6.0);
 

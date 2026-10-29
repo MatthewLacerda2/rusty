@@ -8,7 +8,6 @@ use glam::{Quat, Vec3};
 
 use super::mask_tests::Dissolve;
 use super::params_tests::lua;
-use crate::core::settings::quality::QualityPreset;
 use crate::render::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
 use crate::scene::authoring::{create_entity, default_post_processing, material, Primitive};
 use crate::scene::{Camera, Scene};
@@ -54,7 +53,7 @@ pub(crate) fn dissolve(scene: &RefCell<Scene>, id: u32, d: &Dissolve, amount: f3
 
 /// The frame `cam` sees, as RGBA8.
 fn frame(r: &mut Renderer, scene: &Scene, cam: &Camera) -> Vec<u8> {
-    let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, RES, RES, 2);
+    let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, RES, RES);
     let out = view.color_target_view().unwrap();
     r.render(&mut view, scene, cam, &out, false);
     let target = view.color_target().unwrap();
@@ -104,7 +103,6 @@ fn gpu_a_dissolved_crate_leaves_no_ambient_occlusion() {
     let Some(mut r) = crate::render::test_gpu::headless_or_skip(RES, RES) else {
         return;
     };
-    r.set_quality(QualityPreset::High);
     // A floor lit by ambient light alone, under an AO volume, with and without a crate.
     let yard = |with_crate: bool| {
         let mut scene = Scene::new();

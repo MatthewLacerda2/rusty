@@ -128,7 +128,7 @@ fn gpu_display_view_samples_the_stored_bytes() {
     let Some(r) = crate::render::test_gpu::headless_or_skip(SIZE, SIZE) else {
         return;
     };
-    let view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, SIZE, SIZE, 2);
+    let view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, SIZE, SIZE);
     let srgb = view
         .color_target_view()
         .expect("an offscreen view owns a target");

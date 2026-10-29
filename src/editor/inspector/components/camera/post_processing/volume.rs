@@ -4,7 +4,9 @@
 //! A THIN client (#287): each widget reads the snapshot and writes through the
 //! shared `authoring::rendering::post_processing` op `Graphics.*` calls too.
 
-use super::{slider_row, Section};
+use super::{count_row, quality_row, slider_row, Section};
+use crate::components::SsaoSettings;
+use crate::core::settings::quality::{EffectQuality, MAX_RESOLUTION_DIVISOR};
 use crate::scene::authoring::rendering::post_processing as vc_ops;
 use crate::scene::PostProcessingComponent;
 
@@ -59,7 +61,8 @@ fn draw_shadows(
     });
 }
 
-/// The Ambient Occlusion section (#436): on/off, radius and strength.
+/// The Ambient Occlusion section (#436): on/off, radius and strength, and its
+/// quality level with the `Custom` samples and divisor (#1522).
 fn draw_ssao(
     ui: &mut egui::Ui,
     world: &mut crate::ecs::World,
@@ -78,7 +81,7 @@ fn draw_ssao(
     }
     if vc.ssao.active {
         let (r, i) = (vc.ssao.radius, vc.ssao.intensity);
-        let max = crate::components::SsaoSettings::MAX_INTENSITY;
+        let max = SsaoSettings::MAX_INTENSITY;
         *is_dirty |= slider_row(
             ui,
             (&mut *world, id),
@@ -95,5 +98,38 @@ fn draw_ssao(
             0.0..=max,
             vc_ops::volume::set_ssao_intensity,
         );
+        draw_ssao_quality(ui, (world, id), vc, is_dirty);
     }
+}
+
+/// SSAO's quality level and, at `Custom`, its sample count and divisor.
+fn draw_ssao_quality(
+    ui: &mut egui::Ui,
+    (world, id): (&mut crate::ecs::World, u32),
+    vc: &PostProcessingComponent,
+    is_dirty: &mut bool,
+) {
+    if let Some(quality) = quality_row(ui, "SSAO Quality", vc.ssao.quality) {
+        if let Some(mut c) = world.post_processing_mut(id) {
+            vc_ops::volume::set_ssao_quality(&mut c, quality);
+        }
+        *is_dirty = true;
+    }
+    if vc.ssao.quality != EffectQuality::Custom {
+        return;
+    }
+    let samples = (vc.ssao.samples, 1..=SsaoSettings::MAX_SAMPLES);
+    let set = vc_ops::volume::set_ssao_samples;
+    *is_dirty |= count_row(
+        ui,
+        (&mut *world, id),
+        "    Samples:",
+        samples.0,
+        samples.1,
+        set,
+    );
+    let divisor = (vc.ssao.resolution_divisor, 1..=MAX_RESOLUTION_DIVISOR);
+    let set = vc_ops::volume::set_ssao_resolution_divisor;
+    let label = "    Resolution Divisor:";
+    *is_dirty |= count_row(ui, (world, id), label, divisor.0, divisor.1, set);
 }

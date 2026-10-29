@@ -1,11 +1,11 @@
 //! Lens flare on lavapipe (#1443): a bright dot left of the centre throws a ghost
-//! on the right, mirrored through the centre, on Medium and High; a scene with
-//! nothing above bloom's threshold is byte-identical with the flare on and off.
+//! on the right, mirrored through the centre; a scene with nothing above bloom's
+//! threshold is byte-identical with the flare on and off; the Low preset flares too.
 
 use glam::Vec3;
 
 use crate::components::{MaterialAsset, MaterialComponent, PostProcessingComponent};
-use crate::core::settings::quality::QualityPreset;
+use crate::core::settings::quality::QualityPresets;
 use crate::render::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
 use crate::scene::authoring::{create_entity, default_post_processing, Primitive};
 use crate::scene::{Camera, Scene};
@@ -57,15 +57,13 @@ pub(super) fn eye() -> Camera {
     Camera::new(Vec3::ZERO, -90.0, 0.0)
 }
 
-pub(super) fn renderer(tier: QualityPreset) -> Option<Renderer> {
-    let mut r = crate::render::test_gpu::headless_or_skip(W, H)?;
-    r.quality = tier;
-    Some(r)
+pub(super) fn renderer() -> Option<Renderer> {
+    crate::render::test_gpu::headless_or_skip(W, H)
 }
 
 /// One frame of `scene` through a fresh view (RGBA8).
 fn shot(r: &mut Renderer, scene: &Scene) -> Vec<u8> {
-    let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, W, H, 2);
+    let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, W, H);
     let out = view.color_target_view().unwrap();
     r.render(&mut view, scene, &eye(), &out, false);
     readback::read_texture_rgba8(&r.device, &r.queue, view.color_target().unwrap(), W, H)
@@ -94,25 +92,23 @@ fn light_around(frame: &[u8], (cx, cy): (i32, i32), reach: i32) -> u32 {
 
 #[test]
 fn gpu_a_bright_dot_throws_a_ghost_across_the_centre() {
-    for tier in [QualityPreset::Medium, QualityPreset::High] {
-        let Some(mut r) = renderer(tier) else { return };
-        let off = shot(&mut r, &scene(40.0, false));
-        let on = shot(&mut r, &scene(40.0, true));
-        let (dx, dy) = pixel_of(dot_position());
-        assert!(dx < W as i32 / 2, "the dot is left of the centre ({dx})");
-        let mirror = (W as i32 - 1 - dx, H as i32 - 1 - dy);
-        let (ghost_off, ghost_on) = (light_around(&off, mirror, 6), light_around(&on, mirror, 6));
-        eprintln!("[lens_flare] {tier:?} mirror of the dot: off {ghost_off}, on {ghost_on}");
-        assert!(
-            ghost_on > ghost_off + 200,
-            "{tier:?}: a ghost lands opposite the dot ({ghost_off} -> {ghost_on})"
-        );
-    }
+    let Some(mut r) = renderer() else { return };
+    let off = shot(&mut r, &scene(40.0, false));
+    let on = shot(&mut r, &scene(40.0, true));
+    let (dx, dy) = pixel_of(dot_position());
+    assert!(dx < W as i32 / 2, "the dot is left of the centre ({dx})");
+    let mirror = (W as i32 - 1 - dx, H as i32 - 1 - dy);
+    let (ghost_off, ghost_on) = (light_around(&off, mirror, 6), light_around(&on, mirror, 6));
+    eprintln!("[lens_flare] mirror of the dot: off {ghost_off}, on {ghost_on}");
+    assert!(
+        ghost_on > ghost_off + 200,
+        "a ghost lands opposite the dot ({ghost_off} -> {ghost_on})"
+    );
 }
 
 #[test]
 fn gpu_without_a_bright_pixel_the_flare_changes_nothing() {
-    let Some(mut r) = renderer(QualityPreset::High) else {
+    let Some(mut r) = renderer() else {
         return;
     };
     // Below bloom's threshold (0.8): the bright pass, and so the flare, is zero.
@@ -129,12 +125,14 @@ fn gpu_without_a_bright_pixel_the_flare_changes_nothing() {
 }
 
 #[test]
-fn gpu_low_holds_no_flare_target() {
-    let Some(mut r) = renderer(QualityPreset::Low) else {
+fn gpu_the_low_preset_still_flares() {
+    let Some(mut r) = renderer() else {
         return;
     };
-    let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, W, H, 4);
+    r.quality = QualityPresets::default().get("Low").unwrap().values;
+    let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, W, H);
     let out = view.color_target_view().unwrap();
     r.render(&mut view, &scene(40.0, true), &eye(), &out, false);
-    assert!(view.post_fx.targets.get::<super::FlareTargets>().is_none());
+    let target = view.post_fx.targets.get::<super::FlareTargets>();
+    assert!(target.is_some(), "no preset turns the flare off");
 }

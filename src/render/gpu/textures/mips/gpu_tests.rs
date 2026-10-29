@@ -14,7 +14,7 @@ const SIDE: u32 = 16;
 
 /// One frame's RGB rows of `scene` seen from 12 units away.
 fn frame(renderer: &mut Renderer, scene: &Scene) -> Vec<u8> {
-    let mut view = RenderView::offscreen(&renderer.device, OFFSCREEN_FORMAT, SIDE, SIDE, 2);
+    let mut view = RenderView::offscreen(&renderer.device, OFFSCREEN_FORMAT, SIDE, SIDE);
     let out = view.color_target_view().unwrap();
     let cam = Camera::new(Vec3::new(0.0, 0.0, 12.0), -90.0, 0.0);
     renderer.render(&mut view, scene, &cam, &out, false);

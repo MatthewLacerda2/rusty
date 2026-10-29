@@ -1,9 +1,11 @@
 //! The volume's own settings' ops: its master switch, the sun's shadow cascades and
-//! reach (#435) and screen-space ambient occlusion (#436). No post effects, so no
+//! reach (#435) and screen-space ambient occlusion (#436), its quality level and
+//! `Custom` samples and resolution (#1522). No post effects, so no
 //! knobs: their rows sit before the effects' in [`super::FIELDS`]. Like the effects'
 //! rows they merge: a partial write keeps the other fields, an unknown key errors.
 
 use crate::components::{PostProcessingComponent, ShadowSettings, SsaoSettings};
+use crate::core::settings::quality::{EffectQuality, MAX_RESOLUTION_DIVISOR};
 use crate::scene::authoring::fields::table::{effect, op, Field};
 use crate::scene::authoring::sanitize::{at_least, clamped};
 
@@ -37,6 +39,23 @@ pub fn set_ssao_intensity(vc: &mut PostProcessingComponent, intensity: f32) {
     vc.ssao.intensity = clamped(intensity, 0.0, SsaoSettings::MAX_INTENSITY);
 }
 
+/// Set which samples and resolution AO runs at: a level of the active quality
+/// preset, or `Custom`.
+pub fn set_ssao_quality(vc: &mut PostProcessingComponent, quality: EffectQuality) {
+    vc.ssao.quality = quality;
+}
+
+/// Set the `Custom` sample count, clamped to `1..=64`.
+pub fn set_ssao_samples(vc: &mut PostProcessingComponent, samples: u32) {
+    vc.ssao.samples = samples.clamp(1, SsaoSettings::MAX_SAMPLES);
+}
+
+/// Set the `Custom` occlusion target's divisor of the view's size, clamped to
+/// `1..=4`.
+pub fn set_ssao_resolution_divisor(vc: &mut PostProcessingComponent, divisor: u32) {
+    vc.ssao.resolution_divisor = divisor.clamp(1, MAX_RESOLUTION_DIVISOR);
+}
+
 /// The field-table rows of the volume's own settings: its switch, its shadows and
 /// its ambient occlusion.
 pub const FIELDS: [Field<PostProcessingComponent>; 3] = [
@@ -49,5 +68,8 @@ pub const FIELDS: [Field<PostProcessingComponent>; 3] = [
         set_ssao_active(c, v.active);
         set_ssao_radius(c, v.radius);
         set_ssao_intensity(c, v.intensity);
+        set_ssao_quality(c, v.quality);
+        set_ssao_samples(c, v.samples);
+        set_ssao_resolution_divisor(c, v.resolution_divisor);
     }),
 ];

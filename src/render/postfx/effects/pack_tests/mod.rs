@@ -1,5 +1,5 @@
 //! What each effect packs for one view's camera (#1434, #1467): its composite slots
-//! from the volume and the camera, gated by the tier and the player's options, and
+//! from the volume and the camera, gated by the player's options, and
 //! the march SSR's pass runs (#1526).
 
 use super::fxaa::fxaa_enabled;
@@ -8,7 +8,7 @@ use super::ssr::{march, ssr_enabled};
 use super::{composite_layout, composite_slots, EffectCx};
 use crate::components::{CameraComponent, PostProcessingComponent, Tonemap};
 use crate::core::settings::graphics_options::{GraphicsOption, GraphicsOptions};
-use crate::core::settings::quality::QualityPreset;
+use crate::core::settings::quality::{EffectQuality, QualityPresets};
 use crate::core::settings::GraphicsSettings;
 use crate::render::postfx::params::borrow_post_source;
 use crate::scene::Scene;
@@ -70,7 +70,7 @@ fn ssr(scene: &Scene, camera: Option<u32>, graphics: GraphicsSettings) -> Option
     let guards = borrow_post_source(scene, camera);
     let post = guards.source();
     let vc = post.volume.filter(|_| ssr_enabled(post, graphics, true))?;
-    Some(march(&vc.ssr.quality).steps)
+    Some(march(&vc.ssr, graphics).steps)
 }
 
 fn fxaa(scene: &Scene, camera: Option<u32>) -> bool {
@@ -84,7 +84,7 @@ fn vc() -> PostProcessingComponent {
     let mut vc = crate::scene::authoring::default_post_processing();
     (vc.bloom.intensity, vc.bloom.threshold) = (2.0, 0.7);
     vc.exposure.fixed_ev = 1.5;
-    vc.ssr.quality = "Low".to_string();
+    vc.ssr.quality = EffectQuality::Low;
     vc.tonemapping.mode = Tonemap::Reinhard;
     vc
 }
@@ -93,20 +93,21 @@ fn cam() -> CameraComponent {
     CameraComponent {
         far: 100.0,
         motion_blur_active: true,
+        motion_blur_quality: EffectQuality::Custom,
         motion_blur_samples: 16,
         ..CameraComponent::default()
     }
 }
 
-/// The High tier, every option allowed.
+/// The engine's own quality values, every option allowed.
 fn high() -> GraphicsSettings {
-    QualityPreset::High.into()
+    Default::default()
 }
 
 #[test]
 fn the_volumes_knobs_reach_their_effects_slots() {
     let (scene, id) = scene_with_vc(vc(), None);
-    let medium = QualityPreset::Medium.into();
+    let medium = Default::default();
     assert_eq!(
         packed(&scene, Some(id), medium, "exposure"),
         [[1.5, 0.0, 0.0, 0.0]]
@@ -117,24 +118,27 @@ fn the_volumes_knobs_reach_their_effects_slots() {
     );
 }
 
+/// No preset turns SSR or motion blur off (#1522): a `Low`-level SSR marches the
+/// preset's `Low` row, and a `Custom` motion blur takes its own samples, on every
+/// seeded preset.
 #[test]
-fn low_preset_disables_ssr_and_motion_blur() {
+fn every_preset_runs_ssr_and_motion_blur() {
     let (scene, id) = scene_with_vc(vc(), Some(cam()));
-    let low = QualityPreset::Low.into();
-    assert_eq!(ssr(&scene, Some(id), low), None, "ssr off on Low");
-    assert_eq!(blur(&scene, Some(id), low), None);
-}
-
-#[test]
-fn high_preset_enables_real_ssr_and_motion_blur() {
-    let (scene, id) = scene_with_vc(vc(), Some(cam()));
-    assert_eq!(
-        ssr(&scene, Some(id), high()),
-        Some(16),
-        "SSR on High, marching as its Low quality"
-    );
-    let samples = blur(&scene, Some(id), high());
-    assert_eq!(samples, Some(16.0), "motion-blur samples passed through");
+    for preset in &QualityPresets::default().presets {
+        let graphics = GraphicsSettings {
+            quality: preset.values,
+            ..high()
+        };
+        let steps = preset.values.ssr.low.steps;
+        assert_eq!(
+            ssr(&scene, Some(id), graphics),
+            Some(steps),
+            "{}",
+            preset.name
+        );
+        let samples = blur(&scene, Some(id), graphics);
+        assert_eq!(samples, Some(16.0), "motion-blur samples passed through");
+    }
 }
 
 #[test]
@@ -192,12 +196,11 @@ fn each_view_reads_its_own_camera_whatever_the_entity_order() {
     assert!(fxaa(&scene, None), "no camera: FXAA stays default-on");
 }
 
-/// High tier with the player's `option` forbidden.
+/// The player's `option` forbidden.
 fn forbidding(option: GraphicsOption) -> GraphicsSettings {
     let mut options = GraphicsOptions::default();
     options.set(option, false);
     GraphicsSettings {
-        quality: QualityPreset::High,
         options,
         ..Default::default()
     }

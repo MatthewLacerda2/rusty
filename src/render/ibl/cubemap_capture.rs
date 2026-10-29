@@ -122,13 +122,8 @@ impl Renderer {
         let output = target.create_view(&wgpu::TextureViewDescriptor::default());
         // One throwaway view (its own depth + post-FX) sized to the face, reused across
         // all six faces since they share a resolution (#355).
-        let mut render_view = RenderView::targetless(
-            &self.device,
-            OFFSCREEN_FORMAT,
-            resolution,
-            resolution,
-            self.quality.bloom_divisor(),
-        );
+        let mut render_view =
+            RenderView::targetless(&self.device, OFFSCREEN_FORMAT, resolution, resolution);
 
         // Gather only static geometry, and (for bounce ≥2) let those static surfaces
         // sample the probe field. Both flags are restored after the six faces.

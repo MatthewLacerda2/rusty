@@ -82,7 +82,7 @@ fn gpu_a_rendered_frame_reports_its_passes_when_the_adapter_has_timestamps() {
     let Some(mut renderer) = test_gpu::headless_or_skip(64, 64) else {
         return;
     };
-    let mut view = RenderView::offscreen(&renderer.device, OFFSCREEN_FORMAT, 64, 64, 2);
+    let mut view = RenderView::offscreen(&renderer.device, OFFSCREEN_FORMAT, 64, 64);
     let mut scene = crate::scene::Scene::new();
     create_entity(&mut scene, "Box", Some(Primitive::Box));
     create_entity(&mut scene, "Sun", Some(Primitive::DirectionalLight));

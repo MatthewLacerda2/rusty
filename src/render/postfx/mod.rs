@@ -8,9 +8,10 @@
 //! `PostProcessingComponent` / `CameraComponent` knobs and writes the corrected image
 //! to the real target.
 //!
-//! [`QualityPreset`](crate::core::settings::quality::QualityPreset) (sim-side) gates which
-//! passes run and how big the bloom buffers are so an integrated GPU can hold
-//! ~30fps (Low: no SSR/motion-blur, half-size bloom).
+//! The running quality preset's values
+//! ([`QualityValues`](crate::core::settings::quality::QualityValues), sim-side, #1522)
+//! set what each effect's quality level costs (bloom's buffer size, SSAO's samples,
+//! SSR's march, ...), so an integrated GPU can hold ~30fps; no preset turns a pass off.
 
 pub(crate) mod effects;
 pub(crate) mod grade;

@@ -3,6 +3,7 @@
 //! confusion is tested without an adapter: [`DofParams::coc`] mirrors the shader's.
 
 use crate::components::{DepthOfField, DofMode};
+use crate::core::settings::quality::MAX_RESOLUTION_DIVISOR;
 
 /// The Gaussian blur's radius at `gaussian_max_radius = 1`, as a fraction of the
 /// view's height: 12 px at 1080p, Unity URP's Gaussian at its default radius.
@@ -46,7 +47,7 @@ impl DofParams {
     /// `1 / divisor` resolution; `None` when its mode is `Off`.
     pub(crate) fn new(dof: &DepthOfField, height: u32, divisor: u32) -> Option<Self> {
         let h = height as f32;
-        let divisor = divisor.max(1) as f32;
+        let divisor = divisor.clamp(1, MAX_RESOLUTION_DIVISOR) as f32;
         let (mode, max, focus) = match dof.mode {
             DofMode::Off => return None,
             DofMode::Gaussian => {

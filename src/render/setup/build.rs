@@ -3,7 +3,7 @@
 //! billboard passes), and `Renderer::from_parts` (`render::setup`) destructures the
 //! groups into the renderer, so the seams follow what depends on what (#211).
 
-use crate::core::settings::quality::QualityPreset;
+use crate::core::settings::quality::QualityValues;
 use crate::render::clusters::ClusterBuffers;
 use crate::render::decals::DecalBuffers;
 use crate::render::gpu::bind_layouts;
@@ -79,7 +79,7 @@ pub(crate) struct GpuResources {
     pub ssao: ssao::SsaoRenderer,
     pub grade_bake: GradeBake,
     pub post_passes: Passes,
-    pub quality: QualityPreset,
+    pub quality: QualityValues,
 }
 
 impl GpuResources {
@@ -141,7 +141,7 @@ impl GpuResources {
             ssao,
             grade_bake: GradeBake::new(device, &mut registry),
             post_passes: Passes::new(device, &mut registry),
-            quality: QualityPreset::default(),
+            quality: QualityValues::default(),
         }
     }
 }

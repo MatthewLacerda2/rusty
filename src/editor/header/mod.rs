@@ -5,7 +5,6 @@ use egui_phosphor::regular as icon;
 mod scene_io;
 mod transport;
 
-use crate::core::settings::quality::QualityPreset;
 use crate::editor::menu_create;
 use crate::editor::EditorUi;
 use crate::scene::Scene;
@@ -114,13 +113,17 @@ fn edit_only(ui: &mut egui::Ui, is_playing: bool, icon: &str, label: &str) -> bo
         .clicked()
 }
 
-/// The Config menu — video/quality presets, the speaker mode and Scene Settings.
+/// The Config menu — the project's quality presets, the speaker mode and Scene
+/// Settings.
 fn config_menu(editor: &mut EditorUi, ui: &mut egui::Ui) {
     ui.menu_button("Config", |ui| {
         ui.label("Video / Quality");
-        ui.selectable_value(&mut editor.quality_preset, QualityPreset::Low, "Low");
-        ui.selectable_value(&mut editor.quality_preset, QualityPreset::Medium, "Medium");
-        ui.selectable_value(&mut editor.quality_preset, QualityPreset::High, "High");
+        for name in &editor.quality_presets {
+            let on = editor.quality_preset.as_ref() == Some(name);
+            if ui.selectable_label(on, name).clicked() {
+                editor.quality_request = Some(name.clone());
+            }
+        }
         ui.separator();
         ui.label("Audio / Speaker mode");
         for mode in crate::audio::SpeakerMode::ALL {

@@ -50,16 +50,9 @@ fn main() {
             exit(2);
         }
     };
-    let scene = scene.unwrap_or_else(|| opened.build.startup_scene.clone());
+    let scene = scene.unwrap_or_else(|| opened.settings.build.startup_scene.clone());
 
-    match scenario::run(
-        &scenario_path,
-        &out_dir,
-        &scene,
-        opened.build,
-        opened.graphics_options,
-        opened.decals,
-    ) {
+    match scenario::run(&scenario_path, &out_dir, &scene, opened.settings) {
         Ok(report) => {
             println!(
                 "play: wrote {} (passed: {})",

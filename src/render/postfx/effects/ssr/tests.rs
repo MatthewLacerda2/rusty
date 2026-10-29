@@ -1,25 +1,53 @@
-//! The SSR quality's march (#1521), off the GPU.
+//! The SSR quality's march (#1521, #1522), off the GPU.
 
 use super::march;
+use crate::components::Ssr;
+use crate::core::settings::quality::{EffectQuality, QualityPresets};
+use crate::core::settings::GraphicsSettings;
 
-/// Low marches fewer steps than Medium, Medium than High, High than Ultra, and each
-/// reaches further than the one below it.
+/// On every seeded preset, Low marches fewer steps than Medium and Medium than
+/// High, and each reaches at least as far as the one below it.
 #[test]
-fn each_quality_marches_more_steps_and_reaches_further() {
-    let levels = ["Low", "Medium", "High", "Ultra"].map(march);
-    for pair in levels.windows(2) {
-        let (lo, hi) = (pair[0], pair[1]);
-        assert!(lo.steps < hi.steps, "{lo:?} vs {hi:?}");
-        assert!(
-            lo.steps as f32 * lo.step < hi.steps as f32 * hi.step,
-            "{lo:?} vs {hi:?}"
-        );
+fn each_level_marches_more_steps_and_reaches_further() {
+    for preset in &QualityPresets::default().presets {
+        let graphics = GraphicsSettings {
+            quality: preset.values,
+            ..Default::default()
+        };
+        let at = |quality| {
+            march(
+                &Ssr {
+                    quality,
+                    ..Ssr::default()
+                },
+                graphics,
+            )
+        };
+        let levels = [
+            EffectQuality::Low,
+            EffectQuality::Medium,
+            EffectQuality::High,
+        ]
+        .map(at);
+        for pair in levels.windows(2) {
+            let (lo, hi) = (pair[0], pair[1]);
+            assert!(lo.steps <= hi.steps, "{}: {lo:?} vs {hi:?}", preset.name);
+            let reach =
+                |m: crate::core::settings::quality::SsrQuality| m.steps as f32 * m.step_length;
+            assert!(reach(lo) <= reach(hi), "{}: {lo:?} vs {hi:?}", preset.name);
+        }
     }
-    assert_eq!(levels[0].steps, 16, "HDRP's Low");
-    assert_eq!(levels[2].steps, 64, "HDRP's High");
 }
 
+/// `Custom` marches the volume's own steps and length, whatever the preset.
 #[test]
-fn an_unknown_quality_marches_as_high() {
-    assert_eq!(march("Cinematic"), march("High"));
+fn custom_marches_as_authored() {
+    let ssr = Ssr {
+        quality: EffectQuality::Custom,
+        steps: 40,
+        step_length: 0.3,
+        ..Ssr::default()
+    };
+    let m = march(&ssr, GraphicsSettings::default());
+    assert_eq!((m.steps, m.step_length), (40, 0.3));
 }

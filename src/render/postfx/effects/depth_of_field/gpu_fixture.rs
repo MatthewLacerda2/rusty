@@ -7,7 +7,6 @@ use glam::{Quat, Vec3};
 use crate::components::{
     DepthOfField, DofMode, MaterialAsset, MaterialComponent, PostProcessingComponent, SsaoSettings,
 };
-use crate::core::settings::quality::QualityPreset;
 use crate::render::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
 use crate::scene::authoring::{create_entity, default_post_processing, Primitive};
 use crate::scene::{Camera, Scene};
@@ -20,15 +19,22 @@ pub(super) const H: u32 = 120;
 pub(super) const NEAR: Vec3 = Vec3::new(-0.45, 0.0, -2.0);
 pub(super) const FAR: Vec3 = Vec3::new(2.4, 0.0, -12.0);
 
-/// A headless renderer on `tier`, or `None` without an adapter.
-pub(super) fn renderer(tier: QualityPreset) -> Option<Renderer> {
+/// A headless renderer whose quality preset blurs at `1 / divisor` resolution on
+/// every level, or `None` without an adapter.
+pub(super) fn renderer(divisor: u32) -> Option<Renderer> {
     let mut r = crate::render::test_gpu::headless_or_skip(W, H)?;
-    r.quality = tier;
+    blur_at(&mut r, divisor);
     Some(r)
 }
 
+/// Make `r`'s quality preset blur at `1 / divisor` resolution on every level.
+pub(super) fn blur_at(r: &mut Renderer, divisor: u32) {
+    let d = &mut r.quality.depth_of_field_resolution_divisor;
+    (d.low, d.medium, d.high) = (divisor, divisor, divisor);
+}
+
 pub(super) fn view(r: &Renderer) -> RenderView {
-    RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, W, H, 2)
+    RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, W, H)
 }
 
 /// A wide-open 85 mm lens (f/1.4) focused at `focus` metres: both cubes clamp to

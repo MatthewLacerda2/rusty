@@ -1,6 +1,9 @@
-//! The Screen Space Reflections section: the switch and, while on, the quality.
+//! The Screen Space Reflections section: the switch and, while on, the quality level
+//! and, at `Custom`, the march's knobs (#1522).
 
-use super::{toggle, Section};
+use super::{count_row, knob, knob_row, quality_row, toggle, Section};
+use crate::components::Ssr;
+use crate::core::settings::quality::EffectQuality;
 use crate::scene::authoring::rendering::post_processing::ssr;
 use crate::scene::PostProcessingComponent;
 
@@ -32,23 +35,25 @@ fn draw(
     if !on {
         return;
     }
-    let mut quality = vc.ssr.quality.clone();
-    ui.horizontal(|ui| {
-        ui.label("    Quality:");
-        egui::ComboBox::from_label("")
-            .selected_text(&quality)
-            .show_ui(ui, |ui| {
-                for q in ["Low", "Medium", "High", "Ultra"] {
-                    if ui
-                        .selectable_value(&mut quality, q.to_string(), q)
-                        .changed()
-                    {
-                        if let Some(mut c) = world.post_processing_mut(id) {
-                            ssr::set_quality(&mut c, quality.clone());
-                        }
-                        *is_dirty = true;
-                    }
-                }
-            });
-    });
+    if let Some(quality) = quality_row(ui, "SSR Quality", vc.ssr.quality) {
+        if let Some(mut c) = world.post_processing_mut(id) {
+            ssr::set_quality(&mut c, quality);
+        }
+        *is_dirty = true;
+    }
+    if vc.ssr.quality != EffectQuality::Custom {
+        return;
+    }
+    let (steps, range) = (vc.ssr.steps, 1..=Ssr::MAX_STEPS);
+    *is_dirty |= count_row(
+        ui,
+        (&mut *world, id),
+        "    Steps:",
+        steps,
+        range,
+        ssr::set_steps,
+    );
+    let row = ("    Step Length:", knob(ssr::EFFECT.knobs, "step_length"));
+    let range = Ssr::MIN_STEP_LENGTH..=Ssr::MAX_STEP_LENGTH;
+    *is_dirty |= knob_row(ui, (world, id), row, vc, range);
 }

@@ -1,24 +1,19 @@
 //! The test-only dummy effect (#1467): a scene pass that draws nothing, its doc
 //! section, which no shipped doc holds, and the things an effect declares for
-//! itself: the tiers it runs on (its [`Gate`]), its own per-view state (a slot of
-//! [`Targets`]) and a composite function reading a texture of its own (a
-//! [`CompositeTexture`], #1473), so neither `QualityPreset`, `PostFx` nor the
-//! composite's shared bindings name it.
+//! itself: its [`Gate`], its own per-view state (a slot of [`Targets`]) and a
+//! composite function reading a texture of its own (a [`CompositeTexture`], #1473),
+//! so neither `PostFx` nor the composite's shared bindings name it.
 
 use super::{
     Composite, CompositeTexture, EffectCx, Owner, Pass, PassCx, Phase, PostEffect, Targets,
 };
-use crate::core::settings::quality::QualityPreset;
 use crate::render::postfx::params::Gate;
 use crate::render::{RenderView, Renderer};
 
 pub(crate) const EFFECT: PostEffect = PostEffect {
     name: "dummy",
     owner: Owner::Volume,
-    gate: Gate {
-        option: None,
-        tiers: |q| q == QualityPreset::High,
-    },
+    gate: Gate::NONE,
     module: Some("postfx/effects/dummy.wgsl"),
     composite: &[Composite {
         phase: Phase::Hdr,
@@ -65,31 +60,27 @@ Draws nothing. Tween paths: `Graphics.dummy.strength`.";
 #[cfg(test)]
 mod tests {
     use super::{track, DummyState};
-    use crate::core::settings::quality::QualityPreset;
     use crate::render::postfx::effects::{EffectCx, Targets};
     use crate::render::postfx::params::PostSource;
     use crate::scene::authoring::default_post_processing;
 
     #[test]
-    fn the_dummy_keeps_its_own_slot_on_its_own_tiers() {
-        let mut vc = default_post_processing();
-        vc.dummy.active = true;
-        let cx = |tier: QualityPreset| EffectCx {
+    fn the_dummy_keeps_its_own_slot_while_it_runs() {
+        let (mut on, off) = (default_post_processing(), default_post_processing());
+        on.dummy.active = true;
+        let cx = |vc| EffectCx {
             post: PostSource {
                 camera: None,
-                volume: Some(&vc),
+                volume: Some(vc),
             },
-            graphics: tier.into(),
+            graphics: Default::default(),
             full: true,
         };
         let mut targets = Targets::default();
-        track(&mut targets, &cx(QualityPreset::High));
-        track(&mut targets, &cx(QualityPreset::High));
+        track(&mut targets, &cx(&on));
+        track(&mut targets, &cx(&on));
         assert_eq!(targets.get::<DummyState>().map(|s| s.frames), Some(2));
-        track(&mut targets, &cx(QualityPreset::Medium));
-        assert!(
-            targets.get::<DummyState>().is_none(),
-            "Medium doesn't run it"
-        );
+        track(&mut targets, &cx(&off));
+        assert!(targets.get::<DummyState>().is_none(), "off drops it");
     }
 }

@@ -45,7 +45,7 @@ fn gpu_the_sky_across_the_panorama_seam_keeps_its_colour() {
 
 /// One frame of `scene`'s sky looking along `yaw`, as RGBA8.
 fn sky(renderer: &mut Renderer, scene: &Scene, yaw: f32) -> Vec<u8> {
-    let mut view = RenderView::offscreen(&renderer.device, OFFSCREEN_FORMAT, SIDE, SIDE, 2);
+    let mut view = RenderView::offscreen(&renderer.device, OFFSCREEN_FORMAT, SIDE, SIDE);
     let out = view.color_target_view().unwrap();
     let cam = Camera::new(Vec3::ZERO, yaw, 0.0);
     for _ in 0..2 {

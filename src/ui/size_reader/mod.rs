@@ -7,7 +7,7 @@
 //! through it before stepping, so the window, the headless harness and any loop
 //! that calls `tick` lay out alike, and no caller can forget it. Each size comes
 //! from the file's **header**: no decode and no GPU. The header is the source's
-//! size whatever the device or quality tier does with the upload, as Unity's
+//! size whatever the device or quality preset does with the upload, as Unity's
 //! `Sprite.rect` is. The renderer draws with the same table.
 //!
 //! Only `Simple` and `Filled` Images of a file are read: a `Sliced` or `Tiled` one

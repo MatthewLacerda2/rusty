@@ -12,7 +12,7 @@ use std::path::{Path, PathBuf};
 
 use glam::Vec3;
 use rusty::components::{MaterialAsset, MaterialComponent};
-use rusty::core::settings::quality::QualityPreset;
+use rusty::core::settings::quality::EffectQuality;
 use rusty::dev::capture::CaptureHost;
 use rusty::dev::screenshot::capture_into;
 use rusty::scene::authoring::{create_entity, default_post_processing, Primitive};
@@ -56,7 +56,7 @@ fn metal_scene(ssr: bool) -> Scene {
         let mut vc = default_post_processing();
         vc.bloom.active = false;
         vc.ssr.active = true;
-        vc.ssr.quality = "High".to_string();
+        vc.ssr.quality = EffectQuality::High;
         scene.world.set_post_processing(volume, Some(vc));
         // A volume rides on its camera (#1434): that camera is the view's.
         scene
@@ -80,14 +80,10 @@ fn centre_rgb(path: &Path) -> [f64; 3] {
     sum.map(|s| s / 256.0)
 }
 
-/// Capture `scene` from `cam` as `label` on the `quality` tier; `None` when there is
-/// no adapter.
-fn shoot(label: &str, scene: &Scene, cam: &Camera, quality: QualityPreset) -> Option<[f64; 3]> {
+/// Capture `scene` from `cam` as `label`; `None` when there is no adapter.
+fn shoot(label: &str, scene: &Scene, cam: &Camera) -> Option<[f64; 3]> {
     let path = crate::temp::dir().join(format!("rusty_panorama_{label}.png"));
     let mut host = CaptureHost::new();
-    if let Some(renderer) = host.renderer(96, 96) {
-        renderer.set_quality(quality);
-    }
     if !capture_into(&mut host, scene, cam, &path, 96, 96).expect("capture") {
         eprintln!("[panorama] no GPU/software adapter — skipping visual assertion");
         return None;
@@ -101,15 +97,14 @@ fn shoot(label: &str, scene: &Scene, cam: &Camera, quality: QualityPreset) -> Op
 fn the_sky_pass_maps_the_panorama_by_direction() {
     let scene = sky_scene();
     let towards = |yaw| Camera::new(Vec3::ZERO, yaw, 0.0);
-    let Some([r, _, b]) = shoot("minus_z", &scene, &towards(-90.0), QualityPreset::Medium) else {
+    let Some([r, _, b]) = shoot("minus_z", &scene, &towards(-90.0)) else {
         return;
     };
     assert!(
         r > b + 60.0,
         "-z sky must be the red half (r {r:.1} b {b:.1})"
     );
-    let [r, _, b] =
-        shoot("plus_z", &scene, &towards(90.0), QualityPreset::Medium).expect("adapter vanished");
+    let [r, _, b] = shoot("plus_z", &scene, &towards(90.0)).expect("adapter vanished");
     assert!(
         b > r + 60.0,
         "+z sky must be the blue half (r {r:.1} b {b:.1})"
@@ -118,12 +113,7 @@ fn the_sky_pass_maps_the_panorama_by_direction() {
 
 fn assert_reflects_blue_sky(label: &str, ssr: bool) {
     let cam = Camera::new(Vec3::new(0.0, 0.0, 5.0), -90.0, 0.0);
-    let quality = if ssr {
-        QualityPreset::High
-    } else {
-        QualityPreset::Medium
-    };
-    let Some([r, g, b]) = shoot(label, &metal_scene(ssr), &cam, quality) else {
+    let Some([r, g, b]) = shoot(label, &metal_scene(ssr), &cam) else {
         return;
     };
     assert!(

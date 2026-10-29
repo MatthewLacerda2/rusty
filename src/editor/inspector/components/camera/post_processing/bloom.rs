@@ -1,8 +1,9 @@
-//! The Bloom section: the switch and, while on, its knobs and the lens dirt
-//! texture (#1442).
+//! The Bloom section: the switch and, while on, its knobs, the lens dirt texture
+//! (#1442) and its quality level, with the `Custom` divisor (#1522).
 
 use super::path_field::{self, DIRT};
-use super::{knob, knob_row, toggle, Section};
+use super::{count_row, knob, knob_row, quality_row, toggle, Section};
+use crate::core::settings::quality::{EffectQuality, MAX_RESOLUTION_DIVISOR};
 use crate::scene::authoring::rendering::post_processing::bloom;
 use crate::scene::PostProcessingComponent;
 
@@ -42,6 +43,17 @@ fn draw(
             let row = (label, knob(knobs, field));
             *is_dirty |= knob_row(ui, (&mut *world, id), row, vc, 0.0..=max);
         }
-        path_field::draw(ui, (world, id), &DIRT, vc, is_dirty);
+        path_field::draw(ui, (&mut *world, id), &DIRT, vc, is_dirty);
+        if let Some(quality) = quality_row(ui, "Bloom Quality", vc.bloom.quality) {
+            if let Some(mut c) = world.post_processing_mut(id) {
+                bloom::set_quality(&mut c, quality);
+            }
+            *is_dirty = true;
+        }
+        if vc.bloom.quality == EffectQuality::Custom {
+            let (label, value) = ("    Resolution Divisor:", vc.bloom.resolution_divisor);
+            let (range, set) = (1..=MAX_RESOLUTION_DIVISOR, bloom::set_resolution_divisor);
+            *is_dirty |= count_row(ui, (world, id), label, value, range, set);
+        }
     }
 }

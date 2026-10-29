@@ -1,5 +1,5 @@
-//! `Graphics.{Get,Set}DepthOfFieldMode` and one `{Get,Set}DepthOfField<knob>` pair
-//! per numeric knob (#1445), on the active post-processing volume, through the same
+//! `Graphics.{Get,Set}DepthOfField{Mode,Quality}` (#1522) and one
+//! `{Get,Set}DepthOfField<knob>` pair per numeric knob (#1445), on the active post-processing volume, through the same
 //! `authoring::rendering::post_processing` ops the Inspector card calls. The knobs
 //! come from its knob table, the one the tween paths read too.
 
@@ -39,6 +39,20 @@ pub(super) fn register<'scope>(
             let mode = with_vc(scene, |vc| vc.depth_of_field.mode).unwrap_or_default();
             Ok(mode.name().to_string())
         }),
+    )?;
+    super::knobs::register_quality(
+        scope,
+        (table, scene),
+        "DepthOfFieldQuality",
+        |vc| vc.depth_of_field.quality,
+        vc_ops::depth_of_field::set_quality,
+    )?;
+    super::knobs::register_count(
+        scope,
+        (table, scene),
+        "DepthOfFieldResolutionDivisor",
+        |vc| vc.depth_of_field.resolution_divisor,
+        vc_ops::depth_of_field::set_resolution_divisor,
     )?;
     super::knobs::register(scope, table, scene, vc_ops::depth_of_field::EFFECT.knobs)
 }

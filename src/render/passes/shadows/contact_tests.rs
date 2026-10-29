@@ -57,7 +57,7 @@ pub(super) fn brightness(
     cam: &Camera,
     points: &[Vec3],
 ) -> Vec<u32> {
-    let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, RES, RES, 2);
+    let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, RES, RES);
     let out = view.color_target_view().unwrap();
     r.render(&mut view, scene, cam, &out, false);
     let target = view.color_target().unwrap();

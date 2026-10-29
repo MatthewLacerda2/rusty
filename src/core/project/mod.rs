@@ -40,16 +40,12 @@ mod locate;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use crate::core::application::BuildSettings;
-use crate::core::settings::decals::DecalLimits;
-use crate::core::settings::graphics_options::GraphicsOptions;
-
 pub use agent::{CLAUDE_FILE, MCP_FILE};
 #[cfg(test)]
 pub(crate) use engine::commit::pin as pin_engine;
 pub use engine::commit::{engine_commit, engine_order, UNKNOWN_COMMIT};
 pub use engine::{EngineCheck, Verdict};
-pub use file::{ProjectFile, PROJECT_FILE};
+pub use file::{ProjectFile, ProjectSettings, PROJECT_FILE};
 pub use locate::{engine_dir, engine_path, locate};
 
 /// The project's content folder, relative to its root (Unity's `Assets/`).
@@ -119,20 +115,18 @@ pub enum Access {
 }
 
 /// What [`open`] found.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Opened {
     /// The project root, absolute; now the working directory.
     pub root: PathBuf,
     /// The engine the project was last opened with against the running one. Opening
     /// prints its warning on stderr; a frontend with a UI also shows it.
     pub engine: EngineCheck,
-    /// The project's build settings, as `project.rusty` holds them (the defaults
-    /// when it has none): what the player and `play` boot (the startup scene).
-    pub build: BuildSettings,
-    /// The project's default player graphics options (#1438), from the same file.
-    pub graphics_options: GraphicsOptions,
-    /// The game's decal budgets (#1517), from the same file.
-    pub decals: DecalLimits,
+    /// The project's settings, as `project.rusty` holds them (the defaults when it
+    /// has none): the build settings the player and `play` boot (the startup
+    /// scene), the default player graphics options (#1438), the quality presets
+    /// (#1522) and the decal budgets (#1517).
+    pub settings: ProjectSettings,
 }
 
 /// Open the project at `dir`: create its skeleton, check
@@ -209,9 +203,7 @@ pub(crate) fn prepare(dir: &Path, access: Access) -> Result<(Opened, Vec<String>
         Opened {
             root,
             engine,
-            build: file.build,
-            graphics_options: file.graphics_options,
-            decals: file.decals,
+            settings: file.into(),
         },
         lines,
     ))

@@ -25,7 +25,7 @@ fn holstered() -> (Scene, u32) {
 }
 
 fn counters(renderer: &mut Renderer, scene: &Scene) -> RenderCounters {
-    let mut view = RenderView::offscreen(&renderer.device, OFFSCREEN_FORMAT, W, H, 2);
+    let mut view = RenderView::offscreen(&renderer.device, OFFSCREEN_FORMAT, W, H);
     let out = view.color_target_view().unwrap();
     let cam = Camera::new(Vec3::new(0.0, 0.0, 5.0), -90.0, 0.0);
     renderer.render(&mut view, scene, &cam, &out, false);

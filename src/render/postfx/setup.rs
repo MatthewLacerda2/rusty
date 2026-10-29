@@ -32,7 +32,6 @@ impl PostFx {
         width: u32,
         height: u32,
         output_format: wgpu::TextureFormat,
-        bloom_divisor: u32,
         registry: &mut ShaderRegistry,
     ) -> Self {
         let io_layout = Self::create_io_layout(device);
@@ -43,7 +42,7 @@ impl PostFx {
 
         let (full_size, scene_hdr, ldr) =
             Self::create_targets(device, width, height, output_format);
-        let bloom = BloomTargets::new(device, full_size, bloom_divisor);
+        let bloom = BloomTargets::new(device, full_size, BloomTargets::DIVISOR);
         let custom = CustomChain::new(device, &io_layout, output_format, full_size);
         let grade = GradeLut::new(device);
         let exposure = ExposureMeter::new(device);
@@ -137,13 +136,14 @@ impl PostFx {
         (params_buffer, fx_buffer, sampler)
     }
 
-    /// (Re)allocate the HDR + bloom + LDR targets for a new framebuffer size.
-    pub fn resize(&mut self, device: &wgpu::Device, width: u32, height: u32, bloom_divisor: u32) {
+    /// (Re)allocate the HDR + bloom + LDR targets for a new framebuffer size; bloom
+    /// keeps the divisor it last ran at.
+    pub fn resize(&mut self, device: &wgpu::Device, width: u32, height: u32) {
         let (full_size, scene_hdr, ldr) =
             Self::create_targets(device, width, height, self.output_format);
         self.full_size = full_size;
         self.scene_hdr = scene_hdr;
-        self.bloom = BloomTargets::new(device, full_size, bloom_divisor);
+        self.bloom = BloomTargets::new(device, full_size, self.bloom.divisor);
         self.ldr = ldr;
         self.custom.resize(device, full_size.0, full_size.1);
         // A resize is a cut (#1435): no smear from last frame's framing, and the

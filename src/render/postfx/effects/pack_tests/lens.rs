@@ -13,7 +13,7 @@ fn lens_effects_pack_when_on_and_zero_when_off_or_forbidden() {
     on.chromatic_aberration.active = true;
     on.film_grain.active = true;
     let (scene, id) = scene_with_vc(on, Some(cam()));
-    let low = QualityPreset::Low.into();
+    let low = Default::default();
     let vignette = packed(&scene, Some(id), low, "vignette");
     assert_eq!(vignette, [[0.3, 0.2, 0.25, 0.75], [0.0; 4]]);
     assert_eq!(

@@ -116,7 +116,7 @@ fn gpu_a_still_grade_is_baked_once_and_a_changed_knob_bakes_again() {
     let Some(mut r) = crate::render::test_gpu::headless_or_skip(16, 16) else {
         return;
     };
-    let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, 16, 16, 2);
+    let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, 16, 16);
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
     let id = scene.add_entity("Camera".to_string());

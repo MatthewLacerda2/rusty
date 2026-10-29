@@ -15,10 +15,7 @@ use crate::render::{RenderView, Renderer};
 pub(crate) const EFFECT: PostEffect = PostEffect {
     name: "depth_of_field",
     owner: Owner::Volume,
-    gate: Gate {
-        option: Some(GraphicsOption::DepthOfField),
-        tiers: |q| q.depth_of_field().is_some(),
-    },
+    gate: Gate::option(GraphicsOption::DepthOfField),
     module: None,
     composite: &[],
     grade: &[],
@@ -39,17 +36,19 @@ fn focus(r: &Renderer, view: &mut RenderView, cx: &PassCx) {
 }
 
 /// The depth of field `post`'s volume runs this frame, for a view `height` pixels
-/// tall at the tier's working resolution; `None` when [`dof_enabled`] does not hold.
+/// tall at its quality's working resolution; `None` when [`dof_enabled`] does not hold.
 fn dof_params(post: PostSource, graphics: GraphicsSettings, height: u32) -> Option<DofParams> {
     let dof = &post
         .volume
         .filter(|_| dof_enabled(post, graphics))?
         .depth_of_field;
-    DofParams::new(dof, height, graphics.quality.depth_of_field()?)
+    let levels = &graphics.quality.depth_of_field_resolution_divisor;
+    let divisor = dof.quality.pick(levels, dof.resolution_divisor);
+    DofParams::new(dof, height, divisor)
 }
 
 /// Whether `post`'s volume runs depth of field, through [`effect_runs`]: its mode is
-/// not `Off`, the player's option allows it and the tier runs it (not Low). The
+/// not `Off` and the player's option allows it. The
 /// velocity target, whose depths it reads, is written when this holds too.
 pub(crate) fn dof_enabled(post: PostSource, graphics: GraphicsSettings) -> bool {
     let on = post

@@ -1,21 +1,21 @@
 //! The renderer's runtime framebuffer concern, distinct from one-time construction
 //! (`setup.rs` / `setup_build.rs`): depth-resource creation, surface resize, vsync
-//! toggling, and quality-tier switching — everything that reacts to the window or
+//! toggling, and quality-preset switching — everything that reacts to the window or
 //! settings changing *after* the renderer exists.
 
-use crate::core::settings::quality::QualityPreset;
+use crate::core::settings::quality::QualityValues;
 use crate::core::settings::GraphicsSettings;
 use crate::render::{PixelSize, Renderer};
 
 impl Renderer {
-    /// Switch the scalability tier. Each [`crate::render::RenderView`] re-sizes its own
-    /// post-FX bloom buffers from this tier's divisor on its next render, so setting the
-    /// tier is all that happens here (#355).
-    pub fn set_quality(&mut self, preset: QualityPreset) {
-        self.quality = preset;
+    /// Switch to a quality preset's values (#1522). Each effect reads its level's
+    /// value from them as it runs, and bloom re-sizes its buffers when its divisor
+    /// changes, so setting the values is all that happens here (#355).
+    pub fn set_quality(&mut self, values: QualityValues) {
+        self.quality = values;
     }
 
-    /// Adopt the tier, the player's options (#1438) and the render scale (#1498) the
+    /// Adopt the preset's values, the player's options (#1438) and the render scale (#1498) the
     /// shared cell carries.
     pub fn apply_graphics(&mut self, graphics: GraphicsSettings) {
         self.set_quality(graphics.quality);
@@ -23,7 +23,7 @@ impl Renderer {
         self.render_scale = graphics.render_scale;
     }
 
-    /// What gates a view's post-FX: the tier, and the player's options and render
+    /// What shapes a view's post-FX: the preset's values, and the player's options and render
     /// scale except in the editor's Scene view (`editor_mode`), which ignores them as
     /// Unity's Scene view ignores PlayerPrefs and the URP asset's render scale. The
     /// Game view and the player honour all of them.

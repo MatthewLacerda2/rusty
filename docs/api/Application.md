@@ -44,5 +44,10 @@ editor, and only the running value elsewhere. A player's saved choice
 options*. An unknown option name or a non-`bool` value is ignored with a warning in
 the console, since the file is the developer's to fix.
 
+**Quality presets** (#1522) live in the same file, under `"quality"`: the game's
+named presets, seeded with `Low`, `Medium` and `High` when the file is created, with
+the same editor/player split (`Graphics.SetQualityPreset` / `RemoveQualityPreset`
+write the file in the editor). See [`Graphics.md`](Graphics.md), *Quality presets*.
+
 **Determinism.** `Quit` is a one-way request read by the platform layer after the
 tick; the build settings are read at boot. Neither is read by `FixedUpdate`.

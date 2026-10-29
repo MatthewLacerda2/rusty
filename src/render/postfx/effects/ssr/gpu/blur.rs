@@ -46,7 +46,7 @@ fn darkest_around(frame: &[u8], (x, y): (u32, u32), reach: u32) -> i32 {
 fn gpu_motion_blur_blurs_the_reflected_scene_never_below_what_it_blurs() {
     let Some(mut r) = renderer() else { return };
     let view =
-        |r: &crate::render::Renderer| RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, W, H, 2);
+        |r: &crate::render::Renderer| RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, W, H);
     let (blurring, still) = (walled(true), walled(false));
     let mut blurred_view = view(&r);
     draw(&mut r, &mut blurred_view, &blurring, &turned(0.0));

@@ -4,7 +4,6 @@ use super::{flare_params, flare_size};
 use crate::components::rendering::post_processing::LensFlare;
 use crate::components::PostProcessingComponent;
 use crate::core::settings::graphics_options::GraphicsOption;
-use crate::core::settings::quality::QualityPreset;
 use crate::core::settings::GraphicsSettings;
 use crate::render::postfx::effects::EffectCx;
 use crate::render::postfx::params::PostSource;
@@ -28,12 +27,10 @@ fn flaring() -> PostProcessingComponent {
 }
 
 #[test]
-fn it_flares_only_while_bloom_runs_off_the_low_tier() {
+fn it_flares_only_while_bloom_runs() {
     let vc = flaring();
-    let high = GraphicsSettings::from(QualityPreset::High);
+    let high = GraphicsSettings::default();
     assert!(flare_params(&cx(&vc, high), 1.0).is_some());
-    let low = QualityPreset::Low.into();
-    assert!(flare_params(&cx(&vc, low), 1.0).is_none(), "off on Low");
     let mut no_bloom = flaring();
     no_bloom.bloom.active = false;
     assert!(flare_params(&cx(&no_bloom, high), 1.0).is_none());
@@ -47,7 +44,7 @@ fn it_flares_only_while_bloom_runs_off_the_low_tier() {
 
 #[test]
 fn a_flare_that_can_add_nothing_does_not_run() {
-    let high = GraphicsSettings::from(QualityPreset::High);
+    let high = GraphicsSettings::default();
     let dark = |edit: fn(&mut LensFlare)| {
         let mut vc = flaring();
         edit(&mut vc.lens_flare);
@@ -71,7 +68,7 @@ fn a_loaded_file_is_clamped_where_the_ops_would() {
     vc.lens_flare.tint = [2.0, 0.5, -1.0];
     vc.lens_flare.intensity = 2.0;
     vc.lens_flare.halo_intensity = -3.0;
-    let p = flare_params(&cx(&vc, QualityPreset::Medium.into()), 1.0).unwrap();
+    let p = flare_params(&cx(&vc, Default::default()), 1.0).unwrap();
     assert_eq!(p.tint, [2.0, 1.0, 0.0, 8.0]);
     assert_eq!(p.strengths[1], 0.0);
 }

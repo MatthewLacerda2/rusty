@@ -7,7 +7,6 @@
 use std::cell::RefCell;
 
 use mlua::Lua;
-use rusty::core::settings::quality::QualityPreset;
 use rusty::core::settings::GraphicsSettings;
 use rusty::dev::capture::CaptureHost;
 use rusty::scene::Scene;
@@ -49,10 +48,7 @@ fn written() -> impl PartialEq + std::fmt::Debug {
 
 /// Run `script` against the `Graphics` namespace.
 fn run(scene: &RefCell<Scene>, script: &str) {
-    let (lua, quality) = (
-        Lua::new(),
-        RefCell::new(GraphicsSettings::from(QualityPreset::High)),
-    );
+    let (lua, quality) = (Lua::new(), RefCell::new(GraphicsSettings::default()));
     let app = RefCell::default();
     lua.scope(|s| {
         rusty::api::graphics::register(&lua, s, scene, &quality, &app).unwrap();

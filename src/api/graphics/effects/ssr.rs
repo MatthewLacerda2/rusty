@@ -1,15 +1,15 @@
-//! `Graphics.{Get,Set}Ssr{Active,Quality}`: screen-space reflections over the
-//! active volume (gated by the High preset).
+//! `Graphics.{Get,Set}Ssr{Active,Quality}` and the `Custom` march's knobs,
+//! `Graphics.{Get,Set}Ssr{Steps,StepLength}` (#1522), over the active volume.
 
 use std::cell::RefCell;
 
-use super::super::super::{put, Reg};
-use super::super::state::{with_vc, with_vc_mut};
-use super::knobs::register_flag;
+use super::super::super::Reg;
+use super::knobs::{register_count, register_flag, register_quality};
 use crate::scene::authoring::rendering::post_processing::ssr;
 use crate::scene::Scene;
 
-/// The switch and the quality name (`false` / `""` without an active volume).
+/// The switch, the quality level and the knobs (a new volume's values without an
+/// active volume, `false` for the switch).
 pub(super) fn register<'scope>(
     scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
@@ -22,19 +22,19 @@ pub(super) fn register<'scope>(
         |vc| vc.ssr.active,
         ssr::set_active,
     )?;
-    put(
-        table,
-        "SetSsrQuality",
-        scope.create_function(|_, q: String| {
-            with_vc_mut(scene, |e| ssr::set_quality(e, q.clone()));
-            Ok(())
-        }),
+    register_quality(
+        scope,
+        (table, scene),
+        "SsrQuality",
+        |vc| vc.ssr.quality,
+        ssr::set_quality,
     )?;
-    put(
-        table,
-        "GetSsrQuality",
-        scope.create_function(|_, ()| {
-            Ok(with_vc(scene, |vc| vc.ssr.quality.clone()).unwrap_or_default())
-        }),
-    )
+    register_count(
+        scope,
+        (table, scene),
+        "SsrSteps",
+        |vc| vc.ssr.steps,
+        ssr::set_steps,
+    )?;
+    super::knobs::register(scope, table, scene, ssr::EFFECT.knobs)
 }

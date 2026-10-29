@@ -13,9 +13,10 @@ pub(crate) struct BlurParams {
 }
 
 impl BlurParams {
-    /// The params for `cam`'s motion blur over a view `height` pixels tall.
-    pub(crate) fn new(cam: &CameraComponent, height: u32) -> Self {
-        let samples = cam.motion_blur_samples.clamp(
+    /// The params for `cam`'s motion blur at `samples` taps (its quality's) over a
+    /// view `height` pixels tall.
+    pub(crate) fn new(cam: &CameraComponent, samples: u32, height: u32) -> Self {
+        let samples = samples.clamp(
             CameraComponent::MIN_MOTION_BLUR_SAMPLES,
             CameraComponent::MAX_MOTION_BLUR_SAMPLES,
         );

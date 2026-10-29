@@ -7,7 +7,6 @@ use glam::Vec3;
 
 use super::gpu_fixture::{bokeh, change_around, cube, renderer, scene, shot, NEAR};
 use crate::components::{CameraComponent, DepthOfField};
-use crate::core::settings::quality::QualityPreset;
 use crate::scene::{ClearFlags, Scene};
 
 /// The layer only the gun camera draws.
@@ -39,7 +38,7 @@ fn armed(dof: DepthOfField) -> Scene {
 
 #[test]
 fn gpu_a_viewmodel_stays_sharp_while_the_world_focuses_far() {
-    let Some(mut r) = renderer(QualityPreset::High) else {
+    let Some(mut r) = renderer(1) else {
         return;
     };
     let off = shot(&mut r, &armed(DepthOfField::default()));
