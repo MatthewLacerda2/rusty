@@ -100,7 +100,6 @@ fn play_animation_returns_whether_the_mesh_carries_the_clip() {
                 tracks: Vec::new(),
                 duration: 1.0,
             }],
-            revision: Default::default(),
             ..MeshComponent::new("Asset", Vec::new(), Vec::new())
         }),
     );

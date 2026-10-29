@@ -30,7 +30,6 @@ pub(super) fn posed_sphere(pose: Vec3) -> Scene {
         bind_palette: skin.bind_palette(),
         skin: Some(skin),
         pose_palette: vec![Mat4::from_translation(pose)],
-        revision: Default::default(),
         ..MeshComponent::new("PosedSphere", vertices, indices)
     };
     let mut scene = Scene::new();

@@ -25,6 +25,36 @@ fn local_aabb(vertices: &[Vertex]) -> (Vec3, Vec3) {
     }
 }
 
+/// One mesh a geometry slot could be uploaded from.
+pub(crate) struct UploadCandidate {
+    pub id: MeshId,
+    pub revision: MeshRevision,
+    pub entity: u32,
+    /// Has vertices and indices: an empty mesh never replaces a slot's buffers.
+    pub has_geometry: bool,
+}
+
+/// Which slots to (re-)upload, each from which mesh (#1540): a slot whose resident
+/// buffers hold a revision at least as new as a candidate's skips it; otherwise the
+/// newest candidate with geometry under the slot wins. `resident` is the revision a
+/// renderer uploaded per slot, `None` when nothing is.
+pub(crate) fn stale_uploads(
+    candidates: impl IntoIterator<Item = UploadCandidate>,
+    resident: impl Fn(&MeshId) -> Option<MeshRevision>,
+) -> BTreeMap<MeshId, (MeshRevision, u32)> {
+    let mut updates: BTreeMap<MeshId, (MeshRevision, u32)> = BTreeMap::new();
+    for c in candidates {
+        if !c.has_geometry || resident(&c.id).is_some_and(|r| r >= c.revision) {
+            continue;
+        }
+        let newest = updates.entry(c.id).or_insert((c.revision, c.entity));
+        if c.revision > newest.0 {
+            *newest = (c.revision, c.entity);
+        }
+    }
+    updates
+}
+
 impl Renderer {
     /// Upload every entity's mesh once per unique mesh-asset identity (#127): N
     /// entities sharing a primitive/asset collapse to a single buffer pair. An
@@ -35,24 +65,21 @@ impl Renderer {
     /// the newest such mesh, once. Reading the revision changes nothing, so every
     /// renderer drawing the scene sees the same edit (#1540).
     pub(crate) fn upload_scene_meshes(&mut self, scene: &Scene) {
-        let mut updates: BTreeMap<MeshId, (MeshRevision, u32)> = BTreeMap::new();
-        for entity_id in scene.world.ids_with_mesh() {
+        let candidates = scene.world.ids_with_mesh().into_iter().map(|entity| {
             let mesh = scene
                 .world
-                .mesh(entity_id)
+                .mesh(entity)
                 .expect("id came from ids_with_mesh");
-            let id = MeshId::from_mesh(&mesh);
-            let resident = self.gpu_meshes.get(&id).map(|g| g.revision);
-            if resident.is_some_and(|r| r >= mesh.revision) {
-                continue;
+            UploadCandidate {
+                id: MeshId::from_mesh(&mesh),
+                revision: mesh.revision,
+                entity,
+                has_geometry: !mesh.vertices.is_empty() && !mesh.indices.is_empty(),
             }
-            let newest = updates.entry(id).or_insert((mesh.revision, entity_id));
-            if mesh.revision > newest.0 {
-                *newest = (mesh.revision, entity_id);
-            }
-        }
-        for (id, (revision, entity_id)) in updates {
-            let mesh = scene.world.mesh(entity_id).expect("collected above");
+        });
+        let resident = |id: &MeshId| self.gpu_meshes.get(id).map(|g| g.revision);
+        for (id, (revision, entity)) in stale_uploads(candidates, resident) {
+            let mesh = scene.world.mesh(entity).expect("collected above");
             self.update_gpu_mesh(id, revision, &mesh.vertices, &mesh.indices);
         }
     }
@@ -61,8 +88,8 @@ impl Renderer {
     /// (#127) so geometry shared by many entities is stored once. When a buffer
     /// for this `MeshId` is already resident and large enough, the data is written
     /// in place (`queue.write_buffer`) rather than reallocating a fresh buffer.
-    /// `revision` is the geometry's [`MeshRevision`] ([`MeshRevision::NONE`] for an
-    /// upload no mesh component made), recorded so a newer one replaces it.
+    /// `revision` is the geometry's [`MeshRevision`], recorded so a newer one
+    /// replaces it.
     pub fn update_gpu_mesh(
         &mut self,
         id: MeshId,
@@ -83,9 +110,9 @@ impl Renderer {
         let local_aabb = local_aabb(vertices);
         let skin_bounds = SkinBounds::from_vertices(vertices);
 
-        // Re-use resident buffers when the new data still fits (the dirty-path
-        // case: same geometry re-uploaded). Both buffers carry COPY_DST so they
-        // can be written without reallocation.
+        // Re-use resident buffers when the new data still fits (a newer revision
+        // of geometry already resident under this id). Both buffers carry COPY_DST
+        // so they can be written without reallocation.
         if let Some(existing) = self.gpu_meshes.get_mut(&id) {
             if existing.vertex_buffer.size() >= v_bytes.len() as u64
                 && existing.index_buffer.size() >= i_bytes.len() as u64
@@ -248,3 +275,7 @@ fn axis_arrow_verts(tip: Vec3, head: [Vec3; 4]) -> Vec<Vertex> {
     }
     verts
 }
+
+#[cfg(test)]
+#[path = "debug_meshes_tests.rs"]
+mod tests;

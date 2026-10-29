@@ -9,7 +9,6 @@ fn every_new_geometry_is_newer_than_all_before_it() {
     let mesh = MeshComponent::new("Box", Vec::new(), Vec::new());
     assert!(mesh.revision > first, "a new mesh");
     assert!(MeshRevision::default() > mesh.revision, "a loaded one");
-    assert!(MeshRevision::NONE < first, "NONE is older than any");
 }
 
 #[test]

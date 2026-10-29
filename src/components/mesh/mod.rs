@@ -29,13 +29,10 @@ pub use vertex::Vertex;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct MeshRevision(u64);
 
-/// The next revision handed out; 0 is [`MeshRevision::NONE`].
+/// The next revision handed out.
 static NEXT_REVISION: AtomicU64 = AtomicU64::new(1);
 
 impl MeshRevision {
-    /// Older than every geometry: what an upload no mesh component made carries.
-    pub const NONE: Self = Self(0);
-
     /// A revision newer than every one handed out before.
     pub fn next() -> Self {
         Self(NEXT_REVISION.fetch_add(1, Ordering::Relaxed))

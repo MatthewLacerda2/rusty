@@ -31,7 +31,6 @@ pub fn mesh(clips: Vec<AnimationClip>) -> MeshComponent {
     MeshComponent {
         skin: Some(skin),
         clips,
-        revision: Default::default(),
         ..MeshComponent::new("Asset", Vec::new(), Vec::new())
     }
 }

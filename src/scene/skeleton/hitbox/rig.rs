@@ -112,7 +112,6 @@ pub(super) fn rig(scene: &mut Scene) -> u32 {
         Some(MeshComponent {
             bind_palette: skin.bind_palette(),
             skin: Some(skin),
-            revision: Default::default(),
             ..MeshComponent::new("Asset", vertices(), Vec::new())
         }),
     );
