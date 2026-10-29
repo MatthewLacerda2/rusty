@@ -31,7 +31,7 @@ SELF_CHECKS := target-dir inventory
 
 .DEFAULT_GOAL := help
 .NOTPARALLEL:
-.PHONY: help setup compile-cache check gates quick-gates pre-commit resolved $(SELF_CHECKS) $(GATES) mergeable queue queue-daemon queue-stop blockers checks reclaim mutants-remote test-one-process dead-pub editor-capture export launcher bench bless-converters
+.PHONY: help setup compile-cache check gates quick-gates pre-commit resolved $(SELF_CHECKS) $(GATES) mergeable queue queue-daemon queue-stop blockers checks reclaim coder review-level mutants-remote test-one-process dead-pub editor-capture export launcher bench bless-converters
 
 help: ## List the verbs
 	@grep -E '^[a-z-]+:.*## ' $(firstword $(MAKEFILE_LIST)) | \
@@ -263,7 +263,22 @@ checks: ## Unticked human checks from PRs merged since then. make checks SINCE=1
 reclaim: ## Remove merged worktrees (and their target/) and finished local branches, report disk. ARGS=--dry-run lists only
 	@python3 .github/scripts/reclaim.py $(ARGS)
 
-# ---- signals (#750) ---------------------------------------------------------
+# A batch's two dispatch steps, scripted (#1569). `coder` reads the newest
+# `Brief` comment on the issue, takes its `Model:` line, and creates the one-off
+# routine that starts the cloud coder (through `claude mcp serve`, so the
+# claude.ai token stays inside claude); running it again is the re-brief launch.
+# It refuses a closed, `planning` or `human` issue and a brief with no model.
+# ARGS=--dry-run prints the routine and creates nothing. `review-level` prints
+# `high` or `medium` for an independent review, and the paths that decided it.
+coder: ## Start the cloud coder on an issue's newest Brief. make coder ISSUE=1569, ARGS=--dry-run creates nothing
+	@test -n "$(ISSUE)" || { echo "coder: which issue? e.g. make coder ISSUE=1569" >&2; exit 1; }
+	@python3 .github/scripts/coder.py $(ISSUE) $(ARGS)
+
+review-level: ## The independent review's level (high or medium) and why. make review-level PR=1570
+	@test -n "$(PR)" || { echo "review-level: which pull request? e.g. make review-level PR=1570" >&2; exit 1; }
+	@python3 .github/scripts/review-level.py $(PR)
+
+# ---- signals (#750)---------------------------------------------------------
 
 # Mutation testing on GitHub's runners, over exactly what SCOPE names: `diff`
 # (this branch against origin/main) or path globs. Dispatches
