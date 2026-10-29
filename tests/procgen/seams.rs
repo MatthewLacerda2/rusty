@@ -5,7 +5,7 @@
 
 use rusty::procgen::recipe::{
     Brick, Cavity, Curvature, Gradient, GradientKind, Mapping, Node, Noise, NoiseKind, OpKind,
-    Voronoi, Wave,
+    Voronoi, VoronoiMetric, Wave,
 };
 use rusty::procgen::recipe::{NoiseKind::*, VoronoiOutput::*, WaveKind};
 use rusty::procgen::Image;
@@ -74,6 +74,7 @@ fn generators() -> Vec<(String, OpKind)> {
             let op = OpKind::Voronoi(Voronoi {
                 scale: s,
                 output,
+                metric: VoronoiMetric::Euclidean,
                 randomness,
                 seed: 0,
             });

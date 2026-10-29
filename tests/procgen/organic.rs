@@ -2,7 +2,9 @@
 //! keep the two procgen promises (seamless, resolution-independent) and bake
 //! byte-identically for a seed. The generators' seams are swept in `procgen_seams`.
 
-use rusty::procgen::recipe::{Node, Noise, NoiseKind, OpKind, Voronoi, VoronoiOutput, Warp};
+use rusty::procgen::recipe::{
+    Node, Noise, NoiseKind, OpKind, Voronoi, VoronoiMetric, VoronoiOutput, Warp,
+};
 
 use crate::procgen::bake_seeded;
 use crate::procgen::resolution::assert_resolution_independent;
@@ -49,6 +51,7 @@ fn organic_ops_bake_byte_identically_per_seed() {
         let op = OpKind::Voronoi(Voronoi {
             scale: 6.0,
             output,
+            metric: VoronoiMetric::Euclidean,
             randomness: 0.7,
             seed: 0,
         });

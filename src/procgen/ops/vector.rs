@@ -2,8 +2,12 @@
 //!
 //! These reshape the *domain* or reinterpret channels: [`mapping`] resamples the
 //! input under an affine domain transform (with wrap, so it stays tiling),
-//! [`warp`] displaces one input's domain by another's, [`bump_to_normal`] bakes a tangent-space normal map from a height field, and the
-//! combine/separate pair shuttle between grayscale channels and an RGB image.
+//! [`warp`] displaces one input's domain by another's, [`bump_to_normal`] bakes a
+//! tangent-space normal map from a height field, [`normal_blend`] lays one normal
+//! map over another, and the combine/separate pair shuttle between grayscale
+//! channels and an RGB image.
+
+use glam::Vec3;
 
 use super::super::image_buf::{Image, Rgba};
 use super::generators::count;
@@ -88,6 +92,36 @@ pub fn bump_to_normal(img: &Image, strength: f32) -> Image {
     })
 }
 
+/// Lay normal map `detail` over `base` by Reoriented Normal Mapping (Barré-Brisebois
+/// & Hill, *Blending in Detail*, 2012): `base` is rotated by the tilt `detail`
+/// carries, the result renormalized. Both decode from `[0, 1]` as
+/// [`bump_to_normal`] packs them; `strength` scales the detail's XY first (0 leaves
+/// `base`). A flat input on either side returns the other. Alpha is `base`'s.
+pub fn normal_blend(base: &Image, detail: &Image, strength: f32) -> Image {
+    let mut out = base.clone();
+    out.for_each_row(|y, row| {
+        for (p, d) in row.iter_mut().zip(detail.row(y)) {
+            let n = rnm(decode(*p), decode(*d) * Vec3::new(strength, strength, 1.0));
+            *p = [n.x * 0.5 + 0.5, n.y * 0.5 + 0.5, n.z * 0.5 + 0.5, p[3]];
+        }
+    });
+    out
+}
+
+/// A normal packed in `[0, 1]` RGB as the vector it encodes.
+fn decode(p: Rgba) -> Vec3 {
+    Vec3::new(p[0], p[1], p[2]) * 2.0 - 1.0
+}
+
+/// RNM: `t = base + (0, 0, 1)`, `u = detail × (−1, −1, 1)`, `t·(t·u)/t.z − u`,
+/// renormalized. A degenerate result (a base pointing straight down) reads flat.
+fn rnm(base: Vec3, detail: Vec3) -> Vec3 {
+    let t = base + Vec3::Z;
+    let u = detail * Vec3::new(-1.0, -1.0, 1.0);
+    let r = t * t.dot(u) / t.z.max(1e-6) - u;
+    r.try_normalize().unwrap_or(Vec3::Z)
+}
+
 /// Combine up to three single-channel inputs into one RGB image (alpha 1). Each input
 /// contributes its red channel to one output channel; missing inputs contribute 0.
 pub fn combine_rgb(inputs: &[&Image], resolution: u32) -> Image {
@@ -111,4 +145,54 @@ pub fn separate_rgb(mut img: Image, channel: u8) -> Image {
         [v, v, v, 1.0]
     });
     img
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::procgen::hash;
+
+    const FLAT: Rgba = [0.5, 0.5, 1.0, 1.0];
+
+    /// A field of tilted normals: the normal map of a noisy height.
+    fn normals(seed: u64) -> Image {
+        let h = Image::fill_uv(16, |u, v| {
+            let x = hash::unit2((u * 16.0) as i64, (v * 16.0) as i64, 0, seed);
+            [x, x, x, 1.0]
+        });
+        bump_to_normal(&h, 0.2)
+    }
+
+    fn assert_close(a: &Image, b: &Image) {
+        for (p, q) in a.pixels().iter().zip(b.pixels()) {
+            assert!((0..4).all(|c| (p[c] - q[c]).abs() < 1e-5), "{p:?} vs {q:?}");
+        }
+    }
+
+    #[test]
+    fn a_flat_normal_on_either_side_returns_the_other() {
+        let (n, flat) = (normals(3), Image::filled(16, FLAT));
+        assert_close(&normal_blend(&n, &flat, 1.0), &n);
+        assert_close(&normal_blend(&flat, &n, 1.0), &n);
+    }
+
+    #[test]
+    fn zero_strength_keeps_the_base() {
+        let (base, detail) = (normals(3), normals(4));
+        assert_close(&normal_blend(&base, &detail, 0.0), &base);
+    }
+
+    #[test]
+    fn the_blend_is_unit_length_and_tilts_further_than_the_base() {
+        let tilt = |p: Rgba| ((p[0] - 0.5).powi(2) + (p[1] - 0.5).powi(2)).sqrt();
+        // Two copies of one tilt add up: RNM rotates the base by the detail's tilt.
+        let n = normals(5);
+        let out = normal_blend(&n, &n, 1.0);
+        for (p, q) in out.pixels().iter().zip(n.pixels()) {
+            assert!((decode(*p).length() - 1.0).abs() < 1e-5);
+            if tilt(*q) > 0.05 {
+                assert!(tilt(*p) > tilt(*q), "{p:?} vs {q:?}");
+            }
+        }
+    }
 }

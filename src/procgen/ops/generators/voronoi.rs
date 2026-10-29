@@ -3,20 +3,22 @@
 
 use super::{count, gray, Sampler};
 use crate::procgen::hash;
-use crate::procgen::recipe::VoronoiOutput;
+use crate::procgen::recipe::{VoronoiMetric, VoronoiOutput};
 
 /// The `scale`-cells-per-tile Voronoi sampler. Each cell's feature point sits at the
 /// cell centre pushed by `randomness` (clamped to `[0, 1]`) of a full-cell jitter, so
-/// 0 is a regular grid and 1 is anywhere in the cell.
-pub fn sampler(scale: f32, output: VoronoiOutput, randomness: f32, seed: u64) -> Sampler {
+/// 0 is a regular grid and 1 is anywhere in the cell; `metric` measures distance.
+pub fn sampler(
+    scale: f32,
+    output: VoronoiOutput,
+    metric: VoronoiMetric,
+    randomness: f32,
+    seed: u64,
+) -> Sampler {
     let cells = count(scale);
     let per = cells as i64;
     let jitter = randomness.clamp(0.0, 1.0);
-    // F1 lives in the 3×3 neighbourhood; the second-nearest point can sit one ring out.
-    let reach = match output {
-        VoronoiOutput::Distance | VoronoiOutput::Cells => 1,
-        VoronoiOutput::F2 | VoronoiOutput::Edges => 2,
-    };
+    let reach = reach(output, metric);
     Box::new(move |u, v| {
         let (px, py) = (u * cells, v * cells);
         let (gx, gy) = (px.floor() as i64, py.floor() as i64);
@@ -26,7 +28,7 @@ pub fn sampler(scale: f32, output: VoronoiOutput, randomness: f32, seed: u64) ->
                 let (cx, cy) = (gx + dx, gy + dy);
                 let cell = (cx.rem_euclid(per), cy.rem_euclid(per));
                 let at = |ch| 0.5 + jitter * (hash::unit2(cell.0, cell.1, ch, seed) - 0.5);
-                let dist = (cx as f32 + at(1) - px).hypot(cy as f32 + at(2) - py);
+                let dist = measure(metric, cx as f32 + at(1) - px, cy as f32 + at(2) - py);
                 if dist < f1 {
                     (f2, f1, best_cell) = (f1, dist, cell);
                 } else if dist < f2 {
@@ -45,3 +47,36 @@ pub fn sampler(scale: f32, output: VoronoiOutput, randomness: f32, seed: u64) ->
         }
     })
 }
+
+/// How many cell rings around the sample's own cell hold the point `output` needs.
+/// A point `R + 1` rings out is more than `R` cells away along one axis, so more
+/// than `R` under every metric; a ring reaches far enough once that bounds the
+/// farthest the point can be. `Distance` and `F2` clamp to 1, so one ring is exact
+/// for both: any point within 1 is in it. Under Chebyshev one ring is exact for
+/// every output: a point `k ≥ 2` cells out along x is more than `k − 1 ≥ 1` away,
+/// and the own cell's point and the neighbour's one cell out along x are nearer
+/// (less than 1 across, less than `k − 1` along), so F1 and F2 both lie in ring 1.
+/// Otherwise `Cells` needs the true nearest point, at most the own cell's: `√2`
+/// (Euclidean) or `2` (Manhattan) away; `Edges` the true second-nearest, at most
+/// the farther of the own cell's point and the nearer neighbour's on one axis
+/// (`≤ 1.5` across, `≤ 1` along): `√3.25 ≈ 1.8` (Euclidean) or `2.5` (Manhattan).
+fn reach(output: VoronoiOutput, metric: VoronoiMetric) -> i64 {
+    match (output, metric) {
+        (VoronoiOutput::Distance | VoronoiOutput::F2, _) | (_, VoronoiMetric::Chebyshev) => 1,
+        (VoronoiOutput::Edges, VoronoiMetric::Manhattan) => 3,
+        (VoronoiOutput::Cells | VoronoiOutput::Edges, _) => 2,
+    }
+}
+
+/// The length of `(dx, dy)` under `metric`.
+fn measure(metric: VoronoiMetric, dx: f32, dy: f32) -> f32 {
+    match metric {
+        VoronoiMetric::Euclidean => dx.hypot(dy),
+        VoronoiMetric::Manhattan => dx.abs() + dy.abs(),
+        VoronoiMetric::Chebyshev => dx.abs().max(dy.abs()),
+    }
+}
+
+#[cfg(test)]
+#[path = "voronoi_tests.rs"]
+mod tests;

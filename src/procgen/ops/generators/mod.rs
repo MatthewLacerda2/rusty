@@ -58,7 +58,7 @@ pub fn noise(p: &Noise, seed: u64) -> Sampler {
 
 /// The Voronoi / Worley cellular pattern.
 pub fn voronoi(p: &Voronoi, seed: u64) -> Sampler {
-    voronoi::sampler(p.scale, p.output, p.randomness, seed)
+    voronoi::sampler(p.scale, p.output, p.metric, p.randomness, seed)
 }
 
 /// The running-bond brick pattern.

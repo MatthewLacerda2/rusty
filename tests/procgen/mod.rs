@@ -6,6 +6,7 @@ mod ops;
 mod organic;
 mod resolution;
 mod seams;
+mod stones;
 mod weathering;
 
 use rusty::procgen::recipe::{Constant, Node, OpKind, TextureRecipe};

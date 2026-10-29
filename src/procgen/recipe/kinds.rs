@@ -139,3 +139,41 @@ pub enum ImageEncoding {
     /// Data (a mask, a height, a normal map): every channel as stored.
     Linear,
 }
+
+/// How [`super::OpKind::Voronoi`] measures the distance to a cell point.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum VoronoiMetric {
+    /// Straight-line distance: round cells.
+    #[default]
+    Euclidean,
+    /// `|dx| + |dy|`: diamond-shaped distance, cells with straight, slanted edges.
+    Manhattan,
+    /// `max(|dx|, |dy|)`: square distance, blocky cells (tiles, flagstones).
+    Chebyshev,
+}
+
+/// How [`super::OpKind::ColorRamp`] fills the space between two stops, as Blender's
+/// ColorRamp.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RampInterpolation {
+    /// A straight blend from one stop's colour to the next.
+    #[default]
+    Linear,
+    /// Each stop's colour held up to the next stop: hard bands (toon, posterized).
+    Constant,
+    /// A smoothstep between stops: soft into and out of each colour.
+    Ease,
+}
+
+/// The kernel [`super::OpKind::Blur`] averages with.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BlurKind {
+    /// A flat window: cheap, but leaves square artefacts on soft masks.
+    Box,
+    /// Three box passes, a close approximation of a Gaussian: round falloff.
+    #[default]
+    Gaussian,
+}

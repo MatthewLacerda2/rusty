@@ -34,6 +34,7 @@ impl OpKind {
             OpKind::SeparateRgb(_) => "separate_rgb",
             OpKind::Tile(_) => "tile",
             OpKind::Warp(_) => "warp",
+            OpKind::NormalBlend(_) => "normal_blend",
             OpKind::Math(_) => "math",
             OpKind::MapRange(_) => "map_range",
             OpKind::Clamp(_) => "clamp",
@@ -41,6 +42,7 @@ impl OpKind {
             OpKind::Blur(_) => "blur",
             OpKind::Cavity(_) => "cavity",
             OpKind::Curvature(_) => "curvature",
+            OpKind::Distance(_) => "distance",
         }
     }
 

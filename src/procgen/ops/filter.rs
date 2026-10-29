@@ -1,9 +1,12 @@
 //! src/procgen/ops/filter.rs — neighbourhood ops.
 //!
-//! A **separable box blur**: average a `(2r+1)` window along each row, then along
-//! each column. Each pass slides a running sum along the row (#1490), so the blur
-//! costs `O(n)` whatever the radius, and the window wraps at the edges so the
-//! blurred result stays tiling — its main use is softening a height field before
+//! A **separable blur**: a box averages a `(2r+1)` window along each row, then along
+//! each column; a Gaussian (the default, #1492) is three box passes per axis whose
+//! widths match the variance of `σ = r / 3`, so it reaches about `r` (≈ 10 px for
+//! `r = 12`) for three passes' cost; under about 2.5 px it is one exact 3-tap pass
+//! instead, since three boxes can't go that narrow. Each pass slides a running sum along the row (#1490), so the blur costs
+//! `O(n)` whatever the radius, and the window wraps at the edges so the blurred result
+//! stays tiling — its main use is softening a height field before
 //! [`super::vector::bump_to_normal`] and feathering masks. The column pass runs as a
 //! row pass on the transposed image, so both pass by rows and band in parallel.
 //!
@@ -12,36 +15,104 @@
 //! tile units, so the masks tile and look the same at any resolution.
 
 use super::super::image_buf::{Image, Rgba};
+use super::super::recipe::BlurKind;
 
 /// A blur radius given as a fraction of the tile width, in pixels at `resolution`:
-/// `round(radius * resolution)`, at most half the tile (a wider window just wraps
-/// back over pixels it already averaged). Negative or NaN reads as no blur.
-pub fn pixel_radius(radius: f32, resolution: u32) -> u32 {
-    let px = (radius * resolution as f32).round();
-    if px >= 1.0 {
-        (px as u32).min(resolution / 2)
+/// `radius * resolution`, at most half the tile (a wider window just wraps back over
+/// pixels it already averaged). Negative or NaN reads as no blur.
+pub fn pixel_radius(radius: f32, resolution: u32) -> f32 {
+    let px = radius * resolution as f32;
+    if px > 0.0 {
+        px.min((resolution / 2) as f32)
     } else {
-        0
+        0.0
     }
 }
 
-/// Separable box blur of `radius` **pixels** (see [`pixel_radius`] for the recipe's
-/// tile-fraction unit). `radius == 0` returns the input unchanged.
-pub fn blur(img: &Image, radius: u32) -> Image {
-    if radius == 0 {
+/// Separable blur reaching `radius` **pixels** (see [`pixel_radius`] for the
+/// recipe's tile-fraction unit). A blur with no pass returns the input unchanged.
+pub fn blur(img: &Image, radius: f32, kind: BlurKind) -> Image {
+    let passes = passes(radius, kind);
+    let Some((&first, rest)) = passes.split_first() else {
         return img.clone();
-    }
-    // Drop the row pass before the column pass: at most four images live at once.
-    let t = blur_rows(img, radius as i64).transposed();
-    blur_rows(&t, radius as i64).transposed()
+    };
+    // Each pass replaces the last, so at most four images live at once.
+    let rows = rest
+        .iter()
+        .fold(blur_rows(img, first), |acc, &p| blur_rows(&acc, p));
+    let cols = passes
+        .iter()
+        .fold(rows.transposed(), |acc, &p| blur_rows(&acc, p));
+    cols.transposed()
 }
 
-/// Box-average every row of `src` over a wrapped `(2r+1)` window.
-fn blur_rows(src: &Image, r: i64) -> Image {
-    let inv = 1.0 / (2 * r + 1) as f64;
+/// One 1-D pass along a row.
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum Pass {
+    /// A flat, wrapped `(2r+1)` window.
+    Box(i64),
+    /// The 3-tap kernel `[a, 1 − 2a, a]`, whose variance is `2a`.
+    Taps(f32),
+}
+
+/// A Gaussian narrower than this variance (px², `r ≈ 2.45 px`) is one [`Pass::Taps`]:
+/// three boxes can't go below a radius-1 box's `2/3`, which is where taps meet it.
+const TAPS_UP_TO: f32 = 2.0 / 3.0;
+
+/// The passes one axis runs for a blur reaching `radius` pixels, no-op passes
+/// dropped. A box is one pass of `round(radius)`. A Gaussian matches the variance of
+/// `σ = radius / 3`, so it reaches about `radius` (3σ): three boxes of the odd widths
+/// `w` and `w + 2` whose mix is nearest it (Kovesi, *Fast Almost-Gaussian
+/// Filtering*, 2010), or under [`TAPS_UP_TO`] one exact 3-tap pass. Matching the
+/// variance, not splitting a rounded radius, keeps the spread the same at any
+/// resolution, down to a pixel or two (#1492).
+fn passes(radius: f32, kind: BlurKind) -> Vec<Pass> {
+    let var = (radius / 3.0).powi(2);
+    match kind {
+        BlurKind::Box => box_passes([radius.round() as i64]),
+        BlurKind::Gaussian if radius.is_nan() || radius <= 0.0 => Vec::new(),
+        BlurKind::Gaussian if var < TAPS_UP_TO => vec![Pass::Taps(var / 2.0)],
+        BlurKind::Gaussian => {
+            let var = 12.0 * var;
+            let ideal = (var / 3.0 + 1.0).sqrt().floor() as i64;
+            let w = ideal - 1 + ideal % 2;
+            let wf = w as f32;
+            let narrow = (var - 3.0 * wf * wf - 12.0 * wf - 9.0) / (-4.0 * wf - 4.0);
+            let narrow = narrow.round().clamp(0.0, 3.0) as usize;
+            box_passes((0..3).map(|i| if i < narrow { (w - 1) / 2 } else { (w + 1) / 2 }))
+        }
+    }
+}
+
+/// A box pass per radius, radius 0 (a one-pixel window) dropped.
+fn box_passes(radii: impl IntoIterator<Item = i64>) -> Vec<Pass> {
+    radii
+        .into_iter()
+        .filter(|&r| r > 0)
+        .map(Pass::Box)
+        .collect()
+}
+
+/// Run `pass` over every row of `src`, wrapping at the ends.
+fn blur_rows(src: &Image, pass: Pass) -> Image {
     let mut out = Image::new(src.resolution());
-    out.for_each_row(|y, row| slide(src.row(y), r, inv, row));
+    match pass {
+        Pass::Box(r) => {
+            let inv = 1.0 / (2 * r + 1) as f64;
+            out.for_each_row(|y, row| slide(src.row(y), r, inv, row));
+        }
+        Pass::Taps(a) => out.for_each_row(|y, row| taps(src.row(y), a, row)),
+    }
     out
+}
+
+/// One row through the wrapped kernel `[a, 1 − 2a, a]`.
+fn taps(src: &[Rgba], a: f32, out: &mut [Rgba]) {
+    let n = src.len();
+    for (x, o) in out.iter_mut().enumerate() {
+        let (l, c, r) = (src[(x + n - 1) % n], src[x], src[(x + 1) % n]);
+        *o = std::array::from_fn(|i| a * (l[i] + r[i]) + (1.0 - 2.0 * a) * c[i]);
+    }
 }
 
 /// A dropped pixel past this magnitude re-sums the window, so its rounding residue
@@ -81,12 +152,12 @@ fn slide(src: &[Rgba], r: i64, inv: f64, out: &mut [Rgba]) {
     }
 }
 
-/// Cavity mask: how far each pixel sits below its `radius`-pixel neighbourhood,
-/// `1 − max(blur(h) − h, 0)`, as grayscale. Flat and raised ground stay white;
+/// Cavity mask: how far each pixel sits below its `radius`-pixel neighbourhood (a
+/// Gaussian blur), `1 − max(blur(h) − h, 0)`, as grayscale. Flat and raised ground stay white;
 /// crevices go dark — multiply it into albedo for baked occlusion, or invert it for
 /// a dirt mask.
-pub fn cavity(img: &Image, radius: u32) -> Image {
-    let around = blur(img, radius);
+pub fn cavity(img: &Image, radius: f32) -> Image {
+    let around = blur(img, radius, BlurKind::Gaussian);
     let mut out = Image::new(img.resolution());
     out.for_each_row(|y, row| {
         for ((p, h), b) in row.iter_mut().zip(img.row(y)).zip(around.row(y)) {
@@ -123,85 +194,5 @@ pub fn curvature(img: &Image, radius: f32, strength: f32) -> Image {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    /// Today's blur before #1490: every pixel re-sums its whole wrapped window.
-    fn naive_blur(img: &Image, r: i64) -> Image {
-        let res = img.resolution() as i64;
-        let inv = 1.0 / (2 * r + 1) as f32;
-        let pass = |src: &Image, horizontal: bool| {
-            Image::fill_uv(src.resolution(), |u, v| {
-                let (x, y) = ((u * res as f32) as i64, (v * res as f32) as i64);
-                let mut acc = [0.0f32; 4];
-                for k in -r..=r {
-                    let p = match horizontal {
-                        true => src.get_wrapped(x + k, y),
-                        false => src.get_wrapped(x, y + k),
-                    };
-                    (0..4).for_each(|c| acc[c] += p[c]);
-                }
-                acc.map(|a| a * inv)
-            })
-        };
-        pass(&pass(img, true), false)
-    }
-
-    #[test]
-    fn sliding_blur_matches_the_naive_reference() {
-        let img = Image::fill_uv(32, |u, v| {
-            let h = (u * 91.7 + v * 13.3).sin() * (v * 47.1).cos();
-            [h, u * v, 1.0 - u, h * h]
-        });
-        // Small, mid, exactly half the tile, and past it (the window wraps twice).
-        for r in [1, 3, 8, 16, 40] {
-            let (fast, slow) = (blur(&img, r), naive_blur(&img, r as i64));
-            for (a, b) in fast.pixels().iter().zip(slow.pixels()) {
-                for c in 0..4 {
-                    assert!((a[c] - b[c]).abs() < 1e-5, "r={r}: {a:?} vs {b:?}");
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn a_flat_image_blurs_to_itself_exactly() {
-        let img = Image::filled(16, [0.25, 0.5, 0.75, 1.0]);
-        assert_eq!(blur(&img, 5), img);
-    }
-
-    /// A 32² mid-grey image with one `bad` pixel at (10, 20), blurred at radius 2.
-    fn blur_around(bad: f32) -> Image {
-        let mut img = Image::filled(32, [0.5; 4]);
-        img.pixels_mut()[20 * 32 + 10] = [bad; 4];
-        blur(&img, 2)
-    }
-
-    /// Whether `(x, y)` lies in the (2r+1)² window around (10, 20), r = 2.
-    fn near(x: usize, y: usize) -> bool {
-        x.abs_diff(10) <= 2 && y.abs_diff(20) <= 2
-    }
-
-    #[test]
-    fn an_infinite_pixel_reaches_only_its_window() {
-        let out = blur_around(f32::INFINITY);
-        for (i, p) in out.pixels().iter().enumerate() {
-            let (x, y) = (i % 32, i / 32);
-            match near(x, y) {
-                true => assert!(p[0].is_infinite(), "({x}, {y}): {p:?}"),
-                false => assert!((p[0] - 0.5).abs() < 1e-6, "({x}, {y}): {p:?}"),
-            }
-        }
-    }
-
-    #[test]
-    fn a_huge_pixel_leaves_no_residue_once_dropped() {
-        let out = blur_around(1e20);
-        for (i, p) in out.pixels().iter().enumerate() {
-            let (x, y) = (i % 32, i / 32);
-            if !near(x, y) {
-                assert!((p[0] - 0.5).abs() < 1e-6, "({x}, {y}): {p:?}");
-            }
-        }
-    }
-}
+#[path = "filter_tests.rs"]
+mod tests;

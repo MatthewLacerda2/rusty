@@ -4,6 +4,7 @@
 
 use super::*;
 use crate::procgen::recipe::ShapeKind::*;
+use crate::procgen::recipe::VoronoiMetric::*;
 use crate::procgen::recipe::{
     BrickOutput, Gradient, NoiseKind, OpKind, VoronoiOutput, Wave, WhiteNoise,
 };
@@ -63,12 +64,15 @@ fn lattice_ops() -> Vec<OpKind> {
             VoronoiOutput::F2,
             VoronoiOutput::Edges,
         ] {
-            ops.push(OpKind::Voronoi(Voronoi {
-                scale: s,
-                output,
-                randomness: s / 8.0,
-                seed: 0,
-            }));
+            for metric in [Euclidean, Manhattan, Chebyshev] {
+                ops.push(OpKind::Voronoi(Voronoi {
+                    scale: s,
+                    output,
+                    metric,
+                    randomness: s / 8.0,
+                    seed: 0,
+                }));
+            }
         }
         ops.push(OpKind::Wave(Wave {
             kind: WaveKind::Bands,
@@ -203,6 +207,7 @@ fn grid_voronoi(output: VoronoiOutput) -> Sampler {
     let op = OpKind::Voronoi(Voronoi {
         scale: 4.0,
         output,
+        metric: Euclidean,
         randomness: 0.0,
         seed: 0,
     });
