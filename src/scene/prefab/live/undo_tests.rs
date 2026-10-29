@@ -1,8 +1,8 @@
 //! The live diff is the override set (#1527): an edit the author undoes leaves no
 //! override behind, through Play and through a save/load, so it never comes back.
 
-use super::live_component_tests::{bare, play_stop};
-use super::live_tests::save_and_load;
+use super::component_tests::{bare, play_stop};
+use super::tests::save_and_load;
 use crate::components::ColliderShape;
 use crate::scene::authoring::defaults::{default_collider, default_light};
 use crate::scene::{list_instance_overrides, Scene};

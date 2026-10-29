@@ -2,7 +2,7 @@
 //! as Unity's *added component*: a Light, a Collider or a script added to an instance
 //! child keeps its values through Play and a save/load.
 
-use super::live_tests::save_and_load;
+use super::tests::save_and_load;
 use crate::components::{ColliderShape, ScriptComponent, ScriptFieldValue};
 use crate::scene::authoring::defaults::{default_collider, default_light};
 use crate::scene::snapshot::SceneSnapshot;

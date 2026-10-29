@@ -1,7 +1,7 @@
 //! src/scene/prefab/diff.rs — the generic per-instance override diff (#216, #1527).
 //!
 //! An instance's overrides are its difference from its *baseline*, the source as it
-//! last took it (`live.rs`): a flat map of RFC-6901 `json-pointer-path -> value`,
+//! last took it (`live/`): a flat map of RFC-6901 `json-pointer-path -> value`,
 //! taken on the entity's serde JSON with the volatile/identity fields masked out
 //! (see `STRIPPED_KEYS`), so ids, parenting, rehydrated GPU geometry and the link
 //! itself never count. It covers every first-class component with no per-component
