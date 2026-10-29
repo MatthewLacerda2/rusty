@@ -12,7 +12,7 @@ use glam::{Mat4, Vec3};
 
 use super::{march, surface};
 use crate::render::gpu::bind_entry as entry;
-use crate::render::gpu::fullscreen::Fullscreen;
+use crate::render::gpu::fullscreen::{color_pass, Fullscreen};
 use crate::render::gpu::layout_entries::{sampler_entry, texture_entry, uniform_entry};
 use crate::render::gpu::pipelines::LazyPipeline;
 use crate::render::gpu::shaders::ShaderRegistry;
@@ -161,23 +161,10 @@ impl PostFx {
         let (from, to) = (&self.scene_hdr.texture, &t.source.texture);
         encoder.copy_texture_to_texture(from.as_image_copy(), to.as_image_copy(), extent);
         {
-            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                multiview_mask: None,
-                label: Some("SSR Pass"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    depth_slice: None,
-                    view: &self.scene_hdr.view,
-                    resolve_target: None,
-                    // Loaded: a pixel that gets no SSR is discarded, left as it was.
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Load,
-                        store: wgpu::StoreOp::Store,
-                    },
-                })],
-                depth_stencil_attachment: None,
-                timestamp_writes: timer.writes(GpuPass::Ssr),
-                occlusion_query_set: None,
-            });
+            // Loaded: a pixel that gets no SSR is discarded, left as it was.
+            let timed = ("SSR Pass", timer, GpuPass::Ssr);
+            let load = wgpu::LoadOp::Load;
+            let mut pass = color_pass(&mut encoder, timed, &self.scene_hdr.view, load);
             pass.set_pipeline(passes.pipeline.get());
             pass.set_bind_group(0, &group, &[]);
             pass.draw(0..3, 0..1);
