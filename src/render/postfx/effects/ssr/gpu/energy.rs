@@ -4,8 +4,8 @@
 
 use glam::Vec3;
 
-use super::gpu_fixture::H;
-use super::gpu_fixture::{frame, pixel, renderer, rgb, tuned, Surface, MIRROR, RED, REFLECTING};
+use super::fixture::H;
+use super::fixture::{frame, pixel, renderer, rgb, tuned, Surface, MIRROR, RED, REFLECTING};
 use crate::render::ibl::ktx2_encode::encode_cubemap;
 use crate::render::ibl::reflection_prefilter::PrefilteredCubemap;
 use crate::scene::{FogMode, Scene};

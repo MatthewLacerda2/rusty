@@ -95,10 +95,4 @@ fn pack(cx: &EffectCx, slots: &mut [[f32; 4]]) {
 mod tests;
 
 #[cfg(test)]
-mod gpu_fixture;
-
-#[cfg(test)]
-mod gpu_tests;
-
-#[cfg(test)]
-mod gpu_energy_tests;
+mod gpu;

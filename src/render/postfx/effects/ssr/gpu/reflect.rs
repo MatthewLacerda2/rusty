@@ -4,8 +4,8 @@
 
 use glam::Vec3;
 
-use super::gpu_fixture::{frame, pixel, renderer, rgb, scene, MIRROR, RED, REFLECTING, ROUGH};
-use super::gpu_fixture::{H, W};
+use super::fixture::{frame, pixel, renderer, rgb, scene, MIRROR, RED, REFLECTING, ROUGH};
+use super::fixture::{H, W};
 use crate::components::CameraComponent;
 use crate::scene::authoring::{create_entity, Primitive};
 use crate::scene::{ClearFlags, Scene};
@@ -52,10 +52,10 @@ fn with_viewmodel((mut scene, cam): (Scene, u32)) -> Scene {
     };
     scene.world.set_camera(overlay, Some(lens));
     let gun = create_entity(&mut scene, "Gun", Some(Primitive::Box));
-    super::gpu_fixture::place(&mut scene, gun, Vec3::new(0.0, 0.0, -3.0), Vec3::splat(0.4));
+    super::fixture::place(&mut scene, gun, Vec3::new(0.0, 0.0, -3.0), Vec3::splat(0.4));
     scene.set_parent(gun, Some(overlay)).unwrap();
     scene.world.set_layer(gun, VIEWMODEL);
-    super::gpu_fixture::paint(&mut scene, gun, "gun", MIRROR);
+    super::fixture::paint(&mut scene, gun, "gun", MIRROR);
     scene
 }
 
