@@ -186,8 +186,7 @@ pub use crate::scene::prefab::apply::{
     apply_instance_field_to_source, apply_instance_to_source, revert_instance_field,
 };
 pub use crate::scene::prefab::link::{
-    list_instance_overrides, record_instance_overrides, reimport_instance,
-    revert_instance_overrides,
+    list_instance_overrides, reimport_instance, revert_instance_overrides,
 };
 
 // The asset-instantiate verb (#182) lives in `scene::asset_instance` (size-cap

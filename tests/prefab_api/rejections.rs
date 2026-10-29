@@ -15,10 +15,7 @@ fn unpacked_copy_carries_no_link() {
             .unwrap();
         assert!(!is_linked(&scene, new_id), "an unpacked copy has no link");
         // The linked-instance verbs must reject a plain copy, not silently no-op.
-        assert!(errors(
-            lua,
-            &format!("Scene.RecordPrefabOverrides({new_id})")
-        ));
+        assert!(errors(lua, &format!("Scene.ReimportPrefab({new_id})")));
     });
     let _ = std::fs::remove_file(&path);
 }

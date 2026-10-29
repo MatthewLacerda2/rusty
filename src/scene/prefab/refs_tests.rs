@@ -55,7 +55,6 @@ fn a_linked_instance_diffs_clean_and_propagates_in_its_own_ids() {
     create_entity(&mut other, "Offset", None);
     let inst = instantiate_prefab_linked(&mut other, &prefab, None, &path);
     let child = other.world.children(inst)[0];
-    record_instance_overrides(&mut other, inst).expect("records");
     let overrides = other
         .world
         .prefab_link(inst)
@@ -91,7 +90,6 @@ fn applying_a_changed_reference_writes_the_source_in_local_ids() {
         .selectable_mut(inst)
         .expect("sel")
         .target_graphic = Some(second_inst);
-    record_instance_overrides(&mut other, inst).expect("records");
     crate::scene::prefab::apply::apply_instance_to_source(&mut other, inst).expect("applies");
     let source = read_prefab_file(&path).expect("reads");
     let sel = source.entities[0].selectable.clone().expect("selectable");

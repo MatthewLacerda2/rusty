@@ -1,12 +1,12 @@
 //! src/scene/prefab_link.rs — linked prefab instances: live link operations (#216).
 //!
 //! The verbs that act on an already-stamped **linked** instance (one whose entities
-//! carry a [`PrefabLink`](crate::components::PrefabLink)): record its per-instance overrides, list them, revert
-//! them, and re-import (propagate) the source onto it. They are the apply/revert side
+//! carry a [`PrefabLink`](crate::components::PrefabLink)): list its per-instance
+//! overrides, revert them, and re-import (propagate) the source onto it. They are the apply/revert side
 //! of prefabs v2 and the load-time propagation, all sharing one mechanism:
 //!
 //!   propagate(instance) = rebuild every entity from a FRESH source baseline, then
-//!                         re-apply that entity's recorded override map on top.
+//!                         re-apply that entity's override map on top.
 //!
 //! "Fresh source baseline" = the source `.prefab` re-instantiated through the v1
 //! material merge/rename + mesh rehydrate, so material refs re-resolve through the
@@ -18,10 +18,12 @@
 //! adds nothing structurally.
 
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 use crate::components::{Entity, EntityRefs};
 use crate::scene::prefab::instance::instance_members;
-use crate::scene::prefab::overrides::{apply_overrides, diff_entity};
+use crate::scene::prefab::live::{entity_overrides, keep_root_placement, sync_overrides};
+use crate::scene::prefab::overrides::{apply_overrides, leaves};
 use crate::scene::prefab::read_prefab_file;
 use crate::scene::serialize::rehydrate_entity_mesh;
 use crate::scene::{instantiate_prefab, PrefabData, Scene};
@@ -82,42 +84,20 @@ fn in_instance_space(
     baselines
 }
 
-/// Recompute and store each instance entity's overrides as the diff against its fresh
-/// source baseline. This is how an edited instance "captures" its divergence: call it
-/// after editing the instance (while the source is unchanged) so propagation later
-/// re-applies exactly these paths. Returns the number of entities recorded.
-pub fn record_instance_overrides(scene: &mut Scene, root_id: u32) -> Result<usize, String> {
+/// Re-import the source onto the instance: rebuild every entity from its fresh
+/// baseline, then re-apply its overrides, the edits made since it last took the
+/// source among them (`live.rs`, #1527). Non-overridden fields pick up the latest
+/// source; overridden ones are preserved. This is the propagation step run on scene
+/// load and by the explicit reimport verb.
+pub fn reimport_instance(scene: &mut Scene, root_id: u32) -> Result<(), String> {
     let ids = require_instance(scene, root_id)?;
-    let prefab = load_instance_source(scene, root_id)?;
-    let baselines = fresh_baselines(scene, &prefab);
-    let baselines = in_instance_space(scene, &ids, baselines);
-    let mut recorded = 0;
-    for id in ids {
-        let Some(local_id) = local_id_of(scene, id) else {
-            continue;
-        };
-        let Some(baseline) = baselines.get(&local_id) else {
-            continue;
-        };
-        let overrides = scene
-            .world
-            .entity_document(id)
-            .map(|e| diff_entity(&e, baseline))
-            .unwrap_or_default();
-        if let Some(mut link) = scene.world.prefab_link_mut(id) {
-            link.overrides = overrides;
-            recorded += 1;
-        }
-    }
-    scene.update_all_colliders();
-    Ok(recorded)
+    sync_overrides(&mut scene.world, &ids);
+    propagate(scene, root_id)
 }
 
-/// Re-import the source onto the instance: rebuild every entity from its fresh
-/// baseline, then re-apply its recorded overrides. Non-overridden fields pick up the
-/// latest source; overridden ones are preserved. This is the propagation step run on
-/// scene load and by the explicit reimport verb.
-pub fn reimport_instance(scene: &mut Scene, root_id: u32) -> Result<(), String> {
+/// [`reimport_instance`] re-applying the overrides the links hold as they are, for a
+/// caller that has just synced them and dropped one (a per-field revert or apply).
+pub(super) fn propagate(scene: &mut Scene, root_id: u32) -> Result<(), String> {
     let ids = require_instance(scene, root_id)?;
     let prefab = load_instance_source(scene, root_id)?;
     let baselines = fresh_baselines(scene, &prefab);
@@ -149,16 +129,17 @@ pub fn revert_instance_overrides(scene: &mut Scene, root_id: u32) -> Result<(), 
     Ok(())
 }
 
-/// The recorded override paths of the instance, as `"<local_id>:<json-pointer>"`
+/// The live override paths of the instance, as `"<local_id>:<json-pointer>"`
 /// strings sorted for a stable read. Empty when the instance has no overrides.
 pub fn list_instance_overrides(scene: &Scene, root_id: u32) -> Result<Vec<String>, String> {
     let ids = require_instance(scene, root_id)?;
     let mut out = Vec::new();
     for id in ids {
-        if let Some(link) = scene.world.prefab_link(id) {
-            for path in link.overrides.keys() {
-                out.push(format!("{}:{}", link.local_id, path));
-            }
+        let Some(local_id) = local_id_of(scene, id) else {
+            continue;
+        };
+        for path in entity_overrides(&scene.world, id).keys() {
+            out.push(format!("{local_id}:{path}"));
         }
     }
     out.sort();
@@ -182,7 +163,8 @@ pub fn reimport_all_linked_instances(scene: &mut Scene) {
 }
 
 /// Rebuild one instance entity from its baseline, preserving live identity/structure
-/// and (when `keep_overrides`) re-applying its recorded override map.
+/// and (when `keep`) re-applying its override map; the baseline it was built from is
+/// stored on its link, and a root keeps its own placement.
 fn rebuild_entity(scene: &mut Scene, id: u32, baselines: &BTreeMap<u32, Entity>, keep: bool) {
     let Some(local_id) = local_id_of(scene, id) else {
         return;
@@ -195,17 +177,21 @@ fn rebuild_entity(scene: &mut Scene, id: u32, baselines: &BTreeMap<u32, Entity>,
     }
     let parent_id = scene.world.parent_id(id);
     let children = scene.world.children(id);
-    let link = scene.world.prefab_link(id).map(|l| l.clone());
+    let live = scene.world.entity_document(id);
     let mut rebuilt = baseline.clone();
     rebuilt.id = id;
     rebuilt.parent_id = parent_id;
     rebuilt.children = children;
-    rebuilt.prefab_link = link;
+    rebuilt.prefab_link = live.as_ref().and_then(|e| e.prefab_link.clone());
+    if let Some(link) = rebuilt.prefab_link.as_mut() {
+        link.baseline = Some(Arc::new(leaves(baseline)));
+    }
     if keep {
         if let Some(overrides) = rebuilt.prefab_link.as_ref().map(|l| l.overrides.clone()) {
             apply_overrides(&mut rebuilt, &overrides);
         }
     }
+    keep_root_placement(&mut rebuilt, live.as_ref());
     rehydrate_entity_mesh(&mut rebuilt);
     scene.world.replace_entity(rebuilt);
     // The source file and the overrides are held as a scene file is (#1418).

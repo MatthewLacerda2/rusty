@@ -87,25 +87,14 @@ fn instantiate(
     }
 }
 
-/// The on-instance linked-instance verbs (#216): record the divergence as overrides,
-/// revert, reimport, and the list-overrides read verb. All take the instance ROOT id.
-/// `RecordPrefabOverrides` is the renamed-for-clarity former `ApplyPrefabChanges` —
-/// "record on the instance" vs. the true apply-to-source verbs below (#268).
+/// The on-instance linked-instance verbs (#216): revert, reimport, and the
+/// list-overrides read verb. All take the instance ROOT id. An edit to an instance is
+/// an override the moment it is made, so there is nothing to record (#1527).
 fn register_overrides<'scope>(
     scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
-    put(
-        table,
-        "RecordPrefabOverrides",
-        scope.create_function(|_, root_id: EntityArg| {
-            let root_id = root_id.live("Scene", "RecordPrefabOverrides")?;
-            authoring::record_instance_overrides(&mut scene.borrow_mut(), root_id)
-                .map_err(mlua::Error::RuntimeError)
-        }),
-    )?;
-
     put(
         table,
         "RevertPrefabOverrides",

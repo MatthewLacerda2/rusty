@@ -1,8 +1,9 @@
 //! Integration coverage for the `Scene` namespace's prefab verbs (issue #350):
 //! `SavePrefab` → `Instantiate` round-trips an entity through a `.prefab` file,
-//! linked instances record/revert overrides, unpacked copies carry no link, and
+//! a linked instance's edits are overrides at once (#1527) and revert, unpacked copies carry no link, and
 //! the error paths (bad root, missing file, bad parent arg) reject cleanly.
 
+mod instant;
 mod linked;
 mod rejections;
 mod revert_field;
@@ -33,6 +34,7 @@ fn run(scene: &RefCell<Scene>, body: impl FnOnce(&Lua)) {
     let scene_path: RefCell<Option<String>> = RefCell::new(None);
     lua.scope(|scope| {
         rusty::api::scene::register(&lua, scope, scene, &scene_path).unwrap();
+        rusty::api::transform::register(&lua, scope, scene).unwrap();
         body(&lua);
         Ok(())
     })

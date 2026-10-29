@@ -5,7 +5,7 @@ use super::fixture::{connected, hero, reload};
 use crate::components::JointComponent;
 use crate::scene::prefab::apply::apply_instance_to_source;
 use crate::scene::prefab::instantiate_prefab_linked;
-use crate::scene::{read_prefab_file, record_instance_overrides, save_prefab, Scene};
+use crate::scene::{read_prefab_file, save_prefab, Scene};
 
 /// A linked instance of `Group { Hero (skinned), Rope jointed to Hero's Joint1 }`,
 /// written to its own prefab file: (scene, instance root, its hero, its rope, path).
@@ -41,18 +41,16 @@ fn linked(tag: &str) -> (Scene, u32, u32, u32, String) {
 }
 
 fn override_of_in(scene: &Scene, rope: u32) -> serde_json::Value {
-    let link = scene.world.prefab_link(rope).unwrap();
-    link.overrides["/joint/connected_body"].clone()
+    crate::scene::prefab::live::entity_overrides(&scene.world, rope)["/joint/connected_body"]
+        .clone()
 }
 
 #[test]
 fn a_linked_instance_keeps_its_joint_to_a_bone_after_a_load() {
-    let (scene, root, hero, rope, path) = linked("keeps");
+    let (scene, _, hero, rope, path) = linked("keeps");
     assert_eq!(connected(&scene, rope), scene.find_bone(hero, "Joint1"));
-    let mut scene = scene;
-    record_instance_overrides(&mut scene, root).unwrap();
-    let rope_link = scene.world.prefab_link(rope).unwrap().clone();
-    assert!(rope_link.overrides.is_empty(), "{:?}", rope_link.overrides);
+    let overrides = crate::scene::prefab::live::entity_overrides(&scene.world, rope);
+    assert!(overrides.is_empty(), "{overrides:?}");
 
     let loaded = reload(&scene);
     let spine = loaded.find_bone(hero, "Joint1");
@@ -63,10 +61,9 @@ fn a_linked_instance_keeps_its_joint_to_a_bone_after_a_load() {
 
 #[test]
 fn destroying_an_overridden_reference_leaves_no_dead_id_after_a_load() {
-    let (mut scene, root, _, rope, path) = linked("dead_override");
+    let (mut scene, _, _, rope, path) = linked("dead_override");
     let post = scene.add_entity("Post".into());
     scene.world.joint_mut(rope).unwrap().connected_body = Some(post);
-    record_instance_overrides(&mut scene, root).unwrap();
     assert_eq!(override_of_in(&scene, rope), post);
 
     scene.destroy_entity(post);
@@ -81,7 +78,6 @@ fn destroying_an_overridden_reference_leaves_no_dead_id_after_a_load() {
 fn applying_a_joint_to_another_bone_writes_the_bone_by_name() {
     let (mut scene, root, hero, rope, path) = linked("apply_bone");
     scene.world.joint_mut(rope).unwrap().connected_body = scene.find_bone(hero, "Joint0");
-    record_instance_overrides(&mut scene, root).unwrap();
     apply_instance_to_source(&mut scene, root).unwrap();
 
     let source = read_prefab_file(&path).unwrap();
