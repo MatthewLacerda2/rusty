@@ -50,21 +50,22 @@ pub struct PrefabLink {
     pub local_id: u32,
     /// This entity's per-instance overrides as last stored: its generic field diff
     /// against [`Self::baseline`], as `json-pointer-path -> value` (e.g.
-    /// `"/transform/position/0" -> 5.0`), plus any unused one the source can no
-    /// longer hold. It auto-covers every first-class component with no
-    /// per-component code, and component add/remove too (a `None`↔`Some` is a diff
-    /// at that component's path). Propagation rebuilds the entity from the source,
-    /// then re-applies these paths on top, so non-overridden fields track the source
-    /// while overridden ones are preserved. The current set is
-    /// `scene::prefab::live::live_overrides`; it is stored here before a propagation,
-    /// a save and a Play snapshot. `#[serde(default)]` so a link with none loads.
+    /// `"/transform/position/0" -> 5.0`). It covers every first-class component with
+    /// no per-component code, and component add/remove too (an added component is one
+    /// entry holding its whole value, a removed one is `null` at its path).
+    /// Propagation rebuilds the entity from the source, then re-applies these paths
+    /// on top, so non-overridden fields track the source while overridden ones are
+    /// preserved. The current set is `scene::prefab::live::live_overrides`; it is
+    /// stored here before a propagation, a save and a Play snapshot.
+    /// `#[serde(default)]` so a link with none loads.
     #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
     pub overrides: BTreeMap<String, serde_json::Value>,
     /// The source as this entity last took it (#1527): its masked leaves as the stamp
     /// or the last propagation built them, before any override. An edit is an
     /// override the moment it is made because the live overrides are the entity's
-    /// diff against this, not a list someone records. Runtime only: a saved scene
-    /// carries `overrides`, and its load propagates a fresh one.
+    /// diff against this, not a list someone records. Runtime only: a saved scene or
+    /// a Play snapshot carries `overrides` and no baseline, and its load or restore
+    /// propagates a fresh one (none while the source is missing).
     #[serde(skip)]
     pub baseline: Option<std::sync::Arc<BTreeMap<String, serde_json::Value>>>,
 }

@@ -15,6 +15,7 @@
 //! can never drift. Apply/link/overrides for linked instances live in submodules.
 
 pub mod apply;
+pub mod diff;
 mod extract;
 pub mod instance;
 pub mod link;
