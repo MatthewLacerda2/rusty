@@ -168,8 +168,10 @@ impl Renderer {
         }
     }
 
-    /// The skybox panorama every pass that reads the sky binds (forward reflections,
-    /// post-FX's SSR fallback), or the default texture when the scene has none.
+    /// The skybox panorama every pass that reads the sky binds (the forward pass's
+    /// reflections, the post chain's binding 5), or the default texture when the scene
+    /// has none. No built-in reader samples that one as light: the forward pass falls
+    /// back to the procedural sky, and SSR samples no sky at all (#1542).
     pub(crate) fn sky_panorama(&self) -> &GpuTexture {
         self.skybox_texture
             .as_deref()
