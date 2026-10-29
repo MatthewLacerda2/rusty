@@ -113,9 +113,7 @@ fn draw_overrides_list(
     action: &mut Option<PrefabAction>,
 ) {
     let t = theme::from_ui(ui);
-    let paths: Vec<String> = crate::scene::prefab::live::entity_overrides(world, id)
-        .into_keys()
-        .collect();
+    let paths = crate::scene::prefab::live::entity_overrides(world, id).keys();
     ui.separator();
     if paths.is_empty() {
         ui.colored_label(t.text_secondary, "No overrides on this object");
@@ -162,10 +160,17 @@ fn draw_override_row(
     });
 }
 
-/// Turn a json-pointer override path (e.g. `/transform/position/0`) into a friendly
-/// inspector label (e.g. `transform / position / 0`). Purely cosmetic; the dispatched
-/// action keeps the raw pointer.
+/// Turn an override key into a friendly inspector label: a json pointer
+/// (`/transform/position/0`) reads `transform / position / 0`, an added component
+/// (`+/light`) `light (added)` and a removed one (`-/light`) `light (removed)`.
+/// Purely cosmetic; the dispatched action keeps the raw key.
 fn field_label(path: &str) -> String {
+    if let Some(component) = path.strip_prefix("+/") {
+        return format!("{component} (added)");
+    }
+    if let Some(component) = path.strip_prefix("-/") {
+        return format!("{component} (removed)");
+    }
     let trimmed = path.trim_start_matches('/');
     if trimmed.is_empty() {
         return path.to_string();

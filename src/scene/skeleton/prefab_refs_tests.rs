@@ -41,7 +41,8 @@ fn linked(tag: &str) -> (Scene, u32, u32, u32, String) {
 }
 
 fn override_of_in(scene: &Scene, rope: u32) -> serde_json::Value {
-    crate::scene::prefab::live::entity_overrides(&scene.world, rope)["/joint/connected_body"]
+    crate::scene::prefab::live::entity_overrides(&scene.world, rope).modifications
+        ["/joint/connected_body"]
         .clone()
 }
 

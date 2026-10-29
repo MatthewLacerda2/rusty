@@ -16,8 +16,9 @@
 //! - `/rect_transform/world_anchor/target`;
 //! - `/mesh/skeleton/bodies/<bone>/joint/connected_body`: a saved ragdoll joint, in a
 //!   document only (a load hands it to the bone, `scene::skeleton`'s `sync`);
-//! - `/prefab_link/overrides/<override path>`: an override leaf whose path is one of
-//!   the above holds an instance id too.
+//! - `/prefab_link/overrides/<escaped pointer>`: an id a prefab instance's overrides
+//!   hold, at a modification's leaf, inside one's whole value or inside an added
+//!   component (`prefab_link`'s `visit_override_refs`).
 //!
 //! Not walked: `MeshComponent`'s `skeleton.bones`, one `Option` per joint slot
 //! (runtime-only, never saved, re-bound by name on load). They join the clearing
@@ -28,11 +29,7 @@
 //! A new component field that holds an entity id joins its component's
 //! `EntityRefs` impl; a new component holding one also joins the list.
 
-use std::collections::BTreeMap;
-
-use serde_json::Value;
-
-use super::{Entity, PrefabLink};
+use super::Entity;
 use crate::components::{
     JointComponent, LodGroupComponent, MeshComponent, RectTransformComponent, SelectableComponent,
     SubEmitters,
@@ -141,8 +138,9 @@ with_ref_components!(entity_walk);
 
 impl Entity {
     /// Whether `pointer` (a JSON pointer into the entity document, as prefab
-    /// overrides key their leaves) names one of the component id leaves. Override
-    /// leaves never nest, so `/prefab_link/…` is not one.
+    /// overrides key their leaves) names one of the component id leaves. The ids an
+    /// instance's overrides hold are visited under `/prefab_link/overrides/…`, which
+    /// is not one.
     pub fn is_ref_pointer(pointer: &str) -> bool {
         let under = |prefix: &str, refs: &[&str]| {
             pointer
@@ -166,58 +164,4 @@ impl Entity {
 /// one escape every pointer builder uses (prefab overrides' too).
 pub fn escape_token(token: &str) -> String {
     token.replace('~', "~0").replace('/', "~1")
-}
-
-/// An override leaf that holds an id: its path is a reference pointer and its value
-/// a number (or `null`, a dropped reference).
-fn override_slot(path: &str, value: &Value) -> Option<Option<u32>> {
-    if !Entity::is_ref_pointer(path) {
-        return None;
-    }
-    match value {
-        Value::Null => Some(None),
-        v => v.as_u64().and_then(|n| u32::try_from(n).ok()).map(Some),
-    }
-}
-
-/// The pointer of override `path` under the link: `/overrides/<escaped path>`.
-fn override_pointer(path: &str) -> String {
-    format!("/overrides/{}", escape_token(path))
-}
-
-/// Visit every id leaf of an override map (`PrefabLink::overrides`), keyed by
-/// override path; a dropped one becomes `null`, the override of "no reference".
-pub fn visit_override_refs(overrides: &mut BTreeMap<String, Value>, visit: &mut RefVisit<'_>) {
-    for (path, value) in overrides.iter_mut() {
-        let Some(mut slot) = override_slot(path, value) else {
-            continue;
-        };
-        visit(path, &mut slot);
-        *value = slot.map_or(Value::Null, Value::from);
-    }
-}
-
-impl EntityRefs for PrefabLink {
-    fn visit_refs(&mut self, visit: &mut RefVisit<'_>) {
-        visit_override_refs(&mut self.overrides, &mut |path, r| {
-            visit(&override_pointer(path), r)
-        });
-    }
-
-    fn each_ref(&self, visit: &mut dyn FnMut(&str, u32)) {
-        for (path, value) in &self.overrides {
-            if let Some(Some(id)) = override_slot(path, value) {
-                visit(&override_pointer(path), id);
-            }
-        }
-    }
-
-    #[cfg(test)]
-    fn every_ref() -> Self {
-        let overrides = BTreeMap::from([("/joint/connected_body".into(), Value::Null)]);
-        Self {
-            overrides,
-            ..Self::default()
-        }
-    }
 }

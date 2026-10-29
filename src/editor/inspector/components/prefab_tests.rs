@@ -62,9 +62,7 @@ fn an_edit_is_listed_as_an_override_without_recording() {
     assert!(list_instance_overrides(&scene, root).unwrap().is_empty());
     scene.world.transform_mut(child).unwrap().position.x = 5.0;
     // What the card lists is the live diff: the edit shows the moment it is made.
-    let paths: Vec<String> = crate::scene::prefab::live::entity_overrides(&scene.world, child)
-        .into_keys()
-        .collect();
+    let paths = crate::scene::prefab::live::entity_overrides(&scene.world, child).keys();
     assert_eq!(paths, ["/transform/position/0"]);
 }
 
@@ -175,5 +173,7 @@ fn field_label_humanizes_a_json_pointer() {
         "transform / position / 0"
     );
     assert_eq!(field_label("/name"), "name");
+    assert_eq!(field_label("+/light"), "light (added)");
+    assert_eq!(field_label("-/camera"), "camera (removed)");
     assert_eq!(field_label(""), "");
 }

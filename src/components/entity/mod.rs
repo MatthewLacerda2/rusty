@@ -27,48 +27,12 @@ use super::{
 use super::{CharacterControllerComponent, JointComponent, LineComponent, LodGroupComponent};
 use super::{NavMeshModifierVolumeComponent, ReverbZoneComponent, TrailComponent};
 
+mod prefab_link;
 mod refs;
 
+pub use prefab_link::{visit_override_refs, PrefabLink, PrefabOverrides, SIZE_TOKEN};
 pub(crate) use refs::with_ref_components;
-pub use refs::{escape_token, visit_override_refs, EntityRefs, RefVisit};
-
-/// The live link from an instance entity back to the `.prefab` it was stamped from
-/// (#216). Set on EVERY entity of a linked instance — not just the root — so that
-/// reordering the source's entities can never scramble which source entity an
-/// instance entity corresponds to: the correlation is the explicit `local_id` (the
-/// source's own 0-based local id), independent of order. The root anchors the
-/// `source` path; non-root entities carry the same path so each can be matched on
-/// its own. Absent (`None`) on a plain entity or a v1 *unpacked* copy, which has no
-/// link back to the asset.
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
-pub struct PrefabLink {
-    /// Path to the source `.prefab` asset (the same string for every entity of one
-    /// instance).
-    pub source: String,
-    /// The corresponding source entity's LOCAL id (0-based; root = 0). This is the
-    /// stable correlation key against `PrefabData::entities`, order-independent.
-    pub local_id: u32,
-    /// This entity's per-instance overrides as last stored: its generic field diff
-    /// against [`Self::baseline`], as `json-pointer-path -> value` (e.g.
-    /// `"/transform/position/0" -> 5.0`). It covers every first-class component with
-    /// no per-component code, and component add/remove too (an added component is one
-    /// entry holding its whole value, a removed one is `null` at its path).
-    /// Propagation rebuilds the entity from the source, then re-applies these paths
-    /// on top, so non-overridden fields track the source while overridden ones are
-    /// preserved. The current set is `scene::prefab::live::live_overrides`; it is
-    /// stored here before a propagation, a save and a Play snapshot.
-    /// `#[serde(default)]` so a link with none loads.
-    #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
-    pub overrides: BTreeMap<String, serde_json::Value>,
-    /// The source as this entity last took it (#1527): its masked leaves as the stamp
-    /// or the last propagation built them, before any override. An edit is an
-    /// override the moment it is made because the live overrides are the entity's
-    /// diff against this, not a list someone records. Runtime only: a saved scene or
-    /// a Play snapshot carries `overrides` and no baseline, and its load or restore
-    /// propagates a fresh one (none while the source is missing).
-    #[serde(skip)]
-    pub baseline: Option<std::sync::Arc<BTreeMap<String, serde_json::Value>>>,
-}
+pub use refs::{escape_token, EntityRefs, RefVisit};
 
 // Not sorted (#911): field order is the order a saved scene writes its keys in.
 #[derive(Clone, Debug, Serialize, Deserialize)]

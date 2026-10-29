@@ -21,7 +21,7 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use crate::components::{Entity, EntityRefs};
-use crate::scene::prefab::diff::leaves;
+use crate::scene::prefab::diff::masked;
 use crate::scene::prefab::instance::instance_members;
 use crate::scene::prefab::live::{entity_overrides, keep_root_placement, sync_overrides};
 use crate::scene::prefab::overrides::apply_overrides;
@@ -121,7 +121,7 @@ pub fn revert_instance_overrides(scene: &mut Scene, root_id: u32) -> Result<(), 
     let baselines = in_instance_space(scene, &ids, baselines);
     for id in ids {
         if let Some(mut link) = scene.world.prefab_link_mut(id) {
-            link.overrides.clear();
+            link.overrides = Default::default();
         }
         rebuild_entity(scene, id, &baselines, false);
     }
@@ -139,8 +139,8 @@ pub fn list_instance_overrides(scene: &Scene, root_id: u32) -> Result<Vec<String
         let Some(local_id) = local_id_of(scene, id) else {
             continue;
         };
-        for path in entity_overrides(&scene.world, id).keys() {
-            out.push(format!("{local_id}:{path}"));
+        for key in entity_overrides(&scene.world, id).keys() {
+            out.push(format!("{local_id}:{key}"));
         }
     }
     out.sort();
@@ -153,8 +153,10 @@ pub fn list_instance_overrides(scene: &Scene, root_id: u32) -> Result<Vec<String
 /// Play) reaches each instance, and every baseline is rebuilt against the live
 /// bones, which a load or a Stop respawns with fresh ids. An instance root is a
 /// linked entity with `local_id == 0` (the prefab root). A source whose file is
-/// missing is skipped (the instance keeps its values and its baseline), so a
-/// renamed/deleted `.prefab` never aborts the scene load.
+/// missing is skipped, so a renamed/deleted `.prefab` never aborts the scene load:
+/// the instance keeps its values and the overrides its links hold, and has no
+/// baseline (the document it came from carries none), so an edit made meanwhile is
+/// not tracked until the source is back.
 pub fn propagate_all_linked_instances(scene: &mut Scene) {
     let roots: Vec<u32> = scene
         .world
@@ -189,7 +191,7 @@ fn rebuild_entity(scene: &mut Scene, id: u32, baselines: &BTreeMap<u32, Entity>,
     rebuilt.children = children;
     rebuilt.prefab_link = scene.world.prefab_link(id).map(|l| (*l).clone());
     if let Some(link) = rebuilt.prefab_link.as_mut() {
-        link.baseline = Some(Arc::new(leaves(baseline)));
+        link.baseline = Some(Arc::new(masked(baseline)));
     }
     if keep {
         if let Some(overrides) = rebuilt.prefab_link.as_ref().map(|l| l.overrides.clone()) {

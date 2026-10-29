@@ -13,7 +13,7 @@ use super::{install, RehydratedMesh};
 use crate::asset::{self, AssetRef, ImportedAsset, SubMesh};
 use crate::components::{ColliderComponent, ColliderShape};
 use crate::core::fs::written::Stale;
-use crate::scene::prefab::diff::leaves;
+use crate::scene::prefab::diff::masked;
 use crate::scene::prefab::live::shift_baseline;
 use crate::scene::Scene;
 
@@ -84,7 +84,7 @@ fn reimport_where(scene: &mut Scene, rig: Rig, mut names: impl FnMut(&str) -> bo
         let before = linked.then(|| scene.world.reference_document(id)).flatten();
         if sub.is_some_and(|sub| reimport_entity_mesh(scene, id, sub, rig)) {
             if let Some(before) = before {
-                shift_baseline(&mut scene.world, id, &leaves(&before));
+                shift_baseline(&mut scene.world, id, &masked(&before));
             }
             rebuilt.push(id);
         }

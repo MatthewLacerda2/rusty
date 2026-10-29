@@ -1,8 +1,8 @@
 //! src/scene/prefab/live/mod.rs — an instance edit is an override the moment it is made (#1527).
 //!
 //! Every entity of a linked instance keeps the source as it last took it
-//! ([`PrefabLink::baseline`](crate::components::PrefabLink)): its leaves as the stamp or
-//! the last propagation built them, before any override. Its live overrides are its
+//! ([`PrefabLink::baseline`](crate::components::PrefabLink)): its masked document as
+//! the stamp or the last propagation built it, before any override. Its live overrides are its
 //! diff against that baseline, so an edit is an override whatever made it (the gizmo,
 //! the inspector, a Lua setter, the MCP), with no hook in any setter, as in Unity.
 //!
@@ -27,33 +27,33 @@
 //! The root's position and rotation belong to the instance, never the source (Unity
 //! does the same): propagation keeps them and they are never an override.
 
-use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use serde_json::Value;
 
-use crate::components::{Entity, TransformComponent};
+use crate::components::{Entity, PrefabOverrides, TransformComponent};
 use crate::ecs::World;
-use crate::scene::prefab::diff::{diff, leaves, Leaves};
+use crate::scene::prefab::diff::{diff, diff_values, masked};
+use crate::scene::prefab::overrides::apply_values;
 
 /// `entity`'s overrides now: its diff against its baseline, or the stored set when it
 /// has none yet (a loaded instance whose source was missing). Empty when unlinked.
-pub fn live_overrides(entity: &Entity) -> BTreeMap<String, Value> {
+pub fn live_overrides(entity: &Entity) -> PrefabOverrides {
     let Some(link) = &entity.prefab_link else {
-        return BTreeMap::new();
+        return PrefabOverrides::default();
     };
     let mut out = match &link.baseline {
         Some(base) => diff(entity, base),
         None => link.overrides.clone(),
     };
     if link.local_id == 0 {
-        out.retain(|path, _| !is_root_placement(path));
+        out.modifications.retain(|path, _| !is_root_placement(path));
     }
     out
 }
 
 /// The live overrides of entity `id` ([`live_overrides`]).
-pub fn entity_overrides(world: &World, id: u32) -> BTreeMap<String, Value> {
+pub fn entity_overrides(world: &World, id: u32) -> PrefabOverrides {
     world
         .reference_document(id)
         .map(|e| live_overrides(&e))
@@ -86,11 +86,11 @@ pub fn write_overrides(entities: &mut [Entity]) {
 }
 
 /// Move entity `id`'s baseline by what a model re-import changed on it, `before`
-/// being its leaves before: a refit mesh collider is the model's, not an edit, so it
-/// is neither an override nor applied to the source; every other leaf keeps its
-/// override.
-pub fn shift_baseline(world: &mut World, id: u32, before: &Leaves) {
-    let Some(after) = world.reference_document(id).map(|doc| leaves(&doc)) else {
+/// being its masked document before: a refit mesh collider is the model's, not an
+/// edit, so it is neither an override nor applied to the source; every other leaf
+/// keeps its override.
+pub fn shift_baseline(world: &mut World, id: u32, before: &Value) {
+    let Some(after) = world.reference_document(id).map(|doc| masked(&doc)) else {
         return;
     };
     let Some(mut link) = world.prefab_link_mut(id) else {
@@ -99,17 +99,7 @@ pub fn shift_baseline(world: &mut World, id: u32, before: &Leaves) {
     let Some(base) = link.baseline.as_mut().map(Arc::make_mut) else {
         return;
     };
-    for path in before.keys().chain(after.keys()) {
-        match (before.get(path), after.get(path)) {
-            (a, b) if a == b => {}
-            (_, Some(now)) => {
-                base.insert(path.clone(), now.clone());
-            }
-            (_, None) => {
-                base.remove(path);
-            }
-        }
-    }
+    apply_values(base, &diff_values(before, &after));
 }
 
 /// Take each of `ids`' current values as its baseline: a freshly stamped instance is
@@ -120,7 +110,7 @@ pub fn take_baselines(world: &mut World, ids: impl IntoIterator<Item = u32>) {
             continue;
         };
         if let Some(mut link) = world.prefab_link_mut(id) {
-            link.baseline = Some(Arc::new(leaves(&doc)));
+            link.baseline = Some(Arc::new(masked(&doc)));
         }
     }
 }
