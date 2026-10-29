@@ -67,5 +67,5 @@ fn a_broken_recipe_is_reported_before_any_file_is_read() {
         inputs: vec!["nowhere".into()],
     });
     let err = load_sources(&recipe, Path::new("")).unwrap_err();
-    assert!(err.contains("unknown input 'nowhere'"), "{err}");
+    assert!(err.contains("unknown input \"nowhere\""), "{err}");
 }
