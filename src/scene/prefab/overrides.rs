@@ -105,7 +105,6 @@ pub fn leaves(entity: &Entity) -> BTreeMap<String, Value> {
 /// The override map for `instance` against `baseline`: every flattened leaf whose
 /// value differs (a changed scalar, an added leaf, or a removed leaf surfaced as
 /// `null`). Both sides are masked first, so identity/geometry never leak in.
-#[cfg(test)]
 pub fn diff_entity(instance: &Entity, baseline: &Entity) -> BTreeMap<String, Value> {
     diff_leaves(&leaves(instance), &leaves(baseline))
 }

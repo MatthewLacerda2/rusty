@@ -12,7 +12,7 @@
 //! serializer: [`apply_overrides`] is the same setter the live propagation uses (now
 //! aimed at a raw source entity), [`read_prefab_file`] / [`write_prefab_file`] are the
 //! one `.prefab` reader/writer, and clearing the instance's overrides afterwards reuses
-//! [`revert_instance_overrides`] / [`propagate`] so the instance re-baselines
+//! [`revert_instance_overrides`] / `link::propagate` so the instance re-baselines
 //! against the now-updated source. Scope mirrors #216: a flat instance of a flat prefab,
 //! matched to source entities purely by the link's `local_id`.
 
