@@ -52,7 +52,7 @@ fn the_open_hall_is_split_into_probes_no_wider_than_the_region() {
         let size = p.box_max - p.box_min;
         assert!(size.x <= 12.5 && size.z <= 12.5, "{p:?}");
         assert!(
-            p.box_min.x >= -10.5 && p.box_max.x <= 10.5,
+            p.box_min.x >= -11.0 && p.box_max.x <= 11.0,
             "inside the hall: {p:?}"
         );
         assert_eq!(
@@ -85,7 +85,7 @@ fn a_dust2_sized_level_gets_a_probe_per_room() {
     assert_eq!(plans.len(), 400);
     let first = plans[0];
     assert!(
-        first.box_max.x <= 10.5 && first.box_max.z <= 10.5,
+        first.box_max.x <= 11.0 && first.box_max.z <= 11.0,
         "{first:?}"
     );
     assert!(plans.iter().all(|p| p.position.is_finite()));

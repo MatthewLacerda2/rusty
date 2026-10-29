@@ -7,8 +7,8 @@ use std::rc::Rc;
 
 use glam::Vec3;
 
-use super::super::gpu_tests::{cube_file, probes_at, renderer};
-use super::ranked;
+use super::super::gpu_tests::{cube_file, first, probes_at, renderer};
+use super::{array_bytes, ranked};
 use crate::render::ibl::reflection_probes::MAX_REFLECTION_PROBES;
 use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;
@@ -43,7 +43,7 @@ fn gpu_the_camera_room_keeps_its_probe_past_the_budget() {
     let probes = &renderer.reflection_probes;
     let p = probes.probe_for(Vec3::new(0.0, -50.0, 0.0));
     assert_ne!(p, 0, "the room's probe is resident");
-    assert_eq!(probes.uniforms()[p as usize - 1].center, [0.0, -90.0, 0.0]);
+    assert_eq!(probes.uniforms()[first(p)].center, [0.0, -90.0, 0.0]);
 }
 
 /// Two symmetric probes covering one object give it the same probe from either side
@@ -65,24 +65,23 @@ fn gpu_symmetric_probes_do_not_snap_with_the_camera() {
     let centre_from = |renderer: &mut crate::render::Renderer, x: f32| {
         renderer.update_reflection_probes(&scene, Vec3::new(x, 0.0, 0.0));
         let probes = &renderer.reflection_probes;
-        let p = probes.probe_for(Vec3::ZERO) as usize;
-        probes.uniforms()[p - 1].center
+        probes.uniforms()[first(probes.probe_for(Vec3::ZERO))].center
     };
     let left = centre_from(&mut renderer, -0.5);
     assert_eq!(left, centre_from(&mut renderer, 0.5));
     assert_eq!(left, [-1.0, 0.0, 0.0], "the lower scene index");
 }
 
-/// A larger hand-set cube is passed over: it neither takes a budget slot nor knocks
-/// out the baked-size probes, it is never uploaded, and it warns once per load: again
-/// only after a re-bake reads it again.
+/// A cube whose size is not a power of two is passed over: it neither takes a budget
+/// slot nor knocks out the other probes, it is never uploaded, and it warns once per
+/// load: again only after a re-bake reads it again.
 #[test]
 fn gpu_a_larger_cube_is_passed_over_and_never_uploaded() {
     let Some(mut renderer) = renderer() else {
         return;
     };
     let (big, small) = (
-        cube_file("big_256.ktx2", 256, 5),
+        cube_file("odd_48.ktx2", 48, 5),
         cube_file("small_4.ktx2", 4, 5),
     );
     let scene = probes_at(&[(-2.0, &big), (2.0, &small)]);
@@ -108,15 +107,15 @@ fn gpu_a_larger_cube_is_passed_over_and_never_uploaded() {
     );
 }
 
-/// `update` takes only admitted cubes: one larger than the face would give the
-/// array a mip count wgpu rejects, so a debug build stops at the contract.
+/// `update` takes only admitted cubes: one whose size is not a power of two would give
+/// the array a mip count wgpu rejects, so a debug build stops at the contract.
 #[test]
 #[cfg(debug_assertions)]
 fn gpu_update_refuses_a_cube_that_does_not_fit() {
     let Some(mut renderer) = renderer() else {
         return;
     };
-    let path = cube_file("unadmitted_256.ktx2", 256, 5);
+    let path = cube_file("unadmitted_48.ktx2", 48, 5);
     let cube = Rc::new(renderer.load_cubemap_mips(&path, |_| true).unwrap());
     let scene = probes_at(&[(0.0, &path)]);
     let wanted = [(&scene.reflection_probes.probes[0], cube)];
@@ -130,4 +129,29 @@ fn gpu_update_refuses_a_cube_that_does_not_fit() {
         message.contains("every wanted cube was admitted"),
         "{message}"
     );
+}
+
+/// The resident set stops at the scene's byte budget (#1584), counted at the array's
+/// face; the nearest box is kept whatever its size.
+#[test]
+fn gpu_the_budget_keeps_the_nearest_probes() {
+    let Some(mut renderer) = renderer() else {
+        return;
+    };
+    let cube = cube_file("budget_4.ktx2", 4, 70);
+    let mut scene = probes_at(&[(2.0, &cube), (6.0, "x"), (10.0, &cube)]);
+    scene
+        .reflection_probes
+        .set_cubemap(1, cube_file("budget_b.ktx2", 4, 20));
+    scene.lighting_settings.reflections.budget_mb = 0;
+    let probes =
+        |r: &crate::render::Renderer, x: f32| r.reflection_probes.probe_for(Vec3::new(x, 0.0, 0.0));
+    renderer.update_reflection_probes(&scene, Vec3::ZERO);
+    assert_ne!(
+        probes(&renderer, 2.0),
+        0,
+        "the nearest is kept past a zero budget"
+    );
+    assert_eq!(probes(&renderer, 6.0), 0, "the next is past the budget");
+    assert_eq!((array_bytes(4, 1), array_bytes(512, 1)), (512, 8_388_608));
 }

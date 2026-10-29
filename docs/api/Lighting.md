@@ -10,9 +10,9 @@ path. The two individual verbs stay for a script that wants only one of them.
 | Function | Signature | Returns |
 |---|---|---|
 | `Lighting.Generate` *(dev-only)* | `()` | `{ lightmaps, lightProbes, reflectionProbes, saved }` |
-| `Lighting.GetSettings` *(dev-only)* | `()` | `{ texelsPerUnit, samples, bounces, seed, directional }` |
-| `Lighting.SetSettings` *(dev-only)* | `({ texelsPerUnit?, samples?, bounces?, seed?, directional? })` | — |
-| `Lighting.Bake` *(dev-only)* | `([probeSpacing], [reflectionRegion], [perAxisCap])` | `true` if at least one GPU bake ran, `false` if both skipped (no adapter) |
+| `Lighting.GetSettings` *(dev-only)* | `()` | `{ texelsPerUnit, samples, bounces, seed, directional, reflectionResolution, reflectionBudgetMB }` |
+| `Lighting.SetSettings` *(dev-only)* | `({ texelsPerUnit?, samples?, bounces?, seed?, directional?, reflectionResolution?, reflectionBudgetMB? })` | — |
+| `Lighting.Bake` *(dev-only)* | `([probeSpacing], [reflectionRegion])` | `true` if at least one GPU bake ran, `false` if both skipped (no adapter) |
 | `Lighting.BakeLightmaps` *(dev-only)* | `([texelsPerUnit], [samples], [bounces], [seed], [directional])` | number of lightmaps written |
 | `Lighting.ClearLightmaps` *(dev-only)* | `()` | — |
 
@@ -24,7 +24,10 @@ path. The two individual verbs stay for a script that wants only one of them.
   `Lighting.SetSettings{ samples = 256 }` changes only the fields it names (each clamped
   to the editor's range: `0.25`–`64` texels per unit, `1`–`4096` samples, `1`–`16`
   bounces; a NaN or infinite density takes the default `8`); the editor's card edits the
-  same fields under the button. A scene whose settings are all
+  same fields under the button. The reflection probes' defaults sit beside them:
+  `reflectionResolution` (default `512`, a power of two in 16–2048) and
+  `reflectionBudgetMB` (default `128`, `8`–`2048`), edited in the scene Inspector's
+  *Reflection Probes* section (see `Reflection.md`). A scene whose settings are all
   at their defaults leaves the block out of its file. `Lighting.BakeLightmaps` takes the
   same settings for every argument it is not given.
 - **The result is written at once**, as Unity writes its lighting data asset: the
@@ -61,10 +64,17 @@ so the same level always yields the same layout):
   cover the air actors move through), intersected with the static-geometry AABB. When no
   nav surface has been baked, it **falls back to the static-geometry AABB** alone.
   `probeSpacing` (default `4.0`) is the grid cell size in world units.
-- **Reflection probes** — one per coarse region, from subdividing the static AABB into
-  `reflectionRegion`-sized (default `12.0`) rooms; each region yields a centroid + a
-  parallax box covering it. `perAxisCap` (default `4`) bounds the per-axis region count so
-  a huge level can't explode the bake.
+- **Reflection probes** — **one per room** (#1584). The floor plan comes from the baked
+  **nav surface** (each cell's lowest walkable floor and the underside above it), or,
+  with none, from the static colliders' bounds. It is cut into rooms where it narrows
+  below **2.5 m** (a doorway, an arch, a corridor mouth) or steps by more than 0.5 m.
+  Each room's probe captures from **eye height (1.6 m) over the room's middle**,
+  standing on open floor (never inside geometry), with its box **fitted to the room's
+  walls, floor and ceiling** (the top of the level when the room is open to the sky).
+  A room wider than `reflectionRegion` (default `12.0`) is split into probes no wider
+  than it. Open floor too narrow to hold a room (a wall top, a lone ledge) gets none.
+  A floor plan holds one floor per cell, so a room stacked under another (a tunnel
+  under a catwalk) shares the lower floor's probes.
 
 **Manual-vs-auto rule** (decided **per set**): if the scene already carries any light
 probes, their layout is **kept and only rebaked** — auto-placement runs only for a set
