@@ -22,7 +22,7 @@ fn gpu_a_rendered_view_eases_in_play_holds_when_paused_and_snaps_in_edit() {
     let Some(mut r) = crate::render::test_gpu::headless_or_skip(16, 16) else {
         return;
     };
-    let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, 16, 16, 2);
+    let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, 16, 16);
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
     let id = scene.add_entity("Camera".to_string());

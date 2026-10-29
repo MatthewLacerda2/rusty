@@ -1,12 +1,15 @@
-//! The Camera card's motion-blur widgets (#1433, #1436): the toggle, the sample
-//! count, the intensity (shutter fraction) and the clamp (longest streak). Writes go
+//! The Camera card's motion-blur widgets (#1433, #1436): the toggle, the quality
+//! level (#1522) with the `Custom` sample count, the intensity (shutter fraction)
+//! and the clamp (longest streak). Writes go
 //! through the shared ops, so this card and `Graphics.SetMotionBlur*` are one path;
 //! each op owns its clamp.
 
+use super::post_processing::quality_row;
+use crate::core::settings::quality::EffectQuality;
 use crate::scene::authoring::rendering::camera as camera_ops;
 use crate::scene::CameraComponent;
 
-/// The motion-blur toggle and its three sliders.
+/// The motion-blur toggle, its quality and its sliders.
 pub(super) fn draw_motion_blur(
     ui: &mut egui::Ui,
     world: &mut crate::ecs::World,
@@ -21,13 +24,21 @@ pub(super) fn draw_motion_blur(
         }
         *is_dirty = true;
     }
+    if let Some(quality) = quality_row(ui, "Motion Blur Quality", cam.motion_blur_quality) {
+        if let Some(mut c) = world.camera_mut(id) {
+            camera_ops::set_motion_blur_quality(&mut c, quality);
+        }
+        *is_dirty = true;
+    }
     let mut samples = cam.motion_blur_samples;
     let range = CameraComponent::MIN_MOTION_BLUR_SAMPLES..=CameraComponent::MAX_MOTION_BLUR_SAMPLES;
-    if slider(
-        ui,
-        "Samples:",
-        crate::editor::widgets::slider(&mut samples, range),
-    ) {
+    if cam.motion_blur_quality == EffectQuality::Custom
+        && slider(
+            ui,
+            "Samples:",
+            crate::editor::widgets::slider(&mut samples, range),
+        )
+    {
         if let Some(mut c) = world.camera_mut(id) {
             camera_ops::set_motion_blur_samples(&mut c, samples);
         }

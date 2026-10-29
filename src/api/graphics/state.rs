@@ -2,43 +2,25 @@
 //!
 //! Locate the screen's camera, `scene::camera::main_camera` (Unity's `Camera.main`,
 //! the base of the screen stack, #1434), and its post-FX volume, and read or mutate
-//! them, plus the small string<->enum conversions the Lua surface speaks in.
+//! them, and the render scale in the shared graphics cell.
 //! These are the only places `Graphics.*` reaches into render-only component state.
 
 use std::cell::RefCell;
 
 use super::super::{put, Reg};
 use crate::components::{CameraComponent, PostProcessingComponent};
-use crate::core::settings::quality::QualityPreset;
 use crate::core::settings::render_scale::RenderScale;
 use crate::core::settings::GraphicsSettings;
 use crate::scene::camera::{camera_volume, main_camera};
 use crate::scene::Scene;
 
-/// Global quality preset and render scale get/set over the shared resource cell. Lives here (not
-/// `mod.rs`) to keep that file under the size cap; reaches `QualityPreset::name`/`QualityPreset::parse`
-/// directly.
-pub(super) fn register_quality<'scope>(
+/// The scene's render scale (#1498), in the shared graphics cell: clamped to URP's
+/// range.
+pub(super) fn register_render_scale<'scope>(
     scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     graphics: &'scope RefCell<GraphicsSettings>,
 ) -> Reg {
-    put(
-        table,
-        "GetQuality",
-        scope.create_function(|_, ()| Ok(graphics.borrow().quality.name().to_string())),
-    )?;
-    put(
-        table,
-        "SetQuality",
-        scope.create_function(|_, name: String| {
-            if let Some(p) = QualityPreset::parse(&name) {
-                graphics.borrow_mut().quality = p;
-            }
-            Ok(())
-        }),
-    )?;
-    // The scene's render scale (#1498), in the same cell: clamped to URP's range.
     put(
         table,
         "GetRenderScale",

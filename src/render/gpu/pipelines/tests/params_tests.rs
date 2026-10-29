@@ -73,7 +73,7 @@ pub(super) fn lua(scene: &RefCell<Scene>, script: &str) {
 
 /// The summed (red, blue) of the centre row's left and right halves.
 pub(super) fn halves(renderer: &mut Renderer, scene: &Scene) -> [(u32, u32); 2] {
-    let mut view = RenderView::offscreen(&renderer.device, OFFSCREEN_FORMAT, RES, RES, 2);
+    let mut view = RenderView::offscreen(&renderer.device, OFFSCREEN_FORMAT, RES, RES);
     let out = view.color_target_view().unwrap();
     let cam = Camera::new(Vec3::new(0.0, 0.0, 6.0), -90.0, 0.0);
     renderer.render(&mut view, scene, &cam, &out, false);

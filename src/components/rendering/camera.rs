@@ -5,6 +5,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::core::settings::quality::EffectQuality;
+
 /// A fresh camera renders every layer (Unity's default Culling Mask = Everything).
 /// A scene file that leaves out `culling_mask` loads with this all-on value.
 fn default_culling_mask() -> u32 {
@@ -60,6 +62,11 @@ pub struct CameraComponent {
     #[serde(default = "default_clear_flags")]
     pub clear_flags: ClearFlags,
     pub motion_blur_active: bool,
+    /// Which tap count runs (#1522): a level of the active quality preset, or
+    /// `motion_blur_samples` when `Custom`.
+    #[serde(default)]
+    pub motion_blur_quality: EffectQuality,
+    /// `Custom`: the taps per pixel.
     pub motion_blur_samples: u32,
     /// Motion blur's *Intensity* (#1436, Unity's): the shutter fraction, how much of
     /// a frame's motion one frame smears. `0.5` is a 180° shutter.
@@ -72,9 +79,8 @@ pub struct CameraComponent {
     /// Run the FXAA pass at the end of the post-FX chain (#360). Defaults to `true`
     /// (see `default_fxaa_active`) — the same default-on posture as motion blur,
     /// because both are cheap whole-image effects a game wants unless it says
-    /// otherwise. Unlike motion blur this is *not* gated by the quality preset: FXAA
-    /// runs on every tier including Low, where it is exactly the anti-aliasing an
-    /// iGPU floor wants (MSAA being the expensive alternative).
+    /// otherwise. It has no quality knob: it is exactly the anti-aliasing an iGPU
+    /// floor wants (MSAA being the expensive alternative).
     #[serde(default = "default_fxaa_active")]
     pub fxaa_active: bool,
     /// Perspective (the default) or orthographic — a top-down minimap (#430).
@@ -131,6 +137,7 @@ impl Default for CameraComponent {
             render_order: 0,
             clear_flags: default_clear_flags(),
             motion_blur_active: false,
+            motion_blur_quality: EffectQuality::Medium,
             motion_blur_samples: 0,
             motion_blur_intensity: default_motion_blur_intensity(),
             motion_blur_max_length: default_motion_blur_max_length(),

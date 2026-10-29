@@ -63,7 +63,7 @@ fn prop_yard() -> Scene {
 /// Render `scene` once with instancing on or off; the pixels and what was submitted.
 fn render(renderer: &mut Renderer, scene: &Scene, instancing: bool) -> (Vec<u8>, RenderCounters) {
     renderer.instancing = instancing;
-    let mut view = RenderView::offscreen(&renderer.device, OFFSCREEN_FORMAT, W, H, 2);
+    let mut view = RenderView::offscreen(&renderer.device, OFFSCREEN_FORMAT, W, H);
     let out = view.color_target_view().unwrap();
     let cam = Camera::new(Vec3::new(0.0, 5.0, 8.0), -90.0, -30.0);
     renderer.render(&mut view, scene, &cam, &out, false);

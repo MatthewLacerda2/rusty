@@ -4,7 +4,9 @@
 //! A THIN client (#287): each widget reads the snapshot and writes through the
 //! shared `authoring::rendering::post_processing` op `Graphics.*` calls too.
 
-use super::{slider_row, Section};
+use super::{quality_row, slider_row, Section};
+use crate::components::SsaoSettings;
+use crate::core::settings::quality::{EffectQuality, MAX_RESOLUTION_DIVISOR};
 use crate::scene::authoring::rendering::post_processing as vc_ops;
 use crate::scene::PostProcessingComponent;
 
@@ -59,7 +61,8 @@ fn draw_shadows(
     });
 }
 
-/// The Ambient Occlusion section (#436): on/off, radius and strength.
+/// The Ambient Occlusion section (#436): on/off, radius and strength, and its
+/// quality level with the `Custom` samples and divisor (#1522).
 fn draw_ssao(
     ui: &mut egui::Ui,
     world: &mut crate::ecs::World,
@@ -78,7 +81,7 @@ fn draw_ssao(
     }
     if vc.ssao.active {
         let (r, i) = (vc.ssao.radius, vc.ssao.intensity);
-        let max = crate::components::SsaoSettings::MAX_INTENSITY;
+        let max = SsaoSettings::MAX_INTENSITY;
         *is_dirty |= slider_row(
             ui,
             (&mut *world, id),
@@ -95,5 +98,40 @@ fn draw_ssao(
             0.0..=max,
             vc_ops::volume::set_ssao_intensity,
         );
+        draw_ssao_quality(ui, (world, id), vc, is_dirty);
     }
+}
+
+/// SSAO's quality level and, at `Custom`, its sample count and divisor.
+fn draw_ssao_quality(
+    ui: &mut egui::Ui,
+    (world, id): (&mut crate::ecs::World, u32),
+    vc: &PostProcessingComponent,
+    is_dirty: &mut bool,
+) {
+    if let Some(quality) = quality_row(ui, "SSAO Quality", vc.ssao.quality) {
+        if let Some(mut c) = world.post_processing_mut(id) {
+            vc_ops::volume::set_ssao_quality(&mut c, quality);
+        }
+        *is_dirty = true;
+    }
+    if vc.ssao.quality != EffectQuality::Custom {
+        return;
+    }
+    *is_dirty |= slider_row(
+        ui,
+        (&mut *world, id),
+        "    Samples:",
+        vc.ssao.samples as f32,
+        1.0..=SsaoSettings::MAX_SAMPLES as f32,
+        |c, v| vc_ops::volume::set_ssao_samples(c, v.round() as u32),
+    );
+    *is_dirty |= slider_row(
+        ui,
+        (world, id),
+        "    Resolution Divisor:",
+        vc.ssao.resolution_divisor as f32,
+        1.0..=MAX_RESOLUTION_DIVISOR as f32,
+        |c, v| vc_ops::volume::set_ssao_resolution_divisor(c, v.round() as u32),
+    );
 }

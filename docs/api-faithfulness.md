@@ -338,7 +338,7 @@ fields (incl. the spatial fields stored for #213) round-trip through `SceneData`
 | `SetQuality` | ✅ | renderer — `shell::settings::apply_graphics` hands the shared cell to `Renderer::apply_graphics` each frame; persisted at Stop / quit |
 | `SetOption` | ✅ | renderer — the same cell; `postfx::params::effect_runs` ANDs it into bloom / SSR / SSAO / motion blur / depth of field / lens flare / FXAA (`render/postfx/params_tests.rs`, `render/postfx/effects/pack_tests/`); saved to `Storage` at Stop / quit |
 | `ResetOptions` | ✅ | renderer — the same cell, back to the project defaults, choices forgotten (`tests/graphics/options.rs`) |
-| `SetDefaultOption` | ✅ | round-trip — `project.rusty`'s `graphics_options` in the editor (`core/application_tests.rs`); renderer — the live options the player hasn't set follow it |
+| `SetDefaultOption` | ✅ | round-trip — `project.rusty`'s `graphics_options` in the editor (`core/application/tests.rs`); renderer — the live options the player hasn't set follow it |
 
 ### `Video` — over the shared `VideoSettings`
 

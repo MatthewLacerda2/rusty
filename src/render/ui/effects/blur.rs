@@ -5,7 +5,7 @@
 //! does not copy the frame: after the camera stack's post-FX (the last stage of
 //! the per-camera table, #636), it re-runs the post-FX *composite* over the view's
 //! HDR scene colour straight into the chain's first level, at 1/`divisor` of the
-//! view's size (`QualityPreset::backdrop_divisor`). That is the graded,
+//! view's size (`QualityValues::backdrop_divisor`, the quality preset's). That is the graded,
 //! tonemapped, bloomed 3D frame — everything but FXAA and the authored effects,
 //! which a blur would erase anyway — and not UI drawn before it. A fullscreen pass
 //! at reduced resolution doubles as the first downsample.

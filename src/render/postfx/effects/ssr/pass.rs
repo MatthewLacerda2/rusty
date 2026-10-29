@@ -10,7 +10,9 @@
 
 use glam::{Mat4, Vec3};
 
-use super::{march, surface};
+use super::surface;
+use crate::components::Ssr;
+use crate::core::settings::quality::SsrQuality;
 use crate::render::gpu::bind_entry as entry;
 use crate::render::gpu::fullscreen::{color_pass, Fullscreen};
 use crate::render::gpu::layout_entries::{sampler_entry, texture_entry, uniform_entry};
@@ -31,14 +33,18 @@ pub(crate) struct SsrParams {
 }
 
 impl SsrParams {
-    /// The base camera's frame, marching at `quality`.
-    pub(crate) fn new(view_proj: Mat4, eye: Vec3, quality: &str) -> Self {
-        let m = march(quality);
+    /// The base camera's frame, marching as `m` says, within the march's range (a
+    /// preset in `project.rusty` is never clamped on the way in).
+    pub(crate) fn new(view_proj: Mat4, eye: Vec3, m: SsrQuality) -> Self {
+        let steps = m.steps.clamp(1, Ssr::MAX_STEPS);
+        let step = m
+            .step_length
+            .clamp(Ssr::MIN_STEP_LENGTH, Ssr::MAX_STEP_LENGTH);
         Self {
             inv_view_proj: view_proj.inverse().to_cols_array(),
             view_proj: view_proj.to_cols_array(),
             camera_pos: eye.extend(0.0).to_array(),
-            march: [m.steps as f32, m.step, 0.0, 0.0],
+            march: [steps as f32, step, 0.0, 0.0],
         }
     }
 }

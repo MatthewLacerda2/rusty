@@ -7,7 +7,6 @@ use glam::{Mat4, Vec3};
 use super::{track, wanted, HistoryKey, MotionHistory};
 use crate::components::CameraComponent;
 use crate::core::settings::graphics_options::GraphicsOption;
-use crate::core::settings::quality::QualityPreset;
 use crate::core::settings::GraphicsSettings;
 use crate::render::postfx::params::PostSource;
 use crate::render::InstanceData;
@@ -117,34 +116,25 @@ fn velocity_is_written_only_where_motion_blur_runs() {
         motion_blur_active: true,
         ..CameraComponent::default()
     };
-    assert!(wanted(
-        post(&cam),
-        QualityPreset::Medium.into(),
-        true,
-        false
-    ));
+    assert!(wanted(post(&cam), Default::default(), true, false));
     assert!(
-        !wanted(post(&cam), QualityPreset::Low.into(), true, false),
-        "Low pays nothing"
-    );
-    assert!(
-        !wanted(post(&cam), QualityPreset::High.into(), false, false),
+        !wanted(post(&cam), Default::default(), false, false),
         "no full post-FX"
     );
-    let high = GraphicsSettings::from(QualityPreset::High);
+    let high = GraphicsSettings::default();
     assert!(!wanted(PostSource::default(), high, true, false));
     assert!(
         !wanted(post(&cam), high, true, true),
         "the Scene view never blurs"
     );
-    let mut off = GraphicsSettings::from(QualityPreset::High);
+    let mut off = GraphicsSettings::default();
     off.options.set(GraphicsOption::MotionBlur, false);
     assert!(
         !wanted(post(&cam), off, true, false),
         "the player turned it off"
     );
     cam.motion_blur_active = false;
-    assert!(!wanted(post(&cam), QualityPreset::High.into(), true, false));
+    assert!(!wanted(post(&cam), Default::default(), true, false));
 }
 
 #[test]

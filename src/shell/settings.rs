@@ -7,8 +7,8 @@
 //! surface + winit window. It owns three boundaries:
 //!
 //! * **Load + apply at startup** ([`load`]) — read the persisted `video` blob and
-//!   the `graphics.quality` tier and the `graphics.options` player graphics options
-//!   (over the project's defaults, #1438) from `Storage` (a boundary read, like the
+//!   the `graphics.quality` preset name (among the project's presets, #1522) and the
+//!   `graphics.options` player graphics options (over the project's defaults, #1438) from `Storage` (a boundary read, like the
 //!   scene), seed the shared cells, and apply them to the renderer/window so the app boots
 //!   at the saved resolution / vsync / fullscreen / tier, and the audio maestro in
 //!   the saved speaker mode (#546).
@@ -27,21 +27,24 @@ use super::Shell;
 use crate::app::GameWorld;
 use crate::audio::SpeakerMode;
 use crate::core::settings::video::{VideoSettings, VIDEO_NAMESPACE};
-use crate::core::settings::GraphicsSettings;
+use crate::core::settings::{saved_quality, GraphicsSettings};
 
 /// Read persisted settings from `Storage` and apply them to the renderer, window,
 /// and the shared script cells, so the app boots at the saved resolution / vsync /
-/// fullscreen / quality tier / player graphics options. Missing video settings fall
+/// fullscreen / quality preset / player graphics options. Missing video settings fall
 /// back to `defaults` (the player's first launch honours the build's window mode); a
-/// missing tier keeps the default tier, a missing option the project's default.
+/// missing (or removed) preset runs the project's initial one, a missing option the
+/// project's default.
 pub fn load(shell: &mut Shell, game: &GameWorld, defaults: VideoSettings) {
     let storage = game.resources.storage.borrow();
     let video = storage
         .get_namespace(VIDEO_NAMESPACE)
         .map(|blob| VideoSettings::from_json(&blob))
         .unwrap_or(defaults);
-    let project = game.resources.application.borrow().graphics_defaults();
-    let graphics = GraphicsSettings::load(&storage, project);
+    let mut app = game.resources.application.borrow_mut();
+    app.restore_quality(saved_quality(&storage));
+    let graphics = GraphicsSettings::load(&storage, app.graphics_defaults(), app.quality_presets());
+    drop(app);
     let speaker_mode = SpeakerMode::load(&storage);
     drop(storage);
     game.resources
@@ -58,7 +61,7 @@ pub fn load(shell: &mut Shell, game: &GameWorld, defaults: VideoSettings) {
     shell.applied_video = video;
 }
 
-/// Hand the shared graphics cell (tier + player options) to the renderer: the one
+/// Hand the shared graphics cell (preset values + player options) to the renderer: the one
 /// place either frontend does it, every frame, and [`load`] at boot (#1438).
 pub fn apply_graphics(shell: &mut Shell, game: &GameWorld) {
     let graphics = *game.script_manager().graphics_cell().borrow();

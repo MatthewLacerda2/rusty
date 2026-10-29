@@ -8,7 +8,7 @@
 //! of it and samples no AO, as URP's overlay cameras: `draw::camera::is_overlay`):
 //!
 //! 1. a **depth prepass** of its solids (the forward vertex stage, depth only);
-//! 2. the **occlusion** pass (`ssao.wgsl` `fs_ao`) at the tier's resolution;
+//! 2. the **occlusion** pass (`ssao.wgsl` `fs_ao`) at its quality's resolution;
 //! 3. a depth-aware **blur** that upsamples to full resolution (`fs_blur`);
 //!
 //! and the forward pass reads the result at its group 3 (`t_ao`) to scale its
@@ -16,8 +16,9 @@
 //! group 3 carries a 1x1 white texture instead.
 //!
 //! Cost, per camera that runs it: one more depth-only draw of every visible solid, plus
-//! `samples` depth taps per occlusion texel (Medium: 8 at half resolution — a
-//! quarter of the pixels; High: 16 at full) and 25 per pixel for the blur. The frame
+//! `samples` depth taps per occlusion texel (the seeded Medium preset's Medium
+//! level: 8 at half resolution — a quarter of the pixels) and 25 per pixel for the
+//! blur. The frame
 //! stats count both (`draw_calls`/`triangles` include the prepass; `ssao_samples`
 //! the occlusion taps).
 
@@ -31,7 +32,7 @@ use glam::{Mat4, Vec3};
 
 use crate::components::{PostProcessingComponent, SsaoSettings};
 use crate::core::settings::graphics_options::GraphicsOption;
-use crate::core::settings::quality::SsaoTier;
+use crate::core::settings::quality::{SsaoQuality, MAX_RESOLUTION_DIVISOR};
 use crate::core::settings::GraphicsSettings;
 use crate::render::postfx::params::{effect_runs, Gate};
 use crate::scene::Camera;
@@ -63,26 +64,22 @@ pub(crate) struct SsaoUniform {
     params: [f32; 4],
 }
 
-/// What gates SSAO besides the volume's switch: the player's `ssao` option, and
-/// every tier but Low (`QualityPreset::ssao`).
-const GATE: Gate = Gate {
-    option: Some(GraphicsOption::Ssao),
-    tiers: |q| q.ssao().is_some(),
-};
+/// What gates SSAO besides the volume's switch: the player's `ssao` option.
+const GATE: Gate = Gate::option(GraphicsOption::Ssao);
 
 /// What this frame's SSAO does, when it runs at all: the active volume's look and
-/// the quality tier's cost.
+/// its quality's cost.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct SsaoPlan {
     pub settings: SsaoSettings,
-    pub tier: SsaoTier,
+    pub quality: SsaoQuality,
 }
 
 impl SsaoPlan {
     /// The plan for a view whose base camera's volume is `volume` (#1434), under
-    /// `graphics`: that volume with AO on, on a tier that runs it and with the
-    /// player's `ssao` option allowing it (`effect_runs`, #1438). `None` — nothing
-    /// runs — otherwise.
+    /// `graphics`: that volume with AO on and the player's `ssao` option allowing
+    /// it (`effect_runs`, #1438), at its quality's samples and resolution (#1522),
+    /// within the pass's range. `None` — nothing runs — otherwise.
     pub(crate) fn for_volume(
         volume: Option<&PostProcessingComponent>,
         graphics: GraphicsSettings,
@@ -92,9 +89,16 @@ impl SsaoPlan {
         if !effect_runs(graphics, GATE, on) {
             return None;
         }
-        // `effect_runs` decided the tier runs AO; the tier only supplies its cost.
-        let tier = graphics.quality.ssao()?;
-        Some(Self { settings, tier })
+        let custom = SsaoQuality {
+            samples: settings.samples,
+            resolution_divisor: settings.resolution_divisor,
+        };
+        let picked = settings.quality.pick(&graphics.quality.ssao, custom);
+        let quality = SsaoQuality {
+            samples: picked.samples.clamp(1, SsaoSettings::MAX_SAMPLES),
+            resolution_divisor: picked.resolution_divisor.clamp(1, MAX_RESOLUTION_DIVISOR),
+        };
+        Some(Self { settings, quality })
     }
 }
 
@@ -129,8 +133,8 @@ impl SsaoFrame {
             params: [
                 s.radius,
                 s.intensity,
-                self.plan.tier.samples as f32,
-                self.plan.tier.divisor as f32,
+                self.plan.quality.samples as f32,
+                self.plan.quality.resolution_divisor as f32,
             ],
         }
     }

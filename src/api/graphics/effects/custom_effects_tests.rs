@@ -7,7 +7,6 @@ use std::cell::RefCell;
 
 use mlua::Lua;
 
-use crate::core::settings::quality::QualityPreset;
 use crate::scene::authoring::defaults;
 use crate::scene::Scene;
 use crate::shadergen::{bake_recipe, engine_shader_dir, ShaderRecipe, DEFAULT_OUT_DIR};
@@ -41,7 +40,7 @@ impl Drop for Baked {
 
 /// Run `script` against the `Graphics` namespace, returning its error if any.
 fn run(scene: &RefCell<Scene>, script: &str) -> Result<(), String> {
-    let (lua, graphics) = (Lua::new(), RefCell::new(QualityPreset::High.into()));
+    let (lua, graphics) = (Lua::new(), RefCell::new(Default::default()));
     let app = RefCell::default();
     lua.scope(|s| {
         crate::api::graphics::register(&lua, s, scene, &graphics, &app).unwrap();

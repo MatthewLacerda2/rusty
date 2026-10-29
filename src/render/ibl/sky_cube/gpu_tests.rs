@@ -31,7 +31,7 @@ fn gpu_a_sky_change_bakes_once_and_a_still_sky_never() {
     let Some(mut r) = crate::render::test_gpu::headless_or_skip(8, 8) else {
         return;
     };
-    let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, 8, 8, 2);
+    let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, 8, 8);
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
     assert_eq!(
@@ -98,7 +98,7 @@ fn gpu_the_bake_lays_the_faces_out_as_a_cube_samples_them() {
     let Some(mut r) = crate::render::test_gpu::headless_or_skip(8, 8) else {
         return;
     };
-    let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, 8, 8, 2);
+    let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, 8, 8);
     let mut scene = Scene::new();
     let (w, h) = (256, 128);
     scene.skybox_path = panorama("sky_cube_uv.png", (w, h), |x, y| {

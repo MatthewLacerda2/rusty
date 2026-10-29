@@ -1,7 +1,6 @@
 //! Integration coverage for the `Graphics` scripting namespace (issue #87): the
 //! per-volume post-FX getters/setters write the active `PostProcessingComponent`
-//! / `CameraComponent`, and the global quality preset round-trips through the
-//! shared resource cell. These are render-only, one-way writes — they never feed
+//! / `CameraComponent` (the quality presets: `quality`). These are render-only, one-way writes — they never feed
 //! `FixedUpdate` — so the test only asserts the surface, not sim evolution.
 
 use std::cell::RefCell;
@@ -9,7 +8,7 @@ use std::rc::Rc;
 
 use mlua::Lua;
 use rusty::components::{CameraComponent, PostProcessingComponent, Tonemap};
-use rusty::core::settings::quality::QualityPreset;
+use rusty::core::settings::quality::EffectQuality;
 use rusty::core::settings::GraphicsSettings;
 use rusty::scene::authoring::default_post_processing;
 use rusty::scene::Scene;
@@ -19,7 +18,7 @@ fn scene_with_volume() -> Rc<RefCell<Scene>> {
     let id = scene.add_entity("PostFx".to_string());
     let mut vc: PostProcessingComponent = default_post_processing();
     (vc.bloom.active, vc.ssr.active) = (false, false);
-    vc.ssr.quality = "Low".to_string();
+    vc.ssr.quality = EffectQuality::Low;
     scene.world.set_post_processing(id, Some(vc));
     scene.world.set_camera(
         id,
@@ -41,7 +40,7 @@ fn scene_with_volume() -> Rc<RefCell<Scene>> {
 fn bloom_and_color_round_trip() {
     let lua = Lua::new();
     let scene = scene_with_volume();
-    let quality = Rc::new(RefCell::new(GraphicsSettings::from(QualityPreset::Medium)));
+    let quality = Rc::new(RefCell::new(GraphicsSettings::default()));
     let app = RefCell::default();
 
     lua.scope(|scope| {
@@ -80,7 +79,7 @@ fn bloom_and_color_round_trip() {
 fn motion_blur_knobs_are_clamped() {
     let lua = Lua::new();
     let scene = scene_with_volume();
-    let quality = Rc::new(RefCell::new(GraphicsSettings::from(QualityPreset::Medium)));
+    let quality = Rc::new(RefCell::new(GraphicsSettings::default()));
     let app = RefCell::default();
 
     lua.scope(|scope| {
@@ -103,32 +102,10 @@ fn motion_blur_knobs_are_clamped() {
 }
 
 #[test]
-fn quality_preset_round_trips_through_cell() {
-    let lua = Lua::new();
-    let scene = scene_with_volume();
-    let quality = Rc::new(RefCell::new(GraphicsSettings::from(QualityPreset::Medium)));
-    let app = RefCell::default();
-
-    lua.scope(|scope| {
-        rusty::api::graphics::register(&lua, scope, &scene, &quality, &app).unwrap();
-        lua.load("Graphics.SetQuality(\"High\")").exec().unwrap();
-        assert_eq!(quality.borrow().quality, QualityPreset::High);
-        let name: String = lua.load("return Graphics.GetQuality()").eval().unwrap();
-        assert_eq!(name, "High");
-
-        // An unknown tier name is ignored — the current value is kept.
-        lua.load("Graphics.SetQuality(\"Ultra\")").exec().unwrap();
-        assert_eq!(quality.borrow().quality, QualityPreset::High);
-        Ok(())
-    })
-    .unwrap();
-}
-
-#[test]
 fn getters_return_defaults_with_no_active_volume() {
     let lua = Lua::new();
     let scene = Rc::new(RefCell::new(Scene::new()));
-    let quality = Rc::new(RefCell::new(GraphicsSettings::from(QualityPreset::Low)));
+    let quality = Rc::new(RefCell::new(GraphicsSettings::default()));
     let app = RefCell::default();
 
     lua.scope(|scope| {

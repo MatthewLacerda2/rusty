@@ -48,7 +48,7 @@ fn scene(skip: Option<usize>, hidden: &[Vec3]) -> Scene {
 }
 
 fn render(renderer: &mut Renderer, scene: &Scene) -> (Vec<u8>, RenderCounters) {
-    let mut view = RenderView::offscreen(&renderer.device, OFFSCREEN_FORMAT, W, H, 2);
+    let mut view = RenderView::offscreen(&renderer.device, OFFSCREEN_FORMAT, W, H);
     let out = view.color_target_view().unwrap();
     renderer.render(&mut view, scene, &camera(), &out, false);
     let texture = view.color_target().unwrap();

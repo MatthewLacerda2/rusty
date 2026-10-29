@@ -3,6 +3,7 @@
 use super::*;
 use crate::components::PostProcessingComponent;
 use crate::components::{Tonemap, Wheel};
+use crate::core::settings::quality::EffectQuality;
 use crate::scene::Scene;
 
 fn scene_with_vc() -> (Scene, u32) {
@@ -16,7 +17,7 @@ fn scene_with_vc() -> (Scene, u32) {
         },
         ssr: crate::components::Ssr {
             active: false,
-            quality: "Medium".to_string(),
+            ..Default::default()
         },
         ..crate::scene::authoring::default_post_processing()
     };
@@ -32,7 +33,11 @@ fn ops_write_through_with_clamps() {
     bloom::set_threshold(&mut e, -1.0);
     grading::tonemapping::set_display_gamma(&mut e, -5.0);
     grading::tonemapping::set_mode(&mut e, Tonemap::Reinhard);
-    ssr::set_quality(&mut e, "High".to_string());
+    ssr::set_quality(&mut e, EffectQuality::High);
+    ssr::set_steps(&mut e, 999);
+    volume::set_ssao_samples(&mut e, 0);
+    volume::set_ssao_resolution_divisor(&mut e, 9);
+    bloom::set_resolution_divisor(&mut e, 0);
     volume::set_shadow_cascades(&mut e, 9);
     volume::set_shadow_distance(&mut e, -4.0);
     volume::set_ssao_active(&mut e, false);
@@ -49,7 +54,10 @@ fn ops_write_through_with_clamps() {
         "gamma clamps to its floor"
     );
     assert_eq!(vc.tonemapping.mode, Tonemap::Reinhard);
-    assert_eq!(vc.ssr.quality, "High");
+    assert_eq!(vc.ssr.quality, EffectQuality::High);
+    assert_eq!(vc.ssr.steps, 256, "steps clamp to the march's ceiling");
+    assert_eq!((vc.ssao.samples, vc.ssao.resolution_divisor), (1, 4));
+    assert_eq!(vc.bloom.resolution_divisor, 1);
     assert_eq!(vc.shadows.cascades, 4, "cascades clamp to the map's layers");
     assert_eq!(
         vc.shadows.distance, 1.0,

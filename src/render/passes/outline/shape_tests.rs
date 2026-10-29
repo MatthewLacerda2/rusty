@@ -80,9 +80,9 @@ fn gpu_a_resized_view_rebuilds_its_mask_and_still_rings() {
     };
     let scene = selected_box(Vec3::ONE);
     let cam = Camera::new(Vec3::Z * 3.0, -90.0, 0.0);
-    let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, RES, RES, 2);
+    let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, RES, RES);
     for (w, h) in [(RES, RES), (RES / 2, RES * 3 / 4)] {
-        view.resize(&r.device, w, h, 2);
+        view.resize(&r.device, w, h);
         let out = view.color_target_view().unwrap();
         r.render(&mut view, &scene, &cam, &out, true);
         let mask = view

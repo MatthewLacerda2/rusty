@@ -28,7 +28,7 @@ fn selected_box() -> Scene {
 /// The frame from 3 units in front of the box, editor or game (`editor`), as
 /// (RGBA8 output, the raw HDR texels post-FX read).
 fn render(r: &mut Renderer, scene: &Scene, editor: bool) -> (Vec<u8>, Vec<u8>) {
-    let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, RES, RES, 2);
+    let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, RES, RES);
     let out = view.color_target_view().unwrap();
     let cam = Camera::new(Vec3::new(0.0, 1.0, 3.0), -90.0, 0.0);
     r.render(&mut view, scene, &cam, &out, editor);

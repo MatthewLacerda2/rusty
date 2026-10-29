@@ -18,13 +18,7 @@ const SHADER: &str = "engine/shaders/shader.wgsl";
 
 /// A preview render view (own target + depth + post-FX) sized to the test resolution.
 fn preview_view(renderer: &Renderer) -> RenderView {
-    RenderView::offscreen(
-        &renderer.device,
-        OFFSCREEN_FORMAT,
-        RES,
-        RES,
-        renderer.quality.bloom_divisor(),
-    )
+    RenderView::offscreen(&renderer.device, OFFSCREEN_FORMAT, RES, RES)
 }
 
 fn sphere_scene() -> Scene {

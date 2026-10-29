@@ -39,9 +39,9 @@ fn gpu_a_doubled_view_wider_than_the_device_limit_allocates_within_it() {
     // Wider than half the limit, so scale 2 would overflow it uncapped; 1 px tall
     // keeps the allocation small.
     let width = max / 2 + 64;
-    let mut view = RenderView::targetless(&r.device, OFFSCREEN_FORMAT, width, 1, 2);
+    let mut view = RenderView::targetless(&r.device, OFFSCREEN_FORMAT, width, 1);
     view.set_render_scale(RenderScale::new(2.0));
-    view.resize(&r.device, width, 1, 2);
+    view.resize(&r.device, width, 1);
     assert_eq!(view.scene_size(), PixelSize::new(max, 2));
     assert_eq!(extent(&view.depth_texture), (max, 2));
 }
@@ -55,10 +55,10 @@ fn gpu_a_scaled_view_sizes_its_scene_targets_and_keeps_its_output() {
     let Some(r) = crate::render::test_gpu::headless_or_skip(64, 48) else {
         return;
     };
-    let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, 64, 48, 2);
+    let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, 64, 48);
     assert!(view.scaled_output().is_none(), "native: no upscale target");
     view.set_render_scale(RenderScale::new(0.5));
-    view.resize(&r.device, 64, 48, 2);
+    view.resize(&r.device, 64, 48);
     assert_eq!(view.size(), PixelSize::new(64, 48));
     assert_eq!(view.scene_size(), PixelSize::new(32, 24));
     assert_eq!(extent(&view.depth_texture), (32, 24));
@@ -67,7 +67,7 @@ fn gpu_a_scaled_view_sizes_its_scene_targets_and_keeps_its_output() {
     assert!(view.scaled_output().is_some());
     // Back to native: one size again, and no upscale target.
     view.set_render_scale(RenderScale::NATIVE);
-    view.resize(&r.device, 64, 48, 2);
+    view.resize(&r.device, 64, 48);
     assert_eq!(view.scene_size(), view.size());
     assert_eq!(extent(&view.depth_texture), (64, 48));
     assert!(view.scaled_output().is_none());
@@ -78,7 +78,7 @@ const H: u32 = 64;
 
 /// One frame of a lit box at `scale`, read back at the output's size.
 fn frame(r: &mut Renderer, scene: &Scene, scale: f32) -> Vec<u8> {
-    let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, W, H, 2);
+    let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, W, H);
     view.set_render_scale(RenderScale::new(scale));
     let out = view.color_target_view().unwrap();
     let cam = Camera::new(Vec3::new(0.0, 0.0, 4.0), -90.0, 0.0);

@@ -21,7 +21,7 @@ fn tiles_cover_half_the_longest_streak_in_steps_of_eight() {
 
 #[test]
 fn the_camera_knobs_land_in_the_uniform() {
-    let p = BlurParams::new(&camera(), 1080);
+    let p = BlurParams::new(&camera(), 16, 1080);
     assert_eq!(p.shape, [0.5, 54.0, 16.0, 32.0]);
     assert_eq!(p.tile(), 32);
 }
@@ -34,7 +34,7 @@ fn out_of_range_knobs_are_held_to_what_the_renderer_draws() {
         motion_blur_max_length: 1.0,
         ..camera()
     };
-    let p = BlurParams::new(&cam, 100);
+    let p = BlurParams::new(&cam, cam.motion_blur_samples, 100);
     assert_eq!(p.shape, [1.0, 20.0, 32.0, 16.0]);
 }
 
@@ -53,7 +53,7 @@ fn the_sky_distance_is_one_number_in_rust_and_wgsl() {
 
 #[test]
 fn velocities_over_several_frames_shrink_the_shutter_not_the_clamp() {
-    let one = BlurParams::new(&camera(), 1080);
+    let one = BlurParams::new(&camera(), 16, 1080);
     let four = one.per_frames(4);
     assert_eq!(four.shape, [0.125, 54.0, 16.0, 32.0]);
     assert_eq!(one.per_frames(0), one, "0 frames reads as one");

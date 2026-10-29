@@ -30,12 +30,7 @@ impl Renderer {
         // Keep this view's post-FX bloom buffers sized to the active quality tier — a
         // cheap no-op unless a live quality switch changed the divisor (#355).
         let size = view.size();
-        view.resize(
-            &self.device,
-            size.width,
-            size.height,
-            self.quality.bloom_divisor(),
-        );
+        view.resize(&self.device, size.width, size.height);
 
         self.upload_scene_assets(scene);
 

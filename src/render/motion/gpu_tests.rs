@@ -73,18 +73,10 @@ fn gpu_a_still_scene_under_a_turning_camera_matches_camera_reprojection() {
 fn gpu_no_motion_blur_writes_no_velocity_target() {
     let Some(mut r) = renderer() else { return };
     let mut view = view(&r);
-    let (mut blurred, _) = scene(true);
-    cube(&mut blurred, Vec3::new(0.0, 0.0, -5.0));
     let (mut plain, _) = scene(false);
     cube(&mut plain, Vec3::new(0.0, 0.0, -5.0));
     let cam = eye(0.0);
     assert!(render(&mut r, &mut view, &plain, &cam).is_none());
-    assert_eq!(r.frame_counters.velocity_passes, 0);
-    r.quality = crate::core::settings::quality::QualityPreset::Low;
-    assert!(
-        render(&mut r, &mut view, &blurred, &cam).is_none(),
-        "Low pays nothing"
-    );
     assert_eq!(r.frame_counters.velocity_passes, 0);
 }
 

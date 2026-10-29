@@ -1,5 +1,6 @@
-//! `Graphics.{Get,Set}Bloom{Active,Intensity,Threshold}` and the lens dirt (#1442),
-//! `Graphics.{Get,Set}BloomDirt{Texture,Intensity}`, over the active volume.
+//! `Graphics.{Get,Set}Bloom{Active,Intensity,Threshold}`, the lens dirt (#1442),
+//! `Graphics.{Get,Set}BloomDirt{Texture,Intensity}`, and the quality (#1522),
+//! `Graphics.{Get,Set}Bloom{Quality,ResolutionDivisor}`, over the active volume.
 
 use std::cell::RefCell;
 
@@ -37,6 +38,13 @@ pub(super) fn register<'scope>(
         scope.create_function(|_, ()| {
             Ok(with_vc(scene, |vc| vc.bloom.dirt_texture.clone()).flatten())
         }),
+    )?;
+    super::knobs::register_quality(
+        scope,
+        (table, scene),
+        "BloomQuality",
+        |vc| vc.bloom.quality,
+        bloom::set_quality,
     )?;
     super::knobs::register(scope, table, scene, bloom::EFFECT.knobs)
 }

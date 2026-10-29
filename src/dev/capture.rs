@@ -121,7 +121,6 @@ impl CaptureHost {
             OFFSCREEN_FORMAT,
             (width, height),
             render_scale,
-            renderer.quality.bloom_divisor(),
         );
         Some((renderer, view))
     }

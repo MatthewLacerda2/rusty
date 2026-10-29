@@ -27,7 +27,7 @@ fn looking(eye: Vec3, target: Vec3) -> Camera {
 
 /// Summed RGB of the pixels at each of `points`, as `cam` sees `scene`.
 fn brightness(r: &mut Renderer, scene: &Scene, cam: &Camera, points: &[Vec3]) -> Vec<u32> {
-    let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, RES, RES, 2);
+    let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, RES, RES);
     let out = view.color_target_view().unwrap();
     r.render(&mut view, scene, cam, &out, false);
     let target = view.color_target().unwrap();

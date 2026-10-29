@@ -23,6 +23,7 @@
 //! Pure.
 
 use crate::components::{CameraComponent, ClearFlags, Projection, RenderTarget};
+use crate::core::settings::quality::EffectQuality;
 use crate::scene::authoring::sanitize::{at_least, saturated};
 
 /// The field-of-view range, in degrees: Unity's Camera inspector bounds, applied
@@ -86,7 +87,13 @@ pub fn set_motion_blur_active(c: &mut CameraComponent, active: bool) {
     c.motion_blur_active = active;
 }
 
-/// Set the camera's motion-blur sample count, clamped to the range the renderer
+/// Set which tap count the camera's motion blur runs at (#1522): a level of the
+/// active quality preset, or `Custom` (its `motion_blur_samples`).
+pub fn set_motion_blur_quality(c: &mut CameraComponent, quality: EffectQuality) {
+    c.motion_blur_quality = quality;
+}
+
+/// Set the camera's `Custom` motion-blur sample count, clamped to the range the renderer
 /// honours (`MIN_MOTION_BLUR_SAMPLES..=MAX_MOTION_BLUR_SAMPLES`).
 pub fn set_motion_blur_samples(c: &mut CameraComponent, samples: u32) {
     c.motion_blur_samples = samples.clamp(

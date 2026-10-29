@@ -6,6 +6,7 @@
 //! ```json
 //! { "engine_commit": "<git commit>", "engine_order": 1318, "build": { … },
 //!   "graphics_options": { "motion_blur": true, … },
+//!   "quality": { "default": "Medium", "presets": [ { "name": "Low", … }, … ] },
 //!   "decals": { "max_per_owner": 256, "max_world": 1024, "max_total": 4096 } }
 //! ```
 //!
@@ -20,6 +21,9 @@
 //! * **`build`** — the [`BuildSettings`].
 //! * **`graphics_options`** — the player graphics options a fresh install starts
 //!   with ([`GraphicsOptions`], #1438); a player's saved choice wins over them.
+//! * **`quality`** — the game's quality presets ([`QualityPresets`], #1522): named
+//!   bundles of per-effect quality values, seeded with `Low`, `Medium` and `High`
+//!   when the file is created, the game's to edit, rename, add to or delete.
 //! * **`decals`** — the game's decal budgets ([`DecalLimits`], #1517), applied to
 //!   the scene on entering Play.
 
@@ -32,13 +36,14 @@ use super::engine::{base, EngineCheck};
 use crate::core::application::BuildSettings;
 use crate::core::settings::decals::DecalLimits;
 use crate::core::settings::graphics_options::GraphicsOptions;
+use crate::core::settings::quality::QualityPresets;
 
 /// The project file, at the project root.
 pub const PROJECT_FILE: &str = "project.rusty";
 
 /// What `project.rusty` holds. Every field is `#[serde(default)]`, so a partial file
 /// keeps the defaults for what it omits.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct ProjectFile {
     /// The engine commit the project was last opened with.
@@ -52,6 +57,8 @@ pub struct ProjectFile {
     pub build: BuildSettings,
     /// The project's default player graphics options (all allowed by default).
     pub graphics_options: GraphicsOptions,
+    /// The game's quality presets (a file that omits them gets the seeded three).
+    pub quality: QualityPresets,
     /// The game's decal budgets.
     pub decals: DecalLimits,
 }
@@ -63,7 +70,30 @@ impl Default for ProjectFile {
             engine_order: engine_order(),
             build: BuildSettings::default(),
             graphics_options: GraphicsOptions::default(),
+            quality: QualityPresets::default(),
             decals: DecalLimits::default(),
+        }
+    }
+}
+
+/// What a run of the project plays under: the file's settings, without the engine
+/// record. The player and `play` hand it to an unbound `Application`
+/// (`Application::run_with`), so a shipped game reads them but never rewrites them.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct ProjectSettings {
+    pub build: BuildSettings,
+    pub graphics_options: GraphicsOptions,
+    pub quality: QualityPresets,
+    pub decals: DecalLimits,
+}
+
+impl From<ProjectFile> for ProjectSettings {
+    fn from(file: ProjectFile) -> Self {
+        Self {
+            build: file.build,
+            graphics_options: file.graphics_options,
+            quality: file.quality,
+            decals: file.decals,
         }
     }
 }

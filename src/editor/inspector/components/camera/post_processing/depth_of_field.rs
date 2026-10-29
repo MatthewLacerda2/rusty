@@ -1,9 +1,10 @@
 //! The Post Processing card's Depth of Field section (#1445): the mode, then the
-//! running mode's knobs, through the effect's knob table, the one the `Graphics.*`
+//! running mode's knobs and its quality level (#1522), through the effect's knob table, the one the `Graphics.*`
 //! functions and the tween paths are made from, so the three reach the same knobs.
 
-use super::{slider_row, Section};
+use super::{quality_row, slider_row, Section};
 use crate::components::{DepthOfField, DofMode};
+use crate::core::settings::quality::{EffectQuality, MAX_RESOLUTION_DIVISOR};
 use crate::scene::authoring::rendering::post_processing::{self as vc_ops, Knob};
 use crate::scene::PostProcessingComponent;
 
@@ -53,6 +54,23 @@ fn draw(
         let knob = knob(field);
         let value = (knob.get)(vc);
         *is_dirty |= slider_row(ui, (&mut *world, id), label, value, lo..=hi, knob.set);
+    }
+    if dof.mode == DofMode::Off {
+        return;
+    }
+    if let Some(quality) = quality_row(ui, "DoF Quality", dof.quality) {
+        if let Some(mut c) = world.post_processing_mut(id) {
+            vc_ops::depth_of_field::set_quality(&mut c, quality);
+        }
+        *is_dirty = true;
+    }
+    if dof.quality == EffectQuality::Custom {
+        let knob = knob("resolution_divisor");
+        let (label, range) = (
+            "    Resolution Divisor:",
+            1.0..=MAX_RESOLUTION_DIVISOR as f32,
+        );
+        *is_dirty |= slider_row(ui, (world, id), label, (knob.get)(vc), range, knob.set);
     }
 }
 

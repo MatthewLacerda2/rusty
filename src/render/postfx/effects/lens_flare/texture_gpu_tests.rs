@@ -3,7 +3,6 @@
 //! never provided, always to the black texel.
 
 use super::gpu_tests::{eye, renderer, scene, H, W};
-use crate::core::settings::quality::QualityPreset;
 use crate::render::postfx::effects::textures::{bound_views, composite_textures};
 use crate::render::{RenderView, OFFSCREEN_FORMAT};
 
@@ -16,7 +15,7 @@ fn binding(effect: &str) -> usize {
 
 #[test]
 fn gpu_the_flare_binds_its_target_while_it_flares_and_black_after() {
-    let Some(mut r) = renderer(QualityPreset::High) else {
+    let Some(mut r) = renderer() else {
         return;
     };
     let black = r
@@ -37,7 +36,7 @@ fn gpu_the_flare_binds_its_target_while_it_flares_and_black_after() {
         })
         .create_view(&Default::default());
     let (flare, dummy) = (binding("lens_flare"), binding("dummy"));
-    let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, W, H, 2);
+    let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, W, H);
     let out = view.color_target_view().unwrap();
 
     r.render(&mut view, &scene(40.0, true), &eye(), &out, false);

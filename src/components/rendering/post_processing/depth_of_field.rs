@@ -6,6 +6,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::core::settings::quality::EffectQuality;
+
 crate::core::named_enum! {
     /// Which depth of field runs. Declared in the order the editor lists them (the
     /// default first); the names are Unity's.
@@ -40,6 +42,11 @@ pub struct DepthOfField {
     pub aperture: f32,
     /// Bokeh: the lens's focal length in millimetres, `1..=300`: longer blurs more.
     pub focal_length: f32,
+    /// Which working resolution runs (#1522): a level of the active quality
+    /// preset, or `resolution_divisor` when `Custom`.
+    pub quality: EffectQuality,
+    /// `Custom`: the blur runs at the view's size divided by this, `1..=4`.
+    pub resolution_divisor: u32,
 }
 
 impl DepthOfField {
@@ -61,7 +68,8 @@ impl DepthOfField {
 
 impl Default for DepthOfField {
     /// Off, with Unity URP's defaults ready for either mode: Gaussian from 10 m to
-    /// 30 m at radius 1, Bokeh focused at 10 m through a 50 mm lens at f/5.6.
+    /// 30 m at radius 1, Bokeh focused at 10 m through a 50 mm lens at f/5.6; at the
+    /// preset's `Medium` level (`Custom` starts at half resolution).
     fn default() -> Self {
         Self {
             mode: DofMode::Off,
@@ -71,6 +79,8 @@ impl Default for DepthOfField {
             focus_distance: 10.0,
             aperture: 5.6,
             focal_length: 50.0,
+            quality: EffectQuality::Medium,
+            resolution_divisor: 2,
         }
     }
 }

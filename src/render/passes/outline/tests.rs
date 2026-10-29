@@ -41,7 +41,7 @@ pub(super) fn frame(r: &mut Renderer, scene: &Scene, centre: Vec3) -> Vec<u8> {
 
 /// The editor frame looking down -Z at `centre` from `distance` away, as RGBA8.
 pub(super) fn frame_from(r: &mut Renderer, scene: &Scene, centre: Vec3, distance: f32) -> Vec<u8> {
-    let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, RES, RES, 2);
+    let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, RES, RES);
     let out = view.color_target_view().unwrap();
     let cam = Camera::new(centre + Vec3::Z * distance, -90.0, 0.0);
     r.render(&mut view, scene, &cam, &out, true);

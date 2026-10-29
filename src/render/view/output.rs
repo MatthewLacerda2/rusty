@@ -61,8 +61,8 @@ impl RenderView {
     }
 
     /// Create the offscreen view in `slot` if absent, else resize it in place — so a
-    /// consumer keeps one view across frames and only reallocates when the panel size,
-    /// the render scale (#1498) or the quality tier changes. The scale is set before
+    /// consumer keeps one view across frames and only reallocates when the panel size
+    /// or the render scale (#1498) changes. The scale is set before
     /// the resize, so a frame that changes both size and scale allocates once.
     pub fn ensure_offscreen<'a>(
         slot: &'a mut Option<RenderView>,
@@ -70,13 +70,10 @@ impl RenderView {
         format: wgpu::TextureFormat,
         (width, height): (u32, u32),
         render_scale: RenderScale,
-        bloom_divisor: u32,
     ) -> &'a mut RenderView {
-        let view = slot.get_or_insert_with(|| {
-            RenderView::offscreen(device, format, width, height, bloom_divisor)
-        });
+        let view = slot.get_or_insert_with(|| RenderView::offscreen(device, format, width, height));
         view.set_render_scale(render_scale);
-        view.resize(device, width, height, bloom_divisor);
+        view.resize(device, width, height);
         view
     }
 }

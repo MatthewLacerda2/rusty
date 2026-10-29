@@ -90,7 +90,6 @@ impl EditorFrontend {
             paint::EGUI_RENDERER,
         );
         let mut editor_ui = EditorUi::new(game.script_manager().scene_path_cell());
-        editor_ui.quality_preset = game.script_manager().graphics_cell().borrow().quality;
         #[cfg(feature = "dev")]
         editor_ui.dev.load_prefs(&game.resources.storage.borrow());
         Self {
@@ -153,19 +152,23 @@ impl EditorFrontend {
         interaction
     }
 
-    /// The editor dropdown and `Graphics.SetQuality` (script) feed one shared cell:
-    /// reflect a script-driven change back into the dropdown, push the editor's choice
-    /// into the cell, then hand the cell to the renderer (`settings::apply_graphics`),
-    /// with the player's graphics options beside the tier (#1438).
+    /// The Config menu and `Graphics.SetQuality` (script) select through one
+    /// `Application`: select a preset picked in the menu, mirror the presets and the
+    /// running one back into it, then hand the shared cell to the renderer
+    /// (`settings::apply_graphics`), the player's graphics options beside the
+    /// preset's values (#1438, #1522).
     fn sync_quality(&mut self, shell: &mut Shell, game: &GameWorld) {
-        let cell = game.script_manager().graphics_cell();
-        let scripted = cell.borrow().quality;
-        if scripted != self.editor_ui.quality_preset
-            && self.editor_ui.quality_preset == shell.renderer.quality
-        {
-            self.editor_ui.quality_preset = scripted;
+        let mut app = game.resources.application.borrow_mut();
+        if let Some(name) = self.editor_ui.quality_request.take() {
+            if let Err(err) = app.select_quality(&name) {
+                log::warn!("[Quality] {err}");
+            }
+            game.script_manager().graphics_cell().borrow_mut().quality = app.quality_values();
         }
-        cell.borrow_mut().quality = self.editor_ui.quality_preset;
+        let names = app.quality_presets().names();
+        self.editor_ui.quality_presets = names.into_iter().map(str::to_string).collect();
+        self.editor_ui.quality_preset = app.quality().map(str::to_string);
+        drop(app);
         super::settings::apply_graphics(shell, game);
     }
 

@@ -4,6 +4,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::core::settings::quality::EffectQuality;
+
 /// How the sun's cascaded shadow map covers the view (#435) — HDRP's Shadows volume
 /// override: how many cascades split the view, and how far from the camera shadows
 /// reach. Without an active volume the renderer uses [`ShadowSettings::default`].
@@ -40,8 +42,9 @@ impl Default for ShadowSettings {
 
 /// Screen-space ambient occlusion (#436) — HDRP's Ambient Occlusion volume override.
 /// Darkens only the ambient/indirect light where geometry crowds a point (a crate's
-/// foot on the floor, a room's corners), never direct light. The quality tier decides
-/// the resolution and sample count; these are the look.
+/// foot on the floor, a room's corners), never direct light. `quality` picks the
+/// sample count and resolution (#1522): a level of the active quality preset, or
+/// `samples` and `resolution_divisor` here when `Custom`. The rest is the look.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct SsaoSettings {
@@ -53,9 +56,17 @@ pub struct SsaoSettings {
     /// How strongly occlusion darkens the ambient term; `0` is none, `1` the
     /// physically-plausible amount, above `1` exaggerated.
     pub intensity: f32,
+    /// Which sample count and resolution run.
+    pub quality: EffectQuality,
+    /// `Custom`: hemisphere samples per occlusion texel, `1..=64`.
+    pub samples: u32,
+    /// `Custom`: the occlusion target is the view's size divided by this, `1..=4`.
+    pub resolution_divisor: u32,
 }
 
 impl SsaoSettings {
+    /// The most samples a write accepts.
+    pub const MAX_SAMPLES: u32 = 64;
     /// The shortest radius a write accepts.
     pub const MIN_RADIUS: f32 = 0.01;
     /// The strongest intensity a write accepts.
@@ -63,13 +74,17 @@ impl SsaoSettings {
 }
 
 impl Default for SsaoSettings {
-    /// On, half a metre, plain strength: the contact and corner shading an interior
+    /// On, half a metre, plain strength, at the preset's `Medium` level (`Custom`
+    /// starts at 8 samples at half resolution): the contact and corner shading an interior
     /// needs, without the dark halo a wider radius paints around a character.
     fn default() -> Self {
         Self {
             active: true,
             radius: 0.5,
             intensity: 1.0,
+            quality: EffectQuality::Medium,
+            samples: 8,
+            resolution_divisor: 2,
         }
     }
 }

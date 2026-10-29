@@ -57,8 +57,7 @@ impl Renderer {
     /// A fresh `width` x `height` slot: its offscreen view and the sampled texture.
     pub(super) fn new_render_texture(&mut self, width: u32, height: u32) -> Slot {
         let (w, h) = (width.max(1), height.max(1));
-        let bloom = self.quality.bloom_divisor();
-        let view = RenderView::offscreen(&self.device, OFFSCREEN_FORMAT, w, h, bloom);
+        let view = RenderView::offscreen(&self.device, OFFSCREEN_FORMAT, w, h);
         let texture = self.device.create_texture(&wgpu::TextureDescriptor {
             label: Some("Render Texture"),
             size: wgpu::Extent3d {

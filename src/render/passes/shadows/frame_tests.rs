@@ -64,7 +64,7 @@ fn gpu_the_cascades_follow_the_main_cameras_volume() {
     let Some(mut r) = crate::render::test_gpu::headless_or_skip(32, 32) else {
         return;
     };
-    let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, 32, 32, 2);
+    let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, 32, 32);
     let mut scene = Scene::new();
     create_entity(&mut scene, "Crate", Some(Primitive::Box));
     // Created first: a monitor camera that must not set the screen's shadows.

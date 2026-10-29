@@ -14,10 +14,11 @@
 //!   occlusion (`ssao`, #436).
 //! * The scene's fog (`fog`, #437) — scene-level, not per-volume, so it needs no
 //!   volume; the renderer packs it into every pass's camera globals each frame.
-//! * The global `QualityPreset` resource (Low/Medium/High), gating SSR + motion
-//!   blur. A plain value get/set (`register_quality`, in `state`); the platform layer
-//!   reads the shared cell each frame and hands it to `renderer.set_quality`. The
-//!   scene's render scale (#1498) is a value in the same cell, beside it.
+//! * The project's quality presets (`quality`, #1522) on `Application`, and the
+//!   running one's values in the shared graphics cell, which the platform layer
+//!   hands to the renderer each frame. No preset gates an effect: each effect's
+//!   quality level reads its values from the running preset. The scene's render
+//!   scale (#1498) is a value in the same cell (`state`).
 //! * The player's graphics options (`options`, #1438) in the same cell, which gate
 //!   every camera's effects, and the project's defaults for them on `Application`.
 //!
@@ -31,13 +32,13 @@ use std::cell::RefCell;
 pub(crate) mod effects;
 mod fog;
 mod options;
+mod quality;
 mod shadows;
 mod ssao;
 mod state;
 
 use mlua::Lua;
 
-use self::state::register_quality;
 use super::Reg;
 use crate::core::application::Application;
 use crate::core::settings::GraphicsSettings;
@@ -54,7 +55,8 @@ pub fn register<'scope>(
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
     effects::register(scope, &table, scene)?;
-    register_quality(scope, &table, graphics)?;
+    quality::register_quality(scope, &table, graphics, app)?;
+    state::register_render_scale(scope, &table, graphics)?;
     options::register_options(scope, &table, graphics, app)?;
     shadows::register_shadows(scope, &table, scene)?;
     fog::register_fog(scope, &table, scene)?;

@@ -56,7 +56,7 @@ fn centre_pixel(
     scene: &Scene,
     format: wgpu::TextureFormat,
 ) -> [u8; 3] {
-    let mut view = RenderView::offscreen(&renderer.device, format, 16, 16, 2);
+    let mut view = RenderView::offscreen(&renderer.device, format, 16, 16);
     let out = view.color_target_view().unwrap();
     let cam = Camera::new(Vec3::new(0.0, 0.0, 12.0), -90.0, 0.0);
     renderer.render(&mut view, scene, &cam, &out, false);

@@ -1,5 +1,5 @@
 //! Bloom: a scene pass, before the lens flare's, which reads its chain (the bright-pass
-//! threshold, then a 2D gaussian blur, at the bloom divisor's reduced resolution,
+//! threshold, then a 2D gaussian blur, at its quality's reduced resolution (#1522),
 //! `postfx/bloom.wgsl`), and the composite's add of the blurred result on the HDR
 //! image (`postfx/effects/bloom.wgsl`). The bright pass reads the scene after depth of field
 //! and motion blur, so a moving highlight blooms along its streak, as in URP and HDRP
@@ -15,6 +15,7 @@ use std::rc::Rc;
 
 use super::{Composite, CompositeTexture, EffectCx, Owner, Pass, PassCx, Phase, PostEffect};
 use crate::core::settings::graphics_options::GraphicsOption;
+use crate::core::settings::quality::MAX_RESOLUTION_DIVISOR;
 use crate::render::gpu::bind_entry as entry;
 use crate::render::gpu::fullscreen::Fullscreen;
 use crate::render::gpu::layout_entries::{sampler_entry, texture_entry, uniform_entry};
@@ -132,7 +133,7 @@ impl BloomPasses {
     }
 }
 
-/// One view's bloom ping-pong buffers, at the bloom divisor's reduced resolution: the
+/// One view's bloom ping-pong buffers, at its quality's reduced resolution: the
 /// bright pass writes `a`, the blur `b`, which the composite adds (binding 3); and
 /// the lens dirt it lights (bloom's composite texture), picked by the bloom pass
 /// each frame.
@@ -140,11 +141,17 @@ pub(crate) struct BloomTargets {
     pub(crate) a: PfxTarget,
     pub(crate) b: PfxTarget,
     pub(crate) size: (u32, u32),
+    /// The divisor `size` was made at; the bloom pass rebuilds them when the volume's
+    /// quality asks for another.
+    pub(crate) divisor: u32,
     params: wgpu::Buffer,
     dirt: Option<Rc<GpuTexture>>,
 }
 
 impl BloomTargets {
+    /// The divisor a view's buffers start at, before its bloom first runs: half.
+    pub(crate) const DIVISOR: u32 = 2;
+
     /// The buffers for a view `width` × `height`, `1 / divisor` of its size.
     pub(crate) fn new(device: &wgpu::Device, (w, h): (u32, u32), divisor: u32) -> Self {
         let (bw, bh) = ((w / divisor).max(1), (h / divisor).max(1));
@@ -152,6 +159,7 @@ impl BloomTargets {
             a: PostFx::target(device, bw, bh, "PostFX Bloom A", HDR_FORMAT),
             b: PostFx::target(device, bw, bh, "PostFX Bloom B", HDR_FORMAT),
             size: (bw, bh),
+            divisor,
             params: device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some("Bloom Params"),
                 size: std::mem::size_of::<BloomParams>() as u64,
@@ -169,13 +177,20 @@ impl BloomTargets {
     }
 }
 
-/// Bright pass (scene -> `a`), then the blur (`a` -> `b`), when the view blooms,
-/// with the lens dirt its volume names for the composite.
+/// Bright pass (scene -> `a`), then the blur (`a` -> `b`), when the view blooms, at
+/// its quality's divisor, with the lens dirt its volume names for the composite.
 fn run(r: &Renderer, view: &mut RenderView, cx: &PassCx) {
     let Some(vc) = cx.effect.volume().filter(|_| blooms(&cx.effect)) else {
         view.post_fx.bloom.dirt = None;
         return;
     };
+    let levels = &cx.effect.graphics.quality.bloom_resolution_divisor;
+    let divisor = vc.bloom.quality.pick(levels, vc.bloom.resolution_divisor);
+    let divisor = divisor.clamp(1, MAX_RESOLUTION_DIVISOR);
+    if view.post_fx.bloom.divisor != divisor {
+        let size = view.post_fx.full_size;
+        view.post_fx.bloom = BloomTargets::new(&r.device, size, divisor);
+    }
     view.post_fx.bloom.dirt = r.lens_dirt(vc);
     let (device, queue) = (&r.device, &r.queue);
     let (pfx, passes) = (&view.post_fx, &r.post_passes.bloom);

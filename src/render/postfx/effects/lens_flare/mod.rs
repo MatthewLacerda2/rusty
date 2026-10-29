@@ -14,7 +14,6 @@
 use super::{bloom, Composite, CompositeTexture, EffectCx, Owner, Pass, PassCx, Phase, PostEffect};
 use crate::components::rendering::post_processing::LensFlare;
 use crate::core::settings::graphics_options::GraphicsOption;
-use crate::core::settings::quality::QualityPreset;
 use crate::render::gpu::bind_entry as entry;
 use crate::render::gpu::fullscreen::Fullscreen;
 use crate::render::gpu::layout_entries::{sampler_entry, texture_entry, uniform_entry};
@@ -28,10 +27,7 @@ use crate::render::{RenderView, Renderer};
 pub(crate) const EFFECT: PostEffect = PostEffect {
     name: "lens_flare",
     owner: Owner::Volume,
-    gate: Gate {
-        option: Some(GraphicsOption::LensFlare),
-        tiers: |q| q != QualityPreset::Low,
-    },
+    gate: Gate::option(GraphicsOption::LensFlare),
     module: Some("postfx/effects/lens_flare.wgsl"),
     composite: &[Composite {
         phase: Phase::Hdr,

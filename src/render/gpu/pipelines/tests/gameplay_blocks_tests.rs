@@ -58,7 +58,7 @@ fn checkered_sphere(shader: &str) -> Scene {
 
 fn frame(renderer: &mut Renderer, scene: &mut Scene, time: f32) -> Vec<u8> {
     scene.shader_time = time;
-    let mut view = RenderView::offscreen(&renderer.device, OFFSCREEN_FORMAT, RES, RES, 2);
+    let mut view = RenderView::offscreen(&renderer.device, OFFSCREEN_FORMAT, RES, RES);
     let out = view.color_target_view().unwrap();
     let cam = Camera::new(Vec3::new(0.0, 0.0, 2.5), -90.0, 0.0);
     renderer.render(&mut view, scene, &cam, &out, false);

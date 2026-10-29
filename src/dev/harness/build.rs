@@ -7,10 +7,8 @@ use std::rc::Rc;
 
 use super::{fixture_project, Harness};
 use crate::app::GameWorld;
-use crate::core::application::BuildSettings;
 use crate::core::input::InputState;
-use crate::core::settings::decals::DecalLimits;
-use crate::core::settings::graphics_options::GraphicsOptions;
+use crate::core::project::ProjectSettings;
 use crate::navigation::NavigationGraph;
 use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;
@@ -55,9 +53,7 @@ impl Harness {
     pub fn in_user_workspace(
         out_dir: impl AsRef<Path>,
         scene_path: &str,
-        build: BuildSettings,
-        graphics: GraphicsOptions,
-        decals: DecalLimits,
+        settings: ProjectSettings,
     ) -> Result<Self, String> {
         crate::scene::seed_default_scripts();
         crate::scene::seed_default_scene();
@@ -73,14 +69,17 @@ impl Harness {
         {
             let world = harness.world.borrow();
             *world.script_manager().scene_path_cell().borrow_mut() = Some(scene_path.into());
-            // Unbound, as in the player: a run reads the build settings, never writes them.
+            // Unbound, as in the player: a run reads the settings, never writes them.
             let mut app = world.resources.application.borrow_mut();
-            let _ = app.set_build(build);
-            let _ = app.set_graphics_defaults(graphics);
-            app.set_decal_limits(decals);
-            // No saved player options in a harness (its store is pathless): the
-            // project's defaults are what it plays with (#1438).
-            world.script_manager().graphics_cell().borrow_mut().options = graphics;
+            let options = settings.graphics_options;
+            app.run_with(settings);
+            // No saved player choices in a harness (its store is pathless): the
+            // project's default options (#1438) and initial quality preset (#1522)
+            // are what it plays with.
+            let cell = world.script_manager().graphics_cell();
+            let mut graphics = cell.borrow_mut();
+            graphics.options = options;
+            graphics.quality = app.quality_values();
         }
         Ok(harness)
     }

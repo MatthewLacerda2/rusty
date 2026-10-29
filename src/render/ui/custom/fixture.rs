@@ -135,9 +135,8 @@ impl Shot {
 
 /// Render `scene` in `view` (made on first use) and read it back.
 pub(super) fn shot(renderer: &mut Renderer, view: &mut Option<RenderView>, scene: &Scene) -> Shot {
-    let view = view.get_or_insert_with(|| {
-        RenderView::offscreen(&renderer.device, OFFSCREEN_FORMAT, RES, RES, 2)
-    });
+    let view = view
+        .get_or_insert_with(|| RenderView::offscreen(&renderer.device, OFFSCREEN_FORMAT, RES, RES));
     let out = view.color_target_view().expect("offscreen target");
     let cam = Camera::new(Vec3::new(0.0, 0.0, 5.0), -90.0, 0.0);
     renderer.render(view, scene, &cam, &out, false);

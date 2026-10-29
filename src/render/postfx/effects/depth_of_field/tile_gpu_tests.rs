@@ -9,7 +9,6 @@ use glam::Vec3;
 use super::gpu_fixture::{bokeh, cube, eye, scene, FAR};
 use super::DofParams;
 use crate::components::DepthOfField;
-use crate::core::settings::quality::QualityPreset;
 use crate::render::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
 use crate::scene::camera::DEFAULT_FOV;
 use crate::scene::Scene;
@@ -23,7 +22,7 @@ const POST_DEPTH: f32 = 0.5;
 const GAP: f32 = 30.0;
 
 fn shot(r: &mut Renderer, scene: &Scene) -> Vec<u8> {
-    let mut v = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, W, H, 2);
+    let mut v = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, W, H);
     let out = v.color_target_view().unwrap();
     r.render(&mut v, scene, &eye(), &out, false);
     readback::read_texture_rgba8(&r.device, &r.queue, v.color_target().unwrap(), W, H)
@@ -72,7 +71,6 @@ fn gpu_a_background_beside_a_near_blur_keeps_its_own_blur() {
     let Some(mut r) = crate::render::test_gpu::headless_or_skip(W, H) else {
         return;
     };
-    r.quality = QualityPreset::High;
     // The far cube's left edge, on its front face.
     let face = FAR + Vec3::new(-0.75, 0.0, 0.75);
     let edge = column(face);

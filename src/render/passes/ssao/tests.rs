@@ -4,7 +4,8 @@ use glam::camera::rh::proj::directx;
 use glam::{Mat4, Vec3};
 
 use super::{SsaoFrame, SsaoPlan};
-use crate::core::settings::quality::QualityPreset;
+use crate::core::settings::quality::{EffectQuality, QualityPresets, QualityValues};
+use crate::core::settings::GraphicsSettings;
 use crate::scene::authoring::default_post_processing;
 use crate::scene::Scene;
 
@@ -21,25 +22,53 @@ fn scene_with(edit: impl FnOnce(&mut crate::components::PostProcessingComponent)
     scene
 }
 
-/// The plan for the scene's main camera's volume, as the screen stack asks for it.
-fn plan(scene: &Scene, quality: QualityPreset) -> Option<SsaoPlan> {
+/// The plan for the scene's main camera's volume, as the screen stack asks for it,
+/// under the seeded preset called `preset`.
+fn plan(scene: &Scene, preset: &str) -> Option<SsaoPlan> {
     let main = crate::scene::camera::main_camera(scene);
     let volume = main.and_then(|id| crate::scene::camera::camera_volume(scene, id));
-    SsaoPlan::for_volume(volume.as_deref(), quality.into())
+    let graphics = GraphicsSettings {
+        quality: values(preset),
+        ..Default::default()
+    };
+    SsaoPlan::for_volume(volume.as_deref(), graphics)
 }
 
+fn values(preset: &str) -> QualityValues {
+    QualityPresets::default().get(preset).unwrap().values
+}
+
+/// No preset gates SSAO (#1522): a volume with it on runs it on every one, at its
+/// level's row of that preset.
 #[test]
-fn a_default_volume_runs_ssao_on_medium_and_high_only() {
+fn a_default_volume_runs_ssao_on_every_preset() {
     let scene = scene_with(|_| {});
-    assert_eq!(plan(&scene, QualityPreset::Low), None);
-    let medium = plan(&scene, QualityPreset::Medium).expect("on");
-    assert_eq!(medium.tier, QualityPreset::Medium.ssao().unwrap());
-    assert!(plan(&scene, QualityPreset::High).is_some());
+    for preset in ["Low", "Medium", "High"] {
+        let plan = plan(&scene, preset).expect("on");
+        assert_eq!(plan.quality, values(preset).ssao.medium, "{preset}");
+    }
+}
+
+/// Switching preset changes a `Low`-level volume's samples and leaves a `Custom`
+/// one's alone; `Custom` reaches the pass as authored.
+#[test]
+fn a_preset_switch_moves_a_level_and_leaves_custom_alone() {
+    let low = scene_with(|vc| vc.ssao.quality = EffectQuality::Low);
+    let (a, b) = (plan(&low, "Low").unwrap(), plan(&low, "High").unwrap());
+    assert_ne!(a.quality, b.quality, "the level follows the preset");
+    let custom = scene_with(|vc| {
+        vc.ssao.quality = EffectQuality::Custom;
+        (vc.ssao.samples, vc.ssao.resolution_divisor) = (32, 1);
+    });
+    for preset in ["Low", "High"] {
+        let q = plan(&custom, preset).unwrap().quality;
+        assert_eq!((q.samples, q.resolution_divisor), (32, 1), "{preset}");
+    }
 }
 
 #[test]
 fn nothing_runs_without_an_active_volume_or_with_ao_off() {
-    let high = QualityPreset::High;
+    let high = "High";
     assert_eq!(plan(&Scene::new(), high), None);
     assert_eq!(plan(&scene_with(|vc| vc.active = false), high), None);
     assert_eq!(plan(&scene_with(|vc| vc.ssao.active = false), high), None);
@@ -48,12 +77,12 @@ fn nothing_runs_without_an_active_volume_or_with_ao_off() {
 }
 
 #[test]
-fn the_uniform_carries_the_look_and_the_tier() {
+fn the_uniform_carries_the_look_and_the_quality() {
     let scene = scene_with(|vc| {
         vc.ssao.radius = 0.75;
         vc.ssao.intensity = 2.0;
     });
-    let plan = plan(&scene, QualityPreset::Medium).unwrap();
+    let plan = plan(&scene, "Medium").unwrap();
     let view_proj = directx::perspective(1.0, 1.5, 0.1, 100.0);
     let frame = SsaoFrame {
         plan,
@@ -69,15 +98,14 @@ fn the_uniform_carries_the_look_and_the_tier() {
     assert!(round_trip.abs_diff_eq(Mat4::IDENTITY, 1e-4));
 }
 
-/// #1438: the player's `ssao` option off skips the pass even on High.
+/// #1438: the player's `ssao` option off skips the pass.
 #[test]
 fn the_player_option_off_skips_ssao() {
     use crate::core::settings::graphics_options::{GraphicsOption, GraphicsOptions};
     let scene = scene_with(|_| {});
     let mut options = GraphicsOptions::default();
     options.set(GraphicsOption::Ssao, false);
-    let graphics = crate::core::settings::GraphicsSettings {
-        quality: QualityPreset::High,
+    let graphics = GraphicsSettings {
         options,
         ..Default::default()
     };
