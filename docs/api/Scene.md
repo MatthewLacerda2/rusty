@@ -32,7 +32,6 @@ it behaves identically to the editor and uses the same default values.
 | `Scene.SavePrefab` | `(rootId, path)` | the written path |
 | `Scene.Instantiate` | `(path, …)` — see below | new entity `id` |
 | `Scene.InstantiateUnpacked` | `(prefabPath, [parentId])` | new entity `id` (an unlinked copy) |
-| `Scene.RecordPrefabOverrides` | `(instanceRootId)` | count of entities whose overrides were recorded |
 | `Scene.RevertPrefabOverrides` | `(instanceRootId)` | — (drops overrides, restores the source) |
 | `Scene.ReimportPrefab` | `(instanceRootId)` | — (re-baseline from source, re-apply overrides) |
 | `Scene.ApplyPrefabToSource` | `(instanceRootId)` | count of entities written back into the `.prefab` |
@@ -215,7 +214,7 @@ Two flavours of instance, matching Unity:
 - **Linked** (the default) — the instance keeps a live link back to the `.prefab`. On
   every scene load and on an explicit re-import, the instance is re-baselined from the
   current source so a later edit to the prefab propagates into all its instances. Per-
-  instance edits are recorded as **overrides** that survive that propagation.
+  instance edits are **overrides** the moment they are made, and survive that propagation.
 - **Unpacked** (the v1 copy) — an independent snapshot with no link back to the asset;
   editing the source never touches it.
 
@@ -273,40 +272,41 @@ one name and never drift.
 In every case the geometry is stored only as a reference and rehydrated on the next
 scene load, exactly like a primitive's `primitive_type` — no GPU buffers are inlined.
 
-#### Linked-instance overrides (record / revert / reimport / apply-to-source)
+#### Linked-instance overrides (revert / reimport / apply-to-source)
 
-A linked instance records its divergence from the source as a **generic field diff** —
-a map of `json-pointer-path → value` for each field where the instance differs from a
-fresh copy of the source. This auto-covers every present and future component (and
-component add/remove — a `None`↔`Some` is just a diff at that path) with no per-
-component code. The override set is carried on each instance entity's link, so it
-saves and loads with the scene.
+A linked instance's divergence from the source is a **generic field diff** — a map of
+`json-pointer-path → value` for each field where the instance differs from the source
+as the instance last took it (when it was stamped, loaded or reimported). This
+auto-covers every present and future component (and component add/remove — a
+`None`↔`Some` is just a diff at that path) with no per-component code.
+
+As in Unity, **an edit to an instance is an override the moment it is made**, whatever
+made it: the gizmo, the Inspector, a Lua setter such as `Transform.SetPosition`, the
+MCP. There is nothing to record. The overrides save and load with the scene, survive
+Play (leaving Play restores the edit-mode world exactly), and are re-applied when the
+source changes, so a source edit still reaches every field the instance did not edit.
+The instance **root's position and rotation are always the instance's own**: they never
+come from the source and are never overrides.
 
 Edits flow in two directions. **On-instance** verbs keep edits local to this instance;
 the **apply-to-source** verbs push them up into the shared `.prefab` so *other* instances
-get them. (Naming note (#268): the on-instance recorder is `RecordPrefabOverrides` —
-formerly `ApplyPrefabChanges`, renamed so "apply" unambiguously means apply-to-source.)
+get them.
 
 On-instance:
 
-- **`Scene.RecordPrefabOverrides(instanceRootId)`** — record the instance's current edits
-  as overrides (re-diffs every instance entity against a fresh source baseline and
-  stores the result). Call it after editing an instance, while the source is unchanged,
-  so the edits are preserved through later propagation. Returns the number of entities
-  recorded.
 - **`Scene.RevertPrefabOverrides(instanceRootId)`** — drop every override and rebuild
   the instance straight from the current source (it becomes a pristine copy).
 - **`Scene.ReimportPrefab(instanceRootId)`** — re-baseline from the source and re-apply
-  the recorded overrides on top: non-overridden fields pick up the latest source,
+  the overrides on top: non-overridden fields pick up the latest source,
   overridden ones win. This is the same propagation that runs automatically on scene
   load.
 - **`Scene.ListPrefabOverrides(instanceRootId)`** — the read verb: the instance's
-  recorded override paths as `"localId:json-pointer"` strings (e.g.
-  `"0:/transform/position/0"`).
+  override paths as `"localId:json-pointer"` strings (e.g.
+  `"1:/transform/position/0"`).
 
 Apply-to-source (the Unity "Apply → Prefab" direction):
 
-- **`Scene.ApplyPrefabToSource(instanceRootId)`** — write *every* recorded override back
+- **`Scene.ApplyPrefabToSource(instanceRootId)`** — write *every* override back
   into the source `.prefab` document on disk, then clear them on the instance (it now
   matches the source). Other instances of that prefab pick the change up on their next
   scene load or `ReimportPrefab`. Returns the number of entities written.

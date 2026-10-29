@@ -2,11 +2,9 @@
 //!
 //! A linked prefab instance records its divergence from the source as a GENERIC
 //! field diff, not a typed-per-component struct: a flat map of `json-pointer-path ->
-//! value` for every leaf where the instance differs from a freshly-instantiated copy
-//! of the source entity. Reusing the serde-value approach `prefab.rs` already uses
-//! for material equality, this auto-covers every present and future first-class
-//! component with **no per-component code**, and covers component add/remove too — a
-//! `None`↔`Some` at a component path is just another diff leaf.
+//! value` for every leaf where the instance differs from the source as it last took
+//! it (`live.rs`, #1527). It covers every first-class component with **no
+//! per-component code**, and component add/remove too: a `None`↔`Some` is a leaf.
 //!
 //! The two verbs are symmetric: [`diff_entity`] (instance vs. baseline) yields the
 //! override map, and [`apply_overrides`] (baseline + override map) reproduces the
@@ -96,17 +94,29 @@ fn flatten(prefix: &str, value: &Value, out: &mut BTreeMap<String, Value>) {
     }
 }
 
+/// `entity`'s authored data as json-pointer leaves, identity and geometry masked:
+/// the form a baseline is kept in and an override map is diffed from.
+pub fn leaves(entity: &Entity) -> BTreeMap<String, Value> {
+    let mut out = BTreeMap::new();
+    flatten("", &maskable_json(entity), &mut out);
+    out
+}
+
 /// The override map for `instance` against `baseline`: every flattened leaf whose
 /// value differs (a changed scalar, an added leaf, or a removed leaf surfaced as
 /// `null`). Both sides are masked first, so identity/geometry never leak in.
+#[cfg(test)]
 pub fn diff_entity(instance: &Entity, baseline: &Entity) -> BTreeMap<String, Value> {
-    let mut inst = BTreeMap::new();
-    let mut base = BTreeMap::new();
-    flatten("", &maskable_json(instance), &mut inst);
-    flatten("", &maskable_json(baseline), &mut base);
+    diff_leaves(&leaves(instance), &leaves(baseline))
+}
 
+/// [`diff_entity`] over leaves already taken with [`leaves`].
+pub fn diff_leaves(
+    inst: &BTreeMap<String, Value>,
+    base: &BTreeMap<String, Value>,
+) -> BTreeMap<String, Value> {
     let mut diff = BTreeMap::new();
-    for (path, inst_val) in &inst {
+    for (path, inst_val) in inst {
         if base.get(path) != Some(inst_val) {
             diff.insert(path.clone(), inst_val.clone());
         }

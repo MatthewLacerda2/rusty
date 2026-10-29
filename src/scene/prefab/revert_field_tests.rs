@@ -3,10 +3,7 @@
 
 use super::*;
 use crate::scene::authoring::{create_entity, Primitive};
-use crate::scene::{
-    list_instance_overrides, load_and_instantiate_linked, record_instance_overrides, save_prefab,
-    Scene,
-};
+use crate::scene::{list_instance_overrides, load_and_instantiate_linked, save_prefab, Scene};
 
 /// A linked instance of a fresh Box-root + Sphere-child prefab: (scene, root, path).
 fn linked(tag: &str) -> (Scene, u32, String) {
@@ -30,7 +27,6 @@ fn reverting_a_child_field_resolves_the_root_and_keeps_the_rest() {
     let child = scene.world.children(root)[0];
     scene.world.set_name(child, "Renamed".into());
     scene.world.transform_mut(root).unwrap().position.x = 5.0;
-    record_instance_overrides(&mut scene, root).unwrap();
 
     // Pass the CHILD id: the verb walks up to the root and reimports the instance.
     assert_eq!(revert_instance_field(&mut scene, child, "/name"), Ok(true));
@@ -59,7 +55,6 @@ fn reverting_on_an_unlinked_entity_errors() {
 fn a_missing_source_errors_and_keeps_the_override() {
     let (mut scene, root, path) = linked("gone");
     scene.world.transform_mut(root).unwrap().position.x = 5.0;
-    record_instance_overrides(&mut scene, root).unwrap();
     std::fs::remove_file(&path).unwrap();
 
     assert!(revert_instance_field(&mut scene, root, "/transform/position/0").is_err());

@@ -1,7 +1,7 @@
 //! `Scene.RevertPrefabField` (#998): drop one override so the leaf re-tracks the
 //! source. `true` when an override went, `false` when there was none to drop.
 
-use super::{errors, fixture, pos_of, run};
+use super::{errors, fixture, run};
 use glam::Vec3;
 
 #[test]
@@ -15,21 +15,15 @@ fn revert_prefab_field_returns_whether_it_reverted() {
             ))
             .eval()
             .unwrap();
-        scene
-            .borrow_mut()
-            .world
-            .transform_mut(id)
-            .unwrap()
-            .position
-            .x = 9.0;
-        lua.load(format!("Scene.RecordPrefabOverrides({id})"))
+        lua.load(format!("Transform.SetLocalScale({id}, 9, 1, 1)"))
             .exec()
             .unwrap();
 
-        let revert = format!("return Scene.RevertPrefabField({id}, '/transform/position/0')");
+        let revert = format!("return Scene.RevertPrefabField({id}, '/transform/scale/0')");
         let first: bool = lua.load(&revert).eval().unwrap();
         assert!(first, "the X override was dropped");
-        assert_eq!(pos_of(&scene, id), Vec3::new(1.0, 2.0, 3.0));
+        let scale = scene.borrow().world.transform(id).unwrap().scale;
+        assert_eq!(scale, Vec3::ONE);
         let second: bool = lua.load(&revert).eval().unwrap();
         assert!(!second, "nothing left to revert");
     });

@@ -1,7 +1,7 @@
 //! src/scene/prefab_apply.rs — apply a linked instance's overrides BACK to source (#268).
 //!
-//! The missing direction of the prefab override workflow: #216 gave record / revert /
-//! reimport (edits that live on the *instance*); this writes an instance's recorded
+//! The missing direction of the prefab override workflow: #216 gave revert / reimport
+//! (edits that live on the *instance*); this writes an instance's live
 //! overrides **into the source `.prefab` document on disk**, so the asset itself changes
 //! and every *other* instance picks the edit up on its next load / reimport. Two forms:
 //! whole-object ([`apply_instance_to_source`]) and a single json-pointer leaf
@@ -12,7 +12,7 @@
 //! serializer: [`apply_overrides`] is the same setter the live propagation uses (now
 //! aimed at a raw source entity), [`read_prefab_file`] / [`write_prefab_file`] are the
 //! one `.prefab` reader/writer, and clearing the instance's overrides afterwards reuses
-//! [`revert_instance_overrides`] / [`reimport_instance`] so the instance re-baselines
+//! [`revert_instance_overrides`] / [`propagate`] so the instance re-baselines
 //! against the now-updated source. Scope mirrors #216: a flat instance of a flat prefab,
 //! matched to source entities purely by the link's `local_id`.
 
@@ -22,11 +22,13 @@ use serde_json::Value;
 
 use crate::components::visit_override_refs;
 use crate::scene::prefab::instance::{self, instance_members};
+use crate::scene::prefab::link::propagate;
+use crate::scene::prefab::live::sync_overrides;
 use crate::scene::prefab::overrides::apply_overrides;
 use crate::scene::prefab::{read_prefab_file, write_prefab_file};
-use crate::scene::{reimport_instance, revert_instance_overrides, PrefabData, Scene};
+use crate::scene::{revert_instance_overrides, PrefabData, Scene};
 
-/// Apply every recorded override on the instance rooted at `root_id` back into its
+/// Apply every override on the instance rooted at `root_id` back into its
 /// source `.prefab` on disk, then drop those overrides so the instance now matches the
 /// source. Returns the number of entities whose overrides were written. Errors if
 /// `root_id` is not a linked instance root or the source can't be read/written.
@@ -34,6 +36,7 @@ pub fn apply_instance_to_source(scene: &mut Scene, root_id: u32) -> Result<usize
     let ids = instance_ids(scene, root_id)?;
     let source = link_source(scene, root_id)?;
     let mut prefab = read_prefab_file(&source)?;
+    sync_overrides(&mut scene.world, &ids);
     let mut applied = 0;
     for id in ids {
         let overrides = overrides_of(scene, id);
@@ -68,6 +71,8 @@ pub fn apply_instance_field_to_source(
     let source = link_source(scene, root)?;
     let local_id =
         local_id_of(scene, entity_id).ok_or_else(|| format!("entity {entity_id} is not linked"))?;
+    let ids = instance_ids(scene, root)?;
+    sync_overrides(&mut scene.world, &ids);
     let leaf = overrides_of(scene, entity_id)
         .get(path)
         .cloned()
@@ -79,7 +84,7 @@ pub fn apply_instance_field_to_source(
     }
     write_prefab_file(&prefab, &source)?;
     drop_override(scene, entity_id, path);
-    reimport_instance(scene, root)
+    propagate(scene, root)
 }
 
 /// Revert ONE overridden field: drop the override at `path` from `entity_id`'s map,
@@ -96,10 +101,12 @@ pub fn revert_instance_field(
 ) -> Result<bool, String> {
     let root = instance_root(scene, entity_id)?;
     read_prefab_file(&link_source(scene, root)?)?;
+    let ids = instance_ids(scene, root)?;
+    sync_overrides(&mut scene.world, &ids);
     if !drop_override(scene, entity_id, path) {
         return Ok(false);
     }
-    reimport_instance(scene, root)?;
+    propagate(scene, root)?;
     Ok(true)
 }
 
@@ -184,7 +191,7 @@ fn local_id_of(scene: &Scene, id: u32) -> Option<u32> {
     scene.world.prefab_link(id).map(|l| l.local_id)
 }
 
-/// Entity `id`'s recorded override map (empty if it has none / is unlinked).
+/// Entity `id`'s override map as last synced (empty if it has none / is unlinked).
 fn overrides_of(scene: &Scene, id: u32) -> BTreeMap<String, Value> {
     scene
         .world

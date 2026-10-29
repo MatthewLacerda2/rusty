@@ -53,7 +53,6 @@ fn a_destroyed_lod_renderer_override_keeps_the_other_overrides() {
     let brick = MaterialComponent::new("Brick");
     scene.world.set_material(root, Some(brick));
     scene.world.lod_group_mut(root).unwrap().levels[0].renderers = vec![post];
-    record_instance_overrides(&mut scene, root).unwrap();
 
     scene.destroy_entity(post);
     let mut loaded = reload(&scene);

@@ -4,8 +4,8 @@
 use super::*;
 use crate::scene::authoring::{create_entity, Primitive};
 use crate::scene::{
-    list_instance_overrides, load_and_instantiate_linked, read_prefab_file,
-    record_instance_overrides, save_prefab, Scene,
+    list_instance_overrides, load_and_instantiate_linked, read_prefab_file, reimport_instance,
+    save_prefab, Scene,
 };
 
 /// Author a 2-entity prefab (Box root + Sphere child) at a unique temp path.
@@ -34,7 +34,6 @@ fn apply_writes_into_the_prefab_and_clears_the_override() {
     let path = write_prefab("whole");
     let (mut scene, root) = linked(&path);
     scene.world.transform_mut(root).unwrap().position.x = 5.0;
-    record_instance_overrides(&mut scene, root).unwrap();
     assert!(!list_instance_overrides(&scene, root).unwrap().is_empty());
 
     let applied = apply_instance_to_source(&mut scene, root).unwrap();
@@ -53,7 +52,6 @@ fn a_second_instance_reflects_the_change_after_reimport() {
     // Instance A records + applies an edit to source.
     let (mut a, root_a) = linked(&path);
     a.world.transform_mut(root_a).unwrap().position.y = 9.0;
-    record_instance_overrides(&mut a, root_a).unwrap();
     apply_instance_to_source(&mut a, root_a).unwrap();
 
     // A pristine instance B picks the new source value up on reimport.
@@ -72,7 +70,6 @@ fn per_field_apply_touches_only_that_leaf() {
         t.position.x = 2.0;
         t.position.z = 4.0;
     }
-    record_instance_overrides(&mut scene, root).unwrap();
 
     apply_instance_field_to_source(&mut scene, root, "/transform/position/0").unwrap();
     // Only X went to source; Z is still an instance override.
@@ -91,7 +88,6 @@ fn apply_a_child_field_resolves_the_root() {
     let (mut scene, root) = linked(&path);
     let child = scene.world.children(root)[0];
     scene.world.set_name(child, "Renamed".into());
-    record_instance_overrides(&mut scene, root).unwrap();
 
     // Pass the CHILD id: the verb walks up to the root and applies the child's edit.
     apply_instance_field_to_source(&mut scene, child, "/name").unwrap();
@@ -106,7 +102,6 @@ fn applied_change_round_trips_through_save_load() {
     let path = write_prefab("roundtrip");
     let (mut scene, root) = linked(&path);
     scene.world.transform_mut(root).unwrap().position.x = 3.0;
-    record_instance_overrides(&mut scene, root).unwrap();
     apply_instance_to_source(&mut scene, root).unwrap();
 
     // Save -> load (load runs propagation against the now-updated source).

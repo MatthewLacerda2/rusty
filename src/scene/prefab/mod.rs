@@ -18,6 +18,7 @@ pub mod apply;
 mod extract;
 pub mod instance;
 pub mod link;
+pub mod live;
 pub mod overrides;
 
 pub use extract::extract_prefab;
@@ -73,7 +74,7 @@ pub fn instantiate_prefab(scene: &mut Scene, prefab: &PrefabData, parent: Option
 /// [`instantiate_prefab`], but every entity is stamped with a [`PrefabLink`](crate::components::PrefabLink) back to
 /// `source` (the `.prefab` path) carrying its source `local_id` and an empty override
 /// set. The link is what lets a later scene-load / reimport re-baseline the instance
-/// against the source and re-apply the instance's recorded overrides on top.
+/// against the source and re-apply the instance's overrides on top.
 pub fn instantiate_prefab_linked(
     scene: &mut Scene,
     prefab: &PrefabData,
@@ -111,7 +112,7 @@ fn stamp_prefab(
             entity.prefab_link = Some(crate::components::PrefabLink {
                 source: source.to_string(),
                 local_id,
-                overrides: std::collections::BTreeMap::new(),
+                ..Default::default()
             });
         }
         if entity.parent_id.is_none() {
@@ -129,6 +130,10 @@ fn stamp_prefab(
         let _ = scene.set_parent(new_root, Some(parent_id));
     }
     scene.update_all_colliders();
+    if link_source.is_some() {
+        let ids = prefab.entities.iter().map(|e| base + e.id);
+        live::take_baselines(&mut scene.world, ids.collect::<Vec<_>>());
+    }
     new_root
 }
 
