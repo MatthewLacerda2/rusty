@@ -362,15 +362,18 @@ would double the stamps along the transition; one linked `tile` keeps one stamp 
 cell.
 
 ```lua
-{ id = "tile",   op = "shape", kind = "rounded_rect", size = {0.9, 0.9}, softness = 0.1 },
-{ id = "damage", op = "noise", kind = "fbm", scale = 3, octaves = 4, seed = 5 },
-{ id = "edge",   op = "map_range", from_min = 0.55, from_max = 0.65, to_min = 0, to_max = 1,
-  inputs = {"damage"} },
-{ id = "mask",   op = "clamp", min = 0, max = 1, inputs = {"edge"} },
-{ id = "tiles",  op = "tile", count = 8, inputs = {"tile"},
-  jitter          = { node = "mask", max = 0.6 },
-  rotation_jitter = { node = "mask", max = 0.15 },
-  scale_jitter    = { node = "mask", max = 0.3 } },
+local damaged = { resolution = 256, output = "tiles", nodes = {
+  { id = "tile",   op = "shape", kind = "rounded_rect", size = {0.9, 0.9}, softness = 0.1 },
+  { id = "damage", op = "noise", kind = "fbm", scale = 3, octaves = 4, seed = 5 },
+  { id = "edge",   op = "map_range", from_min = 0.55, from_max = 0.65, to_min = 0, to_max = 1,
+    inputs = {"damage"} },
+  { id = "mask",   op = "clamp", min = 0, max = 1, inputs = {"edge"} },
+  { id = "tiles",  op = "tile", count = 8, inputs = {"tile"},
+    jitter          = { node = "mask", max = 0.6 },
+    rotation_jitter = { node = "mask", max = 0.15 },
+    scale_jitter    = { node = "mask", max = 0.3 } },
+} }
+local stats = Texture.Stats(damaged)  -- `mask` is listed with the rest
 ```
 
 ### Image files — `image`
