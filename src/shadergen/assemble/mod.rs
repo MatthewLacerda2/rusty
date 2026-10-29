@@ -9,8 +9,8 @@
 //! - **surface** — the canonical forward shader (`shader.wgsl`, passed in as
 //!   `surface_base`) is the base; its standard `vs_main` + PBR lighting are kept
 //!   verbatim and the chosen blocks are folded into the final color just before
-//!   `surface_color` returns, which both colour entry points call (`fs_main`, and the
-//!   motion-vector `fs_velocity`, #1435). So a surface variant binds against the
+//!   `surface_color` returns, which every colour entry point calls (`fs_main`, the
+//!   motion-vector `fs_velocity`, #1435, and `fs_velocity_ssr`, #1526). So a surface variant binds against the
 //!   forward pipeline unchanged (same `VertexInput`, bind groups, and entry points),
 //!   varying only the fragment look — exactly the contract.
 //! - **postfx** — a self-contained fullscreen module: the scene-color bindings,

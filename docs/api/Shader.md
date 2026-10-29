@@ -99,7 +99,10 @@ assembles byte-identical WGSL.
   Surface decals (#638) are folded into `fs_main`'s material inputs before the
   lighting, so a variant carries them like the standard shader. A surface variant
   baked before #638 carries the old `fs_main` and **shows no decals** until it is
-  re-baked (it still draws correctly otherwise).
+  re-baked (it still draws correctly otherwise). A surface variant baked before
+  #1526 lacks the `fs_velocity_ssr` entry point (what a view running SSR draws with),
+  so the renderer refuses it: it logs that once and draws the material with the
+  standard shader until the variant is re-baked.
 - **`postfx`** — a self-contained **fullscreen-triangle** fragment program over the
   **tonemapped** scene color (`vs_fullscreen` + `fs_main`), the most self-contained
   pass; each block grades the sampled color, and sampling blocks may also tap
