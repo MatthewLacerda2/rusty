@@ -26,6 +26,11 @@ impl ClipboardRecord {
         self.pending = text;
     }
 
+    /// The capture or write the next tick will publish.
+    pub fn pending(&self) -> &str {
+        &self.pending
+    }
+
     /// Publish the latest capture or write as this tick's clipboard.
     pub fn begin_tick(&mut self) {
         self.current.clone_from(&self.pending);

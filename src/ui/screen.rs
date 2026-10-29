@@ -36,6 +36,12 @@ impl ScreenSize {
         self.game_view = Some((width, height));
     }
 
+    /// The game view's pixel size as the platform last wrote it; `None` headless
+    /// until a run sets one.
+    pub fn game_view(&self) -> Option<(u32, u32)> {
+        self.game_view
+    }
+
     /// The screen size in pixels the UI lays out on: the game view when a platform
     /// reported one, else `video`'s resolution. Each axis is at least 1.
     pub fn pixels(&self, video: &VideoSettings) -> Vec2 {

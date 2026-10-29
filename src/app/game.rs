@@ -23,11 +23,12 @@ use crate::scene::{Camera, Scene, SceneSnapshot};
 use crate::scripting::{ConsoleLogs, ScriptManager};
 use crate::time::Time;
 
+use super::tap::TapPoint;
 use super::{Resources, World};
 
 /// Reported by `tick` so the platform layer can react (e.g. grab the cursor)
 /// without the simulation knowing about the window.
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PlayTransition {
     None,
     Entered,
@@ -128,7 +129,9 @@ impl GameWorld {
     /// tick reads the UI's texture sizes after the transition, before the schedule in
     /// Play and in the edit frame outside it, so no loop that ticks can skip them.
     pub fn tick(&mut self, dt: f32) -> PlayTransition {
-        let transition = self.handle_transition();
+        self.tap(TapPoint::BeforeTick); // a demo's tap (#1581)
+        let transition = self.transition_tapped();
+        self.tap(TapPoint::BeforeInput);
         // Publish input written since the last tick as this tick's edges (#416).
         self.resources.input.borrow_mut().begin_tick();
         // `advance` records raw `dt` (unscaled) and the scaled `delta_time`.
@@ -139,10 +142,8 @@ impl GameWorld {
             time.delta_time
         };
         if self.world.scene.borrow().is_playing() {
-            // Run the schedule's per-frame stages against (&mut World, &mut
-            // Resources). The schedule is moved out of `Resources` for the call (its
-            // systems take `&mut Resources`) and restored after, avoiding a
-            // self-aliasing borrow. `Startup` runs once, in `enter_play`.
+            // The per-frame stages ([`Self::run_schedule_frame`]); `Startup` runs
+            // once, in `enter_play`.
             self.resources.frame_dt = scaled_dt;
             self.refresh_ui_textures();
             self.run_schedule_frame();
@@ -151,6 +152,7 @@ impl GameWorld {
         }
         self.sync_render_camera();
         self.sync_shader_time();
+        self.tap(TapPoint::AfterTick);
         transition
     }
 
@@ -159,7 +161,7 @@ impl GameWorld {
     /// Play the caller runs [`edit_frame`](Self::edit_frame) after it, which re-reads
     /// UI texture sizes after a Stop; entering Play re-reads them here.
     pub fn poll_transition(&mut self) -> PlayTransition {
-        let transition = self.handle_transition();
+        let transition = self.transition_tapped();
         self.refreshed_after(transition)
     }
 
@@ -176,7 +178,7 @@ impl GameWorld {
         self.resources.play_frame
     }
 
-    fn handle_transition(&mut self) -> PlayTransition {
+    pub(super) fn handle_transition(&mut self) -> PlayTransition {
         // A script's `Editor.EnterPlay/ExitPlay` (#1360) asks like any host does.
         let scripted = self.resources.application.borrow_mut().take_play_request();
         if let Some(playing) = scripted {

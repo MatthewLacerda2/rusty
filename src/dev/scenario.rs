@@ -53,19 +53,29 @@ pub fn run(
     if let Some((width, height)) = size {
         harness.set_size(width, height);
     }
-    run_in(harness, scenario_path)
+    // Every Play session of a dev build is a demo (#1581): `play --demo` replays it.
+    super::demo::record_project(&mut harness.world.borrow_mut());
+    run_file(harness, scenario_path)
 }
 
 /// [`run`] on a workspace of the run's own, seeded from the engine's bundled
 /// scripts (see `Harness::new`) — for tests, which must not read a developer's project (#782).
 /// Test seam for `tests/input_harness.rs`.
 pub fn run_isolated(scenario_path: &Path, out_dir: &Path) -> Result<RunReport, String> {
-    run_in(Harness::new(out_dir, DEFAULT_BOT_SCRIPT), scenario_path)
+    run_file(Harness::new(out_dir, DEFAULT_BOT_SCRIPT), scenario_path)
 }
 
-fn run_in(harness: Harness, scenario_path: &Path) -> Result<RunReport, String> {
+/// Run the scenario at `scenario_path` on `harness`.
+pub fn run_file(harness: Harness, scenario_path: &Path) -> Result<RunReport, String> {
     let code = std::fs::read_to_string(scenario_path)
         .map_err(|e| format!("Failed to read scenario {}: {}", scenario_path.display(), e))?;
+    run_code(harness, &code, &scenario_path.to_string_lossy())
+}
+
+/// Run the scenario `code` (named `name` in errors) on `harness`, then write its
+/// results. A recording harness notes the scenario's API calls in its demo
+/// (#1581); a replaying one adds the replay's verdict to the results.
+pub fn run_code(harness: Harness, code: &str, name: &str) -> Result<RunReport, String> {
     let harness = Rc::new(RefCell::new(harness));
 
     // The real API over the harness world's own cells (#1384), held for the whole
@@ -82,10 +92,11 @@ fn run_in(harness: Harness, scenario_path: &Path) -> Result<RunReport, String> {
         .scope(|scope| {
             api::register(&lua, scope, &ctx).map_err(mlua::Error::RuntimeError)?;
             super::bridge::register(&lua, &harness)?;
-            Ok(lua
-                .load(&code)
-                .set_name(scenario_path.to_string_lossy())
-                .exec())
+            let journal = harness.borrow().world.borrow().script_manager().journal();
+            if journal.borrow().is_recording() {
+                super::demo::journal_calls(&lua, &journal)?;
+            }
+            Ok(lua.load(code).set_name(name).exec())
         })
         .map_err(|e| format!("Lua bridge error: {}", e))?;
     if let Err(e) = &exec {
@@ -96,6 +107,7 @@ fn run_in(harness: Harness, scenario_path: &Path) -> Result<RunReport, String> {
             .error(format!("[Scenario error] {}", e));
     }
 
+    super::demo::conclude(&mut harness.borrow_mut());
     let h = harness.borrow();
     let results_path = h
         .write_results()

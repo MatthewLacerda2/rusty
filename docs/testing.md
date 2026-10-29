@@ -59,6 +59,43 @@ things follow:
   are refused for the whole run, before its first `Harness.Step` too (CLAUDE.md,
   *Provider calls are authoring, never gameplay*).
 
+## Demos: every Play session, replayed (#1581)
+
+A dev build records **every Play session** (the editor's Play, every `play` run,
+the dev player) as a demo in the project's `saved/demos/<scene>-<UTC time>.demo`,
+keeping the newest `demos.keep` (`project.rusty`, default 20; `0` records none).
+Replay one headless, on the scene and settings it recorded:
+
+```sh
+cargo run --bin play --features dev -- --project <game> --demo <game>/saved/demos/<file>.demo [scenario.lua] <out_dir>
+```
+
+Without a scenario the whole demo plays; with one, the scenario drives it (its
+`Harness.Step`s advance the replay), so screenshots, `Harness.Bench` and every
+other harness verb work on a human's playtest. `results.json` says how the
+replay went: `demo: replayed N of M ticks`, and an expectation `the demo replays
+bit for bit` that fails at the first digest that differs.
+
+What a demo holds (`dev::demo`, the format in `dev/demo/format.rs`): the scene,
+the engine commit, the seed, the project settings and the save data (`Storage`,
+the player's options with it) Play started from, the Game view size at each
+change, and per tick the input the tick published (`InputFrame`), as a delta from
+the tick before. Everything else that reaches a playing world is recorded as a
+**host act** before its tick: a console, MCP or command-channel line (the one
+evaluator, `ScriptManager::eval`) and a scenario's API calls with their
+plain-data arguments. An act it cannot carry **taints** the demo from that tick:
+an edit made by hand in the editor (the Inspector, the hierarchy, a gizmo), a
+call passing or returning a function or a handle (`Scene.GetScript`'s calls are
+not recorded), Play started on unsaved scene edits. The replay warns from there
+on. Script and asset changes on disk wait for Stop (the editor's watch holds
+them through Play), so they never reach a Play session.
+
+**Bit for bit is checked, not promised.** Every 120 ticks the demo stores a
+digest of the world (the snapshot an agent reads, plus where `Random` stands);
+the replay compares each and reports the first that differs, with the last tick
+that still matched. A demo recorded on another engine commit warns and replays
+anyway. An hour of steady mouse-look writes a few MB; idle ticks write nothing.
+
 ## Rules
 - Test and fixture files are capped at **150 lines** by the size gate
   (`tools/lint`), except a `<x>_tests.rs` sibling of `<x>.rs` (or of a `<x>/`

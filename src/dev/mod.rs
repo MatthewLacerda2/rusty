@@ -12,6 +12,7 @@
 //!   session         — long-lived edit-mode host + command channel (the keystone, #177)
 //!   command_channel — windowed socket command channel: drive a live playtest (#282)
 //!   mcp             — MCP stdio server over the same evaluator (Blender-MCP-style, #288)
+//!   demo        — every Play session recorded, replayed headless bit for bit (#1581)
 //!   harness     — headless deterministic runner: Step / StepUntil / results.json
 //!   scenario    — loads and runs a `.lua` scenario, captures observations
 //!   bridge      — Lua bindings for the scenario VM (the control surface)
@@ -43,6 +44,7 @@ pub mod bridge;
 pub mod capture;
 pub mod command_channel;
 pub mod console;
+pub mod demo;
 pub mod export;
 pub mod harness;
 pub mod lua_surface;

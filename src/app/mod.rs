@@ -34,6 +34,7 @@ mod scene_load;
 mod schedule;
 mod stage;
 mod systems;
+mod tap;
 mod world;
 
 pub use game::{GameWorld, PlayTransition};
@@ -42,6 +43,7 @@ pub use registry::{build, App};
 pub use resources::Resources;
 pub use schedule::Schedule;
 pub use stage::Stage;
+pub use tap::{TapPoint, TickTap};
 pub use world::World;
 
 #[cfg(test)]
