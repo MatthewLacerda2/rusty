@@ -227,8 +227,12 @@ impl EditorUi {
         // is live and the floating dev console takes over. The viewport stays in both
         // modes so the Scene/Game tabs are always reachable (#183).
         if *is_playing {
+            // Off by default and toggled from the header (#1544); hidden, nothing is
+            // drawn and no field can take focus. Logs are collected either way.
             #[cfg(feature = "dev")]
-            bottom_panel::draw_play_console(self, ctx, console);
+            if self.dev.show_play_console {
+                bottom_panel::draw_play_console(self, ctx, console);
+            }
         } else {
             // One diffing navmesh sync per edit-mode frame catches every edit since
             // the last one, whoever made it: a card, the gizmo, the console, MCP

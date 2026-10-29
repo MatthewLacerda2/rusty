@@ -91,6 +91,8 @@ impl EditorFrontend {
         );
         let mut editor_ui = EditorUi::new(game.script_manager().scene_path_cell());
         editor_ui.quality_preset = game.script_manager().graphics_cell().borrow().quality;
+        #[cfg(feature = "dev")]
+        editor_ui.dev.load_prefs(&game.resources.storage.borrow());
         Self {
             egui_ctx,
             egui_winit,
@@ -144,6 +146,10 @@ impl EditorFrontend {
         }
         self.sync_quality(shell, game);
         self.sync_speaker_mode(game);
+        #[cfg(feature = "dev")]
+        self.editor_ui
+            .dev
+            .store_prefs(&mut game.resources.storage.borrow_mut());
         interaction
     }
 
