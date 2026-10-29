@@ -1,6 +1,6 @@
 //! SSR on lavapipe (#1526, #1542): a mirror reflects and a rough floor does not, an
-//! overlay camera's viewmodel is untouched while the world under it still reflects,
-//! and with no skybox the sky an SSR hit replaces is the procedural one.
+//! overlay camera's viewmodel is untouched while the world under it still reflects
+//! (and the overlay draws with the plain pipelines), and with no skybox the sky an SSR hit replaces is the procedural one.
 
 use glam::Vec3;
 
@@ -78,6 +78,18 @@ fn gpu_an_overlay_cameras_pixels_get_no_ssr_and_the_world_still_does() {
     );
     assert_eq!(gun, 0, "the overlay's mirror gun is untouched");
     assert!(world >= 40, "the floor still reflects under the overlay");
+}
+
+#[test]
+fn gpu_an_overlay_camera_draws_with_the_plain_pipelines() {
+    let Some(mut r) = renderer() else { return };
+    frame(&mut r, &with_viewmodel(scene(true, MIRROR, RED)));
+    let counters = &r.frame_counters;
+    assert_eq!(counters.velocity_passes, 2, "both cameras write depths");
+    assert_eq!(
+        counters.ssr_surface_passes, 1,
+        "only the base camera writes SSR's surface targets"
+    );
 }
 
 #[test]

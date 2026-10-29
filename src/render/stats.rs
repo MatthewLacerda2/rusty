@@ -107,6 +107,10 @@ pub struct RenderCounters {
     /// camera that ran SSAO, `0` with AO off. A camera shading with a forward
     /// override of its own (the shader preview) is never primed, nor is any on Metal.
     pub primed_passes: u32,
+    /// Opaque scene passes that wrote SSR's surface targets with the SSR pipelines
+    /// (#1526): one per view whose base camera runs SSR. An overlay camera of the
+    /// stack draws with the plain ones, so it never counts.
+    pub ssr_surface_passes: u32,
     /// Views whose grading LUT was rebaked this frame (#1440): a grading knob or
     /// the tonemap changed, or the view is new. `0` on every frame the grade holds.
     pub grade_lut_bakes: u32,
@@ -146,6 +150,7 @@ impl RenderCounters {
             ("render_texture_draws", self.render_texture_draws.into()),
             ("velocity_passes", self.velocity_passes.into()),
             ("primed_passes", self.primed_passes.into()),
+            ("ssr_surface_passes", self.ssr_surface_passes.into()),
             ("grade_lut_bakes", self.grade_lut_bakes.into()),
         ]
     }

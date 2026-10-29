@@ -171,6 +171,7 @@ fn scene_pass(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
         ssao: ctx
             .ssao
             .map(|plan| SsaoFrame::for_camera(plan, ctx.view_proj, ctx.cam)),
+        base: ctx.is_first,
     };
     r.execute_scene_pass(view, frame, &ctx.solids.draws.opaque);
 }
