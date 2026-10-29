@@ -114,10 +114,17 @@ pub fn cached_gltf(path: &Path) -> Result<PathBuf, ImportError> {
 
 /// Where the cached glTF for the converted source at `path` lives, made or not.
 pub fn cache_location(path: &Path) -> Result<PathBuf, ImportError> {
+    cache_location_as(path, ".glb")
+}
+
+/// Where the import cache keeps a file made from the source at `path`, named as
+/// the source plus `suffix`: the same place and rules as [`cache_location`]
+/// (a compressed texture, #1574, is one).
+pub fn cache_location_as(path: &Path, suffix: &str) -> Result<PathBuf, ImportError> {
     let root = Path::new(".");
     Ok(match project_relative(root, path)? {
-        Some(rel) => cache_path(root, &rel),
-        None => temp_path(path),
+        Some(rel) => with_suffix(&cache_root(root).join(rel), suffix),
+        None => temp_path(path, suffix),
     })
 }
 
@@ -174,10 +181,12 @@ pub fn refresh(converter: &Converter, source: &Path, out: &Path) -> Result<(), I
 /// whole of `rel` under [`IMPORT_CACHE_DIR`], plus `.glb`. Nothing is stripped or
 /// re-encoded, so distinct sources never share a cache (#1167).
 pub fn cache_path(root: &Path, rel: &Path) -> PathBuf {
-    with_suffix(
-        &root.join(paths::native(IMPORT_CACHE_DIR)).join(rel),
-        ".glb",
-    )
+    with_suffix(&cache_root(root).join(rel), ".glb")
+}
+
+/// The import cache folder of the project at `root`.
+fn cache_root(root: &Path) -> PathBuf {
+    root.join(paths::native(IMPORT_CACHE_DIR))
 }
 
 /// True when `path` is inside an import cache: what the manifest and the content
@@ -238,7 +247,7 @@ fn relative_to_cwd(path: &Path) -> Option<PathBuf> {
 
 /// Outside a project: a file in the temp folder named by the source's absolute
 /// path, so two sources with one file name never share it.
-fn temp_path(path: &Path) -> PathBuf {
+fn temp_path(path: &Path, suffix: &str) -> PathBuf {
     let absolute = std::path::absolute(path).unwrap_or_else(|_| path.to_path_buf());
     let digest = hash::fnv1a64(absolute.to_string_lossy().as_bytes());
     let name = path
@@ -246,7 +255,7 @@ fn temp_path(path: &Path) -> PathBuf {
         .map_or_else(Default::default, |n| n.to_string_lossy());
     std::env::temp_dir()
         .join("rusty-import")
-        .join(format!("{digest:016x}-{name}.glb"))
+        .join(format!("{digest:016x}-{name}{suffix}"))
 }
 
 fn with_suffix(path: &Path, suffix: &str) -> PathBuf {

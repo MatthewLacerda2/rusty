@@ -29,8 +29,8 @@ one by its source path still works.
 | `Assets.SetLightmapUVSettings` | `(path, { generate?, hardAngle?, packMargin? })` | how many of the scene's meshes it re-imported |
 | `Assets.GetModelImportSettings` | `(path)` | `{ scaleFactor }` — a model's Scale Factor (below) |
 | `Assets.SetModelImportSettings` | `(path, { scaleFactor? })` | how many of the scene's meshes it re-imported |
-| `Assets.GetTextureImportSettings` | `(path)` | `{ wrapMode, filterMode, generateMipmaps }` — an image's import settings (below) |
-| `Assets.SetTextureImportSettings` | `(path, { wrapMode?, filterMode?, generateMipmaps? })` | nothing |
+| `Assets.GetTextureImportSettings` | `(path)` | `{ wrapMode, filterMode, generateMipmaps, compression, maxSize }` — an image's import settings (below) |
+| `Assets.SetTextureImportSettings` | `(path, { wrapMode?, filterMode?, generateMipmaps?, compression?, maxSize? })` | nothing |
 
 Returned shape (Lua, 1-indexed arrays):
 
@@ -135,7 +135,7 @@ Lighting.BakeLightmaps()
 ### Texture import settings
 
 Unity's Texture Import Settings (#1323), and the image inspector's **Texture Import
-Settings** card: how a texture is sampled, stored per image in its `<file>.meta`
+Settings** card: how a texture is sampled, compressed and sized, stored per image in its `<file>.meta`
 sidecar. Each material map (albedo, metallic, roughness, normal, emissive, a
 shader's `mask`) samples through its own texture's settings, and so do particle and
 ribbon textures. A UI Image takes its texture's filter and mips but always clamps,
@@ -153,6 +153,31 @@ clamped sampler.
 - `generateMipmaps` — upload a full mip chain (on by default, as in Unity). Off, only
   the full-size image is uploaded, so a tiled surface far away shimmers.
 
+- `compression` — how it is block-compressed on the GPU (#1574), Unity's
+  *Compression*: `"None"` (RGBA8, four bytes a texel), `"Normal"` (the default) or
+  `"HighQuality"`. The format follows the slot that first uses the texture:
+
+  | slot | `"Normal"` | `"HighQuality"` |
+  |---|---|---|
+  | albedo, emissive, UI, particles, shader slots: opaque | BC1 (½ byte a texel) | BC7 (1 byte) |
+  | the same, with any alpha below 255 | BC7 | BC7 |
+  | normal map | BC5 (1 byte): x and y; the shader rebuilds z | BC5 |
+  | metallic or roughness map whose image is greyscale | BC4 (½ byte): one channel | BC4 |
+
+  A metallic or roughness map holding different channels (glTF's packed
+  occlusion-roughness-metallic) is compressed as colour is, keeping each channel.
+  Colour stays sRGB. The blocks and every mip are made once, at import, into the
+  project's import cache (`assets/generated/imported/<path>.<kind>.bctex`), and made
+  again only when the image, its compression, its max size, its mipmaps or the
+  encoder change; a game ships the cache. An image whose (fitted) sides are not
+  multiples of 4 is uploaded uncompressed, as Unity leaves it. On a GPU without BC
+  compression every texture uploads uncompressed, with one console warning.
+  `Debug.Stats().texture_bytes` is what the textures take on the GPU.
+- `maxSize` — the longest side it is uploaded at (#1574), Unity's *Max Size*: one of
+  32, 64, 128, 256, 512, 1024, 2048 (the default), 4096 or 8192. A larger image is
+  downscaled at import, its aspect kept (colour in linear light); the file on disk
+  is never changed. Another number is an error naming the list.
+
 `SetTextureImportSettings` changes only the keys it is given, writes the sidecar (a
 file with none gets one), and the texture is re-uploaded with the new settings on the
 next frame — the same verb the inspector's card runs. An unknown mode name is an
@@ -160,6 +185,7 @@ error naming the known ones. A texture extracted from a converted model
 (`model.fbx#tex/Skin`) keeps the defaults.
 
 ```lua no-run
-Assets.SetTextureImportSettings("project/textures/pixel_font.png", { filterMode = "Point" })
+Assets.SetTextureImportSettings("project/textures/pixel_font.png", { filterMode = "Point", compression = "None" })
+Assets.SetTextureImportSettings("project/textures/floor_albedo.png", { compression = "HighQuality", maxSize = 1024 })
 print(Assets.GetTextureImportSettings("project/textures/pixel_font.png").wrapMode)  -- Repeat
 ```

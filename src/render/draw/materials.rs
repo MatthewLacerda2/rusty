@@ -13,8 +13,9 @@ use std::rc::Rc;
 use crate::asset::MapRef;
 use crate::components::MaterialAsset;
 use crate::render::gpu::material_cache::{ParamOwner, MATERIAL_TEXTURES};
+use crate::render::gpu::textures::compressed::is_single_channel;
 use crate::render::gpu::textures::TextureKind;
-use crate::render::{GpuTexture, Renderer};
+use crate::render::{EntityUniform, GpuTexture, Renderer};
 use crate::scene::shader_overrides::ParamValues;
 use crate::scene::{Scene, SceneId};
 use crate::shadergen::textures;
@@ -100,6 +101,30 @@ impl Renderer {
                 .unwrap_or_else(|| Rc::clone(&self.default_texture)),
             None => Rc::clone(&self.default_texture),
         }
+    }
+
+    /// `uniform` with its metallic and roughness flags set to 2 where the map is
+    /// resident as one channel (BC4, #1574): the shader then reads its red channel
+    /// instead of glTF's packed blue and green.
+    pub(crate) fn with_map_channels(
+        &self,
+        mut uniform: EntityUniform,
+        material: Option<&MaterialAsset>,
+    ) -> EntityUniform {
+        let Some(m) = material else {
+            return uniform;
+        };
+        let single = |map: &Option<MapRef>| {
+            let texture = map.as_ref().and_then(|p| self.gpu_textures.get(p));
+            texture.is_some_and(|t| is_single_channel(&t.texture))
+        };
+        if single(&m.metallic_map) {
+            uniform.use_metallic_map = 2;
+        }
+        if single(&m.roughness_map) {
+            uniform.use_roughness_map = 2;
+        }
+        uniform
     }
 
     /// The cache key a map path resolves to: the path when its texture is resident,
@@ -205,11 +230,15 @@ pub(crate) fn material_maps(
         .filter_map(|(i, path)| Some((path?, map_kind(i))))
 }
 
-/// What the map at `index` holds, which decides how its mips average (#1322).
+/// What the map at `index` holds, which decides how its mips average (#1322) and
+/// what it compresses to (#1574): metallic and roughness are masks, the normal map
+/// a normal map, the shader texture slots data.
 fn map_kind(index: usize) -> TextureKind {
-    match is_colour_map(index) {
-        true => TextureKind::Colour,
-        false => TextureKind::Data,
+    match index {
+        1 | 2 => TextureKind::Mask,
+        3 => TextureKind::Normal,
+        i if is_colour_map(i) => TextureKind::Colour,
+        _ => TextureKind::Data,
     }
 }
 

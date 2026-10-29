@@ -58,7 +58,9 @@ impl Renderer {
         // 3. Create Device & Queue
         let (device, queue) = adapter
             .request_device(&wgpu::DeviceDescriptor {
-                required_features: wgpu::Features::empty(),
+                // BC compression where the GPU has it (#1574).
+                required_features: adapter.features()
+                    & crate::render::gpu::textures::compressed::FEATURE,
                 required_limits: wgpu::Limits::default(),
                 label: None,
                 ..Default::default()

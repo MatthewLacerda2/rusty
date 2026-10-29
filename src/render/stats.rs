@@ -6,6 +6,7 @@
 //! for everything that issues geometry. The dev layer folds them into `FrameStats`.
 
 use crate::render::draw::resources::SolidResources;
+use crate::render::gpu::textures::compressed::gpu_bytes;
 use crate::render::passes::particles::ParticleDraws;
 use crate::render::{RenderView, Renderer};
 use crate::scene::{LightType, Scene};
@@ -120,6 +121,11 @@ pub struct RenderCounters {
     /// Opaque copies made this frame (#1523), Unity's *Opaque Texture*: one per
     /// camera whose visible translucents refract or absorb, `0` on every other.
     pub opaque_copies: u32,
+    /// GPU bytes of the image textures the renderer holds by path (material maps,
+    /// UI images, particle textures, render textures), every mip included: what
+    /// texture compression and *Max Size* shrink (#1574). Not a per-frame count:
+    /// the resident total at the frame's end.
+    pub texture_bytes: u64,
 }
 
 impl RenderCounters {
@@ -160,6 +166,7 @@ impl RenderCounters {
             ("grade_lut_bakes", self.grade_lut_bakes.into()),
             ("sky_reflection_bakes", self.sky_reflection_bakes.into()),
             ("opaque_copies", self.opaque_copies.into()),
+            ("texture_bytes", self.texture_bytes),
         ]
     }
 
@@ -208,6 +215,8 @@ impl Renderer {
         c.ui_mask_passes = view.ui.last_mask_passes();
         c.ui_blur_passes = view.ui.last_blur_passes();
         c.draw_calls += c.ui_draws;
+        let textures = self.gpu_textures.values();
+        c.texture_bytes = textures.map(|t| gpu_bytes(&t.texture)).sum();
     }
 }
 

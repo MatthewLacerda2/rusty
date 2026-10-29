@@ -1,3 +1,4 @@
+pub(crate) mod compressed;
 pub(crate) mod freshness;
 pub(crate) mod kind_watch;
 pub(crate) mod mips;
@@ -131,12 +132,25 @@ impl Renderer {
         tex
     }
 
-    /// Decode the image `map` names and upload it, uncached, with the mips and
-    /// sampler its import settings ask for; `None` when it cannot be read. A cache
-    /// with its own keys (bloom's lens dirt, #1442) loads through this.
+    /// Upload the image `map` names, uncached, with the mips, compression, size
+    /// and sampler its import settings ask for; `None` when it cannot be read. A
+    /// cache with its own keys (bloom's lens dirt, #1442) loads through this.
+    /// Compressed, its levels come from the import cache (#1574); uncompressed, it
+    /// is decoded, fitted to its *Max Size* and its mips drawn on the GPU.
     pub(crate) fn upload_map(&self, map: &MapRef, kind: TextureKind) -> Option<Rc<GpuTexture>> {
-        let img = open(map)?;
         let import = import_settings(map);
+        if let Some(blocks) = compressed::load(&self.device, map, &import, kind) {
+            let gpu = (&self.device, &self.queue);
+            let texture = compressed::upload(gpu, map.as_str(), &blocks);
+            return Some(Rc::new(Self::finalize_texture(
+                &self.device,
+                &self.texture_layout,
+                texture,
+                (sampler(&self.device, &import), import.filter_mode),
+                Some(map.as_str()),
+            )));
+        }
+        let img = crate::asset::texture_import::fit(open(map)?, import.max_size, kind);
         Some(self.upload_image_texture(map.as_str(), &img, &import, kind))
     }
 
@@ -247,6 +261,8 @@ fn checkerboard(side: u32, cell: u32) -> image::RgbaImage {
     })
 }
 
+#[cfg(test)]
+mod compressed_gpu_tests;
 #[cfg(test)]
 mod data_map_tests;
 #[cfg(test)]

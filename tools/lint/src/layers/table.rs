@@ -55,9 +55,11 @@ pub const LAYERS: &[Layer] = &[
     sim("core", &[]).uses(&["rustc_hash"]),
     sim("time", &[]),
     // Decoding is the asset pipeline's: models, clips through symphonia (#545; only
-    // `audio` plays them) and colour lookups through `image` (#1441).
+    // `audio` plays them) and colour lookups through `image` (#1441); textures are
+    // block-compressed at import (#1574).
     sim("asset", &["core"]).uses(&[
         "bevy_mikktspace",
+        "block_compression",
         "gltf",
         "image",
         "symphonia",

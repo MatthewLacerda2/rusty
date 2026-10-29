@@ -1,5 +1,6 @@
 //! A texture's import settings (#1323), Unity's Texture Import Settings: how it
-//! wraps, how it filters, and whether it gets a mip chain. Stored in the image's
+//! wraps, how it filters, whether it gets a mip chain, how it is compressed and
+//! how large it may be (#1574). Stored in the image's
 //! `.meta` sidecar beside the model settings, read by the renderer's upload
 //! (`render::gpu::textures`), and written by the image inspector and
 //! `Assets.SetTextureImportSettings` through [`set_texture`].
@@ -36,6 +37,28 @@ pub enum FilterMode {
     Trilinear,
 }
 
+/// How the texture is block-compressed on the GPU (Unity's *Compression*,
+/// #1574). The format follows what the texels hold (`asset::texture_import`).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum Compression {
+    /// Uncompressed RGBA8: four bytes a texel.
+    None,
+    /// BC by kind, the smaller format where one fits: BC1 for an opaque colour or
+    /// data map (half a byte a texel), BC7 with alpha, BC5 for a normal map, BC4
+    /// for a single-channel one. Unity's default.
+    #[default]
+    Normal,
+    /// BC7 for every colour and data map, encoded slower and closer (one byte a
+    /// texel); normal and single-channel maps as `Normal`.
+    HighQuality,
+}
+
+/// The largest side a texture keeps by default (Unity's *Max Size*).
+pub const DEFAULT_MAX_SIZE: u32 = 2048;
+/// The *Max Size* choices, Unity's: a larger image is downscaled at import, its
+/// aspect kept, until its longer side fits.
+pub const MAX_SIZES: [u32; 9] = [32, 64, 128, 256, 512, 1024, 2048, 4096, 8192];
+
 /// One texture's import settings. `#[serde(default)]` so a sparse sidecar loads.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
@@ -44,6 +67,10 @@ pub struct TextureSettings {
     pub filter_mode: FilterMode,
     /// Upload a full mip chain (Unity's *Generate Mip Maps*, on by default).
     pub generate_mipmaps: bool,
+    /// How it is block-compressed (#1574).
+    pub compression: Compression,
+    /// The longest side it is uploaded at, one of [`MAX_SIZES`] (#1574).
+    pub max_size: u32,
 }
 
 impl Default for TextureSettings {
@@ -52,8 +79,38 @@ impl Default for TextureSettings {
             wrap_mode: WrapMode::default(),
             filter_mode: FilterMode::default(),
             generate_mipmaps: true,
+            compression: Compression::default(),
+            max_size: DEFAULT_MAX_SIZE,
         }
     }
+}
+
+impl Compression {
+    pub const ALL: [Self; 3] = [Self::None, Self::Normal, Self::HighQuality];
+
+    /// The name the API and the sidecar use.
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::None => "None",
+            Self::Normal => "Normal",
+            Self::HighQuality => "HighQuality",
+        }
+    }
+
+    /// The compression named `name`, refusing an unknown one with the list of known ones.
+    pub fn parse(name: &str) -> Result<Self, String> {
+        let found = Self::ALL.into_iter().find(|m| m.name() == name);
+        found.ok_or_else(|| unknown("compression", name, Self::ALL.map(Self::name)))
+    }
+}
+
+/// `size` when it is one of [`MAX_SIZES`], else an error listing them.
+pub fn parse_max_size(size: u32) -> Result<u32, String> {
+    if MAX_SIZES.contains(&size) {
+        return Ok(size);
+    }
+    let known = MAX_SIZES.map(|s| s.to_string()).join(", ");
+    Err(format!("max size {size} is not one of {known}"))
 }
 
 impl WrapMode {
@@ -135,6 +192,8 @@ mod tests {
             wrap_mode: WrapMode::Mirror,
             filter_mode: FilterMode::Point,
             generate_mipmaps: false,
+            compression: Compression::HighQuality,
+            max_size: 512,
         };
         set_texture(&png, set).unwrap();
         assert_eq!(texture(&png), set);
@@ -149,6 +208,11 @@ mod tests {
         for m in FilterMode::ALL {
             assert_eq!(FilterMode::parse(m.name()), Ok(m));
         }
+        for c in Compression::ALL {
+            assert_eq!(Compression::parse(c.name()), Ok(c));
+        }
+        assert_eq!(parse_max_size(1024), Ok(1024));
+        assert!(parse_max_size(1000).unwrap_err().contains("2048, 4096"));
         let err = FilterMode::parse("Linear").unwrap_err();
         assert!(
             err.contains("\"Linear\"") && err.contains("Trilinear"),

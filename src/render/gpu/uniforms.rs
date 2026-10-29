@@ -126,7 +126,8 @@ pub(crate) struct EntityUniform {
     pub metallic: f32,
     pub roughness: f32,
     // Map flags (#202, #207). When set, the shader samples the matching group(2)
-    // texture: metallic/roughness multiply their scalar by the sampled channel;
+    // texture: metallic/roughness multiply their scalar by the sampled channel
+    // (glTF's blue/green at 1, red at 2: a one-channel BC4 upload, #1574);
     // `use_normal_map` perturbs the shading normal in tangent space; `use_emissive_map`
     // modulates the emissive factor. These four `u32`s fill the run up to the next
     // 16-byte boundary so the `vec4` that follows is aligned; `EntityUniforms` in

@@ -4,6 +4,7 @@
 #import forward::bindings::{bones, camera, cluster_lights, cluster_ranges, decals, entity, instances, lighting, local_lights, s_decal, s_diffuse, s_emissive, s_lightmaps, s_metallic, s_normal, s_refl_cube, s_roughness, s_shadow, s_skybox, shadow_tiles, t_ao, t_decal_color, t_decal_data, t_diffuse, t_emissive, t_lightmap_dirs, t_lightmaps, t_metallic, t_normal, t_refl_cube, t_roughness, t_shadow, t_shadow_atlas, t_skybox, vertex_to_world, vertex_to_world_prev}
 #import lighting::ssr_surface
 #import forward::transparent
+#import forward::maps::{map_factor, unpack_normal}
 #import forward::lighting::{LIGHTMAP_RGBM_RANGE, ambient_occlusion, calculate_pbr, calculate_shadow, decode_lightmap_direction, environment_reflection, eval_sh, fold_decals, lightmap_direction_rebalance}
 
 // The forward pass (and its SSAO prepass and shadow-cascade entry points). Its
@@ -314,22 +315,20 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
         return vec4<f32>(apply_fog(camera.fog, base_color.rgb, in.world_position, camera.camera_pos), base_color.a);
     }
 
-    // Geometric normal, optionally perturbed by a tangent-space normal map (#207).
-    // The map's RGB in [0,1] decodes to a [-1,1] vector; the TBN basis rotates it
-    // into world space. `w` (handedness) flips the bitangent for mirrored UVs.
+    // Geometric normal, optionally perturbed by a tangent-space normal map (#207; z rebuilt
+    // by `unpack_normal`), rotated by the TBN basis; `w` flips the bitangent for mirrored UVs.
     var N = normalize(in.world_normal);
     if (entity.use_normal_map == 1u) {
         let T = normalize(in.world_tangent.xyz);
         let B = cross(N, T) * in.world_tangent.w;
-        let sampled = textureSample(t_normal, s_normal, in.tex_coords).xyz * 2.0 - 1.0;
-        N = normalize(mat3x3<f32>(T, B, N) * sampled);
+        N = normalize(mat3x3<f32>(T, B, N) * unpack_normal(textureSample(t_normal, s_normal, in.tex_coords)));
     }
     let V = normalize(camera.camera_pos - in.world_position);
 
     // glTF metallic-roughness packs metallic in BLUE, roughness in GREEN. Each scalar
-    // multiplies its map channel when the flag is set, else acts alone (#202).
-    let surface_metallic = clamp(entity.metallic * select(1.0, textureSample(t_metallic, s_metallic, in.tex_coords).b, entity.use_metallic_map == 1u), 0.0, 1.0);
-    let surface_roughness = clamp(entity.roughness * select(1.0, textureSample(t_roughness, s_roughness, in.tex_coords).g, entity.use_roughness_map == 1u), 0.04, 1.0);
+    // multiplies its map channel when the flag is set, else acts alone (#202, #1574).
+    let surface_metallic = clamp(entity.metallic * map_factor(textureSample(t_metallic, s_metallic, in.tex_coords), entity.use_metallic_map, 2u), 0.0, 1.0);
+    let surface_roughness = clamp(entity.roughness * map_factor(textureSample(t_roughness, s_roughness, in.tex_coords), entity.use_roughness_map, 1u), 0.04, 1.0);
 
     // 0. Surface decals (#638): this cluster's decals change the material inputs
     // before any light is summed, so a decal is lit, shadowed and occluded like the
