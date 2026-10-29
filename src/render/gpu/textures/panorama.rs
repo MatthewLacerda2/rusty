@@ -3,8 +3,8 @@
 //! V blends the top row into the bottom one at each pole under linear filtering.
 //!
 //! The upload is the material texture's, mip chain included (#1322), so every
-//! equirect read (`skybox.wgsl`, the reflection fallback in `forward/lighting.wgsl`,
-//! SSR's in `postfx/effects/ssr.wgsl`) samples level 0: derivatives across `equirect_uv`'s
+//! equirect read (`skybox.wgsl`, the reflection fallback in `forward/lighting.wgsl`)
+//! samples level 0: derivatives across `equirect_uv`'s
 //! atan2 seam would pick the coarsest mip, a flat line down the sky.
 
 use std::rc::Rc;

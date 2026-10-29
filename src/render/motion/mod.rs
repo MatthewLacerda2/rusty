@@ -34,7 +34,7 @@
 //! motion blur ([`wanted`]: the camera has it on, the player's option allows it, the
 //! quality tier runs it, #1438, and it is not the editor's Scene view), depth of
 //! field, which reads its depths ([`target_wanted`], #1445), or SSR, which reads its
-//! depths and cameras (#1526, `draw::stack`). SSR alone records no entity poses
+//! depths (#1526, `draw::stack`). SSR alone records no entity poses
 //! ([`Velocity::Depths`]). On any other frame the forward pass draws exactly as
 //! before, and the target is freed.
 
@@ -83,7 +83,7 @@ pub(crate) fn wanted(
 /// motion blur ([`wanted`]) or depth of field (#1445), the second for each pixel's
 /// depth from its own camera (the motion may then be read by no one). Gated alike, so
 /// the Scene view and a display-only render texture write none. SSR reads the target
-/// too, for depths and cameras alone ([`Velocity::Depths`], #1526, `draw::stack`).
+/// too, for its depths alone ([`Velocity::Depths`], #1526, `draw::stack`).
 pub(crate) fn target_wanted(
     post: PostSource,
     graphics: GraphicsSettings,
@@ -107,7 +107,7 @@ pub(crate) struct MotionVectors {
 pub(crate) enum Velocity {
     /// No target: nothing reads it.
     Off,
-    /// A target of depths and cameras, but no entity poses: only SSR reads it
+    /// A target of depths (and cameras), but no entity poses: only SSR reads it
     /// (#1526), so its motion may be the camera's alone.
     Depths,
     /// A target with each entity's motion: motion blur or depth of field reads it.
