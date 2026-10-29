@@ -54,20 +54,7 @@ pub fn draw_mesh(
                 mesh.indices.len()
             ));
             if mesh.skin.is_some() {
-                ui.horizontal(|ui| {
-                    let hitboxes = ui
-                        .button("Generate Hitboxes")
-                        .on_hover_text("One collider per bone, on the Hitbox layer");
-                    if hitboxes.clicked() {
-                        *skin_tool = Some(SkinTool::Hitboxes);
-                    }
-                    let ragdoll = ui
-                        .button("Build Ragdoll")
-                        .on_hover_text("A Rigidbody and Joint on each hitbox bone");
-                    if ragdoll.clicked() {
-                        *skin_tool = Some(SkinTool::Ragdoll);
-                    }
-                });
+                draw_skin_tools(ui, skin_tool);
             }
         }
     });
@@ -84,6 +71,24 @@ pub fn draw_mesh(
         world.set_mesh(id, None);
         *is_dirty = true;
     }
+}
+
+/// *Generate Hitboxes* and *Build Ragdoll*, deferred into `skin_tool`.
+fn draw_skin_tools(ui: &mut egui::Ui, skin_tool: &mut Option<SkinTool>) {
+    ui.horizontal(|ui| {
+        let hitboxes = ui
+            .button("Generate Hitboxes")
+            .on_hover_text("One collider per bone, on the Hitbox layer");
+        if hitboxes.clicked() {
+            *skin_tool = Some(SkinTool::Hitboxes);
+        }
+        let ragdoll = ui
+            .button("Build Ragdoll")
+            .on_hover_text("A Rigidbody and Joint on each hitbox bone");
+        if ragdoll.clicked() {
+            *skin_tool = Some(SkinTool::Ragdoll);
+        }
+    });
 }
 
 /// A `Plane`'s quads per side (#1524): the new count once an edit finishes (a

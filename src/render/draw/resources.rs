@@ -99,19 +99,7 @@ impl Renderer {
             Vec::new()
         };
         for id in scene.world.ids_with_mesh() {
-            // An inactive mesh, or a shadows-only one: it casts, no camera draws it (#1571).
-            let mode = scene.world.mesh(id).map(|m| m.cast_shadows);
-            if !scene.world.is_active_in_hierarchy(id) || mode.is_some_and(|m| !m.is_visible()) {
-                continue;
-            }
-            // During a static-cubemap capture, gather only static geometry — dynamic
-            // actors must not bake into a probe/reflection (#243), mirroring the
-            // shadow pass's `want_static` filter.
-            if self.static_capture && !scene.world.is_static(id) {
-                continue;
-            }
-            // Skip meshes the active camera's culling mask excludes (#92).
-            if !crate::scene::layer_in_mask(scene.world.layer(id), cam.culling_mask) {
+            if !self.camera_draws(scene, id, cam.culling_mask) {
                 continue;
             }
             // A level of detail this camera does not show (#472).
@@ -149,6 +137,23 @@ impl Renderer {
             mesh_particles,
             outline_bounds,
         }
+    }
+
+    /// Whether a camera whose culling mask (#92) is `mask` draws mesh entity `id` at
+    /// all, before LOD and frustum culling.
+    fn camera_draws(&self, scene: &Scene, id: u32, mask: u32) -> bool {
+        // An inactive mesh, or a shadows-only one: it casts, no camera draws it (#1571).
+        let mode = scene.world.mesh(id).map(|m| m.cast_shadows);
+        if !scene.world.is_active_in_hierarchy(id) || mode.is_some_and(|m| !m.is_visible()) {
+            return false;
+        }
+        // During a static-cubemap capture, gather only static geometry — dynamic
+        // actors must not bake into a probe/reflection (#243), mirroring the
+        // shadow pass's `want_static` filter.
+        if self.static_capture && !scene.world.is_static(id) {
+            return false;
+        }
+        crate::scene::layer_in_mask(scene.world.layer(id), mask)
     }
 
     /// Sort the translucent items back to front, batch both lists into instanced
