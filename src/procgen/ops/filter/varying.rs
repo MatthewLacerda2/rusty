@@ -8,10 +8,14 @@
 //! the radius can change smoothly from pixel to pixel with no visible steps. The
 //! column pass runs as a row pass on the transposed image, as the fixed blur's does.
 //!
-//! The widths match the fixed blur's in variance. A box of radius `r` pixels is one
-//! window `2r + 1` wide. A Gaussian reaching `r` (`σ = r / 3`) is three passes of
-//! width `√(4σ² + 1)`, since a window `W` wide adds `(W² − 1) / 12` to the variance,
-//! as the discrete box does at every odd `W`. A radius in tile units turns into
+//! A box of radius `r` pixels is one window `2r + 1` wide, and is not rounded: the
+//! fixed box rounds its radius to a whole pixel, but a varying radius that rounded
+//! would step visibly where it crossed each half pixel, so a linked box widens
+//! smoothly instead and matches the fixed box only at whole radii. A Gaussian
+//! reaching `r` (`σ = r / 3`) is three passes, each adding `σ² / 3` to the variance,
+//! as the fixed Gaussian targets. A window with fractional ends adds more than the
+//! `(W² − 1) / 12` a whole odd window does, so each width is solved from the real
+//! variance of its window ([`gaussian_width`]). A radius in tile units turns into
 //! pixels per axis, as [`super::pixel_radii`] does. A flat radius never comes here:
 //! [`blur_varying`] takes the fixed path for it, so a constant link bakes exactly
 //! like the number.
@@ -53,10 +57,31 @@ fn width(radius: f32, kind: BlurKind) -> f32 {
     match kind {
         BlurKind::Box => 2.0 * radius + 1.0,
         BlurKind::Gaussian => {
-            let sigma = radius / 3.0;
-            (4.0 * sigma * sigma + 1.0).sqrt()
+            let sigma = f64::from(radius) / 3.0;
+            gaussian_width(sigma * sigma / 3.0) as f32
         }
     }
+}
+
+/// The width of the window whose variance (px²) is `var`. A window `2m + 1 + 2f`
+/// wide (`0 ≤ f < 1`) weighs the pixels `−m..=m` fully and the two past them by `f`,
+/// so its variance is `(2Σk² + 2f(m + 1)²) / W` over `k = 1..=m`: `m(m + 1) / 3` at
+/// `f = 0`, rising to `(m + 1)(m + 2) / 3` at `f = 1`. Pick the `m` whose span holds
+/// `var`, then solve that for `f`.
+fn gaussian_width(var: f64) -> f64 {
+    if var.is_nan() || var <= 0.0 {
+        return 1.0;
+    }
+    let mut m = ((1.0 + 12.0 * var).sqrt() - 1.0).div_euclid(2.0);
+    // Rounding can put `m` one off the span that holds `var`.
+    if m * (m + 1.0) / 3.0 > var {
+        m -= 1.0;
+    } else if (m + 1.0) * (m + 2.0) / 3.0 <= var {
+        m += 1.0;
+    }
+    let squares = m * (m + 1.0) * (2.0 * m + 1.0) / 3.0;
+    let f = (var * (2.0 * m + 1.0) - squares) / (2.0 * ((m + 1.0).powi(2) - var));
+    2.0 * m + 1.0 + 2.0 * f.clamp(0.0, 1.0)
 }
 
 /// The passes `kind` runs along every row: one for a box, three for a Gaussian.

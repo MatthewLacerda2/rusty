@@ -116,3 +116,41 @@ fn a_non_finite_pixel_only_reaches_its_own_windows() {
     assert!((out.get_wrapped(20, 0)[0] - 0.5).abs() < 1e-6);
     assert!(!out.get_wrapped(3, 0)[0].is_finite());
 }
+
+/// The variance (px²) along x of `img`'s red about column 32.
+fn spread(img: &Image) -> f64 {
+    let (mut mass, mut moment) = (0.0f64, 0.0f64);
+    for (i, p) in img.pixels().iter().enumerate() {
+        let d = (i % img.width() as usize) as f64 - 32.0;
+        (mass, moment) = (mass + f64::from(p[0]), moment + f64::from(p[0]) * d * d);
+    }
+    moment / mass
+}
+
+#[test]
+fn a_varying_gaussian_spreads_like_the_fixed_one() {
+    let size = Size::new(64, 64);
+    let mut src = Image::filled(size, [0.0, 0.0, 0.0, 1.0]);
+    src.pixels_mut()[32 * 64 + 32] = [1.0; 4];
+    for px in [1.0f32, 1.5, 2.0, 3.0] {
+        let r = map(size, |_, _| px / 64.0);
+        let varying = spread(&per_pixel(&src, field(&r), BlurKind::Gaussian));
+        let sigma2 = f64::from(px / 3.0).powi(2);
+        assert!(
+            (varying - sigma2).abs() < 1e-4,
+            "{px} px: {varying} vs {sigma2}"
+        );
+        // Under 2.45 px the fixed Gaussian is exact taps; at 3 its whole boxes miss.
+        if px < 2.45 {
+            let fixed = spread(&blur(
+                &src,
+                pixel_radii(px / 64.0, size),
+                BlurKind::Gaussian,
+            ));
+            assert!(
+                (varying - fixed).abs() < 1e-4,
+                "{px} px: {varying} vs {fixed}"
+            );
+        }
+    }
+}

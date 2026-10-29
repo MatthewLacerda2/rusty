@@ -111,3 +111,16 @@ fn a_tile_jitter_linked_to_a_ramp_is_ordered_at_its_dark_end_and_tiles() {
         );
     }
 }
+
+#[test]
+fn a_link_stretched_to_one_value_bakes_like_that_number() {
+    // `min == max`: flat whatever the linked node holds, so the blur takes its
+    // fixed path and bakes byte for byte like the number.
+    let blur = |radius: Value| {
+        let mut nodes = warp_inputs();
+        nodes.push(json!({ "id": "b", "op": "blur", "radius": radius, "inputs": ["a"] }));
+        bake(nodes, "b", [64, 32])
+    };
+    let linked = blur(json!({ "node": "d", "min": 0.1, "max": 0.1 }));
+    assert_eq!(linked, blur(json!(0.1)));
+}

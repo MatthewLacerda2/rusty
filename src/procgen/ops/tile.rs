@@ -11,7 +11,7 @@
 use super::super::hash;
 use super::super::image_buf::{Image, Rgba};
 use super::super::recipe::Tile;
-use super::field::{Field, Links};
+use super::field::{Field, Links, PerCell};
 use super::generators::count;
 
 /// The hash channels a cell's offset x/y, rotation and scale draw from (clear of
@@ -97,6 +97,7 @@ impl<'a> Jitters<'a> {
 
 /// One cell's stamp transform: centre offset (cells), `(cos, sin)` of its turn, and
 /// `1 / scale`.
+#[derive(Clone, Copy)]
 struct Stamp {
     offset: [f32; 2],
     turn: (f32, f32),
@@ -128,6 +129,10 @@ pub fn tile(img: &Image, cells: f32, jitter: Jitters, seed: u64) -> Image {
     let n = count(cells);
     let per = n as i64;
     let reach = jitter.reach();
+    let fields = [jitter.offset, jitter.rotation, jitter.scale];
+    let stamps = PerCell::new(per, &fields, |cell| {
+        Stamp::of(cell, jitter.at(cell, n), seed)
+    });
     Image::fill_uv(img.size(), |u, v| {
         let (px, py) = (u * n, v * n);
         let (gx, gy) = (px.floor() as i64, py.floor() as i64);
@@ -136,7 +141,7 @@ pub fn tile(img: &Image, cells: f32, jitter: Jitters, seed: u64) -> Image {
             for dx in -reach..=reach {
                 let (cx, cy) = (gx + dx, gy + dy);
                 let cell = (cx.rem_euclid(per), cy.rem_euclid(per));
-                let stamp = Stamp::of(cell, jitter.at(cell, n), seed);
+                let stamp = stamps.get(cell);
                 let (su, sv) = stamp.local(px - cx as f32 - 0.5, py - cy as f32 - 0.5);
                 if (0.0..1.0).contains(&su) && (0.0..1.0).contains(&sv) {
                     let p = img.sample_bilinear_wrapped(su, sv);

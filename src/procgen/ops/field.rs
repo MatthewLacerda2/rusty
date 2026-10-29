@@ -57,17 +57,31 @@ impl Field<'_> {
     /// The one value the field takes, if it takes one: a number, or a link whose
     /// red is flat. An op whose varying path differs from its fixed one (a blur)
     /// takes the fixed path then, so a flat link bakes exactly like its number.
+    /// Flat means every stretched value is the same: a link with `min == max` is
+    /// flat whatever it links, and `0.0` and `-0.0` count as one value.
     pub fn constant(&self) -> Option<f32> {
         match *self {
             Field::Const(v) => Some(v),
             Field::Map { img, .. } => {
-                let first = img.pixels().first()?[0];
-                let flat = img
-                    .pixels()
-                    .iter()
-                    .all(|p| p[0].to_bits() == first.to_bits());
-                flat.then(|| self.at(0))
+                let first = self.at(0);
+                let same = |v: f32| v == first || v.to_bits() == first.to_bits();
+                (0..img.pixels().len())
+                    .all(|i| same(self.at(i)))
+                    .then_some(first)
             }
+        }
+    }
+
+    /// Whether the field is a link (its value may vary across the map).
+    pub fn linked(&self) -> bool {
+        matches!(self, Field::Map { .. })
+    }
+
+    /// How many pixels the linked image holds; 0 for a number.
+    fn pixels(&self) -> usize {
+        match *self {
+            Field::Const(_) => 0,
+            Field::Map { img, .. } => img.pixels().len(),
         }
     }
 
@@ -79,6 +93,37 @@ impl Field<'_> {
             Field::Map { img, .. } => (0..img.pixels().len())
                 .map(|i| self.at(i))
                 .fold(f32::NEG_INFINITY, f32::max),
+        }
+    }
+}
+
+/// A value per cell of a wrapped `per`×`per` grid, worked out once per cell rather
+/// than once per pixel that looks at the cell (#1494): `tile`'s jitters and
+/// Voronoi's randomness read their links at each cell's centre. A grid finer than
+/// its linked images has no table, since its cells outnumber the pixels that would
+/// read them; with no link there is nothing to save, so each read is the closure.
+pub struct PerCell<T, F> {
+    per: i64,
+    table: Option<Vec<T>>,
+    value: F,
+}
+
+impl<T: Copy, F: Fn((i64, i64)) -> T> PerCell<T, F> {
+    /// The grid's `value` per (wrapped) cell, tabled when one of `fields` links.
+    pub fn new(per: i64, fields: &[Field], value: F) -> Self {
+        let pixels = fields.iter().map(Field::pixels).max().unwrap_or(0);
+        let fits = per.checked_mul(per).is_some_and(|c| c as usize <= pixels);
+        let tabled = fields.iter().any(Field::linked) && fits;
+        let table = tabled.then(|| (0..per * per).map(|i| value((i % per, i / per))).collect());
+        Self { per, table, value }
+    }
+
+    /// The value of the wrapped cell `cell` (each coordinate in `0..per`).
+    #[inline]
+    pub fn get(&self, cell: (i64, i64)) -> T {
+        match &self.table {
+            Some(t) => t[(cell.1 * self.per + cell.0) as usize],
+            None => (self.value)(cell),
         }
     }
 }
@@ -120,5 +165,28 @@ impl<'a> Links<'a> {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_per_cell_table_holds_what_each_cell_reads() {
+        let mask = Image::fill_uv(8, |u, v| [u * v, 0.0, 0.0, 1.0]);
+        let link = [Field::Map {
+            img: &mask,
+            min: 0.0,
+            max: 1.0,
+        }];
+        let read = |c: (i64, i64)| link[0].at_uv(c.0 as f32 / 4.0, c.1 as f32 / 4.0);
+        let cells = PerCell::new(4, &link, read);
+        assert!(cells.table.is_some(), "16 cells fit 64 pixels");
+        (0..16).for_each(|i| assert_eq!(cells.get((i % 4, i / 4)), read((i % 4, i / 4))));
+        assert!(
+            PerCell::new(9, &link, read).table.is_none(),
+            "81 cells don't"
+        );
     }
 }
