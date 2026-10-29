@@ -37,7 +37,7 @@ pub(super) fn plan(
     targets: &[&str],
     scope: Scope,
 ) -> Result<Plan, RunError> {
-    if recipe.resolution == 0 {
+    if recipe.extent().pixels() == 0 {
         return Err(RunError::BadResolution);
     }
     if recipe.nodes.is_empty() {

@@ -58,7 +58,8 @@ pub fn bake_maps(
 }
 
 /// Re-bake material `key` from its stored recipe, optionally at a new `resolution`
-/// (which the recipe keeps, so the next rebake uses it too). Unity's way of iterating
+/// (which the recipe keeps, so the next rebake uses it too; a `size` recipe keeps
+/// its aspect with its longer side there, [`crate::procgen::TextureRecipe::set_resolution`]). Unity's way of iterating
 /// a texture's import size: author at 256, ship at 2048. The library is unchanged
 /// when the bake fails. `root` and `dir` are [`bake_maps`]'s.
 pub fn rebake_maps(
@@ -76,7 +77,9 @@ pub fn rebake_maps(
         format!("material {key:?} has no maps recipe to rebake (define it with `maps`)")
     })?;
     if let Some(resolution) = resolution {
-        recipe.resolution = resolution;
+        recipe
+            .set_resolution(resolution)
+            .map_err(|e| format!("material {key:?} maps: {e}"))?;
     }
     bake_maps(&mut asset, key, root, dir)?;
     materials.insert(key.to_string(), asset);

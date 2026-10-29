@@ -9,7 +9,7 @@
 
 use glam::Vec3;
 
-use super::super::image_buf::{Image, Rgba};
+use super::super::image_buf::{Image, Rgba, Size};
 use super::generators::count;
 
 /// Resample `img` under an affine domain transform: translate, rotate (turns) about
@@ -31,7 +31,7 @@ pub fn mapping(
         let ang = rotation * std::f32::consts::TAU;
         (su, sv, (ang.cos(), ang.sin()))
     };
-    Image::fill_uv(img.resolution(), |u, v| {
+    Image::fill_uv(img.size(), |u, v| {
         // Center the domain so rotation/scale pivot at (0.5, 0.5).
         let (cx, cy) = (u - 0.5, v - 0.5);
         let rx = cx * ca - cy * sa;
@@ -49,7 +49,7 @@ pub fn mapping(
 /// result (#406). A grayscale `by` (R = G) can only push along the diagonal: feed it
 /// `combine_rgb` of two independent noises for an isotropic warp.
 pub fn warp(a: &Image, by: &Image, strength: f32) -> Image {
-    Image::fill_uv(a.resolution(), |u, v| {
+    Image::fill_uv(a.size(), |u, v| {
         let d = by.sample_bilinear_wrapped(u, v);
         a.sample_bilinear_wrapped(u + strength * (d[0] - 0.5), v + strength * (d[1] - 0.5))
     })
@@ -67,18 +67,21 @@ fn quarter_turn(turns: f32) -> (f32, f32) {
 }
 
 /// Bake a tangent-space normal map from `img`'s red channel as a height field. Uses
-/// central differences (wrapped, so the normals tile) converted to **tile units** —
-/// the per-pixel delta times the resolution — so `strength` means the same slope at
-/// any resolution (#394). Packs the unit normal into `[0, 1]` RGB the renderer's
-/// `2*n - 1` decode expects, with B≈1 for a flat surface.
+/// central differences (wrapped, so the normals tile) converted to **tile units** of
+/// the longer side — the per-pixel delta times that side's pixel count — so
+/// `strength` means the same slope at any resolution (#394). Both axes share that
+/// unit (#1493): a trim sheet is mapped at an even texel density, so the same height
+/// step between neighbours slopes the same across and down, as Substance's Normal
+/// node does. Packs the unit normal into `[0, 1]` RGB the renderer's `2*n - 1`
+/// decode expects, with B≈1 for a flat surface.
 pub fn bump_to_normal(img: &Image, strength: f32) -> Image {
-    let res = img.resolution();
+    let (w, hh) = (img.width() as f32, img.height() as f32);
     let h = |x: i64, y: i64| img.get_wrapped(x, y)[0];
-    // Central difference spans two pixels = 2/res of a tile.
-    let k = 0.5 * res as f32 * strength;
-    Image::fill_uv(res, |u, v| {
-        let x = (u * res as f32) as i64;
-        let y = (v * res as f32) as i64;
+    // Central difference spans two pixels = 2/n of the longer side's tile.
+    let k = 0.5 * img.size().longer() as f32 * strength;
+    Image::fill_uv(img.size(), |u, v| {
+        let x = (u * w) as i64;
+        let y = (v * hh) as i64;
         let dx = (h(x + 1, y) - h(x - 1, y)) * k;
         let dy = (h(x, y + 1) - h(x, y - 1)) * k;
         // Tangent-space normal of the height surface: (-dx, -dy, 1) normalized.
@@ -124,8 +127,8 @@ fn rnm(base: Vec3, detail: Vec3) -> Vec3 {
 
 /// Combine up to three single-channel inputs into one RGB image (alpha 1). Each input
 /// contributes its red channel to one output channel; missing inputs contribute 0.
-pub fn combine_rgb(inputs: &[&Image], resolution: u32) -> Image {
-    let mut out = Image::filled(resolution, [0.0, 0.0, 0.0, 1.0]);
+pub fn combine_rgb(inputs: &[&Image], size: Size) -> Image {
+    let mut out = Image::filled(size, [0.0, 0.0, 0.0, 1.0]);
     out.for_each_row(|y, row| {
         for (c, src) in inputs.iter().take(3).enumerate() {
             for (p, s) in row.iter_mut().zip(src.row(y)) {

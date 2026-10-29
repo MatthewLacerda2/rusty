@@ -5,10 +5,10 @@ use super::*;
 
 /// Today's blur before #1490: every pixel re-sums its whole wrapped window.
 fn naive_blur(img: &Image, r: i64) -> Image {
-    let res = img.resolution() as i64;
+    let res = img.width() as i64;
     let inv = 1.0 / (2 * r + 1) as f32;
     let pass = |src: &Image, horizontal: bool| {
-        Image::fill_uv(src.resolution(), |u, v| {
+        Image::fill_uv(src.size(), |u, v| {
             let (x, y) = ((u * res as f32) as i64, (v * res as f32) as i64);
             let mut acc = [0.0f32; 4];
             for k in -r..=r {
@@ -33,7 +33,7 @@ fn sliding_blur_matches_the_naive_reference() {
     // Small, mid, exactly half the tile, and past it (the window wraps twice).
     for r in [1, 3, 8, 16, 40] {
         let (fast, slow) = (
-            blur(&img, r as f32, BlurKind::Box),
+            blur(&img, (r as f32, r as f32), BlurKind::Box),
             naive_blur(&img, r as i64),
         );
         for (a, b) in fast.pixels().iter().zip(slow.pixels()) {
@@ -48,7 +48,7 @@ fn sliding_blur_matches_the_naive_reference() {
 fn a_flat_image_blurs_to_itself_exactly() {
     let img = Image::filled(16, [0.25, 0.5, 0.75, 1.0]);
     for kind in [BlurKind::Box, BlurKind::Gaussian] {
-        assert_eq!(blur(&img, 5.0, kind), img);
+        assert_eq!(blur(&img, (5.0, 5.0), kind), img);
     }
 }
 
@@ -56,7 +56,7 @@ fn a_flat_image_blurs_to_itself_exactly() {
 fn blur_around(bad: f32) -> Image {
     let mut img = Image::filled(32, [0.5; 4]);
     img.pixels_mut()[20 * 32 + 10] = [bad; 4];
-    blur(&img, 2.0, BlurKind::Box)
+    blur(&img, (2.0, 2.0), BlurKind::Box)
 }
 
 /// Whether `(x, y)` lies in the (2r+1)² window around (10, 20), r = 2.
@@ -91,7 +91,7 @@ fn a_huge_pixel_leaves_no_residue_once_dropped() {
 fn a_gaussian_spreads_a_bright_pixel_symmetrically_within_its_radius() {
     let mut img = Image::filled(64, [0.0; 4]);
     img.pixels_mut()[32 * 64 + 32] = [1.0; 4];
-    let out = blur(&img, 12.0, BlurKind::Gaussian);
+    let out = blur(&img, (12.0, 12.0), BlurKind::Gaussian);
     let at = |dx: i64, dy: i64| out.get_wrapped(32 + dx, 32 + dy)[0];
     let peak = at(0, 0);
     // Points at one distance from the centre, on an axis and off it. A box is
@@ -136,7 +136,7 @@ fn a_narrow_gaussian_is_one_exact_three_tap_pass() {
     assert_eq!(passes(at_switch + 1e-3, BlurKind::Gaussian), [Pass::Box(1)]);
     let mut img = Image::filled(16, [0.0; 4]);
     img.pixels_mut()[8 * 16 + 8] = [1.0; 4];
-    let out = blur(&img, 1.5, BlurKind::Gaussian);
+    let out = blur(&img, (1.5, 1.5), BlurKind::Gaussian);
     // A row through the centre is g(dx)·g(0), so its σ² is the kernel's.
     let row: Vec<(f32, f32)> = (-8..8)
         .map(|dx| ((dx * dx) as f32, out.get_wrapped(8 + dx, 8)[0]))

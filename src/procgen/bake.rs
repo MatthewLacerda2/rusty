@@ -139,11 +139,11 @@ fn to_u8(v: f32) -> u8 {
 /// pixels, before writing, for every slot but [`Slot::Data`], which bakes through
 /// [`encode_data`]. Exposed so tests can assert bytes without disk I/O.
 pub fn encode(img: &Image, slot: Slot) -> ImageBuffer<Rgba<u8>, Vec<u8>> {
-    let res = img.resolution();
-    let mut buf = ImageBuffer::new(res, res);
+    let w = img.width();
+    let mut buf = ImageBuffer::new(w, img.height());
     for (i, p) in img.pixels().iter().enumerate() {
-        let x = (i as u32) % res;
-        let y = (i as u32) / res;
+        let x = (i as u32) % w;
+        let y = (i as u32) / w;
         buf.put_pixel(x, y, Rgba(encode_pixel(*p, slot)));
     }
     buf
@@ -152,13 +152,12 @@ pub fn encode(img: &Image, slot: Slot) -> ImageBuffer<Rgba<u8>, Vec<u8>> {
 /// Encode `img` as a [`Slot::Data`] map: 16-bit linear RGBA, each channel clamped
 /// to `[0, 1]` and rounded to the nearest of 65536 steps.
 pub fn encode_data(img: &Image) -> ImageBuffer<Rgba<u16>, Vec<u16>> {
-    let res = img.resolution();
     let raw = img
         .pixels()
         .iter()
         .flat_map(|p| p.map(|c| (c.clamp(0.0, 1.0) * 65535.0 + 0.5) as u16))
         .collect();
-    ImageBuffer::from_raw(res, res, raw).expect("one RGBA texel per pixel")
+    ImageBuffer::from_raw(img.width(), img.height(), raw).expect("one RGBA texel per pixel")
 }
 
 /// Bake `img` to a `.png` at `path`, encoded for `slot`, and note the write in

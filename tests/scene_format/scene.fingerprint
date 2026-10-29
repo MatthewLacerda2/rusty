@@ -769,6 +769,9 @@ scene.materials{}.maps.outputs{key}: string
 scene.materials{}.maps.outputs{}: string
 scene.materials{}.maps.resolution: u32
 scene.materials{}.maps.seed: u64
+scene.materials{}.maps.size: option
+scene.materials{}.maps.size: tuple(2)
+scene.materials{}.maps.size[]: u32
 scene.materials{}.maps: option
 scene.materials{}.metallic: f32
 scene.materials{}.metallic_map: option

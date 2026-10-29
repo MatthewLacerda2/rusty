@@ -123,7 +123,7 @@ pub fn hue_sat_value(mut img: Image, hue: f32, sat: f32, value: f32) -> Image {
 /// `mask` are sampled positionally.
 pub fn mix(a: Image, b: &Image, mask: Option<&Image>, mode: BlendMode, factor: f32) -> Image {
     let mut out = a;
-    let w = out.resolution() as usize;
+    let w = out.width() as usize;
     out.for_each_row(|y, row| {
         for (x, p) in row.iter_mut().enumerate() {
             let i = y * w + x;

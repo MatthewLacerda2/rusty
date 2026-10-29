@@ -103,6 +103,7 @@ node id is an error and nothing is baked. `outputs` is optional and ignored by
 ```lua
 {
   resolution = 1024,        -- power-of-two canvas; sane default 1024
+  -- size = {2048, 512},    -- a non-square canvas in place of resolution (see *Non-square bakes*)
   seed = 42,                -- folded into every stochastic op (default 0)
   output = "n1",            -- output node id (optional; defaults to the last node)
   -- outputs = { base_color = "n1", … },  -- slot → node id, for Texture.BakeSet
@@ -138,7 +139,9 @@ bake and hold no more images than a bake does.
 (nearest rank: all but the outer 2% of pixels lie between them). Each is an
 `{r, g, b, a}` array of linear values, as the runner works in them, before any
 slot's encoding. `resolution` overrides the recipe's for speed: params are in tile
-units (*Units*, below), so the numbers barely move between 128² and 2048².
+units (*Units*, below), so the numbers barely move between 128² and 2048². On a
+`size` recipe it sets the longer side and keeps the aspect, as `Material.Rebake`
+does (*Non-square bakes*, below).
 
 **Read `Stats` before setting `color_ramp` stops or `map_range` bounds.** A noise
 does not span 0–1: fBM is normalised by its total amplitude, so it clusters around
@@ -162,14 +165,15 @@ print(s.n.p1[1], s.n.p99[1])  -- red channel: about 0.35, 0.64
 ```
 
 `Texture.Preview(recipe, path, [size = 128])` writes one PNG at `path`: every node's
-image shrunk to a `size`² tile (a box filter in linear), in the recipe's node order,
+image shrunk to a tile whose longer side is `size`, in the recipe's aspect (a box
+filter in linear), in the recipe's node order,
 left to right then top to bottom, in a near-square grid of `columns` columns (unused
 cells of the last row are black). No text is drawn: tile `k` (from 1) is
 `order[k]`, so open the PNG and match tiles to ids. Every tile is **sRGB-encoded**,
 data included, the way Blender's node previews show everything through the view
 transform: a 0.5 mask shows as 188, not 128. Alpha is not shown.
-`size` defaults to 128, or the recipe's resolution when that is smaller; a `size`
-above the resolution is an error, since a tile larger than the image adds nothing.
+`size` defaults to 128, or the recipe's longer side when that is smaller; a `size`
+above that side is an error, since a tile larger than the image adds nothing.
 Both verbs refuse a recipe whose `output` or `outputs` names a missing node, as the
 bakes do.
 
@@ -324,9 +328,9 @@ imported model, a provider-generated image, an earlier bake, a hand-made mask or
   `"linear"` (a mask, a height, a normal map) reads every channel as stored. Alpha is
   always as stored. 16-bit files keep their precision. png, jpeg and tga are read;
   the format comes from the file's extension.
-- The file is resampled **bilinearly, wrapped**, to the recipe's `resolution`, so the
-  recipe stays resolution-independent. A file already at `resolution` reads back
-  texel for texel.
+- The file is resampled **bilinearly, wrapped**, to the recipe's `resolution` (or
+  `size`, each axis on its own), so the recipe stays resolution-independent. A file
+  already at that size reads back texel for texel.
 - Its **tiling is the file's own**: a photo that doesn't tile keeps its seam (the
   wrap joins its right edge to its left). Every other op still wraps, so a seamless
   source stays seamless through the graph.
@@ -374,19 +378,52 @@ does `shape` (a shape larger than the tile is clipped at the edge, symmetrically
 Params are in **tile units**, never pixels, so the same recipe looks the same at 256²
 and 2048² (iterate at a low `resolution`, ship at a high one):
 
-- `blur.radius` is a **fraction of the tile width** — `0.01` is 1% of the texture;
+- `blur.radius` is a **fraction of the tile** — `0.01` is 1% of the texture;
   the pixel radius is `radius × resolution` (a `box` rounds it), capped at half the
-  tile. A `gaussian` reaches about `radius`, a `box` exactly its rounded radius.
+  tile, and on a `size` recipe `radius × width` across and `radius × height` down. A `gaussian` reaches about `radius`, a `box` exactly its rounded radius.
 - `warp.strength` is a displacement in tiles: a channel at 1.0 pushes the read
   `strength / 2` of a tile.
 - `bump_to_normal.strength` scales the slope measured in tile units (height change
-  across one whole tile), not per pixel.
+  across one whole tile), not per pixel. On a `size` recipe the unit is a tile of the
+  **longer** side on both axes, so the same height step between neighbouring pixels
+  slopes the same across and down, as on a mesh mapped at an even texel density.
 - `shape.size` and `shape.softness` are in tiles (`size = [0.5, 0.5]` is half the
   tile each way); under `tile`, that is a fraction of one cell.
 - `distance.radius` is in tiles: the distance from the edge that reads 1.
 - `cavity.radius` is a tile fraction like `blur.radius`; `curvature.radius` is a
   distance in tiles, sampled bilinearly (so sub-pixel radii stay smooth).
-- `white_noise` is the exception: its grain is one pixel by definition.
+- `white_noise` is the exception: its grain is one pixel by definition (on each axis).
+
+### Non-square bakes — `size`
+
+`size = {w, h}` bakes a `w × h` map in place of `resolution`'s square: a trim sheet
+(a 2048×512 strip of mouldings and panels), a wide decal, signage, a UI strip. Each
+side must be a positive power of two; any other value is refused when the recipe is
+read (`size side 300 is not a positive power of two`). With `size` set,
+`resolution` may be left out, and is ignored if given.
+
+The units are **relative, as in Substance Designer**: the domain stays the unit
+tile, and a non-square map samples it with more pixels along one axis, so the
+pattern **stretches**. Every param keeps its meaning (a `blur.radius` of 0.01 is 1%
+of each side, a `distance.radius` is in tiles of each axis), and every periodic
+count stays a whole number per tile, so the map still tiles on both axes. To get
+square features back, scale the counts by the aspect: on a 4:1 strip, `cols = 4 ×
+rows` gives square bricks, and `scale = {4, 1}` on a `mapping` squares up its input.
+
+```lua no-run
+Texture.Bake({ size = {2048, 512}, seed = 1, nodes = {
+  -- 4:1, so 8 columns over 2 rows lays bricks as wide as they are tall.
+  { id = "b", op = "brick", rows = 2, cols = 8, mortar = 0.04 },
+  { id = "h", op = "blur", radius = 0.004, inputs = { "b" } },
+  { id = "n", op = "bump_to_normal", strength = 0.4, inputs = { "h" } } },
+}, "textures/trim_n.png", "normal")
+```
+
+`Material.Rebake(name, resolution)` and `Texture.Stats(recipe, resolution)` keep a
+`size` recipe's aspect: both sides scale by the same power of two so the **longer**
+side equals `resolution` (`{2048, 512}` at 256 becomes `{256, 64}`). A
+`resolution` that isn't a power of two, or one that would shrink the shorter side
+below a pixel, is an error. `Texture.Preview` tiles keep the aspect too.
 
 **Migration (#392, #394).** Recipes written before these changes bake differently:
 `blur.radius` was whole pixels (`radius = 4` at 512² is now `radius = 0.008`);

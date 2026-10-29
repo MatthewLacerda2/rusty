@@ -1,3 +1,4 @@
+mod aspect;
 mod bake;
 mod bands;
 mod hard_surface;
