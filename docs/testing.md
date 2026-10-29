@@ -59,7 +59,9 @@ game's final audio mix to a 48 kHz float WAV (`audio.wav` by default; a relative
 closes it and returns the path again, and `play --record-audio <path>` records the
 whole run. The harness mixes offline, one fixed tick at a time, so the capture
 needs no sound card and two runs of one scenario write byte-identical files; a
-capture still running when the scenario ends is closed with the results. Measure it
+capture still running when the scenario ends is closed with the results. A run
+started with `--record-audio` is already capturing, so the scenario's own
+`Harness.RecordAudio()` errors (one capture at a time). Measure it
 with `Sound.Level(path, { sections = seconds })`. What a capture taps and what going
 offline changes: `docs/api/Audio.md`, *Capturing the mix*.
 

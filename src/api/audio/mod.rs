@@ -69,7 +69,7 @@ pub fn listener(camera: &RefCell<Camera>) -> Listener {
 }
 
 /// An entity's `AudioSource` and the world position it is heard from — the one lookup
-/// behind both `Audio.GetSpatial` and the shell's per-frame mix (#412), so the two
+/// behind both `Audio.GetSpatial` and the mix every tick pushes (`frame.rs`, #412, #1579), so the two
 /// always resolve the same emitter. `None` when the entity has no `AudioSource`.
 pub fn emitter(scene: &Scene, id: u32) -> Option<(AudioSourceComponent, Vec3)> {
     let src = scene.world.audio(id)?;

@@ -42,7 +42,7 @@ fn a_live_voice_is_heard_once_the_maestro_goes_offline() {
     maestro.start_capture(&out).unwrap();
     assert!(maestro.is_source_playing(7), "the voice survived the swap");
     for _ in 0..6 {
-        maestro.advance_output(0.01);
+        maestro.advance_output(0.01, false);
     }
     assert_eq!(maestro.stop_capture().unwrap(), out);
     let heard = decode_file(&out.to_string_lossy()).unwrap();
@@ -95,7 +95,7 @@ fn a_capture_never_stopped_is_still_a_readable_wav() {
     let out = crate::test_temp::dir().join("rusty_capture_dropped.wav");
     let mut maestro = AudioMaestro::default();
     maestro.start_capture(&out).unwrap();
-    maestro.advance_output(0.01);
+    maestro.advance_output(0.01, false);
     drop(maestro);
     let heard = decode_file(&out.to_string_lossy()).unwrap();
     assert_eq!(heard.samples().len(), 2 * 480, "10 ms at 48 kHz, stereo");

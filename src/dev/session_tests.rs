@@ -156,18 +156,39 @@ fn engine_warnings_ride_along_with_the_reply() {
 #[test]
 fn a_capture_in_the_session_hears_the_steps_it_ran() {
     // The session ticks through `paused_frame`, not the harness: the tick itself
-    // clocks the offline mixer, so the capture holds the stepped time (#1579).
+    // clocks the offline mixer, so the capture holds the stepped time (#1579). Every
+    // step runs paused, so a playing one-shot is held: the capture is silent and
+    // says so (a scenario's capture, which ticks unpaused, hears it: `audio_capture`).
+    crate::logging::init();
     let mut s = session();
-    let path = crate::test_temp::dir().join("rusty_session_capture.wav");
-    let at = crate::core::paths::to_slash(&path);
-    s.command(&format!("Audio.StartCapture('{at}')")).unwrap();
+    let dir = crate::test_temp::dir();
+    let at = |name: &str| crate::core::paths::to_slash(&dir.join(name));
+    let (tone, wav) = (
+        at("rusty_session_tone.wav"),
+        at("rusty_session_capture.wav"),
+    );
+    let bake = "{ source = { kind = 'noise' }, amp = { a = 0.001, d = 0.5, s = 0.0, r = 0.05 } }";
+    s.command(&format!("Sound.Bake({bake}, 'A4', '{tone}')"))
+        .unwrap();
+    s.command(&format!("Audio.StartCapture('{wav}')")).unwrap();
     s.command("Time.Pause()").unwrap();
+    s.command(&format!("Audio.PlayAt('{tone}', 0, 0, 0, 1, 1000, 2000)"))
+        .unwrap();
     s.command("Time.Step(120)").unwrap();
     s.command("Audio.StopCapture()").unwrap();
-    let bytes = std::fs::read(&path).unwrap();
-    assert_eq!(
-        bytes.len(),
-        44 + 2 * 48_000 * 8,
-        "two seconds of float stereo"
+    let bytes = std::fs::read(dir.join("rusty_session_capture.wav")).unwrap();
+    let samples: Vec<f32> = bytes[44..]
+        .chunks(4)
+        .map(|b| f32::from_le_bytes(b.try_into().unwrap()))
+        .collect();
+    assert_eq!(samples.len(), 2 * 2 * 48_000, "two seconds of stereo");
+    assert!(
+        samples.iter().all(|s| *s == 0.0),
+        "the paused one-shot is held"
     );
+    let warned = s
+        .take_warnings()
+        .iter()
+        .any(|m| m.contains("every tick of this capture ran paused"));
+    assert!(warned, "a capture paused throughout says so");
 }

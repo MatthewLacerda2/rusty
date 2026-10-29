@@ -13,9 +13,11 @@
 //!
 //! This is a *bookkeeping* system: on the harness's `NullBackend` it produces no
 //! sound but still records the play events, so a headless play-test can assert that
-//! the right sources auto-started. The per-frame mix (3D rolloff, pan, time scale)
-//! is not a sim system: the windowed shell applies it after each advance
-//! (`shell/audio.rs`, #412), so no device is threaded through a deterministic stage.
+//! the right sources auto-started. The mix (3D rolloff, pan, time scale) is not a
+//! sim system: every tick ends by pushing it and clocking the output
+//! ([`GameWorld::push_audio`](super::GameWorld::push_audio), #412, #1579), and a
+//! paused frame that ran no tick pushes it with no time, so no device is threaded
+//! through a deterministic stage.
 
 mod activity;
 
@@ -166,3 +168,7 @@ mod audio_reverb_tests;
 #[cfg(test)]
 #[path = "activity_tests.rs"]
 mod audio_activity_tests;
+
+#[cfg(test)]
+#[path = "push_tests.rs"]
+mod audio_push_tests;

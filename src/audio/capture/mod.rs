@@ -39,6 +39,10 @@ pub struct Recorder {
     buffer: Vec<f32>,
     /// The first write error, reported when the capture stops.
     failed: Option<String>,
+    /// Ticks the capture ran (an advance of some time), and how many of them ran
+    /// with the clock paused: a capture paused for all of them is silent.
+    ticks: u64,
+    paused_ticks: u64,
 }
 
 impl Recorder {
@@ -57,21 +61,59 @@ impl Recorder {
     fn rate(&self) -> u32 {
         self.tap.rate().unwrap_or(RATE)
     }
+
+    /// Stop tapping, write the header over what reached the file and report what
+    /// the file misses. Every way a capture ends runs it once: `stop_capture`, a
+    /// write failure, and a capture dropped still running.
+    fn close(&mut self) -> Result<(), String> {
+        self.tap.stop();
+        self.drain();
+        let finished = self.file.finish(self.rate());
+        if finished.is_ok() {
+            // Noted, so a clip cache that already played this path decodes the new file.
+            crate::core::fs::written::note_written(&self.path.to_string_lossy());
+        }
+        self.report();
+        let fail = |e: String| format!("capture into '{}' failed: {e}", self.path.display());
+        match (self.failed.take(), finished) {
+            (Some(e), _) => Err(fail(e)),
+            (None, Err(e)) => Err(fail(e.to_string())),
+            (None, Ok(())) => Ok(()),
+        }
+    }
+
+    /// Warn about what the file does not hold as it was played: frames the device
+    /// played while the engine was not draining (written as silence in their
+    /// place), and a capture whose every tick ran paused.
+    fn report(&self) {
+        let at = self.path.display();
+        let dropped = self.tap.dropped_frames();
+        if dropped > 0 {
+            log::warn!(
+                "[Audio] capture '{at}' lost {dropped} frames the engine drained too late; \
+                 they are silence in the file"
+            );
+        }
+        if self.ticks > 0 && self.paused_ticks == self.ticks {
+            log::warn!(
+                "[Audio] capture '{at}': every tick of this capture ran paused: time-scaled \
+                 sources were held; capture a run with `play --record-audio` or \
+                 `Harness.RecordAudio`"
+            );
+        }
+    }
 }
 
 /// A capture never stopped (the editor quit mid-capture, a run that failed after
-/// `--record-audio` started) still leaves a readable WAV: the header is written
-/// over its placeholder, best-effort.
+/// `--record-audio` started) still leaves a readable WAV, closed as `stop_capture`
+/// would, best-effort.
 impl Drop for Recorder {
     fn drop(&mut self) {
         if self.file.is_finished() {
             return;
         }
-        self.tap.stop();
-        self.drain();
-        let rate = self.rate();
-        if self.file.finish(rate).is_ok() {
-            crate::core::fs::written::note_written(&self.path.to_string_lossy());
+        if let Err(e) = self.close() {
+            log::warn!("[Audio] {e}");
         }
     }
 }
@@ -104,14 +146,21 @@ impl AudioMaestro {
             file,
             buffer: Vec::new(),
             failed: None,
+            ticks: 0,
+            paused_ticks: 0,
         });
         Ok(())
     }
 
-    /// `seconds` of engine time went by: an offline mixer renders them, and a
-    /// running capture takes what was mixed. `GameWorld::tick` calls it once a
-    /// tick, whoever drives the sim (the shell, the harness, the headless session).
-    pub fn advance_output(&mut self, seconds: f64) {
+    /// `seconds` of engine time went by, `paused` or not: an offline mixer renders
+    /// them, and a running capture takes what was mixed. `GameWorld::tick` calls it
+    /// once a tick, whoever drives the sim (the shell, the harness, the headless
+    /// session); a paused frame that ran no tick calls it with no time.
+    pub fn advance_output(&mut self, seconds: f64, paused: bool) {
+        if let Some(capture) = self.capture.as_mut().filter(|_| seconds > 0.0) {
+            capture.ticks += 1;
+            capture.paused_ticks += u64::from(paused);
+        }
         let mut left = seconds.max(0.0);
         loop {
             let step = left.min(MAX_RENDER_SECONDS);
@@ -126,29 +175,14 @@ impl AudioMaestro {
         }
     }
 
-    /// Stop the capture and close its file, returning where it was written. Blocks
-    /// the device played while the engine was not draining are lost; their count
-    /// is logged as a warning, never silent.
+    /// Stop the capture and close its file, returning where it was written. A
+    /// write that failed still leaves the header over what was written, and is the
+    /// error. Frames lost to a stalled engine and a capture that ran paused
+    /// throughout are logged as warnings, never silent.
     pub fn stop_capture(&mut self) -> Result<PathBuf, String> {
         let mut capture = self.capture.take().ok_or("no capture is running")?;
-        capture.tap.stop();
-        capture.drain();
-        let rate = capture.rate();
-        let path = capture.path.clone();
-        let fail = |e: String| format!("capture into '{}' failed: {e}", path.display());
-        if let Some(e) = capture.failed.take() {
-            capture.file.abandon();
-            return Err(fail(e));
-        }
-        capture.file.finish(rate).map_err(|e| fail(e.to_string()))?;
-        // Noted, so a clip cache that already played this path decodes the new file.
-        crate::core::fs::written::note_written(&path.to_string_lossy());
-        let dropped = capture.tap.dropped_frames();
-        if dropped > 0 {
-            let at = path.display();
-            log::warn!("[Audio] capture '{at}' lost {dropped} frames the engine drained too late");
-        }
-        Ok(path)
+        capture.close()?;
+        Ok(capture.path.clone())
     }
 
     /// Where the running capture writes, if one is running.

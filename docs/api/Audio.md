@@ -287,8 +287,20 @@ the run's output folder (`docs/testing.md`).
 
 In the windowed editor the device's thread hands each block over without ever
 waiting on the engine; a block the engine had no room for (a frame stalled for
-seconds) is dropped, and `StopCapture` logs how many frames were lost. A capture
-left running when the editor quits or a run fails is still closed as a readable WAV.
+seconds) is dropped, written as **silence of the same length in its place** so the
+file's timing stays true, and `StopCapture` logs how many frames were lost. A capture
+that cannot be written still closes over what reached the disk, and is the error. A
+capture left running when the editor quits or a run fails is still closed as a
+readable WAV.
+
+**A stepped capture is silent.** While the clock is paused (`Time.Pause`), a
+time-scaled source (the default, and every `PlayAt` one-shot) is held, and
+`Time.Step` advances the world without un-pausing it: the headless session
+(`session-mcp`) can only step, so a capture it takes holds the stepped length in
+zeros. The capture says so: when every tick it ran was paused, `StopCapture` (and
+`Harness.StopAudio`) warns *every tick of this capture ran paused*. To hear a run,
+record a scenario (`play --record-audio`, `Harness.RecordAudio`), which ticks
+unpaused.
 
 ```lua no-run
 Audio.StartCapture("captures/door.wav")

@@ -3,8 +3,8 @@
 //! The platform-layer [`AudioBackend`] backed by [kira](https://docs.rs/kira): a
 //! cpal device, a mixer of tracks with effects, and tweened parameters. Opened by
 //! the windowed shell (`shell/boot.rs`) and injected into the `AudioMaestro` after
-//! `GameWorld::new`, so the device only ever exists in the windowed process — never
-//! in the harness, which keeps the `NullBackend`.
+//! `GameWorld::new`, so the sound card only ever opens in the windowed process; the
+//! harness keeps the `NullBackend` until a capture runs this mixer offline (#1579).
 //!
 //! The graph: each voice is a [`ClipSound`] playing into its mixer group's track
 //! (`groups.rs`); group tracks nest as the group tree does and send to one reverb

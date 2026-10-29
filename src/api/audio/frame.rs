@@ -6,7 +6,8 @@
 //! Then the output is told how much time went by, so an offline mixer renders it and
 //! a running capture takes it (`audio::capture`). `GameWorld::push_audio` calls it at
 //! the end of every tick, whoever drives the sim, so a scenario's capture hears the
-//! same mix the speakers would. It uses the same listener and emitter lookups as
+//! same mix the speakers would, and once on a paused frame that ran no tick, with no
+//! time, so a `Time.Pause` reaches the device. It uses the same listener and emitter lookups as
 //! `Audio.GetSpatial`, so what the agent reads back is what plays.
 
 use std::cell::RefCell;
@@ -35,5 +36,5 @@ pub fn push_frame(
     let scene = scene.borrow();
     let mut audio = audio.borrow_mut();
     audio.apply_mix(&env, |id| emitter(&scene, id));
-    audio.advance_output(seconds);
+    audio.advance_output(seconds, env.paused);
 }

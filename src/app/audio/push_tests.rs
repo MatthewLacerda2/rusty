@@ -1,20 +1,20 @@
-//! The shell's per-frame audio mix (#412): a playing `AudioSource` is re-resolved
-//! against the active camera and the clock each frame, in the editor and the player
-//! alike, and the device receives what `Audio.GetSpatial` reports.
+//! The audio mix push (#412, #1579): a playing `AudioSource` is re-resolved against
+//! the active camera and the clock on every tick and on a paused frame that ran
+//! none, whoever drives the world, and the device receives what `Audio.GetSpatial`
+//! reports.
 
 use std::cell::RefCell;
 use std::rc::Rc;
 
 use glam::Vec3;
 
-use super::*;
+use crate::app::GameWorld;
 use crate::audio::recording::{Recording, RecordingBackend};
 use crate::components::AudioSourceComponent;
 use crate::core::input::InputState;
 use crate::navigation::NavigationGraph;
 use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;
-use crate::shell::frame::advance_sim;
 
 /// A playing world with one fully-3D `play_on_start` speaker at the origin, on a
 /// recording backend.
@@ -44,7 +44,7 @@ fn playing_speaker() -> (GameWorld, u32, Rc<RefCell<Recording>>) {
     let (backend, rec) = RecordingBackend::new();
     game.resources.audio.borrow_mut().set_backend(backend);
     game.boot_standalone();
-    advance_sim(&mut game, 0.02);
+    game.tick(0.02);
     (game, id, rec)
 }
 
@@ -60,7 +60,7 @@ fn the_frame_mix_pans_a_source_to_the_listeners_left() {
     assert!(game.resources.audio.borrow().is_source_playing(id));
     let right = game.resources.camera.borrow().right();
     place_camera(&game, right * 3.0);
-    apply_mix(&game);
+    game.push_audio(0.0);
     let voice = rec.borrow().last_voice();
     let applied = rec.borrow().current(voice).unwrap();
     assert!(applied.pan < -0.9, "got {applied:?}");
@@ -71,7 +71,7 @@ fn the_frame_mix_pans_a_source_to_the_listeners_left() {
 fn the_frame_mix_matches_the_spatial_read_back() {
     let (game, id, rec) = playing_speaker();
     place_camera(&game, Vec3::new(2.0, 0.0, 5.0));
-    apply_mix(&game);
+    game.push_audio(0.0);
     let (src, pos) = crate::api::audio::emitter(&game.scene().borrow(), id).unwrap();
     let listener = crate::api::audio::listener(&game.resources.camera);
     let read = game
@@ -88,13 +88,31 @@ fn the_frame_mix_matches_the_spatial_read_back() {
 fn the_frame_mix_follows_time_scale_and_pause() {
     let (game, id, _rec) = playing_speaker();
     game.time().borrow_mut().set_time_scale(0.25);
-    apply_mix(&game);
+    game.push_audio(0.0);
     let audio = || game.resources.audio.borrow().voice_mix(id).unwrap();
     assert_eq!(audio().speed, 0.25);
     game.time().borrow_mut().pause();
-    apply_mix(&game);
+    game.push_audio(0.0);
     assert!(audio().paused);
     game.time().borrow_mut().resume();
-    apply_mix(&game);
+    game.push_audio(0.0);
     assert!(!audio().paused);
+}
+
+#[test]
+fn a_paused_frame_with_no_step_still_pushes_the_mix() {
+    let (mut game, id, rec) = playing_speaker();
+    let pushed = rec.borrow().mixes.len();
+    game.time().borrow_mut().pause();
+    game.paused_frame();
+    assert_eq!(rec.borrow().mixes.len(), pushed + 1, "one push, no tick");
+    assert!(game.resources.audio.borrow().voice_mix(id).unwrap().paused);
+}
+
+#[test]
+fn a_tick_pushes_the_mix_once() {
+    let (mut game, _id, rec) = playing_speaker();
+    let pushed = rec.borrow().mixes.len();
+    game.tick(0.02);
+    assert_eq!(rec.borrow().mixes.len(), pushed + 1);
 }

@@ -11,7 +11,10 @@
 //! single-consumer buffer of atomics (the audio thread writes, the engine drains),
 //! allocated once on the main thread when the first capture starts. A block that
 //! finds the ring full is dropped whole and counted, and the capture reports the
-//! count when it stops.
+//! count when it stops. **The file keeps true time**: a dropped block leaves a gap
+//! the next drain fills with as many silent frames, in the place it was lost. While
+//! a gap is pending the producer writes nothing, so everything in the ring precedes
+//! it and the drain knows where it goes.
 
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, OnceLock};
@@ -38,6 +41,9 @@ pub struct Tap {
     read: AtomicUsize,
     /// Stereo frames dropped since [`Tap::start`] because the ring was full.
     dropped: AtomicU64,
+    /// Dropped frames the drain has not yet written as silence; non-zero holds the
+    /// producer off the ring.
+    gap: AtomicU64,
 }
 
 impl Tap {
@@ -52,6 +58,7 @@ impl Tap {
         let written = self.written.load(Ordering::Acquire);
         self.read.store(written, Ordering::Release);
         self.dropped.store(0, Ordering::Relaxed);
+        self.gap.store(0, Ordering::Release);
         self.on.store(true, Ordering::Release);
     }
 
@@ -60,15 +67,22 @@ impl Tap {
         self.on.store(false, Ordering::Release);
     }
 
-    /// Append everything tapped since the last drain to `out`, interleaved stereo.
+    /// Append everything tapped since the last drain to `out`, interleaved stereo,
+    /// then the silence standing in for any block dropped after it.
     pub fn drain_into(&self, out: &mut Vec<f32>) {
         let Some(ring) = self.ring.get() else {
             return;
         };
+        // The gap first: what it counts was dropped after every sample in the ring.
+        let gap = self.gap.load(Ordering::Acquire);
         let written = self.written.load(Ordering::Acquire);
         let read = self.read.load(Ordering::Relaxed);
         out.extend((read..written).map(|i| f32::from_bits(slot(ring, i).load(Ordering::Relaxed))));
         self.read.store(written, Ordering::Release);
+        if gap > 0 {
+            out.resize(out.len() + gap as usize * 2, 0.0);
+            self.gap.fetch_sub(gap, Ordering::AcqRel);
+        }
     }
 
     /// Stereo frames dropped since the capture started, because the engine did not
@@ -83,7 +97,8 @@ impl Tap {
     }
 
     /// Copy one processed block, if a capture is running: lock-free, and a block
-    /// that does not fit is dropped whole and counted.
+    /// that does not fit, or comes while a gap is pending, is dropped whole and
+    /// counted into the gap.
     fn copy(&self, block: &[Frame], dt: f64) {
         if !self.on.load(Ordering::Acquire) {
             return;
@@ -97,9 +112,11 @@ impl Tap {
         }
         let written = self.written.load(Ordering::Relaxed);
         let read = self.read.load(Ordering::Acquire);
-        if RING_SAMPLES - (written - read) < block.len() * 2 {
-            self.dropped
-                .fetch_add(block.len() as u64, Ordering::Relaxed);
+        let pending = self.gap.load(Ordering::Acquire) > 0;
+        if pending || RING_SAMPLES - (written - read) < block.len() * 2 {
+            let frames = block.len() as u64;
+            self.dropped.fetch_add(frames, Ordering::Relaxed);
+            self.gap.fetch_add(frames, Ordering::AcqRel);
             return;
         }
         for (i, frame) in block.iter().enumerate() {
