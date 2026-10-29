@@ -59,14 +59,13 @@ fn override_survives_propagation() {
     let mut scene = Scene::new();
     let root = load_and_instantiate_linked(&mut scene, &path, None).unwrap();
 
-    // Override the root's position, then record it.
-    scene.world.transform_mut(root).unwrap().position.x = 5.0;
-    record_instance_overrides(&mut scene, root).unwrap();
+    // Override the root's scale: an override at once.
+    scene.world.transform_mut(root).unwrap().scale.x = 5.0;
     assert!(!list_instance_overrides(&scene, root).unwrap().is_empty());
 
     // Reimport (propagation): the override is preserved.
     reimport_instance(&mut scene, root).unwrap();
-    assert_eq!(scene.world.transform(root).unwrap().position.x, 5.0);
+    assert_eq!(scene.world.transform(root).unwrap().scale.x, 5.0);
 }
 
 #[test]
@@ -92,7 +91,6 @@ fn override_wins_over_a_conflicting_source_edit() {
 
     // Override the child's name, record it, THEN change the same field in the source.
     scene.world.set_name(child, "Mine".into());
-    record_instance_overrides(&mut scene, root).unwrap();
     rewrite_prefab_child_name(&path, "SourceWins");
 
     reimport_instance(&mut scene, root).unwrap();
@@ -108,8 +106,7 @@ fn prefab_link_roundtrips_through_save_load() {
     let path = write_prefab("roundtrip");
     let mut scene = Scene::new();
     let root = load_and_instantiate_linked(&mut scene, &path, None).unwrap();
-    scene.world.transform_mut(root).unwrap().position.y = 8.0;
-    record_instance_overrides(&mut scene, root).unwrap();
+    scene.world.transform_mut(root).unwrap().scale.y = 8.0;
 
     // Save -> load (apply_scene_data also runs propagation). The link + override
     // survive the JSON round-trip and the value is intact.
@@ -125,7 +122,7 @@ fn prefab_link_roundtrips_through_save_load() {
         .expect("link survived save/load");
     assert_eq!(link.source, path);
     assert!(!link.overrides.is_empty(), "overrides survived save/load");
-    assert_eq!(scene2.world.transform(root).unwrap().position.y, 8.0);
+    assert_eq!(scene2.world.transform(root).unwrap().scale.y, 8.0);
 }
 
 #[test]
@@ -133,14 +130,13 @@ fn revert_drops_overrides_and_restores_source() {
     let path = write_prefab("revert");
     let mut scene = Scene::new();
     let root = load_and_instantiate_linked(&mut scene, &path, None).unwrap();
-    scene.world.transform_mut(root).unwrap().position.x = 99.0;
-    record_instance_overrides(&mut scene, root).unwrap();
+    scene.world.transform_mut(root).unwrap().scale.x = 99.0;
 
     revert_instance_overrides(&mut scene, root).unwrap();
     assert!(list_instance_overrides(&scene, root).unwrap().is_empty());
     assert_eq!(
-        scene.world.transform(root).unwrap().position.x,
-        0.0,
+        scene.world.transform(root).unwrap().scale.x,
+        1.0,
         "reverted to the source's value"
     );
 }
@@ -149,7 +145,6 @@ fn revert_drops_overrides_and_restores_source() {
 fn override_verbs_reject_a_non_instance() {
     let mut scene = Scene::new();
     let plain = create_entity(&mut scene, "Plain", None);
-    assert!(record_instance_overrides(&mut scene, plain).is_err());
     assert!(reimport_instance(&mut scene, plain).is_err());
     assert!(list_instance_overrides(&scene, plain).is_err());
 }

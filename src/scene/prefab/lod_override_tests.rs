@@ -53,7 +53,6 @@ fn a_destroyed_lod_renderer_override_keeps_the_other_overrides() {
     let brick = MaterialComponent::new("Brick");
     scene.world.set_material(root, Some(brick));
     scene.world.lod_group_mut(root).unwrap().levels[0].renderers = vec![post];
-    record_instance_overrides(&mut scene, root).unwrap();
 
     scene.destroy_entity(post);
     let mut loaded = reload(&scene);
@@ -67,6 +66,35 @@ fn a_destroyed_lod_renderer_override_keeps_the_other_overrides() {
     assert!(
         lod.levels[0].renderers.is_empty(),
         "the dead renderer is dropped"
+    );
+    let _ = std::fs::remove_file(&path);
+}
+
+#[test]
+fn an_instance_added_lod_level_applies_without_its_outside_renderer() {
+    // A dropped id inside a modification's whole value leaves its list of ids, as
+    // the typed walk drops it (#1527): the added level is not lost to a `null`.
+    let path = write_lod_prefab();
+    let mut scene = Scene::new();
+    let post = scene.add_entity("Post".into());
+    let prefab = read_prefab_file(&path).unwrap();
+    let root = instantiate_prefab_linked(&mut scene, &prefab, None, &path);
+    let child = scene.world.children(root)[0];
+    let level = LodLevel {
+        renderers: vec![post, child],
+        ..LodLevel::default()
+    };
+    scene.world.lod_group_mut(root).unwrap().levels.push(level);
+
+    let key = "/lod_group/levels/1";
+    crate::scene::prefab::apply::apply_instance_field_to_source(&mut scene, root, key).unwrap();
+    let source = read_prefab_file(&path).unwrap();
+    let levels = &source.entities[0].lod_group.as_ref().unwrap().levels;
+    assert_eq!(levels.len(), 2, "the added level reached the source");
+    assert_eq!(
+        levels[1].renderers,
+        [1],
+        "the child's local id; Post dropped"
     );
     let _ = std::fs::remove_file(&path);
 }

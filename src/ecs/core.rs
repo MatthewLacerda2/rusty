@@ -212,9 +212,19 @@ impl World {
         self.with_pair_mut::<AnimatorComponent, MeshComponent, R>(id, f)
     }
 
-    /// Assemble one live entity's columns into a document (serialization /
-    /// prefab diffing).
+    /// Assemble one live entity's columns into a document (serialization).
     pub fn entity_document(&self, id: u32) -> Option<Entity> {
+        self.document(id, MeshComponent::clone)
+    }
+
+    /// [`World::entity_document`] with the mesh's reference and none of its
+    /// geometry ([`MeshComponent::reference_only`]): what a prefab diff reads.
+    pub fn reference_document(&self, id: u32) -> Option<Entity> {
+        self.document(id, MeshComponent::reference_only)
+    }
+
+    /// The document of entity `id`, its mesh copied by `mesh`.
+    fn document(&self, id: u32, mesh: fn(&MeshComponent) -> MeshComponent) -> Option<Entity> {
         let core = self.component::<Core>(id)?;
         let name = (*self.name(id)?).clone();
         let transform = (*self.transform(id)?).clone();
@@ -225,7 +235,7 @@ impl World {
             is_static: core.is_static,
             layer: core.layer,
             transform,
-            mesh: self.mesh(id).map(|c| (*c).clone()),
+            mesh: self.mesh(id).map(|c| mesh(&c)),
             material: self.material(id).map(|c| (*c).clone()),
             pending_material: self.component::<MaterialAsset>(id).map(|c| (*c).clone()),
             scripts: (*self.scripts(id)?).clone(),

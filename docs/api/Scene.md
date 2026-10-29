@@ -32,13 +32,12 @@ it behaves identically to the editor and uses the same default values.
 | `Scene.SavePrefab` | `(rootId, path)` | the written path |
 | `Scene.Instantiate` | `(path, …)` — see below | new entity `id` |
 | `Scene.InstantiateUnpacked` | `(prefabPath, [parentId])` | new entity `id` (an unlinked copy) |
-| `Scene.RecordPrefabOverrides` | `(instanceRootId)` | count of entities whose overrides were recorded |
 | `Scene.RevertPrefabOverrides` | `(instanceRootId)` | — (drops overrides, restores the source) |
 | `Scene.ReimportPrefab` | `(instanceRootId)` | — (re-baseline from source, re-apply overrides) |
 | `Scene.ApplyPrefabToSource` | `(instanceRootId)` | count of entities written back into the `.prefab` |
-| `Scene.ApplyPrefabFieldToSource` | `(entityId, jsonPointer)` | — (writes one leaf to the `.prefab`) |
-| `Scene.RevertPrefabField` | `(entityId, jsonPointer)` | `true` if an override was reverted, `false` if there was none at `jsonPointer` |
-| `Scene.ListPrefabOverrides` | `(instanceRootId)` | array of `"localId:json-pointer"` strings |
+| `Scene.ApplyPrefabFieldToSource` | `(entityId, key)` | — (writes one override to the `.prefab`) |
+| `Scene.RevertPrefabField` | `(entityId, key)` | `true` if an override was reverted, `false` if there was none at `key` |
+| `Scene.ListPrefabOverrides` | `(instanceRootId)` | array of `"localId:key"` strings (a JSON pointer, `+/component`, `-/component`) |
 
 **Active, self and in the hierarchy (#1363).** As in Unity, `SetActive(pivot, false)`
 hides and stops the whole subtree under `pivot`: its children stop drawing (meshes,
@@ -220,7 +219,7 @@ Two flavours of instance, matching Unity:
 - **Linked** (the default) — the instance keeps a live link back to the `.prefab`. On
   every scene load and on an explicit re-import, the instance is re-baselined from the
   current source so a later edit to the prefab propagates into all its instances. Per-
-  instance edits are recorded as **overrides** that survive that propagation.
+  instance edits are **overrides** the moment they are made, and survive that propagation.
 - **Unpacked** (the v1 copy) — an independent snapshot with no link back to the asset;
   editing the source never touches it.
 
@@ -278,56 +277,97 @@ one name and never drift.
 In every case the geometry is stored only as a reference and rehydrated on the next
 scene load, exactly like a primitive's `primitive_type` — no GPU buffers are inlined.
 
-#### Linked-instance overrides (record / revert / reimport / apply-to-source)
+#### Linked-instance overrides (revert / reimport / apply-to-source)
 
-A linked instance records its divergence from the source as a **generic field diff** —
-a map of `json-pointer-path → value` for each field where the instance differs from a
-fresh copy of the source. This auto-covers every present and future component (and
-component add/remove — a `None`↔`Some` is just a diff at that path) with no per-
-component code. The override set is carried on each instance entity's link, so it
-saves and loads with the scene.
+A linked instance's divergence from the source is its **diff** against the source as
+the instance last took it (when it was stamped, loaded or reimported), held the way
+Unity holds a prefab instance's overrides, in three kinds. It covers every present and
+future component with no per-component code. Each override has a **key**, the name
+`ListPrefabOverrides` lists it by and the field verbs take:
+
+- **Property modifications**, one per changed leaf, keyed by its JSON pointer
+  (`"/transform/position/0"`). A list's elements are addressed by index, and a list
+  whose length changed has one **size entry**, `"<list>/#size"` (Unity's `Array.size`):
+  removing a script is a size entry (plus the leaves of the scripts that moved up a
+  slot), adding one is a size entry plus one entry holding the new script whole. The
+  elements both lists hold keep following the source, so a source edit to a script
+  the instance didn't touch still reaches it. A list whose length changed is **one
+  override to Apply or Revert**, as Unity applies a whole array: `ApplyPrefabFieldToSource`
+  or `RevertPrefabField` on its size entry or on any entry under that list takes the
+  size and every entry of the list together. A size over 65 536 is skipped with a
+  warning. A field the leaf diff can't split (an
+  enum switched variant, such as a collider's shape) is one entry holding it whole.
+- **Added components** (Unity's *added components*), keyed `"+/<component>"`
+  (`"+/light"`): a component the instance has and the source lacks, held whole, so a
+  Light or a Collider added to an instance child keeps all its values.
+- **Removed components** (Unity's *removed components*), keyed `"-/<component>"`
+  (`"-/camera"`): a source component the instance removed.
+
+An entity id inside any of them (a Joint's `connected_body`, inside an added Joint
+too) follows its entity: it is remapped when the bones respawn on Stop or a load, and
+written to the source as the source's own id by the apply-to-source verbs.
+
+As in Unity, **an edit to an instance is an override the moment it is made**, whatever
+made it: the gizmo, the Inspector, a Lua setter such as `Transform.SetPosition`, the
+MCP. There is nothing to record. The overrides save and load with the scene, survive
+Play (leaving Play restores the edit-mode world exactly), and are re-applied when the
+source changes, so a source edit still reaches every field the instance did not edit.
+The instance **root's position and rotation are always the instance's own**: they never
+come from the source and are never overrides. A source applied to during Play reaches
+the edit-mode instances on Stop, each keeping its own edits.
+
+The overrides are exactly the instance's current diff: an edit the author undoes (a
+component removed and re-added, a collider shape switched back, an added component
+removed) leaves no override behind. So an override on a component or field the source
+has **removed** is dropped; Unity keeps it as an "unused override", rusty doesn't.
+While an instance's source file is **missing** (it was loaded without one),
+the instance keeps the overrides it was saved with, but an edit made meanwhile is not
+tracked as an override until the source is back: the edit stays in the scene, and the
+source, once it returns, overwrites it on the next load or reimport.
 
 Edits flow in two directions. **On-instance** verbs keep edits local to this instance;
 the **apply-to-source** verbs push them up into the shared `.prefab` so *other* instances
-get them. (Naming note (#268): the on-instance recorder is `RecordPrefabOverrides` —
-formerly `ApplyPrefabChanges`, renamed so "apply" unambiguously means apply-to-source.)
+get them.
 
 On-instance:
 
-- **`Scene.RecordPrefabOverrides(instanceRootId)`** — record the instance's current edits
-  as overrides (re-diffs every instance entity against a fresh source baseline and
-  stores the result). Call it after editing an instance, while the source is unchanged,
-  so the edits are preserved through later propagation. Returns the number of entities
-  recorded.
 - **`Scene.RevertPrefabOverrides(instanceRootId)`** — drop every override and rebuild
   the instance straight from the current source (it becomes a pristine copy).
 - **`Scene.ReimportPrefab(instanceRootId)`** — re-baseline from the source and re-apply
-  the recorded overrides on top: non-overridden fields pick up the latest source,
+  the overrides on top: non-overridden fields pick up the latest source,
   overridden ones win. This is the same propagation that runs automatically on scene
   load.
 - **`Scene.ListPrefabOverrides(instanceRootId)`** — the read verb: the instance's
-  recorded override paths as `"localId:json-pointer"` strings (e.g.
-  `"0:/transform/position/0"`).
+  overrides as `"localId:key"` strings, sorted (e.g. `"1:+/light"`, `"1:-/camera"`,
+  `"1:/scripts/#size"`, `"1:/transform/position/0"`).
 
 Apply-to-source (the Unity "Apply → Prefab" direction):
 
-- **`Scene.ApplyPrefabToSource(instanceRootId)`** — write *every* recorded override back
+- **`Scene.ApplyPrefabToSource(instanceRootId)`** — write *every* override back
   into the source `.prefab` document on disk, then clear them on the instance (it now
   matches the source). Other instances of that prefab pick the change up on their next
-  scene load or `ReimportPrefab`. Returns the number of entities written.
-- **`Scene.ApplyPrefabFieldToSource(entityId, jsonPointer)`** — write *one* overridden
-  leaf back into the source, then drop just that override and reimport so the leaf
-  re-tracks the source (the instance's other overrides are untouched). `entityId` may be
-  any instance entity — root or child; the verb resolves the instance root itself. Errors
-  if the entity carries no override at `jsonPointer`.
+  scene load, `ReimportPrefab` or leaving Play. Returns the number of entities written.
+- **`Scene.ApplyPrefabFieldToSource(entityId, key)`** — write *one* override back
+  into the source (a leaf, a list's size, an added component, or a removal), then drop
+  just that override and reimport so it re-tracks the source (the instance's other
+  overrides are untouched). `key` is one `ListPrefabOverrides` lists, without the
+  `localId:` prefix. A key in a list whose length changed applies that whole list
+  (its size entry and every entry under it): applying after removing the first of
+  two scripts leaves the source with only the second. `entityId` may be any instance
+  entity — root or child; the verb
+  resolves the instance root itself. Errors if the entity carries no override at
+  `key`.
 
 Its per-field opposite:
 
-- **`Scene.RevertPrefabField(entityId, jsonPointer)`** — Unity's *Revert* on one
-  property: drop just that override and reimport, so the leaf tracks the source again
-  (the instance's other overrides are untouched). `entityId` may be any instance
-  entity. Returns `false`, changing nothing, when there is no override at
-  `jsonPointer`. The prefab card's per-field revert button.
+- **`Scene.RevertPrefabField(entityId, key)`** — Unity's *Revert* on one override:
+  drop just that override and reimport, so what it covered tracks the source again (a
+  reverted `"+/light"` takes the added light away, a reverted `"-/camera"` brings the
+  source's camera back, a reverted size entry or element of a list whose length
+  changed gives the whole list back to the source).
+  The instance's other overrides are untouched. `entityId` may be any instance
+  entity. Returns `false`, changing nothing, when there is no override at `key`. The
+  prefab card's per-field revert button.
 
 The verbs error if `instanceRootId` (or, for the field form, `entityId`) is not a
 **linked** instance entity. **Scope (#216):** a flat instance of a flat prefab —

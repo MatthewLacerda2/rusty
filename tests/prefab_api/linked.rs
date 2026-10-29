@@ -1,4 +1,4 @@
-//! Linked instances: `SavePrefab` → `Instantiate`, and override record/revert.
+//! Linked instances: `SavePrefab` → `Instantiate`, and overrides and their revert.
 
 use super::{fixture, is_linked, pos_of, run};
 use glam::Vec3;
@@ -21,7 +21,7 @@ fn save_then_instantiate_linked_round_trips() {
         assert_eq!(pos_of(&scene, new_id), Vec3::new(1.0, 2.0, 3.0));
         assert!(is_linked(&scene, new_id), "Instantiate links by default");
 
-        // A pristine linked instance has no recorded divergence.
+        // A pristine linked instance has no divergence.
         let overrides: Vec<String> = lua
             .load(format!("return Scene.ListPrefabOverrides({new_id})"))
             .eval()
@@ -32,7 +32,7 @@ fn save_then_instantiate_linked_round_trips() {
 }
 
 #[test]
-fn linked_instance_records_and_reverts_overrides() {
+fn a_linked_instance_edit_is_an_override_and_reverts() {
     let (scene, root, path) = fixture("overrides");
     run(&scene, |lua| {
         let new_id: u32 = lua
@@ -43,27 +43,22 @@ fn linked_instance_records_and_reverts_overrides() {
             .eval()
             .unwrap();
 
-        // Diverge from the source, record, and the divergence is listed.
-        {
-            let mut s = scene.borrow_mut();
-            s.world.transform_mut(new_id).unwrap().position = Vec3::splat(9.0);
-        }
-        let recorded: usize = lua
-            .load(format!("return Scene.RecordPrefabOverrides({new_id})"))
-            .eval()
+        // Diverge from the source: the divergence is listed with nothing recorded.
+        lua.load(format!("Transform.SetLocalScale({new_id}, 9, 9, 9)"))
+            .exec()
             .unwrap();
-        assert!(recorded > 0, "the moved transform is a recorded override");
         let overrides: Vec<String> = lua
             .load(format!("return Scene.ListPrefabOverrides({new_id})"))
             .eval()
             .unwrap();
-        assert!(!overrides.is_empty());
+        assert_eq!(overrides.len(), 3, "{overrides:?}");
 
         // Revert restores the source values.
         lua.load(format!("Scene.RevertPrefabOverrides({new_id})"))
             .exec()
             .unwrap();
-        assert_eq!(pos_of(&scene, new_id), Vec3::new(1.0, 2.0, 3.0));
+        let scale = scene.borrow().world.transform(new_id).unwrap().scale;
+        assert_eq!(scale, Vec3::ONE);
     });
     let _ = std::fs::remove_file(&path);
 }

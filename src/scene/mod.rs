@@ -68,10 +68,7 @@ pub use lighting::probe::{Probe, ProbeGrid, ProbeVolume};
 pub use lighting::probe_fill::analytic_fill;
 pub use lighting::reflection_probe::{ReflectionProbe, ReflectionProbeSet};
 pub use lighting::sh::Sh9;
-pub use prefab::link::{
-    list_instance_overrides, record_instance_overrides, reimport_instance,
-    revert_instance_overrides,
-};
+pub use prefab::link::{list_instance_overrides, reimport_instance, revert_instance_overrides};
 pub use prefab::{
     extract_prefab, instantiate_prefab, is_prefab_path, load_and_instantiate,
     load_and_instantiate_linked, read_prefab_file, save_prefab, PrefabData, PREFAB_EXTENSION,

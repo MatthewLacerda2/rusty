@@ -32,7 +32,10 @@ pub use animator::{
 pub use audio::reverb_zone::{ReverbParams, ReverbPreset, ReverbZoneComponent};
 pub use audio::source::AudioSourceComponent;
 pub(crate) use entity::with_ref_components;
-pub use entity::{escape_token, visit_override_refs, Entity, EntityRefs, PrefabLink, RefVisit};
+pub use entity::{
+    escape_token, visit_override_refs, Entity, EntityRefs, PrefabLink, PrefabOverrides, RefVisit,
+    SIZE_TOKEN,
+};
 pub use material::{
     BlendMode, DecalBlend, MaterialAsset, MaterialComponent, RefractionModel, RenderMode,
 };

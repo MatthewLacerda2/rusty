@@ -1,182 +1,49 @@
-//! src/scene/prefab_overrides.rs — generic per-instance override diff (#216).
+//! src/scene/prefab/overrides.rs — applying a per-instance override set (#216, #1527).
 //!
-//! A linked prefab instance records its divergence from the source as a GENERIC
-//! field diff, not a typed-per-component struct: a flat map of `json-pointer-path ->
-//! value` for every leaf where the instance differs from a freshly-instantiated copy
-//! of the source entity. Reusing the serde-value approach `prefab.rs` already uses
-//! for material equality, this auto-covers every present and future first-class
-//! component with **no per-component code**, and covers component add/remove too — a
-//! `None`↔`Some` at a component path is just another diff leaf.
+//! A linked prefab instance's divergence from its source is a [`PrefabOverrides`]
+//! (`diff.rs`) against its *baseline*, the source as it last took it (`live/`), with
+//! **no per-component code**. [`apply_overrides`] is its inverse: a fresh source
+//! entity plus the overrides rebuilds the instance. Propagation is "rebuild from the
+//! source, then re-apply the overrides on top"; nothing diffs against the source as
+//! it is now, which would make every leaf it changed an override.
 //!
-//! The two verbs are symmetric: [`diff_entity`] (instance vs. baseline) yields the
-//! override map, and [`apply_overrides`] (baseline + override map) reproduces the
-//! instance. So `apply_overrides(baseline, diff_entity(instance, baseline))` round-
-//! trips, and propagation is "rebuild from a fresh baseline, then re-apply the
-//! recorded map on top".
-//!
-//! Leaves are compared on the entity's serde JSON form with the volatile/identity
-//! fields masked out (see `STRIPPED_KEYS`), so ids, parenting, rehydrated GPU
-//! geometry, and the link itself never count as overrides.
-
-use std::collections::BTreeMap;
+//! The order is Unity's: removed components go, added components come whole, each
+//! list takes its size (shallowest first), then each modification sets its leaf. A
+//! slot a list grew by that no modification fills is dropped again.
 
 use serde_json::Value;
 
-use crate::components::{escape_token, Entity};
+use super::pointer::set_pointer;
+use crate::components::{Entity, PrefabOverrides, SIZE_TOKEN};
 
-/// Top-level entity keys that must never be diffed/overridden: identity + structure
-/// the propagation already owns (ids/parenting are remapped per instance), the
-/// rehydrated-on-load mesh geometry (stored only as a reference; re-derived, so it
-/// would otherwise show as a giant spurious diff), the staged-material slot, and the
-/// link itself (an instance's link is set by the stamper, not copied from source).
-const STRIPPED_KEYS: &[&str] = &[
-    "id",
-    "parent_id",
-    "children",
-    "prefab_link",
-    "pending_material",
-];
-
-/// Mesh sub-keys that are rehydrated from the reference on load (the heavy GPU
-/// buffers + transient revision). The reference fields (`primitive_type`,
-/// `asset_ref`) and authored rig stay, so a *changed mesh reference* is still a
-/// diff, but raw vertex soup is not.
-const STRIPPED_MESH_KEYS: &[&str] = &[
-    "vertices",
-    "indices",
-    "bind_palette",
-    "skin",
-    "clips",
-    "pose_palette",
-    "revision",
-];
-
-/// Lists overridden whole, as one leaf, rather than per element: an entity's material
-/// slots follow its mesh's runs (#1285), so an override may add or lengthen the list,
-/// which per-element leaves cannot (the apply never grows an array).
-const WHOLE_LISTS: &[&str] = &["/material/materials"];
-
-/// The serde JSON of `entity` with the volatile/identity keys masked out, so the
-/// diff sees only authored component data.
-fn maskable_json(entity: &Entity) -> Value {
-    let mut value = serde_json::to_value(entity).unwrap_or(Value::Null);
-    if let Some(obj) = value.as_object_mut() {
-        for key in STRIPPED_KEYS {
-            obj.remove(*key);
-        }
-        if let Some(Value::Object(mesh)) = obj.get_mut("mesh") {
-            for key in STRIPPED_MESH_KEYS {
-                mesh.remove(*key);
-            }
-        }
-    }
-    value
+/// One step of applying an override set onto an entity's JSON form.
+enum Op<'a> {
+    Remove(&'a str),
+    Add(&'a str, &'a Value),
+    Size(&'a str, usize),
+    Set(&'a str, &'a Value),
 }
 
-/// Flatten a JSON value into `out` as RFC-6901 json-pointer leaves. Objects and
-/// arrays recurse (arrays index by position, but a [`WHOLE_LISTS`] list is one
-/// leaf); every scalar — and `null` — is a leaf,
-/// so a present↔absent component (`Some`↔`None`, i.e. object↔`null`) is captured.
-fn flatten(prefix: &str, value: &Value, out: &mut BTreeMap<String, Value>) {
-    match value {
-        Value::Object(map) if !map.is_empty() => {
-            for (k, v) in map {
-                flatten(&format!("{prefix}/{}", escape_token(k)), v, out);
-            }
-        }
-        Value::Array(items) if !items.is_empty() && !WHOLE_LISTS.contains(&prefix) => {
-            for (i, v) in items.iter().enumerate() {
-                flatten(&format!("{prefix}/{i}"), v, out);
-            }
-        }
-        // A scalar, an empty object, or an empty array is a leaf in its own right.
-        leaf => {
-            out.insert(prefix.to_string(), leaf.clone());
-        }
-    }
-}
-
-/// The override map for `instance` against `baseline`: every flattened leaf whose
-/// value differs (a changed scalar, an added leaf, or a removed leaf surfaced as
-/// `null`). Both sides are masked first, so identity/geometry never leak in.
-pub fn diff_entity(instance: &Entity, baseline: &Entity) -> BTreeMap<String, Value> {
-    let mut inst = BTreeMap::new();
-    let mut base = BTreeMap::new();
-    flatten("", &maskable_json(instance), &mut inst);
-    flatten("", &maskable_json(baseline), &mut base);
-
-    let mut diff = BTreeMap::new();
-    for (path, inst_val) in &inst {
-        if base.get(path) != Some(inst_val) {
-            diff.insert(path.clone(), inst_val.clone());
-        }
-    }
-    // A leaf present in the baseline but gone from the instance (e.g. a removed
-    // component, or a shortened array) is an override to `null`.
-    for path in base.keys() {
-        if !inst.contains_key(path) {
-            diff.insert(path.clone(), Value::Null);
-        }
-    }
-    diff
-}
-
-/// Apply an override map onto `baseline` in place, leaf by leaf: set each path's
-/// leaf on the entity's JSON form, then deserialize back. Identity/structure/geometry
-/// keys are preserved from `baseline` because the diff never carries them. A path
-/// that no longer resolves (the source's shape changed underneath an override) is
-/// skipped. A `null` written into an array element the element type can't hold (a
-/// destroyed LOD renderer's id, a shortened list) drops that element. A leaf that
-/// still doesn't fit is skipped with a warning naming it, and the entity keeps every
-/// other override: one stale leaf never costs the rest.
-pub fn apply_overrides(baseline: &mut Entity, overrides: &BTreeMap<String, Value>) {
+/// Apply `overrides` onto `baseline` in place, then deserialize back. Identity,
+/// structure and the link are kept from `baseline` (the diff never carries them). A
+/// path that no longer resolves (the source's shape changed underneath an override)
+/// is skipped. A `null` written into an array element the element type can't hold
+/// (a dropped LOD renderer's id) drops that element. An override that still doesn't
+/// fit is skipped with a warning naming it, and the entity keeps every other one.
+pub fn apply_overrides(baseline: &mut Entity, overrides: &PrefabOverrides) {
     if overrides.is_empty() {
         return;
     }
     let Ok(mut value) = serde_json::to_value(&*baseline) else {
         return;
     };
-    let (mut drops, plain): (Vec<_>, Vec<_>) = overrides
-        .iter()
-        .partition(|(path, leaf)| leaf.is_null() && in_array(&value, path));
-    let mut all = value.clone();
-    for (path, leaf) in &plain {
-        set_pointer(&mut all, path, (*leaf).clone());
-    }
-    if fits(&all) {
-        value = all;
-    } else {
-        for (path, leaf) in plain {
-            let mut trial = value.clone();
-            set_pointer(&mut trial, path, leaf.clone());
-            keep_if_fits(&mut value, trial, &baseline.name, path);
-        }
-    }
-    // Highest index first, so dropping one element never shifts a later drop's.
-    drops.sort_by_key(|(path, _)| std::cmp::Reverse(array_slot(path)));
-    for (path, _) in drops {
-        let mut trial = value.clone();
-        set_pointer(&mut trial, path, Value::Null);
-        if fits(&trial) {
-            value = trial;
-            continue;
-        }
-        let mut trial = value.clone();
-        if let Some((parent, Some(i))) = array_slot(path) {
-            if let Some(Value::Array(items)) = trial.pointer_mut(&parent) {
-                if i < items.len() {
-                    items.remove(i);
-                }
-            }
-        }
-        keep_if_fits(&mut value, trial, &baseline.name, path);
-    }
+    apply_json(&mut value, overrides, &baseline.name);
     if let Ok(rebuilt) = serde_json::from_value::<Entity>(value) {
         let (id, parent_id, children) =
             (baseline.id, baseline.parent_id, baseline.children.clone());
         let link = baseline.prefab_link.clone();
         *baseline = rebuilt;
-        // Identity/structure/link are the stamper's, not the override map's.
+        // Identity/structure/link are the stamper's, not the overrides'.
         baseline.id = id;
         baseline.parent_id = parent_id;
         baseline.children = children;
@@ -184,21 +51,180 @@ pub fn apply_overrides(baseline: &mut Entity, overrides: &BTreeMap<String, Value
     }
 }
 
+/// Apply `overrides` onto a masked document (`diff::masked`) as they are, with no
+/// fit check: how a baseline moves by a change that is not an override.
+pub fn apply_values(value: &mut Value, overrides: &PrefabOverrides) {
+    let mut grown = Vec::new();
+    for op in &ops(value, overrides) {
+        run(value, op, &mut grown);
+    }
+    *value = finished(value, &grown, |p| overrides.modifications.contains_key(p));
+}
+
+/// [`apply_overrides`] on an entity's JSON form, `name` naming it in a warning.
+fn apply_json(value: &mut Value, overrides: &PrefabOverrides, name: &str) {
+    let ops = ops(value, overrides);
+    let mut all = value.clone();
+    let mut grown = Vec::new();
+    for op in &ops {
+        run(&mut all, op, &mut grown);
+    }
+    let all = finished(&all, &grown, |p| overrides.modifications.contains_key(p));
+    if fits(&all) {
+        *value = all;
+        return;
+    }
+    // One at a time: an override that doesn't fit is skipped, the rest kept.
+    let mut filled: Vec<String> = Vec::new();
+    let mut grown = Vec::new();
+    for op in &ops {
+        let mut trial = value.clone();
+        let mut trial_grown = grown.clone();
+        run(&mut trial, op, &mut trial_grown);
+        let mut trial_filled = filled.clone();
+        if let Op::Set(path, _) = op {
+            trial_filled.push(path.to_string());
+        }
+        let is_filled = |p: &str| trial_filled.iter().any(|f| f == p);
+        let ok = fits(&finished(&trial, &trial_grown, is_filled))
+            || matches!(op, Op::Set(path, Value::Null) if drop_element(&mut trial, path)
+                && fits(&finished(&trial, &trial_grown, is_filled)));
+        if ok {
+            (*value, grown, filled) = (trial, trial_grown, trial_filled);
+        } else {
+            log::warn!(
+                "[Prefab] entity '{name}': override '{}' no longer fits the prefab's \
+                 source; it was skipped, and the entity's other overrides kept.",
+                op_key(op)
+            );
+        }
+    }
+    let is_filled = |p: &str| filled.iter().any(|f| f == p);
+    *value = finished(value, &grown, is_filled);
+}
+
+/// The steps of `overrides` in the order they apply. Sizes go shallowest first, and a
+/// `null` into an array element goes last, highest index first, so dropping one
+/// element never shifts another's slot.
+fn ops<'a>(value: &Value, overrides: &'a PrefabOverrides) -> Vec<Op<'a>> {
+    let mut ops: Vec<Op> = overrides
+        .removed_components
+        .iter()
+        .map(|c| Op::Remove(c))
+        .collect();
+    ops.extend(
+        overrides
+            .added_components
+            .iter()
+            .map(|(c, v)| Op::Add(c, v)),
+    );
+    let (sizes, sets): (Vec<_>, Vec<_>) = overrides
+        .modifications
+        .iter()
+        .partition(|(path, _)| list_of_size(path).is_some());
+    let mut sizes: Vec<_> = sizes
+        .into_iter()
+        .filter_map(|(path, n)| Some((list_of_size(path)?, sane_size(path, n)?)))
+        .collect();
+    sizes.sort_by_key(|(list, _)| list.matches('/').count());
+    ops.extend(sizes.into_iter().map(|(list, n)| Op::Size(list, n)));
+    let (mut drops, plain): (Vec<_>, Vec<_>) = sets
+        .into_iter()
+        .partition(|(path, leaf)| leaf.is_null() && in_array(value, path));
+    ops.extend(plain.into_iter().map(|(p, v)| Op::Set(p, v)));
+    drops.sort_by_key(|(path, _)| std::cmp::Reverse(array_slot(path)));
+    ops.extend(drops.into_iter().map(|(p, v)| Op::Set(p, v)));
+    ops
+}
+
+/// Run one step on `value`; a list grown records each new slot's pointer in `grown`.
+fn run(value: &mut Value, op: &Op, grown: &mut Vec<String>) {
+    match *op {
+        Op::Remove(c) => {
+            if let Some(slot) = value.get_mut(c) {
+                *slot = Value::Null;
+            }
+        }
+        Op::Add(c, v) => {
+            if let Some(obj) = value.as_object_mut() {
+                obj.insert(c.to_string(), v.clone());
+            }
+        }
+        Op::Size(list, n) => {
+            // A list the baseline omits (`skip_serializing_if = "Vec::is_empty"`) is
+            // an empty one, made where its parent is there to hold it.
+            let parent = list.rsplit_once('/').map_or("", |(p, _)| p);
+            let missing = value.pointer(list).is_none_or(Value::is_null);
+            if missing && value.pointer(parent).is_some_and(Value::is_object) {
+                set_pointer(value, list, Value::Array(Vec::new()));
+            }
+            if let Some(Value::Array(items)) = value.pointer_mut(list) {
+                grown.extend((items.len()..n).map(|i| format!("{list}/{i}")));
+                items.resize(n, Value::Null);
+            }
+        }
+        Op::Set(path, leaf) => set_pointer(value, path, leaf.clone()),
+    }
+}
+
+/// `value` with every slot in `grown` that no modification `filled` dropped again,
+/// highest index first.
+fn finished(value: &Value, grown: &[String], filled: impl Fn(&str) -> bool) -> Value {
+    let mut value = value.clone();
+    for slot in grown.iter().rev().filter(|s| !filled(s)) {
+        drop_element(&mut value, slot);
+    }
+    value
+}
+
+/// The key of the override `op` came from, for a warning.
+fn op_key(op: &Op) -> String {
+    match *op {
+        Op::Remove(c) => format!("-/{c}"),
+        Op::Add(c, _) => format!("+/{c}"),
+        Op::Size(list, _) => format!("{list}/{SIZE_TOKEN}"),
+        Op::Set(path, _) => path.to_string(),
+    }
+}
+
+/// The longest a size entry may make a list: a larger one is no authored edit (a
+/// hand-edited or corrupt scene), and resizing to it would allocate that many slots.
+const MAX_LIST_SIZE: u64 = 65_536;
+
+/// Size entry `path`'s length, or `None` (with a warning when it is too large).
+fn sane_size(path: &str, n: &Value) -> Option<usize> {
+    let n = n.as_u64()?;
+    if n > MAX_LIST_SIZE {
+        log::warn!(
+            "[Prefab] override '{path}' sets a list's length to {n}, over the cap of \
+             {MAX_LIST_SIZE}; it was skipped."
+        );
+        return None;
+    }
+    usize::try_from(n).ok()
+}
+
+/// The list pointer of a size entry `path` (`/scripts/#size` → `/scripts`).
+fn list_of_size(path: &str) -> Option<&str> {
+    path.strip_suffix(SIZE_TOKEN)?.strip_suffix('/')
+}
+
 /// Whether `value` reads back as an entity.
 fn fits(value: &Value) -> bool {
     serde_json::from_value::<Entity>(value.clone()).is_ok()
 }
 
-/// Take `trial` when it still reads back as an entity; otherwise warn that override
-/// `path` on entity `name` was skipped.
-fn keep_if_fits(value: &mut Value, trial: Value, name: &str, path: &str) {
-    if fits(&trial) {
-        *value = trial;
-    } else {
-        log::warn!(
-            "[Prefab] entity '{name}': override '{path}' no longer fits the prefab's \
-             source; it was skipped, and the entity's other overrides kept."
-        );
+/// Remove the array element at `path` from `value`; whether there was one.
+fn drop_element(value: &mut Value, path: &str) -> bool {
+    let Some((parent, Some(i))) = array_slot(path) else {
+        return false;
+    };
+    match value.pointer_mut(&parent) {
+        Some(Value::Array(items)) if i < items.len() => {
+            items.remove(i);
+            true
+        }
+        _ => false,
     }
 }
 
@@ -213,72 +239,6 @@ fn in_array(value: &Value, path: &str) -> bool {
     array_slot(path).is_some_and(|(parent, i)| {
         i.is_some() && value.pointer(&parent).is_some_and(Value::is_array)
     })
-}
-
-/// Set `value` at an RFC-6901 `pointer` to `leaf`, creating intermediate objects as
-/// needed. Array growth is not supported (overrides only edit existing array slots,
-/// e.g. a vec3 component); an out-of-range array index is a no-op.
-fn set_pointer(value: &mut Value, pointer: &str, leaf: Value) {
-    let tokens: Vec<String> = pointer
-        .split('/')
-        .skip(1) // leading "" before the first "/"
-        .map(unescape)
-        .collect();
-    let Some((last, parents)) = tokens.split_last() else {
-        return;
-    };
-    let mut cursor = value;
-    for token in parents {
-        cursor = match descend(cursor, token) {
-            Some(next) => next,
-            None => return,
-        };
-    }
-    place(cursor, last, leaf);
-}
-
-/// Step one token into a container, materializing a missing object key as an empty
-/// object so a deep override path can be created. A child slot that is currently
-/// `null` (an absent component being *added* by the override) is promoted to an empty
-/// object first, so paths like `/light/intensity` can be built over a `None`
-/// baseline. Returns `None` for an out-of-range array index (we never grow arrays).
-fn descend<'a>(cursor: &'a mut Value, token: &str) -> Option<&'a mut Value> {
-    match cursor {
-        Value::Object(map) => {
-            let slot = map
-                .entry(token.to_string())
-                .or_insert_with(|| Value::Object(serde_json::Map::new()));
-            if slot.is_null() {
-                *slot = Value::Object(serde_json::Map::new());
-            }
-            Some(slot)
-        }
-        Value::Array(items) => token
-            .parse::<usize>()
-            .ok()
-            .and_then(move |i| items.get_mut(i)),
-        _ => None,
-    }
-}
-
-/// Write the final leaf into its parent container under `token`.
-fn place(cursor: &mut Value, token: &str, leaf: Value) {
-    match cursor {
-        Value::Object(map) => {
-            map.insert(token.to_string(), leaf);
-        }
-        Value::Array(items) => {
-            if let Some(slot) = token.parse::<usize>().ok().and_then(|i| items.get_mut(i)) {
-                *slot = leaf;
-            }
-        }
-        _ => {}
-    }
-}
-
-/// Inverse of [`escape_token`] (RFC 6901: `~1` -> `/`, `~0` -> `~`, in that order).
-fn unescape(token: &str) -> String {
-    token.replace("~1", "/").replace("~0", "~")
 }
 
 #[cfg(test)]

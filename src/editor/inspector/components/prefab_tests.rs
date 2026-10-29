@@ -7,8 +7,8 @@
 use super::*;
 use crate::scene::authoring::{create_entity, Primitive};
 use crate::scene::{
-    list_instance_overrides, load_and_instantiate_linked, record_instance_overrides, save_prefab,
-    MaterialAsset, MaterialComponent, Scene,
+    list_instance_overrides, load_and_instantiate_linked, save_prefab, MaterialAsset,
+    MaterialComponent, Scene,
 };
 
 /// Author a 2-entity prefab (Box root + Sphere child) to a unique temp `.prefab`.
@@ -56,27 +56,26 @@ fn instance_root_of_a_plain_entity_is_itself() {
 }
 
 #[test]
-fn record_action_records_overrides_like_the_api() {
-    let (mut scene, root) = linked("record");
-    scene.world.transform_mut(root).unwrap().position.x = 5.0;
+fn an_edit_is_listed_as_an_override_without_recording() {
+    let (mut scene, root) = linked("instant");
+    let child = scene.world.children(root)[0];
     assert!(list_instance_overrides(&scene, root).unwrap().is_empty());
-
-    assert!(dispatch(&mut scene, PrefabAction::Record(root)));
-    // Same effect as Scene.RecordPrefabOverrides: the divergence is now recorded.
-    assert!(!list_instance_overrides(&scene, root).unwrap().is_empty());
+    scene.world.transform_mut(child).unwrap().position.x = 5.0;
+    // What the card lists is the live diff: the edit shows the moment it is made.
+    let paths = crate::scene::prefab::live::entity_overrides(&scene.world, child).keys();
+    assert_eq!(paths, ["/transform/position/0"]);
 }
 
 #[test]
 fn apply_to_source_action_writes_prefab_and_clears_overrides() {
     let (mut scene, root) = linked("apply_to_source");
-    scene.world.transform_mut(root).unwrap().position.x = 6.0;
-    record_instance_overrides(&mut scene, root).unwrap();
+    scene.world.transform_mut(root).unwrap().scale.x = 6.0;
 
     // Apply-to-source clears the instance overrides (it now matches the source) and the
     // value persists, baked into the .prefab. Same effect as Scene.ApplyPrefabToSource.
     assert!(dispatch(&mut scene, PrefabAction::ApplyToSource(root)));
     assert!(list_instance_overrides(&scene, root).unwrap().is_empty());
-    assert_eq!(scene.world.transform(root).unwrap().position.x, 6.0);
+    assert_eq!(scene.world.transform(root).unwrap().scale.x, 6.0);
 }
 
 #[test]
@@ -84,43 +83,40 @@ fn apply_field_to_source_action_clears_only_that_field() {
     let (mut scene, root) = linked("apply_field");
     {
         let mut t = scene.world.transform_mut(root).unwrap();
-        t.position.x = 2.0;
-        t.position.y = 3.0;
+        t.scale.x = 2.0;
+        t.scale.y = 3.0;
     }
-    record_instance_overrides(&mut scene, root).unwrap();
 
     let action = PrefabAction::ApplyFieldToSource {
         entity: root,
-        path: "/transform/position/0".to_string(),
+        path: "/transform/scale/0".to_string(),
     };
     assert!(dispatch(&mut scene, action));
     // X is now in the source (override cleared); Y stays an override.
     let remaining = list_instance_overrides(&scene, root).unwrap();
-    assert_eq!(remaining, vec!["0:/transform/position/1".to_string()]);
+    assert_eq!(remaining, vec!["0:/transform/scale/1".to_string()]);
     let t = scene.world.transform(root).unwrap();
-    assert_eq!(t.position.x, 2.0);
-    assert_eq!(t.position.y, 3.0);
+    assert_eq!(t.scale.x, 2.0);
+    assert_eq!(t.scale.y, 3.0);
 }
 
 #[test]
 fn revert_action_drops_overrides_and_restores_source() {
     let (mut scene, root) = linked("revert");
-    scene.world.transform_mut(root).unwrap().position.x = 9.0;
-    record_instance_overrides(&mut scene, root).unwrap();
+    scene.world.transform_mut(root).unwrap().scale.x = 9.0;
 
     assert!(dispatch(&mut scene, PrefabAction::Revert(root)));
     assert!(list_instance_overrides(&scene, root).unwrap().is_empty());
-    assert_eq!(scene.world.transform(root).unwrap().position.x, 0.0);
+    assert_eq!(scene.world.transform(root).unwrap().scale.x, 1.0);
 }
 
 #[test]
 fn reimport_action_keeps_recorded_overrides() {
     let (mut scene, root) = linked("reimport");
-    scene.world.transform_mut(root).unwrap().position.x = 7.0;
-    record_instance_overrides(&mut scene, root).unwrap();
+    scene.world.transform_mut(root).unwrap().scale.x = 7.0;
 
     assert!(dispatch(&mut scene, PrefabAction::Reimport(root)));
-    assert_eq!(scene.world.transform(root).unwrap().position.x, 7.0);
+    assert_eq!(scene.world.transform(root).unwrap().scale.x, 7.0);
 }
 
 #[test]
@@ -128,27 +124,25 @@ fn revert_field_drops_one_override_and_keeps_the_rest() {
     let (mut scene, root) = linked("revert_field");
     {
         let mut t = scene.world.transform_mut(root).unwrap();
-        t.position.x = 3.0;
-        t.position.y = 4.0;
+        t.scale.x = 3.0;
+        t.scale.y = 4.0;
     }
-    record_instance_overrides(&mut scene, root).unwrap();
 
     // Revert only the X leaf: it returns to source (0.0), Y stays overridden (4.0).
     let action = PrefabAction::RevertField {
         entity: root,
-        path: "/transform/position/0".to_string(),
+        path: "/transform/scale/0".to_string(),
     };
     assert!(dispatch(&mut scene, action));
     let t = scene.world.transform(root).unwrap();
-    assert_eq!(t.position.x, 0.0, "reverted leaf tracks source");
-    assert_eq!(t.position.y, 4.0, "other override preserved");
+    assert_eq!(t.scale.x, 1.0, "reverted leaf tracks source");
+    assert_eq!(t.scale.y, 4.0, "other override preserved");
 }
 
 #[test]
 fn revert_field_on_an_unknown_path_is_a_noop() {
     let (mut scene, root) = linked("revert_field_noop");
-    scene.world.transform_mut(root).unwrap().position.x = 1.0;
-    record_instance_overrides(&mut scene, root).unwrap();
+    scene.world.transform_mut(root).unwrap().scale.x = 1.0;
     let before = list_instance_overrides(&scene, root).unwrap();
 
     let action = PrefabAction::RevertField {
@@ -167,7 +161,6 @@ fn actions_on_a_plain_entity_report_no_change() {
     let mut scene = Scene::new();
     let plain = create_entity(&mut scene, "Plain", None);
     // The verbs error on a non-instance, so dispatch reports "no change" (false).
-    assert!(!dispatch(&mut scene, PrefabAction::Record(plain)));
     assert!(!dispatch(&mut scene, PrefabAction::Revert(plain)));
     assert!(!dispatch(&mut scene, PrefabAction::Reimport(plain)));
     assert!(!dispatch(&mut scene, PrefabAction::ApplyToSource(plain)));
@@ -180,5 +173,7 @@ fn field_label_humanizes_a_json_pointer() {
         "transform / position / 0"
     );
     assert_eq!(field_label("/name"), "name");
+    assert_eq!(field_label("+/light"), "light (added)");
+    assert_eq!(field_label("-/camera"), "camera (removed)");
     assert_eq!(field_label(""), "");
 }

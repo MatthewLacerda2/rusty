@@ -1,8 +1,9 @@
-//! An instance's material list is one override (#1285): a prefab instance can gain
-//! a slot its source lacks, and the diff applies back.
+//! A prefab instance can gain a material slot its source lacks (#1285): a size entry
+//! and the new slot (#1527), which apply back.
 
-use super::{apply_overrides, diff_entity};
+use super::apply_overrides;
 use crate::components::{Entity, MaterialComponent};
+use crate::scene::prefab::diff::diff_entity;
 
 fn with_materials(keys: &[&str]) -> Entity {
     let mut e = Entity::new(3, "Quad".into());
@@ -13,15 +14,13 @@ fn with_materials(keys: &[&str]) -> Entity {
 }
 
 #[test]
-fn a_longer_material_list_is_one_leaf_that_applies_back() {
+fn a_longer_material_list_is_a_size_and_its_new_slot() {
     let baseline = with_materials(&["Red"]);
     let instance = with_materials(&["Red", "Blue"]);
     let diff = diff_entity(&instance, &baseline);
-    assert_eq!(diff.len(), 1, "{diff:?}");
-    assert_eq!(
-        diff["/material/materials"],
-        serde_json::json!(["Red", "Blue"])
-    );
+    let keys = ["/material/materials/#size", "/material/materials/1"];
+    assert_eq!(diff.keys(), keys, "{diff:?}");
+    assert_eq!(diff.modifications[keys[1]], "Blue");
     let mut rebuilt = baseline.clone();
     apply_overrides(&mut rebuilt, &diff);
     assert_eq!(rebuilt.material.unwrap().materials, ["Red", "Blue"]);

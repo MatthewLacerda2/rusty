@@ -549,9 +549,14 @@ scene.entities[].post_processing.white_balance.temperature: f32
 scene.entities[].post_processing.white_balance.tint: f32
 scene.entities[].post_processing: option
 scene.entities[].prefab_link.local_id: u32
-scene.entities[].prefab_link.overrides: map
-scene.entities[].prefab_link.overrides{key}: string
-scene.entities[].prefab_link.overrides{}: any
+scene.entities[].prefab_link.overrides.added_components: map
+scene.entities[].prefab_link.overrides.added_components{key}: string
+scene.entities[].prefab_link.overrides.added_components{}: any
+scene.entities[].prefab_link.overrides.modifications: map
+scene.entities[].prefab_link.overrides.modifications{key}: string
+scene.entities[].prefab_link.overrides.modifications{}: any
+scene.entities[].prefab_link.overrides.removed_components: seq
+scene.entities[].prefab_link.overrides.removed_components[]: string
 scene.entities[].prefab_link.source: string
 scene.entities[].prefab_link: option
 scene.entities[].rect_mask.feather: f32

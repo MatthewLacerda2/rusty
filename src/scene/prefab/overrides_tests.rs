@@ -1,7 +1,8 @@
-//! Tests for the generic per-instance override diff (#216).
+//! Tests for the generic per-instance override diff (#216) and its three shapes (#1527).
 
 use super::*;
 use crate::components::{CameraComponent, MaterialComponent};
+use crate::scene::prefab::diff::diff_entity;
 
 /// A bare entity baseline with one local id.
 fn base() -> Entity {
@@ -10,9 +11,7 @@ fn base() -> Entity {
     e
 }
 
-/// A camera component with distinctive scalar values (no `Default` on the type). All
-/// fields are scalars, so the component round-trips through the override diff even when
-/// rebuilt over a `None` baseline (the apply path does not grow JSON arrays).
+/// A camera component with distinctive scalar values.
 fn camera() -> CameraComponent {
     CameraComponent {
         fov: 75.0,
@@ -37,38 +36,31 @@ fn a_changed_scalar_is_a_single_pointer_override() {
     let mut instance = baseline.clone();
     instance.transform.position.x = 9.0;
     let diff = diff_entity(&instance, &baseline);
-    assert_eq!(diff.len(), 1, "only the one leaf differs: {diff:?}");
+    assert_eq!(diff.keys(), ["/transform/position/0"], "{diff:?}");
     assert_eq!(
-        diff.get("/transform/position/0"),
+        diff.modifications.get("/transform/position/0"),
         Some(&serde_json::json!(9.0))
     );
 }
 
 #[test]
-fn adding_a_component_is_an_override_at_its_path() {
+fn adding_a_component_is_one_added_component() {
     let baseline = base();
     let mut instance = baseline.clone();
     instance.camera = Some(camera());
     let diff = diff_entity(&instance, &baseline);
-    // The added component surfaces as one-or-more leaves under `/camera`.
-    assert!(
-        diff.keys().any(|k| k.starts_with("/camera")),
-        "added component appears in the diff: {diff:?}"
-    );
+    assert_eq!(diff.keys(), ["+/camera"], "{diff:?}");
+    assert_eq!(diff.added_components["camera"]["fov"], 75.0);
 }
 
 #[test]
-fn removing_a_component_overrides_it_to_null() {
+fn removing_a_component_is_one_removed_component() {
     let mut baseline = base();
     baseline.camera = Some(camera());
     let mut instance = baseline.clone();
     instance.camera = None;
     let diff = diff_entity(&instance, &baseline);
-    assert_eq!(
-        diff.get("/camera"),
-        Some(&serde_json::Value::Null),
-        "removed component is a null override: {diff:?}"
-    );
+    assert_eq!(diff.keys(), ["-/camera"], "{diff:?}");
 }
 
 #[test]
@@ -119,8 +111,7 @@ fn applying_an_empty_diff_is_a_noop() {
 
 #[test]
 fn apply_can_add_a_component_over_a_none_baseline() {
-    // The baseline has NO camera; the instance ADDS one. Round-tripping the diff must
-    // rebuild the whole component (the override paths are created over a `null` slot).
+    // The baseline has NO camera; the instance ADDS one, applied whole.
     let baseline = base();
     let mut instance = baseline.clone();
     instance.camera = Some(camera());
@@ -134,17 +125,14 @@ fn apply_can_add_a_component_over_a_none_baseline() {
 }
 
 #[test]
-fn apply_can_remove_a_component_via_null() {
-    // The baseline HAS a camera; a `/camera -> null` override drops it.
+fn apply_removes_a_removed_component() {
+    // The baseline HAS a camera; a removed-component entry drops it.
     let mut baseline = base();
     baseline.camera = Some(camera());
-    let mut overrides = std::collections::BTreeMap::new();
-    overrides.insert("/camera".to_string(), serde_json::Value::Null);
+    let mut overrides = crate::components::PrefabOverrides::default();
+    overrides.removed_components.insert("camera".into());
 
     let mut rebuilt = baseline.clone();
     apply_overrides(&mut rebuilt, &overrides);
-    assert!(
-        rebuilt.camera.is_none(),
-        "null override removes the component"
-    );
+    assert!(rebuilt.camera.is_none(), "the removed component goes");
 }
