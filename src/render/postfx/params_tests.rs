@@ -8,20 +8,8 @@ use crate::core::settings::quality::QualityPreset;
 fn game_time_rides_in_camera_pos_w() {
     let mut scene = Scene::new();
     scene.shader_time = 2.5;
-    let p = frame_params(&scene, Mat4::IDENTITY, [1.0; 3], false);
+    let p = frame_params(&scene, Mat4::IDENTITY, [1.0; 3]);
     assert_eq!(p.camera_pos, [1.0, 1.0, 1.0, 2.5]);
-}
-
-/// Without a panorama SSR reflects the procedural sky, tinted by the frame's ambient,
-/// as the forward pass does (#1542), never the missing-texture checker.
-#[test]
-fn the_sky_says_whether_a_panorama_is_bound_and_tints_the_procedural_one() {
-    let mut scene = Scene::new();
-    scene.ambient_color = glam::Vec3::new(0.1, 0.8, 0.2);
-    let none = frame_params(&scene, Mat4::IDENTITY, [0.0; 3], false);
-    assert_eq!(none.sky, [0.1, 0.8, 0.2, 0.0]);
-    let panorama = frame_params(&scene, Mat4::IDENTITY, [0.0; 3], true);
-    assert_eq!(panorama.sky[3], 1.0);
 }
 
 /// An option allows; it never turns on what the camera or the tier left off.
