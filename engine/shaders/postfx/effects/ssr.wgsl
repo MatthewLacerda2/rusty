@@ -4,29 +4,28 @@
 // march's step count and z its step length in world units, from the volume's quality
 // (`render::postfx::effects::ssr::march`).
 //
-// It reads two targets of the view's own (#1526): the velocity target (#1435) for
+// It reads three targets of the view's own (#1526): the velocity target (#1435) for
 // each pixel's depth along its camera's view axis and which camera of the stack drew
-// it, and the SSR surface target (`lighting/ssr_surface.wgsl`) for its shading normal,
-// smoothness and environment-reflection weight. So only a smooth surface reflects,
-// only the base camera's pixels do (an overlay camera's viewmodel gets none, and
-// hides the world under it from the march), and the march still finds the world
-// after a `DepthOnly` overlay cleared the depth buffer.
+// it, and the two SSR surface targets (`lighting/ssr_surface.wgsl`) for its shading
+// normal, the weight a hit gets and the environment reflection the forward pass
+// applied. So only a smooth surface reflects, only the base camera's pixels do (an
+// overlay camera's viewmodel gets none, and hides the world under it from the march),
+// and the march still finds the world after a `DepthOnly` overlay cleared the depth
+// buffer.
 //
-// An SSR hit **replaces** the environment reflection the forward pass gave the pixel,
-// as HDRP's reflection hierarchy does: the forward added `weight × sky`, so SSR adds
-// `weight × (hit − sky)`, and a miss adds nothing. Where a reflection probe lit the
-// pixel, the composite cannot sample the probe, so the hit is added on top.
+// An SSR hit **replaces** the environment reflection the forward pass applied, sky or
+// reflection probe alike, as HDRP's reflection hierarchy does: `pixel − applied +
+// weight × hit`, both already through the pixel's `ao` and fog. A miss leaves the
+// pixel as the forward pass lit it, so SSR never samples the sky itself (#1542).
+//
+// No derivatives here (src/render/CLAUDE.md, *Shaders*): every read is a
+// `textureLoad` or an explicit-LOD sample, so the per-pixel branches below are safe.
 
 #define_import_path postfx::effects::ssr
 
-#import common::{equirect_uv, procedural_sky}
 #import lighting::ssr_surface
-#import postfx::frame::{Frag, params, t_color, s_color, t_skybox, s_skybox, world_from_depth}
+#import postfx::frame::{Frag, params, t_color, s_color, world_from_depth}
 
-// Below this smoothness a surface gets no SSR; above `SMOOTHNESS_FADE_START` it gets
-// all of it (HDRP's *Minimum Smoothness* and *Smoothness Fade Start*).
-const MIN_SMOOTHNESS: f32 = 0.8;
-const SMOOTHNESS_FADE_START: f32 = 0.9;
 // How far from a screen edge, as a fraction of the screen, a hit fades out (HDRP's
 // *Screen Edge Fade Distance*).
 const SCREEN_FADE: f32 = 0.1;
@@ -116,27 +115,14 @@ fn trace(velocity: texture_2d<f32>, origin: vec3<f32>, r: vec3<f32>, steps: i32,
     return vec4<f32>(0.0);
 }
 
-// The environment the forward pass reflected along `r` (#718): the panorama when one
-// is bound (`params.sky.w`), else the procedural sky the sky pass draws, so no
-// missing-texture checker is ever read as light (#1542).
-fn sky_reflection(r: vec3<f32>) -> vec3<f32> {
-    if (params.sky.w > 0.5) {
-        // Level 0, as the skybox pass reads it: the atan2 seam's derivatives would
-        // pick a coarse mip (#1322).
-        return textureSampleLevel(t_skybox, s_skybox, equirect_uv(r), 0.0).rgb;
-    }
-    return procedural_sky(params.sky.rgb, r);
-}
-
-fn hdr(c: vec3<f32>, f: Frag, velocity: texture_2d<f32>, surface: texture_2d<f32>, p: vec4<f32>) -> vec3<f32> {
+fn hdr(c: vec3<f32>, f: Frag, velocity: texture_2d<f32>, weight: texture_2d<f32>, applied: texture_2d<f32>, p: vec4<f32>) -> vec3<f32> {
     if (p.x < 1.5) {
         return c;
     }
-    let s = ssr_surface::decode(texel(surface, f.uv));
-    let smooth_fade = clamp((s.smoothness - MIN_SMOOTHNESS) / (SMOOTHNESS_FADE_START - MIN_SMOOTHNESS), 0.0, 1.0);
+    let s = ssr_surface::decode(texel(weight, f.uv), texel(applied, f.uv));
     let v = texel(velocity, f.uv);
     // Rough, unlit or sky; or drawn by an overlay camera, whose matrices these are not.
-    if (smooth_fade * s.weight <= 0.0 || v.w > 0.5 || v.z >= SKY_DEPTH) {
+    if (!ssr_surface::reflects(s) || v.w > 0.5 || v.z >= SKY_DEPTH) {
         return c;
     }
     let world = world_at(f.uv, v.z, view_forward());
@@ -146,6 +132,5 @@ fn hdr(c: vec3<f32>, f: Frag, velocity: texture_2d<f32>, surface: texture_2d<f32
     if (hit.w <= 0.0) {
         return c;
     }
-    let replaced = select(sky_reflection(r), vec3<f32>(0.0), s.probe_lit);
-    return max(c + (hit.rgb - replaced) * (smooth_fade * s.weight * hit.w), vec3<f32>(0.0));
+    return max(c + (s.weight * hit.rgb - s.applied) * hit.w, vec3<f32>(0.0));
 }

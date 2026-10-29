@@ -93,17 +93,9 @@ pub(crate) fn effect_runs(graphics: GraphicsSettings, gate: Gate, on: bool) -> b
 
 /// The frame every post pass shares: the view-projection both ways, the camera's
 /// position and the game time (#398), the clock the scene's shaders read as
-/// `camera.time`, and the sky the forward pass reflects (#1542): the procedural sky's
-/// tint, and whether a `panorama` is bound instead.
-pub(crate) fn frame_params(
-    scene: &Scene,
-    view_proj: Mat4,
-    camera_pos: [f32; 3],
-    panorama: bool,
-) -> PostParams {
-    let [r, g, b] = crate::render::draw::lighting::scene_ambient(scene).color;
+/// `camera.time`.
+pub(crate) fn frame_params(scene: &Scene, view_proj: Mat4, camera_pos: [f32; 3]) -> PostParams {
     PostParams {
-        sky: [r, g, b, f32::from(u8::from(panorama))],
         view_proj: view_proj.to_cols_array(),
         inv_view_proj: view_proj.inverse().to_cols_array(),
         camera_pos: [

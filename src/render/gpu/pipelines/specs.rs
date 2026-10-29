@@ -22,14 +22,14 @@ pub(super) struct PipelineSpec {
     pub vertex: &'static str,
     /// The fragment entry point: `fs_main`, the gizmos' unfogged `fs_gizmo`, the
     /// motion-vector `fs_velocity`, or `fs_velocity_ssr`, which writes the SSR surface
-    /// target too (#1526).
+    /// targets too (#1526).
     pub fragment: &'static str,
     /// The velocity target's write mask when the pipeline draws into a view's
     /// velocity target too (#1435), as its second colour target; `None` draws colour
     /// alone.
     pub velocity: Option<wgpu::ColorWrites>,
-    /// Whether it draws into a view's SSR surface target too (#1526), as its third
-    /// colour target, after the velocity one.
+    /// Whether it draws into a view's two SSR surface targets too (#1526), as its
+    /// third and fourth colour targets, after the velocity one.
     pub surface: bool,
 }
 
@@ -176,7 +176,8 @@ pub(super) fn make_pipeline(
                 }),
                 spec.velocity.map(velocity_target),
                 Some(surface_target_state(wgpu::ColorWrites::ALL)),
-            ][..1 + usize::from(spec.velocity.is_some()) + usize::from(spec.surface)],
+                Some(surface_target_state(wgpu::ColorWrites::ALL)),
+            ][..1 + usize::from(spec.velocity.is_some()) + 2 * usize::from(spec.surface)],
         }),
         primitive: wgpu::PrimitiveState {
             topology: spec.topology,

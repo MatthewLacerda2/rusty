@@ -22,9 +22,8 @@ pub(crate) fn default_lighting_uniform(scene: &Scene) -> LightingUniform {
     }
 }
 
-/// The frame's ambient: the last active ambient light's, else the scene's own. It also
-/// tints the procedural sky (`common::procedural_sky`).
-pub(crate) fn scene_ambient(scene: &Scene) -> AmbientLightUniform {
+/// The frame's ambient: the last active ambient light's, else the scene's own.
+fn scene_ambient(scene: &Scene) -> AmbientLightUniform {
     let mut ambient = AmbientLightUniform {
         color: scene.ambient_color.to_array(),
         intensity: scene.ambient_intensity,

@@ -58,7 +58,7 @@ pub(crate) struct ScenePassFrame {
 }
 
 /// The scene pass's colour attachments: the HDR target, a motion-blurred view's
-/// velocity target (#1435), and an SSR view's surface target (#1526). All clear where
+/// velocity target (#1435), and an SSR view's two surface targets (#1526). All clear where
 /// the camera clears colour (the backdrop; no motion, as far as the sky; no SSR) and
 /// keep the layer below where a `DepthOnly` camera composites over it (#93), so the
 /// nearest camera's velocity and distance win as its colour does.
@@ -85,7 +85,8 @@ fn scene_targets(
     );
     let velocity = view.post_fx.motion.target_view();
     let velocity = velocity.map(|v| attachment(v, motion::CLEAR));
-    let surface = ssr::surface::view(&view.post_fx).map(|v| attachment(v, ssr::surface::CLEAR));
+    let surface = ssr::surface::views(&view.post_fx).into_iter().flatten();
+    let surface = surface.map(|v| attachment(v, ssr::surface::CLEAR));
     std::iter::once(colour)
         .chain(velocity)
         .chain(surface)
@@ -158,7 +159,7 @@ impl Renderer {
         });
 
         // Set global bindings
-        let surface = ssr::surface::view(&view.post_fx).is_some();
+        let surface = ssr::surface::target(&view.post_fx).is_some();
         let solid_pass = match velocity {
             Some(_) => SolidPass::Velocity(&self.velocity_pipeline, primed, surface),
             None => SolidPass::Opaque(view.forward_pipeline(&self.render_pipeline), primed),

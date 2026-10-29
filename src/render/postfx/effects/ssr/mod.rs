@@ -1,12 +1,13 @@
 //! Screen-space reflections: a composite function on the HDR image (High tier only;
 //! on every tier the forward pass reflects the sky or a reflection probe, #718).
 //!
-//! It reads two per-view targets (#1526): the velocity target (#1435), for each
-//! pixel's depth and which camera of the stack drew it, and the SSR surface target the
-//! opaque pass writes while SSR runs ([`surface`]): the shading normal, smoothness and
-//! environment-reflection weight. So only a smooth surface reflects, and an overlay
-//! camera's pixels (a viewmodel) get none. The volume's `quality` sets the march
-//! ([`march`], #1521).
+//! It reads three per-view targets (#1526): the velocity target (#1435), for each
+//! pixel's depth and which camera of the stack drew it, and the two SSR surface
+//! targets the opaque pass writes while SSR runs ([`surface`]): the shading normal,
+//! the weight a hit gets and the environment reflection it replaces. So only a smooth
+//! surface reflects, a hit swaps the sky or probe reflection for what is on screen
+//! (never adding to it), and an overlay camera's pixels (a viewmodel) get none. The
+//! volume's `quality` sets the march ([`march`], #1521).
 
 pub(crate) mod surface;
 
@@ -35,8 +36,12 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
                 view: |pfx| pfx.motion.active_target().map(|t| &t.view),
             },
             CompositeTexture {
-                name: "surface",
-                view: surface::view,
+                name: "weight",
+                view: surface::weight_view,
+            },
+            CompositeTexture {
+                name: "applied",
+                view: surface::applied_view,
             },
         ],
         pack,
@@ -71,7 +76,7 @@ pub(crate) fn march(quality: &str) -> March {
 
 /// Whether a view whose base camera is `post`'s runs SSR this frame: its volume has
 /// it on, the player's option allows it and the tier runs it. `full` is the stack's
-/// `full_post_fx`. The opaque pass writes the surface target exactly then.
+/// `full_post_fx`. The opaque pass writes the surface targets exactly then.
 pub(crate) fn ssr_enabled(post: PostSource, graphics: GraphicsSettings, full: bool) -> bool {
     let on = post.volume.is_some_and(|vc| vc.ssr.active);
     full && effect_runs(graphics, EFFECT.gate, on)
@@ -80,7 +85,7 @@ pub(crate) fn ssr_enabled(post: PostSource, graphics: GraphicsSettings, full: bo
 /// x: the mode, `2` (screen-space) when it runs, else `0`; y and z the [`march`].
 fn pack(cx: &EffectCx, slots: &mut [[f32; 4]]) {
     let Some(vc) = cx.volume() else { return };
-    if cx.runs(EFFECT.gate, vc.ssr.active) {
+    if ssr_enabled(cx.post, cx.graphics, cx.full) {
         let m = march(&vc.ssr.quality);
         slots[0] = [2.0, m.steps as f32, m.step, 0.0];
     }
@@ -94,3 +99,6 @@ mod gpu_fixture;
 
 #[cfg(test)]
 mod gpu_tests;
+
+#[cfg(test)]
+mod gpu_energy_tests;

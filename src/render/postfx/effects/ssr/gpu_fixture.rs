@@ -36,7 +36,7 @@ pub(super) fn place(scene: &mut Scene, id: u32, position: Vec3, scale: Vec3) {
 }
 
 /// A material named `name` of `base_color`, `metallic` and `roughness`.
-pub(super) fn paint(scene: &mut Scene, id: u32, name: &str, surface: ([f32; 3], f32, f32)) {
+pub(super) fn paint(scene: &mut Scene, id: u32, name: &str, surface: Surface) {
     let (base_color, metallic, roughness) = surface;
     let asset = MaterialAsset {
         base_color,
@@ -52,10 +52,19 @@ pub(super) fn paint(scene: &mut Scene, id: u32, name: &str, surface: ([f32; 3], 
 /// The scene with SSR `on`, the floor painted `floor` (base colour, metallic,
 /// roughness) and the cube `cube`. No skybox: the procedural sky. Returns it and
 /// the base camera's entity.
-pub(super) fn scene(
+pub(super) fn scene(on: bool, floor: Surface, cube: Surface) -> (Scene, u32) {
+    tuned(on, floor, cube, |_| {})
+}
+
+/// A material: base colour, metallic, roughness.
+pub(super) type Surface = ([f32; 3], f32, f32);
+
+/// [`scene`], its volume then changed by `tune` (SSAO on, say).
+pub(super) fn tuned(
     on: bool,
-    floor: ([f32; 3], f32, f32),
-    cube: ([f32; 3], f32, f32),
+    floor: Surface,
+    cube: Surface,
+    tune: impl FnOnce(&mut PostProcessingComponent),
 ) -> (Scene, u32) {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
@@ -67,6 +76,7 @@ pub(super) fn scene(
         ..Default::default()
     };
     (volume.bloom.active, volume.ssao.active) = (false, false);
+    tune(&mut volume);
     scene.world.set_post_processing(cam, Some(volume));
     let ground = create_entity(&mut scene, "Floor", Some(Primitive::Box));
     place(
@@ -83,11 +93,11 @@ pub(super) fn scene(
 }
 
 /// A mirror: white, metallic, as smooth as the forward pass allows.
-pub(super) const MIRROR: ([f32; 3], f32, f32) = ([0.9, 0.9, 0.9], 1.0, 0.0);
+pub(super) const MIRROR: Surface = ([0.9, 0.9, 0.9], 1.0, 0.0);
 /// A fully rough white floor.
-pub(super) const ROUGH: ([f32; 3], f32, f32) = ([0.9, 0.9, 0.9], 0.0, 1.0);
+pub(super) const ROUGH: Surface = ([0.9, 0.9, 0.9], 0.0, 1.0);
 /// A bright red, rough cube.
-pub(super) const RED: ([f32; 3], f32, f32) = ([1.0, 0.1, 0.1], 0.0, 1.0);
+pub(super) const RED: Surface = ([1.0, 0.1, 0.1], 0.0, 1.0);
 
 /// Render `scene` through [`eye`] into a fresh view and read the frame (RGBA8).
 pub(super) fn frame(r: &mut Renderer, scene: &Scene) -> Vec<u8> {

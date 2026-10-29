@@ -1,4 +1,4 @@
-#import common::{DecalSurface, NO_SHADOW, PI, VertexInput, apply_fog, blend_joints, cluster_index, local_light_radiance, local_shadow_tile, sample_local_shadow}
+#import common::{DecalSurface, NO_SHADOW, PI, VertexInput, apply_fog, blend_joints, fog_factor, cluster_index, local_light_radiance, local_shadow_tile, sample_local_shadow}
 // Every forward binding but `shadow` (the cascades, read only by `calculate_shadow`;
 // `fs_main` names its result `shadow`), so a surface variant's blocks can read any.
 #import forward::bindings::{bones, camera, cluster_lights, cluster_ranges, decals, entity, instances, lighting, local_lights, s_decal, s_diffuse, s_emissive, s_lightmaps, s_metallic, s_normal, s_refl_cube, s_roughness, s_shadow, s_skybox, shadow_tiles, t_ao, t_decal_color, t_decal_data, t_diffuse, t_emissive, t_lightmap_dirs, t_lightmaps, t_metallic, t_normal, t_refl_cube, t_roughness, t_shadow, t_shadow_atlas, t_skybox, vertex_to_world, vertex_to_world_prev}
@@ -213,36 +213,31 @@ fn velocity_targets(in: VelocityVertex) -> VelocityTargets {
     return VelocityTargets(surface_color(v), vec4<f32>(velocity, depth, camera.stack.x));
 }
 
-// ---- The SSR surface target (#1526) ----
+// ---- The SSR surface targets (#1526) ----
 // A view whose camera runs screen-space reflections draws its opaque solids through
-// `fs_velocity_ssr`: `fs_velocity`'s two targets, and at location 2 the surface SSR
-// reads (`lighting/ssr_surface.wgsl`): the shading normal, the smoothness and the
-// environment reflection's weight. `surface_color` fills `ssr_texel` once it knows
-// the material; an unlit surface returns first and leaves it zero, so it gets no SSR.
-var<private> ssr_texel: vec4<f32>;
+// `fs_velocity_ssr`: `fs_velocity`'s two targets, and at locations 2 and 3 the
+// surface SSR reads (`lighting/ssr_surface.wgsl`): the shading normal, the weight a
+// hit gets and the environment reflection step 5 applied, which a hit replaces.
+// `surface_color` records them in `ssr_texels` at step 5; an unlit surface returns
+// first and leaves them zero, so it gets no SSR.
+var<private> ssr_texels: ssr_surface::SsrTexels;
 
 struct VelocitySsrTargets {
     @location(0) color: vec4<f32>,
     @location(1) velocity: vec4<f32>,
-    @location(2) surface: vec4<f32>,
+    @location(2) ssr_weight: vec4<f32>,
+    @location(3) ssr_applied: vec4<f32>,
 };
 
 @fragment
 fn fs_velocity_ssr(in: VelocityVertex) -> VelocitySsrTargets {
     let t = velocity_targets(in);
-    return VelocitySsrTargets(t.color, t.velocity, ssr_texel);
-}
-
-// The texel of a lit surface: the weight is the one step 5 of `surface_color` gives
-// its environment reflection (Fresnel × reflection scale), which an SSR hit replaces.
-fn ssr_surface_texel(N: vec3<f32>, V: vec3<f32>, F0: vec3<f32>, metallic: f32, roughness: f32, probe: u32) -> vec4<f32> {
-    let fresnel = FresnelSchlick(max(dot(N, V), 0.0), F0);
-    let scale = (1.0 - roughness) * (metallic + (1.0 - metallic) * 0.2);
-    return ssr_surface::encode(N, roughness, fresnel * scale, probe > 0u);
+    return VelocitySsrTargets(t.color, t.velocity, ssr_texels.weight, ssr_texels.applied);
 }
 
 // The lit surface colour `fs_main` writes: an authored surface variant splices its
-// blocks in here (`shadergen::assemble`), so both colour entry points carry them.
+// blocks in here (`shadergen::assemble`), so every colour entry point carries them
+// (`fs_main`, `fs_velocity`, `fs_velocity_ssr`).
 fn surface_color(in: VertexOutput) -> vec4<f32> {
     var base_color: vec4<f32>;
     if (entity.use_texture == 1u) {
@@ -296,7 +291,6 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     let roughness = surface.roughness;
 
     let F0 = mix(vec3<f32>(0.04), albedo, metallic);
-    ssr_texel = ssr_surface_texel(N, V, F0, metallic, roughness, instances[in.instance].reflection_probe);
 
     // 1. Ambient lighting term. A lightmapped static mesh reads its lightmap (#438).
     // Non-static objects that a light probe covers
@@ -372,12 +366,17 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
 
     // 5. Environment reflections (#244), always on (#718): like Unity's Lighting ->
     // Environment Reflections, the sky / reflection-probe term applies whether or not
-    // the camera runs SSR, which only adds screen-space detail on top (postfx). A metal
-    // has no diffuse term, so without this it renders black. See `environment_reflection`.
+    // the camera runs SSR. Where SSR runs and hits, it replaces exactly this term
+    // (postfx), so the record below stores what was added and under what weight.
+    // A metal has no diffuse term, so without this it renders black. See
+    // `environment_reflection`.
     let R = reflect(-V, N);
     let F_refl = FresnelSchlick(max(dot(N, V), 0.0), F0);
     let reflection_scale = (1.0 - roughness) * (metallic + (1.0 - metallic) * 0.2);
-    lighting_color += environment_reflection(in.world_position, R, roughness, instances[in.instance].reflection_probe) * F_refl * reflection_scale * ao;
+    let reflection_weight = F_refl * reflection_scale * ao;
+    let reflection = environment_reflection(in.world_position, R, roughness, instances[in.instance].reflection_probe) * reflection_weight;
+    lighting_color += reflection;
+    ssr_texels = ssr_surface::encode(N, roughness, reflection, reflection_weight, fog_factor(camera.fog, in.world_position, camera.camera_pos));
 
     // 6. Emissive (#222 factor, #207 map): self-illumination added on top of the lit
     // colour, independent of any light. The factor is modulated by the emissive map's

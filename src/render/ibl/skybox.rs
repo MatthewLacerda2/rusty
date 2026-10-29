@@ -17,8 +17,8 @@ struct SkyKind {
 impl SkyKind {
     /// An interior-facing, depth-test-only far-plane box pipeline from the shader's
     /// `vs_main`/`fs_main`, depth writes off; with `velocity`, into a view's velocity
-    /// target too (#1435), and with `surface` its SSR surface target (#1526), which the
-    /// sky leaves as cleared: no SSR.
+    /// target too (#1435), and with `surface` its two SSR surface targets (#1526), which
+    /// the sky leaves as cleared: no SSR.
     fn pipeline(
         &self,
         device: &wgpu::Device,
@@ -34,6 +34,7 @@ impl SkyKind {
             colour,
             Some(velocity_target(wgpu::ColorWrites::ALL)),
             Some(surface::target_state(wgpu::ColorWrites::empty())),
+            Some(surface::target_state(wgpu::ColorWrites::empty())),
         ];
         device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some(self.label),
@@ -48,7 +49,7 @@ impl SkyKind {
                 module: &self.shader,
                 entry_point: Some("fs_main"),
                 compilation_options: Default::default(),
-                targets: &targets[..1 + usize::from(velocity) + usize::from(surface)],
+                targets: &targets[..1 + usize::from(velocity) + 2 * usize::from(surface)],
             }),
             primitive: wgpu::PrimitiveState {
                 topology: wgpu::PrimitiveTopology::TriangleList,
@@ -84,7 +85,7 @@ fn box_layout(
 }
 
 /// The colour targets a scene pass writes besides the HDR one: the velocity target
-/// (#1435), and with it the SSR surface target (#1526).
+/// (#1435), and with it the two SSR surface targets (#1526).
 #[derive(Clone, Copy)]
 pub(crate) struct SkyTargets {
     pub velocity: bool,
@@ -99,7 +100,7 @@ pub struct SkyboxRenderer {
     gradient_pipeline: wgpu::RenderPipeline,
     /// The same two writing a motion-blurred view's velocity target too (#1435): the
     /// sky moves with the camera's rotation. Built the first time such a view draws.
-    /// The second pair also carries an SSR view's surface target (#1526).
+    /// The second pair also carries an SSR view's surface targets (#1526).
     velocity: [[LazyPipeline; 2]; 2],
     vertex_buffer: wgpu::Buffer,
     index_buffer: wgpu::Buffer,
