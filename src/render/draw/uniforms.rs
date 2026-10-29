@@ -107,7 +107,6 @@ pub(crate) fn surface_uniform(material: Option<&MaterialAsset>) -> SurfaceUnifor
         depth_postpass: u32::from(glass && m.depth_postpass),
         transmission: transmission(m.transmission_color, m.transmission),
         absorption: absorption(m.transmittance_color, m.absorption_distance),
-        ..SurfaceUniform::default()
     }
 }
 

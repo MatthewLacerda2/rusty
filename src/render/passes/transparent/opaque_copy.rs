@@ -135,9 +135,37 @@ impl Renderer {
         if copy.size != size {
             *copy = make();
         }
+        let copy = view
+            .post_fx
+            .targets
+            .get::<OpaqueCopy>()
+            .expect("fitted above");
+        self.draw_copy(view, &copy.target.view);
+        let views = OpaqueViews {
+            texture: &copy.target.view,
+            sampler: &self.opaque_copy.sampler,
+        };
+        let group = create_shadow_bind_group(
+            device,
+            &self.shadow_layout,
+            &self.shadow_uniform_buffer,
+            &self.shadow_renderer,
+            &self.ssao.no_ao,
+            views,
+        );
+        view.post_fx
+            .targets
+            .get_mut::<OpaqueCopy>()
+            .expect("fitted above")
+            .group = Some(group);
+        self.frame_counters.opaque_copies += 1;
+    }
+
+    /// Draw `view`'s opaque colour and eye distances into `target`.
+    fn draw_copy(&self, view: &RenderView, target: &wgpu::TextureView) {
         let pass = &self.opaque_copy;
         let view_of = |v| wgpu::BindingResource::TextureView(v);
-        let inputs = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        let inputs = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Opaque Copy Inputs"),
             layout: &pass.layout,
             entries: &[
@@ -146,31 +174,20 @@ impl Renderer {
                 entry(2, view_of(&view.depth_view)),
             ],
         });
-        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("Opaque Copy Encoder"),
-        });
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Opaque Copy Encoder"),
+            });
         {
             let timed = ("Opaque Copy", &self.gpu_timer, GpuPass::Transparent);
             let clear = wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT);
-            let mut rp = color_pass(&mut encoder, timed, &copy.target.view, clear);
+            let mut rp = color_pass(&mut encoder, timed, target, clear);
             rp.set_pipeline(pass.pipeline.get());
             rp.set_bind_group(0, &inputs, &[]);
             rp.draw(0..3, 0..1);
         }
         self.queue.submit(std::iter::once(encoder.finish()));
-        let views = OpaqueViews {
-            texture: &copy.target.view,
-            sampler: &pass.sampler,
-        };
-        copy.group = Some(create_shadow_bind_group(
-            device,
-            &self.shadow_layout,
-            &self.shadow_uniform_buffer,
-            &self.shadow_renderer,
-            &self.ssao.no_ao,
-            views,
-        ));
-        self.frame_counters.opaque_copies += 1;
     }
 
     /// The group 3 `view`'s transparent pass binds: its copy's this camera, else the
