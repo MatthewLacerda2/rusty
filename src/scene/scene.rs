@@ -22,8 +22,8 @@ use crate::scene::nav_settings::NavMeshSettings;
 // resolve. The structs themselves live in `crate::components`.
 pub use crate::components::{
     AnimatorComponent, AudioSourceComponent, CameraComponent, ClearFlags, ColliderComponent,
-    ColliderShape, CollisionDetection, CollisionResponse, DirtyFlag, EmitMode, Entity,
-    LightComponent, LightMode, LightType, MaterialAsset, MaterialComponent, MeshComponent,
+    ColliderShape, CollisionDetection, CollisionResponse, EmitMode, Entity, LightComponent,
+    LightMode, LightType, MaterialAsset, MaterialComponent, MeshComponent, MeshRevision,
     NavMeshAgentComponent, Particle, ParticleBlend, ParticleEmitterComponent,
     PostProcessingComponent, RenderMode, RigidBodyComponent, ScriptComponent, ScriptFieldValue,
     Tonemap, TransformComponent,

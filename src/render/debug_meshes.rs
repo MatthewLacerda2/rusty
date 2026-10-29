@@ -1,10 +1,10 @@
 use glam::Vec3;
 use wgpu::util::DeviceExt;
 
-use std::collections::HashSet;
+use std::collections::BTreeMap;
 
 use super::{GpuMesh, MeshId, Renderer, SkinBounds};
-use crate::components::mesh::Vertex;
+use crate::components::mesh::{MeshRevision, Vertex};
 use crate::scene::Scene;
 
 /// The local-space AABB `(min, max)` over a mesh's vertices. Callers upload only
@@ -30,26 +30,30 @@ impl Renderer {
     /// entities sharing a primitive/asset collapse to a single buffer pair. An
     /// inactive entity's mesh is uploaded too, as Unity keeps it loaded: only what
     /// is drawn follows activity, so re-enabling a holstered weapon doesn't stall on
-    /// uploads (#1363). `seen` dedups within the frame; resident-and-clean ids are skipped.
-    /// Each mesh's dirty flag is cleared as it's visited, so a re-bake re-uploads
-    /// the shared geometry exactly once.
+    /// uploads (#1363). An identity is (re-)uploaded when it is not resident or a
+    /// mesh under it carries a newer [`MeshRevision`] than the resident buffers, from
+    /// the newest such mesh, once. Reading the revision changes nothing, so every
+    /// renderer drawing the scene sees the same edit (#1540).
     pub(crate) fn upload_scene_meshes(&mut self, scene: &Scene) {
-        let mut seen: HashSet<MeshId> = HashSet::new();
-        let mut updates: Vec<(MeshId, Vec<Vertex>, Vec<u32>)> = Vec::new();
+        let mut updates: BTreeMap<MeshId, (MeshRevision, u32)> = BTreeMap::new();
         for entity_id in scene.world.ids_with_mesh() {
             let mesh = scene
                 .world
                 .mesh(entity_id)
                 .expect("id came from ids_with_mesh");
             let id = MeshId::from_mesh(&mesh);
-            let dirty = mesh.is_dirty.get();
-            mesh.is_dirty.set(false);
-            if (dirty || !self.gpu_meshes.contains_key(&id)) && seen.insert(id.clone()) {
-                updates.push((id, mesh.vertices.clone(), mesh.indices.clone()));
+            let resident = self.gpu_meshes.get(&id).map(|g| g.revision);
+            if resident.is_some_and(|r| r >= mesh.revision) {
+                continue;
+            }
+            let newest = updates.entry(id).or_insert((mesh.revision, entity_id));
+            if mesh.revision > newest.0 {
+                *newest = (mesh.revision, entity_id);
             }
         }
-        for (id, vertices, indices) in updates {
-            self.update_gpu_mesh(id, &vertices, &indices);
+        for (id, (revision, entity_id)) in updates {
+            let mesh = scene.world.mesh(entity_id).expect("collected above");
+            self.update_gpu_mesh(id, revision, &mesh.vertices, &mesh.indices);
         }
     }
 
@@ -57,7 +61,15 @@ impl Renderer {
     /// (#127) so geometry shared by many entities is stored once. When a buffer
     /// for this `MeshId` is already resident and large enough, the data is written
     /// in place (`queue.write_buffer`) rather than reallocating a fresh buffer.
-    pub fn update_gpu_mesh(&mut self, id: MeshId, vertices: &[Vertex], indices: &[u32]) {
+    /// `revision` is the geometry's [`MeshRevision`] ([`MeshRevision::NONE`] for an
+    /// upload no mesh component made), recorded so a newer one replaces it.
+    pub fn update_gpu_mesh(
+        &mut self,
+        id: MeshId,
+        revision: MeshRevision,
+        vertices: &[Vertex],
+        indices: &[u32],
+    ) {
         if vertices.is_empty() || indices.is_empty() {
             return;
         }
@@ -81,6 +93,7 @@ impl Renderer {
                 existing.num_indices = num_indices;
                 existing.local_aabb = local_aabb;
                 existing.skin_bounds = skin_bounds;
+                existing.revision = revision;
                 self.queue.write_buffer(&existing.vertex_buffer, 0, v_bytes);
                 self.queue.write_buffer(&existing.index_buffer, 0, i_bytes);
                 return;
@@ -111,6 +124,7 @@ impl Renderer {
                 num_indices,
                 local_aabb,
                 skin_bounds,
+                revision,
             },
         );
     }

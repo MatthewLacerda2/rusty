@@ -53,7 +53,7 @@ pub fn soldier() -> MeshComponent {
         clips: vec![walk()],
         pose_palette: Vec::new(),
         skeleton: Default::default(),
-        is_dirty: Default::default(),
+        revision: Default::default(),
     }
 }
 

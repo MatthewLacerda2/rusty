@@ -7,3 +7,6 @@ pub mod lighting;
 pub mod lightmap;
 pub mod probe;
 pub mod reflection;
+
+#[cfg(test)]
+mod open_world_tests;

@@ -78,6 +78,7 @@ fn a_changed_bind_pose_rebinds_the_rig_and_keeps_what_was_authored() {
     let gun = hang_gun(&mut scene, hero, "Joint1");
     let old_palette = scene.world.mesh(hero).unwrap().bind_palette.clone();
     let old_bones = scene.world.mesh(hero).unwrap().skeleton.ids();
+    let old_revision = scene.world.mesh(hero).unwrap().revision;
     let mut writes = ModelWrites::default();
 
     rewrite(
@@ -91,7 +92,7 @@ fn a_changed_bind_pose_rebinds_the_rig_and_keeps_what_was_authored() {
     let skin = mesh.skin.clone().unwrap();
     assert_eq!(skin.local_bind[1].translation, 2.0 * Vec3::Y, "the new rig");
     assert_ne!(mesh.bind_palette, old_palette, "and its bind palette");
-    assert!(mesh.is_dirty.get(), "re-uploaded");
+    assert!(mesh.revision > old_revision, "re-uploaded");
     let bones = mesh.skeleton.ids();
     drop(mesh);
     assert_eq!(bones, old_bones, "the bones are kept");

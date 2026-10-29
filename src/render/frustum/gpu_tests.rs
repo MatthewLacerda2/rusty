@@ -31,7 +31,7 @@ fn skinned_sphere(pose: Vec3) -> MeshComponent {
         bind_palette: skin.bind_palette(),
         skin: Some(skin),
         pose_palette: vec![Mat4::from_translation(pose)],
-        is_dirty: Default::default(),
+        revision: Default::default(),
         ..MeshComponent::new("SkinnedCullSphere", vertices, indices)
     }
 }

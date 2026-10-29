@@ -2,12 +2,12 @@
 //! to keep that file under the size cap.
 
 use crate::render::MeshId;
-use crate::scene::{DirtyFlag, MeshComponent};
+use crate::scene::{MeshComponent, MeshRevision};
 
 fn mesh(primitive: &str, asset: Option<&str>) -> MeshComponent {
     MeshComponent {
         asset_ref: asset.map(String::from),
-        is_dirty: DirtyFlag::new(false),
+        revision: MeshRevision::default(),
         ..MeshComponent::new(primitive.to_string(), Vec::new(), Vec::new())
     }
 }

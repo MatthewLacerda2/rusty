@@ -65,12 +65,13 @@ fn a_rewritten_model_reloads_into_its_entities_mesh_and_collider() {
     let id = spawn(&mut scene, &path);
     let mut writes = ModelWrites::default();
     assert_eq!(index_count(&scene, id), 6);
-    scene.world.mesh(id).unwrap().is_dirty.set(false);
+    let old_revision = scene.world.mesh(id).unwrap().revision;
 
     bake(&path, Bake::B);
     assert_eq!(writes.follow(&mut scene), 1);
     assert_eq!(index_count(&scene, id), 3, "the CPU mesh is the new file's");
-    assert!(scene.world.mesh(id).unwrap().is_dirty.get(), "re-uploaded");
+    let revision = scene.world.mesh(id).unwrap().revision;
+    assert!(revision > old_revision, "re-uploaded");
     assert_eq!(
         collider_box(&scene, id),
         (Vec3::ZERO, Vec3::new(2.0, 2.0, 0.0)),

@@ -96,7 +96,7 @@ pub fn character(scene: &mut Scene, at: Vec3, running: bool) -> u32 {
             bind_palette: skin.bind_palette(),
             skin: Some(skin),
             clips: vec![run_clip()],
-            is_dirty: Default::default(),
+            revision: Default::default(),
             ..MeshComponent::new("Asset", vertices(), Vec::new())
         }),
     );

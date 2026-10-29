@@ -123,7 +123,7 @@ pub fn character(scene: &mut Scene, at: Vec3, swinging: bool) -> u32 {
             bind_palette: skin.bind_palette(),
             skin: Some(skin),
             clips: vec![swing()],
-            is_dirty: Default::default(),
+            revision: Default::default(),
             ..MeshComponent::new("Asset", vertices(), Vec::new())
         }),
     );

@@ -38,7 +38,7 @@ const STRIPPED_KEYS: &[&str] = &[
 ];
 
 /// Mesh sub-keys that are rehydrated from the reference on load (the heavy GPU
-/// buffers + transient dirty flag). The reference fields (`primitive_type`,
+/// buffers + transient revision). The reference fields (`primitive_type`,
 /// `asset_ref`) and authored rig stay, so a *changed mesh reference* is still a
 /// diff, but raw vertex soup is not.
 const STRIPPED_MESH_KEYS: &[&str] = &[
@@ -48,7 +48,7 @@ const STRIPPED_MESH_KEYS: &[&str] = &[
     "skin",
     "clips",
     "pose_palette",
-    "is_dirty",
+    "revision",
 ];
 
 /// Lists overridden whole, as one leaf, rather than per element: an entity's material

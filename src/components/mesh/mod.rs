@@ -1,18 +1,17 @@
 //! src/components/mesh/ — Mesh component, its vertex layout and the built-in
 //! primitive geometry (`vertex`, `primitives`).
 //!
-//! primitive/imported vertex+index data. Moved verbatim from the former
-//! `core/scene.rs`, except the GPU dirty flag is now a `DirtyFlag` newtype: hecs
-//! requires every stored component to be `Send + Sync`, and a bare
-//! `std::cell::Cell` is `!Sync`. `DirtyFlag` keeps the original interior-mutable
-//! `get()`/`set()` API (the renderer clears it while iterating the scene
-//! immutably) and is sound to mark `Sync` because the whole engine runs on a
-//! single thread.
+//! primitive/imported vertex+index data. Moved from the former `core/scene.rs`.
+//!
+//! A mesh says its geometry changed with a [`MeshRevision`], not a flag the
+//! renderer clears (#1540): several renderers draw one scene (the editor's, and
+//! each bake's headless one), and a flag cleared by the first hid the change from
+//! the rest, so the editor kept drawing a re-imported mesh's old vertices.
 
 use crate::asset::{AnimationClip, SkinData};
 use serde::{Deserialize, Serialize};
-use std::cell::Cell;
 use std::ops::Range;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 pub mod primitives;
 mod skeleton;
@@ -21,32 +20,32 @@ mod vertex;
 pub use skeleton::{BoneBinding, BoneBody};
 pub use vertex::Vertex;
 
-/// Interior-mutable boolean that is `Sync` (single-threaded engine invariant).
-#[derive(Debug, Default)]
-pub struct DirtyFlag(Cell<bool>);
+/// Which edit of a mesh's geometry its vertices are (#1540). Every rebuilt or new
+/// geometry takes a fresh one, newer than any before it; a clone keeps it, since
+/// it holds the same vertices. Each renderer remembers the revision it uploaded per
+/// geometry and re-uploads when a mesh carries a newer one, so a change reaches
+/// every renderer drawing the scene, however many there are. Never saved: a loaded
+/// mesh is new geometry. The value is never read by the sim.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct MeshRevision(u64);
 
-// SAFETY: the engine is single-threaded; the renderer is the only place that
-// mutates this flag, and it never crosses a thread boundary. hecs only needs the
-// `Sync` bound for its (unused here) parallel-iteration APIs.
-unsafe impl Sync for DirtyFlag {}
+/// The next revision handed out; 0 is [`MeshRevision::NONE`].
+static NEXT_REVISION: AtomicU64 = AtomicU64::new(1);
 
-impl DirtyFlag {
-    pub fn new(value: bool) -> Self {
-        Self(Cell::new(value))
-    }
+impl MeshRevision {
+    /// Older than every geometry: what an upload no mesh component made carries.
+    pub const NONE: Self = Self(0);
 
-    pub fn get(&self) -> bool {
-        self.0.get()
-    }
-
-    pub fn set(&self, value: bool) {
-        self.0.set(value);
+    /// A revision newer than every one handed out before.
+    pub fn next() -> Self {
+        Self(NEXT_REVISION.fetch_add(1, Ordering::Relaxed))
     }
 }
 
-impl Clone for DirtyFlag {
-    fn clone(&self) -> Self {
-        Self::new(self.0.get())
+impl Default for MeshRevision {
+    /// New geometry: a fresh revision.
+    fn default() -> Self {
+        Self::next()
     }
 }
 
@@ -98,14 +97,15 @@ pub struct MeshComponent {
     /// overrides (#453). Only the overrides are saved, and only when there are any.
     #[serde(default, skip_serializing_if = "BoneBinding::is_unmodified")]
     pub skeleton: BoneBinding,
-    // For GPU rendering, we hold the loaded state or buffers in the renderer
+    /// Which edit of the geometry this is; set a [`MeshRevision::next`] whenever
+    /// `vertices` or `indices` change, so every renderer re-uploads them.
     #[serde(skip)]
-    pub is_dirty: DirtyFlag, // Set to true when mesh data changes to update GPU buffers
+    pub revision: MeshRevision,
 }
 
 impl MeshComponent {
     /// A static mesh: `primitive_type` (see the field) over this geometry, with no
-    /// asset reference, skin or clips, and flagged dirty so the renderer uploads it.
+    /// asset reference, skin or clips, and a fresh revision so every renderer uploads it.
     /// Set the skinned and asset fields on top with `..MeshComponent::new(…)`.
     pub fn new(
         primitive_type: impl Into<String>,
@@ -123,7 +123,7 @@ impl MeshComponent {
             clips: Vec::new(),
             pose_palette: Vec::new(),
             skeleton: BoneBinding::default(),
-            is_dirty: DirtyFlag::new(true),
+            revision: MeshRevision::next(),
         }
     }
 
@@ -207,3 +207,5 @@ mod material_runs_tests;
 #[cfg(test)]
 #[path = "primitives_tests.rs"]
 mod primitives_tests;
+#[cfg(test)]
+mod revision_tests;
