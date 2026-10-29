@@ -12,7 +12,7 @@ use crate::scene::{list_instance_overrides, Scene};
 use glam::Vec3;
 
 /// A script at `path`, its `speed` field set when given.
-fn script(path: &str, speed: Option<f64>) -> ScriptComponent {
+pub(super) fn script(path: &str, speed: Option<f64>) -> ScriptComponent {
     let values = speed.map(|s| ("speed".to_string(), ScriptFieldValue::Number(s)));
     ScriptComponent {
         path: path.into(),
@@ -22,7 +22,7 @@ fn script(path: &str, speed: Option<f64>) -> ScriptComponent {
 }
 
 /// `child`'s scripts as (path, speed).
-fn scripts(scene: &Scene, child: u32) -> Vec<(String, Option<ScriptFieldValue>)> {
+pub(super) fn scripts(scene: &Scene, child: u32) -> Vec<(String, Option<ScriptFieldValue>)> {
     let list = scene.world.scripts(child).unwrap();
     let speed = |s: &ScriptComponent| s.values.get("speed").cloned();
     list.iter().map(|s| (s.path.clone(), speed(s))).collect()

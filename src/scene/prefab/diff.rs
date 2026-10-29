@@ -2,8 +2,8 @@
 //!
 //! An instance's overrides are its difference from its *baseline*, the source as it
 //! last took it (`live/`), taken on the entity's serde JSON with the volatile and
-//! identity fields masked out (see `STRIPPED_KEYS`), so ids, parenting, rehydrated
-//! GPU geometry and the link itself never count. It covers every first-class
+//! identity fields masked out (see `STRIPPED_KEYS`), so ids, parenting and the link
+//! itself never count (rehydrated GPU geometry is never serialized at all). It covers every first-class
 //! component with no per-component code, and emits Unity's three shapes
 //! ([`PrefabOverrides`]): a component one side lacks is an added or a removed
 //! component, and everything else is property modifications, one per changed leaf,
@@ -17,30 +17,10 @@ use serde_json::{Map, Value};
 use crate::components::{escape_token, Entity, PrefabOverrides, SIZE_TOKEN};
 
 /// Top-level entity keys that must never be diffed/overridden: identity + structure
-/// the propagation already owns (ids/parenting are remapped per instance), the
-/// staged-material slot, and the link itself (an instance's link is set by the
-/// stamper, not copied from source).
-const STRIPPED_KEYS: &[&str] = &[
-    "id",
-    "parent_id",
-    "children",
-    "prefab_link",
-    "pending_material",
-];
-
-/// Mesh sub-keys that are rehydrated from the reference on load (the heavy GPU
-/// buffers + the transient revision). The reference fields (`primitive_type`,
-/// `asset_ref`) and authored rig stay, so a *changed mesh reference* is still a
-/// diff, but raw vertex soup is not.
-const STRIPPED_MESH_KEYS: &[&str] = &[
-    "vertices",
-    "indices",
-    "bind_palette",
-    "skin",
-    "clips",
-    "pose_palette",
-    "revision",
-];
+/// the propagation already owns (ids/parenting are remapped per instance) and the
+/// link itself (an instance's link is set by the stamper, not copied from source).
+/// What is never saved (`#[serde(skip)]`, a mesh's geometry) never reaches the JSON.
+const STRIPPED_KEYS: &[&str] = &["id", "parent_id", "children", "prefab_link"];
 
 /// The serde JSON of `entity` with the volatile/identity keys masked out, so the
 /// diff sees only authored component data: the form a baseline is kept in.
@@ -49,11 +29,6 @@ pub fn masked(entity: &Entity) -> Value {
     if let Some(obj) = value.as_object_mut() {
         for key in STRIPPED_KEYS {
             obj.remove(*key);
-        }
-        if let Some(Value::Object(mesh)) = obj.get_mut("mesh") {
-            for key in STRIPPED_MESH_KEYS {
-                mesh.remove(*key);
-            }
         }
     }
     value
@@ -148,3 +123,7 @@ fn swaps_variant(base: &Map<String, Value>, inst: &Map<String, Value>) -> bool {
 pub fn diff_entity(instance: &Entity, baseline: &Entity) -> PrefabOverrides {
     diff(instance, &masked(baseline))
 }
+
+#[cfg(test)]
+#[path = "diff_tests.rs"]
+mod prefab_diff_tests;

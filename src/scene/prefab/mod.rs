@@ -21,6 +21,7 @@ pub mod instance;
 pub mod link;
 pub mod live;
 pub mod overrides;
+mod pointer;
 
 pub use extract::extract_prefab;
 

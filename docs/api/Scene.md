@@ -291,7 +291,11 @@ future component with no per-component code. Each override has a **key**, the na
   removing a script is a size entry (plus the leaves of the scripts that moved up a
   slot), adding one is a size entry plus one entry holding the new script whole. The
   elements both lists hold keep following the source, so a source edit to a script
-  the instance didn't touch still reaches it. A field the leaf diff can't split (an
+  the instance didn't touch still reaches it. A list whose length changed is **one
+  override to Apply or Revert**, as Unity applies a whole array: `ApplyPrefabFieldToSource`
+  or `RevertPrefabField` on its size entry or on any entry under that list takes the
+  size and every entry of the list together. A size over 65 536 is skipped with a
+  warning. A field the leaf diff can't split (an
   enum switched variant, such as a collider's shape) is one entry holding it whole.
 - **Added components** (Unity's *added components*), keyed `"+/<component>"`
   (`"+/light"`): a component the instance has and the source lacks, held whole, so a
@@ -347,7 +351,10 @@ Apply-to-source (the Unity "Apply → Prefab" direction):
   into the source (a leaf, a list's size, an added component, or a removal), then drop
   just that override and reimport so it re-tracks the source (the instance's other
   overrides are untouched). `key` is one `ListPrefabOverrides` lists, without the
-  `localId:` prefix. `entityId` may be any instance entity — root or child; the verb
+  `localId:` prefix. A key in a list whose length changed applies that whole list
+  (its size entry and every entry under it): applying after removing the first of
+  two scripts leaves the source with only the second. `entityId` may be any instance
+  entity — root or child; the verb
   resolves the instance root itself. Errors if the entity carries no override at
   `key`.
 
@@ -356,7 +363,8 @@ Its per-field opposite:
 - **`Scene.RevertPrefabField(entityId, key)`** — Unity's *Revert* on one override:
   drop just that override and reimport, so what it covered tracks the source again (a
   reverted `"+/light"` takes the added light away, a reverted `"-/camera"` brings the
-  source's camera back, a reverted size entry gives the list the source's length).
+  source's camera back, a reverted size entry or element of a list whose length
+  changed gives the whole list back to the source).
   The instance's other overrides are untouched. `entityId` may be any instance
   entity. Returns `false`, changing nothing, when there is no override at `key`. The
   prefab card's per-field revert button.

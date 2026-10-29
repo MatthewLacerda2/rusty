@@ -13,6 +13,7 @@
 
 use serde_json::Value;
 
+use super::pointer::set_pointer;
 use crate::components::{Entity, PrefabOverrides, SIZE_TOKEN};
 
 /// One step of applying an override set onto an entity's JSON form.
@@ -123,7 +124,7 @@ fn ops<'a>(value: &Value, overrides: &'a PrefabOverrides) -> Vec<Op<'a>> {
         .partition(|(path, _)| list_of_size(path).is_some());
     let mut sizes: Vec<_> = sizes
         .into_iter()
-        .filter_map(|(path, n)| Some((list_of_size(path)?, n.as_u64()? as usize)))
+        .filter_map(|(path, n)| Some((list_of_size(path)?, sane_size(path, n)?)))
         .collect();
     sizes.sort_by_key(|(list, _)| list.matches('/').count());
     ops.extend(sizes.into_iter().map(|(list, n)| Op::Size(list, n)));
@@ -150,6 +151,13 @@ fn run(value: &mut Value, op: &Op, grown: &mut Vec<String>) {
             }
         }
         Op::Size(list, n) => {
+            // A list the baseline omits (`skip_serializing_if = "Vec::is_empty"`) is
+            // an empty one, made where its parent is there to hold it.
+            let parent = list.rsplit_once('/').map_or("", |(p, _)| p);
+            let missing = value.pointer(list).is_none_or(Value::is_null);
+            if missing && value.pointer(parent).is_some_and(Value::is_object) {
+                set_pointer(value, list, Value::Array(Vec::new()));
+            }
             if let Some(Value::Array(items)) = value.pointer_mut(list) {
                 grown.extend((items.len()..n).map(|i| format!("{list}/{i}")));
                 items.resize(n, Value::Null);
@@ -177,6 +185,23 @@ fn op_key(op: &Op) -> String {
         Op::Size(list, _) => format!("{list}/{SIZE_TOKEN}"),
         Op::Set(path, _) => path.to_string(),
     }
+}
+
+/// The longest a size entry may make a list: a larger one is no authored edit (a
+/// hand-edited or corrupt scene), and resizing to it would allocate that many slots.
+const MAX_LIST_SIZE: u64 = 65_536;
+
+/// Size entry `path`'s length, or `None` (with a warning when it is too large).
+fn sane_size(path: &str, n: &Value) -> Option<usize> {
+    let n = n.as_u64()?;
+    if n > MAX_LIST_SIZE {
+        log::warn!(
+            "[Prefab] override '{path}' sets a list's length to {n}, over the cap of \
+             {MAX_LIST_SIZE}; it was skipped."
+        );
+        return None;
+    }
+    usize::try_from(n).ok()
 }
 
 /// The list pointer of a size entry `path` (`/scripts/#size` → `/scripts`).
@@ -214,69 +239,6 @@ fn in_array(value: &Value, path: &str) -> bool {
     array_slot(path).is_some_and(|(parent, i)| {
         i.is_some() && value.pointer(&parent).is_some_and(Value::is_array)
     })
-}
-
-/// Set `value` at an RFC-6901 `pointer` to `leaf`, creating intermediate objects as
-/// needed. A `null` into an object removes the key (a map entry the instance
-/// dropped, or an `Option` field left `None`). An out-of-range array index is a
-/// no-op: a list grows only by its size entry.
-fn set_pointer(value: &mut Value, pointer: &str, leaf: Value) {
-    let tokens: Vec<String> = pointer
-        .split('/')
-        .skip(1) // leading "" before the first "/"
-        .map(unescape)
-        .collect();
-    let Some((last, parents)) = tokens.split_last() else {
-        return;
-    };
-    let mut cursor = value;
-    for token in parents {
-        cursor = match descend(cursor, token) {
-            Some(next) => next,
-            None => return,
-        };
-    }
-    match cursor {
-        Value::Object(map) if leaf.is_null() => {
-            map.remove(last);
-        }
-        Value::Object(map) => {
-            map.insert(last.clone(), leaf);
-        }
-        Value::Array(items) => {
-            if let Some(slot) = last.parse::<usize>().ok().and_then(|i| items.get_mut(i)) {
-                *slot = leaf;
-            }
-        }
-        _ => {}
-    }
-}
-
-/// Step one token into a container, materializing a missing (or `null`) object key
-/// as an empty object so a deep override path can be created. Returns `None` for an
-/// out-of-range array index.
-fn descend<'a>(cursor: &'a mut Value, token: &str) -> Option<&'a mut Value> {
-    match cursor {
-        Value::Object(map) => {
-            let slot = map
-                .entry(token.to_string())
-                .or_insert_with(|| Value::Object(serde_json::Map::new()));
-            if slot.is_null() {
-                *slot = Value::Object(serde_json::Map::new());
-            }
-            Some(slot)
-        }
-        Value::Array(items) => token
-            .parse::<usize>()
-            .ok()
-            .and_then(move |i| items.get_mut(i)),
-        _ => None,
-    }
-}
-
-/// Inverse of [`escape_token`](crate::components::escape_token) (RFC 6901: `~1` -> `/`, `~0` -> `~`, in that order).
-fn unescape(token: &str) -> String {
-    token.replace("~1", "/").replace("~0", "~")
 }
 
 #[cfg(test)]

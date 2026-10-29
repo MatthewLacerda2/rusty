@@ -138,15 +138,15 @@ impl MeshComponent {
         }
     }
 
-    /// This mesh's authored reference (`primitive_type`, `asset_ref`, the skeleton's
-    /// saved overrides) with none of its geometry, skin or clips: what a prefab
-    /// override diff reads, without cloning a whole model every frame (#1527).
+    /// This mesh with its rehydrated, never-saved fields (every `#[serde(skip)]` one:
+    /// geometry, skin, clips, palettes, the bone slots) cleared and every saved field
+    /// copied: what a prefab override diff reads, without cloning a whole model every
+    /// frame (#1527). It is the mesh as serde writes it, read back, so a saved field
+    /// added later is copied with no change here.
     pub fn reference_only(&self) -> Self {
-        Self {
-            asset_ref: self.asset_ref.clone(),
-            skeleton: self.skeleton.clone(),
-            ..Self::new(self.primitive_type.clone(), Vec::new(), Vec::new())
-        }
+        serde_json::to_value(self)
+            .and_then(serde_json::from_value)
+            .unwrap_or_else(|_| Self::new(self.primitive_type.clone(), Vec::new(), Vec::new()))
     }
 
     /// The index runs to draw, one per material slot: `ranges`, or the whole index

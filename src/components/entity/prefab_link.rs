@@ -13,8 +13,8 @@
 //! - **added components** (Unity's `m_AddedComponents`), each held whole;
 //! - **removed components** (Unity's `m_RemovedComponents`), by name.
 //!
-//! Every entity id the three hold is visited by [`visit_override_refs`], the one walk
-//! (`refs`): a remap on stamp, load and Stop, the local↔scene conversion of an apply
+//! Every entity id the three hold is visited by [`visit_override_refs`](super::override_refs::visit_override_refs), the one walk
+//! (`override_refs`): a remap on stamp, load and Stop, the local↔scene conversion of an apply
 //! to source, a despawn's `forget`, and a bone kept by name.
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -22,8 +22,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use super::override_refs::{each_override_ref, visit_override_refs};
 use super::refs::{escape_token, EntityRefs, RefVisit};
-use super::Entity;
 
 /// The last token of a list's size entry: `/scripts/#size` (Unity's `Array.size`).
 /// No list index and no field name the engine serializes is `#size`.
@@ -95,7 +95,9 @@ impl PrefabOverrides {
         mods.chain(added).chain(removed).collect()
     }
 
-    /// The override at `key` ([`Self::keys`]) alone, if there is one.
+    /// The override at `key` ([`Self::keys`]) with the ones that go with it, if there
+    /// is one: a list whose length changed goes whole ([`Self::list_of`]), as Unity
+    /// applies and reverts a whole array.
     pub fn only(&self, key: &str) -> Option<Self> {
         let mut one = Self::default();
         if let Some(c) = key.strip_prefix("+/") {
@@ -105,91 +107,66 @@ impl PrefabOverrides {
             self.removed_components.get(c)?;
             one.removed_components.insert(c.to_string());
         } else {
-            let value = self.modifications.get(key)?;
-            one.modifications.insert(key.to_string(), value.clone());
+            self.modifications.get(key)?;
+            one.modifications = self
+                .modifications
+                .iter()
+                .filter(|(k, _)| self.together(key, k))
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect();
         }
         Some(one)
     }
 
-    /// Drop the override at `key` ([`Self::keys`]); whether there was one.
+    /// Drop the override at `key` ([`Self::keys`]) and the ones that go with it
+    /// ([`Self::only`]); whether there was one.
     pub fn remove(&mut self, key: &str) -> bool {
         if let Some(c) = key.strip_prefix("+/") {
             self.added_components.remove(c).is_some()
         } else if let Some(c) = key.strip_prefix("-/") {
             self.removed_components.remove(c)
+        } else if self.modifications.contains_key(key) {
+            let gone: Vec<String> = self
+                .modifications
+                .keys()
+                .filter(|k| self.together(key, k))
+                .cloned()
+                .collect();
+            for k in gone {
+                self.modifications.remove(&k);
+            }
+            true
         } else {
-            self.modifications.remove(key).is_some()
+            false
         }
     }
-}
 
-/// Visit every entity id the overrides hold, each with its pointer in the entity
-/// document (`/joint/connected_body`): an id leaf of a modification, one inside a
-/// modification's whole value, and one inside an added component, which goes
-/// through that component's own [`EntityRefs`] walk, so a list of ids drops a
-/// dropped one as the component itself does. A dropped id elsewhere becomes `null`,
-/// the override of "no reference".
-pub fn visit_override_refs(overrides: &mut PrefabOverrides, visit: &mut RefVisit<'_>) {
-    for (path, value) in &mut overrides.modifications {
-        visit_value_refs(path, value, visit);
-    }
-    for (name, value) in &mut overrides.added_components {
-        if !visit_component_refs(name, value, visit) {
-            visit_value_refs(&format!("/{}", escape_token(name)), value, visit);
-        }
-    }
-}
-
-/// Walk `value`, the document's value at `pointer`, visiting every leaf whose pointer
-/// is an id field ([`Entity::is_ref_pointer`]).
-fn visit_value_refs(pointer: &str, value: &mut Value, visit: &mut RefVisit<'_>) {
-    match value {
-        Value::Object(map) => {
-            for (k, v) in map {
-                visit_value_refs(&format!("{pointer}/{}", escape_token(k)), v, visit);
+    /// The list modification `key` belongs to when that list's length changed: the
+    /// shallowest list with a size entry that is `key` or holds it (`/scripts` for
+    /// `/scripts/#size`, `/scripts/1` and `/scripts/0/name`). Its size and every
+    /// entry under it are one override to apply or revert.
+    pub fn list_of<'k>(&self, key: &'k str) -> Option<&'k str> {
+        let mut end = 0;
+        while let Some(i) = key.get(end + 1..).and_then(|rest| rest.find('/')) {
+            end += i + 1;
+            let list = &key[..end];
+            if self
+                .modifications
+                .contains_key(&format!("{list}/{SIZE_TOKEN}"))
+            {
+                return Some(list);
             }
         }
-        Value::Array(items) => {
-            for (i, v) in items.iter_mut().enumerate() {
-                visit_value_refs(&format!("{pointer}/{i}"), v, visit);
-            }
-        }
-        leaf if Entity::is_ref_pointer(pointer) => {
-            let mut slot = match &*leaf {
-                Value::Null => None,
-                v => match v.as_u64().and_then(|n| u32::try_from(n).ok()) {
-                    Some(id) => Some(id),
-                    None => return,
-                },
-            };
-            visit(pointer, &mut slot);
-            *leaf = slot.map_or(Value::Null, Value::from);
-        }
-        _ => {}
+        None
     }
-}
 
-/// Run added component `name`'s own [`EntityRefs`] walk over `value`, through an
-/// entity carrying it alone; `false` (and `value` untouched) when it doesn't read
-/// back as that component.
-fn visit_component_refs(name: &str, value: &mut Value, visit: &mut RefVisit<'_>) -> bool {
-    let Ok(Value::Object(mut doc)) = serde_json::to_value(Entity::new(0, String::new())) else {
-        return false;
-    };
-    doc.insert(name.to_string(), value.clone());
-    let Ok(mut holder) = serde_json::from_value::<Entity>(Value::Object(doc)) else {
-        return false;
-    };
-    holder.visit_refs(visit);
-    match serde_json::to_value(&holder) {
-        Ok(Value::Object(mut back)) => match back.remove(name) {
-            Some(walked) => {
-                *value = walked;
-                true
-            }
-            None => false,
-        },
-        _ => false,
+    /// Whether modification `other` goes with `key`: it is `key`, or both sit in the
+    /// list of [`Self::list_of`]`(key)`.
+    fn together(&self, key: &str, other: &str) -> bool {
+        match self.list_of(key) {
+            Some(list) => other.strip_prefix(list).is_some_and(|r| r.starts_with('/')),
+            None => other == key,
+        }
     }
 }
 
@@ -206,11 +183,8 @@ impl EntityRefs for PrefabLink {
     }
 
     fn each_ref(&self, visit: &mut dyn FnMut(&str, u32)) {
-        let mut overrides = self.overrides.clone();
-        visit_override_refs(&mut overrides, &mut |p, r| {
-            if let Some(id) = *r {
-                visit(&override_pointer(p), id);
-            }
+        each_override_ref(&self.overrides, &mut |p, id| {
+            visit(&override_pointer(p), id)
         });
     }
 

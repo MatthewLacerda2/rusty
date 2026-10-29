@@ -160,6 +160,17 @@ impl Entity {
     }
 }
 
+impl Entity {
+    /// Whether `pointer` names an element of a *list* of ids (`Vec<u32>`, a LOD
+    /// level's renderers), where a dropped reference leaves the list rather than
+    /// becoming the slot's `None`.
+    pub fn is_ref_list_pointer(pointer: &str) -> bool {
+        pointer
+            .strip_prefix("/lod_group")
+            .is_some_and(LodGroupComponent::is_ref_pointer)
+    }
+}
+
 /// Escape one JSON-pointer reference token (RFC 6901: `~` → `~0`, `/` → `~1`): the
 /// one escape every pointer builder uses (prefab overrides' too).
 pub fn escape_token(token: &str) -> String {
