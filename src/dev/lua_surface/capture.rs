@@ -37,7 +37,7 @@ pub(super) fn register<'scope>(
         scope.create_function(move |_, ()| {
             let path = audio.borrow_mut().stop_capture();
             let path = path.map_err(mlua::Error::RuntimeError)?;
-            Ok(path.display().to_string())
+            Ok(crate::core::paths::to_slash(&path))
         }),
     )
 }

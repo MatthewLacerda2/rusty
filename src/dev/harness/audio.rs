@@ -13,6 +13,7 @@ use std::rc::Rc;
 use mlua::{Lua, Result as LuaResult, Table};
 
 use super::Harness;
+use crate::core::paths::to_slash;
 
 /// The file a capture writes when the scenario names none, under the run's output.
 pub const DEFAULT_FILE: &str = "audio.wav";
@@ -61,10 +62,7 @@ pub fn register(lua: &Lua, harness: &Rc<RefCell<Harness>>, t: &Table) -> LuaResu
         "RecordAudio",
         lua.create_function(move |_, path: Option<String>| {
             let path = h.borrow_mut().record_audio(path.as_deref().map(Path::new));
-            Ok(path
-                .map_err(mlua::Error::RuntimeError)?
-                .display()
-                .to_string())
+            Ok(to_slash(&path.map_err(mlua::Error::RuntimeError)?))
         })?,
     )?;
     let h = Rc::clone(harness);
@@ -72,10 +70,7 @@ pub fn register(lua: &Lua, harness: &Rc<RefCell<Harness>>, t: &Table) -> LuaResu
         "StopAudio",
         lua.create_function(move |_, ()| {
             let path = h.borrow_mut().stop_audio();
-            Ok(path
-                .map_err(mlua::Error::RuntimeError)?
-                .display()
-                .to_string())
+            Ok(to_slash(&path.map_err(mlua::Error::RuntimeError)?))
         })?,
     )
 }
