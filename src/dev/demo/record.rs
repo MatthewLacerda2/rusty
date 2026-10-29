@@ -32,7 +32,7 @@ struct Session {
     entry: Entry,
 }
 
-/// Records a world's Play sessions; install with [`install`](super::install).
+/// Records a world's Play sessions; install with [`record`](super::record).
 pub struct Recorder {
     destination: Destination,
     session: Option<Session>,
