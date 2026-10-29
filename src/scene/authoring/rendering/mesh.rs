@@ -76,7 +76,10 @@ mod tests {
         set_subdivisions(&mut plane, 64).unwrap();
         assert_eq!(plane.vertices.len(), 65 * 65);
         assert_eq!(plane.indices.len(), 64 * 64 * 6);
-        assert!(plane.revision > before, "a rebuilt grid takes a fresh revision");
+        assert!(
+            plane.revision > before,
+            "a rebuilt grid takes a fresh revision"
+        );
         set_subdivisions(&mut plane, 1).unwrap();
         assert_eq!(plane.vertices.len(), 4, "1 is the single quad again");
     }
