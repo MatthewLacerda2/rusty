@@ -137,3 +137,5 @@ pub fn eval_linked(
 mod arity_tests;
 #[cfg(test)]
 mod aspect_tests;
+#[cfg(test)]
+mod link_tests;

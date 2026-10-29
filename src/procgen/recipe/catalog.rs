@@ -274,5 +274,8 @@ pub const OPS: &[OpInfo] = &[
 ];
 
 #[cfg(test)]
+#[path = "socket_tests.rs"]
+mod socket_tests;
+#[cfg(test)]
 #[path = "catalog_tests.rs"]
 mod tests;
