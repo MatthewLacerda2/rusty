@@ -187,7 +187,7 @@ impl Renderer {
             velocity_pipeline: forward.velocity_pipeline,
             primed_pipelines: forward.primed_pipelines,
             post_passes,
-            transparent_pipeline: forward.transparent_pipeline,
+            transparent_pipelines: forward.transparent_pipelines,
             line_pipeline: forward.line_pipeline,
             outline: forward.outline,
             prepass_pipeline: forward.prepass_pipeline,

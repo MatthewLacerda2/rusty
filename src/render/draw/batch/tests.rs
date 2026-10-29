@@ -6,7 +6,7 @@ use crate::render::{InstanceData, MeshId};
 /// An item of mesh `mesh`, palette `bone_base`, tint `tint`, tagged by `tag` in its
 /// instance's translation so a test can read back the order instances were packed in.
 pub(super) fn item(mesh: &str, bone_base: u32, tint: f32, tag: f32) -> DrawItem {
-    let mut uniform = [0u32; 36];
+    let mut uniform = [0u32; crate::render::gpu::uniforms::ENTITY_UNIFORM_WORDS];
     uniform[16] = tint.to_bits();
     uniform[34] = bone_base;
     let mut instance = InstanceData::IDENTITY;

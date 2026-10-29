@@ -7,7 +7,7 @@
 //!
 //! It reuses the camera's instanced draw data the opaque pass binds (group 1 frame
 //! buffers, group 2 shared material, #470) and the same shader; only the pipeline differs
-//! (`transparent_pipeline`: alpha blend, depth test on / write off). It LOADs the
+//! (`transparent_pipelines`: one per blend state, #1523; depth test on / write off). It LOADs the
 //! existing HDR colour + depth — never clears — so it layers onto the opaque image and
 //! is occluded by opaque depth without writing depth itself (overlapping translucent
 //! surfaces all blend rather than z-cull each other).
@@ -71,7 +71,7 @@ impl Renderer {
         self.draw_batches(
             pass,
             items,
-            SolidPass::Transparent(&self.transparent_pipeline),
+            SolidPass::Transparent(&self.transparent_pipelines),
         );
     }
 }

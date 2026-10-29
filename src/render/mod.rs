@@ -126,7 +126,7 @@ pub struct Renderer {
     /// Alpha-blended translucent solids (#242); depth write off, drawn back-to-front
     /// in the transparent pass after opaque. Built on first use, like the three
     /// editor-only pipelines below (#985).
-    transparent_pipeline: gpu::pipelines::LazyPipeline,
+    transparent_pipelines: gpu::pipelines::TransparentPipelines,
     line_pipeline: gpu::pipelines::LazyPipeline,
     /// The editor's selection outline (#1175).
     outline: passes::outline::OutlinePasses,

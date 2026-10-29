@@ -33,6 +33,7 @@ use mlua::Value;
 use crate::api::lua_json::{decode, recipe_json};
 use crate::components::MaterialAsset;
 use crate::procgen::TextureRecipe;
+use crate::scene::authoring::material::{SurfaceField, SurfaceKind, SurfaceValue, SURFACE_FIELDS};
 
 /// The validation-bearing fields lifted out of the recipe so the caller applies them
 /// through the shared `set_*` ops. `None` means "not authored" — leave the asset's
@@ -52,6 +53,9 @@ pub struct Validated {
     /// The raw `shader_textures` slot → path map (#400), applied by the shared
     /// `set_shader_texture` op so an unknown slot is refused by name.
     pub shader_textures: Vec<(String, String)>,
+    /// The transparent-surface fields the recipe names (#1523), each applied by
+    /// the shared `set_surface` op, so a recipe validates as the setters do.
+    pub surface: Vec<(&'static SurfaceField, SurfaceValue)>,
 }
 
 /// Parse a material recipe's `maps` value (#409) — a multi-output `TextureRecipe`
@@ -96,6 +100,11 @@ fn asset_from_json_value(
             .remove("shader")
             .and_then(|v| v.as_str().map(str::to_string));
         validated.shader_textures = shader_textures(obj.remove("shader_textures"))?;
+        for field in SURFACE_FIELDS {
+            if let Some(v) = obj.remove(field.key) {
+                validated.surface.push((field, surface_value(field, &v)?));
+            }
+        }
         maps = maps_recipe(obj.remove("maps"))?;
     }
     refuse_unknown_keys(&value)?;
@@ -103,6 +112,22 @@ fn asset_from_json_value(
     asset.maps_recipe = maps;
     asset.decal = asset.decal.clamped();
     Ok((asset, validated))
+}
+
+/// A recipe's surface field as the row's kind reads it (#1523); the row's own
+/// `check` runs here, so a bad recipe is refused before anything is defined.
+fn surface_value(field: &SurfaceField, v: &serde_json::Value) -> Result<SurfaceValue, String> {
+    let value = match &field.kind {
+        SurfaceKind::Choice(_) => v.as_str().map(|s| SurfaceValue::Text(s.to_owned())),
+        SurfaceKind::Toggle => v.as_bool().map(SurfaceValue::Bool),
+        SurfaceKind::Number(_) => v.as_f64().map(|n| SurfaceValue::Number(n as f32)),
+        SurfaceKind::Color => serde_json::from_value::<[f32; 3]>(v.clone())
+            .ok()
+            .map(SurfaceValue::Color),
+    };
+    value
+        .ok_or_else(|| field.wrong_kind())
+        .and_then(|v| field.check(v))
 }
 
 /// The recipe's `shader_textures` table (`{ mask = "noise.png" }`) as slot → path

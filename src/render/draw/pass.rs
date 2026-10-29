@@ -5,7 +5,7 @@ use crate::render::draw::batch::DrawBatch;
 use crate::render::gpu::draw_buffers::DrawBuffers;
 use crate::render::gpu::global_group::GlobalGroup;
 use crate::render::gpu::pipelines::surface::SolidPass;
-use crate::render::gpu::pipelines::PrimedPipelines;
+use crate::render::gpu::pipelines::{PrimedPipelines, TransparentBlend};
 use crate::render::ibl::skybox::SkyTargets;
 use crate::render::motion;
 use crate::render::passes::ssao::SsaoFrame;
@@ -272,10 +272,11 @@ impl Renderer {
                 continue;
             }
             let primed = solid_pass.primed() && in_prepass;
-            let pipeline = (batch.key.pipeline, primed);
+            let blend = TransparentBlend::of(&batch.key.uniform().surface);
+            let pipeline = (batch.key.pipeline, primed, blend);
             if bound != Some(pipeline) {
                 let shaders = &self.surface_shaders;
-                render_pass.set_pipeline(shaders.pick(solid_pass, pipeline.0, primed));
+                render_pass.set_pipeline(shaders.pick(solid_pass, pipeline.0, primed, blend));
                 bound = Some(pipeline);
             }
             let offsets = DrawBuffers::offsets(batch.uniform_slot);

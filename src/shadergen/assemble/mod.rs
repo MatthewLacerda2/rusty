@@ -58,8 +58,10 @@ pub use depth::{CUT_PREPASS, CUT_SHADOW};
 /// chain into the final color. The forward shader's `surface_color` computes
 /// `lighting_color`; the assembler rewrites the final write to apply the blocks
 /// to it. We splice by replacing the exact final-return line, which applies the
-/// scene fog (#437) last — so an authored look is fogged like every other surface.
-const SURFACE_RETURN: &str = "return vec4<f32>(apply_fog(camera.fog, lighting_color, in.world_position, camera.camera_pos), base_color.a);";
+/// scene fog (#437) and the transparent composite (#1523) last — so an authored
+/// look is fogged and blended like every other surface.
+const SURFACE_RETURN: &str =
+    "return transparent::composite(lighting_color, base_color.a, env_brdf, in.world_position);";
 
 /// Assemble `recipe` into a complete WGSL module. `surface_base` is the pass's base
 /// shader (`bake::base_source`: the forward shader for surface, `ui.wgsl` for ui). Returns an

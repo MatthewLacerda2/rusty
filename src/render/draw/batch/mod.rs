@@ -20,6 +20,7 @@ pub(crate) mod sort;
 
 use std::ops::Range;
 
+use crate::render::gpu::uniforms::ENTITY_UNIFORM_WORDS;
 use crate::render::{EntityUniform, InstanceData, MeshId};
 
 /// What two solids must share to be drawn by one instanced call.
@@ -39,7 +40,7 @@ pub(crate) struct BatchKey {
     /// The per-draw uniform's words (tint, PBR scalars, map and cutout flags, and the
     /// skinned palette's `bone_base`), compared bit-for-bit — so each skinned entity,
     /// with a palette of its own, is a draw of its own.
-    pub uniform: [u32; 36],
+    pub uniform: [u32; ENTITY_UNIFORM_WORDS],
 }
 
 impl BatchKey {

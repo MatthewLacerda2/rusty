@@ -58,8 +58,8 @@ pub(crate) struct SurfacePipelines {
     pub velocity: super::VelocityPipelines,
     /// The same two over a primed depth (#1499), built the first time a view primes.
     pub primed: super::PrimedPipelines,
-    /// Alpha-blended solids (the transparent spec).
-    pub transparent: wgpu::RenderPipeline,
+    /// Blended solids, one per blend state (#1523), built on first draw.
+    pub transparent: super::TransparentPipelines,
     /// The depth passes of a variant whose blocks cut fragments or move the UVs or the
     /// vertices (#648, #1499, #1524); `None` draws its depth with the standard pipelines.
     pub cut: Option<CutPipelines>,

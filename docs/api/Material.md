@@ -49,6 +49,24 @@ conversion wrote into the import cache is a reference (#1072).
 | `Material.GetAssetShaderParam` | `(asset, name)` → the asset's value: the one set, else the shader's baked default |
 | `Material.SetShaderTexture` | `(id, slot, path)` — point an extra texture slot of the material's surface shader (`"mask"`, see *Shader textures* below) at a texture path (a PNG or an `rt:<name>` render texture); `nil` or `""` clears it back to white; errors on an unknown slot |
 
+### Transparent surfaces
+
+A `Transparent` material does more than fade by `alpha` (#1523). Each knob below is a
+field of the material (it saves with it, `DefineAsset` takes it by the key in
+brackets, and the Inspector's Material card shows it), with a `Set` and a `Get`.
+`Get` returns `nil` for an entity without a material; `Set` creates one, as every
+setter does, and raises an error naming what the field takes for a value it can't
+(an unknown name, a number for a boolean). Names are read in any case. The knobs
+follow Unity: URP Lit's blending options, and HDRP Lit's refraction, absorption and
+thin translucency, leaving out what HDRP spends most on (diffusion profiles,
+sphere and ray-traced refraction, order-independent transparency).
+
+| Function | Signature |
+|---|---|
+| `Material.SetBlendMode` / `GetBlendMode` | `(id, mode)` [`blend_mode`] — URP's *Blending Mode*: `"Alpha"` (default; `alpha` of the surface over the rest), `"Premultiply"` (the colour is already premultiplied: it is added whole, covering `alpha` of what is behind), `"Additive"` (added onto what is behind, scaled by `alpha`), `"Multiply"` (multiplies what is behind; `alpha` fades the tint toward white) |
+| `Material.SetPreserveSpecular` / `GetPreserveSpecular` | `(id, on)` [`preserve_specular`] — URP's *Preserve Specular Lighting*, on by default: only the diffuse is faded by `alpha`, so reflections and highlights stay whole on clear glass, and the opacity rises toward grazing angles with the Fresnel reflection (URP's `alpha * (1 - reflectivity) + reflectivity`, at the view angle), so water seen flat reflects more and shows less of the floor. Ignored under `Premultiply` and `Multiply`, as URP ignores it |
+| `Material.SetReceiveShadows` / `GetReceiveShadows` | `(id, on)` [`receive_shadows`] — URP's *Receive Shadows*, on by default: off, neither the sun's cascades nor a point or spot light's shadow lands on the surface (a wall's shadow stays off the water). Any material, opaque too; the surface still casts its own |
+
 ### Material slots
 
 An entity's `MaterialComponent` holds a **list** of library keys, one per material

@@ -41,7 +41,9 @@ fn draw(renderer: &mut Renderer, scene: &Scene, editor_mode: bool) {
 /// Which of (transparent, line, outline mask) are built.
 fn built(renderer: &Renderer) -> [bool; 3] {
     [
-        renderer.transparent_pipeline.is_built(),
+        super::TransparentBlend::ALL
+            .into_iter()
+            .any(|b| renderer.transparent_pipelines.is_built(b)),
         renderer.line_pipeline.is_built(),
         renderer.outline.mask.is_built(),
     ]
@@ -77,7 +79,7 @@ fn gpu_warm_pipelines_builds_every_lazy_pipeline() {
         return;
     };
     let every = renderer.lazy_pipelines(true);
-    // transparent + the motion-vector forward and 2 sky (#1435) + the same 3 into
+    // one transparent per blend state (#1523) + the motion-vector forward and 2 sky (#1435) + the same 3 into
     // the SSR surface target too (#1526) + the 2 primed forward ones (#1499) and the
     // primed SSR one + SSR's own pass + the motion blur's
     // 3 tile passes and gather (#1436) + the depth of field's 9 (#1445) + bloom's
@@ -86,7 +88,22 @@ fn gpu_warm_pipelines_builds_every_lazy_pipeline() {
     // one + 4 editor (line, the outline's mask, dilation and edge).
     assert_eq!(
         every.len(),
-        1 + 3 + 3 + 2 + 1 + 1 + 4 + 9 + 2 + 1 + 2 + 2 + UiBlend::ALL.len() + 2 + 1 + 4
+        super::TransparentBlend::ALL.len()
+            + 3
+            + 3
+            + 2
+            + 1
+            + 1
+            + 4
+            + 9
+            + 2
+            + 1
+            + 2
+            + 2
+            + UiBlend::ALL.len()
+            + 2
+            + 1
+            + 4
     );
     assert!(every.iter().all(|p| !p.is_built()), "headless stays lazy");
 

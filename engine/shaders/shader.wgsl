@@ -3,6 +3,7 @@
 // `fs_main` names its result `shadow`), so a surface variant's blocks can read any.
 #import forward::bindings::{bones, camera, cluster_lights, cluster_ranges, decals, entity, instances, lighting, local_lights, s_decal, s_diffuse, s_emissive, s_lightmaps, s_metallic, s_normal, s_refl_cube, s_roughness, s_shadow, s_skybox, shadow_tiles, t_ao, t_decal_color, t_decal_data, t_diffuse, t_emissive, t_lightmap_dirs, t_lightmaps, t_metallic, t_normal, t_refl_cube, t_roughness, t_shadow, t_shadow_atlas, t_skybox, vertex_to_world, vertex_to_world_prev}
 #import lighting::ssr_surface
+#import forward::transparent
 #import forward::lighting::{LIGHTMAP_RGBM_RANGE, ambient_occlusion, calculate_pbr, calculate_shadow, decode_lightmap_direction, environment_reflection, eval_sh, fold_decals, lightmap_direction_rebalance}
 
 // The forward pass (and its SSAO prepass and shadow-cascade entry points). Its
@@ -318,7 +319,16 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
         surface = fold_decals(surface, cluster, in.world_position, normalize(in.world_normal));
     }
     N = surface.normal;
-    let albedo = surface.albedo;
+    // A Multiply surface tints what is behind it toward white by its alpha (#1523,
+    // URP's `ApplyAlphaModulate` on the albedo).
+    var albedo = surface.albedo;
+    if (entity.blend_mode == 3u) {
+        albedo = mix(vec3<f32>(1.0), albedo, base_color.a);
+    }
+    // Preserve specular (#1523, URP's `_ALPHAPREMULTIPLY_ON`): only the diffuse is
+    // multiplied by alpha here, and the pipeline blends premultiplied, so reflections
+    // and highlights are not faded with it. `albedo` still sets a metal's F0.
+    let diffuse_albedo = albedo * select(1.0, base_color.a, entity.premultiply_diffuse == 1u);
     let metallic = surface.metallic;
     let roughness = surface.roughness;
 
@@ -359,7 +369,7 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     let ao = ambient_occlusion(in.clip_position.xy) * surface.occlusion;
     // The diffuse share is URP's `albedo * oneMinusReflectivity`: what the
     // environment reflection (step 5) takes, a dielectric's 4%, is not diffused too.
-    var lighting_color = ambient_irradiance * albedo * (0.96 * (1.0 - metallic)) * ao;
+    var lighting_color = ambient_irradiance * diffuse_albedo * (0.96 * (1.0 - metallic)) * ao;
 
     // A lightmapped surface skips `Baked` lights below: their direct light is already
     // in its lightmap (#438). Only a probe/reflection bake capture uploads them at all
@@ -367,14 +377,19 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     let skip_baked = lightmap_page > 0u;
 
     // 2. Directional lights (#434). Slot 0 is the sun, the one the cascades shadow.
-    let shadow = calculate_shadow(in.world_position, N);
+    // A surface that receives no shadows (#1523, URP's *Receive Shadows*) skips the
+    // cascades and the atlas.
+    var shadow = 1.0;
+    if (entity.receive_shadows == 1u) {
+        shadow = calculate_shadow(in.world_position, N);
+    }
     for (var i = 0u; i < lighting.num_dir_lights; i = i + 1u) {
         let sun = lighting.dir_lights[i];
         if (skip_baked && sun.baked > 0.5) {
             continue;
         }
         let radiance = sun.color * sun.intensity * select(1.0, shadow, i == 0u);
-        lighting_color += calculate_pbr(N, V, normalize(-sun.direction), radiance, F0, metallic, roughness, albedo);
+        lighting_color += calculate_pbr(N, V, normalize(-sun.direction), radiance, F0, metallic, roughness, diffuse_albedo);
     }
 
     // 3. Point and spot lights, only those binned into this fragment's cluster (#434),
@@ -391,11 +406,11 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
         }
         // Its shadow, when the atlas holds one (#468).
         let tile = local_shadow_tile(light, in.world_position);
-        if (tile != NO_SHADOW) {
+        if (tile != NO_SHADOW && entity.receive_shadows == 1u) {
             radiance *= sample_local_shadow(shadow_tiles[tile], t_shadow_atlas, s_shadow, light.position, in.world_position, N);
         }
         let L = normalize(light.position - in.world_position);
-        lighting_color += calculate_pbr(N, V, L, radiance, F0, metallic, roughness, albedo);
+        lighting_color += calculate_pbr(N, V, L, radiance, F0, metallic, roughness, diffuse_albedo);
     }
 
     // 5. Environment reflections (#244), always on (#718): like Unity's Lighting ->
@@ -433,7 +448,8 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     }
     lighting_color += emissive;
 
-    // 7. Scene fog (#437), last, in linear HDR before post-FX. Authored surface
-    // blocks fold into `lighting_color` here, so they are fogged too.
-    return vec4<f32>(apply_fog(camera.fog, lighting_color, in.world_position, camera.camera_pos), base_color.a);
+    // 7. Scene fog (#437), last, in linear HDR before post-FX, and how a transparent
+    // surface composites (#1523). Authored surface blocks fold into `lighting_color`
+    // here, so they are fogged too.
+    return transparent::composite(lighting_color, base_color.a, env_brdf, in.world_position);
 }

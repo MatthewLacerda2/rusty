@@ -21,6 +21,7 @@ mod maps;
 mod shader_params;
 mod slots;
 mod sources;
+mod surface;
 
 use std::collections::BTreeMap;
 use std::ops::RangeInclusive;
@@ -35,6 +36,9 @@ pub use shader_params::{
 };
 pub use slots::{keys, set_slot, slot_count};
 pub use sources::load_sources;
+pub use surface::{
+    set_surface, surface_field, SurfaceField, SurfaceKind, SurfaceValue, SURFACE_FIELDS,
+};
 
 use super::sanitize::{finite_array_or, non_negative, unit};
 use crate::asset::MapRef;

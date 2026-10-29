@@ -123,6 +123,9 @@ fn define(
     for (slot, path) in validated.shader_textures {
         mat_ops::set_shader_texture(materials, name, &slot, Some(path))?;
     }
+    for (field, value) in validated.surface {
+        mat_ops::set_surface(materials, name, field, value)?;
+    }
     Ok(())
 }
 

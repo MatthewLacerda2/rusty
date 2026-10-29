@@ -22,6 +22,9 @@
 //! 4. **Slots** (`slots`, #1285) — `Get` / `Set` / `GetAll` / `SetAt`: which library
 //!    material each sub-mesh run of the entity's mesh draws with.
 //!
+//! 5. **Transparent surfaces** (`surface`, #1523) — a `Set<Field>` / `Get<Field>`
+//!    pair per row of the shared surface-field table (`SetBlendMode`, …).
+//!
 //! Both are THIN adapters (#287): each setter resolves a library key (the entity's via
 //! `authoring::material::ensure_material_key`, or the chosen name via
 //! `authoring::material::ensure_named`), parses the render-mode string, then calls the
@@ -33,6 +36,7 @@ mod asset;
 mod from_lua;
 pub(crate) mod shader;
 mod slots;
+mod surface;
 
 use std::cell::RefCell;
 
@@ -57,6 +61,7 @@ pub fn register<'scope>(
     register_transparency(scope, &table, scene)?;
     asset::register(scope, &table, scene)?;
     slots::register(scope, &table, scene)?;
+    surface::register(scope, &table, scene)?;
     shader::params::register(scope, &table, scene)?;
     shader::textures::register(scope, &table, scene)?;
     put(

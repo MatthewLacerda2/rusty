@@ -8,9 +8,11 @@ mod lazy;
 pub(crate) mod priming;
 mod specs;
 pub(crate) mod surface;
+pub(crate) mod transparent;
 pub(crate) mod winding;
 
 pub(crate) use lazy::LazyPipeline;
+pub(crate) use transparent::{TransparentBlend, TransparentPipelines};
 
 use specs::{
     forward_spec, line_spec, make_pipeline, primed_spec, primed_velocity_spec, transparent_spec,
@@ -28,8 +30,8 @@ pub(crate) struct ForwardPipelines {
     /// The same, writing the view's velocity target too (#1435), and its SSR surface
     /// target (#1526): built the first time a view runs motion blur or SSR.
     pub velocity: VelocityPipelines,
-    /// Alpha-blended translucent solids (#242): ALPHA_BLENDING, depth write off.
-    pub transparent: LazyPipeline,
+    /// Blended translucent solids (#242), one per blend state (#1523), depth write off.
+    pub transparent: TransparentPipelines,
     /// The editor's line gizmos (grid, collider boxes, axis arrows, probes), drawn
     /// over the post-FX output (#1224), so built against the output format.
     pub line: LazyPipeline,
@@ -73,7 +75,9 @@ pub(crate) fn create_pipelines(
         velocity: VelocityPipelines::new(|surface| {
             lazy(&render_layout, format, velocity_spec(surface))
         }),
-        transparent: lazy(&render_layout, format, transparent_spec()),
+        transparent: TransparentPipelines::new(|blend| {
+            lazy(&render_layout, format, transparent_spec(blend))
+        }),
         line: lazy(&line_layout, output_format, line_spec()),
         prepass: make_prepass(device, shader, &render_layout, "fs_prepass"),
         primed: PrimedPipelines::new(device, shader, format, &render_layout),
@@ -101,7 +105,9 @@ pub(crate) fn surface_pipelines(
             lazy_pipeline(device, shader, format, layout, velocity_spec(surface))
         }),
         primed: PrimedPipelines::new(device, shader, format, layout),
-        transparent: make_pipeline(device, shader, format, layout, &transparent_spec()),
+        transparent: TransparentPipelines::new(|blend| {
+            lazy_pipeline(device, shader, format, layout, transparent_spec(blend))
+        }),
         cut: cut.then(|| surface::CutPipelines {
             prepass: make_prepass(device, shader, layout, CUT_PREPASS),
             shadow: depth_pipeline(device, shader, shadow_layout, Some(CUT_SHADOW), false),

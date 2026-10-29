@@ -8,6 +8,7 @@ use glam::Mat4;
 
 use crate::components::{MaterialAsset, RenderMode};
 use crate::render::gpu::lightmaps::Lightmaps;
+use crate::render::gpu::uniforms::SurfaceUniform;
 use crate::render::{EntityUniform, InstanceData};
 use crate::scene::Scene;
 
@@ -74,7 +75,33 @@ pub(crate) fn material_uniform(lit: bool, material: Option<&MaterialAsset>) -> E
         alpha_cutoff,
         bone_base: 0,
         receive_decals,
+        surface: surface_uniform(material),
     }
+}
+
+/// The transparent-surface terms of `material` (#1523). Blending and preserve
+/// specular apply to a `Transparent` material alone; a draw with no material
+/// receives shadows.
+pub(crate) fn surface_uniform(material: Option<&MaterialAsset>) -> SurfaceUniform {
+    let Some(m) = material else {
+        return SurfaceUniform {
+            receive_shadows: 1,
+            ..SurfaceUniform::default()
+        };
+    };
+    let glass = m.is_transparent();
+    SurfaceUniform {
+        blend_mode: m.blend_mode as u32,
+        premultiply_diffuse: u32::from(glass && preserves_specular(m)),
+        receive_shadows: u32::from(m.receive_shadows),
+        ..SurfaceUniform::default()
+    }
+}
+
+/// Whether URP's *Preserve Specular Lighting* is in effect for `m`: on, and under a
+/// blend mode that keeps it (`BlendMode::preserves_specular`).
+pub(crate) fn preserves_specular(m: &MaterialAsset) -> bool {
+    m.preserve_specular && m.blend_mode.preserves_specular()
 }
 
 /// One solid's instance: its world matrix, the SH its ambient term reads when a light

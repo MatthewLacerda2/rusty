@@ -26,7 +26,7 @@ fn surface_folds_blocks_into_the_final_return() {
     // The original flat return is gone (rewritten to apply the chain).
     assert!(!wgsl.contains(SURFACE_RETURN));
     // ...and the fog still wraps the folded chain, so authored looks are fogged.
-    assert!(wgsl.contains("apply_fog(camera.fog, srf_toon_ramp("));
+    assert!(wgsl.contains("transparent::composite(srf_toon_ramp("));
 }
 
 #[test]
