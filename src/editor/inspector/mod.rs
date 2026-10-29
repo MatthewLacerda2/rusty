@@ -224,7 +224,8 @@ fn draw_components(
 ) {
     let skin_tool = &mut pending.skin_tool;
     mesh::draw_mesh(ui, world, id, &mut editor.is_dirty, skin_tool);
-    material::draw_material_card(ui, editor, world, id, materials);
+    let action = &mut pending.material_action;
+    material::draw_material_card(ui, editor, world, id, materials, action);
     render::draw_light(ui, world, id, &mut editor.is_dirty);
     lod_group::draw_lod_group(ui, world, id, &mut editor.is_dirty);
 

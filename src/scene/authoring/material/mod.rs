@@ -18,6 +18,7 @@
 //! Pure: no wall-clock, no RNG.
 
 mod coordinates;
+mod library;
 mod maps;
 mod shader_params;
 mod slots;
@@ -31,6 +32,9 @@ pub use crate::components::material::entity_material_key;
 
 pub use coordinates::{
     BLEND_SHARPNESS_RANGE, COORDINATE_FIELDS, MAP_COORD_RANGE, WORLD_SIZE_RANGE,
+};
+pub use library::{
+    delete_asset, describe, describe_all, restore_asset, users, DeletedMaterial, MaterialUser,
 };
 pub use maps::{bake_maps, rebake_maps, MAPS_DIR};
 pub use shader_params::{
