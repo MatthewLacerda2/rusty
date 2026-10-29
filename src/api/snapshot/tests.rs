@@ -140,3 +140,14 @@ fn nav_agent_reports_its_turning() {
     assert_eq!(agent["angular_speed"].as_f64(), Some(120.0));
     assert_eq!(agent["angular_acceleration"].as_f64(), Some(720.0));
 }
+
+#[test]
+fn a_subdivided_plane_reports_its_subdivisions() {
+    use super::components::mesh_value;
+    let mut scene = Scene::new();
+    let id = create_entity(&mut scene, "Water", Some(Primitive::Plane));
+    let read = |s: &Scene| mesh_value(&s.world.mesh(id).unwrap());
+    assert!(read(&scene).get("subdivisions").is_none(), "1 stays out");
+    scene.world.mesh_mut(id).unwrap().subdivisions = 64;
+    assert_eq!(read(&scene)["subdivisions"].as_u64(), Some(64));
+}

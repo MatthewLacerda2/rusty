@@ -337,10 +337,12 @@ Material.SetShader(pool, "pool_water")
 Material.SetShaderParam(pool, "vertex_waves.amplitude", 0.05)   -- live, no re-bake
 ```
 
-Two limits: a **Static** entity's shadow is drawn once into the cached static map
-and stays as it was, so keep a moving surface non-static; and frustum culling uses
-the mesh's bounds as modelled, so keep `amplitude` small against the mesh's size
-(swells, not towers). A second scrolling normal-map layer
+A **Static** moving surface still casts a moving shadow: a variant that moves its
+vertices is drawn in the dynamic shadow sweep every frame, as a cutting one is,
+never frozen into the cached static map. What a bake captures stays as modelled:
+the lightmap baker sees the flat mesh, and a reflection probe captures the surface
+at the moment it was baked. Frustum culling uses the mesh's bounds as modelled too,
+so keep `amplitude` small against the mesh's size (swells, not towers). A second scrolling normal-map layer
 is not a block: blocks restyle the colour, move the UVs or move the vertex, and a
 blended second normal sample is none of those.
 
