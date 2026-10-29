@@ -2,9 +2,7 @@
 //! without a GPU: what the shader branches on and the blend picks.
 
 use super::{material_uniform, surface_uniform};
-use crate::components::{
-    BlendMode, MapCoordinates, MaterialAsset, RefractionModel, RenderMode, UvMapping,
-};
+use crate::components::{BlendMode, MaterialAsset, RefractionModel, RenderMode, UvMapping};
 
 fn glass() -> MaterialAsset {
     MaterialAsset {
@@ -123,13 +121,11 @@ fn only_a_transparent_material_packs_its_blend_mode() {
 #[test]
 fn map_coordinates_pack_as_scale_offset_mode_and_repeats_per_metre() {
     let tiled = MaterialAsset {
-        coordinates: MapCoordinates {
-            tiling: [4.0, 2.0],
-            offset: [0.5, 0.25],
-            uv_mapping: UvMapping::Triplanar,
-            world_size: 2.0,
-            blend_sharpness: 8.0,
-        },
+        tiling: [4.0, 2.0],
+        offset: [0.5, 0.25],
+        uv_mapping: UvMapping::Triplanar,
+        world_size: 2.0,
+        blend_sharpness: 8.0,
         ..MaterialAsset::default()
     };
     let m = material_uniform(true, Some(&tiled)).mapping;

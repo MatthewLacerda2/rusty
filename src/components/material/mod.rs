@@ -18,9 +18,10 @@ use serde::{Deserialize, Serialize};
 use crate::asset::MapRef;
 use crate::procgen::TextureRecipe;
 pub use decal::DecalBlend;
-pub use mapping::{MapCoordinates, UvMapping};
+pub use mapping::UvMapping;
+use mapping::{default_blend_sharpness, default_tiling};
 use surface::{default_ior, default_one, white};
-pub use surface::{BlendMode, RefractionModel};
+pub use surface::{BlendMode, RefractionModel, RenderMode};
 
 fn default_base_color() -> [f32; 3] {
     [1.0, 1.0, 1.0]
@@ -44,25 +45,6 @@ fn default_true() -> bool {
 
 fn is_true(value: &bool) -> bool {
     *value
-}
-
-crate::core::named_enum! {
-    /// How a material's surface is composited — Unity's "Rendering Mode" (#242). Plain
-    /// serde data, mirroring [`ParticleBlend`](super::ParticleBlend) as prior art for a
-    /// blend selector. `Opaque` is the default and the fast path.
-    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-    pub enum RenderMode {
-        /// Fully opaque (`REPLACE`, depth write on). The default; rides the solids pass.
-        #[default]
-        Opaque = "Opaque",
-        /// Alpha-tested: the fragment is `discard`ed below `alpha_cutoff`, else fully
-        /// opaque. Writes depth, needs no sorting, so it also rides the solids pass
-        /// (foliage, chain-link, grates).
-        Cutout = "Cutout",
-        /// Alpha-blended (`ALPHA_BLENDING`), depth test on / write off, drawn in a
-        /// separate back-to-front-sorted pass after opaque (glass, holograms, fades).
-        Transparent = "Transparent",
-    }
 }
 
 /// The glTF 2.0 metallic-roughness material data — a reusable asset. Stored in the
@@ -95,10 +77,25 @@ pub struct MaterialAsset {
     pub emissive: [f32; 3],
     #[serde(default)]
     pub emissive_map: Option<MapRef>,
-    /// Where the maps above are read (#1573): tiling, offset and a world-space
-    /// projection. Flattened: its keys sit beside these in a scene file.
-    #[serde(flatten, skip_serializing_if = "MapCoordinates::is_default")]
-    pub coordinates: MapCoordinates,
+    /// Unity's *Tiling* (#1573): how many times the maps above repeat across UV0,
+    /// or across `world_size` metres under a world mapping. (1, 1) by default.
+    #[serde(default = "default_tiling")]
+    pub tiling: [f32; 2],
+    /// Unity's *Offset*, added after `tiling`, in texture repeats. (0, 0) by default.
+    #[serde(default)]
+    pub offset: [f32; 2],
+    /// Where the maps are read, HDRP's *Base UV Mapping*: UV0 (the default), or
+    /// projected from world space.
+    #[serde(default)]
+    pub uv_mapping: UvMapping,
+    /// How many metres one repeat covers under a world mapping (HDRP's *World
+    /// Scale* is its inverse). 1 by default.
+    #[serde(default = "default_one")]
+    pub world_size: f32,
+    /// How sharply `Triplanar` turns from one projection to the next: the normal's
+    /// components are raised to this power before they weight the three. 4 by default.
+    #[serde(default = "default_blend_sharpness")]
+    pub blend_sharpness: f32,
     /// Compositing mode (#242); `Opaque` when absent.
     #[serde(default)]
     pub render_mode: RenderMode,
@@ -208,7 +205,11 @@ impl Default for MaterialAsset {
             normal_map: None,
             emissive: [0.0, 0.0, 0.0],
             emissive_map: None,
-            coordinates: MapCoordinates::default(),
+            tiling: default_tiling(),
+            offset: [0.0; 2],
+            uv_mapping: UvMapping::Uv0,
+            world_size: default_one(),
+            blend_sharpness: default_blend_sharpness(),
             render_mode: RenderMode::Opaque,
             alpha: default_alpha(),
             alpha_cutoff: default_alpha_cutoff(),

@@ -88,7 +88,7 @@ fn a_pair_is_clamped_per_component() {
     let mut materials = one();
     let tiling = SurfaceValue::Vec2([5000.0, -3.0]);
     set_surface(&mut materials, "k", field("Tiling"), tiling).unwrap();
-    assert_eq!(materials["k"].coordinates.tiling, [1000.0, -3.0]);
+    assert_eq!(materials["k"].tiling, [1000.0, -3.0]);
     let err = set_surface(
         &mut materials,
         "k",

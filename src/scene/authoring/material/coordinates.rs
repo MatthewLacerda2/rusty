@@ -18,7 +18,7 @@ fn pair(value: SurfaceValue) -> [f32; 2] {
 }
 
 fn world_mapped(m: &MaterialAsset) -> bool {
-    m.coordinates.uv_mapping != UvMapping::Uv0
+    m.uv_mapping != UvMapping::Uv0
 }
 
 /// Every map-coordinate field, in Inspector order.
@@ -29,8 +29,8 @@ pub static COORDINATE_FIELDS: &[SurfaceField] = &[
         label: "UV Mapping",
         kind: SurfaceKind::Choice(|| UvMapping::ALL.map(UvMapping::name).to_vec()),
         shown: |_| true,
-        get: |m| SurfaceValue::Text(m.coordinates.uv_mapping.name().to_owned()),
-        put: |m, v| m.coordinates.uv_mapping = choice(v, UvMapping::parse),
+        get: |m| SurfaceValue::Text(m.uv_mapping.name().to_owned()),
+        put: |m, v| m.uv_mapping = choice(v, UvMapping::parse),
     },
     SurfaceField {
         key: "tiling",
@@ -38,8 +38,8 @@ pub static COORDINATE_FIELDS: &[SurfaceField] = &[
         label: "Tiling",
         kind: SurfaceKind::Vec2(-1000.0..=1000.0),
         shown: |_| true,
-        get: |m| SurfaceValue::Vec2(m.coordinates.tiling),
-        put: |m, v| m.coordinates.tiling = pair(v),
+        get: |m| SurfaceValue::Vec2(m.tiling),
+        put: |m, v| m.tiling = pair(v),
     },
     SurfaceField {
         key: "offset",
@@ -47,8 +47,8 @@ pub static COORDINATE_FIELDS: &[SurfaceField] = &[
         label: "Offset",
         kind: SurfaceKind::Vec2(-1000.0..=1000.0),
         shown: |_| true,
-        get: |m| SurfaceValue::Vec2(m.coordinates.offset),
-        put: |m, v| m.coordinates.offset = pair(v),
+        get: |m| SurfaceValue::Vec2(m.offset),
+        put: |m, v| m.offset = pair(v),
     },
     SurfaceField {
         key: "world_size",
@@ -56,16 +56,16 @@ pub static COORDINATE_FIELDS: &[SurfaceField] = &[
         label: "World Size (m)",
         kind: SurfaceKind::Number(0.01..=100.0),
         shown: world_mapped,
-        get: |m| SurfaceValue::Number(m.coordinates.world_size),
-        put: |m, v| m.coordinates.world_size = number(v),
+        get: |m| SurfaceValue::Number(m.world_size),
+        put: |m, v| m.world_size = number(v),
     },
     SurfaceField {
         key: "blend_sharpness",
         api: "BlendSharpness",
         label: "Blend Sharpness",
         kind: SurfaceKind::Number(1.0..=64.0),
-        shown: |m| m.coordinates.uv_mapping == UvMapping::Triplanar,
-        get: |m| SurfaceValue::Number(m.coordinates.blend_sharpness),
-        put: |m, v| m.coordinates.blend_sharpness = number(v),
+        shown: |m| m.uv_mapping == UvMapping::Triplanar,
+        get: |m| SurfaceValue::Number(m.blend_sharpness),
+        put: |m, v| m.blend_sharpness = number(v),
     },
 ];

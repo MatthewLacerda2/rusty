@@ -6,7 +6,7 @@
 
 use glam::Mat4;
 
-use crate::components::{MapCoordinates, MaterialAsset, RefractionModel, RenderMode};
+use crate::components::{MaterialAsset, RefractionModel, RenderMode};
 use crate::render::gpu::lightmaps::Lightmaps;
 use crate::render::gpu::uniforms::{MappingUniform, SurfaceUniform};
 use crate::render::{EntityUniform, InstanceData};
@@ -76,13 +76,13 @@ pub(crate) fn material_uniform(lit: bool, material: Option<&MaterialAsset>) -> E
         bone_base: 0,
         receive_decals,
         surface: surface_uniform(lit, material),
-        mapping: material.map_or_else(MappingUniform::default, |m| mapping_uniform(&m.coordinates)),
+        mapping: material.map_or_else(MappingUniform::default, mapping_uniform),
     }
 }
 
-/// Where `c` reads a material's maps (#1573): its tiling and offset as one
+/// Where material `c` reads its maps (#1573): its tiling and offset as one
 /// scale/offset, its mapping by index, and its world size as repeats per metre.
-pub(crate) fn mapping_uniform(c: &MapCoordinates) -> MappingUniform {
+pub(crate) fn mapping_uniform(c: &MaterialAsset) -> MappingUniform {
     let [sx, sy] = c.tiling;
     let [ox, oy] = c.offset;
     MappingUniform {

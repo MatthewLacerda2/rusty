@@ -191,7 +191,7 @@ pub(crate) struct SurfaceUniform {
 }
 
 /// Where a draw's material maps are read (#1573), packed from its
-/// `MapCoordinates`; the default is UV0 untouched, for draws with no material.
+/// tiling, offset and UV mapping; the default is UV0 untouched, for draws with no material.
 #[repr(C)]
 #[derive(Copy, Clone, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub(crate) struct MappingUniform {

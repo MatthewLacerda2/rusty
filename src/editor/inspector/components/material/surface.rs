@@ -7,6 +7,8 @@
 
 use std::collections::BTreeMap;
 
+use crate::editor::widgets::DragRange;
+
 use crate::scene::authoring::material::{self as mat_ops, SurfaceField, SurfaceKind, SurfaceValue};
 use crate::scene::MaterialAsset;
 
@@ -68,12 +70,12 @@ fn draw_field(
                 let x = ui.add(
                     egui::DragValue::new(&mut v[0])
                         .speed(0.01)
-                        .range(range.clone()),
+                        .ranged(range.clone()),
                 );
                 let y = ui.add(
                     egui::DragValue::new(&mut v[1])
                         .speed(0.01)
-                        .range(range.clone()),
+                        .ranged(range.clone()),
                 );
                 (x.changed() || y.changed()).then_some(SurfaceValue::Vec2(v))
             }

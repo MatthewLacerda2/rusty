@@ -1,6 +1,26 @@
-//! How a `Transparent` material composites over what is behind it (#1523): Unity
-//! URP Lit's *Blending Mode* and *Preserve Specular Lighting*, the *Receive
-//! Shadows* toggle every surface has, and HDRP Lit's refraction and absorption.
+//! How a material is composited (its `RenderMode`, #242) and how a `Transparent`
+//! one composites over what is behind it (#1523): Unity URP Lit's *Blending Mode*
+//! and *Preserve Specular Lighting*, the *Receive Shadows* toggle every surface has,
+//! and HDRP Lit's refraction and absorption.
+
+crate::core::named_enum! {
+    /// How a material's surface is composited — Unity's "Rendering Mode" (#242). Plain
+    /// serde data, mirroring [`ParticleBlend`](crate::components::ParticleBlend) as prior art for a
+    /// blend selector. `Opaque` is the default and the fast path.
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    pub enum RenderMode {
+        /// Fully opaque (`REPLACE`, depth write on). The default; rides the solids pass.
+        #[default]
+        Opaque = "Opaque",
+        /// Alpha-tested: the fragment is `discard`ed below `alpha_cutoff`, else fully
+        /// opaque. Writes depth, needs no sorting, so it also rides the solids pass
+        /// (foliage, chain-link, grates).
+        Cutout = "Cutout",
+        /// Alpha-blended (`ALPHA_BLENDING`), depth test on / write off, drawn in a
+        /// separate back-to-front-sorted pass after opaque (glass, holograms, fades).
+        Transparent = "Transparent",
+    }
+}
 
 crate::core::named_enum! {
     /// How a transparent surface's colour combines with the image behind it — URP

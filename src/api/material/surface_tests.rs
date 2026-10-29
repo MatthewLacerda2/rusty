@@ -103,7 +103,7 @@ fn map_coordinates_take_pairs_by_position_or_name() {
             uv_mapping = "Planar", world_size = 2 })"#,
     )
     .unwrap();
-    let c = scene.borrow().materials["floor"].coordinates.clone();
+    let c = scene.borrow().materials["floor"].clone();
     assert_eq!(
         (c.tiling, c.offset, c.world_size),
         ([8.0; 2], [1.0, 0.0], 2.0)
