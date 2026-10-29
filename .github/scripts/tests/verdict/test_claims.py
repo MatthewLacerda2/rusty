@@ -12,7 +12,7 @@ import subprocess
 import unittest
 from unittest import mock
 
-from merging.queue import cli, outcomes, pulls, rebase, taking
+from merging.queue import cli, outcomes, pulls, taking, update
 from merging.verdict import closing, github, protocol
 from tests.verdict.fixtures import READY, both, verdict
 
@@ -113,7 +113,7 @@ class Taken(unittest.TestCase):
         pull = {**claiming({}), "state": "OPEN", "title": "t", "author": {"login": "x"}}
         with mock.patch.object(pulls, "look", return_value=pull), \
             mock.patch.object(github, "gh", side_effect=answers({927: issue("human")})), \
-            mock.patch.object(rebase, "advance") as rebased, mock.patch("builtins.print"):
+            mock.patch.object(update, "advance") as rebased, mock.patch("builtins.print"):
             _, state, why = taking.take("o/r", 927, cli.parse(["927"]))
         self.assertEqual(state, outcomes.AWAITS_ISSUE)  # only the issue can change (#1279)
         self.assertEqual(why, "it closes #927, which is labelled `human`.")

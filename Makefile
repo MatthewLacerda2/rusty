@@ -31,7 +31,7 @@ SELF_CHECKS := target-dir inventory
 
 .DEFAULT_GOAL := help
 .NOTPARALLEL:
-.PHONY: help setup compile-cache check gates quick-gates pre-commit resolved $(SELF_CHECKS) $(GATES) mergeable queue queue-daemon queue-stop blockers checks reclaim mutants-remote test-one-process dead-pub editor-capture export launcher bench bless-converters
+.PHONY: help setup compile-cache check gates quick-gates pre-commit resolved $(SELF_CHECKS) $(GATES) mergeable queue queue-daemon queue-stop blockers checks reclaim coder review-level mutants-remote test-one-process dead-pub editor-capture export launcher bench bless-converters
 
 help: ## List the verbs
 	@grep -E '^[a-z-]+:.*## ' $(firstword $(MAKEFILE_LIST)) | \
@@ -85,7 +85,7 @@ pre-commit: ## What the commit hook runs: formatting + size gate on staged .rs, 
 	@files="$$(git diff --cached --name-only --diff-filter=ACMR -- '*.rs' '*.py' '*.lua' '*.wgsl')"; \
 		if [ -n "$$files" ]; then $(LINT) -- $$files; fi
 
-# `git rebase --continue` skips the commit hook; the push hook covers it (#1096).
+# `git rebase --continue` and `--no-verify` skip the commit hook; the push hook covers them (#1096).
 resolved: ## The push hook's check: rustfmt on the root crate and tools/lint, as lint.yml runs it
 	@python3 .github/scripts/resolved.py
 
@@ -210,12 +210,13 @@ mergeable: ## Did CI really run on this PR's head? make mergeable PR=524
 	@test -n "$(PR)" || { echo "mergeable: which pull request? e.g. make mergeable PR=524" >&2; exit 1; }
 	@python3 .github/scripts/mergeable.py $(PR)
 
-# The same question in a loop, with the rebase and the waiting done for you.
-# Serialized: one branch at a time, in the order given. Compile-checks each
-# rebased head before pushing it (#571; ARGS=--no-check skips). Never resolves
+# The same question in a loop, with the update from main and the waiting done for you.
+# Serialized: one branch at a time, in the order given. Merges origin/main into
+# each (never a rebase, so never a force-push, #1568) and compile-checks the
+# updated head before pushing it (#571; ARGS=--no-check skips). Never resolves
 # a conflict or touches a worktree of yours; it names what to clean up.
 # ARGS passes flags through, e.g. ARGS=--dry-run (reads only, writes nothing).
-queue: ## Rebase, wait for CI, squash-merge each in turn. make queue PRS="524 526", or ARGS=--watch
+queue: ## Merge main in, wait for CI, squash-merge each in turn. make queue PRS="524 526", or ARGS=--watch
 	@test -n "$(PRS)$(filter --watch,$(ARGS))" || { echo "queue: which pull requests? e.g. make queue PRS=\"524 526\", or make queue ARGS=--watch" >&2; exit 1; }
 	@python3 .github/scripts/merge-queue.py $(PRS) $(ARGS)
 
@@ -263,7 +264,22 @@ checks: ## Unticked human checks from PRs merged since then. make checks SINCE=1
 reclaim: ## Remove merged worktrees (and their target/) and finished local branches, report disk. ARGS=--dry-run lists only
 	@python3 .github/scripts/reclaim.py $(ARGS)
 
-# ---- signals (#750) ---------------------------------------------------------
+# A batch's two dispatch steps, scripted (#1569). `coder` reads the newest
+# `Brief` comment on the issue, takes its `Model:` line, and creates the one-off
+# routine that starts the cloud coder (through `claude mcp serve`, so the
+# claude.ai token stays inside claude); running it again is the re-brief launch.
+# It refuses a closed, `planning` or `human` issue and a brief with no model.
+# ARGS=--dry-run prints the routine and creates nothing. `review-level` prints
+# `high` or `medium` for an independent review, and the paths that decided it.
+coder: ## Start the cloud coder on an issue's newest Brief. make coder ISSUE=1569, ARGS=--dry-run creates nothing
+	@test -n "$(ISSUE)" || { echo "coder: which issue? e.g. make coder ISSUE=1569" >&2; exit 1; }
+	@python3 .github/scripts/coder.py $(ISSUE) $(ARGS)
+
+review-level: ## The independent review's level (high or medium) and why. make review-level PR=1570
+	@test -n "$(PR)" || { echo "review-level: which pull request? e.g. make review-level PR=1570" >&2; exit 1; }
+	@python3 .github/scripts/review-level.py $(PR)
+
+# ---- signals (#750)---------------------------------------------------------
 
 # Mutation testing on GitHub's runners, over exactly what SCOPE names: `diff`
 # (this branch against origin/main) or path globs. Dispatches

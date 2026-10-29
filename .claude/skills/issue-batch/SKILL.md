@@ -13,8 +13,8 @@ This skill is how the orchestrator runs a batch on top of them.
 
 ## What runs together: file collision, not count
 
-Merging is serialized, so every branch behind another pays a rebase per merge
-ahead of it. Over separate files that is seconds of `git`; over shared code it is
+Merging is serialized, so every branch behind another pays an update (a merge of
+`main` into it) per merge ahead of it. Over separate files that is seconds of `git`; over shared code it is
 a session of conflict resolution. **Before starting a branch, ask whether it edits
 the same types as one in flight.** Spread across modules (physics, UI,
 navigation, audio, CI) at once; within one module, run one branch at a time.
@@ -71,21 +71,36 @@ build half the cores (`CARGO_BUILD_JOBS`) when another may overlap it. Never run
 `cloud-brief.md`, and puts its issue number in every scratch filename: siblings
 share the scratchpad.
 
-**Launching a cloud coder.** A one-off routine via `RemoteTrigger` (the `schedule`
-skill has the body shape):
+**Launching a cloud coder: post the `Brief`, then `make coder ISSUE=N`** (#1569).
+It reads the newest `Brief` comment on #N, takes the model from its `Model:` line,
+and creates the one-off routine that starts the cloud session a minute or two
+later; it prints the routine's link, where its run links the session. Running it
+again for the same issue is the re-brief launch: a new routine whose prompt names
+the new `Brief`. `ARGS=--dry-run` prints the routine and
+creates nothing. Never assemble a `RemoteTrigger` body by hand; what the script
+keeps, and why (`.github/scripts/dispatch/routine.py` has the detail):
 
 - **Environment: `anthropic_cloud`**, never a `bridge` one (`archlinux:…` is this
   machine). That choice is what makes it remote. Not the `Agent` tool's
-  `isolation: "remote"`, which fell back to a local worktree here (#504).
-- `run_once_at` computed, never typed: `date -u -d '+2 min' +%Y-%m-%dT%H:%M:00Z`
-  (`-v+2M` on macOS). The API refuses a time already past.
-- **The model** from the brief's `Model:` line (*Which model*), never the
-  example body's default.
-- **`allowed_tools`** includes `ToolSearch`; the GitHub MCP tools load through it
-  without being listed.
+  `isolation: "remote"`, which fell back to a local worktree here (#504). The API
+  cannot list environments, so the script takes the one the newest `rusty #…`
+  routine ran in; `RUSTY_CLOUD_ENV` names it on an account with none yet.
+- **The model** from the brief's `Model:` line (*Which model*): a brief without
+  one naming Opus or Sonnet is refused, and so are a closed issue, a `planning`
+  or `human` one, and a brief by someone who cannot push.
+- `run_once_at` computed, `allowed_tools` with `ToolSearch` (the GitHub MCP tools
+  load through it without being listed), and the prompt below.
+- **The prompt names the brief's URL**, the exact comment the script checked,
+  never "the newest `Brief`": the repository is public and the routine fires
+  minutes later (28 late on 2026-10-29), so a comment posted in between would
+  otherwise be what a coder with push access follows (PR #1572's review).
+- It calls `RemoteTrigger` through `claude mcp serve`, so it needs the `claude`
+  CLI signed in to claude.ai, as this machine is; the token never leaves
+  `claude`. `claude --cloud` cannot do it: it starts a session only from an
+  interactive terminal, and an orchestrator's shell has none.
 
 **The brief is a comment on the issue** (#910), first line `Brief`. The prompt is
-echoed back about three times by `RemoteTrigger`, so it stays a fixed pointer, and
+echoed back about three times by `RemoteTrigger`, so it stays a pointer, and
 the comment is durable for a relaunch or a later reader. Standing rules for every
 coder live in [`cloud-brief.md`](cloud-brief.md); change them there, once.
 
@@ -126,18 +141,19 @@ So, before writing a brief:
 - file an issue first and cite the number it got, never the one you expect: two
   briefs named the wrong issue in one batch.
 
-The routine prompt:
+The routine prompt, which `make coder` writes (`dispatch/routine.py`'s `PROMPT`):
 
 ```text
 Read `.claude/skills/issue-batch/cloud-brief.md` and follow it.
-Issue(s): #N. Your brief is the newest comment on it that starts with `Brief`.
+Issue(s): #N. Your brief is the comment at <the brief's URL>; read it there, not the newest `Brief`.
 ```
 
-A re-brief (a rebase, a fix, a new sibling) is a new `Brief` comment on the
-issue that says **add commits on top, rebase only if the PR conflicts** (the
-queue rebases at merge; a voluntary rebase's force-push was refused twice on
-2026-10-28 and cost a `-v2` PR each), and the PR turned back to draft. **Then `RemoteTrigger run` the coder's own routine right
-away.** Its prompt already points at the newest `Brief`. Don't wait for the old
+A re-brief (a conflict, a fix, a new sibling) is a new `Brief` comment on the
+issue that says **add commits on top, merge `origin/main` in only if the PR
+conflicts, never rebase** (the queue merges `main` in at merge time; a rebase's
+force-push was refused twice on 2026-10-28 and cost a `-v2` PR each, #1568), so
+no brief needs to authorise a force-push, and the PR turned back to draft. **Then `make coder ISSUE=N` again
+right away**: a new routine whose prompt names the new `Brief`. Don't wait for the old
 session: it is subscribed to the PR, not the issue. In the 2026-10-22 batch,
 sessions woke on the draft flip, read only the PR, found no instruction and
 stood down, by design (`cloud-brief.md`: once ready, the branch is the
@@ -267,7 +283,7 @@ The model follows the shape of the task, not the area of the code (operator,
 2026-10-19). **Sonnet when the issue already says exactly what to do and a gate
 proves it was done; Opus when the work has to decide something.**
 
-- **Sonnet:** a mechanical rebase (two rows in one table, a moved file); a doc
+- **Sonnet:** a mechanical conflict resolution (two rows in one table, a moved file); a doc
   fix the docrefs check proves; splitting an oversized file or regrouping a
   directory; a lint rule whose issue names the case to flag and the case to pass;
   the editor's egui panels, cards and inspectors.

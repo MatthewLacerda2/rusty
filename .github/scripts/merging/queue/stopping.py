@@ -2,8 +2,8 @@
 
 ## A hand-back skips the entry; it does not stop the queue
 
-Only the machine does (see above). Every branch is rebased onto `main` as `main` is at its own turn, and CI
-judges that tree, so nothing a hand-back leaves behind can make a later merge
+Only the machine does (see above). Every branch has `main` merged in as `main`
+is at its own turn, and CI judges that tree, so nothing a hand-back leaves behind can make a later merge
 unsound (scorsese#495). Each hand-back is named in the summary, and the exit
 status is non-zero if there was any.
 """
@@ -17,7 +17,7 @@ from merging.verdict import github
 class Stopped(Exception):
     """A failure that is the machine's, not the branch's: the queue stops.
 
-    Raised through [`rebase.advance`] (whose `finally` still removes its worktree) and
+    Raised through [`update.advance`] (whose `finally` still removes its worktree) and
     caught by [`drain`], which names every later entry as not taken.
     """
 

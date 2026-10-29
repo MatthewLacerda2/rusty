@@ -50,4 +50,4 @@ def conflicts(pulls: list[dict], git, known: dict[tuple[str, str], list[str]], b
 
 def why(files: list[str]) -> str:
     """The hand-back's reason, naming the files."""
-    return f"it conflicts with `main` in {', '.join(files)}; rebase it onto origin/main and push."
+    return f"it conflicts with `main` in {', '.join(files)}; merge origin/main into it and push."

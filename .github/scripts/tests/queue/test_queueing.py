@@ -57,7 +57,7 @@ class Contract(unittest.TestCase):
             ("--dry-run", "merge nothing"),
             ("--deadline", "give up waiting"),
             ("--poll", "ask GitHub"),
-            ("--root", "rebase in"),
+            ("--root", "update in"),
         ):
             self.assertIn(flag, done.stdout)
             self.assertIn(described, " ".join(done.stdout.split()))

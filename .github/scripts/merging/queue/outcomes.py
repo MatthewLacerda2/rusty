@@ -44,7 +44,8 @@ class Awaiting(tuple):
 STOPPED, NOT_TAKEN = "stopped the queue", "not taken"
 
 # A watched pull request that turned draft or closed between listing and taking,
-# and what [`taking.take`] says about one.
+# or whose branch was pushed to during its take ([`refusal.MOVED`], #1568), and
+# what [`taking.take`] says about one.
 NOT_READY = "not ready"
 
 NOT_OPEN, A_DRAFT = "it is {}.", "it is a draft; mark it ready first."

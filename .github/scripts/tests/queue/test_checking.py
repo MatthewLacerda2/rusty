@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""#571: a textually clean rebase is compiled before it is pushed."""
+"""#571: a textually clean update is compiled before it is pushed."""
 
 from __future__ import annotations
 
@@ -7,22 +7,22 @@ import subprocess
 import unittest
 from unittest import mock
 
-from merging.queue import checks, cli, gitio, rebase
+from merging.queue import checks, cli, gitio, update
 from tests.queue.fixtures import READY, completed
 from tests.verdict.fixtures import SHA
 
 
 class Checking(unittest.TestCase):
-    """#571: a textually clean rebase is compiled before it is pushed."""
+    """#571: a textually clean update is compiled before it is pushed."""
 
-    def fake_git(self, rebase=0, moved=True, unmerged=""):
-        """`gitio.git` for [`rebase.advance`]: records every call, pushes included."""
+    def fake_git(self, merge=0, moved=True, unmerged=""):
+        """`gitio.git` for [`update.advance`]: records every call, pushes included."""
         calls = []
 
         def git(*args, cwd=None):
             calls.append(args)
-            if args[0] == "rebase" and args[1] != "--abort":
-                return completed(rebase)
+            if args[0] == "merge" and args[1] != "--abort":
+                return completed(merge)
             if args[0] == "rev-parse":
                 return subprocess.CompletedProcess([], 0, ("1" * 40 if moved else SHA) + "\n", "")
             if args[0] == "diff":
@@ -34,12 +34,12 @@ class Checking(unittest.TestCase):
     def advance(self, check, **git):
         fake, calls = self.fake_git(**git)
         with mock.patch.object(gitio, "git", side_effect=fake):
-            result = rebase.advance("b", SHA, ".", push=True, check=check)
+            result = update.advance("b", SHA, ".", push=True, check=check)
         self.calls = calls
         return result, [c[0] for c in calls]
 
     def test_a_head_that_fails_the_check_is_never_pushed(self):
-        (fresh, notes), verbs = self.advance(lambda work: ["the rebased head fails cargo check (dev); not pushed."])
+        (fresh, notes), verbs = self.advance(lambda work: ["the updated head fails cargo check (dev); not pushed."])
         self.assertIsNone(fresh)
         self.assertIn("not pushed", notes[0])
         self.assertNotIn("push", verbs)
@@ -52,21 +52,21 @@ class Checking(unittest.TestCase):
 
     def test_a_conflict_is_handed_back_unchecked_and_unresolved(self):
         check = mock.Mock(return_value=[])
-        (fresh, notes), verbs = self.advance(check, rebase=1, unmerged="src/app/registry.rs\n")
+        (fresh, notes), verbs = self.advance(check, merge=1, unmerged="src/app/registry.rs\n")
         self.assertIsNone(fresh)
         self.assertIn("src/app/registry.rs", " ".join(notes))
-        self.assertIn(("rebase", "--abort"), self.calls)
+        self.assertIn(("merge", "--abort"), self.calls)
         check.assert_not_called()
         self.assertNotIn("push", verbs)
 
-    def test_a_rebase_that_moved_nothing_is_not_rechecked(self):
+    def test_an_update_that_moved_nothing_is_not_rechecked(self):
         check = mock.Mock(return_value=[])
         (fresh, _), verbs = self.advance(check, moved=False)
         self.assertEqual(fresh, SHA)
         check.assert_not_called()
         self.assertNotIn("push", verbs)
 
-    def test_verify_runs_both_feature_sets_then_the_size_gate_in_the_rebased_tree(self):
+    def test_verify_runs_both_feature_sets_then_the_size_gate_in_the_updated_tree(self):
         runner = mock.Mock(return_value=completed(0))
         self.assertEqual(checks.verify("/tmp/wt", "/q/target", runner=runner), [])
         argvs = [c.args[0] for c in runner.call_args_list]

@@ -58,8 +58,8 @@ def no_run(pull: dict, short: str, workflow: str) -> list[str]:
             " merge ref for a conflicted branch, so it never evaluates the"
             " workflow's triggers and creates no run, no check and no error"
             " anywhere. The workflow file is fine — do not edit it.",
-            "Rebase onto `main` and force-push; the merge routine asks for that"
-            " rebase anyway.",
+            "Merge `origin/main` into the branch and push; the merge routine"
+            " does that update anyway.",
         ]
 
     lines = [

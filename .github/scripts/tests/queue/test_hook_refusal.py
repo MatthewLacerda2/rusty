@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """#1108: a refused push is handed back with what refused it.
 
-Since #1101 `.githooks/pre-push` runs on the queue's own force-pushes, so a
-refusal is GitHub, the hook or the lease ([`refusal`]). The stderr decides
+Since #1101 `.githooks/pre-push` runs on the queue's own pushes, so a
+refusal is GitHub, the hook or a moved branch ([`refusal`]); since #1568 the
+last is no hand-back but [`refusal.MOVED`]. The stderr decides
 first; only a refusal it does not name falls back to the remote head.
 """
 
@@ -10,7 +11,8 @@ from __future__ import annotations
 
 import unittest
 
-from tests.queue.fixtures import SHA, STALE, advancing, done
+from merging.queue import refusal
+from tests.queue.fixtures import SHA, NON_FF, advancing, done
 
 
 OTHER = "2" * 40
@@ -37,7 +39,7 @@ def refused(stderr: str, remote_head):
 class Refusal(unittest.TestCase):
     def test_the_hook_with_the_head_unmoved(self):
         notes = refused(HOOK, SHA)
-        self.assertEqual(notes[0], f"the pre-push hook refused the force-push of b: {FMT}")
+        self.assertEqual(notes[0], f"the pre-push hook refused the push of b: {FMT}")
         self.assertTrue(any("1111111" in n and "make resolved" in n for n in notes))
         self.assertIn("+mod a;", notes)
         self.assertNotIn("something else has pushed", " ".join(notes))
@@ -49,28 +51,32 @@ class Refusal(unittest.TestCase):
         notes = refused(NO_CARGO, OTHER)
         self.assertEqual(
             notes[0],
-            "the pre-push hook refused the force-push of b:"
+            "the pre-push hook refused the push of b:"
             " FileNotFoundError: [Errno 2] No such file or directory: 'cargo'",
         )
         self.assertIn("`cargo` on its PATH", notes[1])
 
     def test_github_rejecting_it_is_never_the_hook(self):
         notes = refused(WORKFLOW, SHA)
-        self.assertIn("GitHub rejected the force-push of b", notes[0])
+        self.assertIn("GitHub rejected the push of b", notes[0])
         self.assertIn("`workflow` scope", notes[0])
         self.assertNotIn("hook", " ".join(notes))
 
-    def test_a_moved_head_is_the_lease(self):
-        notes = refused(STALE, OTHER)
-        self.assertIn("the force-push of b was refused: ! [rejected]", notes[0])
-        self.assertIn("something else has pushed since", notes[1])
+    def test_a_moved_head_is_a_moved_branch(self):
+        notes = refused(NON_FF, OTHER)
+        self.assertEqual(notes[0], refusal.MOVED)
+        self.assertIn("refused by its lease: ! [rejected]", notes[1])
         self.assertNotIn("hook", " ".join(notes))
 
-    def test_an_unreadable_head_is_the_lease(self):
-        self.assertIn("something else has pushed since", refused(STALE, None)[1])
+    def test_an_unreadable_head_is_a_hand_back_never_moved(self):
+        # An expired token reading as "moved" would have the watch retake it forever.
+        notes = refused(NON_FF, None)
+        self.assertNotEqual(notes[0], refusal.MOVED)
+        self.assertIn("could not be read", notes[0])
+        self.assertIn("Handed back.", notes[1])
 
     def test_the_reason_is_one_line(self):
-        for stderr in (HOOK, NO_CARGO, WORKFLOW, STALE):
+        for stderr in (HOOK, NO_CARGO, WORKFLOW, NON_FF):
             self.assertNotIn("\n", refused(stderr, SHA)[0], stderr)
 
 

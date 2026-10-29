@@ -61,7 +61,7 @@ def paths(pull: dict) -> list[str]:
 def lock_waits(pulls: list[dict], bots: tuple[str, ...]) -> dict[int, int]:
     """Each pull request held behind an older one that edits a lockfile too,
     mapped to that owner (#969). Drafts count, as owner and as waiter: the
-    owner's resolution is the one the rest rebase onto. Dependabot is
+    owner's resolution is the one the rest merge in. Dependabot is
     neither: it rebases itself."""
     editing = sorted(
         p.get("number") for p in pulls

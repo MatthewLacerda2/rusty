@@ -22,7 +22,7 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
     `say(...)` (also each board change, [`board.transitions`]), `memory` (a path), `bots`, and the end states: `merged`, `ends`
     (ended without a hand-back: green under `--no-merge`, previewed by a dry run)
     `stops` (the machine's failure, [`queue.stopping.Stopped`]) and `skips` (it
-    turned draft or closed after the listing). Anything else is a hand-back: it is
+    turned draft or closed after the listing, or its branch moved mid-take). Anything else is a hand-back: it is
     remembered, announced ([`ending.handed_back`]) and passed over until its head
     moves or runs again; one in [`outcomes.AWAITING`] also until its body or labels
     change ([`handbacks.reworded`]), and an `AWAITS_ISSUE` one until its issues no
