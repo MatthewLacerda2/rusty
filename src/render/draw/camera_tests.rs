@@ -21,7 +21,9 @@ fn stages_run_in_the_frames_order() {
             "solids",
             "scene",
             "ssr",
+            "opaque_copy",
             "transparent",
+            "depth_postpass",
             "world_ui",
             "effects",
             "count",
@@ -45,6 +47,11 @@ fn every_stage_reads_only_what_an_earlier_stage_wrote() {
     // SSR reflects the opaque image the scene pass drew, before anything blends over
     // it (#1526, HDRP's order).
     assert_eq!(position("ssr"), position("scene") + 1);
+    // The opaque copy holds the reflected image a refracting surface reads, and the
+    // depth postpass writes over what the translucents drew (#1523).
+    assert_eq!(position("opaque_copy"), position("ssr") + 1);
+    assert_eq!(position("transparent"), position("opaque_copy") + 1);
+    assert_eq!(position("depth_postpass"), position("transparent") + 1);
     // The counters read the solids and the effects' draw counts.
     assert!(position("effects") < position("count"));
     // Post-FX composites everything this camera drew into the scene (#1224): Unity's

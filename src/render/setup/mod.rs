@@ -3,6 +3,7 @@ pub(crate) mod build;
 pub(crate) mod gpu_rule;
 pub(crate) mod headless;
 pub(crate) mod resize;
+mod shadow_system;
 pub(crate) mod textures;
 mod warm;
 
@@ -187,7 +188,8 @@ impl Renderer {
             velocity_pipeline: forward.velocity_pipeline,
             primed_pipelines: forward.primed_pipelines,
             post_passes,
-            transparent_pipeline: forward.transparent_pipeline,
+            transparent_pipelines: forward.transparent_pipelines,
+            depth_postpass_pipelines: forward.depth_postpass_pipelines,
             line_pipeline: forward.line_pipeline,
             outline: forward.outline,
             prepass_pipeline: forward.prepass_pipeline,
@@ -218,6 +220,7 @@ impl Renderer {
             shadow_renderer: shadows.renderer,
             shadow_uniform_buffer: shadows.uniform_buffer,
             shadow_bind_group: shadows.bind_group,
+            opaque_copy: shadows.opaque_copy,
             particle_renderer: billboards.particle_renderer,
             ribbon_renderer: billboards.ribbon_renderer,
             decals: global.decals,

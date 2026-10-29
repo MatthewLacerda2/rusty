@@ -41,7 +41,9 @@ pub(crate) const CAMERA_PASSES: &[(&str, CameraPass)] = &[
     ("solids", batch_solids),
     ("scene", scene_pass),
     ("ssr", ssr),
+    ("opaque_copy", opaque_copy),
     ("transparent", transparent),
+    ("depth_postpass", depth_postpass),
     ("world_ui", world_ui),
     ("effects", effects),
     ("count", count),
@@ -125,6 +127,7 @@ impl<'a> CameraCtx<'a> {
                 clusters: clusters.uniform(),
                 prev_view_proj: shared.prev_view_projs[idx].to_cols_array(),
                 stack: [idx as f32, shared.prev_time, 0.0, 0.0],
+                inv_view_proj: view_proj.inverse().to_cols_array(),
             },
             clusters,
             solids: SolidResources::default(),
@@ -190,9 +193,21 @@ fn ssr(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
     }
 }
 
+/// Unity's *Opaque Texture* (#1523): this camera's colour and depth, after SSR, for
+/// the translucents that refract or absorb; skipped when none of them does.
+fn opaque_copy(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
+    r.copy_opaque(view, &ctx.solids.draws.transparent);
+}
+
 /// Translucent solids (#242), back-to-front over the opaque ones.
 fn transparent(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
     r.draw_transparent(view, &ctx.solids.draws.transparent);
+}
+
+/// HDRP's transparent depth postpass (#1523): the translucents that ask for it
+/// write their depth (and velocity texel) over what they drew over.
+fn depth_postpass(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
+    r.draw_depth_postpass(view, &ctx.solids.draws.transparent);
 }
 
 /// World canvases (#429): scene geometry, occluded by it, before particles.

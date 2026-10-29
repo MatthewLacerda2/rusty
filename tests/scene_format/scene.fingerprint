@@ -745,22 +745,26 @@ scene.lightmaps.pages: seq
 scene.lightmaps.pages[]: string
 scene.materials: map
 scene.materials{key}: string
+scene.materials{}.absorption_distance: f32
 scene.materials{}.alpha: f32
 scene.materials{}.alpha_cutoff: f32
 scene.materials{}.base_color: tuple(3)
 scene.materials{}.base_color[]: f32
 scene.materials{}.base_color_map: option
 scene.materials{}.base_color_map: string
+scene.materials{}.blend_mode: enum Alpha|Premultiply|Additive|Multiply
 scene.materials{}.decal.albedo: f32
 scene.materials{}.decal.angle_fade: f32
 scene.materials{}.decal.metallic: f32
 scene.materials{}.decal.normal: f32
 scene.materials{}.decal.occlusion: f32
 scene.materials{}.decal.roughness: f32
+scene.materials{}.depth_postpass: bool
 scene.materials{}.emissive: tuple(3)
 scene.materials{}.emissive[]: f32
 scene.materials{}.emissive_map: option
 scene.materials{}.emissive_map: string
+scene.materials{}.ior: f32
 scene.materials{}.maps.nodes: seq
 scene.materials{}.maps.nodes[]: any
 scene.materials{}.maps.output: option
@@ -779,7 +783,10 @@ scene.materials{}.metallic_map: option
 scene.materials{}.metallic_map: string
 scene.materials{}.normal_map: option
 scene.materials{}.normal_map: string
+scene.materials{}.preserve_specular: bool
 scene.materials{}.receive_decals: bool
+scene.materials{}.receive_shadows: bool
+scene.materials{}.refraction_model: enum None|Planar|Thin
 scene.materials{}.render_mode: enum Opaque|Cutout|Transparent
 scene.materials{}.roughness: f32
 scene.materials{}.roughness_map: option
@@ -793,6 +800,12 @@ scene.materials{}.shader_params{}[]: f32
 scene.materials{}.shader_textures: map
 scene.materials{}.shader_textures{key}: string
 scene.materials{}.shader_textures{}: string
+scene.materials{}.thickness: f32
+scene.materials{}.transmission: f32
+scene.materials{}.transmission_color: tuple(3)
+scene.materials{}.transmission_color[]: f32
+scene.materials{}.transmittance_color: tuple(3)
+scene.materials{}.transmittance_color[]: f32
 scene.nav_settings.agent_height: f32
 scene.nav_settings.agent_radius: f32
 scene.nav_settings.areas: seq

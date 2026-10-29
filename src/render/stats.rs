@@ -117,6 +117,9 @@ pub struct RenderCounters {
     /// Sky reflection cubes baked this frame (#1553): a new panorama, or the first
     /// frame showing the procedural sky. `0` on every frame the sky holds.
     pub sky_reflection_bakes: u32,
+    /// Opaque copies made this frame (#1523), Unity's *Opaque Texture*: one per
+    /// camera whose visible translucents refract or absorb, `0` on every other.
+    pub opaque_copies: u32,
 }
 
 impl RenderCounters {
@@ -156,6 +159,7 @@ impl RenderCounters {
             ("ssr_surface_passes", self.ssr_surface_passes.into()),
             ("grade_lut_bakes", self.grade_lut_bakes.into()),
             ("sky_reflection_bakes", self.sky_reflection_bakes.into()),
+            ("opaque_copies", self.opaque_copies.into()),
         ]
     }
 

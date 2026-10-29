@@ -126,7 +126,9 @@ pub struct Renderer {
     /// Alpha-blended translucent solids (#242); depth write off, drawn back-to-front
     /// in the transparent pass after opaque. Built on first use, like the three
     /// editor-only pipelines below (#985).
-    transparent_pipeline: gpu::pipelines::LazyPipeline,
+    transparent_pipelines: gpu::pipelines::TransparentPipelines,
+    /// The translucents' depth postpass (#1523).
+    depth_postpass_pipelines: gpu::pipelines::DepthPostpassPipelines,
     line_pipeline: gpu::pipelines::LazyPipeline,
     /// The editor's selection outline (#1175).
     outline: passes::outline::OutlinePasses,
@@ -215,6 +217,10 @@ pub struct Renderer {
     /// The forward pass's group 3 with the white no-AO fallback: every pass that
     /// draws without SSAO (the transparent pass, a frame with SSAO off) binds this.
     pub shadow_bind_group: wgpu::BindGroup,
+    /// The opaque copy's pass, stand-in and sampler (#1523): every group 3 binds the
+    /// stand-in but a transparent pass whose camera copied
+    /// (`passes::transparent::opaque_copy`).
+    pub(crate) opaque_copy: passes::transparent::OpaqueCopyPass,
     /// The SSAO depth prepass (#436): the forward vertex stage, depth only.
     pub(crate) prepass_pipeline: wgpu::RenderPipeline,
     /// The SSAO occlusion + blur passes and their no-AO fallback (#436).

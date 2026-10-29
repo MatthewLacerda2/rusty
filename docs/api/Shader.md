@@ -103,7 +103,11 @@ assembles byte-identical WGSL.
   re-baked (it still draws correctly otherwise). A surface variant baked before
   #1526 lacks the `fs_velocity_ssr` entry point (what a view running SSR draws with),
   so the renderer refuses it: it logs that once and draws the material with the
-  standard shader until the variant is re-baked.
+  standard shader until the variant is re-baked. So is one baked before #1523, which
+  lacks `fs_depth_postpass` (a translucent's depth postpass) and returns through the
+  old fog line rather than `transparent::composite`: a variant inherits the
+  transparent-surface knobs (`Material.SetBlendMode`, refraction, absorption,
+  translucency, …) from the standard shader only once re-baked.
   Each surface block also says how it changes the environment reflection that SSR
   replaces (#1526): a block adding light (a rim, a glow) keeps it, one scaling the
   colour (a tint, a `mix` toward a colour such as `hit_flash`) scales it alike, and one

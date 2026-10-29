@@ -23,6 +23,9 @@ pub(crate) struct CameraUniform {
     /// target's `.a`, so motion blur orders a higher camera in front. `y`: last
     /// frame's game time (#1524), for the vertex blocks' motion. `zw` unused.
     pub stack: [f32; 4],
+    /// `view_proj`'s inverse (#1523), what refraction and absorption rebuild the
+    /// opaque depth's world point with.
+    pub inv_view_proj: [f32; 16],
 }
 
 /// How a world point finds its light cluster (#434), mirroring `Clusters` in
@@ -149,13 +152,50 @@ pub(crate) struct EntityUniform {
     // `1` when this draw folds in the decals of its cluster (#638): a lit, non-
     // transparent surface whose material receives decals. Completes the 16-byte run.
     pub receive_decals: u32,
+    // How the surface composites, shadows and transmits (#1523); its fields follow
+    // `receive_decals` flat in `EntityUniforms`.
+    pub surface: SurfaceUniform,
 }
+
+/// A draw's transparent-surface terms (#1523): blending, shadows, refraction,
+/// absorption, depth postpass and thin translucency, packed from its material.
+#[repr(C)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
+pub(crate) struct SurfaceUniform {
+    /// The material's `BlendMode`, by index: 3 (Multiply) tints toward white by alpha.
+    pub blend_mode: u32,
+    /// 1 when URP's preserve specular applies: the diffuse is premultiplied by alpha
+    /// in the shader, the specular is not, and the Fresnel raises the opacity.
+    pub premultiply_diffuse: u32,
+    /// 0 when no shadow lands on the surface (URP's *Receive Shadows* off).
+    pub receive_shadows: u32,
+    /// The refraction model: 0 none, 1 planar (HDRP's Box), 2 thin.
+    pub refraction_model: u32,
+    pub ior: f32,
+    /// The refraction model's thickness in metres (thin: HDRP's fixed 5 mm).
+    pub thickness: f32,
+    /// 1 when the surface composites over the opaque copy itself (refraction or
+    /// absorption), so it draws with alpha 1.
+    pub uses_opaque: u32,
+    /// 1 when the surface writes its depth after drawing.
+    pub depth_postpass: u32,
+    /// The absorption coefficient per metre, rgb (HDRP's
+    /// `TransmittanceColorAtDistanceToAbsorption`); `w` the material's thickness,
+    /// the depth it absorbs over where the sky is behind it.
+    pub absorption: [f32; 4],
+    /// Thin translucency: rgb the transmission colour times its amount, `w` the
+    /// amount (0: none).
+    pub transmission: [f32; 4],
+}
+
+/// How many 32-bit words an [`EntityUniform`] holds.
+pub(crate) const ENTITY_UNIFORM_WORDS: usize = std::mem::size_of::<EntityUniform>() / 4;
 
 impl EntityUniform {
     /// The uniform as plain words — the batch key compares these bit-for-bit, so two
     /// draws share a batch only when every material scalar and flag is identical.
-    pub(crate) fn words(&self) -> [u32; 36] {
-        let mut words = [0u32; 36];
+    pub(crate) fn words(&self) -> [u32; ENTITY_UNIFORM_WORDS] {
+        let mut words = [0u32; ENTITY_UNIFORM_WORDS];
         words.copy_from_slice(bytemuck::cast_slice(bytemuck::bytes_of(self)));
         words
     }

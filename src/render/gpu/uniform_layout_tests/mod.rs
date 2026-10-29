@@ -12,6 +12,7 @@ use crate::render::ibl::reflection_probes::ReflectionProbeUniform;
 use crate::render::passes::shadows::atlas::ShadowTile;
 use crate::shadergen::compose;
 
+mod entity;
 mod postfx;
 
 const PROBE: &str = "#import postfx::params::PostParams\n\
@@ -27,10 +28,16 @@ const PROBE: &str = "#import postfx::params::PostParams\n\
         + decals[0].fade.x + post.camera_pos.x);\n\
 }\n";
 
-/// `(member offset by name, struct size)` of the WGSL struct named `name`.
+/// `(member offset by name, struct size)` of the WGSL struct named `name` in
+/// [`PROBE`].
 fn wgsl_struct(name: &str) -> (Vec<(String, usize)>, usize) {
+    wgsl_struct_in(PROBE, name)
+}
+
+/// [`wgsl_struct`] in the composed `probe`.
+fn wgsl_struct_in(probe: &str, name: &str) -> (Vec<(String, usize)>, usize) {
     let mut composer = compose::composer_with_common("engine/shaders").unwrap();
-    let module = compose::compose(&mut composer, PROBE, "probe.wgsl").unwrap();
+    let module = compose::compose(&mut composer, probe, "probe.wgsl").unwrap();
     let found = module
         .types
         .iter()
@@ -52,7 +59,16 @@ fn wgsl_struct(name: &str) -> (Vec<(String, usize)>, usize) {
 
 /// Assert each `(wgsl member, rust offset)` pair and the size agree.
 fn assert_layout(name: &str, pairs: &[(&str, usize)], size: usize) {
-    let (members, span) = wgsl_struct(name);
+    assert_members(wgsl_struct(name), name, pairs, size);
+}
+
+/// Assert `(members, span)` against each `(wgsl member, rust offset)` pair and `size`.
+fn assert_members(
+    (members, span): (Vec<(String, usize)>, usize),
+    name: &str,
+    pairs: &[(&str, usize)],
+    size: usize,
+) {
     for (member, rust) in pairs {
         let wgsl = members
             .iter()
@@ -74,11 +90,12 @@ fn camera_uniform_matches_wgsl_layout() {
         ("clusters", offset_of!(CameraUniform, clusters)),
         ("prev_view_proj", offset_of!(CameraUniform, prev_view_proj)),
         ("stack", offset_of!(CameraUniform, stack)),
+        ("inv_view_proj", offset_of!(CameraUniform, inv_view_proj)),
     ];
     assert_layout("CameraUniforms", &pairs, size_of::<CameraUniform>());
     // `time` rides in the vec3 pad (#398); the cluster block adds 48 bytes (#434),
-    // last frame's matrix 64 (#1435), the stack index 16 (#1436).
-    assert_eq!(size_of::<CameraUniform>(), 256);
+    // last frame's matrix 64 (#1435), the stack index 16 (#1436), the inverse 64 (#1523).
+    assert_eq!(size_of::<CameraUniform>(), 320);
 }
 
 #[test]

@@ -62,6 +62,7 @@ impl SsaoTargets {
                 &r.shadow_uniform_buffer,
                 &r.shadow_renderer,
                 &ao,
+                r.opaque_copy.fallback(),
             ),
             textures: [depth_tex, raw_tex, ao_tex],
             depth,

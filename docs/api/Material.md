@@ -49,6 +49,40 @@ conversion wrote into the import cache is a reference (#1072).
 | `Material.GetAssetShaderParam` | `(asset, name)` → the asset's value: the one set, else the shader's baked default |
 | `Material.SetShaderTexture` | `(id, slot, path)` — point an extra texture slot of the material's surface shader (`"mask"`, see *Shader textures* below) at a texture path (a PNG or an `rt:<name>` render texture); `nil` or `""` clears it back to white; errors on an unknown slot |
 
+### Transparent surfaces
+
+A `Transparent` material does more than fade by `alpha` (#1523). Each knob below is a
+field of the material (it saves with it, `DefineAsset` takes it by the key in
+brackets, and the Inspector's Material card shows it), with a `Set` and a `Get`.
+`Get` returns `nil` for an entity without a material; `Set` creates one, as every
+setter does, and raises an error naming what the field takes for a value it can't
+(an unknown name, a number for a boolean). Names are read in any case. The knobs
+follow Unity: URP Lit's blending options, and HDRP Lit's refraction, absorption and
+thin translucency, leaving out what HDRP spends most on (diffusion profiles,
+sphere and ray-traced refraction, order-independent transparency).
+
+| Function | Signature |
+|---|---|
+| `Material.SetBlendMode` / `GetBlendMode` | `(id, mode)` [`blend_mode`] — URP's *Blending Mode*: `"Alpha"` (default; `alpha` of the surface over the rest), `"Premultiply"` (the colour is already premultiplied: it is added whole, covering `alpha` of what is behind), `"Additive"` (added onto what is behind, scaled by `alpha`), `"Multiply"` (multiplies what is behind; `alpha` fades the tint toward white) |
+| `Material.SetPreserveSpecular` / `GetPreserveSpecular` | `(id, on)` [`preserve_specular`] — URP's *Preserve Specular Lighting*, on by default: only the diffuse is faded by `alpha`, so reflections and highlights stay whole on clear glass, and the opacity rises toward grazing angles with the Fresnel reflection (URP's `alpha * (1 - reflectivity) + reflectivity`, at the view angle), so water seen flat reflects more and shows less of the floor. Ignored under `Premultiply` and `Multiply`, as URP ignores it |
+| `Material.SetRefractionModel` / `GetRefractionModel` | `(id, model)` [`refraction_model`] — HDRP's *Refraction Model*: `"None"` (default), `"Planar"` (the surface is a slab `thickness` thick: water, a thick pane; HDRP's *Planar*, its code's `RefractionModelBox`) or `"Thin"` (HDRP's thin shell, a fixed 5 mm slab, so a window or a bubble barely bends). The view ray bends by the shading normal, its normal map included, so ripples bend the floor; where the bent ray would land on something in front of the surface it reads straight through, as HDRP does |
+| `Material.SetIndexOfRefraction` / `GetIndexOfRefraction` | `(id, ior)` [`ior`] — HDRP's *Index of Refraction* in `[1, 2.5]`: water 1.33, glass 1.5 (the default) |
+| `Material.SetThickness` / `GetThickness` | `(id, metres)` [`thickness`] — how thick the surface is, in `[0, 10]` (default 1), as HDRP's *Thickness*: a `Planar` refraction's slab depth (a `Thin` one is always 5 mm), and the depth an absorbing surface absorbs over where only the sky is behind it, whatever its refraction model |
+| `Material.SetTransmittanceColor` / `GetTransmittanceColor` | `(id, {r, g, b})` [`transmittance_color`] — HDRP's *Transmittance Color*: the colour light keeps after `absorption_distance` metres through the surface (Beer-Lambert), each channel in `[0, 1]`. White, the default, absorbs nothing; any other colour tints and darkens what is behind by how far it is behind the surface, so shallow water stays clear and the deep end takes the colour |
+| `Material.SetAbsorptionDistance` / `GetAbsorptionDistance` | `(id, metres)` [`absorption_distance`] — HDRP's *Absorption Distance*, where light has kept exactly `transmittance_color`, in `[0.01, 100]` (default 1) |
+| `Material.SetDepthPostpass` / `GetDepthPostpass` | `(id, on)` [`depth_postpass`] — HDRP's *Transparent Depth Postpass*, off by default: after the translucents drew, the surface writes its depth, so depth of field focuses on it and motion blur moves it rather than what is behind it, and soft particles and world canvases meet it. Fog needs none: each surface is fogged where it is drawn. Screen-space reflections never land on a transparent surface: SSR runs before the translucents (HDRP's order), and HDRP's separate transparent SSR is not part of rusty |
+| `Material.SetTransmission` / `GetTransmission` | `(id, amount)` [`transmission`] — HDRP's thin *Translucent* type, in `[0, 1]` (default 0): how much of a light behind the surface comes through as diffuse light (a leaf, a lampshade, a cloth banner lit from behind). Any material, opaque or transparent; the surface is shaded with its normal toward the viewer, as HDRP flips a double-sided translucent's |
+| `Material.SetTransmissionColor` / `GetTransmissionColor` | `(id, {r, g, b})` [`transmission_color`] — HDRP's *Transmission Tint*, the colour that light takes on its way through (default white); each channel in `[0, 1]` |
+| `Material.SetReceiveShadows` / `GetReceiveShadows` | `(id, on)` [`receive_shadows`] — URP's *Receive Shadows*, on by default: off, neither the sun's cascades nor a point or spot light's shadow lands on the surface (a wall's shadow stays off the water). Any material, opaque too; the surface still casts its own |
+
+Refraction and absorption read the **opaque copy** (Unity's *Opaque Texture* and
+*Depth Texture*): the camera's colour and depth after its opaque pass and
+screen-space reflections, made only on a frame that shows a surface that refracts
+or absorbs, and counted in `Debug.Stats().opaque_copies`. So what a refracting
+surface shows behind it is the opaque scene (other translucents behind it are not
+in the copy, as in Unity), and only under `Alpha` or `Premultiply`: an `Additive` or
+`Multiply` surface adds to or tints what is behind it, and has nothing to bend.
+
 ### Material slots
 
 An entity's `MaterialComponent` holds a **list** of library keys, one per material

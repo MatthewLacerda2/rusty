@@ -8,6 +8,7 @@
 //! engine-provided per-entity type), while the data it points at is the shared asset.
 
 mod decal;
+mod surface;
 
 use std::collections::BTreeMap;
 
@@ -16,6 +17,8 @@ use serde::{Deserialize, Serialize};
 use crate::asset::MapRef;
 use crate::procgen::TextureRecipe;
 pub use decal::DecalBlend;
+use surface::{default_ior, default_one, white};
+pub use surface::{BlendMode, RefractionModel};
 
 fn default_base_color() -> [f32; 3] {
     [1.0, 1.0, 1.0]
@@ -102,6 +105,56 @@ pub struct MaterialAsset {
     /// is below this are discarded. Defaults to 0.5 (Unity's default).
     #[serde(default = "default_alpha_cutoff")]
     pub alpha_cutoff: f32,
+    /// How a `Transparent` surface combines with what is behind it (#1523), URP's
+    /// *Blending Mode*; `Alpha` when absent.
+    #[serde(default)]
+    pub blend_mode: BlendMode,
+    /// URP's *Preserve Specular Lighting* (#1523): a `Transparent` surface's
+    /// reflections and highlights are not faded by `alpha`, and its opacity rises
+    /// toward grazing angles as its Fresnel reflection does. On by default; ignored
+    /// under `Premultiply` and `Multiply`, as URP ignores it.
+    #[serde(default = "default_true")]
+    pub preserve_specular: bool,
+    /// Whether shadows land on this surface (#1523), URP's *Receive Shadows*: off,
+    /// the sun's cascades and point/spot shadows skip it (water under a wall's
+    /// shadow). On by default.
+    #[serde(default = "default_true")]
+    pub receive_shadows: bool,
+    /// How a `Transparent` surface bends what is behind it (#1523), HDRP's
+    /// *Refraction Model*; `None` when absent. Bends by the shading normal, its
+    /// normal map included.
+    #[serde(default)]
+    pub refraction_model: RefractionModel,
+    /// The index of refraction, HDRP's *Index of Refraction* (water 1.33, glass
+    /// 1.5, the default).
+    #[serde(default = "default_ior")]
+    pub ior: f32,
+    /// How thick a `Planar` refraction's slab is, in metres (default 1).
+    #[serde(default = "default_one")]
+    pub thickness: f32,
+    /// The colour light keeps after `absorption_distance` metres through a
+    /// `Transparent` surface (#1523), HDRP's *Transmittance Color*; white (the
+    /// default) absorbs nothing. Shallow water stays clear, deep water takes it.
+    #[serde(default = "white")]
+    pub transmittance_color: [f32; 3],
+    /// The distance at which light keeps `transmittance_color`, in metres, HDRP's
+    /// *Absorption Distance* (default 1).
+    #[serde(default = "default_one")]
+    pub absorption_distance: f32,
+    /// HDRP's *Transparent Depth Postpass* (#1523): a `Transparent` surface writes
+    /// its depth after drawing, so depth of field, motion blur and soft particles
+    /// see it rather than what is behind it. Off by default.
+    #[serde(default)]
+    pub depth_postpass: bool,
+    /// The colour thin translucency lets through (#1523), HDRP's *Transmission
+    /// Tint*; white by default.
+    #[serde(default = "white")]
+    pub transmission_color: [f32; 3],
+    /// How much light passes through the surface from behind, `[0, 1]`: HDRP's
+    /// thin *Translucent* material (a leaf, a lampshade, a banner lit from behind),
+    /// opaque or transparent. 0 (the default) lets none through.
+    #[serde(default)]
+    pub transmission: f32,
     /// The authored surface shader this material renders with (#396): a module name
     /// resolved as `<name>.wgsl` in `assets/shaders` (where `Shader.Bake`
     /// writes), then `engine/shaders`. `None` is the standard forward shader.
@@ -152,6 +205,17 @@ impl Default for MaterialAsset {
             render_mode: RenderMode::Opaque,
             alpha: default_alpha(),
             alpha_cutoff: default_alpha_cutoff(),
+            blend_mode: BlendMode::Alpha,
+            preserve_specular: true,
+            receive_shadows: true,
+            refraction_model: RefractionModel::None,
+            ior: default_ior(),
+            thickness: default_one(),
+            transmittance_color: white(),
+            absorption_distance: default_one(),
+            depth_postpass: false,
+            transmission_color: white(),
+            transmission: 0.0,
             shader: None,
             shader_params: BTreeMap::new(),
             shader_textures: BTreeMap::new(),
@@ -212,69 +276,4 @@ pub fn entity_material_key(id: u32) -> String {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn defaults_are_opaque_and_fully_solid() {
-        let m = MaterialAsset::default();
-        assert_eq!(m.render_mode, RenderMode::Opaque);
-        assert_eq!(m.alpha, 1.0);
-        assert_eq!(m.alpha_cutoff, 0.5);
-        assert!(!m.is_transparent());
-    }
-
-    #[test]
-    fn is_transparent_only_for_transparent_mode() {
-        let with_mode = |mode| MaterialAsset {
-            render_mode: mode,
-            ..MaterialAsset::default()
-        };
-        assert!(!with_mode(RenderMode::Opaque).is_transparent());
-        assert!(!with_mode(RenderMode::Cutout).is_transparent());
-        assert!(with_mode(RenderMode::Transparent).is_transparent());
-    }
-
-    #[test]
-    fn transparency_fields_round_trip_through_serde() {
-        let m = MaterialAsset {
-            render_mode: RenderMode::Transparent,
-            alpha: 0.25,
-            alpha_cutoff: 0.7,
-            ..MaterialAsset::default()
-        };
-        let json = serde_json::to_string(&m).expect("serialize");
-        let back: MaterialAsset = serde_json::from_str(&json).expect("deserialize");
-        assert_eq!(back.render_mode, RenderMode::Transparent);
-        assert_eq!(back.alpha, 0.25);
-        assert_eq!(back.alpha_cutoff, 0.7);
-    }
-
-    #[test]
-    fn a_material_without_transparency_fields_loads_opaque() {
-        // A hand-written material that names no render_mode/alpha/alpha_cutoff loads
-        // through `#[serde(default)]` as a fully-opaque material.
-        let json = r#"{ "base_color": [0.5, 0.5, 0.5], "metallic": 0.0, "roughness": 0.5 }"#;
-        let m: MaterialAsset = serde_json::from_str(json).expect("a sparse material parses");
-        assert_eq!(m.render_mode, RenderMode::Opaque);
-        assert_eq!(m.alpha, 1.0);
-        assert_eq!(m.alpha_cutoff, 0.5);
-    }
-
-    #[test]
-    fn shader_params_and_textures_round_trip_and_are_omitted_when_empty() {
-        let m = MaterialAsset {
-            shader: Some("enemy_hit".into()),
-            shader_params: BTreeMap::from([("hit_flash.amount".into(), vec![0.5])]),
-            shader_textures: BTreeMap::from([("mask".into(), "noise.png".into())]),
-            ..MaterialAsset::default()
-        };
-        let back: MaterialAsset =
-            serde_json::from_str(&serde_json::to_string(&m).unwrap()).unwrap();
-        assert_eq!(back.shader_params, m.shader_params);
-        assert_eq!(back.shader_textures, m.shader_textures);
-        let plain = serde_json::to_string(&MaterialAsset::default()).unwrap();
-        assert!(!plain.contains("shader_params"), "{plain}");
-        assert!(!plain.contains("shader_textures"), "{plain}");
-    }
-}
+mod tests;

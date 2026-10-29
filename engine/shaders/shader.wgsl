@@ -3,6 +3,7 @@
 // `fs_main` names its result `shadow`), so a surface variant's blocks can read any.
 #import forward::bindings::{bones, camera, cluster_lights, cluster_ranges, decals, entity, instances, lighting, local_lights, s_decal, s_diffuse, s_emissive, s_lightmaps, s_metallic, s_normal, s_refl_cube, s_roughness, s_shadow, s_skybox, shadow_tiles, t_ao, t_decal_color, t_decal_data, t_diffuse, t_emissive, t_lightmap_dirs, t_lightmaps, t_metallic, t_normal, t_refl_cube, t_roughness, t_shadow, t_shadow_atlas, t_skybox, vertex_to_world, vertex_to_world_prev}
 #import lighting::ssr_surface
+#import forward::transparent
 #import forward::lighting::{LIGHTMAP_RGBM_RANGE, ambient_occlusion, calculate_pbr, calculate_shadow, decode_lightmap_direction, environment_reflection, eval_sh, fold_decals, lightmap_direction_rebalance}
 
 // The forward pass (and its SSAO prepass and shadow-cascade entry points). Its
@@ -233,6 +234,12 @@ fn velocity_targets(in: VelocityVertex) -> VelocityTargets {
         in.clip_position, in.world_position, in.world_normal, in.tex_coords,
         in.world_tangent, in.instance, in.lightmap_uv,
     );
+    return VelocityTargets(surface_color(v), velocity_texel(in));
+}
+
+// The velocity target's texel for `in`: its screen motion, its view depth and its
+// camera's place in the stack.
+fn velocity_texel(in: VelocityVertex) -> vec4<f32> {
     // A surface behind the camera last frame (a projectile past the player's head)
     // had no place on screen to move from: it writes no motion, not a huge streak.
     var velocity = vec2<f32>(0.0);
@@ -242,7 +249,22 @@ fn velocity_targets(in: VelocityVertex) -> VelocityTargets {
     // Depth along this camera's view axis, not the straight-line distance: a plane
     // facing the camera has one depth, so depth of field focuses on a plane (#1445).
     let depth = dot(camera.clusters.view_z.xyz, in.world_position) + camera.clusters.view_z.w;
-    return VelocityTargets(surface_color(v), vec4<f32>(velocity, depth, camera.stack.x));
+    return vec4<f32>(velocity, depth, camera.stack.x);
+}
+
+// ---- The transparent depth postpass (#1523) ----
+// HDRP's *Transparent Depth Postpass*: after the translucents drew, a surface that
+// asks for it writes its depth, and in a view with a velocity target its texel
+// there (location 1; the pipeline has no colour target at 0), so depth of field and
+// motion blur see the surface, not what is behind it. A view without one draws it
+// through `fs_prepass`.
+struct DepthPostpassTargets {
+    @location(1) velocity: vec4<f32>,
+};
+
+@fragment
+fn fs_depth_postpass(in: VelocityVertex) -> DepthPostpassTargets {
+    return DepthPostpassTargets(velocity_texel(in));
 }
 
 // ---- The SSR surface targets (#1526) ----
@@ -318,7 +340,22 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
         surface = fold_decals(surface, cluster, in.world_position, normalize(in.world_normal));
     }
     N = surface.normal;
-    let albedo = surface.albedo;
+    // A Multiply surface tints what is behind it toward white by its alpha (#1523,
+    // URP's `ApplyAlphaModulate` on the albedo).
+    var albedo = surface.albedo;
+    if (entity.blend_mode == 3u) {
+        albedo = mix(vec3<f32>(1.0), albedo, base_color.a);
+    }
+    // Preserve specular (#1523, URP's `_ALPHAPREMULTIPLY_ON`): only the diffuse is
+    // multiplied by alpha here, and the pipeline blends premultiplied, so reflections
+    // and highlights are not faded with it. `albedo` still sets a metal's F0.
+    let diffuse_albedo = albedo * select(1.0, base_color.a, entity.premultiply_diffuse == 1u);
+    // Thin translucency (#1523) lights the side facing away from a light, so the
+    // normal faces the viewer, as HDRP flips a double-sided translucent's normal.
+    let translucent = entity.transmission.w > 0.0;
+    if (translucent) {
+        N = faceForward(N, -V, N);
+    }
     let metallic = surface.metallic;
     let roughness = surface.roughness;
 
@@ -359,7 +396,7 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     let ao = ambient_occlusion(in.clip_position.xy) * surface.occlusion;
     // The diffuse share is URP's `albedo * oneMinusReflectivity`: what the
     // environment reflection (step 5) takes, a dielectric's 4%, is not diffused too.
-    var lighting_color = ambient_irradiance * albedo * (0.96 * (1.0 - metallic)) * ao;
+    var lighting_color = ambient_irradiance * diffuse_albedo * (0.96 * (1.0 - metallic)) * ao;
 
     // A lightmapped surface skips `Baked` lights below: their direct light is already
     // in its lightmap (#438). Only a probe/reflection bake capture uploads them at all
@@ -367,14 +404,29 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     let skip_baked = lightmap_page > 0u;
 
     // 2. Directional lights (#434). Slot 0 is the sun, the one the cascades shadow.
-    let shadow = calculate_shadow(in.world_position, N);
+    // A surface that receives no shadows (#1523, URP's *Receive Shadows*) skips the
+    // cascades and the atlas.
+    // Light through a translucent surface reaches its back face, so its shadow is
+    // looked up off that face (`-N`), where the surface casts none on itself.
+    var shadow = 1.0;
+    var back_shadow = 1.0;
+    if (entity.receive_shadows == 1u) {
+        shadow = calculate_shadow(in.world_position, N);
+        if (translucent) {
+            back_shadow = calculate_shadow(in.world_position, -N);
+        }
+    }
     for (var i = 0u; i < lighting.num_dir_lights; i = i + 1u) {
         let sun = lighting.dir_lights[i];
         if (skip_baked && sun.baked > 0.5) {
             continue;
         }
-        let radiance = sun.color * sun.intensity * select(1.0, shadow, i == 0u);
-        lighting_color += calculate_pbr(N, V, normalize(-sun.direction), radiance, F0, metallic, roughness, albedo);
+        let L = normalize(-sun.direction);
+        let radiance = sun.color * sun.intensity;
+        lighting_color += calculate_pbr(N, V, L, radiance * select(1.0, shadow, i == 0u), F0, metallic, roughness, diffuse_albedo);
+        if (translucent) {
+            lighting_color += transparent::transmitted(N, L, radiance * select(1.0, back_shadow, i == 0u), diffuse_albedo);
+        }
     }
 
     // 3. Point and spot lights, only those binned into this fragment's cluster (#434),
@@ -385,17 +437,26 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
         if (skip_baked && light.baked > 0.5) {
             continue;
         }
-        var radiance = local_light_radiance(light, in.world_position);
+        let radiance = local_light_radiance(light, in.world_position);
         if (all(radiance == vec3<f32>(0.0))) {
             continue;
         }
-        // Its shadow, when the atlas holds one (#468).
+        // Its shadow, when the atlas holds one (#468), off the back face too for a
+        // translucent surface.
         let tile = local_shadow_tile(light, in.world_position);
-        if (tile != NO_SHADOW) {
-            radiance *= sample_local_shadow(shadow_tiles[tile], t_shadow_atlas, s_shadow, light.position, in.world_position, N);
+        var lit = 1.0;
+        var back_lit = 1.0;
+        if (tile != NO_SHADOW && entity.receive_shadows == 1u) {
+            lit = sample_local_shadow(shadow_tiles[tile], t_shadow_atlas, s_shadow, light.position, in.world_position, N);
+            if (translucent) {
+                back_lit = sample_local_shadow(shadow_tiles[tile], t_shadow_atlas, s_shadow, light.position, in.world_position, -N);
+            }
         }
         let L = normalize(light.position - in.world_position);
-        lighting_color += calculate_pbr(N, V, L, radiance, F0, metallic, roughness, albedo);
+        lighting_color += calculate_pbr(N, V, L, radiance * lit, F0, metallic, roughness, diffuse_albedo);
+        if (translucent) {
+            lighting_color += transparent::transmitted(N, L, radiance * back_lit, diffuse_albedo);
+        }
     }
 
     // 5. Environment reflections (#244), always on (#718): like Unity's Lighting ->
@@ -433,7 +494,8 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     }
     lighting_color += emissive;
 
-    // 7. Scene fog (#437), last, in linear HDR before post-FX. Authored surface
-    // blocks fold into `lighting_color` here, so they are fogged too.
-    return vec4<f32>(apply_fog(camera.fog, lighting_color, in.world_position, camera.camera_pos), base_color.a);
+    // 7. Scene fog (#437), last, in linear HDR before post-FX, and how a transparent
+    // surface composites (#1523). Authored surface blocks fold into `lighting_color`
+    // here, so they are fogged too.
+    return transparent::composite(lighting_color, base_color.a, env_brdf, in.world_position, N, in.clip_position.xy);
 }

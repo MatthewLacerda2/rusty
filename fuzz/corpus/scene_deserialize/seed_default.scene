@@ -672,6 +672,25 @@
       "render_mode": "Opaque",
       "alpha": 1.0,
       "alpha_cutoff": 0.5,
+      "blend_mode": "Alpha",
+      "preserve_specular": true,
+      "receive_shadows": true,
+      "refraction_model": "None",
+      "ior": 1.5,
+      "thickness": 1.0,
+      "transmittance_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "absorption_distance": 1.0,
+      "depth_postpass": false,
+      "transmission_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "transmission": 0.0,
       "shader": null
     }
   },

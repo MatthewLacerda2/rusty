@@ -13,6 +13,7 @@
 
 mod shader_params;
 mod slots;
+mod surface;
 
 use crate::editor::inspector::components::card::remove_component;
 use crate::scene::authoring::ComponentKind;
@@ -90,6 +91,7 @@ fn draw_material(
         optional_map(ui, "Use Emissive Map", materials, key, MapKind::Emissive);
 
         draw_material_transparency(ui, materials, key, is_dirty);
+        surface::draw_surface_fields(ui, materials, key, is_dirty);
 
         // The authored surface shader (#396) — `Material.SetShader`'s twin.
         let mut shader = materials[key].shader.clone().unwrap_or_default();

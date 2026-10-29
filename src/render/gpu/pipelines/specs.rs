@@ -2,6 +2,7 @@
 //! a [`PipelineSpec`] into a pipeline. The layouts and entry points are shared, so
 //! each pipeline names only what it changes from [`PipelineSpec::opaque`].
 
+use super::transparent::TransparentBlend;
 use crate::render::gpu::mesh::vertex_layout;
 use crate::render::gpu::DEPTH_FORMAT;
 use crate::render::postfx::effects::ssr::surface::target_state as surface_target_state;
@@ -110,14 +111,15 @@ fn primed(spec: PipelineSpec) -> PipelineSpec {
     }
 }
 
-/// Transparent pass (#242): same shader/layout as the forward pass but alpha-blended
-/// and depth-WRITE-off (still depth-TESTED against opaque) so overlapping translucent
-/// surfaces all blend rather than z-cull each other. Drawn back-to-front after opaque.
-pub(super) fn transparent_spec() -> PipelineSpec {
+/// Transparent pass (#242): same shader/layout as the forward pass but blended by
+/// `blend` (#1523) and depth-WRITE-off (still depth-TESTED against opaque) so
+/// overlapping translucent surfaces all blend rather than z-cull each other. Drawn
+/// back-to-front after opaque.
+pub(super) fn transparent_spec(blend: TransparentBlend) -> PipelineSpec {
     PipelineSpec {
-        blend: wgpu::BlendState::ALPHA_BLENDING,
+        blend: blend.state(),
         depth_write_enabled: false,
-        ..PipelineSpec::opaque("Transparent Pipeline")
+        ..PipelineSpec::opaque(blend.label())
     }
 }
 

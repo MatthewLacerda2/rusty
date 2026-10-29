@@ -34,6 +34,24 @@ struct EntityUniforms {
     bone_base: u32,
     // 1 when this draw folds in its cluster's decals (#638).
     receive_decals: u32,
+    // The transparent-surface terms (#1523), mirroring `SurfaceUniform`
+    // (src/render/gpu/uniforms.rs) byte-for-byte. `blend_mode`: 0 Alpha,
+    // 1 Premultiply, 2 Additive, 3 Multiply.
+    blend_mode: u32,
+    // 1 when preserve specular applies: diffuse * alpha here, specular whole.
+    premultiply_diffuse: u32,
+    receive_shadows: u32,
+    // 0 none, 1 planar (HDRP's Box), 2 thin.
+    refraction_model: u32,
+    ior: f32,
+    thickness: f32,
+    // 1 when the surface composites over the opaque copy itself.
+    uses_opaque: u32,
+    depth_postpass: u32,
+    // Absorption per metre (rgb); w the depth it absorbs over against the sky.
+    absorption: vec4<f32>,
+    // Thin translucency: rgb colour * amount, w the amount.
+    transmission: vec4<f32>,
 };
 
 // One instance of an instanced draw (#470), indexed by `instance_index`. Mirrors
@@ -211,3 +229,11 @@ var t_ao: texture_2d<f32>;
 var t_shadow_atlas: texture_depth_2d;
 @group(3) @binding(5)
 var<storage, read> shadow_tiles: array<ShadowTile>;
+// The camera's opaque copy (#1523, `opaque_copy.wgsl`), Unity's *Opaque Texture*
+// and *Depth Texture* in one: rgb its colour after the opaque pass and SSR, alpha
+// the distance from the eye to that surface; a 1x1 stand-in in every pass but a
+// transparent one with a surface that refracts or absorbs. Linear, clamped sampler.
+@group(3) @binding(6)
+var t_opaque: texture_2d<f32>;
+@group(3) @binding(7)
+var s_opaque: sampler;

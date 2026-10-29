@@ -2,7 +2,10 @@
 //! material's surface variant (#396) or the standard one, over a primed depth or not
 //! (#1499).
 
-use super::super::{LazyPipeline, PrimedPipelines, VelocityPipelines};
+use super::super::{
+    DepthPostpassPipelines, PrimedPipelines, TransparentBlend, TransparentPipelines,
+    VelocityPipelines,
+};
 use super::SurfaceShaders;
 
 /// Which solids pass a batch is drawn in, carrying that pass's standard pipeline, so
@@ -22,8 +25,11 @@ pub(crate) enum SolidPass<'a> {
     /// Opaque solids writing motion vectors too (#1435), and the SSR surface target
     /// when the last field holds (#1526).
     Velocity(&'a VelocityPipelines, Option<&'a PrimedPipelines>, bool),
-    /// Alpha-blended solids; the standard pipeline is built only if a batch uses it.
-    Transparent(&'a LazyPipeline),
+    /// Blended solids; each standard pipeline is built only if a batch uses it.
+    Transparent(&'a TransparentPipelines),
+    /// The translucents' depth postpass (#1523), into the view's velocity target
+    /// too when the last field holds.
+    DepthPostpass(&'a DepthPostpassPipelines, bool),
 }
 
 impl SolidPass<'_> {
@@ -47,12 +53,13 @@ impl SolidPass<'_> {
 impl SurfaceShaders {
     /// What pipeline `id` draws with in `pass`: its variant's, else the standard one;
     /// with `primed` (a lit batch in a primed pass, #1499), the one over the primed
-    /// depth.
+    /// depth; in the transparent pass, the one for its `blend` (#1523).
     pub(crate) fn pick<'a>(
         &'a self,
         pass: SolidPass<'a>,
         id: usize,
         primed: bool,
+        blend: TransparentBlend,
     ) -> &'a wgpu::RenderPipeline {
         let variant = self.get(id);
         match pass {
@@ -67,7 +74,12 @@ impl SurfaceShaders {
             SolidPass::Velocity(standard, _, ssr) => {
                 variant.map_or(standard, |v| &v.velocity).get(ssr)
             }
-            SolidPass::Transparent(lazy) => variant.map_or_else(|| lazy.get(), |v| &v.transparent),
+            SolidPass::Transparent(standard) => {
+                variant.map_or(standard, |v| &v.transparent).get(blend)
+            }
+            SolidPass::DepthPostpass(standard, velocity) => variant
+                .map_or(standard, |v| &v.depth_postpass)
+                .get(velocity),
         }
     }
 }
