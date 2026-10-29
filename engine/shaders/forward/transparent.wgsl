@@ -1,13 +1,14 @@
-// engine/shaders/forward/transparent.wgsl — how a surface's lit colour leaves the
-// forward shader (#1523): the scene fog, and for a transparent surface the alpha its
-// blend mode reads and, when it refracts or absorbs, what is behind it. Every colour
+// engine/shaders/forward/transparent.wgsl — the forward shader's transparent-surface
+// terms (#1523): how a surface's lit colour leaves it (the scene fog, and for a
+// transparent surface the alpha its blend mode reads and, when it refracts or
+// absorbs, what is behind it), and thin translucency's back-lit light. Every colour
 // entry point returns through `composite`; an opaque surface leaves it exactly as
 // `apply_fog` would, at alpha 1.
 
 #define_import_path forward::transparent
 
 #import forward::bindings::{camera, entity, s_opaque, t_opaque}
-#import common::fog_factor
+#import common::{PI, fog_factor}
 
 // `lit` fogged, with the alpha the pipeline blends with. Preserve specular (URP's
 // `_ALPHAPREMULTIPLY_ON`) already multiplied the diffuse by `alpha` and blends
@@ -38,6 +39,14 @@ fn composite(lit: vec3<f32>, alpha: f32, env_brdf: vec3<f32>, world: vec3<f32>, 
         return vec4<f32>(color, opacity);
     }
     return vec4<f32>(color + (1.0 - opacity) * behind(world, N, pixel), 1.0);
+}
+
+// The diffuse light a thin translucent surface lets through from a light behind it
+// (#1523): HDRP's thin *Translucent* type, a back-face Lambert term scaled by the
+// transmission colour times its amount. `N` faces the viewer, so a light behind the
+// surface has `dot(N, L) < 0`; `radiance` is the light shadowed at the back face.
+fn transmitted(N: vec3<f32>, L: vec3<f32>, radiance: vec3<f32>, albedo: vec3<f32>) -> vec3<f32> {
+    return entity.transmission.rgb * albedo / PI * radiance * saturate(dot(-N, L));
 }
 
 // Where the opaque copy holds no surface (the sky): `opaque_copy.wgsl`'s

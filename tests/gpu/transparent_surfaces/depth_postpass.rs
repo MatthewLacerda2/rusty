@@ -14,7 +14,7 @@ const SIZE: u32 = 160;
 
 /// The pane 3 m from the eye over a grey wall at 25 m, its postpass `on`.
 fn pane(on: bool) -> rusty::scene::Scene {
-    let mut scene = stage_with(-0.8, |vc| {
+    let mut scene = stage_with(glam::Quat::from_rotation_x(-0.8), |vc| {
         vc.depth_of_field = DepthOfField {
             mode: DofMode::Bokeh,
             focus_distance: 3.0,

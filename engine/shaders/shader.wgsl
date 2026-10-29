@@ -350,6 +350,12 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     // multiplied by alpha here, and the pipeline blends premultiplied, so reflections
     // and highlights are not faded with it. `albedo` still sets a metal's F0.
     let diffuse_albedo = albedo * select(1.0, base_color.a, entity.premultiply_diffuse == 1u);
+    // Thin translucency (#1523) lights the side facing away from a light, so the
+    // normal faces the viewer, as HDRP flips a double-sided translucent's normal.
+    let translucent = entity.transmission.w > 0.0;
+    if (translucent) {
+        N = faceForward(N, -V, N);
+    }
     let metallic = surface.metallic;
     let roughness = surface.roughness;
 
@@ -400,17 +406,27 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     // 2. Directional lights (#434). Slot 0 is the sun, the one the cascades shadow.
     // A surface that receives no shadows (#1523, URP's *Receive Shadows*) skips the
     // cascades and the atlas.
+    // Light through a translucent surface reaches its back face, so its shadow is
+    // looked up off that face (`-N`), where the surface casts none on itself.
     var shadow = 1.0;
+    var back_shadow = 1.0;
     if (entity.receive_shadows == 1u) {
         shadow = calculate_shadow(in.world_position, N);
+        if (translucent) {
+            back_shadow = calculate_shadow(in.world_position, -N);
+        }
     }
     for (var i = 0u; i < lighting.num_dir_lights; i = i + 1u) {
         let sun = lighting.dir_lights[i];
         if (skip_baked && sun.baked > 0.5) {
             continue;
         }
-        let radiance = sun.color * sun.intensity * select(1.0, shadow, i == 0u);
-        lighting_color += calculate_pbr(N, V, normalize(-sun.direction), radiance, F0, metallic, roughness, diffuse_albedo);
+        let L = normalize(-sun.direction);
+        let radiance = sun.color * sun.intensity;
+        lighting_color += calculate_pbr(N, V, L, radiance * select(1.0, shadow, i == 0u), F0, metallic, roughness, diffuse_albedo);
+        if (translucent) {
+            lighting_color += transparent::transmitted(N, L, radiance * select(1.0, back_shadow, i == 0u), diffuse_albedo);
+        }
     }
 
     // 3. Point and spot lights, only those binned into this fragment's cluster (#434),
@@ -421,17 +437,26 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
         if (skip_baked && light.baked > 0.5) {
             continue;
         }
-        var radiance = local_light_radiance(light, in.world_position);
+        let radiance = local_light_radiance(light, in.world_position);
         if (all(radiance == vec3<f32>(0.0))) {
             continue;
         }
-        // Its shadow, when the atlas holds one (#468).
+        // Its shadow, when the atlas holds one (#468), off the back face too for a
+        // translucent surface.
         let tile = local_shadow_tile(light, in.world_position);
+        var lit = 1.0;
+        var back_lit = 1.0;
         if (tile != NO_SHADOW && entity.receive_shadows == 1u) {
-            radiance *= sample_local_shadow(shadow_tiles[tile], t_shadow_atlas, s_shadow, light.position, in.world_position, N);
+            lit = sample_local_shadow(shadow_tiles[tile], t_shadow_atlas, s_shadow, light.position, in.world_position, N);
+            if (translucent) {
+                back_lit = sample_local_shadow(shadow_tiles[tile], t_shadow_atlas, s_shadow, light.position, in.world_position, -N);
+            }
         }
         let L = normalize(light.position - in.world_position);
-        lighting_color += calculate_pbr(N, V, L, radiance, F0, metallic, roughness, diffuse_albedo);
+        lighting_color += calculate_pbr(N, V, L, radiance * lit, F0, metallic, roughness, diffuse_albedo);
+        if (translucent) {
+            lighting_color += transparent::transmitted(N, L, radiance * back_lit, diffuse_albedo);
+        }
     }
 
     // 5. Environment reflections (#244), always on (#718): like Unity's Lighting ->

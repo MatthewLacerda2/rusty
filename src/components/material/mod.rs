@@ -146,6 +146,15 @@ pub struct MaterialAsset {
     /// see it rather than what is behind it. Off by default.
     #[serde(default)]
     pub depth_postpass: bool,
+    /// The colour thin translucency lets through (#1523), HDRP's *Transmission
+    /// Tint*; white by default.
+    #[serde(default = "white")]
+    pub transmission_color: [f32; 3],
+    /// How much light passes through the surface from behind, `[0, 1]`: HDRP's
+    /// thin *Translucent* material (a leaf, a lampshade, a banner lit from behind),
+    /// opaque or transparent. 0 (the default) lets none through.
+    #[serde(default)]
+    pub transmission: f32,
     /// The authored surface shader this material renders with (#396): a module name
     /// resolved as `<name>.wgsl` in `assets/shaders` (where `Shader.Bake`
     /// writes), then `engine/shaders`. `None` is the standard forward shader.
@@ -205,6 +214,8 @@ impl Default for MaterialAsset {
             transmittance_color: white(),
             absorption_distance: default_one(),
             depth_postpass: false,
+            transmission_color: white(),
+            transmission: 0.0,
             shader: None,
             shader_params: BTreeMap::new(),
             shader_textures: BTreeMap::new(),

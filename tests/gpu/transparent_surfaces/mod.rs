@@ -9,6 +9,7 @@ mod preserve_specular;
 mod receive_shadows;
 mod refraction;
 mod textures;
+mod translucency;
 
 pub use textures::{checker, ripples};
 
@@ -24,15 +25,15 @@ pub const SIZE: u32 = 64;
 /// A scene with a sun at `sun_pitch` radians below the horizon and a view volume:
 /// bloom and SSR off and a fixed exposure, so a pixel is what the forward pass drew.
 pub fn stage(sun_pitch: f32) -> Scene {
-    stage_with(sun_pitch, |_| {})
+    stage_with(Quat::from_rotation_x(sun_pitch), |_| {})
 }
 
-/// [`stage`], its volume's settings changed by `tweak` first.
-pub fn stage_with(sun_pitch: f32, tweak: impl FnOnce(&mut PostProcessingComponent)) -> Scene {
+/// [`stage`] with the sun turned by `sun`, the volume's settings changed by `tweak`.
+pub fn stage_with(sun: Quat, tweak: impl FnOnce(&mut PostProcessingComponent)) -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
-    let sun = create_entity(&mut scene, "Sun", Some(Primitive::DirectionalLight));
-    scene.world.transform_mut(sun).unwrap().rotation = Quat::from_rotation_x(sun_pitch);
+    let light = create_entity(&mut scene, "Sun", Some(Primitive::DirectionalLight));
+    scene.world.transform_mut(light).unwrap().rotation = sun;
     let volume = create_entity(&mut scene, "Volume", None);
     let mut vc = default_post_processing();
     vc.exposure.fixed_ev = -1.0;

@@ -242,6 +242,24 @@ pub static SURFACE_FIELDS: &[SurfaceField] = &[
         get: |m| SurfaceValue::Bool(m.depth_postpass),
         put: |m, v| m.depth_postpass = boolean(v),
     },
+    SurfaceField {
+        key: "transmission",
+        api: "Transmission",
+        label: "Transmission",
+        kind: SurfaceKind::Number(0.0..=1.0),
+        shown: always,
+        get: |m| SurfaceValue::Number(m.transmission),
+        put: |m, v| m.transmission = number(v),
+    },
+    SurfaceField {
+        key: "transmission_color",
+        api: "TransmissionColor",
+        label: "Transmission Color",
+        kind: SurfaceKind::Color,
+        shown: |m| m.transmission > 0.0,
+        get: |m| SurfaceValue::Color(m.transmission_color),
+        put: |m, v| m.transmission_color = color(v),
+    },
 ];
 
 #[cfg(test)]

@@ -105,9 +105,15 @@ pub(crate) fn surface_uniform(material: Option<&MaterialAsset>) -> SurfaceUnifor
         thickness,
         uses_opaque: u32::from(reads_opaque),
         depth_postpass: u32::from(glass && m.depth_postpass),
+        transmission: transmission(m.transmission_color, m.transmission),
         absorption: absorption(m.transmittance_color, m.absorption_distance),
         ..SurfaceUniform::default()
     }
+}
+
+/// Thin translucency's lane: the colour times the amount, then the amount.
+fn transmission([r, g, b]: [f32; 3], amount: f32) -> [f32; 4] {
+    [r * amount, g * amount, b * amount, amount]
 }
 
 /// HDRP's thin refraction slab (`Lit.hlsl`, `REFRACTION_THIN_DISTANCE`): 5 mm.
@@ -202,3 +208,7 @@ pub(crate) fn probe_sh_at(scene: &Scene, position: glam::Vec3) -> (u32, [[f32; 4
         None => (0, [[0.0; 4]; 9]),
     }
 }
+
+#[cfg(test)]
+#[path = "uniforms_tests.rs"]
+mod tests;
