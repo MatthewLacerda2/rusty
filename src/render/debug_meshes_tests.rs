@@ -1,7 +1,8 @@
 //! The re-upload rule (#1540): which geometry slots a renderer refreshes, and from
 //! which mesh. Pure, so it runs with no adapter.
 
-use super::{stale_uploads, UploadCandidate};
+use super::{has_geometry, stale_uploads, UploadCandidate};
+use crate::components::mesh::Vertex;
 use crate::components::MeshRevision;
 use crate::render::MeshId;
 
@@ -42,8 +43,16 @@ fn the_newest_mesh_with_geometry_wins_a_slot() {
         MeshRevision::next(),
         MeshRevision::next(),
     );
-    let both = vec![floor(new, 2), floor(old, 1)];
-    assert_eq!(picks(None, both), [2], "newest, whatever the order");
+    for both in [
+        vec![floor(new, 2), floor(old, 1)],
+        vec![floor(old, 1), floor(new, 2)],
+    ] {
+        assert_eq!(picks(None, both), [2], "newest, whatever the order");
+    }
+    // Meshes cloned from one share its revision: the first found keeps the slot,
+    // so the pick does not depend on how many share it.
+    let tie = vec![floor(new, 4), floor(new, 5)];
+    assert_eq!(picks(None, tie), [4], "a tie keeps the first");
     let empty = UploadCandidate {
         has_geometry: false,
         ..floor(newest, 3)
@@ -53,4 +62,13 @@ fn the_newest_mesh_with_geometry_wins_a_slot() {
         [2],
         "empty never wins"
     );
+}
+
+#[test]
+fn a_mesh_has_geometry_only_with_vertices_and_indices() {
+    let v = [Vertex::new(glam::Vec3::ZERO, glam::Vec3::Y, [0.0, 0.0])];
+    assert!(has_geometry(&v, &[0]));
+    assert!(!has_geometry(&v, &[]), "no indices");
+    assert!(!has_geometry(&[], &[0]), "no vertices");
+    assert!(!has_geometry(&[], &[]));
 }

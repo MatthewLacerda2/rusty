@@ -143,3 +143,7 @@ impl ParticleEmitterComponent {
         spawned
     }
 }
+
+#[cfg(test)]
+#[path = "spawn_tests.rs"]
+mod tests;

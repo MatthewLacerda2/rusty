@@ -25,6 +25,12 @@ fn local_aabb(vertices: &[Vertex]) -> (Vec3, Vec3) {
     }
 }
 
+/// Whether a mesh has anything to draw: vertices and indices both. A mesh without
+/// either never replaces a slot's buffers.
+pub(crate) fn has_geometry(vertices: &[Vertex], indices: &[u32]) -> bool {
+    !vertices.is_empty() && !indices.is_empty()
+}
+
 /// One mesh a geometry slot could be uploaded from.
 pub(crate) struct UploadCandidate {
     pub id: MeshId,
@@ -74,7 +80,7 @@ impl Renderer {
                 id: MeshId::from_mesh(&mesh),
                 revision: mesh.revision,
                 entity,
-                has_geometry: !mesh.vertices.is_empty() && !mesh.indices.is_empty(),
+                has_geometry: has_geometry(&mesh.vertices, &mesh.indices),
             }
         });
         let resident = |id: &MeshId| self.gpu_meshes.get(id).map(|g| g.revision);
@@ -97,7 +103,7 @@ impl Renderer {
         vertices: &[Vertex],
         indices: &[u32],
     ) {
-        if vertices.is_empty() || indices.is_empty() {
+        if !has_geometry(vertices, indices) {
             return;
         }
 

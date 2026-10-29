@@ -89,3 +89,35 @@ fn an_all_inside_mask_reads_one_and_an_empty_mask_zero() {
     let empty = Image::filled(8, [0.0, 0.0, 0.0, 1.0]);
     assert_eq!(distance(&empty, Field::Const(0.1)), empty);
 }
+
+/// An 8×8 inside mask whose first pixel's red is `red`.
+fn one_pixel(red: f32) -> Image {
+    let mut img = Image::filled(8, [1.0; 4]);
+    img.pixels_mut()[0] = [red, red, red, 1.0];
+    img
+}
+
+#[test]
+fn a_pixel_of_exactly_half_red_is_outside() {
+    let out = distance(&one_pixel(0.5), Field::Const(0.5));
+    assert_eq!(out.pixels()[0][0], 0.0, "the half-red pixel");
+    assert!(out.pixels()[1][0] < 1.0, "its neighbour sits by the edge");
+}
+
+#[test]
+fn a_radius_of_zero_of_either_sign_reads_one_inside() {
+    for radius in [0.0, -0.0] {
+        let out = distance(&one_pixel(0.0), Field::Const(radius));
+        assert!(out.pixels()[1..].iter().all(|p| p[0] == 1.0), "{radius:?}");
+    }
+}
+
+#[test]
+fn a_row_whose_only_site_is_past_the_wrap_reaches_it() {
+    let mut row = vec![f32::INFINITY; 16];
+    row[2] = 0.0;
+    let out = periodic_edt(&row, 1.0);
+    // The last pixel is 3 from the site's copy one row-length on, at 18.
+    assert_eq!(out[15], (9.0, 18));
+    assert_eq!(out[10].0, 64.0, "halfway: 8 from either copy");
+}
