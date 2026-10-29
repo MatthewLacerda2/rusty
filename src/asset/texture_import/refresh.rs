@@ -1,6 +1,6 @@
 //! Making an image's compressed cache current (#1574), at import and never at a
 //! draw: one image ([`refresh`]), every image under a folder ([`refresh_all`],
-//! Play's refresh and an export), or a queue a worker thread drains ([`queue`],
+//! Play's refresh, an export and `Assets.Refresh`), or a queue a worker thread drains ([`queue`],
 //! the editor). Each encode holds the cache's lock (`convert::lock_cache`), so the
 //! worker and a Play refresh never make one cache twice at once.
 
@@ -10,6 +10,7 @@ use std::sync::Mutex;
 
 use super::{cache, cache_file, encode, fit, format_of, shrink, TextureKind};
 use crate::asset::{convert, is_image_path, sidecar};
+use crate::core::fs::written::Stale;
 
 /// Make the compressed cache of the image at `source` current, encoding it when it
 /// is missing or stale. Returns whether it encoded; `false` too when the image is
@@ -74,13 +75,8 @@ pub fn images(root: &Path) -> Vec<PathBuf> {
 /// what an export runs before it copies the caches. Each one re-made is noted in
 /// `core::fs::written`, so a renderer holding it uncompressed swaps it. Returns how
 /// many it encoded; a failure is warned of, the rest still run, and the failures
-/// are the `Err`, one per line. A standalone game (`convert::is_standalone`)
-/// encodes nothing, as Unity's player imports nothing: it plays from the caches
-/// its export shipped, and an image without one uploads uncompressed.
+/// are the `Err`, one per line. `Assets.Refresh` runs it on request.
 pub fn refresh_all(root: &Path) -> Result<usize, String> {
-    if convert::is_standalone() {
-        return Ok(0);
-    }
     let images = images(root);
     let (mut encoded, mut failed) = (0, Vec::new());
     for (i, image) in images.iter().enumerate() {
@@ -100,6 +96,19 @@ pub fn refresh_all(root: &Path) -> Result<usize, String> {
         true => Ok(encoded),
         false => Err(failed.join("\n")),
     }
+}
+
+/// [`queue`] every image under `root` that `changed` names, or whose sidecar it
+/// names: the editor watch's refresh (`convert::refresh_changed`).
+pub fn queue_changed(root: &Path, changed: &Stale) {
+    if changed.is_empty() {
+        return;
+    }
+    let names = |path: &Path| changed.matches(&path.to_string_lossy());
+    let touched = images(root)
+        .into_iter()
+        .filter(|image| names(image) || names(&sidecar::meta_path(image)));
+    queue(touched.collect());
 }
 
 /// The worker's inbox, started by the first [`queue`].

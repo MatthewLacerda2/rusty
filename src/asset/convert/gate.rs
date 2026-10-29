@@ -107,9 +107,10 @@ pub fn mark_standalone() {
     with_gate(|gate| gate.standalone = true);
 }
 
-/// Whether this thread runs a standalone game ([`mark_standalone`]): it compresses
-/// no texture (`texture_import::refresh_all`), so it never writes into its install.
-pub fn is_standalone() -> bool {
+/// Whether this thread runs a standalone game ([`mark_standalone`]): its refresh
+/// before Play compresses no texture ([`refresh_sources`]), so it never writes
+/// into its install.
+fn is_standalone() -> bool {
     with_gate(|gate| gate.standalone)
 }
 
@@ -121,7 +122,8 @@ pub fn conversion_allowed() -> bool {
 /// Bring every converted source under `root` up to date, as Unity refreshes its
 /// asset database before Play: a model only a script spawns has a cache to play
 /// from. Every image's compressed copy too (`texture_import::refresh_all`,
-/// #1574), so Play draws none uncompressed for want of one. A source whose
+/// #1574), so Play draws none uncompressed for want of one, but in a standalone
+/// game, which plays from the copies its export shipped. A source whose
 /// conversion fails is warned of and skipped. Returns how many model sources were
 /// looked at; none while conversion is refused.
 pub fn refresh_sources(root: &Path) -> usize {
@@ -134,8 +136,11 @@ pub fn refresh_sources(root: &Path) -> usize {
             log::warn!("[Asset] {}: {e}", source.display());
         }
     }
-    // Each failure was warned of as it ran.
-    let _ = crate::asset::texture_import::refresh_all(root);
+    // Each failure was warned of as it ran. A standalone game compresses none, as
+    // Unity's player imports nothing: it plays from what its export shipped.
+    if !is_standalone() {
+        let _ = crate::asset::texture_import::refresh_all(root);
+    }
     sources.len()
 }
 
@@ -167,7 +172,7 @@ pub fn refresh_changed(root: &Path, changed: Vec<String>) -> usize {
         return 0;
     }
     let changed = Stale::new(changed);
-    queue_images(root, &changed);
+    crate::asset::texture_import::queue_changed(root, &changed);
     let touched = touched(root, &changed);
     let mut converted = 0;
     for source in touched {
@@ -177,19 +182,6 @@ pub fn refresh_changed(root: &Path, changed: Vec<String>) -> usize {
         }
     }
     converted
-}
-
-/// Queue every image under `root` that `changed` names, or whose sidecar it names.
-fn queue_images(root: &Path, changed: &Stale) {
-    if changed.is_empty() {
-        return;
-    }
-    let names = |path: &Path| changed.matches(&path.to_string_lossy());
-    let images = crate::asset::texture_import::images(root);
-    let changed_images = images
-        .into_iter()
-        .filter(|image| names(image) || names(&crate::asset::sidecar::meta_path(image)));
-    crate::asset::texture_import::queue(changed_images.collect());
 }
 
 /// The sources under `root` a note in `changed` touches, sorted.

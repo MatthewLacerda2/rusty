@@ -24,7 +24,7 @@ one by its source path still works.
 |---|---|---|
 | `Assets.Manifest` | `()` | array of asset tables (see shape below) |
 | `Assets.List` | `()` | alias for `Assets.Manifest` |
-| `Assets.Refresh` | `()` | `{ converted = { wavPath, ... }, skipped = { { path, reason }, ... } }` — imports what arrived (below) |
+| `Assets.Refresh` | `()` | `{ converted = { wavPath, ... }, skipped = { { path, reason }, ... }, compressed }` — imports what arrived (below) |
 | `Assets.GetLightmapUVSettings` | `(path)` | `{ generate, hardAngle, packMargin }` — a model's Generate Lightmap UVs setting (below) |
 | `Assets.SetLightmapUVSettings` | `(path, { generate?, hardAngle?, packMargin? })` | how many of the scene's meshes it re-imported |
 | `Assets.GetModelImportSettings` | `(path)` | `{ scaleFactor }` — a model's Scale Factor (below) |
@@ -62,6 +62,11 @@ once, its encoder delay and padding trimmed, written as a 16-bit PCM `.wav` besi
 carries WAV, never MP3. OGG is never converted. The editor runs the same refresh at
 boot and whenever its window regains focus, logging each conversion to the console;
 call it yourself after writing or copying an `.mp3` into the project.
+
+It also makes every image's compressed copy current (see `compression`, below) and
+returns how many it made in `compressed`; one that fails is warned of in the
+console. It waits for them, on any build: the way to compress textures from a
+script, a session or the `play` harness, which otherwise never encodes.
 
 An MP3 is left in place, and listed in `skipped` with the reason, when its `.wav`
 sibling already exists (a refresh never overwrites a file) or when it does not decode
@@ -180,8 +185,8 @@ clamped sampler.
   encoder change. The editor makes them in the background when an image is added,
   its settings change or the project opens (the console says each one); entering
   Play waits for any still stale, as it waits for models; an export makes and ships
-  them. The standalone player and the `play` harness never encode: they play from
-  the copies the editor or an export made. Until its copy is made, a texture draws
+  them. The standalone player and the `play` harness never encode on their own:
+  they play from the copies the editor, an export or `Assets.Refresh()` made. Until its copy is made, a texture draws
   uncompressed. Encoding BC7 is slow, a few seconds for a 2048² map spread over
   every core, so a project's first import of many large maps takes minutes, once. An
   image whose (fitted) sides are not multiples of 4 is uploaded uncompressed, as

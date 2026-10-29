@@ -39,60 +39,71 @@ fn draw_import_settings(ui: &mut egui::Ui, path: &str) {
     let source = Path::new(path);
     let stored = sidecar::texture(source);
     let mut s = stored;
-    ui.horizontal(|ui| {
-        ui.label("Wrap Mode:");
-        egui::ComboBox::from_id_salt("ImgWrapMode")
-            .selected_text(s.wrap_mode.name())
-            .show_ui(ui, |ui| {
-                for mode in WrapMode::ALL {
-                    ui.selectable_value(&mut s.wrap_mode, mode, mode.name());
-                }
-            });
-    });
-    ui.horizontal(|ui| {
-        ui.label("Filter Mode:");
-        egui::ComboBox::from_id_salt("ImgFilterMode")
-            .selected_text(s.filter_mode.name())
-            .show_ui(ui, |ui| {
-                for mode in FilterMode::ALL {
-                    ui.selectable_value(&mut s.filter_mode, mode, mode.name());
-                }
-            });
-    });
+    let names = |m: &WrapMode| m.name().to_owned();
+    combo(
+        ui,
+        ("Wrap Mode:", "ImgWrapMode"),
+        &mut s.wrap_mode,
+        WrapMode::ALL,
+        names,
+    );
+    let names = |m: &FilterMode| m.name().to_owned();
+    combo(
+        ui,
+        ("Filter Mode:", "ImgFilterMode"),
+        &mut s.filter_mode,
+        FilterMode::ALL,
+        names,
+    );
     ui.checkbox(&mut s.generate_mipmaps, "Generate Mipmaps");
-    ui.horizontal(|ui| {
-        ui.label("Texture Type:");
-        egui::ComboBox::from_id_salt("ImgTextureType")
-            .selected_text(s.texture_type.name())
-            .show_ui(ui, |ui| {
-                for t in TextureType::ALL {
-                    ui.selectable_value(&mut s.texture_type, t, t.name());
-                }
-            });
-    });
-    ui.horizontal(|ui| {
-        ui.label("Max Size:");
-        egui::ComboBox::from_id_salt("ImgMaxSize")
-            .selected_text(s.max_size.to_string())
-            .show_ui(ui, |ui| {
-                for size in MAX_SIZES {
-                    ui.selectable_value(&mut s.max_size, size, size.to_string());
-                }
-            });
-    });
-    ui.horizontal(|ui| {
-        ui.label("Compression:");
-        egui::ComboBox::from_id_salt("ImgCompression")
-            .selected_text(s.compression.name())
-            .show_ui(ui, |ui| {
-                for c in Compression::ALL {
-                    ui.selectable_value(&mut s.compression, c, c.name());
-                }
-            });
-    });
+    let names = |t: &TextureType| t.name().to_owned();
+    let all = TextureType::ALL;
+    combo(
+        ui,
+        ("Texture Type:", "ImgTextureType"),
+        &mut s.texture_type,
+        all,
+        names,
+    );
+    let names = |size: &u32| size.to_string();
+    combo(
+        ui,
+        ("Max Size:", "ImgMaxSize"),
+        &mut s.max_size,
+        MAX_SIZES,
+        names,
+    );
+    let names = |c: &Compression| c.name().to_owned();
+    combo(
+        ui,
+        ("Compression:", "ImgCompression"),
+        &mut s.compression,
+        Compression::ALL,
+        names,
+    );
     if s != stored {
         let _ = sidecar::set_texture(source, s);
     }
+}
+
+/// One labelled drop-down: `value` picked from `options`, each shown by `name`.
+fn combo<T: Copy + PartialEq, const N: usize>(
+    ui: &mut egui::Ui,
+    (label, id): (&str, &str),
+    value: &mut T,
+    options: [T; N],
+    name: impl Fn(&T) -> String,
+) {
+    ui.horizontal(|ui| {
+        ui.label(label);
+        egui::ComboBox::from_id_salt(id)
+            .selected_text(name(value))
+            .show_ui(ui, |ui| {
+                for option in options {
+                    ui.selectable_value(value, option, name(&option));
+                }
+            });
+    });
 }
 
 /// Entity picker that applies this texture to the chosen scene entity.

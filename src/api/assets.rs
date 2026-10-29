@@ -55,7 +55,13 @@ pub fn register(lua: &Lua) -> Reg {
     put(
         &table,
         "Refresh",
-        lua.create_function(|lua, ()| refresh_table(lua, &refresh(Path::new(ASSET_ROOT)))),
+        lua.create_function(|lua, ()| {
+            let t = refresh_table(lua, &refresh(Path::new(ASSET_ROOT)))?;
+            // A failure is warned of in the console as it runs.
+            let images = crate::asset::texture_import::refresh_all(Path::new(ASSET_ROOT));
+            t.raw_set("compressed", images.unwrap_or_default())?;
+            Ok(t)
+        }),
     )?;
 
     put(
@@ -202,7 +208,8 @@ fn manifest_table(lua: &Lua) -> mlua::Result<Table> {
     Ok(assets)
 }
 
-/// `{ converted = { wavPath, ... }, skipped = { { path, reason }, ... } }`.
+/// `{ converted = { wavPath, ... }, skipped = { { path, reason }, ... } }`; the
+/// caller adds `compressed`.
 fn refresh_table(lua: &Lua, report: &Refresh) -> mlua::Result<Table> {
     let converted = lua.create_table()?;
     for (i, (_, wav)) in report.converted.iter().enumerate() {

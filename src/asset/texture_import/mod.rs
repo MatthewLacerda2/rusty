@@ -46,7 +46,7 @@ mod shrink;
 use std::path::{Path, PathBuf};
 
 pub use encode::{full_chain_len, BlockFormat, Compressed};
-pub use refresh::{images, queue, refresh, refresh_all};
+pub use refresh::{images, queue, queue_changed, refresh, refresh_all};
 pub use shrink::fit;
 
 use super::sidecar::{Compression, TextureSettings, TextureType};
