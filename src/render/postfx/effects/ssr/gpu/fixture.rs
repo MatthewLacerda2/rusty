@@ -102,8 +102,18 @@ pub(super) const RED: Surface = ([1.0, 0.1, 0.1], 0.0, 1.0);
 /// Render `scene` through [`eye`] into a fresh view and read the frame (RGBA8).
 pub(super) fn frame(r: &mut Renderer, scene: &Scene) -> Vec<u8> {
     let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, W, H, 2);
+    draw(r, &mut view, scene, &eye())
+}
+
+/// Render `scene` through `cam` into `view` and read the frame (RGBA8).
+pub(super) fn draw(
+    r: &mut Renderer,
+    view: &mut RenderView,
+    scene: &Scene,
+    cam: &Camera,
+) -> Vec<u8> {
     let out = view.color_target_view().unwrap();
-    r.render(&mut view, scene, &eye(), &out, false);
+    r.render(view, scene, cam, &out, false);
     readback::read_texture_rgba8(&r.device, &r.queue, view.color_target().unwrap(), W, H)
 }
 
@@ -120,4 +130,9 @@ pub(super) fn pixel(p: Vec3) -> (u32, u32) {
 pub(super) fn rgb(frame: &[u8], (x, y): (u32, u32)) -> [i32; 3] {
     let i = ((y * W + x) * 4) as usize;
     [0, 1, 2].map(|c| i32::from(frame[i + c]))
+}
+
+/// Pixel `p`'s linear RGB.
+pub(super) fn linear(frame: &[u8], p: (u32, u32)) -> [f32; 3] {
+    rgb(frame, p).map(|c| crate::core::color::srgb_to_linear(c as u8))
 }
