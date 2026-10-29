@@ -232,5 +232,9 @@ mod scrolled_cut_tests;
 mod lazy_tests;
 
 #[cfg(test)]
+#[path = "tests/vertex_waves_tests.rs"]
+mod vertex_waves_tests;
+
+#[cfg(test)]
 #[path = "tests/priming/backend_tests.rs"]
 mod priming_backend_tests;

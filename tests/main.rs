@@ -51,6 +51,7 @@ mod navmesh_settings;
 mod parity_authoring_ops;
 mod particles;
 mod physics;
+mod plane_subdivisions;
 mod prefab_api;
 mod procgen;
 mod proptest;

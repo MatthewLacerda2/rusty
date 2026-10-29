@@ -66,8 +66,13 @@ until its scripts load at the head of the next (see the spawn note in
 **`primitive`** (optional) is one of the GameObject menu's primitives,
 case-insensitive: `Box`, `Sphere`, `Plane`, `Cylinder`, `Capsule` (meshes) or
 `PointLight`, `DirectionalLight`, `SpotLight`. The Capsule is Unity's: radius 0.5,
-full height 2, along Y. Omit it (or pass an unknown name) to create a bare
-entity carrying only its mandatory `Transform` — the menu's **Create Empty**.
+full height 2, along Y. The Plane is 15 × 15 on XZ, one quad; for vertices a
+vertex shader can move (`vertex_waves`, [`Shader.md`](Shader.md)), cut it into a grid
+with `Component.Set(id, "Mesh", { subdivisions = 64 })`: 1–256 quads per side,
+`(n + 1)²` vertices, the same size and UVs, saved with the scene (the Inspector's
+Mesh card has the same field). A count out of range, or on another shape, is an
+error. Omit `primitive` (or pass an unknown name) to create a bare entity carrying
+only its mandatory `Transform` — the menu's **Create Empty**.
 
 **`kind`** is one of the Add Component menu's first-class components,
 case-insensitive: `Light`, `Animator`, `Collider`, `RigidBody`,
