@@ -289,9 +289,12 @@ end  -- rows number nil / cols number nil / mortar number 0.05
   and `sqrt` have no right-hand side, so they take exactly 1 input; `map_range {from_min,
   from_max, to_min, to_max}`; `clamp {min, max}`; `rgb_to_bw`.
 - **Filter**: `blur {radius, kind="gaussian"|"box"}` (separable; wraps, so it stays
-  tiling; `gaussian`, the default, is a round falloff reaching about `radius` (3σ), three
-  box passes that cost no more than one; `box` is a flat window and leaves square
-  artefacts on soft masks and normals);
+  tiling; `gaussian`, the default, is a round falloff with `σ = radius / 3`: three
+  box passes per axis matched to that variance, each `O(n)` whatever the radius, so
+  it costs about three boxes and its kernel stops a little short of `radius` (about
+  10 px for 12); under about 2.5 px it is one exact 3-tap pass, so even a 1-pixel blur
+  softens; `box` is one flat window, a third of the cost, and leaves square artefacts
+  on soft masks and normals);
   `cavity {radius}` (height → `1 − max(blur(h) − h, 0)` with a Gaussian blur: white on flat and raised
   ground, dark in crevices — multiply into albedo for baked occlusion, `invert` it
   for a dirt mask); `curvature {radius, strength=1}` (height → `0.5 + strength × (h −
@@ -301,9 +304,11 @@ end  -- rows number nil / cols number nil / mortar number 0.05
   the input's red above 0.5 is inside, and each inside pixel reads its distance to the
   mask's edge divided by `radius`, clamped to 1; outside reads 0. It rounds **any**
   mask — a Voronoi cell, a thresholded noise, a stamp — the way `shape`'s `softness`
-  and brick's `bevel` round their own; feed it to `bump_to_normal`, through a
-  `color_ramp` with `interpolation = "ease"` for a rounder profile. It wraps, so a
-  tiling mask gives a tiling bevel).
+  and brick's `bevel` round their own; feed it to `bump_to_normal`. Straight, it is a
+  chamfer; through `math` `func = "sqrt"` (a curve steepest at the rim and flat on
+  top) it is a rounded, convex edge. Avoid an `ease` `color_ramp` here: it is flat at
+  the rim too, so the edge reads as a pillow. It wraps, so a tiling mask gives a
+  tiling bevel).
 
 ### Image files — `image`
 
@@ -334,7 +339,7 @@ imported model, a provider-generated image, an earlier bake, a hand-made mask or
 ```lua no-run
 Texture.Bake({ resolution = 512, nodes = {
   { id = "logo", op = "image", path = "textures/logo.png", encoding = "linear" },
-  { id = "h", op = "blur", radius = 0.004, inputs = { "logo" } },
+  { id = "h", op = "blur", radius = 0.01, inputs = { "logo" } },
   { id = "n", op = "bump_to_normal", strength = 0.3, inputs = { "h" } } },
 }, "textures/logo_n.png", "normal")
 ```
@@ -371,7 +376,7 @@ and 2048² (iterate at a low `resolution`, ship at a high one):
 
 - `blur.radius` is a **fraction of the tile width** — `0.01` is 1% of the texture;
   the pixel radius is `radius × resolution` (a `box` rounds it), capped at half the
-  tile. A `gaussian` under about 2 pixels barely blurs.
+  tile. A `gaussian` reaches about `radius`, a `box` exactly its rounded radius.
 - `warp.strength` is a displacement in tiles: a channel at 1.0 pushes the read
   `strength / 2` of a tile.
 - `bump_to_normal.strength` scales the slope measured in tile units (height change
@@ -457,8 +462,7 @@ Texture.Bake({
     { id = "stones", op = "map_range", from_min = 0.06, from_max = 0.1,
       to_min = 0, to_max = 1, inputs = {"cells"} },                 -- 1 on stones, 0 in the gaps
     { id = "bevel", op = "distance", radius = 0.04, inputs = {"stones"} },
-    { id = "round", op = "color_ramp", interpolation = "ease", inputs = {"bevel"},
-      stops = { { pos = 0, color = "#000000" }, { pos = 1, color = "#ffffff" } } },
+    { id = "round", op = "math", func = "sqrt", inputs = {"bevel"} }, -- a rounded edge
     { id = "n", op = "bump_to_normal", strength = 0.5, inputs = {"round"} },
     { id = "grain", op = "noise", kind = "fbm", scale = 24, octaves = 3 },
     { id = "gn", op = "bump_to_normal", strength = 0.1, inputs = {"grain"} },

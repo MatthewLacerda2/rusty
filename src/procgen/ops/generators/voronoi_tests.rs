@@ -30,37 +30,66 @@ fn each_metric_gives_its_distance_on_a_regular_grid() {
 }
 
 /// The two smallest distances from `(px, py)` (in cells) to every point of the
-/// `cells`² tile and its eight wrapped copies: what the sampler must find.
-fn brute_force(cells: i64, metric: VoronoiMetric, seed: u64, px: f32, py: f32) -> (f32, f32) {
-    let mut d: Vec<f32> = Vec::new();
+/// `cells`² tile and its eight wrapped copies, and the (wrapped) cell of the
+/// nearest: what the sampler must find.
+fn brute_force(
+    cells: i64,
+    metric: VoronoiMetric,
+    seed: u64,
+    px: f32,
+    py: f32,
+) -> (f32, f32, (i64, i64)) {
+    let mut d: Vec<(f32, (i64, i64))> = Vec::new();
     for cy in -cells..2 * cells {
         for cx in -cells..2 * cells {
             let (wx, wy) = (cx.rem_euclid(cells), cy.rem_euclid(cells));
             let at = |ch| hash::unit2(wx, wy, ch, seed);
-            d.push(measure(
-                metric,
-                cx as f32 + at(1) - px,
-                cy as f32 + at(2) - py,
-            ));
+            let dist = measure(metric, cx as f32 + at(1) - px, cy as f32 + at(2) - py);
+            d.push((dist, (wx, wy)));
         }
     }
-    d.sort_by(f32::total_cmp);
-    (d[0], d[1])
+    d.sort_by(|a, b| a.0.total_cmp(&b.0));
+    (d[0].0, d[1].0, d[0].1)
 }
 
+/// Samples where one ring finds the wrong point, so a reach cut to 1 fails them:
+/// `(metric, seed, u, v)`, from scanning 1.2M samples per metric against a
+/// 9×9 search. Euclidean's misses are too rare for the sweep below to hit.
+const SHORT_REACH_MISSES: [(VoronoiMetric, u64, f32, f32); 3] = [
+    (Euclidean, 1167, 0.977_623_05, 0.400_408_63), // the wrong cell
+    (Euclidean, 1543, 0.622_436_46, 0.187_380_08), // edges 0.16 off
+    (Manhattan, 1321, 0.812_072_5, 0.579_942_5),   // the wrong cell
+];
+
+/// Every output checked unclamped where it can be: `Edges` against the true
+/// `F2 − F1` and `Cells` against the true nearest cell's colour, so a reach too
+/// short for either fails (forcing every reach to 1 fails both Euclidean misses
+/// above and the sweep's Manhattan edges and cells).
 #[test]
 fn the_search_reach_finds_the_nearest_two_points_under_every_metric() {
-    let cells = 5;
-    for metric in METRICS {
-        for seed in 0..6 {
-            let f1 = sampler(cells as f32, Distance, metric, 1.0, seed);
-            let f2 = sampler(cells as f32, F2, metric, 1.0, seed);
-            for i in 0..400 {
+    let sweep = METRICS.into_iter().flat_map(|metric| {
+        (0..6).flat_map(move |seed| {
+            (0..400).map(move |i| {
                 let (u, v) = (hash::unit2(i, 0, 3, seed), hash::unit2(i, 1, 3, seed));
-                let (b1, b2) = brute_force(cells, metric, seed, u * 5.0, v * 5.0);
-                assert!((f1(u, v)[0] - b1.min(1.0)).abs() < 1e-6, "{metric:?} F1");
-                assert!((f2(u, v)[0] - b2.min(1.0)).abs() < 1e-6, "{metric:?} F2");
-            }
-        }
+                (metric, seed, u, v)
+            })
+        })
+    });
+    for (metric, seed, u, v) in SHORT_REACH_MISSES.into_iter().chain(sweep) {
+        let at = |output| sampler(5.0, output, metric, 1.0, seed)(u, v);
+        let (b1, b2, cell) = brute_force(5, metric, seed, u * 5.0, v * 5.0);
+        assert!(
+            (at(Distance)[0] - b1.min(1.0)).abs() < 1e-6,
+            "{metric:?} F1"
+        );
+        assert!((at(F2)[0] - b2.min(1.0)).abs() < 1e-6, "{metric:?} F2");
+        let gap = (b2 - b1).min(1.0);
+        assert!((at(Edges)[0] - gap).abs() < 1e-5, "{metric:?} {seed} edges");
+        let c = |ch| hash::unit2(cell.0, cell.1, ch, seed);
+        assert_eq!(
+            at(Cells),
+            [c(3), c(4), c(5), 1.0],
+            "{metric:?} {seed} cells"
+        );
     }
 }

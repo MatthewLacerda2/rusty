@@ -7,6 +7,7 @@ use rusty::procgen::recipe::{
     Blur, BlurKind, BumpToNormal, Cavity, Checker, Curvature, Mapping, Node, Noise, NoiseKind,
     OpKind,
 };
+use rusty::procgen::runner::stats::node_stats;
 use rusty::procgen::Image;
 
 use super::node;
@@ -122,5 +123,27 @@ fn height_op_radii_are_in_tile_units() {
         let label = format!("{op:?}");
         let nodes = [perlin(4.0), node("c", op, &["n"])];
         assert_resolution_independent(&label, &nodes, 0.02);
+    }
+}
+
+/// `Texture.Stats` at 128² must read like 1024²: a gaussian too narrow for a pass
+/// at the low size (`0.01 × 128 ≈ 1.3 px`) falls back to one radius-1 box rather
+/// than turning `cavity` flat white.
+#[test]
+fn a_small_cavity_reads_alike_at_128_and_1024() {
+    let nodes = [
+        perlin(16.0),
+        node("c", OpKind::Cavity(Cavity { radius: 0.01 }), &["n"]),
+    ];
+    let depth = |res| {
+        let s = node_stats(&bake(&nodes, res), &mut Vec::new());
+        (1.0 - s.mean[0], 1.0 - s.p1[0])
+    };
+    let (low, high) = (depth(128), depth(1024));
+    for (l, h) in [(low.0, high.0), (low.1, high.1)] {
+        assert!(
+            l > 0.0 && (l / h - 1.0).abs() < 0.2,
+            "128² {l} vs 1024² {h}"
+        );
     }
 }

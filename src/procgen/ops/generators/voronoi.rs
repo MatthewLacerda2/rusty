@@ -51,19 +51,20 @@ pub fn sampler(
 /// How many cell rings around the sample's own cell hold the point `output` needs.
 /// A point `R + 1` rings out is more than `R` cells away along one axis, so more
 /// than `R` under every metric; a ring reaches far enough once that bounds the
-/// farthest the point can be. F1 is at most the own cell's point: `1` (Chebyshev)
-/// or `2` (Manhattan) away. F2 is at most the farther of the own cell's point and
-/// the nearer neighbour's on one axis (`≤ 1.5` across, `≤ 1` along): `1.5`
-/// (Chebyshev), `√3.25 ≈ 1.8` (Euclidean) or `2.5` (Manhattan) away. Euclidean F1
-/// keeps the 3×3 search it always had, though its bound is `√2`: only when all nine
-/// nearby points are pushed away at full jitter can one two rings out be nearer.
+/// farthest the point can be. `Distance` and `F2` clamp to 1, so one ring is exact
+/// for both: any point within 1 is in it. Under Chebyshev one ring is exact for
+/// every output: a point `k ≥ 2` cells out along x is more than `k − 1 ≥ 1` away,
+/// and the own cell's point and the neighbour's one cell out along x are nearer
+/// (less than 1 across, less than `k − 1` along), so F1 and F2 both lie in ring 1.
+/// Otherwise `Cells` needs the true nearest point, at most the own cell's: `√2`
+/// (Euclidean) or `2` (Manhattan) away; `Edges` the true second-nearest, at most
+/// the farther of the own cell's point and the nearer neighbour's on one axis
+/// (`≤ 1.5` across, `≤ 1` along): `√3.25 ≈ 1.8` (Euclidean) or `2.5` (Manhattan).
 fn reach(output: VoronoiOutput, metric: VoronoiMetric) -> i64 {
-    let second = matches!(output, VoronoiOutput::F2 | VoronoiOutput::Edges);
-    match (metric, second) {
-        (VoronoiMetric::Euclidean | VoronoiMetric::Chebyshev, false) => 1,
-        (VoronoiMetric::Euclidean | VoronoiMetric::Chebyshev, true) => 2,
-        (VoronoiMetric::Manhattan, false) => 2,
-        (VoronoiMetric::Manhattan, true) => 3,
+    match (output, metric) {
+        (VoronoiOutput::Distance | VoronoiOutput::F2, _) | (_, VoronoiMetric::Chebyshev) => 1,
+        (VoronoiOutput::Edges, VoronoiMetric::Manhattan) => 3,
+        (VoronoiOutput::Cells | VoronoiOutput::Edges, _) => 2,
     }
 }
 
