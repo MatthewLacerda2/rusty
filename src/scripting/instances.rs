@@ -83,4 +83,24 @@ impl super::ScriptManager {
         };
         find(lua, id, name)?.map(|t| f(lua, &t)).transpose()
     }
+
+    /// [`Self::with_script`] inside an API scope, so `f` may call the instance's
+    /// own functions: they reach `Scene`, `Physics` and the rest as they do from
+    /// a lifecycle hook. The scenario proxy's call path (#1580); a plain field read
+    /// stays on `with_script`, which registers nothing.
+    pub fn with_script_in_api_scope<R>(
+        &self,
+        id: u32,
+        name: &str,
+        f: impl FnOnce(&Lua, &Table) -> mlua::Result<R>,
+    ) -> mlua::Result<Option<R>> {
+        let Some(lua) = &self.lua else {
+            return Ok(None);
+        };
+        let ctx = self.make_ctx();
+        lua.scope(|scope| {
+            crate::api::register(lua, scope, &ctx).map_err(mlua::Error::RuntimeError)?;
+            find(lua, id, name)?.map(|t| f(lua, &t)).transpose()
+        })
+    }
 }

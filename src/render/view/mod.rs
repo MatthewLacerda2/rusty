@@ -58,8 +58,9 @@ pub struct RenderView {
     /// references this view's depth view, so it is invalidated (set `None`) whenever
     /// the depth target is reallocated on resize.
     pub(crate) scene_depth_bind_group: Option<wgpu::BindGroup>,
-    /// SSAO targets (#436), allocated the first frame this view runs AO; they check
-    /// their own size, so `resize` leaves them alone.
+    /// SSAO targets (#436), allocated the first frame this view runs AO. They check
+    /// their own size and divisor, and their bind groups read this view's depth, so
+    /// `resize` drops them with it.
     pub(crate) ssao: Option<crate::render::passes::ssao::SsaoTargets>,
     /// The offscreen colour target this view renders into (editor viewport / Inspector
     /// preview), `RENDER_ATTACHMENT | TEXTURE_BINDING` so egui samples it. `None` for a
@@ -195,6 +196,7 @@ impl RenderView {
         self.depth_view = depth_view;
         // The cached scene-depth bind group references the freed depth view.
         self.scene_depth_bind_group = None;
+        self.ssao = None;
         let (w, h) = (scene.width, scene.height);
         self.post_fx.resize(device, w, h);
         self.upscale_source = scale::upscale_source(device, self.format, size, scene);

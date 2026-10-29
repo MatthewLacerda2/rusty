@@ -27,6 +27,7 @@ impl Renderer {
         all.extend(self.velocity_pipeline.lazies());
         all.extend(self.primed_pipelines.velocity.lazies());
         all.extend(self.post_passes.lazy_pipelines());
+        all.extend(self.ssao.lazy_pipelines());
         all.extend(self.skybox_renderer.lazy_pipelines());
         all.extend(self.particle_renderer.lazy_pipelines());
         all.extend(self.ribbon_renderer.lazy_pipelines());

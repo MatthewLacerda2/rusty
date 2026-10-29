@@ -31,6 +31,19 @@ pub const DEFAULT_WIDTH: u32 = 1280;
 /// Default windowed framebuffer height (matches the boot window size in `main`).
 pub const DEFAULT_HEIGHT: u32 = 720;
 
+/// The largest side [`parse_size`] accepts: wgpu's default `max_texture_dimension_2d`,
+/// the limit every renderer is built with, so a bigger target could not be made.
+pub const MAX_SIDE: u32 = 8192;
+
+/// Parse a `<W>x<H>` size (`2940x1388`), as the dev binaries' `--size` takes it:
+/// both sides whole pixels from 1 to [`MAX_SIDE`]. `Err` names the bad input.
+pub fn parse_size(text: &str) -> Result<(u32, u32), String> {
+    let bad = || format!("bad size {text:?}: expected <W>x<H>, each 1..={MAX_SIDE}");
+    let (w, h) = text.split_once('x').ok_or_else(bad)?;
+    let side = |s: &str| s.parse().ok().filter(|n| (1..=MAX_SIDE).contains(n));
+    Ok((side(w).ok_or_else(bad)?, side(h).ok_or_else(bad)?))
+}
+
 /// Runtime video settings: framebuffer resolution, vsync, and fullscreen. Pure
 /// data — the render/platform layer maps these onto a wgpu surface + winit window.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -141,6 +154,17 @@ mod tests {
         assert_eq!(v.resolution(), (1280, 720));
         assert!(v.vsync);
         assert!(!v.fullscreen);
+    }
+
+    #[test]
+    fn parse_size_reads_w_x_h_and_refuses_the_rest() {
+        assert_eq!(parse_size("2940x1388"), Ok((2940, 1388)));
+        assert_eq!(parse_size("1x8192"), Ok((1, MAX_SIDE)));
+        for bad in [
+            "", "1280", "0x720", "1280x0", "8193x1", "-1x2", "12x34x5", "ax720",
+        ] {
+            assert!(parse_size(bad).is_err(), "{bad:?} should be refused");
+        }
     }
 
     #[test]

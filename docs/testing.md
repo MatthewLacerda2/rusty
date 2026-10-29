@@ -23,8 +23,14 @@ things follow:
 - `Scene.GetScript(id, name)` answers a live **handle** on the gameplay instance,
   not the table itself: `pc.vy` reads the field now, `pc.marker = {…}` writes it,
   both by value, copied Lua to Lua: integer keys, mixed tables, integers vs
-  floats and `math.huge`/NaN all keep their type; a function field raises an
-  error, and no gameplay metamethod runs. Each read is a **copy**, so assign a
+  floats and `math.huge`/NaN all keep their type, and no gameplay metamethod
+  runs. A function field reads as a proxy that **calls** the game script's
+  function in the gameplay VM, at the current tick (#1580): `pc:Refill(30)` (the
+  instance is `self`) or `pc.Add(2, 3)`, with arguments and returns copied the
+  same way (a function or userdata argument is an error; one returned is an
+  error raised after the call ran, so its side effects stand), and a game script
+  error raised as the scenario's, with its traceback. That is how a test reaches
+  a state (refill, give a weapon, start wave N) without playing there. Each read is a **copy**, so assign a
   whole field through the handle: `pc.marker.hits = 5` changes the scenario's
   copy only, while `local m = pc.marker; m.hits = 5; pc.marker = m` writes it.
   Fields are read raw, so one the instance inherits through its metatable (a
@@ -82,6 +88,14 @@ things follow:
   engine's demo scene in memory instead, the fixture the engine's own tests use. Test code
   that names `in_user_workspace` or `scenario::run(` fails `make rules`
   (`test-user-workspace`, #980).
+- **A run renders at a Game view size** (#1583): 1280x720 unless `play --size
+  <W>x<H>` names another (`--size 2940x1388` for a Retina view). Every
+  `Harness.Screenshot`, `Render` and `Bench` frame draws at it, with its targets, post
+  effects and UI sized to it, and the sim lays its UI out on it as a window that size
+  would. One shot can name its own size, as Unity's
+  `ScreenCapture.CaptureScreenshot(path, superSize)` does:
+  `Harness.Screenshot(path, { width = 2940, height = 1388 })`; the run keeps its size.
+  Each side is a whole 1 to 8192 (`video::MAX_SIDE`), else an error.
 - **The test-fixture project** is `tests/fixtures/project/` (#829): the committed
   scenarios, the bot-player script and its `project.rusty`, opened like any other
   project — `cargo run --bin play --features dev -- --project tests/fixtures/project

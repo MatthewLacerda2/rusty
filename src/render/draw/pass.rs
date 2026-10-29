@@ -149,7 +149,7 @@ impl Renderer {
     ) {
         let clear = frame.clear;
         let velocity = view.post_fx.motion.target_view();
-        let primed = self.prime_depth(view, encoder, frame);
+        let primed = self.prime_depth(view, frame);
         let targets = scene_targets(view, frame);
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             multiview_mask: None,
@@ -204,21 +204,15 @@ impl Renderer {
     }
 
     /// Depth priming (#1499), Unity URP's *Auto* mode: when this camera ran the SSAO
-    /// prepass, copy its depth into the view's, so the forward pass starts from it and
-    /// shades each lit pixel once. The prepass is the forward vertex stage at the
-    /// view's size and format, clipping cutouts as `fs_main` does. A view shading with
-    /// a pipeline of its own (the shader preview) is not primed: its override has no
-    /// primed twin, and nor is any view on Metal (`pipelines::priming`). `Some` carries the pipelines the primed pass draws lit solids with.
-    fn prime_depth(
-        &self,
-        view: &RenderView,
-        encoder: &mut wgpu::CommandEncoder,
-        frame: &ScenePassFrame,
-    ) -> Option<&PrimedPipelines> {
-        let prepass = view.ssao.as_ref().filter(|_| self.primes(view, frame))?;
-        let (from, to) = (prepass.depth_texture(), &view.depth_texture);
-        encoder.copy_texture_to_texture(from.as_image_copy(), to.as_image_copy(), from.size());
-        Some(&self.primed_pipelines)
+    /// prepass, which drew straight into the view's depth (#1578), the forward pass
+    /// starts from it and shades each lit pixel once. The prepass is the forward
+    /// vertex stage at the view's size and format, clipping cutouts as `fs_main` does.
+    /// A view shading with a pipeline of its own (the shader preview) is not primed:
+    /// its override has no primed twin, and nor is any view on Metal
+    /// (`pipelines::priming`); those clear the prepass's depth and draw their own.
+    /// `Some` carries the pipelines the primed pass draws lit solids with.
+    fn prime_depth(&self, view: &RenderView, frame: &ScenePassFrame) -> Option<&PrimedPipelines> {
+        self.primes(view, frame).then_some(&self.primed_pipelines)
     }
 
     /// Whether this camera's forward pass is primed ([`Self::prime_depth`]).
