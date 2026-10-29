@@ -1,7 +1,7 @@
 //! The `image` op (#1491): a decoded file feeds a recipe like any generator.
 
 use rusty::procgen::recipe::{ImageEncoding, ImageTexture, OpKind, TextureRecipe};
-use rusty::procgen::{evaluate, evaluate_with, RunError, Source, Sources};
+use rusty::procgen::{evaluate, evaluate_with, Source, Sources};
 
 use crate::procgen::node;
 
@@ -86,11 +86,7 @@ fn an_inverted_image_reads_raw_with_linear() {
 fn an_image_without_its_file_is_an_error_naming_the_path() {
     let err = evaluate(&inverted(ImageEncoding::Srgb)).unwrap_err();
     assert_eq!(
-        err,
-        RunError::MissingSource {
-            node: "photo".into(),
-            path: "textures/swatch.png".into()
-        }
+        err.to_string(),
+        r#"node "photo" (image): has no image loaded for "textures/swatch.png""#
     );
-    assert!(err.to_string().contains("textures/swatch.png"));
 }

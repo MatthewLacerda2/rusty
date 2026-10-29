@@ -65,11 +65,15 @@ pub struct Gamma {
 /// Scale / rotate (turns) / translate the *domain* of the single input, resampled
 /// bilinearly with wrap. With `tiling` (the default) `scale` rounds to whole repeats
 /// and `rotation` snaps to quarter turns, so the output tiles; `tiling = false`
-/// honours free values for decals and one-off maps, at the cost of a seam.
+/// honours free values for decals and one-off maps, at the cost of a seam. Each
+/// transform left out is the identity, as in Blender's Mapping node (#1575).
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Mapping {
+    #[serde(default = "one_vec2")]
     pub scale: [f32; 2],
+    #[serde(default)]
     pub rotation: f32,
+    #[serde(default)]
     pub translation: [f32; 2],
     #[serde(default = "yes")]
     pub tiling: bool,
@@ -197,6 +201,10 @@ fn one_u32() -> u32 {
 
 fn one_f32() -> f32 {
     1.0
+}
+
+fn one_vec2() -> [f32; 2] {
+    [1.0, 1.0]
 }
 
 fn one_param() -> Param {

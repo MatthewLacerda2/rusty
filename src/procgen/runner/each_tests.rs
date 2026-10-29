@@ -15,7 +15,8 @@ fn a_cycle_the_output_never_reaches_is_still_refused() {
         ],
     )
     .with_output("out");
-    assert_eq!(evaluate(&recipe), Err(RunError::Cycle("a".into())));
+    let err = evaluate(&recipe).unwrap_err();
+    assert_eq!(err.to_string(), r#"node "a" (invert): is on a cycle"#);
 }
 
 #[test]

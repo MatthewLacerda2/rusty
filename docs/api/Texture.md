@@ -120,8 +120,10 @@ Each node has a stable `id`, an `op` tag, the op's params as sibling fields, and
 `inputs` array of upstream node ids (in order; omit it on a generator). A node's
 `inputs` must hold as many ids as its op accepts (`Texture.Ops()`' `min_inputs` to
 `max_inputs`): a short or surplus list is refused before anything bakes, naming the
-node — `node "mr" (op "mix") takes 2 to 3 inputs, but 1 given` — so a dangling wire
-never bakes a silently black or flat map. **Unknown keys are errors**
+node — `node "mr" (mix): takes 2 to 3 inputs, but 1 given` — so a dangling wire
+never bakes a silently black or flat map. Every error about one node starts the
+same way, with its id and op: `node "n" (noise): unknown key "scael"; …`,
+`node "inv" (invert): references unknown input "ghost"`. **Unknown keys are errors**
 everywhere in a recipe — on the recipe itself, on a node, on a ramp stop: `{ op =
 "noise", scael = 8 }` is refused with a message naming `scael` and the params `noise`
 takes, rather than baking with the default scale. The runner evaluates the DAG
@@ -268,8 +270,9 @@ end  -- rows number nil / cols number nil / mortar number 0.05
   uses only part of the range (a 4-octave fBM spans about 0.35–0.64), so a ramp fed
   straight from it shows only its middle; `auto_levels` before the `color_ramp` uses
   the whole ramp, whatever the input's spread.
-- **Vector / normal**: `mapping {scale=[x,y], rotation, translation=[x,y],
-  tiling=true}` (bilinear, wrapped resample; `rotation` in turns); `bump_to_normal
+- **Vector / normal**: `mapping {scale=[1,1], rotation=0, translation=[0,0],
+  tiling=true}` (bilinear, wrapped resample; `rotation` in turns; each transform
+  left out is the identity, so `mapping {rotation = 0.25}` only turns); `bump_to_normal
   {strength}` (height → tangent-space normal); `combine_rgb` (1 to 3 grayscale
   inputs → R, G, B; a channel without an input reads 0); `separate_rgb
   {channel=0..3}`; `warp {strength}` (2 inputs: samples input 1 displaced by input 2's R/G, centred on 0.5 so mid-grey moves nothing; `strength` is in
