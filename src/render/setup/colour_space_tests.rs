@@ -19,7 +19,7 @@ const ONE_ENCODE_OF_HALF: u8 = 188;
 /// with every post-FX knob neutral (no tonemap), so the composite outputs 0.5.
 fn mid_grey_scene() -> Scene {
     let mut scene = Scene::new();
-    scene.skybox_path = String::new();
+    crate::render::test_gpu::black_sky(&mut scene);
     scene.ambient_intensity = 0.0;
     let id = scene.add_entity("Grey".to_string());
     let (vertices, indices) = crate::components::mesh::primitives::generate_box(8.0, 8.0, 8.0);

@@ -28,7 +28,7 @@ fn emissive_box(scene: &mut Scene, name: &str, pos: Vec3, size: Vec3, emissive: 
     let asset = MaterialAsset {
         base_color: [0.0; 3],
         emissive: [emissive; 3],
-        roughness: 1.0, // no sky reflection: the pixel is the emissive alone
+        roughness: 1.0, // the least sky reflection (#1543): the pixel is near the emissive alone
         ..MaterialAsset::default()
     };
     scene.materials.insert(name.to_string(), asset);

@@ -16,7 +16,7 @@ use crate::scene::{Camera, MeshComponent, Scene};
 /// every post-FX knob neutral, so the centre pixel is the map's colour.
 pub(super) fn emissive_scene(map: &str) -> Scene {
     let mut scene = Scene::new();
-    scene.skybox_path = String::new();
+    crate::render::test_gpu::black_sky(&mut scene);
     scene.ambient_intensity = 0.0;
     let id = scene.add_entity("Box".to_string());
     let (vertices, indices) = crate::components::mesh::primitives::generate_box(8.0, 8.0, 8.0);

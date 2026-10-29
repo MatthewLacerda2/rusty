@@ -109,9 +109,11 @@ fn gpu_a_centimetre_fbx_quad_previews_as_its_red_and_blue_textures() {
     }
     let image = image::open(&out).unwrap().to_rgb8();
     let count = |own: usize| {
+        // Dominant, not pure: seen near edge-on, the quad's Fresnel sheen of the sky
+        // (#1543) greys both faces as it would in Unity.
         let hue = |p: &&image::Rgb<u8>| {
-            let others: u16 = (0..3).filter(|&c| c != own).map(|c| u16::from(p[c])).sum();
-            p[own] > 96 && others < 64
+            let others = (0..3).filter(|&c| c != own).map(|c| p[c]).max().unwrap();
+            p[own] > 96 && p[own] > others.saturating_add(48)
         };
         image.pixels().filter(hue).count()
     };

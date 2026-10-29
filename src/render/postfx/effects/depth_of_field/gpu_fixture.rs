@@ -47,7 +47,7 @@ pub(super) fn bokeh(focus: f32) -> DepthOfField {
 /// else, the two cubes and a wall behind them. Returns the scene and the camera.
 pub(super) fn scene(dof: DepthOfField) -> (Scene, u32) {
     let mut scene = Scene::new();
-    scene.skybox_path = String::new();
+    crate::render::test_gpu::black_sky(&mut scene);
     let sun = create_entity(&mut scene, "Sun", Some(Primitive::DirectionalLight));
     scene.world.transform_mut(sun).unwrap().rotation = Quat::from_rotation_x(-1.0);
     let cam = scene.add_entity("Camera".to_string());

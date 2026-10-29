@@ -82,7 +82,7 @@ fn a_mesh_particle_draws_its_mesh_and_counts_as_a_particle() {
         MaterialAsset {
             base_color: [0.0; 3],
             emissive: [1.0, 0.1, 0.1],
-            // Fully rough: no sky reflection (#718), so the pixel is the emissive alone.
+            // Under the wall fixture's black sky nothing reflects: the emissive alone.
             roughness: 1.0,
             ..MaterialAsset::default()
         },

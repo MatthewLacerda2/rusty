@@ -129,9 +129,10 @@ fn gpu_the_exported_quad_renders_red_from_its_cache() {
         return;
     }
     let image = image::open(&png).unwrap().to_rgb8();
+    // Red-dominant, not pure: a dielectric reflects ~4% of the sky head-on (#1543).
     let red = image
         .pixels()
-        .filter(|p| p[0] > 96 && p[1] < 32 && p[2] < 32);
+        .filter(|p| p[0] > 96 && p[0] > p[1].max(p[2]).saturating_add(48));
     let share = red.count() as f32 / image.pixels().len() as f32;
     assert!(share > 0.25, "{share:.3} of the frame is the red quad");
 }

@@ -71,6 +71,7 @@ fn the_sky_blends_to_fog_at_the_horizon_only() {
     let mut host = CaptureHost::new();
     // The wall sits behind the camera, so the view is all sky.
     let mut scene = wall_scene(-20.0, [0.0, 0.0, 0.0]);
+    scene.skybox_path = String::new();
     scene.fog = fogged(FogMode::Exponential).fog;
     let Some(img) = shot(&mut host, &scene, "sky") else {
         return;
