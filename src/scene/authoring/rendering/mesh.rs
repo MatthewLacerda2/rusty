@@ -20,6 +20,10 @@ pub fn set_subdivisions(mesh: &mut MeshComponent, subdivisions: u32) -> Result<(
             "subdivisions must be 1..={MAX_PLANE_SUBDIVISIONS}, got {subdivisions}"
         ));
     }
+    if mesh.primitive_type != "Plane" && subdivisions == 1 {
+        mesh.subdivisions = 1; // clears a stray count; the shape ignores it anyway
+        return Ok(());
+    }
     if subdivisions == mesh.subdivisions {
         return Ok(());
     }
@@ -36,6 +40,27 @@ pub fn set_subdivisions(mesh: &mut MeshComponent, subdivisions: u32) -> Result<(
     mesh.indices = indices;
     mesh.is_dirty.set(true);
     Ok(())
+}
+
+/// Hold a count read from a file (#1524), so the field agrees with the grid the
+/// rehydrated mesh is built from: out of range clamps into `1..=`
+/// [`MAX_PLANE_SUBDIVISIONS`], and a count on a mesh that isn't a `Plane` resets to
+/// one quad. Returns the warning when it moved one, `None` when it was already valid.
+/// The field table leaves the field `unheld!` for this: rehydration runs it on every
+/// scene load and prefab instantiation, before the World sees the mesh.
+pub fn hold_subdivisions(mesh: &mut MeshComponent) -> Option<String> {
+    let read = mesh.subdivisions;
+    let held = match mesh.primitive_type.as_str() {
+        "Plane" => read.clamp(1, MAX_PLANE_SUBDIVISIONS),
+        _ => 1,
+    };
+    (held != read).then(|| {
+        mesh.subdivisions = held;
+        format!(
+            "a {} mesh's subdivisions {read} was held at {held} (1..={MAX_PLANE_SUBDIVISIONS}, Plane only)",
+            mesh.primitive_type
+        )
+    })
 }
 
 #[cfg(test)]
@@ -68,5 +93,23 @@ mod tests {
             .unwrap_err()
             .contains("Plane"));
         assert_eq!(set_subdivisions(&mut cube, 1), Ok(()));
+        cube.subdivisions = 4; // a stray count, from a hand-edited file
+        assert_eq!(set_subdivisions(&mut cube, 1), Ok(()), "1 clears it");
+        assert_eq!(cube.subdivisions, 1);
+    }
+
+    #[test]
+    fn a_loaded_count_is_held_into_what_the_grid_builds() {
+        let mut plane = primitive_mesh_component(Primitive::Plane).unwrap();
+        for (read, held) in [(0, Some(1)), (500, Some(256)), (64, None)] {
+            plane.subdivisions = read;
+            let warned = hold_subdivisions(&mut plane);
+            assert_eq!(warned.is_some(), held.is_some(), "{read}: {warned:?}");
+            assert_eq!(plane.subdivisions, held.unwrap_or(read));
+        }
+        let mut cube = primitive_mesh_component(Primitive::Box).unwrap();
+        cube.subdivisions = 4;
+        assert!(hold_subdivisions(&mut cube).unwrap().contains("Box"));
+        assert_eq!(cube.subdivisions, 1);
     }
 }

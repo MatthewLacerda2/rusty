@@ -62,7 +62,7 @@ pub fn hold_entities(entities: &mut [Entity]) {
 /// without one.
 pub(super) fn hold<C: Inspect>(world: &mut World, id: u32, kind: &str) {
     if !C::FIELDS.iter().any(held_on_load) {
-        return; // Transform: nothing to hold, so no copy to make
+        return; // Transform, Mesh: nothing to hold, so no copy to make
     }
     C::update(world, id, &mut |live| {
         let mut refused = |field: &str, e: String| {

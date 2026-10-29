@@ -18,12 +18,14 @@ use crate::components::{
 };
 
 /// Mesh identity: the primitive kind and, for imported meshes, the
-/// `path::sub_object` asset reference. Never the GPU geometry.
+/// `path::sub_object` asset reference, plus a `Plane`'s `subdivisions` when it isn't
+/// the single quad (#1524). Never the GPU geometry.
 pub(crate) fn mesh_value(m: &MeshComponent) -> Value {
-    json!({
-        "primitive_type": m.primitive_type,
-        "asset_ref": m.asset_ref,
-    })
+    let mut v = json!({ "primitive_type": m.primitive_type, "asset_ref": m.asset_ref });
+    if m.subdivisions != 1 {
+        v["subdivisions"] = json!(m.subdivisions);
+    }
+    v
 }
 
 /// Material (PBR) params + texture references, read from the resolved library

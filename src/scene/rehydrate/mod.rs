@@ -129,6 +129,9 @@ fn rehydrate_one(mesh: &crate::scene::MeshComponent) -> RehydratedMesh {
 /// changed since the save (the Scale Factor, #1398) reaches it.
 pub fn rehydrate_entity_mesh(entity: &mut Entity) {
     if let Some(mesh) = &mut entity.mesh {
+        if let Some(warning) = crate::scene::authoring::rendering::mesh::hold_subdivisions(mesh) {
+            log::warn!("[Scene] entity {}: {warning}", entity.id);
+        }
         let rebuilt = rehydrate_one(mesh);
         install(mesh, rebuilt);
         let positions = mesh.vertices.iter().map(|v| Vec3::from_array(v.position));

@@ -95,13 +95,13 @@ impl GpuMesh {
 pub struct MeshId(pub String);
 
 impl MeshId {
-    /// Geometry key for a mesh component: `"<primitive_type>|<asset_ref>"`.
+    /// Geometry key: `"<primitive_type>|<asset_ref>"`, plus `"|<subdivisions>"` for a
+    /// Plane cut finer than one quad, so it never shares the 1-quad buffer (#1524).
     pub fn from_mesh(mesh: &crate::scene::MeshComponent) -> Self {
-        MeshId(format!(
-            "{}|{}",
-            mesh.primitive_type,
-            mesh.asset_ref.as_deref().unwrap_or("")
-        ))
+        let (kind, asset) = (&mesh.primitive_type, mesh.asset_ref.as_deref());
+        let cuts = Some(mesh.subdivisions).filter(|&n| n != 1);
+        let cuts = cuts.map(|n| format!("|{n}")).unwrap_or_default();
+        MeshId(format!("{kind}|{}{cuts}", asset.unwrap_or("")))
     }
 }
 

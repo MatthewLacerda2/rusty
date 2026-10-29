@@ -75,18 +75,27 @@ pub fn draw_mesh(
     }
 }
 
-/// A `Plane`'s quads per side (#1524): the new count when it was dragged.
+/// A `Plane`'s quads per side (#1524): the new count once an edit finishes (a
+/// released drag or a typed value). Mid-drag the count is held in egui's memory, so
+/// the grid is rebuilt and re-uploaded once, not every frame of the drag.
 fn draw_subdivisions(ui: &mut egui::Ui, current: u32) -> Option<u32> {
-    let mut n = current;
+    let held = ui.id().with("mesh_subdivisions");
+    let mut n = ui.data(|d| d.get_temp::<u32>(held)).unwrap_or(current);
     let drag = egui::DragValue::new(&mut n).ranged(1..=MAX_PLANE_SUBDIVISIONS);
-    let changed = ui
+    let r = ui
         .horizontal(|ui| {
             ui.label("Subdivisions:")
                 .on_hover_text("Quads per side: vertices for a vertex shader to move");
-            ui.add(drag).changed()
+            ui.add(drag)
         })
         .inner;
-    (changed && n != current).then_some(n)
+    if r.dragged() && !r.drag_stopped() {
+        ui.data_mut(|d| d.insert_temp(held, n));
+        return None;
+    }
+    ui.data_mut(|d| d.remove::<u32>(held));
+    let finished = r.drag_stopped() || r.changed();
+    (finished && n != current).then_some(n)
 }
 
 /// 3C. Light configuration. A THIN client (#287): every widget reads the field into
