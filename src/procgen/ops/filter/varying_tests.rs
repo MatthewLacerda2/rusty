@@ -38,7 +38,7 @@ fn a_uniform_box_radius_matches_the_fixed_box() {
     for size in [Size::new(32, 32), Size::new(64, 32)] {
         let (src, r) = (noise(size), map(size, |_, _| 0.0625));
         let fixed = blur(&src, pixel_radii(0.0625, size), BlurKind::Box);
-        let out = blur_varying(&src, field(&r), BlurKind::Box);
+        let out = per_pixel(&src, field(&r), BlurKind::Box);
         assert!(gap(&out, &fixed) < 1e-5, "{size:?}: {}", gap(&out, &fixed));
     }
 }
@@ -48,8 +48,16 @@ fn a_uniform_gaussian_radius_is_close_to_the_fixed_gaussian() {
     let size = Size::new(64, 32);
     let (src, r) = (noise(size), map(size, |_, _| 0.1));
     let fixed = blur(&src, pixel_radii(0.1, size), BlurKind::Gaussian);
-    let out = blur_varying(&src, field(&r), BlurKind::Gaussian);
+    let out = per_pixel(&src, field(&r), BlurKind::Gaussian);
     assert!(gap(&out, &fixed) < 0.03, "{}", gap(&out, &fixed));
+}
+
+#[test]
+fn a_flat_field_is_the_fixed_blur_byte_for_byte() {
+    let size = Size::new(64, 32);
+    let (src, r) = (noise(size), map(size, |_, _| 0.1));
+    let fixed = blur(&src, pixel_radii(0.1, size), BlurKind::Gaussian);
+    assert_eq!(blur_varying(&src, field(&r), BlurKind::Gaussian), fixed);
 }
 
 #[test]
@@ -81,7 +89,7 @@ fn the_window_wraps_across_both_edges() {
     let mut src = Image::filled(size, [0.0, 0.0, 0.0, 1.0]);
     src.pixels_mut()[0] = [1.0; 4];
     let r = map(size, |_, _| 0.125);
-    let out = blur_varying(&src, field(&r), BlurKind::Box);
+    let out = per_pixel(&src, field(&r), BlurKind::Box);
     assert!(
         out.get_wrapped(-1, 0)[0] > 0.0,
         "nothing crossed the left edge"

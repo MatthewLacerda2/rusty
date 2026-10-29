@@ -104,29 +104,14 @@ pub fn eval_linked(
         OpKind::BumpToNormal(p) => vector::bump_to_normal(inputs[0], f(&p.strength)),
         OpKind::CombineRgb => vector::combine_rgb(inputs, size),
         OpKind::SeparateRgb(p) => vector::separate_rgb(own(), p.channel),
-        OpKind::Tile(p) => {
-            let jitter = tile::Jitters {
-                offset: f(&p.jitter),
-                rotation: f(&p.rotation_jitter),
-                scale: f(&p.scale_jitter),
-            };
-            tile::tile(inputs[0], p.count, jitter, seed)
-        }
+        OpKind::Tile(p) => tile::tile(inputs[0], p.count, tile::Jitters::of(p, links), seed),
         OpKind::Warp(p) => vector::warp(inputs[0], inputs[1], f(&p.strength)),
         OpKind::NormalBlend(p) => vector::normal_blend(inputs[0], inputs[1], f(&p.strength)),
         OpKind::Math(p) => math::math(own(), inputs.get(1).copied(), p.func, p.value),
         OpKind::MapRange(p) => math::map_range(own(), p.from_min, p.from_max, p.to_min, p.to_max),
         OpKind::Clamp(p) => math::clamp(own(), p.min, p.max),
         OpKind::RgbToBw => math::rgb_to_bw(own()),
-        OpKind::Blur(p) => {
-            // A flat radius takes the fixed path: a link to a constant bakes exactly
-            // like the number.
-            let radius = f(&p.radius);
-            match radius.constant() {
-                Some(r) => filter::blur(inputs[0], px(r), p.kind),
-                None => filter::blur_varying(inputs[0], radius, p.kind),
-            }
-        }
+        OpKind::Blur(p) => filter::blur_varying(inputs[0], f(&p.radius), p.kind),
         OpKind::Cavity(p) => filter::cavity(inputs[0], px(p.radius)),
         OpKind::Curvature(p) => filter::curvature(inputs[0], p.radius, f(&p.strength)),
         OpKind::Distance(p) => distance::distance(inputs[0], f(&p.radius)),

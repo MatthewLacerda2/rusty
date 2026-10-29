@@ -13,16 +13,25 @@
 //! width `√(4σ² + 1)`, since a window `W` wide adds `(W² − 1) / 12` to the variance,
 //! as the discrete box does at every odd `W`. A radius in tile units turns into
 //! pixels per axis, as [`super::pixel_radii`] does. A flat radius never comes here:
-//! the dispatcher takes the fixed path for it, so a constant link bakes exactly like
-//! the number.
+//! [`blur_varying`] takes the fixed path for it, so a constant link bakes exactly
+//! like the number.
 
 use super::super::super::image_buf::{Image, Rgba};
 use super::super::super::recipe::BlurKind;
 use super::super::field::Field;
-use super::{pixel_radius, LARGE};
+use super::{pixel_radii, pixel_radius, LARGE};
 
 /// Blur `img`, each pixel reaching the `radius` (tile units) its field gives there.
+/// A flat field is the fixed blur ([`super::blur`]), byte for byte.
 pub fn blur_varying(img: &Image, radius: Field, kind: BlurKind) -> Image {
+    if let Some(r) = radius.constant() {
+        return super::blur(img, pixel_radii(r, img.size()), kind);
+    }
+    per_pixel(img, radius, kind)
+}
+
+/// The varying path, whatever the field.
+fn per_pixel(img: &Image, radius: Field, kind: BlurKind) -> Image {
     let (w, h) = (img.width(), img.height());
     let n = img.pixels().len();
     let across: Vec<f32> = (0..n)

@@ -10,7 +10,8 @@
 
 use super::super::hash;
 use super::super::image_buf::{Image, Rgba};
-use super::field::Field;
+use super::super::recipe::Tile;
+use super::field::{Field, Links};
 use super::generators::count;
 
 /// The hash channels a cell's offset x/y, rotation and scale draw from (clear of
@@ -59,7 +60,16 @@ pub struct Jitters<'a> {
     pub scale: Field<'a>,
 }
 
-impl Jitters<'_> {
+impl<'a> Jitters<'a> {
+    /// The `tile` op's three jitter params, resolved against its `links`.
+    pub fn of(p: &Tile, links: &Links<'a>) -> Self {
+        Self {
+            offset: links.field(&p.jitter),
+            rotation: links.field(&p.rotation_jitter),
+            scale: links.field(&p.scale_jitter),
+        }
+    }
+
     /// The same jitter everywhere.
     pub fn uniform(offset: f32, rotation: f32, scale: f32) -> Self {
         Self {
