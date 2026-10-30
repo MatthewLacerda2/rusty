@@ -8,14 +8,15 @@
 //!
 //! | Texture Type | format | mips average |
 //! |---|---|---|
-//! | `Default` | BC7 (a byte a texel) | in linear light |
+//! | `Default` | BC7 (a byte a texel) | in linear light; raw with *sRGB* off |
 //! | `NormalMap` | BC5 (x and y, a byte a texel; the shader rebuilds z) | raw |
 //! | `SingleChannel` | BC4 (red, half a byte a texel) | raw |
 //!
 //! `HighQuality` searches BC7's modes harder than `Normal`; BC4 and BC5 encode
 //! the same at both. A `Default` texture keeps its sRGB storage: the renderer
 //! samples it decoded in a colour slot and raw in a data slot, as it does
-//! `Rgba8UnormSrgb`. A texture drawn in a slot its type cannot serve (a BC5 normal
+//! `Rgba8UnormSrgb`; with *sRGB (Color Texture)* off ([`is_linear`]) it is
+//! stored and sampled raw everywhere. A texture drawn in a slot its type cannot serve (a BC5 normal
 //! map as albedo would lose blue) is uploaded uncompressed for that use
 //! ([`fits`]), so no channel is ever lost.
 //!
@@ -91,13 +92,31 @@ impl TextureKind {
         self == Self::Colour
     }
 
-    /// How a compressed texture of `texture_type` averages its mips.
-    fn of_type(texture_type: TextureType) -> Self {
-        match texture_type {
-            TextureType::Default => Self::Colour,
-            TextureType::NormalMap | TextureType::SingleChannel => Self::Data,
+    /// How a compressed texture with `settings` averages its mips: a `Default` one
+    /// as colour unless its *sRGB* is off.
+    fn of_settings(settings: &TextureSettings) -> Self {
+        match settings.texture_type == TextureType::Default && settings.srgb {
+            true => Self::Colour,
+            false => Self::Data,
         }
     }
+
+    /// What a slot holding `self` reads a texture with `settings` as: data in a
+    /// colour slot when its *sRGB* is off ([`is_linear`]), else `self`.
+    pub fn reading(self, settings: &TextureSettings) -> Self {
+        match self.is_colour() && is_linear(settings) {
+            true => Self::Data,
+            false => self,
+        }
+    }
+}
+
+/// Whether a texture with `settings` holds data stored raw wherever it is drawn: a
+/// `Default` one with *sRGB (Color Texture)* off (a packed metallic/roughness
+/// map). It is stored linear (`Rgba8Unorm`, BC7 unorm), so even a colour slot
+/// samples it undecoded, and its mips average raw (#1574), as Unity's.
+pub fn is_linear(settings: &TextureSettings) -> bool {
+    settings.texture_type == TextureType::Default && !settings.srgb
 }
 
 /// The block format a texture with `settings` is compressed to, `None` when it is
@@ -162,7 +181,7 @@ pub fn load(
     let image = open(source).ok()?.decode().ok()?;
     let source_size = (image.width(), image.height());
     Some(Loaded {
-        texels: Texels::Image(fit(image, settings.max_size, kind)),
+        texels: Texels::Image(fit(image, settings.max_size, kind.reading(settings))),
         source_size,
     })
 }
@@ -202,5 +221,7 @@ pub const CACHE_SUFFIX: &str = ".bctex";
 mod cache_tests;
 #[cfg(test)]
 mod load_tests;
+#[cfg(test)]
+mod srgb_tests;
 #[cfg(test)]
 mod tests;

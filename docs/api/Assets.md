@@ -24,13 +24,13 @@ one by its source path still works.
 |---|---|---|
 | `Assets.Manifest` | `()` | array of asset tables (see shape below) |
 | `Assets.List` | `()` | alias for `Assets.Manifest` |
-| `Assets.Refresh` | `()` | `{ converted = { wavPath, ... }, skipped = { { path, reason }, ... }, compressed, failed = { path, ... } }` — imports what arrived (below); an error during Play |
+| `Assets.Refresh` | `()` | `{ converted = { wavPath, ... }, skipped = { { path, reason }, ... }, compressed, failed = { path, ... } }` — imports what arrived (below); images wait for Stop |
 | `Assets.GetLightmapUVSettings` | `(path)` | `{ generate, hardAngle, packMargin }` — a model's Generate Lightmap UVs setting (below) |
 | `Assets.SetLightmapUVSettings` | `(path, { generate?, hardAngle?, packMargin? })` | how many of the scene's meshes it re-imported |
 | `Assets.GetModelImportSettings` | `(path)` | `{ scaleFactor }` — a model's Scale Factor (below) |
 | `Assets.SetModelImportSettings` | `(path, { scaleFactor? })` | how many of the scene's meshes it re-imported |
-| `Assets.GetTextureImportSettings` | `(path)` | `{ wrapMode, filterMode, generateMipmaps, textureType, compression, maxSize }` — an image's import settings (below) |
-| `Assets.SetTextureImportSettings` | `(path, { wrapMode?, filterMode?, generateMipmaps?, textureType?, compression?, maxSize? })` | nothing |
+| `Assets.GetTextureImportSettings` | `(path)` | `{ wrapMode, filterMode, generateMipmaps, textureType, sRGB, compression, maxSize }` — an image's import settings (below) |
+| `Assets.SetTextureImportSettings` | `(path, { wrapMode?, filterMode?, generateMipmaps?, textureType?, sRGB?, compression?, maxSize? })` | nothing |
 
 Returned shape (Lua, 1-indexed arrays):
 
@@ -67,8 +67,9 @@ It also makes every image's compressed copy current (see `compression`, below) a
 returns how many it made in `compressed`; each image that fails (it does not decode,
 say) is warned of in the console, listed in `failed` by path, and draws
 uncompressed. It waits for them, on any build: the way to compress textures from a
-script or a session in edit mode. During Play it raises an error and imports
-nothing, as a model's conversion waits for Stop.
+script or a session in edit mode. During Play it still imports audio, as Unity's
+`AssetDatabase.Refresh` imports in Play, but compresses no image (`compressed` is
+`0`): images wait for Stop, as a model's conversion does.
 
 An MP3 is left in place, and listed in `skipped` with the reason, when its `.wav`
 sibling already exists (a refresh never overwrites a file) or when it does not decode
@@ -165,7 +166,7 @@ clamped sampler.
 
   | type | format | for |
   |---|---|---|
-  | `"Default"` | BC7 (a byte a texel), alpha kept, mips averaged in linear light | colour, packed data (glTF's occlusion-roughness-metallic) |
+  | `"Default"` | BC7 (a byte a texel), alpha kept, mips averaged in linear light (raw with `sRGB` off) | colour, packed data (glTF's occlusion-roughness-metallic, with `sRGB` off) |
   | `"NormalMap"` | BC5 (a byte a texel): x and y; the shader rebuilds z | tangent-space normal maps |
   | `"SingleChannel"` | BC4 (half a byte): red only | roughness, metallic, masks |
 
@@ -176,6 +177,14 @@ clamped sampler.
   slot. A texture drawn in a slot its type cannot serve (a normal map as albedo, a
   single-channel map as colour) is uploaded uncompressed for that use, with one
   console warning, so it never loses a channel.
+- `sRGB` — Unity's *sRGB (Color Texture)*, read for a `"Default"` texture only (the
+  inspector shows it then): on (the default), its texels are sRGB colour, mips and
+  a `maxSize` downscale average in linear light; off, they are data stored raw (a
+  packed metallic/roughness map), averaged and sampled as stored even in a colour
+  slot. Assigning a `"Default"` image to a material's metallic or roughness slot
+  (`Material.SetMetallicMap`/`SetRoughnessMap`, a material document, a maps recipe,
+  the inspector, a model's import) turns it off and says so in the console; never
+  during Play. `"NormalMap"` and `"SingleChannel"` are always data.
 - `compression` — how it is block-compressed on the GPU (#1574), Unity's
   *Compression*: `"None"` (RGBA8, four bytes a texel), `"Normal"` (the default) or
   `"HighQuality"`, which encodes BC7 slower and closer to the source. Unity's
@@ -183,8 +192,8 @@ clamped sampler.
   the pure-Rust BC1 encoders flatten a block of two contrasting colours (red beside
   blue) to one. The blocks and every mip are made at import, never at a draw, into
   the project's import cache (`assets/generated/imported/<path>.bctex`), and made
-  again only when the image, its type, compression, max size or mipmaps, or the
-  encoder change. The editor makes them in the background when an image is added,
+  again only when the image, its type, `sRGB`, compression, max size or mipmaps, or
+  the encoder change. The editor makes them in the background when an image is added,
   its settings change or the project opens (the console says each one); entering
   Play waits for any still stale, as it waits for models; an export makes and ships
   them. The standalone player and the `play` harness never encode on their own:

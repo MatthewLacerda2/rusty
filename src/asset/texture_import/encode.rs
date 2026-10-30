@@ -70,7 +70,7 @@ pub(super) fn encode(
         return None;
     }
     let format = super::format_of(settings)?;
-    let kind = TextureKind::of_type(settings.texture_type);
+    let kind = TextureKind::of_settings(settings);
     let base = image.to_rgba8();
     let variant = variant(format, settings.compression, &base);
     let count = match settings.generate_mipmaps {

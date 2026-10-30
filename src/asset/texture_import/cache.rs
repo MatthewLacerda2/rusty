@@ -18,11 +18,12 @@ const MAGIC: &[u8; 4] = b"RBCT";
 
 /// A digest of everything the blocks depend on: the source's bytes (`source`,
 /// their `fnv1a64`), the settings that shape them (not wrap or filter, which only
-/// the sampler reads) and the encoder's version.
+/// the sampler reads; *sRGB* only where it is read) and the encoder's version.
 pub(super) fn stamp(source: u64, settings: &TextureSettings) -> u64 {
     let made_by = format!(
-        "{source:016x} v{ENCODER_VERSION} {} {} {} {}",
+        "{source:016x} v{ENCODER_VERSION} {} {} {} {} {}",
         settings.texture_type.name(),
+        super::is_linear(settings),
         settings.compression.name(),
         settings.max_size,
         settings.generate_mipmaps,

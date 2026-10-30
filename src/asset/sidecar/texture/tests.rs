@@ -10,6 +10,7 @@ fn settings_round_trip_through_the_sidecar_and_a_missing_one_is_the_default() {
         filter_mode: FilterMode::Point,
         generate_mipmaps: false,
         texture_type: TextureType::SingleChannel,
+        srgb: false,
         compression: Compression::HighQuality,
         max_size: 512,
     };
@@ -70,4 +71,23 @@ fn a_default_image_in_the_normal_slot_becomes_a_normal_map_and_others_stay() {
         !meta_path(&dir.join("missing.png")).exists(),
         "no file, no sidecar"
     );
+}
+
+#[test]
+fn a_default_image_in_a_data_slot_turns_srgb_off_and_others_stay() {
+    let dir = crate::test_temp::dir();
+    let png = dir.join("orm.png");
+    image::RgbaImage::new(4, 4).save(&png).unwrap();
+    fit_data_slot(&png);
+    let fixed = texture(&png);
+    assert!(!fixed.srgb && fixed.texture_type == TextureType::Default);
+    let single = dir.join("rough.png");
+    image::RgbaImage::new(4, 4).save(&single).unwrap();
+    let set = TextureSettings {
+        texture_type: TextureType::SingleChannel,
+        ..Default::default()
+    };
+    set_texture(&single, set).unwrap();
+    fit_data_slot(&single);
+    assert_eq!(texture(&single), set, "only a Default texture is changed");
 }

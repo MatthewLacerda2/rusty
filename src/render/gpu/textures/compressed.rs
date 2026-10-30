@@ -15,11 +15,16 @@ use crate::asset::texture_import::{self, BlockFormat, Compressed, TextureKind};
 pub(crate) const FEATURE: wgpu::Features = wgpu::Features::TEXTURE_COMPRESSION_BC;
 
 /// The format a texture of `format` is stored as, and the one its data view reads
-/// the same blocks as.
-pub(crate) fn formats(format: BlockFormat) -> (wgpu::TextureFormat, wgpu::TextureFormat) {
+/// the same blocks as. BC7 is stored sRGB when `srgb` (a colour texture), else
+/// linear (*sRGB* off, `texture_import::is_linear`).
+pub(crate) fn formats(
+    format: BlockFormat,
+    srgb: bool,
+) -> (wgpu::TextureFormat, wgpu::TextureFormat) {
     use wgpu::TextureFormat as F;
     match format {
-        BlockFormat::Bc7 => (F::Bc7RgbaUnormSrgb, F::Bc7RgbaUnorm),
+        BlockFormat::Bc7 if srgb => (F::Bc7RgbaUnormSrgb, F::Bc7RgbaUnorm),
+        BlockFormat::Bc7 => (F::Bc7RgbaUnorm, F::Bc7RgbaUnorm),
         BlockFormat::Bc4 => (F::Bc4RUnorm, F::Bc4RUnorm),
         BlockFormat::Bc5 => (F::Bc5RgUnorm, F::Bc5RgUnorm),
     }
@@ -89,14 +94,15 @@ pub(crate) fn reads_as(texture: &wgpu::Texture, kind: TextureKind) -> bool {
     }
 }
 
-/// Create a texture holding `texture`'s levels; returns it with its data view's
-/// format.
+/// Create a texture holding `texture`'s levels, stored sRGB when `srgb`
+/// ([`formats`]); returns it with its data view's format.
 pub(super) fn upload(
     (device, queue): (&wgpu::Device, &wgpu::Queue),
     label: &str,
     texture: &Compressed,
+    srgb: bool,
 ) -> (wgpu::Texture, wgpu::TextureFormat) {
-    let (format, data_format) = formats(texture.format);
+    let (format, data_format) = formats(texture.format, srgb);
     let size = super::extent(texture.width, texture.height);
     let mut usage = wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST;
     if cfg!(test) {
@@ -154,10 +160,4 @@ pub(crate) fn gpu_bytes(texture: &wgpu::Texture) -> u64 {
             blocks * block * u64::from(p.depth_or_array_layers)
         })
         .sum()
-}
-
-/// Whether `texture` holds one channel (BC4): the shader reads its red channel
-/// where it would read a packed map's own (#1574).
-pub(crate) fn is_single_channel(texture: &wgpu::Texture) -> bool {
-    texture.format() == formats(BlockFormat::Bc4).0
 }

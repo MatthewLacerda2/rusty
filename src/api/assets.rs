@@ -152,13 +152,14 @@ fn model_import_table(lua: &Lua, path: &str) -> mlua::Result<Table> {
     Ok(t)
 }
 
-/// `{ wrapMode, filterMode, generateMipmaps, textureType, compression, maxSize }`.
+/// `{ wrapMode, filterMode, generateMipmaps, textureType, sRGB, compression, maxSize }`.
 fn texture_table(lua: &Lua, s: &TextureSettings) -> mlua::Result<Table> {
     let t = lua.create_table()?;
     t.raw_set("wrapMode", s.wrap_mode.name())?;
     t.raw_set("filterMode", s.filter_mode.name())?;
     t.raw_set("generateMipmaps", s.generate_mipmaps)?;
     t.raw_set("textureType", s.texture_type.name())?;
+    t.raw_set("sRGB", s.srgb)?;
     t.raw_set("compression", s.compression.name())?;
     t.raw_set("maxSize", s.max_size)?;
     Ok(t)
@@ -178,6 +179,7 @@ fn texture_settings(mut s: TextureSettings, t: &Table) -> mlua::Result<TextureSe
     if let Some(name) = t.get::<Option<String>>("textureType")? {
         s.texture_type = TextureType::parse(&name).map_err(runtime)?;
     }
+    s.srgb = t.get::<Option<bool>>("sRGB")?.unwrap_or(s.srgb);
     if let Some(name) = t.get::<Option<String>>("compression")? {
         s.compression = Compression::parse(&name).map_err(runtime)?;
     }
@@ -203,12 +205,10 @@ fn manifest_table(lua: &Lua) -> mlua::Result<Table> {
 }
 
 /// `Assets.Refresh()`: every import brought up to date, audio and images, and
-/// what it did ([`refresh_table`]). Refused during Play, as a model's conversion
-/// is (`convert::conversion_allowed`): imports wait for Stop.
+/// what it did ([`refresh_table`]). Audio imports in Play too, as Unity's
+/// `AssetDatabase.Refresh` does; images wait for Stop, as a model's conversion
+/// does (`texture_import::refresh_all` does nothing then).
 fn refresh_all(lua: &Lua) -> mlua::Result<Table> {
-    if !crate::asset::convert::conversion_allowed() {
-        return Err(runtime("Assets.Refresh: imports are refused during Play"));
-    }
     let root = Path::new(ASSET_ROOT);
     let t = refresh_table(lua, &refresh(root))?;
     // Each failure was warned of in the console as it ran.

@@ -65,6 +65,10 @@ fn draw_import_settings(ui: &mut egui::Ui, path: &str) {
         all,
         names,
     );
+    if s.texture_type == TextureType::Default {
+        // Unity shows *sRGB (Color Texture)* for a Default texture only.
+        ui.checkbox(&mut s.srgb, "sRGB (Color Texture)");
+    }
     let names = |size: &u32| size.to_string();
     combo(
         ui,

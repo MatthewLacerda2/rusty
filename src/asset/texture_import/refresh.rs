@@ -64,7 +64,7 @@ fn refresh_on(source: &Path, progress: &str, cores: Cores) -> Result<bool, Strin
     let image = reader(source, std::io::Cursor::new(&bytes))
         .and_then(|r| r.decode())
         .map_err(|e| named(&e))?;
-    let kind = TextureKind::of_type(settings.texture_type);
+    let kind = TextureKind::of_settings(&settings);
     let fitted = fit(image, settings.max_size, kind);
     let Some(made) = encode::encode(&fitted, &settings, cores) else {
         return Ok(false);

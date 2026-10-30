@@ -13,7 +13,6 @@ use std::rc::Rc;
 use crate::asset::MapRef;
 use crate::components::MaterialAsset;
 use crate::render::gpu::material_cache::{ParamOwner, MATERIAL_TEXTURES};
-use crate::render::gpu::textures::compressed::is_single_channel;
 use crate::render::gpu::textures::TextureKind;
 use crate::render::{EntityUniform, GpuTexture, Renderer};
 use crate::scene::shader_overrides::ParamValues;
@@ -113,8 +112,9 @@ impl Renderer {
     }
 
     /// `uniform` with its metallic and roughness flags set to 2 where the map is
-    /// resident as one channel (BC4, #1574): the shader then reads its red channel
-    /// instead of glTF's packed blue and green.
+    /// resident and of Texture Type `SingleChannel` (#1574), BC4 or not yet: the
+    /// shader then reads its red channel instead of glTF's packed blue and green,
+    /// so the look does not change when the compressed copy lands.
     pub(crate) fn with_map_channels(
         &self,
         mut uniform: EntityUniform,
@@ -125,7 +125,7 @@ impl Renderer {
         };
         let single = |map: &Option<MapRef>| {
             let texture = map.as_ref().and_then(|p| self.gpu_textures.get(p));
-            texture.is_some_and(|t| is_single_channel(&t.texture))
+            texture.is_some_and(|t| t.single_channel)
         };
         if single(&m.metallic_map) {
             uniform.use_metallic_map = 2;

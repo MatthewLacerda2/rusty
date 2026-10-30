@@ -7,8 +7,8 @@ use std::rc::Rc;
 use image::GenericImageView;
 
 use super::{compressed, sampler, upload, MipSettings, TextureKind, DATA_FORMAT};
-use crate::asset::sidecar::TextureSettings;
-use crate::asset::texture_import::Texels;
+use crate::asset::sidecar::{TextureSettings, TextureType};
+use crate::asset::texture_import::{self, Texels};
 use crate::asset::MapRef;
 use crate::render::{GpuTexture, Renderer};
 
@@ -89,11 +89,12 @@ impl Renderer {
         let file = map.file()?;
         let import = crate::asset::sidecar::texture(&file);
         let compress = compressed::wanted_for(map.as_str(), self.device.features(), &import, kind);
-        let loaded = crate::asset::texture_import::load(&file, &import, kind, compress)?;
+        let loaded = texture_import::load(&file, &import, kind, compress)?;
+        let srgb = !texture_import::is_linear(&import);
         let mut texture = match &loaded.texels {
             Texels::Blocks(blocks) => {
                 let gpu = (&self.device, &self.queue);
-                let texture = compressed::upload(gpu, map.as_str(), blocks);
+                let texture = compressed::upload(gpu, map.as_str(), blocks, srgb);
                 Self::finalize_texture(
                     &self.device,
                     &self.texture_layout,
@@ -105,6 +106,7 @@ impl Renderer {
             Texels::Image(img) => self.upload_image_texture(map.as_str(), img, &import, kind),
         };
         texture.source_size = loaded.source_size;
+        texture.single_channel = import.texture_type == TextureType::SingleChannel;
         Some(Rc::new(texture))
     }
 
@@ -121,7 +123,8 @@ impl Renderer {
         let (width, height) = img.dimensions();
         let levels = settings.levels(width, height);
         let gpu = (&self.device, &self.queue);
-        let texture = upload(gpu, path_str, &img.to_rgba8(), levels);
+        let srgb = !texture_import::is_linear(import);
+        let texture = upload(gpu, path_str, &img.to_rgba8(), (levels, srgb));
         let kind = settings.kind;
         self.mip_generator
             .generate(&self.device, &self.queue, &texture, kind);

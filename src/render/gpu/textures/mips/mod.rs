@@ -38,11 +38,12 @@ pub(crate) struct MipSettings {
 
 impl MipSettings {
     /// The settings for a map with import settings `import`, used as `kind`: a
-    /// full chain unless its *Generate Mip Maps* is off (Unity's default is on).
+    /// full chain unless its *Generate Mip Maps* is off (Unity's default is on),
+    /// averaged raw when its *sRGB* is off (`TextureKind::reading`).
     pub(crate) fn for_map(import: &TextureSettings, kind: TextureKind) -> Self {
         Self {
             generate: import.generate_mipmaps,
-            kind,
+            kind: kind.reading(import),
         }
     }
 

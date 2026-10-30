@@ -33,6 +33,12 @@ pub struct TextureSettings {
     pub generate_mipmaps: bool,
     /// What its texels hold, which picks its block format (#1574).
     pub texture_type: TextureType,
+    /// Unity's *sRGB (Color Texture)*, read for a `Default` texture only: on, its
+    /// texels are sRGB colour (mips average in linear light, the colour view
+    /// decodes); off, they are data stored raw (a packed metallic/roughness map),
+    /// averaged and sampled as stored. `NormalMap` and `SingleChannel` are always
+    /// data.
+    pub srgb: bool,
     /// How it is block-compressed (#1574).
     pub compression: Compression,
     /// The longest side it is uploaded at, one of [`MAX_SIZES`] (#1574).
@@ -46,6 +52,7 @@ impl Default for TextureSettings {
             filter_mode: FilterMode::default(),
             generate_mipmaps: true,
             texture_type: TextureType::default(),
+            srgb: true,
             compression: Compression::default(),
             max_size: DEFAULT_MAX_SIZE,
         }
@@ -107,27 +114,49 @@ pub fn set_texture(source: &Path, settings: TextureSettings) -> Result<(), Impor
 
 /// The image at `source`, just assigned to a material's normal slot, set to
 /// [`TextureType::NormalMap`] when it is still `Default`, and said so: Unity's
-/// *Fix now*, done for the agent (#1574). Only an image on disk, and only while
-/// imports may change (never in Play, `convert::conversion_allowed`). A texture a
-/// converted model's cache holds is left alone: those are never compressed.
+/// *Fix now*, done for the agent (#1574).
 pub fn fit_normal_slot(source: &Path) {
+    fit_slot(
+        source,
+        "a normal map, so its Texture Type is now NormalMap",
+        |s| {
+            (s.texture_type == TextureType::Default).then_some(TextureSettings {
+                texture_type: TextureType::NormalMap,
+                ..*s
+            })
+        },
+    );
+}
+
+/// The image at `source`, just assigned to a material's metallic or roughness
+/// slot, set to linear (*sRGB* off) when it is a `Default` texture still marked
+/// sRGB, and said so: its texels are data, so its mips average raw, as an
+/// uncompressed upload in that slot does (#1322, #1574).
+pub fn fit_data_slot(source: &Path) {
+    fit_slot(
+        source,
+        "data (metallic/roughness), so its sRGB is now off",
+        |s| {
+            (s.texture_type == TextureType::Default && s.srgb)
+                .then_some(TextureSettings { srgb: false, ..*s })
+        },
+    );
+}
+
+/// Apply `fix` to the import settings of `source` when it asks for a change, and
+/// log it as `used` (what it was used as, and what changed). Only an image on disk, and only while imports may change (never
+/// in Play, `convert::conversion_allowed`). A texture a converted model's cache
+/// holds is left alone: those are never compressed.
+fn fit_slot(source: &Path, used: &str, fix: impl Fn(&TextureSettings) -> Option<TextureSettings>) {
     use crate::asset::convert::{conversion_allowed, is_import_cache};
     if !conversion_allowed() || is_import_cache(source) || !source.is_file() {
         return;
     }
-    let settings = texture(source);
-    if settings.texture_type != TextureType::Default {
+    let Some(fixed) = fix(&texture(source)) else {
         return;
-    }
-    let fixed = TextureSettings {
-        texture_type: TextureType::NormalMap,
-        ..settings
     };
     match set_texture(source, fixed) {
-        Ok(()) => log::info!(
-            "[Import] {}: used as a normal map, so its Texture Type is now NormalMap",
-            source.display()
-        ),
+        Ok(()) => log::info!("[Import] {}: used as {used}", source.display()),
         Err(e) => log::warn!("[Import] {}: {e}", source.display()),
     }
 }

@@ -97,10 +97,10 @@ pub fn default_material() -> MaterialAsset {
 /// pointing both at the same image reads the correct channel. The base-color alpha is
 /// dropped (the renderer's base color is RGB).
 pub fn material_asset_from_import(data: &crate::asset::MaterialData) -> MaterialAsset {
-    // Unity's model importer marks a bump map a material names as a Normal map
-    // (#1574), so it compresses as one.
-    super::material::fit_normal_slot(data.normal_map.as_ref());
-    MaterialAsset {
+    // Unity's model importer marks a bump map a material names as a Normal map,
+    // and its packed metallic/roughness map linear (#1574), so each compresses
+    // as what it holds.
+    let asset = MaterialAsset {
         base_color: [data.base_color[0], data.base_color[1], data.base_color[2]],
         base_color_map: data.base_color_map.clone(),
         metallic: data.metallic,
@@ -114,7 +114,9 @@ pub fn material_asset_from_import(data: &crate::asset::MaterialData) -> Material
         // yet read glTF `alphaMode`/`alphaCutoff`, so transparency is authored after
         // import via the inspector or the `Material` API.
         ..MaterialAsset::default()
-    }
+    };
+    super::material::fit_map_slots(&asset);
+    asset
 }
 
 /// Attach a `MaterialComponent` to entity `id` referencing its own library material

@@ -31,7 +31,12 @@ impl Renderer {
     ) -> GpuTexture {
         let label = "Default Checkerboard Texture";
         let checker = checkerboard(256, 32);
-        let texture = upload((device, queue), label, &checker, full_chain_len(256, 256));
+        let texture = upload(
+            (device, queue),
+            label,
+            &checker,
+            (full_chain_len(256, 256), true),
+        );
         mips.generate(device, queue, &texture, TextureKind::Colour);
         let sampler = default_sampler(device);
         Self::finalize_texture(device, layout, (texture, DATA_FORMAT), sampler, Some(label))
@@ -46,7 +51,7 @@ impl Renderer {
     ) -> GpuTexture {
         let label = "White Texture";
         let white = image::RgbaImage::from_pixel(1, 1, image::Rgba([255; 4]));
-        let texture = upload((device, queue), label, &white, 1);
+        let texture = upload((device, queue), label, &white, (1, true));
         let sampler = default_sampler(device);
         Self::finalize_texture(device, layout, (texture, DATA_FORMAT), sampler, Some(label))
     }
@@ -92,6 +97,7 @@ impl Renderer {
             filter,
             bind_group,
             source_size: (size.width, size.height),
+            single_channel: false,
         }
     }
 }
@@ -106,13 +112,15 @@ fn default_sampler(device: &wgpu::Device) -> (wgpu::Sampler, FilterMode) {
 /// the mip pass.
 pub(crate) type Uploader<'a> = (&'a wgpu::Device, &'a wgpu::Queue, &'a MipGenerator);
 
-/// Create an sRGB texture of `levels` mips with `image` written to its base; the
-/// caller draws the rest ([`MipGenerator::generate`]).
+/// Create a texture of `levels` mips with `image` written to its base; the
+/// caller draws the rest ([`MipGenerator::generate`]). Stored sRGB when `srgb`,
+/// else linear (*sRGB* off, `texture_import::is_linear`); either way it can be
+/// viewed as the other.
 pub(super) fn upload(
     (device, queue): (&wgpu::Device, &wgpu::Queue),
     label: &str,
     image: &image::RgbaImage,
-    levels: u32,
+    (levels, srgb): (u32, bool),
 ) -> wgpu::Texture {
     let (width, height) = image.dimensions();
     let mut usage = wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST;
@@ -130,9 +138,13 @@ pub(super) fn upload(
         mip_level_count: levels,
         sample_count: 1,
         dimension: wgpu::TextureDimension::D2,
-        format: IMAGE_FORMAT,
+        format: if srgb { IMAGE_FORMAT } else { DATA_FORMAT },
         usage,
-        view_formats: &[DATA_FORMAT],
+        view_formats: if srgb {
+            &[DATA_FORMAT]
+        } else {
+            &[IMAGE_FORMAT]
+        },
     });
     queue.write_texture(
         wgpu::TexelCopyTextureInfo {

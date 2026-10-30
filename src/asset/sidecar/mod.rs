@@ -16,7 +16,7 @@ use std::path::{Path, PathBuf};
 mod texture;
 
 pub use texture::{
-    fit_normal_slot, parse_max_size, set_texture, texture, Compression, FilterMode,
+    fit_data_slot, fit_normal_slot, parse_max_size, set_texture, texture, Compression, FilterMode,
     TextureSettings, TextureType, WrapMode, DEFAULT_MAX_SIZE, MAX_SIZES,
 };
 

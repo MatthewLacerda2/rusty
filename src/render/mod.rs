@@ -104,9 +104,10 @@ pub struct GpuTexture {
     /// clamped (`render::ui`, #1397).
     pub filter: crate::asset::sidecar::FilterMode,
     pub bind_group: wgpu::BindGroup,
-    /// The source image's size, before *Max Size* (#1574): what UI geometry
-    /// measures in, as Unity keeps a sprite's borders in source pixels.
+    /// The source image's size before *Max Size*: UI geometry measures in it (#1574).
     pub source_size: (u32, u32),
+    /// Texture Type `SingleChannel`: a metallic/roughness slot reads red (#1574).
+    pub single_channel: bool,
 }
 
 pub struct Renderer {

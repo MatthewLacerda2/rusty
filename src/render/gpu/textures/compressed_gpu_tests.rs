@@ -119,8 +119,8 @@ fn gpu_a_one_channel_map_reads_red_as_a_mask_and_grey_as_colour() {
     };
     let uniform = crate::render::draw::uniforms::material_uniform(true, Some(&material));
     let uniform = renderer.with_map_channels(uniform, Some(&material));
-    let bc = renderer.device.features().contains(FEATURE);
-    assert_eq!(uniform.use_roughness_map, if bc { 2 } else { 1 });
+    // Its Texture Type sets red, BC4 or not yet (#1574).
+    assert_eq!(uniform.use_roughness_map, 2);
     assert_eq!(uniform.use_metallic_map, 0, "no metallic map");
     let drawn = centre(&mut renderer, &emissive_scene(&grey));
     let spread = drawn.iter().max().unwrap() - drawn.iter().min().unwrap();
