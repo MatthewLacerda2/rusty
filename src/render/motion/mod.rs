@@ -196,3 +196,6 @@ mod gpu_tests;
 
 #[cfg(test)]
 mod stack_gpu_tests;
+
+#[cfg(test)]
+mod vectors_gpu_tests;

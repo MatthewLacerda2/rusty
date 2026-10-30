@@ -165,6 +165,29 @@ mod tests {
     }
 
     #[test]
+    fn each_cell_reads_its_own_jitter_from_a_link() {
+        // A 4×4 grid over a 16×16 link: cell (cx, cy) is a 4×4 block of red
+        // (cx + 4cy) / 16, so a read anywhere but that cell's centre is off.
+        let link = Image::fill_uv(16, |u, v| {
+            let (cx, cy) = ((u * 4.0).floor(), (v * 4.0).floor());
+            [(cx + 4.0 * cy) / 16.0, 0.0, 0.0, 1.0]
+        });
+        let field = Field::Map {
+            img: &link,
+            min: 0.0,
+            max: 1.0,
+        };
+        let jitters = Jitters {
+            offset: field,
+            ..Jitters::uniform(0.0, 0.0, 0.0)
+        };
+        for (cx, cy) in (0..4).flat_map(|y| (0..4).map(move |x| (x, y))) {
+            let want = (cx + 4 * cy) as f32 / 16.0;
+            assert_eq!(jitters.at((cx, cy), 4.0).offset, want, "cell ({cx}, {cy})");
+        }
+    }
+
+    #[test]
     fn no_jitter_repeats_the_input_exactly() {
         let src = Image::fill_uv(8, |u, v| [u, v, 0.0, 1.0]);
         let out = tile(&src, 2.0, Jitters::uniform(0.0, 0.0, 0.0), 1);

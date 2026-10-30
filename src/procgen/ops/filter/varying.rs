@@ -174,3 +174,7 @@ fn direct(line: &[Rgba], a: f64, b: f64) -> [f64; 4] {
 #[cfg(test)]
 #[path = "varying_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "width_tests.rs"]
+mod width_tests;
