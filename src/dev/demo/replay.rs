@@ -13,7 +13,7 @@
 use mlua::Lua;
 
 use super::calls;
-use super::format::{host_call, End};
+use super::format::{host_call, End, Header};
 use super::read::{Demo, DemoTick, DemoTicks};
 use super::sources::Sources;
 use crate::app::{GameWorld, PlayTransition, TapPoint, TickTap};
@@ -120,25 +120,32 @@ impl Replayer {
     }
 }
 
+/// Warn when the demo was recorded on another engine build, or on a project whose
+/// scene file or scripts changed since: it replays anyway.
+fn warn_changes(world: &GameWorld, header: &Header) {
+    let running = crate::core::project::engine_commit();
+    let mut console = world.console().borrow_mut();
+    if header.engine_commit != running {
+        let line = format!(
+            "[Demo] recorded on engine {}, replayed on {running}: it may differ",
+            header.engine_commit
+        );
+        console.warn(line);
+    }
+    if let Some(what) = header.sources.changed(&Sources::of(world)) {
+        console.warn(format!(
+            "[Demo] the project's {what} changed since it was recorded: it may differ"
+        ));
+    }
+}
+
 /// Set `world` up as `demo` started — its seed, save data, the options and quality
 /// the player had saved, the time scale and pause, the Game view size — and install the
 /// replay. Call before the world's first tick; the project settings go in when
 /// the harness is built.
 pub fn prepare(world: &mut GameWorld, demo: Demo) -> Result<(), String> {
     let header = &demo.header;
-    let running = crate::core::project::engine_commit();
-    if header.engine_commit != running {
-        let line = format!(
-            "[Demo] recorded on engine {}, replayed on {running}: it may differ",
-            header.engine_commit
-        );
-        world.console().borrow_mut().warn(line);
-    }
-    if let Some(what) = header.sources.changed(&Sources::of(world)) {
-        let line =
-            format!("[Demo] the project's {what} changed since it was recorded: it may differ");
-        world.console().borrow_mut().warn(line);
-    }
+    warn_changes(world, header);
     world.resources.script_manager.set_play_seed(header.seed);
     // An `f32` widened to `f64` narrows back exactly.
     let mut time = world.resources.time.borrow_mut();

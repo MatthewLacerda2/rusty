@@ -95,14 +95,15 @@ mod tests {
     #[test]
     fn the_scripts_digest_follows_every_lua_file_but_not_saved_ones() {
         let root = crate::test_temp::dir();
-        std::fs::create_dir_all(root.join("scripts/ai")).unwrap();
+        let brain = root.join("scripts").join("ai").join("brain.lua");
+        std::fs::create_dir_all(brain.parent().unwrap()).unwrap();
         std::fs::create_dir_all(root.join("saved")).unwrap();
-        std::fs::write(root.join("scripts/ai/brain.lua"), "x = 1").unwrap();
+        std::fs::write(&brain, "x = 1").unwrap();
         let before = scripts_digest(&root);
-        std::fs::write(root.join("saved/notes.lua"), "ignored").unwrap();
+        std::fs::write(root.join("saved").join("notes.lua"), "ignored").unwrap();
         std::fs::write(root.join("readme.txt"), "ignored").unwrap();
         assert_eq!(scripts_digest(&root), before, "saved/ and non-Lua files");
-        std::fs::write(root.join("scripts/ai/brain.lua"), "x = 2").unwrap();
+        std::fs::write(&brain, "x = 2").unwrap();
         assert_ne!(scripts_digest(&root), before, "an edited script");
     }
 }

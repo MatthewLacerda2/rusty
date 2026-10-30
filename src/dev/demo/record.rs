@@ -85,6 +85,24 @@ fn drain(world: &GameWorld) -> Vec<HostCall> {
     acts
 }
 
+/// The header of a demo of `world` starting now on `scene`.
+fn header(world: &GameWorld, scene: String, before_play: &[HostCall]) -> Header {
+    let time = world.resources.time.borrow().clone();
+    Header {
+        scene,
+        engine_commit: crate::core::project::engine_commit().to_string(),
+        seed: world.script_manager().play_seed(),
+        sources: Sources::of(world),
+        settings: world.resources.application.borrow().settings(),
+        storage: world.resources.storage.borrow().data(),
+        size: world.resources.screen.borrow().game_view(),
+        time_scale: Exact(f64::from(time.time_scale)),
+        paused: time.paused,
+        pending_steps: time.pending_steps,
+        before_play: before_play.iter().map(host_json).collect(),
+    }
+}
+
 impl Recorder {
     pub(super) fn new(destination: Destination, world: &GameWorld) -> Self {
         Self {
@@ -155,20 +173,7 @@ impl Recorder {
             Some(true) => None,
         };
         before_play.extend(taint.map(HostCall::Taint));
-        let time = world.resources.time.borrow().clone();
-        let header = Header {
-            scene,
-            engine_commit: crate::core::project::engine_commit().to_string(),
-            seed: world.script_manager().play_seed(),
-            sources: Sources::of(world),
-            settings: world.resources.application.borrow().settings(),
-            storage: world.resources.storage.borrow().data(),
-            size: world.resources.screen.borrow().game_view(),
-            time_scale: Exact(f64::from(time.time_scale)),
-            paused: time.paused,
-            pending_steps: time.pending_steps,
-            before_play: before_play.iter().map(host_json).collect(),
-        };
+        let header = header(world, scene, &before_play);
         // lint: allow(asset-write) a demo, read by `play --demo`, never by a path-keyed cache
         let opened = File::create(&path).map(lock).and_then(|mut out| {
             let header = serde_json::to_string(&header)?;
