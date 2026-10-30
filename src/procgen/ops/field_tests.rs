@@ -50,3 +50,40 @@ fn at_pixel_stretches_red_to_the_link_range() {
     };
     assert_eq!(field.at_pixel(0.6, 0.6), 3.0);
 }
+
+#[test]
+fn a_link_is_flat_when_its_values_are_one_even_as_zero_and_minus_zero() {
+    // `min` −0 keeps a red of −0 at −0 and a red of 0 at +0: the same value.
+    let mut img = Image::new(Size::new(2, 1));
+    img.map_indexed(|i, _| [if i == 0 { 0.0 } else { -0.0 }, 0.0, 0.0, 1.0]);
+    let field = Field::Map {
+        img: &img,
+        min: -0.0,
+        max: 1.0,
+    };
+    assert_eq!(field.constant(), Some(0.0));
+    let nan = Image::filled(Size::new(2, 1), [f32::NAN, 0.0, 0.0, 1.0]);
+    let field = Field::Map {
+        img: &nan,
+        min: 0.0,
+        max: 1.0,
+    };
+    assert!(
+        field.constant().is_some_and(f32::is_nan),
+        "an all-NaN link is flat"
+    );
+}
+
+#[test]
+fn only_a_link_is_linked_and_its_max_is_its_largest_value() {
+    assert!(!Field::Const(3.0).linked());
+    assert_eq!(Field::Const(3.0).max(), 3.0);
+    let img = indexed();
+    let field = Field::Map {
+        img: &img,
+        min: 2.0,
+        max: 4.0,
+    };
+    assert!(field.linked());
+    assert_eq!(field.max(), 2.0 + 2.0 * 7.0, "red 7 stretched over [2, 4]");
+}
