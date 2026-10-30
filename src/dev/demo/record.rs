@@ -262,6 +262,7 @@ impl TickTap for Recorder {
                 };
                 if let Err(err) = session.end_tick(world) {
                     log::warn!("[Demo] {}: {err}", session.path.display());
+                    session.index.end(world, session.t);
                     self.session = None;
                 }
             }

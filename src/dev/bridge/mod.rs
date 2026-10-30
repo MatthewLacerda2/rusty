@@ -11,7 +11,7 @@
 //! This module adds only what is the scenario's own: the `Harness` table
 //! (Step, StepUntil, Snapshot, Log, Expect, Frame, Stats, AssertBudget, Screenshot,
 //! Render, AttachPlayerBot, LoadStress, Bench, RecordAudio, StopAudio, and the demo verbs
-//! FindInDemo, SeekDemo, CutDemo in `demo`), `Scene.GetScript` answered across
+//! FindInDemo, SeekDemo, CutDemo, DemoPath in `demo`), `Scene.GetScript` answered across
 //! the VM boundary (`script_ref`), and the refusal of what entering Play would wipe
 //! (`before_play`).
 

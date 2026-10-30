@@ -1,9 +1,10 @@
-//! `Harness.FindInDemo` / `SeekDemo` / `CutDemo` (#1597): a scenario running on a
-//! demo (`play --demo <file> <scenario>`) finds a moment in its index, replays to
-//! it, and cuts a range of it into a scenario of its own.
+//! `Harness.FindInDemo` / `SeekDemo` / `CutDemo` / `DemoPath` (#1597): a scenario
+//! running on a demo (`play --demo <file> <scenario>`) finds a moment in its
+//! index, replays to it, cuts a range of it into a scenario of its own, and asks
+//! which demo it runs on.
 
 use std::cell::RefCell;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
 use glam::Vec3;
@@ -11,19 +12,20 @@ use mlua::{Lua, Result as LuaResult, Table, Value};
 
 use super::{world_of, Shared};
 use crate::app::GameWorld;
-use crate::dev::demo::{self, Demo, EventKind, Query, Replayer, NO_DEMO};
+use crate::dev::demo::{self, EventKind, Query, Replayer, NO_DEMO};
 
 fn fail(verb: &str, msg: impl std::fmt::Display) -> mlua::Error {
     mlua::Error::RuntimeError(format!("Harness.{verb}: {msg}"))
 }
 
-/// The demo `world` replays, read again from its file.
-fn on_demo(world: &Rc<RefCell<GameWorld>>, verb: &str) -> LuaResult<Demo> {
+/// The demo `world` replays: its file and how many ticks it holds, as the
+/// replay read them.
+fn on_demo(world: &Rc<RefCell<GameWorld>>, verb: &str) -> LuaResult<(PathBuf, u64)> {
     let mut world = world.borrow_mut();
     let replayer = world
         .tap_mut::<Replayer>()
         .ok_or_else(|| fail(verb, NO_DEMO))?;
-    Demo::read(replayer.demo_path()).map_err(|e| fail(verb, e))
+    Ok((replayer.demo_path().to_path_buf(), replayer.verdict().of))
 }
 
 pub(super) fn register(lua: &Lua, harness: &Shared, t: &Table) -> LuaResult<()> {
@@ -33,7 +35,8 @@ pub(super) fn register(lua: &Lua, harness: &Shared, t: &Table) -> LuaResult<()> 
         "FindInDemo",
         lua.create_function(move |_, query: Table| {
             let query = query_of(&query)?;
-            Ok(on_demo(&world, "FindInDemo")?.find(&query))
+            let (path, ticks) = on_demo(&world, "FindInDemo")?;
+            Ok(demo::find_in(&path, ticks, &query))
         })?,
     )?;
 
@@ -51,9 +54,18 @@ pub(super) fn register(lua: &Lua, harness: &Shared, t: &Table) -> LuaResult<()> 
     t.set(
         "CutDemo",
         lua.create_function(move |_, (from, to, path): (u64, u64, String)| {
-            let demo = on_demo(&world, "CutDemo")?;
-            demo::cut(demo.path(), demo.ticks, from, to, Path::new(&path))
-                .map_err(|e| fail("CutDemo", e))
+            let (demo, ticks) = on_demo(&world, "CutDemo")?;
+            demo::cut(&demo, ticks, from, to, Path::new(&path)).map_err(|e| fail("CutDemo", e))
+        })?,
+    )?;
+
+    // DemoPath() -> string | nil: the replayed demo's full path (a cut checks it).
+    let world = world_of(harness);
+    t.set(
+        "DemoPath",
+        lua.create_function(move |_, ()| {
+            let path = on_demo(&world, "DemoPath").ok().map(|(path, _)| path);
+            Ok(path.map(|p| demo::full_path(&p).to_string_lossy().into_owned()))
         })?,
     )
 }

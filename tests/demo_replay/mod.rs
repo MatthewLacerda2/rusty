@@ -11,6 +11,7 @@ mod edit_mode;
 mod ends;
 mod hosts;
 mod index;
+mod index_edges;
 mod play_bin;
 mod timing;
 

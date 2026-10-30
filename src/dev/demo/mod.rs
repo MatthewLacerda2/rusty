@@ -47,10 +47,12 @@ use std::path::Path;
 
 pub use calls::{journal_calls, plain_value};
 pub use files::{demos_in, Destination, DEMOS_DIR};
-pub use index::{Event, EventKind, IndexLine, Query, CAMERA_EVERY};
+pub use index::{find_in, Event, EventKind, IndexLine, Query, CAMERA_EVERY};
 pub use read::{Demo, DemoTick, DemoTicks};
 pub use record::Recorder;
-pub use replay::{cut, prepare, seek, Divergence, Replayer, Verdict, NO_DEMO};
+pub use replay::{
+    cut, cut_scenario, full_path, prepare, seek, Divergence, Replayer, Verdict, NO_DEMO,
+};
 
 use crate::app::GameWorld;
 use crate::dev::harness::Harness;

@@ -3,16 +3,26 @@
 //! replayed, so a moment found in a playtest becomes a regression test.
 //!
 //! The scenario copies no world state: it runs on the source demo (`play --demo
-//! <demo> <scenario> <out>`, named in its header), seeks to the tick before
-//! `from`, steps the range on the recorded input, and ends with an assert stub
-//! to fill in. The replay's own check (`the demo replays bit for bit as far as
+//! <demo> <scenario> <out>`, named in its header), checks that it does
+//! (`Harness.DemoPath()`, the replayed demo's full path), seeks to the tick
+//! before `from`, steps the range on the recorded input, and ends with an assert
+//! stub to fill in. The replay's own check (`the demo replays bit for bit as far as
 //! the scenario stepped it`) proves the range came out the same.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
+
+/// `path` in full, as `Harness.DemoPath()` answers it: the same file however it
+/// was named on the command line.
+pub fn full_path(path: &Path) -> PathBuf {
+    std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
+}
 
 /// The scenario reproducing ticks `from..=to` of the demo at `demo`.
 pub fn scenario(demo: &Path, from: u64, to: u64) -> String {
-    let demo = demo.display();
+    let full = full_path(demo);
+    let demo = full.display();
+    // A Rust string literal reads the same in Lua: `\\`, `\"`, `\u{..}`.
+    let named = format!("{:?}", full.to_string_lossy());
     let seek = match from {
         0 => String::new(),
         _ => format!(
@@ -26,6 +36,7 @@ pub fn scenario(demo: &Path, from: u64, to: u64) -> String {
         "-- Ticks {from} to {to} of the demo {demo} (Harness.CutDemo, #1597).\n\
          -- It runs on that demo, which must stay where it is:\n\
          --   play --demo {demo} <this file> <out_dir>\n\
+         assert(Harness.DemoPath() == {named}, \"not on its demo: play --demo \" .. {named})\n\
          {seek}\
          Harness.Step({steps})  -- ticks {from} to {to}, on their recorded input\n\
          {stub}",

@@ -17,52 +17,15 @@ use super::format::{host_call, End};
 use super::read::{Demo, DemoTick, DemoTicks};
 mod cut;
 mod seek;
+mod verdict;
 use crate::app::{GameWorld, PlayTransition, TapPoint, TickTap};
 use crate::core::settings::video::{VideoSettings, VIDEO_NAMESPACE};
 use crate::core::settings::{saved_quality, GraphicsSettings};
 use crate::scripting::HostCall;
-pub use cut::cut;
+pub use cut::{cut, full_path, scenario as cut_scenario};
 use seek::Start;
 pub use seek::{seek, NO_DEMO};
-
-/// The first digest that differs from the recording: the state went astray after
-/// `matched` (the last digest that agreed, if any) and by `tick`.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Divergence {
-    pub tick: u64,
-    pub matched: Option<u64>,
-    pub expected: String,
-    pub actual: String,
-}
-
-impl std::fmt::Display for Divergence {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "diverged by tick {}", self.tick)?;
-        match self.matched {
-            Some(t) => write!(f, " (the state still matched at tick {t})"),
-            None => write!(f, " (no earlier digest matched)"),
-        }
-    }
-}
-
-/// How a replay went, so far.
-#[derive(Clone, Debug, Default)]
-pub struct Verdict {
-    /// Ticks replayed.
-    pub ticks: u64,
-    /// Ticks the demo holds.
-    pub of: u64,
-    /// Digests compared.
-    pub checked: u64,
-    /// The last tick whose digest agreed.
-    pub matched: Option<u64>,
-    pub diverged: Option<Divergence>,
-    /// `(tick, what)` for every act the demo could not carry.
-    pub taints: Vec<(u64, String)>,
-    /// Whether a scenario on top steps the replay: it may end it before the
-    /// demo's end on purpose.
-    pub scenario: bool,
-}
+pub use verdict::{Divergence, Verdict};
 
 /// Feeds a demo into the world it is installed on; see [`prepare`].
 pub struct Replayer {
@@ -74,6 +37,8 @@ pub struct Replayer {
     verdict: Verdict,
     /// Where a seek back restarts it (`seek`).
     start: Start,
+    /// Whether the world ran a tick past the demo's last.
+    past_end: bool,
 }
 
 impl Replayer {
@@ -94,6 +59,12 @@ impl Replayer {
     /// The demo file it replays.
     pub fn demo_path(&self) -> &std::path::Path {
         self.start.path()
+    }
+
+    /// Whether the world ran on past the demo's last tick: it no longer stands
+    /// where the replay left it.
+    pub fn past_end(&self) -> bool {
+        self.past_end
     }
 
     /// Its start state and its verdict: what a restart keeps (`seek`).
@@ -150,6 +121,13 @@ impl Replayer {
 /// replay. Call before the world's first tick; the project settings go in when
 /// the harness is built.
 pub fn prepare(world: &mut GameWorld, demo: Demo) -> Result<(), String> {
+    let lua = crate::scripting::sandboxed_vm()?;
+    install(world, demo, lua);
+    Ok(())
+}
+
+/// [`prepare`], with what can fail done: `lua` is the replay's own VM.
+fn install(world: &mut GameWorld, demo: Demo, lua: Lua) {
     let start = Start::of(world, demo.path());
     let header = &demo.header;
     super::sources::warn_changes(world, header);
@@ -179,7 +157,6 @@ pub fn prepare(world: &mut GameWorld, demo: Demo) -> Result<(), String> {
             .borrow_mut()
             .set_game_view(width, height);
     }
-    let lua = crate::scripting::sandboxed_vm()?;
     let before_play = header.before_play.iter().filter_map(host_call).collect();
     let verdict = Verdict {
         of: demo.ticks,
@@ -193,8 +170,8 @@ pub fn prepare(world: &mut GameWorld, demo: Demo) -> Result<(), String> {
         lua,
         verdict,
         start,
+        past_end: false,
     })));
-    Ok(())
 }
 
 impl Replayer {
@@ -235,6 +212,7 @@ impl Replayer {
     /// last, the acts made before Stop and the digest Play ended on.
     fn after_tick(&mut self, world: &mut GameWorld) {
         let Some(tick) = self.tick.take() else {
+            self.past_end |= self.finished();
             return;
         };
         self.verdict.ticks = tick.t + 1;

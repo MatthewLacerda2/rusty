@@ -5,9 +5,11 @@
 //! line by a piece of its text, an event by kind, or the active camera's sampled
 //! position inside a box.
 
+use std::path::Path;
+
 use glam::Vec3;
 
-use super::super::read::Demo;
+use super::super::read::{index_of, Demo};
 use super::{Event, IndexLine};
 
 /// What `Harness.FindInDemo` looks for.
@@ -83,12 +85,17 @@ impl Query {
 impl Demo {
     /// The ticks whose index lines match `query`, in order, each once.
     pub fn find(&self, query: &Query) -> Vec<u64> {
-        let mut ticks: Vec<u64> = self
-            .index()
-            .filter(|line| query.matches(line))
-            .map(|line| line.at)
-            .collect();
-        ticks.dedup();
-        ticks
+        find_in(self.path(), self.ticks, query)
     }
+}
+
+/// [`Demo::find`] on the demo at `path`, which holds `ticks` ticks: what a replay
+/// knows of its demo, without checking the file again.
+pub fn find_in(path: &Path, ticks: u64, query: &Query) -> Vec<u64> {
+    let mut found: Vec<u64> = index_of(path, ticks)
+        .filter(|line| query.matches(line))
+        .map(|line| line.at)
+        .collect();
+    found.dedup();
+    found
 }

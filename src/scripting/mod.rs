@@ -32,7 +32,7 @@ mod schema;
 mod shared;
 mod timers;
 
-pub use console::{ConsoleLogs, LogLevel, Mark};
+pub use console::{ConsoleLogs, DemoFeed, LogLevel, Mark};
 pub use discovery::{monobehaviour_scripts, script_label};
 pub use journal::{HostCall, HostJournal, Plain};
 pub use manager::ScriptManager;

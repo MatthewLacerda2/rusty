@@ -45,11 +45,18 @@ pub struct DemoTick {
     pub digest: Option<String>,
 }
 
-/// The lines after a demo's header: a tick's [`Entry`], an index line, the [`End`].
+/// The lines after a demo's header: a tick's [`Entry`], an index line (or one
+/// that does not parse: never a reason to lose the replay), the [`End`].
 enum Line {
     Entry(Box<Entry>),
-    Index(IndexLine),
+    Index,
+    BadIndex(String),
     End(End),
+}
+
+/// Serialized field order puts `at` first: an index line is told apart unparsed.
+fn is_index(line: &str) -> bool {
+    line.starts_with("{\"at\":")
 }
 
 fn lines_of(path: &Path) -> Result<Lines<BufReader<File>>, String> {
@@ -59,11 +66,17 @@ fn lines_of(path: &Path) -> Result<Lines<BufReader<File>>, String> {
 
 fn parse_line(line: &str, n: usize) -> Result<Line, String> {
     let at = |e: serde_json::Error| format!("line {n}: {e}");
+    let index = |parsed: Result<IndexLine, _>| {
+        parsed.map_or_else(|e| Line::BadIndex(at(e)), |_| Line::Index)
+    };
+    if is_index(line) {
+        return Ok(index(serde_json::from_str(line)));
+    }
     let value: Value = serde_json::from_str(line).map_err(at)?;
     Ok(if value.get("end").is_some() {
         Line::End(serde_json::from_value(value).map_err(at)?)
     } else if value.get("at").is_some() {
-        Line::Index(serde_json::from_value(value).map_err(at)?)
+        index(serde_json::from_value(value))
     } else {
         Line::Entry(Box::new(serde_json::from_value(value).map_err(at)?))
     })
@@ -88,9 +101,14 @@ impl Demo {
         };
         let (_, header) = next_line()?.ok_or("empty file")?;
         let header: Header = serde_json::from_str(&header).map_err(|e| format!("header: {e}"))?;
-        let (mut last, mut end) = (None::<u64>, None);
+        let (mut last, mut end, mut warned) = (None::<u64>, None, false);
         while let Some((n, line)) = next_line()? {
             match parse_line(&line, n)? {
+                Line::BadIndex(e) if !warned => {
+                    log::warn!("[Demo] {}: an index line skipped, {e}", path.display());
+                    warned = true;
+                }
+                Line::Index | Line::BadIndex(_) => {}
                 Line::End(found) => {
                     end = Some(found);
                     break;
@@ -99,7 +117,6 @@ impl Demo {
                     return Err(format!("line {n}: tick {} out of order", entry.t));
                 }
                 Line::Entry(entry) => last = Some(entry.t),
-                Line::Index(_) => {}
             }
         }
         let ticks = end
@@ -118,18 +135,9 @@ impl Demo {
         &self.path
     }
 
-    /// Every index line in order (#1597), read from disk as it goes: what a search
-    /// reads, never replaying anything.
+    /// Every index line in order (#1597): [`index_of`] this demo.
     pub fn index(&self) -> impl Iterator<Item = IndexLine> {
-        let lines = lines_of(&self.path).into_iter().flatten().enumerate();
-        lines.skip(1).filter_map(|(n, line)| {
-            // Serialized field order puts `at` first: a tick line is skipped unparsed.
-            let line = line.ok().filter(|l| l.starts_with("{\"at\":"))?;
-            match parse_line(&line, n + 1) {
-                Ok(Line::Index(index)) => Some(index),
-                _ => None,
-            }
-        })
+        index_of(&self.path, self.ticks)
     }
 
     /// Every tick from 0, in order, read from disk as it goes.
@@ -152,6 +160,20 @@ impl Demo {
             },
         }
     }
+}
+
+/// Every index line of the demo at `path`, which holds `ticks` ticks, in order,
+/// read from disk as it goes: what a search reads, never replaying anything. A
+/// line that does not parse ([`Demo::read`] warned of it) and a line past the
+/// last tick (a demo cut short) are skipped.
+pub fn index_of(path: &Path, ticks: u64) -> impl Iterator<Item = IndexLine> {
+    let lines = lines_of(path).into_iter().flatten();
+    lines.skip(1).filter_map(move |line| {
+        let line = line.ok().filter(|l| is_index(l))?;
+        serde_json::from_str::<IndexLine>(&line)
+            .ok()
+            .filter(|index| index.at < ticks)
+    })
 }
 
 /// The ticks of a [`Demo`], rebuilt one by one from its deltas.
@@ -182,7 +204,7 @@ impl DemoTicks {
             };
             return match line {
                 Ok(Line::Entry(entry)) => Some(*entry),
-                Ok(Line::Index(_)) => continue,
+                Ok(Line::Index | Line::BadIndex(_)) => continue,
                 Ok(Line::End(_)) => None,
                 Err(e) => {
                     log::warn!("[Demo] {e}");

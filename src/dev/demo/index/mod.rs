@@ -8,12 +8,14 @@
 //! ```
 //!
 //! An index line follows its tick's line (`at` is the tick, as a tick line's `t`).
-//! The active camera's position is sampled every [`CAMERA_EVERY`] ticks; the
-//! events are the ones the engine knows (an entity spawned or destroyed, a scene
-//! loaded, Play entered, paused, resumed or stopped, every console line) and the
+//! The active camera's position is sampled every [`CAMERA_EVERY`] ticks (a
+//! non-finite one is skipped: JSON has no NaN); the events are the ones the engine
+//! knows (an entity spawned or destroyed, a scene loaded, Play entered, paused,
+//! resumed or stopped, every console line, each repeat of one included) and the
 //! game facts a script marks with `Debug.Mark(label [, value])`. The entities that
 //! come and go with a scene load are not listed: the load is the event. The last
-//! index line, at the demo's end tick, carries what came after the last tick.
+//! index line, at the demo's last tick, carries what came after it and Play
+//! stopping.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -26,7 +28,7 @@ mod find;
 use crate::app::GameWorld;
 use crate::scene::{Scene, SceneId};
 use crate::scripting::LogLevel;
-pub use find::{EventKind, Query};
+pub use find::{find_in, EventKind, Query};
 
 /// Ticks between two camera samples: four a second at 60 Hz.
 pub const CAMERA_EVERY: u64 = 15;
@@ -82,8 +84,6 @@ pub struct Indexer {
     ids: Vec<u32>,
     scene: SceneId,
     paused: bool,
-    /// The console's count of lines when last read.
-    logged: u64,
     events: Vec<Event>,
 }
 
@@ -103,17 +103,15 @@ fn level_name(level: &LogLevel) -> &'static str {
 
 impl Indexer {
     /// Right before Play is entered: the world as it stands is the baseline, and
-    /// `Debug.Mark`s are kept from now on.
+    /// the console feeds the index from now on.
     pub fn start(world: &GameWorld) -> Self {
-        let mut console = world.console().borrow_mut();
-        console.keep_marks(true);
+        world.console().borrow_mut().feed_demo(true);
         let scene = world.scene().borrow();
         let mut indexer = Self {
             names: BTreeMap::new(),
             ids: Vec::new(),
             scene: scene.id(),
             paused: world.time().borrow().paused,
-            logged: console.logged(),
             events: vec![play("entered")],
         };
         indexer.rebase(&scene);
@@ -123,10 +121,9 @@ impl Indexer {
     /// The index line of tick `t`, just run; `None` when it has nothing to say.
     pub fn line(&mut self, world: &GameWorld, t: u64) -> Option<IndexLine> {
         self.gather(world);
-        let camera = t.is_multiple_of(CAMERA_EVERY).then(|| {
-            let position = world.camera().borrow().position;
-            position.to_array()
-        });
+        let position = world.camera().borrow().position;
+        let camera =
+            (t.is_multiple_of(CAMERA_EVERY) && position.is_finite()).then(|| position.to_array());
         let line = IndexLine {
             at: t,
             camera,
@@ -135,32 +132,33 @@ impl Indexer {
         (line.camera.is_some() || !line.events.is_empty()).then_some(line)
     }
 
-    /// The last line, at `end`, right before Stop: what came after the last tick,
-    /// and Play stopping. Marks are no longer kept.
-    pub fn end(&mut self, world: &GameWorld, end: u64) -> IndexLine {
+    /// The last line, right before Stop, of a demo of `ticks` ticks: what came
+    /// after the last tick, and Play stopping, stamped at that tick (a search
+    /// finds only ticks a seek can reach). The console stops feeding the index.
+    pub fn end(&mut self, world: &GameWorld, ticks: u64) -> IndexLine {
         self.gather(world);
         self.events.push(play("stopped"));
-        world.console().borrow_mut().keep_marks(false);
+        world.console().borrow_mut().feed_demo(false);
         IndexLine {
-            at: end,
+            at: ticks.saturating_sub(1),
             camera: None,
             events: std::mem::take(&mut self.events),
         }
     }
 
     fn gather(&mut self, world: &GameWorld) {
-        let mut console = world.console().borrow_mut();
-        for mark in console.take_marks() {
+        // The engine's own lines join the console at the tick that raised them.
+        crate::logging::forward(world.console());
+        let feed = world.console().borrow_mut().take_feed();
+        for mark in feed.marks {
             let value = mark.value.as_ref().map(plain_json);
             let label = mark.label;
             self.events.push(Event::Mark { label, value });
         }
-        for (text, level) in console.since(self.logged) {
-            let (text, level) = (text.clone(), level_name(level).into());
+        for (text, level) in feed.lines {
+            let level = level_name(&level).into();
             self.events.push(Event::Log { text, level });
         }
-        self.logged = console.logged();
-        drop(console);
         let paused = world.time().borrow().paused;
         if paused != self.paused {
             self.paused = paused;

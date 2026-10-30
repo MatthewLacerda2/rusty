@@ -3,16 +3,17 @@
 //! recorded `dt`, the digests checked on the way), and draws nothing.
 //!
 //! Seeking back restarts the replay from the demo's start state: Play is left,
-//! and the world is put back as [`prepare`] found it (the scene, the camera, the
-//! clock, the input, the UI's event state, the navmesh), then prepared again from
-//! the file. It is the same world, not a new one: a scenario's API is bound to the
-//! world's own cells for the whole run, so a fresh world would leave it reading
-//! the old one.
+//! and the world is put back as [`prepare`](super::prepare) found it (the scene,
+//! the camera, the clock, the input, the UI's event state, the navmesh, no quit
+//! asked), then prepared again from the file, read before anything is torn down.
+//! It is the same world, not a new one: a scenario's API is bound to the world's
+//! own cells for the whole run, so a fresh world would leave it reading the old
+//! one.
 
 use std::path::{Path, PathBuf};
 
 use super::super::read::Demo;
-use super::{prepare, Replayer};
+use super::{install, Replayer};
 use crate::app::GameWorld;
 use crate::core::input::InputState;
 use crate::dev::harness::tick_unless_quit;
@@ -46,9 +47,11 @@ impl Start {
     }
 
     /// Put `world` back as it was, Play left first.
-    fn restore(self, world: &mut GameWorld) -> PathBuf {
+    fn restore(self, world: &mut GameWorld) {
         world.set_playing(false);
         world.poll_transition();
+        // A demo that ended on `Application.Quit()` starts again unquit.
+        world.take_quit_request();
         let mut scene = world.scene().borrow_mut();
         self.scene.restore(&mut scene);
         *world.nav().borrow_mut() = NavigationGraph::from_scene(&scene);
@@ -59,14 +62,14 @@ impl Start {
         *world.input().borrow_mut() = InputState::new();
         *world.resources.event_system.borrow_mut() = Default::default();
         world.set_playing(true);
-        self.path
     }
 }
 
 pub const NO_DEMO: &str = "this run replays no demo: run the scenario with `play --demo <file>`";
 
 /// Replay `world`'s demo up to and including tick `tick`: forward from where it
-/// stands, or from its start when `tick` has already run.
+/// stands, or from its start when `tick` has already run (or the world ran on
+/// past the demo's end).
 pub fn seek(world: &mut GameWorld, tick: u64) -> Result<(), String> {
     let replayer = world.tap_mut::<Replayer>().ok_or(NO_DEMO)?;
     let (done, of) = (replayer.verdict().ticks, replayer.verdict().of);
@@ -75,7 +78,7 @@ pub fn seek(world: &mut GameWorld, tick: u64) -> Result<(), String> {
             "tick {tick} is past the demo's end: it holds {of} ticks"
         ));
     }
-    if done > tick + 1 {
+    if done > tick + 1 || replayer.past_end() {
         restart(world)?;
     }
     loop {
@@ -92,14 +95,19 @@ pub fn seek(world: &mut GameWorld, tick: u64) -> Result<(), String> {
 }
 
 /// Start the replay over: the world as it was prepared, prepared again. What the
-/// verdict found stays found: a divergence, and that a scenario steps it.
+/// verdict found stays found: a divergence, and that a scenario steps it. What
+/// can fail (the file read again, the replay's VM) is done first, so a failed
+/// restart leaves the run as it stood.
 fn restart(world: &mut GameWorld) -> Result<(), String> {
+    let replayer = world.tap_mut::<Replayer>().ok_or(NO_DEMO)?;
+    let demo = Demo::read(replayer.demo_path())?;
+    let lua = crate::scripting::sandboxed_vm()?;
     let tap = world.take_tap().ok_or(NO_DEMO)?;
     let any: Box<dyn std::any::Any> = tap;
     let old = any.downcast::<Replayer>().map_err(|_| NO_DEMO)?;
     let (start, verdict) = old.into_start();
-    let path = start.restore(world);
-    prepare(world, Demo::read(&path)?)?;
+    start.restore(world);
+    install(world, demo, lua);
     let replayer = world.tap_mut::<Replayer>().ok_or(NO_DEMO)?;
     replayer.carry(verdict);
     Ok(())

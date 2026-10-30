@@ -25,7 +25,7 @@ Harness.Step(150)
 
 /// A replay of `path` on a fresh harness, stepped by a scenario, its world kept
 /// to read after a run.
-fn replaying(dir: &Path, name: &str, path: &Path) -> (Harness, Rc<RefCell<GameWorld>>) {
+pub(super) fn replaying(dir: &Path, name: &str, path: &Path) -> (Harness, Rc<RefCell<GameWorld>>) {
     let harness = Harness::new(dir.join(name), "");
     let mut world = harness.world.borrow_mut();
     demo::prepare(&mut world, Demo::read(path).unwrap()).unwrap();
@@ -36,7 +36,7 @@ fn replaying(dir: &Path, name: &str, path: &Path) -> (Harness, Rc<RefCell<GameWo
     (harness, world)
 }
 
-fn digest_at(world: &Rc<RefCell<GameWorld>>, tick: u64) -> String {
+pub(super) fn digest_at(world: &Rc<RefCell<GameWorld>>, tick: u64) -> String {
     demo::seek(&mut world.borrow_mut(), tick).unwrap();
     demo::state_digest(&world.borrow())
 }
@@ -48,7 +48,11 @@ fn the_index_finds_a_mark_a_log_line_and_a_destroyed_entity() {
     assert_eq!(demo.find(&Query::Mark("checkpoint".into())), [100]);
     assert_eq!(demo.find(&Query::Log("the gate".into())), [100]);
     assert_eq!(demo.find(&Query::Event(EventKind::Destroyed)), [150]);
-    assert_eq!(demo.find(&Query::Event(EventKind::Play)), [0, 300]);
+    assert_eq!(
+        demo.find(&Query::Event(EventKind::Play)),
+        [0, 299],
+        "Stop at the last tick"
+    );
     assert!(
         demo.find(&Query::Mark("check".into())).is_empty(),
         "a label whole"
