@@ -111,7 +111,7 @@ pub fn delete_asset(scene: &mut Scene, key: &str, force: bool) -> Result<Deleted
         move_off(scene, user, &mut created);
     }
     if !moved.is_empty() {
-        log::warn!("Material {key:?} deleted; now on the default material: {named}");
+        log::warn!("[Material] {key:?} deleted; now on the default material: {named}");
     }
     let scene_id = scene.id();
     Ok(DeletedMaterial {
