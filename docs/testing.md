@@ -132,6 +132,82 @@ replays anyway. A replay streams the file from disk, so an hour
 of play costs no memory; an hour of steady mouse-look writes about 10 MB, and idle
 ticks write nothing.
 
+### Finding a moment (#1597)
+
+While it records, a demo also writes an **index**: lines of their own beside the
+tick lines (`{"at":t,…}`), read by a search and skipped by a replay. Every 15
+ticks (four times a second) it samples the active camera's position (a NaN or
+infinite one is skipped), and at the tick it happened it lists what the engine
+knows: an entity spawned or destroyed (its id and name), a scene loaded
+(`Scene.Load`; the entities that come and go with the load are not listed one by
+one), Play entered, paused, resumed and stopped (Stop, and whatever came after
+the last tick, at the last tick), and every console line (`Debug.Log`, warnings,
+errors, the engine's own; a line repeated tick after tick, which the console
+folds into one `line (×N)`, is listed at every tick it came). An index line that
+does not read back costs only itself: the demo warns once and replays. A game fact the
+engine can't know (health, the active weapon, "took damage") the game marks
+itself with **`Debug.Mark(label [, value])`** (`docs/api/Debug.md`): stored at its
+tick, a no-op when no demo records. An hour of play adds well under a megabyte of
+camera samples; marks and console lines cost what the game writes.
+
+A scenario on a demo searches it with **`Harness.FindInDemo(query)`**, which
+returns the matching ticks in order, each once, read from the file without
+replaying anything. A query holds exactly one of:
+
+| Query | Matches |
+|---|---|
+| `{ mark = "took_damage" }` | a `Debug.Mark` with that label (the whole label) |
+| `{ log = "Enemy" }` | a console line holding that text |
+| `{ event = "destroyed" }` | an event: `"spawned"`, `"destroyed"`, `"scene"` or `"play"` |
+| `{ inside = { min = {x, y, z}, max = {x, y, z} } }` | a camera sample inside the box, edges included |
+
+**`Harness.SeekDemo(tick)`** replays up to and including `tick`, so the world
+stands as that tick left it: the recorded input and `dt`, the digests checked on
+the way, nothing drawn. A tick already behind the replay, or any tick once the
+scenario has stepped past the demo's end, restarts it from the demo's start
+state (Play is left, the scene, camera, clock and input go back as the replay
+found them, a quit the game asked for is forgotten, and the demo is prepared
+again), then replays forward: the same state, bit for bit, as a straight
+replay. A tick past the demo's end, or a run on no demo, is an error; so is a
+demo file gone since the run began, which leaves the run where it stood.
+**`Harness.DemoPath()`** answers the replayed demo's full path (`nil` on no
+demo). A worked example, on a playtest where the
+player took damage:
+
+```lua no-run
+-- play --demo saved/demos/main-20261030-101500.demo scenarios/look.lua out/
+local hits = Harness.FindInDemo({ mark = "took_damage" })
+Harness.Log("hit at ticks " .. table.concat(hits, ", "))
+Harness.SeekDemo(hits[1])                  -- the world as the first hit left it
+Harness.Screenshot("out/first_hit.png")
+Harness.Bench(120)                         -- and how the next two seconds run
+```
+
+### Cutting a scenario (#1597)
+
+**`Harness.CutDemo(from, to, path)`** writes a scenario that reproduces ticks
+`from` to `to` of the demo the run replays, so a bug found in a playtest becomes
+a regression test. It copies no world state: the scenario runs on the **same
+demo**, which it names by its full path in its header and checks it runs on,
+seeks to the tick before `from`, steps the range on the recorded input, and ends
+with an assert stub to fill in:
+
+```lua no-run
+-- Ticks 130 to 250 of the demo /game/saved/demos/main-20261030-101500.demo (Harness.CutDemo, #1597).
+-- It runs on that demo, which must stay where it is:
+--   play --demo /game/saved/demos/main-20261030-101500.demo <this file> <out_dir>
+assert(Harness.DemoPath() == "/game/saved/demos/main-20261030-101500.demo", "not on its demo: play --demo " .. "/game/saved/demos/main-20261030-101500.demo")
+Harness.SeekDemo(129)  -- the demo up to tick 130
+Harness.Step(121)  -- ticks 130 to 250, on their recorded input
+Harness.Expect(true, "TODO: what should hold at tick 250")
+```
+
+Run it with `play --demo <that demo> <scenario> <out_dir>`; its results say
+whether the range replayed bit for bit (`the demo replays bit for bit as far as
+the scenario stepped it`). `saved/` is git-ignored and pruned to `demos.keep`, so
+a cut kept as a test needs its demo moved beside it (and the path in its header,
+its check and its command changed to match).
+
 ## Rules
 - Test and fixture files are capped at **150 lines** by the size gate
   (`tools/lint`), except a `<x>_tests.rs` sibling of `<x>.rs` (or of a `<x>/`

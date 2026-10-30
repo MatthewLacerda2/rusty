@@ -19,6 +19,25 @@ pub struct Sources {
     pub scripts: String,
 }
 
+/// Warn when the demo was recorded on another engine build, or on a project whose
+/// scene file or scripts changed since: it replays anyway.
+pub(super) fn warn_changes(world: &GameWorld, header: &super::format::Header) {
+    let running = crate::core::project::engine_commit();
+    let mut console = world.console().borrow_mut();
+    if header.engine_commit != running {
+        let line = format!(
+            "[Demo] recorded on engine {}, replayed on {running}: it may differ",
+            header.engine_commit
+        );
+        console.warn(line);
+    }
+    if let Some(what) = header.sources.changed(&Sources::of(world)) {
+        console.warn(format!(
+            "[Demo] the project's {what} changed since it was recorded: it may differ"
+        ));
+    }
+}
+
 /// Folders no script of the game lives in: what the engine writes, and hidden ones.
 fn skipped(name: &str) -> bool {
     use crate::core::project::{CACHE_DIR, SAVED_DIR};

@@ -74,6 +74,10 @@ nothing to wait for.
   dispatch on the same branch cancels the earlier run, and an unmerged close
   of the PR cancels what is left (a merged PR's run finishes and reports,
   #1530), so dispatch once, when you ready.
+- **Before readying, check your change at its edges**: zero, one and a
+  Dust2-sized level (memory held, work per frame, the first frame after a load or
+  bake) and a malformed input file (truncated, a value out of range, a NaN):
+  they are what independent reviews send back most.
 - **Once ready, the branch is the merge queue's. Never push to it again**, not
   to update it from `main` and not to fix your own red CI: a red or conflicting ready PR comes
   back to the orchestrator as a hand-back, and it briefs a fix. Anything you
