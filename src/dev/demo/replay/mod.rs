@@ -13,13 +13,17 @@
 use mlua::Lua;
 
 use super::calls;
-use super::format::{host_call, End, Header};
+use super::format::{host_call, End};
 use super::read::{Demo, DemoTick, DemoTicks};
-use super::sources::Sources;
+mod cut;
+mod seek;
 use crate::app::{GameWorld, PlayTransition, TapPoint, TickTap};
 use crate::core::settings::video::{VideoSettings, VIDEO_NAMESPACE};
 use crate::core::settings::{saved_quality, GraphicsSettings};
 use crate::scripting::HostCall;
+pub use cut::cut;
+use seek::Start;
+pub use seek::{seek, NO_DEMO};
 
 /// The first digest that differs from the recording: the state went astray after
 /// `matched` (the last digest that agreed, if any) and by `tick`.
@@ -68,6 +72,8 @@ pub struct Replayer {
     end: End,
     lua: Lua,
     verdict: Verdict,
+    /// Where a seek back restarts it (`seek`).
+    start: Start,
 }
 
 impl Replayer {
@@ -83,6 +89,25 @@ impl Replayer {
     /// A scenario on top steps this replay, so stopping short is its choice.
     pub fn driven_by_scenario(&mut self) {
         self.verdict.scenario = true;
+    }
+
+    /// The demo file it replays.
+    pub fn demo_path(&self) -> &std::path::Path {
+        self.start.path()
+    }
+
+    /// Its start state and its verdict: what a restart keeps (`seek`).
+    pub(super) fn into_start(self) -> (Start, Verdict) {
+        (self.start, self.verdict)
+    }
+
+    /// A restarted replay keeps what the run before found: a divergence, and that
+    /// a scenario steps it.
+    pub(super) fn carry(&mut self, before: Verdict) {
+        self.verdict.scenario = before.scenario;
+        if self.verdict.diverged.is_none() {
+            self.verdict.diverged = before.diverged;
+        }
     }
 
     fn act(&mut self, world: &mut GameWorld, t: u64, act: HostCall) {
@@ -120,32 +145,14 @@ impl Replayer {
     }
 }
 
-/// Warn when the demo was recorded on another engine build, or on a project whose
-/// scene file or scripts changed since: it replays anyway.
-fn warn_changes(world: &GameWorld, header: &Header) {
-    let running = crate::core::project::engine_commit();
-    let mut console = world.console().borrow_mut();
-    if header.engine_commit != running {
-        let line = format!(
-            "[Demo] recorded on engine {}, replayed on {running}: it may differ",
-            header.engine_commit
-        );
-        console.warn(line);
-    }
-    if let Some(what) = header.sources.changed(&Sources::of(world)) {
-        console.warn(format!(
-            "[Demo] the project's {what} changed since it was recorded: it may differ"
-        ));
-    }
-}
-
 /// Set `world` up as `demo` started — its seed, save data, the options and quality
 /// the player had saved, the time scale and pause, the Game view size — and install the
 /// replay. Call before the world's first tick; the project settings go in when
 /// the harness is built.
 pub fn prepare(world: &mut GameWorld, demo: Demo) -> Result<(), String> {
+    let start = Start::of(world, demo.path());
     let header = &demo.header;
-    warn_changes(world, header);
+    super::sources::warn_changes(world, header);
     world.resources.script_manager.set_play_seed(header.seed);
     // An `f32` widened to `f64` narrows back exactly.
     let mut time = world.resources.time.borrow_mut();
@@ -185,6 +192,7 @@ pub fn prepare(world: &mut GameWorld, demo: Demo) -> Result<(), String> {
         end: demo.end,
         lua,
         verdict,
+        start,
     })));
     Ok(())
 }

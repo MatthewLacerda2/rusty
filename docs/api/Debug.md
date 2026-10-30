@@ -9,6 +9,7 @@ because the namespace is absent.
 | `Debug.Log` | `(message)` | — |
 | `Debug.Warn` | `(message)` | — |
 | `Debug.Error` | `(message)` | — |
+| `Debug.Mark` | `(label [, value])` | — : notes a game fact (`value` plain data: a number, string, boolean or a table of them) in the recording demo's index, at this tick, for `Harness.FindInDemo` to find; a no-op when no demo records (#1597, `docs/testing.md`, *Finding a moment*) |
 | `Debug.Snapshot` | `([opts])` | a pretty **JSON string**: the whole live world (below). Skeleton bones are left out unless `opts.bones` is `true` |
 | `Debug.SnapshotEntity` | `(id)` | a pretty **JSON string**: one entity (below), or `null` if absent |
 | `Debug.Preview` | `(asset_path, out_png [, opts])` | the written path, or `nil` if the machine has no GPU |

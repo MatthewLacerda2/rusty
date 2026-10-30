@@ -14,6 +14,7 @@ use std::path::{Path, PathBuf};
 use serde_json::Value;
 
 use super::format::{host_call, End, Entry, Header};
+use super::index::IndexLine;
 use crate::core::input::InputFrame;
 use crate::dev::harness::FIXED_DT;
 use crate::scripting::HostCall;
@@ -44,9 +45,10 @@ pub struct DemoTick {
     pub digest: Option<String>,
 }
 
-/// The lines after a demo's header, each a tick's [`Entry`] or the [`End`].
+/// The lines after a demo's header: a tick's [`Entry`], an index line, the [`End`].
 enum Line {
     Entry(Box<Entry>),
+    Index(IndexLine),
     End(End),
 }
 
@@ -60,6 +62,8 @@ fn parse_line(line: &str, n: usize) -> Result<Line, String> {
     let value: Value = serde_json::from_str(line).map_err(at)?;
     Ok(if value.get("end").is_some() {
         Line::End(serde_json::from_value(value).map_err(at)?)
+    } else if value.get("at").is_some() {
+        Line::Index(serde_json::from_value(value).map_err(at)?)
     } else {
         Line::Entry(Box::new(serde_json::from_value(value).map_err(at)?))
     })
@@ -95,6 +99,7 @@ impl Demo {
                     return Err(format!("line {n}: tick {} out of order", entry.t));
                 }
                 Line::Entry(entry) => last = Some(entry.t),
+                Line::Index(_) => {}
             }
         }
         let ticks = end
@@ -105,6 +110,25 @@ impl Demo {
             path: path.to_path_buf(),
             ticks,
             end: end.unwrap_or_default(),
+        })
+    }
+
+    /// The file it was read from.
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
+
+    /// Every index line in order (#1597), read from disk as it goes: what a search
+    /// reads, never replaying anything.
+    pub fn index(&self) -> impl Iterator<Item = IndexLine> {
+        let lines = lines_of(&self.path).into_iter().flatten().enumerate();
+        lines.skip(1).filter_map(|(n, line)| {
+            // Serialized field order puts `at` first: a tick line is skipped unparsed.
+            let line = line.ok().filter(|l| l.starts_with("{\"at\":"))?;
+            match parse_line(&line, n + 1) {
+                Ok(Line::Index(index)) => Some(index),
+                _ => None,
+            }
         })
     }
 
@@ -158,6 +182,7 @@ impl DemoTicks {
             };
             return match line {
                 Ok(Line::Entry(entry)) => Some(*entry),
+                Ok(Line::Index(_)) => continue,
                 Ok(Line::End(_)) => None,
                 Err(e) => {
                     log::warn!("[Demo] {e}");

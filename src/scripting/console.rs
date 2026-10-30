@@ -9,6 +9,16 @@ pub struct ConsoleLogs {
     /// How many entries were ever added, the dropped ones included: a mark for
     /// [`ConsoleLogs::since`].
     logged: u64,
+    /// `Debug.Mark`s since a recording demo last took them (#1597); `None` while
+    /// no demo records, which makes a mark a no-op.
+    marks: Option<Vec<Mark>>,
+}
+
+/// A game fact a script marked for a demo's index (`Debug.Mark(label [, value])`).
+#[derive(Clone, Debug, PartialEq)]
+pub struct Mark {
+    pub label: String,
+    pub value: Option<super::Plain>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -30,7 +40,26 @@ impl ConsoleLogs {
             messages: Vec::new(),
             repeat: None,
             logged: 0,
+            marks: None,
         }
+    }
+
+    /// Keep `Debug.Mark`s from now on (`true`, a demo started recording), or drop
+    /// them as they come (`false`).
+    pub fn keep_marks(&mut self, keep: bool) {
+        self.marks = keep.then(Vec::new);
+    }
+
+    /// Note a mark; a no-op unless a demo records.
+    pub fn mark(&mut self, mark: Mark) {
+        if let Some(marks) = &mut self.marks {
+            marks.push(mark);
+        }
+    }
+
+    /// The marks since the last take, oldest first.
+    pub fn take_marks(&mut self) -> Vec<Mark> {
+        self.marks.as_mut().map(std::mem::take).unwrap_or_default()
     }
 
     pub fn info(&mut self, msg: String) {
@@ -126,6 +155,23 @@ mod tests {
                 "[Asset] gone"
             ]
         );
+    }
+
+    #[test]
+    fn a_mark_is_kept_only_while_a_demo_records() {
+        let mut log = ConsoleLogs::new();
+        let mark = |label: &str| Mark {
+            label: label.into(),
+            value: None,
+        };
+        log.mark(mark("dropped"));
+        log.keep_marks(true);
+        log.mark(mark("kept"));
+        assert_eq!(log.take_marks(), [mark("kept")]);
+        assert!(log.take_marks().is_empty(), "taken once");
+        log.keep_marks(false);
+        log.mark(mark("dropped"));
+        assert!(log.take_marks().is_empty());
     }
 
     #[test]

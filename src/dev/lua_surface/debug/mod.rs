@@ -1,6 +1,6 @@
 //! src/dev/lua_surface/debug/ — `Debug` namespace (DEV-ONLY).
 //!
-//! `Debug.Log/Warn/Error`, the structured scene-read `Debug.Snapshot` /
+//! `Debug.Log/Warn/Error`, the demo index's `Debug.Mark` (#1597), the structured scene-read `Debug.Snapshot` /
 //! `Debug.SnapshotEntity` (#180), the headless `Debug.Preview` asset shot (#353) and its
 //! named-material twin `Debug.PreviewMaterial` (#404),
 //! the frame stats `Debug.Stats` (#433), and the audio reads `Debug.AudioEvents` /
@@ -17,6 +17,7 @@ use mlua::{Lua, Table};
 use crate::api::{put, snapshot, ApiScopedCtx, Reg};
 use crate::dev::preview::{capture_asset, capture_material, PreviewOptions};
 use crate::preview::PreviewMesh;
+use crate::scripting::Mark;
 
 /// Register the `Debug` namespace onto `lua` (dev builds only).
 pub fn register<'scope>(
@@ -64,6 +65,23 @@ fn register_logging<'scope>(
         "Error",
         scope.create_function(|_, msg: String| {
             console.borrow_mut().error(msg);
+            Ok(())
+        }),
+    )?;
+    // `Debug.Mark(label [, value])` — a game fact for the recording demo's index
+    // (#1597); a no-op while no demo records.
+    put(
+        table,
+        "Mark",
+        scope.create_function(|_, (label, value): (String, mlua::Value)| {
+            let value = match value {
+                mlua::Value::Nil => None,
+                value => Some(crate::dev::demo::plain_value(&value).map_err(|kind| {
+                    let msg = format!("Debug.Mark: a value must be plain data, not a {kind}");
+                    mlua::Error::RuntimeError(msg)
+                })?),
+            };
+            console.borrow_mut().mark(Mark { label, value });
             Ok(())
         }),
     )

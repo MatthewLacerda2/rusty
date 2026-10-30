@@ -7,7 +7,8 @@
 //! anything (the input delta, the `dt`, the host acts before it, a new Game view
 //! size, a digest every [`digest::EVERY`] ticks), and right before Play is left
 //! (or the run ends, [`Recorder::stop`]) the end line: the acts after the last
-//! tick and a final digest. Host acts come from the world's journal
+//! tick and a final digest. After each tick's line comes its index line (`index`,
+//! #1597). Host acts come from the world's journal
 //! (`scripting::HostJournal`); acts in edit mode are dropped frame by frame,
 //! ticked or paused, and `Editor.EnterPlay` / `Editor.ExitPlay` are never kept:
 //! the transition they ask for is the demo's start or end.
@@ -20,7 +21,7 @@ use super::delta::InputDelta;
 use super::digest;
 use super::files::Destination;
 use super::format::{host_json, End, Entry, Exact, Header};
-use super::sources::Sources;
+use super::index::{IndexLine, Indexer};
 use crate::app::{GameWorld, PlayTransition, TapPoint, TickTap};
 use crate::core::input::InputFrame;
 use crate::dev::harness::FIXED_DT;
@@ -37,6 +38,7 @@ struct Session {
     size: Option<(u32, u32)>,
     host: Vec<HostCall>,
     entry: Entry,
+    index: Indexer,
 }
 
 /// Records a world's Play sessions; install with [`record`](super::record).
@@ -85,24 +87,6 @@ fn drain(world: &GameWorld) -> Vec<HostCall> {
     acts
 }
 
-/// The header of a demo of `world` starting now on `scene`.
-fn header(world: &GameWorld, scene: String, before_play: &[HostCall]) -> Header {
-    let time = world.resources.time.borrow().clone();
-    Header {
-        scene,
-        engine_commit: crate::core::project::engine_commit().to_string(),
-        seed: world.script_manager().play_seed(),
-        sources: Sources::of(world),
-        settings: world.resources.application.borrow().settings(),
-        storage: world.resources.storage.borrow().data(),
-        size: world.resources.screen.borrow().game_view(),
-        time_scale: Exact(f64::from(time.time_scale)),
-        paused: time.paused,
-        pending_steps: time.pending_steps,
-        before_play: before_play.iter().map(host_json).collect(),
-    }
-}
-
 impl Recorder {
     pub(super) fn new(destination: Destination, world: &GameWorld) -> Self {
         Self {
@@ -131,6 +115,10 @@ impl Recorder {
                 digest: Some(digest::of(world)),
             };
             session.host.clear();
+            let index = session.index.end(world, session.t);
+            if let Err(err) = session.write_index(&index) {
+                log::warn!("[Demo] {}: {err}", session.path.display());
+            }
             self.close(end);
         }
     }
@@ -173,7 +161,7 @@ impl Recorder {
             Some(true) => None,
         };
         before_play.extend(taint.map(HostCall::Taint));
-        let header = header(world, scene, &before_play);
+        let header = Header::of(world, scene, &before_play);
         // lint: allow(asset-write) a demo, read by `play --demo`, never by a path-keyed cache
         let opened = File::create(&path).map(lock).and_then(|mut out| {
             let header = serde_json::to_string(&header)?;
@@ -191,6 +179,7 @@ impl Recorder {
                     size: header.size,
                     host: Vec::new(),
                     entry: Entry::default(),
+                    index: Indexer::start(world),
                 });
             }
             Err(err) => log::warn!("[Demo] {}: {err}", path.display()),
@@ -224,6 +213,10 @@ impl Session {
         }
     }
 
+    fn write_index(&mut self, line: &IndexLine) -> std::io::Result<()> {
+        writeln!(self.out, "{}", serde_json::to_string(line)?)
+    }
+
     /// The tick is done: its line written, if it has anything to say.
     fn end_tick(&mut self, world: &GameWorld) -> std::io::Result<()> {
         if digest::due(self.t) {
@@ -232,6 +225,9 @@ impl Session {
         let entry = std::mem::take(&mut self.entry);
         if !entry.is_empty() {
             writeln!(self.out, "{}", serde_json::to_string(&entry)?)?;
+        }
+        if let Some(index) = self.index.line(world, self.t) {
+            self.write_index(&index)?;
         }
         if entry.digest.is_some() {
             self.out.flush()?;

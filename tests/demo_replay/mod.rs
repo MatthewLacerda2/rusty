@@ -10,6 +10,7 @@ use rusty::dev::scenario;
 mod edit_mode;
 mod ends;
 mod hosts;
+mod index;
 mod play_bin;
 mod timing;
 
