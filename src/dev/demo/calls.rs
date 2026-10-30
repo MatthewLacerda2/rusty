@@ -86,6 +86,12 @@ pub fn journal_calls(lua: &Lua, journal: &Rc<RefCell<HostJournal>>) -> mlua::Res
         .call::<()>((note, check, verbs))
 }
 
+/// `value` as plain data, or the kind of value it holds that is not (a
+/// `Debug.Mark`'s value, #1597).
+pub fn plain_value(value: &Value) -> Result<Plain, &'static str> {
+    plain(value, 0)
+}
+
 /// `value` as plain data, or what kind of value kept it from being plain.
 fn plain(value: &Value, depth: usize) -> Result<Plain, &'static str> {
     Ok(match value {

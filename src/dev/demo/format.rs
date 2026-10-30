@@ -10,6 +10,9 @@
 //! {"end":7200,"digest":"41d0…"}
 //! ```
 //!
+//! Beside the tick lines run the index's own (`{"at":t,…}`, `index`, #1597), read
+//! by a search and skipped by a replay.
+//!
 //! A tick no line names had the input and `dt` of the tick before and no host
 //! act; the first tick's `dt` is measured from the fixed step. No
 //! format version (CLAUDE.md, *No backward compatibility*): the header's engine
@@ -24,6 +27,7 @@ use serde_json::{json, Value};
 
 use super::delta::InputDelta;
 use super::sources::Sources;
+use crate::app::GameWorld;
 use crate::core::project::ProjectSettings;
 use crate::scripting::{HostCall, Plain};
 
@@ -103,6 +107,26 @@ pub struct Header {
     /// (a scenario's set-up, a taint on how Play started), as [`Entry::host`].
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub before_play: Vec<Value>,
+}
+
+impl Header {
+    /// The header of a demo of `world` starting now on `scene`.
+    pub fn of(world: &GameWorld, scene: String, before_play: &[HostCall]) -> Self {
+        let time = world.resources.time.borrow().clone();
+        Self {
+            scene,
+            engine_commit: crate::core::project::engine_commit().to_string(),
+            seed: world.script_manager().play_seed(),
+            sources: Sources::of(world),
+            settings: world.resources.application.borrow().settings(),
+            storage: world.resources.storage.borrow().data(),
+            size: world.resources.screen.borrow().game_view(),
+            time_scale: Exact(f64::from(time.time_scale)),
+            paused: time.paused,
+            pending_steps: time.pending_steps,
+            before_play: before_play.iter().map(host_json).collect(),
+        }
+    }
 }
 
 /// One tick that had something to say.
@@ -185,7 +209,7 @@ const FLOAT_BITS: &str = "__f64";
 
 /// A plain Lua value as JSON. A Lua float stays a float (`1.0`, not `1`), so
 /// `math.type` reads the same on replay.
-fn plain_json(value: &Plain) -> Value {
+pub(super) fn plain_json(value: &Plain) -> Value {
     match value {
         Plain::Nil => Value::Null,
         Plain::Bool(b) => Value::Bool(*b),

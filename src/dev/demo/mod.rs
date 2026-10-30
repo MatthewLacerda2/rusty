@@ -24,14 +24,20 @@
 //!   runs on it.
 //! - **Nothing of it in a ship build**: the whole module is `dev`.
 //!
-//! The file format is in `format`; the per-tick reader a search or a scrub reads
-//! is [`Demo::ticks`].
+//! - **Found, sought, cut** (#1597): an index beside the tick lines (`index`: the
+//!   camera sampled, the engine's events, the console, `Debug.Mark`s) that
+//!   [`Demo::find`] searches without replaying; [`seek`] replays to a tick, back
+//!   by restarting; [`cut`] writes a scenario reproducing a range of ticks.
+//!
+//! The file format is in `format`; the per-tick reader a replay steps through is
+//! [`Demo::ticks`], the index's is [`Demo::index`].
 
 mod calls;
 mod delta;
 mod digest;
 mod files;
 mod format;
+mod index;
 mod read;
 mod record;
 mod replay;
@@ -39,15 +45,24 @@ mod sources;
 
 use std::path::Path;
 
-pub use calls::journal_calls;
+pub use calls::{journal_calls, plain_value};
 pub use files::{demos_in, Destination, DEMOS_DIR};
+pub use index::{find_in, Event, EventKind, IndexLine, Query, CAMERA_EVERY};
 pub use read::{Demo, DemoTick, DemoTicks};
 pub use record::Recorder;
-pub use replay::{prepare, Divergence, Replayer, Verdict};
+pub use replay::{
+    cut, cut_scenario, full_path, prepare, seek, Divergence, Replayer, Verdict, NO_DEMO,
+};
 
 use crate::app::GameWorld;
 use crate::dev::harness::Harness;
 use crate::dev::scenario::{self, RunReport};
+
+/// The state digest a demo stores every 120 ticks (`digest`), of `world` as it
+/// stands: two worlds with the same one are the same, bit for bit.
+pub fn state_digest(world: &GameWorld) -> String {
+    digest::of(world)
+}
 
 /// Record every Play session of `world` to `destination` from now on.
 pub fn record(world: &mut GameWorld, destination: Destination) {
