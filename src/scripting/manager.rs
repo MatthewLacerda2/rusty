@@ -6,7 +6,7 @@ use std::rc::Rc;
 
 use crate::api::ApiScopedCtx;
 use crate::core::input::InputState;
-use crate::core::random::Random;
+use crate::core::random::{Random, DEFAULT_SEED};
 use crate::navigation::NavigationGraph;
 use crate::scene::Camera;
 use crate::scene::Scene;
@@ -14,6 +14,7 @@ use crate::time::Time;
 use crate::ui::EventSystem;
 
 use super::console::ConsoleLogs;
+use super::journal::HostJournal;
 use super::shared::ApiCells;
 
 /// One live script instance: the Lua registry key of its lifecycle table plus
@@ -50,6 +51,12 @@ pub struct ScriptManager {
     /// Empty — the process's working directory — for the editor and the player;
     /// the headless harness points it at a workspace it seeded itself.
     workspace: PathBuf,
+    /// Where `Random` starts with every fresh VM (#443): [`DEFAULT_SEED`] unless a
+    /// demo replay asks for the seed it recorded (#1581).
+    play_seed: u64,
+    /// A host's acts on the world while a demo records (#1581); [`Self::eval`]
+    /// notes every line it runs.
+    pub(super) journal: Rc<RefCell<HostJournal>>,
 }
 
 impl ScriptManager {
@@ -67,6 +74,8 @@ impl ScriptManager {
             load_attempted: BTreeSet::new(),
             cells: ApiCells::new(scene, input, nav, console, camera, time),
             workspace: PathBuf::new(),
+            play_seed: DEFAULT_SEED,
+            journal: Rc::default(),
         }
     }
 
@@ -94,7 +103,7 @@ impl ScriptManager {
         // seeded RNG — which restarts from its default seed with every fresh VM.
         let lua = super::sandbox::new_sim_vm()?;
         super::sandbox::install_file_access(&lua, &self.workspace, &self.cells.console)?;
-        *self.cells.random.borrow_mut() = Random::default();
+        *self.cells.random.borrow_mut() = Random::new(self.play_seed);
         *self.cells.event_system.borrow_mut() = EventSystem::default();
 
         // Override print to write to our console panel. This stays as a
@@ -149,6 +158,27 @@ impl ScriptManager {
             lua.load(code).exec()
         })
         .map_err(|e| e.to_string())
+    }
+
+    /// The seed every fresh VM's `Random` starts from.
+    pub fn play_seed(&self) -> u64 {
+        self.play_seed
+    }
+
+    /// Start every fresh VM's `Random` from `seed`: a demo replays under the seed
+    /// it was recorded with (#1581). Takes effect at the next Play.
+    pub fn set_play_seed(&mut self, seed: u64) {
+        self.play_seed = seed;
+    }
+
+    /// Where `Random` stands now, for a demo's state digest.
+    pub fn random_state(&self) -> u64 {
+        self.cells.random.borrow().state()
+    }
+
+    /// The host-act journal a demo records from (#1581).
+    pub fn journal(&self) -> Rc<RefCell<HostJournal>> {
+        Rc::clone(&self.journal)
     }
 
     /// Whether the live runtime exists: during Play, and outside it on a host that

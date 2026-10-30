@@ -8,7 +8,7 @@ use super::camera::{CameraCtx, StackShared, CAMERA_PASSES};
 use crate::render::gpu::uniforms::FogUniform;
 use crate::render::motion::{self, HistoryKey, Velocity};
 use crate::render::passes::ssao::SsaoPlan;
-use crate::render::postfx::effects::ssr::{ssr_enabled, surface};
+use crate::render::postfx::effects::ssr::{ssr_enabled, surface, transparent};
 use crate::render::postfx::effects::{self, EffectCx, PassCx};
 use crate::render::postfx::params::{frame_params, PostSource};
 use crate::render::{RenderView, Renderer};
@@ -86,6 +86,7 @@ impl Renderer {
             prev_time,
             fog: FogUniform::from_settings(&scene.fog),
             ssao: SsaoPlan::for_volume(pass.post.volume, self.graphics(pass.editor_mode)),
+            ssr_march: transparent::camera_march(pass.post, graphics, ssr),
         };
         for idx in 0..pass.stack.len() {
             let mut ctx = CameraCtx::new(scene, &pass, &shared, idx);

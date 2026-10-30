@@ -83,6 +83,8 @@ mod bot_player_session;
 #[cfg(feature = "dev")]
 mod busy_replay;
 #[cfg(feature = "dev")]
+mod demo_replay;
+#[cfg(feature = "dev")]
 mod doc_examples;
 #[cfg(feature = "dev")]
 mod editor_play;

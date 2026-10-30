@@ -4,7 +4,8 @@
 //! Split into focused submodules — `console` (log buffer + levels), `manager`
 //! (runtime init / live-state), `loader` (script compile + the queued spawn
 //! scan), `lifecycle` (the hook dispatch: init/update/trigger), `eval` (the
-//! REPL evaluator + API-surface walk), `shared` (the API's cells, owned, for a
+//! REPL evaluator + API-surface walk), `journal` (a host's acts on a playing
+//! world, kept for a demo, #1581), `shared` (the API's cells, owned, for a
 //! second VM over the same world), `timers` (the `Timer` scheduler: invokes
 //! and coroutines, #444), `callbacks` (the lifecycle-callback
 //! names, kept public and namespaced) and `api_doc` (the `docs/api/` reference,
@@ -22,6 +23,7 @@ mod console;
 mod discovery;
 mod eval;
 pub mod instances;
+mod journal;
 mod lifecycle;
 mod loader;
 mod manager;
@@ -32,6 +34,7 @@ mod timers;
 
 pub use console::{ConsoleLogs, LogLevel};
 pub use discovery::{monobehaviour_scripts, script_label};
+pub use journal::{HostCall, HostJournal, Plain};
 pub use manager::ScriptManager;
 pub(crate) use sandbox::require_sim_vm;
 #[cfg(feature = "dev")]

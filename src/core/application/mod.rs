@@ -48,6 +48,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::core::project::{ProjectFile, ProjectSettings};
 use crate::core::settings::decals::DecalLimits;
+use crate::core::settings::demos::DemoSettings;
 use crate::core::settings::graphics_options::{GraphicsOption, GraphicsOptions};
 use crate::core::settings::quality::QualityPresets;
 
@@ -110,6 +111,8 @@ pub struct Application {
     quality_selected: Option<String>,
     /// The project's decal budgets (#1517) as last read or set.
     decal_limits: DecalLimits,
+    /// How many play demos the project keeps (#1581).
+    demos: DemoSettings,
     /// The bound file's text the budgets and presets were last parsed from, good or
     /// bad: the same text again is not re-parsed, so its warnings are not repeated.
     read_from: Option<String>,
@@ -151,6 +154,7 @@ impl Application {
         (self.build, self.graphics_defaults) = (file.build, file.graphics_options);
         self.quality = file.quality;
         self.decal_limits = file.decals;
+        self.demos = file.demos;
         self.read_from = text;
         Ok(())
     }
@@ -162,6 +166,19 @@ impl Application {
         self.graphics_defaults = settings.graphics_options;
         self.quality = settings.quality;
         self.decal_limits = settings.decals;
+        self.demos = settings.demos;
+    }
+
+    /// The project settings this run plays under, as [`run_with`](Self::run_with)
+    /// takes them: what a demo records so its replay plays under the same (#1581).
+    pub fn settings(&self) -> ProjectSettings {
+        ProjectSettings {
+            build: self.build.clone(),
+            graphics_options: self.graphics_defaults,
+            quality: self.quality.clone(),
+            decals: self.decal_limits,
+            demos: self.demos,
+        }
     }
 
     /// The current build settings.

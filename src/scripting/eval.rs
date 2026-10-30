@@ -31,6 +31,9 @@ impl ScriptManager {
             return Ok(String::new());
         }
 
+        // A line can change the world, so a recording demo replays it (#1581).
+        let line = super::HostCall::Eval(trimmed.to_string());
+        self.journal.borrow_mut().push(line);
         let ctx = self.make_ctx();
         lua.scope(|scope| -> mlua::Result<String> {
             api::register(lua, scope, &ctx).map_err(mlua::Error::RuntimeError)?;

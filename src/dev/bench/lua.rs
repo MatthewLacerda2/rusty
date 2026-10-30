@@ -46,7 +46,7 @@ pub fn register(lua: &Lua, harness: &Rc<RefCell<Harness>>, t: &Table) -> LuaResu
 
 /// A `LoadStress` options table over [`StressSpec::default`]. An unknown key is an
 /// error, so a typo cannot silently bench the wrong scene.
-fn spec_from_lua(lua: &Lua, opts: Option<Table>) -> LuaResult<StressSpec> {
+pub(crate) fn spec_from_lua(lua: &Lua, opts: Option<Table>) -> LuaResult<StressSpec> {
     let mut spec = StressSpec::default();
     let Some(opts) = opts else {
         return Ok(spec);

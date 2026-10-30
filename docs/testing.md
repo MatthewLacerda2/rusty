@@ -71,6 +71,67 @@ started with `--record-audio` is already capturing, so the scenario's own
 with `Sound.Level(path, { sections = seconds })`. What a capture taps and what going
 offline changes: `docs/api/Audio.md`, *Capturing the mix*.
 
+## Demos: every Play session, replayed (#1581)
+
+A dev build records **every Play session** (the editor's Play, every `play` run,
+the dev player) as a demo in the project's `saved/demos/<scene>-<UTC time>.demo`,
+keeping the newest `demos.keep` (`project.rusty`, default 20; `0` records none).
+Replay one headless, on the scene and settings it recorded:
+
+```sh
+cargo run --bin play --features dev -- --project <game> --demo <game>/saved/demos/<file>.demo [scenario.lua] <out_dir>
+```
+
+Without a scenario the whole demo plays; with one, the scenario drives it (its
+`Harness.Step`s advance the replay), so screenshots, `Harness.Bench` and every
+other harness verb work on a human's playtest. `results.json` says how the
+replay went: `demo: replayed N of M ticks`, and an expectation `the demo replays
+bit for bit` that fails at the first digest that differs, and fails a replay
+that stopped before the demo's end (`stopped at tick N of M`) unless a scenario
+stepped it there. **A scenario on a demo should only observe** (screenshots,
+reads, `Harness.Bench`): a call that changes the world runs on top of the
+recorded acts, and the replay diverges from there.
+
+What a demo holds (`dev::demo`, the format in `dev/demo/format.rs`): the scene,
+the engine commit, the seed, the project settings, the save data (`Storage`, the
+player's options with it), `Time.timeScale`, `Time.paused` and the queued
+`Time.Step`s Play started from, and a digest of the scene file and of the
+project's `.lua` files, read right
+before Play is entered (whether by a tick, a paused frame or `Editor.EnterPlay`),
+the Game view size at each change, and per tick the input the tick published
+(`InputFrame`), as a delta from the tick before, and the tick's `dt`: the editor
+and the dev player tick on wall-clock time, and the replay runs each tick on the
+`dt` it was recorded with. Everything else that reaches a playing world is
+recorded as a **host act** before its tick: a console, MCP or command-channel
+line (the one evaluator, `ScriptManager::eval`), a scenario's API calls with their
+plain-data arguments, and the `Harness` verbs that change the world without a
+tick (`Harness.AttachPlayerBot`, `Harness.LoadStress`). Acts made before Play is
+entered (a scenario's set-up, a console line in edit mode) replay before
+entering it, on an edit-mode runtime the replay brings up, acts made after it
+after. `Editor.EnterPlay()` and `Editor.ExitPlay()` are not acts: the transition
+they ask for is the demo's start and end. A demo still being written is never
+pruned (its recorder holds a lock on the file). An act it cannot carry **taints** the demo from that tick: an edit made
+by hand in the editor during Play (the Inspector, the hierarchy, a gizmo), a call
+passing or returning a function or a handle (`Scene.GetScript`'s calls are not
+recorded), Play started on unsaved scene edits. The replay warns from there on.
+Script and asset changes on disk wait for Stop (the editor's watch holds them
+through Play), so they never reach a Play session. `play --size` and `--scene`
+are refused with `--demo`: the replay plays the scene and the Game view size the
+demo recorded (the sim lays the UI out on it, and every frame renders at it).
+
+**Bit for bit is checked, not promised.** Every 120 ticks, and once right before
+Stop (or when a `play` run ends), the demo stores a digest of the world: every
+entity's id, name, active flag and transform, every rigidbody's velocities, the
+play frame, `Time.time` and where `Random` stands, hashed straight from the
+world. Script state (a Lua table's fields) is not in it: a script that diverges
+shows once it moves something. The replay compares each digest and reports the
+first that differs, with the last tick that still matched; a demo shorter than
+120 ticks is still checked by its end digest. A demo recorded on another engine
+commit, or on a project whose scene file or scripts changed since, warns and
+replays anyway. A replay streams the file from disk, so an hour
+of play costs no memory; an hour of steady mouse-look writes about 10 MB, and idle
+ticks write nothing.
+
 ## Rules
 - Test and fixture files are capped at **150 lines** by the size gate
   (`tools/lint`), except a `<x>_tests.rs` sibling of `<x>.rs` (or of a `<x>/`

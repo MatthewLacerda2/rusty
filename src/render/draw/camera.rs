@@ -16,7 +16,8 @@
 //! editor's `outline` and `handles` follow it there, onto the finished image, in
 //! Unity's order: scene, post-FX, outline, handles, then the UI (#1224). An
 //! overlay camera ([`is_overlay`], a viewmodel) runs every stage but skips the
-//! base camera's screen-space work: no decals in its clusters, no SSAO (#1497).
+//! base camera's screen-space work: no decals in its clusters, no SSAO (#1497),
+//! no transparent SSR ([`ssr_march`], #1570).
 
 use super::pass::{PassClear, ScenePassFrame};
 use super::resources::SolidResources;
@@ -73,6 +74,9 @@ pub(crate) struct CameraCtx<'a> {
     pub fog: FogUniform,
     /// The stack's SSAO, or `None` on an overlay camera, which samples no AO.
     pub ssao: Option<SsaoPlan>,
+    /// Whether this camera's `receive_ssr` translucents trace SSR (#1570): the base
+    /// camera of a view running it ([`ssr_march`]).
+    pub traces: bool,
     /// The LOD level each entity shows to this camera (#472).
     pub lod: LodSelection,
     pub uniform: CameraUniform,
@@ -92,6 +96,9 @@ pub(crate) struct StackShared {
     pub prev_time: f32,
     pub fog: FogUniform,
     pub ssao: Option<SsaoPlan>,
+    /// The base camera's transparent SSR march (#1570), `[steps, step]`; zero when
+    /// the view runs no SSR.
+    pub ssr_march: [f32; 2],
 }
 
 impl<'a> CameraCtx<'a> {
@@ -105,6 +112,7 @@ impl<'a> CameraCtx<'a> {
         let view_proj = shared.view_projs[idx];
         let clusters = ClusterGrid::new(cam, shared.aspect);
         let overlay = is_overlay(idx == 0, cam.clear_flags);
+        let (march, traces) = ssr_march(idx == 0, shared.ssr_march);
         Self {
             scene,
             cam,
@@ -118,6 +126,7 @@ impl<'a> CameraCtx<'a> {
             frustum: Frustum::from_view_proj(view_proj),
             fog: shared.fog,
             ssao: shared.ssao.filter(|_| !overlay),
+            traces,
             lod: LodSelection::for_camera(scene, cam),
             uniform: CameraUniform {
                 view_proj: view_proj.to_cols_array(),
@@ -126,7 +135,7 @@ impl<'a> CameraCtx<'a> {
                 fog: shared.fog,
                 clusters: clusters.uniform(),
                 prev_view_proj: shared.prev_view_projs[idx].to_cols_array(),
-                stack: [idx as f32, shared.prev_time, 0.0, 0.0],
+                stack: [idx as f32, shared.prev_time, march[0], march[1]],
                 inv_view_proj: view_proj.inverse().to_cols_array(),
             },
             clusters,
@@ -142,6 +151,14 @@ impl<'a> CameraCtx<'a> {
 /// URP's rule: SSAO is a base-camera renderer feature).
 pub(crate) fn is_overlay(is_first: bool, clear_flags: ClearFlags) -> bool {
     !is_first && clear_flags == ClearFlags::DepthOnly
+}
+
+/// The transparent SSR march `[steps, step]` a camera hands its translucents, and
+/// whether it traces at all: the stack's `march` on its base (first) camera, none
+/// on an overlay or any other stacked camera (SSR is the base camera's alone).
+pub(crate) fn ssr_march(is_first: bool, march: [f32; 2]) -> ([f32; 2], bool) {
+    let march = if is_first { march } else { [0.0; 2] };
+    (march, march[0] > 0.0)
 }
 
 fn upload_camera(r: &mut Renderer, _: &mut RenderView, ctx: &mut CameraCtx) {
@@ -194,9 +211,10 @@ fn ssr(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
 }
 
 /// Unity's *Opaque Texture* (#1523): this camera's colour and depth, after SSR, for
-/// the translucents that refract or absorb; skipped when none of them does.
+/// the translucents that refract or absorb, or trace SSR (#1570); skipped when none
+/// of them does.
 fn opaque_copy(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
-    r.copy_opaque(view, &ctx.solids.draws.transparent);
+    r.copy_opaque(view, &ctx.solids.draws.transparent, ctx.traces);
 }
 
 /// Translucent solids (#242), back-to-front over the opaque ones.

@@ -29,6 +29,7 @@ pub mod stress;
 use std::path::Path;
 
 pub use lua::register;
+pub(crate) use lua::spec_from_lua;
 pub use report::{Report, Samples, Summary};
 
 use super::capture::RenderedFrame;

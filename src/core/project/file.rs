@@ -7,7 +7,8 @@
 //! { "engine_commit": "<git commit>", "engine_order": 1318, "build": { … },
 //!   "graphics_options": { "motion_blur": true, … },
 //!   "quality": { "default": "Medium", "presets": [ { "name": "Low", … }, … ] },
-//!   "decals": { "max_per_owner": 256, "max_world": 1024, "max_total": 4096 } }
+//!   "decals": { "max_per_owner": 256, "max_world": 1024, "max_total": 4096 },
+//!   "demos": { "keep": 20 } }
 //! ```
 //!
 //! * **`engine_commit`** — the engine build the project was last opened with, so a
@@ -26,6 +27,8 @@
 //!   when the file is created, the game's to edit, rename, add to or delete.
 //! * **`decals`** — the game's decal budgets ([`DecalLimits`], #1517), applied to
 //!   the scene on entering Play.
+//! * **`demos`** — how many play demos a dev build keeps in `saved/demos/`
+//!   ([`DemoSettings`], #1581; default 20).
 
 use std::path::Path;
 
@@ -35,6 +38,7 @@ use super::engine::commit::{engine_commit, engine_order, UNKNOWN_COMMIT};
 use super::engine::{base, EngineCheck};
 use crate::core::application::BuildSettings;
 use crate::core::settings::decals::DecalLimits;
+use crate::core::settings::demos::DemoSettings;
 use crate::core::settings::graphics_options::GraphicsOptions;
 use crate::core::settings::quality::QualityPresets;
 
@@ -61,6 +65,8 @@ pub struct ProjectFile {
     pub quality: QualityPresets,
     /// The game's decal budgets.
     pub decals: DecalLimits,
+    /// How many play demos `saved/demos/` keeps (#1581).
+    pub demos: DemoSettings,
 }
 
 impl Default for ProjectFile {
@@ -72,6 +78,7 @@ impl Default for ProjectFile {
             graphics_options: GraphicsOptions::default(),
             quality: QualityPresets::default(),
             decals: DecalLimits::default(),
+            demos: DemoSettings::default(),
         }
     }
 }
@@ -79,12 +86,16 @@ impl Default for ProjectFile {
 /// What a run of the project plays under: the file's settings, without the engine
 /// record. The player and `play` hand it to an unbound `Application`
 /// (`Application::run_with`), so a shipped game reads them but never rewrites them.
-#[derive(Clone, Debug, Default, PartialEq)]
+/// A demo keeps it in its header, so a replay plays under the settings it was
+/// recorded with (#1581).
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
 pub struct ProjectSettings {
     pub build: BuildSettings,
     pub graphics_options: GraphicsOptions,
     pub quality: QualityPresets,
     pub decals: DecalLimits,
+    pub demos: DemoSettings,
 }
 
 impl From<ProjectFile> for ProjectSettings {
@@ -94,6 +105,7 @@ impl From<ProjectFile> for ProjectSettings {
             graphics_options: file.graphics_options,
             quality: file.quality,
             decals: file.decals,
+            demos: file.demos,
         }
     }
 }

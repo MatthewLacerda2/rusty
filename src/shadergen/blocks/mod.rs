@@ -165,7 +165,9 @@ pub enum Reflection {
     /// `{args}` filled as [`Block::call`]'s, is the factor. The record scales by it.
     Scaled(&'static str),
     /// The block is not a per-channel scale of the colour (a toon ramp, a desaturate
-    /// mixing the channels): the pixel gets no SSR.
+    /// mixing the channels): an opaque pixel gets no SSR. A `receive_ssr`
+    /// transparent (#1570) still does: it traces its hit in the forward pass before
+    /// the blocks run, so the block restyles the reflection with the colour.
     Dropped,
 }
 
