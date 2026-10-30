@@ -135,7 +135,8 @@ impl Demo {
         &self.path
     }
 
-    /// Every index line in order (#1597): [`index_of`] this demo.
+    /// Every index line in order (#1597), read from disk as it goes: what a
+    /// search reads, never replaying anything.
     pub fn index(&self) -> impl Iterator<Item = IndexLine> {
         index_of(&self.path, self.ticks)
     }
