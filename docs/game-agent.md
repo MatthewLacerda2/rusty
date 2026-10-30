@@ -30,6 +30,12 @@ replayed exactly:
 - `math.random` is seeded (the `Random` namespace);
 - `require`, `dofile` and `loadfile` read inside the project; a file outside it warns.
 
+So a dev build records every Play session (the editor's, `play`'s, the dev
+player's) as a demo in `saved/demos/`: the start (scene, settings, save data,
+seed) and what reached the game tick by tick. When the developer reports a bug
+from a playtest, replay their demo headless instead of guessing a scenario
+(next section).
+
 ## The project
 
 ```text
@@ -88,7 +94,9 @@ cd <engine> && cargo run --bin play --features dev -- \
 It plays the game's startup scene (`build.startup_scene` in `project.rusty`), the
 same one the standalone player boots; `--scene <path>`, relative to the game like
 the startup scene, plays another. The scenario and output paths are read from where
-the command runs. It writes `results.json` and `console.log` into the output folder. See `docs/testing.md` for
+the command runs. It writes `results.json` and `console.log` into the output folder. `--demo <saved/demos/…>.demo` replays a recorded Play session instead,
+on the scene it recorded, with an optional scenario on top for screenshots and
+asserts; it fails if the game no longer plays it the same. See `docs/testing.md` for
 scenarios and captures, and `docs/ui.md` for the in-game UI.
 
 ## The MCP

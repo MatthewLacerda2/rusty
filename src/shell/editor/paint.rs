@@ -1,5 +1,6 @@
 //! src/shell/editor/paint.rs — finishing the egui frame (tessellate, upload textures,
-//! paint over the swapchain) and the dev-only console REPL drain.
+//! paint over the swapchain), the frame's edits settled, and the dev-only console
+//! REPL drain.
 
 use super::EditorFrontend;
 use crate::app::GameWorld;
@@ -88,6 +89,21 @@ pub(in crate::shell::editor) fn paint_pass(
     full_output.textures_delta.clear();
 }
 
+/// Settle the frame's edits (the dashboard's, and the viewport's from the frame
+/// before): whether any was made, the flag cleared. An edit made by hand during
+/// Play is no call a demo can replay, so it taints the one recording (#1581).
+pub(super) fn take_edits(editor_ui: &mut EditorUi, game: &GameWorld) -> bool {
+    let edited = std::mem::take(&mut editor_ui.is_dirty);
+    if edited && game.scene().borrow().is_playing() {
+        let what = "an editor edit (the Inspector, the hierarchy, a gizmo)".to_string();
+        let journal = game.script_manager().journal();
+        journal
+            .borrow_mut()
+            .push(crate::scripting::HostCall::Taint(what));
+    }
+    edited
+}
+
 /// Run a submitted REPL line through the single live evaluator. Dev builds only — the
 /// console input line and the harness share `evaluate_line`. A line outside Play may
 /// have moved static geometry, so it marks the scene dirty (#1339).
@@ -108,3 +124,29 @@ pub(super) fn drain_repl(editor_ui: &mut EditorUi, game: &GameWorld) {
 /// No REPL in ship builds.
 #[cfg(not(feature = "dev"))]
 pub(super) fn drain_repl(_editor_ui: &mut EditorUi, _game: &GameWorld) {}
+
+#[cfg(all(test, feature = "dev"))]
+mod tests {
+    use super::*;
+    use crate::dev::harness::Harness;
+    use crate::scripting::HostCall;
+
+    #[test]
+    fn an_inspector_edit_during_play_taints_the_demo() {
+        let h = Harness::new(crate::test_temp::dir(), "");
+        let mut ui = EditorUi::new(Default::default());
+        let journal = h.world.borrow().script_manager().journal();
+        journal.borrow_mut().start();
+        ui.is_dirty = true; // what an Inspector field sets on a change
+        assert!(take_edits(&mut ui, &h.world.borrow()) && !ui.is_dirty);
+        assert!(
+            journal.borrow_mut().take().is_empty(),
+            "edit mode: no taint"
+        );
+        h.step(1); // enters Play
+        ui.is_dirty = true;
+        assert!(take_edits(&mut ui, &h.world.borrow()));
+        let acts = journal.borrow_mut().take();
+        assert!(matches!(&acts[..], [HostCall::Taint(what)] if what.contains("editor edit")));
+    }
+}

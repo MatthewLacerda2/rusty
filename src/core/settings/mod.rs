@@ -1,7 +1,8 @@
 //! The engine's global settings resources: the quality presets' values, the player's
-//! graphics options, the video settings and the game's decal budgets.
+//! graphics options, the video settings, the game's decal budgets and how many play demos it keeps.
 
 pub mod decals;
+pub mod demos;
 pub mod graphics_options;
 pub mod quality;
 pub mod render_scale;
