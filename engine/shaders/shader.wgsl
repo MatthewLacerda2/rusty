@@ -323,9 +323,9 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
         return vec4<f32>(apply_fog(camera.fog, base_color.rgb, in.world_position, camera.camera_pos), base_color.a);
     }
 
-    // Geometric normal, optionally perturbed by a tangent-space normal map (#207),
-    // rotated into world space by the mesh's tangent frame or, under a world mapping,
-    // reoriented per projection (`mapping::sample_normal`).
+    // Geometric normal, optionally perturbed by a tangent-space normal map (#207; z
+    // rebuilt by `maps::unpack_normal`), rotated into world space by the mesh's tangent
+    // frame or, under a world mapping, reoriented per projection (`mapping::sample_normal`).
     var N = normalize(in.world_normal);
     if (entity.use_normal_map == 1u) {
         N = mapping::sample_normal(t_normal, s_normal, maps, N, in.world_tangent);
@@ -333,9 +333,9 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     let V = normalize(camera.camera_pos - in.world_position);
 
     // glTF metallic-roughness packs metallic in BLUE, roughness in GREEN. Each scalar
-    // multiplies its map channel when the flag is set, else acts alone (#202).
-    let surface_metallic = clamp(entity.metallic * mapping::sample_if(entity.use_metallic_map, t_metallic, s_metallic, maps).b, 0.0, 1.0);
-    let surface_roughness = clamp(entity.roughness * mapping::sample_if(entity.use_roughness_map, t_roughness, s_roughness, maps).g, 0.04, 1.0);
+    // multiplies its map channel when the flag is set, else acts alone (#202, #1574).
+    let surface_metallic = clamp(entity.metallic * mapping::mask(entity.use_metallic_map, t_metallic, s_metallic, maps, 2u), 0.0, 1.0);
+    let surface_roughness = clamp(entity.roughness * mapping::mask(entity.use_roughness_map, t_roughness, s_roughness, maps, 1u), 0.04, 1.0);
 
     // 0. Surface decals (#638): this cluster's decals change the material inputs
     // before any light is summed, so a decal is lit, shadowed and occluded like the

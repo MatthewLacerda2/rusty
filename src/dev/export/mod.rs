@@ -10,13 +10,15 @@
 //! Blender, with no mode switch: the player's refresh before Play
 //! (`asset::convert::refresh_sources`) finds nothing, and every load is served
 //! from the cache (`asset::convert::cached_gltf` and `texture_ref` both resolve a
-//! source's cache by its path, the source present or not).
+//! source's cache by its path, the source present or not). Every image's
+//! compressed copy is made current first and shipped beside it (#1574), so the
+//! player never encodes a texture nor writes one into its install.
 //!
 //! What is copied: `project.rusty` (the build settings, and the mark that makes
 //! the import cache project-relative), the seed manifest, everything under
 //! `assets/` but the convertible sources (and Blender's backups of them), and the
-//! import cache of each source, under its lock; a cache whose source is gone stays
-//! behind. What is not: `cache/` (machine-local, regenerable) and `saved/` (this
+//! import cache of each source and each image, under its lock; a cache whose
+//! source is gone stays behind. What is not: `cache/` (machine-local, regenerable) and `saved/` (this
 //! machine's save data), which the export makes empty, with the rest of the
 //! project skeleton, so the player's first launch writes nothing into an install.
 //! The engine's own content (`engine/`) ships beside the player, not in the
@@ -57,6 +59,9 @@ pub fn export(out: &Path) -> Result<Exported, String> {
     for source in &sources {
         cached_gltf(source).map_err(|e| format!("{}: {e}", source.display()))?;
     }
+    // An image that fails is warned of and ships uncompressed, as Unity builds
+    // with an import error logged.
+    crate::asset::texture_import::refresh_all(Path::new(ASSETS_DIR));
     let existed = out.is_dir();
     let written = copy_runtime_files(Path::new("."), &sources, &out).and_then(|files| {
         create_skeleton(&out)?;
@@ -101,6 +106,12 @@ fn copy_runtime_files(root: &Path, sources: &[PathBuf], out: &Path) -> Result<Ve
     }
     copy::tree(root, Path::new(ASSETS_DIR), out, &mut files)?;
     let glbs = copy::caches(root, sources, out, &mut files)?;
+    let images = crate::asset::texture_import::images(&root.join(ASSETS_DIR));
+    let images: Vec<PathBuf> = images
+        .iter()
+        .map(|i| i.strip_prefix(root).unwrap_or(i).to_path_buf())
+        .collect();
+    copy::texture_caches(root, &images, out, &mut files)?;
     let missing = textures::missing(out, &glbs, &files);
     if !missing.is_empty() {
         return Err(format!(

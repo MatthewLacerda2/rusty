@@ -85,10 +85,13 @@ impl Renderer {
         };
 
         // Timestamps where the adapter has them: the frame stats' GPU time (#835).
-        let timestamps = adapter.features() & wgpu::Features::TIMESTAMP_QUERY;
+        // And BC texture compression (#1574).
+        let wanted =
+            wgpu::Features::TIMESTAMP_QUERY | crate::render::gpu::textures::compressed::FEATURE;
+        let features = adapter.features() & wanted;
         let (device, queue) = adapter
             .request_device(&wgpu::DeviceDescriptor {
-                required_features: timestamps,
+                required_features: features,
                 required_limits: wgpu::Limits::default(),
                 label: Some("Headless Screenshot Device"),
                 ..Default::default()

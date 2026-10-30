@@ -11,6 +11,7 @@
 #define_import_path forward::mapping
 
 #import forward::bindings::entity
+#import forward::maps::{map_factor, unpack_normal}
 
 const UV0: u32 = 0u;
 const TRIPLANAR: u32 = 2u;
@@ -101,17 +102,19 @@ fn sample(t: texture_2d<f32>, s: sampler, c: MapCoords) -> vec4<f32> {
         + textureSample(t, s, c.z) * c.weights.z;
 }
 
-// Map `t` at `c` when `on` (a per-draw `use_*_map` flag) is 1, else white: a
-// material without the map never fetches it.
-fn sample_if(on: u32, t: texture_2d<f32>, s: sampler, c: MapCoords) -> vec4<f32> {
-    if (on != 1u) {
-        return vec4<f32>(1.0);
+// The factor metallic or roughness map `t` at `c` multiplies its scalar by, under
+// its per-draw `use_*_map` flag `on` (`maps::map_factor`, `packed` its glTF
+// channel): 1 without a map, which is then never fetched.
+fn mask(on: u32, t: texture_2d<f32>, s: sampler, c: MapCoords, packed: u32) -> f32 {
+    if (on == 0u) {
+        return 1.0;
     }
-    return sample(t, s, c);
+    return map_factor(sample(t, s, c), on, packed);
 }
 
 // The world-space shading normal from tangent-space normal map `t` at `c`, over
-// geometric normal `n`. UV0 rotates the map by the mesh's tangent frame (`tangent`,
+// geometric normal `n`, each sample's z rebuilt from x and y (`maps::unpack_normal`,
+// so a BC5 map, which keeps only those, reads right, #1574). UV0 rotates the map by the mesh's tangent frame (`tangent`,
 // `w` its handedness); Planar and Triplanar have no mesh tangents to lean on, so
 // each projection's sample is reoriented onto its world axis with the whiteout
 // blend (Golus), and Planar is Triplanar with all the weight on the Y projection.
@@ -119,16 +122,16 @@ fn sample_normal(t: texture_2d<f32>, s: sampler, c: MapCoords, n: vec3<f32>, tan
     if (entity.uv_mapping == UV0) {
         let T = normalize(tangent.xyz);
         let B = cross(n, T) * tangent.w;
-        let sampled = textureSample(t, s, c.uv).xyz * 2.0 - 1.0;
+        let sampled = unpack_normal(textureSample(t, s, c.uv));
         return normalize(mat3x3<f32>(T, B, n) * sampled);
     }
-    let ty = textureSample(t, s, c.uv).xyz * 2.0 - 1.0;
+    let ty = unpack_normal(textureSample(t, s, c.uv));
     var tx = vec3<f32>(0.0, 0.0, 1.0);
     var tz = vec3<f32>(0.0, 0.0, 1.0);
     var w = vec3<f32>(0.0, 1.0, 0.0);
     if (entity.uv_mapping == TRIPLANAR) {
-        tx = textureSample(t, s, c.x).xyz * 2.0 - 1.0;
-        tz = textureSample(t, s, c.z).xyz * 2.0 - 1.0;
+        tx = unpack_normal(textureSample(t, s, c.x));
+        tz = unpack_normal(textureSample(t, s, c.z));
         w = c.weights;
     }
     let nx = vec3<f32>(tx.xy + n.zy, abs(tx.z) * n.x);

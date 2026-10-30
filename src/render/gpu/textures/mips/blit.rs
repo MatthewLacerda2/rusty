@@ -6,7 +6,7 @@
 //! texture in an optimised build and 670 ms in the unoptimised dev build the editor
 //! runs (the engine crate is opt-level 0 there), on top of the image's decode.
 
-use super::TextureKind;
+use super::{view_format, TextureKind};
 use crate::render::gpu::fullscreen::Fullscreen;
 use crate::render::gpu::layout_entries::texture_entry;
 use crate::render::gpu::pipelines::LazyPipeline;
@@ -43,7 +43,7 @@ impl MipGenerator {
                     vs: "vs_fullscreen",
                     fs: "fs_downsample",
                 };
-                pass.colour(device, &[Some(kind.view_format().into())])
+                pass.colour(device, &[Some(view_format(kind).into())])
             }
         };
         Self {
@@ -86,11 +86,11 @@ impl MipGenerator {
         }
         let pipeline = match kind {
             TextureKind::Colour => &self.colour,
-            TextureKind::Data => self.data.get(),
+            _ => self.data.get(),
         };
         let level = |mip| {
             texture.create_view(&wgpu::TextureViewDescriptor {
-                format: Some(kind.view_format()),
+                format: Some(view_format(kind)),
                 dimension: Some(wgpu::TextureViewDimension::D2),
                 base_mip_level: mip,
                 mip_level_count: Some(1),

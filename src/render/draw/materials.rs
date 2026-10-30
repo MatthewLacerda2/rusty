@@ -14,7 +14,7 @@ use crate::asset::MapRef;
 use crate::components::MaterialAsset;
 use crate::render::gpu::material_cache::{ParamOwner, MATERIAL_TEXTURES};
 use crate::render::gpu::textures::TextureKind;
-use crate::render::{GpuTexture, Renderer};
+use crate::render::{EntityUniform, GpuTexture, Renderer};
 use crate::scene::shader_overrides::ParamValues;
 use crate::scene::{Scene, SceneId};
 use crate::shadergen::textures;
@@ -77,7 +77,7 @@ impl Renderer {
             return i;
         }
         let maps = std::array::from_fn(|i| {
-            let map = self.resolve_map(paths[i].as_ref());
+            let map = self.resolve_map(paths[i].as_ref(), map_kind(i));
             // An extra slot with no texture of its own is a neutral white mask,
             // not the checker a missing map shows (#400).
             match i >= 5 && Rc::ptr_eq(&map, &self.default_texture) {
@@ -89,17 +89,51 @@ impl Renderer {
         self.materials.insert(key, group)
     }
 
-    /// Resolve a material map path to a resident GPU texture, falling back to the
-    /// default texture when the path is absent or not yet uploaded.
-    fn resolve_map(&self, path: Option<&MapRef>) -> Rc<GpuTexture> {
-        match path {
-            Some(p) => self
-                .gpu_textures
-                .get(p)
-                .cloned()
-                .unwrap_or_else(|| Rc::clone(&self.default_texture)),
-            None => Rc::clone(&self.default_texture),
+    /// Resolve a material map path to a resident GPU texture for a slot holding
+    /// `kind` (its uncompressed copy where the slot cannot read the upload's
+    /// format, #1574), falling back to the default texture when the path is
+    /// absent or not yet uploaded.
+    fn resolve_map(&self, path: Option<&MapRef>, kind: TextureKind) -> Rc<GpuTexture> {
+        path.and_then(|p| self.texture_for(p, kind))
+            .unwrap_or_else(|| Rc::clone(&self.default_texture))
+    }
+
+    /// Entity `id`'s solid uniform for `material`
+    /// ([`super::uniforms::solid_entity_uniform`]), its map channels set by what
+    /// is resident ([`Self::with_map_channels`]).
+    pub(crate) fn solid_uniform(
+        &self,
+        scene: &Scene,
+        id: u32,
+        material: Option<&MaterialAsset>,
+    ) -> EntityUniform {
+        let uniform = super::uniforms::solid_entity_uniform(scene, id, material);
+        self.with_map_channels(uniform, material)
+    }
+
+    /// `uniform` with its metallic and roughness flags set to 2 where the map is
+    /// resident and of Texture Type `SingleChannel` (#1574), BC4 or not yet: the
+    /// shader then reads its red channel instead of glTF's packed blue and green,
+    /// so the look does not change when the compressed copy lands.
+    pub(crate) fn with_map_channels(
+        &self,
+        mut uniform: EntityUniform,
+        material: Option<&MaterialAsset>,
+    ) -> EntityUniform {
+        let Some(m) = material else {
+            return uniform;
+        };
+        let single = |map: &Option<MapRef>| {
+            let texture = map.as_ref().and_then(|p| self.gpu_textures.get(p));
+            texture.is_some_and(|t| t.single_channel)
+        };
+        if single(&m.metallic_map) {
+            uniform.use_metallic_map = 2;
         }
+        if single(&m.roughness_map) {
+            uniform.use_roughness_map = 2;
+        }
+        uniform
     }
 
     /// The cache key a map path resolves to: the path when its texture is resident,
@@ -205,11 +239,15 @@ pub(crate) fn material_maps(
         .filter_map(|(i, path)| Some((path?, map_kind(i))))
 }
 
-/// What the map at `index` holds, which decides how its mips average (#1322).
+/// What the map at `index` holds, which decides how an uncompressed upload's mips
+/// average (#1322) and which compressed formats it can read (#1574): metallic and
+/// roughness are masks, the normal map a normal map, the shader texture slots data.
 fn map_kind(index: usize) -> TextureKind {
-    match is_colour_map(index) {
-        true => TextureKind::Colour,
-        false => TextureKind::Data,
+    match index {
+        1 | 2 => TextureKind::Mask,
+        3 => TextureKind::Normal,
+        i if is_colour_map(i) => TextureKind::Colour,
+        _ => TextureKind::Data,
     }
 }
 

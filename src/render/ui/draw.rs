@@ -57,9 +57,10 @@ impl Renderer {
                 .bind_group(&self.device, Some((path.as_str(), Rc::clone(&tex))));
         }
         let textures = &self.gpu_textures;
+        // Source pixels, not the upload's, which *Max Size* may have shrunk (#1574).
         let tex_size = |p: &str| {
-            let s = textures.get(p)?.texture.size();
-            Some(Vec2::new(s.width as f32, s.height as f32))
+            let (w, h) = textures.get(p)?.source_size;
+            Some(Vec2::new(w as f32, h as f32))
         };
         let atlases = &mut self.ui_renderer.atlases;
         let meshes = build_canvas_meshes(&scene.world, &layout, screen, &tex_size, atlases);
