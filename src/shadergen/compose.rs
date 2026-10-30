@@ -26,9 +26,11 @@ pub const MODULES: &[&str] = &[
     "sky/noise.wgsl",
     "lighting/reflection_probe.wgsl",
     "lighting/ssr_surface.wgsl",
+    "lighting/ssr_march.wgsl",
     "common.wgsl",
     "sky/motion.wgsl",
     "forward/bindings.wgsl",
+    "forward/maps.wgsl",
     "forward/mapping.wgsl",
     "forward/lighting.wgsl",
     "forward/transparent.wgsl",
@@ -51,6 +53,8 @@ pub fn composer_with_common(base: &str) -> Result<Composer, String> {
         composer
             .add_composable_module(ComposableModuleDescriptor {
                 source: &source,
+                // Only naga_oil's error messages read it: a mutant deleting
+                // this line is equivalent (cargo-mutants, #1601).
                 file_path: module,
                 // The module's import name. naga_oil derives it from a
                 // `#define_import_path` directive in the source or this field;

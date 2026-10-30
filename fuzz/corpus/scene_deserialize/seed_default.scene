@@ -701,6 +701,7 @@
       ],
       "absorption_distance": 1.0,
       "depth_postpass": false,
+      "receive_ssr": false,
       "transmission_color": [
         1.0,
         1.0,

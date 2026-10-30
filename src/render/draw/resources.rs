@@ -249,7 +249,7 @@ impl Renderer {
             let entry = scene.material_entry_at(id, slot);
             let material = entry.map(|(_, asset)| asset);
             let transparent = material.is_some_and(MaterialAsset::is_transparent);
-            let mut uniform = super::uniforms::solid_entity_uniform(scene, id, material);
+            let mut uniform = self.solid_uniform(scene, id, material);
             uniform.bone_base = bone_base;
             let shader = material.and_then(|m| m.shader.as_deref());
             let pipeline = self.surface_shaders.pipeline_id(&self.device, shader);

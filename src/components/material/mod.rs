@@ -149,6 +149,11 @@ pub struct MaterialAsset {
     /// see it rather than what is behind it. Off by default.
     #[serde(default)]
     pub depth_postpass: bool,
+    /// HDRP's *Receive SSR Transparent* (#1570): a `Transparent` surface traces
+    /// screen-space reflections of the opaque scene where the view runs SSR, over its
+    /// probe reflection. Off by default; an opaque surface always takes SSR.
+    #[serde(default)]
+    pub receive_ssr: bool,
     /// The colour thin translucency lets through (#1523), HDRP's *Transmission
     /// Tint*; white by default.
     #[serde(default = "white")]
@@ -222,6 +227,7 @@ impl Default for MaterialAsset {
             transmittance_color: white(),
             absorption_distance: default_one(),
             depth_postpass: false,
+            receive_ssr: false,
             transmission_color: white(),
             transmission: 0.0,
             shader: None,

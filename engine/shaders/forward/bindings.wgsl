@@ -15,7 +15,8 @@ struct EntityUniforms {
     metallic: f32,
     roughness: f32,
     // Mirrors `EntityUniform` (src/render/mod.rs) byte-for-byte (#202, #207): map
-    // flags. metallic/roughness scale their scalar by the sampled channel; normal
+    // flags. metallic/roughness scale their scalar by the sampled channel (glTF's
+    // blue/green at 1, red at 2: a one-channel BC4 upload, #1574); normal
     // perturbs the shading normal; emissive modulates the emissive factor. Four u32s
     // fill the run so the `vec4` that follows is 16-byte aligned.
     use_metallic_map: u32,
@@ -52,6 +53,12 @@ struct EntityUniforms {
     absorption: vec4<f32>,
     // Thin translucency: rgb colour * amount, w the amount.
     transmission: vec4<f32>,
+    // 1 when the surface traces screen-space reflections (#1570) where the camera
+    // marches (`camera.stack.z`).
+    receive_ssr: u32,
+    surface_pad_a: u32,
+    surface_pad_b: u32,
+    surface_pad_c: u32,
     // Where the maps are read (#1573), mirroring `MappingUniform`
     // (src/render/gpu/uniforms.rs) byte-for-byte: xy the tiling, zw the offset.
     uv_st: vec4<f32>,

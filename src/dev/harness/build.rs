@@ -105,9 +105,12 @@ impl Harness {
             Rc::clone(&console),
         );
         // Headless harness always runs the simulation (play mode), with no edit mode
-        // to return to: standalone, so `Editor.ExitPlay()` is refused (#1360).
+        // to return to: standalone, so `Editor.ExitPlay()` is refused (#1360), and
+        // a player's imports: it compresses no texture, playing from the caches the
+        // editor or an export made (#1574).
         world.resources.script_manager.set_workspace_root(workspace);
         world.resources.application.borrow_mut().mark_standalone();
+        crate::asset::convert::mark_standalone();
         world.set_playing(true);
         let stats = crate::dev::stats::install(&mut world);
 

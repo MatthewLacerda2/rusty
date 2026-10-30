@@ -107,6 +107,13 @@ pub fn mark_standalone() {
     with_gate(|gate| gate.standalone = true);
 }
 
+/// Whether this thread runs a standalone game ([`mark_standalone`]): its refresh
+/// before Play compresses no texture ([`refresh_sources`]), so it never writes
+/// into its install.
+fn is_standalone() -> bool {
+    with_gate(|gate| gate.standalone)
+}
+
 /// Whether a stale or missing cache is converted now.
 pub fn conversion_allowed() -> bool {
     with_gate(|gate| gate.allowed())
@@ -114,8 +121,11 @@ pub fn conversion_allowed() -> bool {
 
 /// Bring every converted source under `root` up to date, as Unity refreshes its
 /// asset database before Play: a model only a script spawns has a cache to play
-/// from. A source whose conversion fails is warned of and skipped. Returns how
-/// many sources were looked at; none while conversion is refused.
+/// from. Every image's compressed copy too (`texture_import::refresh_all`,
+/// #1574), so Play draws none uncompressed for want of one, but in a standalone
+/// game, which plays from the copies its export shipped. A source whose
+/// conversion fails is warned of and skipped. Returns how many model sources were
+/// looked at; none while conversion is refused.
 pub fn refresh_sources(root: &Path) -> usize {
     if !conversion_allowed() {
         return 0;
@@ -125,6 +135,11 @@ pub fn refresh_sources(root: &Path) -> usize {
         if let Err(e) = cached_gltf(source) {
             log::warn!("[Asset] {}: {e}", source.display());
         }
+    }
+    // Each failure was warned of as it ran. A standalone game compresses none, as
+    // Unity's player imports nothing: it plays from what its export shipped.
+    if !is_standalone() {
+        crate::asset::texture_import::refresh_all(root);
     }
     sources.len()
 }
@@ -149,12 +164,16 @@ pub fn convertible_sources(root: &Path) -> Vec<PathBuf> {
 /// changes again.
 /// Convert every source under `root` that `changed` names, or whose cached
 /// conversion read a file `changed` names. Returns how many it converted; a failure
-/// is warned of, as an import's is. A no-op while conversion is off.
+/// is warned of, as an import's is. An image `changed` names, or whose sidecar it
+/// names, is queued for its compressed copy (`texture_import::queue`, #1574), off
+/// this thread. A no-op while conversion is off.
 pub fn refresh_changed(root: &Path, changed: Vec<String>) -> usize {
     if !conversion_allowed() {
         return 0;
     }
-    let touched = touched(root, &Stale::new(changed));
+    let changed = Stale::new(changed);
+    crate::asset::texture_import::queue_changed(root, &changed);
+    let touched = touched(root, &changed);
     let mut converted = 0;
     for source in touched {
         match cached_gltf(&source) {

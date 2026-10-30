@@ -12,7 +12,8 @@
 //!    `GetAsset` / `HasAsset`: author a reusable `MaterialAsset`
 //!    into the library under a chosen *name*, decoupled from any entity. An entity then
 //!    uses it by pointing a slot at that name (`Material.Set`). Round-trips
-//!    through `SceneData` like any library asset.
+//!    through `SceneData` like any library asset. `DeleteAsset` (`library`, #1576)
+//!    takes one out again.
 //! 3. **Surface shader** (#396, #399) — `SetShader` names the material's authored
 //!    surface shader; `SetAssetShaderParam` / `GetAssetShaderParam` (`shader_params`)
 //!    drive the params it exposes at runtime, and `SetShaderParam` / `GetShaderParam` /
@@ -34,6 +35,7 @@
 
 mod asset;
 mod from_lua;
+mod library;
 pub(crate) mod shader;
 mod slots;
 mod surface;
@@ -60,6 +62,7 @@ pub fn register<'scope>(
     register_maps(scope, &table, scene)?;
     register_transparency(scope, &table, scene)?;
     asset::register(scope, &table, scene)?;
+    library::register(scope, &table, scene)?;
     slots::register(scope, &table, scene)?;
     surface::register(scope, &table, scene)?;
     shader::params::register(scope, &table, scene)?;

@@ -21,7 +21,8 @@ pub(crate) struct CameraUniform {
     pub prev_view_proj: [f32; 16],
     /// `x`: this camera's index in its stack, bottom to top (#1436): the velocity
     /// target's `.a`, so motion blur orders a higher camera in front. `y`: last
-    /// frame's game time (#1524), for the vertex blocks' motion. `zw` unused.
+    /// frame's game time (#1524), for the vertex blocks' motion. `zw`: the transparent
+    /// SSR march (#1570), steps and step length, zero where the camera traces none.
     pub stack: [f32; 4],
     /// `view_proj`'s inverse (#1523), what refraction and absorption rebuild the
     /// opaque depth's world point with.
@@ -126,7 +127,8 @@ pub(crate) struct EntityUniform {
     pub metallic: f32,
     pub roughness: f32,
     // Map flags (#202, #207). When set, the shader samples the matching group(2)
-    // texture: metallic/roughness multiply their scalar by the sampled channel;
+    // texture: metallic/roughness multiply their scalar by the sampled channel
+    // (glTF's blue/green at 1, red at 2: a one-channel BC4 upload, #1574);
     // `use_normal_map` perturbs the shading normal in tangent space; `use_emissive_map`
     // modulates the emissive factor. These four `u32`s fill the run up to the next
     // 16-byte boundary so the `vec4` that follows is aligned; `EntityUniforms` in
@@ -188,6 +190,12 @@ pub(crate) struct SurfaceUniform {
     /// Thin translucency: rgb the transmission colour times its amount, `w` the
     /// amount (0: none).
     pub transmission: [f32; 4],
+    /// 1 when the surface traces screen-space reflections (#1570): a lit
+    /// `Transparent` material with `receive_ssr` that can be smooth enough to
+    /// reflect (`postfx::effects::ssr::transparent::traces`); it traces only where
+    /// the camera's `stack.z` gives a march.
+    pub receive_ssr: u32,
+    pub _pad: [u32; 3],
 }
 
 /// Where a draw's material maps are read (#1573), packed from its
