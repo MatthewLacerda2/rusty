@@ -1,17 +1,15 @@
 //! Which cubes the probe array admits (#1245): a power of two up to [`MAX_FACE`],
 //! checked before a cube is uploaded, and again on the frame's way in.
 
-use std::rc::Rc;
-
 use super::{ProbeArray, MAX_FACE};
-use crate::render::ibl::cubemap::CubemapTexture;
+use crate::render::ibl::cubemap::CubeShape;
 use crate::scene::ReflectionProbe;
 
 impl ProbeArray {
     /// Whether a `size`-texel cube at `path` fits the array: a power of two up to
-    /// [`MAX_FACE`]; any other cube is warned about. The cubemap cache asks once per
-    /// load of a path, before uploading it (#1245), so a cube that doesn't fit warns
-    /// once, and again after a re-bake re-reads it.
+    /// [`MAX_FACE`]; any other cube is warned about. The frame asks once per path,
+    /// from its header, before reading the rest (#1245, #1584), so a cube that
+    /// doesn't fit warns once, and again after a re-bake re-reads it.
     pub(in crate::render::ibl) fn admits(path: &str, size: u32) -> bool {
         if fits(MAX_FACE, size) {
             return true;
@@ -30,11 +28,12 @@ fn fits(face: u32, size: u32) -> bool {
     size > 0 && face.is_multiple_of(size) && (face / size).is_power_of_two()
 }
 
-/// The cubes of `wanted` that fit the array. Each should, being admitted before it
-/// was uploaded: a debug build asserts it, a release build leaves out one that doesn't.
+/// The cubes of `wanted` that fit the array. Each should, being admitted when its
+/// header was read: a debug build asserts it, a release build leaves out one that
+/// doesn't.
 pub(super) fn admitted<'a>(
-    wanted: &'a [(&'a ReflectionProbe, Rc<CubemapTexture>)],
-) -> Vec<(&'a ReflectionProbe, &'a CubemapTexture)> {
+    wanted: &[(&'a ReflectionProbe, CubeShape)],
+) -> Vec<(&'a ReflectionProbe, CubeShape)> {
     let face = MAX_FACE;
     debug_assert!(
         wanted.iter().all(|(_, cube)| fits(face, cube.size)),
@@ -42,6 +41,6 @@ pub(super) fn admitted<'a>(
     );
     (wanted.iter())
         .filter(|(_, cube)| fits(face, cube.size))
-        .map(|(p, c)| (*p, &**c))
+        .copied()
         .collect()
 }

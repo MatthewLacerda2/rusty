@@ -22,34 +22,30 @@
 //! **Size and budget.** The array's face is the largest resident cube's (#1584); a
 //! smaller cube lands as many mips down as it is halved, and its `mip_base` tells the
 //! shader where its chain starts, so a 128-texel cube shares an array of 512-texel
-//! ones. The resident set is held to the scene's byte budget
-//! (`LightingSettings::reflections`, counted at the array's face), filled nearest box
-//! first, a cube that would pass it skipped (`frame.rs`). The array holds exactly the
-//! slots it needs, shrinking when the budget or the wanted count drops (`slots.rs`),
-//! and the decoded cubes the renderer keeps to copy from are evicted back to the
-//! budget, least recently resident first (`cache.rs`). A cube whose size is not a
-//! power of two up to
-//! [`MAX_FACE`] is left out with a warning, never uploaded (the size is checked
-//! between decoding the file and creating its texture, #1245), and the objects it
-//! would cover reflect the sky.
+//! ones. The array is the only copy of a resident cube: a cube is read from disk,
+//! copied into its slot, and its own texture dropped, so the scene's byte budget
+//! (`LightingSettings::reflections`, counted at the array's face) bounds all the
+//! probe memory there is. The frame fills it nearest box first, judging each cube by
+//! its KTX2 header before reading the rest of it, and leaves room in it for
+//! [`SPARE_SLOTS`] cubes that just left range (`frame.rs`, `slots.rs`). A cube
+//! whose size is not a power of two up to [`MAX_FACE`] is left out with a warning,
+//! never uploaded (#1245), and the objects it would cover reflect the sky.
 
 mod admit;
-mod cache;
 mod frame;
 mod gpu;
 mod pack;
 pub(crate) mod slots;
 
-use std::rc::Rc;
+use std::collections::HashMap;
 
 use glam::Vec3;
 
 use self::admit::admitted;
-use self::cache::CubeCache;
 pub(crate) use self::pack::pack_blend;
 use self::slots::SlotTable;
-pub(crate) use self::slots::MAX_REFLECTION_PROBES;
-use super::cubemap::CubemapTexture;
+pub(crate) use self::slots::{MAX_REFLECTION_PROBES, SPARE_SLOTS};
+use super::cubemap::{CubeShape, CubemapTexture};
 use crate::scene::{ReflectionProbe, ReflectionProbeSet};
 
 /// The largest face a resident cube may have: the largest a probe bakes at.
@@ -75,9 +71,13 @@ pub(crate) struct ReflectionProbeUniform {
     pub params: [f32; 4],
 }
 
-/// A probe the array holds this frame: the probe, its cube, and how many mips below
-/// the array's base level the cube's chain starts.
-type Resident<'a> = (&'a ReflectionProbe, &'a CubemapTexture, u32);
+/// A probe the array holds this frame: the probe, its cube's shape, and how many mips
+/// below the array's base level the cube's chain starts.
+type Resident<'a> = (&'a ReflectionProbe, CubeShape, u32);
+
+/// A cube the array must read from disk and copy in this frame: its path and shape,
+/// its slot, and how many mips down it lands.
+pub(super) type CubeCopy = (String, CubeShape, usize, u32);
 
 /// The probe cube array and this frame's probes.
 pub(crate) struct ProbeArray {
@@ -89,14 +89,18 @@ pub(crate) struct ProbeArray {
     mips: u32,
     cubes: usize,
     table: SlotTable,
-    /// The decoded cubes the renderer's cache holds, evicted to the budget.
-    cache: CubeCache,
+    /// The shape of every cube path the frame has looked at, from its KTX2 header;
+    /// `None` for a file that is missing or that the array does not admit.
+    shapes: HashMap<String, Option<CubeShape>>,
     /// This frame's resident probes in selection form; probe `i` is uniform `i`.
     active: ReflectionProbeSet,
     uniforms: [ReflectionProbeUniform; MAX_REFLECTION_PROBES],
     /// How many cubes were copied in, for tests that a frame did no GPU work.
     #[cfg(test)]
     pub(crate) copies: usize,
+    /// How many cubes were read from disk, for tests of what a frame loads.
+    #[cfg(test)]
+    pub(crate) loads: usize,
 }
 
 impl ProbeArray {
@@ -118,11 +122,13 @@ impl ProbeArray {
             mips: 1,
             cubes: 1,
             table: SlotTable::default(),
-            cache: CubeCache::default(),
+            shapes: HashMap::new(),
             active: ReflectionProbeSet::new(),
             uniforms: [ReflectionProbeUniform::default(); MAX_REFLECTION_PROBES],
             #[cfg(test)]
             copies: 0,
+            #[cfg(test)]
+            loads: 0,
         }
     }
 
@@ -143,31 +149,32 @@ impl ProbeArray {
         self.face
     }
 
-    /// Drop the slots of re-written cubemaps (#1207), and what the cache knew of
-    /// them; the next frame loads and copies them again.
+    /// Drop the slots of re-written cubemaps (#1207), and their shapes; the next
+    /// frame reads and copies them again.
     pub(crate) fn forget(&mut self, stale: impl Fn(&str) -> bool) {
         self.table.forget(&stale);
-        self.cache.forget(&stale);
+        self.shapes.retain(|p, _| !stale(p));
     }
 
-    /// Make `wanted` (in scene order, at most the budget) this frame's probes: copy
-    /// the cubes that are not resident yet, resizing the array to the slots they
-    /// need (no more than `budget` bytes pays for, past what they need). Returns true when the array texture was replaced, so group 0 must rebind.
-    /// Each cube must be [admitted](Self::admits): a debug build asserts it, and a
-    /// release build leaves out one that isn't, since a cube larger than the face would
-    /// give the array a mip count wgpu rejects (#1245).
-    fn update(
+    /// Make `wanted` (in scene order, within the budget) this frame's probes: place
+    /// them in slots, resizing the array to the slots they and the spares need (no
+    /// more than `budget` bytes pays for, past what they need), and return the cubes
+    /// that must be read and copied in ([`Self::fill`]) and whether the array texture
+    /// was replaced, so group 0 must rebind. Each cube must be
+    /// [admitted](Self::admits): a debug build asserts it, and a release build leaves
+    /// out one that isn't, since a cube larger than the face would give the array a
+    /// mip count wgpu rejects (#1245).
+    fn place(
         &mut self,
         device: &wgpu::Device,
-        queue: &wgpu::Queue,
-        wanted: &[(&ReflectionProbe, Rc<CubemapTexture>)],
+        wanted: &[(&ReflectionProbe, CubeShape)],
         budget: u64,
-    ) -> bool {
+    ) -> (Vec<CubeCopy>, bool) {
         let kept = admitted(wanted);
         if kept.is_empty() {
             // Nothing to shade: keep the resident cubes for the next scene.
             self.activate(&[], &[]);
-            return false;
+            return (Vec::new(), false);
         }
         let (face, mips) = self.target_size(&kept);
         let kept: Vec<Resident> = kept
@@ -190,21 +197,13 @@ impl ProbeArray {
             (self.texture, self.view) = gpu::array_texture(device, face, mips, self.cubes);
             (self.face, self.mips) = (face, mips);
         }
-        let copies: Vec<_> = plan
-            .copies
-            .iter()
+        let copies = (plan.copies.iter())
             .map(|&slot| {
-                (
-                    unique[plan.slot_of.iter().position(|&s| s == slot).unwrap()],
-                    slot,
-                )
+                let k = plan.slot_of.iter().position(|&s| s == slot).unwrap();
+                let (_, shape, shift) = unique[k];
+                (paths[k].to_string(), shape, slot, shift)
             })
             .collect();
-        gpu::copy_into(device, queue, &self.texture, &copies);
-        #[cfg(test)]
-        {
-            self.copies += copies.len();
-        }
         let layers: Vec<u32> = kept
             .iter()
             .map(|r| {
@@ -212,17 +211,32 @@ impl ProbeArray {
             })
             .collect();
         self.activate(&kept, &layers);
-        rebuilt
+        (copies, rebuilt)
+    }
+
+    /// Copy each loaded `(cube, slot, shift)` [`Self::place`] asked for into its
+    /// slot. The cubes are dropped after: the array is the copy that stays.
+    fn fill(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        cubes: &[(CubemapTexture, usize, u32)],
+    ) {
+        gpu::copy_into(device, queue, &self.texture, cubes);
+        #[cfg(test)]
+        {
+            self.copies += cubes.len();
+        }
     }
 
     /// The face size and mip count to hold `kept`: the largest cube's face, and the
     /// current array's mips when they hold every cube's chain (so a scene with smaller
     /// cubes does not reallocate), else as many as the set needs.
-    fn target_size(&self, kept: &[(&ReflectionProbe, &CubemapTexture)]) -> (u32, u32) {
+    fn target_size(&self, kept: &[(&ReflectionProbe, CubeShape)]) -> (u32, u32) {
         let face = kept.iter().map(|(_, cube)| cube.size).max().unwrap_or(1);
         let mips = kept
             .iter()
-            .map(|(_, cube)| (face / cube.size).trailing_zeros() + cube.texture.mip_level_count())
+            .map(|(_, cube)| (face / cube.size).trailing_zeros() + cube.mips)
             .max()
             .unwrap_or(1);
         if self.face == face && mips <= self.mips {
@@ -233,28 +247,22 @@ impl ProbeArray {
 
     /// Record `kept` as the frame's probes, probe `i` in layer `layers[i]`: the
     /// selection set draws query and the uniforms the shader reads. Only a probe that
-    /// changed since the last frame is cloned, and the clone is clamped
-    /// (`ReflectionProbe::clamp_settings`): a scene file's values reach here as
-    /// written, and the blend and the shader read the clamped ones.
+    /// changed since the last frame is cloned; a loaded scene's probes were held to
+    /// their ranges once, on load (#1584).
     fn activate(&mut self, kept: &[Resident], layers: &[u32]) {
         self.active.probes.truncate(kept.len());
         for (i, (&(probe, cube, shift), &layer)) in kept.iter().zip(layers).enumerate() {
-            let clamped = || {
-                let mut p = probe.clone();
-                p.clamp_settings();
-                p
-            };
             match self.active.probes.get_mut(i) {
                 Some(resident) if resident == probe => {}
-                Some(resident) => *resident = clamped(),
-                None => self.active.probes.push(clamped()),
+                Some(resident) => resident.clone_from(probe),
+                None => self.active.probes.push(probe.clone()),
             }
             let probe = &self.active.probes[i];
             self.uniforms[i] = ReflectionProbeUniform {
                 center: probe.position.to_array(),
                 mip_base: shift as f32,
                 box_min: probe.box_min.to_array(),
-                mip_count: cube.texture.mip_level_count() as f32,
+                mip_count: cube.mips as f32,
                 box_max: probe.box_max.to_array(),
                 layer,
                 params: [

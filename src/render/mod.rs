@@ -30,7 +30,7 @@ pub mod ui;
 
 // Moved submodules pulled back under short names so this module's body keeps
 // naming them directly (grouped by subfolder — see the convention in CLAUDE.md).
-use ibl::{cubemap, reflection_probes, sky_cube, skybox};
+use ibl::{reflection_probes, sky_cube, skybox};
 use passes::{particles, shadows};
 
 use crate::components::MeshRevision;
@@ -210,14 +210,6 @@ pub struct Renderer {
     reflection_probes: reflection_probes::ProbeArray,
     /// The sky's prefiltered reflection cubes at group-0 binding 2 (#1553).
     sky_reflection: sky_cube::SkyReflection,
-    /// Decoded cubemaps by path — the content cache the probe array copies from (#355).
-    /// Which probes are resident is per-scene state and legitimately flips when two
-    /// scenes with different probes render in one frame; without this, each flip
-    /// re-read the KTX2 from disk and re-uploaded every mip. A cached `None` remembers
-    /// an unreadable file so it is not retried on every flip either; an engine write to
-    /// the path (a reflection bake) drops the entry, cached `None` included
-    /// (`refresh_textures`, #1207).
-    cubemaps: HashMap<String, Option<Rc<cubemap::CubemapTexture>>>,
     pub shadow_layout: wgpu::BindGroupLayout,
     pub shadow_uniform_buffer: wgpu::Buffer,
     /// The forward pass's group 3 with the white no-AO fallback: every pass that

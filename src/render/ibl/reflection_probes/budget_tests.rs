@@ -1,5 +1,6 @@
-//! The byte budget (#1584): it bounds the resident set, the array and the decoded
-//! cubes the renderer keeps, and one big cube does not empty the set.
+//! The byte budget (#1584): it bounds the resident set and the array, the one copy of
+//! a resident cube; a frame reads only what it copies; one big cube does not empty
+//! the set.
 
 use glam::Vec3;
 
@@ -56,39 +57,76 @@ fn gpu_one_big_cube_does_not_empty_the_resident_set() {
         64,
         "the face did not grow"
     );
-    assert!(
-        !renderer.cubemaps.contains_key(&big),
-        "and the big one is evicted"
+    assert_eq!(
+        renderer.reflection_probes.loads, 2,
+        "the big one is never read"
     );
 }
 
-/// A level of more probes than the budget, walked end to end: the array and the
-/// decoded cubes never pass the budget, and the probe underfoot stays resident.
+/// A line of `n` probes 4 m apart, each its own 64-texel cube, under a 1 MB budget:
+/// eight 64-texel cubes, six shaded and two spare.
+fn level(n: usize, name: &str) -> Scene {
+    let mut scene = Scene::new();
+    for k in 0..n {
+        let set = &mut scene.reflection_probes;
+        let i = set.add(Vec3::new(4.0 * k as f32, 0.0, 0.0), Vec3::ONE);
+        set.set_cubemap(i, cube_file(&format!("{name}_{k}.ktx2"), 64, k as u8));
+    }
+    scene.lighting_settings.reflections.budget_mb = 1;
+    scene
+}
+
+/// The first frame of a level of many probes reads only the cubes it copies, not
+/// every cube whose size it doesn't know yet.
+#[test]
+fn gpu_the_first_frame_reads_only_what_the_array_holds() {
+    let Some(mut renderer) = renderer() else {
+        return;
+    };
+    let scene = level(60, "first");
+    renderer.update_reflection_probes(&scene, Vec3::ZERO);
+    let probes = &renderer.reflection_probes;
+    assert_eq!(probes.loads, 6, "six shaded, nothing read past the budget");
+    assert_eq!(
+        probes.shapes.len(),
+        6,
+        "no header past the full array is read"
+    );
+}
+
+/// A level of more probes than the budget, walked end to end: the array, the only
+/// copy of the cubes, never passes the budget, and the probe underfoot stays
+/// resident.
 #[test]
 fn gpu_a_walk_through_the_level_stays_within_the_budget() {
     let Some(mut renderer) = renderer() else {
         return;
     };
-    let mut scene = Scene::new();
-    for k in 0..40 {
-        let set = &mut scene.reflection_probes;
-        let i = set.add(Vec3::new(4.0 * k as f32, 0.0, 0.0), Vec3::ONE);
-        set.set_cubemap(i, cube_file(&format!("walk_{k}.ktx2"), 64, k as u8));
-    }
-    scene.lighting_settings.reflections.budget_mb = 1;
-    let budget = 1 << 20;
+    let scene = level(40, "walk");
     for step in 0..=80 {
         let x = 2.0 * step as f32;
         renderer.update_reflection_probes(&scene, Vec3::new(x, 0.0, 0.0));
         let probes = &renderer.reflection_probes;
-        let held = renderer.cubemaps.values().flatten().count() as u64;
         assert!(
-            held * array_bytes(64, 1) <= budget,
-            "{held} cubes held at {x}"
+            array_bytes(probes.face(), probes.cubes) <= 1 << 20,
+            "at {x}"
         );
-        assert!(probes.cache.held_bytes() <= budget);
-        assert!(array_bytes(probes.face(), probes.cubes) <= budget, "at {x}");
         let underfoot = (x / 4.0).round().min(39.0) * 4.0;
         assert_ne!(probe_at(&renderer, underfoot), 0, "at {x}");
     }
+    assert_eq!(renderer.reflection_probes.loads, 40, "each cube read once");
+}
+
+/// Pacing across the budget's edge reads nothing from disk: the cube that left
+/// range waits in a spare slot.
+#[test]
+fn gpu_pacing_across_the_budget_edge_reads_nothing_again() {
+    let Some(mut renderer) = renderer() else {
+        return;
+    };
+    let scene = level(20, "pace");
+    for x in [10.0, 14.0, 10.0, 14.0, 10.0, 14.0] {
+        renderer.update_reflection_probes(&scene, Vec3::new(x, 0.0, 0.0));
+    }
+    assert_eq!(renderer.reflection_probes.loads, 7, "the seventh read once");
 }

@@ -150,8 +150,8 @@ fn gpu_bake_writes_file_and_sets_path() {
 
     // The written file loads back, through the path the frame uses, into a mipped
     // cube the probe array admits.
-    let cube = renderer.cached_cubemap(&path).expect("baked file loads");
-    assert_eq!(cube.size, RES);
+    renderer.update_reflection_probes(&scene, scene.reflection_probes.probes[0].position);
+    assert_eq!(renderer.reflection_probes.face(), RES, "baked file loads");
 
     let _ = std::fs::remove_dir_all(&dir);
 }

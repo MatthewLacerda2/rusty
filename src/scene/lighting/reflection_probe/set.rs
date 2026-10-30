@@ -68,9 +68,14 @@ impl ReflectionProbeSet {
             return false;
         };
         f(p);
-        p.clamp_settings();
-        (p.box_min, p.box_max) = (p.box_min.min(p.box_max), p.box_min.max(p.box_max));
+        hold(p);
         true
+    }
+
+    /// Hold every probe as [`Self::edit`] does: what a loaded scene file wrote goes
+    /// through it once, so no reader clamps again (#1584).
+    pub fn hold(&mut self) {
+        self.probes.iter_mut().for_each(hold);
     }
 
     /// Remove probe `index` (no-op if out of range).
@@ -85,3 +90,13 @@ impl ReflectionProbeSet {
         self.probes.clear();
     }
 }
+
+/// `p`'s settings held to their ranges and its box corners in order.
+fn hold(p: &mut ReflectionProbe) {
+    p.clamp_settings();
+    (p.box_min, p.box_max) = (p.box_min.min(p.box_max), p.box_min.max(p.box_max));
+}
+
+#[cfg(test)]
+#[path = "set_tests.rs"]
+mod set_tests;

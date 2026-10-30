@@ -3,12 +3,12 @@
 
 use std::cell::RefCell;
 use std::panic::AssertUnwindSafe;
-use std::rc::Rc;
 
 use glam::Vec3;
 
 use super::super::gpu_tests::{cube_file, first, probes_at, renderer};
 use super::ranked;
+use crate::render::ibl::cubemap::read_cube_shape;
 use crate::render::ibl::reflection_probes::MAX_REFLECTION_PROBES;
 use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;
@@ -97,8 +97,12 @@ fn gpu_a_larger_cube_is_passed_over_and_never_uploaded() {
     let probes = &renderer.reflection_probes;
     assert_eq!(probes.probe_for(Vec3::new(-2.0, 0.0, 0.0)), 0);
     assert_ne!(probes.probe_for(Vec3::new(2.0, 0.0, 0.0)), 0);
-    let cached = renderer.cubemaps.get(&big);
-    assert!(matches!(cached, Some(None)), "cached as absent, no texture");
+    let known = renderer.reflection_probes.shapes.get(&big);
+    assert_eq!(known, Some(&None), "known as unusable, never read whole");
+    assert_eq!(
+        renderer.reflection_probes.loads, 1,
+        "only the small one was read"
+    );
     renderer.invalidate_textures(std::slice::from_ref(&big));
     assert_eq!(
         warnings(&mut renderer),
@@ -107,7 +111,7 @@ fn gpu_a_larger_cube_is_passed_over_and_never_uploaded() {
     );
 }
 
-/// `update` takes only admitted cubes: one whose size is not a power of two would give
+/// `place` takes only admitted cubes: one whose size is not a power of two would give
 /// the array a mip count wgpu rejects, so a debug build stops at the contract.
 #[test]
 #[cfg(debug_assertions)]
@@ -116,14 +120,11 @@ fn gpu_update_refuses_a_cube_that_does_not_fit() {
         return;
     };
     let path = cube_file("unadmitted_48.ktx2", 48, 5);
-    let cube = Rc::new(renderer.load_cubemap_mips(&path, |_| true).unwrap());
+    let shape = read_cube_shape(&path).unwrap();
     let scene = probes_at(&[(0.0, &path)]);
-    let wanted = [(&scene.reflection_probes.probes[0], cube)];
+    let wanted = [(&scene.reflection_probes.probes[0], shape)];
     let r = &mut renderer;
-    let update = AssertUnwindSafe(|| {
-        r.reflection_probes
-            .update(&r.device, &r.queue, &wanted, u64::MAX)
-    });
+    let update = AssertUnwindSafe(|| r.reflection_probes.place(&r.device, &wanted, u64::MAX));
     let err = std::panic::catch_unwind(update).expect_err("the assert trips");
     let message = (err.downcast_ref::<&str>().map(|m| m.to_string()))
         .or_else(|| err.downcast_ref::<String>().cloned())
