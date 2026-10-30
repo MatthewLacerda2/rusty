@@ -263,21 +263,9 @@ pub struct Renderer {
     /// The scene-depth layout the soft particles sample the depth target through.
     scene_depth_layout: wgpu::BindGroupLayout,
 
-    /// When set, the forward pass gathers only `is_static` entities (#243). The
-    /// static-cubemap capture toggles this on for its 6 faces and restores it after,
-    /// so probe/reflection bakes see the distant environment (static walls + skybox)
-    /// without the dynamic actors that would otherwise bake into the captured lighting.
-    static_capture: bool,
-
-    /// When set, static surfaces sample the probe field during a static-cubemap
-    /// capture instead of falling back to flat ambient (#285). The multi-bounce probe
-    /// bake toggles this on for bounce ≥2 so each capture re-lights the static scene
-    /// from the previous bounce's probe SH, adding one indirect bounce per pass.
-    /// Off everywhere else, so direct-only capture (bounce 1, reflection bakes) and
-    /// runtime shading keep their "static ⇒ no probe SH" rule.
-    capture_probe_bounce: bool,
-    /// Off while a reflection probe that captures without shadows is baked (#1584).
-    capture_shadows: bool,
+    /// How the frame renders while a static cubemap is captured (#243, #285, #1584):
+    /// the default outside a capture. See [`ibl::cubemap_capture::CaptureMode`].
+    capture: ibl::cubemap_capture::CaptureMode,
 
     /// What the last `render` call submitted (#433) — read by the dev layer's stats.
     pub frame_counters: RenderCounters,

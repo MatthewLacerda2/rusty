@@ -30,12 +30,12 @@ impl Renderer {
         let fitted = cascades::fit(
             camera,
             aspect,
-            sun_direction(scene, self.static_capture),
+            sun_direction(scene, self.capture.static_only),
             settings,
             ShadowRenderer::CASCADE_SIZE,
         );
         // A probe captured without shadows (#1584) samples no cascade.
-        let sampled: &[_] = if self.capture_shadows { &fitted } else { &[] };
+        let sampled: &[_] = if self.capture.shadows { &fitted } else { &[] };
         let uniform = CascadeUniform::new(sampled, camera.position, camera.forward());
         self.queue
             .write_buffer(&self.shadow_uniform_buffer, 0, bytemuck::bytes_of(&uniform));
@@ -61,8 +61,11 @@ impl Renderer {
             surfaces: &self.surface_shaders,
             timer: &self.gpu_timer,
         };
-        self.shadow_renderer
-            .render_cascades(&mut encoder, &frame, lod);
+        if self.capture.shadows {
+            // a probe captured without shadows samples no cascade, so draws none
+            self.shadow_renderer
+                .render_cascades(&mut encoder, &frame, lod);
+        }
         let bake = self.shadow_renderer.render_atlas(&mut encoder, &frame, lod);
         self.queue.submit(std::iter::once(encoder.finish()));
         self.frame_counters.shadow_atlas_cached = bake.cached;
@@ -78,7 +81,7 @@ impl Renderer {
         let view_proj = camera.build_view_projection(aspect);
         let grid = ClusterGrid::new(camera, aspect);
         let mut requests = clusters::shadow_requests(&grid, &self.clusters.staged());
-        if !self.capture_shadows {
+        if !self.capture.shadows {
             requests.clear(); // a probe captured without shadows plans no tile
         }
         let plan = atlas::plan(&requests, view_proj, camera.position);
