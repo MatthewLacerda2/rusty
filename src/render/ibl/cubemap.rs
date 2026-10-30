@@ -242,5 +242,5 @@ mod cubemap_tests;
 mod cube_shape_tests;
 
 #[cfg(test)]
-#[path = "cube_corrupt_tests.rs"]
-mod cube_corrupt_tests;
+#[path = "corrupt_cube_tests.rs"]
+mod corrupt_cube_tests;

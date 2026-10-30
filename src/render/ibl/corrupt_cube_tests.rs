@@ -40,6 +40,9 @@ fn put_u64(b: &mut [u8], at: usize, v: u64) {
     b[at..at + 8].copy_from_slice(&v.to_le_bytes());
 }
 
+/// A change that breaks a valid cube.
+type Corruption = fn(&mut Vec<u8>);
+
 /// The same judgement from the header read (through a file) and the full parse.
 fn judged(bytes: &[u8]) -> (Result<CubeShape, Refusal>, Option<CubeShape>) {
     let path = crate::test_temp::dir().join("cube.ktx2");
@@ -60,7 +63,7 @@ fn a_mipped_cube_is_read_whole_by_both() {
 #[test]
 fn every_corrupt_or_unsupported_cube_is_refused_by_both() {
     const LAST: usize = HEADER + 2 * LEVEL_ENTRY;
-    let corrupt: [(&str, fn(&mut Vec<u8>)); 9] = [
+    let corrupt: [(&str, Corruption); 9] = [
         ("truncated", |b| b.truncate(b.len() - 1)),
         ("truncated in the header", |b| b.truncate(60)),
         ("truncated in the index", |b| b.truncate(HEADER + 30)),
