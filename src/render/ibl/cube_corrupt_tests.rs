@@ -12,12 +12,14 @@ fn mipped_cube() -> Vec<u8> {
     // Room for two more index entries, then the 2- and 1-texel levels appended.
     bytes.splice(index - 2 * LEVEL_ENTRY..index - 2 * LEVEL_ENTRY, [0; 48]);
     put_u32(&mut bytes, 40, 3);
-    put_u32(&mut bytes, 48, u32_at(&bytes, 48) + 48);
+    let dfd_at = u32_at(&bytes, 48);
+    put_u32(&mut bytes, 48, dfd_at + 48);
     put_u64(&mut bytes, HEADER, base_at as u64 + 48);
     for (level, edge) in [(1, 2u64), (2, 1)] {
         let len = edge * edge * 24;
         let entry = HEADER + level * LEVEL_ENTRY;
-        put_u64(&mut bytes, entry, bytes.len() as u64);
+        let at = bytes.len() as u64;
+        put_u64(&mut bytes, entry, at);
         put_u64(&mut bytes, entry + 8, len);
         put_u64(&mut bytes, entry + 16, len);
         bytes.resize(bytes.len() + len as usize, 0);
@@ -57,7 +59,7 @@ fn a_mipped_cube_is_read_whole_by_both() {
 
 #[test]
 fn every_corrupt_or_unsupported_cube_is_refused_by_both() {
-    let last = HEADER + 2 * LEVEL_ENTRY;
+    const LAST: usize = HEADER + 2 * LEVEL_ENTRY;
     let corrupt: [(&str, fn(&mut Vec<u8>)); 9] = [
         ("truncated", |b| b.truncate(b.len() - 1)),
         ("truncated in the header", |b| b.truncate(60)),
@@ -66,9 +68,9 @@ fn every_corrupt_or_unsupported_cube_is_refused_by_both() {
         ("levelCount huge", |b| put_u32(b, 40, u32::MAX)),
         ("zstd-supercompressed", |b| put_u32(b, 44, 2)),
         ("a 3D cube", |b| put_u32(b, 28, 4)),
-        ("short last level", |b| put_u64(b, last + 8, 23)),
+        ("short last level", |b| put_u64(b, LAST + 8, 23)),
         ("a level index past the end", |b| {
-            put_u64(b, last, u64::MAX - 8)
+            put_u64(b, LAST, u64::MAX - 8)
         }),
     ];
     for (what, corrupt) in corrupt {
