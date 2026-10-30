@@ -11,9 +11,13 @@
 //! write and its validation live once in that shared module, which the Lua
 //! `Material.*` API calls too, so the panel and the binding are siblings over one op.
 
+mod library;
 mod shader_params;
 mod slots;
 mod surface;
+
+pub(in crate::editor::inspector) use library::apply as apply_action;
+pub use library::{MaterialAction, MaterialDelete};
 
 use crate::editor::inspector::components::card::remove_component;
 use crate::scene::authoring::ComponentKind;
@@ -33,7 +37,7 @@ use crate::scene::{MaterialAsset, RenderMode};
 /// it references in the library. Folds in any pending material the Add menu staged (it
 /// lacked library access); on the card's "remove" detaches the entity's reference — the
 /// shared asset stays in the library for other referencing entities. No-op when the
-/// entity references no material. Carries a Details/Preview tab strip (#352) — materials
+/// entity references no material. Its *Delete* row (`library`, #1576) emits `action`. Carries a Details/Preview tab strip (#352) — materials
 /// have no on-disk file to dispatch a Preview tab on the way `assets/mod.rs` does, so it
 /// hangs off this card instead.
 pub fn draw_material_card(
@@ -42,6 +46,7 @@ pub fn draw_material_card(
     world: &mut crate::ecs::World,
     id: u32,
     materials: &mut BTreeMap<String, MaterialAsset>,
+    action: &mut Option<MaterialAction>,
 ) {
     let Some(first) = world.material(id).map(|m| m.first().to_string()) else {
         return;
@@ -55,6 +60,7 @@ pub fn draw_material_card(
         return;
     };
     mat_ops::fold_pending(materials, &key, MaterialAsset::default());
+    library::draw(ui, &editor.material_delete, &key, action);
 
     preview::draw_tab_strip(ui, &mut editor.preview_tab_active, editor.theme);
     if editor.preview_tab_active {

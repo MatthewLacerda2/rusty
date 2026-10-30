@@ -2,6 +2,7 @@
 //! that need `&mut Scene`, applied once the card pass is done. The navmesh is not
 //! one of them: the editor syncs it once per edit-mode frame (#992).
 
+use super::components::material::{self, MaterialAction};
 use super::components::mesh::SkinTool;
 use super::components::prefab;
 use crate::editor::EditorUi;
@@ -16,14 +17,21 @@ pub(super) struct PendingEdits {
     pub(super) prefab_action: Option<prefab::PrefabAction>,
     /// The Mesh card's *Generate Hitboxes* / *Build Ragdoll* buttons (#464, #466).
     pub(super) skin_tool: Option<SkinTool>,
+    /// The Material card's *Delete* / *Undo* (#1576).
+    pub(super) material_action: Option<MaterialAction>,
 }
 
 impl PendingEdits {
     /// Apply the deferred edits once the entity guard has dropped: re-parent, run a
-    /// prefab verb, run a skin tool, and mark the scene dirty for each that did.
+    /// prefab verb, delete or restore a material, run a skin tool, and mark the scene dirty for each that did.
     pub(super) fn apply(self, editor: &mut EditorUi, scene: &mut Scene, id: u32) {
         if let Some(action) = self.prefab_action {
             if prefab::dispatch(scene, action) {
+                editor.is_dirty = true;
+            }
+        }
+        if let Some(action) = self.material_action {
+            if material::apply_action(editor, scene, action) {
                 editor.is_dirty = true;
             }
         }

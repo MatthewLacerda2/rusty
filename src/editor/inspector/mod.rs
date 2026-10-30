@@ -86,6 +86,8 @@ fn draw_entity_inspector(
 ) {
     let mut pending = PendingEdits::default();
     let cx = gather_context(scene, selected_id);
+    // A material delete's confirm and Undo belong to the scene they came from (#1576).
+    editor.material_delete.keep_scene(scene.id());
 
     // The cards borrow the world (`scene.world`) and the material library
     // (`scene.materials`) as DISJOINT fields of `Scene`, so the material card can
@@ -224,7 +226,8 @@ fn draw_components(
 ) {
     let skin_tool = &mut pending.skin_tool;
     mesh::draw_mesh(ui, world, id, &mut editor.is_dirty, skin_tool);
-    material::draw_material_card(ui, editor, world, id, materials);
+    let action = &mut pending.material_action;
+    material::draw_material_card(ui, editor, world, id, materials, action);
     render::draw_light(ui, world, id, &mut editor.is_dirty);
     lod_group::draw_lod_group(ui, world, id, &mut editor.is_dirty);
 

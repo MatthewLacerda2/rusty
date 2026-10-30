@@ -175,6 +175,7 @@ like any library material (no engine special-casing).
 | `Material.GetAsset` | `(name)` | the asset's canonical JSON string, or `nil` if absent |
 | `Material.Rebake` | `(name [, resolution])` | — (re-bakes the asset's `maps` recipe; errors if it has none) |
 | `Material.HasAsset` | `(name)` | `bool` |
+| `Material.DeleteAsset` | `(name [, { force = true }])` | an array naming each user it moved to the default material (empty when none); see *Deleting a material asset* below |
 
 The **recipe** is a table (or that table's JSON string — both decode alike) whose shape mirrors the `MaterialAsset` document one-to-one
 (every field optional — omit one to take its default; enum values are read in any case), bounded to exactly what the
@@ -215,6 +216,32 @@ through the *same* shared ops the per-entity setters use: `alpha`/`alpha_cutoff`
 to `[0,1]`, and an unknown `render_mode` string degrades to `Opaque` — so validation is
 single-sourced, not re-implemented. `Material.DefineAsset` **overwrites** any existing
 asset of that name.
+
+#### Deleting a material asset
+
+`Material.DeleteAsset(name)` takes a material out of the library, as deleting a
+material asset in Unity does (#1576). Its **users** are what names it by its key:
+each material slot of an entity, an emitter's mesh particles (`render.material`)
+and a live decal (`Decals.Spawn`'s `material`). A material still in use is
+**refused**: the error names every user (`entity 3 "Floor" slot 0`, with
+`(instance of prefabs/crate.prefab)` for a prefab instance's entity), and nothing
+changes. With `{ force = true }` each user falls back to the engine's default
+material and the console warns which: a slot to its entity's own default material
+(`entity_<id>_material`, created as the default white material when the library has
+none, the one *Add Component* attaches), mesh particles and a decal to no material
+(the engine default, and the decal's own texture). An absent `name` is an error. The
+deletion saves with the scene. A `.prefab` file is never a user: it carries its own
+copy of every material it names, which instancing it merges back in. The editor's
+Material card has the same **Delete** (a confirm lists the users) and one *Undo*
+that restores the asset and every slot it moved.
+
+```lua with=id
+Material.DefineAsset("checker", { base_color = {0.5, 0.5, 0.5} })
+Material.Set(id, "checker")
+-- Material.DeleteAsset("checker") would refuse: entity `id` uses it.
+local moved = Material.DeleteAsset("checker", { force = true })
+-- moved[1] names entity `id`'s slot 0, now on its own default material.
+```
 
 #### One call: the maps recipe inside the material — `maps`
 

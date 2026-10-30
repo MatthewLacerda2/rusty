@@ -21,6 +21,7 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use crate::components::{Entity, EntityRefs};
+use crate::scene::authoring::material::drop_unused;
 use crate::scene::prefab::diff::masked;
 use crate::scene::prefab::instance::instance_members;
 use crate::scene::prefab::live::{entity_overrides, keep_root_placement, sync_overrides};
@@ -37,8 +38,9 @@ use crate::scene::{instantiate_prefab, PrefabData, Scene};
 /// their LOCAL ids, component references included (callers move those into the
 /// instance's ids with [`in_instance_space`] and overwrite identity/structure). A
 /// reference to one of the scratch skeleton's bones keeps the bone by name in
-/// `bone_refs` (#1264), naming its skinned entity meanwhile.
-fn fresh_baselines(scene: &mut Scene, prefab: &PrefabData) -> BTreeMap<u32, Entity> {
+/// `bone_refs` (#1264), naming its skinned entity meanwhile. Also returns the keys
+/// the merge added, for [`drop_unused`] once the instance is rebuilt (#1576).
+fn fresh_baselines(scene: &mut Scene, prefab: &PrefabData) -> (BTreeMap<u32, Entity>, Vec<String>) {
     let mut scratch = Scene::new();
     scratch.materials = scene.materials.clone();
     let root = instantiate_prefab(&mut scratch, prefab, None);
@@ -60,8 +62,13 @@ fn fresh_baselines(scene: &mut Scene, prefab: &PrefabData) -> BTreeMap<u32, Enti
     }
 
     // Carry back any materials the merge added (a brand-new key, or a uniquified one).
+    let added = scratch
+        .materials
+        .keys()
+        .filter(|k| !scene.materials.contains_key(*k));
+    let added = added.cloned().collect();
     scene.materials = scratch.materials;
-    out
+    (out, added)
 }
 
 /// `baselines` (keyed by local id) with their component references moved from
@@ -101,11 +108,14 @@ pub fn reimport_instance(scene: &mut Scene, root_id: u32) -> Result<(), String> 
 pub(super) fn propagate(scene: &mut Scene, root_id: u32) -> Result<(), String> {
     let ids = require_instance(scene, root_id)?;
     let prefab = load_instance_source(scene, root_id)?;
-    let baselines = fresh_baselines(scene, &prefab);
+    let (baselines, added) = fresh_baselines(scene, &prefab);
     let baselines = in_instance_space(scene, &ids, baselines);
     for id in ids {
         rebuild_entity(scene, id, &baselines, true);
     }
+    // Only what a slot still names after the overrides stays: a material deleted
+    // from the scene is not brought back by its prefab's copy (#1576).
+    drop_unused(scene, &added);
     // A rebuilt skinned mesh lost its bone binding; re-bind it by name (#453).
     scene.sync_skeletons();
     scene.update_all_colliders();
@@ -117,7 +127,7 @@ pub(super) fn propagate(scene: &mut Scene, root_id: u32) -> Result<(), String> {
 pub fn revert_instance_overrides(scene: &mut Scene, root_id: u32) -> Result<(), String> {
     let ids = require_instance(scene, root_id)?;
     let prefab = load_instance_source(scene, root_id)?;
-    let baselines = fresh_baselines(scene, &prefab);
+    let (baselines, added) = fresh_baselines(scene, &prefab);
     let baselines = in_instance_space(scene, &ids, baselines);
     for id in ids {
         if let Some(mut link) = scene.world.prefab_link_mut(id) {
@@ -125,6 +135,7 @@ pub fn revert_instance_overrides(scene: &mut Scene, root_id: u32) -> Result<(), 
         }
         rebuild_entity(scene, id, &baselines, false);
     }
+    drop_unused(scene, &added);
     scene.sync_skeletons();
     scene.update_all_colliders();
     Ok(())

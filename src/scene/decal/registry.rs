@@ -149,6 +149,13 @@ impl DecalSet {
         true
     }
 
+    /// Point live decal `id` at library material `material`, or at none (#1576).
+    /// `false` when no live decal has that id.
+    pub fn set_material(&mut self, id: u32, material: Option<String>) -> bool {
+        let decal = self.ring.iter_mut().find(|d| d.id == id);
+        decal.map(|d| d.material = material).is_some()
+    }
+
     /// Take every decal out, oldest first. Ids keep counting, and the budgets stay.
     pub(super) fn drain(&mut self) -> VecDeque<Decal> {
         self.counts = Counts::default();
