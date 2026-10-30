@@ -69,13 +69,13 @@ pub(super) fn copy_cube(
     }
 }
 
-/// Copy each `(cube, slot)` into its array layer, in one submission; nothing to copy
-/// submits nothing.
+/// Copy each `(cube, slot, shift)` into its array layer, in one submission; nothing
+/// to copy submits nothing.
 pub(super) fn copy_into(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
     array: &wgpu::Texture,
-    copies: &[(super::Resident, usize)],
+    copies: &[(CubemapTexture, usize, u32)],
 ) {
     if copies.is_empty() {
         return;
@@ -83,8 +83,8 @@ pub(super) fn copy_into(
     let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
         label: Some("Reflection Probe Copies"),
     });
-    for &((_, cube, shift), slot) in copies {
-        copy_cube(&mut encoder, cube, array, slot as u32, shift);
+    for (cube, slot, shift) in copies {
+        copy_cube(&mut encoder, cube, array, *slot as u32, *shift);
     }
     queue.submit([encoder.finish()]);
 }

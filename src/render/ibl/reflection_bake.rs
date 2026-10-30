@@ -8,9 +8,10 @@
 //! #244). Each frame loads it through the probe array's cubemap cache
 //! (`Renderer::cached_cubemap`), and the forward pass reflects it.
 //!
-//! Every cube is baked at [`DEFAULT_REFLECTION_RESOLUTION`], the face of the probe
-//! array the frame copies cubes into (#1238): a bake at any other size would write
-//! cubes the frame rejects, so there is no size to pass (#1245).
+//! Each probe bakes at its own resolution, or the scene's default
+//! (`LightingSettings::reflections`), through its own lens: its clip planes and
+//! shadows (#1584). The probe array the frame copies cubes into takes the face of
+//! the largest resident cube, so every power-of-two size fits.
 //!
 //! Pure render layer: a function of (static scene, probe positions) plus the output
 //! directory — no wall-clock / RNG, so it is clean under the determinism guard
@@ -18,23 +19,33 @@
 
 use std::path::Path;
 
+use crate::render::ibl::cubemap_capture::CaptureLens;
 use crate::render::ibl::ktx2_encode::encode_cubemap;
 use crate::render::ibl::reflection_prefilter::prefilter;
 use crate::render::Renderer;
-use crate::scene::Scene;
-
-/// Default per-face capture resolution for a reflection bake. Higher than the light-probe
-/// bake's 32 (which only feeds a 9-coefficient SH): a reflection cubemap is sampled
-/// directly, so it wants enough base resolution that a mirror surface reads crisp room
-/// detail before the rougher mips blur it.
-pub const DEFAULT_REFLECTION_RESOLUTION: u32 = 128;
+use crate::scene::lighting::reflection_probe::clamp_resolution;
+use crate::scene::{ReflectionProbe, Scene};
 
 impl Renderer {
-    /// Bake one reflection probe: capture the static scene from `position` at
-    /// [`DEFAULT_REFLECTION_RESOLUTION`] per face, prefilter it into a roughness mip
-    /// chain, and return the encoded KTX2 bytes.
-    pub fn bake_reflection(&mut self, scene: &Scene, position: glam::Vec3) -> Vec<u8> {
-        let capture = self.capture_static_cubemap(scene, position, DEFAULT_REFLECTION_RESOLUTION);
+    /// Bake one reflection probe: capture the static scene from its position at
+    /// `resolution` per face through its clip planes and shadow setting, prefilter it
+    /// into a roughness mip chain, and return the encoded KTX2 bytes.
+    pub fn bake_reflection(
+        &mut self,
+        scene: &Scene,
+        probe: &ReflectionProbe,
+        resolution: u32,
+    ) -> Vec<u8> {
+        // A scene file's values reach here unclamped: bake from a clamped copy.
+        let mut probe = probe.clone();
+        probe.clamp_settings();
+        let resolution = clamp_resolution(resolution);
+        let lens = CaptureLens {
+            near: probe.near_clip,
+            far: probe.far_clip,
+            shadows: probe.shadows,
+        };
+        let capture = self.capture_reflection_cubemap(scene, probe.position, resolution, lens);
         let prefiltered = prefilter(&capture);
         // The mip a fully-rough surface samples (CPU mirror of the shader's selection),
         // logged so a bake's roughness range is visible when debugging a probe.
@@ -49,19 +60,16 @@ impl Renderer {
         encode_cubemap(&prefiltered)
     }
 
-    /// Bake every reflection probe in `scene`, writing each one's KTX2 cubemap into
+    /// Bake every reflection probe in `scene` at its resolution, writing each one's KTX2 cubemap into
     /// `out_dir` (named `reflection_probe_<i>.ktx2`) and pointing the probe's
     /// `cubemap_path` at it. Returns the number of probes baked, or an error if a file
     /// could not be written. With no probes it is a successful no-op (0 baked).
     pub fn bake_reflections(&mut self, scene: &mut Scene, out_dir: &Path) -> Result<usize, String> {
-        let positions: Vec<glam::Vec3> = scene
-            .reflection_probes
-            .probes
-            .iter()
-            .map(|p| p.position)
-            .collect();
-        for (i, position) in positions.into_iter().enumerate() {
-            let bytes = self.bake_reflection(scene, position);
+        let default = scene.lighting_settings.reflections.resolution;
+        let probes = scene.reflection_probes.probes.clone();
+        for (i, probe) in probes.iter().enumerate() {
+            let resolution = clamp_resolution(probe.resolution.unwrap_or(default));
+            let bytes = self.bake_reflection(scene, probe, resolution);
             let path = out_dir.join(format!("reflection_probe_{i}.ktx2"));
             crate::core::fs::written::write(&path, &bytes).map_err(|e| {
                 format!("Failed to write reflection cubemap {}: {e}", path.display())

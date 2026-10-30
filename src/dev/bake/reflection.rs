@@ -2,9 +2,9 @@
 //!
 //! The dev-layer bridge between the script-side `Reflection.Bake()` action and the
 //! render-layer bake (`Renderer::bake_reflections`), the specular sibling of
-//! `probe_bake.rs`. It spins up a headless `Renderer` (no window surface) sized for one
-//! cubemap face, captures + GGX-prefilters each probe, writes the KTX2 cubemaps next to
-//! the scene, and points each probe at its file. Like the light-probe bake it skips
+//! `probe_bake.rs`. It spins up a headless `Renderer` (no window surface),
+//! captures and GGX-prefilters each probe at its resolution, writes the KTX2 cubemaps
+//! next to the scene, and points each probe at its file. Like the light-probe bake it skips
 //! gracefully when no GPU/software adapter is present — it NEVER panics, so an unattended
 //! headless run with no adapter degrades to a no-op rather than a crash.
 //!
@@ -18,7 +18,7 @@
 
 use std::path::Path;
 
-use crate::render::{Renderer, DEFAULT_REFLECTION_RESOLUTION};
+use crate::render::Renderer;
 use crate::scene::Scene;
 
 /// Bake every reflection probe in `scene`, writing each one's KTX2 cubemap next to
@@ -37,8 +37,9 @@ pub fn bake_scene_reflections(scene: &mut Scene, scene_path: Option<&str>) -> Re
         .unwrap_or_else(|| Path::new("."))
         .to_path_buf();
 
-    let res = DEFAULT_REFLECTION_RESOLUTION;
-    let mut renderer = match pollster::block_on(Renderer::new_headless(res, res)) {
+    // Each probe's faces render into a target of their own size, so the renderer's
+    // own is only a placeholder.
+    let mut renderer = match pollster::block_on(Renderer::new_headless(64, 64)) {
         Some(r) => r,
         None => {
             log::warn!("[ReflectionBake] no GPU/software adapter available — skipping bake");

@@ -150,7 +150,7 @@ impl Renderer {
         // During a static-cubemap capture, gather only static geometry — dynamic
         // actors must not bake into a probe/reflection (#243), mirroring the
         // shadow pass's `want_static` filter.
-        if self.static_capture && !scene.world.is_static(id) {
+        if self.capture.static_only && !scene.world.is_static(id) {
             return false;
         }
         crate::scene::layer_in_mask(scene.world.layer(id), mask)
@@ -225,7 +225,7 @@ impl Renderer {
             scene,
             id,
             model_matrix,
-            self.capture_probe_bounce,
+            self.capture.probe_bounce,
             &self.lightmaps,
         );
         // Like Unity, the reflection probe is picked per object, at the centre of its

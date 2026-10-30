@@ -191,9 +191,13 @@ fn apply(scene: &mut Scene, mut data: SceneData, from_disk: bool) {
     scene.probes = data.probes;
     // Reflection probes (positions + boxes + cubemap paths) come straight from the
     // scene doc; the cubemaps themselves are loaded lazily by the renderer (#244).
+    // Held to their ranges once, here (#1584), so every reader (the bake, the
+    // probe array, `Reflection.Get`, the Inspector) sees the same values.
     scene.reflection_probes = data.reflection_probes;
+    scene.reflection_probes.hold();
     scene.lightmaps = data.lightmaps;
     scene.lighting_settings = data.lighting_settings;
+    scene.lighting_settings.reflections.clamp();
 
     // Rebuild every skeleton from its model, then hang the saved attachments back
     // on their bones by name (#453) — before prefab propagation, which rebuilds a

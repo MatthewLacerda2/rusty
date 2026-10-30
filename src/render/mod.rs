@@ -30,7 +30,7 @@ pub mod ui;
 
 // Moved submodules pulled back under short names so this module's body keeps
 // naming them directly (grouped by subfolder — see the convention in CLAUDE.md).
-use ibl::{cubemap, reflection_probes, sky_cube, skybox};
+use ibl::{reflection_probes, sky_cube, skybox};
 use passes::{particles, shadows};
 
 use crate::components::MeshRevision;
@@ -43,7 +43,6 @@ pub use gpu::mesh::MeshId;
 pub use ibl::cubemap_capture::{CubemapCapture, CubemapFace};
 pub use ibl::probe::bake::{project_cubemap, DEFAULT_BAKE_RESOLUTION};
 pub use ibl::probe::bounce::{BounceReport, CONVERGENCE_EPSILON, MAX_BOUNCES};
-pub use ibl::reflection_bake::DEFAULT_REFLECTION_RESOLUTION;
 pub use setup::headless::{gpu_required, OFFSCREEN_FORMAT, REQUIRE_GPU_ENV};
 pub use setup::SurfaceWindow;
 pub use stats::RenderCounters;
@@ -211,14 +210,6 @@ pub struct Renderer {
     reflection_probes: reflection_probes::ProbeArray,
     /// The sky's prefiltered reflection cubes at group-0 binding 2 (#1553).
     sky_reflection: sky_cube::SkyReflection,
-    /// Decoded cubemaps by path — the content cache the probe array copies from (#355).
-    /// Which probes are resident is per-scene state and legitimately flips when two
-    /// scenes with different probes render in one frame; without this, each flip
-    /// re-read the KTX2 from disk and re-uploaded every mip. A cached `None` remembers
-    /// an unreadable file so it is not retried on every flip either; an engine write to
-    /// the path (a reflection bake) drops the entry, cached `None` included
-    /// (`refresh_textures`, #1207).
-    cubemaps: HashMap<String, Option<Rc<cubemap::CubemapTexture>>>,
     pub shadow_layout: wgpu::BindGroupLayout,
     pub shadow_uniform_buffer: wgpu::Buffer,
     /// The forward pass's group 3 with the white no-AO fallback: every pass that
@@ -264,19 +255,9 @@ pub struct Renderer {
     /// The scene-depth layout the soft particles sample the depth target through.
     scene_depth_layout: wgpu::BindGroupLayout,
 
-    /// When set, the forward pass gathers only `is_static` entities (#243). The
-    /// static-cubemap capture toggles this on for its 6 faces and restores it after,
-    /// so probe/reflection bakes see the distant environment (static walls + skybox)
-    /// without the dynamic actors that would otherwise bake into the captured lighting.
-    static_capture: bool,
-
-    /// When set, static surfaces sample the probe field during a static-cubemap
-    /// capture instead of falling back to flat ambient (#285). The multi-bounce probe
-    /// bake toggles this on for bounce ≥2 so each capture re-lights the static scene
-    /// from the previous bounce's probe SH, adding one indirect bounce per pass.
-    /// Off everywhere else, so direct-only capture (bounce 1, reflection bakes) and
-    /// runtime shading keep their "static ⇒ no probe SH" rule.
-    capture_probe_bounce: bool,
+    /// How the frame renders while a static cubemap is captured (#243, #285, #1584):
+    /// the default outside a capture. See [`ibl::cubemap_capture::CaptureMode`].
+    capture: ibl::cubemap_capture::CaptureMode,
 
     /// What the last `render` call submitted (#433) — read by the dev layer's stats.
     pub frame_counters: RenderCounters,

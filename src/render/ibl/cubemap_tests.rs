@@ -6,7 +6,7 @@ use super::*;
 /// Build a minimal-but-valid KTX2 byte blob for a `size × size` RGBA8 cubemap with one
 /// mip level, each face a solid colour `face_index` in the red channel. Layout: 80-byte
 /// header, one 24-byte level-index entry, a tiny DFD placeholder, then the packed faces.
-fn build_cubemap_ktx2(size: u32, format: u32, face_count: u32) -> Vec<u8> {
+pub(super) fn build_cubemap_ktx2(size: u32, format: u32, face_count: u32) -> Vec<u8> {
     const MAGIC: [u8; 12] = [
         0xAB, 0x4B, 0x54, 0x58, 0x20, 0x32, 0x30, 0xBB, 0x0D, 0x0A, 0x1A, 0x0A,
     ];
@@ -47,9 +47,9 @@ fn build_cubemap_ktx2(size: u32, format: u32, face_count: u32) -> Vec<u8> {
     buf
 }
 
-const R8G8B8A8_UNORM: u32 = 37;
-const R8G8B8A8_SRGB: u32 = 43;
-const R16G16B16A16_SFLOAT: u32 = 97; // an HDR format we must reject
+pub(super) const R8G8B8A8_UNORM: u32 = 37;
+pub(super) const R8G8B8A8_SRGB: u32 = 43;
+pub(super) const R16G16B16A16_SFLOAT: u32 = 97; // an HDR format we must reject
 
 #[test]
 fn parses_valid_rgba8_cubemap() {
@@ -87,30 +87,6 @@ fn rejects_hdr_format() {
 fn rejects_garbage() {
     assert!(parse_ktx2_cubemap_mips(b"not a ktx2 file at all").is_none());
     assert!(parse_ktx2_cubemap_mips(&[]).is_none());
-}
-
-/// A reflection cubemap re-baked at a path the cache already loaded (or failed to)
-/// is read again on the next frame (#1207).
-#[test]
-fn gpu_a_cubemap_rebaked_at_a_cached_path_reloads() {
-    use crate::core::fs::written::contract::{follows_rebakes, Bake};
-    let Some(mut renderer) = crate::render::test_gpu::headless_or_skip(4, 4) else {
-        return;
-    };
-    let size = |bake| if bake == Bake::A { 2 } else { 4 };
-    let path = crate::test_temp::dir().join("probe.ktx2");
-    follows_rebakes(
-        &path.to_string_lossy(),
-        |p, bake| {
-            let bytes = build_cubemap_ktx2(size(bake), R8G8B8A8_SRGB, 6);
-            crate::core::fs::written::write(std::path::Path::new(p), &bytes).unwrap();
-        },
-        |p| {
-            renderer.refresh_textures();
-            renderer.cached_cubemap(p).map(|cube| cube.size)
-        },
-        |loaded, bake| *loaded == Some(size(bake)),
-    );
 }
 
 /// Re-baking a resident probe's cubemap at the same size reaches the probe array on

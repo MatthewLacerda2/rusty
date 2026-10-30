@@ -62,7 +62,7 @@ impl Renderer {
         camera: &Camera,
     ) -> u32 {
         // Ribbons are dynamic effects: never baked into a static probe capture.
-        if self.static_capture {
+        if self.capture.static_only {
             return 0;
         }
         let ribbons = collect(scene, camera);

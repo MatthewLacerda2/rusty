@@ -7,7 +7,7 @@
 //! Only `is_static` entities (plus the skybox — the distant environment) are drawn;
 //! dynamic actors are excluded so they never bake into a probe/reflection. The static
 //! filter mirrors the shadow pass's `want_static` pattern (`shadows.rs`): the forward
-//! solid-gather honours the renderer's `static_capture` flag, toggled on here for the
+//! solid-gather honours the renderer's [`CaptureMode::static_only`], toggled on here for the
 //! six faces and restored after.
 //!
 //! Output is a function of (static scene, position, resolution) — no wall-clock/RNG,
@@ -90,7 +90,25 @@ impl Renderer {
         position: Vec3,
         resolution: u32,
     ) -> CubemapCapture {
-        self.capture_static_cubemap_inner(scene, position, resolution, false)
+        self.capture_static_cubemap_inner(
+            scene,
+            position,
+            resolution,
+            false,
+            CaptureLens::default(),
+        )
+    }
+
+    /// Like [`Renderer::capture_static_cubemap`], through a reflection probe's `lens`:
+    /// its clip planes, and shadows or none (#1584).
+    pub fn capture_reflection_cubemap(
+        &mut self,
+        scene: &Scene,
+        position: Vec3,
+        resolution: u32,
+        lens: CaptureLens,
+    ) -> CubemapCapture {
+        self.capture_static_cubemap_inner(scene, position, resolution, false, lens)
     }
 
     /// Like [`Renderer::capture_static_cubemap`], but the static surfaces are *also*
@@ -104,7 +122,7 @@ impl Renderer {
         position: Vec3,
         resolution: u32,
     ) -> CubemapCapture {
-        self.capture_static_cubemap_inner(scene, position, resolution, true)
+        self.capture_static_cubemap_inner(scene, position, resolution, true, CaptureLens::default())
     }
 
     /// Shared capture spine: render the static scene into a 6-face cubemap from
@@ -116,6 +134,7 @@ impl Renderer {
         position: Vec3,
         resolution: u32,
         light_static_from_probes: bool,
+        lens: CaptureLens,
     ) -> CubemapCapture {
         let resolution = resolution.max(1);
         let target = self.make_face_target(resolution);
@@ -125,15 +144,19 @@ impl Renderer {
         let mut render_view =
             RenderView::targetless(&self.device, OFFSCREEN_FORMAT, resolution, resolution);
 
-        // Gather only static geometry, and (for bounce ≥2) let those static surfaces
-        // sample the probe field. Both flags are restored after the six faces.
-        let prev_static = self.static_capture;
-        let prev_bounce = self.capture_probe_bounce;
-        self.static_capture = true;
-        self.capture_probe_bounce = light_static_from_probes;
+        // Gather only static geometry, (for bounce ≥2) let those static surfaces
+        // sample the probe field, and cast shadows as the lens says. The mode is
+        // restored after the six faces.
+        let prev = self.capture;
+        self.capture = CaptureMode {
+            static_only: true,
+            probe_bounce: light_static_from_probes,
+            shadows: lens.shadows,
+        };
 
         let faces = CubemapFace::ALL.map(|face| {
-            let camera = face_camera(position, face);
+            let mut camera = face_camera(position, face);
+            (camera.near, camera.far) = (lens.near, lens.far);
             self.render(&mut render_view, scene, &camera, &output, false);
             crate::render::readback::read_texture_rgba8(
                 &self.device,
@@ -144,8 +167,7 @@ impl Renderer {
             )
         });
 
-        self.static_capture = prev_static;
-        self.capture_probe_bounce = prev_bounce;
+        self.capture = prev;
         CubemapCapture { resolution, faces }
     }
 
@@ -165,6 +187,54 @@ impl Renderer {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
             view_formats: &[],
         })
+    }
+}
+
+/// How the renderer draws while a static cubemap is captured; the default (all
+/// dynamic, no probe bounce, shadows on) is every other frame's.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct CaptureMode {
+    /// The forward pass gathers only `is_static` entities (#243), so probe and
+    /// reflection bakes see the distant environment (static walls + skybox) without
+    /// the dynamic actors that would otherwise bake into the captured lighting.
+    pub static_only: bool,
+    /// Static surfaces sample the probe field instead of flat ambient (#285): the
+    /// multi-bounce probe bake sets it for bounce ≥2, adding one indirect bounce per
+    /// pass. Off everywhere else, so direct-only capture and runtime shading keep
+    /// their "static ⇒ no probe SH" rule.
+    pub probe_bounce: bool,
+    /// Lights cast shadows; off for a reflection probe captured without (#1584).
+    pub shadows: bool,
+}
+
+impl Default for CaptureMode {
+    fn default() -> Self {
+        Self {
+            static_only: false,
+            probe_bounce: false,
+            shadows: true,
+        }
+    }
+}
+
+/// How a capture sees (#1584): the clip planes of its six cameras, and whether its
+/// lights cast shadows. A reflection probe sets its own; the default is the scene
+/// camera's planes, with shadows.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct CaptureLens {
+    pub near: f32,
+    pub far: f32,
+    pub shadows: bool,
+}
+
+impl Default for CaptureLens {
+    fn default() -> Self {
+        let camera = Camera::new(Vec3::ZERO, 0.0, 0.0);
+        Self {
+            near: camera.near,
+            far: camera.far,
+            shadows: true,
+        }
     }
 }
 
