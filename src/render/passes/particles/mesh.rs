@@ -117,7 +117,7 @@ impl Renderer {
         // Debris flies through decal boxes; it never takes their stamp (#638).
         let uniform = EntityUniform {
             receive_decals: 0,
-            ..material_uniform(true, material)
+            ..self.with_map_channels(material_uniform(true, material), material)
         };
         let key = BatchKey {
             pipeline,

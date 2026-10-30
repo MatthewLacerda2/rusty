@@ -69,6 +69,7 @@ pub type MaterialLibrary = BTreeMap<String, MaterialAsset>;
 /// asset's own fields are still validated by routing each value through the per-field
 /// `set_*` ops (the API does this), so the clamps stay single-sourced.
 pub fn define_asset(materials: &mut MaterialLibrary, name: &str, asset: MaterialAsset) {
+    fit_map_slots(&asset);
     materials.insert(name.to_string(), asset);
 }
 
@@ -131,10 +132,12 @@ pub fn set_metallic(materials: &mut MaterialLibrary, key: &str, value: f32) {
     }
 }
 
-/// Set (or, with `None`, clear) the metallic map path.
+/// Set (or, with `None`, clear) the metallic map path. A `Default` image still
+/// marked sRGB turns it off (`sidecar::fit_data_slot`, #1574).
 pub fn set_metallic_map(materials: &mut MaterialLibrary, key: &str, path: Option<String>) {
     if let Some(m) = materials.get_mut(key) {
         m.metallic_map = path.map(MapRef::from);
+        fit_data_slot(m.metallic_map.as_ref());
     }
 }
 
@@ -145,17 +148,45 @@ pub fn set_roughness(materials: &mut MaterialLibrary, key: &str, value: f32) {
     }
 }
 
-/// Set (or, with `None`, clear) the roughness map path.
+/// Set (or, with `None`, clear) the roughness map path. A `Default` image still
+/// marked sRGB turns it off (`sidecar::fit_data_slot`, #1574).
 pub fn set_roughness_map(materials: &mut MaterialLibrary, key: &str, path: Option<String>) {
     if let Some(m) = materials.get_mut(key) {
         m.roughness_map = path.map(MapRef::from);
+        fit_data_slot(m.roughness_map.as_ref());
     }
 }
 
-/// Set (or, with `None`, clear) the normal map path.
+/// Set (or, with `None`, clear) the normal map path. An image still of Texture
+/// Type `Default` becomes a `NormalMap` (`sidecar::fit_normal_slot`, #1574).
 pub fn set_normal_map(materials: &mut MaterialLibrary, key: &str, path: Option<String>) {
     if let Some(m) = materials.get_mut(key) {
         m.normal_map = path.map(MapRef::from);
+        fit_normal_slot(m.normal_map.as_ref());
+    }
+}
+
+/// Fit the import settings of every image `asset`'s slots name to the slot:
+/// [`fit_normal_slot`] and [`fit_data_slot`]. Every way a material gets its maps
+/// whole goes through it (a material document, a maps recipe, a model's import).
+pub fn fit_map_slots(asset: &MaterialAsset) {
+    fit_normal_slot(asset.normal_map.as_ref());
+    fit_data_slot(asset.metallic_map.as_ref());
+    fit_data_slot(asset.roughness_map.as_ref());
+}
+
+/// [`crate::asset::sidecar::fit_normal_slot`] for the image a normal slot names.
+pub fn fit_normal_slot(map: Option<&MapRef>) {
+    if let Some(file) = map.and_then(MapRef::file) {
+        crate::asset::sidecar::fit_normal_slot(&file);
+    }
+}
+
+/// [`crate::asset::sidecar::fit_data_slot`] for the image a metallic or roughness
+/// slot names.
+pub fn fit_data_slot(map: Option<&MapRef>) {
+    if let Some(file) = map.and_then(MapRef::file) {
+        crate::asset::sidecar::fit_data_slot(&file);
     }
 }
 

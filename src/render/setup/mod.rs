@@ -58,7 +58,9 @@ impl Renderer {
         // 3. Create Device & Queue
         let (device, queue) = adapter
             .request_device(&wgpu::DeviceDescriptor {
-                required_features: wgpu::Features::empty(),
+                // BC compression where the GPU has it (#1574).
+                required_features: adapter.features()
+                    & crate::render::gpu::textures::compressed::FEATURE,
                 required_limits: wgpu::Limits::default(),
                 label: None,
                 ..Default::default()
@@ -231,6 +233,7 @@ impl Renderer {
             render_scale: Default::default(),
             gpu_meshes: HashMap::new(),
             gpu_textures: HashMap::new(),
+            texture_fallbacks: HashMap::new(),
             texture_kinds: Default::default(),
             texture_freshness: crate::core::fs::freshness::Freshness::new(),
             grid_vertex_buffer: None,

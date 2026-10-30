@@ -40,6 +40,7 @@ pub mod reference;
 pub mod scale_factor;
 pub mod sidecar;
 pub mod tangents;
+pub mod texture_import;
 
 pub use anim_data::{AnimationClip, Interpolation, JointTrack, Track};
 pub use animation_graph::{

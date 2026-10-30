@@ -1,7 +1,7 @@
 #import common::{DecalSurface, NO_SHADOW, PI, VertexInput, apply_fog, blend_joints, fog_factor, cluster_index, local_light_radiance, local_shadow_tile, sample_local_shadow}
 // Every forward binding but `shadow` (the cascades, read only by `calculate_shadow`;
 // `fs_main` names its result `shadow`), so a surface variant's blocks can read any.
-#import forward::bindings::{bones, camera, cluster_lights, cluster_ranges, decals, entity, instances, lighting, local_lights, s_decal, s_diffuse, s_emissive, s_lightmaps, s_metallic, s_normal, s_refl_cube, s_roughness, s_shadow, s_skybox, shadow_tiles, t_ao, t_decal_color, t_decal_data, t_diffuse, t_emissive, t_lightmap_dirs, t_lightmaps, t_metallic, t_normal, t_refl_cube, t_roughness, t_shadow, t_shadow_atlas, t_skybox, vertex_to_world, vertex_to_world_prev}
+#import forward::bindings::{bones, camera, cluster_lights, cluster_ranges, decals, entity, instances, lighting, local_lights, normal_to_world, s_decal, s_diffuse, s_emissive, s_lightmaps, s_metallic, s_normal, s_refl_cube, s_roughness, s_shadow, s_skybox, shadow_tiles, t_ao, t_decal_color, t_decal_data, t_diffuse, t_emissive, t_lightmap_dirs, t_lightmaps, t_metallic, t_normal, t_refl_cube, t_roughness, t_shadow, t_shadow_atlas, t_skybox, tangent_to_world, vertex_to_world, vertex_to_world_prev}
 #import lighting::ssr_surface
 #import forward::transparent
 #import forward::mapping
@@ -72,11 +72,10 @@ fn surface_vertex(v: SurfaceVertex, time: f32) -> SurfaceVertex {
 }
 
 // `model`'s vertex through `to_world` (`world_pos` already is its position): the
-// normal and the tangent ride the same transform.
+// normal by the inverse-transpose, the tangent along the surface (#1596).
 fn world_vertex(model: VertexInput, to_world: mat4x4<f32>, world_pos: vec4<f32>) -> SurfaceVertex {
-    let normal = normalize((to_world * vec4<f32>(model.normal, 0.0)).xyz);
-    let tangent = normalize((to_world * vec4<f32>(model.tangent.xyz, 0.0)).xyz);
-    return SurfaceVertex(world_pos.xyz, normal, tangent);
+    let normal = normal_to_world(to_world, model.normal);
+    return SurfaceVertex(world_pos.xyz, normal, tangent_to_world(to_world, model.tangent.xyz, normal));
 }
 
 // The SSAO depth prepass (#436): depth only, so it writes no colour. Cutout texels
@@ -318,9 +317,9 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
         return vec4<f32>(apply_fog(camera.fog, base_color.rgb, in.world_position, camera.camera_pos), base_color.a);
     }
 
-    // Geometric normal, optionally perturbed by a tangent-space normal map (#207),
-    // rotated into world space by the mesh's tangent frame or, under a world mapping,
-    // reoriented per projection (`mapping::sample_normal`).
+    // Geometric normal, optionally perturbed by a tangent-space normal map (#207; z
+    // rebuilt by `maps::unpack_normal`), rotated into world space by the mesh's tangent
+    // frame or, under a world mapping, reoriented per projection (`mapping::sample_normal`).
     var N = normalize(in.world_normal);
     if (entity.use_normal_map == 1u) {
         N = mapping::sample_normal(t_normal, s_normal, maps, N, in.world_tangent);
@@ -328,9 +327,9 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     let V = normalize(camera.camera_pos - in.world_position);
 
     // glTF metallic-roughness packs metallic in BLUE, roughness in GREEN. Each scalar
-    // multiplies its map channel when the flag is set, else acts alone (#202).
-    let surface_metallic = clamp(entity.metallic * mapping::sample_if(entity.use_metallic_map, t_metallic, s_metallic, maps).b, 0.0, 1.0);
-    let surface_roughness = clamp(entity.roughness * mapping::sample_if(entity.use_roughness_map, t_roughness, s_roughness, maps).g, 0.04, 1.0);
+    // multiplies its map channel when the flag is set, else acts alone (#202, #1574).
+    let surface_metallic = clamp(entity.metallic * mapping::mask(entity.use_metallic_map, t_metallic, s_metallic, maps, 2u), 0.0, 1.0);
+    let surface_roughness = clamp(entity.roughness * mapping::mask(entity.use_roughness_map, t_roughness, s_roughness, maps, 1u), 0.04, 1.0);
 
     // 0. Surface decals (#638): this cluster's decals change the material inputs
     // before any light is summed, so a decal is lit, shadowed and occluded like the

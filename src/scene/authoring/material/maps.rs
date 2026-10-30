@@ -104,6 +104,7 @@ fn fill_empty_maps(asset: &mut MaterialAsset, baked: &BTreeMap<String, String>) 
             target.get_or_insert_with(|| MapRef::from(path.clone()));
         }
     }
+    super::fit_map_slots(asset);
 }
 
 #[cfg(test)]

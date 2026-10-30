@@ -72,3 +72,18 @@ fn game_time_is_last_frames_and_a_cut_forgets_it() {
     assert_eq!(frame(cut, 7.0), 7.0, "a new scene is a cut");
     assert_eq!(frame(cut, 7.5), 7.0);
 }
+
+#[test]
+fn reset_is_a_cut_under_the_same_key() {
+    let (k, mut mv) = (
+        super::tests::key(Scene::new().id(), Some(1)),
+        super::MotionVectors::default(),
+    );
+    mv.history.begin(k, &one(at(1.0)));
+    mv.history.record(7, at(1.0), &[]);
+    mv.history.end();
+    mv.reset();
+    let prev = mv.history.begin(k, &one(at(2.0)));
+    assert_eq!(prev, [at(2.0)], "the camera kept last frame's matrix");
+    assert!(mv.history.pose(7).is_none(), "the entity kept its pose");
+}
