@@ -25,6 +25,7 @@
 //! This module is pure data + math — deterministic, sim-reachable, no RNG/clock.
 
 mod floor;
+mod islands;
 mod room_probes;
 mod rooms;
 #[cfg(test)]

@@ -41,10 +41,13 @@ without its own bakes at (**512**), the **memory budget** of resident cubes
 box the camera stands in counts as distance zero; ties go to the lower index), at most
 32, while the cubes stay within the budget: a cube that would pass it is skipped and
 farther ones that fit are still taken; the nearest is always kept. They share one
-texture whose face is the largest resident cube's, sized to the cubes it holds, so a
-512 cube costs 8 MB there (a 128 MB budget holds 16) and a smaller cube rides in
-its lower mips. The decoded cubes kept for copying are held to the budget too, least
-recently resident evicted first. A cubemap whose size is not a power of two up to 2048 is skipped with
+texture whose face is the largest resident cube's, so a 512 cube costs 8 MB there and
+a smaller cube rides in its lower mips. That texture is the only copy of a resident
+cube (a file is read, copied in and dropped), and it keeps two spare cubes inside the
+budget for the ones that just left range, so a 128 MB budget shades with 14 512 cubes
+and pacing back and forth across its edge reads nothing from disk. A cube is judged by
+its file header before it is read, and once the budget is full no file is read at
+all. A cubemap whose size is not a power of two up to 2048 is skipped with
 a console warning (repeated after the next bake), and its objects reflect the skybox.
 Probes may share one cubemap file; each keeps its own box. An object whose probes are
 not resident blends the ones that are, or reflects the skybox.

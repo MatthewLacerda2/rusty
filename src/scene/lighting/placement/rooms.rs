@@ -13,7 +13,8 @@
 //!
 //!   4. **Narrow areas** — connected open floor no core reached (a level of
 //!      corridors narrower than a doorway, a ledge) is a room of its own, so no
-//!      walkable space is left reflecting the sky.
+//!      walkable space is left reflecting the sky; one smaller than
+//!      [`MIN_ISLAND_AREA`] (the top of a jump box) joins the room around it.
 //!
 //! Every step runs in scan order with ties to the lower index, so a level always
 //! splits the same way.
@@ -21,6 +22,7 @@
 use std::collections::VecDeque;
 
 use super::floor::FloorGrid;
+use super::islands::{absorb_islands, MIN_ISLAND_AREA};
 
 /// What counts as a room.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -77,7 +79,9 @@ pub fn find_rooms(grid: &FloorGrid, params: &RoomParams) -> (Vec<Option<u32>>, u
         count += 1;
     }
     grow(grid, params.step, &mut room, queue);
-    // What no core reached: each connected area its own room.
+    let cores = count;
+    // What no core reached: each connected area its own room, but an island too
+    // small for a probe of its own joins the room around it (`islands.rs`).
     for start in 0..room.len() {
         if grid.cells[start].is_some() && room[start].is_none() {
             room[start] = Some(count);
@@ -85,6 +89,7 @@ pub fn find_rooms(grid: &FloorGrid, params: &RoomParams) -> (Vec<Option<u32>>, u
             count += 1;
         }
     }
+    let count = absorb_islands(grid, &mut room, cores, count);
     (room, count)
 }
 
@@ -114,7 +119,7 @@ fn neighbours(grid: &FloorGrid, i: usize, step: f32) -> impl Iterator<Item = usi
 }
 
 /// The index of the cell `(dx, dz)` from `(x, z)`, if it is on the grid.
-fn cell_at(grid: &FloorGrid, x: usize, z: usize, dx: isize, dz: isize) -> Option<usize> {
+pub(super) fn cell_at(grid: &FloorGrid, x: usize, z: usize, dx: isize, dz: isize) -> Option<usize> {
     let nx = x.checked_add_signed(dx).filter(|&v| v < grid.width)?;
     let nz = z.checked_add_signed(dz).filter(|&v| v < grid.depth)?;
     Some(nz * grid.width + nx)

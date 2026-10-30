@@ -75,7 +75,8 @@ so the same level always yields the same layout):
   A room wider than `reflectionRegion` (default `12.0`, at least `2.0`: a smaller one is
   an error) is split into probes no wider than it. Open floor too narrow to hold a room
   (a level of corridors narrower than a doorway, a lone ledge) is an area of its own and
-  gets its probes the same way. A layout over `reflectionMaxProbes` is re-tiled wider,
+  gets its probes the same way, unless it is under 9 m² (the top of a jump box or a
+  crate): that joins the room around it. A layout over `reflectionMaxProbes` is re-tiled wider,
   with a console warning, until it fits (or every room is one probe). Without a nav
   surface the floor plan is rasterized at 0.5 m, or coarser (with a warning) when the
   level would take more than 4 million cells. Triggers are not walls.
