@@ -209,9 +209,8 @@ impl Indexer {
             self.events.push(Event::Destroyed { id, name });
         }
         for &id in ids {
-            if !self.names.contains_key(&id) {
-                let name = name_of(scene, id);
-                self.names.insert(id, name.clone());
+            if let std::collections::btree_map::Entry::Vacant(slot) = self.names.entry(id) {
+                let name = slot.insert(name_of(scene, id)).clone();
                 self.events.push(Event::Spawned { id, name });
             }
         }

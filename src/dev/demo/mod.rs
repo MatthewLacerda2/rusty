@@ -56,7 +56,7 @@ use crate::app::GameWorld;
 use crate::dev::harness::Harness;
 use crate::dev::scenario::{self, RunReport};
 
-/// The state digest a demo stores every [`digest::EVERY`] ticks, of `world` as it
+/// The state digest a demo stores every 120 ticks (`digest`), of `world` as it
 /// stands: two worlds with the same one are the same, bit for bit.
 pub fn state_digest(world: &GameWorld) -> String {
     digest::of(world)
