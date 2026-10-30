@@ -44,6 +44,7 @@ fn entity_uniform_matches_wgsl_layout() {
         ),
         ("absorption", at(offset_of!(SurfaceUniform, absorption))),
         ("transmission", at(offset_of!(SurfaceUniform, transmission))),
+        ("receive_ssr", at(offset_of!(SurfaceUniform, receive_ssr))),
         ("uv_st", map(offset_of!(MappingUniform, uv_st))),
         ("uv_mapping", map(offset_of!(MappingUniform, uv_mapping))),
         ("world_scale", map(offset_of!(MappingUniform, world_scale))),

@@ -480,7 +480,8 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     let fresnel = pow(1.0 - saturate(abs(dot(N, V))), 4.0);
     let env_brdf = mix(F0, vec3<f32>(grazing), fresnel) / (alpha * alpha + 1.0);
     let reflection_weight = env_brdf * ao;
-    let reflection = environment_reflection(in.world_position, R, roughness, instances[in.instance].reflection_probe) * reflection_weight;
+    // A transparent surface with `receive_ssr` traces SSR over it here (#1570).
+    let reflection = transparent::reflect_ssr(environment_reflection(in.world_position, R, roughness, instances[in.instance].reflection_probe) * reflection_weight, reflection_weight, in.world_position, N, R, roughness);
     lighting_color += reflection;
     ssr_texels = ssr_surface::encode(N, roughness, reflection, reflection_weight, fog_factor(camera.fog, in.world_position, camera.camera_pos));
 
