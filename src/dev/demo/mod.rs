@@ -63,15 +63,21 @@ pub fn record_project(world: &mut GameWorld) {
 /// Replay the demo at `demo_path` headless on the open project, writing a
 /// scenario run's results into `out_dir`. With `scenario_path` that scenario
 /// drives the run (its steps advance the replay); without, the whole demo plays.
-/// The Game view size is the demo's: the sim lays the UI out on it.
+/// `run.record_audio` captures the replay's mix, as `play --record-audio`; the
+/// Game view size is the demo's (the sim lays the UI out on it), so `run.size` is
+/// not read.
 pub fn replay(
     demo_path: &Path,
     scenario_path: Option<&Path>,
     out_dir: &Path,
+    run: scenario::Run,
 ) -> Result<RunReport, String> {
     let demo = Demo::read(demo_path)?;
     let header = demo.header.clone();
-    let harness = Harness::in_user_workspace(out_dir, &header.scene, header.settings)?;
+    let mut harness = Harness::in_user_workspace(out_dir, &header.scene, header.settings)?;
+    if let Some(path) = run.record_audio {
+        harness.record_audio(Some(path))?;
+    }
     let ticks = demo.ticks;
     prepare(&mut harness.world.borrow_mut(), demo)?;
     match scenario_path {

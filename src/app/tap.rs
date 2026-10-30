@@ -70,8 +70,9 @@ impl GameWorld {
         }
     }
 
-    /// The tick's `dt`, as the tap has it.
-    pub(super) fn tap_dt(&mut self, dt: f32) -> f32 {
+    /// The tap at [`TapPoint::BeforeInput`], then the tick's `dt` as it has it.
+    pub(super) fn tap_input(&mut self, dt: f32) -> f32 {
+        self.tap(TapPoint::BeforeInput);
         self.resources.tap.as_mut().map_or(dt, |tap| tap.dt(dt))
     }
 

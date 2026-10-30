@@ -3,8 +3,8 @@
 //! The platform-layer [`AudioBackend`] backed by [kira](https://docs.rs/kira): a
 //! cpal device, a mixer of tracks with effects, and tweened parameters. Opened by
 //! the windowed shell (`shell/boot.rs`) and injected into the `AudioMaestro` after
-//! `GameWorld::new`, so the device only ever exists in the windowed process — never
-//! in the harness, which keeps the `NullBackend`.
+//! `GameWorld::new`, so the sound card only ever opens in the windowed process; the
+//! harness keeps the `NullBackend` until a capture runs this mixer offline (#1579).
 //!
 //! The graph: each voice is a [`ClipSound`] playing into its mixer group's track
 //! (`groups.rs`); group tracks nest as the group tree does and send to one reverb
@@ -15,8 +15,9 @@
 //! ([`ClipCache`]), so the hundredth footstep costs no disk or decode until the
 //! engine re-writes its file.
 //!
-//! Generic over kira's `Backend` so tests render the whole graph headlessly
-//! (`capture.rs`); the shell uses kira's cpal backend.
+//! Generic over kira's `Backend`: the shell uses kira's cpal backend, and tests and
+//! a headless capture render the whole graph offline (`capture.rs`, #1579). The last
+//! effect on the main track is the [`Tap`] a capture reads the final mix from.
 
 use crate::core::collections::Map;
 use std::sync::Arc;
@@ -25,9 +26,11 @@ use kira::backend::{Backend, DefaultBackend};
 use kira::track::MainTrackBuilder;
 use kira::{AudioManager, AudioManagerSettings, Capacities};
 
+use super::capture::Clocked;
 use super::decode::ClipCache;
 use super::groups::{GroupTracks, VOICES_PER_GROUP};
 use super::output::OutputStage;
+use super::tap::{Tap, TapEffect};
 use super::voice::{ClipSound, ClipSoundData, VoiceControl};
 use crate::audio::backend::{AudioBackend, PlayParams, VoiceId, VoiceMix};
 use crate::audio::mixer::{GroupId, GroupMix};
@@ -42,6 +45,7 @@ pub struct KiraBackend<B: Backend = DefaultBackend> {
     output: OutputStage,
     voices: Map<VoiceId, Arc<VoiceControl>>,
     cache: ClipCache,
+    tap: Arc<Tap>,
 }
 
 impl KiraBackend {
@@ -58,6 +62,8 @@ impl<B: Backend> KiraBackend<B> {
     pub fn with_backend(settings: B::Settings) -> Option<Self> {
         let mut main = MainTrackBuilder::new().sound_capacity(VOICES_PER_GROUP);
         let output = OutputStage::build(&mut main, SpeakerMode::default());
+        let tap = Arc::new(Tap::default());
+        main.add_effect(TapEffect(Arc::clone(&tap)));
         let mut manager = AudioManager::<B>::new(AudioManagerSettings {
             capacities: Capacities::default(),
             main_track_builder: main,
@@ -71,6 +77,7 @@ impl<B: Backend> KiraBackend<B> {
             output,
             voices: Map::default(),
             cache: ClipCache::new(),
+            tap,
         })
     }
 
@@ -87,7 +94,7 @@ impl<B: Backend> KiraBackend<B> {
     }
 }
 
-impl<B: Backend> AudioBackend for KiraBackend<B> {
+impl<B: Backend + Clocked> AudioBackend for KiraBackend<B> {
     fn play(&mut self, id: VoiceId, params: &PlayParams) -> bool {
         let Some(clip) = self.cache.get_or_decode(&params.clip) else {
             return false;
@@ -145,6 +152,14 @@ impl<B: Backend> AudioBackend for KiraBackend<B> {
 
     fn set_reverb(&mut self, params: &ReverbParams) {
         self.groups.set_reverb(params);
+    }
+
+    fn tap(&self) -> Option<Arc<Tap>> {
+        Some(Arc::clone(&self.tap))
+    }
+
+    fn advance(&mut self, seconds: f64) {
+        self.manager.backend_mut().advance(seconds);
     }
 }
 

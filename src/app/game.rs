@@ -127,16 +127,15 @@ impl GameWorld {
     /// Advance the simulation by `dt` seconds. Returns any play-state transition so
     /// the caller can handle platform-only concerns (cursor grab/visibility). Every
     /// tick reads the UI's texture sizes after the transition, before the schedule in
-    /// Play and in the edit frame outside it, so no loop that ticks can skip them.
+    /// Play and in the edit frame outside it, so no loop that ticks can skip them,
+    /// and ends by pushing the audio mix and advancing the output `dt`.
     pub fn tick(&mut self, dt: f32) -> PlayTransition {
         self.tap(TapPoint::BeforeTick); // a demo's tap (#1581)
         let transition = self.transition_tapped();
-        self.tap(TapPoint::BeforeInput);
-        let dt = self.tap_dt(dt);
+        let dt = self.tap_input(dt);
         // Publish input written since the last tick as this tick's edges (#416).
         self.resources.input.borrow_mut().begin_tick();
-        // `advance` records raw `dt` (unscaled) and the scaled `delta_time`.
-        // The game sim integrates the scaled value.
+        // `advance` keeps the raw `dt`; the sim integrates the scaled `delta_time`.
         let scaled_dt = {
             let mut time = self.resources.time.borrow_mut();
             time.advance(dt);
@@ -153,6 +152,7 @@ impl GameWorld {
         }
         self.sync_render_camera();
         self.sync_shader_time();
+        self.push_audio(dt);
         self.tap(TapPoint::AfterTick);
         transition
     }

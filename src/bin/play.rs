@@ -2,8 +2,8 @@
 //!
 //! ```text
 //! Usage:
-//!   cargo run --bin play --features dev -- [--project <dir>] [--scene <path>] [--size <W>x<H>] <scenario.lua> <out_dir>
-//!   cargo run --bin play --features dev -- [--project <dir>] --demo <file> [scenario.lua] <out_dir>
+//!   cargo run --bin play --features dev -- [--project <dir>] [--scene <path>] [--size <W>x<H>] [--record-audio <path>] <scenario.lua> <out_dir>
+//!   cargo run --bin play --features dev -- [--project <dir>] [--record-audio <path>] --demo <file> [scenario.lua] <out_dir>
 //! ```
 //!
 //! The scenario plays the game project at `<dir>` (default `./project`, #829); the
@@ -13,6 +13,8 @@
 //! relative to the project like the startup scene (#1343). `--size <W>x<H>` is the
 //! run's render size, as a Game view resolution: every screenshot, post effect and
 //! UI layout is sized to it (default 1280x720, #1583).
+//! `--record-audio <path>` captures the whole run's final audio mix to a WAV
+//! (#1579), named from the launch directory like the other paths.
 //!
 //! Drives `app::GameWorld::tick` at a fixed 1/60 timestep with NO window/GPU, runs
 //! the given Lua scenario, and writes <out_dir>/results.json + <out_dir>/console.log.
@@ -32,8 +34,8 @@ use rusty::core::settings::video::parse_size;
 use rusty::dev::{demo, scenario};
 
 const USAGE: &str =
-    "usage: play [--project <dir>] [--scene <path>] [--size <W>x<H>] <scenario.lua> <out_dir>
-       play [--project <dir>] --demo <file> [scenario.lua] <out_dir>";
+    "usage: play [--project <dir>] [--scene <path>] [--size <W>x<H>] [--record-audio <path>] <scenario.lua> <out_dir>
+       play [--project <dir>] [--record-audio <path>] --demo <file> [scenario.lua] <out_dir>";
 
 fn main() {
     rusty::logging::init();
@@ -43,23 +45,17 @@ fn main() {
     let demo = rusty::core::project::take_value(&mut args, "--demo");
     let size = rusty::core::project::take_value(&mut args, "--size")
         .and_then(|size| size.as_deref().map(parse_size).transpose());
-    let (project, scene, size, demo) = match (project, scene, size, demo) {
-        (Ok(project), Ok(scene), Ok(size), Ok(demo)) => (project, scene, size, demo),
-        (Err(e), ..) | (_, Err(e), ..) | (_, _, Err(e), _) | (.., Err(e)) => {
+    let audio = rusty::core::project::take_value(&mut args, "--record-audio");
+    let (project, scene, size, audio, demo) = match (project, scene, size, audio, demo) {
+        (Ok(project), Ok(scene), Ok(size), Ok(audio), Ok(demo)) => {
+            (project, scene, size, audio, demo)
+        }
+        (Err(e), ..) | (_, Err(e), ..) | (_, _, Err(e), ..) | (.., Err(e), _) | (.., Err(e)) => {
             eprintln!("play: {e}\n{USAGE}");
             exit(2);
         }
     };
-    // Paths are named from the launch directory; opening the project moves it.
-    let from_here = |p: &str| absolute(p).unwrap_or_else(|_| PathBuf::from(p));
-    let (scenario_path, out_dir) = match (args.as_slice(), &demo) {
-        ([scenario, out], _) => (Some(from_here(scenario)), from_here(out)),
-        ([out], Some(_)) => (None, from_here(out)),
-        _ => {
-            eprintln!("{USAGE}");
-            exit(2);
-        }
-    };
+    let (scenario_path, out_dir) = positional(&args, demo.is_some());
     if demo.is_some() && size.is_some() {
         // The sim lays the UI out on the Game view size, which the demo recorded.
         eprintln!(
@@ -68,6 +64,7 @@ fn main() {
         exit(2);
     }
     let demo = demo.map(|d| from_here(&d));
+    let audio = audio.map(|path| from_here(&path));
     let opened = rusty::core::project::open(&rusty::core::project::locate(project), Access::Run);
     let opened = match opened {
         Ok(opened) => opened,
@@ -78,12 +75,33 @@ fn main() {
     };
     let scene = scene.unwrap_or_else(|| opened.settings.build.startup_scene.clone());
 
+    let run = scenario::Run {
+        size,
+        record_audio: audio.as_deref(),
+    };
     let ran = match (&demo, &scenario_path) {
-        (Some(demo), scenario_path) => demo::replay(demo, scenario_path.as_deref(), &out_dir),
-        (None, Some(path)) => scenario::run(path, &out_dir, &scene, opened.settings, size),
+        (Some(demo), scenario_path) => demo::replay(demo, scenario_path.as_deref(), &out_dir, run),
+        (None, Some(path)) => scenario::run(path, &out_dir, &scene, opened.settings, run),
         (None, None) => Err(USAGE.to_string()),
     };
     report(ran);
+}
+
+/// Paths are named from the launch directory; opening the project moves it.
+fn from_here(p: &str) -> PathBuf {
+    absolute(p).unwrap_or_else(|_| PathBuf::from(p))
+}
+
+/// The scenario (optional with `--demo`) and the output folder, or the usage.
+fn positional(args: &[String], demo: bool) -> (Option<PathBuf>, PathBuf) {
+    match args {
+        [scenario, out] => (Some(from_here(scenario)), from_here(out)),
+        [out] if demo => (None, from_here(out)),
+        _ => {
+            eprintln!("{USAGE}");
+            exit(2);
+        }
+    }
 }
 
 /// Print where the run wrote its results, and exit non-zero unless it passed.

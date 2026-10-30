@@ -2,7 +2,9 @@
 //!
 //! `Debug.*`, the GPU bake verbs (`Lighting.Bake`, `Reflection.Bake`, `Probe.Bake`,
 //! `Lighting.Generate`) and the provider verbs `Speech.Generate` (#386) and
-//! `Sfx.Generate` (#388), and the play switch `Editor.*` (#1360) belong to the one API surface, but they render or spend, so
+//! `Sfx.Generate` (#388), the play switch `Editor.*` (#1360) and the audio capture
+//! `Audio.StartCapture` (#1579) belong to the one API surface, but they render, spend or
+//! record, so
 //! they live here in the platform layer and are installed onto the surface through
 //! [`api::extend`]. The arrow runs
 //! `dev → api` only: the sim surface never compiles the renderer. A script sees the
@@ -14,6 +16,7 @@
 
 // sorted: one module per dev namespace; kept in order so parallel branches don't collide
 mod bake;
+mod capture;
 mod debug;
 mod editor;
 mod generate;
@@ -33,8 +36,8 @@ pub fn install_api() {
     INSTALL.call_once(|| api::extend(register));
 }
 
-/// The [`api::Extension`] itself: `Debug`, the bake verbs on the tables `api` already
-/// registered, `Editor` (#1360), `Sfx` (#388), and `Speech` (#386) with its voice verbs (#387).
+/// The [`api::Extension`] itself: `Debug`, the bake verbs and the audio capture
+/// (#1579) on the tables `api` already registered, `Editor` (#1360), `Sfx` (#388), and `Speech` (#386) with its voice verbs (#387).
 fn register<'scope>(
     lua: &Lua,
     scope: &'scope mlua::Scope<'scope, '_>,
@@ -43,6 +46,7 @@ fn register<'scope>(
     // sorted: each registrar adds its own table or extends one `api` made; `voices`
     // extends `Speech`, which `speech` sorts before
     bake::register(lua, scope, ctx)?;
+    capture::register(lua, scope, ctx)?;
     debug::register(lua, scope, ctx)?;
     editor::register(lua, scope, ctx)?;
     generate::register(lua, scope, ctx)?;

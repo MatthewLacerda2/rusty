@@ -81,6 +81,8 @@ pub struct AudioMaestro {
     pub(super) enabled_sources: BTreeSet<u32>,
     /// Monotone id source for backend voices (deterministic — never a clock/RNG).
     next_voice: u64,
+    /// The running final-mix capture, if any (`capture/`, #1579).
+    pub(super) capture: Option<super::capture::Recorder>,
 }
 
 impl Default for AudioMaestro {
@@ -107,6 +109,7 @@ impl AudioMaestro {
             log: AudioEventLog::new(DEFAULT_EVENT_CAP),
             enabled_sources: BTreeSet::new(),
             next_voice: 1,
+            capture: None,
         };
         maestro.sync_groups();
         maestro

@@ -25,7 +25,6 @@
     reason = "platform layer, exempt from the sim's clock ban (#757): the frame loop measures real time to produce the sim's dt"
 )]
 
-pub mod audio;
 pub mod boot;
 mod event_loop;
 mod focus;
@@ -207,7 +206,6 @@ fn run_frame<F: Frontend>(
     if let Some(clipboard) = shell.clipboard.as_mut() {
         input::clipboard::apply_request(clipboard, &mut game.input().borrow_mut());
     }
-    audio::apply_mix(game);
     frontend.on_play_transition(game, transition);
     shell.cursor.sync(frontend.cursor(game), &shell.window);
 

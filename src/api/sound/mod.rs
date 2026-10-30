@@ -32,8 +32,9 @@
 //!
 //! Every bake verb returns `path, level`: the path first, because callers feed it
 //! straight to `Audio.PlayAt`, and the level table second, so the figures are never
-//! one forgotten call away. `Sound.Level(path)` measures any clip on disk the same
-//! way — an import, or an earlier bake being compared against (#378). The table
+//! one forgotten call away. `Sound.Level(path [, { sections = seconds }])` measures
+//! any clip on disk the same way — an import, an earlier bake being compared
+//! against (#378), or a capture of the game's mix on a grid of its own (#1579). The table
 //! also carries the bake over time (`sections`), across the spectrum (`bands`) and
 //! track by track (`tracks`), and `Sound.Diff(a, b)` compares two clips field by
 //! field (#379, `diff.rs`).
@@ -88,8 +89,12 @@ pub fn register(lua: &Lua) -> Reg {
     put(
         &table,
         "Level",
-        lua.create_function(|lua, path: String| {
-            let profile = measure_file(&path).map_err(mlua::Error::RuntimeError)?;
+        lua.create_function(|lua, (path, opts): (String, Option<Table>)| {
+            let grid = match opts {
+                Some(opts) => opts.get::<Option<f64>>("sections")?,
+                None => None,
+            };
+            let profile = measure_file(&path, grid).map_err(mlua::Error::RuntimeError)?;
             report_table(lua, &profile, &[])
         }),
     )?;
@@ -192,6 +197,10 @@ mod bake_tests;
 #[cfg(test)]
 #[path = "rebake_tests.rs"]
 mod rebake_tests;
+
+#[cfg(test)]
+#[path = "grid_tests.rs"]
+mod grid_tests;
 
 #[cfg(test)]
 #[path = "level_tests.rs"]
