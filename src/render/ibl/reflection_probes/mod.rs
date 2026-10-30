@@ -29,6 +29,8 @@
 //! between decoding the file and creating its texture, #1245), and the objects it
 //! would cover reflect the sky.
 
+mod admit;
+mod cache;
 mod frame;
 mod gpu;
 mod pack;
@@ -38,6 +40,8 @@ use std::rc::Rc;
 
 use glam::Vec3;
 
+use self::admit::admitted;
+use self::cache::CubeCache;
 pub(crate) use self::pack::pack_blend;
 use self::slots::SlotTable;
 pub(crate) use self::slots::MAX_REFLECTION_PROBES;
@@ -81,6 +85,8 @@ pub(crate) struct ProbeArray {
     mips: u32,
     cubes: usize,
     table: SlotTable,
+    /// The decoded cubes the renderer's cache holds, evicted to the budget.
+    cache: CubeCache,
     /// This frame's resident probes in selection form; probe `i` is uniform `i`.
     active: ReflectionProbeSet,
     uniforms: [ReflectionProbeUniform; MAX_REFLECTION_PROBES],
@@ -108,6 +114,7 @@ impl ProbeArray {
             mips: 1,
             cubes: 1,
             table: SlotTable::default(),
+            cache: CubeCache::default(),
             active: ReflectionProbeSet::new(),
             uniforms: [ReflectionProbeUniform::default(); MAX_REFLECTION_PROBES],
             #[cfg(test)]
@@ -132,29 +139,16 @@ impl ProbeArray {
         self.face
     }
 
-    /// Drop the slots of re-written cubemaps (#1207); the next frame copies them again.
+    /// Drop the slots of re-written cubemaps (#1207), and what the cache knew of
+    /// them; the next frame loads and copies them again.
     pub(crate) fn forget(&mut self, stale: impl Fn(&str) -> bool) {
         self.table.forget(&stale);
-    }
-
-    /// Whether a `size`-texel cube at `path` fits the array: a power of two up to
-    /// [`MAX_FACE`]; any other cube is warned about. The cubemap cache asks once per
-    /// load of a path, before uploading it (#1245), so a cube that doesn't fit warns
-    /// once, and again after a re-bake re-reads it.
-    pub(in crate::render::ibl) fn admits(path: &str, size: u32) -> bool {
-        if fits(MAX_FACE, size) {
-            return true;
-        }
-        log::warn!(
-            "[Reflection] cubemap {path} is {size} texels, not a power of two up to \
-             {MAX_FACE}; its objects reflect the sky"
-        );
-        false
+        self.cache.forget(&stale);
     }
 
     /// Make `wanted` (in scene order, at most the budget) this frame's probes: copy
-    /// the cubes that are not resident yet, rebuilding the array when it cannot hold
-    /// them. Returns true when the array texture was replaced, so group 0 must rebind.
+    /// the cubes that are not resident yet, resizing the array to the slots they
+    /// need (no more than `budget` bytes pays for, past what they need). Returns true when the array texture was replaced, so group 0 must rebind.
     /// Each cube must be [admitted](Self::admits): a debug build asserts it, and a
     /// release build leaves out one that isn't, since a cube larger than the face would
     /// give the array a mip count wgpu rejects (#1245).
@@ -163,6 +157,7 @@ impl ProbeArray {
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         wanted: &[(&ReflectionProbe, Rc<CubemapTexture>)],
+        budget: u64,
     ) -> bool {
         let kept = admitted(wanted);
         if kept.is_empty() {
@@ -183,7 +178,8 @@ impl ProbeArray {
             .iter()
             .map(|(p, ..)| p.cubemap_path.as_str())
             .collect();
-        let plan = self.table.plan(&paths);
+        let room = budget / frame::array_bytes(face, 1).max(1);
+        let plan = self.table.plan(&paths, room as usize);
         let rebuilt = plan.capacity != self.cubes || face != self.face || mips != self.mips;
         if rebuilt {
             self.cubes = plan.capacity;
@@ -233,10 +229,23 @@ impl ProbeArray {
 
     /// Record `kept` as the frame's probes, probe `i` in layer `layers[i]`: the
     /// selection set draws query and the uniforms the shader reads. Only a probe that
-    /// changed since the last frame is cloned.
+    /// changed since the last frame is cloned, and the clone is clamped
+    /// (`ReflectionProbe::clamp_settings`): a scene file's values reach here as
+    /// written, and the blend and the shader read the clamped ones.
     fn activate(&mut self, kept: &[Resident], layers: &[u32]) {
         self.active.probes.truncate(kept.len());
         for (i, (&(probe, cube, shift), &layer)) in kept.iter().zip(layers).enumerate() {
+            let clamped = || {
+                let mut p = probe.clone();
+                p.clamp_settings();
+                p
+            };
+            match self.active.probes.get_mut(i) {
+                Some(resident) if resident == probe => {}
+                Some(resident) => *resident = clamped(),
+                None => self.active.probes.push(clamped()),
+            }
+            let probe = &self.active.probes[i];
             self.uniforms[i] = ReflectionProbeUniform {
                 center: probe.position.to_array(),
                 mip_base: shift as f32,
@@ -251,35 +260,8 @@ impl ProbeArray {
                     0.0,
                 ],
             };
-            match self.active.probes.get_mut(i) {
-                Some(resident) if resident == probe => {}
-                Some(resident) => *resident = probe.clone(),
-                None => self.active.probes.push(probe.clone()),
-            }
         }
     }
-}
-
-/// Whether a `size`-texel cube fits an array of `face` texels: `face` halved a whole
-/// number of times.
-fn fits(face: u32, size: u32) -> bool {
-    size > 0 && face.is_multiple_of(size) && (face / size).is_power_of_two()
-}
-
-/// The cubes of `wanted` that fit the array. Each should, being admitted before it
-/// was uploaded: a debug build asserts it, a release build leaves out one that doesn't.
-fn admitted<'a>(
-    wanted: &'a [(&'a ReflectionProbe, Rc<CubemapTexture>)],
-) -> Vec<(&'a ReflectionProbe, &'a CubemapTexture)> {
-    let face = MAX_FACE;
-    debug_assert!(
-        wanted.iter().all(|(_, cube)| fits(face, cube.size)),
-        "every wanted cube was admitted"
-    );
-    (wanted.iter())
-        .filter(|(_, cube)| fits(face, cube.size))
-        .map(|(p, c)| (*p, &**c))
-        .collect()
 }
 
 /// One entry per distinct cube path in `kept`, in first-wanted order: the cubes that

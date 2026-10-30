@@ -6,10 +6,10 @@
 
 /// The most reflection probes shaded in one frame: the array's layer budget and the
 /// length of `LightingUniforms.refl_probes`. The frame keeps the probes whose boxes
-/// are nearest the camera (its distance to each box, zero inside it, #1238); an
-/// object whose probe is past them reflects the sky. 32 cubes are 192
-/// array layers (under wgpu's default limit of 256) and, at the bake's 128-texel
-/// face, about 17 MB of RGBA8 with mips.
+/// are nearest the camera (its distance to each box, zero inside it, #1238), as many
+/// as the scene's byte budget holds (#1584); an object whose probe is past them
+/// reflects the sky. 32 cubes are 192 array layers (under wgpu's default limit of
+/// 256); the budget, not this cap, bounds their memory.
 pub(crate) const MAX_REFLECTION_PROBES: usize = 32;
 
 /// One frame's plan for the array: the slot each wanted cube lands in, which of
@@ -35,19 +35,20 @@ pub(crate) struct SlotTable {
 impl SlotTable {
     /// Place `wanted` (at most [`MAX_REFLECTION_PROBES`] distinct paths) into slots and
     /// record it: a path already resident keeps its slot, a new one takes the first
-    /// slot no wanted path holds. When they do not fit, the table grows to the next
-    /// power of two (capped at the budget) and every slot is re-copied.
-    pub(crate) fn plan(&mut self, wanted: &[&str]) -> SlotPlan {
+    /// slot no wanted path holds. The array holds exactly as many slots as it needs
+    /// (#1584): when `wanted` outgrows it, or it holds more than `room` (the slots
+    /// the budget pays for) or twice what is wanted, it is resized to fit `wanted`
+    /// and every slot is re-copied.
+    pub(crate) fn plan(&mut self, wanted: &[&str], room: usize) -> SlotPlan {
         let needed = wanted.len().min(MAX_REFLECTION_PROBES);
         let wanted = &wanted[..needed];
-        if needed > self.paths.len() {
-            let capacity = needed.next_power_of_two().min(MAX_REFLECTION_PROBES);
+        let len = self.paths.len();
+        if needed > len || len > room.max(needed) || needed * 2 <= len {
             self.paths = wanted.iter().map(|p| Some(p.to_string())).collect();
-            self.paths.resize(capacity, None);
             return SlotPlan {
                 slot_of: (0..needed).collect(),
                 copies: (0..needed).collect(),
-                capacity,
+                capacity: needed,
             };
         }
         let resident = |path: &str, paths: &[Option<String>]| {

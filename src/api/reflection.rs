@@ -143,12 +143,15 @@ fn register_settings<'scope>(
         table,
         "Set",
         scope.create_function(|_, (index, t): (u32, Table)| {
-            let mut fields = Ok(());
-            scene
-                .borrow_mut()
-                .reflection_probes
-                .edit(index as usize, |p| fields = write_fields(p, &t));
-            fields
+            let mut scene = scene.borrow_mut();
+            let set = &mut scene.reflection_probes;
+            let Some(mut probe) = set.probes.get(index as usize).cloned() else {
+                return Ok(());
+            };
+            // Every field is read before any is written: a bad one changes nothing.
+            write_fields(&mut probe, &t)?;
+            set.edit(index as usize, |p| *p = probe);
+            Ok(())
         }),
     )?;
     put(

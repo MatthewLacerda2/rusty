@@ -49,21 +49,31 @@ impl ReflectionProbe {
 
 impl ReflectionProbeSet {
     /// The blend an object centred at `point` reflects (see the module docs), or
-    /// `None` when no probe reaches it (it reflects the sky).
+    /// `None` when no probe reaches it (it reflects the sky). One pass keeping the
+    /// top two, no allocation: the renderer asks once per draw.
     pub fn blend(&self, point: Vec3) -> Option<ProbeBlend> {
-        let mut candidates: Vec<(usize, f32)> = (self.probes.iter().enumerate())
-            .map(|(i, p)| (i, p.influence(point)))
-            .filter(|&(_, w)| w > 0.0)
-            .collect();
         let probe = |i: usize| &self.probes[i];
-        candidates.sort_by(|&(a, wa), &(b, wb)| {
+        // `Less` when candidate `a` ranks above `b`.
+        let rank = |&(a, wa): &(usize, f32), &(b, wb): &(usize, f32)| {
             (probe(b).importance.cmp(&probe(a).importance))
                 .then(wb.total_cmp(&wa))
                 .then((probe(a).distance_sq(point)).total_cmp(&probe(b).distance_sq(point)))
                 .then(a.cmp(&b))
-        });
-        let &(first, w1) = candidates.first()?;
-        let Some(&(second, w2)) = candidates.get(1) else {
+        };
+        let (mut top, mut next): (Option<(usize, f32)>, Option<(usize, f32)>) = (None, None);
+        for (i, p) in self.probes.iter().enumerate() {
+            let c = (i, p.influence(point));
+            if c.1 <= 0.0 {
+                continue;
+            }
+            if top.is_none_or(|t| rank(&c, &t).is_lt()) {
+                (top, next) = (Some(c), top);
+            } else if next.is_none_or(|n| rank(&c, &n).is_lt()) {
+                next = Some(c);
+            }
+        }
+        let (first, w1) = top?;
+        let Some((second, w2)) = next else {
             return Some(ProbeBlend {
                 first,
                 first_weight: w1,

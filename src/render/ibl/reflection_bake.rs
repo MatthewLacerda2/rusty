@@ -36,6 +36,10 @@ impl Renderer {
         probe: &ReflectionProbe,
         resolution: u32,
     ) -> Vec<u8> {
+        // A scene file's values reach here unclamped: bake from a clamped copy.
+        let mut probe = probe.clone();
+        probe.clamp_settings();
+        let resolution = clamp_resolution(resolution);
         let lens = CaptureLens {
             near: probe.near_clip,
             far: probe.far_clip,

@@ -37,6 +37,7 @@ use self::room_probes::plan_rooms;
 pub use self::room_probes::EYE_HEIGHT;
 use self::rooms::find_rooms;
 pub use self::rooms::RoomParams;
+use crate::scene::lighting::settings::ReflectionSettings;
 use crate::scene::Scene;
 
 /// A light-probe grid request: the inclusive `[min, max]` corners and the cell spacing,
@@ -61,7 +62,8 @@ pub struct ReflectionPlan {
 /// actor's head/torso occupies, not only the floor it stands on. World units.
 const VERTICAL_HEADROOM: f32 = 3.0;
 
-/// World-space AABB of the scene's STATIC, active geometry (its colliders). `None`
+/// World-space AABB of the scene's STATIC, active, solid geometry (its colliders;
+/// a trigger is not geometry). `None`
 /// when the scene has no static collider to bound — the caller then has nothing to
 /// place against. Deterministic: a pure fold over the entities in id order.
 pub fn static_scene_aabb(scene: &Scene) -> Option<(Vec3, Vec3)> {
@@ -76,7 +78,7 @@ pub fn static_scene_aabb(scene: &Scene) -> Option<(Vec3, Vec3)> {
             .world
             .collider(id)
             .expect("id came from ids_with_collider");
-        if !collider.active {
+        if !collider.active || collider.is_trigger {
             continue;
         }
         let Some(pose) = scene.world.world_pose(id) else {
@@ -138,16 +140,24 @@ pub fn plan_light_probes(
 }
 
 /// How reflection probes are placed: one per room, a room larger than `region`
-/// split into probes no wider than it.
+/// split into probes no wider than it, at most `max_probes` in all.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ReflectionPlacement {
-    /// The widest a probe's box may be, world units (`reflectionRegion`).
+    /// The widest a probe's box may be, world units (`reflectionRegion`), at least
+    /// [`MIN_REGION`].
     pub region: f32,
     /// The floor plan's cell when it is rasterized from the colliders.
     pub cell: f32,
     /// What separates two rooms.
     pub rooms: RoomParams,
+    /// The most probes placed (`LightingSettings::reflections`); over it the tiles
+    /// widen until the level fits.
+    pub max_probes: usize,
 }
+
+/// The narrowest `region` placement accepts, world units: a probe per two metres
+/// already over-samples a room, and below it the count grows with the square.
+pub const MIN_REGION: f32 = 2.0;
 
 impl Default for ReflectionPlacement {
     fn default() -> Self {
@@ -155,6 +165,7 @@ impl Default for ReflectionPlacement {
             region: 12.0,
             cell: 0.5,
             rooms: RoomParams::default(),
+            max_probes: ReflectionSettings::default().max_probes as usize,
         }
     }
 }
@@ -165,6 +176,10 @@ impl Default for ReflectionPlacement {
 /// fits its room's walls, floor and ceiling (an open room reaches the top of the
 /// static geometry), and it captures from eye height over the room's middle; see
 /// `rooms.rs` and `room_probes.rs`. Empty with nothing to stand on.
+///
+/// Bounded: `region` is held to at least [`MIN_REGION`], and a level that would
+/// take more than `max_probes` tiles is re-tiled wider, with a warning, until it
+/// fits or every room is one tile.
 pub fn plan_reflection_probes(
     scene: &Scene,
     floor: Option<FloorGrid>,
@@ -180,9 +195,28 @@ pub fn plan_reflection_probes(
         .map_or(f32::MIN, |(_, max)| max.y)
         .max(highest_floor + VERTICAL_HEADROOM);
     let (room, count) = find_rooms(&grid, &params.rooms);
-    plan_rooms(&grid, &room, count, params.region, sky)
+    let asked = params.region.max(MIN_REGION);
+    let widest = grid.cell * grid.width.max(grid.depth) as f32;
+    let max = params.max_probes.max(1);
+    let (mut region, mut plans) = (asked, plan_rooms(&grid, &room, count, asked, sky));
+    while plans.len() > max && region < widest {
+        region *= (plans.len() as f32 / max as f32).sqrt().max(1.1);
+        plans = plan_rooms(&grid, &room, count, region, sky);
+    }
+    if region > asked {
+        log::warn!(
+            "[Lighting] {asked} m reflection tiles pass the {max}-probe ceiling; \
+             placed {} probes on {region:.1} m tiles",
+            plans.len()
+        );
+    }
+    plans
 }
 
 #[cfg(test)]
 #[path = "../placement_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "limits_tests.rs"]
+mod limits_tests;

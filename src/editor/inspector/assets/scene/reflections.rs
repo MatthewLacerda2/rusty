@@ -1,5 +1,5 @@
 //! The scene inspector's **Reflection Probes** section (#1584): the probes' scene
-//! defaults (resolution, memory budget) and every probe's Unity Reflection Probe
+//! defaults (resolution, memory budget, probe ceiling) and every probe's Unity Reflection Probe
 //! settings, the same fields `Reflection.Set` / `Reflection.Get` and
 //! `Lighting.SetSettings` write. Edits go through `ReflectionProbeSet::edit`, which
 //! clamps them as the API's do.
@@ -41,6 +41,14 @@ fn draw_defaults(ui: &mut egui::Ui, r: &mut ReflectionSettings) -> bool {
             .on_hover_text("Probe cubes kept in memory at once, nearest boxes first")
             .changed();
         ui.label("Memory budget");
+    });
+    ui.horizontal(|ui| {
+        let max = egui::DragValue::new(&mut r.max_probes).ranged(ReflectionSettings::MAX_PROBES);
+        changed |= ui
+            .add(max)
+            .on_hover_text("The most probes Generate Lighting places; past it, tiles widen")
+            .changed();
+        ui.label("Max probes");
     });
     if changed {
         r.clamp();

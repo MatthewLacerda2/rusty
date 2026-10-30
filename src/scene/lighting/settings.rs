@@ -38,15 +38,20 @@ pub struct ReflectionSettings {
     /// boxes to the camera fill it, and an object whose probe is past it reflects the
     /// next probe, or the sky.
     pub budget_mb: u32,
+    /// The most probes `Lighting.Generate()` places: over it, the tiles a large
+    /// room is cut into widen until the level fits.
+    pub max_probes: u32,
 }
 
 impl Default for ReflectionSettings {
-    /// 512-texel cubes, one good size for every probe; a 128 MB budget holds 15 of
-    /// them (about 8.4 MB each with their mips), enough for the rooms around a player.
+    /// 512-texel cubes, one good size for every probe; a 128 MB budget holds 16 of
+    /// them (8 MB each with their mips), enough for the rooms around a player. 512
+    /// probes cover a Dust2-sized level (200 m of 20 m rooms takes 400 at 12 m tiles).
     fn default() -> Self {
         Self {
             resolution: 512,
             budget_mb: 128,
+            max_probes: 512,
         }
     }
 }
@@ -54,10 +59,14 @@ impl Default for ReflectionSettings {
 impl ReflectionSettings {
     /// The budgets a write accepts, in megabytes.
     pub const BUDGET_MB: RangeInclusive<u32> = 8..=2048;
+    /// The probe ceilings a write accepts.
+    pub const MAX_PROBES: RangeInclusive<u32> = 1..=4096;
 
-    /// Hold both knobs to their ranges: a power-of-two resolution and a budget in
-    /// [`Self::BUDGET_MB`].
+    /// Hold every knob to its range: a power-of-two resolution, a budget in
+    /// [`Self::BUDGET_MB`] and a ceiling in [`Self::MAX_PROBES`].
     pub fn clamp(&mut self) {
+        let (lo, hi) = (*Self::MAX_PROBES.start(), *Self::MAX_PROBES.end());
+        self.max_probes = self.max_probes.clamp(lo, hi);
         self.resolution = clamp_resolution(self.resolution);
         self.budget_mb = self
             .budget_mb

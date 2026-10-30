@@ -11,9 +11,12 @@
 //!   3. **Rooms** — every open cell joins the core it reaches first, growing all of
 //!      them at once, so a doorway is shared out between the rooms it joins.
 //!
-//! Open floor no core reaches (a wall top, a ledge too narrow to stand a room on)
-//! belongs to no room. Every step runs in scan order with ties to the lower index,
-//! so a level always splits the same way.
+//!   4. **Narrow areas** — connected open floor no core reached (a level of
+//!      corridors narrower than a doorway, a ledge) is a room of its own, so no
+//!      walkable space is left reflecting the sky.
+//!
+//! Every step runs in scan order with ties to the lower index, so a level always
+//! splits the same way.
 
 use std::collections::VecDeque;
 
@@ -73,16 +76,29 @@ pub fn find_rooms(grid: &FloorGrid, params: &RoomParams) -> (Vec<Option<u32>>, u
         }
         count += 1;
     }
-    // Grow every core at once, in the order its cells were filled.
+    grow(grid, params.step, &mut room, queue);
+    // What no core reached: each connected area its own room.
+    for start in 0..room.len() {
+        if grid.cells[start].is_some() && room[start].is_none() {
+            room[start] = Some(count);
+            grow(grid, params.step, &mut room, VecDeque::from([start]));
+            count += 1;
+        }
+    }
+    (room, count)
+}
+
+/// Grow the rooms of the cells in `queue` into every unlabelled cell joined to
+/// them, all at once, in queue order.
+fn grow(grid: &FloorGrid, step: f32, room: &mut [Option<u32>], mut queue: VecDeque<usize>) {
     while let Some(i) = queue.pop_front() {
-        for n in neighbours(grid, i, params.step) {
+        for n in neighbours(grid, i, step) {
             if room[n].is_none() {
                 room[n] = room[i];
                 queue.push_back(n);
             }
         }
     }
-    (room, count)
 }
 
 /// The open cells joined to cell `i` along an axis: open, and within a `step`.

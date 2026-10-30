@@ -80,3 +80,22 @@ fn set_and_get_every_setting() {
         (2.0, 0.2, false)
     );
 }
+
+#[test]
+fn a_set_with_a_bad_field_writes_nothing() {
+    let scene = empty_scene();
+    let lua = Lua::new();
+    lua.scope(|scope| {
+        register(&lua, scope, &scene).unwrap();
+        lua.load("Reflection.Add(0,0,0, 1,1,1)").exec().unwrap();
+        let bad = "Reflection.Set(0, { blendDistance = 4, intensity = 'bright' })";
+        assert!(lua.load(bad).exec().is_err());
+        Ok(())
+    })
+    .unwrap();
+    let p = &scene.borrow().reflection_probes.probes[0];
+    assert_eq!(
+        p.blend_distance, 1.0,
+        "the field before the bad one is untouched"
+    );
+}

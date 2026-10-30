@@ -116,7 +116,11 @@ fn auto_place_reflection(
     }
     let radius = scene.nav_settings.agent_radius;
     let floor = nav.and_then(|nav| nav.floor_grid(radius));
-    let plans = placement::plan_reflection_probes(scene, floor, params);
+    let params = ReflectionPlacement {
+        max_probes: scene.lighting_settings.reflections.max_probes as usize,
+        ..*params
+    };
+    let plans = placement::plan_reflection_probes(scene, floor, &params);
     if plans.is_empty() {
         return false;
     }

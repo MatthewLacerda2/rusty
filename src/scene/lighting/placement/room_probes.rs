@@ -6,7 +6,8 @@
 //! walls; its floor is the lowest under it, its ceiling the median underside over its
 //! cells, or `sky` when most of it is open. The capture point stands over the open
 //! cell nearest the tile's centroid, so it is never inside a wall, at
-//! [`EYE_HEIGHT`] (kept under the ceiling).
+//! [`EYE_HEIGHT`] (kept under that cell's own ceiling, and the box raised to hold
+//! it).
 
 use glam::{Vec2, Vec3};
 
@@ -91,12 +92,15 @@ fn plan_tile(grid: &FloorGrid, cells: &[usize], sky: f32) -> ReflectionPlan {
             (centre(a).distance_squared(centroid)).total_cmp(&centre(b).distance_squared(centroid))
         })
         .expect("a tile has cells");
-    let eye = (open(stand).floor + EYE_HEIGHT).min(ceiling - CEILING_GAP);
+    // Under the standing cell's own ceiling, not the tile's: on a stair the median
+    // can sit below the step it stands on.
+    let own = open(stand);
+    let eye = (own.floor + EYE_HEIGHT).min(own.ceiling - CEILING_GAP);
     let at = centre(stand);
     ReflectionPlan {
         position: Vec3::new(at.x, eye, at.y),
         box_min: Vec3::new(lo.x, floor, lo.y),
-        box_max: Vec3::new(hi.x, ceiling, hi.y),
+        box_max: Vec3::new(hi.x, ceiling.max(eye + CEILING_GAP), hi.y),
     }
 }
 

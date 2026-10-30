@@ -94,8 +94,9 @@ fn a_dust2_sized_level_gets_a_probe_per_room() {
 }
 
 #[test]
-fn a_room_too_narrow_for_a_core_gets_no_probe() {
-    // A 1.5 m wide corridor alone, walled in: narrower than a doorway everywhere.
+fn an_area_too_narrow_for_a_core_gets_its_own_probes() {
+    // A 1.5 m wide, 20 m long walkway alone: narrower than a doorway everywhere,
+    // so it holds no room core, and still gets probes, tiled by the 12 m region.
     let mut scene = Scene::new();
     let block = super::super::test_level::block;
     block(
@@ -103,5 +104,10 @@ fn a_room_too_narrow_for_a_core_gets_no_probe() {
         Vec3::new(0.0, -0.2, 0.0),
         Vec3::new(1.5, 0.0, 20.0),
     );
-    assert!(plan(&scene).is_empty());
+    let plans = plan(&scene);
+    assert_eq!(plans.len(), 2, "{plans:?}");
+    for p in &plans {
+        assert!(p.box_min.x >= 0.0 && p.box_max.x <= 1.5, "{p:?}");
+        assert!(p.box_max.z - p.box_min.z <= 12.5, "{p:?}");
+    }
 }

@@ -45,6 +45,9 @@ pub struct FloorGrid {
 const STEP: f32 = 0.4;
 /// Height above a floor an actor's body ends: anything higher is overhead.
 const HEAD: f32 = 1.8;
+/// The most cells a rasterized floor plan holds: 2000 × 2000, a kilometre square
+/// at half a metre. A larger level is rasterized at a coarser cell.
+pub const MAX_FLOOR_CELLS: usize = 4_000_000;
 
 impl FloorGrid {
     /// The world XZ of cell `(x, z)`'s centre.
@@ -57,16 +60,17 @@ impl FloorGrid {
     /// it, it is blocked where a solid crosses body height above that floor, and its
     /// ceiling is the lowest bottom overhead. A collider is judged by its bounding
     /// box, so a level built as one mesh collider wants the nav surface's grid.
+    /// A level too wide for [`MAX_FLOOR_CELLS`] at `cell` is rasterized at the
+    /// finest cell that fits, with a warning naming its extent.
     pub fn from_static(scene: &Scene, cell: f32) -> Option<Self> {
         let boxes = static_boxes(scene);
         let (min, max) = boxes
             .iter()
             .copied()
             .reduce(|a, b| (a.0.min(b.0), a.1.max(b.1)))?;
-        let cell = cell.max(0.1);
         let span = Vec2::new(max.x - min.x, max.z - min.z);
-        let width = (span.x / cell).ceil().max(1.0) as usize;
-        let depth = (span.y / cell).ceil().max(1.0) as usize;
+        let cell = capped_cell(span, cell.max(0.1));
+        let (width, depth) = cells_across(span, cell);
         let mut grid = Self {
             origin: Vec2::new(min.x, min.z) + Vec2::splat(cell * 0.5),
             cell,
@@ -128,13 +132,43 @@ impl FloorGrid {
     }
 }
 
-/// The world bounds of the scene's static, active colliders, in entity order.
+/// How many cells of `cell` cover `span` along X and Z.
+fn cells_across(span: Vec2, cell: f32) -> (usize, usize) {
+    let n = |extent: f32| (extent / cell).ceil().max(1.0) as usize;
+    (n(span.x), n(span.y))
+}
+
+/// `cell`, or the finest coarser cell at which `span` takes at most
+/// [`MAX_FLOOR_CELLS`] (warned about, naming the extent).
+fn capped_cell(span: Vec2, cell: f32) -> f32 {
+    let fits = |cell: f32| {
+        let (w, d) = cells_across(span, cell);
+        w.saturating_mul(d) <= MAX_FLOOR_CELLS
+    };
+    if fits(cell) {
+        return cell;
+    }
+    let mut coarse = cell.max((span.x * span.y / MAX_FLOOR_CELLS as f32).sqrt());
+    while !fits(coarse) {
+        coarse *= 1.01;
+    }
+    log::warn!(
+        "[Lighting] the static level is {:.0} × {:.0} m, too wide for a {cell} m floor \
+         plan; reflection probes are placed on a {coarse:.2} m one",
+        span.x,
+        span.y
+    );
+    coarse
+}
+
+/// The world bounds of the scene's static, active, solid colliders, in entity
+/// order: a trigger is not a wall, as the nav bake has it.
 fn static_boxes(scene: &Scene) -> Vec<(Vec3, Vec3)> {
     let world = &scene.world;
     (world.ids_with_collider().into_iter())
         .filter(|&id| world.is_static(id) && world.is_active_in_hierarchy(id))
         .filter_map(|id| {
-            let collider = world.collider(id).filter(|c| c.active)?;
+            let collider = world.collider(id).filter(|c| c.active && !c.is_trigger)?;
             Some(collider.calculate_world_aabb(world.world_pose(id)?))
         })
         .collect()

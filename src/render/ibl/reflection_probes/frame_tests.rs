@@ -8,7 +8,7 @@ use std::rc::Rc;
 use glam::Vec3;
 
 use super::super::gpu_tests::{cube_file, first, probes_at, renderer};
-use super::{array_bytes, ranked};
+use super::ranked;
 use crate::render::ibl::reflection_probes::MAX_REFLECTION_PROBES;
 use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;
@@ -120,7 +120,10 @@ fn gpu_update_refuses_a_cube_that_does_not_fit() {
     let scene = probes_at(&[(0.0, &path)]);
     let wanted = [(&scene.reflection_probes.probes[0], cube)];
     let r = &mut renderer;
-    let update = AssertUnwindSafe(|| r.reflection_probes.update(&r.device, &r.queue, &wanted));
+    let update = AssertUnwindSafe(|| {
+        r.reflection_probes
+            .update(&r.device, &r.queue, &wanted, u64::MAX)
+    });
     let err = std::panic::catch_unwind(update).expect_err("the assert trips");
     let message = (err.downcast_ref::<&str>().map(|m| m.to_string()))
         .or_else(|| err.downcast_ref::<String>().cloned())
@@ -129,29 +132,4 @@ fn gpu_update_refuses_a_cube_that_does_not_fit() {
         message.contains("every wanted cube was admitted"),
         "{message}"
     );
-}
-
-/// The resident set stops at the scene's byte budget (#1584), counted at the array's
-/// face; the nearest box is kept whatever its size.
-#[test]
-fn gpu_the_budget_keeps_the_nearest_probes() {
-    let Some(mut renderer) = renderer() else {
-        return;
-    };
-    let cube = cube_file("budget_4.ktx2", 4, 70);
-    let mut scene = probes_at(&[(2.0, &cube), (6.0, "x"), (10.0, &cube)]);
-    scene
-        .reflection_probes
-        .set_cubemap(1, cube_file("budget_b.ktx2", 4, 20));
-    scene.lighting_settings.reflections.budget_mb = 0;
-    let probes =
-        |r: &crate::render::Renderer, x: f32| r.reflection_probes.probe_for(Vec3::new(x, 0.0, 0.0));
-    renderer.update_reflection_probes(&scene, Vec3::ZERO);
-    assert_ne!(
-        probes(&renderer, 2.0),
-        0,
-        "the nearest is kept past a zero budget"
-    );
-    assert_eq!(probes(&renderer, 6.0), 0, "the next is past the budget");
-    assert_eq!((array_bytes(4, 1), array_bytes(512, 1)), (512, 8_388_608));
 }

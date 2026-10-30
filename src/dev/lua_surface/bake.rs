@@ -17,6 +17,7 @@ use super::super::{
 };
 use super::generate::Overrides;
 use crate::api::{global_table, put, ApiScopedCtx, Reg};
+use crate::scene::lighting::placement::MIN_REGION;
 use crate::scene::Scene;
 
 /// Add `Bake` to the `Probe`, `Reflection` and `Lighting` tables.
@@ -87,7 +88,7 @@ fn register_lighting<'scope>(
             let mut scene = scene.borrow_mut();
             let path = scene_path.borrow();
             let nav = nav.borrow();
-            let params = bake_params(spacing, region);
+            let params = bake_params(spacing, region)?;
             let report =
                 lighting_bake::bake_lighting(&mut scene, path.as_deref(), Some(&nav), params)
                     .map_err(mlua::Error::external)?;
@@ -97,11 +98,22 @@ fn register_lighting<'scope>(
 }
 
 /// Build bake params from the optional Lua arguments, falling back to the defaults.
-fn bake_params(spacing: Option<f32>, region: Option<f32>) -> lighting_bake::LightingBakeParams {
+/// A `reflectionRegion` under [`MIN_REGION`] (or not a number) is refused: the
+/// probe count grows with its inverse square.
+fn bake_params(
+    spacing: Option<f32>,
+    region: Option<f32>,
+) -> mlua::Result<lighting_bake::LightingBakeParams> {
     let mut params = lighting_bake::LightingBakeParams::default();
     params.probe_spacing = spacing.unwrap_or(params.probe_spacing);
-    params.reflection.region = region.unwrap_or(params.reflection.region);
-    params
+    let region = region.unwrap_or(params.reflection.region);
+    if region.is_nan() || region < MIN_REGION {
+        return Err(mlua::Error::runtime(format!(
+            "Lighting.Bake: reflectionRegion {region} is under the {MIN_REGION} m minimum"
+        )));
+    }
+    params.reflection.region = region;
+    Ok(params)
 }
 
 /// `Lighting.BakeLightmaps([texelsPerUnit], [samples], [bounces], [seed],

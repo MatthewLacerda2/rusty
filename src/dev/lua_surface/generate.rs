@@ -1,7 +1,7 @@
 //! `Lighting.Generate()` and the scene's lighting settings (#832): the one verb
 //! behind the editor's Generate Lighting button, and `Lighting.GetSettings()` /
 //! `SetSettings{…}`, the knobs the button's card edits (the lightmap bake's, and the
-//! reflection probes' default resolution and memory budget, #1584).
+//! reflection probes' default resolution, memory budget and probe ceiling, #1584).
 
 use mlua::{Lua, Table};
 
@@ -103,7 +103,8 @@ pub(super) fn register<'scope>(
 /// The reflection probes' defaults, as `GetSettings` returns them (#1584).
 fn put_reflections(out: &Table, r: &ReflectionSettings) -> mlua::Result<()> {
     out.set("reflectionResolution", r.resolution)?;
-    out.set("reflectionBudgetMB", r.budget_mb)
+    out.set("reflectionBudgetMB", r.budget_mb)?;
+    out.set("reflectionMaxProbes", r.max_probes)
 }
 
 /// The reflection defaults `t` names written into `r`, then clamped.
@@ -111,6 +112,7 @@ fn set_reflections(t: &Table, r: &mut ReflectionSettings) -> mlua::Result<()> {
     let get = |key: &str| t.get::<Option<u32>>(key);
     r.resolution = get("reflectionResolution")?.unwrap_or(r.resolution);
     r.budget_mb = get("reflectionBudgetMB")?.unwrap_or(r.budget_mb);
+    r.max_probes = get("reflectionMaxProbes")?.unwrap_or(r.max_probes);
     r.clamp();
     Ok(())
 }
