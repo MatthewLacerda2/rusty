@@ -72,8 +72,8 @@ brick wall's bumps face out of every side of a box. The projections are in world
 space, so the texture stays put as an entity moves through it: use world mapping
 for static level geometry (a greybox of scaled primitives sharing one material), and
 UV0 for anything that moves. A surface shader's UV blocks (`uv_scroll`, see *Surface
-shaders* below) move UV0, so they apply under `UV0` only. A cutout's shadow is
-clipped at UV0 untiled for now.
+shaders* below) move UV0, so they apply under `UV0` only. A `Cutout` material's
+shadow is clipped where its surface is, through the same Tiling, Offset and mapping.
 
 ```lua with=id
 -- Two boxes of different scale, one material: the same 0.5 m tiles on every face.

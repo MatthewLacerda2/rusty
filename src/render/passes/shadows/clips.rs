@@ -21,9 +21,11 @@
 
 use std::collections::HashMap;
 
-use crate::components::RenderMode;
+use crate::components::{MaterialAsset, RenderMode};
 use crate::render::draw::materials::entity_params;
+use crate::render::draw::uniforms::mapping_uniform;
 use crate::render::gpu::pipelines::surface::STANDARD;
+use crate::render::gpu::uniforms::MappingUniform;
 use crate::render::Renderer;
 use crate::scene::Scene;
 
@@ -46,8 +48,28 @@ impl Clip {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct CasterClip {
     pub clip: Clip,
-    /// The Cutout material's alpha cutoff, and whether it has an albedo map to test.
-    pub cutout: Option<(f32, bool)>,
+    /// The Cutout material's alpha test, when it is Cutout.
+    pub cutout: Option<Cutout>,
+}
+
+/// A Cutout material's shadow test: its alpha cutoff, whether it has an albedo map to
+/// test, and where that map is read (#1594: its Tiling/Offset and world mapping).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct Cutout {
+    pub cutoff: f32,
+    pub textured: bool,
+    pub mapping: MappingUniform,
+}
+
+impl Cutout {
+    /// `asset`'s test, or `None` when it is not Cutout.
+    pub(crate) fn of(asset: &MaterialAsset) -> Option<Self> {
+        (asset.render_mode == RenderMode::Cutout).then(|| Self {
+            cutoff: asset.alpha_cutoff,
+            textured: asset.base_color_map.is_some(),
+            mapping: mapping_uniform(asset),
+        })
+    }
 }
 
 impl Renderer {
@@ -78,8 +100,7 @@ impl Renderer {
         let shader = asset.shader.as_deref();
         let pipeline = self.surface_shaders.pipeline_id(&self.device, shader);
         let cuts = self.surface_shaders.cut(pipeline).is_some();
-        let cutout = (asset.render_mode == RenderMode::Cutout)
-            .then(|| (asset.alpha_cutoff, asset.base_color_map.is_some()));
+        let cutout = Cutout::of(asset);
         if !cuts && cutout.is_none() {
             return None;
         }
