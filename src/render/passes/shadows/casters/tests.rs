@@ -2,6 +2,14 @@ use super::*;
 use crate::render::gpu::pipelines::winding::is_mirrored;
 use glam::{Mat4, Vec3};
 
+fn cut(cutoff: f32) -> super::super::clips::Cutout {
+    super::super::clips::Cutout {
+        cutoff,
+        textured: true,
+        mapping: Default::default(),
+    }
+}
+
 fn at(x: f32, bone_base: u32) -> CasterData {
     CasterData::new(Mat4::from_translation(Vec3::X * x), bone_base)
 }
@@ -60,7 +68,7 @@ fn a_clipped_caster_draws_apart_from_plain_copies_of_its_mesh() {
         ..mesh("Box", 36)
     };
     let casters = vec![
-        (clipped.clone(), at(0.0, 0).cutout(0.5, true)),
+        (clipped.clone(), at(0.0, 0).cutout(cut(0.5))),
         (mesh("Box", 36), at(1.0, 0)),
         (clipped, at(2.0, 0)),
     ];
@@ -68,12 +76,6 @@ fn a_clipped_caster_draws_apart_from_plain_copies_of_its_mesh() {
     let keys: Vec<_> = batches.iter().map(|b| b.key.clip).collect();
     assert_eq!(keys, [None, Some(clip)]);
     assert_eq!(packed[1].alpha_cutoff, 0.5, "the cutout rides its instance");
-}
-
-#[test]
-fn the_caster_layout_matches_the_shadow_stage() {
-    // `struct Caster { model: mat4x4<f32>, bone_base, alpha_cutoff, use_texture, _pad0 }`.
-    assert_eq!(std::mem::size_of::<CasterData>(), 80);
 }
 
 /// A mirrored caster (#1134) draws with the winding flipped, so it never shares a

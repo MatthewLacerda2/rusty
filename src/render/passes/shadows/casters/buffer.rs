@@ -3,11 +3,15 @@
 
 use crate::render::gpu::draw_buffers::{joint_array_bytes, JointMatrix};
 use crate::render::gpu::grow_buffer::GrowBuffer;
+use crate::render::gpu::uniforms::MappingUniform;
+use crate::render::passes::shadows::clips::Cutout;
 use crate::render::passes::shadows::setup::{CASTERS_BINDING, JOINTS_BINDING};
 
 /// One caster as `shader.wgsl`'s `Caster` reads it: world matrix, where its palette
 /// starts in the joint array (0 — the identity — for an unskinned mesh), and its
-/// cutout alpha test (#648; a cutoff of 0 clips nothing).
+/// cutout alpha test (#648; a cutoff of 0 clips nothing) at the texels its material's
+/// mapping terms (`terms`) read (#1594). The mapping rides the instance, as the cutoff does, so
+/// casters that differ only in it still share one draw and each clips by its own.
 #[repr(C)]
 #[derive(Copy, Clone, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub(in crate::render::passes::shadows) struct CasterData {
@@ -16,6 +20,7 @@ pub(in crate::render::passes::shadows) struct CasterData {
     pub alpha_cutoff: f32,
     pub use_texture: u32,
     _pad: u32,
+    pub terms: MappingUniform,
 }
 
 impl CasterData {
@@ -27,15 +32,18 @@ impl CasterData {
             alpha_cutoff: 0.0,
             use_texture: 0,
             _pad: 0,
+            terms: MappingUniform::default(),
         }
     }
 
-    /// This caster, its shadow clipped where its albedo's alpha (when `textured`) is
-    /// below `cutoff` — a Cutout material's test (#242, #648).
-    pub fn cutout(self, cutoff: f32, textured: bool) -> Self {
+    /// This caster, its shadow clipped where its albedo's alpha (when textured) is
+    /// below the cutoff — a Cutout material's test (#242, #648), read through its
+    /// mapping (#1594).
+    pub fn cutout(self, cut: Cutout) -> Self {
         Self {
-            alpha_cutoff: cutoff,
-            use_texture: u32::from(textured),
+            alpha_cutoff: cut.cutoff,
+            use_texture: u32::from(cut.textured),
+            terms: cut.mapping,
             ..self
         }
     }
