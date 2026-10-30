@@ -8,15 +8,21 @@
 //! default (`entity_{id}_material`, created as [`MaterialAsset::default`] when the
 //! library has none, the material *Add Component* attaches), mesh particles and a
 //! decal to no material, which draw the engine default and the decal's texture.
-//! The [`DeletedMaterial`] a delete returns is one undo step ([`restore_asset`]).
+//! The [`DeletedMaterial`] a delete returns is one undo step ([`restore_asset`]):
+//! it puts back the asset as it was deleted, so a material defined under the same
+//! key since is overwritten by the undo, and a user it can no longer point back
+//! (a slot gone since) is skipped with a console warning.
 //!
-//! A `.prefab` file is never a user: it carries its own copy of every material it
-//! names (`PrefabData::materials`), and instancing it merges that copy back in.
-//! An instance in the scene is a user through its entities' slots.
+//! A `.prefab` file is never a user: it carries its own copy of every material its
+//! entities name ([`entity_keys`], `PrefabData::materials`), and instancing it
+//! merges that copy back in. An instance in the scene is a user through its
+//! entities' slots and particles; propagating it from its source keeps only the
+//! merged materials something still names, so a deleted one stays deleted.
 //!
 //! Pure: no wall-clock, no RNG; users are listed in entity-id order.
 
 use super::{entity_material_key, set_slot, MaterialLibrary};
+use crate::components::{Entity, MaterialComponent, ParticleEmitterComponent};
 use crate::scene::{MaterialAsset, Scene, SceneId};
 
 /// One place that names a library material by its key.
@@ -50,20 +56,54 @@ pub fn users(scene: &Scene, key: &str) -> Vec<MaterialUser> {
     ids.sort_unstable();
     let mut found = Vec::new();
     for id in ids {
-        if let Some(material) = scene.world.material(id) {
-            let slots = material.materials.iter().enumerate();
-            let used = slots.filter(|(_, k)| *k == key);
-            found.extend(used.map(|(slot, _)| MaterialUser::Slot { id, slot }));
-        }
+        let material = scene.world.material(id);
         let particles = scene.world.particles(id);
-        if particles.is_some_and(|p| p.render.material.as_deref() == Some(key)) {
-            found.push(MaterialUser::Particles { id });
-        }
+        let named = entity_users(id, material.as_deref(), particles.as_deref());
+        let used = named.into_iter().filter(|(_, k)| k == key);
+        found.extend(used.map(|(user, _)| user));
     }
     let decals = scene.decals.iter();
     let named = decals.filter(|d| d.material.as_deref() == Some(key));
     found.extend(named.map(|d| MaterialUser::Decal { id: d.id }));
     found
+}
+
+/// Every library key entity document `entity` names (slots, then particles), the
+/// set a `.prefab` carries a copy of.
+pub fn entity_keys(entity: &Entity) -> Vec<String> {
+    let named = entity_users(
+        entity.id,
+        entity.material.as_ref(),
+        entity.particles.as_ref(),
+    );
+    named.into_iter().map(|(_, key)| key).collect()
+}
+
+/// The one walk of what on entity `id` names a library material: each slot, then
+/// its particles, with the key it names.
+fn entity_users(
+    id: u32,
+    material: Option<&MaterialComponent>,
+    particles: Option<&ParticleEmitterComponent>,
+) -> Vec<(MaterialUser, String)> {
+    let slots = material.iter().flat_map(|m| m.materials.iter().enumerate());
+    let mut found: Vec<_> = slots
+        .map(|(slot, key)| (MaterialUser::Slot { id, slot }, key.clone()))
+        .collect();
+    if let Some(key) = particles.and_then(|p| p.render.material.clone()) {
+        found.push((MaterialUser::Particles { id }, key));
+    }
+    found
+}
+
+/// Remove each of `keys` from the library when nothing [`users`] it, the merged
+/// materials a prefab propagation brought in that no slot names after overrides.
+pub fn drop_unused(scene: &mut Scene, keys: &[String]) {
+    for key in keys {
+        if users(scene, key).is_empty() {
+            scene.materials.remove(key);
+        }
+    }
 }
 
 /// A user as a person reads it: `entity 3 "Crate" slot 0`, with the prefab an
@@ -137,20 +177,21 @@ pub fn restore_asset(scene: &mut Scene, deleted: DeletedMaterial) -> Result<(), 
     let key = deleted.key;
     scene.materials.insert(key.clone(), deleted.asset);
     for user in &deleted.moved {
-        point(scene, user, Some(&key));
-    }
-    for made in deleted.created.iter().filter(|m| **m != key) {
-        if users(scene, made).is_empty() {
-            scene.materials.remove(made);
+        if let Err(e) = point(scene, user, Some(&key)) {
+            let user = describe(scene, user);
+            log::warn!("[Material] undo of {key:?}: {user} not restored: {e}");
         }
     }
+    let created = deleted.created.into_iter().filter(|m| *m != key);
+    drop_unused(scene, &created.collect::<Vec<_>>());
     Ok(())
 }
 
 /// Move `user` to its default material, noting any entity default it creates.
 fn move_off(scene: &mut Scene, user: &MaterialUser, created: &mut Vec<String>) {
     let MaterialUser::Slot { id, .. } = *user else {
-        return point(scene, user, None);
+        let _always = point(scene, user, None);
+        return;
     };
     let fallback = entity_material_key(id);
     if !scene.materials.contains_key(&fallback) {
@@ -159,17 +200,21 @@ fn move_off(scene: &mut Scene, user: &MaterialUser, created: &mut Vec<String>) {
             .insert(fallback.clone(), MaterialAsset::default());
         created.push(fallback.clone());
     }
-    point(scene, user, Some(&fallback));
+    if let Err(e) = point(scene, user, Some(&fallback)) {
+        let user = describe(scene, user);
+        log::warn!("[Material] {user} not moved to {fallback:?}: {e}");
+    }
 }
 
 /// Point `user` at `key`; `None` (particles and decals only) leaves it on none.
-fn point(scene: &mut Scene, user: &MaterialUser, key: Option<&str>) {
+/// A slot that is gone, or out of range now, is an error.
+fn point(scene: &mut Scene, user: &MaterialUser, key: Option<&str>) -> Result<(), String> {
     let key = key.map(str::to_string);
     match *user {
         MaterialUser::Slot { id, slot } => {
             let library: &MaterialLibrary = &scene.materials;
             if let Some(key) = key {
-                let _gone = set_slot(&mut scene.world, library, id, slot, &key);
+                return set_slot(&mut scene.world, library, id, slot, &key);
             }
         }
         MaterialUser::Particles { id } => {
@@ -181,7 +226,11 @@ fn point(scene: &mut Scene, user: &MaterialUser, key: Option<&str>) {
             scene.decals.set_material(id, key);
         }
     }
+    Ok(())
 }
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod prefab_tests;

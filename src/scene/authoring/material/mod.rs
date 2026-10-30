@@ -34,7 +34,8 @@ pub use coordinates::{
     BLEND_SHARPNESS_RANGE, COORDINATE_FIELDS, MAP_COORD_RANGE, WORLD_SIZE_RANGE,
 };
 pub use library::{
-    delete_asset, describe, describe_all, restore_asset, users, DeletedMaterial, MaterialUser,
+    delete_asset, describe, describe_all, drop_unused, entity_keys, restore_asset, users,
+    DeletedMaterial, MaterialUser,
 };
 pub use maps::{bake_maps, rebake_maps, MAPS_DIR};
 pub use shader_params::{
