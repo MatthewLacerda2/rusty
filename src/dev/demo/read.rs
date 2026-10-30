@@ -46,7 +46,7 @@ pub struct DemoTick {
 
 /// The lines after a demo's header, each a tick's [`Entry`] or the [`End`].
 enum Line {
-    Entry(Entry),
+    Entry(Box<Entry>),
     End(End),
 }
 
@@ -61,7 +61,7 @@ fn parse_line(line: &str, n: usize) -> Result<Line, String> {
     Ok(if value.get("end").is_some() {
         Line::End(serde_json::from_value(value).map_err(at)?)
     } else {
-        Line::Entry(serde_json::from_value(value).map_err(at)?)
+        Line::Entry(Box::new(serde_json::from_value(value).map_err(at)?))
     })
 }
 
@@ -157,7 +157,7 @@ impl DemoTicks {
                 Err(e) => Err(e.to_string()),
             };
             return match line {
-                Ok(Line::Entry(entry)) => Some(entry),
+                Ok(Line::Entry(entry)) => Some(*entry),
                 Ok(Line::End(_)) => None,
                 Err(e) => {
                     log::warn!("[Demo] {e}");
