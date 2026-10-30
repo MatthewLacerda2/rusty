@@ -184,6 +184,8 @@ impl Iterator for DemoTicks {
         self.tick.t = t;
         self.tick.host.clear();
         self.tick.digest = None;
+        // A capture is an edge: it is published on its own tick only.
+        self.tick.input.clipboard = None;
         if let Some(entry) = self.ahead.take_if(|e| e.t == t) {
             self.tick.input = entry.input.apply(&self.tick.input);
             if let Some(dt) = entry.dt {
@@ -197,3 +199,7 @@ impl Iterator for DemoTicks {
         Some(self.tick.clone())
     }
 }
+
+#[cfg(test)]
+#[path = "read_tests.rs"]
+mod tests;

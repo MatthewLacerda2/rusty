@@ -15,6 +15,7 @@ use mlua::Lua;
 use super::calls;
 use super::format::{host_call, End};
 use super::read::{Demo, DemoTick, DemoTicks};
+use super::sources::Sources;
 use crate::app::{GameWorld, PlayTransition, TapPoint, TickTap};
 use crate::core::settings::video::{VideoSettings, VIDEO_NAMESPACE};
 use crate::core::settings::{saved_quality, GraphicsSettings};
@@ -54,6 +55,9 @@ pub struct Verdict {
     pub diverged: Option<Divergence>,
     /// `(tick, what)` for every act the demo could not carry.
     pub taints: Vec<(u64, String)>,
+    /// Whether a scenario on top steps the replay: it may end it before the
+    /// demo's end on purpose.
+    pub scenario: bool,
 }
 
 /// Feeds a demo into the world it is installed on; see [`prepare`].
@@ -74,6 +78,11 @@ impl Replayer {
     /// Whether every tick of the demo was replayed.
     pub fn finished(&self) -> bool {
         self.verdict.ticks >= self.verdict.of
+    }
+
+    /// A scenario on top steps this replay, so stopping short is its choice.
+    pub fn driven_by_scenario(&mut self) {
+        self.verdict.scenario = true;
     }
 
     fn act(&mut self, world: &mut GameWorld, t: u64, act: HostCall) {
@@ -112,7 +121,7 @@ impl Replayer {
 }
 
 /// Set `world` up as `demo` started — its seed, save data, the options and quality
-/// the player had saved, the time scale, the Game view size — and install the
+/// the player had saved, the time scale and pause, the Game view size — and install the
 /// replay. Call before the world's first tick; the project settings go in when
 /// the harness is built.
 pub fn prepare(world: &mut GameWorld, demo: Demo) -> Result<(), String> {
@@ -125,9 +134,17 @@ pub fn prepare(world: &mut GameWorld, demo: Demo) -> Result<(), String> {
         );
         world.console().borrow_mut().warn(line);
     }
+    if let Some(what) = header.sources.changed(&Sources::of(world)) {
+        let line =
+            format!("[Demo] the project's {what} changed since it was recorded: it may differ");
+        world.console().borrow_mut().warn(line);
+    }
     world.resources.script_manager.set_play_seed(header.seed);
     // An `f32` widened to `f64` narrows back exactly.
-    world.resources.time.borrow_mut().time_scale = header.time_scale.0 as f32;
+    let mut time = world.resources.time.borrow_mut();
+    time.time_scale = header.time_scale.0 as f32;
+    (time.paused, time.pending_steps) = (header.paused, header.pending_steps);
+    drop(time);
     let storage_cell = world.resources.storage.clone();
     let mut storage = storage_cell.borrow_mut();
     storage.replace(header.storage.clone());
@@ -166,6 +183,18 @@ pub fn prepare(world: &mut GameWorld, demo: Demo) -> Result<(), String> {
 }
 
 impl Replayer {
+    /// Right before Play is entered: the acts made before it. A line run in edit
+    /// mode needs the edit-mode runtime the recording host had (the editor's, the
+    /// session's), which a headless replay brings up for it.
+    fn before_play(&mut self, world: &mut GameWorld) {
+        let acts = std::mem::take(&mut self.before_play);
+        if acts.iter().any(|act| matches!(act, HostCall::Eval(_))) {
+            let init = world.init_edit_runtime();
+            world.report_lua_init(init);
+        }
+        self.acts(world, 0, acts);
+    }
+
     /// Before input is published: the tick's host acts again, and its Game view
     /// size. After the transition, so the acts made between entering Play and
     /// the first tick land after entering it, however it was entered.
@@ -235,14 +264,11 @@ impl Replayer {
 impl TickTap for Replayer {
     fn at(&mut self, point: TapPoint, world: &mut GameWorld) {
         match point {
-            TapPoint::Before(PlayTransition::Entered) => {
-                let acts = std::mem::take(&mut self.before_play);
-                self.acts(world, 0, acts);
-            }
+            TapPoint::Before(PlayTransition::Entered) => self.before_play(world),
             TapPoint::BeforeTick => self.tick = self.ticks.next(),
             TapPoint::BeforeInput => self.before_input(world),
             TapPoint::AfterTick => self.after_tick(world),
-            TapPoint::Before(_) | TapPoint::Transition(_) => {}
+            TapPoint::Before(_) | TapPoint::Transition(_) | TapPoint::AfterPoll => {}
         }
     }
 

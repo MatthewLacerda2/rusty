@@ -7,13 +7,15 @@ use rusty::dev::demo::{self, Demo, Destination, Replayer, Verdict};
 use rusty::dev::harness::Harness;
 use rusty::dev::scenario;
 
+mod edit_mode;
+mod ends;
 mod hosts;
 mod play_bin;
 mod timing;
 
 /// Walk, turn, a REPL line and API calls that move the world and draw from
 /// `Random` between ticks: every kind of act a demo carries.
-const SCENARIO: &str = r#"
+pub const SCENARIO: &str = r#"
 local player = Scene.FindEntityByName("Player")
 Input.Press("W")
 Harness.Step(90)

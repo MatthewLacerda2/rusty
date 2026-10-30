@@ -3,6 +3,7 @@
 //! The platform layer names the file: the wall-clock time is in the name only and
 //! never reaches the sim.
 
+use std::fs::{File, TryLockError};
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -39,13 +40,24 @@ impl Destination {
     }
 }
 
-/// Delete the oldest demos in `dir` until at most `keep` are left.
+/// Delete the oldest demos in `dir` until at most `keep` are left, never one a
+/// recorder still writes (a paused Play's demo can look oldest by its time).
 fn prune(dir: &Path, keep: usize) {
-    let mut demos = demos_in(dir);
+    let demos = demos_in(dir);
     let excess = demos.len().saturating_sub(keep);
-    for path in demos.drain(..excess) {
+    let closed = demos.into_iter().filter(|path| !is_being_written(path));
+    for path in closed.take(excess) {
         let _ = std::fs::remove_file(path);
     }
+}
+
+/// Whether a recorder holds the lock it takes on the demo it writes, released
+/// when the file closes, however the process ends.
+fn is_being_written(path: &Path) -> bool {
+    let Ok(file) = File::open(path) else {
+        return false;
+    };
+    matches!(file.try_lock_shared(), Err(TryLockError::WouldBlock))
 }
 
 /// The demos in `dir`, oldest first (by modification time, then name).
@@ -130,5 +142,21 @@ mod tests {
         let left = demos_in(&dir);
         assert_eq!(left.len(), 3, "the oldest went: {left:?}");
         assert_eq!(std::fs::read_to_string(&left[0]).unwrap(), "1");
+    }
+
+    #[test]
+    fn a_demo_still_being_written_is_never_pruned() {
+        let dir = crate::test_temp::dir();
+        let folder = Destination::Folder(dir.clone());
+        let open = folder.next("a.scene", 3).unwrap();
+        let writing = File::create(&open).unwrap();
+        writing.try_lock().unwrap();
+        for _ in 0..3 {
+            std::thread::sleep(std::time::Duration::from_millis(20));
+            std::fs::write(folder.next("a.scene", 2).unwrap(), "").unwrap();
+        }
+        let left = demos_in(&dir);
+        assert_eq!(left.len(), 2, "{left:?}");
+        assert_eq!(left[0], open, "the open demo stays, oldest as it is");
     }
 }

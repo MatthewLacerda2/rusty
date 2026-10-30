@@ -9,7 +9,6 @@ use super::{fixture_project, Harness};
 use crate::app::GameWorld;
 use crate::core::input::InputState;
 use crate::core::project::ProjectSettings;
-use crate::dev::screenshot::{DEFAULT_HEIGHT, DEFAULT_WIDTH};
 use crate::navigation::NavigationGraph;
 use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;
@@ -119,7 +118,6 @@ impl Harness {
             expectations: Vec::new(),
             out_dir: out_dir.as_ref().to_path_buf(),
             capture: crate::dev::capture::CaptureHost::new(),
-            size: (DEFAULT_WIDTH, DEFAULT_HEIGHT),
             stats,
             _providers: crate::dev::providers::HeadlessHold::take(),
         }

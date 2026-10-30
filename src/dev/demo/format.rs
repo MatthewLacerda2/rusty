@@ -2,7 +2,7 @@
 //! anything to say (#1581).
 //!
 //! ```text
-//! {"scene":"assets/scenes/main.scene","engine_commit":"8f6ad5f…","seed":…,"settings":{…},"storage":{…},"size":[1280,720],"time_scale":1.0,"before_play":[…]}
+//! {"scene":"assets/scenes/main.scene","engine_commit":"8f6ad5f…","seed":…,"sources":{…},"settings":{…},"storage":{…},"size":[1280,720],"time_scale":1.0,"before_play":[…]}
 //! {"t":0,"input":{"held":["W"]},"host":[{"eval":"Time.SetScale(0.5)"}]}
 //! {"t":1,"dt":0.0172}
 //! {"t":119,"digest":"9b1c…"}
@@ -23,6 +23,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use super::delta::InputDelta;
+use super::sources::Sources;
 use crate::core::project::ProjectSettings;
 use crate::scripting::{HostCall, Plain};
 
@@ -80,6 +81,10 @@ pub struct Header {
     pub engine_commit: String,
     /// Where `Random` started.
     pub seed: u64,
+    /// The scene file and the project's scripts as they were: a replay on a
+    /// changed project says so.
+    #[serde(default)]
+    pub sources: Sources,
     /// The project settings the run played under.
     pub settings: ProjectSettings,
     /// The save data (`Storage`) Play started from: the player's options with it.
@@ -88,6 +93,12 @@ pub struct Header {
     pub size: Option<(u32, u32)>,
     /// `Time.timeScale` as edit mode left it: entering Play keeps it.
     pub time_scale: Exact,
+    /// `Time.paused` and the queued `Time.Step`s as edit mode left them: entering
+    /// Play keeps both, as it keeps the time scale.
+    #[serde(default)]
+    pub paused: bool,
+    #[serde(default)]
+    pub pending_steps: u32,
     /// Host acts made before the tick that entered Play, run before entering it
     /// (a scenario's set-up, a taint on how Play started), as [`Entry::host`].
     #[serde(default, skip_serializing_if = "Vec::is_empty")]

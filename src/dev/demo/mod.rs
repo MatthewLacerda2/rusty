@@ -35,6 +35,7 @@ mod format;
 mod read;
 mod record;
 mod replay;
+mod sources;
 
 use std::path::Path;
 
@@ -79,7 +80,12 @@ pub fn replay(
         harness.record_audio(Some(path))?;
     }
     let ticks = demo.ticks;
-    prepare(&mut harness.world.borrow_mut(), demo)?;
+    let mut world = harness.world.borrow_mut();
+    prepare(&mut world, demo)?;
+    if let (Some(_), Some(replayer)) = (scenario_path, world.tap_mut::<Replayer>()) {
+        replayer.driven_by_scenario();
+    }
+    drop(world);
     match scenario_path {
         Some(path) => scenario::run_file(harness, path),
         None => scenario::run_code(harness, &format!("Harness.Step({ticks})"), "=demo"),
@@ -111,8 +117,24 @@ pub fn conclude(harness: &mut Harness) {
     for (t, what) in &verdict.taints {
         harness.log(format!("demo tainted from tick {t}: {what}"));
     }
+    let short = verdict.ticks < verdict.of;
     match &verdict.diverged {
         Some(divergence) => harness.expect(false, format!("the demo replays: {divergence}")),
+        // Its end digest never compared: only a scenario may stop it short.
+        None if short && !verdict.scenario => harness.expect(
+            false,
+            format!(
+                "the demo replays: stopped at tick {} of {}",
+                verdict.ticks, verdict.of
+            ),
+        ),
+        None if short => harness.expect(
+            true,
+            format!(
+                "the demo replays bit for bit as far as the scenario stepped it (tick {} of {})",
+                verdict.ticks, verdict.of
+            ),
+        ),
         None if verdict.checked > 0 => harness.expect(true, "the demo replays bit for bit".into()),
         None => {}
     }

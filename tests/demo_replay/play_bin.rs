@@ -49,3 +49,17 @@ fn play_records_a_demo_and_play_demo_replays_it() {
     let demos = rusty::dev::demo::demos_in(&game.join("saved").join("demos"));
     assert_eq!(demos.len(), 1, "a replay records nothing");
 }
+
+#[test]
+fn play_demo_refuses_another_scene() {
+    let out = Command::new(env!("CARGO_BIN_EXE_play"))
+        .args(["--demo", "x.demo", "--scene", "other.scene", "out"])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(2));
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("--scene cannot change a --demo replay"),
+        "{stderr}"
+    );
+}

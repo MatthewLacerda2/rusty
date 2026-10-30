@@ -8,7 +8,9 @@
 //! size, a digest every [`digest::EVERY`] ticks), and right before Play is left
 //! (or the run ends, [`Recorder::stop`]) the end line: the acts after the last
 //! tick and a final digest. Host acts come from the world's journal
-//! (`scripting::HostJournal`); acts in edit mode are dropped tick by tick.
+//! (`scripting::HostJournal`); acts in edit mode are dropped frame by frame,
+//! ticked or paused, and `Editor.EnterPlay` / `Editor.ExitPlay` are never kept:
+//! the transition they ask for is the demo's start or end.
 
 use std::fs::File;
 use std::io::{BufWriter, Write};
@@ -18,6 +20,7 @@ use super::delta::InputDelta;
 use super::digest;
 use super::files::Destination;
 use super::format::{host_json, End, Entry, Exact, Header};
+use super::sources::Sources;
 use crate::app::{GameWorld, PlayTransition, TapPoint, TickTap};
 use crate::core::input::InputFrame;
 use crate::dev::harness::FIXED_DT;
@@ -54,6 +57,34 @@ fn is_saved(world: &GameWorld) -> Option<bool> {
     Some(!world.scene().borrow().has_unsaved_edits(&path))
 }
 
+/// Whether `act` only enters or leaves Play: the transition it asks for is the
+/// demo's own start or end, so it is not an act to replay.
+fn is_play_verb(act: &HostCall) -> bool {
+    let named = match act {
+        HostCall::Eval(line) => line.trim_end_matches(';').trim_end(),
+        HostCall::Call { function, .. } => function,
+        HostCall::Taint(_) => return false,
+    };
+    let named = named.strip_suffix("()").unwrap_or(named);
+    matches!(named, "Editor.EnterPlay" | "Editor.ExitPlay")
+}
+
+/// `file` locked for as long as it is open, so no pruning deletes it meanwhile
+/// (`files::prune`); a filesystem without locks only loses that guard.
+fn lock(file: File) -> BufWriter<File> {
+    if let Err(err) = file.try_lock() {
+        log::debug!("[Demo] cannot lock the demo being written: {err}");
+    }
+    BufWriter::new(file)
+}
+
+/// The host acts since the last drain, without the Play and Stop verbs.
+fn drain(world: &GameWorld) -> Vec<HostCall> {
+    let mut acts = world.script_manager().journal().borrow_mut().take();
+    acts.retain(|act| !is_play_verb(act));
+    acts
+}
+
 impl Recorder {
     pub(super) fn new(destination: Destination, world: &GameWorld) -> Self {
         Self {
@@ -73,7 +104,7 @@ impl Recorder {
     /// its last tick and the state digest go in its end line. Right before Stop,
     /// and when a run ends without one.
     pub fn stop(&mut self, world: &GameWorld) {
-        let acts = world.script_manager().journal().borrow_mut().take();
+        let acts = drain(world);
         if let Some(session) = &mut self.session {
             session.host.extend(acts);
             let end = End {
@@ -99,8 +130,15 @@ impl Recorder {
         }
     }
 
+    /// An edit-mode frame ended without entering Play, ticked or paused: what a
+    /// host did in it is no part of a demo.
+    fn edit_frame_done(&mut self, world: &GameWorld) {
+        world.script_manager().journal().borrow_mut().take();
+        self.clean_at_install = None;
+    }
+
     fn start(&mut self, world: &GameWorld) {
-        let mut before_play = world.script_manager().journal().borrow_mut().take();
+        let mut before_play = drain(world);
         let keep = world.resources.application.borrow().settings().demos.keep;
         let scene_path = world.script_manager().scene_path_cell().borrow().clone();
         let scene = scene_path.clone().unwrap_or_default();
@@ -117,18 +155,22 @@ impl Recorder {
             Some(true) => None,
         };
         before_play.extend(taint.map(HostCall::Taint));
+        let time = world.resources.time.borrow().clone();
         let header = Header {
             scene,
             engine_commit: crate::core::project::engine_commit().to_string(),
             seed: world.script_manager().play_seed(),
+            sources: Sources::of(world),
             settings: world.resources.application.borrow().settings(),
             storage: world.resources.storage.borrow().data(),
             size: world.resources.screen.borrow().game_view(),
-            time_scale: Exact(f64::from(world.resources.time.borrow().time_scale)),
+            time_scale: Exact(f64::from(time.time_scale)),
+            paused: time.paused,
+            pending_steps: time.pending_steps,
             before_play: before_play.iter().map(host_json).collect(),
         };
         // lint: allow(asset-write) a demo, read by `play --demo`, never by a path-keyed cache
-        let opened = File::create(&path).map(BufWriter::new).and_then(|mut out| {
+        let opened = File::create(&path).map(lock).and_then(|mut out| {
             let header = serde_json::to_string(&header)?;
             writeln!(out, "{header}").map(|()| out)
         });
@@ -203,8 +245,7 @@ impl TickTap for Recorder {
             TapPoint::Before(PlayTransition::Exited) => self.stop(world),
             TapPoint::BeforeTick => {
                 if let Some(session) = &mut self.session {
-                    let acts = world.script_manager().journal().borrow_mut().take();
-                    session.host.extend(acts);
+                    session.host.extend(drain(world));
                 }
             }
             TapPoint::BeforeInput => {
@@ -212,11 +253,10 @@ impl TickTap for Recorder {
                     session.read_input(world);
                 }
             }
+            TapPoint::AfterPoll if self.session.is_none() => self.edit_frame_done(world),
             TapPoint::AfterTick => {
                 let Some(session) = &mut self.session else {
-                    // Edit mode: what a host did there is no part of a demo.
-                    world.script_manager().journal().borrow_mut().take();
-                    self.clean_at_install = None;
+                    self.edit_frame_done(world);
                     return;
                 };
                 if let Err(err) = session.end_tick(world) {
@@ -224,7 +264,7 @@ impl TickTap for Recorder {
                     self.session = None;
                 }
             }
-            TapPoint::Before(_) | TapPoint::Transition(_) => {}
+            TapPoint::Before(_) | TapPoint::Transition(_) | TapPoint::AfterPoll => {}
         }
     }
 

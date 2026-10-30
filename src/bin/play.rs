@@ -56,10 +56,15 @@ fn main() {
         }
     };
     let (scenario_path, out_dir) = positional(&args, demo.is_some());
-    if demo.is_some() && size.is_some() {
-        // The sim lays the UI out on the Game view size, which the demo recorded.
+    // The demo recorded both: the scene Play started in, and the Game view size
+    // the sim laid the UI out on.
+    let fixed = [
+        ("--scene", scene.is_some(), "scene"),
+        ("--size", size.is_some(), "size"),
+    ];
+    if let Some((flag, _, what)) = fixed.iter().find(|f| demo.is_some() && f.1) {
         eprintln!(
-            "play: --size cannot change a --demo replay: it plays at the size it recorded\n{USAGE}"
+            "play: {flag} cannot change a --demo replay: it plays the {what} it recorded\n{USAGE}"
         );
         exit(2);
     }

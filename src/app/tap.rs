@@ -30,6 +30,9 @@ pub enum TapPoint {
     AfterTick,
     /// Play was entered or left, by a tick or by a paused frame's poll.
     Transition(PlayTransition),
+    /// A paused frame's poll is done, with no tick run: an edit-mode frame ends
+    /// here as a ticked one ends at [`AfterTick`](Self::AfterTick).
+    AfterPoll,
 }
 
 /// Watches (a recorder) or feeds (a replay) a world's ticks.
