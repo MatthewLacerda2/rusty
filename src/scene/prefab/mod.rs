@@ -143,7 +143,10 @@ fn stamp_prefab(
 /// the key wasn't uniquified). Shared by stamping and baseline-building so an
 /// instance and its propagation baseline resolve the same library key.
 fn rename_entity_material(entity: &mut Entity, renames: &BTreeMap<String, String>) {
-    for key in entity.material.iter_mut().flat_map(|m| &mut m.materials) {
+    let slots = entity.material.iter_mut().flat_map(|m| &mut m.materials);
+    let particles = entity.particles.iter_mut();
+    let emitted = particles.filter_map(|p| p.render.material.as_mut());
+    for key in slots.chain(emitted) {
         if let Some(renamed) = renames.get(key) {
             *key = renamed.clone();
         }

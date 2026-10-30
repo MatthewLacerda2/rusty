@@ -15,7 +15,8 @@ struct EntityUniforms {
     metallic: f32,
     roughness: f32,
     // Mirrors `EntityUniform` (src/render/mod.rs) byte-for-byte (#202, #207): map
-    // flags. metallic/roughness scale their scalar by the sampled channel; normal
+    // flags. metallic/roughness scale their scalar by the sampled channel (glTF's
+    // blue/green at 1, red at 2: a one-channel BC4 upload, #1574); normal
     // perturbs the shading normal; emissive modulates the emissive factor. Four u32s
     // fill the run so the `vec4` that follows is 16-byte aligned.
     use_metallic_map: u32,
@@ -171,6 +172,32 @@ fn vertex_to_world(model: VertexInput, instance: u32) -> mat4x4<f32> {
         model.joint_weights,
     );
     return entity.model_matrix * instances[instance].model_matrix * bone_transform;
+}
+
+// `normal` (object space) to world space under `to_world` (#1596): by the
+// inverse-transpose of its upper 3x3, as Unity's `unity_WorldToObject` does, so a
+// non-uniformly scaled curved mesh keeps its normals perpendicular to the surface.
+// The cofactor matrix (each column the cross product of the other two) is that
+// inverse-transpose times the determinant, so after `normalize` it points the same
+// way for three cross products and no per-draw uniform; `sign(det)` keeps a mirrored
+// (negative-determinant) placement's normals outward.
+fn normal_to_world(to_world: mat4x4<f32>, normal: vec3<f32>) -> vec3<f32> {
+    let c0 = to_world[0].xyz;
+    let c1 = to_world[1].xyz;
+    let c2 = to_world[2].xyz;
+    let cofactor = mat3x3<f32>(cross(c1, c2), cross(c2, c0), cross(c0, c1));
+    let det = dot(c0, cross(c1, c2));
+    return normalize(cofactor * normal) * select(1.0, -1.0, det < 0.0);
+}
+
+// `tangent` (object space) to world space under `to_world`: it lies in the surface,
+// so it rides `to_world` itself, then is re-orthogonalised against the world
+// `normal`. One along the normal has no in-surface part and is kept as transformed.
+// Its handedness (`w`) is the caller's to pass on.
+fn tangent_to_world(to_world: mat4x4<f32>, tangent: vec3<f32>, normal: vec3<f32>) -> vec3<f32> {
+    let along = (to_world * vec4<f32>(tangent, 0.0)).xyz;
+    let ortho = along - normal * dot(normal, along);
+    return normalize(select(ortho, along, dot(ortho, ortho) < 1e-12));
 }
 
 // Where `model`'s vertex was in world space last frame (#1435): last frame's palette

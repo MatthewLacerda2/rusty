@@ -103,6 +103,10 @@ pub struct GpuTexture {
     /// clamped (`render::ui`, #1397).
     pub filter: crate::asset::sidecar::FilterMode,
     pub bind_group: wgpu::BindGroup,
+    /// The source image's size before *Max Size*: UI geometry measures in it (#1574).
+    pub source_size: (u32, u32),
+    /// Texture Type `SingleChannel`: a metallic/roughness slot reads red (#1574).
+    pub single_channel: bool,
 }
 
 pub struct Renderer {
@@ -171,6 +175,9 @@ pub struct Renderer {
     // across entities resolves to one buffer pair, not one per entity.
     pub gpu_meshes: HashMap<MeshId, GpuMesh>,
     pub gpu_textures: HashMap<crate::asset::MapRef, Rc<GpuTexture>>,
+    /// An uncompressed copy of a cached upload whose block format a slot cannot
+    /// read (a BC5 normal map drawn as albedo, #1574), by the same key.
+    pub(crate) texture_fallbacks: HashMap<crate::asset::MapRef, Rc<GpuTexture>>,
     /// Which cached uploads went stale: re-written files and failed loads (#689).
     /// What each cached upload's mips were built for (#1416).
     pub(crate) texture_kinds: crate::render::gpu::textures::kind_watch::KindWatch,

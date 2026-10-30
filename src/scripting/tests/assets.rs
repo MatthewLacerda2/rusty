@@ -65,7 +65,15 @@ fn the_assets_api_sets_and_reads_a_textures_import_settings() {
          s = Assets.GetTextureImportSettings(p)
          assert(s.wrapMode == 'Repeat' and s.filterMode == 'Point' and not s.generateMipmaps)
          local ok, err = pcall(Assets.SetTextureImportSettings, p, {{ wrapMode = 'Tile' }})
-         assert(not ok and tostring(err):find('Mirror'), tostring(err))"
+         assert(not ok and tostring(err):find('Mirror'), tostring(err))
+         assert(s.compression == 'Normal' and s.maxSize == 2048)
+         Assets.SetTextureImportSettings(p, {{ compression = 'HighQuality', maxSize = 512 }})
+         s = Assets.GetTextureImportSettings(p)
+         assert(s.compression == 'HighQuality' and s.maxSize == 512 and s.filterMode == 'Point')
+         ok, err = pcall(Assets.SetTextureImportSettings, p, {{ maxSize = 500 }})
+         assert(not ok and tostring(err):find('4096'), tostring(err))
+         ok, err = pcall(Assets.SetTextureImportSettings, p, {{ compression = 'BC7' }})
+         assert(not ok and tostring(err):find('HighQuality'), tostring(err))"
     );
     m.exec(&lua).unwrap();
     let stored = crate::asset::sidecar::texture(&png);

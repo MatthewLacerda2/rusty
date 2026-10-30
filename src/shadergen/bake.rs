@@ -89,3 +89,22 @@ pub fn base_source(pass: PassKind, engine_shaders: &str) -> Result<String, Strin
         std::fs::read_to_string(format!("{engine_shaders}/{file}")).map_err(|e| e.to_string())?;
     Ok(source.replace("\r\n", "\n"))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::BakeError;
+
+    #[test]
+    fn a_bake_error_names_its_stage_and_carries_the_cause() {
+        let cases = [
+            (BakeError::BaseRead("x".into()), "reading surface base"),
+            (BakeError::Assemble("x".into()), "assembly"),
+            (BakeError::Validate("x".into()), "validation"),
+            (BakeError::Write("x".into()), "writing module"),
+        ];
+        for (err, stage) in cases {
+            let text = err.to_string();
+            assert!(text.contains(stage) && text.ends_with(": x"), "{text}");
+        }
+    }
+}
