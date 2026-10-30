@@ -105,3 +105,22 @@ fn a_static_cutouts_mapping_moves_the_bake_key() {
     let sized = key_with(&|_| {});
     assert_ne!(key_with(&|m| m.alpha_cutoff = 0.25), sized);
 }
+
+/// The digest numbers a Cutout by its slot index, unresolved slots counted, so the
+/// slot it names is the one the shadow clips: moving the Cutout past an unresolved
+/// slot moves the key.
+#[test]
+fn a_cutouts_slot_index_counts_unresolved_slots() {
+    use crate::components::RenderMode;
+    use crate::scene::authoring::material;
+    let mut scene = static_yard();
+    let crate_id = scene.world.find_by_name("Crate").expect("the crate");
+    let key = material::ensure_material_key(&mut scene, crate_id).unwrap();
+    scene.materials.get_mut(&key).unwrap().render_mode = RenderMode::Cutout;
+    let mut key_as = |slots: Vec<String>| {
+        scene.world.material_mut(crate_id).unwrap().materials = slots;
+        statics_key(&scene)
+    };
+    let first = key_as(vec![key.clone(), "missing".into()]);
+    assert_ne!(key_as(vec!["missing".into(), key.clone()]), first);
+}

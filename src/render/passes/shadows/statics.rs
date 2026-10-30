@@ -44,7 +44,12 @@ fn casting_key(scene: &Scene) -> u64 {
         if !mode.casts() || mode == ShadowCasting::TwoSided {
             key = mix(key, (u64::from(id) << 2) | mode as u64);
         }
-        for (slot, asset) in scene.material_assets_of(id).enumerate() {
+        // By slot index, unresolved keys included, so the digest names the slot
+        // `slot_clip` clips (`material_assets_of` would skip them and shift it).
+        let slots = world.material(id).map_or(0, |m| m.materials.len());
+        for (slot, (_, asset)) in
+            (0..slots).filter_map(|s| Some((s, scene.material_entry_at(id, s)?)))
+        {
             if let Some(cut) = Cutout::of(asset) {
                 key = mix(key, (u64::from(id) << 16) | slot as u64);
                 key = cutout_digest(key, &cut, asset.base_color_map.as_ref().map(MapRef::as_str));

@@ -112,6 +112,9 @@ pub(super) struct CasterFrame<'a> {
     pub clips: &'a HashMap<(u32, usize), CasterClip>,
     pub materials: &'a MaterialCache,
     pub surfaces: &'a SurfaceShaders,
+    /// The scene's [`StaticsKey`](super::StaticsKey), digested once for the frame
+    /// and compared by both the cascades' and the atlas's static bakes (#1594).
+    pub statics: super::StaticsKey,
     /// The renderer's GPU pass timer: every sweep is a `shadows` pass (#835).
     pub timer: &'a crate::render::timing::GpuTimer,
 }
