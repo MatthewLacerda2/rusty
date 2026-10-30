@@ -1,4 +1,6 @@
-use crate::asset::sidecar::{self, Compression, FilterMode, TextureType, WrapMode, MAX_SIZES};
+use crate::asset::sidecar::{
+    self, Compression, FilterMode, TextureSettings, TextureType, WrapMode, MAX_SIZES,
+};
 use crate::editor::EditorUi;
 use crate::scene::{MaterialComponent, Scene};
 use egui_phosphor::regular as icon;
@@ -56,6 +58,15 @@ fn draw_import_settings(ui: &mut egui::Ui, path: &str) {
         names,
     );
     ui.checkbox(&mut s.generate_mipmaps, "Generate Mipmaps");
+    draw_compression(ui, &mut s);
+    if s != stored {
+        let _ = sidecar::set_texture(source, s);
+    }
+}
+
+/// The settings that decide its GPU format (#1574): Texture Type, sRGB (for a
+/// `Default` texture, as Unity shows it), Max Size and Compression.
+fn draw_compression(ui: &mut egui::Ui, s: &mut TextureSettings) {
     let names = |t: &TextureType| t.name().to_owned();
     let all = TextureType::ALL;
     combo(
@@ -85,9 +96,6 @@ fn draw_import_settings(ui: &mut egui::Ui, path: &str) {
         Compression::ALL,
         names,
     );
-    if s != stored {
-        let _ = sidecar::set_texture(source, s);
-    }
 }
 
 /// One labelled drop-down: `value` picked from `options`, each shown by `name`.
