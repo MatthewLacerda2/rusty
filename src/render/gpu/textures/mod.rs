@@ -1,15 +1,14 @@
+pub(crate) mod compressed;
 pub(crate) mod freshness;
 pub(crate) mod kind_watch;
+mod load;
 pub(crate) mod mips;
 mod panorama;
 mod sampler;
 
-use std::rc::Rc;
-
 use crate::asset::sidecar::{FilterMode, TextureSettings};
 use crate::asset::MapRef;
 use crate::render::{GpuTexture, Renderer};
-use image::GenericImageView;
 use mips::full_chain_len;
 pub(crate) use mips::{MipGenerator, MipSettings, TextureKind};
 pub(crate) use sampler::{sampler, ui_sampler};
@@ -32,7 +31,12 @@ impl Renderer {
     ) -> GpuTexture {
         let label = "Default Checkerboard Texture";
         let checker = checkerboard(256, 32);
-        let texture = upload((device, queue), label, &checker, full_chain_len(256, 256));
+        let texture = upload(
+            (device, queue),
+            label,
+            &checker,
+            (full_chain_len(256, 256), true),
+        );
         mips.generate(device, queue, &texture, TextureKind::Colour);
         let sampler = default_sampler(device);
         Self::finalize_texture(device, layout, (texture, DATA_FORMAT), sampler, Some(label))
@@ -47,7 +51,7 @@ impl Renderer {
     ) -> GpuTexture {
         let label = "White Texture";
         let white = image::RgbaImage::from_pixel(1, 1, image::Rgba([255; 4]));
-        let texture = upload((device, queue), label, &white, 1);
+        let texture = upload((device, queue), label, &white, (1, true));
         let sampler = default_sampler(device);
         Self::finalize_texture(device, layout, (texture, DATA_FORMAT), sampler, Some(label))
     }
@@ -84,6 +88,7 @@ impl Renderer {
             ],
         });
 
+        let size = texture.size();
         GpuTexture {
             texture,
             view,
@@ -91,79 +96,9 @@ impl Renderer {
             sampler,
             filter,
             bind_group,
+            source_size: (size.width, size.height),
+            single_channel: false,
         }
-    }
-
-    /// Loads and registers the texture `map` names. Caches results dynamically,
-    /// keyed by the map; a failed load is remembered as a miss (drawn with the
-    /// default) and retried once the file appears, never cached under its path (#689).
-    /// A colour texture; `load_texture_as` names what the texels hold.
-    pub fn load_texture(&mut self, map: &MapRef) -> Rc<GpuTexture> {
-        self.load_texture_as(map, TextureKind::Colour)
-    }
-
-    /// [`Self::load_texture`] for a texture holding `kind`, which decides how its
-    /// mips average. The first load of a file decides it: the cache keeps one
-    /// upload per file, and a later request of the other kind warns once
-    /// ([`kind_watch::KindWatch`]).
-    pub(crate) fn load_texture_as(&mut self, map: &MapRef, kind: TextureKind) -> Rc<GpuTexture> {
-        let path_str = map.as_str();
-        if let Some(tex) = self.gpu_textures.get(path_str) {
-            self.texture_kinds.requested(path_str, kind, "material");
-            return Rc::clone(tex);
-        }
-        if self.texture_freshness.is_miss(path_str) {
-            return Rc::clone(&self.default_texture);
-        }
-        // A render texture (#430) is never on disk: it is registered by the frame
-        // that draws it, and until then shows the default — uncached, so it appears
-        // the moment its camera exists.
-        if crate::render::render_texture::is_render_texture(path_str) {
-            return Rc::clone(&self.default_texture);
-        }
-
-        let Some(tex) = self.upload_map(map, kind) else {
-            self.texture_freshness.miss(path_str);
-            return Rc::clone(&self.default_texture);
-        };
-        self.texture_kinds.uploaded(path_str, kind);
-        self.gpu_textures.insert(map.clone(), Rc::clone(&tex));
-        tex
-    }
-
-    /// Decode the image `map` names and upload it, uncached, with the mips and
-    /// sampler its import settings ask for; `None` when it cannot be read. A cache
-    /// with its own keys (bloom's lens dirt, #1442) loads through this.
-    pub(crate) fn upload_map(&self, map: &MapRef, kind: TextureKind) -> Option<Rc<GpuTexture>> {
-        let img = open(map)?;
-        let import = import_settings(map);
-        Some(self.upload_image_texture(map.as_str(), &img, &import, kind))
-    }
-
-    /// Uploads a decoded image holding `kind`, with the mips and the sampler its
-    /// import settings ask for (#1323), and wraps it in a cached `GpuTexture`.
-    fn upload_image_texture(
-        &self,
-        path_str: &str,
-        img: &image::DynamicImage,
-        import: &TextureSettings,
-        kind: TextureKind,
-    ) -> Rc<GpuTexture> {
-        let settings = MipSettings::for_map(import, kind);
-        let (width, height) = img.dimensions();
-        let levels = settings.levels(width, height);
-        let gpu = (&self.device, &self.queue);
-        let texture = upload(gpu, path_str, &img.to_rgba8(), levels);
-        let kind = settings.kind;
-        self.mip_generator
-            .generate(&self.device, &self.queue, &texture, kind);
-        Rc::new(Self::finalize_texture(
-            &self.device,
-            &self.texture_layout,
-            (texture, DATA_FORMAT),
-            (sampler(&self.device, import), import.filter_mode),
-            Some(path_str),
-        ))
     }
 }
 
@@ -177,13 +112,15 @@ fn default_sampler(device: &wgpu::Device) -> (wgpu::Sampler, FilterMode) {
 /// the mip pass.
 pub(crate) type Uploader<'a> = (&'a wgpu::Device, &'a wgpu::Queue, &'a MipGenerator);
 
-/// Create an sRGB texture of `levels` mips with `image` written to its base; the
-/// caller draws the rest ([`MipGenerator::generate`]).
+/// Create a texture of `levels` mips with `image` written to its base; the
+/// caller draws the rest ([`MipGenerator::generate`]). Stored sRGB when `srgb`,
+/// else linear (*sRGB* off, `texture_import::is_linear`); either way it can be
+/// viewed as the other.
 pub(super) fn upload(
     (device, queue): (&wgpu::Device, &wgpu::Queue),
     label: &str,
     image: &image::RgbaImage,
-    levels: u32,
+    (levels, srgb): (u32, bool),
 ) -> wgpu::Texture {
     let (width, height) = image.dimensions();
     let mut usage = wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST;
@@ -201,9 +138,13 @@ pub(super) fn upload(
         mip_level_count: levels,
         sample_count: 1,
         dimension: wgpu::TextureDimension::D2,
-        format: IMAGE_FORMAT,
+        format: if srgb { IMAGE_FORMAT } else { DATA_FORMAT },
         usage,
-        view_formats: &[DATA_FORMAT],
+        view_formats: if srgb {
+            &[DATA_FORMAT]
+        } else {
+            &[IMAGE_FORMAT]
+        },
     });
     queue.write_texture(
         wgpu::TexelCopyTextureInfo {
@@ -231,14 +172,6 @@ fn extent(width: u32, height: u32) -> wgpu::Extent3d {
     }
 }
 
-/// The import settings of the image `map` names (#1323), from the sidecar beside
-/// the file it resolves to; the defaults when it has none.
-fn import_settings(map: &MapRef) -> TextureSettings {
-    let file = map.file();
-    file.map(|f| crate::asset::sidecar::texture(&f))
-        .unwrap_or_default()
-}
-
 /// A `side`² dark neon checker of `cell`-texel squares.
 fn checkerboard(side: u32, cell: u32) -> image::RgbaImage {
     image::RgbaImage::from_fn(side, side, |x, y| match (x / cell + y / cell) % 2 {
@@ -247,6 +180,8 @@ fn checkerboard(side: u32, cell: u32) -> image::RgbaImage {
     })
 }
 
+#[cfg(test)]
+mod compressed_gpu_tests;
 #[cfg(test)]
 mod data_map_tests;
 #[cfg(test)]

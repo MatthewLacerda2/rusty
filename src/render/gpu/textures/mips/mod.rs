@@ -17,33 +17,14 @@ pub(crate) use blit::MipGenerator;
 
 use crate::asset::sidecar::TextureSettings;
 
-/// What a texture's texels hold, which decides how its mips average. A texture's
-/// first use decides it: the cache keeps one upload per file.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum TextureKind {
-    /// Authored in sRGB and sampled through the decoding view (albedo, emissive,
-    /// UI images, particles).
-    Colour,
-    /// Raw values sampled as stored (metallic, roughness, normal, extra slots).
-    Data,
-}
+pub(crate) use crate::asset::texture_import::TextureKind;
 
-impl TextureKind {
-    /// How a warning names the kind.
-    pub(crate) fn name(self) -> &'static str {
-        match self {
-            Self::Colour => "colour",
-            Self::Data => "data",
-        }
-    }
-
-    /// The view format a level of this kind is read and written through: the
-    /// sRGB one averages in linear light, the raw one averages the bytes.
-    pub(crate) fn view_format(self) -> wgpu::TextureFormat {
-        match self {
-            Self::Colour => super::IMAGE_FORMAT,
-            Self::Data => super::DATA_FORMAT,
-        }
+/// The view format a level of `kind` is read and written through: the sRGB one
+/// averages colour in linear light, the raw one averages every other kind's bytes.
+pub(crate) fn view_format(kind: TextureKind) -> wgpu::TextureFormat {
+    match kind.is_colour() {
+        true => super::IMAGE_FORMAT,
+        false => super::DATA_FORMAT,
     }
 }
 
@@ -57,11 +38,12 @@ pub(crate) struct MipSettings {
 
 impl MipSettings {
     /// The settings for a map with import settings `import`, used as `kind`: a
-    /// full chain unless its *Generate Mip Maps* is off (Unity's default is on).
+    /// full chain unless its *Generate Mip Maps* is off (Unity's default is on),
+    /// averaged raw when its *sRGB* is off (`TextureKind::reading`).
     pub(crate) fn for_map(import: &TextureSettings, kind: TextureKind) -> Self {
         Self {
             generate: import.generate_mipmaps,
-            kind,
+            kind: kind.reading(import),
         }
     }
 
@@ -74,10 +56,7 @@ impl MipSettings {
     }
 }
 
-/// How many levels a full chain of a `width`×`height` image has, down to 1×1.
-pub(crate) fn full_chain_len(width: u32, height: u32) -> u32 {
-    32 - width.max(height).max(1).leading_zeros()
-}
+pub(crate) use crate::asset::texture_import::full_chain_len;
 
 #[cfg(test)]
 mod gpu_tests;

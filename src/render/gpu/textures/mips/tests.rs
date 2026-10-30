@@ -35,11 +35,11 @@ fn with_generation_off_only_the_base_is_uploaded() {
 #[test]
 fn each_kind_averages_through_its_own_view() {
     assert_eq!(
-        TextureKind::Colour.view_format(),
+        view_format(TextureKind::Colour),
         wgpu::TextureFormat::Rgba8UnormSrgb
     );
     assert_eq!(
-        TextureKind::Data.view_format(),
+        view_format(TextureKind::Data),
         wgpu::TextureFormat::Rgba8Unorm
     );
 }
