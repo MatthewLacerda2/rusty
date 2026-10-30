@@ -192,8 +192,9 @@ const ABSENT: &str = "absent";
 const UNREADABLE: &str = "unreadable";
 
 /// What the file at `path` holds now, by the same memo a dependency's look uses:
-/// a source's digest, read again only when its length or mtime changed.
-pub(super) fn digest(path: &Path) -> Seen {
+/// a source's digest, read again only when its length or mtime changed. A
+/// compressed texture's stamp is made from it too (#1574).
+pub fn digest(path: &Path) -> Seen {
     seen(path)
 }
 

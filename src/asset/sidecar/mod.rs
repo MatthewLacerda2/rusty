@@ -15,7 +15,10 @@ use std::path::{Path, PathBuf};
 
 mod texture;
 
-pub use texture::{set_texture, texture, FilterMode, TextureSettings, WrapMode};
+pub use texture::{
+    fit_data_slot, fit_normal_slot, parse_max_size, set_texture, texture, Compression, FilterMode,
+    TextureSettings, TextureType, WrapMode, DEFAULT_MAX_SIZE, MAX_SIZES,
+};
 
 use super::lightmap_uv::LightmapUvSettings;
 use super::mesh_data::ImportedAsset;

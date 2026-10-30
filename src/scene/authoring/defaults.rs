@@ -97,7 +97,10 @@ pub fn default_material() -> MaterialAsset {
 /// pointing both at the same image reads the correct channel. The base-color alpha is
 /// dropped (the renderer's base color is RGB).
 pub fn material_asset_from_import(data: &crate::asset::MaterialData) -> MaterialAsset {
-    MaterialAsset {
+    // Unity's model importer marks a bump map a material names as a Normal map,
+    // and its packed metallic/roughness map linear (#1574), so each compresses
+    // as what it holds.
+    let asset = MaterialAsset {
         base_color: [data.base_color[0], data.base_color[1], data.base_color[2]],
         base_color_map: data.base_color_map.clone(),
         metallic: data.metallic,
@@ -111,7 +114,9 @@ pub fn material_asset_from_import(data: &crate::asset::MaterialData) -> Material
         // yet read glTF `alphaMode`/`alphaCutoff`, so transparency is authored after
         // import via the inspector or the `Material` API.
         ..MaterialAsset::default()
-    }
+    };
+    super::material::fit_map_slots(&asset);
+    asset
 }
 
 /// Attach a `MaterialComponent` to entity `id` referencing its own library material
@@ -210,5 +215,19 @@ mod tests {
         assert_eq!(mat.normal_map, Some("n.png".into()));
         assert_eq!(mat.emissive, [0.1, 0.2, 0.3]);
         assert_eq!(mat.emissive_map, Some("e.png".into()));
+    }
+
+    #[test]
+    fn an_imported_normal_map_becomes_a_normal_map() {
+        use crate::asset::sidecar::{texture, TextureType};
+        let dir = crate::test_temp::dir();
+        let png = dir.join("bumps.png");
+        image::RgbaImage::new(4, 4).save(&png).unwrap();
+        let data = MaterialData {
+            normal_map: Some(png.to_string_lossy().into_owned().into()),
+            ..MaterialData::default()
+        };
+        material_asset_from_import(&data);
+        assert_eq!(texture(&png).texture_type, TextureType::NormalMap);
     }
 }

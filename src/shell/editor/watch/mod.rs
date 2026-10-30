@@ -100,6 +100,9 @@ impl Watch {
             .map_err(|e| log::warn!("[Editor] not watching the project's files: {e}"))
             .ok()?;
         watch.sources = Some(assets.to_path_buf());
+        // Every image whose compressed copy is missing or stale is made in the
+        // background, so a project opens without a freeze (#1574).
+        crate::asset::texture_import::queue(crate::asset::texture_import::images(assets));
         watch.ignored = vec![crate::asset::convert::IMPORT_CACHE_DIR.into()];
         Some(watch)
     }
