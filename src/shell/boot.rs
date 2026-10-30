@@ -137,11 +137,13 @@ pub fn load_game(scene_path: &str) -> GameWorld {
     )]
     let mut game = GameWorld::new(scene, input, nav, console);
     // Dev builds time the schedule so `Debug.Stats()` answers in a playtest (#433),
-    // and add `Debug.*` and the bake verbs to the console's surface (#737).
+    // add `Debug.*` and the bake verbs to the console's surface (#737), and record.
     #[cfg(feature = "dev")]
     {
         crate::dev::stats::install(&mut game);
         crate::dev::lua_surface::install_api();
+        // Every Play session is kept as a demo in `saved/demos/` (#1581).
+        crate::dev::demo::record_project(&mut game);
     }
     // The current scene file only when the World is that file's: a startup scene
     // that doesn't parse leaves the editor on Untitled (Unity's way), so a Save can't

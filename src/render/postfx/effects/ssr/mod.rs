@@ -9,10 +9,12 @@
 //! runs ([`surface`]): the shading normal, the weight a hit gets and the environment
 //! reflection it replaces. So only a smooth surface reflects, and a hit swaps the sky
 //! or probe reflection for what is on screen (never adding to it). The volume's
-//! `quality` sets the march ([`march`], #1521, #1522).
+//! `quality` sets the march ([`march`], #1521, #1522). A transparent surface that
+//! opts in traces its own reflection in the transparent pass ([`transparent`], #1570).
 
 pub(crate) mod pass;
 pub(crate) mod surface;
+pub(crate) mod transparent;
 
 use super::{Owner, PostEffect};
 use crate::components::Ssr;
@@ -35,13 +37,21 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
 };
 
 /// The march `ssr` runs under `graphics`: its quality level's row of the running
-/// preset, or its own `steps` and `step_length` when `Custom`.
+/// preset, or its own `steps` and `step_length` when `Custom`, within the march's
+/// range (a preset in `project.rusty` is never clamped on the way in), so every
+/// caller marches clamped values.
 pub(crate) fn march(ssr: &Ssr, graphics: GraphicsSettings) -> SsrQuality {
     let custom = SsrQuality {
         steps: ssr.steps,
         step_length: ssr.step_length,
     };
-    ssr.quality.pick(&graphics.quality.ssr, custom)
+    let m = ssr.quality.pick(&graphics.quality.ssr, custom);
+    SsrQuality {
+        steps: m.steps.clamp(1, Ssr::MAX_STEPS),
+        step_length: m
+            .step_length
+            .clamp(Ssr::MIN_STEP_LENGTH, Ssr::MAX_STEP_LENGTH),
+    }
 }
 
 /// Whether a view whose base camera is `post`'s runs SSR this frame: its volume has
@@ -72,6 +82,9 @@ pub(crate) fn run(
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod transparent_tests;
 
 #[cfg(test)]
 mod gpu;

@@ -103,7 +103,8 @@ sphere and ray-traced refraction, order-independent transparency).
 | `Material.SetThickness` / `GetThickness` | `(id, metres)` [`thickness`] — how thick the surface is, in `[0, 10]` (default 1), as HDRP's *Thickness*: a `Planar` refraction's slab depth (a `Thin` one is always 5 mm), and the depth an absorbing surface absorbs over where only the sky is behind it, whatever its refraction model |
 | `Material.SetTransmittanceColor` / `GetTransmittanceColor` | `(id, {r, g, b})` [`transmittance_color`] — HDRP's *Transmittance Color*: the colour light keeps after `absorption_distance` metres through the surface (Beer-Lambert), each channel in `[0, 1]`. White, the default, absorbs nothing; any other colour tints and darkens what is behind by how far it is behind the surface, so shallow water stays clear and the deep end takes the colour |
 | `Material.SetAbsorptionDistance` / `GetAbsorptionDistance` | `(id, metres)` [`absorption_distance`] — HDRP's *Absorption Distance*, where light has kept exactly `transmittance_color`, in `[0.01, 100]` (default 1) |
-| `Material.SetDepthPostpass` / `GetDepthPostpass` | `(id, on)` [`depth_postpass`] — HDRP's *Transparent Depth Postpass*, off by default: after the translucents drew, the surface writes its depth, so depth of field focuses on it and motion blur moves it rather than what is behind it, and soft particles and world canvases meet it. Fog needs none: each surface is fogged where it is drawn. Screen-space reflections never land on a transparent surface: SSR runs before the translucents (HDRP's order), and HDRP's separate transparent SSR is not part of rusty |
+| `Material.SetDepthPostpass` / `GetDepthPostpass` | `(id, on)` [`depth_postpass`] — HDRP's *Transparent Depth Postpass*, off by default: after the translucents drew, the surface writes its depth, so depth of field focuses on it and motion blur moves it rather than what is behind it, and soft particles and world canvases meet it. Fog needs none: each surface is fogged where it is drawn. SSR reflections on it are `receive_ssr`'s (below), which needs no postpass |
+| `Material.SetReceiveSsr` / `GetReceiveSsr` | `(id, on)` [`receive_ssr`] — HDRP's *Receive SSR Transparent*, off by default: where the camera runs screen-space reflections (`Graphics`' SSR, on the base camera), a smooth `Transparent` surface traces its own reflected ray against the opaque scene and puts what it hits in place of its sky or reflection-probe reflection, faded by the same smoothness and screen-edge rules as an opaque surface; a miss keeps the probe. So water shows the player, a ball or an enemy moving above it. It reflects only opaque things (other translucents are not in the opaque copy), and an opaque material always takes SSR, so the knob is shown for `Transparent` only. Cost: one march per pixel the surface covers, at SSR's quality; with SSR off, or no such surface on screen, nothing. A surface too rough to ever reflect (roughness 0.2 or more, with no roughness map) traces nothing and asks for no opaque copy |
 | `Material.SetTransmission` / `GetTransmission` | `(id, amount)` [`transmission`] — HDRP's thin *Translucent* type, in `[0, 1]` (default 0): how much of a light behind the surface comes through as diffuse light (a leaf, a lampshade, a cloth banner lit from behind). Any material, opaque or transparent; the surface is shaded with its normal toward the viewer, as HDRP flips a double-sided translucent's |
 | `Material.SetTransmissionColor` / `GetTransmissionColor` | `(id, {r, g, b})` [`transmission_color`] — HDRP's *Transmission Tint*, the colour that light takes on its way through (default white); each channel in `[0, 1]` |
 | `Material.SetReceiveShadows` / `GetReceiveShadows` | `(id, on)` [`receive_shadows`] — URP's *Receive Shadows*, on by default: off, neither the sun's cascades nor a point or spot light's shadow lands on the surface (a wall's shadow stays off the water). Any material, opaque too; the surface still casts its own |
@@ -111,7 +112,8 @@ sphere and ray-traced refraction, order-independent transparency).
 Refraction and absorption read the **opaque copy** (Unity's *Opaque Texture* and
 *Depth Texture*): the camera's colour and depth after its opaque pass and
 screen-space reflections, made only on a frame that shows a surface that refracts
-or absorbs, and counted in `Debug.Stats().opaque_copies`. So what a refracting
+or absorbs (or traces SSR with `receive_ssr`), and counted in
+`Debug.Stats().opaque_copies`. So what a refracting
 surface shows behind it is the opaque scene (other translucents behind it are not
 in the copy, as in Unity), and only under `Alpha` or `Premultiply`: an `Additive` or
 `Multiply` surface adds to or tints what is behind it, and has nothing to bend.
@@ -173,6 +175,7 @@ like any library material (no engine special-casing).
 | `Material.GetAsset` | `(name)` | the asset's canonical JSON string, or `nil` if absent |
 | `Material.Rebake` | `(name [, resolution])` | — (re-bakes the asset's `maps` recipe; errors if it has none) |
 | `Material.HasAsset` | `(name)` | `bool` |
+| `Material.DeleteAsset` | `(name [, { force = true }])` | an array naming each user it moved to the default material (empty when none); see *Deleting a material asset* below |
 
 The **recipe** is a table (or that table's JSON string — both decode alike) whose shape mirrors the `MaterialAsset` document one-to-one
 (every field optional — omit one to take its default; enum values are read in any case), bounded to exactly what the
@@ -213,6 +216,32 @@ through the *same* shared ops the per-entity setters use: `alpha`/`alpha_cutoff`
 to `[0,1]`, and an unknown `render_mode` string degrades to `Opaque` — so validation is
 single-sourced, not re-implemented. `Material.DefineAsset` **overwrites** any existing
 asset of that name.
+
+#### Deleting a material asset
+
+`Material.DeleteAsset(name)` takes a material out of the library, as deleting a
+material asset in Unity does (#1576). Its **users** are what names it by its key:
+each material slot of an entity, an emitter's mesh particles (`render.material`)
+and a live decal (`Decals.Spawn`'s `material`). A material still in use is
+**refused**: the error names every user (`entity 3 "Floor" slot 0`, with
+`(instance of prefabs/crate.prefab)` for a prefab instance's entity), and nothing
+changes. With `{ force = true }` each user falls back to the engine's default
+material and the console warns which: a slot to its entity's own default material
+(`entity_<id>_material`, created as the default white material when the library has
+none, the one *Add Component* attaches), mesh particles and a decal to no material
+(the engine default, and the decal's own texture). An absent `name` is an error. The
+deletion saves with the scene. A `.prefab` file is never a user: it carries its own
+copy of every material it names, which instancing it merges back in. The editor's
+Material card has the same **Delete** (a confirm lists the users) and one *Undo*
+that restores the asset and every slot it moved.
+
+```lua with=id
+Material.DefineAsset("checker", { base_color = {0.5, 0.5, 0.5} })
+Material.Set(id, "checker")
+-- Material.DeleteAsset("checker") would refuse: entity `id` uses it.
+local moved = Material.DeleteAsset("checker", { force = true })
+-- moved[1] names entity `id`'s slot 0, now on its own default material.
+```
 
 #### One call: the maps recipe inside the material — `maps`
 

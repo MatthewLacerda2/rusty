@@ -12,8 +12,9 @@
 /// The clipboard text the sim reads, and the write it asked the platform for.
 #[derive(Clone, Debug, Default)]
 pub struct ClipboardRecord {
-    /// The latest capture or write; published by [`Self::begin_tick`].
-    pending: String,
+    /// The capture since the last tick, if any; published by [`Self::begin_tick`]
+    /// and gone with it, so the text is not carried (and copied) tick after tick.
+    pending: Option<String>,
     /// What this tick reads.
     current: String,
     /// The game's last write, not yet applied to the OS clipboard.
@@ -23,12 +24,25 @@ pub struct ClipboardRecord {
 impl ClipboardRecord {
     /// The platform's snapshot of the OS clipboard text; published on the next tick.
     pub fn capture(&mut self, text: String) {
+        self.pending = Some(text);
+    }
+
+    /// The capture the next tick will publish, if one was made since the last.
+    pub fn pending(&self) -> Option<&str> {
+        self.pending.as_deref()
+    }
+
+    /// Replace the capture the next tick publishes: a demo replay's (#1581).
+    pub fn set_pending(&mut self, text: Option<String>) {
         self.pending = text;
     }
 
-    /// Publish the latest capture or write as this tick's clipboard.
+    /// Publish the latest capture as this tick's clipboard; without one, the text
+    /// holds.
     pub fn begin_tick(&mut self) {
-        self.current.clone_from(&self.pending);
+        if let Some(text) = self.pending.take() {
+            self.current = text;
+        }
     }
 
     /// The clipboard text as of this tick.
@@ -39,7 +53,7 @@ impl ClipboardRecord {
     /// The game (or a bot) sets the clipboard: readable at once, and recorded for the
     /// platform to copy to the OS clipboard after the tick.
     pub fn set(&mut self, text: &str) {
-        self.pending = text.to_string();
+        self.pending = None;
         self.current = text.to_string();
         self.request = Some(text.to_string());
     }

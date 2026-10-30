@@ -282,11 +282,13 @@ surface was reflecting. Only smooth surfaces reflect: none below a smoothness of
 and base colour) at the shading normal, its SSAO and its fog. A miss keeps the sky or
 probe reflection. It runs on the base camera's opaque image, right after its opaque
 pass (HDRP's order): translucent surfaces, particles, ribbons and world canvases blend
-over the reflection, depth of field and motion blur blur it, and a `DepthOnly` overlay
+over the reflection (a `Transparent` material with `receive_ssr` traces its own in
+its pass, against that opaque image; see `Material.SetReceiveSsr`), depth of field and motion blur blur it, and a `DepthOnly` overlay
 camera (a viewmodel) draws over it and gets none. An authored surface block that
 restyles the colour scales the reflection with it (`hit_flash` at amount 1 shows
 none); one that isn't a per-channel scale of it (`toon_ramp`, `hologram`, `desaturate`)
-gets no SSR.
+gets no SSR on an opaque surface. A `receive_ssr` transparent traces its hit before
+its blocks run, so any block restyles its reflection with the rest of its colour.
 `Debug.Stats().gpu_passes.ssr` times it. Where SSR is off the forward shader reflects
 the sky or a reflection probe. Its **quality** sets the march (see *Quality presets*):
 the seeded `Medium` preset marches 16, 32 or 64 steps at its `Low`, `Medium` and

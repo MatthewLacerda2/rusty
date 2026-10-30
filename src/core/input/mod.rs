@@ -23,8 +23,11 @@
 //! [`CursorState`] here; the platform layer applies it to the OS cursor. The
 //! clipboard works the same way ([`clipboard`](crate::core::clipboard), #612).
 
+mod frame;
 pub mod gamepad;
 pub mod keymap;
+
+pub use frame::InputFrame;
 
 use crate::core::collections::{Map, Set};
 

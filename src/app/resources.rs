@@ -113,6 +113,9 @@ pub struct Resources {
     /// The schedule's observer (#433) — the dev layer's frame-stats timer. `None`
     /// unless installed via `GameWorld::set_probe`; it only watches the frame.
     pub(super) probe: Option<Box<dyn super::SystemProbe>>,
+    /// The tick's tap (#1581) — a dev demo recorder or replay. `None` unless
+    /// installed via `GameWorld::set_tap`.
+    pub(super) tap: Option<Box<dyn super::TickTap>>,
     /// How far the edit scene's meshes follow the write log (#1242).
     pub(super) model_writes: crate::scene::model_writes::ModelWrites,
 }
@@ -181,6 +184,7 @@ impl Resources {
             animation_graphs: GraphCache::default(),
             animation_events: Vec::new(),
             probe: None,
+            tap: None,
             model_writes: Default::default(),
         }
     }

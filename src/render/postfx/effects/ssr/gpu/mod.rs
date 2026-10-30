@@ -6,3 +6,4 @@ mod cover;
 mod energy;
 mod fixture;
 mod reflect;
+mod transparent;

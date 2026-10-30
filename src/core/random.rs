@@ -36,6 +36,12 @@ impl Random {
         self.state = seed;
     }
 
+    /// Where the stream stands: two generators with one state draw the same
+    /// numbers from here on (a demo's state digest reads it, #1581).
+    pub fn state(&self) -> u64 {
+        self.state
+    }
+
     /// The next raw 64-bit value (SplitMix64).
     fn next_u64(&mut self) -> u64 {
         self.state = self.state.wrapping_add(0x9E37_79B9_7F4A_7C15);

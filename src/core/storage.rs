@@ -84,6 +84,22 @@ impl Storage {
         std::fs::write(path, text).map_err(|e| format!("Failed to write storage file: {}", e))
     }
 
+    /// Everything stored, as one JSON object: what a demo records as the save data
+    /// its Play session started from (#1581).
+    pub fn data(&self) -> Value {
+        Value::Object(self.data.clone())
+    }
+
+    /// Replace everything stored with `data` (a JSON object; anything else empties
+    /// the store), leaving the bound path alone: a replay starts from the save
+    /// data its demo recorded.
+    pub fn replace(&mut self, data: Value) {
+        self.data = match data {
+            Value::Object(map) => map,
+            _ => Map::new(),
+        };
+    }
+
     /// The value at `namespace.key`, or `None` if either is absent.
     pub fn get(&self, namespace: &str, key: &str) -> Option<Value> {
         self.data.get(namespace)?.as_object()?.get(key).cloned()

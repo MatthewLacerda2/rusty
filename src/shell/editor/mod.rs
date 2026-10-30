@@ -140,9 +140,8 @@ impl EditorFrontend {
             &mut game.script_manager().graphics_cell().borrow_mut().options,
             &mut game.resources.console.borrow_mut(),
         );
-        if self.editor_ui.is_dirty {
+        if paint::take_edits(&mut self.editor_ui, game) {
             shell.renderer.shadow_renderer.invalidate_static_cache();
-            self.editor_ui.is_dirty = false;
         }
         self.sync_quality(shell, game);
         self.sync_speaker_mode(game);
