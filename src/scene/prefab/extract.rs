@@ -9,7 +9,7 @@ use crate::scene::Scene;
 
 /// Walk `root_id` + its descendants, deep-clone their bundles, remap to local
 /// (0-based) ids — rewriting `parent_id`/`children` through the map and detaching
-/// the root's own parent — and slice out the materials the subtree references.
+/// the root's own parent — and slice out every material the subtree names.
 /// Returns `None` if `root_id` is not a live entity.
 pub fn extract_prefab(scene: &Scene, root_id: u32) -> Option<PrefabData> {
     if !scene.world.contains(root_id) {
@@ -35,9 +35,10 @@ pub fn extract_prefab(scene: &Scene, root_id: u32) -> Option<PrefabData> {
     for mut entity in docs {
         let is_root = entity.id == root_id;
         remap_entity(&mut entity, &local, is_root);
-        for key in entity.material.iter().flat_map(|m| &m.materials) {
-            if let Some(asset) = scene.materials.get(key) {
-                materials.insert(key.clone(), asset.clone());
+        // Every key the entity names, slots and particles alike (#1576).
+        for key in crate::scene::authoring::material::entity_keys(&entity) {
+            if let Some(asset) = scene.materials.get(&key) {
+                materials.insert(key, asset.clone());
             }
         }
         entities.push(entity);
