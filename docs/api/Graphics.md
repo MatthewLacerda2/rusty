@@ -287,7 +287,8 @@ its pass, against that opaque image; see `Material.SetReceiveSsr`), depth of fie
 camera (a viewmodel) draws over it and gets none. An authored surface block that
 restyles the colour scales the reflection with it (`hit_flash` at amount 1 shows
 none); one that isn't a per-channel scale of it (`toon_ramp`, `hologram`, `desaturate`)
-gets no SSR.
+gets no SSR on an opaque surface. A `receive_ssr` transparent traces its hit before
+its blocks run, so any block restyles its reflection with the rest of its colour.
 `Debug.Stats().gpu_passes.ssr` times it. Where SSR is off the forward shader reflects
 the sky or a reflection probe. Its **quality** sets the march (see *Quality presets*):
 the seeded `Medium` preset marches 16, 32 or 64 steps at its `Low`, `Medium` and

@@ -37,13 +37,21 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
 };
 
 /// The march `ssr` runs under `graphics`: its quality level's row of the running
-/// preset, or its own `steps` and `step_length` when `Custom`.
+/// preset, or its own `steps` and `step_length` when `Custom`, within the march's
+/// range (a preset in `project.rusty` is never clamped on the way in), so every
+/// caller marches clamped values.
 pub(crate) fn march(ssr: &Ssr, graphics: GraphicsSettings) -> SsrQuality {
     let custom = SsrQuality {
         steps: ssr.steps,
         step_length: ssr.step_length,
     };
-    ssr.quality.pick(&graphics.quality.ssr, custom)
+    let m = ssr.quality.pick(&graphics.quality.ssr, custom);
+    SsrQuality {
+        steps: m.steps.clamp(1, Ssr::MAX_STEPS),
+        step_length: m
+            .step_length
+            .clamp(Ssr::MIN_STEP_LENGTH, Ssr::MAX_STEP_LENGTH),
+    }
 }
 
 /// Whether a view whose base camera is `post`'s runs SSR this frame: its volume has

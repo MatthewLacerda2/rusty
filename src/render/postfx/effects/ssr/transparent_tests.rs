@@ -1,7 +1,8 @@
 //! Transparent SSR's switches (#1570), off the GPU: the march the base camera
 //! hands its translucents, and which material traces.
 
-use super::transparent::camera_march;
+use super::transparent::{camera_march, traces, MIN_SMOOTHNESS};
+use crate::asset::MapRef;
 use crate::components::{MaterialAsset, PostProcessingComponent, RenderMode, Ssr};
 use crate::core::settings::quality::EffectQuality;
 use crate::core::settings::GraphicsSettings;
@@ -47,6 +48,7 @@ fn only_a_lit_transparent_with_receive_ssr_traces() {
     let water = MaterialAsset {
         render_mode: RenderMode::Transparent,
         receive_ssr: true,
+        roughness: 0.04,
         ..MaterialAsset::default()
     };
     assert_eq!(surface_uniform(true, Some(&water)).receive_ssr, 1);
@@ -65,4 +67,36 @@ fn only_a_lit_transparent_with_receive_ssr_traces() {
         ..water
     };
     assert_eq!(surface_uniform(true, Some(&off)).receive_ssr, 0);
+}
+
+#[test]
+fn a_material_too_rough_to_ever_reflect_traces_nothing() {
+    let glass = |roughness| MaterialAsset {
+        render_mode: RenderMode::Transparent,
+        receive_ssr: true,
+        roughness,
+        ..MaterialAsset::default()
+    };
+    assert!(traces(&glass(0.04)), "still water");
+    assert!(
+        !traces(&glass(0.2)),
+        "frosted glass: a fade of 0 everywhere"
+    );
+    // A roughness map multiplies the factor down: some pixel may still reflect.
+    let mapped = MaterialAsset {
+        roughness_map: Some(MapRef::from("ripples.png")),
+        ..glass(0.6)
+    };
+    assert!(traces(&mapped));
+    assert_eq!(surface_uniform(true, Some(&glass(0.6))).receive_ssr, 0);
+}
+
+#[test]
+fn the_minimum_smoothness_is_one_number_in_rust_and_wgsl() {
+    let wgsl = include_str!("../../../../../engine/shaders/lighting/ssr_surface.wgsl");
+    let line = format!("const MIN_SMOOTHNESS: f32 = {MIN_SMOOTHNESS:.1};");
+    assert!(
+        wgsl.contains(&line),
+        "ssr_surface.wgsl should declare `{line}`"
+    );
 }

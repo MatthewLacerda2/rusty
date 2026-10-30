@@ -55,14 +55,17 @@ fn composite(lit: vec3<f32>, alpha: f32, env_brdf: vec3<f32>, world: vec3<f32>, 
 // traces: both are uniform, so every other surface returns at once. `N` is the
 // shading normal, `roughness` the perceptual roughness.
 fn reflect_ssr(reflection: vec3<f32>, weight: vec3<f32>, world: vec3<f32>, N: vec3<f32>, R: vec3<f32>, roughness: f32) -> vec3<f32> {
-    if (entity.receive_ssr == 0u || camera.stack.z < 1.0) {
+    // A pixel too rough to reflect (HDRP's *Minimum Smoothness*) marches nothing,
+    // as the SSR pass discards a surface that `ssr_surface::reflects` refuses.
+    let fade = ssr_surface::smoothness_fade(roughness);
+    if (entity.receive_ssr == 0u || camera.stack.z < 1.0 || fade <= 0.0) {
         return reflection;
     }
     let f = ssr_march::Frame(camera.view_proj, camera.camera_pos, vec3<f32>(0.0), vec4<f32>(0.0, 0.0, 0.0, 1.0));
     // Off the side the ray leaves from: both faces are drawn.
     let origin = world + faceForward(N, -R, N) * 0.02;
     let hit = ssr_march::trace(f, t_opaque, t_opaque, s_opaque, origin, R, i32(camera.stack.z), camera.stack.w);
-    let k = hit.w * ssr_surface::smoothness_fade(roughness);
+    let k = hit.w * fade;
     return reflection + (weight * hit.rgb - reflection) * k;
 }
 

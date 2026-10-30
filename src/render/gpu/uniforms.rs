@@ -190,8 +190,9 @@ pub(crate) struct SurfaceUniform {
     /// amount (0: none).
     pub transmission: [f32; 4],
     /// 1 when the surface traces screen-space reflections (#1570): a lit
-    /// `Transparent` material with `receive_ssr`; it traces only where the camera's
-    /// `stack.z` gives a march.
+    /// `Transparent` material with `receive_ssr` that can be smooth enough to
+    /// reflect (`postfx::effects::ssr::transparent::traces`); it traces only where
+    /// the camera's `stack.z` gives a march.
     pub receive_ssr: u32,
     pub _pad: [u32; 3],
 }

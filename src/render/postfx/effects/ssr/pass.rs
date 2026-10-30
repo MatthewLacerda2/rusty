@@ -32,15 +32,13 @@ pub(crate) struct SsrParams {
 }
 
 impl SsrParams {
-    /// The base camera's frame, marching as `m` says, within the march's range (a
-    /// preset in `project.rusty` is never clamped on the way in).
+    /// The base camera's frame, marching as `m` ([`super::march`]) says.
     pub(crate) fn new(view_proj: Mat4, eye: Vec3, m: SsrQuality) -> Self {
-        let (steps, step) = super::transparent::clamped(m);
         Self {
             inv_view_proj: view_proj.inverse().to_cols_array(),
             view_proj: view_proj.to_cols_array(),
             camera_pos: eye.extend(0.0).to_array(),
-            march: [steps as f32, step, 0.0, 0.0],
+            march: [m.steps as f32, m.step_length, 0.0, 0.0],
         }
     }
 }

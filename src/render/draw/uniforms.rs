@@ -11,6 +11,7 @@ use glam::Mat4;
 use crate::components::{MaterialAsset, RefractionModel, RenderMode};
 use crate::render::gpu::lightmaps::Lightmaps;
 use crate::render::gpu::uniforms::{MappingUniform, SurfaceUniform};
+use crate::render::postfx::effects::ssr;
 use crate::render::{EntityUniform, InstanceData};
 use crate::scene::authoring::material::{BLEND_SHARPNESS_RANGE, MAP_COORD_RANGE, WORLD_SIZE_RANGE};
 use crate::scene::Scene;
@@ -131,7 +132,7 @@ pub(crate) fn surface_uniform(lit: bool, material: Option<&MaterialAsset>) -> Su
         depth_postpass: u32::from(glass && m.depth_postpass),
         transmission: transmission(m.transmission_color, m.transmission),
         absorption: absorption(m.transmittance_color, m.absorption_distance, m.thickness),
-        receive_ssr: u32::from(lit && glass && m.receive_ssr),
+        receive_ssr: u32::from(lit && glass && ssr::transparent::traces(m)),
         _pad: [0; 3],
     }
 }
