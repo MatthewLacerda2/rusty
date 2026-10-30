@@ -36,7 +36,8 @@ impl Renderer {
         probe: &ReflectionProbe,
         resolution: u32,
     ) -> Vec<u8> {
-        // A scene file's values reach here unclamped: bake from a clamped copy.
+        // A scene's probes are held to range on load and on edit, but any probe may be
+        // passed here (a test builds its own): bake from a held copy.
         let mut probe = probe.clone();
         probe.clamp_settings();
         let resolution = clamp_resolution(resolution);

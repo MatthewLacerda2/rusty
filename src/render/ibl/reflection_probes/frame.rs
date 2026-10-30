@@ -5,7 +5,7 @@
 use glam::Vec3;
 
 use super::{ProbeArray, MAX_REFLECTION_PROBES, SPARE_SLOTS};
-use crate::render::ibl::cubemap::{read_cube_shape, CubeShape};
+use crate::render::ibl::cubemap::{read_cube_shape, CubeShape, Refusal};
 use crate::render::Renderer;
 use crate::scene::{ReflectionProbe, Scene};
 
@@ -23,8 +23,17 @@ impl Renderer {
     /// array are passed over and never uploaded (#1245). Which probes are resident
     /// depends on the camera's distance to each box; only ties are broken by scene
     /// index, and the residents are handed over in scene order, so two runs from one
-    /// camera agree.
+    /// camera agree. A cube that fails to load is refused until it is re-written, and
+    /// the frame's probes are chosen again without it, so no slot is bound to what it
+    /// held before (#1609).
     pub(crate) fn update_reflection_probes(&mut self, scene: &Scene, camera_pos: Vec3) {
+        // Each pass that fails refuses one more cached shape, so this ends.
+        while !self.place_reflection_probes(scene, camera_pos) {}
+    }
+
+    /// One pass of [`Self::update_reflection_probes`]: false when a cube it had to
+    /// load was refused.
+    fn place_reflection_probes(&mut self, scene: &Scene, camera_pos: Vec3) -> bool {
         let probes = &scene.reflection_probes.probes;
         let budget = scene.lighting_settings.reflections.budget_bytes();
         let mut wanted = Vec::new();
@@ -52,34 +61,56 @@ impl Renderer {
         wanted.sort_by_key(|&(i, _)| i);
         let wanted: Vec<_> = wanted.into_iter().map(|(i, s)| (&probes[i], s)).collect();
         let (copies, rebuilt) = self.reflection_probes.place(&self.device, &wanted, budget);
-        let mut loaded = Vec::new();
+        let (mut loaded, mut placed) = (Vec::new(), true);
         for (path, shape, slot, shift) in copies {
             #[cfg(test)]
             {
                 self.reflection_probes.loads += 1;
             }
-            match self.load_cubemap_mips(&path, |size| size == shape.size) {
-                Some(cube) => loaded.push((cube, slot, shift)),
-                // Changed or gone since its header was read: read it again next frame.
-                None => self.reflection_probes.forget(|p| p == path),
+            match self.load_cubemap_mips(&path, shape) {
+                Ok(cube) => loaded.push((cube, slot, shift)),
+                Err(why) => {
+                    self.reflection_probes.refuse(&path, why);
+                    placed = false;
+                }
             }
         }
         (self.reflection_probes).fill(&self.device, &self.queue, &loaded);
         self.global_bind_group_dirty |= rebuilt;
+        placed
     }
 }
 
 impl ProbeArray {
     /// The shape of the cube at `path`, from its header the first time it is asked
-    /// for (#1584); `None` for a missing file or one the array does not admit, which
-    /// warns once.
+    /// for (#1584); `None` for a file that is missing, malformed (#1609) or one the
+    /// array does not admit, which warns once.
     fn shape(&mut self, path: &str) -> Option<CubeShape> {
         if let Some(&known) = self.shapes.get(path) {
             return known;
         }
-        let shape = read_cube_shape(path).filter(|s| Self::admits(path, s.size));
-        self.shapes.insert(path.to_string(), shape);
-        shape
+        match read_cube_shape(path) {
+            Ok(shape) if Self::admits(path, shape.size) => {
+                self.shapes.insert(path.to_string(), Some(shape));
+                Some(shape)
+            }
+            Ok(_) => {
+                self.shapes.insert(path.to_string(), None);
+                None
+            }
+            Err(why) => {
+                self.refuse(path, why);
+                None
+            }
+        }
+    }
+
+    /// Leave the cube at `path` out until it is re-written ([`Self::forget`]), with
+    /// one warning saying `why`: its slot is emptied and its shape cached as `None`.
+    fn refuse(&mut self, path: &str, why: Refusal) {
+        log::warn!("[Reflection] cubemap {path} is left out: {why}");
+        self.table.forget(|p| p == path);
+        self.shapes.insert(path.to_string(), None);
     }
 }
 
@@ -116,3 +147,7 @@ mod frame_tests;
 #[cfg(test)]
 #[path = "budget_tests.rs"]
 mod budget_tests;
+
+#[cfg(test)]
+#[path = "refuse_tests.rs"]
+mod refuse_tests;

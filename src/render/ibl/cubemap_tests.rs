@@ -67,26 +67,26 @@ fn parses_valid_rgba8_cubemap() {
 #[test]
 fn accepts_srgb_too() {
     let bytes = build_cubemap_ktx2(1, R8G8B8A8_SRGB, 6);
-    assert!(parse_ktx2_cubemap_mips(&bytes).is_some());
+    assert!(parse_ktx2_cubemap_mips(&bytes).is_ok());
 }
 
 #[test]
 fn rejects_non_cube() {
     // A 2D texture (1 face) is not a cubemap.
     let bytes = build_cubemap_ktx2(1, R8G8B8A8_UNORM, 1);
-    assert!(parse_ktx2_cubemap_mips(&bytes).is_none());
+    assert!(parse_ktx2_cubemap_mips(&bytes).is_err());
 }
 
 #[test]
 fn rejects_hdr_format() {
     let bytes = build_cubemap_ktx2(1, R16G16B16A16_SFLOAT, 6);
-    assert!(parse_ktx2_cubemap_mips(&bytes).is_none());
+    assert!(parse_ktx2_cubemap_mips(&bytes).is_err());
 }
 
 #[test]
 fn rejects_garbage() {
-    assert!(parse_ktx2_cubemap_mips(b"not a ktx2 file at all").is_none());
-    assert!(parse_ktx2_cubemap_mips(&[]).is_none());
+    assert!(parse_ktx2_cubemap_mips(b"not a ktx2 file at all").is_err());
+    assert!(parse_ktx2_cubemap_mips(&[]).is_err());
 }
 
 /// Re-baking a resident probe's cubemap at the same size reaches the probe array on

@@ -6,17 +6,14 @@ use super::*;
 
 /// The shape a blob's first 48 bytes state, as [`read_cube_shape`] reads them.
 fn shape(bytes: &[u8]) -> Option<CubeShape> {
-    cube_shape(bytes.get(..48)?.try_into().unwrap())
+    cube_shape(bytes.get(..48)?.try_into().unwrap()).ok()
 }
 
 #[test]
 fn the_header_states_the_size_and_mips_of_a_cube_the_loader_accepts() {
     let bytes = build_cubemap_ktx2(8, R8G8B8A8_SRGB, 6);
     assert_eq!(shape(&bytes), Some(CubeShape { size: 8, mips: 1 }));
-    assert!(
-        parse_ktx2_cubemap_mips(&bytes).is_some(),
-        "the loader agrees"
-    );
+    assert!(parse_ktx2_cubemap_mips(&bytes).is_ok(), "the loader agrees");
 }
 
 #[test]
@@ -27,9 +24,9 @@ fn the_header_refuses_what_the_loader_refuses() {
         vec![0; 80],
     ] {
         assert_eq!(shape(&bytes), None);
-        assert!(parse_ktx2_cubemap_mips(&bytes).is_none());
+        assert!(parse_ktx2_cubemap_mips(&bytes).is_err());
     }
-    assert_eq!(read_cube_shape("no/such/cube.ktx2"), None);
+    assert!(read_cube_shape("no/such/cube.ktx2").is_err());
 }
 
 /// A reflection cubemap re-baked at a path the probe array already read (or failed
