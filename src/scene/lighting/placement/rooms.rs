@@ -14,7 +14,7 @@
 //!   4. **Narrow areas** — connected open floor no core reached (a level of
 //!      corridors narrower than a doorway, a ledge) is a room of its own, so no
 //!      walkable space is left reflecting the sky; one smaller than
-//!      [`MIN_ISLAND_AREA`] (the top of a jump box) joins the room around it.
+//!      `MIN_ISLAND_AREA` (the top of a jump box) joins the room around it.
 //!
 //! Every step runs in scan order with ties to the lower index, so a level always
 //! splits the same way.
@@ -22,7 +22,7 @@
 use std::collections::VecDeque;
 
 use super::floor::FloorGrid;
-use super::islands::{absorb_islands, MIN_ISLAND_AREA};
+use super::islands::absorb_islands;
 
 /// What counts as a room.
 #[derive(Clone, Copy, Debug, PartialEq)]

@@ -45,7 +45,8 @@ pub struct ReflectionSettings {
 
 impl Default for ReflectionSettings {
     /// 512-texel cubes, one good size for every probe; a 128 MB budget holds 16 of
-    /// them (8 MB each with their mips), enough for the rooms around a player. 512
+    /// them (8 MB each with their mips): 14 shaded and 2 spare, enough for the rooms
+    /// around a player. 512
     /// probes cover a Dust2-sized level (200 m of 20 m rooms takes 400 at 12 m tiles).
     fn default() -> Self {
         Self {

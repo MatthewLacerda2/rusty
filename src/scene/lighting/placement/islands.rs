@@ -32,7 +32,7 @@ pub fn absorb_islands(grid: &FloorGrid, room: &mut [Option<u32>], first: u32, co
     let small: Vec<bool> = areas.iter().map(|a| a.len() < min_cells).collect();
     let host = |r: u32| r < first || !small[(r - first) as usize];
     let reach = (ISLAND_REACH / grid.cell).ceil() as usize;
-    for (k, island) in areas.iter().enumerate().filter(|(k, _)| small[*k]) {
+    for (island, _) in areas.iter().zip(&small).filter(|(_, s)| **s) {
         if let Some(h) = nearest_room(grid, room, island, reach, host) {
             island.iter().for_each(|&i| room[i] = Some(h));
         }
