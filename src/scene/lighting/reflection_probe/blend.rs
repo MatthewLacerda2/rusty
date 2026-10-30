@@ -60,7 +60,7 @@ impl ReflectionProbeSet {
                 .then((probe(a).distance_sq(point)).total_cmp(&probe(b).distance_sq(point)))
                 .then(a.cmp(&b))
         };
-        let (mut top, mut next): (Option<(usize, f32)>, Option<(usize, f32)>) = (None, None);
+        let (mut top, mut next) = (None::<(usize, f32)>, None::<(usize, f32)>);
         for (i, p) in self.probes.iter().enumerate() {
             let c = (i, p.influence(point));
             if c.1 <= 0.0 {

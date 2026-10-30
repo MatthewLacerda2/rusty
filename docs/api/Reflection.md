@@ -35,14 +35,16 @@ infinitely far away. An object no baked probe reaches reflects the global skybox
 | `intensity` | `1` | brightness of the reflection, `0`–`8` |
 
 **Scene defaults** live in the lighting settings (`Lighting.GetSettings()` /
-`SetSettings{ reflectionResolution, reflectionBudgetMB }`): the resolution a probe
-without its own bakes at (**512**) and the **memory budget** of resident cubes
-(**128 MB**). Each frame keeps the baked probes whose boxes are nearest the camera (a
+`SetSettings{ reflectionResolution, reflectionBudgetMB, reflectionMaxProbes }`): the resolution a probe
+without its own bakes at (**512**), the **memory budget** of resident cubes
+(**128 MB**) and the most probes `Lighting.Generate()` places (**512**). Each frame keeps the baked probes whose boxes are nearest the camera (a
 box the camera stands in counts as distance zero; ties go to the lower index), at most
-32, until the next one would put the cubes past the budget; the nearest is always
-kept. They share one texture whose face is the largest resident cube's, so a 512
-cube costs about 8.4 MB there (a 128 MB budget holds 15) and a smaller cube rides in
-its lower mips. A cubemap whose size is not a power of two up to 2048 is skipped with
+32, while the cubes stay within the budget: a cube that would pass it is skipped and
+farther ones that fit are still taken; the nearest is always kept. They share one
+texture whose face is the largest resident cube's, sized to the cubes it holds, so a
+512 cube costs 8 MB there (a 128 MB budget holds 16) and a smaller cube rides in
+its lower mips. The decoded cubes kept for copying are held to the budget too, least
+recently resident evicted first. A cubemap whose size is not a power of two up to 2048 is skipped with
 a console warning (repeated after the next bake), and its objects reflect the skybox.
 Probes may share one cubemap file; each keeps its own box. An object whose probes are
 not resident blends the ones that are, or reflects the skybox.

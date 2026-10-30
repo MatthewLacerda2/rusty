@@ -28,15 +28,16 @@ fn set_settings_changes_only_the_named_fields_and_clamps() {
 #[test]
 fn reflection_settings_read_back_and_clamp() {
     let s = session();
-    let read = "local s = Lighting.GetSettings() return s.reflectionResolution .. ' ' .. s.reflectionBudgetMB";
-    assert_eq!(s.eval(read).unwrap(), "512 128");
-    s.eval("Lighting.SetSettings{ reflectionResolution = 1000, reflectionBudgetMB = 1 }")
+    let read = "local s = Lighting.GetSettings() \
+        return s.reflectionResolution .. ' ' .. s.reflectionBudgetMB .. ' ' .. s.reflectionMaxProbes";
+    assert_eq!(s.eval(read).unwrap(), "512 128 512");
+    s.eval("Lighting.SetSettings{ reflectionResolution = 1000, reflectionBudgetMB = 1, reflectionMaxProbes = 0 }")
         .unwrap();
     let r = s.world().scene().borrow().lighting_settings.reflections;
     assert_eq!(
-        (r.resolution, r.budget_mb),
-        (1024, 8),
-        "a power of two; the least budget"
+        (r.resolution, r.budget_mb, r.max_probes),
+        (1024, 8, 1),
+        "a power of two; the least budget and ceiling"
     );
 }
 
@@ -98,4 +99,10 @@ fn bake_lightmaps_applies_every_named_argument_and_clamps() {
     .apply(base);
     let got = (huge.texels_per_unit, huge.samples, huge.bounces);
     assert_eq!(got, (8.0, 4096, 16), "upper bounds; +inf takes the default");
+}
+
+#[test]
+fn bake_refuses_a_reflection_region_under_the_minimum() {
+    let err = session().eval("return Lighting.Bake(nil, 0)").unwrap_err();
+    assert!(err.to_string().contains("under the 2 m minimum"), "{err}");
 }

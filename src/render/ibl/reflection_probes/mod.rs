@@ -24,7 +24,11 @@
 //! shader where its chain starts, so a 128-texel cube shares an array of 512-texel
 //! ones. The resident set is held to the scene's byte budget
 //! (`LightingSettings::reflections`, counted at the array's face), filled nearest box
-//! first (`frame.rs`). A cube whose size is not a power of two up to
+//! first, a cube that would pass it skipped (`frame.rs`). The array holds exactly the
+//! slots it needs, shrinking when the budget or the wanted count drops (`slots.rs`),
+//! and the decoded cubes the renderer keeps to copy from are evicted back to the
+//! budget, least recently resident first (`cache.rs`). A cube whose size is not a
+//! power of two up to
 //! [`MAX_FACE`] is left out with a warning, never uploaded (the size is checked
 //! between decoding the file and creating its texture, #1245), and the objects it
 //! would cover reflect the sky.

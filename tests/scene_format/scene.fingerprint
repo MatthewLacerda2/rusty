@@ -751,6 +751,7 @@ scene.lighting_settings.lightmaps.samples: u32
 scene.lighting_settings.lightmaps.seed: u64
 scene.lighting_settings.lightmaps.texels_per_unit: f32
 scene.lighting_settings.reflections.budget_mb: u32
+scene.lighting_settings.reflections.max_probes: u32
 scene.lighting_settings.reflections.resolution: u32
 scene.lightmaps.directions: seq
 scene.lightmaps.directions[]: string

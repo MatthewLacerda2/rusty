@@ -60,7 +60,7 @@ impl FloorGrid {
     /// it, it is blocked where a solid crosses body height above that floor, and its
     /// ceiling is the lowest bottom overhead. A collider is judged by its bounding
     /// box, so a level built as one mesh collider wants the nav surface's grid.
-    /// A level too wide for [`MAX_FLOOR_CELLS`] at `cell` is rasterized at the
+    /// A level too wide for `MAX_FLOOR_CELLS` at `cell` is rasterized at the
     /// finest cell that fits, with a warning naming its extent.
     pub fn from_static(scene: &Scene, cell: f32) -> Option<Self> {
         let boxes = static_boxes(scene);
