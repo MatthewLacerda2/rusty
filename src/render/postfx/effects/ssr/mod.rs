@@ -76,4 +76,7 @@ pub(crate) fn run(
 mod tests;
 
 #[cfg(test)]
+mod transparent_tests;
+
+#[cfg(test)]
 mod gpu;
