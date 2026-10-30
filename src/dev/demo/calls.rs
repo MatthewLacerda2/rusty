@@ -4,26 +4,43 @@
 //! `Transform.SetPosition` reaches the world without passing through `InputState`.
 //! [`journal_calls`] wraps every API namespace function in that VM so each call
 //! notes `Namespace.Function` and its plain-data arguments in the world's journal;
-//! [`invoke`] makes the same call on replay. An argument or a returned value that
-//! is not plain data (a function, a script handle from `Scene.GetScript`) cannot
-//! be replayed, and taints the demo instead.
+//! [`invoke`] makes the same call on replay. The `Harness` verbs that change the
+//! world ([`HARNESS_VERBS`]) are noted the same way and replayed by
+//! [`invoke_harness`]; the rest only read it, or step it (the steps are ticks).
+//! An argument or a returned value that is not plain data (a function, a script
+//! handle from `Scene.GetScript`) cannot be replayed, and taints the demo instead.
 
 use std::cell::RefCell;
 use std::rc::Rc;
 
 use mlua::{Function, Lua, MultiValue, Table, Value};
 
+use crate::scene::Scene;
 use crate::scripting::{ApiCells, HostCall, HostJournal, Plain};
 
-/// Wraps each namespace function (the stdlib and `Harness` are not the API; the
-/// `math.random` shims call `Random.*`, which is) with a note and a check.
+/// The `Harness` verbs that change the world without a tick: noted like an API
+/// call. Every other `Harness` verb reads the world, or steps it.
+pub const HARNESS_VERBS: &[&str] = &["AttachPlayerBot", "LoadStress"];
+
+/// Wraps each namespace function (the stdlib is not the API; the `math.random`
+/// shims call `Random.*`, which is) and each of [`HARNESS_VERBS`] with a note and
+/// a check.
 const WRAP: &str = r#"
-local note, check = ...
+local note, check, harness_verbs = ...
 local skip = { string = true, table = true, coroutine = true, utf8 = true, math = true,
                Harness = true, _G = true }
 local namespaces = {}
 for name, value in pairs(_G) do
     if type(value) == "table" and not skip[name] then namespaces[#namespaces + 1] = name end
+end
+local function wrap(t, ns, name, f)
+    local full = ns .. "." .. name
+    rawset(t, name, function(...)
+        note(full, ...)
+        local r = table.pack(f(...))
+        check(full, table.unpack(r, 1, r.n))
+        return table.unpack(r, 1, r.n)
+    end)
 end
 for _, ns in ipairs(namespaces) do
     local t = _G[ns]
@@ -31,15 +48,12 @@ for _, ns in ipairs(namespaces) do
     for name, f in pairs(t) do
         if type(f) == "function" then fns[name] = f end
     end
-    for name, f in pairs(fns) do
-        local full = ns .. "." .. name
-        rawset(t, name, function(...)
-            note(full, ...)
-            local r = table.pack(f(...))
-            check(full, table.unpack(r, 1, r.n))
-            return table.unpack(r, 1, r.n)
-        end)
-    end
+    for name, f in pairs(fns) do wrap(t, ns, name, f) end
+end
+local harness = rawget(_G, "Harness")
+for _, name in ipairs(harness_verbs) do
+    local f = harness and harness[name]
+    if type(f) == "function" then wrap(harness, "Harness", name, f) end
 end
 "#;
 
@@ -66,7 +80,10 @@ pub fn journal_calls(lua: &Lua, journal: &Rc<RefCell<HostJournal>>) -> mlua::Res
         }
         Ok(())
     })?;
-    lua.load(WRAP).set_name("=demo").call::<()>((note, check))
+    let verbs = lua.create_sequence_from(HARNESS_VERBS.iter().copied())?;
+    lua.load(WRAP)
+        .set_name("=demo")
+        .call::<()>((note, check, verbs))
 }
 
 /// `value` as plain data, or what kind of value kept it from being plain.
@@ -150,6 +167,37 @@ pub fn invoke(lua: &Lua, cells: &ApiCells, function: &str, args: &[Plain]) -> Re
         f.call::<MultiValue>(args).map(drop)
     })
     .map_err(|e| format!("{function}: {e}"))
+}
+
+/// Make the `Harness.<verb>` call (one of [`HARNESS_VERBS`]) with `args` on
+/// `scene`, as the scenario's harness did.
+pub fn invoke_harness(
+    lua: &Lua,
+    scene: &RefCell<Scene>,
+    verb: &str,
+    args: &[Plain],
+) -> Result<(), String> {
+    let arg = |i: usize| args.get(i).map_or(Ok(Value::Nil), |a| to_lua(lua, a));
+    let done = match verb {
+        "AttachPlayerBot" => match args.first() {
+            Some(Plain::Str(path)) => {
+                crate::dev::botplayer::attach_player_bot(&mut scene.borrow_mut(), path);
+                Ok(())
+            }
+            _ => Err("a script path".to_string()),
+        },
+        "LoadStress" => {
+            let opts = match arg(0).map_err(|e| e.to_string())? {
+                Value::Table(t) => Some(t),
+                _ => None,
+            };
+            let spec = crate::dev::bench::spec_from_lua(lua, opts).map_err(|e| e.to_string())?;
+            crate::dev::bench::stress::load(&mut scene.borrow_mut(), &spec);
+            Ok(())
+        }
+        _ => Err("not a verb a demo replays".to_string()),
+    };
+    done.map_err(|e| format!("Harness.{verb}: {e}"))
 }
 
 #[cfg(test)]

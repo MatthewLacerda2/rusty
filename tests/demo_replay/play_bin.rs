@@ -39,7 +39,13 @@ fn play_records_a_demo_and_play_demo_replays_it() {
         String::from_utf8_lossy(&out.stderr)
     );
     let results = std::fs::read_to_string(out_dir.join("results.json")).unwrap();
-    assert!(results.contains("demo: replayed 3 of 3 ticks"), "{results}");
+    // The run is shorter than a digest's 120 ticks: the end digest checks it.
+    let replayed = "demo: replayed 3 of 3 ticks, 1 digests compared";
+    assert!(results.contains(replayed), "{results}");
+    assert!(
+        results.contains("the demo replays bit for bit"),
+        "{results}"
+    );
     let demos = rusty::dev::demo::demos_in(&game.join("saved").join("demos"));
     assert_eq!(demos.len(), 1, "a replay records nothing");
 }

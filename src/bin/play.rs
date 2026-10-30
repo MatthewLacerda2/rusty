@@ -3,7 +3,7 @@
 //! ```text
 //! Usage:
 //!   cargo run --bin play --features dev -- [--project <dir>] [--scene <path>] [--size <W>x<H>] <scenario.lua> <out_dir>
-//!   cargo run --bin play --features dev -- [--project <dir>] [--size <W>x<H>] --demo <file> [scenario.lua] <out_dir>
+//!   cargo run --bin play --features dev -- [--project <dir>] --demo <file> [scenario.lua] <out_dir>
 //! ```
 //!
 //! The scenario plays the game project at `<dir>` (default `./project`, #829); the
@@ -33,7 +33,7 @@ use rusty::dev::{demo, scenario};
 
 const USAGE: &str =
     "usage: play [--project <dir>] [--scene <path>] [--size <W>x<H>] <scenario.lua> <out_dir>
-       play [--project <dir>] [--size <W>x<H>] --demo <file> [scenario.lua] <out_dir>";
+       play [--project <dir>] --demo <file> [scenario.lua] <out_dir>";
 
 fn main() {
     rusty::logging::init();
@@ -60,6 +60,13 @@ fn main() {
             exit(2);
         }
     };
+    if demo.is_some() && size.is_some() {
+        // The sim lays the UI out on the Game view size, which the demo recorded.
+        eprintln!(
+            "play: --size cannot change a --demo replay: it plays at the size it recorded\n{USAGE}"
+        );
+        exit(2);
+    }
     let demo = demo.map(|d| from_here(&d));
     let opened = rusty::core::project::open(&rusty::core::project::locate(project), Access::Run);
     let opened = match opened {
@@ -72,7 +79,7 @@ fn main() {
     let scene = scene.unwrap_or_else(|| opened.settings.build.startup_scene.clone());
 
     let ran = match (&demo, &scenario_path) {
-        (Some(demo), scenario_path) => demo::replay(demo, scenario_path.as_deref(), &out_dir, size),
+        (Some(demo), scenario_path) => demo::replay(demo, scenario_path.as_deref(), &out_dir),
         (None, Some(path)) => scenario::run(path, &out_dir, &scene, opened.settings, size),
         (None, None) => Err(USAGE.to_string()),
     };

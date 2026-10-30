@@ -32,6 +32,7 @@ pub struct InputDelta {
     mouse_position: Option<[Exact; 2]>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pads: Option<[bool; MAX_PADS]>,
+    /// A clipboard capture this tick: an edge, like `down`, not carried on.
     #[serde(skip_serializing_if = "Option::is_none")]
     clipboard: Option<String>,
 }
@@ -45,26 +46,42 @@ fn pair(p: (f64, f64)) -> [Exact; 2] {
     [Exact(p.0), Exact(p.1)]
 }
 
+/// A pair's bits: floats compare as the file stores them, so `-0.0` is a change
+/// and a NaN is not one every tick.
+fn pair_bits(p: (f64, f64)) -> (u64, u64) {
+    (p.0.to_bits(), p.1.to_bits())
+}
+
+fn axes_bits(axes: &[(String, f32)]) -> Vec<(&str, u32)> {
+    axes.iter()
+        .map(|(n, v)| (n.as_str(), v.to_bits()))
+        .collect()
+}
+
 impl InputDelta {
     /// What changed from `before` to `now`.
     pub fn between(before: &InputFrame, now: &InputFrame) -> Self {
-        let axes = changed(&before.axes, &now.axes).map(|axes| {
-            axes.into_iter()
-                .map(|(name, value)| (name, Exact(f64::from(value))))
+        let axes = (axes_bits(&before.axes) != axes_bits(&now.axes)).then(|| {
+            now.axes
+                .iter()
+                .map(|(name, value)| (name.clone(), Exact(f64::from(*value))))
                 .collect()
         });
+        let moved = |p: fn(&InputFrame) -> (f64, f64)| {
+            (pair_bits(p(before)) != pair_bits(p(now))).then(|| pair(p(now)))
+        };
         Self {
             held: changed(&before.held, &now.held),
             down: changed(&before.down, &now.down),
             up: changed(&before.up, &now.up),
-            mouse_delta: changed(&before.mouse_delta, &now.mouse_delta).map(pair),
+            mouse_delta: moved(|f| f.mouse_delta),
             scroll: changed(&before.scroll.to_bits(), &now.scroll.to_bits())
                 .map(|_| Exact(now.scroll)),
             text: changed(&before.text, &now.text),
             axes,
-            mouse_position: changed(&before.mouse_position, &now.mouse_position).map(pair),
+            mouse_position: moved(|f| f.mouse_position),
             pads: changed(&before.pads, &now.pads),
-            clipboard: changed(&before.clipboard, &now.clipboard),
+            clipboard: now.clipboard.clone(),
         }
     }
 
@@ -103,9 +120,7 @@ impl InputDelta {
         if let Some(pads) = self.pads {
             now.pads = pads;
         }
-        if let Some(clipboard) = &self.clipboard {
-            now.clipboard.clone_from(clipboard);
-        }
+        now.clipboard.clone_from(&self.clipboard);
         now
     }
 }
@@ -135,5 +150,33 @@ mod tests {
         let read: InputDelta = serde_json::from_str(&text).unwrap();
         assert_eq!(read.apply(&before), now, "bit for bit through the file");
         assert!(InputDelta::between(&now, &now).is_empty());
+    }
+
+    #[test]
+    fn floats_change_by_their_bits_and_a_capture_is_one_ticks() {
+        let zero = InputFrame::default();
+        let negative = InputFrame {
+            mouse_position: (-0.0, 0.0),
+            axes: vec![("PADLEFTX".into(), -0.0)],
+            ..InputFrame::default()
+        };
+        let delta = InputDelta::between(&zero, &negative);
+        assert!(delta.mouse_position.is_some() && delta.axes.is_some());
+        let nan = InputFrame {
+            axes: vec![("PADLEFTX".into(), f32::NAN)],
+            ..InputFrame::default()
+        };
+        assert!(
+            InputDelta::between(&nan, &nan).is_empty(),
+            "NaN is no change"
+        );
+        let pasted = InputFrame {
+            clipboard: Some("text".into()),
+            ..InputFrame::default()
+        };
+        let delta = InputDelta::between(&zero, &pasted);
+        assert_eq!(delta.apply(&zero), pasted);
+        let next = InputDelta::between(&pasted, &zero);
+        assert_eq!(next.apply(&pasted).clipboard, None, "not carried on");
     }
 }

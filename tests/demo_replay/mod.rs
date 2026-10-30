@@ -9,6 +9,7 @@ use rusty::dev::scenario;
 
 mod hosts;
 mod play_bin;
+mod timing;
 
 /// Walk, turn, a REPL line and API calls that move the world and draw from
 /// `Random` between ticks: every kind of act a demo carries.
@@ -63,7 +64,10 @@ fn a_recorded_run_replays_bit_for_bit() {
     assert!(calls.len() >= 3, "the API calls are recorded: {calls:?}");
     let verdict = replay(&dir, demo, |_| {});
     assert_eq!(verdict.diverged, None, "{verdict:?}");
-    assert_eq!(verdict.checked, 2, "a digest every 120 ticks");
+    assert_eq!(
+        verdict.checked, 3,
+        "a digest every 120 ticks, and one at the end"
+    );
     // The default scene is built in memory: no file to replay it from, said once.
     let taints: Vec<u64> = verdict.taints.iter().map(|(t, _)| *t).collect();
     assert_eq!(taints, [0], "{:?}", verdict.taints);

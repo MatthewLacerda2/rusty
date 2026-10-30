@@ -2,14 +2,16 @@
 //! anything to say (#1581).
 //!
 //! ```text
-//! {"scene":"assets/scenes/main.scene","engine_commit":"8f6ad5f…","seed":…,"settings":{…},"storage":{…},"size":[1280,720]}
+//! {"scene":"assets/scenes/main.scene","engine_commit":"8f6ad5f…","seed":…,"settings":{…},"storage":{…},"size":[1280,720],"time_scale":1.0,"before_play":[…]}
 //! {"t":0,"input":{"held":["W"]},"host":[{"eval":"Time.SetScale(0.5)"}]}
+//! {"t":1,"dt":0.0172}
 //! {"t":119,"digest":"9b1c…"}
 //! {"t":240,"input":{"mouse_delta":[1.0,-2.0]},"size":[1920,1080]}
-//! {"end":7200}
+//! {"end":7200,"digest":"41d0…"}
 //! ```
 //!
-//! A tick no line names had the input of the tick before and no host act. No
+//! A tick no line names had the input and `dt` of the tick before and no host
+//! act; the first tick's `dt` is measured from the fixed step. No
 //! format version (CLAUDE.md, *No backward compatibility*): the header's engine
 //! commit is what a replay checks, and it warns when it differs. A float is
 //! written as a JSON number when that number reads back to the same bits, and as
@@ -84,14 +86,23 @@ pub struct Header {
     pub storage: Value,
     /// The Game view's pixel size when Play started, if a platform had set one.
     pub size: Option<(u32, u32)>,
+    /// `Time.timeScale` as edit mode left it: entering Play keeps it.
+    pub time_scale: Exact,
+    /// Host acts made before the tick that entered Play, run before entering it
+    /// (a scenario's set-up, a taint on how Play started), as [`Entry::host`].
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub before_play: Vec<Value>,
 }
 
 /// One tick that had something to say.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Entry {
-    /// The tick, counted from the one that entered Play (`0`).
+    /// The tick, counted from the first after Play was entered (`0`).
     pub t: u64,
+    /// The tick's `dt` (an `f32`, widened), when it differs from the tick before.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dt: Option<Exact>,
     #[serde(skip_serializing_if = "InputDelta::is_empty")]
     pub input: InputDelta,
     /// Host acts made before this tick, in order ([`host_json`]).
@@ -109,15 +120,22 @@ impl Entry {
     /// Whether the tick has nothing to write.
     pub fn is_empty(&self) -> bool {
         self.input.is_empty()
+            && self.dt.is_none()
             && self.host.is_empty()
             && self.size.is_none()
             && self.digest.is_none()
     }
 }
 
-/// The last line: how many ticks the demo holds.
-pub fn end_line(ticks: u64) -> Value {
-    json!({ "end": ticks })
+/// The last line, written on Stop: how many ticks the demo holds, the host acts
+/// made after the last of them, and the state digest Play ended on.
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct End {
+    pub end: u64,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub host: Vec<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub digest: Option<String>,
 }
 
 /// A host act as a JSON value: `{"eval": line}`, `{"call": name, "args": […]}` or

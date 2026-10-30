@@ -47,3 +47,23 @@ fn an_act_a_demo_cannot_carry_taints_it_from_its_tick() {
         "{what}"
     );
 }
+
+#[test]
+fn a_harness_verb_that_changes_the_world_replays() {
+    let dir = crate::temp::dir().join("demo_harness_verb");
+    let code = r#"
+        local spawned = Harness.LoadStress({ enemies = 2, lights = 1, decals = 0, particle_systems = 0 })
+        Harness.Expect(spawned.enemies == 2, "spawned")
+        Harness.Step(130)
+    "#;
+    let demo = Demo::read(&record(&dir, code)).unwrap();
+    let before_play = serde_json::to_string(&demo.header.before_play).unwrap();
+    assert!(before_play.contains("Harness.LoadStress"), "{before_play}");
+    let verdict = replay(&dir, demo, |_| {});
+    assert_eq!(
+        (verdict.diverged, verdict.checked),
+        (None, 2),
+        "{:?}",
+        verdict.taints
+    );
+}

@@ -77,24 +77,38 @@ replay went: `demo: replayed N of M ticks`, and an expectation `the demo replays
 bit for bit` that fails at the first digest that differs.
 
 What a demo holds (`dev::demo`, the format in `dev/demo/format.rs`): the scene,
-the engine commit, the seed, the project settings and the save data (`Storage`,
-the player's options with it) Play started from, the Game view size at each
-change, and per tick the input the tick published (`InputFrame`), as a delta from
-the tick before. Everything else that reaches a playing world is recorded as a
-**host act** before its tick: a console, MCP or command-channel line (the one
-evaluator, `ScriptManager::eval`) and a scenario's API calls with their
-plain-data arguments. An act it cannot carry **taints** the demo from that tick:
-an edit made by hand in the editor (the Inspector, the hierarchy, a gizmo), a
-call passing or returning a function or a handle (`Scene.GetScript`'s calls are
-not recorded), Play started on unsaved scene edits. The replay warns from there
-on. Script and asset changes on disk wait for Stop (the editor's watch holds
-them through Play), so they never reach a Play session.
+the engine commit, the seed, the project settings, the save data (`Storage`, the
+player's options with it) and `Time.timeScale` Play started from, read right
+before Play is entered (whether by a tick, a paused frame or `Editor.EnterPlay`),
+the Game view size at each change, and per tick the input the tick published
+(`InputFrame`), as a delta from the tick before, and the tick's `dt`: the editor
+and the dev player tick on wall-clock time, and the replay runs each tick on the
+`dt` it was recorded with. Everything else that reaches a playing world is
+recorded as a **host act** before its tick: a console, MCP or command-channel
+line (the one evaluator, `ScriptManager::eval`), a scenario's API calls with their
+plain-data arguments, and the `Harness` verbs that change the world without a
+tick (`Harness.AttachPlayerBot`, `Harness.LoadStress`). Acts made before Play is
+entered (a scenario's set-up) replay before entering it, acts made after it
+after. An act it cannot carry **taints** the demo from that tick: an edit made
+by hand in the editor during Play (the Inspector, the hierarchy, a gizmo), a call
+passing or returning a function or a handle (`Scene.GetScript`'s calls are not
+recorded), Play started on unsaved scene edits. The replay warns from there on.
+Script and asset changes on disk wait for Stop (the editor's watch holds them
+through Play), so they never reach a Play session. `play --size` is refused with
+`--demo`: the replay plays at the Game view size the demo recorded, which the sim
+lays the UI out on.
 
-**Bit for bit is checked, not promised.** Every 120 ticks the demo stores a
-digest of the world (the snapshot an agent reads, plus where `Random` stands);
-the replay compares each and reports the first that differs, with the last tick
-that still matched. A demo recorded on another engine commit warns and replays
-anyway. An hour of steady mouse-look writes about 10 MB; idle ticks write nothing.
+**Bit for bit is checked, not promised.** Every 120 ticks, and once right before
+Stop (or when a `play` run ends), the demo stores a digest of the world: every
+entity's id, name, active flag and transform, every rigidbody's velocities, the
+play frame, `Time.time` and where `Random` stands, hashed straight from the
+world. Script state (a Lua table's fields) is not in it: a script that diverges
+shows once it moves something. The replay compares each digest and reports the
+first that differs, with the last tick that still matched; a demo shorter than
+120 ticks is still checked by its end digest. A demo recorded on another engine
+commit warns and replays anyway. A replay streams the file from disk, so an hour
+of play costs no memory; an hour of steady mouse-look writes about 10 MB, and idle
+ticks write nothing.
 
 ## Rules
 - Test and fixture files are capped at **150 lines** by the size gate

@@ -132,6 +132,7 @@ impl GameWorld {
         self.tap(TapPoint::BeforeTick); // a demo's tap (#1581)
         let transition = self.transition_tapped();
         self.tap(TapPoint::BeforeInput);
+        let dt = self.tap_dt(dt);
         // Publish input written since the last tick as this tick's edges (#416).
         self.resources.input.borrow_mut().begin_tick();
         // `advance` records raw `dt` (unscaled) and the scaled `delta_time`.

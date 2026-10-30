@@ -1,12 +1,15 @@
-//! The state digest a demo stores every [`EVERY`] ticks, and a replay compares
-//! (#1581): what makes "bit for bit" a check, not a promise.
+//! The state digest a demo stores every [`EVERY`] ticks and when Play ends, and a
+//! replay compares (#1581): what makes "bit for bit" a check, not a promise.
 //!
-//! It hashes the world snapshot an agent reads (`dev::snapshot`: every entity in
-//! the authoring-rich shape, the camera, the frame) and where the `Random` stream
-//! stands, so a draw the world shows nothing of yet still counts.
+//! It hashes the fields straight from the world, never a serialized snapshot, so
+//! a Dust2-sized scene does not hitch every two seconds of a playtest: every
+//! entity's id, name, own active flag and transform, every rigidbody's linear and
+//! angular velocity, the play frame, `Time.time`, and where the `Random` stream
+//! stands, so a draw the world shows nothing of yet still counts. It does **not**
+//! cover script state (a Lua table's fields): a script that diverges shows up
+//! once it moves something.
 
 use crate::app::GameWorld;
-use crate::core::hash::fnv1a64;
 
 /// Ticks between two digests: two seconds at 60 Hz.
 pub const EVERY: u64 = 120;
@@ -16,11 +19,61 @@ pub fn due(t: u64) -> bool {
     (t + 1).is_multiple_of(EVERY)
 }
 
+/// FNV-1a, 64-bit, fed field by field (the same function as `core::hash`).
+struct Fnv(u64);
+
+impl Fnv {
+    fn bytes(&mut self, bytes: &[u8]) {
+        for b in bytes {
+            self.0 = (self.0 ^ u64::from(*b)).wrapping_mul(0x0000_0100_0000_01b3);
+        }
+    }
+
+    fn u64(&mut self, x: u64) {
+        self.bytes(&x.to_le_bytes());
+    }
+
+    fn floats(&mut self, xs: &[f32]) {
+        for x in xs {
+            self.bytes(&x.to_bits().to_le_bytes());
+        }
+    }
+}
+
 /// The world's state as one hex string.
 pub fn of(world: &GameWorld) -> String {
-    let snapshot = crate::dev::snapshot::snapshot(world);
-    let mut bytes = serde_json::to_vec(&snapshot).unwrap_or_default();
-    let random = world.script_manager().random_state();
-    bytes.extend_from_slice(&random.to_le_bytes());
-    format!("{:016x}", fnv1a64(&bytes))
+    let mut h = Fnv(0xcbf2_9ce4_8422_2325);
+    let scene = world.scene().borrow();
+    let ecs = &scene.world;
+    for &id in ecs.ids() {
+        h.u64(u64::from(id));
+        if let Some(name) = ecs.name(id) {
+            h.bytes(name.as_bytes());
+        }
+        // lint: allow(active-self) the digest keeps the flag itself, as a save would
+        h.bytes(&[u8::from(ecs.is_active_self(id))]);
+        if let Some(t) = ecs.transform(id) {
+            h.floats(&t.position.to_array());
+            h.floats(&t.rotation.to_array());
+            h.floats(&t.scale.to_array());
+        }
+        if let Some(body) = ecs.rigidbody(id) {
+            h.floats(&body.velocity.to_array());
+            h.floats(&body.angular_velocity.to_array());
+        }
+    }
+    h.u64(world.play_frame());
+    h.u64(world.resources.time.borrow().time.to_bits());
+    h.u64(world.script_manager().random_state());
+    format!("{:016x}", h.0)
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn the_streamed_hash_is_fnv1a() {
+        let mut h = super::Fnv(0xcbf2_9ce4_8422_2325);
+        h.bytes(b"a");
+        assert_eq!(h.0, crate::core::hash::fnv1a64(b"a"));
+    }
 }

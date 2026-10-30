@@ -140,9 +140,8 @@ impl EditorFrontend {
             &mut game.script_manager().graphics_cell().borrow_mut().options,
             &mut game.resources.console.borrow_mut(),
         );
-        if self.editor_ui.is_dirty {
+        if paint::take_edits(&mut self.editor_ui, game) {
             shell.renderer.shadow_renderer.invalidate_static_cache();
-            self.editor_ui.is_dirty = false;
         }
         self.sync_quality(shell, game);
         self.sync_speaker_mode(game);
@@ -260,16 +259,7 @@ impl Frontend for EditorFrontend {
 
         self.editor_ui.preview_texture_id = self.preview_texture_id;
         sync_ui_textures(&mut self.editor_ui, game);
-        let was_dirty = self.editor_ui.is_dirty;
         let interaction = self.draw_dashboard(shell, game);
-        if self.editor_ui.is_dirty && !was_dirty && game.scene().borrow().is_playing() {
-            // An edit by hand is no API call a demo can replay (#1581).
-            let what = "an editor edit (the Inspector, the hierarchy, a gizmo)".to_string();
-            let journal = game.script_manager().journal();
-            journal
-                .borrow_mut()
-                .push(crate::scripting::HostCall::Taint(what));
-        }
         paint::drain_repl(&mut self.editor_ui, game);
 
         // Render the scene into the viewport target now (after the panel rect is

@@ -18,10 +18,13 @@ use super::game::{GameWorld, PlayTransition};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TapPoint {
     /// The top of `tick`, before its play transition: where a host's acts since
-    /// the last tick are drained or replayed.
+    /// the last tick are drained.
     BeforeTick,
+    /// Play is about to be entered or left, by a tick or by a paused frame's poll:
+    /// the world is still as the last tick (or edit mode) left it.
+    Before(PlayTransition),
     /// After the transition, right before input is published: where the tick's
-    /// `InputFrame` is read or written.
+    /// host acts are replayed and its `InputFrame` is read or written.
     BeforeInput,
     /// The tick is done.
     AfterTick,
@@ -33,6 +36,12 @@ pub enum TapPoint {
 pub trait TickTap: Any {
     /// The world reached `point`. The tap is out of the world for the call.
     fn at(&mut self, point: TapPoint, world: &mut GameWorld);
+
+    /// The tick's `dt`, right after [`TapPoint::BeforeInput`]: a recorder notes
+    /// it, a replay hands back the recorded one.
+    fn dt(&mut self, dt: f32) -> f32 {
+        dt
+    }
 }
 
 impl GameWorld {
@@ -61,8 +70,22 @@ impl GameWorld {
         }
     }
 
-    /// The play transition, with the tap told when one happened.
+    /// The tick's `dt`, as the tap has it.
+    pub(super) fn tap_dt(&mut self, dt: f32) -> f32 {
+        self.resources.tap.as_mut().map_or(dt, |tap| tap.dt(dt))
+    }
+
+    /// The play transition, with the tap told before and after one happens.
     pub(super) fn transition_tapped(&mut self) -> PlayTransition {
+        let heading = self.resources.application.borrow().play_heading();
+        if heading != self.world.scene.borrow().is_playing() {
+            let next = if heading {
+                PlayTransition::Entered
+            } else {
+                PlayTransition::Exited
+            };
+            self.tap(TapPoint::Before(next));
+        }
         let transition = self.handle_transition();
         if transition != PlayTransition::None {
             self.tap(TapPoint::Transition(transition));

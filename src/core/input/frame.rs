@@ -29,8 +29,8 @@ pub struct InputFrame {
     pub axes: Vec<(String, f32)>,
     pub mouse_position: (f64, f64),
     pub pads: [bool; MAX_PADS],
-    /// The clipboard text the tick will read.
-    pub clipboard: String,
+    /// The clipboard text captured since the last tick, if any.
+    pub clipboard: Option<String>,
 }
 
 fn sorted(set: &crate::core::collections::Set<String>) -> Vec<String> {
@@ -59,7 +59,7 @@ impl InputState {
             axes,
             mouse_position: self.mouse_position,
             pads: std::array::from_fn(|pad| self.pads.is_connected(pad)),
-            clipboard: self.clipboard.pending().to_string(),
+            clipboard: self.clipboard.pending().map(str::to_string),
         }
     }
 
@@ -79,7 +79,7 @@ impl InputState {
         for (pad, connected) in frame.pads.iter().enumerate() {
             self.pads.set_connected(pad, *connected);
         }
-        self.clipboard.capture(frame.clipboard.clone());
+        self.clipboard.set_pending(frame.clipboard.clone());
     }
 }
 
