@@ -14,6 +14,7 @@
     "filter_mode": "Trilinear",
     "generate_mipmaps": true,
     "texture_type": "Default",
+    "srgb": true,
     "compression": "Normal",
     "max_size": 2048
   }
