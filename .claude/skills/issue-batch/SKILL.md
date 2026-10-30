@@ -133,6 +133,9 @@ So, before writing a brief:
   "fix the doc, or walk every node" was met by reordering bakes and losing #1485's
   freeing;
 - when a decision removes data or a capability, grep its consumers;
+- a brief for work that records, replays or digests the sim names every input
+  the sim reads, the frame's `dt` included: #1581's first brief said "what
+  `begin_tick` publishes" and left out the wall-clock `dt` the editor ticks with;
 - verify any claim about a platform or a tool in one command.
 - write "Builds on PR #N merged" only after `gh pr view N --json state` says
   `MERGED`: a coder that finds the groundwork missing stands down (2026-10-24, #1387);
