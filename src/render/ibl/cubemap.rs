@@ -13,11 +13,8 @@
 //! The CPU-side parse ([`parse_ktx2_cubemap_mips`]) is split out as a pure function over
 //! bytes so it is unit-testable without a GPU or a file on disk.
 
-use std::rc::Rc;
-
 use ktx2::Format;
 
-use super::reflection_probes::ProbeArray;
 use crate::render::Renderer;
 
 /// A decoded LDR cubemap WITH its roughness mip chain (#245). `mips[0]` is the base level
@@ -60,6 +57,47 @@ pub fn parse_ktx2_cubemap_mips(bytes: &[u8]) -> Option<CubemapMips> {
     Some(CubemapMips { size, mips })
 }
 
+/// A cube file's base face size and mip count, as its KTX2 header states them.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct CubeShape {
+    pub size: u32,
+    pub mips: u32,
+}
+
+/// The shape of the cube at `path`, read from its KTX2 header alone (#1584): the
+/// probe array budgets a cube before it decides to load it, so a cube it passes over
+/// costs 48 bytes of disk, not a decode. `None` when the file is missing or its
+/// header is not one [`parse_ktx2_cubemap_mips`] would accept.
+pub(crate) fn read_cube_shape(path: &str) -> Option<CubeShape> {
+    use std::io::Read;
+    let mut header = [0u8; 48];
+    std::fs::File::open(path)
+        .ok()?
+        .read_exact(&mut header)
+        .ok()?;
+    cube_shape(&header)
+}
+
+/// [`read_cube_shape`] over a header's first 48 bytes; pure, for tests.
+pub(crate) fn cube_shape(header: &[u8; 48]) -> Option<CubeShape> {
+    const MAGIC: [u8; 12] = [
+        0xAB, 0x4B, 0x54, 0x58, 0x20, 0x32, 0x30, 0xBB, 0x0D, 0x0A, 0x1A, 0x0A,
+    ];
+    let word = |at: usize| u32::from_le_bytes(header[at..at + 4].try_into().unwrap());
+    let format = Format::new(word(12));
+    let (size, layers, faces) = (word(20), word(32), word(36));
+    let usable = header[..12] == MAGIC
+        && format.is_some_and(is_rgba8)
+        && size > 0
+        && word(24) == size
+        && layers <= 1
+        && faces == 6;
+    usable.then(|| CubeShape {
+        size,
+        mips: word(40).max(1),
+    })
+}
+
 /// True for the LDR RGBA8 formats a reflection bake emits (UNORM or SRGB).
 fn is_rgba8(format: Format) -> bool {
     matches!(format, Format::R8G8B8A8_UNORM | Format::R8G8B8A8_SRGB)
@@ -88,28 +126,6 @@ impl Renderer {
         let bytes = std::fs::read(path).ok()?;
         let data = parse_ktx2_cubemap_mips(&bytes).filter(|data| accept(data.size))?;
         Some(self.upload_cubemap_mips(path, &data))
-    }
-
-    /// A reflection probe's cube, through a by-path content cache (#355): only a cube
-    /// the probe array [admits](ProbeArray::admits) is uploaded, so everything the
-    /// cache holds fits the array, whoever asks (#1245). A cube that doesn't fit warns
-    /// and is cached as absent, so it warns once per load of its path.
-    ///
-    /// Which cube is *bound* is per-scene state: two scenes with different reflection
-    /// probes rendering in one frame legitimately swap it every frame. Uncached, each
-    /// swap re-read the KTX2 from disk and re-uploaded every mip — a full disk load
-    /// per frame, per flip. The failure is cached too, so an unreadable path is not
-    /// retried on every flip either. A path the engine (re)writes, such as a
-    /// reflection bake, is dropped from the cache by `refresh_textures` (#1207).
-    pub(crate) fn cached_cubemap(&mut self, path: &str) -> Option<Rc<CubemapTexture>> {
-        if let Some(hit) = self.cubemaps.get(path) {
-            return hit.clone();
-        }
-        let loaded = self
-            .load_cubemap_mips(path, |size| ProbeArray::admits(path, size))
-            .map(Rc::new);
-        self.cubemaps.insert(path.to_string(), loaded.clone());
-        loaded
     }
 
     /// Upload a decoded mipped cubemap into a mipped 6-layer cube texture with a cube view
@@ -171,3 +187,7 @@ impl Renderer {
 #[cfg(test)]
 #[path = "cubemap_tests.rs"]
 mod cubemap_tests;
+
+#[cfg(test)]
+#[path = "cube_shape_tests.rs"]
+mod cube_shape_tests;

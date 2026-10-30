@@ -5,7 +5,7 @@
 #define_import_path forward::lighting
 
 #import common::{DecalSurface, PI, apply_decal}
-#import lighting::reflection_probe::parallax_correct
+#import lighting::reflection_probe::{ReflectionProbe, parallax_correct}
 #import forward::bindings::{camera, cluster_lights, cluster_ranges, decals, instances, lighting, s_decal, s_refl_cube, s_shadow, s_skybox, shadow, t_ao, t_decal_color, t_decal_data, t_refl_cube, t_shadow, t_skybox}
 
 // Fold the decals binned into `cluster` into `s`, oldest first (FIFO, #638): each
@@ -229,21 +229,45 @@ fn eval_sh(N: vec3<f32>, instance: u32) -> vec3<f32> {
     return max(out, vec3<f32>(0.0));
 }
 
-// The environment a surface reflects along the mirror direction `R` (#244, #718). With
-// a reflection probe (`probe` is its resident index plus one, picked per object,
-// #1206), the direction is parallax-corrected against that probe's box and its baked,
-// prefiltered cube is sampled (roughness selects the mip within its chain, #245).
-// Without one, the sky's cube (#1553), prefiltered the same way, so a rough metal
-// reflects a blurred sky: the panorama, or the procedural sky's terms tinted with the
-// ambient colour the sky pass draws it with (#256).
-fn environment_reflection(world_pos: vec3<f32>, raw_r: vec3<f32>, roughness: f32, probe: u32) -> vec3<f32> {
+// The environment a surface reflects along the mirror direction `R` (#244, #718). An
+// object blends up to two reflection probes (#1584, Unity's Blend Probes, picked per
+// object on the CPU): `blend` packs each one's resident index plus one and weight
+// (`render::ibl::reflection_probes::pack_blend`), and the sky takes what they leave.
+// A probe's direction is parallax-corrected against its box when its box projection
+// is on, and its baked, prefiltered cube is sampled (roughness selects the mip within
+// its chain, #245), scaled by its intensity. The sky is its cube (#1553), prefiltered
+// the same way, so a rough metal reflects a blurred sky: the panorama, or the
+// procedural sky's terms tinted with the ambient colour the sky pass draws it with
+// (#256). Every sample has an explicit level, so the per-instance branches are safe.
+fn environment_reflection(world_pos: vec3<f32>, raw_r: vec3<f32>, roughness: f32, blend: u32) -> vec3<f32> {
     let R = normalize(raw_r);
-    if (probe > 0u) {
-        let p = lighting.refl_probes[probe - 1u];
-        let corrected = parallax_correct(p, world_pos, R);
-        let lod = p.mip_base + roughness * (p.mip_count - 1.0);
-        return textureSampleLevel(t_refl_cube, s_refl_cube, corrected, p.layer, lod).rgb;
+    let first = blend & 63u;
+    let second = (blend >> 6u) & 63u;
+    let first_weight = f32((blend >> 12u) & 1023u) / 1023.0;
+    let second_weight = f32((blend >> 22u) & 1023u) / 1023.0;
+    var out = vec3<f32>(0.0);
+    if (first > 0u) {
+        out += probe_reflection(lighting.refl_probes[first - 1u], world_pos, R, roughness) * first_weight;
     }
+    if (second > 0u) {
+        out += probe_reflection(lighting.refl_probes[second - 1u], world_pos, R, roughness) * second_weight;
+    }
+    let sky_weight = select(1.0, max(1.0 - first_weight - second_weight, 0.0), first > 0u);
+    if (sky_weight > 0.002) {
+        out += sky_reflection(R, roughness) * sky_weight;
+    }
+    return out;
+}
+
+// One resident probe's reflection along `R`.
+fn probe_reflection(p: ReflectionProbe, world_pos: vec3<f32>, R: vec3<f32>, roughness: f32) -> vec3<f32> {
+    let dir = select(R, parallax_correct(p, world_pos, R), p.params.y > 0.5);
+    let lod = p.mip_base + roughness * (p.mip_count - 1.0);
+    return textureSampleLevel(t_refl_cube, s_refl_cube, dir, p.layer, lod).rgb * p.params.x;
+}
+
+// The sky's reflection along `R`.
+fn sky_reflection(R: vec3<f32>, roughness: f32) -> vec3<f32> {
     let lod = roughness * f32(textureNumLevels(t_skybox) - 1u);
     let sky = textureSampleLevel(t_skybox, s_skybox, R, lod);
     if (lighting.sky_textured > 0.5) {

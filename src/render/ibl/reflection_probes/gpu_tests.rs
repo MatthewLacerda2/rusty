@@ -30,6 +30,12 @@ pub(super) fn probes_at(probes: &[(f32, &str)]) -> Scene {
     scene
 }
 
+/// The resident index of the first probe a packed blend names (`pack_blend`).
+pub(super) fn first(packed: u32) -> usize {
+    assert_ne!(packed & 63, 0, "a probe is named");
+    (packed & 63) as usize - 1
+}
+
 pub(super) fn renderer() -> Option<Renderer> {
     crate::render::test_gpu::headless_or_skip(4, 4)
 }
@@ -58,7 +64,11 @@ fn gpu_a_probe_less_scene_keeps_the_resident_cubes() {
     );
     renderer.update_reflection_probes(&viewport, Vec3::ZERO);
     assert_eq!(renderer.reflection_probes.copies, 2, "nothing copied again");
-    assert_eq!(renderer.reflection_probes.face(), 128, "the bake's face");
+    assert_eq!(
+        renderer.reflection_probes.face(),
+        4,
+        "the largest cube's face"
+    );
     assert!(
         !renderer.global_bind_group_dirty,
         "the array was not rebuilt"
@@ -79,15 +89,15 @@ fn gpu_probes_sharing_a_cube_keep_their_own_boxes() {
     let left = probes.probe_for(Vec3::new(-2.0, 0.0, 0.0));
     let right = probes.probe_for(Vec3::new(2.0, 0.0, 0.0));
     assert!(left != 0 && right != 0 && left != right, "{left} {right}");
-    let [l, r] = [left, right].map(|p| probes.uniforms()[p as usize - 1]);
+    let [l, r] = [left, right].map(|p| probes.uniforms()[first(p)]);
     assert_eq!(l.layer, r.layer);
     assert_eq!(l.center, [-2.0, 0.0, 0.0]);
     assert_eq!(r.center, [2.0, 0.0, 0.0]);
     assert_eq!(r.box_min, [1.0, -1.0, -1.0]);
 }
 
-/// A cube that is not the array's face halved a whole number of times is left out:
-/// its probe takes no layer and its objects reflect the sky.
+/// A cube whose size is not a power of two is left out: its probe takes no layer and
+/// its objects reflect the sky.
 #[test]
 fn gpu_a_cube_of_another_size_is_left_out() {
     let Some(mut renderer) = renderer() else {
@@ -100,4 +110,23 @@ fn gpu_a_cube_of_another_size_is_left_out() {
     let probes = &renderer.reflection_probes;
     assert_ne!(probes.probe_for(Vec3::new(-2.0, 0.0, 0.0)), 0);
     assert_eq!(probes.probe_for(Vec3::new(2.0, 0.0, 0.0)), 0);
+}
+
+/// The array's face follows the largest resident cube (#1584); a smaller one rides
+/// in its lower mips.
+#[test]
+fn gpu_the_face_follows_the_largest_cube() {
+    let Some(mut renderer) = renderer() else {
+        return;
+    };
+    let (small, large) = (
+        cube_file("face_4.ktx2", 4, 10),
+        cube_file("face_16.ktx2", 16, 10),
+    );
+    let scene = probes_at(&[(-2.0, &small), (2.0, &large)]);
+    renderer.update_reflection_probes(&scene, Vec3::ZERO);
+    let probes = &renderer.reflection_probes;
+    assert_eq!(probes.face(), 16);
+    let small_probe = probes.uniforms()[first(probes.probe_for(Vec3::new(-2.0, 0.0, 0.0)))];
+    assert_eq!(small_probe.mip_base, 2.0, "16 halved twice");
 }

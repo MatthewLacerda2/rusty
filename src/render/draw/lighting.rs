@@ -99,7 +99,7 @@ impl crate::render::Renderer {
         );
         self.clusters.stage(crate::render::clusters::local_lights(
             scene,
-            self.static_capture,
+            self.capture.static_only,
         ));
         self.begin_counters(scene);
     }
@@ -110,7 +110,7 @@ impl crate::render::Renderer {
     /// sky pass draws.
     fn build_lighting_uniform(&self, scene: &Scene) -> LightingUniform {
         let mut lighting_uniform = default_lighting_uniform(scene);
-        apply_scene_lights(&mut lighting_uniform, scene, self.static_capture);
+        apply_scene_lights(&mut lighting_uniform, scene, self.capture.static_only);
         lighting_uniform.refl_probes = *self.reflection_probes.uniforms();
         if self.skybox_texture.is_some() {
             lighting_uniform.sky_textured = 1.0;

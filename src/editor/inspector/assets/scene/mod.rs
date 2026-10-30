@@ -13,6 +13,8 @@ mod bake {
     }
 }
 
+mod reflections;
+
 use crate::editor::EditorUi;
 use crate::navigation::{NavBounds, NavigationGraph};
 use crate::scene::Scene;
@@ -44,6 +46,7 @@ pub fn draw(
 
     draw_scene_operations(ui, editor, scene, console, path);
     draw_navmesh(ui, scene, nav);
+    reflections::draw(ui, editor, scene);
     bake::draw(ui, editor, scene, console, path);
 }
 

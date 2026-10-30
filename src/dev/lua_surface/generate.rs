@@ -1,12 +1,14 @@
 //! `Lighting.Generate()` and the scene's lighting settings (#832): the one verb
 //! behind the editor's Generate Lighting button, and `Lighting.GetSettings()` /
-//! `SetSettings{…}`, the knobs the button's card edits.
+//! `SetSettings{…}`, the knobs the button's card edits (the lightmap bake's, and the
+//! reflection probes' default resolution, memory budget and probe ceiling, #1584).
 
 use mlua::{Lua, Table};
 
 use super::super::bake::generate_lighting::generate_lighting;
 use crate::api::{global_table, put, ApiScopedCtx, Reg};
 use crate::scene::lighting::lightmap::BakeSettings;
+use crate::scene::lighting::settings::ReflectionSettings;
 
 /// The knobs a script may override, each optional; `None` keeps `base`'s.
 #[derive(Default)]
@@ -73,13 +75,15 @@ pub(super) fn register<'scope>(
         &table,
         "GetSettings",
         scope.create_function(move |lua, ()| {
-            let s = scene.borrow().lighting_settings.lightmaps;
+            let settings = scene.borrow().lighting_settings;
+            let (s, r) = (settings.lightmaps, settings.reflections);
             let out = lua.create_table()?;
             out.set("texelsPerUnit", s.texels_per_unit)?;
             out.set("samples", s.samples)?;
             out.set("bounces", s.bounces)?;
             out.set("seed", s.seed)?;
             out.set("directional", s.directional)?;
+            put_reflections(&out, &r)?;
             Ok(out)
         }),
     )?;
@@ -91,9 +95,26 @@ pub(super) fn register<'scope>(
             let mut scene = scene.borrow_mut();
             let s = &mut scene.lighting_settings.lightmaps;
             *s = overrides.apply(*s);
-            Ok(())
+            set_reflections(&t, &mut scene.lighting_settings.reflections)
         }),
     )
+}
+
+/// The reflection probes' defaults, as `GetSettings` returns them (#1584).
+fn put_reflections(out: &Table, r: &ReflectionSettings) -> mlua::Result<()> {
+    out.set("reflectionResolution", r.resolution)?;
+    out.set("reflectionBudgetMB", r.budget_mb)?;
+    out.set("reflectionMaxProbes", r.max_probes)
+}
+
+/// The reflection defaults `t` names written into `r`, then clamped.
+fn set_reflections(t: &Table, r: &mut ReflectionSettings) -> mlua::Result<()> {
+    let get = |key: &str| t.get::<Option<u32>>(key);
+    r.resolution = get("reflectionResolution")?.unwrap_or(r.resolution);
+    r.budget_mb = get("reflectionBudgetMB")?.unwrap_or(r.budget_mb);
+    r.max_probes = get("reflectionMaxProbes")?.unwrap_or(r.max_probes);
+    r.clamp();
+    Ok(())
 }
 
 #[cfg(test)]

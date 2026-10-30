@@ -62,9 +62,8 @@ impl Renderer {
         let stale = Stale::new(paths.to_vec());
         let is_stale =
             |key: &str| texture_ref::is_written(&stale, key) || settings_written(&stale, key);
-        // A cubemap loaded from a re-written file (#1207). Its probe-array slot
-        // goes too, so the next frame copies the new cube in (#1206).
-        self.cubemaps.retain(|key, _| !is_stale(key));
+        // A probe cube re-written (#1207): its probe-array slot and what the array
+        // knew of its shape go, so the next frame reads and copies it again (#1206).
         self.reflection_probes.forget(is_stale);
         // A mesh emitter's re-imported model (#1219).
         self.forget_particle_meshes(&stale);

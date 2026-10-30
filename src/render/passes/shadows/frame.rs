@@ -30,11 +30,13 @@ impl Renderer {
         let fitted = cascades::fit(
             camera,
             aspect,
-            sun_direction(scene, self.static_capture),
+            sun_direction(scene, self.capture.static_only),
             settings,
             ShadowRenderer::CASCADE_SIZE,
         );
-        let uniform = CascadeUniform::new(&fitted, camera.position, camera.forward());
+        // A probe captured without shadows (#1584) samples no cascade.
+        let sampled: &[_] = if self.capture.shadows { &fitted } else { &[] };
+        let uniform = CascadeUniform::new(sampled, camera.position, camera.forward());
         self.queue
             .write_buffer(&self.shadow_uniform_buffer, 0, bytemuck::bytes_of(&uniform));
         self.shadow_renderer.instancing = self.instancing;
@@ -60,8 +62,11 @@ impl Renderer {
             timer: &self.gpu_timer,
             statics: statics_key(scene),
         };
-        self.shadow_renderer
-            .render_cascades(&mut encoder, &frame, lod);
+        if self.capture.shadows {
+            // a probe captured without shadows samples no cascade, so draws none
+            self.shadow_renderer
+                .render_cascades(&mut encoder, &frame, lod);
+        }
         let bake = self.shadow_renderer.render_atlas(&mut encoder, &frame, lod);
         self.queue.submit(std::iter::once(encoder.finish()));
         self.frame_counters.shadow_atlas_cached = bake.cached;
@@ -76,7 +81,10 @@ impl Renderer {
     fn plan_shadow_atlas(&mut self, camera: &Camera, aspect: f32) {
         let view_proj = camera.build_view_projection(aspect);
         let grid = ClusterGrid::new(camera, aspect);
-        let requests = clusters::shadow_requests(&grid, &self.clusters.staged());
+        let mut requests = clusters::shadow_requests(&grid, &self.clusters.staged());
+        if !self.capture.shadows {
+            requests.clear(); // a probe captured without shadows plans no tile
+        }
         let plan = atlas::plan(&requests, view_proj, camera.position);
         for &(light, first_tile) in &plan.shadows {
             self.clusters.set_shadow(light, first_tile);

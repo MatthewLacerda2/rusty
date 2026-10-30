@@ -1,8 +1,8 @@
 //! Reflection probes (#244): data model + parallax-corrected runtime sampling.
 //!
 //! Headless + deterministic, no GPU. Asserts (1) the reflection-probe set — positions,
-//! parallax boxes, and cubemap PATHS — round-trips through the scene document, and
-//! (2) the nearest-probe selection + box-projected parallax math behaves: a surface
+//! parallax boxes, settings and cubemap PATHS — round-trips through the scene
+//! document, and (2) the probe blend + box-projected parallax math behaves: a surface
 //! inside a probe's box reflects that probe (tracking the room as the camera moves),
 //! and points outside every box fall back (no probe → skybox).
 
@@ -21,6 +21,9 @@ fn reflection_probe_set_round_trips() {
     scene
         .reflection_probes
         .set_box(i, Vec3::new(-4.0, -4.0, -4.0), Vec3::new(6.0, 6.0, 6.0));
+    scene.reflection_probes.edit(i, |p| {
+        (p.importance, p.resolution, p.shadows) = (4, Some(128), false);
+    });
     scene
         .reflection_probes
         .set_cubemap(i, "reflections/room.ktx2".to_string());
@@ -44,12 +47,17 @@ fn reflection_probe_set_round_trips() {
     assert_eq!(p.box_min, Vec3::new(-4.0, -4.0, -4.0));
     assert_eq!(p.box_max, Vec3::new(6.0, 6.0, 6.0));
     assert_eq!(p.cubemap_path, "reflections/room.ktx2");
+    assert_eq!(
+        (p.importance, p.resolution, p.shadows),
+        (4, Some(128), false)
+    );
 }
 
-/// The acceptance selection logic: of two boxes covering a point, the nearer probe
-/// wins; a point outside every box selects nothing (caller falls back to the skybox).
+/// The acceptance selection logic (#1584, Unity's *Blend Probes*): of two boxes
+/// covering a point, both share its reflection, the nearer capture point first; a
+/// point out of every probe's reach selects nothing (the caller reflects the skybox).
 #[test]
-fn nearest_containing_probe_is_selected() {
+fn covering_probes_blend_nearest_first() {
     let mut scene = Scene::new();
     scene
         .reflection_probes
@@ -58,11 +66,12 @@ fn nearest_containing_probe_is_selected() {
         .reflection_probes
         .add(Vec3::new(2.0, 0.0, 0.0), Vec3::splat(10.0)); // covers origin, near
 
-    let selected = scene.reflection_probes.select(Vec3::ZERO);
-    assert_eq!(selected.map(|(i, _)| i), Some(1));
+    let blend = scene.reflection_probes.blend(Vec3::ZERO).unwrap();
+    assert_eq!((blend.first, blend.second), (1, Some(0)));
+    assert_eq!(blend.first_weight + blend.second_weight, 1.0);
     assert!(scene
         .reflection_probes
-        .select(Vec3::new(100.0, 0.0, 0.0))
+        .blend(Vec3::new(100.0, 0.0, 0.0))
         .is_none());
 }
 

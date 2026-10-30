@@ -44,11 +44,12 @@ fn gpu_auto_places_both_sets_on_empty_scene() {
     let mut scene = room_scene();
     // A coarse grid and one reflection region: the claim is that both sets get
     // placed, which a few probes prove as well as the default grid (#985).
-    let coarse = LightingBakeParams {
+    let mut coarse = LightingBakeParams {
         probe_spacing: 10.0,
-        reflection_region: 20.0,
-        reflection_cap: 1,
+        ..Default::default()
     };
+    coarse.reflection.region = 40.0;
+    scene.lighting_settings.reflections.resolution = 16;
     let report = bake_lighting(&mut scene, Some(scene_path), None, coarse)
         .expect("placement + adapter-free bake never errors with a scene path");
 

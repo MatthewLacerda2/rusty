@@ -85,8 +85,9 @@ struct InstanceData {
     lightmap_page: u32,
     // 1 when the lightmap's direction page is bound (#810).
     lightmap_directional: u32,
-    // The resident reflection probe this instance reflects, plus one; 0 for none
-    // (the sky). Picked per object at its world-bounds centre (#1206).
+    // The resident reflection probes this instance blends (#1584): two indices plus
+    // one and their weights, packed by `pack_blend`; 0 for the sky alone. Picked per
+    // object at its world-bounds centre (#1206).
     reflection_probe: u32,
     lightmap_st: vec4<f32>,
     // Motion vectors (#1435): where last frame's joint palette starts in `bones`, and
@@ -115,7 +116,7 @@ var s_skybox: sampler;
 
 // The resident reflection probes' prefiltered cubemaps (#245), one per layer (#1206),
 // sampled with `textureSampleLevel` (roughness -> mip) at the layer a draw's
-// `reflection_probe` names. A draw with none samples the sky's cube instead.
+// `reflection_probe` names. What its probes leave samples the sky's cube instead.
 @group(0) @binding(4)
 var t_refl_cube: texture_cube_array<f32>;
 @group(0) @binding(5)
