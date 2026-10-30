@@ -118,7 +118,8 @@ var<uniform> shadow_light: ShadowLight;
 // One caster (#470): its world matrix, where its joint palette starts in `bones`
 // (#599; 0, the shared identity, for a mesh with no skin), and its cutout alpha test
 // (#648): the albedo map's alpha when `use_texture == 1` (a cutout's tint alpha is
-// always 1), clipped below `alpha_cutoff` (0 for a material that does not clip).
+// always 1), read where its material's `mapping` puts it (#1594), clipped below
+// `alpha_cutoff` (0 for a material that does not clip).
 // Mirrors `CasterData` (src/render/passes/shadows/casters/buffer.rs) byte-for-byte.
 struct Caster {
     model: mat4x4<f32>,
@@ -126,6 +127,8 @@ struct Caster {
     alpha_cutoff: f32,
     use_texture: u32,
     _pad0: u32,
+    // Its material's mapping (#1594); not named `mapping`, which is the module's.
+    terms: mapping::Mapping,
 };
 
 // Every caster, one per instance: a draw covers a run of casters sharing one mesh
@@ -134,7 +137,8 @@ struct Caster {
 var<storage, read> casters: array<Caster>;
 
 // A caster's vertex in the cascade's light space. Only what a clip reads is filled:
-// the UVs and world position; the normal and tangent stay zero.
+// the UVs, world position and normal (a triplanar clip weighs by it); the tangent
+// stays zero.
 @vertex
 fn vs_shadow(model: VertexInput, @builtin(instance_index) instance: u32) -> VertexOutput {
     let caster = casters[instance];
@@ -150,18 +154,20 @@ fn vs_shadow(model: VertexInput, @builtin(instance_index) instance: u32) -> Vert
     var out: VertexOutput;
     out.clip_position = shadow_light.light_space * vec4<f32>(moved.position, world.w);
     out.world_position = moved.position;
+    out.world_normal = moved.normal;
     out.tex_coords = model.tex_coords;
     out.instance = instance;
     return out;
 }
 
-// A cutout caster's shadow is clipped as its surface is (#648). The albedo is sampled
-// unconditionally: `use_texture` is per instance, so a branch on it is not uniform.
+// A cutout caster's shadow is clipped as its surface is (#648), at the texels its
+// material's Tiling/Offset and world mapping read (#1594). The albedo is sampled
+// unconditionally: `use_texture` and the mapping are per instance, so a branch on
+// either is not uniform (`mapping::sample_any`).
 fn shadow_clip(in: VertexOutput) {
     let caster = casters[in.instance];
-    let texel = textureSample(t_diffuse, s_diffuse, in.tex_coords).a;
-    let alpha = select(1.0, texel, caster.use_texture == 1u);
-    if (alpha < caster.alpha_cutoff) {
+    let texel = mapping::sample_any(t_diffuse, s_diffuse, caster.terms, in.tex_coords, in.world_position, normalize(in.world_normal)).a;
+    if (select(1.0, texel, caster.use_texture == 1u) < caster.alpha_cutoff) {
         discard;
     }
 }

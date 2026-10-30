@@ -16,15 +16,14 @@ mod casters;
 mod clips;
 mod frame;
 mod setup;
+mod statics;
 mod sweeps;
 mod uniform;
 
-use crate::components::ShadowCasting;
 use crate::render::gpu::pipelines::surface::SurfaceShaders;
 use crate::render::gpu::pipelines::winding::Facing;
 use crate::render::gpu::pipelines::LazyPipeline;
 use crate::render::CameraUniform;
-use crate::scene::{Scene, SceneId};
 use atlas::ShadowAtlas;
 use cascades::{Cascade, MAX_CASCADES};
 use casters::CasterBuffer;
@@ -32,6 +31,7 @@ use clips::Clip;
 use glam::Mat4;
 
 pub(crate) use setup::{depth_pipeline, lazy_depth_pipeline};
+pub(crate) use statics::{statics_key, StaticsKey};
 pub(crate) use uniform::CascadeUniform;
 
 /// Byte stride between the cascades' light-space matrices in the depth pass's uniform
@@ -86,40 +86,6 @@ pub struct ShadowRenderer {
     pub(crate) instancing: bool,
     /// The point and spot lights' shadow atlas (#468).
     pub(crate) atlas: ShadowAtlas,
-}
-
-/// Which scene's static casters a bake holds, at which of its
-/// [`World::static_revision`](crate::ecs::World::static_revision)s, and with which
-/// casting modes: a Static flag flipped, a static entity spawned or despawned, or a
-/// static mesh's `cast_shadows` changed (#1571) re-bakes them on the next frame
-/// whoever made the change — the inspector, a script in Play, a load (#1496).
-pub(crate) type StaticsKey = (SceneId, u64, u64);
-
-/// `scene`'s [`StaticsKey`] now.
-pub(crate) fn statics_key(scene: &Scene) -> StaticsKey {
-    (
-        scene.id(),
-        scene.world.static_revision(),
-        casting_key(scene),
-    )
-}
-
-/// A digest of every static mesh's `cast_shadows` that changes its shadow (`Off`,
-/// `TwoSided`), by entity, in scene order: it moves when one changes, which no
-/// revision tracks (#1571). `ShadowsOnly` casts exactly as `On`, so switching
-/// between them keeps the bake.
-fn casting_key(scene: &Scene) -> u64 {
-    let world = &scene.world;
-    let mut key = 0u64;
-    for id in world.ids_with_mesh() {
-        let mode = world.mesh(id).map_or(ShadowCasting::On, |m| m.cast_shadows);
-        let reshapes = !mode.casts() || mode == ShadowCasting::TwoSided;
-        if reshapes && world.is_static(id) {
-            let mixed = (u64::from(id) << 2) | mode as u64;
-            key = key.wrapping_mul(0x100_0000_01b3).wrapping_add(mixed + 1);
-        }
-    }
-    key
 }
 
 impl ShadowRenderer {
@@ -235,7 +201,7 @@ impl ShadowRenderer {
     /// another scene's statics, an older [`StaticsKey`] revision of this one's, or
     /// nothing at all.
     #[cfg(test)]
-    pub fn needs_static_bake(&self, scene: &Scene) -> bool {
+    pub fn needs_static_bake(&self, scene: &crate::scene::Scene) -> bool {
         let key = statics_key(scene);
         let count = self.cascades.len().max(1);
         self.static_cache[..count]
@@ -285,5 +251,7 @@ mod cutout_tests;
 #[cfg(test)]
 pub(super) mod contact_tests;
 
+#[cfg(test)]
+mod mapped_cutout_tests;
 #[cfg(test)]
 mod mirror_tests;

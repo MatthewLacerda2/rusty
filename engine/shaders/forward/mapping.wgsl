@@ -26,30 +26,69 @@ struct MapCoords {
     weights: vec3<f32>,
 };
 
-fn tile(uv: vec2<f32>) -> vec2<f32> {
-    return uv * entity.uv_st.xy + entity.uv_st.zw;
+// A material's mapping terms: `render::gpu::uniforms::MappingUniform` byte-for-byte.
+// The forward draws read theirs from `entity`; a shadow caster carries its own per
+// instance (#1594), so the `*_with` functions take them explicitly.
+struct Mapping {
+    uv_st: vec4<f32>,
+    uv_mapping: u32,
+    world_scale: f32,
+    blend_sharpness: f32,
+    _pad: u32,
+};
+
+// The draw's own terms.
+fn entity_mapping() -> Mapping {
+    return Mapping(entity.uv_st, entity.uv_mapping, entity.world_scale, entity.blend_sharpness, 0u);
+}
+
+fn tile_with(m: Mapping, uv: vec2<f32>) -> vec2<f32> {
+    return uv * m.uv_st.xy + m.uv_st.zw;
 }
 
 // The coordinates at a point with mesh UV `uv`, world `position` and geometric
-// world `normal`. UV0 does no projection maths; Planar projects once (along Y).
-// Triplanar's projections follow Ben Golus's "Normal Mapping for a Triplanar
-// Shader" (zy, xz, xy), which `sample_normal`'s whiteout blend expects.
+// world `normal`, under the draw's own terms (`coords_with`).
 fn coords(uv: vec2<f32>, position: vec3<f32>, normal: vec3<f32>) -> MapCoords {
+    return coords_with(entity_mapping(), uv, position, normal);
+}
+
+// `coords` under terms `m`. UV0 does no projection maths; Planar projects once
+// (along Y). Triplanar's projections follow Ben Golus's "Normal Mapping for a
+// Triplanar Shader" (zy, xz, xy), which `sample_normal`'s whiteout blend expects.
+// UV0 and Planar fill all three projections with their one lookup, its weight all
+// on Y, so `sample_any` reads them without a branch on the mapping.
+fn coords_with(m: Mapping, uv: vec2<f32>, position: vec3<f32>, normal: vec3<f32>) -> MapCoords {
     var c: MapCoords;
-    if (entity.uv_mapping == UV0) {
-        c.uv = tile(uv);
-        return c;
-    }
-    let p = position * entity.world_scale;
-    c.uv = tile(p.xz);
-    if (entity.uv_mapping == TRIPLANAR) {
-        c.x = tile(p.zy);
-        c.y = c.uv;
-        c.z = tile(p.xy);
-        let w = pow(max(abs(normal), vec3<f32>(1e-4)), vec3<f32>(entity.blend_sharpness));
+    let p = position * m.world_scale;
+    c.uv = select(tile_with(m, p.xz), tile_with(m, uv), m.uv_mapping == UV0);
+    c.x = c.uv;
+    c.y = c.uv;
+    c.z = c.uv;
+    c.weights = vec3<f32>(0.0, 1.0, 0.0);
+    if (m.uv_mapping == TRIPLANAR) {
+        c.x = tile_with(m, p.zy);
+        c.z = tile_with(m, p.xy);
+        let w = pow(max(abs(normal), vec3<f32>(1e-4)), vec3<f32>(m.blend_sharpness));
         c.weights = w / max(w.x + w.y + w.z, 1e-4);
     }
     return c;
+}
+
+// Map `t` under terms `m` at a point (`coords_with`'s arguments) where the mapping
+// is not uniform across the draw (a shadow caster's, per instance): the derivatives
+// are taken first, in uniform control flow, and the branch on the mapping samples
+// with them.
+fn sample_any(t: texture_2d<f32>, s: sampler, m: Mapping, uv: vec2<f32>, position: vec3<f32>, normal: vec3<f32>) -> vec4<f32> {
+    let c = coords_with(m, uv, position, normal);
+    let dx = mat3x2<f32>(dpdx(c.x), dpdx(c.y), dpdx(c.z));
+    let dy = mat3x2<f32>(dpdy(c.x), dpdy(c.y), dpdy(c.z));
+    let y = textureSampleGrad(t, s, c.y, dx[1], dy[1]);
+    if (m.uv_mapping != TRIPLANAR) {
+        return y;
+    }
+    return textureSampleGrad(t, s, c.x, dx[0], dy[0]) * c.weights.x
+        + y * c.weights.y
+        + textureSampleGrad(t, s, c.z, dx[2], dy[2]) * c.weights.z;
 }
 
 // Map `t` at `c`.

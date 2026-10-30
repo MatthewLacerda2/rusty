@@ -210,8 +210,8 @@ impl ShadowRenderer {
             let two_sided = mesh.cast_shadows == ShadowCasting::TwoSided;
             for (indices, clip) in runs {
                 let mut caster = CasterData::new(world, bone_base);
-                if let Some((cutoff, textured)) = clip.and_then(|c| c.cutout) {
-                    caster = caster.cutout(cutoff, textured);
+                if let Some(cut) = clip.and_then(|c| c.cutout) {
+                    caster = caster.cutout(cut);
                 }
                 casters.push(Candidate {
                     key: CasterKey {
@@ -279,5 +279,7 @@ struct Candidate {
     bounds: Option<(glam::Vec3, glam::Vec3)>,
 }
 
+#[cfg(test)]
+mod layout_tests;
 #[cfg(test)]
 mod tests;
