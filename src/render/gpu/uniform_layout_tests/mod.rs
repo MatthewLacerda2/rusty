@@ -35,7 +35,7 @@ fn wgsl_struct(name: &str) -> (Vec<(String, usize)>, usize) {
 }
 
 /// [`wgsl_struct`] in the composed `probe`.
-fn wgsl_struct_in(probe: &str, name: &str) -> (Vec<(String, usize)>, usize) {
+pub(crate) fn wgsl_struct_in(probe: &str, name: &str) -> (Vec<(String, usize)>, usize) {
     let mut composer = compose::composer_with_common("engine/shaders").unwrap();
     let module = compose::compose(&mut composer, probe, "probe.wgsl").unwrap();
     let found = module
@@ -63,7 +63,7 @@ fn assert_layout(name: &str, pairs: &[(&str, usize)], size: usize) {
 }
 
 /// Assert `(members, span)` against each `(wgsl member, rust offset)` pair and `size`.
-fn assert_members(
+pub(crate) fn assert_members(
     (members, span): (Vec<(String, usize)>, usize),
     name: &str,
     pairs: &[(&str, usize)],

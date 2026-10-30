@@ -31,7 +31,7 @@ pub(super) fn join_alike<'c>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::render::passes::shadows::clips::Clip;
+    use crate::render::passes::shadows::clips::{Clip, Cutout};
 
     fn cutout(material: usize) -> CasterClip {
         CasterClip {
@@ -39,7 +39,11 @@ mod tests {
                 pipeline: 0,
                 material,
             },
-            cutout: Some((0.5, true)),
+            cutout: Some(Cutout {
+                cutoff: 0.5,
+                textured: true,
+                mapping: Default::default(),
+            }),
         }
     }
 

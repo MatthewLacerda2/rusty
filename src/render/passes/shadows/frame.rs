@@ -6,7 +6,7 @@
 use glam::Vec3;
 
 use super::casters::CasterFrame;
-use super::{atlas, cascades, CascadeUniform, ShadowRenderer};
+use super::{atlas, cascades, statics_key, CascadeUniform, ShadowRenderer};
 use crate::components::{LightType, ShadowSettings};
 use crate::render::clusters::{self, ClusterGrid};
 use crate::render::lod::LodSelection;
@@ -60,6 +60,7 @@ impl Renderer {
             materials: &self.materials,
             surfaces: &self.surface_shaders,
             timer: &self.gpu_timer,
+            statics: statics_key(scene),
         };
         if self.capture.shadows {
             // a probe captured without shadows samples no cascade, so draws none

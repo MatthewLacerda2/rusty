@@ -112,6 +112,9 @@ pub(super) struct CasterFrame<'a> {
     pub clips: &'a HashMap<(u32, usize), CasterClip>,
     pub materials: &'a MaterialCache,
     pub surfaces: &'a SurfaceShaders,
+    /// The scene's [`StaticsKey`](super::StaticsKey), digested once for the frame
+    /// and compared by both the cascades' and the atlas's static bakes (#1594).
+    pub statics: super::StaticsKey,
     /// The renderer's GPU pass timer: every sweep is a `shadows` pass (#835).
     pub timer: &'a crate::render::timing::GpuTimer,
 }
@@ -210,8 +213,8 @@ impl ShadowRenderer {
             let two_sided = mesh.cast_shadows == ShadowCasting::TwoSided;
             for (indices, clip) in runs {
                 let mut caster = CasterData::new(world, bone_base);
-                if let Some((cutoff, textured)) = clip.and_then(|c| c.cutout) {
-                    caster = caster.cutout(cutoff, textured);
+                if let Some(cut) = clip.and_then(|c| c.cutout) {
+                    caster = caster.cutout(cut);
                 }
                 casters.push(Candidate {
                     key: CasterKey {
@@ -279,5 +282,7 @@ struct Candidate {
     bounds: Option<(glam::Vec3, glam::Vec3)>,
 }
 
+#[cfg(test)]
+mod layout_tests;
 #[cfg(test)]
 mod tests;
