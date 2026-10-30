@@ -51,3 +51,23 @@ fn gpu_a_cube_that_fails_to_load_is_left_out_until_rewritten() {
     let probes = &renderer.reflection_probes;
     assert_ne!(probes.probe_for(Vec3::new(-2.0, 0.0, 0.0)), 0, "re-written");
 }
+
+/// When every wanted cube is refused, the array sized for it is given back.
+#[test]
+fn gpu_refusing_every_cube_gives_the_array_back() {
+    let Some(mut renderer) = renderer() else {
+        return;
+    };
+    let broken = cube_file("only_broken_8.ktx2", 8, 5);
+    let scene = probes_at(&[(0.0, &broken)]);
+    assert!(renderer.reflection_probes.shape(&broken).is_some());
+    let bytes = std::fs::read(&broken).unwrap();
+    std::fs::write(&broken, &bytes[..bytes.len() - 1]).unwrap();
+    renderer.global_bind_group_dirty = false;
+    renderer.update_reflection_probes(&scene, Vec3::ZERO);
+    assert_eq!(renderer.reflection_probes.face(), 1, "the stand-in again");
+    assert!(
+        renderer.global_bind_group_dirty,
+        "group 0 rebinds the stand-in"
+    );
+}

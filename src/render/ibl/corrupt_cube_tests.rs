@@ -63,12 +63,20 @@ fn a_mipped_cube_is_read_whole_by_both() {
 #[test]
 fn every_corrupt_or_unsupported_cube_is_refused_by_both() {
     const LAST: usize = HEADER + 2 * LEVEL_ENTRY;
-    let corrupt: [(&str, Corruption); 9] = [
+    let corrupt: [(&str, Corruption); 11] = [
         ("truncated", |b| b.truncate(b.len() - 1)),
         ("truncated in the header", |b| b.truncate(60)),
         ("truncated in the index", |b| b.truncate(HEADER + 30)),
         ("levelCount past log2(size)+1", |b| put_u32(b, 40, 4)),
         ("levelCount huge", |b| put_u32(b, 40, u32::MAX)),
+        ("faces huge", |b| {
+            put_u32(b, 20, 1 << 30);
+            put_u32(b, 24, 1 << 30);
+        }),
+        ("faces past the largest a probe bakes", |b| {
+            put_u32(b, 20, 2 * MAX_FACE);
+            put_u32(b, 24, 2 * MAX_FACE);
+        }),
         ("zstd-supercompressed", |b| put_u32(b, 44, 2)),
         ("a 3D cube", |b| put_u32(b, 28, 4)),
         ("short last level", |b| put_u64(b, LAST + 8, 23)),

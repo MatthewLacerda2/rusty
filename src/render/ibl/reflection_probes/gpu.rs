@@ -2,6 +2,22 @@
 //! a baked cube into one of its layers.
 
 use super::super::cubemap::CubemapTexture;
+use super::ProbeArray;
+
+impl ProbeArray {
+    /// With no cube resident (every one refused or re-written, #1609), shrink the
+    /// array back to the black 1×1 stand-in [`ProbeArray::new`] starts with, so a
+    /// refused large cube leaves nothing allocated; true when it was rebuilt.
+    pub(super) fn release_if_empty(&mut self, device: &wgpu::Device) -> bool {
+        if self.table.holds_any() || (self.face, self.mips, self.cubes) == (1, 1, 1) {
+            return false;
+        }
+        self.table.clear();
+        (self.texture, self.view) = array_texture(device, 1, 1, 1);
+        (self.face, self.mips, self.cubes) = (1, 1, 1);
+        true
+    }
+}
 
 /// A cube-array texture of `cubes` black cubes, `face` texels square with `mips`
 /// levels, and its `CubeArray` view.

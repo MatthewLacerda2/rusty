@@ -15,6 +15,7 @@
 
 use ktx2::Format;
 
+use super::reflection_probes::MAX_FACE;
 use crate::render::Renderer;
 
 /// A decoded LDR cubemap WITH its roughness mip chain (#245). `mips[0]` is the base level
@@ -86,8 +87,9 @@ pub(crate) fn read_cube_shape(path: &str) -> Result<CubeShape, Refusal> {
 }
 
 /// The shape a KTX2 header's first 48 bytes state, when it is a cube the loader
-/// reads: an LDR RGBA8 square cube (six faces, no depth, at most one layer), not
-/// supercompressed, with no more mip levels than its size has.
+/// reads: an LDR RGBA8 square cube (six faces, no depth, at most one layer) no
+/// larger than [`MAX_FACE`], not supercompressed, with no more mip levels than its
+/// size has.
 pub(crate) fn cube_shape(header: &[u8; 48]) -> Result<CubeShape, Refusal> {
     const MAGIC: [u8; 12] = [
         0xAB, 0x4B, 0x54, 0x58, 0x20, 0x32, 0x30, 0xBB, 0x0D, 0x0A, 0x1A, 0x0A,
@@ -100,6 +102,8 @@ pub(crate) fn cube_shape(header: &[u8; 48]) -> Result<CubeShape, Refusal> {
         Some("it is not RGBA8")
     } else if size == 0 || word(24) != size || word(28) != 0 {
         Some("its faces are not square")
+    } else if size > MAX_FACE {
+        Some("its faces are larger than a probe bakes")
     } else if word(32) > 1 || word(36) != 6 {
         Some("it is not one cube of six faces")
     } else if word(44) != 0 {
@@ -132,7 +136,7 @@ fn level_ranges(
         let at = |o: usize| u64::from_le_bytes(entry[o..o + 8].try_into().unwrap());
         let (offset, length) = (at(0), at(8));
         let edge = u64::from((shape.size >> i).max(1));
-        let faces = edge * edge * 4 * 6;
+        let faces = (edge.checked_mul(edge * 4 * 6)).ok_or("its faces are too large")?;
         let end = (offset.checked_add(faces)).filter(|&end| length >= faces && end <= len);
         let end = end.ok_or("a level lies past its end or is short of its faces")?;
         Ok(usize::try_from(offset).map_err(|_| "it is too large")?..end as usize)
