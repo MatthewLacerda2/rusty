@@ -1,20 +1,21 @@
-//! src/render/cubemap.rs — KTX2 cubemap loading for reflection probes (#244).
+//! KTX2 cubemap loading for reflection probes (#244).
 //!
-//! Loads a baked reflection-probe cubemap (a KTX2 file) into a wgpu cube texture,
-//! paralleling the skybox `load_texture` path. The KTX2 parse is `ktx2` (parse-only);
-//! the decoded faces upload into a `D2Array`-of-6 cube texture.
+//! Loads a baked reflection-probe cubemap (a KTX2 file) into a wgpu cube texture the
+//! probe array copies in. The container is read here, with `ktx2` naming the formats
+//! only: its `Reader` bounds-checks one level of the index and its offset sums can
+//! overflow, so a corrupt file would panic it (#1609).
 //!
-//! Graceful absence is a first-class requirement: there are NO real baked cubemaps
-//! until the bake lands (#245), so a missing/unreadable/odd-format file must NOT panic
-//! or error — [`load_ktx2_cubemap`] returns `None` and the caller falls back to the
-//! global skybox. Only LDR RGBA8 (UNORM / SRGB) is accepted, matching the bake's output
-//! format; anything else is treated as absent.
-//!
-//! The CPU-side parse ([`parse_ktx2_cubemap_mips`]) is split out as a pure function over
-//! bytes so it is unit-testable without a GPU or a file on disk.
+//! A missing, unreadable or odd-format file must NOT panic: it is refused with a
+//! reason, and the probe array warns once and leaves it out. Only LDR RGBA8 (UNORM /
+//! SRGB) is accepted, matching the bake's output format. One rule decides what a cube
+//! may be, [`cube_shape`] over the header and [`level_ranges`] over the level index;
+//! the header-only read ([`read_cube_shape`]) and the full parse
+//! ([`parse_ktx2_cubemap_mips`]) both apply it, as pure functions over bytes so they
+//! are unit-testable without a GPU or a file on disk.
 
 use ktx2::Format;
 
+use super::reflection_probes::MAX_FACE;
 use crate::render::Renderer;
 
 /// A decoded LDR cubemap WITH its roughness mip chain (#245). `mips[0]` is the base level
@@ -26,35 +27,39 @@ pub struct CubemapMips {
     pub mips: Vec<Vec<u8>>,
 }
 
-/// Parse a KTX2 blob into an LDR RGBA8 cubemap WITH its full roughness mip chain (#245),
-/// or `None` when it is not a usable LDR cubemap. Level 0 is the base; each later level is
-/// expected to halve the edge length (the prefilter's layout). A level whose byte length
-/// is short for its expected size truncates the chain there rather than failing — the
-/// loader stays tolerant. Pure and GPU-free so the loading path is testable headlessly.
-pub fn parse_ktx2_cubemap_mips(bytes: &[u8]) -> Option<CubemapMips> {
-    let reader = ktx2::Reader::new(bytes).ok()?;
-    let header = reader.header();
-    if header.face_count != 6 || header.layer_count > 1 || !is_rgba8(header.format?) {
-        return None;
-    }
-    let size = header.pixel_width;
-    if size == 0 || header.pixel_height != size {
-        return None;
-    }
+/// Why a cube file is not one the probe array can read, for its one warning (#1609).
+pub(crate) type Refusal = &'static str;
 
-    let mut mips = Vec::new();
-    for (level, data) in reader.levels().enumerate() {
-        let level_size = (size >> level).max(1);
-        let expected = (level_size as usize) * (level_size as usize) * 4 * 6;
-        if data.len() < expected {
-            break;
+/// The KTX2 header's length, where the level index starts, and one index entry's.
+const HEADER: usize = 80;
+const LEVEL_ENTRY: usize = 24;
+
+impl CubemapMips {
+    /// The base face size and mip count this cube holds.
+    pub(crate) fn shape(&self) -> CubeShape {
+        CubeShape {
+            size: self.size,
+            mips: self.mips.len() as u32,
         }
-        mips.push(data[..expected].to_vec());
     }
-    if mips.is_empty() {
-        return None;
-    }
-    Some(CubemapMips { size, mips })
+}
+
+/// Parse a KTX2 blob into an LDR RGBA8 cubemap WITH its full roughness mip chain (#245),
+/// or why it is not one. Level 0 is the base; each later level halves the edge length
+/// (the prefilter's layout). The file must be what [`cube_shape`] and [`level_ranges`]
+/// accept, the rule [`read_cube_shape`] judges a header by, so the two never disagree
+/// and no byte sequence panics (#1609). Pure and GPU-free so it is testable headlessly.
+pub fn parse_ktx2_cubemap_mips(bytes: &[u8]) -> Result<CubemapMips, Refusal> {
+    let header = bytes
+        .get(..HEADER)
+        .ok_or("it is shorter than a KTX2 header")?;
+    let shape = cube_shape(header[..48].try_into().unwrap())?;
+    let ranges = level_ranges(&bytes[HEADER..], shape, bytes.len() as u64)?;
+    let mips = ranges.into_iter().map(|r| bytes[r].to_vec()).collect();
+    Ok(CubemapMips {
+        size: shape.size,
+        mips,
+    })
 }
 
 /// A cube file's base face size and mip count, as its KTX2 header states them.
@@ -64,38 +69,83 @@ pub(crate) struct CubeShape {
     pub mips: u32,
 }
 
-/// The shape of the cube at `path`, read from its KTX2 header alone (#1584): the
-/// probe array budgets a cube before it decides to load it, so a cube it passes over
-/// costs 48 bytes of disk, not a decode. `None` when the file is missing or its
-/// header is not one [`parse_ktx2_cubemap_mips`] would accept.
-pub(crate) fn read_cube_shape(path: &str) -> Option<CubeShape> {
+/// The shape of the cube at `path`, read from its header and level index alone
+/// (#1584): the probe array budgets a cube before it decides to load it, so a cube it
+/// passes over costs a few hundred bytes of disk, not a decode. Refused when the file
+/// is missing or is not one [`parse_ktx2_cubemap_mips`] would accept (#1609).
+pub(crate) fn read_cube_shape(path: &str) -> Result<CubeShape, Refusal> {
     use std::io::Read;
-    let mut header = [0u8; 48];
-    std::fs::File::open(path)
-        .ok()?
-        .read_exact(&mut header)
-        .ok()?;
-    cube_shape(&header)
+    let mut file = std::fs::File::open(path).map_err(|_| "it cannot be opened")?;
+    let len = file.metadata().map_err(|_| "it cannot be opened")?.len();
+    let mut header = [0u8; HEADER];
+    (file.read_exact(&mut header)).map_err(|_| "it is shorter than a KTX2 header")?;
+    let shape = cube_shape(header[..48].try_into().unwrap())?;
+    let mut index = vec![0u8; shape.mips as usize * LEVEL_ENTRY];
+    (file.read_exact(&mut index)).map_err(|_| "its level index is cut short")?;
+    level_ranges(&index, shape, len)?;
+    Ok(shape)
 }
 
-/// [`read_cube_shape`] over a header's first 48 bytes; pure, for tests.
-pub(crate) fn cube_shape(header: &[u8; 48]) -> Option<CubeShape> {
+/// The shape a KTX2 header's first 48 bytes state, when it is a cube the loader
+/// reads: an LDR RGBA8 square cube (six faces, no depth, at most one layer) no
+/// larger than [`MAX_FACE`], not supercompressed, with no more mip levels than its
+/// size has.
+pub(crate) fn cube_shape(header: &[u8; 48]) -> Result<CubeShape, Refusal> {
     const MAGIC: [u8; 12] = [
         0xAB, 0x4B, 0x54, 0x58, 0x20, 0x32, 0x30, 0xBB, 0x0D, 0x0A, 0x1A, 0x0A,
     ];
     let word = |at: usize| u32::from_le_bytes(header[at..at + 4].try_into().unwrap());
-    let format = Format::new(word(12));
-    let (size, layers, faces) = (word(20), word(32), word(36));
-    let usable = header[..12] == MAGIC
-        && format.is_some_and(is_rgba8)
-        && size > 0
-        && word(24) == size
-        && layers <= 1
-        && faces == 6;
-    usable.then(|| CubeShape {
-        size,
-        mips: word(40).max(1),
-    })
+    let size = word(20);
+    let refusal = if header[..12] != MAGIC {
+        Some("it is not a KTX2 file")
+    } else if !Format::new(word(12)).is_some_and(is_rgba8) {
+        Some("it is not RGBA8")
+    } else if size == 0 || word(24) != size || word(28) != 0 {
+        Some("its faces are not square")
+    } else if size > MAX_FACE {
+        Some("its faces are larger than a probe bakes")
+    } else if word(32) > 1 || word(36) != 6 {
+        Some("it is not one cube of six faces")
+    } else if word(44) != 0 {
+        Some("it is supercompressed")
+    } else if word(40) > u32::BITS - size.leading_zeros() {
+        Some("it states more mip levels than its size has")
+    } else {
+        None
+    };
+    refusal.map_or(
+        Ok(CubeShape {
+            size,
+            mips: word(40).max(1),
+        }),
+        Err,
+    )
+}
+
+/// The bytes of each of `shape`'s levels, from its level `index` (what follows the
+/// header) in a file of `len` bytes: every level must lie inside the file and hold
+/// its six faces. A level's bytes past its faces are not read.
+fn level_ranges(
+    index: &[u8],
+    shape: CubeShape,
+    len: u64,
+) -> Result<Vec<std::ops::Range<usize>>, Refusal> {
+    let entries =
+        (index.get(..shape.mips as usize * LEVEL_ENTRY)).ok_or("its level index is cut short")?;
+    let level = |(i, entry): (usize, &[u8])| {
+        let at = |o: usize| u64::from_le_bytes(entry[o..o + 8].try_into().unwrap());
+        let (offset, length) = (at(0), at(8));
+        let edge = u64::from((shape.size >> i).max(1));
+        let faces = (edge.checked_mul(edge * 4 * 6)).ok_or("its faces are too large")?;
+        let end = (offset.checked_add(faces)).filter(|&end| length >= faces && end <= len);
+        let end = end.ok_or("a level lies past its end or is short of its faces")?;
+        Ok(usize::try_from(offset).map_err(|_| "it is too large")?..end as usize)
+    };
+    entries
+        .chunks_exact(LEVEL_ENTRY)
+        .enumerate()
+        .map(level)
+        .collect()
 }
 
 /// True for the LDR RGBA8 formats a reflection bake emits (UNORM or SRGB).
@@ -114,18 +164,21 @@ pub struct CubemapTexture {
 
 impl Renderer {
     /// Load a reflection-probe cubemap WITH its roughness mip chain from `path` (#245),
-    /// into a mipped cube texture the forward pass samples with `textureSampleLevel`.
-    /// Returns `None` (caller falls back to the skybox) when the file is missing, is not
-    /// a usable LDR RGBA8 cubemap — the expected state until the bake exists (#245) — or
-    /// has a base size `accept` refuses, which is decoded but never uploaded (#1245).
-    pub fn load_cubemap_mips(
+    /// into a mipped cube texture the probe array copies in. Refused when the file is
+    /// missing, is not a usable LDR RGBA8 cubemap, or is not the `expect`ed shape (size
+    /// and mip count) the frame planned for, which is decoded but never uploaded
+    /// (#1245, #1609).
+    pub(crate) fn load_cubemap_mips(
         &self,
         path: &str,
-        accept: impl FnOnce(u32) -> bool,
-    ) -> Option<CubemapTexture> {
-        let bytes = std::fs::read(path).ok()?;
-        let data = parse_ktx2_cubemap_mips(&bytes).filter(|data| accept(data.size))?;
-        Some(self.upload_cubemap_mips(path, &data))
+        expect: CubeShape,
+    ) -> Result<CubemapTexture, Refusal> {
+        let bytes = std::fs::read(path).map_err(|_| "it cannot be read")?;
+        let data = parse_ktx2_cubemap_mips(&bytes)?;
+        if data.shape() != expect {
+            return Err("it changed shape since its header was read");
+        }
+        Ok(self.upload_cubemap_mips(path, &data))
     }
 
     /// Upload a decoded mipped cubemap into a mipped 6-layer cube texture with a cube view
@@ -191,3 +244,7 @@ mod cubemap_tests;
 #[cfg(test)]
 #[path = "cube_shape_tests.rs"]
 mod cube_shape_tests;
+
+#[cfg(test)]
+#[path = "corrupt_cube_tests.rs"]
+mod corrupt_cube_tests;

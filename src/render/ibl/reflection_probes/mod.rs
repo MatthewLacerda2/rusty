@@ -172,9 +172,10 @@ impl ProbeArray {
     ) -> (Vec<CubeCopy>, bool) {
         let kept = admitted(wanted);
         if kept.is_empty() {
-            // Nothing to shade: keep the resident cubes for the next scene.
+            // Nothing to shade: keep the resident cubes for the next scene, and give
+            // the array back when none is resident (#1609).
             self.activate(&[], &[]);
-            return (Vec::new(), false);
+            return (Vec::new(), self.release_if_empty(device));
         }
         let (face, mips) = self.target_size(&kept);
         let kept: Vec<Resident> = kept

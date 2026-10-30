@@ -103,6 +103,11 @@ impl SlotTable {
         }
     }
 
+    /// Whether any slot holds a cube.
+    pub(crate) fn holds_any(&self) -> bool {
+        self.paths.iter().any(Option::is_some)
+    }
+
     /// Empty every slot: the array was rebuilt at another size.
     pub(crate) fn clear(&mut self) {
         self.paths.clear();
