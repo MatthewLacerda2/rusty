@@ -14,7 +14,8 @@
 //! `Assets.GetModelImportSettings` / `SetModelImportSettings` (#1398) read and write
 //! a model's Scale Factor, the inspector's drag.
 //! `Assets.GetTextureImportSettings` / `SetTextureImportSettings` (#1323) read and
-//! write an image's wrap, filter and mipmap settings, the image inspector's card.
+//! write an image's wrap, filter, mipmap, texture type, compression and max-size
+//! settings (#1574), the image inspector's card.
 
 use std::cell::RefCell;
 use std::path::Path;
@@ -23,7 +24,9 @@ use mlua::{Lua, Table};
 
 use super::{global_table, put, Reg};
 use crate::asset::audio::{refresh, Refresh};
-use crate::asset::sidecar::{FilterMode, TextureSettings, WrapMode};
+use crate::asset::sidecar::{
+    parse_max_size, Compression, FilterMode, TextureSettings, TextureType, WrapMode,
+};
 use crate::asset::{build_manifest, AssetEntry, SubObjectEntry};
 use crate::asset::{sidecar, LightmapUvSettings};
 use crate::core::paths::to_slash;
@@ -52,7 +55,7 @@ pub fn register(lua: &Lua) -> Reg {
     put(
         &table,
         "Refresh",
-        lua.create_function(|lua, ()| refresh_table(lua, &refresh(Path::new(ASSET_ROOT)))),
+        lua.create_function(|lua, ()| refresh_all(lua)),
     )?;
 
     put(
@@ -149,16 +152,21 @@ fn model_import_table(lua: &Lua, path: &str) -> mlua::Result<Table> {
     Ok(t)
 }
 
-/// `{ wrapMode, filterMode, generateMipmaps }`.
+/// `{ wrapMode, filterMode, generateMipmaps, textureType, sRGB, compression, maxSize }`.
 fn texture_table(lua: &Lua, s: &TextureSettings) -> mlua::Result<Table> {
     let t = lua.create_table()?;
     t.raw_set("wrapMode", s.wrap_mode.name())?;
     t.raw_set("filterMode", s.filter_mode.name())?;
     t.raw_set("generateMipmaps", s.generate_mipmaps)?;
+    t.raw_set("textureType", s.texture_type.name())?;
+    t.raw_set("sRGB", s.srgb)?;
+    t.raw_set("compression", s.compression.name())?;
+    t.raw_set("maxSize", s.max_size)?;
     Ok(t)
 }
 
-/// `stored` with the keys `t` names replaced; an unknown mode name is an error.
+/// `stored` with the keys `t` names replaced; an unknown mode name or a max size
+/// outside Unity's list is an error.
 fn texture_settings(mut s: TextureSettings, t: &Table) -> mlua::Result<TextureSettings> {
     if let Some(name) = t.get::<Option<String>>("wrapMode")? {
         s.wrap_mode = WrapMode::parse(&name).map_err(runtime)?;
@@ -168,6 +176,16 @@ fn texture_settings(mut s: TextureSettings, t: &Table) -> mlua::Result<TextureSe
     }
     let mipmaps = t.get::<Option<bool>>("generateMipmaps")?;
     s.generate_mipmaps = mipmaps.unwrap_or(s.generate_mipmaps);
+    if let Some(name) = t.get::<Option<String>>("textureType")? {
+        s.texture_type = TextureType::parse(&name).map_err(runtime)?;
+    }
+    s.srgb = t.get::<Option<bool>>("sRGB")?.unwrap_or(s.srgb);
+    if let Some(name) = t.get::<Option<String>>("compression")? {
+        s.compression = Compression::parse(&name).map_err(runtime)?;
+    }
+    if let Some(size) = t.get::<Option<u32>>("maxSize")? {
+        s.max_size = parse_max_size(size).map_err(runtime)?;
+    }
     Ok(s)
 }
 
@@ -186,7 +204,26 @@ fn manifest_table(lua: &Lua) -> mlua::Result<Table> {
     Ok(assets)
 }
 
-/// `{ converted = { wavPath, ... }, skipped = { { path, reason }, ... } }`.
+/// `Assets.Refresh()`: every import brought up to date, audio and images, and
+/// what it did ([`refresh_table`]). Audio imports in Play too, as Unity's
+/// `AssetDatabase.Refresh` does; images wait for Stop, as a model's conversion
+/// does (`texture_import::refresh_all` does nothing then).
+fn refresh_all(lua: &Lua) -> mlua::Result<Table> {
+    let root = Path::new(ASSET_ROOT);
+    let t = refresh_table(lua, &refresh(root))?;
+    // Each failure was warned of in the console as it ran.
+    let images = crate::asset::texture_import::refresh_all(root);
+    t.raw_set("compressed", images.encoded)?;
+    let failed = lua.create_table()?;
+    for (i, (image, _)) in images.failed.iter().enumerate() {
+        failed.raw_set(i + 1, to_slash(image))?;
+    }
+    t.raw_set("failed", failed)?;
+    Ok(t)
+}
+
+/// `{ converted = { wavPath, ... }, skipped = { { path, reason }, ... } }`; the
+/// caller adds `compressed` and `failed`.
 fn refresh_table(lua: &Lua, report: &Refresh) -> mlua::Result<Table> {
     let converted = lua.create_table()?;
     for (i, (_, wav)) in report.converted.iter().enumerate() {
