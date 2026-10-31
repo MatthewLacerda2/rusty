@@ -16,6 +16,8 @@ it behaves identically to the editor and uses the same default values.
 | `Scene.AddScript` | `(id, path, [fields])` | `true` if the entity exists — see below |
 | `Scene.SetParent` | `(id, parent_id)` | — (errors on a parenting cycle); a `nil` parent unparents, as Unity's `SetParent(null)` |
 | `Scene.ClearParent` | `(id)` | — |
+| `Scene.GetName` | `(id)` | the entity's name, as Unity's `gameObject.name` (`nil` for a missing or `nil` id) |
+| `Scene.SetName` | `(id, name)` | `true` if an entity existed at `id` — renames it, as the inspector's name field does, and in edit mode the new name is saved with the scene (a rename during Play reverts on Stop, like every Play-time change). As in Unity, an empty name and a name another entity already has are both allowed (`FindEntityByName` returns the first match) |
 | `Scene.SetActive` | `(id, active)` | `true` if an entity existed at `id` — Unity's `SetActive`; its callbacks follow the edge (`OnEnable` / `OnDisable`) |
 | `Scene.IsActive` | `(id)` | Unity's `activeSelf`: the entity's own `active` flag (`false` for a missing or `nil` id; an inactive ancestor still hides it) |
 | `Scene.IsActiveInHierarchy` | `(id)` | Unity's `activeInHierarchy`: `true` when the entity and every ancestor are active (`false` for a missing or `nil` id) — what decides whether it draws, simulates and ticks |
@@ -69,8 +71,9 @@ function, or a table holding one): the error says the call itself ran.
 
 **`primitive`** (optional) is one of the GameObject menu's primitives,
 case-insensitive: `Box`, `Sphere`, `Plane`, `Cylinder`, `Capsule` (meshes) or
-`PointLight`, `DirectionalLight`, `SpotLight`. The Capsule is Unity's: radius 0.5,
-full height 2, along Y. The Plane is 15 × 15 on XZ, one quad; for vertices a
+`PointLight`, `DirectionalLight`, `SpotLight`. The sizes are Unity's: the Box is
+1 × 1 × 1, the Sphere diameter 1, the Cylinder diameter 1 and height 2 along Y
+(−1..1), and the Capsule radius 0.5, full height 2, along Y. The Plane is 15 × 15 on XZ, one quad; for vertices a
 vertex shader can move (`vertex_waves`, [`Shader.md`](Shader.md)), cut it into a grid
 with `Component.Set(id, "Mesh", { subdivisions = 64 })`: 1–256 quads per side,
 `(n + 1)²` vertices, the same size and UVs, saved with the scene (the Inspector's

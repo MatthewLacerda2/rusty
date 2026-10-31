@@ -16,7 +16,7 @@
 //!
 //! Usage:
 //! ```text
-//!   cargo run --bin session-mcp --features dev               # embed: default scene
+//!   cargo run --bin session-mcp --features dev               # embed: the boot scene
 //!   cargo run --bin session-mcp --features dev -- <scene>    # embed: a specific scene
 //!   cargo run --bin session-mcp --features dev -- --empty    # embed: an empty scene
 //!   cargo run --bin session-mcp --features dev -- --project <dir> [<scene>|--empty]
@@ -72,9 +72,11 @@ fn attach_address(args: &[String]) -> Option<Option<String>> {
 /// Boot the in-process embed-mode session, exiting the process on failure.
 fn boot_embedded(args: &[String]) -> Session {
     // `--project <dir>` chdirs first; then `--empty` starts blank, an explicit path
-    // boots that scene, and no argument boots (and seeds) the bundled default scene.
+    // boots that scene, and no argument boots the project's boot scene
+    // (`core::project::boot_scene`: the editor's last scene, then the startup scene,
+    // then an empty one, #1618).
     let boot_scene = session::boot_scene_from_args(args);
-    match Session::new(&boot_scene) {
+    match Session::boot(&boot_scene) {
         Ok(s) => s,
         Err(e) => {
             eprintln!("session-mcp: failed to start: {}", e);

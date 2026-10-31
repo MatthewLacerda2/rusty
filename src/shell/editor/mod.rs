@@ -13,6 +13,7 @@ pub mod capture;
 mod cursor_release;
 mod game_focus;
 mod icon;
+mod last_scene;
 mod paint;
 mod start;
 mod viewport;
@@ -68,6 +69,8 @@ pub struct EditorFrontend {
     watch: Option<watch::Watch>,
     /// The open scene following its file on disk (#1340).
     follow: watch::follow::SceneFollow,
+    /// The scene path last remembered for the next launch (`last_scene`, #1618).
+    last_scene: Option<String>,
 }
 
 impl EditorFrontend {
@@ -108,6 +111,7 @@ impl EditorFrontend {
             scene_id: None,
             watch: watch::Watch::editor(),
             follow: watch::follow::SceneFollow::new(),
+            last_scene: None,
         }
     }
 
@@ -254,6 +258,7 @@ impl Frontend for EditorFrontend {
             watch.apply(game.scene().borrow().is_playing());
         }
         self.follow_scene_file(game);
+        self.remember_open_scene(game);
         let raw_input = self.egui_winit.take_egui_input(&shell.window);
         self.egui_ctx.begin_pass(raw_input);
 

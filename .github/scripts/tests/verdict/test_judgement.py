@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """The merge check refuses a pull request nothing actually checked.
 
-`main` has no required checks (#491), so this is the whole defence: a check
-that only asked "did anything go red" would agree with GitHub about a draft's
+The ruleset's required checks (#491) accept a draft's green gate on the same
+commit, so this is the defence that matters: a check that only asked "did anything go red" would agree with GitHub about a draft's
 run — gate green, nothing compiled. `judge` is tested by import because it is
 pure and the interesting states are ones GitHub produces on its own schedule.
 """
@@ -31,8 +31,8 @@ class Judgement(unittest.TestCase):
         self.assert_refused(verdict(*both(), pull={**READY, "isDraft": True}), "draft")
 
     def test_no_run_at_all_is_refused(self):
-        # The headline: not a red check but an absent one — and with no
-        # required checks on `main`, GitHub would merge it.
+        # The headline: not a red check but an absent one. `main`'s required
+        # checks (#491) block it on GitHub too; the verdict refuses it first.
         self.assert_refused(verdict(), "no `ci` run exists")
 
     def test_green_ci_without_a_lint_run_is_half_a_check(self):

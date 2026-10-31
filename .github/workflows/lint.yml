@@ -135,9 +135,10 @@ jobs:
         env:
           RUSTDOCFLAGS: -D warnings
         run: cargo doc --no-deps --locked --features dev
-      # The merge helpers' tests (#486): `make mergeable` is the only thing between
-      # a red PR and `main` while it has no required checks (#491), so a change
-      # that breaks its judgement is a gate failure. Stdlib `unittest`, no build.
+      # The merge helpers' tests (#486): `make mergeable` is the merge path's
+      # judge, which the ruleset's required checks (#491) cannot replace (they
+      # cannot tell a draft's run from a ready one), so a change that breaks its
+      # judgement is a gate failure. Stdlib `unittest`, no build.
       - name: Merge helper tests (.github/scripts)
         if: needs.changes.outputs.code != 'false'
         run: python3 -m unittest discover --start-directory .github/scripts/tests --top-level-directory .github/scripts --verbose
@@ -148,7 +149,8 @@ jobs:
         run: python3 -m unittest discover --start-directory tools/launcher/tests --top-level-directory tools/launcher --verbose
 
   # The single required status check for lint.yml (issue #229) — the lint-workflow
-  # analog of ci.yml's `ci-gate`. Branch protection requires this job, not `lint` by
+  # analog of ci.yml's `ci-gate`. `main`'s ruleset (`.github/rulesets/main.json`,
+  # #491; see `ci-gate` for what it does not prove) requires this job, not `lint` by
   # name, so a lint job that is later added or skipped can never re-introduce the
   # skipped-required-check deadlock (#218). Passes when `lint` succeeded or was
   # skipped; fails only on a real failure or cancellation. `changes` must SUCCEED
