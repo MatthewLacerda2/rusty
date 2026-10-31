@@ -1,10 +1,11 @@
-//! The forward pass draws both sides of a surface and never turns its normal toward
-//! the camera, so the Fresnel angle is `|N.V|`: seen from behind, a one-sided plane
-//! reflects what its front does, not a grazing ~50% of the sky.
+//! A plane whose material draws both faces (#1615) is shaded from the side it is seen,
+//! its normal turned toward the camera, and the Fresnel angle is `|N.V|`: seen from
+//! behind, it reflects what its front does, not a grazing ~50% of the sky.
 
 use std::f32::consts::FRAC_PI_2;
 
 use glam::{Quat, Vec3};
+use rusty::components::{MaterialAsset, RenderFace};
 use rusty::scene::authoring::Primitive;
 
 use super::{black_plastic, reflectance, scene};
@@ -13,7 +14,11 @@ use super::{black_plastic, reflectance, scene};
 /// turned toward the camera (`+Z`) by `angle`, or away from it by `-angle`. `None`
 /// when no adapter rendered it.
 fn plane(label: &str, angle: f32) -> Option<f64> {
-    let (mut scene, id) = scene(Primitive::Plane, black_plastic(0.5));
+    let both = MaterialAsset {
+        render_face: RenderFace::Both,
+        ..black_plastic(0.5)
+    };
+    let (mut scene, id) = scene(Primitive::Plane, both);
     {
         let mut transform = scene.world.transform_mut(id).unwrap();
         transform.rotation = Quat::from_rotation_x(angle);
