@@ -26,7 +26,8 @@ use crate::scene::prefab::diff::masked;
 use crate::scene::prefab::instance::instance_members;
 use crate::scene::prefab::live::{entity_overrides, keep_root_placement, sync_overrides};
 use crate::scene::prefab::overrides::apply_overrides;
-use crate::scene::prefab::read_prefab_file;
+use crate::scene::prefab::restamp::{instance_roots, propagate_roots};
+use crate::scene::prefab::source::{read_source, rekey};
 use crate::scene::serialize::rehydrate_entity_mesh;
 use crate::scene::{instantiate_prefab, PrefabData, Scene};
 
@@ -106,9 +107,19 @@ pub fn reimport_instance(scene: &mut Scene, root_id: u32) -> Result<(), String> 
 /// [`reimport_instance`] re-applying the overrides the links hold as they are, for a
 /// caller that has just synced them and dropped one (a per-field revert or apply).
 pub(super) fn propagate(scene: &mut Scene, root_id: u32) -> Result<(), String> {
-    let ids = require_instance(scene, root_id)?;
     let prefab = load_instance_source(scene, root_id)?;
-    let (baselines, added) = fresh_baselines(scene, &prefab);
+    propagate_from(scene, root_id, &prefab)
+}
+
+/// [`propagate`] from `prefab`, the instance's source as already read.
+pub(super) fn propagate_from(
+    scene: &mut Scene,
+    root_id: u32,
+    prefab: &PrefabData,
+) -> Result<(), String> {
+    let ids = require_instance(scene, root_id)?;
+    rekey(&mut scene.world, &ids, prefab);
+    let (baselines, added) = fresh_baselines(scene, prefab);
     let baselines = in_instance_space(scene, &ids, baselines);
     for id in ids {
         rebuild_entity(scene, id, &baselines, true);
@@ -127,6 +138,7 @@ pub(super) fn propagate(scene: &mut Scene, root_id: u32) -> Result<(), String> {
 pub fn revert_instance_overrides(scene: &mut Scene, root_id: u32) -> Result<(), String> {
     let ids = require_instance(scene, root_id)?;
     let prefab = load_instance_source(scene, root_id)?;
+    rekey(&mut scene.world, &ids, &prefab);
     let (baselines, added) = fresh_baselines(scene, &prefab);
     let baselines = in_instance_space(scene, &ids, baselines);
     for id in ids {
@@ -167,17 +179,11 @@ pub fn list_instance_overrides(scene: &Scene, root_id: u32) -> Result<Vec<String
 /// missing is skipped, so a renamed/deleted `.prefab` never aborts the scene load:
 /// the instance keeps its values and the overrides its links hold, and has no
 /// baseline (the document it came from carries none), so an edit made meanwhile is
-/// not tracked until the source is back.
+/// not tracked until the source is back. Each source is read once, however many
+/// instances it has: a level holding hundreds of one model builds it once.
 pub fn propagate_all_linked_instances(scene: &mut Scene) {
-    let roots: Vec<u32> = scene
-        .world
-        .ids_with_prefab_link()
-        .into_iter()
-        .filter(|&id| scene.world.prefab_link(id).is_some_and(|l| l.local_id == 0))
-        .collect();
-    for root in roots {
-        let _ = propagate(scene, root);
-    }
+    let roots = instance_roots(scene, |_| true);
+    propagate_roots(scene, roots);
 }
 
 /// Rebuild one instance entity from its baseline, preserving live identity/structure
@@ -227,14 +233,14 @@ fn local_id_of(scene: &Scene, id: u32) -> Option<u32> {
     scene.world.prefab_link(id).map(|l| l.local_id)
 }
 
-/// Read the `.prefab` file an instance's root links to.
+/// Read the source (a `.prefab`, or a model's current import) an instance's root
+/// links to.
 fn load_instance_source(scene: &Scene, root_id: u32) -> Result<PrefabData, String> {
-    let source = link_source(scene, root_id)?;
-    read_prefab_file(&source)
+    read_source(&link_source(scene, root_id)?)
 }
 
 /// The source path recorded on the instance root.
-fn link_source(scene: &Scene, root_id: u32) -> Result<String, String> {
+pub(super) fn link_source(scene: &Scene, root_id: u32) -> Result<String, String> {
     scene
         .world
         .prefab_link(root_id)

@@ -4,7 +4,9 @@
 //! `.obj` or glTF its writer noted), every entity whose `"Asset"` mesh names that
 //! file re-reads it: the CPU mesh, its mesh collider's box and, through the fresh
 //! geometry revision it takes (`MeshRevision`, #1540), every renderer's GPU upload
-//! move together, as Unity updates every instance of a re-imported model. The
+//! move together, as Unity updates every instance of a re-imported model; a
+//! whole-model instance is rebuilt from the new import, node layout and all
+//! (#1637, `prefab::restamp`). The
 //! renderer's particle-mesh cache follows the same log for emitters (`render::passes::particles::mesh_cache`).
 //!
 //! It runs on the edit frame (`app::GameWorld::edit_frame`), every frame outside
@@ -16,6 +18,7 @@
 use std::collections::BTreeMap;
 
 use crate::core::fs::written::{note_written, written_since, Stale};
+use crate::scene::prefab::restamp::restamp_models;
 use crate::scene::rehydrate::{reimport_model_ids, reimport_written, Rig};
 use crate::scene::Scene;
 
@@ -49,7 +52,10 @@ impl ModelWrites {
         if paths.is_empty() {
             return 0;
         }
-        reimport_written(scene, &Stale::new(paths))
+        // A whole-model instance of a re-written model is rebuilt from it (#1637).
+        let stale = Stale::new(paths);
+        let refit = |scene: &mut Scene| reimport_written(scene, &stale);
+        restamp_models(scene, |source| stale.matches(source), refit)
     }
 }
 

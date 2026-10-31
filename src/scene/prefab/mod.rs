@@ -5,7 +5,8 @@
 //! own `.prefab` asset so it can be stamped into any scene as an independent copy. v1
 //! is **unpacked**: each instance is a plain copy with no live link back to the asset;
 //! a **linked** instance (#216, [`instantiate_prefab_linked`]) keeps one, its edits
-//! kept as overrides (#1527). Like `SceneData`,
+//! kept as overrides (#1527). An imported model is a source too, built from its
+//! import rather than read from a file (Unity's model prefab, #1637, `source`). Like `SceneData`,
 //! a `PrefabData` is references-only: component VALUES + the material-library slice,
 //! never GPU buffers — meshes rehydrate from `primitive_type`/`asset_ref`.
 //!
@@ -23,6 +24,8 @@ pub mod link;
 pub mod live;
 pub mod overrides;
 mod pointer;
+pub mod restamp;
+pub mod source;
 
 pub use extract::extract_prefab;
 
@@ -102,6 +105,11 @@ fn stamp_prefab(
     let mut new_root = base + prefab.root;
     let mut bone_parents = Vec::new();
     let mut bone_refs = Vec::new();
+    // A model's entities are keyed by node path too (#1637, `source`).
+    let model = link_source.is_some_and(source::is_model_source);
+    let nodes = model
+        .then(|| source::node_paths(prefab))
+        .unwrap_or_default();
     for entity in &prefab.entities {
         let local_id = entity.id;
         let mut entity = entity.clone();
@@ -115,6 +123,7 @@ fn stamp_prefab(
             entity.prefab_link = Some(crate::components::PrefabLink {
                 source: source.to_string(),
                 local_id,
+                node: nodes.get(&local_id).cloned(),
                 ..Default::default()
             });
         }

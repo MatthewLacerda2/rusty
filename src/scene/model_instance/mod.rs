@@ -11,9 +11,13 @@
 //!
 //! The `_LOD<n>` nodes under one parent sharing a base (and Blender's `.001`
 //! duplicate suffix) become one LODGroup where the first of them sits (`lod`).
-//! A later Scale Factor change re-imports the meshes but does not move the parts
-//! yet: an instance keeps no link to its model, so it cannot be told apart from
-//! entities that merely share its names (#1637, models as prefab sources).
+//!
+//! The spawn is a **linked prefab instance of the model** (#1637, Unity's model
+//! prefab): [`model_prefab`] builds the tree in a scratch scene and extracts it as
+//! a [`PrefabData`], and [`instantiate_model`] stamps that with a link to the file
+//! on every entity, keyed by node path (`scene::prefab::source`). So a Scale
+//! Factor change or a re-imported file reaches every instance (at once in the open
+//! scene, on load in the others), and a part moved by hand keeps its override.
 
 mod lod;
 
@@ -22,15 +26,66 @@ use glam::{Mat4, Vec3};
 use crate::asset::{Imported, ModelNode};
 use crate::components::TransformComponent;
 use crate::scene::asset_instance::instantiate_imported;
-use crate::scene::Scene;
+use crate::scene::prefab::instantiate_prefab_linked;
+use crate::scene::prefab::PrefabData;
+use crate::scene::{extract_prefab, Scene};
 
-/// Spawn the model at `path` (imported as `asset`) at `position`: a root entity
-/// named after the file, and its node tree under it. Returns the root's id.
+/// Spawn the model at `path` (imported as `asset`) at `position` as a linked
+/// instance of it: a root entity named after the file, and its node tree under
+/// it. Returns the root's id.
 pub fn instantiate_model(scene: &mut Scene, path: &str, asset: &Imported, position: Vec3) -> u32 {
-    let root = scene.add_entity(file_stem(path));
+    let root = instantiate_prefab_linked(scene, &model_prefab(path, asset), None, path);
     if let Some(mut t) = scene.world.transform_mut(root) {
         t.position = position;
     }
+    scene.update_all_colliders();
+    root
+}
+
+/// The model at `path` (imported as `asset`) as a prefab: its node tree spawned
+/// into a scratch scene and extracted. A node with no material of its own draws
+/// with one engine default per model, keyed `<path>::#default`, never the scratch
+/// entity's own key, which would name some other entity of the scene it is
+/// stamped into.
+pub fn model_prefab(path: &str, asset: &Imported) -> PrefabData {
+    let mut scratch = Scene::new();
+    let root = spawn_tree(&mut scratch, path, asset);
+    let mut prefab = extract_prefab(&scratch, root).expect("the root was just spawned");
+    share_default_material(&mut prefab, path);
+    prefab
+}
+
+/// Rename every per-entity default material of `prefab` to `<path>::#default`.
+fn share_default_material(prefab: &mut PrefabData, path: &str) {
+    let is_own = |key: &str| {
+        let id = key
+            .strip_prefix("entity_")
+            .and_then(|k| k.strip_suffix("_material"));
+        id.is_some_and(|id| id.parse::<u32>().is_ok())
+    };
+    let shared = format!("{path}::#default");
+    let owned: Vec<String> = prefab
+        .materials
+        .keys()
+        .filter(|k| is_own(k))
+        .cloned()
+        .collect();
+    for key in owned {
+        if let Some(asset) = prefab.materials.remove(&key) {
+            prefab.materials.entry(shared.clone()).or_insert(asset);
+        }
+    }
+    let slots = prefab.entities.iter_mut().flat_map(|e| &mut e.material);
+    for key in slots.flat_map(|m| &mut m.materials) {
+        if is_own(key) {
+            key.clone_from(&shared);
+        }
+    }
+}
+
+/// Spawn the root and the node tree under it into `scene`. Returns the root.
+fn spawn_tree(scene: &mut Scene, path: &str, asset: &Imported) -> u32 {
+    let root = scene.add_entity(file_stem(path));
     let nodes = asset.node_tree();
     let mut lods = lod::Lods::default();
     let mut spawned: Vec<u32> = Vec::with_capacity(nodes.len());
@@ -120,6 +175,8 @@ fn file_stem(path: &str) -> String {
 
 #[cfg(test)]
 mod bone_tests;
+#[cfg(test)]
+mod link_tests;
 #[cfg(test)]
 mod lod_tests;
 #[cfg(test)]

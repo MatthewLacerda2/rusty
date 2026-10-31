@@ -265,9 +265,16 @@ one name and never drift.
   empty node is an empty child; a `_LOD<n>` set of sibling nodes is one LODGroup (an
   Alt+D copy, `Crate_LOD0.001`, is a group of its own); what a skeleton's joint holds
   (a mesh on the joint, a gun under `Hand`) hangs from that bone's entity, so it
-  follows the animation. Returns the root's id. A Scale Factor or source change after
-  the spawn rescales the meshes but does **not** move the parts yet (#1637): set the
-  Scale Factor before instantiating (`Assets.SetModelImportSettings`).
+  follows the animation. Returns the root's id. The spawn is a **linked prefab
+  instance of the model** (#1637): every entity links to the model file, keyed by its
+  node path, so a Scale Factor change (`Assets.SetModelImportSettings`) or a re-written
+  file rebuilds the open scene's instances from the new import at once and every other
+  scene's on load, and an edit made to a part (a moved wall, a renamed node) is an
+  override that survives it. The prefab verbs below work on it (`ListPrefabOverrides`,
+  `RevertPrefabOverrides`, `ReimportPrefab`, `RevertPrefabField`) except the two
+  apply-to-source ones, which error: a model is read-only, as in Unity. A node added to
+  the file is not spawned into existing instances yet, and a node removed from it
+  leaves its entity as it was (#1665).
 
 - **`Scene.Instantiate(assetRef, [name], [x, y, z])`** — spawns one entity from an
   importable model sub-object reference (`path::sub_object`, the `reference` field

@@ -13,7 +13,9 @@
 //! aimed at a raw source entity), [`read_prefab_file`] / [`write_prefab_file`] are the
 //! one `.prefab` reader/writer, and clearing the instance's overrides afterwards reuses
 //! [`revert_instance_overrides`] / `link::propagate` so the instance re-baselines
-//! against the now-updated source. Scope mirrors #216: a flat instance of a flat prefab,
+//! against the now-updated source. A model source is read-only (#1637,
+//! `source::read_writable`): applying to it errors, as Unity can't apply to a model
+//! prefab, while reverting a field works as on any instance. Scope mirrors #216: a flat instance of a flat prefab,
 //! matched to source entities purely by the link's `local_id`.
 
 use std::collections::BTreeMap;
@@ -23,7 +25,8 @@ use crate::scene::prefab::instance::{self, instance_members};
 use crate::scene::prefab::link::propagate;
 use crate::scene::prefab::live::sync_overrides;
 use crate::scene::prefab::overrides::apply_overrides;
-use crate::scene::prefab::{read_prefab_file, write_prefab_file};
+use crate::scene::prefab::source::{read_source, read_writable};
+use crate::scene::prefab::write_prefab_file;
 use crate::scene::{revert_instance_overrides, PrefabData, Scene};
 
 /// Apply every override on the instance rooted at `root_id` back into its
@@ -33,7 +36,7 @@ use crate::scene::{revert_instance_overrides, PrefabData, Scene};
 pub fn apply_instance_to_source(scene: &mut Scene, root_id: u32) -> Result<usize, String> {
     let ids = instance_ids(scene, root_id)?;
     let source = link_source(scene, root_id)?;
-    let mut prefab = read_prefab_file(&source)?;
+    let mut prefab = read_writable(&source)?;
     sync_overrides(&mut scene.world, &ids);
     let mut applied = 0;
     for id in ids {
@@ -75,7 +78,7 @@ pub fn apply_instance_field_to_source(
     let one = overrides_of(scene, entity_id)
         .only(path)
         .ok_or_else(|| format!("entity {entity_id} has no override at {path}"))?;
-    let mut prefab = read_prefab_file(&source)?;
+    let mut prefab = read_writable(&source)?;
     let one = to_local_refs(scene, root, &one);
     if !write_onto_source(&mut prefab, local_id, &one) {
         return Err(format!("source has no entity with local id {local_id}"));
@@ -98,7 +101,7 @@ pub fn revert_instance_field(
     path: &str,
 ) -> Result<bool, String> {
     let root = instance_root(scene, entity_id)?;
-    read_prefab_file(&link_source(scene, root)?)?;
+    read_source(&link_source(scene, root)?)?;
     let ids = instance_ids(scene, root)?;
     sync_overrides(&mut scene.world, &ids);
     if !drop_override(scene, entity_id, path) {
