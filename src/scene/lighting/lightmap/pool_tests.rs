@@ -91,7 +91,7 @@ fn a_bake_is_byte_identical_on_one_worker_or_many() {
         lightmap_size(&scene.meshes[0], 5.0, 32).unwrap(),
     );
     assert!(
-        texels.len() > 2 * BATCH && texels.len() % BATCH != 0,
+        texels.len() > 2 * BATCH && !texels.len().is_multiple_of(BATCH),
         "{}",
         texels.len()
     );

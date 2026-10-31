@@ -29,6 +29,28 @@ struct Slot<P, L, T> {
     done: Mutex<Option<T>>,
 }
 
+impl<P, L, T> Slot<P, L, T> {
+    fn new(items: Vec<P>) -> Self {
+        Self {
+            left: AtomicUsize::new(items.len().div_ceil(BATCH).max(1)),
+            items: RwLock::new(items),
+            parts: Mutex::default(),
+            done: Mutex::new(None),
+        }
+    }
+
+    /// Once every batch is in: the chart's items move out (no reader is left) with
+    /// its results in item order, so both are freed when `finish` is done.
+    fn finish(&self, finish: impl FnOnce(Vec<P>, Vec<L>) -> T) {
+        let mut parts = std::mem::take(&mut *lock(&self.parts));
+        parts.sort_unstable_by_key(|(first, _)| *first);
+        let all = parts.into_iter().flat_map(|(_, out)| out).collect();
+        let items =
+            std::mem::take(&mut *self.items.write().unwrap_or_else(PoisonError::into_inner));
+        *lock(&self.done) = Some(finish(items, all));
+    }
+}
+
 /// Run `trace(chart, first, items)` over every batch of every chart on `threads`
 /// workers, then `finish(chart, items, results)` once per chart with its own items
 /// back and its results in item order. `None` when `progress` was cancelled before
@@ -51,15 +73,7 @@ where
         .enumerate()
         .flat_map(|(c, items)| (0..items.len().max(1)).step_by(BATCH).map(move |s| (c, s)))
         .collect();
-    let slots: Vec<Slot<P, L, T>> = charts
-        .into_iter()
-        .map(|items| Slot {
-            left: AtomicUsize::new(items.len().div_ceil(BATCH).max(1)),
-            items: RwLock::new(items),
-            parts: Mutex::default(),
-            done: Mutex::new(None),
-        })
-        .collect();
+    let slots: Vec<Slot<P, L, T>> = charts.into_iter().map(Slot::new).collect();
     let next = AtomicUsize::new(0);
     let work = || loop {
         if progress.is_cancelled() {
@@ -78,13 +92,7 @@ where
         lock(&slot.parts).push((first, out));
         // The worker that hands in a chart's last batch finishes it.
         if slot.left.fetch_sub(1, Ordering::AcqRel) == 1 {
-            let mut parts = std::mem::take(&mut *lock(&slot.parts));
-            parts.sort_unstable_by_key(|(first, _)| *first);
-            let all = parts.into_iter().flat_map(|(_, out)| out).collect();
-            // Every batch is in, so no reader is left: the chart's items move out.
-            let items =
-                std::mem::take(&mut *slot.items.write().unwrap_or_else(PoisonError::into_inner));
-            *lock(&slot.done) = Some(finish(c, items, all));
+            slot.finish(|items, all| finish(c, items, all));
         }
     };
     let threads = threads.clamp(1, batches.len().max(1));
