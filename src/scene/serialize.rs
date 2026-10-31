@@ -154,17 +154,12 @@ pub fn apply_world_data(scene: &mut Scene, data: SceneData) {
     apply(scene, data, false);
 }
 
-/// `from_disk`: the document came from a file, so its values are held; a World
-/// snapshot's already were.
-fn apply(scene: &mut Scene, mut data: SceneData, from_disk: bool) {
-    rehydrate_meshes(&mut data);
-    scene.meshes_read_at = crate::core::fs::written::written_since(u64::MAX).0;
-
-    // Start from the document's library, then fold in any material an entity still
-    // has staged (an Add-menu default restored from a snapshot before the inspector
-    // folded it in); an authored asset already under the key is kept (#997). Done
-    // before spawning so each entity's reference resolves.
-    scene.materials = data.materials;
+/// Start from the document's library, then fold in any material an entity still
+/// has staged (an Add-menu default restored from a snapshot before the inspector
+/// folded it in); an authored asset already under the key is kept (#997). Done
+/// before spawning so each entity's reference resolves.
+fn take_materials(scene: &mut Scene, data: &mut SceneData) {
+    scene.materials = std::mem::take(&mut data.materials);
     for entity in &mut data.entities {
         if let Some(pending) = entity.pending_material.take() {
             if let Some(reference) = &entity.material {
@@ -172,6 +167,15 @@ fn apply(scene: &mut Scene, mut data: SceneData, from_disk: bool) {
             }
         }
     }
+}
+
+/// `from_disk`: the document came from a file, so its values are held; a World
+/// snapshot's already were.
+fn apply(scene: &mut Scene, mut data: SceneData, from_disk: bool) {
+    rehydrate_meshes(&mut data);
+    scene.meshes_read_at = crate::core::fs::written::written_since(u64::MAX).0;
+
+    take_materials(scene, &mut data);
 
     let bone_parents = crate::scene::skeleton::take_bone_parents(&mut data.entities);
     let bone_refs = crate::scene::skeleton::take_bone_refs(&mut data.entities);
