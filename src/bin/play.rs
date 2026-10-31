@@ -29,7 +29,7 @@
 use std::path::{absolute, PathBuf};
 use std::process::exit;
 
-use rusty::core::project::Access;
+use rusty::core::project::{boot_scene, Access};
 use rusty::core::settings::video::parse_size;
 use rusty::dev::{demo, scenario};
 
@@ -70,17 +70,9 @@ fn main() {
     }
     let demo = demo.map(|d| from_here(&d));
     let audio = audio.map(|path| from_here(&path));
-    let opened = rusty::core::project::open(&rusty::core::project::locate(project), Access::Run);
-    let opened = match opened {
-        Ok(opened) => opened,
-        Err(e) => {
-            eprintln!("play: cannot open the project: {e}");
-            exit(2);
-        }
-    };
+    let opened = open_project(project);
     let startup = &opened.settings.build.startup_scene;
-    let scene = scene
-        .unwrap_or_else(|| rusty::core::project::boot_scene(&opened.root, startup, Access::Run));
+    let scene = scene.unwrap_or_else(|| boot_scene(&opened.root, startup, Access::Run));
 
     let run = scenario::Run {
         size,
@@ -92,6 +84,15 @@ fn main() {
         (None, None) => Err(USAGE.to_string()),
     };
     report(ran);
+}
+
+/// Open the project to run it; exits with status 2 when it can't be opened.
+fn open_project(project: Option<PathBuf>) -> rusty::core::project::Opened {
+    let opened = rusty::core::project::open(&rusty::core::project::locate(project), Access::Run);
+    opened.unwrap_or_else(|e| {
+        eprintln!("play: cannot open the project: {e}");
+        exit(2);
+    })
 }
 
 /// Paths are named from the launch directory; opening the project moves it.
