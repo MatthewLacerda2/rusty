@@ -98,9 +98,10 @@ pub fn subdivided_geometry(
         Primitive::Box => Some(primitives::generate_box(1.0, 1.0, 1.0)),
         Primitive::Sphere => Some(primitives::generate_sphere(0.5, 16, 16)),
         Primitive::Plane => Some(primitives::generate_plane_grid(15.0, 15.0, subdivisions)),
+        // Unity's Cylinder: diameter 1, height 2, along Y (#1621).
         Primitive::Cylinder => Some(primitives::generate_cylinder(
-            Vec3::new(0.0, -0.5, 0.0),
-            Vec3::new(0.0, 0.5, 0.0),
+            Vec3::new(0.0, -1.0, 0.0),
+            Vec3::new(0.0, 1.0, 0.0),
             0.5,
             12,
         )),
