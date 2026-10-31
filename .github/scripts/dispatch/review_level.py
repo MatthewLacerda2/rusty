@@ -29,6 +29,12 @@ TABLE: dict[str, tuple[str, ...]] = {
         # field lives (a component's own module): #1587 changed the format from
         # `src/components/mesh/` and read `medium`
         "tests/scene_format/scene.fingerprint",
+        # surface-shader variants baked to `assets/shaders/` import these symbols by
+        # name, so a rename strands every baked file (#1638; #1628 read `medium`)
+        "engine/shaders/forward/bindings.wgsl",
+        "src/shadergen/",
+        # the `.demo` file a recorded playtest is saved as (#1581)
+        "src/dev/demo/",
     ),
     "determinism": (
         "src/core/random.rs",  # the seeded Random resource
@@ -36,6 +42,13 @@ TABLE: dict[str, tuple[str, ...]] = {
         "src/api/random.rs",  # Random, the script's view of that stream
         "clippy.toml",  # the disallowed clocks, RNGs and std hash maps
         "tools/lint/src/determinism/",  # `make determinism`, the guard's opt-outs
+        # which modules are sim and which crates each may name: a new crate in a sim
+        # row is new code the sim runs (#1634 moved `ui`'s text layout onto two
+        # crates and read `medium`)
+        "tools/lint/src/layers/table.rs",
+        # record and replay: a replay that diverges is a desynced harness (#1636's
+        # seek/restore read `medium`)
+        "src/dev/demo/",
     ),
     "scripting sandbox": (
         "src/scripting/sandbox/",  # the gameplay VM's stdlib: no os/io, require's reach
