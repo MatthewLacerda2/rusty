@@ -105,7 +105,7 @@ impl ColliderComponent {
             active: self.active,
             shape: self.shape.clone(),
             is_trigger: self.is_trigger,
-            material: self.material.clone(),
+            material: self.material,
             shared_mesh: self.shared_mesh.as_ref().map(SharedMesh::without_geometry),
             aabb_min: self.aabb_min,
             aabb_max: self.aabb_max,
