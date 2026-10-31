@@ -31,8 +31,8 @@ class Judgement(unittest.TestCase):
         self.assert_refused(verdict(*both(), pull={**READY, "isDraft": True}), "draft")
 
     def test_no_run_at_all_is_refused(self):
-        # The headline: not a red check but an absent one — and with no
-        # required checks on `main`, GitHub would merge it.
+        # The headline: not a red check but an absent one. `main`'s required
+        # checks (#491) block it on GitHub too; the verdict refuses it first.
         self.assert_refused(verdict(), "no `ci` run exists")
 
     def test_green_ci_without_a_lint_run_is_half_a_check(self):

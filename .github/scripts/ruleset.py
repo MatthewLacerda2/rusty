@@ -35,6 +35,9 @@ import ghrest
 
 FILE = Path(__file__).resolve().parents[1] / "rulesets" / "main.json"
 FIELDS = ("name", "target", "enforcement", "conditions", "bypass_actors")
+# Keys GitHub leaves out of its answer for a caller without write access to the
+# ruleset: absent is "cannot read", never drift.
+WITHHELD = ("bypass_actors",)
 
 
 def covers(want: object, live: object) -> bool:
@@ -49,6 +52,11 @@ def covers(want: object, live: object) -> bool:
     return want == live
 
 
+def unread(want: dict, live: dict | None) -> list[str]:
+    """The committed keys this token cannot see on the live ruleset."""
+    return [key for key in WITHHELD if live is not None and key in want and key not in live]
+
+
 def drift(want: dict, live: dict | None) -> list[str]:
     """Each way the live ruleset differs from the committed one, in words."""
     if live is None:
@@ -56,7 +64,7 @@ def drift(want: dict, live: dict | None) -> list[str]:
     found = [
         f"`{key}`: committed {json.dumps(want[key])}, live {json.dumps(live.get(key))}"
         for key in FIELDS
-        if key in want and not covers(want[key], live.get(key))
+        if key in want and key not in unread(want, live) and not covers(want[key], live.get(key))
     ]
     wanted = {rule["type"]: rule for rule in want.get("rules", [])}
     present = {rule["type"]: rule for rule in live.get("rules") or []}
@@ -110,6 +118,8 @@ def main(argv: list[str], gh: Gh | None = None, repo: str | None = None) -> int:
         print(f"ruleset: applied {FILE.name} to {repo}")
         current = live(gh, repo, want["name"])
         gaps = drift(want, current)
+    for key in unread(want, current):
+        print(f"ruleset: `{key}` cannot be read with this token (it needs write access); not compared")
     for gap in gaps:
         print(f"ruleset: drift: {gap}")
     if not gaps:
