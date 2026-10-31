@@ -6,7 +6,9 @@
 //! are recorded as one more object: the stack keeps a copy as a baseline, and an
 //! edit that leaves the scene differing from it records the fields it changed, as
 //! they were before ([`LevelDelta`]). One list of fields, so the copy, the comparison and the restore never
-//! disagree about what the scene level is.
+//! disagree about what the scene level is, and that list is the scene state
+//! inventory's authored fields (`scene::state::inventory`, #1649): a field is
+//! undoable because it is classified authored, not because this file names it.
 //!
 //! **Bake outputs are not edits** (Unity's Undo never reverts a lighting bake):
 //! the lightmaps are not on the list at all, and of the probe sets only what the
@@ -22,7 +24,7 @@ use crate::scene::lighting::reflection_probe::ReflectionProbeSet;
 use crate::scene::Scene;
 
 macro_rules! scene_level {
-    ($($field:ident: $ty:ty => $same:ident, $put:ident;)*) => {
+    (authored { $($field:ident: $ty:ty => $same:ident, $put:ident;)* }) => {
         /// The scene-level state, as values: the open edit's baseline.
         #[derive(Clone, Debug)]
         pub(super) struct SceneLevel {
@@ -36,10 +38,6 @@ macro_rules! scene_level {
         pub(super) struct LevelDelta {
             $($field: Option<$ty>,)*
         }
-
-        /// The `Scene` fields the scene level is made of, as `SceneData` names them.
-        #[cfg(test)]
-        pub(super) const FIELDS: &[&str] = &[$(stringify!($field)),*];
 
         impl SceneLevel {
             /// `scene`'s scene-level state, copied.
@@ -83,20 +81,8 @@ macro_rules! scene_level {
     };
 }
 
-scene_level! {
-    skybox_path: String => eq, assign;
-    ambient_color: glam::Vec3 => eq_or_bytes, assign;
-    ambient_intensity: f32 => eq_or_bytes, assign;
-    sky: crate::scene::SkySettings => eq_or_bytes, assign;
-    nav_settings: crate::scene::nav_settings::NavMeshSettings => eq_or_bytes, assign;
-    fog: crate::scene::FogSettings => eq_or_bytes, assign;
-    layers: crate::scene::LayerRegistry => eq_or_bytes, assign;
-    collision_matrix: crate::scene::CollisionMatrix => eq_or_bytes, assign;
-    materials: std::collections::BTreeMap<String, crate::scene::MaterialAsset> => eq_or_bytes, assign;
-    probes: ProbeVolume => same_probes, put_probes;
-    reflection_probes: ReflectionProbeSet => same_reflections, put_reflections;
-    lighting_settings: crate::scene::lighting::LightingSettings => eq_or_bytes, assign;
-}
+// The scene level is the inventory's authored fields (`scene::state`, #1649).
+crate::scene::state::inventory::authored_fields!(scene_level {});
 
 fn eq<T: PartialEq>(a: &T, b: &T) -> bool {
     a == b

@@ -1,7 +1,11 @@
 //! Undoing a Destroy brings the entity back as it was (#1631): lit by the last
-//! bake, and a skinned one bound to its restored bones.
+//! bake, wearing the decals it owned (#1649), and a skinned one bound to its
+//! restored bones.
+
+use glam::Vec3;
 
 use crate::scene::authoring::{create_entity, Primitive};
+use crate::scene::decal::DecalSpec;
 use crate::scene::lighting::lightmap::LightmapEntry;
 use crate::scene::{to_scene_data, Scene};
 
@@ -60,4 +64,32 @@ fn an_undone_destroy_of_a_skinned_entity_binds_its_skeleton() {
         bound, bones,
         "bound to its restored bones, not in bind pose"
     );
+}
+
+/// An owned decal goes with its owner, comes back with the Undo in its place in
+/// the blend order, and goes again with the Redo.
+#[test]
+fn an_undone_destroy_puts_its_decals_back_in_blend_order() {
+    let mut scene = Scene::new();
+    let wall = create_entity(&mut scene, "Wall", Some(Primitive::Box));
+    let mut stamp = |owner| {
+        scene.spawn_decal(
+            Vec3::ZERO,
+            Vec3::Y,
+            DecalSpec {
+                owner,
+                ..Default::default()
+            },
+        )
+    };
+    let ids = [stamp(None), stamp(Some(wall)), stamp(None)].map(Option::unwrap);
+    let order = |scene: &Scene| scene.decals.iter().map(|d| d.id).collect::<Vec<_>>();
+    destroy(&mut scene, wall);
+    assert_eq!(order(&scene), [ids[0], ids[2]]);
+    scene.undo();
+    assert_eq!(order(&scene), ids);
+    scene.redo();
+    assert_eq!(order(&scene), [ids[0], ids[2]]);
+    scene.undo();
+    assert_eq!(order(&scene), ids);
 }

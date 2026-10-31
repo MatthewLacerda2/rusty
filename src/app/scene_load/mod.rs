@@ -19,21 +19,20 @@ mod boot;
 pub use boot::load_boot_scene;
 
 use crate::physics::PhysicsWorld;
-use crate::scene::SceneId;
 
 use super::game::GameWorld;
 use super::resources::Resources;
 use super::world::World;
 
-/// Where an editor Play session started: the scene file and the scene's runtime
-/// identity, so Stop can put both back after a play-mode `Scene.Load` swapped them.
+/// Where an editor Play session started: the scene file, so Stop can put it back
+/// after a play-mode `Scene.Load` swapped it. The scene's identity comes back with
+/// the edit snapshot (`SceneSnapshot`, #1649).
 pub struct PlayOrigin {
     path: Option<String>,
-    scene: SceneId,
 }
 
 impl GameWorld {
-    /// Remember the scene file and identity Play starts in (taken with the snapshot).
+    /// Remember the scene file Play starts in (taken with the snapshot).
     pub(super) fn capture_play_origin(&mut self) {
         self.resources.play_origin = Some(PlayOrigin {
             path: self
@@ -42,26 +41,17 @@ impl GameWorld {
                 .scene_path_cell()
                 .borrow()
                 .clone(),
-            scene: self.world.scene.borrow().id(),
         });
     }
 
-    /// On Stop, after the snapshot restore: drop any load or destroy still queued
-    /// (a paused Play can leave one, #1298) and every
-    /// `DontDestroyOnLoad` mark, and hand back the scene file and identity Play
-    /// started in: the restored World is that scene again, so a bake waiting for Stop
-    /// still applies (#1374). The renderer's caches keyed by that identity are as
-    /// valid as after a Stop with no load (a static shadow bake records its scene,
-    /// and the swapped-in scene's bakes replaced it).
+    /// On Stop, after the snapshot restore: hand back the scene file Play started
+    /// in. The snapshot gave back the scene's identity, so a bake waiting for Stop
+    /// still applies (#1374), and leaving Play dropped any load or destroy still
+    /// queued and every `DontDestroyOnLoad` mark (`Scene::set_playing`).
     pub(super) fn restore_play_origin(&mut self) {
-        let mut scene = self.world.scene.borrow_mut();
-        scene.pending_load = None;
-        scene.pending_destroy.clear(); // the next Play must not destroy edit entities
-        scene.persistent.clear();
         let Some(origin) = self.resources.play_origin.take() else {
             return;
         };
-        scene.restore_id(origin.scene);
         *self.resources.script_manager.scene_path_cell().borrow_mut() = origin.path;
     }
 }

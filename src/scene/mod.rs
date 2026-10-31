@@ -28,6 +28,7 @@
 //!   io        — save/load, path + extension, default-scene seeding
 //!   default_scene — the default scene's builder, materials and seeded assets
 //!   snapshot  — edit-mode snapshot/restore around Play
+//!   state     — the one inventory of the scene's state and what each lifecycle owes it
 //!   undo      — edit mode's Undo / Redo: per-object records, grouped by gesture
 //!   runtime   — play-mode requests drained at the tick tail: destroys, scene loads
 
@@ -59,6 +60,7 @@ pub mod serialize;
 pub mod settings;
 pub mod skeleton;
 pub mod snapshot;
+pub mod state;
 pub mod undo;
 pub mod world_cache;
 

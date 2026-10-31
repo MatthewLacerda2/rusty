@@ -17,10 +17,15 @@
 //! an id a script can remove it by. Ageing runs on the fixed sim tick
 //! ([`DecalSet::tick`]), never the wall clock; the registry is [`DecalSet`].
 //!
-//! **Persistence (#1518).** A load drops every decal but the [`Decal::persist`]
-//! ones, which `Scene::swap_in` carries across (`persist.rs`). Nothing is saved to
-//! disk, and Stop's snapshot restore puts back the edit-mode decals, dropping every
-//! one Play stamped.
+//! **Persistence (#1518).** A Play-mode load drops every decal but the
+//! [`Decal::persist`] ones, which `Scene::swap_in` carries across (`persist.rs`);
+//! an edit-mode load drops them all. Nothing is saved to disk, and Stop's snapshot
+//! restore puts back the edit-mode decals, dropping every one Play stamped.
+//!
+//! **Owned decals follow their owner (#1649).** The despawn door drops a destroyed
+//! entity's decals with it (`DecalSet::take_owned`), and an Undo of the Destroy
+//! puts them back in their place in the blend order (`DecalSet::put_back`), as
+//! a projector under a GameObject goes and comes back with it in Unity.
 
 use crate::asset::MapRef;
 use glam::camera::rh::view::look_to_mat4;

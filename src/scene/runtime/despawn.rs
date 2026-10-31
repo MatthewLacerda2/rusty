@@ -34,9 +34,17 @@ impl Scene {
     /// `exit_play`) calls this outside tests, so every reader sees the state
     /// change at the same moment.
     /// Entering Play forgets the Undo history: Stop restores Play's changes.
+    /// Leaving it drops what Play asked for and never got (a load or destroy a
+    /// paused Play left queued, #1298) and every `DontDestroyOnLoad` mark: the
+    /// scene state inventory's runtime class (`scene::state`, #1649).
     pub(crate) fn set_playing(&mut self, playing: bool) {
         if playing && !self.playing {
             self.clear_undo();
+        }
+        if !playing && self.playing {
+            self.pending_load = None;
+            self.pending_destroy.clear(); // the next Play must not destroy edit entities
+            self.persistent.clear();
         }
         self.playing = playing;
     }
@@ -70,7 +78,7 @@ impl Scene {
 
     /// Despawn every entity of `ids` together, then drop the scene's own references
     /// to them (#1264): the selection, `DontDestroyOnLoad`, a queued destroy, their
-    /// lightmap entries and shader overrides. The World's references go in
+    /// lightmap entries, the decals they own and their shader overrides. The World's references go in
     /// `World::despawn_all`, one pass for the batch. Every despawn in the scene runs
     /// through here, saying `why` it may skip script teardown.
     pub(crate) fn despawn_batch(&mut self, ids: &BTreeSet<u32>, why: Despawn) {
@@ -79,7 +87,8 @@ impl Scene {
             "an edit-mode despawn of {ids:?} in Play skips script teardown; use Scene::destroy"
         );
         // Before the World forgets them: a recorded edit keeps their entries (#1631).
-        self.keep_dropped_lightmaps(ids);
+        let decals = self.decals.take_owned(ids);
+        self.keep_dropped(ids, decals);
         self.world.despawn_all(ids);
         for &id in ids {
             self.shader_overrides.clear(id, None);

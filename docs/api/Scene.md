@@ -200,7 +200,10 @@ scene — additive loading is not supported.
   stay put in world space, keeping their id and age.
 - **Edit mode:** `Scene.Load` is the API face of the editor's File ▸ Open — the
   scene loads immediately (no callbacks: no scripts run in edit mode) and becomes
-  the current scene file that `Scene.Save()` writes back to. If the scene document
+  the current scene file that `Scene.Save()` writes back to. It drops every
+  decal of the old scene, `persist = true` ones too, as do File ▸ Open and the
+  editor reloading a scene file changed on disk: persistence is for a Play-mode
+  load only (#1649). If the scene document
   loads but its lighting sidecar does not, the scene is still loaded and still the
   current file (probes keep zero SH); `Load` returns the warning as a string.
 - **Editor Play:** a `Scene.Load` swaps the running world, and **Stop restores
