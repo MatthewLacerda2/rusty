@@ -43,7 +43,7 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 pub use agent::{CLAUDE_FILE, MCP_FILE};
-pub use boot::{boot_scene, remember_scene, LAST_SCENE_PATH};
+pub use boot::{boot_scene, remember_scene, scene_to_remember, BootPlan, LAST_SCENE_PATH};
 #[cfg(test)]
 pub(crate) use engine::commit::pin as pin_engine;
 pub use engine::commit::{engine_commit, engine_order, UNKNOWN_COMMIT};

@@ -10,7 +10,7 @@
 use std::path::{Path, PathBuf};
 
 use super::bundled::{self, STARTER_MATERIALS, STARTER_MATERIALS_PATH};
-use super::manifest::{SeedManifest, SEED_MANIFEST_PATH};
+use super::manifest::{SeedManifest, SeedOutcome, SEED_MANIFEST_PATH};
 use super::scene_json;
 use crate::core::paths::native;
 use crate::scene::{default_scene, Scene};
@@ -36,21 +36,40 @@ pub fn build_default_scene(scene: &mut Scene) -> String {
 /// manifest's [`seed_once`](SeedManifest::seed_once): a new project gets it, an
 /// unedited copy follows the engine's default, and a deleted one stays deleted
 /// (#1618), as Unity never recreates a template's `SampleScene`. Its texture and
-/// shader are seeded every time, each only if missing. Which scene then opens is
-/// `core::project::boot_scene`'s call, not this one's.
+/// shader are seeded with it, each only if missing, and not at all once the scene
+/// is deleted (File ▸ Reset Scene still brings both back). Which scene then opens
+/// is `core::project::boot_scene`'s call, not this one's.
 pub fn seed_default_scene() {
-    default_scene::seed_default_assets();
+    let manifest = Path::new(SEED_MANIFEST_PATH);
+    let dest = native(DEFAULT_SCENE_PATH);
+    seed_default_scene_at(manifest, &dest, default_scene::seed_default_assets);
+}
+
+/// [`seed_default_scene`] against explicit paths; `seed_assets` seeds the scene's
+/// texture and shader, run unless the scene's outcome is
+/// [`SeedOutcome::Deleted`].
+fn seed_default_scene_at(
+    manifest_path: &Path,
+    dest: &Path,
+    seed_assets: impl FnOnce(),
+) -> Option<SeedOutcome> {
     let json = match default_scene_bytes() {
         Ok(json) => json,
-        Err(e) => return eprintln!("[Scene] seeding the default scene failed: {e}"),
+        Err(e) => {
+            eprintln!("[Scene] seeding the default scene failed: {e}");
+            return None;
+        }
     };
-    let manifest_path = Path::new(SEED_MANIFEST_PATH);
     let mut manifest = SeedManifest::load(manifest_path);
     let hint = "File ▸ Reset Scene to take the new one";
-    manifest.seed_once(&native(DEFAULT_SCENE_PATH), &json, hint);
+    let outcome = manifest.seed_once(dest, &json, hint);
     if let Err(e) = manifest.save() {
         eprintln!("[Seed] writing {} failed: {e}", manifest_path.display());
     }
+    if outcome != SeedOutcome::Deleted {
+        seed_assets();
+    }
+    Some(outcome)
 }
 
 /// Seed the bundled default scripts and the starter materials into the project on

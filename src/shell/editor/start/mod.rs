@@ -67,8 +67,8 @@ fn prepare(
     }
     boot::seed_project_workspace();
     let startup = &opened.settings.build.startup_scene;
-    let scene = crate::core::project::boot_scene(&opened.root, startup, Access::Edit);
-    let mut game = boot::load_game(&scene);
+    let plan = crate::core::project::boot_scene(&opened.root, startup, Access::Edit);
+    let mut game = boot::load_game(&plan.unwrap_or_default());
     // Editor scripting works outside Play, as in Unity (#1339): the console line
     // and MCP `eval` drive the edit scene; Stop brings this runtime back.
     let init = game.init_edit_runtime();

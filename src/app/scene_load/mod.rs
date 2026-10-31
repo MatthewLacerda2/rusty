@@ -14,6 +14,10 @@
 //! Editor Play: Stop restores the edit snapshot taken at Play — the scene Play was
 //! pressed in, not the one play ended in — together with its scene-file path.
 
+mod boot;
+
+pub use boot::load_boot_scene;
+
 use crate::physics::PhysicsWorld;
 use crate::scene::SceneId;
 
