@@ -37,6 +37,7 @@ fn a_nil_id_reads_as_a_missing_entity() {
     );
     assert_eq!(eval("return Scene.IsActive(nil)"), "false");
     assert_eq!(eval("return Scene.IsStatic(nil)"), "false");
+    assert_eq!(eval("return Scene.GetName(nil) == nil"), "true");
 }
 
 #[test]
@@ -46,6 +47,7 @@ fn a_nil_id_on_a_write_is_an_error_naming_the_verb() {
     for (line, verb) in [
         ("Scene.SetActive(nil, true)", "Scene.SetActive"),
         ("Scene.SetStatic(nil, true)", "Scene.SetStatic"),
+        ("Scene.SetName(nil, 'x')", "Scene.SetName"),
         (
             "Transform.SetPosition(nil, 1, 2, 3)",
             "Transform.SetPosition",
