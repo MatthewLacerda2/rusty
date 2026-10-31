@@ -9,12 +9,12 @@
 //
 // It shares group(0) with the forward pass: camera at binding 0, the SAME lighting
 // uniform at binding 1. Its look is the scene's sky settings (`lighting.sky`, #1620);
-// a colour they leave unset is derived from `lighting.ambient.color`, the very term
-// the surface shader uses for hemisphere ambient, so by default the background and
-// the lighting always agree.
+// a colour they leave unset is derived from `lighting.ambient.color`, the `Color`
+// mode term the surface shader uses for hemisphere ambient, so by default a `Color`
+// scene's background and lighting agree. A `Gradient` ambient's three colours light
+// the surfaces only: the sky never follows them (#1647, as Unity's skybox).
 
-#import lighting::ambient::AmbientLight
-#import common::{CameraUniforms, ProceduralSky, VertexInput, procedural_sky, sky_fog}
+#import common::{AmbientLight, CameraUniforms, ProceduralSky, VertexInput, procedural_sky, sky_fog}
 #import sky::motion::{SkyTargets, sky_targets}
 
 @group(0) @binding(0)
@@ -23,7 +23,7 @@ var<uniform> camera: CameraUniforms;
 // A prefix of the forward pass's `LightingUniforms`: we only need the leading
 // `ambient` term and the procedural sky's settings (#1620), and a uniform binding
 // may declare a struct smaller than the bound buffer. `AmbientLight` is the shared
-// `lighting::ambient` one, so the prefix can't drift from it.
+// `common` one, so the prefix can't drift from it.
 struct SkyLighting {
     ambient: AmbientLight,
     sky: ProceduralSky,

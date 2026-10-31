@@ -13,9 +13,12 @@
 //! `Color` semantics (rusty's own entity; Unity has none).
 //!
 //! **One evaluation, three readers**: [`Scene::drawn_ambient`] is what a frame draws,
-//! and its [`AmbientRadiance`] is the one function of direction the forward shader
-//! (`lighting::ambient::ambient_radiance`, a GPU test holds the two equal), the lightmap trace's
-//! escaping ray and the light-probe fill all evaluate. The procedural sky follows
+//! and its [`AmbientRadiance`] is the one function the forward shader
+//! (`lighting::ambient::ambient_radiance`, a GPU test holds the two equal), the
+//! lightmap trace's escaping ray and the light-probe fill all evaluate. The shader
+//! shades a surface with [`AmbientRadiance::at`]; the bakes take its `incoming`
+//! radiance, whose cosine average is `at` again, so an open baked or probe-lit
+//! surface matches an unbaked one (exactly in `Color`, up to L2 in `Gradient`). The procedural sky follows
 //! only the `Color` colour (`SkySettings::resolved`), as Unity's skybox is apart
 //! from its ambient.
 //!

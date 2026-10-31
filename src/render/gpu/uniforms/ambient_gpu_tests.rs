@@ -1,11 +1,11 @@
 //! The ambient's one evaluation (#1647), run on the GPU: `lighting::ambient::ambient_radiance`
 //! fed the uniform a scene uploads must draw, in `Color` mode, exactly what the
 //! forward pass drew before the gradient, and in either mode what the CPU's
-//! `AmbientRadiance::at` (lightmaps, probes) computes.
+//! `AmbientRadiance::at` (what the lightmap and probe bakes are held to) computes.
 
 use glam::Vec3;
 
-use crate::render::draw::lighting::scene_ambient;
+use crate::render::draw::scene_ambient;
 use crate::scene::{AmbientMode, Scene};
 
 /// `flat_ambient` as `main` drew it at fe8afe0, before the gradient: frozen here as
@@ -19,7 +19,7 @@ fn today_ambient(color: vec3<f32>, intensity: f32, N: vec3<f32>) -> vec3<f32> {
 ";
 
 /// What the probe reads, imported ahead of the `AMBIENT` it declares.
-const IMPORTS: &str = "#import lighting::ambient::{AmbientLight, ambient_radiance}\n";
+const IMPORTS: &str = "#import common::AmbientLight\n#import lighting::ambient::ambient_radiance\n";
 
 /// Per invocation (128): a unit direction spread over the sphere, then the ambient
 /// under `AMBIENT` along it, and today's.

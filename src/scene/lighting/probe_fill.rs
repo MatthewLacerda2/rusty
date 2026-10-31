@@ -2,8 +2,7 @@
 //!
 //! This is the deterministic, render-free stand-in for the real probe bake (#241).
 //! It projects the scene's environment — the drawn ambient (`Scene::drawn_ambient`,
-//! the forward shader's own function of direction, #1647) plus the active
-//! directional light — into each probe's L2 SH, so the whole probe path
+//! #1647) plus the active directional light — into each probe's L2 SH, so the whole probe path
 //! (placement → interpolation → shader sampling) is testable headlessly *before*
 //! the GPU capture lands. It deliberately ignores occlusion and bounce: a probe
 //! sees the same analytic sky+sun regardless of geometry. The real capture replaces
@@ -57,9 +56,12 @@ impl AnalyticEnv {
         }
     }
 
-    /// Project this environment into an L2 SH probe. The ambient is integrated over
-    /// the sphere (its hemisphere or trilight is linear in `y`, so L0 and L1 carry
-    /// it); the sun is a single bright directional sample.
+    /// Project this environment into an L2 SH probe. The ambient's radiance
+    /// (`AmbientRadiance::incoming`) is integrated over the sphere: it is built so the
+    /// probe's cosine-convolved read-back over π is the forward shader's flat ambient,
+    /// exactly for the `Color` hemisphere (linear in `y`, carried by L0 and L1) and up
+    /// to the L2 cut for the `Gradient` trilight (its horizon kink needs L2). The sun
+    /// is a single bright directional sample.
     pub fn project(&self) -> Sh9 {
         let mut sh = Sh9::zero();
         // The ambient, integrated over the sphere. A Fibonacci sphere is
@@ -67,7 +69,7 @@ impl AnalyticEnv {
         let dirs = fibonacci_sphere(512);
         let w = 4.0 * std::f32::consts::PI / dirs.len() as f32;
         for d in &dirs {
-            sh.add_sample(*d, self.sky.at(*d), w);
+            sh.add_sample(*d, self.sky.incoming(*d), w);
         }
         // Directional sun: one delta-ish sample. Weighted so its reconstructed
         // contribution reads as a plausible directional bounce, not a full sphere.
@@ -98,7 +100,8 @@ pub fn analytic_fill(scene: &mut Scene) {
 
 /// `n` near-uniformly distributed unit directions on the sphere (the Fibonacci
 /// lattice). Deterministic and roughly equal-area, so each sample carries the same
-/// solid-angle weight — exactly what an SH projection of a constant field needs.
+/// solid-angle weight `4π / n`: the quadrature an SH projection of a smooth field
+/// over the sphere takes.
 pub fn fibonacci_sphere(n: usize) -> Vec<Vec3> {
     let golden = std::f32::consts::PI * (3.0 - 5.0_f32.sqrt()); // golden angle
     let mut v = Vec::with_capacity(n);
@@ -113,59 +116,5 @@ pub fn fibonacci_sphere(n: usize) -> Vec<Vec3> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::components::{LightComponent, LightType};
-    use glam::Quat;
-
-    /// A default scene with a set ambient term. Built through `Scene::new` rather
-    /// than functional struct-update: the scene's runtime `id` is private (#355), and
-    /// going through the constructor is what guarantees every scene gets its own.
-    fn scene_with_ambient(color: Vec3, intensity: f32) -> Scene {
-        let mut scene = Scene::new();
-        scene.ambient_color = color;
-        scene.ambient_intensity = intensity;
-        scene
-    }
-
-    #[test]
-    fn fill_is_position_dependent() {
-        let mut scene = scene_with_ambient(Vec3::new(0.2, 0.3, 0.4), 1.0);
-        scene.probes.add_probe(Vec3::new(0.0, 0.0, 0.0));
-        scene.probes.add_probe(Vec3::new(0.0, 4.0, 0.0));
-        analytic_fill(&mut scene);
-        let low = scene.probes.probes[0].sh.eval(Vec3::Y);
-        let high = scene.probes.probes[1].sh.eval(Vec3::Y);
-        assert!(
-            high.x > low.x,
-            "expected height to brighten: {high} vs {low}"
-        );
-    }
-
-    #[test]
-    fn directional_sun_adds_directionality() {
-        let mut scene = scene_with_ambient(Vec3::splat(0.1), 1.0);
-        let id = scene.add_entity("Sun".to_string());
-        // Point the light's -Z straight down, so the sample direction is +Y.
-        if let Some(mut transform) = scene.world.transform_mut(id) {
-            transform.rotation = Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2);
-        }
-        scene.world.set_light(
-            id,
-            Some(LightComponent {
-                light_type: LightType::Directional,
-                intensity: 5.0,
-                range: 0.0,
-                inner_cone: 0.0,
-                outer_cone: 0.0,
-                ..crate::scene::authoring::default_light()
-            }),
-        );
-        scene.probes.add_probe(Vec3::ZERO);
-        analytic_fill(&mut scene);
-        let sh = scene.probes.probes[0].sh;
-        let up = sh.eval(Vec3::Y).x;
-        let down = sh.eval(Vec3::NEG_Y).x;
-        assert!(up > down, "sun from above should brighten up-normals");
-    }
-}
+#[path = "probe_fill_tests.rs"]
+mod tests;

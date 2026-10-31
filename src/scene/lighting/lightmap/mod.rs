@@ -44,6 +44,8 @@ pub use raster::{lightmap_size, MIN_RESOLUTION};
 pub use set::{LightmapEntry, LightmapSet};
 
 #[cfg(test)]
+mod ambient_tests;
+#[cfg(test)]
 mod atlas_tests;
 #[cfg(test)]
 mod casting_tests;

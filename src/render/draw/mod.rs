@@ -4,7 +4,7 @@
 
 pub(crate) mod batch;
 mod camera;
-pub(crate) mod lighting;
+mod lighting;
 pub(crate) mod materials;
 mod overlays;
 mod pass;
@@ -15,6 +15,10 @@ pub(crate) mod uniforms;
 
 #[cfg(test)]
 mod inactive_parent_tests;
+
+/// The frame's ambient uniform, for the GPU probe that runs it (`ambient_gpu_tests`).
+#[cfg(test)]
+pub(crate) use lighting::scene_ambient;
 
 use self::stack::StackPass;
 use crate::asset::MapRef;

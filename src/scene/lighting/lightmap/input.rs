@@ -94,9 +94,9 @@ pub struct BakeLight {
 pub struct BakeScene {
     pub meshes: Vec<BakeMesh>,
     pub lights: Vec<BakeLight>,
-    /// What a ray escaping the scene sees along its direction: the drawn ambient
-    /// (`Scene::drawn_ambient`), the very function the forward shader shades an
-    /// unbaked surface with (#1647).
+    /// The drawn ambient (`Scene::drawn_ambient`, #1647): a ray escaping the scene
+    /// sees its `incoming` radiance, so an open texel bakes to the `at` the forward
+    /// shader shades an unbaked surface with.
     pub sky: crate::scene::AmbientRadiance,
 }
 

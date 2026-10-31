@@ -101,3 +101,37 @@ fn the_default_gradient_lights_as_the_default_colour() {
         assert!(color.at(dir).abs_diff_eq(gradient.at(dir), 1e-6), "{dir}");
     }
 }
+
+/// `incoming`'s cosine average over the hemisphere around a normal is `at` (exactly
+/// for the hemisphere, up to L2 for the trilight), by a fine quadrature with no
+/// noise, so the trace's and the probe fill's own tests only add their sampling.
+#[test]
+fn the_incoming_radiance_cosine_averages_to_the_unbaked_ambient() {
+    let average = |r: &AmbientRadiance, n: Vec3| {
+        let dirs = crate::scene::lighting::probe_fill::fibonacci_sphere(20_000);
+        let sum: Vec3 = dirs
+            .iter()
+            .map(|d| r.incoming(*d) * n.dot(*d).max(0.0))
+            .sum();
+        sum * (4.0 / dirs.len() as f32) // 4π / n solid angle, over π
+    };
+    let hemi = AmbientRadiance::Hemisphere(Vec3::new(0.4, 0.8, 1.2));
+    assert!(hemi.incoming(Vec3::NEG_Y).min_element() >= 0.0);
+    let tri = AmbientRadiance::Trilight {
+        sky: Vec3::new(0.1, 0.3, 1.2),
+        equator: Vec3::splat(0.4),
+        ground: Vec3::new(1.2, 0.5, 0.1),
+    };
+    for n in [
+        Vec3::Y,
+        Vec3::NEG_Y,
+        Vec3::X,
+        Vec3::new(1.0, -1.0, 0.5).normalize(),
+    ] {
+        assert!(average(&hemi, n).abs_diff_eq(hemi.at(n), 2e-3), "{n}");
+        assert!(average(&tri, n).abs_diff_eq(tri.at_l2(n), 2e-3), "{n}");
+        assert!(hemi.at_l2(n).abs_diff_eq(hemi.at(n), 1e-6), "{n}");
+    }
+    // The L2 cut softens the trilight's horizon kink, and no more than that.
+    assert!(tri.at_l2(Vec3::Y).abs_diff_eq(tri.at(Vec3::Y), 0.15));
+}

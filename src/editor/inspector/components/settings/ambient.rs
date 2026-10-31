@@ -23,6 +23,7 @@ pub(super) fn draw(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene) 
                 if ui
                     .selectable_label(before.mode == mode, mode.name())
                     .clicked()
+                    && before.mode != mode
                 {
                     env_ops::set_ambient_mode(&mut scene.ambient, mode);
                     changed = true;
