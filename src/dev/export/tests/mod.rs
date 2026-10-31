@@ -28,6 +28,7 @@ fn project(root: &Path) {
         ("assets/models/barrel.glb", "glb".into()),
         ("assets/models/rock.obj", "obj".into()),
         ("assets/generated/voice.wav", "provider output".into()),
+        ("assets/generated/theme.mp3", "audio's source".into()),
         (&cached("soldier.fbx.glb"), "cache".into()),
         (&cached("soldier.fbx.glb.source"), "stamp".into()),
         (
@@ -81,7 +82,7 @@ fn the_runtime_files_are_copied_in_order_and_the_sources_left_behind() {
         assert!(!out.join(&gone).exists(), "{gone} is not exported");
     }
     let orphan = cached("gone.fbx.glb");
-    for gone in ["cache", "saved", &orphan] {
+    for gone in ["cache", "saved", &orphan, "assets/generated/theme.mp3"] {
         assert!(!out.join(gone).exists(), "{gone} is not exported");
     }
 }

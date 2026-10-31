@@ -44,7 +44,8 @@ impl Harness {
     /// playing the scene at `scene_path` — what an agent play-testing its game wants
     /// (the `play` binary passes the project's startup scene, #1343). The bundled
     /// scripts and the default scene are seeded through the seed manifest first, as
-    /// the standalone player's boot does, so a fresh project's startup scene exists.
+    /// the editor's open and `make export` do (the standalone player, which runs an
+    /// export, boots read-only, #1653), so a fresh project's startup scene exists.
     /// A scene document that can't be read or parsed is an error: a play-test of
     /// nothing proves nothing. A bad lighting sidecar is not: it goes to the console,
     /// as the player's boot (`shell::boot::load_game`) logs it, and probes play unbaked.

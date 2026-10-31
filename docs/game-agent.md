@@ -55,12 +55,14 @@ CLAUDE.md        the game's rules: yours
 Every path the game stores is **relative to the project root**, `/`-separated
 (`assets/scripts/enemy.lua`).
 
-- **Some files are the engine's.** Every boot seeds the bundled scripts, the
+- **Some files are the engine's.** Every edit-open (the editor, an agent session,
+  `make export`) and every `play` run seeds the bundled scripts, the
   starter materials and, in a new project, `assets/scenes/default.scene`: a copy
   you never edited follows the engine's newer default, an edited one is kept, and a
   deleted default scene stays deleted (`.seeded`, at the root, records which is
   which). `assets/scripts/ui/` and `assets/prefabs/ui/` are the UI widget kit's and
-  are **rewritten on every boot**: never edit them (`docs/ui.md`).
+  are **rewritten on every seeding**: never edit them (`docs/ui.md`). The shipped
+  player seeds nothing: it boots read-only and writes only under `saved/`.
 - **One model format inside: glTF.** `.obj` loads for static meshes; `.fbx` and
   `.blend` are converted to a cached glTF at import (`.blend` needs Blender 5 or
   later installed).

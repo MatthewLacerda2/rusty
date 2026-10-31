@@ -1,5 +1,5 @@
-//! src/shell/boot.rs — the boot steps both frontends share: the project seed,
-//! the window, the renderer, the simulation, audio, and the assembled [`Shell`].
+//! src/shell/boot.rs — the boot steps of the two frontends: the project seed (the
+//! editor's alone: the player boots read-only, #1653), the window, the renderer, the simulation, audio, and the assembled [`Shell`].
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -24,6 +24,8 @@ use crate::scripting::ConsoleLogs;
 /// Seed the open project (`core::project::open` made it the working directory and
 /// created its skeleton) with the bundled scripts and the default scene, then run an
 /// asset refresh. Idempotent: what the user edited is kept (the seed manifest, #746).
+/// The editor's open runs it; the player boots read-only and never does (#1653),
+/// so the export (`dev::export`) runs the same steps on the source before it copies.
 pub fn seed_project_workspace() {
     // The bundled GAME scripts (player_controller.lua, bot.lua) and the demo scene
     // that uses them; the play loop itself runs no gameplay.
@@ -39,7 +41,8 @@ pub fn seed_project_workspace() {
 pub const ASSET_ROOT: &str = crate::core::project::ASSETS_DIR;
 
 /// Import what arrived in the project since the last look (Unity's asset refresh):
-/// today that is MP3 → WAV. Runs at boot and, in the editor, on window focus.
+/// today that is MP3 → WAV. Runs when the editor opens a project and on its
+/// window's focus; never in the player.
 pub fn refresh_assets() -> crate::asset::audio::Refresh {
     crate::asset::audio::refresh(std::path::Path::new(ASSET_ROOT))
 }
