@@ -34,6 +34,16 @@ def pid_of(locked: str | None) -> int | None:
     return int(found.group(1)) if found else None
 
 
+# The harness's lock on an `Agent` worktree: `claude agent agent-<id> (pid <pid> start <ticks>)`.
+_AGENT = re.compile(r"^claude agent\b.*\(pid (\d+)(?: start \d+)?\)$")
+
+
+def agent_pid_of(locked: str | None) -> int | None:
+    """The PID a harness agent's worktree lock names, or `None` for any other lock (#1658)."""
+    found = _AGENT.match((locked or "").strip())
+    return int(found.group(1)) if found else None
+
+
 def alive(pid: int) -> bool:
     """Whether a process with this PID exists (one owned by another user counts)."""
     try:
