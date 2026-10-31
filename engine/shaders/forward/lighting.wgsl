@@ -1,6 +1,7 @@
 // engine/shaders/forward/lighting.wgsl — the forward pass's lighting helpers (#1015):
 // decals, ambient occlusion, lightmaps, the PBR response, the sun's cascaded shadow,
-// probe SH, and the environment reflection. `fs_main` in `shader.wgsl` sums them.
+// probe SH, the flat ambient and the environment reflection. `fs_main` in
+// `shader.wgsl` sums them.
 
 #define_import_path forward::lighting
 
@@ -274,4 +275,13 @@ fn sky_reflection(R: vec3<f32>, roughness: f32) -> vec3<f32> {
         return sky.rgb;
     }
     return sky.rgb + lighting.ambient.color * sky.a;
+}
+
+// The flat Hemispherical Sky-Ground ambient at normal `N`, as irradiance E / pi: the
+// sky colour above, a quarter of it (darker and cooler) below. What a surface no
+// lightmap or probe covers takes (`surface_color`'s step 1).
+fn flat_ambient(N: vec3<f32>) -> vec3<f32> {
+    let sky_color = lighting.ambient.color;
+    let ground_color = sky_color * 0.25;
+    return mix(ground_color, sky_color, N.y * 0.5 + 0.5) * lighting.ambient.intensity;
 }

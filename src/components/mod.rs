@@ -37,7 +37,8 @@ pub use entity::{
     SIZE_TOKEN,
 };
 pub use material::{
-    BlendMode, DecalBlend, MaterialAsset, MaterialComponent, RefractionModel, RenderMode, UvMapping,
+    BlendMode, DecalBlend, MaterialAsset, MaterialComponent, RefractionModel, RenderFace,
+    RenderMode, UvMapping,
 };
 pub use mesh::{MeshComponent, MeshRevision, ShadowCasting};
 pub use nav::agent::{NavMeshAgentComponent, NavPathStatus, MAX_AVOIDANCE_PRIORITY};

@@ -30,7 +30,9 @@ use crate::editor::inspector::components::card::component_card;
 use crate::editor::inspector::preview::{self, PreviewSubject};
 use crate::editor::EditorUi;
 use crate::scene::authoring::material::FACTOR_RANGE;
-use crate::scene::authoring::material::{self as mat_ops, COORDINATE_FIELDS, SURFACE_FIELDS};
+use crate::scene::authoring::material::{
+    self as mat_ops, COORDINATE_FIELDS, FACE_FIELDS, SURFACE_FIELDS,
+};
 use crate::scene::{MaterialAsset, RenderMode};
 
 /// 3B2. Render the Material card for the entity `id`, editing the shared `MaterialAsset`
@@ -98,6 +100,7 @@ fn draw_material(
         surface::draw_fields(ui, COORDINATE_FIELDS, materials, key, is_dirty);
 
         draw_material_transparency(ui, materials, key, is_dirty);
+        surface::draw_fields(ui, FACE_FIELDS, materials, key, is_dirty);
         surface::draw_fields(ui, SURFACE_FIELDS, materials, key, is_dirty);
 
         // The authored surface shader (#396) — `Material.SetShader`'s twin.

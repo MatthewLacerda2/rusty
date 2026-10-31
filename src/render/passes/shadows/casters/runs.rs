@@ -5,18 +5,42 @@
 use std::ops::Range;
 
 use super::super::clips::CasterClip;
-use super::{CasterBatch, CasterData, CasterKey};
+use super::{CasterBatch, CasterData, CasterFrame, CasterKey};
+use crate::components::{MaterialComponent, RenderFace};
 
-/// A mesh's `(slot, run)` draws ([`GpuMesh::runs`]) paired with how each slot clips
-/// its shadow (`clip_of(slot)`), adjacent runs that clip alike joined into one: a mesh
-/// whose materials all cast plainly stays one draw.
+/// How one material slot casts: its clip (`None` casts plainly) and its material's
+/// render face (#1615).
+pub(super) type SlotCast<'f> = (Option<&'f CasterClip>, RenderFace);
+
+/// Entity `id`'s `(slot, run)` draws, joined by how each slot casts. `material` is
+/// its material component, borrowed once by the caller for every slot.
+pub(super) fn slot_runs<'f>(
+    frame: &CasterFrame<'f>,
+    id: u32,
+    material: Option<&MaterialComponent>,
+    runs: Vec<(usize, Range<u32>)>,
+) -> Vec<(Range<u32>, SlotCast<'f>)> {
+    let slots = material.map_or(&[][..], |m| &m.materials[..]);
+    let face = |slot: usize| {
+        let key = slots.get(slot)?;
+        frame.scene.materials.get(key).map(|m| m.render_face)
+    };
+    join_alike(runs, |slot| {
+        (frame.clips.get(&(id, slot)), face(slot).unwrap_or_default())
+    })
+}
+
+/// A mesh's `(slot, run)` draws ([`GpuMesh::runs`]) paired with how each slot casts
+/// its shadow (`clip_of(slot)`: its clip, and its render face, #1615), adjacent runs
+/// that cast alike joined into one: a mesh whose materials all cast plainly stays
+/// one draw.
 ///
 /// [`GpuMesh::runs`]: crate::render::GpuMesh::runs
-pub(super) fn join_alike<'c>(
+pub(super) fn join_alike<T: PartialEq>(
     runs: Vec<(usize, Range<u32>)>,
-    clip_of: impl Fn(usize) -> Option<&'c CasterClip>,
-) -> Vec<(Range<u32>, Option<&'c CasterClip>)> {
-    let mut out: Vec<(Range<u32>, Option<&'c CasterClip>)> = Vec::new();
+    clip_of: impl Fn(usize) -> T,
+) -> Vec<(Range<u32>, T)> {
+    let mut out: Vec<(Range<u32>, T)> = Vec::new();
     for (slot, indices) in runs {
         let clip = clip_of(slot);
         match out.last_mut() {
@@ -76,7 +100,10 @@ mod tests {
 
     #[test]
     fn plain_runs_join_into_one_draw() {
-        let joined = join_alike(vec![(0, 0..3), (1, 3..6), (2, 6..9)], |_| None);
+        let joined = join_alike(
+            vec![(0, 0..3), (1, 3..6), (2, 6..9)],
+            |_| None::<&CasterClip>,
+        );
         assert_eq!(joined.len(), 1);
         assert_eq!(joined[0].0, 0..9);
     }
@@ -101,14 +128,14 @@ mod tests {
         use crate::render::MeshId;
         let leaf = cutout(4);
         let runs = || vec![(0, 0..3), (1, 3..6)];
-        let a = join_alike(runs(), |_| None);
+        let a = join_alike(runs(), |_| None::<&CasterClip>);
         let b = join_alike(runs(), |slot| (slot == 1).then_some(&leaf));
         let casters = a
             .into_iter()
             .chain(b)
             .map(|(indices, clip)| {
                 let key = CasterKey {
-                    facing: Facing::Front,
+                    facing: Facing::Ccw,
                     clip: clip.map(|c| c.clip),
                     mesh: MeshId("Quad".into()),
                     indices: indices.into(),

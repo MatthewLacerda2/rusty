@@ -8,7 +8,7 @@ use std::ops::RangeInclusive;
 
 use glam::Mat4;
 
-use crate::components::{MaterialAsset, RefractionModel, RenderMode};
+use crate::components::{MaterialAsset, RefractionModel, RenderFace, RenderMode};
 use crate::render::gpu::lightmaps::Lightmaps;
 use crate::render::gpu::uniforms::{MappingUniform, SurfaceUniform};
 use crate::render::postfx::effects::ssr;
@@ -77,7 +77,7 @@ pub(crate) fn material_data(lit: bool, material: Option<&MaterialAsset>) -> Mate
         use_cutout,
         alpha_cutoff,
         receive_decals,
-        _pad: 0,
+        two_sided: u32::from(material.is_some_and(|m| m.render_face != RenderFace::Front)),
         surface: surface_uniform(lit, material),
         mapping: material.map_or_else(MappingUniform::default, mapping_uniform),
     }

@@ -3,19 +3,20 @@
 //! each pipeline names only what it changes from [`PipelineSpec::opaque`].
 
 use super::transparent::TransparentBlend;
+use super::winding::Facing;
 use crate::render::gpu::mesh::vertex_layout;
 use crate::render::gpu::DEPTH_FORMAT;
 use crate::render::postfx::effects::ssr::surface::target_state as surface_target_state;
 
 /// Fixed-function knobs that distinguish the forward-pass pipelines. The default is
-/// the opaque forward pass: no culling, counter-clockwise front faces, REPLACE, depth
-/// written and tested `Less`.
+/// the opaque forward pass: counter-clockwise triangles kept (each pass builds one
+/// per [`Facing`], #1615), REPLACE, depth written and tested `Less`.
 #[derive(Clone, Copy)]
 pub(super) struct PipelineSpec {
     pub label: &'static str,
     pub topology: wgpu::PrimitiveTopology,
-    pub cull_mode: Option<wgpu::Face>,
-    pub front_face: wgpu::FrontFace,
+    /// Which triangles it keeps: a material's render face, by the mesh's winding.
+    pub facing: Facing,
     pub blend: wgpu::BlendState,
     pub depth_write_enabled: bool,
     pub depth_compare: wgpu::CompareFunction,
@@ -41,8 +42,7 @@ impl PipelineSpec {
         Self {
             label,
             topology: wgpu::PrimitiveTopology::TriangleList,
-            cull_mode: None,
-            front_face: wgpu::FrontFace::Ccw,
+            facing: Facing::Ccw,
             blend: wgpu::BlendState::REPLACE,
             depth_write_enabled: true,
             depth_compare: wgpu::CompareFunction::Less,
@@ -52,10 +52,14 @@ impl PipelineSpec {
             surface: false,
         }
     }
+
+    /// This spec keeping `facing`'s triangles.
+    pub(super) fn facing(self, facing: Facing) -> Self {
+        Self { facing, ..self }
+    }
 }
 
-/// Opaque/cutout forward pass: REPLACE, depth write on. No culling so primitives can
-/// render inside-out if needed.
+/// Opaque/cutout forward pass: REPLACE, depth write on.
 pub(super) fn forward_spec() -> PipelineSpec {
     PipelineSpec::opaque("Forward Lit Pipeline")
 }
@@ -125,9 +129,10 @@ pub(super) fn transparent_spec(blend: TransparentBlend) -> PipelineSpec {
 
 /// The editor's line gizmos: don't write depth so they display over the grid. Drawn
 /// on the finished image after post-FX (#1224), so `fs_gizmo` writes the authored
-/// colour unfogged, as Unity draws its gizmos.
+/// colour unfogged, as Unity draws its gizmos. Lines have no face, so nothing culls.
 pub(super) fn line_spec() -> PipelineSpec {
     PipelineSpec {
+        facing: Facing::Both,
         fragment: "fs_gizmo",
         topology: wgpu::PrimitiveTopology::LineList,
         blend: wgpu::BlendState::ALPHA_BLENDING,
@@ -181,12 +186,10 @@ pub(super) fn make_pipeline(
                 Some(surface_target_state(wgpu::ColorWrites::ALL)),
             ][..1 + usize::from(spec.velocity.is_some()) + 2 * usize::from(spec.surface)],
         }),
-        primitive: wgpu::PrimitiveState {
+        primitive: spec.facing.primitive(wgpu::PrimitiveState {
             topology: spec.topology,
-            front_face: spec.front_face,
-            cull_mode: spec.cull_mode,
             ..Default::default()
-        },
+        }),
         depth_stencil: Some(wgpu::DepthStencilState {
             format: DEPTH_FORMAT,
             depth_write_enabled: Some(spec.depth_write_enabled),

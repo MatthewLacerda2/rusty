@@ -6,7 +6,7 @@ use glam::{Quat, Vec3};
 use super::mesh_particle_matrix;
 use crate::components::particle::{EmitterFrame, ParticleRenderMode, SimulationSpace};
 use crate::components::ParticleEmitterComponent;
-use crate::core::curve::Range;
+use crate::core::curve::{Curve, Range};
 
 #[test]
 fn a_local_mesh_particle_is_drawn_at_its_size_turned_with_the_emitter() {
@@ -28,4 +28,21 @@ fn a_local_mesh_particle_is_drawn_at_its_size_turned_with_the_emitter() {
         let want = turn * tumble * Vec3::X * 0.5;
         assert!(x.abs_diff_eq(want, 1e-5), "drawn X {x}, want {want}");
     }
+}
+
+/// A size curve that dips below zero draws the particle at zero, never mirrored
+/// (#1615): a mirrored mesh would show its inside with back faces culled.
+#[test]
+fn a_size_curve_below_zero_draws_a_mesh_particle_at_zero_not_mirrored() {
+    let mut e = ParticleEmitterComponent {
+        size: Range::constant(1.0),
+        size_over_life: Curve::constant(-2.0),
+        ..Default::default()
+    };
+    e.render.mode = ParticleRenderMode::Mesh;
+    e.emit_at(EmitterFrame::IDENTITY, 1);
+    let p = &e.runtime.particles[0];
+    assert_eq!(e.size_of(p), 0.0);
+    let m = mesh_particle_matrix(p.position, e.size_of(p), p.orientation());
+    assert!(m.determinant() >= 0.0, "a mirrored mesh particle: {m}");
 }

@@ -84,14 +84,18 @@ impl Renderer {
         let clear = wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT);
         let timed = ("Selection Mask Pass", &self.gpu_timer, GpuPass::Outline);
         let mut pass = color_pass(encoder, timed, mask, clear);
-        pass.set_pipeline(self.outline.mask.get());
         pass.set_bind_group(0, &self.global_bind_group, &[]);
         // Group 3 is in the forward layout; the mask reads nothing from it.
         pass.set_bind_group(3, &self.shadow_bind_group, &[]);
+        let mut bound = None;
         for draw in &draws.outline {
             let Some(gpu_mesh) = self.gpu_meshes.get(&draw.mesh) else {
                 continue;
             };
+            if bound != Some(draw.facing) {
+                pass.set_pipeline(self.outline.mask.get(draw.facing));
+                bound = Some(draw.facing);
+            }
             pass.set_vertex_buffer(0, gpu_mesh.vertex_buffer.slice(..));
             pass.set_index_buffer(gpu_mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
             let offsets = DrawBuffers::offsets(draw.uniform_slot);

@@ -3,8 +3,8 @@
 //! (#1499).
 
 use super::super::{
-    DepthPostpassPipelines, PrimedPipelines, TransparentBlend, TransparentPipelines,
-    VelocityPipelines,
+    DepthPostpassPipelines, FacedPipeline, Facing, PrimedPipelines, TransparentBlend,
+    TransparentPipelines, VelocityPipelines,
 };
 use super::SurfaceShaders;
 
@@ -19,9 +19,9 @@ use super::SurfaceShaders;
 pub(crate) enum SolidPass<'a> {
     /// The SSAO depth prepass; the standard pipeline unless a variant cuts, moves its
     /// UVs or moves its vertices (#648, #1499, #1524).
-    Prepass(&'a wgpu::RenderPipeline),
+    Prepass(&'a FacedPipeline),
     /// Opaque solids; the standard pipeline is the view's (the preview may swap it).
-    Opaque(&'a wgpu::RenderPipeline, Option<&'a PrimedPipelines>),
+    Opaque(&'a FacedPipeline, Option<&'a PrimedPipelines>),
     /// Opaque solids writing motion vectors too (#1435), and the SSR surface target
     /// when the last field holds (#1526).
     Velocity(&'a VelocityPipelines, Option<&'a PrimedPipelines>, bool),
@@ -53,33 +53,37 @@ impl SolidPass<'_> {
 impl SurfaceShaders {
     /// What pipeline `id` draws with in `pass`: its variant's, else the standard one;
     /// with `primed` (a lit batch in a primed pass, #1499), the one over the primed
-    /// depth; in the transparent pass, the one for its `blend` (#1523).
+    /// depth; in the transparent pass, the one for its `blend` (#1523); in every
+    /// pass, the one keeping `facing`'s triangles (#1615).
     pub(crate) fn pick<'a>(
         &'a self,
         pass: SolidPass<'a>,
         id: usize,
         primed: bool,
         blend: TransparentBlend,
+        facing: Facing,
     ) -> &'a wgpu::RenderPipeline {
         let variant = self.get(id);
         match pass {
-            SolidPass::Prepass(standard) => self.cut(id).map_or(standard, |c| &c.prepass),
-            SolidPass::Opaque(_, Some(p)) if primed => {
-                variant.map_or(&p.forward, |v| &v.primed.forward).get()
+            SolidPass::Prepass(standard) => {
+                self.cut(id).map_or(standard, |c| &c.prepass).get(facing)
             }
-            SolidPass::Opaque(standard, _) => variant.map_or(standard, |v| &v.forward),
-            SolidPass::Velocity(_, Some(p), ssr) if primed => {
-                variant.map_or(&p.velocity, |v| &v.primed.velocity).get(ssr)
-            }
+            SolidPass::Opaque(_, Some(p)) if primed => variant
+                .map_or(&p.forward, |v| &v.primed.forward)
+                .get(facing),
+            SolidPass::Opaque(standard, _) => variant.map_or(standard, |v| &v.forward).get(facing),
+            SolidPass::Velocity(_, Some(p), ssr) if primed => variant
+                .map_or(&p.velocity, |v| &v.primed.velocity)
+                .get(ssr, facing),
             SolidPass::Velocity(standard, _, ssr) => {
-                variant.map_or(standard, |v| &v.velocity).get(ssr)
+                variant.map_or(standard, |v| &v.velocity).get(ssr, facing)
             }
-            SolidPass::Transparent(standard) => {
-                variant.map_or(standard, |v| &v.transparent).get(blend)
-            }
+            SolidPass::Transparent(standard) => variant
+                .map_or(standard, |v| &v.transparent)
+                .get(blend, facing),
             SolidPass::DepthPostpass(standard, velocity) => variant
                 .map_or(standard, |v| &v.depth_postpass)
-                .get(velocity),
+                .get(velocity, facing),
         }
     }
 }

@@ -810,6 +810,7 @@ scene.materials{}.receive_decals: bool
 scene.materials{}.receive_shadows: bool
 scene.materials{}.receive_ssr: bool
 scene.materials{}.refraction_model: enum None|Planar|Thin
+scene.materials{}.render_face: enum Front|Back|Both
 scene.materials{}.render_mode: enum Opaque|Cutout|Transparent
 scene.materials{}.roughness: f32
 scene.materials{}.roughness_map: option

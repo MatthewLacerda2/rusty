@@ -2,15 +2,16 @@
 //! tile keeps beside what it baked, compared each frame (#355, #694).
 
 use crate::asset::MapRef;
-use crate::components::ShadowCasting;
+use crate::components::{RenderFace, ShadowCasting};
 use crate::render::passes::shadows::clips::Cutout;
 use crate::scene::{Scene, SceneId};
 
 /// Which scene's static casters a bake holds, at which of its
 /// [`World::static_revision`](crate::ecs::World::static_revision)s, and with which
-/// casting modes and cutout tests: a Static flag flipped, a static entity spawned or
-/// despawned, a static mesh's `cast_shadows` changed (#1571), or a static Cutout
-/// material's test or mapping edited (#1594) re-bakes them on the next frame whoever
+/// casting modes, render faces and cutout tests: a Static flag flipped, a static
+/// entity spawned or despawned, a static mesh's `cast_shadows` changed (#1571), a
+/// static material's Render Face switched (#1615), or a static Cutout material's
+/// test or mapping edited (#1594) re-bakes them on the next frame whoever
 /// made the change — the inspector, a script in Play, a load (#1496).
 pub(crate) type StaticsKey = (SceneId, u64, u64);
 
@@ -31,6 +32,7 @@ fn mix(key: u64, word: u64) -> u64 {
 /// A digest, by entity in scene order, of what shapes each static mesh's shadow that
 /// no revision tracks: a `cast_shadows` that changes it (`Off`, `TwoSided`, #1571;
 /// `ShadowsOnly` casts exactly as `On`, so switching between them keeps the bake),
+/// each slot's Render Face other than `Front` (the faces it casts from, #1615),
 /// and each Cutout slot's test — cutoff, albedo map and mapping (#1594), the terms
 /// its clip reads. It moves when one of them changes.
 fn casting_key(scene: &Scene) -> u64 {
@@ -50,6 +52,9 @@ fn casting_key(scene: &Scene) -> u64 {
         for (slot, (_, asset)) in
             (0..slots).filter_map(|s| Some((s, scene.material_entry_at(id, s)?)))
         {
+            if let Some(face) = face_word(asset.render_face) {
+                key = mix(key, (u64::from(id) << 18) | ((slot as u64) << 2) | face);
+            }
             if let Some(cut) = Cutout::of(asset) {
                 key = mix(key, (u64::from(id) << 16) | slot as u64);
                 key = cutout_digest(key, &cut, asset.base_color_map.as_ref().map(MapRef::as_str));
@@ -57,6 +62,16 @@ fn casting_key(scene: &Scene) -> u64 {
         }
     }
     key
+}
+
+/// A non-`Front` face's digest word; `Front`, the default, adds none, so the key of
+/// a scene with no two-sided material is what it was before faces existed.
+fn face_word(face: RenderFace) -> Option<u64> {
+    match face {
+        RenderFace::Front => None,
+        RenderFace::Back => Some(1),
+        RenderFace::Both => Some(2),
+    }
 }
 
 /// `key` with `cut` and the albedo map it tests folded in.

@@ -113,9 +113,9 @@ fn gpu_bake_probes_fills_all_in_place() {
 
 /// A synthetic cubemap with a single red face projects to a red, directional SH —
 /// covers the projection math on hosts with no GPU adapter at all. Painting the
-/// `PosX` face buffer lights the world hemisphere that face actually saw (the capture
-/// renders it with a flipped camera, so the `PosX` buffer maps to the −X hemisphere),
-/// so irradiance must be brightest toward −X, red, and dim the other way.
+/// `PosX` face buffer lights the world hemisphere that face saw, +X (#1615 aimed the
+/// capture's faces down their own axes), so irradiance must be brightest toward +X,
+/// red, and dim the other way.
 #[test]
 fn project_red_face_is_red_and_directional() {
     let res = 8;
@@ -133,8 +133,8 @@ fn project_red_face_is_red_and_directional() {
         faces,
     };
     let sh = project_cubemap(&capture);
-    let lit = sh.eval(Vec3::NEG_X);
-    let dark = sh.eval(Vec3::X);
+    let lit = sh.eval(Vec3::X);
+    let dark = sh.eval(Vec3::NEG_X);
     assert!(lit.x > 0.0, "expected red irradiance, got {lit}");
     assert!(
         lit.y < 1.0e-4 && lit.z < 1.0e-4,

@@ -37,14 +37,14 @@
 //! follow it. Only those variants pay for depth pipelines of their own.
 
 mod pass;
+mod upkeep;
 
 use std::{collections::HashMap, path::Path};
 use wgpu::naga::ShaderStage;
 
-use crate::core::fs::written::{written_since, Stale};
-use crate::core::paths::native;
+use crate::core::fs::written::written_since;
 use crate::shadergen::assemble::{CUT_PREPASS, CUT_SHADOW};
-use crate::shadergen::params::{resolve_module, sidecar_path, ParamLayout};
+use crate::shadergen::params::{resolve_module, ParamLayout};
 use crate::shadergen::{baked, compose, engine_shader_dir, DEFAULT_OUT_DIR};
 
 /// The pipeline id of the renderer's standard forward shader.
@@ -57,8 +57,8 @@ type Built = (SurfacePipelines, ParamLayout);
 
 /// One authored surface shader's pipelines.
 pub(crate) struct SurfacePipelines {
-    /// Opaque/cutout solids, and the same into a view's velocity target (#1435).
-    pub forward: wgpu::RenderPipeline,
+    /// Opaque/cutout solids per facing (#1615), and into a velocity target (#1435).
+    pub forward: super::FacedPipeline,
     pub velocity: super::VelocityPipelines,
     /// The same two over a primed depth (#1499), built the first time a view primes.
     pub primed: super::PrimedPipelines,
@@ -74,8 +74,8 @@ pub(crate) struct SurfacePipelines {
 /// (#648, #1499, #1524); the shadow ones through the shadow pass's clip layout, one
 /// per [`Facing`](super::winding::Facing) (#1134; the two-sided one lazy, #1571).
 pub(crate) struct CutPipelines {
-    /// The SSAO prepass, through the forward layout.
-    pub prepass: wgpu::RenderPipeline,
+    /// The SSAO prepass, through the forward layout, one per facing (#1615).
+    pub prepass: super::FacedPipeline,
     pub shadow: wgpu::RenderPipeline,
     pub mirrored_shadow: wgpu::RenderPipeline,
     pub two_sided_shadow: super::LazyPipeline,
@@ -105,6 +105,8 @@ pub(crate) struct SurfaceShaders {
     builds: usize,
     /// The newest write-log generation already looked at.
     seen: u64,
+    /// Build a slot's facing pipelines with it (a windowed renderer, #1615).
+    warm: bool,
 }
 
 impl SurfaceShaders {
@@ -124,6 +126,7 @@ impl SurfaceShaders {
             slots: Vec::new(),
             builds: 0,
             seen: written_since(u64::MAX).0,
+            warm: false,
         }
     }
 
@@ -185,26 +188,6 @@ impl SurfaceShaders {
         self.get(id)?.cut.as_ref()
     }
 
-    /// Mark every slot stale whose module or params file, in any of the dirs it
-    /// resolves against, was written since the last look (re-baked, appeared, edited,
-    /// vanished).
-    pub(crate) fn refresh(&mut self) {
-        let (seen, paths) = written_since(self.seen);
-        self.seen = seen;
-        if paths.is_empty() {
-            return;
-        }
-        let written = Stale::new(paths);
-        let dirs = &self.dirs;
-        for slot in self.slots.iter_mut().filter(|s| !s.stale) {
-            slot.stale = dirs.iter().any(|dir| {
-                let wgsl = native(dir).join(format!("{}.wgsl", slot.name));
-                written.matches(&wgsl.to_string_lossy())
-                    || written.matches(&sidecar_path(&wgsl).to_string_lossy())
-            });
-        }
-    }
-
     /// Rebuild slot `i` from its current file, logging once per failed version.
     fn rebuild(&mut self, device: &wgpu::Device, i: usize) {
         let dirs: Vec<&str> = self.dirs.iter().map(String::as_str).collect();
@@ -232,6 +215,9 @@ impl SurfaceShaders {
             None => (None, ParamLayout::default()),
         };
         slot.stale = false;
+        if self.warm {
+            self.warm_slot(i);
+        }
     }
 
     /// Compose `path` against `common`, check it is a surface module, and build its

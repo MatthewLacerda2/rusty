@@ -4,11 +4,12 @@
 //! one is held to, #1602) needs two pure operations over a
 //! captured cubemap: the world DIRECTION each output texel points down, and the COLOUR
 //! the captured environment shows along an arbitrary direction. Both must agree with the
-//! exact per-face orientation `capture_static_cubemap` rendered with (#243) — the faces
-//! carry the empirically-tuned flipped cameras, so a hand-rolled axis basis would desync.
+//! exact per-face orientation `capture_static_cubemap` stored (#243) — the faces
+//! carry `face_camera`'s exact lenses (its up vectors and the readback flip included,
+//! #1615), so a hand-rolled axis basis would desync.
 //!
-//! So this module derives everything from the same `face_camera` view-projection the
-//! capture used: [`FaceProjections`] inverts it for texel->direction (which
+//! So this module derives everything from the same `face_view_projection` the
+//! capture stored: [`FaceProjections`] inverts it for texel->direction (which
 //! `probe_bake` also uses for its SH projection) and uses the forward matrix for direction->texel, picking the
 //! face whose frustum a direction falls inside. Pure math — no GPU, no clock/RNG.
 
@@ -18,7 +19,7 @@ use glam::{Mat4, Vec3, Vec4, Vec4Swizzles};
 use crate::core::color;
 #[cfg(test)]
 pub use crate::core::color::srgb_to_linear;
-use crate::render::ibl::cubemap_capture::face_camera;
+use crate::render::ibl::cubemap_capture::face_view_projection;
 use crate::render::CubemapFace;
 
 /// The six faces' forward + inverse view-projection matrices, cached once so the
@@ -36,8 +37,7 @@ impl FaceProjections {
         let mut view_proj = [Mat4::IDENTITY; 6];
         let mut inv_view_proj = [Mat4::IDENTITY; 6];
         for face in CubemapFace::ALL {
-            let camera = face_camera(Vec3::ZERO, face);
-            let vp = camera.build_view_projection(1.0);
+            let vp = face_view_projection(Vec3::ZERO, face);
             view_proj[face as usize] = vp;
             inv_view_proj[face as usize] = vp.inverse();
         }

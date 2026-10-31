@@ -45,7 +45,9 @@ fn built(renderer: &Renderer) -> [bool; 3] {
             .into_iter()
             .any(|b| renderer.transparent_pipelines.is_built(b)),
         renderer.line_pipeline.is_built(),
-        renderer.outline.mask.is_built(),
+        super::Facing::ALL
+            .into_iter()
+            .any(|f| renderer.outline.mask.is_built(f)),
     ]
 }
 
@@ -75,27 +77,31 @@ fn gpu_optional_forward_pipelines_build_on_first_draw() {
 /// shipped game (no editor overlays) leaves only the line and outline ones lazy.
 #[test]
 fn gpu_warm_pipelines_builds_every_lazy_pipeline() {
-    let Some(renderer) = crate::render::test_gpu::headless_or_skip(RES, RES) else {
+    let Some(mut renderer) = crate::render::test_gpu::headless_or_skip(RES, RES) else {
         return;
     };
     let every = renderer.lazy_pipelines(true);
-    // one transparent per blend state and the 2 depth postpass (#1523) + the motion-vector forward and 2 sky (#1435) + the same 3 into
-    // the SSR surface target too (#1526) + the 2 primed forward ones (#1499) and the
-    // primed SSR one + SSR's own pass + SSAO's occlusion, blur and upsample (#1578) +
-    // the motion blur's
-    // 3 tile passes and gather (#1436) + the depth of field's 9 (#1445) + bloom's
-    // bright pass and blur (#1467) + the lens flare's (#1443; the composite adds it, #1473) + 2 particle
-    // + 2 ribbon + one world canvas per blend mode + 2 mirrored and 2 two-sided shadow
-    // (#1571) + the data-mip one + the opaque copy (#1523) + 4 editor (line, the outline's
-    // mask, dilation and edge).
+    // Every forward-target pass has one pipeline per facing (#1615): `F` of each.
+    const F: usize = 3;
+    // one transparent per blend state and the 2 depth postpass (#1523) + the
+    // motion-vector forward and 2 sky (#1435) + the same into the SSR surface target
+    // too (#1526) + the 2 primed forward ones (#1499) and the primed SSR one + the
+    // opaque pass's and the prepass's mirrored and two-sided ones (#1615) + SSR's own
+    // pass + SSAO's occlusion, blur and upsample (#1578) + the motion blur's 3 tile
+    // passes and gather (#1436) + the depth of field's 9 (#1445) + bloom's bright
+    // pass and blur (#1467) + the lens flare's (#1443; the composite adds it, #1473)
+    // + 2 particle + 2 ribbon + one world canvas per blend mode + 2 mirrored and 2
+    // two-sided shadow (#1571) + the data-mip one + the opaque copy (#1523) + the
+    // editor's line, the outline's mask (one per facing), dilation and edge.
     assert_eq!(
         every.len(),
-        super::TransparentBlend::ALL.len()
-            + 2
-            + 3
-            + 3
-            + 2
-            + 1
+        super::TransparentBlend::ALL.len() * F
+            + 2 * F
+            + (F + 2)
+            + (F + 2)
+            + 2 * F
+            + F
+            + 2 * (F - 1)
             + 1
             + 3
             + 4
@@ -109,7 +115,7 @@ fn gpu_warm_pipelines_builds_every_lazy_pipeline() {
             + 2
             + 1
             + 1
-            + 4
+            + (1 + F + 2)
     );
     assert!(every.iter().all(|p| !p.is_built()), "headless stays lazy");
 

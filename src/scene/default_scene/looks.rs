@@ -8,6 +8,7 @@
 
 use std::collections::BTreeMap;
 
+use crate::components::RenderFace;
 use crate::procgen::recipe::{Checker, Node, OpKind};
 use crate::procgen::TextureRecipe;
 use crate::scene::authoring::material::{self as mat, MaterialLibrary};
@@ -126,4 +127,6 @@ pub(super) fn define_all(materials: &mut MaterialLibrary) {
     mat::set_shader(materials, ENEMY, SHADER_NAME.to_string());
     mat::set_render_mode(materials, WATER, RenderMode::Transparent);
     mat::set_alpha(materials, WATER, 0.45);
+    // A swimmer looks up at the surface too (#1615): water draws both faces.
+    mat::set_render_face(materials, WATER, RenderFace::Both);
 }

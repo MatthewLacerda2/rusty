@@ -33,6 +33,7 @@ pub const MODULES: &[&str] = &[
     "forward/bindings.wgsl",
     "forward/maps.wgsl",
     "forward/mapping.wgsl",
+    "forward/facing.wgsl",
     "forward/lighting.wgsl",
     "forward/transparent.wgsl",
     "postfx/params.wgsl",

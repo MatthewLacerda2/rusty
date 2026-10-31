@@ -18,6 +18,7 @@
 //! Pure: no wall-clock, no RNG.
 
 mod coordinates;
+mod face;
 mod library;
 mod maps;
 mod shader_params;
@@ -33,6 +34,7 @@ pub use crate::components::material::entity_material_key;
 pub use coordinates::{
     BLEND_SHARPNESS_RANGE, COORDINATE_FIELDS, MAP_COORD_RANGE, WORLD_SIZE_RANGE,
 };
+pub use face::FACE_FIELDS;
 pub use library::{
     delete_asset, describe, describe_all, drop_unused, entity_keys, restore_asset, users,
     DeletedMaterial, MaterialUser,
@@ -52,6 +54,7 @@ pub use surface::{
 
 use super::sanitize::{finite_array_or, non_negative, unit};
 use crate::asset::MapRef;
+use crate::components::RenderFace;
 use crate::scene::{MaterialAsset, MaterialComponent, RenderMode, Scene};
 
 /// The range of the `[0, 1]` factors (metallic, roughness, alpha, alpha cutoff): the
@@ -208,6 +211,14 @@ pub fn set_emissive_map(materials: &mut MaterialLibrary, key: &str, path: Option
 pub fn set_render_mode(materials: &mut MaterialLibrary, key: &str, mode: RenderMode) {
     if let Some(m) = materials.get_mut(key) {
         m.render_mode = mode;
+    }
+}
+
+/// Set which faces the material draws (#1615): the typed form of the `render_face`
+/// row ([`FACE_FIELDS`]) that `Material.SetRenderFace` and the Inspector write.
+pub fn set_render_face(materials: &mut MaterialLibrary, key: &str, face: RenderFace) {
+    if let Some(m) = materials.get_mut(key) {
+        m.render_face = face;
     }
 }
 

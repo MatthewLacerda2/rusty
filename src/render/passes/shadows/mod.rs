@@ -174,8 +174,8 @@ impl ShadowRenderer {
         facing: Facing,
     ) -> &'a wgpu::RenderPipeline {
         let twin = |i: usize| match facing {
-            Facing::Front => None,
-            Facing::Mirrored => Some(self.twins[0][i].get()),
+            Facing::Ccw => None,
+            Facing::Cw => Some(self.twins[0][i].get()),
             Facing::Both => Some(self.twins[1][i].get()),
         };
         let Some(c) = clip else {
@@ -183,8 +183,8 @@ impl ShadowRenderer {
         };
         match surfaces.cut(c.pipeline) {
             Some(cut) => match facing {
-                Facing::Front => &cut.shadow,
-                Facing::Mirrored => &cut.mirrored_shadow,
+                Facing::Ccw => &cut.shadow,
+                Facing::Cw => &cut.mirrored_shadow,
                 Facing::Both => cut.two_sided_shadow.get(),
             },
             None => twin(1).unwrap_or(&self.clip_pipeline),
@@ -244,6 +244,9 @@ mod cache_tests;
 
 #[cfg(test)]
 mod casting_tests;
+
+#[cfg(test)]
+mod face_tests;
 
 #[cfg(test)]
 mod cutout_tests;

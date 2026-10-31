@@ -6,7 +6,8 @@
 //! material — it writes depth only — so the mesh alone is the key; a clipped caster
 //! (#648, `clips`) also keys on its cut and material group, which its draw binds, and
 //! every caster on its [`Facing`]: a mirrored one (#1134) flips its winding, a
-//! two-sided one (#1571) culls nothing, and each picks its pipeline. A mesh whose
+//! two-sided one (#1571) culls nothing, one whose material draws its back or both
+//! faces (#1615) casts them, and each picks its pipeline. A mesh whose
 //! `cast_shadows` is `Off` is never gathered.
 //!
 //! Skinned casters are posed (#599): each sweep packs its skinned casters' palettes
@@ -31,7 +32,7 @@ use std::ops::Range;
 
 use super::clips::{CasterClip, Clip};
 use super::ShadowRenderer;
-use crate::components::ShadowCasting;
+use crate::components::{RenderFace, ShadowCasting};
 use crate::render::draw::batch::IndexRun;
 use crate::render::gpu::draw_buffers::{push_palette, JointMatrix};
 use crate::render::gpu::material_cache::MaterialCache;
@@ -43,8 +44,18 @@ use crate::scene::Scene;
 pub(super) use buffer::CasterBuffer;
 use buffer::{CasterData, CasterRecords, CasterUpload};
 use glam::Mat4;
-use runs::{batch_casters, join_alike};
+use runs::{batch_casters, slot_runs};
 pub(super) use sweep::Sweep;
+
+/// The facing a caster placed by `world` draws with: every triangle when it is
+/// two-sided (#1571), else its material's render face (#1615, as Unity's
+/// ShadowCaster pass culls by `_Cull`), its winding flipped when mirrored (#1134).
+pub(super) fn caster_facing(world: Mat4, two_sided: bool, face: RenderFace) -> Facing {
+    match two_sided {
+        true => Facing::Both,
+        false => Facing::of(world, face),
+    }
+}
 
 /// What a run of casters shares: its facing (mirrored, #1134, or two-sided, #1571),
 /// its clip (`None` for plain depth), then its mesh. Field order is sort order:
@@ -188,22 +199,22 @@ impl ShadowRenderer {
             if !sweep.takes(scene.world.is_static(id) && !moving) {
                 continue;
             }
-            let runs = gpu_mesh.runs(&mesh, material.as_deref());
-            let runs = join_alike(runs, |slot| frame.clips.get(&(id, slot)));
+            let material = material.as_deref();
+            let runs = slot_runs(frame, id, material, gpu_mesh.runs(&mesh, material));
             let world = scene.world.local_to_world(id);
             // A skinned caster is bounded by its posed skeleton (#833); one whose pose
             // cannot be bounded is never culled — a wrongly-culled caster drops its shadow.
             let bounds = gpu_mesh.world_bounds(&mesh, world);
             let bone_base = push_palette(&mut joints, mesh.active_palette());
             let two_sided = mesh.cast_shadows == ShadowCasting::TwoSided;
-            for (indices, clip) in runs {
+            for (indices, (clip, face)) in runs {
                 let mut caster = CasterData::new(world, bone_base);
                 if let Some(cut) = clip.and_then(|c| c.cutout) {
                     caster = caster.cutout(cut);
                 }
                 casters.push(Candidate {
                     key: CasterKey {
-                        facing: Facing::of(world, two_sided),
+                        facing: caster_facing(world, two_sided, face),
                         clip: clip.map(|c| c.clip),
                         mesh: mesh_id.clone(),
                         indices: indices.into(),

@@ -45,7 +45,9 @@ struct MaterialData {
     alpha_cutoff: f32,
     // 1 when the surface folds in its cluster's decals (#638).
     receive_decals: u32,
-    material_pad: u32,
+    // 1 when a back face may draw (#1615, render face Back or Both): `fs_main`
+    // shades a face seen from behind with its normal flipped.
+    two_sided: u32,
     // The transparent-surface terms (#1523). `blend_mode`: 0 Alpha, 1 Premultiply,
     // 2 Additive, 3 Multiply.
     blend_mode: u32,

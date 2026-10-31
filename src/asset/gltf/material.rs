@@ -40,8 +40,23 @@ pub(super) fn material_data(
             .and_then(|t| texture_path(&t.texture(), base_dir, source))
             .map(MapRef::from),
         emissive: material.emissive_factor(),
+        double_sided: material.double_sided() && !from_blend(source),
     }
 }
+
+/// Whether the glTF is a `.blend`'s conversion, whose `doubleSided` says nothing
+/// (#1615): Blender's exporter writes it on every material whose Backface Culling
+/// is off, Blender's default, which would draw every Blender model's back faces. So
+/// a `.blend` imports single-sided, as Unity's `.blend` import does (through FBX,
+/// which has no such flag), and *Render Face* is set after import. A `.gltf` or
+/// `.glb` authored as such keeps its `doubleSided`, as Unity's glTFast reads it.
+fn from_blend(source: Option<&str>) -> bool {
+    source.is_some_and(|s| paths::extension(s) == "blend")
+}
+
+#[cfg(test)]
+#[path = "material_tests.rs"]
+mod tests;
 
 /// Resolve a glTF texture's image to a file path, anchored at the glTF file's
 /// directory; a named image a conversion of `source` wrote, which lies in the

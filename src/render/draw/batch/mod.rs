@@ -21,6 +21,7 @@ pub(crate) mod sort;
 
 use std::ops::Range;
 
+use crate::render::gpu::pipelines::Facing;
 use crate::render::gpu::uniforms::MATERIAL_DATA_WORDS;
 use crate::render::{InstanceData, MaterialData, MeshId};
 
@@ -30,6 +31,10 @@ pub(crate) struct BatchKey {
     /// The pipeline: the standard forward shader (0) or a material's authored surface
     /// shader (#396). First, so opaque draws sort into one run of state per shader.
     pub pipeline: usize,
+    /// Which triangles it keeps (#1615): its material's render face, by its winding
+    /// (a mirrored instance's flips, #1134). Second, so each shader's runs group by
+    /// cull state.
+    pub facing: Facing,
     /// The geometry (vertex + index buffers), by asset identity (#127).
     pub mesh: MeshId,
     /// The drawn index run (#1285), whole: each material run of one mesh is a draw of
@@ -81,6 +86,8 @@ pub(crate) struct DrawItem {
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct OutlineDraw {
     pub mesh: MeshId,
+    /// The triangles the forward draw keeps (#1615).
+    pub facing: Facing,
     pub material: usize,
     pub indices: Range<u32>,
     pub uniform_slot: u32,
@@ -92,6 +99,7 @@ impl OutlineDraw {
     fn of(batch: &DrawBatch, instance: u32) -> Self {
         Self {
             mesh: batch.key.mesh.clone(),
+            facing: batch.key.facing,
             material: batch.key.material,
             indices: batch.key.indices.range(),
             uniform_slot: batch.uniform_slot,

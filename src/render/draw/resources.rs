@@ -5,10 +5,8 @@
 //! render pass.
 
 use super::batch::sort::{back_to_front, view_depth};
-use super::batch::{BatchKey, DrawItem, FrameDraws};
-use super::materials::entity_params;
+use super::batch::{DrawItem, FrameDraws};
 use super::overlays::{OverlayBindings, OverlayDraws};
-use crate::components::MaterialAsset;
 use crate::render::gpu::draw_buffers::{push_palette, FrameUpload, JointMatrix};
 use crate::render::lod::LodSelection;
 use crate::render::motion::{track, MotionHistory};
@@ -257,20 +255,8 @@ impl Renderer {
         }
         let mut items = Vec::with_capacity(runs.len());
         for (slot, indices) in runs {
-            let entry = scene.material_entry_at(id, slot);
-            let material = entry.map(|(_, asset)| asset);
-            let transparent = material.is_some_and(MaterialAsset::is_transparent);
-            let record = self.solid_material(scene, id, material);
-            let shader = material.and_then(|m| m.shader.as_deref());
-            let pipeline = self.surface_shaders.pipeline_id(&self.device, shader);
-            let key = BatchKey {
-                pipeline,
-                mesh: mesh_id.clone(),
-                indices: indices.into(),
-                material: self.material_index(entry, pipeline, entity_params(scene, id, slot)),
-                record: record.words(),
-                bone_base,
-            };
+            let at = (model_matrix, &mesh_id, bone_base);
+            let (key, transparent) = self.slot_key(scene, id, (slot, indices), at);
             let item = DrawItem {
                 key,
                 instance,

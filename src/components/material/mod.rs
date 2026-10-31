@@ -21,7 +21,7 @@ pub use decal::DecalBlend;
 pub use mapping::UvMapping;
 use mapping::{default_blend_sharpness, default_tiling};
 use surface::{default_ior, default_one, white};
-pub use surface::{BlendMode, RefractionModel, RenderMode};
+pub use surface::{BlendMode, RefractionModel, RenderFace, RenderMode};
 
 fn default_base_color() -> [f32; 3] {
     [1.0, 1.0, 1.0]
@@ -99,6 +99,9 @@ pub struct MaterialAsset {
     /// Compositing mode (#242); `Opaque` when absent.
     #[serde(default)]
     pub render_mode: RenderMode,
+    /// Which faces draw (#1615), URP's *Render Face*; `Front` when absent.
+    #[serde(default)]
+    pub render_face: RenderFace,
     /// Base-color alpha in `[0, 1]`. Only read when `render_mode == Transparent`
     /// (the blend factor); `Opaque`/`Cutout` ignore it. Defaults to 1.0 (fully
     /// opaque) so existing materials are unaffected.
@@ -216,6 +219,7 @@ impl Default for MaterialAsset {
             world_size: default_one(),
             blend_sharpness: default_blend_sharpness(),
             render_mode: RenderMode::Opaque,
+            render_face: RenderFace::Front,
             alpha: default_alpha(),
             alpha_cutoff: default_alpha_cutoff(),
             blend_mode: BlendMode::Alpha,

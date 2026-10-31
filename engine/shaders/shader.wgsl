@@ -5,7 +5,8 @@
 #import lighting::ssr_surface
 #import forward::transparent
 #import forward::mapping
-#import forward::lighting::{LIGHTMAP_RGBM_RANGE, ambient_occlusion, calculate_pbr, calculate_shadow, decode_lightmap_direction, environment_reflection, eval_sh, fold_decals, lightmap_direction_rebalance}
+#import forward::lighting::{LIGHTMAP_RGBM_RANGE, ambient_occlusion, calculate_pbr, calculate_shadow, decode_lightmap_direction, environment_reflection, eval_sh, flat_ambient, fold_decals, lightmap_direction_rebalance}
+#import forward::facing::{facing_normal, facing_tangent, seen_from_behind}
 
 // The forward pass (and its SSAO prepass and shadow-cascade entry points). Its
 // resources are `forward/bindings.wgsl`, its lighting helpers `forward/lighting.wgsl`.
@@ -302,8 +303,12 @@ fn fs_velocity_ssr(in: VelocityVertex) -> VelocitySsrTargets {
 // (`fs_main`, `fs_velocity`, `fs_velocity_ssr`).
 fn surface_color(in: VertexOutput) -> vec4<f32> {
     let m = material();
+    // The geometric normal, turned toward the viewer on a face seen from behind when
+    // the material draws back faces (#1615, `seen_from_behind`). First, before any branch.
+    let behind = seen_from_behind(in.world_normal, in.world_position, m.two_sided == 1u);
+    let geometric = facing_normal(in.world_normal, behind);
     // Where every map below is read (#1573): UV0 tiled, or projected from world space.
-    let maps = mapping::coords(in.tex_coords, in.world_position, normalize(in.world_normal));
+    let maps = mapping::coords(in.tex_coords, in.world_position, geometric);
     var base_color = m.color_tint;
     if (m.use_texture == 1u) {
         base_color *= mapping::sample(t_diffuse, s_diffuse, maps);
@@ -326,9 +331,9 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     // Geometric normal, optionally perturbed by a tangent-space normal map (#207; z
     // rebuilt by `maps::unpack_normal`), rotated into world space by the mesh's tangent
     // frame or, under a world mapping, reoriented per projection (`mapping::sample_normal`).
-    var N = normalize(in.world_normal);
+    var N = geometric;
     if (m.use_normal_map == 1u) {
-        N = mapping::sample_normal(t_normal, s_normal, maps, N, in.world_tangent);
+        N = mapping::sample_normal(t_normal, s_normal, maps, N, facing_tangent(in.world_tangent, behind));
     }
     let V = normalize(camera.camera_pos - in.world_position);
 
@@ -343,7 +348,7 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     let cluster = cluster_index(camera.clusters, camera.view_proj, in.world_position);
     var surface = DecalSurface(base_color.rgb, N, surface_metallic, surface_roughness, 1.0);
     if (m.receive_decals == 1u) {
-        surface = fold_decals(surface, cluster, in.world_position, normalize(in.world_normal));
+        surface = fold_decals(surface, cluster, in.world_position, geometric);
     }
     N = surface.normal;
     // A Multiply surface tints what is behind it toward white by its alpha (#1523,
@@ -385,7 +390,7 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
             // The normal-mapped (and decal-perturbed) N reshapes the baked light.
             let texel = textureSampleLevel(t_lightmap_dirs, s_lightmaps, in.lightmap_uv, lightmap_page - 1u, 0.0);
             let dir = decode_lightmap_direction(texel);
-            ambient_irradiance *= lightmap_direction_rebalance(dir, N, normalize(in.world_normal));
+            ambient_irradiance *= lightmap_direction_rebalance(dir, N, geometric);
         }
     } else if (instances[in.instance].use_sh == 1u) {
         // `eval_sh` returns irradiance E; a Lambert surface reflects albedo / pi * E,
@@ -393,10 +398,7 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
         // lightmap and flat ambient already hold (#807).
         ambient_irradiance = eval_sh(N, in.instance) / PI;
     } else {
-        let sky_color = lighting.ambient.color;
-        let ground_color = sky_color * 0.25; // ground is darker and cooler/desaturated
-        let ambient_grad = mix(ground_color, sky_color, N.y * 0.5 + 0.5);
-        ambient_irradiance = ambient_grad * lighting.ambient.intensity;
+        ambient_irradiance = flat_ambient(N);
     }
     // SSAO (#436) darkens only the indirect light: ambient here, env reflection below.
     let ao = ambient_occlusion(in.clip_position.xy) * surface.occlusion;
@@ -477,8 +479,8 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     // `alpha = roughness^2` (so perceptual roughness to the 4th), is the energy a rough
     // lobe loses, so a rough metal reads blurry, not black. `roughness` is perceptual,
     // URP's `perceptualRoughness`; a dielectric reflects F0 = 0.04 head-on. The angle is
-    // `|N.V|`: both sides are drawn and `N` is never turned toward the camera, so a
-    // visible back face would otherwise take the grazing Fresnel.
+    // `|N.V|`: a normal map or a vertex normal can still lean away from the camera on a
+    // face turned toward it, which would otherwise take the grazing Fresnel.
     let R = reflect(-V, N);
     let reflectivity = 0.04 + 0.96 * metallic;
     let grazing = saturate(1.0 - roughness + reflectivity);

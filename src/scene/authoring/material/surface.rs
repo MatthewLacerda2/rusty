@@ -104,10 +104,11 @@ impl SurfaceKind {
     }
 }
 
-/// Every material field the table drives: the transparent-surface rows, then the
-/// map coordinates' (#1573).
+/// Every material field the table drives: the render face (#1615), the
+/// transparent-surface rows, then the map coordinates' (#1573).
 pub fn material_fields() -> impl Iterator<Item = &'static SurfaceField> {
-    SURFACE_FIELDS.iter().chain(super::COORDINATE_FIELDS)
+    let rows = super::FACE_FIELDS.iter().chain(SURFACE_FIELDS);
+    rows.chain(super::COORDINATE_FIELDS)
 }
 
 /// The row whose `key` or `api` is `name` (in any case).
@@ -134,7 +135,7 @@ fn transparent(m: &MaterialAsset) -> bool {
     m.is_transparent()
 }
 
-fn always(_: &MaterialAsset) -> bool {
+pub(super) fn always(_: &MaterialAsset) -> bool {
     true
 }
 

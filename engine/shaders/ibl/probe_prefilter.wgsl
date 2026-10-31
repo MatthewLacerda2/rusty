@@ -5,8 +5,8 @@
 // shares (`ibl::ggx`).
 //
 // It is `render::ibl::reflection_prefilter::cpu::prefilter` texel for texel, which stays
-// the reference its tests pin: the same face matrices (the capture's own cameras, so
-// the faces' flipped orientation needs no second convention), the same nearest-texel
+// the reference its tests pin: the same face matrices (`cubemap_capture::face_view_projection`,
+// the stored layout's own, so it needs no second convention), the same nearest-texel
 // lookup of the base faces and the same N·L weighting. The result is sRGB-encoded into
 // an RGBA8 face, read back for the KTX2 encode.
 

@@ -5,6 +5,7 @@
 pub(crate) mod cube_sample;
 pub(crate) mod cubemap;
 pub(crate) mod cubemap_capture;
+mod faces;
 pub(crate) mod ktx2_encode;
 pub(crate) mod probe;
 pub(crate) mod reflection_bake;

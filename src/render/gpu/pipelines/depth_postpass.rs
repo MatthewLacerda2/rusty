@@ -4,15 +4,15 @@
 //! stage's invariant position lands on its own depth) and, in a view with a velocity
 //! target, its texel there. Each is built on its first draw.
 
-use super::{velocity_target, LazyPipeline};
+use super::{velocity_target, FacedPipeline, Facing, LazyPipeline};
 use crate::render::gpu::mesh::vertex_layout;
 use crate::render::gpu::DEPTH_FORMAT;
 
 /// One shader's depth postpass pipelines: depth alone, and depth with the velocity
-/// target.
+/// target, each one per [`Facing`] (#1615).
 pub(crate) struct DepthPostpassPipelines {
-    plain: LazyPipeline,
-    velocity: LazyPipeline,
+    plain: FacedPipeline,
+    velocity: FacedPipeline,
 }
 
 impl DepthPostpassPipelines {
@@ -23,9 +23,8 @@ impl DepthPostpassPipelines {
         layout: &wgpu::PipelineLayout,
     ) -> Self {
         let make = |velocity: bool| {
-            let (shader, layout) = (shader.clone(), layout.clone());
-            LazyPipeline::new(device, move |device| {
-                build(device, &shader, &layout, velocity)
+            FacedPipeline::lazy(device, shader, layout, move |d, s, l, f| {
+                build(d, s, l, velocity, f)
             })
         };
         Self {
@@ -34,17 +33,18 @@ impl DepthPostpassPipelines {
         }
     }
 
-    /// The one for a view that writes a velocity target, or not.
-    pub(crate) fn get(&self, velocity: bool) -> &wgpu::RenderPipeline {
+    /// The one for a view that writes a velocity target, or not, keeping
+    /// `facing`'s triangles.
+    pub(crate) fn get(&self, velocity: bool, facing: Facing) -> &wgpu::RenderPipeline {
         match velocity {
-            false => self.plain.get(),
-            true => self.velocity.get(),
+            false => self.plain.get(facing),
+            true => self.velocity.get(facing),
         }
     }
 
-    /// Both, for warming.
-    pub(crate) fn lazies(&self) -> [&LazyPipeline; 2] {
-        [&self.plain, &self.velocity]
+    /// Every one, for warming.
+    pub(crate) fn lazies(&self) -> impl Iterator<Item = &LazyPipeline> {
+        self.plain.lazies().chain(self.velocity.lazies())
     }
 }
 
@@ -55,6 +55,7 @@ fn build(
     shader: &wgpu::ShaderModule,
     layout: &wgpu::PipelineLayout,
     velocity: bool,
+    facing: Facing,
 ) -> wgpu::RenderPipeline {
     let (label, vertex, fragment) = match velocity {
         false => ("Depth Postpass Pipeline", "vs_main", "fs_prepass"),
@@ -80,7 +81,7 @@ fn build(
             compilation_options: Default::default(),
             targets: if velocity { &targets } else { &[] },
         }),
-        primitive: wgpu::PrimitiveState::default(),
+        primitive: facing.primitive(wgpu::PrimitiveState::default()),
         depth_stencil: Some(wgpu::DepthStencilState {
             format: DEPTH_FORMAT,
             depth_write_enabled: Some(true),

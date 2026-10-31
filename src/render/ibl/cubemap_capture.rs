@@ -15,54 +15,20 @@
 
 use glam::Vec3;
 
+use super::faces::mirror_rows;
+pub use super::faces::CubemapFace;
+pub(crate) use super::faces::{face_camera, face_view_projection};
+
 use crate::render::{RenderView, Renderer, OFFSCREEN_FORMAT};
 
 use crate::scene::Camera;
 use crate::scene::Scene;
 
-/// The six faces of a cubemap, in the conventional +X,-X,+Y,-Y,+Z,-Z order. The
-/// index into [`CubemapCapture::faces`] is `face as usize`.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum CubemapFace {
-    PosX,
-    NegX,
-    PosY,
-    NegY,
-    PosZ,
-    NegZ,
-}
-
-impl CubemapFace {
-    /// All six faces in storage order.
-    pub const ALL: [CubemapFace; 6] = [
-        CubemapFace::PosX,
-        CubemapFace::NegX,
-        CubemapFace::PosY,
-        CubemapFace::NegY,
-        CubemapFace::PosZ,
-        CubemapFace::NegZ,
-    ];
-
-    /// The (yaw, pitch) in degrees that aims [`Camera`] down this face's axis, so the
-    /// `PosX` face looks toward +X, etc. The view basis [`Camera::build_view_projection`]
-    /// derives from `look_at_rh` flips the apparent axis relative to [`Camera::forward`]'s
-    /// `forward = (cosY·cosP, sinP, sinY·cosP)`, so each face aims down the *opposite*
-    /// yaw/pitch (verified against the rendered face colours, #243).
-    fn yaw_pitch(self) -> (f32, f32) {
-        match self {
-            CubemapFace::PosX => (180.0, 0.0),
-            CubemapFace::NegX => (0.0, 0.0),
-            CubemapFace::PosY => (0.0, -90.0),
-            CubemapFace::NegY => (0.0, 90.0),
-            CubemapFace::PosZ => (-90.0, 0.0),
-            CubemapFace::NegZ => (90.0, 0.0),
-        }
-    }
-}
-
 /// Six LDR RGBA8 faces captured from one world point. Each face is `resolution ×
 /// resolution`, tightly packed (`resolution * resolution * 4` bytes), row-major top
-/// to bottom. Indexed by `CubemapFace as usize` via [`CubemapCapture::face`].
+/// to bottom, laid out as a `texture_cube` samples it (#1615): uploaded as a cube's
+/// six layers, a direction reads what the capture saw along it. Indexed by
+/// `CubemapFace as usize` via [`CubemapCapture::face`].
 pub struct CubemapCapture {
     /// Edge length in pixels of every face.
     pub resolution: u32,
@@ -157,14 +123,16 @@ impl Renderer {
         let faces = CubemapFace::ALL.map(|face| {
             let mut camera = face_camera(position, face);
             (camera.near, camera.far) = (lens.near, lens.far);
-            self.render(&mut render_view, scene, &camera, &output, false);
-            crate::render::readback::read_texture_rgba8(
+            self.render_capture_face(&mut render_view, scene, &camera, &output);
+            let mut face = crate::render::readback::read_texture_rgba8(
                 &self.device,
                 &self.queue,
                 &target,
                 resolution,
                 resolution,
-            )
+            );
+            mirror_rows(&mut face, resolution);
+            face
         });
 
         self.capture = prev;
@@ -238,17 +206,14 @@ impl Default for CaptureLens {
     }
 }
 
-/// A [`Camera`] at `position` aimed down `face`'s axis with a 90° vertical FOV — the
-/// exact lens that tiles six faces into a seamless cube. `pub(crate)` so the probe
-/// bake (`probe/bake.rs`) reconstructs the *same* per-texel world directions the
-/// capture rendered, keeping projection and capture in lockstep.
-pub(crate) fn face_camera(position: Vec3, face: CubemapFace) -> Camera {
-    let (yaw, pitch) = face.yaw_pitch();
-    let mut camera = Camera::new(position, yaw, pitch);
-    camera.fov = 90.0;
-    camera
-}
-
 #[cfg(test)]
 #[path = "cubemap_capture_tests.rs"]
 mod cubemap_capture_tests;
+
+#[cfg(test)]
+#[path = "texture_cube_tests.rs"]
+mod texture_cube_tests;
+
+#[cfg(test)]
+#[path = "capture_camera_tests.rs"]
+mod capture_camera_tests;
