@@ -219,4 +219,4 @@ fn read_if_present(path: &Path) -> Result<Option<String>, String> {
 
 #[cfg(test)]
 #[path = "rebake_tests.rs"]
-pub(super) mod tests;
+pub(crate) mod tests;

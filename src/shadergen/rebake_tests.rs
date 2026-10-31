@@ -10,7 +10,7 @@ use crate::shadergen::recipe::{BlockSel, PassKind, ShaderRecipe};
 use crate::shadergen::{bake_recipe, validate::validate};
 
 /// A fresh `<tag>` dir holding a copy of the engine shaders a surface bake reads.
-pub(super) fn engine_copy(tag: &str) -> (PathBuf, String) {
+pub(crate) fn engine_copy(tag: &str) -> (PathBuf, String) {
     let root = crate::test_temp::dir().join(format!("rusty_1638_{tag}_{}", std::process::id()));
     std::fs::remove_dir_all(&root).ok();
     (root.clone(), copy_engine(&root.join("engine")))
@@ -18,7 +18,7 @@ pub(super) fn engine_copy(tag: &str) -> (PathBuf, String) {
 
 /// A copy of the engine shaders at `engine` (its hash is cached per directory, so a
 /// changed engine is a second copy, not an edit of the first).
-pub(super) fn copy_engine(engine: &Path) -> String {
+pub(crate) fn copy_engine(engine: &Path) -> String {
     for name in MODULES.iter().chain(&["shader.wgsl"]) {
         let to = engine.join(name);
         std::fs::create_dir_all(to.parent().unwrap()).unwrap();
@@ -27,7 +27,7 @@ pub(super) fn copy_engine(engine: &Path) -> String {
     engine.to_str().unwrap().to_owned()
 }
 
-pub(super) fn rim() -> ShaderRecipe {
+pub(crate) fn rim() -> ShaderRecipe {
     ShaderRecipe {
         pass: PassKind::Surface,
         name: "rim".into(),
