@@ -11,7 +11,7 @@ use crate::scene::{MeshComponent, ReflectionProbe, Scene};
 
 const RES: u32 = 64;
 
-#[path = "cube_tap_tests.rs"]
+#[path = "tap_tests.rs"]
 mod tap;
 use tap::sample;
 

@@ -1,4 +1,4 @@
-//! Reading a cube texture as a shader does, for `cube_layout_tests` (#1615): each
+//! Reading a cube texture as a shader does, for `texture_cube_tests` (#1615): each
 //! tap is one `textureSampleLevel` of a `texture_cube` view.
 
 use glam::Vec3;

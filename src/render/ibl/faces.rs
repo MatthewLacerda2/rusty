@@ -1,4 +1,4 @@
-//! src/render/ibl/cube_face.rs — the six faces of a captured cube and how each is
+//! src/render/ibl/faces.rs — the six faces of a captured cube and how each is
 //! aimed and laid out (#243, #1615): the cameras that render them, the readback
 //! flip that lays them out as a `texture_cube` samples them, and the matrices every
 //! reader of a capture maps directions through.

@@ -15,9 +15,9 @@
 
 use glam::Vec3;
 
-use super::cube_face::mirror_rows;
-pub use super::cube_face::CubemapFace;
-pub(crate) use super::cube_face::{face_camera, face_view_projection};
+use super::faces::mirror_rows;
+pub use super::faces::CubemapFace;
+pub(crate) use super::faces::{face_camera, face_view_projection};
 
 use crate::render::{RenderView, Renderer, OFFSCREEN_FORMAT};
 
@@ -211,5 +211,5 @@ impl Default for CaptureLens {
 mod cubemap_capture_tests;
 
 #[cfg(test)]
-#[path = "cube_layout_tests.rs"]
-mod cube_layout_tests;
+#[path = "texture_cube_tests.rs"]
+mod texture_cube_tests;
