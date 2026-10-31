@@ -230,7 +230,7 @@ fn seen(path: &Path) -> Seen {
     let Ok(bytes) = std::fs::read(path) else {
         return Seen::Unreadable;
     };
-    let digest = hash::fnv1a64(&bytes);
+    let digest = hash::content(&bytes);
     let canonical = std::fs::canonicalize(path).ok();
     let mut looks = lock();
     looks.forget_written();

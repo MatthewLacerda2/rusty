@@ -86,6 +86,9 @@ fn deterministic(converter: &Converter, source: &Path, name: &str) -> u64 {
         "the {} converter writes {name} differently twice: its output is not deterministic",
         converter.name
     );
+    // FNV-1a, not `hash::content` (#1326): FINGERPRINTS holds these hashes, and
+    // `table::bless` refuses a changed one at the blessed version, so a new hash
+    // would force a bump of every converter. This runs in tests, never at launch.
     hash::fnv1a64(&first)
 }
 

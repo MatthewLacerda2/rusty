@@ -58,7 +58,7 @@ pub(super) fn folder_tag(out: &Path, stamp: &str) -> String {
     for dependency in stored(out).iter().flat_map(|s| &s.depends_on) {
         key.push_str(&dependency.now().line());
     }
-    format!("{:016x}", hash::fnv1a64(key.as_bytes()))
+    format!("{:016x}", hash::content(key.as_bytes()))
 }
 
 /// The textures folder tag the stamp file `record` names.
