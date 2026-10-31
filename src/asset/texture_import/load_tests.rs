@@ -36,7 +36,7 @@ fn a_cache_is_current_exactly_when_a_read_takes_it() {
     refresh(&png, "").unwrap();
     let out = cache_file(&png).unwrap();
     let settings = crate::asset::sidecar::texture(&png);
-    let digest = crate::core::hash::fnv1a64(&std::fs::read(&png).unwrap());
+    let digest = crate::core::hash::content(&std::fs::read(&png).unwrap());
     let stamp = cache::stamp(digest, &settings);
     assert!(cache::is_current(&out, stamp));
     assert!(!cache::is_current(&out, stamp ^ 1), "another stamp");

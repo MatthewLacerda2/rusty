@@ -6,7 +6,7 @@
 use std::path::{Path, PathBuf};
 
 use crate::app::GameWorld;
-use crate::core::hash::fnv1a64;
+use crate::core::hash::content;
 
 /// The scene file's and the scripts' digests, in hex.
 #[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -74,7 +74,7 @@ fn scripts_digest(root: &Path) -> String {
         all.extend(std::fs::read(root.join(&file)).unwrap_or_default());
         all.push(0);
     }
-    format!("{:016x}", fnv1a64(&all))
+    format!("{:016x}", content(&all))
 }
 
 impl Sources {
@@ -89,7 +89,7 @@ impl Sources {
         let scene_path = world.script_manager().scene_path_cell().borrow().clone();
         let scene = scene_path
             .and_then(|path| std::fs::read(path).ok())
-            .map(|bytes| format!("{:016x}", fnv1a64(&bytes)));
+            .map(|bytes| format!("{:016x}", content(&bytes)));
         Self {
             scene,
             scripts: scripts_digest(&root),
