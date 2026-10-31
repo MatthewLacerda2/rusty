@@ -31,6 +31,8 @@
 //!   the Animator and physics (#466).
 //! - `ik` bends the posed bones toward script-set targets after `LateUpdate`;
 //!   bones a ragdoll's dynamic body carries are skipped (#461).
+//! - `probe` counts skeleton reads in tests, so a test can pin a system that must
+//!   not read one (a scene without a ragdoll, #1617).
 
 mod bone_refs;
 mod hang;
@@ -38,6 +40,7 @@ mod hitbox;
 mod ik;
 mod palette;
 mod persist;
+pub(crate) mod probe;
 mod ragdoll;
 mod reimport;
 mod sync;
@@ -71,17 +74,67 @@ impl Scene {
     /// Every bone entity of every skinned mesh in the scene: the ids
     /// [`Scene::is_bone`] holds for, as one set for a caller that asks about many.
     pub fn bone_ids(&self) -> BTreeSet<u32> {
-        self.world
-            .ids_with_mesh()
-            .into_iter()
-            .flat_map(|owner| self.live_bones(owner))
-            .collect()
+        let owners = self.skinned_ids().into_iter();
+        owners.flat_map(|owner| self.live_bones(owner)).collect()
+    }
+
+    /// Every skinned entity: one whose mesh lists a skeleton, in insertion order
+    /// (`World::ids_with_mesh`'s).
+    pub fn skinned_ids(&self) -> Vec<u32> {
+        let ids = self.world.ids_with_mesh().into_iter();
+        ids.filter(|&id| {
+            self.world
+                .mesh(id)
+                .is_some_and(|m| !m.skeleton.bones.is_empty())
+        })
+        .collect()
+    }
+
+    /// Every live bone and everything under one (its hitbox, the gun in a hand),
+    /// ascending: [`Scene::bone_ids`]' subtrees. One walk down each skinned
+    /// entity, so no bone climbs to check it is still under its owner — reaching
+    /// it from the owner proves that (#1617). At most [`World::len`] steps per
+    /// skeleton, so a malformed child cycle ends the walk.
+    ///
+    /// [`World::len`]: crate::ecs::World::len
+    pub fn bone_subtrees(&self) -> BTreeSet<u32> {
+        let mut out = BTreeSet::new();
+        for owner in self.skinned_ids() {
+            let bones = self.listed_bones(owner);
+            let mut stack: Vec<(u32, bool)> = Vec::new();
+            stack.extend(self.world.children(owner).into_iter().map(|c| (c, false)));
+            let mut steps = self.world.len();
+            while let Some((id, under)) = stack.pop().filter(|_| steps > 0) {
+                steps -= 1;
+                if !self.world.contains(id) {
+                    continue;
+                }
+                let hung = under || bones.binary_search(&id).is_ok();
+                if hung {
+                    out.insert(id);
+                }
+                stack.extend(self.world.children(id).into_iter().map(|c| (c, hung)));
+            }
+        }
+        out
+    }
+
+    /// The bone ids `owner`'s skeleton lists (present slots), sorted.
+    fn listed_bones(&self, owner: u32) -> Vec<u32> {
+        probe::read();
+        let Some(mesh) = self.world.mesh(owner) else {
+            return Vec::new();
+        };
+        let mut bones: Vec<u32> = mesh.skeleton.bones.iter().flatten().copied().collect();
+        bones.sort_unstable();
+        bones
     }
 
     /// `owner`'s bones that are still its bones, with their slots: present (not
     /// missing) and under `owner` ([`Scene::is_under`]). The one walk every reader
     /// that treats a slot as a bone of the skeleton goes through.
     pub(super) fn live_slots(&self, owner: u32) -> Vec<(usize, u32)> {
+        probe::read();
         let Some(mesh) = self.world.mesh(owner) else {
             return Vec::new();
         };
@@ -113,8 +166,8 @@ impl Scene {
     /// the hierarchy; `None` for an entity that is not a bone.
     pub fn bone_owner(&self, id: u32) -> Option<u32> {
         self.world.ancestors(id).find(|&c| {
-            self.world
-                .mesh(c)
+            let mesh = self.world.mesh(c);
+            mesh.inspect(|_| probe::read())
                 .is_some_and(|m| m.skeleton.bones.contains(&Some(id)))
         })
     }

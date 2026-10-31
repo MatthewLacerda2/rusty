@@ -12,8 +12,6 @@
 //! them, kinematic velocities included), and a body's own collider — a
 //! Rigidbody's or a CharacterController's — is the step's to place.
 
-use std::collections::BTreeSet;
-
 use super::compound::world_pose;
 use super::convert::to_pose;
 use super::world::PhysicsWorld;
@@ -21,47 +19,33 @@ use crate::scene::Scene;
 
 impl PhysicsWorld {
     /// Re-place each collider on or under a bone at its live world pose and refit
-    /// the query pipeline over the ones that moved. Walks the sorted plan, so the
-    /// order is deterministic; a scene without skeletons costs one empty set.
+    /// the query pipeline over the ones that moved. Walks the skeletons' subtrees
+    /// ([`Scene::bone_subtrees`], ascending ids), never the scene's other
+    /// colliders, so a map's static geometry costs nothing here (#1617).
     pub fn follow_bones(&mut self, scene: &Scene) {
-        let bones = scene.bone_ids();
-        if bones.is_empty() {
-            return;
-        }
         let mut moved = Vec::new();
-        for (&owner, ids) in &self.plan {
-            for &id in ids {
-                let carries_body = id == owner
-                    && (scene.world.has_rigidbody(id) || scene.world.has_character_controller(id));
-                if carries_body || !hangs_from_bone(scene, &bones, id) {
-                    continue;
-                }
-                let (Some(&handle), Some(pose)) =
-                    (self.id_to_collider.get(&id), world_pose(scene, id))
-                else {
-                    continue;
-                };
-                let Some(collider) = self.colliders.get_mut(handle) else {
-                    continue;
-                };
-                let target = to_pose(pose.pos, pose.rot);
-                if *collider.position() != target {
-                    collider.set_position(target);
-                    moved.push(handle);
-                }
+        for id in scene.bone_subtrees() {
+            let Some(&handle) = self.id_to_collider.get(&id) else {
+                continue;
+            };
+            let carries_body = self.plan.contains_key(&id)
+                && (scene.world.has_rigidbody(id) || scene.world.has_character_controller(id));
+            if carries_body {
+                continue;
+            }
+            let (Some(pose), Some(collider)) =
+                (world_pose(scene, id), self.colliders.get_mut(handle))
+            else {
+                continue;
+            };
+            let target = to_pose(pose.pos, pose.rot);
+            if *collider.position() != target {
+                collider.set_position(target);
+                moved.push(handle);
             }
         }
         if !moved.is_empty() {
             self.refresh_query_tree(&moved);
         }
     }
-}
-
-/// Whether `id` is a bone or sits anywhere under one (`bones` is [`Scene::bone_ids`],
-/// the set form of [`Scene::is_bone`]).
-fn hangs_from_bone(scene: &Scene, bones: &BTreeSet<u32>, id: u32) -> bool {
-    scene
-        .world
-        .self_and_ancestors(id)
-        .any(|c| bones.contains(&c))
 }
