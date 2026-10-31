@@ -12,10 +12,18 @@ fn run(s: &mut Session, line: &str) -> String {
         .unwrap_or_else(|e| panic!("`{line}` failed: {e}"))
 }
 
-/// The scene as `Scene.Save` would write it.
+/// The scene as `Scene.Save` would write it, but for the id allocator: an
+/// undone create's id stays retired, so the allocator may only have moved on.
 fn document(s: &Session) -> String {
     let scene = s.world().world.scene.borrow();
-    serde_json::to_string(&crate::scene::to_scene_data(&scene)).expect("a scene serializes")
+    let mut data = crate::scene::to_scene_data(&scene);
+    data.next_entity_id = 0;
+    serde_json::to_string(&data).expect("a scene serializes")
+}
+
+/// The id allocator as saved.
+fn next_id(s: &Session) -> u32 {
+    crate::scene::to_scene_data(&s.world().world.scene.borrow()).next_entity_id
 }
 
 #[test]
@@ -32,7 +40,7 @@ fn api_edits_undo_and_redo_to_identical_documents() {
     for line in &steps {
         run(&mut s, line);
     }
-    let end = document(&s);
+    let (end, end_id) = (document(&s), next_id(&s));
     assert_eq!(run(&mut s, "Editor.UndoName()"), steps[3]);
     for _ in 0..=steps.len() {
         run(&mut s, "Editor.Undo()");
@@ -42,6 +50,7 @@ fn api_edits_undo_and_redo_to_identical_documents() {
         start,
         "every step undone: the scene it started as"
     );
+    assert_eq!(next_id(&s), end_id, "the undone create's id stays retired");
     assert_eq!(run(&mut s, "Editor.Undo()"), "nil", "nothing left to undo");
     for _ in 0..=steps.len() {
         run(&mut s, "Editor.Redo()");
@@ -91,11 +100,8 @@ fn a_new_edit_clears_redo_and_play_records_nothing() {
         "nil",
         "a new edit clears Redo"
     );
-    assert_eq!(
-        id,
-        run(&mut s, "Scene.FindEntityByName('B')"),
-        "the undone id is free again"
-    );
+    let b = run(&mut s, "Scene.FindEntityByName('B')");
+    assert_ne!(id, b, "the undone id is never handed out again");
 
     run(&mut s, "Editor.EnterPlay()");
     assert_eq!(
@@ -103,7 +109,7 @@ fn a_new_edit_clears_redo_and_play_records_nothing() {
         "nil",
         "Play clears the history"
     );
-    run(&mut s, &format!("Scene.SetName({id}, 'Played')"));
+    run(&mut s, &format!("Scene.SetName({b}, 'Played')"));
     assert_eq!(
         run(&mut s, "Editor.Undo()"),
         "nil",

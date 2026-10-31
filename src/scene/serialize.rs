@@ -171,8 +171,9 @@ fn apply(scene: &mut Scene, mut data: SceneData, from_disk: bool) {
     let bone_parents = crate::scene::skeleton::take_bone_parents(&mut data.entities);
     let bone_refs = crate::scene::skeleton::take_bone_refs(&mut data.entities);
     scene.world.clear();
-    scene.clear_undo(); // the history named the replaced World's entities (#1631)
-                        // The overrides named the replaced World's entities; they are runtime-only (#670).
+    // The Undo history named the replaced World's entities (#1631).
+    scene.clear_undo();
+    // The overrides named the replaced World's entities; they are runtime-only (#670).
     scene.shader_overrides.clear_all();
     for entity in data.entities {
         scene.world.insert_entity(entity);

@@ -31,8 +31,6 @@ pub struct Recorded {
 /// What the journal recorded since it was last taken.
 #[derive(Debug, Default)]
 pub struct Journaled {
-    /// The id allocator before the first recorded write.
-    pub next_id: u32,
     /// Each touched entity's state before its first write; `None` for one created.
     pub before: BTreeMap<u32, Option<Recorded>>,
 }
@@ -67,13 +65,6 @@ impl World {
         Some(Recorded { doc, seq })
     }
 
-    /// Set the id allocator outright: an Undo of a create puts it back (#1631).
-    /// Never below an id still live.
-    pub fn restore_next_id(&mut self, next_id: u32) {
-        let floor = self.order.iter().max().map_or(1, |&id| id + 1);
-        self.next_id = next_id.max(floor);
-    }
-
     /// Record `id`'s state before a write, if recording and not yet recorded.
     pub(super) fn note(&mut self, id: u32) {
         if !self.journal.recording {
@@ -85,11 +76,7 @@ impl World {
             }
         }
         let recorded = self.record(id);
-        let next_id = self.next_id;
-        let taken = self.journal.taken.get_or_insert_with(|| Journaled {
-            next_id,
-            before: BTreeMap::new(),
-        });
+        let taken = self.journal.taken.get_or_insert_with(Journaled::default);
         taken.before.insert(id, recorded);
     }
 }

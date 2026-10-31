@@ -36,7 +36,6 @@ fn the_first_write_records_the_state_before_once() {
     let created = world.spawn("New".into());
     world.despawn_all(&BTreeSet::from([2]));
     let taken = world.journal_take().expect("recorded");
-    assert_eq!(taken.next_id, created, "the allocator before the create");
     let names: Vec<_> = taken
         .before
         .iter()
@@ -63,14 +62,4 @@ fn a_restored_entity_takes_its_old_slot_and_id() {
     assert_eq!(world.ids(), [1, 2, 3, 4]);
     assert_eq!(world.ids_with_mesh(), Vec::<u32>::new());
     assert_eq!(world.name(2).map(|n| (*n).clone()), Some("B".into()));
-}
-
-#[test]
-fn the_allocator_goes_back_but_never_below_a_live_id() {
-    let mut world = world_of(&["A", "B", "C"]);
-    world.restore_next_id(2);
-    assert_eq!(world.next_id(), 4, "3 is live");
-    world.despawn_all(&BTreeSet::from([2, 3]));
-    world.restore_next_id(2);
-    assert_eq!(world.next_id(), 2);
 }

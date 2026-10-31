@@ -4,8 +4,9 @@
 //! A frame records only while the editor itself runs (the dashboard, then the
 //! viewport's pointer edits); the watch, the frame's followers and the render
 //! are not edits. A step closes when the frame ends with no gesture held: no
-//! button down, no gizmo or rect-tool drag, no text field holding the keyboard.
-//! A frame nobody touched folds what it changed into the last step instead.
+//! button down, no gizmo or rect-tool drag, no text field being typed into.
+//! A frame nobody touched folds what it changed into the last step instead;
+//! camera navigation (the wheel, a held fly key) is no touch.
 
 use super::EditorFrontend;
 use crate::app::GameWorld;
@@ -38,15 +39,9 @@ impl EditorFrontend {
         self.close_edits(game);
     }
 
-    /// Record the writes that follow as the editor's edit: a full one when someone
-    /// is acting on the editor, a cheap follow-up otherwise.
+    /// Record the writes that follow as the editor's edit.
     fn record_edits(&self, game: &GameWorld) {
-        let mut scene = game.scene().borrow_mut();
-        if self.held() || self.touched() {
-            scene.begin_edits();
-        } else {
-            scene.begin_follow_up();
-        }
+        game.scene().borrow_mut().begin_edits();
     }
 
     /// Stop recording until the next [`Self::record_edits`].
@@ -73,10 +68,11 @@ impl EditorFrontend {
 
 impl EditorFrontend {
     /// Whether a gesture holds the step open: a button down, a gizmo or rect-tool
-    /// drag, a text field holding the keyboard.
+    /// drag, a text field being typed into (not the console, not a widget that
+    /// only kept focus after its gesture: `editor::header::typing_holds_step`).
     fn held(&self) -> bool {
         self.egui_ctx.input(|i| i.pointer.any_down())
-            || self.egui_ctx.egui_wants_keyboard_input()
+            || crate::editor::header::typing_holds_step(&self.egui_ctx)
             || self.editor_ui.gizmo_drag.is_some()
             || self.editor_ui.rect_drag.is_some()
     }
@@ -87,7 +83,8 @@ impl EditorFrontend {
     }
 }
 
-/// Whether `event` is someone acting on the editor, not the pointer only passing.
+/// Whether `event` is someone acting on the editor, not the pointer only
+/// passing or the camera navigating (the wheel zooms, a held key repeats).
 fn is_user_input(event: &egui::Event) -> bool {
     !matches!(
         event,
@@ -95,5 +92,34 @@ fn is_user_input(event: &egui::Event) -> bool {
             | egui::Event::MouseMoved(_)
             | egui::Event::PointerGone
             | egui::Event::WindowFocused(_)
+            | egui::Event::MouseWheel { .. }
+            | egui::Event::Zoom(_)
+            | egui::Event::Key { repeat: true, .. }
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_user_input;
+
+    #[test]
+    fn camera_navigation_is_no_touch_and_a_press_is() {
+        let wheel = egui::Event::MouseWheel {
+            unit: egui::MouseWheelUnit::Line,
+            delta: egui::vec2(0.0, 1.0),
+            phase: egui::TouchPhase::Move,
+            modifiers: egui::Modifiers::NONE,
+        };
+        let key = |repeat| egui::Event::Key {
+            key: egui::Key::W,
+            physical_key: None,
+            pressed: true,
+            repeat,
+            modifiers: egui::Modifiers::NONE,
+        };
+        assert!(!is_user_input(&wheel));
+        assert!(!is_user_input(&egui::Event::Zoom(1.1)));
+        assert!(!is_user_input(&key(true)), "a held fly key repeats");
+        assert!(is_user_input(&key(false)));
+    }
 }

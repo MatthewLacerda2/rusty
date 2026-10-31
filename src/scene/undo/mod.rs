@@ -29,7 +29,7 @@ use std::collections::{BTreeMap, VecDeque};
 use crate::ecs::Recorded;
 use crate::scene::Scene;
 
-use level::{level_bytes, SceneLevel};
+use level::SceneLevel;
 
 /// How many steps Undo keeps. Unity bounds its history by memory, not count; a
 /// step here holds only what one edit touched (documents without geometry), so
@@ -41,8 +41,6 @@ pub const DEPTH: usize = 200;
 #[derive(Debug)]
 struct Step {
     name: String,
-    /// The id allocator before the edit, so an Undo of a create gives its id back.
-    next_id: u32,
     entities: BTreeMap<u32, Option<Recorded>>,
     level: Option<SceneLevel>,
 }
@@ -54,13 +52,8 @@ pub struct UndoStack {
     redo: Vec<Step>,
     /// Whether an edit is open (between `begin_edits` and `commit_edits`).
     open: bool,
-    /// Whether the open edit is a follow-up (`begin_follow_up`): no baseline taken.
-    follow_up: bool,
-    /// The scene level as it stood when the open edit began, and its bytes.
+    /// The scene level as it stood when the open edit began.
     level: Option<SceneLevel>,
-    level_bytes: Vec<u8>,
-    /// Scratch for this frame's bytes, kept to reuse its allocation.
-    scratch: Vec<u8>,
 }
 
 impl Scene {
@@ -70,24 +63,9 @@ impl Scene {
         if self.is_playing() {
             return;
         }
-        if !self.history.open || std::mem::take(&mut self.history.follow_up) {
-            self.history.open = true;
-            self.rebaseline_level();
-        }
-        self.world.journal_resume();
-    }
-
-    /// Open an edit for a frame no one touched, closed by
-    /// [`Scene::commit_follow_up`]: entity writes are recorded as ever, but the
-    /// scene level is compared only when something was written, so an idle frame
-    /// costs nothing (serializing a Dust2-sized scene level twice a frame does).
-    pub fn begin_follow_up(&mut self) {
-        if self.is_playing() {
-            return;
-        }
         if !self.history.open {
             self.history.open = true;
-            self.history.follow_up = true;
+            self.rebaseline_level();
         }
         self.world.journal_resume();
     }
@@ -137,21 +115,16 @@ impl Scene {
     fn take_step(&mut self, name: Option<&str>) -> Option<Step> {
         self.world.journal_pause();
         let journaled = self.world.journal_take();
-        let follow_up = std::mem::take(&mut self.history.follow_up);
         if !std::mem::take(&mut self.history.open) || self.is_playing() {
             return None;
         }
-        // A follow-up that wrote nothing compares nothing; one that did compares
-        // against the last baseline taken, when one is still held.
-        let compare = !(follow_up && journaled.is_none()) && self.history.level.is_some();
-        let (next_id, before) = journaled.map_or((self.world.next_id(), BTreeMap::new()), |j| {
-            (j.next_id, j.before)
-        });
+        let before = journaled.map(|j| j.before).unwrap_or_default();
         let entities: BTreeMap<_, _> = before
             .into_iter()
             .filter(|(id, before)| changed(before.as_ref(), self.world.record(*id).as_ref()))
             .collect();
-        let level = (compare && self.level_changed())
+        let level = self
+            .level_changed()
             .then(|| self.history.level.take())
             .flatten();
         if entities.is_empty() && level.is_none() {
@@ -160,7 +133,6 @@ impl Scene {
         let name = name.map_or_else(|| self.step_name(&entities), str::to_string);
         Some(Step {
             name,
-            next_id,
             entities,
             level,
         })
@@ -228,22 +200,19 @@ impl Scene {
 
     /// Take the scene level as the open edit's baseline, unless it already is.
     fn rebaseline_level(&mut self) {
-        let mut scratch = std::mem::take(&mut self.history.scratch);
-        level_bytes(self, &mut scratch);
-        self.history.scratch = scratch;
-        if self.history.level.is_none() || self.history.scratch != self.history.level_bytes {
+        let held = self.history.level.as_ref();
+        if !held.is_some_and(|level| level.matches(self)) {
             self.history.level = Some(SceneLevel::capture(self));
-            std::mem::swap(&mut self.history.scratch, &mut self.history.level_bytes);
         }
     }
 
     /// Whether the scene level differs from the open edit's baseline (which the
     /// commit then takes as the step's state before; the next edit re-takes one).
-    fn level_changed(&mut self) -> bool {
-        let mut scratch = std::mem::take(&mut self.history.scratch);
-        level_bytes(self, &mut scratch);
-        self.history.scratch = scratch;
-        self.history.scratch != self.history.level_bytes
+    fn level_changed(&self) -> bool {
+        self.history
+            .level
+            .as_ref()
+            .is_some_and(|level| !level.matches(self))
     }
 
     /// A name after what a step touched, as Unity names its undo groups.
@@ -276,5 +245,11 @@ fn changed(before: Option<&Recorded>, after: Option<&Recorded>) -> bool {
     }
 }
 
+#[cfg(test)]
+mod bake_tests;
+#[cfg(test)]
+mod ids_tests;
+#[cfg(test)]
+mod level_tests;
 #[cfg(test)]
 mod tests;

@@ -97,6 +97,7 @@ fn draw_repl_input(editor: &mut EditorUi, ui: &mut egui::Ui) {
         ui.label(egui::RichText::new("lua>").monospace());
         let resp = ui.add(
             egui::TextEdit::singleline(&mut editor.dev.repl_input.buffer)
+                .id(super::header::repl_input_id())
                 .desired_width(f32::INFINITY)
                 .hint_text(
                     // egui 0.36 no longer draws the hint in the field's font.

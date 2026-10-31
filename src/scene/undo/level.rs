@@ -3,28 +3,35 @@
 //! Scene Settings, fog, layers, the collision matrix, the material library, the
 //! probe sets and the bake's settings live on `Scene`, beside the World, and are
 //! written by plain field assignment from the inspector and the API alike. They
-//! are recorded as one more object: the stack keeps their serialized bytes as a
-//! baseline, and an edit whose bytes differ from it records the baseline's values
-//! as the state before. One list of fields, so the stored copy, the compared bytes
-//! and the restore never disagree about what the scene level is.
+//! are recorded as one more object: the stack keeps a copy as a baseline, and an
+//! edit that leaves the scene differing from it records the copy as the state
+//! before. One list of fields, so the copy, the comparison and the restore never
+//! disagree about what the scene level is.
+//!
+//! **Bake outputs are not edits** (Unity's Undo never reverts a lighting bake):
+//! the lightmaps are not on the list at all, and of the probe sets only what the
+//! user places is: a light probe's baked SH and a reflection probe's cubemap are
+//! neither compared nor put back while the set keeps its length, so an Undo of a
+//! probe move after a bake keeps the bake. A restore that changes a set's length
+//! (an add or a removal undone) takes the recorded probes whole.
 
 use serde::Serialize;
 
+use crate::scene::lighting::probe::ProbeVolume;
+use crate::scene::lighting::reflection_probe::ReflectionProbeSet;
 use crate::scene::Scene;
 
 macro_rules! scene_level {
-    ($($field:ident: $ty:ty,)*) => {
+    ($($field:ident: $ty:ty => $same:ident, $put:ident;)*) => {
         /// The scene-level state, as values: what a step puts back.
-        #[derive(Clone, Debug, Serialize)]
+        #[derive(Clone, Debug)]
         pub(super) struct SceneLevel {
             $($field: $ty,)*
         }
 
-        /// The same fields borrowed: what is serialized to compare, uncopied.
-        #[derive(Serialize)]
-        struct LevelRef<'a> {
-            $($field: &'a $ty,)*
-        }
+        /// The `Scene` fields the scene level is made of, as `SceneData` names them.
+        #[cfg(test)]
+        pub(super) const FIELDS: &[&str] = &[$(stringify!($field)),*];
 
         impl SceneLevel {
             /// `scene`'s scene-level state, copied.
@@ -32,33 +39,93 @@ macro_rules! scene_level {
                 Self { $($field: scene.$field.clone(),)* }
             }
 
+            /// Whether `scene`'s scene level is still this one, as an edit sees it.
+            pub(super) fn matches(&self, scene: &Scene) -> bool {
+                true $(&& $same(&self.$field, &scene.$field))*
+            }
+
             /// Put these values back on `scene`.
             pub(super) fn restore(self, scene: &mut Scene) {
-                $(scene.$field = self.$field;)*
+                $($put(self.$field, &mut scene.$field);)*
             }
-        }
-
-        /// `scene`'s scene-level state serialized into `out` (cleared first).
-        pub(super) fn level_bytes(scene: &Scene, out: &mut Vec<u8>) {
-            out.clear();
-            let level = LevelRef { $($field: &scene.$field,)* };
-            // Plain data, written to memory: serializing it cannot fail.
-            let _ = serde_json::to_writer(out, &level);
         }
     };
 }
 
 scene_level! {
-    skybox_path: String,
-    ambient_color: glam::Vec3,
-    ambient_intensity: f32,
-    nav_settings: crate::scene::nav_settings::NavMeshSettings,
-    fog: crate::scene::FogSettings,
-    layers: crate::scene::LayerRegistry,
-    collision_matrix: crate::scene::CollisionMatrix,
-    materials: std::collections::BTreeMap<String, crate::scene::MaterialAsset>,
-    probes: crate::scene::lighting::probe::ProbeVolume,
-    reflection_probes: crate::scene::lighting::reflection_probe::ReflectionProbeSet,
-    lightmaps: crate::scene::lighting::lightmap::LightmapSet,
-    lighting_settings: crate::scene::lighting::LightingSettings,
+    skybox_path: String => eq, assign;
+    ambient_color: glam::Vec3 => eq_or_bytes, assign;
+    ambient_intensity: f32 => eq_or_bytes, assign;
+    nav_settings: crate::scene::nav_settings::NavMeshSettings => eq_or_bytes, assign;
+    fog: crate::scene::FogSettings => eq_or_bytes, assign;
+    layers: crate::scene::LayerRegistry => eq_or_bytes, assign;
+    collision_matrix: crate::scene::CollisionMatrix => eq_or_bytes, assign;
+    materials: std::collections::BTreeMap<String, crate::scene::MaterialAsset> => eq_or_bytes, assign;
+    probes: ProbeVolume => same_probes, put_probes;
+    reflection_probes: ReflectionProbeSet => same_reflections, put_reflections;
+    lighting_settings: crate::scene::lighting::LightingSettings => eq_or_bytes, assign;
+}
+
+fn eq<T: PartialEq>(a: &T, b: &T) -> bool {
+    a == b
+}
+
+/// `==` first (cheap); on a mismatch, the saved form decides, so a NaN that
+/// never equals itself is no edit.
+fn eq_or_bytes<T: PartialEq + Serialize>(a: &T, b: &T) -> bool {
+    a == b || same_bytes(a, b)
+}
+
+/// Whether two values save the same. Only `==`'s fallback: serializing the
+/// material library every frame costs a Dust2-sized scene ~60 µs.
+fn same_bytes<T: Serialize>(a: &T, b: &T) -> bool {
+    serde_json::to_vec(a).ok() == serde_json::to_vec(b).ok()
+}
+
+fn assign<T>(value: T, slot: &mut T) {
+    *slot = value;
+}
+
+/// The probe set as placed: the grid and every position, not the baked SH.
+fn same_probes(a: &ProbeVolume, b: &ProbeVolume) -> bool {
+    a.grid == b.grid
+        && a.probes.len() == b.probes.len()
+        && a.probes
+            .iter()
+            .zip(&b.probes)
+            .all(|(p, q)| p.position == q.position)
+}
+
+/// Put the probes back, keeping the live baked SH while the count is unchanged.
+fn put_probes(mut value: ProbeVolume, slot: &mut ProbeVolume) {
+    if value.probes.len() == slot.probes.len() {
+        for (p, live) in value.probes.iter_mut().zip(&slot.probes) {
+            p.sh = live.sh;
+        }
+    }
+    *slot = value;
+}
+
+/// The reflection probes as placed and set, without the baked cubemap's path.
+fn same_reflections(a: &ReflectionProbeSet, b: &ReflectionProbeSet) -> bool {
+    a.probes.len() == b.probes.len()
+        && a.probes.iter().zip(&b.probes).all(|(p, q)| {
+            let unbaked = |r: &crate::scene::lighting::reflection_probe::ReflectionProbe| {
+                let mut r = r.clone();
+                r.cubemap_path.clear();
+                r
+            };
+            p == q || eq_or_bytes(&unbaked(p), &unbaked(q))
+        })
+}
+
+/// Put the reflection probes back, keeping the live cubemaps while the count is
+/// unchanged.
+fn put_reflections(mut value: ReflectionProbeSet, slot: &mut ReflectionProbeSet) {
+    if value.probes.len() == slot.probes.len() {
+        for (p, live) in value.probes.iter_mut().zip(&mut slot.probes) {
+            p.cubemap_path = std::mem::take(&mut live.cubemap_path);
+        }
+    }
+    *slot = value;
 }

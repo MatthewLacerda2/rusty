@@ -28,7 +28,7 @@ pub fn layer_in_mask(layer: u8, mask: u32) -> bool {
 }
 
 /// The project's named layers: exactly [`LAYER_COUNT`] slots indexed by layer.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct LayerRegistry {
     /// One name per slot. Index 0 is always `"Default"`; an empty string marks an
     /// unnamed user slot. Kept at exactly [`LAYER_COUNT`] entries by [`normalize`].

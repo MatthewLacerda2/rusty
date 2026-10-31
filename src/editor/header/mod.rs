@@ -6,6 +6,9 @@ mod edit_menu;
 mod scene_io;
 mod transport;
 
+pub(crate) use edit_menu::repl_input_id;
+pub use edit_menu::typing_holds_step;
+
 use crate::editor::menu_create;
 use crate::editor::EditorUi;
 use crate::scene::Scene;

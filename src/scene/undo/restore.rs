@@ -9,8 +9,8 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::ecs::{Recorded, World};
-use crate::scene::Scene;
+use crate::ecs::Recorded;
+use crate::scene::{Despawn, Scene};
 
 use super::level::SceneLevel;
 use super::Step;
@@ -21,7 +21,6 @@ pub(super) fn apply(scene: &mut Scene, step: Step) -> Step {
     scene.world.journal_pause();
     let inverse = Step {
         name: step.name.clone(),
-        next_id: scene.world.next_id(),
         entities: step
             .entities
             .keys()
@@ -29,22 +28,26 @@ pub(super) fn apply(scene: &mut Scene, step: Step) -> Step {
             .collect(),
         level: step.level.as_ref().map(|_| SceneLevel::capture(scene)),
     };
-    restore_entities(&mut scene.world, step.entities);
-    scene.world.restore_next_id(step.next_id);
+    restore_entities(scene, step.entities);
     if let Some(level) = step.level {
         level.restore(scene);
     }
     inverse
 }
 
-/// Despawn what the step created, then put back every recorded entity.
-fn restore_entities(world: &mut World, entities: BTreeMap<u32, Option<Recorded>>) {
+/// Despawn what the step created, through the scene's one door so its own
+/// references (the selection, lightmap entries, shader overrides, …) go too,
+/// then put back every recorded entity. An undone create's id stays retired: the
+/// allocator never goes back (Unity never hands an undone object's id out
+/// again), and a Redo re-creates the entity under that same id.
+fn restore_entities(scene: &mut Scene, entities: BTreeMap<u32, Option<Recorded>>) {
     let created: BTreeSet<u32> = entities
         .iter()
-        .filter(|(id, before)| before.is_none() && world.contains(**id))
+        .filter(|(id, before)| before.is_none() && scene.world.contains(**id))
         .map(|(&id, _)| id)
         .collect();
-    world.despawn_all(&created);
+    scene.despawn_batch(&created, Despawn::EditMode);
+    let world = &mut scene.world;
     for recorded in entities.into_values().flatten() {
         let Recorded { mut doc, seq } = recorded;
         let live = world.mesh_mut(doc.id);

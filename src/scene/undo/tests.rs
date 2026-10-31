@@ -66,11 +66,11 @@ fn a_follow_up_frame_joins_the_last_step() {
     edit(&mut scene, |s| move_to(s, id, 1.0));
     // An idle frame that writes nothing records nothing, however the level moved.
     scene.skybox_path = "baked.hdr".into();
-    scene.begin_follow_up();
+    scene.begin_edits();
     scene.commit_follow_up();
     scene.skybox_path.clear();
     // The next frame folds the gesture's leftovers in (a card's library insert).
-    scene.begin_follow_up();
+    scene.begin_edits();
     scene.materials.insert("Folded".into(), Default::default());
     scene.world.set_name(id, "Renamed".into());
     scene.commit_follow_up();
