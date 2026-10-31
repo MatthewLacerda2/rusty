@@ -268,10 +268,20 @@ the font. `cargo deny` checks crate licenses, not assets, so keep font licenses 
 face and size: ligatures, contextual forms, combining marks and GPOS kerning come
 from the font, and the same font bytes and string always give the same glyphs. A
 right-to-left run shapes in visual order, but there is no bidirectional reordering
-across runs, and lines break only at whitespace and `\n` (no UAX #14, so CJK breaks
-between characters only when a word is wider than the rect). Letter spacing adds to
-every glyph, a ligature counting once. Bold and italic tags never split a run, so a
-pair kerns across them; a size tag or a real bold/italic face starts a new run.
+across runs, and a multi-line right-to-left text wraps in visual order, not reading
+order (its first visual line holds the end of the sentence). Lines break only at
+whitespace and `\n` (no UAX #14, so CJK breaks between characters only when a word is
+wider than the rect), never between a letter and its combining marks, and a space
+carrying a mark is drawn and is no break. Letter spacing and a synthesized bold widen
+each cluster once (a ligature, or a letter with its marks, counts as one), so an
+accent stays on its letter. Colour, bold and italic tags never split a run, so a pair
+kerns across them, but no ligature forms over a tag (`f<color=#f00>i</color>` draws
+two coloured letters, and the letters touching the tag draw unligated); a size tag or
+a real bold/italic face starts a new run. A line cut by overflow or a mid-word break
+drops the kerning against the glyph that was cut. A synthesized italic shears every
+glyph about its line's baseline, so a raised mark leans with its letter. Shaping is
+memoised per font (it is size-free), so auto-size and a HUD redrawn every frame shape
+each string once.
 
 **Layout is CPU, in the sim's terms.** Measuring, wrapping, overflow and auto-size
 (`src/ui/text/`) never touch the GPU: headless layout is the window's, and

@@ -64,19 +64,26 @@ pub fn break_lines(items: &[Item], max_width: Option<f32>, empty: LineMetrics) -
         let mut line: Vec<Item> = Vec::new();
         let mut last_space: Option<usize> = None;
         let mut soft = false;
-        for it in paragraph {
+        for (i, it) in paragraph.iter().enumerate() {
             let right = end_pen(&line) + it.advance;
             let over = max_width.is_some_and(|w| right > w + EPS);
             if over && !it.is_space() && !it.joins && !line.is_empty() {
                 let tail = match last_space.take() {
                     Some(b) => line.split_off(b + 1),
-                    None => Vec::new(),
+                    None => {
+                        if let Some(last) = line.last_mut() {
+                            last.cut(); // a word broken mid-way
+                        }
+                        Vec::new()
+                    }
                 };
                 out.push(Line::new(std::mem::take(&mut line), empty));
                 line = tail;
                 soft = true;
             }
-            if it.is_space() {
+            // A space carrying a mark is drawn, so it is no break.
+            let breakable = it.is_space() && !paragraph.get(i + 1).is_some_and(|n| n.joins);
+            if breakable {
                 if line.is_empty() && soft {
                     continue; // a soft break swallows the space it lands on
                 }
@@ -159,14 +166,20 @@ fn shorten(line: &mut Line, width: f32, mark: bool, measurer: &Measurer) {
             items.pop();
             continue;
         }
-        let candidate = Line::new([items.as_slice(), &dots].concat(), height);
+        let mut kept = items.clone();
+        if let Some(last) = kept.last_mut() {
+            last.cut();
+        }
+        let candidate = Line::new([kept.as_slice(), &dots].concat(), height);
         if candidate.width() <= width + EPS {
             *line = candidate;
             break;
         }
-        if items.pop().is_none() {
+        if items.is_empty() {
             break;
         }
+        // Drop a whole cluster: a mark never stays without its base, nor goes alone.
+        while items.pop().is_some_and(|it| it.joins) {}
     }
     line.metrics = height.max(line.metrics);
 }

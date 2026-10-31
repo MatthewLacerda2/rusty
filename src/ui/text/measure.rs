@@ -7,6 +7,8 @@
 //! metrics — all in reference units at its own size. Pure CPU; the same numbers
 //! headless and windowed.
 
+use std::ops::Range;
+
 use glam::{Vec2, Vec4};
 
 use super::font::{self, FontHandle, GlyphId};
@@ -39,14 +41,24 @@ pub struct Item {
     pub advance: f32,
     /// Where the glyph sits relative to the pen (a mark's attachment), y up.
     pub offset: Vec2,
+    /// [`Item::advance`] without kerning against the glyph after it: what the
+    /// item advances when a line is cut after it.
+    pub bare: f32,
     /// Part of the previous glyph's cluster (a mark on its base): never broken from it.
     pub joins: bool,
     pub metrics: LineMetrics,
 }
 
 impl Item {
+    /// Whitespace that draws nothing. A glyph joined to its cluster (an accent
+    /// on a space) is never one, whatever character the cluster starts with.
     pub fn is_space(&self) -> bool {
-        self.ch.is_whitespace()
+        self.ch.is_whitespace() && !self.joins
+    }
+
+    /// End a line here: drop the kerning against the glyph that was cut.
+    pub fn cut(&mut self) {
+        self.advance = self.bare;
     }
 }
 
@@ -167,7 +179,6 @@ impl<'a> Measurer<'a> {
 
     /// Shape one run (one face, one size, no `\n`) into `out`.
     fn run(&self, run: &[(char, Style)], (face, size): (usize, f32), out: &mut Vec<Item>) {
-        let t = self.text;
         let font = &self.faces[face];
         // A tab shapes as a space: one byte each, so clusters still line up.
         let text: String = run
@@ -176,12 +187,19 @@ impl<'a> Measurer<'a> {
             .collect();
         let starts: Vec<usize> = text.char_indices().map(|(i, _)| i).collect();
         let scale = size / font.units_per_em();
-        let mut prev_cluster = None;
-        for g in shape::shape(font, &text) {
+        let glyphs = shape::shape(font, &text, &style_changes(run, &starts, text.len()));
+        for (i, g) in glyphs.iter().enumerate() {
             let at = starts.partition_point(|&b| b <= g.cluster as usize).max(1) - 1;
             let (ch, style) = run[at];
             let faux_bold = style.bold && face != BOLD;
-            let bold_extra = if faux_bold { FAUX_BOLD_ADVANCE } else { 0.0 };
+            // Spacing and faux bold widen a cluster once, after its last glyph, so
+            // a mark keeps its place on its base.
+            let ends = glyphs.get(i + 1).is_none_or(|n| n.cluster != g.cluster);
+            let extra = if ends {
+                self.extra(faux_bold) * size
+            } else {
+                0.0
+            };
             out.push(Item {
                 ch,
                 glyph: g.glyph,
@@ -190,13 +208,19 @@ impl<'a> Measurer<'a> {
                 color: style.color,
                 faux_bold,
                 faux_italic: style.italic && face != ITALIC,
-                advance: g.advance * scale + (t.letter_spacing + bold_extra) * size,
+                advance: g.advance * scale + extra,
+                bare: g.bare * scale + extra,
                 offset: g.offset * scale,
-                joins: prev_cluster == Some(g.cluster),
+                joins: i > 0 && glyphs[i - 1].cluster == g.cluster,
                 metrics: metrics(font, size),
             });
-            prev_cluster = Some(g.cluster);
         }
+    }
+
+    /// The advance, in ems, letter spacing and a synthesized bold add to a cluster.
+    fn extra(&self, faux_bold: bool) -> f32 {
+        let bold = if faux_bold { FAUX_BOLD_ADVANCE } else { 0.0 };
+        self.text.letter_spacing + bold
     }
 
     /// A line break: no glyph and no advance, only the line metrics it ends with.
@@ -210,11 +234,22 @@ impl<'a> Measurer<'a> {
             faux_bold: false,
             faux_italic: false,
             advance: 0.0,
+            bare: 0.0,
             offset: Vec2::ZERO,
             joins: false,
             metrics: metrics(&self.faces[face], size),
         }
     }
+}
+
+/// The two characters on each side of a style change (colour, bold, italic) in
+/// `run`, as byte ranges of its text: no ligature forms over them, so a tag inside
+/// one still shows. Both sides, since a font may build a ligature from either end.
+fn style_changes(run: &[(char, Style)], starts: &[usize], len: usize) -> Vec<Range<usize>> {
+    (1..run.len())
+        .filter(|&i| run[i].1 != run[i - 1].1)
+        .map(|i| starts[i - 1]..starts.get(i + 1).copied().unwrap_or(len))
+        .collect()
 }
 
 fn metrics(font: &FontHandle, size: f32) -> LineMetrics {

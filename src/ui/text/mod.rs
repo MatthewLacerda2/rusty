@@ -8,6 +8,8 @@
 //! (#421) read — is exactly the window's. The SDF atlas and the drawing live in
 //! `render::ui::text`.
 
+#[cfg(test)]
+mod cluster_tests;
 pub mod font;
 pub mod layout;
 mod lines;

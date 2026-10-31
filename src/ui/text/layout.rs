@@ -26,6 +26,9 @@ pub struct PlacedGlyph {
     pub face: usize,
     /// Pen position on the baseline (plus a mark's offset), rect-local reference units.
     pub origin: Vec2,
+    /// The y of the line's baseline: a synthesized italic shears about it, so a
+    /// raised mark leans with its base.
+    pub baseline: f32,
     /// Em size, reference units.
     pub size: f32,
     /// Display-space fill, straight alpha (rich-text colour folded in).
@@ -158,6 +161,7 @@ fn place(text: &TextComponent, lines: &[Line], rect: Vec2) -> TextLayout {
                 glyph: it.glyph,
                 face: it.face,
                 origin: Vec2::new(x0 + x, baseline) + it.offset,
+                baseline,
                 size: it.size,
                 color: it.color,
                 faux_bold: it.faux_bold,

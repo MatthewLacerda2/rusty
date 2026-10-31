@@ -11,7 +11,10 @@
 //! (`outline`) are pure functions of the font bytes, so layout is deterministic.
 
 use crate::core::collections::Map;
+use std::ops::Range;
 use std::sync::{Arc, Mutex, OnceLock};
+
+use super::shape::Shaped;
 
 use skrifa::instance::{LocationRef, Size};
 use skrifa::{FontRef, MetadataProvider};
@@ -21,14 +24,29 @@ pub use skrifa::GlyphId;
 /// The bundled default font's bytes.
 const DEFAULT_FONT: &[u8] = include_bytes!("../../../engine/fonts/InstrumentSans-Regular.ttf");
 
-/// One loaded font: its bytes, the shaper's per-font tables and its metrics.
+/// One loaded font: its bytes, the shaper's per-font tables and plans, and its metrics.
 pub struct FontData {
     bytes: Arc<[u8]>,
     pub(super) shaper: harfrust::ShaperData,
+    /// Shape plans by (direction, script), built on first use: a plan compiles the
+    /// font's lookups, so building one per run would dominate a HUD's layout.
+    pub(super) plans: Mutex<Vec<PlanEntry>>,
+    /// Shaped runs by (text, unligated ranges): `shape` memoises here.
+    pub(super) runs: Mutex<Map<RunKey, Arc<[Shaped]>>>,
     units_per_em: f32,
     /// Ascent, descent and line gap in font units, all positive.
     vertical: [f32; 3],
 }
+
+/// A cached shape plan and the segment properties it was built for.
+pub(super) type PlanEntry = (
+    harfrust::Direction,
+    harfrust::Script,
+    Arc<harfrust::ShapePlan>,
+);
+
+/// A shaped run's memo key: its text and the byte ranges kept unligated.
+pub(super) type RunKey = (String, Vec<Range<usize>>);
 
 /// A shared handle to a loaded font.
 pub type FontHandle = Arc<FontData>;
@@ -45,6 +63,8 @@ impl FontData {
             units_per_em: f32::from(m.units_per_em),
             vertical: [m.ascent, -m.descent, m.leading.max(0.0)],
             shaper,
+            plans: Mutex::default(),
+            runs: Mutex::default(),
             bytes,
         })
     }

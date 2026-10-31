@@ -1,4 +1,5 @@
 //! Shaped layout (#1328): determinism, ligatures and marks through `layout_text`.
+//! Clusters under spacing, styles and cuts: `cluster_tests`.
 
 use glam::Vec2;
 
@@ -34,19 +35,17 @@ fn the_same_font_bytes_and_string_give_an_identical_layout() {
 }
 
 #[test]
-fn a_ligature_draws_fewer_glyphs_than_it_has_letters_or_the_same() {
-    let fi = layout_text(&text("fi"), Vec2::new(500.0, 100.0));
-    let f_i = layout_text(&text("f i"), Vec2::new(500.0, 100.0));
-    assert!(fi.glyphs.len() <= 2 && f_i.glyphs.len() == 2);
-    assert!(fi.size.x > 0.0);
+fn the_bundled_font_ligates_fi_into_one_glyph() {
+    let wide = Vec2::new(500.0, 100.0);
+    assert_eq!(layout_text(&text("fi"), wide).glyphs.len(), 1);
+    assert_eq!(layout_text(&text("f i"), wide).glyphs.len(), 2);
 }
 
 #[test]
 fn a_combining_mark_never_wraps_away_from_its_base() {
-    // A decomposed accent the font may compose or attach: either way its glyphs
-    // stay on one line however narrow the rect.
-    let l = layout_text(&text("e\u{301}"), Vec2::new(1.0, 500.0));
-    assert_eq!(l.lines, 1, "{l:?}");
+    // q has no precomposed q-acute, so the accent stays its own glyph, joined.
+    let l = layout_text(&text("q\u{301}"), Vec2::new(1.0, 500.0));
+    assert_eq!((l.lines, l.glyphs.len()), (1, 2), "{l:?}");
 }
 
 #[test]
