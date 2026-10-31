@@ -48,13 +48,24 @@ pub enum Lifecycle {
     Stop,
     /// An edit-mode step, undone.
     Undo,
-    /// `load_from_file` over a live scene (a scene switch, Generate Lighting's
-    /// reload, the editor's follow).
+    /// `load_from_file` over a live scene in edit mode: File ▸ Open, an edit-mode
+    /// `Scene.Load` and the editor's follow of a file changed on disk.
     Load,
+    /// A Play-mode `Scene.Load`: the tick's scene-load phase swaps another
+    /// document in (`Scene::swap_in`), carrying only the `DontDestroyOnLoad`
+    /// survivors. It is judged with the marked entity left behind, so whatever is
+    /// keyed by that entity must not cross with its stale id (`promise`).
+    PlayLoad,
 }
 
 impl Lifecycle {
-    pub const ALL: [Lifecycle; 4] = [Self::Save, Self::Stop, Self::Undo, Self::Load];
+    pub const ALL: [Lifecycle; 5] = [
+        Self::Save,
+        Self::Stop,
+        Self::Undo,
+        Self::Load,
+        Self::PlayLoad,
+    ];
 }
 
 /// What a lifecycle does to a value, as a promise and as an observation.
@@ -74,27 +85,33 @@ pub enum Outcome {
 impl Class {
     /// What `lifecycle` promises this class.
     pub fn owes(self, lifecycle: Lifecycle) -> Outcome {
-        use Lifecycle::{Load, Save, Stop, Undo};
+        use Lifecycle::{Load, PlayLoad, Save, Stop, Undo};
         use Outcome::{Back, Free, Gone, Left};
         match (self, lifecycle) {
             (Self::Authored | Self::Entities, Save | Stop | Undo) => Back,
             (Self::BakeOutput | Self::Selection, Save | Stop) => Back,
             (Self::BakeOutput | Self::Selection, Undo) => Left,
             (Self::Runtime, Save | Stop) => Gone,
-            // A load in edit mode finds them empty, and a Play load (`swap_in`)
-            // carries the survivors' marks across: a disk load owes them nothing.
+            // An edit-mode load finds them empty: leaving Play cleared them
+            // (`Scene::set_playing`).
             (Self::Runtime, Load) => Free,
+            // A Play load leaves the play state and the phase's own request (it took
+            // the load before the swap); what it keys by entity is `promise`'s. The
+            // shader clocks run on, and the disk record stays the edit scene's,
+            // which Stop puts back: a Play load reads its file and records nothing.
+            (Self::Runtime | Self::Frame | Self::DiskRecord, PlayLoad) => Left,
             (Self::EditRuntime | Self::Identity | Self::DiskRecord, Save) => Gone,
             (Self::EditRuntime | Self::Identity | Self::DiskRecord, Stop) => Back,
             (Self::Frame, Save) => Gone,
             (Self::Frame, Stop | Load) => Left,
             (Self::Follow, Save) => Gone,
-            (Self::Follow, Stop | Load) => Free,
-            (Self::History, Save | Stop | Load) => Gone,
+            (Self::Follow, Stop | Load | PlayLoad) => Free,
+            // Play holds none: entering it forgets the history.
+            (Self::History, Save | Stop | Load | PlayLoad) => Gone,
             // Undo works the history itself.
             (Self::History, Undo) => Free,
             (_, Undo) => Left,
-            (_, Load) => Gone,
+            (_, Load | PlayLoad) => Gone,
         }
     }
 
@@ -102,6 +119,16 @@ impl Class {
     /// baked SH goes to the sidecar beside it, through its field's document.
     pub fn saved(self) -> bool {
         self.owes(Lifecycle::Save) == Outcome::Back
+    }
+}
+
+/// What `lifecycle` promises a value of `class`, keyed as `keyed`: its class's
+/// promise, except that a Play load drops every entry keyed by an entity it
+/// leaves behind, whatever the class (the old id may name an incoming entity).
+pub fn promise(class: Class, keyed: Keyed, lifecycle: Lifecycle) -> Outcome {
+    match (keyed, lifecycle) {
+        (Keyed::Dropped | Keyed::Restored, Lifecycle::PlayLoad) => Outcome::Gone,
+        _ => class.owes(lifecycle),
     }
 }
 

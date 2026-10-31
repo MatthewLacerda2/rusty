@@ -12,7 +12,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::ecs::Recorded;
 use crate::scene::{Despawn, Scene};
 
-use super::{lightmaps, Step};
+use super::{side::Side, Step};
 
 /// Apply `step` to `scene` with the journal off, returning its inverse: the same
 /// objects' state as it was just before, under the same name.
@@ -26,10 +26,10 @@ pub(super) fn apply(scene: &mut Scene, step: Step) -> Step {
             .map(|&id| (id, scene.world.record(id)))
             .collect(),
         level: step.level.as_ref().map(|delta| delta.inverse(scene)),
-        lightmaps: lightmaps::entries_of(scene, step.entities.keys().copied()),
+        side: Side::of(scene, step.entities.keys().copied()),
     };
     restore_entities(scene, step.entities);
-    lightmaps::put_back(scene, step.lightmaps);
+    step.side.put_back(scene);
     if let Some(level) = step.level {
         level.restore(scene);
     }
@@ -37,7 +37,8 @@ pub(super) fn apply(scene: &mut Scene, step: Step) -> Step {
 }
 
 /// Despawn what the step created, through the scene's one door so its own
-/// references (the selection, lightmap entries, shader overrides, …) go too,
+/// references (the selection, lightmap entries, owned decals, shader overrides,
+/// …) go too,
 /// then put back every recorded entity, binding the skeleton of each whose mesh
 /// was rebuilt (a rebuild leaves the bones unbound, as a load does). An undone create's id stays retired: the
 /// allocator never goes back (Unity never hands an undone object's id out

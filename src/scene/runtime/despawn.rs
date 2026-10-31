@@ -78,7 +78,7 @@ impl Scene {
 
     /// Despawn every entity of `ids` together, then drop the scene's own references
     /// to them (#1264): the selection, `DontDestroyOnLoad`, a queued destroy, their
-    /// lightmap entries and shader overrides. The World's references go in
+    /// lightmap entries, the decals they own and their shader overrides. The World's references go in
     /// `World::despawn_all`, one pass for the batch. Every despawn in the scene runs
     /// through here, saying `why` it may skip script teardown.
     pub(crate) fn despawn_batch(&mut self, ids: &BTreeSet<u32>, why: Despawn) {
@@ -87,7 +87,8 @@ impl Scene {
             "an edit-mode despawn of {ids:?} in Play skips script teardown; use Scene::destroy"
         );
         // Before the World forgets them: a recorded edit keeps their entries (#1631).
-        self.keep_dropped_lightmaps(ids);
+        let decals = self.decals.take_owned(ids);
+        self.keep_dropped(ids, decals);
         self.world.despawn_all(ids);
         for &id in ids {
             self.shader_overrides.clear(id, None);

@@ -14,7 +14,7 @@
 //! The ring itself stays in global spawn order whatever the buckets, so the blend
 //! order never changes.
 
-use std::collections::VecDeque;
+use std::collections::{BTreeSet, VecDeque};
 use std::ops::Deref;
 
 use glam::Vec3;
@@ -172,6 +172,36 @@ impl DecalSet {
             }
             kept
         });
+    }
+
+    /// Take out every decal owned by one of `owners`, oldest first: the despawn
+    /// door drops a destroyed entity's decals with it (#1649), as Unity destroys a
+    /// projector under a destroyed object.
+    pub(crate) fn take_owned(&mut self, owners: &BTreeSet<u32>) -> Vec<Decal> {
+        let owned = |d: &Decal| d.owner.is_some_and(|o| owners.contains(&o.entity));
+        let taken: Vec<Decal> = self.ring.iter().filter(|d| owned(d)).cloned().collect();
+        self.retain(|d| !owned(d));
+        taken
+    }
+
+    /// Put `decals` back as they were (an Undo of their owner's Destroy, #1649),
+    /// each at its place in the blend order: the ring is in spawn order, which is
+    /// id order, so before the first decal with a later id. One whose id is live
+    /// already is skipped. The budgets are not applied: the scene is put back as
+    /// it stood.
+    pub(crate) fn put_back(&mut self, decals: Vec<Decal>) {
+        for decal in decals {
+            if self.ring.iter().any(|d| d.id == decal.id) {
+                continue;
+            }
+            if decal.retiring {
+                self.counts.evicting += usize::from(decal.evicted);
+            } else {
+                self.counts.add(decal.bucket());
+            }
+            let at = self.ring.iter().position(|d| d.id > decal.id);
+            self.ring.insert(at.unwrap_or(self.ring.len()), decal);
+        }
     }
 
     /// Put back the decals `saved` held (Stop's snapshot restore, #1518), as they

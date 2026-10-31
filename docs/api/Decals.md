@@ -55,7 +55,8 @@ Decals.Spawn(px, py, pz, nx, ny, nz, { material = "blood", size = 1.2, rotation 
 - **`owner`** (an entity id): the decal sticks to that entity. Its box is kept in
   the entity's space, so a bullet hole on a swinging door, a sliding crate or a
   moving car stays on it. While the owner is inactive its decals are hidden (they
-  come back with it); when it is destroyed they are dropped. Any entity works,
+  come back with it); when it is destroyed they are dropped with it, and in the
+  editor an Undo of that Destroy brings them back (#1649). Any entity works,
   including a skinned character's **bone** (bones are GameObjects): the mark
   follows that bone rigidly, though it does not bend with the skin around a joint.
   Without an owner a decal stays where it was stamped in world space.
@@ -64,9 +65,12 @@ Decals.Spawn(px, py, pz, nx, ny, nz, { material = "blood", size = 1.2, rotation 
   lifetime, so blood dries away and scorch cools instead of popping. Age is game
   time on the fixed tick: it slows with `Time.SetTimeScale` and stops at scale `0`, and a replay ages
   every decal identically. Decals age only in Play.
-- **`persist = true`** keeps the decal across `Scene.Load` (#1518), for a trail of
-  destruction that outlives a level reset (`Scene.Load(Scene.GetActivePath())`).
-  Without it a decal goes away with its scene. A persistent decal keeps its id,
+- **`persist = true`** keeps the decal across a **Play-mode** `Scene.Load` (#1518),
+  for a trail of destruction that outlives a level reset
+  (`Scene.Load(Scene.GetActivePath())`). Without it a decal goes away with its
+  scene. An edit-mode load (File ▸ Open, `Scene.Load` in edit mode, the editor
+  reloading a scene file changed on disk) drops every decal, persistent ones too
+  (#1649). A persistent decal keeps its id,
   its age and what is left of its `lifetime` and `fade`, and its place in the blend
   order: everything spawned after the load lands over it. Where it lands:
   - **an owner that survives** (`Scene.DontDestroyOnLoad`): it stays on it;

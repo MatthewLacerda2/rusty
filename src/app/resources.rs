@@ -83,8 +83,9 @@ pub struct Resources {
     /// Edit-mode scene captured on Play and restored on Stop, so play-mode mutations
     /// never leak back into the authoritative edit scene (Unity-style).
     pub(super) edit_snapshot: Option<SceneSnapshot>,
-    /// The scene file and identity editor Play started in, put back on Stop after a
-    /// play-mode `Scene.Load` (#432). Taken with `edit_snapshot`.
+    /// The scene file editor Play started in, put back on Stop after a play-mode
+    /// `Scene.Load` (#432). Taken with `edit_snapshot`, which carries the scene's
+    /// identity (#1649).
     pub(super) play_origin: Option<super::scene_load::PlayOrigin>,
     /// The host brought the Lua runtime up in edit mode (`init_edit_runtime`, the
     /// editor and the headless session): Stop brings it back after Play's runtime

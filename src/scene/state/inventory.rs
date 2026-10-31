@@ -101,8 +101,10 @@ authored_fields!(scene_state {
         selected_entity_id: Selection, Dropped;
         // Stamped in edit mode they survive Play (`DecalSet::restore`); a load drops
         // them, a Play load carrying the persistent ones (`take_persistent_decals`).
-        decals: EditRuntime, No;
-        // An Undo of a Destroy puts its entity's entry back (`undo::lightmaps`).
+        // An owned one goes with its owner and comes back with an Undo of the
+        // Destroy (`DecalOwner`, `undo::side`), as a projector under a GameObject.
+        decals: EditRuntime, Restored;
+        // An Undo of a Destroy puts its entity's entry back (`undo::side`).
         lightmaps: BakeOutput, Restored;
         pending_destroy: Runtime, Dropped;
         playing: Runtime, No;

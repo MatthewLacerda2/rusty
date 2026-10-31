@@ -80,7 +80,11 @@ pub const MARKS: &[Mark] = marks! {
         !s.collision_matrix.can_collide(9, 10);
     "materials" => |s, _| s.materials.insert("Marked".into(), Default::default()),
         s.materials.contains_key("Marked");
-    "decals" => |s, _| s.spawn_decal(Vec3::ZERO, Vec3::Y, DecalSpec::default()), !s.decals.is_empty();
+    "decals" => |s, b| s.spawn_decal(Vec3::ZERO, Vec3::Y, DecalSpec {
+            owner: Some(b),
+            ..Default::default()
+        }),
+        s.decals.iter().any(|d| d.owner.is_some_and(|o| o.entity == b));
     "probes" => |s, _| s.probes.move_probe(0, Vec3::new(1.5, 0.0, 0.0)),
         s.probes.probes.first().is_some_and(|p| p.position.x == 1.5);
     "probes.sh" as BakeOutput => |s, _| s.probes.probes[0].sh.coeffs[0] = [0.5; 3],

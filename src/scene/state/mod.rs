@@ -20,9 +20,11 @@
 //!   the saved classes' fields, in `names_tests`.
 //! - **Their behaviour is checked against it.** `lifecycle_tests` sets every field
 //!   (each has a mark in `marks`, and a field with none fails), runs save → load,
-//!   Play → Stop, edit → Undo and a load over it, and compares what came back with
-//!   what the class promises; `keyed_tests` does the same for the tables keyed by
-//!   entity id, through the despawn door and the Undo of a Destroy.
+//!   Play → Stop, edit → Undo, an edit-mode load over it and a Play-mode
+//!   `Scene.Load` (`runners`), and compares what came back with what the class
+//!   promises; `keyed_tests` does the same for the tables keyed by entity id
+//!   (lightmap entries, owned decals, …), through the despawn door and the Undo of
+//!   a Destroy.
 //!
 //! The host's state (the save data, the
 //! settings, the seed, the clock, the Game view), is not the scene's: a replay
@@ -48,6 +50,8 @@ mod lifecycle_tests;
 mod marks;
 #[cfg(test)]
 mod names_tests;
+#[cfg(test)]
+mod runners;
 
 #[cfg(test)]
-pub use class::{Class, Field, Keyed, Lifecycle, Outcome};
+pub use class::{promise, Class, Field, Keyed, Lifecycle, Outcome};

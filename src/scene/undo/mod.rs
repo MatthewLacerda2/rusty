@@ -22,8 +22,8 @@
 //! edit clears Redo. It keeps the last [`DEPTH`] steps.
 
 mod level;
-mod lightmaps;
 mod restore;
+mod side;
 
 use std::collections::{BTreeMap, VecDeque};
 
@@ -44,8 +44,8 @@ struct Step {
     name: String,
     entities: BTreeMap<u32, Option<Recorded>>,
     level: Option<LevelDelta>,
-    /// The lightmap entries of the step's destroyed entities (`lightmaps`).
-    lightmaps: lightmaps::Entries,
+    /// The side entries of the step's destroyed entities (`side`).
+    side: side::Side,
 }
 
 /// The scene's Undo and Redo stacks, and the open edit's scene-level baseline.
@@ -57,8 +57,8 @@ pub struct UndoStack {
     open: bool,
     /// The scene level as it stood when the open edit began.
     level: Option<SceneLevel>,
-    /// Lightmap entries the open edit's despawns dropped (`lightmaps`).
-    dropped: lightmaps::Entries,
+    /// Side entries the open edit's despawns dropped (`side`).
+    dropped: side::Side,
 }
 
 impl Scene {
@@ -115,9 +115,7 @@ impl Scene {
             (slot @ None, later) => *slot = later,
             (Some(_), None) => {}
         }
-        for (id, entry) in step.lightmaps {
-            last.lightmaps.entry(id).or_insert(entry);
-        }
+        last.side.absorb(step.side);
         true
     }
 
@@ -161,12 +159,12 @@ impl Scene {
             return None;
         }
         let name = name.map_or_else(|| self.step_name(&entities), str::to_string);
-        dropped.retain(|id, _| entities.contains_key(id));
+        dropped.retain(|id| entities.contains_key(&id));
         Some(Step {
             name,
             entities,
             level,
-            lightmaps: dropped,
+            side: dropped,
         })
     }
 
