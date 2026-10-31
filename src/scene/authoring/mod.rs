@@ -17,6 +17,7 @@ pub mod audio;
 pub mod components;
 pub mod defaults;
 pub mod dependency;
+pub mod environment;
 pub mod fields;
 pub mod fog;
 pub mod material;
