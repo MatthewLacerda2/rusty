@@ -12,7 +12,7 @@ pub use reimport::{reimport_model, reimport_model_ids, reimport_written, Rig};
 
 use glam::{Mat4, Vec3};
 
-use crate::asset::{self, MeshVertex, SubMesh};
+use crate::asset::{self, MeshRevision, MeshVertex, SubMesh};
 use crate::components::mesh::Vertex;
 use crate::components::Entity;
 use crate::scene::authoring::{subdivided_geometry, Primitive};
@@ -43,6 +43,9 @@ struct RehydratedMesh {
     bind_palette: Vec<Mat4>,
     skin: Option<crate::asset::SkinData>,
     clips: Vec<crate::asset::AnimationClip>,
+    /// The revision of the import it came from (#857): every instance of one
+    /// import shares it. `None` (a primitive, a failed import) takes a fresh one.
+    revision: Option<MeshRevision>,
 }
 
 impl RehydratedMesh {
@@ -56,8 +59,8 @@ impl RehydratedMesh {
     }
 
     /// Pull geometry + the full rig (bind palette, skeleton, clips) out of an
-    /// imported sub-mesh.
-    fn from_sub_mesh(sub: &SubMesh) -> Self {
+    /// imported sub-mesh, which carries `revision`, its import's.
+    fn from_sub_mesh(sub: &SubMesh, revision: MeshRevision) -> Self {
         let bind_palette = sub
             .skin
             .as_ref()
@@ -70,17 +73,20 @@ impl RehydratedMesh {
             bind_palette,
             skin: sub.skin.clone(),
             clips: sub.clips.clone(),
+            revision: Some(revision),
         }
     }
 }
 
 /// Re-import an `"Asset"` mesh's geometry + rig from its path-based `asset_ref`
-/// (`path::sub_object`). On failure (missing/renamed source — the accepted
-/// path-based trade-off) the mesh rehydrates empty rather than aborting the load.
+/// (`path::sub_object`), through the file's shared import (`asset::imported`, #857),
+/// so a load instancing one file many times parses it once. On failure
+/// (missing/renamed source — the accepted path-based trade-off) the mesh
+/// rehydrates empty rather than aborting the load.
 fn rehydrate_asset_mesh(asset_ref: &Option<String>) -> RehydratedMesh {
     match asset_ref {
-        Some(reference) => match asset::import_sub_mesh(reference) {
-            Ok(sub) => RehydratedMesh::from_sub_mesh(&sub),
+        Some(reference) => match shared_sub_mesh(reference) {
+            Ok(rebuilt) => rebuilt,
             Err(e) => {
                 warn_once(reference, &e);
                 RehydratedMesh::default()
@@ -88,6 +94,16 @@ fn rehydrate_asset_mesh(asset_ref: &Option<String>) -> RehydratedMesh {
         },
         None => RehydratedMesh::default(),
     }
+}
+
+/// The sub-mesh `reference` names, out of its file's shared import.
+fn shared_sub_mesh(reference: &str) -> Result<RehydratedMesh, asset::ImportError> {
+    let asset_ref = asset::AssetRef::parse(reference)?;
+    let import = asset::imported(std::path::Path::new(&asset_ref.path))?;
+    let sub = import.sub_mesh(&asset_ref.sub_object).ok_or_else(|| {
+        asset::ImportError::BadReference(format!("'{reference}': the file has no such sub-object"))
+    })?;
+    Ok(RehydratedMesh::from_sub_mesh(sub, import.revision))
 }
 
 thread_local! {
@@ -156,7 +172,7 @@ fn install(mesh: &mut crate::scene::MeshComponent, rebuilt: RehydratedMesh) {
     mesh.clips = rebuilt.clips;
     mesh.pose_palette = Vec::new();
     mesh.skeleton.bones.clear();
-    mesh.revision = crate::components::MeshRevision::next();
+    mesh.revision = rebuilt.revision.unwrap_or_else(MeshRevision::next);
 }
 
 /// Build an `"Asset"` mesh component from a path-based reference, importing its
@@ -171,9 +187,14 @@ pub fn asset_mesh_component(reference: &str) -> crate::scene::MeshComponent {
 }
 
 /// [`asset_mesh_component`] from `sub`, the sub-mesh `reference` names, which
-/// its caller already imported: no second parse of the file.
-pub fn asset_mesh_component_of(reference: &str, sub: &SubMesh) -> crate::scene::MeshComponent {
-    built(reference, RehydratedMesh::from_sub_mesh(sub))
+/// its caller already imported (as an import carrying `revision`): no second parse
+/// of the file.
+pub fn asset_mesh_component_of(
+    reference: &str,
+    sub: &SubMesh,
+    revision: MeshRevision,
+) -> crate::scene::MeshComponent {
+    built(reference, RehydratedMesh::from_sub_mesh(sub, revision))
 }
 
 fn built(reference: &str, rebuilt: RehydratedMesh) -> crate::scene::MeshComponent {
@@ -192,5 +213,7 @@ pub fn asset_ref_file(reference: &str) -> Option<String> {
     asset::AssetRef::parse(reference).ok().map(|r| r.path)
 }
 
+#[cfg(test)]
+mod shared_tests;
 #[cfg(test)]
 mod tests;

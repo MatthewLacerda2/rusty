@@ -151,9 +151,10 @@ pub fn save(source: &Path, settings: &ImportSettings) -> Result<(), ImportError>
 }
 
 /// Import the file, then write/refresh its sidecar's cached sub-object map,
-/// preserving any existing settings. Returns the imported asset for the caller.
-pub fn import_and_sync_sidecar(source: &Path) -> Result<ImportedAsset, ImportError> {
-    let asset = super::import_file(source)?;
+/// preserving any existing settings. Returns the file's shared import
+/// ([`super::imported`], #857) for the caller.
+pub fn import_and_sync_sidecar(source: &Path) -> Result<super::Imported, ImportError> {
+    let asset = super::imported(source)?;
     let settings = load(source)?.with_sub_objects(&asset);
     save(source, &settings)?;
     Ok(asset)

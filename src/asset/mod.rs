@@ -29,6 +29,7 @@ pub mod audio;
 pub mod convert;
 pub mod flat_normals;
 pub mod gltf;
+pub mod import_cache;
 pub mod lightmap_uv;
 pub mod lod;
 pub mod lut;
@@ -48,6 +49,7 @@ pub use animation_graph::{
     AnimationGraph, Condition, GraphEdge, GraphError, GraphNode, NumericOp, ParameterDeclaration,
 };
 pub use convert::texture_ref::MapRef;
+pub use import_cache::{imported, Imported, MeshRevision};
 pub use lightmap_uv::LightmapUvSettings;
 pub use lut::Lut;
 pub use manifest::{build_manifest, AssetEntry, AssetManifest, SubObjectEntry};
@@ -122,15 +124,28 @@ pub fn is_image_path(path: impl AsRef<Path>) -> bool {
 /// unwrap sees the scaled model. Reads the sidecar, never writes it (see
 /// [`import_and_sync_sidecar`] for the variant that maintains the `.meta` cache); a
 /// file with no sidecar imports with the defaults.
+///
+/// Always parses: what builds a scene goes through [`imported`] instead, which
+/// parses each file once and shares the result (#857).
 pub fn import_file(path: &Path) -> Result<ImportedAsset, ImportError> {
-    let mut asset = parse_file(path)?;
-    let settings = sidecar::load(path).unwrap_or_else(|e| {
+    import_with(path, &settings_of(path))
+}
+
+/// The import settings `path`'s sidecar records, the defaults (with a warning)
+/// when it cannot be read.
+fn settings_of(path: &Path) -> ImportSettings {
+    sidecar::load(path).unwrap_or_else(|e| {
         log::warn!(
             "[Asset] {}: {e}; importing with default settings",
             path.display()
         );
         ImportSettings::default()
-    });
+    })
+}
+
+/// [`import_file`] with `settings` already read.
+fn import_with(path: &Path, settings: &ImportSettings) -> Result<ImportedAsset, ImportError> {
+    let mut asset = parse_file(path)?;
     scale_factor::apply(&mut asset, scale_factor::sanitize(settings.scale, 1.0));
     if settings.lightmap_uvs.generate {
         for sub in &mut asset.sub_meshes {
@@ -153,12 +168,12 @@ fn parse_file(path: &Path) -> Result<ImportedAsset, ImportError> {
     }
 }
 
-/// Re-import just the sub-mesh a reference points at. This is the hot path scene
-/// rehydration calls: parse the reference, import the file, pull out the one
-/// addressable sub-object.
+/// Re-import just the sub-mesh a reference points at: parse the reference, take
+/// the file's shared import ([`imported`]), pull out the one addressable
+/// sub-object.
 pub fn import_sub_mesh(reference: &str) -> Result<SubMesh, ImportError> {
     let asset_ref = AssetRef::parse(reference)?;
-    let asset = import_file(Path::new(&asset_ref.path))?;
+    let asset = imported(Path::new(&asset_ref.path))?;
     asset
         .sub_mesh(&asset_ref.sub_object)
         .cloned()

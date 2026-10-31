@@ -29,7 +29,7 @@ fn model_under_a_colon_folder_is_refused_with_the_rule() {
     // The refusal comes before any file access, so the folder is only named, never
     // made: Windows can't create one holding `:`.
     let real = write_gltf("rusty_1295_kit.gltf", NO_MATERIAL_GLTF);
-    let asset = crate::asset::import_file(std::path::Path::new(&real)).unwrap();
+    let asset = crate::asset::imported(std::path::Path::new(&real)).unwrap();
     let path = "my::kit/crate.gltf".to_string();
     let mut scene = Scene::new();
     let before = scene.world.collect_entities().len();

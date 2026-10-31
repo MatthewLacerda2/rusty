@@ -19,19 +19,14 @@ mod lod;
 
 use glam::{Mat4, Vec3};
 
-use crate::asset::{ImportedAsset, ModelNode};
+use crate::asset::{Imported, ModelNode};
 use crate::components::TransformComponent;
 use crate::scene::asset_instance::instantiate_imported;
 use crate::scene::Scene;
 
 /// Spawn the model at `path` (imported as `asset`) at `position`: a root entity
 /// named after the file, and its node tree under it. Returns the root's id.
-pub fn instantiate_model(
-    scene: &mut Scene,
-    path: &str,
-    asset: &ImportedAsset,
-    position: Vec3,
-) -> u32 {
+pub fn instantiate_model(scene: &mut Scene, path: &str, asset: &Imported, position: Vec3) -> u32 {
     let root = scene.add_entity(file_stem(path));
     if let Some(mut t) = scene.world.transform_mut(root) {
         t.position = position;
@@ -81,7 +76,7 @@ fn holder(scene: &Scene, node: &ModelNode, parent: u32) -> (u32, Mat4) {
 fn spawn_node(
     scene: &mut Scene,
     path: &str,
-    asset: &ImportedAsset,
+    asset: &Imported,
     node: &ModelNode,
     parent: u32,
 ) -> u32 {
