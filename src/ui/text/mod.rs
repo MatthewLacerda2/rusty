@@ -15,5 +15,7 @@ mod measure;
 mod outline;
 pub mod rich;
 mod shape;
+#[cfg(test)]
+mod shaping_tests;
 
 pub use layout::{layout_text, measure_string, preferred_size, PlacedGlyph, TextLayout};
