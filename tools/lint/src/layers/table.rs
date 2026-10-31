@@ -52,7 +52,7 @@ const fn platform(module: &'static str, deps: &'static [&'static str]) -> Layer 
 
 pub const LAYERS: &[Layer] = &[
     // The data the sim runs on.
-    sim("core", &[]).uses(&["rustc_hash"]),
+    sim("core", &[]).uses(&["rustc_hash", "xxhash_rust"]),
     sim("time", &[]),
     // Decoding is the asset pipeline's: models, clips through symphonia (#545; only
     // `audio` plays them) and colour lookups through `image` (#1441); textures are

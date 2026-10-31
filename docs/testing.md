@@ -91,6 +91,9 @@ that stopped before the demo's end (`stopped at tick N of M`) unless a scenario
 stepped it there. **A scenario on a demo should only observe** (screenshots,
 reads, `Harness.Bench`): a call that changes the world runs on top of the
 recorded acts, and the replay diverges from there.
+The digests are xxh3 (`core::hash::content`) since #1326: a demo recorded
+before that no longer verifies, and is simply recorded again (*No backward
+compatibility*).
 
 What a demo holds (`dev::demo`, the format in `dev/demo/format.rs`): the scene,
 the engine commit, the seed, the project settings, the save data (`Storage`, the

@@ -210,6 +210,8 @@ pub struct Renderer {
     reflection_probes: reflection_probes::ProbeArray,
     /// The sky's prefiltered reflection cubes at group-0 binding 2 (#1553).
     sky_reflection: sky_cube::SkyReflection,
+    /// The reflection-probe bake's GPU prefilter (#1602), built on the first bake.
+    probe_prefilter: std::sync::OnceLock<ibl::reflection_prefilter::gpu::ProbePrefilter>,
     pub shadow_layout: wgpu::BindGroupLayout,
     pub shadow_uniform_buffer: wgpu::Buffer,
     /// The forward pass's group 3 with the white no-AO fallback: every pass that

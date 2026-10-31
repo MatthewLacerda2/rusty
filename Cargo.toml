@@ -119,6 +119,9 @@ hecs = { version = "0.10.5" }
 # The sim's hash maps (#764): FxHash has no per-process seed, so a map iterates in the
 # same order every run. Already in the tree through mlua and type-map: same version.
 rustc-hash = "2.1.2"
+# Content fingerprints (#1326): xxh3 runs at opt-level 2 as a dependency, ~40x the
+# opt-level-0 FNV the editor ran, and its output is fixed by its spec on every platform.
+xxhash-rust = { version = "0.8.19", default-features = false, features = ["xxh3"] }
 rapier3d = { version = "0.36.0" }
 image = { version = "0.25.10", default-features = false, features = ["jpeg", "png", "tga"] }
 ktx2 = { version = "0.3.0" }

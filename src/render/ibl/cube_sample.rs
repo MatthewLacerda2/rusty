@@ -1,6 +1,7 @@
 //! src/render/cube_sample.rs — CPU-side cubemap direction <-> texel mapping (#245).
 //!
-//! The GGX prefilter (`reflection_prefilter.rs`) needs two pure operations over a
+//! The CPU GGX prefilter (`reflection_prefilter::cpu`, the reference the bake's GPU
+//! one is held to, #1602) needs two pure operations over a
 //! captured cubemap: the world DIRECTION each output texel points down, and the COLOUR
 //! the captured environment shows along an arbitrary direction. Both must agree with the
 //! exact per-face orientation `capture_static_cubemap` rendered with (#243) — the faces
@@ -14,7 +15,9 @@
 
 use glam::{Mat4, Vec3, Vec4, Vec4Swizzles};
 
+#[cfg(test)]
 use crate::core::color;
+#[cfg(test)]
 pub use crate::core::color::srgb_to_linear;
 use crate::render::ibl::cubemap_capture::face_camera;
 use crate::render::CubemapFace;
@@ -45,6 +48,12 @@ impl FaceProjections {
         }
     }
 
+    /// Each face's view-projection and its inverse, for the GPU prefilter's uniform
+    /// (`reflection_prefilter::gpu`, #1602), which maps directions as this does.
+    pub(crate) fn matrices(&self) -> (&[Mat4; 6], &[Mat4; 6]) {
+        (&self.view_proj, &self.inv_view_proj)
+    }
+
     /// World direction for the texel at face coords `(u, v)` in [-1, 1] (clip-space NDC,
     /// x right, y up).
     pub fn direction(&self, face: CubemapFace, u: f32, v: f32) -> Vec3 {
@@ -55,6 +64,8 @@ impl FaceProjections {
 
     /// The (face, u, v) a world `dir` projects to: the face whose frustum it falls inside
     /// (positive clip w, NDC within [-1, 1]). Returns `None` only for the zero vector.
+    /// The CPU reference prefilter's; the GPU one locates in its shader (#1602).
+    #[cfg(test)]
     fn locate(&self, dir: Vec3) -> Option<(CubemapFace, f32, f32)> {
         let dir = dir.normalize_or_zero();
         if dir == Vec3::ZERO {
@@ -92,6 +103,7 @@ pub fn face_uv(px: u32, py: u32, res: u32) -> (f32, f32) {
 /// (sRGB-decoded). Nearest-texel lookup is plenty for the importance-sampled prefilter,
 /// which averages many taps. Black when the direction can't be located (only the zero
 /// vector). `faces[f]` is `res * res * 4` bytes, row-major top-to-bottom.
+#[cfg(test)]
 pub fn sample_linear(proj: &FaceProjections, faces: &[Vec<u8>; 6], res: u32, dir: Vec3) -> Vec3 {
     let Some((face, u, v)) = proj.locate(dir) else {
         return Vec3::ZERO;
@@ -112,6 +124,7 @@ pub fn sample_linear(proj: &FaceProjections, faces: &[Vec<u8>; 6], res: u32, dir
 
 /// Forward-sRGB transfer: linear channel -> 8-bit byte, the encode side of the prefilter
 /// (the output KTX2 stores sRGB-encoded LDR, the same space the capture produced).
+#[cfg(test)]
 pub fn linear_to_srgb(c: f32) -> u8 {
     (color::linear_to_srgb(c) * 255.0 + 0.5).clamp(0.0, 255.0) as u8
 }

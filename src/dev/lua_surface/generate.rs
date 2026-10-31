@@ -52,7 +52,7 @@ pub(super) fn register<'scope>(
     scope: &'scope mlua::Scope<'scope, '_>,
     ctx: &ApiScopedCtx<'scope>,
 ) -> Reg {
-    let (scene, scene_path, nav) = (ctx.scene, ctx.scene_path, ctx.nav);
+    let (scene, scene_path, nav, console) = (ctx.scene, ctx.scene_path, ctx.nav, ctx.console);
     let table = global_table(lua, "Lighting")?;
     put(
         &table,
@@ -61,7 +61,8 @@ pub(super) fn register<'scope>(
             let path = scene_path.borrow();
             let nav = nav.borrow();
             let mut scene = scene.borrow_mut();
-            let report = generate_lighting(&mut scene, path.as_deref(), Some(&nav))
+            let mut say = |line| console.borrow_mut().info(line);
+            let report = generate_lighting(&mut scene, path.as_deref(), Some(&nav), &mut say)
                 .map_err(mlua::Error::external)?;
             let out = lua.create_table()?;
             out.set("lightmaps", report.lightmaps)?;
