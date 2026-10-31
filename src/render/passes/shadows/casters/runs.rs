@@ -1,10 +1,11 @@
 //! A caster's material slots as depth draws (#1285): each slot of a multi-material
 //! mesh clips its shadow by its own material, and adjacent runs that clip alike draw
-//! as one.
+//! as one; then a sweep's casters grouped into instanced runs of one key (#470).
 
 use std::ops::Range;
 
 use super::super::clips::CasterClip;
+use super::{CasterBatch, CasterData, CasterKey};
 
 /// A mesh's `(slot, run)` draws ([`GpuMesh::runs`]) paired with how each slot clips
 /// its shadow (`clip_of(slot)`), adjacent runs that clip alike joined into one: a mesh
@@ -28,6 +29,35 @@ pub(super) fn join_alike<'c>(
     out
 }
 
+/// Group `casters` into instanced runs of one key, returning the packed casters (in
+/// draw order) and the batches. Sorted by key — by facing, and within each plain
+/// casters first, so the clipping pipelines bind last — and stable, so scene order
+/// holds within a run; depth writes make the order between runs irrelevant. With `instancing` off, one draw per caster
+/// in scene order (the pre-#470 path, for comparison).
+pub(super) fn batch_casters(
+    mut casters: Vec<(CasterKey, CasterData)>,
+    instancing: bool,
+) -> (Vec<CasterData>, Vec<CasterBatch>) {
+    if instancing {
+        casters.sort_by(|a, b| a.0.cmp(&b.0));
+    }
+    let mut matrices = Vec::with_capacity(casters.len());
+    let mut batches: Vec<CasterBatch> = Vec::new();
+    for (key, caster) in casters {
+        let index = matrices.len() as u32;
+        matrices.push(caster);
+        match batches.last_mut() {
+            Some(run) if instancing && run.key == key => run.instances.end = index + 1,
+            _ => batches.push(CasterBatch {
+                key,
+                instances: index..index + 1,
+                record: 0,
+            }),
+        }
+    }
+    (matrices, batches)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -35,10 +65,7 @@ mod tests {
 
     fn cutout(material: usize) -> CasterClip {
         CasterClip {
-            clip: Clip {
-                pipeline: 0,
-                material,
-            },
+            clip: Clip::of(0, material),
             cutout: Some(Cutout {
                 cutoff: 0.5,
                 textured: true,

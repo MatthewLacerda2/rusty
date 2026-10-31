@@ -1,10 +1,18 @@
 //! GPU uniform memory layouts for the forward renderer, split out of `mod.rs` to keep it
-//! under the size cap. Each `#[repr(C)]` struct mirrors a `struct` in `shader.wgsl`
+//! under the size cap. Each `#[repr(C)]` struct mirrors a `struct` in the WGSL
 //! byte-for-byte; the comments call out the alignment padding that keeps the two in sync.
 //! `pub(crate)` so the render submodules that build and write these uniforms can name them
 //! and their fields, exactly as when they lived in `mod.rs` (behavior unchanged).
 
 use crate::render::ibl::reflection_probes::{ReflectionProbeUniform, MAX_REFLECTION_PROBES};
+
+mod material;
+mod records;
+
+pub(crate) use material::{
+    DrawUniform, MappingUniform, MaterialData, SurfaceUniform, MATERIAL_DATA_WORDS,
+};
+pub(crate) use records::{RecordTable, RecordWords};
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
@@ -115,137 +123,14 @@ pub(crate) struct LightingUniform {
     pub refl_probes: [ReflectionProbeUniform; MAX_REFLECTION_PROBES],
 }
 
-#[repr(C)]
-#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-pub(crate) struct EntityUniform {
-    // The draw's own transform, applied on top of each instance's (#470): identity for
-    // instanced solids, the gizmo's placement for editor overlays.
-    pub model_matrix: [f32; 16],
-    pub color_tint: [f32; 4],
-    pub use_texture: u32,
-    pub is_lit: u32,
-    pub metallic: f32,
-    pub roughness: f32,
-    // Map flags (#202, #207). When set, the shader samples the matching group(2)
-    // texture: metallic/roughness multiply their scalar by the sampled channel
-    // (glTF's blue/green at 1, red at 2: a one-channel BC4 upload, #1574);
-    // `use_normal_map` perturbs the shading normal in tangent space; `use_emissive_map`
-    // modulates the emissive factor. These four `u32`s fill the run up to the next
-    // 16-byte boundary so the `vec4` that follows is aligned; `EntityUniforms` in
-    // shader.wgsl mirrors this field order byte-for-byte.
-    pub use_metallic_map: u32,
-    pub use_roughness_map: u32,
-    pub use_normal_map: u32,
-    pub use_emissive_map: u32,
-    // Flat emissive factor (#222): rgb glow added on top of the lit colour in
-    // `fs_main`. The renderer draws to an HDR target with a bloom bright-pass, so
-    // values >1.0 glow automatically. Stored as a `vec4` (4th lane unused) to dodge
-    // WGSL's `vec3` 16-byte-alignment gotcha and keep the struct a 16-byte multiple.
-    pub emissive: [f32; 4],
-    // Cutout alpha-test (#242). `use_cutout == 1` makes `fs_main` discard fragments
-    // whose final alpha is below `alpha_cutoff` (Cutout materials).
-    pub use_cutout: u32,
-    pub alpha_cutoff: f32,
-    // Index of this draw's joint 0 in the frame's bone-palette storage array (#455):
-    // the vertex shader reads `bones[bone_base + joint]`. `0` is the shared identity
-    // matrix every non-skinned draw uses. `EntityUniforms` in shader.wgsl mirrors this
-    // field order byte-for-byte.
-    pub bone_base: u32,
-    // `1` when this draw folds in the decals of its cluster (#638): a lit, non-
-    // transparent surface whose material receives decals. Completes the 16-byte run.
-    pub receive_decals: u32,
-    // How the surface composites, shadows and transmits (#1523); its fields follow
-    // `receive_decals` flat in `EntityUniforms`.
-    pub surface: SurfaceUniform,
-    // Where the material's maps are read (#1573); flat after `transmission`.
-    pub mapping: MappingUniform,
-}
-
-/// A draw's transparent-surface terms (#1523): blending, shadows, refraction,
-/// absorption, depth postpass and thin translucency, packed from its material.
-#[repr(C)]
-#[derive(Copy, Clone, Debug, Default, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
-pub(crate) struct SurfaceUniform {
-    /// The material's `BlendMode`, by index: 3 (Multiply) tints toward white by alpha.
-    pub blend_mode: u32,
-    /// 1 when URP's preserve specular applies: the diffuse is premultiplied by alpha
-    /// in the shader, the specular is not, and the Fresnel raises the opacity.
-    pub premultiply_diffuse: u32,
-    /// 0 when no shadow lands on the surface (URP's *Receive Shadows* off).
-    pub receive_shadows: u32,
-    /// The refraction model: 0 none, 1 planar (HDRP's Box), 2 thin.
-    pub refraction_model: u32,
-    pub ior: f32,
-    /// The refraction model's thickness in metres (thin: HDRP's fixed 5 mm).
-    pub thickness: f32,
-    /// 1 when the surface composites over the opaque copy itself (refraction or
-    /// absorption), so it draws with alpha 1.
-    pub uses_opaque: u32,
-    /// 1 when the surface writes its depth after drawing.
-    pub depth_postpass: u32,
-    /// The absorption coefficient per metre, rgb (HDRP's
-    /// `TransmittanceColorAtDistanceToAbsorption`); `w` the material's thickness,
-    /// the depth it absorbs over where the sky is behind it.
-    pub absorption: [f32; 4],
-    /// Thin translucency: rgb the transmission colour times its amount, `w` the
-    /// amount (0: none).
-    pub transmission: [f32; 4],
-    /// 1 when the surface traces screen-space reflections (#1570): a lit
-    /// `Transparent` material with `receive_ssr` that can be smooth enough to
-    /// reflect (`postfx::effects::ssr::transparent::traces`); it traces only where
-    /// the camera's `stack.z` gives a march.
-    pub receive_ssr: u32,
-    pub _pad: [u32; 3],
-}
-
-/// Where a draw's material maps are read (#1573), packed from its
-/// tiling, offset and UV mapping; the default is UV0 untouched, for draws with no material.
-#[repr(C)]
-#[derive(Copy, Clone, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
-pub(crate) struct MappingUniform {
-    /// `xy` the tiling, `zw` the offset (Unity's `_MainTex_ST`).
-    pub uv_st: [f32; 4],
-    /// 0 UV0, 1 planar (world XZ), 2 triplanar.
-    pub uv_mapping: u32,
-    /// Texture repeats per metre under a world mapping: `1 / world_size`.
-    pub world_scale: f32,
-    /// The power the normal is raised to before it weights the three projections.
-    pub blend_sharpness: f32,
-    pub _pad: u32,
-}
-
-impl Default for MappingUniform {
-    fn default() -> Self {
-        Self {
-            uv_st: [1.0, 1.0, 0.0, 0.0],
-            uv_mapping: 0,
-            world_scale: 1.0,
-            blend_sharpness: 4.0,
-            _pad: 0,
-        }
-    }
-}
-
-/// How many 32-bit words an [`EntityUniform`] holds.
-pub(crate) const ENTITY_UNIFORM_WORDS: usize = std::mem::size_of::<EntityUniform>() / 4;
-
-impl EntityUniform {
-    /// The uniform as plain words — the batch key compares these bit-for-bit, so two
-    /// draws share a batch only when every material scalar and flag is identical.
-    pub(crate) fn words(&self) -> [u32; ENTITY_UNIFORM_WORDS] {
-        let mut words = [0u32; ENTITY_UNIFORM_WORDS];
-        words.copy_from_slice(bytemuck::cast_slice(bytemuck::bytes_of(self)));
-        words
-    }
-}
-
 /// One instance of a forward draw (#470), read by `instance_index` from the group-1
 /// storage array: the entity's world matrix, its light-probe SH (#240), and where its
 /// baked lightmap sits (#438).
 ///
 /// Only what legitimately differs between copies of one mesh + material lives here.
 /// Everything the fragment shader branches on before sampling a texture stays in the
-/// per-draw [`EntityUniform`], so those branches stay in uniform control flow. The SH
+/// draw's [`MaterialData`] record, indexed by the per-draw uniform, so those branches
+/// stay in uniform control flow. The SH
 /// branch samples nothing, so it may vary per instance.
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]

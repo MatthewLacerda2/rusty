@@ -36,6 +36,12 @@ impl ScreenSize {
         self.game_view = Some((width, height));
     }
 
+    /// Put back a size read with [`game_view`](Self::game_view), `None` included:
+    /// a demo replay restoring the screen it started on (#1598).
+    pub fn restore_game_view(&mut self, game_view: Option<(u32, u32)>) {
+        self.game_view = game_view;
+    }
+
     /// The game view's pixel size as the platform last wrote it; `None` headless
     /// until a run sets one.
     pub fn game_view(&self) -> Option<(u32, u32)> {

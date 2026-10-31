@@ -1,23 +1,36 @@
 //! src/app/systems/camera_sync.rs — reconcile the render camera with the scene's camera.
 //!
-//! The render [`Camera`] resource carries the game camera's position/orientation
-//! (driven by the play-mode follow logic and `Camera.*`) plus its lens
-//! and culling mask. Each frame this copies the active `CameraComponent`'s
-//! fov/near/far/culling-mask into that resource, so per-camera clip planes and the
-//! Unity-style culling mask (#92) take effect without the renderer reaching into the
-//! scene. Multi-camera stacking is the follow-up (#93).
+//! The render [`Camera`] resource carries the main view's position/orientation (the
+//! main camera entity's when there is one, #1619; else the free camera `Camera.*`
+//! drives) plus its lens and culling mask. Each frame this copies that pose and the
+//! active `CameraComponent`'s fov/near/far/culling-mask into the resource, so
+//! per-camera clip planes and the Unity-style culling mask (#92) take effect without
+//! the renderer reaching into the scene. Readers that must see a move the same
+//! frame (world-space UI, the audio listener, snapshots) read [`GameWorld::main_view`]
+//! or `game_camera_from_scene` instead of this mirror.
 //!
 //! [`Camera`]: crate::scene::Camera
 
-use crate::scene::sync_lens_from_scene;
+use crate::scene::camera::sync_pose_from_scene;
+use crate::scene::{game_camera_from_scene, sync_lens_from_scene, Camera};
 
 use crate::app::GameWorld;
 
 impl GameWorld {
-    /// Sync the render camera's lens + culling mask from the scene's active camera.
+    /// The camera the screen shows (#1619): the scene's main camera entity, else the
+    /// free view camera. The player, the editor's Game view and every headless
+    /// capture render from it, so what a script set through `Camera.*` is what each
+    /// of them shows.
+    pub fn main_view(&self) -> Camera {
+        game_camera_from_scene(&self.resources.camera.borrow(), &self.world.scene.borrow())
+    }
+
+    /// Sync the render camera's pose, lens and culling mask from the scene's main
+    /// camera.
     pub(crate) fn sync_render_camera(&mut self) {
         let scene = self.world.scene.borrow();
         let mut camera = self.resources.camera.borrow_mut();
+        sync_pose_from_scene(&mut camera, &scene);
         sync_lens_from_scene(&mut camera, &scene, scene.is_playing());
     }
 

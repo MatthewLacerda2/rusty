@@ -39,7 +39,7 @@ pub fn register<'scope>(
         "AudioVoices",
         scope.create_function(move |lua, ()| -> mlua::Result<Value> {
             let scene = scene.borrow();
-            let (audio, heard_by) = (audio.borrow(), listener(camera));
+            let (audio, heard_by) = (audio.borrow(), listener(camera, &scene));
             let voices: Vec<_> = scene
                 .world
                 .ids_with_audio()

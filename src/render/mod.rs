@@ -49,11 +49,11 @@ pub use stats::RenderCounters;
 pub use timing::{ClockProbe, GpuPass, GpuTimes};
 pub use view::{PixelSize, RenderView};
 
-// GPU uniform memory layouts live in `gpu/uniforms.rs` (split out to keep files under
+// GPU uniform memory layouts live in `gpu/uniforms/` (split out to keep files under
 // the size cap); re-imported here so the render module body still names them directly.
 pub(crate) use gpu::uniforms::{
-    AmbientLightUniform, CameraUniform, DirectionalLightUniform, EntityUniform, InstanceData,
-    LightingUniform,
+    AmbientLightUniform, CameraUniform, DirectionalLightUniform, DrawUniform, InstanceData,
+    LightingUniform, MaterialData,
 };
 
 // Stores GPU Buffer handlers for meshes
@@ -156,7 +156,7 @@ pub struct Renderer {
     /// The baked lightmap pages group 0 binds (#438), rebound when the scene's change.
     pub(crate) lightmaps: gpu::lightmaps::Lightmaps,
     /// The packed per-frame draw data every solid draw binds as group 1 (#470): per-draw
-    /// uniforms, bone palettes and instances, rewritten per camera.
+    /// uniforms, bone palettes, instances and material records, rewritten per camera.
     draw_buffers: gpu::draw_buffers::DrawBuffers,
     /// One group-2 material bind group per distinct set of resolved maps (#470).
     materials: gpu::material_cache::MaterialCache,

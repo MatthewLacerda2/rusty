@@ -8,7 +8,6 @@
 
 mod animator;
 mod depth_of_field;
-mod fog;
 mod graphics;
 mod lens;
 mod lens_flare;
@@ -17,3 +16,4 @@ mod nav_agent;
 mod particles;
 mod physics;
 mod ribbons;
+mod scene_settings;

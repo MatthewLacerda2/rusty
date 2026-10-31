@@ -11,7 +11,7 @@ use std::path::Path;
 
 use super::EvalBackend;
 use crate::core::project::{self, Access};
-use crate::dev::session::Session;
+use crate::dev::session::{self, Session};
 
 /// The in-process session `session-mcp` drives without `--attach`.
 pub struct Embedded {
@@ -41,13 +41,13 @@ impl EvalBackend for Embedded {
 }
 
 impl Embedded {
-    /// Open `root` (it becomes the working directory) and boot its seeded default
-    /// scene. On failure the old project stays open and current.
+    /// Open `root` (it becomes the working directory) and boot its boot scene, as
+    /// `--project <root>` would. On failure the old project stays open and current.
     fn switch(&self, root: &Path) -> Result<(), String> {
         let back = std::env::current_dir().map_err(|e| e.to_string())?;
-        project::open(root, Access::Edit)?;
-        let boot_scene = crate::scene::seed_default_scene();
-        match Session::new(&boot_scene) {
+        let opened = project::open(root, Access::Edit)?;
+        let boot_scene = session::seeded_boot_scene(&opened);
+        match Session::boot(&boot_scene) {
             Ok(session) => {
                 *self.session.borrow_mut() = session;
                 Ok(())

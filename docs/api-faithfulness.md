@@ -52,13 +52,13 @@ per-module unit tests (e.g. `api/light.rs`) are the pattern.
 
 | Setter | Status | Read-site |
 |---|---|---|
-| `SetMetallic` | ✅ | renderer — `draw_resources::solid_entity_uniform` packs `metallic` into `EntityUniform`; `shader.wgsl` PBR uses it |
+| `SetMetallic` | ✅ | renderer — `draw::uniforms::material_data` packs `metallic` into the draw's `MaterialData` record; `shader.wgsl` PBR uses it |
 | `SetRoughness` | ✅ | renderer — same path, `roughness` uniform |
-| `SetColor` | ✅ | renderer — writes `base_color` through `authoring::material::set_base_color`, the inspector's op; `draw::uniforms::solid_entity_uniform` packs it as `EntityUniform.color_tint`, and `shader.wgsl` multiplies the albedo by it (#1368) |
+| `SetColor` | ✅ | renderer — writes `base_color` through `authoring::material::set_base_color`, the inspector's op; `draw::uniforms::material_data` packs it as `MaterialData.color_tint`, and `shader.wgsl` multiplies the albedo by it (#1368) |
 | `SetTexture` | ✅ | renderer — `draw::upload_scene_assets` calls `load_texture(path)` for every active entity **each frame**, and `draw_resources::build_solid_resource` binds `gpu_textures[path]`. A runtime path change loads + binds next frame. (This is the issue's "canonical no-op"; it is **wired** in the current renderer.) Round-trips. |
 | `SetMetallicMap` | ✅ | renderer — `draw::upload_scene_assets` loads the map, `draw_resources::build_solid_resource` assembles the per-entity group(2) material bind group, and `shader.wgsl` samples `t_metallic` (`.b` channel) × the metallic scalar (#202, closed #184) |
 | `SetRoughnessMap` | ✅ | renderer — same path; `shader.wgsl` samples `t_roughness` (`.g` channel) × the roughness scalar (#202, closed #184) |
-| `SetEmissive` | ✅ | renderer — `draw_resources::solid_entity_uniform` packs `emissive` into `EntityUniform`; `shader.wgsl` adds it after lighting (blooms when >1.0) (#222) |
+| `SetEmissive` | ✅ | renderer — `draw::uniforms::material_data` packs `emissive` into the draw's `MaterialData` record; `shader.wgsl` adds it after lighting (blooms when >1.0) (#222) |
 | `SetNormalMap` | ✅ | renderer — `draw::upload_scene_assets` loads the map, `build_solid_resource` binds `t_normal` to the group(2) material bind group, and `shader.wgsl` perturbs the shading normal in tangent space (per-vertex tangents + TBN) (#207) |
 | `SetEmissiveMap` | ✅ | renderer — same upload/bind path; `shader.wgsl` samples `t_emissive` and modulates the emissive factor (`factor × map.rgb`) (#207) |
 | `DefineAsset` | ✅ | renderer + round-trip (#271) — writes a `MaterialAsset` into `scene.materials` under a chosen name; an entity referencing that name via its `MaterialComponent` is sampled by the renderer through the SAME per-entity material path as every row above (`draw_resources::build_solid_resource` + `shader.wgsl`). The asset is part of `SceneData` (`materials` map), so it survives save→load. Proven by `tests/material_authoring.rs` (round-trip; entity-uses-asset; clamps/unknown-mode degrade; packed map slots) |
@@ -94,6 +94,7 @@ per-module unit tests (e.g. `api/light.rs`) are the pattern.
 | `ApplyPrefabToSource` / `ApplyPrefabFieldToSource` | ✅ | write the instance's overrides into the source `.prefab` on disk (reusing the override setter + the one `.prefab` writer), then clear them — other instances pick the edit up on reload/reimport (#268) |
 | `SetActive` | ✅ | sim + renderer — the same `active` flag `Deactivate` clears, read through Unity's `activeInHierarchy` (`World::is_active_in_hierarchy`, #1363): an inactive parent hides and stops its subtree — the script lifecycle's `OnEnable`/`OnDisable` edge sweep, Animators, physics, nav, audio (a voice stops on the falling edge, a `play_on_start` source replays on the rising one, `app/audio/activity.rs`), layout groups, UI hit-testing and drawing all ask it; round-trips (`tests/ui/widgets/reads.rs`, #422) |
 | `SetStatic` | ✅ | sim + renderer — `World::set_static`, the inspector checkbox's write: physics makes the body Fixed (`physics::shape::build::classify`, re-read each tick); the cascade and atlas sweeps put it in the cached static bake (`shadows::casters::prepare_casters`, re-baked when `World::static_revision` moves, #1496); probe SH skips it (`draw::uniforms::entity_probe_sh`); the lightmap input (`scene::lighting::lightmap::input`), probe placement (`scene::lighting::placement::static_scene_aabb`), the navmesh bounds (`navigation::bounds`) and the probe cubemap capture (`draw::resources`, `static_capture`) read it at their next bake; round-trips as `is_static`. Proven by `tests/static_flag_api.rs` (a Rigidbody set static from Lua stops falling) and `gpu_a_static_flag_flip_rebakes_with_no_one_invalidating` |
+| `SetName` | ✅ | sim + editor — `World::set_name`, the inspector name field's write: `World::find_by_name` (`Scene.FindEntityByName`), `Scene.FindChild`, the hierarchy and inspector read it; round-trips with the scene. Proven by `tests/scene_name_api.rs` (`a_rename_is_saved_with_the_scene`) |
 
 ### `Navigation` — over `Scene.nav_settings`
 
@@ -555,7 +556,7 @@ The full glTF-PBR map surface is now **faithful**. `Material.SetMetallicMap` /
 `shader.wgsl` sampling of `t_metallic`/`t_roughness`), closing the **#184** gap; the
 issue's "canonical no-op" — `Material.SetTexture` — was already faithful
 (`upload_scene_assets` lazily loads any texture path each frame). The flat **emissive
-factor** (`SetEmissive`) was wired by #222 through the `EntityUniform` slot and the
+factor** (`SetEmissive`) was wired by #222 through the per-draw uniform (since #1616 the `MaterialData` record) and the
 `fs_main` add-after-lighting term (glows, and blooms when >1.0 via the HDR target).
 **#207** closed the last two map no-ops: `SetNormalMap` now perturbs the shading
 normal in tangent space (a `tangent` vertex attribute — read from the glTF `TANGENT`

@@ -1,7 +1,7 @@
 //! The transparent-surface terms a material packs into its draw's uniform (#1523),
 //! without a GPU: what the shader branches on and the blend picks.
 
-use super::{material_uniform, surface_uniform};
+use super::{material_data, surface_uniform};
 use crate::components::{BlendMode, MaterialAsset, RefractionModel, RenderMode, UvMapping};
 
 fn glass() -> MaterialAsset {
@@ -128,7 +128,7 @@ fn map_coordinates_pack_as_scale_offset_mode_and_repeats_per_metre() {
         blend_sharpness: 8.0,
         ..MaterialAsset::default()
     };
-    let m = material_uniform(true, Some(&tiled)).mapping;
+    let m = material_data(true, Some(&tiled)).mapping;
     assert_eq!(m.uv_st, [4.0, 2.0, 0.5, 0.25]);
     assert_eq!(
         (m.uv_mapping, m.world_scale, m.blend_sharpness),
@@ -139,12 +139,12 @@ fn map_coordinates_pack_as_scale_offset_mode_and_repeats_per_metre() {
         blend_sharpness: 200.0,
         ..tiled
     };
-    let m = material_uniform(true, Some(&wild)).mapping;
+    let m = material_data(true, Some(&wild)).mapping;
     assert_eq!(
         (m.world_scale, m.blend_sharpness),
         (100.0, 64.0),
         "clamped to the rows"
     );
-    let plain = material_uniform(true, None).mapping;
+    let plain = material_data(true, None).mapping;
     assert_eq!((plain.uv_st, plain.uv_mapping), ([1.0, 1.0, 0.0, 0.0], 0));
 }

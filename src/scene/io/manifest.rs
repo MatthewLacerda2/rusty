@@ -13,6 +13,10 @@
 //!   kept, with one line saying a newer default exists. Never overwritten without
 //!   proof.
 //!
+//! [`SeedManifest::seed_once`] adds one rule for a file the user may delete for good
+//! (the default scene, #1618): recorded but missing → deleted on purpose, and left
+//! deleted, as Unity never recreates a template's `SampleScene`.
+//!
 //! Generic over the file: a caller hands in the destination and the bundled bytes,
 //! so a rewritten default (a new scene, a new script) rides the same path.
 //!
@@ -41,6 +45,9 @@ pub enum SeedOutcome {
     Refreshed,
     /// The file differs from both the bundled version and the seeded one: kept as is.
     Kept,
+    /// The file was seeded before and is gone: deleted on purpose, so not written
+    /// ([`SeedManifest::seed_once`]).
+    Deleted,
 }
 
 /// The recorded seed hashes, keyed by the destination path `/`-spelled
@@ -94,12 +101,23 @@ impl SeedManifest {
                 }
             }
             SeedOutcome::UpToDate => {}
+            SeedOutcome::Deleted => return outcome,
         }
         if self.entries.get(&key) != Some(&want) {
             self.entries.insert(key.clone(), want);
             self.touched.insert(key, want);
         }
         outcome
+    }
+
+    /// [`seed`](Self::seed), except a file the manifest records but that is missing
+    /// now: the user deleted it, and it stays deleted. Only a project that never had
+    /// it (a new one) gets it written.
+    pub fn seed_once(&mut self, dest: &Path, bundled: &[u8], hint: &str) -> SeedOutcome {
+        if !dest.exists() && self.entries.contains_key(&paths::to_slash(dest)) {
+            return SeedOutcome::Deleted;
+        }
+        self.seed(dest, bundled, hint)
     }
 
     /// Write back the entries this run changed, merged over what is on disk now.

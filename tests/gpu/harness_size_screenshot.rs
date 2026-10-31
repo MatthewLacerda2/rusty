@@ -28,7 +28,11 @@ fn the_run_size_sizes_shots_and_the_ui_and_one_shot_may_name_its_own() {
     assert_eq!(h.size(), (1280, 720), "the default stays a 720p Game view");
     h.set_size(320, 180);
     // The sim lays its UI out on the run's size, as a window of that size would.
-    let screen = h.world.borrow().resources.ui_view().screen;
+    let screen = {
+        let w = h.world.borrow();
+        let scene = w.scene().borrow();
+        w.resources.ui_view(&scene).screen
+    };
     assert_eq!(screen, glam::Vec2::new(320.0, 180.0));
     h.step(2);
 

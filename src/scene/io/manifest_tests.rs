@@ -105,3 +105,25 @@ fn a_key_is_slash_spelled_on_every_os() {
         "{text}"
     );
 }
+
+#[test]
+fn a_seed_once_file_is_written_once_and_a_deletion_is_final() {
+    let (manifest, dest) = workspace("seed_once");
+    let once = |bundled: &str| {
+        let mut m = SeedManifest::load(&manifest);
+        let outcome = m.seed_once(&dest, bundled.as_bytes(), "reset");
+        m.save().unwrap();
+        outcome
+    };
+    assert_eq!(once("v1"), SeedOutcome::Written);
+    assert_eq!(once("v1"), SeedOutcome::UpToDate);
+    assert_eq!(
+        once("v2"),
+        SeedOutcome::Refreshed,
+        "an unedited copy follows"
+    );
+    std::fs::remove_file(&dest).unwrap();
+    assert_eq!(once("v2"), SeedOutcome::Deleted);
+    assert_eq!(once("v3"), SeedOutcome::Deleted);
+    assert!(!dest.exists(), "a deleted seed is never recreated");
+}

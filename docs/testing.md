@@ -119,6 +119,10 @@ through Play), so they never reach a Play session. `play --size` and `--scene`
 are refused with `--demo`: the replay plays the scene and the Game view size the
 demo recorded (the sim lays the UI out on it, and every frame renders at it).
 
+**Open one in the editor.** `Editor.OpenDemo(path)` ([`api/Editor.md`](api/Editor.md),
+*The demo timeline*) plays a demo on the Game view with a timeline: play/pause,
+scrub by tick (the same seek as `Harness.SeekDemo`) and the index's marks on the bar.
+
 **Bit for bit is checked, not promised.** Every 120 ticks, and once right before
 Stop (or when a `play` run ends), the demo stores a digest of the world: every
 entity's id, name, active flag and transform, every rigidbody's velocities, the
@@ -596,8 +600,10 @@ Measure before optimising: `make bench` runs
 the default fy_pool_day yard, and prints a short report in the terminal. The yard
 is the fixture project's startup scene, `assets/scenes/default.scene`, which `play`
 loads from disk (#1343). It is gitignored and seeded through the seed manifest,
-which keeps a local edit, so an edited copy changes what the bench measures; delete
-it to measure the default again.
+which keeps a local edit, so an edited copy changes what the bench measures. A
+deleted copy is not seeded again (#1618): to measure the default again, delete it
+and remove its `assets/scenes/default.scene` line from the fixture's `.seeded`
+(only that line: the others record the seeded scripts).
 
 - **the scene** — 50 skinned soldiers (a procedural 16-bone, ~12k-triangle rig with a
   walk cycle and hitboxes) walking the navmesh with a Lua brain each (patrol + a

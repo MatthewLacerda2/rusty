@@ -65,7 +65,7 @@ pub(in crate::app) fn register(app: &mut App) {
 /// settled layout — or computes one on the first tick of Play, before this
 /// session's first `LateUpdate` ran.
 pub(in crate::app) fn dispatch_ui_events(world: &mut World, res: &mut Resources) {
-    let view = res.ui_view();
+    let view = res.ui_view(&world.scene.borrow());
     if res.play_frame == 0 {
         res.ui_layout = UiLayout::compute_in(&world.scene.borrow().world, &view);
     }
@@ -107,14 +107,15 @@ fn show_selectable_states(world: &mut World, res: &mut Resources) {
 /// Advance every `ScreenSpaceCamera` canvas's sway lag by this tick's camera turn.
 fn sway_ui(world: &mut World, res: &mut Resources) {
     let dt = res.time.borrow().unscaled_delta_time;
-    let camera = res.camera.borrow().clone();
-    crate::ui::sway::update_sway(&mut world.scene.borrow_mut().world, &camera, dt);
+    let mut scene = world.scene.borrow_mut();
+    let camera = crate::scene::game_camera_from_scene(&res.camera.borrow(), &scene);
+    crate::ui::sway::update_sway(&mut scene.world, &camera, dt);
 }
 
 /// Recompute every canvas's layout for this tick.
 fn layout_ui(world: &mut World, res: &mut Resources) {
-    let view = res.ui_view();
     let scene = world.scene.borrow();
+    let view = res.ui_view(&scene);
     res.ui_layout = UiLayout::compute_in(&scene.world, &view);
 }
 

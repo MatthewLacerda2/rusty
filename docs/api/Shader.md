@@ -90,13 +90,20 @@ assembles byte-identical WGSL.
 
 - **`surface`** — varies the *look* of the forward/surface pass. The full PBR
   lighting is kept **verbatim** (so the variant binds against the forward pipeline
-  unchanged — same `VertexInput`, the `LightingUniforms`/`EntityUniforms`/group(2)
-  material maps, and `vs_main`/`fs_main` entry points); each colour block restyles
+  unchanged — same `VertexInput`, the `LightingUniforms`, the group-1 `draw` and
+  material record, the group(2) material maps, and `vs_main`/`fs_main` entry points); each colour block restyles
   the shaded color before the final write. The vertex stage is the standard one
   too, unless a **vertex-stage** block (`vertex_waves`, below) moves the vertices.
-  Group 1 is the instanced layout (#470): the per-draw `EntityUniforms` plus a
-  per-instance `instances` array (world matrix, probe SH). A surface variant baked
-  before #470 was written against the old per-entity layout — re-bake it.
+  Group 1 is the instanced layout (#470): the small per-draw `draw` uniform (its
+  transform, joint base and record index), the draw's material record read through
+  `material()` (#1616: tint, PBR scalars, map flags, cutout, the transparent-surface
+  and mapping terms), and a per-instance `instances` array (world matrix, probe SH).
+  The shadow casters bind the same `draw` and record, so `material()` reads in the
+  shadow stage too. A surface variant baked before #470 was written against the old
+  per-entity layout — re-bake it. One baked before #1616 imports the old per-draw
+  `entity` uniform, which no longer exists, so the renderer refuses it: it logs that
+  once and draws the material with the standard shader until the variant is
+  re-baked (`Shader.Bake` again; an automatic re-bake is #1638).
   Surface decals (#638) are folded into `fs_main`'s material inputs before the
   lighting, so a variant carries them like the standard shader. A surface variant
   baked before #638 carries the old `fs_main` and **shows no decals** until it is
@@ -140,7 +147,10 @@ What a block's helper can read (#398). Surface blocks get the forward contract:
   `Time.time`). It is scaled by `Time.SetTimeScale`, freezes while the game is paused,
   and is **0 in edit mode and `Debug.Preview`**, so previews stay pixel-comparable and
   a replay renders the same frames. Pulses, scrolling, flicker: drive them off this.
-- `entity` — the per-draw `EntityUniforms`; the material maps (`t_diffuse`,
+- `material()` — the draw's material record (#1616): `color_tint`, `metallic`,
+  `roughness`, `emissive`, `alpha_cutoff`, the `use_*` map flags and the surface
+  and mapping terms, as `MaterialData` in `forward/bindings.wgsl` lists them;
+  `draw` — the per-draw uniform (`model_matrix`, `bone_base`); the material maps (`t_diffuse`,
   `t_emissive`, …), each with its own sampler (`s_diffuse`, `s_emissive`, …) that
   carries the texture's wrap and filter import settings
   ([`Assets.SetTextureImportSettings`](Assets.md#texture-import-settings)).

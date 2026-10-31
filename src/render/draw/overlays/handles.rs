@@ -56,10 +56,7 @@ impl Renderer {
             pass.set_bind_group(2, &self.default_material_bind_group, &[]);
             // Group 3 is in the forward layout; unlit lines read nothing from it.
             pass.set_bind_group(3, &self.shadow_bind_group, &[]);
-            let o = &overlays;
-            self.draw_editor_overlays(&mut pass, &o.grid, &o.aabb, &o.axis);
-            // Light- & reflection-probe gizmos (#284): visualization only.
-            self.draw_probe_overlays(&mut pass, &o.probes);
+            self.draw_editor_overlays(&mut pass, &overlays);
         }
         self.queue.submit(std::iter::once(encoder.finish()));
     }

@@ -45,7 +45,7 @@ fn a_run_draws_at_its_nearest_instance_and_stays_one_draw() {
     // Inside the run, the copies are nearest first too.
     let tags: Vec<_> = draws.instances.iter().map(|i| i.model_matrix[12]).collect();
     assert_eq!(tags, [3.0, 0.0, 2.0, 1.0]);
-    // Uniform slots follow the draw order, so `uniforms()` still lines up.
+    // Uniform slots follow the draw order, so `pack()` still lines up.
     let slots: Vec<_> = draws.opaque.iter().map(|b| b.uniform_slot).collect();
     assert_eq!(slots, [0, 1]);
 }

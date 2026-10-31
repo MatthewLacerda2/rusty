@@ -35,7 +35,7 @@ fn drawn(kind: &ColliderShape) -> Vec<Drawn> {
             Primitive::Cylinder,
             ColliderShape::Cylinder {
                 radius: 0.5,
-                height: 1.0,
+                height: 2.0,
             },
         ),
         ColliderShape::Capsule { .. } => primitive(

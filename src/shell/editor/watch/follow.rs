@@ -134,6 +134,17 @@ impl SceneFollow {
 }
 
 impl EditorFrontend {
+    /// A different scene now sits in the World (its identity changed without the
+    /// editor opening it): as File ▸ Open does, drop the selection, which names an
+    /// entity of the old scene.
+    pub(in crate::shell::editor) fn follow_scene_swap(&mut self, game: &GameWorld) {
+        let id = game.scene().borrow().id();
+        if self.scene_id.is_some_and(|last| last != id) {
+            self.editor_ui.selected_entity_id = None;
+        }
+        self.scene_id = Some(id);
+    }
+
     /// Reload the open scene when its file changed on disk (#1340). The reload is
     /// the editor's own, so it keeps the selection `follow_scene_swap` would drop.
     pub(in crate::shell::editor) fn follow_scene_file(&mut self, game: &GameWorld) {

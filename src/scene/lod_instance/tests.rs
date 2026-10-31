@@ -1,11 +1,10 @@
 //! Tests for the `_LOD<n>` import convention (#472): a set's base name spawns one
-//! LODGroup entity whose levels list its children, the whole-file spawn groups sets
-//! and leaves other sub-objects alone, and the group's renderer references survive a
+//! LODGroup entity whose levels list its children (the whole-model spawn's sets are
+//! `scene::model_instance`'s tests), and the group's renderer references survive a
 //! prefab extract / stamp.
 
 use glam::Vec3;
 
-use super::instantiate_model;
 use crate::scene::authoring::instantiate_asset;
 use crate::scene::{extract_prefab, instantiate_prefab, Scene};
 
@@ -80,22 +79,6 @@ fn the_base_name_spawns_one_group_over_its_levels() {
     }
     // A name that is neither a sub-object nor a set still errors.
     assert!(instantiate_asset(&mut scene, &format!("{path}::Lamp"), None, pos).is_err());
-}
-
-#[test]
-fn the_whole_file_groups_sets_and_spawns_the_rest_alone() {
-    let path = write_gltf("rusty_472_model.gltf");
-    let asset = crate::asset::import_and_sync_sidecar(std::path::Path::new(&path)).unwrap();
-    let mut scene = Scene::new();
-    let ids = instantiate_model(&mut scene, &path, &asset, Vec3::ZERO);
-
-    let names: Vec<String> = ids
-        .iter()
-        .map(|&id| scene.world.name(id).unwrap().clone())
-        .collect();
-    assert_eq!(names, vec!["Crate", "Barrel"]);
-    assert!(scene.world.has_lod_group(ids[0]));
-    assert!(!scene.world.has_lod_group(ids[1]));
 }
 
 #[test]

@@ -131,7 +131,7 @@ fn character(scene: &mut Scene, id: u32, height: f32, radius: f32) {
     cc::set_radius(&mut c, radius);
 }
 
-/// Player (id 2): a 1.6 m × 0.5 m cylinder — the unit primitive scaled, its capsule
+/// Player (id 2): a 1.6 m × 0.5 m cylinder — the 2 m primitive scaled, its 2 m capsule
 /// scaling with it.
 fn add_player(scene: &mut Scene) {
     let id = create_entity(scene, "Player", Some(Primitive::Cylinder));
@@ -139,9 +139,9 @@ fn add_player(scene: &mut Scene) {
         scene,
         id,
         Vec3::from(layout::PLAYER_SPAWN),
-        Vec3::new(1.0, 1.6, 1.0),
+        Vec3::new(1.0, 0.8, 1.0),
     );
-    character(scene, id, 1.0, 0.5);
+    character(scene, id, 2.0, 0.5);
     wear(scene, id, looks::PLAYER);
     attach_script(scene, id, PLAYER_CONTROLLER_SCRIPT);
 }

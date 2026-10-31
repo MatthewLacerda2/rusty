@@ -110,7 +110,7 @@ pub(crate) struct OpaqueCopy {
 /// refracts or absorbs, or traces SSR (#1570) on a camera that marches (`traces`).
 pub(crate) fn wanted(batches: &[DrawBatch], traces: bool) -> bool {
     batches.iter().any(|b| {
-        let s = b.key.uniform().surface;
+        let s = b.key.record().surface;
         s.uses_opaque == 1 || (traces && s.receive_ssr == 1)
     })
 }
