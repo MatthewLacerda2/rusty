@@ -2,19 +2,23 @@
 //! std's `DefaultHasher` is not.
 //!
 //! [`content`] fingerprints what the engine reads or writes: import-cache sources and
-//! keys, texture caches, lightmap file tags, demo digests. It is xxh3 (#1326): compiled
-//! at opt-level 2 as a dependency, it runs about 40 times faster than [`fnv1a64`] does
-//! in rusty's own opt-level-0 dev build, which the editor runs on every launch.
-//! [`fnv1a64`] stays only where a digest is already stored in game repos (the scene
-//! manifest's `.seeded` records), so changing it would break what they hold.
+//! keys, texture caches, lightmap file tags, demo digests. It is xxh3 (#1326): its
+//! long-input paths compile at opt-level 2 as a dependency, so hashing a file's bytes
+//! runs about 40 times faster than [`fnv1a64`] does in rusty's own opt-level-0 dev
+//! build, which the editor runs on every launch (inputs up to 128 bytes are inlined
+//! into the caller, so short keys get no such speed-up).
+//! [`fnv1a64`] stays where a stored digest is compared with a fresh one: the scene
+//! manifest's `.seeded` records (committed in game repos) and the converter output
+//! table `asset::convert::fingerprint` checks against `fingerprints.txt` (re-blessing
+//! every row would need Blender). Changing it there breaks what they hold.
 
 /// xxh3, 64-bit, seed 0: the content hash.
 pub fn content(bytes: &[u8]) -> u64 {
     xxhash_rust::xxh3::xxh3_64(bytes)
 }
 
-/// FNV-1a, 64-bit. Only for digests already committed in game repos; new uses take
-/// [`content`].
+/// FNV-1a, 64-bit. Only for digests already stored (the `.seeded` manifest,
+/// `fingerprints.txt`); new uses take [`content`].
 pub fn fnv1a64(bytes: &[u8]) -> u64 {
     bytes.iter().fold(0xcbf2_9ce4_8422_2325, |h, b| {
         (h ^ u64::from(*b)).wrapping_mul(0x0000_0100_0000_01b3)
