@@ -1,7 +1,7 @@
 #import common::{DecalSurface, NO_SHADOW, PI, VertexInput, apply_fog, blend_joints, fog_factor, cluster_index, local_light_radiance, local_shadow_tile, sample_local_shadow}
 // Every forward binding but `shadow` (the cascades, read only by `calculate_shadow`;
 // `fs_main` names its result `shadow`), so a surface variant's blocks can read any.
-#import forward::bindings::{bones, camera, cluster_lights, cluster_ranges, decals, instances, lighting, local_lights, material, normal_to_world, s_decal, s_diffuse, s_emissive, s_lightmaps, s_metallic, s_normal, s_refl_cube, s_roughness, s_shadow, s_skybox, shadow_tiles, t_ao, t_decal_color, t_decal_data, t_diffuse, t_emissive, t_lightmap_dirs, t_lightmaps, t_metallic, t_normal, t_refl_cube, t_roughness, t_shadow, t_shadow_atlas, t_skybox, tangent_to_world, vertex_to_world, vertex_to_world_prev}
+#import forward::bindings::{bones, camera, cluster_lights, cluster_ranges, decals, draw, instances, lighting, local_lights, material, normal_to_world, s_decal, s_diffuse, s_emissive, s_lightmaps, s_metallic, s_normal, s_refl_cube, s_roughness, s_shadow, s_skybox, shadow_tiles, t_ao, t_decal_color, t_decal_data, t_diffuse, t_emissive, t_lightmap_dirs, t_lightmaps, t_metallic, t_normal, t_refl_cube, t_roughness, t_shadow, t_shadow_atlas, t_skybox, tangent_to_world, vertex_to_world, vertex_to_world_prev}
 #import lighting::ssr_surface
 #import forward::transparent
 #import forward::mapping

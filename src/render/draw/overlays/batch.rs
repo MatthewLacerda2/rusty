@@ -8,40 +8,39 @@ use glam::Mat4;
 use wgpu::util::DeviceExt;
 
 use crate::render::gpu::draw_buffers::{group1, uniform_array_bytes, DrawBuffers};
+use crate::render::gpu::uniforms::{RecordTable, RecordWords};
 use crate::render::{DrawUniform, MaterialData, Renderer};
 
-/// The overlays' uniforms in slot order and the distinct records they index.
+/// The overlays' gizmos in slot order: each one's placement and flat record.
 #[derive(Default)]
 pub(crate) struct OverlayDraws {
-    uniforms: Vec<DrawUniform>,
-    records: Vec<MaterialData>,
+    gizmos: Vec<(Mat4, RecordWords)>,
 }
 
 impl OverlayDraws {
     /// Add a gizmo placed by `model_matrix` and drawn flat in `tint`
     /// ([`MaterialData::flat`]); returns its slot. Gizmos of one tint share a record.
     pub(crate) fn push(&mut self, model_matrix: Mat4, tint: [f32; 4]) -> u32 {
-        let record = MaterialData::flat(tint);
-        let material = match self.records.iter().position(|r| *r == record) {
-            Some(i) => i,
-            None => {
-                self.records.push(record);
-                self.records.len() - 1
-            }
-        };
-        self.uniforms.push(DrawUniform {
-            model_matrix: model_matrix.to_cols_array(),
-            bone_base: 0,
-            material: material as u32,
-            _pad: [0; 2],
-        });
-        (self.uniforms.len() - 1) as u32
+        self.gizmos
+            .push((model_matrix, MaterialData::flat(tint).words()));
+        (self.gizmos.len() - 1) as u32
     }
 
-    /// How many distinct records the gizmos index.
-    #[cfg(test)]
-    pub(crate) fn record_count(&self) -> usize {
-        self.records.len()
+    /// Every gizmo's per-draw uniform, in slot order, and the records they index
+    /// ([`RecordTable`]: one per distinct tint).
+    fn pack(&self) -> (Vec<DrawUniform>, Vec<MaterialData>) {
+        let table = RecordTable::new(self.gizmos.iter().map(|g| g.1));
+        let uniforms = self
+            .gizmos
+            .iter()
+            .map(|(model, words)| DrawUniform {
+                model_matrix: model.to_cols_array(),
+                bone_base: 0,
+                material: table.index(words),
+                _pad: [0; 2],
+            })
+            .collect();
+        (uniforms, table.records())
     }
 }
 
@@ -62,9 +61,10 @@ impl OverlayBindings {
 impl Renderer {
     /// Upload `draws` as one bind group, or `None` when no gizmo was added.
     pub(crate) fn overlay_bindings(&self, draws: &OverlayDraws) -> Option<OverlayBindings> {
-        if draws.uniforms.is_empty() {
+        if draws.gizmos.is_empty() {
             return None;
         }
+        let (uniforms, records) = draws.pack();
         let init = |label, contents: &[u8], usage| {
             self.device
                 .create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -75,12 +75,12 @@ impl Renderer {
         };
         let uniforms = init(
             "Overlay Draw Uniforms",
-            &uniform_array_bytes(&draws.uniforms),
+            &uniform_array_bytes(&uniforms),
             wgpu::BufferUsages::UNIFORM,
         );
         let records = init(
             "Overlay Materials",
-            bytemuck::cast_slice(&draws.records),
+            bytemuck::cast_slice(&records),
             wgpu::BufferUsages::STORAGE,
         );
         let group = group1(
@@ -110,10 +110,12 @@ mod tests {
         let b = draws.push(Mat4::from_translation(glam::Vec3::X), [1.0, 0.0, 0.0, 1.0]);
         let c = draws.push(Mat4::IDENTITY, cyan);
         assert_eq!((a, b, c), (0, 1, 2), "every gizmo has its own uniform");
-        assert_eq!(draws.record_count(), 2, "two tints, two records");
-        assert_eq!(draws.uniforms[2].material, draws.uniforms[0].material);
+        let (uniforms, records) = draws.pack();
+        assert_eq!(records.len(), 2, "two tints, two records");
+        assert_eq!(uniforms[2].material, uniforms[0].material);
+        assert_ne!(uniforms[1].material, uniforms[0].material);
         assert_eq!(
-            draws.uniforms[1].model_matrix[12], 1.0,
+            uniforms[1].model_matrix[12], 1.0,
             "placement rides the uniform"
         );
     }

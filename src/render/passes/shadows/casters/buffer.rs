@@ -10,8 +10,8 @@ use crate::render::gpu::draw_buffers::{
     joint_array_bytes, uniform_array_bytes, JointMatrix, UNIFORM_STRIDE,
 };
 use crate::render::gpu::grow_buffer::GrowBuffer;
-use crate::render::gpu::uniforms::{MappingUniform, MATERIAL_DATA_WORDS};
-use crate::render::passes::shadows::clips::Cutout;
+use crate::render::gpu::uniforms::{MappingUniform, RecordTable, RecordWords};
+use crate::render::passes::shadows::clips::{Clip, Cutout};
 use crate::render::passes::shadows::setup::{
     CASTERS_BINDING, DRAW_BINDING, JOINTS_BINDING, MATERIALS_BINDING,
 };
@@ -59,30 +59,24 @@ impl CasterData {
     }
 }
 
-/// A sweep's distinct material records, in first-use order. Record 0 is a flat one
-/// that plain draws (and a cutout's standard clip, which reads its terms per caster)
-/// bind and never read.
-pub(in crate::render::passes::shadows) struct CasterRecords(Vec<MaterialData>);
-
-impl Default for CasterRecords {
-    fn default() -> Self {
-        Self(vec![MaterialData::flat([1.0; 4])])
-    }
-}
+/// A sweep's distinct material records ([`RecordTable`]): every variant clip's
+/// record, and a flat one that plain draws and a cutout's standard clip (which reads
+/// its test per caster) bind and never read.
+pub(in crate::render::passes::shadows) struct CasterRecords(RecordTable);
 
 impl CasterRecords {
-    /// The index of the record `words` packs (record 0 for `None`), added on first use.
-    pub(in crate::render::passes::shadows) fn index(
-        &mut self,
-        words: Option<&[u32; MATERIAL_DATA_WORDS]>,
-    ) -> u32 {
-        let Some(words) = words else { return 0 };
-        let record = MaterialData::from_words(words);
-        let found = self.0.iter().position(|r| *r == record);
-        found.unwrap_or_else(|| {
-            self.0.push(record);
-            self.0.len() - 1
-        }) as u32
+    /// The records `clips` read, beside the flat one.
+    pub(in crate::render::passes::shadows) fn new<'a>(
+        clips: impl IntoIterator<Item = Option<&'a Clip>>,
+    ) -> Self {
+        let read = clips.into_iter().flatten().filter_map(|c| c.record);
+        Self(RecordTable::new(read.chain([flat()])))
+    }
+
+    /// The index of the record `clip` reads (the flat one when it reads none).
+    pub(in crate::render::passes::shadows) fn index(&self, clip: Option<&Clip>) -> u32 {
+        self.0
+            .index(&clip.and_then(|c| c.record).unwrap_or_else(flat))
     }
 
     /// One per-draw uniform per record, naming it.
@@ -95,6 +89,11 @@ impl CasterRecords {
         };
         (0..self.0.len() as u32).map(draw).collect()
     }
+}
+
+/// The record a draw that reads none binds.
+fn flat() -> RecordWords {
+    MaterialData::flat([1.0; 4]).words()
 }
 
 /// The caster, joint and record arrays and the bind group that exposes them to the
@@ -142,7 +141,7 @@ impl CasterBuffer {
         layout: &wgpu::BindGroupLayout,
         sweep: CasterUpload,
     ) {
-        let records = &sweep.records.0;
+        let records = sweep.records.0.records();
         let grew = [
             self.casters
                 .upload(device, queue, bytemuck::cast_slice(sweep.casters)),
@@ -151,7 +150,7 @@ impl CasterBuffer {
             self.draws
                 .upload(device, queue, &uniform_array_bytes(&sweep.records.draws())),
             self.materials
-                .upload(device, queue, bytemuck::cast_slice(records)),
+                .upload(device, queue, bytemuck::cast_slice(&records)),
         ];
         if grew.contains(&true) {
             let buffers = [&self.casters, &self.joints, &self.draws, &self.materials];

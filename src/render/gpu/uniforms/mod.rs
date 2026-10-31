@@ -7,10 +7,12 @@
 use crate::render::ibl::reflection_probes::{ReflectionProbeUniform, MAX_REFLECTION_PROBES};
 
 mod material;
+mod records;
 
 pub(crate) use material::{
     DrawUniform, MappingUniform, MaterialData, SurfaceUniform, MATERIAL_DATA_WORDS,
 };
+pub(crate) use records::{RecordTable, RecordWords};
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]

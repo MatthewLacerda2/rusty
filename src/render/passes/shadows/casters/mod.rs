@@ -61,7 +61,8 @@ pub(super) struct CasterKey {
 }
 
 /// One instanced depth draw: `instances` of `key`'s mesh, its index run each, and
-/// the sweep's material record its clip reads (#1616; 0 for a plain draw).
+/// the sweep's material record its clip reads (#1616; the flat one for a draw that
+/// reads none).
 pub(super) struct CasterBatch {
     key: CasterKey,
     instances: Range<u32>,
@@ -107,7 +108,6 @@ impl ShadowRenderer {
     ) -> Vec<Vec<CasterBatch>> {
         let (candidates, joints) = self.collect_casters(frame, lod, sweep);
         let mut matrices = Vec::new();
-        let mut records = CasterRecords::default();
         let mut per_volume = Vec::with_capacity(volumes.len());
         for &volume in volumes {
             // Cull casters against the LIGHT's volume, not the camera's (#330). An
@@ -126,11 +126,15 @@ impl ShadowRenderer {
             let base = matrices.len() as u32;
             for batch in &mut batches {
                 batch.instances = batch.instances.start + base..batch.instances.end + base;
-                batch.record = records.index(batch.key.clip.as_ref().map(|c| &c.record));
             }
             matrices.extend(packed);
             self.drawn.extend(batches.iter().map(CasterBatch::counts));
             per_volume.push(batches);
+        }
+        // Indexed once every volume is batched: the records sort by their words.
+        let records = CasterRecords::new(per_volume.iter().flatten().map(|b| b.key.clip.as_ref()));
+        for batch in per_volume.iter_mut().flatten() {
+            batch.record = records.index(batch.key.clip.as_ref());
         }
         let buffer = match sweep {
             Sweep::Static => &mut self.static_casters,
