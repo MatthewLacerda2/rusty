@@ -10,7 +10,8 @@
 //!   point, and the per-texel estimate (the units it stores are explained in `trace`);
 //! * `filter` — the edge-aware Gaussian that smooths the baked bounce;
 //! * `bake` — the parallel, seeded driver ([`bake`]), watched and stopped through
-//!   `progress` ([`BakeProgress`], #808);
+//!   `progress` ([`BakeProgress`], #808); its `pool` is the one work pool every
+//!   mesh's texels share, in fixed-size batches (#1656);
 //! * `atlas` — packing the lightmaps into equal-size pages ([`pack`]);
 //! * `encode` — RGBM, how a page is stored as an 8-bit PNG, and the RGBA8 direction
 //!   page a directional bake adds (#810);
@@ -53,6 +54,8 @@ mod casting_tests;
 mod direction_tests;
 #[cfg(test)]
 mod gather_tests;
+#[cfg(test)]
+mod pool_tests;
 #[cfg(test)]
 mod probe_direct_tests;
 #[cfg(test)]

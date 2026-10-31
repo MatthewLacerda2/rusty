@@ -26,7 +26,7 @@ mod paint;
 
 use std::{cell::RefCell, path::Path, rc::Rc};
 
-use crate::app::GameWorld;
+use crate::app::{GameWorld, ProjectSource};
 use crate::core::input::InputState;
 use crate::dev::capture::CaptureHost;
 use crate::editor::{viewport::scene_nav::selection_bounds, EditorUi, ViewportTab};
@@ -86,19 +86,23 @@ impl Default for EditorCaptureOptions {
 
 /// The editor's default scene in a fresh edit-mode world — what `cargo run` opens on a
 /// new project, built in memory like the harness does (its textures and shader seeded
-/// into the open project). Neither the sim nor any script runs.
-pub fn default_world() -> GameWorld {
+/// into the open project), under `project`'s settings (#1652): `editor-capture`
+/// reads the open project's, tests take the engine's defaults. Neither the sim nor
+/// any script runs.
+pub fn default_world(project: ProjectSource) -> GameWorld {
     crate::scene::seed_default_scripts();
     crate::scene::default_scene::seed_default_assets();
     let mut scene = Scene::new();
     crate::scene::default_scene::build(&mut scene, crate::scene::default_scene::BOT_SCRIPT);
     let nav = NavigationGraph::from_scene(&scene);
-    GameWorld::new(
+    let game = GameWorld::new(
         Rc::new(RefCell::new(scene)),
         Rc::new(RefCell::new(InputState::new())),
         Rc::new(RefCell::new(nav)),
         Rc::new(RefCell::new(ConsoleLogs::new())),
-    )
+    );
+    game.open_project(project);
+    game
 }
 
 /// Capture the editor over `game`'s scene to a PNG at `path`: `Ok(false)` on a box with

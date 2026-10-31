@@ -628,8 +628,8 @@ without one, the middle preset):
 
 A new project is seeded with `Low`, `Medium` and `High` (`Medium` first); the game may
 edit, rename, add to or delete them, in the file or through `SetQualityPreset` /
-`RemoveQualityPreset`, which write the file in the editor (in the player and the
-harness they change the running game only). `QualityPresets()` lists them with every
+`RemoveQualityPreset`, which write the file in the editor and the headless session
+(in the player and `play` they change the running game only). `QualityPresets()` lists them with every
 value; `SetQualityPreset(name, values)` writes only the values it names, and takes a
 listed preset back whole:
 
