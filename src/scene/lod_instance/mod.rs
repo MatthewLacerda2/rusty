@@ -9,7 +9,7 @@
 //!
 //! `Scene.Instantiate("file.glb::Crate")` spawns a set here, the base name
 //! addressing it whole. The whole-model spawn (`scene::model_instance`) groups
-//! its LOD nodes itself, per node, and shares [`set_levels`] and [`lod0_size`].
+//! its LOD nodes itself, per node, and shares `set_levels` and `lod0_size`.
 
 use glam::Vec3;
 
