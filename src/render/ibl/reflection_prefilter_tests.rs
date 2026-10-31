@@ -5,8 +5,10 @@
 //! are progressively blurrier (higher roughness) than mip0 while keeping the room's mean
 //! colour. We measure "blurrier" as lower spatial variance across a face.
 
+use super::cpu::prefilter;
 use super::*;
 use crate::render::ibl::cube_sample::srgb_to_linear;
+use crate::render::{CubemapCapture, CubemapFace};
 
 /// A capture whose +X face is a sharp half-red / half-black split and the other faces a
 /// solid mid-grey — enough high-frequency contrast that the prefilter visibly smooths it.

@@ -50,7 +50,7 @@ fn gpu_auto_places_both_sets_on_empty_scene() {
     };
     coarse.reflection.region = 40.0;
     scene.lighting_settings.reflections.resolution = 16;
-    let report = bake_lighting(&mut scene, Some(scene_path), None, coarse)
+    let report = bake_lighting(&mut scene, Some(scene_path), None, coarse, &mut |_| {})
         .expect("placement + adapter-free bake never errors with a scene path");
 
     assert!(report.auto_placed_light, "light probes auto-placed");
@@ -87,6 +87,7 @@ fn gpu_manual_probes_are_kept_not_replaced() {
         Some(scene_path),
         None,
         LightingBakeParams::default(),
+        &mut |_| {},
     )
     .expect("rebake never errors with a scene path");
 
@@ -101,8 +102,14 @@ fn gpu_manual_probes_are_kept_not_replaced() {
 #[test]
 fn empty_scene_places_nothing_and_succeeds() {
     let mut scene = Scene::new();
-    let report =
-        bake_lighting(&mut scene, None, None, LightingBakeParams::default()).expect("no-op bake");
+    let report = bake_lighting(
+        &mut scene,
+        None,
+        None,
+        LightingBakeParams::default(),
+        &mut |_| {},
+    )
+    .expect("no-op bake");
     assert_eq!(report.light_probes, 0);
     assert_eq!(report.reflection_probes, 0);
     assert!(!report.auto_placed_light);
