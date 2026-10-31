@@ -61,24 +61,19 @@ impl ModelWrites {
 }
 
 /// Whether the scene re-imported `path` itself at its latest note (`read`, from
-/// [`reimport_noted`]): nothing wrote it again since.
+/// [`reimport_noted_except`]): nothing wrote it again since.
 fn already_read(read: &BTreeMap<String, u64>, path: &str) -> bool {
     read.get(path)
         .is_some_and(|&at| !written_since(at).1.iter().any(|p| p == path))
 }
 
 /// Re-import the meshes in `scene` instanced from the model at `path` now, for a
-/// setting that changes what the model imports as (the Scale Factor, #1398), and
-/// note the model as written so every other cache keyed by it re-reads it too.
-/// The scene records the note it made, so its own [`ModelWrites::follow`] skips it
-/// and the meshes are not read twice, whatever other notes are waiting. Returns the
-/// ids of the entities rebuilt.
-pub fn reimport_noted(scene: &mut Scene, path: &str, rig: Rig) -> Vec<u32> {
-    reimport_noted_except(scene, path, rig, &BTreeSet::new())
-}
-
-/// [`reimport_noted`] leaving out the entities in `skip` (a linked model
-/// instance's parts, which its rebuild re-imports, #1637).
+/// setting that changes what the model imports as (the Scale Factor, #1398),
+/// leaving out the entities in `skip` (a linked model instance's parts, which its
+/// rebuild re-imports, #1637), and note the model as written so every other cache
+/// keyed by it re-reads it too. The scene records the note it made, so its own
+/// [`ModelWrites::follow`] skips it and the meshes are not read twice, whatever
+/// other notes are waiting. Returns the ids of the entities rebuilt.
 pub fn reimport_noted_except(
     scene: &mut Scene,
     path: &str,

@@ -51,7 +51,7 @@ pub fn read_writable(path: &str) -> Result<PrefabData, String> {
 
 /// The node path of every entity of `prefab`, by local id: the root is `""`, a
 /// child its parent's path and its own name joined by `/` (a node a bone holds is
-/// `<bone>><name>`), and the second sibling sharing a name takes `[1]`, the third
+/// `<bone>><name>`, by the nearest bone: `parent_bone` is nearest first), and the second sibling sharing a name takes `[1]`, the third
 /// `[2]`. Parents come before their children in `prefab.entities`, as
 /// `extract_prefab` writes them; an entity whose parent is not yet known is
 /// skipped.
@@ -66,7 +66,7 @@ pub fn node_paths(prefab: &PrefabData) -> BTreeMap<u32, String> {
         let Some(parent_path) = paths.get(&parent) else {
             continue;
         };
-        let segment = match entity.parent_bone.last() {
+        let segment = match entity.parent_bone.first() {
             Some(bone) => format!("{bone}>{}", entity.name),
             None => entity.name.clone(),
         };
@@ -102,6 +102,14 @@ pub fn rekey(world: &mut World, ids: &[u32], prefab: &PrefabData) {
             link.local_id = local;
         }
     }
+}
+
+/// The node path of `id` when it is a model part whose node `prefab` (the model
+/// as it imports now) no longer has: there is nothing to rebuild or revert it to.
+pub fn gone_node(world: &World, id: u32, prefab: &PrefabData) -> Option<String> {
+    let node = world.prefab_link(id)?.node.clone()?;
+    let gone = !node_paths(prefab).values().any(|p| *p == node);
+    gone.then_some(node)
 }
 
 #[cfg(test)]

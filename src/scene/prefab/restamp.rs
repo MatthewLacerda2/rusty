@@ -9,7 +9,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::scene::prefab::instance::instance_members;
 use crate::scene::prefab::link::{finish_rebuild, link_source, rebuild_instance};
 use crate::scene::prefab::live::sync_overrides;
-use crate::scene::prefab::source::{is_model_source, read_source};
+use crate::scene::prefab::source::{is_model_source, node_paths, read_source};
 use crate::scene::{PrefabData, Scene};
 
 /// Run `refit` (a re-import of the models `names` accepts, #1637) as those models'
@@ -20,7 +20,8 @@ use crate::scene::{PrefabData, Scene};
 /// moved node) from the file. It writes entities but is no edit: unrecorded, as a
 /// bake is, when an instance is there to rebuild. `refit` is handed the instances'
 /// static meshed parts, which the rebuild re-imports anyway, for it to skip; a
-/// skinned part is left to it, since its rig and bones are the refit's to move.
+/// skinned part is left to it, since its rig and bones are the refit's to move,
+/// and so is a part whose node the model lost, which the rebuild leaves alone.
 pub fn restamp_models<R>(
     scene: &mut Scene,
     names: impl Fn(&str) -> bool,
@@ -32,18 +33,39 @@ pub fn restamp_models<R>(
     }
     scene.unrecorded(|scene| {
         let mut skip = BTreeSet::new();
+        let mut nodes: BTreeMap<String, Option<BTreeSet<String>>> = BTreeMap::new();
         for &root in &roots {
             let Some(ids) = instance_members(scene, root) else {
                 continue;
             };
             sync_overrides(&mut scene.world, &ids);
-            let is_static = |id: &u32| scene.world.mesh(*id).is_some_and(|m| m.skin.is_none());
-            skip.extend(ids.iter().copied().filter(is_static));
+            // Only a part the rebuild will reach is skipped: one whose node the
+            // model still has. A gone part (or every part of a model that no longer
+            // reads) is left to `refit`, or it would keep stale geometry.
+            let Some(Some(kept)) = link_source(scene, root)
+                .ok()
+                .map(|s| nodes.entry(s).or_insert_with_key(|s| node_set(s)).as_ref())
+            else {
+                continue;
+            };
+            let rebuilt = |id: &u32| {
+                let static_mesh = scene.world.mesh(*id).is_some_and(|m| m.skin.is_none());
+                let node = scene.world.prefab_link(*id).and_then(|l| l.node.clone());
+                static_mesh && node.is_some_and(|n| kept.contains(&n))
+            };
+            skip.extend(ids.iter().copied().filter(rebuilt));
         }
         let out = refit(scene, &skip);
         propagate_roots(scene, roots);
         out
     })
+}
+
+/// The node paths of the model at `source` as it imports now, `None` when it
+/// can't be read.
+fn node_set(source: &str) -> Option<BTreeSet<String>> {
+    let prefab = read_source(source).ok()?;
+    Some(node_paths(&prefab).into_values().collect())
 }
 
 /// The instance roots (a linked entity with `local_id == 0`) whose source `pick`

@@ -369,7 +369,9 @@ get them.
 On-instance:
 
 - **`Scene.RevertPrefabOverrides(instanceRootId)`** — drop every override and rebuild
-  the instance straight from the current source (it becomes a pristine copy).
+  the instance straight from the current source (it becomes a pristine copy). A model
+  part whose node left the model keeps its overrides and values: there is nothing to
+  revert it to.
 - **`Scene.ReimportPrefab(instanceRootId)`** — re-baseline from the source and re-apply
   the overrides on top: non-overridden fields pick up the latest source,
   overridden ones win. This is the same propagation that runs automatically on scene
@@ -405,7 +407,8 @@ Its per-field opposite:
   source's camera back, a reverted size entry or element of a list whose length
   changed gives the whole list back to the source).
   The instance's other overrides are untouched. `entityId` may be any instance
-  entity. Returns `false`, changing nothing, when there is no override at `key`. The
+  entity. Returns `false`, changing nothing, when there is no override at `key`, and
+  errors on a model part whose node left the model (it has nothing to revert to). The
   prefab card's per-field revert button.
 
 The verbs error if `instanceRootId` (or, for the field form, `entityId`) is not a

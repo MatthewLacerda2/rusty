@@ -23,7 +23,8 @@ fn every_entity_has_one_path_and_duplicates_are_numbered() {
             node(1, "Kit", Some(0), &[]),
             node(2, "Cube", Some(1), &[]),
             node(3, "Cube", Some(1), &[]),
-            node(4, "Gun", Some(1), &["Root", "Hand"]),
+            node(4, "Gun", Some(1), &["Hand", "Root"]),
+            node(6, "Gun", Some(1), &["HandL", "Root"]),
             node(5, "Orphan", Some(9), &[]),
         ],
         materials: BTreeMap::new(),
@@ -34,7 +35,8 @@ fn every_entity_has_one_path_and_duplicates_are_numbered() {
     assert_eq!(at(1), Some("Kit"));
     assert_eq!(at(2), Some("Kit/Cube"));
     assert_eq!(at(3), Some("Kit/Cube[1]"));
-    assert_eq!(at(4), Some("Kit/Hand>Gun"));
+    assert_eq!(at(4), Some("Kit/Hand>Gun"), "keyed by the nearest bone");
+    assert_eq!(at(6), Some("Kit/HandL>Gun"), "sockets on two hands differ");
     assert_eq!(at(5), None, "a parent outside the prefab gives no path");
 }
 

@@ -90,3 +90,15 @@ fn a_second_spawn_shares_the_edited_material() {
     let again = super::instantiate_model(&mut scene, &path, &asset, Vec3::X);
     assert_eq!(wall_material(&scene, again), (key, RED, vec![]));
 }
+
+#[test]
+fn a_lone_sub_object_spawn_keeps_the_edited_material() {
+    let (mut scene, root) = spawn_file("rusty_1637_wood3.gltf", &wood_kit(), Vec3::ZERO);
+    let (key, _, _) = wall_material(&scene, root);
+    scene.materials.get_mut(&key).unwrap().base_color = RED;
+    let path = scene.world.prefab_link(root).unwrap().source.clone();
+    let sub = format!("{path}::WallMesh");
+    let lone = crate::scene::asset_instance::instantiate_asset(&mut scene, &sub, None, Vec3::X);
+    assert!(lone.is_ok(), "{lone:?}");
+    assert_eq!(wall_material(&scene, root), (key, RED, vec![]));
+}

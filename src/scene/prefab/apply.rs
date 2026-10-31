@@ -25,7 +25,7 @@ use crate::scene::prefab::instance::{self, instance_members};
 use crate::scene::prefab::link::{propagate, propagate_from};
 use crate::scene::prefab::live::sync_overrides;
 use crate::scene::prefab::overrides::apply_overrides;
-use crate::scene::prefab::source::{read_source, read_writable};
+use crate::scene::prefab::source::{gone_node, read_source, read_writable};
 use crate::scene::prefab::write_prefab_file;
 use crate::scene::{revert_instance_overrides, PrefabData, Scene};
 
@@ -92,8 +92,8 @@ pub fn apply_instance_field_to_source(
 /// then reimport the instance so that leaf tracks the source again while every other
 /// override stays (Unity's `PrefabUtility.RevertPropertyOverride`). `entity_id` may be
 /// any instance entity (root or child). `Ok(false)` when there is no override at
-/// `path`; errors if `entity_id` is not a linked instance entity or the source can't
-/// be read. Either way nothing changes: the source is read before the override goes.
+/// `path`; errors if `entity_id` is not a linked instance entity, the source can't
+/// be read, or `entity_id` is a model part whose node the model lost (#1637). Either way nothing changes: the source is read before the override goes.
 /// The editor's per-field revert button and `Scene.RevertPrefabField` (#998).
 pub fn revert_instance_field(
     scene: &mut Scene,
@@ -103,6 +103,11 @@ pub fn revert_instance_field(
     let root = instance_root(scene, entity_id)?;
     let source = link_source(scene, root)?;
     let prefab = read_source(&source)?;
+    if let Some(node) = gone_node(&scene.world, entity_id, &prefab) {
+        return Err(format!(
+            "{node} is gone from {source}: there is nothing to revert it to"
+        ));
+    }
     let ids = instance_ids(scene, root)?;
     sync_overrides(&mut scene.world, &ids);
     if !drop_override(scene, entity_id, path) {

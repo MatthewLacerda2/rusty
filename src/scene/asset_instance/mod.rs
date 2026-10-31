@@ -172,9 +172,12 @@ fn import_material(
     } else {
         format!("{path}::{}", data.name)
     };
+    // A material already in the scene is the user's (a placed model's recolour,
+    // #997): a later spawn of the same file must not reset it.
     scene
         .materials
-        .insert(key.clone(), material_asset_from_import(data));
+        .entry(key.clone())
+        .or_insert_with(|| material_asset_from_import(data));
     Some(key)
 }
 
@@ -250,9 +253,12 @@ pub fn set_model_scale_factor(scene: &mut Scene, path: &str, scale: f32) -> Resu
         crate::scene::lod_instance::rescale_groups_over(scene, &ids, &before);
         ids.len() + skip.len()
     };
+    // The same match the write-log follow uses, so a link naming the model by
+    // another spelling (absolute vs project-relative) is found too.
+    let model = crate::core::fs::written::Stale::new(vec![path.to_string()]);
     Ok(crate::scene::prefab::restamp::restamp_models(
         scene,
-        |s| s == path,
+        |s| model.matches(s),
         refit,
     ))
 }

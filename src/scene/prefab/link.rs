@@ -141,7 +141,13 @@ pub(super) fn rebuild_instance(
     let baselines = in_instance_space(scene, &ids, baselines);
     for id in ids {
         if !keep {
-            if let Some(mut link) = scene.world.prefab_link_mut(id) {
+            // A part whose node the model lost keeps its edits: there is nothing to
+            // revert it to, and clearing them would only see them re-synced.
+            if let Some(mut link) = scene
+                .world
+                .prefab_link_mut(id)
+                .filter(|l| l.local_id != GONE)
+            {
                 link.overrides = Default::default();
             }
         }
@@ -162,7 +168,9 @@ pub(super) fn finish_rebuild(scene: &mut Scene) {
 }
 
 /// Drop every override on the instance and rebuild it straight from the fresh source
-/// baseline (the instance becomes a pristine copy of the current source).
+/// baseline (the instance becomes a pristine copy of the current source). A model
+/// part whose node the model lost keeps its overrides, as it keeps its values
+/// (#1637): `list_instance_overrides` still lists them as `(gone)`.
 pub fn revert_instance_overrides(scene: &mut Scene, root_id: u32) -> Result<(), String> {
     require_instance(scene, root_id)?;
     let source = link_source(scene, root_id)?;

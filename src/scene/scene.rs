@@ -146,7 +146,7 @@ pub struct Scene {
     /// from a document: every note up to it is in them (#1242). Never serialized.
     pub meshes_read_at: u64,
     /// Models whose meshes the scene re-imported itself, each with the write-log
-    /// generation of the note it made (`model_writes::reimport_noted`, #1398): the
+    /// generation of the note it made (`model_writes::reimport_noted_except`, #1398): the
     /// follow skips a note it already read. Never serialized.
     pub meshes_reimported: BTreeMap<String, u64>,
     /// The text the engine last read or wrote at this scene's file (#1340), so the
