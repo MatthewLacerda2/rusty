@@ -7,7 +7,7 @@
 //! waiter lock a file no newcomer opens.
 //!
 //! **Where it lives** (#1190): never beside the cache, which sits in `assets/`
-//! and may be versioned or shipped (#866). A project's cache locks in its
+//! and may be versioned or shipped (a game's own `.gitignore` decides, #866). A project's cache locks in its
 //! machine-local, gitignored [`project::CACHE_DIR`] (Unity's `Library/`), in
 //! [`LOCKS_DIR`];
 //! any other cache (the temp folder's, a test's) in the temp folder. The file is
