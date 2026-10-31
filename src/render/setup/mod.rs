@@ -246,6 +246,7 @@ impl Renderer {
             skybox_path: "".to_string(),
             reflection_probes: global.reflection_probes,
             sky_reflection: global.sky_reflection,
+            probe_prefilter: Default::default(),
             capture: Default::default(),
             frame_counters: Default::default(),
             gpu_timer,

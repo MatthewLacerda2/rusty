@@ -19,10 +19,10 @@
 use glam::{Mat4, Vec3};
 use wgpu::util::DeviceExt;
 
-use super::aabb_wireframe;
+use super::{aabb_wireframe, OverlayBindings, OverlayDraws};
 use crate::components::mesh::Vertex;
 use crate::render::draw::resources::ProbeResource;
-use crate::render::{EntityUniform, Renderer};
+use crate::render::Renderer;
 use crate::scene::lighting::sh::Sh9;
 use crate::scene::Scene;
 
@@ -34,30 +34,38 @@ const REFLECTION_TINT: [f32; 4] = [1.0, 0.65, 0.1, 0.9];
 
 impl Renderer {
     /// Pre-create the light- and reflection-probe gizmo resources for one editor pass.
-    /// Each entry owns its line-list vertex buffer + flat-unlit uniform buffer + bind
-    /// group; the bone palette is the renderer's shared identity buffer (no per-probe
-    /// allocation), mirroring `precreate_aabb`. Empty when both probe sets are empty.
-    pub(crate) fn precreate_probes(&self, scene: &Scene) -> Vec<ProbeResource> {
+    /// Each entry owns its line-list vertex buffer and a slot of `draws` (its flat
+    /// tint), mirroring `precreate_aabb`. Empty when both probe sets are empty.
+    pub(crate) fn precreate_probes(
+        &self,
+        scene: &Scene,
+        draws: &mut OverlayDraws,
+    ) -> Vec<ProbeResource> {
         let mut resources = Vec::new();
         // Light probes: a marker per probe, tinted by its baked SH irradiance.
         for probe in &scene.probes.probes {
             let verts = probe_marker_verts(probe.position, MARKER_HALF);
             let tint = sh_marker_tint(&probe.sh);
-            resources.push(self.build_probe_resource(&verts, tint));
+            resources.push(self.build_probe_resource(draws, &verts, tint));
         }
         // Reflection probes: a parallax-box wireframe + a capture-position marker.
         for probe in &scene.reflection_probes.probes {
             let box_verts = aabb_wireframe(probe.box_min, probe.box_max);
-            resources.push(self.build_probe_resource(&box_verts, REFLECTION_TINT));
+            resources.push(self.build_probe_resource(draws, &box_verts, REFLECTION_TINT));
             let marker_verts = probe_marker_verts(probe.position, MARKER_HALF);
-            resources.push(self.build_probe_resource(&marker_verts, REFLECTION_TINT));
+            resources.push(self.build_probe_resource(draws, &marker_verts, REFLECTION_TINT));
         }
         resources
     }
 
     /// Build one probe gizmo's GPU resources: a vertex buffer for its line-list geometry
-    /// (already in world space) plus a flat-unlit uniform buffer + bind group.
-    fn build_probe_resource(&self, verts: &[Vertex], tint: [f32; 4]) -> ProbeResource {
+    /// (already in world space) and its slot of `draws`, drawn flat in `tint`.
+    fn build_probe_resource(
+        &self,
+        draws: &mut OverlayDraws,
+        verts: &[Vertex],
+        tint: [f32; 4],
+    ) -> ProbeResource {
         let vertex_buffer = self
             .device
             .create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -65,57 +73,25 @@ impl Renderer {
                 contents: bytemuck::cast_slice(verts),
                 usage: wgpu::BufferUsages::VERTEX,
             });
-        let entity_buf = self
-            .device
-            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("Probe Gizmo Uniform"),
-                contents: bytemuck::bytes_of(&flat_overlay_uniform(tint)),
-                usage: wgpu::BufferUsages::UNIFORM,
-            });
-        let bind_group =
-            self.entity_bind_group("Probe Gizmo", &entity_buf, self.shared_bones_buffer());
-        (vertex_buffer, entity_buf, bind_group, verts.len() as u32)
+        let slot = draws.push(Mat4::IDENTITY, tint);
+        (vertex_buffer, slot, verts.len() as u32)
     }
 
     /// Draw the probe gizmos into the handles pass. Caller has already bound the
     /// `line_pipeline`, group 0 (camera/lighting) and group 3 (shadow); this binds each
-    /// probe's group-1 uniform + group-2 default material (line draws never sample it).
-    pub(crate) fn draw_probe_overlays<'a>(
+    /// probe's slot of `bindings` + group-2 default material (line draws never sample it).
+    pub(super) fn draw_probe_overlays<'a>(
         &'a self,
         render_pass: &mut wgpu::RenderPass<'a>,
+        bindings: &'a OverlayBindings,
         probe_resources: &'a [ProbeResource],
     ) {
         render_pass.set_bind_group(2, &self.default_material_bind_group, &[]);
-        for (vertex_buffer, _entity_buf, bind_group, count) in probe_resources {
+        for (vertex_buffer, slot, count) in probe_resources {
             render_pass.set_vertex_buffer(0, vertex_buffer.slice(..));
-            render_pass.set_bind_group(1, bind_group, &[0]);
+            bindings.bind(render_pass, *slot);
             render_pass.draw(0..*count, 0..1);
         }
-    }
-}
-
-/// A flat, unlit overlay uniform: identity model matrix (gizmo vertices are authored in
-/// world space), the given `tint`, no textures/SH/cutout. The shared shape every line
-/// overlay draws with.
-fn flat_overlay_uniform(tint: [f32; 4]) -> EntityUniform {
-    EntityUniform {
-        model_matrix: Mat4::IDENTITY.to_cols_array(),
-        color_tint: tint,
-        use_texture: 0,
-        is_lit: 0,
-        metallic: 0.0,
-        roughness: 0.5,
-        use_metallic_map: 0,
-        use_roughness_map: 0,
-        use_normal_map: 0,
-        use_emissive_map: 0,
-        emissive: [0.0; 4],
-        use_cutout: 0,
-        alpha_cutoff: 0.0,
-        bone_base: 0,
-        receive_decals: 0,
-        surface: crate::render::gpu::uniforms::SurfaceUniform::default(),
-        mapping: crate::render::gpu::uniforms::MappingUniform::default(),
     }
 }
 

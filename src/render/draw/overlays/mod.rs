@@ -3,6 +3,7 @@
 //! pass that draws them over the finished image ([`handles`], #1224).
 
 mod axis;
+mod batch;
 mod handles;
 mod probes;
 
@@ -10,45 +11,23 @@ use glam::{Mat4, Vec3};
 use wgpu::util::DeviceExt;
 
 use crate::components::mesh::Vertex;
-use crate::render::draw::resources::{AabbResource, AxisResource, GridResource};
-use crate::render::{EntityUniform, Renderer};
+use crate::render::draw::resources::{AabbResource, GridResource, Overlays};
+use crate::render::Renderer;
 use crate::scene::Scene;
+pub(crate) use batch::{OverlayBindings, OverlayDraws};
 
 impl Renderer {
-    pub(crate) fn precreate_grid(&self) -> Option<GridResource> {
-        let _grid_buf = self.grid_vertex_buffer.as_ref()?;
-        let grid_uniform = EntityUniform {
-            model_matrix: Mat4::IDENTITY.to_cols_array(),
-            color_tint: [0.15, 0.15, 0.22, 1.0], // Neon slate blue grid
-            use_texture: 0,
-            is_lit: 0,
-            metallic: 0.0,
-            roughness: 0.5,
-            use_metallic_map: 0,
-            use_roughness_map: 0,
-            use_normal_map: 0,
-            use_emissive_map: 0,
-            emissive: [0.0; 4],
-            use_cutout: 0,
-            alpha_cutoff: 0.0,
-            bone_base: 0,
-            receive_decals: 0,
-            surface: crate::render::gpu::uniforms::SurfaceUniform::default(),
-            mapping: crate::render::gpu::uniforms::MappingUniform::default(),
-        };
-        let grid_buf_unif = self
-            .device
-            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("Grid Unif"),
-                contents: bytemuck::bytes_of(&grid_uniform),
-                usage: wgpu::BufferUsages::UNIFORM,
-            });
-        let grid_bind_group =
-            self.entity_bind_group("Grid", &grid_buf_unif, self.shared_bones_buffer());
-        Some((grid_buf_unif, grid_bind_group))
+    pub(crate) fn precreate_grid(&self, draws: &mut OverlayDraws) -> Option<GridResource> {
+        self.grid_vertex_buffer.as_ref()?;
+        // Neon slate blue grid.
+        Some(draws.push(Mat4::IDENTITY, [0.15, 0.15, 0.22, 1.0]))
     }
 
-    pub(crate) fn precreate_aabb(&self, scene: &Scene) -> Vec<AabbResource> {
+    pub(crate) fn precreate_aabb(
+        &self,
+        scene: &Scene,
+        draws: &mut OverlayDraws,
+    ) -> Vec<AabbResource> {
         let mut aabb_resources = Vec::new();
         for id in scene.world.ids_with_collider() {
             if !scene.world.is_active_in_hierarchy(id) {
@@ -86,73 +65,39 @@ impl Renderer {
                 [0.0, 0.8, 1.0, 0.8]
             };
 
-            let (entity_buf, col_bind_group) = self.build_aabb_bindings(tint_color);
-            aabb_resources.push((aabb_wire_buffer, entity_buf, col_bind_group));
+            // Its vertices are already in world space.
+            let slot = draws.push(Mat4::IDENTITY, tint_color);
+            aabb_resources.push((aabb_wire_buffer, slot));
         }
         aabb_resources
     }
 
-    /// Build an AABB wireframe's uniform buffer + bind group (bound against the
-    /// renderer's shared identity bone palette).
-    fn build_aabb_bindings(&self, tint_color: [f32; 4]) -> (wgpu::Buffer, wgpu::BindGroup) {
-        let entity_uniform = EntityUniform {
-            model_matrix: Mat4::IDENTITY.to_cols_array(), // Vertices are already in world space
-            color_tint: tint_color,
-            use_texture: 0,
-            is_lit: 0,
-            metallic: 0.0,
-            roughness: 0.5,
-            use_metallic_map: 0,
-            use_roughness_map: 0,
-            use_normal_map: 0,
-            use_emissive_map: 0,
-            emissive: [0.0; 4],
-            use_cutout: 0,
-            alpha_cutoff: 0.0,
-            bone_base: 0,
-            receive_decals: 0,
-            surface: crate::render::gpu::uniforms::SurfaceUniform::default(),
-            mapping: crate::render::gpu::uniforms::MappingUniform::default(),
-        };
-
-        let entity_buf = self
-            .device
-            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: None,
-                contents: bytemuck::bytes_of(&entity_uniform),
-                usage: wgpu::BufferUsages::UNIFORM,
-            });
-        let col_bind_group =
-            self.entity_bind_group("AABB", &entity_buf, self.shared_bones_buffer());
-        (entity_buf, col_bind_group)
-    }
-
     /// Draw the editor overlays (floor grid, collider AABBs, selected-entity axis
-    /// arrows) into the handles pass. Editor-mode only; called from `draw_handles`.
+    /// arrows) into the handles pass, each at its slot of `overlays`' one group 1.
+    /// Editor-mode only; called from `draw_handles`.
     pub(crate) fn draw_editor_overlays<'a>(
         &'a self,
         render_pass: &mut wgpu::RenderPass<'a>,
-        grid_resources: &'a Option<GridResource>,
-        aabb_resources: &'a [AabbResource],
-        axis_arrow_resources: &'a [AxisResource],
+        overlays: &'a Overlays,
     ) {
+        let Some(bindings) = &overlays.bindings else {
+            return;
+        };
         // A. Floor grid
-        if let Some((_grid_buf_unif, grid_bind_group)) = grid_resources {
-            if let Some(grid_buf) = &self.grid_vertex_buffer {
-                render_pass.set_vertex_buffer(0, grid_buf.slice(..));
-                render_pass.set_bind_group(1, grid_bind_group, &[0]);
-                render_pass.set_bind_group(2, &self.default_material_bind_group, &[]);
-                render_pass.draw(0..self.grid_count, 0..1);
-            }
+        if let (Some(slot), Some(grid_buf)) = (overlays.grid, &self.grid_vertex_buffer) {
+            render_pass.set_vertex_buffer(0, grid_buf.slice(..));
+            bindings.bind(render_pass, slot);
+            render_pass.set_bind_group(2, &self.default_material_bind_group, &[]);
+            render_pass.draw(0..self.grid_count, 0..1);
         }
         // B. AABB outlines for active colliders
-        for (aabb_wire_buffer, _entity_buf, col_bind_group) in aabb_resources {
+        for (aabb_wire_buffer, slot) in &overlays.aabb {
             render_pass.set_vertex_buffer(0, aabb_wire_buffer.slice(..));
-            render_pass.set_bind_group(1, col_bind_group, &[0]);
+            bindings.bind(render_pass, *slot);
             render_pass.draw(0..24, 0..1);
         }
         // C. Axis arrows for the selected entity
-        for (i, _entity_buf, bind_group) in axis_arrow_resources {
+        for &(i, slot) in &overlays.axis {
             let buffer = match i {
                 0 => &self.axis_x_buffer,
                 1 => &self.axis_y_buffer,
@@ -161,10 +106,12 @@ impl Renderer {
             };
             if let Some(buf) = buffer {
                 render_pass.set_vertex_buffer(0, buf.slice(..));
-                render_pass.set_bind_group(1, bind_group, &[0]);
+                bindings.bind(render_pass, slot);
                 render_pass.draw(0..self.axis_count, 0..1);
             }
         }
+        // D. Light- & reflection-probe gizmos (#284): visualization only.
+        self.draw_probe_overlays(render_pass, bindings, &overlays.probes);
     }
 }
 

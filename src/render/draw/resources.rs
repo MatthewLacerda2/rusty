@@ -7,8 +7,9 @@
 use super::batch::sort::{back_to_front, view_depth};
 use super::batch::{BatchKey, DrawItem, FrameDraws};
 use super::materials::entity_params;
+use super::overlays::{OverlayBindings, OverlayDraws};
 use crate::components::MaterialAsset;
-use crate::render::gpu::draw_buffers::{group1, push_palette, FrameUpload, JointMatrix};
+use crate::render::gpu::draw_buffers::{push_palette, FrameUpload, JointMatrix};
 use crate::render::lod::LodSelection;
 use crate::render::motion::{track, MotionHistory};
 use crate::render::passes::outline::{outlined, OutlineBounds};
@@ -34,23 +35,25 @@ pub(crate) struct SolidResources {
     /// `None` when it rings none.
     pub outline_bounds: Option<OutlineBounds>,
 }
-// The overlay resources keep only the buffers they own (the per-overlay entity
-// uniform + any vertex buffer) plus their bind group; the joint array they bind is
-// the renderer's one shared identity matrix, so no per-overlay palette is allocated
-// (#210). The selection outline is not an overlay: it is its own pass over the
-// solids' own draws (`passes::outline`, #1175).
-pub(crate) type GridResource = (wgpu::Buffer, wgpu::BindGroup);
-pub(crate) type AabbResource = (wgpu::Buffer, wgpu::Buffer, wgpu::BindGroup);
-pub(crate) type AxisResource = (usize, wgpu::Buffer, wgpu::BindGroup);
-// One probe gizmo line draw (#284): its world-space line-list vertex buffer, the flat
-// overlay uniform it owns, its group-1 bind group, and the vertex count to draw.
-pub(crate) type ProbeResource = (wgpu::Buffer, wgpu::Buffer, wgpu::BindGroup, u32);
+// Each overlay keeps only what it owns (any vertex buffer) and its slot of the pass's
+// one overlay group 1 ([`OverlayBindings`], #1616): its uniform there places it and
+// names its tint's record, and the joints and instance it binds are the renderer's
+// shared identities (#210). The selection outline is not an overlay: it is its own
+// pass over the solids' own draws (`passes::outline`, #1175).
+pub(crate) type GridResource = u32;
+pub(crate) type AabbResource = (wgpu::Buffer, u32);
+pub(crate) type AxisResource = (usize, u32);
+// One probe gizmo line draw (#284): its world-space line-list vertex buffer, its
+// slot, and the vertex count to draw.
+pub(crate) type ProbeResource = (wgpu::Buffer, u32, u32);
 
 /// The editor-only overlay resources for one handles pass (grid, collider AABBs,
 /// axis arrows, probe gizmos), drawn after post-FX (#1224). Bundled so the pass
 /// takes a single value instead of four (#93).
 #[derive(Default)]
 pub(crate) struct Overlays {
+    /// The group 1 every overlay binds at its slot; `None` when there is none.
+    pub bindings: Option<OverlayBindings>,
     pub grid: Option<GridResource>,
     pub aabb: Vec<AabbResource>,
     pub axis: Vec<AxisResource>,
@@ -69,11 +72,17 @@ impl Renderer {
     /// Pre-create the editor overlay resources for one handles pass. Only an editor
     /// camera draws one (`draw::camera`'s `handles` stage).
     pub(crate) fn precreate_overlays(&self, scene: &Scene) -> Overlays {
+        let mut draws = OverlayDraws::default();
+        let grid = self.precreate_grid(&mut draws);
+        let aabb = self.precreate_aabb(scene, &mut draws);
+        let axis = self.precreate_axis_arrows(scene, &mut draws);
+        let probes = self.precreate_probes(scene, &mut draws);
         Overlays {
-            grid: self.precreate_grid(),
-            aabb: self.precreate_aabb(scene),
-            axis: self.precreate_axis_arrows(scene),
-            probes: self.precreate_probes(scene),
+            bindings: self.overlay_bindings(&draws),
+            grid,
+            aabb,
+            axis,
+            probes,
         }
     }
 
@@ -167,14 +176,16 @@ impl Renderer {
         back_to_front(&mut transparent);
         let transparent = transparent.into_iter().map(|(item, _)| item).collect();
         let draws = FrameDraws::build(opaque, transparent, self.instancing);
+        let (uniforms, materials) = draws.pack();
         self.draw_buffers.upload(
             &self.device,
             &self.queue,
             &self.entity_bones_layout,
             FrameUpload {
-                uniforms: &draws.uniforms(),
+                uniforms: &uniforms,
                 joints,
                 instances: &draws.instances,
+                materials: &materials,
             },
         );
         draws
@@ -249,8 +260,7 @@ impl Renderer {
             let entry = scene.material_entry_at(id, slot);
             let material = entry.map(|(_, asset)| asset);
             let transparent = material.is_some_and(MaterialAsset::is_transparent);
-            let mut uniform = self.solid_uniform(scene, id, material);
-            uniform.bone_base = bone_base;
+            let record = self.solid_material(scene, id, material);
             let shader = material.and_then(|m| m.shader.as_deref());
             let pipeline = self.surface_shaders.pipeline_id(&self.device, shader);
             let key = BatchKey {
@@ -258,7 +268,8 @@ impl Renderer {
                 mesh: mesh_id.clone(),
                 indices: indices.into(),
                 material: self.material_index(entry, pipeline, entity_params(scene, id, slot)),
-                uniform: uniform.words(),
+                record: record.words(),
+                bone_base,
             };
             let item = DrawItem {
                 key,
@@ -269,23 +280,6 @@ impl Renderer {
             items.push((item, origin, transparent));
         }
         items
-    }
-
-    /// Create an overlay's group-1 bind group: its own uniform buffer, a bones buffer,
-    /// and the shared one-element identity instance array — an overlay is one draw of
-    /// instance 0, its transform carried in the uniform. Bound at offset `[0]`.
-    pub(crate) fn entity_bind_group(
-        &self,
-        label: &str,
-        entity_buf: &wgpu::Buffer,
-        bones_buf: &wgpu::Buffer,
-    ) -> wgpu::BindGroup {
-        group1(
-            &self.device,
-            &self.entity_bones_layout,
-            label,
-            [entity_buf, bones_buf, self.draw_buffers.identity_instance()],
-        )
     }
 }
 

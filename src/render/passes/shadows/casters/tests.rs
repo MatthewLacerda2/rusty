@@ -59,10 +59,7 @@ fn skinned_copies_of_one_mesh_share_a_draw_with_their_own_palettes() {
 /// copy of its mesh; plain runs sort first, so the clip pipelines bind last.
 #[test]
 fn a_clipped_caster_draws_apart_from_plain_copies_of_its_mesh() {
-    let clip = Clip {
-        pipeline: 1,
-        material: 3,
-    };
+    let clip = Clip::of(1, 3);
     let clipped = CasterKey {
         clip: Some(clip),
         ..mesh("Box", 36)
@@ -109,10 +106,7 @@ fn a_mirrored_caster_draws_apart_from_unmirrored_copies() {
 fn mirrored_runs_sort_before_the_clip_material() {
     let key = |mirrored: bool, material| CasterKey {
         facing: [Facing::Front, Facing::Mirrored][usize::from(mirrored)],
-        clip: Some(Clip {
-            pipeline: 1,
-            material,
-        }),
+        clip: Some(Clip::of(1, material)),
         ..mesh("Box", 36)
     };
     let casters = [(true, 3), (false, 4), (true, 4), (false, 3)]

@@ -117,7 +117,7 @@ fn gpu_a_one_channel_map_reads_red_as_a_mask_and_grey_as_colour() {
         roughness_map: Some(map),
         ..Default::default()
     };
-    let uniform = crate::render::draw::uniforms::material_uniform(true, Some(&material));
+    let uniform = crate::render::draw::uniforms::material_data(true, Some(&material));
     let uniform = renderer.with_map_channels(uniform, Some(&material));
     // Its Texture Type sets red, BC4 or not yet (#1574).
     assert_eq!(uniform.use_roughness_map, 2);
