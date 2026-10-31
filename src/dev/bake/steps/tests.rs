@@ -10,7 +10,7 @@ use crate::scene::Scene;
 
 /// A scene with `light` manual light probes and `reflection` manual reflection
 /// probes at a small resolution, saved under `name`; returns it and its path.
-fn probed(name: &str, light: usize, reflection: usize) -> (Scene, String) {
+pub(super) fn probed(name: &str, light: usize, reflection: usize) -> (Scene, String) {
     let dir = crate::test_temp::dir().join(format!("rusty_1602_{name}"));
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("level.scene").to_string_lossy().into_owned();
@@ -35,9 +35,9 @@ fn gpu_each_step_bakes_a_reflection_probe_or_a_few_light_probes() {
         return; // no adapter
     }
     let mut lines = Vec::new();
-    let mut last = job.stage(&scene);
+    let mut last = job.stage();
     while !job.step(&mut scene, &mut |l| lines.push(l)).unwrap() {
-        let now = job.stage(&scene);
+        let now = job.stage();
         match (last, now) {
             (Stage::Light { done: a, .. }, Stage::Light { done: b, .. }) => {
                 assert!(b <= a + LIGHT_PROBES_PER_STEP, "{last:?} → {now:?}")
@@ -49,6 +49,7 @@ fn gpu_each_step_bakes_a_reflection_probe_or_a_few_light_probes() {
         }
         last = now;
     }
+    job.commit(&mut scene).unwrap();
     for i in 1..=3 {
         let line = format!("Baking reflection probe {i} of 3");
         assert!(lines.contains(&line), "{line} in {lines:?}");
@@ -62,7 +63,7 @@ fn gpu_each_step_bakes_a_reflection_probe_or_a_few_light_probes() {
         baked.iter().all(|p| !p.cubemap_path.is_empty()),
         "every probe baked"
     );
-    assert_eq!(job.stage(&scene), Stage::Done);
+    assert_eq!(job.stage(), Stage::Done);
 }
 
 /// Stepped and in one call, the same probes: the sync path is the steps run out.
@@ -78,6 +79,7 @@ fn gpu_stepping_bakes_what_one_call_bakes() {
     let params = LightingBakeParams::default();
     let mut job = start_lighting(&mut stepped, Some(&path), None, params);
     while !job.step(&mut stepped, &mut |_| {}).unwrap() {}
+    job.commit(&mut stepped).unwrap();
     let sh = |s: &Scene| s.probes.probes.iter().map(|p| p.sh).collect::<Vec<_>>();
     assert_eq!(sh(&stepped), sh(&whole));
 }

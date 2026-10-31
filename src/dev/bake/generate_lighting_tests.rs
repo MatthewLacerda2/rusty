@@ -97,3 +97,18 @@ fn generate_is_refused_in_play() {
         "the file is untouched"
     );
 }
+
+/// One bake at a time (#1602): while the editor's Generate Lighting runs, a script's
+/// `Generate` and `Bake` are refused before they place or bake anything.
+#[test]
+fn a_script_bake_is_refused_while_the_editors_runs() {
+    let (mut scene, path) = saved_floor("running");
+    scene.lighting_bake_running = true;
+    let refused = generate_lighting(&mut scene, Some(&path), None, &mut |_| {});
+    assert_eq!(refused.unwrap_err(), super::BAKE_RUNNING);
+    let params = super::super::lighting::LightingBakeParams::default();
+    let bake =
+        super::super::lighting::bake_lighting(&mut scene, Some(&path), None, params, &mut |_| {});
+    assert_eq!(bake.unwrap_err(), super::BAKE_RUNNING);
+    assert!(scene.probes.is_empty(), "nothing was placed");
+}

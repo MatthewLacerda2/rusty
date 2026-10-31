@@ -59,11 +59,13 @@ pub fn generate_lighting(
     say: &mut dyn FnMut(String),
 ) -> Result<GenerateReport, String> {
     refuse_in_play(scene)?;
+    refuse_while_baking(scene)?;
     let path = scene_path.ok_or(UNSAVED)?;
     let settings = scene.lighting_settings.lightmaps;
     let lightmaps = bake_scene_lightmaps(scene, Some(path), &settings)?;
     let mut probes = start_probes(scene, path, nav)?;
     while !probes.step(scene, say)? {}
+    probes.commit(scene)?;
     finish(scene, path, lightmaps, probes.report())
 }
 
@@ -86,7 +88,8 @@ pub fn start_probes(
 }
 
 /// The last step, once lightmaps (`lightmaps` of them, already applied to `scene`)
-/// and probes are baked: write the lighting into the file at `path`.
+/// and probes are baked and committed ([`LightingBake::commit`]): write the lighting
+/// into the file at `path`.
 pub fn finish(
     scene: &mut Scene,
     path: &str,
@@ -100,6 +103,19 @@ pub fn finish(
         probes,
         saved,
     })
+}
+
+/// Why a script's bake is refused while the editor's runs: the two would bake the same
+/// probes and write the same files.
+pub const BAKE_RUNNING: &str =
+    "Generate Lighting is already running in the editor; wait for it to finish";
+
+/// A bake run in one call is refused while the editor's stepped one runs (#1602).
+pub fn refuse_while_baking(scene: &Scene) -> Result<(), String> {
+    match scene.lighting_bake_running {
+        true => Err(BAKE_RUNNING.to_string()),
+        false => Ok(()),
+    }
 }
 
 /// Generate Lighting writes the scene file, so Play refuses it as it refuses Save.

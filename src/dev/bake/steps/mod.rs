@@ -9,15 +9,28 @@
 //!
 //! Each step that starts a bounce pass or a reflection probe says so (`probe i of
 //! n`), to the console and so to the MCP log, so a long bake reads as progress rather
-//! than a hang. Placement happens when the job starts; the bakes read the scene as it
-//! is at each step.
+//! than a hang.
+//!
+//! **A bake works on a snapshot and applies only when it completes** (Unity's shape).
+//! Placement happens when the job starts; then both probe sets are copied, the bakes
+//! read the copies, and their results are staged without touching the scene: the light
+//! probes' SH in the solve, the cubemaps in `<name>.baking` files. [`commit`]
+//! (LightingBake::commit) applies both in one step. If either probe set changed since
+//! the start (one added, removed or moved, a reflection probe's resolution, clip
+//! planes or shadows), a step or the commit refuses with [`PROBES_CHANGED`] and
+//! nothing is applied; the staged files go with the job. The captures still render the
+//! live scene's meshes and lights at each step.
 
 use std::path::{Path, PathBuf};
 
 use super::lighting::LightingBakeReport;
 use crate::render::ibl::probe::solve::BounceSolve;
+pub use crate::render::ibl::probe::solve::PROBES_CHANGED;
 use crate::render::{Renderer, DEFAULT_BAKE_RESOLUTION};
 use crate::scene::Scene;
+use staged::{ReflectionSnapshot, StagedCubemaps};
+
+mod staged;
 
 /// Light probes captured per step: one light probe's six faces are a fraction of a
 /// reflection probe's at its 512-texel default.
@@ -42,13 +55,14 @@ pub enum Stage {
 
 /// A probe bake in progress: the headless renderer it captures with (`None`
 /// without an adapter, when both bakes skip, as `bake_scene_probes` does), the
-/// light-probe solve and the next reflection probe.
+/// light-probe solve, and the reflection probes it bakes with the cubes staged so far.
 pub struct LightingBake {
     renderer: Option<Renderer>,
     light: BounceSolve,
     light_done: bool,
     scene_path: Option<String>,
-    next_reflection: usize,
+    reflections: ReflectionSnapshot,
+    staged: StagedCubemaps,
     report: LightingBakeReport,
 }
 
@@ -74,32 +88,58 @@ impl LightingBake {
             light_done: renderer.is_none(),
             renderer,
             scene_path: scene_path.map(str::to_owned),
-            next_reflection: 0,
+            reflections: ReflectionSnapshot::take(scene),
+            staged: StagedCubemaps::default(),
             report,
         }
     }
 
     /// One frame's share of the bake; `say` gets each progress line. Returns whether
-    /// the bake is done. Errors when reflection probes have no saved scene to write
-    /// beside, or a cubemap could not be written.
+    /// the bake is done and ready to [`commit`](Self::commit). Errors when reflection
+    /// probes have no saved scene to write beside, a cubemap could not be written, or
+    /// the scene's probes changed since the start ([`PROBES_CHANGED`]).
     pub fn step(&mut self, scene: &mut Scene, say: &mut dyn FnMut(String)) -> Result<bool, String> {
+        self.refuse_changed(scene)?;
         if !self.light_done {
             self.step_light(scene, say);
             return Ok(false);
         }
-        let total = scene.reflection_probes.len();
-        if self.next_reflection >= total {
+        let total = self.reflections.len();
+        let i = self.staged.len();
+        let Some((probe, resolution)) = self.reflections.get(i) else {
             return Ok(true);
-        }
+        };
         let out_dir = out_dir(self.scene_path.as_deref())?;
         let Some(renderer) = self.renderer.as_mut() else {
             return Ok(true);
         };
-        let i = self.next_reflection;
         say(format!("Baking reflection probe {} of {total}", i + 1));
-        renderer.bake_reflection_into(scene, i, &out_dir)?;
-        self.next_reflection += 1;
-        Ok(self.next_reflection >= total)
+        let bytes = renderer.bake_reflection(scene, probe, *resolution);
+        self.staged.write(&out_dir, &bytes)?;
+        Ok(self.staged.len() >= total)
+    }
+
+    /// Apply a finished bake to `scene` in one step: the light probes' SH and every
+    /// reflection probe's cube. Errors, applying nothing, when the bake has not
+    /// finished or the scene's probes changed since it started.
+    pub fn commit(&mut self, scene: &mut Scene) -> Result<(), String> {
+        self.refuse_changed(scene)?;
+        if self.stage() != Stage::Done {
+            return Err("the probe bake has not finished".into());
+        }
+        if self.renderer.is_none() {
+            return Ok(()); // nothing baked
+        }
+        self.light.commit(scene)?;
+        self.staged.commit(scene)
+    }
+
+    /// [`PROBES_CHANGED`] when either probe set is not the one this bake started on.
+    fn refuse_changed(&self, scene: &Scene) -> Result<(), String> {
+        match self.light.changed(scene) || self.reflections.changed(scene) {
+            true => Err(PROBES_CHANGED.into()),
+            false => Ok(()),
+        }
     }
 
     /// Up to [`LIGHT_PROBES_PER_STEP`] light probes of the current pass.
@@ -123,8 +163,8 @@ impl LightingBake {
     }
 
     /// Where the bake is, for the editor's bar.
-    pub fn stage(&self, scene: &Scene) -> Stage {
-        let total = scene.reflection_probes.len();
+    pub fn stage(&self) -> Stage {
+        let total = self.reflections.len();
         if !self.light_done {
             let (bounce, done, total) = self.light.progress();
             Stage::Light {
@@ -132,9 +172,9 @@ impl LightingBake {
                 done,
                 total,
             }
-        } else if self.next_reflection < total && self.renderer.is_some() {
+        } else if self.staged.len() < total && self.renderer.is_some() {
             Stage::Reflection {
-                done: self.next_reflection,
+                done: self.staged.len(),
                 total,
             }
         } else {
@@ -158,5 +198,6 @@ fn out_dir(scene_path: Option<&str>) -> Result<PathBuf, String> {
 }
 
 #[cfg(test)]
-#[path = "steps_tests.rs"]
+mod snapshot_tests;
+#[cfg(test)]
 mod tests;

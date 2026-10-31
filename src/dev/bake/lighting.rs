@@ -64,7 +64,8 @@ pub struct LightingBakeReport {
 /// report on success; errors only when a bake's own contract fails (e.g. reflections
 /// need a saved scene path to write the cubemaps beside). A missing GPU adapter is NOT
 /// an error — each bake skips gracefully and the report's `ran_*` flag is `false`.
-/// Runs [`start_lighting`]'s job to the end, its progress lines to `say`.
+/// Runs [`start_lighting`]'s job to the end, its progress lines to `say`, and commits
+/// it. Refused while the editor's Generate Lighting runs.
 pub fn bake_lighting(
     scene: &mut Scene,
     scene_path: Option<&str>,
@@ -72,8 +73,10 @@ pub fn bake_lighting(
     params: LightingBakeParams,
     say: &mut dyn FnMut(String),
 ) -> Result<LightingBakeReport, String> {
+    super::generate_lighting::refuse_while_baking(scene)?;
     let mut job = start_lighting(scene, scene_path, nav, params);
     while !job.step(scene, say)? {}
+    job.commit(scene)?;
     Ok(job.report())
 }
 

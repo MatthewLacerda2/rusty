@@ -31,6 +31,7 @@ use glam::Vec3;
 use super::solve::BounceSolve;
 use crate::render::Renderer;
 use crate::scene::lighting::lightmap::{baked_direct_sh, BakeScene};
+use crate::scene::lighting::probe::ProbeVolume;
 use crate::scene::lighting::sh::Sh9;
 use crate::scene::Scene;
 
@@ -69,30 +70,32 @@ impl Renderer {
         let mut solve = BounceSolve::new(scene, resolution);
         loop {
             if let Some(report) = solve.step(self, scene) {
+                // Nothing edits the scene inside this call, so its probes are the ones baked.
+                let committed = solve.commit(scene);
+                debug_assert!(committed.is_ok(), "{committed:?}");
                 return report;
             }
         }
     }
 }
 
-/// Write a freshly-solved SH field onto the scene's probes (one SH per probe, in
+/// Write a freshly-solved SH field onto a solve's probes (one SH per probe, in
 /// order). The next bounce's lit capture reads these back through the probe field.
-pub(super) fn write_field(scene: &mut Scene, field: &[Sh9]) {
-    for (probe, &sh) in scene.probes.probes.iter_mut().zip(field) {
+pub(super) fn write_field(volume: &mut ProbeVolume, field: &[Sh9]) {
+    for (probe, &sh) in volume.probes.iter_mut().zip(field) {
         probe.sh = sh;
     }
 }
 
-/// Add the direct light of the scene's `Baked` lights to every probe (#809), shadowed
-/// by the static meshes the lightmap bake sees.
-pub(super) fn add_baked_direct(scene: &mut Scene) {
-    let positions: Vec<Vec3> = scene.probes.probes.iter().map(|p| p.position).collect();
+/// Add the direct light of `scene`'s `Baked` lights to every probe of `volume` (#809),
+/// shadowed by the static meshes the lightmap bake sees.
+pub(super) fn add_baked_direct(scene: &Scene, volume: &mut ProbeVolume) {
+    let positions: Vec<Vec3> = volume.probes.iter().map(|p| p.position).collect();
     if positions.is_empty() {
         return;
     }
     let statics = BakeScene::gather(scene, &|_| None);
-    for (probe, direct) in scene
-        .probes
+    for (probe, direct) in volume
         .probes
         .iter_mut()
         .zip(baked_direct_sh(&statics, &positions))

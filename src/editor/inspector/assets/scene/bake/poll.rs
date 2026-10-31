@@ -1,11 +1,14 @@
-//! Generate Lighting's per-frame drive (#808, #1602): the lightmaps' worker polled,
-//! then the probe step taken one step a frame, then the lighting written.
+//! Generate Lighting's per-frame drive (#808, #1602): the lightmaps' worker polled
+//! and its lightmaps applied, then the probe step taken one step a frame, committed
+//! and the lighting written. A bake dropped midway says what reached the scene: the
+//! lightmaps once they landed, the probes never.
 
 use std::time::Duration;
 
 use super::Step;
 use crate::dev::bake::generate_lighting::{finish, start_probes};
 use crate::dev::bake::lightmap::BakeOutcome;
+use crate::dev::bake::steps::PROBES_CHANGED;
 use crate::editor::EditorUi;
 use crate::navigation::NavigationGraph;
 use crate::scene::{LightingSave, Scene};
@@ -18,8 +21,20 @@ const PROGRESS_REPAINT: Duration = Duration::from_millis(100);
 /// Each frame the inspector draws: keep the UI repainting while a bake runs, apply
 /// the lightmaps once they land, then take one probe step a frame and write the
 /// lighting. Runs whether or not the scene card is showing, and waits while the
-/// scene plays.
+/// scene plays. Tells the scene whether a bake is running, so a script's bake waits
+/// its turn.
 pub fn poll(
+    editor: &mut EditorUi,
+    ctx: &egui::Context,
+    scene: &mut Scene,
+    log: &mut ConsoleLogs,
+    nav: &NavigationGraph,
+) {
+    drive(editor, ctx, scene, log, nav);
+    scene.lighting_bake_running = editor.dev.lightmap_bake.is_some();
+}
+
+fn drive(
     editor: &mut EditorUi,
     ctx: &egui::Context,
     scene: &mut Scene,
@@ -35,10 +50,15 @@ pub fn poll(
         return ctx.request_repaint_after(PROGRESS_REPAINT);
     }
     if active.scene != scene.id() || active.path != open {
-        // Its result would land on another scene's entities: drop it (dropping the
-        // job stops the worker) rather than apply it.
+        // Its result would land on another scene's entities, or be written into a
+        // file the scene no longer is: drop it (dropping the job stops the worker and
+        // deletes its staged cubemaps) rather than apply it.
+        let why = match active.scene != scene.id() {
+            true => "the open scene changed",
+            false => "the scene was saved elsewhere",
+        };
+        log.warn(dropped(&active.step, why));
         editor.dev.lightmap_bake = None;
-        log.warn("Generate Lighting dropped: the open scene changed".into());
         return;
     }
     match advance(&mut active.step, scene, log, nav) {
@@ -93,8 +113,16 @@ fn advance(
             path,
         } => {
             let mut say = |line| log.info(line);
-            match job.step(scene, &mut say) {
+            match job.step(scene, &mut say).and_then(|done| match done {
+                true => job.commit(scene).map(|()| true),
+                false => Ok(false),
+            }) {
                 Ok(false) => None,
+                Err(e) if e == PROBES_CHANGED => {
+                    log.warn(dropped(step, "the probes changed during the bake"));
+                    // The lightmaps were applied but never written.
+                    Some(true)
+                }
                 Ok(true) => match finish(scene, path, *lightmaps, job.report()) {
                     Ok(report) => {
                         log.info(report.summary());
@@ -105,5 +133,15 @@ fn advance(
                 Err(e) => fail(log, e),
             }
         }
+    }
+}
+
+/// The console line for a bake dropped because `why`, saying what reached the scene.
+fn dropped(step: &Step, why: &str) -> String {
+    match step {
+        Step::Lightmaps(_) => format!("Generate Lighting dropped: {why}; nothing was applied"),
+        Step::Probes { .. } => format!(
+            "Generate Lighting dropped: {why}; the lightmaps were applied, the probes kept their old lighting"
+        ),
     }
 }

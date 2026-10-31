@@ -11,9 +11,12 @@
 //! step then runs one step a frame (#1602, Unity's `BakeAsync`): the probes capture
 //! through the GPU, so they stay on the UI thread, but no frame waits on more than a
 //! reflection probe or a few light probes, and the editor and the MCP keep answering.
-//! The bar shows `probe i of n`, the console each pass and probe. Then [`poll`] writes
-//! the lighting. A bake cancelled during the lightmaps writes nothing; the probe step
-//! has no Cancel, since it bakes into the scene's probes in place. The
+//! The bar shows `probe i of n`, the console each pass and probe. Then [`poll`]
+//! commits the probes and writes the lighting. A bake cancelled during the lightmaps
+//! writes nothing. The probe step bakes from a snapshot of the probes and applies them
+//! only at its end, so the scene stays editable while it runs; a probe added, removed
+//! or moved meanwhile drops it with nothing of the probes applied. It has no Cancel
+//! (#1602 kept it out of scope). The
 //! settings under the button (#810's directional mode among them) are the scene's,
 //! as `Lighting.SetSettings{…}` edits them.
 
@@ -98,7 +101,7 @@ pub fn draw(
     if generate.clicked() {
         start(editor, scene, console);
     }
-    draw_progress(ui, editor, scene);
+    draw_progress(ui, editor);
 }
 
 /// The scene's lightmap knobs; returns whether any changed.
@@ -171,19 +174,20 @@ fn start(editor: &mut EditorUi, scene: &mut Scene, console: &mut ConsoleLogs) {
                 scene: scene.id(),
                 path: Some(path),
             });
+            scene.lighting_bake_running = true; // a script's bake waits from now on
         }
         Err(e) => console.error(format!("Generate Lighting failed: {e}")),
     }
 }
 
 /// The running bake's bar, and its Cancel button during the lightmaps.
-fn draw_progress(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &Scene) {
+fn draw_progress(ui: &mut egui::Ui, editor: &mut EditorUi) {
     let Some(active) = &editor.dev.lightmap_bake else {
         return;
     };
     let job = match &active.step {
         Step::Lightmaps(job) => job,
-        Step::Probes { job, .. } => return draw_probe_progress(ui, job.stage(scene)),
+        Step::Probes { job, .. } => return draw_probe_progress(ui, job.stage()),
     };
     let (done, total) = job.progress();
     let text = match (job.is_cancelled(), total) {
@@ -222,5 +226,7 @@ fn draw_probe_progress(ui: &mut egui::Ui, stage: Stage) {
     ui.add_sized([180.0, 20.0], bar);
 }
 
+#[cfg(test)]
+mod drop_tests;
 #[cfg(test)]
 mod tests;
