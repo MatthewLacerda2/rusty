@@ -31,7 +31,7 @@ SELF_CHECKS := target-dir inventory
 
 .DEFAULT_GOAL := help
 .NOTPARALLEL:
-.PHONY: help setup compile-cache check gates quick-gates pre-commit resolved $(SELF_CHECKS) $(GATES) mergeable queue queue-daemon queue-stop blockers checks reclaim coder review-level mutants-remote test-one-process dead-pub editor-capture export launcher bench bless-converters
+.PHONY: help setup compile-cache check gates quick-gates pre-commit resolved $(SELF_CHECKS) $(GATES) mergeable ruleset queue queue-daemon queue-stop blockers checks reclaim coder review-level mutants-remote test-one-process dead-pub editor-capture export launcher bench bless-converters
 
 help: ## List the verbs
 	@grep -E '^[a-z-]+:.*## ' $(firstword $(MAKEFILE_LIST)) | \
@@ -197,8 +197,8 @@ deny: ## [gate] Advisories, bans, sources, licenses (cargo-deny)
 # ---- merging (#486) --------------------------------------------------------
 
 # The merge helpers' own tests: stdlib `unittest`, no build, well under a
-# second — and a gate, because `mergeable` is the only thing between a red PR
-# and `main` while it has no required checks (#491).
+# second — and a gate, because `mergeable` is the merge path's judge: the
+# ruleset's required checks (#491) cannot tell a draft's run from a ready one.
 scripts: ## [gate] Tests of the merge and mutation helpers in .github/scripts, and of tools/launcher
 	python3 -m unittest discover --start-directory .github/scripts/tests --top-level-directory .github/scripts --quiet
 	python3 -m unittest discover --start-directory tools/launcher/tests --top-level-directory tools/launcher --quiet
@@ -209,6 +209,12 @@ scripts: ## [gate] Tests of the merge and mutation helpers in .github/scripts, a
 mergeable: ## Did CI really run on this PR's head? make mergeable PR=524
 	@test -n "$(PR)" || { echo "mergeable: which pull request? e.g. make mergeable PR=524" >&2; exit 1; }
 	@python3 .github/scripts/mergeable.py $(PR)
+
+# `main`'s ruleset is code (#491): .github/rulesets/main.json requires `ci-gate`
+# and `lint-gate`. Read-only by default, exits 1 on drift; ARGS=--apply writes the
+# file to GitHub. Applying changes how the queue merges: do it between merges.
+ruleset: ## Does main's live ruleset match .github/rulesets/main.json? ARGS=--apply writes it
+	@python3 .github/scripts/ruleset.py $(ARGS)
 
 # The same question in a loop, with the update from main and the waiting done for you.
 # Serialized: one branch at a time, in the order given. Merges origin/main into
