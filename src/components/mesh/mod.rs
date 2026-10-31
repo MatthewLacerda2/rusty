@@ -12,6 +12,7 @@ use crate::asset::{AnimationClip, SkinData};
 use serde::{Deserialize, Serialize};
 use std::ops::Range;
 
+mod geometry;
 pub mod primitives;
 mod shadow_casting;
 mod skeleton;

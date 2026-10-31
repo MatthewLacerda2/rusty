@@ -28,6 +28,10 @@ avoid:
   `src/scene/authoring/dependency.rs` (`set_default`, `has_kind`, `clear_one`:
   two component branches together push these past clippy's 50-line cap; split
   by group, never trim);
+- `src/scene/serialize.rs`'s `apply` and `src/scene/undo/level.rs`'s list: every
+  saved `Scene` field adds a line to both, so two such branches pass clippy's
+  50-line cap in `apply` (#1645 with #1640); the level list's check test asks the
+  second to land for its field;
 - `src/api/mod.rs`, `src/scripting/callbacks.rs`,
   `src/editor/inspector/components/add/`;
 - `src/app/registry.rs`'s `build()`, where order *is* execution order, so a merge
@@ -163,7 +167,9 @@ stood down, by design (`cloud-brief.md`: once ready, the branch is the
 queue's). That looked like "half never wake", and it is also why they never
 race the fresh session. So never put the re-brief, or a pointer to it, on the PR: every session
 subscribed to it would act on it, and a PR re-briefed twice has two. **Take the
-`queue` label off when you re-brief**, and put it back only after reading the
+`queue` label off when you re-brief**, and before you push to a queued PR
+yourself: the queue merges `main` into the head it took and hands back a head
+that moved under it (#1645, 2026-10-31), and put it back only after reading the
 fix. A re-briefed PR that keeps the label is merged as soon as its coder readies
 it, unread (#1255, 2026-10-23).
 
@@ -196,10 +202,12 @@ lines and exits non-zero, and one never seen holding it says *unconfirmed*. A st
 request left for a supervisor that is gone is removed at a fresh start (not when the
 supervisor restarts itself on a change to its own code, which keeps it).
 The supervisor's own endings are status 7 (`supervisor: worktree <path> is gone;
-stopped.`) and 8 (`supervisor: crashed: <error>; stopped.`). Put a `Monitor` on `tail -F
+stopped.`) and 8 (`supervisor: crashed: <error>; stopped.`). Put a `Monitor` on `tail -n 30 -F
 .git/merge-queue/queue.log | grep --line-buffered -E 'HANDED BACK|supervisor:.*stopped'` and on new issue comments matching `Standing down` (a coder that stops says so on its issue, not on a PR),
 never on the watch itself (a `Monitor` dies at 30 minutes and takes its command
-with it). The log's `watch:` lines are the whole view of the coders: no second
+with it). Re-arm it with `-n 30`, never `-n0`: a `-n0` re-arm drops whatever the
+log said while no `Monitor` ran, and two PRs sat ready and unread for an hour
+that way (2026-10-31). The log's `watch:` lines are the whole view of the coders: no second
 poller. **Stop it with `make queue-stop`**, between pull requests; never by
 pattern: `pkill -f` kills scorsese's watch too. Never `pkill -f` a pattern your own
 command line contains either: it kills the shell running it. Run bare (`make queue ARGS="--watch

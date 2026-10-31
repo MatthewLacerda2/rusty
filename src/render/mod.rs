@@ -151,6 +151,8 @@ pub struct Renderer {
     /// Rebuild the group-0 bind group only when the skybox it binds changed, not every
     /// camera every frame — its camera/lighting buffers are persistent (#210).
     global_bind_group_dirty: bool,
+    /// Group 0 kept for the procedural sky slot not bound (#1620).
+    spare_global_group: ibl::sky_cube::SpareGroup<wgpu::BindGroup>,
     /// The light-cluster buffers group 0 binds (#434), refilled per camera.
     clusters: clusters::ClusterBuffers,
     /// The baked lightmap pages group 0 binds (#438), rebound when the scene's change.

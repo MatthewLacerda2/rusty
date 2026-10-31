@@ -112,3 +112,19 @@ fn a_script_bake_is_refused_while_the_editors_runs() {
     assert_eq!(bake.unwrap_err(), super::BAKE_RUNNING);
     assert!(scene.probes.is_empty(), "nothing was placed");
 }
+
+/// A bake inside a console line's step (#1631): the probes it places and the
+/// lightmaps it applies are no edit, so undoing the line keeps them.
+#[test]
+fn gpu_generate_inside_an_edit_is_no_part_of_its_step() {
+    let (mut scene, path) = saved_floor("undo_1631");
+    scene.begin_edits();
+    scene.ambient_intensity = 0.25;
+    generate_lighting(&mut scene, Some(&path), None, &mut |_| {}).unwrap();
+    scene.commit_edits(None);
+    let (probes, lightmaps) = (scene.probes.probes.len(), scene.lightmaps.clone());
+    assert!(probes > 0, "the bake placed probes");
+    while scene.undo().is_some() {}
+    assert_eq!(scene.probes.probes.len(), probes);
+    assert_eq!(scene.lightmaps, lightmaps);
+}

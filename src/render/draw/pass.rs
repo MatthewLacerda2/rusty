@@ -225,24 +225,35 @@ impl Renderer {
     /// Rebuild the group-0 bind group, but only when something it names changed — the
     /// skybox, the probe cube, or a light-cluster buffer that grew (#434). Its buffers
     /// are otherwise persistent (skips ~one bind-group creation per camera, #210).
+    /// When only the procedural sky slot changed, the group kept for that slot is
+    /// swapped in instead (`SpareGroup`, #1620).
     fn update_global_bind_group(&mut self) {
-        if !self.global_bind_group_dirty {
+        let switched = self.spare_global_group.switched;
+        if !self.global_bind_group_dirty && !switched {
             return;
         }
+        let only_sky = !self.global_bind_group_dirty;
         self.global_bind_group_dirty = false;
         let sky = &self.sky_reflection;
+        let panorama = self.skybox_texture.as_deref();
         // The resident reflection probes' cube array at binding 4 (#1206).
         let cube = &self.reflection_probes;
-        self.global_bind_group = GlobalGroup {
-            camera: &self.camera_buffer,
-            lighting: &self.lighting_buffer,
-            skybox: (sky.view(self.skybox_texture.as_deref()), &sky.sampler),
-            cube: (&cube.view, &cube.sampler),
-            clusters: &self.clusters,
-            decals: &self.decals,
-            lightmaps: self.lightmaps.binding(),
-        }
-        .create(&self.device, &self.camera_lighting_layout);
+        let build = || {
+            GlobalGroup {
+                camera: &self.camera_buffer,
+                lighting: &self.lighting_buffer,
+                skybox: (sky.view(panorama), &sky.sampler),
+                cube: (&cube.view, &cube.sampler),
+                clusters: &self.clusters,
+                decals: &self.decals,
+                lightmaps: self.lightmaps.binding(),
+            }
+            .create(&self.device, &self.camera_lighting_layout)
+        };
+        let slot = sky.procedural_slot(panorama);
+        let group = &mut self.global_bind_group;
+        self.spare_global_group
+            .replace(group, (slot, only_sky), build);
     }
 
     /// Record `batches` into `pass`: per batch, its pipeline when it differs from the

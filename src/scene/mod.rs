@@ -23,6 +23,7 @@
 //!   io        — save/load, path + extension, default-scene seeding
 //!   default_scene — the default scene's builder, materials and seeded assets
 //!   snapshot  — edit-mode snapshot/restore around Play
+//!   undo      — edit mode's Undo / Redo: per-object records, grouped by gesture
 //!   runtime   — play-mode requests drained at the tick tail: destroys, scene loads
 
 // Panic-free sim (#195, #962): bare `.unwrap()` is denied in every sim module (use `?`
@@ -53,6 +54,7 @@ pub mod serialize;
 pub mod settings;
 pub mod skeleton;
 pub mod snapshot;
+pub mod undo;
 pub mod world_cache;
 
 pub use camera::{
@@ -90,5 +92,6 @@ pub use serialize::{apply_scene_data, asset_mesh_component, to_scene_data, Scene
 pub use settings::collision_matrix::CollisionMatrix;
 pub use settings::fog::{FogMode, FogSettings};
 pub use settings::layers::{layer_in_mask, LayerRegistry, LAYER_COUNT};
-pub use settings::{collision_matrix, fog, layers, shader_overrides};
+pub use settings::sky::SkySettings;
+pub use settings::{collision_matrix, fog, layers, shader_overrides, sky};
 pub use snapshot::SceneSnapshot;

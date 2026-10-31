@@ -51,6 +51,61 @@ pub(crate) fn black_sky(scene: &mut crate::scene::Scene) {
     scene.skybox_path = path.to_string_lossy().into_owned();
 }
 
+/// A compute probe: dispatch `source`'s `main` over 64 × 2 invocations and read
+/// back the 256 `vec4`s it writes to its one binding, a storage array (#1524): how
+/// a test runs a WGSL helper as written on the GPU.
+pub(crate) fn run_probe(
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    source: wgpu::ShaderSource,
+) -> Vec<[f32; 4]> {
+    let module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+        label: None,
+        source,
+    });
+    let pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+        label: None,
+        layout: None,
+        module: &module,
+        entry_point: Some("main"),
+        compilation_options: Default::default(),
+        cache: None,
+    });
+    let size = 256 * 16;
+    let buffer = |usage| {
+        device.create_buffer(&wgpu::BufferDescriptor {
+            label: None,
+            size,
+            usage,
+            mapped_at_creation: false,
+        })
+    };
+    let storage = buffer(wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_SRC);
+    let staging = buffer(wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST);
+    let group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        label: None,
+        layout: &pipeline.get_bind_group_layout(0),
+        entries: &[wgpu::BindGroupEntry {
+            binding: 0,
+            resource: storage.as_entire_binding(),
+        }],
+    });
+    let mut encoder = device.create_command_encoder(&Default::default());
+    {
+        let mut pass = encoder.begin_compute_pass(&Default::default());
+        pass.set_pipeline(&pipeline);
+        pass.set_bind_group(0, &group, &[]);
+        pass.dispatch_workgroups(64, 2, 1);
+    }
+    encoder.copy_buffer_to_buffer(&storage, 0, &staging, 0, size);
+    queue.submit([encoder.finish()]);
+    let slice = staging.slice(..);
+    slice.map_async(wgpu::MapMode::Read, |_| {});
+    let _ = device.poll(wgpu::PollType::wait_indefinitely());
+    let mapped = slice.get_mapped_range().expect("mapped");
+    bytemuck::cast_slice(&mapped).to_vec()
+}
+
 #[cfg(test)]
 mod tests {
     /// The one GPU test that refuses to skip, and only where asked to. Without it, a

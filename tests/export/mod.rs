@@ -12,6 +12,7 @@ use serde_json::Value;
 mod blend;
 mod fbx;
 mod scene;
+mod shaders;
 mod textures;
 
 /// The import cache, relative to a project (`asset::convert::IMPORT_CACHE_DIR`).

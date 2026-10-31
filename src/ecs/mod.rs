@@ -34,6 +34,10 @@ mod despawn;
 #[cfg(test)]
 mod despawn_tests;
 mod handles;
+pub mod journal;
+#[cfg(test)]
+mod journal_tests;
+mod placement;
 #[cfg(test)]
 mod query_tests;
 #[cfg(test)]
@@ -43,6 +47,7 @@ mod world_space;
 
 pub use access::{CompMut, CompRef};
 pub use descendants::{Descendants, HierarchyPath};
+pub use journal::{Journaled, Recorded};
 pub use world::World;
 pub use world_space::{ColliderMut, TransformMut};
 

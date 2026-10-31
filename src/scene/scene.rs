@@ -70,6 +70,10 @@ pub struct Scene {
     /// Scene fog (#437): distance + height fog the renderer applies to every
     /// world-space pass. Serialized with the scene; off by default.
     pub fog: crate::scene::FogSettings,
+    /// The procedural sky's look (#1620): cloud coverage and opacity, and the
+    /// zenith, horizon and ground colours. Serialized with the scene; the defaults
+    /// draw the sky as it always was.
+    pub sky: crate::scene::SkySettings,
     /// The project's shared Layers registry (Unity's Tags & Layers). Serialized
     /// with the scene; the per-entity `layer` index points into it.
     pub layers: LayerRegistry,
@@ -148,6 +152,8 @@ pub struct Scene {
     /// The text the engine last read or wrote at this scene's file (#1340), so the
     /// editor tells an outside change from its own write. Never serialized.
     pub(in crate::scene) disk_text: crate::scene::io::DiskText,
+    /// Edit mode's Undo / Redo history (#1631, `scene::undo`). Never serialized.
+    pub(in crate::scene) history: crate::scene::undo::UndoStack,
 }
 
 impl Default for Scene {
@@ -161,6 +167,7 @@ impl Default for Scene {
             ambient_intensity: default_ambient_intensity(),
             nav_settings: NavMeshSettings::default(),
             fog: crate::scene::FogSettings::default(),
+            sky: crate::scene::SkySettings::default(),
             layers: LayerRegistry::default(),
             collision_matrix: CollisionMatrix::default(),
             materials: BTreeMap::new(),
@@ -183,6 +190,7 @@ impl Default for Scene {
             meshes_read_at: 0,
             meshes_reimported: BTreeMap::new(),
             disk_text: Default::default(),
+            history: Default::default(),
         }
     }
 }

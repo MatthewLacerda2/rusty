@@ -21,22 +21,24 @@
 use crate::components::Entity;
 
 use super::activity::ActivityStore;
-use super::bundle::{build_bundle, Core};
+use super::bundle::Core;
 use super::handles::Handles;
+use super::journal::Journal;
 use super::world_space::{BoundsQueue, WorldStore};
 
 pub(in crate::ecs) use hecs::{Ref, RefMut};
 
 pub struct World {
-    inner: hecs::World,
+    pub(super) inner: hecs::World,
     /// Stable engine id -> hecs handle (generational), a dense table (#696).
-    handles: Handles,
+    pub(super) handles: Handles,
     /// Insertion order of stable ids — preserves the former `Vec<Entity>` ordering.
-    order: Vec<u32>,
+    /// Sorted by `Core::seq`: `place` appends, `overwrite` keeps the slot.
+    pub(super) order: Vec<u32>,
     /// Monotonic stable-id allocator (mirrors the former `next_entity_id`).
-    next_id: u32,
+    pub(super) next_id: u32,
     /// Insertion-sequence allocator: `place` stamps `Core::seq`, so narrow queries sort.
-    next_seq: u64,
+    pub(super) next_seq: u64,
     /// Every entity's world matrix, dirty-flagged (`ecs::world_space`).
     pub(super) world_space: WorldStore,
     /// The moved entities whose colliders' AABBs are due a refresh (`ecs::world_space`).
@@ -45,6 +47,8 @@ pub struct World {
     pub(super) activity: ActivityStore,
     /// Bumped whenever the set of static entities may have changed (`World::static_revision`).
     pub(super) static_revision: u64,
+    /// The edit-mode change journal the editor's Undo reads (`ecs::journal`, #1631).
+    pub(super) journal: Journal,
 }
 
 impl Default for World {
@@ -65,6 +69,7 @@ impl World {
             bounds: BoundsQueue::default(),
             activity: ActivityStore::default(),
             static_revision: 0,
+            journal: Journal::default(),
         }
     }
 
@@ -94,6 +99,7 @@ impl World {
     /// attaches a Transform (mandatory) via `Entity::new`.
     pub fn spawn(&mut self, name: String) -> u32 {
         let id = self.next_id;
+        self.note(id); // before the allocator moves, so an Undo gives the id back
         self.next_id += 1;
         self.place(Entity::new(id, name));
         id
@@ -103,6 +109,7 @@ impl World {
     /// from disk), decomposing it into the mandatory + optional columns. The
     /// entity's `id` is honoured; `next_id` is advanced past it.
     pub fn insert_entity(&mut self, entity: Entity) {
+        self.note(entity.id);
         if entity.id >= self.next_id {
             self.next_id = entity.id + 1;
         }
@@ -113,6 +120,7 @@ impl World {
     /// Drop the rows of `ids`, whose references `World::despawn_all` cleared first.
     pub(super) fn remove_rows(&mut self, ids: &std::collections::BTreeSet<u32>) {
         for &id in ids {
+            self.note(id);
             self.static_revision += u64::from(self.is_static(id));
             self.world_space.forget(id);
             if let Some(handle) = self.handles.remove(id) {
@@ -128,6 +136,7 @@ impl World {
         self.inner.clear();
         self.handles.clear();
         self.order.clear();
+        self.journal = Journal::default();
         self.next_id = 1;
         self.next_seq = 0;
         self.reset_caches();
@@ -173,6 +182,7 @@ impl World {
         id: u32,
     ) -> Option<RefMut<'_, T>> {
         let handle = self.handles.get(id)?;
+        self.note(id);
         self.inner.get::<&mut T>(handle).ok()
     }
 
@@ -212,6 +222,7 @@ impl World {
         let Some(handle) = self.handles.get(id) else {
             return false;
         };
+        self.note(id);
         match value {
             Some(v) => {
                 let _ = self.inner.insert_one(handle, v);
@@ -227,6 +238,7 @@ impl World {
     /// is dead).
     pub(in crate::ecs) fn take_component<T: hecs::Component>(&mut self, id: u32) -> Option<T> {
         let handle = self.handles.get(id)?;
+        self.note(id);
         self.inner.remove_one::<T>(handle).ok()
     }
 
@@ -239,6 +251,7 @@ impl World {
         f: impl FnOnce(&mut A, Option<&mut B>) -> R,
     ) -> Option<R> {
         let handle = self.handles.get(id)?;
+        self.note(id);
         let mut query = self
             .inner
             .query_one::<(&mut A, Option<&mut B>)>(handle)
@@ -257,44 +270,5 @@ impl World {
         let mut query = self.inner.query_one::<(&A, &B)>(handle).ok()?;
         let (a, b) = query.get()?;
         Some(f(a, b))
-    }
-
-    /// Spawn a hecs entity carrying every column of `entity` in one archetype placement
-    /// (`EntityBuilder`, O(k)), not N `insert_one` re-migrations (O(k²)).
-    fn place(&mut self, entity: Entity) {
-        let id = entity.id;
-        let seq = self.next_seq;
-        self.next_seq += 1;
-        self.static_revision += u64::from(entity.is_static);
-        let mut builder = build_bundle(entity, seq);
-        let handle = self.inner.spawn(builder.build());
-        self.handles.insert(id, handle);
-        self.order.push(id);
-        self.moved(id); // a carried document (a re-rooted load survivor) brings a stale box
-    }
-
-    /// Overwrite a LIVE entity's whole column set with an `Entity` document in one
-    /// placement (despawn + respawn under the same id, so no absent column survives
-    /// stale) — `replace_entity`'s bridge. `false` when the entity does not exist.
-    pub(in crate::ecs) fn overwrite(&mut self, entity: Entity) -> bool {
-        let id = entity.id;
-        let Some(old_handle) = self.handles.get(id) else {
-            return false;
-        };
-        // The entity keeps its slot in insertion order (`self.order` is not
-        // touched), so it must also keep its sequence stamp — a fresh one
-        // would let narrow queries sort it to the back.
-        let seq = match self.inner.get::<&Core>(old_handle) {
-            Ok(core) => core.seq,
-            Err(_) => return false,
-        };
-        let _ = self.inner.despawn(old_handle);
-        let mut builder = build_bundle(entity, seq);
-        let new_handle = self.inner.spawn(builder.build());
-        self.handles.insert(id, new_handle);
-        self.moved(id);
-        self.invalidate_caches(); // its transform, parent and flag may all differ
-        self.static_revision += 1;
-        true
     }
 }

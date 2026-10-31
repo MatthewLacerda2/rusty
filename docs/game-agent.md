@@ -110,6 +110,9 @@ The tools describe themselves; what they don't say:
   and `snapshot`, then `Editor.ExitPlay()` to get the authored scene back and
   `Time.Resume()` last, so the next Play runs live (`docs/api/Editor.md`). Globals
   set before a switch are gone after it;
+- every edit-mode `eval` is one Undo step: `Editor.Undo()` takes back the last one
+  (the operator's Ctrl+Z does the same), without reloading the scene and losing
+  other unsaved work (`docs/api/Editor.md`);
 - when the engine warned during a call, the result carries a second text block
   starting `engine warnings:`. Read it: a skipped asset or a dropped collider shows
   up there first;

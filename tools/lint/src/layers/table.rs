@@ -171,6 +171,7 @@ pub const LAYERS: &[Layer] = &[
             "render",
             "scene",
             "scripting",
+            "shadergen",
             "time",
         ],
     )

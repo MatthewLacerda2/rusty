@@ -6,24 +6,33 @@
 //! probe (`forward::lighting::environment_reflection`). So a rough metal reflects a
 //! blurred sky and a mirror a sharp one; the sky pass still draws the sky sharp.
 //!
-//! Two cubes, bound at group-0 binding 2 in the panorama's old place:
+//! Three cubes, one bound at group-0 binding 2 in the panorama's old place:
 //! - **the panorama's**, baked when the scene's panorama texture changes (a load, a
 //!   switch, a re-import), never for an unchanged one. The cube of the last
 //!   panorama is kept while the procedural sky shows, so two scenes that alternate
 //!   in one frame (the Inspector preview beside the viewport) bake nothing;
-//! - **the procedural sky's**, baked once per renderer, on the first frame without
-//!   a panorama. `procedural_sky` is affine in its tint, so the cube holds its two
-//!   terms and the shader applies the ambient colour per sample: a tint that changes
+//! - **the procedural sky's two**, each holding the sky for one set of the scene's
+//!   sky settings (#1620): baked on the first frame that shows settings neither
+//!   holds, into the slot not bound, so two skies drawn in one frame (the Inspector
+//!   preview's default beside a scene's own) both stay baked, and group 0 is kept
+//!   built for each (`spare`): alternating them swaps groups and builds none. A
+//!   setting that changes every frame (a scripted slider) bakes every frame. For fixed settings
+//!   `procedural_sky` is affine in the ambient colour, so a cube holds its two terms
+//!   and the shader applies the ambient colour per sample: an ambient that changes
 //!   every frame (a scripted day cycle) never rebakes it, so no refresh needs
-//!   Unity's realtime time slicing.
+//!   Unity's realtime time slicing; a settings change bakes once.
 //!
 //! GPU state rebuilt from the scene, never saved. Each bake is one compute pass,
 //! timed as `Debug.Stats().gpu_passes.sky_reflection` and counted as
 //! `sky_reflection_bakes`.
 
 mod gpu;
+mod spare;
+
+pub(crate) use spare::SpareGroup;
 
 use crate::render::gpu::shaders::ShaderRegistry;
+use crate::render::gpu::uniforms::ProceduralSkyUniform;
 use crate::render::timing::GpuTimer;
 use crate::render::GpuTexture;
 
@@ -38,23 +47,64 @@ pub(crate) enum Bake {
     Panorama,
 }
 
-/// The bake a frame needs: the procedural cube the first time no panorama shows,
-/// the panorama's when the shown panorama is not the one its cube holds
-/// (`held_matches`: `None` with no panorama shown).
-pub(crate) fn plan(procedural_baked: bool, held_matches: Option<bool>) -> Bake {
+/// The bake a frame needs: a procedural cube when no panorama shows and no cube
+/// holds the shown sky settings (`procedural_held`), the panorama's when the shown
+/// panorama is not the one its cube holds (`held_matches`: `None` with no panorama
+/// shown).
+pub(crate) fn plan(procedural_held: bool, held_matches: Option<bool>) -> Bake {
     match held_matches {
-        None if !procedural_baked => Bake::Procedural,
+        None if !procedural_held => Bake::Procedural,
         Some(false) => Bake::Panorama,
         _ => Bake::Nothing,
     }
 }
 
-/// The two sky cubes, the bake pipeline and the sampler the forward pass reads them
+/// One procedural sky cube and the sky settings it was baked for (`None`: never).
+struct Procedural {
+    cube: gpu::Cube,
+    holds: Option<ProceduralSkyUniform>,
+}
+
+/// The procedural slot a frame shows `sky` from, and what that costs: the slot that
+/// holds it (`holds`, per slot) as is, else a bake into [`bake_slot`]. Showing a slot
+/// other than the bound one (`current`) switches group 0 (`Prepared::switched`).
+fn procedural_step<K: PartialEq>(
+    holds: &[Option<K>; 2],
+    current: usize,
+    sky: &K,
+) -> (usize, Prepared) {
+    let (slot, baked) = match holds.iter().position(|h| h.as_ref() == Some(sky)) {
+        Some(slot) => (slot, false),
+        None => (bake_slot(current, holds[current].is_none()), true),
+    };
+    let switched = slot != current;
+    (
+        slot,
+        Prepared {
+            baked,
+            rebind: false,
+            switched,
+        },
+    )
+}
+
+/// The slot to bake `sky` into: the bound one while it holds nothing (the first
+/// bake), else the other, so the sky bound last is kept.
+fn bake_slot(current: usize, current_empty: bool) -> usize {
+    if current_empty {
+        current
+    } else {
+        1 - current
+    }
+}
+
+/// The sky cubes, the bake pipeline and the sampler the forward pass reads them
 /// through.
 pub(crate) struct SkyReflection {
     filter: gpu::Filter,
-    procedural: gpu::Cube,
-    procedural_baked: bool,
+    procedural: [Procedural; 2],
+    /// The procedural slot [`Self::view`] binds.
+    current: usize,
     /// The panorama texture the panorama cube was baked from, and the cube.
     panorama: Option<(wgpu::Texture, gpu::Cube)>,
     /// Trilinear, clamped: the roughness picks the mip.
@@ -65,8 +115,11 @@ pub(crate) struct SkyReflection {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct Prepared {
     pub baked: bool,
-    /// The cube to bind was replaced: group 0 must be rebuilt.
+    /// The panorama cube was replaced: group 0 must be rebuilt.
     pub rebind: bool,
+    /// The procedural slot bound changed: group 0 switches to the one built for it
+    /// ([`SpareGroup`]).
+    pub switched: bool,
 }
 
 impl SkyReflection {
@@ -80,8 +133,11 @@ impl SkyReflection {
         });
         Self {
             filter: gpu::Filter::new(device, registry),
-            procedural: gpu::Cube::new(device, "Procedural Sky Reflection"),
-            procedural_baked: false,
+            procedural: std::array::from_fn(|_| Procedural {
+                cube: gpu::Cube::new(device, "Procedural Sky Reflection"),
+                holds: None,
+            }),
+            current: 0,
             panorama: None,
             sampler,
         }
@@ -91,19 +147,28 @@ impl SkyReflection {
     /// once [`Self::prepare`] ran for it. The shader tells the two apart by
     /// `LightingUniforms.sky_textured`.
     pub(crate) fn view(&self, panorama: Option<&GpuTexture>) -> &wgpu::TextureView {
-        match (&self.panorama, panorama) {
-            (Some((held, cube)), Some(p)) if *held == p.texture => &cube.view,
-            _ => &self.procedural.view,
+        match (&self.panorama, self.procedural_slot(panorama)) {
+            (Some((_, cube)), None) => &cube.view,
+            _ => &self.procedural[self.current].cube.view,
         }
     }
 
-    /// Bake what showing `panorama` (`None`: the procedural sky) needs this frame,
-    /// timing it on `timer`.
+    /// The procedural slot [`Self::view`] binds for `panorama`: `None` when it binds
+    /// the panorama's cube.
+    pub(crate) fn procedural_slot(&self, panorama: Option<&GpuTexture>) -> Option<usize> {
+        match (&self.panorama, panorama) {
+            (Some((held, _)), Some(p)) if *held == p.texture => None,
+            _ => Some(self.current),
+        }
+    }
+
+    /// Bake what showing `panorama` (`None`: the procedural sky, shaped by `sky`)
+    /// needs this frame, timing it on `timer`.
     pub(crate) fn prepare(
         &mut self,
         (device, queue): (&wgpu::Device, &wgpu::Queue),
         timer: &GpuTimer,
-        panorama: Option<&GpuTexture>,
+        (panorama, sky): (Option<&GpuTexture>, &ProceduralSkyUniform),
     ) -> Prepared {
         let held = (self.panorama.as_ref(), panorama);
         let held_matches = match held {
@@ -111,24 +176,30 @@ impl SkyReflection {
             (Some((held, _)), Some(p)) => Some(*held == p.texture),
             (None, Some(_)) => Some(false),
         };
-        match (plan(self.procedural_baked, held_matches), panorama) {
-            (Bake::Procedural, _) => {
-                self.filter
-                    .bake((device, queue), timer, &self.procedural, None);
-                self.procedural_baked = true;
-                Prepared {
-                    baked: true,
-                    rebind: false,
-                }
-            }
+        let held = self.procedural.iter().any(|p| p.holds == Some(*sky));
+        match (plan(held, held_matches), panorama) {
             (Bake::Panorama, Some(p)) => {
                 let cube = gpu::Cube::new(device, "Panorama Sky Reflection");
-                self.filter.bake((device, queue), timer, &cube, Some(p));
+                self.filter
+                    .bake((device, queue), timer, &cube, (Some(p), sky));
                 self.panorama = Some((p.texture.clone(), cube));
                 Prepared {
                     baked: true,
                     rebind: true,
+                    switched: false,
                 }
+            }
+            (_, None) => {
+                let holds = self.procedural.each_ref().map(|p| p.holds);
+                let (slot, prepared) = procedural_step(&holds, self.current, sky);
+                if prepared.baked {
+                    let target = &mut self.procedural[slot];
+                    self.filter
+                        .bake((device, queue), timer, &target.cube, (None, sky));
+                    target.holds = Some(*sky);
+                }
+                self.current = slot;
+                prepared
             }
             _ => Prepared::default(),
         }
@@ -142,3 +213,11 @@ mod tests;
 #[cfg(test)]
 #[path = "gpu_tests.rs"]
 mod gpu_tests;
+
+#[cfg(test)]
+#[path = "settings_gpu_tests.rs"]
+mod settings_gpu_tests;
+
+#[cfg(test)]
+#[path = "defaults_gpu_tests.rs"]
+mod defaults_gpu_tests;

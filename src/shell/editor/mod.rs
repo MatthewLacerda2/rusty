@@ -18,6 +18,7 @@ mod icon;
 mod last_scene;
 mod paint;
 mod start;
+mod undo;
 mod viewport;
 mod watch;
 
@@ -28,8 +29,7 @@ pub use start::{launch, launch_picker};
 use winit::event::WindowEvent;
 use winit::keyboard::KeyCode;
 
-use super::frame::Host;
-use super::{Frontend, Shell};
+use super::{frame::Host, Frontend, Shell};
 use crate::app::{GameWorld, PlayTransition};
 use crate::core::input::CursorState;
 use crate::editor::{EditorUi, ViewportInteraction, ViewportTab};
@@ -273,7 +273,7 @@ impl Frontend for EditorFrontend {
 
         self.editor_ui.preview_texture_id = self.preview_texture_id;
         sync_ui_textures(&mut self.editor_ui, game);
-        let interaction = self.draw_dashboard(shell, game);
+        let interaction = self.recorded_dashboard(shell, game);
         paint::drain_repl(&mut self.editor_ui, game);
 
         // Render the scene into the viewport target now (after the panel rect is
@@ -285,7 +285,7 @@ impl Frontend for EditorFrontend {
             .flatten()
             .map(|render| game_focus::game_view_rect(&interaction, ppp, render));
         self.render_viewport_scene(shell, game, &interaction, ppp);
-        self.handle_viewport_interaction(game, &interaction, ppp);
+        self.recorded_viewport_interaction(game, &interaction, ppp);
         // Only when the Inspector's Preview tab requested one this frame (#352).
         self.render_preview_scene(shell, ppp);
 

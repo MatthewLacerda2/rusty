@@ -72,7 +72,7 @@ fn the_authored_shader_draws_with_its_stored_params() {
     .expect("bake and assign the flash shader");
     let key = sess.eval("return MAT").expect("material key");
     let pixel = centre(&sess, key.trim(), "flash.png");
-    for ext in ["wgsl", "params.json"] {
+    for ext in ["wgsl", "params.json", "recipe.json"] {
         let _ = std::fs::remove_file(format!("assets/shaders/{name}.{ext}"));
     }
     let Some([r, g, b]) = pixel else {

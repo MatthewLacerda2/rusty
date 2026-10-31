@@ -48,7 +48,7 @@ struct Baked(String);
 
 impl Drop for Baked {
     fn drop(&mut self) {
-        for ext in ["wgsl", "params.json"] {
+        for ext in ["wgsl", "params.json", "recipe.json"] {
             let _ = std::fs::remove_file(format!("{DEFAULT_OUT_DIR}/{}.{ext}", self.0));
         }
     }

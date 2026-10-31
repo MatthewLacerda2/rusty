@@ -11,6 +11,9 @@ use crate::api;
 
 use super::manager::ScriptManager;
 
+/// How much of a console line names its Undo step (`Editor.UndoName`).
+const STEP_NAME_CHARS: usize = 60;
+
 impl ScriptManager {
     /// Evaluate ONE line of Lua against the LIVE runtime and return the result as
     /// a display string. This is the single evaluator behind both the in-editor
@@ -34,27 +37,37 @@ impl ScriptManager {
         // A line can change the world, so a recording demo replays it (#1581).
         let line = super::HostCall::Eval(trimmed.to_string());
         self.journal.borrow_mut().push(line);
+        // One line is one Undo step (#1631); hand edits still open become their own.
+        {
+            let mut scene = self.cells.scene.borrow_mut();
+            scene.commit_edits(None);
+            scene.begin_edits();
+        }
         let ctx = self.make_ctx();
-        lua.scope(|scope| -> mlua::Result<String> {
-            api::register(lua, scope, &ctx).map_err(mlua::Error::RuntimeError)?;
+        let result = lua
+            .scope(|scope| -> mlua::Result<String> {
+                api::register(lua, scope, &ctx).map_err(mlua::Error::RuntimeError)?;
 
-            // Try as an expression first so REPL lines echo their value.
-            let values = match lua
-                .load(format!("return {}", trimmed))
-                .eval::<mlua::MultiValue>()
-            {
-                Ok(v) => v,
-                Err(_) => lua.load(trimmed).eval::<mlua::MultiValue>()?,
-            };
+                // Try as an expression first so REPL lines echo their value.
+                let values = match lua
+                    .load(format!("return {}", trimmed))
+                    .eval::<mlua::MultiValue>()
+                {
+                    Ok(v) => v,
+                    Err(_) => lua.load(trimmed).eval::<mlua::MultiValue>()?,
+                };
 
-            let rendered = values
-                .iter()
-                .map(value_to_string)
-                .collect::<Vec<_>>()
-                .join(", ");
-            Ok(rendered)
-        })
-        .map_err(|e| e.to_string())
+                let rendered = values
+                    .iter()
+                    .map(value_to_string)
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                Ok(rendered)
+            })
+            .map_err(|e| e.to_string());
+        let step: String = trimmed.chars().take(STEP_NAME_CHARS).collect();
+        self.cells.scene.borrow_mut().commit_edits(Some(&step));
+        result
     }
 
     /// The live Lua API surface as `namespace → {function names}`.

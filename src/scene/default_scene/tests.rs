@@ -103,7 +103,7 @@ fn seeding_bakes_the_texture_and_shader_once() {
 
     let png = tex.join(format!("{FLOOR}_base_color.png"));
     assert!(png.is_file(), "checker baked");
-    for ext in ["wgsl", "params.json"] {
+    for ext in ["wgsl", "params.json", "recipe.json"] {
         assert!(
             shaders.join(format!("{SHADER_NAME}.{ext}")).is_file(),
             "{ext}"

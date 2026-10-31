@@ -8,11 +8,13 @@ use crate::render::ibl::reflection_probes::{ReflectionProbeUniform, MAX_REFLECTI
 
 mod material;
 mod records;
+mod sky;
 
 pub(crate) use material::{
     DrawUniform, MappingUniform, MaterialData, SurfaceUniform, MATERIAL_DATA_WORDS,
 };
 pub(crate) use records::{RecordTable, RecordWords};
+pub(crate) use sky::ProceduralSkyUniform;
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
@@ -110,6 +112,9 @@ pub(crate) const MAX_DIRECTIONAL_LIGHTS: usize = 4;
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub(crate) struct LightingUniform {
     pub ambient: AmbientLightUniform,
+    // The procedural sky's settings (#1620), right after `ambient` so the sky pass
+    // reads both through a prefix of this struct (`sky_gradient.wgsl`).
+    pub sky: ProceduralSkyUniform,
     pub dir_lights: [DirectionalLightUniform; MAX_DIRECTIONAL_LIGHTS],
     pub num_dir_lights: u32,
     // `sky_textured` (#718) 1.0 when a skybox panorama is bound: the sky cube (#1553)
