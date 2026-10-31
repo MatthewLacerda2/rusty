@@ -46,7 +46,7 @@ fn default_ambient_intensity() -> f32 {
 /// This is deliberately separate from the runtime hecs `World`: hecs does not
 /// serialize a World for free, and we never want GPU buffers in the file. Its
 /// `#[serde(default)]`s let a sparse, hand-written scene omit a block; no older
-/// format is read (CLAUDE.md, *No backward compatibility*).
+/// format is read (CLAUDE.md, *Backward compatibility is not a concern*).
 #[derive(Serialize, Deserialize)]
 pub struct SceneData {
     pub entities: Vec<Entity>,

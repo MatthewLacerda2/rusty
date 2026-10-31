@@ -15,7 +15,7 @@
 //!
 //! A tick no line names had the input and `dt` of the tick before and no host
 //! act; the first tick's `dt` is measured from the fixed step. No
-//! format version (CLAUDE.md, *No backward compatibility*): the header's engine
+//! format version (CLAUDE.md, *Backward compatibility is not a concern*): the header's engine
 //! commit is what a replay checks, and it warns when it differs. A float is
 //! written as a JSON number when that number reads back to the same bits, and as
 //! its bits otherwise ([`Exact`]), so a replay is bit for bit.

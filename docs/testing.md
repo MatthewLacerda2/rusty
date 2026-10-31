@@ -92,8 +92,8 @@ stepped it there. **A scenario on a demo should only observe** (screenshots,
 reads, `Harness.Bench`): a call that changes the world runs on top of the
 recorded acts, and the replay diverges from there.
 The digests are xxh3 (`core::hash::content`) since #1326: a demo recorded
-before that no longer verifies, and is simply recorded again (*No backward
-compatibility*).
+before that no longer verifies, and is simply recorded again (*Backward
+compatibility is not a concern*).
 
 What a demo holds (`dev::demo`, the format in `dev/demo/format.rs`): the scene,
 the engine commit, the seed, the project settings, the save data (`Storage`, the
@@ -714,7 +714,7 @@ file holds. A serde tracer walks `SceneData`'s read side (every field, every enu
 variant, serde aliases included) into `tests/scene_format/scene.fingerprint`, one
 `path: kind` line per place a file can hold a value. A renamed, retyped, added or
 removed field or variant fails the test, which lists the changed lines. Files
-already saved need no migration (CLAUDE.md, *No backward compatibility*): update the
+already saved need no migration (CLAUDE.md, *Backward compatibility is not a concern*): update the
 engine's fixtures and the default scene, say what changed in the PR, then re-bless by
 name: `RUSTY_BLESS_SCENE_FORMAT=1 cargo nextest run -E
 'test(scene_format)'`. What serde hides from the tracer (a `#[serde(flatten)]`
