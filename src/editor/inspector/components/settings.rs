@@ -1,7 +1,8 @@
-//! src/editor/inspector_settings.rs — the Scene Settings inspector panel.
+//! src/editor/inspector/components/settings.rs — the Scene Settings inspector panel.
 //!
 //! Shown when nothing is selected: the project-level scalars (skybox, ambient
-//! light), the scene fog (#437, routed through `authoring::fog` like `Graphics.SetFog*`)
+//! light, routed through `authoring::environment` like `Lighting.Set*`, #1612), the
+//! scene fog (#437, routed through `authoring::fog` like `Graphics.SetFog*`)
 //! plus the **Tags & Layers** surface that renames the shared Layers
 //! registry (#90). Layer 0 is the fixed `"Default"`; slots 1..31 are user-named
 //! and persist with the scene.
@@ -11,6 +12,7 @@ use glam::Vec3;
 
 use crate::editor::theme;
 use crate::editor::EditorUi;
+use crate::scene::authoring::environment as env_ops;
 use crate::scene::authoring::fog as fog_ops;
 use crate::scene::{FogMode, FogSettings, Scene, LAYER_COUNT};
 
@@ -24,8 +26,9 @@ pub fn draw(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene) {
     // 1. Skybox Path
     ui.horizontal(|ui| {
         ui.label("Skybox:");
-        let response = ui.text_edit_singleline(&mut scene.skybox_path);
-        if response.changed() {
+        let mut path = scene.skybox_path.clone();
+        if ui.text_edit_singleline(&mut path).changed() {
+            env_ops::set_skybox(scene, &path);
             editor.is_dirty = true;
         }
     });
@@ -44,7 +47,7 @@ pub fn draw(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene) {
             scene.ambient_color.z,
         ];
         if ui.color_edit_button_rgb(&mut color_arr).changed() {
-            scene.ambient_color = Vec3::new(color_arr[0], color_arr[1], color_arr[2]);
+            env_ops::set_ambient_color(scene, Vec3::from_array(color_arr));
             editor.is_dirty = true;
         }
     });
@@ -52,10 +55,11 @@ pub fn draw(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene) {
 
     // 3. Ambient Light Intensity
     ui.label("Ambient Intensity:");
-    let response = ui.add(
-        crate::editor::widgets::slider(&mut scene.ambient_intensity, 0.0..=5.0).text("intensity"),
-    );
+    let mut intensity = scene.ambient_intensity;
+    let response =
+        ui.add(crate::editor::widgets::slider(&mut intensity, 0.0..=5.0).text("intensity"));
     if response.changed() {
+        env_ops::set_ambient_intensity(scene, intensity);
         editor.is_dirty = true;
     }
     ui.add_space(8.0);
