@@ -2,6 +2,7 @@
 //! blank, and the docked panels are where the editor puts them. A smoke check, not a
 //! golden: fonts and anti-aliasing differ across platforms, so no pixel is pinned.
 
+use rusty::app::ProjectSource;
 use rusty::editor::theme::Theme;
 use rusty::shell::editor::capture::{self, EditorCaptureOptions};
 
@@ -30,7 +31,7 @@ fn panel_share(img: &image::RgbaImage, x0: u32, x1: u32) -> f32 {
 #[test]
 fn the_default_scene_captures_with_its_panels() {
     let out = crate::temp::dir().join("editor.png");
-    let game = capture::default_world();
+    let game = capture::default_world(ProjectSource::defaults());
     let opts = EditorCaptureOptions {
         width: W,
         height: H,
@@ -74,7 +75,7 @@ fn the_default_scene_captures_with_its_panels() {
 
 #[test]
 fn an_unknown_selection_is_an_error_not_a_blank_inspector() {
-    let game = capture::default_world();
+    let game = capture::default_world(ProjectSource::defaults());
     let opts = EditorCaptureOptions {
         select: Some("NoSuchEntity".to_string()),
         ..Default::default()
@@ -96,7 +97,7 @@ fn selecting_a_scene_asset_opens_its_inspector_card() {
     let dir = crate::temp::dir();
     let asset = dir.join("level.scene");
     std::fs::write(&asset, "{}").expect("write the asset");
-    let game = capture::default_world();
+    let game = capture::default_world(ProjectSource::defaults());
     let mut host = rusty::dev::capture::CaptureHost::new();
     let mut shot = |name: &str, select_asset: Option<String>| {
         let out = dir.join(name);
@@ -124,7 +125,7 @@ fn selecting_a_scene_asset_opens_its_inspector_card() {
 
 #[test]
 fn a_missing_asset_or_a_double_selection_is_an_error() {
-    let game = capture::default_world();
+    let game = capture::default_world(ProjectSource::defaults());
     let out = crate::temp::dir().join("x.png");
     let missing = EditorCaptureOptions {
         select_asset: Some("no/such.scene".to_string()),

@@ -8,7 +8,7 @@
 
 use super::frame::Host;
 use super::{boot, Frontend, Launch, Shell};
-use crate::app::GameWorld;
+use crate::app::{GameWorld, ProjectSource};
 use crate::core::application::{BuildSettings, WindowMode};
 use crate::core::project::{Access, ProjectSettings};
 use crate::core::settings::video::VideoSettings;
@@ -84,6 +84,16 @@ pub fn video_defaults(build: &BuildSettings) -> VideoSettings {
     }
 }
 
+/// The player's world on `plan`'s scene: the project's settings taken unbound (a
+/// shipped game reads them but never rewrites them; the graphics defaults are what
+/// a first launch's options fall back to, #1438), then Play entered for good.
+fn world(plan: &crate::core::project::BootPlan, settings: ProjectSettings) -> GameWorld {
+    let mut game = boot::load_game(plan);
+    game.open_project(ProjectSource::ReadOnly(settings));
+    game.boot_standalone();
+    game
+}
+
 /// Boot the standalone player on the open project's settings
 /// (`core::project::Opened`) and run until the game quits or the window closes.
 pub fn launch(settings: ProjectSettings) {
@@ -100,11 +110,7 @@ pub fn launch(settings: ProjectSettings) {
         eprintln!("[Player] cannot start: {err}");
         std::process::exit(1);
     });
-    let mut game = boot::load_game(&plan);
-    // Unbound: a shipped game reads its settings but never rewrites them. The
-    // graphics defaults are what a first launch's options fall back to (#1438).
-    game.resources.application.borrow_mut().run_with(settings);
-    game.boot_standalone();
+    let game = world(&plan, settings);
 
     let launch = Launch {
         video_defaults: video_defaults(&build),
@@ -120,6 +126,14 @@ pub fn launch(settings: ProjectSettings) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_player_world_runs_the_projects_settings() {
+        use crate::app::project_tests::{assert_runs_the_fixture, FIXTURE};
+        let file = crate::core::project::ProjectFile::from_json(FIXTURE).unwrap();
+        let game = world(&crate::core::project::BootPlan::default(), file.into());
+        assert_runs_the_fixture(&game);
+    }
 
     #[test]
     fn first_launch_follows_the_build_window_mode() {

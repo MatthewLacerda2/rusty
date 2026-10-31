@@ -16,7 +16,9 @@
 
 mod boot;
 
-pub use boot::load_boot_scene;
+#[cfg(test)]
+pub(crate) use boot::project_tests;
+pub use boot::{load_boot_scene, ProjectSource};
 
 use crate::physics::PhysicsWorld;
 
