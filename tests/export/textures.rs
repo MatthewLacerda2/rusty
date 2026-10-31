@@ -23,12 +23,22 @@ fn an_images_compressed_copy_ships_and_the_player_writes_none() {
     );
     let (ran, _) = play(&out, &[]);
     assert!(ran.status.success());
-    // The player's first launch seeds the starter content (an image among it);
-    // it compresses none of it, and leaves the shipped copy as it was.
+    // The export seeds the starter content (an image among it) and ships its
+    // compressed copy too (#1653); the player makes none and changes none.
     let after = tree(&out);
-    assert_eq!(after.get(&cached), shipped.get(&cached));
-    let made: Vec<_> = after.keys().filter(|k| k.ends_with(".bctex")).collect();
-    assert_eq!(made, [&cached], "the player compressed nothing");
+    let compressed = |t: &std::collections::BTreeMap<String, Vec<u8>>| -> Vec<(String, Vec<u8>)> {
+        let copies = t.iter().filter(|(k, _)| k.ends_with(".bctex"));
+        copies.map(|(k, b)| (k.clone(), b.clone())).collect()
+    };
+    assert!(
+        compressed(&shipped).len() > 1,
+        "the seeded image ships compressed"
+    );
+    assert_eq!(
+        compressed(&after),
+        compressed(&shipped),
+        "the player compressed nothing"
+    );
 }
 
 #[test]
