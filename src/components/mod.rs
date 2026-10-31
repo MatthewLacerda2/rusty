@@ -55,7 +55,7 @@ pub use particle::{
 pub use physics::character_controller::CharacterControllerComponent;
 pub use physics::collider::{
     capsule_dims, CapsuleAxis, ColliderComponent, ColliderShape, CombineMode, PhysicsMaterial,
-    ScaledShape,
+    ScaledShape, SharedMesh,
 };
 pub use physics::joint::{JointComponent, JointKind};
 pub use physics::rigidbody::{CollisionDetection, RigidBodyComponent};

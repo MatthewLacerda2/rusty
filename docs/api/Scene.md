@@ -98,11 +98,17 @@ case-insensitive: `Mesh` (aliases `MeshFilter`, `MeshRenderer`), `Light`, `Anima
 Each is added with the inspector's default values; adding an
 existing kind replaces it. An unknown kind is an error that lists the kinds.
 `Mesh` is Unity's Mesh Filter and Mesh Renderer in one: adding it attaches the
-toolbar's `Box`, and removing it keeps the entity, its id and its `Collider`, so
+toolbar's `Box`, and, as adding an existing kind replaces it, adding it to an
+entity that already has a mesh replaces that mesh with the `Box`, an imported or
+skinned one included. Removing it keeps the entity, its id and its `Collider`, so
 a blockout box can stay an invisible collider (Unity's
-`Destroy(GetComponent<MeshRenderer>())`). As in Unity, where a renderer holds its
-materials, removing the `Mesh` drops the entity's `Material` reference too (the
-library asset stays). (Scripts attach by path, not as a defaulted kind: see
+`Destroy(GetComponent<MeshRenderer>())`). A `Mesh`-shaped collider (the one an
+imported model gets) keeps the removed mesh as its own, Unity's
+`MeshCollider.sharedMesh`: the entity still collides and still reaches the navmesh,
+and the scene saves the mesh's reference on the collider (`shared_mesh`) and
+rebuilds it on load. Adding a `Mesh` back drops that copy, and the collider follows
+the new mesh. As in Unity, where a renderer holds its materials, removing the
+`Mesh` drops the entity's `Material` reference too (the library asset stays). (Scripts attach by path, not as a defaulted kind: see
 `AddScript`.)
 
 **`AddScript(id, path, [fields])`** is the Add Component menu's script entries:

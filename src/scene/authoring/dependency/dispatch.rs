@@ -68,8 +68,16 @@ pub fn has_kind(world: &World, id: u32, kind: ComponentKind) -> bool {
 pub(crate) fn set_default(world: &mut World, id: u32, kind: ComponentKind) -> bool {
     match kind {
         // Unity's empty Mesh Filter draws nothing; rusty's Mesh is the Filter and
-        // Renderer in one, so it arrives as the menu's default Box.
-        ComponentKind::Mesh => world.set_mesh(id, primitive_mesh_component(Primitive::Box)),
+        // Renderer in one, so it arrives as the menu's default Box. A Mesh-shaped
+        // collider follows the entity's Mesh again, so its shared mesh goes (#1657).
+        ComponentKind::Mesh => {
+            if let Some(mut collider) = world.collider_mut(id) {
+                if collider.shared_mesh.is_some() {
+                    collider.shared_mesh = None;
+                }
+            }
+            world.set_mesh(id, primitive_mesh_component(Primitive::Box))
+        }
         ComponentKind::Light => world.set_light(id, Some(default_light())),
         ComponentKind::Animator => world.set_animator(id, Some(default_animator())),
         ComponentKind::Collider => world.set_collider(id, Some(default_collider())),

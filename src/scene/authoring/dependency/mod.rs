@@ -24,13 +24,15 @@
 //! through here — `set_default`'s Material arm exists only for completeness and stages
 //! the default asset the same way the editor Add menu does. Removing a Mesh also
 //! drops the Material reference ([`remove_with_cascade`], #1657): in Unity the
-//! materials live on the renderer.
+//! materials live on the renderer. A Mesh-shaped collider keeps the removed Mesh as
+//! its `shared_mesh`, and adding a Mesh clears it again ([`set_default`]).
 
 mod dispatch;
 
 pub use dispatch::has_kind;
 pub(crate) use dispatch::{clear_one, set_default};
 
+use crate::components::{ColliderShape, SharedMesh};
 use crate::ecs::World;
 use crate::scene::authoring::components::ComponentKind;
 
@@ -70,10 +72,25 @@ pub fn remove_with_cascade(world: &mut World, id: u32, kind: ComponentKind) -> b
     // material reference too (#1657). Not a `requires`, which would also make adding
     // a Material add a Mesh. The library asset stays, as the Material card's remove
     // leaves it.
+    // A Mesh-shaped collider keeps the removed Mesh as its own shared mesh, so the
+    // entity stays in collision and the navmesh (Unity's `MeshCollider.sharedMesh`).
     if kind == ComponentKind::Mesh {
         clear_one(world, id, ComponentKind::Texture);
+        keep_collider_mesh(world, id);
     }
     clear_one(world, id, kind)
+}
+
+/// Hand entity `id`'s Mesh to its Mesh-shaped collider, if it has both (#1657).
+fn keep_collider_mesh(world: &mut World, id: u32) {
+    let Some(shared) = world.mesh(id).map(|m| SharedMesh::of(&m)) else {
+        return;
+    };
+    if let Some(mut collider) = world.collider_mut(id) {
+        if matches!(collider.shape, ColliderShape::Mesh { .. }) {
+            collider.shared_mesh = Some(shared);
+        }
+    }
 }
 
 /// Drop any component on `id` whose declared requirements are unmet, repeating until

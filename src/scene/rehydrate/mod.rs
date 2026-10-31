@@ -143,6 +143,8 @@ fn rehydrate_one(mesh: &crate::scene::MeshComponent) -> RehydratedMesh {
 /// are never stored on disk, only rebuilt here.
 /// A mesh collider's saved box is refit to the rebuilt mesh, so an import setting
 /// changed since the save (the Scale Factor, #1398) reaches it.
+/// A Mesh-shaped collider's shared mesh (#1657) is rebuilt the same way when the
+/// entity has no Mesh of its own.
 pub fn rehydrate_entity_mesh(entity: &mut Entity) {
     if let Some(mesh) = &mut entity.mesh {
         if let Some(warning) = crate::scene::authoring::rendering::mesh::hold_subdivisions(mesh) {
@@ -150,14 +152,32 @@ pub fn rehydrate_entity_mesh(entity: &mut Entity) {
         }
         let rebuilt = rehydrate_one(mesh);
         install(mesh, rebuilt);
-        let positions = mesh.vertices.iter().map(|v| Vec3::from_array(v.position));
-        let bounds = positions.fold(None, |b: Option<(Vec3, Vec3)>, p| {
-            Some(b.map_or((p, p), |(lo, hi)| (lo.min(p), hi.max(p))))
-        });
+        let bounds = bounds_of(mesh.vertices.iter().map(|v| v.position));
         if let (Some(bounds), Some(collider)) = (bounds, &mut entity.collider) {
             reimport::refit(collider, bounds);
         }
+        return;
     }
+    let Some(collider) = &mut entity.collider else {
+        return;
+    };
+    let Some(shared) = &mut collider.shared_mesh else {
+        return;
+    };
+    let mut mesh = shared.reference();
+    let rebuilt = rehydrate_one(&mesh);
+    install(&mut mesh, rebuilt);
+    shared.take_geometry(&mesh);
+    if let Some(bounds) = bounds_of(shared.positions.iter().copied()) {
+        reimport::refit(collider, bounds);
+    }
+}
+
+/// The box around `positions`, or `None` for none.
+fn bounds_of(positions: impl Iterator<Item = [f32; 3]>) -> Option<(Vec3, Vec3)> {
+    positions.map(Vec3::from_array).fold(None, |b, p| {
+        Some(b.map_or((p, p), |(lo, hi): (Vec3, Vec3)| (lo.min(p), hi.max(p))))
+    })
 }
 
 /// Put `rebuilt`'s geometry and rig on `mesh`, unbound from any bones: a fresh

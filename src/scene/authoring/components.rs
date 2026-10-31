@@ -9,6 +9,7 @@
 
 use crate::scene::authoring::defaults::attach_default_material;
 use crate::scene::authoring::dependency;
+use crate::scene::authoring::fields::KINDS;
 use crate::scene::Scene;
 
 /// Declares `ComponentKind` and `ComponentKind::ALL` from one list, so a new kind is
@@ -147,11 +148,16 @@ impl ComponentKind {
     }
 
     /// [`parse`](Self::parse), with an unknown name an error that lists every kind
-    /// (by the name `parse` takes first): the message `Scene.AddComponent` and
+    /// by the name `Component.*` gives it (`Material`, `AudioSource`, `LODGroup`), so
+    /// the two errors list the same names: the message `Scene.AddComponent` and
     /// `Scene.RemoveComponent` raise.
     pub fn parse_or_list(name: &str) -> Result<Self, String> {
         Self::parse(name).ok_or_else(|| {
-            let kinds: Vec<String> = Self::ALL.iter().map(|k| format!("{k:?}")).collect();
+            let kinds: Vec<&str> = KINDS
+                .iter()
+                .filter(|k| k.add.is_some())
+                .map(|k| k.name)
+                .collect();
             format!("unknown component '{name}' (kinds: {})", kinds.join(", "))
         })
     }
@@ -244,7 +250,17 @@ mod tests {
     fn an_unknown_kind_lists_the_kinds() {
         let err = ComponentKind::parse_or_list("Meshh").unwrap_err();
         assert!(err.starts_with("unknown component 'Meshh' (kinds: Mesh, Light,"));
-        assert!(err.contains("Texture") && err.ends_with("Shape)"), "{err}");
+        let listed = err.split("(kinds: ").nth(1).unwrap().trim_end_matches(')');
+        // The names Component.* uses, each one AddComponent takes, every kind once.
+        assert!(
+            listed.contains("Material, ") && !listed.contains("Texture"),
+            "{err}"
+        );
+        let parsed: Vec<_> = listed
+            .split(", ")
+            .filter_map(ComponentKind::parse)
+            .collect();
+        assert_eq!(parsed.len(), ComponentKind::ALL.len(), "{err}");
         assert_eq!(
             ComponentKind::parse_or_list("MeshRenderer"),
             Ok(ComponentKind::Mesh)
