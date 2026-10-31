@@ -68,15 +68,12 @@ fn follow_bones_moves_a_hitbox_with_its_bone() {
     let hips = scene.world.parent_id(spine).unwrap();
     scene.world.transform_mut(hips).unwrap().rotation = Quat::from_rotation_z(1.0);
     let handle = physics.id_to_collider[&hitboxes[0]];
-    let stale = Vec3::from(physics.colliders[handle].position().translation);
+    let stale = physics.colliders[handle].position().translation;
     let want = scene.world.world_pose(hitboxes[0]).unwrap().pos;
     assert!((stale - want).length() > 0.1, "the swing moved the hitbox");
     physics.follow_bones(&scene);
     let at = physics.colliders[handle].position().translation;
-    assert!(
-        (Vec3::from(at) - want).length() < 1e-5,
-        "{at:?} vs {want:?}"
-    );
+    assert!((at - want).length() < 1e-5, "{at:?} vs {want:?}");
 }
 
 #[test]
