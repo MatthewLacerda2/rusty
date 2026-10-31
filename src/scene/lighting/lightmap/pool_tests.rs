@@ -6,6 +6,7 @@ use glam::Vec3;
 
 use super::bake::bake_on;
 use super::bake::pool::{run, BATCH};
+use super::raster::{lightmap_size, rasterize};
 use super::tests::{floor, quad, settings, sun, wall};
 use super::*;
 
@@ -18,8 +19,6 @@ fn charts() -> Vec<Vec<usize>> {
 }
 
 fn pooled(threads: usize, progress: &BakeProgress) -> Option<Vec<(usize, Vec<usize>)>> {
-    let charts = charts();
-    let slices: Vec<&[usize]> = charts.iter().map(Vec::as_slice).collect();
     let trace = |c: usize, first: usize, items: &[usize]| {
         assert!(items.len() <= BATCH);
         let at = |(k, &item): (usize, &usize)| {
@@ -28,7 +27,11 @@ fn pooled(threads: usize, progress: &BakeProgress) -> Option<Vec<(usize, Vec<usi
         };
         items.iter().enumerate().map(at).collect()
     };
-    run(&slices, threads, progress, trace, |c, out| (c, out))
+    let finish = |c: usize, items: Vec<usize>, out: Vec<usize>| {
+        assert_eq!(items, charts()[c], "a chart's own items come back to it");
+        (c, out)
+    };
+    run(charts(), threads, progress, trace, finish)
 }
 
 #[test]
@@ -51,7 +54,8 @@ fn results_keep_chart_and_item_order_on_any_thread_count() {
 
 #[test]
 fn no_charts_is_an_empty_result_and_a_cancel_is_none() {
-    let none = run::<u8, u8, u8>(&[], 4, &BakeProgress::default(), |_, _, _| vec![], |_, _| 0);
+    let nothing = BakeProgress::default();
+    let none = run::<u8, u8, u8>(vec![], 4, &nothing, |_, _, _| vec![], |_, _, _| 0);
     assert_eq!(none, Some(vec![]));
     let progress = BakeProgress::default();
     progress.cancel();
@@ -74,10 +78,23 @@ fn a_bake_is_byte_identical_on_one_worker_or_many() {
         lights: vec![sun(true)],
         sky: Vec3::new(0.3, 0.4, 0.5),
     };
+    // Dense enough that the floor and wall span several batches, the last partial.
     let s = BakeSettings {
+        texels_per_unit: 5.0,
+        max_resolution: 32,
+        samples: 8,
         filter_radius: 2,
         ..settings()
     };
+    let texels = rasterize(
+        &scene.meshes[0],
+        lightmap_size(&scene.meshes[0], 5.0, 32).unwrap(),
+    );
+    assert!(
+        texels.len() > 2 * BATCH && texels.len() % BATCH != 0,
+        "{}",
+        texels.len()
+    );
     let on = |threads| bake_on(&scene, &s, &BakeProgress::default(), threads);
     let one = on(1).expect("not cancelled");
     assert_eq!(one.len(), 14);

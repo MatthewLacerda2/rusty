@@ -147,9 +147,12 @@ pub(super) fn bake_on(
         })
         .collect();
     progress.set_total(charts.iter().map(|(_, _, p)| p.len() as u64).sum());
-    let points: Vec<&[TexelPoint]> = charts.iter().map(|(_, _, p)| p.as_slice()).collect();
+    let (heads, points): (Vec<(usize, u32)>, Vec<Vec<TexelPoint>>) = charts
+        .into_iter()
+        .map(|(i, size, p)| ((i, size), p))
+        .unzip();
     let trace = |c: usize, _: usize, batch: &[TexelPoint]| {
-        let mesh = charts[c].0 as u64;
+        let mesh = heads[c].0 as u64;
         let one = |p: &TexelPoint| {
             let mut rng = Rng::new(settings.seed, mesh, p.index as u64);
             let s = settings;
@@ -157,11 +160,12 @@ pub(super) fn bake_on(
         };
         batch.iter().map(one).collect()
     };
-    let finish = |c: usize, light: Vec<TexelLight>| {
-        let (index, size, ref points) = charts[c];
+    // The pool hands each chart its points back once traced, so they die with it.
+    let finish = |c: usize, points: Vec<TexelPoint>, light: Vec<TexelLight>| {
+        let (index, size) = heads[c];
         lightmap(scene, index, size, points, light, settings)
     };
-    pool::run(&points, threads, progress, trace, finish)
+    pool::run(points, threads, progress, trace, finish)
 }
 
 /// One mesh's lightmap from its traced texels.
@@ -169,15 +173,14 @@ fn lightmap(
     scene: &BakeScene,
     index: usize,
     size: u32,
-    points: &[TexelPoint],
+    points: Vec<TexelPoint>,
     light: Vec<TexelLight>,
     settings: &BakeSettings,
 ) -> Lightmap {
     let mesh = &scene.meshes[index];
     // Texels inside other geometry are dropped here and filled by dilation below.
     let (points, light): (Vec<TexelPoint>, Vec<TexelLight>) = points
-        .iter()
-        .copied()
+        .into_iter()
         .zip(light)
         .filter(|(_, l)| l.valid)
         .unzip();
