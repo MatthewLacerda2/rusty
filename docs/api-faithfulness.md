@@ -52,13 +52,13 @@ per-module unit tests (e.g. `api/light.rs`) are the pattern.
 
 | Setter | Status | Read-site |
 |---|---|---|
-| `SetMetallic` | ✅ | renderer — `draw_resources::solid_entity_uniform` packs `metallic` into `EntityUniform`; `shader.wgsl` PBR uses it |
+| `SetMetallic` | ✅ | renderer — `draw::uniforms::material_data` packs `metallic` into the draw's `MaterialData` record; `shader.wgsl` PBR uses it |
 | `SetRoughness` | ✅ | renderer — same path, `roughness` uniform |
-| `SetColor` | ✅ | renderer — writes `base_color` through `authoring::material::set_base_color`, the inspector's op; `draw::uniforms::solid_entity_uniform` packs it as `EntityUniform.color_tint`, and `shader.wgsl` multiplies the albedo by it (#1368) |
+| `SetColor` | ✅ | renderer — writes `base_color` through `authoring::material::set_base_color`, the inspector's op; `draw::uniforms::material_data` packs it as `MaterialData.color_tint`, and `shader.wgsl` multiplies the albedo by it (#1368) |
 | `SetTexture` | ✅ | renderer — `draw::upload_scene_assets` calls `load_texture(path)` for every active entity **each frame**, and `draw_resources::build_solid_resource` binds `gpu_textures[path]`. A runtime path change loads + binds next frame. (This is the issue's "canonical no-op"; it is **wired** in the current renderer.) Round-trips. |
 | `SetMetallicMap` | ✅ | renderer — `draw::upload_scene_assets` loads the map, `draw_resources::build_solid_resource` assembles the per-entity group(2) material bind group, and `shader.wgsl` samples `t_metallic` (`.b` channel) × the metallic scalar (#202, closed #184) |
 | `SetRoughnessMap` | ✅ | renderer — same path; `shader.wgsl` samples `t_roughness` (`.g` channel) × the roughness scalar (#202, closed #184) |
-| `SetEmissive` | ✅ | renderer — `draw_resources::solid_entity_uniform` packs `emissive` into `EntityUniform`; `shader.wgsl` adds it after lighting (blooms when >1.0) (#222) |
+| `SetEmissive` | ✅ | renderer — `draw::uniforms::material_data` packs `emissive` into the draw's `MaterialData` record; `shader.wgsl` adds it after lighting (blooms when >1.0) (#222) |
 | `SetNormalMap` | ✅ | renderer — `draw::upload_scene_assets` loads the map, `build_solid_resource` binds `t_normal` to the group(2) material bind group, and `shader.wgsl` perturbs the shading normal in tangent space (per-vertex tangents + TBN) (#207) |
 | `SetEmissiveMap` | ✅ | renderer — same upload/bind path; `shader.wgsl` samples `t_emissive` and modulates the emissive factor (`factor × map.rgb`) (#207) |
 | `DefineAsset` | ✅ | renderer + round-trip (#271) — writes a `MaterialAsset` into `scene.materials` under a chosen name; an entity referencing that name via its `MaterialComponent` is sampled by the renderer through the SAME per-entity material path as every row above (`draw_resources::build_solid_resource` + `shader.wgsl`). The asset is part of `SceneData` (`materials` map), so it survives save→load. Proven by `tests/material_authoring.rs` (round-trip; entity-uses-asset; clamps/unknown-mode degrade; packed map slots) |
@@ -556,7 +556,7 @@ The full glTF-PBR map surface is now **faithful**. `Material.SetMetallicMap` /
 `shader.wgsl` sampling of `t_metallic`/`t_roughness`), closing the **#184** gap; the
 issue's "canonical no-op" — `Material.SetTexture` — was already faithful
 (`upload_scene_assets` lazily loads any texture path each frame). The flat **emissive
-factor** (`SetEmissive`) was wired by #222 through the `EntityUniform` slot and the
+factor** (`SetEmissive`) was wired by #222 through the per-draw uniform (since #1616 the `MaterialData` record) and the
 `fs_main` add-after-lighting term (glows, and blooms when >1.0 via the HDR target).
 **#207** closed the last two map no-ops: `SetNormalMap` now perturbs the shading
 normal in tangent space (a `tangent` vertex attribute — read from the glTF `TANGENT`

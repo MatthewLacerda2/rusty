@@ -6,9 +6,8 @@ use crate::render::{InstanceData, MeshId};
 /// An item of mesh `mesh`, palette `bone_base`, tint `tint`, tagged by `tag` in its
 /// instance's translation so a test can read back the order instances were packed in.
 pub(super) fn item(mesh: &str, bone_base: u32, tint: f32, tag: f32) -> DrawItem {
-    let mut uniform = [0u32; crate::render::gpu::uniforms::ENTITY_UNIFORM_WORDS];
-    uniform[16] = tint.to_bits();
-    uniform[34] = bone_base;
+    let mut record = [0u32; crate::render::gpu::uniforms::MATERIAL_DATA_WORDS];
+    record[0] = tint.to_bits();
     let mut instance = InstanceData::IDENTITY;
     instance.model_matrix[12] = tag;
     DrawItem {
@@ -17,7 +16,8 @@ pub(super) fn item(mesh: &str, bone_base: u32, tint: f32, tag: f32) -> DrawItem 
             mesh: MeshId(mesh.to_string()),
             indices: (0..36).into(),
             material: 0,
-            uniform,
+            record,
+            bone_base,
         },
         instance,
         depth: 0.0,
@@ -64,7 +64,12 @@ fn a_different_uniform_or_skinned_palette_splits_the_batch() {
     );
     let slots: Vec<u32> = draws.opaque.iter().map(|b| b.uniform_slot).collect();
     assert_eq!(slots, [0, 1, 2, 3]);
-    assert_eq!(draws.uniforms().len(), 4);
+    let (uniforms, records) = draws.pack();
+    assert_eq!(uniforms.len(), 4);
+    assert_eq!(records.len(), 2, "the three tint-1 draws share one record");
+    let named: Vec<_> = uniforms.iter().map(|u| (u.material, u.bone_base)).collect();
+    assert_eq!(named, [(0, 0), (1, 0), (1, 1), (1, 2)]);
+    assert_eq!(records[0].color_tint[0], 0.5);
 }
 
 #[test]

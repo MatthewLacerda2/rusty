@@ -5,7 +5,11 @@ scene has, in order, with the scene's own settings, and the result **written** �
 separate save. It bakes the lightmaps (`Lighting.BakeLightmaps`, below), then the light
 and reflection probes (`Lighting.Bake`), so walls and actors are always lit by the same
 bake. The editor's **"Generate Lighting"** button (the scene inspector) is this exact
-path. The two individual verbs stay for a script that wants only one of them.
+path. The call returns when the bake is done (Unity's `Lightmapping.Bake`); the button
+bakes the same probes a step a frame — one reflection probe or a few light probes —
+so the editor and the MCP keep answering (Unity's `BakeAsync`, #1602). Both say each
+bounce pass and reflection probe in the console (`Baking reflection probe 3 of 12`).
+The two individual verbs stay for a script that wants only one of them.
 
 | Function | Signature | Returns |
 |---|---|---|
@@ -47,8 +51,20 @@ path. The two individual verbs stay for a script that wants only one of them.
   `Lighting.Bake` does.
 - **In the editor** the lightmap step runs in the background (#808) with a progress
   bar and **Cancel**; a cancelled run writes nothing and keeps the old lighting. When
-  the lightmaps land, the probe step and the write follow on the same frame, and the
-  console logs one summary line.
+  the lightmaps land they are applied (the probes are captured under them), then the
+  probe step runs a step a frame and the console logs one summary line at the end.
+- **The probes bake from a snapshot and apply at the end** (Unity's shape, #1602): the
+  light and reflection probes are copied when the probe step starts, and their SH and
+  cubemaps are applied in one step when it finishes. Adding, removing or moving a probe
+  (or changing a reflection probe's resolution, clip planes or shadows) while it runs
+  drops the bake with a console line: the probes keep their old lighting and the
+  already-applied lightmaps are kept, with the scene marked unsaved; a probe step that
+  fails for another reason (a cubemap that cannot be written) marks it unsaved too.
+  Saving this one elsewhere drops it the same way; opening another scene drops it with
+  nothing applied to the new one.
+- **One bake at a time:** `Lighting.Generate()`, `Lighting.Bake()`,
+  `Lighting.BakeLightmaps()`, `Probe.Bake()` and `Reflection.Bake()` error while the
+  editor's Generate Lighting is running.
 
 ### Light and reflection probes
 

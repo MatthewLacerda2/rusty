@@ -41,9 +41,9 @@ use crate::render::lod::LodSelection;
 use crate::render::{Frustum, GpuMesh, MeshId};
 use crate::scene::Scene;
 pub(super) use buffer::CasterBuffer;
-use buffer::CasterData;
+use buffer::{CasterData, CasterRecords, CasterUpload};
 use glam::Mat4;
-use runs::join_alike;
+use runs::{batch_casters, join_alike};
 pub(super) use sweep::Sweep;
 
 /// What a run of casters shares: its facing (mirrored, #1134, or two-sided, #1571),
@@ -60,10 +60,13 @@ pub(super) struct CasterKey {
     pub indices: IndexRun,
 }
 
-/// One instanced depth draw: `instances` of `key`'s mesh, its index run each.
+/// One instanced depth draw: `instances` of `key`'s mesh, its index run each, and
+/// the sweep's material record its clip reads (#1616; the flat one for a draw that
+/// reads none).
 pub(super) struct CasterBatch {
     key: CasterKey,
     instances: Range<u32>,
+    record: u32,
 }
 
 impl CasterBatch {
@@ -71,34 +74,6 @@ impl CasterBatch {
     pub(super) fn counts(&self) -> (u32, u32) {
         (self.key.indices.len(), self.instances.len() as u32)
     }
-}
-
-/// Group `casters` into instanced runs of one key, returning the packed casters (in
-/// draw order) and the batches. Sorted by key — by facing, and within each plain
-/// casters first, so the clipping pipelines bind last — and stable, so scene order
-/// holds within a run; depth writes make the order between runs irrelevant. With `instancing` off, one draw per caster
-/// in scene order (the pre-#470 path, for comparison).
-pub(super) fn batch_casters(
-    mut casters: Vec<(CasterKey, CasterData)>,
-    instancing: bool,
-) -> (Vec<CasterData>, Vec<CasterBatch>) {
-    if instancing {
-        casters.sort_by(|a, b| a.0.cmp(&b.0));
-    }
-    let mut matrices = Vec::with_capacity(casters.len());
-    let mut batches: Vec<CasterBatch> = Vec::new();
-    for (key, caster) in casters {
-        let index = matrices.len() as u32;
-        matrices.push(caster);
-        match batches.last_mut() {
-            Some(run) if instancing && run.key == key => run.instances.end = index + 1,
-            _ => batches.push(CasterBatch {
-                key,
-                instances: index..index + 1,
-            }),
-        }
-    }
-    (matrices, batches)
 }
 
 /// What one depth sweep needs from the renderer.
@@ -156,6 +131,11 @@ impl ShadowRenderer {
             self.drawn.extend(batches.iter().map(CasterBatch::counts));
             per_volume.push(batches);
         }
+        // Indexed once every volume is batched: the records sort by their words.
+        let records = CasterRecords::new(per_volume.iter().flatten().map(|b| b.key.clip.as_ref()));
+        for batch in per_volume.iter_mut().flatten() {
+            batch.record = records.index(batch.key.clip.as_ref());
+        }
         let buffer = match sweep {
             Sweep::Static => &mut self.static_casters,
             Sweep::Dynamic => &mut self.dynamic_casters,
@@ -163,7 +143,12 @@ impl ShadowRenderer {
             Sweep::AtlasDynamic => &mut self.atlas.dynamic_casters,
         };
         let layout = &self.entity_layout;
-        buffer.upload(frame.device, frame.queue, layout, &matrices, &joints);
+        let sweep = CasterUpload {
+            casters: &matrices,
+            joints: &joints,
+            records: &records,
+        };
+        buffer.upload(frame.device, frame.queue, layout, sweep);
         per_volume
     }
 
@@ -251,8 +236,7 @@ impl ShadowRenderer {
         };
         let offset = (volume as u64 * super::LIGHT_SPACE_STRIDE) as u32;
         render_pass.set_bind_group(0, global, &[offset]);
-        render_pass.set_bind_group(1, &casters.bind_group, &[]);
-        let mut bound = None;
+        let (mut bound, mut record) = (None, None);
         for batch in batches {
             let Some(gpu_mesh) = frame.gpu_meshes.get(&batch.key.mesh) else {
                 continue;
@@ -262,6 +246,11 @@ impl ShadowRenderer {
             if bound != Some(wanted) {
                 render_pass.set_pipeline(self.pipeline_for(frame.surfaces, clip, facing));
                 bound = Some(wanted);
+            }
+            if record != Some(batch.record) {
+                let offsets = CasterBuffer::offsets(batch.record);
+                render_pass.set_bind_group(1, &casters.bind_group, &offsets);
+                record = Some(batch.record);
             }
             if let Some(clip) = clip {
                 render_pass.set_bind_group(2, frame.materials.group(clip.material), &[]);
@@ -284,5 +273,7 @@ struct Candidate {
 
 #[cfg(test)]
 mod layout_tests;
+#[cfg(test)]
+mod material_tests;
 #[cfg(test)]
 mod tests;
